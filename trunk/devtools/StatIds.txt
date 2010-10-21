@@ -1,0 +1,46 @@
+Ids of Stats
+
+0x00000001 = Max Health (value * 100)
+0x0000001b = Health (value * 100)
+0x00000033 = current PVP Exp (value)
+0x00000034 = current Exp (value)
+0x00000036 = Level (value)
+0x00000039 = Exp Offset (value)
+0x0000003d = Coins lower Part(CoinsValue & 0x00000000ffffffff)
+0x00000046 = PvP Level (value)
+0x000000f3 = Skillpoints (value)
+0x0000014b = Coins higher Part(CoinsValue & 0xffffffff00000000)
+0x0000015e = MaxExp (value)
+0x00000161 = PVP Max Exp (value)
+0x00000163 = PVP Exp Offset (value)
+0x000001f8 = Stamina (value * 100)
+0x000001f9 = Max Stamina (value * 100)
+0x000001fa = Mana (value * 100)
+0x000001fb = Max Mana (value * 100)
+
+0x00000292 = Death PVP(value)
+0x00000290 = Killing Blows PVP(value)
+0x0000029a = Annihilation Win PVP(value)
+0x0000029b = Annihilation Lose PVP(value)
+0x0000029c = Capture the Skull Win PVP(value)
+0x0000029d = Capture the Skull Lose PVP(value)
+0x0000029e = Siege Win PVP(value)
+0x0000029f = Siege Lose PVP(value)
+
+0x00000324 = strength (20 = 2points)
+0x00000326 = Constitution (20 = 2points)
+0x00000328 = inteligence (20 = 2points)
+0x0000032a = wisdom (20 = 2points)
+0x0000032e = Dexterity (20 = 2points)
+
+0x00000449 = Murder Points PVP(value * 100)
+
+
+
+UPDATE 27 . 02 . 2010 - 09:51
+
+      47 = HairType
+      64 = Headmesh
+      67 = Change Class
+      89 = Change Race
+

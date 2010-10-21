@@ -1,0 +1,26 @@
+mysqlAccount = "root"
+mysqlPassword = "toor"
+mysqlAddress = "127.0.0.1"
+mysqlPort = 3306
+mysqlDatabase = "faolan"
+
+universeAgentPort = 7000
+
+playerAgentIPAddress = "127.0.0.1"
+playerAgentPort = 7001
+
+csPlayerAgentIPAddress = "127.0.0.1"
+csPlayerAgentPort = 7002
+
+agentServerIPAddress = "127.0.0.1"
+agentServerPort = 7003
+
+worldServerIPAddress = "127.0.0.1"
+worldServerPort = 7004
+
+realmName = "Project Faolan Realm"
+
+characterSlots = 4
+clientVersion = ""
+
+playIntro = false
