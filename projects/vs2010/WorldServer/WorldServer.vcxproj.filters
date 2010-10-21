@@ -1,0 +1,95 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Source Files\Handlers">
+      <UniqueIdentifier>{19a62304-7cab-4f3b-8cf1-0e4ee3a97288}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\ServerHandlers">
+      <UniqueIdentifier>{ac1dbc3e-5b09-47a4-886d-efa0ea053166}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Source Files\Passblob">
+      <UniqueIdentifier>{c13c2ee7-bdb9-44b4-b441-3f3cd5ffcf9a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\PassBlobs">
+      <UniqueIdentifier>{cbdeeb3a-c385-403d-9134-8270eed39930}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\sendPackets">
+      <UniqueIdentifier>{2dea541e-b38b-4d90-be94-411934bf075f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\sendPackets">
+      <UniqueIdentifier>{06b44803-cac1-4d28-a591-939fdeb0d4d6}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\src\WorldServer\WorldServer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\WorldServer\CharacterHandler.cpp">
+      <Filter>Source Files\Handlers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\WorldServer\CombatHandler.cpp">
+      <Filter>Source Files\Handlers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\WorldServer\CommandHandler.cpp">
+      <Filter>Source Files\Handlers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\WorldServer\NPCHandler.cpp">
+      <Filter>Source Files\Handlers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\WorldServer\WorldAgentHandler.cpp">
+      <Filter>Source Files\ServerHandlers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\WorldServer\WorldCharAgentHandler.cpp">
+      <Filter>Source Files\ServerHandlers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\WorldServer\WorldCharAgentProjectHandler.cpp">
+      <Filter>Source Files\ServerHandlers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\WorldServer\AbilityHandler.cpp">
+      <Filter>Source Files\Handlers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\WorldServer\CharStatsHandler.cpp">
+      <Filter>Source Files\Handlers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\PassblobHandler.cpp">
+      <Filter>Source Files\Passblob</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\CharMovement.cpp">
+      <Filter>Source Files\Passblob</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\CharAction.cpp">
+      <Filter>Source Files\Passblob</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\SelectObject.cpp">
+      <Filter>Source Files\Passblob</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\DeleteItem.cpp">
+      <Filter>Source Files\Passblob</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\LoadBarFull.cpp">
+      <Filter>Source Files\Passblob</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\WorldServer\SendPackets\SendPackets.cpp">
+      <Filter>Source Files\sendPackets</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\src\WorldServer\WorldServer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\WorldServer\PassBlobs\PassblobHandler.h">
+      <Filter>Header Files\PassBlobs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\WorldServer\SendPackets\SendPackets.h">
+      <Filter>Header Files\sendPackets</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

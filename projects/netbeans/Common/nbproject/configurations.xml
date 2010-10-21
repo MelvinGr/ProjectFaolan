@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configurationDescriptor version="62">
+  <logicalFolder name="root" displayName="root" projectFiles="true">
+    <logicalFolder name="HeaderFiles"
+                   displayName="Header Files"
+                   projectFiles="true">
+      <logicalFolder name="f2" displayName="BigInt" projectFiles="true">
+        <itemPath>../../../src/Common/BigInt/BigInteger.h</itemPath>
+        <itemPath>../../../src/Common/BigInt/BigIntegerAlgorithms.h</itemPath>
+        <itemPath>../../../src/Common/BigInt/BigIntegerLibrary.h</itemPath>
+        <itemPath>../../../src/Common/BigInt/BigIntegerUtils.h</itemPath>
+        <itemPath>../../../src/Common/BigInt/BigUnsigned.h</itemPath>
+        <itemPath>../../../src/Common/BigInt/BigUnsignedInABase.h</itemPath>
+        <itemPath>../../../src/Common/BigInt/NumberlikeArray.h</itemPath>
+      </logicalFolder>
+      <logicalFolder name="f1" displayName="Config" projectFiles="true">
+        <itemPath>../../../src/Common/ConfigParser/Config.h</itemPath>
+        <itemPath>../../../src/Common/Settings.h</itemPath>
+      </logicalFolder>
+      <itemPath>../../../src/Common/CRC32.h</itemPath>
+      <itemPath>../../../src/Common/Client.h</itemPath>
+      <itemPath>../../../src/Common/Common.h</itemPath>
+      <itemPath>../../../src/Common/Functions.h</itemPath>
+      <itemPath>../../../src/Common/Logger.h</itemPath>
+      <itemPath>../../../src/Common/LoginEncryption.h</itemPath>
+      <itemPath>../../../src/Common/Mutex.h</itemPath>
+      <itemPath>../../../src/Common/MysqlDatabase.h</itemPath>
+      <itemPath>../../../src/Common/Networking.h</itemPath>
+      <itemPath>../../../src/Common/Packet.h</itemPath>
+      <itemPath>../../../src/Common/PacketBuffer.h</itemPath>
+      <itemPath>../../../src/Common/Singleton.h</itemPath>
+      <itemPath>../../../src/Common/Structs.h</itemPath>
+      <itemPath>../../../src/Common/SvnVariables.h</itemPath>
+      <itemPath>../../../src/Common/SwapByte.h</itemPath>
+      <itemPath>../../../src/Common/Timer.h</itemPath>
+      <itemPath>../../../src/Common/Vector3D.h</itemPath>
+    </logicalFolder>
+    <logicalFolder name="SourceFiles"
+                   displayName="Source Files"
+                   projectFiles="true">
+      <logicalFolder name="f2" displayName="BigInt" projectFiles="true">
+        <itemPath>../../../src/Common/BigInt/BigInteger.cpp</itemPath>
+        <itemPath>../../../src/Common/BigInt/BigIntegerAlgorithms.cpp</itemPath>
+        <itemPath>../../../src/Common/BigInt/BigIntegerUtils.cpp</itemPath>
+        <itemPath>../../../src/Common/BigInt/BigUnsigned.cpp</itemPath>
+        <itemPath>../../../src/Common/BigInt/BigUnsignedInABase.cpp</itemPath>
+      </logicalFolder>
+      <logicalFolder name="f1" displayName="Config" projectFiles="true">
+        <itemPath>../../../src/Common/ConfigParser/Config.cpp</itemPath>
+        <itemPath>../../../src/Common/Settings.cpp</itemPath>
+      </logicalFolder>
+      <itemPath>../../../src/Common/CRC32.cpp</itemPath>
+      <itemPath>../../../src/Common/Client.cpp</itemPath>
+      <itemPath>../../../src/Common/Functions.cpp</itemPath>
+      <itemPath>../../../src/Common/Logger.cpp</itemPath>
+      <itemPath>../../../src/Common/LoginEncryption.cpp</itemPath>
+      <itemPath>../../../src/Common/Mutex.cpp</itemPath>
+      <itemPath>../../../src/Common/MysqlDatabase.cpp</itemPath>
+      <itemPath>../../../src/Common/Networking.cpp</itemPath>
+      <itemPath>../../../src/Common/Packet.cpp</itemPath>
+      <itemPath>../../../src/Common/PacketBuffer.cpp</itemPath>
+      <itemPath>../../../src/Common/SwapByte.cpp</itemPath>
+      <itemPath>../../../src/Common/Timer.cpp</itemPath>
+      <itemPath>../../../src/Common/Vector3D.cpp</itemPath>
+    </logicalFolder>
+    <logicalFolder name="ExternalFiles"
+                   displayName="Important Files"
+                   projectFiles="false">
+      <itemPath>Makefile</itemPath>
+    </logicalFolder>
+  </logicalFolder>
+  <sourceRootList>
+    <Elem>../../../src/Common</Elem>
+  </sourceRootList>
+  <projectmakefile>Makefile</projectmakefile>
+  <confs>
+    <conf name="Debug" type="3">
+      <toolsSet>
+        <developmentServer>localhost</developmentServer>
+        <compilerSet>GNU|GNU</compilerSet>
+        <platform>2</platform>
+      </toolsSet>
+      <compileType>
+        <ccTool>
+          <commandLine>-lpthread</commandLine>
+          <preprocessorList>
+            <Elem>_DEBUG</Elem>
+          </preprocessorList>
+          <warningLevel>2</warningLevel>
+        </ccTool>
+        <archiverTool>
+          <output>../../../build/${CND_PLATFORM}/${CND_CONF}/libcommon.a</output>
+        </archiverTool>
+      </compileType>
+    </conf>
+  </confs>
+</configurationDescriptor>
