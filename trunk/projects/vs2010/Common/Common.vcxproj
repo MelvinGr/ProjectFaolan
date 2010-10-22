@@ -70,7 +70,7 @@
     </Lib>
     <PostBuildEvent>
       <Message>Copying Files!</Message>
-      <Command>copy /b "..\..\..\etc\libmysql.dll" "$(TargetDir)\libmysql.dll" &amp;&amp; copy /b "..\..\..\etc\FaolanConfig.cnf" "$(TargetDir)\FaolanConfig.cnf"</Command>
+      <Command>copy /b "..\..\..\scripts\libmysql.dll" "$(TargetDir)\libmysql.dll" &amp;&amp; copy /b "..\..\..\scripts\FaolanConfig.cnf" "$(TargetDir)\FaolanConfig.cnf"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
