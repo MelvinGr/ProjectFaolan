@@ -354,8 +354,15 @@ void WorldServer::CharStat::sendCharacterStats(GameClient * client)
 	uint32 size = sizeof(pack1) + sizeof(pack2) + sizeof(pack3) + sizeof(pack4) + sizeof(pack6) + sizeof(pack1_4);
 	//size += sizeof(pack1_1) + sizeof(pack1_2) + sizeof(pack1_3) + (2 * 4);
 	size += (4 * 4) + (38 * 8) + 1;
-	size += (1*4) + (spellsx.size() * 3 * 4) + sizeof(pack8);
-	Log.Debug("Size of stat pack: 0x%08x\n", size);
+	if(levelSpells.size() > 0)
+	{
+		size += (1*4) + (spellsx.size() * 3 * 4) + sizeof(pack8);
+	}
+	else
+	{
+		size += (1*4) + sizeof(pack8);
+	}
+
 	aBuffer.write<uint32>(size);
 	aBuffer.write<uint32>(0x87e67dad);
 	aBuffer.write<uint32>(0x0000c350);
@@ -426,6 +433,10 @@ void WorldServer::CharStat::sendCharacterStats(GameClient * client)
 			aBuffer.write<uint32>(0xffffffff);
 			aBuffer.write<uint32>(0x00000002);
 		}
+	}
+	else
+	{
+		aBuffer.write<uint32>(1009); // = 0 spells (0x0000013f)
 	}
 	aBuffer.writeArray(pack8, sizeof(pack8));
 	aBuffer.doItAll(client->clientSocket);
