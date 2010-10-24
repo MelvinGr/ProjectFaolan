@@ -87,6 +87,7 @@ void WorldServer::GameCharAgentHandler(Packet* packet, GlobalTable* GTable)
 
 	case 0x54:
 		{
+			Log.Debug("Receive 0x54 opcode GCA\n");
 			uint32 data = packet->data->read<uint32>();
 			uint32 clientInst = packet->data->read<uint32>();
 			uint8 data1 = packet->data->read<uint32>();
@@ -110,7 +111,23 @@ void WorldServer::GameCharAgentHandler(Packet* packet, GlobalTable* GTable)
 					aBuffer.doItAll(client->clientSocket);
 				}
 			}
-
+			if(data1 == 0x00)
+			{
+				/*
+				PacketBuffer aBuffer(500);
+					aBuffer.writeHeader("GameAgent", "GameInterface", gameUnknown1, 0, client->nClientInst, 0, 0x00);
+					aBuffer.write<uint32>(0x00000019);
+					aBuffer.write<uint32>(0xf98e10b3);
+					aBuffer.write<uint32>(0x0000c350);
+					aBuffer.write<uint32>(client->nClientInst);
+					aBuffer.write<uint8>(0x00);
+					aBuffer.write<uint32>(0x00000013);
+					aBuffer.write<uint32>(0);
+					aBuffer.write<uint32>(0x3e4f4f3c);
+					aBuffer.doItAll(client->clientSocket);
+					//*/
+			}
+			/*
 			if(data1 == 0x00)
 			{
 				if(client->charInfo.map == 4000)
@@ -214,8 +231,8 @@ void WorldServer::GameCharAgentHandler(Packet* packet, GlobalTable* GTable)
 					aBuffer.writeArray(pack9, sizeof(pack9));
 					aBuffer.doItAll(client->clientSocket);
 					//*/
-				}
-			}
+				//}
+			//}
 			//
 
 			break;
@@ -266,6 +283,18 @@ void WorldServer::GameCharAgentHandler(Packet* packet, GlobalTable* GTable)
 			uint32 clientInst = packet->data->read<uint32>();
 
 			PacketBuffer aBuffer(500);
+					aBuffer.writeHeader("GameAgent", "GameInterface", gameUnknown1, 0, client->nClientInst, 0, 0x00);
+					aBuffer.write<uint32>(0x00000019);
+					aBuffer.write<uint32>(0xf98e10b3);
+					aBuffer.write<uint32>(0x0000c350);
+					aBuffer.write<uint32>(client->nClientInst);
+					aBuffer.write<uint8>(0x00);
+					aBuffer.write<uint32>(0x00000013);
+					aBuffer.write<uint32>(0);
+					aBuffer.write<uint32>(0x3e4f4f3c);
+					aBuffer.doItAll(client->clientSocket);
+
+			aBuffer = PacketBuffer(500);
 			aBuffer.writeHeader("GameCharAgent", "GameCharInterface", gameUnknown1, 0, client->nClientInst, 0, 0x07);
 			aBuffer.write<uint32>(data);
 			aBuffer.write<uint32>(data1);
@@ -275,7 +304,7 @@ void WorldServer::GameCharAgentHandler(Packet* packet, GlobalTable* GTable)
 			04 = quest complete (? over head)
 			*/
 			
-				aBuffer.write<uint8>(0x00);
+			aBuffer.write<uint8>(0x00);
 			
 			aBuffer.doItAll(client->clientSocket);
 			
