@@ -18,5 +18,5 @@ using namespace std;
 namespace Buffer
 {
 	uint32 read(ifstream* idx);
-	string read(ifstream* idx, unsigned int size);
+	string read(ifstream* idx, unsigned int size, bool swap = true);
 }
