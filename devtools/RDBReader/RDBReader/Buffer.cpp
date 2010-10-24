@@ -22,7 +22,7 @@ uint32 Buffer::read(ifstream* idx)
 	return ret;
 }
 
-string Buffer::read(ifstream* idx, unsigned int size)
+string Buffer::read(ifstream* idx, unsigned int size, bool swap)
 {
 	string ret = "";
 	for(unsigned int i = 0; i< size; i++)
@@ -31,12 +31,15 @@ string Buffer::read(ifstream* idx, unsigned int size)
 	}
 	if(ret.size() > 0)
 	{
-		char x;
-		for(unsigned int i = 0; i< size/2; i++)
+		if(swap)
 		{
-			x = ret[i];
-			ret[i] = ret[size-1-i];
-			ret[size-1-i] = x;
+			char x;
+			for(unsigned int i = 0; i< size/2; i++)
+			{
+				x = ret[i];
+				ret[i] = ret[size-1-i];
+				ret[size-1-i] = x;
+			}
 		}
 	}
 	return ret;
