@@ -42,7 +42,7 @@ int main()
 					tmp.idx = Buffer::read(&idx);
 					DS.push_back(tmp);
 				}
-				for(unsigned int i = 0; i < 100; i++)
+				for(unsigned int i = 0; i < Hdr.recordCount; i++)
 				{
 					DS[i].unk0 = Buffer::read(&idx);
 					DS[i].unk1 = Buffer::read(&idx);
@@ -56,9 +56,28 @@ int main()
 					DS[i].unk9 = Buffer::read(&idx);
 					DS[i].unk10 = Buffer::read(&idx);
 
-					printf("%u - %u\n%u - %u - %u - %u - %u - %u - %u - %u - %u - %u - %u\n", DS[i].idx, DS[i].type,
+					if(DS[i].unk0 > 0x3fffecc0 && DS[i].unk0 < 0x3fffed00)
+					{
+					printf("unk0 found: %u - %u\n%u - %u - %u - %u - %u - %u - %u - %u - %u - %u - %u\n", DS[i].idx, DS[i].type,
 						DS[i].unk0, DS[i].unk1, DS[i].unk2, DS[i].unk3, DS[i].unk4, DS[i].unk5, DS[i].unk6, DS[i].unk7, DS[i].unk8, DS[i].unk9, DS[i].unk10);
+					}
+					if(DS[i].unk1 > 0x3fffecc0 && DS[i].unk1 < 0x3fffed00)
+					{
+					printf("unk1 found: %u - %u\n%u - Offset: %u - %u - %u - %u - %u - %u - %u - %u - %u - %u\n", DS[i].idx, DS[i].type,
+						DS[i].unk0, DS[i].unk1, DS[i].unk2, DS[i].unk3, DS[i].unk4, DS[i].unk5, DS[i].unk6, DS[i].unk7, DS[i].unk8, DS[i].unk9, DS[i].unk10);
+					printf("Found in i: %i\n", i);
+					}
 				}
+				ifstream rdb00("./RDB/00.rdbdata",ios::binary);
+				ofstream xmlout("xmltest.xml",ios::out);
+				streamoff offset = DS[324955].unk1;
+				rdb00.seekg(offset);
+				uint32 unk0 = Buffer::read(&rdb00);
+				uint32 unk1 = Buffer::read(&rdb00);
+				uint32 unk2 = Buffer::read(&rdb00);
+				string xmltest = Buffer::read(&rdb00, (DS[324955].unk2 - 12), false);
+				printf("%02x %02x %02x %02x\n", xmltest.c_str()[0], xmltest.c_str()[1], xmltest.c_str()[2], xmltest.c_str()[3]);
+				xmlout << xmltest;
 				
 			}
 			else
