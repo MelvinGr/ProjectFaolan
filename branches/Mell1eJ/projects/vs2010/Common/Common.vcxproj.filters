@@ -1,0 +1,200 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="BigIntegerLibrary">
+      <UniqueIdentifier>{3b7371b8-bf94-4ef7-aade-7cc1b53f2f1f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Network">
+      <UniqueIdentifier>{a6ff80d1-ff8d-4df4-ae47-ebe967a18edd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Other">
+      <UniqueIdentifier>{da46263b-9f94-48eb-a918-c3e6354ddff0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Network">
+      <UniqueIdentifier>{31c5879e-3940-43be-9a99-2393e30043bd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Other">
+      <UniqueIdentifier>{65c9c068-2a0c-4af3-b032-933bf8ab218f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Network\Database">
+      <UniqueIdentifier>{e535255c-3e69-485f-bf42-5a3230bcbf44}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Network\Database\MySQL">
+      <UniqueIdentifier>{025fb198-b7c9-4b80-ab4e-8253170e652a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Network\Database">
+      <UniqueIdentifier>{30dd13d3-0a89-4c96-91d7-0feeaef9a8f5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Network\Database\MySQL">
+      <UniqueIdentifier>{857406fa-93fc-403f-9377-80c879d438f9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Network\Packet">
+      <UniqueIdentifier>{1a09b56d-0b9c-4e33-8777-991a341ce509}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Network\Packet">
+      <UniqueIdentifier>{8badf409-726e-4cad-9504-b877ed70902e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Network\Connection">
+      <UniqueIdentifier>{5a4aacd6-b975-4da3-b112-6daabdd12d36}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Network\Connection">
+      <UniqueIdentifier>{01ddba1c-b6ab-4f65-b678-caf01eb449f6}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\src\Common\BigIntegerLibrary\BigInteger.h">
+      <Filter>BigIntegerLibrary</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\BigIntegerLibrary\BigIntegerAlgorithms.h">
+      <Filter>BigIntegerLibrary</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\BigIntegerLibrary\BigIntegerLibrary.h">
+      <Filter>BigIntegerLibrary</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\BigIntegerLibrary\BigIntegerUtils.h">
+      <Filter>BigIntegerLibrary</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\BigIntegerLibrary\BigUnsigned.h">
+      <Filter>BigIntegerLibrary</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\BigIntegerLibrary\BigUnsignedInABase.h">
+      <Filter>BigIntegerLibrary</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\BigIntegerLibrary\NumberlikeArray.h">
+      <Filter>BigIntegerLibrary</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\LoginEncryption.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Singleton.h">
+      <Filter>Header Files\Other</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Functions.h">
+      <Filter>Header Files\Other</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\GameClient.h">
+      <Filter>Header Files\Other</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\SafeQueue.h">
+      <Filter>Header Files\Other</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Common.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Vector3D.h">
+      <Filter>Header Files\Other</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Database.h">
+      <Filter>Header Files\Network\Database</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\MysqlDatabase.h">
+      <Filter>Header Files\Network\Database\MySQL</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\MysqlQuery.h">
+      <Filter>Header Files\Network\Database\MySQL</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Configuration.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Buffer.h">
+      <Filter>Header Files\Network\Packet</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\BufferPool.h">
+      <Filter>Header Files\Network\Packet</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\SwapByte.h">
+      <Filter>Header Files\Network\Packet</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Packet.h">
+      <Filter>Header Files\Network\Packet</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\CRC32.h">
+      <Filter>Header Files\Network\Packet</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Query.h">
+      <Filter>Header Files\Network\Database</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\ConnectionAcceptor.h">
+      <Filter>Header Files\Network\Connection</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Acceptor.h">
+      <Filter>Header Files\Network\Connection</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Connection.h">
+      <Filter>Header Files\Network\Connection</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Network.h">
+      <Filter>Header Files\Network\Connection</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\src\Common\BigIntegerLibrary\BigInteger.cpp">
+      <Filter>BigIntegerLibrary</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\BigIntegerLibrary\BigIntegerAlgorithms.cpp">
+      <Filter>BigIntegerLibrary</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\BigIntegerLibrary\BigIntegerUtils.cpp">
+      <Filter>BigIntegerLibrary</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\BigIntegerLibrary\BigUnsigned.cpp">
+      <Filter>BigIntegerLibrary</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\BigIntegerLibrary\BigUnsignedInABase.cpp">
+      <Filter>BigIntegerLibrary</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\LoginEncryption.cpp">
+      <Filter>Source Files\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\Vector3D.cpp">
+      <Filter>Source Files\Other</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\GameClient.cpp">
+      <Filter>Source Files\Other</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\Functions.cpp">
+      <Filter>Source Files\Other</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\MysqlDatabase.cpp">
+      <Filter>Source Files\Network\Database\MySQL</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\MysqlQuery.cpp">
+      <Filter>Source Files\Network\Database\MySQL</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\Database.cpp">
+      <Filter>Source Files\Network\Database</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\Configuration.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\Packet.cpp">
+      <Filter>Source Files\Network\Packet</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\CRC32.cpp">
+      <Filter>Source Files\Network\Packet</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\BufferPool.cpp">
+      <Filter>Source Files\Network\Packet</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\Buffer.cpp">
+      <Filter>Source Files\Network\Packet</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\Query.cpp">
+      <Filter>Source Files\Network\Database</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\Connection.cpp">
+      <Filter>Source Files\Network\Connection</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\Network.cpp">
+      <Filter>Source Files\Network\Connection</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

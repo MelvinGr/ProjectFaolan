@@ -1,0 +1,24 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Common", "Common\Common.vcxproj", "{DC00D144-97D4-4BF1-9A44-0FD3D3D53863}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UniverseAgent", "UniverseAgent\UniverseAgent.vcxproj", "{598F87E5-FB8E-4BD9-9D66-34127B3824F2}"
+	ProjectSection(ProjectDependencies) = postProject
+		{DC00D144-97D4-4BF1-9A44-0FD3D3D53863} = {DC00D144-97D4-4BF1-9A44-0FD3D3D53863}
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{DC00D144-97D4-4BF1-9A44-0FD3D3D53863}.Debug|Win32.ActiveCfg = Debug|Win32
+		{DC00D144-97D4-4BF1-9A44-0FD3D3D53863}.Debug|Win32.Build.0 = Debug|Win32
+		{598F87E5-FB8E-4BD9-9D66-34127B3824F2}.Debug|Win32.ActiveCfg = Debug|Win32
+		{598F87E5-FB8E-4BD9-9D66-34127B3824F2}.Debug|Win32.Build.0 = Debug|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
