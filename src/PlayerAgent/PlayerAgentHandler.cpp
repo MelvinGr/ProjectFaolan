@@ -97,6 +97,7 @@ void PlayerAgent::sendRealmList(GameClient* client)
 
 void PlayerAgent::PlayerAgentHandler(Packet* packet, GameClient* client)
 {
+	Log.Debug("Receive opcode: 0x%08x\n", packet->opcode);
 	switch(packet->opcode)
 	{
 	case 0x9cb2cb03: // Authenticate
@@ -140,6 +141,7 @@ void PlayerAgent::PlayerAgentHandler(Packet* packet, GameClient* client)
 
 	case 0xBE735486: // CreateCharacter
 		{
+			Log.Error("Get second char creation pack\n");
 			uint32 i_nDimID = packet->data->read<uint32>();
 
 			uint32 unk1 = packet->data->read<uint32>(); // dont know if these are correct values
@@ -324,11 +326,32 @@ void PlayerAgent::PlayerAgentHandler(Packet* packet, GameClient* client)
 			aBuffer.write<uint32>(0x00009c50); //
 			aBuffer.write<uint32>(0x00036bc1); // cookie
 			aBuffer.doItAll(client->clientSocket);
+			
+			break;
+		}
+	case 0xCA2C4E5E:
+		{
+			client->charInfo.realmID = packet->data->read<uint32>();
+			/*
+			 000006E8  00 00 00 42 4b 7d b2 74  00 0b 50 6c 61 79 65 72 ...BK}.t ..Player
+    000006F8  41 67 65 6e 74 00 00 00  06 00 00 00 00 00 0f 50 Agent... .......P
+    00000708  6c 61 79 65 72 49 6e 74  65 72 66 61 63 65 59 47 layerInt erfaceYG
+    00000718  c8 29 00 00 00 00 23 36  05 b9 00 00 c3 50 01 0a .)....#6 .....P..
+    00000728  82 7e 00 00 00 00
+			*/
+			PacketBuffer aBuffer(500);
+			aBuffer.writeHeader("ServerInterface", "PlayerInterface", 1, 0, client->nClientInst, 0, 0x233605b9); // CSServerConnectReady
+			aBuffer.write<uint32>(0x0000c350);
+			aBuffer.write<uint32>(client->charInfo.characterID);
+			aBuffer.write<uint32>(0);
+			aBuffer.doItAll(client->clientSocket);
 
 			break;
 		}
 	case 0x3c7c926c:
 		{
+			
+			Log.Debug("Receive Create Char\n");
 			RealmInfo* realm = 0;
 			for(uint32 i = 0; i < Settings.realms.size(); i++)
 			{
@@ -346,7 +369,7 @@ void PlayerAgent::PlayerAgentHandler(Packet* packet, GameClient* client)
 			}
 
 			PacketBuffer aBuffer(500);
-			/*
+			
 			aBuffer.writeHeader("ServerInterface", "PlayerInterface", 1, 0, client->nClientInst, 0, 0x5aed2a60); // CSServerConnectReady
 			aBuffer.write<uint32>(htonl(inet_addr(realm->csPlayerAgentIPAddress.c_str()))); // CSPlayer
 			aBuffer.write<uint16>(realm->csPlayerAgentPort); // CSport
@@ -370,9 +393,9 @@ void PlayerAgent::PlayerAgentHandler(Packet* packet, GameClient* client)
 			aBuffer.write<uint16>(realm->worldServerPort); // game port
 			aBuffer.write<uint32>(htonl(inet_addr(realm->worldServerIPAddress.c_str()))); // i_nGameAddr
 			aBuffer.write<uint16>(realm->worldServerPort); // game port
-			aBuffer.write<uint32>(client->charInfo.characterID); //
+			aBuffer.write<uint32>(client->nClientInst);//client->charInfo.characterID); //
 			aBuffer.write<uint32>(0x0000c350);
-			aBuffer.write<uint32>(client->nClientInst); //
+			aBuffer.write<uint32>(client->charInfo.characterID);//client->nClientInst); //
 			aBuffer.write<uint8>(0x62); //
 			aBuffer.write<uint32>(0x0000c79c); //
 			aBuffer.write<uint32>(client->charInfo.map); //
@@ -385,12 +408,11 @@ void PlayerAgent::PlayerAgentHandler(Packet* packet, GameClient* client)
 
 			aBuffer = PacketBuffer(500);
 			//*/
+			
 			aBuffer.writeHeader("ServerInterface", "PlayerInterface", 1, 0, client->nClientInst, 0, 0xf4116428);
 			aBuffer.write<uint32>(0x000003f1); //
-			//aBuffer.write<uint32>(0x00000001); //
-			//aBuffer.write<uint32>(0x00000001); //
 			aBuffer.doItAll(client->clientSocket);
-
+			//*/
 			break;
 		}
 
