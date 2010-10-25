@@ -21,10 +21,6 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "Common.h"
 
-#if PLATFORM == PLATFORM_WIN32
-#	include <winsock2.h>
-#endif
-
 #include <map>
 #include <string>
 
@@ -66,12 +62,12 @@ public:
 
 	string error();
 
-	const char* MysqlQuery::getRealmName(uint32 idx);
-	uint32 MysqlQuery::getRealmId();
+	const char* getRealmName(uint32 idx);
+	uint32 getRealmId();
 
-	bool MysqlQuery::nextRow();
-	const char* MysqlQuery::getCharString(uint32 idx);
-	uint32 MysqlQuery::getCharUint(uint32 idx);
+	bool nextRow();
+	const char* getCharString(uint32 idx);
+	uint32 getCharUint(uint32 idx);
 
 	uint32 getUint32();
 	uint64 getUint64();

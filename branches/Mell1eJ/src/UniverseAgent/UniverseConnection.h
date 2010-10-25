@@ -42,12 +42,12 @@ class UniverseConnection : public Connection
 	void onRead(const boost::system::error_code& e, size_t bytesTransferred);
 	void onWrite(const boost::system::error_code& e);
 
+	static uint32 connectionCount;
+	
 	GameClient gameClient;
-	uint32 connectionCount;
 	uint32 m_connectionID;
 
 public:
-
 	UniverseConnection(boost::asio::io_service& IOService, BufferPool* hp);
 	~UniverseConnection();
 

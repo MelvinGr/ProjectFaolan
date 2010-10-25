@@ -40,9 +40,9 @@ class Buffer
 	size_t m_size;
 
 public:
-	Buffer::Buffer() : m_rawBuffer(0), m_writeCursor(0), m_readCursor(0), m_size(0) { }
-	Buffer::Buffer(size_t chunkSize) : m_rawBuffer(chunkSize), m_writeCursor(0), m_readCursor(0), m_size(0) { }
-	Buffer::Buffer(uint8* data, size_t chunkSize) : m_rawBuffer(chunkSize), m_writeCursor(0), m_readCursor(0), m_size(0) { write(data, chunkSize); }
+	Buffer() : m_rawBuffer(0), m_writeCursor(0), m_readCursor(0), m_size(0) { }
+	Buffer(size_t chunkSize) : m_rawBuffer(chunkSize), m_writeCursor(0), m_readCursor(0), m_size(0) { }
+	Buffer(uint8* data, size_t chunkSize) : m_rawBuffer(chunkSize), m_writeCursor(0), m_readCursor(0), m_size(0) { write(data, chunkSize); }
 
 	size_t size()
 	{
@@ -118,25 +118,6 @@ public:
 		return ret;
 	}
 
-	template <typename T> void write(string& data)
-	{
-		BOOST_ASSERT((m_writeCursor + data.length() + sizeof(uint16)) <= m_rawBuffer.size());
-
-		write<uint16>(data.length());
-		write((uint8*)data.c_str(), data.length());
-	}
-
-	template <> string read()
-	{
-		uint16 stringSize = read<uint16>();
-
-		BOOST_ASSERT((m_readCursor + stringSize) <= m_rawBuffer.size());
-		string ret(&m_rawBuffer[m_readCursor], &m_rawBuffer[m_readCursor + stringSize]);
-
-		m_readCursor += stringSize;
-		return ret;
-	}
-
 	void writeHeader(string sender, string receiver, uint32 unknown1, uint32 unknown2, uint32 user, uint32 unknown4, uint32 opcode)
 	{
 		reset();
@@ -163,5 +144,25 @@ public:
 		memcpy(&m_rawBuffer[4], reinterpret_cast<uint8*>(&hash), sizeof(uint32));
 	}
 };
+
+template <> void Buffer::write(string& data)
+{
+	BOOST_ASSERT((m_writeCursor + data.length() + sizeof(uint16)) <= m_rawBuffer.size());
+
+	write<uint16>(data.length());
+	write((uint8*)data.c_str(), data.length());
+}
+
+template <> string Buffer::read()
+{
+	BOOST_ASSERT((m_readCursor + sizeof(uint16)) <= m_rawBuffer.size());
+	uint16 stringSize = read<uint16>();
+
+	BOOST_ASSERT((m_readCursor + stringSize) <= m_rawBuffer.size());
+	string ret(&m_rawBuffer[m_readCursor], &m_rawBuffer[m_readCursor + stringSize]);
+
+	m_readCursor += stringSize;
+	return ret;
+}
 
 #endif

@@ -21,14 +21,12 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "Common.h"
 
-#if PLATFORM == PLATFORM_WIN32
-#include <Winsock2.h>
-#else
+#if PLATFORM != PLATFORM_WIN32
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <limits.h>
 #include <errno.h>
-#include <linux/version.h>
+//#include <linux/version.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>

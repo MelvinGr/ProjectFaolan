@@ -21,8 +21,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include <iostream>
 
 #if PLATFORM != PLATFORM_WIN32
-#	include <pthread.h>
-#	include <signal.h>
+#include <pthread.h>
+#include <signal.h>
 #endif
 
 #include <boost/bind.hpp>
@@ -73,7 +73,7 @@ int32 main(int32 argc, int8* argv[])
 		MysqlDatabase* db = MysqlDatabase::createInstance(Config.demuxerCount, Config.DBUsername, Config.DBHost, Config.DBPassword, Config.DBName, Config.DBPort);
 		if(!db->start())
 		{
-			throw exception("Could not connect to the Database!");
+			throw runtime_error("Could not connect to the Database!");
 		}
 
 		Network n;

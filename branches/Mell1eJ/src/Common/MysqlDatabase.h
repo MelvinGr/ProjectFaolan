@@ -21,10 +21,6 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "Common.h"
 
-#if PLATFORM == PLATFORM_WIN32
-#	include <winsock2.h>
-#endif
-
 #include <boost/thread.hpp>
 #include <boost/foreach.hpp>
 

@@ -18,7 +18,9 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "UniverseConnection.h"
 
-UniverseConnection::UniverseConnection(boost::asio::io_service& IOService, BufferPool* hp) : Connection(IOService, hp), connectionCount(0), m_connectionID(0)
+uint32 UniverseConnection::connectionCount = 0;
+
+UniverseConnection::UniverseConnection(boost::asio::io_service& IOService, BufferPool* hp) : Connection(IOService, hp), m_connectionID(0)
 {
 	//
 }

@@ -20,7 +20,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #define COMMON_H
 
 #ifdef HAVE_CONFIG_H
-# include <config.h>
+#	include <config.h>
 #endif
 
 #define PLATFORM_WIN32 0
@@ -28,13 +28,15 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #define PLATFORM_APPLE 2
 
 #if defined(__WIN32__) || defined(WIN32) || defined (_WIN32)
-#  define PLATFORM PLATFORM_WIN32
-#  define WIN32_LEAN_AND_MEAN
-#  define _WIN32_WINNT 0x0501
+#	define PLATFORM PLATFORM_WIN32
+#	define WIN32_LEAN_AND_MEAN
+#	define _WIN32_WINNT 0x0501
 #elif defined(__APPLE_CC__)
-#  define PLATFORM PLATFORM_APPLE
+#	define PLATFORM PLATFORM_APPLE
+#elif defined (__linux__)
+#	define PLATFORM PLATFORM_UNIX
 #else
-#  define PLATFORM PLATFORM_UNIX
+#	pragma error "FATAL ERROR: Unknown OS."
 #endif
 
 #define COMPILER_MICROSOFT 0
@@ -42,18 +44,18 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #define COMPILER_BORLAND   2
 
 #ifdef _MSC_VER
-#  define COMPILER COMPILER_MICROSOFT
+#	define COMPILER COMPILER_MICROSOFT
 #elif defined(__BORLANDC__)
-#  define COMPILER COMPILER_BORLAND
+#	define COMPILER COMPILER_BORLAND
 #elif defined(__GNUC__)
-#  define COMPILER COMPILER_GNU
+#	define COMPILER COMPILER_GNU
 #else
-#  pragma error "FATAL ERROR: Unknown compiler."
+#	pragma error "FATAL ERROR: Unknown compiler."
 #endif
 
 #if COMPILER == COMPILER_MICROSOFT
-//#  pragma warning(disable : 4267) // conversion from 'size_t' to 'int', possible loss of data.
-#  pragma warning(disable : 4996) // 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead.
+//#	pragma warning(disable : 4267) // conversion from 'size_t' to 'int', possible loss of data.
+#	pragma warning(disable : 4996) // 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead.
 #endif
 
 #if PLATFORM == PLATFORM_WIN32
@@ -76,14 +78,17 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #elif COMPILER == COMPILER_GNU && __GNUC__ >= 3
 #	define HM_NAMESPACE __gnu_cxx
 
-namespace __gnu_cxx {
-	template<> struct hash<unsigned long long> {
+namespace __gnu_cxx 
+{
+	template<> struct hash<unsigned long long> 
+	{
 		size_t operator()(const unsigned long long &__x) const { return (size_t)__x; }
 	};
-	template<typename T> struct hash<T *> {
+	
+	template<typename T> struct hash<T *> 
+	{
 		size_t operator()(T * const &__x) const { return (size_t)__x; }
 	};
-
 };
 
 #else
@@ -96,18 +101,20 @@ typedef __int64   int64;
 typedef long long int64;
 #endif
 
-typedef long        int32;
+typedef int        int32;
 typedef short       int16;
 typedef char        int8;
 
 #if COMPILER == COMPILER_MICROSOFT
 typedef unsigned __int64   uint64;
+typedef _W64 unsigned int SOCKET;
 #else
 typedef unsigned long long  uint64;
 typedef unsigned long      DWORD;
+typedef int32 SOCKET;
 #endif
 
-typedef unsigned long        uint32;
+typedef unsigned int        uint32;
 typedef unsigned short       uint16;
 typedef unsigned char        uint8;
 
