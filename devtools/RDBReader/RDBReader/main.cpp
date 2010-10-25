@@ -1,4 +1,5 @@
 #include "common.h"
+#include "config.h"
 
 using namespace std;
 
@@ -45,8 +46,8 @@ int main()
 				for(unsigned int i = 0; i < Hdr.recordCount; i++)
 				{
 					DS[i].unk0 = Buffer::read(&idx);
-					DS[i].unk1 = Buffer::read(&idx);
-					DS[i].unk2 = Buffer::read(&idx); //maybe size
+					DS[i].offset = Buffer::read(&idx);
+					DS[i].size = Buffer::read(&idx); 
 					DS[i].unk3 = Buffer::read(&idx);
 					DS[i].unk4 = Buffer::read(&idx);
 					DS[i].unk5 = Buffer::read(&idx);
@@ -55,29 +56,568 @@ int main()
 					DS[i].unk8 = Buffer::read(&idx);
 					DS[i].unk9 = Buffer::read(&idx);
 					DS[i].unk10 = Buffer::read(&idx);
+				}
 
-					if(DS[i].unk0 > 0x3fffecc0 && DS[i].unk0 < 0x3fffed00)
+				for(unsigned int i = 0; i < Hdr.recordCount; i++)
+				{
+					/*
+					type 1000056
+					maybe Ressurectoin points with coords
+
+					type 1010004
+					FCTX files (maybe textures)
+					*/
+					if(DS[i].type == 1010041 && DS[i].size > 0 && (DS[i].unk0 & 0xff) < 36)
 					{
-					printf("unk0 found: %u - %u\n%u - %u - %u - %u - %u - %u - %u - %u - %u - %u - %u\n", DS[i].idx, DS[i].type,
-						DS[i].unk0, DS[i].unk1, DS[i].unk2, DS[i].unk3, DS[i].unk4, DS[i].unk5, DS[i].unk6, DS[i].unk7, DS[i].unk8, DS[i].unk9, DS[i].unk10);
+						printf("%u - %u - %u\n%u - %u - %u - %u - %u - %u - %u - %u - %u - %u - %u\n", i, DS[i].idx, DS[i].type,
+							DS[i].unk0, DS[i].offset, DS[i].size, DS[i].unk3, DS[i].unk4, DS[i].unk5, DS[i].unk6, DS[i].unk7, DS[i].unk8, DS[i].unk9, DS[i].unk10);
 					}
-					if(DS[i].unk1 > 0x3fffecc0 && DS[i].unk1 < 0x3fffed00)
+					//*/
+					if(DS[i].type == TEXTSCRIPT && textscript == true)
 					{
-					printf("unk1 found: %u - %u\n%u - Offset: %u - %u - %u - %u - %u - %u - %u - %u - %u - %u\n", DS[i].idx, DS[i].type,
-						DS[i].unk0, DS[i].unk1, DS[i].unk2, DS[i].unk3, DS[i].unk4, DS[i].unk5, DS[i].unk6, DS[i].unk7, DS[i].unk8, DS[i].unk9, DS[i].unk10);
-					printf("Found in i: %i\n", i);
+						char* rdbnr = new char[3];
+						sprintf(rdbnr, "%02i", (DS[i].unk0 & 0xff));
+						if((DS[i].unk0 & 0xff) >=0 && (DS[i].unk0 & 0xff) < 36)
+						{
+							string rdbfile = "./RDB/";
+							rdbfile += rdbnr;
+							rdbfile+=".rdbdata";
+							ifstream rdbf(rdbfile, ios::binary);
+							if(rdbf)
+							{
+								string file = "./xml/textscript/RDB";
+								file += rdbnr;
+								file +="_";
+								char* fnr = new char[14];
+								sprintf(fnr, "%12i", DS[i].idx);
+								file += fnr;
+								file += ".xml";
+								ofstream xmlout(file ,ios::out);
+								if(xmlout)
+								{
+									rdbf.seekg(DS[i].offset);
+									uint32 unknown1 = Buffer::read(&rdbf);
+									uint32 unknown2 = Buffer::read(&rdbf);
+									uint32 unknown3 = Buffer::read(&rdbf);
+									string xmltest = Buffer::read(&rdbf, (DS[i].size - 12), false);
+									xmlout << xmltest;
+									
+									rdbf.close();
+								}
+								
+								xmlout.close();
+							}
+							else
+							{
+								printf("Error with file: %s\n", rdbfile.c_str());
+							}
+						}
+					}
+					if(DS[i].type == SCRIPTGROUP3 && scriptgroup == true)
+					{
+						char* rdbnr = new char[3];
+						sprintf(rdbnr, "%02i", (DS[i].unk0 & 0xff));
+						if((DS[i].unk0 & 0xff) >=0 && (DS[i].unk0 & 0xff) < 36)
+						{
+							string rdbfile = "./RDB/";
+							rdbfile += rdbnr;
+							rdbfile+=".rdbdata";
+							ifstream rdbf(rdbfile, ios::binary);
+							if(rdbf)
+							{
+								string file = "./xml/scriptgroup/RDB";
+								file += rdbnr;
+								file +="_";
+								char* fnr = new char[10];
+								sprintf(fnr, "%08i", i);
+								file += fnr;
+								file += ".xml";
+								ofstream xmlout(file ,ios::out);
+								if(xmlout)
+								{
+									rdbf.seekg(DS[i].offset);
+									uint32 unknown1 = Buffer::read(&rdbf);
+									uint32 unknown2 = Buffer::read(&rdbf);
+									uint32 unknown3 = Buffer::read(&rdbf);
+									string xmltest = Buffer::read(&rdbf, (DS[i].size - 12), false);
+									xmlout << xmltest;
+									
+									rdbf.close();
+								}
+								
+								xmlout.close();
+							}
+							else
+							{
+								printf("Error with file: %s\n", rdbfile.c_str());
+							}
+						}
+					}
+					if(DS[i].type == SCRIPTGROUP2 && scriptgroup == true)
+					{
+						char* rdbnr = new char[3];
+						sprintf(rdbnr, "%02i", (DS[i].unk0 & 0xff));
+						if((DS[i].unk0 & 0xff) >=0 && (DS[i].unk0 & 0xff) < 36)
+						{
+							string rdbfile = "./RDB/";
+							rdbfile += rdbnr;
+							rdbfile+=".rdbdata";
+							ifstream rdbf(rdbfile, ios::binary);
+							if(rdbf)
+							{
+								string file = "./xml/scriptgroup/RDB";
+								file += rdbnr;
+								file +="_";
+								char* fnr = new char[10];
+								sprintf(fnr, "%08i", i);
+								file += fnr;
+								file += ".xml";
+								ofstream xmlout(file ,ios::out);
+								if(xmlout)
+								{
+									rdbf.seekg(DS[i].offset);
+									uint32 unknown1 = Buffer::read(&rdbf);
+									uint32 unknown2 = Buffer::read(&rdbf);
+									uint32 unknown3 = Buffer::read(&rdbf);
+									string xmltest = Buffer::read(&rdbf, (DS[i].size - 12), false);
+									xmlout << xmltest;
+									
+									rdbf.close();
+								}
+								
+								xmlout.close();
+							}
+							else
+							{
+								printf("Error with file: %s\n", rdbfile.c_str());
+							}
+						}
+					}
+					if(DS[i].type == COLLECTIONLIBRARY && collectionlibrary == true)
+					{
+						char* rdbnr = new char[3];
+						sprintf(rdbnr, "%02i", (DS[i].unk0 & 0xff));
+						if((DS[i].unk0 & 0xff) >=0 && (DS[i].unk0 & 0xff) < 36)
+						{
+							string rdbfile = "./RDB/";
+							rdbfile += rdbnr;
+							rdbfile+=".rdbdata";
+							ifstream rdbf(rdbfile, ios::binary);
+							if(rdbf)
+							{
+								string file = "./xml/collectionlibrary/RDB";
+								file += rdbnr;
+								file +="_";
+								char* fnr = new char[10];
+								sprintf(fnr, "%08i", i);
+								file += fnr;
+								file += ".xml";
+								ofstream xmlout(file ,ios::out);
+								if(xmlout)
+								{
+									rdbf.seekg(DS[i].offset);
+									uint32 unknown1 = Buffer::read(&rdbf);
+									uint32 unknown2 = Buffer::read(&rdbf);
+									uint32 unknown3 = Buffer::read(&rdbf);
+									string xmltest = Buffer::read(&rdbf, (DS[i].size - 12), false);
+									xmlout << xmltest;
+									
+									rdbf.close();
+								}
+								
+								xmlout.close();
+							}
+							else
+							{
+								printf("Error with file: %s\n", rdbfile.c_str());
+							}
+						}
+					}
+					if(DS[i].type == STATICAIPOINTS2 && staticapoints2== true)
+					{
+						char* rdbnr = new char[3];
+						sprintf(rdbnr, "%02i", (DS[i].unk0 & 0xff));
+						if((DS[i].unk0 & 0xff) >=0 && (DS[i].unk0 & 0xff) < 36)
+						{
+							string rdbfile = "./RDB/";
+							rdbfile += rdbnr;
+							rdbfile+=".rdbdata";
+							ifstream rdbf(rdbfile, ios::binary);
+							if(rdbf)
+							{
+								string file = "./xml/staticapoints/RDB";
+								file += rdbnr;
+								file +="_";
+								char* fnr = new char[10];
+								sprintf(fnr, "%08i", i);
+								file += fnr;
+								file += ".xml";
+								ofstream xmlout(file ,ios::out);
+								if(xmlout)
+								{
+									rdbf.seekg(DS[i].offset);
+									string xmltest = Buffer::read(&rdbf, (DS[i].size), false);
+									xmlout << xmltest;
+									
+									rdbf.close();
+								}
+								
+								xmlout.close();
+							}
+							else
+							{
+								printf("Error with file: %s\n", rdbfile.c_str());
+							}
+						}
+					}
+					if(DS[i].type == RIVERS && rivers == true)
+					{
+						char* rdbnr = new char[3];
+						sprintf(rdbnr, "%02i", (DS[i].unk0 & 0xff));
+						if((DS[i].unk0 & 0xff) >=0 && (DS[i].unk0 & 0xff) < 36)
+						{
+							string rdbfile = "./RDB/";
+							rdbfile += rdbnr;
+							rdbfile+=".rdbdata";
+							ifstream rdbf(rdbfile, ios::binary);
+							if(rdbf)
+							{
+								string file = "./xml/rivers/RDB";
+								file += rdbnr;
+								file +="_";
+								char* fnr = new char[10];
+								sprintf(fnr, "%08i", i);
+								file += fnr;
+								file += ".xml";
+								ofstream xmlout(file ,ios::out);
+								if(xmlout)
+								{
+									rdbf.seekg(DS[i].offset);
+									uint32 unknown1 = Buffer::read(&rdbf);
+									uint32 unknown2 = Buffer::read(&rdbf);
+									uint32 unknown3 = Buffer::read(&rdbf);
+									string xmltest = Buffer::read(&rdbf, (DS[i].size - 12), false);
+									xmlout << xmltest;
+									
+									rdbf.close();
+								}
+								
+								xmlout.close();
+							}
+							else
+							{
+								printf("Error with file: %s\n", rdbfile.c_str());
+							}
+						}
+					}
+					if(DS[i].type == PATROLS && patrols == true)
+					{
+						char* rdbnr = new char[3];
+						sprintf(rdbnr, "%02i", (DS[i].unk0 & 0xff));
+						if((DS[i].unk0 & 0xff) >=0 && (DS[i].unk0 & 0xff) < 36)
+						{
+							string rdbfile = "./RDB/";
+							rdbfile += rdbnr;
+							rdbfile+=".rdbdata";
+							ifstream rdbf(rdbfile, ios::binary);
+							if(rdbf)
+							{
+								string file = "./xml/patrols/RDB";
+								file += rdbnr;
+								file +="_";
+								char* fnr = new char[10];
+								sprintf(fnr, "%08i", i);
+								file += fnr;
+								file += ".xml";
+								ofstream xmlout(file ,ios::out);
+								if(xmlout)
+								{
+									rdbf.seekg(DS[i].offset);
+									uint32 unknown1 = Buffer::read(&rdbf);
+									uint32 unknown2 = Buffer::read(&rdbf);
+									uint32 unknown3 = Buffer::read(&rdbf);
+									string xmltest = Buffer::read(&rdbf, (DS[i].size - 12), false);
+									xmlout << xmltest;
+									//printf("%u - %u\n%u - %u - %u - %u - %u - %u - %u - %u - %u - %u - %u\n", DS[i].idx, DS[i].type,
+									//	DS[i].unk0, DS[i].offset, DS[i].size, DS[i].unk3, DS[i].unk4, DS[i].unk5, DS[i].unk6, DS[i].unk7, DS[i].unk8, DS[i].unk9, DS[i].unk10);
+									rdbf.close();
+								}
+								
+								xmlout.close();
+							}
+							else
+							{
+								printf("Error with file: %s\n", rdbfile.c_str());
+							}
+						}
+					}
+					if(DS[i].type == BOUNDEDAREAS && boundedareas == true)
+					{
+						char* rdbnr = new char[3];
+						sprintf(rdbnr, "%02i", (DS[i].unk0 & 0xff));
+						if((DS[i].unk0 & 0xff) >=0 && (DS[i].unk0 & 0xff) < 36)
+						{
+							string rdbfile = "./RDB/";
+							rdbfile += rdbnr;
+							rdbfile+=".rdbdata";
+							ifstream rdbf(rdbfile, ios::binary);
+							if(rdbf)
+							{
+								string file = "./xml/boundedareas/RDB";
+								file += rdbnr;
+								file +="_";
+								char* fnr = new char[10];
+								sprintf(fnr, "%08i", i);
+								file += fnr;
+								file += ".xml";
+								ofstream xmlout(file ,ios::out);
+								if(xmlout)
+								{
+									rdbf.seekg(DS[i].offset);
+									uint32 unknown1 = Buffer::read(&rdbf);
+									uint32 unknown2 = Buffer::read(&rdbf);
+									uint32 unknown3 = Buffer::read(&rdbf);
+									string xmltest = Buffer::read(&rdbf, (DS[i].size - 12), false);
+									xmlout << xmltest;
+									//printf("%u - %u\n%u - %u - %u - %u - %u - %u - %u - %u - %u - %u - %u\n", DS[i].idx, DS[i].type,
+									//	DS[i].unk0, DS[i].offset, DS[i].size, DS[i].unk3, DS[i].unk4, DS[i].unk5, DS[i].unk6, DS[i].unk7, DS[i].unk8, DS[i].unk9, DS[i].unk10);
+									rdbf.close();
+								}
+								
+								xmlout.close();
+							}
+							else
+							{
+								printf("Error with file: %s\n", rdbfile.c_str());
+							}
+						}
+					}
+					if(DS[i].type == STATICAIPOINTS && staticaipoints == true)
+					{
+						char* rdbnr = new char[3];
+						sprintf(rdbnr, "%02i", (DS[i].unk0 & 0xff));
+						if((DS[i].unk0 & 0xff) >=0 && (DS[i].unk0 & 0xff) < 36)
+						{
+							string rdbfile = "./RDB/";
+							rdbfile += rdbnr;
+							rdbfile+=".rdbdata";
+							ifstream rdbf(rdbfile, ios::binary);
+							if(rdbf)
+							{
+								string file = "./xml/staticaipoints/RDB";
+								file += rdbnr;
+								file +="_";
+								char* fnr = new char[10];
+								sprintf(fnr, "%08i", i);
+								file += fnr;
+								file += ".xml";
+								ofstream xmlout(file ,ios::out);
+								if(xmlout)
+								{
+									rdbf.seekg(DS[i].offset);
+									uint32 unknown1 = Buffer::read(&rdbf);
+									uint32 unknown2 = Buffer::read(&rdbf);
+									uint32 unknown3 = Buffer::read(&rdbf);
+									string xmltest = Buffer::read(&rdbf, (DS[i].size - 12), false);
+									xmlout << xmltest;
+									
+									rdbf.close();
+								}
+								
+								xmlout.close();
+							}
+							else
+							{
+								printf("Error with file: %s\n", rdbfile.c_str());
+							}
+						}
+					}
+					
+					if(DS[i].type == PNG && exportPNG==true)
+					{
+						char* rdbnr = new char[3];
+						sprintf(rdbnr, "%02i", (DS[i].unk0 & 0xff));
+						if((DS[i].unk0 & 0xff) >=0 && (DS[i].unk0 & 0xff) < 36)
+						{
+							string rdbfile = "./RDB/";
+							rdbfile += rdbnr;
+							rdbfile+=".rdbdata";
+							ifstream rdbf(rdbfile, ios::binary);
+							if(rdbf)
+							{
+								string file = "./png/png/RDB";
+								file += rdbnr;
+								file +="_";
+								char* fnr = new char[10];
+								sprintf(fnr, "%08i", i);
+								file += fnr;
+								file += ".png";
+								rdbf.seekg(DS[i].offset);
+								uint32 unknown1 = Buffer::read(&rdbf);
+								uint32 unknown2 = Buffer::read(&rdbf);
+								uint32 unknown3 = Buffer::read(&rdbf);
+									
+								ofstream xmlout(file ,ios::binary);
+								if(xmlout)
+								{
+									unsigned char k;
+									for(unsigned l = 0; l < (DS[i].size - 12); l++)
+									{
+										k = rdbf.get() & 0xff;
+										xmlout << k;
+									}
+								}
+								else
+								{
+									printf("Error creating file: %s\n", file.c_str());
+								}
+								xmlout.close();
+								rdbf.close();
+							}
+							else
+							{
+								printf("Error with file: %s\n", rdbfile.c_str());
+							}
+						}
+					}
+					if(DS[i].type == PNG2 && exportPNG2==true)
+					{
+						char* rdbnr = new char[3];
+						sprintf(rdbnr, "%02i", (DS[i].unk0 & 0xff));
+						if((DS[i].unk0 & 0xff) >=0 && (DS[i].unk0 & 0xff) < 36)
+						{
+							string rdbfile = "./RDB/";
+							rdbfile += rdbnr;
+							rdbfile+=".rdbdata";
+							ifstream rdbf(rdbfile, ios::binary);
+							if(rdbf)
+							{
+								string file = "./png/png2/RDB";
+								file += rdbnr;
+								file +="_";
+								char* fnr = new char[10];
+								sprintf(fnr, "%08i", i);
+								file += fnr;
+								file += ".png";
+								rdbf.seekg(DS[i].offset);
+								uint32 unknown1 = Buffer::read(&rdbf);
+								uint32 unknown2 = Buffer::read(&rdbf);
+								uint32 unknown3 = Buffer::read(&rdbf);
+									
+								ofstream xmlout(file ,ios::binary);
+								if(xmlout)
+								{
+									unsigned char k;
+									for(unsigned l = 0; l < (DS[i].size - 12); l++)
+									{
+										k = rdbf.get() & 0xff;
+										xmlout << k;
+									}
+								}
+								else
+								{
+									printf("Error creating file: %s\n", file.c_str());
+								}
+								xmlout.close();
+								rdbf.close();
+							}
+							else
+							{
+								printf("Error with file: %s\n", rdbfile.c_str());
+							}
+						}
+					}
+					//*/
+					if(DS[i].type == SCRIPTGROUP && scriptgroup == true)
+					{
+						char* rdbnr = new char[3];
+						sprintf(rdbnr, "%02i", (DS[i].unk0 & 0xff));
+						if((DS[i].unk0 & 0xff) >=0 && (DS[i].unk0 & 0xff) < 36)
+						{
+							string rdbfile = "./RDB/";
+							rdbfile += rdbnr;
+							rdbfile+=".rdbdata";
+							ifstream rdbf(rdbfile, ios::binary);
+							if(rdbf)
+							{
+								string file = "./xml/scriptgroup/RDB";
+								file += rdbnr;
+								file +="_";
+								char* fnr = new char[10];
+								sprintf(fnr, "%08i", i);
+								file += fnr;
+								file += ".xml";
+								ofstream xmlout(file ,ios::out);
+
+								rdbf.seekg(DS[i].offset);
+								uint32 unknown1 = Buffer::read(&rdbf);
+								uint32 unknown2 = Buffer::read(&rdbf);
+								uint32 unknown3 = Buffer::read(&rdbf);
+								string xmltest = Buffer::read(&rdbf, (DS[i].size - 12), false);
+								xmlout << xmltest;
+								
+								rdbf.close();
+								xmlout.close();
+							}
+							else
+							{
+								printf("Error with file: %s\n", rdbfile.c_str());
+							}
+						}
+					}
+					if(DS[i].type == ANIMSYS && animsys == true)
+					{
+						char* rdbnr = new char[3];
+						sprintf(rdbnr, "%02i", (DS[i].unk0 & 0xff));
+						if((DS[i].unk0 & 0xff) >=0 && (DS[i].unk0 & 0xff) < 36)
+						{
+							string rdbfile = "./RDB/";
+							rdbfile += rdbnr;
+							rdbfile+=".rdbdata";
+							ifstream rdbf(rdbfile, ios::binary);
+							if(rdbf)
+							{
+								string file = "./xml/animsys/RDB";
+								file += rdbnr;
+								file +="_";
+								char* fnr = new char[10];
+								sprintf(fnr, "%08i", i);
+								file += fnr;
+								file += ".xml";
+								ofstream xmlout(file ,ios::out);
+
+								rdbf.seekg(DS[i].offset);
+								uint32 unknown1 = Buffer::read(&rdbf);
+								uint32 unknown2 = Buffer::read(&rdbf);
+								uint32 unknown3 = Buffer::read(&rdbf);
+								string xmltest = Buffer::read(&rdbf, (DS[i].size - 12), false);
+								xmlout << xmltest;
+								
+								rdbf.close();
+								xmlout.close();
+							}
+							else
+							{
+								printf("Error with file: %s\n", rdbfile.c_str());
+							}
+						}
 					}
 				}
-				ifstream rdb00("./RDB/00.rdbdata",ios::binary);
-				ofstream xmlout("xmltest.xml",ios::out);
-				streamoff offset = DS[324955].unk1;
+
+				/*
+				ifstream rdb00("./RDB/13.rdbdata",ios::binary);
+				ofstream xmlout("test.dxt",ios::out);
+				streamoff offset = DS[274797].offset;
 				rdb00.seekg(offset);
+				string type = Buffer::read(&rdb00, 4, false);
 				uint32 unk0 = Buffer::read(&rdb00);
 				uint32 unk1 = Buffer::read(&rdb00);
 				uint32 unk2 = Buffer::read(&rdb00);
-				string xmltest = Buffer::read(&rdb00, (DS[324955].unk2 - 12), false);
-				printf("%02x %02x %02x %02x\n", xmltest.c_str()[0], xmltest.c_str()[1], xmltest.c_str()[2], xmltest.c_str()[3]);
+				uint32 unk3 = Buffer::read(&rdb00);
+				string type2 = Buffer::read(&rdb00, 4, false);
+				string xmltest = Buffer::read(&rdb00, (DS[274797].size - 24), false);
 				xmlout << xmltest;
+				//*/
 				
 			}
 			else
