@@ -39,7 +39,7 @@ bool MysqlQuery::execute()
 	{
 		MysqlDatabase::MysqlDatabaseConnection* mydbc = (MysqlDatabase::MysqlDatabaseConnection*)m_dbc;
 
-		if (!mysql_query(&(mydbc->m_mysql), m_queryTxt))
+		if (!mysql_query(mydbc->m_mysql, m_queryTxt))
 		{
 			return true;
 		}
@@ -53,7 +53,7 @@ bool MysqlQuery::storeResult()
 	if (execute() && !m_res)
 	{
 		MysqlDatabase::MysqlDatabaseConnection* mydbc = (MysqlDatabase::MysqlDatabaseConnection*)m_dbc;
-		m_res = mysql_store_result(&(mydbc->m_mysql));
+		m_res = mysql_store_result(mydbc->m_mysql);
 		if (m_res)
 		{
 			m_column = mysql_num_fields(m_res);
@@ -94,18 +94,25 @@ string MysqlQuery::error()
 {
 	if (m_dbc)
 	{
-		MysqlDatabase::MysqlDatabaseConnection* mydbc =
-			(MysqlDatabase::MysqlDatabaseConnection*)m_dbc;
-		return mysql_error(&(mydbc->m_mysql));
+		MysqlDatabase::MysqlDatabaseConnection* mydbc = (MysqlDatabase::MysqlDatabaseConnection*)m_dbc;
+		return mysql_error(mydbc->m_mysql);
 	}
 
 	return "";
 }
 
-//////////////////////////////////////////////////////
+bool MysqlQuery::succes()
+{
+	if (m_dbc)
+	{
+		MysqlDatabase::MysqlDatabaseConnection* mydbc = (MysqlDatabase::MysqlDatabaseConnection*)m_dbc;
+		return (mysql_errno(mydbc->m_mysql) == 0);
+	}
+	else 
+		return false;
+}
+
 // get returned values from query
-//
-//////////////////////////////////////////////////////
 uint32 MysqlQuery::getUint32(uint32 idx)
 {
 	if (m_res && m_row && (idx < m_column))
@@ -134,17 +141,6 @@ const char* MysqlQuery::getCharString(uint32 idx)
 uint32 MysqlQuery::getCharUint(uint32 idx)
 {
 	return boost::lexical_cast<uint32>(m_row[idx]);
-}
-
-const char* MysqlQuery::getRealmName(uint32 idx)
-{
-	m_row=mysql_fetch_row(m_res);
-	return m_row[1];
-}
-
-uint32 MysqlQuery::getRealmId()
-{
-	return boost::lexical_cast<uint32>(m_row[0]);
 }
 
 uint64 MysqlQuery::getUint64(uint32 idx)

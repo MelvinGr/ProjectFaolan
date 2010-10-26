@@ -18,24 +18,24 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "BufferPool.h"
 
-// Buffer Pool class definition
+// PacketBuffer Pool class definition
 BufferPool::BufferPool(uint32 chunkNumber, size_t chunkSize) : m_bufferStack()
 {
 	for(uint32  i = 0; i < chunkNumber; i++)
 	{
-		m_bufferStack.push(new Buffer(chunkSize));
+		m_bufferStack.push(new PacketBuffer(chunkSize));
 	}
 }
 
-Buffer* BufferPool::allocateBuffer(size_t size)
+PacketBuffer* BufferPool::allocateBuffer(size_t size)
 {
 	if (m_bufferStack.size() == 0) // no more buffer available in the pool
 	{
-		return new Buffer(size);
+		return new PacketBuffer(size);
 	}
 	else
 	{
-		Buffer* buf = m_bufferStack.top();
+		PacketBuffer* buf = m_bufferStack.top();
 		if (buf->capacity() < size)
 		{
 			buf->resize(size);  
@@ -46,7 +46,7 @@ Buffer* BufferPool::allocateBuffer(size_t size)
 	}
 }
 
-void BufferPool::disposeBuffer(Buffer* buf)
+void BufferPool::disposeBuffer(PacketBuffer* buf)
 {
 	buf->reset();
 	m_bufferStack.push(buf);
@@ -56,7 +56,7 @@ BufferPool::~BufferPool()
 {
 	for(uint32 i = m_bufferStack.size(); i <= 0; i--)
 	{
-		Buffer* b = m_bufferStack.top();
+		PacketBuffer* b = m_bufferStack.top();
 
 		delete b;
 		m_bufferStack.pop();

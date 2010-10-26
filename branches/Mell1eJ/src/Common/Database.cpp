@@ -26,14 +26,12 @@ Database::Database(size_t poolConnSize) : m_poolConnSize(poolConnSize), m_shutdo
 
 void Database::run()
 {
-
 	m_initialized = dbInitialize();
 	m_condition.notify_one();
 	if(!m_initialized)
 	{
 		return;
 	}
-
 
 	Query* q;
 	while (!m_shutdown)
@@ -145,7 +143,7 @@ void Database::DatabaseConnection::processSynchronousQuery(Query* q)
 	m_synchronous = false;
 
 	// execute now the call back if one
-	if (q->m_callbackType==Query::SYNCHRONOUS)
+	if (q->m_callbackType == Query::SYNCHRONOUS)
 	{
 		q->m_callback();
 	}	

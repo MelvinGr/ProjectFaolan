@@ -18,7 +18,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "Packet.h"
 
-Packet::Packet(Buffer* buf) : m_buffer(buf)
+Packet::Packet(PacketBuffer* buf) : m_buffer(buf)
 {
 	length = m_buffer->read<uint32>();
 	crc32 = m_buffer->read<uint32>();

@@ -48,6 +48,12 @@
     <Filter Include="Source Files\Network\Connection">
       <UniqueIdentifier>{01ddba1c-b6ab-4f65-b678-caf01eb449f6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Client">
+      <UniqueIdentifier>{21c67ab9-f83e-4580-b54c-a43d07ada74b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Client">
+      <UniqueIdentifier>{db12b9ef-2da3-4d4d-ba4d-96157ec18864}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\Common\BigIntegerLibrary\BigInteger.h">
@@ -80,14 +86,8 @@
     <ClInclude Include="..\..\..\src\Common\Functions.h">
       <Filter>Header Files\Other</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\Common\GameClient.h">
-      <Filter>Header Files\Other</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\Common\SafeQueue.h">
       <Filter>Header Files\Other</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\Common\Common.h">
-      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Common\Vector3D.h">
       <Filter>Header Files\Other</Filter>
@@ -100,12 +100,6 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\Common\MysqlQuery.h">
       <Filter>Header Files\Network\Database\MySQL</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\Common\Configuration.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\Common\Buffer.h">
-      <Filter>Header Files\Network\Packet</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Common\BufferPool.h">
       <Filter>Header Files\Network\Packet</Filter>
@@ -134,6 +128,27 @@
     <ClInclude Include="..\..\..\src\Common\Network.h">
       <Filter>Header Files\Network\Connection</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\MysqlFunctions.h">
+      <Filter>Header Files\Network\Database\MySQL</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\GameClient.h">
+      <Filter>Header Files\Client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Configuration.h">
+      <Filter>Header Files\Other</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Common.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\PacketBuffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\CharacterInfo.h">
+      <Filter>Header Files\Client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Structs.h">
+      <Filter>Header Files\Other</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\Common\BigIntegerLibrary\BigInteger.cpp">
@@ -157,9 +172,6 @@
     <ClCompile Include="..\..\..\src\Common\Vector3D.cpp">
       <Filter>Source Files\Other</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\Common\GameClient.cpp">
-      <Filter>Source Files\Other</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\Common\Functions.cpp">
       <Filter>Source Files\Other</Filter>
     </ClCompile>
@@ -172,9 +184,6 @@
     <ClCompile Include="..\..\..\src\Common\Database.cpp">
       <Filter>Source Files\Network\Database</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\Common\Configuration.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\Common\Packet.cpp">
       <Filter>Source Files\Network\Packet</Filter>
     </ClCompile>
@@ -182,9 +191,6 @@
       <Filter>Source Files\Network\Packet</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Common\BufferPool.cpp">
-      <Filter>Source Files\Network\Packet</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\Common\Buffer.cpp">
       <Filter>Source Files\Network\Packet</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\Common\Query.cpp">
@@ -195,6 +201,21 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\Common\Network.cpp">
       <Filter>Source Files\Network\Connection</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\MysqlFunctions.cpp">
+      <Filter>Source Files\Network\Database\MySQL</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\Configuration.cpp">
+      <Filter>Source Files\Other</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\GameClient.cpp">
+      <Filter>Source Files\Client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\PacketBuffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\CharacterInfo.cpp">
+      <Filter>Source Files\Client</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

@@ -27,7 +27,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include <boost/bind.hpp>
 #include <boost/asio.hpp>
 
-#include "Buffer.h"
+#include "PacketBuffer.h"
 #include "BufferPool.h"
 
 /**
@@ -52,14 +52,14 @@ protected:
 
 	void AsyncRead();
 
-	void AsyncWrite(Buffer* b);
-	void AsyncWrite(Buffer* b, uint32 size);
+	void AsyncWrite(PacketBuffer* b);
+	void AsyncWrite(PacketBuffer* b, uint32 size);
 
-	void SendPacket(Buffer *b);
+	void SendPacket(PacketBuffer *b);
 
 	boost::asio::ip::tcp::socket m_socket;
 	BufferPool* m_bufferPool;
-	Buffer m_readBuffer; 
+	PacketBuffer m_readBuffer; 
 };
 
 #endif

@@ -29,6 +29,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include "Database.h"
 #include "Singleton.h"
 
+#define MySQLDB MysqlDatabase::instance()
 class MysqlDatabase : public Database 
 {
 	MysqlDatabase(size_t poolSize, const string& login, const string& host, const string& password, const string& database, uint32 port);
@@ -53,7 +54,7 @@ public:
 	{
 	private:
 		bool dbInitialize();
-		MYSQL m_mysql;
+		MYSQL *m_mysql;
 
 		string m_login, m_host, m_password, m_database;
 		const uint32 m_port;

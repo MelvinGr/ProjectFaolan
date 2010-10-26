@@ -95,30 +95,24 @@ namespace __gnu_cxx
 #	define HM_NAMESPACE std
 #endif
 
-#if COMPILER == COMPILER_MICROSOFT
-typedef __int64   int64;
-#else
-typedef long long int64;
-#endif
-
-typedef int        int32;
+typedef int			int32;
 typedef short       int16;
 typedef char        int8;
 
+typedef unsigned int        uint32;
+typedef unsigned short      uint16;
+typedef unsigned char       uint8;
+
+typedef long double ldouble;
+
 #if COMPILER == COMPILER_MICROSOFT
+typedef __int64   int64;
 typedef unsigned __int64   uint64;
 typedef _W64 unsigned int SOCKET;
 #else
+typedef long long int64;
 typedef unsigned long long  uint64;
-typedef unsigned long      DWORD;
-typedef int32 SOCKET;
 #endif
-
-typedef unsigned int        uint32;
-typedef unsigned short       uint16;
-typedef unsigned char        uint8;
-
-typedef long double ldouble;
 
 #if COMPILER == COMPILER_MICROSOFT
 #	define I64FMT "%016I64X"

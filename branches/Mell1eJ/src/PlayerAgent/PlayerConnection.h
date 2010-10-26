@@ -16,10 +16,11 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef UNIVERSECONNECTION_H
-#define UNIVERSECONNECTION_H
+#ifndef PLAYERCONNECTION_H
+#define PLAYERCONNECTION_H
 
 #include <iostream>
+#include <vector>
 
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/bind.hpp>
@@ -34,24 +35,26 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include "../Common/BufferPool.h"
 #include "../Common/PacketBuffer.h"
 #include "../Common/Packet.h"
+#include "../Common/CharacterInfo.h"
+#include "../Common/Structs.h"
 
 #if 1 // DATABASE_TYPE == DATABASE_MYSQL
 #include "../Common/MysqlFunctions.h"
 #endif
 
-class UniverseConnection : public Connection
+class PlayerConnection : public Connection
 {
 	void onRead(const boost::system::error_code& e, size_t bytesTransferred);
 	void onWrite(const boost::system::error_code& e);
-
-	static uint32 connectionCount;
 	
 	GameClient gameClient;
-	uint32 m_connectionID;
+	
+	void SendRealmList();
+	void SendCharacterList();
 
 public:
-	UniverseConnection(boost::asio::io_service& IOService, BufferPool* hp);
-	~UniverseConnection();
+	PlayerConnection(boost::asio::io_service& IOService, BufferPool* hp);
+	~PlayerConnection();
 
 	void start();
 };

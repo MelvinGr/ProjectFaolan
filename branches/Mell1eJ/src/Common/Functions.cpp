@@ -20,15 +20,6 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 namespace String
 {
-	string GetIPFromSocket(SOCKET socket)
-	{
-		sockaddr_in m_addr;
-		socklen_t len = sizeof(m_addr);
-		getpeername(socket, (sockaddr*)&m_addr, &len);
-
-		return inet_ntoa(m_addr.sin_addr);
-	}
-
 	string arrayToHexString(uint8* data, uint32 size)
 	{
 		if(size == 0)

@@ -16,8 +16,8 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef Configuration_H
-#define Configuration_H
+#ifndef CONFIGURATION_H
+#define CONFIGURATION_H
 
 #include "Common.h"
 

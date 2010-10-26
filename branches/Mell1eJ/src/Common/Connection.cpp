@@ -40,19 +40,19 @@ void Connection::AsyncRead()
 		boost::bind(&Connection::onRead, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 }
 
-void Connection::AsyncWrite(Buffer* b)
+void Connection::AsyncWrite(PacketBuffer* b)
 {
 	boost::asio::async_write(m_socket, boost::asio::buffer(b->constBuffer(), b->size()), 
 		boost::bind(&Connection::onWrite, shared_from_this(), boost::asio::placeholders::error));
 }
 
-void Connection::AsyncWrite(Buffer* b, uint32 size)
+void Connection::AsyncWrite(PacketBuffer* b, uint32 size)
 {
 	boost::asio::async_write(m_socket, boost::asio::buffer(b->constBuffer(), (size+4)), 
 		boost::bind(&Connection::onWrite, shared_from_this(), boost::asio::placeholders::error));
 }
 
-void Connection::SendPacket(Buffer *b)
+void Connection::SendPacket(PacketBuffer *b)
 {
 	b->finalize();
 	AsyncWrite(b);

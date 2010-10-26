@@ -57,7 +57,6 @@ namespace String
 		return ss.str();
 	}
 
-	string GetIPFromSocket(SOCKET socket);
 	string arrayToHexString(uint8* data, uint32 size);
 	string serverInfoStr();
 	vector<string> splitString(string str, string delim);

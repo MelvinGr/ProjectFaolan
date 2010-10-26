@@ -23,6 +23,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include <string>
 
+#include "CharacterInfo.h"
+
 using namespace std;
 
 class GameClient
@@ -35,6 +37,8 @@ public:
 
 	uint32 nClientInst;
 	uint32 nCookie;
+
+	CharacterInfo characterInfo;
 
 	GameClient();
 	~GameClient();

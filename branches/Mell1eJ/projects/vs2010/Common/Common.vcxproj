@@ -19,7 +19,8 @@
     <ClInclude Include="..\..\..\src\Common\BigIntegerLibrary\BigUnsigned.h" />
     <ClInclude Include="..\..\..\src\Common\BigIntegerLibrary\BigUnsignedInABase.h" />
     <ClInclude Include="..\..\..\src\Common\BigIntegerLibrary\NumberlikeArray.h" />
-    <ClInclude Include="..\..\..\src\Common\Buffer.h" />
+    <ClInclude Include="..\..\..\src\Common\CharacterInfo.h" />
+    <ClInclude Include="..\..\..\src\Common\PacketBuffer.h" />
     <ClInclude Include="..\..\..\src\Common\BufferPool.h" />
     <ClInclude Include="..\..\..\src\Common\Common.h" />
     <ClInclude Include="..\..\..\src\Common\Configuration.h" />
@@ -31,12 +32,14 @@
     <ClInclude Include="..\..\..\src\Common\GameClient.h" />
     <ClInclude Include="..\..\..\src\Common\LoginEncryption.h" />
     <ClInclude Include="..\..\..\src\Common\MysqlDatabase.h" />
+    <ClInclude Include="..\..\..\src\Common\MysqlFunctions.h" />
     <ClInclude Include="..\..\..\src\Common\MysqlQuery.h" />
     <ClInclude Include="..\..\..\src\Common\Network.h" />
     <ClInclude Include="..\..\..\src\Common\Packet.h" />
     <ClInclude Include="..\..\..\src\Common\Query.h" />
     <ClInclude Include="..\..\..\src\Common\SafeQueue.h" />
     <ClInclude Include="..\..\..\src\Common\Singleton.h" />
+    <ClInclude Include="..\..\..\src\Common\Structs.h" />
     <ClInclude Include="..\..\..\src\Common\SwapByte.h" />
     <ClInclude Include="..\..\..\src\Common\Vector3D.h" />
   </ItemGroup>
@@ -46,7 +49,8 @@
     <ClCompile Include="..\..\..\src\Common\BigIntegerLibrary\BigIntegerUtils.cpp" />
     <ClCompile Include="..\..\..\src\Common\BigIntegerLibrary\BigUnsigned.cpp" />
     <ClCompile Include="..\..\..\src\Common\BigIntegerLibrary\BigUnsignedInABase.cpp" />
-    <ClCompile Include="..\..\..\src\Common\Buffer.cpp" />
+    <ClCompile Include="..\..\..\src\Common\CharacterInfo.cpp" />
+    <ClCompile Include="..\..\..\src\Common\PacketBuffer.cpp" />
     <ClCompile Include="..\..\..\src\Common\BufferPool.cpp" />
     <ClCompile Include="..\..\..\src\Common\Configuration.cpp" />
     <ClCompile Include="..\..\..\src\Common\Connection.cpp" />
@@ -56,6 +60,7 @@
     <ClCompile Include="..\..\..\src\Common\GameClient.cpp" />
     <ClCompile Include="..\..\..\src\Common\LoginEncryption.cpp" />
     <ClCompile Include="..\..\..\src\Common\MysqlDatabase.cpp" />
+    <ClCompile Include="..\..\..\src\Common\MysqlFunctions.cpp" />
     <ClCompile Include="..\..\..\src\Common\MysqlQuery.cpp" />
     <ClCompile Include="..\..\..\src\Common\Network.cpp" />
     <ClCompile Include="..\..\..\src\Common\Packet.cpp" />

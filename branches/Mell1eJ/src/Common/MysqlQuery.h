@@ -61,9 +61,7 @@ public:
 	bool storeResult();
 
 	string error();
-
-	const char* getRealmName(uint32 idx);
-	uint32 getRealmId();
+	bool succes();
 
 	bool nextRow();
 	const char* getCharString(uint32 idx);

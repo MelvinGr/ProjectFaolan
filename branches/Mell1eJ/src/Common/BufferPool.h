@@ -25,7 +25,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include <boost/foreach.hpp>
 
-#include "Buffer.h"
+#include "PacketBuffer.h"
 
 using namespace std;
 
@@ -35,7 +35,7 @@ using namespace std;
 */
 class BufferPool 
 {
-	stack<Buffer*> m_bufferStack;
+	stack<PacketBuffer*> m_bufferStack;
 
 public:
 
@@ -47,7 +47,7 @@ public:
 	* These buffers have to be manually released by disposeBuffer.
 	* @param size size of the requested buffer in byte.
 	*/
-	Buffer* allocateBuffer(size_t size);
+	PacketBuffer* allocateBuffer(size_t size);
 
 	/**
 	* release a previously requested buffer.
@@ -55,7 +55,7 @@ public:
 	* The buffer cursors are reseted.
 	* @param buffer the allocated space to release
 	*/
-	void disposeBuffer(Buffer* buf);
+	void disposeBuffer(PacketBuffer* buf);
 
 	/**
 	* Delete all buffer in the pool for clean shutdown.
