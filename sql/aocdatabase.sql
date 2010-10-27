@@ -268,16 +268,17 @@ CREATE TABLE IF NOT EXISTS `const_stats` (
 -- ----------------------------
 -- Table structure for p_abilities
 -- ----------------------------
-CREATE TABLE `p_abilities` (
-  `name` text,
-  `id` int(11) NOT NULL default '0',
-  `level` tinyint(11) default NULL,
-  `data0` bigint(12) default NULL,
-  `data1` bigint(12) default NULL,
-  `data2` bigint(12) default NULL,
-  `data3` bigint(12) default NULL,
-  `data4` bigint(12) default NULL,
-  PRIMARY KEY  (`id`)
+DROP TABLE IF EXISTS `p_abilities`;
+CREATE TABLE IF NOT EXISTS `p_abilities` (
+  `name` text NOT NULL,
+  `id` int(11) NOT NULL DEFAULT '0',
+  `slot` int(11) NOT NULL DEFAULT '0',
+  `data0` bigint(12) NOT NULL DEFAULT '0',
+  `data1` bigint(12) NOT NULL DEFAULT '0',
+  `data2` bigint(12) NOT NULL DEFAULT '0',
+  `data3` bigint(12) NOT NULL DEFAULT '0',
+  `data4` bigint(12) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- ----------------------------
@@ -395,8 +396,13 @@ INSERT INTO `maps` VALUES ('2070', 'Poitain', '1151341050', '1127124818', '11529
 INSERT INTO `maps` VALUES ('1000', 'Conarch Village', '1114641152', '1114053233', '1144011162', '0', '0', '0');
 INSERT INTO `maps` VALUES ('2000', 'Old Tarantia', '1146428220', '1120564870', '1140034652', '0', '0', '0');
 INSERT INTO `maps` VALUES ('3020', 'Khopshef Province', '1141409216', '1094408432', '1149125668', '0', '0', '0');
-INSERT INTO `p_abilities` VALUES('Normal Attack Left', '769094', '1', '1263352118', '3236668225', '2153842419', '314062142', '3015939650');
-INSERT INTO `p_abilities` VALUES('Normal Attack Front', '769099', '1', '1227967307', '3443694845', '1660108369', '1296666148', '2957995211');
+INSERT INTO `p_abilities` (`name`, `id`, `slot`, `data0`, `data1`, `data2`, `data3`, `data4`) VALUES
+('Rest', 269272, 106, 1312109365, 2023574725, 3133773807, 3870783406, 1887832719),
+('Normal Attack Left', 769094, 108, 1263352118, 3236668225, 2153842419, 314062142, 3015939650),
+('Normal Attack right', 769095, 109, 1346650673, 1688691897, 2528496312, 3832970358, 2802705639),
+('Normal Attack Front', 769099, 112, 1227967307, 3443694845, 1660108369, 1296666148, 2957995211),
+('toggle combat', 3316611, 1250, 1280331096, 2235756528, 749634890, 3339552459, 3958402763),
+('switch weapon', 3675584, 259, 1278563891, 1677823321, 1538326685, 1383384407, 1833387476);
 INSERT INTO `const_abilitys` VALUES (29, 1, '769094_1-769099_1', NULL, '165241', NULL);
 INSERT INTO `const_abilitys` VALUES (44, 1, '769094_1-769099_1', NULL, NULL, NULL);
 INSERT INTO `const_abilitys` VALUES (18, 1, '769094_1-769099_1', NULL, NULL, NULL);
