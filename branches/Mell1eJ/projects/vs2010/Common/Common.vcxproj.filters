@@ -140,14 +140,14 @@
     <ClInclude Include="..\..\..\src\Common\Common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\Common\PacketBuffer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\Common\CharacterInfo.h">
       <Filter>Header Files\Client</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\Common\Structs.h">
       <Filter>Header Files\Other</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\PacketBuffer.h">
+      <Filter>Header Files\Network\Packet</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -211,11 +211,11 @@
     <ClCompile Include="..\..\..\src\Common\GameClient.cpp">
       <Filter>Source Files\Client</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\Common\PacketBuffer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\Common\CharacterInfo.cpp">
       <Filter>Source Files\Client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\PacketBuffer.cpp">
+      <Filter>Source Files\Network\Packet</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

@@ -27,13 +27,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "Common.h"
 
-#include <iostream>
 #include <sstream>
 #include <string>
-
-#include "BigIntegerLibrary/BigIntegerLibrary.h"
-
-#include "Functions.h"
 
 using namespace std;
 

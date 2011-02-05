@@ -27,6 +27,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include <boost/bind.hpp>
 #include <boost/asio.hpp>
 
+#include "Packet.h"
 #include "PacketBuffer.h"
 #include "BufferPool.h"
 
@@ -38,6 +39,7 @@ class Connection : private boost::noncopyable,  public boost::enable_shared_from
 {
 public:
 	Connection(boost::asio::io_service& IOService, BufferPool* bp);
+	~Connection();
 
 	boost::asio::ip::tcp::socket& socket();
 
@@ -45,21 +47,20 @@ public:
 	virtual void start() = 0;
 
 protected:
-	virtual void onRead(const boost::system::error_code& e, size_t bytesTransferred) = 0;
-	virtual void onWrite(const boost::system::error_code& e) = 0;
+	boost::asio::ip::tcp::socket m_socket;
+	BufferPool* m_bufferPool;
+	vector<uint8> m_readBuffer; 
 
 	void disconnect();
 
+	void onRead(const boost::system::error_code& e, size_t bytesTransferred);
+	void onWrite(const boost::system::error_code& e);
+
+	virtual void handlePacket(PacketBuffer *m_packetBuffer, Packet* m_packet) = 0;
+
 	void AsyncRead();
-
 	void AsyncWrite(PacketBuffer* b);
-	void AsyncWrite(PacketBuffer* b, uint32 size);
-
 	void SendPacket(PacketBuffer *b);
-
-	boost::asio::ip::tcp::socket m_socket;
-	BufferPool* m_bufferPool;
-	PacketBuffer m_readBuffer; 
 };
 
 #endif

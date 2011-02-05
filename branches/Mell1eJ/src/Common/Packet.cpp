@@ -18,6 +18,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "Packet.h"
 
+#include <sstream>
+
 Packet::Packet(PacketBuffer* buf) : m_buffer(buf)
 {
 	length = m_buffer->read<uint32>();
@@ -29,13 +31,27 @@ Packet::Packet(PacketBuffer* buf) : m_buffer(buf)
 	userID = m_buffer->read<uint32>();
 	unknown4 = m_buffer->read<uint32>();
 	opcode = m_buffer->read<uint32>();
-
-	uint32 dataLength = length - HeaderLength();
-	data.resize(dataLength);
-	data.write(m_buffer->read(dataLength), dataLength);
 }
 
 inline uint32 Packet::HeaderLength()
 {
 	return sizeof(uint16) * 2 + sizeof(uint32) * 6 + sender.length() + receiver.length();
+}
+
+string Packet::toString()
+{
+	stringstream ss;
+	ss <<
+		"length: "		<< length << "\n" <<
+		"crc32: "		<< crc32 << "\n" <<
+		"sender: "		<< sender << "\n" <<
+		"unknown1: "	<< unknown1 << "\n" <<
+		"unknown2: "	<< unknown2 << "\n" <<
+		"receiver: "	<< receiver << "\n" <<
+		"userID: "		<< userID << "\n" <<
+		"unknown4: "	<< unknown4 << "\n" <<
+		"opcode: "		<< opcode << "\n" <<
+		"data Length: "	<< length - HeaderLength() << "\n";
+
+	return ss.str();
 }

@@ -20,6 +20,12 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 Connection::Connection(boost::asio::io_service& IOService, BufferPool* bp) : m_socket(IOService), m_bufferPool(bp), m_readBuffer(2000)
 {
+	//
+}
+
+Connection::~Connection()
+{
+	//
 }
 
 boost::asio::ip::tcp::socket& Connection::socket()
@@ -34,21 +40,44 @@ void Connection::disconnect()
 
 void Connection::AsyncRead()
 {
-	m_readBuffer.reset();
-
-	m_socket.async_read_some(boost::asio::buffer(m_readBuffer.mutBuffer()), 
+	m_socket.async_read_some(boost::asio::buffer(m_readBuffer), 
 		boost::bind(&Connection::onRead, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
+}
+
+void Connection::onRead(const boost::system::error_code &e, size_t bytesTransferred)
+{
+	if(e)
+	{
+		printf("Client disconnected!\n");
+		return;
+	}
+
+	if(bytesTransferred == 0)
+	{
+		AsyncRead();
+		return;
+	}
+
+	PacketBuffer packetBuffer(&m_readBuffer[0], bytesTransferred);
+	Packet packet(&packetBuffer);
+
+	handlePacket(&packetBuffer, &packet);
+	AsyncRead();
+}
+
+void Connection::onWrite(const boost::system::error_code &e)
+{
+	if (e)
+	{
+		printf("socket write problem!\n");
+		boost::system::error_code ignored_ec;
+		m_socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ignored_ec);
+	}
 }
 
 void Connection::AsyncWrite(PacketBuffer* b)
 {
-	boost::asio::async_write(m_socket, boost::asio::buffer(b->constBuffer(), b->size()), 
-		boost::bind(&Connection::onWrite, shared_from_this(), boost::asio::placeholders::error));
-}
-
-void Connection::AsyncWrite(PacketBuffer* b, uint32 size)
-{
-	boost::asio::async_write(m_socket, boost::asio::buffer(b->constBuffer(), (size+4)), 
+	boost::asio::async_write(m_socket, boost::asio::buffer(b->buffer, b->bufferLength), 
 		boost::bind(&Connection::onWrite, shared_from_this(), boost::asio::placeholders::error));
 }
 

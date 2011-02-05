@@ -18,11 +18,6 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "MysqlFunctions.h"
 
-MySQLFunctions::MySQLFunctions() : Singleton<MySQLFunctions>()
-{
-	//
-}
-
 bool MySQLFunctions::CheckLogin(string username, string password)
 {
 	MysqlQuery q(MysqlQuery::NO_CALLBACK, MysqlQuery::HAS_RESULT);
@@ -35,7 +30,7 @@ bool MySQLFunctions::CheckLogin(string username, string password)
 		return false;
 }
 
-uint32 MySQLFunctions::GetAccountID(string username)
+int32 MySQLFunctions::GetAccountID(string username)
 {
 	MysqlQuery q(MysqlQuery::NO_CALLBACK, MysqlQuery::HAS_RESULT);
 	q.setQueryText("SELECT account_id FROM accounts WHERE username = '%s' LIMIT 1", username.c_str());
@@ -44,7 +39,7 @@ uint32 MySQLFunctions::GetAccountID(string username)
 	if(q.succes())
 		return q.getUint32(0);				
 	else
-		return 0;
+		return -1;
 }
 
 bool MySQLFunctions::IsAccountBanned(uint32 nClientInst)
@@ -56,10 +51,10 @@ bool MySQLFunctions::IsAccountBanned(uint32 nClientInst)
 	if(q.succes())
 		return (q.getUint32(0) != 0);
 	else 
-		return 0;
+		return false;
 }
 
-uint32 MySQLFunctions::GetNewCharacterId()
+int32 MySQLFunctions::GetNewCharacterId()
 {
 	MysqlQuery q(MysqlQuery::NO_CALLBACK, MysqlQuery::HAS_RESULT);
 	q.setQueryText("SELECT MAX(character_id) FROM characters");
@@ -68,7 +63,7 @@ uint32 MySQLFunctions::GetNewCharacterId()
 	if(q.succes())
 		return q.getUint32(0) + 1;				
 	else
-		return 0;
+		return -1;
 }
 
 bool MySQLFunctions::SetAccountCookie(uint32 nClientInst, uint32 cookie)

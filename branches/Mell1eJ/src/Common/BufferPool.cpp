@@ -36,7 +36,7 @@ PacketBuffer* BufferPool::allocateBuffer(size_t size)
 	else
 	{
 		PacketBuffer* buf = m_bufferStack.top();
-		if (buf->capacity() < size)
+		if (buf->maxLength < size)
 		{
 			buf->resize(size);  
 		}

@@ -40,14 +40,12 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #endif
 
 class UniverseConnection : public Connection
-{
-	void onRead(const boost::system::error_code& e, size_t bytesTransferred);
-	void onWrite(const boost::system::error_code& e);
-
-	static uint32 connectionCount;
-	
+{	
 	GameClient gameClient;
 	uint32 m_connectionID;
+	static uint32 connectionCount;
+
+	void handlePacket(PacketBuffer *m_packetBuffer, Packet* m_packet);
 
 public:
 	UniverseConnection(boost::asio::io_service& IOService, BufferPool* hp);

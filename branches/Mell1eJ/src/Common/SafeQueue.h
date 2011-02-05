@@ -39,7 +39,6 @@ template<typename T> class SafeQueue
 	boost::condition_variable m_condition;
 
 public:
-
 	size_t size()
 	{
 		boost::mutex::scoped_lock lock(m_mutex);

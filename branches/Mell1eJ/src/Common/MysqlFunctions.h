@@ -36,18 +36,12 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 using namespace std;
 
-#define Database MySQLFunctions::instance()
-class MySQLFunctions : public Singleton<MySQLFunctions>
+namespace MySQLFunctions
 {
-	friend class Singleton<MySQLFunctions>;
-	
-	MySQLFunctions();
-
-public:
 	bool CheckLogin(string username, string password);
-	uint32 GetAccountID(string username);
+	int32 GetAccountID(string username);
 	bool IsAccountBanned(uint32 nClientInst);
-	uint32 GetNewCharacterId();
+	int32 GetNewCharacterId();
 	bool SetAccountCookie(uint32 nClientInst, uint32 cookie);
 	bool UpdateLastInfo(uint32 nClientInst, string ipAddress);
 

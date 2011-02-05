@@ -40,45 +40,39 @@ void UniverseConnection::start()
 	AsyncRead();
 }
 
-void UniverseConnection::onRead(const boost::system::error_code &e, size_t bytesTransferred)
+void UniverseConnection::handlePacket(PacketBuffer *m_packetBuffer, Packet* m_packet)
 {
-	if(e)
-	{
-		printf("Client disconnected (m_connectionID: %u)\n", m_connectionID);
-		return;
-	}
-
-	//PacketBuffer *buffer = m_bufferPool->allocateBuffer(500);
-
-	Packet packet(&m_readBuffer);
-	switch(packet.opcode)
+	PacketBuffer *m_writeBuffer = m_bufferPool->allocateBuffer(2000);
+	switch(m_packet->opcode)
 	{
 	case 0x00: // InitiateAuthentication
 		{
-			string cDevName = packet.data.read<string>();
-			string cUserName = packet.data.read<string>();
-			uint32 nGameID = packet.data.read<uint32>();
+			string cDevName = m_packet->m_buffer->read<string>();
+			string cUserName = m_packet->m_buffer->read<string>();
+			uint32 nGameID = m_packet->m_buffer->read<uint32>();
 
-			PacketBuffer buffer(500);
-			buffer.writeHeader("UniverseAgent", "UniverseInterface", 1, 0, gameClient.nClientInst, 0, 0x00); // Challenge
-			buffer.write<string>(gameClient.authChallenge);
-			SendPacket(&buffer);
+			m_writeBuffer->reset();
+			m_writeBuffer->writeHeader("UniverseAgent", "UniverseInterface", 1, 0, gameClient.nClientInst, 0, 0x00); // Challenge
+			m_writeBuffer->write<string>(gameClient.authChallenge);
+			SendPacket(m_writeBuffer);
 
 			break;
 		}
 
 	case 0x01: // AnswerChallenge
 		{
-			string cAnswerChallenge = packet.data.read<string>();
+			string cAnswerChallenge = m_packet->m_buffer->read<string>();
 			string decryptedData = LoginEncryption::decryptLoginKey(cAnswerChallenge);
-			vector<string> decryptedDataVector = String::splitString(decryptedData, "|");
+
+			vector<string> decryptedDataVector;
+			boost::algorithm::split(decryptedDataVector, decryptedData, boost::is_any_of("|"));
 
 			if(decryptedDataVector.size() != 3) // wrong decryption
 			{
-				PacketBuffer buffer(500);
-				buffer.writeHeader("UniverseAgent", "UniverseInterface", 1, 0, gameClient.nClientInst, 0, 0x02); // LoginProblem
-				buffer.write<uint32>(0x04); // eLoginStatus -- error code: internal server error
-				SendPacket(&buffer);
+				m_writeBuffer->reset();
+				m_writeBuffer->writeHeader("UniverseAgent", "UniverseInterface", 1, 0, gameClient.nClientInst, 0, 0x02); // LoginProblem
+				m_writeBuffer->write<uint32>(0x04); // eLoginStatus -- error code: internal server error
+				SendPacket(m_writeBuffer);
 
 				break;
 			}
@@ -89,49 +83,49 @@ void UniverseConnection::onRead(const boost::system::error_code &e, size_t bytes
 
 			if(nChallenge != gameClient.authChallenge) // wrong auth
 			{
-				PacketBuffer buffer(500);
-				buffer.writeHeader("UniverseAgent", "UniverseInterface", 1, 0, gameClient.nClientInst, 0, 0x02); // LoginProblem
-				buffer.write<uint32>(0x04); // eLoginStatus -- error code: internal server error
-				SendPacket(&buffer);
+				m_writeBuffer->reset();
+				m_writeBuffer->writeHeader("UniverseAgent", "UniverseInterface", 1, 0, gameClient.nClientInst, 0, 0x02); // LoginProblem
+				m_writeBuffer->write<uint32>(0x04); // eLoginStatus -- error code: internal server error
+				SendPacket(m_writeBuffer);
 
 				break;
 			}
 				
-			if(!Database.CheckLogin(username, password)) // wrong login CheckLogin
+			if(!MySQLFunctions::CheckLogin(username, password)) // wrong login
 			{
-				PacketBuffer buffer(500);
-				buffer.writeHeader("UniverseAgent", "UniverseInterface", 1, 0, gameClient.nClientInst, 0, 0x01); // AckAuthenticate
-				buffer.write<uint32>(0x00); // nAuthStatus
-				buffer.write<uint64>(0x00); // cPlayerID
-				buffer.write<uint32>(0x00); // uCookie
-				buffer.write<uint32>(0x00); // eReason
-				buffer.write<uint16>(0x0E); // error code: invalid username/password
-				SendPacket(&buffer);
+				m_writeBuffer->reset();
+				m_writeBuffer->writeHeader("UniverseAgent", "UniverseInterface", 1, 0, gameClient.nClientInst, 0, 0x01); // AckAuthenticate
+				m_writeBuffer->write<uint32>(0x00); // nAuthStatus
+				m_writeBuffer->write<uint64>(0x00); // cPlayerID
+				m_writeBuffer->write<uint32>(0x00); // uCookie
+				m_writeBuffer->write<uint32>(0x00); // eReason
+				m_writeBuffer->write<uint16>(0x0E); // error code: invalid username/password
+				SendPacket(m_writeBuffer);
 
 				break;
 			}
 			
-			gameClient.nClientInst = Database.GetAccountID(username);
+			gameClient.nClientInst = MySQLFunctions::GetAccountID(username);
 			if(gameClient.nClientInst == -1) // could not get clientInst
 			{
-				PacketBuffer buffer(500);
-				buffer.writeHeader("UniverseAgent", "UniverseInterface", 1, 0, gameClient.nClientInst, 0, 0x02); // LoginProblem
-				buffer.write<uint32>(0x04); // eLoginStatus -- error code: internal server error
-				SendPacket(&buffer);
+				m_writeBuffer->reset();
+				m_writeBuffer->writeHeader("UniverseAgent", "UniverseInterface", 1, 0, gameClient.nClientInst, 0, 0x02); // LoginProblem
+				m_writeBuffer->write<uint32>(0x04); // eLoginStatus -- error code: internal server error
+				SendPacket(m_writeBuffer);
 
 				break;
 			}
 
-			if(Database.IsAccountBanned(gameClient.nClientInst)) // player banned
+			if(MySQLFunctions::IsAccountBanned(gameClient.nClientInst)) // player banned
 			{
-				PacketBuffer buffer(500);
-				buffer.writeHeader("UniverseAgent", "UniverseInterface", 1, 0, gameClient.nClientInst, 0, 0x01);
-				buffer.write<uint32>(0x00); // nAuthStatus
-				buffer.write<uint64>(0x00); // cPlayerID
-				buffer.write<uint32>(0x00); // uCookie
-				buffer.write<uint32>(0x00); // eReason
-				buffer.write<uint16>(0x17); // error code: account freezed
-				SendPacket(&buffer);
+				m_writeBuffer->reset();
+				m_writeBuffer->writeHeader("UniverseAgent", "UniverseInterface", 1, 0, gameClient.nClientInst, 0, 0x01);
+				m_writeBuffer->write<uint32>(0x00); // nAuthStatus
+				m_writeBuffer->write<uint64>(0x00); // cPlayerID
+				m_writeBuffer->write<uint32>(0x00); // uCookie
+				m_writeBuffer->write<uint32>(0x00); // eReason
+				m_writeBuffer->write<uint16>(0x17); // error code: account freezed
+				SendPacket(m_writeBuffer);
 
 				break;
 			}
@@ -150,32 +144,32 @@ void UniverseConnection::onRead(const boost::system::error_code &e, size_t bytes
 				0x09
 			};
 
-			PacketBuffer buffer(500);
-			buffer.writeHeader("UniverseAgent", "UniverseInterface", 1, 0, gameClient.nClientInst, 0, 0x05); // SetRegionState
-			buffer.write(real, sizeof(real));
-			SendPacket(&buffer);
+			m_writeBuffer->reset();
+			m_writeBuffer->writeHeader("UniverseAgent", "UniverseInterface", 1, 0, gameClient.nClientInst, 0, 0x05); // SetRegionState
+			m_writeBuffer->write(real, sizeof(real));
+			SendPacket(m_writeBuffer);
 
-			uint32 cookie = Database.GetNewCharacterId();
+			uint32 cookie = MySQLFunctions::GetNewCharacterId();
 			string playerAgentIPAddress = Config.playerAgentAddress + ":" + String::toString(Config.playerAgentPort);
 
-			Database.SetAccountCookie(gameClient.nClientInst, cookie);
-			Database.UpdateLastInfo(gameClient.nClientInst, gameClient.ipAddress);
+			MySQLFunctions::SetAccountCookie(gameClient.nClientInst, cookie);
+			MySQLFunctions::UpdateLastInfo(gameClient.nClientInst, gameClient.ipAddress);
 
-			buffer.reset();
-			buffer.writeHeader("UniverseAgent", "UniverseInterface", 1, 0, gameClient.nClientInst, 0, 0x01); // AckAuthenticate
-			buffer.write<uint32>(0x01); // nAuthStatus
-			buffer.write<uint64>(gameClient.nClientInst); // cPlayerID
-			buffer.write<string>(playerAgentIPAddress); // cTerritoryManagerAddr
-			buffer.write<uint32>(cookie); // uCookie
-			buffer.write<uint32>(0x00); // eReason
-			SendPacket(&buffer);
+			m_writeBuffer->reset();
+			m_writeBuffer->writeHeader("UniverseAgent", "UniverseInterface", 1, 0, gameClient.nClientInst, 0, 0x01); // AckAuthenticate
+			m_writeBuffer->write<uint32>(0x01); // nAuthStatus
+			m_writeBuffer->write<uint64>(gameClient.nClientInst); // cPlayerID
+			m_writeBuffer->write<string>(playerAgentIPAddress); // cTerritoryManagerAddr
+			m_writeBuffer->write<uint32>(cookie); // uCookie
+			m_writeBuffer->write<uint32>(0x00); // eReason
+			SendPacket(m_writeBuffer);
 
 			break;
 		}
 
 	case 0x02: // ClientDisconnected
 		{
-			//uint32 connectionID = packet.data.read<uint32>(); // int64 ? - InstanceType
+			//uint32 connectionID = m_packet->m_buffer->read<uint32>(); // int64 ? - InstanceType
 			disconnect();
 
 			break;
@@ -183,23 +177,12 @@ void UniverseConnection::onRead(const boost::system::error_code &e, size_t bytes
 
 	default:
 		{
-			printf("Unknown Packet With Opcode: 0x%08X\n", packet.opcode);
-			printf("%s\n\n", String::arrayToHexString((uint8*)packet.data.constCharBuffer(), packet.data.size()).c_str());
+			printf("Unknown Packet!\n");
+			printf("%s\n\n", m_packetBuffer->toString().c_str());
 
 			break;
 		}
 	}
 
-	//m_bufferPool->disposeBuffer(buffer);
-	AsyncRead();
-}
-
-void UniverseConnection::onWrite(const boost::system::error_code &e)
-{
-	if (e)
-	{
-		printf("socket write problem \n");
-		boost::system::error_code ignored_ec;
-		m_socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ignored_ec);
-	}
+	m_bufferPool->disposeBuffer(m_writeBuffer);
 }

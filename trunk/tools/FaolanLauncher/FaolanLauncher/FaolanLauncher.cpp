@@ -164,7 +164,7 @@ int main(int argc, char* argv[])
 		Error("Faolan Launcher", "Injection failed!");
 		return -6;
 	}
-	else Succes("Faolan Launcher", "Injection successfull, Conan should be with you shortly!");
+	//else Succes("Faolan Launcher", "Injection successfull, Conan should be with you shortly!");
 
 	return 0;
 }

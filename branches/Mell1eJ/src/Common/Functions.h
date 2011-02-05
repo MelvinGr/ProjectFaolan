@@ -21,30 +21,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "Common.h"
 
-#if PLATFORM != PLATFORM_WIN32
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <limits.h>
-#include <errno.h>
-//#include <linux/version.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#endif
-
-#include <iostream>
+#include <string>
 #include <sstream>
-#include <iomanip>
-#include <fstream>
-#include <vector>
-#include <algorithm>
-#include <stdio.h>
-#include <time.h>
-#include <zlib.h>
-
-#include "SwapByte.h"
-#include "Packet.h"
-#include "Vector3D.h"
 
 using namespace std;
 
@@ -59,11 +37,16 @@ namespace String
 
 	string arrayToHexString(uint8* data, uint32 size);
 	string serverInfoStr();
-	vector<string> splitString(string str, string delim);
 	string replace(string str, string from, string to);
 	string timeString();
 }     
 
-bool FileExists(string strFilename);
+namespace File
+{
+	uint64 Read(string path, bool binary, int8 **buffer);
+	void Write(string path, bool binary, int8 *buffer, uint64 length);
+
+	bool Exists(string strFilename);
+}
 
 #endif

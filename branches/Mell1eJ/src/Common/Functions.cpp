@@ -18,6 +18,31 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "Functions.h"
 
+#if PLATFORM == PLATFORM_WIN32
+#include <windows.h>
+#else
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <limits.h>
+#include <errno.h>
+//#include <linux/version.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
+
+#include <iostream>
+#include <iomanip>
+#include <fstream>
+#include <vector>
+#include <algorithm>
+#include <stdio.h>
+#include <time.h>
+#include <zlib.h>
+
+#include "SwapByte.h"
+#include "Vector3D.h"
+
 namespace String
 {
 	string arrayToHexString(uint8* data, uint32 size)
@@ -30,7 +55,7 @@ namespace String
 
 		for (uint32 i = 0; i < size; i += 16)
 		{
-			sprintf(buffer, "%08X: ", i);
+			sprintf(buffer, "%08X: ", data + i);
 			retstr += buffer;
 
 			for (int8 j = 0; j < 16; j++) 
@@ -53,8 +78,6 @@ namespace String
 					retstr += buffer;
 				}
 			}
-
-			retstr += "\n";
 		}
 
 		return retstr;
@@ -64,27 +87,9 @@ namespace String
 	{
 		int8 tmp[1024];
 		//sprintf(tmp, "Revision: %i\nBuild Date: %s\nBuild Time: %s\nPlatform: %s, %s %s\nCompiler: %s, version: %i", 
-			//SVN_REVISION, __DATE__, __TIME__, PLATFORMNAME, CONFIG, ARCH, COMPILER, COMPILERVERSION);	
+		//SVN_REVISION, __DATE__, __TIME__, PLATFORMNAME, CONFIG, ARCH, COMPILER, COMPILERVERSION);	
 
 		return string(tmp);
-	}
-
-	vector<string> splitString(string str, string delim)
-	{
-		vector<string> results;
-
-		uint32 cutAt;
-		while((cutAt = str.find_first_of(delim)) != str.npos)
-		{
-			if(cutAt > 0)
-				results.push_back(str.substr(0, cutAt));
-
-			str = str.substr(cutAt + 1);
-		}
-
-		if(str.length() > 0) results.push_back(str);
-
-		return results;
 	}
 
 	string replace(string str, string from, string to)
@@ -109,11 +114,32 @@ namespace String
 		int8 tmp[128];
 		sprintf(tmp, "%02i:%02i:%02i", timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
 
-		return string(tmp);
+		return tmp;
 	}
 }
 
-bool FileExists(string strFilename)
+uint64 File::Read(string path, bool binary, int8 **buffer)
+{
+	fstream file(path.c_str(), (binary ? ios::binary | ios::in : ios::in) | ios::ate);
+
+	uint64 size = file.tellg();
+    *buffer = new int8[size];
+
+    file.seekg (0, ios::beg);
+    file.read(*buffer, size);
+    file.close();
+
+	return size;
+}
+
+void File::Write(string path, bool binary, int8 *buffer, uint64 length)
+{
+	fstream file(path.c_str(), (binary ? ios::binary | ios::out : ios::out));
+	file.write(buffer, length);
+	file.close();
+}
+
+bool File::Exists(string strFilename)
 {
 #if PLATFORM == PLATFORM_WIN32
 	return (GetFileAttributes(strFilename.c_str()) != INVALID_FILE_ATTRIBUTES);

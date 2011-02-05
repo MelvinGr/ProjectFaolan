@@ -24,15 +24,13 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include <string>
 
 #include "PacketBuffer.h"
-#include "BufferPool.h"
 
 using namespace std;
 
 class Packet 
-{	
+{
+public:	
     PacketBuffer* m_buffer;
-
-public:
     Packet(PacketBuffer* buf);
 	
 	uint32 length;
@@ -44,9 +42,10 @@ public:
 	uint32 userID;
 	uint32 unknown4;
 	uint32 opcode;
-	PacketBuffer data;
+	//PacketBuffer data;
 
 	inline uint32 HeaderLength();
+	string toString();
 };
 
 #endif

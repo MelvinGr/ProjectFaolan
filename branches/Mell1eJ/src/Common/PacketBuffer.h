@@ -4,10 +4,10 @@ Copyright (C) 2009, 2010 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
-the Free software Foundation, either version 3 of the License, or
+the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-This program is distributed in the hope that it will be useful, 
+This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU General Public License for more details.
@@ -16,153 +16,162 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef BUFFER_H
-#define BUFFER_H
+#ifndef PACKETBUFFER_H
+#define PACKETBUFFER_H
 
 #include "Common.h"
 
-#include <vector>
-#include <memory>
+#if PLATFORM == PLATFORM_WIN32
+#include <Winsock2.h>
+#else
+#include <sys/socket.h>
+#endif
+
+#include <iostream>
 #include <string>
+#include <assert.h>
+#include <string.h>
+#include <stdio.h>
 
-#include <boost/assert.hpp>
-#include <boost/asio.hpp>
-
-#include "SwapByte.h"
 #include "CRC32.h"
+#include "SwapByte.h"
+#include "Functions.h"
 
 using namespace std;
 
-class PacketBuffer 
+struct PacketBuffer
 {
-	vector<uint8> m_rawBuffer;
-	uint32 m_writeCursor, m_readCursor;
-	size_t m_size;
-
 public:
-	PacketBuffer() : m_rawBuffer(0), m_writeCursor(0), m_readCursor(0), m_size(0) { }
-	PacketBuffer(size_t chunkSize) : m_rawBuffer(chunkSize), m_writeCursor(0), m_readCursor(0), m_size(0) { }
-	PacketBuffer(uint8* data, size_t chunkSize) : m_rawBuffer(chunkSize), m_writeCursor(0), m_readCursor(0), m_size(0) { write(data, chunkSize); }
+	uint32 offset;
+	uint8* buffer;
+	uint32 bufferLength;
+	uint32 maxLength;
 
-	size_t size()
+	PacketBuffer() {}
+
+	PacketBuffer(uint32 length)
 	{
-		return m_size;
+		offset = 0;
+		bufferLength = 0;
+		maxLength = length;
+		buffer = new uint8[length];
 	}
 
-	size_t capacity()
+	PacketBuffer(uint8* data, uint32 length)
 	{
-		return m_rawBuffer.size();
+		offset = 0;
+		bufferLength = length;
+		maxLength = length;
+		buffer = new uint8[length];
+
+		memcpy(buffer, data, length);
 	}
 
-	void resize(size_t size)
+	~PacketBuffer()
 	{
-		m_rawBuffer.resize(size);
+		delete[] buffer;
+
+		offset = 0;
+		bufferLength = 0;
+		maxLength = 0;
+	}
+
+	inline string toString()
+	{
+		return String::arrayToHexString(buffer, bufferLength);
 	}
 
 	void reset()
 	{
-		m_size = 0;
-		m_writeCursor = 0;
-		m_readCursor = 0;
+		memset(buffer, 0, maxLength);
+
+		offset = 0;
+		bufferLength = 0;
 	}
 
-	const uint8* constCharBuffer() const
+	void resize(uint32 size)
 	{
-		return &m_rawBuffer[0];
-	}
-
-	const vector<uint8>& constBuffer() const
-	{
-		return m_rawBuffer;
-	}
-
-	vector<uint8>& mutBuffer()
-	{
-		return m_rawBuffer;
-	}
-
-	template <typename T> void write(T data)
-	{
-		SwapByte::Swap<T>(data);
-		write(reinterpret_cast<uint8*>(&data), sizeof(data));
-	}
-
-	void write(const uint8* data, size_t length)
-	{
-		BOOST_ASSERT((m_writeCursor + length) <= m_rawBuffer.size());
-		memcpy(&m_rawBuffer[m_writeCursor], data, length);
-
-		m_writeCursor += length;
-		m_size += length;
+		buffer = (uint8*)realloc(buffer, size);
+		bufferLength = size;
 	}
 
 	template <typename T> T read()
 	{
-		BOOST_ASSERT((m_readCursor + sizeof(T)) <= m_rawBuffer.size());
+		try
+		{
+			T ret = *(reinterpret_cast<T*>(&buffer[offset]));
+			SwapByte::Swap<T>(ret);
 
-		T ret = *(reinterpret_cast<T*>(&m_rawBuffer[m_readCursor]));
-		SwapByte::Swap<T>(ret);
-
-		m_readCursor += sizeof(T);
-		return ret;
+			offset += sizeof(T);
+			return ret;
+		}
+		catch(char* msg)
+		{
+			printf("Error at reading @ PacketBuffer.h\nErrorMsg: %s \n", msg);
+			return NULL;
+		}
 	}
 
-	unsigned char* read(unsigned int length)
+	template <typename T> void write(T data)
 	{
-		BOOST_ASSERT((m_readCursor + length) <= m_rawBuffer.size());
+		try
+		{
+			T newData = data;
+			SwapByte::Swap<T>(newData);
 
-		uint8* ret = new uint8[length];
-		for(uint32 i = 0; i < length; i++) 
-			ret[i] = read<uint8>();
+			assert((offset + sizeof(T)) <= maxLength);
+			memcpy(&buffer[offset], reinterpret_cast<uint8*>(&newData), sizeof(newData));
 
-		return ret;
-	}
-	
-	void write(string data)
-	{
-		BOOST_ASSERT((m_writeCursor + data.length() + sizeof(uint16)) <= m_rawBuffer.size());
-		
-		write<uint16>(data.length());
-		write((uint8*)data.c_str(), data.length());
-	}
-	
-	string read()
-	{
-		BOOST_ASSERT((m_readCursor + sizeof(uint16)) <= m_rawBuffer.size());
-		uint16 stringSize = read<uint16>();
-		
-		BOOST_ASSERT((m_readCursor + stringSize) <= m_rawBuffer.size());
-		string ret(&m_rawBuffer[m_readCursor], &m_rawBuffer[m_readCursor + stringSize]);
-		
-		m_readCursor += stringSize;
-		return ret;
+			offset += sizeof(newData);
+			bufferLength += sizeof(newData);
+		}
+		catch(char* msg)
+		{
+			printf("Error at writing @ PacketBuffer.h\nErrorMsg: %s \n", msg);
+		}
 	}
 
-	void writeHeader(string sender, string receiver, uint32 unknown1, uint32 unknown2, uint32 user, uint32 unknown4, uint32 opcode)
-	{
-		reset();
-
-		write<uint32>(0); // Write empty length
-		write<uint32>(0); // write empty crc32
-		write<string>(sender); // write sender
-		write<uint32>(unknown1); // write Unknown 1
-		write<uint32>(unknown2); // write Unknown 2
-		write<string>(receiver); // write receiver
-		write<uint32>(user); // write userID
-		write<uint32>(unknown4); // write Unknown 4
-		write<uint32>(opcode); // write opcode
-	}
-
-	void finalize()
-	{
-		uint32 packetLength = m_size - sizeof(uint32); 
-		SwapByte::Swap<uint32>(packetLength);
-		memcpy(&m_rawBuffer[0], reinterpret_cast<uint8*>(&packetLength), sizeof(uint32));
-
-		uint32 hash = CRC32::CalculateCRC32(&m_rawBuffer[0], m_size);
-		SwapByte::Swap<uint32>(hash);
-		memcpy(&m_rawBuffer[4], reinterpret_cast<uint8*>(&hash), sizeof(uint32));
-	}
+	uint8* read(uint32 length);
+	void write(const uint8* data, uint32 length);
+	void writeHeader(string sender, string receiver, uint32 unknown1, uint32 unknown2, uint32 user, uint32 unknown4, uint32 opcode);
+	void finalize();
 };
+
+
+template <> inline void PacketBuffer::write(string data)
+{
+	try
+	{
+		assert((offset + sizeof(int16)) <= maxLength);
+		write<uint16>(data.size());
+	
+		assert((offset + data.size()) <= maxLength);
+		write((uint8*)data.c_str(), data.size());
+	}
+	catch(char* msg)
+	{
+		printf("Error at writing String @ PacketBuffer.h\nErrorMsg: %s \n", msg);
+	}
+}
+
+template <> inline string PacketBuffer::read()
+{
+	try
+	{
+		assert((offset + sizeof(int16)) <= bufferLength);
+		uint16 stringLength = read<uint16>();
+	
+		assert((offset + stringLength) <= bufferLength);
+		string data(&buffer[offset], &buffer[offset + stringLength]);
+	
+		offset += stringLength;
+		return data;
+	}
+	catch(char* msg)
+	{
+		printf("Error at reading String @ PacketBuffer.h\nErrorMsg: %s \n", msg);
+		return "";
+	}
+}
 
 #endif
