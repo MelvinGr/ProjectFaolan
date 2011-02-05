@@ -1,12 +1,9 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 10.00
-# Visual Studio 2008
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FaolanLauncher", "FaolanLauncher\FaolanLauncher.vcproj", "{39B3F85F-560A-4C50-B148-95F1286E7AB2}"
-	ProjectSection(ProjectDependencies) = postProject
-		{C1C6AC6D-4A57-4C50-8C3C-515C33E544A0} = {C1C6AC6D-4A57-4C50-8C3C-515C33E544A0}
-	EndProjectSection
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FaolanLauncher", "FaolanLauncher\FaolanLauncher.vcxproj", "{39B3F85F-560A-4C50-B148-95F1286E7AB2}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FaolanLauncherDLL", "FaolanLauncherDLL\FaolanLauncherDLL.vcproj", "{C1C6AC6D-4A57-4C50-8C3C-515C33E544A0}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FaolanLauncherDLL", "FaolanLauncherDLL\FaolanLauncherDLL.vcxproj", "{C1C6AC6D-4A57-4C50-8C3C-515C33E544A0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
