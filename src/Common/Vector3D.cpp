@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Servoer Emulator for Age of Conan.
-Copyright (C) 2009, 2010 The Project Faolan Team
+Copyright (C) 2009, 2010, 2011 The Project Faolan Team
 
 This program is free softvtare: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
