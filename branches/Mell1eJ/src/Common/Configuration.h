@@ -31,6 +31,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 using namespace std;
 
+class Database;
+
 /**
 * server configuration manager
 * @author Albator
@@ -44,39 +46,24 @@ class Configuration : public Singleton<Configuration>
 
 	boost::program_options::options_description m_description;
 	boost::program_options::variables_map m_variableMap;
-
 	boost::mutex m_mutex;
-	uint32 m_addressCounter;
-	vector<string> m_charServers;
 
 public:
-	void parseCommandLine(int argc, char* argv[]);
+	void parseCommandLine(int argc, int8* argv[]);
 	void parseConfigFile();
 	void printConfiguration();
-	void generateFinalOptions();
 
 	string DBUsername, DBPassword, DBName, DBHost;
-	uint32 DBPort, DBConnectionCount;
+	uint32 DBPort, DBConnectionCount, DBType;
+
+	uint32 demuxerCount;
+	uint32 characterSlots;
 	
 	string universeAgentAddress;
 	uint32 universeAgentPort;
 
 	string playerAgentAddress;
 	uint32 playerAgentPort;
-
-	string csPlayerAgentAddress;
-	uint32 csPlayerAgentPort;
-
-	string agentServerAddress;
-	uint32 agentServerPort;
-
-	string worldServerAddress;
-	uint32 worldServerPort;
-
-	uint32 demuxerCount;
-
-	string realmName;
-	uint32 characterSlots;
 };
 
 #endif

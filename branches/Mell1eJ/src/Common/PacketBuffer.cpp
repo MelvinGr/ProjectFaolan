@@ -18,18 +18,18 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "PacketBuffer.h"
 
-void PacketBuffer::write(const uint8* data, uint32 length)
+void PacketBuffer::reset()
 {
-	try
-	{
-		assert((offset + length) <= maxLength);
-		for(uint32 i = 0; i < length; i++)
-			write<uint8>(data[i]);
-	}
-	catch(char* msg)
-	{
-		printf("Error at writing Array @ PacketBuffer.cpp\nErrorMsg: %s \n", msg);
-	}
+	memset(buffer, 0, maxLength);
+
+	offset = 0;
+	bufferLength = 0;
+}
+
+void PacketBuffer::resize(uint32 size)
+{
+	buffer = (uint8*)realloc(buffer, size);
+	maxLength = size;
 }
 
 uint8* PacketBuffer::read(uint32 length)
@@ -43,10 +43,24 @@ uint8* PacketBuffer::read(uint32 length)
 
 		return ret;
 	}
-	catch(char* msg)
+	catch(int8* msg)
 	{
 		printf("Error at reading Array @ PacketBuffer.cpp\nErrorMsg: %s \n", msg);
 		return 0;
+	}
+}
+
+void PacketBuffer::write(const uint8* data, uint32 length)
+{
+	try
+	{
+		assert((offset + length) <= maxLength);
+		for(uint32 i = 0; i < length; i++)
+			write<uint8>(data[i]);
+	}
+	catch(int8* msg)
+	{
+		printf("Error at writing Array @ PacketBuffer.cpp\nErrorMsg: %s \n", msg);
 	}
 }
 

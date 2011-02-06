@@ -16,14 +16,12 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef SAFEQUEUE_
-#define SAFEQUEUE_
-
-#include "Common.h"
+#ifndef SAFEQUEUE_H
+#define SAFEQUEUE_H
 
 #include <boost/thread.hpp>
-
 #include <queue>
+#include "Common.h"
 
 using namespace std;
 
@@ -34,10 +32,6 @@ using namespace std;
 */
 template<typename T> class SafeQueue 
 {
-	queue<T> m_queue;
-	mutable boost::mutex m_mutex;
-	boost::condition_variable m_condition;
-
 public:
 	size_t size()
 	{
@@ -105,6 +99,11 @@ public:
 		x = m_queue.front();
 		m_queue.pop();        
 	}
+
+private:
+	queue<T> m_queue;
+	mutable boost::mutex m_mutex;
+	boost::condition_variable m_condition;
 };
 
 #endif

@@ -76,25 +76,6 @@ public:
 		maxLength = 0;
 	}
 
-	inline string toString()
-	{
-		return String::arrayToHexString(buffer, bufferLength);
-	}
-
-	void reset()
-	{
-		memset(buffer, 0, maxLength);
-
-		offset = 0;
-		bufferLength = 0;
-	}
-
-	void resize(uint32 size)
-	{
-		buffer = (uint8*)realloc(buffer, size);
-		bufferLength = size;
-	}
-
 	template <typename T> T read()
 	{
 		try
@@ -105,7 +86,7 @@ public:
 			offset += sizeof(T);
 			return ret;
 		}
-		catch(char* msg)
+		catch(int8* msg)
 		{
 			printf("Error at reading @ PacketBuffer.h\nErrorMsg: %s \n", msg);
 			return NULL;
@@ -125,11 +106,15 @@ public:
 			offset += sizeof(newData);
 			bufferLength += sizeof(newData);
 		}
-		catch(char* msg)
+		catch(int8* msg)
 		{
 			printf("Error at writing @ PacketBuffer.h\nErrorMsg: %s \n", msg);
 		}
 	}
+
+	inline string toString() { return String::arrayToHexString(buffer, bufferLength); }
+	void reset();
+	void resize(uint32 size);
 
 	uint8* read(uint32 length);
 	void write(const uint8* data, uint32 length);
@@ -148,7 +133,7 @@ template <> inline void PacketBuffer::write(string data)
 		assert((offset + data.size()) <= maxLength);
 		write((uint8*)data.c_str(), data.size());
 	}
-	catch(char* msg)
+	catch(int8* msg)
 	{
 		printf("Error at writing String @ PacketBuffer.h\nErrorMsg: %s \n", msg);
 	}
@@ -167,7 +152,7 @@ template <> inline string PacketBuffer::read()
 		offset += stringLength;
 		return data;
 	}
-	catch(char* msg)
+	catch(int8* msg)
 	{
 		printf("Error at reading String @ PacketBuffer.h\nErrorMsg: %s \n", msg);
 		return "";

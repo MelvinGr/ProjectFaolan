@@ -131,9 +131,10 @@ typedef unsigned long long  uint64;
 #define atol(a) strtoul(a, NULL, 10)
 #define STRINGIZE(a) #a
 
-#endif
 
 ///////////////////////////////////////////////////
+
+#define foreach BOOST_FOREACH
 
 #define FaolanBanner\
 	"-------------------------------------------------------------------------------\n"\
@@ -143,3 +144,5 @@ typedef unsigned long long  uint64;
 	"|  #     #  #  #   #   # #    #     #      #    ##### #   # #    ##### #  ##  |\n"\
 	"|  #     #   #  ###  ### #### ###   #      #    #   #  ###  #### #   # #   #  |\n"\
 	"-------------------------------------------------------------------------------\n"
+
+#endif

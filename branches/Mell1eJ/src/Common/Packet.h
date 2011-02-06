@@ -30,7 +30,7 @@ using namespace std;
 class Packet 
 {
 public:	
-    PacketBuffer* m_buffer;
+    PacketBuffer* buffer;
     Packet(PacketBuffer* buf);
 	
 	uint32 length;

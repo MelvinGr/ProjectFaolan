@@ -56,7 +56,7 @@ protected:
 	void onRead(const boost::system::error_code& e, size_t bytesTransferred);
 	void onWrite(const boost::system::error_code& e);
 
-	virtual void handlePacket(PacketBuffer *m_packetBuffer, Packet* m_packet) = 0;
+	virtual void handlePacket(PacketBuffer *packetBuffer, Packet* packet) = 0;
 
 	void AsyncRead();
 	void AsyncWrite(PacketBuffer* b);

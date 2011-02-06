@@ -44,10 +44,10 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 class PlayerConnection : public Connection
 {
-	void onRead(const boost::system::error_code& e, size_t bytesTransferred);
-	void onWrite(const boost::system::error_code& e);
+	void handlePacket(PacketBuffer *packetBuffer, Packet* packet);
 	
 	GameClient gameClient;
+	CharacterInfo characterInfo;
 	
 	void SendRealmList();
 	void SendCharacterList();

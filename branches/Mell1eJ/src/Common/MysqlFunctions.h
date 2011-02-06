@@ -42,13 +42,18 @@ namespace MySQLFunctions
 	int32 GetAccountID(string username);
 	bool IsAccountBanned(uint32 nClientInst);
 	int32 GetNewCharacterId();
+
+	int32 GetAccountCookie(uint32 nClientInst);
 	bool SetAccountCookie(uint32 nClientInst, uint32 cookie);
+
 	bool UpdateLastInfo(uint32 nClientInst, string ipAddress);
 
 	bool GetRealm(uint32 realmID, RealmInfo *realm);
 	bool GetRealms(vector<RealmInfo> *realms);
 	bool GetCharacter(uint32 characterID, CharacterInfo *character);
 	bool GetCharacters(uint32 accountID, vector<CharacterInfo> *characters);
+
+	bool DeleteCharacter(uint32 characterID);
 };
 
 #endif

@@ -20,17 +20,17 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include <sstream>
 
-Packet::Packet(PacketBuffer* buf) : m_buffer(buf)
+Packet::Packet(PacketBuffer* buf) : buffer(buf)
 {
-	length = m_buffer->read<uint32>();
-	crc32 = m_buffer->read<uint32>();
-	sender = m_buffer->read<string>();
-	unknown1 = m_buffer->read<uint32>(); 
-	unknown2 = m_buffer->read<uint32>();
-	receiver = m_buffer->read<string>();
-	userID = m_buffer->read<uint32>();
-	unknown4 = m_buffer->read<uint32>();
-	opcode = m_buffer->read<uint32>();
+	length = buffer->read<uint32>();
+	crc32 = buffer->read<uint32>();
+	sender = buffer->read<string>();
+	unknown1 = buffer->read<uint32>(); 
+	unknown2 = buffer->read<uint32>();
+	receiver = buffer->read<string>();
+	userID = buffer->read<uint32>();
+	unknown4 = buffer->read<uint32>();
+	opcode = buffer->read<uint32>();
 }
 
 inline uint32 Packet::HeaderLength()

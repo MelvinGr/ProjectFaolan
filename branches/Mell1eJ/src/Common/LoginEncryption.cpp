@@ -71,7 +71,7 @@ string LoginEncryption::decryptLoginKey(const string& loginKey)
 	uint32 length = *(reinterpret_cast<uint32*>(&dataString[8]));
 	SwapByte::Swap<uint32>(length);
 
-	return dataString.substr(12, 8 + sizeof(uint32) + length);
+	return dataString.substr(12, 12 + length);
 }
 
 uint8 LoginEncryption::popHexChar(stringstream& sstr)

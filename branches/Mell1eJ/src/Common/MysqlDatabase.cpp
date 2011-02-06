@@ -17,18 +17,18 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "MysqlDatabase.h"
+#include <boost/thread.hpp>
+#include <boost/foreach.hpp>
 
 MysqlDatabase* MysqlDatabase::m_db = NULL;
 
-MysqlDatabase::MysqlDatabase(size_t poolSize, const string& login, const string& host, const string& password, const string& database, uint32 port) :
-	Database(poolSize), m_login(login), m_host(host), m_password(password), m_database(database), m_port(port)
+MysqlDatabase* MysqlDatabase::createInstance(std::size_t poolSize, const std::string &login, const std::string &host, const std::string &password, const std::string &database, uint32 port)
 {
-
-}
-
-MysqlDatabase* MysqlDatabase::createInstance(size_t poolSize, const string &login, const string &host, const string &password, const string &database, uint32 port)
-{
-	return (m_db ? m_db : new MysqlDatabase(poolSize, login, host, password, database, port));
+	if(m_db==NULL)
+	{
+		m_db = new MysqlDatabase(poolSize,login,host,password,database,port);
+	}
+	return m_db;
 }
 
 MysqlDatabase* MysqlDatabase::instance()
@@ -45,40 +45,53 @@ void MysqlDatabase::destroy()
 	}
 }
 
+MysqlDatabase::MysqlDatabase(std::size_t poolSize, const std::string& login,
+	const std::string& host, const std::string& password,
+	const std::string& database, uint32 port) :
+Database(poolSize), m_login(login), m_host(host), m_password(password),
+	m_database(database), m_port(port)
+{
+
+}
+
+
+
 bool MysqlDatabase::dbInitialize()
 {
-	for (uint32 i = 0; i < m_poolConnSize; i++)
+
+	for (uint32 i=0; i < m_poolConnSize; i++)
 	{
-		DatabaseConnection* dbc = new MysqlDatabaseConnection(this, m_login, m_host, m_password, m_database, m_port);
+		DatabaseConnection* dbc = new MysqlDatabaseConnection(this,m_login,m_host,m_password,m_database,m_port);
 		m_dbConnQueue.push(dbc);
 		m_dbConn.push_back(dbc);
 
 		if(!dbc->dbInitialize())
 		{
-			printf("%s\n", dbc->error().c_str());
+			printf("%s\n",dbc->error().c_str());
 			return false;
 		}
-
 		m_group.create_thread(boost::bind(&MysqlDatabaseConnection::run, dbc));
 	}
 
 	return true;
+
 }
 
 bool MysqlDatabase::start()
 {
 	boost::mutex::scoped_lock lock(m_mutex);
 
-	m_runThread = new boost::thread(boost::bind(&MysqlDatabase::run, this));
-	m_condition.wait(lock);	
+	m_runThread = new boost::thread(boost::bind(&MysqlDatabase::run,this));
+	m_condition.wait(lock);
+
 
 	if(m_initialized)
 	{
-		printf("Connected to Mysql DB on port: %u Host: %s DB name: %s\n", m_port, m_host.c_str(), m_database.c_str());
+		printf("Connected to Mysql DB on port: %d Host: %s DB name: %s \n",m_port,m_host.c_str(),m_database.c_str());
 	}
 	else
 	{
-		printf("Fail to connect to Mysql DB on port: %u Host: %s DB name: %s\n", m_port, m_host.c_str(), m_database.c_str());
+		printf("Fail to connect to Mysql DB on port: %d Host: %s DB name: %s \n",m_port,m_host.c_str(),m_database.c_str());
 	}
 
 	return m_initialized;
@@ -100,47 +113,66 @@ MysqlDatabase::~MysqlDatabase()
 	}
 }
 
+/////////////////////////////////////////////////////////////:
 // MysqlDatabaseConnection def
-MysqlDatabase::MysqlDatabaseConnection::MysqlDatabaseConnection(Database* db, const string& login, const string& host, const string& password, const string& database, uint32 port) :
-	DatabaseConnection(db), m_mysql(0), m_login(login), m_host(host), m_password(password), m_database(database), m_port(port)
+//////////////////////////////////////////////////////////////
+
+MysqlDatabase::MysqlDatabaseConnection::MysqlDatabaseConnection(Database* db,
+	const std::string& login, const std::string& host,
+	const std::string& password, const std::string& database, uint32 port) :
+DatabaseConnection(db), m_login(login), m_host(host), m_password(password),
+	m_database(database), m_port(port)
 {
 
 }
 
 bool MysqlDatabase::MysqlDatabaseConnection::dbInitialize()
 {
-	if(m_mysql = mysql_init(NULL))
+
+	mysql_init(&m_mysql);
+	//mysql_option(&m_mysql, MYSQL_SET_CHARSET_NAME, "utf8");
+
+	if (!mysql_real_connect(&m_mysql, m_host.c_str(), m_login.c_str(),
+		m_password.c_str(), m_database.c_str(), m_port, NULL, 0))
 	{
-		//mysql_option(m_mysql, MYSQL_SET_CHARSET_NAME, "utf8");
-		if (mysql_real_connect(m_mysql, m_host.c_str(), m_login.c_str(), m_password.c_str(), m_database.c_str(), m_port, NULL, 0))
-			return (m_initialized = connected());
+
+		m_initialized = false;
 	}
-	
-	return (m_initialized = false);
+
+	m_initialized = connected();
+
+	return m_initialized;
+
 }
 
 bool MysqlDatabase::MysqlDatabaseConnection::connected()
 {
-	return (mysql_ping(m_mysql) == 0);
+	return mysql_ping(&m_mysql) ? false : true;
 }
 
-void MysqlDatabase::MysqlDatabaseConnection::disconnect()
+bool MysqlDatabase::MysqlDatabaseConnection::disconnect()
 {
-	mysql_close(m_mysql);
+	mysql_close(&m_mysql);
+	return true;
 }
 
 MysqlDatabase::MysqlDatabaseConnection::~MysqlDatabaseConnection()
 {
+
 	disconnect();
 }
 
 void MysqlDatabase::MysqlDatabaseConnection::shutdown()
 {
-	m_shutdown = true;
+	m_shutdown=true;
 	m_condition.notify_one();
 }
 
-string MysqlDatabase::MysqlDatabaseConnection::error()
+std::string MysqlDatabase::MysqlDatabaseConnection::error()
 {
-	return mysql_error(m_mysql);
+	return mysql_error(&m_mysql);
+
 }
+
+
+

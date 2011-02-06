@@ -45,7 +45,7 @@ class UniverseConnection : public Connection
 	uint32 m_connectionID;
 	static uint32 connectionCount;
 
-	void handlePacket(PacketBuffer *m_packetBuffer, Packet* m_packet);
+	void handlePacket(PacketBuffer *packetBuffer, Packet* packet);
 
 public:
 	UniverseConnection(boost::asio::io_service& IOService, BufferPool* hp);

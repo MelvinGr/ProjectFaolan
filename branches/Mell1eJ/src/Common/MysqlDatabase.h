@@ -19,58 +19,70 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #ifndef MYSQLDATABASE_H
 #define MYSQLDATABASE_H
 
-#include "Common.h"
-
-#include <boost/thread.hpp>
-#include <boost/foreach.hpp>
-
-#include <mysql/mysql.h>
-
 #include "Database.h"
+#include "Common.h"
 #include "Singleton.h"
 
+#if PLATFORM == PLATFORM_WIN32
+#	include <winsock2.h>
+#endif
+#include <mysql/mysql.h>
+
 #define MySQLDB MysqlDatabase::instance()
-class MysqlDatabase : public Database 
-{
-	MysqlDatabase(size_t poolSize, const string& login, const string& host, const string& password, const string& database, uint32 port);
+class MysqlDatabase : public Database {
+public:
+
+	static MysqlDatabase* createInstance(std::size_t poolSize, const std::string& login,
+		const std::string& host, const std::string& password,
+		const std::string& database, uint32 port);
+
+	static MysqlDatabase* instance();
+
+	static void destroy();
+
+	bool start();
+
+
+
+	class MysqlDatabaseConnection : public Database::DatabaseConnection {
+	public:
+		friend class MysqlQuery;
+		MysqlDatabaseConnection(Database* db, const std::string& login,
+			const std::string& host, const std::string& password,
+			const std::string& database, uint32 port);
+
+		bool connected();
+
+		bool disconnect();
+
+		void shutdown();
+
+		~MysqlDatabaseConnection();
+
+		std::string error();
+	private:
+
+		bool dbInitialize();
+		MYSQL m_mysql;
+
+		std::string m_login, m_host, m_password, m_database;
+		const uint32 m_port;
+	};
+
+private:
+
+	MysqlDatabase(std::size_t poolSize, const std::string& login,
+		const std::string& host, const std::string& password,
+		const std::string& database, uint32 port);
 
 	~MysqlDatabase();
 
-	string m_login, m_host, m_password, m_database;
+	std::string m_login, m_host, m_password, m_database;
 	const uint32 m_port;
 	bool dbInitialize();
 
 	static MysqlDatabase* m_db;
 
-public:
-	static MysqlDatabase* createInstance(size_t poolSize, const string& login, const string& host, const string& password, const string& database, uint32 port);
-
-	static MysqlDatabase* instance();
-	static void destroy();
-
-	bool start();
-
-	class MysqlDatabaseConnection : public Database::DatabaseConnection 
-	{
-	private:
-		bool dbInitialize();
-		MYSQL *m_mysql;
-
-		string m_login, m_host, m_password, m_database;
-		const uint32 m_port;
-
-	public:
-		friend class MysqlQuery;
-		MysqlDatabaseConnection(Database* db, const string& login, const string& host, const string& password, const string& database, uint32 port);
-		~MysqlDatabaseConnection();
-
-		bool connected();
-
-		void disconnect();
-		void shutdown();
-
-		string error();
-	};
 };
 
-#endif
+#endif /*MYSQLDATABASE_H_*/

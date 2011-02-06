@@ -19,61 +19,59 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #ifndef MYSQLQUERY_H
 #define MYSQLQUERY_H
 
+#include "Query.h"
 #include "Common.h"
-
+#include "MysqlDatabase.h"
 #include <map>
 #include <string>
 
-#include <boost/lexical_cast.hpp>
-
-#include <mysql/mysql.h>
-
-#include "Query.h"
-#include "MysqlDatabase.h"
-
-using namespace std;
-
-class MysqlQuery : public Query 
-{
-	MYSQL_RES* m_res;
-	MYSQL_ROW m_row;
+class MysqlQuery : public Query {
 
 public:
-	/**
-	* Query with a callback
-	* 
-	*/
-	MysqlQuery(boost::function<void ()> f, CallbackType type, QueryType t);
+    /**
+     * Query with a callback
+     * 
+     */
+    MysqlQuery(boost::function<void ()> f, CallbackType type, QueryType t);
 
-	MysqlQuery(CallbackType type, QueryType t);
+    MysqlQuery(CallbackType type, QueryType t);
+    
+    /**
+     * Query without callback
+     */
+    MysqlQuery(QueryType t);
 
-	/**
-	* Query without callback
-	*/
-	MysqlQuery(QueryType t);
+    bool execute();
 
-	bool execute();
-
-	bool fetchRow();
+    bool fetchRow();
 
 	uint64 numRows();
 
-	bool storeResult();
+    bool storeResult();
+    bool succes();
 
-	string error();
-	bool succes();
+    std::string error();
 
-	bool nextRow();
-	const char* getCharString(uint32 idx);
-	uint32 getCharUint(uint32 idx);
+	const char* MysqlQuery::getRealmName(uint32 idx);
+	uint32 MysqlQuery::getRealmId();
 
-	uint32 getUint32();
-	uint64 getUint64();
-	const char* getString();
+	bool MysqlQuery::nextRow();
+	const char* MysqlQuery::getCharString(uint32 idx);
+	uint32 MysqlQuery::getCharUint(uint32 idx);
 
-	uint32 getUint32(uint32 idx);
-	uint64 getUint64(uint32 idx);
-	const char* getString(uint32 idx);
+    
+    uint32 getUint32();
+    uint64 getUint64();
+    const char* getString();
+    
+    uint32 getUint32(uint32 idx);
+    uint64 getUint64(uint32 idx);
+    const char* getString(uint32 idx);
+
+private:
+    MYSQL_RES* m_res;
+    MYSQL_ROW m_row;
+
 };
 
-#endif
+#endif /*MYSQLQUERY_H_*/

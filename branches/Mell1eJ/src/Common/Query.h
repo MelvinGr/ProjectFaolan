@@ -20,23 +20,19 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #define QUERY_H
 
 #include "Common.h"
-
-#include <stdarg.h>
-
+#include "Database.h"
 #include <boost/bind.hpp>
 #include <boost/function.hpp>
-
-#include "Database.h"
-
-using namespace std;
 
 /**
 * database query class
 * @author Albator
 */
-class Query 
-{
+class Query {
+
 public:
+
+
 	enum CallbackType { MAIN_THREAD, WORKER_THREAD, NO_CALLBACK, SYNCHRONOUS };
 	enum QueryType { HAS_RESULT, NO_RESULT };
 
@@ -46,7 +42,9 @@ public:
 	*/
 	Query(boost::function<void ()> f, CallbackType type, QueryType t);
 
+
 	Query(CallbackType type, QueryType t);
+
 
 	/**
 	* Query without callback
@@ -56,12 +54,13 @@ public:
 	/**
 	* assign a text to the query
 	*/
-	//void setQueryText(const string& queryText);
+	//void setQueryText(const std::string& queryText);
 
 	/**
 	* assign a text to the query C style
 	*/
 	void setQueryText(const char* queryText, ...);
+
 
 	void setCallbackFunction(boost::function<void ()> f);
 
@@ -77,16 +76,19 @@ public:
 	*/
 	virtual bool fetchRow()=0;
 
+
 	/**
 	* Query without result set
 	*/
 	virtual bool execute()=0;
+
 
 	/**
 	* Release the connection attached to the object query
 	* This will call the query callback.
 	*/
 	void releaseDBConnection();
+
 
 	/**
 	*  Free results.
@@ -98,6 +100,7 @@ public:
 	}
 
 	void setDatabaseConnection(Database::DatabaseConnection* dbc);
+
 
 	////////////////////////////////////////////////////////
 	// Get data from the current row.
@@ -111,16 +114,20 @@ public:
 	virtual uint64 getUint64(uint32 idx)=0;
 	virtual const char* getString(uint32 idx)=0;
 
+
 	virtual ~Query()
 	{
-		//
+
 	}
+
+
+
 
 	/**
 	* 
 	* @return last error message
 	*/
-	virtual string error()=0;
+	virtual std::string error()=0;
 
 	boost::function<void ()> m_callback;
 	CallbackType m_callbackType;
@@ -132,6 +139,9 @@ protected:
 	Database::DatabaseConnection* m_dbc;
 	uint32 m_column;
 	int m_idx;
+
+
+
 };
 
-#endif
+#endif /*QUERY_H_*/

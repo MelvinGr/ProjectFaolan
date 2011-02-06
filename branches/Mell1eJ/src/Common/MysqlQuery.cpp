@@ -17,18 +17,24 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "MysqlQuery.h"
+#include "MysqlDatabase.h"
+#include <mysql/mysql.h>
+#include <boost/lexical_cast.hpp>
 
-MysqlQuery::MysqlQuery(QueryType t) : Query(t), m_res(NULL)
+MysqlQuery::MysqlQuery(QueryType t) :
+Query(t), m_res(NULL)
 {
 
 }
 
-MysqlQuery::MysqlQuery(boost::function<void ()> f, CallbackType type, QueryType t) : Query(f, type, t), m_res(NULL)
+MysqlQuery::MysqlQuery(boost::function<void ()> f, CallbackType type, QueryType t) :
+Query(f, type, t), m_res(NULL)
 {
 
 }
 
-MysqlQuery::MysqlQuery(CallbackType type, QueryType t) : Query(type, t), m_res(NULL)
+MysqlQuery::MysqlQuery(CallbackType type, QueryType t) :
+Query(type, t), m_res(NULL)
 {
 
 }
@@ -37,9 +43,10 @@ bool MysqlQuery::execute()
 {
 	if (m_dbc)
 	{
-		MysqlDatabase::MysqlDatabaseConnection* mydbc = (MysqlDatabase::MysqlDatabaseConnection*)m_dbc;
+		MysqlDatabase::MysqlDatabaseConnection* mydbc =
+			(MysqlDatabase::MysqlDatabaseConnection*)m_dbc;
 
-		if (!mysql_query(mydbc->m_mysql, m_queryTxt))
+		if (!mysql_query(&(mydbc->m_mysql), m_queryTxt))
 		{
 			return true;
 		}
@@ -52,8 +59,9 @@ bool MysqlQuery::storeResult()
 {
 	if (execute() && !m_res)
 	{
-		MysqlDatabase::MysqlDatabaseConnection* mydbc = (MysqlDatabase::MysqlDatabaseConnection*)m_dbc;
-		m_res = mysql_store_result(mydbc->m_mysql);
+		MysqlDatabase::MysqlDatabaseConnection* mydbc =
+			(MysqlDatabase::MysqlDatabaseConnection*)m_dbc;
+		m_res = mysql_store_result(&(mydbc->m_mysql));
 		if (m_res)
 		{
 			m_column = mysql_num_fields(m_res);
@@ -73,6 +81,7 @@ bool MysqlQuery::fetchRow()
 		{
 			return true;
 		}
+
 	}
 
 	return false;
@@ -90,15 +99,17 @@ uint64 MysqlQuery::numRows()
 	}
 }
 
-string MysqlQuery::error()
+std::string MysqlQuery::error()
 {
 	if (m_dbc)
 	{
-		MysqlDatabase::MysqlDatabaseConnection* mydbc = (MysqlDatabase::MysqlDatabaseConnection*)m_dbc;
-		return mysql_error(mydbc->m_mysql);
+		MysqlDatabase::MysqlDatabaseConnection* mydbc =
+			(MysqlDatabase::MysqlDatabaseConnection*)m_dbc;
+		return mysql_error(&mydbc->m_mysql);
 	}
 
 	return "";
+
 }
 
 bool MysqlQuery::succes()
@@ -106,13 +117,18 @@ bool MysqlQuery::succes()
 	if (m_dbc)
 	{
 		MysqlDatabase::MysqlDatabaseConnection* mydbc = (MysqlDatabase::MysqlDatabaseConnection*)m_dbc;
-		return (mysql_errno(mydbc->m_mysql) == 0);
+		return (mysql_errno(&mydbc->m_mysql) == 0);
 	}
 	else 
 		return false;
 }
 
+//////////////////////////////////////////////////////
 // get returned values from query
+//
+////////////////////////////////////////////////////////
+
+
 uint32 MysqlQuery::getUint32(uint32 idx)
 {
 	if (m_res && m_row && (idx < m_column))
@@ -127,7 +143,7 @@ uint32 MysqlQuery::getUint32(uint32 idx)
 bool MysqlQuery::nextRow()
 {
 	m_row=mysql_fetch_row(m_res);
-	if(m_row<0)
+	if(m_row<=0)
 		return false;
 	else
 		return true;
@@ -141,6 +157,17 @@ const char* MysqlQuery::getCharString(uint32 idx)
 uint32 MysqlQuery::getCharUint(uint32 idx)
 {
 	return boost::lexical_cast<uint32>(m_row[idx]);
+}
+
+const char* MysqlQuery::getRealmName(uint32 idx)
+{
+	m_row=mysql_fetch_row(m_res);
+	return m_row[1];
+}
+
+uint32 MysqlQuery::getRealmId()
+{
+	return boost::lexical_cast<uint32>(m_row[0]);
 }
 
 uint64 MysqlQuery::getUint64(uint32 idx)
@@ -179,3 +206,4 @@ const char* MysqlQuery::getString()
 {
 	return getString(m_idx);
 }
+

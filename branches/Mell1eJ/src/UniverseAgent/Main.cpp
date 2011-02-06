@@ -69,12 +69,9 @@ int32 main(int32 argc, int8* argv[])
 		Config.parseCommandLine(argc, argv);
 		Config.parseConfigFile();
 
-		// Setup database
-		MysqlDatabase* db = MysqlDatabase::createInstance(Config.demuxerCount, Config.DBUsername, Config.DBHost, Config.DBPassword, Config.DBName, Config.DBPort);
-		if(!db->start())
-		{
+		Database *database = MysqlDatabase::createInstance(Config.demuxerCount, Config.DBUsername, Config.DBHost, Config.DBPassword, Config.DBName, Config.DBPort); 
+		if(!database->start())
 			throw runtime_error("Could not connect to the Database!");
-		}
 
 		Network n;
 		n.createConnectionAcceptor<UniverseConnection>(Config.universeAgentAddress, Config.universeAgentPort, Config.demuxerCount);		

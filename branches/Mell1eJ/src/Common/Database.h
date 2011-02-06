@@ -21,21 +21,20 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "Common.h"
 
-#include <queue>
-#include <vector>
-#include <iostream>
-
 #include <boost/thread.hpp>
 #include <boost/foreach.hpp>
 #include <boost/bind.hpp>
 #include <boost/function.hpp>
 #include <boost/logic/tribool.hpp>
-#include <boost/foreach.hpp>
-#include <boost/thread.hpp>
+#include <queue>
+#include <vector>
+
 
 #include "SafeQueue.h"
 
 class Query;
+
+
 
 /**
 * Management of a set of database connexion each executed in a different thread
@@ -46,18 +45,19 @@ class Query;
 * Tasks can have callback methods executed in the connection thread or in the thread running the database
 * @author Albator
 */
-class Database 
-{
+class Database {
 public:
-	Database(size_t poolConnSize);
 
-	class DatabaseConnection 
-	{
+	Database(std::size_t poolConnSize);
+
+	class DatabaseConnection {
 	public:
+
 		DatabaseConnection(Database* db);
 
 		virtual bool connected() = 0;
-		virtual void disconnect() = 0;
+
+		virtual bool disconnect() = 0;
 
 		virtual ~DatabaseConnection()
 		{
@@ -80,9 +80,11 @@ public:
 
 		virtual bool dbInitialize() = 0;
 
-		virtual string error() = 0;
+		virtual std::string error() = 0;
 
 	protected:
+
+
 		mutable boost::mutex m_mutex, m_synchronousMutex, m_initializedMutex;
 		boost::condition_variable m_condition, m_synchronousCond, m_initializedCondition;
 		bool m_connected, m_shutdown, m_synchronous;
@@ -90,6 +92,9 @@ public:
 		bool m_initialized;
 
 		Query* m_query;
+
+
+
 	};
 
 	/**
@@ -102,6 +107,7 @@ public:
 	* consumed query, can have a callback function executed later in the main thread
 	*/
 	void enqueueFinishedQuery(Query* q);
+
 
 	/**
 	* Execute the query in synchronous mode
@@ -123,10 +129,11 @@ public:
 	*/
 	void releaseDBConnection(DatabaseConnection* db);
 
+
 	/**
 	* @return number of available DB in the pool
 	*/
-	size_t availableDBConnection();
+	std::size_t availableDBConnection();
 
 	virtual ~Database()
 	{
@@ -138,6 +145,8 @@ public:
 	* delete connections to db
 	*/
 	void shutdown();
+
+
 
 protected:
 	virtual bool dbInitialize()=0;
@@ -151,12 +160,15 @@ protected:
 	SafeQueue<DatabaseConnection*> m_dbConnQueue;
 	SafeQueue<Query*> m_queryQueue;
 	SafeQueue<Query*> m_executedQueryQueue;
-	size_t m_poolConnSize;
+	std::size_t m_poolConnSize;
 	boost::thread_group m_group;
 	bool m_shutdown, m_initialized;
 	boost::condition_variable m_condition;
 	boost::mutex m_mutex;
-	vector<DatabaseConnection*> m_dbConn;
+	std::vector<DatabaseConnection*> m_dbConn;
 	boost::thread *m_runThread;
+
+
+
 };
-#endif
+#endif /*DATABASE_H_*/

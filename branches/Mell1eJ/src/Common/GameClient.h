@@ -38,7 +38,7 @@ public:
 	uint32 nClientInst;
 	uint32 nCookie;
 
-	CharacterInfo characterInfo;
+	//CharacterInfo characterInfo;
 
 	GameClient();
 	~GameClient();

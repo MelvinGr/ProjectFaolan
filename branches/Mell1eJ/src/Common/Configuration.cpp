@@ -19,35 +19,25 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include "Configuration.h"
 
 #define bvalue boost::program_options::value
-Configuration::Configuration() : Singleton<Configuration>(), m_description("server options"), m_addressCounter(0)
+Configuration::Configuration() : Singleton<Configuration>(), m_description("server options")
 {
 	m_description.add_options()
-		("DBUsername", 				bvalue<string>(&DBUsername)->default_value("root"), 					"DB Username")
-		("DBPassword", 				bvalue<string>(&DBPassword)->default_value("toor"), 					"DB password")
-		("DBHost", 					bvalue<string>(&DBHost)->default_value("127.0.0.1"), 					"DB Host")
-		("DBPort", 					bvalue<uint32>(&DBPort)->default_value(3306), 							"DB port")
-		("DBName", 					bvalue<string>(&DBName)->default_value("faolan"), 						"DB name")
-		("DBConnectionCount",		bvalue<uint32>(&DBConnectionCount)->default_value(5), 					"Number of active connection to the DB server")
+		("DBUsername",				boost::program_options::value<string>(&DBUsername),				"DB Username")
+		("DBPassword",				boost::program_options::value<string>(&DBPassword),				"DB password")
+		("DBHost",					boost::program_options::value<string>(&DBHost),					"DB Host")
+		("DBPort",					boost::program_options::value<uint32>(&DBPort),					"DB port")
+		("DBName",					boost::program_options::value<string>(&DBName),					"DB name")
+		("DBConnectionCount",		boost::program_options::value<uint32>(&DBConnectionCount),		"Number of active connection to the DB server")
+		("DBType",					boost::program_options::value<uint32>(&DBType),					"DB Type")
 
-		("universeAgentAddress", 	bvalue<string>(&universeAgentAddress)->default_value("127.0.0.1"),		"Address to listen to")
-		("universeAgentPort", 		bvalue<uint32>(&universeAgentPort)->default_value(7000), 				"Port to listen to")
+		("demuxerCount",			boost::program_options::value<uint32>(&demuxerCount),			"Count of network demuxer threads")
+		("characterSlots",			boost::program_options::value<uint32>(&characterSlots),			"Number of character slots")
 
-		("playerAgentAddress", 		bvalue<string>(&playerAgentAddress)->default_value("127.0.0.1"),		"Address to listen to")
-		("playerAgentPort", 		bvalue<uint32>(&playerAgentPort)->default_value(7001), 					"Port to listen to")
+		("universeAgentAddress",	boost::program_options::value<string>(&universeAgentAddress),	"Address to listen to")
+		("universeAgentPort",		boost::program_options::value<uint32>(&universeAgentPort),		"Port to listen to")
 
-		("csPlayerAgentAddress", 	bvalue<string>(&csPlayerAgentAddress)->default_value("127.0.0.1"),		"Address to listen to")
-		("csPlayerAgentPort", 		bvalue<uint32>(&csPlayerAgentPort)->default_value(7002), 				"Port to listen to")
-
-		("agentServerAddress", 		bvalue<string>(&agentServerAddress)->default_value("127.0.0.1"),		"Address to listen to")
-		("agentServerPort", 		bvalue<uint32>(&agentServerPort)->default_value(7003), 					"Port to listen to")
-
-		("worldServerAddress", 		bvalue<string>(&worldServerAddress)->default_value("127.0.0.1"),		"Address to listen to")
-		("worldServerPort", 		bvalue<uint32>(&worldServerPort)->default_value(7004), 					"Port to listen to")
-
-		("demuxerCount", 			bvalue<uint32>(&demuxerCount)->default_value(2), 						"Count of network demuxer threads")
-
-		("realmName", 				bvalue<string>(&realmName)->default_value("Project Faolan Realm"),		"Realm Name")
-		("characterSlots", 			bvalue<uint32>(&characterSlots)->default_value(4), 						"Number of character slots");
+		("playerAgentAddress",		boost::program_options::value<string>(&playerAgentAddress),		"Address to listen to")
+		("playerAgentPort",			boost::program_options::value<uint32>(&playerAgentPort),		"Port to listen to");
 }
 
 void Configuration::parseCommandLine(int argc, char *argv[])
@@ -72,7 +62,7 @@ void Configuration::parseConfigFile()
 	}
 	else
 	{
-		cout << "Can't open the configuration file" << endl;
+		throw runtime_error("Can't open the configuration file");
 	}
 }
 

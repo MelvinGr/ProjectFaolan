@@ -17,18 +17,22 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "Query.h"
+#include <stdarg.h>
 
-Query::Query(boost::function<void ()> f, CallbackType type, QueryType t) : m_callback(f), m_callbackType(type), m_queryType(t), m_dbc(NULL), m_idx(0)
+Query::Query(boost::function<void ()> f, CallbackType type, QueryType t) :
+m_callback(f), m_callbackType(type), m_queryType(t), m_dbc(NULL),m_idx(0)
 {
 
 }
 
-Query::Query(QueryType t) : m_callbackType(Query::NO_CALLBACK), m_queryType(t), m_dbc(NULL), m_idx(0)
+Query::Query(QueryType t) :
+m_callbackType(Query::NO_CALLBACK), m_queryType(t), m_dbc(NULL),m_idx(0)
 {
 
 }
 
-Query::Query(CallbackType type, QueryType t) : m_callbackType(type), m_queryType(t), m_dbc(NULL), m_idx(0)
+Query::Query(CallbackType type, QueryType t) :
+m_callbackType(type), m_queryType(t), m_dbc(NULL),m_idx(0)
 {
 
 }
@@ -44,6 +48,7 @@ void Query::setQueryText(const char* queryTxt, ...)
 	va_start(Params, queryTxt);
 	vsprintf(m_queryTxt, queryTxt, Params);
 	va_end(Params);
+
 }
 
 void Query::releaseDBConnection()
@@ -64,3 +69,5 @@ void Query::setCallbackType(CallbackType type)
 {
 	m_callbackType=type;
 }
+
+

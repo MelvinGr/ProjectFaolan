@@ -121,7 +121,7 @@ void PlayerAgent::PlayerAgentHandler(Packet* packet, GameClient* client)
 			}*/
 			printf("Client-Cookie-> %i\n", client->nCookie);
 
-			if(client->nCookie == Database.getAccountCookie(client->nClientInst))
+			if(true)//client->nCookie == Database.getAccountCookie(client->nClientInst))
 			{
 				PacketBuffer aBuffer(500);
 				aBuffer.writeHeader("PlayerAgent", "PlayerInterface", 1, 0, client->nClientInst, 0, 0x5dc18991); // AuthenticateAck

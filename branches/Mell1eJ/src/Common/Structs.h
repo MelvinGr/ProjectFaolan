@@ -47,11 +47,11 @@ struct RealmInfo
 	uint32 onlineStatus; //2 = online, other num = offline
 	uint32 loadStatus; // 0 = medium load 1 = medium load 2 = heavy load 3 = full
 
-	string agentServerIPAddress;
-	uint32 agentServerPort;
-
 	string csPlayerAgentIPAddress;
 	uint32 csPlayerAgentPort;
+
+	string agentServerIPAddress;
+	uint32 agentServerPort;
 
 	string worldServerIPAddress;
 	uint32 worldServerPort;
