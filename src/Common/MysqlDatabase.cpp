@@ -33,6 +33,51 @@ void MySQLDatabase::closeMysql()
 	mysql_close(&mysql);
 }
 
+//Realms from db
+void MySQLDatabase::loadRealms(vector<RealmInfo*>* realms)
+{
+	MYSQL_RES* res;
+	MYSQL_ROW row;
+	uint32 realmsc = 0;
+	int8 query[1000];
+	uint8 activ = 0;
+	sprintf(query, "SELECT * FROM realms");
+	if (mysql_query(&mysql, query) == 0 && (res = mysql_store_result(&mysql)))
+	{
+		while ((row = mysql_fetch_row(res)))
+		{
+			activ = atoi(row[6]);
+			if(activ > 0)
+			{
+				if(atoi64(row[0]) > 0)
+				{
+					RealmInfo* tmpRealm = new RealmInfo();
+					tmpRealm->realmID = atoi64(row[0]);
+					tmpRealm->realmName = row[1];
+					tmpRealm->onlineStatus = atoi(row[2]);
+					tmpRealm->realmType = atoi64(row[4]);
+					tmpRealm->loadStatus = atoi(row[5]);
+					tmpRealm->csPlayerAgentIPAddress = row[7];
+					tmpRealm->csPlayerAgentPort = atoi(row[8]);
+					tmpRealm->agentServerIPAddress = row[9];
+					tmpRealm->agentServerPort = atoi(row[10]);
+					tmpRealm->worldServerIPAddress = row[11];
+					tmpRealm->worldServerPort = atoi(row[12]);
+
+					realms->push_back(tmpRealm);
+					realmsc++;
+				}
+			}
+		}
+	}
+	mysql_free_result(res);
+	if(realmsc > 0)
+		Log.Notice("Loaded %i relams from the database.\n", realmsc);
+	else
+		Log.Error("No realms activ at the database\n");
+}
+//-----
+
 //Server Start Functions
 
 bool MySQLDatabase::loadGlobalSpells(vector<Spells>* SPELLS)
@@ -105,7 +150,7 @@ bool MySQLDatabase::loadGlobalSpells(vector<Spells>* SPELLS)
 	}
 }
 
-bool MySQLDatabase::ladGlobalNpcs(vector<NPC>* NPCS)
+bool MySQLDatabase::loadGlobalNpcs(vector<NPC>* NPCS)
 {
 	MYSQL_RES* res;
 	MYSQL_ROW row;
@@ -181,6 +226,88 @@ bool MySQLDatabase::ladGlobalNpcs(vector<NPC>* NPCS)
 			}
 		}
 		Log.Notice("|\n%i NPCs loaded\n\n", knownSpells);
+		mysql_free_result(res);
+		return true;
+	}
+	else
+	{
+		Log.Error("Error at loading NPCs in table!!!\n\n");
+		return false;
+	}
+}
+
+bool MySQLDatabase::loadGlobalObjects(vector<Object>* OBJECTS)
+{
+	MYSQL_RES* res;
+	MYSQL_ROW row;
+	uint32 knownObjects = 0;
+	Log.Notice("Loading Objects in table\n|");
+	int8 query[1000];
+	sprintf(query, "SELECT * FROM worldobjects");
+	if (mysql_query(&mysql, query) == 0 && (res = mysql_store_result(&mysql)))
+	{
+		while ((row = mysql_fetch_row(res)))
+		{
+			if(atoi(row[0]) > 0)
+			{
+				knownObjects++;
+			}
+		}
+		mysql_free_result(res);
+	}
+	else
+	{
+		Log.Error("Error at loading Objects in table!!!\n\n");
+		return false;
+	}
+
+	uint32 tmpCounter = 0;
+	uint32 tmpBar = 0;
+	uint32 lastValue = 0;
+
+	sprintf(query, "SELECT * FROM worldobjects");
+	if (mysql_query(&mysql, query) == 0 && (res = mysql_store_result(&mysql)))
+	{
+		while ((row = mysql_fetch_row(res)))
+		{
+			Object objInfo;
+			objInfo.id = atoi64(row[0]);
+			if(objInfo.id > 0)
+			{
+				objInfo.name = row[1];
+				objInfo.map = atoi64(row[2]);
+				objInfo.position.x = atoi64(row[3]);
+				objInfo.position.y = atoi64(row[4]);
+				objInfo.position.z = atoi64(row[5]);
+				objInfo.rotation.x = atoi64(row[6]);
+				objInfo.rotation.y = atoi64(row[7]);
+				objInfo.rotation.z = atoi64(row[8]);
+				objInfo.data0 = atoi64(row[9]);
+				objInfo.data1 = atoi64(row[10]);
+				objInfo.data2 = atoi64(row[11]);
+				objInfo.data3 = atoi64(row[12]);
+				objInfo.data4 = atoi64(row[13]);
+				objInfo.data5 = atoi64(row[14]);
+				objInfo.unk0 = atoi64(row[15]);
+				objInfo.sdat1 = row[16];
+				objInfo.sdat2 = row[17];
+				objInfo.unk1 = atoi64(row[18]);
+				
+				OBJECTS->push_back(objInfo);
+				tmpCounter++;
+				tmpBar = tmpCounter / knownObjects;
+				if((tmpBar*50) > lastValue)
+				{
+					uint8 dif= (tmpBar*50) - lastValue;
+					for(int v=0; v < dif; v++)
+					{
+						Log.Notice("=");
+					}
+					lastValue = tmpBar;
+				}
+			}
+		}
+		Log.Notice("|\n%i Objects loaded\n\n", knownObjects);
 		mysql_free_result(res);
 		return true;
 	}
@@ -362,6 +489,30 @@ bool MySQLDatabase::setAccountCookie(uint32 accountID, uint32 cookie)
 	int8 query[1000];
 	sprintf(query, "UPDATE accounts SET cookie = %u WHERE account_id = %u", cookie, accountID);
 	return (mysql_query(&mysql, query) == 0);
+}
+
+bool MySQLDatabase::getAccountTrail(uint32 accountID)
+{
+	MYSQL_RES* res;
+	MYSQL_ROW row;
+
+	int8 query[1000];
+	sprintf(query, "SELECT trial FROM accounts WHERE account_id = %u", accountID);
+
+	if ((mysql_query(&mysql, query) == 0) && (res = mysql_store_result(&mysql)) && (row = mysql_fetch_row(res)))
+	{
+		uint32 result = atoi(row[0]);
+		mysql_free_result(res);
+		if(result > 0)
+		{
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+	else return true;
 }
 
 int32 MySQLDatabase::getAccountByCharacter(CharacterInfo character)

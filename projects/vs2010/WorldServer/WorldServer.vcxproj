@@ -32,8 +32,7 @@
     <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AllRules.ruleset</CodeAnalysisRuleSet>
     <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" />
-    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:\libs\mysql\lib;C:\libs\zlib\lib;$(LibraryPath)</LibraryPath>
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:\libs\mysql\include;C:\libs\zlib\include;$(IncludePath)</IncludePath>
+    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -76,10 +75,14 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\src\WorldServer\AbilityHandler.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\CharStatsHandler.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\Packet\AckAuth.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\Packet\Ping.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\Packet\ReportID.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\CharAction.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\CharMovement.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\DeleteItem.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\LoadBarFull.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\ObjectHandler.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\PassblobHandler.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\SelectObject.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\SendPackets\SendPackets.cpp" />

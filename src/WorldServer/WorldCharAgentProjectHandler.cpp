@@ -20,6 +20,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 void WorldServer::GameCharAgentProjectHandler(Packet* packet, GameClient* client)
 {
+	Log.Warning("Receive Packet With Opcode: 0x%08X (%s):\n", packet->opcode, packet->receiver.c_str());
 	switch(packet->opcode)
 	{
 	case 0x00:

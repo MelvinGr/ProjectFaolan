@@ -76,7 +76,7 @@ public:
 		maxLength = 0;
 	}
 
-	template <typename T> T read()
+	template <typename T> T read(bool set2B = true)
 	{
 		try
 		{
@@ -93,7 +93,7 @@ public:
 		}
 	}
 
-	template <typename T> void write(T data)
+	template <typename T> void write(T data, bool set2B = true)
 	{
 		try
 		{
@@ -122,12 +122,20 @@ public:
 };
 
 
-template <> inline void PacketBuffer::write(string data)
+template <> inline void PacketBuffer::write(string data, bool set2B)
 {
 	try
 	{
-		assert((offset + sizeof(int16)) <= maxLength);
-		write<uint16>(data.size());
+		if(set2B)
+		{
+			assert((offset + sizeof(int16)) <= maxLength);
+			write<uint16>(data.size());
+		}
+		else
+		{
+			assert((offset + sizeof(int8)) <= maxLength);
+			write<uint8>(data.size());
+		}
 	
 		assert((offset + data.size()) <= maxLength);
 		writeArray((uint8*)data.c_str(), data.size());
@@ -138,12 +146,22 @@ template <> inline void PacketBuffer::write(string data)
 	}
 }
 
-template <> inline string PacketBuffer::read()
+template <> inline string PacketBuffer::read(bool set2B)
 {
 	try
 	{
-		assert((offset + sizeof(int16)) <= bufferLength);
-		uint16 stringLength = read<uint16>();
+		uint16 stringLength = 0;
+		if(set2B)
+		{
+			assert((offset + sizeof(int16)) <= bufferLength);
+			stringLength = read<uint16>();
+		}
+		else
+		{
+			assert((offset + sizeof(int8)) <= bufferLength);
+			stringLength = read<uint8>();
+			stringLength &= 0x00000000ffffffff;
+		}
 	
 		assert((offset + stringLength) <= bufferLength);
 		string data(&buffer[offset], &buffer[offset + stringLength]);

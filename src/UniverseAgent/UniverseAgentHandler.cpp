@@ -109,8 +109,8 @@ void UniverseAgent::UniverseAgentHandler(Packet* packet, GameClient* client)
 
 			uint8 real[] =
 			{
-				0x00, 0x00, 0x06, 0x08,
-				0x00, 0x00, 0x00, 0x02,
+				0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x4a,
 				0x00, 0x00, 0x00, 0x00,
 				0x01, 0x01, 0x01, 0x01,
 				0x3f, 0x80,
@@ -118,7 +118,7 @@ void UniverseAgent::UniverseAgentHandler(Packet* packet, GameClient* client)
 				0x3f, 0x80,
 				0x00, 0x00, 0x01, 0x01,
 				0x00, 0x00, 0x00, 0x00,
-				0x09
+				0x08
 			};
 
 			PacketBuffer aBuffer(500);
@@ -126,13 +126,13 @@ void UniverseAgent::UniverseAgentHandler(Packet* packet, GameClient* client)
 			aBuffer.writeArray(real, sizeof(real));
 			aBuffer.doItAll(client->clientSocket);
 
+			//Delete Character at the database with accountid and level = 0
 			Database.deleteEmptyChar(client->charInfo.accountID);
 			uint32 cookie = Database.generateCharId();
 			client->charInfo.characterID = cookie;
 			client->charInfo.accountID = client->nClientInst;
 			printf("Accountcookie: 0x%08x\n", cookie);
-			//Database.insertEmptyChar(client);
-			//uint32 cookie = Network::generateCookie();
+			
 			Database.setAccountCookie(client->nClientInst, cookie);
 			Database.updateLastInfo(client->nClientInst, client->ipAddress);
 

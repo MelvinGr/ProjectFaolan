@@ -25,7 +25,7 @@ void PlayerAgent::sendCharacterList(GameClient* client)
 
 	PacketBuffer aBuffer(5000);
 	aBuffer.writeHeader("PlayerAgent", "PlayerInterface", 1, 0, client->nClientInst, 0, 0xc414c5ef); // UpdateClientPlayerData
-	aBuffer.write<uint32>(client->charInfo.accountID); // PlayerInstance
+	aBuffer.write<uint32>(client->charInfo.accountID); // account - ID
 	uint32 anz_chars = characters.size();
 	for(uint32 i = 0; i < characters.size(); i++)
 	{
@@ -40,11 +40,14 @@ void PlayerAgent::sendCharacterList(GameClient* client)
 	{
 		if(characters[i].level <= 0)
 			continue;
-		uint32 ClientInst = characters[i].characterID + (characters[i].realmID * 0x01000000);
+		uint32 tmp_realm = (characters[i].realmID << (3*8)) & 0xff000000;
+		//uint32 ClientInst = characters[i].characterID + (characters[i].realmID * 0x01000000);
+		//test new calculation of ClientInst
+		uint32 ClientInst = characters[i].characterID + tmp_realm;
 
-		aBuffer.write<uint32>(ClientInst); // Charinstance
-		aBuffer.write<uint32>(client->charInfo.accountID); // PlayerInstance
-		aBuffer.write<uint32>(ClientInst); // Charinstance
+		aBuffer.write<uint32>(ClientInst); // Char - ID
+		aBuffer.write<uint32>(client->charInfo.accountID); // Account - ID
+		aBuffer.write<uint32>(ClientInst); // Char - ID
 		aBuffer.write<string>(characters[i].name); // charName
 		aBuffer.write<uint32>(characters[i].realmID); // serverID
 		aBuffer.write<uint32>(characters[i].sex); // Sex
@@ -55,19 +58,32 @@ void PlayerAgent::sendCharacterList(GameClient* client)
 		aBuffer.write<uint32>(characters[i].Class); // class
 		aBuffer.write<uint32>(0x00000000); // u2
 		aBuffer.write<uint32>(0x00000000); // u2
-		aBuffer.write<uint32>(0x4bbafa33); // u3
-		aBuffer.write<uint32>(0x00000002); // u4
+		aBuffer.write<uint32>(0x4e185739); // u3
+		aBuffer.write<uint32>(0x00000003); // u4 maybe voice
 		aBuffer.write<uint32>(characters[i].race); // race
-		aBuffer.write<string>("en");
+		//aBuffer.write<string>("en");
+		aBuffer.write<uint16>(0x0000);
 		aBuffer.write<uint32>(0x00000000); // u6
 		aBuffer.write<uint32>(0x00000000); // u7
 		aBuffer.write<string>("6f60ebba2cd4881d0393617a01f761b4"); // u8
 	}
-	aBuffer.write<uint32>(Settings.characterSlots); // Number of Char Slots -- default 8
-	aBuffer.write<uint32>(0x000007e2);
-	aBuffer.write<uint32>(0x00000002); // u9
-	aBuffer.write<uint32>(0x0000000a); // u10
-	aBuffer.write<uint32>(0x0000004a); // u11
+	aBuffer.write<uint32>(0x000003f1);
+	aBuffer.write<uint32>(client->charInfo.accountID);
+	aBuffer.write<uint32>(0x00000000);
+	if(Database.getAccountTrail(client->charInfo.accountID))
+	{
+		aBuffer.write<uint32>(0x00000102); //Trail version
+		aBuffer.write<uint32>(0x00000000);
+		aBuffer.write<uint32>(0x00000000);
+		aBuffer.write<uint32>(Settings.characterSlotsTrial);
+	}
+	else
+	{
+		aBuffer.write<uint32>(0x00000002); //normal version
+		aBuffer.write<uint32>(0x00000000);
+		aBuffer.write<uint32>(0x00000000);
+		aBuffer.write<uint32>(Settings.characterSlots);
+	}
 	aBuffer.doItAll(client->clientSocket);
 }
 
@@ -110,18 +126,9 @@ void PlayerAgent::PlayerAgentHandler(Packet* packet, GameClient* client)
 			Database.deleteEmptyChar(client->charInfo.accountID);
 			Database.insertEmptyChar(client);
 
-			/*if(true)  //isCharacterLoggedIn(client->nClientInst))
-			{
-			PacketBuffer aBuffer(500);
-			aBuffer.writeHeader("ServerAgent", "PlayerInterface", 1, 0, client->nClientInst, 0, 0xd4063ca0); // Playerloggedin
-			aBuffer.write<uint32>(0x0000000b);
-			aBuffer.doItAll(client->clientSocket);
-
-			break;
-			}*/
 			printf("Client-Cookie-> %i\n", client->nCookie);
 
-			if(true)//client->nCookie == Database.getAccountCookie(client->nClientInst))
+			if(client->nCookie == Database.getAccountCookie(client->nClientInst))
 			{
 				PacketBuffer aBuffer(500);
 				aBuffer.writeHeader("PlayerAgent", "PlayerInterface", 1, 0, client->nClientInst, 0, 0x5dc18991); // AuthenticateAck
@@ -139,9 +146,163 @@ void PlayerAgent::PlayerAgentHandler(Packet* packet, GameClient* client)
 			break;
 		}
 
+	case 0x6a546d41: // GetStartupData
+		{
+			
+			//Temp Packet. I think 0x000003f1 disables a function
+			PacketBuffer aBuffer(500);
+			aBuffer.writeHeader("PlayerAgent", "PlayerInterface", 1, 0, client->nClientInst, 0, 0x0c09ca25); // ???
+			aBuffer.write<uint32>(0x000003f1);
+			aBuffer.doItAll(client->clientSocket);
+
+			break;
+		}
+
+	case 0xdfd8518e:
+		{
+			sendCharacterList(client);
+			sendRealmList(client);
+
+			PacketBuffer aBuffer(500);
+			aBuffer.writeHeader("PlayerAgent", "PlayerInterface", 1, 0, client->nClientInst, 0, 0x4f91a58c); // PlayerSetupComplete
+			aBuffer.write<uint32>(0x01); // authstatus
+			aBuffer.doItAll(client->clientSocket);
+			break;
+		}
+
+	case 0x9847aed6: // VerifyLanguageSetting
+		{
+			// Inmy client lang is 04 PL 
+			uint32 nClientLanguage = packet->data->read<uint32>();
+			if(nClientLanguage==0) // if it's english client with enlish realm
+			{
+				//sendCharacterList(client);
+			}
+			else
+			{
+				PacketBuffer aBuffer(500);
+				aBuffer.writeHeader("PlayerAgent", "PlayerInterface", 1, 0, client->nClientInst, 0, 0xd4c59816); // Set the realm language to same as client ?
+				aBuffer.write<uint32>(0x00000000); // server language 0 is english 
+				aBuffer.doItAll(client->clientSocket);
+			}
+
+			break;
+		}
+
+	case 0xc3c5c31d: // RequestDeleteCharacter
+		{
+			uint32 nCharacterInstance = packet->data->read<uint32>();
+			Log.Notice("REQUEST DELETE CHAR\n\n");
+			Database.deleteCharacter(nCharacterInstance / 1009 - 1);
+			sendCharacterList(client);
+			sendRealmList(client);
+
+			break;
+		}
+
+	case 0xca2c4e5e: //Request create character
+		{
+			uint32 i_nDimID = packet->data->read<uint32>();
+
+			RealmInfo* realm = 0;
+			for(uint32 i = 0; i < Settings.realms.size(); i++)
+			{
+				if(Settings.realms[i]->realmID == i_nDimID)
+				{
+					realm = Settings.realms[i];
+					break; // break forloop
+				}
+			}
+
+			if(realm == 0) // send error opcode, whatever
+				break;
+
+			client->nClientInst = client->charInfo.characterID + (i_nDimID * 0x01000000);
+
+			if(client->charInfo.characterID == -1) // send error opcode, whatever
+				break;
+
+			client->charInfo.realmID = i_nDimID;
+
+			PacketBuffer aBuffer(500);
+			aBuffer.writeHeader("PlayerInterface", "PlayerInterface", 1, 0, client->nClientInst, 0, 0x233605b9);
+			aBuffer.write<uint32>(0x0000c350);
+			aBuffer.write<uint32>(client->nClientInst);
+			aBuffer.write<uint32>(0);
+			aBuffer.doItAll(client->clientSocket);
+
+			break;
+		}
+	case 0x3c7c926c: //sent to create character
+		{
+			RealmInfo* realm = 0;
+			for(uint32 i = 0; i < Settings.realms.size(); i++)
+			{
+				if(Settings.realms[i]->realmID == client->charInfo.realmID)
+				{
+					realm = Settings.realms[i];
+					break; // break forloop
+				}
+			}
+
+			if(realm == 0) // send error opcode, whatever
+			{
+				Log.Error("Realm-Error!!!\n");
+				break;
+			}
+
+			//CS - Server Information Packet
+			PacketBuffer aBuffer(500);
+			aBuffer.writeHeader("ServerInterface", "PlayerInterface", 1, 0, client->nClientInst, 0, 0x5aed2a60); // CSServerConnectReady
+			aBuffer.write<uint32>(htonl(inet_addr(realm->csPlayerAgentIPAddress.c_str()))); // CSPlayer
+			aBuffer.write<uint16>(realm->csPlayerAgentPort); // CSport
+			aBuffer.write<uint32>(client->charInfo.characterID);
+			aBuffer.write<uint32>(0x0000c350);
+			aBuffer.write<uint32>(client->nClientInst);
+			aBuffer.doItAll(client->clientSocket);
+
+			//Agent - Server information packet
+			aBuffer = PacketBuffer(500);
+			aBuffer.writeHeader("ServerInterface", "PlayerInterface", 1, 0, client->nClientInst, 0, 0x23a632fa);
+			aBuffer.write<uint32>(htonl(inet_addr(realm->agentServerIPAddress.c_str()))); // i_nClientAgentAddress
+			aBuffer.write<uint16>(realm->agentServerPort);
+			aBuffer.write<uint32>(client->charInfo.characterID);
+			aBuffer.write<uint32>(0x0000c350);
+			aBuffer.write<uint32>(client->nClientInst);
+			aBuffer.doItAll(client->clientSocket);
+
+			//World- Server information packet (1 address is world on create char and one is world server ip on enter world)
+			aBuffer = PacketBuffer(500);
+			aBuffer.writeHeader("ServerInterface", "PlayerInterface", 1, 0, client->nClientInst, 0, 0xd8b66c79); // LoginConnectReady
+			aBuffer.write<uint32>(htonl(inet_addr(realm->worldServerIPAddress.c_str()))); // i_nGameAddr
+			aBuffer.write<uint16>(realm->worldServerPort); // game port
+			aBuffer.write<uint32>(htonl(inet_addr(realm->worldServerIPAddress.c_str()))); // i_nGameAddr
+			aBuffer.write<uint16>(realm->worldServerPort); // game port
+			aBuffer.write<uint32>(client->charInfo.characterID); //
+			aBuffer.write<uint32>(0x0000c350);
+			aBuffer.write<uint32>(client->nClientInst); //
+			aBuffer.write<uint8>(0x62); //
+			aBuffer.write<uint32>(0x0000c79c); //
+			aBuffer.write<uint32>(client->charInfo.map); //
+			aBuffer.write<uint32>(0x00000000); //
+			aBuffer.write<uint32>(client->nClientInst); //
+			aBuffer.write<uint32>(0x0000004e); //
+			aBuffer.write<uint32>(0x00009c50); //
+			aBuffer.write<uint32>(0x00038c65); // instane
+			aBuffer.doItAll(client->clientSocket);
+
+			aBuffer = PacketBuffer(500);
+			//*/
+			aBuffer.writeHeader("ServerInterface", "PlayerInterface", 1, 0, client->nClientInst, 0, 0xf4116428);
+			aBuffer.write<uint32>(0x000003f1);
+			//aBuffer.doItAll(client->clientSocket);
+
+			break;
+		}
+
 	case 0xBE735486: // CreateCharacter
 		{
-			Log.Error("Get second char creation pack\n");
+			Log.Error("unknown createChar opcode\n");
 			uint32 i_nDimID = packet->data->read<uint32>();
 
 			uint32 unk1 = packet->data->read<uint32>(); // dont know if these are correct values
@@ -191,7 +352,7 @@ void PlayerAgent::PlayerAgentHandler(Packet* packet, GameClient* client)
 			aBuffer.write<uint32>(client->charInfo.accountID);
 			aBuffer.write<uint32>(0x0000c350);
 			aBuffer.write<uint32>(client->nClientInst);
-			aBuffer.doItAll(client->clientSocket);
+			//aBuffer.doItAll(client->clientSocket);
 
 			aBuffer = PacketBuffer(500);
 			aBuffer.writeHeader("ServerInterface", "PlayerInterface", 1, 0, client->nClientInst, 0, 0x5aed2a60); // CSServerConnectReady
@@ -200,7 +361,7 @@ void PlayerAgent::PlayerAgentHandler(Packet* packet, GameClient* client)
 			aBuffer.write<uint32>(client->charInfo.accountID);
 			aBuffer.write<uint32>(0x0000c350);
 			aBuffer.write<uint32>(client->nClientInst);
-			aBuffer.doItAll(client->clientSocket);
+			//aBuffer.doItAll(client->clientSocket);
 
 			aBuffer = PacketBuffer(500);
 			aBuffer.writeHeader("ServerInterface", "PlayerInterface", 1, 0, client->nClientInst, 0, 0xd8b66c79); // LoginConnectReady
@@ -219,7 +380,7 @@ void PlayerAgent::PlayerAgentHandler(Packet* packet, GameClient* client)
 			aBuffer.write<uint32>(0x00000001); //
 			aBuffer.write<uint32>(0x00009c50); //
 			aBuffer.write<uint32>(0x00036bc1); // cookie
-			aBuffer.doItAll(client->clientSocket);
+			//aBuffer.doItAll(client->clientSocket);
 			/*
 			aBuffer = PacketBuffer(500);
 			aBuffer.writeHeader("ServerInterface", "PlayerInterface", 1, 0, client->nClientInst, 0, 0xd8b66c79); // LoginConnectReady
@@ -324,95 +485,9 @@ void PlayerAgent::PlayerAgentHandler(Packet* packet, GameClient* client)
 			aBuffer.write<uint32>(0x00000000); //
 			aBuffer.write<uint32>(0x00000001); //
 			aBuffer.write<uint32>(0x00009c50); //
-			aBuffer.write<uint32>(0x00036bc1); // cookie
-			aBuffer.doItAll(client->clientSocket);
-			
-			break;
-		}
-	case 0xCA2C4E5E:
-		{
-			client->charInfo.realmID = packet->data->read<uint32>();
-			/*
-			 000006E8  00 00 00 42 4b 7d b2 74  00 0b 50 6c 61 79 65 72 ...BK}.t ..Player
-    000006F8  41 67 65 6e 74 00 00 00  06 00 00 00 00 00 0f 50 Agent... .......P
-    00000708  6c 61 79 65 72 49 6e 74  65 72 66 61 63 65 59 47 layerInt erfaceYG
-    00000718  c8 29 00 00 00 00 23 36  05 b9 00 00 c3 50 01 0a .)....#6 .....P..
-    00000728  82 7e 00 00 00 00
-			*/
-			PacketBuffer aBuffer(500);
-			aBuffer.writeHeader("ServerInterface", "PlayerInterface", 1, 0, client->nClientInst, 0, 0x233605b9); // CSServerConnectReady
-			aBuffer.write<uint32>(0x0000c350);
-			aBuffer.write<uint32>(client->charInfo.characterID);
-			aBuffer.write<uint32>(0);
+			aBuffer.write<uint32>(0x00038c65); // cookie
 			aBuffer.doItAll(client->clientSocket);
 
-			break;
-		}
-	case 0x3c7c926c:
-		{
-			
-			Log.Debug("Receive Create Char\n");
-			RealmInfo* realm = 0;
-			for(uint32 i = 0; i < Settings.realms.size(); i++)
-			{
-				if(Settings.realms[i]->realmID == client->charInfo.realmID)
-				{
-					realm = Settings.realms[i];
-					break; // break forloop
-				}
-			}
-
-			if(realm == 0) // send error opcode, whatever
-			{
-				Log.Error("Realm-Error!!!\n");
-				break;
-			}
-
-			PacketBuffer aBuffer(500);
-			
-			aBuffer.writeHeader("ServerInterface", "PlayerInterface", 1, 0, client->nClientInst, 0, 0x5aed2a60); // CSServerConnectReady
-			aBuffer.write<uint32>(htonl(inet_addr(realm->csPlayerAgentIPAddress.c_str()))); // CSPlayer
-			aBuffer.write<uint16>(realm->csPlayerAgentPort); // CSport
-			aBuffer.write<uint32>(client->charInfo.characterID);
-			aBuffer.write<uint32>(0x0000c350);
-			aBuffer.write<uint32>(client->nClientInst);
-			aBuffer.doItAll(client->clientSocket);
-
-			aBuffer = PacketBuffer(500);
-			aBuffer.writeHeader("ServerInterface", "PlayerInterface", 1, 0, client->nClientInst, 0, 0x23a632fa);
-			aBuffer.write<uint32>(htonl(inet_addr(realm->agentServerIPAddress.c_str()))); // i_nClientAgentAddress
-			aBuffer.write<uint16>(realm->agentServerPort);
-			aBuffer.write<uint32>(client->charInfo.characterID);
-			aBuffer.write<uint32>(0x0000c350);
-			aBuffer.write<uint32>(client->nClientInst);
-			aBuffer.doItAll(client->clientSocket);
-
-			aBuffer = PacketBuffer(500);
-			aBuffer.writeHeader("ServerInterface", "PlayerInterface", 1, 0, client->nClientInst, 0, 0xd8b66c79); // LoginConnectReady
-			aBuffer.write<uint32>(htonl(inet_addr(realm->worldServerIPAddress.c_str()))); // i_nGameAddr
-			aBuffer.write<uint16>(realm->worldServerPort); // game port
-			aBuffer.write<uint32>(htonl(inet_addr(realm->worldServerIPAddress.c_str()))); // i_nGameAddr
-			aBuffer.write<uint16>(realm->worldServerPort); // game port
-			aBuffer.write<uint32>(client->nClientInst);//client->charInfo.characterID); //
-			aBuffer.write<uint32>(0x0000c350);
-			aBuffer.write<uint32>(client->charInfo.characterID);//client->nClientInst); //
-			aBuffer.write<uint8>(0x62); //
-			aBuffer.write<uint32>(0x0000c79c); //
-			aBuffer.write<uint32>(client->charInfo.map); //
-			aBuffer.write<uint32>(0x00000000); //
-			aBuffer.write<uint32>(0x00000000); //
-			aBuffer.write<uint32>(0x00000001); //
-			aBuffer.write<uint32>(0x00009c50); //
-			aBuffer.write<uint32>(0x00036bc1); // cookie
-			aBuffer.doItAll(client->clientSocket);
-
-			aBuffer = PacketBuffer(500);
-			//*/
-			
-			aBuffer.writeHeader("ServerInterface", "PlayerInterface", 1, 0, client->nClientInst, 0, 0xf4116428);
-			aBuffer.write<uint32>(0x000003f1); //
-			aBuffer.doItAll(client->clientSocket);
-			//*/
 			break;
 		}
 
@@ -422,35 +497,6 @@ void PlayerAgent::PlayerAgentHandler(Packet* packet, GameClient* client)
 			string cNewName = packet->data->read<string>();
 
 			//
-
-			break;
-		}
-
-	case 0xc3c5c31d: // RequestDeleteCharacter
-		{
-			uint32 nCharacterInstance = packet->data->read<uint32>();
-			Log.Notice("REQUEST DELETE CHAR\n\n");
-			Database.deleteCharacter(nCharacterInstance / 1009 - 1);
-			sendCharacterList(client);
-
-			break;
-		}
-
-	case 0x9847aed6: // VerifyLanguageSetting
-		{
-			// Inmy client lang is 04 PL 
-			uint32 nClientLanguage = packet->data->read<uint32>();
-			if(nClientLanguage==0) // if it's english client with enlish realm
-			{
-				//sendCharacterList(client);
-			}
-			else
-			{
-				PacketBuffer aBuffer(500);
-				aBuffer.writeHeader("PlayerAgent", "PlayerInterface", 1, 0, client->nClientInst, 0, 0xd4c59816); // Set the realm language to same as client ?
-				aBuffer.write<uint32>(0x00000000); // server language 0 is english 
-				aBuffer.doItAll(client->clientSocket);
-			}
 
 			break;
 		}
@@ -469,39 +515,6 @@ void PlayerAgent::PlayerAgentHandler(Packet* packet, GameClient* client)
 
 			//
 
-			break;
-		}
-
-	case 0x6a546d41: // GetStartupData
-		{
-			
-			PacketBuffer aBuffer(500);
-			aBuffer.writeHeader("PlayerAgent", "PlayerInterface", 1, 0, client->nClientInst, 0, 0x0c09ca25); // ???
-			aBuffer.write<uint32>(0x000003f1);
-			aBuffer.doItAll(client->clientSocket);
-			
-			//Then wait
-
-			//sendCharacterList(client);
-			//sendRealmList(client);
-			/*
-			aBuffer = PacketBuffer(500);
-			aBuffer.writeHeader("PlayerAgent", "PlayerInterface", 1, 0, client->nClientInst, 0, 0x4f91a58c); // PlayerSetupComplete
-			aBuffer.write<uint32>(0x01); // authstatus
-			aBuffer.doItAll(client->clientSocket);
-			//*/
-
-			break;
-		}
-	case 0xdfd8518e:
-		{
-			sendCharacterList(client);
-			sendRealmList(client);
-
-			PacketBuffer aBuffer(500);
-			aBuffer.writeHeader("PlayerAgent", "PlayerInterface", 1, 0, client->nClientInst, 0, 0x4f91a58c); // PlayerSetupComplete
-			aBuffer.write<uint32>(0x01); // authstatus
-			aBuffer.doItAll(client->clientSocket);
 			break;
 		}
 

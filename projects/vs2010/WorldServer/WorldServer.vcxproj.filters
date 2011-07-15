@@ -27,6 +27,9 @@
     <Filter Include="Source Files\sendPackets">
       <UniqueIdentifier>{06b44803-cac1-4d28-a591-939fdeb0d4d6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Packet">
+      <UniqueIdentifier>{dba575ce-9035-4227-8ac1-41044c46df4a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\WorldServer\WorldServer.cpp">
@@ -79,6 +82,18 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\WorldServer\SendPackets\SendPackets.cpp">
       <Filter>Source Files\sendPackets</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\WorldServer\Packet\Ping.cpp">
+      <Filter>Source Files\Packet</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\WorldServer\Packet\AckAuth.cpp">
+      <Filter>Source Files\Packet</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\WorldServer\Packet\ReportID.cpp">
+      <Filter>Source Files\Packet</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\ObjectHandler.cpp">
+      <Filter>Source Files\Handlers</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

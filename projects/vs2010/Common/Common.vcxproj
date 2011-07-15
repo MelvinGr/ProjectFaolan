@@ -32,8 +32,7 @@
     <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" />
     <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectName)</TargetName>
-    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:\libs\mysql\lib;C:\libs\zlib\lib;$(LibraryPath)</LibraryPath>
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:\libs\mysql\include;C:\libs\zlib\include;$(IncludePath)</IncludePath>
+    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <PreBuildEvent>
@@ -71,7 +70,7 @@
     </Lib>
     <PostBuildEvent>
       <Message>Copying Files!</Message>
-      <Command>copy /b "..\..\..\scripts\libmysql.dll" "$(TargetDir)\libmysql.dll" &amp;&amp; copy /b "..\..\..\scripts\FaolanConfig.cnf" "$(TargetDir)\FaolanConfig.cnf"</Command>
+      <Command>copy /b "..\..\..\etc\libmysql.dll" "$(TargetDir)\libmysql.dll" &amp;&amp; copy /b "..\..\..\etc\FaolanConfig.cnf" "$(TargetDir)\FaolanConfig.cnf"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
