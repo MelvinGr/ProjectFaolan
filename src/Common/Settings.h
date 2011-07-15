@@ -59,6 +59,7 @@ public:
 	string realmName;
 
 	uint32 characterSlots;
+	uint32 characterSlotsTrial;
 	string clientVersion;
 
 	vector<RealmInfo*> realms;

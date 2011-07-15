@@ -48,9 +48,14 @@ public:
     bool initMysql(string host, int32 port, string login, string password, string database);
     void closeMysql();
 
+	//Realms from db
+	void loadRealms(vector<RealmInfo*>* realms);
+	//
+
 	//ServerStart
 	bool loadGlobalSpells(vector<Spells>* SPELLS);
-	bool ladGlobalNpcs(vector<NPC>* NPCS);
+	bool loadGlobalNpcs(vector<NPC>* NPCS);
+	bool loadGlobalObjects(vector<Object>* OBJECTS);
 	//-----------
 
     bool checkLogin(string username, string password);
@@ -67,6 +72,7 @@ public:
 
     bool setAccountCookie(string username, uint32 cookie);
     bool setAccountCookie(uint32 accountID, uint32 cookie);
+	bool getAccountTrail(uint32 accountID);
 
 	int32 getAccountByCharacter(CharacterInfo character);
 

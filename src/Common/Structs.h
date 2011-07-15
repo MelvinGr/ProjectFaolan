@@ -164,4 +164,22 @@ struct Spells
 	string effectSpell;
 };
 
+struct Object
+{
+	uint32 id;
+	string name;
+	uint32 map;
+	Vector3D position;
+	Vector3D rotation;
+	uint32 data0;
+	uint32 data1;
+	uint32 data2;
+	uint32 data3;
+	uint32 data4;
+	uint32 data5;
+	uint32 unk0;
+	uint32 unk1;
+	string sdat1;
+	string sdat2;
+};
 #endif

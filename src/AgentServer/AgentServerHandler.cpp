@@ -187,7 +187,6 @@ void AgentServer::AgentServerHandler(GameClient* client, vector<GameClient*>* cl
 	default:
 		{
 			Log.Warning("Unknown Packet With Opcode: 0x%04X Data:\n", opcode);
-			if(opcode != 0xfdfd)
 			Log.Warning("%s\n\n", String::arrayToHexString(client->receiveBuffer.buffer, client->receiveBuffer.bufferLength).c_str());
 
 			break;
