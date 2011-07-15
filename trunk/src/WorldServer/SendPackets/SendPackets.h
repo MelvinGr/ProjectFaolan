@@ -24,11 +24,22 @@ namespace sendPackets
 	namespace passBlob
 	{
 		void CharStats(GameClient* client, uint32 target, uint32* value);
+
+		//Object Handler
+		namespace objHandle
+		{
+			void initObject(GlobalTable* GTable);
+			bool checkAlreadySpawned(vector<uint32>* spawned, uint32 objId);
+			bool spawnObj(Object tmpObj, GlobalTable* GTable);
+		}
 	}
 	void GI_AckAuthentication(GameClient* client, uint32 value); //0x01
-	void GI_Pong(Packet* packet, GameClient* client); //0x05
+	void GI_PingPong(Packet* packet, GameClient* client);
 	void GI_ReportDimensionID(GameClient* client, string realmId); //0x0c
 	void GI_ReportServerID(GameClient* client, uint32 value); //0x0d
+
+
+	void GCI_PingPong(Packet* packet, GameClient* client);
 
 	namespace other
 	{

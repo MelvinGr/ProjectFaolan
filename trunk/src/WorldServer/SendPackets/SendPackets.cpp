@@ -51,56 +51,6 @@ void sendPackets::passBlob::CharStats(GameClient* client, uint32 target, uint32*
 	}
 }
 
-void sendPackets::GI_AckAuthentication(GameClient* client, uint32 value)
-{
-	PacketBuffer aBuffer(500);
-	aBuffer.writeHeader("GameAgent", "GameInterface", gameUnknown1, 0, client->nClientInst, 0, Opcodes::GI_AckAuthentication); // AckAuthenticate
-	aBuffer.write<uint32>(value); // cDimID
-	aBuffer.doItAll(client->clientSocket);
-
-	Log.Debug("Sent GI_AckAuthentication\n");
-}
-
-void sendPackets::GI_Pong(Packet* packet, GameClient* client)
-{
-	uint32 cSendTime = packet->data->read<uint32>(); // ACE_Time_Value
-	uint32 lastData = packet->data->read<uint32>();
-
-	time_t nServerTime;
-	time(&nServerTime);
-
-	PacketBuffer aBuffer(500);
-	aBuffer.writeHeader("GameAgent", "GameInterface", gameUnknown1, 0, client->nClientInst, 0, Opcodes::GI_Pong); 
-	aBuffer.write<uint32>(cSendTime);
-	aBuffer.write<uint32>(nServerTime);
-	aBuffer.write<uint32>(lastData);
-	aBuffer.write<uint32>(nServerTime);
-	aBuffer.doItAll(client->clientSocket);
-
-	Log.Debug("Sent GI_Pong\n");
-}
-
-void sendPackets::GI_ReportDimensionID(GameClient* client, string realmId)
-{
-	PacketBuffer aBuffer(500);
-	aBuffer.writeHeader("GameAgent", "GameInterface", gameUnknown1, 0, client->nClientInst, 0, Opcodes::GI_ReportDimesionID); // ReportDimesionID
-	aBuffer.write<string>(realmId); // dimensionID
-	aBuffer.doItAll(client->clientSocket);
-
-	Log.Debug("Sent GI_ReportDimensionID\n");
-}
-
-void sendPackets::GI_ReportServerID(GameClient* client, uint32 value)
-{
-	PacketBuffer aBuffer(500);
-	aBuffer.writeHeader("GameAgent", "GameInterface", gameUnknown1, 0, client->nClientInst, 0, Opcodes::GI_ReportServerID); // ReportServerID
-	aBuffer.write<uint32>(gameUnknown1);
-	aBuffer.write<uint32>(value); // serverid? 
-	aBuffer.doItAll(client->clientSocket);
-
-	Log.Debug("Sent GI_ReportServerID\n");
-}
-
 void sendPackets::other::removeEffect(GlobalTable* GTable, uint32 effectId, uint32 npcId)
 {
 	PacketBuffer aBuffer(500);

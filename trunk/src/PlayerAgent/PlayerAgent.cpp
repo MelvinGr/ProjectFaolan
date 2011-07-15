@@ -54,6 +54,7 @@ int32 main(int32 argc, int8* argv[], int8* envp[])
 
 	Networking network(Settings.playerAgentPort);
 	int32 result = network.initDB();
+	Database.loadRealms(&Settings.realms);
 	if(result == 0)
 		int32 result = network.start();
 	if(result == 0) 

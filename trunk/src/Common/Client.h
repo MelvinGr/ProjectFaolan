@@ -53,6 +53,7 @@ struct CharacterInfo
 	Combat combat;
 
 	bool isExhausted;
+	bool enableRegen;
 
 	lvlStats maxStats;
 	lvlStats curMaxStats;
@@ -163,6 +164,7 @@ struct GameClient
 
 	vector<uint32>* loadedChar;
 	vector<uint32>* spawnedMobs;
+	vector<uint32>* spawnedObj;
 
 	CharacterInfo charInfo;
 
@@ -183,6 +185,7 @@ struct GlobalTable
 	vector<Spells> SPELLS;
 	GameClient* client;
 	vector<NPC> NPCS;
+	vector<Object> OBJECTS;
 	void* socket;
 };
 #endif

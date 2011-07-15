@@ -52,6 +52,7 @@ bool SettingsClass::load(string settingsFile, int8* envp[])
 	realmName = config.pString("realmName");
 
 	characterSlots = config.pInt("characterSlots");
+	characterSlotsTrial = config.pInt("characterSlotsTrial");
 	clientVersion = config.pString("clientVersion");
 
 	playIntro = config.pBool("playIntro");
@@ -68,7 +69,7 @@ bool SettingsClass::load(string settingsFile, int8* envp[])
 	realm1->agentServerPort = agentServerPort;
 	realm1->worldServerIPAddress = worldServerIPAddress;
 	realm1->worldServerPort = worldServerPort;
-	realms.push_back(realm1);
+	//realms.push_back(realm1);
 
 	return true;
 }

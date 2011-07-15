@@ -81,14 +81,17 @@ void WorldServer::HandleNpcCombat(GlobalTable* GTable)
 			}
 		}
 
-		//Auras
-		auraTimeDiff = difftime(actTime, auraLastCheck);
-		if(auraTimeDiff > 1.200)
+		//Do only if Regen is active
+		if(client->charInfo.enableRegen == true)
 		{
-			auraLastCheck = actTime;
-			client->charInfo.Update(GTable->client);
+			//Auras
+			auraTimeDiff = difftime(actTime, auraLastCheck);
+			if(auraTimeDiff > 1.200)
+			{
+				auraLastCheck = actTime;
+				client->charInfo.Update(GTable->client);
+			}
 		}
-
 		//Spell
 		if(client->charInfo.combat.spellId > 0)
 		{
@@ -107,6 +110,8 @@ void WorldServer::HandleClient(GlobalTable* GTable)
 	GameClient* client = new GameClient(*((uint32*)socket));
 	clientList->push_back(client);
 	GTable->client = client;
+	//Default disable regeneration (at begin or char creation there is no value for stats)
+	GTable->client->charInfo.enableRegen = false;
 	//Need to set 0 later set to char current exp
 	GTable->client->charInfo.curExp = 0;
 	GTable->client->charInfo.hp = 1;
@@ -168,7 +173,8 @@ int32 main(int32 argc, int8* argv[], int8* envp[])
 	{
 		//Loading Global Table with values;
 		Database.loadGlobalSpells(&GTable.SPELLS);
-		Database.ladGlobalNpcs(&GTable.NPCS);
+		Database.loadGlobalNpcs(&GTable.NPCS);
+		Database.loadGlobalObjects(&GTable.OBJECTS);
 
 		result = network.start();
 		if(result == 0) 
