@@ -56,6 +56,7 @@ public:
 	bool loadGlobalSpells(vector<Spells>* SPELLS);
 	bool loadGlobalNpcs(vector<NPC>* NPCS);
 	bool loadGlobalObjects(vector<Object>* OBJECTS);
+	bool loadGlobalItems(vector<Item>* ITEMS);
 	//-----------
 
     bool checkLogin(string username, string password);
@@ -93,6 +94,7 @@ public:
 	bool getNpcItems(uint32 npcId, vector<Item>* item);
 
     bool deleteCharacter(uint32 characterID);
+	bool deleteCharacterData(uint32 characterID);
 	bool deleteEmptyChar(uint32 accountID);
 	string getCharacterName(uint32 characterID);
     int32 getNewCharacterID();
@@ -105,6 +107,10 @@ public:
 	bool getMaxStats(GameClient* clientInfo);
 
 	bool getMapDetails(string map_name, teleport* info);
+
+	//Character
+	bool getCharItems(uint32 charId, vector<Item>* item);
+	bool getCharBar(uint32 charId, vector<Item>* barItems);
 };
 
 #endif
