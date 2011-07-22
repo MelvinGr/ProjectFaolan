@@ -130,13 +130,10 @@ bool WorldServer::spawnNPC(NPC tmpNPC, GlobalTable* GTable)
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-			0x00, 0x00, 0x00, 0x00, 
-
-			//0x00, 0x00, 0x00, 0x01, //16
+			0x00, 0x00, 0x00, 0x00
 		};
 
 		uint8 enemy0_5[] = {
-			//0x3f, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 			0x00, 0x00, 0x03, 0xf1, 
 		
 			0x00, 0x00, 0x00, 0x03, 
@@ -149,7 +146,8 @@ bool WorldServer::spawnNPC(NPC tmpNPC, GlobalTable* GTable)
 		PacketBuffer aBuffer(10000);
 		aBuffer.writeHeader("GameAgent", "GameInterface", gameUnknown1, 0, GTable->client->nClientInst, 0, 0x00); // PassBlob
 		uint32 size = sizeof(enemy0_0) + sizeof(enemy0_1) + sizeof(enemy0_3) + sizeof(enemy0_4) + sizeof(enemy0_5) + sizeof(enemy0_2);
-		size += (5 * 8) + (27 * 4) + (7 * 2) + sizeof(ending) + 2 + tmpNPC.name.size() + (19 * 4 * npcItems.size());
+		size += (5 * 8) + (27 * 4) + (8 * 2)+ (2 * 1) + sizeof(ending) + 2 + tmpNPC.name.size() + (19 * 4 * npcItems.size());
+		
 		if(tmpNPC.hairMesh > 0)
 		{
 			size += (3 * 4) + (1 * 2);
@@ -166,7 +164,6 @@ bool WorldServer::spawnNPC(NPC tmpNPC, GlobalTable* GTable)
 		aBuffer.write<uint64>(0);
 		aBuffer.write<uint16>(0x0041);
 		aBuffer.write<uint32>(0x00038c65); //instance
-		//aBuffer.write<uint32>(0x080ac283);
 		aBuffer.write<uint32>(tmpNPC.position.x);
 		aBuffer.write<uint32>(tmpNPC.position.y);
 		aBuffer.write<uint32>(tmpNPC.position.z);
