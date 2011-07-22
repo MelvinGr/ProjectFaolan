@@ -165,6 +165,7 @@ struct GameClient
 	vector<uint32>* loadedChar;
 	vector<uint32>* spawnedMobs;
 	vector<uint32>* spawnedObj;
+	vector<Item> charItems;
 
 	CharacterInfo charInfo;
 
@@ -186,6 +187,7 @@ struct GlobalTable
 	GameClient* client;
 	vector<NPC> NPCS;
 	vector<Object> OBJECTS;
+	vector<Item> ITEMS;
 	void* socket;
 };
 #endif

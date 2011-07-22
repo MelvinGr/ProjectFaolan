@@ -21,7 +21,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 void sendPackets::passBlob::CharStats(GameClient* client, uint32 target, uint32* value)
 {
 	uint32 statsCounter = value[0];
-	uint32 size = (4 * 4) + 1 + (statsCounter * 2);
+	uint32 size = (5 * 4) + 1 + (statsCounter * 8);
 	uint32 pointer = 0;
 
 	if(statsCounter>0)
@@ -43,6 +43,7 @@ void sendPackets::passBlob::CharStats(GameClient* client, uint32 target, uint32*
 		}
 
 		aBuffer.write<uint32>(0x3e4f4f3c);
+		Log.Notice("npc stats Pack:\n%s\n\n", String::arrayToHexString(aBuffer.buffer, aBuffer.bufferLength).c_str());
 		aBuffer.doItAll(client->clientSocket);
 	}
 	else

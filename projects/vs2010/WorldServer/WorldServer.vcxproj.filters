@@ -95,6 +95,12 @@
     <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\ObjectHandler.cpp">
       <Filter>Source Files\Handlers</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\WorldServer\ItemHandler.cpp">
+      <Filter>Source Files\Handlers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\WorldServer\SpellHandler.cpp">
+      <Filter>Source Files\Handlers</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\WorldServer\WorldServer.h">
