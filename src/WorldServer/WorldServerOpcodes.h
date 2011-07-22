@@ -96,9 +96,12 @@ enum Opcodes
 	*/
 	GCI_UpdateAggroStatus		= 0,
 	GCI_UpdateName				= 1,
+	GCI_learnSpell				= 0x0a,
 	GCI_addItem					= 0x1c,
+	GCI_SpellBarData			= 0x6f,
 	GCI_Pong					= 0x77,
 
+	GCA_SpellbarRequest			= 0x64,
 	GCA_Ping					= 0x7c
 };
 

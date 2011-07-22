@@ -94,17 +94,28 @@ void WorldServer::GameCharAgentHandler(Packet* packet, GlobalTable* GTable)
 			uint32 clientInst = packet->data->read<uint32>();
 			uint8 data1 = packet->data->read<uint8>();
 
-			if(data1 == 0x01)
-			{
-				
-			}
+			break;
+		}
 
-			if(data1 == 0x00)
+	case Opcodes::GCA_SpellbarRequest:	//Spellbar request
+		{
+			Log.Debug("GCA_SpellbarRequest\n");
+			vector<Item> charBar;
+			Database.getCharBar(client->charInfo.characterID, &charBar);
+			PacketBuffer aBuffer(500);
+			aBuffer.writeHeader("GameCharAgent", "GameCharInterface", gameUnknown1, 0, client->nClientInst, 0, Opcodes::GCI_SpellBarData);
+			aBuffer.write(((charBar.size() + 1) * 1009));
+			for(uint32 c = 0; c < charBar.size(); c++)
 			{
-				
+				aBuffer.write<uint32>(charBar[c].pos);
+				aBuffer.write<uint32>(4);
+				aBuffer.write<uint32>(charBar[c].id);
+				aBuffer.write<uint32>(0);
+				aBuffer.write<uint32>(0);
+				aBuffer.write<uint32>(0);
 			}
-			//
-
+			aBuffer.doItAll(client->clientSocket);
+			Log.Debug("GCI_SpellbarData\n");
 			break;
 		}
 

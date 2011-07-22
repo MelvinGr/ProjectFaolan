@@ -175,6 +175,7 @@ int32 main(int32 argc, int8* argv[], int8* envp[])
 		Database.loadGlobalSpells(&GTable.SPELLS);
 		Database.loadGlobalNpcs(&GTable.NPCS);
 		Database.loadGlobalObjects(&GTable.OBJECTS);
+		Database.loadGlobalItems(&GTable.ITEMS);
 
 		result = network.start();
 		if(result == 0) 

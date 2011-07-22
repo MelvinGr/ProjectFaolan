@@ -103,7 +103,7 @@ namespace WorldServer
 
 	//CharStatsHandler
 	struct CharStat {
-		void sendCharSpawn(GameClient* client);
+		void sendCharSpawn(GlobalTable* GTable);
 		void sendCharacterStats(GameClient* client);
 		uint64 addMaxHealth(uint32 value);
 		uint64 addHealth(uint32 value);
@@ -138,11 +138,17 @@ namespace WorldServer
 		uint64 addAnnihilationWin(uint32 value);
 		uint64 addDeath(uint32 value);
 		uint64 addKillingBlows(uint32 value);
-		uint8 getSexRace(uint32 sex, uint32 race);
 
 		void setStartStats(GameClient* client);
 
+		void sendCharSpells(GameClient* client);
+	};
+
+	//Functions of the ItemHandler 
+	struct ItemHandler {
+		void sendCharItems(GameClient* client);
 		void setItemStats(GameClient* client, uint32 placeId, uint32 itemId);
+		void setItemData(GlobalTable* GTable, Item* tmpItem);
 	};
 }
 #endif

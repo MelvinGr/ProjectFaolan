@@ -75,6 +75,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\src\WorldServer\AbilityHandler.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\CharStatsHandler.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\ItemHandler.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\Packet\AckAuth.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\Packet\Ping.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\Packet\ReportID.cpp" />
@@ -86,6 +87,7 @@
     <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\PassblobHandler.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\SelectObject.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\SendPackets\SendPackets.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\SpellHandler.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\WorldServer.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\CharacterHandler.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\CombatHandler.cpp" />

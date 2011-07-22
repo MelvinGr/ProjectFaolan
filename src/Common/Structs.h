@@ -128,6 +128,8 @@ struct NPC
 	uint32 nameId;
 	uint32 mapId;
 	uint32 typ;
+	uint32 gender;
+	uint32 race;
 	Vector3D position;
 	Vector3D rotation;
 	string extras;
