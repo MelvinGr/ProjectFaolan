@@ -404,7 +404,7 @@ CREATE TABLE IF NOT EXISTS `npc_details` (
 -- Daten für Tabelle `npc_details`
 --
 
-INSERT INTO `npc_details` (`id`, `position_x`, `position_y`, `position_z`, `rotation_x`, `rotation_y`, `rotation_z`, `bodymesh`, `headmesh`, `hairmesh`, `beardmesh`, `npcsize`) VALUES
+INSERT INTO `npc_details` (`id`, `position_x`, `position_y`, `position_z`, `rotation_x`, `rotation_y`, `rotation_z`, `bodymesh`, `headmesh`, `hairmesh`, `beardmesh`, `npcsize`, `gender`, `race`) VALUES
 (433435, 1134607368, 1125238684, 1143222632, 1054102189, 1063842617, 1536, 140327, 191546, 13, 0, 100, 2, 11),
 (433433, 1134021280, 1125247291, 1143100195, 1054102189, 1063842617, 0, 168152, 160655, 0, 0, 100, 2, 11),
 (433376, 1134991770, 1125272562, 1144029610, 1059471930, 3208817143, 11776, 137506, 160655, 0, 0, 100, 2, 11),
