@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010, 2011 The Project Faolan Team
+Copyright (C) 2009, 2010, 2011, 2012 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -90,7 +90,7 @@ public:
 		}
 
 		m_acceptor = new boost::asio::ip::tcp::acceptor(*(IOService().first));
-		boost::asio::ip::tcp::resolver resolver(m_acceptor->io_service());
+		boost::asio::ip::tcp::resolver resolver(m_acceptor->get_io_service()); //io_service
 		boost::asio::ip::tcp::resolver::query query(address, String::toString(port));
 		boost::asio::ip::tcp::endpoint endpoint = *resolver.resolve(query);
 		m_acceptor->open(endpoint.protocol());

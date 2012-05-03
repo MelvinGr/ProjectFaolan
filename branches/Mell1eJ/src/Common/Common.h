@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010, 2011 The Project Faolan Team
+Copyright (C) 2009, 2010, 2011, 2012 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -58,12 +58,6 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #	pragma warning(disable : 4996) // 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead.
 #endif
 
-#if PLATFORM == PLATFORM_WIN32
-#	define STRCASECMP stricmp
-#else
-#	define STRCASECMP strcasecmp
-#endif
-
 #if COMPILER == COMPILER_GNU && __GNUC__ >= 3
 #	include <ext/hash_map>
 #	define __fastcall __attribute__((__fastcall__))
@@ -115,12 +109,14 @@ typedef unsigned long long  uint64;
 #endif
 
 #if COMPILER == COMPILER_MICROSOFT
+#	define STRCASECMP stricmp
 #	define I64FMT "%016I64X"
 #	define I64FMTD "%I64u"
 #	define SI64FMTD "%I64d"
 #	define snprintf _snprintf
 #	define atoll __atoi64
 #else
+#	define STRCASECMP strcasecmp
 #	define stricmp strcasecmp
 #	define strnicmp strncasecmp
 #	define I64FMT "%016llX"
