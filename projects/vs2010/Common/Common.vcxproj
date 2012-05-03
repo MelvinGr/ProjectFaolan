@@ -10,12 +10,14 @@
     <ProjectGuid>{CD343F68-9D03-454A-8815-C87819B15289}</ProjectGuid>
     <RootNamespace>Common</RootNamespace>
     <Keyword>Win32Proj</Keyword>
+    <VCTargetsPath Condition="'$(VCTargetsPath11)' != '' and '$(VSVersion)' == '' and $(VisualStudioVersion) == ''">$(VCTargetsPath11)</VCTargetsPath>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <CharacterSet>MultiByte</CharacterSet>
     <WholeProgramOptimization>false</WholeProgramOptimization>
+    <PlatformToolset>v100</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -32,7 +34,7 @@
     <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" />
     <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectName)</TargetName>
-    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(LibraryPath)</LibraryPath>
+    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(VCInstallDir)lib;$(VCInstallDir)atlmfc\lib;$(WindowsSdkDir)lib;$(FrameworkSDKDir)\lib</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <PreBuildEvent>
@@ -62,6 +64,7 @@
       <PrecompiledHeaderOutputFile>
       </PrecompiledHeaderOutputFile>
       <CompileAs>CompileAsCpp</CompileAs>
+      <AdditionalIncludeDirectories>C:\libs\mysql-connector-c;C:\libs\zlib</AdditionalIncludeDirectories>
     </ClCompile>
     <Lib>
       <UseUnicodeResponseFiles>false</UseUnicodeResponseFiles>
@@ -70,7 +73,7 @@
     </Lib>
     <PostBuildEvent>
       <Message>Copying Files!</Message>
-      <Command>copy /b "..\..\..\etc\libmysql.dll" "$(TargetDir)\libmysql.dll" &amp;&amp; copy /b "..\..\..\etc\FaolanConfig.cnf" "$(TargetDir)\FaolanConfig.cnf"</Command>
+      <Command>copy /b "..\..\..\scripts\libmysql.dll" "$(TargetDir)\libmysql.dll" &amp;&amp; copy /b "..\..\..\scripts\FaolanConfig.cnf" "$(TargetDir)\FaolanConfig.cnf"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
