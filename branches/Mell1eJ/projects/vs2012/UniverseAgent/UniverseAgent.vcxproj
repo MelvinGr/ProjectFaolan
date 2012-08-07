@@ -7,15 +7,15 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\PlayerAgent\PlayerConnection.cpp" />
-    <ClCompile Include="..\..\..\src\PlayerAgent\Main.cpp" />
+    <ClCompile Include="..\..\..\src\UniverseAgent\UniverseConnection.cpp" />
+    <ClCompile Include="..\..\..\src\UniverseAgent\Main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\src\PlayerAgent\PlayerConnection.h" />
+    <ClInclude Include="..\..\..\src\UniverseAgent\UniverseConnection.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectName>PlayerAgent</ProjectName>
-    <ProjectGuid>{1B9AC86A-97DD-41BB-BFBC-BECB0B946FA7}</ProjectGuid>
+    <ProjectName>UniverseAgent</ProjectName>
+    <ProjectGuid>{598F87E5-FB8E-4BD9-9D66-34127B3824F2}</ProjectGuid>
     <RootNamespace>Faolancharmysql</RootNamespace>
     <Keyword>Win32Proj</Keyword>
     <VCTargetsPath Condition="'$(VCTargetsPath11)' != '' and '$(VSVersion)' == '' and $(VisualStudioVersion) == ''">$(VCTargetsPath11)</VCTargetsPath>
@@ -36,13 +36,20 @@
   <PropertyGroup>
     <_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..\..\build\$(PlatformName)\$(Configuration)\</OutDir>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(Configuration)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\tmp\VC++\$(SolutionName)\$(ProjectName)\$(Configuration)\</IntDir>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <IncludePath>D:\Libraries\boost;D:\Libraries\mysql-connector-c\include;D:\Libraries\zlib;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LibraryPath>D:\Libraries\boost\stage\lib;D:\Libraries\mysql-connector-c\lib;D:\Libraries\zlib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>C:\libs\boost;C:\libs\zlib;C:\libs\mysql-connector-c;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>
+      </AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -54,7 +61,8 @@
     </ClCompile>
     <Link>
       <AdditionalDependencies>ws2_32.lib;libmysql.lib;zlib.lib;..\..\..\build\$(PlatformName)\$(Configuration)\Common.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\libs\boost\stage\lib;C:\libs\zlib\lib\Debug;C:\libs\mysql-connector-c\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>
+      </AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <TargetMachine>MachineX86</TargetMachine>

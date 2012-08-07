@@ -7,7 +7,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{758C52C8-5D49-401F-A8A6-2EEA7C47B1E1}</ProjectGuid>
+    <ProjectGuid>{4B60E848-D709-47C3-BC48-3DB1DB2B8030}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <VCTargetsPath Condition="'$(VCTargetsPath11)' != '' and '$(VSVersion)' == '' and $(VisualStudioVersion) == ''">$(VCTargetsPath11)</VCTargetsPath>
   </PropertyGroup>
@@ -16,7 +16,7 @@
     <ConfigurationType>Application</ConfigurationType>
     <CharacterSet>MultiByte</CharacterSet>
     <WholeProgramOptimization>false</WholeProgramOptimization>
-    <PlatformToolset>v100</PlatformToolset>
+    <PlatformToolset>v110</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -83,11 +83,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\PlayerAgent\PlayerAgent.cpp" />
-    <ClCompile Include="..\..\..\src\PlayerAgent\PlayerAgentHandler.cpp" />
+    <ClCompile Include="..\..\..\src\CSPlayerAgent\CSPlayerAgent.cpp" />
+    <ClCompile Include="..\..\..\src\CSPlayerAgent\CSPlayerAgentHandler.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\src\PlayerAgent\PlayerAgent.h" />
+    <ClInclude Include="..\..\..\src\CSPlayerAgent\CSPlayerAgent.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.vcxproj">
