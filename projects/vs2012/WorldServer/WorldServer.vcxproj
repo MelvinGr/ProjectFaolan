@@ -7,8 +7,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{758C52C8-5D49-401F-A8A6-2EEA7C47B1E1}</ProjectGuid>
-    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{66374919-1E7D-49A8-A37C-82F39FA1970C}</ProjectGuid>
+    <RootNamespace>WorldServer</RootNamespace>
     <VCTargetsPath Condition="'$(VCTargetsPath11)' != '' and '$(VSVersion)' == '' and $(VisualStudioVersion) == ''">$(VCTargetsPath11)</VCTargetsPath>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -16,7 +16,7 @@
     <ConfigurationType>Application</ConfigurationType>
     <CharacterSet>MultiByte</CharacterSet>
     <WholeProgramOptimization>false</WholeProgramOptimization>
-    <PlatformToolset>v100</PlatformToolset>
+    <PlatformToolset>v110</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -34,12 +34,10 @@
     <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AllRules.ruleset</CodeAnalysisRuleSet>
     <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" />
+    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\Libraries\mysql-connector-c\lib;D:\Libraries\zlib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <IncludePath>D:\Libraries\mysql-connector-c\include;D:\Libraries\zlib;$(IncludePath)</IncludePath>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LibraryPath>D:\Libraries\mysql-connector-c\lib;D:\Libraries\zlib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -78,16 +76,40 @@
       <EnableCOMDATFolding>
       </EnableCOMDATFolding>
       <TargetMachine>MachineX86</TargetMachine>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>
       </AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\PlayerAgent\PlayerAgent.cpp" />
-    <ClCompile Include="..\..\..\src\PlayerAgent\PlayerAgentHandler.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\AbilityHandler.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\CharStatsHandler.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\ItemHandler.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\Packet\AckAuth.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\Packet\Ping.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\Packet\ReportID.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\CharAction.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\CharMovement.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\DeleteItem.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\LoadBarFull.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\ObjectHandler.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\PassblobHandler.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\SelectObject.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\SendPackets\SendPackets.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\SpellHandler.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\WorldServer.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\CharacterHandler.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\CombatHandler.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\CommandHandler.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\NPCHandler.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\WorldAgentHandler.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\WorldCharAgentHandler.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\WorldCharAgentProjectHandler.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\src\PlayerAgent\PlayerAgent.h" />
+    <ClInclude Include="..\..\..\src\WorldServer\PassBlobs\PassblobHandler.h" />
+    <ClInclude Include="..\..\..\src\WorldServer\SendPackets\SendPackets.h" />
+    <ClInclude Include="..\..\..\src\WorldServer\WorldServer.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.vcxproj">
