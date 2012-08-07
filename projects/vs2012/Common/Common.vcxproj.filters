@@ -1,0 +1,194 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Source Files\Networking">
+      <UniqueIdentifier>{0c95e038-33b6-4019-bde2-b203ef766499}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Crypt">
+      <UniqueIdentifier>{725db1de-8506-4b6a-9bd0-10b103c81fba}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Packets">
+      <UniqueIdentifier>{1bcafda6-3762-4aa5-a15b-88ef212174ec}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Other">
+      <UniqueIdentifier>{9d002b28-10a5-43dc-8043-d77a01ce14f5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Threads">
+      <UniqueIdentifier>{cc5161c4-2204-4390-b9cd-d941daef86e0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Header Files\Networking">
+      <UniqueIdentifier>{b4580897-388a-4457-a35f-18012cc8c3f6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Crypt">
+      <UniqueIdentifier>{0f13d618-528f-41a5-bf0b-83a458b4604d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Packets">
+      <UniqueIdentifier>{bd2841cc-c6f8-4a6f-9703-2951296f2893}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Other">
+      <UniqueIdentifier>{532e542f-41c4-4f0d-a631-9b7fb3509193}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Threads">
+      <UniqueIdentifier>{a5d2e5f2-6a42-432f-b2e9-76f9ff63b1a3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libs">
+      <UniqueIdentifier>{2922bee4-034a-473f-bfcb-c4981cc4caf9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libs\ConfigParser">
+      <UniqueIdentifier>{031bdd33-fb09-466e-8d5c-430078828657}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libs\BigInt">
+      <UniqueIdentifier>{30f0aa29-1445-4c5c-8145-b0d3de1e1e7d}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\src\Common\MysqlDatabase.cpp">
+      <Filter>Source Files\Networking</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\Networking.cpp">
+      <Filter>Source Files\Networking</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\CRC32.cpp">
+      <Filter>Source Files\Crypt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\LoginEncryption.cpp">
+      <Filter>Source Files\Crypt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\Packet.cpp">
+      <Filter>Source Files\Packets</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\PacketBuffer.cpp">
+      <Filter>Source Files\Packets</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\Client.cpp">
+      <Filter>Source Files\Other</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\Functions.cpp">
+      <Filter>Source Files\Other</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\Logger.cpp">
+      <Filter>Source Files\Other</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\Settings.cpp">
+      <Filter>Source Files\Other</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\SwapByte.cpp">
+      <Filter>Source Files\Other</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\Timer.cpp">
+      <Filter>Source Files\Other</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\Vector3D.cpp">
+      <Filter>Source Files\Other</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\Mutex.cpp">
+      <Filter>Source Files\Threads</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\ConfigParser\Config.cpp">
+      <Filter>Libs\ConfigParser</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\BigInt\BigInteger.cpp">
+      <Filter>Libs\BigInt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\BigInt\BigIntegerAlgorithms.cpp">
+      <Filter>Libs\BigInt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\BigInt\BigIntegerUtils.cpp">
+      <Filter>Libs\BigInt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\BigInt\BigUnsigned.cpp">
+      <Filter>Libs\BigInt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\BigInt\BigUnsignedInABase.cpp">
+      <Filter>Libs\BigInt</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\src\Common\Common.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\MysqlDatabase.h">
+      <Filter>Header Files\Networking</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Networking.h">
+      <Filter>Header Files\Networking</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\CRC32.h">
+      <Filter>Header Files\Crypt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\LoginEncryption.h">
+      <Filter>Header Files\Crypt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Packet.h">
+      <Filter>Header Files\Packets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\PacketBuffer.h">
+      <Filter>Header Files\Packets</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Client.h">
+      <Filter>Header Files\Other</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Functions.h">
+      <Filter>Header Files\Other</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Logger.h">
+      <Filter>Header Files\Other</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Settings.h">
+      <Filter>Header Files\Other</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Structs.h">
+      <Filter>Header Files\Other</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\SvnVariables.h">
+      <Filter>Header Files\Other</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\SwapByte.h">
+      <Filter>Header Files\Other</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Timer.h">
+      <Filter>Header Files\Other</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Vector3d.h">
+      <Filter>Header Files\Other</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Mutex.h">
+      <Filter>Header Files\Threads</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Singleton.h">
+      <Filter>Header Files\Threads</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\ConfigParser\Config.h">
+      <Filter>Libs\ConfigParser</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\BigInt\BigInteger.h">
+      <Filter>Libs\BigInt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\BigInt\BigIntegerAlgorithms.h">
+      <Filter>Libs\BigInt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\BigInt\BigIntegerLibrary.h">
+      <Filter>Libs\BigInt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\BigInt\BigIntegerUtils.h">
+      <Filter>Libs\BigInt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\BigInt\BigUnsigned.h">
+      <Filter>Libs\BigInt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\BigInt\BigUnsignedInABase.h">
+      <Filter>Libs\BigInt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\BigInt\NumberlikeArray.h">
+      <Filter>Libs\BigInt</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

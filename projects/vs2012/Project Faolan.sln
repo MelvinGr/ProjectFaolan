@@ -1,0 +1,37 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UniverseAgent", "UniverseAgent\UniverseAgent.vcxproj", "{D5B9EDDA-8FEF-4F17-8DB1-D633D691E10C}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PlayerAgent", "PlayerAgent\PlayerAgent.vcxproj", "{758C52C8-5D49-401F-A8A6-2EEA7C47B1E1}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CSPlayerAgent", "CSPlayerAgent\CSPlayerAgent.vcxproj", "{4B60E848-D709-47C3-BC48-3DB1DB2B8030}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AgentServer", "AgentServer\AgentServer.vcxproj", "{DE5BF5ED-0208-4DAB-9719-C5A0366A0E91}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Common", "Common\Common.vcxproj", "{CD343F68-9D03-454A-8815-C87819B15289}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "WorldServer", "WorldServer\WorldServer.vcxproj", "{66374919-1E7D-49A8-A37C-82F39FA1970C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D5B9EDDA-8FEF-4F17-8DB1-D633D691E10C}.Debug|Win32.ActiveCfg = Debug|Win32
+		{D5B9EDDA-8FEF-4F17-8DB1-D633D691E10C}.Debug|Win32.Build.0 = Debug|Win32
+		{758C52C8-5D49-401F-A8A6-2EEA7C47B1E1}.Debug|Win32.ActiveCfg = Debug|Win32
+		{758C52C8-5D49-401F-A8A6-2EEA7C47B1E1}.Debug|Win32.Build.0 = Debug|Win32
+		{4B60E848-D709-47C3-BC48-3DB1DB2B8030}.Debug|Win32.ActiveCfg = Debug|Win32
+		{4B60E848-D709-47C3-BC48-3DB1DB2B8030}.Debug|Win32.Build.0 = Debug|Win32
+		{DE5BF5ED-0208-4DAB-9719-C5A0366A0E91}.Debug|Win32.ActiveCfg = Debug|Win32
+		{DE5BF5ED-0208-4DAB-9719-C5A0366A0E91}.Debug|Win32.Build.0 = Debug|Win32
+		{CD343F68-9D03-454A-8815-C87819B15289}.Debug|Win32.ActiveCfg = Debug|Win32
+		{CD343F68-9D03-454A-8815-C87819B15289}.Debug|Win32.Build.0 = Debug|Win32
+		{66374919-1E7D-49A8-A37C-82F39FA1970C}.Debug|Win32.ActiveCfg = Debug|Win32
+		{66374919-1E7D-49A8-A37C-82F39FA1970C}.Debug|Win32.Build.0 = Debug|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
