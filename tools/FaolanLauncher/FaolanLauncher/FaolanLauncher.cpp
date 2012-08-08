@@ -16,11 +16,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef _DEBUG
+//#ifndef _DEBUG
 #define DLLNAME "FaolanLauncher.dll"
-#else
-#define DLLNAME "FaolanLauncher.dbg.dll"
-#endif
+//#else
+//#define DLLNAME "FaolanLauncher.dbg.dll"
+//#endif
 
 #include <Windows.h>
 #include <stdio.h>
