@@ -18,7 +18,9 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "MysqlFunctions.h"
 
-bool MySQLFunctions::CheckLogin(string username, string password)
+using namespace std;
+
+bool MySQLFunctions::CheckLogin(const std::string& username, const std::string& password)
 {
 	MysqlQuery* q = new MysqlQuery(MysqlQuery::NO_CALLBACK,MysqlQuery::HAS_RESULT);
 	q->setQueryText("SELECT * FROM accounts WHERE username = '%s' AND password = '%s' LIMIT 1", username.c_str(), password.c_str());
@@ -36,7 +38,7 @@ bool MySQLFunctions::CheckLogin(string username, string password)
 	return value;
 }
 
-int32 MySQLFunctions::GetAccountID(string username)
+int32 MySQLFunctions::GetAccountID(const std::string& username)
 {
 	MysqlQuery* q = new MysqlQuery(MysqlQuery::NO_CALLBACK,MysqlQuery::HAS_RESULT);
 	q->setQueryText("SELECT account_id FROM accounts WHERE username = '%s' LIMIT 1", username.c_str());
@@ -126,7 +128,7 @@ bool MySQLFunctions::SetAccountCookie(uint32 nClientInst, uint32 cookie)
 	return q->succes();
 }
 
-bool MySQLFunctions::UpdateLastInfo(uint32 nClientInst, string ipAddress)
+bool MySQLFunctions::UpdateLastInfo(uint32 nClientInst, const std::string& ipAddress)
 {
 	time_t rawtime;
 	time(&rawtime);

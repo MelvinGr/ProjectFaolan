@@ -26,25 +26,23 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include "Vector3D.h"
 #include "Structs.h"
 
-using namespace std;
-
 class CharacterInfo
 {
 public:
 	uint32 characterID;
 	uint32 accountID;
-	string name;
+	std::string name;
 	uint32 race;
 	uint32 Class; 
 	uint32 level;
 	uint32 sex;
 	uint32 realmID;
-	string lastConnection;
+	std::string lastConnection;
 	uint32 map;
 	uint32 headmesh;
 	uint32 size;
 	uint32 voice;
-	string language;
+	std::string language;
 	uint32 lbinprv;
 
 	Vector3D position;

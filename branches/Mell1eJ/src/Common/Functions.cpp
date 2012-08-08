@@ -43,6 +43,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include "SwapByte.h"
 #include "Vector3D.h"
 
+using namespace std;
+
 namespace String
 {
 	string arrayToHexString(uint8* data, uint32 size)
@@ -92,7 +94,7 @@ namespace String
 		return string(tmp);
 	}
 
-	string replace(string str, string from, string to)
+	string replace(const std::string& str, const std::string& from, const std::string& to)
 	{
 		string newStr = str;
 		int32 oldPosition = -2, position;
@@ -118,7 +120,7 @@ namespace String
 	}
 }
 
-uint64 File::Read(string path, bool binary, int8 **buffer)
+uint64 File::Read(const std::string& path, bool binary, int8 **buffer)
 {
 	fstream file(path.c_str(), (binary ? ios::binary | ios::in : ios::in) | ios::ate);
 
@@ -132,14 +134,14 @@ uint64 File::Read(string path, bool binary, int8 **buffer)
 	return size;
 }
 
-void File::Write(string path, bool binary, int8 *buffer, uint64 length)
+void File::Write(const std::string& path, bool binary, int8 *buffer, uint64 length)
 {
 	fstream file(path.c_str(), (binary ? ios::binary | ios::out : ios::out));
 	file.write(buffer, length);
 	file.close();
 }
 
-bool File::Exists(string strFilename)
+bool File::Exists(const std::string& strFilename)
 {
 #if PLATFORM == PLATFORM_WIN32
 	return (GetFileAttributes(strFilename.c_str()) != INVALID_FILE_ATTRIBUTES);

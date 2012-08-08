@@ -27,15 +27,13 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "PacketBuffer.h"
 
-using namespace std;
-
 /*
 * BufferPool class to read and write data on raw buffer.
 * @author Albator
 */
 class BufferPool 
 {
-	stack<PacketBuffer*> m_bufferStack;
+	std::stack<PacketBuffer*> m_bufferStack;
 
 public:
 

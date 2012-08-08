@@ -36,7 +36,7 @@ class Acceptor : private boost::noncopyable
 	/**
 	* return next available io_service using a round robin for load balancing
 	*/
-	virtual pair<boost::asio::io_service*, BufferPool*> IOService()=0;
+	virtual std::pair<boost::asio::io_service*, BufferPool*> IOService()=0;
 
 public:
 	/**

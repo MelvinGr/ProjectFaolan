@@ -18,6 +18,10 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "Connection.h"
 
+#include <boost/lexical_cast.hpp>
+
+using namespace std;
+
 Connection::Connection(boost::asio::io_service& IOService, BufferPool* bp) : m_socket(IOService), m_bufferPool(bp), m_readBuffer(2000)
 {
 	//
@@ -44,6 +48,8 @@ void Connection::AsyncRead()
 		boost::bind(&Connection::onRead, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 }
 
+int packetCounter = 0;
+
 void Connection::onRead(const boost::system::error_code &e, size_t bytesTransferred)
 {
 	if(e)
@@ -59,7 +65,10 @@ void Connection::onRead(const boost::system::error_code &e, size_t bytesTransfer
 	}
 
 	PacketBuffer packetBuffer(&m_readBuffer[0], bytesTransferred);
+	File::Write("D:\\packets\\packet" + boost::lexical_cast<string>(packetCounter) + "f.bin", true, (int8*)packetBuffer.buffer, packetBuffer.bufferLength);
 	Packet packet(&packetBuffer);
+
+	packetCounter++;
 
 	handlePacket(&packetBuffer, &packet);
 	AsyncRead();

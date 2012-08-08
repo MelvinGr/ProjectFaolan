@@ -29,8 +29,6 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "Singleton.h"
 
-using namespace std;
-
 class Database;
 
 /**
@@ -53,16 +51,16 @@ public:
 	void parseConfigFile();
 	void printConfiguration();
 
-	string DBUsername, DBPassword, DBName, DBHost;
+	std::string DBUsername, DBPassword, DBName, DBHost;
 	uint32 DBPort, DBConnectionCount, DBType;
 
 	uint32 demuxerCount;
 	uint32 characterSlots;
 	
-	string universeAgentAddress;
+	std::string universeAgentAddress;
 	uint32 universeAgentPort;
 
-	string playerAgentAddress;
+	std::string playerAgentAddress;
 	uint32 playerAgentPort;
 };
 

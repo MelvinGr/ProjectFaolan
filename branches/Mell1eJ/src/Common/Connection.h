@@ -49,7 +49,7 @@ public:
 protected:
 	boost::asio::ip::tcp::socket m_socket;
 	BufferPool* m_bufferPool;
-	vector<uint8> m_readBuffer; 
+	std::vector<uint8> m_readBuffer; 
 
 	void disconnect();
 

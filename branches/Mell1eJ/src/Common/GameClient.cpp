@@ -18,6 +18,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "GameClient.h"
 
+using namespace std;
+
 GameClient::GameClient()
 {
 	ipAddress = "";//Network::GetIPFromSocket(clientSocket);

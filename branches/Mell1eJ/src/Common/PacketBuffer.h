@@ -37,8 +37,6 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include "SwapByte.h"
 #include "Functions.h"
 
-using namespace std;
-
 struct PacketBuffer
 {
 public:
@@ -112,18 +110,37 @@ public:
 		}
 	}
 
-	inline string toString() { return String::arrayToHexString(buffer, bufferLength); }
+	inline std::string toString() { return String::arrayToHexString(buffer, bufferLength); }
 	void reset();
 	void resize(uint32 size);
 
 	uint8* read(uint32 length);
 	void write(const uint8* data, uint32 length);
-	void writeHeader(string sender, string receiver, uint32 unknown1, uint32 unknown2, uint32 user, uint32 unknown4, uint32 opcode);
+	void writeHeader(uint32 unknown1, uint32 unknown2, uint32 unknown3, uint32 unknown4, uint32 unknown5, uint32 opcode);
 	void finalize();
 };
 
+template <> inline std::string PacketBuffer::read()
+{
+	try
+	{
+		assert((offset + sizeof(int16)) <= bufferLength);
+		uint16 stringLength = read<uint16>();
+	
+		assert((offset + stringLength) <= bufferLength);
+		std::string data(&buffer[offset], &buffer[offset + stringLength]);
+	
+		offset += stringLength;
+		return data;
+	}
+	catch(int8* msg)
+	{
+		printf("Error at reading String @ PacketBuffer.h\nErrorMsg: %s \n", msg);
+		return "";
+	}
+}
 
-template <> inline void PacketBuffer::write(string data)
+template <> inline void PacketBuffer::write(std::string data)
 {
 	try
 	{
@@ -136,26 +153,6 @@ template <> inline void PacketBuffer::write(string data)
 	catch(int8* msg)
 	{
 		printf("Error at writing String @ PacketBuffer.h\nErrorMsg: %s \n", msg);
-	}
-}
-
-template <> inline string PacketBuffer::read()
-{
-	try
-	{
-		assert((offset + sizeof(int16)) <= bufferLength);
-		uint16 stringLength = read<uint16>();
-	
-		assert((offset + stringLength) <= bufferLength);
-		string data(&buffer[offset], &buffer[offset + stringLength]);
-	
-		offset += stringLength;
-		return data;
-	}
-	catch(int8* msg)
-	{
-		printf("Error at reading String @ PacketBuffer.h\nErrorMsg: %s \n", msg);
-		return "";
 	}
 }
 

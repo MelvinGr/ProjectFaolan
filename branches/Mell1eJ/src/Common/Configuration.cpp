@@ -18,6 +18,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "Configuration.h"
 
+using namespace std;
+
 #define bvalue boost::program_options::value
 Configuration::Configuration() : Singleton<Configuration>(), m_description("server options")
 {

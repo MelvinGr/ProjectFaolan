@@ -18,6 +18,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "PacketBuffer.h"
 
+using namespace std;
+
 void PacketBuffer::reset()
 {
 	memset(buffer, 0, maxLength);
@@ -64,16 +66,15 @@ void PacketBuffer::write(const uint8* data, uint32 length)
 	}
 }
 
-void PacketBuffer::writeHeader(string sender, string receiver, uint32 unknown1, uint32 unknown2, uint32 user, uint32 unknown4, uint32 opcode)
+void PacketBuffer::writeHeader(uint32 unknown1, uint32 unknown2, uint32 unknown3, uint32 unknown4, uint32 unknown5, uint32 opcode)
 {
 	write<uint32>(0); // Write empty length
 	write<uint32>(0); // write empty crc32
-	write<string>(sender); // write sender
-	write<uint32>(unknown1); // write Unknown 1
-	write<uint32>(unknown2); // write Unknown 2
-	write<string>(receiver); // write receiver
-	write<uint32>(user); // write userID
-	write<uint32>(unknown4); // write Unknown 4
+	write<uint32>(unknown1); // write 
+	write<uint32>(unknown2); // write 
+	write<uint32>(unknown3); // write 
+	write<uint32>(unknown4); // write 
+	write<uint32>(unknown5); // write 
 	write<uint32>(opcode); // write opcode
 }
 
@@ -83,7 +84,7 @@ void PacketBuffer::finalize()
 	SwapByte::Swap<uint32>(packetLength);
 	memcpy(&buffer[0], reinterpret_cast<uint8*>(&packetLength), sizeof(int32));
 
-	uint32 hash = CRC32::CalculateCRC32((uint8*)buffer, bufferLength);
+	uint32 hash = CRC32::CalculateCRC32(buffer, bufferLength);
 	SwapByte::Swap<uint32>(hash);
 	memcpy(&buffer[4], reinterpret_cast<uint8*>(&hash), sizeof(int32));
 }

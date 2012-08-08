@@ -13,6 +13,11 @@
   <ItemGroup>
     <ClInclude Include="..\..\..\src\PlayerAgent\PlayerConnection.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Common\Common.vcxproj">
+      <Project>{dc00d144-97d4-4bf1-9a44-0fd3d3d53863}</Project>
+    </ProjectReference>
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectName>PlayerAgent</ProjectName>
     <ProjectGuid>{1B9AC86A-97DD-41BB-BFBC-BECB0B946FA7}</ProjectGuid>
@@ -58,6 +63,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <MultiProcessorCompilation>false</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>ws2_32.lib;libmysql.lib;zlib.lib;..\..\..\build\$(PlatformName)\$(Configuration)\Common.lib;%(AdditionalDependencies)</AdditionalDependencies>

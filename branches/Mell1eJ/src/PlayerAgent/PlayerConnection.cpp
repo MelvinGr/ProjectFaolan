@@ -18,6 +18,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "PlayerConnection.h"
 
+using namespace std;
+
 PlayerConnection::PlayerConnection(boost::asio::io_service& IOService, BufferPool* hp) : Connection(IOService, hp)
 {
 	//

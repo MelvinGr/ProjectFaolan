@@ -30,18 +30,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sstream>
 #include <string>
 
-using namespace std;
-
 class LoginEncryption
 {
 public:
-	static string decryptLoginKey(const string& loginKey);
+	static std::string decryptLoginKey(const std::string& loginKey);
 
 private:
-	static uint8 popHexChar(stringstream& sstr);
-	static uint32 popHexInt(stringstream& sstr);
+	static uint8 popHexChar(std::stringstream& sstr);
+	static uint32 popHexInt(std::stringstream& sstr);
 
-	static string decryptTea(const string& encryptedBlock, const uint32* key);
+	static std::string decryptTea(const std::string& encryptedBlock, const uint32* key);
 	static void decryptTeaRound(uint32* block, const uint32* key);
 };
 

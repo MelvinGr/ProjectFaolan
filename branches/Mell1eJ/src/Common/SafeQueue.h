@@ -23,8 +23,6 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include <queue>
 #include "Common.h"
 
-using namespace std;
-
 /**
 * A thread safe queue based on Boost::Thread lock
 * queue like interface
@@ -101,7 +99,7 @@ public:
 	}
 
 private:
-	queue<T> m_queue;
+	std::queue<T> m_queue;
 	mutable boost::mutex m_mutex;
 	boost::condition_variable m_condition;
 };

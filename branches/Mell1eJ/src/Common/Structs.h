@@ -25,8 +25,6 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include "Vector3D.h"
 #include "Functions.h"
 
-using namespace std;
-
 enum CharacterState
 {
 	RESTING = 0,
@@ -41,27 +39,27 @@ enum CharacterState
 struct RealmInfo
 {
 	uint32 realmID;
-	string realmName;
+	std::string realmName;
 	uint16 realmType; // 0,1 = PvE | 256,257 = PvP | 1081 = PvP by faction, probably a bitmask
 
 	uint32 onlineStatus; //2 = online, other num = offline
 	uint32 loadStatus; // 0 = medium load 1 = medium load 2 = heavy load 3 = full
 
-	string csPlayerAgentIPAddress;
+	std::string csPlayerAgentIPAddress;
 	uint32 csPlayerAgentPort;
 
-	string agentServerIPAddress;
+	std::string agentServerIPAddress;
 	uint32 agentServerPort;
 
-	string worldServerIPAddress;
+	std::string worldServerIPAddress;
 	uint32 worldServerPort;
 };
 
 struct AccountInfo
 {
 	uint32 accountID;
-	string username;
-	string mail;
+	std::string username;
+	std::string mail;
 	uint32 kind;
 	uint32 characterCount;
 	uint32 cookie;
@@ -91,7 +89,7 @@ struct Combat
 	time_t activateSpell;
 	uint32 spellId;
 
-	vector<effectSpell> effect;
+	std::vector<effectSpell> effect;
 };
 
 struct teleport
@@ -124,13 +122,13 @@ struct NPCMove
 struct NPC
 {
 	uint32 npcId;
-	string name;
+	std::string name;
 	uint32 nameId;
 	uint32 mapId;
 	uint32 typ;
 	Vector3D position;
 	Vector3D rotation;
-	string extras;
+	std::string extras;
 	uint32 action;
 	uint32 level;
 	uint32 fraction;
@@ -156,12 +154,12 @@ struct Spells
 {
 	uint32 id;
 	uint32 level;
-	string name;
+	std::string name;
 	uint32 castTime;
 	uint32 minDmg;
 	uint32 maxDmg;
 	uint32 costMana;
-	string effectSpell;
+	std::string effectSpell;
 };
 
 #endif

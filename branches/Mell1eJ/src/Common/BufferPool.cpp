@@ -18,6 +18,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "BufferPool.h"
 
+using namespace std;
+
 // PacketBuffer Pool class definition
 BufferPool::BufferPool(uint32 chunkNumber, size_t chunkSize) : m_bufferStack()
 {

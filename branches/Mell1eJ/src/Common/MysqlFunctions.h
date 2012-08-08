@@ -34,24 +34,22 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include "Structs.h"
 #include "CharacterInfo.h"
 
-using namespace std;
-
 namespace MySQLFunctions
 {
-	bool CheckLogin(string username, string password);
-	int32 GetAccountID(string username);
+	bool CheckLogin(const std::string& username, const std::string& password);
+	int32 GetAccountID(const std::string& username);
 	bool IsAccountBanned(uint32 nClientInst);
 	int32 GetNewCharacterId();
 
 	int32 GetAccountCookie(uint32 nClientInst);
 	bool SetAccountCookie(uint32 nClientInst, uint32 cookie);
 
-	bool UpdateLastInfo(uint32 nClientInst, string ipAddress);
+	bool UpdateLastInfo(uint32 nClientInst, const std::string& ipAddress);
 
 	bool GetRealm(uint32 realmID, RealmInfo *realm);
-	bool GetRealms(vector<RealmInfo> *realms);
+	bool GetRealms(std::vector<RealmInfo> *realms);
 	bool GetCharacter(uint32 characterID, CharacterInfo *character);
-	bool GetCharacters(uint32 accountID, vector<CharacterInfo> *characters);
+	bool GetCharacters(uint32 accountID, std::vector<CharacterInfo> *characters);
 
 	bool DeleteCharacter(uint32 characterID);
 };

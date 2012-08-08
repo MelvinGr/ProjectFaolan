@@ -25,8 +25,6 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "PacketBuffer.h"
 
-using namespace std;
-
 class Packet 
 {
 public:	
@@ -35,17 +33,17 @@ public:
 	
 	uint32 length;
 	uint32 crc32;
-	string sender;
+	std::string sender;
 	uint32 unknown1;
 	uint32 unknown2;
-	string receiver;
+	std::string receiver;
 	uint32 userID;
 	uint32 unknown4;
 	uint32 opcode;
 	//PacketBuffer data;
 
 	inline uint32 HeaderLength();
-	string toString();
+	std::string toString();
 };
 
 #endif

@@ -38,7 +38,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 class Network : private boost::noncopyable 
 {
-	vector<Acceptor*> m_acceptors;
+	std::vector<Acceptor*> m_acceptors;
 	boost::thread_group m_threadGroup;
 
 public:
@@ -47,7 +47,7 @@ public:
 	/**
 	* Create a new connection acceptor and run it in a separate thread
 	*/
-	template<typename ConnectionType> void createConnectionAcceptor(const string& address, const uint32 port,  size_t poolSize)
+	template<typename ConnectionType> void createConnectionAcceptor(const std::string& address, const uint32 port,  size_t poolSize)
 	{
 		ConnectionAcceptor<ConnectionType>* ca = new ConnectionAcceptor<ConnectionType>(address, port, poolSize);
 		m_acceptors.push_back(ca);

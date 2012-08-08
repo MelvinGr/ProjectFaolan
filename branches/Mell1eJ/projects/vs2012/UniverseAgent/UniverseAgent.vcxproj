@@ -13,6 +13,11 @@
   <ItemGroup>
     <ClInclude Include="..\..\..\src\UniverseAgent\UniverseConnection.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Common\Common.vcxproj">
+      <Project>{dc00d144-97d4-4bf1-9a44-0fd3d3d53863}</Project>
+    </ProjectReference>
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectName>UniverseAgent</ProjectName>
     <ProjectGuid>{598F87E5-FB8E-4BD9-9D66-34127B3824F2}</ProjectGuid>
@@ -58,6 +63,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <MultiProcessorCompilation>false</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>ws2_32.lib;libmysql.lib;zlib.lib;..\..\..\build\$(PlatformName)\$(Configuration)\Common.lib;%(AdditionalDependencies)</AdditionalDependencies>

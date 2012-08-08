@@ -25,15 +25,13 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "CharacterInfo.h"
 
-using namespace std;
-
 class GameClient
 {
 public:
-	string ipAddress;
+	std::string ipAddress;
 
-	string authChallenge;
-	string username;
+	std::string authChallenge;
+	std::string username;
 
 	uint32 nClientInst;
 	uint32 nCookie;

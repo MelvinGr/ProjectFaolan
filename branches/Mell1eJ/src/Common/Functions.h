@@ -22,31 +22,21 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include "Common.h"
 
 #include <string>
-#include <sstream>
-
-using namespace std;
 
 namespace String
 {
-	template <typename T> string toString(T data)
-	{
-		stringstream ss;
-		ss << data;
-		return ss.str();
-	}
-
-	string arrayToHexString(uint8* data, uint32 size);
-	string serverInfoStr();
-	string replace(string str, string from, string to);
-	string timeString();
+	std::string arrayToHexString(uint8* data, uint32 size);
+	std::string serverInfoStr();
+	std::string replace(const std::string& str, const std::string& from, const std::string& to);
+	std::string timeString();
 }     
 
 namespace File
 {
-	uint64 Read(string path, bool binary, int8 **buffer);
-	void Write(string path, bool binary, int8 *buffer, uint64 length);
+	uint64 Read(const std::string& path, bool binary, int8 **buffer);
+	void Write(const std::string& path, bool binary, int8 *buffer, uint64 length);
 
-	bool Exists(string strFilename);
+	bool Exists(const std::string& strFilename);
 }
 
 #endif
