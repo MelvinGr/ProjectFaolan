@@ -1,0 +1,4 @@
+Add this line to your hosts file:
+127.0.0.1		dm01-sto.ageofconan.com
+
+Use the FaolanLauncher to launch age of conan
