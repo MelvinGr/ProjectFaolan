@@ -25,32 +25,27 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include <map>
 #include <string>
 
-class MysqlQuery : public Query {
+class MysqlQuery : public Query 
+{
+	MYSQL_RES* m_res;
+	MYSQL_ROW m_row;
 
 public:
-    /**
-     * Query with a callback
-     * 
-     */
-    MysqlQuery(boost::function<void ()> f, CallbackType type, QueryType t);
+	// Query with a callback
+	MysqlQuery(boost::function<void ()> f, CallbackType type, QueryType t);
+	MysqlQuery(CallbackType type, QueryType t);
 
-    MysqlQuery(CallbackType type, QueryType t);
-    
-    /**
-     * Query without callback
-     */
-    MysqlQuery(QueryType t);
+	// Query without callback
+	MysqlQuery(QueryType t);
 
-    bool execute();
-
-    bool fetchRow();
-
+	bool execute();
+	bool fetchRow();
 	uint64 numRows();
 
-    bool storeResult();
-    bool succes();
+	bool storeResult();
+	bool succes();
 
-    std::string error();
+	std::string error();
 
 	const char* MysqlQuery::getRealmName(uint32 idx);
 	uint32 MysqlQuery::getRealmId();
@@ -59,19 +54,13 @@ public:
 	const char* MysqlQuery::getCharString(uint32 idx);
 	uint32 MysqlQuery::getCharUint(uint32 idx);
 
-    
-    uint32 getUint32();
-    uint64 getUint64();
-    const char* getString();
-    
-    uint32 getUint32(uint32 idx);
-    uint64 getUint64(uint32 idx);
-    const char* getString(uint32 idx);
+	uint32 getUint32();
+	uint64 getUint64();
+	const char* getString();
 
-private:
-    MYSQL_RES* m_res;
-    MYSQL_ROW m_row;
-
+	uint32 getUint32(uint32 idx);
+	uint64 getUint64(uint32 idx);
+	const char* getString(uint32 idx);
 };
 
-#endif /*MYSQLQUERY_H_*/
+#endif

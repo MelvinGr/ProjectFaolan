@@ -78,7 +78,7 @@ namespace __gnu_cxx
 	{
 		size_t operator()(const unsigned long long &__x) const { return (size_t)__x; }
 	};
-	
+
 	template<typename T> struct hash<T *> 
 	{
 		size_t operator()(T * const &__x) const { return (size_t)__x; }

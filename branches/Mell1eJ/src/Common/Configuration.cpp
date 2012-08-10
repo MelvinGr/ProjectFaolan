@@ -18,33 +18,53 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "Configuration.h"
 
+#include <iostream>
+#include <fstream>
+
 using namespace std;
 
-#define bvalue boost::program_options::value
-Configuration::Configuration() : Singleton<Configuration>(), m_description("server options")
+Configuration::Configuration() 
+	: Singleton<Configuration>(), m_description("Server Options")
 {
 	m_description.add_options()
-		("DBUsername",				boost::program_options::value<string>(&DBUsername),				"DB Username")
-		("DBPassword",				boost::program_options::value<string>(&DBPassword),				"DB password")
-		("DBHost",					boost::program_options::value<string>(&DBHost),					"DB Host")
-		("DBPort",					boost::program_options::value<uint32>(&DBPort),					"DB port")
-		("DBName",					boost::program_options::value<string>(&DBName),					"DB name")
-		("DBConnectionCount",		boost::program_options::value<uint32>(&DBConnectionCount),		"Number of active connection to the DB server")
-		("DBType",					boost::program_options::value<uint32>(&DBType),					"DB Type")
+		("DBUsername", "")
+		("DBPassword", "")
+		("DBHost", "")
+		("DBPort", "")
+		("DBName", "")
+		("DBConnectionCount", "")
 
-		("demuxerCount",			boost::program_options::value<uint32>(&demuxerCount),			"Count of network demuxer threads")
-		("characterSlots",			boost::program_options::value<uint32>(&characterSlots),			"Number of character slots")
+		("demuxerCount", "")
+		("characterSlots", "")
 
-		("universeAgentAddress",	boost::program_options::value<string>(&universeAgentAddress),	"Address to listen to")
-		("universeAgentPort",		boost::program_options::value<uint32>(&universeAgentPort),		"Port to listen to")
+		("universeAgentAddress", "")
+		("universeAgentPort", "")
 
-		("playerAgentAddress",		boost::program_options::value<string>(&playerAgentAddress),		"Address to listen to")
-		("playerAgentPort",			boost::program_options::value<uint32>(&playerAgentPort),		"Port to listen to");
+		("playerAgentAddress", "")
+		("playerAgentPort", "");
 }
 
-void Configuration::parseCommandLine(int argc, char *argv[])
+/*void ShadyOptionsHack(boost::program_options::parsed_options &parsed)
 {
-	boost::program_options::store(boost::program_options::parse_command_line(argc, argv, m_description), m_variableMap);
+	vector<string> to_pass_further = 
+		boost::program_options::collect_unrecognized(parsed.options, boost::program_options::include_positional);
+
+	for(int32 i = 0; i < (to_pass_further.size() - 1); i++)
+	{
+		vector<string> vec;
+		//vec.push_back(to_pass_further[i]);
+		vec.push_back(to_pass_further[i + 1]);
+		parsed.options.push_back(vector<boost::program_options::option>::value_type(to_pass_further[i], vec));
+	}
+}*/
+
+void Configuration::parseCommandLine(int32 argc, int8 *argv[])
+{
+	boost::program_options::parsed_options parsed = 
+		boost::program_options::command_line_parser(argc, argv).options(m_description).allow_unregistered().run();
+	//ShadyOptionsHack(parsed);
+
+	boost::program_options::store(parsed, m_variableMap);
 	boost::program_options::notify(m_variableMap);
 
 	if (argc < 2 || (!strcmp(argv[1], "-?") || !strcmp(argv[1], "--?") || !strcmp(argv[1], "/?") || !strcmp(argv[1], "/h") || !strcmp(argv[1], "-h") || !strcmp(argv[1], "--h") || !strcmp(argv[1], "--help") || !strcmp(argv[1], "/help") || !strcmp(argv[1], "-help") || !strcmp(argv[1], "help")))
@@ -53,12 +73,15 @@ void Configuration::parseCommandLine(int argc, char *argv[])
 	}
 }
 
-void Configuration::parseConfigFile()
+void Configuration::parseConfigFile(const string &configPath)
 {
-	ifstream ifs("FaolanConfig.cfg");
+	ifstream ifs(configPath);
 	if(ifs.is_open())
 	{
-		boost::program_options::store(boost::program_options::parse_config_file(ifs, m_description), m_variableMap);
+		boost::program_options::parsed_options parsed = boost::program_options::parse_config_file(ifs, m_description, true);
+		//ShadyOptionsHack(parsed);
+
+		boost::program_options::store(parsed, m_variableMap);
 		boost::program_options::notify(m_variableMap);
 		ifs.close();
 	}

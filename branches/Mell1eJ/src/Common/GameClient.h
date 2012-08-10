@@ -39,7 +39,6 @@ public:
 	//CharacterInfo characterInfo;
 
 	GameClient();
-	~GameClient();
 };
 
 #endif

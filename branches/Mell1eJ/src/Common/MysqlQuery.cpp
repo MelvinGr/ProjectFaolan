@@ -21,20 +21,20 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include <mysql/mysql.h>
 #include <boost/lexical_cast.hpp>
 
-MysqlQuery::MysqlQuery(QueryType t) :
-Query(t), m_res(NULL)
+MysqlQuery::MysqlQuery(QueryType t) 
+	: Query(t), m_res(NULL)
 {
 
 }
 
-MysqlQuery::MysqlQuery(boost::function<void ()> f, CallbackType type, QueryType t) :
-Query(f, type, t), m_res(NULL)
+MysqlQuery::MysqlQuery(boost::function<void ()> f, CallbackType type, QueryType t) 
+	: Query(f, type, t), m_res(NULL)
 {
 
 }
 
-MysqlQuery::MysqlQuery(CallbackType type, QueryType t) :
-Query(type, t), m_res(NULL)
+MysqlQuery::MysqlQuery(CallbackType type, QueryType t) 
+	: Query(type, t), m_res(NULL)
 {
 
 }
@@ -43,9 +43,7 @@ bool MysqlQuery::execute()
 {
 	if (m_dbc)
 	{
-		MysqlDatabase::MysqlDatabaseConnection* mydbc =
-			(MysqlDatabase::MysqlDatabaseConnection*)m_dbc;
-
+		MysqlDatabase::MysqlDatabaseConnection* mydbc =	(MysqlDatabase::MysqlDatabaseConnection*)m_dbc;
 		if (!mysql_query(&(mydbc->m_mysql), m_queryTxt))
 		{
 			return true;
@@ -59,8 +57,7 @@ bool MysqlQuery::storeResult()
 {
 	if (execute() && !m_res)
 	{
-		MysqlDatabase::MysqlDatabaseConnection* mydbc =
-			(MysqlDatabase::MysqlDatabaseConnection*)m_dbc;
+		MysqlDatabase::MysqlDatabaseConnection* mydbc = (MysqlDatabase::MysqlDatabaseConnection*)m_dbc;
 		m_res = mysql_store_result(&(mydbc->m_mysql));
 		if (m_res)
 		{
@@ -81,7 +78,6 @@ bool MysqlQuery::fetchRow()
 		{
 			return true;
 		}
-
 	}
 
 	return false;
@@ -103,13 +99,11 @@ std::string MysqlQuery::error()
 {
 	if (m_dbc)
 	{
-		MysqlDatabase::MysqlDatabaseConnection* mydbc =
-			(MysqlDatabase::MysqlDatabaseConnection*)m_dbc;
+		MysqlDatabase::MysqlDatabaseConnection* mydbc = (MysqlDatabase::MysqlDatabaseConnection*)m_dbc;
 		return mysql_error(&mydbc->m_mysql);
 	}
 
 	return "";
-
 }
 
 bool MysqlQuery::succes()
@@ -123,12 +117,7 @@ bool MysqlQuery::succes()
 		return false;
 }
 
-//////////////////////////////////////////////////////
 // get returned values from query
-//
-////////////////////////////////////////////////////////
-
-
 uint32 MysqlQuery::getUint32(uint32 idx)
 {
 	if (m_res && m_row && (idx < m_column))
@@ -161,7 +150,7 @@ uint32 MysqlQuery::getCharUint(uint32 idx)
 
 const char* MysqlQuery::getRealmName(uint32 idx)
 {
-	m_row=mysql_fetch_row(m_res);
+	m_row = mysql_fetch_row(m_res);
 	return m_row[1];
 }
 
@@ -206,4 +195,3 @@ const char* MysqlQuery::getString()
 {
 	return getString(m_idx);
 }
-

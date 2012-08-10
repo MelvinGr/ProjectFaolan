@@ -75,4 +75,5 @@ namespace SwapByte
 			(((uint64)(value) & (uint64)0x00ff000000000000ULL) >> 40) | (((uint64)(value) & (uint64)0xff00000000000000ULL) >> 56));
 	}
 };
+
 #endif

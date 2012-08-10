@@ -46,10 +46,10 @@ namespace MySQLFunctions
 
 	bool UpdateLastInfo(uint32 nClientInst, const std::string& ipAddress);
 
-	bool GetRealm(uint32 realmID, RealmInfo *realm);
-	bool GetRealms(std::vector<RealmInfo> *realms);
-	bool GetCharacter(uint32 characterID, CharacterInfo *character);
-	bool GetCharacters(uint32 accountID, std::vector<CharacterInfo> *characters);
+	bool GetRealm(uint32 realmID, RealmInfo &realm);
+	bool GetRealms(std::vector<RealmInfo> &realms);
+	bool GetCharacter(uint32 characterID, CharacterInfo &character);
+	bool GetCharacters(uint32 accountID, std::vector<CharacterInfo> &characters);
 
 	bool DeleteCharacter(uint32 characterID);
 };

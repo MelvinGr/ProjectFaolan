@@ -44,24 +44,18 @@ class Network : private boost::noncopyable
 public:
 	Network();
 
-	/**
-	* Create a new connection acceptor and run it in a separate thread
-	*/
-	template<typename ConnectionType> void createConnectionAcceptor(const std::string& address, const uint32 port,  size_t poolSize)
+	// Create a new connection acceptor and run it in a separate thread
+	template<typename ConnectionType> void createConnectionAcceptor(const std::string& address, const uint32 port, const size_t poolSize)
 	{
 		ConnectionAcceptor<ConnectionType>* ca = new ConnectionAcceptor<ConnectionType>(address, port, poolSize);
 		m_acceptors.push_back(ca);
 		m_threadGroup.create_thread(boost::bind(&ConnectionAcceptor<ConnectionType>::run, ca));
 	}
 
-	/**
-	* shut down all the running acceptor
-	*/
+	// shut down all the running acceptor
 	void stop();
 
-	/**
-	* Wait acceptors until they stop
-	*/
+	// Wait acceptors until they stop
 	void wait();
 
 	~Network();

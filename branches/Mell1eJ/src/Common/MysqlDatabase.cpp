@@ -22,16 +22,13 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 MysqlDatabase* MysqlDatabase::m_db = NULL;
 
-MysqlDatabase* MysqlDatabase::createInstance(std::size_t poolSize, const std::string &login, const std::string &host, const std::string &password, const std::string &database, uint32 port)
+void MysqlDatabase::createInstance(std::size_t poolSize, const std::string &login, const std::string &host, 
+								   const std::string &password, const std::string &database, uint32 port)
 {
-	if(m_db==NULL)
-	{
-		m_db = new MysqlDatabase(poolSize,login,host,password,database,port);
-	}
-	return m_db;
+	m_db = new MysqlDatabase(poolSize, login, host, password, database, port);
 }
 
-MysqlDatabase* MysqlDatabase::instance()
+MysqlDatabase* MysqlDatabase::Instance()
 {
 	return m_db;
 }
@@ -46,20 +43,16 @@ void MysqlDatabase::destroy()
 }
 
 MysqlDatabase::MysqlDatabase(std::size_t poolSize, const std::string& login,
-	const std::string& host, const std::string& password,
-	const std::string& database, uint32 port) :
-Database(poolSize), m_login(login), m_host(host), m_password(password),
-	m_database(database), m_port(port)
+							 const std::string& host, const std::string& password, const std::string& database, uint32 port)
+							 : Database(poolSize), m_login(login), m_host(host), m_password(password),
+							 m_database(database), m_port(port)
 {
 
 }
 
-
-
 bool MysqlDatabase::dbInitialize()
 {
-
-	for (uint32 i=0; i < m_poolConnSize; i++)
+	for (uint32 i = 0; i < m_poolConnSize; i++)
 	{
 		DatabaseConnection* dbc = new MysqlDatabaseConnection(this,m_login,m_host,m_password,m_database,m_port);
 		m_dbConnQueue.push(dbc);
@@ -70,11 +63,11 @@ bool MysqlDatabase::dbInitialize()
 			printf("%s\n",dbc->error().c_str());
 			return false;
 		}
+
 		m_group.create_thread(boost::bind(&MysqlDatabaseConnection::run, dbc));
 	}
 
 	return true;
-
 }
 
 bool MysqlDatabase::start()
@@ -99,7 +92,7 @@ bool MysqlDatabase::start()
 
 MysqlDatabase::~MysqlDatabase()
 {
-	BOOST_FOREACH(DatabaseConnection* dbc, m_dbConn)
+	foreach(DatabaseConnection* dbc, m_dbConn)
 	{
 		if(dbc)
 		{
@@ -113,36 +106,27 @@ MysqlDatabase::~MysqlDatabase()
 	}
 }
 
-/////////////////////////////////////////////////////////////:
 // MysqlDatabaseConnection def
-//////////////////////////////////////////////////////////////
-
 MysqlDatabase::MysqlDatabaseConnection::MysqlDatabaseConnection(Database* db,
-	const std::string& login, const std::string& host,
-	const std::string& password, const std::string& database, uint32 port) :
-DatabaseConnection(db), m_login(login), m_host(host), m_password(password),
-	m_database(database), m_port(port)
+																const std::string& login, const std::string& host, const std::string& password, const std::string& database, uint32 port) 
+																: DatabaseConnection(db), m_login(login), m_host(host), m_password(password), m_database(database), m_port(port)
 {
 
 }
 
 bool MysqlDatabase::MysqlDatabaseConnection::dbInitialize()
 {
-
 	mysql_init(&m_mysql);
 	//mysql_option(&m_mysql, MYSQL_SET_CHARSET_NAME, "utf8");
 
 	if (!mysql_real_connect(&m_mysql, m_host.c_str(), m_login.c_str(),
 		m_password.c_str(), m_database.c_str(), m_port, NULL, 0))
 	{
-
 		m_initialized = false;
 	}
 
 	m_initialized = connected();
-
 	return m_initialized;
-
 }
 
 bool MysqlDatabase::MysqlDatabaseConnection::connected()
@@ -158,7 +142,6 @@ bool MysqlDatabase::MysqlDatabaseConnection::disconnect()
 
 MysqlDatabase::MysqlDatabaseConnection::~MysqlDatabaseConnection()
 {
-
 	disconnect();
 }
 
@@ -171,8 +154,4 @@ void MysqlDatabase::MysqlDatabaseConnection::shutdown()
 std::string MysqlDatabase::MysqlDatabaseConnection::error()
 {
 	return mysql_error(&m_mysql);
-
 }
-
-
-

@@ -28,31 +28,22 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 class Acceptor : private boost::noncopyable
 {    
-	/**
-	* event call when there is a new connection attempt
-	*/
-	virtual void onAccept(const boost::system::error_code& e)=0;
+	// event call when there is a new connection attempt
+	virtual void onAccept(const boost::system::error_code& e) = 0;
 
-	/**
-	* return next available io_service using a round robin for load balancing
-	*/
-	virtual std::pair<boost::asio::io_service*, BufferPool*> IOService()=0;
+	// return next available io_service using a round robin for load balancing
+	virtual std::pair<boost::asio::io_service*, BufferPool*> IOService() = 0;
 
 public:
-	/**
-	* Run until stop is called or all the io_service return
-	* 
-	*/
+	// Run until stop is called or all the io_service return
 	virtual void run()=0;
 
-	/**
-	* stop all the running io_services
-	*/
+	// stop all the running io_services
 	virtual void stop()=0;
 
 	virtual ~Acceptor()
 	{
 	}
-
 };
+
 #endif

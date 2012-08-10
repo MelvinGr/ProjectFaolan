@@ -22,22 +22,20 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include <boost/foreach.hpp>
 #include <boost/thread.hpp>
 
-Database::Database(std::size_t poolConnSize) :
-m_poolConnSize(poolConnSize), m_shutdown(false), m_dbConn(poolConnSize), m_initialized(false)
+Database::Database(std::size_t poolConnSize) 
+	: m_poolConnSize(poolConnSize), m_shutdown(false), m_dbConn(poolConnSize), m_initialized(false)
 {
 
 }
 
 void Database::run()
 {
-
 	m_initialized = dbInitialize();
 	m_condition.notify_one();
 	if(!m_initialized)
 	{
 		return;
 	}
-
 
 	Query* q;
 	while (!m_shutdown)
@@ -59,7 +57,6 @@ void Database::run()
 void Database::enqueueQuery(Query* q)
 {
 	m_queryQueue.push(q);
-
 }
 
 void Database::releaseDBConnection(Database::DatabaseConnection* db)
@@ -74,7 +71,7 @@ void Database::enqueueFinishedQuery(Query* q)
 
 void Database::runFinishedQueryCallback()
 {
-	Query* q= NULL;
+	Query* q = NULL;
 
 	m_executedQueryQueue.tryPop(q);
 	while (q)
@@ -91,17 +88,15 @@ std::size_t Database::availableDBConnection()
 
 void Database::shutdown()
 {
-	m_shutdown=true;
+	m_shutdown = true;
 
 	// send shutdown signal to all connection, and execute last query
-	BOOST_FOREACH(DatabaseConnection* dbc, m_dbConn)
+	foreach(DatabaseConnection* dbc, m_dbConn)
 	{
 		if(dbc)
 		{
-
 			dbc->shutdown();
 		}
-
 	}
 
 	// all the connections should be shutdown
@@ -111,11 +106,9 @@ void Database::shutdown()
 		m_queryQueue.push(NULL); // null shutdown signal, a bit tricky...
 		m_runThread->join();
 	}
-
-
 }
 
-bool Database::executeSynchronousQuery(Query* q)
+void Database::executeSynchronousQuery(Query* q)
 {
 	DatabaseConnection* dbc;
 	m_dbConnQueue.popWait(dbc);
@@ -123,17 +116,11 @@ bool Database::executeSynchronousQuery(Query* q)
 	dbc->processSynchronousQuery(q);
 
 	releaseDBConnection(dbc);
-	return true;
 }
 
-
-
-/////////////////////////////////////////////////////////////////
 // DatabaseConnection def
-/////////////////////////////////////////////////////////////////
-
-Database::DatabaseConnection::DatabaseConnection(Database* db) :
-m_db(db), m_connected(false), m_shutdown(false), m_synchronous(false),m_initialized(false), m_query(NULL)
+Database::DatabaseConnection::DatabaseConnection(Database* db) 
+	: m_db(db), m_connected(false), m_shutdown(false), m_synchronous(false),m_initialized(false), m_query(NULL)
 {
 
 }
@@ -149,7 +136,6 @@ void Database::DatabaseConnection::processQuery(Query* q)
 
 void Database::DatabaseConnection::processSynchronousQuery(Query* q)
 {
-
 	boost::mutex::scoped_lock lock(m_mutex);
 
 	m_synchronous = true;
@@ -165,22 +151,16 @@ void Database::DatabaseConnection::processSynchronousQuery(Query* q)
 	{
 		q->m_callback();
 	}
-
 }
-
 
 void Database::DatabaseConnection::run()
 {
 	boost::mutex::scoped_lock lock(m_mutex);
 
-
-
 	if(!m_initialized)
 	{
 		return;
 	}
-
-
 
 	while (!m_query)
 	{
@@ -203,7 +183,6 @@ void Database::DatabaseConnection::run()
 				}
 			}
 
-
 			if(!m_synchronous) // run callback and release connection in asynchronous mode
 			{
 				if (m_query->m_callbackType==Query::WORKER_THREAD)
@@ -216,7 +195,6 @@ void Database::DatabaseConnection::run()
 
 				//now release the connection/thread
 				m_db->releaseDBConnection(this);
-
 			}
 			else
 			{
@@ -230,14 +208,11 @@ void Database::DatabaseConnection::run()
 		{
 			return;
 		}
-
 	}
-
 }
 
 bool Database::DatabaseConnection::initialized()
 {
-
 	boost::mutex::scoped_lock lock(m_mutex);
 
 	return m_initialized;

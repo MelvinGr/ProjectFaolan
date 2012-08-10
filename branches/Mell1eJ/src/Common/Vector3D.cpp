@@ -18,14 +18,14 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "Vector3D.h"
 
-ldouble Vector3D::distance(Vector3D otherVector)
+double Vector3D::distance(Vector3D otherVector)
 {
 	// Pythagorus 3D theorem = sqrt(x2 + y2 + z2)
 
-	ldouble distance = sqrt(
-		(ldouble)(otherVector.x - x) * (otherVector.x - x) +
-		(ldouble)(otherVector.y - y) * (otherVector.y - y) + 
-		(ldouble)(otherVector.z - z) * (otherVector.z - z));
+	double distance = sqrt(
+		(otherVector.x - x) * (otherVector.x - x) +
+		(otherVector.y - y) * (otherVector.y - y) + 
+		(otherVector.z - z) * (otherVector.z - z));
 
 	return distance;
 }

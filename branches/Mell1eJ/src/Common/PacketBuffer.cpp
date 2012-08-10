@@ -66,18 +66,6 @@ void PacketBuffer::write(const uint8* data, uint32 length)
 	}
 }
 
-void PacketBuffer::writeHeader(uint32 unknown1, uint32 unknown2, uint32 unknown3, uint32 unknown4, uint32 unknown5, uint32 opcode)
-{
-	write<uint32>(0); // Write empty length
-	write<uint32>(0); // write empty crc32
-	write<uint32>(unknown1); // write 
-	write<uint32>(unknown2); // write 
-	write<uint32>(unknown3); // write 
-	write<uint32>(unknown4); // write 
-	write<uint32>(unknown5); // write 
-	write<uint32>(opcode); // write opcode
-}
-
 void PacketBuffer::finalize()
 {
 	uint32 packetLength = bufferLength - sizeof(uint32);

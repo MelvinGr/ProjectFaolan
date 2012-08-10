@@ -66,15 +66,20 @@ int32 main(int32 argc, int8* argv[])
 	{
 		printf("%s", FaolanBanner);
 
+		Config.parseConfigFile("FaolanConfig.cfg");
 		Config.parseCommandLine(argc, argv);
-		Config.parseConfigFile();
 
-		Database *database = MysqlDatabase::createInstance(Config.demuxerCount, Config.DBUsername, Config.DBHost, Config.DBPassword, Config.DBName, Config.DBPort); 
-		if(!database->start())
+		MysqlDatabase::createInstance(Config.GetValue<size_t>("demuxerCount"), Config.GetValue<string>("DBUsername"), 
+			Config.GetValue<string>("DBHost"), Config.GetValue<string>("DBPassword"), Config.GetValue<string>("DBName"), 
+			Config.GetValue<int>("DBPort"));
+
+		if(!MysqlDB->start())
 			throw runtime_error("Could not connect to the Database!");
 
 		Network n;
-		n.createConnectionAcceptor<UniverseConnection>(Config.universeAgentAddress, Config.universeAgentPort, Config.demuxerCount);		
+		n.createConnectionAcceptor<UniverseConnection>(Config.GetValue<string>("universeAgentAddress"), 
+			Config.GetValue<int>("universeAgentPort"), Config.GetValue<int>("demuxerCount"));	
+
 		//n.createConnectionAcceptor<InterConnection>(Config.listenInterAddress, Config.listenInterPort, 1);
 
 #if PLATFORM == PLATFORM_WIN32

@@ -30,6 +30,10 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 template<typename T> class SafeQueue 
 {
+	std::queue<T> m_queue;
+	mutable boost::mutex m_mutex;
+	boost::condition_variable m_condition;
+
 public:
 	size_t size()
 	{
@@ -97,11 +101,6 @@ public:
 		x = m_queue.front();
 		m_queue.pop();        
 	}
-
-private:
-	std::queue<T> m_queue;
-	mutable boost::mutex m_mutex;
-	boost::condition_variable m_condition;
 };
 
 #endif

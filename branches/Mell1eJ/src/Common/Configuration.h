@@ -21,20 +21,14 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "Common.h"
 
-#include <iostream>
-#include <fstream>
+#include <string>
 
 #include <boost/program_options.hpp>
 #include <boost/thread.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include "Singleton.h"
 
-class Database;
-
-/**
-* server configuration manager
-* @author Albator
-*/
 #define Config Configuration::instance()
 class Configuration : public Singleton<Configuration>
 {
@@ -42,26 +36,22 @@ class Configuration : public Singleton<Configuration>
 
 	Configuration();
 
-	boost::program_options::options_description m_description;
-	boost::program_options::variables_map m_variableMap;
 	boost::mutex m_mutex;
+	boost::program_options::options_description m_description;	
+	boost::program_options::variables_map m_variableMap;
 
 public:
-	void parseCommandLine(int argc, int8* argv[]);
-	void parseConfigFile();
+	template <typename T> T GetValue(const std::string &other)
+	{
+		if(m_variableMap.count(other))
+			return boost::lexical_cast<T>(m_variableMap[other].as<string>());
+
+		throw runtime_error("Could not load option: '" + other + "'!");
+	}
+
+	void parseCommandLine(int32 argc, int8* argv[]);
+	void parseConfigFile(const std::string &configPath);
 	void printConfiguration();
-
-	std::string DBUsername, DBPassword, DBName, DBHost;
-	uint32 DBPort, DBConnectionCount, DBType;
-
-	uint32 demuxerCount;
-	uint32 characterSlots;
-	
-	std::string universeAgentAddress;
-	uint32 universeAgentPort;
-
-	std::string playerAgentAddress;
-	uint32 playerAgentPort;
 };
 
 #endif

@@ -25,7 +25,7 @@ Network::Network()
 
 void Network::stop()
 {
-	BOOST_FOREACH(Acceptor* ca, m_acceptors)
+	foreach(Acceptor* ca, m_acceptors)
 	{        
 		ca->stop();
 	}   
@@ -33,7 +33,7 @@ void Network::stop()
 
 Network::~Network()
 {
-	BOOST_FOREACH(Acceptor* ca, m_acceptors)
+	foreach(Acceptor* ca, m_acceptors)
 	{
 		delete ca;
 	}

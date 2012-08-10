@@ -55,9 +55,7 @@ public:
 	*/
 	void disposeBuffer(PacketBuffer* buf);
 
-	/**
-	* Delete all buffer in the pool for clean shutdown.
-	*/
+	// Delete all buffer in the pool for clean shutdown.
 	~BufferPool();
 };
 

@@ -48,8 +48,6 @@ void Connection::AsyncRead()
 		boost::bind(&Connection::onRead, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 }
 
-int packetCounter = 0;
-
 void Connection::onRead(const boost::system::error_code &e, size_t bytesTransferred)
 {
 	if(e)
@@ -64,13 +62,7 @@ void Connection::onRead(const boost::system::error_code &e, size_t bytesTransfer
 		return;
 	}
 
-	PacketBuffer packetBuffer(&m_readBuffer[0], bytesTransferred);
-	File::Write("D:\\packets\\packet" + boost::lexical_cast<string>(packetCounter) + "f.bin", true, (int8*)packetBuffer.buffer, packetBuffer.bufferLength);
-	Packet packet(&packetBuffer);
-
-	packetCounter++;
-
-	handlePacket(&packetBuffer, &packet);
+	handlePacket(Packet(PacketBuffer(&m_readBuffer[0], bytesTransferred)));
 	AsyncRead();
 }
 
@@ -84,14 +76,14 @@ void Connection::onWrite(const boost::system::error_code &e)
 	}
 }
 
-void Connection::AsyncWrite(PacketBuffer* b)
+void Connection::AsyncWrite(PacketBuffer &b)
 {
-	boost::asio::async_write(m_socket, boost::asio::buffer(b->buffer, b->bufferLength), 
+	boost::asio::async_write(m_socket, boost::asio::buffer(b.buffer, b.bufferLength), 
 		boost::bind(&Connection::onWrite, shared_from_this(), boost::asio::placeholders::error));
 }
 
-void Connection::SendPacket(PacketBuffer *b)
+void Connection::SendPacket(PacketBuffer &b)
 {
-	b->finalize();
+	b.finalize();
 	AsyncWrite(b);
 }

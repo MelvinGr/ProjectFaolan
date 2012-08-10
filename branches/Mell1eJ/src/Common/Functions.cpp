@@ -124,12 +124,12 @@ uint64 File::Read(const std::string& path, bool binary, int8 **buffer)
 {
 	fstream file(path.c_str(), (binary ? ios::binary | ios::in : ios::in) | ios::ate);
 
-	uint64 size = file.tellg();
-    *buffer = new int8[size];
+	streamoff size = file.tellg();
+	*buffer = new int8[size];
 
-    file.seekg (0, ios::beg);
-    file.read(*buffer, size);
-    file.close();
+	file.seekg (0, ios::beg);
+	file.read(*buffer, size);
+	file.close();
 
 	return size;
 }

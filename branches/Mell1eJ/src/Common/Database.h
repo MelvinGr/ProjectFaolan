@@ -29,12 +29,9 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include <queue>
 #include <vector>
 
-
 #include "SafeQueue.h"
 
 class Query;
-
-
 
 /**
 * Management of a set of database connexion each executed in a different thread
@@ -45,18 +42,19 @@ class Query;
 * Tasks can have callback methods executed in the connection thread or in the thread running the database
 * @author Albator
 */
-class Database {
+class Database 
+{
 public:
-
 	Database(std::size_t poolConnSize);
 
-	class DatabaseConnection {
+	class DatabaseConnection 
+	{
 	public:
+		Database* m_db;
 
 		DatabaseConnection(Database* db);
 
 		virtual bool connected() = 0;
-
 		virtual bool disconnect() = 0;
 
 		virtual ~DatabaseConnection()
@@ -65,74 +63,43 @@ public:
 
 		void run();
 
-		/**
-		* execute de query asynchronously
-		*/
+		// execute de query asynchronously
 		void processQuery(Query* q);
-
 		void processSynchronousQuery(Query* q);
-
-		Database* m_db;
-
-		virtual void shutdown()=0;
-
 		bool initialized();
 
+		virtual void shutdown()=0;
 		virtual bool dbInitialize() = 0;
-
 		virtual std::string error() = 0;
 
 	protected:
-
-
 		mutable boost::mutex m_mutex, m_synchronousMutex, m_initializedMutex;
 		boost::condition_variable m_condition, m_synchronousCond, m_initializedCondition;
 		bool m_connected, m_shutdown, m_synchronous;
 
 		bool m_initialized;
-
 		Query* m_query;
-
-
-
 	};
 
-	/**
-	* add a query to the queue
-	* executed when a connection thread is available
-	*/
+	// add a query to the queue executed when a connection thread is available
 	void enqueueQuery(Query* q);
 
-	/**
-	* consumed query, can have a callback function executed later in the main thread
-	*/
+	// consumed query, can have a callback function executed later in the main thread
 	void enqueueFinishedQuery(Query* q);
 
+	// Execute the query in synchronous mode
+	void executeSynchronousQuery(Query* q);
 
-	/**
-	* Execute the query in synchronous mode
-	*/
-	bool executeSynchronousQuery(Query* q);
-	/**
-	* Start database thread and wait until the db is initialized
-	*/
+	// Start database thread and wait until the db is initialized
 	virtual bool start()=0;
 
-	/**
-	* Loop through the finished query to execute their callback in the main thread (calling thread)
-	* 
-	*/
+	// Loop through the finished query to execute their callback in the main thread (calling thread)
 	void runFinishedQueryCallback();
 
-	/**
-	* release a connection to the pool
-	*/
+	// release a connection to the pool
 	void releaseDBConnection(DatabaseConnection* db);
 
-
-	/**
-	* @return number of available DB in the pool
-	*/
+	// return number of available DB in the pool
 	std::size_t availableDBConnection();
 
 	virtual ~Database()
@@ -140,21 +107,13 @@ public:
 
 	}
 
-	/**
-	* Shutdown database thread and all the thread in the pool
-	* delete connections to db
-	*/
+	// Shutdown database thread and all the thread in the pool delete connections to db
 	void shutdown();
-
-
 
 protected:
 	virtual bool dbInitialize()=0;
 
-	/**
-	* Start all connection threads
-	* main database loop, wait for new task.
-	*/
+	// Start all connection threads main database loop, wait for new task.
 	void run();
 
 	SafeQueue<DatabaseConnection*> m_dbConnQueue;
@@ -167,8 +126,6 @@ protected:
 	boost::mutex m_mutex;
 	std::vector<DatabaseConnection*> m_dbConn;
 	boost::thread *m_runThread;
-
-
-
 };
-#endif /*DATABASE_H_*/
+
+#endif

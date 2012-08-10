@@ -47,9 +47,7 @@ template <typename T> class ConnectionAcceptor : public Acceptor
 	boost::shared_ptr<T> m_connection;
 	uint32 m_nextIOService;
 
-	/**
-	* event call when there is a new connection attempt
-	*/
+	// event call when there is a new connection attempt
 	void onAccept(const boost::system::error_code& e)
 	{
 		if (!e)
@@ -63,9 +61,7 @@ template <typename T> class ConnectionAcceptor : public Acceptor
 		}
 	}
 
-	/**
-	* return next available io_service using a round robin for load balancing
-	*/
+	// return next available io_service using a round robin for load balancing
 	std::pair<boost::asio::io_service*, BufferPool*> IOService()
 	{
 		std::pair<boost::asio::io_service*, BufferPool*> ioS = m_IOServices[m_nextIOService];
@@ -108,14 +104,9 @@ public:
 		printf("Server listening on port: %u \n", port);
 	}
 
-
-	/**
-	* Run until stop is called or all the io_service return
-	* 
-	*/
+	// Run until stop is called or all the io_service return
 	void run()
 	{
-
 		std::vector<boost::shared_ptr<boost::thread> > threads;
 		for (size_t i = 0; i < m_IOServices.size(); ++i)
 		{
@@ -129,25 +120,21 @@ public:
 			threads[i]->join();
 	}
 
-
-	/**
-	* stop all the running io_services
-	*/
+	// stop all the running io_services
 	void stop()
 	{
 		for (size_t i = 0; i < m_IOServices.size(); ++i)
 			m_IOServices[i].first->stop();
 	}
 
-
 	~ConnectionAcceptor()
 	{
-		BOOST_FOREACH(boost::asio::io_service::work* w, m_works)
+		foreach(boost::asio::io_service::work* w, m_works)
 		{
 			delete w;
 		}
 
-		//BOOST_FOREACH(pair<boost::asio::io_service*, BufferPool*>& ioS, m_IOServices)
+		//foreach(pair<boost::asio::io_service*, BufferPool*>& ioS, m_IOServices)
 		//{
 		//delete ioS;
 		//	}

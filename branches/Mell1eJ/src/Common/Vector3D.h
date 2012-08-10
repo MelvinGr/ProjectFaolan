@@ -26,17 +26,17 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 class Vector3D
 {
 public:
-	int32 x, y, z;
+	double x, y, z;
 
 	Vector3D() {}
-	Vector3D(int32 nx, int32 ny, int32 nz)
+	Vector3D(double nx, double ny, double nz)
 	{
 		x = nx;
 		y = ny;
 		z = nz;
 	}
 
-	ldouble distance(Vector3D otherVector);
+	double distance(Vector3D otherVector);
 };
 
 

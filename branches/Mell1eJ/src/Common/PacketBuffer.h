@@ -110,14 +110,14 @@ public:
 		}
 	}
 
-	inline std::string toString() { return String::arrayToHexString(buffer, bufferLength); }
 	void reset();
 	void resize(uint32 size);
 
 	uint8* read(uint32 length);
 	void write(const uint8* data, uint32 length);
-	void writeHeader(uint32 unknown1, uint32 unknown2, uint32 unknown3, uint32 unknown4, uint32 unknown5, uint32 opcode);
 	void finalize();
+
+	inline std::string toString() { return String::arrayToHexString(buffer, bufferLength); }
 };
 
 template <> inline std::string PacketBuffer::read()
@@ -126,10 +126,10 @@ template <> inline std::string PacketBuffer::read()
 	{
 		assert((offset + sizeof(int16)) <= bufferLength);
 		uint16 stringLength = read<uint16>();
-	
+
 		assert((offset + stringLength) <= bufferLength);
 		std::string data(&buffer[offset], &buffer[offset + stringLength]);
-	
+
 		offset += stringLength;
 		return data;
 	}
@@ -140,13 +140,13 @@ template <> inline std::string PacketBuffer::read()
 	}
 }
 
-template <> inline void PacketBuffer::write(std::string data)
+template <> inline void PacketBuffer::write(const std::string &data)
 {
 	try
 	{
 		assert((offset + sizeof(int16)) <= maxLength);
 		write<uint16>(data.size());
-	
+
 		assert((offset + data.size()) <= maxLength);
 		write((uint8*)data.c_str(), data.size());
 	}

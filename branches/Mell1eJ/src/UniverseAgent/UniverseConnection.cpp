@@ -22,9 +22,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 using namespace std;
 
-uint32 UniverseConnection::connectionCount = 0;
-
-UniverseConnection::UniverseConnection(boost::asio::io_service& IOService, BufferPool* hp) : Connection(IOService, hp), m_connectionID(0)
+UniverseConnection::UniverseConnection(boost::asio::io_service& IOService, BufferPool* hp) 
+	: Connection(IOService, hp)
 {
 	//
 }
@@ -36,30 +35,32 @@ UniverseConnection::~UniverseConnection()
 
 void UniverseConnection::start()
 {
-	m_connectionID = connectionCount;
-
-	printf("New connection accepted (m_connectionID: %u)\n", m_connectionID);
+	static uint32 connectionCount = 0;
+	uint32 m_connectionID = connectionCount;
 	connectionCount++;
 
+	printf("New connection accepted (m_connectionID: %u)\n", m_connectionID);
+	
 	AsyncRead();
 }
 
-void UniverseConnection::handlePacket(PacketBuffer *packetBuffer, Packet* packet)
+void UniverseConnection::handlePacket(Packet &packet)
 {
-	PacketBuffer *buffer = m_bufferPool->allocateBuffer(2000);
+	//PacketBuffer *buffer = m_bufferPool.allocateBuffer(2000);
+	PacketBuffer buffer(2000);
 
-	switch(packet->opcode)
+	switch(packet.opcode)
 	{
 	case 0x2000: // InitiateAuthentication
 		{
-			string cUserName = packet->buffer->read<string>();
-			uint32 nGameID = packet->buffer->read<uint32>();
+			string cUserName = packet.data.read<string>();
+			uint32 nGameID = packet.data.read<uint32>();
 
-			buffer->reset();
-			buffer->writeHeader(0x00000016, 0x0A070DA0, 0xDB4D6010, 0x0112090D, 0x5440380C, 0x10E4);
+			buffer.reset();
+			//buffer.writeHeader(0x00000016, 0x0A070DA0, 0xDB4D6010, 0x0112090D, 0x5440380C, 0x10E4);
 
-			buffer->write<uint32>(0xA5412000);
-			buffer->write<string>("704c38cd38334cf4862515a14758f4b9");
+			buffer.write<uint32>(0xA5412000);
+			buffer.write<string>("704c38cd38334cf4862515a14758f4b9");
 
 			SendPacket(buffer);
 
@@ -68,46 +69,20 @@ void UniverseConnection::handlePacket(PacketBuffer *packetBuffer, Packet* packet
 
 	case 0x2001: // AnswerChallenge
 		{
-			string cAnswerChallenge = packet->buffer->read<string>();
+			string cAnswerChallenge = packet.data.read<string>();
 			string decryptedData = LoginEncryption::decryptLoginKey(cAnswerChallenge);
 
 			vector<string> decryptedDataVector;
 			boost::algorithm::split(decryptedDataVector, decryptedData, boost::is_any_of("|"));
 
-			buffer->reset();
-			buffer->writeHeader(0x00000018, 0x0A070DA0, 0xDB4D6010, 0x01120B0D, 0x5440380C, 0x10EC);
-
-			buffer->write<uint32>(0xEB80DE03);
-			buffer->write<uint32>(0x20050101); //
-			buffer->write<uint32>(0x01013F80); //
-			buffer->write<uint32>(0x00003F80);
-			buffer->write<uint32>(0x00000101);
-			buffer->write<uint8>(0x00);
-		
-			SendPacket(buffer);
-
-			///////////////////////////////////////////////////////////////////
-
-			buffer->reset();
-			buffer->writeHeader(0x00000018, 0x0A070DA0, 0xDB4D6010, 0x01120B0D, 0x5440380C, 0x10EC);
-
-			buffer->write<uint32>(0xEB80DE03); 
-			buffer->write<uint32>(0x20010000); 
-			buffer->write<uint32>(0x00010000);
-			buffer->write<uint32>(0x27123BC0);
-			buffer->write<uint16>(0x35EC);
-			buffer->write<string>("127.0.0.1:7001");
-			buffer->write<uint32>(0x38B8D44F); // cookie
-			buffer->write<uint32>(0x00000000); // reason
-
-			SendPacket(buffer);
+			//
 
 			break;
 		}
 
 	case 0x02: // ClientDisconnected
 		{
-			//uint32 connectionID = packet->buffer->read<uint32>(); // int64 ? - InstanceType
+			//uint32 connectionID = packet.data.read<uint32>(); // int64 ? - InstanceType
 			disconnect();
 
 			break;
@@ -115,11 +90,11 @@ void UniverseConnection::handlePacket(PacketBuffer *packetBuffer, Packet* packet
 
 	default:
 		{
-			printf("Unknown Packet!\n%s\n\n", packetBuffer->toString().c_str());
+			//printf("Unknown Packet!\n%s\n\n", packetBuffer.toString().c_str());
 
 			break;
 		}
 	}
 
-	m_bufferPool->disposeBuffer(buffer);
+	//m_bufferPool.disposeBuffer(buffer);
 }

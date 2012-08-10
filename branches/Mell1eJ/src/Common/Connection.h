@@ -35,7 +35,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 * Abstract connection class
 * @author Albator, Doron
 */
-class Connection : private boost::noncopyable,  public boost::enable_shared_from_this<Connection>
+class Connection : private boost::noncopyable, public boost::enable_shared_from_this<Connection>
 {
 public:
 	Connection(boost::asio::io_service& IOService, BufferPool* bp);
@@ -56,11 +56,11 @@ protected:
 	void onRead(const boost::system::error_code& e, size_t bytesTransferred);
 	void onWrite(const boost::system::error_code& e);
 
-	virtual void handlePacket(PacketBuffer *packetBuffer, Packet* packet) = 0;
+	virtual void handlePacket(Packet &packet) = 0;
 
 	void AsyncRead();
-	void AsyncWrite(PacketBuffer* b);
-	void SendPacket(PacketBuffer *b);
+	void AsyncWrite(PacketBuffer &b);
+	void SendPacket(PacketBuffer &b);
 };
 
 #endif

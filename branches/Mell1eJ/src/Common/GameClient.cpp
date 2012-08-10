@@ -29,8 +29,3 @@ GameClient::GameClient()
 	nClientInst = 0;
 	nCookie = 0;
 }
-
-GameClient::~GameClient()
-{
-	//
-}

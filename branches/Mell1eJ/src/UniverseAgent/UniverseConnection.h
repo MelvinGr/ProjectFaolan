@@ -42,10 +42,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 class UniverseConnection : public Connection
 {	
 	GameClient gameClient;
-	uint32 m_connectionID;
-	static uint32 connectionCount;
 
-	void handlePacket(PacketBuffer *packetBuffer, Packet* packet);
+	void handlePacket(Packet &packet);
 
 public:
 	UniverseConnection(boost::asio::io_service& IOService, BufferPool* hp);

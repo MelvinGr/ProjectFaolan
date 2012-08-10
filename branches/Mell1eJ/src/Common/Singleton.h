@@ -44,7 +44,6 @@ public:
 	}
 
 protected:
-
 	Singleton()
 	{
 	}
@@ -52,7 +51,6 @@ protected:
 	~Singleton()
 	{
 	}
-
 };
 
 template<typename T> T* Singleton<T>::m_instance = NULL;
