@@ -20,7 +20,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 using namespace std;
 
-Packet::Packet(PacketBuffer &packetBuffer)
+Packet::Packet(PacketBuffer &packetBuffer) 
+	: senderInt(0), receiverInt(0), headerData(0), data(0)
 {
 	length = packetBuffer.read<uint32>();
 	crc32 = packetBuffer.read<uint32>();
@@ -32,7 +33,7 @@ Packet::Packet(PacketBuffer &packetBuffer)
 	if(senderLength <= 0)
 		printf("Error at senderlength\n");
 
-	senderInt = PacketBuffer(packetBuffer.read(senderLength), senderLength);
+	senderInt = new PacketBuffer(packetBuffer.read(senderLength), senderLength);
 
 	receiver = packetBuffer.read<uint8>();
 	receiverLength = packetBuffer.read<uint8>();
@@ -40,7 +41,7 @@ Packet::Packet(PacketBuffer &packetBuffer)
 	if(receiverLength <= 0)
 		printf("Error at receiverlength\n");
 
-	receiverInt = PacketBuffer(packetBuffer.read(receiverLength), receiverLength);
+	receiverInt = new PacketBuffer(packetBuffer.read(receiverLength), receiverLength);
 
 	uint32 checkHeaderLength = headersize - (sizeof(uint32) + senderLength + receiverLength);
 	if(checkHeaderLength == sizeof(uint16))
@@ -49,7 +50,7 @@ Packet::Packet(PacketBuffer &packetBuffer)
 		opcode = packetBuffer.read<uint32>();
 	else if(checkHeaderLength > sizeof(uint32))
 	{
-		headerData = PacketBuffer(packetBuffer.read(checkHeaderLength - sizeof(uint32)), checkHeaderLength - sizeof(uint32));
+		headerData = new PacketBuffer(packetBuffer.read(checkHeaderLength - sizeof(uint32)), checkHeaderLength - sizeof(uint32));
 		opcode = packetBuffer.read<uint32>();
 	}
 	else
@@ -59,9 +60,21 @@ Packet::Packet(PacketBuffer &packetBuffer)
 
 	uint32 dataLength = length - (headersize + sizeof(uint32) * 2);
 	if(dataLength > 0)
-		data = PacketBuffer(packetBuffer.read(dataLength), dataLength);
+		data = new PacketBuffer(packetBuffer.read(dataLength), dataLength);
 	else
 		printf("ERROR at Packet.cpp: dtaLength: %i\n", dataLength);
+}
+
+Packet::~Packet()
+{
+	if(senderInt)
+		delete senderInt;
+	if(receiverInt)
+		delete receiverInt;
+	if(headerData)
+		delete headerData;
+	if(data)
+		delete data;
 }
 
 uint32 Packet::HeaderLength()

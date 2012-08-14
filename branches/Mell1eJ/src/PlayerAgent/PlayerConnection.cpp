@@ -18,425 +18,167 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "PlayerConnection.h"
 
+#if 1 // DATABASE_TYPE == DATABASE_MYSQL
+#include "../Common/MysqlFunctions.h"
+#endif
+
 using namespace std;
 
-PlayerConnection::PlayerConnection(boost::asio::io_service& IOService, BufferPool* hp) : Connection(IOService, hp)
+PlayerConnection::PlayerConnection(boost::asio::io_service& IOService, BufferPool* hp)
+	: Connection(IOService, hp)
 {
 	//
 }
 
-PlayerConnection::~PlayerConnection()
+void PlayerConnection::handlePacket(Packet &packet)
 {
-	//
-}
+	//PacketBuffer *buffer = m_bufferPool->allocateBuffer(2000);
+	PacketBuffer buffer(2000);
 
-void PlayerConnection::start()
-{
-	printf("New connection accepted\n");
-
-	AsyncRead();
-}
-
-void PlayerConnection::SendCharacterList()
-{
-	vector<CharacterInfo> characters;
-	if(!MySQLFunctions::GetCharacters(gameClient.nClientInst, &characters))
+	switch(packet.opcode)
 	{
-		// send error to client?
-		printf("Error while fetching characters!");
-	}
-
-	PacketBuffer *buffer = m_bufferPool->allocateBuffer(2000);
-	buffer->writeHeader("PlayerAgent", "PlayerInterface", 1, 0, gameClient.nClientInst, 0, 0xc414c5ef); // UpdateClientPlayerData
-	buffer->write<uint32>(gameClient.nClientInst); // PlayerInstance
-	buffer->write<uint32>((characters.size() + 1) * 1009); // number of characters
-
-	foreach(CharacterInfo character, characters)
-	{
-		if(character.level <= 0)
-			continue;
-
-		uint32 ClientInst = character.characterID + (character.realmID * 0x01000000);
-
-		buffer->write<uint32>(ClientInst); // Charinstance
-		buffer->write<uint32>(gameClient.nClientInst); // PlayerInstance
-		buffer->write<uint32>(ClientInst); // Charinstance
-		buffer->write<string>(character.name); // charName
-		buffer->write<uint32>(character.realmID); // serverID
-		buffer->write<uint32>(character.sex); // Sex
-		buffer->write<string>(character.lastConnection); //last connection
-		buffer->write<uint32>(0x00000000); // u1
-		buffer->write<uint32>(character.map); // playfield
-		buffer->write<uint32>(character.level); // Charlevel
-		buffer->write<uint32>(character.Class); // class
-		buffer->write<uint32>(0x00000000); // u2
-		buffer->write<uint32>(0x00000000); // u2
-		buffer->write<uint32>(0x4bbafa33); // u3
-		buffer->write<uint32>(0x00000002); // u4
-		buffer->write<uint32>(character.race); // race
-		buffer->write<string>("en");
-		buffer->write<uint32>(0x00000000); // u6
-		buffer->write<uint32>(0x00000000); // u7
-		buffer->write<string>("6f60ebba2cd4881d0393617a01f761b4"); // u8
-	}
-
-	buffer->write<uint32>(Config.characterSlots); // Number of Char Slots -- default 8
-	buffer->write<uint32>(0x000007e2);
-	buffer->write<uint32>(0x00000002); // u9
-	buffer->write<uint32>(0x0000000a); // u10
-	buffer->write<uint32>(0x0000004a); // u11
-	SendPacket(buffer);
-
-	m_bufferPool->disposeBuffer(buffer);
-}
-
-void PlayerConnection::SendRealmList()
-{	
-	vector<RealmInfo> realms;
-	if(!MySQLFunctions::GetRealms(&realms))
-	{
-		// send error to client?
-		printf("Error while fetching realms!");
-	}
-
-	PacketBuffer *buffer = m_bufferPool->allocateBuffer(1000);
-	buffer->writeHeader("PlayerAgent", "PlayerInterface", 1, 0, gameClient.nClientInst, 0, 0xf899b14c); // SetDimensionList
-	buffer->write<uint32>(realms.size()); // Realmcount
-
-	foreach(RealmInfo realm, realms)
-	{
-		buffer->write<uint32>(realm.realmID); // realmID
-		buffer->write<uint32>(realm.onlineStatus); // onlineStatus - 2 = online, other num = offline
-		buffer->write<uint32>(0x0007a120); //u1
-		buffer->write<string>(realm.realmName); // realmname
-		buffer->write<uint32>(0x00000002); //u2
-		buffer->write<uint32>(0x00000000); //u3
-		buffer->write<uint32>(0x00000000); //u4
-		buffer->write<uint32>(0x00000000); // server full status 1 = full
-		buffer->write<uint32>(realm.loadStatus); //load status -- 0 = medium load 1 = medium load 2 = heavy load 3 = full
-		buffer->write<uint32>(0x00000000); //u7
-		buffer->write<uint32>(0x00000000); //u8
-		buffer->write<uint16>(realm.realmType); // realmtype - 0,1 = PvE | 256,257 = PvP | 1081 = PvP by faction, probably a bitmask
-		buffer->write<uint32>(0x00000000); //u9
-	}
-
-	SendPacket(buffer);
-	m_bufferPool->disposeBuffer(buffer);
-}
-
-void PlayerConnection::handlePacket(PacketBuffer *packetBuffer, Packet* packet)
-{
-	PacketBuffer *buffer = m_bufferPool->allocateBuffer(2000);
-	switch(packet->opcode)
-	{
-	case 0x9cb2cb03: // Authenticate
+	case 0x96CBE509:
 		{
-			gameClient.nClientInst = packet->buffer->read<uint32>();
-			gameClient.nCookie = packet->buffer->read<uint32>();
-			characterInfo.characterID = gameClient.nCookie;
-			characterInfo.accountID = gameClient.nClientInst;
+			//printf("Receive:\n%s\n\n", String::arrayToHexString(packet.packetBuffer->buffer, packet.packetBuffer->bufferLength).c_str());
+			printf("Recv: Auth Init\n");
+
+			InitAuth(packet);
+
+			break;
+		}
+	case 0xDAD1D206:
+		{
+			//printf("Receive:\n%s\n\n", String::arrayToHexString(packet.packetBuffer->buffer, packet.packetBuffer->bufferLength).c_str());
 			
-			if(true)//gameClient.nCookie == MySQLFunctions::GetAccountCookie(gameClient.nClientInst))
-			{
-				buffer->reset();
-				buffer->writeHeader("PlayerAgent", "PlayerInterface", 1, 0, gameClient.nClientInst, 0, 0x5dc18991); // AuthenticateAck
-				buffer->write<uint32>(0x01); // nStatus
-				SendPacket(buffer);
-			}
-			else
-			{
-				buffer->reset();
-				buffer->writeHeader("PlayerAgent", "PlayerInterface", 1, 0, gameClient.nClientInst, 0, 0x5dc18991); // AuthenticateAck
-				buffer->write<uint32>(0xff); // nStatus
-				SendPacket(buffer);
-			}
+			string unk1 = packet.data->read<string>();
+			printf("Receive unknown String: %s\n", unk1.c_str());
+
+			//send before charlist char-specific packets
+			SendSmallCharList();
 
 			break;
 		}
 
-	case 0xBE735486: // CreateCharacter
+	case 0xA3E1FE0D:
 		{
-			printf("Get second char creation pack\n");
-			uint32 i_nDimID = packet->buffer->read<uint32>();
-
-			uint32 unk1 = packet->buffer->read<uint32>(); // dont know if these are correct values
-			uint32 unk2 = packet->buffer->read<uint32>();
-			uint8 unk3 = packet->buffer->read<uint8>();
-
-			RealmInfo realm;
-			if(!MySQLFunctions::GetRealm(characterInfo.realmID, &realm))
-			{
-				// send error opcode, whatever
-				printf("INTERNAL ERROR\n");
-				break;
-			}
-
-			gameClient.nClientInst = characterInfo.characterID + (i_nDimID * 0x01000000);
-
-			if(characterInfo.characterID == -1) // send error opcode, whatever
-				break;
-
-			buffer->reset();
-			buffer->writeHeader("ServerInterface", "PlayerInterface", 1, 0, gameClient.nClientInst, 0, 0x23a632fa);
-			buffer->write<uint32>(htonl(inet_addr(realm.agentServerIPAddress.c_str()))); // i_nClientAgentAddress
-			buffer->write<uint16>(realm.agentServerPort);
-			buffer->write<uint32>(characterInfo.accountID);
-			buffer->write<uint32>(0x0000c350);
-			buffer->write<uint32>(gameClient.nClientInst);
-			SendPacket(buffer);
-
-			buffer->reset();
-			buffer->writeHeader("ServerInterface", "PlayerInterface", 1, 0, gameClient.nClientInst, 0, 0x5aed2a60); // CSServerConnectReady
-			buffer->write<uint32>(htonl(inet_addr(realm.csPlayerAgentIPAddress.c_str()))); // CSPlayer
-			buffer->write<uint16>(realm.csPlayerAgentPort); // CSport
-			buffer->write<uint32>(characterInfo.accountID);
-			buffer->write<uint32>(0x0000c350);
-			buffer->write<uint32>(gameClient.nClientInst);
-			SendPacket(buffer);
-
-			buffer->reset();
-			buffer->writeHeader("ServerInterface", "PlayerInterface", 1, 0, gameClient.nClientInst, 0, 0xd8b66c79); // LoginConnectReady
-			buffer->write<uint32>(htonl(inet_addr(realm.worldServerIPAddress.c_str()))); // i_nGameAddr
-			buffer->write<uint16>(realm.worldServerPort); // game port
-			buffer->write<uint32>(htonl(inet_addr(realm.worldServerIPAddress.c_str()))); // i_nGameAddr
-			buffer->write<uint16>(realm.worldServerPort); // game port
-			buffer->write<uint32>(characterInfo.accountID); //
-			buffer->write<uint32>(0x0000c350);
-			buffer->write<uint32>(gameClient.nClientInst); //
-			buffer->write<uint8>(0x62); //
-			buffer->write<uint32>(0x0000c79c); //
-			buffer->write<uint32>(characterInfo.map); //
-			buffer->write<uint32>(0x00000000); //
-			buffer->write<uint32>(0x00000000); //
-			buffer->write<uint32>(0x00000001); //
-			buffer->write<uint32>(0x00009c50); //
-			buffer->write<uint32>(0x00036bc1); // cookie
-			SendPacket(buffer);
-
-			break;
-		}
-
-	case 0xEF616EB6: // LoginCharacter:
-		{
-			gameClient.nClientInst = packet->buffer->read<uint32>();
-			uint32 unk = packet->buffer->read<uint32>();
-			string cClientLanguage = packet->buffer->read<string>();
-			characterInfo.characterID = gameClient.nClientInst & 0x00ffffff;
-
-			uint32 unk1 = packet->buffer->read<uint32>(); // dont know if these are correct values
-			uint16 unk2 = packet->buffer->read<uint16>();
-			uint8 unk3 = packet->buffer->read<uint8>();
+			//printf("Receive:\n%s\n\n", String::arrayToHexString(packet.packetBuffer->buffer, packet.packetBuffer->bufferLength).c_str());
 			
-			if(!MySQLFunctions::GetCharacter(characterInfo.characterID , &characterInfo))
-			{
-				// send error opcode, whatever
-				printf("INTERNAL ERROR\n");
-				break;
-			}
-
-			RealmInfo realm;
-			if(!MySQLFunctions::GetRealm(characterInfo.realmID, &realm))
-			{
-				// send error opcode, whatever
-				printf("INTERNAL ERROR\n");
-				break;
-			}
-
-			gameClient.nClientInst = characterInfo.characterID + (characterInfo.realmID * 0x01000000);
-
-			buffer->reset();
-			buffer->writeHeader("ServerInterface", "PlayerInterface", 1, 0, gameClient.nClientInst, 0, 0x5aed2a60); // CSServerConnectReady
-			buffer->write<uint32>(htonl(inet_addr(realm.csPlayerAgentIPAddress.c_str()))); // CSPlayer
-			buffer->write<uint16>(realm.csPlayerAgentPort); // CSport
-			buffer->write<uint32>(characterInfo.accountID);
-			buffer->write<uint32>(0x0000c350);
-			buffer->write<uint32>(gameClient.nClientInst);
-			SendPacket(buffer);
-
-			buffer->reset();
-			buffer->writeHeader("ServerInterface", "PlayerInterface", 1, 0, gameClient.nClientInst, 0, 0x23a632fa);
-			buffer->write<uint32>(htonl(inet_addr(realm.agentServerIPAddress.c_str()))); // i_nClientAgentAddress
-			buffer->write<uint16>(realm.agentServerPort);
-			buffer->write<uint32>(characterInfo.accountID);
-			buffer->write<uint32>(0x0000c350);
-			buffer->write<uint32>(gameClient.nClientInst);
-			SendPacket(buffer);
-
-			buffer->reset();
-			buffer->writeHeader("ServerInterface", "PlayerInterface", 1, 0, gameClient.nClientInst, 0, 0xd8b66c79); // LoginConnectReady
-			buffer->write<uint32>(htonl(inet_addr(realm.worldServerIPAddress.c_str()))); // i_nGameAddr
-			buffer->write<uint16>(realm.worldServerPort); // game port
-			buffer->write<uint32>(htonl(inet_addr(realm.worldServerIPAddress.c_str()))); // i_nGameAddr
-			buffer->write<uint16>(realm.worldServerPort); // game port
-			buffer->write<uint32>(characterInfo.accountID); //
-			buffer->write<uint32>(0x0000c350);
-			buffer->write<uint32>(gameClient.nClientInst); //
-			buffer->write<uint8>(0x62); //
-			buffer->write<uint32>(0x0000c79c); //
-			buffer->write<uint32>(characterInfo.map); //
-			buffer->write<uint32>(0x00000000); //
-			buffer->write<uint32>(0x00000000); //
-			buffer->write<uint32>(0x00000001); //
-			buffer->write<uint32>(0x00009c50); //
-			buffer->write<uint32>(0x00036bc1); // cookie
-			SendPacket(buffer);
-
-			break;
-		}
-	case 0xCA2C4E5E:
-		{
-			characterInfo.realmID = packet->buffer->read<uint32>();
-
-			buffer->reset();
-			buffer->writeHeader("ServerInterface", "PlayerInterface", 1, 0, gameClient.nClientInst, 0, 0x233605b9); // CSServerConnectReady
-			buffer->write<uint32>(0x0000c350);
-			buffer->write<uint32>(characterInfo.characterID);
-			buffer->write<uint32>(0);
-			SendPacket(buffer);
-
-			break;
-		}
-	case 0x3c7c926c:
-		{
-			printf("Receive Create Char\n");
-
-			RealmInfo realm;
-			if(!MySQLFunctions::GetRealm(characterInfo.realmID, &realm))
-			{
-				// send error opcode, whatever
-				printf("INTERNAL ERROR\n");
-				break;
-			}
-
-			buffer->reset();
-			buffer->writeHeader("ServerInterface", "PlayerInterface", 1, 0, gameClient.nClientInst, 0, 0x5aed2a60); // CSServerConnectReady
-			buffer->write<uint32>(htonl(inet_addr(realm.csPlayerAgentIPAddress.c_str()))); // CSPlayer
-			buffer->write<uint16>(realm.csPlayerAgentPort); // CSport
-			buffer->write<uint32>(characterInfo.characterID);
-			buffer->write<uint32>(0x0000c350);
-			buffer->write<uint32>(gameClient.nClientInst);
-			SendPacket(buffer);
-
-			buffer->reset();
-			buffer->writeHeader("ServerInterface", "PlayerInterface", 1, 0, gameClient.nClientInst, 0, 0x23a632fa);
-			buffer->write<uint32>(htonl(inet_addr(realm.agentServerIPAddress.c_str()))); // i_nClientAgentAddress
-			buffer->write<uint16>(realm.agentServerPort);
-			buffer->write<uint32>(characterInfo.characterID);
-			buffer->write<uint32>(0x0000c350);
-			buffer->write<uint32>(gameClient.nClientInst);
-			SendPacket(buffer);
-
-			buffer->reset();
-			buffer->writeHeader("ServerInterface", "PlayerInterface", 1, 0, gameClient.nClientInst, 0, 0xd8b66c79); // LoginConnectReady
-			buffer->write<uint32>(htonl(inet_addr(realm.worldServerIPAddress.c_str()))); // i_nGameAddr
-			buffer->write<uint16>(realm.worldServerPort); // game port
-			buffer->write<uint32>(htonl(inet_addr(realm.worldServerIPAddress.c_str()))); // i_nGameAddr
-			buffer->write<uint16>(realm.worldServerPort); // game port
-			buffer->write<uint32>(gameClient.nClientInst);//characterInfo.characterID); //
-			buffer->write<uint32>(0x0000c350);
-			buffer->write<uint32>(characterInfo.characterID);//gameClient.nClientInst); //
-			buffer->write<uint8>(0x62); //
-			buffer->write<uint32>(0x0000c79c); //
-			buffer->write<uint32>(characterInfo.map); //
-			buffer->write<uint32>(0x00000000); //
-			buffer->write<uint32>(0x00000000); //
-			buffer->write<uint32>(0x00000001); //
-			buffer->write<uint32>(0x00009c50); //
-			buffer->write<uint32>(0x00036bc1); // cookie
-			SendPacket(buffer);
-
-			buffer->reset();
-			buffer->writeHeader("ServerInterface", "PlayerInterface", 1, 0, gameClient.nClientInst, 0, 0xf4116428);
-			buffer->write<uint32>(0x000003f1); //
-			SendPacket(buffer);
-
-			break;
-		}
-
-	case 0x03: // RenameCharacter
-		{
-			uint64 nCharInstance = packet->buffer->read<uint32>();
-			string cNewName = packet->buffer->read<string>();
-
-			//
-
-			break;
-		}
-
-	case 0xc3c5c31d: // RequestDeleteCharacter
-		{
-			uint32 nCharacterInstance = packet->buffer->read<uint32>();
-			MySQLFunctions::DeleteCharacter(nCharacterInstance / 1009 - 1);
-			SendCharacterList();
-
-			break;
-		}
-
-	case 0x9847aed6: // VerifyLanguageSetting
-		{
-			// Inmy client lang is 04 PL 
-			uint32 nClientLanguage = packet->buffer->read<uint32>();
-			if(nClientLanguage==0) // if it's english client with enlish realm
-			{
-				//sendCharacterList(client);
-			}
-			else
-			{
-				buffer->reset();
-				buffer->writeHeader("PlayerAgent", "PlayerInterface", 1, 0, gameClient.nClientInst, 0, 0xd4c59816); // Set the realm language to same as client ?
-				buffer->write<uint32>(0x00000000); // server language 0 is english 
-				SendPacket(buffer);
-			}
-
-			break;
-		}
-
-	case 0x06: // GetDimensionList
-		{
-			SendRealmList();
-
-			break;
-		}
-
-	case 0x07: // RequestSuggestNickname
-		{
-			uint32 i_nRace = packet->buffer->read<uint32>();
-			uint32 i_nSex = packet->buffer->read<uint32>();
-
-			//
-
-			break;
-		}
-
-	case 0x6a546d41: // GetStartupData
-		{
-
-			buffer->reset();
-			buffer->writeHeader("PlayerAgent", "PlayerInterface", 1, 0, gameClient.nClientInst, 0, 0x0c09ca25); // ???
-			buffer->write<uint32>(0x000003f1);
-			SendPacket(buffer);
-
-			break;
-		}
-	case 0xdfd8518e:
-		{
 			SendCharacterList();
 			SendRealmList();
 
-			buffer->reset();
-			buffer->writeHeader("PlayerAgent", "PlayerInterface", 1, 0, gameClient.nClientInst, 0, 0x4f91a58c); // PlayerSetupComplete
-			buffer->write<uint32>(0x01); // authstatus
-			SendPacket(buffer);
+			uint8 headerData[] = { 0x20, 0x8c };
+			uint8 sender[] = { 0x0d, 0x84, 0x04, 0xf2, 0x82, 0x10, 0x03 };
+			uint8 receiver[] = { 0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0xeb, 0x8e, 0x95, 0xbf, 0x05 };
+			
+			PacketBuffer aBuffer(500);
+			WritePlayerHeader(aBuffer, sender, sizeof(sender), receiver, sizeof(receiver), headerData, sizeof(headerData), 0xcbc6fc04);
+			aBuffer.write<uint32>(1);
+			SendPacket(aBuffer);
+
+			break;
+		}
+
+	case 0xDD9EC209:
+		{
+			uint32 languageID = packet.data->read<uint32>();
+			printf("Maybe report language\nLanguage: %i\n", languageID);
+
+			/*
+			Receive opcode: 0xdd9ec209
+			Unknown Packet With Opcode: 0xDD9EC209
+			00000000: 00 00 00 00                                      ....
+			*/
+			break;
+		}
+
+	case 0xDD85FB0E:
+		{
+			printf("Enter World\n");
+
+			/*
+			Receive opcode: 0xdd85fb0e
+			Unknown Packet With Opcode: 0xDD85FB0E
+			00000000: 01 00 07 E4 00 00 03 F1 00 02 65 6E 00 00 00 00  ..........en....
+			00000010: 00 00 00 01 5F 00 00 00 00 00 00 00 00           ...._........
+			*/
+
+			break;
+		}
+
+	case 0x9CB1D10C:
+		{
+			printf("Maybe Create new Character\n");
+			
+			uint32 i_nDimID = packet.data->read<uint32>();
+
+			RealmInfo realm;
+			if(!MySQLFunctions::GetRealm(i_nDimID, realm)) // send error opcode, whatever
+			{
+				printf("No Realm found\n");
+				break;
+			}
+
+			//gameClient.nClientInst = gameClient.charInfo.characterID + (i_nDimID * 0x01000000);
+			uint32 nClientInst = gameClient.characterInfo.characterID + (i_nDimID * 0x01000000);
+			gameClient.characterInfo.realmID = i_nDimID;
+
+			uint8 headerData[] = { 0x20, 0xb9 };
+			uint8 sender[] = { 0x0d, 0x84, 0x04, 0xf2, 0x82, 0x10, 0x03 };
+			uint8 receiver[] = { 0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0xeb, 0x8e, 0x95, 0xbf, 0x05 };
+
+			PacketBuffer aBuffer(500);
+			WritePlayerHeader(aBuffer, sender, sizeof(sender), receiver, sizeof(receiver), headerData, sizeof(headerData), 0x8bd89902);
+			aBuffer.write<uint32>(0x0000c350);
+			aBuffer.write<uint32>(nClientInst); // gameClient.nClientInst
+			aBuffer.write<uint32>(0);
+			SendPacket(aBuffer);
+
+			/*
+			Receive opcode: 0x9cb1d10c
+			Unknown Packet With Opcode: 0x9CB1D10C
+			00000000: 00 00 00 01 00 00 03 F1 00 00 00 00 00 00 00 01  ................
+			00000010: 5F 00 00 00 00 00 00 00 00                       _........
+			*/
+			break;
+		}
+
+	case 0xA4F2E303:
+		{
+			printf("Request for Server Addresses\n");
+		
+			RealmInfo realm;
+			if(!MySQLFunctions::GetRealm(gameClient.characterInfo.realmID, realm)) // send error opcode, whatever
+			{
+				printf("No Realm found\n");
+				break;
+			}
+
+			SendAgentServerAddress(realm.agentServerIPAddress, realm.agentServerPort);
+			SendCSServerAddress(realm.csPlayerAgentIPAddress, realm.csPlayerAgentPort);
+			SendWorldServerAddress(realm.worldServerIPAddress, realm.worldServerPort);
+			
+			break;
+		}
+
+	case 0x86979E0C:
+		{
+			/*
+			Receive opcode: 0x86979e0c
+			Unknown Packet With Opcode: 0x86979E0C
+			00000000: 01 00 07 E4                                      ....
+			*/
+			uint32 charID = packet.data->read<uint32>();
+			printf("Delete Character\nChar-ID: 0x%08x\n", charID);
 			break;
 		}
 
 	default:
 		{
-			printf("Unknown Packet!\n%s\n%s\n\n", packet->toString().c_str(), packetBuffer->toString().c_str());
+			//printf("Unknown Packet!\n%s\n%s\n\n", packet.toString().c_str(), packetBuffer->toString().c_str());
 
 			break;
 		}
 	}
 
-	m_bufferPool->disposeBuffer(buffer);
+	//m_bufferPool->disposeBuffer(buffer);
 }

@@ -35,21 +35,18 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include "../Common/PacketBuffer.h"
 #include "../Common/Packet.h"
 
-#if 1 // DATABASE_TYPE == DATABASE_MYSQL
-#include "../Common/MysqlFunctions.h"
-#endif
-
 class UniverseConnection : public Connection
 {	
-	GameClient gameClient;
-
 	void handlePacket(Packet &packet);
+
+	void WriteUniverseHeader(PacketBuffer &packetBuffer, uint8 sender[], uint8 sl, uint8 receiver[], uint8 rl, uint16 opcode);
+
+	void InitAuth(Packet &packet);
+	void SetRegionState(Packet &packet);
+	void AckAuthenticate(Packet &packet, uint32 authStatus, uint32 eReason, uint16 errorCode);
 
 public:
 	UniverseConnection(boost::asio::io_service& IOService, BufferPool* hp);
-	~UniverseConnection();
-
-	void start();
 };
 
 #endif

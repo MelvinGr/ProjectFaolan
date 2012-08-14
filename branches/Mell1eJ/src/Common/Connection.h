@@ -21,6 +21,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "Common.h"
 
+#include <map>
+
 #include <boost/asio.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/enable_shared_from_this.hpp>
@@ -30,6 +32,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include "Packet.h"
 #include "PacketBuffer.h"
 #include "BufferPool.h"
+#include "GameClient.h"
 
 /**
 * Abstract connection class
@@ -39,12 +42,17 @@ class Connection : private boost::noncopyable, public boost::enable_shared_from_
 {
 public:
 	Connection(boost::asio::io_service& IOService, BufferPool* bp);
-	~Connection();
+	//~Connection();
 
 	boost::asio::ip::tcp::socket& socket();
 
 	// First operation executed after establishing a connection
-	virtual void start() = 0;
+	void start();
+
+	uint32 connectionCount;
+	GameClient gameClient;
+
+	void SendPacket(PacketBuffer &b);
 
 protected:
 	boost::asio::ip::tcp::socket m_socket;
@@ -60,7 +68,6 @@ protected:
 
 	void AsyncRead();
 	void AsyncWrite(PacketBuffer &b);
-	void SendPacket(PacketBuffer &b);
 };
 
 #endif

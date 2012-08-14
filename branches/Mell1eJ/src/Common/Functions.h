@@ -33,8 +33,8 @@ namespace String
 
 namespace File
 {
-	uint64 Read(const std::string& path, bool binary, int8 **buffer);
-	void Write(const std::string& path, bool binary, int8 *buffer, uint64 length);
+	uint64 Read(const std::string& path, bool binary, uint8 **buffer);
+	void Write(const std::string& path, bool binary, const uint8 *buffer, uint64 length);
 
 	bool Exists(const std::string& strFilename);
 }

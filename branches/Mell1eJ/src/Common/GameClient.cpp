@@ -17,15 +17,14 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "GameClient.h"
+#include "Connection.h"
 
 using namespace std;
 
 GameClient::GameClient()
+	: m_connectionID(0), connection(0)
 {
 	ipAddress = "";//Network::GetIPFromSocket(clientSocket);
 
-	authChallenge = "32423423592352";
-
-	nClientInst = 0;
-	nCookie = 0;
+	authChallenge = "704c38cd38334cf4862515a14758f4b9";
 }

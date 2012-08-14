@@ -23,20 +23,21 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include <string>
 
-#include "CharacterInfo.h"
+#include "Structs.h"
+
+class Connection;
 
 class GameClient
 {
 public:
+	uint32 m_connectionID;
+	Connection *connection;
+
 	std::string ipAddress;
-
 	std::string authChallenge;
-	std::string username;
 
-	uint32 nClientInst;
-	uint32 nCookie;
-
-	//CharacterInfo characterInfo;
+	AccountInfo accountInfo;
+	CharacterInfo characterInfo;
 
 	GameClient();
 };

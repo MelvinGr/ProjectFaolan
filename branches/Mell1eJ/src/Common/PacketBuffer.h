@@ -84,14 +84,14 @@ public:
 			offset += sizeof(T);
 			return ret;
 		}
-		catch(int8* msg)
+		catch(const std::string &msg)
 		{
-			printf("Error at reading @ PacketBuffer.h\nErrorMsg: %s \n", msg);
+			printf("Error while reading %s: %s\n", typeid(T).name(), msg.c_str());
 			return NULL;
 		}
 	}
 
-	template <typename T> void write(T data)
+	template <typename T> void write(const T &data)
 	{
 		try
 		{
@@ -104,9 +104,9 @@ public:
 			offset += sizeof(newData);
 			bufferLength += sizeof(newData);
 		}
-		catch(int8* msg)
+		catch(const std::string &msg)
 		{
-			printf("Error at writing @ PacketBuffer.h\nErrorMsg: %s \n", msg);
+			printf("Error while writing %s: %s\n", typeid(T).name(), msg.c_str());
 		}
 	}
 
@@ -133,14 +133,14 @@ template <> inline std::string PacketBuffer::read()
 		offset += stringLength;
 		return data;
 	}
-	catch(int8* msg)
+	catch(const std::string &msg)
 	{
-		printf("Error at reading String @ PacketBuffer.h\nErrorMsg: %s \n", msg);
+		printf("Error while reading string: %s\n", msg.c_str());
 		return "";
 	}
 }
 
-template <> inline void PacketBuffer::write(const std::string &data)
+template <> inline void PacketBuffer::write(const std::string &data) 
 {
 	try
 	{
@@ -150,9 +150,9 @@ template <> inline void PacketBuffer::write(const std::string &data)
 		assert((offset + data.size()) <= maxLength);
 		write((uint8*)data.c_str(), data.size());
 	}
-	catch(int8* msg)
+	catch(const std::string &msg)
 	{
-		printf("Error at writing String @ PacketBuffer.h\nErrorMsg: %s \n", msg);
+		printf("Error while writing string: %s\n", msg.c_str());
 	}
 }
 

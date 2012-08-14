@@ -44,6 +44,28 @@ struct RealmInfo
 	uint32 worldServerPort;
 };
 
+struct CharacterInfo
+{
+	uint32 characterID;
+	uint32 accountID;
+	std::string name;
+	uint32 race;
+	uint32 Class; 
+	uint32 level;
+	uint32 sex;
+	uint32 realmID;
+	std::string lastConnection;
+	uint32 map;
+	uint32 headmesh;
+	uint32 size;
+	uint32 voice;
+	std::string language;
+	uint32 lbinprv;
+
+	Vector3D position;
+	Vector3D rotation;
+};
+
 struct AccountInfo
 {
 	uint32 accountID;

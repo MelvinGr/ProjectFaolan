@@ -66,18 +66,20 @@ int32 main(int32 argc, int8* argv[])
 	{
 		printf("%s", FaolanBanner);
 
+		Config.parseConfigFile("FaolanConfig.cfg");
 		Config.parseCommandLine(argc, argv);
-		Config.parseConfigFile();
 
-		// Setup database
-		MysqlDatabase* db = MysqlDatabase::createInstance(Config.demuxerCount, Config.DBUsername, Config.DBHost, Config.DBPassword, Config.DBName, Config.DBPort);
-		if(!db->start())
-		{
+		MysqlDatabase::createInstance(Config.GetValue<size_t>("demuxerCount"), Config.GetValue<string>("DBUsername"), 
+			Config.GetValue<string>("DBHost"), Config.GetValue<string>("DBPassword"), Config.GetValue<string>("DBName"), 
+			Config.GetValue<int>("DBPort"));
+
+		if(!MysqlDB->start())
 			throw runtime_error("Could not connect to the Database!");
-		}
 
 		Network n;
-		n.createConnectionAcceptor<PlayerConnection>(Config.playerAgentAddress, Config.playerAgentPort, Config.demuxerCount);		
+		n.createConnectionAcceptor<PlayerConnection>(Config.GetValue<string>("playerAgentIPAddress"), 
+			Config.GetValue<int>("playerAgentPort"), Config.GetValue<int>("demuxerCount"));	
+
 		//n.createConnectionAcceptor<InterConnection>(Config.listenInterAddress, Config.listenInterPort, 1);
 
 #if PLATFORM == PLATFORM_WIN32
@@ -99,7 +101,7 @@ int32 main(int32 argc, int8* argv[])
 	}
 	catch (exception& e)
 	{
-		printf("Unhandled Exception: %s\n", e.what());
+		printf("Unhandled Exception: %s\n",  e.what());
 	}
 
 	MysqlDatabase::destroy();

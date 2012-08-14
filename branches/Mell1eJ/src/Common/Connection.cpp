@@ -22,15 +22,26 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 using namespace std;
 
-Connection::Connection(boost::asio::io_service& IOService, BufferPool* bp) : m_socket(IOService), m_bufferPool(bp), m_readBuffer(2000)
+Connection::Connection(boost::asio::io_service& IOService, BufferPool *bp) 
+	: m_socket(IOService), m_bufferPool(bp), m_readBuffer(2000), connectionCount(0)
 {
 	//
 }
 
-Connection::~Connection()
+void Connection::start()
+{
+	gameClient.m_connectionID = connectionCount;
+	gameClient.connection = this;
+	connectionCount++;	
+
+	printf("New connection accepted (m_connectionID: %u)\n", gameClient.m_connectionID);
+	AsyncRead();
+}
+
+/*Connection::~Connection()
 {
 	//
-}
+}*/
 
 boost::asio::ip::tcp::socket& Connection::socket()
 {
@@ -44,8 +55,8 @@ void Connection::disconnect()
 
 void Connection::AsyncRead()
 {
-	m_socket.async_read_some(boost::asio::buffer(m_readBuffer), 
-		boost::bind(&Connection::onRead, shared_from_this(), boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
+	m_socket.async_read_some(boost::asio::buffer(m_readBuffer), boost::bind(&Connection::onRead, shared_from_this(),
+		boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
 }
 
 void Connection::onRead(const boost::system::error_code &e, size_t bytesTransferred)
@@ -70,7 +81,7 @@ void Connection::onWrite(const boost::system::error_code &e)
 {
 	if (e)
 	{
-		printf("socket write problem!\n");
+		printf("Socket write error: %s on ConnectionID: %u\n", e.message().c_str(), gameClient.m_connectionID);
 		boost::system::error_code ignored_ec;
 		m_socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ignored_ec);
 	}

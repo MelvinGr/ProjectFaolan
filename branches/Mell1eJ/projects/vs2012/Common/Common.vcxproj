@@ -15,7 +15,6 @@
     <ClInclude Include="..\..\..\src\Common\BigIntegerLibrary\BigUnsigned.h" />
     <ClInclude Include="..\..\..\src\Common\BigIntegerLibrary\BigUnsignedInABase.h" />
     <ClInclude Include="..\..\..\src\Common\BigIntegerLibrary\NumberlikeArray.h" />
-    <ClInclude Include="..\..\..\src\Common\CharacterInfo.h" />
     <ClInclude Include="..\..\..\src\Common\PacketBuffer.h" />
     <ClInclude Include="..\..\..\src\Common\BufferPool.h" />
     <ClInclude Include="..\..\..\src\Common\Common.h" />
@@ -45,7 +44,6 @@
     <ClCompile Include="..\..\..\src\Common\BigIntegerLibrary\BigIntegerUtils.cpp" />
     <ClCompile Include="..\..\..\src\Common\BigIntegerLibrary\BigUnsigned.cpp" />
     <ClCompile Include="..\..\..\src\Common\BigIntegerLibrary\BigUnsignedInABase.cpp" />
-    <ClCompile Include="..\..\..\src\Common\CharacterInfo.cpp" />
     <ClCompile Include="..\..\..\src\Common\PacketBuffer.cpp" />
     <ClCompile Include="..\..\..\src\Common\BufferPool.cpp" />
     <ClCompile Include="..\..\..\src\Common\Configuration.cpp" />
@@ -86,7 +84,7 @@
   <PropertyGroup>
     <_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..\..\build\$(PlatformName)\$(Configuration)\</OutDir>
-    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">D:\tmp\VC++\$(SolutionName)\$(ProjectName)\$(Configuration)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:\tmp\VC++\$(SolutionName)\$(ProjectName)\$(Configuration)\</IntDir>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</LinkIncremental>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">

@@ -17,6 +17,9 @@
     <ClCompile Include="..\..\..\src\UniverseAgent\Main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\UniverseAgent\UniverseAgentPackets.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\UniverseAgent\UniverseConnection.h">

@@ -34,18 +34,20 @@ struct Packet
 
 	uint8 sender;
 	uint8 senderLength;
-	PacketBuffer senderInt;
+	PacketBuffer *senderInt;
 
 	uint8 receiver;
 	uint8 receiverLength;
-	PacketBuffer receiverInt;
+	PacketBuffer *receiverInt;
 
 	uint32 opcode;
 
-	PacketBuffer headerData;
-	PacketBuffer data;
+	PacketBuffer *headerData;
+	PacketBuffer *data;
 
 	Packet(PacketBuffer &pBuffer);
+	~Packet();
+
 	uint32 HeaderLength();
 };
 

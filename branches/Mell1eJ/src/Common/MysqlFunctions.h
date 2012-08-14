@@ -22,17 +22,11 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include "Common.h"
 
 #include <iostream>
-#include <fstream>
 #include <string>
 #include <vector>
 
-#include <boost/program_options.hpp>
-#include <boost/thread.hpp>
-
-#include "MysqlQuery.h"
 #include "Singleton.h"
 #include "Structs.h"
-#include "CharacterInfo.h"
 
 namespace MySQLFunctions
 {

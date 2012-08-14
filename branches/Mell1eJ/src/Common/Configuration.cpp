@@ -35,13 +35,24 @@ Configuration::Configuration()
 		("DBConnectionCount", "")
 
 		("demuxerCount", "")
-		("characterSlots", "")
 
-		("universeAgentAddress", "")
+		("characterSlots", "")
+		("playIntro", "")
+
+		("universeAgentIPAddress", "")
 		("universeAgentPort", "")
 
-		("playerAgentAddress", "")
-		("playerAgentPort", "");
+		("playerAgentIPAddress", "")
+		("playerAgentPort", "")
+
+		("csPlayerAgentIPAddress", "")
+		("csPlayerAgentPort", "")
+
+		("agentServerIPAddress", "")
+		("agentServerPort", "")
+
+		("worldServerIPAddress", "")
+		("worldServerPort", "");
 }
 
 /*void ShadyOptionsHack(boost::program_options::parsed_options &parsed)

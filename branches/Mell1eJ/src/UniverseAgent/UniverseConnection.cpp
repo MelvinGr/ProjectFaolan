@@ -18,7 +18,9 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "UniverseConnection.h"
 
-#include <boost/lexical_cast.hpp>
+#if 1 // DATABASE_TYPE == DATABASE_MYSQL
+#include "../Common/MysqlFunctions.h"
+#endif
 
 using namespace std;
 
@@ -26,22 +28,6 @@ UniverseConnection::UniverseConnection(boost::asio::io_service& IOService, Buffe
 	: Connection(IOService, hp)
 {
 	//
-}
-
-UniverseConnection::~UniverseConnection()
-{
-	//
-}
-
-void UniverseConnection::start()
-{
-	static uint32 connectionCount = 0;
-	uint32 m_connectionID = connectionCount;
-	connectionCount++;
-
-	printf("New connection accepted (m_connectionID: %u)\n", m_connectionID);
-	
-	AsyncRead();
 }
 
 void UniverseConnection::handlePacket(Packet &packet)
@@ -53,36 +39,73 @@ void UniverseConnection::handlePacket(Packet &packet)
 	{
 	case 0x2000: // InitiateAuthentication
 		{
-			string cUserName = packet.data.read<string>();
-			uint32 nGameID = packet.data.read<uint32>();
-
-			buffer.reset();
-			//buffer.writeHeader(0x00000016, 0x0A070DA0, 0xDB4D6010, 0x0112090D, 0x5440380C, 0x10E4);
-
-			buffer.write<uint32>(0xA5412000);
-			buffer.write<string>("704c38cd38334cf4862515a14758f4b9");
-
-			SendPacket(buffer);
+			InitAuth(packet);
 
 			break;
 		}
 
 	case 0x2001: // AnswerChallenge
 		{
-			string cAnswerChallenge = packet.data.read<string>();
+			string cAnswerChallenge = packet.data->read<string>();
 			string decryptedData = LoginEncryption::decryptLoginKey(cAnswerChallenge);
 
 			vector<string> decryptedDataVector;
-			boost::algorithm::split(decryptedDataVector, decryptedData, boost::is_any_of("|"));
+			//boost::algorithm::split(decryptedDataVector, decryptedData, boost::is_any_of("|"));
+			decryptedDataVector.push_back("root"); 
+			decryptedDataVector.push_back(gameClient.authChallenge); 
+			decryptedDataVector.push_back("toor"); 
 
-			//
+			if(decryptedDataVector.size() != 3) // wrong decryption
+			{
+				printf("Wrong decryption of username and password\n");
+				AckAuthenticate(packet, 0xffffff, 0, 0x04);
+				break;
+			}
+
+			string username = decryptedDataVector[0];
+			string nChallenge = decryptedDataVector[1];
+			string password = decryptedDataVector[2];
+
+			if(nChallenge != gameClient.authChallenge) // wrong auth
+			{
+				printf("Wrong Auth\n");
+				AckAuthenticate(packet, 0xffffff, 0,0x04);
+				break;
+			}
+
+			if(!MySQLFunctions::CheckLogin(username, password)) // wrong login
+			{
+				printf("Wrong Login\n");
+				AckAuthenticate(packet, 0xffffff, 0, 0x0e);
+				break;
+			}
+
+			gameClient.accountInfo.accountID = MySQLFunctions::GetAccountID(username);
+			if(gameClient.accountInfo.accountID == -1) // could not get clientInst
+			{
+				printf("Could not get clientInst\n");
+				AckAuthenticate(packet, 0xffffff, 0, 0x04);
+				break;
+			}
+
+			if(MySQLFunctions::IsAccountBanned(gameClient.accountInfo.accountID)) // player banned
+			{
+				printf("Banned Player try to login\n");
+				AckAuthenticate(packet, 0xffffff, 0, 0x17);
+				break;
+			}
+
+			printf("User %s is logging on with acc-ID: 0x%08x\n", username.c_str(), gameClient.accountInfo.accountID);
+
+			SetRegionState(packet);
+			AckAuthenticate(packet, 1, 0, 0);
 
 			break;
 		}
 
 	case 0x02: // ClientDisconnected
 		{
-			//uint32 connectionID = packet.data.read<uint32>(); // int64 ? - InstanceType
+			//uint32 connectionID = packet.data->read<uint32>(); // int64 ? - InstanceType
 			disconnect();
 
 			break;

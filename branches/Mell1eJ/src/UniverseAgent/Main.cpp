@@ -77,7 +77,7 @@ int32 main(int32 argc, int8* argv[])
 			throw runtime_error("Could not connect to the Database!");
 
 		Network n;
-		n.createConnectionAcceptor<UniverseConnection>(Config.GetValue<string>("universeAgentAddress"), 
+		n.createConnectionAcceptor<UniverseConnection>(Config.GetValue<string>("universeAgentIPAddress"), 
 			Config.GetValue<int>("universeAgentPort"), Config.GetValue<int>("demuxerCount"));	
 
 		//n.createConnectionAcceptor<InterConnection>(Config.listenInterAddress, Config.listenInterPort, 1);

@@ -35,28 +35,27 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include "../Common/BufferPool.h"
 #include "../Common/PacketBuffer.h"
 #include "../Common/Packet.h"
-#include "../Common/CharacterInfo.h"
 #include "../Common/Structs.h"
-
-#if 1 // DATABASE_TYPE == DATABASE_MYSQL
-#include "../Common/MysqlFunctions.h"
-#endif
 
 class PlayerConnection : public Connection
 {
-	void handlePacket(PacketBuffer *packetBuffer, Packet* packet);
-	
-	GameClient gameClient;
-	CharacterInfo characterInfo;
-	
-	void SendRealmList();
+	void handlePacket(Packet &packet);
+
+	void WritePlayerHeader(PacketBuffer &packetBuffer, uint8 sender[], uint8 sl, uint8 receiver[], uint8 rl, 
+										 uint8 headerData[], uint8 hl, uint32 opcode, bool minOpcode = false);
+
+	void InitAuth(Packet &packet);
+
+	void SendSmallCharList();
 	void SendCharacterList();
+	void SendRealmList();
+
+	void SendAgentServerAddress(const std::string &server, uint32 port);
+	void SendCSServerAddress(const std::string &server, uint32 port);
+	void SendWorldServerAddress(const std::string &server, uint32 port);
 
 public:
 	PlayerConnection(boost::asio::io_service& IOService, BufferPool* hp);
-	~PlayerConnection();
-
-	void start();
 };
 
 #endif

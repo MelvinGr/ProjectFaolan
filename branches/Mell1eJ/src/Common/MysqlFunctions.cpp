@@ -18,6 +18,11 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "MysqlFunctions.h"
 
+#include <boost/program_options.hpp>
+#include <boost/thread.hpp>
+
+#include "MysqlQuery.h"
+
 using namespace std;
 
 bool MySQLFunctions::CheckLogin(const std::string& username, const std::string& password)

@@ -120,24 +120,24 @@ namespace String
 	}
 }
 
-uint64 File::Read(const std::string& path, bool binary, int8 **buffer)
+uint64 File::Read(const std::string& path, bool binary, uint8 **buffer)
 {
 	fstream file(path.c_str(), (binary ? ios::binary | ios::in : ios::in) | ios::ate);
 
 	streamoff size = file.tellg();
-	*buffer = new int8[size];
+	*buffer = new uint8[size];
 
 	file.seekg (0, ios::beg);
-	file.read(*buffer, size);
+	file.read((int8*)*buffer, size);
 	file.close();
 
 	return size;
 }
 
-void File::Write(const std::string& path, bool binary, int8 *buffer, uint64 length)
+void File::Write(const std::string& path, bool binary, const uint8 *buffer, uint64 length)
 {
 	fstream file(path.c_str(), (binary ? ios::binary | ios::out : ios::out));
-	file.write(buffer, length);
+	file.write((const int8*)buffer, length);
 	file.close();
 }
 
