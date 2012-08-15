@@ -22,8 +22,11 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 using namespace std;
 
+map<uint32, GameClient*> Connection::gameClients;
+uint32 Connection::connectionCount = 0;
+
 Connection::Connection(boost::asio::io_service& IOService, BufferPool *bp) 
-	: m_socket(IOService), m_bufferPool(bp), m_readBuffer(2000), connectionCount(0)
+	: m_socket(IOService), m_bufferPool(bp), m_readBuffer(2000)
 {
 	//
 }
@@ -32,16 +35,20 @@ void Connection::start()
 {
 	gameClient.m_connectionID = connectionCount;
 	gameClient.connection = this;
+	gameClients[connectionCount] = &gameClient;
+
 	connectionCount++;	
 
 	printf("New connection accepted (m_connectionID: %u)\n", gameClient.m_connectionID);
 	AsyncRead();
 }
 
-/*Connection::~Connection()
+void Connection::stop()
 {
-	//
-}*/
+	printf("Connection dropped (m_connectionID: %u)\n", gameClient.m_connectionID);
+
+	gameClients.erase(gameClient.m_connectionID); 
+}
 
 boost::asio::ip::tcp::socket& Connection::socket()
 {
@@ -63,7 +70,7 @@ void Connection::onRead(const boost::system::error_code &e, size_t bytesTransfer
 {
 	if(e)
 	{
-		printf("Client disconnected!\n");
+		stop();
 		return;
 	}
 

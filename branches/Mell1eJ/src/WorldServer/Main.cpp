@@ -35,7 +35,11 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include "../Common/MysqlDatabase.h"
 #include "../Common/MysqlQuery.h"
 
-#include "PlayerConnection.h"
+#if 1 // DATABASE_TYPE == DATABASE_MYSQL
+#include "../Common/MysqlFunctions.h"
+#endif
+
+#include "WorldConnection.h"
 #include "InternalConnection.h"
 
 using namespace std;
@@ -78,10 +82,10 @@ int32 main(int32 argc, int8* argv[])
 
 		if(!MysqlDB->start())
 			throw runtime_error("Could not connect to the Database!");
-		
+
 		boost::asio::io_service ioService;
 		InternalConnection* ic = new InternalConnection(ioService, 0,
-			Config.GetValue<string>("faolanmanageripaddress"), Config.GetValue<uint32>("faolanmanagerport"), PlayerAgent);
+			Config.GetValue<string>("faolanmanageripaddress"), Config.GetValue<uint32>("faolanmanagerport"), WorldServer);
 
 		boost::thread icThread(boost::bind(&InternalConnection::start, ic));
 
@@ -90,9 +94,11 @@ int32 main(int32 argc, int8* argv[])
 		else
 			throw runtime_error("Could not connect to the Manager!");
 
+		cin.get();
+
 		Network n;
-		n.createConnectionAcceptor<PlayerConnection>(Config.GetValue<string>("playeragentipaddress"), 
-			Config.GetValue<uint32>("playeragentport"), Config.GetValue<size_t>("demuxercount"));	
+		//n.createConnectionAcceptor<WorldConnection>(realmInfo.worldServerIPAddress, 
+		//	realmInfo.worldServerPort, Config.GetValue<size_t>("demuxerCount"));	
 
 #if PLATFORM == PLATFORM_WIN32
 		console_ctrl_function = boost::bind(&Network::stop, &n);

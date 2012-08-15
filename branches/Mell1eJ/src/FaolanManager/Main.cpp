@@ -35,8 +35,11 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include "../Common/MysqlDatabase.h"
 #include "../Common/MysqlQuery.h"
 
-#include "PlayerConnection.h"
-#include "InternalConnection.h"
+#if 1 // DATABASE_TYPE == DATABASE_MYSQL
+#include "../Common/MysqlFunctions.h"
+#endif
+
+#include "ManagerConnection.h"
 
 using namespace std;
 
@@ -78,21 +81,10 @@ int32 main(int32 argc, int8* argv[])
 
 		if(!MysqlDB->start())
 			throw runtime_error("Could not connect to the Database!");
-		
-		boost::asio::io_service ioService;
-		InternalConnection* ic = new InternalConnection(ioService, 0,
-			Config.GetValue<string>("faolanmanageripaddress"), Config.GetValue<uint32>("faolanmanagerport"), PlayerAgent);
-
-		boost::thread icThread(boost::bind(&InternalConnection::start, ic));
-
-		if (ic->waitUntilConnected())
-			printf("Connected to the Manager!\n");
-		else
-			throw runtime_error("Could not connect to the Manager!");
 
 		Network n;
-		n.createConnectionAcceptor<PlayerConnection>(Config.GetValue<string>("playeragentipaddress"), 
-			Config.GetValue<uint32>("playeragentport"), Config.GetValue<size_t>("demuxercount"));	
+		n.createConnectionAcceptor<ManagerConnection>(Config.GetValue<string>("faolanmanageripaddress"), 
+			Config.GetValue<uint32>("faolanmanagerport"), 1);
 
 #if PLATFORM == PLATFORM_WIN32
 		console_ctrl_function = boost::bind(&Network::stop, &n);

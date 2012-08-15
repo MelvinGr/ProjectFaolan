@@ -11,24 +11,15 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\PlayerAgent\PlayerConnection.cpp">
+    <ClCompile Include="..\..\..\src\FaolanManager\Main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\PlayerAgent\Main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\PlayerAgent\PlayerAgentPackets.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\PlayerAgent\InternalConnection.cpp">
+    <ClCompile Include="..\..\..\src\FaolanManager\ManagerConnection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\src\PlayerAgent\PlayerConnection.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\PlayerAgent\InternalConnection.h">
+    <ClInclude Include="..\..\..\src\FaolanManager\ManagerConnection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

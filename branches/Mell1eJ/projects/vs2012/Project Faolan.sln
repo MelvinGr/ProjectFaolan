@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 11
+# Visual Studio 2012
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Common", "Common\Common.vcxproj", "{DC00D144-97D4-4BF1-9A44-0FD3D3D53863}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UniverseAgent", "UniverseAgent\UniverseAgent.vcxproj", "{598F87E5-FB8E-4BD9-9D66-34127B3824F2}"
@@ -13,6 +13,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PlayerAgent", "PlayerAgent\
 		{DC00D144-97D4-4BF1-9A44-0FD3D3D53863} = {DC00D144-97D4-4BF1-9A44-0FD3D3D53863}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "WorldServer", "WorldServer\WorldServer.vcxproj", "{53379272-C170-4793-875A-551E700E533C}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FaolanManager", "FaolanManager\FaolanManager.vcxproj", "{99F53814-C275-4D2D-B5F5-E628DF460C65}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -20,8 +24,12 @@ Global
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{1B9AC86A-97DD-41BB-BFBC-BECB0B946FA7}.Debug|Win32.ActiveCfg = Debug|Win32
 		{1B9AC86A-97DD-41BB-BFBC-BECB0B946FA7}.Debug|Win32.Build.0 = Debug|Win32
+		{53379272-C170-4793-875A-551E700E533C}.Debug|Win32.ActiveCfg = Debug|Win32
+		{53379272-C170-4793-875A-551E700E533C}.Debug|Win32.Build.0 = Debug|Win32
 		{598F87E5-FB8E-4BD9-9D66-34127B3824F2}.Debug|Win32.ActiveCfg = Debug|Win32
 		{598F87E5-FB8E-4BD9-9D66-34127B3824F2}.Debug|Win32.Build.0 = Debug|Win32
+		{99F53814-C275-4D2D-B5F5-E628DF460C65}.Debug|Win32.ActiveCfg = Debug|Win32
+		{99F53814-C275-4D2D-B5F5-E628DF460C65}.Debug|Win32.Build.0 = Debug|Win32
 		{DC00D144-97D4-4BF1-9A44-0FD3D3D53863}.Debug|Win32.ActiveCfg = Debug|Win32
 		{DC00D144-97D4-4BF1-9A44-0FD3D3D53863}.Debug|Win32.Build.0 = Debug|Win32
 	EndGlobalSection

@@ -42,15 +42,16 @@ class Connection : private boost::noncopyable, public boost::enable_shared_from_
 {
 public:
 	Connection(boost::asio::io_service& IOService, BufferPool* bp);
-	//~Connection();
 
 	boost::asio::ip::tcp::socket& socket();
 
 	// First operation executed after establishing a connection
 	void start();
+	void stop();
 
-	uint32 connectionCount;
+	static uint32 connectionCount;
 	GameClient gameClient;
+	static std::map<uint32, GameClient*> gameClients;
 
 	void SendPacket(PacketBuffer &b);
 

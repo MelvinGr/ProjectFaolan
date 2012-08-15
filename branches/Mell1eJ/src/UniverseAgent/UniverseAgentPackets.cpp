@@ -86,7 +86,7 @@ void UniverseConnection::AckAuthenticate(Packet &packet, uint32 authStatus, uint
 	//accID = 0x0000271257e5476b;
 
 	gameClient.accountInfo.cookie = rand();
-	MySQLFunctions::SetAccountCookie(gameClient.accountInfo.accountID, gameClient.accountInfo.cookie);
+	MysqlFunctions::SetAccountCookie(gameClient.accountInfo.accountID, gameClient.accountInfo.cookie);
 
 	printf("Accountcookie: 0x%08x\nClientInst: 0x%08x\n", gameClient.accountInfo.cookie, gameClient.accountInfo.accountID);
 

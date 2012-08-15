@@ -27,32 +27,29 @@ Configuration::Configuration()
 	: Singleton<Configuration>(), m_description("Server Options")
 {
 	m_description.add_options()
-		("DBUsername", "")
-		("DBPassword", "")
-		("DBHost", "")
-		("DBPort", "")
-		("DBName", "")
-		("DBConnectionCount", "")
+		("dbusername", "")
+		("dbpassword", "")
+		("dbhost", "")
+		("dbport", "")
+		("dbname", "")
+		("dbconnectioncount", "")
 
-		("demuxerCount", "")
+		("demuxercount", "")
 
-		("characterSlots", "")
-		("playIntro", "")
+		("characterslots", "")
+		("playintro", "")
 
-		("universeAgentIPAddress", "")
-		("universeAgentPort", "")
+		("faolanmanageripaddress", "")
+		("faolanmanagerport", "")
 
-		("playerAgentIPAddress", "")
-		("playerAgentPort", "")
+		("universeagentipaddress", "")
+		("universeagentport", "")
 
-		("csPlayerAgentIPAddress", "")
-		("csPlayerAgentPort", "")
-
-		("agentServerIPAddress", "")
-		("agentServerPort", "")
-
-		("worldServerIPAddress", "")
-		("worldServerPort", "");
+		("playeragentipaddress", "")
+		("playeragentport", "")
+		
+		("ipaddress", "")
+		("port", "");
 }
 
 /*void ShadyOptionsHack(boost::program_options::parsed_options &parsed)

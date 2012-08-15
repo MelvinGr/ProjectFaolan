@@ -7,11 +7,13 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\src\PlayerAgent\InternalConnection.cpp" />
     <ClCompile Include="..\..\..\src\PlayerAgent\PlayerAgentPackets.cpp" />
     <ClCompile Include="..\..\..\src\PlayerAgent\PlayerConnection.cpp" />
     <ClCompile Include="..\..\..\src\PlayerAgent\Main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\src\PlayerAgent\InternalConnection.h" />
     <ClInclude Include="..\..\..\src\PlayerAgent\PlayerConnection.h" />
   </ItemGroup>
   <ItemGroup>

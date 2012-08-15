@@ -25,8 +25,9 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include "Vector3D.h"
 #include "Functions.h"
 
-struct RealmInfo
+class RealmInfo
 {
+public:
 	uint32 realmID;
 	std::string realmName;
 	uint16 realmType; // 0,1 = PvE | 256,257 = PvP | 1081 = PvP by faction, probably a bitmask
@@ -42,6 +43,8 @@ struct RealmInfo
 
 	std::string worldServerIPAddress;
 	uint32 worldServerPort;
+
+	void SetWorldServerOnline(bool online);
 };
 
 struct CharacterInfo

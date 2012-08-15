@@ -112,7 +112,7 @@ void PlayerConnection::handlePacket(Packet &packet)
 			uint32 i_nDimID = packet.data->read<uint32>();
 
 			RealmInfo realm;
-			if(!MySQLFunctions::GetRealm(i_nDimID, realm)) // send error opcode, whatever
+			if(!MysqlFunctions::GetRealm(i_nDimID, realm)) // send error opcode, whatever
 			{
 				printf("No Realm found\n");
 				break;
@@ -147,7 +147,7 @@ void PlayerConnection::handlePacket(Packet &packet)
 			printf("Request for Server Addresses\n");
 		
 			RealmInfo realm;
-			if(!MySQLFunctions::GetRealm(gameClient.characterInfo.realmID, realm)) // send error opcode, whatever
+			if(!MysqlFunctions::GetRealm(gameClient.characterInfo.realmID, realm)) // send error opcode, whatever
 			{
 				printf("No Realm found\n");
 				break;

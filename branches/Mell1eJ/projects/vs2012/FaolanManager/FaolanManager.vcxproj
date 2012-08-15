@@ -7,23 +7,20 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\UniverseAgent\InternalConnection.cpp" />
-    <ClCompile Include="..\..\..\src\UniverseAgent\UniverseAgentPackets.cpp" />
-    <ClCompile Include="..\..\..\src\UniverseAgent\UniverseConnection.cpp" />
-    <ClCompile Include="..\..\..\src\UniverseAgent\Main.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\..\..\src\UniverseAgent\InternalConnection.h" />
-    <ClInclude Include="..\..\..\src\UniverseAgent\UniverseConnection.h" />
+    <ClCompile Include="..\..\..\src\FaolanManager\Main.cpp" />
+    <ClCompile Include="..\..\..\src\FaolanManager\ManagerConnection.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.vcxproj">
       <Project>{dc00d144-97d4-4bf1-9a44-0fd3d3d53863}</Project>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\src\FaolanManager\ManagerConnection.h" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectName>UniverseAgent</ProjectName>
-    <ProjectGuid>{598F87E5-FB8E-4BD9-9D66-34127B3824F2}</ProjectGuid>
+    <ProjectName>FaolanManager</ProjectName>
+    <ProjectGuid>{99F53814-C275-4D2D-B5F5-E628DF460C65}</ProjectGuid>
     <RootNamespace>Faolancharmysql</RootNamespace>
     <Keyword>Win32Proj</Keyword>
     <VCTargetsPath Condition="'$(VCTargetsPath11)' != '' and '$(VSVersion)' == '' and $(VisualStudioVersion) == ''">$(VCTargetsPath11)</VCTargetsPath>

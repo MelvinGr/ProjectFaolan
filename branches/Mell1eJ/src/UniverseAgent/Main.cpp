@@ -36,6 +36,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include "../Common/MysqlQuery.h"
 
 #include "UniverseConnection.h"
+#include "InternalConnection.h"
 
 using namespace std;
 
@@ -66,21 +67,32 @@ int32 main(int32 argc, int8* argv[])
 	{
 		printf("%s", FaolanBanner);
 
+		srand((uint32)time(0));
+
 		Config.parseConfigFile("FaolanConfig.cfg");
 		Config.parseCommandLine(argc, argv);
 
-		MysqlDatabase::createInstance(Config.GetValue<size_t>("demuxerCount"), Config.GetValue<string>("DBUsername"), 
-			Config.GetValue<string>("DBHost"), Config.GetValue<string>("DBPassword"), Config.GetValue<string>("DBName"), 
-			Config.GetValue<int>("DBPort"));
+		MysqlDatabase::createInstance(Config.GetValue<size_t>("demuxercount"), Config.GetValue<string>("dbusername"), 
+			Config.GetValue<string>("dbhost"), Config.GetValue<string>("dbpassword"), Config.GetValue<string>("dbname"), 
+			Config.GetValue<uint32>("dbport"));
 
 		if(!MysqlDB->start())
 			throw runtime_error("Could not connect to the Database!");
+		
+		boost::asio::io_service ioService;
+		InternalConnection* ic = new InternalConnection(ioService, 0,
+			Config.GetValue<string>("faolanmanageripaddress"), Config.GetValue<uint32>("faolanmanagerport"), UniverseAgent);
+
+		boost::thread icThread(boost::bind(&InternalConnection::start, ic));
+
+		if (ic->waitUntilConnected())
+			printf("Connected to the Manager!\n");
+		else
+			throw runtime_error("Could not connect to the Manager!");
 
 		Network n;
-		n.createConnectionAcceptor<UniverseConnection>(Config.GetValue<string>("universeAgentIPAddress"), 
-			Config.GetValue<int>("universeAgentPort"), Config.GetValue<int>("demuxerCount"));	
-
-		//n.createConnectionAcceptor<InterConnection>(Config.listenInterAddress, Config.listenInterPort, 1);
+		n.createConnectionAcceptor<UniverseConnection>(Config.GetValue<string>("universeagentipaddress"), 
+			Config.GetValue<uint32>("universeagentport"), Config.GetValue<size_t>("demuxercount"));	
 
 #if PLATFORM == PLATFORM_WIN32
 		console_ctrl_function = boost::bind(&Network::stop, &n);

@@ -56,10 +56,12 @@ public:
 
 	uint32 getUint32();
 	uint64 getUint64();
+	double getDouble();
 	const char* getString();
 
 	uint32 getUint32(uint32 idx);
 	uint64 getUint64(uint32 idx);
+	double getDouble(uint32 idx);
 	const char* getString(uint32 idx);
 };
 

@@ -47,7 +47,7 @@ void UniverseConnection::handlePacket(Packet &packet)
 	case 0x2001: // AnswerChallenge
 		{
 			string cAnswerChallenge = packet.data->read<string>();
-			string decryptedData = LoginEncryption::decryptLoginKey(cAnswerChallenge);
+			//string decryptedData = LoginEncryption::decryptLoginKey(cAnswerChallenge);
 
 			vector<string> decryptedDataVector;
 			//boost::algorithm::split(decryptedDataVector, decryptedData, boost::is_any_of("|"));
@@ -73,14 +73,14 @@ void UniverseConnection::handlePacket(Packet &packet)
 				break;
 			}
 
-			if(!MySQLFunctions::CheckLogin(username, password)) // wrong login
+			if(!MysqlFunctions::CheckLogin(username, password)) // wrong login
 			{
 				printf("Wrong Login\n");
 				AckAuthenticate(packet, 0xffffff, 0, 0x0e);
 				break;
 			}
 
-			gameClient.accountInfo.accountID = MySQLFunctions::GetAccountID(username);
+			gameClient.accountInfo.accountID = MysqlFunctions::GetAccountID(username);
 			if(gameClient.accountInfo.accountID == -1) // could not get clientInst
 			{
 				printf("Could not get clientInst\n");
@@ -88,7 +88,7 @@ void UniverseConnection::handlePacket(Packet &packet)
 				break;
 			}
 
-			if(MySQLFunctions::IsAccountBanned(gameClient.accountInfo.accountID)) // player banned
+			if(MysqlFunctions::IsAccountBanned(gameClient.accountInfo.accountID)) // player banned
 			{
 				printf("Banned Player try to login\n");
 				AckAuthenticate(packet, 0xffffff, 0, 0x17);

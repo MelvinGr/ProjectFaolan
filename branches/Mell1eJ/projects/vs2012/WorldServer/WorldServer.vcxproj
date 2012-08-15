@@ -7,14 +7,14 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\UniverseAgent\InternalConnection.cpp" />
-    <ClCompile Include="..\..\..\src\UniverseAgent\UniverseAgentPackets.cpp" />
-    <ClCompile Include="..\..\..\src\UniverseAgent\UniverseConnection.cpp" />
-    <ClCompile Include="..\..\..\src\UniverseAgent\Main.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\InternalConnection.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\WorldServerPackets.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\WorldConnection.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\Main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\src\UniverseAgent\InternalConnection.h" />
-    <ClInclude Include="..\..\..\src\UniverseAgent\UniverseConnection.h" />
+    <ClInclude Include="..\..\..\src\WorldServer\InternalConnection.h" />
+    <ClInclude Include="..\..\..\src\WorldServer\WorldConnection.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.vcxproj">
@@ -22,8 +22,8 @@
     </ProjectReference>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectName>UniverseAgent</ProjectName>
-    <ProjectGuid>{598F87E5-FB8E-4BD9-9D66-34127B3824F2}</ProjectGuid>
+    <ProjectName>WorldServer</ProjectName>
+    <ProjectGuid>{53379272-C170-4793-875A-551E700E533C}</ProjectGuid>
     <RootNamespace>Faolancharmysql</RootNamespace>
     <Keyword>Win32Proj</Keyword>
     <VCTargetsPath Condition="'$(VCTargetsPath11)' != '' and '$(VSVersion)' == '' and $(VisualStudioVersion) == ''">$(VCTargetsPath11)</VCTargetsPath>

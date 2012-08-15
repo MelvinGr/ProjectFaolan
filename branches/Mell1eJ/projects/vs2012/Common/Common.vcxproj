@@ -15,6 +15,8 @@
     <ClInclude Include="..\..\..\src\Common\BigIntegerLibrary\BigUnsigned.h" />
     <ClInclude Include="..\..\..\src\Common\BigIntegerLibrary\BigUnsignedInABase.h" />
     <ClInclude Include="..\..\..\src\Common\BigIntegerLibrary\NumberlikeArray.h" />
+    <ClInclude Include="..\..\..\src\Common\FaolanManager.h" />
+    <ClInclude Include="..\..\..\src\Common\InterServerConnection.h" />
     <ClInclude Include="..\..\..\src\Common\PacketBuffer.h" />
     <ClInclude Include="..\..\..\src\Common\BufferPool.h" />
     <ClInclude Include="..\..\..\src\Common\Common.h" />
@@ -44,6 +46,8 @@
     <ClCompile Include="..\..\..\src\Common\BigIntegerLibrary\BigIntegerUtils.cpp" />
     <ClCompile Include="..\..\..\src\Common\BigIntegerLibrary\BigUnsigned.cpp" />
     <ClCompile Include="..\..\..\src\Common\BigIntegerLibrary\BigUnsignedInABase.cpp" />
+    <ClCompile Include="..\..\..\src\Common\FaolanManager.cpp" />
+    <ClCompile Include="..\..\..\src\Common\InterServerConnection.cpp" />
     <ClCompile Include="..\..\..\src\Common\PacketBuffer.cpp" />
     <ClCompile Include="..\..\..\src\Common\BufferPool.cpp" />
     <ClCompile Include="..\..\..\src\Common\Configuration.cpp" />
@@ -59,6 +63,7 @@
     <ClCompile Include="..\..\..\src\Common\Network.cpp" />
     <ClCompile Include="..\..\..\src\Common\Packet.cpp" />
     <ClCompile Include="..\..\..\src\Common\Query.cpp" />
+    <ClCompile Include="..\..\..\src\Common\Structs.cpp" />
     <ClCompile Include="..\..\..\src\Common\Vector3D.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

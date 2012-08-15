@@ -146,6 +146,12 @@
     <ClInclude Include="..\..\..\src\Common\PacketBuffer.h">
       <Filter>Header Files\Network\Packet</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\InterServerConnection.h">
+      <Filter>Header Files\Network\Connection</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\FaolanManager.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\Common\BigIntegerLibrary\BigInteger.cpp">
@@ -210,6 +216,15 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\Common\PacketBuffer.cpp">
       <Filter>Source Files\Network\Packet</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\Structs.cpp">
+      <Filter>Source Files\Other</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\InterServerConnection.cpp">
+      <Filter>Source Files\Network\Connection</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\Common\FaolanManager.cpp">
+      <Filter>Source Files\Network</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

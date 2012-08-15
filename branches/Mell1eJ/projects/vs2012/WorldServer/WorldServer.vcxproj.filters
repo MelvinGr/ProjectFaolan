@@ -11,24 +11,24 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\PlayerAgent\PlayerConnection.cpp">
+    <ClCompile Include="..\..\..\src\WorldServer\WorldServerPackets.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\PlayerAgent\Main.cpp">
+    <ClCompile Include="..\..\..\src\WorldServer\WorldConnection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\PlayerAgent\PlayerAgentPackets.cpp">
+    <ClCompile Include="..\..\..\src\WorldServer\Main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\PlayerAgent\InternalConnection.cpp">
+    <ClCompile Include="..\..\..\src\WorldServer\InternalConnection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\src\PlayerAgent\PlayerConnection.h">
+    <ClInclude Include="..\..\..\src\WorldServer\WorldConnection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\PlayerAgent\InternalConnection.h">
+    <ClInclude Include="..\..\..\src\WorldServer\InternalConnection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

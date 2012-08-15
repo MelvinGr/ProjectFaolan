@@ -170,6 +170,17 @@ uint64 MysqlQuery::getUint64(uint32 idx)
 	return NULL;
 }
 
+double MysqlQuery::getDouble(uint32 idx)
+{
+	if (m_res && m_row && (idx < m_column))
+	{
+		m_idx++;
+		return boost::lexical_cast<double>(m_row[idx]);
+	}
+
+	return NULL;
+}
+
 const char* MysqlQuery::getString(uint32 idx)
 {
 	if (m_res && m_row && (idx < m_column))
@@ -189,6 +200,11 @@ uint32 MysqlQuery::getUint32()
 uint64 MysqlQuery::getUint64()
 {
 	return getUint64(m_idx);
+}
+
+double MysqlQuery::getDouble()
+{
+	return getDouble(m_idx);
 }
 
 const char* MysqlQuery::getString()

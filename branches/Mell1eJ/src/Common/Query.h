@@ -68,10 +68,12 @@ public:
 	// Get data from the current row. increment the column index, if no index precised
 	virtual uint32 getUint32()=0;
 	virtual uint64 getUint64()=0;
+	virtual double getDouble() = 0;
 	virtual const char* getString()=0;
 
 	virtual uint32 getUint32(uint32 idx)=0;
 	virtual uint64 getUint64(uint32 idx)=0;
+	virtual double getDouble(uint32 idx) = 0;
 	virtual const char* getString(uint32 idx)=0;
 
 	virtual ~Query()

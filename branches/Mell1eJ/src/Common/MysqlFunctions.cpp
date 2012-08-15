@@ -25,7 +25,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 using namespace std;
 
-bool MySQLFunctions::CheckLogin(const std::string& username, const std::string& password)
+bool MysqlFunctions::CheckLogin(const std::string& username, const std::string& password)
 {
 	MysqlQuery q(MysqlQuery::NO_CALLBACK, MysqlQuery::HAS_RESULT);
 	q.setQueryText("SELECT * FROM accounts WHERE username = '%s' AND password = '%s' LIMIT 1", username.c_str(), password.c_str());
@@ -40,7 +40,7 @@ bool MySQLFunctions::CheckLogin(const std::string& username, const std::string& 
 	return value;
 }
 
-int32 MySQLFunctions::GetAccountID(const std::string& username)
+int32 MysqlFunctions::GetAccountID(const std::string& username)
 {
 	MysqlQuery q(MysqlQuery::NO_CALLBACK, MysqlQuery::HAS_RESULT);
 	q.setQueryText("SELECT account_id FROM accounts WHERE username = '%s' LIMIT 1", username.c_str());
@@ -58,7 +58,7 @@ int32 MySQLFunctions::GetAccountID(const std::string& username)
 	return value;
 }
 
-bool MySQLFunctions::IsAccountBanned(uint32 nClientInst)
+bool MysqlFunctions::IsAccountBanned(uint32 nClientInst)
 {
 	MysqlQuery q(MysqlQuery::NO_CALLBACK, MysqlQuery::HAS_RESULT);
 	q.setQueryText("SELECT state FROM accounts WHERE account_id = %u LIMIT 1", nClientInst);
@@ -76,7 +76,7 @@ bool MySQLFunctions::IsAccountBanned(uint32 nClientInst)
 	return value;
 }
 
-int32 MySQLFunctions::GetNewCharacterId()
+int32 MysqlFunctions::GetNewCharacterId()
 {
 	MysqlQuery q(MysqlQuery::NO_CALLBACK, MysqlQuery::HAS_RESULT);
 	q.setQueryText("SELECT MAX(character_id) FROM characters");
@@ -94,7 +94,7 @@ int32 MySQLFunctions::GetNewCharacterId()
 	return value;
 }
 
-int32 MySQLFunctions::GetAccountCookie(uint32 nClientInst)
+int32 MysqlFunctions::GetAccountCookie(uint32 nClientInst)
 {
 	MysqlQuery q(MysqlQuery::NO_CALLBACK, MysqlQuery::HAS_RESULT);
 	q.setQueryText("SELECT cookie FROM accounts WHERE account_id = '%u' LIMIT 1", nClientInst);
@@ -112,7 +112,7 @@ int32 MySQLFunctions::GetAccountCookie(uint32 nClientInst)
 	return value;
 }
 
-bool MySQLFunctions::SetAccountCookie(uint32 nClientInst, uint32 cookie)
+bool MysqlFunctions::SetAccountCookie(uint32 nClientInst, uint32 cookie)
 {
 	MysqlQuery q(MysqlQuery::NO_CALLBACK, MysqlQuery::HAS_RESULT);
 	q.setQueryText("UPDATE accounts SET cookie = %u WHERE account_id = %u", cookie, nClientInst);
@@ -123,7 +123,18 @@ bool MySQLFunctions::SetAccountCookie(uint32 nClientInst, uint32 cookie)
 	return q.succes();
 }
 
-bool MySQLFunctions::UpdateLastInfo(uint32 nClientInst, const std::string& ipAddress)
+bool MysqlFunctions::SetWorldServerOnline(uint32 realmID, uint32 status)
+{
+	MysqlQuery q(MysqlQuery::NO_CALLBACK, MysqlQuery::HAS_RESULT);
+	q.setQueryText("UPDATE realms SET onlineStatus = %u WHERE id = %u", status, realmID);
+
+	MysqlDB->executeSynchronousQuery(&q);
+	Sleep(50);
+
+	return q.succes();
+}
+
+bool MysqlFunctions::UpdateLastInfo(uint32 nClientInst, const std::string& ipAddress)
 {
 	time_t rawtime;
 	time(&rawtime);
@@ -140,10 +151,10 @@ bool MySQLFunctions::UpdateLastInfo(uint32 nClientInst, const std::string& ipAdd
 	return q.succes();
 }
 
-bool MySQLFunctions::GetRealm(uint32 realmID, RealmInfo &realm)
+bool MysqlFunctions::GetRealm(uint32 realmID, RealmInfo &realm)
 {
 	MysqlQuery q(MysqlQuery::NO_CALLBACK, MysqlQuery::HAS_RESULT);
-	q.setQueryText("SELECT * FROM realms WHERE realm_id=%u", realmID);
+	q.setQueryText("SELECT * FROM realms WHERE id=%u", realmID);
 
 	MysqlDB->executeSynchronousQuery(&q); 
 	Sleep(50);
@@ -156,9 +167,9 @@ bool MySQLFunctions::GetRealm(uint32 realmID, RealmInfo &realm)
 
 	realm.realmID = q.getUint32();
 	realm.realmName = q.getString();
-	realm.realmType = q.getUint32();
-
 	realm.onlineStatus = q.getUint32();
+	uint32 lastUpd = q.getUint32();
+	realm.realmType = q.getUint32();
 	realm.loadStatus = q.getUint32();
 
 	realm.csPlayerAgentIPAddress = q.getString();
@@ -173,10 +184,10 @@ bool MySQLFunctions::GetRealm(uint32 realmID, RealmInfo &realm)
 	return true;
 }
 
-bool MySQLFunctions::GetRealms(vector<RealmInfo> &realms)
+bool MysqlFunctions::GetRealms(vector<RealmInfo> &realms)
 {
 	MysqlQuery q(MysqlQuery::NO_CALLBACK, MysqlQuery::HAS_RESULT);
-	q.setQueryText("SELECT realm_id FROM realms");
+	q.setQueryText("SELECT id FROM realms");
 
 	MysqlDB->executeSynchronousQuery(&q);
 	Sleep(50);
@@ -198,7 +209,7 @@ bool MySQLFunctions::GetRealms(vector<RealmInfo> &realms)
 	return true;
 }
 
-bool MySQLFunctions::GetCharacter(uint32 characterID, CharacterInfo &character)
+bool MysqlFunctions::GetCharacter(uint32 characterID, CharacterInfo &character)
 {
 	MysqlQuery q(MysqlQuery::NO_CALLBACK, MysqlQuery::HAS_RESULT);
 	q.setQueryText("SELECT * FROM characters WHERE character_id=%u", characterID);
@@ -226,13 +237,14 @@ bool MySQLFunctions::GetCharacter(uint32 characterID, CharacterInfo &character)
 	character.size = q.getUint32();
 	character.voice = q.getUint32();
 	character.lastConnection = q.getString();
-	character.position = Vector3D(q.getUint64(), q.getUint64(), q.getUint64());		
+	character.position = Vector3D(q.getDouble(), q.getDouble(), q.getDouble());		
+	character.rotation = Vector3D(q.getDouble(), q.getDouble(), q.getDouble());	
 	character.lbinprv = q.getUint32();
 
 	return true;
 }
 
-bool MySQLFunctions::GetCharacters(uint32 accountID, vector<CharacterInfo> &characters)
+bool MysqlFunctions::GetCharacters(uint32 accountID, vector<CharacterInfo> &characters)
 {
 	MysqlQuery q(MysqlQuery::NO_CALLBACK, MysqlQuery::HAS_RESULT);
 	q.setQueryText("SELECT character_id FROM characters WHERE account_id = %u", accountID);
@@ -257,7 +269,7 @@ bool MySQLFunctions::GetCharacters(uint32 accountID, vector<CharacterInfo> &char
 	return true;
 }
 
-bool MySQLFunctions::DeleteCharacter(uint32 characterID)
+bool MysqlFunctions::DeleteCharacter(uint32 characterID)
 {
 	return true;
 }

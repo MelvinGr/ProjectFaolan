@@ -97,12 +97,10 @@ typedef unsigned int        uint32;
 typedef unsigned short      uint16;
 typedef unsigned char       uint8;
 
-typedef long double ldouble;
-
 #if COMPILER == COMPILER_MICROSOFT
 typedef __int64   int64;
 typedef unsigned __int64   uint64;
-typedef _W64 unsigned int SOCKET;
+//typedef _W64 unsigned int SOCKET;
 #else
 typedef long long int64;
 typedef unsigned long long  uint64;
