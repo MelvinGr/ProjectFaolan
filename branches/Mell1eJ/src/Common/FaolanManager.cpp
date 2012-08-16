@@ -24,12 +24,12 @@ void WriteManagerHeader(PacketBuffer &packetBuffer, FaolanManagerSenderReceivers
 {
 	packetBuffer.write<uint32>(0); // Write empty length
 	packetBuffer.write<uint32>(0); // write empty crc32
-	packetBuffer.write<uint32>(sizeof(uint8) * 4 + sizeof(uint16)); // header length
+	packetBuffer.write<uint32>(sizeof(uint8) * 6 + sizeof(uint16)); // header length
 	packetBuffer.write<uint8>(sender); // sender
-	packetBuffer.write<uint8>(0); // sender length
-	//packetBuffer.write(sender, sl); // sender data
+	packetBuffer.write<uint8>(1); // sender length
+	packetBuffer.write<uint8>(0); // sender data
 	packetBuffer.write<uint8>(receiver); // receiver
-	packetBuffer.write<uint8>(0); // receiver length
-	//packetBuffer.write(receiver, rl); // receiver data
+	packetBuffer.write<uint8>(1); // receiver length
+	packetBuffer.write<uint8>(0); // receiver data
 	packetBuffer.write<uint16>(opcode); // opcode
 }

@@ -15,6 +15,7 @@
     <ClInclude Include="..\..\..\src\Common\BigIntegerLibrary\BigUnsigned.h" />
     <ClInclude Include="..\..\..\src\Common\BigIntegerLibrary\BigUnsignedInABase.h" />
     <ClInclude Include="..\..\..\src\Common\BigIntegerLibrary\NumberlikeArray.h" />
+    <ClInclude Include="..\..\..\src\Common\FaolanBaseClass.h" />
     <ClInclude Include="..\..\..\src\Common\FaolanManager.h" />
     <ClInclude Include="..\..\..\src\Common\InterServerConnection.h" />
     <ClInclude Include="..\..\..\src\Common\PacketBuffer.h" />

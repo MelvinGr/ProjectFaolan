@@ -80,9 +80,6 @@
     <ClInclude Include="..\..\..\src\Common\LoginEncryption.h">
       <Filter>Header Files\Network</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\Common\Singleton.h">
-      <Filter>Header Files\Other</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\Common\Functions.h">
       <Filter>Header Files\Other</Filter>
     </ClInclude>
@@ -151,6 +148,12 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\Common\FaolanManager.h">
       <Filter>Header Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\Singleton.h">
+      <Filter>Header Files\Other</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\Common\FaolanBaseClass.h">
+      <Filter>Header Files\Other</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

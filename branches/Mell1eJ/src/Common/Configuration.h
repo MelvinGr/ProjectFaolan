@@ -29,14 +29,13 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "Singleton.h"
 
-#define Config Configuration::instance()
+#define Config Configuration::Instance()
 class Configuration : public Singleton<Configuration>
 {
 	friend class Singleton<Configuration>;
 
 	Configuration();
 
-	boost::mutex m_mutex;
 	boost::program_options::options_description m_description;	
 	boost::program_options::variables_map m_variableMap;
 

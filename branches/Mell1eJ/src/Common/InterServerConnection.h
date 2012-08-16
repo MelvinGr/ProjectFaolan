@@ -34,7 +34,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 class InterServerConnection
 {
-protected:
+//protected:
 	// synchro
 	mutable boost::mutex m_mutex;
 	boost::condition_variable m_condition;
@@ -47,11 +47,6 @@ protected:
 
 	void AsyncRead();
 	void AsyncWrite(PacketBuffer& b);
-
-	virtual void handlePacket(Packet &packet) = 0;
-
-	void registerWithManager();
-	void onRegistrationStatus(Packet &packet);
 
 	boost::asio::io_service& m_IOService;
 	boost::asio::ip::tcp::socket m_Socket;
@@ -69,6 +64,8 @@ protected:
 public:
 	InterServerConnection(boost::asio::io_service& IOService, const std::string& loginServerAddress, 
 		uint32 port, FaolanManagerSenderReceivers _sender);
+
+	boost::function<void(Packet&)> HandlePacketCallback;
 
 	/**
 	* Main function of inter server communication process.

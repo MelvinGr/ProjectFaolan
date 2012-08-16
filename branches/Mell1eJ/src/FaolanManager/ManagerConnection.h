@@ -34,12 +34,16 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include "../Common/BufferPool.h"
 #include "../Common/PacketBuffer.h"
 #include "../Common/Packet.h"
+#include "../Common/FaolanManager.h"
+#include "../Common/structs.h"
 
 class ManagerConnection : public Connection
 {	
 	void handlePacket(Packet &packet);
 
-	//
+	void GetOfflineServer(FaolanManagerSenderReceivers type, RealmInfo &realm);
+
+	static std::vector<RealmInfo> realms;
 
 public:
 	ManagerConnection(boost::asio::io_service& IOService, BufferPool* hp);

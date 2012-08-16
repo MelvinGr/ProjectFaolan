@@ -123,16 +123,38 @@ bool MysqlFunctions::SetAccountCookie(uint32 nClientInst, uint32 cookie)
 	return q.succes();
 }
 
-bool MysqlFunctions::SetWorldServerOnline(uint32 realmID, uint32 status)
+/*bool MysqlFunctions::SetCSPlayerAgentOnline(uint32 realmID, uint32 status)
 {
 	MysqlQuery q(MysqlQuery::NO_CALLBACK, MysqlQuery::HAS_RESULT);
-	q.setQueryText("UPDATE realms SET onlineStatus = %u WHERE id = %u", status, realmID);
+	q.setQueryText("UPDATE realms SET csactive = %u WHERE id = %u", status, realmID);
 
 	MysqlDB->executeSynchronousQuery(&q);
 	Sleep(50);
 
 	return q.succes();
 }
+
+bool MysqlFunctions::SetAgentServerOnline(uint32 realmID, uint32 status)
+{
+	MysqlQuery q(MysqlQuery::NO_CALLBACK, MysqlQuery::HAS_RESULT);
+	q.setQueryText("UPDATE realms SET agentactive = %u WHERE id = %u", status, realmID);
+
+	MysqlDB->executeSynchronousQuery(&q);
+	Sleep(50);
+
+	return q.succes();
+}
+
+bool MysqlFunctions::SetWorldServerOnline(uint32 realmID, uint32 status)
+{
+	MysqlQuery q(MysqlQuery::NO_CALLBACK, MysqlQuery::HAS_RESULT);
+	q.setQueryText("UPDATE realms SET worldactive = %u WHERE id = %u", status, realmID);
+
+	MysqlDB->executeSynchronousQuery(&q);
+	Sleep(50);
+
+	return q.succes();
+}*/
 
 bool MysqlFunctions::UpdateLastInfo(uint32 nClientInst, const std::string& ipAddress)
 {
@@ -167,19 +189,23 @@ bool MysqlFunctions::GetRealm(uint32 realmID, RealmInfo &realm)
 
 	realm.realmID = q.getUint32();
 	realm.realmName = q.getString();
-	realm.onlineStatus = q.getUint32();
-	uint32 lastUpd = q.getUint32();
 	realm.realmType = q.getUint32();
 	realm.loadStatus = q.getUint32();
 
-	realm.csPlayerAgentIPAddress = q.getString();
-	realm.csPlayerAgentPort = q.getUint32();
+	realm.universeAgentIPAddress = q.getString();
+	realm.universeAgentPort = q.getUint32();
+	
+	realm.playerAgentIPAddress = q.getString();
+	realm.playerAgentPort = q.getUint32();
+
+	realm.worldServerIPAddress = q.getString();
+	realm.worldServerPort = q.getUint32();
 
 	realm.agentServerIPAddress = q.getString();
 	realm.agentServerPort = q.getUint32();
 
-	realm.worldServerIPAddress = q.getString();
-	realm.worldServerPort = q.getUint32();
+	realm.csPlayerAgentIPAddress = q.getString();
+	realm.csPlayerAgentPort = q.getUint32();
 
 	return true;
 }

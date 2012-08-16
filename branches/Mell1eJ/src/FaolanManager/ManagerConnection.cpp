@@ -18,18 +18,19 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "ManagerConnection.h"
 
-#include "../Common/FaolanManager.h"
-
 #if 1 // DATABASE_TYPE == DATABASE_MYSQL
 #include "../Common/MysqlFunctions.h"
 #endif
 
 using namespace std;
 
+vector<RealmInfo> ManagerConnection::realms;
+
 ManagerConnection::ManagerConnection(boost::asio::io_service& IOService, BufferPool* hp) 
 	: Connection(IOService, hp)
 {
-	//
+	if(realms.size() == 0)
+		MysqlFunctions::GetRealms(realms);
 }
 
 void ManagerConnection::start()
@@ -46,78 +47,98 @@ void ManagerConnection::stop()
 	//
 }
 
+void ManagerConnection::GetOfflineServer(FaolanManagerSenderReceivers type, RealmInfo &realm)
+{
+	//boost::mutex::scoped_lock lock(m_mutex);
+
+	foreach(RealmInfo &realmInfo, realms)
+	{
+		if(type == UniverseAgentID && !realmInfo.universeAgentActive && !realmInfo.universeAgentInitializing)
+		{
+			realm = realmInfo;
+			realmInfo.universeAgentInitializing = true;
+		}
+		else if(type == PlayerAgentID && !realmInfo.playerAgentActive && !realmInfo.playerAgentInitializing)
+		{
+			realm = realmInfo;
+			realmInfo.playerAgentInitializing = true;
+		}
+		else if(type == WorldServerID && !realmInfo.worldServerActive && !realmInfo.worldServerInitializing)
+		{
+			realm = realmInfo;
+			realmInfo.worldServerInitializing = true;
+		}
+		else if(type == AgentServerID && !realmInfo.agentServerActive && !realmInfo.agentServerInitializing)
+		{
+			realm = realmInfo;
+			realmInfo.agentServerInitializing = true;
+		}
+		else if(type == CSPlayerServerID && !realmInfo.csPlayerAgentActive && !realmInfo.csPlayerAgentInitializing)
+		{
+			realm = realmInfo;
+			realmInfo.csPlayerAgentInitializing = true;
+		}
+	}
+}
+
 void ManagerConnection::handlePacket(Packet &packet)
 {
 	//PacketBuffer *buffer = m_bufferPool.allocateBuffer(2000);
 	PacketBuffer buffer(2000);
 
+	FaolanManagerSenderReceivers sender = (FaolanManagerSenderReceivers)packet.sender;
+
 	switch(packet.opcode)
 	{
-	case RequestNewOfflineRealm:
+	case RequestRealmInfo:
 		{
-			//uint32 realmID = packet.data->read<uint32>();
+			//uint32 realmID = packet.data->read<uint32>();	
 
-			//uint32 clientID = rand();
+			RealmInfo realmInfo;
+			GetOfflineServer(sender, realmInfo);
 
-			vector<RealmInfo> realms;
-			MysqlFunctions::GetRealms(realms);
+			WriteManagerHeader(buffer, FaolanManagerID, sender, RequestRealmInfoResponse);
+			buffer.write<uint32>(realmInfo.realmID);
 
-			WriteManagerHeader(buffer, FaolanManager, (FaolanManagerSenderReceivers)packet.sender, RequestNewOfflineRealmResponse);
-
-			foreach(const RealmInfo &realmInfo, realms)
+			switch(sender)
 			{
-				if(realmInfo.onlineStatus == 2)
-					continue;
+			case UniverseAgentID:
+				{
+					buffer.write<string>(realmInfo.universeAgentIPAddress);
+					buffer.write<uint32>(realmInfo.universeAgentPort);
 
-				buffer.write<uint32>(realmInfo.realmID);
-				break;
+					break;
+				}
+			case PlayerAgentID:
+				{
+					buffer.write<string>(realmInfo.playerAgentIPAddress);
+					buffer.write<uint32>(realmInfo.playerAgentPort);
+
+					break;
+				}
+			case WorldServerID:
+				{
+					buffer.write<string>(realmInfo.worldServerIPAddress);
+					buffer.write<uint32>(realmInfo.worldServerPort);
+
+					break;
+				}
+			case AgentServerID:
+				{
+					buffer.write<string>(realmInfo.agentServerIPAddress);
+					buffer.write<uint32>(realmInfo.agentServerPort);
+
+					break;
+				}				
+			case CSPlayerServerID:
+				{
+					buffer.write<string>(realmInfo.csPlayerAgentIPAddress);
+					buffer.write<uint32>(realmInfo.csPlayerAgentPort);
+
+					break;
+				}	
 			}
 
-			SendPacket(buffer);
-
-			break;
-		}
-
-	case RequestRealmWorldServerInfo:
-		{
-			uint32 realmID = packet.data->read<uint32>();	
-
-			RealmInfo realmInfo;
-			MysqlFunctions::GetRealm(realmID, realmInfo);
-
-			WriteManagerHeader(buffer, FaolanManager, (FaolanManagerSenderReceivers)packet.sender, RequestRealmWorldServerInfoResponse);
-			buffer.write<string>(realmInfo.worldServerIPAddress);
-			buffer.write<uint32>(realmInfo.worldServerPort);
-			SendPacket(buffer);
-
-			break;
-		}
-
-	case RequestRealmAgentServerInfo:
-		{
-			uint32 realmID = packet.data->read<uint32>();
-
-			RealmInfo realmInfo;
-			MysqlFunctions::GetRealm(realmID, realmInfo);
-
-			WriteManagerHeader(buffer, FaolanManager, (FaolanManagerSenderReceivers)packet.sender, RequestRealmAgentServerInfoResponse);
-			buffer.write<string>(realmInfo.agentServerIPAddress);
-			buffer.write<uint32>(realmInfo.agentServerPort);
-			SendPacket(buffer);
-
-			break;
-		}
-
-	case RequestRealmCSPlayerServerInfo:
-		{
-			uint32 realmID = packet.data->read<uint32>();
-
-			RealmInfo realmInfo;
-			MysqlFunctions::GetRealm(realmID, realmInfo);
-
-			WriteManagerHeader(buffer, FaolanManager, (FaolanManagerSenderReceivers)packet.sender, RequestRealmCSPlayerServerInfoResponse);
-			buffer.write<string>(realmInfo.csPlayerAgentIPAddress);
-			buffer.write<uint32>(realmInfo.csPlayerAgentPort);
 			SendPacket(buffer);
 
 			break;
@@ -128,7 +149,7 @@ void ManagerConnection::handlePacket(Packet &packet)
 			string address = packet.data->read<string>();
 			uint32 port = packet.data->read<uint32>();
 
-			WriteManagerHeader(buffer, FaolanManager, (FaolanManagerSenderReceivers)packet.sender, RequestRegisterResponse);
+			WriteManagerHeader(buffer, FaolanManagerID, (FaolanManagerSenderReceivers)packet.sender, RequestRegisterResponse);
 			buffer.write<uint8>(true);
 			SendPacket(buffer);
 
@@ -137,13 +158,71 @@ void ManagerConnection::handlePacket(Packet &packet)
 
 	case ServerStatusChange:
 		{
-			//
+			uint32 realmID = packet.data->read<uint32>();
+			bool status = packet.data->read<uint8>();
+
+			// C++0X lambda expression
+			RealmInfo realmInfo = *std::find_if(realms.begin(), realms.end(), [&](RealmInfo const& n)
+			{
+				return n.realmID == realmID;
+			});
+
+			switch(sender)
+			{
+			case UniverseAgentID:
+				{
+					realmInfo.universeAgentInitializing = false;
+					realmInfo.universeAgentActive = status;
+
+					break;
+				}
+			case PlayerAgentID:
+				{
+					realmInfo.playerAgentInitializing = false;
+					realmInfo.playerAgentActive = status;
+
+					break;
+				}
+			case WorldServerID:
+				{
+					realmInfo.worldServerInitializing = false;
+					realmInfo.worldServerActive = status;
+
+					break;
+				}
+			case AgentServerID:
+				{
+					realmInfo.agentServerInitializing = false;
+					realmInfo.agentServerActive = status;
+
+					break;
+				}				
+			case CSPlayerServerID:
+				{
+					realmInfo.csPlayerAgentInitializing = false;
+					realmInfo.csPlayerAgentActive = status;
+
+					break;
+				}	
+			}
+
+			printf("%s: %s\n", FaolanManagerSenderReceiversText[sender], status ? "Active" : "Down");
+
+			/*printf("Realm Status: UniverseAgent: %s, PlayerAgent: %s\nWorldServer: %s, AgentServer: %s, CSPlayerAgent: %s\n", 
+				realmInfo.universeAgentActive ? "Active" : (realmInfo.universeAgentInitializing ? "Initializing" : "Down"),
+				realmInfo.playerAgentActive   ? "Active" : (realmInfo.playerAgentInitializing   ? "Initializing" : "Down"),
+				realmInfo.worldServerActive   ? "Active" : (realmInfo.worldServerInitializing   ? "Initializing" : "Down"),
+				realmInfo.agentServerActive   ? "Active" : (realmInfo.agentServerInitializing   ? "Initializing" : "Down"),
+				realmInfo.csPlayerAgentActive ? "Active" : (realmInfo.csPlayerAgentInitializing ? "Initializing" : "Down"));*/
 
 			break;
 		}
 
 	case Pong:
 		{
+			uint64 ping = packet.data->read<uint64>();
+			uint64 pong = packet.data->read<uint64>();
+
 			//
 
 			break;

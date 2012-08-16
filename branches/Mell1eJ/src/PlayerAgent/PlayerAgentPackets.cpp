@@ -193,7 +193,7 @@ void PlayerConnection::SendRealmList()
 	foreach(const RealmInfo &realmInfo, realms)
 	{
 		aBuffer.write<uint32>(realmInfo.realmID); // realmID
-		aBuffer.write<uint32>(realmInfo.onlineStatus); // onlineStatus - 2 = online, other num = offline
+		aBuffer.write<uint32>(realmInfo.worldServerActive); // onlineStatus - 2 = online, other num = offline
 		aBuffer.write<string>(realmInfo.realmName); // realmname 
 		aBuffer.write<uint32>(0x00000c02); //u2
 		aBuffer.write<uint32>(0x00000000); //u3

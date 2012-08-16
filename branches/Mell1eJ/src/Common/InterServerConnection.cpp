@@ -25,8 +25,8 @@ using namespace std;
 
 InterServerConnection::InterServerConnection(boost::asio::io_service& IOService, 
 											 const std::string& loginServerAddress, uint32 port, FaolanManagerSenderReceivers _sender)
-	: m_IOService(IOService),m_Socket(IOService),m_Resolver(IOService), m_readBuffer(1000), m_writeBuffer(1000),
-		m_loginServerAddress(loginServerAddress), m_port(port), m_connected(false), m_registered(false), sender(_sender)
+											 : m_IOService(IOService),m_Socket(IOService),m_Resolver(IOService), m_readBuffer(1000), m_writeBuffer(1000),
+											 m_loginServerAddress(loginServerAddress), m_port(port), m_connected(false), m_registered(false), sender(_sender)
 {
 	//
 }
@@ -49,27 +49,6 @@ void InterServerConnection::stop()
 
 	m_Socket.close();
 	m_IOService.stop();
-}
-
-void InterServerConnection::registerWithManager()
-{
-	PacketBuffer buffer(2000);
-	WriteManagerHeader(buffer, sender, FaolanManager, RequestRegister);
-	buffer.write<string>(m_loginServerAddress);
-	buffer.write<uint32>(m_port);
-	SendPacket(buffer);
-}
-
-void InterServerConnection::onRegistrationStatus(Packet &packet)
-{
-    m_registered = (bool)packet.data->read<uint8>();
-
-    if (m_registered)
-		printf("Server completed registration on auth server\n");
-    else
-		printf("Problems at registration on auth server\n");
-
-    m_condition.notify_all();
 }
 
 void InterServerConnection::onResolve(const boost::system::error_code& err, boost::asio::ip::tcp::resolver::iterator endpoint_iterator)
@@ -95,7 +74,10 @@ void InterServerConnection::onConnect(const boost::system::error_code& err, boos
 	if (!err)
 	{
 		m_connected = true;
-		registerWithManager();
+		//registerWithManager();
+		m_registered = true;
+		m_condition.notify_all();
+
 		AsyncRead();
 	}
 	else if (endpoint_iterator != boost::asio::ip::tcp::resolver::iterator())
@@ -126,13 +108,13 @@ void InterServerConnection::onRead(const boost::system::error_code& e, std::size
 		AsyncRead();
 		return;
 	}
-	
+
 	Packet packet(PacketBuffer(&m_readBuffer[0], bytesTransferred));
-	if(packet.opcode == RequestRegisterResponse)
-		onRegistrationStatus(packet);
-	else
-		handlePacket(packet);
-	
+	//if(packet.opcode == RequestRegisterResponse)
+	//	onRegistrationStatus(packet);
+	//else
+	HandlePacketCallback(packet);
+
 	AsyncRead();
 }
 
@@ -151,7 +133,7 @@ bool InterServerConnection::waitUntilConnected()
 {
 	boost::mutex::scoped_lock lock(m_mutex);
 	m_condition.wait(lock);
-	
+
 	return (m_connected && m_registered);
 }
 

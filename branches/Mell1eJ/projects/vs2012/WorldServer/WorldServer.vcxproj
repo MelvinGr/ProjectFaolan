@@ -7,13 +7,11 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\WorldServer\InternalConnection.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\WorldServerPackets.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\WorldConnection.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\Main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\src\WorldServer\InternalConnection.h" />
     <ClInclude Include="..\..\..\src\WorldServer\WorldConnection.h" />
   </ItemGroup>
   <ItemGroup>

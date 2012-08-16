@@ -25,7 +25,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include <string>
 #include <vector>
 
-#include "Singleton.h"
+#include "MysqlDatabase.h"
 #include "Structs.h"
 
 namespace MysqlFunctions
@@ -37,7 +37,10 @@ namespace MysqlFunctions
 
 	int32 GetAccountCookie(uint32 nClientInst);
 	bool SetAccountCookie(uint32 nClientInst, uint32 cookie);
-	bool SetWorldServerOnline(uint32 realmID, uint32 status);
+
+	//bool SetCSPlayerAgentOnline(uint32 realmID, uint32 status);
+	//bool SetAgentServerOnline(uint32 realmID, uint32 status);
+	//bool SetWorldServerOnline(uint32 realmID, uint32 status);
 
 	bool UpdateLastInfo(uint32 nClientInst, const std::string& ipAddress);
 

@@ -20,15 +20,9 @@
     <ClCompile Include="..\..\..\src\WorldServer\Main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\WorldServer\InternalConnection.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\WorldServer\WorldConnection.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\WorldServer\InternalConnection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

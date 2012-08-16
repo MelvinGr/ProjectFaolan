@@ -36,14 +36,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 enum FaolanManagerOpcodes : uint16
 {
-	RequestNewOfflineRealm = 0,
-	RequestNewOfflineRealmResponse,
-	RequestRealmWorldServerInfo,
-	RequestRealmWorldServerInfoResponse,
-	RequestRealmAgentServerInfo,
-	RequestRealmAgentServerInfoResponse,
-	RequestRealmCSPlayerServerInfo,
-	RequestRealmCSPlayerServerInfoResponse,
+	RequestRealmInfo,
+	RequestRealmInfoResponse,
 	RequestRegister, 
 	RequestRegisterResponse,
 	ServerStatusChange,
@@ -54,13 +48,16 @@ enum FaolanManagerOpcodes : uint16
 
 enum FaolanManagerSenderReceivers : uint8
 {
-	FaolanManager = 0,
-	UniverseAgent,
-	PlayerAgent,
-	WorldServer,
-	AgentServer,
-	CSPlayerServer
+	FaolanManagerID,
+	UniverseAgentID,
+	PlayerAgentID,
+	WorldServerID,
+	AgentServerID,
+	CSPlayerServerID
 };
+
+static const int8* FaolanManagerSenderReceiversText[] = 
+	{ "FaolanManager", "UniverseAgent", "PlayerAgent", "WorldServer", "AgentServer", "CSPlayerServer" };
 
 // Follow UniverseAgent structure
 void WriteManagerHeader(PacketBuffer &packetBuffer, FaolanManagerSenderReceivers sender, 

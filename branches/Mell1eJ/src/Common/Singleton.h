@@ -29,18 +29,12 @@ template <typename T> class Singleton
 	void operator =(Singleton&);
 
 public:
-	static T& instance()
+	static T& Instance()
 	{
 		if(!m_instance)
 			m_instance = new T();
 
 		return *m_instance;
-	}
-
-	static void destroy()
-	{
-		if(m_instance)
-			delete m_instance;
 	}
 
 protected:
@@ -50,6 +44,8 @@ protected:
 
 	~Singleton()
 	{
+		if(m_instance)
+			delete m_instance;
 	}
 };
 

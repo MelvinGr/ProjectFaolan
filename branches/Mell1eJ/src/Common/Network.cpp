@@ -18,9 +18,43 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "Network.h"
 
+#if PLATFORM == PLATFORM_WIN32
+boost::function0<void> console_ctrl_function;
+BOOL WINAPI console_ctrl_handler(DWORD ctrl_type)
+{
+	switch (ctrl_type)
+	{
+	case CTRL_C_EVENT:
+	case CTRL_BREAK_EVENT:
+	case CTRL_CLOSE_EVENT:
+	case CTRL_SHUTDOWN_EVENT:
+		{
+			console_ctrl_function();
+			return TRUE;
+		}
+
+	default:
+		return FALSE;
+	}
+}
+#endif
+
 Network::Network()
 {
-	//
+#if PLATFORM == PLATFORM_WIN32
+	console_ctrl_function = boost::bind(&Network::stop, this);
+	SetConsoleCtrlHandler(console_ctrl_handler, TRUE);
+#else
+	sigset_t wait_mask;
+	sigemptyset(&wait_mask);
+	sigaddset(&wait_mask, SIGINT);
+	sigaddset(&wait_mask, SIGQUIT);
+	sigaddset(&wait_mask, SIGTERM);
+	pthread_sigmask(SIG_BLOCK, &wait_mask, 0);
+
+	int32 sig = 0;
+	sigwait(&wait_mask, &sig);
+#endif
 }
 
 void Network::stop()

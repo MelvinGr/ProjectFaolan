@@ -24,7 +24,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 using namespace std;
 
 Configuration::Configuration() 
-	: Singleton<Configuration>(), m_description("Server Options")
+	: m_description("Server Options")
 {
 	m_description.add_options()
 		("dbusername", "")
@@ -40,16 +40,7 @@ Configuration::Configuration()
 		("playintro", "")
 
 		("faolanmanageripaddress", "")
-		("faolanmanagerport", "")
-
-		("universeagentipaddress", "")
-		("universeagentport", "")
-
-		("playeragentipaddress", "")
-		("playeragentport", "")
-		
-		("ipaddress", "")
-		("port", "");
+		("faolanmanagerport", "");
 }
 
 /*void ShadyOptionsHack(boost::program_options::parsed_options &parsed)

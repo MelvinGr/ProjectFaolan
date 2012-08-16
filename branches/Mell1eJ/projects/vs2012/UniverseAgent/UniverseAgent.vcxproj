@@ -7,13 +7,11 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\UniverseAgent\InternalConnection.cpp" />
     <ClCompile Include="..\..\..\src\UniverseAgent\UniverseAgentPackets.cpp" />
     <ClCompile Include="..\..\..\src\UniverseAgent\UniverseConnection.cpp" />
     <ClCompile Include="..\..\..\src\UniverseAgent\Main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\src\UniverseAgent\InternalConnection.h" />
     <ClInclude Include="..\..\..\src\UniverseAgent\UniverseConnection.h" />
   </ItemGroup>
   <ItemGroup>

@@ -20,15 +20,9 @@
     <ClCompile Include="..\..\..\src\UniverseAgent\UniverseAgentPackets.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\UniverseAgent\InternalConnection.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\UniverseAgent\UniverseConnection.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\UniverseAgent\InternalConnection.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

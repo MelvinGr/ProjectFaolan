@@ -31,20 +31,38 @@ public:
 	uint32 realmID;
 	std::string realmName;
 	uint16 realmType; // 0,1 = PvE | 256,257 = PvP | 1081 = PvP by faction, probably a bitmask
-
-	uint32 onlineStatus; //2 = online, other num = offline
 	uint32 loadStatus; // 0 = medium load 1 = medium load 2 = heavy load 3 = full
 
-	std::string csPlayerAgentIPAddress;
-	uint32 csPlayerAgentPort;
-
-	std::string agentServerIPAddress;
-	uint32 agentServerPort;
+	std::string universeAgentIPAddress;
+	uint32 universeAgentPort;
+	bool universeAgentActive, universeAgentInitializing;
+	
+	std::string playerAgentIPAddress;
+	uint32 playerAgentPort;
+	bool playerAgentActive, playerAgentInitializing;
 
 	std::string worldServerIPAddress;
 	uint32 worldServerPort;
+	bool worldServerActive, worldServerInitializing;
 
-	void SetWorldServerOnline(bool online);
+	std::string agentServerIPAddress;
+	uint32 agentServerPort;
+	bool agentServerActive, agentServerInitializing;
+
+	std::string csPlayerAgentIPAddress;
+	uint32 csPlayerAgentPort;
+	bool csPlayerAgentActive, csPlayerAgentInitializing;
+
+	RealmInfo()
+		: realmID(0), realmType(0), loadStatus(0),
+			universeAgentPort(0), universeAgentActive(0), universeAgentInitializing(0),
+			playerAgentPort(0), playerAgentActive(0), playerAgentInitializing(0),
+			csPlayerAgentPort(0), csPlayerAgentActive(false), csPlayerAgentInitializing(false),
+			agentServerPort(0), agentServerActive(false), agentServerInitializing(false),
+			worldServerPort(0), worldServerActive(false), worldServerInitializing(false)
+	{
+		//
+	}
 };
 
 struct CharacterInfo
