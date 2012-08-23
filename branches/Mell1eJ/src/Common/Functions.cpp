@@ -47,7 +47,7 @@ using namespace std;
 
 namespace String
 {
-	string arrayToHexString(uint8* data, uint32 size)
+	string arrayToHexString(const uint8* data, size_t size)
 	{
 		if(size == 0)
 			return "No Data! (Length = 0)";
@@ -97,8 +97,8 @@ namespace String
 	string replace(const std::string& str, const std::string& from, const std::string& to)
 	{
 		string newStr = str;
-		int32 oldPosition = -2, position;
-		while((position = newStr.find(from, oldPosition + 2)) != (int32)string::npos)
+		size_t oldPosition = -2, position;
+		while((position = newStr.find(from, oldPosition + 2)) != string::npos)
 		{
 			oldPosition = position;
 			newStr = newStr.replace(position, from.length(), to);
@@ -120,7 +120,7 @@ namespace String
 	}
 }
 
-uint64 File::Read(const std::string& path, bool binary, uint8 **buffer)
+/*uint64 File::Read(const std::string& path, bool binary, uint8 **buffer)
 {
 	fstream file(path.c_str(), (binary ? ios::binary | ios::in : ios::in) | ios::ate);
 
@@ -134,11 +134,29 @@ uint64 File::Read(const std::string& path, bool binary, uint8 **buffer)
 	return size;
 }
 
-void File::Write(const std::string& path, bool binary, const uint8 *buffer, uint64 length)
+void File::Write(const std::string& path, bool binary, const uint8 *buffer, size_t length)
 {
 	fstream file(path.c_str(), (binary ? ios::binary | ios::out : ios::out));
 	file.write((const int8*)buffer, length);
 	file.close();
+}*/
+
+void File::Read(const std::string& path, vector<uint8> &buffer)
+{
+	typedef istream_iterator<uint8> istream_iterator;
+
+	ifstream inputStream(path);
+	inputStream >> noskipws;
+	copy(istream_iterator(inputStream), istream_iterator(), back_inserter(buffer));
+	inputStream.close();
+}
+
+void File::Write(const std::string& path, const vector<uint8> &buffer)
+{
+	ofstream outputStream(path);
+	ostream_iterator<uint8> outputIterator(outputStream);
+    copy(buffer.begin(), buffer.end(), outputIterator);
+	outputStream.close();
 }
 
 bool File::Exists(const std::string& strFilename)

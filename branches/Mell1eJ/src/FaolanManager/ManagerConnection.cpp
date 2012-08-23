@@ -73,7 +73,7 @@ void ManagerConnection::GetOfflineServer(FaolanManagerSenderReceivers type, Real
 			realm = realmInfo;
 			realmInfo.agentServerInitializing = true;
 		}
-		else if(type == CSPlayerServerID && !realmInfo.csPlayerAgentActive && !realmInfo.csPlayerAgentInitializing)
+		else if(type == CSPlayerAgentID && !realmInfo.csPlayerAgentActive && !realmInfo.csPlayerAgentInitializing)
 		{
 			realm = realmInfo;
 			realmInfo.csPlayerAgentInitializing = true;
@@ -97,7 +97,7 @@ void ManagerConnection::handlePacket(Packet &packet)
 			RealmInfo realmInfo;
 			GetOfflineServer(sender, realmInfo);
 
-			WriteManagerHeader(buffer, FaolanManagerID, sender, RequestRealmInfoResponse);
+			FaolanManager::WriteManagerHeader(buffer, FaolanManagerID, sender, RequestRealmInfoResponse);
 			buffer.write<uint32>(realmInfo.realmID);
 
 			switch(sender)
@@ -130,7 +130,7 @@ void ManagerConnection::handlePacket(Packet &packet)
 
 					break;
 				}				
-			case CSPlayerServerID:
+			case CSPlayerAgentID:
 				{
 					buffer.write<string>(realmInfo.csPlayerAgentIPAddress);
 					buffer.write<uint32>(realmInfo.csPlayerAgentPort);
@@ -149,7 +149,7 @@ void ManagerConnection::handlePacket(Packet &packet)
 			string address = packet.data->read<string>();
 			uint32 port = packet.data->read<uint32>();
 
-			WriteManagerHeader(buffer, FaolanManagerID, (FaolanManagerSenderReceivers)packet.sender, RequestRegisterResponse);
+			FaolanManager::WriteManagerHeader(buffer, FaolanManagerID, (FaolanManagerSenderReceivers)packet.sender, RequestRegisterResponse);
 			buffer.write<uint8>(true);
 			SendPacket(buffer);
 
@@ -197,7 +197,7 @@ void ManagerConnection::handlePacket(Packet &packet)
 
 					break;
 				}				
-			case CSPlayerServerID:
+			case CSPlayerAgentID:
 				{
 					realmInfo.csPlayerAgentInitializing = false;
 					realmInfo.csPlayerAgentActive = status;

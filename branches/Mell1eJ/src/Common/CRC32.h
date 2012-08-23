@@ -247,6 +247,6 @@ namespace CRC32
 		, 0xDE0506F1
 	};
 
-	uint32 CalculateCRC32(uint8* value, uint32 length);
+	FAOLANEXPORTED uint32 CalculateCRC32(const uint8* value, size_t length);
 }
 #endif

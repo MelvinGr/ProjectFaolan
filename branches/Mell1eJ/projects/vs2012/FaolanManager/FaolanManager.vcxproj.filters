@@ -11,7 +11,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\FaolanManager\Main.cpp">
+    <ClCompile Include="..\..\..\src\FaolanManager\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\FaolanManager\ManagerConnection.cpp">

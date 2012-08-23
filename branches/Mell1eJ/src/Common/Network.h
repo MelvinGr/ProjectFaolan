@@ -36,7 +36,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 * Network class
 * @author Albator, Doron
 */
-class Network : private boost::noncopyable 
+class FAOLANEXPORTED Network : private boost::noncopyable 
 {
 	std::vector<Acceptor*> m_acceptors;
 	boost::thread_group m_threadGroup;

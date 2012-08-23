@@ -18,8 +18,14 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "MysqlQuery.h"
 #include "MysqlDatabase.h"
-#include <mysql/mysql.h>
+
 #include <boost/lexical_cast.hpp>
+#if PLATFORM == PLATFORM_WIN32
+#	include <winsock2.h>
+#   include <mysql/mysql.h>
+#else
+#   include <mysql.h>
+#endif
 
 MysqlQuery::MysqlQuery(QueryType t) 
 	: Query(t), m_res(NULL)

@@ -19,7 +19,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include "FaolanManager.h"
 
 // Follow UniverseAgent structure
-void WriteManagerHeader(PacketBuffer &packetBuffer, FaolanManagerSenderReceivers sender, 
+void FaolanManager::WriteManagerHeader(PacketBuffer &packetBuffer, FaolanManagerSenderReceivers sender, 
 						FaolanManagerSenderReceivers receiver, FaolanManagerOpcodes opcode) 
 {
 	packetBuffer.write<uint32>(0); // Write empty length

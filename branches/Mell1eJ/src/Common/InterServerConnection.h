@@ -32,7 +32,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 * Connection to the auth server to register the char server
 * @author Albator
 */
-class InterServerConnection
+class FAOLANEXPORTED InterServerConnection
 {
 //protected:
 	// synchro

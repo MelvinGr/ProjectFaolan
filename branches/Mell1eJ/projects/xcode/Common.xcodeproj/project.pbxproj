@@ -1,0 +1,451 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		DCA3E6E215E3CD970010E124 /* Acceptor.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6A815E3CD970010E124 /* Acceptor.h */; };
+		DCA3E6E315E3CD970010E124 /* BigInteger.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6AA15E3CD970010E124 /* BigInteger.cpp */; };
+		DCA3E6E415E3CD970010E124 /* BigInteger.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6AB15E3CD970010E124 /* BigInteger.h */; };
+		DCA3E6E515E3CD970010E124 /* BigIntegerAlgorithms.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6AC15E3CD970010E124 /* BigIntegerAlgorithms.cpp */; };
+		DCA3E6E615E3CD970010E124 /* BigIntegerAlgorithms.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6AD15E3CD970010E124 /* BigIntegerAlgorithms.h */; };
+		DCA3E6E715E3CD970010E124 /* BigIntegerLibrary.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6AE15E3CD970010E124 /* BigIntegerLibrary.h */; };
+		DCA3E6E815E3CD970010E124 /* BigIntegerUtils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6AF15E3CD970010E124 /* BigIntegerUtils.cpp */; };
+		DCA3E6E915E3CD970010E124 /* BigIntegerUtils.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6B015E3CD970010E124 /* BigIntegerUtils.h */; };
+		DCA3E6EA15E3CD970010E124 /* BigUnsigned.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6B115E3CD970010E124 /* BigUnsigned.cpp */; };
+		DCA3E6EB15E3CD970010E124 /* BigUnsigned.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6B215E3CD970010E124 /* BigUnsigned.h */; };
+		DCA3E6EC15E3CD970010E124 /* BigUnsignedInABase.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6B315E3CD970010E124 /* BigUnsignedInABase.cpp */; };
+		DCA3E6ED15E3CD970010E124 /* BigUnsignedInABase.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6B415E3CD970010E124 /* BigUnsignedInABase.h */; };
+		DCA3E6EE15E3CD970010E124 /* NumberlikeArray.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6B515E3CD970010E124 /* NumberlikeArray.h */; };
+		DCA3E6EF15E3CD970010E124 /* BufferPool.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6B615E3CD970010E124 /* BufferPool.cpp */; };
+		DCA3E6F015E3CD970010E124 /* BufferPool.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6B715E3CD970010E124 /* BufferPool.h */; };
+		DCA3E6F115E3CD970010E124 /* CRC32.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6B815E3CD970010E124 /* CRC32.cpp */; };
+		DCA3E6F215E3CD970010E124 /* CRC32.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6B915E3CD970010E124 /* CRC32.h */; };
+		DCA3E6F315E3CD970010E124 /* Common.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6BA15E3CD970010E124 /* Common.h */; };
+		DCA3E6F415E3CD970010E124 /* Configuration.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6BB15E3CD970010E124 /* Configuration.cpp */; };
+		DCA3E6F515E3CD970010E124 /* Configuration.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6BC15E3CD970010E124 /* Configuration.h */; };
+		DCA3E6F615E3CD970010E124 /* Connection.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6BD15E3CD970010E124 /* Connection.cpp */; };
+		DCA3E6F715E3CD970010E124 /* Connection.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6BE15E3CD970010E124 /* Connection.h */; };
+		DCA3E6F815E3CD970010E124 /* ConnectionAcceptor.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6BF15E3CD970010E124 /* ConnectionAcceptor.h */; };
+		DCA3E6F915E3CD970010E124 /* Database.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6C015E3CD970010E124 /* Database.cpp */; };
+		DCA3E6FA15E3CD970010E124 /* Database.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6C115E3CD970010E124 /* Database.h */; };
+		DCA3E6FB15E3CD970010E124 /* FaolanBaseClass.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6C215E3CD970010E124 /* FaolanBaseClass.h */; };
+		DCA3E6FC15E3CD970010E124 /* FaolanManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6C315E3CD970010E124 /* FaolanManager.cpp */; };
+		DCA3E6FD15E3CD970010E124 /* FaolanManager.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6C415E3CD970010E124 /* FaolanManager.h */; };
+		DCA3E6FE15E3CD970010E124 /* Functions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6C515E3CD970010E124 /* Functions.cpp */; };
+		DCA3E6FF15E3CD970010E124 /* Functions.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6C615E3CD970010E124 /* Functions.h */; };
+		DCA3E70015E3CD970010E124 /* GameClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6C715E3CD970010E124 /* GameClient.cpp */; };
+		DCA3E70115E3CD970010E124 /* GameClient.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6C815E3CD970010E124 /* GameClient.h */; };
+		DCA3E70215E3CD970010E124 /* InterServerConnection.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6C915E3CD970010E124 /* InterServerConnection.cpp */; };
+		DCA3E70315E3CD970010E124 /* InterServerConnection.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6CA15E3CD970010E124 /* InterServerConnection.h */; };
+		DCA3E70415E3CD970010E124 /* LoginEncryption.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6CB15E3CD970010E124 /* LoginEncryption.cpp */; };
+		DCA3E70515E3CD970010E124 /* LoginEncryption.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6CC15E3CD970010E124 /* LoginEncryption.h */; };
+		DCA3E70615E3CD970010E124 /* MysqlDatabase.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6CD15E3CD970010E124 /* MysqlDatabase.cpp */; };
+		DCA3E70715E3CD970010E124 /* MysqlDatabase.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6CE15E3CD970010E124 /* MysqlDatabase.h */; };
+		DCA3E70815E3CD970010E124 /* MysqlFunctions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6CF15E3CD970010E124 /* MysqlFunctions.cpp */; };
+		DCA3E70915E3CD970010E124 /* MysqlFunctions.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6D015E3CD970010E124 /* MysqlFunctions.h */; };
+		DCA3E70A15E3CD970010E124 /* MysqlQuery.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6D115E3CD970010E124 /* MysqlQuery.cpp */; };
+		DCA3E70B15E3CD970010E124 /* MysqlQuery.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6D215E3CD970010E124 /* MysqlQuery.h */; };
+		DCA3E70C15E3CD970010E124 /* Network.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6D315E3CD970010E124 /* Network.cpp */; };
+		DCA3E70D15E3CD970010E124 /* Network.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6D415E3CD970010E124 /* Network.h */; };
+		DCA3E70E15E3CD970010E124 /* Packet.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6D515E3CD970010E124 /* Packet.cpp */; };
+		DCA3E70F15E3CD970010E124 /* Packet.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6D615E3CD970010E124 /* Packet.h */; };
+		DCA3E71015E3CD970010E124 /* PacketBuffer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6D715E3CD970010E124 /* PacketBuffer.cpp */; };
+		DCA3E71115E3CD970010E124 /* PacketBuffer.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6D815E3CD970010E124 /* PacketBuffer.h */; };
+		DCA3E71215E3CD970010E124 /* Query.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6D915E3CD970010E124 /* Query.cpp */; };
+		DCA3E71315E3CD970010E124 /* Query.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6DA15E3CD970010E124 /* Query.h */; };
+		DCA3E71415E3CD970010E124 /* SafeQueue.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6DB15E3CD970010E124 /* SafeQueue.h */; };
+		DCA3E71515E3CD970010E124 /* Singleton.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6DC15E3CD970010E124 /* Singleton.h */; };
+		DCA3E71615E3CD970010E124 /* Structs.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6DD15E3CD970010E124 /* Structs.cpp */; };
+		DCA3E71715E3CD970010E124 /* Structs.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6DE15E3CD970010E124 /* Structs.h */; };
+		DCA3E71815E3CD970010E124 /* SwapByte.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6DF15E3CD970010E124 /* SwapByte.h */; };
+		DCA3E71915E3CD970010E124 /* Vector3D.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6E015E3CD970010E124 /* Vector3D.cpp */; };
+		DCA3E71A15E3CD970010E124 /* Vector3D.h in Headers */ = {isa = PBXBuildFile; fileRef = DCA3E6E115E3CD970010E124 /* Vector3D.h */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		DC1ED78A15E3CB45000E6E4F /* libCommon.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libCommon.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		DCA3E6A815E3CD970010E124 /* Acceptor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Acceptor.h; sourceTree = "<group>"; };
+		DCA3E6AA15E3CD970010E124 /* BigInteger.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = BigInteger.cpp; sourceTree = "<group>"; };
+		DCA3E6AB15E3CD970010E124 /* BigInteger.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BigInteger.h; sourceTree = "<group>"; };
+		DCA3E6AC15E3CD970010E124 /* BigIntegerAlgorithms.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = BigIntegerAlgorithms.cpp; sourceTree = "<group>"; };
+		DCA3E6AD15E3CD970010E124 /* BigIntegerAlgorithms.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BigIntegerAlgorithms.h; sourceTree = "<group>"; };
+		DCA3E6AE15E3CD970010E124 /* BigIntegerLibrary.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BigIntegerLibrary.h; sourceTree = "<group>"; };
+		DCA3E6AF15E3CD970010E124 /* BigIntegerUtils.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = BigIntegerUtils.cpp; sourceTree = "<group>"; };
+		DCA3E6B015E3CD970010E124 /* BigIntegerUtils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BigIntegerUtils.h; sourceTree = "<group>"; };
+		DCA3E6B115E3CD970010E124 /* BigUnsigned.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = BigUnsigned.cpp; sourceTree = "<group>"; };
+		DCA3E6B215E3CD970010E124 /* BigUnsigned.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BigUnsigned.h; sourceTree = "<group>"; };
+		DCA3E6B315E3CD970010E124 /* BigUnsignedInABase.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = BigUnsignedInABase.cpp; sourceTree = "<group>"; };
+		DCA3E6B415E3CD970010E124 /* BigUnsignedInABase.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BigUnsignedInABase.h; sourceTree = "<group>"; };
+		DCA3E6B515E3CD970010E124 /* NumberlikeArray.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NumberlikeArray.h; sourceTree = "<group>"; };
+		DCA3E6B615E3CD970010E124 /* BufferPool.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = BufferPool.cpp; sourceTree = "<group>"; };
+		DCA3E6B715E3CD970010E124 /* BufferPool.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BufferPool.h; sourceTree = "<group>"; };
+		DCA3E6B815E3CD970010E124 /* CRC32.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CRC32.cpp; sourceTree = "<group>"; };
+		DCA3E6B915E3CD970010E124 /* CRC32.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CRC32.h; sourceTree = "<group>"; };
+		DCA3E6BA15E3CD970010E124 /* Common.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Common.h; sourceTree = "<group>"; };
+		DCA3E6BB15E3CD970010E124 /* Configuration.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Configuration.cpp; sourceTree = "<group>"; };
+		DCA3E6BC15E3CD970010E124 /* Configuration.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Configuration.h; sourceTree = "<group>"; };
+		DCA3E6BD15E3CD970010E124 /* Connection.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Connection.cpp; sourceTree = "<group>"; };
+		DCA3E6BE15E3CD970010E124 /* Connection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Connection.h; sourceTree = "<group>"; };
+		DCA3E6BF15E3CD970010E124 /* ConnectionAcceptor.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ConnectionAcceptor.h; sourceTree = "<group>"; };
+		DCA3E6C015E3CD970010E124 /* Database.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Database.cpp; sourceTree = "<group>"; };
+		DCA3E6C115E3CD970010E124 /* Database.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Database.h; sourceTree = "<group>"; };
+		DCA3E6C215E3CD970010E124 /* FaolanBaseClass.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FaolanBaseClass.h; sourceTree = "<group>"; };
+		DCA3E6C315E3CD970010E124 /* FaolanManager.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = FaolanManager.cpp; sourceTree = "<group>"; };
+		DCA3E6C415E3CD970010E124 /* FaolanManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FaolanManager.h; sourceTree = "<group>"; };
+		DCA3E6C515E3CD970010E124 /* Functions.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Functions.cpp; sourceTree = "<group>"; };
+		DCA3E6C615E3CD970010E124 /* Functions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Functions.h; sourceTree = "<group>"; };
+		DCA3E6C715E3CD970010E124 /* GameClient.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = GameClient.cpp; sourceTree = "<group>"; };
+		DCA3E6C815E3CD970010E124 /* GameClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GameClient.h; sourceTree = "<group>"; };
+		DCA3E6C915E3CD970010E124 /* InterServerConnection.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = InterServerConnection.cpp; sourceTree = "<group>"; };
+		DCA3E6CA15E3CD970010E124 /* InterServerConnection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = InterServerConnection.h; sourceTree = "<group>"; };
+		DCA3E6CB15E3CD970010E124 /* LoginEncryption.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = LoginEncryption.cpp; sourceTree = "<group>"; };
+		DCA3E6CC15E3CD970010E124 /* LoginEncryption.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = LoginEncryption.h; sourceTree = "<group>"; };
+		DCA3E6CD15E3CD970010E124 /* MysqlDatabase.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MysqlDatabase.cpp; sourceTree = "<group>"; };
+		DCA3E6CE15E3CD970010E124 /* MysqlDatabase.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MysqlDatabase.h; sourceTree = "<group>"; };
+		DCA3E6CF15E3CD970010E124 /* MysqlFunctions.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MysqlFunctions.cpp; sourceTree = "<group>"; };
+		DCA3E6D015E3CD970010E124 /* MysqlFunctions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MysqlFunctions.h; sourceTree = "<group>"; };
+		DCA3E6D115E3CD970010E124 /* MysqlQuery.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MysqlQuery.cpp; sourceTree = "<group>"; };
+		DCA3E6D215E3CD970010E124 /* MysqlQuery.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MysqlQuery.h; sourceTree = "<group>"; };
+		DCA3E6D315E3CD970010E124 /* Network.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Network.cpp; sourceTree = "<group>"; };
+		DCA3E6D415E3CD970010E124 /* Network.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Network.h; sourceTree = "<group>"; };
+		DCA3E6D515E3CD970010E124 /* Packet.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Packet.cpp; sourceTree = "<group>"; };
+		DCA3E6D615E3CD970010E124 /* Packet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Packet.h; sourceTree = "<group>"; };
+		DCA3E6D715E3CD970010E124 /* PacketBuffer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PacketBuffer.cpp; sourceTree = "<group>"; };
+		DCA3E6D815E3CD970010E124 /* PacketBuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PacketBuffer.h; sourceTree = "<group>"; };
+		DCA3E6D915E3CD970010E124 /* Query.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Query.cpp; sourceTree = "<group>"; };
+		DCA3E6DA15E3CD970010E124 /* Query.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Query.h; sourceTree = "<group>"; };
+		DCA3E6DB15E3CD970010E124 /* SafeQueue.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SafeQueue.h; sourceTree = "<group>"; };
+		DCA3E6DC15E3CD970010E124 /* Singleton.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Singleton.h; sourceTree = "<group>"; };
+		DCA3E6DD15E3CD970010E124 /* Structs.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Structs.cpp; sourceTree = "<group>"; };
+		DCA3E6DE15E3CD970010E124 /* Structs.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Structs.h; sourceTree = "<group>"; };
+		DCA3E6DF15E3CD970010E124 /* SwapByte.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SwapByte.h; sourceTree = "<group>"; };
+		DCA3E6E015E3CD970010E124 /* Vector3D.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Vector3D.cpp; sourceTree = "<group>"; };
+		DCA3E6E115E3CD970010E124 /* Vector3D.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Vector3D.h; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		DC1ED78715E3CB45000E6E4F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		DC1ED77F15E3CB45000E6E4F = {
+			isa = PBXGroup;
+			children = (
+				DCA3E6A715E3CD970010E124 /* Common */,
+				DC1ED78B15E3CB45000E6E4F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		DC1ED78B15E3CB45000E6E4F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				DC1ED78A15E3CB45000E6E4F /* libCommon.a */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		DCA3E6A715E3CD970010E124 /* Common */ = {
+			isa = PBXGroup;
+			children = (
+				DCA3E6A815E3CD970010E124 /* Acceptor.h */,
+				DCA3E6A915E3CD970010E124 /* BigIntegerLibrary */,
+				DCA3E6B615E3CD970010E124 /* BufferPool.cpp */,
+				DCA3E6B715E3CD970010E124 /* BufferPool.h */,
+				DCA3E6B815E3CD970010E124 /* CRC32.cpp */,
+				DCA3E6B915E3CD970010E124 /* CRC32.h */,
+				DCA3E6BA15E3CD970010E124 /* Common.h */,
+				DCA3E6BB15E3CD970010E124 /* Configuration.cpp */,
+				DCA3E6BC15E3CD970010E124 /* Configuration.h */,
+				DCA3E6BD15E3CD970010E124 /* Connection.cpp */,
+				DCA3E6BE15E3CD970010E124 /* Connection.h */,
+				DCA3E6BF15E3CD970010E124 /* ConnectionAcceptor.h */,
+				DCA3E6C015E3CD970010E124 /* Database.cpp */,
+				DCA3E6C115E3CD970010E124 /* Database.h */,
+				DCA3E6C215E3CD970010E124 /* FaolanBaseClass.h */,
+				DCA3E6C315E3CD970010E124 /* FaolanManager.cpp */,
+				DCA3E6C415E3CD970010E124 /* FaolanManager.h */,
+				DCA3E6C515E3CD970010E124 /* Functions.cpp */,
+				DCA3E6C615E3CD970010E124 /* Functions.h */,
+				DCA3E6C715E3CD970010E124 /* GameClient.cpp */,
+				DCA3E6C815E3CD970010E124 /* GameClient.h */,
+				DCA3E6C915E3CD970010E124 /* InterServerConnection.cpp */,
+				DCA3E6CA15E3CD970010E124 /* InterServerConnection.h */,
+				DCA3E6CB15E3CD970010E124 /* LoginEncryption.cpp */,
+				DCA3E6CC15E3CD970010E124 /* LoginEncryption.h */,
+				DCA3E6CD15E3CD970010E124 /* MysqlDatabase.cpp */,
+				DCA3E6CE15E3CD970010E124 /* MysqlDatabase.h */,
+				DCA3E6CF15E3CD970010E124 /* MysqlFunctions.cpp */,
+				DCA3E6D015E3CD970010E124 /* MysqlFunctions.h */,
+				DCA3E6D115E3CD970010E124 /* MysqlQuery.cpp */,
+				DCA3E6D215E3CD970010E124 /* MysqlQuery.h */,
+				DCA3E6D315E3CD970010E124 /* Network.cpp */,
+				DCA3E6D415E3CD970010E124 /* Network.h */,
+				DCA3E6D515E3CD970010E124 /* Packet.cpp */,
+				DCA3E6D615E3CD970010E124 /* Packet.h */,
+				DCA3E6D715E3CD970010E124 /* PacketBuffer.cpp */,
+				DCA3E6D815E3CD970010E124 /* PacketBuffer.h */,
+				DCA3E6D915E3CD970010E124 /* Query.cpp */,
+				DCA3E6DA15E3CD970010E124 /* Query.h */,
+				DCA3E6DB15E3CD970010E124 /* SafeQueue.h */,
+				DCA3E6DC15E3CD970010E124 /* Singleton.h */,
+				DCA3E6DD15E3CD970010E124 /* Structs.cpp */,
+				DCA3E6DE15E3CD970010E124 /* Structs.h */,
+				DCA3E6DF15E3CD970010E124 /* SwapByte.h */,
+				DCA3E6E015E3CD970010E124 /* Vector3D.cpp */,
+				DCA3E6E115E3CD970010E124 /* Vector3D.h */,
+			);
+			name = Common;
+			path = ../../src/Common;
+			sourceTree = "<group>";
+		};
+		DCA3E6A915E3CD970010E124 /* BigIntegerLibrary */ = {
+			isa = PBXGroup;
+			children = (
+				DCA3E6AA15E3CD970010E124 /* BigInteger.cpp */,
+				DCA3E6AB15E3CD970010E124 /* BigInteger.h */,
+				DCA3E6AC15E3CD970010E124 /* BigIntegerAlgorithms.cpp */,
+				DCA3E6AD15E3CD970010E124 /* BigIntegerAlgorithms.h */,
+				DCA3E6AE15E3CD970010E124 /* BigIntegerLibrary.h */,
+				DCA3E6AF15E3CD970010E124 /* BigIntegerUtils.cpp */,
+				DCA3E6B015E3CD970010E124 /* BigIntegerUtils.h */,
+				DCA3E6B115E3CD970010E124 /* BigUnsigned.cpp */,
+				DCA3E6B215E3CD970010E124 /* BigUnsigned.h */,
+				DCA3E6B315E3CD970010E124 /* BigUnsignedInABase.cpp */,
+				DCA3E6B415E3CD970010E124 /* BigUnsignedInABase.h */,
+				DCA3E6B515E3CD970010E124 /* NumberlikeArray.h */,
+			);
+			path = BigIntegerLibrary;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXHeadersBuildPhase section */
+		DC1ED78815E3CB45000E6E4F /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DCA3E6E215E3CD970010E124 /* Acceptor.h in Headers */,
+				DCA3E6E415E3CD970010E124 /* BigInteger.h in Headers */,
+				DCA3E6E615E3CD970010E124 /* BigIntegerAlgorithms.h in Headers */,
+				DCA3E6E715E3CD970010E124 /* BigIntegerLibrary.h in Headers */,
+				DCA3E6E915E3CD970010E124 /* BigIntegerUtils.h in Headers */,
+				DCA3E6EB15E3CD970010E124 /* BigUnsigned.h in Headers */,
+				DCA3E6ED15E3CD970010E124 /* BigUnsignedInABase.h in Headers */,
+				DCA3E6EE15E3CD970010E124 /* NumberlikeArray.h in Headers */,
+				DCA3E6F015E3CD970010E124 /* BufferPool.h in Headers */,
+				DCA3E6F215E3CD970010E124 /* CRC32.h in Headers */,
+				DCA3E6F315E3CD970010E124 /* Common.h in Headers */,
+				DCA3E6F515E3CD970010E124 /* Configuration.h in Headers */,
+				DCA3E6F715E3CD970010E124 /* Connection.h in Headers */,
+				DCA3E6F815E3CD970010E124 /* ConnectionAcceptor.h in Headers */,
+				DCA3E6FA15E3CD970010E124 /* Database.h in Headers */,
+				DCA3E6FB15E3CD970010E124 /* FaolanBaseClass.h in Headers */,
+				DCA3E6FD15E3CD970010E124 /* FaolanManager.h in Headers */,
+				DCA3E6FF15E3CD970010E124 /* Functions.h in Headers */,
+				DCA3E70115E3CD970010E124 /* GameClient.h in Headers */,
+				DCA3E70315E3CD970010E124 /* InterServerConnection.h in Headers */,
+				DCA3E70515E3CD970010E124 /* LoginEncryption.h in Headers */,
+				DCA3E70715E3CD970010E124 /* MysqlDatabase.h in Headers */,
+				DCA3E70915E3CD970010E124 /* MysqlFunctions.h in Headers */,
+				DCA3E70B15E3CD970010E124 /* MysqlQuery.h in Headers */,
+				DCA3E70D15E3CD970010E124 /* Network.h in Headers */,
+				DCA3E70F15E3CD970010E124 /* Packet.h in Headers */,
+				DCA3E71115E3CD970010E124 /* PacketBuffer.h in Headers */,
+				DCA3E71315E3CD970010E124 /* Query.h in Headers */,
+				DCA3E71415E3CD970010E124 /* SafeQueue.h in Headers */,
+				DCA3E71515E3CD970010E124 /* Singleton.h in Headers */,
+				DCA3E71715E3CD970010E124 /* Structs.h in Headers */,
+				DCA3E71815E3CD970010E124 /* SwapByte.h in Headers */,
+				DCA3E71A15E3CD970010E124 /* Vector3D.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXHeadersBuildPhase section */
+
+/* Begin PBXNativeTarget section */
+		DC1ED78915E3CB45000E6E4F /* Common */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DC1ED78E15E3CB45000E6E4F /* Build configuration list for PBXNativeTarget "Common" */;
+			buildPhases = (
+				DC1ED78615E3CB45000E6E4F /* Sources */,
+				DC1ED78715E3CB45000E6E4F /* Frameworks */,
+				DC1ED78815E3CB45000E6E4F /* Headers */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Common;
+			productName = Common;
+			productReference = DC1ED78A15E3CB45000E6E4F /* libCommon.a */;
+			productType = "com.apple.product-type.library.static";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		DC1ED78115E3CB45000E6E4F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0440;
+				ORGANIZATIONNAME = "Project Faolan";
+			};
+			buildConfigurationList = DC1ED78415E3CB45000E6E4F /* Build configuration list for PBXProject "Common" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = English;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = DC1ED77F15E3CB45000E6E4F;
+			productRefGroup = DC1ED78B15E3CB45000E6E4F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				DC1ED78915E3CB45000E6E4F /* Common */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		DC1ED78615E3CB45000E6E4F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DCA3E6E315E3CD970010E124 /* BigInteger.cpp in Sources */,
+				DCA3E6E515E3CD970010E124 /* BigIntegerAlgorithms.cpp in Sources */,
+				DCA3E6E815E3CD970010E124 /* BigIntegerUtils.cpp in Sources */,
+				DCA3E6EA15E3CD970010E124 /* BigUnsigned.cpp in Sources */,
+				DCA3E6EC15E3CD970010E124 /* BigUnsignedInABase.cpp in Sources */,
+				DCA3E6EF15E3CD970010E124 /* BufferPool.cpp in Sources */,
+				DCA3E6F115E3CD970010E124 /* CRC32.cpp in Sources */,
+				DCA3E6F415E3CD970010E124 /* Configuration.cpp in Sources */,
+				DCA3E6F615E3CD970010E124 /* Connection.cpp in Sources */,
+				DCA3E6F915E3CD970010E124 /* Database.cpp in Sources */,
+				DCA3E6FC15E3CD970010E124 /* FaolanManager.cpp in Sources */,
+				DCA3E6FE15E3CD970010E124 /* Functions.cpp in Sources */,
+				DCA3E70015E3CD970010E124 /* GameClient.cpp in Sources */,
+				DCA3E70215E3CD970010E124 /* InterServerConnection.cpp in Sources */,
+				DCA3E70415E3CD970010E124 /* LoginEncryption.cpp in Sources */,
+				DCA3E70615E3CD970010E124 /* MysqlDatabase.cpp in Sources */,
+				DCA3E70815E3CD970010E124 /* MysqlFunctions.cpp in Sources */,
+				DCA3E70A15E3CD970010E124 /* MysqlQuery.cpp in Sources */,
+				DCA3E70C15E3CD970010E124 /* Network.cpp in Sources */,
+				DCA3E70E15E3CD970010E124 /* Packet.cpp in Sources */,
+				DCA3E71015E3CD970010E124 /* PacketBuffer.cpp in Sources */,
+				DCA3E71215E3CD970010E124 /* Query.cpp in Sources */,
+				DCA3E71615E3CD970010E124 /* Structs.cpp in Sources */,
+				DCA3E71915E3CD970010E124 /* Vector3D.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		DC1ED78C15E3CB45000E6E4F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.8;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		DC1ED78D15E3CB45000E6E4F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.8;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		DC1ED78F15E3CB45000E6E4F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				EXECUTABLE_PREFIX = lib;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				HEADER_SEARCH_PATHS = /opt/local/include;
+				LIBRARY_SEARCH_PATHS = /opt/local/lib;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		DC1ED79015E3CB45000E6E4F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				EXECUTABLE_PREFIX = lib;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				HEADER_SEARCH_PATHS = /opt/local/include;
+				LIBRARY_SEARCH_PATHS = /opt/local/lib;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		DC1ED78415E3CB45000E6E4F /* Build configuration list for PBXProject "Common" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DC1ED78C15E3CB45000E6E4F /* Debug */,
+				DC1ED78D15E3CB45000E6E4F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DC1ED78E15E3CB45000E6E4F /* Build configuration list for PBXNativeTarget "Common" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DC1ED78F15E3CB45000E6E4F /* Debug */,
+				DC1ED79015E3CB45000E6E4F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = DC1ED78115E3CB45000E6E4F /* Project object */;
+}

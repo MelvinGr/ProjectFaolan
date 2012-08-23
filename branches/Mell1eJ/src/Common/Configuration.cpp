@@ -57,7 +57,7 @@ Configuration::Configuration()
 	}
 }*/
 
-void Configuration::parseCommandLine(int32 argc, int8 *argv[])
+void Configuration::parseCommandLine(int32 argc, const int8 *argv[])
 {
 	boost::program_options::parsed_options parsed = 
 		boost::program_options::command_line_parser(argc, argv).options(m_description).allow_unregistered().run();
@@ -74,7 +74,7 @@ void Configuration::parseCommandLine(int32 argc, int8 *argv[])
 
 void Configuration::parseConfigFile(const string &configPath)
 {
-	ifstream ifs(configPath);
+	ifstream ifs(configPath.c_str());
 	if(ifs.is_open())
 	{
 		boost::program_options::parsed_options parsed = boost::program_options::parse_config_file(ifs, m_description, true);

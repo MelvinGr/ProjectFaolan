@@ -53,10 +53,16 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #	pragma error "FATAL ERROR: Unknown compiler."
 #endif
 
-#if COMPILER == COMPILER_MICROSOFT
-//#	pragma warning(disable : 4267) // conversion from 'size_t' to 'int', possible loss of data.
-#	pragma warning(disable : 4996) // 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead.
+#define PLATFORM_32BIT 32
+#define PLATFORM_64BIT 64
+
+#if _WIN64 || __amd64__ || __ia64__
+#   define BITPLATFORM PLATFORM_64BIT
+#else
+#   define BITPLATFORM PLATFORM_32BIT
 #endif
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #if COMPILER == COMPILER_GNU && __GNUC__ >= 3
 #	include <ext/hash_map>
@@ -89,6 +95,45 @@ namespace __gnu_cxx
 #	define HM_NAMESPACE std
 #endif
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#if COMPILER == COMPILER_MICROSOFT
+#	define strcasecmp stricmp
+
+#	define I64FMT "%016I64X"
+#	define I64FMTD "%I64u"
+#	define SI64FMTD "%I64d"
+
+#	define snprintf _snprintf
+#	define atoll __atoi64
+
+#	pragma warning(disable: 4251)
+#	pragma warning(disable: 4275)
+#	pragma warning(disable: 4996)
+#else
+//#	define STRCASECMP strcasecmp
+#	define stricmp strcasecmp
+#	define strnicmp strncasecmp
+
+#	define I64FMT "%016llX"
+#	define I64FMTD "%llu"
+#	define SI64FMTD "%lld"
+
+#   define Sleep sleep
+#endif
+
+#if COMPILER == COMPILER_MICROSOFT
+#	ifdef COMMON_EXPORT
+#	  define FAOLANEXPORTED __declspec(dllexport)
+#	else
+#	  define FAOLANEXPORTED __declspec(dllimport)
+#	endif
+#else 
+#	define FAOLANEXPORTED 
+#endif 
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 typedef int			int32;
 typedef short       int16;
 typedef char        int8;
@@ -100,32 +145,15 @@ typedef unsigned char       uint8;
 #if COMPILER == COMPILER_MICROSOFT
 typedef __int64   int64;
 typedef unsigned __int64   uint64;
-//typedef _W64 unsigned int SOCKET;
 #else
 typedef long long int64;
 typedef unsigned long long  uint64;
 #endif
 
-#if COMPILER == COMPILER_MICROSOFT
-#	define STRCASECMP stricmp
-#	define I64FMT "%016I64X"
-#	define I64FMTD "%I64u"
-#	define SI64FMTD "%I64d"
-#	define snprintf _snprintf
-#	define atoll __atoi64
-#else
-#	define STRCASECMP strcasecmp
-#	define stricmp strcasecmp
-#	define strnicmp strncasecmp
-#	define I64FMT "%016llX"
-#	define I64FMTD "%llu"
-#	define SI64FMTD "%lld"
-#endif
-
 #define atol(a) strtoul(a, NULL, 10)
 #define STRINGIZE(a) #a
 
-///////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
@@ -138,5 +166,12 @@ typedef unsigned long long  uint64;
 	"|  #     #  #  #   #   # #    #     #      #    ##### #   # #    ##### #  ##  |\n"\
 	"|  #     #   #  ###  ### #### ###   #      #    #   #  ###  #### #   # #   #  |\n"\
 	"-------------------------------------------------------------------------------\n"
+
+#define FAOLAN_CATCH\
+    catch(const std::exception &ex)\
+    {\
+        printf("Exception thrown in file: %s on line: %i Message:\n%s\n",\
+            __FILE__, __LINE__, ex.what());\
+    }
 
 #endif

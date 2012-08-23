@@ -25,7 +25,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include "Vector3D.h"
 #include "Functions.h"
 
-class RealmInfo
+class FAOLANEXPORTED RealmInfo
 {
 public:
 	uint32 realmID;
@@ -65,8 +65,9 @@ public:
 	}
 };
 
-struct CharacterInfo
+class FAOLANEXPORTED CharacterInfo
 {
+public:
 	uint32 characterID;
 	uint32 accountID;
 	std::string name;
@@ -87,8 +88,9 @@ struct CharacterInfo
 	Vector3D rotation;
 };
 
-struct AccountInfo
+class FAOLANEXPORTED AccountInfo
 {
+public:
 	uint32 accountID;
 	std::string username;
 	std::string mail;

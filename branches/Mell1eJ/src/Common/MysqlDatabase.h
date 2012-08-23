@@ -25,11 +25,13 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #if PLATFORM == PLATFORM_WIN32
 #	include <winsock2.h>
+#   include <mysql/mysql.h>
+#else
+#   include <mysql.h>
 #endif
-#include <mysql/mysql.h>
 
 #define MysqlDB MysqlDatabase::Instance()
-class MysqlDatabase : public Database
+class FAOLANEXPORTED MysqlDatabase : public Database
 {
 	MysqlDatabase(std::size_t poolSize, const std::string& login,
 		const std::string& host, const std::string& password,
@@ -53,7 +55,7 @@ public:
 	static void destroy();
 	bool start();
 
-	class MysqlDatabaseConnection : public Database::DatabaseConnection 
+	class FAOLANEXPORTED MysqlDatabaseConnection : public Database::DatabaseConnection 
 	{
 		bool dbInitialize();
 		MYSQL m_mysql;

@@ -25,18 +25,21 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 namespace String
 {
-	std::string arrayToHexString(uint8* data, uint32 size);
-	std::string serverInfoStr();
-	std::string replace(const std::string& str, const std::string& from, const std::string& to);
-	std::string timeString();
+	FAOLANEXPORTED std::string arrayToHexString(const uint8* data, size_t size);
+	FAOLANEXPORTED std::string serverInfoStr();
+	FAOLANEXPORTED std::string replace(const std::string& str, const std::string& from, const std::string& to);
+	FAOLANEXPORTED std::string timeString();
 }     
 
 namespace File
 {
-	uint64 Read(const std::string& path, bool binary, uint8 **buffer);
-	void Write(const std::string& path, bool binary, const uint8 *buffer, uint64 length);
+	//uint64 Read(const std::string& path, bool binary, uint8 **buffer);
+	//void Write(const std::string& path, bool binary, const uint8 *buffer, size_t length);
 
-	bool Exists(const std::string& strFilename);
+	FAOLANEXPORTED void Read(const std::string& path, std::vector<uint8> &buffer);
+	FAOLANEXPORTED void Write(const std::string& path, const std::vector<uint8> &buffer);
+
+	FAOLANEXPORTED bool Exists(const std::string& strFilename);
 }
 
 #endif

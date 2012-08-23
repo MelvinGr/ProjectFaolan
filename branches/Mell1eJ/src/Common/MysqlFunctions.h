@@ -30,26 +30,26 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 namespace MysqlFunctions
 {
-	bool CheckLogin(const std::string& username, const std::string& password);
-	int32 GetAccountID(const std::string& username);
-	bool IsAccountBanned(uint32 nClientInst);
-	int32 GetNewCharacterId();
+	FAOLANEXPORTED bool CheckLogin(const std::string& username, const std::string& password);
+	FAOLANEXPORTED int32 GetAccountID(const std::string& username);
+	FAOLANEXPORTED bool IsAccountBanned(uint32 nClientInst);
+	FAOLANEXPORTED int32 GetNewCharacterId();
 
-	int32 GetAccountCookie(uint32 nClientInst);
-	bool SetAccountCookie(uint32 nClientInst, uint32 cookie);
+	FAOLANEXPORTED int32 GetAccountCookie(uint32 nClientInst);
+	FAOLANEXPORTED bool SetAccountCookie(uint32 nClientInst, uint32 cookie);
 
 	//bool SetCSPlayerAgentOnline(uint32 realmID, uint32 status);
 	//bool SetAgentServerOnline(uint32 realmID, uint32 status);
 	//bool SetWorldServerOnline(uint32 realmID, uint32 status);
 
-	bool UpdateLastInfo(uint32 nClientInst, const std::string& ipAddress);
+	FAOLANEXPORTED bool UpdateLastInfo(uint32 nClientInst, const std::string& ipAddress);
 
-	bool GetRealm(uint32 realmID, RealmInfo &realm);
-	bool GetRealms(std::vector<RealmInfo> &realms);
-	bool GetCharacter(uint32 characterID, CharacterInfo &character);
-	bool GetCharacters(uint32 accountID, std::vector<CharacterInfo> &characters);
+	FAOLANEXPORTED bool GetRealm(uint32 realmID, RealmInfo &realm);
+	FAOLANEXPORTED bool GetRealms(std::vector<RealmInfo> &realms);
+	FAOLANEXPORTED bool GetCharacter(uint32 characterID, CharacterInfo &character);
+	FAOLANEXPORTED bool GetCharacters(uint32 accountID, std::vector<CharacterInfo> &characters);
 
-	bool DeleteCharacter(uint32 characterID);
+	FAOLANEXPORTED bool DeleteCharacter(uint32 characterID);
 };
 
 #endif

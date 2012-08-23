@@ -28,51 +28,46 @@ void PacketBuffer::reset()
 	bufferLength = 0;
 }
 
-void PacketBuffer::resize(uint32 size)
+void PacketBuffer::resize(size_t size)
 {
 	buffer = (uint8*)realloc(buffer, size);
 	maxLength = size;
 }
 
-uint8* PacketBuffer::read(uint32 length)
+uint8* PacketBuffer::read(size_t length)
 {
 	try
 	{
 		assert((offset + length) <= bufferLength);
 		uint8* ret = new uint8[length];
-		for(uint32 i = 0; i < length; i++) 
+		for(size_t i = 0; i < length; i++) 
 			ret[i] = read<uint8>();
 
 		return ret;
 	}
-	catch(int8* msg)
-	{
-		printf("Error at reading Array @ PacketBuffer.cpp\nErrorMsg: %s \n", msg);
-		return 0;
-	}
+	FAOLAN_CATCH
+    
+    return 0;
 }
 
-void PacketBuffer::write(const uint8* data, uint32 length)
+void PacketBuffer::write(const uint8* data, size_t length)
 {
 	try
 	{
 		assert((offset + length) <= maxLength);
-		for(uint32 i = 0; i < length; i++)
+		for(size_t i = 0; i < length; i++)
 			write<uint8>(data[i]);
 	}
-	catch(int8* msg)
-	{
-		printf("Error at writing Array @ PacketBuffer.cpp\nErrorMsg: %s \n", msg);
-	}
+	FAOLAN_CATCH
 }
 
 void PacketBuffer::finalize()
 {
-	uint32 packetLength = bufferLength - sizeof(uint32);
+	uint32 packetLength = (uint32)bufferLength - sizeof(uint32);
 	SwapByte::Swap<uint32>(packetLength);
-	memcpy(&buffer[0], reinterpret_cast<uint8*>(&packetLength), sizeof(int32));
+	memcpy(&buffer[0], reinterpret_cast<uint8*>(&packetLength), sizeof(uint32));
 
 	uint32 hash = CRC32::CalculateCRC32(buffer, bufferLength);
 	SwapByte::Swap<uint32>(hash);
-	memcpy(&buffer[4], reinterpret_cast<uint8*>(&hash), sizeof(int32));
+	memcpy(&buffer[4], reinterpret_cast<uint8*>(&hash), sizeof(uint32));
 }

@@ -76,7 +76,7 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <CharacterSet>MultiByte</CharacterSet>
     <PlatformToolset>v110</PlatformToolset>
   </PropertyGroup>
@@ -94,32 +94,38 @@
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</LinkIncremental>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>D:\Libraries\boost;D:\Libraries\mysql-connector-c\include;D:\Libraries\zlib;$(IncludePath)</IncludePath>
+    <IncludePath>D:\Libraries\Windows\boost;D:\Libraries\Windows\mysql-connector-c\include;D:\Libraries\Windows\zlib;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LibraryPath>D:\Libraries\boost\stage\lib;D:\Libraries\mysql-connector-c\lib;D:\Libraries\zlib;$(LibraryPath)</LibraryPath>
+    <LibraryPath>D:\Libraries\Windows\boost\stage\lib;D:\Libraries\Windows\mysql-connector-c\lib;D:\Libraries\Windows\zlib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>
       </AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <MinimalRebuild>true</MinimalRebuild>
+      <PreprocessorDefinitions>WIN32;DEBUG;COMMON_EXPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>
+      </MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
-      <PrecompiledHeader>
-      </PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
+      <PrecompiledHeaderFile>Common.h</PrecompiledHeaderFile>
+      <ForcedUsingFiles>../../Common.h</ForcedUsingFiles>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>ws2_32.lib;libmysql.lib;gmp.lib;gmpxx.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\Program Files\MySQL\MySQL Server 5.0\lib\opt;C:\Program Files\boost\boost_1_35_0\lib;..\..\dep\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>ws2_32.lib;libmysql.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>
+      </AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <TargetMachine>MachineX86</TargetMachine>
+      <GenerateWindowsMetadata>false</GenerateWindowsMetadata>
+      <OptimizeReferences>
+      </OptimizeReferences>
     </Link>
     <PostBuildEvent>
       <Command>copy /b "..\..\..\scripts\libmysql.dll" "$(TargetDir)libmysql.dll" &amp;&amp; copy "..\..\..\scripts\FaolanConfig.cfg" "$(TargetDir)FaolanConfig.cfg"</Command>

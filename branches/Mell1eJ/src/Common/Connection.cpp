@@ -80,7 +80,11 @@ void Connection::onRead(const boost::system::error_code &e, size_t bytesTransfer
 		return;
 	}
 
-	handlePacket(Packet(PacketBuffer(&m_readBuffer[0], bytesTransferred)));
+    PacketBuffer packetBuffer(&m_readBuffer[0], bytesTransferred);
+    Packet packet(packetBuffer);
+    
+	handlePacket(packet);
+    
 	AsyncRead();
 }
 

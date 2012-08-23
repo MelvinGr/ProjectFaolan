@@ -28,7 +28,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 * database query class
 * @author Albator
 */
-class Query 
+class FAOLANEXPORTED Query 
 {
 public:
 	enum CallbackType { MAIN_THREAD, WORKER_THREAD, NO_CALLBACK, SYNCHRONOUS };

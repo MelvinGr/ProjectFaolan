@@ -35,7 +35,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include "../Common/PacketBuffer.h"
 #include "../Common/Packet.h"
 #include "../Common/FaolanManager.h"
-#include "../Common/structs.h"
+#include "../Common/Structs.h"
 
 class ManagerConnection : public Connection
 {	

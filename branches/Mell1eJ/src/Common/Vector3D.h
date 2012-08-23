@@ -23,7 +23,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include <math.h>
 
-class Vector3D
+class FAOLANEXPORTED Vector3D
 {
 public:
 	double x, y, z;

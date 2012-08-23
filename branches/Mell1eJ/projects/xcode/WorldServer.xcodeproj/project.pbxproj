@@ -1,0 +1,253 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		DC2D9B5E15E45D4B00663E82 /* libboost_program_options-mt.a in Frameworks */ = {isa = PBXBuildFile; fileRef = DC2D9B5A15E45D4B00663E82 /* libboost_program_options-mt.a */; };
+		DC2D9B5F15E45D4B00663E82 /* libboost_system-mt.a in Frameworks */ = {isa = PBXBuildFile; fileRef = DC2D9B5B15E45D4B00663E82 /* libboost_system-mt.a */; };
+		DC2D9B6015E45D4B00663E82 /* libboost_thread-mt.a in Frameworks */ = {isa = PBXBuildFile; fileRef = DC2D9B5C15E45D4B00663E82 /* libboost_thread-mt.a */; };
+		DC2D9B6115E45D4B00663E82 /* libmysqlclient.a in Frameworks */ = {isa = PBXBuildFile; fileRef = DC2D9B5D15E45D4B00663E82 /* libmysqlclient.a */; };
+		DCA3E78815E3CEC40010E124 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E78415E3CEC30010E124 /* main.cpp */; };
+		DCA3E78915E3CEC40010E124 /* WorldConnection.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E78515E3CEC30010E124 /* WorldConnection.cpp */; };
+		DCA3E78A15E3CEC40010E124 /* WorldServerPackets.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E78715E3CEC40010E124 /* WorldServerPackets.cpp */; };
+		DCA3E78D15E3CED40010E124 /* libCommon.a in Frameworks */ = {isa = PBXBuildFile; fileRef = DCA3E78C15E3CED40010E124 /* libCommon.a */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		DCA3E72B15E3CE1F0010E124 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		DC2D9B5A15E45D4B00663E82 /* libboost_program_options-mt.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "libboost_program_options-mt.a"; path = "../../../../../../../OSX/opt/local/lib/libboost_program_options-mt.a"; sourceTree = "<group>"; };
+		DC2D9B5B15E45D4B00663E82 /* libboost_system-mt.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "libboost_system-mt.a"; path = "../../../../../../../OSX/opt/local/lib/libboost_system-mt.a"; sourceTree = "<group>"; };
+		DC2D9B5C15E45D4B00663E82 /* libboost_thread-mt.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "libboost_thread-mt.a"; path = "../../../../../../../OSX/opt/local/lib/libboost_thread-mt.a"; sourceTree = "<group>"; };
+		DC2D9B5D15E45D4B00663E82 /* libmysqlclient.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libmysqlclient.a; path = ../../../../../../../OSX/opt/local/lib/libmysqlclient.a; sourceTree = "<group>"; };
+		DCA3E72D15E3CE1F0010E124 /* WorldServer */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = WorldServer; sourceTree = BUILT_PRODUCTS_DIR; };
+		DCA3E78415E3CEC30010E124 /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		DCA3E78515E3CEC30010E124 /* WorldConnection.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = WorldConnection.cpp; sourceTree = "<group>"; };
+		DCA3E78615E3CEC30010E124 /* WorldConnection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WorldConnection.h; sourceTree = "<group>"; };
+		DCA3E78715E3CEC40010E124 /* WorldServerPackets.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = WorldServerPackets.cpp; sourceTree = "<group>"; };
+		DCA3E78C15E3CED40010E124 /* libCommon.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libCommon.a; path = build/Release/libCommon.a; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		DCA3E72A15E3CE1F0010E124 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DC2D9B5E15E45D4B00663E82 /* libboost_program_options-mt.a in Frameworks */,
+				DC2D9B5F15E45D4B00663E82 /* libboost_system-mt.a in Frameworks */,
+				DC2D9B6015E45D4B00663E82 /* libboost_thread-mt.a in Frameworks */,
+				DC2D9B6115E45D4B00663E82 /* libmysqlclient.a in Frameworks */,
+				DCA3E78D15E3CED40010E124 /* libCommon.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		DCA3E72215E3CE1F0010E124 = {
+			isa = PBXGroup;
+			children = (
+				DCA3E79115E3CEEE0010E124 /* Libraries */,
+				DCA3E78315E3CEC30010E124 /* WorldServer */,
+				DCA3E72E15E3CE1F0010E124 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		DCA3E72E15E3CE1F0010E124 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				DCA3E72D15E3CE1F0010E124 /* WorldServer */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		DCA3E78315E3CEC30010E124 /* WorldServer */ = {
+			isa = PBXGroup;
+			children = (
+				DCA3E78415E3CEC30010E124 /* main.cpp */,
+				DCA3E78515E3CEC30010E124 /* WorldConnection.cpp */,
+				DCA3E78615E3CEC30010E124 /* WorldConnection.h */,
+				DCA3E78715E3CEC40010E124 /* WorldServerPackets.cpp */,
+			);
+			name = WorldServer;
+			path = ../../src/WorldServer;
+			sourceTree = "<group>";
+		};
+		DCA3E79115E3CEEE0010E124 /* Libraries */ = {
+			isa = PBXGroup;
+			children = (
+				DC2D9B5A15E45D4B00663E82 /* libboost_program_options-mt.a */,
+				DC2D9B5B15E45D4B00663E82 /* libboost_system-mt.a */,
+				DC2D9B5C15E45D4B00663E82 /* libboost_thread-mt.a */,
+				DC2D9B5D15E45D4B00663E82 /* libmysqlclient.a */,
+				DCA3E78C15E3CED40010E124 /* libCommon.a */,
+			);
+			name = Libraries;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		DCA3E72C15E3CE1F0010E124 /* WorldServer */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DCA3E73715E3CE1F0010E124 /* Build configuration list for PBXNativeTarget "WorldServer" */;
+			buildPhases = (
+				DCA3E72915E3CE1F0010E124 /* Sources */,
+				DCA3E72A15E3CE1F0010E124 /* Frameworks */,
+				DCA3E72B15E3CE1F0010E124 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = WorldServer;
+			productName = WorldServer;
+			productReference = DCA3E72D15E3CE1F0010E124 /* WorldServer */;
+			productType = "com.apple.product-type.tool";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		DCA3E72415E3CE1F0010E124 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0440;
+				ORGANIZATIONNAME = "Project Faolan";
+			};
+			buildConfigurationList = DCA3E72715E3CE1F0010E124 /* Build configuration list for PBXProject "WorldServer" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = English;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = DCA3E72215E3CE1F0010E124;
+			productRefGroup = DCA3E72E15E3CE1F0010E124 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				DCA3E72C15E3CE1F0010E124 /* WorldServer */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		DCA3E72915E3CE1F0010E124 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DCA3E78815E3CEC40010E124 /* main.cpp in Sources */,
+				DCA3E78915E3CEC40010E124 /* WorldConnection.cpp in Sources */,
+				DCA3E78A15E3CEC40010E124 /* WorldServerPackets.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		DCA3E73515E3CE1F0010E124 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.8;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		DCA3E73615E3CE1F0010E124 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.8;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		DCA3E73815E3CE1F0010E124 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				HEADER_SEARCH_PATHS = /opt/local/include;
+				LIBRARY_SEARCH_PATHS = /opt/local/lib;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		DCA3E73915E3CE1F0010E124 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				HEADER_SEARCH_PATHS = /opt/local/include;
+				LIBRARY_SEARCH_PATHS = /opt/local/lib;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		DCA3E72715E3CE1F0010E124 /* Build configuration list for PBXProject "WorldServer" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DCA3E73515E3CE1F0010E124 /* Debug */,
+				DCA3E73615E3CE1F0010E124 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DCA3E73715E3CE1F0010E124 /* Build configuration list for PBXNativeTarget "WorldServer" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DCA3E73815E3CE1F0010E124 /* Debug */,
+				DCA3E73915E3CE1F0010E124 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = DCA3E72415E3CE1F0010E124 /* Project object */;
+}

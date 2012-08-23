@@ -26,8 +26,9 @@ gcc */
 #include "Common.h"
 #include "PacketBuffer.h"
 
-struct Packet
+class FAOLANEXPORTED Packet
 {
+public:
 	uint32 length;
 	uint32 crc32;
 	uint32 headersize;

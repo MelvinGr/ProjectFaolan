@@ -14,7 +14,7 @@
     <ClCompile Include="..\..\..\src\PlayerAgent\PlayerConnection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\PlayerAgent\Main.cpp">
+    <ClCompile Include="..\..\..\src\PlayerAgent\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\PlayerAgent\PlayerAgentPackets.cpp">

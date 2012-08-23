@@ -53,14 +53,17 @@ enum FaolanManagerSenderReceivers : uint8
 	PlayerAgentID,
 	WorldServerID,
 	AgentServerID,
-	CSPlayerServerID
+	CSPlayerAgentID
 };
 
 static const int8* FaolanManagerSenderReceiversText[] = 
-	{ "FaolanManager", "UniverseAgent", "PlayerAgent", "WorldServer", "AgentServer", "CSPlayerServer" };
+{ "FaolanManager", "UniverseAgent", "PlayerAgent", "WorldServer", "AgentServer", "CSPlayerAgent" };
 
-// Follow UniverseAgent structure
-void WriteManagerHeader(PacketBuffer &packetBuffer, FaolanManagerSenderReceivers sender, 
-						FaolanManagerSenderReceivers receiver, FaolanManagerOpcodes opcode);
+namespace FaolanManager
+{
+	// Follow UniverseAgent structure
+	FAOLANEXPORTED void WriteManagerHeader(PacketBuffer &packetBuffer, FaolanManagerSenderReceivers sender, 
+		FaolanManagerSenderReceivers receiver, FaolanManagerOpcodes opcode);
+}
 
 #endif

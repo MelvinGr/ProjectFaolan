@@ -1,0 +1,255 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		DC2D9B6615E45DCB00663E82 /* libboost_program_options-mt.a in Frameworks */ = {isa = PBXBuildFile; fileRef = DC2D9B6215E45DCB00663E82 /* libboost_program_options-mt.a */; };
+		DC2D9B6715E45DCB00663E82 /* libboost_system-mt.a in Frameworks */ = {isa = PBXBuildFile; fileRef = DC2D9B6315E45DCB00663E82 /* libboost_system-mt.a */; };
+		DC2D9B6815E45DCB00663E82 /* libboost_thread-mt.a in Frameworks */ = {isa = PBXBuildFile; fileRef = DC2D9B6415E45DCB00663E82 /* libboost_thread-mt.a */; };
+		DC2D9B6915E45DCB00663E82 /* libmysqlclient.a in Frameworks */ = {isa = PBXBuildFile; fileRef = DC2D9B6515E45DCB00663E82 /* libmysqlclient.a */; };
+		DCA3E78015E3CEB70010E124 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E77D15E3CEB70010E124 /* main.cpp */; };
+		DCA3E78115E3CEB70010E124 /* ManagerConnection.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E77E15E3CEB70010E124 /* ManagerConnection.cpp */; };
+		DCA3E78F15E3CEDF0010E124 /* libCommon.a in Frameworks */ = {isa = PBXBuildFile; fileRef = DCA3E78E15E3CEDF0010E124 /* libCommon.a */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		DCA3E74315E3CE430010E124 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		DC2D9B6215E45DCB00663E82 /* libboost_program_options-mt.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "libboost_program_options-mt.a"; path = "../../../../../../../OSX/opt/local/lib/libboost_program_options-mt.a"; sourceTree = "<group>"; };
+		DC2D9B6315E45DCB00663E82 /* libboost_system-mt.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "libboost_system-mt.a"; path = "../../../../../../../OSX/opt/local/lib/libboost_system-mt.a"; sourceTree = "<group>"; };
+		DC2D9B6415E45DCB00663E82 /* libboost_thread-mt.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "libboost_thread-mt.a"; path = "../../../../../../../OSX/opt/local/lib/libboost_thread-mt.a"; sourceTree = "<group>"; };
+		DC2D9B6515E45DCB00663E82 /* libmysqlclient.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libmysqlclient.a; path = ../../../../../../../OSX/opt/local/lib/libmysqlclient.a; sourceTree = "<group>"; };
+		DCA3E74515E3CE430010E124 /* FaolanManager */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = FaolanManager; sourceTree = BUILT_PRODUCTS_DIR; };
+		DCA3E77D15E3CEB70010E124 /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		DCA3E77E15E3CEB70010E124 /* ManagerConnection.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = ManagerConnection.cpp; sourceTree = "<group>"; };
+		DCA3E77F15E3CEB70010E124 /* ManagerConnection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ManagerConnection.h; sourceTree = "<group>"; };
+		DCA3E78E15E3CEDF0010E124 /* libCommon.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libCommon.a; path = build/Release/libCommon.a; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		DCA3E74215E3CE430010E124 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DC2D9B6615E45DCB00663E82 /* libboost_program_options-mt.a in Frameworks */,
+				DC2D9B6715E45DCB00663E82 /* libboost_system-mt.a in Frameworks */,
+				DC2D9B6815E45DCB00663E82 /* libboost_thread-mt.a in Frameworks */,
+				DC2D9B6915E45DCB00663E82 /* libmysqlclient.a in Frameworks */,
+				DCA3E78F15E3CEDF0010E124 /* libCommon.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		DCA3E73A15E3CE420010E124 = {
+			isa = PBXGroup;
+			children = (
+				DCA3E79015E3CEE30010E124 /* Libraries */,
+				DCA3E77C15E3CEB70010E124 /* FaolanManager */,
+				DCA3E74615E3CE430010E124 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		DCA3E74615E3CE430010E124 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				DCA3E74515E3CE430010E124 /* FaolanManager */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		DCA3E77C15E3CEB70010E124 /* FaolanManager */ = {
+			isa = PBXGroup;
+			children = (
+				DCA3E77D15E3CEB70010E124 /* main.cpp */,
+				DCA3E77E15E3CEB70010E124 /* ManagerConnection.cpp */,
+				DCA3E77F15E3CEB70010E124 /* ManagerConnection.h */,
+			);
+			name = FaolanManager;
+			path = ../../src/FaolanManager;
+			sourceTree = "<group>";
+		};
+		DCA3E79015E3CEE30010E124 /* Libraries */ = {
+			isa = PBXGroup;
+			children = (
+				DC2D9B6215E45DCB00663E82 /* libboost_program_options-mt.a */,
+				DC2D9B6315E45DCB00663E82 /* libboost_system-mt.a */,
+				DC2D9B6415E45DCB00663E82 /* libboost_thread-mt.a */,
+				DC2D9B6515E45DCB00663E82 /* libmysqlclient.a */,
+				DCA3E78E15E3CEDF0010E124 /* libCommon.a */,
+			);
+			name = Libraries;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		DCA3E74415E3CE430010E124 /* FaolanManager */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DCA3E74F15E3CE430010E124 /* Build configuration list for PBXNativeTarget "FaolanManager" */;
+			buildPhases = (
+				DCA3E74115E3CE430010E124 /* Sources */,
+				DCA3E74215E3CE430010E124 /* Frameworks */,
+				DCA3E74315E3CE430010E124 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FaolanManager;
+			productName = FaolanManager;
+			productReference = DCA3E74515E3CE430010E124 /* FaolanManager */;
+			productType = "com.apple.product-type.tool";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		DCA3E73C15E3CE420010E124 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0440;
+				ORGANIZATIONNAME = "Project Faolan";
+			};
+			buildConfigurationList = DCA3E73F15E3CE420010E124 /* Build configuration list for PBXProject "FaolanManager" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = English;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = DCA3E73A15E3CE420010E124;
+			productRefGroup = DCA3E74615E3CE430010E124 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				DCA3E74415E3CE430010E124 /* FaolanManager */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		DCA3E74115E3CE430010E124 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DCA3E78015E3CEB70010E124 /* main.cpp in Sources */,
+				DCA3E78115E3CEB70010E124 /* ManagerConnection.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		DCA3E74D15E3CE430010E124 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.8;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		DCA3E74E15E3CE430010E124 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.8;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		DCA3E75015E3CE430010E124 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				HEADER_SEARCH_PATHS = /opt/local/include;
+				LIBRARY_SEARCH_PATHS = (
+					/opt/local/lib,
+					"\"$(SRCROOT)/../../../../../../../OSX/opt/local/lib\"",
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		DCA3E75115E3CE430010E124 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				HEADER_SEARCH_PATHS = /opt/local/include;
+				LIBRARY_SEARCH_PATHS = (
+					/opt/local/lib,
+					"\"$(SRCROOT)/../../../../../../../OSX/opt/local/lib\"",
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		DCA3E73F15E3CE420010E124 /* Build configuration list for PBXProject "FaolanManager" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DCA3E74D15E3CE430010E124 /* Debug */,
+				DCA3E74E15E3CE430010E124 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DCA3E74F15E3CE430010E124 /* Build configuration list for PBXNativeTarget "FaolanManager" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DCA3E75015E3CE430010E124 /* Debug */,
+				DCA3E75115E3CE430010E124 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = DCA3E73C15E3CE420010E124 /* Project object */;
+}

@@ -42,7 +42,7 @@ class Query;
 * Tasks can have callback methods executed in the connection thread or in the thread running the database
 * @author Albator
 */
-class Database 
+class FAOLANEXPORTED Database 
 {
 public:
 	Database(std::size_t poolConnSize);

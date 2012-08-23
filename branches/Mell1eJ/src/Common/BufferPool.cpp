@@ -56,7 +56,7 @@ void BufferPool::disposeBuffer(PacketBuffer* buf)
 
 BufferPool::~BufferPool()
 {
-	for(uint32 i = m_bufferStack.size(); i <= 0; i--)
+	for(size_t i = m_bufferStack.size(); i <= 0; i--)
 	{
 		PacketBuffer* b = m_bufferStack.top();
 

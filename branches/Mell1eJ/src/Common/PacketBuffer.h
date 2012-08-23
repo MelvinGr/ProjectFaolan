@@ -30,24 +30,23 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include <iostream>
 #include <string>
 #include <assert.h>
-#include <string.h>
 #include <stdio.h>
 
 #include "CRC32.h"
 #include "SwapByte.h"
 #include "Functions.h"
 
-struct PacketBuffer
+class FAOLANEXPORTED PacketBuffer
 {
 public:
-	uint32 offset;
 	uint8* buffer;
-	uint32 bufferLength;
-	uint32 maxLength;
+	size_t offset;
+	size_t bufferLength;
+	size_t maxLength;
 
 	PacketBuffer() {}
 
-	PacketBuffer(uint32 length)
+	PacketBuffer(size_t length)
 	{
 		offset = 0;
 		bufferLength = 0;
@@ -55,7 +54,7 @@ public:
 		buffer = new uint8[length];
 	}
 
-	PacketBuffer(uint8* data, uint32 length)
+	PacketBuffer(uint8* data, size_t length)
 	{
 		offset = 0;
 		bufferLength = length;
@@ -84,11 +83,9 @@ public:
 			offset += sizeof(T);
 			return ret;
 		}
-		catch(const std::string &msg)
-		{
-			printf("Error while reading %s: %s\n", typeid(T).name(), msg.c_str());
-			return NULL;
-		}
+		FAOLAN_CATCH
+        
+        return NULL;
 	}
 
 	template <typename T> void write(const T &data)
@@ -104,17 +101,14 @@ public:
 			offset += sizeof(newData);
 			bufferLength += sizeof(newData);
 		}
-		catch(const std::string &msg)
-		{
-			printf("Error while writing %s: %s\n", typeid(T).name(), msg.c_str());
-		}
+		FAOLAN_CATCH
 	}
 
 	void reset();
-	void resize(uint32 size);
+	void resize(size_t size);
 
-	uint8* read(uint32 length);
-	void write(const uint8* data, uint32 length);
+	uint8* read(size_t length);
+	void write(const uint8* data, size_t length);
 	void finalize();
 
 	inline std::string toString() { return String::arrayToHexString(buffer, bufferLength); }
@@ -133,11 +127,9 @@ template <> inline std::string PacketBuffer::read()
 		offset += stringLength;
 		return data;
 	}
-	catch(const std::string &msg)
-	{
-		printf("Error while reading string: %s\n", msg.c_str());
-		return "";
-	}
+	FAOLAN_CATCH
+    
+    return "";
 }
 
 template <> inline void PacketBuffer::write(const std::string &data) 
@@ -150,10 +142,7 @@ template <> inline void PacketBuffer::write(const std::string &data)
 		assert((offset + data.size()) <= maxLength);
 		write((uint8*)data.c_str(), data.size());
 	}
-	catch(const std::string &msg)
-	{
-		printf("Error while writing string: %s\n", msg.c_str());
-	}
+	FAOLAN_CATCH
 }
 
 #endif

@@ -22,6 +22,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include "Common.h"
 
 #include <string>
+#include <stdexcept>
 
 #include <boost/program_options.hpp>
 #include <boost/thread.hpp>
@@ -30,7 +31,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 #include "Singleton.h"
 
 #define Config Configuration::Instance()
-class Configuration : public Singleton<Configuration>
+class FAOLANEXPORTED Configuration : public Singleton<Configuration>
 {
 	friend class Singleton<Configuration>;
 
@@ -43,12 +44,12 @@ public:
 	template <typename T> T GetValue(const std::string &other)
 	{
 		if(m_variableMap.count(other))
-			return boost::lexical_cast<T>(m_variableMap[other].as<string>());
+			return boost::lexical_cast<T>(m_variableMap[other].as<std::string>());
 
-		throw runtime_error("Could not load option: '" + other + "'!");
+		throw std::runtime_error("Could not load option: '" + other + "'!");
 	}
 
-	void parseCommandLine(int32 argc, int8* argv[]);
+	void parseCommandLine(int32 argc, const int8* argv[]);
 	void parseConfigFile(const std::string &configPath);
 	void printConfiguration();
 };

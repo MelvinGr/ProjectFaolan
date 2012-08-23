@@ -1,0 +1,253 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		DC2D9B7015E464DA00663E82 /* libboost_program_options-mt.a in Frameworks */ = {isa = PBXBuildFile; fileRef = DC2D9B6C15E464DA00663E82 /* libboost_program_options-mt.a */; };
+		DC2D9B7115E464DA00663E82 /* libboost_system-mt.a in Frameworks */ = {isa = PBXBuildFile; fileRef = DC2D9B6D15E464DA00663E82 /* libboost_system-mt.a */; };
+		DC2D9B7215E464DA00663E82 /* libboost_thread-mt.a in Frameworks */ = {isa = PBXBuildFile; fileRef = DC2D9B6E15E464DA00663E82 /* libboost_thread-mt.a */; };
+		DC2D9B7315E464DA00663E82 /* libmysqlclient.a in Frameworks */ = {isa = PBXBuildFile; fileRef = DC2D9B6F15E464DA00663E82 /* libmysqlclient.a */; };
+		DCA3E6A415E3CD8D0010E124 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6A015E3CD8D0010E124 /* main.cpp */; };
+		DCA3E6A515E3CD8D0010E124 /* PlayerAgentPackets.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6A115E3CD8D0010E124 /* PlayerAgentPackets.cpp */; };
+		DCA3E6A615E3CD8D0010E124 /* PlayerConnection.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCA3E6A215E3CD8D0010E124 /* PlayerConnection.cpp */; };
+		DCA3E71D15E3CDA80010E124 /* libCommon.a in Frameworks */ = {isa = PBXBuildFile; fileRef = DCA3E71C15E3CDA80010E124 /* libCommon.a */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		DC1ED77015E3CB04000E6E4F /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		DC1ED77215E3CB04000E6E4F /* PlayerAgent */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = PlayerAgent; sourceTree = BUILT_PRODUCTS_DIR; };
+		DC2D9B6C15E464DA00663E82 /* libboost_program_options-mt.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "libboost_program_options-mt.a"; path = "../../../../../../../OSX/opt/local/lib/libboost_program_options-mt.a"; sourceTree = "<group>"; };
+		DC2D9B6D15E464DA00663E82 /* libboost_system-mt.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "libboost_system-mt.a"; path = "../../../../../../../OSX/opt/local/lib/libboost_system-mt.a"; sourceTree = "<group>"; };
+		DC2D9B6E15E464DA00663E82 /* libboost_thread-mt.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = "libboost_thread-mt.a"; path = "../../../../../../../OSX/opt/local/lib/libboost_thread-mt.a"; sourceTree = "<group>"; };
+		DC2D9B6F15E464DA00663E82 /* libmysqlclient.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libmysqlclient.a; path = ../../../../../../../OSX/opt/local/lib/libmysqlclient.a; sourceTree = "<group>"; };
+		DCA3E6A015E3CD8D0010E124 /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		DCA3E6A115E3CD8D0010E124 /* PlayerAgentPackets.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PlayerAgentPackets.cpp; sourceTree = "<group>"; };
+		DCA3E6A215E3CD8D0010E124 /* PlayerConnection.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = PlayerConnection.cpp; sourceTree = "<group>"; };
+		DCA3E6A315E3CD8D0010E124 /* PlayerConnection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PlayerConnection.h; sourceTree = "<group>"; };
+		DCA3E71C15E3CDA80010E124 /* libCommon.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libCommon.a; path = build/Release/libCommon.a; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		DC1ED76F15E3CB04000E6E4F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DC2D9B7015E464DA00663E82 /* libboost_program_options-mt.a in Frameworks */,
+				DC2D9B7115E464DA00663E82 /* libboost_system-mt.a in Frameworks */,
+				DC2D9B7215E464DA00663E82 /* libboost_thread-mt.a in Frameworks */,
+				DC2D9B7315E464DA00663E82 /* libmysqlclient.a in Frameworks */,
+				DCA3E71D15E3CDA80010E124 /* libCommon.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		DC1ED76715E3CB04000E6E4F = {
+			isa = PBXGroup;
+			children = (
+				DCA3E72015E3CDC10010E124 /* Libraries */,
+				DCA3E69F15E3CD8D0010E124 /* PlayerAgent */,
+				DC1ED77315E3CB04000E6E4F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		DC1ED77315E3CB04000E6E4F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				DC1ED77215E3CB04000E6E4F /* PlayerAgent */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		DCA3E69F15E3CD8D0010E124 /* PlayerAgent */ = {
+			isa = PBXGroup;
+			children = (
+				DCA3E6A015E3CD8D0010E124 /* main.cpp */,
+				DCA3E6A115E3CD8D0010E124 /* PlayerAgentPackets.cpp */,
+				DCA3E6A215E3CD8D0010E124 /* PlayerConnection.cpp */,
+				DCA3E6A315E3CD8D0010E124 /* PlayerConnection.h */,
+			);
+			name = PlayerAgent;
+			path = ../../src/PlayerAgent;
+			sourceTree = "<group>";
+		};
+		DCA3E72015E3CDC10010E124 /* Libraries */ = {
+			isa = PBXGroup;
+			children = (
+				DC2D9B6C15E464DA00663E82 /* libboost_program_options-mt.a */,
+				DC2D9B6D15E464DA00663E82 /* libboost_system-mt.a */,
+				DC2D9B6E15E464DA00663E82 /* libboost_thread-mt.a */,
+				DC2D9B6F15E464DA00663E82 /* libmysqlclient.a */,
+				DCA3E71C15E3CDA80010E124 /* libCommon.a */,
+			);
+			name = Libraries;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		DC1ED77115E3CB04000E6E4F /* PlayerAgent */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DC1ED77C15E3CB04000E6E4F /* Build configuration list for PBXNativeTarget "PlayerAgent" */;
+			buildPhases = (
+				DC1ED76E15E3CB04000E6E4F /* Sources */,
+				DC1ED76F15E3CB04000E6E4F /* Frameworks */,
+				DC1ED77015E3CB04000E6E4F /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PlayerAgent;
+			productName = PlayerAgent;
+			productReference = DC1ED77215E3CB04000E6E4F /* PlayerAgent */;
+			productType = "com.apple.product-type.tool";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		DC1ED76915E3CB04000E6E4F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0440;
+				ORGANIZATIONNAME = "Project Faolan";
+			};
+			buildConfigurationList = DC1ED76C15E3CB04000E6E4F /* Build configuration list for PBXProject "PlayerAgent" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = English;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = DC1ED76715E3CB04000E6E4F;
+			productRefGroup = DC1ED77315E3CB04000E6E4F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				DC1ED77115E3CB04000E6E4F /* PlayerAgent */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		DC1ED76E15E3CB04000E6E4F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DCA3E6A415E3CD8D0010E124 /* main.cpp in Sources */,
+				DCA3E6A515E3CD8D0010E124 /* PlayerAgentPackets.cpp in Sources */,
+				DCA3E6A615E3CD8D0010E124 /* PlayerConnection.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		DC1ED77A15E3CB04000E6E4F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.8;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		DC1ED77B15E3CB04000E6E4F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.8;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		DC1ED77D15E3CB04000E6E4F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				HEADER_SEARCH_PATHS = /opt/local/include;
+				LIBRARY_SEARCH_PATHS = /opt/local/lib;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		DC1ED77E15E3CB04000E6E4F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				HEADER_SEARCH_PATHS = /opt/local/include;
+				LIBRARY_SEARCH_PATHS = /opt/local/lib;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		DC1ED76C15E3CB04000E6E4F /* Build configuration list for PBXProject "PlayerAgent" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DC1ED77A15E3CB04000E6E4F /* Debug */,
+				DC1ED77B15E3CB04000E6E4F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DC1ED77C15E3CB04000E6E4F /* Build configuration list for PBXNativeTarget "PlayerAgent" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DC1ED77D15E3CB04000E6E4F /* Debug */,
+				DC1ED77E15E3CB04000E6E4F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = DC1ED76915E3CB04000E6E4F /* Project object */;
+}

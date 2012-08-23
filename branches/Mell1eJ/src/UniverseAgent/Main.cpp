@@ -17,15 +17,10 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "../Common/Common.h"
-
-#include <iostream>
-
 #include "../Common/FaolanBaseClass.h"
 #include "UniverseConnection.h"
 
-using namespace std;
-
-int32 main(int32 argc, int8* argv[])
+int main(int argc, const char *argv[])
 {
 	FaolanBaseClass<UniverseConnection> universeAgent(argc, argv, UniverseAgentID);
 	universeAgent.Start();

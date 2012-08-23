@@ -26,7 +26,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "BufferPool.h"
 
-class Acceptor : private boost::noncopyable
+class FAOLANEXPORTED Acceptor : private boost::noncopyable
 {    
 	// event call when there is a new connection attempt
 	virtual void onAccept(const boost::system::error_code& e) = 0;

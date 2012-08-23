@@ -109,7 +109,8 @@ void InterServerConnection::onRead(const boost::system::error_code& e, std::size
 		return;
 	}
 
-	Packet packet(PacketBuffer(&m_readBuffer[0], bytesTransferred));
+    PacketBuffer packetBuffer(&m_readBuffer[0], bytesTransferred);    
+	Packet packet(packetBuffer);
 	//if(packet.opcode == RequestRegisterResponse)
 	//	onRegistrationStatus(packet);
 	//else

@@ -20,22 +20,22 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 namespace CRC32
 {
-	uint32 CalculateCRC32(uint8* value, uint32 length)
+	uint32 CalculateCRC32(const uint8* value, size_t length)
 	{
 		uint32* buffer = (uint32*)value + 2;
 
-		uint32 len = length - 8;
+		size_t len = length - 8;
 		uint32 crc32 = 0xffffffff;
-		uint32 offset = 0;
+		size_t offset = 0;
 
 		if (len >= 32)
 		{
-			for(uint32 i = 0; i < len >> 5; i++)
+			for(size_t i = 0; i < len >> 5; i++)
 			{
 				crc32 ^= buffer[offset];
 				len -= 4;
 
-				for(uint32 i = 0; i < 7; i++)
+				for(uint8 i = 0; i < 7; i++)
 				{
 					offset++;
 					crc32 = crcTab2[crc32 >> 16 & 0xFF] ^ crcTab3[crc32 >> 8 & 0xFF] ^ crcTab1[crc32 >> 24] ^ crcTab4[crc32 & 0xFF] ^ buffer[offset];
@@ -49,7 +49,7 @@ namespace CRC32
 
 		if (len >= offset)
 		{
-			for (uint32 i = 0; i < (len >> 2); i++)
+			for (size_t i = 0; i < (len >> 2); i++)
 			{
 				crc32 ^= buffer[offset];
 				len -= 4;
@@ -63,9 +63,13 @@ namespace CRC32
 		{
 			offset *= 4;
 
-			for (uint32 i = 0; i < len; i++)
+			for (size_t i = 0; i < len; i++)
 			{
+#if BITPLATFORM == PLATFORM_32BIT
 				uint8 tmp = *(uint8*)((uint32)buffer + offset);
+#else
+                uint8 tmp = *(uint8*)((uint64)buffer + offset);
+#endif
 				crc32 = (crc32 >> 8) ^ crcTab1[(tmp ^ crc32) & 0xFF];
 				offset++;
 			}

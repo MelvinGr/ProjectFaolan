@@ -32,7 +32,7 @@ bool MysqlFunctions::CheckLogin(const std::string& username, const std::string& 
 
 	MysqlDB->executeSynchronousQuery(&q); 
 	Sleep(50);
-
+    
 	bool value = false;
 	if(q.succes())
 		value = q.fetchRow();

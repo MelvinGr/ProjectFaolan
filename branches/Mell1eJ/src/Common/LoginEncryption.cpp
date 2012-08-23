@@ -110,7 +110,7 @@ string LoginEncryption::decryptTea(const string& encryptedBlock, const uint32* k
 	uint32 prev[2];
 	uint32 newPrev[2];
 	uint8* p = reinterpret_cast<uint8*>(dataBlock);
-	uint32 length = encryptedBlock.length();
+	size_t length = encryptedBlock.length();
 	stringstream decryptedBlockStream;
 	stringstream encryptedBlockStream(encryptedBlock);
 

@@ -54,7 +54,7 @@ template <class ConnectionAcceptorT> class FaolanBaseClass
 		case RequestRealmInfoResponse:
 			{
 				realmID = packet.data->read<uint32>();
-				string address = packet.data->read<string>();
+                std::string address = packet.data->read<std::string>();
 				uint32 port = packet.data->read<uint32>();
 
 				network.createConnectionAcceptor<ConnectionAcceptorT>(address, port, Config.GetValue<size_t>("demuxercount"));
@@ -70,7 +70,7 @@ template <class ConnectionAcceptorT> class FaolanBaseClass
 				uint64 ping = packet.data->read<uint64>();
 
 				PacketBuffer packetBuffer(100);
-				WriteManagerHeader(packetBuffer, sender, FaolanManagerID, Pong);
+				FaolanManager::WriteManagerHeader(packetBuffer, sender, FaolanManagerID, Pong);
 				packetBuffer.write<uint64>(ping);
 				packetBuffer.write<uint64>(time(0));
 				internalConnection->SendPacket(packetBuffer);
@@ -93,9 +93,7 @@ public:
 	FaolanManagerSenderReceivers sender;
 	uint32 realmID;
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-	FaolanBaseClass(int32 argc, int8* argv[], FaolanManagerSenderReceivers _sender)
+	FaolanBaseClass(int32 argc, const int8* argv[], FaolanManagerSenderReceivers _sender)
 		: internalConnection(0), sender(_sender), realmID(0)
 	{
 		printf("%s", FaolanBanner);
@@ -105,8 +103,8 @@ public:
 		Config.parseConfigFile("FaolanConfig.cfg");
 		Config.parseCommandLine(argc, argv);
 
-		MysqlDatabase::createInstance(Config.GetValue<size_t>("demuxercount"), Config.GetValue<string>("dbusername"), 
-			Config.GetValue<string>("dbhost"), Config.GetValue<string>("dbpassword"), Config.GetValue<string>("dbname"), 
+		MysqlDatabase::createInstance(Config.GetValue<size_t>("demuxercount"), Config.GetValue<std::string>("dbusername"), 
+			Config.GetValue<std::string>("dbhost"), Config.GetValue<std::string>("dbpassword"), Config.GetValue<std::string>("dbname"), 
 			Config.GetValue<uint32>("dbport"));
 	}
 
@@ -123,11 +121,11 @@ public:
 	void Start(bool isManager = false)
 	{
 		if(!MysqlDB->start())
-			throw runtime_error("Could not connect to the Database!");
+			throw std::runtime_error("Could not connect to the Database!");
 
 		if(isManager)
 		{
-			network.createConnectionAcceptor<ConnectionAcceptorT>(Config.GetValue<string>("faolanmanageripaddress"),
+			network.createConnectionAcceptor<ConnectionAcceptorT>(Config.GetValue<std::string>("faolanmanageripaddress"),
 				Config.GetValue<uint32>("faolanmanagerport"), Config.GetValue<size_t>("demuxercount"));
 
 			network.wait();
@@ -135,7 +133,7 @@ public:
 		else
 		{
 			internalConnection = new InterServerConnection(ioService,
-				Config.GetValue<string>("faolanmanageripaddress"), Config.GetValue<uint32>("faolanmanagerport"), sender);
+				Config.GetValue<std::string>("faolanmanageripaddress"), Config.GetValue<uint32>("faolanmanagerport"), sender);
 
 			internalConnection->HandlePacketCallback = boost::bind(&FaolanBaseClass::handlePacket, this, _1);
 
@@ -144,7 +142,7 @@ public:
 			if (internalConnection->waitUntilConnected())
 				printf("Connected to the Manager!\n");
 			else
-				throw runtime_error("Could not connect to the Manager!");
+				throw std::runtime_error("Could not connect to the Manager!");
 
 			///////
 
@@ -162,7 +160,7 @@ public:
 	void DoServerStatusChange(bool status)
 	{
 		PacketBuffer buffer(100);
-		WriteManagerHeader(buffer, sender, FaolanManagerID, ServerStatusChange);
+		FaolanManager::WriteManagerHeader(buffer, sender, FaolanManagerID, ServerStatusChange);
 		buffer.write<uint32>(realmID);
 		buffer.write<uint8>(status);
 		internalConnection->SendPacket(buffer);
@@ -171,7 +169,7 @@ public:
 	void DoRequestRealmInfo()
 	{
 		PacketBuffer buffer(2000);
-		WriteManagerHeader(buffer, sender, FaolanManagerID, RequestRealmInfo);
+		FaolanManager::WriteManagerHeader(buffer, sender, FaolanManagerID, RequestRealmInfo);
 		buffer.write<uint8>(0); // dummy
 		internalConnection->SendPacket(buffer);
 	}
@@ -179,7 +177,7 @@ public:
 	/*void registerWithManager()
 	{
 	PacketBuffer buffer(2000);
-	WriteManagerHeader(buffer, sender, FaolanManager, RequestRegister);
+	FaolanManager::WriteManagerHeader(buffer, sender, FaolanManager, RequestRegister);
 	buffer.write<string>(m_loginServerAddress);
 	buffer.write<uint32>(m_port);
 	SendPacket(buffer);

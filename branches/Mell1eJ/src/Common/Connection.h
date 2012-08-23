@@ -38,7 +38,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 * Abstract connection class
 * @author Albator, Doron
 */
-class Connection : private boost::noncopyable, public boost::enable_shared_from_this<Connection>
+class FAOLANEXPORTED Connection : private boost::noncopyable, public boost::enable_shared_from_this<Connection>
 {
 public:
 	Connection(boost::asio::io_service& IOService, BufferPool* bp);

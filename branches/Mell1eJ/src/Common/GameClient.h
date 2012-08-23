@@ -39,7 +39,7 @@ public:
 	AccountInfo accountInfo;
 	CharacterInfo characterInfo;
 
-	GameClient();
+	FAOLANEXPORTED GameClient();
 };
 
 #endif

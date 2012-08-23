@@ -17,7 +17,7 @@
     <ClCompile Include="..\..\..\src\WorldServer\WorldConnection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\WorldServer\Main.cpp">
+    <ClCompile Include="..\..\..\src\WorldServer\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -17,17 +17,10 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "../Common/Common.h"
-
-#include <iostream>
-
 #include "../Common/FaolanBaseClass.h"
-#include "../Common/InterServerConnection.h"
-
 #include "WorldConnection.h"
 
-using namespace std;
-
-int32 main(int32 argc, int8* argv[])
+int main(int argc, const char *argv[])
 {
 	FaolanBaseClass<WorldConnection> worldServer(argc, argv, WorldServerID);
 	worldServer.Start();

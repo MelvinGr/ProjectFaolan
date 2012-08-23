@@ -23,7 +23,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 namespace SwapByte
 {
-	inline bool BigEndian()
+	FAOLANEXPORTED inline bool BigEndian()
 	{
 		int16 w = 0x4321;
 		return (*(uint8*)&w != 0x21);

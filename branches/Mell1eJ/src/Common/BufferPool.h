@@ -31,7 +31,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 * BufferPool class to read and write data on raw buffer.
 * @author Albator
 */
-class BufferPool 
+class FAOLANEXPORTED BufferPool 
 {
 	std::stack<PacketBuffer*> m_bufferStack;
 
