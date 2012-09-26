@@ -7,6 +7,9 @@
     <Filter Include="Header Files">
       <UniqueIdentifier>{f97c6488-a4ab-4f49-ab71-40fecfe891fb}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Packets">
+      <UniqueIdentifier>{b7f9f476-9a59-4428-a7cf-e2d2959afc3f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\UniverseAgent\UniverseAgent.cpp">
@@ -15,9 +18,15 @@
     <ClCompile Include="..\..\..\src\UniverseAgent\UniverseAgentHandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\UniverseAgent\Packets\universePackets.cpp">
+      <Filter>Source Files\Packets</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\UniverseAgent\UniverseAgent.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\UniverseAgent\Packets\universePackets.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
