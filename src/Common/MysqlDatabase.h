@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010, 2011, 2012 The Project Faolan Team
+Copyright (C) 2009, 2010 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -48,15 +48,10 @@ public:
     bool initMysql(string host, int32 port, string login, string password, string database);
     void closeMysql();
 
-	//Realms from db
-	void loadRealms(vector<RealmInfo*>* realms);
-	//
-
 	//ServerStart
+	bool loadRealmlist(vector<RealmInfo*>* realms);
 	bool loadGlobalSpells(vector<Spells>* SPELLS);
-	bool loadGlobalNpcs(vector<NPC>* NPCS);
-	bool loadGlobalObjects(vector<Object>* OBJECTS);
-	bool loadGlobalItems(vector<Item>* ITEMS);
+	bool ladGlobalNpcs(vector<NPC>* NPCS);
 	//-----------
 
     bool checkLogin(string username, string password);
@@ -73,7 +68,6 @@ public:
 
     bool setAccountCookie(string username, uint32 cookie);
     bool setAccountCookie(uint32 accountID, uint32 cookie);
-	bool getAccountTrail(uint32 accountID);
 
 	int32 getAccountByCharacter(CharacterInfo character);
 
@@ -94,7 +88,6 @@ public:
 	bool getNpcItems(uint32 npcId, vector<Item>* item);
 
     bool deleteCharacter(uint32 characterID);
-	bool deleteCharacterData(uint32 characterID);
 	bool deleteEmptyChar(uint32 accountID);
 	string getCharacterName(uint32 characterID);
     int32 getNewCharacterID();
@@ -107,10 +100,6 @@ public:
 	bool getMaxStats(GameClient* clientInfo);
 
 	bool getMapDetails(string map_name, teleport* info);
-
-	//Character
-	bool getCharItems(uint32 charId, vector<Item>* item);
-	bool getCharBar(uint32 charId, vector<Item>* barItems);
 };
 
 #endif

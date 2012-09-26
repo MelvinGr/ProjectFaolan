@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010, 2011, 2012 The Project Faolan Team
+Copyright (C) 2009, 2010 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -80,16 +80,15 @@ void WorldServer::checkAbility(GameClient* client)
 //Adds a Ability to the player
 void WorldServer::addAbility(GameClient* client, uint32 abilityId, uint32 level, uint32 iLevel)
 {
-	//Abilitys work at opcode 0x50 (GameCharAgent)
+	//Abilitys work at opcode 0x4d (GameCharAgent)
 	Item abilityData; //Use the Struct of Items
 	if(Database.getAbilityData(abilityId, &abilityData)) //Check if Ability is in the Database
 	{
 		PacketBuffer aBuffer(500);
-		aBuffer.writeHeader("GameCharAgent", "GameCharInterface", gameUnknown1, 0, client->nClientInst, 0, 0x50);
+		aBuffer.writeHeader("GameCharAgent", "GameCharInterface", gameUnknown1, 0, client->nClientInst, 0, 0x4d);
 		aBuffer.write<uint32>(iLevel ? iLevel : abilityData.iLevel); //Level is used for slot iLevel if null load position from the db if > 0 load debug pos
 		aBuffer.write<uint32>(abilityData.id);
 		aBuffer.write<uint32>(abilityData.id);
-		aBuffer.write<uint32>(0);
 		aBuffer.write<uint32>(level);
 		aBuffer.write<uint32>(abilityData.data0);
 
@@ -102,16 +101,11 @@ void WorldServer::addAbility(GameClient* client, uint32 abilityId, uint32 level,
 		aBuffer.write<uint32>(abilityData.data2);
 		aBuffer.write<uint32>(abilityData.data3);
 		aBuffer.write<uint32>(abilityData.data4);
-		
-		aBuffer.write<uint32>(0xb290805c);
-		aBuffer.write<uint32>(0x29e627ca);
-		aBuffer.write<uint32>(0xb290805c);
-		aBuffer.write<uint32>(0x29e627ca);
-		
+
 		aBuffer.write<uint32>(level);
 		aBuffer.write<uint32>(0);
 		aBuffer.write<uint8>(0);
-		Log.Notice("addAbility pack:\n%s\n\n", String::arrayToHexString(aBuffer.buffer, aBuffer.bufferLength).c_str());
+		
 		aBuffer.doItAll(client->clientSocket);
 	}
 	else
@@ -125,7 +119,7 @@ void WorldServer::addSpell(GameClient* client, uint32 SpellId)
 {
 	//Abilitys work at opcode 0x09 (GameCharAgent)
 	PacketBuffer aBuffer(500);
-	aBuffer.writeHeader("GameCharAgent", "GameCharInterface", gameUnknown1, 0, client->nClientInst, 0, Opcodes::GCI_learnSpell);
+	aBuffer.writeHeader("GameCharAgent", "GameCharInterface", gameUnknown1, 0, client->nClientInst, 0, 0x09);
 	aBuffer.write<uint32>(SpellId);
 	aBuffer.doItAll(client->clientSocket);
 }

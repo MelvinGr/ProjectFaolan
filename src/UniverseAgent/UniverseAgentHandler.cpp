@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010, 2011, 2012 The Project Faolan Team
+Copyright (C) 2009, 2010 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -17,152 +17,98 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "UniverseAgent.h"
+#include "Packets/universePackets.h"
 
 void UniverseAgent::UniverseAgentHandler(Packet* packet, GameClient* client)
 {
 	switch(packet->opcode)
 	{
-	case 0x00: // InitiateAuthentication
+	case 0x2000: // InitiateAuthentication
 		{
-			string cDevName = packet->data->read<string>();
-			string cUserName = packet->data->read<string>();
-			uint32 nGameID = packet->data->read<uint32>();
-
-			PacketBuffer aBuffer(500);
-			aBuffer.writeHeader("UniverseAgent", "UniverseInterface", 1, 0, client->nClientInst, 0, 0x00); // Challenge
-			aBuffer.write<string>(client->authChallenge);
-
-			aBuffer.doItAll(client->clientSocket);
-
+			Log.Warning("Receive:\n%s\n\n", String::arrayToHexString(packet->packetBuffer->buffer, packet->packetBuffer->bufferLength).c_str());
+			universePackets::initAuth(packet, client);
 			break;
 		}
 
-	case 0x01: // AnswerChallenge
+	case 0x2001: // AnswerChallenge
 		{
 			string cAnswerChallenge = packet->data->read<string>();
 
 			string decryptedData = LoginEncryption::decryptLoginKey(cAnswerChallenge);
+			Log.Warning("Receive:\n%s\n\n", String::arrayToHexString(packet->packetBuffer->buffer, packet->packetBuffer->bufferLength).c_str());
 			vector<string> decryptedDataVector = String::splitString(decryptedData, "|");
-
+			
 			if(decryptedDataVector.size() != 3) // wrong decryption
 			{
-				PacketBuffer aBuffer(500);
-				aBuffer.writeHeader("UniverseAgent", "UniverseInterface", 1, 0, client->nClientInst, 0, 0x02); // LoginProblem
-				aBuffer.write<uint32>(0x04); // eLoginStatus -- error code: internal server error
-				aBuffer.doItAll(client->clientSocket);
-
+				Log.Error("Wrong decryption of username and password\n");
+				universePackets::AckAuthenticate(packet, client, 0xffffff, 0, "", 0, 0, 0x04);
 				break;
 			}
 
 			string username = decryptedDataVector[0];
 			string nChallenge = decryptedDataVector[1];
 			string password = decryptedDataVector[2];
-
+			
 			if(nChallenge != client->authChallenge) // wrong auth
 			{
-				PacketBuffer aBuffer(500);
-				aBuffer.writeHeader("UniverseAgent", "UniverseInterface", 1, 0, client->nClientInst, 0, 0x02); // LoginProblem
-				aBuffer.write<uint32>(0x04); // eLoginStatus -- error code: internal server error
-				aBuffer.doItAll(client->clientSocket);
-
+				Log.Error("Wrong Auth\n");
+				universePackets::AckAuthenticate(packet, client, 0xffffff, 0, "", 0, 0,0x04);
 				break;
 			}
-
+			
 			if(!Database.checkLogin(username, password)) // wrong login
 			{
-				PacketBuffer aBuffer(500);
-				aBuffer.writeHeader("UniverseAgent", "UniverseInterface", 1, 0, client->nClientInst, 0, 0x01); // AckAuthenticate
-				aBuffer.write<uint32>(0x00); // nAuthStatus
-				aBuffer.write<uint64>(0x00); // cPlayerID
-				aBuffer.write<uint32>(0x00); // uCookie
-				aBuffer.write<uint32>(0x00); // eReason
-				aBuffer.write<uint16>(0x0E); // error code: invalid username/password
-				aBuffer.doItAll(client->clientSocket);
-
+				Log.Error("Wrong Login\n");
+				universePackets::AckAuthenticate(packet, client, 0xffffff, 0, "", 0, 0, 0x0e);
 				break;
 			}
-
+			
 			client->nClientInst = Database.getAccountID(username);
+			
 			if(client->nClientInst == -1) // could not get clientInst
 			{
-				PacketBuffer aBuffer(500);
-				aBuffer.writeHeader("UniverseAgent", "UniverseInterface", 1, 0, client->nClientInst, 0, 0x02); // LoginProblem
-				aBuffer.write<uint32>(0x04); // eLoginStatus -- error code: internal server error
-				aBuffer.doItAll(client->clientSocket);
-
+				Log.Error("Could not get clientInst\n");
+				universePackets::AckAuthenticate(packet, client, 0xffffff, 0, "", 0, 0, 0x04);
 				break;
 			}
 
 			if(Database.getBannedState(client->nClientInst)) // player banned
 			{
-				PacketBuffer aBuffer(500);
-				aBuffer.writeHeader("UniverseAgent", "UniverseInterface", 1, 0, client->nClientInst, 0, 0x01);
-				aBuffer.write<uint32>(0x00); // nAuthStatus
-				aBuffer.write<uint64>(0x00); // cPlayerID
-				aBuffer.write<uint32>(0x00); // uCookie
-				aBuffer.write<uint32>(0x00); // eReason
-				aBuffer.write<uint16>(0x17); // error code: account freezed
-				aBuffer.doItAll(client->clientSocket);
-
+				Log.Error("Banned Player try to login\n");
+				universePackets::AckAuthenticate(packet, client, 0xffffff, 0, "", 0, 0, 0x17);
 				break;
 			}
 
-			uint8 real[] =
-			{
-				0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00, 0x00, 0x4a,
-				0x00, 0x00, 0x00, 0x00,
-				0x01, 0x01, 0x01, 0x01,
-				0x3f, 0x80,
-				0x00, 0x00,
-				0x3f, 0x80,
-				0x00, 0x00, 0x01, 0x01,
-				0x00, 0x00, 0x00, 0x00,
-				0x08
-			};
+			Log.Debug("User %s is logging on with acc-ID: 0x%08x\n", username.c_str(), client->nClientInst);
 
-			PacketBuffer aBuffer(500);
-			aBuffer.writeHeader("UniverseAgent", "UniverseInterface", 1, 0, client->nClientInst, 0, 0x05); // SetRegionState
-			aBuffer.writeArray(real, sizeof(real));
-			aBuffer.doItAll(client->clientSocket);
+			universePackets::setRegionState(packet, client);
 
-			//Delete Character at the database with accountid and level = 0
 			Database.deleteEmptyChar(client->charInfo.accountID);
+
 			uint32 cookie = Database.generateCharId();
 			client->charInfo.characterID = cookie;
 			client->charInfo.accountID = client->nClientInst;
-			printf("Accountcookie: 0x%08x\n", cookie);
-			
+			printf("Accountcookie: 0x%08x\nClientInst: 0x%08x\n", cookie, client->nClientInst);
+			//Database.insertEmptyChar(client);
+			//uint32 cookie = Network::generateCookie();
 			Database.setAccountCookie(client->nClientInst, cookie);
 			Database.updateLastInfo(client->nClientInst, client->ipAddress);
 
 			string playerAgentIPAddress = Settings.playerAgentIPAddress + ":" +
 				String::toString(Settings.playerAgentPort);
 
-			aBuffer = PacketBuffer(500);
-			aBuffer.writeHeader("UniverseAgent", "UniverseInterface", 1, 0, client->nClientInst, 0, 0x01); // AckAuthenticate
-			aBuffer.write<uint32>(0x01); // nAuthStatus
-			aBuffer.write<uint64>(client->nClientInst); // cPlayerID
-			aBuffer.write<string>(playerAgentIPAddress); // cTerritoryManagerAddr
-			aBuffer.write<uint32>(cookie); // uCookie
-			aBuffer.write<uint32>(0x00); // eReason
-			aBuffer.doItAll(client->clientSocket);
+			uint64 accID = 0x0000271200000000 + client->nClientInst;
+			//accID = 0x0000271257e5476b;
+			universePackets::AckAuthenticate(packet, client, 1, accID, playerAgentIPAddress, cookie, 0, 0);
 
-			break;
-		}
-
-	case 0x02: // ClientDisconnected
-		{
-			uint32 connectionID = packet->data->read<uint32>(); // int64 ? - InstanceType
-
-			closesocket(client->clientSocket);
 			break;
 		}
 
 	default:
 		{
-			Log.Warning("Unknown Packet With Opcode: 0x%08X\n", packet->opcode);
-			Log.Warning("%s\n\n", String::arrayToHexString(packet->data->buffer, packet->data->bufferLength).c_str());
+			//Log.Warning("Unknown Packet With Opcode: 0x%08X\n", packet->opcode);
+			//Log.Warning("%s\n\n", String::arrayToHexString(packet->data->buffer, packet->data->bufferLength).c_str());
+			Log.Error("Receive unknown packet:\n%s\n\n", String::arrayToHexString(packet->packetBuffer->buffer, packet->packetBuffer->bufferLength).c_str());
 
 			break;
 		}

@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010, 2011, 2012 The Project Faolan Team
+Copyright (C) 2009, 2010 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -33,6 +33,7 @@ using namespace std;
 
 namespace PlayerAgent
 {
+	void sendSmallCharList(GameClient* client);
 	void sendCharacterList(GameClient* client);
 	void sendRealmList(GameClient* client);
 
@@ -40,4 +41,11 @@ namespace PlayerAgent
 
 	void HandleClient(void* socket);
 }
+
+enum OPCODES
+{
+	REQUEST_AUTH = 0x96CBE509,
+	REQUEST_SMALLCHARLIST  = 0xDAD1D206,
+	REQUEST_CHAR_REALMDATA = 0xA3E1FE0D
+};
 #endif

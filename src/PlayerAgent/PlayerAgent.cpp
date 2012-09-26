@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010, 2011, 2012 The Project Faolan Team
+Copyright (C) 2009, 2010 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -54,9 +54,16 @@ int32 main(int32 argc, int8* argv[], int8* envp[])
 
 	Networking network(Settings.playerAgentPort);
 	int32 result = network.initDB();
-	Database.loadRealms(&Settings.realms);
+
+	Database.loadRealmlist(&Settings.realms);
+	for(uint32 x = 0; x < Settings.realms.size();x++)
+	{
+		Log.Debug("Added realm \"%s\"\n", Settings.realms[x]->realmName.c_str());
+	}
+
 	if(result == 0)
 		int32 result = network.start();
+
 	if(result == 0) 
 	{
 		while(true)

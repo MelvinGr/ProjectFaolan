@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010, 2011, 2012 The Project Faolan Team
+Copyright (C) 2009, 2010 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -103,7 +103,7 @@ namespace WorldServer
 
 	//CharStatsHandler
 	struct CharStat {
-		void sendCharSpawn(GlobalTable* GTable);
+		void sendCharSpawn(GameClient* client);
 		void sendCharacterStats(GameClient* client);
 		uint64 addMaxHealth(uint32 value);
 		uint64 addHealth(uint32 value);
@@ -138,17 +138,11 @@ namespace WorldServer
 		uint64 addAnnihilationWin(uint32 value);
 		uint64 addDeath(uint32 value);
 		uint64 addKillingBlows(uint32 value);
+		uint8 getSexRace(uint32 sex, uint32 race);
 
 		void setStartStats(GameClient* client);
 
-		void sendCharSpells(GameClient* client);
-	};
-
-	//Functions of the ItemHandler 
-	struct ItemHandler {
-		void sendCharItems(GameClient* client);
 		void setItemStats(GameClient* client, uint32 placeId, uint32 itemId);
-		void setItemData(GlobalTable* GTable, Item* tmpItem);
 	};
 }
 #endif

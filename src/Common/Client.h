@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010, 2011, 2012 The Project Faolan Team
+Copyright (C) 2009, 2010 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -53,7 +53,6 @@ struct CharacterInfo
 	Combat combat;
 
 	bool isExhausted;
-	bool enableRegen;
 
 	lvlStats maxStats;
 	lvlStats curMaxStats;
@@ -164,8 +163,6 @@ struct GameClient
 
 	vector<uint32>* loadedChar;
 	vector<uint32>* spawnedMobs;
-	vector<uint32>* spawnedObj;
-	vector<Item> charItems;
 
 	CharacterInfo charInfo;
 
@@ -186,8 +183,6 @@ struct GlobalTable
 	vector<Spells> SPELLS;
 	GameClient* client;
 	vector<NPC> NPCS;
-	vector<Object> OBJECTS;
-	vector<Item> ITEMS;
 	void* socket;
 };
 #endif

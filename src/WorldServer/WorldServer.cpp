@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010, 2011, 2012 The Project Faolan Team
+Copyright (C) 2009, 2010 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@ void WorldServer::HandleNpcCombat(GlobalTable* GTable)
 	double combatTimeDiff = 0;
 	double auraTimeDiff = 0;
 	time_t auraLastCheck = time(&actTime);
-
+	/*
 	while(client->isConnected)
 	{
 		time(&actTime);
@@ -44,7 +44,7 @@ void WorldServer::HandleNpcCombat(GlobalTable* GTable)
 			gettimeofday(&now, 0);
 			curTime = (curTime * 1000) + now.tv_usec;
 		#endif
-
+			/*
 		//Combat
 		for(uint32 i = 0; i < GTable->NPCS.size(); i++)
 		{
@@ -80,18 +80,19 @@ void WorldServer::HandleNpcCombat(GlobalTable* GTable)
 				}
 			}
 		}
+		//*/
 
-		//Do only if Regen is active
-		if(client->charInfo.enableRegen == true)
+		/*
+		//Auras
+		auraTimeDiff = difftime(actTime, auraLastCheck);
+		if(auraTimeDiff > 1.200)
 		{
-			//Auras
-			auraTimeDiff = difftime(actTime, auraLastCheck);
-			if(auraTimeDiff > 1.200)
-			{
-				auraLastCheck = actTime;
-				client->charInfo.Update(GTable->client);
-			}
+			auraLastCheck = actTime;
+			client->charInfo.Update(GTable->client);
 		}
+		//*/
+
+		/*
 		//Spell
 		if(client->charInfo.combat.spellId > 0)
 		{
@@ -101,7 +102,9 @@ void WorldServer::HandleNpcCombat(GlobalTable* GTable)
 				GTable->client->charInfo.combat.spellId = 0;
 			}
 		}
-	}
+		//*/
+	//}
+
 }
 
 void WorldServer::HandleClient(GlobalTable* GTable)
@@ -110,8 +113,6 @@ void WorldServer::HandleClient(GlobalTable* GTable)
 	GameClient* client = new GameClient(*((uint32*)socket));
 	clientList->push_back(client);
 	GTable->client = client;
-	//Default disable regeneration (at begin or char creation there is no value for stats)
-	GTable->client->charInfo.enableRegen = false;
 	//Need to set 0 later set to char current exp
 	GTable->client->charInfo.curExp = 0;
 	GTable->client->charInfo.hp = 1;
@@ -133,18 +134,40 @@ void WorldServer::HandleClient(GlobalTable* GTable)
 		Packet* packet = client->getNextPacket(true);
 		if(packet)
 		{
-			if(packet->receiver == "GameAgent")
-				GameAgentHandler(packet, GTable, clientList);
-			else if(packet->receiver == "GameCharAgent")
-				GameCharAgentHandler(packet, GTable);
-			else if(packet->receiver == "GameCharAgentProject")
-				GameCharAgentProjectHandler(packet, client);
-
+			//Log.Warning("Receive:\n%s\n\n", String::arrayToHexString(packet->packetBuffer->buffer, packet->packetBuffer->bufferLength).c_str());
+			
+			if(true)
+			{
+				bool keepP = false;
+				uint32 tmpPointer = 0;
+				uint32 tmpSize = 0;
+			do
+			{
+				keepP = false;
+				packet->packetBuffer->offset =  tmpPointer;
+				tmpSize = (packet->packetBuffer->buffer[tmpPointer]<< 6) | (packet->packetBuffer->buffer[tmpPointer+1]<< 4) | (packet->packetBuffer->buffer[tmpPointer+2]<< 2) | (packet->packetBuffer->buffer[tmpPointer+3]);
+				if((tmpSize+tmpPointer+4) < packet->packetBuffer->bufferLength)
+				{
+					keepP = true;
+				}
+				Packet* tmpPacket = new Packet(&PacketBuffer((packet->packetBuffer->readArray(tmpSize+4)), tmpSize+4));
+				//Log.Warning("Receive:\n%s\n\n", String::arrayToHexString(tmpPacket->packetBuffer->buffer, tmpPacket->packetBuffer->bufferLength).c_str());
+				GameAgentHandler(tmpPacket, GTable, clientList);
+				delete tmpPacket;
+				if((tmpSize+tmpPointer) <= 0xffffffff)
+					tmpPointer += (tmpSize+4);
+				else
+					tmpPointer += 0xffffffff;
+			} while(keepP);
+			}
+			//*/
+			//Log.Warning("Receive:\n%s\n\n", String::arrayToHexString(packet->packetBuffer->buffer, packet->packetBuffer->bufferLength).c_str());
+			//GameAgentHandler(packet, GTable, clientList);
 			delete packet;
 		}
 	}
 
-	Database.updateCharacter(&client->charInfo);	
+	//Database.updateCharacter(&client->charInfo);	
 	remove(clientList->begin(), clientList->end(), client); 
 	delete client;
 }
@@ -171,11 +194,11 @@ int32 main(int32 argc, int8* argv[], int8* envp[])
 
 	if(result == 0)
 	{
+		Database.loadRealmlist(&Settings.realms);
+
 		//Loading Global Table with values;
 		Database.loadGlobalSpells(&GTable.SPELLS);
-		Database.loadGlobalNpcs(&GTable.NPCS);
-		Database.loadGlobalObjects(&GTable.OBJECTS);
-		Database.loadGlobalItems(&GTable.ITEMS);
+		Database.ladGlobalNpcs(&GTable.NPCS);
 
 		result = network.start();
 		if(result == 0) 

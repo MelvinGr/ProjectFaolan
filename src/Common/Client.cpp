@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010, 2011, 2012 The Project Faolan Team
+Copyright (C) 2009, 2010 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -20,7 +20,6 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 void CharacterInfo::Update(GameClient* client)
 {
-	Log.Debug("Character HP: %i\n", client->charInfo.hp);
 	if(client->charInfo.hp < 0)
 		client->charInfo.hp = 0;
 
@@ -67,7 +66,7 @@ void CharacterInfo::Update(GameClient* client)
 					aBuffer.write<uint32>(client->charInfo.stamina*100);
 					aBuffer.write<uint32>(0x3e4f4f3c);
 					aBuffer.doItAll(client->clientSocket);
-					Log.Notice("Stamina[is_spr]:%i\n",client->charInfo.stamina);
+					//Log.Notice("Stamina[is_spr]:%i\n",client->charInfo.stamina);
 
 				}
 				else
@@ -84,7 +83,7 @@ void CharacterInfo::Update(GameClient* client)
 					aBuffer.write<uint32>(0x00000000);//set to 0 
 					aBuffer.write<uint32>(0x3e4f4f3c);
 					aBuffer.doItAll(client->clientSocket);	
-					Log.Notice("Stamina[is_spr]:%i\n",client->charInfo.stamina);
+					//Log.Notice("Stamina[is_spr]:%i\n",client->charInfo.stamina);
 				}
 
 				break;
@@ -131,7 +130,7 @@ void CharacterInfo::RegenerateStamina(GameClient* client)
 	aBuffer.write<uint32>(client->charInfo.stamina*100);//set to 0 
 	aBuffer.write<uint32>(0x3e4f4f3c);
 	aBuffer.doItAll(client->clientSocket);
-	Log.Notice("Stamina[regen]:%u\n",client->charInfo.stamina);
+	//Log.Notice("Stamina[regen]:%u\n",client->charInfo.stamina);
 }
 
 void CharacterInfo::RegenerateMana(GameClient* client)
@@ -154,7 +153,7 @@ void CharacterInfo::RegenerateMana(GameClient* client)
 	aBuffer.write<uint32>(client->charInfo.mana*100);//set to 0 
 	aBuffer.write<uint32>(0x3e4f4f3c);
 	aBuffer.doItAll(client->clientSocket);
-	Log.Notice("Stamina[regen]:%u\n",client->charInfo.stamina);
+	//Log.Notice("Stamina[regen]:%u\n",client->charInfo.stamina);
 }
 
 void CharacterInfo::RegenerateHealth(GameClient* client)
@@ -218,7 +217,7 @@ void CharacterInfo::RegenerateHealth(GameClient* client)
 	aBuffer.write<uint32>(0x3e4f4f3c);
 	aBuffer.doItAll(client->clientSocket);
 
-	Log.Notice("CURR HPREGEN:%i\n\n", client->charInfo.hp);
+	//Log.Notice("CURR HPREGEN:%i\n\n", client->charInfo.hp);
 }
 
 void CharacterInfo::InitalizeStatupStats(GameClient* client)
@@ -397,7 +396,8 @@ GameClient::GameClient(SOCKET socket)
 		initializedBuffer = false;
 		isConnected = true;
 
-		authChallenge = "32423423592352";
+		//authChallenge = "32423423592352";
+		authChallenge = "1a7bcf1a9a2eff134f3bbd1d3f1a3bd";
 
 		nClientInst = 0;
 		nCookie = 0;
@@ -545,10 +545,12 @@ Packet* GameClient::getNextPacket(bool compressed)
 		Packet* packet = new Packet(&receiveBuffer);
 		if(!CheckPacketCRC(packet)) // Request new packet
 		{
-			//Log.Warning("Got incorrect Packet (wrong CRC)!\n\n");
-			//Log.Notice("[%s][%s] Received Opcode: 0x%08X (%s)\n", String::timeString().c_str(),
-			//ipAddress.c_str(), packet->opcode, packet->receiver.c_str());
-			//Log.Notice("%s\n\n", String::arrayToHexString(packet->data->buffer, packet->data->bufferLength).c_str());
+			Log.Warning("Got incorrect Packet (wrong CRC)!\n\n");
+			/*
+			Log.Notice("[%s][%s] Received Opcode: 0x%08X\n", String::timeString().c_str(),
+			ipAddress.c_str(), packet->opcode);
+			Log.Notice("%s\n\n", String::arrayToHexString(packet->data->buffer, packet->data->bufferLength).c_str());
+			//*/
 			//packet.drop();
 			//continue;
 		}
@@ -556,9 +558,6 @@ Packet* GameClient::getNextPacket(bool compressed)
 		Log.Notice("[%s][%s] Received Opcode: 0x%08X (%s)\n", String::timeString().c_str(),
 			ipAddress.c_str(), packet->opcode, packet->receiver.c_str());
 		//*/
-		Log.Notice("[%s][%s] Received Opcode: 0x%08X (%s)\n", String::timeString().c_str(),
-			ipAddress.c_str(), packet->opcode, packet->receiver.c_str());
-		Log.Notice("%s\n\n", String::arrayToHexString(packet->data->buffer, packet->data->bufferLength).c_str());
 
 		return packet;
 	}

@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010, 2011, 2012 The Project Faolan Team
+Copyright (C) 2009, 2010 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -18,10 +18,52 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 #include "../WorldServer.h"
 
+void sendPackets::GI_ReportDimensionID(GameClient* client, string realmId)
+{
+	uint8 sender[] = { 0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x0f };
+	uint8 receiver[] = { 0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0x84, 0x80, 0x80, 0x08 };
+	
+	PacketBuffer aBuffer(500);
+	aBuffer.writeHeader(sender, sizeof(sender), receiver, sizeof(receiver), 0x200b, true); // ReportDimesionID
+	aBuffer.write<string>("1");
+		//Log.Warning("Send Packet:\n%s\n\n", String::arrayToHexString(aBuffer.buffer, aBuffer.bufferLength).c_str());
+	aBuffer.doItAll(client->clientSocket);
+	Log.Debug("Sent ReportDimensionID\n");
+}
+
+void sendPackets::GI_ReportServerID(GameClient* client, uint32 value)
+{
+	uint8 sender[] = { 0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x0f };
+	uint8 receiver[] = { 0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0x84, 0x80, 0x80, 0x08 };
+	
+	PacketBuffer aBuffer(500);
+	aBuffer.writeHeader(sender, sizeof(sender), receiver, sizeof(receiver), 0x200c, true); // ReportServerID
+	aBuffer.write<uint32>(gameUnknown1);
+	aBuffer.write<uint32>(value);
+	aBuffer.doItAll(client->clientSocket);
+
+	Log.Debug("Sent GI_ReportServerID\n");
+}
+
+void sendPackets::GI_AckAuthentication(GameClient* client, uint32 value)
+{
+	uint8 sender[] = { 0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x0f };
+	uint8 receiver[] = { 0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0x84, 0x80, 0x80, 0x08 };
+	
+	PacketBuffer aBuffer(500);
+	aBuffer.writeHeader(sender, sizeof(sender), receiver, sizeof(receiver), 0x2001, true); // ReportServerID
+	aBuffer.write<uint32>(value);
+	aBuffer.doItAll(client->clientSocket);
+
+	Log.Debug("Sent GI_AckAuthentication\n");
+}
+
+//OLD 
+
 void sendPackets::passBlob::CharStats(GameClient* client, uint32 target, uint32* value)
 {
 	uint32 statsCounter = value[0];
-	uint32 size = (5 * 4) + 1 + (statsCounter * 8);
+	uint32 size = (4 * 4) + 1 + (statsCounter * 2);
 	uint32 pointer = 0;
 
 	if(statsCounter>0)
@@ -43,13 +85,31 @@ void sendPackets::passBlob::CharStats(GameClient* client, uint32 target, uint32*
 		}
 
 		aBuffer.write<uint32>(0x3e4f4f3c);
-		Log.Notice("npc stats Pack:\n%s\n\n", String::arrayToHexString(aBuffer.buffer, aBuffer.bufferLength).c_str());
 		aBuffer.doItAll(client->clientSocket);
 	}
 	else
 	{
 		Log.Error("No values for stats packet\n");
 	}
+}
+
+void sendPackets::GI_Pong(Packet* packet, GameClient* client)
+{
+	uint32 cSendTime = packet->data->read<uint32>(); // ACE_Time_Value
+	uint32 lastData = packet->data->read<uint32>();
+
+	time_t nServerTime;
+	time(&nServerTime);
+
+	PacketBuffer aBuffer(500);
+	aBuffer.writeHeader("GameAgent", "GameInterface", gameUnknown1, 0, client->nClientInst, 0, Opcodes::GI_Pong); 
+	aBuffer.write<uint32>(cSendTime);
+	aBuffer.write<uint32>(nServerTime);
+	aBuffer.write<uint32>(lastData);
+	aBuffer.write<uint32>(nServerTime);
+	aBuffer.doItAll(client->clientSocket);
+
+	Log.Debug("Sent GI_Pong\n");
 }
 
 void sendPackets::other::removeEffect(GlobalTable* GTable, uint32 effectId, uint32 npcId)
