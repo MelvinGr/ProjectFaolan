@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010, 2011, 2012 The Project Faolan Team
+Copyright (C) 2009, 2010 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -34,13 +34,15 @@ struct Packet
 
 	uint32 length;
 	uint32 crc32;
-	string sender;
-	uint32 unknown1;
-	uint32 unknown2;
-	string receiver;
-	uint32 userID;
-	uint32 unknown4;
+	uint32 headersize;
+	uint8 sender;
+	uint8 slength;
+	PacketBuffer* senderInt;
+	uint8 receiver;
+	uint8 rlength;
+	PacketBuffer* receiverInt;
 	uint32 opcode;
+	PacketBuffer* headerData;
 	PacketBuffer* data; // use this one for reading data!!
 
 	Packet(PacketBuffer* pBuffer);

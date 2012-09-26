@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010, 2011, 2012 The Project Faolan Team
+Copyright (C) 2009, 2010 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -20,11 +20,17 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 void AgentServer::AgentServerHandler(GameClient* client, vector<GameClient*>* clientList)
 {
-	client->Receive(false);
-
+	if(!client->Receive(false))
+	{
+		Log.Error("Error receiving Packet\n");
+		return;
+	}
+	/*
 	uint16 opcode = client->receiveBuffer.read<uint16>();
 	uint16 length = client->receiveBuffer.read<uint16>(); // opcode & length dont count in length
-
+	//*/
+	Log.Warning("Packet:\n%s\n\n", String::arrayToHexString(client->receiveBuffer.buffer, client->receiveBuffer.bufferLength).c_str());
+	uint16 opcode = 0xcdcd;
 	Log.Notice("[%s][%s] Received Opcode: 0x%04X\n", String::timeString().c_str(), client->ipAddress.c_str(), opcode);
 	//Log.Notice("%s\n\n", String::arrayToHexString(client->receiveBuffer.buffer, client->receiveBuffer.bufferLength).c_str());
 
@@ -187,6 +193,7 @@ void AgentServer::AgentServerHandler(GameClient* client, vector<GameClient*>* cl
 	default:
 		{
 			Log.Warning("Unknown Packet With Opcode: 0x%04X Data:\n", opcode);
+			if(opcode != 0xfdfd)
 			Log.Warning("%s\n\n", String::arrayToHexString(client->receiveBuffer.buffer, client->receiveBuffer.bufferLength).c_str());
 
 			break;

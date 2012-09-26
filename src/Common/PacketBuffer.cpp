@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010, 2011, 2012 The Project Faolan Team
+Copyright (C) 2009, 2010 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -17,6 +17,26 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "PacketBuffer.h"
+
+string PacketBuffer::readString()
+{
+	if((offset + sizeof(int8)) <= maxLength)
+	{
+		uint8 stringLength = read<uint8>();
+		string data(&buffer[offset], &buffer[offset + stringLength]);
+	
+		offset += stringLength;
+		return data;
+	}
+}
+void PacketBuffer::writeString(string data)
+{
+	assert((offset + sizeof(int8)) <= maxLength);
+	write<uint8>(data.size());
+	
+	assert((offset + data.size()) <= maxLength);
+	writeArray((uint8*)data.c_str(), data.size());
+}
 
 void PacketBuffer::writeArray(uint8* data, uint32 length)
 {
@@ -62,7 +82,103 @@ void PacketBuffer::writeHeader(string sender, string receiver, uint32 unknown1, 
 	write<uint32>(unknown4); // write Unknown 4
 	write<uint32>(opcode); // write opcode
 }
+/*
+void PacketBuffer::setHeader(uint32 headersize, uint32 unk1, uint32 unk2, uint32 unk3, uint32 unk4, uint8* headerData, uint32 opcode)
+{
+	write<uint32>(0); // Write empty length
+	write<uint32>(0); // write empty crc32
+	write<uint32>(headersize);
+	write<uint32>(unk1); //
+	write<uint32>(unk2); //
+	write<uint32>(unk3); //
+	write<uint32>(unk4); //
+	if(headersize >= 0x14)
+	{
+		writeArray(headerData, (headersize-20));
+		write<uint32>(opcode);
+	}
+	else
+	{
+		writeArray(headerData, (headersize-18));
+		write<uint16>(opcode);
+	}
+}
+//*/
+void PacketBuffer::setHeader(uint8* sender, uint8 sl, uint8* receiver, uint8 rl, uint8* headerData, uint8 hl, uint32 opcode, bool minOpcode)
+{
+	write<uint32>(0); // Write empty length
+	write<uint32>(0); // write empty crc32
 
+	//Write Headerlength
+	if(minOpcode)
+		write<uint32>(sl + rl + hl + 2 + 2 + 2);
+	else
+		write<uint32>(sl + rl + hl + 2 + 2 + 4);
+
+	//Write sender
+	write<uint8>(0x0a);
+	write<uint8>(sl);
+	writeArray(sender, sl);
+
+	//Write receiver
+	write<uint8>(0x12);
+	write<uint8>(rl);
+	writeArray(receiver, rl);
+
+	//Write headerdata
+	if(hl > 0)
+		writeArray(headerData, hl);
+	
+	//write opcode
+	if(minOpcode)
+		write<uint16>(opcode);
+	else
+		write<uint32>(opcode);
+}
+//*/
+/*
+void PacketBuffer::writeHeader(uint8 sender[], uint8 sl, uint8 receiver[], uint8 rl, uint8 headerData[], uint8 hl, uint32 opcode, bool minOpcode)
+{
+	write<uint32>(0); // Write empty length
+	write<uint32>(0); // write empty crc32
+	write<uint32>(sl + rl + hl + 2 + 2 + 4);
+	write<uint8>(0x0a);
+	write<uint8>(sl);
+	writeArray(sender, sl);
+	write<uint8>(0x12);
+	write<uint8>(rl);
+	writeArray(receiver, rl);
+	if(hl > 0)
+	{
+		writeArray(headerData, hl);
+	}
+	
+	if(minOpcode)
+		write<uint16>(opcode);
+	else
+		write<uint32>(opcode);
+}
+//*/
+void PacketBuffer::writeHeader(uint8 sender[], uint8 sl, uint8 receiver[], uint8 rl, uint32 opcode, bool minOpcode)
+{
+	write<uint32>(0); // Write empty length
+	write<uint32>(0); // write empty crc32
+	if(minOpcode)
+		write<uint32>(sl + rl + 2 + 2 + 2);
+	else
+		write<uint32>(sl + rl + 2 + 2 + 4);
+	write<uint8>(0x0a);
+	write<uint8>(sl);
+	writeArray(sender, sl);
+	write<uint8>(0x12);
+	write<uint8>(rl);
+	writeArray(receiver, rl);
+	if(minOpcode)
+		write<uint16>(opcode);
+	else
+		write<uint32>(opcode);
+}
+//*/
 void PacketBuffer::finalize()
 {
 	uint32 packetLength = bufferLength - sizeof(uint32);
@@ -84,6 +200,15 @@ void PacketBuffer::finalizeAgentServer()
 void PacketBuffer::doItAll(SOCKET client)
 {
 	finalize();
+	/*
+	printf("Send:\n");
+	for(uint32 i = 0; i < bufferLength; i++)
+	{
+		printf("%02x ", buffer[i]);
+	}
+	printf("\n");
+	//*/
+	//printf("BuferLength: 0x%08x\n", bufferLength);
 	send(client, (int8*)buffer, bufferLength, 0);
 	drop();
 }

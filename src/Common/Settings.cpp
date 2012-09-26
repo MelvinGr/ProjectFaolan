@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010, 2011, 2012 The Project Faolan Team
+Copyright (C) 2009, 2010 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -52,24 +52,24 @@ bool SettingsClass::load(string settingsFile, int8* envp[])
 	realmName = config.pString("realmName");
 
 	characterSlots = config.pInt("characterSlots");
-	characterSlotsTrial = config.pInt("characterSlotsTrial");
 	clientVersion = config.pString("clientVersion");
 
 	playIntro = config.pBool("playIntro");
-
+	/*
 	RealmInfo* realm1 = new RealmInfo();
 	realm1->realmID = 1;
 	realm1->onlineStatus = 2; //2 = online, other num = offline
 	realm1->realmName = realmName;
 	realm1->loadStatus = 0; // 0 = medium load 1 = medium load 2 = heavy load 3 = full
-	realm1->realmType = 256; // 0,1 = PvE | 256,257 = PvP | 1081 = PvP by faction, probably a bitmask
+	realm1->realmType = 0; // 0,1 = PvE | 256,257 = PvP | 1081 = PvP by faction, probably a bitmask
 	realm1->csPlayerAgentIPAddress = csPlayerAgentIPAddress;
 	realm1->csPlayerAgentPort = csPlayerAgentPort;
 	realm1->agentServerIPAddress = agentServerIPAddress;
 	realm1->agentServerPort = agentServerPort;
 	realm1->worldServerIPAddress = worldServerIPAddress;
 	realm1->worldServerPort = worldServerPort;
-	//realms.push_back(realm1);
+	realms.push_back(realm1);
+	//*/
 
 	return true;
 }

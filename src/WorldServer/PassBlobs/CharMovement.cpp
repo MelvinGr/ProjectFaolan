@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010, 2011, 2012 The Project Faolan Team
+Copyright (C) 2009, 2010 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -28,10 +28,8 @@ void PassBlob::CharMovement(Packet* packet, GameClient* client)
 		client->charInfo.position.x = packet->data->read<uint32>();
 		client->charInfo.position.y = packet->data->read<uint32>();
 		client->charInfo.position.z = packet->data->read<uint32>();
-		client->charInfo.rotation.x = packet->data->read<uint32>();
-		client->charInfo.rotation.y = packet->data->read<uint32>();
-		//uint32 unk_data1 = packet->data->read<uint32>();
-		//uint32 unk_data2 = packet->data->read<uint32>();
+		uint32 unk_data1 = packet->data->read<uint32>();
+		uint32 unk_data2 = packet->data->read<uint32>();
 
 		type &= 0x00ff;
 
@@ -60,8 +58,8 @@ void PassBlob::CharMovement(Packet* packet, GameClient* client)
 						aBuffer.write<uint32>(client->charInfo.position.x);
 						aBuffer.write<uint32>(client->charInfo.position.y);
 						aBuffer.write<uint32>(client->charInfo.position.z);
-						aBuffer.write<uint32>(client->charInfo.rotation.x);
-						aBuffer.write<uint32>(client->charInfo.rotation.y);
+						aBuffer.write<uint32>(unk_data1);
+						aBuffer.write<uint32>(unk_data2);
 						aBuffer.write<uint8>(unk1);
 						aBuffer.write<uint32>(unk2);
 						aBuffer.write<uint32>(unk3);
@@ -88,7 +86,7 @@ void PassBlob::CharMovement(Packet* packet, GameClient* client)
 					{
 						uint8 unk1 = packet->data->read<uint8>();
 						uint32 unk2 = packet->data->read<uint32>();
-						client->charInfo.rotation.z = packet->data->read<uint32>();
+						uint32 unk3 = packet->data->read<uint32>();
 						uint16 unk4 = packet->data->read<uint16>();
 
 						PacketBuffer aBuffer(500);
@@ -101,11 +99,11 @@ void PassBlob::CharMovement(Packet* packet, GameClient* client)
 						aBuffer.write<uint32>(client->charInfo.position.x);
 						aBuffer.write<uint32>(client->charInfo.position.y);
 						aBuffer.write<uint32>(client->charInfo.position.z);
-						aBuffer.write<uint32>(client->charInfo.rotation.x);
-						aBuffer.write<uint32>(client->charInfo.rotation.y);
+						aBuffer.write<uint32>(unk_data1);
+						aBuffer.write<uint32>(unk_data2);
 						aBuffer.write<uint8>(unk1);
 						aBuffer.write<uint32>(unk2);
-						aBuffer.write<uint32>(client->charInfo.rotation.z);
+						aBuffer.write<uint32>(unk3);
 						aBuffer.write<uint16>(unk4);
 						aBuffer.write<uint32>(0x3e4f4f3c);
 						aBuffer.doItAll(client->clientSocket);
@@ -142,8 +140,8 @@ void PassBlob::CharMovement(Packet* packet, GameClient* client)
 						aBuffer.write<uint32>(client->charInfo.position.x);
 						aBuffer.write<uint32>(client->charInfo.position.y);
 						aBuffer.write<uint32>(client->charInfo.position.z);
-						aBuffer.write<uint32>(client->charInfo.rotation.x);
-						aBuffer.write<uint32>(client->charInfo.rotation.y);
+						aBuffer.write<uint32>(unk_data1);
+						aBuffer.write<uint32>(unk_data2);
 						aBuffer.write<uint8>(unk1);
 						aBuffer.write<uint32>(unk2);
 						aBuffer.write<uint32>(unk3);
@@ -178,8 +176,8 @@ void PassBlob::CharMovement(Packet* packet, GameClient* client)
 						aBuffer.write<uint32>(client->charInfo.position.x);
 						aBuffer.write<uint32>(client->charInfo.position.y);
 						aBuffer.write<uint32>(client->charInfo.position.z);
-						aBuffer.write<uint32>(client->charInfo.rotation.x);
-						aBuffer.write<uint32>(client->charInfo.rotation.y);
+						aBuffer.write<uint32>(unk_data1);
+						aBuffer.write<uint32>(unk_data2);
 						
 						uint32 size = packet->data->bufferLength - ((9 * 4) + 2 + 4);
 						aBuffer.writeArray(packet->data->readArray(size), size);
@@ -210,8 +208,8 @@ void PassBlob::CharMovement(Packet* packet, GameClient* client)
 						aBuffer.write<uint32>(client->charInfo.position.x);
 						aBuffer.write<uint32>(client->charInfo.position.y);
 						aBuffer.write<uint32>(client->charInfo.position.z);
-						aBuffer.write<uint32>(client->charInfo.rotation.x);
-						aBuffer.write<uint32>(client->charInfo.rotation.y);
+						aBuffer.write<uint32>(unk_data1);
+						aBuffer.write<uint32>(unk_data2);
 						
 						uint32 size = packet->data->bufferLength - ((9 * 4) + 2 + 4);
 						aBuffer.writeArray(packet->data->readArray(size), size);
@@ -240,8 +238,8 @@ void PassBlob::CharMovement(Packet* packet, GameClient* client)
 						aBuffer.write<uint32>(client->charInfo.position.x);
 						aBuffer.write<uint32>(client->charInfo.position.y);
 						aBuffer.write<uint32>(client->charInfo.position.z);
-						aBuffer.write<uint32>(client->charInfo.rotation.x);
-						aBuffer.write<uint32>(client->charInfo.rotation.y);
+						aBuffer.write<uint32>(unk_data1);
+						aBuffer.write<uint32>(unk_data2);
 						
 						uint32 size = packet->data->bufferLength - ((9 * 4) + 2 + 4);
 						aBuffer.writeArray(packet->data->readArray(size), size);
@@ -270,8 +268,8 @@ void PassBlob::CharMovement(Packet* packet, GameClient* client)
 						aBuffer.write<uint32>(client->charInfo.position.x);
 						aBuffer.write<uint32>(client->charInfo.position.y);
 						aBuffer.write<uint32>(client->charInfo.position.z);
-						aBuffer.write<uint32>(client->charInfo.rotation.x);
-						aBuffer.write<uint32>(client->charInfo.rotation.y);
+						aBuffer.write<uint32>(unk_data1);
+						aBuffer.write<uint32>(unk_data2);
 						
 						uint32 size = packet->data->bufferLength - ((9 * 4) + 2 + 4);
 						aBuffer.writeArray(packet->data->readArray(size), size);

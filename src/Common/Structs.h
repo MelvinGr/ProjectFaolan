@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010, 2011, 2012 The Project Faolan Team
+Copyright (C) 2009, 2010 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -46,6 +46,7 @@ struct RealmInfo
 
 	uint32 onlineStatus; //2 = online, other num = offline
 	uint32 loadStatus; // 0 = medium load 1 = medium load 2 = heavy load 3 = full
+	uint32 serverActive;
 
 	string agentServerIPAddress;
 	uint32 agentServerPort;
@@ -128,8 +129,6 @@ struct NPC
 	uint32 nameId;
 	uint32 mapId;
 	uint32 typ;
-	uint32 gender;
-	uint32 race;
 	Vector3D position;
 	Vector3D rotation;
 	string extras;
@@ -166,22 +165,4 @@ struct Spells
 	string effectSpell;
 };
 
-struct Object
-{
-	uint32 id;
-	string name;
-	uint32 map;
-	Vector3D position;
-	Vector3D rotation;
-	uint32 data0;
-	uint32 data1;
-	uint32 data2;
-	uint32 data3;
-	uint32 data4;
-	uint32 data5;
-	uint32 unk0;
-	uint32 unk1;
-	string sdat1;
-	string sdat2;
-};
 #endif

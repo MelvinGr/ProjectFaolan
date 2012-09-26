@@ -73,9 +73,9 @@ enum Opcodes
 	GI_GameStats				= 8,
 	GI_GameServerStats			= 9,
 	GI_GameServerDataSet		= 10,
-	GI_ReportGameServerDataset	= 13, //changed not coorect !!!
-	GI_ReportDimesionID			= 11, //changed
-	GI_ReportServerID			= 12, //changed
+	GI_ReportGameServerDataset	= 11,
+	GI_ReportDimesionID			= 12,
+	GI_ReportServerID			= 13,
 	GI_DataSink					= 14,
 	GI_Kicked					= 15,
 
@@ -95,14 +95,7 @@ enum Opcodes
 	GCA ... GameCharAgent (Client)
 	*/
 	GCI_UpdateAggroStatus		= 0,
-	GCI_UpdateName				= 1,
-	GCI_learnSpell				= 0x0a,
-	GCI_addItem					= 0x1c,
-	GCI_SpellBarData			= 0x6f,
-	GCI_Pong					= 0x77,
-
-	GCA_SpellbarRequest			= 0x64,
-	GCA_Ping					= 0x7c
+	GCI_UpdateName				= 1
 };
 
 enum PassBlobOpcodes

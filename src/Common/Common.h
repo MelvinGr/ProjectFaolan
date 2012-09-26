@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010, 2011, 2012 The Project Faolan Team
+Copyright (C) 2009, 2010 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published byd
@@ -103,12 +103,8 @@ typedef long double ldouble;
 
 //////////////////////////////////////////////////////////////////////////
 
-#define gameUnknown1 0x0000001a
+#define gameUnknown1 0x00000014
 #define maxDistance 8000000
-
-//temp defines
-#define gameInstance 0x00038c65
-//////////////
 
 #define _USE_MATH_DEFINES
 
