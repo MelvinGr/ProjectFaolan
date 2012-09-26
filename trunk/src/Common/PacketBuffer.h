@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010, 2011, 2012 The Project Faolan Team
+Copyright (C) 2009, 2010 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -76,7 +76,7 @@ public:
 		maxLength = 0;
 	}
 
-	template <typename T> T read(bool set2B = true)
+	template <typename T> T read()
 	{
 		try
 		{
@@ -93,28 +93,41 @@ public:
 		}
 	}
 
-	template <typename T> void write(T data, bool set2B = true)
+	template <typename T> void write(T data)
 	{
 		try
 		{
 			T newData = data;
 			SwapByte::Swap<T>(newData);
 
-			assert((offset + sizeof(T)) <= maxLength);
-			memcpy(&buffer[offset], reinterpret_cast<uint8*>(&newData), sizeof(newData));
+			//assert((offset + sizeof(T)) <= maxLength);
+			if((offset + sizeof(T)) <= maxLength)
+				{
+				memcpy(&buffer[offset], reinterpret_cast<uint8*>(&newData), sizeof(newData));
 
-			offset += sizeof(newData);
-			bufferLength += sizeof(newData);
+				offset += sizeof(newData);
+				bufferLength += sizeof(newData);
+			}
+			else
+			{
+				printf("Error writing to packetbuffer. -> check packet length!!!\n");
+			}
 		}
 		catch(char* msg)
 		{
-			printf("Error at writing @ PacketBuffer.h\nErrorMsg: %s \n", msg);
+			printf("Exception thrown at writing @ PacketBuffer.h\nErrorMsg: %s \n", msg);
 		}
 	}
 
 	uint8* readArray(uint32 length);
 	void writeArray(uint8* data, uint32 length);
+	void writeString(string data);
+	string readString();
 	void writeHeader(string sender, string receiver, uint32 unknown1, uint32 unknown2, uint32 user, uint32 unknown4, uint32 opcode);
+	void writeHeader(uint8 sender[], uint8 sl, uint8 receiver[], uint8 rl, uint8 headerData[], uint8 hl, uint32 opcode, bool minOpcode = false);
+	void writeHeader(uint8 sender[], uint8 sl, uint8 receiver[], uint8 rl, uint32 opcode, bool minOpcode = false);
+	void setHeader(uint8* sender, uint8 sl, uint8* receiver, uint8 rl, uint8* headerData, uint8 hl, uint32 opcode, bool minOpcode = false);
+	void setHeader(uint32 headersize, uint32 unk1, uint32 unk2, uint32 unk3, uint32 unk4, uint8* headerData, uint32 opcode);
 	void finalize();
 	void finalizeAgentServer();
 	void doItAll(SOCKET client);
@@ -122,52 +135,52 @@ public:
 };
 
 
-template <> inline void PacketBuffer::write(string data, bool set2B)
+template <> inline void PacketBuffer::write(string data)
 {
 	try
 	{
-		if(set2B)
+		//assert((offset + sizeof(int16)) <= maxLength);
+		if((offset + sizeof(int16)) <= maxLength)
 		{
-			assert((offset + sizeof(int16)) <= maxLength);
 			write<uint16>(data.size());
+	
+			//assert((offset + data.size()) <= maxLength);
+			if((offset + data.size()+sizeof(int16)) <= maxLength)
+				writeArray((uint8*)data.c_str(), data.size());
+			else
+				printf("Error writing string to packetbuffer. -> check packet length!!!\n");
 		}
 		else
 		{
-			assert((offset + sizeof(int8)) <= maxLength);
-			write<uint8>(data.size());
+			printf("Error writing string to packetbuffer. -> check packet length!!!\n");
 		}
-	
-		assert((offset + data.size()) <= maxLength);
-		writeArray((uint8*)data.c_str(), data.size());
 	}
 	catch(char* msg)
 	{
-		printf("Error at writing String @ PacketBuffer.h\nErrorMsg: %s \n", msg);
+		printf("Exception thrown by writing String @ PacketBuffer.h\nErrorMsg: %s \n", msg);
 	}
 }
 
-template <> inline string PacketBuffer::read(bool set2B)
+template <> inline string PacketBuffer::read()
 {
 	try
 	{
-		uint16 stringLength = 0;
-		if(set2B)
+		//assert((offset + sizeof(int16)) <= bufferLength);
+		if((offset + sizeof(int16)) <= bufferLength)
 		{
-			assert((offset + sizeof(int16)) <= bufferLength);
-			stringLength = read<uint16>();
+			uint16 stringLength = read<uint16>();
+	
+			//assert((offset + stringLength) <= bufferLength);
+			string data(&buffer[offset], &buffer[offset + stringLength]);
+	
+			offset += stringLength;
+			return data;
 		}
 		else
 		{
-			assert((offset + sizeof(int8)) <= bufferLength);
-			stringLength = read<uint8>();
-			stringLength &= 0x00000000ffffffff;
+			printf("Error reading string at packetbuffer!!!\n");
 		}
-	
-		assert((offset + stringLength) <= bufferLength);
-		string data(&buffer[offset], &buffer[offset + stringLength]);
-	
-		offset += stringLength;
-		return data;
+		return "";
 	}
 	catch(char* msg)
 	{

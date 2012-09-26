@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010, 2011, 2012 The Project Faolan Team
+Copyright (C) 2009, 2010 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -20,7 +20,6 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 void WorldServer::GameCharAgentProjectHandler(Packet* packet, GameClient* client)
 {
-	Log.Warning("Receive Packet With Opcode: 0x%08X (%s):\n", packet->opcode, packet->receiver.c_str());
 	switch(packet->opcode)
 	{
 	case 0x00:
@@ -50,10 +49,12 @@ void WorldServer::GameCharAgentProjectHandler(Packet* packet, GameClient* client
 
 			break;
 		}
+		
 	default:
 		{
-			Log.Warning("Unknown Packet With Opcode: 0x%08X (%s):\n", packet->opcode, packet->receiver.c_str());
-			Log.Warning("%s\n\n", String::arrayToHexString(packet->data->buffer, packet->data->bufferLength).c_str());
+			Log.Warning("Receive unknown Packet:\n%s\n\n", String::arrayToHexString(packet->packetBuffer->buffer, packet->packetBuffer->bufferLength).c_str());
+			//Log.Warning("Unknown Packet With Opcode: 0x%08X (%s):\n", packet->opcode, packet->receiver.c_str());
+			//Log.Warning("%s\n\n", String::arrayToHexString(packet->data->buffer, packet->data->bufferLength).c_str());
 
 			break;
 		}

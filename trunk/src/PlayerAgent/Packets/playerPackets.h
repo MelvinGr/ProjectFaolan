@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010 The Project Faolan Team
+Copyright (C) 2009 - 2012 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -16,36 +16,23 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef PLAYERAGENT_H
-#define PLAYERAGENT_H
+#ifndef PLAYERPACKETS_H
+#define PLAYERPACKETS_H
 
-#include <time.h>
-#include "../Common/Common.h"
-#include "../Common/Settings.h"
-#include "../Common/MysqlDatabase.h"
-#include "../Common/Functions.h"
-#include "../Common/PacketBuffer.h"
-#include "../Common/Packet.h"
-#include "../Common/Networking.h"
-#include "../Common/Logger.h"
+#include "../playerAgent.h"
 
-using namespace std;
-
-namespace PlayerAgent
+namespace playerPackets
 {
+	void initAuth(Packet* packet, GameClient* client);
 	void sendSmallCharList(GameClient* client);
 	void sendCharacterList(GameClient* client);
 	void sendRealmList(GameClient* client);
+	void sendAgentServerAddress(GameClient* client, uint32 ip, uint16 port, uint32 accID,uint32 nClientInst);
+	void sendCSServerAddress(GameClient* client, uint32 ip, uint16 port, uint32 accID,uint32 nClientInst);
+	void sendWorldServerAddress(GameClient* client, uint32 ip, uint16 port, uint32 accID,uint32 nClientInst);
 
-	void PlayerAgentHandler(Packet* packet, GameClient* client);
-
-	void HandleClient(void* socket);
+	//functions
+	uint32 getCharCount(vector<CharacterInfo> characters);
 }
 
-enum OPCODES
-{
-	REQUEST_AUTH = 0x96CBE509,
-	REQUEST_SMALLCHARLIST  = 0xDAD1D206,
-	REQUEST_CHAR_REALMDATA = 0xA3E1FE0D
-};
 #endif

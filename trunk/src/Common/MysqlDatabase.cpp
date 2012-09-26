@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010, 2011, 2012 The Project Faolan Team
+Copyright (C) 2009, 2010 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -33,52 +33,48 @@ void MySQLDatabase::closeMysql()
 	mysql_close(&mysql);
 }
 
-//Realms from db
-void MySQLDatabase::loadRealms(vector<RealmInfo*>* realms)
+//Server Start Functions
+
+bool MySQLDatabase::loadRealmlist(vector<RealmInfo*>* realms)
 {
 	MYSQL_RES* res;
 	MYSQL_ROW row;
-	uint32 realmsc = 0;
+	uint32 knownSpells = 0;
+	Log.Notice("Loading Realmlist: ");
 	int8 query[1000];
-	uint8 activ = 0;
-	sprintf(query, "SELECT * FROM realms");
+	sprintf(query, "SELECT * FROM realms WHERE activ = '1'");
 	if (mysql_query(&mysql, query) == 0 && (res = mysql_store_result(&mysql)))
 	{
 		while ((row = mysql_fetch_row(res)))
 		{
-			activ = atoi(row[6]);
-			if(activ > 0)
+			RealmInfo* tmprealm = new RealmInfo();
+			tmprealm->realmID = atoi64(row[0]);
+			if(tmprealm->realmID > 0)
 			{
-				if(atoi64(row[0]) > 0)
-				{
-					RealmInfo* tmpRealm = new RealmInfo();
-					tmpRealm->realmID = atoi64(row[0]);
-					tmpRealm->realmName = row[1];
-					tmpRealm->onlineStatus = atoi(row[2]);
-					tmpRealm->realmType = atoi64(row[4]);
-					tmpRealm->loadStatus = atoi(row[5]);
-					tmpRealm->csPlayerAgentIPAddress = row[7];
-					tmpRealm->csPlayerAgentPort = atoi(row[8]);
-					tmpRealm->agentServerIPAddress = row[9];
-					tmpRealm->agentServerPort = atoi(row[10]);
-					tmpRealm->worldServerIPAddress = row[11];
-					tmpRealm->worldServerPort = atoi(row[12]);
-
-					realms->push_back(tmpRealm);
-					realmsc++;
-				}
+				tmprealm->realmName = row[1];
+				tmprealm->onlineStatus = atoi(row[2]);
+				tmprealm->realmType = atoi(row[4]);
+				tmprealm->loadStatus = atoi(row[5]);
+				tmprealm->serverActive = atoi(row[6]);
+				tmprealm->csPlayerAgentIPAddress = row[7];
+				tmprealm->csPlayerAgentPort = atoi(row[8]);
+				tmprealm->agentServerIPAddress = row[9];
+				tmprealm->agentServerPort = atoi(row[10]);
+				tmprealm->worldServerIPAddress = row[11];
+				tmprealm->worldServerPort = atoi(row[12]);
+				realms->push_back(tmprealm);
 			}
 		}
+		Log.Success("done\n\n", knownSpells);
+		mysql_free_result(res);
+		return true;
 	}
-	mysql_free_result(res);
-	if(realmsc > 0)
-		Log.Notice("Loaded %i relams from the database.\n", realmsc);
 	else
-		Log.Error("No realms activ at the database\n");
+	{
+		Log.Error("Error loading realmlist!!!\n\n");
+		return false;
+	}
 }
-//-----
-
-//Server Start Functions
 
 bool MySQLDatabase::loadGlobalSpells(vector<Spells>* SPELLS)
 {
@@ -150,7 +146,7 @@ bool MySQLDatabase::loadGlobalSpells(vector<Spells>* SPELLS)
 	}
 }
 
-bool MySQLDatabase::loadGlobalNpcs(vector<NPC>* NPCS)
+bool MySQLDatabase::ladGlobalNpcs(vector<NPC>* NPCS)
 {
 	MYSQL_RES* res;
 	MYSQL_ROW row;
@@ -236,158 +232,6 @@ bool MySQLDatabase::loadGlobalNpcs(vector<NPC>* NPCS)
 	}
 }
 
-bool MySQLDatabase::loadGlobalObjects(vector<Object>* OBJECTS)
-{
-	MYSQL_RES* res;
-	MYSQL_ROW row;
-	uint32 knownObjects = 0;
-	Log.Notice("Loading Objects in table\n|");
-	int8 query[1000];
-	sprintf(query, "SELECT * FROM worldobjects");
-	if (mysql_query(&mysql, query) == 0 && (res = mysql_store_result(&mysql)))
-	{
-		while ((row = mysql_fetch_row(res)))
-		{
-			if(atoi(row[0]) > 0)
-			{
-				knownObjects++;
-			}
-		}
-		mysql_free_result(res);
-	}
-	else
-	{
-		Log.Error("Error at loading Objects in table!!!\n\n");
-		return false;
-	}
-
-	uint32 tmpCounter = 0;
-	uint32 tmpBar = 0;
-	uint32 lastValue = 0;
-
-	sprintf(query, "SELECT * FROM worldobjects");
-	if (mysql_query(&mysql, query) == 0 && (res = mysql_store_result(&mysql)))
-	{
-		while ((row = mysql_fetch_row(res)))
-		{
-			Object objInfo;
-			objInfo.id = atoi64(row[0]);
-			if(objInfo.id > 0)
-			{
-				objInfo.name = row[1];
-				objInfo.map = atoi64(row[2]);
-				objInfo.position.x = atoi64(row[3]);
-				objInfo.position.y = atoi64(row[4]);
-				objInfo.position.z = atoi64(row[5]);
-				objInfo.rotation.x = atoi64(row[6]);
-				objInfo.rotation.y = atoi64(row[7]);
-				objInfo.rotation.z = atoi64(row[8]);
-				objInfo.data0 = atoi64(row[9]);
-				objInfo.data1 = atoi64(row[10]);
-				objInfo.data2 = atoi64(row[11]);
-				objInfo.data3 = atoi64(row[12]);
-				objInfo.data4 = atoi64(row[13]);
-				objInfo.data5 = atoi64(row[14]);
-				objInfo.unk0 = atoi64(row[15]);
-				objInfo.sdat1 = row[16];
-				objInfo.sdat2 = row[17];
-				objInfo.unk1 = atoi64(row[18]);
-				
-				OBJECTS->push_back(objInfo);
-				tmpCounter++;
-				tmpBar = tmpCounter / knownObjects;
-				if((tmpBar*50) > lastValue)
-				{
-					uint8 dif= (tmpBar*50) - lastValue;
-					for(int v=0; v < dif; v++)
-					{
-						Log.Notice("=");
-					}
-					lastValue = tmpBar;
-				}
-			}
-		}
-		Log.Notice("|\n%i Objects loaded\n\n", knownObjects);
-		mysql_free_result(res);
-		return true;
-	}
-	else
-	{
-		Log.Error("Error at loading Objects in table!!!\n\n");
-		return false;
-	}
-}
-
-bool MySQLDatabase::loadGlobalItems(vector<Item>* ITEMS)
-{
-	MYSQL_RES* res;
-	MYSQL_ROW row;
-	uint32 knownObjects = 0;
-	Log.Notice("Loading Items in table\n|");
-	int8 query[1000];
-	sprintf(query, "SELECT * FROM p_items");
-	if (mysql_query(&mysql, query) == 0 && (res = mysql_store_result(&mysql)))
-	{
-		while ((row = mysql_fetch_row(res)))
-		{
-			if(atoi64(row[1]) > 0)
-			{
-				knownObjects++;
-			}
-		}
-		mysql_free_result(res);
-	}
-	else
-	{
-		Log.Error("Error at loading Items in table!!!\n\n");
-		return false;
-	}
-
-	uint32 tmpCounter = 0;
-	uint32 tmpBar = 0;
-	uint32 lastValue = 0;
-
-	sprintf(query, "SELECT * FROM p_items");
-	if (mysql_query(&mysql, query) == 0 && (res = mysql_store_result(&mysql)))
-	{
-		while ((row = mysql_fetch_row(res)))
-		{
-			Item itemInfo;
-			itemInfo.id = atoi64(row[1]);
-			if(itemInfo.id > 0)
-			{
-				itemInfo.iLevel = atoi64(row[2]);
-				itemInfo.data0 = atoi64(row[3]);
-				itemInfo.data1 = atoi64(row[4]);
-				itemInfo.data2 = atoi64(row[5]);
-				itemInfo.data3 = atoi64(row[6]);
-				itemInfo.data4 = atoi64(row[7]);
-				
-				ITEMS->push_back(itemInfo);
-				tmpCounter++;
-				tmpBar = tmpCounter / knownObjects;
-				if((tmpBar*50) > lastValue)
-				{
-					uint8 dif= (tmpBar*50) - lastValue;
-					for(int v=0; v < dif; v++)
-					{
-						Log.Notice("=");
-					}
-					lastValue = tmpBar;
-				}
-			}
-		}
-		Log.Notice("|\n%i Items loaded\n\n", knownObjects);
-		mysql_free_result(res);
-		return true;
-	}
-	else
-	{
-		Log.Error("Error at loading Items in table!!!\n\n");
-		return false;
-	}
-}
-
 //----------------------
 
 bool MySQLDatabase::checkLogin(string username, string password)
@@ -409,8 +253,8 @@ bool MySQLDatabase::updateLastInfo(uint32 accountID, string ip)
 	tm* timeinfo = localtime(&rawtime);
 
 	int8 query[1000];
-	sprintf(query, "UPDATE accounts SET last_ip = '%s', last_connection = '%02i/%02i/%04i %02i:%02i' WHERE account_id = %u",
-		ip.c_str(), timeinfo->tm_mday, timeinfo->tm_mon + 1, timeinfo->tm_year + 1900, timeinfo->tm_hour, timeinfo->tm_min, accountID);
+	sprintf(query, "UPDATE accounts SET last_ip = '%s', last_connection = '%02i/%02i/%04i' WHERE account_id = %u",
+		ip.c_str(), timeinfo->tm_mday, timeinfo->tm_mon + 1, timeinfo->tm_year + 1900, accountID);
 
 	return (mysql_query(&mysql, query) == 0);
 }
@@ -504,46 +348,19 @@ uint32 MySQLDatabase::getEmptyChar_Id(uint32 accountID)
 
 bool MySQLDatabase::updateCharacter(CharacterInfo* charInfo)
 {
-	MYSQL_RES* res;
-	int8 query[1000];
+	deleteCharacter(charInfo->characterID);
+
 	time_t rawtime;
-	
 	time(&rawtime);
 	tm* timeinfo = localtime(&rawtime);
 
-	sprintf(query, "SELECT * FROM characters WHERE character_id = '%u' AND account_id='%u'", charInfo->characterID, charInfo->accountID);
-	if ((mysql_query(&mysql, query) == 0) && (res = mysql_store_result(&mysql)))
-	{
-		sprintf(query, "UPDATE characters SET map_id='%u', last_connection='%02i/%02i/%04i %02i:%02i' WHERE character_id='%u' AND account_id='%u'",
-			charInfo->map, timeinfo->tm_mday, timeinfo->tm_mon + 1, timeinfo->tm_year + 1900, timeinfo->tm_hour, timeinfo->tm_min,
-			charInfo->characterID, charInfo->accountID);
-	}
-	else
-	{
-		deleteCharacter(charInfo->characterID);
+	int8 query[1000];
+	sprintf(query, "INSERT INTO characters VALUES ('%u', '%u', '%s', '%u', '%u', '%u', '%u', '1', '%u', 'en', '%u', '%u', '%u', '%02i/%02i/%04i %02i:%02i', '%u', '%u', '%u', '1126113')",
+		charInfo->characterID, charInfo->accountID, charInfo->name.c_str(), charInfo->race, charInfo->Class, charInfo->level, 
+		charInfo->sex, charInfo->map, charInfo->headmesh, charInfo->size, charInfo->voice,
+		timeinfo->tm_mday, timeinfo->tm_mon + 1, timeinfo->tm_year + 1900, timeinfo->tm_hour, timeinfo->tm_min,
+		charInfo->position.x, charInfo->position.y, charInfo->position.z);
 
-		sprintf(query, "INSERT INTO characters VALUES ('%u', '%u', '%s', '%u', '%u', '%u', '%u', '1', '%u', 'en', '%u', '%u', '%u', '%02i/%02i/%04i %02i:%02i', '%u', '%u', '%u', '1126113')",
-			charInfo->characterID, charInfo->accountID, charInfo->name.c_str(), charInfo->race, charInfo->Class, charInfo->level, 
-			charInfo->sex, charInfo->map, charInfo->headmesh, charInfo->size, charInfo->voice,
-			timeinfo->tm_mday, timeinfo->tm_mon + 1, timeinfo->tm_year + 1900, timeinfo->tm_hour, timeinfo->tm_min,
-			charInfo->position.x, charInfo->position.y, charInfo->position.z);
-	}
-
-	sprintf(query, "SELECT * FROM playerdata WHERE id = '%u' AND account_id='%u'", charInfo->characterID, charInfo->accountID);
-	if ((mysql_query(&mysql, query) == 0) && (res = mysql_store_result(&mysql)))
-	{
-		sprintf(query, "UPDATE playerdata SET posX='%u', posY='%u', posZ='%u', rotX='%u', rotY='%u', rotZ='%u' WHERE character_id='%u' AND account_id='%u'",
-			charInfo->position.x, charInfo->position.y, charInfo->position.z, charInfo->rotation.x, charInfo->rotation.y, charInfo->rotation.z,
-			charInfo->characterID, charInfo->accountID);
-	}
-	else
-	{
-		deleteCharacterData(charInfo->characterID);
-
-		sprintf(query, "INSERT INTO playerdata VALUES ('%u', '%u', '%u', '%u', '%u', '%u', '%u', '%u')",
-			charInfo->characterID, charInfo->accountID, charInfo->position.x, charInfo->position.y, charInfo->position.z,
-			charInfo->rotation.x, charInfo->rotation.y, charInfo->rotation.z);
-	}
 	return (mysql_query(&mysql, query) == 0);
 }
 
@@ -588,30 +405,6 @@ bool MySQLDatabase::setAccountCookie(uint32 accountID, uint32 cookie)
 	return (mysql_query(&mysql, query) == 0);
 }
 
-bool MySQLDatabase::getAccountTrail(uint32 accountID)
-{
-	MYSQL_RES* res;
-	MYSQL_ROW row;
-
-	int8 query[1000];
-	sprintf(query, "SELECT trial FROM accounts WHERE account_id = %u", accountID);
-
-	if ((mysql_query(&mysql, query) == 0) && (res = mysql_store_result(&mysql)) && (row = mysql_fetch_row(res)))
-	{
-		uint32 result = atoi(row[0]);
-		mysql_free_result(res);
-		if(result > 0)
-		{
-			return true;
-		}
-		else
-		{
-			return false;
-		}
-	}
-	else return true;
-}
-
 int32 MySQLDatabase::getAccountByCharacter(CharacterInfo character)
 {
 	MYSQL_RES* res;
@@ -646,7 +439,7 @@ bool MySQLDatabase::getCharacters(uint32 accountID, vector<CharacterInfo>* chara
 {
 	MYSQL_RES* res;
 	MYSQL_ROW row;
-
+	Log.Warning("ACC ID: 0x%08x\n", accountID);
 	int8 query[1000];
 	sprintf(query, "SELECT character_id FROM characters WHERE account_id = %u", accountID);
 	if ((mysql_query(&mysql, query) == 0) && (res = mysql_store_result(&mysql)))
@@ -668,43 +461,44 @@ bool MySQLDatabase::getCharacterInfo(uint32 characterID, CharacterInfo* info)
 {
 	MYSQL_RES* res;
 	MYSQL_ROW row;
-
+	Log.Warning("CHAR ID: 0x%08x\n", characterID);
 	int8 query[1000];
 	sprintf(query, "SELECT character_id, account_id, name, race, class, level, sex, realm_id, last_connection, map_id, language, headmesh, size, voice, pos_x, pos_y, pos_z, lbinprv FROM characters WHERE character_id = %u", characterID);
 	if ((mysql_query(&mysql, query) == 0) && (res = mysql_store_result(&mysql)) && (row = mysql_fetch_row(res)))
 	{
 		info->characterID = atoi(row[0]);
-		info->accountID = atoi(row[1]);
-		info->name = row[2];
-		info->race = atoi(row[3]);
-		info->Class = atoi(row[4]);
-		info->level = atoi(row[5]);
-		info->sex = atoi(row[6]);
-		info->realmID = atoi(row[7]);
-		info->lastConnection = row[8];
-		info->map = atoi(row[9]);
-		info->language = row[10];
-		info->headmesh = atoi(row[11]);
-		info->size = atoi(row[12]);
-		info->voice = atoi(row[13]);
-		info->position = Vector3D(atoi64(row[14]), atoi64(row[15]), atoi64(row[16]));
-		info->lbinprv = atoi(row[17]);
+		if(info->characterID > 0)
+		{
+			info->accountID = atoi(row[1]);
+			info->name = row[2];
+			info->race = atoi(row[3]);
+			info->Class = atoi(row[4]);
+			info->level = atoi(row[5]);
+			info->sex = atoi(row[6]);
+			info->realmID = atoi(row[7]);
+			info->lastConnection = row[8];
+			info->map = atoi(row[9]);
+			info->language = row[10];
+			info->headmesh = atoi(row[11]);
+			info->size = atoi(row[12]);
+			info->voice = atoi(row[13]);
+			info->position = Vector3D(atoi64(row[14]), atoi64(row[15]), atoi64(row[16]));
+			info->lbinprv = atoi(row[17]);
 
-		mysql_free_result(res);
+			mysql_free_result(res);
+			return true;
+		}
+		else
+		{
+			info->level = 0;
+			return false;
+		}
 	}
-	else return false;
-
-	sprintf(query, "SELECT * FROM playerdata WHERE character_id = %u", characterID);
-	if ((mysql_query(&mysql, query) == 0) && (res = mysql_store_result(&mysql)) && (row = mysql_fetch_row(res)))
+	else 
 	{
-		info->position = Vector3D(atoi64(row[2]), atoi64(row[3]), atoi64(row[4]));
-		info->rotation = Vector3D(atoi64(row[5]), atoi64(row[6]), atoi64(row[7]));
-
-		mysql_free_result(res);
+		info->level = 0;
+		return false;
 	}
-	else return false;
-
-	return true;
 }
 
 string MySQLDatabase::getLevelAbilitys(uint32 classId, uint32 level)
@@ -910,18 +704,8 @@ bool MySQLDatabase::getNpcItems(uint32 npcId, vector<Item>* item)
 							itemInfo.pos = (i + 1);
 							break;
 						}
-					case 0x11:
-					case 0x12:
-						{
-							itemInfo.pos = (i + 4);
-							break;
-						}
-					case 0x0b:
-					case 0x0c:
-					case 0x0d:
-					case 0x0e:
-					case 0x0f:
 					case 0x10:
+					case 0x11:
 						{
 							itemInfo.pos = (i + 3);
 							break;
@@ -952,13 +736,6 @@ bool MySQLDatabase::deleteCharacter(uint32 characterID)
 {
 	int8 query[1000];
 	sprintf(query, "DELETE FROM characters WHERE character_id = %u", characterID);
-	return (mysql_query(&mysql, query) == 0);
-}
-
-bool MySQLDatabase::deleteCharacterData(uint32 characterID)
-{
-	int8 query[1000];
-	sprintf(query, "DELETE FROM playerdata WHERE character_id = %u", characterID);
 	return (mysql_query(&mysql, query) == 0);
 }
 
@@ -1098,8 +875,6 @@ bool MySQLDatabase::getNpcMesh(uint32 npcID, NPC* spawn)
 		spawn->hairMesh = atoi64(row[9]);
 		spawn->beardMesh = atoi64(row[10]);
 		spawn->size = atoi64(row[11]);
-		spawn->gender = atoi(row[12]);
-		spawn->race = atoi(row[13]);
 
 		mysql_free_result(res);
 		return true;
@@ -1169,159 +944,4 @@ bool MySQLDatabase::getMapDetails(string map_name, teleport* info)
 		return true;
 	}
 	else return false;
-}
-
-//Character
-bool MySQLDatabase::getCharItems(uint32 charId, vector<Item>* item)
-{
-	MYSQL_RES* res;
-	MYSQL_ROW row;
-
-	int8 query[1000];
-	sprintf(query, "SELECT * FROM player_items WHERE id = '%u'", charId);
-	if (mysql_query(&mysql, query) == 0 && (res = mysql_store_result(&mysql)) && (row = mysql_fetch_row(res)))
-	{
-		Item itemInfo;
-		for(uint32 i = 0; i < 18; i++)
-		{
-			if(atoi64(row[i + 1]) > 0)
-			{
-				uint32 item_id = atoi64(row[i + 1]);
-				itemInfo.id = item_id;
-				switch((i+1))
-				{
-					case 0x01:
-					case 0x02:
-					case 0x03:
-						{
-							itemInfo.pos = (i + 1);
-							break;
-						}
-					case 0x11:
-					case 0x12:
-						{
-							itemInfo.pos = (i + 4);
-							break;
-						}
-					case 0x0b:
-					case 0x0c:
-					case 0x0d:
-					case 0x0e:
-					case 0x0f:
-					case 0x10:
-						{
-							itemInfo.pos = (i + 3);
-							break;
-						}
-					default:
-						{
-							itemInfo.pos = (i + 2);
-							break;
-						}
-				}
-				item->push_back(itemInfo);
-			}
-		}
-
-		mysql_free_result(res);
-		return true;
-	}
-	else
-		return false;
-}
-
-bool MySQLDatabase::getCharBar(uint32 charId, vector<Item>* barItems)
-{
-	MYSQL_RES* res;
-	MYSQL_ROW row;
-
-	int8 query[1000];
-	sprintf(query, "SELECT * FROM playerbar WHERE id = '%u'", charId);
-	if (mysql_query(&mysql, query) == 0 && (res = mysql_store_result(&mysql)) && (row = mysql_fetch_row(res)))
-	{
-		Item itemInfo;
-		if(atoi64(row[1]) > 0)
-		{
-			itemInfo.id = atoi64(row[1]);
-			itemInfo.pos = 0;
-			barItems->push_back(itemInfo);
-		}
-		if(atoi64(row[2]) > 0)
-		{
-			itemInfo.id = atoi64(row[2]);
-			itemInfo.pos = 1;
-			barItems->push_back(itemInfo);
-		}
-		if(atoi64(row[3]) > 0)
-		{
-			itemInfo.id = atoi64(row[3]);
-			itemInfo.pos = 2;
-			barItems->push_back(itemInfo);
-		}
-		if(atoi64(row[4]) > 0)
-		{
-			itemInfo.id = atoi64(row[4]);
-			itemInfo.pos = 0x0a;
-			barItems->push_back(itemInfo);
-		}
-		if(atoi64(row[5]) > 0)
-		{
-			itemInfo.id = atoi64(row[5]);
-			itemInfo.pos = 0x0c;
-			barItems->push_back(itemInfo);
-		}
-		if(atoi64(row[6]) > 0)
-		{
-			itemInfo.id = atoi64(row[6]);
-			itemInfo.pos = 0x64;
-			barItems->push_back(itemInfo);
-		}
-		if(atoi64(row[7]) > 0)
-		{
-			itemInfo.id = atoi64(row[7]);
-			itemInfo.pos = 0x65;
-			barItems->push_back(itemInfo);
-		}
-		if(atoi64(row[8]) > 0)
-		{
-			itemInfo.id = atoi64(row[8]);
-			itemInfo.pos = 0x66;
-			barItems->push_back(itemInfo);
-		}
-		if(atoi64(row[9]) > 0)
-		{
-			itemInfo.id = atoi64(row[9]);
-			itemInfo.pos = 0x67;
-			barItems->push_back(itemInfo);
-		}
-		if(atoi64(row[10]) > 0)
-		{
-			itemInfo.id = atoi64(row[10]);
-			itemInfo.pos = 0x6d;
-			barItems->push_back(itemInfo);
-		}
-		if(atoi64(row[11]) > 0)
-		{
-			itemInfo.id = atoi64(row[11]);
-			itemInfo.pos = 0x6e;
-			barItems->push_back(itemInfo);
-		}
-		if(atoi64(row[12]) > 0)
-		{
-			itemInfo.id = atoi64(row[12]);
-			itemInfo.pos = 0x70;
-			barItems->push_back(itemInfo);
-		}
-		if(atoi64(row[13]) > 0)
-		{
-			itemInfo.id = atoi64(row[13]);
-			itemInfo.pos = 0x4e84;
-			barItems->push_back(itemInfo);
-		}
-
-		mysql_free_result(res);
-		return true;
-	}
-	else
-		return false;
 }

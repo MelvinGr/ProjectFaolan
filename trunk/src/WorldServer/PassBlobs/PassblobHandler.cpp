@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010, 2011, 2012 The Project Faolan Team
+Copyright (C) 2009, 2010 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -43,21 +43,18 @@ void PassBlob::PassBlobHandler(Packet* packet, GlobalTable* GTable) //GameClient
 
 		case PassBlobOpcodes::CHAR_ACTION:
 			{
-				Log.Debug("Receive GA_PassBlob - CHAR_ACTION\n");
 				CharAction(packet, GTable); //client);
 				break;
 			}
 
 		case PassBlobOpcodes::SELECT_OBJECT:
 			{
-				Log.Debug("Receive GA_PassBlob - SELECT_OBJECT\n");
 				SelectObject(packet, client);
 				break;
 			}
 
 		case PassBlobOpcodes::DELETE_ITEM:
 			{
-				Log.Debug("Receive GA_PassBlob - DELETE_ITEM\n");
 				DeleteItem(packet, client);
 				break;
 			}
@@ -143,230 +140,22 @@ void PassBlob::PassBlobHandler(Packet* packet, GlobalTable* GTable) //GameClient
 
 		case  0xa36d3b74:
 			{
+				Log.Debug("Receive GA_PassBlob - Unknown passblob-opcode 0x%08x\n", passblobOpcode);
 				uint32 data = packet->data->read<uint32>();
 				uint32 ClientInst = packet->data->read<uint32>();
 				uint32 unk = packet->data->read<uint32>();
-				uint32 unk2 = packet->data->read<uint32>(); 
-				uint32 unk3 = packet->data->read<uint16>();
-				uint32 cmdval = 0;
-				uint8 tmpval;
-				//set max value 4 Byte
-				int i = 0;
-				uint8 setval = 0;
-				for(i = 0; i < 8; i++)
-				{
-					tmpval = packet->data->read<uint8>();
-					if(tmpval == 0x22)
-					{
-						i = 500;
-					}
-					else
-					{
-						setval++;
-						cmdval = cmdval << 8;
-						cmdval &= 0xffffff00;
-						cmdval += tmpval;
-					}
-				}
-				if(setval < 4)
-				{
-					for(int x = setval; x <= 4; x++)
-					{
-						cmdval = cmdval << 8;
-						cmdval &= 0xffffff00;
-					}
-				}
-				SwapByte::Swap<uint32>(cmdval);
-				Log.Debug("\nValue: 0x%08x\n", cmdval);
-				string command = packet->data->read<string>(false);
-				Log.Debug("Command: %s\n\n", command.c_str(), cmdval);
 
-				if(command == "ChangeSex")
+				switch(unk)
 				{
-					client->charInfo.sex = cmdval / 2;
-				}
-				if(command == "ChangeRace")
-				{
-					client->charInfo.race = cmdval;
-				}
-				if(command == "ChangeHeadMesh")
-				{
-					client->charInfo.headmesh = cmdval;
-				}
-				if(command == "ChangeSize")
-				{
-					client->charInfo.size = cmdval;
-				}
-				if(command == "ChangeClass")
-				{
-					client->charInfo.Class = cmdval;
-				}
-				if(command == "ChangeVoice")
-				{
-					client->charInfo.voice = cmdval;
-				}
-				if(command == "Finish")
-				{
-					Log.Debug("Stored new char values:\nSex -> %i\nRace -> %i\nHeadMesh -> 0x%08x\nSize-> %i\nClass: -> %i\nVoice: %i\n\n",
-						client->charInfo.sex, client->charInfo.race, client->charInfo.headmesh, client->charInfo.size,
-						client->charInfo.Class, client->charInfo.voice);
-				}
-				if(command == "SetMorphValue")
-				{
-					Log.Debug("Receive:\n%s\n\n", String::arrayToHexString(packet->data->buffer, packet->data->bufferLength).c_str());
-					uint8 test = packet->data->read<uint8>();
-					string morphCom = packet->data->read<string>(false);
-					if(morphCom.length() > 0)
-					{
-						client->counter++;
-						//char lastC = packet->data->read<char>();
-						//morphCom.append(1, lastC);
-						uint32 size = morphCom.length() + 2 + (6 * 4) + (2 * 1);
-
-						PacketBuffer aBuffer(1000);
-						aBuffer.writeHeader("GameAgent", "GameInterface", gameUnknown1, 0, client->nClientInst, 0, 0x00);
-						aBuffer.write<uint32>(size);
-						aBuffer.write<uint32>(0xbadf5a4b);
-						aBuffer.write<uint32>(0x0000c350);
-						aBuffer.write<uint32>(client->nClientInst);
-						aBuffer.write<uint8>(0);
-						aBuffer.write<string>(morphCom);
-						aBuffer.write<uint32>(0x3f800000);
-						aBuffer.write<uint8>(0);
-						aBuffer.write<uint32>(client->counter);
-						aBuffer.write<uint32>(0x3e4f4f3c);
-						Log.Error("Send:\n%s\n\n", String::arrayToHexString(aBuffer.buffer, aBuffer.bufferLength).c_str());
-						aBuffer.doItAll(client->clientSocket);
-
-						client->state = 0x00100000;
-						if(client->counter == 0x0d && false)
+					case 0x0004020a:
 						{
-							Log.Debug("send Packets after morph\n");
-							aBuffer = PacketBuffer(500);
-							aBuffer.writeHeader("GameAgent", "GameInterface", gameUnknown1, 0, client->nClientInst, 0, 0x00); 
-							aBuffer.write<uint32>(0x00000019);
-							aBuffer.write<uint32>(0xf98e10b3);
-							aBuffer.write<uint32>(0x0000c350);
-							aBuffer.write<uint32>(client->nClientInst);
-							aBuffer.write<uint8>(1);
-							aBuffer.write<uint32>(0x0000006a);
-							aBuffer.write<uint32>(0x00000014);
-							aBuffer.write<uint32>(0x3e4f4f3c);
-							aBuffer.doItAll(client->clientSocket);
+							string command = packet->data->read<string>();
+							string value = packet->data->read<string>();
 
-							uint8 pack4[] = {
-								0x00, 0x00, 0x00, 0x00, 0x0e, 0x08, 0x05, 0x10, 0x00, 0x18, 0xec, 0x97, 0x02, 0x32, 0x04, 0x08, 0x00, 0x10, 0x00, 0x3e, 0x4f, 0x4f, 0x3c
-							};
-							aBuffer = PacketBuffer(500);
-							aBuffer.writeHeader("GameCharAgent", "GameCharInterface", gameUnknown1, 0, client->nClientInst, 0, 0x00); 
-							aBuffer.write<uint32>(0x00000023);
-							aBuffer.write<uint32>(0xa36d3b74);
-							aBuffer.write<uint32>(0x0000c350);
-							aBuffer.write<uint32>(client->nClientInst);
-							aBuffer.writeArray(pack4, sizeof(pack4));
-							aBuffer.doItAll(client->clientSocket);
+							if(command == "TheNameIs")
+							{
+								client->charInfo.name = value;
 
-							uint8 pack5[] = {
-								0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x1f, 0x40, 0x00, 0x00, 0x01, 0xf9, 0x00, 0x00, 0x2e, 0xe0, 0x00, 0x00, 0x01, 0xfb, 0x00, 0x00, 0x40, 0x74, 0x3e, 0x4f, 0x4f, 0x3c
-							};
-							aBuffer = PacketBuffer(500);
-							aBuffer.writeHeader("GameCharAgent", "GameCharInterface", gameUnknown1, 0, client->nClientInst, 0, 0x00); 
-							aBuffer.write<uint32>(0x0000002d);
-							aBuffer.write<uint32>(0x96b8dc59);
-							aBuffer.write<uint32>(0x0000c350);
-							aBuffer.write<uint32>(client->nClientInst);
-							aBuffer.writeArray(pack5, sizeof(pack5));
-							aBuffer.doItAll(client->clientSocket);
-							Log.Debug("Packets sent\n");
-						}
-					}
-					else
-					{
-						client->counter = 1;
-					}
-				}
-				if(command == "TheNameIs")
-				{
-					Log.Debug("Receive:\n%s\n\n", String::arrayToHexString(packet->data->buffer, packet->data->bufferLength).c_str());
-					uint8 test = packet->data->read<uint8>();
-					client->charInfo.name = packet->data->read<string>(false);
-					Log.Error("Name: %s\n", client->charInfo.name.c_str());
-
-					uint32 size = client->charInfo.name.length() + 2 + (6 * 4) + 1;
-
-					PacketBuffer aBuffer(1000);
-					aBuffer.writeHeader("GameAgent", "GameInterface", gameUnknown1, 0, client->nClientInst, 0, 0x00);
-					aBuffer.write<uint32>(size);
-					aBuffer.write<uint32>(0xadce0cda);
-					aBuffer.write<uint32>(0x0000c350);
-					aBuffer.write<uint32>(client->nClientInst);
-					aBuffer.write<uint8>(0);
-					aBuffer.write<uint32>(0x00000003);
-					aBuffer.write<uint32>(0x01000000);
-					aBuffer.write<string>(client->charInfo.name);
-					aBuffer.write<uint32>(0x3e4f4f3c);
-					Log.Error("Send:\n%s\n\n", String::arrayToHexString(aBuffer.buffer, aBuffer.bufferLength).c_str());
-					aBuffer.doItAll(client->clientSocket);
-
-					if(!Database.isValidCharName(client->charInfo.name))
-					{
-						//TODO add missing return packet
-						Log.Warning("Charname is incorrect !\n\n");
-						break;
-					}
-
-					client->charInfo.level = 1;
-					client->charInfo.position.x = 0x43a14000;
-					client->charInfo.position.y = 0x43114fb3;
-					client->charInfo.position.z = 0x4430399a;
-
-					size = client->charInfo.name.size() + (8 * 4) + 2 + 1 + 1 + 11;
-					aBuffer = PacketBuffer(500);						
-					aBuffer.writeHeader("GameAgent", "GameInterface", gameUnknown1, 0, client->nClientInst, 0, 0x00);
-					aBuffer.write<uint32>(size);
-					aBuffer.write<uint32>(0xa36d3b74);
-					aBuffer.write<uint32>(0x0000c350);
-					aBuffer.write<uint32>(client->nClientInst);
-					aBuffer.write<uint32>(0);
-					aBuffer.write<uint32>(0x1f080510);
-					aBuffer.write<uint32>(0x02180022);
-					aBuffer.write<string>("NicknameOK", false);
-					aBuffer.write<uint8>(0x2a);
-					aBuffer.write<string>(client->charInfo.name);
-					aBuffer.write<uint32>(0x32040800);
-					aBuffer.write<uint16>(0x1000);
-					aBuffer.write<uint32>(0x3e4f4f3c);
-					aBuffer.doItAll(client->clientSocket);
-
-					uint8 pack01[] = 
-					{
-						0x00, 0x00, 0x00, 0x07, 0xe2, 0x00, 0x00, 0xcf, 0xef, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x46, 0x37, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3e, 0x4f, 0x4f, 0x3c
-					};
-
-					aBuffer = PacketBuffer(500);						
-					aBuffer.writeHeader("GameAgent", "GameInterface", gameUnknown1, 0, client->nClientInst, 0, 0x00);
-					aBuffer.write<uint32>(0x0000003e);
-					aBuffer.write<uint32>(0xf508f4c1);
-					aBuffer.write<uint32>(0x0000c350);
-					aBuffer.write<uint32>(client->nClientInst);
-					aBuffer.writeArray(pack01, sizeof(pack01));
-					aBuffer.doItAll(client->clientSocket);
-
-					aBuffer = PacketBuffer(500);						
-					aBuffer.writeHeader("GameAgent", "GameInterface", gameUnknown1, 0, client->nClientInst, 0, 0x00);
-					aBuffer.write<uint32>(0x00000039);
-					aBuffer.write<uint32>(0xa36d3b74);
-					aBuffer.write<uint32>(0x0000c350);
-					aBuffer.write<uint32>(client->nClientInst);
-					aBuffer.write<uint32>(0x24080510);
-					aBuffer.write<uint32>(0x02180022);
-					aBuffer.write<string>("CharCreationFinished", false);
-					aBuffer.write<uint32>(0x2a003204);
-					aBuffer.write<uint32>(0x08001000);
-					aBuffer.write<uint32>(0x3e4f4f3c);
-					aBuffer.doItAll(client->clientSocket);
-				}
-					/*
 								uint32 size = client->charInfo.name.size() + 2 + (6 * 4) + (1 * 1);
 
 								PacketBuffer aBuffer(500);
@@ -1727,7 +1516,7 @@ void PassBlob::PassBlobHandler(Packet* packet, GlobalTable* GTable) //GameClient
 						}
 					}
 				}
-				//*/
+
 				break;
 			}
 
