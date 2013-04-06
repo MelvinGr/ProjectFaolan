@@ -82,28 +82,34 @@ void PacketBuffer::writeHeader(string sender, string receiver, uint32 unknown1, 
 	write<uint32>(unknown4); // write Unknown 4
 	write<uint32>(opcode); // write opcode
 }
-/*
-void PacketBuffer::setHeader(uint32 headersize, uint32 unk1, uint32 unk2, uint32 unk3, uint32 unk4, uint8* headerData, uint32 opcode)
+
+void PacketBuffer::setHeader(uint8* sender, uint8 sl, uint8* receiver, uint8 rl, uint8* headerData, uint8 hl, uint32 opcode, bool minOpcode)
 {
 	write<uint32>(0); // Write empty length
 	write<uint32>(0); // write empty crc32
-	write<uint32>(headersize);
-	write<uint32>(unk1); //
-	write<uint32>(unk2); //
-	write<uint32>(unk3); //
-	write<uint32>(unk4); //
-	if(headersize >= 0x14)
-	{
-		writeArray(headerData, (headersize-20));
-		write<uint32>(opcode);
-	}
-	else
-	{
-		writeArray(headerData, (headersize-18));
-		write<uint16>(opcode);
-	}
+
+	//Write Headerlength
+	write<uint32>(sl + rl + hl + 2 + 2 + 2);
+
+	//Write sender
+	write<uint8>(0x0a);
+	write<uint8>(sl);
+	writeArray(sender, sl);
+
+	//Write receiver
+	write<uint8>(0x12);
+	write<uint8>(rl);
+	writeArray(receiver, rl);
+	
+	//write opcode
+	write<uint16>(opcode);
+	
+	//Write headerdata
+	if(hl > 0)
+		writeArray(headerData, hl);
 }
-//*/
+
+/*
 void PacketBuffer::setHeader(uint8* sender, uint8 sl, uint8* receiver, uint8 rl, uint8* headerData, uint8 hl, uint32 opcode, bool minOpcode)
 {
 	write<uint32>(0); // Write empty length

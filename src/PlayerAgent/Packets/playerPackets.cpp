@@ -30,7 +30,7 @@ void playerPackets::initAuth(Packet* packet, GameClient* client)
 	client->nCookie = packet->data->read<uint32>();
 	uint32 authStatus = packet->data->read<uint32>();
 
-	uint8 headerData[] = { 0x20, 0x91 };
+	uint8 headerData[] = { 0x93, 0x86, 0xee, 0x05 };
 	uint8 sender[] = { 0x0d, 0x84, 0x04, 0xf2, 0x82, 0x10, 0x02 };
 	uint8 receiver[] = { 0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0xeb, 0x8e, 0x95, 0xbf, 0x05 };
 	
@@ -40,8 +40,9 @@ void playerPackets::initAuth(Packet* packet, GameClient* client)
 	}
 	//*/
 	PacketBuffer aBuffer(500);
-	aBuffer.setHeader(sender, sizeof(sender), receiver, sizeof(receiver), headerData, sizeof(headerData), 0x9386ee05);
+	aBuffer.setHeader(sender, sizeof(sender), receiver, sizeof(receiver), headerData, sizeof(headerData), 0x2091);
 	aBuffer.write<uint32>(authStatus);
+	Log.Warning("Send Packet:\n%s\n\n", String::arrayToHexString(aBuffer.buffer, aBuffer.bufferLength).c_str());
 	aBuffer.doItAll(client->clientSocket);
 
 	Log.Debug("Send: Auth Init\n");
@@ -58,12 +59,12 @@ void playerPackets::sendSmallCharList(GameClient* client)
 
 	uint32 anzChars = getCharCount(characters);
 
-	uint8 headerData[] = { 0x20 };
+	uint8 headerData[] = { 0x94, 0xa7, 0x60 };
 	uint8 sender[] = { 0x0d, 0x84, 0x04, 0xf2, 0x82, 0x10, 0x02 };
 	uint8 receiver[] = { 0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0xeb, 0x8e, 0x95, 0xbf, 0x05 };
 
 	PacketBuffer aBuffer(500);
-	aBuffer.setHeader(sender, sizeof(sender), receiver, sizeof(receiver), headerData, sizeof(headerData), 0xa594a760);
+	aBuffer.setHeader(sender, sizeof(sender), receiver, sizeof(receiver), headerData, sizeof(headerData), 0x20a5);
 	aBuffer.write<uint32>(((anzChars+1)*1009));
 	for(uint32 i = 0; i < characters.size(); i++)
 	{
@@ -76,6 +77,7 @@ void playerPackets::sendSmallCharList(GameClient* client)
 		//aBuffer.write<string>("6f60ebba2cd4881d0393617a01f761b4");
 	}
 	//*/
+	Log.Warning("Send Packet:\n%s\n\n", String::arrayToHexString(aBuffer.buffer, aBuffer.bufferLength).c_str());
 	aBuffer.doItAll(client->clientSocket);
 	Log.Debug("Send: Small Charlist\n");
 }
@@ -85,12 +87,12 @@ void playerPackets::sendCharacterList(GameClient* client)
 	vector<CharacterInfo> characters;
 	Database.getCharacters(client->nClientInst, &characters);
 
-	uint8 headerData[] = { 0x20, 0xef };
+	uint8 headerData[] = { 0x8b, 0xd3, 0xa0, 0x0c };
 	uint8 sender[] = { 0x0d, 0x84, 0x04, 0xf2, 0x82, 0x10, 0x02 };
 	uint8 receiver[] = { 0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0xeb, 0x8e, 0x95, 0xbf, 0x05 };
 
 	PacketBuffer aBuffer(5000);
-	aBuffer.setHeader(sender, sizeof(sender), receiver, sizeof(receiver), headerData, sizeof(headerData), 0x8bd3a00c); // UpdateClientPlayerData
+	aBuffer.setHeader(sender, sizeof(sender), receiver, sizeof(receiver), headerData, sizeof(headerData), 0x20ef); // UpdateClientPlayerData
 	aBuffer.write<uint32>(client->charInfo.accountID); // PlayerInstance
 	uint32 anzChars = getCharCount(characters);
 
@@ -115,7 +117,7 @@ void playerPackets::sendCharacterList(GameClient* client)
 		aBuffer.write<uint32>(characters[i].Class); // class
 		aBuffer.write<uint32>(0x00000000); // u2
 		aBuffer.write<uint32>(0x00000000); // u2
-		aBuffer.write<uint32>(0x4f6640b0); // u3
+		aBuffer.write<uint32>(0x515c4d50); // u3
 		aBuffer.write<uint32>(0x00000002); // u4
 		aBuffer.write<uint32>(characters[i].race); // race
 		//aBuffer.write<string>("en");
@@ -134,7 +136,8 @@ void playerPackets::sendCharacterList(GameClient* client)
 	//aBuffer.write<uint32>(0x00000002);
 	aBuffer.write<uint32>(Settings.characterSlots); // Number of Char Slots -- default 8
 	aBuffer.write<uint32>(0x00000000);
-	aBuffer.write<uint16>(0x0000);
+	//aBuffer.write<uint16>(0x0000);
+	aBuffer.write<string>("https://www.facebook.com/dialog/oauth?client_id=224452727645859&display=popup&redirect_uri=https://www.facebook.com/connect/login_success.html&scope=read_stream,publish_stream,publish_actions,offline_access,user_photos,user_videos,user_photo_video_tags&response_type=token");
 	aBuffer.write<uint32>(0x00000001);
 	aBuffer.doItAll(client->clientSocket);
 	Log.Debug("Send: Full Charlist\n");
@@ -142,15 +145,17 @@ void playerPackets::sendCharacterList(GameClient* client)
 
 void playerPackets::sendRealmList(GameClient* client)
 {
-	uint8 headerData[] = { 0x20, 0xcc };
+	uint8 headerData[] = { 0xe2, 0xe6, 0xc4, 0x0f };
 	uint8 sender[] = { 0x0d, 0x84, 0x04, 0xf2, 0x82, 0x10, 0x02 };
 	uint8 receiver[] = { 0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0xeb, 0x8e, 0x95, 0xbf, 0x05  };
 
 	PacketBuffer aBuffer(500);
-	aBuffer.setHeader(sender, sizeof(sender), receiver, sizeof(receiver), headerData, sizeof(headerData), 0xe2e6c40f); // SetDimensionList
+	aBuffer.setHeader(sender, sizeof(sender), receiver, sizeof(receiver), headerData, sizeof(headerData), 0x20cc); // SetDimensionList
 	aBuffer.write<uint32>(Settings.realms.size()); // Realmcount
+	Log.Debug("Realmanzahl: %i\n", Settings.realms.size());
 	for(uint32 i = 0; i < Settings.realms.size(); i++)
 	{
+		Log.Debug("Realmname: %s\n", Settings.realms[i]->realmName.c_str());
 		aBuffer.write<uint32>(Settings.realms[i]->realmID); // realmID
 		aBuffer.write<uint32>(Settings.realms[i]->onlineStatus); // onlineStatus - 2 = online, other num = offline
 		aBuffer.write<string>(Settings.realms[i]->realmName); // realmname
@@ -175,12 +180,12 @@ void playerPackets::sendRealmList(GameClient* client)
 
 void playerPackets::sendCSServerAddress(GameClient* client, uint32 ip, uint16 port, uint32 accID,uint32 nClientInst)
 {
-	uint8 headerData[] = { 0x1a, 0x07, 0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0x01, 0x20, 0xe0 };
+	uint8 headerData[] = { 0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0x01, 0x20, 0xe0, 0xd4, 0xb4, 0xd7, 0x05 };
 	uint8 sender[] = { 0x0d, 0x16, 0x91, 0x35, 0x1d, 0x10, 0x14 };
 	uint8 receiver[] = { 0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0xeb, 0x8e, 0x95, 0xbf, 0x05 };
 	
 	PacketBuffer aBuffer(500);
-	aBuffer.setHeader(sender, sizeof(sender), receiver, sizeof(receiver), headerData, sizeof(headerData), 0xd4b4d705);
+	aBuffer.setHeader(sender, sizeof(sender), receiver, sizeof(receiver), headerData, sizeof(headerData), 0x1a07);
 	aBuffer.write<uint32>(ip);
 	aBuffer.write<uint16>(port);
 	aBuffer.write<uint32>(accID);
@@ -193,12 +198,12 @@ void playerPackets::sendCSServerAddress(GameClient* client, uint32 ip, uint16 po
 
 void playerPackets::sendAgentServerAddress(GameClient* client, uint32 ip, uint16 port, uint32 accID,uint32 nClientInst)
 {
-	uint8 headerData[] = { 0x1a, 0x07, 0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0x01, 0x20, 0xfa };
+	uint8 headerData[] = { 0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0x01, 0x20, 0xfa, 0xe5, 0x98, 0x9d, 0x02 };
 	uint8 sender[] = { 0x0d, 0x16, 0x91, 0x35, 0x1d, 0x10, 0x14 };
 	uint8 receiver[] = { 0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0xeb, 0x8e, 0x95, 0xbf, 0x05 };
 	
 	PacketBuffer aBuffer(500);
-	aBuffer.setHeader(sender, sizeof(sender), receiver, sizeof(receiver), headerData, sizeof(headerData), 0xe5989d02);
+	aBuffer.setHeader(sender, sizeof(sender), receiver, sizeof(receiver), headerData, sizeof(headerData), 0x1a07);
 	aBuffer.write<uint32>(ip);
 	aBuffer.write<uint16>(port);
 	aBuffer.write<uint32>(accID);
@@ -211,12 +216,12 @@ void playerPackets::sendAgentServerAddress(GameClient* client, uint32 ip, uint16
 
 void playerPackets::sendWorldServerAddress(GameClient* client, uint32 ip, uint16 port, uint32 accID,uint32 nClientInst)
 {
-	uint8 headerData[] = { 0x1a, 0x07, 0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0x01, 0x20, 0xf9 };
+	uint8 headerData[] = { 0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0x01, 0x20, 0xf9, 0xd8, 0xd9, 0xc5, 0x0d };
 	uint8 sender[] = { 0x0d, 0x16, 0x91, 0x35, 0x1d, 0x10, 0x14 };
 	uint8 receiver[] = { 0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0xeb, 0x8e, 0x95, 0xbf, 0x05 };
 	
 	PacketBuffer aBuffer(500);
-	aBuffer.setHeader(sender, sizeof(sender), receiver, sizeof(receiver), headerData, sizeof(headerData), 0xd8d9c50d);
+	aBuffer.setHeader(sender, sizeof(sender), receiver, sizeof(receiver), headerData, sizeof(headerData), 0x1a07);
 	aBuffer.write<uint32>(ip);
 	aBuffer.write<uint16>(port);
 	aBuffer.write<uint32>(0);

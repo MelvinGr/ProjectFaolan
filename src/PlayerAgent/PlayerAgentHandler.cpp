@@ -24,7 +24,7 @@ void PlayerAgent::PlayerAgentHandler(Packet* packet, GameClient* client)
 	Log.Debug("Receive opcode: 0x%08x\n", packet->opcode);
 	switch(packet->opcode)
 	{
-	case OPCODES::REQUEST_AUTH:	//0x96CBE509
+	case OPCODES::REQUEST_AUTH:
 		{
 			Log.Debug("Recv: Auth Init\n");
 			playerPackets::initAuth(packet, client);
@@ -32,6 +32,7 @@ void PlayerAgent::PlayerAgentHandler(Packet* packet, GameClient* client)
 			Database.insertEmptyChar(client);
 			break;
 		}
+	case 0x20c1:
 	case OPCODES::REQUEST_SMALLCHARLIST:  //0xDAD1D206:
 		{
 			Log.Warning("Receive:\n%s\n\n", String::arrayToHexString(packet->packetBuffer->buffer, packet->packetBuffer->bufferLength).c_str());
@@ -42,36 +43,47 @@ void PlayerAgent::PlayerAgentHandler(Packet* packet, GameClient* client)
 			break;
 		}
 
+	case 0x208e:
 	case OPCODES::REQUEST_CHAR_REALMDATA: //0xA3E1FE0D:
 		{
 			Log.Warning("Receive:\n%s\n\n", String::arrayToHexString(packet->packetBuffer->buffer, packet->packetBuffer->bufferLength).c_str());
 			playerPackets::sendCharacterList(client);
 			playerPackets::sendRealmList(client);
 
-			uint8 headerData[] = { 0x20, 0x8c };
+			uint8 headerData[] = { 0xcb, 0xc6, 0xfc, 0x04 };
 			uint8 sender[] = { 0x0d, 0x84, 0x04, 0xf2, 0x82, 0x10, 0x02 };
 			uint8 receiver[] = { 0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0xeb, 0x8e, 0x95, 0xbf, 0x05 };
 			PacketBuffer aBuffer(500);
-			aBuffer.setHeader(sender, sizeof(sender), receiver, sizeof(receiver), headerData, sizeof(headerData), 0xcbc6fc04);
+			aBuffer.setHeader(sender, sizeof(sender), receiver, sizeof(receiver), headerData, sizeof(headerData), 0x208c);
 			aBuffer.write<uint32>(1);
 			aBuffer.doItAll(client->clientSocket);
 
 			break;
 		}
 
+	case 0x20a6:
+		{
+			uint8 headerData[] = { 0x99, 0x95, 0x92, 0x05 };
+			uint8 sender[] = { 0x0d, 0x84, 0x04, 0xf2, 0x82, 0x10, 0x02 };
+			uint8 receiver[] = { 0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0xeb, 0x8e, 0x95, 0xbf, 0x05 };
+			PacketBuffer aBuffer(500);
+			aBuffer.setHeader(sender, sizeof(sender), receiver, sizeof(receiver), headerData, sizeof(headerData), 0x209c);
+			aBuffer.write<uint16>(0);
+			aBuffer.write<uint8>(0);
+			aBuffer.doItAll(client->clientSocket);
+
+			break;
+		}
+
+	case 0x20d6:
 	case 0xDD9EC209:
 		{
 			uint32 languageID = packet->data->read<uint32>();
 			Log.Warning("Maybe report language\nLanguage: %i\n", languageID);
 
-			/*
-			Receive opcode: 0xdd9ec209
-Unknown Packet With Opcode: 0xDD9EC209
-00000000: 00 00 00 00                                      ....
-			*/
 			break;
 		}
-
+	case 0x20b6:
 	case 0xDD85FB0E: // ENTER WORLD
 		{
 			Log.Warning("Enter World\n");
@@ -79,11 +91,11 @@ Unknown Packet With Opcode: 0xDD9EC209
 			client->charInfo.realmID = (client->nClientInst >> 24) &0x000000ff;
 			client->charInfo.characterID = client->nClientInst & 0x00ffffff;
 
-			uint8 headerData[] = { 0x20, 0xb9 };
+			uint8 headerData[] = { 0x8b, 0xd8, 0x99, 0x02 };
 			uint8 sender[] = { 0x0d, 0x84, 0x04, 0xf2, 0x82, 0x10, 0x03 };
 			uint8 receiver[] = { 0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0xeb, 0x8e, 0x95, 0xbf, 0x05 };
 			PacketBuffer aBuffer(500);
-			aBuffer.setHeader(sender, sizeof(sender), receiver, sizeof(receiver), headerData, sizeof(headerData), 0x8bd89902);
+			aBuffer.setHeader(sender, sizeof(sender), receiver, sizeof(receiver), headerData, sizeof(headerData), 0x20b9);
 			aBuffer.write<uint32>(0x0000c350);
 			aBuffer.write<uint32>(client->nClientInst);
 			aBuffer.write<uint32>(0);
@@ -91,7 +103,7 @@ Unknown Packet With Opcode: 0xDD9EC209
 
 			break;
 		}
-
+	case 0x20de:
 	case 0x9CB1D10C: //CREATE NEW CHAR
 		{
 			Log.Warning("Create new Character\n");
@@ -123,25 +135,19 @@ Unknown Packet With Opcode: 0xDD9EC209
 				break;
 			}
 
-			uint8 headerData[] = { 0x20, 0xb9 };
+			uint8 headerData[] = { 0x8b, 0xd8, 0x99, 0x02 };
 			uint8 sender[] = { 0x0d, 0x84, 0x04, 0xf2, 0x82, 0x10, 0x03 };
 			uint8 receiver[] = { 0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0xeb, 0x8e, 0x95, 0xbf, 0x05 };
 			PacketBuffer aBuffer(500);
-			aBuffer.setHeader(sender, sizeof(sender), receiver, sizeof(receiver), headerData, sizeof(headerData), 0x8bd89902);
+			aBuffer.setHeader(sender, sizeof(sender), receiver, sizeof(receiver), headerData, sizeof(headerData), 0x20b9);
 			aBuffer.write<uint32>(0x0000c350);
 			aBuffer.write<uint32>(client->nClientInst);
 			aBuffer.write<uint32>(0);
 			aBuffer.doItAll(client->clientSocket);
 
-			/*
-			Receive opcode: 0x9cb1d10c
-Unknown Packet With Opcode: 0x9CB1D10C
-00000000: 00 00 00 01 00 00 03 F1 00 00 00 00 00 00 00 01  ................
-00000010: 5F 00 00 00 00 00 00 00 00                       _........
-*/
 			break;
 		}
-		
+	case 0x20ec:
 	case 0xA4F2E303:
 		{
 			Log.Debug("Request for Server Addresses\n");
@@ -169,7 +175,7 @@ Unknown Packet With Opcode: 0x9CB1D10C
 
 			break;
 		}
-		
+	case 0x209d:
 	case 0x86979E0C: //DELETE CHAR
 		{
 			uint32 charID = packet->data->read<uint32>();

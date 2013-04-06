@@ -17,7 +17,38 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "Packet.h"
+Packet::Packet(PacketBuffer* pBuffer)
+{
+	packetBuffer = pBuffer;
+	length = packetBuffer->read<uint32>();
+	crc32 = packetBuffer->read<uint32>();
+	headersize = packetBuffer->read<uint32>(); //size of header
+	sender = packetBuffer->read<uint8>();
+	slength = packetBuffer->read<uint8>();
+	if(slength<=0)
+		printf("Error at senderlength\n");
+	senderInt = new PacketBuffer(packetBuffer->readArray(slength), slength);
+	receiver = packetBuffer->read<uint8>();
+	rlength = packetBuffer->read<uint8>();
+	if(rlength<=0)
+		printf("Error at receiverlength\n");
+	receiverInt = new PacketBuffer(packetBuffer->readArray(rlength), rlength);
 
+	opcode = packetBuffer->read<uint16>();
+
+	uint32 checkHeaderLength = headersize - ( 4 + slength + rlength);
+	if (checkHeaderLength > 0)
+		headerData = new PacketBuffer(packetBuffer->readArray((checkHeaderLength - 2)), (checkHeaderLength - 2));
+
+	uint32 dataLength = length - (headersize + 8);
+	if(dataLength > 0)
+		data = new PacketBuffer(packetBuffer->readArray(dataLength), dataLength);
+	else
+	{
+		data = new PacketBuffer(0);
+	}
+}
+/*
 Packet::Packet(PacketBuffer* pBuffer)
 {
 	packetBuffer = pBuffer;
@@ -68,7 +99,7 @@ Packet::Packet(PacketBuffer* pBuffer)
 		data = new PacketBuffer(0);
 	}
 }
-
+//*/
 uint32 Packet::HeaderLength()
 {
 	return (headersize + 8);
