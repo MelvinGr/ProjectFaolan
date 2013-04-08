@@ -869,12 +869,18 @@ bool MySQLDatabase::getNpcMesh(uint32 npcID, NPC* spawn)
 	if (mysql_query(&mysql, query) == 0 && (res = mysql_store_result(&mysql)) && (row = mysql_fetch_row(res)))
 	{
 		spawn->position = Vector3D(atoi64(row[1]), atoi64(row[2]), atoi64(row[3]));
-		spawn->rotation = Vector3D(atoi64(row[4]), atoi64(row[5]), atoi64(row[6]));
-		spawn->bodyMesh = atoi64(row[7]);
-		spawn->headMesh = atoi64(row[8]);
-		spawn->hairMesh = atoi64(row[9]);
-		spawn->beardMesh = atoi64(row[10]);
-		spawn->size = atoi64(row[11]);
+		spawn->rotation.a = atoi64(row[4]);
+		spawn->rotation.b = atoi64(row[5]);
+		spawn->rotation.c = atoi64(row[6]);
+		spawn->rotation.d = atoi64(row[7]);
+		spawn->bodyMesh = atoi64(row[8]);
+		spawn->headMesh = atoi64(row[9]);
+		spawn->hairMesh = atoi64(row[10]);
+		spawn->beardMesh = atoi64(row[11]);
+		spawn->size = atoi64(row[12]);
+		spawn->gender = (atoi64(row[13])&0xff);
+		spawn->race = (atoi64(row[14])&0xff);
+		spawn->typ = (atoi64(row[15])&0xff);
 
 		mysql_free_result(res);
 		return true;

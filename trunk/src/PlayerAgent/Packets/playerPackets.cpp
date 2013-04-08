@@ -42,10 +42,9 @@ void playerPackets::initAuth(Packet* packet, GameClient* client)
 	PacketBuffer aBuffer(500);
 	aBuffer.setHeader(sender, sizeof(sender), receiver, sizeof(receiver), headerData, sizeof(headerData), 0x2091);
 	aBuffer.write<uint32>(authStatus);
-	Log.Warning("Send Packet:\n%s\n\n", String::arrayToHexString(aBuffer.buffer, aBuffer.bufferLength).c_str());
 	aBuffer.doItAll(client->clientSocket);
 
-	Log.Debug("Send: Auth Init\n");
+	Log.Debug("Auth User\n");
 }
 
 

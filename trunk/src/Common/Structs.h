@@ -130,7 +130,13 @@ struct NPC
 	uint32 mapId;
 	uint32 typ;
 	Vector3D position;
-	Vector3D rotation;
+	struct RotationStruct
+	{
+		uint32 a;
+		uint32 b;
+		uint32 c;
+		uint32 d;
+	}rotation;
 	string extras;
 	uint32 action;
 	uint32 level;
@@ -147,6 +153,8 @@ struct NPC
 	uint32 curHealth;
 	uint32 curStamina;
 	uint32 curMana;
+	uint8 gender;
+	uint8 race;
 
 	bool attackMode;
 	NPCMove move;

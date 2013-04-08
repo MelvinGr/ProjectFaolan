@@ -103,7 +103,7 @@ typedef long double ldouble;
 
 //////////////////////////////////////////////////////////////////////////
 
-#define gameUnknown1 0x00000014
+#define gameUnknown1 0x0000000b
 #define maxDistance 8000000
 
 #define _USE_MATH_DEFINES
