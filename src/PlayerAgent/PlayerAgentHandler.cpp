@@ -26,7 +26,6 @@ void PlayerAgent::PlayerAgentHandler(Packet* packet, GameClient* client)
 	{
 	case OPCODES::REQUEST_AUTH:
 		{
-			Log.Debug("Recv: Auth Init\n");
 			playerPackets::initAuth(packet, client);
 			Database.deleteEmptyChar(client->charInfo.accountID);
 			Database.insertEmptyChar(client);

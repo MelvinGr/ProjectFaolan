@@ -102,7 +102,7 @@ namespace WorldServer
 	void addSpell(GameClient* client, uint32 SpellId);
 
 	//CharStatsHandler
-	struct CharStat {
+	namespace CharStat {
 		void sendCharSpawn(GameClient* client);
 		void sendCharacterStats(GameClient* client);
 		uint64 addMaxHealth(uint32 value);
