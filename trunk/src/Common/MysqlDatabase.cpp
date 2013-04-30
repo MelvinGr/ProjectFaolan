@@ -234,6 +234,20 @@ bool MySQLDatabase::ladGlobalNpcs(vector<NPC>* NPCS)
 
 //----------------------
 
+//Char
+void MySQLDatabase::saveCharPosition(GameClient* clientInfo)
+{
+	MYSQL_RES* res;
+
+	int8 query[1000];
+	sprintf(query,"UPDATE characters SET map_id='%i', pos_x='%i', pos_y='%i', pos_z='%i' WHERE character_id = '%i' AND account_id = '%i'", clientInfo->charInfo.map, clientInfo->charInfo.position.x,
+		clientInfo->charInfo.position.y, clientInfo->charInfo.position.z, clientInfo->charInfo.characterID, clientInfo->charInfo.accountID);
+	Log.Debug("Query: %s\n", query);
+	bool result = (mysql_query(&mysql, query) == 0) && (res = mysql_store_result(&mysql)) && mysql_fetch_row(res);
+	mysql_free_result(res);
+}
+//----------------------
+
 bool MySQLDatabase::checkLogin(string username, string password)
 {
 	MYSQL_RES* res;

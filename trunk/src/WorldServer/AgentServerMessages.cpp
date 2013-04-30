@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010 The Project Faolan Team
+Copyright (C) 2012, 2013 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -16,41 +16,17 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef NETWORKING_H
-#define NETWORKING_H
+#include "AgentServer.h"
 
-#include "Common.h"
-
-#ifdef WINDOWS
-#include <Winsock2.h>
-#else
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <errno.h>
-#endif
-
-#include <stdio.h>
-#include <vector>
-
-#include "Settings.h"
-#include "MysqlDatabase.h"
-
-class Networking
+void AgentServer::sendNewChannel(GameClient* client, uint8 typ, uint32 channelId, string channelName)
 {
-	SOCKET sock;
-	int32 port;
-
-	sockaddr_in sin;
-	socklen_t sockAddrLen;
-
-public:
-	int32 errorCode;
-
-	Networking(int32 nPort);
-	int32 initDB();
-	int32 start(string waitTxt = "");
-	SOCKET AcceptClient();
-	void close();
-};
-
-#endif
+	PacketBuffer aBuffer(500);
+	aBuffer.write<uint16>(0x003c); //opcode for new cahnnel
+	aBuffer.write<uint16>(0);
+	aBuffer.write<uint8>(typ);
+	aBuffer.write<uint32>(channelId);
+	aBuffer.write<string>(channelName);
+	aBuffer.write<uint32>(0x00008044);
+	aBuffer.write<uint16>(0);
+	aBuffer.doItAllAgentServer(client->clientSocket);
+}
