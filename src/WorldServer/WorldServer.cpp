@@ -17,8 +17,45 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "WorldServer.h"
+#include "AgentServer.h"
 
 vector<GameClient*>* clientList = new vector<GameClient*>();
+
+void WorldServer::StartAgentServer(GlobalTable* GTable)
+{
+	Networking agentNet(Settings.agentServerPort);
+	int32 result = agentNet.initDB();
+	if(result == 0)
+		result = agentNet.start("- AgentNet: Wait for Connections\n");
+	if(result == 0) 
+	{
+		while(true)
+		{
+			SOCKET client = agentNet.AcceptClient();
+
+#ifdef WINDOWS
+			CreateThread(0, 0, (LPTHREAD_START_ROUTINE)AgentServer::HandleClient, &client, 0, 0);
+#else
+			pthread_create(0, 0, (void*(*)(void*))AgentServer::HandleClient, &client);
+#endif
+		}
+	}
+	else Log.Error("AgentNet: Error while setting up the Networking, errorcode: %u!\n", result);
+}
+
+void AgentServer::HandleClient(void* socket)
+{
+	GameClient* client = new GameClient(*((uint32*)socket));
+	clientList->push_back(client);
+
+	while(client->isConnected)
+	{
+		AgentServerHandler(client, clientList);
+	}
+	
+	remove(clientList->begin(), clientList->end(), client); 
+	delete client;
+}
 
 void WorldServer::HandleNpcCombat(GlobalTable* GTable)
 {
@@ -200,7 +237,13 @@ int32 main(int32 argc, int8* argv[], int8* envp[])
 		Database.loadGlobalSpells(&GTable.SPELLS);
 		Database.ladGlobalNpcs(&GTable.NPCS);
 
-		result = network.start();
+		#ifdef WINDOWS
+			CreateThread(0, 0, (LPTHREAD_START_ROUTINE)WorldServer::StartAgentServer, &GTable, 0, 0);
+		#else
+			pthread_create(0, 0, (void*(*)(void*))WorldServer::StartAgentServer, &GTable);
+		#endif
+
+		result = network.start("- WorldNet: Wait for Connections\n");
 		if(result == 0) 
 		{
 			while(true)
@@ -215,7 +258,7 @@ int32 main(int32 argc, int8* argv[], int8* envp[])
 			}
 		}
 	}
-	else Log.Error("Error while setting up the Networking, errorcode: %u!\n", result);
+	else Log.Error("WorldNet: Error while setting up the Networking, errorcode: %u!\n", result);
 
 	return result;
 }

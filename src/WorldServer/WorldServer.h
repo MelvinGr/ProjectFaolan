@@ -94,6 +94,7 @@ namespace WorldServer
 
 	//Start
 	void HandleClient(GlobalTable* GTable);
+	void StartAgentServer(GlobalTable* GTable);
 
 	//AbilityHandler
 	void checkNewAbilities(GameClient* client);

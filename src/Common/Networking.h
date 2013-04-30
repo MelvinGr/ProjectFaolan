@@ -48,7 +48,7 @@ public:
 
 	Networking(int32 nPort);
 	int32 initDB();
-	int32 start();
+	int32 start(string waitTxt = "");
 	SOCKET AcceptClient();
 	void close();
 };
