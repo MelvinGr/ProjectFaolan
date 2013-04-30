@@ -54,6 +54,10 @@ public:
 	bool ladGlobalNpcs(vector<NPC>* NPCS);
 	//-----------
 
+	//Char
+	void saveCharPosition(GameClient* clientInfo);
+	//-----------
+
     bool checkLogin(string username, string password);
     bool updateLastInfo(uint32 accountID, string ip);
 

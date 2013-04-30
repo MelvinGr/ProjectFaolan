@@ -1,6 +1,6 @@
 /*
 Project Faolan a Simple and Free Server Emulator for Age of Conan.
-Copyright (C) 2009, 2010 The Project Faolan Team
+Copyright (C) 2012, 2013 The Project Faolan Team
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -16,41 +16,28 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef NETWORKING_H
-#define NETWORKING_H
+#ifndef AGENTSERVER_H
+#define AGENTSERVER_H
 
-#include "Common.h"
+#include "../Common/Common.h"
+#include "../Common/Settings.h"
+#include "../Common/MysqlDatabase.h"
+#include "../Common/Functions.h"
+#include "../Common/PacketBuffer.h"
+#include "../Common/Packet.h"
+#include "../Common/Networking.h"
+#include "../Common/Logger.h"
+#include "../Common/Client.h"
 
-#ifdef WINDOWS
-#include <Winsock2.h>
-#else
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <errno.h>
-#endif
+using namespace std;
 
-#include <stdio.h>
-#include <vector>
-
-#include "Settings.h"
-#include "MysqlDatabase.h"
-
-class Networking
+namespace AgentServer
 {
-	SOCKET sock;
-	int32 port;
+	void AgentServerHandler(GameClient* client, vector<GameClient*>* clientList);
 
-	sockaddr_in sin;
-	socklen_t sockAddrLen;
+	void HandleClient(void* socket);
 
-public:
-	int32 errorCode;
-
-	Networking(int32 nPort);
-	int32 initDB();
-	int32 start(string waitTxt = "");
-	SOCKET AcceptClient();
-	void close();
-};
-
+	//Messages
+	void sendNewChannel(GameClient* client, uint8 typ, uint32 channelId, string channelName);
+}
 #endif

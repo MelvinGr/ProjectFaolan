@@ -35,7 +35,7 @@ int32 Networking::initDB()
 	return 0;
 }
 
-int32 Networking::start()
+int32 Networking::start(string waitTxt)
 {
 #ifdef WINDOWS
 	WSADATA wsdata;
@@ -101,7 +101,10 @@ int32 Networking::start()
 	}
 	//*/
 	//Log.Success("Connected to MySQL Server!\n");
-	Log.Success("- Waiting for Connections!\n");
+	if(waitTxt.size() > 0)
+		Log.Success(waitTxt.c_str());
+	else
+		Log.Success("- Waiting for Connections!\n");
 
 	return 0;
 }

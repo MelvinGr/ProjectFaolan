@@ -74,6 +74,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\WorldServer\AbilityHandler.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\AgentServerHandler.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\AgentServerMessages.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\CharStatsHandler.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\CharAction.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\CharMovement.cpp" />
@@ -92,6 +94,7 @@
     <ClCompile Include="..\..\..\src\WorldServer\WorldCharAgentProjectHandler.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\src\WorldServer\AgentServer.h" />
     <ClInclude Include="..\..\..\src\WorldServer\PassBlobs\PassblobHandler.h" />
     <ClInclude Include="..\..\..\src\WorldServer\SendPackets\SendPackets.h" />
     <ClInclude Include="..\..\..\src\WorldServer\WorldServer.h" />
