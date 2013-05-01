@@ -39,5 +39,6 @@ namespace AgentServer
 
 	//Messages
 	void sendNewChannel(GameClient* client, uint8 typ, uint32 channelId, string channelName);
+	void sendNewChatMember(GameClient* client, uint32 memberInst);
 }
 #endif

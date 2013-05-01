@@ -45,6 +45,8 @@ using namespace std;
 
 namespace WorldServer
 {
+	//MainHandler
+	void loadWorldHandler(GlobalTable * GTable);
 	//NPC Combat System
 	void HandleNpcCombat(GlobalTable * GTable);
 	//--------------
@@ -90,7 +92,7 @@ namespace WorldServer
 	void addCharLevel(string level,GameClient *Client);
 	void addItem(string itemname, GameClient* client);
 	void addMoney(uint32 cash, GameClient* client);
-	void teleportChar(string zone, GameClient* client, vector<GameClient*>* clientList);
+	void teleportChar(string zone, GlobalTable* GTable, vector<GameClient*>* clientList);
 
 	//Start
 	void HandleClient(GlobalTable* GTable);

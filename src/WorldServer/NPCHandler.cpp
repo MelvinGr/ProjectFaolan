@@ -26,12 +26,11 @@ void WorldServer::LoadNearNPCs(GlobalTable* GTable)
 	{
 		for(uint32 i = 0; i < GTable->NPCS.size(); i++)
 		{
-			Log.Debug("NPC %s\n", GTable->NPCS[i].name.c_str());
 			if(//GTable->client->charInfo.position.distance(GTable->NPCS[i].position) < maxDistance &&
 				//!checkAlreadySpawned(GTable->client->spawnedMobs, GTable->NPCS[i].npcId) &&
 				GTable->NPCS[i].mapId == GTable->client->charInfo.map)
 			{
-				Log.Debug("spawn now\n");
+				Log.Debug("spawn NPC %s\n", GTable->NPCS[i].name.c_str());
 				spawnNPC(GTable->NPCS[i], GTable);
 			}
 		}
@@ -158,7 +157,7 @@ bool WorldServer::spawnNPC(NPC tmpNPC, GlobalTable* GTable)
 		aBuffer.write<uint8>(0x88); //Id
 		aBuffer.write<uint32>(tmpNPC.headMesh);	//HeadMesh
 		aBuffer.writeArray(npcData4, sizeof(npcData4));
-		Log.Warning("Send Packet:\n%s\n\n", String::arrayToHexString(aBuffer.buffer, aBuffer.bufferLength).c_str());
+		//Log.Warning("Send Packet:\n%s\n\n", String::arrayToHexString(aBuffer.buffer, aBuffer.bufferLength).c_str());
 		aBuffer.doItAll(GTable->client->clientSocket);
 	return true;
 }

@@ -21,12 +21,25 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 void AgentServer::sendNewChannel(GameClient* client, uint8 typ, uint32 channelId, string channelName)
 {
 	PacketBuffer aBuffer(500);
-	aBuffer.write<uint16>(0x003c); //opcode for new cahnnel
+	aBuffer.write<uint16>(0x003c); //opcode for new channel
 	aBuffer.write<uint16>(0);
 	aBuffer.write<uint8>(typ);
 	aBuffer.write<uint32>(channelId);
 	aBuffer.write<string>(channelName);
 	aBuffer.write<uint32>(0x00008044);
 	aBuffer.write<uint16>(0);
+	aBuffer.doItAllAgentServer(client->clientSocket);
+}
+
+void AgentServer::sendNewChatMember(GameClient* client, uint32 memberInst)
+{
+	string membername = Database.getUsernameFromClientInst(memberInst);
+
+	PacketBuffer aBuffer(500);
+	aBuffer.write<uint16>(0x0014); //opcode for new chatmember
+	aBuffer.write<uint16>(0);
+	aBuffer.write<uint32>(memberInst);
+	aBuffer.write<uint32>(0);
+	aBuffer.write<string>(membername);
 	aBuffer.doItAllAgentServer(client->clientSocket);
 }

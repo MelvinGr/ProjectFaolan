@@ -77,6 +77,7 @@
     <ClCompile Include="..\..\..\src\WorldServer\AgentServerHandler.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\AgentServerMessages.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\CharStatsHandler.cpp" />
+    <ClCompile Include="..\..\..\src\WorldServer\loadWorldHandler.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\CharAction.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\CharMovement.cpp" />
     <ClCompile Include="..\..\..\src\WorldServer\PassBlobs\DeleteItem.cpp" />
