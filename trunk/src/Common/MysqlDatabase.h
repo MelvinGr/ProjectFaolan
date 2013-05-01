@@ -56,6 +56,7 @@ public:
 
 	//Char
 	void saveCharPosition(GameClient* clientInfo);
+	string getUsernameFromClientInst(uint32 clientInst);
 	//-----------
 
     bool checkLogin(string username, string password);

@@ -246,6 +246,23 @@ void MySQLDatabase::saveCharPosition(GameClient* clientInfo)
 	bool result = (mysql_query(&mysql, query) == 0) && (res = mysql_store_result(&mysql)) && mysql_fetch_row(res);
 	mysql_free_result(res);
 }
+
+string MySQLDatabase::getUsernameFromClientInst(uint32 clientInst)
+{
+	uint8 realmID = ((clientInst & 0xff000000) >> 24) &0x000000ff;
+	uint32 charId = clientInst &0x00ffffff;
+	MYSQL_RES* res;
+	MYSQL_ROW row;
+
+	int8 query[1000];
+	sprintf(query, "SELECT name FROM characters WHERE character_id='%u' AND realm_id='%u'", charId, realmID);
+
+	if ((mysql_query(&mysql, query) == 0) && (res = mysql_store_result(&mysql)) && (row = mysql_fetch_row(res)))
+	{
+		return row[0];
+	}
+	return NULL;
+}
 //----------------------
 
 bool MySQLDatabase::checkLogin(string username, string password)
