@@ -4,7 +4,7 @@ mysqlAddress = "127.0.0.1"
 mysqlPort = 3306
 mysqlDatabase = "faolan"
 
-universeAgentPort = 7000
+universeAgentPort = 7010
 
 playerAgentIPAddress = "127.0.0.1"
 playerAgentPort = 7001

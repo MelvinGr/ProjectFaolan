@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2005-2008, Faolan Team
+Copyright (c) 2005-2008, CellAO Team
 
 All rights reserved.
 
@@ -7,7 +7,7 @@ Redistribution and use in source and binary forms, with or without modification,
 
 * Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
 * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
-* Neither the name of the Faolan Team nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+* Neither the name of the CellAO Team nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
@@ -41,7 +41,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define CELLAO_KEY_PRIME		"eca2e8c85d863dcdc26a429a71a9815ad052f6139669dd659f98ae159d313d13c6bf2838e10a69b6478b64a24bd054ba8248e8fa778703b418408249440b2c1edd28853e240d8a7e49540b76d120d3b1ad2878b1b99490eb4a2a5e84caa8a91cecbdb1aa7c816e8be343246f80c637abc653b893fd91686cf8d32d6cfe5f2a6f"
 #define CELLAO_KEY_GENERATOR	"5"
 
-int match(unsigned char *memory, unsigned char *matchone, unsigned char *matchtwo, unsigned long max)
+int match(const unsigned char *memory, const unsigned char *matchone, const unsigned char *matchtwo, unsigned long max)
 {
 	if (IsBadReadPtr(memory, max))
 		return 0;
@@ -52,7 +52,7 @@ int match(unsigned char *memory, unsigned char *matchone, unsigned char *matchtw
 	* a second time in findkeys() after this matches it. So there is no risk doing this.
 	*         -- NV
 	*/
-	while(max--)
+	while (max--)
 	{
 		if ((*memory != *matchone) && (*memory != *matchtwo))
 			return 0;
@@ -72,7 +72,7 @@ unsigned long fixprotect(void *ptr, unsigned long size)
 
 	VirtualQuery(ptr, &mbi, sizeof(mbi));
 
-	switch(mbi.Protect & 0xFF)
+	switch (mbi.Protect & 0xFF)
 	{
 	case PAGE_EXECUTE:
 	case PAGE_EXECUTE_READ:
@@ -109,27 +109,31 @@ void findkeys(unsigned char *base, unsigned long size)
 		{
 			if (!memcmp(ptr, FUNCOM_KEY_PUBLIC, sizeof(FUNCOM_KEY_PUBLIC)))
 			{
+				MessageBox(0, "Found private key", "Project Faolan Launcher", MB_ICONEXCLAMATION);
 				oldprotect = fixprotect(ptr, sizeof(CELLAO_KEY_PUBLIC));
 
 				memcpy(ptr, CELLAO_KEY_PUBLIC, sizeof(CELLAO_KEY_PUBLIC));
 
 				VirtualProtect(ptr, sizeof(FUNCOM_KEY_PUBLIC), oldprotect, &oldprotect);
 
-				ptr += sizeof(FUNCOM_KEY_PUBLIC) - 1;
-				remaining -= sizeof(FUNCOM_KEY_PUBLIC) - 1;
-			} else if (!memcmp(ptr, FUNCOM_KEY_PRIME, sizeof(FUNCOM_KEY_PRIME)))
+				ptr += sizeof(FUNCOM_KEY_PUBLIC)-1;
+				remaining -= sizeof(FUNCOM_KEY_PUBLIC)-1;
+			}
+			else if (!memcmp(ptr, FUNCOM_KEY_PRIME, sizeof(FUNCOM_KEY_PRIME)))
 			{
+				MessageBox(0, "Found public key", "Project Faolan Launcher", MB_ICONEXCLAMATION);
 				oldprotect = fixprotect(ptr, sizeof(FUNCOM_KEY_PRIME));
 
 				memcpy(ptr, CELLAO_KEY_PRIME, sizeof(CELLAO_KEY_PRIME));
 
 				VirtualProtect(ptr, sizeof(FUNCOM_KEY_PRIME), oldprotect, &oldprotect);
 
-				ptr += sizeof(FUNCOM_KEY_PRIME) - 1;
-				remaining -= sizeof(FUNCOM_KEY_PRIME) - 1;
-			} else
+				ptr += sizeof(FUNCOM_KEY_PRIME)-1;
+				remaining -= sizeof(FUNCOM_KEY_PRIME)-1;
+			}
+			else
 			{
-				MessageBox(0, "Danger, Will Robinson.\nThis should not happen!", "Faolan Launcher", MB_ICONEXCLAMATION);
+				MessageBox(0, "Danger, Will Robinson.\nThis should not happen!", "Project Faolan Launcher", MB_ICONEXCLAMATION);
 
 				ExitProcess(0);
 			}
@@ -146,16 +150,15 @@ BOOL WINAPI execv_Hook(const char *cmdname, const char *const *argv)
 	PROCESS_INFORMATION	pi;
 	HANDLE				hKernel;
 	void				*dllname;
-	char				*buffer;
+	char				buffer[1024];
 
 	memset(&si, 0, sizeof(si));
 
 	si.cb = sizeof(si);
 
-	buffer = malloc(1024);
 	strcpy_s(buffer, 1024, *argv++);
 
-	while(*argv != NULL)
+	while (*argv != NULL)
 	{
 		strcat_s(buffer, 1024, " ");
 		strcat_s(buffer, 1024, *argv);
@@ -165,19 +168,19 @@ BOOL WINAPI execv_Hook(const char *cmdname, const char *const *argv)
 
 	if (!CreateProcess(cmdname, buffer, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &si, &pi))
 	{
-		MessageBox(0, "execv_Hook(): Failed to load start process!", "Faolan Launcher", MB_ICONEXCLAMATION);
+		MessageBox(0, "execv_Hook(): Failed to load start process!", "Project Faolan Launcher", MB_ICONEXCLAMATION);
 
 		ExitProcess(1);
 	}
 
 	hKernel = GetModuleHandle("Kernel32.dll");
 
-	dllname = VirtualAllocEx(pi.hProcess, NULL, sizeof(DLLNAME), MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+	dllname = VirtualAllocEx(pi.hProcess, NULL, sizeof(DLLNAME), MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 	WriteProcessMemory(pi.hProcess, dllname, DLLNAME, sizeof(DLLNAME), NULL);
 
 	if (CreateRemoteThread(pi.hProcess, NULL, 0, (LPTHREAD_START_ROUTINE)GetProcAddress(hKernel, "LoadLibraryA"), dllname, 0, NULL) == NULL)
 	{
-		MessageBox(0, "execv_Hook(): Failed to create remote thread.\nPlease check Anti-Virus software/etc that could be preventing this", "Faolan Launcher", MB_ICONEXCLAMATION);
+		MessageBox(0, "execv_Hook(): Failed to create remote thread.\nPlease check Anti-Virus software/etc that could be preventing this", "Project Faolan Launcher", MB_ICONEXCLAMATION);
 	}
 
 	CloseHandle(hKernel);
@@ -187,29 +190,26 @@ BOOL WINAPI execv_Hook(const char *cmdname, const char *const *argv)
 	CloseHandle(pi.hProcess);
 	CloseHandle(pi.hThread);
 
-	free(buffer);
-
 	ExitProcess(0);
 
 	return 0;
 }
 
-int * WINAPI spawnv_Hook(int mode, const char *cmdname, const char *const *argv)
+HANDLE WINAPI spawnv_Hook(int mode, const char *cmdname, const char *const *argv)
 {
 	STARTUPINFO			si;
 	PROCESS_INFORMATION	pi;
-	HANDLE				hKernel;
+	HMODULE				hKernel;
 	void				*dllname;
-	char				*buffer;
+	char				buffer[1024];
 
 	memset(&si, 0, sizeof(si));
 
 	si.cb = sizeof(si);
 
-	buffer = malloc(1024);
 	strcpy_s(buffer, 1024, *argv++);
 
-	while(*argv != NULL)
+	while (*argv != NULL)
 	{
 		strcat_s(buffer, 1024, " ");
 		strcat_s(buffer, 1024, *argv);
@@ -219,19 +219,19 @@ int * WINAPI spawnv_Hook(int mode, const char *cmdname, const char *const *argv)
 
 	if (!CreateProcess(cmdname, buffer, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &si, &pi))
 	{
-		MessageBox(0, "spawnv_Hook(): Failed to load start process!", "Faolan Launcher", MB_ICONEXCLAMATION);
+		MessageBox(0, "spawnv_Hook(): Failed to load start process!", "Project Faolan Launcher", MB_ICONEXCLAMATION);
 
 		ExitProcess(1);
 	}
 
 	hKernel = GetModuleHandle("Kernel32.dll");
 
-	dllname = VirtualAllocEx(pi.hProcess, NULL, sizeof(DLLNAME), MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+	dllname = VirtualAllocEx(pi.hProcess, NULL, sizeof(DLLNAME), MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 	WriteProcessMemory(pi.hProcess, dllname, DLLNAME, sizeof(DLLNAME), NULL);
 
 	if (CreateRemoteThread(pi.hProcess, NULL, 0, (LPTHREAD_START_ROUTINE)GetProcAddress(hKernel, "LoadLibraryA"), dllname, 0, NULL) == NULL)
 	{
-		MessageBox(0, "spawnv_Hook(): Failed to create remote thread.\nPlease check Anti-Virus software/etc that could be preventing this", "Faolan Launcher", MB_ICONEXCLAMATION);
+		MessageBox(0, "spawnv_Hook(): Failed to create remote thread.\nPlease check Anti-Virus software/etc that could be preventing this", "Project Faolan Launcher", MB_ICONEXCLAMATION);
 	}
 
 	CloseHandle(hKernel);
@@ -240,28 +240,72 @@ int * WINAPI spawnv_Hook(int mode, const char *cmdname, const char *const *argv)
 
 	CloseHandle(pi.hThread);
 
-	free(buffer);
-
 	return pi.hProcess;
+}
+
+BOOL WINAPI CreateProcessA_Hook(LPCTSTR lpApplicationName, LPTSTR lpCommandLine, LPSECURITY_ATTRIBUTES lpProcessAttributes, LPSECURITY_ATTRIBUTES lpThreadAttributes, BOOL bInheritHandles, DWORD dwCreationFlags, LPVOID lpEnvironment, LPCTSTR lpCurrentDirectory, LPSTARTUPINFO lpStartupInfo, LPPROCESS_INFORMATION lpProcessInformation)
+{
+	STARTUPINFO			si;
+	PROCESS_INFORMATION	pi;
+	HMODULE				hKernel;
+	void				*dllname;
+	BOOL				ret;
+
+	if (lpStartupInfo == NULL)
+	{
+		lpStartupInfo = &si;
+	}
+
+	if (lpProcessInformation == NULL)
+	{
+		lpProcessInformation = &pi;
+	}
+
+	if (!(ret = CreateProcess(lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, dwCreationFlags | CREATE_SUSPENDED, lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation)))
+	{
+		MessageBox(0, "CreateProcessA_Hook(): Failed to load start process!", "Project Faolan Launcher", MB_ICONEXCLAMATION);
+
+		return ret;
+	}
+
+	hKernel = GetModuleHandle("Kernel32.dll");
+
+	dllname = VirtualAllocEx(pi.hProcess, NULL, sizeof(DLLNAME), MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+	WriteProcessMemory(pi.hProcess, dllname, DLLNAME, sizeof(DLLNAME), NULL);
+
+	if (CreateRemoteThread(pi.hProcess, NULL, 0, (LPTHREAD_START_ROUTINE)GetProcAddress(hKernel, "LoadLibraryA"), dllname, 0, NULL) == NULL)
+	{
+		MessageBox(0, "CreateProcessA_Hook(): Failed to create remote thread.\nPlease check Anti-Virus software/etc that could be preventing this", "Project Faolan Launcher", MB_ICONEXCLAMATION);
+	}
+
+	CloseHandle(hKernel);
+
+	ResumeThread(pi.hThread);
+
+	CloseHandle(pi.hThread);
+
+	return ret;
 }
 
 void InstallHook()
 {
-	void						*hModule;
+	HMODULE						hmsvcr, hKernel32;
 	PIMAGE_DOS_HEADER			pDosHeader;
 	PIMAGE_NT_HEADERS			pNTHeaders;
 	PIMAGE_IMPORT_DESCRIPTOR	pImportDescriptor;
 	PIMAGE_THUNK_DATA			pThunkData;
-	void						*origexecv, *origspawnv;
-	char						buffer[MAX_PATH+1];
+	void						*origexecv, *origspawnv, *origCreateProcessA;
+	char						buffer[MAX_PATH + 1];
 	int							i, doneclient = 0;
 
-	hModule = LoadLibrary("msvcr71.dll");
+	hmsvcr = LoadLibrary("msvcr80.dll");
+	hKernel32 = LoadLibrary("Kernel32.dll");
 
-	origexecv = GetProcAddress(hModule, "_execv");
-	origspawnv = GetProcAddress(hModule, "_spawnv");
+	origexecv = GetProcAddress(hmsvcr, "_execv");
+	origspawnv = GetProcAddress(hmsvcr, "_spawnv");
+	origCreateProcessA = GetProcAddress(hKernel32, "CreateProcessA");
 
-	pDosHeader = (void*)GetModuleHandle(NULL);
+	pDosHeader = (PIMAGE_DOS_HEADER)GetModuleHandle(NULL);
 
 redo:
 	if (IsBadReadPtr(pDosHeader, sizeof(IMAGE_DOS_HEADER)))
@@ -283,16 +327,16 @@ redo:
 	if (pImportDescriptor == (PIMAGE_IMPORT_DESCRIPTOR)pNTHeaders)
 		return;
 
-	while(pImportDescriptor->Name)
+	while (pImportDescriptor->Name)
 	{
-		if (!_stricmp((char*)pDosHeader + pImportDescriptor->Name, "msvcr71.dll"))
+		if (!_stricmp((char*)pDosHeader + pImportDescriptor->Name, "msvcr80.dll"))
 		{
-			// Found msvcr71.dll Thunks
+			// Found msvcr80.dll Thunks
 			pThunkData = (PIMAGE_THUNK_DATA)((unsigned long)pDosHeader + (unsigned long)pImportDescriptor->FirstThunk);
 
-			while(pThunkData->u1.Function)
+			while (pThunkData->u1.Function)
 			{
-				if((unsigned long)pThunkData->u1.Function == (unsigned long)origexecv)
+				if ((unsigned long)pThunkData->u1.Function == (unsigned long)origexecv)
 				{
 					unsigned long oldprotect;
 
@@ -301,7 +345,8 @@ redo:
 					pThunkData->u1.Function = (unsigned long)execv_Hook;
 
 					VirtualProtect(&pThunkData->u1.Function, 4, oldprotect, &oldprotect);
-				} else if((unsigned long)pThunkData->u1.Function == (unsigned long)origspawnv)
+				}
+				else if ((unsigned long)pThunkData->u1.Function == (unsigned long)origspawnv)
 				{
 					unsigned long oldprotect;
 
@@ -313,7 +358,26 @@ redo:
 				}
 				pThunkData++;
 			}
-			break;
+		}
+		else if (!_stricmp((char*)pDosHeader + pImportDescriptor->Name, "Kernel32.dll"))
+		{
+			// Found Kernel32.dll Thunks
+			pThunkData = (PIMAGE_THUNK_DATA)((unsigned long)pDosHeader + (unsigned long)pImportDescriptor->FirstThunk);
+
+			while (pThunkData->u1.Function)
+			{
+				if ((unsigned long)pThunkData->u1.Function == (unsigned long)origCreateProcessA)
+				{
+					unsigned long oldprotect;
+
+					oldprotect = fixprotect(&pThunkData->u1.Function, 4);
+
+					pThunkData->u1.Function = (unsigned long)CreateProcessA_Hook;
+
+					VirtualProtect(&pThunkData->u1.Function, 4, oldprotect, &oldprotect);
+				}
+				pThunkData++;
+			}
 		}
 		pImportDescriptor++;
 	}
@@ -323,7 +387,7 @@ redo:
 
 	doneclient = 1;
 
-	GetModuleFileName((void*)pDosHeader, buffer, sizeof(buffer));
+	GetModuleFileName((HMODULE)pDosHeader, buffer, sizeof(buffer));
 	buffer[sizeof(buffer)-1] = 0;
 
 	for (i = strlen(buffer); (buffer[i] != '\\') && (i > 0); i--);
@@ -332,7 +396,7 @@ redo:
 
 	if (!_stricmp(&buffer[i], "Client.exe"))
 	{
-		pDosHeader = (void*)GetModuleHandle("GUIFunc.dll");
+		pDosHeader = (PIMAGE_DOS_HEADER)GetModuleHandle("GUIFunc.dll");
 
 		goto redo;
 	}
@@ -340,36 +404,36 @@ redo:
 
 BOOL APIENTRY DllMain(HINSTANCE hModule, DWORD dwReason, PVOID lpReserved)
 {
-	switch(dwReason)
+	switch (dwReason)
 	{
 	case DLL_PROCESS_ATTACH:
-		{
-			SYSTEM_INFO					si;
-			MEMORY_BASIC_INFORMATION	mbi;
-			void						*current;
+	{
+							   SYSTEM_INFO					si;
+							   MEMORY_BASIC_INFORMATION	mbi;
+							   unsigned char				*current;
 
-			GetSystemInfo(&si);
+							   GetSystemInfo(&si);
 
-			current = si.lpMinimumApplicationAddress;
+							   current = (unsigned char*)si.lpMinimumApplicationAddress;
 
-			while (current < si.lpMaximumApplicationAddress)
-			{
-				VirtualQuery(current, &mbi, sizeof(mbi));
+							   while ((LPVOID)current < si.lpMaximumApplicationAddress)
+							   {
+								   VirtualQuery(current, &mbi, sizeof(mbi));
 
-				current = mbi.BaseAddress;
+								   current = (unsigned char*)mbi.BaseAddress;
 
-				if ((mbi.State & MEM_COMMIT) && (mbi.Type & MEM_IMAGE))
-				{
-					findkeys(current, mbi.RegionSize);
-				}
+								   if ((mbi.State & MEM_COMMIT) && (mbi.Type & MEM_IMAGE))
+								   {
+									   findkeys(current, mbi.RegionSize);
+								   }
 
-				current = (void*)((unsigned long)current + mbi.RegionSize);
-			}
+								   current = current + mbi.RegionSize;
+							   }
 
-			InstallHook();
+							   InstallHook();
 
-			break;
-		}
+							   break;
+	}
 
 	case DLL_PROCESS_DETACH:
 		break;
