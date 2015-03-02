@@ -1,22 +1,23 @@
 using System;
 using System.Linq;
 using LibFaolan.Database;
-using LibFaolan.Network.Shared;
+using LibFaolan.Network;
+using LibFaolan.Other;
 
 namespace LibFaolan.Data
 {
-    public class ConanAccount
+    public sealed class Account
     {
         public string AuthChallenge = "2bac5cd78ee0e5a37395991bfbeeeab8";
         public UInt32 AuthStatus;
-        public ConanCharacter Character;
+        public Character Character;
         public UInt32 Cookie;
         public int counter, state;
         public UInt32 Id; // PlayerInstance
         public byte Kind; // 0 = user, 1 = admin
         public string Username;
 
-        public ConanCharacter charInfo
+        public Character charInfo
         {
             get { return Character; }
             set { Character = value; }
@@ -24,10 +25,8 @@ namespace LibFaolan.Data
 
         public UInt64 LongId => (0x0000271200000000u + Id); // As used by the client (why?)
 
-        public UInt32 nClientInst
-        {
-            get;// { return Id; }
-            set;// { Id = value; }
+        public UInt32 nClientInst { get; // { return Id; }
+            set; // { Id = value; }
         }
 
         public void LoadDetailsFromDatabase(IDatabase database)
@@ -56,10 +55,10 @@ namespace LibFaolan.Data
             return database.ExecuteScalar<int>("SELECT state FROM accounts WHERE account_id = '" + Id + "'") == 1;
         }
 
-        public ConanCharacter[] GetCharacters(IDatabase database)
+        public Character[] GetCharacters(IDatabase database)
         {
             var chars = database.ExecuteDynamic("SELECT character_id FROM characters WHERE account_id = '" + Id + "'")
-                .Select(c => new ConanCharacter((UInt32) c["character_id"])).ToArray();
+                .Select(c => new Character((UInt32) c["character_id"])).ToArray();
 
             foreach (var c in chars)
                 c.LoadDetailsFromDatabase(database);

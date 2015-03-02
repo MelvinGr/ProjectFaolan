@@ -1,5 +1,5 @@
 using System;
-using LibFaolan.Network.Shared;
+using LibFaolan.Network;
 
 namespace LibFaolan.Crypt
 {
@@ -229,7 +229,7 @@ namespace LibFaolan.Crypt
             , 0xDE0506F1
         };
 
-        public static unsafe UInt32 CalculateForPacketBuffer(PacketBuffer packetBuffer)
+        public static unsafe UInt32 CalculateForPacketBuffer(ConanStream packetBuffer)
         {
             fixed (byte* fix = packetBuffer.GetBuffer())
             {

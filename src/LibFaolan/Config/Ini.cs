@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -7,7 +7,7 @@ using System.Text;
 namespace LibFaolan.Config
 {
     // https://www.nuget.org/packages/ini/
-    public class Ini
+    public sealed class Ini
     {
         private readonly string file;
 
@@ -22,7 +22,6 @@ namespace LibFaolan.Config
         public Ini(string file)
         {
             this.file = file;
-
             if (!File.Exists(file))
                 return;
 
@@ -35,21 +34,13 @@ namespace LibFaolan.Config
         public void Load()
         {
             var txt = File.ReadAllText(file);
-
             var currentSection = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
-
             ini[""] = currentSection;
 
             foreach (var l in txt.Split(new[] {"\n"}, StringSplitOptions.RemoveEmptyEntries)
-                .Select((t, i) => new
-                {
-                    idx = i,
-                    text = t.Trim()
-                }))
-                // .Where(t => !string.IsNullOrWhiteSpace(t) && !t.StartsWith(";")))
+                .Select((t, i) => new {idx = i, text = t.Trim()}))
             {
                 var line = l.text;
-
                 if (line.StartsWith(";") || string.IsNullOrWhiteSpace(line))
                 {
                     currentSection.Add(";" + l.idx, line);
@@ -76,10 +67,7 @@ namespace LibFaolan.Config
         /// </summary>
         /// <param name="key">parameter key</param>
         /// <returns></returns>
-        public string GetValue(string key)
-        {
-            return GetValue(key, "", "");
-        }
+        public string GetValue(string key) => GetValue(key, "", "");
 
         /// <summary>
         ///     Get a parameter value in the section
@@ -87,10 +75,7 @@ namespace LibFaolan.Config
         /// <param name="key">parameter key</param>
         /// <param name="section">section</param>
         /// <returns></returns>
-        public string GetValue(string key, string section)
-        {
-            return GetValue(key, section, "");
-        }
+        public string GetValue(string key, string section) => GetValue(key, section, "");
 
         /// <summary>
         ///     Returns a parameter value in the section, with a default value if not found
@@ -150,6 +135,7 @@ namespace LibFaolan.Config
             if (sb.Length < 4)
                 return sb[sb.Length - 2] == '\r' &&
                        sb[sb.Length - 1] == '\n';
+
             return sb[sb.Length - 4] == '\r' &&
                    sb[sb.Length - 3] == '\n' &&
                    sb[sb.Length - 2] == '\r' &&
@@ -161,10 +147,7 @@ namespace LibFaolan.Config
         /// </summary>
         /// <param name="key">parameter key</param>
         /// <param name="value">parameter value</param>
-        public void WriteValue(string key, string value)
-        {
-            WriteValue(key, "", value);
-        }
+        public void WriteValue(string key, string value) => WriteValue(key, "", value);
 
         /// <summary>
         ///     Write a parameter value in a section
@@ -203,9 +186,6 @@ namespace LibFaolan.Config
         ///     Get all the section names of the INI file
         /// </summary>
         /// <returns></returns>
-        public string[] GetSections()
-        {
-            return ini.Keys.Where(t => t != "").ToArray();
-        }
+        public string[] GetSections() => ini.Keys.Where(t => t != "").ToArray();
     }
 }

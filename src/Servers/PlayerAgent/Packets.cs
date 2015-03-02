@@ -1,12 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using LibFaolan;
 using LibFaolan.Config;
 using LibFaolan.Data;
 using LibFaolan.Database;
 using LibFaolan.DllImport;
-using LibFaolan.Network.Shared;
+using LibFaolan.Network;
 
 namespace PlayerAgent
 {
@@ -17,25 +15,27 @@ namespace PlayerAgent
         private static readonly byte[] Sender2 = {0x0d, 0x16, 0x91, 0x35, 0x1d, 0x10, 0x14};
         private static readonly byte[] sender3 = {0x0D, 0x16, 0x91, 0x35, 0x1D, 0x10, 0x46};
         private static readonly byte[] receiver3 = {0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0xEC, 0xEB, 0x80, 0xDE, 0x03};
+        private static readonly byte[] Sender4 = {0x0D, 0x84, 0x04, 0xF2, 0x82, 0x10, 0x03};
+        private static readonly byte[] Receiver4 = {0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0xEC, 0xEB, 0x80, 0xDE, 0x03};
 
-        public void InitAuth(NetworkClient client, ConanAccount account)
+        public void InitAuth(NetworkClient client, Account account)
         {
             byte[] headerData = {0x93, 0x86, 0xee, 0x05};
 
-            new PacketBuffer()
+            new ConanStream()
                 .WriteHeader(Sender, Receiver, headerData, 0x2091, true)
                 .WriteUInt32(account.AuthStatus)
                 .Send(client);
         }
 
-        public void SendSmallCharList(NetworkClient client, ConanAccount account)
+        public void SendSmallCharList(NetworkClient client, Account account)
         {
-            var characters = new List<ConanCharacter>(); // get from db
+            var characters = new List<Character>(); // get from db
             var anzChars = (UInt32) characters.Count;
 
             byte[] headerData = {0x94, 0xa7, 0x60};
 
-            var aBuffer = new PacketBuffer();
+            var aBuffer = new ConanStream();
             aBuffer.WriteHeader(Sender, Receiver, headerData, 0x20a5, true);
             aBuffer.WriteUInt32((anzChars + 1)*1009);
             foreach (var character in characters)
@@ -47,12 +47,12 @@ namespace PlayerAgent
             aBuffer.Send(client);
         }
 
-        public void SendCharacterList(NetworkClient client, ConanAccount account, IDatabase database)
+        public void SendCharacterList(NetworkClient client, Account account, IDatabase database)
         {
             var characters = account.GetCharacters(Database);
             byte[] headerData = {0x8b, 0xd3, 0xa0, 0x0c};
 
-            var aBuffer = new PacketBuffer();
+            var aBuffer = new ConanStream();
             aBuffer.WriteHeader(Sender, Receiver, headerData, 0x20ef, true); // UpdateClientPlayerData
             aBuffer.WriteUInt32(account.Id); // PlayerInstance
             var anzChars = (UInt32) characters.Length;
@@ -100,11 +100,11 @@ namespace PlayerAgent
             aBuffer.Send(client);
         }
 
-        public void SendRealmList(NetworkClient client, ConanAccount account)
+        public void SendRealmList(NetworkClient client, Account account)
         {
             byte[] headerData = {0xe2, 0xe6, 0xc4, 0x0f};
 
-            var aBuffer = new PacketBuffer();
+            var aBuffer = new ConanStream();
             aBuffer.WriteHeader(Sender, Receiver, headerData, 0x20cc, true); // SetDimensionList
             aBuffer.WriteUInt32(Realms.Count);
             foreach (var realm in Realms)
@@ -127,28 +127,28 @@ namespace PlayerAgent
             aBuffer.Send(client);
         }
 
-        public void Request_Char_RealmData_1(NetworkClient client, ConanAccount account)
+        public void Request_Char_RealmData_1(NetworkClient client, Account account)
         {
             byte[] headerData = {0xcb, 0xc6, 0xfc, 0x04};
 
-            new PacketBuffer()
+            new ConanStream()
                 .WriteHeader(Sender, Receiver, headerData, 0x208c, true)
                 .WriteUInt32(1)
                 .Send(client);
         }
 
-        public void Ox20a6_1(NetworkClient client, ConanAccount account)
+        public void Ox20a6_1(NetworkClient client, Account account)
         {
             byte[] headerData = {0x99, 0x95, 0x92, 0x05};
 
-            new PacketBuffer()
+            new ConanStream()
                 .WriteHeader(Sender, Receiver, headerData, 0x209c, true)
                 .WriteUInt16(0)
                 .WriteByte(0)
                 .Send(client);
         }
 
-        public void SendCSPlayerAgent(NetworkClient client, ConanAccount account)
+        public void SendCSPlayerAgent(NetworkClient client, Account account)
         {
             // fs21.bin_0
             byte[] headerData = {0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE0, 0xD4, 0xB4, 0xD7, 0x05};
@@ -158,7 +158,7 @@ namespace PlayerAgent
                 0x50, 0x08, 0x02, 0xE5, 0xD4
             };
 
-            new PacketBuffer() // send CSPlayerAgent
+            new ConanStream() // send CSPlayerAgent
                 .WriteHeader(sender3, receiver3, headerData, 0x1A07, true)
                 .WriteUInt32(Network.htonl(Network.inet_addr(Settings.CSPlayerAgentAddress)))
                 .WriteUInt16(Settings.CSPlayerAgentPort)
@@ -167,7 +167,7 @@ namespace PlayerAgent
                 .Send(client);
         }
 
-        public void SendPlayerAgent(NetworkClient client, ConanAccount account)
+        public void SendPlayerAgent(NetworkClient client, Account account)
         {
             // fs21.bin_1
             var headerData = new byte[]
@@ -178,7 +178,7 @@ namespace PlayerAgent
                 0xE5, 0xD4
             };
 
-            new PacketBuffer() // Send PlayerAgent
+            new ConanStream() // Send PlayerAgent
                 .WriteHeader(sender3, receiver3, headerData, 0x1A07, true)
                 .WriteUInt32(Network.htonl(Network.inet_addr(Settings.PlayerAgentAddress)))
                 .WriteUInt16(Settings.PlayerAgentPort)
@@ -187,7 +187,7 @@ namespace PlayerAgent
                 .Send(client);
         }
 
-        public void SendGameServer(NetworkClient client, ConanAccount account)
+        public void SendGameServer(NetworkClient client, Account account)
         {
             // fs21.bin_2
             var headerData = new byte[]
@@ -199,20 +199,20 @@ namespace PlayerAgent
                 0x01, 0x00, 0x00, 0x9C, 0x50, 0x00, 0x10, 0xBD, 0xAC
             };
 
-            new PacketBuffer() // Send WorldServer
+            new ConanStream() // Send WorldServer
                 .WriteHeader(sender3, receiver3, headerData, 0x1A07, true)
                 .WriteString(Realms[0].IpAddress + ":" + Realms[0].Port)
                 .WriteArray(packetData)
                 .Send(client);
         }
 
-        public void SendLast(NetworkClient client, ConanAccount account)
+        public void SendLast(NetworkClient client, Account account)
         {
             // fs21.bin_3
             var headerData = new byte[]
             {0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE3, 0xEE, 0x9F, 0xE2, 0x07};
 
-            new PacketBuffer()
+            new ConanStream()
                 .WriteHeader(sender3, receiver3, headerData, 0x1A07, true)
                 .WriteUInt32(0x0000276A)
                 .WriteString("AAPointsPerLevel")
@@ -245,11 +245,9 @@ namespace PlayerAgent
                 .Send(client);
         }
 
-        public void EnterWorld(NetworkClient client, ConanAccount account)
+        public void EnterWorld(NetworkClient client, Account account)
         {
             byte[] headerData = {0x8B, 0xD8, 0x99, 0x02};
-            byte[] sender = {0x0D, 0x84, 0x04, 0xF2, 0x82, 0x10, 0x03};
-            byte[] receiver = {0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0xEC, 0xEB, 0x80, 0xDE, 0x03};
             byte[] packetData =
             {
                 0x00, 0x00, 0x13, 0xF2, 0x49, 0x4F,
@@ -556,8 +554,8 @@ namespace PlayerAgent
                 0xA9, 0x48, 0xD5, 0xE5
             };
 
-            new PacketBuffer()
-                .WriteHeader(sender, receiver, headerData, 0x20B9, true)
+            new ConanStream()
+                .WriteHeader(Sender4, Receiver4, headerData, 0x20B9, true)
                 .WriteUInt32(0x0000C350)
                 .WriteUInt32(account.Character.Id) // 0x0802E5D4) // charid?
                 .WriteArray(packetData)

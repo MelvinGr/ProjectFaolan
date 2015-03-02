@@ -1,10 +1,11 @@
 using Hik.Communication.Scs.Server;
 
-namespace LibFaolan.Network.Shared
+namespace LibFaolan.Network
 {
-    public class NetworkClient
+    public sealed class NetworkClient
     {
         private string _ipaddress;
+        internal NetworkClientDisconnectedDelegate Disconnected;
 
         public NetworkClient(IScsServerClient client)
         {
@@ -31,9 +32,18 @@ namespace LibFaolan.Network.Shared
             }
         }
 
-        public void Send(Packet value)
+        public void Send(byte[] value)
         {
-            InternalClient.SendMessage(value);
+            try
+            {
+                InternalClient.SendMessage(new WireProtocol.SendPacket(value));
+            }
+            catch
+            {
+                Disconnected?.Invoke(this);
+            }
         }
+
+        internal delegate void NetworkClientDisconnectedDelegate(NetworkClient client);
     }
 }

@@ -1,23 +1,22 @@
-using LibFaolan;
 using LibFaolan.Data;
 using LibFaolan.Database;
 using LibFaolan.Extentions;
 using LibFaolan.Network;
-using LibFaolan.Network.Shared;
+using LibFaolan.Other;
 
 namespace UniverseAgent
 {
-    public partial class UniverseAgentListener : Server<ConanPacket>
+    public partial class UniverseAgentListener : Server
     {
-        public UniverseAgentListener(ushort port, Logger logger, IDatabase database) 
+        public UniverseAgentListener(ushort port, Logger logger, IDatabase database)
             : base(port, logger, database)
         {
         }
-        
+
         public override void ClientConnected(NetworkClient client)
         {
             Logger.WriteLine("New client with address: " + client.IpAddress);
-            client.Tag = new ConanAccount();
+            client.Tag = new Account();
         }
 
         public override void ClientDisconnected(NetworkClient client)
@@ -25,10 +24,10 @@ namespace UniverseAgent
             Logger.WriteLine("Client with address: " + client.IpAddress + " disconnected!");
         }
 
-        public override void ReceivedPacket(NetworkClient client, ConanPacket packet)
+        public override void ReceivedPacket(NetworkClient client, Packet packet)
         {
-            Logger.WriteLine("Received opcode: " + (Opcodes)packet.Opcode + " (" + packet.Opcode.ToHex() + ")");
-            var account = (ConanAccount) client.Tag;
+            Logger.WriteLine("Received opcode: " + (Opcodes) packet.Opcode + " (" + packet.Opcode.ToHex() + ")");
+            var account = (Account) client.Tag;
 
             switch ((Opcodes) packet.Opcode)
             {

@@ -1,15 +1,13 @@
-using System;
-using LibFaolan;
 using LibFaolan.Data;
 using LibFaolan.Database;
 using LibFaolan.DllImport;
 using LibFaolan.Extentions;
 using LibFaolan.Network;
-using LibFaolan.Network.Shared;
+using LibFaolan.Other;
 
 namespace GameServer
 {
-    public partial class GameServerListener : Server<ConanPacket>
+    public partial class GameServerListener : Server
     {
         public GameServerListener(ushort port, Logger logger, IDatabase database) : base(port, logger, database)
         {
@@ -18,7 +16,7 @@ namespace GameServer
         public override void ClientConnected(NetworkClient client)
         {
             Logger.WriteLine("New client with address: " + client.IpAddress);
-            client.Tag = new ConanAccount();
+            client.Tag = new Account();
         }
 
         public override void ClientDisconnected(NetworkClient client)
@@ -26,10 +24,10 @@ namespace GameServer
             Logger.WriteLine("Client with address: " + client.IpAddress + " disconnected!");
         }
 
-        public override void ReceivedPacket(NetworkClient client, ConanPacket packet)
+        public override void ReceivedPacket(NetworkClient client, Packet packet)
         {
             Logger.WriteLine("Received opcode: " + (Opcodes) packet.Opcode + " (" + packet.Opcode.ToHex() + ")");
-            var account = (ConanAccount) client.Tag;
+            var account = (Account) client.Tag;
 
             switch ((Opcodes) packet.Opcode)
             {
@@ -41,7 +39,7 @@ namespace GameServer
 
                     account.Id = 1;
                     account.LoadDetailsFromDatabase(Database);
-                    account.charInfo = new ConanCharacter(2);
+                    account.charInfo = new Character(2);
                     account.charInfo.LoadDetailsFromDatabase(Database);
 
                     Logger.WriteLine("CharID: " + account.nClientInst.ToHex());
@@ -57,15 +55,17 @@ namespace GameServer
                     ReportServerID(client, account, 0x00000006);
                     AckAuthentication(client, account, 1);
 
-                    //LoadWorldHandler(client, account);
-                    SendEverything(client);
+                    // what is 0x201C? client works just fine without direct noticible changes when not sending these
+                    Send0x201C(client);
+                    Send0x200A(client);
+                    Send0x2000(client, account);
 
                     break;
                 }
 
                 case Opcodes.Ox2000:
                 {
-                    Ox2000(client, account, packet);
+                    Handle0x2000(client, account, packet);
 
                     break;
                 }
@@ -138,7 +138,7 @@ namespace GameServer
                     var sender = new byte[] {0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x4C};
                     var receiver = new byte[] {0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, 0xD4, 0xCB, 0x8B, 0x40};
 
-                    new PacketBuffer() // p.158
+                    new ConanStream() // p.158
                         .WriteHeader(sender, receiver, null, SendOpcodes.Pong, true)
                         .WriteUInt32(0x42c80000) // old = 0x42c80000, new = 0x42B32A07
                         .WriteUInt32(0)
@@ -165,7 +165,7 @@ namespace GameServer
                     var sender = new byte[] {0x0d, 0x5d, 0xb9, 0xec, 0xa9, 0x10, 0x18};
                     var receiver = new byte[] {0x0d, 0x91, 0xf7, 0x87, 0x8b, 0x10, 0xe6, 0x8f, 0x80, 0x08};
 
-                    new PacketBuffer()
+                    new ConanStream()
                         .WriteHeader(sender, receiver, null, 0x2008, true)
                         .WriteUInt32(part1)
                         .WriteUInt32(spawnId)
@@ -185,7 +185,7 @@ namespace GameServer
                     var time = 0;
                     Other.time(ref time);
 
-                    new PacketBuffer()
+                    new ConanStream()
                         .WriteHeader(sender, receiver, null, 0x0000207D, true)
                         .WriteUInt32(counter)
                         .WriteUInt32(0x0000004E)
@@ -207,11 +207,12 @@ namespace GameServer
                         var receiver2 = new byte[] {0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0x84, 0x80, 0x80, 0x08};
                         var data1 = new byte[]
                         {
-                            0x00, 0x00, 0x00, 0x00, 0x0e, 0x08, 0x05, 0x10, 0x00, 0x18, 0xec, 0x97, 0x02, 0x32, 0x04, 0x08,
+                            0x00, 0x00, 0x00, 0x00, 0x0e, 0x08, 0x05, 0x10, 0x00, 0x18, 0xec, 0x97, 0x02, 0x32, 0x04,
+                            0x08,
                             0x00, 0x10, 0x00
                         };
 
-                        var aBuffer = new PacketBuffer();
+                        var aBuffer = new ConanStream();
                         aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
                         aBuffer.WriteUInt32(0x0000001f);
                         aBuffer.WriteUInt32(0xa36d3b74);
@@ -222,11 +223,12 @@ namespace GameServer
 
                         var data2 = new byte[]
                         {
-                            0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x2a, 0xf8, 0x00, 0x00, 0x01,
+                            0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x2a, 0xf8, 0x00, 0x00,
+                            0x01,
                             0xf9, 0x00, 0x00, 0x43, 0x30, 0x00, 0x00, 0x01, 0xfb, 0x00, 0x00, 0x00, 0x00
                         };
 
-                        aBuffer = new PacketBuffer();
+                        aBuffer = new ConanStream();
                         aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
                         aBuffer.WriteUInt32(0x00000029);
                         aBuffer.WriteUInt32(0x96b8dc59);
@@ -235,6 +237,14 @@ namespace GameServer
                         aBuffer.WriteArray(data2);
                         aBuffer.Send(client);
                     }
+
+                    break;
+                }
+
+                case Opcodes.ManualRemoveBuff:
+                {
+                    //
+                    Logger.WriteLine("REMOVE BUFF");
 
                     break;
                 }

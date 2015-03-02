@@ -2,7 +2,7 @@ using System;
 
 namespace LibFaolan.Config
 {
-    public class Settings
+    public sealed class Settings
     {
         private static Ini _ini;
         public static string UniverseAgentAddress;

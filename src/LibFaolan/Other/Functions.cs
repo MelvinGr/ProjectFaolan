@@ -2,8 +2,9 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Net;
+using LibFaolan.Network;
 
-namespace LibFaolan
+namespace LibFaolan.Other
 {
     public static class Functions
     {
@@ -35,6 +36,19 @@ namespace LibFaolan
             var remaining = new byte[stream.Length - stream.Position];
             stream.Read(remaining, 0, remaining.Length);
             stream = new MemoryStream(remaining);
+        }
+
+        public static void TrimStream(ref ConanStream stream)
+        {
+            if (stream.Position == stream.Length)
+            {
+                stream = new ConanStream();
+                return;
+            }
+
+            var remaining = new byte[stream.Length - stream.Position];
+            stream.Read(remaining, 0, remaining.Length);
+            stream = new ConanStream(remaining);
         }
 
         public static ulong SecondsSindsEpoch()

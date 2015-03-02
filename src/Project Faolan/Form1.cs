@@ -1,10 +1,9 @@
 using System;
 using System.Windows.Forms;
-using LibFaolan;
 using LibFaolan.Config;
 using LibFaolan.Database;
 using LibFaolan.Network;
-using LibFaolan.Network.Shared;
+using LibFaolan.Other;
 
 namespace ProjectFaolan
 {
@@ -68,7 +67,7 @@ namespace ProjectFaolan
         private void gameServerButton_Click(object sender, EventArgs e)
             => StartServer(Settings.GameServerPort, out Statics.GameServer);
 
-        private bool StartServer<T>(ushort port, out T ret) where T : Server<ConanPacket>
+        private bool StartServer<T>(ushort port, out T ret) where T : Server
         {
             var logger = GetLogger("[" + typeof (T).Name + "] ");
             var server = (T) Activator.CreateInstance(typeof (T), port, logger, Statics.MySqlDatabase);
