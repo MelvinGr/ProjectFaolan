@@ -39,8 +39,7 @@ namespace LibFaolan.DllImport
             int mode;
             var handle = GetStdHandle(STD_INPUT_HANDLE);
             GetConsoleMode(handle, out mode);
-            mode |= ENABLE_QUICK_EDIT_MODE;
-            SetConsoleMode(handle, mode);
+            SetConsoleMode(handle, mode | ENABLE_QUICK_EDIT_MODE);
         }
     }
 }

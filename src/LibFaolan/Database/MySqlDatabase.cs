@@ -5,8 +5,7 @@ using MySql.Data.MySqlClient;
 
 namespace LibFaolan.Database
 {
-    // http://www.codeproject.com/Articles/43438/Connect-C-to-MySQL
-    public class MySqlDatabase : IDatabase
+    public sealed class MySqlDatabase : IDatabase
     {
         private readonly MySqlConnection _connection;
 

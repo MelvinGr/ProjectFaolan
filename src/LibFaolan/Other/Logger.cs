@@ -1,9 +1,9 @@
 using System;
 using System.IO;
 
-namespace LibFaolan
+namespace LibFaolan.Other
 {
-    public class Logger
+    public sealed class Logger
     {
         public readonly string Tag;
 

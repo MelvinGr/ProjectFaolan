@@ -1,6 +1,6 @@
 using LibFaolan.Config;
 using LibFaolan.Data;
-using LibFaolan.Network.Shared;
+using LibFaolan.Network;
 
 namespace UniverseAgent
 {
@@ -10,17 +10,17 @@ namespace UniverseAgent
         private static readonly byte[] Receiver = {0x0d, 0x54, 0x40, 0x38, 0x0c, 0x10, 0xdc, 0xc8, 0x49};
         private static readonly byte[] Receiver2 = {0x0d, 0x54, 0x40, 0x38, 0x0c, 0x10, 0xec, 0xeb, 0x80, 0xde, 0x03};
 
-        public static void InitAuth(NetworkClient client, ConanAccount account)
+        public static void InitAuth(NetworkClient client, Account account)
         {
-            new PacketBuffer()
+            new ConanStream()
                 .WriteHeader(Sender, Receiver, null, 0x2000, true)
                 .WriteString(account.AuthChallenge)
                 .Send(client);
         }
 
-        public static void SetRegionState(NetworkClient client, ConanAccount account)
+        public static void SetRegionState(NetworkClient client, Account account)
         {
-            new PacketBuffer()
+            new ConanStream()
                 .WriteHeader(Sender, Receiver2, null, 0x2005, true)
                 .WriteArray(0x01, 0x01, 0x01, 0x01, 0x3f, 0x80, 0x00, 0x00, 0x3f, 0x80, 0x00, 0x00, 0x01, 0x01, 0x00)
                 .Send(client);
@@ -48,9 +48,9 @@ namespace UniverseAgent
             aBuffer.Send(client);
         }*/
 
-        public static void SendPlayerAgentRealm(NetworkClient client, ConanAccount account)
+        public static void SendPlayerAgentRealm(NetworkClient client, Account account)
         {
-            new PacketBuffer()
+            new ConanStream()
                 .WriteHeader(Sender, Receiver2, null, 0x2001, true)
                 .WriteUInt32(0x01) // authstatus
                 .WriteUInt64(account.LongId)

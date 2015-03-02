@@ -4,60 +4,51 @@ using System.Text;
 using LibFaolan.Crypt;
 using LibFaolan.Data;
 using LibFaolan.Extentions;
-using LibFaolan.Network.Internal;
+using LibFaolan.Math;
 
-namespace LibFaolan.Network.Shared
+namespace LibFaolan.Network
 {
-    public class PacketBuffer
+    public class ConanStream : MemoryStream
     {
-        private readonly MemoryStream _stream;
-
-        public PacketBuffer()
+        public ConanStream()
         {
-            _stream = new MemoryStream();
         }
 
-        public PacketBuffer(byte[] data)
+        public ConanStream(byte[] data) : base(data)
         {
-            _stream = new MemoryStream(data);
         }
 
-        public PacketBuffer(MemoryStream data)
+        public new UInt32 Length => (UInt32) base.Length;
+
+        public new UInt32 Position
         {
-            _stream = data;
+            get { return (UInt32) base.Position; }
+            set { base.Position = value; }
         }
 
-        public UInt32 Length => (UInt32) _stream.Length;
-
-        public UInt32 Position
+        public new byte ReadByte()
         {
-            get { return (UInt32) _stream.Position; }
-            set { _stream.Position = value; }
-        }
-
-        public byte ReadByte()
-        {
-            return (byte) _stream.ReadByte();
+            return (byte) base.ReadByte();
         }
 
         public UInt16 ReadUInt16()
         {
             var value = new byte[sizeof (UInt16)];
-            _stream.Read(value, 0, sizeof (UInt16));
+            Read(value, 0, sizeof (UInt16));
             return BitConverter.ToUInt16(value.Reverse(), 0);
         }
 
         public UInt32 ReadUInt32()
         {
             var value = new byte[sizeof (UInt32)];
-            _stream.Read(value, 0, sizeof (UInt32));
+            Read(value, 0, sizeof (UInt32));
             return BitConverter.ToUInt32(value.Reverse(), 0);
         }
 
         public UInt64 ReadUInt64()
         {
             var value = new byte[sizeof (UInt64)];
-            _stream.Read(value, 0, sizeof (UInt64));
+            Read(value, 0, sizeof (UInt64));
             return BitConverter.ToUInt64(value.Reverse(), 0);
         }
 
@@ -68,10 +59,17 @@ namespace LibFaolan.Network.Shared
             return Encoding.UTF8.GetString(bytes);
         }
 
+        public string ReadShortString()
+        {
+            var length = ReadByte();
+            var bytes = ReadArray(length);
+            return Encoding.UTF8.GetString(bytes);
+        }
+
         public byte[] ReadArray(UInt32 length)
         {
             var headerBytes = new byte[length];
-            _stream.Read(headerBytes, 0, (int) length);
+            Read(headerBytes, 0, (int) length);
             return headerBytes;
         }
 
@@ -82,76 +80,100 @@ namespace LibFaolan.Network.Shared
             return new ConanArray(bytes);
         }
 
+        public Vector3 ReadVector3()
+        {
+            return new Vector3(ReadUInt32(), ReadUInt32(), ReadUInt32());
+        }
+
         ////////////////////////////////////////////////////////
 
-        public PacketBuffer WriteByte(byte value)
+        public new ConanStream WriteByte(byte value)
         {
-            _stream.WriteByte(value);
+            base.WriteByte(value);
             return this;
         }
 
-        public PacketBuffer WriteUInt16(Int16 value)
+        public ConanStream WriteUInt16(Int16 value)
         {
             WriteUInt16((UInt16) value);
             return this;
         }
 
-        public PacketBuffer WriteUInt16(UInt16 value)
+        public ConanStream WriteUInt16(UInt16 value)
         {
             var buffer = BitConverter.GetBytes(value).Reverse();
-            _stream.Write(buffer, 0, sizeof (UInt16));
+            Write(buffer, 0, sizeof (UInt16));
             return this;
         }
 
-        public PacketBuffer WriteUInt32(Int32 value)
+        public ConanStream WriteUInt32(Int32 value)
         {
             WriteUInt32((UInt32) value);
             return this;
         }
 
-        public PacketBuffer WriteUInt32(UInt32 value)
+        public ConanStream WriteUInt32(UInt32 value)
         {
             var buffer = BitConverter.GetBytes(value).Reverse();
-            _stream.Write(buffer, 0, sizeof (UInt32));
+            Write(buffer, 0, sizeof (UInt32));
             return this;
         }
 
-        public PacketBuffer WriteUInt64(Int64 value)
+        public ConanStream WriteUInt64(Int64 value)
         {
             WriteUInt64((UInt64) value);
             return this;
         }
 
-        public PacketBuffer WriteUInt64(UInt64 value)
+        public ConanStream WriteUInt64(UInt64 value)
         {
             var buffer = BitConverter.GetBytes(value).Reverse();
-            _stream.Write(buffer, 0, sizeof (UInt64));
+            Write(buffer, 0, sizeof (UInt64));
             return this;
         }
 
-        public PacketBuffer WriteString(string value)
+        public ConanStream WriteString(string value)
         {
             WriteUInt16((UInt16) value.Length);
             WriteArray(Encoding.UTF8.GetBytes(value));
             return this;
         }
 
-        public PacketBuffer WriteArray(params byte[] value)
+        public ConanStream WriteShortString(string value)
         {
-            _stream.Write(value, 0, value.Length);
+            if (value.Length > byte.MaxValue)
+                throw new Exception("value.Length > byte.MaxValue");
+
+            WriteByte((byte) value.Length);
+            WriteArray(Encoding.UTF8.GetBytes(value));
             return this;
         }
 
-        public PacketBuffer WriteConanArray(ConanArray value)
+        public ConanStream WriteArray(params byte[] value)
+        {
+            Write(value, 0, value.Length);
+            return this;
+        }
+
+        public ConanStream WriteConanArray(ConanArray value)
         {
             WriteByte(value.Length);
             WriteArray(value.Data);
             return this;
         }
 
+        public ConanStream WriteVector3(Vector3 value)
+        {
+            WriteUInt32(value.X);
+            WriteUInt32(value.Y);
+            WriteUInt32(value.Z);
+
+            return this;
+        }
+
         ////////////////////////////////////////////////////////
 
-        public PacketBuffer WriteHeader<T>(ConanArray sender, ConanArray receiver, byte[] headerData, T opcode,
+        public ConanStream WriteHeader<T>(ConanArray sender, ConanArray receiver, byte[] headerData, T opcode,
             bool minOpcode) where T : struct
         {
             WriteUInt32(0); // Write empty length
@@ -170,7 +192,7 @@ namespace LibFaolan.Network.Shared
             WriteConanArray(receiver);
 
             //write opcode
-            if (minOpcode) // hmmmm... (opcode can be given as uint* or as a enum)
+            if (minOpcode) // hmmmm should be done better... (opcode can be given as uint* or as a enum)
                 WriteUInt16(Convert.ToUInt16(opcode));
             else
                 WriteUInt32(Convert.ToUInt32(opcode));
@@ -182,63 +204,23 @@ namespace LibFaolan.Network.Shared
             return this;
         }
 
-        public PacketBuffer WriteInternalHeader(byte sender, byte receiver, InternalOpcodes opcode)
+        public ConanStream WriteLengthHash()
         {
-            WriteUInt32(0); // Write empty length
-            WriteUInt32(0); // write empty crc32
-
-            WriteByte(sender);
-            WriteByte(receiver);
-            WriteUInt16((UInt16) opcode);
-
-            return this;
-        }
-
-        public PacketBuffer WriteLengthHash()
-        {
-            var oldPos = _stream.Position;
-            _stream.Position = 0;
+            var oldPos = Position;
+            Position = 0;
             WriteUInt32(Length - sizeof (UInt32));
 
             var hash = Crc32.CalculateForPacketBuffer(this);
-            _stream.Position = sizeof (UInt32);
+            Position = sizeof (UInt32);
             WriteUInt32(hash);
-            _stream.Position = oldPos;
+            Position = oldPos;
             return this;
         }
 
-        public void Send(NetworkClient client, bool compressed = false)
+        public void Send(NetworkClient client)
         {
             WriteLengthHash();
-
-            /*if (!compressed)
-            {
-                client.Send(new Packet(this));
-                return;
-            }*/
-            client.Send(new Packet(this));
-        }
-
-        public void SendInternal(NetworkClient client)
-        {
-            WriteLengthHash();
-            client.Send(new Packet(this));
-        }
-
-        public void SendInternal(InternalConnection client)
-        {
-            WriteLengthHash();
-            client.Send(new Packet(this));
-        }
-
-        public byte[] GetBuffer()
-        {
-            return _stream.GetBuffer();
-        }
-
-        public byte[] ToArray()
-        {
-            return _stream.ToArray();
+            client.Send(ToArray());
         }
     }
 }

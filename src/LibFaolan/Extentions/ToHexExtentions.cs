@@ -9,6 +9,18 @@ namespace LibFaolan.Extentions
             return string.Format("0x{0:X" + Marshal.SizeOf(value) + "}", value);
         }*/
 
+        public static string ToHex(this Enum value)
+        {
+            var enumType = Enum.GetUnderlyingType(value.GetType());
+
+            if (enumType == typeof (byte)) return Convert.ToByte(value).ToHex();
+            if (enumType == typeof (UInt16) || enumType == typeof (Int16)) return Convert.ToUInt16(value).ToHex();
+            if (enumType == typeof (UInt32) || enumType == typeof (Int32)) return Convert.ToUInt32(value).ToHex();
+            if (enumType == typeof (UInt64) || enumType == typeof (Int64)) return Convert.ToUInt64(value).ToHex();
+
+            throw new Exception("Unknown enum type!");
+        }
+
         public static string ToHex(this byte value)
         {
             return string.Format("0x{0:X2}", value);

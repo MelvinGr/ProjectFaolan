@@ -2,7 +2,7 @@ using System;
 
 namespace LibFaolan.Data
 {
-    public class ConanRealm
+    public sealed class Realm
     {
         public UInt32 Country; //Country: 0 England, 1 France, 2 Spain, 3 German
         public UInt32 FullStatus; // server full status 1 = full

@@ -1,13 +1,12 @@
 using System;
-using LibFaolan;
 using LibFaolan.Database;
 using LibFaolan.Extentions;
 using LibFaolan.Network;
-using LibFaolan.Network.Shared;
+using LibFaolan.Other;
 
 namespace CSPlayerAgent
 {
-    public partial class CsPlayerAgentListener : Server<ConanPacket>
+    public partial class CsPlayerAgentListener : Server
     {
         public CsPlayerAgentListener(UInt16 port, Logger logger, IDatabase database) : base(port, logger, database)
         {
@@ -23,9 +22,9 @@ namespace CSPlayerAgent
             Logger.WriteLine("Client with address: " + client.IpAddress + " disconnected!");
         }
 
-        public override void ReceivedPacket(NetworkClient client, ConanPacket packet)
+        public override void ReceivedPacket(NetworkClient client, Packet packet)
         {
-            Logger.WriteLine("Received opcode: " + (Opcodes)packet.Opcode + " (" + packet.Opcode.ToHex() + ")");
+            Logger.WriteLine("Received opcode: " + (Opcodes) packet.Opcode + " (" + packet.Opcode.ToHex() + ")");
 
             switch ((Opcodes) packet.Opcode)
             {
@@ -39,7 +38,7 @@ namespace CSPlayerAgent
                     byte[] sender = {0x0d, 0x14, 0x56, 0xd5, 0x6d, 0x10, 0x04};
                     byte[] receiver = {0x0d, 0xc8, 0x60, 0xd5, 0xbb, 0x10, 0x84, 0x80, 0x80, 0x08};
 
-                    new PacketBuffer()
+                    new ConanStream()
                         .WriteHeader(sender, receiver, null, 0x2000, true)
                         .WriteUInt32(auth)
                         .Send(client);

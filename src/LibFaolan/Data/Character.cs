@@ -1,12 +1,13 @@
 using System;
 using System.Linq;
-using System.Numerics;
 using LibFaolan.Database;
-using LibFaolan.Network.Shared;
+using LibFaolan.Math;
+using LibFaolan.Network;
+using LibFaolan.Other;
 
 namespace LibFaolan.Data
 {
-    public class ConanCharacter
+    public sealed class Character
     {
         public uint AccountId;
         public UInt32 Class;
@@ -25,7 +26,7 @@ namespace LibFaolan.Data
         public byte Size;
         public uint Voice;
 
-        public ConanCharacter(uint id)
+        public Character(uint id)
         {
             Id = id;
         }
@@ -50,7 +51,7 @@ namespace LibFaolan.Data
             Size = (byte) c["size"];
             Voice = (UInt32) c["voice"];
             LastConnection = (UInt32) c["last_connection"];
-            Position = new Vector3(c["pos_x"], c["pos_y"], c["pos_z"]);
+            Position = new Vector3((UInt32) c["pos_x"], (UInt32) c["pos_y"], (UInt32) c["pos_z"]);
             lbinprv = (UInt32) c["lbinprv"];
         }
 

@@ -1,23 +1,19 @@
-using System;
 using System.Collections.Generic;
-using LibFaolan;
 using LibFaolan.Config;
 using LibFaolan.Data;
 using LibFaolan.Database;
 using LibFaolan.Extentions;
 using LibFaolan.Network;
-using LibFaolan.Network.Shared;
+using LibFaolan.Other;
 
 namespace PlayerAgent
 {
-    public partial class PlayerAgentListener : Server<ConanPacket>
+    public partial class PlayerAgentListener : Server
     {
-        public List<ConanRealm> Realms { get; }
-
         public PlayerAgentListener(ushort port, Logger logger, IDatabase database) : base(port, logger, database)
         {
-            Realms = new List<ConanRealm>();
-            Realms.Add(new ConanRealm
+            Realms = new List<Realm>();
+            Realms.Add(new Realm
             {
                 Country = 0,
                 FullStatus = 0,
@@ -31,10 +27,12 @@ namespace PlayerAgent
             });
         }
 
+        public List<Realm> Realms { get; }
+
         public override void ClientConnected(NetworkClient client)
         {
             Logger.WriteLine("New client with address: " + client.IpAddress);
-            client.Tag = new ConanAccount();
+            client.Tag = new Account();
         }
 
         public override void ClientDisconnected(NetworkClient client)
@@ -42,10 +40,10 @@ namespace PlayerAgent
             Logger.WriteLine("Client with address: " + client.IpAddress + " disconnected!");
         }
 
-        public override void ReceivedPacket(NetworkClient client, ConanPacket packet)
+        public override void ReceivedPacket(NetworkClient client, Packet packet)
         {
-            Logger.WriteLine("Received opcode: " + (Opcodes)packet.Opcode + " (" + packet.Opcode.ToHex() + ")");
-            var account = (ConanAccount) client.Tag;
+            Logger.WriteLine("Received opcode: " + (Opcodes) packet.Opcode + " (" + packet.Opcode.ToHex() + ")");
+            var account = (Account) client.Tag;
 
             switch ((Opcodes) packet.Opcode)
             {
@@ -99,7 +97,7 @@ namespace PlayerAgent
                     var unk5 = packet.Data.ReadUInt32();
                     var unk6 = packet.Data.ReadUInt32();
 
-                    account.Character = new ConanCharacter(characterId);
+                    account.Character = new Character(characterId);
                     account.Character.LoadDetailsFromDatabase(Database);
                     account.Character.UpdateLastInfo(Database, client);
 
@@ -118,15 +116,15 @@ namespace PlayerAgent
 
                 case Opcodes.CreateCharacter:
                 {
-                    UInt32 i_nDimID = packet.Data.ReadUInt32();
+                    var i_nDimID = packet.Data.ReadUInt32();
 
-                    var headerData = new byte[]{ 0x8b, 0xd8, 0x99, 0x02 };
-                    var sender = new byte[] { 0x0d, 0x84, 0x04, 0xf2, 0x82, 0x10, 0x03 };
-                    var receiver = new byte[] { 0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0xeb, 0x8e, 0x95, 0xbf, 0x05 };
+                    var headerData = new byte[] {0x8b, 0xd8, 0x99, 0x02};
+                    var sender = new byte[] {0x0d, 0x84, 0x04, 0xf2, 0x82, 0x10, 0x03};
+                    var receiver = new byte[] {0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0xeb, 0x8e, 0x95, 0xbf, 0x05};
 
                     account.nClientInst = 0xdeadbeef;
 
-                    new PacketBuffer()
+                    new ConanStream()
                         .WriteHeader(sender, receiver, headerData, 0x20b9, true)
                         .WriteUInt32(0x0000c350)
                         .WriteUInt32(account.nClientInst)

@@ -2,7 +2,7 @@ using System;
 
 namespace LibFaolan.Data
 {
-    public class ConanArray
+    public sealed class ConanArray
     {
         public ConanArray(params byte[] data)
         {
