@@ -1,6 +1,5 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.Collections.ObjectModel;
 using Hik.Communication.Scs.Communication.EndPoints.Tcp;
 using Hik.Communication.Scs.Server;
 using LibFaolan.Database;
@@ -10,6 +9,11 @@ namespace LibFaolan.Network
 {
     public abstract class Server
     {
+        private readonly IScsServer _scsServer;
+        public readonly IDatabase Database;
+        public readonly Logger Logger;
+        public readonly ushort Port;
+
         protected Server(ushort port, Logger logger, IDatabase database)
         {
             if (logger == null || database == null)
@@ -18,25 +22,21 @@ namespace LibFaolan.Network
             Port = port;
             Logger = logger;
             Database = database;
-            Clients = new SynchronizedCollection<NetworkClient>();
 
-            ScsServer = ScsServerFactory.CreateServer(new ScsTcpEndPoint(port));
-            ScsServer.WireProtocolFactory = new WireProtocol.ProtocolFactory();
-            ScsServer.ClientConnected += Internal_ClientConnected;
-            ScsServer.ClientDisconnected += Internal_ClientDisconnected;
+            _scsServer = ScsServerFactory.CreateServer(new ScsTcpEndPoint(port));
+            _scsServer.WireProtocolFactory = new WireProtocol.ProtocolFactory();
+            _scsServer.ClientConnected += Internal_ClientConnected;
+            _scsServer.ClientDisconnected += (s, e) => ClientDisconnected((NetworkClient) e.Client.Tag);
         }
 
-        public IScsServer ScsServer { get; private set; }
-        public ushort Port { get; private set; }
-        public SynchronizedCollection<NetworkClient> Clients { get; private set; }
-        public Logger Logger { get; set; }
-        public IDatabase Database { get; set; }
+        public ReadOnlyCollection<IScsServerClient> Clients
+            => (ReadOnlyCollection<IScsServerClient>) _scsServer.Clients.Values;
 
         public bool Start()
         {
             try
             {
-                ScsServer.Start();
+                _scsServer.Start();
                 return true;
             }
             catch
@@ -49,9 +49,7 @@ namespace LibFaolan.Network
         {
             try
             {
-                ScsServer.Stop();
-                Clients = null;
-                ScsServer = null;
+                _scsServer.Stop();
                 return true;
             }
             catch
@@ -60,36 +58,23 @@ namespace LibFaolan.Network
             }
         }
 
-        private void Internal_ClientDisconnected(NetworkClient client)
-        {
-            if (client != null)
-                ClientDisconnected(client);
-
-            Clients.Remove(client);
-        }
-
-        private void Internal_ClientDisconnected(object sender, ServerClientEventArgs e)
-        {
-            var client = Clients.FirstOrDefault(c => c.InternalClient.ClientId == e.Client.ClientId);
-            Internal_ClientDisconnected(client);
-        }
-
         private void Internal_ClientConnected(object sender, ServerClientEventArgs e)
         {
-            var client = new NetworkClient(e.Client);
-            client.Disconnected += Internal_ClientDisconnected;
-            Clients.Add(client);
-            ClientConnected(client);
+            e.Client.Tag = new NetworkClient(e.Client);
+            e.Client.MessageReceived += (s, ee) =>
+                ReceivedPacket((NetworkClient) ((IScsServerClient) s).Tag, (Packet) ee.Message);
 
-            e.Client.MessageReceived += (s, ee) => ReceivedPacket(client, (Packet) ee.Message);
+            ClientConnected((NetworkClient) e.Client.Tag);
         }
 
         public virtual void ClientConnected(NetworkClient client)
         {
+            Logger.WriteLine("Client with address: " + client.IpAddress + " connected!");
         }
 
         public virtual void ClientDisconnected(NetworkClient client)
         {
+            Logger.WriteLine("Client with address: " + client.IpAddress + " disconnected!");
         }
 
         public abstract void ReceivedPacket(NetworkClient client, Packet packet);

@@ -59,7 +59,7 @@ namespace ProjectFaolan
             => StartServer(Settings.PlayerAgentPort, out Statics.PlayerAgent);
 
         private void csPlayerAgentButton_Click(object sender, EventArgs e)
-            => StartServer(Settings.CSPlayerAgentPort, out Statics.CsplayerAgent);
+            => StartServer(Settings.CsPlayerAgentPort, out Statics.CsplayerAgent);
 
         private void agentServerButton_Click(object sender, EventArgs e)
             => StartServer(Settings.AgentServerPort, out Statics.AgentServer);

@@ -15,13 +15,7 @@ namespace UniverseAgent
 
         public override void ClientConnected(NetworkClient client)
         {
-            Logger.WriteLine("New client with address: " + client.IpAddress);
             client.Tag = new Account();
-        }
-
-        public override void ClientDisconnected(NetworkClient client)
-        {
-            Logger.WriteLine("Client with address: " + client.IpAddress + " disconnected!");
         }
 
         public override void ReceivedPacket(NetworkClient client, Packet packet)

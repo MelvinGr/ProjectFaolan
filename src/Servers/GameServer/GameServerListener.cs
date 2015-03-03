@@ -11,18 +11,11 @@ namespace GameServer
     {
         public GameServerListener(ushort port, Logger logger, IDatabase database) : base(port, logger, database)
         {
-            //SpawnPlayer(null,new Account{Character = new Character(2) {Name = "Hendrik"} });
         }
 
         public override void ClientConnected(NetworkClient client)
         {
-            Logger.WriteLine("New client with address: " + client.IpAddress);
             client.Tag = new Account();
-        }
-
-        public override void ClientDisconnected(NetworkClient client)
-        {
-            Logger.WriteLine("Client with address: " + client.IpAddress + " disconnected!");
         }
 
         public override void ReceivedPacket(NetworkClient client, Packet packet)
@@ -34,15 +27,15 @@ namespace GameServer
             {
                 case Opcodes.Hello:
                 {
-                    account.nClientInst = packet.Data.ReadUInt32(); // 0x0802e5d4
+                    account.ClientInstance = packet.Data.ReadUInt32(); // 0x0802e5d4
                     account.Id = packet.Data.ReadUInt32(); // 0x310cec57
                     var clientVersion = packet.Data.ReadString();
 
                     account.LoadDetailsFromDatabase(Database);
-                    account.charInfo = new Character(2);
-                    account.charInfo.LoadDetailsFromDatabase(Database);
+                    account.Character = new Character(2);
+                    account.Character.LoadDetailsFromDatabase(Database);
 
-                    Logger.WriteLine("CharID: " + account.nClientInst.ToHex());
+                    Logger.WriteLine("CharID: " + account.ClientInstance.ToHex());
                     Logger.WriteLine("Recieve Client Version: " + clientVersion);
 
                     /*if (clientVersion != "v4.00.NoTS@369764")
@@ -51,21 +44,44 @@ namespace GameServer
                         //break;
                     }*/
 
-                    ReportDimensionID(client, account, 1);
-                    ReportServerID(client, account, 0x00000006);
+                    ReportDimensionId(client, account, 1);
+                    ReportServerId(client, account, 0x00000006);
                     AckAuthentication(client, account, 1);
 
-                    // what is 0x201C? client works just fine without direct noticible changes when not sending these
-                    Send0x201C(client, account);
-                    Send0x200A(client);
-                    Send0x2000(client, account);
+                    Send0X201C(client, account); // No imediate visible change when not sending these
+                    Send0X200A(client, account);
+
+                    SendPlayerRelated0X2000(client, account);
+                    Send0x5D85BFC7(client); // Needed to get the loading bar to start loading
+                    SpawnPlayer(client, account);
+                    //Send0x33A56FB0(client); // No imediate visible change when not sending these 
+                    //Send0x66AEDD50(client); // No imediate visible change when not sending these
+                    SendSpawnNPCAndPlayersTest(client); // Spawn some NPC's and other players
+                    //Send0x4F57DC08(client); // No imediate visible change when not sending these
+                    //Send0x642CD3D6(client); // No imediate visible change when not sending these
+                    //Send0x96C46740(client); // No imediate visible change when not sending these
 
                     break;
                 }
 
                 case Opcodes.Ox2000:
                 {
-                    Handle0x2000(client, account, packet);
+                    if (packet.SenderInt[1] == 0x48)
+                    {
+                        var sId1 = packet.Data.ReadUInt32();
+                        var sId2 = packet.Data.ReadUInt32();
+                        var sId3 = packet.Data.ReadUInt32();
+                        var sId4 = packet.Data.ReadUInt32();
+
+                        var aBuffer = new PacketStream();
+                        aBuffer.WriteHeader(Sender3, Receiver3, null, 0x2000);
+                        aBuffer.WriteUInt32(sId3);
+                        aBuffer.WriteUInt32(sId4);
+                        aBuffer.WriteUInt32(sId4 != 0x000027f9 ? 0x00000002 : 0x00000000);
+                        aBuffer.Send(client);
+                    }
+                    else
+                        Handle0X2000(client, account, packet);
 
                     break;
                 }
@@ -135,11 +151,8 @@ namespace GameServer
 
                 case Opcodes.Ping: // Ping
                 {
-                    var sender = new byte[] {0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x4C};
-                    var receiver = new byte[] {0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, 0xD4, 0xCB, 0x8B, 0x40};
-
                     new PacketStream() // p.158
-                        .WriteHeader(sender, receiver, null, SendOpcodes.Pong, true)
+                        .WriteHeader(Sender10, Receiver10, null, SendOpcodes.Pong)
                         .WriteUInt32(0x42c80000) // old = 0x42c80000, new = 0x42B32A07
                         .WriteUInt32(0)
                         .WriteUInt32(0)
@@ -150,23 +163,13 @@ namespace GameServer
 
                 case Opcodes.SpawnCheck: // p.160&161
                 {
-                    /*
-                        0x00, 0x00, 0xC3, 0x50, 
-                        0x00, 0x02, 0x7A, 0x66,
-                        0x00, 0x00, 0xC3, 0x50,
-                        0x08, 0x02, 0xE5, 0xD4
-                    */
-
                     var part1 = packet.Data.ReadUInt32();
                     var spawnId = packet.Data.ReadUInt32();
                     var unk0 = packet.Data.ReadUInt32();
                     var nClientInst = packet.Data.ReadUInt32();
 
-                    var sender = new byte[] {0x0d, 0x5d, 0xb9, 0xec, 0xa9, 0x10, 0x18};
-                    var receiver = new byte[] {0x0d, 0x91, 0xf7, 0x87, 0x8b, 0x10, 0xe6, 0x8f, 0x80, 0x08};
-
                     new PacketStream()
-                        .WriteHeader(sender, receiver, null, 0x2008, true)
+                        .WriteHeader(Sender9, Receiver9, null, 0x2008)
                         .WriteUInt32(part1)
                         .WriteUInt32(spawnId)
                         .WriteByte(0)
@@ -178,15 +181,11 @@ namespace GameServer
                 case Opcodes.GcPing: // GCPing?  p.162
                 {
                     var counter = packet.Data.ReadUInt32();
-
-                    var sender = new byte[] {0x0D, 0x5D, 0xB9, 0xEC, 0xA9, 0x10, 0x4C};
-                    var receiver = new byte[] {0x0D, 0x91, 0xF7, 0x87, 0x8B, 0x10, 0xD4, 0xCB, 0x8B, 0x40};
-
                     var time = 0;
                     Other.time(ref time);
 
                     new PacketStream()
-                        .WriteHeader(sender, receiver, null, 0x0000207D, true)
+                        .WriteHeader(Sender8, Receiver8, null, 0x0000207D)
                         .WriteUInt32(counter)
                         .WriteUInt32(0x0000004E)
                         // counter  retvalue
@@ -195,45 +194,41 @@ namespace GameServer
                         // 3        0x2c, 0x7e, 0xc6, 0xb8 -> p.540
                         // 4        0x2c, 0x7e, 0xc6, 0xb8 -> p.541
                         // 5        0x2c, 0xa6, 0xb1, 0x78 -> p.564
-                        .WriteUInt32(time) // not the correct value..
+                        .WriteUInt32(time) // not the correct value? But still working
                         .Send(client);
 
-                    if (account.state == 1 && account.counter > 0)
+                    if (account.State == 1 && account.Counter > 0)
                     {
-                        account.state = 0;
-                        account.counter = 0;
+                        account.State = 0;
+                        account.Counter = 0;
 
-                        var sender2 = new byte[] {0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x14};
-                        var receiver2 = new byte[] {0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0x84, 0x80, 0x80, 0x08};
                         var data1 = new byte[]
                         {
                             0x00, 0x00, 0x00, 0x00, 0x0e, 0x08, 0x05, 0x10, 0x00, 0x18, 0xec, 0x97, 0x02, 0x32, 0x04,
-                            0x08,
-                            0x00, 0x10, 0x00
+                            0x08, 0x00, 0x10, 0x00
                         };
 
                         var aBuffer = new PacketStream();
-                        aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+                        aBuffer.WriteHeader(Sender7, Receiver7, null, 0x2000);
                         aBuffer.WriteUInt32(0x0000001f);
                         aBuffer.WriteUInt32(0xa36d3b74);
                         aBuffer.WriteUInt32(0x0000c350);
-                        aBuffer.WriteUInt32(account.nClientInst);
+                        aBuffer.WriteUInt32(account.ClientInstance);
                         aBuffer.WriteArray(data1);
                         aBuffer.Send(client);
 
                         var data2 = new byte[]
                         {
                             0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x2a, 0xf8, 0x00, 0x00,
-                            0x01,
-                            0xf9, 0x00, 0x00, 0x43, 0x30, 0x00, 0x00, 0x01, 0xfb, 0x00, 0x00, 0x00, 0x00
+                            0x01, 0xf9, 0x00, 0x00, 0x43, 0x30, 0x00, 0x00, 0x01, 0xfb, 0x00, 0x00, 0x00, 0x00
                         };
 
                         aBuffer = new PacketStream();
-                        aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+                        aBuffer.WriteHeader(Sender7, Receiver7, null, 0x2000);
                         aBuffer.WriteUInt32(0x00000029);
                         aBuffer.WriteUInt32(0x96b8dc59);
                         aBuffer.WriteUInt32(0x0000c350);
-                        aBuffer.WriteUInt32(account.nClientInst);
+                        aBuffer.WriteUInt32(account.ClientInstance);
                         aBuffer.WriteArray(data2);
                         aBuffer.Send(client);
                     }

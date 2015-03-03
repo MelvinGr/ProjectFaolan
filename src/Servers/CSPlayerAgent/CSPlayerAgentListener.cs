@@ -14,12 +14,7 @@ namespace CSPlayerAgent
 
         public override void ClientConnected(NetworkClient client)
         {
-            Logger.WriteLine("New client with address: " + client.IpAddress);
-        }
-
-        public override void ClientDisconnected(NetworkClient client)
-        {
-            Logger.WriteLine("Client with address: " + client.IpAddress + " disconnected!");
+            //
         }
 
         public override void ReceivedPacket(NetworkClient client, Packet packet)
@@ -39,7 +34,7 @@ namespace CSPlayerAgent
                     byte[] receiver = {0x0d, 0xc8, 0x60, 0xd5, 0xbb, 0x10, 0x84, 0x80, 0x80, 0x08};
 
                     new PacketStream()
-                        .WriteHeader(sender, receiver, null, 0x2000, true)
+                        .WriteHeader(sender, receiver, null, 0x2000)
                         .WriteUInt32(auth)
                         .Send(client);
 

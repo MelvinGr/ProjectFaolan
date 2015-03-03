@@ -8,8 +8,8 @@ namespace LibFaolan.Other
 {
     public static class PacketUtills
     {
-        private static readonly Dictionary<string, string> _senders = new Dictionary<string, string>();
-        private static readonly Dictionary<string, string> _receivers = new Dictionary<string, string>();
+        private static readonly Dictionary<string, string> Senders = new Dictionary<string, string>();
+        private static readonly Dictionary<string, string> Receivers = new Dictionary<string, string>();
 
         public static string ChainedPacketToCsCode(Packet packet, int id)
         {
@@ -19,24 +19,24 @@ namespace LibFaolan.Other
             var addSenderData = false;
             var senderName = "";
             var senderData = packet.SenderInt.ToHexString();
-            if (_senders.ContainsValue(senderData))
-                senderName = _senders.FirstOrDefault(s => s.Value == senderData).Key;
+            if (Senders.ContainsValue(senderData))
+                senderName = Senders.FirstOrDefault(s => s.Value == senderData).Key;
             else
             {
-                senderName = "sender" + _senders.Count;
-                _senders[senderName] = senderData;
+                senderName = "sender" + Senders.Count;
+                Senders[senderName] = senderData;
                 addSenderData = true;
             }
 
             var addReceiverData = false;
             var receiverName = "";
             var receiverData = packet.ReceiverInt.ToHexString();
-            if (_receivers.ContainsValue(receiverData))
-                receiverName = _receivers.FirstOrDefault(s => s.Value == receiverData).Key;
+            if (Receivers.ContainsValue(receiverData))
+                receiverName = Receivers.FirstOrDefault(s => s.Value == receiverData).Key;
             else
             {
-                receiverName = "receiver" + _receivers.Count;
-                _receivers[receiverName] = receiverData;
+                receiverName = "receiver" + Receivers.Count;
+                Receivers[receiverName] = receiverData;
                 addReceiverData = true;
             }
 

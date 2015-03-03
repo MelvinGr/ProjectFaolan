@@ -4,16 +4,14 @@ namespace LibFaolan.Network
 {
     public sealed class NetworkClient
     {
+        private readonly IScsServerClient _client;
         private string _ipaddress;
-        internal NetworkClientDisconnectedDelegate Disconnected;
+        public object Tag;
 
         public NetworkClient(IScsServerClient client)
         {
-            InternalClient = client;
+            _client = client;
         }
-
-        public object Tag { get; set; }
-        public IScsServerClient InternalClient { get; }
 
         public string IpAddress
         {
@@ -21,7 +19,7 @@ namespace LibFaolan.Network
             {
                 if (_ipaddress == null)
                 {
-                    _ipaddress = InternalClient.RemoteEndPoint.ToString();
+                    _ipaddress = _client.RemoteEndPoint.ToString();
 
                     var index = _ipaddress.LastIndexOf('/') + 1;
                     _ipaddress = _ipaddress.Substring(index, _ipaddress.Length - index);
@@ -36,14 +34,11 @@ namespace LibFaolan.Network
         {
             try
             {
-                InternalClient.SendMessage(new WireProtocol.SendPacket(value));
+                _client.SendMessage(new WireProtocol.SendPacket(value));
             }
             catch
             {
-                Disconnected?.Invoke(this);
             }
         }
-
-        internal delegate void NetworkClientDisconnectedDelegate(NetworkClient client);
     }
 }

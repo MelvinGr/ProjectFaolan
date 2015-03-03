@@ -9,8 +9,8 @@ namespace LibFaolan.Config
         public static ushort UniverseAgentPort;
         public static string PlayerAgentAddress;
         public static ushort PlayerAgentPort;
-        public static string CSPlayerAgentAddress;
-        public static ushort CSPlayerAgentPort;
+        public static string CsPlayerAgentAddress;
+        public static ushort CsPlayerAgentPort;
         public static string AgentServerAddress;
         public static ushort AgentServerPort;
         public static string GameServerAddress;
@@ -35,8 +35,8 @@ namespace LibFaolan.Config
                 PlayerAgentAddress = _ini.GetValue("PlayerAgentAddress");
                 PlayerAgentPort = UInt16.Parse(_ini.GetValue("PlayerAgentPort"));
 
-                CSPlayerAgentAddress = _ini.GetValue("CSPlayerAgentAddress");
-                CSPlayerAgentPort = UInt16.Parse(_ini.GetValue("CSPlayerAgentPort"));
+                CsPlayerAgentAddress = _ini.GetValue("CSPlayerAgentAddress");
+                CsPlayerAgentPort = UInt16.Parse(_ini.GetValue("CSPlayerAgentPort"));
 
                 AgentServerAddress = _ini.GetValue("AgentServerAddress");
                 AgentServerPort = UInt16.Parse(_ini.GetValue("AgentServerPort"));

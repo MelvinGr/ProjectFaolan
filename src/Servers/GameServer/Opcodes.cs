@@ -31,6 +31,21 @@ namespace GameServer
             SelectDeselect = 0x0D155695
         }
 
+        private enum Ox2000RespondsOpcodes : uint
+        {
+            Ox5D85BFC7 = 0x5D85BFC7,
+            Ox33A56FB0 = 0x33A56FB0,
+            Ox66AEDD50 = 0x66AEDD50,
+            Spawn = 0xFA015807,
+            Ox4F57DC08 = 0x4F57DC08,
+            Ox642CD3D6 = 0x642CD3D6,
+            Ox96C46740 = 0x96C46740,
+            Ox6B87E316 = 0x6B87E316,
+            OxF98E10B3 = 0xF98E10B3,
+            Ox96B8DC59 = 0x96B8DC59,
+            Ox737A6DF9 = 0x737A6DF9
+        };
+
         private enum MovingTypes : ushort
         {
             Run = 0x010a, // not sure

@@ -9,9 +9,9 @@ namespace LibFaolan.Config
     // https://www.nuget.org/packages/ini/
     public sealed class Ini
     {
-        private readonly string file;
+        private readonly string _file;
 
-        private readonly Dictionary<string, Dictionary<string, string>> ini =
+        private readonly Dictionary<string, Dictionary<string, string>> _ini =
             new Dictionary<string, Dictionary<string, string>>(StringComparer.InvariantCultureIgnoreCase);
 
         /// <summary>
@@ -21,7 +21,7 @@ namespace LibFaolan.Config
         /// <param name="file">Full path where the INI file has to be read from or written to</param>
         public Ini(string file)
         {
-            this.file = file;
+            _file = file;
             if (!File.Exists(file))
                 return;
 
@@ -33,9 +33,9 @@ namespace LibFaolan.Config
         /// </summary>
         public void Load()
         {
-            var txt = File.ReadAllText(file);
+            var txt = File.ReadAllText(_file);
             var currentSection = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
-            ini[""] = currentSection;
+            _ini[""] = currentSection;
 
             foreach (var l in txt.Split(new[] {"\n"}, StringSplitOptions.RemoveEmptyEntries)
                 .Select((t, i) => new {idx = i, text = t.Trim()}))
@@ -50,7 +50,7 @@ namespace LibFaolan.Config
                 if (line.StartsWith("[") && line.EndsWith("]"))
                 {
                     currentSection = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
-                    ini[line.Substring(1, line.Length - 2)] = currentSection;
+                    _ini[line.Substring(1, line.Length - 2)] = currentSection;
                     continue;
                 }
 
@@ -86,13 +86,13 @@ namespace LibFaolan.Config
         /// <returns></returns>
         public string GetValue(string key, string section, string @default)
         {
-            if (!ini.ContainsKey(section))
+            if (!_ini.ContainsKey(section))
                 return @default;
 
-            if (!ini[section].ContainsKey(key))
+            if (!_ini[section].ContainsKey(key))
                 return @default;
 
-            return ini[section][key];
+            return _ini[section][key];
         }
 
         /// <summary>
@@ -101,7 +101,7 @@ namespace LibFaolan.Config
         public void Save()
         {
             var sb = new StringBuilder();
-            foreach (var section in ini)
+            foreach (var section in _ini)
             {
                 if (section.Key != "")
                 {
@@ -123,14 +123,14 @@ namespace LibFaolan.Config
                     }
                 }
 
-                if (!endWithCRLF(sb))
+                if (!EndWithCrlf(sb))
                     sb.AppendLine();
             }
 
-            File.WriteAllText(file, sb.ToString());
+            File.WriteAllText(_file, sb.ToString());
         }
 
-        private bool endWithCRLF(StringBuilder sb)
+        private bool EndWithCrlf(StringBuilder sb)
         {
             if (sb.Length < 4)
                 return sb[sb.Length - 2] == '\r' &&
@@ -158,13 +158,13 @@ namespace LibFaolan.Config
         public void WriteValue(string key, string section, string value)
         {
             Dictionary<string, string> currentSection;
-            if (!ini.ContainsKey(section))
+            if (!_ini.ContainsKey(section))
             {
                 currentSection = new Dictionary<string, string>();
-                ini.Add(section, currentSection);
+                _ini.Add(section, currentSection);
             }
             else
-                currentSection = ini[section];
+                currentSection = _ini[section];
 
             currentSection[key] = value;
         }
@@ -176,16 +176,16 @@ namespace LibFaolan.Config
         /// <returns></returns>
         public string[] GetKeys(string section)
         {
-            if (!ini.ContainsKey(section))
+            if (!_ini.ContainsKey(section))
                 return new string[0];
 
-            return ini[section].Keys.ToArray();
+            return _ini[section].Keys.ToArray();
         }
 
         /// <summary>
         ///     Get all the section names of the INI file
         /// </summary>
         /// <returns></returns>
-        public string[] GetSections() => ini.Keys.Where(t => t != "").ToArray();
+        public string[] GetSections() => _ini.Keys.Where(t => t != "").ToArray();
     }
 }

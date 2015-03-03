@@ -11,7 +11,7 @@ namespace LibFaolan.Math
     {
         #region Private Fields
 
-        private static Vector3 zero = new Vector3(0f, 0f, 0f);
+        private static Vector3 _zero = new Vector3(0f, 0f, 0f);
 
         #endregion Private Fields
 
@@ -30,7 +30,7 @@ namespace LibFaolan.Math
         /// </summary>
         public static Vector3 Zero
         {
-            get { return zero; }
+            get { return _zero; }
         }
 
         /// <summary>
@@ -290,14 +290,14 @@ namespace LibFaolan.Math
         public float Length()
         {
             float result;
-            DistanceSquared(ref this, ref zero, out result);
+            DistanceSquared(ref this, ref _zero, out result);
             return (float) System.Math.Sqrt(result);
         }
 
         public float LengthSquared()
         {
             float result;
-            DistanceSquared(ref this, ref zero, out result);
+            DistanceSquared(ref this, ref _zero, out result);
             return result;
         }
 
@@ -415,7 +415,7 @@ namespace LibFaolan.Math
         public static void Normalize(ref Vector3 value, out Vector3 result)
         {
             float factor;
-            Distance(ref value, ref zero, out factor);
+            Distance(ref value, ref _zero, out factor);
             factor = 1f/factor;
             result.X = value.X*factor;
             result.Y = value.Y*factor;

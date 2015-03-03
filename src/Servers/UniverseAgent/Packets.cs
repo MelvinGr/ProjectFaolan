@@ -13,15 +13,15 @@ namespace UniverseAgent
         public static void InitAuth(NetworkClient client, Account account)
         {
             new PacketStream()
-                .WriteHeader(Sender, Receiver, null, 0x2000, true)
-                .WriteString(account.AuthChallenge)
+                .WriteHeader(Sender, Receiver, null, 0x2000)
+                .WriteString(Account.AuthChallenge)
                 .Send(client);
         }
 
         public static void SetRegionState(NetworkClient client, Account account)
         {
             new PacketStream()
-                .WriteHeader(Sender, Receiver2, null, 0x2005, true)
+                .WriteHeader(Sender, Receiver2, null, 0x2005)
                 .WriteArray(0x01, 0x01, 0x01, 0x01, 0x3f, 0x80, 0x00, 0x00, 0x3f, 0x80, 0x00, 0x00, 0x01, 0x01, 0x00)
                 .Send(client);
         }
@@ -51,7 +51,7 @@ namespace UniverseAgent
         public static void SendPlayerAgentRealm(NetworkClient client, Account account)
         {
             new PacketStream()
-                .WriteHeader(Sender, Receiver2, null, 0x2001, true)
+                .WriteHeader(Sender, Receiver2, null, 0x2001)
                 .WriteUInt32(0x01) // authstatus
                 .WriteUInt64(account.LongId)
                 .WriteString(Settings.PlayerAgentAddress + ":" + Settings.PlayerAgentPort)
