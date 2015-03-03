@@ -41,7 +41,7 @@ namespace GameServer
             {
                 case "IntroDone":
                 {
-                    var aBuffer = new ConanStream();
+                    var aBuffer = new PacketStream();
                     aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
                     aBuffer.WriteUInt32(0x00000019);
                     aBuffer.WriteUInt32(0x96b8dc59);
@@ -58,7 +58,7 @@ namespace GameServer
                     account.charInfo.Sex = (byte) recVal;
                     break;
                 case "ChangeRace":
-                    account.charInfo.Race = recVal;
+                    account.charInfo.Race = (byte) recVal;
                     break;
                 case "ChangeHeadMesh":
                     account.charInfo.HeadMesh = recVal;
@@ -67,10 +67,10 @@ namespace GameServer
                     account.charInfo.Size = (byte) recVal;
                     break;
                 case "ChangeClass":
-                    account.charInfo.Class = recVal;
+                    account.charInfo.Class = (byte) recVal;
                     break;
                 case "ChangeVoice":
-                    account.charInfo.Voice = recVal;
+                    account.charInfo.Voice = (byte) recVal;
                     break;
                 case "SetMorphValue":
                     Logger.WriteLine("Second Command: " + recSecCmd + " with value: " + recVal);
@@ -81,7 +81,7 @@ namespace GameServer
                         account.counter++;
                         account.state = 1;
 
-                        var aBuffer = new ConanStream();
+                        var aBuffer = new PacketStream();
                         aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
                         aBuffer.WriteUInt32(recSecCmd.Length + (5*4) + (1*2) + (2*1)); // length
                         aBuffer.WriteUInt32(0xbadf5a4b);
@@ -114,7 +114,7 @@ namespace GameServer
                         break;
                     */
 
-                    var aBuffer = new ConanStream();
+                    var aBuffer = new PacketStream();
                     aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
                     aBuffer.WriteUInt32(account.charInfo.Name.Length + (5*4) + (1*2) + (1*1));
                     aBuffer.WriteUInt32(0xadce0cda);
@@ -130,7 +130,7 @@ namespace GameServer
                     {
                         0x00, 0x00, 0x00, 0x00, 0x1f, 0x08, 0x05, 0x10, 0x02, 0x18, 0x00, 0x22
                     };
-                    aBuffer = new ConanStream();
+                    aBuffer = new PacketStream();
                     aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
                     aBuffer.WriteUInt32(account.charInfo.Name.Length + (10 + 1) + data.Length + (4*4) + (1*2) + (2*1));
                     aBuffer.WriteUInt32(0xa36d3b74);
@@ -151,7 +151,7 @@ namespace GameServer
                         0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x46, 0x37, 0x00, 0x00, 0x00, 0x00,
                         0x00
                     };
-                    aBuffer = new ConanStream();
+                    aBuffer = new PacketStream();
                     aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
                     aBuffer.WriteUInt32(data2.Length + (3*4));
                     aBuffer.WriteUInt32(0xf508f4c1);
@@ -167,7 +167,7 @@ namespace GameServer
                         0x69, 0x73, 0x68, 0x65, 0x64,
                         0x2a, 0x00, 0x32, 0x04, 0x08, 0x00, 0x10, 0x00
                     };
-                    aBuffer = new ConanStream();
+                    aBuffer = new PacketStream();
                     aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
                     aBuffer.WriteUInt32(data3.Length + (3*4));
                     aBuffer.WriteUInt32(0xa36d3b74);
@@ -182,7 +182,7 @@ namespace GameServer
                         0x00, 0x00, 0xc3, 0x50, 0x00, 0x00, 0x27, 0xf6, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00,
                         0x00, 0x00, 0x0a, 0x08, 0xc5, 0xc3, 0x02, 0x18, 0x01, 0x28, 0x18, 0x30, 0x00
                     };
-                    aBuffer = new ConanStream();
+                    aBuffer = new PacketStream();
                     aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
                     aBuffer.WriteUInt32(data4.Length + (1*4));
                     aBuffer.WriteUInt32(0x642cd3d6);
@@ -195,7 +195,7 @@ namespace GameServer
                         0x00, 0x00, 0xc3, 0x50, 0x00, 0x00, 0x27, 0xf7, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00,
                         0x00, 0x00, 0x0a, 0x08, 0xc5, 0xc3, 0x02, 0x18, 0x01, 0x28, 0x18, 0x30, 0x00
                     };
-                    aBuffer = new ConanStream();
+                    aBuffer = new PacketStream();
                     aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
                     aBuffer.WriteUInt32(data5.Length + (1*4));
                     aBuffer.WriteUInt32(0x642cd3d6);
@@ -207,7 +207,7 @@ namespace GameServer
                     {
                         0x01, 0x00, 0x00, 0x00, 0x6a, 0x00, 0x00, 0x00, 0x14
                     };
-                    aBuffer = new ConanStream();
+                    aBuffer = new PacketStream();
                     aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
                     aBuffer.WriteUInt32(data6.Length + (3*4));
                     aBuffer.WriteUInt32(0xf98e10b3);

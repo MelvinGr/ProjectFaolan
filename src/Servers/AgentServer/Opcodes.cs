@@ -4,7 +4,6 @@ namespace AgentServer
     {
         private enum Opcodes
         {
-            Authenticate = 0x2000
         };
     }
 }

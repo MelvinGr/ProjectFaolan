@@ -47,7 +47,7 @@ namespace PlayerAgent
 
             switch ((Opcodes) packet.Opcode)
             {
-                case Opcodes.Request_Auth:
+                case Opcodes.RequestAuth:
                 {
                     account.Id = packet.Data.ReadUInt32();
                     var cookie = packet.Data.ReadUInt32();
@@ -61,7 +61,7 @@ namespace PlayerAgent
 
                     break;
                 }
-                case Opcodes.Request_SmallCharList:
+                case Opcodes.RequestSmallCharList:
                 {
                     var unk1 = packet.Data.ReadString();
                     //Log.Notice("Receive unknown String: %s\n", unk1.c_str());
@@ -70,7 +70,7 @@ namespace PlayerAgent
 
                     break;
                 }
-                case Opcodes.Request_Char_RealmData:
+                case Opcodes.RequestCharRealmData:
                 {
                     SendCharacterList(client, account, Database);
                     SendRealmList(client, account);
@@ -79,7 +79,7 @@ namespace PlayerAgent
                     break;
                 }
 
-                case Opcodes.Ox20a6:
+                case Opcodes.Ox20A6:
                 {
                     Ox20a6_1(client, account);
 
@@ -106,7 +106,7 @@ namespace PlayerAgent
                     break;
                 }
 
-                case Opcodes.Ox20d6:
+                case Opcodes.Ox20D6:
                 {
                     var languageId = packet.Data.ReadUInt32();
                     Logger.WriteLine("Maybe report language (Language: " + languageId + ")");
@@ -124,7 +124,7 @@ namespace PlayerAgent
 
                     account.nClientInst = 0xdeadbeef;
 
-                    new ConanStream()
+                    new PacketStream()
                         .WriteHeader(sender, receiver, headerData, 0x20b9, true)
                         .WriteUInt32(0x0000c350)
                         .WriteUInt32(account.nClientInst)
@@ -141,12 +141,12 @@ namespace PlayerAgent
                     break;
                 }
 
-                case Opcodes.Ox20EC: // request server address?
+                case Opcodes.Ox20Ec: // request server address?
                 {
                     // packet has no data
 
                     SendPlayerAgent(client, account);
-                    SendCSPlayerAgent(client, account);
+                    SendCsPlayerAgent(client, account);
                     SendGameServer(client, account);
                     SendLast(client, account);
 

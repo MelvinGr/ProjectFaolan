@@ -18,7 +18,7 @@ namespace LibFaolan.Other
 
             var addSenderData = false;
             var senderName = "";
-            var senderData = packet.SenderInt.Data.ToHexString();
+            var senderData = packet.SenderInt.ToHexString();
             if (_senders.ContainsValue(senderData))
                 senderName = _senders.FirstOrDefault(s => s.Value == senderData).Key;
             else
@@ -30,7 +30,7 @@ namespace LibFaolan.Other
 
             var addReceiverData = false;
             var receiverName = "";
-            var receiverData = packet.ReceiverInt.Data.ToHexString();
+            var receiverData = packet.ReceiverInt.ToHexString();
             if (_receivers.ContainsValue(receiverData))
                 receiverName = _receivers.FirstOrDefault(s => s.Value == receiverData).Key;
             else
@@ -70,10 +70,10 @@ namespace LibFaolan.Other
                 string.Format("UInt32\theadersize\t=\t{0}\r\n", packet.Headersize) +
                 string.Format("byte\tsender\t\t=\t0x{0:X}\r\n", packet.Sender) +
                 string.Format("byte\tslength\t\t=\t{0}\r\n", packet.SenderInt.Length) +
-                string.Format("byte[]\tsenderInt\t=\t{0}\r\n", packet.SenderInt.Data.ToHexString()) +
+                string.Format("byte[]\tsenderInt\t=\t{0}\r\n", packet.SenderInt.ToHexString()) +
                 string.Format("byte\treceiver\t=\t0x{0:X}\r\n", packet.Receiver) +
                 string.Format("byte\trlength\t\t=\t{0}\r\n", packet.ReceiverInt.Length) +
-                string.Format("byte[]\treceiverInt\t=\t{0}\r\n", packet.ReceiverInt.Data.ToHexString()) +
+                string.Format("byte[]\treceiverInt\t=\t{0}\r\n", packet.ReceiverInt.ToHexString()) +
                 string.Format("UInt32\topcode\t\t=\t0x{0:X8}\r\n", packet.Opcode) +
                 string.Format("UInt32\thdrDataLen\t=\t{0}\r\n", packet.HeaderData?.Length) +
                 string.Format("byte[]\theaderData\t=\t{0}\r\n",
@@ -92,8 +92,8 @@ namespace LibFaolan.Other
                 (packet.HeaderData != null && packet.HeaderData.Length > 0
                     ? "var headerData = new byte[]" + packet.HeaderData.ToArray().ToHexString() + ";\r\n"
                     : "") +
-                "var sender = new byte[]" + packet.SenderInt.Data.ToHexString() + ";\r\n" +
-                "var receiver = new byte[]" + packet.ReceiverInt.Data.ToHexString() + ";\r\n" +
+                "var sender = new byte[]" + packet.SenderInt.ToHexString() + ";\r\n" +
+                "var receiver = new byte[]" + packet.ReceiverInt.ToHexString() + ";\r\n" +
                 (packet.Data != null
                     ? "var packetData = new byte[]" + packet.Data.ToArray().ToHexString() + ";\r\n"
                     : "") + "\r\n" +

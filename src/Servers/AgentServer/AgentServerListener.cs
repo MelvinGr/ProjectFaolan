@@ -28,12 +28,7 @@ namespace AgentServer
 
             switch ((Opcodes) packet.Opcode)
             {
-                case Opcodes.Authenticate:
-                {
-                    //
-
-                    break;
-                }
+                //
 
                 default:
                 {

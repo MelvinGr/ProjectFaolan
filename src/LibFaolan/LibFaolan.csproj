@@ -47,13 +47,14 @@
     <Compile Include="Database\IDatabase.cs" />
     <Compile Include="Database\MySqlDatabase.cs" />
     <Compile Include="Data\Account.cs" />
-    <Compile Include="Data\ConanArray.cs" />
     <Compile Include="Data\Character.cs" />
     <Compile Include="Data\Realm.cs" />
     <Compile Include="Extentions\ArrayExtentions.cs" />
     <Compile Include="Extentions\DictionaryExtentions.cs" />
     <Compile Include="Extentions\ToHexExtentions.cs" />
+    <Compile Include="Math\MathHelper.cs" />
     <Compile Include="Math\Vector3.cs" />
+    <Compile Include="Network\PacketStream.cs" />
     <Compile Include="Other\Functions.cs" />
     <Compile Include="Other\Logger.cs" />
     <Compile Include="DllImport\DllImport.cs" />

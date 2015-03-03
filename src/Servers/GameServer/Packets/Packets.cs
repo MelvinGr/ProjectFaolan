@@ -11,7 +11,7 @@ namespace GameServer
             var sender = new byte[] {0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x0b};
             var receiver = new byte[] {0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0xe6, 0x8f, 0x80, 0x08};
 
-            new ConanStream()
+            new PacketStream()
                 .WriteHeader(sender, receiver, null, 0x200b, true) // ReportDimesionID
                 .WriteString(realmId.ToString())
                 .Send(client);
@@ -22,7 +22,7 @@ namespace GameServer
             var sender = new byte[] {0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x0b};
             var receiver = new byte[] {0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0xe6, 0x8f, 0x80, 0x08};
 
-            new ConanStream()
+            new PacketStream()
                 .WriteHeader(sender, receiver, null, 0x200c, true) // ReportServerID
                 .WriteUInt32(0x0000000b)
                 .WriteUInt32(value)
@@ -34,7 +34,7 @@ namespace GameServer
             var sender = new byte[] {0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x0b};
             var receiver = new byte[] {0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0xe6, 0x8f, 0x80, 0x08};
 
-            new ConanStream()
+            new PacketStream()
                 .WriteHeader(sender, receiver, null, 0x2001, true) // ReportServerID
                 .WriteUInt32(value)
                 .Send(client);

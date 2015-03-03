@@ -38,7 +38,7 @@ namespace CSPlayerAgent
                     byte[] sender = {0x0d, 0x14, 0x56, 0xd5, 0x6d, 0x10, 0x04};
                     byte[] receiver = {0x0d, 0xc8, 0x60, 0xd5, 0xbb, 0x10, 0x84, 0x80, 0x80, 0x08};
 
-                    new ConanStream()
+                    new PacketStream()
                         .WriteHeader(sender, receiver, null, 0x2000, true)
                         .WriteUInt32(auth)
                         .Send(client);

@@ -1,6 +1,5 @@
 using System;
 using Hik.Communication.Scs.Communication.Messages;
-using LibFaolan.Data;
 using LibFaolan.Extentions;
 
 namespace LibFaolan.Network
@@ -31,9 +30,9 @@ namespace LibFaolan.Network
         public UInt32 Length;
         public UInt32 Opcode;
         public byte Receiver;
-        public ConanArray ReceiverInt;
+        public byte[] ReceiverInt;
         public byte Sender;
-        public ConanArray SenderInt;
+        public byte[] SenderInt;
 
         public Packet(ConanStream stream)
         {
@@ -51,12 +50,18 @@ namespace LibFaolan.Network
 
             Crc32 = stream.ReadUInt32();
             Headersize = stream.ReadUInt32();
+            if (Headersize > 0xffff) // this should do..
+            {
+                //throw new Exception("Headersize > 0xffff");
+                Length = UInt32.MaxValue;
+                return;
+            }
 
             Sender = stream.ReadByte();
-            SenderInt = stream.ReadConanArray();
+            SenderInt = stream.ReadArrayPrependLengthByte();
 
             Receiver = stream.ReadByte();
-            ReceiverInt = stream.ReadConanArray();
+            ReceiverInt = stream.ReadArrayPrependLengthByte();
 
             Opcode = stream.ReadUInt16();
 

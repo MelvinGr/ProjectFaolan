@@ -10,21 +10,22 @@ namespace LibFaolan.Data
     public sealed class Character
     {
         public uint AccountId;
-        public UInt32 Class;
+        public byte Class;
         public uint HeadMesh;
         public UInt32 Id;
         public string Language;
         public uint LastConnection;
-        public uint lbinprv;
-        public UInt32 Level;
+        public uint Lbinprv;
+        public byte Level;
         public UInt32 Map;
         public string Name;
         public Vector3 Position;
-        public UInt32 Race;
-        public UInt32 RealmId;
+        public byte Race;
+        public byte RealmId;
+        public Vector3 Rotation;
         public byte Sex;
         public byte Size;
-        public uint Voice;
+        public byte Voice;
 
         public Character(uint id)
         {
@@ -40,19 +41,20 @@ namespace LibFaolan.Data
 
             AccountId = (UInt32) c["account_id"];
             Name = c["name"];
-            Race = (UInt32) c["race"];
-            Class = (UInt32) c["class"];
-            Level = (UInt32) c["level"];
+            Race = (byte) c["race"];
+            Class = (byte) c["class"];
+            Level = (byte) c["level"];
             Sex = (byte) c["sex"];
-            RealmId = (UInt32) c["realm_id"];
+            RealmId = (byte) c["realm_id"];
             Map = (UInt32) c["map_id"];
             Language = c["language"];
             HeadMesh = (UInt32) c["headmesh"];
             Size = (byte) c["size"];
-            Voice = (UInt32) c["voice"];
+            Voice = (byte) c["voice"];
             LastConnection = (UInt32) c["last_connection"];
-            Position = new Vector3((UInt32) c["pos_x"], (UInt32) c["pos_y"], (UInt32) c["pos_z"]);
-            lbinprv = (UInt32) c["lbinprv"];
+            Position = new Vector3(float.Parse(c["pos_x"]), float.Parse(c["pos_y"]), float.Parse(c["pos_z"]));
+            Rotation = new Vector3(float.Parse(c["rot_x"]), float.Parse(c["rot_y"]), float.Parse(c["rot_z"]));
+            Lbinprv = (UInt32) c["lbinprv"];
         }
 
         public bool UpdateLastInfo(IDatabase database, NetworkClient client)
