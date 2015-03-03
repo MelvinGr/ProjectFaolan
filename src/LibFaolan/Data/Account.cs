@@ -8,26 +8,16 @@ namespace LibFaolan.Data
 {
     public sealed class Account
     {
-        public string AuthChallenge = "2bac5cd78ee0e5a37395991bfbeeeab8";
+        public static readonly string AuthChallenge = "2bac5cd78ee0e5a37395991bfbeeeab8";
         public UInt32 AuthStatus;
         public Character Character;
+        public UInt32 ClientInstance;
         public UInt32 Cookie;
-        public int counter, state;
+        public int Counter, State;
         public UInt32 Id; // PlayerInstance
         public byte Kind; // 0 = user, 1 = admin
         public string Username;
-
-        public Character charInfo
-        {
-            get { return Character; }
-            set { Character = value; }
-        }
-
         public UInt64 LongId => (0x0000271200000000u + Id); // As used by the client (why?)
-
-        public UInt32 nClientInst { get; // { return Id; }
-            set; // { Id = value; }
-        }
 
         public void LoadDetailsFromDatabase(IDatabase database)
         {
@@ -48,7 +38,7 @@ namespace LibFaolan.Data
             Cookie = obj["cookie"];
             Username = obj["username"];
             Kind = obj["kind"];
-            nClientInst = 0x0802E5D4;
+            ClientInstance = 0x0802E5D4;
         }
 
         public bool IsBanned(IDatabase database)

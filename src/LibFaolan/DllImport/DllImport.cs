@@ -20,7 +20,7 @@ namespace LibFaolan.DllImport
 
     public static class Console
     {
-        private const int STD_INPUT_HANDLE = -10;
+        private const int StdInputHandle = -10;
         // ENABLE_QUICK_EDIT_MODE ENABLE_EXTENDED_FLAGS
         private const int ENABLE_QUICK_EDIT_MODE = 0x40 | 0x80;
 
@@ -37,7 +37,7 @@ namespace LibFaolan.DllImport
         public static void EnableQuickEditMode()
         {
             int mode;
-            var handle = GetStdHandle(STD_INPUT_HANDLE);
+            var handle = GetStdHandle(StdInputHandle);
             GetConsoleMode(handle, out mode);
             SetConsoleMode(handle, mode | ENABLE_QUICK_EDIT_MODE);
         }

@@ -22,7 +22,7 @@ namespace LibFaolan.Network
             byte[] data; 
         */
 
-        private readonly ConanStream originalStream;
+        private readonly ConanStream _originalStream;
         public UInt32 Crc32;
         public ConanStream Data;
         public ConanStream HeaderData;
@@ -36,7 +36,7 @@ namespace LibFaolan.Network
 
         public Packet(ConanStream stream)
         {
-            originalStream = stream;
+            _originalStream = stream;
             stream.Position = 0;
 
             Length = stream.ReadUInt32();
@@ -85,7 +85,7 @@ namespace LibFaolan.Network
 
         public override string ToString()
         {
-            return string.Format("Opcode: {0} Length: {1}", Opcode.ToHex(), originalStream.Length);
+            return string.Format("Opcode: {0} Length: {1}", Opcode.ToHex(), _originalStream.Length);
         }
     }
 }

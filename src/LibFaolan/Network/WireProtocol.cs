@@ -8,7 +8,6 @@ namespace LibFaolan.Network
 {
     public sealed class WireProtocol : IScsWireProtocol
     {
-        private readonly bool EnableCompression = false;
         private byte[] _backBuffer;
         private ConanStream _stream;
 
@@ -16,10 +15,9 @@ namespace LibFaolan.Network
         {
             var messages = new List<IScsMessage>();
 
-            // zlib compression (0x80000005)
-            if (!EnableCompression && receivedBytes.Length == 9 &&
-                (receivedBytes[0] == 0x80 && receivedBytes[1] == 0x00 &&
-                 receivedBytes[2] == 0x00 && receivedBytes[3] == 0x05))
+            // zlib compression (0x80000005) (Client sends start packet, but does not use compression?)
+            if (receivedBytes[0] == 0x80 && receivedBytes[1] == 0x00 &&
+                receivedBytes[2] == 0x00 && receivedBytes[3] == 0x05)
             {
                 //Console.WriteLine("Skipping zlib packet");
                 return messages;

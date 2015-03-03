@@ -13,8 +13,8 @@ namespace PlayerAgent
         private static readonly byte[] Sender = {0x0d, 0x84, 0x04, 0xf2, 0x82, 0x10, 0x02};
         private static readonly byte[] Receiver = {0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0xeb, 0x8e, 0x95, 0xbf, 0x05};
         private static readonly byte[] Sender2 = {0x0d, 0x16, 0x91, 0x35, 0x1d, 0x10, 0x14};
-        private static readonly byte[] sender3 = {0x0D, 0x16, 0x91, 0x35, 0x1D, 0x10, 0x46};
-        private static readonly byte[] receiver3 = {0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0xEC, 0xEB, 0x80, 0xDE, 0x03};
+        private static readonly byte[] Sender3 = {0x0D, 0x16, 0x91, 0x35, 0x1D, 0x10, 0x46};
+        private static readonly byte[] Receiver3 = {0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0xEC, 0xEB, 0x80, 0xDE, 0x03};
         private static readonly byte[] Sender4 = {0x0D, 0x84, 0x04, 0xF2, 0x82, 0x10, 0x03};
         private static readonly byte[] Receiver4 = {0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0xEC, 0xEB, 0x80, 0xDE, 0x03};
 
@@ -23,7 +23,7 @@ namespace PlayerAgent
             byte[] headerData = {0x93, 0x86, 0xee, 0x05};
 
             new PacketStream()
-                .WriteHeader(Sender, Receiver, headerData, 0x2091, true)
+                .WriteHeader(Sender, Receiver, headerData, 0x2091)
                 .WriteUInt32(account.AuthStatus)
                 .Send(client);
         }
@@ -36,7 +36,7 @@ namespace PlayerAgent
             byte[] headerData = {0x94, 0xa7, 0x60};
 
             var aBuffer = new PacketStream();
-            aBuffer.WriteHeader(Sender, Receiver, headerData, 0x20a5, true);
+            aBuffer.WriteHeader(Sender, Receiver, headerData, 0x20a5);
             aBuffer.WriteUInt32((anzChars + 1)*1009);
             foreach (var character in characters)
             {
@@ -53,15 +53,15 @@ namespace PlayerAgent
             byte[] headerData = {0x8b, 0xd3, 0xa0, 0x0c};
 
             var aBuffer = new PacketStream();
-            aBuffer.WriteHeader(Sender, Receiver, headerData, 0x20ef, true); // UpdateClientPlayerData
-            aBuffer.WriteUInt32(account.nClientInst); // PlayerInstance
+            aBuffer.WriteHeader(Sender, Receiver, headerData, 0x20ef); // UpdateClientPlayerData
+            aBuffer.WriteUInt32(account.ClientInstance); // PlayerInstance
             var anzChars = (UInt32) characters.Length;
 
             aBuffer.WriteUInt32((anzChars + 1)*1009); // number of characters
             foreach (var character in characters)
             {
                 aBuffer.WriteUInt32(character.Id); // Charinstance
-                aBuffer.WriteUInt32(account.nClientInst); // PlayerInstance
+                aBuffer.WriteUInt32(account.ClientInstance); // PlayerInstance
                 aBuffer.WriteUInt32(character.Id); // Charinstance
                 aBuffer.WriteString(character.Name); // charName
                 aBuffer.WriteUInt32(character.RealmId); // serverID
@@ -105,7 +105,7 @@ namespace PlayerAgent
             byte[] headerData = {0xe2, 0xe6, 0xc4, 0x0f};
 
             var aBuffer = new PacketStream();
-            aBuffer.WriteHeader(Sender, Receiver, headerData, 0x20cc, true); // SetDimensionList
+            aBuffer.WriteHeader(Sender, Receiver, headerData, 0x20cc); // SetDimensionList
             aBuffer.WriteUInt32(Realms.Count);
             foreach (var realm in Realms)
             {
@@ -132,7 +132,7 @@ namespace PlayerAgent
             byte[] headerData = {0xcb, 0xc6, 0xfc, 0x04};
 
             new PacketStream()
-                .WriteHeader(Sender, Receiver, headerData, 0x208c, true)
+                .WriteHeader(Sender, Receiver, headerData, 0x208c)
                 .WriteUInt32(1)
                 .Send(client);
         }
@@ -142,7 +142,7 @@ namespace PlayerAgent
             byte[] headerData = {0x99, 0x95, 0x92, 0x05};
 
             new PacketStream()
-                .WriteHeader(Sender, Receiver, headerData, 0x209c, true)
+                .WriteHeader(Sender, Receiver, headerData, 0x209c)
                 .WriteUInt16(0)
                 .WriteByte(0)
                 .Send(client);
@@ -154,12 +154,12 @@ namespace PlayerAgent
             byte[] headerData = {0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE0, 0xD4, 0xB4, 0xD7, 0x05};
 
             new PacketStream() // send CSPlayerAgent
-                .WriteHeader(sender3, receiver3, headerData, 0x1A07, true)
-                .WriteUInt32(Network.htonl(Network.inet_addr(Settings.CSPlayerAgentAddress)))
-                .WriteUInt16(Settings.CSPlayerAgentPort)
+                .WriteHeader(Sender3, Receiver3, headerData, 0x1A07)
+                .WriteUInt32(Network.htonl(Network.inet_addr(Settings.CsPlayerAgentAddress)))
+                .WriteUInt16(Settings.CsPlayerAgentPort)
                 .WriteUInt32(account.Id)
                 .WriteUInt32(0x0000c350)
-                .WriteUInt32(account.nClientInst)
+                .WriteUInt32(account.ClientInstance)
                 .Send(client);
         }
 
@@ -170,12 +170,12 @@ namespace PlayerAgent
             {0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xFA, 0xE5, 0x98, 0x9D, 0x02};
 
             new PacketStream() // Send PlayerAgent
-                .WriteHeader(sender3, receiver3, headerData, 0x1A07, true)
+                .WriteHeader(Sender3, Receiver3, headerData, 0x1A07)
                 .WriteUInt32(Network.htonl(Network.inet_addr(Settings.PlayerAgentAddress)))
                 .WriteUInt16(Settings.PlayerAgentPort)
                 .WriteUInt32(account.Id)
                 .WriteUInt32(0x0000c350)
-                .WriteUInt32(account.nClientInst)
+                .WriteUInt32(account.ClientInstance)
                 .Send(client);
         }
 
@@ -192,11 +192,11 @@ namespace PlayerAgent
             };
 
             new PacketStream() // Send WorldServer
-                .WriteHeader(sender3, receiver3, headerData, 0x1A07, true)
+                .WriteHeader(Sender3, Receiver3, headerData, 0x1A07)
                 .WriteString(Realms[0].IpAddress + ":" + Realms[0].Port)
                 .WriteUInt32(0x5679E2CF)
                 .WriteUInt32(0x0000C350)
-                .WriteUInt32(account.nClientInst)
+                .WriteUInt32(account.ClientInstance)
                 .WriteArray(packetData)
                 .Send(client);
         }
@@ -208,7 +208,7 @@ namespace PlayerAgent
             {0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE3, 0xEE, 0x9F, 0xE2, 0x07};
 
             new PacketStream()
-                .WriteHeader(sender3, receiver3, headerData, 0x1A07, true)
+                .WriteHeader(Sender3, Receiver3, headerData, 0x1A07)
                 .WriteUInt32(0x0000276A)
                 .WriteString("AAPointsPerLevel")
                 .WriteUInt32(0x3FF00000)
@@ -550,9 +550,9 @@ namespace PlayerAgent
             };
 
             new PacketStream()
-                .WriteHeader(Sender4, Receiver4, headerData, 0x20B9, true)
+                .WriteHeader(Sender4, Receiver4, headerData, 0x20B9)
                 .WriteUInt32(0x0000C350)
-                .WriteUInt32(account.nClientInst) // 0x0802E5D4) // charid?
+                .WriteUInt32(account.ClientInstance) // 0x0802E5D4) // charid?
                 .WriteArray(packetData)
                 .Send(client);
         }

@@ -11,31 +11,25 @@ namespace GameServer
             {
                 0x00, 0x00, 0x00, 0x89, 0xf5, 0x08, 0xf4, 0xc1, 0x00, 0x00, 0xc3, 0x50
             };
-            var blobData7_1 = new byte[]
+            var blobData71 = new byte[]
             {
                 0x00, 0x00, 0x00, 0x07, 0xe2, 0x00, 0x00, 0xd0, 0x0c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x09, 0x00, 0x39, 0xbf, 0x93
-                //0x00, 0x4d, 
-                //0x4d, 0x61, 0x6c, 0x65, 0x54, 0x65, 0x6d, 0x70, 0x6c, 0x61, 0x74, 0x65, 0x3d, 0x35, 0x30, 0x30, 0x30, 0x30, 0x3a, 0x31, 0x30, 0x32, 0x33, 0x32, 0x3b, 0x46, 0x65, 0x6d, 0x61, 0x6c, 0x65, 0x54, 0x65, 0x6d, 0x70, 0x6c, 0x61, 0x74, 0x65, 0x3d, 0x35, 0x30, 0x30, 0x30, 0x30, 0x3a, 0x31, 0x30, 0x32, 0x33, 0x33, 0x3b, 0x53, 0x74, 0x79, 0x67, 0x69, 0x61, 0x6e, 0x53, 0x6c, 0x61, 0x76, 0x65, 0x72, 0x3d, 0x35, 0x30, 0x30, 0x30, 0x30, 0x3a, 0x31, 0x30, 0x32, 0x33, 0x34, 
-                //0x00, 0x00, 0x00, 0x00, 0x00
             };
+
             var aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteArray(blobData7);
-            aBuffer.WriteUInt32(account.nClientInst);
-            aBuffer.WriteArray(blobData7_1);
+            aBuffer.WriteUInt32(account.ClientInstance);
+            aBuffer.WriteArray(blobData71);
             aBuffer.WriteString(
                 "MaleTemplate=50000:10232;FemaleTemplate=50000:10233;StygianSlaver=50000:10234");
             aBuffer.WriteByte(0);
             aBuffer.WriteUInt32(0);
             aBuffer.Send(client);
 
-            var blobData8 = new byte[]
-            {
-                0x00, 0x00, 0x00, 0x89, 0xf5, 0x08, 0xf4, 0xc1, 0x00, 0x00, 0xc3, 0x50
-            };
-            var blobData8_1 = new byte[]
+            var blobData81 = new byte[]
             {
                 0x00, 0x00, 0x00, 0x07, 0xe2, 0x00, 0x00, 0xd0, 0x0c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -47,38 +41,40 @@ namespace GameServer
                 0x76, 0x65, 0x72, 0x3d, 0x35, 0x30, 0x30, 0x30, 0x30, 0x3a, 0x31, 0x30, 0x32, 0x33, 0x34,
                 0x00, 0x00, 0x00, 0x00, 0x00
             };
+
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
-            aBuffer.WriteArray(blobData8);
-            aBuffer.WriteUInt32(account.nClientInst);
-            aBuffer.WriteArray(blobData8_1);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
+            aBuffer.WriteUInt32(0x00000089);
+            aBuffer.WriteUInt32(0xf508f4c1);
+            aBuffer.WriteUInt32(0x0000c350);
+            aBuffer.WriteUInt32(account.ClientInstance);
+            aBuffer.WriteArray(blobData81);
             aBuffer.Send(client);
-            //*/
 
             var blobData4 = new byte[]
             {
                 0x00, 0x00, 0x00, 0x15, 0xf9, 0x8e, 0x10, 0xb3, 0x00, 0x00, 0xc3, 0x50
             };
-            var blobData4_1 = new byte[]
+            var blobData41 = new byte[]
             {
                 0x00, 0x00, 0x00, 0x03, 0x60, 0x00, 0x00, 0x00, 0x02
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteArray(blobData4);
-            aBuffer.WriteUInt32(account.nClientInst);
-            aBuffer.WriteArray(blobData4_1);
+            aBuffer.WriteUInt32(account.ClientInstance);
+            aBuffer.WriteArray(blobData41);
             aBuffer.Send(client);
 
             var blobData5 = new byte[]
             {
                 0x00, 0x00, 0x00, 0x4c, 0x6b, 0x87, 0xe3, 0x16, 0x00, 0x00, 0xc3, 0x50
             };
-            var blobData5_1 = new byte[]
+            var blobData51 = new byte[]
             {
                 0x00, 0x00, 0x00, 0x0b, 0x90, 0x00, 0x00, 0x00, 0xc3, 0x50
             };
-            var blobData5_2 = new byte[]
+            var blobData52 = new byte[]
             {
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x27, 0x10,
@@ -94,27 +90,27 @@ namespace GameServer
                 0x02, 0x3c, 0x4b, 0xa3
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteArray(blobData5);
-            aBuffer.WriteUInt32(account.nClientInst);
-            aBuffer.WriteArray(blobData5_1);
-            aBuffer.WriteUInt32(account.nClientInst);
-            aBuffer.WriteArray(blobData5_2);
+            aBuffer.WriteUInt32(account.ClientInstance);
+            aBuffer.WriteArray(blobData51);
+            aBuffer.WriteUInt32(account.ClientInstance);
+            aBuffer.WriteArray(blobData52);
             aBuffer.Send(client);
 
             var blobData6 = new byte[]
             {
                 0x00, 0x00, 0x00, 0x11, 0x40, 0x74, 0x9b, 0x8a, 0x00, 0x00, 0xc3, 0x50
             };
-            var blobData6_1 = new byte[]
+            var blobData61 = new byte[]
             {
                 0x01, 0x00, 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteArray(blobData6);
-            aBuffer.WriteUInt32(account.nClientInst);
-            aBuffer.WriteArray(blobData6_1);
+            aBuffer.WriteUInt32(account.ClientInstance);
+            aBuffer.WriteArray(blobData61);
             aBuffer.Send(client);
 
 
@@ -122,7 +118,7 @@ namespace GameServer
             {
                 0x00, 0x00, 0x03, 0x06, 0xa3, 0x6d, 0x3b, 0x74, 0x00, 0x00, 0xc3, 0x50
             };
-            var blobData9_1 = new byte[]
+            var blobData91 = new byte[]
             {
                 0x00, 0x00, 0x00, 0x02, 0xf5, 0x08, 0x05, 0x10, 0x07, 0x18, 0x00, 0x22, 0xb9, 0x01, 0x3c,
                 0x72, 0x65, 0x6d, 0x6f, 0x74, 0x65, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x20, 0x74, 0x6f,
@@ -177,10 +173,10 @@ namespace GameServer
                 0x38, 0x33, 0x32, 0x08, 0x08, 0x95, 0xb1, 0x27, 0x10, 0x99, 0xf7, 0x31
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteArray(blobData9);
-            aBuffer.WriteUInt32(account.nClientInst);
-            aBuffer.WriteArray(blobData9_1);
+            aBuffer.WriteUInt32(account.ClientInstance);
+            aBuffer.WriteArray(blobData91);
             aBuffer.Send(client);
 
 
@@ -188,17 +184,17 @@ namespace GameServer
             {
                 0x00, 0x00, 0x00, 0x2b, 0xa3, 0x6d, 0x3b, 0x74, 0x00, 0x00, 0xc3, 0x50
             };
-            var blobData10_1 = new byte[]
+            var blobData101 = new byte[]
             {
                 0x00, 0x00, 0x00, 0x00, 0x1a, 0x08, 0x05, 0x10, 0x02, 0x18, 0x00, 0x22, 0x0a, 0x50, 0x6c,
                 0x61, 0x79, 0x4f, 0x72, 0x53, 0x6b, 0x69, 0x70, 0x2a, 0x00, 0x32, 0x04, 0x08, 0x00, 0x10,
                 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteArray(blobData10);
-            aBuffer.WriteUInt32(account.nClientInst);
-            aBuffer.WriteArray(blobData10_1);
+            aBuffer.WriteUInt32(account.ClientInstance);
+            aBuffer.WriteArray(blobData101);
             aBuffer.Send(client);
 
 
@@ -210,7 +206,7 @@ namespace GameServer
                 0x37, 0x39, 0x32, 0x30, 0x3f, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteArray(blobData11);
             aBuffer.Send(client);
 
@@ -222,7 +218,7 @@ namespace GameServer
                 0x30, 0x33, 0x36, 0x36, 0x36, 0x3f, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteArray(blobData12);
             aBuffer.Send(client);
 
@@ -235,7 +231,7 @@ namespace GameServer
                 0x02, 0x28, 0x18, 0x30, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteArray(blobData13);
             aBuffer.Send(client);
 
@@ -244,7 +240,7 @@ namespace GameServer
             {
                 0x00, 0x00, 0x00, 0x29, 0xba, 0xdf, 0x5a, 0x4b, 0x00, 0x00, 0xc3, 0x50
             };
-            var blobData14_1 = new byte[]
+            var blobData141 = new byte[]
             {
                 //0x00, 
                 //0x00, 0x11, 
@@ -252,12 +248,12 @@ namespace GameServer
                 0x3f, 0x80, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteArray(blobData14);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteByte(0);
             aBuffer.WriteString("*texscript_183875");
-            aBuffer.WriteArray(blobData14_1);
+            aBuffer.WriteArray(blobData141);
             aBuffer.Send(client);
 
 
@@ -269,7 +265,7 @@ namespace GameServer
                 0x38, 0x37, 0x35, 0x3f, 0x80, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteArray(blobData15);
             aBuffer.Send(client);
 
@@ -282,7 +278,7 @@ namespace GameServer
                 0x38, 0x37, 0x35, 0x3f, 0x80, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteArray(blobData16);
             aBuffer.Send(client);
         }

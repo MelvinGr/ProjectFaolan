@@ -33,12 +33,11 @@
     </Reference>
     <Reference Include="Scs, Version=1.1.0.1, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\SCS.1.1.0.1\lib\net40\Scs.dll</HintPath>
+      <HintPath>..\..\other\Scs.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Data" />
-    <Reference Include="System.ServiceModel" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Config\Ini.cs" />

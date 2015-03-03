@@ -5,30 +5,30 @@ namespace GameServer
 {
     partial class GameServerListener
     {
-        private void Handle0xf98e10b3(NetworkClient client, Account account, Packet packet)
+        private void Handle0Xf98E10B3(NetworkClient client, Account account, Packet packet)
         {
             var aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x201c, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x201c);
             aBuffer.WriteUInt32(0x00000068);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt32(0);
             aBuffer.WriteUInt32(0x00000017);
             aBuffer.WriteUInt32(0x0001e1da);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x201c, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x201c);
             aBuffer.WriteUInt32(0x00000068);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt32(0);
             aBuffer.WriteUInt32(0x00000008);
             aBuffer.WriteUInt32(0xffffffff);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x201c, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x201c);
             aBuffer.WriteUInt32(0x00000068);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt32(0);
             aBuffer.WriteUInt32(0x00000017);
             aBuffer.WriteUInt32(0x0001e1db);
@@ -48,34 +48,34 @@ namespace GameServer
                 0x30, 0x00, 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x2020, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x2020);
             aBuffer.WriteUInt32(0x00000068);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x201c, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x201c);
             aBuffer.WriteUInt32(0x00000068);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt32(0);
             aBuffer.WriteUInt32(0x00000017);
             aBuffer.WriteUInt32(0x0001e1dc);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x201c, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x201c);
             aBuffer.WriteUInt32(0x00000068);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt32(0);
             aBuffer.WriteUInt32(0x00000008);
             aBuffer.WriteUInt32(0xffffffff);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x201c, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x201c);
             aBuffer.WriteUInt32(0x00000068);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt32(0);
             aBuffer.WriteUInt32(0x00000017);
             aBuffer.WriteUInt32(0x0001e1dd);
@@ -95,34 +95,34 @@ namespace GameServer
                 0x4c, 0x00, 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x2020, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x2020);
             aBuffer.WriteUInt32(0x00000068);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data2);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x201c, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x201c);
             aBuffer.WriteUInt32(0x00000068);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt32(0);
             aBuffer.WriteUInt32(0x00000017);
             aBuffer.WriteUInt32(0x0001e1de);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x201c, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x201c);
             aBuffer.WriteUInt32(0x00000068);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt32(0);
             aBuffer.WriteUInt32(0x00000008);
             aBuffer.WriteUInt32(0xffffffff);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x201c, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x201c);
             aBuffer.WriteUInt32(0x00000068);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt32(0);
             aBuffer.WriteUInt32(0x00000017);
             aBuffer.WriteUInt32(0x0001e1df);
@@ -142,9 +142,9 @@ namespace GameServer
                 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x2020, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x2020);
             aBuffer.WriteUInt32(0x00000068);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data3);
             aBuffer.Send(client);
 
@@ -161,18 +161,18 @@ namespace GameServer
             };
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x2000);
             aBuffer.WriteUInt32(0x00000078);
             aBuffer.WriteUInt32(0x642cd3d6);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data4);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x201c, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x201c);
             aBuffer.WriteUInt32(0x00000065);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt32(0x00000010);
             aBuffer.WriteUInt32(0x00000017);
             aBuffer.WriteUInt32(0x0001e1e1);
@@ -190,11 +190,11 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x2000);
             aBuffer.WriteUInt32(0x00000078);
             aBuffer.WriteUInt32(0x642cd3d6);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data5);
             aBuffer.Send(client);
 
@@ -210,11 +210,11 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x2000);
             aBuffer.WriteUInt32(0x00000078);
             aBuffer.WriteUInt32(0x642cd3d6);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data6);
             aBuffer.Send(client);
 
@@ -230,18 +230,18 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x2000);
             aBuffer.WriteUInt32(0x00000078);
             aBuffer.WriteUInt32(0x642cd3d6);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data7);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x201c, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x201c);
             aBuffer.WriteUInt32(0x00000065);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt32(0x00000005);
             aBuffer.WriteUInt32(0x00000017);
             aBuffer.WriteUInt32(0x0001e1e3);
@@ -259,29 +259,29 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x2000);
             aBuffer.WriteUInt32(0x00000078);
             aBuffer.WriteUInt32(0x642cd3d6);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data8);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x201c, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x201c);
             aBuffer.WriteUInt32(0x00000065);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt32(0x00000012);
             aBuffer.WriteUInt32(0x00000017);
             aBuffer.WriteUInt32(0x0001e1e5);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x2000);
             aBuffer.WriteUInt32(0x00000015);
             aBuffer.WriteUInt32(0xf98e10b3);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteByte(0);
             aBuffer.WriteUInt32(0x00000360);
             aBuffer.WriteUInt32(0x00000003);
@@ -294,11 +294,11 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data9);
             aBuffer.Send(client);
 
@@ -309,11 +309,11 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data10);
             aBuffer.Send(client);
 
@@ -324,11 +324,11 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data11);
             aBuffer.Send(client);
 
@@ -339,11 +339,11 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data12);
             aBuffer.Send(client);
 
@@ -354,11 +354,11 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data13);
             aBuffer.Send(client);
 
@@ -369,11 +369,11 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data14);
             aBuffer.Send(client);
 
@@ -384,11 +384,11 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data15);
             aBuffer.Send(client);
 
@@ -399,11 +399,11 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data16);
             aBuffer.Send(client);
 
@@ -414,11 +414,11 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data17);
             aBuffer.Send(client);
 
@@ -429,11 +429,11 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data18);
             aBuffer.Send(client);
 
@@ -444,11 +444,11 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data19);
             aBuffer.Send(client);
 
@@ -459,11 +459,11 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data20);
             aBuffer.Send(client);
 
@@ -474,11 +474,11 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data21);
             aBuffer.Send(client);
 
@@ -489,11 +489,11 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data22);
             aBuffer.Send(client);
 
@@ -504,11 +504,11 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data23);
             aBuffer.Send(client);
 
@@ -519,11 +519,11 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data24);
             aBuffer.Send(client);
 
@@ -537,7 +537,7 @@ namespace GameServer
                 0x01, 0x00, 0x00, 0x00, 0x00, 0x01
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x2050, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x2050);
             aBuffer.WriteArray(data25);
             aBuffer.Send(client);
 
@@ -551,7 +551,7 @@ namespace GameServer
                 0x01, 0x00, 0x00, 0x00, 0x00, 0x01
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x2050, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x2050);
             aBuffer.WriteArray(data26);
             aBuffer.Send(client);
 
@@ -565,7 +565,7 @@ namespace GameServer
                 0x01, 0x00, 0x00, 0x00, 0x00, 0x01
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x2050, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x2050);
             aBuffer.WriteArray(data27);
             aBuffer.Send(client);
 
@@ -579,7 +579,7 @@ namespace GameServer
                 0x01, 0x00, 0x00, 0x00, 0x00, 0x01
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x2050, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x2050);
             aBuffer.WriteArray(data28);
             aBuffer.Send(client);
 
@@ -593,7 +593,7 @@ namespace GameServer
                 0x01, 0x00, 0x00, 0x00, 0x00, 0x01
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x2050, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x2050);
             aBuffer.WriteArray(data29);
             aBuffer.Send(client);
 
@@ -607,7 +607,7 @@ namespace GameServer
                 0x01, 0x00, 0x00, 0x00, 0x00, 0x01
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x2050, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x2050);
             aBuffer.WriteArray(data30);
             aBuffer.Send(client);
 
@@ -618,130 +618,130 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data31);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x00000012);
             aBuffer.WriteUInt32(0xa8bbeb7f);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt16(0x0001);
             aBuffer.WriteUInt32(0x00416544);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x00000012);
             aBuffer.WriteUInt32(0xa8bbeb7f);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt16(0x0001);
             aBuffer.WriteUInt32(0x00416541);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x00000012);
             aBuffer.WriteUInt32(0xa8bbeb7f);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt16(0x0001);
             aBuffer.WriteUInt32(0x00416542);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x00000012);
             aBuffer.WriteUInt32(0xa8bbeb7f);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt16(0x0001);
             aBuffer.WriteUInt32(0x00416548);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x00000012);
             aBuffer.WriteUInt32(0xa8bbeb7f);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt16(0x0001);
             aBuffer.WriteUInt32(0x004165f1);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x00000012);
             aBuffer.WriteUInt32(0xa8bbeb7f);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt16(0x0001);
             aBuffer.WriteUInt32(0x004165ef);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x00000012);
             aBuffer.WriteUInt32(0xa8bbeb7f);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt16(0x0001);
             aBuffer.WriteUInt32(0x00416546);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x00000012);
             aBuffer.WriteUInt32(0xa8bbeb7f);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt16(0x0001);
             aBuffer.WriteUInt32(0x00416545);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x00000012);
             aBuffer.WriteUInt32(0xa8bbeb7f);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt16(0x0001);
             aBuffer.WriteUInt32(0x004165f0);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x00000012);
             aBuffer.WriteUInt32(0xa8bbeb7f);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt16(0x0001);
             aBuffer.WriteUInt32(0x00416547);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x00000012);
             aBuffer.WriteUInt32(0xa8bbeb7f);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt16(0x0001);
             aBuffer.WriteUInt32(0x00416543);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x00000012);
             aBuffer.WriteUInt32(0xa8bbeb7f);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt16(0x0001);
             aBuffer.WriteUInt32(0x00416549);
             aBuffer.Send(client);
@@ -753,11 +753,11 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data32);
             aBuffer.Send(client);
 
@@ -768,11 +768,11 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data33);
             aBuffer.Send(client);
 
@@ -783,11 +783,11 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data34);
             aBuffer.Send(client);
 
@@ -798,11 +798,11 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data35);
             aBuffer.Send(client);
 
@@ -813,11 +813,11 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data36);
             aBuffer.Send(client);
 
@@ -828,11 +828,11 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data37);
             aBuffer.Send(client);
 
@@ -846,7 +846,7 @@ namespace GameServer
                 0x01, 0x00, 0x00, 0x00, 0x00, 0x01
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x2050, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x2050);
             aBuffer.WriteArray(data38);
             aBuffer.Send(client);
 
@@ -857,20 +857,20 @@ namespace GameServer
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data39);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x00000011);
             aBuffer.WriteUInt32(0x40749b8a);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteByte(1);
             aBuffer.WriteUInt32(0x0000003d);
             aBuffer.Send(client);
@@ -883,31 +883,31 @@ namespace GameServer
                 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000003a);
             aBuffer.WriteUInt32(0xf508f4c1);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteArray(data40);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender4, receiver4, null, 0x201b, true);
+            aBuffer.WriteHeader(Sender4, Receiver4, null, 0x201b);
             aBuffer.Send(client);
 
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
+            aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002b);
             aBuffer.WriteUInt32(0x10d27bc0);
             aBuffer.WriteUInt32(0x0000c350);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteByte(0x01);
             aBuffer.WriteUInt32(0x62);
             aBuffer.WriteUInt32(0x0000c79c);
             aBuffer.WriteUInt32(0x00000faa); //map
             aBuffer.WriteUInt32(0);
-            aBuffer.WriteUInt32(account.nClientInst);
+            aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt32(0);
             aBuffer.WriteUInt32(0);
             aBuffer.WriteUInt32(0);

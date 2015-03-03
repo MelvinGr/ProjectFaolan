@@ -31,13 +31,7 @@ namespace PlayerAgent
 
         public override void ClientConnected(NetworkClient client)
         {
-            Logger.WriteLine("New client with address: " + client.IpAddress);
             client.Tag = new Account();
-        }
-
-        public override void ClientDisconnected(NetworkClient client)
-        {
-            Logger.WriteLine("Client with address: " + client.IpAddress + " disconnected!");
         }
 
         public override void ReceivedPacket(NetworkClient client, Packet packet)
@@ -116,18 +110,18 @@ namespace PlayerAgent
 
                 case Opcodes.CreateCharacter:
                 {
-                    var i_nDimID = packet.Data.ReadUInt32();
+                    var iNDimId = packet.Data.ReadUInt32();
 
                     var headerData = new byte[] {0x8b, 0xd8, 0x99, 0x02};
                     var sender = new byte[] {0x0d, 0x84, 0x04, 0xf2, 0x82, 0x10, 0x03};
                     var receiver = new byte[] {0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0xeb, 0x8e, 0x95, 0xbf, 0x05};
 
-                    account.nClientInst = 0xdeadbeef;
+                    account.ClientInstance = 0xdeadbeef;
 
                     new PacketStream()
-                        .WriteHeader(sender, receiver, headerData, 0x20b9, true)
+                        .WriteHeader(sender, receiver, headerData, 0x20b9)
                         .WriteUInt32(0x0000c350)
-                        .WriteUInt32(account.nClientInst)
+                        .WriteUInt32(account.ClientInstance)
                         .WriteUInt32(0)
                         .Send(client);
 

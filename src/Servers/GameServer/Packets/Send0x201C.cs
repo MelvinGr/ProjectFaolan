@@ -5,15 +5,15 @@ namespace GameServer
 {
     partial class GameServerListener
     {
-        private void Send0x201C(NetworkClient client, Account account)
+        private void Send0X201C(NetworkClient client, Account account)
         {
             var packetData3 = new byte[]
             {
                 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x17, 0x00, 0x0D, 0x3B, 0xC9
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000065).WriteUInt32(account.nClientInst).WriteArray(packetData3)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000065).WriteUInt32(account.ClientInstance).WriteArray(packetData3)
                 .Send(client);
 
             var packetData4 = new byte[]
@@ -22,8 +22,8 @@ namespace GameServer
                 0x3B, 0xCA
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000065).WriteUInt32(account.nClientInst).WriteArray(packetData4)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000065).WriteUInt32(account.ClientInstance).WriteArray(packetData4)
                 .Send(client);
 
             var packetData5 = new byte[]
@@ -32,8 +32,8 @@ namespace GameServer
                 0x3B, 0xCB
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000065).WriteUInt32(account.nClientInst).WriteArray(packetData5)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000065).WriteUInt32(account.ClientInstance).WriteArray(packetData5)
                 .Send(client);
 
             var packetData6 = new byte[]
@@ -42,8 +42,8 @@ namespace GameServer
                 0x3B, 0xCC
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000065).WriteUInt32(account.nClientInst).WriteArray(packetData6)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000065).WriteUInt32(account.ClientInstance).WriteArray(packetData6)
                 .Send(client);
 
             var packetData7 = new byte[]
@@ -52,8 +52,8 @@ namespace GameServer
                 0x3B, 0xCD
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000065).WriteUInt32(account.nClientInst).WriteArray(packetData7)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000065).WriteUInt32(account.ClientInstance).WriteArray(packetData7)
                 .Send(client);
 
             var packetData8 = new byte[]
@@ -62,8 +62,8 @@ namespace GameServer
                 0x3B, 0xCE
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000065).WriteUInt32(account.nClientInst).WriteArray(packetData8)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000065).WriteUInt32(account.ClientInstance).WriteArray(packetData8)
                 .Send(client);
 
             var packetData9 = new byte[]
@@ -72,8 +72,8 @@ namespace GameServer
                 0x3B, 0xCF
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000065).WriteUInt32(account.nClientInst).WriteArray(packetData9)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000065).WriteUInt32(account.ClientInstance).WriteArray(packetData9)
                 .Send(client);
 
             var packetData10 = new byte[]
@@ -82,8 +82,8 @@ namespace GameServer
                 0x3B, 0xD0
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000065).WriteUInt32(account.nClientInst).WriteArray(packetData10)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000065).WriteUInt32(account.ClientInstance).WriteArray(packetData10)
                 .Send(client);
 
             var packetData11 = new byte[]
@@ -92,8 +92,8 @@ namespace GameServer
                 0x3B, 0xD1
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000065).WriteUInt32(account.nClientInst).WriteArray(packetData11)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000065).WriteUInt32(account.ClientInstance).WriteArray(packetData11)
                 .Send(client);
 
             var packetData12 = new byte[]
@@ -102,8 +102,8 @@ namespace GameServer
                 0x3B, 0xD2
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000065).WriteUInt32(account.nClientInst).WriteArray(packetData12)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000065).WriteUInt32(account.ClientInstance).WriteArray(packetData12)
                 .Send(client);
 
             var packetData13 = new byte[]
@@ -112,8 +112,8 @@ namespace GameServer
                 0x3B, 0xD3
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000065).WriteUInt32(account.nClientInst).WriteArray(packetData13)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000065).WriteUInt32(account.ClientInstance).WriteArray(packetData13)
                 .Send(client);
 
             var packetData14 = new byte[]
@@ -122,8 +122,8 @@ namespace GameServer
                 0x3B, 0xD4
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000065).WriteUInt32(account.nClientInst).WriteArray(packetData14)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000065).WriteUInt32(account.ClientInstance).WriteArray(packetData14)
                 .Send(client);
 
             var packetData15 = new byte[]
@@ -132,8 +132,8 @@ namespace GameServer
                 0x3B, 0xD5
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000065).WriteUInt32(account.nClientInst).WriteArray(packetData15)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000065).WriteUInt32(account.ClientInstance).WriteArray(packetData15)
                 .Send(client);
 
             var packetData16 = new byte[]
@@ -142,8 +142,8 @@ namespace GameServer
                 0x3B, 0xD6
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000065).WriteUInt32(account.nClientInst).WriteArray(packetData16)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000065).WriteUInt32(account.ClientInstance).WriteArray(packetData16)
                 .Send(client);
 
             var packetData17 = new byte[]
@@ -152,8 +152,8 @@ namespace GameServer
                 0x3B, 0xD7
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000065).WriteUInt32(account.nClientInst).WriteArray(packetData17)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000065).WriteUInt32(account.ClientInstance).WriteArray(packetData17)
                 .Send(client);
 
             var packetData18 = new byte[]
@@ -162,8 +162,8 @@ namespace GameServer
                 0x3B, 0xD8
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000065).WriteUInt32(account.nClientInst).WriteArray(packetData18)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000065).WriteUInt32(account.ClientInstance).WriteArray(packetData18)
                 .Send(client);
 
             var packetData19 = new byte[]
@@ -172,8 +172,8 @@ namespace GameServer
                 0x3B, 0xD9
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000065).WriteUInt32(account.nClientInst).WriteArray(packetData19)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000065).WriteUInt32(account.ClientInstance).WriteArray(packetData19)
                 .Send(client);
 
             var packetData20 = new byte[]
@@ -182,8 +182,8 @@ namespace GameServer
                 0x3B, 0xDA
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000065).WriteUInt32(account.nClientInst).WriteArray(packetData20)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000065).WriteUInt32(account.ClientInstance).WriteArray(packetData20)
                 .Send(client);
 
             var packetData21 = new byte[]
@@ -192,8 +192,8 @@ namespace GameServer
                 0x3B, 0xDB
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000065).WriteUInt32(account.nClientInst).WriteArray(packetData21)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000065).WriteUInt32(account.ClientInstance).WriteArray(packetData21)
                 .Send(client);
 
             var packetData22 = new byte[]
@@ -202,8 +202,8 @@ namespace GameServer
                 0x3B, 0xDC
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000068).WriteUInt32(account.nClientInst).WriteArray(packetData22)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000068).WriteUInt32(account.ClientInstance).WriteArray(packetData22)
                 .Send(client);
 
             var packetData23 = new byte[]
@@ -212,8 +212,8 @@ namespace GameServer
                 0x3B, 0xDD
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000068).WriteUInt32(account.nClientInst).WriteArray(packetData23)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000068).WriteUInt32(account.ClientInstance).WriteArray(packetData23)
                 .Send(client);
 
             var packetData24 = new byte[]
@@ -222,8 +222,8 @@ namespace GameServer
                 0x3B, 0xDE
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000068).WriteUInt32(account.nClientInst).WriteArray(packetData24)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000068).WriteUInt32(account.ClientInstance).WriteArray(packetData24)
                 .Send(client);
 
             var packetData25 = new byte[]
@@ -232,8 +232,8 @@ namespace GameServer
                 0x3B, 0xDF
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000068).WriteUInt32(account.nClientInst).WriteArray(packetData25)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000068).WriteUInt32(account.ClientInstance).WriteArray(packetData25)
                 .Send(client);
 
             var packetData26 = new byte[]
@@ -242,8 +242,8 @@ namespace GameServer
                 0x3B, 0xE0
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000068).WriteUInt32(account.nClientInst).WriteArray(packetData26)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000068).WriteUInt32(account.ClientInstance).WriteArray(packetData26)
                 .Send(client);
 
             var packetData27 = new byte[]
@@ -252,8 +252,8 @@ namespace GameServer
                 0x3B, 0xE1
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000068).WriteUInt32(account.nClientInst).WriteArray(packetData27)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000068).WriteUInt32(account.ClientInstance).WriteArray(packetData27)
                 .Send(client);
 
             var packetData28 = new byte[]
@@ -262,8 +262,8 @@ namespace GameServer
                 0x3B, 0xE2
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000068).WriteUInt32(account.nClientInst).WriteArray(packetData28)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000068).WriteUInt32(account.ClientInstance).WriteArray(packetData28)
                 .Send(client);
 
             var packetData29 = new byte[]
@@ -272,8 +272,8 @@ namespace GameServer
                 0x3B, 0xE3
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000068).WriteUInt32(account.nClientInst).WriteArray(packetData29)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000068).WriteUInt32(account.ClientInstance).WriteArray(packetData29)
                 .Send(client);
 
             var packetData30 = new byte[]
@@ -282,8 +282,8 @@ namespace GameServer
                 0x3B, 0xE4
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000068).WriteUInt32(account.nClientInst).WriteArray(packetData30)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000068).WriteUInt32(account.ClientInstance).WriteArray(packetData30)
                 .Send(client);
 
             var packetData31 = new byte[]
@@ -292,8 +292,8 @@ namespace GameServer
                 0x3B, 0xE5
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000068).WriteUInt32(account.nClientInst).WriteArray(packetData31)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000068).WriteUInt32(account.ClientInstance).WriteArray(packetData31)
                 .Send(client);
 
             var packetData32 = new byte[]
@@ -302,8 +302,8 @@ namespace GameServer
                 0x3B, 0xE6
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000068).WriteUInt32(account.nClientInst).WriteArray(packetData32)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000068).WriteUInt32(account.ClientInstance).WriteArray(packetData32)
                 .Send(client);
 
             var packetData33 = new byte[]
@@ -312,8 +312,8 @@ namespace GameServer
                 0x3B, 0xE7
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000068).WriteUInt32(account.nClientInst).WriteArray(packetData33)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000068).WriteUInt32(account.ClientInstance).WriteArray(packetData33)
                 .Send(client);
 
             var packetData34 = new byte[]
@@ -322,8 +322,8 @@ namespace GameServer
                 0x3B, 0xE8
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000068).WriteUInt32(account.nClientInst).WriteArray(packetData34)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000068).WriteUInt32(account.ClientInstance).WriteArray(packetData34)
                 .Send(client);
 
             var packetData35 = new byte[]
@@ -332,8 +332,8 @@ namespace GameServer
                 0x3B, 0xE9
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000068).WriteUInt32(account.nClientInst).WriteArray(packetData35)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000068).WriteUInt32(account.ClientInstance).WriteArray(packetData35)
                 .Send(client);
 
             var packetData36 = new byte[]
@@ -342,8 +342,8 @@ namespace GameServer
                 0x3B, 0xEA
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000068).WriteUInt32(account.nClientInst).WriteArray(packetData36)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000068).WriteUInt32(account.ClientInstance).WriteArray(packetData36)
                 .Send(client);
 
             var packetData37 = new byte[]
@@ -352,8 +352,8 @@ namespace GameServer
                 0x3B, 0xEB
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000068).WriteUInt32(account.nClientInst).WriteArray(packetData37)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000068).WriteUInt32(account.ClientInstance).WriteArray(packetData37)
                 .Send(client);
 
             var packetData38 = new byte[]
@@ -362,8 +362,8 @@ namespace GameServer
                 0x3B, 0xEC
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000068).WriteUInt32(account.nClientInst).WriteArray(packetData38)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000068).WriteUInt32(account.ClientInstance).WriteArray(packetData38)
                 .Send(client);
 
             var packetData39 = new byte[]
@@ -372,8 +372,8 @@ namespace GameServer
                 0x3B, 0xED
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000068).WriteUInt32(account.nClientInst).WriteArray(packetData39)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000068).WriteUInt32(account.ClientInstance).WriteArray(packetData39)
                 .Send(client);
 
             var packetData40 = new byte[]
@@ -382,8 +382,8 @@ namespace GameServer
                 0x3B, 0xEE
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000070).WriteUInt32(account.nClientInst).WriteArray(packetData40)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000070).WriteUInt32(account.ClientInstance).WriteArray(packetData40)
                 .Send(client);
 
             var packetData41 = new byte[]
@@ -392,8 +392,8 @@ namespace GameServer
                 0x3B, 0xEF
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000070).WriteUInt32(account.nClientInst).WriteArray(packetData41)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000070).WriteUInt32(account.ClientInstance).WriteArray(packetData41)
                 .Send(client);
 
             var packetData42 = new byte[]
@@ -402,8 +402,8 @@ namespace GameServer
                 0x3B, 0xF0
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000070).WriteUInt32(account.nClientInst).WriteArray(packetData42)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000070).WriteUInt32(account.ClientInstance).WriteArray(packetData42)
                 .Send(client);
 
             var packetData43 = new byte[]
@@ -412,8 +412,8 @@ namespace GameServer
                 0x3B, 0xF1
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000070).WriteUInt32(account.nClientInst).WriteArray(packetData43)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000070).WriteUInt32(account.ClientInstance).WriteArray(packetData43)
                 .Send(client);
 
             var packetData44 = new byte[]
@@ -422,8 +422,8 @@ namespace GameServer
                 0x3B, 0xF2
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000070).WriteUInt32(account.nClientInst).WriteArray(packetData44)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000070).WriteUInt32(account.ClientInstance).WriteArray(packetData44)
                 .Send(client);
 
             var packetData45 = new byte[]
@@ -432,8 +432,8 @@ namespace GameServer
                 0x3B, 0xF3
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData45)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData45)
                 .Send(client);
 
             var packetData46 = new byte[]
@@ -442,8 +442,8 @@ namespace GameServer
                 0x3B, 0xF4
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData46)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData46)
                 .Send(client);
 
             var packetData47 = new byte[]
@@ -452,8 +452,8 @@ namespace GameServer
                 0x3B, 0xF5
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData47)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData47)
                 .Send(client);
 
             var packetData48 = new byte[]
@@ -462,8 +462,8 @@ namespace GameServer
                 0x3B, 0xF6
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData48)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData48)
                 .Send(client);
 
             var packetData49 = new byte[]
@@ -472,8 +472,8 @@ namespace GameServer
                 0x3B, 0xF7
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData49)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData49)
                 .Send(client);
 
             var packetData50 = new byte[]
@@ -482,8 +482,8 @@ namespace GameServer
                 0x3B, 0xF8
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData50)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData50)
                 .Send(client);
 
             var packetData51 = new byte[]
@@ -492,8 +492,8 @@ namespace GameServer
                 0x3B, 0xF9
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData51)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData51)
                 .Send(client);
 
             var packetData52 = new byte[]
@@ -502,8 +502,8 @@ namespace GameServer
                 0x3B, 0xFA
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData52)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData52)
                 .Send(client);
 
             var packetData53 = new byte[]
@@ -512,8 +512,8 @@ namespace GameServer
                 0x3B, 0xFB
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData53)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData53)
                 .Send(client);
 
             var packetData54 = new byte[]
@@ -522,8 +522,8 @@ namespace GameServer
                 0x3B, 0xFC
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData54)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData54)
                 .Send(client);
 
             var packetData55 = new byte[]
@@ -532,8 +532,8 @@ namespace GameServer
                 0x3B, 0xFD
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData55)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData55)
                 .Send(client);
 
             var packetData56 = new byte[]
@@ -542,8 +542,8 @@ namespace GameServer
                 0x3B, 0xFE
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData56)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData56)
                 .Send(client);
 
             var packetData57 = new byte[]
@@ -552,8 +552,8 @@ namespace GameServer
                 0x3B, 0xFF
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData57)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData57)
                 .Send(client);
 
             var packetData58 = new byte[]
@@ -562,8 +562,8 @@ namespace GameServer
                 0x3C, 0x00
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData58)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData58)
                 .Send(client);
 
             var packetData59 = new byte[]
@@ -572,8 +572,8 @@ namespace GameServer
                 0x3C, 0x01
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData59)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData59)
                 .Send(client);
 
             var packetData60 = new byte[]
@@ -582,8 +582,8 @@ namespace GameServer
                 0x3C, 0x02
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData60)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData60)
                 .Send(client);
 
             var packetData61 = new byte[]
@@ -592,8 +592,8 @@ namespace GameServer
                 0x3C, 0x03
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData61)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData61)
                 .Send(client);
 
             var packetData62 = new byte[]
@@ -602,8 +602,8 @@ namespace GameServer
                 0x3C, 0x04
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData62)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData62)
                 .Send(client);
 
             var packetData63 = new byte[]
@@ -612,8 +612,8 @@ namespace GameServer
                 0x3C, 0x05
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData63)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData63)
                 .Send(client);
 
             var packetData64 = new byte[]
@@ -622,8 +622,8 @@ namespace GameServer
                 0x3C, 0x06
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData64)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData64)
                 .Send(client);
 
             var packetData65 = new byte[]
@@ -632,8 +632,8 @@ namespace GameServer
                 0x3C, 0x07
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData65)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData65)
                 .Send(client);
 
             var packetData66 = new byte[]
@@ -642,8 +642,8 @@ namespace GameServer
                 0x3C, 0x08
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData66)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData66)
                 .Send(client);
 
             var packetData67 = new byte[]
@@ -652,8 +652,8 @@ namespace GameServer
                 0x3C, 0x09
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData67)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData67)
                 .Send(client);
 
             var packetData68 = new byte[]
@@ -662,8 +662,8 @@ namespace GameServer
                 0x3C, 0x0A
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData68)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData68)
                 .Send(client);
 
             var packetData69 = new byte[]
@@ -672,8 +672,8 @@ namespace GameServer
                 0x3C, 0x0B
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData69)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData69)
                 .Send(client);
 
             var packetData70 = new byte[]
@@ -682,8 +682,8 @@ namespace GameServer
                 0x3C, 0x0C
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData70)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData70)
                 .Send(client);
 
             var packetData71 = new byte[]
@@ -692,8 +692,8 @@ namespace GameServer
                 0x3C, 0x0D
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData71)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData71)
                 .Send(client);
 
             var packetData72 = new byte[]
@@ -702,8 +702,8 @@ namespace GameServer
                 0x3C, 0x0E
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData72)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData72)
                 .Send(client);
 
             var packetData73 = new byte[]
@@ -712,8 +712,8 @@ namespace GameServer
                 0x3C, 0x0F
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData73)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData73)
                 .Send(client);
 
             var packetData74 = new byte[]
@@ -722,8 +722,8 @@ namespace GameServer
                 0x3C, 0x10
             };
             new PacketStream()
-                .WriteHeader(sender1, receiver1, null, 0x0000201C, true)
-                .WriteUInt32(0x00000071).WriteUInt32(account.nClientInst).WriteArray(packetData74)
+                .WriteHeader(Sender1, Receiver1, null, 0x0000201C)
+                .WriteUInt32(0x00000071).WriteUInt32(account.ClientInstance).WriteArray(packetData74)
                 .Send(client);
         }
     }

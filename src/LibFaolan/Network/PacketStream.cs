@@ -13,8 +13,8 @@ namespace LibFaolan.Network
         {
         }
 
-        public ConanStream WriteHeader<T>(byte[] sender, byte[] receiver, byte[] headerData, T opcode,
-            bool minOpcode) where T : struct
+        public PacketStream WriteHeader<T>(byte[] sender, byte[] receiver, byte[] headerData, T opcode,
+            bool minOpcode = true) where T : struct
         {
             WriteUInt32(0); // Write empty length
             WriteUInt32(0); // write empty crc32
@@ -44,7 +44,7 @@ namespace LibFaolan.Network
             return this;
         }
 
-        public ConanStream WriteLengthHash()
+        private void WriteLengthHash()
         {
             var oldPos = Position;
             Position = 0;
@@ -54,7 +54,6 @@ namespace LibFaolan.Network
             Position = sizeof (UInt32);
             WriteUInt32(hash);
             Position = oldPos;
-            return this;
         }
 
         public override void Send(NetworkClient client)

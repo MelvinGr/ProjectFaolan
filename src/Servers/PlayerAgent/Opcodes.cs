@@ -2,7 +2,7 @@ namespace PlayerAgent
 {
     partial class PlayerAgentListener
     {
-        private enum Opcodes
+        private enum Opcodes : ushort
         {
             RequestAuth = 0x2083,
             RequestSmallCharList = 0x20c1, //0xDAD1D206,
