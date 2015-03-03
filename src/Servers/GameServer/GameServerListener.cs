@@ -11,6 +11,7 @@ namespace GameServer
     {
         public GameServerListener(ushort port, Logger logger, IDatabase database) : base(port, logger, database)
         {
+            //SpawnPlayer(null,new Account{Character = new Character(2) {Name = "Hendrik"} });
         }
 
         public override void ClientConnected(NetworkClient client)
@@ -34,10 +35,9 @@ namespace GameServer
                 case Opcodes.Hello:
                 {
                     account.nClientInst = packet.Data.ReadUInt32(); // 0x0802e5d4
-                    var unk0 = packet.Data.ReadUInt32(); // 0x310cec57
+                    account.Id = packet.Data.ReadUInt32(); // 0x310cec57
                     var clientVersion = packet.Data.ReadString();
 
-                    account.Id = 1;
                     account.LoadDetailsFromDatabase(Database);
                     account.charInfo = new Character(2);
                     account.charInfo.LoadDetailsFromDatabase(Database);
@@ -56,7 +56,7 @@ namespace GameServer
                     AckAuthentication(client, account, 1);
 
                     // what is 0x201C? client works just fine without direct noticible changes when not sending these
-                    Send0x201C(client);
+                    Send0x201C(client, account);
                     Send0x200A(client);
                     Send0x2000(client, account);
 
@@ -138,7 +138,7 @@ namespace GameServer
                     var sender = new byte[] {0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x4C};
                     var receiver = new byte[] {0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, 0xD4, 0xCB, 0x8B, 0x40};
 
-                    new ConanStream() // p.158
+                    new PacketStream() // p.158
                         .WriteHeader(sender, receiver, null, SendOpcodes.Pong, true)
                         .WriteUInt32(0x42c80000) // old = 0x42c80000, new = 0x42B32A07
                         .WriteUInt32(0)
@@ -160,12 +160,12 @@ namespace GameServer
                     var part1 = packet.Data.ReadUInt32();
                     var spawnId = packet.Data.ReadUInt32();
                     var unk0 = packet.Data.ReadUInt32();
-                    var unk1 = packet.Data.ReadUInt32();
+                    var nClientInst = packet.Data.ReadUInt32();
 
                     var sender = new byte[] {0x0d, 0x5d, 0xb9, 0xec, 0xa9, 0x10, 0x18};
                     var receiver = new byte[] {0x0d, 0x91, 0xf7, 0x87, 0x8b, 0x10, 0xe6, 0x8f, 0x80, 0x08};
 
-                    new ConanStream()
+                    new PacketStream()
                         .WriteHeader(sender, receiver, null, 0x2008, true)
                         .WriteUInt32(part1)
                         .WriteUInt32(spawnId)
@@ -175,7 +175,7 @@ namespace GameServer
                     break;
                 }
 
-                case Opcodes.GCPing: // GCPing?  p.162
+                case Opcodes.GcPing: // GCPing?  p.162
                 {
                     var counter = packet.Data.ReadUInt32();
 
@@ -185,7 +185,7 @@ namespace GameServer
                     var time = 0;
                     Other.time(ref time);
 
-                    new ConanStream()
+                    new PacketStream()
                         .WriteHeader(sender, receiver, null, 0x0000207D, true)
                         .WriteUInt32(counter)
                         .WriteUInt32(0x0000004E)
@@ -212,7 +212,7 @@ namespace GameServer
                             0x00, 0x10, 0x00
                         };
 
-                        var aBuffer = new ConanStream();
+                        var aBuffer = new PacketStream();
                         aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
                         aBuffer.WriteUInt32(0x0000001f);
                         aBuffer.WriteUInt32(0xa36d3b74);
@@ -228,7 +228,7 @@ namespace GameServer
                             0xf9, 0x00, 0x00, 0x43, 0x30, 0x00, 0x00, 0x01, 0xfb, 0x00, 0x00, 0x00, 0x00
                         };
 
-                        aBuffer = new ConanStream();
+                        aBuffer = new PacketStream();
                         aBuffer.WriteHeader(sender2, receiver2, null, 0x2000, true);
                         aBuffer.WriteUInt32(0x00000029);
                         aBuffer.WriteUInt32(0x96b8dc59);

@@ -27,7 +27,7 @@ namespace LibFaolan.Network
 
             if (_backBuffer != null)
             {
-                _stream = new ConanStream();
+                _stream = new PacketStream();
                 _stream.Write(_backBuffer, 0, _backBuffer.Length);
                 _stream.Write(receivedBytes, 0, receivedBytes.Length);
                 _backBuffer = null;

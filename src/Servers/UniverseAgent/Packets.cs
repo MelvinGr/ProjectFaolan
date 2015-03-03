@@ -12,7 +12,7 @@ namespace UniverseAgent
 
         public static void InitAuth(NetworkClient client, Account account)
         {
-            new ConanStream()
+            new PacketStream()
                 .WriteHeader(Sender, Receiver, null, 0x2000, true)
                 .WriteString(account.AuthChallenge)
                 .Send(client);
@@ -20,7 +20,7 @@ namespace UniverseAgent
 
         public static void SetRegionState(NetworkClient client, Account account)
         {
-            new ConanStream()
+            new PacketStream()
                 .WriteHeader(Sender, Receiver2, null, 0x2005, true)
                 .WriteArray(0x01, 0x01, 0x01, 0x01, 0x3f, 0x80, 0x00, 0x00, 0x3f, 0x80, 0x00, 0x00, 0x01, 0x01, 0x00)
                 .Send(client);
@@ -50,7 +50,7 @@ namespace UniverseAgent
 
         public static void SendPlayerAgentRealm(NetworkClient client, Account account)
         {
-            new ConanStream()
+            new PacketStream()
                 .WriteHeader(Sender, Receiver2, null, 0x2001, true)
                 .WriteUInt32(0x01) // authstatus
                 .WriteUInt64(account.LongId)

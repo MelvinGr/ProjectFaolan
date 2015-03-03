@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using LibFaolan.Data;
 using LibFaolan.Extentions;
 using LibFaolan.Network;
@@ -20,6 +18,8 @@ namespace GameServer
         private static readonly byte[] receiver4 = {0x0d, 0x91, 0xf7, 0x87, 0x8b, 0x10, 0x84, 0x80, 0x80, 0x08};
         private static readonly byte[] sender5 = {0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x0b};
         private static readonly byte[] receiver5 = {0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0xe6, 0x8f, 0x80, 0x08};
+        private static readonly byte[] sender6 = {0x0d, 0x5d, 0xb9, 0xec, 0xa9, 0x10, 0x0b};
+        private static readonly byte[] receiver6 = {0x0d, 0x91, 0xf7, 0x87, 0x8b, 0x10, 0xe6, 0x8f, 0x80, 0x08};
 
         private void Handle0x2000(NetworkClient client, Account account, Packet packet)
         {
@@ -30,7 +30,7 @@ namespace GameServer
                 var sId3 = packet.Data.ReadUInt32();
                 var sId4 = packet.Data.ReadUInt32();
 
-                var aBuffer = new ConanStream();
+                var aBuffer = new PacketStream();
                 aBuffer.WriteHeader(sender3, receiver3, null, 0x2000, true);
                 aBuffer.WriteUInt32(sId3);
                 aBuffer.WriteUInt32(sId4);
@@ -40,54 +40,50 @@ namespace GameServer
             else
             {
                 var pbLength = packet.Data.ReadUInt32();
-                var pbOpcode = (GameServer.GameServerListener.DataOpcodes) packet.Data.ReadUInt32();
+                var pbOpcode = (DataOpcodes) packet.Data.ReadUInt32();
                 Logger.WriteLine("Received data opcode: " + pbOpcode + " (" + pbOpcode.ToHex() + ")");
                 switch (pbOpcode)
                 {
-                    case GameServer.GameServerListener.DataOpcodes.Oxf98e10b3:
+                    case DataOpcodes.Oxf98E10B3:
                     {
                         Handle0xf98e10b3(client, account, packet);
                         break;
                     }
-                    case GameServer.GameServerListener.DataOpcodes.Ox36d3b74:
+                    case DataOpcodes.Ox36D3B74:
                     {
                         Handle0xa36d3b74(client, account, packet);
                         break;
                     }
-                    case GameServer.GameServerListener.DataOpcodes.Move:
+                    case DataOpcodes.Move:
                     {
                         var dataobjdec = packet.Data.ReadUInt32();
                         var dataclientinst = packet.Data.ReadUInt32();
-                        var movingType = (GameServer.GameServerListener.MovingTypes) packet.Data.ReadUInt16();
+                        var movingType = (MovingTypes) packet.Data.ReadUInt16();
 
                         Logger.WriteLine("Moving type: " + movingType + "(" + movingType.ToHex() + ")");
 
                         switch (movingType)
                         {
-                            case GameServer.GameServerListener.MovingTypes.Run: //MELVIN
-                            case GameServer.GameServerListener.MovingTypes.Walk: //MELVIN
-                            case GameServer.GameServerListener.MovingTypes.Ox011a:
-                            case GameServer.GameServerListener.MovingTypes.Ox011e:
-                            case GameServer.GameServerListener.MovingTypes.Ox001e:
-                            case GameServer.GameServerListener.MovingTypes.Ox001a:
+                            case MovingTypes.Run: //MELVIN
+                            case MovingTypes.Walk: //MELVIN
+                            case MovingTypes.Ox011A:
+                            case MovingTypes.Ox011E:
+                            case MovingTypes.Ox001E:
+                            case MovingTypes.Ox001A:
                             {
-                                var charCoordX = packet.Data.ReadUInt32();
-                                var charCoordY = packet.Data.ReadUInt32();
-                                var charCoordZ = packet.Data.ReadUInt32();
+                                var charCoords = packet.Data.ReadVector3();
                                 var datadat = packet.Data.ReadArray(pbLength - ((6*4) + (1*2)));
 
-                                var aBuffer = new ConanStream();
+                                var aBuffer = new PacketStream();
                                 aBuffer.WriteHeader(sender5, receiver5, null, 0x2000, true);
                                 aBuffer.WriteUInt32(pbLength);
-                                aBuffer.WriteUInt32((UInt32) pbOpcode);
+                                aBuffer.WriteUInt32(pbOpcode);
                                 aBuffer.WriteUInt32(dataobjdec);
                                 aBuffer.WriteUInt32(dataclientinst);
-                                aBuffer.WriteUInt16((UInt16) movingType);
-                                aBuffer.WriteUInt32(charCoordX);
-                                aBuffer.WriteUInt32(charCoordY);
-                                aBuffer.WriteUInt32(charCoordZ);
+                                aBuffer.WriteUInt16(movingType);
+                                aBuffer.WriteVector3(charCoords);
                                 //aBuffer.WriteArray(datadat, (pbLength - ((6 * 4) + (1 * 2))));
-                                aBuffer.WriteArray(datadat.Take((int) pbLength - ((6*4) + (1*2))).ToArray());
+                                aBuffer.WriteArray(datadat);
 
                                 aBuffer.Send(client);
                                 break;
@@ -100,10 +96,8 @@ namespace GameServer
                         }
                         break;
                     }
-                    case GameServer.GameServerListener.DataOpcodes.ReadyForPlayScreen: //peer0_160
+                    case DataOpcodes.ReadyForPlayScreen: //peer0_160
                     {
-                        var sender1_0 = new byte[] {0x0d, 0x5d, 0xb9, 0xec, 0xa9, 0x10, 0x0b};
-                        var receiver1_0 = new byte[] {0x0d, 0x91, 0xf7, 0x87, 0x8b, 0x10, 0xe6, 0x8f, 0x80, 0x08};
                         var blobData1 = new byte[]
                         {
                             0x43, 0xa7, 0x40, 0x00,
@@ -122,8 +116,8 @@ namespace GameServer
                             0x00
                         };
 
-                        var aBuffer = new ConanStream();
-                        aBuffer.WriteHeader(sender1_0, receiver1_0, null, 0x2024, true);
+                        var aBuffer = new PacketStream();
+                        aBuffer.WriteHeader(sender6, receiver6, null, 0x2024, true);
                         aBuffer.WriteArray(blobData1);
                         aBuffer.Send(client);
 
@@ -137,7 +131,7 @@ namespace GameServer
                         {
                             0x00, 0x09
                         };
-                        aBuffer = new ConanStream();
+                        aBuffer = new PacketStream();
                         aBuffer.WriteHeader(sender5, receiver5, null, 0x2000, true);
                         aBuffer.WriteArray(blobData2);
                         aBuffer.WriteUInt32(account.nClientInst);
@@ -148,7 +142,7 @@ namespace GameServer
                         {
                             0x00, 0x00, 0x00, 0x0d, 0x86, 0x4c, 0xfe, 0xf8, 0x00, 0x00, 0xc3, 0x50
                         };
-                        aBuffer = new ConanStream();
+                        aBuffer = new PacketStream();
                         aBuffer.WriteHeader(sender5, receiver5, null, 0x2000, true);
                         aBuffer.WriteArray(blobData3);
                         aBuffer.WriteUInt32(account.nClientInst);
@@ -160,7 +154,7 @@ namespace GameServer
 
                         break;
                     }
-                    case GameServer.GameServerListener.DataOpcodes.InteractWithObject:
+                    case DataOpcodes.InteractWithObject:
                     {
                         var cInstPreId = packet.Data.ReadUInt32();
                         var clientInst = packet.Data.ReadUInt32();
@@ -176,7 +170,7 @@ namespace GameServer
 
                         break;
                     }
-                    case GameServer.GameServerListener.DataOpcodes.CloseGame:
+                    case DataOpcodes.CloseGame:
                     {
                         var unk0 = packet.Data.ReadUInt32();
                         var accountID = packet.Data.ReadUInt32();
@@ -184,9 +178,9 @@ namespace GameServer
                         Logger.WriteLine("Received close game! (x button)");
                         break;
                     }
-                    case GameServer.GameServerListener.DataOpcodes.AchievementNPC:
+                    case DataOpcodes.SelectDeselect:
                     {
-                        Logger.WriteLine("AchievementNPC!");
+                        Logger.WriteLine("SelectDeselect!");
 
                         break;
                     }

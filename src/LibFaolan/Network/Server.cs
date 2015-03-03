@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Hik.Communication.Scs.Communication.EndPoints.Tcp;
@@ -11,6 +12,9 @@ namespace LibFaolan.Network
     {
         protected Server(ushort port, Logger logger, IDatabase database)
         {
+            if (logger == null || database == null)
+                throw new Exception("logger == null || database == null");
+
             Port = port;
             Logger = logger;
             Database = database;

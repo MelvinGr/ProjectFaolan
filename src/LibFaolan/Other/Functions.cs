@@ -42,7 +42,7 @@ namespace LibFaolan.Other
         {
             if (stream.Position == stream.Length)
             {
-                stream = new ConanStream();
+                stream = new PacketStream();
                 return;
             }
 

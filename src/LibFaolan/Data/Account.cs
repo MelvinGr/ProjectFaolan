@@ -48,6 +48,7 @@ namespace LibFaolan.Data
             Cookie = obj["cookie"];
             Username = obj["username"];
             Kind = obj["kind"];
+            nClientInst = 0x0802E5D4;
         }
 
         public bool IsBanned(IDatabase database)
