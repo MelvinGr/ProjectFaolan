@@ -13,7 +13,6 @@
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
-    <NuGetPackageImportStamp>3ceb108a</NuGetPackageImportStamp>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
     <DebugSymbols>true</DebugSymbols>
@@ -29,11 +28,10 @@
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="MySql.Data">
-      <HintPath>..\packages\MySQL.NET.6.6.4\lib\net40\MySql.Data.dll</HintPath>
+      <HintPath>..\MySql.Data.dll</HintPath>
     </Reference>
-    <Reference Include="Scs, Version=1.1.0.1, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\other\Scs.dll</HintPath>
+    <Reference Include="Scs">
+      <HintPath>..\Scs.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -47,33 +45,35 @@
     <Compile Include="Database\MySqlDatabase.cs" />
     <Compile Include="Data\Account.cs" />
     <Compile Include="Data\Character.cs" />
+    <Compile Include="Data\ConanMap.cs" />
     <Compile Include="Data\Realm.cs" />
     <Compile Include="Extentions\ArrayExtentions.cs" />
     <Compile Include="Extentions\DictionaryExtentions.cs" />
     <Compile Include="Extentions\ToHexExtentions.cs" />
+    <Compile Include="Extentions\TryParseExtentions.cs" />
     <Compile Include="Math\MathHelper.cs" />
     <Compile Include="Math\Vector3.cs" />
+    <Compile Include="Network\ProtocolFactory.cs" />
     <Compile Include="Network\PacketStream.cs" />
+    <Compile Include="Network\SendPacket.cs" />
     <Compile Include="Other\Functions.cs" />
     <Compile Include="Other\Logger.cs" />
     <Compile Include="DllImport\DllImport.cs" />
-    <Compile Include="Network\Packet.cs" />
+    <Compile Include="Network\ConanPacket.cs" />
     <Compile Include="Network\NetworkClient.cs" />
     <Compile Include="Network\ConanStream.cs" />
     <Compile Include="Network\Server.cs" />
-    <Compile Include="Network\WireProtocol.cs" />
+    <Compile Include="Network\ConanWireProtocol.cs" />
     <Compile Include="Other\PacketUtills.cs" />
+    <None Include="Properties\AssemblyInfo.base.cs" />
+    <Compile Include="Other\Statics.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
-  <ItemGroup>
-    <None Include="packages.config" />
-  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
+  <UsingTask TaskName="GitVersionFile" AssemblyFile="..\MSBuildVersioning.dll" />
   <Target Name="BeforeBuild">
+    <GitVersionFile TemplateFile="Properties\AssemblyInfo.base.cs" DestinationFile="Properties\AssemblyInfo.cs" />
   </Target>
   <Target Name="AfterBuild">
   </Target>
-  -->
 </Project>

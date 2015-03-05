@@ -6,7 +6,7 @@ using LibFaolan.Other;
 
 namespace UniverseAgent
 {
-    public partial class UniverseAgentListener : Server
+    public partial class UniverseAgentListener : Server<ConanPacket, ProtocolFactory<ConanWireProtocol>>
     {
         public UniverseAgentListener(ushort port, Logger logger, IDatabase database)
             : base(port, logger, database)
@@ -18,7 +18,7 @@ namespace UniverseAgent
             client.Tag = new Account();
         }
 
-        public override void ReceivedPacket(NetworkClient client, Packet packet)
+        public override void ReceivedPacket(NetworkClient client, ConanPacket packet)
         {
             Logger.WriteLine("Received opcode: " + (Opcodes) packet.Opcode + " (" + packet.Opcode.ToHex() + ")");
             var account = (Account) client.Tag;

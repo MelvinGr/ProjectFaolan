@@ -5,7 +5,7 @@ namespace GameServer
 {
     partial class GameServerListener
     {
-        private void HandleNewCharacter(NetworkClient client, Account account, Packet packet)
+        private void HandleNewCharacter(NetworkClient client, Account account, ConanPacket packet)
         {
             var blobData7 = new byte[]
             {

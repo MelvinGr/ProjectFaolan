@@ -1,13 +1,17 @@
 using System;
-using System.Collections.ObjectModel;
+using System.Collections.Concurrent;
 using Hik.Communication.Scs.Communication.EndPoints.Tcp;
+using Hik.Communication.Scs.Communication.Messages;
+using Hik.Communication.Scs.Communication.Protocols;
 using Hik.Communication.Scs.Server;
 using LibFaolan.Database;
 using LibFaolan.Other;
 
 namespace LibFaolan.Network
 {
-    public abstract class Server
+    public abstract class Server<TPacketType, TWireProtocolFactory>
+        where TPacketType : IScsMessage
+        where TWireProtocolFactory : IScsWireProtocolFactory, new()
     {
         private readonly IScsServer _scsServer;
         public readonly IDatabase Database;
@@ -24,13 +28,12 @@ namespace LibFaolan.Network
             Database = database;
 
             _scsServer = ScsServerFactory.CreateServer(new ScsTcpEndPoint(port));
-            _scsServer.WireProtocolFactory = new WireProtocol.ProtocolFactory();
+            _scsServer.WireProtocolFactory = new TWireProtocolFactory();
             _scsServer.ClientConnected += Internal_ClientConnected;
             _scsServer.ClientDisconnected += (s, e) => ClientDisconnected((NetworkClient) e.Client.Tag);
         }
 
-        public ReadOnlyCollection<IScsServerClient> Clients
-            => (ReadOnlyCollection<IScsServerClient>) _scsServer.Clients.Values;
+        public ConcurrentDictionary<long, IScsServerClient> Clients => _scsServer.Clients;
 
         public bool Start()
         {
@@ -62,7 +65,7 @@ namespace LibFaolan.Network
         {
             e.Client.Tag = new NetworkClient(e.Client);
             e.Client.MessageReceived += (s, ee) =>
-                ReceivedPacket((NetworkClient) ((IScsServerClient) s).Tag, (Packet) ee.Message);
+                ReceivedPacket((NetworkClient) ((IScsServerClient) s).Tag, (TPacketType) ee.Message);
 
             ClientConnected((NetworkClient) e.Client.Tag);
         }
@@ -77,6 +80,6 @@ namespace LibFaolan.Network
             Logger.WriteLine("Client with address: " + client.IpAddress + " disconnected!");
         }
 
-        public abstract void ReceivedPacket(NetworkClient client, Packet packet);
+        public abstract void ReceivedPacket(NetworkClient client, TPacketType packet);
     }
 }

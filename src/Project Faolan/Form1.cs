@@ -1,9 +1,16 @@
 using System;
 using System.Windows.Forms;
+using AgentServer;
+using CSPlayerAgent;
+using GameServer;
+using Hik.Communication.Scs.Communication.Messages;
+using Hik.Communication.Scs.Communication.Protocols;
 using LibFaolan.Config;
 using LibFaolan.Database;
 using LibFaolan.Network;
 using LibFaolan.Other;
+using PlayerAgent;
+using UniverseAgent;
 
 namespace ProjectFaolan
 {
@@ -30,6 +37,8 @@ namespace ProjectFaolan
         {
             base.OnShown(e);
 
+            _logger.WriteLine(LibFaolan.Other.Statics.BuildInfo);
+
             if (Settings.Load(ConfigPath))
                 _logger.WriteLine("Loaded settings from: '" + ConfigPath + "'");
             else
@@ -53,33 +62,52 @@ namespace ProjectFaolan
         private Logger GetLogger(string tag) => new Logger(tag) {TextWriter = _consoleStream};
 
         private void universeAgentButton_Click(object sender, EventArgs e)
-            => StartServer(Settings.UniverseAgentPort, out Statics.UniverseAgent);
+        {
+            var logger = GetLogger("[" + typeof (UniverseAgentListener).Name + "] ");
+            Statics.UniverseAgent = new UniverseAgentListener(Settings.UniverseAgentPort, logger, Statics.MySqlDatabase);
+            StartServer(Statics.UniverseAgent);
+        }
 
         private void playerAgentButton_Click(object sender, EventArgs e)
-            => StartServer(Settings.PlayerAgentPort, out Statics.PlayerAgent);
+        {
+            var logger = GetLogger("[" + typeof (PlayerAgentListener).Name + "] ");
+            Statics.PlayerAgent = new PlayerAgentListener(Settings.PlayerAgentPort, logger, Statics.MySqlDatabase);
+            StartServer(Statics.PlayerAgent);
+        }
 
         private void csPlayerAgentButton_Click(object sender, EventArgs e)
-            => StartServer(Settings.CsPlayerAgentPort, out Statics.CsplayerAgent);
+        {
+            var logger = GetLogger("[" + typeof (CsPlayerAgentListener).Name + "] ");
+            Statics.CsplayerAgent = new CsPlayerAgentListener(Settings.CsPlayerAgentPort, logger, Statics.MySqlDatabase);
+            StartServer(Statics.CsplayerAgent);
+        }
 
         private void agentServerButton_Click(object sender, EventArgs e)
-            => StartServer(Settings.AgentServerPort, out Statics.AgentServer);
+        {
+            var logger = GetLogger("[" + typeof (AgentServerListener).Name + "] ");
+            Statics.AgentServer = new AgentServerListener(Settings.AgentServerPort, logger, Statics.MySqlDatabase);
+            StartServer(Statics.AgentServer);
+        }
 
         private void gameServerButton_Click(object sender, EventArgs e)
-            => StartServer(Settings.GameServerPort, out Statics.GameServer);
-
-        private bool StartServer<T>(ushort port, out T ret) where T : Server
         {
-            var logger = GetLogger("[" + typeof (T).Name + "] ");
-            var server = (T) Activator.CreateInstance(typeof (T), port, logger, Statics.MySqlDatabase);
+            var logger = GetLogger("[" + typeof (GameServerListener).Name + "] ");
+            Statics.GameServer = new GameServerListener(Settings.GameServerPort, logger, Statics.MySqlDatabase,
+                Statics.AgentServer);
+            StartServer(Statics.GameServer);
+        }
+
+        private bool StartServer<TPacketType, TWireProtocolFactory>(Server<TPacketType, TWireProtocolFactory> server)
+            where TPacketType : IScsMessage
+            where TWireProtocolFactory : IScsWireProtocolFactory, new()
+        {
             if (server.Start())
             {
-                logger.WriteLine("Started on port: " + server.Port);
-                ret = server;
+                server.Logger.WriteLine("Started on port: " + server.Port);
                 return true;
             }
 
-            logger.WriteLine("Failed to start on port: " + server.Port);
-            ret = null;
+            server.Logger.WriteLine("Failed to start on port: " + server.Port);
             return false;
         }
     }

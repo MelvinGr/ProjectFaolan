@@ -8,7 +8,7 @@ using LibFaolan.Other;
 
 namespace PlayerAgent
 {
-    public partial class PlayerAgentListener : Server
+    public partial class PlayerAgentListener : Server<ConanPacket, ProtocolFactory<ConanWireProtocol>>
     {
         public PlayerAgentListener(ushort port, Logger logger, IDatabase database) : base(port, logger, database)
         {
@@ -34,7 +34,7 @@ namespace PlayerAgent
             client.Tag = new Account();
         }
 
-        public override void ReceivedPacket(NetworkClient client, Packet packet)
+        public override void ReceivedPacket(NetworkClient client, ConanPacket packet)
         {
             Logger.WriteLine("Received opcode: " + (Opcodes) packet.Opcode + " (" + packet.Opcode.ToHex() + ")");
             var account = (Account) client.Tag;
@@ -116,8 +116,6 @@ namespace PlayerAgent
                     var sender = new byte[] {0x0d, 0x84, 0x04, 0xf2, 0x82, 0x10, 0x03};
                     var receiver = new byte[] {0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0xeb, 0x8e, 0x95, 0xbf, 0x05};
 
-                    account.ClientInstance = 0xdeadbeef;
-
                     new PacketStream()
                         .WriteHeader(sender, receiver, headerData, 0x20b9)
                         .WriteUInt32(0x0000c350)
@@ -139,7 +137,7 @@ namespace PlayerAgent
                 {
                     // packet has no data
 
-                    SendPlayerAgent(client, account);
+                    SendAgentServer(client, account);
                     SendCsPlayerAgent(client, account);
                     SendGameServer(client, account);
                     SendLast(client, account);

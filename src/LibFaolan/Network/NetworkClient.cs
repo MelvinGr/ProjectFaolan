@@ -34,7 +34,7 @@ namespace LibFaolan.Network
         {
             try
             {
-                _client.SendMessage(new WireProtocol.SendPacket(value));
+                _client.SendMessage(new SendPacket(value));
             }
             catch
             {

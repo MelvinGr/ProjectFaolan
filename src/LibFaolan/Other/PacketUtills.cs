@@ -11,7 +11,7 @@ namespace LibFaolan.Other
         private static readonly Dictionary<string, string> Senders = new Dictionary<string, string>();
         private static readonly Dictionary<string, string> Receivers = new Dictionary<string, string>();
 
-        public static string ChainedPacketToCsCode(Packet packet, int id)
+        public static string ChainedPacketToCsCode(ConanPacket packet, int id)
         {
             var hasHeaderData = (packet.HeaderData != null && packet.HeaderData.Length > 0);
             var headerDataName = (hasHeaderData ? "headerdata" + id : "null");
@@ -62,7 +62,7 @@ namespace LibFaolan.Other
             return var;
         }
 
-        public static string PacketToString(Packet packet)
+        public static string PacketToString(ConanPacket packet)
         {
             var var =
                 string.Format("UInt32\tlength\t\t=\t{0}\r\n", packet.Length) +
@@ -85,7 +85,7 @@ namespace LibFaolan.Other
             return var;
         }
 
-        public static string PacketToCsCode(Packet packet, string comment = null)
+        public static string PacketToCsCode(ConanPacket packet, string comment = null)
         {
             var var =
                 (comment != null ? "// " + comment + "\r\n" : "") +
@@ -111,7 +111,7 @@ namespace LibFaolan.Other
             return var;
         }
 
-        public static void PacketDataToFile(Packet packet, string path)
+        public static void PacketDataToFile(ConanPacket packet, string path)
         {
             File.WriteAllBytes(path, packet.Data.ToArray());
         }
