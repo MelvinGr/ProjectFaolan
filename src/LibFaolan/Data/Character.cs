@@ -25,9 +25,8 @@ namespace LibFaolan.Data
         public Vector3 Rotation;
         public byte Sex;
         public byte Size;
+        public byte SkinColour; //0x03 = female ; 0x04 = male ; 0x02 = male
         public byte Voice;
-        public byte SkinColour;//0x03 = female ; 0x04 = male ; 0x02 = male
-#warning load skin colour from database
 
         public Character(uint id)
         {

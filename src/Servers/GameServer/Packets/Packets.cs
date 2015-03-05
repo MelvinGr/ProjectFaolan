@@ -67,7 +67,7 @@ namespace GameServer
 
             new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
                 .WriteArrayPrependLengthUInt32(new ConanStream()
-                    .WriteUInt32(0x06ec1255) // opcode..(?)
+                    .WriteUInt32(0x06ec1255) 
                     .WriteUInt32(0x0000c350)
                     .WriteUInt32(account.ClientInstance)
                     .WriteUInt16(0x0009))
@@ -75,7 +75,7 @@ namespace GameServer
 
             new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
                 .WriteArrayPrependLengthUInt32(new ConanStream()
-                    .WriteUInt32(0x864cfef8) // opcode..(?)
+                    .WriteUInt32(0x864cfef8)
                     .WriteUInt32(0x0000c350)
                     .WriteUInt32(account.ClientInstance)
                     .WriteByte(0))

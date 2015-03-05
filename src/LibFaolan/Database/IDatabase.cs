@@ -5,6 +5,7 @@ namespace LibFaolan.Database
 {
     public interface IDatabase
     {
+        ConanMap[] AllMaps { get; }
         bool Connect();
         void Disconnect();
         bool IsConnected();
@@ -16,10 +17,8 @@ namespace LibFaolan.Database
         T ExecuteScalar<T>(string query);
         // ...
         IEnumerable<Dictionary<string, dynamic>> ExecuteDynamic(string query);
-        
         //////////////////////////////////////////////////////////////////////////////////////////////
 
         bool CheckLogin(string username, string password);
-        ConanMap[] AllMaps { get; }
     }
 }
