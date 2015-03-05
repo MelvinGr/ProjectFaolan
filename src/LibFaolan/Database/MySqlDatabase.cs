@@ -12,6 +12,7 @@ namespace LibFaolan.Database
     public sealed class MySqlDatabase : IDatabase
     {
         private readonly MySqlConnection _connection;
+        private ConanMap[] _allMaps;
 
         public MySqlDatabase(string server, uint port, string database, string user, string password)
         {
@@ -54,7 +55,7 @@ namespace LibFaolan.Database
 
         public T ExecuteScalar<T>(string query)
         {
-            return (T)new MySqlCommand(query, _connection).ExecuteScalar();
+            return (T) new MySqlCommand(query, _connection).ExecuteScalar();
         }
 
         public IEnumerable<Dictionary<string, dynamic>> ExecuteDynamic(string query)
@@ -77,8 +78,6 @@ namespace LibFaolan.Database
                                          "' AND password = '" + password + "'") != null;
         }
 
-        private ConanMap[] _allMaps;
-
         public ConanMap[] AllMaps
         {
             get
@@ -87,10 +86,10 @@ namespace LibFaolan.Database
                 {
                     Id = (UInt32) c["map_id"],
                     Name = c["map_name"],
-                    Position = new Vector3(/*float.Parse */ (c["position_0"]), /*float.Parse */ (c["position_1"]),
+                    Position = new Vector3( /*float.Parse */ (c["position_0"]), /*float.Parse */ (c["position_1"]),
                         /*float.Parse*/(c["position_2"])),
-                    Rotation = new Vector3(/*float.Parse*/(c["rotation_0"]), /*float.Parse */ (c["rotation_1"]),
-                        /*float.Parse */ (c["rotation_2"])),
+                    Rotation = new Vector3( /*float.Parse*/(c["rotation_0"]), /*float.Parse */ (c["rotation_1"]),
+                        /*float.Parse */ (c["rotation_2"]))
                 }).ToArray());
             }
         }
