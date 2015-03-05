@@ -6,7 +6,7 @@ namespace GameServer
 {
     partial class GameServerListener
     {
-        private void HandleCommandPacket(NetworkClient client, Account account, Packet packet)
+        private void HandleCommandPacket(NetworkClient client, Account account, ConanPacket packet)
         {
             var recObjTyp = packet.Data.ReadUInt32();
             var recClientInst = packet.Data.ReadUInt32();

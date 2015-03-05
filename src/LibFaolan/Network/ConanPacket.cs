@@ -4,7 +4,7 @@ using LibFaolan.Extentions;
 
 namespace LibFaolan.Network
 {
-    public sealed class Packet : IScsMessage
+    public class ConanPacket : IScsMessage
     {
         /////////
         /*
@@ -34,7 +34,7 @@ namespace LibFaolan.Network
         public byte Sender;
         public byte[] SenderInt;
 
-        public Packet(ConanStream stream)
+        public ConanPacket(ConanStream stream)
         {
             _originalStream = stream;
             stream.Position = 0;

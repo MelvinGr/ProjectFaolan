@@ -22,7 +22,15 @@ namespace UniverseAgent
         {
             new PacketStream()
                 .WriteHeader(Sender, Receiver2, null, 0x2005)
-                .WriteArray(0x01, 0x01, 0x01, 0x01, 0x3f, 0x80, 0x00, 0x00, 0x3f, 0x80, 0x00, 0x00, 0x01, 0x01, 0x00)
+                .WriteArray
+                (
+                    0x01, 0x01, 0x01, 0x01,
+                    0x3f, 0x80,
+                    0x00, 0x00,
+                    0x3f, 0x80,
+                    0x00, 0x00, 0x01, 0x01,
+                    0x00
+                )
                 .Send(client);
         }
 
@@ -55,7 +63,8 @@ namespace UniverseAgent
                 .WriteUInt32(0x01) // authstatus
                 .WriteUInt64(account.LongId)
                 .WriteString(Settings.PlayerAgentAddress + ":" + Settings.PlayerAgentPort)
-                .WriteArray(0x31, 0x0c, 0xec, 0x57, 0x00, 0x00, 0x00, 0x00)
+                .WriteUInt32(0x310cec57)
+                .WriteUInt32(0x00000000)
                 .Send(client);
         }
     }

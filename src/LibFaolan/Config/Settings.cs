@@ -1,4 +1,5 @@
 using System;
+using LibFaolan.Other;
 
 namespace LibFaolan.Config
 {
@@ -21,6 +22,12 @@ namespace LibFaolan.Config
         public static string MySqlDatabase;
         public static string MySqlUsername;
         public static string MySqlPassword;
+        public static string WelcomeString;
+
+        public static string UserWelcomeString => WelcomeString
+            .Replace("$BuildDate$", Statics.BuildDate)
+            .Replace("$BuildHash$", Statics.BuildHash)
+            .Replace("\n", "<br />");
 
         public static bool Load(string path)
         {
@@ -51,6 +58,8 @@ namespace LibFaolan.Config
                 MySqlDatabase = _ini.GetValue("MySqlDatabase");
                 MySqlUsername = _ini.GetValue("MySqlUsername");
                 MySqlPassword = _ini.GetValue("MySqlPassword");
+
+                WelcomeString = _ini.GetValue("WelcomeString");
 
                 return true;
             }

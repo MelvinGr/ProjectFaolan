@@ -4,7 +4,7 @@ namespace GameServer
 {
     partial class GameServerListener
     {
-        private void SendSpawnNPCAndPlayersTest(NetworkClient client)
+        private static void SendSpawnNPCAndPlayersTest(NetworkClient client)
         {
             var packetData98 = new byte[]
             {

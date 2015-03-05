@@ -194,3 +194,7 @@ FakesAssemblies/
 
 # Visual Studio 6 workspace options file
 *.opt
+
+# is auto generated
+src/LibFaolan/Properties/AssemblyInfo.cs
+

@@ -12,11 +12,12 @@ namespace PlayerAgent
     {
         private static readonly byte[] Sender = {0x0d, 0x84, 0x04, 0xf2, 0x82, 0x10, 0x02};
         private static readonly byte[] Receiver = {0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0xeb, 0x8e, 0x95, 0xbf, 0x05};
-        private static readonly byte[] Sender2 = {0x0d, 0x16, 0x91, 0x35, 0x1d, 0x10, 0x14};
         private static readonly byte[] Sender3 = {0x0D, 0x16, 0x91, 0x35, 0x1D, 0x10, 0x46};
         private static readonly byte[] Receiver3 = {0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0xEC, 0xEB, 0x80, 0xDE, 0x03};
         private static readonly byte[] Sender4 = {0x0D, 0x84, 0x04, 0xF2, 0x82, 0x10, 0x03};
         private static readonly byte[] Receiver4 = {0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0xEC, 0xEB, 0x80, 0xDE, 0x03};
+        private static readonly byte[] sender0 = {0x0D, 0x16, 0x91, 0x35, 0x1D, 0x10, 0x4C};
+        private static readonly byte[] receiver0 = {0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0xEC, 0xEB, 0x80, 0xDE, 0x03};
 
         public void InitAuth(NetworkClient client, Account account)
         {
@@ -150,11 +151,10 @@ namespace PlayerAgent
 
         public void SendCsPlayerAgent(NetworkClient client, Account account)
         {
-            // fs21.bin_0
-            byte[] headerData = {0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE0, 0xD4, 0xB4, 0xD7, 0x05};
+            var headerdata0 = new byte[] {0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE0, 0xD4, 0xB4, 0xD7, 0x05};
 
             new PacketStream() // send CSPlayerAgent
-                .WriteHeader(Sender3, Receiver3, headerData, 0x1A07)
+                .WriteHeader(Sender3, Receiver3, headerdata0, 0x1A07)
                 .WriteUInt32(Network.htonl(Network.inet_addr(Settings.CsPlayerAgentAddress)))
                 .WriteUInt16(Settings.CsPlayerAgentPort)
                 .WriteUInt32(account.Id)
@@ -163,16 +163,14 @@ namespace PlayerAgent
                 .Send(client);
         }
 
-        public void SendPlayerAgent(NetworkClient client, Account account)
+        public void SendAgentServer(NetworkClient client, Account account)
         {
-            // fs21.bin_1
-            var headerData = new byte[]
-            {0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xFA, 0xE5, 0x98, 0x9D, 0x02};
+            var headerdata0 = new byte[] {0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xFA, 0xE5, 0x98, 0x9D, 0x02};
 
             new PacketStream() // Send PlayerAgent
-                .WriteHeader(Sender3, Receiver3, headerData, 0x1A07)
-                .WriteUInt32(Network.htonl(Network.inet_addr(Settings.PlayerAgentAddress)))
-                .WriteUInt16(Settings.PlayerAgentPort)
+                .WriteHeader(sender0, receiver0, headerdata0, 0x1A07)
+                .WriteUInt32(Network.htonl(Network.inet_addr(Settings.AgentServerAddress)))
+                .WriteUInt16(Settings.AgentServerPort)
                 .WriteUInt32(account.Id)
                 .WriteUInt32(0x0000c350)
                 .WriteUInt32(account.ClientInstance)

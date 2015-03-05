@@ -12,7 +12,8 @@ namespace GameServer
             Ox206A = 0x206a,
             Ox207B = 0x207b,
             Ox205A = 0x205a,
-            ManualRemoveBuff = 0x201D
+            ManualRemoveBuff = 0x201D,
+            ChatCommand = 0x2002
         };
 
         private enum SendOpcodes : ushort
@@ -40,16 +41,19 @@ namespace GameServer
             Ox4F57DC08 = 0x4F57DC08,
             Ox642CD3D6 = 0x642CD3D6,
             Ox96C46740 = 0x96C46740,
-            Ox6B87E316 = 0x6B87E316,
+            ApplySpell = 0x6B87E316,
             OxF98E10B3 = 0xF98E10B3,
-            Ox96B8DC59 = 0x96B8DC59,
+            SitOnMount = 0x96B8DC59, // Does not apply buff
             Ox737A6DF9 = 0x737A6DF9
         };
 
         private enum MovingTypes : ushort
         {
-            Run = 0x010a, // not sure
-            Walk = 0x010e, // not sure
+            Run = 0x010a,
+            Walk = 0x010e,
+            Jump = 0x0156,
+            WalkJump = 0x0152,
+            MountedJump = 0x0142,
             Ox011A = 0x011a,
             Ox011E = 0x011e,
             Ox001E = 0x001e,

@@ -2,11 +2,12 @@ using System;
 using System.Collections.Generic;
 using Hik.Communication.Scs.Communication.Messages;
 using Hik.Communication.Scs.Communication.Protocols;
+using LibFaolan.Network;
 using LibFaolan.Other;
 
-namespace LibFaolan.Network
+namespace AgentServer
 {
-    public sealed class WireProtocol : IScsWireProtocol
+    public sealed class AgentServerWireProtocol : IScsWireProtocol
     {
         private byte[] _backBuffer;
         private ConanStream _stream;
@@ -14,14 +15,6 @@ namespace LibFaolan.Network
         public IEnumerable<IScsMessage> CreateMessages(byte[] receivedBytes)
         {
             var messages = new List<IScsMessage>();
-
-            // zlib compression (0x80000005) (Client sends start packet, but does not use compression?)
-            if (receivedBytes[0] == 0x80 && receivedBytes[1] == 0x00 &&
-                receivedBytes[2] == 0x00 && receivedBytes[3] == 0x05)
-            {
-                //Console.WriteLine("Skipping zlib packet");
-                return messages;
-            }
 
             if (_backBuffer != null)
             {
@@ -39,7 +32,7 @@ namespace LibFaolan.Network
 
         public byte[] GetBytes(IScsMessage message)
         {
-            return ((SendPacket) message).Value;
+            return ((SendPacket) message).Data;
         }
 
         public void Reset()
@@ -54,8 +47,8 @@ namespace LibFaolan.Network
 
             _stream.Position = 0;
 
-            var packet = new Packet(_stream);
-            if (packet.Length != UInt32.MaxValue)
+            var packet = new AgentServerPacket(_stream);
+            if (packet.Length != UInt16.MaxValue)
             {
                 messages.Add(packet);
                 Functions.TrimStream(ref _stream);
@@ -64,31 +57,6 @@ namespace LibFaolan.Network
 
             _backBuffer = _stream.ToArray();
             return false;
-        }
-
-        internal sealed class SendPacket : IScsMessage
-        {
-            public SendPacket(byte[] value)
-            {
-                Value = value;
-            }
-
-            public byte[] Value { get; }
-            public string MessageId => null;
-
-            public string RepliedMessageId
-            {
-                get { return null; }
-                set { }
-            }
-        }
-
-        internal sealed class ProtocolFactory : IScsWireProtocolFactory
-        {
-            public IScsWireProtocol CreateWireProtocol()
-            {
-                return new WireProtocol();
-            }
         }
     }
 }

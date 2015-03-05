@@ -5,7 +5,7 @@ namespace GameServer
 {
     partial class GameServerListener
     {
-        private void Handle0Xf98E10B3(NetworkClient client, Account account, Packet packet)
+        private void Handle0Xf98E10B3(NetworkClient client, Account account, ConanPacket packet)
         {
             var aBuffer = new PacketStream();
             aBuffer.WriteHeader(Sender4, Receiver4, null, 0x201c);

@@ -1,3 +1,5 @@
+using System.IO;
+using AgentServer;
 using LibFaolan.Data;
 using LibFaolan.Database;
 using LibFaolan.DllImport;
@@ -7,10 +9,17 @@ using LibFaolan.Other;
 
 namespace GameServer
 {
-    public partial class GameServerListener : Server
+    public partial class GameServerListener : Server<ConanPacket, ProtocolFactory<ConanWireProtocol>>
     {
-        public GameServerListener(ushort port, Logger logger, IDatabase database) : base(port, logger, database)
+        private static AgentServerListener _agentServerListener;
+        private static new IDatabase Database;
+
+        public GameServerListener(ushort port, Logger logger, IDatabase database,
+            AgentServerListener agentServerListener)
+            : base(port, logger, database)
         {
+            Database = database;
+            _agentServerListener = agentServerListener;
         }
 
         public override void ClientConnected(NetworkClient client)
@@ -18,7 +27,7 @@ namespace GameServer
             client.Tag = new Account();
         }
 
-        public override void ReceivedPacket(NetworkClient client, Packet packet)
+        public override void ReceivedPacket(NetworkClient client, ConanPacket packet)
         {
             Logger.WriteLine("Received opcode: " + (Opcodes) packet.Opcode + " (" + packet.Opcode.ToHex() + ")");
             var account = (Account) client.Tag;
@@ -51,12 +60,21 @@ namespace GameServer
                     Send0X201C(client, account); // No imediate visible change when not sending these
                     Send0X200A(client, account);
 
-                    SendPlayerRelated0X2000(client, account);
+                    var packetData135 = Functions.HexStreamToByteArray(File.ReadAllText("../../other/fs135.hex"));
+                    new PacketStream() // To big to keep here, but necessary to send...
+                        .WriteHeader(Sender0, Receiver0, null, 0x2000)
+                        .WriteArrayPrependLengthUInt32(new ConanStream()
+                            .WriteUInt32(Ox2000RespondsOpcodes.Ox737A6DF9)
+                            .WriteArray(packetData135))
+                        .Send(client);
+
                     Send0x5D85BFC7(client); // Needed to get the loading bar to start loading
                     SpawnPlayer(client, account);
+                    //SendPlayerBuffsTest(client, account);
+                    //SendSitOnMountTest(client, account);
                     //Send0x33A56FB0(client); // No imediate visible change when not sending these 
                     //Send0x66AEDD50(client); // No imediate visible change when not sending these
-                    SendSpawnNPCAndPlayersTest(client); // Spawn some NPC's and other players
+                    //SendSpawnNPCAndPlayersTest(client); // Spawn some NPC's and other players
                     //Send0x4F57DC08(client); // No imediate visible change when not sending these
                     //Send0x642CD3D6(client); // No imediate visible change when not sending these
                     //Send0x96C46740(client); // No imediate visible change when not sending these
@@ -238,8 +256,23 @@ namespace GameServer
 
                 case Opcodes.ManualRemoveBuff:
                 {
-                    //
                     Logger.WriteLine("REMOVE BUFF");
+
+                    break;
+                }
+
+                case Opcodes.ChatCommand:
+                {
+                    var unk0 = packet.Data.ReadUInt32();
+                    var unk1 = packet.Data.ReadUInt32();
+                    var unk2 = packet.Data.ReadUInt32();
+                    var unk3 = packet.Data.ReadUInt32();
+                    var text = packet.Data.ReadString();
+
+                    if (text[0] == '.' && text[1] != '.')
+                        HandleGMCommand(client, account, text);
+                    else
+                        _agentServerListener.CharacterSay(account, text);
 
                     break;
                 }
