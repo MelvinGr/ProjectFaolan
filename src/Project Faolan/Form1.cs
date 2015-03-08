@@ -33,6 +33,14 @@ namespace ProjectFaolan
             _logger = GetLogger(null);
         }
 
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            if(Statics.GameServer != null)
+                Statics.GameServer.SaveAllCharacterData();
+
+            base.OnFormClosing(e);
+        }
+
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
@@ -54,8 +62,8 @@ namespace ProjectFaolan
                 Statics.Database = new MySqlDatabase(Settings.MySqlAddress, Settings.MySqlPort, Settings.MySqlDatabase,
                     Settings.MySqlUsername, Settings.MySqlPassword);
             }
-            else if(Settings.UseSQLite)
-                Statics.Database = new SqLiteDatabase(Settings.SQLitePath);
+            else if(Settings.UseSqLite)
+                Statics.Database = new SqLiteDatabase(Settings.SqLitePath);
 
             if (Statics.Database.Connect())
                 _logger.WriteLine("Connected to database");
@@ -67,35 +75,35 @@ namespace ProjectFaolan
 
         private void universeAgentButton_Click(object sender, EventArgs e)
         {
-            var logger = GetLogger("[" + typeof (UniverseAgentListener).Name + "] ");
+            var logger = GetLogger("[UniverseAgent] ");
             Statics.UniverseAgent = new UniverseAgentListener(Settings.UniverseAgentPort, logger, Statics.Database);
             StartServer(Statics.UniverseAgent);
         }
 
         private void playerAgentButton_Click(object sender, EventArgs e)
         {
-            var logger = GetLogger("[" + typeof (PlayerAgentListener).Name + "] ");
+            var logger = GetLogger("[PlayerAgent] ");
             Statics.PlayerAgent = new PlayerAgentListener(Settings.PlayerAgentPort, logger, Statics.Database);
             StartServer(Statics.PlayerAgent);
         }
 
         private void csPlayerAgentButton_Click(object sender, EventArgs e)
         {
-            var logger = GetLogger("[" + typeof (CsPlayerAgentListener).Name + "] ");
+            var logger = GetLogger("[CsPlayerAgent] ");
             Statics.CsplayerAgent = new CsPlayerAgentListener(Settings.CsPlayerAgentPort, logger, Statics.Database);
             StartServer(Statics.CsplayerAgent);
         }
 
         private void agentServerButton_Click(object sender, EventArgs e)
         {
-            var logger = GetLogger("[" + typeof (AgentServerListener).Name + "] ");
+            var logger = GetLogger("[AgentServer] ");
             Statics.AgentServer = new AgentServerListener(Settings.AgentServerPort, logger, Statics.Database);
             StartServer(Statics.AgentServer);
         }
 
         private void gameServerButton_Click(object sender, EventArgs e)
         {
-            var logger = GetLogger("[" + typeof (GameServerListener).Name + "] ");
+            var logger = GetLogger("[GameServer] ");
             Statics.GameServer = new GameServerListener(Settings.GameServerPort, logger, Statics.Database,
                 Statics.AgentServer);
             StartServer(Statics.GameServer);

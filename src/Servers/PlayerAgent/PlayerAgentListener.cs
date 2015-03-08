@@ -21,9 +21,9 @@ namespace PlayerAgent
                 LoadStatus = 0,
                 OnlineStatus = 2,
                 Port = Settings.GameServerPort,
-                RealmId = 0,
-                RealmName = "Project Faolan",
-                RealmType = 256
+                Id = 0,
+                Name = "Project Faolan",
+                Type = 256
             });
         }
 

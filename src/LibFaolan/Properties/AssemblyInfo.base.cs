@@ -11,4 +11,4 @@ using System.Reflection;
 #endif
 
 [assembly: AssemblyVersion("0.0.$REVNUM$.$DIRTY$")]
-[assembly: AssemblyDescription("$REVID$ $DATETIME$")]
+[assembly: AssemblyDescription("$REVID$ $DIRTY$ $DATETIME$")]

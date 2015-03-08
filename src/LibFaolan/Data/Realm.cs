@@ -10,8 +10,13 @@ namespace LibFaolan.Data
         public byte LoadStatus; //load status -- 0 = medium load 1 = medium load 2 = heavy load 3 = full
         public byte OnlineStatus; // onlineStatus - 2 = online, other num = offline
         public UInt16 Port;
-        public byte RealmId;
-        public string RealmName;
-        public UInt16 RealmType; // realmtype - 0,1 = PvE | 256,257 = PvP | 1081 = PvP by faction, probably a bitmask
+        public byte Id;
+        public string Name;
+        public UInt16 Type; // realmtype - 0,1 = PvE | 256,257 = PvP | 1081 = PvP by faction, probably a bitmask
+
+        public override string ToString()
+        {
+            return Id + ": " + Name;
+        }
     }
 }

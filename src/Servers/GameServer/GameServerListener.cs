@@ -11,17 +11,25 @@ namespace GameServer
 {
     public partial class GameServerListener : Server<ConanPacket, ProtocolFactory<ConanWireProtocol>>
     {
-        private static AgentServerListener _agentServerListener;
+        public static AgentServerListener _agentServerListener;
         private new static IDatabase Database;
+        private new static Logger Logger;
 
         public GameServerListener(ushort port, Logger logger, IDatabase database,
             AgentServerListener agentServerListener)
             : base(port, logger, database)
         {
             Database = database;
+            Logger = logger;
             _agentServerListener = agentServerListener;
 
             ConanMap.Init(Database);
+            Spell.Init(Database);
+            InitGmCommands();
+
+            //var pkt = Functions.HexStreamToByteArray("000001067a26ee35000000170a070d13ce71b1104c120a0d47c1676c10d4cb8b402000000000e366aedd500000c87800008710000000002b0a0f0d66127a44156b9331431d0e15934412140d00000000157f2e3ebf1d0000000025315e2b3f18baec430000007208001211546865204e6565646c65206f66205365741a573c6c6f63616c697a65642069643d2233353935363137222063617465676f72793d2235353030302220666c6167733d2222206b65793d226f592947616b446226616d703b672671756f743b4f4d415338384d602922203e280160010035052c000f696e0000000000000000b9ae1a663b080e66bc5898463efcacc63e10547f3c1fe0db3f8000000000000000000000f9ec6ecb38000000170a070d13ce71b1104c120a0d47c1676c10d4cb8b402000000000d666aedd500000c8780000870c000000002b0a0f0d4f6d65441531562b431d55b2874412140d00000000150b0895be1d00000000254bea743f18baec4300000065");
+            //var cs = PacketUtills.PacketToCsCode(new ConanPacket(new ConanStream(pkt)));
+            //File.WriteAllText("c:/users/melvin/desktop/spawn.cs", cs);
         }
 
         public override void ClientConnected(NetworkClient client)
@@ -75,7 +83,7 @@ namespace GameServer
                     //SendPlayerBuffsTest(client, account);
                     //SendSitOnMountTest(client, account);
                     //Send0x33A56FB0(client); // No imediate visible change when not sending these 
-                    //Send0x66AEDD50(client); // No imediate visible change when not sending these
+                    //SendObjectSpawnTest(client); // No imediate visible change when not sending these
                     //SendSpawnNPCAndPlayersTest(client); // Spawn some NPC's and other players
                     //Send0x4F57DC08(client); // No imediate visible change when not sending these
                     //Send0x642CD3D6(client); // No imediate visible change when not sending these

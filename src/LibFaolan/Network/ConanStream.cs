@@ -65,8 +65,8 @@ namespace LibFaolan.Network
         public ConanStream WriteArrayPrependLengthByte(ConanStream stream)
             => WriteArrayPrependLengthByte(stream.ToArray());
 
-        public ConanStream WriteArrayPrependLengthUInt16(ConanStream stream)
-            => WriteArrayPrependLengthUInt16(stream.ToArray());
+        public ConanStream WriteArrayPrependLengthUInt16(ConanStream stream, bool removeLen = false)
+            => WriteArrayPrependLengthUInt16(stream.ToArray(), removeLen);
 
         public ConanStream WriteArrayPrependLengthUInt32(ConanStream stream)
             => WriteArrayPrependLengthUInt32(stream.ToArray());
@@ -93,12 +93,16 @@ namespace LibFaolan.Network
             return WriteArray(value);
         }
 
-        public ConanStream WriteArrayPrependLengthUInt16(byte[] value)
+        public ConanStream WriteArrayPrependLengthUInt16(byte[] value, bool removeLen = false)
         {
             if (value.Length > UInt16.MaxValue)
                 throw new Exception("value.Length > UInt16.MaxValue");
 
-            WriteUInt16((UInt16) value.Length);
+            if (removeLen)
+                WriteUInt16((UInt16)(value.Length - sizeof(UInt16)));
+            else
+                WriteUInt16((UInt16) value.Length);
+
             return WriteArray(value);
         }
 

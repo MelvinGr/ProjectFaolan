@@ -36,15 +36,15 @@ namespace GameServer
         {
             Ox5D85BFC7 = 0x5D85BFC7,
             Ox33A56FB0 = 0x33A56FB0,
-            Ox66AEDD50 = 0x66AEDD50,
+            SpawnObject = 0x66AEDD50,
             Spawn = 0xFA015807,
-            Ox4F57DC08 = 0x4F57DC08,
+            SetDayTime = 0x4F57DC08,
             Ox642CD3D6 = 0x642CD3D6,
             Ox96C46740 = 0x96C46740,
             ApplySpell = 0x6B87E316,
             OxF98E10B3 = 0xF98E10B3,
             SitOnMount = 0x96B8DC59, // Does not apply buff
-            Ox737A6DF9 = 0x737A6DF9
+            Ox737A6DF9 = 0x737A6DF9,
         };
 
         private enum MovingTypes : ushort

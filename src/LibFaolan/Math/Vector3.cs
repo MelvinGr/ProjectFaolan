@@ -4,6 +4,7 @@
 
 using System;
 using System.Text;
+using LibFaolan.Extentions;
 
 namespace LibFaolan.Math
 {
@@ -501,6 +502,19 @@ namespace LibFaolan.Math
             sb.Append(Y);
             sb.Append(" Z:");
             sb.Append(Z);
+            sb.Append("}");
+            return sb.ToString();
+        }
+
+        public string ToHexString()
+        {
+            var sb = new StringBuilder();
+            sb.Append("{X:");
+            sb.Append(X.ToHex());
+            sb.Append(" Y:");
+            sb.Append(Y.ToHex());
+            sb.Append(" Z:");
+            sb.Append(Z.ToHex());
             sb.Append("}");
             return sb.ToString();
         }

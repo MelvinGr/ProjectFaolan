@@ -110,9 +110,9 @@ namespace PlayerAgent
             aBuffer.WriteUInt32(Realms.Count);
             foreach (var realm in Realms)
             {
-                aBuffer.WriteUInt32(realm.RealmId);
+                aBuffer.WriteUInt32(realm.Id);
                 aBuffer.WriteUInt32(realm.OnlineStatus);
-                aBuffer.WriteString(realm.RealmName);
+                aBuffer.WriteString(realm.Name);
                 aBuffer.WriteUInt32(0x00000c02); //u2
                 aBuffer.WriteUInt32(0x00000000); //u3
                 aBuffer.WriteUInt32(0x00000000); //u4
@@ -120,7 +120,7 @@ namespace PlayerAgent
                 aBuffer.WriteUInt32(realm.LoadStatus);
                 aBuffer.WriteUInt16(0x0000);
                 aBuffer.WriteByte(0x00);
-                aBuffer.WriteUInt16(realm.RealmType);
+                aBuffer.WriteUInt16(realm.Type);
                 aBuffer.WriteUInt32(realm.Country);
                 aBuffer.WriteByte(0x00);
             }

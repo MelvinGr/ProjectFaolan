@@ -72,7 +72,7 @@ namespace AgentServer
                     }
 
                     // "<localized category=20000 token=\"welcome_message\">"
-                    SendSystemMessage(client, Settings.UserWelcomeString);
+                    SendSystemMessage(client, Settings.InGameWelcomeString);
 
                     new ConanStream()
                         .WriteUInt16(0x003c)

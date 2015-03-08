@@ -27,7 +27,7 @@ namespace UniverseAgent
             {
                 case Opcodes.InitiateAuthentication:
                 {
-                    account.Username = packet.Data.ReadString();
+                    account.Name = packet.Data.ReadString();
                     var unk0 = packet.Data.ReadUInt32();
 
                     account.LoadDetailsFromDatabase(Database);
@@ -61,7 +61,7 @@ namespace UniverseAgent
                         break;
                     }
                     */
-                    if (!account.CheckLogin(Database, account.Username)) // wrong login
+                    if (!account.CheckLogin(Database, account.Name)) // wrong login
                     {
                         Logger.WriteLine("Wrong Login");
                         //Packets.AckAuthenticate(client, 0xffffff, 0, 0x0e);
@@ -83,7 +83,7 @@ namespace UniverseAgent
                         break;
                     }
 
-                    Logger.WriteLine("User {0} is logging on with accountId: {1}", account.Username, account.Id);
+                    Logger.WriteLine("User {0} is logging on with accountId: {1}", account.Name, account.Id);
 
                     account.UpdateLastInfo(Database, client);
                     SetRegionState(client, account);

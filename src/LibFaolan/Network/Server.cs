@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
 using Hik.Communication.Scs.Communication.EndPoints.Tcp;
 using Hik.Communication.Scs.Communication.Messages;
 using Hik.Communication.Scs.Communication.Protocols;
 using Hik.Communication.Scs.Server;
+using LibFaolan.Data;
 using LibFaolan.Database;
 using LibFaolan.Other;
 
@@ -33,7 +36,9 @@ namespace LibFaolan.Network
             _scsServer.ClientDisconnected += (s, e) => ClientDisconnected((NetworkClient) e.Client.Tag);
         }
 
-        public ConcurrentDictionary<long, IScsServerClient> Clients => _scsServer.Clients;
+        protected ConcurrentDictionary<long, IScsServerClient> Clients => _scsServer.Clients;
+        protected IEnumerable<NetworkClient> NetworkClients => Clients.Select(c => (NetworkClient)c.Value.Tag);
+        protected IEnumerable<Account> Accounts => NetworkClients.Select(nc => (Account)nc.Tag);
 
         public bool Start()
         {
