@@ -18,7 +18,7 @@ namespace LibFaolan.Data
         public int Counter, State;
         public UInt32 Id; // PlayerInstance
         public byte Kind; // 0 = user, 1 = admin
-        public string Username;
+        public string Name;
         public UInt64 LongId => (0x0000271200000000u + Id); // As used by the client (why?)
 
         public void LoadDetailsFromDatabase(IDatabase database)
@@ -26,8 +26,8 @@ namespace LibFaolan.Data
             Dictionary<string, dynamic> obj;
             if (Id != 0)
                 obj = database.ExecuteReader("SELECT * FROM accounts WHERE account_id=" + Id).ToDictionary();
-            else if (Username != null)
-                obj = database.ExecuteReader("SELECT * FROM accounts WHERE username='" + Username + "'").ToDictionary();
+            else if (Name != null)
+                obj = database.ExecuteReader("SELECT * FROM accounts WHERE username='" + Name + "'").ToDictionary();
             else
                 throw new Exception("Id == 0 && Username == null");
 
@@ -37,14 +37,14 @@ namespace LibFaolan.Data
             Id = (UInt32) obj["account_id"];
             // AuthStatus = 
             Cookie = (UInt32) obj["cookie"];
-            Username = obj["username"];
+            Name = obj["username"];
             Kind = (byte) obj["kind"];
             ClientInstance = 0x0802E5D4;
         }
 
         public bool CheckLogin(IDatabase database, string password)
         {
-            return database.ExecuteScalar<object>("SELECT account_id FROM accounts WHERE username = '" + Username +
+            return database.ExecuteScalar<object>("SELECT account_id FROM accounts WHERE username = '" + Name +
                                                   "' AND password = '" + password + "'") != null;
         }
 
@@ -69,6 +69,11 @@ namespace LibFaolan.Data
             return database.ExecuteNonQuery("UPDATE accounts SET last_connection='" +
                                             Functions.SecondsSindsEpoch() + "', last_ip='" + client.IpAddress +
                                             "' WHERE account_id=" + Id) == 1;
+        }
+
+        public override string ToString()
+        {
+            return Id + ": " + Name;
         }
     }
 }

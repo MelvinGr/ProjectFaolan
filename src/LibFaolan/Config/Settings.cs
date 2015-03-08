@@ -23,13 +23,16 @@ namespace LibFaolan.Config
         public static string MySqlDatabase;
         public static string MySqlUsername;
         public static string MySqlPassword;
-        public static bool UseSQLite;
-        public static string SQLitePath;
+        public static bool UseSqLite;
+        public static string SqLitePath;
         public static string WelcomeString;
 
-        public static string UserWelcomeString => WelcomeString
+        public static string InGameWelcomeString => WelcomeString
             .Replace("$BuildDate$", Statics.BuildDate)
-            .Replace("$BuildHash$", Statics.BuildHash)
+            .Replace("$BuildHash$", Statics.BuildHash 
+                + (Statics.BuildDirty ? " (dirty)" : "")
+                + " (" + Statics.AssemblyConfiguration + ")")
+            .Replace("\r", "")
             .Replace("\n", "<br />");
 
         public static bool Load(string path)
@@ -66,10 +69,10 @@ namespace LibFaolan.Config
                     MySqlPassword = _ini.GetValue("MySqlPassword");
                 }
 
-                UseSQLite = _ini.GetValue("UseSQLite") == "1";
-                if (UseSQLite)
+                UseSqLite = _ini.GetValue("UseSQLite") == "1";
+                if (UseSqLite)
                 {
-                    SQLitePath = _ini.GetValue("SQLitePath");
+                    SqLitePath = _ini.GetValue("SQLitePath");
                 }
 
                 WelcomeString = _ini.GetValue("WelcomeString");

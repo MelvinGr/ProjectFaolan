@@ -1,3 +1,4 @@
+using System.Linq;
 using LibFaolan.Data;
 using LibFaolan.Extentions;
 using LibFaolan.Network;
@@ -32,9 +33,9 @@ namespace GameServer
 
                     switch (movingType)
                     {
-                        case MovingTypes.Run: //MELVIN
-                        case MovingTypes.Walk: //MELVIN
-                        case MovingTypes.Jump: // MELVIN
+                        case MovingTypes.Run:
+                        case MovingTypes.Walk:
+                        case MovingTypes.Jump:
                         case MovingTypes.WalkJump:
                         case MovingTypes.MountedJump:
                         case MovingTypes.Ox011A:
@@ -45,9 +46,14 @@ namespace GameServer
                             var charCoords = packet.Data.ReadVector3();
                             var datadat = packet.Data.ReadArray(pbLength - 6*4 + 1*2);
 
+                            //var recvClient = Accounts.FirstOrDefault(a => a.ClientInstance == dataclientinst);
+                            //recvClient.Character.Position = charCoords;
+                            account.Character.Position = charCoords;
+
+                            // send to all (nearby) clients?
                             new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
                                 .WriteArrayPrependLengthUInt32(new ConanStream()
-                                    .WriteUInt32(pbOpcode) // opcode
+                                    .WriteUInt32(pbOpcode) 
                                     .WriteUInt32(dataobjdec)
                                     .WriteUInt32(dataclientinst)
                                     .WriteUInt16(movingType)
@@ -101,6 +107,71 @@ namespace GameServer
                     var data = packet.Data.ToArray();
 
                     Logger.WriteLine("SelectDeselect!");
+
+                    /*
+                    uint32 length = packet->data->bufferLength - 4;
+
+	                switch(length)
+	                {
+		                case PassBlob::SELECT_NPC:
+			                {
+				                Log.Debug("Receive GA_PassBlob - SELECT_OBJECT - SELECT_NPC\n");
+				                try
+				                {
+					                uint32 data = packet->data->read<uint32>();
+					                uint32 ClientInst = packet->data->read<uint32>();
+					                uint8 unk0 = packet->data->read<uint8>();
+					                uint32 data2 = packet->data->read<uint32>();
+					                client->charInfo.combat.target = packet->data->read<uint32>();
+					                uint32 unk1 = packet->data->read<uint32>();
+					                uint32 unk2 = packet->data->read<uint32>();
+					                uint32 end = packet->data->read<uint32>();
+
+					                PacketBuffer aBuffer(500);
+					                aBuffer.writeHeader("GameAgent", "GameInterface", gameUnknown1, 0, client->nClientInst, 0, GI_PassBlob);
+					                aBuffer.write<uint32>(length);
+					                aBuffer.write<uint32>(SELECT_OBJECT);
+					                aBuffer.write<uint32>(data);
+					                aBuffer.write<uint32>(ClientInst);
+					                aBuffer.write<uint8>(unk0);
+					                aBuffer.write<uint32>(data2);
+					                aBuffer.write<uint32>(client->charInfo.combat.target);
+					                aBuffer.write<uint32>(unk1);
+					                aBuffer.write<uint32>(unk2);
+					                aBuffer.write<uint32>(end);
+					                aBuffer.doItAll(client->clientSocket);
+					                Log.Debug("Sent GI_PassBlob - SELECT_OBJECT - SELECT_NPC\n");
+				                }
+				                catch(char* errMsg)
+				                {
+					                Log.Error("Error at receiving SelectionDatas @ SELECT_NPC - SelectObjet.cpp\nError Message:\n%s\n", errMsg);
+				                }
+				                break;
+			                }
+
+		                default:
+			                {
+				                Log.Debug("Receive GA_PassBlob - SELECT_OBJECT - Unknown Length: 0x%08x\n", length);
+				                try
+				                {
+					                PacketBuffer aBuffer(500);
+					                aBuffer.writeHeader("GameAgent", "GameInterface", gameUnknown1, 0, client->nClientInst, 0, 0x00);
+					                aBuffer.write<uint32>(length);
+					                aBuffer.write<uint32>(SELECT_OBJECT);
+					                aBuffer.writeArray(packet->data->readArray(length-4), length-4);
+					                aBuffer.doItAll(client->clientSocket);
+					                Log.Debug("Sent GI_PassBlob - SELECT_OBJECT - Unknown\n");
+				                }
+				                catch(char* errMsg)
+				                {
+					                Log.Error("Error at receiving SelectionDatas @ SELECT_NPC - SelectObjet.cpp\nError Message:\n%s\n", errMsg);
+				                }
+				                break;
+			                }
+	                }                    
+                    */
+
+
                     break;
                 }
                 default:

@@ -24,5 +24,10 @@ namespace LibFaolan.Data
                 Rotation = new Vector3((float) c["rotation_0"], (float) c["rotation_1"], (float) c["rotation_2"])
             }).ToArray();
         }
+
+        public override string ToString()
+        {
+            return Id + ": " + Name;
+        }
     }
 }

@@ -7,9 +7,6 @@ namespace AgentServer
 {
     partial class AgentServerListener
     {
-        private IEnumerable<NetworkClient> NetworkClients => Clients.Select(c => (NetworkClient) c.Value.Tag);
-        //private IEnumerable<Account> Accounts => NetworkClients.Select(nc => nc.Tag).Cast<Account>();
-
         /*var scsclient = Clients.FirstOrDefault(c =>
         {
             var cc = (NetworkClient)c.Tag;
@@ -51,7 +48,7 @@ namespace AgentServer
                     .WriteArrayPrependLengthUInt16(new ConanStream()
                         .WriteUInt32(account.ClientInstance)
                         .WriteString(message)
-                        .WriteUInt16(0x0001)
+                        .WriteUInt16(0x0001) // type?
                         .WriteByte(0))
                     .Send(client);
             }

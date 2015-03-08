@@ -8,7 +8,6 @@ namespace LibFaolan.Other
 {
     public static class Functions
     {
-        private static readonly DateTime DateTime1970 = new DateTime(1970, 1, 1);
         // https://stackoverflow.com/questions/321370/how-can-i-convert-a-hex-string-to-a-byte-array
         public static byte[] HexStreamToByteArray(string hex)
         {
@@ -51,9 +50,11 @@ namespace LibFaolan.Other
             stream = new ConanStream(remaining);
         }
 
-        public static ulong SecondsSindsEpoch()
+        public static UInt32 SecondsSindsEpoch()
         {
-            return (ulong) (DateTime.UtcNow - DateTime1970).TotalSeconds;
+            int t2 = 0;
+            DllImport.Other.time(ref t2);
+            return (UInt32)t2;
         }
 
         public static void ExitLoop()

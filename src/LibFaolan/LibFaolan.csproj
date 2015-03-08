@@ -29,7 +29,7 @@
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="MySql.Data">
-      <HintPath>..\packages\MySql.Data.6.9.6\lib\net40\MySql.Data.dll</HintPath>
+      <HintPath>..\MySql.Data.dll</HintPath>
     </Reference>
     <Reference Include="Scs">
       <HintPath>..\Scs.dll</HintPath>
@@ -49,6 +49,8 @@
     <Compile Include="Database\IDatabase.cs" />
     <Compile Include="Database\MySqlDatabase.cs" />
     <Compile Include="Database\SQLiteDatabase.cs" />
+    <Compile Include="Data\WorldObject.cs" />
+    <Compile Include="Data\Spell.cs" />
     <Compile Include="Data\Account.cs" />
     <Compile Include="Data\Character.cs" />
     <Compile Include="Data\ConanMap.cs" />
