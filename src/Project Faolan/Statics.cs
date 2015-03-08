@@ -14,6 +14,6 @@ namespace ProjectFaolan
         public static GameServerListener GameServer;
         public static CsPlayerAgentListener CsplayerAgent;
         public static AgentServerListener AgentServer;
-        public static MySqlDatabase MySqlDatabase;
+        public static IDatabase Database;
     }
 }

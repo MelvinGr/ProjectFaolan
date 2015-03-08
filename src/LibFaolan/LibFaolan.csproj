@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -13,6 +13,7 @@
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
+    <NuGetPackageImportStamp>0dca748c</NuGetPackageImportStamp>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
     <DebugSymbols>true</DebugSymbols>
@@ -28,7 +29,7 @@
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="MySql.Data">
-      <HintPath>..\MySql.Data.dll</HintPath>
+      <HintPath>..\packages\MySql.Data.6.9.6\lib\net40\MySql.Data.dll</HintPath>
     </Reference>
     <Reference Include="Scs">
       <HintPath>..\Scs.dll</HintPath>
@@ -36,6 +37,10 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Data" />
+    <Reference Include="System.Data.SQLite, Version=1.0.96.0, Culture=neutral, PublicKeyToken=db937bc2d44ff139, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\System.Data.SQLite.Core.1.0.96.0\lib\net40\System.Data.SQLite.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Config\Ini.cs" />
@@ -43,12 +48,13 @@
     <Compile Include="Crypt\Crc32.cs" />
     <Compile Include="Database\IDatabase.cs" />
     <Compile Include="Database\MySqlDatabase.cs" />
+    <Compile Include="Database\SQLiteDatabase.cs" />
     <Compile Include="Data\Account.cs" />
     <Compile Include="Data\Character.cs" />
     <Compile Include="Data\ConanMap.cs" />
     <Compile Include="Data\Realm.cs" />
     <Compile Include="Extentions\ArrayExtentions.cs" />
-    <Compile Include="Extentions\DictionaryExtentions.cs" />
+    <Compile Include="Extentions\IDataReaderExtentions.cs" />
     <Compile Include="Extentions\ToHexExtentions.cs" />
     <Compile Include="Extentions\TryParseExtentions.cs" />
     <Compile Include="Math\MathHelper.cs" />
@@ -65,6 +71,7 @@
     <Compile Include="Network\Server.cs" />
     <Compile Include="Network\ConanWireProtocol.cs" />
     <Compile Include="Other\PacketUtills.cs" />
+    <None Include="packages.config" />
     <None Include="Properties\AssemblyInfo.base.cs" />
     <Compile Include="Other\Statics.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -75,5 +82,12 @@
     <GitVersionFile TemplateFile="Properties\AssemblyInfo.base.cs" DestinationFile="Properties\AssemblyInfo.cs" />
   </Target>
   <Target Name="AfterBuild">
+  </Target>
+  <Import Project="..\packages\System.Data.SQLite.Core.1.0.96.0\build\net40\System.Data.SQLite.Core.targets" Condition="Exists('..\packages\System.Data.SQLite.Core.1.0.96.0\build\net40\System.Data.SQLite.Core.targets')" />
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\packages\System.Data.SQLite.Core.1.0.96.0\build\net40\System.Data.SQLite.Core.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\System.Data.SQLite.Core.1.0.96.0\build\net40\System.Data.SQLite.Core.targets'))" />
   </Target>
 </Project>
