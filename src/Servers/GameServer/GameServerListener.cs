@@ -12,7 +12,7 @@ namespace GameServer
     public partial class GameServerListener : Server<ConanPacket, ProtocolFactory<ConanWireProtocol>>
     {
         private static AgentServerListener _agentServerListener;
-        private static new IDatabase Database;
+        private new static IDatabase Database;
 
         public GameServerListener(ushort port, Logger logger, IDatabase database,
             AgentServerListener agentServerListener)
@@ -20,6 +20,8 @@ namespace GameServer
         {
             Database = database;
             _agentServerListener = agentServerListener;
+
+            ConanMap.Init(Database);
         }
 
         public override void ClientConnected(NetworkClient client)

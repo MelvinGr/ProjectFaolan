@@ -1,6 +1,6 @@
 using System;
-using System.Linq;
 using LibFaolan.Database;
+using LibFaolan.Extentions;
 using LibFaolan.Math;
 using LibFaolan.Network;
 using LibFaolan.Other;
@@ -36,9 +36,9 @@ namespace LibFaolan.Data
         public void LoadDetailsFromDatabase(IDatabase database)
         {
             var c =
-                database.ExecuteDynamic("SELECT * FROM characters WHERE character_id = '" + Id + "'").FirstOrDefault();
-            if (c == null)
-                throw new Exception("c == null");
+                database.ExecuteReader("SELECT * FROM characters WHERE character_id=" + Id).ToDictionary();
+            if (c.Count == 0)
+                throw new Exception("c.Count == 0");
 
             AccountId = (UInt32) c["account_id"];
             Name = c["name"];
@@ -53,8 +53,8 @@ namespace LibFaolan.Data
             Size = (byte) c["size"];
             Voice = (byte) c["voice"];
             LastConnection = (UInt32) c["last_connection"];
-            Position = new Vector3(float.Parse(c["pos_x"]), float.Parse(c["pos_y"]), float.Parse(c["pos_z"]));
-            Rotation = new Vector3(float.Parse(c["rot_x"]), float.Parse(c["rot_y"]), float.Parse(c["rot_z"]));
+            Position = new Vector3((float) c["pos_x"], (float) c["pos_y"], (float) c["pos_z"]);
+            Rotation = new Vector3((float) c["rot_x"], (float) c["rot_y"], (float) c["rot_z"]);
             Lbinprv = (UInt32) c["lbinprv"];
         }
 

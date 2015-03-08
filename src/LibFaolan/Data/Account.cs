@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using LibFaolan.Database;
+using LibFaolan.Extentions;
 using LibFaolan.Network;
 using LibFaolan.Other;
 
@@ -21,35 +23,40 @@ namespace LibFaolan.Data
 
         public void LoadDetailsFromDatabase(IDatabase database)
         {
-            dynamic obj;
+            Dictionary<string, dynamic> obj;
             if (Id != 0)
-                obj = database.ExecuteDynamic("SELECT * FROM accounts WHERE account_id='" + Id + "'").FirstOrDefault();
+                obj = database.ExecuteReader("SELECT * FROM accounts WHERE account_id=" + Id).ToDictionary();
             else if (Username != null)
-                obj =
-                    database.ExecuteDynamic("SELECT * FROM accounts WHERE username='" + Username + "'").FirstOrDefault();
+                obj = database.ExecuteReader("SELECT * FROM accounts WHERE username='" + Username + "'").ToDictionary();
             else
                 throw new Exception("Id == 0 && Username == null");
 
-            if (obj == null)
-                throw new Exception("obj == null");
+            if (obj.Count == 0)
+                throw new Exception("obj.Count == 0");
 
-            Id = obj["account_id"];
+            Id = (UInt32) obj["account_id"];
             // AuthStatus = 
-            Cookie = obj["cookie"];
+            Cookie = (UInt32) obj["cookie"];
             Username = obj["username"];
-            Kind = obj["kind"];
+            Kind = (byte) obj["kind"];
             ClientInstance = 0x0802E5D4;
+        }
+
+        public bool CheckLogin(IDatabase database, string password)
+        {
+            return database.ExecuteScalar<object>("SELECT account_id FROM accounts WHERE username = '" + Username +
+                                                  "' AND password = '" + password + "'") != null;
         }
 
         public bool IsBanned(IDatabase database)
         {
-            return database.ExecuteScalar<int>("SELECT state FROM accounts WHERE account_id = '" + Id + "'") == 1;
+            return database.ExecuteScalar<dynamic>("SELECT state FROM accounts WHERE account_id=" + Id) == 1;
         }
 
         public Character[] GetCharacters(IDatabase database)
         {
-            var chars = database.ExecuteDynamic("SELECT character_id FROM characters WHERE account_id = '" + Id + "'")
-                .Select(c => new Character((UInt32) c["character_id"])).ToArray();
+            var chars = database.ExecuteReader("SELECT character_id FROM characters WHERE account_id=" + Id)
+                .ToIEnumerable().Select(c => new Character((UInt32) c["character_id"])).ToArray();
 
             foreach (var c in chars)
                 c.LoadDetailsFromDatabase(database);
@@ -61,8 +68,7 @@ namespace LibFaolan.Data
         {
             return database.ExecuteNonQuery("UPDATE accounts SET last_connection='" +
                                             Functions.SecondsSindsEpoch() + "', last_ip='" + client.IpAddress +
-                                            "' WHERE " +
-                                            "account_id='" + Id + "'") == 1;
+                                            "' WHERE account_id=" + Id) == 1;
         }
     }
 }

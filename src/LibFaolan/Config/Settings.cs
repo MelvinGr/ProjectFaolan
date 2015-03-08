@@ -17,11 +17,14 @@ namespace LibFaolan.Config
         public static string GameServerAddress;
         public static ushort GameServerPort;
         public static uint CharacterSlots;
+        public static bool UseMysql;
         public static string MySqlAddress;
         public static ushort MySqlPort;
         public static string MySqlDatabase;
         public static string MySqlUsername;
         public static string MySqlPassword;
+        public static bool UseSQLite;
+        public static string SQLitePath;
         public static string WelcomeString;
 
         public static string UserWelcomeString => WelcomeString
@@ -53,11 +56,21 @@ namespace LibFaolan.Config
 
                 CharacterSlots = UInt32.Parse(_ini.GetValue("CharacterSlots"));
 
-                MySqlAddress = _ini.GetValue("MySqlAddress");
-                MySqlPort = UInt16.Parse(_ini.GetValue("MySqlPort"));
-                MySqlDatabase = _ini.GetValue("MySqlDatabase");
-                MySqlUsername = _ini.GetValue("MySqlUsername");
-                MySqlPassword = _ini.GetValue("MySqlPassword");
+                UseMysql = _ini.GetValue("UseMySQL") == "1";
+                if (UseMysql)
+                {
+                    MySqlAddress = _ini.GetValue("MySqlAddress");
+                    MySqlPort = UInt16.Parse(_ini.GetValue("MySqlPort"));
+                    MySqlDatabase = _ini.GetValue("MySqlDatabase");
+                    MySqlUsername = _ini.GetValue("MySqlUsername");
+                    MySqlPassword = _ini.GetValue("MySqlPassword");
+                }
+
+                UseSQLite = _ini.GetValue("UseSQLite") == "1";
+                if (UseSQLite)
+                {
+                    SQLitePath = _ini.GetValue("SQLitePath");
+                }
 
                 WelcomeString = _ini.GetValue("WelcomeString");
 

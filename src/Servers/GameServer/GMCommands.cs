@@ -4,7 +4,6 @@ using System.Linq;
 using LibFaolan.Data;
 using LibFaolan.Extentions;
 using LibFaolan.Network;
-using LibFaolan.Other;
 
 namespace GameServer
 {
@@ -23,7 +22,8 @@ namespace GameServer
                 {"_mount", (c, a, arg) => SendSitOnMountTest(c, a)},
                 {"_buff", (c, a, arg) => SendPlayerBuffsTest(c, a)},
                 {"_spawn", (c, a, arg) => SendSpawnNPCAndPlayersTest(c)},
-                {"_casteffect", (c, a, arg) => ApplySpellTest(c, a, arg)}
+                {"_casteffect", (c, a, arg) => ApplySpellTest(c, a, arg)},
+                {"_kalanthes", (c, a, arg) => SpawnKalanthesTest(c)}
             };
         }
 
@@ -36,15 +36,15 @@ namespace GameServer
                 return;
             }
 
-            var map = Database.AllMaps.FirstOrDefault(m => m.Id == mapId);
+            var map = ConanMap.AllMaps.FirstOrDefault(m => m.Id == mapId);
             if (map == null)
             {
                 _agentServerListener.SendSystemMessage(account, "Unknown mapId: '" + arguments + "'");
                 return;
             }
 
-            var sender = new byte[] { 0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x0b };
-            var receiver = new byte[] { 0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0xe6, 0x8f, 0x80, 0x08 };
+            var sender = new byte[] {0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x0b};
+            var receiver = new byte[] {0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0xe6, 0x8f, 0x80, 0x08};
 
             account.Character.Map = map.Id;
             account.Character.Position.X = map.Position.X;
@@ -59,7 +59,7 @@ namespace GameServer
 
             //Log.Notice("Teleporting\nMapId: %i\nPOS X: %i\nPOS Y: %i\nPOS Z: %i\n\n", map.mapID, map.Position.X, map.Position.Y, map.Position.Z);
 
-           new PacketStream()
+            new PacketStream()
                 .WriteHeader(sender, receiver, null, 0x2000)
                 .WriteArrayPrependLengthUInt32(new ConanStream()
                     .WriteUInt32(0x10d27bc0)
@@ -74,7 +74,7 @@ namespace GameServer
                     .WriteUInt32(0x00000000)
                     .WriteUInt32(0x00000000)
                     .WriteUInt32(0x00000000))
-            .Send(client);
+                .Send(client);
 
             var pack2_0 = new byte[]
             {
@@ -111,7 +111,7 @@ namespace GameServer
                     .WriteUInt32(0x00000032)
                     .WriteByte(0))
                 .Send(client);
-            
+
             Send0x5D85BFC7(client);
             SendReadyForPlayScreen(client, account);
             SpawnPlayer(client, account);
@@ -119,11 +119,11 @@ namespace GameServer
 
         private static void SendListAllMaps(Account account) =>
             _agentServerListener.SendSystemMessage(account,
-                string.Join("<br />", Database.AllMaps.Select(m => m.Id + " : " + m.Name)));
+                string.Join("<br />", ConanMap.AllMaps.Select(m => m.Id + " : " + m.Name)));
 
         private static void SendGmHelpText(Account account) =>
             _agentServerListener.SendSystemMessage(account, "Available Commands:<br/>"
-                + string.Join("<br />", GmCommandsDict.Keys));
+                                                            + string.Join("<br />", GmCommandsDict.Keys));
 
         private static void ApplySpellTest(NetworkClient client, Account account, string arguments)
         {
@@ -151,7 +151,7 @@ namespace GameServer
                 GmCommandsDict[command].Invoke(client, account, arguments);
             else
                 _agentServerListener.SendSystemMessage(account, "Unknown command: '" +
-                    command + "' type .help for info");
+                                                                command + "' type .help for info");
         }
 
         private delegate void GmCommandDelegate(NetworkClient client, Account account, string arguments);

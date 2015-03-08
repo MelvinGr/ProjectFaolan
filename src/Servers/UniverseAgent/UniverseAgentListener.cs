@@ -61,7 +61,7 @@ namespace UniverseAgent
                         break;
                     }
                     */
-                    if (!Database.CheckLogin(account.Username, account.Username)) // wrong login
+                    if (!account.CheckLogin(Database, account.Username)) // wrong login
                     {
                         Logger.WriteLine("Wrong Login");
                         //Packets.AckAuthenticate(client, 0xffffff, 0, 0x0e);
