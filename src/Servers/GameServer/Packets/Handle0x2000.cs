@@ -32,14 +32,14 @@ namespace GameServer
 
                     switch (movingType)
                     {
-                        case MovingTypes.Run:
+                        case MovingTypes.MountedRun:
                         case MovingTypes.Walk:
                         case MovingTypes.Jump:
                         case MovingTypes.WalkJump:
                         case MovingTypes.MountedJump:
                         case MovingTypes.Falling:
-                        case MovingTypes.Ox011A:
-                        case MovingTypes.Ox011E:
+                        case MovingTypes.Ox011A: // run
+                        case MovingTypes.Ox011E: // rotate?
                         case MovingTypes.Ox001E:
                         case MovingTypes.Ox001A:
                         {
@@ -90,6 +90,8 @@ namespace GameServer
                     var objId = packet.Data.ReadUInt32(); // ??
                     var unk2 = packet.Data.ReadUInt32();
 
+                    //account.Character.SelectedTarget = ??;
+
                     Logger.Info("Interacting,"
                                 + "\nunk0: " + unk0.ToHex()
                                 + "\nunk1: " + unk1.ToHex()
@@ -102,22 +104,17 @@ namespace GameServer
                 }
                 case DataOpcodes.CloseGame:
                 {
-                    var unk0 = packet.Data.ReadUInt32();
-                    var accountId = packet.Data.ReadUInt32();
+                    //var unk0 = packet.Data.ReadUInt32();
+                    //var accountId = packet.Data.ReadUInt32();
 
                     account.Character.SaveDataToDatabase(Database);
                     break;
                 }
                 case DataOpcodes.SelectDeselect:
                 {
-                    var data = packet.Data.ToArray();
+                    var length = packet.Data.Length - 4;
 
-                    Logger.Info("SelectDeselect!");
-
-                    /*
-                    uint32 length = packet->data->bufferLength - 4;
-
-	                switch(length)
+	                /*switch(length)
 	                {
 		                case PassBlob::SELECT_NPC:
 			                {
@@ -176,8 +173,7 @@ namespace GameServer
 			                }
 	                }                    
                     */
-
-
+                    
                     break;
                 }
                 default:

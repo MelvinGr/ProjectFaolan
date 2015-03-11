@@ -116,15 +116,15 @@ namespace GameServer
 
         private static void SendListAllMaps(Account account) =>
             _agentServerListener.SendSystemMessage(account,
-                string.Join("<br/>", ConanMap.AllMaps.Select(m => m.Id + ": " + m.Name)));
+                string.Join("<br />", ConanMap.AllMaps.Select(m => m.Id + ": " + m.Name)));
 
         private static void SendListAllSpells(Account account) =>
             _agentServerListener.SendSystemMessage(account,
-                string.Join("<br/>", Spell.AllSpells.Select(s => s.Id + ": " + s.Name)));
+                string.Join("<br />", Spell.AllSpells.Select(s => s.Id + ": " + s.Name)));
 
         private static void SendGmHelpText(Account account) =>
             _agentServerListener.SendSystemMessage(account,
-                "Available Commands:<br/>" + string.Join("<br/>", _gmCommandsDict.Keys));
+                "Available Commands:<br />" + string.Join("<br />", _gmCommandsDict.Keys));
 
         private static void ApplySpellTest(NetworkClient client, Account account, string arguments)
         {
@@ -135,8 +135,6 @@ namespace GameServer
 
         private void HandleGMCommand(NetworkClient client, Account account, string commandText)
         {
-            // Should do a gm check here, send error of not allowed blabla
-
             string command;
             string arguments = null;
             if (!commandText.Contains(' '))

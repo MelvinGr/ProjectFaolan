@@ -34,7 +34,7 @@ namespace GameServer
 
         private enum Ox2000RespondsOpcodes : uint
         {
-            Ox5D85BFC7 = 0x5D85BFC7,
+            MapChange = 0x5D85BFC7,
             Ox33A56FB0 = 0x33A56FB0,
             SpawnObject = 0x66AEDD50,
             Spawn = 0xFA015807,
@@ -49,7 +49,7 @@ namespace GameServer
 
         private enum MovingTypes : ushort
         {
-            Run = 0x010a,
+            MountedRun = 0x010a,
             Walk = 0x010e,
             Jump = 0x0156,
             WalkJump = 0x0152,
