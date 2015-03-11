@@ -12,9 +12,7 @@ namespace LibFaolan.Extentions
             return data;
         }
 
-        public static string ToHexString(this IEnumerable<byte> value)
-        {
-            return "{ " + string.Join(", ", value.Select(e => e.ToHex())) + " }";
-        }
+        public static string ToHex(this IEnumerable<byte> value) =>
+            "{ " + string.Join(", ", value.Select(e => e.ToHex())) + " }";
     }
 }

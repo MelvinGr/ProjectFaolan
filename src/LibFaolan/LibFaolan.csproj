@@ -27,9 +27,12 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="log4net">
+      <HintPath>..\packages\log4net.2.0.3\lib\net40-full\log4net.dll</HintPath>
+    </Reference>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="MySql.Data">
-      <HintPath>..\MySql.Data.dll</HintPath>
+      <HintPath>..\packages\MySql.Data.6.9.6\lib\net40\MySql.Data.dll</HintPath>
     </Reference>
     <Reference Include="Scs">
       <HintPath>..\Scs.dll</HintPath>
@@ -38,7 +41,6 @@
     <Reference Include="System.Core" />
     <Reference Include="System.Data" />
     <Reference Include="System.Data.SQLite, Version=1.0.96.0, Culture=neutral, PublicKeyToken=db937bc2d44ff139, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
       <HintPath>..\packages\System.Data.SQLite.Core.1.0.96.0\lib\net40\System.Data.SQLite.dll</HintPath>
     </Reference>
   </ItemGroup>
@@ -59,13 +61,13 @@
     <Compile Include="Extentions\IDataReaderExtentions.cs" />
     <Compile Include="Extentions\ToHexExtentions.cs" />
     <Compile Include="Extentions\TryParseExtentions.cs" />
+    <Compile Include="Other\Logger.cs" />
     <Compile Include="Math\MathHelper.cs" />
     <Compile Include="Math\Vector3.cs" />
     <Compile Include="Network\ProtocolFactory.cs" />
     <Compile Include="Network\PacketStream.cs" />
     <Compile Include="Network\SendPacket.cs" />
     <Compile Include="Other\Functions.cs" />
-    <Compile Include="Other\Logger.cs" />
     <Compile Include="DllImport\DllImport.cs" />
     <Compile Include="Network\ConanPacket.cs" />
     <Compile Include="Network\NetworkClient.cs" />

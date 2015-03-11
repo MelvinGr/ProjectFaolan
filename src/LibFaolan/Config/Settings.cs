@@ -1,5 +1,4 @@
 using System;
-using LibFaolan.Other;
 
 namespace LibFaolan.Config
 {
@@ -26,14 +25,6 @@ namespace LibFaolan.Config
         public static bool UseSqLite;
         public static string SqLitePath;
         public static string WelcomeString;
-
-        public static string InGameWelcomeString => WelcomeString
-            .Replace("$BuildDate$", Statics.BuildDate)
-            .Replace("$BuildHash$", Statics.BuildHash 
-                + (Statics.BuildDirty ? " (dirty)" : "")
-                + " (" + Statics.AssemblyConfiguration + ")")
-            .Replace("\r", "")
-            .Replace("\n", "<br />");
 
         public static bool Load(string path)
         {

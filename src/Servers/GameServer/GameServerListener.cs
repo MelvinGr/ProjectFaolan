@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using AgentServer;
 using LibFaolan.Data;
@@ -11,7 +12,7 @@ namespace GameServer
 {
     public partial class GameServerListener : Server<ConanPacket, ProtocolFactory<ConanWireProtocol>>
     {
-        public static AgentServerListener _agentServerListener;
+        private static AgentServerListener _agentServerListener;
         private new static IDatabase Database;
         private new static Logger Logger;
 
@@ -26,10 +27,6 @@ namespace GameServer
             ConanMap.Init(Database);
             Spell.Init(Database);
             InitGmCommands();
-
-            //var pkt = Functions.HexStreamToByteArray("000001067a26ee35000000170a070d13ce71b1104c120a0d47c1676c10d4cb8b402000000000e366aedd500000c87800008710000000002b0a0f0d66127a44156b9331431d0e15934412140d00000000157f2e3ebf1d0000000025315e2b3f18baec430000007208001211546865204e6565646c65206f66205365741a573c6c6f63616c697a65642069643d2233353935363137222063617465676f72793d2235353030302220666c6167733d2222206b65793d226f592947616b446226616d703b672671756f743b4f4d415338384d602922203e280160010035052c000f696e0000000000000000b9ae1a663b080e66bc5898463efcacc63e10547f3c1fe0db3f8000000000000000000000f9ec6ecb38000000170a070d13ce71b1104c120a0d47c1676c10d4cb8b402000000000d666aedd500000c8780000870c000000002b0a0f0d4f6d65441531562b431d55b2874412140d00000000150b0895be1d00000000254bea743f18baec4300000065");
-            //var cs = PacketUtills.PacketToCsCode(new ConanPacket(new ConanStream(pkt)));
-            //File.WriteAllText("c:/users/melvin/desktop/spawn.cs", cs);
         }
 
         public override void ClientConnected(NetworkClient client)
@@ -37,9 +34,16 @@ namespace GameServer
             client.Tag = new Account();
         }
 
+        public override void ClientDisconnected(NetworkClient client)
+        {
+            base.ClientDisconnected(client);
+
+            ((Account) client.Tag).Character?.SaveDataToDatabase(Database);
+        }
+
         public override void ReceivedPacket(NetworkClient client, ConanPacket packet)
         {
-            Logger.WriteLine("Received opcode: " + (Opcodes) packet.Opcode + " (" + packet.Opcode.ToHex() + ")");
+            Logger.Info("Received opcode: " + (Opcodes) packet.Opcode + " (" + packet.Opcode.ToHex() + ")");
             var account = (Account) client.Tag;
 
             switch ((Opcodes) packet.Opcode)
@@ -50,27 +54,32 @@ namespace GameServer
                     account.Id = packet.Data.ReadUInt32(); // 0x310cec57
                     var clientVersion = packet.Data.ReadString();
 
-                    account.LoadDetailsFromDatabase(Database);
-                    account.Character = new Character(2);
-                    account.Character.LoadDetailsFromDatabase(Database);
+                    var charId = (UInt32) Database.ExecuteScalar<Int64>(
+                        "SELECT characterid FROM clientinstances " +
+                        "WHERE accountid=" + account.Id + " AND clientinst=" + account.ClientInstance);
 
-                    Logger.WriteLine("CharID: " + account.ClientInstance.ToHex());
-                    Logger.WriteLine("Recieve Client Version: " + clientVersion);
+                    account.Character = new Character(charId);
+                    account.Character.LoadDetailsFromDatabase(Database);
+                    account.LoadDetailsFromDatabase(Database);
+
+                    Logger.Info("CharID: " + account.ClientInstance.ToHex());
+                    Logger.Info("Recieve Client Version: " + clientVersion);
 
                     /*if (clientVersion != "v4.00.NoTS@369764")
                     {
-                        Logger.WriteLine("Incompatible client connects to the Server");
+                        Logger.Info("Incompatible client connects to the Server");
                         //break;
                     }*/
 
-                    ReportDimensionId(client, account, 1);
-                    ReportServerId(client, account, 0x00000006);
+                    ReportDimensionId(client, account, account.Character.RealmId); // 1
+                    ReportServerId(client, account, account.Character.RealmId); // 0x00000006
                     AckAuthentication(client, account, 1);
 
                     Send0X201C(client, account); // No imediate visible change when not sending these
                     Send0X200A(client, account);
 
-                    var packetData135 = Functions.HexStreamToByteArray(File.ReadAllText("../../other/fs135.hex"));
+                    var packetData135 = Functions.HexStreamToByteArray(File.ReadAllText("../../other/fs135.hex")
+                        .Replace("\r", "").Replace("\n", ""));
                     new PacketStream() // To big to keep here, but necessary to send...
                         .WriteHeader(Sender0, Receiver0, null, 0x2000)
                         .WriteArrayPrependLengthUInt32(new ConanStream()
@@ -78,8 +87,10 @@ namespace GameServer
                             .WriteArray(packetData135))
                         .Send(client);
 
-                    Send0x5D85BFC7(client); // Needed to get the loading bar to start loading
+                    MapChange(client, account);
                     SpawnPlayer(client, account);
+                    SetTimeofDay(client);
+
                     //SendPlayerBuffsTest(client, account);
                     //SendSitOnMountTest(client, account);
                     //Send0x33A56FB0(client); // No imediate visible change when not sending these 
@@ -114,7 +125,7 @@ namespace GameServer
                     break;
                 }
 
-                case Opcodes.Ox206A: // request change map
+                case Opcodes.Ox206A: // request change map(?)
                 {
                     /*byte[] sender = { 0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x14 };
                     byte[] receiver = { 0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0x84, 0x80, 0x80, 0x08 };
@@ -156,22 +167,24 @@ namespace GameServer
                     aBuffer.WriteUInt16(Program.GameServerPort);
                     aBuffer.Send(client);*/
 
-                    var packetData = packet.Data;
-                    //
+                    //var packetData = packet.Data.ToArray().ToHexString();
+                    Logger.Info("Opcodes.Ox206A");
 
                     break;
                 }
                 case Opcodes.Ox207B:
                 {
-                    var packetData = packet.Data;
-                    //Logger.WriteLine("Receive opcode 0x207b. Maybe hide object(helmet,...)");
+                    //var packetData = packet.Data;
+                    Logger.Info("Opcodes.Ox207B");
+                    //Logger.Info("Receive opcode 0x207b. Maybe hide object(helmet,...)");
 
                     break;
                 }
 
                 case Opcodes.Ox205A:
                 {
-                    var packetData = packet.Data;
+                    //var packetData = packet.Data;
+                    Logger.Info("Opcodes.Ox205A");
                     //
 
                     break;
@@ -225,10 +238,10 @@ namespace GameServer
                         .WriteUInt32(time) // not the correct value? But still working
                         .Send(client);
 
-                    if (account.State == 1 && account.Counter > 0)
+                    if (account.CreateState == 1 && account.CreateCounter > 0)
                     {
                         account.State = 0;
-                        account.Counter = 0;
+                        account.CreateCounter = 0;
 
                         var data1 = new byte[]
                         {
@@ -266,7 +279,7 @@ namespace GameServer
 
                 case Opcodes.ManualRemoveBuff:
                 {
-                    Logger.WriteLine("REMOVE BUFF");
+                    Logger.Info("REMOVE BUFF");
 
                     break;
                 }
@@ -289,7 +302,7 @@ namespace GameServer
 
                 default:
                 {
-                    Logger.WriteLine("Unknown packet: " + packet);
+                    Logger.Info("Unknown packet: " + packet);
                     break;
                 }
             }

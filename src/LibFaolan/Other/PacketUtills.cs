@@ -18,7 +18,7 @@ namespace LibFaolan.Other
 
             var addSenderData = false;
             var senderName = "";
-            var senderData = packet.SenderInt.ToHexString();
+            var senderData = packet.SenderInt.ToHex();
             if (Senders.ContainsValue(senderData))
                 senderName = Senders.FirstOrDefault(s => s.Value == senderData).Key;
             else
@@ -30,7 +30,7 @@ namespace LibFaolan.Other
 
             var addReceiverData = false;
             var receiverName = "";
-            var receiverData = packet.ReceiverInt.ToHexString();
+            var receiverData = packet.ReceiverInt.ToHex();
             if (Receivers.ContainsValue(receiverData))
                 receiverName = Receivers.FirstOrDefault(s => s.Value == receiverData).Key;
             else
@@ -47,11 +47,11 @@ namespace LibFaolan.Other
                 (addReceiverData ? "var " + receiverName + " = new byte[]" + receiverData + ";\r\n" : "") +
                 (hasHeaderData
                     ? "var " + headerDataName + " = new byte[]" +
-                      packet.HeaderData.ToArray().ToHexString() + ";\r\n"
+                      packet.HeaderData.ToArray().ToHex() + ";\r\n"
                     : "") +
                 (packet.Data != null
                     ? "var " + packetDataName + " = new byte[]" +
-                      packet.Data.ToArray().ToHexString() + ";"
+                      packet.Data.ToArray().ToHex() + ";"
                     : "") + "\r\n" +
                 "new PacketBuffer()" + "\r\n" +
                 "    .WriteHeader(" + senderName + ", " + receiverName + ", " + headerDataName + ", " +
@@ -70,17 +70,17 @@ namespace LibFaolan.Other
                 string.Format("UInt32\theadersize\t=\t{0}\r\n", packet.Headersize) +
                 string.Format("byte\tsender\t\t=\t0x{0:X}\r\n", packet.Sender) +
                 string.Format("byte\tslength\t\t=\t{0}\r\n", packet.SenderInt.Length) +
-                string.Format("byte[]\tsenderInt\t=\t{0}\r\n", packet.SenderInt.ToHexString()) +
+                string.Format("byte[]\tsenderInt\t=\t{0}\r\n", packet.SenderInt.ToHex()) +
                 string.Format("byte\treceiver\t=\t0x{0:X}\r\n", packet.Receiver) +
                 string.Format("byte\trlength\t\t=\t{0}\r\n", packet.ReceiverInt.Length) +
-                string.Format("byte[]\treceiverInt\t=\t{0}\r\n", packet.ReceiverInt.ToHexString()) +
+                string.Format("byte[]\treceiverInt\t=\t{0}\r\n", packet.ReceiverInt.ToHex()) +
                 string.Format("UInt32\topcode\t\t=\t0x{0:X8}\r\n", packet.Opcode) +
                 string.Format("UInt32\thdrDataLen\t=\t{0}\r\n", packet.HeaderData?.Length) +
                 string.Format("byte[]\theaderData\t=\t{0}\r\n",
-                    packet.HeaderData != null ? packet.HeaderData.ToArray().ToHexString() : "") +
+                    packet.HeaderData != null ? packet.HeaderData.ToArray().ToHex() : "") +
                 string.Format("UInt32\tdataLength\t=\t{0}\r\n", packet.Data?.Length) +
                 string.Format("byte[]\tdata\t\t=\t{0}\r\n",
-                    packet.Data != null ? packet.Data.ToArray().ToHexString() : "");
+                    packet.Data != null ? packet.Data.ToArray().ToHex() : "");
 
             return var;
         }
@@ -90,12 +90,12 @@ namespace LibFaolan.Other
             var var =
                 (comment != null ? "// " + comment + "\r\n" : "") +
                 (packet.HeaderData != null && packet.HeaderData.Length > 0
-                    ? "var headerData = new byte[]" + packet.HeaderData.ToArray().ToHexString() + ";\r\n"
+                    ? "var headerData = new byte[]" + packet.HeaderData.ToArray().ToHex() + ";\r\n"
                     : "") +
-                "var sender = new byte[]" + packet.SenderInt.ToHexString() + ";\r\n" +
-                "var receiver = new byte[]" + packet.ReceiverInt.ToHexString() + ";\r\n" +
+                "var sender = new byte[]" + packet.SenderInt.ToHex() + ";\r\n" +
+                "var receiver = new byte[]" + packet.ReceiverInt.ToHex() + ";\r\n" +
                 (packet.Data != null
-                    ? "var packetData = new byte[]" + packet.Data.ToArray().ToHexString() + ";\r\n"
+                    ? "var packetData = new byte[]" + packet.Data.ToArray().ToHex() + ";\r\n"
                     : "") + "\r\n" +
                 "new PacketBuffer()" + "\r\n" +
                 "    .WriteHeader(sender, receiver, " +

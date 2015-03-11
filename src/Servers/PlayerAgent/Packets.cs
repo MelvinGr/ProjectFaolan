@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using LibFaolan.Config;
 using LibFaolan.Data;
 using LibFaolan.Database;
@@ -31,8 +30,8 @@ namespace PlayerAgent
 
         public void SendSmallCharList(NetworkClient client, Account account)
         {
-            var characters = new List<Character>(); // get from db
-            var anzChars = (UInt32) characters.Count;
+            var characters = account.GetCharacters(Database);
+            var anzChars = (UInt32) characters.Length;
 
             byte[] headerData = {0x94, 0xa7, 0x60};
 
@@ -192,7 +191,7 @@ namespace PlayerAgent
             new PacketStream() // Send WorldServer
                 .WriteHeader(Sender3, Receiver3, headerData, 0x1A07)
                 .WriteString(Realms[0].IpAddress + ":" + Realms[0].Port)
-                .WriteUInt32(0x5679E2CF)
+                .WriteUInt32(account.Id) // 0x5679E2CF
                 .WriteUInt32(0x0000C350)
                 .WriteUInt32(account.ClientInstance)
                 .WriteArray(packetData)
@@ -547,10 +546,14 @@ namespace PlayerAgent
                 0xA9, 0x48, 0xD5, 0xE5
             };
 
+            account.ClientInstance = (UInt32) Database.ExecuteScalar<Int64>(
+                "SELECT clientinst FROM clientinstances " +
+                "WHERE accountid=" + account.Id + " AND characterid=" + account.Character.Id);
+
             new PacketStream()
                 .WriteHeader(Sender4, Receiver4, headerData, 0x20B9)
                 .WriteUInt32(0x0000C350)
-                .WriteUInt32(account.ClientInstance) // 0x0802E5D4) // charid?
+                .WriteUInt32(account.ClientInstance)
                 .WriteArray(packetData)
                 .Send(client);
         }

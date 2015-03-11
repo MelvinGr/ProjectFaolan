@@ -1,4 +1,5 @@
 using System.Data.Common;
+using LibFaolan.Other;
 using MySql.Data.MySqlClient;
 
 namespace LibFaolan.Database
@@ -7,21 +8,26 @@ namespace LibFaolan.Database
     {
         private readonly MySqlConnection _connection;
 
-        public MySqlDatabase(string server, uint port, string database, string user, string password)
+        public MySqlDatabase(string server, uint port, string database, string user, string password, Logger logger)
         {
+            Logger = logger;
             _connection = new MySqlConnection("SERVER=" + server + ";PORT=" + port + ";DATABASE='" +
                                               database + "';UID='" + user + "';PASSWORD='" + password + "';");
         }
+
+        public Logger Logger { get; }
 
         public bool Connect()
         {
             try
             {
                 _connection.Open();
+                Logger.Info("Connected");
                 return true;
             }
             catch
             {
+                Logger.Info("Could not connect");
                 return false;
             }
         }

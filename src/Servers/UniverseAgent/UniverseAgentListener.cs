@@ -20,7 +20,7 @@ namespace UniverseAgent
 
         public override void ReceivedPacket(NetworkClient client, ConanPacket packet)
         {
-            Logger.WriteLine("Received opcode: " + (Opcodes) packet.Opcode + " (" + packet.Opcode.ToHex() + ")");
+            Logger.Info("Received opcode: " + (Opcodes) packet.Opcode + " (" + packet.Opcode.ToHex() + ")");
             var account = (Account) client.Tag;
 
             switch ((Opcodes) packet.Opcode)
@@ -45,7 +45,7 @@ namespace UniverseAgent
 
                     if (decryptedDataVector.Length != 3) // wrong decryption
                     {
-                        Logger.WriteLine("Wrong decryption of username and password");
+                        Logger.Info("Wrong decryption of username and password");
                         Packets.AckAuthenticate(client, 0xffffff, 0, 0x04);
                         break;
                     }
@@ -56,14 +56,14 @@ namespace UniverseAgent
 
                     if (nChallenge != client.AuthChallenge) // wrong auth
                     {
-                        Logger.WriteLine("Wrong Auth");
+                        Logger.Info("Wrong Auth");
                         Packets.AckAuthenticate(client, 0xffffff, 0, 0x04);
                         break;
                     }
                     */
                     if (!account.CheckLogin(Database, account.Name)) // wrong login
                     {
-                        Logger.WriteLine("Wrong Login");
+                        Logger.Info("Wrong Login");
                         //Packets.AckAuthenticate(client, 0xffffff, 0, 0x0e);
                         break;
                     }
@@ -71,19 +71,19 @@ namespace UniverseAgent
                     /*
                     if (client.nClientInst == -1) // could not get clientInst
                     {
-                        Logger.WriteLine("Could not get clientInst");
+                        Logger.Info("Could not get clientInst");
                         Packets.AckAuthenticate(client, 0xffffff, 0, 0x04);
                         break;
                     }*/
 
                     if (account.IsBanned(Database)) // player banned
                     {
-                        Logger.WriteLine("Banned Player tried to login");
+                        Logger.Info("Banned Player tried to login");
                         //Packets.AckAuthenticate(client, 0xffffff, 0, 0x17);
                         break;
                     }
 
-                    Logger.WriteLine("User {0} is logging on with accountId: {1}", account.Name, account.Id);
+                    Logger.Info("User {0} is logging on with accountId: {1}", account.Name, account.Id);
 
                     account.UpdateLastInfo(Database, client);
                     SetRegionState(client, account);
@@ -93,7 +93,7 @@ namespace UniverseAgent
                 }
                 default:
                 {
-                    Logger.WriteLine("Unknown packet: " + packet);
+                    Logger.Info("Unknown packet: " + packet);
                     break;
                 }
             }

@@ -37,18 +37,20 @@ namespace LibFaolan.Network
         }
 
         protected ConcurrentDictionary<long, IScsServerClient> Clients => _scsServer.Clients;
-        protected IEnumerable<NetworkClient> NetworkClients => Clients.Select(c => (NetworkClient)c.Value.Tag);
-        protected IEnumerable<Account> Accounts => NetworkClients.Select(nc => (Account)nc.Tag);
+        protected IEnumerable<NetworkClient> NetworkClients => Clients.Select(c => (NetworkClient) c.Value.Tag);
+        protected IEnumerable<Account> Accounts => NetworkClients.Select(nc => (Account) nc.Tag);
 
         public bool Start()
         {
             try
             {
                 _scsServer.Start();
+                Logger.Info("Started on port: " + Port);
                 return true;
             }
             catch
             {
+                Logger.Info("Failed to start on port: " + Port);
                 return false;
             }
         }
@@ -77,12 +79,12 @@ namespace LibFaolan.Network
 
         public virtual void ClientConnected(NetworkClient client)
         {
-            Logger.WriteLine("Client with address: " + client.IpAddress + " connected!");
+            Logger.Info("Client with address: " + client.IpAddress + " connected!");
         }
 
         public virtual void ClientDisconnected(NetworkClient client)
         {
-            Logger.WriteLine("Client with address: " + client.IpAddress + " disconnected!");
+            Logger.Info("Client with address: " + client.IpAddress + " disconnected!");
         }
 
         public abstract void ReceivedPacket(NetworkClient client, TPacketType packet);

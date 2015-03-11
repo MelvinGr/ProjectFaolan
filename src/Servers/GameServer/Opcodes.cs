@@ -44,7 +44,7 @@ namespace GameServer
             ApplySpell = 0x6B87E316,
             OxF98E10B3 = 0xF98E10B3,
             SitOnMount = 0x96B8DC59, // Does not apply buff
-            Ox737A6DF9 = 0x737A6DF9,
+            Ox737A6DF9 = 0x737A6DF9
         };
 
         private enum MovingTypes : ushort
@@ -54,6 +54,7 @@ namespace GameServer
             Jump = 0x0156,
             WalkJump = 0x0152,
             MountedJump = 0x0142,
+            Falling = 0x0116,
             Ox011A = 0x011a,
             Ox011E = 0x011e,
             Ox001E = 0x001e,

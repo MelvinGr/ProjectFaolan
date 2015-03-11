@@ -74,13 +74,13 @@ namespace GameServer
                     account.Character.Voice = (byte) recVal;
                     break;
                 case "SetMorphValue":
-                    Logger.WriteLine("Second Command: " + recSecCmd + " with value: " + recVal);
+                    Logger.Info("Second Command: " + recSecCmd + " with value: " + recVal);
                     if (recSecCmd.Length > 0)
                     {
                         //vector<string> scriptData = String::splitString(recSecCmd, "_");
-                        //Logger.WriteLine("Splitted String: %s - " + scriptData[0], scriptData[1]);
-                        account.Counter++;
-                        account.State = 1;
+                        //Logger.Info("Splitted String: %s - " + scriptData[0], scriptData[1]);
+                        account.CreateCounter++;
+                        account.CreateState = 1;
 
                         new PacketStream().WriteHeader(Sender2, Receiver2, null, 0x2000)
                             .WriteArrayPrependLengthUInt32(new ConanStream()
@@ -92,24 +92,24 @@ namespace GameServer
                                 .WriteString(recSecCmd)
                                 .WriteUInt32(0x3f800000)
                                 .WriteByte(0)
-                                .WriteUInt32(account.Counter + 1))
+                                .WriteUInt32(account.CreateCounter + 1))
                             .Send(client);
                     }
                     else
                     {
-                        account.Counter = 0;
+                        account.CreateCounter = 0;
                     }
                     break;
                 case "TheNameIs":
                 {
-                    Logger.WriteLine("Attempt to create Char with the name: " + recSecCmd);
+                    Logger.Info("Attempt to create Char with the name: " + recSecCmd);
                     account.Character.Name = recSecCmd;
 
                     //MELVIN 
                     /*if (!Database.isValidCharName(account.charInfo.Name))
                     {
                         //TODO add missing return packet
-                        Logger.WriteLine("Charname is incorrect !");
+                        Logger.Info("Charname is incorrect !");
                         closesocket(account.clientSocket);
                         break;
                     */
@@ -219,7 +219,7 @@ namespace GameServer
                 }
                     break;
                 default:
-                    Logger.WriteLine("Receive unknown command: {0} with value {1}", recCmd, recVal);
+                    Logger.Info("Receive unknown command: {0} with value {1}", recCmd, recVal);
                     break;
             }
         }
