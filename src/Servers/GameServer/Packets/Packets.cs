@@ -23,7 +23,7 @@ namespace GameServer
                 0x41, 0x70,
                 0x00, 0x00, 0x3F, 0x42,
                 0x40, 0xA8,
-                0x00, 0x00, 0x00, 0x02,
+                0x00, 0x00, 0x00, 0x02, // len for next 2?
                 0xFF, 0xFF, 0xFF, 0xFF,
                 0xFF, 0xFF, 0xFF, 0xFF,
                 0x00, 0x00, 0x00, 0x07,
@@ -32,7 +32,7 @@ namespace GameServer
 
             new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
                 .WriteArrayPrependLengthUInt32(new ConanStream()
-                    .WriteUInt32(Ox2000RespondsOpcodes.Ox5D85BFC7)
+                    .WriteUInt32(Ox2000RespondsOpcodes.MapChange)
                     .WriteUInt32(0)
                     .WriteUInt32(0)
                     .WriteByte(0)

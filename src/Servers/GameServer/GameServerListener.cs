@@ -292,7 +292,7 @@ namespace GameServer
                     var unk3 = packet.Data.ReadUInt32();
                     var text = packet.Data.ReadString();
 
-                    if (text[0] == '.' && text[1] != '.')
+                    if (text[0] == '.' && text[1] != '.' && account.Type >= AccountType.GameMaster)
                         HandleGMCommand(client, account, text);
                     else
                         _agentServerListener.CharacterSay(account, text);
