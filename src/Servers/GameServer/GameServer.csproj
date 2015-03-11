@@ -34,6 +34,7 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Functions.cs" />
@@ -46,7 +47,6 @@
     <Compile Include="GameServerListener.cs" />
     <Compile Include="Packets\Handle0x2000.cs" />
     <Compile Include="Packets\Packets.cs" />
-    <Compile Include="Packets\Send0x2000_SendSpawnNPCAndPlayersTest.cs" />
     <Compile Include="..\..\LibFaolan\Properties\AssemblyInfo.cs">
       <Link>Properties\AssemblyInfo.cs</Link>
     </Compile>
@@ -54,6 +54,7 @@
     <Compile Include="Packets\Send0x200A.cs" />
     <Compile Include="Packets\Send0x201C.cs" />
     <Compile Include="SenderReceivers.cs" />
+    <Compile Include="Tests.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\LibFaolan\LibFaolan.csproj">

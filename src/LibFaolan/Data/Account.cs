@@ -4,21 +4,36 @@ using System.Linq;
 using LibFaolan.Database;
 using LibFaolan.Extentions;
 using LibFaolan.Network;
-using LibFaolan.Other;
 
 namespace LibFaolan.Data
 {
+    public enum AccountState : byte
+    {
+        Banned,
+        Unactivated,
+        Active
+    }
+
+    public enum AccountType : byte
+    {
+        Trial,
+        Normal,
+        GameMaster,
+        Administrator
+    }
+
     public sealed class Account
     {
         public static readonly string AuthChallenge = "2bac5cd78ee0e5a37395991bfbeeeab8";
         public UInt32 AuthStatus;
         public Character Character;
         public UInt32 ClientInstance;
-        public UInt32 Cookie;
-        public int Counter, State;
+        public int CreateCounter;
+        public int CreateState;
         public UInt32 Id; // PlayerInstance
-        public byte Kind; // 0 = user, 1 = admin
         public string Name;
+        public AccountState State;
+        public AccountType Type;
         public UInt64 LongId => (0x0000271200000000u + Id); // As used by the client (why?)
 
         public void LoadDetailsFromDatabase(IDatabase database)
@@ -35,11 +50,9 @@ namespace LibFaolan.Data
                 throw new Exception("obj.Count == 0");
 
             Id = (UInt32) obj["account_id"];
-            // AuthStatus = 
-            Cookie = (UInt32) obj["cookie"];
             Name = obj["username"];
-            Kind = (byte) obj["kind"];
-            ClientInstance = 0x0802E5D4;
+            Type = (AccountType) obj["type"];
+            State = (AccountState) obj["state"];
         }
 
         public bool CheckLogin(IDatabase database, string password)
@@ -66,9 +79,13 @@ namespace LibFaolan.Data
 
         public bool UpdateLastInfo(IDatabase database, NetworkClient client)
         {
-            return database.ExecuteNonQuery("UPDATE accounts SET last_connection='" +
-                                            Functions.SecondsSindsEpoch() + "', last_ip='" + client.IpAddress +
-                                            "' WHERE account_id=" + Id) == 1;
+            var t2 = 0;
+            DllImport.Other.time(ref t2);
+
+            return database.ExecuteNonQuery("UPDATE accounts SET " +
+                                            "last_connection=" + t2 +
+                                            ", last_ip='" + client.IpAddress + "'" +
+                                            "WHERE account_id=" + Id) == 1;
         }
 
         public override string ToString()

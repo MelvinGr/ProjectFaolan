@@ -1,9 +1,11 @@
 using System.Data.Common;
+using LibFaolan.Other;
 
 namespace LibFaolan.Database
 {
     public interface IDatabase
     {
+        Logger Logger { get; }
         bool Connect();
         void Disconnect();
         bool IsConnected();

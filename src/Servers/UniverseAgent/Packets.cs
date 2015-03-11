@@ -34,28 +34,6 @@ namespace UniverseAgent
                 .Send(client);
         }
 
-        /*public static void AckAuthenticate(ConanClient client, UInt32 authStatus, UInt32 eReason, UInt16 errorCode)
-        {
-            byte[] sender = {0x0d, 0xa0, 0xdb, 0x4d, 0x60, 0x10, 0x01};
-            byte[] receiver = {0x0d, 0x54, 0x40, 0x38, 0x0c, 0x10, 0xeb, 0x8e, 0x95, 0xbf, 0x05};
-
-            var aBuffer = new PacketBuffer()
-                .WriteHeader(sender, receiver, null, 0x2001, true)
-                .WriteUInt32(authStatus)
-                .WriteUInt64(client.Id);
-
-            if (errorCode == 0)
-                aBuffer.WriteString(Statics.TerritoryManagerAddr);
-
-            aBuffer.WriteUInt32(client.Cookie);
-            aBuffer.WriteUInt32(eReason);
-
-            if (errorCode > 0)
-                aBuffer.WriteUInt16(errorCode);
-
-            aBuffer.Send(client);
-        }*/
-
         public static void SendPlayerAgentRealm(NetworkClient client, Account account)
         {
             new PacketStream()

@@ -20,7 +20,7 @@ namespace CSPlayerAgent
 
         public override void ReceivedPacket(NetworkClient client, ConanPacket packet)
         {
-            Logger.WriteLine("Received opcode: " + (Opcodes) packet.Opcode + " (" + packet.Opcode.ToHex() + ")");
+            Logger.Info("Received opcode: " + (Opcodes) packet.Opcode + " (" + packet.Opcode.ToHex() + ")");
             var account = (Account) client.Tag;
 
             switch ((Opcodes) packet.Opcode)
@@ -82,7 +82,7 @@ namespace CSPlayerAgent
 
                 default:
                 {
-                    Logger.WriteLine("Unknown packet: " + packet);
+                    Logger.Info("Unknown packet: " + packet);
                     break;
                 }
             }

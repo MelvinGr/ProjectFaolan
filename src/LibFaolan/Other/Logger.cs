@@ -1,43 +1,65 @@
-using System;
-using System.IO;
+using log4net;
+using log4net.Appender;
+using log4net.Config;
+using log4net.Core;
+using log4net.Layout;
+using log4net.Repository.Hierarchy;
 
 namespace LibFaolan.Other
 {
-    public sealed class Logger
+    public class Logger
     {
-        public readonly string Tag;
+        private readonly ILog _logger;
 
         public Logger(string tag = null)
         {
-            Tag = tag;
+            _logger = LogManager.GetLogger(tag != null ? "[" + tag + "] " : "");
         }
 
-        public TextWriter TextWriter { get; set; }
-
-        public void Write(string text)
+        public static void Setup(string path)
         {
-            //lock (TextWriter)
+            // "%d[%2%t] %-5p[%-10c] %m %n"
+            var pl = new PatternLayout {ConversionPattern = "%c%m%n"};
+            pl.ActivateOptions();
+
+            var fileAppender = new FileAppender
             {
-                if (TextWriter != null)
-                    TextWriter.Write(Tag != null ? Tag + text : text);
-                else
-                    Console.Write(Tag != null ? Tag + text : text);
-            }
+                AppendToFile = true,
+                LockingModel = new FileAppender.MinimalLock(),
+                File = path,
+                Layout = pl
+            };
+            fileAppender.ActivateOptions();
+
+            BufferingForwardingAppender bufferingForwardingAppender = new BufferingForwardingAppender
+            {
+                Lossy = false,
+                Fix = FixFlags.None
+            };
+            bufferingForwardingAppender.AddAppender(fileAppender);
+            bufferingForwardingAppender.ActivateOptions();
+
+            var consoleAppender = new ConsoleAppender { Layout = pl };
+            consoleAppender.ActivateOptions();
+
+            var hierarchy = (Hierarchy) LogManager.GetRepository();
+            hierarchy.Root.RemoveAllAppenders();
+            BasicConfigurator.Configure(hierarchy, bufferingForwardingAppender, consoleAppender);
         }
 
-        public void WriteLine()
+        public void Info(string msg, params object[] args)
         {
-            Write(Environment.NewLine);
+            _logger.Info(string.Format(msg, args));
         }
 
-        public void WriteLine(string value)
+        public void Error(string errorMsg, params object[] args)
         {
-            Write(value + Environment.NewLine);
+            _logger.Error(string.Format(errorMsg, args));
         }
 
-        public void WriteLine(string format, params object[] arg)
+        public void Warning(string warningMsg, params object[] args)
         {
-            WriteLine(string.Format(format, arg));
+            _logger.Warn(string.Format(warningMsg, args));
         }
     }
 }

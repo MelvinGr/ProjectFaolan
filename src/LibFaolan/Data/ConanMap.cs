@@ -19,9 +19,9 @@ namespace LibFaolan.Data
             AllMaps = database.ExecuteReader("SELECT * FROM maps").ToIEnumerable().Select(c => new ConanMap
             {
                 Id = (UInt32) c["map_id"],
-                Name = c["map_name"],
-                Position = new Vector3((float) c["position_0"], (float) c["position_1"], (float) c["position_2"]),
-                Rotation = new Vector3((float) c["rotation_0"], (float) c["rotation_1"], (float) c["rotation_2"])
+                Name = (string) c["map_name"],
+                Position = new Vector3((float) c["pos_x"], (float) c["pos_y"], (float) c["pos_z"]),
+                Rotation = new Vector3((float) c["rot_x"], (float) c["rot_y"], (float) c["rot_z"])
             }).ToArray();
         }
 

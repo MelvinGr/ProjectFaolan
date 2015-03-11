@@ -3,7 +3,6 @@ using LibFaolan.Database;
 using LibFaolan.Extentions;
 using LibFaolan.Math;
 using LibFaolan.Network;
-using LibFaolan.Other;
 
 namespace LibFaolan.Data
 {
@@ -11,11 +10,11 @@ namespace LibFaolan.Data
     {
         public uint AccountId;
         public byte Class;
+        public uint Experience;
         public uint HeadMesh;
         public UInt32 Id;
         public string Language;
         public uint LastConnection;
-        public uint Experience;
         public uint Lbinprv;
         public byte Level;
         public UInt32 Map;
@@ -24,6 +23,7 @@ namespace LibFaolan.Data
         public byte Race;
         public byte RealmId;
         public Vector3 Rotation;
+        public UInt32 SelectedTarget;
         public byte Sex;
         public byte Size;
         public byte SkinColour; //0x03 = female ; 0x04 = male ; 0x02 = male
@@ -41,30 +41,33 @@ namespace LibFaolan.Data
             if (c.Count == 0)
                 throw new Exception("c.Count == 0");
 
-            AccountId = (UInt32)c["account_id"];
-            Name = c["name"];
-            Race = (byte)c["race"];
-            Class = (byte)c["class"];
-            Level = (byte)c["level"];
-            Experience = (UInt32)c["Experience"];
-            Sex = (byte)c["sex"];
-            RealmId = (byte)c["realm_id"];
-            Map = (UInt32)c["map_id"];
-            Language = c["language"];
-            HeadMesh = (UInt32)c["headmesh"];
-            Size = (byte)c["size"];
-            Voice = (byte)c["voice"];
-            LastConnection = (UInt32)c["last_connection"];
-            Position = new Vector3((float)c["pos_x"], (float)c["pos_y"], (float)c["pos_z"]);
-            Rotation = new Vector3((float)c["rot_x"], (float)c["rot_y"], (float)c["rot_z"]);
-            Lbinprv = (UInt32)c["lbinprv"];
+            AccountId = (UInt32) c["account_id"];
+            Name = (string) c["name"];
+            Race = (byte) c["race"];
+            Class = (byte) c["class"];
+            Level = (byte) c["level"];
+            Experience = (UInt32) c["Experience"];
+            Sex = (byte) c["sex"];
+            RealmId = (byte) c["realm_id"];
+            Map = (UInt32) c["map_id"];
+            Language = (string) c["language"];
+            HeadMesh = (UInt32) c["headmesh"];
+            Size = (byte) c["size"];
+            Voice = (byte) c["voice"];
+            LastConnection = (UInt32) c["last_connection"];
+            Position = new Vector3((float) c["pos_x"], (float) c["pos_y"], (float) c["pos_z"]);
+            Rotation = new Vector3((float) c["rot_x"], (float) c["rot_y"], (float) c["rot_z"]);
+            Lbinprv = (UInt32) c["lbinprv"];
         }
 
         public bool UpdateLastInfo(IDatabase database, NetworkClient client)
         {
+            var t2 = 0;
+            DllImport.Other.time(ref t2);
+
             return database.ExecuteNonQuery("UPDATE characters SET " +
-                "last_connection=" + Functions.SecondsSindsEpoch() + " " +
-                "WHERE character_id=" + Id) == 1;
+                                            "last_connection=" + t2 + " " +
+                                            "WHERE character_id=" + Id) == 1;
         }
 
         public bool SaveDataToDatabase(IDatabase database)
@@ -73,12 +76,12 @@ namespace LibFaolan.Data
                 "UPDATE characters SET " +
                 "level=" + Level + ", " +
                 "map_id=" + Map + ", " +
-                "pos_x='" + Position.X + "', " +
-                "pos_y='" + Position.Y + "', " +
-                "pos_z='" + Position.Z + "', " +
-                "rot_x='" + Rotation.X + "', " +
-                "rot_y='" + Rotation.Y + "', " +
-                "rot_z='" + Rotation.Z + "' " +
+                "pos_x=" + Position.X + ", " +
+                "pos_y=" + Position.Y + ", " +
+                "pos_z=" + Position.Z + ", " +
+                "rot_x=" + Rotation.X + ", " +
+                "rot_y=" + Rotation.Y + ", " +
+                "rot_z=" + Rotation.Z + " " +
                 "WHERE character_id=" + Id) == 1;
         }
 

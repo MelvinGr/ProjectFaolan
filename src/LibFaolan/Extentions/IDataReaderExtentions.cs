@@ -5,14 +5,22 @@ namespace LibFaolan.Extentions
 {
     public static class DataReaderExtentions
     {
-        // http://paul.kinlan.me/idatarecord-fields-to-dictionary-extension-me/
         public static Dictionary<string, dynamic> ToDictionary(this IDataReader dataRecord)
         {
             var fieldBag = new Dictionary<string, dynamic>(dataRecord.FieldCount);
             while (dataRecord.Read())
             {
+                // dataRecord.GetValue fails on float/double (wrong value), so do it like this
                 for (var i = 0; i < dataRecord.FieldCount; i++)
-                    fieldBag.Add(dataRecord.GetName(i), dataRecord.GetValue(i));
+                {
+                    var typ = dataRecord.GetFieldType(i);
+                    if (typ == typeof (float))
+                        fieldBag.Add(dataRecord.GetName(i), (float) dataRecord.GetDecimal(i));
+                    else if (typ == typeof (double))
+                        fieldBag.Add(dataRecord.GetName(i), (double) dataRecord.GetDecimal(i));
+                    else
+                        fieldBag.Add(dataRecord.GetName(i), dataRecord.GetValue(i));
+                }
             }
 
             return fieldBag;
@@ -22,11 +30,20 @@ namespace LibFaolan.Extentions
         {
             while (dataRecord.Read())
             {
-                var row = new Dictionary<string, dynamic>(dataRecord.FieldCount);
+                // dataRecord.GetValue fails on float/double (wrong value), so do it like this
+                var fieldBag = new Dictionary<string, dynamic>(dataRecord.FieldCount);
                 for (var i = 0; i < dataRecord.FieldCount; i++)
-                    row.Add(dataRecord.GetName(i), dataRecord.GetValue(i));
+                {
+                    var typ = dataRecord.GetFieldType(i);
+                    if (typ == typeof (float))
+                        fieldBag.Add(dataRecord.GetName(i), (float) dataRecord.GetDecimal(i));
+                    else if (typ == typeof (double))
+                        fieldBag.Add(dataRecord.GetName(i), (double) dataRecord.GetDecimal(i));
+                    else
+                        fieldBag.Add(dataRecord.GetName(i), dataRecord.GetValue(i));
+                }
 
-                yield return row;
+                yield return fieldBag;
             }
         }
     }

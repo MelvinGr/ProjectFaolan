@@ -895,7 +895,6 @@ namespace GameServer
             aBuffer.WriteHeader(Sender4, Receiver4, null, 0x201b);
             aBuffer.Send(client);
 
-
             aBuffer = new PacketStream();
             aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
             aBuffer.WriteUInt32(0x0000002b);
@@ -905,7 +904,7 @@ namespace GameServer
             aBuffer.WriteByte(0x01);
             aBuffer.WriteUInt32(0x62);
             aBuffer.WriteUInt32(0x0000c79c);
-            aBuffer.WriteUInt32(0x00000faa); //map
+            aBuffer.WriteUInt32(0x00000fab); //map
             aBuffer.WriteUInt32(0);
             aBuffer.WriteUInt32(account.ClientInstance);
             aBuffer.WriteUInt32(0);
@@ -913,14 +912,6 @@ namespace GameServer
             aBuffer.WriteUInt32(0);
             aBuffer.WriteByte(0);
             aBuffer.Send(client);
-
-            //MELVIN 
-            //account.charInfo.Level = 1;
-            //account.charInfo.Map = 0x00000faa;
-            /*if (!Database.updateCharacter(&account.charInfo))
-            {
-                Logger.WriteLine("Critical error at saving new character " + account.charInfo.Name);
-            }*/
         }
     }
 }

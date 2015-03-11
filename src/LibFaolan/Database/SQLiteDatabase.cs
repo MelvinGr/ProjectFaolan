@@ -1,6 +1,7 @@
 using System.Data;
 using System.Data.Common;
 using System.Data.SQLite;
+using LibFaolan.Other;
 
 namespace LibFaolan.Database
 {
@@ -8,20 +9,25 @@ namespace LibFaolan.Database
     {
         private readonly SQLiteConnection _connection;
 
-        public SqLiteDatabase(string path)
+        public SqLiteDatabase(string path, Logger logger)
         {
+            Logger = logger;
             _connection = new SQLiteConnection("Data Source='" + path + "';Version=3;");
         }
+
+        public Logger Logger { get; }
 
         public bool Connect()
         {
             try
             {
                 _connection.Open();
+                Logger.Info("Connected");
                 return true;
             }
             catch
             {
+                Logger.Info("Could not connect");
                 return false;
             }
         }

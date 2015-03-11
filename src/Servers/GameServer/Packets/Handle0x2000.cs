@@ -1,4 +1,3 @@
-using System.Linq;
 using LibFaolan.Data;
 using LibFaolan.Extentions;
 using LibFaolan.Network;
@@ -11,7 +10,7 @@ namespace GameServer
         {
             var pbLength = packet.Data.ReadUInt32();
             var pbOpcode = (DataOpcodes) packet.Data.ReadUInt32();
-            Logger.WriteLine("Received data opcode: " + pbOpcode + " (" + pbOpcode.ToHex() + ")");
+            Logger.Info("Received data opcode: " + pbOpcode + " (" + pbOpcode.ToHex() + ")");
 
             switch (pbOpcode)
             {
@@ -38,6 +37,7 @@ namespace GameServer
                         case MovingTypes.Jump:
                         case MovingTypes.WalkJump:
                         case MovingTypes.MountedJump:
+                        case MovingTypes.Falling:
                         case MovingTypes.Ox011A:
                         case MovingTypes.Ox011E:
                         case MovingTypes.Ox001E:
@@ -53,7 +53,7 @@ namespace GameServer
                             // send to all (nearby) clients?
                             new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
                                 .WriteArrayPrependLengthUInt32(new ConanStream()
-                                    .WriteUInt32(pbOpcode) 
+                                    .WriteUInt32(pbOpcode)
                                     .WriteUInt32(dataobjdec)
                                     .WriteUInt32(dataclientinst)
                                     .WriteUInt16(movingType)
@@ -65,7 +65,7 @@ namespace GameServer
                         }
                         default:
                         {
-                            Logger.WriteLine("Received unknown moving type: " + movingType.ToHex());
+                            Logger.Info("Received unknown moving type: " + movingType.ToHex());
                             break;
                         }
                     }
@@ -87,10 +87,16 @@ namespace GameServer
                     var unk1 = packet.Data.ReadUInt32();
                     var unkdata = packet.Data.ReadArrayPrependLengthUInt32();
                     var objPreId = packet.Data.ReadUInt32();
-                    var objId = packet.Data.ReadUInt32();
+                    var objId = packet.Data.ReadUInt32(); // ??
                     var unk2 = packet.Data.ReadUInt32();
 
-                    Logger.WriteLine("Interacting with object");
+                    Logger.Info("Interacting,"
+                                + "\nunk0: " + unk0.ToHex()
+                                + "\nunk1: " + unk1.ToHex()
+                                + "\nunkdata: " + unkdata.ToHex()
+                                + "\nobjPreId: " + objPreId.ToHex()
+                                + " objId: " + objId.ToHex()
+                                + "\nunk2: " + objPreId.ToHex());
 
                     break;
                 }
@@ -99,14 +105,14 @@ namespace GameServer
                     var unk0 = packet.Data.ReadUInt32();
                     var accountId = packet.Data.ReadUInt32();
 
-                    Logger.WriteLine("Received close game! (x button)");
+                    account.Character.SaveDataToDatabase(Database);
                     break;
                 }
                 case DataOpcodes.SelectDeselect:
                 {
                     var data = packet.Data.ToArray();
 
-                    Logger.WriteLine("SelectDeselect!");
+                    Logger.Info("SelectDeselect!");
 
                     /*
                     uint32 length = packet->data->bufferLength - 4;
@@ -178,7 +184,7 @@ namespace GameServer
                 {
                     var data = packet.Data.ToArray();
 
-                    Logger.WriteLine("Unknown data Opcode: " + pbOpcode.ToHex());
+                    Logger.Info("Unknown data Opcode: " + pbOpcode.ToHex());
                     break;
                 }
             }

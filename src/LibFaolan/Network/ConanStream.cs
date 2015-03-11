@@ -99,7 +99,7 @@ namespace LibFaolan.Network
                 throw new Exception("value.Length > UInt16.MaxValue");
 
             if (removeLen)
-                WriteUInt16((UInt16)(value.Length - sizeof(UInt16)));
+                WriteUInt16((UInt16) (value.Length - sizeof (UInt16)));
             else
                 WriteUInt16((UInt16) value.Length);
 
