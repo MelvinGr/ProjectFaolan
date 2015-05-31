@@ -1,4 +1,6 @@
 using System;
+using System.Globalization;
+using System.Reflection;
 using System.Runtime.InteropServices;
 
 namespace LibFaolan.DllImport
@@ -7,6 +9,13 @@ namespace LibFaolan.DllImport
     {
         [DllImport("msvcrt.dll", EntryPoint = "_time32", CallingConvention = CallingConvention.Cdecl)]
         public static extern int time(ref int timer);
+
+        public static int time()
+        {
+            var epoch = 0;
+            time(ref epoch);
+            return epoch;
+        }
     }
 
     public static class Network
@@ -56,5 +65,47 @@ namespace LibFaolan.DllImport
         // https://stackoverflow.com/questions/4646827/on-exit-for-a-console-application
         [DllImport("kernel32.dll")]
         public static extern bool SetConsoleCtrlHandler(ConsoleEventDelegate callback, bool add);
+
+        // http://blog.rastating.com/setting-default-currentculture-in-all-versions-of-net/
+        public static void SetDefaultCulture(CultureInfo culture)
+        {
+            var type = typeof (CultureInfo);
+
+            try
+            {
+                type.InvokeMember("s_userDefaultCulture",
+                    BindingFlags.SetField | BindingFlags.NonPublic | BindingFlags.Static,
+                    null,
+                    culture,
+                    new object[] {culture});
+
+                type.InvokeMember("s_userDefaultUICulture",
+                    BindingFlags.SetField | BindingFlags.NonPublic | BindingFlags.Static,
+                    null,
+                    culture,
+                    new object[] {culture});
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                type.InvokeMember("m_userDefaultCulture",
+                    BindingFlags.SetField | BindingFlags.NonPublic | BindingFlags.Static,
+                    null,
+                    culture,
+                    new object[] {culture});
+
+                type.InvokeMember("m_userDefaultUICulture",
+                    BindingFlags.SetField | BindingFlags.NonPublic | BindingFlags.Static,
+                    null,
+                    culture,
+                    new object[] {culture});
+            }
+            catch
+            {
+            }
+        }
     }
 }

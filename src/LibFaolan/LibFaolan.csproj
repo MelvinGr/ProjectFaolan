@@ -51,6 +51,7 @@
     <Compile Include="Database\IDatabase.cs" />
     <Compile Include="Database\MySqlDatabase.cs" />
     <Compile Include="Database\SQLiteDatabase.cs" />
+    <Compile Include="Data\Enums.cs" />
     <Compile Include="Data\WorldObject.cs" />
     <Compile Include="Data\Spell.cs" />
     <Compile Include="Data\Account.cs" />

@@ -30,11 +30,9 @@ namespace ProjectFaolan
         {
             Console.EnableQuickEditMode();
             //Console.SetConsoleCtrlHandler(ConsoleCtrlHandler, true); // Causes crash??
-            Functions.SetDefaultCulture(CultureInfo.InvariantCulture);
+            Console.SetDefaultCulture(CultureInfo.InvariantCulture);
 
-            var epoch = 0;
-            Other.time(ref epoch);
-            Logger.Setup("ProjectFolan_" + epoch + ".log");
+            Logger.Setup("ProjectFolan_" + Other.time() + ".log");
 
             new Logger().Info(Statics.Banner);
         }
@@ -47,21 +45,23 @@ namespace ProjectFaolan
 
         public void Start()
         {
+            var dbLogger = new Logger("Database");
+
             if (Settings.Load(ConfigPath))
-                new Logger("Database").Info("Loaded from: '" + ConfigPath + "'");
+                dbLogger.Info("Loaded from: '" + ConfigPath + "'");
             else
             {
-                new Logger("Database").Info("Failed to load from: '" + ConfigPath + "'");
+                dbLogger.Info("Failed to load from: '" + ConfigPath + "'");
                 return;
             }
 
             if (Settings.UseMysql)
             {
                 _database = new MySqlDatabase(Settings.MySqlAddress, Settings.MySqlPort, Settings.MySqlDatabase,
-                    Settings.MySqlUsername, Settings.MySqlPassword, new Logger("Database"));
+                    Settings.MySqlUsername, Settings.MySqlPassword, dbLogger);
             }
             else if (Settings.UseSqLite)
-                _database = new SqLiteDatabase(Settings.SqLitePath, new Logger("Database"));
+                _database = new SqLiteDatabase(Settings.SqLitePath, dbLogger);
 
             if (!_database.Connect())
                 return;

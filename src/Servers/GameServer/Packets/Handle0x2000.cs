@@ -114,7 +114,7 @@ namespace GameServer
                 {
                     var length = packet.Data.Length - 4;
 
-	                /*switch(length)
+                    /*switch(length)
 	                {
 		                case PassBlob::SELECT_NPC:
 			                {
@@ -173,7 +173,7 @@ namespace GameServer
 			                }
 	                }                    
                     */
-                    
+
                     break;
                 }
                 default:

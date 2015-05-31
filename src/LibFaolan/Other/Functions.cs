@@ -1,56 +1,12 @@
 using System;
-using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using LibFaolan.Network;
 
 namespace LibFaolan.Other
 {
     public static class Functions
     {
-        // http://blog.rastating.com/setting-default-currentculture-in-all-versions-of-net/
-        public static void SetDefaultCulture(CultureInfo culture)
-        {
-            var type = typeof (CultureInfo);
-
-            try
-            {
-                type.InvokeMember("s_userDefaultCulture",
-                    BindingFlags.SetField | BindingFlags.NonPublic | BindingFlags.Static,
-                    null,
-                    culture,
-                    new object[] {culture});
-
-                type.InvokeMember("s_userDefaultUICulture",
-                    BindingFlags.SetField | BindingFlags.NonPublic | BindingFlags.Static,
-                    null,
-                    culture,
-                    new object[] {culture});
-            }
-            catch
-            {
-            }
-
-            try
-            {
-                type.InvokeMember("m_userDefaultCulture",
-                    BindingFlags.SetField | BindingFlags.NonPublic | BindingFlags.Static,
-                    null,
-                    culture,
-                    new object[] {culture});
-
-                type.InvokeMember("m_userDefaultUICulture",
-                    BindingFlags.SetField | BindingFlags.NonPublic | BindingFlags.Static,
-                    null,
-                    culture,
-                    new object[] {culture});
-            }
-            catch
-            {
-            }
-        }
-
         // https://stackoverflow.com/questions/321370/how-can-i-convert-a-hex-string-to-a-byte-array
         public static byte[] HexStreamToByteArray(string hex)
         {

@@ -31,7 +31,7 @@ namespace LibFaolan.Other
             };
             fileAppender.ActivateOptions();
 
-            BufferingForwardingAppender bufferingForwardingAppender = new BufferingForwardingAppender
+            var bufferingForwardingAppender = new BufferingForwardingAppender
             {
                 Lossy = false,
                 Fix = FixFlags.None
@@ -39,7 +39,7 @@ namespace LibFaolan.Other
             bufferingForwardingAppender.AddAppender(fileAppender);
             bufferingForwardingAppender.ActivateOptions();
 
-            var consoleAppender = new ConsoleAppender { Layout = pl };
+            var consoleAppender = new ConsoleAppender {Layout = pl};
             consoleAppender.ActivateOptions();
 
             var hierarchy = (Hierarchy) LogManager.GetRepository();

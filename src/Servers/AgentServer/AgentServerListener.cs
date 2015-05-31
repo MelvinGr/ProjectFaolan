@@ -21,18 +21,18 @@ namespace AgentServer
 
         public override void ReceivedPacket(NetworkClient client, AgentServerPacket packet)
         {
-            Logger.Info("Received opcode: " + (Opcodes)packet.Opcode + " (" + packet.Opcode.ToHex() + ")");
-            var account = (Account)client.Tag;
+            Logger.Info("Received opcode: " + (Opcodes) packet.Opcode + " (" + packet.Opcode.ToHex() + ")");
+            var account = (Account) client.Tag;
 
-            switch ((Opcodes)packet.Opcode)
+            switch ((Opcodes) packet.Opcode)
             {
-            case Opcodes.Hello:
+                case Opcodes.Hello:
                 {
                     var unk0 = packet.Data.ReadUInt32();
                     account.ClientInstance = packet.Data.ReadUInt32();
                     account.Id = packet.Data.ReadUInt32();
 
-                    var charId = (UInt32)Database.ExecuteScalar<Int64>(
+                    var charId = (UInt32) Database.ExecuteScalar<Int64>(
                         "SELECT characterid FROM clientinstances " +
                         "WHERE accountid=" + account.Id + " AND clientinst=" + account.ClientInstance);
 
@@ -48,8 +48,9 @@ namespace AgentServer
                         .WriteArrayPrependLengthUInt16(new ConanStream()
                             .WriteUInt32(account.ClientInstance)
                             .WriteUInt32(0x00000000)
-                            .WriteString(account.Character.Name.Length > 0 ?
-                            account.Character.Name : "Character" + account.ClientInstance))
+                            .WriteString(account.Character.Name.Length > 0
+                                ? account.Character.Name
+                                : "Character" + account.ClientInstance))
                         .Send(client);
 
                     // "<localized category=20000 token=\"welcome_message\">"
@@ -69,7 +70,7 @@ namespace AgentServer
                     break;
                 }
 
-            default:
+                default:
                 {
                     Logger.Info("Unknown packet: " + packet);
                     break;
