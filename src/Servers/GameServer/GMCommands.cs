@@ -57,7 +57,7 @@ namespace GameServer
             account.Character.SaveDataToDatabase(Database);
 
             new PacketStream()
-                .WriteHeader(sender_99, receiver_99, null, 0x2000)
+                .WriteHeader(Sender99, Receiver99, null, 0x2000)
                 .WriteArrayPrependLengthUInt32(new ConanStream()
                     .WriteUInt32(0x10d27bc0)
                     .WriteUInt32(0x0000c350)
@@ -94,7 +94,7 @@ namespace GameServer
             };
 
             new PacketStream()
-                .WriteHeader(sender_99, receiver_99, null, 0x2000)
+                .WriteHeader(Sender99, Receiver99, null, 0x2000)
                 .WriteArrayPrependLengthUInt32(new ConanStream()
                     .WriteUInt32(0x5a32f0d7)
                     .WriteUInt32(0x0000c350)

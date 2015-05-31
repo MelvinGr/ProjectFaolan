@@ -62,9 +62,7 @@ namespace LibFaolan.Config
 
                 UseSqLite = _ini.GetValue("UseSQLite") == "1";
                 if (UseSqLite)
-                {
                     SqLitePath = _ini.GetValue("SQLitePath");
-                }
 
                 WelcomeString = _ini.GetValue("WelcomeString");
 

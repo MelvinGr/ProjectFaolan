@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using AgentServer;
 using LibFaolan.Data;
+using LibFaolan.Data.Enums;
 using LibFaolan.Database;
 using LibFaolan.DllImport;
 using LibFaolan.Extentions;

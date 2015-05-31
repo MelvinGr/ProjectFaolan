@@ -1,27 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using LibFaolan.Data.Enums;
 using LibFaolan.Database;
 using LibFaolan.Extentions;
 using LibFaolan.Network;
 
 namespace LibFaolan.Data
 {
-    public enum AccountState : byte
-    {
-        Banned,
-        Unactivated,
-        Active
-    }
-
-    public enum AccountType : byte
-    {
-        Trial,
-        Normal,
-        GameMaster,
-        Administrator
-    }
-
     public sealed class Account
     {
         public static readonly string AuthChallenge = "2bac5cd78ee0e5a37395991bfbeeeab8";
