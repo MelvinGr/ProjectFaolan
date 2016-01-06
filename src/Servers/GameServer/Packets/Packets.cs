@@ -108,7 +108,7 @@ namespace GameServer
             var receiver = new byte[] {0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0xe6, 0x8f, 0x80, 0x08};
 
             new PacketStream()
-                .WriteHeader(sender, receiver, null, 0x200b) // ReportDimesionID
+                .WriteHeader(sender, receiver, null, RespondOpcodes.ReportDimesionId)
                 .WriteString(realmId.ToString())
                 .Send(client);
         }
@@ -119,7 +119,7 @@ namespace GameServer
             var receiver = new byte[] {0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0xe6, 0x8f, 0x80, 0x08};
 
             new PacketStream()
-                .WriteHeader(sender, receiver, null, 0x200c) // ReportServerID
+                .WriteHeader(sender, receiver, null, RespondOpcodes.ReportServerId)
                 .WriteUInt32(0x0000000b)
                 .WriteUInt32(value)
                 .Send(client);
@@ -131,7 +131,7 @@ namespace GameServer
             var receiver = new byte[] {0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0xe6, 0x8f, 0x80, 0x08};
 
             new PacketStream()
-                .WriteHeader(sender, receiver, null, 0x2001) // ReportServerID
+                .WriteHeader(sender, receiver, null, RespondOpcodes.AckAuthentication)
                 .WriteUInt32(value)
                 .Send(client);
         }
@@ -157,7 +157,7 @@ namespace GameServer
             };
 
             var aBuffer = new PacketStream();
-            aBuffer.WriteHeader(Sender6, Receiver6, null, 0x2024);
+            aBuffer.WriteHeader(Sender6, Receiver6, null, RespondOpcodes.ReadyForPlayScreen);
             aBuffer.WriteVector3(account.Character.Position);
             aBuffer.WriteUInt32(0x00007e2); //2018 = 2*1009 -> -1 -> 1xCoord
             aBuffer.WriteVector3(account.Character.Position);

@@ -49,17 +49,26 @@ namespace LibFaolan.Other
 
         public void Info(string msg, params object[] args)
         {
-            _logger.Info(string.Format(msg, args));
+            if (args.Length > 0)
+                _logger.Info(string.Format(msg, args));
+            else
+                _logger.Info(msg);
         }
 
         public void Error(string errorMsg, params object[] args)
         {
-            _logger.Error(string.Format(errorMsg, args));
+            if (args.Length > 0)
+                _logger.Error(string.Format(errorMsg, args));
+            else
+                _logger.Error(errorMsg);
         }
 
         public void Warning(string warningMsg, params object[] args)
         {
-            _logger.Warn(string.Format(warningMsg, args));
+            if (args.Length > 0)
+                _logger.Warn(string.Format(warningMsg, args));
+            else
+                _logger.Warn(warningMsg);
         }
     }
 }

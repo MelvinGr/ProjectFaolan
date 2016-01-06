@@ -9,13 +9,7 @@ namespace GameServer
         {
             var packetData1020 = new byte[]
             {
-                0x00, 0x00,
-                0x00, 0x00, 0x2B, 0x0A,
-                0x0F, 0x0D, 0xF6, 0xE8,
-                0x89, 0x44, 0x15, 0xBA,
-                0x49, 0x25, 0x43, 0x1D,
-                0xFE, 0xA4, 0x66, 0x44,
-                0x12, 0x14, 0x0D, 0x00,
+                0x14, 0x0D, 0x00,
                 0x00, 0x00, 0x00, 0x15,
                 0x44, 0x77, 0xF5, 0x3E,
                 0x1D,
@@ -244,6 +238,14 @@ namespace GameServer
                     .WriteUInt32(Ox2000RespondsOpcodes.Spawn)
                     .WriteUInt32(0x0000C350)
                     .WriteUInt32(account.ClientInstance)
+                    .WriteUInt32(0x00000000)
+                    .WriteUInt32(0x2B0A0F0D)
+                    .WriteFloat(account.Character.Position.X)
+                    .WriteByte(0x15) // ??
+                    .WriteFloat(account.Character.Position.Y)
+                    .WriteByte(0x1d) // ??
+                    .WriteFloat(account.Character.Position.Z)
+                    .WriteByte(0x12) // ??
                     .WriteArray(packetData1020)
                     .WriteUInt16((short) (0x0722 + account.Character.Name.Length))
                     .WriteByte(0x0a)
