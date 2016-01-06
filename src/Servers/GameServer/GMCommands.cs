@@ -51,7 +51,7 @@ namespace GameServer
             }
 
             account.Character.Map = map.Id;
-            account.Character.Position = map.Position;
+            //account.Character.Position = map.Position;
             account.Character.Rotation = map.Rotation;
             account.Character.SaveDataToDatabase(Database);
 

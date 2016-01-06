@@ -28,7 +28,7 @@ namespace GameServer
             };
             new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
                 .WriteArrayPrependLengthUInt32(new ConanStream()
-                    .WriteUInt32(Ox2000RespondsOpcodes.Ox33A56FB0)
+                    .WriteUInt32(Ox2000RespondsOpcodes.Ox33A56Fb0)
                     .WriteArray(packetData81))
                 .Send(client);
 
@@ -54,7 +54,7 @@ namespace GameServer
             };
             new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
                 .WriteArrayPrependLengthUInt32(new ConanStream()
-                    .WriteUInt32(Ox2000RespondsOpcodes.Ox33A56FB0)
+                    .WriteUInt32(Ox2000RespondsOpcodes.Ox33A56Fb0)
                     .WriteArray(packetData82))
                 .Send(client);
 
@@ -80,7 +80,7 @@ namespace GameServer
             };
             new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
                 .WriteArrayPrependLengthUInt32(new ConanStream()
-                    .WriteUInt32(Ox2000RespondsOpcodes.Ox33A56FB0)
+                    .WriteUInt32(Ox2000RespondsOpcodes.Ox33A56Fb0)
                     .WriteArray(packetData85))
                 .Send(client);
 
@@ -103,7 +103,7 @@ namespace GameServer
             };
             new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
                 .WriteArrayPrependLengthUInt32(new ConanStream()
-                    .WriteUInt32(Ox2000RespondsOpcodes.Ox33A56FB0)
+                    .WriteUInt32(Ox2000RespondsOpcodes.Ox33A56Fb0)
                     .WriteArray(packetData86))
                 .Send(client);
 
@@ -128,7 +128,7 @@ namespace GameServer
             };
             new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
                 .WriteArrayPrependLengthUInt32(new ConanStream()
-                    .WriteUInt32(Ox2000RespondsOpcodes.Ox33A56FB0)
+                    .WriteUInt32(Ox2000RespondsOpcodes.Ox33A56Fb0)
                     .WriteArray(packetData92))
                 .Send(client);
 
@@ -154,7 +154,7 @@ namespace GameServer
             };
             new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
                 .WriteArrayPrependLengthUInt32(new ConanStream()
-                    .WriteUInt32(Ox2000RespondsOpcodes.Ox33A56FB0)
+                    .WriteUInt32(Ox2000RespondsOpcodes.Ox33A56Fb0)
                     .WriteArray(packetData95))
                 .Send(client);
         }
@@ -175,7 +175,7 @@ namespace GameServer
             };
             new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
                 .WriteArrayPrependLengthUInt32(new ConanStream()
-                    .WriteUInt32(Ox2000RespondsOpcodes.Ox642CD3D6)
+                    .WriteUInt32(Ox2000RespondsOpcodes.Ox642Cd3D6)
                     .WriteArray(packetData142))
                 .Send(client);
 
@@ -193,7 +193,7 @@ namespace GameServer
             };
             new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
                 .WriteArrayPrependLengthUInt32(new ConanStream()
-                    .WriteUInt32(Ox2000RespondsOpcodes.Ox642CD3D6)
+                    .WriteUInt32(Ox2000RespondsOpcodes.Ox642Cd3D6)
                     .WriteArray(packetData147))
                 .Send(client);
 
@@ -211,7 +211,7 @@ namespace GameServer
             };
             new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
                 .WriteArrayPrependLengthUInt32(new ConanStream()
-                    .WriteUInt32(Ox2000RespondsOpcodes.Ox642CD3D6)
+                    .WriteUInt32(Ox2000RespondsOpcodes.Ox642Cd3D6)
                     .WriteArray(packetData148))
                 .Send(client);
 
@@ -229,7 +229,7 @@ namespace GameServer
             };
             new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
                 .WriteArrayPrependLengthUInt32(new ConanStream()
-                    .WriteUInt32(Ox2000RespondsOpcodes.Ox642CD3D6)
+                    .WriteUInt32(Ox2000RespondsOpcodes.Ox642Cd3D6)
                     .WriteArray(packetData149))
                 .Send(client);
 
@@ -247,7 +247,7 @@ namespace GameServer
             };
             new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
                 .WriteArrayPrependLengthUInt32(new ConanStream()
-                    .WriteUInt32(Ox2000RespondsOpcodes.Ox642CD3D6)
+                    .WriteUInt32(Ox2000RespondsOpcodes.Ox642Cd3D6)
                     .WriteArray(packetData150))
                 .Send(client);
 
@@ -265,7 +265,7 @@ namespace GameServer
             };
             new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
                 .WriteArrayPrependLengthUInt32(new ConanStream()
-                    .WriteUInt32(Ox2000RespondsOpcodes.Ox642CD3D6)
+                    .WriteUInt32(Ox2000RespondsOpcodes.Ox642Cd3D6)
                     .WriteArray(packetData152))
                 .Send(client);
         }

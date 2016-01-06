@@ -66,24 +66,24 @@ namespace GameServer
                     Logger.Info("Recieve Client Version: " + clientVersion);
 
                     /*if (clientVersion != "v4.00.NoTS@369764")
-                    {
-                        Logger.Info("Incompatible client connects to the Server");
-                        //break;
-                    }*/
+                        {
+                            Logger.Info("Incompatible client connects to the Server");
+                            //break;
+                        }*/
 
                     ReportDimensionId(client, account, account.Character.RealmId); // 1
                     ReportServerId(client, account, account.Character.RealmId); // 0x00000006
                     AckAuthentication(client, account, 1);
 
-                    Send0X201C(client, account); // No imediate visible change when not sending these
-                    Send0X200A(client, account);
+                    //Send0X201C(client, account); // No imediate visible change when not sending these
+                    //Send0X200A(client, account);
 
-                    var packetData135 = Functions.HexStreamToByteArray(File.ReadAllText("../../other/fs135.hex")
-                        .Replace("\r", "").Replace("\n", ""));
+                    var packetData135 = Functions.HexStreamToByteArray(
+                        File.ReadAllText("../../other/fs135.hex").Replace("\r", "").Replace("\n", ""));
                     new PacketStream() // To big to keep here, but necessary to send...
                         .WriteHeader(Sender0, Receiver0, null, 0x2000)
                         .WriteArrayPrependLengthUInt32(new ConanStream()
-                            .WriteUInt32(Ox2000RespondsOpcodes.Ox737A6DF9)
+                            .WriteUInt32(Ox2000RespondsOpcodes.Ox737A6Df9)
                             .WriteArray(packetData135))
                         .Send(client);
 
@@ -124,48 +124,61 @@ namespace GameServer
 
                     break;
                 }
+                case Opcodes.Ox200C: // request change map(?)
+                {
+                    var packetData = packet.Data;
+                    Logger.Info("Opcodes.Ox200c");
 
+                    break;
+                }
+                case Opcodes.Ox205C:
+                {
+                    var packetData = packet.Data;
+                    Logger.Info("Opcodes.Ox205c");
+
+                    break;
+                }
                 case Opcodes.Ox206A: // request change map(?)
                 {
                     /*byte[] sender = { 0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x14 };
-                    byte[] receiver = { 0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0x84, 0x80, 0x80, 0x08 };
+                        byte[] receiver = { 0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0x84, 0x80, 0x80, 0x08 };
 
-                    PacketBuffer aBuffer = new PacketBuffer();
-                    aBuffer.WriteHeader(sender, receiver, null, 0x2009, true);
-                    aBuffer.WriteUInt32(0x00000067);
-                    aBuffer.WriteUInt32(0x5a32f0d7);
-                    aBuffer.WriteUInt32(0x0000c350);
-                    aBuffer.WriteUInt32(account.nClientInst);
-                    aBuffer.WriteByte(0);
-                    aBuffer.WriteUInt64(0);
-                    aBuffer.WriteUInt64(0);
-                    aBuffer.WriteUInt64(0);
-                    aBuffer.WriteUInt32(0x3f800000);
-                    aBuffer.WriteByte(0x62);
-                    aBuffer.WriteUInt32(0x0000c79c);
-                    aBuffer.WriteUInt32(0x00000faa); //map
-                    aBuffer.WriteUInt32(account.nClientInst);
-                    aBuffer.WriteUInt32(0x0000000a);
-                    aBuffer.WriteUInt32(0x00009c50);
-                    aBuffer.WriteUInt32(0x00030bde); //instance
-                    aBuffer.WriteUInt64(0);
-                    aBuffer.WriteUInt32(0x00000014);
-                    aBuffer.WriteUInt32(0x00018704);
-                    aBuffer.WriteUInt32(0x43a14000);
-                    aBuffer.WriteUInt32(0x43160000);
-                    aBuffer.WriteUInt32(0x4430399a);
-                    aBuffer.WriteUInt32(0x00000032);
-                    aBuffer.WriteByte(0);
-                    //Log.Warning("Send Packet:\n%s\n\n", String::arrayToHexString(aBuffer.buffer, aBuffer.bufferLength).c_str());
-                    aBuffer.Send(client);
+                        PacketBuffer aBuffer = new PacketBuffer();
+                        aBuffer.WriteHeader(sender, receiver, null, 0x2009, true);
+                        aBuffer.WriteUInt32(0x00000067);
+                        aBuffer.WriteUInt32(0x5a32f0d7);
+                        aBuffer.WriteUInt32(0x0000c350);
+                        aBuffer.WriteUInt32(account.nClientInst);
+                        aBuffer.WriteByte(0);
+                        aBuffer.WriteUInt64(0);
+                        aBuffer.WriteUInt64(0);
+                        aBuffer.WriteUInt64(0);
+                        aBuffer.WriteUInt32(0x3f800000);
+                        aBuffer.WriteByte(0x62);
+                        aBuffer.WriteUInt32(0x0000c79c);
+                        aBuffer.WriteUInt32(0x00000faa); //map
+                        aBuffer.WriteUInt32(account.nClientInst);
+                        aBuffer.WriteUInt32(0x0000000a);
+                        aBuffer.WriteUInt32(0x00009c50);
+                        aBuffer.WriteUInt32(0x00030bde); //instance
+                        aBuffer.WriteUInt64(0);
+                        aBuffer.WriteUInt32(0x00000014);
+                        aBuffer.WriteUInt32(0x00018704);
+                        aBuffer.WriteUInt32(0x43a14000);
+                        aBuffer.WriteUInt32(0x43160000);
+                        aBuffer.WriteUInt32(0x4430399a);
+                        aBuffer.WriteUInt32(0x00000032);
+                        aBuffer.WriteByte(0);
+                        //Log.Warning("Send Packet:\n%s\n\n", String::arrayToHexString(aBuffer.buffer, aBuffer.bufferLength).c_str());
+                        aBuffer.Send(client);
 
-                    aBuffer = new PacketBuffer();
-                    aBuffer.WriteHeader(sender, receiver, null, 0x2002, true);
-                    //aBuffer.WriteUInt32(htonl(inet_addr(realm->worldServerIPAddress)));
-                    //aBuffer.WriteUInt16(realm->worldServerPort);
-                    aBuffer.WriteUInt32(Native.Network.htonl(Native.Network.inet_addr("127.0.0.1")));
-                    aBuffer.WriteUInt16(Program.GameServerPort);
-                    aBuffer.Send(client);*/
+                        aBuffer = new PacketBuffer();
+                        aBuffer.WriteHeader(sender, receiver, null, 0x2002, true);
+                        //aBuffer.WriteUInt32(htonl(inet_addr(realm->worldServerIPAddress)));
+                        //aBuffer.WriteUInt16(realm->worldServerPort);
+                        aBuffer.WriteUInt32(Native.Network.htonl(Native.Network.inet_addr("127.0.0.1")));
+                        aBuffer.WriteUInt16(Program.GameServerPort);
+                        aBuffer.Send(client);*/
 
                     //var packetData = packet.Data.ToArray().ToHexString();
                     Logger.Info("Opcodes.Ox206A");
@@ -174,7 +187,7 @@ namespace GameServer
                 }
                 case Opcodes.Ox207B:
                 {
-                    //var packetData = packet.Data;
+                    var packetData = packet.Data;
                     Logger.Info("Opcodes.Ox207B");
                     //Logger.Info("Receive opcode 0x207b. Maybe hide object(helmet,...)");
 
@@ -183,7 +196,7 @@ namespace GameServer
 
                 case Opcodes.Ox205A:
                 {
-                    //var packetData = packet.Data;
+                    var packetData = packet.Data;
                     Logger.Info("Opcodes.Ox205A");
                     //
 
@@ -193,7 +206,7 @@ namespace GameServer
                 case Opcodes.Ping: // Ping
                 {
                     new PacketStream() // p.158
-                        .WriteHeader(Sender10, Receiver10, null, SendOpcodes.Pong)
+                        .WriteHeader(Sender10, Receiver10, null, RespondOpcodes.Pong)
                         .WriteUInt32(0x42c80000) // old = 0x42c80000, new = 0x42B32A07
                         .WriteUInt32(0)
                         .WriteUInt32(0)
@@ -279,6 +292,7 @@ namespace GameServer
 
                 case Opcodes.ManualRemoveBuff:
                 {
+                    var packetData = packet.Data.ToArray();
                     Logger.Info("REMOVE BUFF");
 
                     break;
@@ -296,6 +310,14 @@ namespace GameServer
                         HandleGMCommand(client, account, text);
                     else
                         _agentServerListener.CharacterSay(account, text);
+
+                    break;
+                }
+
+                case Opcodes.VanityToggle:
+                {
+                    var packetData = packet.Data.ToArray();
+                    Logger.Info("VanityToggle");
 
                     break;
                 }

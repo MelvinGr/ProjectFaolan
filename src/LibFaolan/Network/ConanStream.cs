@@ -58,7 +58,7 @@ namespace LibFaolan.Network
         public ConanStream WriteUInt64(Enum value) => WriteUInt64(Convert.ToUInt64(value));
         public ConanStream WriteUInt64(long value) => WriteUInt64((ulong) value);
         public ConanStream WriteUInt64(ulong value) => WriteArray(BitConverter.GetBytes(value).Reverse());
-        public ConanStream WriteFloat(float value) => WriteArray(BitConverter.GetBytes(value).Reverse());
+        public ConanStream WriteFloat(float value) => WriteArray(BitConverter.GetBytes(value)); // dont reverse here ???
         public ConanStream WriteShortString(string value) => WriteArrayPrependLengthByte(Encoding.UTF8.GetBytes(value));
         public ConanStream WriteString(string value) => WriteArrayPrependLengthUInt16(Encoding.UTF8.GetBytes(value));
 
