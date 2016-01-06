@@ -19,14 +19,21 @@ namespace ProjectFaolan
         private const string ConfigPath="faolan.ini";
 #endif
 
-        private UniverseAgentListener _universeAgent;
-        private PlayerAgentListener _playerAgent;
-        private GameServerListener _gameServer;
-        private CsPlayerAgentListener _csplayerAgent;
-        private AgentServerListener _agentServer;
-        private IDatabase _database;
+        private static UniverseAgentListener _universeAgent;
+        private static PlayerAgentListener _playerAgent;
+        private static GameServerListener _gameServer;
+        private static CsPlayerAgentListener _csplayerAgent;
+        private static AgentServerListener _agentServer;
+        private static IDatabase _database;
 
-        public Program()
+        /*private bool ConsoleCtrlHandler(Console.CtrlType eventType)
+        {
+            _gameServer?.SaveAllCharacterData();
+            return false;
+        }*/
+
+        [System.STAThread]
+        private static void Main()
         {
             Console.EnableQuickEditMode();
             //Console.SetConsoleCtrlHandler(ConsoleCtrlHandler, true); // Causes crash??
@@ -35,33 +42,22 @@ namespace ProjectFaolan
             Logger.Setup("ProjectFolan_" + Other.time() + ".log");
 
             new Logger().Info(Statics.Banner);
-        }
-
-        /*private bool ConsoleCtrlHandler(Console.CtrlType eventType)
-        {
-            _gameServer?.SaveAllCharacterData();
-            return false;
-        }*/
-
-        public void Start()
-        {
-            var dbLogger = new Logger("Database");
 
             if (Settings.Load(ConfigPath))
-                dbLogger.Info("Loaded from: '" + ConfigPath + "'");
+                new Logger("Settings").Info("Loaded from: '" + ConfigPath + "'");
             else
             {
-                dbLogger.Info("Failed to load from: '" + ConfigPath + "'");
+                new Logger("Settings").Info("Failed to load from: '" + ConfigPath + "'");
                 return;
             }
 
             if (Settings.UseMysql)
             {
                 _database = new MySqlDatabase(Settings.MySqlAddress, Settings.MySqlPort, Settings.MySqlDatabase,
-                    Settings.MySqlUsername, Settings.MySqlPassword, dbLogger);
+                    Settings.MySqlUsername, Settings.MySqlPassword, new Logger("MySQL"));
             }
             else if (Settings.UseSqLite)
-                _database = new SqLiteDatabase(Settings.SqLitePath, dbLogger);
+                _database = new SqLiteDatabase(Settings.SqLitePath, new Logger("SQLite"));
 
             if (!_database.Connect())
                 return;
@@ -84,8 +80,5 @@ namespace ProjectFaolan
                 _agentServer);
             _gameServer.Start();
         }
-
-        [System.STAThread]
-        private static void Main() => new Program().Start();
     }
 }
