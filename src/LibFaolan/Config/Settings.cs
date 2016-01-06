@@ -1,5 +1,3 @@
-using System;
-
 namespace LibFaolan.Config
 {
     public sealed class Settings
@@ -34,27 +32,27 @@ namespace LibFaolan.Config
                 _ini.Load();
 
                 UniverseAgentAddress = _ini.GetValue("UniverseAgentAddress");
-                UniverseAgentPort = UInt16.Parse(_ini.GetValue("UniverseAgentPort"));
+                UniverseAgentPort = ushort.Parse(_ini.GetValue("UniverseAgentPort"));
 
                 PlayerAgentAddress = _ini.GetValue("PlayerAgentAddress");
-                PlayerAgentPort = UInt16.Parse(_ini.GetValue("PlayerAgentPort"));
+                PlayerAgentPort = ushort.Parse(_ini.GetValue("PlayerAgentPort"));
 
                 CsPlayerAgentAddress = _ini.GetValue("CSPlayerAgentAddress");
-                CsPlayerAgentPort = UInt16.Parse(_ini.GetValue("CSPlayerAgentPort"));
+                CsPlayerAgentPort = ushort.Parse(_ini.GetValue("CSPlayerAgentPort"));
 
                 AgentServerAddress = _ini.GetValue("AgentServerAddress");
-                AgentServerPort = UInt16.Parse(_ini.GetValue("AgentServerPort"));
+                AgentServerPort = ushort.Parse(_ini.GetValue("AgentServerPort"));
 
                 GameServerAddress = _ini.GetValue("GameServerAddress");
-                GameServerPort = UInt16.Parse(_ini.GetValue("GameServerPort"));
+                GameServerPort = ushort.Parse(_ini.GetValue("GameServerPort"));
 
-                CharacterSlots = UInt32.Parse(_ini.GetValue("CharacterSlots"));
+                CharacterSlots = uint.Parse(_ini.GetValue("CharacterSlots"));
 
                 UseMysql = _ini.GetValue("UseMySQL") == "1";
                 if (UseMysql)
                 {
                     MySqlAddress = _ini.GetValue("MySqlAddress");
-                    MySqlPort = UInt16.Parse(_ini.GetValue("MySqlPort"));
+                    MySqlPort = ushort.Parse(_ini.GetValue("MySqlPort"));
                     MySqlDatabase = _ini.GetValue("MySqlDatabase");
                     MySqlUsername = _ini.GetValue("MySqlUsername");
                     MySqlPassword = _ini.GetValue("MySqlPassword");

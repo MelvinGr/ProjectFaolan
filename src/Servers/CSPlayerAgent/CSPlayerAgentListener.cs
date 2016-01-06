@@ -1,4 +1,3 @@
-using System;
 using LibFaolan.Data;
 using LibFaolan.Database;
 using LibFaolan.Extentions;
@@ -9,7 +8,7 @@ namespace CSPlayerAgent
 {
     public partial class CsPlayerAgentListener : Server<ConanPacket, ProtocolFactory<ConanWireProtocol>>
     {
-        public CsPlayerAgentListener(UInt16 port, Logger logger, IDatabase database) : base(port, logger, database)
+        public CsPlayerAgentListener(ushort port, Logger logger, IDatabase database) : base(port, logger, database)
         {
         }
 

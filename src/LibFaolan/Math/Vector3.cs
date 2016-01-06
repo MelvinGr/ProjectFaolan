@@ -430,10 +430,10 @@ namespace LibFaolan.Math
             // R = I - (2 * N * ( DotProduct[ I,N] ))
             Vector3 reflectedVector;
             // inline the dotProduct here instead of calling method
-            var dotProduct = ((vector.X*normal.X) + (vector.Y*normal.Y)) + (vector.Z*normal.Z);
-            reflectedVector.X = vector.X - (2.0f*normal.X)*dotProduct;
-            reflectedVector.Y = vector.Y - (2.0f*normal.Y)*dotProduct;
-            reflectedVector.Z = vector.Z - (2.0f*normal.Z)*dotProduct;
+            var dotProduct = vector.X*normal.X + vector.Y*normal.Y + vector.Z*normal.Z;
+            reflectedVector.X = vector.X - 2.0f*normal.X*dotProduct;
+            reflectedVector.Y = vector.Y - 2.0f*normal.Y*dotProduct;
+            reflectedVector.Z = vector.Z - 2.0f*normal.Z*dotProduct;
 
             return reflectedVector;
         }
@@ -445,10 +445,10 @@ namespace LibFaolan.Math
             // R = I - (2 * N * ( DotProduct[ I,N] ))
 
             // inline the dotProduct here instead of calling method
-            var dotProduct = ((vector.X*normal.X) + (vector.Y*normal.Y)) + (vector.Z*normal.Z);
-            result.X = vector.X - (2.0f*normal.X)*dotProduct;
-            result.Y = vector.Y - (2.0f*normal.Y)*dotProduct;
-            result.Z = vector.Z - (2.0f*normal.Z)*dotProduct;
+            var dotProduct = vector.X*normal.X + vector.Y*normal.Y + vector.Z*normal.Z;
+            result.X = vector.X - 2.0f*normal.X*dotProduct;
+            result.Y = vector.Y - 2.0f*normal.Y*dotProduct;
+            result.Z = vector.Z - 2.0f*normal.Z*dotProduct;
         }
 
         public static Vector3 SmoothStep(Vector3 value1, Vector3 value2, float amount)

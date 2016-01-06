@@ -1,4 +1,3 @@
-using System;
 using Hik.Communication.Scs.Communication.Messages;
 using LibFaolan.Extentions;
 
@@ -23,12 +22,12 @@ namespace LibFaolan.Network
         */
 
         private readonly ConanStream _originalStream;
-        public UInt32 Crc32;
+        public uint Crc32;
         public ConanStream Data;
         public ConanStream HeaderData;
-        public UInt32 Headersize;
-        public UInt32 Length;
-        public UInt32 Opcode;
+        public uint Headersize;
+        public uint Length;
+        public uint Opcode;
         public byte Receiver;
         public byte[] ReceiverInt;
         public byte Sender;
@@ -44,7 +43,7 @@ namespace LibFaolan.Network
             if (Length == 0 || stream.Length < Length)
             {
                 //throw new Exception("stream.Length < length");
-                Length = UInt32.MaxValue;
+                Length = uint.MaxValue;
                 return;
             }
 
@@ -53,7 +52,7 @@ namespace LibFaolan.Network
             if (Headersize > 0xffff) // this should do..
             {
                 //throw new Exception("Headersize > 0xffff");
-                Length = UInt32.MaxValue;
+                Length = uint.MaxValue;
                 return;
             }
 
@@ -65,16 +64,16 @@ namespace LibFaolan.Network
 
             Opcode = stream.ReadUInt16();
 
-            var checkHeaderLength = Headersize - (UInt32) (sizeof (UInt32) + SenderInt.Length + ReceiverInt.Length);
+            var checkHeaderLength = Headersize - (uint) (sizeof (uint) + SenderInt.Length + ReceiverInt.Length);
             if (checkHeaderLength > 0)
                 HeaderData = new ConanStream(stream.ReadArray(checkHeaderLength - sizeof (byte)*2));
 
-            var dataLength = Length - (Headersize + sizeof (UInt32)*2);
+            var dataLength = Length - (Headersize + sizeof (uint)*2);
             if (dataLength > 0)
                 Data = new ConanStream(stream.ReadArray(dataLength));
         }
 
-        public UInt32 HeaderLength => (Headersize + sizeof (UInt32)*2); // + length & crc32
+        public uint HeaderLength => Headersize + sizeof (uint)*2; // + length & crc32
         public string MessageId => null;
 
         public string RepliedMessageId

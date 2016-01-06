@@ -13,8 +13,8 @@ namespace LibFaolan.Other
 
         public static string ChainedPacketToCsCode(ConanPacket packet, int id)
         {
-            var hasHeaderData = (packet.HeaderData != null && packet.HeaderData.Length > 0);
-            var headerDataName = (hasHeaderData ? "headerdata" + id : "null");
+            var hasHeaderData = packet.HeaderData != null && packet.HeaderData.Length > 0;
+            var headerDataName = hasHeaderData ? "headerdata" + id : "null";
 
             var addSenderData = false;
             var senderName = "";

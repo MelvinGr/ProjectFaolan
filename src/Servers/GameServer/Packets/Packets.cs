@@ -1,4 +1,3 @@
-using System;
 using LibFaolan.Data;
 using LibFaolan.Network;
 
@@ -44,7 +43,7 @@ namespace GameServer
                 .Send(client);
         }
 
-        private static void ApplySpell(NetworkClient client, UInt32 applyTo, UInt32 applyFrom, UInt32 spellId,
+        private static void ApplySpell(NetworkClient client, uint applyTo, uint applyFrom, uint spellId,
             byte[] data = null)
         {
             // Use as 'dummy' data (comes from Scythe Shield Rank 3 (3 hours, 20 min, 28ish sec))
@@ -103,7 +102,7 @@ namespace GameServer
                 .Send(client);
         }
 
-        private static void ReportDimensionId(NetworkClient client, Account account, UInt32 realmId)
+        private static void ReportDimensionId(NetworkClient client, Account account, uint realmId)
         {
             var sender = new byte[] {0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x0b};
             var receiver = new byte[] {0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0xe6, 0x8f, 0x80, 0x08};
@@ -114,7 +113,7 @@ namespace GameServer
                 .Send(client);
         }
 
-        private static void ReportServerId(NetworkClient client, Account account, UInt32 value)
+        private static void ReportServerId(NetworkClient client, Account account, uint value)
         {
             var sender = new byte[] {0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x0b};
             var receiver = new byte[] {0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0xe6, 0x8f, 0x80, 0x08};
@@ -126,7 +125,7 @@ namespace GameServer
                 .Send(client);
         }
 
-        private static void AckAuthentication(NetworkClient client, Account account, UInt32 value)
+        private static void AckAuthentication(NetworkClient client, Account account, uint value)
         {
             var sender = new byte[] {0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x0b};
             var receiver = new byte[] {0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0xe6, 0x8f, 0x80, 0x08};

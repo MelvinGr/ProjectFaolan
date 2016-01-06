@@ -1,4 +1,3 @@
-using System;
 using System.IO;
 using AgentServer;
 using LibFaolan.Data;
@@ -55,7 +54,7 @@ namespace GameServer
                     account.Id = packet.Data.ReadUInt32(); // 0x310cec57
                     var clientVersion = packet.Data.ReadString();
 
-                    var charId = (UInt32) Database.ExecuteScalar<Int64>(
+                    var charId = (uint) Database.ExecuteScalar<long>(
                         "SELECT characterid FROM clientinstances " +
                         "WHERE accountid=" + account.Id + " AND clientinst=" + account.ClientInstance);
 

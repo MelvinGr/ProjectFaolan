@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 using AgentServer;
 using CSPlayerAgent;
@@ -8,6 +9,7 @@ using LibFaolan.DllImport;
 using LibFaolan.Other;
 using PlayerAgent;
 using UniverseAgent;
+using Console = LibFaolan.DllImport.Console;
 
 namespace ProjectFaolan
 {
@@ -32,7 +34,7 @@ namespace ProjectFaolan
             return false;
         }*/
 
-        [System.STAThread]
+        [STAThread]
         private static void Main()
         {
             Console.EnableQuickEditMode();

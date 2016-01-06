@@ -8,8 +8,8 @@ namespace AgentServer
     {
         private readonly ConanStream _originalStream;
         public ConanStream Data;
-        public UInt16 Length;
-        public UInt16 Opcode;
+        public ushort Length;
+        public ushort Opcode;
 
         public AgentServerPacket(ConanStream stream)
         {
@@ -22,11 +22,11 @@ namespace AgentServer
             if (Length == 0 || stream.Length < Length)
             {
                 //throw new Exception("stream.Length < length");
-                Length = UInt16.MaxValue;
+                Length = ushort.MaxValue;
                 return;
             }
 
-            Data = new ConanStream(stream.ReadArray(Length - sizeof (UInt16)*2u));
+            Data = new ConanStream(stream.ReadArray(Length - sizeof (ushort)*2u));
 
             Console.WriteLine();
         }

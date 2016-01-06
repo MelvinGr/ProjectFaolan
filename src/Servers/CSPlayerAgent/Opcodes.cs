@@ -10,6 +10,6 @@ namespace CSPlayerAgent
             Ox202a = 0x202a,
             Ox203b = 0x203b,
             Ox203c = 0x203c
-        };
+        }
     }
 }

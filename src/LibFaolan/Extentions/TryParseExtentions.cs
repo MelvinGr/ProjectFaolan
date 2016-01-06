@@ -1,4 +1,3 @@
-using System;
 using System.Globalization;
 
 namespace LibFaolan.Extentions
@@ -16,37 +15,37 @@ namespace LibFaolan.Extentions
             return byte.TryParse(input, out output);
         }
 
-        public static bool TryParseNormalOrHex(this string input, out UInt16 output)
+        public static bool TryParseNormalOrHex(this string input, out ushort output)
         {
             if (input.StartsWith("0x"))
             {
-                return UInt16.TryParse(input.Substring(2), NumberStyles.HexNumber,
+                return ushort.TryParse(input.Substring(2), NumberStyles.HexNumber,
                     CultureInfo.InvariantCulture, out output);
             }
 
-            return UInt16.TryParse(input, out output);
+            return ushort.TryParse(input, out output);
         }
 
-        public static bool TryParseNormalOrHex(this string input, out UInt32 output)
+        public static bool TryParseNormalOrHex(this string input, out uint output)
         {
             if (input.StartsWith("0x"))
             {
-                return UInt32.TryParse(input.Substring(2), NumberStyles.HexNumber,
+                return uint.TryParse(input.Substring(2), NumberStyles.HexNumber,
                     CultureInfo.InvariantCulture, out output);
             }
 
-            return UInt32.TryParse(input, out output);
+            return uint.TryParse(input, out output);
         }
 
-        public static bool TryParseNormalOrHex(this string input, out UInt64 output)
+        public static bool TryParseNormalOrHex(this string input, out ulong output)
         {
             if (input.StartsWith("0x"))
             {
-                return UInt64.TryParse(input.Substring(2), NumberStyles.HexNumber,
+                return ulong.TryParse(input.Substring(2), NumberStyles.HexNumber,
                     CultureInfo.InvariantCulture, out output);
             }
 
-            return UInt64.TryParse(input, out output);
+            return ulong.TryParse(input, out output);
         }
     }
 }

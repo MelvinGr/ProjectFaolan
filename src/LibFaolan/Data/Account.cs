@@ -11,16 +11,16 @@ namespace LibFaolan.Data
     public sealed class Account
     {
         public static readonly string AuthChallenge = "2bac5cd78ee0e5a37395991bfbeeeab8";
-        public UInt32 AuthStatus;
+        public uint AuthStatus;
         public Character Character;
-        public UInt32 ClientInstance;
+        public uint ClientInstance;
         public int CreateCounter;
         public int CreateState;
-        public UInt32 Id; // PlayerInstance
+        public uint Id; // PlayerInstance
         public string Name;
         public AccountState State;
         public AccountType Type;
-        public UInt64 LongId => (0x0000271200000000u + Id); // As used by the client (why?)
+        public ulong LongId => 0x0000271200000000u + Id; // As used by the client (why?)
 
         public void LoadDetailsFromDatabase(IDatabase database)
         {
@@ -35,7 +35,7 @@ namespace LibFaolan.Data
             if (obj.Count == 0)
                 throw new Exception("obj.Count == 0");
 
-            Id = (UInt32) obj["account_id"];
+            Id = (uint) obj["account_id"];
             Name = obj["username"];
             Type = (AccountType) obj["type"];
             State = (AccountState) obj["state"];
@@ -55,7 +55,7 @@ namespace LibFaolan.Data
         public Character[] GetCharacters(IDatabase database)
         {
             var chars = database.ExecuteReader("SELECT character_id FROM characters WHERE account_id=" + Id)
-                .ToIEnumerable().Select(c => new Character((UInt32) c["character_id"])).ToArray();
+                .ToIEnumerable().Select(c => new Character((uint) c["character_id"])).ToArray();
 
             foreach (var c in chars)
                 c.LoadDetailsFromDatabase(database);

@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using LibFaolan.Data;
@@ -37,7 +36,7 @@ namespace GameServer
 
         private static void DoTeleport(NetworkClient client, Account account, string arguments)
         {
-            UInt32 mapId;
+            uint mapId;
             if (!arguments.TryParseNormalOrHex(out mapId))
             {
                 _agentServerListener.SendSystemMessage(account, "Invalid input: '" + arguments + "'");
@@ -128,7 +127,7 @@ namespace GameServer
 
         private static void ApplySpellTest(NetworkClient client, Account account, string arguments)
         {
-            UInt32 id;
+            uint id;
             if (arguments.TryParseNormalOrHex(out id))
                 ApplySpell(client, account.ClientInstance, account.ClientInstance, id);
         }

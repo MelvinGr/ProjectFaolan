@@ -5,6 +5,6 @@ namespace AgentServer
         private enum Opcodes : ushort
         {
             Hello = 0x0000
-        };
+        }
     }
 }

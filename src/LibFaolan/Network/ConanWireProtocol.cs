@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using Hik.Communication.Scs.Communication.Messages;
 using Hik.Communication.Scs.Communication.Protocols;
@@ -55,7 +54,7 @@ namespace LibFaolan.Network
             _stream.Position = 0;
 
             var packet = new ConanPacket(_stream);
-            if (packet.Length != UInt32.MaxValue)
+            if (packet.Length != uint.MaxValue)
             {
                 messages.Add(packet);
                 Functions.TrimStream(ref _stream);
