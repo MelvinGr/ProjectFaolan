@@ -39,7 +39,7 @@ namespace LibFaolan.Database
 
         public bool IsConnected()
         {
-            return (_connection.State == ConnectionState.Open || _connection.State == ConnectionState.Executing);
+            return _connection.State == ConnectionState.Open || _connection.State == ConnectionState.Executing;
         }
 
         public int ExecuteNonQuery(string query)

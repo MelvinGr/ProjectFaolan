@@ -1,4 +1,3 @@
-using System;
 using System.Linq;
 using LibFaolan.Database;
 using LibFaolan.Extentions;
@@ -7,13 +6,13 @@ namespace LibFaolan.Data
 {
     public sealed class Spell
     {
-        public UInt16 CastTime;
-        public UInt32 EffectSpell;
-        public UInt32 Id;
+        public ushort CastTime;
+        public uint EffectSpell;
+        public uint Id;
         public byte Level;
-        public UInt16 ManaCost;
-        public UInt16 MaxDamage;
-        public UInt16 MinDamage;
+        public ushort ManaCost;
+        public ushort MaxDamage;
+        public ushort MinDamage;
         public string Name;
         public static Spell[] AllSpells { get; private set; }
 
@@ -21,14 +20,14 @@ namespace LibFaolan.Data
         {
             AllSpells = database.ExecuteReader("SELECT * FROM spells").ToIEnumerable().Select(c => new Spell
             {
-                Id = (UInt32) c["id"],
+                Id = (uint) c["id"],
                 Level = (byte) c["level"],
                 Name = (string) c["name"],
-                CastTime = (UInt16) c["castTime"],
-                MinDamage = (UInt16) c["minDmg"],
-                MaxDamage = (UInt16) c["maxDmg"],
-                ManaCost = (UInt16) c["costMana"],
-                EffectSpell = (UInt32) c["effectSpell"]
+                CastTime = (ushort) c["castTime"],
+                MinDamage = (ushort) c["minDmg"],
+                MaxDamage = (ushort) c["maxDmg"],
+                ManaCost = (ushort) c["costMana"],
+                EffectSpell = (uint) c["effectSpell"]
             }).ToArray();
         }
 

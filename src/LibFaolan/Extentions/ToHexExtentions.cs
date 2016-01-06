@@ -14,9 +14,9 @@ namespace LibFaolan.Extentions
             var enumType = Enum.GetUnderlyingType(value.GetType());
 
             if (enumType == typeof (byte)) return Convert.ToByte(value).ToHex();
-            if (enumType == typeof (UInt16) || enumType == typeof (Int16)) return Convert.ToUInt16(value).ToHex();
-            if (enumType == typeof (UInt32) || enumType == typeof (Int32)) return Convert.ToUInt32(value).ToHex();
-            if (enumType == typeof (UInt64) || enumType == typeof (Int64)) return Convert.ToUInt64(value).ToHex();
+            if (enumType == typeof (ushort) || enumType == typeof (short)) return Convert.ToUInt16(value).ToHex();
+            if (enumType == typeof (uint) || enumType == typeof (int)) return Convert.ToUInt32(value).ToHex();
+            if (enumType == typeof (ulong) || enumType == typeof (long)) return Convert.ToUInt64(value).ToHex();
             if (enumType == typeof (float)) return Convert.ToUInt32(value).ToHex();
             if (enumType == typeof (double)) return Convert.ToUInt64(value).ToHex();
 
@@ -33,44 +33,44 @@ namespace LibFaolan.Extentions
             return string.Format("0x{0:X2}", value);
         }
 
-        public static string ToHex(this UInt16 value)
+        public static string ToHex(this ushort value)
         {
             return string.Format("0x{0:X4}", value);
         }
 
-        public static string ToHex(this Int16 value)
+        public static string ToHex(this short value)
         {
             return string.Format("0x{0:X4}", value);
         }
 
-        public static string ToHex(this UInt32 value)
+        public static string ToHex(this uint value)
         {
             return string.Format("0x{0:X8}", value);
         }
 
-        public static string ToHex(this Int32 value)
+        public static string ToHex(this int value)
         {
             return string.Format("0x{0:X8}", value);
         }
 
-        public static string ToHex(this UInt64 value)
+        public static string ToHex(this ulong value)
         {
             return string.Format("0x{0:X16}", value);
         }
 
-        public static string ToHex(this Int64 value)
+        public static string ToHex(this long value)
         {
             return string.Format("0x{0:X16}", value);
         }
 
         public static string ToHex(this float value)
         {
-            return string.Format("0x{0:X8}", (UInt32) value); //?
+            return string.Format("0x{0:X8}", (uint) value); //?
         }
 
         public static string ToHex(this double value)
         {
-            return string.Format("0x{0:X16}", (UInt64) value); //?
+            return string.Format("0x{0:X16}", (ulong) value); //?
         }
     }
 }

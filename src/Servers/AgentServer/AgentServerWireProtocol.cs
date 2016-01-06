@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using Hik.Communication.Scs.Communication.Messages;
 using Hik.Communication.Scs.Communication.Protocols;
@@ -48,7 +47,7 @@ namespace AgentServer
             _stream.Position = 0;
 
             var packet = new AgentServerPacket(_stream);
-            if (packet.Length != UInt16.MaxValue)
+            if (packet.Length != ushort.MaxValue)
             {
                 messages.Add(packet);
                 Functions.TrimStream(ref _stream);

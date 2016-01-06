@@ -21,7 +21,7 @@ namespace LibFaolan.Network
 
             //Write Headerlength
             WriteUInt32(1 + sender.Length + 1 + receiver.Length + (headerData?.Length ?? 0)
-                        + sizeof (byte)*2 + (minOpcode ? sizeof (UInt16) : sizeof (UInt32)));
+                        + sizeof (byte)*2 + (minOpcode ? sizeof (ushort) : sizeof (uint)));
 
             //Write sender
             WriteByte(0x0a);
@@ -48,10 +48,10 @@ namespace LibFaolan.Network
         {
             var oldPos = Position;
             Position = 0;
-            WriteUInt32(Length - sizeof (UInt32));
+            WriteUInt32(Length - sizeof (uint));
 
             var hash = Crc32.CalculateForPacketBuffer(this);
-            Position = sizeof (UInt32);
+            Position = sizeof (uint);
             WriteUInt32(hash);
             Position = oldPos;
         }

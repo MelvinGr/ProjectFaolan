@@ -12,18 +12,18 @@ namespace LibFaolan.Data
         public byte Class;
         public uint Experience;
         public uint HeadMesh;
-        public UInt32 Id;
+        public uint Id;
         public string Language;
         public uint LastConnection;
         public uint Lbinprv;
         public byte Level;
-        public UInt32 Map;
+        public uint Map;
         public string Name;
         public Vector3 Position;
         public byte Race;
         public byte RealmId;
         public Vector3 Rotation;
-        public UInt32 SelectedTarget;
+        public uint SelectedTarget;
         public byte Sex;
         public byte Size;
         public byte SkinColour; //0x03 = female ; 0x04 = male ; 0x02 = male
@@ -41,23 +41,23 @@ namespace LibFaolan.Data
             if (c.Count == 0)
                 throw new Exception("c.Count == 0");
 
-            AccountId = (UInt32) c["account_id"];
+            AccountId = (uint) c["account_id"];
             Name = (string) c["name"];
             Race = (byte) c["race"];
             Class = (byte) c["class"];
             Level = (byte) c["level"];
-            Experience = (UInt32) c["Experience"];
+            Experience = (uint) c["Experience"];
             Sex = (byte) c["sex"];
             RealmId = (byte) c["realm_id"];
-            Map = (UInt32) c["map_id"];
+            Map = (uint) c["map_id"];
             Language = (string) c["language"];
-            HeadMesh = (UInt32) c["headmesh"];
+            HeadMesh = (uint) c["headmesh"];
             Size = (byte) c["size"];
             Voice = (byte) c["voice"];
-            LastConnection = (UInt32) c["last_connection"];
+            LastConnection = (uint) c["last_connection"];
             Position = new Vector3((float) c["pos_x"], (float) c["pos_y"], (float) c["pos_z"]);
             Rotation = new Vector3((float) c["rot_x"], (float) c["rot_y"], (float) c["rot_z"]);
-            Lbinprv = (UInt32) c["lbinprv"];
+            Lbinprv = (uint) c["lbinprv"];
         }
 
         public bool UpdateLastInfo(IDatabase database, NetworkClient client)

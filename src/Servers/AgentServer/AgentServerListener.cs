@@ -1,4 +1,3 @@
-using System;
 using LibFaolan.Config;
 using LibFaolan.Data;
 using LibFaolan.Database;
@@ -10,7 +9,7 @@ namespace AgentServer
 {
     public partial class AgentServerListener : Server<AgentServerPacket, ProtocolFactory<AgentServerWireProtocol>>
     {
-        public AgentServerListener(UInt16 port, Logger logger, IDatabase database) : base(port, logger, database)
+        public AgentServerListener(ushort port, Logger logger, IDatabase database) : base(port, logger, database)
         {
         }
 
@@ -32,7 +31,7 @@ namespace AgentServer
                     account.ClientInstance = packet.Data.ReadUInt32();
                     account.Id = packet.Data.ReadUInt32();
 
-                    var charId = (UInt32) Database.ExecuteScalar<Int64>(
+                    var charId = (uint) Database.ExecuteScalar<long>(
                         "SELECT characterid FROM clientinstances " +
                         "WHERE accountid=" + account.Id + " AND clientinst=" + account.ClientInstance);
 

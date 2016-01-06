@@ -14,12 +14,12 @@ namespace GameServer
             Ox205A = 0x205a,
             ManualRemoveBuff = 0x201D,
             ChatCommand = 0x2002
-        };
+        }
 
         private enum SendOpcodes : ushort
         {
             Pong = 0x2009
-        };
+        }
 
         private enum DataOpcodes : uint
         {
@@ -45,7 +45,7 @@ namespace GameServer
             OxF98E10B3 = 0xF98E10B3,
             SitOnMount = 0x96B8DC59, // Does not apply buff
             Ox737A6DF9 = 0x737A6DF9
-        };
+        }
 
         private enum MovingTypes : ushort
         {

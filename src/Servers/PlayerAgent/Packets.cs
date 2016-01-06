@@ -1,4 +1,3 @@
-using System;
 using LibFaolan.Config;
 using LibFaolan.Data;
 using LibFaolan.Database;
@@ -31,7 +30,7 @@ namespace PlayerAgent
         public void SendSmallCharList(NetworkClient client, Account account)
         {
             var characters = account.GetCharacters(Database);
-            var anzChars = (UInt32) characters.Length;
+            var anzChars = (uint) characters.Length;
 
             byte[] headerData = {0x94, 0xa7, 0x60};
 
@@ -55,7 +54,7 @@ namespace PlayerAgent
             var aBuffer = new PacketStream();
             aBuffer.WriteHeader(Sender, Receiver, headerData, 0x20ef); // UpdateClientPlayerData
             aBuffer.WriteUInt32(account.ClientInstance); // PlayerInstance
-            var anzChars = (UInt32) characters.Length;
+            var anzChars = (uint) characters.Length;
 
             aBuffer.WriteUInt32((anzChars + 1)*1009); // number of characters
             foreach (var character in characters)
@@ -546,7 +545,7 @@ namespace PlayerAgent
                 0xA9, 0x48, 0xD5, 0xE5
             };
 
-            account.ClientInstance = (UInt32) Database.ExecuteScalar<Int64>(
+            account.ClientInstance = (uint) Database.ExecuteScalar<long>(
                 "SELECT clientinst FROM clientinstances " +
                 "WHERE accountid=" + account.Id + " AND characterid=" + account.Character.Id);
 

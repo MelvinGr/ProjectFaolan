@@ -16,18 +16,18 @@ namespace LibFaolan.Network
         {
         }
 
-        public new UInt32 Length => (UInt32) base.Length;
+        public new uint Length => (uint) base.Length;
 
-        public new UInt32 Position
+        public new uint Position
         {
-            get { return (UInt32) base.Position; }
+            get { return (uint) base.Position; }
             set { base.Position = value; }
         }
 
         public new byte ReadByte() => (byte) base.ReadByte();
-        public UInt16 ReadUInt16() => BitConverter.ToUInt16(ReadArray(sizeof (UInt16)).Reverse(), 0);
-        public UInt32 ReadUInt32() => BitConverter.ToUInt32(ReadArray(sizeof (UInt32)).Reverse(), 0);
-        public UInt64 ReadUInt64() => BitConverter.ToUInt64(ReadArray(sizeof (UInt64)).Reverse(), 0);
+        public ushort ReadUInt16() => BitConverter.ToUInt16(ReadArray(sizeof (ushort)).Reverse(), 0);
+        public uint ReadUInt32() => BitConverter.ToUInt32(ReadArray(sizeof (uint)).Reverse(), 0);
+        public ulong ReadUInt64() => BitConverter.ToUInt64(ReadArray(sizeof (ulong)).Reverse(), 0);
         public float ReadFloat() => BitConverter.ToSingle(ReadArray(sizeof (float)).Reverse(), 0);
         public string ReadShortString() => Encoding.UTF8.GetString(ReadArrayPrependLengthByte());
         public string ReadString() => Encoding.UTF8.GetString(ReadArrayPrependLengthUInt16());
@@ -36,7 +36,7 @@ namespace LibFaolan.Network
         public byte[] ReadArrayPrependLengthUInt16() => ReadArray(ReadUInt16());
         public byte[] ReadArrayPrependLengthUInt32() => ReadArray(ReadUInt32());
 
-        public byte[] ReadArray(UInt32 length)
+        public byte[] ReadArray(uint length)
         {
             var buffer = new byte[length];
             Read(buffer, 0, (int) length);
@@ -50,14 +50,14 @@ namespace LibFaolan.Network
         }
 
         public ConanStream WriteUInt16(Enum value) => WriteUInt16(Convert.ToUInt16(value));
-        public ConanStream WriteUInt16(Int16 value) => WriteUInt16((UInt16) value);
-        public ConanStream WriteUInt16(UInt16 value) => WriteArray(BitConverter.GetBytes(value).Reverse());
+        public ConanStream WriteUInt16(short value) => WriteUInt16((ushort) value);
+        public ConanStream WriteUInt16(ushort value) => WriteArray(BitConverter.GetBytes(value).Reverse());
         public ConanStream WriteUInt32(Enum value) => WriteUInt32(Convert.ToUInt32(value));
-        public ConanStream WriteUInt32(Int32 value) => WriteUInt32((UInt32) value);
-        public ConanStream WriteUInt32(UInt32 value) => WriteArray(BitConverter.GetBytes(value).Reverse());
+        public ConanStream WriteUInt32(int value) => WriteUInt32((uint) value);
+        public ConanStream WriteUInt32(uint value) => WriteArray(BitConverter.GetBytes(value).Reverse());
         public ConanStream WriteUInt64(Enum value) => WriteUInt64(Convert.ToUInt64(value));
-        public ConanStream WriteUInt64(Int64 value) => WriteUInt64((UInt64) value);
-        public ConanStream WriteUInt64(UInt64 value) => WriteArray(BitConverter.GetBytes(value).Reverse());
+        public ConanStream WriteUInt64(long value) => WriteUInt64((ulong) value);
+        public ConanStream WriteUInt64(ulong value) => WriteArray(BitConverter.GetBytes(value).Reverse());
         public ConanStream WriteFloat(float value) => WriteArray(BitConverter.GetBytes(value).Reverse());
         public ConanStream WriteShortString(string value) => WriteArrayPrependLengthByte(Encoding.UTF8.GetBytes(value));
         public ConanStream WriteString(string value) => WriteArrayPrependLengthUInt16(Encoding.UTF8.GetBytes(value));
@@ -95,13 +95,13 @@ namespace LibFaolan.Network
 
         public ConanStream WriteArrayPrependLengthUInt16(byte[] value, bool removeLen = false)
         {
-            if (value.Length > UInt16.MaxValue)
+            if (value.Length > ushort.MaxValue)
                 throw new Exception("value.Length > UInt16.MaxValue");
 
             if (removeLen)
-                WriteUInt16((UInt16) (value.Length - sizeof (UInt16)));
+                WriteUInt16((ushort) (value.Length - sizeof (ushort)));
             else
-                WriteUInt16((UInt16) value.Length);
+                WriteUInt16((ushort) value.Length);
 
             return WriteArray(value);
         }

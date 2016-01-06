@@ -6,6 +6,6 @@ namespace UniverseAgent
         {
             InitiateAuthentication = 0x2000,
             AnswerChallenge = 0x2001
-        };
+        }
     }
 }

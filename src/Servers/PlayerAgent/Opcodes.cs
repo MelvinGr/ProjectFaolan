@@ -13,6 +13,6 @@ namespace PlayerAgent
             CreateCharacter = 0x20de,
             Ox20Ec = 0x20ec,
             DeleteCharacter = 0x209d // 0x86979E0C:
-        };
+        }
     }
 }

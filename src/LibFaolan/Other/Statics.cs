@@ -15,7 +15,7 @@ namespace LibFaolan.Other
             GetAttributes<AssemblyConfigurationAttribute>().First().Configuration;
 
         public static string BuildHash => AssemblyDescription.Split(' ')[0];
-        public static bool BuildDirty => (AssemblyDescription.Split(' ')[1] == "1");
+        public static bool BuildDirty => AssemblyDescription.Split(' ')[1] == "1";
 
         public static string BuildDate => DateTime.Parse(AssemblyDescription.Split(' ')[2])
             .ToString("HH:mm:ss MM/dd/yyyy", CultureInfo.InvariantCulture);

@@ -1,11 +1,10 @@
-using System;
 using LibFaolan.Network;
 
 namespace LibFaolan.Crypt
 {
     public static class Crc32
     {
-        private static readonly UInt32[] CrcTab1 =
+        private static readonly uint[] CrcTab1 =
         {
             0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA, 0x076DC419
             , 0x706AF48F, 0xE963A535, 0x9E6495A3, 0x0EDB8832, 0x79DCB8A4
@@ -61,7 +60,7 @@ namespace LibFaolan.Crypt
             , 0x2D02EF8D
         };
 
-        private static readonly UInt32[] CrcTab2 =
+        private static readonly uint[] CrcTab2 =
         {
             0x00000000, 0x191B3141, 0x32366282, 0x2B2D53C3, 0x646CC504
             , 0x7D77F445, 0x565AA786, 0x4F4196C7, 0xC8D98A08, 0xD1C2BB49
@@ -117,7 +116,7 @@ namespace LibFaolan.Crypt
             , 0x9324FD72
         };
 
-        private static readonly UInt32[] CrcTab3 =
+        private static readonly uint[] CrcTab3 =
         {
             0x00000000, 0x01C26A37, 0x0384D46E, 0x0246BE59, 0x0709A8DC
             , 0x06CBC2EB, 0x048D7CB2, 0x054F1685, 0x0E1351B8, 0x0FD13B8F
@@ -173,7 +172,7 @@ namespace LibFaolan.Crypt
             , 0xBE9834ED
         };
 
-        private static readonly UInt32[] CrcTab4 =
+        private static readonly uint[] CrcTab4 =
         {
             0x00000000, 0xB8BC6765, 0xAA09C88B, 0x12B5AFEE, 0x8F629757
             , 0x37DEF032, 0x256B5FDC, 0x9DD738B9, 0xC5B428EF, 0x7D084F8A
@@ -229,23 +228,23 @@ namespace LibFaolan.Crypt
             , 0xDE0506F1
         };
 
-        public static unsafe UInt32 CalculateForPacketBuffer(ConanStream packetBuffer)
+        public static unsafe uint CalculateForPacketBuffer(ConanStream packetBuffer)
         {
             fixed (byte* fix = packetBuffer.GetBuffer())
             {
-                var buffer = (UInt32*) fix + 2; // skip length and hash
-                var len = packetBuffer.Length - sizeof (UInt32)*2;
+                var buffer = (uint*) fix + 2; // skip length and hash
+                var len = packetBuffer.Length - sizeof (uint)*2;
                 var crc32 = 0xffffffff;
-                UInt32 offset = 0;
+                uint offset = 0;
 
                 if (len >= 32)
                 {
-                    for (UInt32 i = 0; i < len >> 5; i++)
+                    for (uint i = 0; i < len >> 5; i++)
                     {
                         crc32 ^= buffer[offset];
                         len -= 4;
 
-                        for (UInt32 ii = 0; ii < 7; ii++)
+                        for (uint ii = 0; ii < 7; ii++)
                         {
                             offset++;
                             crc32 = CrcTab2[crc32 >> 16 & 0xFF] ^ CrcTab3[crc32 >> 8 & 0xFF] ^ CrcTab1[crc32 >> 24] ^
@@ -261,7 +260,7 @@ namespace LibFaolan.Crypt
 
                 if (len >= offset)
                 {
-                    for (UInt32 i = 0; i < (len >> 2); i++)
+                    for (uint i = 0; i < len >> 2; i++)
                     {
                         crc32 ^= buffer[offset];
                         len -= 4;
@@ -276,9 +275,9 @@ namespace LibFaolan.Crypt
                 {
                     offset *= 4;
 
-                    for (UInt32 i = 0; i < len; i++)
+                    for (uint i = 0; i < len; i++)
                     {
-                        var tmp = *(byte*) ((UInt64) buffer + offset);
+                        var tmp = *(byte*) ((ulong) buffer + offset);
                         crc32 = (crc32 >> 8) ^ CrcTab1[(tmp ^ crc32) & 0xFF];
                         offset++;
                     }

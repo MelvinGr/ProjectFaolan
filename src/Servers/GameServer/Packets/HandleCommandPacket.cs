@@ -1,4 +1,3 @@
-using System;
 using LibFaolan.Data;
 using LibFaolan.Network;
 
@@ -16,18 +15,18 @@ namespace GameServer
             var unk3 = packet.Data.ReadByte();
             var runByte = packet.Data.ReadByte();
 
-            UInt32 recVal = 0;
+            uint recVal = 0;
             var runId = 0;
             while (runByte != 0x22)
             {
                 if (runId == 0)
                     recVal = runByte;
                 if (runId == 1)
-                    recVal += (runByte*0x100u);
+                    recVal += runByte*0x100u;
                 if (runId == 2)
-                    recVal += (runByte*0x10000u);
+                    recVal += runByte*0x10000u;
                 if (runId == 3)
-                    recVal += (runByte*0x1000000u);
+                    recVal += runByte*0x1000000u;
 
                 runByte = packet.Data.ReadByte();
                 runId++;
@@ -116,7 +115,7 @@ namespace GameServer
 
                     var aBuffer = new PacketStream();
                     aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
-                    aBuffer.WriteUInt32(account.Character.Name.Length + (5*4) + (1*2) + (1*1));
+                    aBuffer.WriteUInt32(account.Character.Name.Length + 5*4 + 1*2 + 1*1);
                     aBuffer.WriteUInt32(0xadce0cda);
                     aBuffer.WriteUInt32(0x0000c350);
                     aBuffer.WriteUInt32(account.ClientInstance);
@@ -132,7 +131,7 @@ namespace GameServer
                     };
                     aBuffer = new PacketStream();
                     aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
-                    aBuffer.WriteUInt32(account.Character.Name.Length + (10 + 1) + data.Length + (4*4) + (1*2) + (2*1));
+                    aBuffer.WriteUInt32(account.Character.Name.Length + 10 + 1 + data.Length + 4*4 + 1*2 + 2*1);
                     aBuffer.WriteUInt32(0xa36d3b74);
                     aBuffer.WriteUInt32(0x0000c350);
                     aBuffer.WriteUInt32(account.ClientInstance);
@@ -153,7 +152,7 @@ namespace GameServer
                     };
                     aBuffer = new PacketStream();
                     aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
-                    aBuffer.WriteUInt32(data2.Length + (3*4));
+                    aBuffer.WriteUInt32(data2.Length + 3*4);
                     aBuffer.WriteUInt32(0xf508f4c1);
                     aBuffer.WriteUInt32(0x0000c350);
                     aBuffer.WriteUInt32(account.ClientInstance);
@@ -169,7 +168,7 @@ namespace GameServer
                     };
                     aBuffer = new PacketStream();
                     aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
-                    aBuffer.WriteUInt32(data3.Length + (3*4));
+                    aBuffer.WriteUInt32(data3.Length + 3*4);
                     aBuffer.WriteUInt32(0xa36d3b74);
                     aBuffer.WriteUInt32(0x0000c350);
                     aBuffer.WriteUInt32(account.ClientInstance);
@@ -184,7 +183,7 @@ namespace GameServer
                     };
                     aBuffer = new PacketStream();
                     aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
-                    aBuffer.WriteUInt32(data4.Length + (1*4));
+                    aBuffer.WriteUInt32(data4.Length + 1*4);
                     aBuffer.WriteUInt32(0x642cd3d6);
                     aBuffer.WriteArray(data4);
 
@@ -197,7 +196,7 @@ namespace GameServer
                     };
                     aBuffer = new PacketStream();
                     aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
-                    aBuffer.WriteUInt32(data5.Length + (1*4));
+                    aBuffer.WriteUInt32(data5.Length + 1*4);
                     aBuffer.WriteUInt32(0x642cd3d6);
                     aBuffer.WriteArray(data5);
 
@@ -209,7 +208,7 @@ namespace GameServer
                     };
                     aBuffer = new PacketStream();
                     aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
-                    aBuffer.WriteUInt32(data6.Length + (3*4));
+                    aBuffer.WriteUInt32(data6.Length + 3*4);
                     aBuffer.WriteUInt32(0xf98e10b3);
                     aBuffer.WriteUInt32(0x0000c350);
                     aBuffer.WriteUInt32(account.ClientInstance);
