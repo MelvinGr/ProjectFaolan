@@ -116,11 +116,16 @@ namespace PlayerAgent
                     var sender = new byte[] {0x0d, 0x84, 0x04, 0xf2, 0x82, 0x10, 0x03};
                     var receiver = new byte[] {0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0xeb, 0x8e, 0x95, 0xbf, 0x05};
 
-                    // INSERT NEW CLIENTINST INTO DB
-                    account.ClientInstance = 0xdeadbeef;
+                    Database.ExecuteNonQuery("INSERT INTO Characters (account_id, realm_id) VALUES (" + account.Id +
+                                             ", " + iNDimId + ")");
+                    var charID = (uint) Database.LastInsertRowID();
+
+                    Database.ExecuteNonQuery("INSERT INTO clientinstances (accountid, characterid) VALUES (" +
+                                             account.Id + ", " + charID + ")");
+                    account.ClientInstance = (uint) Database.LastInsertRowID();
 
                     new PacketStream()
-                        .WriteHeader(sender, receiver, headerData, 0x20b9)
+                        .WriteHeader(sender, receiver, headerData, RespondseOpcodes.CreateCharacter)
                         .WriteUInt32(0x0000c350)
                         .WriteUInt32(account.ClientInstance)
                         .WriteUInt32(0)
@@ -131,7 +136,9 @@ namespace PlayerAgent
 
                 case Opcodes.DeleteCharacter:
                 {
-                    //
+                    var data = packet.Data.ToArray();
+
+                    Logger.Info("DELETE CHAR");
 
                     break;
                 }
@@ -150,7 +157,7 @@ namespace PlayerAgent
 
                 default:
                 {
-                    Logger.Info("Unknown packet: " + packet);
+                    Logger.Warning("Unknown packet: " + packet);
                     break;
                 }
             }

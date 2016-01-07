@@ -170,7 +170,8 @@ namespace GameServer
 
                     Logger.Info("Account with ID: " + accountId.ToHex() + " Has logged off");
 
-                    account.Character.SaveDataToDatabase(Database);
+                    // is handled in ClientDisconnected
+                    //account.Character.SaveDataToDatabase(Database);
                     break;
                 }
                 case DataOpcodes.SelectDeselect:
@@ -279,7 +280,7 @@ namespace GameServer
                 {
                     var data = packet.Data.ToArray();
 
-                    Logger.Info("Unknown data Opcode: " + pbOpcode.ToHex());
+                    Logger.Warning("Unknown data Opcode: " + pbOpcode.ToHex());
                     break;
                 }
             }

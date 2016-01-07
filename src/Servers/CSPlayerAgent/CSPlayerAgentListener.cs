@@ -46,42 +46,40 @@ namespace CSPlayerAgent
                 {
                     var unk0 = packet.Data.ReadUInt32(); // 0x00, 0x00, 0xC3, 0x50
                     var nClientInst = packet.Data.ReadUInt32(); // 0x08, 0x02, 0xE5, 0xD4
-                    // "{ 0x00, 0x00, 0xC3, 0x50, 0x02, 0x10, 0x33, 0xC0 }"
-                    // "{ 0x00, 0x00, 0xC3, 0x50, 0x02, 0x0F, 0x2C, 0xDF }"
 
-                    //
+                    Logger.Info("Opcodes.Ox2019");
 
                     break;
                 }
 
                 case Opcodes.Ox2072:
                 {
-                    // no data
+                    Logger.Info("Opcodes.Ox2072");
                     break;
                 }
 
                 case Opcodes.Ox202a:
                 {
-                    // no data
+                    Logger.Info("Opcodes.Ox202a");
 
                     break;
                 }
 
                 case Opcodes.Ox203b:
                 {
-                    // no data
+                    Logger.Info("Opcodes.Ox203b");
                     break;
                 }
 
                 case Opcodes.Ox203c:
                 {
-                    // no data
+                    Logger.Info("Opcodes.Ox203c");
                     break;
                 }
 
                 default:
                 {
-                    Logger.Info("Unknown packet: " + packet);
+                    Logger.Warning("Unknown packet: " + packet);
                     break;
                 }
             }

@@ -56,5 +56,8 @@ namespace LibFaolan.Database
         {
             return (T) new SQLiteCommand(query, _connection).ExecuteScalar();
         }
+
+        public long LastInsertRowID()
+            => (long) new SQLiteCommand("SELECT last_insert_rowid()", _connection).ExecuteScalar();
     }
 }

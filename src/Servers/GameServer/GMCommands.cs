@@ -53,7 +53,7 @@ namespace GameServer
             account.Character.Map = map.Id;
             //account.Character.Position = map.Position;
             account.Character.Rotation = map.Rotation;
-            account.Character.SaveDataToDatabase(Database);
+            account.Character.SaveDataToDatabase(_databaseStatic);
 
             new PacketStream()
                 .WriteHeader(Sender99, Receiver99, null, 0x2000)
