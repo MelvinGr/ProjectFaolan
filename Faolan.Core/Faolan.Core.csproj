@@ -1,0 +1,91 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{8F960929-5303-4947-909C-6D979D033F64}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <RootNamespace>Faolan.Core</RootNamespace>
+    <AssemblyName>Faolan.Core</AssemblyName>
+    <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <TargetFrameworkProfile />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>..\bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>..\bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup>
+    <StartupObject />
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Config\Ini.cs" />
+    <Compile Include="Config\Settings.cs" />
+    <Compile Include="ConsoleTools.cs" />
+    <Compile Include="Crypt\Crc32.cs" />
+    <Compile Include="Database\IDatabase.cs" />
+    <Compile Include="Database\MySqlDatabase.cs" />
+    <Compile Include="Database\SqLiteDatabase.cs" />
+    <Compile Include="Data\Account.cs" />
+    <Compile Include="Data\Character.cs" />
+    <Compile Include="Data\ConanMap.cs" />
+    <Compile Include="Data\Enums.cs" />
+    <Compile Include="Data\Realm.cs" />
+    <Compile Include="Data\Spell.cs" />
+    <Compile Include="Data\WorldObject.cs" />
+    <Compile Include="Extentions\ArrayExtentions.cs" />
+    <Compile Include="Extentions\IDataReaderExtentions.cs" />
+    <Compile Include="Extentions\ToHexExtentions.cs" />
+    <Compile Include="Extentions\TryParseExtentions.cs" />
+    <Compile Include="Functions.cs" />
+    <Compile Include="Logger.cs" />
+    <Compile Include="Math\MathHelper.cs" />
+    <Compile Include="Math\Vector3.cs" />
+    <Compile Include="Network\ConanPacket.cs" />
+    <Compile Include="Network\ConanStream.cs" />
+    <Compile Include="Network\NetworkClient.cs" />
+    <Compile Include="Network\Opcodes.cs" />
+    <Compile Include="Network\PacketStream.cs" />
+    <Compile Include="Network\PacketUtills.cs" />
+    <Compile Include="Network\Server.cs" />
+    <Compile Include="Statics.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="GitVersionTask">
+      <Version>4.0.1-beta1-50</Version>
+      <PrivateAssets>All</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="MySql.Data">
+      <Version>8.0.13</Version>
+    </PackageReference>
+    <PackageReference Include="System.Data.SQLite">
+      <Version>1.0.109.2</Version>
+    </PackageReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>
