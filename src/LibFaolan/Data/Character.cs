@@ -65,8 +65,7 @@ namespace LibFaolan.Data
             var t2 = 0;
             DllImport.Other.time(ref t2);
 
-            return database.ExecuteNonQuery("UPDATE characters SET " +
-                                            "last_connection=" + t2 + " " +
+            return database.ExecuteNonQuery("UPDATE characters SET last_connection=" + t2 + " " +
                                             "WHERE character_id=" + Id) == 1;
         }
 

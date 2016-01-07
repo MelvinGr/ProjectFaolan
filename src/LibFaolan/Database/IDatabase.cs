@@ -15,5 +15,7 @@ namespace LibFaolan.Database
         DbDataReader ExecuteReader(string query);
         // Used to execute a command that will return only 1 value, for example Select Count(*).
         T ExecuteScalar<T>(string query);
+
+        long LastInsertRowID();
     }
 }

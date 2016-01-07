@@ -93,7 +93,7 @@ namespace UniverseAgent
                 }
                 default:
                 {
-                    Logger.Info("Unknown packet: " + packet);
+                    Logger.Warning("Unknown packet: " + packet);
                     break;
                 }
             }

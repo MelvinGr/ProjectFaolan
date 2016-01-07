@@ -1,3 +1,4 @@
+using System;
 using System.Data.Common;
 using LibFaolan.Other;
 using MySql.Data.MySqlClient;
@@ -55,6 +56,11 @@ namespace LibFaolan.Database
         public T ExecuteScalar<T>(string query)
         {
             return (T) new MySqlCommand(query, _connection).ExecuteScalar();
+        }
+
+        public long LastInsertRowID()
+        {
+            throw new NotImplementedException();
         }
     }
 }

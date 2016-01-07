@@ -14,5 +14,20 @@ namespace PlayerAgent
             Ox20Ec = 0x20ec,
             DeleteCharacter = 0x209d // 0x86979E0C:
         }
+
+        private enum RespondseOpcodes : ushort
+        {
+            CreateCharacter = 0x20b9,
+            InitAuth = 0x2091,
+            SmallCharList = 0x20a5,
+            SendCharacterList = 0x20ef,
+            SendRealmList = 0x20cc,
+            SendCharacterRealmData = 0x208c,
+            SendCSPlayerAgent = 0x1A07,
+            SendAgentServer = 0x1A07,
+            SendGameServer = 0x1A07,
+            SendLast = 0x1A07,
+            EnterWorld = 0x20B9
+        }
     }
 }

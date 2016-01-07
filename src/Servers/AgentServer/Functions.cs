@@ -23,7 +23,7 @@ namespace AgentServer
         private void SendSystemMessage(NetworkClient client, string message)
         {
             new ConanStream()
-                .WriteUInt16(0x0023)
+                .WriteUInt16(RespondsOpcodes.SystemMessage)
                 .WriteArrayPrependLengthUInt16(new ConanStream()
                     .WriteUInt16(0x0000)
                     .WriteString(message)
@@ -43,7 +43,7 @@ namespace AgentServer
             foreach (var client in NetworkClients)
             {
                 new ConanStream()
-                    .WriteUInt16(0x0022) // opcode
+                    .WriteUInt16(RespondsOpcodes.CharacterChat) // opcode
                     .WriteArrayPrependLengthUInt16(new ConanStream()
                         .WriteUInt32(account.ClientInstance)
                         .WriteString(message)

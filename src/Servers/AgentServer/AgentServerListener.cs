@@ -43,7 +43,7 @@ namespace AgentServer
                         .Send(client);
 
                     new ConanStream()
-                        .WriteUInt16(0x0014)
+                        .WriteUInt16(RespondsOpcodes.Ox0014)
                         .WriteArrayPrependLengthUInt16(new ConanStream()
                             .WriteUInt32(account.ClientInstance)
                             .WriteUInt32(0x00000000)
@@ -57,7 +57,7 @@ namespace AgentServer
                     SendSystemMessage(client, Statics.BuildInfo.Replace("\n", "<br />"));
 
                     new ConanStream()
-                        .WriteUInt16(0x003c)
+                        .WriteUInt16(RespondsOpcodes.Ox003c)
                         .WriteArrayPrependLengthUInt16(new ConanStream()
                             .WriteByte(0x04)
                             .WriteUInt32(0x0000232a)
@@ -71,7 +71,7 @@ namespace AgentServer
 
                 default:
                 {
-                    Logger.Info("Unknown packet: " + packet);
+                    Logger.Warning("Unknown packet: " + packet);
                     break;
                 }
             }
