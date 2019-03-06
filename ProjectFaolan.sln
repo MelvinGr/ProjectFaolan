@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.26403.7
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.28621.142
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Faolan.Files", "Faolan.Files", "{EDCB7F2F-B78D-418E-AF8C-DEE1BD596ADD}"
 	ProjectSection(SolutionItems) = preProject
@@ -13,35 +13,31 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Faolan.Files", "Faolan.File
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Faolan.Tools", "Faolan.Tools", "{04F51CCF-FCE6-43E9-9925-1D7ECFA06208}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HexStreamToPacket", "Faolan.Tools\HexStreamToPacket\HexStreamToPacket.csproj", "{88E15AED-D32D-42BC-97F1-E70F88DD20F3}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HexStreamToPacket", "Faolan.Tools\HexStreamToPacket\HexStreamToPacket.csproj", "{88E15AED-D32D-42BC-97F1-E70F88DD20F3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Faolan", "Faolan\Faolan.csproj", "{79222BCD-5D5F-47A6-A84A-8E501CFA1520}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Faolan", "Faolan\Faolan.csproj", "{79222BCD-5D5F-47A6-A84A-8E501CFA1520}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Faolan.Core", "Faolan.Core\Faolan.Core.csproj", "{8F960929-5303-4947-909C-6D979D033F64}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Faolan.Core", "Faolan.Core\Faolan.Core.csproj", "{8F960929-5303-4947-909C-6D979D033F64}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
-		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{88E15AED-D32D-42BC-97F1-E70F88DD20F3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{88E15AED-D32D-42BC-97F1-E70F88DD20F3}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{88E15AED-D32D-42BC-97F1-E70F88DD20F3}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{88E15AED-D32D-42BC-97F1-E70F88DD20F3}.Release|Any CPU.Build.0 = Release|Any CPU
 		{79222BCD-5D5F-47A6-A84A-8E501CFA1520}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{79222BCD-5D5F-47A6-A84A-8E501CFA1520}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{79222BCD-5D5F-47A6-A84A-8E501CFA1520}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{79222BCD-5D5F-47A6-A84A-8E501CFA1520}.Release|Any CPU.Build.0 = Release|Any CPU
 		{8F960929-5303-4947-909C-6D979D033F64}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{8F960929-5303-4947-909C-6D979D033F64}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{8F960929-5303-4947-909C-6D979D033F64}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{8F960929-5303-4947-909C-6D979D033F64}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{88E15AED-D32D-42BC-97F1-E70F88DD20F3} = {04F51CCF-FCE6-43E9-9925-1D7ECFA06208}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {1232EF40-8718-490F-96A0-080E1B1F99BE}
 	EndGlobalSection
 EndGlobal
