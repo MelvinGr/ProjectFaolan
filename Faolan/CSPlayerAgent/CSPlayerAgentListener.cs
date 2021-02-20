@@ -1,29 +1,37 @@
-using Faolan.Core;
+using System.Threading.Tasks;
 using Faolan.Core.Database;
-using Faolan.Core.Extentions;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Opcodes;
+using Faolan.Extensions;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Faolan.CSPlayerAgent
 {
     public class CsPlayerAgentListener : Server<ConanPacket>
     {
-        public CsPlayerAgentListener(ushort port, Logger logger, IDatabase database)
-            : base(port, logger, database)
+        // ReSharper disable once SuggestBaseTypeForParameter
+        public CsPlayerAgentListener(ILogger<CsPlayerAgentListener> logger, IConfiguration configuration,
+            IDatabaseRepository database)
+            : base(configuration.CsPlayerAgentPort(), logger, configuration, database)
         {
         }
 
-        public override void ReceivedPacket(INetworkClient client, ConanPacket packet)
+        protected override async Task ReceivedPacket(NetworkClient client, ConanPacket packet)
         {
-            Logger.Info("Received opcode: " + (CsPlayerAgentOpcodes) packet.Opcode + " (" + packet.Opcode.ToHex() +
-                        ")");
+            Logger.LogInformation($"Received opcode: {(CsPlayerAgentOpcodes) packet.Opcode} ({packet.Opcode.ToHex()})");
 
             switch ((CsPlayerAgentOpcodes) packet.Opcode)
             {
                 case CsPlayerAgentOpcodes.Authenticate:
                 {
-                    client.Account.ClientInstance = packet.Data.ReadUInt32(); // ID64::InstanceType 
-                    client.Account.Id = packet.Data.ReadUInt32();
+                    var clientInstance = packet.Data.ReadUInt32(); // ID64::InstanceType 
+                    var accountId = packet.Data.ReadUInt32();
+
+                    client.Account = await Database.GetAccount(accountId);
+                    client.Account.ClientInstance = clientInstance;
+
                     var unk0 = packet.Data.ReadByte();
                     var auth = packet.Data.ReadUInt32();
 
@@ -43,39 +51,39 @@ namespace Faolan.CSPlayerAgent
                     var unk0 = packet.Data.ReadUInt32(); // 0x00, 0x00, 0xC3, 0x50
                     var nClientInst = packet.Data.ReadUInt32(); // 0x08, 0x02, 0xE5, 0xD4
 
-                    Logger.Info("Opcodes.Ox2019");
+                    Logger.LogInformation("Opcodes.Ox2019");
 
                     break;
                 }
 
                 case CsPlayerAgentOpcodes.Ox2072:
                 {
-                    Logger.Info("Opcodes.Ox2072");
+                    Logger.LogInformation("Opcodes.Ox2072");
                     break;
                 }
 
                 case CsPlayerAgentOpcodes.Ox202A:
                 {
-                    Logger.Info("Opcodes.Ox202a");
+                    Logger.LogInformation("Opcodes.Ox202a");
 
                     break;
                 }
 
                 case CsPlayerAgentOpcodes.Ox203B:
                 {
-                    Logger.Info("Opcodes.Ox203b");
+                    Logger.LogInformation("Opcodes.Ox203b");
                     break;
                 }
 
                 case CsPlayerAgentOpcodes.Ox203C:
                 {
-                    Logger.Info("Opcodes.Ox203c");
+                    Logger.LogInformation("Opcodes.Ox203c");
                     break;
                 }
 
                 default:
                 {
-                    Logger.Warning("Unknown packet: " + packet);
+                    Logger.LogWarning($"Unknown packet: {packet}");
                     break;
                 }
             }

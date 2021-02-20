@@ -2,86 +2,91 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Faolan.Core.Network
 {
-    public abstract class Server<TPacketType>
-        where TPacketType : Packet
+    public abstract class Server<TPacket> : BackgroundService where TPacket : Packet
     {
-        private readonly Task _listenThread;
         private readonly TcpListener _tcpListener;
-        public readonly IDatabase Database;
-        protected readonly Logger Logger;
-        public readonly ushort Port;
+        protected readonly IConfiguration Configuration;
 
-        protected Server(ushort port, Logger logger, IDatabase database)
+        protected readonly IDatabaseRepository Database;
+        protected readonly ILogger Logger;
+        protected readonly SynchronizedCollection<NetworkClient> NetworkClients = new();
+
+        // ReSharper disable once SuggestBaseTypeForParameter
+        protected Server(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database)
         {
-            if (logger == null || database == null)
-                throw new Exception("logger == null || database == null");
-
-            Port = port;
             Logger = logger;
+            Configuration = configuration;
             Database = database;
-            _tcpListener = new TcpListener(IPAddress.Any, Port);
+            _tcpListener = new TcpListener(IPAddress.Any, port);
+        }
 
-            _listenThread = new Task(async () =>
+        public IPEndPoint LocalEndPoint => (IPEndPoint) _tcpListener?.LocalEndpoint;
+
+        protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+        {
+            try
             {
+                _tcpListener.Start();
+                cancellationToken.Register(_tcpListener.Stop);
+
+                Logger.LogInformation($"Started on port: {LocalEndPoint.Port}");
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e, $"Failed to start on port: {LocalEndPoint.Port}");
+                return;
+            }
+
+            while (!cancellationToken.IsCancellationRequested)
                 try
                 {
-                    _tcpListener.Start(100);
-                    Logger.Info("Started on port: {0}", Port);
+                    var socket = await _tcpListener.AcceptSocketAsync();
+                    /*var clientTask = protocol.HandleClient(client, cancellationToken)
+                        .ContinueWith(antecedent => client.Dispose())
+                        .ContinueWith(antecedent => logger.LogInformation("Client disposed."));*/
+
+                    var networkClient =
+                        (NetworkClient) Activator.CreateInstance(typeof(NetworkClient<TPacket>), socket, Logger);
+                    if (networkClient == null)
+                        throw new Exception("networkClient == null");
+
+                    networkClient.Disconnected = ClientDisconnected;
+                    networkClient.ReceivedPacket = (s, e) => ReceivedPacket(s, (TPacket) e);
+                    ClientConnected(networkClient);
+
+                    networkClient.Start();
                 }
-                catch (Exception e)
+                catch (SocketException) when (cancellationToken.IsCancellationRequested)
                 {
-                    Logger.Error("Failed to start on port: {0}\r\n{1}", Port, e.Message);
-                    return;
+                    Logger.LogInformation("Stopped listening because cancellation was requested.");
                 }
-
-                Logger.Info("Waiting for a connection...");
-                while (KeepRunning)
-                    try
-                    {
-                        var soc = await _tcpListener.AcceptSocketAsync();
-                        var state =
-                            (INetworkClient) Activator.CreateInstance(typeof(NetworkClient<TPacketType>), soc, this);
-                        NetworkClients.Add(state);
-                        ClientConnected(state);
-                    }
-                    catch (Exception e)
-                    {
-                        //
-                    }
-            });
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, "Error handling client");
+                }
         }
 
-        public bool KeepRunning { get; private set; }
-
-        public static List<INetworkClient> NetworkClients { get; } = new List<INetworkClient>();
-
-        public void Start()
+        protected void ClientConnected(NetworkClient client)
         {
-            _listenThread.Start();
+            NetworkClients.Add(client);
+            Logger.LogInformation($"Client with address: {client.IpAddress} connected!");
         }
 
-        public void Stop()
+        protected void ClientDisconnected(NetworkClient client)
         {
-            KeepRunning = false;
-            _tcpListener.Stop();
-            //_listenThread.Abort();
+            NetworkClients.Remove(client);
+            Logger.LogInformation($"Client with address: {client.IpAddress} disconnected!");
         }
 
-        public virtual void ClientConnected(INetworkClient client)
-        {
-            Logger.Info($"Client with address: {client.IpAddress} connected!");
-        }
-
-        public virtual void ClientDisconnected(INetworkClient client)
-        {
-            Logger.Info($"Client with address: {client.IpAddress} disconnected!");
-        }
-
-        public abstract void ReceivedPacket(INetworkClient client, TPacketType packet);
+        protected abstract Task ReceivedPacket(NetworkClient client, TPacket packet);
     }
 }

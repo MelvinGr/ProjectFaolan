@@ -1,71 +1,41 @@
-using Faolan.Core.Database;
-using Faolan.Core.Network;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Faolan.Core.Enums;
 
 namespace Faolan.Core.Data
 {
-    public sealed class Account
+    public class Account : BaseObject
     {
-        public readonly string AuthChallenge = "2bac5cd78ee0e5a37395991bfbeeeab8";
-        public uint AuthStatus;
-        public Character Character;
-        public uint ClientInstance;
-        public int CreateCounter;
-        public int CreateState;
-        public uint Id; // PlayerInstance
-        public string Name;
-        public AccountState State;
-        public AccountType Type;
-        public ulong LongId => 0x0000271200000000u + Id; // As used by the client (why?)
+        public const string AuthChallenge = "2bac5cd78ee0e5a37395991bfbeeeab8";
 
-        public bool IsBanned { get; set; }
+        [MaxLength(128)]
+        public string UserName { get; set; }
 
-        public void LoadDetailsFromDatabase(IDatabase database)
-        {
-            /*Dictionary<string, dynamic> obj;
-            if (Id != 0)
-                obj = database.ExecuteReader($"SELECT * FROM accounts WHERE account_id={Id}").ToDictionary();
-            else if (Name != null)
-                obj = database.ExecuteReader($"SELECT * FROM accounts WHERE username=\'{Name}\'").ToDictionary();
-            else
-                throw new Exception("Id == 0 && Username == null");
+        [MaxLength(128)]
+        public string Password { get; set; }
 
-            if (obj.Count == 0)
-                throw new Exception("obj.Count == 0");
+        public uint AuthStatus { get; set; }
+        public uint ClientInstance { get; set; } // use this as current character id
+        public int CreateCounter { get; set; }
+        public int CreateState { get; set; }
+        public AccountState State { get; set; }
+        public AccountType Type { get; set; }
+        public DateTime? LastConnection { get; set; }
+        public DateTime CreationDate { get; set; }
 
-            Id = (uint) obj["account_id"];
-            Name = obj["username"];
-            Type = (AccountType) obj["type"];
-            State = (AccountState) obj["state"];*/
-        }
+        [MaxLength(45)] // INET6_ADDRSTRLEN 46
+        public string LastIpAddress { get; set; }
 
-        public bool CheckLogin(IDatabase database, string password)
-        {
-            return true; //database.ExecuteScalar<object>("SELECT account_id FROM accounts " +
-            //$"WHERE username = \'{Name}\' AND password = \'{password}\'") != null;
-        }
+        [NotMapped]
+        public ulong LongId => 0x0000271200000000u + Id; // As used by the client
 
-        //(IDatabase database) => database.ExecuteScalar<dynamic>("SELECT state FROM accounts WHERE account_id=" + Id) == 1;
-
-        public Character[] GetCharacters(IDatabase database)
-        {
-            //var chars = database.ExecuteReader("SELECT character_id FROM characters WHERE account_id=" + Id)
-            //    .ToIEnumerable().Select(c => new Character((uint) c["character_id"])).ToArray();
-
-            //foreach (var c in chars)
-            //    c.LoadDetailsFromDatabase(database);
-
-            return null;
-        }
-
-        public bool UpdateLastInfo(IDatabase database, INetworkClient client)
-        {
-            return true; //database.ExecuteNonQuery($"UPDATE accounts SET last_connection={Functions.Time()}," +
-            //$"last_ip=\'{client.IpAddress}\'WHERE account_id={Id}") == 1;
-        }
+        public virtual List<Character> Characters { get; set; }
 
         public override string ToString()
         {
-            return $"{Id}: {Name}";
+            return $"{base.ToString()}: {UserName}";
         }
     }
 }

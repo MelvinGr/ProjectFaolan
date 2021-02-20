@@ -1,37 +1,17 @@
-using Faolan.Core.Database;
+using System.ComponentModel.DataAnnotations;
 
 namespace Faolan.Core.Data
 {
-    public sealed class Spell
+    public class Spell : BaseObject
     {
-        public ushort CastTime;
-        public uint EffectSpell;
-        public uint Id;
-        public byte Level;
-        public ushort ManaCost;
-        public ushort MaxDamage;
-        public ushort MinDamage;
-        public string Name;
-        public static Spell[] AllSpells { get; private set; }
+        [MaxLength(128)]
+        public string Name { get; set; }
 
-        public static void Init(IDatabase database)
-        {
-            /*AllSpells = database.ExecuteReader("SELECT * FROM spells").ToIEnumerable().Select(c => new Spell
-            {
-                Id = (uint) c["id"],
-                Level = (byte) c["level"],
-                Name = (string) c["name"],
-                CastTime = (ushort) c["castTime"],
-                MinDamage = (ushort) c["minDmg"],
-                MaxDamage = (ushort) c["maxDmg"],
-                ManaCost = (ushort) c["costMana"],
-                EffectSpell = (uint) c["effectSpell"]
-            }).ToArray();*/
-        }
-
-        public override string ToString()
-        {
-            return $"{Id}: {Name}";
-        }
+        public ushort CastTime { get; set; }
+        public uint EffectSpell { get; set; }
+        public byte Level { get; set; }
+        public ushort ManaCost { get; set; }
+        public ushort MaxDamage { get; set; }
+        public ushort MinDamage { get; set; }
     }
 }

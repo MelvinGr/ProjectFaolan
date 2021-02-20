@@ -1,27 +1,28 @@
-using Faolan.Core.Config;
+using Faolan.Core.Data;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Opcodes;
+using Faolan.Extensions;
 
 namespace Faolan.UniverseAgent
 {
     partial class UniverseAgentListener
     {
         private static readonly byte[] Sender = {0x0d, 0xa0, 0xdb, 0x4d, 0x60, 0x10, 0x01};
-        private static readonly byte[] Receiver = {0x0d, 0x54, 0x40, 0x38, 0x0c, 0x10, 0xdc, 0xc8, 0x49};
+        private static readonly byte[] Receiver = {0x0d, 0x54, 0x40, 0x38, 0x0c, 0x10, 0x99, 0xA7, 0x42};
         private static readonly byte[] Receiver2 = {0x0d, 0x54, 0x40, 0x38, 0x0c, 0x10, 0xec, 0xeb, 0x80, 0xde, 0x03};
 
-        public static void InitAuth(INetworkClient client)
+        private static void InitAuth(NetworkClient client)
         {
             new PacketStream()
-                .WriteHeader(Sender, Receiver, null, UniverseAgentRespondseOpcodes.InitiateAuthentication)
-                .WriteString(client.Account.AuthChallenge)
+                .WriteHeader(Sender, Receiver, null, UniverseAgentResponseOpcodes.InitiateAuthentication)
+                .WriteString(Account.AuthChallenge)
                 .Send(client);
         }
 
-        public static void SetRegionState(INetworkClient client)
+        private static void SetRegionState(NetworkClient client)
         {
             new PacketStream()
-                .WriteHeader(Sender, Receiver2, null, UniverseAgentRespondseOpcodes.SetRegion)
+                .WriteHeader(Sender, Receiver2, null, UniverseAgentResponseOpcodes.SetRegion)
                 .WriteArray
                 (
                     0x01, 0x01, 0x01, 0x01,
@@ -34,14 +35,14 @@ namespace Faolan.UniverseAgent
                 .Send(client);
         }
 
-        public static void SendPlayerAgentRealm(INetworkClient client)
+        private void SendPlayerAgentRealm(NetworkClient client)
         {
             new PacketStream()
-                .WriteHeader(Sender, Receiver2, null, UniverseAgentRespondseOpcodes.SendPlayerAgentRealm)
+                .WriteHeader(Sender, Receiver2, null, UniverseAgentResponseOpcodes.SendPlayerAgentRealm)
                 .WriteUInt32(0x01) // authstatus
                 .WriteUInt64(client.Account.LongId)
-                .WriteString(Settings.PlayerAgentAddress + ":" + Settings.PlayerAgentPort)
-                .WriteUInt32(0x310cec57)
+                .WriteString($"{Configuration.ServerIpAddress()}:{Configuration.PlayerAgentPort()}")
+                .WriteUInt32(client.Account.Id)
                 .WriteUInt32(0x00000000)
                 .Send(client);
         }

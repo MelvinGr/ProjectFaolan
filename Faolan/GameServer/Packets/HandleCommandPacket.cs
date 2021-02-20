@@ -1,10 +1,13 @@
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Microsoft.Extensions.Logging;
 
-namespace Faolan.GameServer.Packets
+// ReSharper disable once CheckNamespace
+namespace Faolan.GameServer
 {
-    internal partial class Packets
+    public partial class GameServerListener
     {
-        public static void HandleCommandPacket(INetworkClient client, ConanPacket packet)
+        private void HandleCommandPacket(NetworkClient client, ConanPacket packet)
         {
             var recObjTyp = packet.Data.ReadUInt32();
             var recClientInst = packet.Data.ReadUInt32();
@@ -18,21 +21,28 @@ namespace Faolan.GameServer.Packets
             var runId = 0;
             while (runByte != 0x22)
             {
-                if (runId == 0)
-                    recVal = runByte;
-                if (runId == 1)
-                    recVal += runByte * 0x100u;
-                if (runId == 2)
-                    recVal += runByte * 0x10000u;
-                if (runId == 3)
-                    recVal += runByte * 0x1000000u;
+                switch (runId)
+                {
+                    case 0:
+                        recVal = runByte;
+                        break;
+                    case 1:
+                        recVal += runByte * 0x100u;
+                        break;
+                    case 2:
+                        recVal += runByte * 0x10000u;
+                        break;
+                    case 3:
+                        recVal += runByte * 0x1000000u;
+                        break;
+                }
 
                 runByte = packet.Data.ReadByte();
                 runId++;
             }
 
             var recCmd = packet.Data.ReadShortString();
-            var strend = packet.Data.ReadByte();
+            var strEnd = packet.Data.ReadByte();
             var unk4 = packet.Data.ReadUInt16(); // MELVIN
             var recSecCmd = packet.Data.ReadShortString();
 
@@ -41,8 +51,7 @@ namespace Faolan.GameServer.Packets
                 case "IntroDone":
                 {
                     var aBuffer = new PacketStream();
-                    aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2,
-                        null, 0x2000);
+                    aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
                     aBuffer.WriteUInt32(0x00000019);
                     aBuffer.WriteUInt32(0x96b8dc59);
                     aBuffer.WriteUInt32(0x0000c350);
@@ -55,25 +64,25 @@ namespace Faolan.GameServer.Packets
                 }
                     break;
                 case "ChangeSex":
-                    client.Character.Sex = (byte) recVal;
+                    client.Character.Sex = (Sex) recVal;
                     break;
                 case "ChangeRace":
-                    client.Character.Race = (byte) recVal;
+                    client.Character.Race = (Race) recVal;
                     break;
                 case "ChangeHeadMesh":
-                    client.Character.HeadMesh = recVal;
+                    client.Character.Body.HeadMesh = recVal;
                     break;
                 case "ChangeSize":
-                    client.Character.Size = (byte) recVal;
+                    client.Character.Body.Size = (byte) recVal;
                     break;
                 case "ChangeClass":
-                    client.Character.Class = (byte) recVal;
+                    client.Character.Class = (Class) recVal;
                     break;
                 case "ChangeVoice":
-                    client.Character.Voice = (byte) recVal;
+                    client.Character.Body.Voice = (byte) recVal;
                     break;
                 case "SetMorphValue":
-                    Logger.Info("Second Command: " + recSecCmd + " with value: " + recVal);
+                    Logger.LogInformation($"Second Command: {recSecCmd} with value: {recVal}");
                     if (recSecCmd.Length > 0)
                     {
                         //vector<string> scriptData = String::splitString(recSecCmd, "_");
@@ -81,8 +90,8 @@ namespace Faolan.GameServer.Packets
                         client.Account.CreateCounter++;
                         client.Account.CreateState = 1;
 
-                        new PacketStream().WriteHeader(GameServerListener.Sender2,
-                                GameServerListener.Receiver2, null, 0x2000)
+                        new PacketStream().WriteHeader(Sender2,
+                                Receiver2, null, 0x2000)
                             .WriteArrayPrependLengthUInt32(new ConanStream()
                                 //aBuffer.WriteUInt32(recSecCmd.Length + (5*4) + (1*2) + (2*1)); // length
                                 .WriteUInt32(0xbadf5a4b)
@@ -103,7 +112,7 @@ namespace Faolan.GameServer.Packets
                     break;
                 case "TheNameIs":
                 {
-                    Logger.Info("Attempt to create Char with the name: " + recSecCmd);
+                    Logger.LogInformation($"Attempt to create Char with the name: {recSecCmd}");
                     client.Character.Name = recSecCmd;
 
                     //MELVIN 
@@ -116,7 +125,7 @@ namespace Faolan.GameServer.Packets
                     */
 
                     var aBuffer = new PacketStream();
-                    aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2,
+                    aBuffer.WriteHeader(Sender2, Receiver2,
                         null, 0x2000);
                     aBuffer.WriteUInt32(client.Character.Name.Length + 5 * 4 + 1 * 2 + 1 * 1);
                     aBuffer.WriteUInt32(0xadce0cda);
@@ -133,9 +142,10 @@ namespace Faolan.GameServer.Packets
                         0x00, 0x00, 0x00, 0x00, 0x1f, 0x08, 0x05, 0x10, 0x02, 0x18, 0x00, 0x22
                     };
                     aBuffer = new PacketStream();
-                    aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2,
+                    aBuffer.WriteHeader(Sender2, Receiver2,
                         null, 0x2000);
-                    aBuffer.WriteUInt32(client.Character.Name.Length + 10 + 1 + data.Length + 4 * 4 + 1 * 2 + 2 * 1);
+                    aBuffer.WriteUInt32(client.Character.Name.Length + 10 + 1 + data.Length + 4 * 4 + 1 * 2 +
+                                        2 * 1);
                     aBuffer.WriteUInt32(0xa36d3b74);
                     aBuffer.WriteUInt32(0x0000c350);
                     aBuffer.WriteUInt32(client.Account.ClientInstance);
@@ -155,7 +165,7 @@ namespace Faolan.GameServer.Packets
                         0x00
                     };
                     aBuffer = new PacketStream();
-                    aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2,
+                    aBuffer.WriteHeader(Sender2, Receiver2,
                         null, 0x2000);
                     aBuffer.WriteUInt32(data2.Length + 3 * 4);
                     aBuffer.WriteUInt32(0xf508f4c1);
@@ -172,7 +182,7 @@ namespace Faolan.GameServer.Packets
                         0x2a, 0x00, 0x32, 0x04, 0x08, 0x00, 0x10, 0x00
                     };
                     aBuffer = new PacketStream();
-                    aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2,
+                    aBuffer.WriteHeader(Sender2, Receiver2,
                         null, 0x2000);
                     aBuffer.WriteUInt32(data3.Length + 3 * 4);
                     aBuffer.WriteUInt32(0xa36d3b74);
@@ -188,7 +198,7 @@ namespace Faolan.GameServer.Packets
                         0x00, 0x00, 0x0a, 0x08, 0xc5, 0xc3, 0x02, 0x18, 0x01, 0x28, 0x18, 0x30, 0x00
                     };
                     aBuffer = new PacketStream();
-                    aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2,
+                    aBuffer.WriteHeader(Sender2, Receiver2,
                         null, 0x2000);
                     aBuffer.WriteUInt32(data4.Length + 1 * 4);
                     aBuffer.WriteUInt32(0x642cd3d6);
@@ -202,7 +212,7 @@ namespace Faolan.GameServer.Packets
                         0x00, 0x00, 0x0a, 0x08, 0xc5, 0xc3, 0x02, 0x18, 0x01, 0x28, 0x18, 0x30, 0x00
                     };
                     aBuffer = new PacketStream();
-                    aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2,
+                    aBuffer.WriteHeader(Sender2, Receiver2,
                         null, 0x2000);
                     aBuffer.WriteUInt32(data5.Length + 1 * 4);
                     aBuffer.WriteUInt32(0x642cd3d6);
@@ -215,7 +225,7 @@ namespace Faolan.GameServer.Packets
                         0x01, 0x00, 0x00, 0x00, 0x6a, 0x00, 0x00, 0x00, 0x14
                     };
                     aBuffer = new PacketStream();
-                    aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2,
+                    aBuffer.WriteHeader(Sender2, Receiver2,
                         null, 0x2000);
                     aBuffer.WriteUInt32(data6.Length + 3 * 4);
                     aBuffer.WriteUInt32(0xf98e10b3);
@@ -227,7 +237,7 @@ namespace Faolan.GameServer.Packets
                 }
                     break;
                 default:
-                    Logger.Info("Receive unknown command: {0} with value {1}", recCmd, recVal);
+                    Logger.LogInformation("Receive unknown command: {0} with value {1}", recCmd, recVal);
                     break;
             }
         }

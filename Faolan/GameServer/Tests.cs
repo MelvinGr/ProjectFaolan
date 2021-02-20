@@ -5,7 +5,7 @@ namespace Faolan.GameServer
 {
     partial class GameServerListener
     {
-        private static void SpawnObjectTest(INetworkClient client)
+        private static void SpawnObjectTest(NetworkClient client)
         {
             var sender = new byte[] {0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x4C};
             var receiver = new byte[] {0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, 0xD4, 0xCB, 0x8B, 0x40};
@@ -324,7 +324,7 @@ namespace Faolan.GameServer
                 .Send(client);
         }
 
-        private static void SendPlayerBuffsTest(INetworkClient client)
+        private static void SendPlayerBuffsTest(NetworkClient client)
         {
             var packetData1372 = new byte[]
             {
@@ -361,17 +361,15 @@ namespace Faolan.GameServer
             };
 
             // Scythe Shield Rank 3 (3 hours, 20 min, 28ish sec)
-            Packets.Packets.ApplySpell(client, client.Account.ClientInstance, client.Account.ClientInstance,
-                0x02387E00);
+            ApplySpell(client, client.Account.ClientInstance, client.Account.ClientInstance, 0x02387E00);
             //, packetData1372);
 
             // Set's Cold Hatred (No timer)
-            Packets.Packets.ApplySpell(client, client.Account.ClientInstance, client.Account.ClientInstance,
-                0x0365D300);
+            ApplySpell(client, client.Account.ClientInstance, client.Account.ClientInstance, 0x0365D300);
             //, packetData1382);
         }
 
-        private static void SendSitOnMountTest(INetworkClient client)
+        private static void SendSitOnMountTest(NetworkClient client)
         {
             /*var packetData1402 = new byte[]
             {
@@ -419,7 +417,7 @@ namespace Faolan.GameServer
             };
 
             // Mounted buff (Fading black horse)
-            Packets.Packets.ApplySpell(client, client.Account.ClientInstance, client.Account.ClientInstance,
+            ApplySpell(client, client.Account.ClientInstance, client.Account.ClientInstance,
                 0x31EB1500);
             //, packetData1392);
 
@@ -441,7 +439,7 @@ namespace Faolan.GameServer
                 .Send(client);
         }
 
-        private static void SpawnPlayers(INetworkClient client)
+        private static void SpawnPlayers(NetworkClient client)
         {
             //Merciatu 64 (mounted)
             var packetData117 = new byte[]
@@ -919,7 +917,7 @@ namespace Faolan.GameServer
                 .Send(client);
         }
 
-        private static void SpawnCaravanMaster(INetworkClient client)
+        private static void SpawnCaravanMaster(NetworkClient client)
         {
             // lvl 80, [Khitan Pathfinder]
             var packetData99 = new byte[]
@@ -1033,7 +1031,7 @@ namespace Faolan.GameServer
                 .Send(client);
         }
 
-        private static void SpawnStygianTravler(INetworkClient client)
+        private static void SpawnStygianTravler(NetworkClient client)
         {
             var packetData113 = new byte[]
             {
@@ -1078,7 +1076,7 @@ namespace Faolan.GameServer
                 .Send(client);
         }
 
-        private static void SpawnPriestOfSet(INetworkClient client)
+        private static void SpawnPriestOfSet(NetworkClient client)
         {
             // lvl 30
             var packetData103 = new byte[]
@@ -1127,7 +1125,7 @@ namespace Faolan.GameServer
                 .Send(client);
         }
 
-        private static void SpawnCommoners(INetworkClient client)
+        private static void SpawnCommoners(NetworkClient client)
         {
             var packetData124 = new byte[]
             {
@@ -1682,7 +1680,7 @@ namespace Faolan.GameServer
                 .Send(client);
         }
 
-        public static void Spawnrunningchild(INetworkClient client)
+        public static void Spawnrunningchild(NetworkClient client)
         {
             var packetData146 = new byte[]
             {
@@ -1887,7 +1885,7 @@ namespace Faolan.GameServer
                 .Send(client);
         }
 
-        public static void SpawnKalanthesTest(INetworkClient client)
+        public static void SpawnKalanthesTest(NetworkClient client)
         {
             var packetData131 = new byte[]
             {

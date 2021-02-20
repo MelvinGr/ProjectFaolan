@@ -13,14 +13,15 @@ namespace Faolan.AgentServer
 
             if (Length == 0 || stream.Length < Length)
             {
-                Valid = false;
+                IsValid = false;
                 return;
             }
 
-            Data = new ConanStream(stream.ReadArray(Length - sizeof(ushort) * 2u));
+            Data = new ConanStream(stream.ReadArray(Length - sizeof(ushort) * 2));
         }
 
-        public AgentServerOpcodes Opcode { get; protected set; }
-        public override bool Valid { get; }
+        public AgentServerOpcodes Opcode { get; }
+
+        public override bool IsValid { get; }
     }
 }

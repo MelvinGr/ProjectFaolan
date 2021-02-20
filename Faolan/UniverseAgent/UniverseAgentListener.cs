@@ -1,31 +1,36 @@
-using Faolan.Core;
+using System.Threading.Tasks;
 using Faolan.Core.Database;
-using Faolan.Core.Extentions;
+using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Opcodes;
+using Faolan.Extensions;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Faolan.UniverseAgent
 {
     public partial class UniverseAgentListener : Server<ConanPacket>
     {
-        public UniverseAgentListener(ushort port, Logger logger, IDatabase database)
-            : base(port, logger, database)
+        // ReSharper disable once SuggestBaseTypeForParameter
+        public UniverseAgentListener(ILogger<UniverseAgentListener> logger, IConfiguration configuration,
+            IDatabaseRepository database)
+            : base(configuration.UniverseAgentPort(), logger, configuration, database)
         {
         }
 
-        public override void ReceivedPacket(INetworkClient client, ConanPacket packet)
+        protected override async Task ReceivedPacket(NetworkClient client, ConanPacket packet)
         {
-            Logger.Info("Received opcode: " + (UniverseAgentOpcodes) packet.Opcode + " (" + packet.Opcode.ToHex() +
-                        ")");
+            Logger.LogInformation($"Received opcode: {(UniverseAgentOpcodes) packet.Opcode} ({packet.Opcode.ToHex()})");
 
             switch ((UniverseAgentOpcodes) packet.Opcode)
             {
                 case UniverseAgentOpcodes.InitiateAuthentication:
                 {
-                    client.Account.Name = packet.Data.ReadString();
+                    var accountName = packet.Data.ReadString();
                     var unk0 = packet.Data.ReadUInt32();
 
-                    client.Account.LoadDetailsFromDatabase(Database);
+                    client.Account = await Database.GetAccount(822930519 /*accountName*/);
                     InitAuth(client);
 
                     break;
@@ -56,9 +61,9 @@ namespace Faolan.UniverseAgent
                         break;
                     }
                     */
-                    if (!client.Account.CheckLogin(Database, client.Account.Name)) // wrong login
+                    if (!await Database.CheckLogin(client.Account.UserName, "")) // wrong login
                     {
-                        Logger.Info("Wrong Login");
+                        Logger.LogInformation("Wrong Login");
                         //Packets.AckAuthenticate(client, 0xffffff, 0, 0x0e);
                         break;
                     }
@@ -71,16 +76,16 @@ namespace Faolan.UniverseAgent
                         break;
                     }*/
 
-                    if (client.Account.IsBanned) //(Database)) // player banned
+                    if (client.Account.State == AccountState.Banned)
                     {
-                        Logger.Info("Banned Player tried to login");
+                        Logger.LogInformation("Banned Player tried to login");
                         //Packets.AckAuthenticate(client, 0xffffff, 0, 0x17);
                         break;
                     }
 
-                    Logger.Info("User {0} is logging on with accountId: {1}", client.Account.Name, client.Account.Id);
+                    Logger.LogInformation("User {0} ({1}) is logging on", client.Account.UserName, client.Account.Id);
+                    await Database.UpdateLastInfo(client.Account, client);
 
-                    client.Account.UpdateLastInfo(Database, client);
                     SetRegionState(client);
                     SendPlayerAgentRealm(client);
 
@@ -88,7 +93,7 @@ namespace Faolan.UniverseAgent
                 }
                 default:
                 {
-                    Logger.Warning("Unknown packet: " + packet);
+                    Logger.LogWarning($"Unknown packet: {packet}");
                     break;
                 }
             }

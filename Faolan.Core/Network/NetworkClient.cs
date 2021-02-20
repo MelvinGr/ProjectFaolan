@@ -2,118 +2,220 @@ using System;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading.Tasks;
 using Faolan.Core.Data;
+using Faolan.Core.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace Faolan.Core.Network
 {
-    public abstract class INetworkClient
+    public abstract class NetworkClient
     {
-        protected Socket Socket { get; set; }
-        public string IpAddress => ((IPEndPoint) Socket.LocalEndPoint).Address.ToString();
+        public delegate void NetworkClientDelegate(NetworkClient client);
 
-        public Account Account { get; set; }
+        public delegate Task ReceivedPacketDelegate(NetworkClient client, Packet packet);
 
-        public Character Character
+        protected readonly ILogger Logger;
+        protected Socket Socket;
+
+        protected NetworkClient(Socket socket, ILogger logger)
         {
-            get => Account?.Character;
-            set => Account.Character = value;
+            Socket = socket;
+            Logger = logger;
         }
 
+        public string IpAddress => ((IPEndPoint) Socket.RemoteEndPoint)?.Address.ToString();
+
+        public Account Account { get; set; }
+        public Character Character { get; set; }
+        public ReceivedPacketDelegate ReceivedPacket { get; set; }
+        public NetworkClientDelegate Disconnected { get; set; }
+
+        public abstract void Start();
         public abstract void Send(byte[] value);
     }
 
-    public sealed class NetworkClient<TPacketType> : INetworkClient
-        where TPacketType : Packet
+    public class NetworkClient<TPacket> : NetworkClient
+        where TPacket : Packet
     {
-        private readonly byte[] _buffer = new byte[10240];
-        private readonly Server<TPacketType> _server;
+        private readonly byte[] _packetLengthBuffer = new byte[sizeof(int)];
 
-        private byte[] _backBuffer;
-        private ConanStream _stream;
+        private readonly byte[] _tcpBuffer = new byte[0xFFFF];
+        private byte[] _packetBuffer;
+        private int _packetBytesRead;
 
-        public NetworkClient(Socket client, Server<TPacketType> server)
+        public NetworkClient(Socket socket, ILogger logger)
+            : base(socket, logger)
         {
-            Socket = client;
-            Account = new Account();
-            _server = server;
-            BeginReceive();
         }
 
-        private void ReadCallback(int bytesRead)
+        public override void Start()
         {
-            if (bytesRead == 0)
-                return;
-
-            var receivedBytes = _buffer.Take(bytesRead).ToArray();
-            // zlib compression (0x80000005) (Client sends start packet, but does not use compression?)
-            if (receivedBytes[0] == 0x80 && receivedBytes[1] == 0x00 &&
-                receivedBytes[2] == 0x00 && receivedBytes[3] == 0x05)
-                return; // messages;
-
-            if (_backBuffer != null && _backBuffer.Length > 0)
-            {
-                _stream = new ConanStream(_backBuffer.Concat(receivedBytes).ToArray());
-                _backBuffer = null;
-            }
-            else
-            {
-                _stream = new ConanStream(receivedBytes);
-            }
-
-            while (true)
-            {
-                if (_stream == null || _stream.Length == 0)
-                    break;
-
-                _stream.Position = 0;
-
-                var packet = (TPacketType) Activator.CreateInstance(typeof(TPacketType), _stream);
-                if (packet.Valid)
-                {
-                    _server.ReceivedPacket(this, packet);
-
-                    Functions.TrimStream(ref _stream);
-                    break;
-                }
-
-                _backBuffer = _stream.ToArray();
-            }
-
-            BeginReceive();
+            BeginReceive( /*token*/);
         }
 
         public override void Send(byte[] value)
         {
-            Socket.BeginSend(value, 0, value.Length, 0, ar =>
+            /*var stream = new ConanStream(value);
+            _ = stream.ReadUInt32();
+            _ = stream.ReadUInt32();
+            _ = stream.ReadUInt32();
+            _ = stream.ReadByte();
+            _ = stream.ReadArrayPrependLengthByte();
+            _ = stream.ReadByte();
+            _ = stream.ReadArrayPrependLengthByte();
+            var opcode = stream.ReadUInt16();            
+            Console.WriteLine($"Send opcode: 0x{opcode:X4}");*/
+
+            try
             {
-                try
+                Socket?.BeginSend(value, 0, value.Length, 0, ar =>
                 {
-                    Socket.EndSend(ar);
-                }
-                catch //(Exception e)
-                {
-                    _server.ClientDisconnected(this);
-                    Socket = null;
-                    //Console.WriteLine(e.Message);
-                }
-            }, null);
+                    try
+                    {
+                        Socket.EndSend(ar);
+                    }
+                    catch // (Exception e)
+                    {
+                        Disconnected?.Invoke(this);
+                        Socket = null;
+                    }
+                }, null);
+            }
+            catch // (Exception e)
+            {
+                Disconnected?.Invoke(this);
+                Socket = null;
+            }
         }
 
-        private void BeginReceive()
+        private void BeginReceive( /*token*/)
         {
-            Socket.BeginReceive(_buffer, 0, _buffer.Length, 0, ar =>
+            try
             {
-                try
+                Socket?.BeginReceive(_tcpBuffer, 0, _tcpBuffer.Length, 0, ar =>
                 {
-                    ReadCallback(Socket.EndReceive(ar));
-                }
-                catch //(Exception e)
+                    try
+                    {
+                        var bytesRead = Socket.EndReceive(ar);
+                        if (bytesRead == 0)
+                            return;
+
+                        var buffer = _tcpBuffer.Take(bytesRead).ToArray();
+
+                        // zlib compression (0x80000005)
+                        if (buffer[0] == 0x80 && buffer[1] == 0x00 && buffer[2] == 0x00 && buffer[3] == 0x05)
+                        {
+                            //decompressor = new Inflater();
+                            //buffer = buffer.Skip(9).ToArray();
+                            //Console.WriteLine("zlib start");
+
+                            Logger.LogDebug(buffer.ToHexString());
+
+                            BeginReceive();
+                            return;
+                        }
+
+                        DataReceived(buffer, bytesRead);
+                        BeginReceive();
+                    }
+                    catch // (Exception e)
+                    {
+                        Disconnected?.Invoke(this);
+                        Socket = null;
+                    }
+                }, null);
+            }
+            catch // (Exception e)
+            {
+                Disconnected?.Invoke(this);
+                Socket = null;
+            }
+        }
+
+        // https://blog.stephencleary.com/2009/04/message-framing.html
+        private void DataReceived(byte[] data, int length)
+        {
+            var i = 0;
+            while (i != length)
+            {
+                var bytesAvailable = data.Length - i;
+                if (_packetBuffer != null)
                 {
-                    _server.ClientDisconnected(this);
-                    Socket = null;
-                    //Console.WriteLine(e.Message);
+                    // We're reading into the data buffer
+                    var bytesRequested = _packetBuffer.Length - _packetBytesRead;
+
+                    var bytesTransferred = Math.Min(bytesRequested, bytesAvailable);
+                    Array.Copy(data, i, _packetBuffer, _packetBytesRead, bytesTransferred);
+                    i += bytesTransferred;
+
+                    ReadCompleted(bytesTransferred);
                 }
-            }, null);
+                else
+                {
+                    // We're reading into the length prefix buffer
+                    var bytesRequested = _packetLengthBuffer.Length - _packetBytesRead;
+
+                    var bytesTransferred = Math.Min(bytesRequested, bytesAvailable);
+                    Array.Copy(data, i, _packetLengthBuffer, _packetBytesRead, bytesTransferred);
+                    i += bytesTransferred;
+
+                    ReadCompleted(bytesTransferred);
+                }
+            }
+        }
+
+        private void ReadCompleted(int count)
+        {
+            _packetBytesRead += count;
+
+            if (_packetBuffer == null)
+            {
+                // We're currently receiving the length buffer
+                if (_packetBytesRead == sizeof(int))
+                {
+                    var length = BitConverter.ToInt32(_packetLengthBuffer.Reverse().ToArray(), 0);
+
+                    // Sanity check for length < 0
+                    if (length < 0)
+                        throw new ProtocolViolationException("Message length is less than zero");
+
+                    // Another sanity check is needed here for very large packets, to prevent denial-of-service attacks
+                    /* if (MaxMessageSize > 0 && length > MaxMessageSize)
+                        throw new ProtocolViolationException($"Message length {length} is larger than maximum message size {MaxMessageSize}"); */
+
+                    // Zero-length packets are allowed as keepalives
+                    if (length == 0)
+                    {
+                        _packetBytesRead = 0;
+                        //GotCompletePacket(Array.Empty<byte>());
+                    }
+                    else
+                    {
+                        // Create the data buffer and start reading into it
+                        _packetBuffer = new byte[length];
+                        _packetBytesRead = 0;
+                    }
+                }
+            }
+            else
+            {
+                if (_packetBytesRead == _packetBuffer.Length)
+                {
+                    // We've gotten an entire packet, add back the length
+                    var completePacket = _packetLengthBuffer.Concat(_packetBuffer).ToArray();
+
+                    var packet = (TPacket) Activator.CreateInstance(typeof(TPacket), completePacket);
+                    if (packet?.IsValid == true)
+                        ReceivedPacket?.Invoke(this, packet);
+                    else
+                        throw new Exception("packet?.IsValid != true");
+
+                    // Start reading the length buffer again
+                    _packetBuffer = null;
+                    _packetBytesRead = 0;
+                }
+            }
         }
     }
 }

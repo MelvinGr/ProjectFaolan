@@ -1,27 +1,27 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
     <OutputType>Library</OutputType>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <TargetFramework>net5.0</TargetFramework>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <OutputPath>..\bin\$(Configuration)\</OutputPath>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <Configurations>Debug</Configurations>
+    <DefineConstants>$(Configuration.ToUpper());TRACE</DefineConstants>
+    <BuildDate>$([System.DateTime]::UTCNow.ToString("HH:mm:ss dd-MM-yyyy"))</BuildDate>
+  </PropertyGroup>
+
+  <PropertyGroup>
     <Authors>Project Faolan</Authors>
+    <PackageId>Faolan.Core</PackageId>
+    <Version>0.1.0</Version>
+    <Description>$(BuildDate)</Description>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-  </PropertyGroup>
+
   <ItemGroup>
-    <PackageReference Include="GitVersionTask">
-      <Version>4.0.1-beta1-50</Version>
-      <PrivateAssets>All</PrivateAssets>
+    <PackageReference Include="GitVersion.MsBuild" Version="5.6.6">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="MySql.Data">
-      <Version>8.0.19</Version>
-    </PackageReference>
-    <PackageReference Include="System.Data.SQLite">
-      <Version>1.0.112</Version>
-    </PackageReference>
+    <PackageReference Include="System.ServiceModel.Primitives" Version="4.8.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="5.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Proxies" Version="5.0.3" />
   </ItemGroup>
 </Project>
