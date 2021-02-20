@@ -1,0 +1,13 @@
+{
+  "ServerIpAddress": "127.0.0.1",
+
+  "UniverseAgentPort": 7010,
+  "PlayerAgentPort": 7011,
+  "CSPlayerAgentPort": 7012,
+  "AgentServerPort": 7013,
+
+  "DatabasePath": "faolan.db",
+  "DatabasePathDev": "../../../Faolan/faolan.db",
+
+  "WelcomeString": "Welcome to Project Faolan! $BUILDSTRING"
+}

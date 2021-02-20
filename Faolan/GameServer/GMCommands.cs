@@ -1,7 +1,8 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Faolan.Core.Data;
-using Faolan.Core.Extentions;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 
 namespace Faolan.GameServer
@@ -12,52 +13,26 @@ namespace Faolan.GameServer
 
         private void InitGmCommands()
         {
-            _gmCommandsDict = new Dictionary<string, GmCommandDelegate>
-            {
-                {"help", (c, arg) => SendGmHelpText(c.Account)},
-                {"broadcast", (c, arg) => _agentServerListener.SystemBroadcast(arg)},
-                {"listmaps", (c, arg) => SendListAllMaps(c.Account)},
-                {"listspells", (c, arg) => SendListAllSpells(c.Account)},
-                {"teleport", (c, arg) => DoTeleport(c, arg)},
-                {"savedata", (c, arg) => SaveData()},
-                {"settimeofday", (c, arg) => Packets.Packets.SetTimeofDay(c)},
-                {
-                    "printpos",
-                    (c, arg) =>
-                        _agentServerListener.SendSystemMessage(c.Account, c.Account.Character.Position.ToString())
-                },
-                {"_mount", (c, arg) => SendSitOnMountTest(c)},
-                {"_buff", (c, arg) => SendPlayerBuffsTest(c)},
-                {"_casteffect", (c, arg) => ApplySpellTest(c, arg)},
-                {"_spawnrunningchild", (c, arg) => Spawnrunningchild(c)}
-            };
+            _gmCommandsDict = new Dictionary<string, GmCommandDelegate>();
         }
 
-        private void SaveData()
-        {
-            SaveAllCharacterData();
-        }
 
-        private static void DoTeleport(INetworkClient client, string arguments)
+        private async Task DoTeleport(NetworkClient client, uint mapId)
         {
-            uint mapId;
-            if (!arguments.TryParseNormalOrHex(out mapId))
+            /*if (!arguments.TryParseNormalOrHex(out uint mapId))
             {
-                _agentServerListener.SendSystemMessage(client.Account, "Invalid input: '" + arguments + "'");
+                _agentServerListener?.SendSystemMessage(client.Account, $"Invalid input: '{arguments}'");
                 return;
-            }
+            }*/
 
-            var map = ConanMap.AllMaps.FirstOrDefault(m => m.Id == mapId);
+            var map = await Database.GetMap(mapId);
             if (map == null)
-            {
-                _agentServerListener.SendSystemMessage(client.Account, "Unknown mapId: '" + arguments + "'");
+                //_agentServerListener?.SendSystemMessage(client.Account, $"Unknown mapId: '{arguments}'");
                 return;
-            }
 
-            client.Character.Map = map.Id;
+            client.Character.MapId = map.Id;
             //client.Character.Position = map.Position;
             client.Character.Rotation = map.Rotation;
-            client.Character.SaveDataToDatabase(_databaseStatic);
 
             new PacketStream()
                 .WriteHeader(Sender99, Receiver99, null, 0x2000)
@@ -67,7 +42,7 @@ namespace Faolan.GameServer
                     .WriteUInt32(client.Account.ClientInstance)
                     .WriteUInt16(0x0162)
                     .WriteUInt32(0x0000c79c)
-                    .WriteUInt32(client.Character.Map)
+                    .WriteUInt32(client.Character.MapId)
                     .WriteUInt32(0x00000000)
                     .WriteUInt32(client.Account.ClientInstance)
                     .WriteByte(0x00)
@@ -103,7 +78,7 @@ namespace Faolan.GameServer
                     .WriteUInt32(0x0000c350)
                     .WriteUInt32(client.Account.ClientInstance)
                     .WriteArray(pack20)
-                    .WriteUInt32(client.Character.Map)
+                    .WriteUInt32(client.Character.MapId)
                     .WriteUInt32(0)
                     .WriteUInt32(client.Account.ClientInstance)
                     .WriteArray(pack21)
@@ -112,38 +87,37 @@ namespace Faolan.GameServer
                     .WriteByte(0))
                 .Send(client);
 
-            Packets.Packets.MapChange(client);
-            Packets.Packets.SendReadyForPlayScreen(client);
-            Packets.Packets.SpawnPlayer(client);
+            MapChange(client);
+            SendReadyForPlayScreen(client);
+            SpawnPlayer(client);
         }
 
-        private static void SendListAllMaps(Account account)
+        private void SendListAllMaps(Account account)
         {
             _agentServerListener.SendSystemMessage(account,
-                string.Join("<br />", ConanMap.AllMaps.Select(m => m.Id + ": " + m.Name)));
+                string.Join("<br />", Database.Context.WorldMaps.Select(m => $"{m.Id}: {m.Name}")));
         }
 
-        private static void SendListAllSpells(Account account)
+        private void SendListAllSpells(Account account)
         {
             _agentServerListener.SendSystemMessage(account,
-                string.Join("<br />", Spell.AllSpells.Select(s => s.Id + ": " + s.Name)));
+                string.Join("<br />", Database.Context.Spells.Select(s => $"{s.Id}: {s.Name}")));
         }
 
-        private static void SendGmHelpText(Account account)
+        private void SendGmHelpText(Account account)
         {
             _agentServerListener.SendSystemMessage(account,
-                "Available Commands:<br />" + string.Join("<br />", _gmCommandsDict.Keys));
+                $"Available Commands:<br />{string.Join("<br />", _gmCommandsDict.Keys)}");
         }
 
-        private static void ApplySpellTest(INetworkClient client, string arguments)
+        private void ApplySpellTest(NetworkClient client, string arguments)
         {
-            uint id;
-            if (arguments.TryParseNormalOrHex(out id))
-                Packets.Packets.ApplySpell(client, client.Account.ClientInstance,
+            if (arguments.TryParseNormalOrHex(out uint id))
+                ApplySpell(client, client.Account.ClientInstance,
                     client.Account.ClientInstance, id);
         }
 
-        private void HandleGmCommand(INetworkClient client, string commandText)
+        private void HandleGmCommand(NetworkClient client, string commandText)
         {
             string command;
             string arguments = null;
@@ -161,10 +135,10 @@ namespace Faolan.GameServer
             if (_gmCommandsDict.ContainsKey(command))
                 _gmCommandsDict[command].Invoke(client, arguments);
             else
-                _agentServerListener.SendSystemMessage(client.Account, "Unknown command: '" +
-                                                                       command + "' type .help for info");
+                _agentServerListener.SendSystemMessage(client.Account,
+                    $"Unknown command: '{command}' type .help for info");
         }
 
-        private delegate void GmCommandDelegate(INetworkClient client, string arguments);
+        private delegate Task GmCommandDelegate(NetworkClient client, string arguments);
     }
 }

@@ -1,11 +1,12 @@
 using Faolan.Core.Network;
 using Faolan.Core.Network.Opcodes;
 
-namespace Faolan.GameServer.Packets
+// ReSharper disable once CheckNamespace
+namespace Faolan.GameServer
 {
-    internal partial class Packets
+    public partial class GameServerListener
     {
-        public static void SpawnPlayer(INetworkClient client)
+        private static void SpawnPlayer(NetworkClient client)
         {
             var packetData1020 = new byte[]
             {
@@ -233,8 +234,7 @@ namespace Faolan.GameServer.Packets
             };
 
             new PacketStream()
-                .WriteHeader(GameServerListener.Sender0, GameServerListener.Receiver0, null,
-                    0x2000)
+                .WriteHeader(Sender0, Receiver0, null, 0x2000)
                 .WriteArrayPrependLengthUInt32(new PacketStream()
                     .WriteUInt32(GameServerOx2000RespondsOpcodes.Spawn)
                     .WriteUInt32(0x0000C350)

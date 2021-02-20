@@ -3,13 +3,13 @@ using Faolan.Core.Crypt;
 
 namespace Faolan.Core.Network
 {
-    public sealed class PacketStream : ConanStream
+    public class PacketStream : ConanStream
     {
         public PacketStream()
         {
         }
 
-        public PacketStream(byte[] data) : base(data)
+        public PacketStream(params byte[] data) : base(data)
         {
         }
 
@@ -37,26 +37,26 @@ namespace Faolan.Core.Network
             else
                 WriteUInt32(Convert.ToUInt32(opcode));
 
-            //Write headerdata
+            //Write headerData
             if (headerData?.Length > 0)
                 WriteArray(headerData);
 
             return this;
         }
 
-        private void WriteLengthHash()
+        public void WriteLengthHash()
         {
             var oldPos = Position;
             Position = 0;
             WriteUInt32(Length - sizeof(uint));
 
-            var hash = Crc32.CalculateForPacketBuffer(this);
+            var hash = Crc32.Calculate(this);
             Position = sizeof(uint);
             WriteUInt32(hash);
             Position = oldPos;
         }
 
-        public override void Send(INetworkClient client)
+        public override void Send(NetworkClient client)
         {
             WriteLengthHash();
             base.Send(client);

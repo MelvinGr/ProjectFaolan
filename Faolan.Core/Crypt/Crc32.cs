@@ -136,14 +136,14 @@ namespace Faolan.Core.Crypt
             0xCCB0A91F, 0x740CCE7A, 0x66B96194, 0xDE0506F1
         };
 
-        public static uint CalculateForPacketBuffer(MemoryStream packetBuffer)
+        public static uint Calculate(MemoryStream packetBuffer)
         {
             return Calculate(packetBuffer.ToArray());
         }
 
         public static unsafe uint Calculate(byte[] data)
         {
-            fixed (byte* fix = data) //packetBuffer.GetBuffer())
+            fixed (byte* fix = data)
             {
                 var buffer = (uint*) fix + 2; // skip length and hash
                 var len = data.Length - sizeof(uint) * 2;

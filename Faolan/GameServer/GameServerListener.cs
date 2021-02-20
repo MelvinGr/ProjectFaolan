@@ -1,60 +1,90 @@
-using System.IO;
+using System;
+using System.Threading.Tasks;
 using Faolan.AgentServer;
 using Faolan.Core;
-using Faolan.Core.Data;
 using Faolan.Core.Database;
-using Faolan.Core.Extentions;
+using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Opcodes;
+using Faolan.Properties;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
     public partial class GameServerListener : Server<ConanPacket>
     {
-        private static AgentServerListener _agentServerListener;
-        private static IDatabase _databaseStatic;
+        private readonly AgentServerListener _agentServerListener;
 
-        public GameServerListener(ushort port, Logger logger, IDatabase database,
-            AgentServerListener agentServerListener)
-            : base(port, logger, database)
+        public GameServerListener(ILogger logger, IConfiguration configuration,
+            IDatabaseRepository database, ushort port, AgentServerListener agentServerListener)
+            : base(port, logger, configuration, database)
         {
-            _databaseStatic = database;
             _agentServerListener = agentServerListener;
 
-            ConanMap.Init(Database);
-            Spell.Init(Database);
-            InitGmCommands();
+            //InitGmCommands();
         }
 
-        public override void ClientDisconnected(INetworkClient client)
+        private void MapChange2(NetworkClient client)
         {
-            base.ClientDisconnected(client);
+            var sender0 = new byte[] {0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x63};
+            var receiver0 = new byte[] {0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, 0xBD, 0xB3, 0x82, 0x88, 0x01};
 
-            client.Character?.SaveDataToDatabase(Database);
+            new PacketStream()
+                .WriteHeader(sender0, receiver0, null, 0x00002000)
+                .WriteArrayPrependLengthUInt32(new ConanStream()
+                    .WriteUInt32(GameServerOx2000RespondsOpcodes.MapChange)
+                    .WriteUInt32(0)
+                    .WriteUInt32(0)
+                    .WriteByte(0)
+                    .WriteVector3(client.Character.Position)
+                    .WriteByte(0x62)
+                    .WriteUInt32(0x0000C79C)
+                    .WriteUInt32(client.Character.MapId)
+                    .WriteArray(
+                        0x00, 0x00, 0x00, 0x00,
+                        0x00, 0x00, 0x00, 0x00,
+                        0x00, 0x00, 0x00, 0x00,
+                        0x00, 0x00, 0x00, 0x01,
+                        0x00, 0x00, 0x9C, 0x50,
+                        0x00, 0x34, 0x34, 0x8C,
+                        0x00,
+                        0x00, 0x00, 0x00, 0x01,
+                        0x00, 0x00, 0x00, 0x18,
+                        0x00, 0x00, 0x00, 0x01,
+                        0x00, 0x34, 0x34, 0x8C,
+                        0x00, 0x00, 0xCB, 0x20,
+                        0x41, 0x70,
+                        0x00, 0x00, 0x3E, 0xF2,
+                        0x95, 0x73,
+                        0x00, 0x00, 0x00, 0x03,
+                        0xFF, 0xFF, 0xFF, 0xFF,
+                        0xFF, 0xFF, 0xFF, 0xFF,
+                        0x00, 0x00, 0x00, 0x07,
+                        0x00, 0x00, 0x00, 0x01
+                    ))
+                .Send(client);
         }
 
-        public override void ReceivedPacket(INetworkClient client, ConanPacket packet)
+        protected override async Task ReceivedPacket(NetworkClient client, ConanPacket packet)
         {
-            Logger.Info("Received opcode: " + (GameServerOpcodes) packet.Opcode + " (" + packet.Opcode.ToHex() + ")");
+            Logger.LogInformation($"Received opcode: {(GameServerOpcodes) packet.Opcode} ({packet.Opcode.ToHex()})");
 
             switch ((GameServerOpcodes) packet.Opcode)
             {
                 case GameServerOpcodes.Hello:
                 {
-                    client.Account.ClientInstance = packet.Data.ReadUInt32(); // 0x0802e5d4
-                    client.Account.Id = packet.Data.ReadUInt32(); // 0x310cec57
+                    //Resources.
+                    var clientInstance = packet.Data.ReadUInt32(); // 0x0802e5d4 0x1101b4f5
+                    var accountId = packet.Data.ReadUInt32(); // 0x310cec57 0x2b68ea25=728295973
                     var clientVersion = packet.Data.ReadString();
 
-                    var charId = (uint) 0; //Database.ExecuteScalar<long>(
-                    //    "SELECT characterid FROM clientinstances " +
-                    //    "WHERE accountid=" + client.Account.Id + " AND clientinst=" + client.Account.ClientInstance);
+                    client.Account = await Database.GetAccount(accountId);
+                    client.Character = await Database.GetCharacter(clientInstance);
+                    await Database.UpdateClientInstance(client.Account, clientInstance);
 
-                    client.Character = new Character(charId);
-                    client.Character.LoadDetailsFromDatabase(Database);
-                    client.Account.LoadDetailsFromDatabase(Database);
-
-                    Logger.Info("CharID: " + client.Account.ClientInstance.ToHex());
-                    Logger.Info("Recieve Client Version: " + clientVersion);
+                    Logger.LogInformation($"Character: {clientInstance.ToHex()} with client Version: {clientVersion}");
 
                     /*if (clientVersion != "v4.00.NoTS@369764")
                     {
@@ -62,42 +92,33 @@ namespace Faolan.GameServer
                         //break;
                     }*/
 
-                    Packets.Packets.ReportDimensionId(client, client.Character.RealmId); // 1
-                    Packets.Packets.ReportServerId(client, client.Character.RealmId); // 0x00000006
-                    Packets.Packets.AckAuthentication(client, 1);
+                    //ReportDimensionId(client, client.Character.RealmId ?? throw new Exception()); // 1
+                    //ReportServerId(client, client.Character.RealmId ?? throw new Exception()); // 0x00000006
+                    //AckAuthentication(client, 1);
 
-                    Packets.Packets.Send0X201C(client); // No imediate visible change when not sending these
-                    Packets.Packets.Send0X200A(client); // No imediate visible change when not sending these
+                    foreach (var line in Resources.dumphex.Replace("\r", "").Split('\n'))
+                    {
+                        var hex = line.Replace("|", "");
+                        if (hex.Contains("# BIGBOY #"))
+                            hex = Resources.bigboy.Replace("\r", "").Replace("\n", "");
+                        //else if (line.Contains("MapChange"))
+                        //   MapChange2(client);
+                        else if (!hex.StartsWith("0x"))
+                            continue;
 
-                    var packetData135 = Functions.HexStreamToByteArray(
-                        File.ReadAllText("../../Faolan.Files/fs135.hex").Replace("\r", "").Replace("\n", ""));
+                        var bytesLine = hex.Replace(",", "").Replace("0x", "").Replace(" ", "").HexToByteArray();
 
-                    new PacketStream() // To big to keep here, but necessary to send...
-                        .WriteHeader(Sender0, Receiver0, null, 0x2000)
-                        .WriteArrayPrependLengthUInt32(new ConanStream()
-                            .WriteUInt32(GameServerOx2000RespondsOpcodes.Ox737A6Df9)
-                            .WriteArray(packetData135))
-                        .Send(client);
+                        new PacketStream(bytesLine).Send(client);
+                    }
 
-                    Packets.Packets.MapChange(client);
-                    Packets.Packets.SpawnPlayer(client);
-                    Packets.Packets.SetTimeofDay(client);
-
-                    //SendPlayerBuffsTest(client);
-                    //SendSitOnMountTest(client);
-                    //Send0x33A56FB0(client); // No imediate visible change when not sending these 
-                    //SendObjectSpawnTest(client); // No imediate visible change when not sending these
-                    //SendSpawnNPCAndPlayersTest(client); // Spawn some NPC's and other players
-                    //Send0x4F57DC08(client); // No imediate visible change when not sending these
-                    //Send0x642CD3D6(client); // No imediate visible change when not sending these
-                    //Send0x96C46740(client); // No imediate visible change when not sending these
+                    //await DoTeleport(client, 500);
 
                     break;
                 }
 
                 case GameServerOpcodes.Ox2000:
                 {
-                    if (packet.SenderInt[1] == 0x48)
+                    if (packet.SenderBytes[1] == 0x48)
                     {
                         var sId1 = packet.Data.ReadUInt32();
                         var sId2 = packet.Data.ReadUInt32();
@@ -113,25 +134,57 @@ namespace Faolan.GameServer
                     }
                     else
                     {
-                        Packets.Packets.Handle0X2000(client, packet);
+                        Handle0X2000(client, packet);
                     }
 
                     break;
                 }
+
                 case GameServerOpcodes.Ox200C: // request change map(?)
                 {
-                    var packetData = packet.Data;
-                    Logger.Info("GameServerOpcodes.Ox200c");
+                    Logger.LogInformation("0x200C: " + packet.Data?.ToArray().ToHexString());
 
                     break;
                 }
+
                 case GameServerOpcodes.Ox205C:
                 {
-                    var packetData = packet.Data;
-                    Logger.Info("GameServerOpcodes.Ox205c");
+                    Logger.LogInformation("0x205C: " + packet.Data?.ToArray().ToHexString());
 
                     break;
                 }
+
+                case GameServerOpcodes.Ox205E:
+                {
+                    Logger.LogInformation("0x205E: " + packet.Data?.ToArray().ToHexString());
+
+                    break;
+                }
+
+                case GameServerOpcodes.Ox205F:
+                {
+                    var unk0 = packet.Data.ReadUInt32(); // 0xc350
+                    var characterId = packet.Data.ReadUInt32();
+
+                    Logger.LogInformation("0x205F: " + packet.Data?.ToArray().ToHexString());
+
+                    break;
+                }
+
+                case GameServerOpcodes.Ox206D:
+                {
+                    Logger.LogInformation("0x206D: " + packet.Data?.ToArray().ToHexString());
+
+                    break;
+                }
+
+                case GameServerOpcodes.Ox2085:
+                {
+                    Logger.LogInformation("0x205A: " + packet.Data?.ToArray().ToHexString());
+
+                    break;
+                }
+
                 case GameServerOpcodes.Ox206A: // request change map(?)
                 {
                     /*byte[] sender = { 0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x14 };
@@ -174,15 +227,15 @@ namespace Faolan.GameServer
                             aBuffer.WriteUInt16(Program.GameServerPort);
                             aBuffer.Send(client);*/
 
-                    //var packetData = packet.Data.ToArray().ToHexString();
-                    Logger.Info("GameServerOpcodes.Ox206A");
+                    //var packetData = packet.Data?.ToArray().ToHexString();
+                    Logger.LogInformation("0x206A: " + packet.Data?.ToArray().ToHexString());
 
                     break;
                 }
+
                 case GameServerOpcodes.Ox207B:
                 {
-                    var packetData = packet.Data;
-                    Logger.Info("GameServerOpcodes.Ox207B");
+                    Logger.LogInformation("0x207B: " + packet.Data?.ToArray().ToHexString());
                     //Logger.Info("Receive opcode 0x207b. Maybe hide object(helmet,...)");
 
                     break;
@@ -190,8 +243,9 @@ namespace Faolan.GameServer
 
                 case GameServerOpcodes.Ox205A:
                 {
-                    var packetData = packet.Data;
-                    Logger.Info("GameServerOpcodes.Ox205A");
+                    var counter = packet.Data.ReadUInt32();
+
+                    Logger.LogInformation($"0x205A: {counter} ({counter:X4})");
                     //
 
                     break;
@@ -199,9 +253,11 @@ namespace Faolan.GameServer
 
                 case GameServerOpcodes.Ping: // Ping
                 {
+                    Logger.LogInformation("Ping: " + packet.Data?.ToArray().ToHexString());
+
                     new PacketStream() // p.158
                         .WriteHeader(Sender10, Receiver10, null, GameServerRespondOpcodes.Pong)
-                        .WriteUInt32(0x42c80000) // old = 0x42c80000, new = 0x42B32A07
+                        .WriteUInt32(0) //0x42c80000) // old = 0x42c80000, new = 0x42B32A07
                         .WriteUInt32(0)
                         .WriteUInt32(0)
                         .Send(client);
@@ -211,7 +267,9 @@ namespace Faolan.GameServer
 
                 case GameServerOpcodes.SpawnCheck: // p.160&161
                 {
-                    var part1 = packet.Data.ReadUInt32();
+                    Logger.LogInformation("SpawnCheck?: " + packet.Data?.ToArray().ToHexString());
+
+                    /*var part1 = packet.Data.ReadUInt32();
                     var spawnId = packet.Data.ReadUInt32();
                     var unk0 = packet.Data.ReadUInt32();
                     var nClientInst = packet.Data.ReadUInt32();
@@ -221,15 +279,17 @@ namespace Faolan.GameServer
                         .WriteUInt32(part1)
                         .WriteUInt32(spawnId)
                         .WriteByte(0)
-                        .Send(client);
+                        .Send(client);*/
 
                     break;
                 }
 
                 case GameServerOpcodes.GcPing: // GCPing?  p.162
                 {
+                    Logger.LogInformation("GcPing: " + packet.Data?.ToArray().ToHexString());
+
                     var counter = packet.Data.ReadUInt32();
-                    var time = Functions.Time();
+                    var time = Statics.EpochTime();
 
                     new PacketStream()
                         .WriteHeader(Sender8, Receiver8, null, GameServerRespondOpcodes.GcPing)
@@ -245,7 +305,7 @@ namespace Faolan.GameServer
                         .Send(client);
 
                     // is this still relevant?
-                    if (client.Account.CreateState == 1 && client.Account.CreateCounter > 0)
+                    /*if (client.Account.CreateState == 1 && client.Account.CreateCounter > 0)
                     {
                         client.Account.State = 0;
                         client.Account.CreateCounter = 0;
@@ -279,21 +339,23 @@ namespace Faolan.GameServer
                         aBuffer.WriteUInt32(client.Account.ClientInstance);
                         aBuffer.WriteArray(data2);
                         aBuffer.Send(client);
-                    }
+                    }*/
 
                     break;
                 }
 
                 case GameServerOpcodes.ManualRemoveBuff:
                 {
-                    var packetData = packet.Data.ToArray();
-                    Logger.Info("REMOVE BUFF");
+                    var packetData = packet.Data?.ToArray();
+                    Logger.LogInformation("REMOVE BUFF");
 
                     break;
                 }
 
                 case GameServerOpcodes.ChatCommand:
                 {
+                    Logger.LogInformation("ChatCommand: " + packet.Data?.ToArray().ToHexString());
+
                     var unk0 = packet.Data.ReadUInt32();
                     var unk1 = packet.Data.ReadUInt32();
                     var unk2 = packet.Data.ReadUInt32();
@@ -310,15 +372,15 @@ namespace Faolan.GameServer
 
                 case GameServerOpcodes.VanityToggle:
                 {
-                    var packetData = packet.Data.ToArray();
-                    Logger.Info("VanityToggle");
+                    var packetData = packet.Data?.ToArray();
+                    Logger.LogInformation("VanityToggle");
 
                     break;
                 }
 
                 default:
                 {
-                    Logger.Warning("Unknown packet: " + packet);
+                    Logger.LogWarning($"Unknown packet: {packet}");
                     break;
                 }
             }

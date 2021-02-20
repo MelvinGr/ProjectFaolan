@@ -39,18 +39,23 @@
             ChatCommand = 0x2002,
             Ox200C = 0x200c,
             Ox205C = 0x205c,
-            VanityToggle = 0x200B
+            VanityToggle = 0x200B,
+
+            Ox205E = 0x205E,
+            Ox205F = 0x205F,
+            Ox206D = 0x206D,
+            Ox2085 = 0x2085
         }
 
         public enum GameServerRespondOpcodes : ushort
         {
             Pong = 0x2009,
-            ReportDimesionId = 0x200b,
+            ReportDimensionId = 0x200b,
             ReportServerId = 0x200c,
             AckAuthentication = 0x2001,
             ReadyForPlayScreen = 0x2024,
             SpawnCheck = 0x2008,
-            GcPing = 0x0000207D
+            GcPing = 0x207D
         }
 
         public enum GameServerDataOpcodes : uint
@@ -92,11 +97,11 @@
             EnterWorld = 0x20b6, //0xDD85FB0E
             Ox20D6 = 0x20d6, //0xDD9EC209
             CreateCharacter = 0x20de,
-            Ox20Ec = 0x20ec,
+            Ox20EC = 0x20EC,
             DeleteCharacter = 0x209d // 0x86979E0C:
         }
 
-        public enum PlayerAgentRespondseOpcodes : ushort
+        public enum PlayerAgentResponseOpcodes : ushort
         {
             CreateCharacter = 0x20b9,
             InitAuth = 0x2091,
@@ -117,7 +122,7 @@
             AnswerChallenge = 0x2001
         }
 
-        public enum UniverseAgentRespondseOpcodes : ushort
+        public enum UniverseAgentResponseOpcodes : ushort
         {
             InitiateAuthentication = 0x2000,
             SendPlayerAgentRealm = 0x2001,

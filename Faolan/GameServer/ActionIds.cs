@@ -32,7 +32,7 @@ namespace Faolan.GameServer
         public enum ActionTypes : uint
         {
             CastSpell = 0x4,
-            MoveEquipedToInventory = 0x9,
+            MoveEquippedToInventory = 0x9,
             SwitchWeaponsButton = 0x2e
         }
 

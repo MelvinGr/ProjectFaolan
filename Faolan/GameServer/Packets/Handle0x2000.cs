@@ -1,18 +1,19 @@
-using System.Linq;
-using Faolan.Core.Extentions;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Opcodes;
 using Faolan.GameServer.ActionIds;
+using Microsoft.Extensions.Logging;
 
-namespace Faolan.GameServer.Packets
+// ReSharper disable once CheckNamespace
+namespace Faolan.GameServer
 {
-    internal partial class Packets
+    public partial class GameServerListener
     {
-        public static void Handle0X2000(INetworkClient client, ConanPacket packet)
+        private void Handle0X2000(NetworkClient client, ConanPacket packet)
         {
             var pbLength = packet.Data.ReadUInt32();
             var pbOpcode = (GameServerDataOpcodes) packet.Data.ReadUInt32();
-            Logger.Info("Received data opcode: " + pbOpcode + " (" + pbOpcode.ToHex() + ")");
+            Logger.LogInformation($"Received data opcode: {pbOpcode} ({pbOpcode.ToHex()})");
 
             switch (pbOpcode)
             {
@@ -48,14 +49,10 @@ namespace Faolan.GameServer.Packets
                             var charCoords = packet.Data.ReadVector3();
                             var datadat = packet.Data.ReadArray(pbLength - 6 * 4 + 1 * 2);
 
-                            var recvClient =
-                                NetworkClients.FirstOrDefault(nc => nc.Account.ClientInstance == dataclientinst);
-                            recvClient.Character.Position = charCoords;
-                            //account.Character.Position = charCoords;
+                            Database.UpdateCharacterPosition(dataclientinst, charCoords);
 
                             // send to all (nearby) clients?
-                            new PacketStream().WriteHeader(GameServerListener.Sender5,
-                                    GameServerListener.Receiver5, null, 0x2000)
+                            new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
                                 .WriteArrayPrependLengthUInt32(new ConanStream()
                                     .WriteUInt32(pbOpcode)
                                     .WriteUInt32(dataobjdec)
@@ -69,7 +66,7 @@ namespace Faolan.GameServer.Packets
                         }
                         default:
                         {
-                            Logger.Info("Received unknown moving type: " + movingType.ToHex());
+                            Logger.LogInformation($"Received unknown moving type: {movingType.ToHex()}");
                             break;
                         }
                     }
@@ -79,7 +76,7 @@ namespace Faolan.GameServer.Packets
                 case GameServerDataOpcodes.ReadyForPlayScreen: //peer0_160
                 {
                     SendReadyForPlayScreen(client);
-                    if (client.Character.Level == 0)
+                    if (client.Character.Name == null)
                         HandleNewCharacter(client, packet);
 
                     break;
@@ -90,7 +87,7 @@ namespace Faolan.GameServer.Packets
                     var clientInst = packet.Data.ReadUInt32();
                     var unk0 = packet.Data.ReadUInt16();
                     var actionType = (ActionTypes) packet.Data.ReadUInt32();
-                    var unkdata = packet.Data.ReadArrayPrependLengthUInt32();
+                    var unkData = packet.Data.ReadArrayPrependLengthUInt32();
                     var unk1 = packet.Data.ReadUInt32(); // fromid?
                     var targetSlotId = packet.Data.ReadUInt32();
                     var unk2 = packet.Data.ReadUInt32();
@@ -141,26 +138,26 @@ namespace Faolan.GameServer.Packets
                     {
                         case ActionTypes.CastSpell:
                         {
-                            Logger.Info("Player with ID: " + clientInst.ToHex() + " CastSpell");
+                            Logger.LogInformation($"Player with ID: {clientInst.ToHex()} CastSpell");
                             break;
                         }
-                        case ActionTypes.MoveEquipedToInventory:
+                        case ActionTypes.MoveEquippedToInventory:
                         {
                             var fromSlot = (CharacterEquipSlotsIDs) unk1;
 
-                            Logger.Info("Player with ID: " + clientInst.ToHex() + " MoveEquipedToInventory"
-                                        + " (" + fromSlot + " -> " + targetSlotId + ")");
+                            Logger.LogInformation(
+                                $"Player with ID: {clientInst.ToHex()} MoveEquipedToInventory ({fromSlot} -> {targetSlotId})");
 
                             break;
                         }
                         case ActionTypes.SwitchWeaponsButton:
                         {
-                            Logger.Info("Player with ID: " + clientInst.ToHex() + " SwitchWeaponsButton");
+                            Logger.LogInformation($"Player with ID: {clientInst.ToHex()} SwitchWeaponsButton");
                             break;
                         }
                         default:
                         {
-                            Logger.Info("Player with ID: " + clientInst + " UNKNOWN ACTION: " + actionType.ToHex());
+                            Logger.LogInformation($"Player with ID: {clientInst} UNKNOWN ACTION: {actionType.ToHex()}");
                             break;
                         }
                     }
@@ -172,7 +169,7 @@ namespace Faolan.GameServer.Packets
                     var unk0 = packet.Data.ReadUInt32();
                     var accountId = packet.Data.ReadUInt32();
 
-                    Logger.Info("Account with ID: " + accountId.ToHex() + " Has logged off");
+                    Logger.LogInformation($"Account with ID: {accountId.ToHex()} Has logged off");
 
                     // is handled in ClientDisconnected
                     //account.Character.SaveDataToDatabase(Database);
@@ -183,8 +180,7 @@ namespace Faolan.GameServer.Packets
                     var length = packet.Data.Length - 4;
 
                     var data = packet.Data.ToArray();
-
-                    Logger.Info("GameServerDataOpcodes.SelectDeselect");
+                    Logger.LogInformation("GameServerDataOpcodes.SelectDeselect");
 
                     /*switch(length)
                         {
@@ -251,40 +247,36 @@ namespace Faolan.GameServer.Packets
                 case GameServerDataOpcodes.DropItem:
                 {
                     var data = packet.Data.ToArray();
-
-                    Logger.Info("DROP ITEM!");
+                    Logger.LogInformation("DROP ITEM!");
 
                     break;
                 }
                 case GameServerDataOpcodes.MoveItemInInventory:
                 {
                     var data = packet.Data.ToArray();
-
-                    Logger.Info("MoveItemInInventory");
+                    Logger.LogInformation("MoveItemInInventory");
 
                     break;
                 }
                 case GameServerDataOpcodes.DeleteQuest:
                 {
                     var data = packet.Data.ToArray();
-
-                    Logger.Info("DeleteQuest");
+                    Logger.LogInformation("DeleteQuest");
 
                     break;
                 }
                 case GameServerDataOpcodes.InventoryClaimsButton:
                 {
                     var data = packet.Data.ToArray();
-
-                    Logger.Info("InventoryClaimsButton");
+                    Logger.LogInformation("InventoryClaimsButton");
 
                     break;
                 }
                 default:
                 {
                     var data = packet.Data.ToArray();
+                    Logger.LogWarning($"Unknown data Opcode: {pbOpcode.ToHex()}\r\n{data.ToHexString()}");
 
-                    Logger.Warning("Unknown data Opcode: " + pbOpcode.ToHex());
                     break;
                 }
             }

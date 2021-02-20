@@ -1,13 +1,14 @@
 using Faolan.Core.Network;
 
-namespace Faolan.GameServer.Packets
+// ReSharper disable once CheckNamespace
+namespace Faolan.GameServer
 {
-    internal partial class Packets
+    public partial class GameServerListener
     {
-        public static void Handle0Xf98E10B3(INetworkClient client, ConanPacket packet)
+        private static void Handle0Xf98E10B3(NetworkClient client, ConanPacket packet)
         {
             var aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x201c);
             aBuffer.WriteUInt32(0x00000068);
             aBuffer.WriteUInt32(client.Account.ClientInstance);
@@ -17,7 +18,7 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x201c);
             aBuffer.WriteUInt32(0x00000068);
             aBuffer.WriteUInt32(client.Account.ClientInstance);
@@ -27,7 +28,7 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x201c);
             aBuffer.WriteUInt32(0x00000068);
             aBuffer.WriteUInt32(client.Account.ClientInstance);
@@ -50,7 +51,7 @@ namespace Faolan.GameServer.Packets
                 0x30, 0x00, 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x2020);
             aBuffer.WriteUInt32(0x00000068);
             aBuffer.WriteUInt32(client.Account.ClientInstance);
@@ -58,7 +59,7 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x201c);
             aBuffer.WriteUInt32(0x00000068);
             aBuffer.WriteUInt32(client.Account.ClientInstance);
@@ -68,7 +69,7 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x201c);
             aBuffer.WriteUInt32(0x00000068);
             aBuffer.WriteUInt32(client.Account.ClientInstance);
@@ -78,7 +79,7 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x201c);
             aBuffer.WriteUInt32(0x00000068);
             aBuffer.WriteUInt32(client.Account.ClientInstance);
@@ -101,7 +102,7 @@ namespace Faolan.GameServer.Packets
                 0x4c, 0x00, 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x2020);
             aBuffer.WriteUInt32(0x00000068);
             aBuffer.WriteUInt32(client.Account.ClientInstance);
@@ -109,7 +110,7 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x201c);
             aBuffer.WriteUInt32(0x00000068);
             aBuffer.WriteUInt32(client.Account.ClientInstance);
@@ -119,7 +120,7 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x201c);
             aBuffer.WriteUInt32(0x00000068);
             aBuffer.WriteUInt32(client.Account.ClientInstance);
@@ -129,7 +130,7 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x201c);
             aBuffer.WriteUInt32(0x00000068);
             aBuffer.WriteUInt32(client.Account.ClientInstance);
@@ -152,7 +153,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x2020);
             aBuffer.WriteUInt32(0x00000068);
             aBuffer.WriteUInt32(client.Account.ClientInstance);
@@ -172,7 +173,7 @@ namespace Faolan.GameServer.Packets
             };
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x2000);
             aBuffer.WriteUInt32(0x00000078);
             aBuffer.WriteUInt32(0x642cd3d6);
@@ -182,7 +183,7 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x201c);
             aBuffer.WriteUInt32(0x00000065);
             aBuffer.WriteUInt32(client.Account.ClientInstance);
@@ -203,7 +204,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x2000);
             aBuffer.WriteUInt32(0x00000078);
             aBuffer.WriteUInt32(0x642cd3d6);
@@ -224,7 +225,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x2000);
             aBuffer.WriteUInt32(0x00000078);
             aBuffer.WriteUInt32(0x642cd3d6);
@@ -245,7 +246,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x2000);
             aBuffer.WriteUInt32(0x00000078);
             aBuffer.WriteUInt32(0x642cd3d6);
@@ -255,7 +256,7 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x201c);
             aBuffer.WriteUInt32(0x00000065);
             aBuffer.WriteUInt32(client.Account.ClientInstance);
@@ -276,7 +277,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x2000);
             aBuffer.WriteUInt32(0x00000078);
             aBuffer.WriteUInt32(0x642cd3d6);
@@ -286,7 +287,7 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x201c);
             aBuffer.WriteUInt32(0x00000065);
             aBuffer.WriteUInt32(client.Account.ClientInstance);
@@ -296,7 +297,7 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x2000);
             aBuffer.WriteUInt32(0x00000015);
             aBuffer.WriteUInt32(0xf98e10b3);
@@ -314,7 +315,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
@@ -330,7 +331,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
@@ -346,7 +347,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
@@ -362,7 +363,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
@@ -378,7 +379,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
@@ -394,7 +395,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
@@ -410,7 +411,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
@@ -426,7 +427,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
@@ -442,7 +443,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
@@ -458,7 +459,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
@@ -474,7 +475,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
@@ -490,7 +491,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
@@ -506,7 +507,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
@@ -522,7 +523,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
@@ -538,7 +539,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
@@ -554,7 +555,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
@@ -573,7 +574,7 @@ namespace Faolan.GameServer.Packets
                 0x01, 0x00, 0x00, 0x00, 0x00, 0x01
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x2050);
             aBuffer.WriteArray(data25);
             aBuffer.Send(client);
@@ -588,7 +589,7 @@ namespace Faolan.GameServer.Packets
                 0x01, 0x00, 0x00, 0x00, 0x00, 0x01
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x2050);
             aBuffer.WriteArray(data26);
             aBuffer.Send(client);
@@ -603,7 +604,7 @@ namespace Faolan.GameServer.Packets
                 0x01, 0x00, 0x00, 0x00, 0x00, 0x01
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x2050);
             aBuffer.WriteArray(data27);
             aBuffer.Send(client);
@@ -618,7 +619,7 @@ namespace Faolan.GameServer.Packets
                 0x01, 0x00, 0x00, 0x00, 0x00, 0x01
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x2050);
             aBuffer.WriteArray(data28);
             aBuffer.Send(client);
@@ -633,7 +634,7 @@ namespace Faolan.GameServer.Packets
                 0x01, 0x00, 0x00, 0x00, 0x00, 0x01
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x2050);
             aBuffer.WriteArray(data29);
             aBuffer.Send(client);
@@ -648,7 +649,7 @@ namespace Faolan.GameServer.Packets
                 0x01, 0x00, 0x00, 0x00, 0x00, 0x01
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x2050);
             aBuffer.WriteArray(data30);
             aBuffer.Send(client);
@@ -660,7 +661,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
@@ -670,7 +671,7 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x00000012);
             aBuffer.WriteUInt32(0xa8bbeb7f);
@@ -681,7 +682,7 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x00000012);
             aBuffer.WriteUInt32(0xa8bbeb7f);
@@ -692,7 +693,7 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x00000012);
             aBuffer.WriteUInt32(0xa8bbeb7f);
@@ -703,7 +704,7 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x00000012);
             aBuffer.WriteUInt32(0xa8bbeb7f);
@@ -714,7 +715,7 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x00000012);
             aBuffer.WriteUInt32(0xa8bbeb7f);
@@ -725,7 +726,7 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x00000012);
             aBuffer.WriteUInt32(0xa8bbeb7f);
@@ -736,7 +737,7 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x00000012);
             aBuffer.WriteUInt32(0xa8bbeb7f);
@@ -747,7 +748,7 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x00000012);
             aBuffer.WriteUInt32(0xa8bbeb7f);
@@ -758,7 +759,7 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x00000012);
             aBuffer.WriteUInt32(0xa8bbeb7f);
@@ -769,7 +770,7 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x00000012);
             aBuffer.WriteUInt32(0xa8bbeb7f);
@@ -780,7 +781,7 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x00000012);
             aBuffer.WriteUInt32(0xa8bbeb7f);
@@ -791,7 +792,7 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x00000012);
             aBuffer.WriteUInt32(0xa8bbeb7f);
@@ -808,7 +809,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
@@ -824,7 +825,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
@@ -840,7 +841,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
@@ -856,7 +857,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
@@ -872,7 +873,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
@@ -888,7 +889,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
@@ -907,7 +908,7 @@ namespace Faolan.GameServer.Packets
                 0x01, 0x00, 0x00, 0x00, 0x00, 0x01
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x2050);
             aBuffer.WriteArray(data38);
             aBuffer.Send(client);
@@ -919,7 +920,7 @@ namespace Faolan.GameServer.Packets
                 0x00, 0x00, 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000002d);
             aBuffer.WriteUInt32(0x6b6fd368);
@@ -929,7 +930,7 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x00000011);
             aBuffer.WriteUInt32(0x40749b8a);
@@ -947,7 +948,7 @@ namespace Faolan.GameServer.Packets
                 0x00
             };
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000003a);
             aBuffer.WriteUInt32(0xf508f4c1);
@@ -957,12 +958,12 @@ namespace Faolan.GameServer.Packets
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender4, GameServerListener.Receiver4, null,
+            aBuffer.WriteHeader(Sender4, Receiver4, null,
                 0x201b);
             aBuffer.Send(client);
 
             aBuffer = new PacketStream();
-            aBuffer.WriteHeader(GameServerListener.Sender2, GameServerListener.Receiver2, null,
+            aBuffer.WriteHeader(Sender2, Receiver2, null,
                 0x2000);
             aBuffer.WriteUInt32(0x0000002b);
             aBuffer.WriteUInt32(0x10d27bc0);

@@ -1,39 +1,45 @@
+using System.Threading.Tasks;
 using Faolan.Core;
-using Faolan.Core.Config;
-using Faolan.Core.Data;
 using Faolan.Core.Database;
-using Faolan.Core.Extentions;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Opcodes;
+using Faolan.Extensions;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Faolan.AgentServer
 {
     public partial class AgentServerListener : Server<AgentServerPacket>
     {
-        public AgentServerListener(ushort port, Logger logger, IDatabase database)
-            : base(port, logger, database)
+        // ReSharper disable once SuggestBaseTypeForParameter
+        public AgentServerListener(ILogger<AgentServerListener> logger, IConfiguration configuration,
+            IDatabaseRepository database)
+            : base(configuration.AgentServerPort(), logger, configuration, database)
         {
         }
 
-        public override void ReceivedPacket(INetworkClient client, AgentServerPacket packet)
+        protected override async Task ReceivedPacket(NetworkClient client, AgentServerPacket packet)
         {
-            Logger.Info("Received opcode: " + packet.Opcode + " (" + packet.Opcode.ToHex() + ")");
+            Logger.LogInformation($"Received opcode: {packet.Opcode} ({packet.Opcode.ToHex()})");
 
             switch (packet.Opcode)
             {
                 case AgentServerOpcodes.Hello:
                 {
                     var unk0 = packet.Data.ReadUInt32();
-                    client.Account.ClientInstance = packet.Data.ReadUInt32();
-                    client.Account.Id = packet.Data.ReadUInt32();
+                    var clientInstance = packet.Data.ReadUInt32();
+                    var accountId = packet.Data.ReadUInt32();
+
+                    client.Account = await Database.GetAccount(accountId);
+                    client.Account.ClientInstance = clientInstance;
 
                     var charId = (uint) 0; /*Database.ExecuteScalar<long>(
                         "SELECT characterid FROM clientinstances " +
                         "WHERE Accountid=" + client.Account.Id + " AND clientinst=" +
                         client.Account.ClientInstance);*/
 
-                    client.Character = new Character(charId);
-                    client.Character.LoadDetailsFromDatabase(Database);
+                    client.Character = await Database.GetCharacter(charId);
 
                     new ConanStream()
                         .WriteUInt32(0x00050000)
@@ -46,12 +52,12 @@ namespace Faolan.AgentServer
                             .WriteUInt32(0x00000000)
                             .WriteString(client.Character.Name.Length > 0
                                 ? client.Character.Name
-                                : "Character" + client.Account.ClientInstance))
+                                : $"Character{client.Account.ClientInstance}"))
                         .Send(client);
 
                     // "<localized category=20000 token=\"welcome_message\">"
-                    SendSystemMessage(client, Settings.WelcomeString);
-                    SendSystemMessage(client, Statics.BuildInfo.Replace("\n", "<br />"));
+                    SendSystemMessage(client, Configuration.WelcomeString());
+                    SendSystemMessage(client, Statics.BuildString.Replace("\n", "<br />"));
 
                     new ConanStream()
                         .WriteUInt16(AgentServerRespondsOpcodes.Ox003C)
@@ -68,7 +74,7 @@ namespace Faolan.AgentServer
 
                 default:
                 {
-                    Logger.Warning("Unknown packet: " + packet);
+                    Logger.LogWarning($"Unknown packet: {packet}");
                     break;
                 }
             }
