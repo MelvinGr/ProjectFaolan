@@ -18,7 +18,7 @@ namespace Faolan.Core.Network
 
         protected readonly IDatabaseRepository Database;
         protected readonly ILogger Logger;
-        protected readonly SynchronizedCollection<NetworkClient> NetworkClients = new();
+        protected readonly SynchronizedCollection<INetworkClient> NetworkClients = new();
 
         // ReSharper disable once SuggestBaseTypeForParameter
         protected Server(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database)
@@ -50,12 +50,7 @@ namespace Faolan.Core.Network
                 try
                 {
                     var socket = await _tcpListener.AcceptSocketAsync();
-                    /*var clientTask = protocol.HandleClient(client, cancellationToken)
-                        .ContinueWith(antecedent => client.Dispose())
-                        .ContinueWith(antecedent => logger.LogInformation("Client disposed."));*/
-
-                    var networkClient =
-                        (NetworkClient) Activator.CreateInstance(typeof(NetworkClient<TPacket>), socket, Logger);
+                    var networkClient = (NetworkClient) Activator.CreateInstance(typeof(NetworkClient<TPacket>), socket, Logger);
                     if (networkClient == null)
                         throw new Exception("networkClient == null");
 
@@ -75,18 +70,18 @@ namespace Faolan.Core.Network
                 }
         }
 
-        protected void ClientConnected(NetworkClient client)
+        protected void ClientConnected(INetworkClient client)
         {
             NetworkClients.Add(client);
             Logger.LogInformation($"Client with address: {client.IpAddress} connected!");
         }
 
-        protected void ClientDisconnected(NetworkClient client)
+        protected void ClientDisconnected(INetworkClient client)
         {
             NetworkClients.Remove(client);
             Logger.LogInformation($"Client with address: {client.IpAddress} disconnected!");
         }
 
-        protected abstract Task ReceivedPacket(NetworkClient client, TPacket packet);
+        protected abstract Task ReceivedPacket(INetworkClient client, TPacket packet);
     }
 }

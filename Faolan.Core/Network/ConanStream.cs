@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Text;
+using Faolan.Core.Data;
 
 namespace Faolan.Core.Network
 {
@@ -34,9 +35,19 @@ namespace Faolan.Core.Network
             return BitConverter.ToUInt16(ReadArray(sizeof(ushort)).Reverse().ToArray(), 0);
         }
 
+        public T ReadUInt16<T>() where T : Enum
+        {
+            return (T) Enum.ToObject(typeof(T), ReadUInt16());
+        }
+
         public uint ReadUInt32()
         {
             return BitConverter.ToUInt32(ReadArray(sizeof(uint)).Reverse().ToArray(), 0);
+        }
+
+        public T ReadUInt32<T>() where T : Enum
+        {
+            return (T) Enum.ToObject(typeof(T), ReadUInt32());
         }
 
         public ulong ReadUInt64()
@@ -49,14 +60,14 @@ namespace Faolan.Core.Network
             return BitConverter.ToSingle(ReadArray(sizeof(float)).Reverse().ToArray(), 0);
         }
 
-        public string ReadShortString()
+        public string ReadStringByteLength()
         {
-            return Encoding.UTF8.GetString(ReadArrayPrependLengthByte());
+            return Encoding.UTF8.GetString(ReadArrayByteLength());
         }
 
         public string ReadString()
         {
-            return Encoding.UTF8.GetString(ReadArrayPrependLengthUInt16());
+            return Encoding.UTF8.GetString(ReadArrayUInt16Length());
         }
 
         public Vector3 ReadVector3()
@@ -64,23 +75,26 @@ namespace Faolan.Core.Network
             return new(ReadFloat(), ReadFloat(), ReadFloat());
         }
 
-        public byte[] ReadArrayPrependLengthByte()
+        public byte[] ReadArrayByteLength()
         {
             return ReadArray(ReadByte());
         }
 
-        public byte[] ReadArrayPrependLengthUInt16()
+        public byte[] ReadArrayUInt16Length()
         {
             return ReadArray(ReadUInt16());
         }
 
-        public byte[] ReadArrayPrependLengthUInt32()
+        public byte[] ReadArrayUInt32Length()
         {
             return ReadArray(ReadUInt32());
         }
 
         public byte[] ReadArray(uint length)
         {
+            if (length > int.MaxValue)
+                throw new Exception("length > Int32.MaxValue");
+
             var buffer = new byte[length];
             Read(buffer, 0, (int) length);
             return buffer;
@@ -152,29 +166,29 @@ namespace Faolan.Core.Network
             return WriteArray(BitConverter.GetBytes(value));
         }
 
-        public ConanStream WriteShortString(string value)
+        public ConanStream WriteStringByteLength(string value)
         {
-            return WriteArrayPrependLengthByte(Encoding.UTF8.GetBytes(value ?? ""));
+            return WriteArrayByteLength(Encoding.UTF8.GetBytes(value ?? ""));
         }
 
         public ConanStream WriteString(string value)
         {
-            return WriteArrayPrependLengthUInt16(Encoding.UTF8.GetBytes(value ?? ""));
+            return WriteArrayUInt16Length(Encoding.UTF8.GetBytes(value ?? ""));
         }
 
-        public ConanStream WriteArrayPrependLengthByte(ConanStream stream)
+        public ConanStream WriteArrayByteLength(ConanStream stream)
         {
-            return WriteArrayPrependLengthByte(stream.ToArray());
+            return WriteArrayByteLength(stream.ToArray());
         }
 
-        public ConanStream WriteArrayPrependLengthUInt16(ConanStream stream, bool removeLen = false)
+        public ConanStream WriteArrayUInt16Length(ConanStream stream)
         {
-            return WriteArrayPrependLengthUInt16(stream.ToArray(), removeLen);
+            return WriteArrayUInt16Length(stream.ToArray());
         }
 
-        public ConanStream WriteArrayPrependLengthUInt32(ConanStream stream)
+        public ConanStream WriteArrayUInt32Length(ConanStream stream)
         {
-            return WriteArrayPrependLengthUInt32(stream.ToArray());
+            return WriteArrayUInt32Length(stream.ToArray());
         }
 
         public ConanStream WriteArray(params byte[] value)
@@ -190,7 +204,35 @@ namespace Faolan.Core.Network
             return WriteFloat(value.Z);
         }
 
-        public ConanStream WriteArrayPrependLengthByte(params byte[] value)
+        public ConanStream WritePosition(Character character)
+        {
+            WriteFloat(character.PositionX);
+            WriteFloat(character.PositionY);
+            return WriteFloat(character.PositionZ);
+        }
+
+        public ConanStream WriteRotation(Character character)
+        {
+            WriteFloat(character.RotationX);
+            WriteFloat(character.RotationY);
+            return WriteFloat(character.RotationZ);
+        }
+
+        public ConanStream WritePosition(MapObject worldObject)
+        {
+            WriteFloat(worldObject.PositionX);
+            WriteFloat(worldObject.PositionY);
+            return WriteFloat(worldObject.PositionZ);
+        }
+
+        public ConanStream WriteRotation(MapObject worldObject)
+        {
+            WriteFloat(worldObject.RotationX);
+            WriteFloat(worldObject.RotationY);
+            return WriteFloat(worldObject.RotationZ);
+        }
+
+        public ConanStream WriteArrayByteLength(params byte[] value)
         {
             if (value.Length > byte.MaxValue)
                 throw new Exception("value.Length > byte.MaxValue");
@@ -199,26 +241,22 @@ namespace Faolan.Core.Network
             return WriteArray(value);
         }
 
-        public ConanStream WriteArrayPrependLengthUInt16(byte[] value, bool removeLen = false)
+        public ConanStream WriteArrayUInt16Length(params byte[] value)
         {
             if (value.Length > ushort.MaxValue)
                 throw new Exception("value.Length > UInt16.MaxValue");
 
-            if (removeLen)
-                WriteUInt16((ushort) (value.Length - sizeof(ushort)));
-            else
-                WriteUInt16((ushort) value.Length);
-
+            WriteUInt16((ushort) value.Length);
             return WriteArray(value);
         }
 
-        public ConanStream WriteArrayPrependLengthUInt32(params byte[] value)
+        public ConanStream WriteArrayUInt32Length(params byte[] value)
         {
             WriteUInt32(value.Length);
             return WriteArray(value);
         }
 
-        public virtual void Send(NetworkClient client)
+        public virtual void Send(INetworkClient client)
         {
             client.Send(ToArray());
         }

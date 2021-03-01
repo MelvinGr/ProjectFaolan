@@ -1,9 +1,11 @@
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using Faolan.Core.Enums;
 
 namespace Faolan.Core.Data
 {
-    public class Realm : BaseObject
+    public class Realm : BaseEntity
     {
         [MaxLength(128)]
         public string Name { get; set; }
@@ -14,9 +16,13 @@ namespace Faolan.Core.Data
         public ushort Port { get; set; }
 
         public RealmCountry Country { get; set; }
-        public bool FullStatus { get; set; }
         public RealmLoadStatus LoadStatus { get; set; }
         public RealmOnlineStatus OnlineStatus { get; set; }
-        public ushort Type { get; set; } // realmtype - 0,1 = PvE | 256,257 = PvP | 1081 = PvP by faction
+        public RealmType Type { get; set; }
+
+        public virtual ICollection<Character> Characters { get; set; }
+
+        [NotMapped]
+        public bool FullStatus => LoadStatus == RealmLoadStatus.Full;
     }
 }

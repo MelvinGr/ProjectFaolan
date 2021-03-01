@@ -1,4 +1,5 @@
 using System.IO;
+using Faolan.Core.Network;
 
 namespace Faolan.Core.Crypt
 {
@@ -136,71 +137,78 @@ namespace Faolan.Core.Crypt
             0xCCB0A91F, 0x740CCE7A, 0x66B96194, 0xDE0506F1
         };
 
-        public static uint Calculate(MemoryStream packetBuffer)
+        public static unsafe uint Calculate(PacketStream packetBuffer)
         {
-            return Calculate(packetBuffer.ToArray());
+            fixed (byte* pointer = packetBuffer.ToArray()) // skip length and hash
+            {
+                return Calculate((uint*) pointer + 2, packetBuffer.Length - sizeof(uint) * 2);
+            }
+        }
+
+        public static unsafe uint Calculate(MemoryStream data)
+        {
+            fixed (byte* pointer = data.ToArray())
+            {
+                return Calculate((uint*) pointer, data.Length);
+            }
         }
 
         public static unsafe uint Calculate(byte[] data)
         {
-            fixed (byte* fix = data)
+            fixed (byte* pointer = data)
             {
-                var buffer = (uint*) fix + 2; // skip length and hash
-                var len = data.Length - sizeof(uint) * 2;
-                var crc32 = 0xffffffff;
-                uint offset = 0;
-
-                if (len >= 32)
-                {
-                    var l = len >> 5;
-                    for (uint i = 0; i < l; i++)
-                    {
-                        crc32 ^= buffer[offset];
-                        len -= 4;
-
-                        for (uint ii = 0; ii < 7; ii++)
-                        {
-                            offset++;
-                            crc32 = CrcTab2[(crc32 >> 16) & 0xFF] ^ CrcTab3[(crc32 >> 8) & 0xFF] ^
-                                    CrcTab1[crc32 >> 24] ^
-                                    CrcTab4[crc32 & 0xFF] ^ buffer[offset];
-                            len -= 4;
-                        }
-
-                        crc32 = CrcTab2[(crc32 >> 16) & 0xFF] ^ CrcTab3[(crc32 >> 8) & 0xFF] ^ CrcTab1[crc32 >> 24] ^
-                                CrcTab4[crc32 & 0xFF];
-                        offset++;
-                    }
-                }
-
-                if (len >= offset)
-                {
-                    var l = len >> 2;
-                    for (uint i = 0; i < l; i++)
-                    {
-                        crc32 ^= buffer[offset];
-                        len -= 4;
-
-                        crc32 = CrcTab2[(crc32 >> 16) & 0xFF] ^ CrcTab3[(crc32 >> 8) & 0xFF] ^ CrcTab1[crc32 >> 24] ^
-                                CrcTab4[crc32 & 0xFF];
-                        offset++;
-                    }
-                }
-
-                if (len > 0)
-                {
-                    offset *= 4;
-
-                    for (uint i = 0; i < len; i++)
-                    {
-                        var tmp = *(byte*) ((ulong) buffer + offset);
-                        crc32 = (crc32 >> 8) ^ CrcTab1[(tmp ^ crc32) & 0xFF];
-                        offset++;
-                    }
-                }
-
-                return crc32 ^ 0xFFFFFFFF;
+                return Calculate((uint*) pointer, data.Length);
             }
+        }
+
+        public static unsafe uint Calculate(uint* buffer, long length)
+        {
+            var crc32 = 0xffffffff;
+            long offset = 0;
+
+            if (length >= 32)
+                for (var i = 0; i < length >> 5; i++)
+                {
+                    crc32 ^= buffer[offset];
+                    length -= 4;
+
+                    for (var j = 0; j < 7; j++)
+                    {
+                        offset++;
+                        crc32 = CrcTab2[(crc32 >> 16) & 0xFF] ^ CrcTab3[(crc32 >> 8) & 0xFF] ^
+                                CrcTab1[crc32 >> 24] ^ CrcTab4[crc32 & 0xFF] ^ buffer[offset];
+                        length -= 4;
+                    }
+
+                    crc32 = CrcTab2[(crc32 >> 16) & 0xFF] ^ CrcTab3[(crc32 >> 8) & 0xFF] ^
+                            CrcTab1[crc32 >> 24] ^ CrcTab4[crc32 & 0xFF];
+                    offset++;
+                }
+
+            if (length >= offset)
+                for (var i = 0; i < length >> 2; i++)
+                {
+                    crc32 ^= buffer[offset];
+                    length -= 4;
+
+                    crc32 = CrcTab2[(crc32 >> 16) & 0xFF] ^ CrcTab3[(crc32 >> 8) & 0xFF] ^
+                            CrcTab1[crc32 >> 24] ^ CrcTab4[crc32 & 0xFF];
+                    offset++;
+                }
+
+            if (length > 0)
+            {
+                offset *= 4;
+
+                for (var i = 0; i < length; i++)
+                {
+                    var tmp = *(byte*) ((long) buffer + offset);
+                    crc32 = (crc32 >> 8) ^ CrcTab1[(tmp ^ crc32) & 0xFF];
+                    offset++;
+                }
+            }
+
+            return crc32 ^ 0xFFFFFFFF;
         }
     }
 }

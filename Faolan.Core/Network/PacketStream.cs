@@ -13,26 +13,28 @@ namespace Faolan.Core.Network
         {
         }
 
-        public PacketStream WriteHeader<T>(byte[] sender, byte[] receiver, byte[] headerData, T opcode,
-            bool minOpcode = true) where T : struct
+        public PacketStream WriteHeader<T>(byte[] sender, byte[] receiver, byte[] headerData, T opcode, bool shortOpcode = true) where T : struct
         {
             WriteUInt32(0); // Write empty length
             WriteUInt32(0); // write empty crc32
 
             //Write Headerlength
-            WriteUInt32(1 + sender.Length + 1 + receiver.Length + (headerData?.Length ?? 0)
-                        + sizeof(byte) * 2 + (minOpcode ? sizeof(ushort) : sizeof(uint)));
+            WriteUInt32(sizeof(byte) + sender.Length + 
+                        sizeof(byte) + receiver.Length +
+                        (shortOpcode ? sizeof(ushort) : sizeof(uint)) +
+                        (headerData?.Length ?? 0) +
+                        sizeof(byte) * 2);
 
             //Write sender
             WriteByte(0x0a);
-            WriteArrayPrependLengthByte(sender);
+            WriteArrayByteLength(sender);
 
             //Write receiver
             WriteByte(0x12);
-            WriteArrayPrependLengthByte(receiver);
+            WriteArrayByteLength(receiver);
 
             //write opcode
-            if (minOpcode) // hmmmm should be done better... (opcode can be given as uint* or as a enum)
+            if (shortOpcode)
                 WriteUInt16(Convert.ToUInt16(opcode));
             else
                 WriteUInt32(Convert.ToUInt32(opcode));
@@ -49,14 +51,11 @@ namespace Faolan.Core.Network
             var oldPos = Position;
             Position = 0;
             WriteUInt32(Length - sizeof(uint));
-
-            var hash = Crc32.Calculate(this);
-            Position = sizeof(uint);
-            WriteUInt32(hash);
+            WriteUInt32(Crc32.Calculate(this));
             Position = oldPos;
         }
 
-        public override void Send(NetworkClient client)
+        public override void Send(INetworkClient client)
         {
             WriteLengthHash();
             base.Send(client);

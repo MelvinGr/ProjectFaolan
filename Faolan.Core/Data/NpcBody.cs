@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Faolan.Core.Data
 {
-    public class NpcBody : BaseObject
+    public class NpcBody : BaseEntity
     {
         [ForeignKey(nameof(Npc))]
         public uint NpcId { get; set; }

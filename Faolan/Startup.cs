@@ -39,18 +39,21 @@ namespace Faolan
             var host = Host.CreateDefaultBuilder(args)
                 .ConfigureAppConfiguration((hostingContext, config) =>
                 {
-                    //var a = hostingContext.HostingEnvironment.IsDevelopment();
                     config.SetBasePath(Directory.GetCurrentDirectory());
-                    config.AddEnvironmentVariables();
                     config.AddJsonFile(Path.GetFullPath(Statics.ConfigFilePath));
                     config.AddCommandLine(args);
+                    //config.AddEnvironmentVariables();
                 })
-                .ConfigureLogging(configLogging =>
+                .ConfigureLogging(builder =>
                 {
-                    configLogging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Warning);
+                    builder.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Warning);
 
-                    configLogging.AddConsole();
-                    configLogging.AddDebug();
+                    //builder.AddDebug();
+                    builder.AddSimpleConsole(options =>
+                    {
+                        options.IncludeScopes = true;
+                        options.SingleLine = true;
+                    });
                 })
                 .UseStartup<Startup>()
                 .Build();
@@ -64,8 +67,7 @@ namespace Faolan
 
             services.AddDbContext<IDatabaseContext, DatabaseContext>(options =>
             {
-                options.UseSqlite($"Data Source={Configuration.DatabasePath()}",
-                    x => x.MigrationsAssembly("Faolan"));
+                options.UseSqlite($"Data Source={Configuration.DatabasePath()}", x => x.MigrationsAssembly("Faolan"));
             });
 
             services.AddScoped<IDatabaseRepository, DatabaseRepository>();
@@ -86,10 +88,12 @@ namespace Faolan
                 var dataRepository = provider.GetRequiredService<IDatabaseRepository>();
                 var agentServerListener = provider.GetRequiredService<AgentServerListener>();
 
-                // ReSharper disable once PossibleNullReferenceException
                 var realm = dataRepository.Context.Realms.FirstOrDefault();
+                if (realm == null)
+                    throw new Exception("realm == null");
+
                 return new GameServerListener(
-                    loggerFactory.CreateLogger(typeof(GameServerListener).FullName + $"-{realm.Id}"),
+                    loggerFactory.CreateLogger($"{typeof(GameServerListener).FullName}-{realm.Id}"),
                     configuration, dataRepository, realm.Port, agentServerListener);
             });
         }
@@ -116,7 +120,6 @@ namespace Faolan
         {
             var options = new DbContextOptionsBuilder<DatabaseContext>();
             options.UseSqlite("Data Source=faolan.db", x => x.MigrationsAssembly("Faolan"));
-
             return new DatabaseContext(options.Options);
         }
     }

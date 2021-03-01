@@ -5,7 +5,7 @@ namespace Faolan.GameServer
 {
     public partial class GameServerListener
     {
-        private static void HandleNewCharacter(NetworkClient client, ConanPacket packet)
+        private static void HandleNewCharacter(INetworkClient client, ConanPacket packet)
         {
             var blobData7 = new byte[]
             {
@@ -112,7 +112,6 @@ namespace Faolan.GameServer
             aBuffer.WriteArray(blobData61);
             aBuffer.Send(client);
 
-
             var blobData9 = new byte[]
             {
                 0x00, 0x00, 0x03, 0x06, 0xa3, 0x6d, 0x3b, 0x74, 0x00, 0x00, 0xc3, 0x50
@@ -194,7 +193,6 @@ namespace Faolan.GameServer
             aBuffer.WriteUInt32(client.Account.ClientInstance);
             aBuffer.WriteArray(blobData101);
             aBuffer.Send(client);
-
 
             var blobData11 = new byte[]
             {

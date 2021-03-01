@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Extensions;
@@ -12,13 +13,12 @@ namespace Faolan.CSPlayerAgent
     public class CsPlayerAgentListener : Server<ConanPacket>
     {
         // ReSharper disable once SuggestBaseTypeForParameter
-        public CsPlayerAgentListener(ILogger<CsPlayerAgentListener> logger, IConfiguration configuration,
-            IDatabaseRepository database)
+        public CsPlayerAgentListener(ILogger<CsPlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database)
             : base(configuration.CsPlayerAgentPort(), logger, configuration, database)
         {
         }
 
-        protected override async Task ReceivedPacket(NetworkClient client, ConanPacket packet)
+        protected override async Task ReceivedPacket(INetworkClient client, ConanPacket packet)
         {
             Logger.LogInformation($"Received opcode: {(CsPlayerAgentOpcodes) packet.Opcode} ({packet.Opcode.ToHex()})");
 
@@ -30,7 +30,10 @@ namespace Faolan.CSPlayerAgent
                     var accountId = packet.Data.ReadUInt32();
 
                     client.Account = await Database.GetAccount(accountId);
-                    client.Account.ClientInstance = clientInstance;
+                    if (client.Account == null)
+                        throw new Exception("client.Account == null");
+
+                    //client.Account.ClientInstance = clientInstance;
 
                     var unk0 = packet.Data.ReadByte();
                     var auth = packet.Data.ReadUInt32();

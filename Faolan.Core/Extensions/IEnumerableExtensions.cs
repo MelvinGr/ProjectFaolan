@@ -8,21 +8,18 @@ namespace Faolan.Core.Extensions
     // ReSharper disable once InconsistentNaming
     public static class IEnumerableExtensions
     {
-        public static string ToHex(this IEnumerable<byte> value)
-        {
-            return "{ " + string.Join(", ", value.Select(e => e.ToHex())) + " }";
-        }
-
+        // https://stackoverflow.com/questions/42340501/converting-plc-hexadecimal-values-to-real-world-valuesarithmetic-types-int-floa
         public static string HexDump(this IEnumerable<byte> bytes, int bytesPerLine = 16)
         {
-            if (bytes == null) return "<null>";
+            if (bytes == null)
+                return "<null>";
+
             var bytesLength = bytes.Count();
 
-            var HexChars = "0123456789ABCDEF".ToCharArray();
+            var hexChars = new[] {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 
-            var firstHexColumn =
-                8 // 8 characters for the address
-                + 3; // 3 spaces
+            var firstHexColumn = 8 // 8 characters for the address
+                                 + 3; // 3 spaces
 
             var firstCharColumn = firstHexColumn
                                   + bytesPerLine * 3 // - 2 digit for the hexadecimal value and 1 space
@@ -39,14 +36,14 @@ namespace Faolan.Core.Extensions
 
             for (var i = 0; i < bytesLength; i += bytesPerLine)
             {
-                line[0] = HexChars[(i >> 28) & 0xF];
-                line[1] = HexChars[(i >> 24) & 0xF];
-                line[2] = HexChars[(i >> 20) & 0xF];
-                line[3] = HexChars[(i >> 16) & 0xF];
-                line[4] = HexChars[(i >> 12) & 0xF];
-                line[5] = HexChars[(i >> 8) & 0xF];
-                line[6] = HexChars[(i >> 4) & 0xF];
-                line[7] = HexChars[(i >> 0) & 0xF];
+                line[0] = hexChars[(i >> 28) & 0xF];
+                line[1] = hexChars[(i >> 24) & 0xF];
+                line[2] = hexChars[(i >> 20) & 0xF];
+                line[3] = hexChars[(i >> 16) & 0xF];
+                line[4] = hexChars[(i >> 12) & 0xF];
+                line[5] = hexChars[(i >> 8) & 0xF];
+                line[6] = hexChars[(i >> 4) & 0xF];
+                line[7] = hexChars[(i >> 0) & 0xF];
 
                 var hexColumn = firstHexColumn;
                 var charColumn = firstCharColumn;
@@ -63,8 +60,8 @@ namespace Faolan.Core.Extensions
                     else
                     {
                         var b = bytes.ElementAt(i + j);
-                        line[hexColumn] = HexChars[(b >> 4) & 0xF];
-                        line[hexColumn + 1] = HexChars[b & 0xF];
+                        line[hexColumn] = hexChars[(b >> 4) & 0xF];
+                        line[hexColumn + 1] = hexChars[b & 0xF];
                         line[charColumn] = b < 32 ? '·' : (char) b;
                     }
 

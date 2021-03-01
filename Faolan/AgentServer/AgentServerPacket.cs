@@ -5,10 +5,10 @@ namespace Faolan.AgentServer
 {
     public class AgentServerPacket : Packet
     {
-        public AgentServerPacket(ConanStream stream)
+        public AgentServerPacket(PacketStream stream)
             : base(stream)
         {
-            Opcode = (AgentServerOpcodes) stream.ReadUInt16();
+            Opcode = stream.ReadUInt16<AgentServerOpcodes>();
             Length = stream.ReadUInt16();
 
             if (Length == 0 || stream.Length < Length)

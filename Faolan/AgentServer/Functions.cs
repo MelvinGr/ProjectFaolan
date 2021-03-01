@@ -7,7 +7,7 @@ namespace Faolan.AgentServer
 {
     partial class AgentServerListener
     {
-        private NetworkClient ClientForAccount(Account account)
+        private INetworkClient ClientForAccount(Account account)
         {
             return NetworkClients.FirstOrDefault(nc => nc.Account.ClientInstance == account.ClientInstance);
         }
@@ -19,11 +19,11 @@ namespace Faolan.AgentServer
                 SendSystemMessage(client, message);
         }
 
-        private void SendSystemMessage(NetworkClient client, string message)
+        private void SendSystemMessage(INetworkClient client, string message)
         {
             new ConanStream()
                 .WriteUInt16(AgentServerRespondsOpcodes.SystemMessage)
-                .WriteArrayPrependLengthUInt16(new ConanStream()
+                .WriteArrayUInt16Length(new ConanStream()
                     .WriteUInt16(0x0000)
                     .WriteString(message)
                     .WriteUInt16(0x0000))
@@ -42,7 +42,7 @@ namespace Faolan.AgentServer
             foreach (var client in NetworkClients)
                 new ConanStream()
                     .WriteUInt16(AgentServerRespondsOpcodes.CharacterChat) // opcode
-                    .WriteArrayPrependLengthUInt16(new ConanStream()
+                    .WriteArrayUInt16Length(new ConanStream()
                         .WriteUInt32(client.Account.ClientInstance)
                         .WriteString(message)
                         .WriteUInt16(0x0001) // type?

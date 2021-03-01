@@ -9,8 +9,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Faolan.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    [Migration("20210228190319_3")]
-    partial class _3
+    [Migration("20210307180936_6")]
+    partial class _6
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
@@ -23,6 +23,10 @@ namespace Faolan.Migrations
                     b.Property<uint>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("AuthChallenge")
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
 
                     b.Property<uint>("AuthStatus")
                         .HasColumnType("INTEGER");
@@ -39,10 +43,10 @@ namespace Faolan.Migrations
                     b.Property<DateTime>("CreationDate")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTime>("LastConnection")
+                    b.Property<DateTime?>("LastConnection")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("LastIPAddress")
+                    b.Property<string>("LastIpAddress")
                         .HasMaxLength(45)
                         .HasColumnType("TEXT");
 
@@ -83,24 +87,24 @@ namespace Faolan.Migrations
                     b.Property<DateTime>("CreationDate")
                         .HasColumnType("TEXT");
 
-                    b.Property<uint>("CurrentMapId")
-                        .HasColumnType("INTEGER");
-
                     b.Property<uint>("Experience")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Language")
-                        .HasMaxLength(2)
+                        .HasMaxLength(4)
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTime>("LastConnection")
+                    b.Property<DateTime?>("LastConnection")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("LastIPAddress")
+                    b.Property<string>("LastIpAddress")
                         .HasMaxLength(45)
                         .HasColumnType("TEXT");
 
                     b.Property<ushort>("Level")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("MapId")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
@@ -137,6 +141,8 @@ namespace Faolan.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AccountId");
+
+                    b.HasIndex("MapId");
 
                     b.HasIndex("Name")
                         .IsUnique();
@@ -390,6 +396,103 @@ namespace Faolan.Migrations
                     b.ToTable("Items");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Data.Map", b =>
+                {
+                    b.Property<uint>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<float>("PositionX")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("PositionY")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("PositionZ")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("RotationX")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("RotationY")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("RotationZ")
+                        .HasColumnType("REAL");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Maps");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Data.MapObject", b =>
+                {
+                    b.Property<uint>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Data0")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Data1")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Data2")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Data3")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Data4")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Data5")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("MapId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<float>("PositionX")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("PositionY")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("PositionZ")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("RotationX")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("RotationY")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("RotationZ")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("Sdat1")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Sdat2")
+                        .HasColumnType("TEXT");
+
+                    b.Property<uint>("Unk0")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Unk1")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MapId");
+
+                    b.ToTable("MapObjects");
+                });
+
             modelBuilder.Entity("Faolan.Core.Data.Npc", b =>
                 {
                     b.Property<uint>("Id")
@@ -411,10 +514,13 @@ namespace Faolan.Migrations
                     b.Property<uint>("Health")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint>("Level")
+                    b.Property<ushort>("Level")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("Mana")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("MapId")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
@@ -442,12 +548,9 @@ namespace Faolan.Migrations
                     b.Property<uint>("Stamina")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint?>("WorldMapId")
-                        .HasColumnType("INTEGER");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("WorldMapId");
+                    b.HasIndex("MapId");
 
                     b.ToTable("Npcs");
                 });
@@ -600,9 +703,6 @@ namespace Faolan.Migrations
                     b.Property<byte>("Country")
                         .HasColumnType("INTEGER");
 
-                    b.Property<bool>("FullStatus")
-                        .HasColumnType("INTEGER");
-
                     b.Property<string>("IpAddress")
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");
@@ -661,98 +761,6 @@ namespace Faolan.Migrations
                     b.ToTable("Spells");
                 });
 
-            modelBuilder.Entity("Faolan.Core.Data.WorldMap", b =>
-                {
-                    b.Property<uint>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Name")
-                        .HasMaxLength(128)
-                        .HasColumnType("TEXT");
-
-                    b.Property<float>("PositionX")
-                        .HasColumnType("REAL");
-
-                    b.Property<float>("PositionY")
-                        .HasColumnType("REAL");
-
-                    b.Property<float>("PositionZ")
-                        .HasColumnType("REAL");
-
-                    b.Property<float>("RotationX")
-                        .HasColumnType("REAL");
-
-                    b.Property<float>("RotationY")
-                        .HasColumnType("REAL");
-
-                    b.Property<float>("RotationZ")
-                        .HasColumnType("REAL");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("WorldMaps");
-                });
-
-            modelBuilder.Entity("Faolan.Core.Data.WorldObject", b =>
-                {
-                    b.Property<uint>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("Data0")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("Data1")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("Data2")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("Data3")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("Data4")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("Data5")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<float>("PositionX")
-                        .HasColumnType("REAL");
-
-                    b.Property<float>("PositionY")
-                        .HasColumnType("REAL");
-
-                    b.Property<float>("PositionZ")
-                        .HasColumnType("REAL");
-
-                    b.Property<float>("RotationX")
-                        .HasColumnType("REAL");
-
-                    b.Property<float>("RotationY")
-                        .HasColumnType("REAL");
-
-                    b.Property<float>("RotationZ")
-                        .HasColumnType("REAL");
-
-                    b.Property<string>("Sdat1")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Sdat2")
-                        .HasColumnType("TEXT");
-
-                    b.Property<uint>("Unk0")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("Unk1")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("WorldObjects");
-                });
-
             modelBuilder.Entity("Faolan.Core.Data.Character", b =>
                 {
                     b.HasOne("Faolan.Core.Data.Account", "Account")
@@ -761,11 +769,18 @@ namespace Faolan.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Faolan.Core.Data.Realm", "Realm")
+                    b.HasOne("Faolan.Core.Data.Map", "Map")
                         .WithMany()
-                        .HasForeignKey("RealmId");
+                        .HasForeignKey("MapId");
+
+                    b.HasOne("Faolan.Core.Data.Realm", "Realm")
+                        .WithMany("Characters")
+                        .HasForeignKey("RealmId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Account");
+
+                    b.Navigation("Map");
 
                     b.Navigation("Realm");
                 });
@@ -900,13 +915,26 @@ namespace Faolan.Migrations
                     b.Navigation("Wrist");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Data.MapObject", b =>
+                {
+                    b.HasOne("Faolan.Core.Data.Map", "Map")
+                        .WithMany("Objects")
+                        .HasForeignKey("MapId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Map");
+                });
+
             modelBuilder.Entity("Faolan.Core.Data.Npc", b =>
                 {
-                    b.HasOne("Faolan.Core.Data.WorldMap", "WorldMap")
-                        .WithMany()
-                        .HasForeignKey("WorldMapId");
+                    b.HasOne("Faolan.Core.Data.Map", "Map")
+                        .WithMany("Npcs")
+                        .HasForeignKey("MapId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
-                    b.Navigation("WorldMap");
+                    b.Navigation("Map");
                 });
 
             modelBuilder.Entity("Faolan.Core.Data.NpcBody", b =>
@@ -1051,11 +1079,23 @@ namespace Faolan.Migrations
                     b.Navigation("Equipment");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Data.Map", b =>
+                {
+                    b.Navigation("Npcs");
+
+                    b.Navigation("Objects");
+                });
+
             modelBuilder.Entity("Faolan.Core.Data.Npc", b =>
                 {
                     b.Navigation("Body");
 
                     b.Navigation("Equipment");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Data.Realm", b =>
+                {
+                    b.Navigation("Characters");
                 });
 #pragma warning restore 612, 618
         }

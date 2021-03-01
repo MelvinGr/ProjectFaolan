@@ -19,6 +19,8 @@ namespace Faolan.PacketAnalyzer
             InitializeComponent();
 
             outputListBox.DrawMode = DrawMode.Normal;
+
+            ReadDump(@"C:\Users\Melvin\Desktop\a.txt");
         }
 
         private void parseButton_Click(object sender, EventArgs e)
@@ -74,6 +76,14 @@ namespace Faolan.PacketAnalyzer
             outputHexTextBox.Text = packetWrapper.Data?.HexDump();
         }
 
+        private void ReadDump(string path)
+        {
+            var text = File.ReadAllText(path);
+            var bytes = text.Replace(" ", "").Replace("\r", "").Replace("\n", "").HexToByteArray();
+
+            DumpCompressed(bytes);
+        }
+
         private void Dump(byte[] bytes, bool reverse = true)
         {
             var stream = new MemoryStream(bytes);
@@ -83,15 +93,16 @@ namespace Faolan.PacketAnalyzer
                 {
                     var packetLengthBuffer = new byte[4];
                     stream.Read(packetLengthBuffer, 0, 4);
+
                     var length = reverse
                         ? BitConverter.ToInt32(packetLengthBuffer.Reverse().ToArray(), 0)
-                        : BitConverter.ToInt32(packetLengthBuffer.ToArray(), 0);
+                        : BitConverter.ToInt32(packetLengthBuffer, 0);
 
                     var packetBuffer = new byte[length];
                     stream.Read(packetBuffer, 0, length);
 
-                    var completePacket = packetLengthBuffer.Concat(packetBuffer).ToHexString();
-                    outputListBox.Items.Add(new PacketWrapper(i, bytes, completePacket));
+                    var completePacket = packetLengthBuffer.Concat(packetBuffer).ToArray();
+                    outputListBox.Items.Add(new PacketWrapper(i, completePacket, completePacket.ToHex()));
 
                     i++;
                     if (stream.Position == stream.Length)
@@ -106,32 +117,7 @@ namespace Faolan.PacketAnalyzer
 
         private void DumpCompressed(byte[] b)
         {
-            var bytes = UnCompress(b.Skip(9).ToArray()).ToArray();
-
-            var stream = new MemoryStream(bytes);
-            var i = 0;
-            while (true)
-                try
-                {
-                    var packetLengthBuffer = new byte[4];
-                    stream.Read(packetLengthBuffer, 0, 4);
-                    var length = BitConverter.ToInt32(packetLengthBuffer.Reverse().ToArray(), 0);
-
-                    var packetBuffer = new byte[length];
-                    stream.Read(packetBuffer, 0, length);
-
-                    var completePacket = packetLengthBuffer.Concat(packetBuffer).ToArray().ToHexString();
-                    outputListBox.Items.Add(new PacketWrapper(i, bytes, completePacket));
-
-                    i++;
-                    if (stream.Position == stream.Length)
-                        break;
-                }
-                catch (Exception e)
-                {
-                    Error(e.Message);
-                    break;
-                }
+            Dump(UnCompress(b.Skip(9).ToArray()));
         }
 
         private static byte[] UnCompress(byte[] input)
@@ -144,10 +130,15 @@ namespace Faolan.PacketAnalyzer
 
             var buf = new byte[10240];
             while (!decompressor.IsFinished && !decompressor.IsNeedingInput)
-            {
-                var count = decompressor.Inflate(buf);
-                bos.Write(buf, 0, count);
-            }
+                try
+                {
+                    var count = decompressor.Inflate(buf);
+                    bos.Write(buf, 0, count);
+                }
+                catch (Exception e)
+                {
+                    break;
+                }
 
             // Get the decompressed data  
             return bos.ToArray();

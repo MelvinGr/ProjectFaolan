@@ -5,13 +5,13 @@ namespace Faolan.Core.Network
 {
     public abstract class Packet
     {
-        protected Packet(ConanStream stream)
+        protected Packet(PacketStream stream)
         {
             Stream = stream;
             stream.Position = 0;
         }
 
-        protected ConanStream Stream { get; }
+        protected PacketStream Stream { get; }
         public ConanStream Data { get; protected init; }
         public uint Length { get; protected init; }
 
@@ -29,7 +29,7 @@ namespace Faolan.Core.Network
         public readonly byte Sender;
         public readonly byte[] SenderBytes;
 
-        public ConanPacket(byte[] bytes) : base(new ConanStream(bytes))
+        public ConanPacket(byte[] bytes) : base(new PacketStream(bytes))
         {
             Length = Stream.ReadUInt32();
 
@@ -37,10 +37,10 @@ namespace Faolan.Core.Network
             HeaderLength = Stream.ReadUInt32();
 
             Sender = Stream.ReadByte();
-            SenderBytes = Stream.ReadArrayPrependLengthByte();
+            SenderBytes = Stream.ReadArrayByteLength();
 
             Receiver = Stream.ReadByte();
-            ReceiverBytes = Stream.ReadArrayPrependLengthByte();
+            ReceiverBytes = Stream.ReadArrayByteLength();
 
             Opcode = Stream.ReadUInt16();
 
@@ -56,12 +56,11 @@ namespace Faolan.Core.Network
                 Console.WriteLine($"Invalid {GetType().Name}");
         }
 
-        //public uint HeaderLength => HeaderSize + sizeof(uint) * 2; // + length & crc32
         public override bool IsValid => Crc32 == Crypt.Crc32.Calculate(Stream);
 
         public override string ToString()
         {
-            return $"Opcode: {Opcode.ToHex()} Length: {Length}";
+            return $"Opcode: {Opcode.ToHex()} Length: {Length}{(Data != null ? Environment.NewLine + Data.ToArray().ToHex() : "")}";
         }
     }
 }

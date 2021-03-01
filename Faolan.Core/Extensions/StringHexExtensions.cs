@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
 namespace Faolan.Core.Extensions
 {
@@ -23,19 +22,10 @@ namespace Faolan.Core.Extensions
             }
         }
 
-        public static string ToHexString(this IEnumerable<byte> ba, bool zeroX = true)
+        public static string ToHex(this IEnumerable<byte> value)
         {
-            var hex = new StringBuilder();
-            foreach (var b in ba)
-                hex.AppendFormat(zeroX ? "0x{0:x2}, " : "{0:x2}", b);
-
-            return hex.ToString().Trim(' ', ',');
+            return "{ " + string.Join(", ", value.Select(e => e.ToHex())) + " }";
         }
-
-        /*public static string ToHex<T>(this T value) where T : struct
-        {
-            return string.Format("0x{0:X" + Marshal.SizeOf(value) + "}", value);
-        }*/
 
         public static string ToHex(this Enum value)
         {
@@ -99,12 +89,12 @@ namespace Faolan.Core.Extensions
 
         public static string ToHex(this float value)
         {
-            return $"0x{(uint) value:X8}";
+            return $"0x{value:X8}";
         }
 
         public static string ToHex(this double value)
         {
-            return $"0x{(ulong) value:X16}";
+            return $"0x{value:X16}";
         }
     }
 }

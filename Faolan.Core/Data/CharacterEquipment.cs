@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Faolan.Core.Data
 {
-    public class CharacterEquipment : BaseObject
+    public class CharacterEquipment : BaseEntity
     {
         [ForeignKey(nameof(Character))]
         public uint CharacterId { get; set; }

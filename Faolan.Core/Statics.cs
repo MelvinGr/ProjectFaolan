@@ -16,10 +16,8 @@ namespace Faolan.Core
         public static bool IsDebug => false;
         public const string BuildConfig = "Release";
 #endif
-
-        public static readonly string BuildString = $"{GitVersionInformation.Sha} {BuildConfig} @ " +
-                                                    FileVersionInfo.GetVersionInfo(typeof(Statics).Assembly.Location)
-                                                        .Comments; // {RuntimeInformation.RuntimeIdentifier.ToTitleCase()} 
+        // {RuntimeInformation.RuntimeIdentifier.ToTitleCase()}
+        public static readonly string BuildString = $"{GitVersionInformation.Sha} {BuildConfig} @ {FileVersionInfo.GetVersionInfo(typeof(Statics).Assembly.Location).Comments}";
 
         public static string Banner =>
             "-------------------------------------------------------------------------------\n" +
@@ -54,10 +52,5 @@ namespace Faolan.Core
             (Race.Stygian, ArchType.Mage, Class.Demonologist),
             (Race.Stygian, ArchType.Mage, Class.Necromancer)
         };
-
-        public static uint EpochTime()
-        {
-            return (uint) DateTimeOffset.Now.ToUnixTimeSeconds();
-        }
     }
 }
