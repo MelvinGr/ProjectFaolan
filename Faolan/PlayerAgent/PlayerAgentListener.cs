@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Extensions;
@@ -12,14 +13,13 @@ namespace Faolan.PlayerAgent
     public partial class PlayerAgentListener : Server<ConanPacket>
     {
         // ReSharper disable once SuggestBaseTypeForParameter
-        public PlayerAgentListener(ILogger<PlayerAgentListener> logger, IConfiguration configuration,
-            IDatabaseRepository database)
+        public PlayerAgentListener(ILogger<PlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database)
             : base(configuration.PlayerAgentPort(), logger, configuration, database)
         {
             //
         }
 
-        protected override async Task ReceivedPacket(NetworkClient client, ConanPacket packet)
+        protected override async Task ReceivedPacket(INetworkClient client, ConanPacket packet)
         {
             Logger.LogInformation($"Received opcode: {(PlayerAgentOpcodes) packet.Opcode} ({packet.Opcode.ToHex()})");
 
@@ -31,16 +31,17 @@ namespace Faolan.PlayerAgent
                     var cookie = packet.Data.ReadUInt32();
 
                     client.Account = await Database.GetAccount(accountId);
-                    client.Account.AuthStatus = packet.Data.ReadUInt32();
+                    if (client.Account == null)
+                        throw new Exception("client.Account == null");
 
+                    client.Account.AuthStatus = packet.Data.ReadUInt32();
                     var unk1 = packet.Data.ReadUInt32();
 
                     //if (cookie != client.Cookie)
                     //Logger.Info("Cookie mismatch!");
 
                     new PacketStream()
-                        .WriteHeader(Sender, Receiver, new byte[] {0x93, 0x86, 0xee, 0x05},
-                            PlayerAgentResponseOpcodes.InitAuth)
+                        .WriteHeader(Sender, Receiver, new byte[] {0x93, 0x86, 0xee, 0x05}, PlayerAgentResponseOpcodes.InitAuth)
                         .WriteUInt32(client.Account.AuthStatus)
                         .Send(client);
 
@@ -56,7 +57,7 @@ namespace Faolan.PlayerAgent
                         .WriteHeader(Sender, Receiver3, new byte[] {0xDD, 0xAD, 0x83, 0x02}, 0x20E5)
                         .WriteUInt32(0x0000C350)
                         .WriteUInt32(0x1101b4f5) // char id
-                        .WriteArrayPrependLengthUInt32( // maybe char preview?
+                        .WriteArrayUInt32Length( // maybe char preview?
                             0x49, 0x4F, 0x7A, 0x31, 0x22, 0x02, 0x00, 0x00, 0x78, 0xDA, 0xE3, 0x66, 0x60, 0x60, 0x28,
                             0x28,
                             0x4A, 0x2D, 0xCB, 0x4C, 0x2D, 0xD7, 0x4B, 0xCA, 0xCC, 0xE3, 0x67, 0x62, 0x60, 0x60, 0xE1,
@@ -97,8 +98,7 @@ namespace Faolan.PlayerAgent
                     var characters = await Database.GetCharactersByAccount(client.Account.Id);
 
                     var aBuffer = new PacketStream();
-                    aBuffer.WriteHeader(Sender, Receiver, new byte[] {0x94, 0xa7, 0x60},
-                        PlayerAgentResponseOpcodes.SmallCharList);
+                    aBuffer.WriteHeader(Sender, Receiver, new byte[] {0x94, 0xa7, 0x60}, PlayerAgentResponseOpcodes.SmallCharList);
                     aBuffer.WriteUInt32((characters.Length + 1) * 1009);
 
                     foreach (var character in characters)
@@ -115,7 +115,7 @@ namespace Faolan.PlayerAgent
 
                 case PlayerAgentOpcodes.RequestCharRealmData:
                 {
-                    var charCount = packet.Data.ReadUInt32() / 1009 - 1;
+                    var charCount = packet.Data.ReadUInt32() / 1009 - 1; // % 1009
 
                     for (var i = 0; i < charCount; i++)
                     {
@@ -129,8 +129,7 @@ namespace Faolan.PlayerAgent
                     await SendRealmList(client);
 
                     new PacketStream()
-                        .WriteHeader(Sender, Receiver, new byte[] {0xcb, 0xc6, 0xfc, 0x04},
-                            PlayerAgentResponseOpcodes.SendCharacterRealmData)
+                        .WriteHeader(Sender, Receiver, new byte[] {0xcb, 0xc6, 0xfc, 0x04}, PlayerAgentResponseOpcodes.SendCharacterRealmData)
                         .WriteUInt32(1)
                         .Send(client);
 
@@ -139,17 +138,8 @@ namespace Faolan.PlayerAgent
 
                 case PlayerAgentOpcodes.Ox20A6:
                 {
-                    /*var headerData = new byte[] { 0xE0, 0xC1, 0x9C, 0x0D };
-                    var sender = new byte[] { 0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0xEC, 0xEB, 0x80, 0xDE, 0x03 };
-                    var receiver = new byte[] { 0x0D, 0x84, 0x04, 0xF2, 0x82, 0x10, 0xA6, 0x88, 0x3D };
-                    new PacketStream()
-                        .WriteHeader(sender, receiver, headerData, 0x000020A6, true)
-                        .Send(client);*/
-
-                    byte[] headerData = {0x99, 0x95, 0x92, 0x05};
-
-                    new PacketStream()
-                        .WriteHeader(Sender, Receiver, headerData, 0x209c)
+                    new PacketStream() // headerdata was { 0xE0, 0xC1, 0x9C, 0x0D };
+                        .WriteHeader(Sender, Receiver, new byte[] {0x99, 0x95, 0x92, 0x05}, 0x209c)
                         .WriteUInt16(0)
                         .WriteByte(0)
                         .Send(client);
@@ -168,16 +158,14 @@ namespace Faolan.PlayerAgent
                     var unk5 = packet.Data.ReadUInt32();
                     var unk6 = packet.Data.ReadUInt32();
 
-                    client.Character = await Database.GetCharacter(characterId);
-                    await Database.UpdateLastInfo(client.Character, client);
                     await Database.UpdateClientInstance(client.Account, characterId);
+                    await Database.UpdateLastInfo(client.Character, client);
 
-                    //SendAgentServer(client);
-                    //SendCsPlayerAgent(client);
+                    SendAgentServer(client);
+                    SendCsPlayerAgent(client);
                     SendGameServer(client);
 
-                    var headerData3 = new byte[]
-                        {0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE3, 0xEE, 0x9F, 0xE2, 0x07};
+                    var headerData3 = new byte[] {0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE3, 0xEE, 0x9F, 0xE2, 0x07};
                     var packetData3 = new byte[]
                     {
                         0x00, 0x00, 0x46, 0xF2,
@@ -360,8 +348,7 @@ namespace Faolan.PlayerAgent
                     await Database.UpdateClientInstance(client.Account, newCharacter.Id);
 
                     new PacketStream()
-                        .WriteHeader(Sender4, Receiver, new byte[] {0x8b, 0xd8, 0x99, 0x02},
-                            PlayerAgentResponseOpcodes.CreateCharacter)
+                        .WriteHeader(Sender4, Receiver, new byte[] {0x8b, 0xd8, 0x99, 0x02}, PlayerAgentResponseOpcodes.CreateCharacter)
                         .WriteUInt32(0x0000c350)
                         .WriteUInt32(client.Account.ClientInstance)
                         .WriteUInt32(0)
@@ -373,7 +360,6 @@ namespace Faolan.PlayerAgent
                 case PlayerAgentOpcodes.DeleteCharacter:
                 {
                     var data = packet.Data.ToArray();
-
                     Logger.LogInformation("DELETE CHAR");
 
                     break;

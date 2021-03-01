@@ -17,7 +17,7 @@ namespace Faolan.PlayerAgent
         private static readonly byte[] Sender2 = {0x0D, 0x16, 0x91, 0x35, 0x1D, 0x10, 0x64};
         private static readonly byte[] Sender4 = {0x0d, 0x84, 0x04, 0xf2, 0x82, 0x10, 0x03};
 
-        private async Task SendCharacterList(NetworkClient client)
+        private async Task SendCharacterList(INetworkClient client)
         {
             var characters = await Database.GetCharactersByAccount(client.Account.Id);
 
@@ -35,9 +35,10 @@ namespace Faolan.PlayerAgent
                 aBuffer.WriteString(character.Name);
                 aBuffer.WriteUInt32(character.RealmId ?? throw new Exception("character.RealmId == null"));
                 aBuffer.WriteUInt32(character.Sex);
-                aBuffer.WriteString(character.LastConnection?.ToString("MM/dd/yyyy HH:mm:ss"));
+                aBuffer.WriteString(
+                    (character.LastConnection ?? character.CreationDate).ToString("MM/dd/yyyy HH:mm:ss"));
                 aBuffer.WriteUInt32(0x00000000);
-                aBuffer.WriteUInt32(character.MapId);
+                aBuffer.WriteUInt32(character.MapId ?? throw new Exception("client.MapId == null"));
                 aBuffer.WriteUInt32(character.Level);
                 aBuffer.WriteUInt32(character.Class);
                 aBuffer.WriteUInt32(0x00000000);
@@ -71,7 +72,7 @@ namespace Faolan.PlayerAgent
             aBuffer.Send(client);
         }
 
-        private async Task SendRealmList(NetworkClient client)
+        private async Task SendRealmList(INetworkClient client)
         {
             var realms = await Database.Context.Realms.ToArrayAsync();
 
@@ -100,7 +101,7 @@ namespace Faolan.PlayerAgent
             aBuffer.Send(client);
         }
 
-        private void SendCsPlayerAgent(NetworkClient client)
+        private void SendCsPlayerAgent(INetworkClient client)
         {
             var headerData0 = new byte[] {0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE0, 0xD4, 0xB4, 0xD7, 0x05};
 
@@ -114,7 +115,7 @@ namespace Faolan.PlayerAgent
                 .Send(client);
         }
 
-        private void SendAgentServer(NetworkClient client)
+        private void SendAgentServer(INetworkClient client)
         {
             var headerData0 = new byte[] {0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xFA, 0xE5, 0x98, 0x9D, 0x02};
 
@@ -128,7 +129,7 @@ namespace Faolan.PlayerAgent
                 .Send(client);
         }
 
-        private void SendGameServer(NetworkClient client)
+        private void SendGameServer(INetworkClient client)
         {
             var headerData2 = new byte[] {0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xF9, 0xD8, 0xD9, 0xC5, 0x0D};
             var sender2 = new byte[] {0x0D, 0x16, 0x91, 0x35, 0x1D, 0x10, 0x64};

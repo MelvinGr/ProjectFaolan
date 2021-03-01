@@ -19,32 +19,28 @@ namespace Faolan.Core.Extensions
         public static bool TryParseNormalOrHex(this string input, out byte output)
         {
             return input.StartsWith("0x") || input.StartsWith("0X") || input.StartsWith("#")
-                ? byte.TryParse(input.Substring(input[0] == '#' ? 1 : 2), NumberStyles.HexNumber,
-                    CultureInfo.InvariantCulture, out output)
+                ? byte.TryParse(input.Substring(input[0] == '#' ? 1 : 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out output)
                 : byte.TryParse(input, out output);
         }
 
         public static bool TryParseNormalOrHex(this string input, out ushort output)
         {
             return input.StartsWith("0x") || input.StartsWith("0X") || input.StartsWith("#")
-                ? ushort.TryParse(input.Substring(input[0] == '#' ? 1 : 2), NumberStyles.HexNumber,
-                    CultureInfo.InvariantCulture, out output)
+                ? ushort.TryParse(input.Substring(input[0] == '#' ? 1 : 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out output)
                 : ushort.TryParse(input, out output);
         }
 
         public static bool TryParseNormalOrHex(this string input, out uint output)
         {
             return input.StartsWith("0x") || input.StartsWith("0X") || input.StartsWith("#")
-                ? uint.TryParse(input.Substring(input[0] == '#' ? 1 : 2), NumberStyles.HexNumber,
-                    CultureInfo.InvariantCulture, out output)
+                ? uint.TryParse(input.Substring(input[0] == '#' ? 1 : 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out output)
                 : uint.TryParse(input, out output);
         }
 
         public static bool TryParseNormalOrHex(this string input, out ulong output)
         {
             return input.StartsWith("0x") || input.StartsWith("0X") || input.StartsWith("#")
-                ? ulong.TryParse(input.Substring(input[0] == '#' ? 1 : 2), NumberStyles.HexNumber,
-                    CultureInfo.InvariantCulture, out output)
+                ? ulong.TryParse(input.Substring(input[0] == '#' ? 1 : 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out output)
                 : ulong.TryParse(input, out output);
         }
     }

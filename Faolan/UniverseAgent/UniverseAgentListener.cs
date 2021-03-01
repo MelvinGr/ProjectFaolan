@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Enums;
@@ -13,13 +14,12 @@ namespace Faolan.UniverseAgent
     public partial class UniverseAgentListener : Server<ConanPacket>
     {
         // ReSharper disable once SuggestBaseTypeForParameter
-        public UniverseAgentListener(ILogger<UniverseAgentListener> logger, IConfiguration configuration,
-            IDatabaseRepository database)
+        public UniverseAgentListener(ILogger<UniverseAgentListener> logger, IConfiguration configuration, IDatabaseRepository database)
             : base(configuration.UniverseAgentPort(), logger, configuration, database)
         {
         }
 
-        protected override async Task ReceivedPacket(NetworkClient client, ConanPacket packet)
+        protected override async Task ReceivedPacket(INetworkClient client, ConanPacket packet)
         {
             Logger.LogInformation($"Received opcode: {(UniverseAgentOpcodes) packet.Opcode} ({packet.Opcode.ToHex()})");
 
@@ -30,9 +30,11 @@ namespace Faolan.UniverseAgent
                     var accountName = packet.Data.ReadString();
                     var unk0 = packet.Data.ReadUInt32();
 
-                    client.Account = await Database.GetAccount(822930519 /*accountName*/);
-                    InitAuth(client);
+                    client.Account = await Database.GetAccount(accountName);
+                    if (client.Account == null)
+                        throw new Exception("client.Account == null");
 
+                    InitAuth(client);
                     break;
                 }
                 case UniverseAgentOpcodes.AnswerChallenge:
@@ -68,22 +70,14 @@ namespace Faolan.UniverseAgent
                         break;
                     }
 
-                    /*
-                    if (client.nClientInst == -1) // could not get clientInst
+                    if (client.Account.State != AccountState.Active)
                     {
-                        Logger.Info("Could not get clientInst");
-                        Packets.AckAuthenticate(client, 0xffffff, 0, 0x04);
-                        break;
-                    }*/
-
-                    if (client.Account.State == AccountState.Banned)
-                    {
-                        Logger.LogInformation("Banned Player tried to login");
+                        Logger.LogInformation($"{client.Account.State} player tried to login");
                         //Packets.AckAuthenticate(client, 0xffffff, 0, 0x17);
                         break;
                     }
 
-                    Logger.LogInformation("User {0} ({1}) is logging on", client.Account.UserName, client.Account.Id);
+                    Logger.LogInformation($"User {client.Account.UserName} ({client.Account.Id.ToHex()}) is logging on");
                     await Database.UpdateLastInfo(client.Account, client);
 
                     SetRegionState(client);

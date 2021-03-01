@@ -18,7 +18,7 @@ namespace Faolan.Extensions
         {
 #pragma warning disable 618
             return IPAddress.HostToNetworkOrder(
-                IPAddress.TryParse(config.ServerIpAddress(), out var ip) ? (uint) ip.Address : throw new Exception());
+                IPAddress.TryParse(config.ServerIpAddress(), out var ip) ? ip.Address : throw new Exception("!IPAddress.TryParse"));
 #pragma warning restore 618
         }
 

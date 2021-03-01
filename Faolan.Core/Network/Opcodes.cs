@@ -44,7 +44,8 @@
             Ox205E = 0x205E,
             Ox205F = 0x205F,
             Ox206D = 0x206D,
-            Ox2085 = 0x2085
+            Ox2085 = 0x2085,
+            Ox207E = 0x207E
         }
 
         public enum GameServerRespondOpcodes : ushort

@@ -1,21 +1,22 @@
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Numerics;
 
 namespace Faolan.Core.Data
 {
-    public class WorldObject : BaseObject
+    public abstract class BaseEntity
     {
-        public uint Data0 { get; set; }
-        public uint Data1 { get; set; }
-        public uint Data2 { get; set; }
-        public uint Data3 { get; set; }
-        public uint Data4 { get; set; }
-        public uint Data5 { get; set; }
-        public string Sdat1 { get; set; }
-        public string Sdat2 { get; set; }
-        public uint Unk0 { get; set; }
-        public uint Unk1 { get; set; }
+        [Key]
+        public uint Id { get; set; }
 
+        public override string ToString()
+        {
+            return $"{Id} [{GetType().Name}]";
+        }
+    }
+
+    public abstract class Base3DEntity : BaseEntity
+    {
         [NotMapped]
         public Vector3 Position
         {
@@ -47,5 +48,10 @@ namespace Faolan.Core.Data
         public float RotationX { get; set; }
         public float RotationY { get; set; }
         public float RotationZ { get; set; }
+
+        public override string ToString()
+        {
+            return $"{Id} [{GetType().Name}] [{Position}, {Rotation}]";
+        }
     }
 }

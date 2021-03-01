@@ -14,8 +14,8 @@ namespace Faolan.Core.Database
 
         Task<bool> CheckLogin(string username, string password);
 
-        Task<bool> UpdateLastInfo(Account account, NetworkClient client);
-        Task<bool> UpdateLastInfo(Character character, NetworkClient client);
+        Task<bool> UpdateLastInfo(Account account, INetworkClient client);
+        Task<bool> UpdateLastInfo(Character character, INetworkClient client);
 
         Task<bool> UpdateClientInstance(Account account, uint characterId);
 
@@ -29,7 +29,7 @@ namespace Faolan.Core.Database
 
         Task<Realm> GetRealm(uint id);
 
-        Task<WorldMap> GetMap(uint id);
+        Task<Map> GetMap(uint id);
 
         Task<Spell> GetSpell(uint id);
     }
@@ -49,14 +49,14 @@ namespace Faolan.Core.Database
             return await Context.Accounts.AnyAsync(a => a.UserName.ToLower() == username);
         }
 
-        public async Task<bool> UpdateLastInfo(Account account, NetworkClient client)
+        public async Task<bool> UpdateLastInfo(Account account, INetworkClient client)
         {
             account.LastConnection = DateTime.UtcNow;
             account.LastIpAddress = client.IpAddress;
             return await Context.SaveChangesAsync() > 0;
         }
 
-        public async Task<bool> UpdateLastInfo(Character character, NetworkClient client)
+        public async Task<bool> UpdateLastInfo(Character character, INetworkClient client)
         {
             character.LastConnection = DateTime.UtcNow;
             character.LastIpAddress = client.IpAddress;
@@ -98,8 +98,7 @@ namespace Faolan.Core.Database
 
         public async Task<Character> CreateCharacter(uint accountId, uint realmId)
         {
-            var character = await Context.Characters
-                .FirstOrDefaultAsync(c => c.AccountId == accountId && c.Name == null);
+            var character = await Context.Characters.FirstOrDefaultAsync(c => c.AccountId == accountId && c.Name == null);
             if (character == null)
             {
                 character = new Character
@@ -137,9 +136,9 @@ namespace Faolan.Core.Database
             return await Context.Realms.FirstOrDefaultAsync(r => r.Id == id);
         }
 
-        public async Task<WorldMap> GetMap(uint id)
+        public async Task<Map> GetMap(uint id)
         {
-            return await Context.WorldMaps.FirstOrDefaultAsync(m => m.Id == id);
+            return await Context.Maps.FirstOrDefaultAsync(m => m.Id == id);
         }
 
         public async Task<Spell> GetSpell(uint id)

@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database;
@@ -13,13 +14,12 @@ namespace Faolan.AgentServer
     public partial class AgentServerListener : Server<AgentServerPacket>
     {
         // ReSharper disable once SuggestBaseTypeForParameter
-        public AgentServerListener(ILogger<AgentServerListener> logger, IConfiguration configuration,
-            IDatabaseRepository database)
+        public AgentServerListener(ILogger<AgentServerListener> logger, IConfiguration configuration, IDatabaseRepository database)
             : base(configuration.AgentServerPort(), logger, configuration, database)
         {
         }
 
-        protected override async Task ReceivedPacket(NetworkClient client, AgentServerPacket packet)
+        protected override async Task ReceivedPacket(INetworkClient client, AgentServerPacket packet)
         {
             Logger.LogInformation($"Received opcode: {packet.Opcode} ({packet.Opcode.ToHex()})");
 
@@ -32,14 +32,11 @@ namespace Faolan.AgentServer
                     var accountId = packet.Data.ReadUInt32();
 
                     client.Account = await Database.GetAccount(accountId);
-                    client.Account.ClientInstance = clientInstance;
+                    if (client.Account == null)
+                        throw new Exception("client.Account == null");
 
-                    var charId = (uint) 0; /*Database.ExecuteScalar<long>(
-                        "SELECT characterid FROM clientinstances " +
-                        "WHERE Accountid=" + client.Account.Id + " AND clientinst=" +
-                        client.Account.ClientInstance);*/
-
-                    client.Character = await Database.GetCharacter(charId);
+                    if (!await Database.UpdateClientInstance(client.Account, clientInstance))
+                        throw new Exception("!await Database.UpdateClientInstance");
 
                     new ConanStream()
                         .WriteUInt32(0x00050000)
@@ -47,7 +44,7 @@ namespace Faolan.AgentServer
 
                     new ConanStream()
                         .WriteUInt16(AgentServerRespondsOpcodes.Ox0014)
-                        .WriteArrayPrependLengthUInt16(new ConanStream()
+                        .WriteArrayUInt16Length(new ConanStream()
                             .WriteUInt32(client.Account.ClientInstance)
                             .WriteUInt32(0x00000000)
                             .WriteString(client.Character.Name.Length > 0
@@ -61,7 +58,7 @@ namespace Faolan.AgentServer
 
                     new ConanStream()
                         .WriteUInt16(AgentServerRespondsOpcodes.Ox003C)
-                        .WriteArrayPrependLengthUInt16(new ConanStream()
+                        .WriteArrayUInt16Length(new ConanStream()
                             .WriteByte(0x04)
                             .WriteUInt32(0x0000232a)
                             .WriteString("~Trial")

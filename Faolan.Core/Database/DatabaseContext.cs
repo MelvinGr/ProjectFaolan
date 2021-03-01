@@ -18,11 +18,11 @@ namespace Faolan.Core.Database
         DbSet<NpcEquipment> NpcEquipment { get; }
         DbSet<Realm> Realms { get; }
         DbSet<Spell> Spells { get; }
-        DbSet<WorldMap> WorldMaps { get; }
-        DbSet<WorldObject> WorldObjects { get; }
+        DbSet<Map> Maps { get; }
+        DbSet<MapObject> MapObjects { get; }
 
-        DatabaseFacade Database { get; }
-        Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+        DatabaseFacade Database { get; } // from DbContext
+        Task<int> SaveChangesAsync(CancellationToken cancellationToken = default); // from DbContext
     }
 
     public class DatabaseContext : DbContext, IDatabaseContext
@@ -42,8 +42,8 @@ namespace Faolan.Core.Database
         public DbSet<NpcEquipment> NpcEquipment { get; set; }
         public DbSet<Realm> Realms { get; set; }
         public DbSet<Spell> Spells { get; set; }
-        public DbSet<WorldMap> WorldMaps { get; set; }
-        public DbSet<WorldObject> WorldObjects { get; set; }
+        public DbSet<Map> Maps { get; set; }
+        public DbSet<MapObject> MapObjects { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder options)
         {
@@ -59,8 +59,14 @@ namespace Faolan.Core.Database
 
             modelBuilder
                 .Entity<Character>()
-                .HasIndex(p => p.Name)
+                .HasIndex(c => c.Name)
                 .IsUnique();
+
+            modelBuilder
+                .Entity<Character>()
+                .HasOne(c => c.Realm)
+                .WithMany(r => r.Characters)
+                .OnDelete(DeleteBehavior.SetNull);
         }
     }
 }

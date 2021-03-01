@@ -29,8 +29,7 @@ namespace Faolan.Extensions
             hostBuilder.ConfigureServices((ctx, serviceCollection) =>
             {
                 // Find a method that has this signature: ConfigureServices(IServiceCollection)
-                var cfgServicesMethod =
-                    typeof(TStartup).GetMethod(ConfigureServicesMethodName, new[] {typeof(IServiceCollection)});
+                var cfgServicesMethod = typeof(TStartup).GetMethod(ConfigureServicesMethodName, new[] {typeof(IServiceCollection)});
 
                 // Check if TStartup has a ctor that takes a IConfiguration parameter
                 var hasConfigCtor = typeof(TStartup).GetConstructor(new[] {typeof(IConfiguration)}) != null;

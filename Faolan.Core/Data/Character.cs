@@ -1,12 +1,11 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Numerics;
 using Faolan.Core.Enums;
 
 namespace Faolan.Core.Data
 {
-    public class Character : BaseObject
+    public class Character : Base3DEntity
     {
         [MaxLength(128)]
         public string Name { get; set; }
@@ -27,41 +26,9 @@ namespace Faolan.Core.Data
         public string LastIpAddress { get; set; }
 
         [ForeignKey(nameof(Map))]
-        public uint MapId { get; set; }
+        public uint? MapId { get; set; }
 
-        public virtual WorldMap Map { get; set; }
-
-        [NotMapped]
-        public Vector3 Position
-        {
-            get => new(PositionX, PositionY, PositionZ);
-            set
-            {
-                PositionX = value.X;
-                PositionY = value.Y;
-                PositionZ = value.Z;
-            }
-        }
-
-        public float PositionX { get; set; }
-        public float PositionY { get; set; }
-        public float PositionZ { get; set; }
-
-        [NotMapped]
-        public Vector3 Rotation
-        {
-            get => new(RotationX, RotationY, RotationZ);
-            set
-            {
-                RotationX = value.X;
-                RotationY = value.Y;
-                RotationZ = value.Z;
-            }
-        }
-
-        public float RotationX { get; set; }
-        public float RotationY { get; set; }
-        public float RotationZ { get; set; }
+        public virtual Map Map { get; set; }
 
         [ForeignKey(nameof(Account))]
         public uint AccountId { get; set; }

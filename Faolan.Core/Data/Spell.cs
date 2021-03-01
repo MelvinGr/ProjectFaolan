@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Faolan.Core.Data
 {
-    public class Spell : BaseObject
+    public class Spell : BaseEntity
     {
         [MaxLength(128)]
         public string Name { get; set; }

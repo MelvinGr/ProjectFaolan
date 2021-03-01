@@ -9,11 +9,20 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.Core.Network
 {
-    public abstract class NetworkClient
+    public interface INetworkClient
     {
-        public delegate void NetworkClientDelegate(NetworkClient client);
+        string IpAddress { get; }
+        Account Account { get; set; }
+        Character Character { get; }
 
-        public delegate Task ReceivedPacketDelegate(NetworkClient client, Packet packet);
+        void Send(byte[] value);
+    }
+
+    public abstract class NetworkClient : INetworkClient
+    {
+        public delegate void NetworkClientDelegate(INetworkClient client);
+
+        public delegate Task ReceivedPacketDelegate(INetworkClient client, Packet packet);
 
         protected readonly ILogger Logger;
         protected Socket Socket;
@@ -24,23 +33,25 @@ namespace Faolan.Core.Network
             Logger = logger;
         }
 
-        public string IpAddress => ((IPEndPoint) Socket.RemoteEndPoint)?.Address.ToString();
-
-        public Account Account { get; set; }
-        public Character Character { get; set; }
         public ReceivedPacketDelegate ReceivedPacket { get; set; }
         public NetworkClientDelegate Disconnected { get; set; }
 
-        public abstract void Start();
+        public string IpAddress => ((IPEndPoint) Socket.RemoteEndPoint)?.Address.ToString();
+
+        public Account Account { get; set; }
+        public Character Character => Account?.Character;
+
         public abstract void Send(byte[] value);
+        public abstract void Start();
     }
 
     public class NetworkClient<TPacket> : NetworkClient
         where TPacket : Packet
     {
+        private readonly object _lock = new();
         private readonly byte[] _packetLengthBuffer = new byte[sizeof(int)];
-
         private readonly byte[] _tcpBuffer = new byte[0xFFFF];
+
         private byte[] _packetBuffer;
         private int _packetBytesRead;
 
@@ -67,25 +78,30 @@ namespace Faolan.Core.Network
             var opcode = stream.ReadUInt16();            
             Console.WriteLine($"Send opcode: 0x{opcode:X4}");*/
 
-            try
+            lock (_lock)
             {
-                Socket?.BeginSend(value, 0, value.Length, 0, ar =>
+                try
                 {
-                    try
+                    Socket?.Send(value);
+
+                    /*Socket?.BeginSend(value, 0, value.Length, 0, ar =>
                     {
-                        Socket.EndSend(ar);
-                    }
-                    catch // (Exception e)
-                    {
-                        Disconnected?.Invoke(this);
-                        Socket = null;
-                    }
-                }, null);
-            }
-            catch // (Exception e)
-            {
-                Disconnected?.Invoke(this);
-                Socket = null;
+                        try
+                        {
+                            Socket.EndSend(ar);
+                        }
+                        catch // (Exception e)
+                        {
+                            Disconnected?.Invoke(this);
+                            Socket = null;
+                        }
+                    }, null);*/
+                }
+                catch // (Exception e)
+                {
+                    Disconnected?.Invoke(this);
+                    Socket = null;
+                }
             }
         }
 
@@ -110,7 +126,7 @@ namespace Faolan.Core.Network
                             //buffer = buffer.Skip(9).ToArray();
                             //Console.WriteLine("zlib start");
 
-                            Logger.LogDebug(buffer.ToHexString());
+                            Logger.LogDebug("ZLIB: " + buffer.ToHex());
 
                             BeginReceive();
                             return;
