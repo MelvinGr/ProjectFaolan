@@ -1,0 +1,24 @@
+﻿<Window x:Class="Faolan.PacketAnalyzer.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Faolan.PacketAnalyzer"
+        mc:Ignorable="d"
+        Title="MainWindow" Height="700" Width="1200">
+    <Grid>
+        <ListBox x:Name="outputListBox" Margin="10,10,10,310" SelectionChanged="outputListBox_SelectionChanged">
+            <ListBox.ItemTemplate>
+                <DataTemplate DataType="{x:Type local:PacketWrapper}">
+                    <TextBlock Text="{Binding Path=DisplayString}" Background="{Binding Path=Color}"/>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+        <TextBox x:Name="outputTextBox" Margin="141,0,527,10" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" IsReadOnly="True" VerticalAlignment="Bottom" Height="295" />
+        <TextBox x:Name="outputHexTextBox" Margin="0,0,10,10" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" IsReadOnly="True" VerticalAlignment="Bottom" Height="295" HorizontalAlignment="Right" Width="512"  />
+        <Button x:Name="loadButton" Content="Load" Margin="10,0,0,35" VerticalAlignment="Bottom" HorizontalAlignment="Left" Width="126" Click="loadButton_Click" />
+        <Button x:Name="saveButton" Content="Save" Margin="10,0,0,10" VerticalAlignment="Bottom" HorizontalAlignment="Left" Width="126" Click="saveButton_Click"/>
+        <CheckBox x:Name="useTicksInSRCheckBox" Content="Ticks in s/r names"  VerticalAlignment="Bottom" HorizontalAlignment="Left" IsChecked="True" Checked="useTicksInSRCheckBox_Checked" Margin="10,0,0,60"/>
+
+    </Grid>
+</Window>
