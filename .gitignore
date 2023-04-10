@@ -254,3 +254,6 @@ ModelManifest.xml
 
 /Faolan.Core/faolan.db-wal
 /Faolan.Core/faolan.db-shm
+/.contextkeeper/
+/Faolan/faolan.db-wal
+/Faolan/faolan.db-shm

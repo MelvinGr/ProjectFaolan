@@ -3,25 +3,25 @@ using Faolan.Core.Network.Opcodes;
 
 namespace Faolan.AgentServer
 {
-    public class AgentServerPacket : Packet
-    {
-        public AgentServerPacket(PacketStream stream)
-            : base(stream)
-        {
-            Opcode = stream.ReadUInt16<AgentServerOpcodes>();
-            Length = stream.ReadUInt16();
+	public class AgentServerPacket : Packet
+	{
+		public AgentServerOpcodes Opcode { get; }
 
-            if (Length == 0 || stream.Length < Length)
-            {
-                IsValid = false;
-                return;
-            }
+		public override bool IsValid { get; }
 
-            Data = new ConanStream(stream.ReadArray(Length - sizeof(ushort) * 2));
-        }
+		public AgentServerPacket(PacketStream stream)
+			: base(stream)
+		{
+			Opcode = stream.ReadUInt16<AgentServerOpcodes>();
+			Length = stream.ReadUInt16();
 
-        public AgentServerOpcodes Opcode { get; }
+			if (Length == 0 || stream.Length < Length)
+			{
+				IsValid = false;
+				return;
+			}
 
-        public override bool IsValid { get; }
-    }
+			Data = new ConanStream(stream.ReadArray(Length - sizeof(ushort) * 2));
+		}
+	}
 }

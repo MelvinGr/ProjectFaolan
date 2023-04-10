@@ -1,13 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.28621.142
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.33424.131
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Faolan", "Faolan\Faolan.csproj", "{79222BCD-5D5F-47A6-A84A-8E501CFA1520}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Faolan.Core", "Faolan.Core\Faolan.Core.csproj", "{8F960929-5303-4947-909C-6D979D033F64}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Faolan.PacketAnalyzer", "Faolan.PacketAnalyzer\Faolan.PacketAnalyzer.csproj", "{D6F37D11-422F-48D0-B4E1-62101E4D227A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Faolan.PacketAnalyzer", "Faolan.PacketAnalyzer\Faolan.PacketAnalyzer.csproj", "{E77E97E1-658F-44A2-9902-BEADDE8D8D94}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -23,10 +23,10 @@ Global
 		{8F960929-5303-4947-909C-6D979D033F64}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8F960929-5303-4947-909C-6D979D033F64}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8F960929-5303-4947-909C-6D979D033F64}.Release|Any CPU.Build.0 = Release|Any CPU
-		{D6F37D11-422F-48D0-B4E1-62101E4D227A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{D6F37D11-422F-48D0-B4E1-62101E4D227A}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{D6F37D11-422F-48D0-B4E1-62101E4D227A}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{D6F37D11-422F-48D0-B4E1-62101E4D227A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E77E97E1-658F-44A2-9902-BEADDE8D8D94}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E77E97E1-658F-44A2-9902-BEADDE8D8D94}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E77E97E1-658F-44A2-9902-BEADDE8D8D94}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E77E97E1-658F-44A2-9902-BEADDE8D8D94}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
