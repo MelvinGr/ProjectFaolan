@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -23,12 +22,11 @@ namespace Faolan.PacketAnalyzer
 		private CaptureFileReaderDevice _captureFileReaderDevice;
 		private Inflater _inflater;
 
-
 		public MainWindow()
 		{
 			InitializeComponent();
 
-			outputListBox.ContextMenu = new ContextMenu();
+			packetDataGrid.ContextMenu = new ContextMenu();
 
 			var colors = typeof(Colors)
 				.GetProperties(BindingFlags.Static | BindingFlags.Public)
@@ -43,39 +41,52 @@ namespace Faolan.PacketAnalyzer
 				{
 					var source = (MenuItem)e.Source;
 
-					var packetWrapper = (PacketWrapper)outputListBox.Items[outputListBox.SelectedIndex];
+					var packetWrapper = (PacketWrapper)packetDataGrid.Items[packetDataGrid.SelectedIndex];
 					packetWrapper.Color = source.Background;
 				};
 
-				outputListBox.ContextMenu.Items.Add(menuItem);
+				packetDataGrid.ContextMenu.Items.Add(menuItem);
 			}
 		}
 
-		private void outputListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+		private void packetDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
 		{
-			if (outputListBox.SelectedIndex == -1)
+			if (packetDataGrid.SelectedIndex == -1)
 			{
 				outputTextBox.Text = "";
 				return;
 			}
 
-			var packetWrapper = (PacketWrapper)outputListBox.Items[outputListBox.SelectedIndex];
+			var packetWrapper = (PacketWrapper)packetDataGrid.Items[packetDataGrid.SelectedIndex];
 
+			notesTextBox.DataContext = packetWrapper;
 			outputTextBox.Text = PacketUtils.PacketToCsCode(packetWrapper.ConanPacket, packetWrapper.Ticks, useTicksInSRCheckBox.IsChecked == true);
 			outputHexTextBox.Text = packetWrapper.ConanPacket.Bytes.HexDump();
+		}
+
+		private void importButton_Click(object sender, RoutedEventArgs e)
+		{
+			outputTextBox.Text = "";
+			packetDataGrid.Items.Clear();
+
+			ReadDump(@"C:\Users\Melvin\Desktop\conan3.pcapng");
 		}
 
 		private void loadButton_Click(object sender, RoutedEventArgs e)
 		{
 			outputTextBox.Text = "";
-			outputListBox.Items.Clear();
+			packetDataGrid.Items.Clear();
 
-			ReadDump(@"C:\Users\Melvin\Desktop\conan3.pcapng");
+			var json = File.ReadAllText("c:/temp/conan.json");
+			var items = JsonConvert.DeserializeObject<PacketWrapper[]>(json);
+
+			foreach (var item in items)
+				packetDataGrid.Items.Add(item);
 		}
 
 		private void saveButton_Click(object sender, RoutedEventArgs e)
 		{
-			var json = JsonConvert.SerializeObject(outputListBox.Items, Formatting.Indented);
+			var json = JsonConvert.SerializeObject(packetDataGrid.Items, Formatting.Indented);
 			//var x = JsonConvert.DeserializeObject<PacketWrapper[]>(json);
 
 			File.WriteAllText("c:/temp/conan.json", json);
@@ -144,13 +155,13 @@ namespace Faolan.PacketAnalyzer
 				_packetSplitters[sourceDestAddress] = new PacketSplitter();
 				_packetSplitters[sourceDestAddress].ReceivedPacket += (ticks, packet) =>
 				{
-					if (outputListBox.Items.Count > 100)
+					if (packetDataGrid.Items.Count > 1000)
 					{
 						_captureFileReaderDevice.StopCapture();
 						return;
 					}
 
-					Dispatcher.Invoke(() => outputListBox.Items.Add(new PacketWrapper(ticks, serviceName, isDownload, packet)));
+					Dispatcher.Invoke(() => packetDataGrid.Items.Add(new PacketWrapper(ticks, serviceName, isDownload, packet)));
 				};
 			}
 

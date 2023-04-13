@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 
 namespace Faolan.Core.Extensions
 {
@@ -42,6 +43,20 @@ namespace Faolan.Core.Extensions
 			return input.StartsWith("0x") || input.StartsWith("0X") || input.StartsWith("#")
 				? ulong.TryParse(input.Substring(input[0] == '#' ? 1 : 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out output)
 				: ulong.TryParse(input, out output);
+		}
+
+		public static string GetPrintable(this byte[] bytes)
+		{
+			var builder = new StringBuilder();
+			foreach (var b in bytes)
+			{
+				if (b >= 0x21 && b <= 0x7e)
+					builder.Append((char)b);
+				else if (b == '\n')
+					builder.Append(' ');
+			}
+
+			return builder.ToString();
 		}
 	}
 }
