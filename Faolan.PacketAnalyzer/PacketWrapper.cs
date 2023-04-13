@@ -2,9 +2,11 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Windows.Media;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Opcodes;
 using Newtonsoft.Json;
 
 namespace Faolan.PacketAnalyzer
@@ -17,14 +19,28 @@ namespace Faolan.PacketAnalyzer
 		public string ServiceName { get; set; }
 		public bool IsDownload { get; set; }
 
+		public string Notes { get; set; }
+
 		[JsonIgnore]
 		public ConanPacket ConanPacket { get; set; }
 
 		[JsonIgnore]
-		public string Hex { get; }
+		public string HexDisplay { get; }
 
 		[JsonIgnore]
-		public string DisplayString => ToString();
+		public string BytesRowDisplay { get; }
+
+		[JsonIgnore]
+		public string BytesStringDisplay { get; }
+
+		[JsonIgnore]
+		public string ServiceNameDisplay { get; }
+
+		[JsonIgnore]
+		public string Opcode => ConanPacket?.Opcode.ToHex();
+
+		[JsonIgnore]
+		public string GameServerOpcode { get; }
 
 		public byte[] Bytes // for serialization
 		{
@@ -35,7 +51,6 @@ namespace Faolan.PacketAnalyzer
 		public Brush Color
 		{
 			get => _color;
-
 			set => SetField(ref _color, value);
 		}
 
@@ -45,17 +60,25 @@ namespace Faolan.PacketAnalyzer
 			ServiceName = serviceName;
 			IsDownload = isDownload;
 			ConanPacket = conanPacket;
-			Hex = conanPacket.Data?.ToArray().ToHex();
+
+			HexDisplay = Bytes?.ToHex();
+			BytesRowDisplay = HexDisplay?.Substring(0, Math.Min(HexDisplay.Length, 295));
+			BytesStringDisplay = Bytes?.GetPrintable();
+			ServiceNameDisplay = $"{ServiceName} {(IsDownload ? "DL" : "UP")}";
+
+			if (serviceName.Contains("gs") && conanPacket.SenderBytes[1] != 0x48 && conanPacket.Data != null)
+			{
+				var pbLength = conanPacket.Data.ReadUInt32();
+				var pbOpcode = conanPacket.Data.ReadUInt32<GameServerDataOpcodes>();
+				//Console.WriteLine("OPCODE: " + pbOpcode);
+				GameServerOpcode = Enum.IsDefined(pbOpcode) ? pbOpcode.ToString() : pbOpcode.ToHex();
+			}
 		}
 
 		[JsonConstructor]
-		public PacketWrapper(long ticks, string serviceName, bool isDownload, byte[] bytes, Brush color)
+		public PacketWrapper(long ticks, string serviceName, bool isDownload, byte[] bytes, Brush color) 
+			: this(ticks, serviceName, isDownload, new ConanPacket(bytes)) 
 		{
-			Ticks = ticks;
-			ServiceName = serviceName;
-			IsDownload = isDownload;
-			ConanPacket = new ConanPacket(bytes);
-			Hex = ConanPacket.Data?.ToArray().ToHex();
 			_color = color;
 		}
 
@@ -63,7 +86,7 @@ namespace Faolan.PacketAnalyzer
 
 		public override string ToString()
 		{
-			return $"({Ticks}) ({ServiceName} {(IsDownload ? "DL" : "UP")}) ({ConanPacket.Opcode:X8}) | {Hex?.Substring(0, Math.Min(Hex.Length, 295))}";
+			return $"({Ticks}) ({ConanPacket.Opcode:X8}) {GameServerOpcode} | {BytesRowDisplay}";
 		}
 
 		protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
