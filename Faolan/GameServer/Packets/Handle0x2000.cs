@@ -147,6 +147,13 @@ namespace Faolan.GameServer
 							break;
 						}
 
+						case ActionType.Emote:
+						{
+							Logger.LogInformation($"Player with ID: {clientInst.ToHex()} Emote");
+
+							break;
+						}
+
 						case ActionType.MoveEquippedToInventory:
 						{
 							var fromSlot = (CharacterEquipmentSlot)unk1;
