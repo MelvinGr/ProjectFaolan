@@ -1,10 +1,9 @@
 using System;
 using System.IO;
 using System.Net;
-using Faolan.Core;
 using Microsoft.Extensions.Configuration;
 
-namespace Faolan.Extensions
+namespace Faolan.Core.Extensions
 {
 	// ReSharper disable once InconsistentNaming
 	public static class IConfigurationExtensions

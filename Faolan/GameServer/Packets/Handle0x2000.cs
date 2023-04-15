@@ -12,24 +12,24 @@ namespace Faolan.GameServer
 		private void Handle0X2000(INetworkClient client, ConanPacket packet)
 		{
 			var pbLength = packet.Data.ReadUInt32();
-			var pbOpcode = packet.Data.ReadUInt32<GameServerDataOpcodes>();
+			var pbOpcode = packet.Data.ReadUInt32<GameServer0X2000Opcodes>();
 			Logger.LogInformation($"Received data opcode: {pbOpcode} ({pbOpcode.ToHex()})");
 
 			switch (pbOpcode)
 			{
-				case GameServerDataOpcodes.Oxf98E10B3:
+				case GameServer0X2000Opcodes.Oxf98E10B3:
 				{
 					Handle0Xf98E10B3(client, packet);
 					break;
 				}
 
-				case GameServerDataOpcodes.Ox36D3B74:
+				case GameServer0X2000Opcodes.Ox36D3B74:
 				{
 					HandleCommandPacket(client, packet);
 					break;
 				}
 
-				case GameServerDataOpcodes.Move:
+				case GameServer0X2000Opcodes.Move:
 				{
 					var dataobjdec = packet.Data.ReadUInt32();
 					var dataclientinst = packet.Data.ReadUInt32();
@@ -49,7 +49,7 @@ namespace Faolan.GameServer
 						case MovingType.Ox001A:
 						{
 							var charCoords = packet.Data.ReadVector3();
-							var datadat = packet.Data.ReadArray(pbLength - 6 * 4 + 1 * 2);
+                            var datadat = packet.Data.ReadRemainingArray();//.ReadArray(pbLength - 6 * 4 + 1 * 2);
 
 							Database.UpdateCharacterPosition(dataclientinst, charCoords);
 
@@ -77,7 +77,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerDataOpcodes.ReadyForPlayScreen: //peer0_160
+				case GameServer0X2000Opcodes.ReadyForPlayScreen: //peer0_160
 				{
 					SendReadyForPlayScreen(client);
 					if (client.Character.Name == null)
@@ -86,7 +86,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerDataOpcodes.Interact:
+				case GameServer0X2000Opcodes.Interact:
 				{
 					var cInstPreId = packet.Data.ReadUInt32();
 					var clientInst = packet.Data.ReadUInt32();
@@ -140,8 +140,14 @@ namespace Faolan.GameServer
 					    */
 
 					switch (actionType)
-					{
-						case ActionType.CastSpell:
+                    {
+                        case ActionType.RightClickItem:
+                        {
+                            Logger.LogInformation($"Player with ID: {clientInst.ToHex()} RightClickItem");
+                            break;
+                        }
+
+                            case ActionType.CastSpell:
 						{
 							Logger.LogInformation($"Player with ID: {clientInst.ToHex()} CastSpell");
 							break;
@@ -180,7 +186,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerDataOpcodes.CloseGame:
+				case GameServer0X2000Opcodes.CloseGame:
 				{
 					var unk0 = packet.Data.ReadUInt32();
 					var accountId = packet.Data.ReadUInt32();
@@ -192,7 +198,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerDataOpcodes.SelectDeselect:
+				case GameServer0X2000Opcodes.SelectDeselect:
 				{
 					var length = packet.Data.Length - 4;
 
@@ -262,7 +268,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerDataOpcodes.DropItem:
+				case GameServer0X2000Opcodes.DropItem:
 				{
 					var data = packet.Data.ToArray();
 					Logger.LogInformation("DROP ITEM!");
@@ -270,7 +276,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerDataOpcodes.MoveItemInInventory:
+				case GameServer0X2000Opcodes.MoveItemInInventory:
 				{
 					var data = packet.Data.ToArray();
 					Logger.LogInformation("MoveItemInInventory");
@@ -278,7 +284,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerDataOpcodes.DeleteQuest:
+				case GameServer0X2000Opcodes.DeleteQuest:
 				{
 					var data = packet.Data.ToArray();
 					Logger.LogInformation("DeleteQuest");
@@ -286,7 +292,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerDataOpcodes.InventoryClaimsButton:
+				case GameServer0X2000Opcodes.InventoryClaimsButton:
 				{
 					var data = packet.Data.ToArray();
 					Logger.LogInformation("InventoryClaimsButton");

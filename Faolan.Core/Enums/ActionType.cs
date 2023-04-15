@@ -5,6 +5,7 @@ namespace Faolan.Core.Enums
 		CastSpell = 0x4,
 		Emote = 0x5,
 		MoveEquippedToInventory = 0x9,
-		SwitchWeaponsButton = 0x2e
-	}
+		SwitchWeaponsButton = 0x2e,
+        RightClickItem = 0x0e
+    }
 }

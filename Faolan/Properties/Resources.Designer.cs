@@ -19,7 +19,7 @@ namespace Faolan.Properties {
     // class via a tool like ResGen or Visual Studio.
     // To add or remove a member, edit your .ResX file then rerun ResGen
     // with the /str option, or rebuild your VS project.
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "16.0.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "17.0.0.0")]
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     internal class Resources {
@@ -66,19 +66,6 @@ namespace Faolan.Properties {
         internal static string bigboy {
             get {
                 return ResourceManager.GetString("bigboy", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to # ReportDimensionId = 0x200B
-        ///0x00, 0x00, 0x00, 0x23, 0x6e, 0x62, 0x9e, 0xdd, 0x00, 0x00, 0x00, 0x18, 0x0a, 0x07, 0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x63, 0x12, 0x0b, 0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0xbd, 0xb3, 0x82, 0x88, 0x01, 0x20, 0x0b, 0x00, 0x01, 0x32, 
-        ///
-        ///# ReportServerId = 0x200C
-        ///0x00, 0x00, 0x00, 0x28, 0x12, 0x74, 0x5e, 0x27, 0x00, 0x00, 0x00, 0x18, 0x0a, 0x07, 0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x63, 0x12, 0x0b, 0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0xbd, 0xb3, 0x82, 0x88, 0x01, 0x20, 0x0c, 0 [rest of string was truncated]&quot;;.
-        /// </summary>
-        internal static string dumphex {
-            get {
-                return ResourceManager.GetString("dumphex", resourceCulture);
             }
         }
     }

@@ -105,7 +105,19 @@ namespace Faolan.Core.Network
 			return buffer;
 		}
 
-		public new ConanStream WriteByte(byte value)
+        public byte[] ReadRemainingArray()
+        {
+            var length = Length - Position;
+
+            if (length > int.MaxValue)
+                throw new Exception("length > Int32.MaxValue");
+
+            var buffer = new byte[length];
+            Read(buffer, 0, (int)length);
+            return buffer;
+        }
+
+        public new ConanStream WriteByte(byte value)
 		{
 			base.WriteByte(value);
 			return this;
@@ -209,7 +221,7 @@ namespace Faolan.Core.Network
 			return WriteFloat(value.Z);
 		}
 
-		public ConanStream WritePosition(Character character)
+        /*public ConanStream WritePosition(Character character)
 		{
 			WriteFloat(character.PositionX);
 			WriteFloat(character.PositionY);
@@ -235,9 +247,9 @@ namespace Faolan.Core.Network
 			WriteFloat(worldObject.RotationX);
 			WriteFloat(worldObject.RotationY);
 			return WriteFloat(worldObject.RotationZ);
-		}
+		}*/
 
-		public ConanStream WriteArrayByteLength(params byte[] value)
+        public ConanStream WriteArrayByteLength(params byte[] value)
 		{
 			if (value.Length > byte.MaxValue)
 				throw new Exception("value.Length > byte.MaxValue");

@@ -52,7 +52,7 @@ namespace Faolan.CSPlayerAgent
 				case CsPlayerAgentOpcodes.Ox2019: // register?
 				{
 					var unk0 = packet.Data.ReadUInt32(); // 0x00, 0x00, 0xC3, 0x50
-					var nClientInst = packet.Data.ReadUInt32(); // 0x08, 0x02, 0xE5, 0xD4
+					var nClientInst = packet.Data.ReadUInt32(); 
 
 					Logger.LogInformation("Opcodes.Ox2019");
 

@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 
@@ -58,5 +60,15 @@ namespace Faolan.Core.Extensions
 
 			return builder.ToString();
 		}
+
+        public static bool ContainsIgnoreCase(this string s, string find)
+        {
+            return s.Contains(find, StringComparison.InvariantCultureIgnoreCase);
+        }
+
+        public static string JoinAsString<T>(this IEnumerable<T> enumerable, string separator)
+        {
+            return string.Join(separator, enumerable);
+        }
 	}
 }

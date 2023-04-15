@@ -75,5 +75,13 @@ namespace Faolan.Core.Extensions
 
 			return result.ToString();
 		}
+
+        public static List<T> AppendRange<T>(this IEnumerable<T> items, IEnumerable<T> items2)
+        {
+            var x = items.ToList();
+            x.AddRange(items2);
+
+            return x;
+        }
 	}
 }

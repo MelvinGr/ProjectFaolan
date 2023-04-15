@@ -59,7 +59,7 @@
 			GcPing = 0x207D
 		}
 
-		public enum GameServerDataOpcodes : uint
+		public enum GameServer0X2000Opcodes : uint
 		{
 			Interact = 0x642CD3D6,
 			CloseGame = 0x6B6FD368,
@@ -74,7 +74,7 @@
 			InventoryClaimsButton = 0x06EC1255
 		}
 
-		public enum GameServerOx2000RespondsOpcodes : uint
+		public enum GameServer0X2000RespondsOpcodes : uint
 		{
 			MapChange = 0x5D85BFC7,
 			Ox33A56Fb0 = 0x33A56FB0,

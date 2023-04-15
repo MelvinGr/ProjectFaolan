@@ -3,8 +3,8 @@
 
   "UniverseAgentPort": 7010,
   "PlayerAgentPort": 7011,
-  "CSPlayerAgentPort": 7012,
-  "AgentServerPort": 7013,
+  "CSPlayerAgentPort": 7013,
+  "AgentServerPort": 7002,
 
   "DatabasePath": "faolan.db",
   "DatabasePathDev": "../../../Faolan/faolan.db",

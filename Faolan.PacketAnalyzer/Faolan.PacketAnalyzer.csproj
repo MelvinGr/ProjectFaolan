@@ -17,6 +17,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\Faolan.Core\Faolan.Core.csproj" />
+		<ProjectReference Include="..\Faolan\Faolan.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -7,12 +7,13 @@ namespace Faolan.PacketAnalyzer
 {
 	public class PacketSplitter
 	{
-		public delegate void ReceivedPacketDel(long ticks, ConanPacket packet);
+		public delegate void ReceivedPacketDel(string ticks, ConanPacket packet);
 
 		private readonly byte[] _packetLengthBuffer = new byte[sizeof(int)];
 
 		private byte[] _packetBuffer;
 		private int _packetBytesRead;
+		private int _currentPacketCounter = 0;
 
 		// https://blog.stephencleary.com/2009/04/message-framing.html
 		public void DataReceived(long ticks, byte[] data)
@@ -80,7 +81,10 @@ namespace Faolan.PacketAnalyzer
 						_packetBuffer = new byte[length];
 						_packetBytesRead = 0;
 					}
-				}
+
+                    _currentPacketCounter = 0;
+
+                }
 			}
 			else
 			{
@@ -92,14 +96,17 @@ namespace Faolan.PacketAnalyzer
 					var packet = new ConanPacket(completePacket);
 					//var packet = (TPacket)Activator.CreateInstance(typeof(TPacket), completePacket);
 					if (packet?.IsValid == true)
-						ReceivedPacket?.Invoke(ticks, packet);
+						ReceivedPacket?.Invoke(ticks + "_" + _currentPacketCounter, packet);
 					//else
 					//    throw new Exception("packet?.IsValid != true");
 
 					// Start reading the length buffer again
 					_packetBuffer = null;
 					_packetBytesRead = 0;
-				}
+
+                    _currentPacketCounter++;
+
+                }
 			}
 		}
 	}

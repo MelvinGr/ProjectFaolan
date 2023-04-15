@@ -44,7 +44,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.Spawn)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.Spawn)
 					.WriteArray(packetData146))
 				.Send(client);
 		}
@@ -78,7 +78,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.Spawn)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.Spawn)
 					.WriteArray(packetData131))
 				.Send(client);
 		}
@@ -102,7 +102,7 @@ namespace Faolan.GameServer
 			new PacketStream()
 				.WriteHeader(sender, receiver, null, 0x00002000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.SpawnObject)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.SpawnObject)
 					.WriteArray(packetData2))
 				.Send(client);
 
@@ -118,7 +118,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.SpawnObject)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.SpawnObject)
 					.WriteArray(packetData83))
 				.Send(client);
 
@@ -136,7 +136,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.SpawnObject)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.SpawnObject)
 					.WriteArray(packetData84))
 				.Send(client);
 
@@ -152,7 +152,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.SpawnObject)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.SpawnObject)
 					.WriteArray(packetData87))
 				.Send(client);
 
@@ -168,7 +168,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.SpawnObject)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.SpawnObject)
 					.WriteArray(packetData88))
 				.Send(client);
 
@@ -184,7 +184,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.SpawnObject)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.SpawnObject)
 					.WriteArray(packetData89))
 				.Send(client);
 
@@ -200,7 +200,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.SpawnObject)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.SpawnObject)
 					.WriteArray(packetData90))
 				.Send(client);
 
@@ -215,7 +215,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.SpawnObject)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.SpawnObject)
 					.WriteArray(packetData91))
 				.Send(client);
 
@@ -230,7 +230,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.SpawnObject)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.SpawnObject)
 					.WriteArray(packetData93))
 				.Send(client);
 
@@ -246,7 +246,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.SpawnObject)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.SpawnObject)
 					.WriteArray(packetData94))
 				.Send(client);
 
@@ -261,7 +261,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.SpawnObject)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.SpawnObject)
 					.WriteArray(packetData96))
 				.Send(client);
 
@@ -277,7 +277,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.SpawnObject)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.SpawnObject)
 					.WriteArray(packetData97))
 				.Send(client);
 		}
@@ -357,7 +357,7 @@ namespace Faolan.GameServer
 			new PacketStream() // Sit on mount (Fading black horse) (does not apply the buff)
 				.WriteHeader(Sender0, Receiver0, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.SitOnMount)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.SitOnMount)
 					.WriteUInt32(0x0000C350)
 					.WriteUInt32(client.Account.ClientInstance)
 					.WriteArray(packetData1431))
@@ -477,7 +477,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.Spawn)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.Spawn)
 					.WriteArray(packetData117))
 				.Send(client);
 
@@ -602,7 +602,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.Spawn)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.Spawn)
 					.WriteArray(packetData118))
 				.Send(client);
 		}
@@ -641,7 +641,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.Spawn)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.Spawn)
 					.WriteArray(packetData99))
 				.Send(client);
 
@@ -668,7 +668,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.Spawn)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.Spawn)
 					.WriteArray(packetData116))
 				.Send(client);
 		}
@@ -696,7 +696,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.Spawn)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.Spawn)
 					.WriteArray(packetData113))
 				.Send(client);
 		}
@@ -726,7 +726,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.Spawn)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.Spawn)
 					.WriteArray(packetData103))
 				.Send(client);
 		}
@@ -767,7 +767,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.Spawn)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.Spawn)
 					.WriteArray(packetData124))
 				.Send(client);
 
@@ -814,7 +814,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.Spawn)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.Spawn)
 					.WriteArray(packetData127))
 				.Send(client);
 
@@ -852,7 +852,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.Spawn)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.Spawn)
 					.WriteArray(packetData128))
 				.Send(client);
 
@@ -890,7 +890,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.Spawn)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.Spawn)
 					.WriteArray(packetData129))
 				.Send(client);
 
@@ -934,7 +934,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.Spawn)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.Spawn)
 					.WriteArray(packetData130))
 				.Send(client);
 
@@ -985,7 +985,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.Spawn)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.Spawn)
 					.WriteArray(packetData133))
 				.Send(client);
 
@@ -1027,7 +1027,7 @@ namespace Faolan.GameServer
 			};
 			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.Spawn)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.Spawn)
 					.WriteArray(packetData145))
 				.Send(client);
 		}
