@@ -4,7 +4,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using Faolan.Core.Data;
-using Faolan.Core.Extensions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.Core.Network
@@ -25,18 +25,21 @@ namespace Faolan.Core.Network
 		public delegate Task ReceivedPacketDelegate(INetworkClient client, Packet packet);
 
 		protected readonly ILogger Logger;
-		protected Socket Socket;
+        protected Socket Socket;
+        protected readonly bool _isAgentServer;
 
 		public ReceivedPacketDelegate ReceivedPacket { get; set; }
 		public NetworkClientDelegate Disconnected { get; set; }
 
-		protected NetworkClient(Socket socket, ILogger logger)
+		protected NetworkClient(Socket socket, ILogger logger, bool isAgentServer)
 		{
 			Socket = socket;
 			Logger = logger;
-		}
+            _isAgentServer = isAgentServer;
+        }
 
 		public string IpAddress => ((IPEndPoint)Socket.RemoteEndPoint)?.Address.ToString();
+        //public ushort LocalPort => (ushort)(((IPEndPoint)Socket.LocalEndPoint)?.Port ?? 0);
 
 		public Account Account { get; set; }
 		public Character Character => Account?.Character;
@@ -54,11 +57,13 @@ namespace Faolan.Core.Network
 
 		private byte[] _packetBuffer;
 		private int _packetBytesRead;
+        //private Inflater _inflater;
 
-		public NetworkClient(Socket socket, ILogger logger)
-			: base(socket, logger)
-		{
-		}
+        public NetworkClient(Socket socket, ILogger logger)
+			: base(socket, logger, typeof(TPacket).Name.Contains("AgentServerPacket"))
+        {
+			//
+        }
 
 		public override void Start()
 		{
@@ -122,17 +127,16 @@ namespace Faolan.Core.Network
 						// zlib compression (0x80000005)
 						if (buffer[0] == 0x80 && buffer[1] == 0x00 && buffer[2] == 0x00 && buffer[3] == 0x05)
 						{
-							//decompressor = new Inflater();
-							//buffer = buffer.Skip(9).ToArray();
-							//Console.WriteLine("zlib start");
-
-							Logger.LogDebug("ZLIB: " + buffer.ToHex());
-
-							BeginReceive();
+                            BeginReceive();
 							return;
-						}
 
-						DataReceived(buffer, bytesRead);
+                            //_inflater = new Inflater();
+                            //buffer = Decompress(buffer.Skip(9).ToArray());
+                        }
+                        //else if (_inflater != null)
+                        //    buffer = Decompress(buffer);
+
+                        DataReceived(buffer, bytesRead);
 						BeginReceive();
 					}
 					catch // (Exception e)
@@ -152,6 +156,17 @@ namespace Faolan.Core.Network
 		// https://blog.stephencleary.com/2009/04/message-framing.html
 		private void DataReceived(byte[] data, int length)
 		{
+            if (_isAgentServer)
+            {
+                var packet = (TPacket)Activator.CreateInstance(typeof(TPacket), data);
+                if (packet?.IsValid == true)
+                    ReceivedPacket?.Invoke(this, packet);
+                else
+                    throw new Exception("packet?.IsValid != true");
+
+                return;
+            }
+
 			var i = 0;
 			while (i != length)
 			{
@@ -233,5 +248,28 @@ namespace Faolan.Core.Network
 				}
 			}
 		}
-	}
+
+        /*private byte[] Decompress(byte[] input)
+        {
+            try
+            {
+                _inflater.SetInput(input);
+
+                var bos = new MemoryStream(input.Length);
+
+                var buf = new byte[10240];
+                while (!_inflater.IsFinished && !_inflater.IsNeedingInput)
+                {
+                    var count = _inflater.Inflate(buf);
+                    bos.Write(buf, 0, count);
+                }
+
+                return bos.ToArray();
+            }
+            catch //(Exception e)
+            {
+                return null;
+            }
+        }*/
+    }
 }

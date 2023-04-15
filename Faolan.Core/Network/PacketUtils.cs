@@ -75,7 +75,7 @@ namespace Faolan.Core.Network
 				""; //"$"byte[]\tremainingData\t=\t{packet.RemainingData.ToHex()}\r\n";
 		}
 
-		public static string PacketToCsCode(ConanPacket packet, long? index = null, bool useIndexForSr = true)
+		public static string PacketToCsCode(ConanPacket packet, string index = null, bool useIndexForSr = true)
 		{
 			var indexStr = useIndexForSr ? index?.ToString() : null;
 			var indexStr2 = index?.ToString();

@@ -7,10 +7,13 @@ using System.Threading.Tasks;
 using Faolan.AgentServer;
 using Faolan.Core;
 using Faolan.Core.Database;
+using Faolan.Core.Extensions;
+using Faolan.Core.Network;
 using Faolan.CSPlayerAgent;
 using Faolan.Extensions;
 using Faolan.GameServer;
 using Faolan.PlayerAgent;
+using Faolan.Properties;
 using Faolan.UniverseAgent;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
@@ -34,7 +37,15 @@ namespace Faolan
 		{
 			services.AddLogging();
 
-			services.AddDbContext<IDatabaseContext, DatabaseContext>(options => { options.UseSqlite($"Data Source={Configuration.DatabasePath()}", x => x.MigrationsAssembly("Faolan")); });
+            /*var hex = Resources.bigboy.Replace("\r", "").Replace("\n", "")
+                .Replace(",", "").Replace("0x", "").Replace(" ", "")
+                .HexToByteArray();
+
+            var p = new ConanPacket(hex);
+            var x = PacketUtils.PacketToCsCode(p);
+			System.IO.File.WriteAllBytes("c:/temp/bigboy.bin", hex);*/
+
+            services.AddDbContext<IDatabaseContext, DatabaseContext>(options => { options.UseSqlite($"Data Source={Configuration.DatabasePath()}", x => x.MigrationsAssembly("Faolan")); });
 
 			services.AddScoped<IDatabaseRepository, DatabaseRepository>();
 			services.AddHostedService<DatabaseMigrator>();

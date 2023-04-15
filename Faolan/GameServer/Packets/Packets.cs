@@ -23,7 +23,7 @@ namespace Faolan.GameServer
 			new PacketStream()
 				.WriteHeader(Sender0, Receiver0, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.ApplySpell)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.ApplySpell)
 					.WriteUInt32(0x0000C350)
 					.WriteUInt32(applyTo) //Apply to ?
 					.WriteUInt16(0x0000)
@@ -41,7 +41,7 @@ namespace Faolan.GameServer
 			new PacketStream()
 				.WriteHeader(sender0, receiver0, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(GameServerOx2000RespondsOpcodes.SetDayTime)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.SetDayTime)
 					/*.WriteArray(
 					    0x00, 0x00, 0x00, 0x00,
 					    0x00, 0x00, 0x00, 0x00,
@@ -77,7 +77,7 @@ namespace Faolan.GameServer
 		{
 			var sender0 = new byte[] { 0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x63 };
 			var receiver0 = new byte[] { 0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, 0xBD, 0xB3, 0x82, 0x88, 0x01 };
-			var packetData0 = new byte[] { 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00, 0x10 };
+			var packetData0 = new byte[] { 0x00, 0x00, 0x00, 0x54, 0x00, 0x00, 0x00, 0x01 };
 			new PacketStream()
 				.WriteHeader(sender0, receiver0, null, GameServerRespondOpcodes.ReportServerId)
 				.WriteArray(packetData0)
@@ -88,20 +88,27 @@ namespace Faolan.GameServer
 		{
 			var sender0 = new byte[] { 0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x63 };
 			var receiver0 = new byte[] { 0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, 0xBD, 0xB3, 0x82, 0x88, 0x01 };
-			var packetData0 = new byte[] { 0x00, 0x00, 0x00, 0x01 };
 			new PacketStream()
 				.WriteHeader(sender0, receiver0, null, GameServerRespondOpcodes.AckAuthentication)
-				.WriteArray(packetData0)
+				.WriteUInt32(0x00000001)
 				.Send(client);
 		}
 
 		private static void SendReadyForPlayScreen(INetworkClient client)
 		{
-			var aBuffer = new PacketStream();
+            //var sender638172479350760890_0_0 = new byte[] { 0x0D, 0x5D, 0xB9, 0xEC, 0xA9, 0x10, 0x64 };
+            //var receiver638172479350760890_0_0 = new byte[] { 0x0D, 0x91, 0xF7, 0x87, 0x8B, 0x10, 0xD4, 0xCB, 0x8B, 0x40 };
+            //var packetData638172479350760890_0_0 = new byte[] { 0x44, 0x69, 0x39, 0x48, 0x42, 0xE5, 0x22, 0xD2, 0x44, 0x4D, 0xEF, 0xBE, 0x00, 0x00, 0x07, 0xE2, 0x44, 0x75, 0xD7, 0x0A, 0x42, 0xDD, 0x16, 0x87, 0x44, 0x0C, 0xB9, 0xCB, 0x00, 0x00, 0xC7, 0xA0, 0x00, 0x00, 0x07, 0xD0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x64, 0x00 };
+            //new PacketStream()
+            //    .WriteHeader(sender638172479350760890_0_0, receiver638172479350760890_0_0, null, 0x00002024, true)
+            //    .WriteArray(packetData638172479350760890_0_0)
+            //    .Send(client);
+
+            var aBuffer = new PacketStream();
 			aBuffer.WriteHeader(Sender6, Receiver6, null, GameServerRespondOpcodes.ReadyForPlayScreen);
-			aBuffer.WritePosition(client.Character);
+			aBuffer.WriteVector3(client.Character.Position);
 			aBuffer.WriteUInt32(0x00007e2); //2018 = 2*1009 -> -1 -> 1xCoord
-			aBuffer.WritePosition(client.Character);
+			aBuffer.WriteVector3(client.Character.Position);
 			aBuffer.WriteArray(0x00, 0x00, 0xc7, 0x9e,
 				0x00, 0x00, 0x0f, 0xaa,
 				0x00, 0x00, 0x00, 0x00,
@@ -111,15 +118,17 @@ namespace Faolan.GameServer
 				0x00);
 			aBuffer.Send(client);
 
-			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
-				.WriteArrayUInt32Length(new ConanStream()
-					.WriteUInt32(0x06ec1255)
-					.WriteUInt32(0x0000c350)
-					.WriteUInt32(client.Account.ClientInstance)
-					.WriteUInt16(0x0009))
-				.Send(client);
+			//
 
-			new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
+			//new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
+			//	.WriteArrayUInt32Length(new ConanStream()
+			//		.WriteUInt32(0x06ec1255)
+			//		.WriteUInt32(0x0000c350)
+			//		.WriteUInt32(client.Account.ClientInstance)
+			//		.WriteUInt16(0x0009))
+			//	.Send(client);
+
+            new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
 				.WriteArrayUInt32Length(new ConanStream()
 					.WriteUInt32(0x864cfef8)
 					.WriteUInt32(0x0000c350)

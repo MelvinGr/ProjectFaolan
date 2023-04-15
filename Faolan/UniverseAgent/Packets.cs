@@ -1,3 +1,4 @@
+using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Opcodes;
 using Faolan.Extensions;

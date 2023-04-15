@@ -19,7 +19,14 @@ namespace Faolan.AgentServer
 		{
 		}
 
-		protected override async Task ReceivedPacket(INetworkClient client, AgentServerPacket packet)
+        protected override void ClientConnected(INetworkClient client)
+        {
+			base.ClientConnected(client);
+
+            Console.WriteLine();
+        }
+		
+        protected override async Task ReceivedPacket(INetworkClient client, AgentServerPacket packet)
 		{
 			Logger.LogInformation($"Received opcode: {packet.Opcode} ({packet.Opcode.ToHex()})");
 

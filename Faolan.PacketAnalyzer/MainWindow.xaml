@@ -6,6 +6,12 @@
         xmlns:local="clr-namespace:Faolan.PacketAnalyzer"
         mc:Ignorable="d"
         Title="MainWindow" Height="700" Width="1200">
+    <Window.Resources>
+        <local:PacketWrapperCollection x:Key="packetWrappers" />
+        <CollectionViewSource x:Key="cvsPacketWrappers" Source="{StaticResource packetWrappers}" Filter="packetWrappers_Filter">
+        </CollectionViewSource>
+    </Window.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition />
@@ -19,14 +25,16 @@
             <ColumnDefinition />
         </Grid.ColumnDefinitions>
 
-        <DataGrid Grid.RowSpan="2" Grid.ColumnSpan="4" Grid.Row="0" Grid.Column="0" x:Name="packetDataGrid" Margin="10,10,10,0" SelectionChanged="packetDataGrid_SelectionChanged" ItemsSource="{Binding}" AutoGenerateColumns="False" >
+        <DataGrid Grid.RowSpan="2" Grid.ColumnSpan="4" Grid.Row="0" Grid.Column="0" x:Name="packetDataGrid" Margin="10,10,10,0" SelectionChanged="packetDataGrid_SelectionChanged" 
+                  ItemsSource="{Binding Source={StaticResource cvsPacketWrappers}}" AutoGenerateColumns="False" CanUserAddRows="False" >
             <DataGrid.Columns>
-                <DataGridTextColumn Header="Ticks" Binding="{Binding Ticks}"/>
-                <DataGridTextColumn Header="Service" Binding="{Binding ServiceNameDisplay}"/>
-                <DataGridTextColumn Header="Opcode" Binding="{Binding Opcode}"/>
-                <DataGridTextColumn Header="Opcode2" Binding="{Binding GameServerOpcode}"/>
-                <DataGridTextColumn Header="Body" Binding="{Binding Path=BytesRowDisplay}"  />
-                <DataGridTextColumn Header="Strings" Binding="{Binding Path=BytesStringDisplay}"  />
+                <!--<DataGridTextColumn Header="Ticks" Binding="{Binding Ticks}" IsReadOnly="True" />-->
+                <DataGridTextColumn Header="Service" Binding="{Binding ServiceNameDisplay}" IsReadOnly="True" />
+                <DataGridTextColumn Header="Opcode" Binding="{Binding Opcode}" IsReadOnly="True" />
+                <DataGridTextColumn Header="Opcode2" Binding="{Binding GameServerOpcode}" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Notes" Binding="{Binding Notes}" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Strings" Binding="{Binding Path=BytesStringDisplay}" IsReadOnly="True" />
+                <!--<DataGridTextColumn Header="Body" Binding="{Binding Path=BytesRowDisplay}" IsReadOnly="True" />-->
                 <!-- Background="{Binding Path=Color}" -->
             </DataGrid.Columns>
         </DataGrid>
@@ -50,6 +58,8 @@
             <Button x:Name="importButton" Content="Import" Margin="10,0,0,60" VerticalAlignment="Bottom" HorizontalAlignment="Left" Width="126" Click="importButton_Click" />
             <Button x:Name="loadButton" Content="Load" Margin="10,0,0,35" VerticalAlignment="Bottom" HorizontalAlignment="Left" Width="126" Click="loadButton_Click" />
             <Button x:Name="saveButton" Content="Save" Margin="10,0,0,10" VerticalAlignment="Bottom" HorizontalAlignment="Left" Width="126" Click="saveButton_Click"/>
+            <ComboBox x:Name="sourceComboBox" Margin="10,0,0,114" VerticalAlignment="Bottom" HorizontalAlignment="Left" Width="126" SelectionChanged="sourceComboBox_SelectionChanged"/>
+            <TextBox x:Name="searchTextTextBox" Margin="10,0,0,141" VerticalAlignment="Bottom" HorizontalAlignment="Left" Width="126" TextChanged="searchTextTextBox_TextChanged"/>
         </Grid>
     </Grid>
 </Window>

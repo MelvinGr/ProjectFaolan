@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Opcodes;
 using Faolan.Extensions;
@@ -101,34 +102,68 @@ namespace Faolan.PlayerAgent
 		}
 
 		private void SendCsPlayerAgent(INetworkClient client)
-		{
-			var headerData0 = new byte[] { 0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE0, 0xD4, 0xB4, 0xD7, 0x05 };
+        {
+            var sender638167354496472670 = new byte[] { 0x0D, 0x16, 0x91, 0x35, 0x1D, 0x10, 0x54 };
+            var receiver638167354496472670 = new byte[] { 0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0xEC, 0xEB, 0x80, 0xDE, 0x03 };
+
+            var headerData0 = new byte[] { 0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE0, 0xD4, 0xB4, 0xD7, 0x05 };
 
 			new PacketStream() // send CSPlayerAgent
-				.WriteHeader(Sender3, Receiver3, headerData0, PlayerAgentResponseOpcodes.SendCsPlayerAgent)
+				.WriteHeader(sender638167354496472670, receiver638167354496472670, headerData0, PlayerAgentResponseOpcodes.SendCsPlayerAgent)
 				.WriteUInt32(Configuration.ServerIpAddressLong())
 				.WriteUInt16(Configuration.CsPlayerAgentPort())
 				.WriteUInt32(client.Account.Id)
 				.WriteUInt32(0x0000c350)
 				.WriteUInt32(client.Account.ClientInstance)
 				.Send(client);
-		}
 
-		private void SendAgentServer(INetworkClient client)
-		{
-			var headerData0 = new byte[] { 0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xFA, 0xE5, 0x98, 0x9D, 0x02 };
+            /*var headerData638167354496472670 = new byte[] { 0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE0, 0xD4, 0xB4, 0xD7, 0x05 };
+            var packetData638167354496472670 = new byte[]
+            {
+                0x25, 0x12, 0xC0, 0x2B, 
+                0x1B, 0x65, // 7013
+                0x02, 0x8C, 0x26, 0xAF,
+                0x00, 0x00, 0xC3, 0x50,
+                0x08, 0x02, 0xE5, 0xD4
+            };
+            new PacketStream()
+                .WriteHeader(sender638167354496472670, receiver638167354496472670, headerData638167354496472670, 0x00001A07, true)
+                .WriteArray(packetData638167354496472670)
+                .Send(client);*/
+        }
 
-			new PacketStream() // Send PlayerAgent
-				.WriteHeader(Sender0, Receiver3, headerData0, PlayerAgentResponseOpcodes.SendAgentServer)
+        private void SendAgentServer(INetworkClient client)
+        {
+            var sender638167354496472670 = new byte[] { 0x0D, 0x16, 0x91, 0x35, 0x1D, 0x10, 0x54 };
+            var receiver638167354496472670 = new byte[] { 0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0xEC, 0xEB, 0x80, 0xDE, 0x03 };
+
+            var headerData0 = new byte[] { 0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xFA, 0xE5, 0x98, 0x9D, 0x02 };
+
+			new PacketStream() 
+				.WriteHeader(sender638167354496472670, receiver638167354496472670, headerData0, PlayerAgentResponseOpcodes.SendAgentServer)
 				.WriteUInt32(Configuration.ServerIpAddressLong())
 				.WriteUInt16(Configuration.AgentServerPort())
 				.WriteUInt32(client.Account.Id)
 				.WriteUInt32(0x0000c350)
 				.WriteUInt32(client.Account.ClientInstance)
 				.Send(client);
-		}
 
-		private void SendGameServer(INetworkClient client)
+            /*var headerData638167354496472670 = new byte[] { 0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xFA, 0xE5, 0x98, 0x9D, 0x02 };
+            var packetData638167354496472670 = new byte[]
+            {
+                0x25, 0x12, 0xC0, 0x2B, 
+                0x1B, 0x5A, // 7002
+                0x02, 0x8C, 0x26, 0xAF,
+                0x00, 0x00, 0xC3, 0x50,
+                0x08, 0x02, 0xE5, 0xD4
+            };
+            new PacketStream()
+                .WriteHeader(sender638167354496472670, receiver638167354496472670, headerData638167354496472670, 0x00001A07, true)
+                .WriteArray(packetData638167354496472670)
+                .Send(client);*/
+        }
+
+        private void SendGameServer(INetworkClient client)
 		{
 			var headerData2 = new byte[] { 0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xF9, 0xD8, 0xD9, 0xC5, 0x0D };
 			var sender2 = new byte[] { 0x0D, 0x16, 0x91, 0x35, 0x1D, 0x10, 0x64 };

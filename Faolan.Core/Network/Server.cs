@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
+using Faolan.Core.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -21,9 +22,10 @@ namespace Faolan.Core.Network
 		protected readonly SynchronizedCollection<INetworkClient> NetworkClients = new();
 
 		public IPEndPoint LocalEndPoint => (IPEndPoint)_tcpListener?.LocalEndpoint;
+        //public ushort Port => (ushort)(LocalEndPoint?.Port ?? 0);
 
-		// ReSharper disable once SuggestBaseTypeForParameter
-		protected Server(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database)
+        // ReSharper disable once SuggestBaseTypeForParameter
+        protected Server(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database)
 		{
 			Logger = logger;
 			Configuration = configuration;
@@ -72,13 +74,13 @@ namespace Faolan.Core.Network
 			}
 		}
 
-		protected void ClientConnected(INetworkClient client)
+		protected virtual void ClientConnected(INetworkClient client)
 		{
 			NetworkClients.Add(client);
 			Logger.LogInformation($"Client with address: {client.IpAddress} connected!");
 		}
 
-		protected void ClientDisconnected(INetworkClient client)
+        protected virtual void ClientDisconnected(INetworkClient client)
 		{
 			NetworkClients.Remove(client);
 			Logger.LogInformation($"Client with address: {client.IpAddress} disconnected!");

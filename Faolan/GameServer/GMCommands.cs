@@ -73,7 +73,7 @@ namespace Faolan.GameServer
 					.WriteUInt32(0)
 					.WriteUInt32(client.Account.ClientInstance)
 					.WriteArray(pack21)
-					.WritePosition(client.Character)
+					.WriteVector3(client.Character.Position)
 					.WriteUInt32(0x00000032)
 					.WriteByte(0))
 				.Send(client);

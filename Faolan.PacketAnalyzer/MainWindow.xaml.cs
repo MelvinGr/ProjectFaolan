@@ -1,9 +1,12 @@
 ﻿using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Media;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
@@ -15,170 +18,253 @@ using SharpPcap.LibPcap;
 
 namespace Faolan.PacketAnalyzer
 {
-	public partial class MainWindow : Window
-	{
-		private readonly Dictionary<string, PacketSplitter> _packetSplitters = new();
+    public partial class MainWindow : Window
+    {
+        private const string _defaultKey = "--";
 
-		private CaptureFileReaderDevice _captureFileReaderDevice;
-		private Inflater _inflater;
+        private readonly Dictionary<string, PacketSplitter> _packetSplitters = new();
 
-		public MainWindow()
-		{
-			InitializeComponent();
+        private ICaptureDevice _captureFileReaderDevice;
+        private Inflater _inflater;
 
-			packetDataGrid.ContextMenu = new ContextMenu();
+        private PacketWrapperCollection PacketWrappers => (PacketWrapperCollection)Resources["packetWrappers"];
 
-			var colors = typeof(Colors)
-				.GetProperties(BindingFlags.Static | BindingFlags.Public)
-				.Where(p => p.Name.StartsWith("Light"))
-				.ToDictionary(p => p.Name, v => new SolidColorBrush((Color)v.GetValue(null, null)));
+        private string SourceComboBoxSelectedItem
+        {
+            get => (string)sourceComboBox.SelectedItem;
+            set => sourceComboBox.SelectedItem = value;
+        }
 
-			foreach (var item in colors)
-			{
-				var menuItem = new MenuItem { Header = item.Key, Background = item.Value };
+        public MainWindow()
+        {
+            InitializeComponent();
+            
+            packetDataGrid.ContextMenu = new ContextMenu();
 
-				menuItem.Click += (_, e) =>
-				{
-					var source = (MenuItem)e.Source;
+            var exportMenuItem = new MenuItem { Header = "Export Selected to Clipboard" };
+            exportMenuItem.Click += ExportMenuItemOnClick;
 
-					var packetWrapper = (PacketWrapper)packetDataGrid.Items[packetDataGrid.SelectedIndex];
-					packetWrapper.Color = source.Background;
-				};
+            packetDataGrid.ContextMenu.Items.Add(exportMenuItem);
 
-				packetDataGrid.ContextMenu.Items.Add(menuItem);
-			}
-		}
+            var colorsMenuItem = new MenuItem { Header = "Colors" };
+            packetDataGrid.ContextMenu.Items.Add(colorsMenuItem);
 
-		private void packetDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
-		{
-			if (packetDataGrid.SelectedIndex == -1)
-			{
-				outputTextBox.Text = "";
-				return;
-			}
+            var colors = typeof(Colors)
+                .GetProperties(BindingFlags.Static | BindingFlags.Public)
+                .Where(p => p.Name.StartsWith("Light"))
+                .ToDictionary(p => p.Name, v => new SolidColorBrush((Color)v.GetValue(null, null)));
 
-			var packetWrapper = (PacketWrapper)packetDataGrid.Items[packetDataGrid.SelectedIndex];
+            foreach (var item in colors)
+            {
+                var menuItem = new MenuItem
+                {
+                    Header = item.Key,
+                    Background = item.Value
+                };
 
-			notesTextBox.DataContext = packetWrapper;
-			outputTextBox.Text = PacketUtils.PacketToCsCode(packetWrapper.ConanPacket, packetWrapper.Ticks, useTicksInSRCheckBox.IsChecked == true);
-			outputHexTextBox.Text = packetWrapper.ConanPacket.Bytes.HexDump();
-		}
+                menuItem.Click += (_, e) =>
+                {
+                    var source = (MenuItem)e.Source;
 
-		private void importButton_Click(object sender, RoutedEventArgs e)
-		{
-			outputTextBox.Text = "";
-			packetDataGrid.Items.Clear();
+                    var packetWrapper = (PacketWrapper)packetDataGrid.Items[packetDataGrid.SelectedIndex];
+                    packetWrapper.Color = source.Background;
+                };
 
-			ReadDump(@"C:\Users\Melvin\Desktop\conan3.pcapng");
-		}
+                colorsMenuItem.Items.Add(menuItem);
+            }
+        }
 
-		private void loadButton_Click(object sender, RoutedEventArgs e)
-		{
-			outputTextBox.Text = "";
-			packetDataGrid.Items.Clear();
+        private void ExportMenuItemOnClick(object sender, RoutedEventArgs e)
+        {
+            var selectedItems = packetDataGrid.SelectedItems.OfType<PacketWrapper>().ToArray();
 
-			var json = File.ReadAllText("c:/temp/conan.json");
-			var items = JsonConvert.DeserializeObject<PacketWrapper[]>(json);
+            var x = selectedItems.Select((i, ii) => PacketUtils.PacketToCsCode(i.ConanPacket, i.Ticks + "_" +ii, useTicksInSRCheckBox.IsChecked == true)).JoinAsString("\r\n");
 
-			foreach (var item in items)
-				packetDataGrid.Items.Add(item);
-		}
+            try
+            {
+                Clipboard.SetText(x);
+            }
+            catch
+            {
+                //
+            }
+        }
 
-		private void saveButton_Click(object sender, RoutedEventArgs e)
-		{
-			var json = JsonConvert.SerializeObject(packetDataGrid.Items, Formatting.Indented);
-			//var x = JsonConvert.DeserializeObject<PacketWrapper[]>(json);
+        private void packetDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (packetDataGrid.SelectedIndex == -1)
+            {
+                outputTextBox.Text = "";
+                return;
+            }
 
-			File.WriteAllText("c:/temp/conan.json", json);
-		}
+            var packetWrapper = (PacketWrapper)packetDataGrid.Items[packetDataGrid.SelectedIndex];
 
-		private void useTicksInSRCheckBox_Checked(object sender, RoutedEventArgs e)
-		{
-			//
-		}
+            notesTextBox.DataContext = packetWrapper;
+            outputTextBox.Text = PacketUtils.PacketToCsCode(packetWrapper.ConanPacket, packetWrapper.Ticks, useTicksInSRCheckBox.IsChecked == true);
+            outputHexTextBox.Text = packetWrapper.ConanPacket.Bytes.HexDump();
+        }
 
-		private void ReadDump(string path)
-		{
-			_captureFileReaderDevice?.Dispose();
+        private void importButton_Click(object sender, RoutedEventArgs e)
+        {
+            outputTextBox.Text = "";
+            PacketWrappers.Clear();
 
-			_captureFileReaderDevice = new CaptureFileReaderDevice(path);
-			_captureFileReaderDevice.OnPacketArrival += OnOnPacketArrival;
+            ReadDump(@"C:\Users\Melvin\Desktop\mellie.pcapng");
+            UpdateSourceComboBox();
+        }
 
-			_captureFileReaderDevice.Open();
-			_captureFileReaderDevice.StartCapture();
-		}
+        private void loadButton_Click(object sender, RoutedEventArgs e)
+        {
+            outputTextBox.Text = "";
+            PacketWrappers.Clear();
 
-		private byte[] Decompress(Inflater inflater, byte[] input)
-		{
-			try
-			{
-				inflater.SetInput(input);
+            var json = File.ReadAllText("c:/temp/conan.json");
+            var items = JsonConvert.DeserializeObject<PacketWrapper[]>(json);
 
-				var bos = new MemoryStream(input.Length);
+            foreach (var item in items)
+                PacketWrappers.Add(item);
 
-				var buf = new byte[10240];
-				while (!inflater.IsFinished && !inflater.IsNeedingInput)
-				{
-					var count = inflater.Inflate(buf);
-					bos.Write(buf, 0, count);
-				}
+            UpdateSourceComboBox();
+        }
 
-				return bos.ToArray();
-			}
-			catch //(Exception e)
-			{
-				return null;
-			}
-		}
+        private void saveButton_Click(object sender, RoutedEventArgs e)
+        {
+            var json = JsonConvert.SerializeObject(PacketWrappers, Formatting.Indented);
+            //var x = JsonConvert.DeserializeObject<PacketWrapper[]>(json);
 
-		private void OnOnPacketArrival(object _, PacketCapture capture)
-		{
-			var p = capture.GetPacket();
-			var ethernetPacket = p.GetPacket();
-			var ipPacket = ethernetPacket.PayloadPacket as IPPacket;
-			if (ipPacket?.PayloadPacket is not TcpPacket tcpPacket)
-				return;
+            File.WriteAllText("c:/temp/conan.json", json);
+        }
 
-			var sourceAddress = ReverseDnsResolver.GetHostName(ipPacket.SourceAddress) + $":{tcpPacket.SourcePort}";
-			var destAddress = ReverseDnsResolver.GetHostName(ipPacket.DestinationAddress) + $":{tcpPacket.DestinationPort}";
-			var sourceDestAddress = $"{sourceAddress} > {destAddress}";
+        private void useTicksInSRCheckBox_Checked(object sender, RoutedEventArgs e)
+        {
+            //
+        }
 
-			if (!sourceDestAddress.Contains("ageofconan.com"))
-				return;
+        private void packetWrappers_Filter(object sender, FilterEventArgs e)
+        {
+            var packetWrapper = (PacketWrapper)e.Item;
 
-			var serviceName = (sourceAddress.Contains("localhost") ? destAddress : sourceAddress).Replace(".ageofconan.com", "");
-			var isDownload = destAddress.Contains("localhost");
-			var isFromGameServer = sourceAddress.Contains("gs013-nj4");
+            e.Accepted = (SourceComboBoxSelectedItem is null or _defaultKey || packetWrapper.ServiceName == SourceComboBoxSelectedItem) &&
+                         (string.IsNullOrEmpty(searchTextTextBox.Text) || packetWrapper.BytesStringDisplay.ContainsIgnoreCase(searchTextTextBox.Text));
+        }
 
-			if (!_packetSplitters.ContainsKey(sourceDestAddress))
-			{
-				_packetSplitters[sourceDestAddress] = new PacketSplitter();
-				_packetSplitters[sourceDestAddress].ReceivedPacket += (ticks, packet) =>
-				{
-					if (packetDataGrid.Items.Count > 1000)
-					{
-						_captureFileReaderDevice.StopCapture();
-						return;
-					}
+        private void sourceComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            var listCollectionView = (ListCollectionView)packetDataGrid.ItemsSource;
+            listCollectionView.Refresh();
+        }
 
-					Dispatcher.Invoke(() => packetDataGrid.Items.Add(new PacketWrapper(ticks, serviceName, isDownload, packet)));
-				};
-			}
+        private void UpdateSourceComboBox()
+        {
+            sourceComboBox.ItemsSource = new [] { _defaultKey }.AppendRange(PacketWrappers.Select(p => p.ServiceName).Distinct().OrderBy(p => p));//.ToArray();
+            SourceComboBoxSelectedItem = _defaultKey;
+        }
 
-			var bytes = tcpPacket.PayloadData;
-			if (isFromGameServer)
-			{
-				if (bytes[0] == 0x80 && bytes[1] == 0x00 && bytes[2] == 0x00 && bytes[3] == 0x05)
-				{
-					_inflater = new Inflater();
-					bytes = Decompress(_inflater, bytes.Skip(9).ToArray());
-				}
-				else if (_inflater != null)
-					bytes = Decompress(_inflater, bytes);
-			}
+        private void searchTextTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (searchTextTextBox.Text.Length != 0 && searchTextTextBox.Text.Length <= 2)
+                return;
 
-			if (bytes?.Length > 16)
-				_packetSplitters[sourceDestAddress].DataReceived(capture.Header.Timeval.Date.Ticks, bytes);
-		}
-	}
+            var listCollectionView = (ListCollectionView)packetDataGrid.ItemsSource;
+            listCollectionView.Refresh();
+        }
+
+        //////////////////
+
+        private void ReadDump(string path)
+        {
+            _captureFileReaderDevice?.Dispose();
+
+            _captureFileReaderDevice = new CaptureFileReaderDevice(path); // CaptureDeviceList.Instance.SingleOrDefault(i => i.Description == "Intel(R) Wi-Fi 6 AX201 160MHz");
+            _captureFileReaderDevice.OnPacketArrival += OnOnPacketArrival;
+
+            _captureFileReaderDevice.Open();
+            _captureFileReaderDevice.StartCapture();
+        }
+
+        private byte[] Decompress(Inflater inflater, byte[] input)
+        {
+            try
+            {
+                inflater.SetInput(input);
+
+                var bos = new MemoryStream(input.Length);
+
+                var buf = new byte[10240];
+                while (!inflater.IsFinished && !inflater.IsNeedingInput)
+                {
+                    var count = inflater.Inflate(buf);
+                    bos.Write(buf, 0, count);
+                }
+
+                return bos.ToArray();
+            }
+            catch //(Exception e)
+            {
+                return null;
+            }
+        }
+
+        private readonly int[] ports = Enumerable.Range(7000, 100).ToArray();
+
+
+        private void OnOnPacketArrival(object _, PacketCapture capture)
+        {
+            var p = capture.GetPacket();
+            var ethernetPacket = p.GetPacket();
+            var ipPacket = ethernetPacket.PayloadPacket as IPPacket;
+            if (ipPacket?.PayloadPacket is not TcpPacket tcpPacket)
+                return;
+
+            if (!ports.Contains(tcpPacket.SourcePort) && !ports.Contains(tcpPacket.DestinationPort))
+                return;
+
+            var sourceAddress = ReverseDnsResolver.GetHostName(ipPacket.SourceAddress) + $":{tcpPacket.SourcePort}";
+            var destAddress = ReverseDnsResolver.GetHostName(ipPacket.DestinationAddress) + $":{tcpPacket.DestinationPort}";
+            var sourceDestAddress = $"{sourceAddress} > {destAddress}";
+
+            if (!sourceDestAddress.Contains("ageofconan.com"))
+                return;
+
+            var serviceName = (sourceAddress.Contains("localhost") ? destAddress : sourceAddress).Replace(".ageofconan.com", "");
+            var isDownload = destAddress.Contains("localhost");
+            var isFromGameServer = sourceAddress.StartsWith("gs0");
+
+            if (!_packetSplitters.ContainsKey(sourceDestAddress))
+            {
+                _packetSplitters[sourceDestAddress] = new PacketSplitter();
+                _packetSplitters[sourceDestAddress].ReceivedPacket += (ticks, packet) =>
+                {
+                    if (PacketWrappers.Count > 1000)
+                    {
+                        //_captureFileReaderDevice.StopCapture();
+                        //return;
+                    }
+
+                    Dispatcher.Invoke(() => PacketWrappers.Add(new PacketWrapper(ticks, serviceName, isDownload, packet)));
+                };
+            }
+
+            var bytes = tcpPacket.PayloadData;
+            if (isFromGameServer && bytes?.Length > 0)
+            {
+                if (bytes[0] == 0x80 && bytes[1] == 0x00 && bytes[2] == 0x00 && bytes[3] == 0x05)
+                {
+                    _inflater = new Inflater();
+                    bytes = Decompress(_inflater, bytes.Skip(9).ToArray());
+                }
+                else if (_inflater != null)
+                    bytes = Decompress(_inflater, bytes);
+            }
+
+            if (bytes?.Length > 16)
+                _packetSplitters[sourceDestAddress].DataReceived(capture.Header.Timeval.Date.Ticks, bytes);
+        }
+    }
+
+    public class PacketWrapperCollection : ObservableCollection<PacketWrapper>
+    {
+        // Creating the Tasks collection in this way enables data binding from XAML.
+    }
 }

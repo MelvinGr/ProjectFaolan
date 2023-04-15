@@ -15,7 +15,7 @@ namespace Faolan.PacketAnalyzer
 	{
 		private Brush _color;
 
-		public long Ticks { get; set; }
+		public string Ticks { get; set; }
 		public string ServiceName { get; set; }
 		public bool IsDownload { get; set; }
 
@@ -54,7 +54,7 @@ namespace Faolan.PacketAnalyzer
 			set => SetField(ref _color, value);
 		}
 
-		public PacketWrapper(long ticks, string serviceName, bool isDownload, ConanPacket conanPacket)
+		public PacketWrapper(string ticks, string serviceName, bool isDownload, ConanPacket conanPacket)
 		{
 			Ticks = ticks;
 			ServiceName = serviceName;
@@ -69,14 +69,24 @@ namespace Faolan.PacketAnalyzer
 			if (serviceName.Contains("gs") && conanPacket.SenderBytes[1] != 0x48 && conanPacket.Data != null)
 			{
 				var pbLength = conanPacket.Data.ReadUInt32();
-				var pbOpcode = conanPacket.Data.ReadUInt32<GameServerDataOpcodes>();
-				//Console.WriteLine("OPCODE: " + pbOpcode);
-				GameServerOpcode = Enum.IsDefined(pbOpcode) ? pbOpcode.ToString() : pbOpcode.ToHex();
-			}
+
+                if (isDownload)
+                {
+                    var pbOpcode = conanPacket.Data.ReadUInt32<GameServer0X2000RespondsOpcodes>();
+                    //Console.WriteLine("OPCODE: " + pbOpcode);
+                    GameServerOpcode = Enum.IsDefined(pbOpcode) ? pbOpcode.ToString() : pbOpcode.ToHex();
+                }
+                else
+                {
+                    var pbOpcode = conanPacket.Data.ReadUInt32<GameServer0X2000Opcodes>();
+                    //Console.WriteLine("OPCODE: " + pbOpcode);
+                    GameServerOpcode = Enum.IsDefined(pbOpcode) ? pbOpcode.ToString() : pbOpcode.ToHex();
+                }
+            }
 		}
 
 		[JsonConstructor]
-		public PacketWrapper(long ticks, string serviceName, bool isDownload, byte[] bytes, Brush color) 
+		public PacketWrapper(string ticks, string serviceName, bool isDownload, byte[] bytes, Brush color) 
 			: this(ticks, serviceName, isDownload, new ConanPacket(bytes)) 
 		{
 			_color = color;
