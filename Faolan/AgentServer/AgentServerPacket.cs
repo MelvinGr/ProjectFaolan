@@ -9,19 +9,19 @@ namespace Faolan.AgentServer
 
 		public override bool IsValid { get; }
 
-		public AgentServerPacket(PacketStream stream)
-			: base(stream)
-		{
-			Opcode = stream.ReadUInt16<AgentServerOpcodes>();
-			Length = stream.ReadUInt16();
+		public AgentServerPacket(byte[] bytes)
+			: base(bytes)
+        {
+            Opcode = Stream.ReadUInt16<AgentServerOpcodes>();
+			Length = Stream.ReadUInt16();
 
-			if (Length == 0 || stream.Length < Length)
+			if (Length == 0 || Stream.Length < Length)
 			{
 				IsValid = false;
 				return;
 			}
 
-			Data = new ConanStream(stream.ReadArray(Length - sizeof(ushort) * 2));
+			Data = new ConanStream(Stream.ReadArray(Length - sizeof(ushort) * 2));
 		}
 	}
 }

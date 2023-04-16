@@ -7,7 +7,9 @@ namespace Faolan.PacketAnalyzer
 {
 	public class PacketSplitter
 	{
-		public delegate void ReceivedPacketDel(string ticks, ConanPacket packet);
+        public string SourceDestAddress { get; }
+
+        public delegate void ReceivedPacketDel(string ticks, ConanPacket packet);
 
 		private readonly byte[] _packetLengthBuffer = new byte[sizeof(int)];
 
@@ -15,7 +17,12 @@ namespace Faolan.PacketAnalyzer
 		private int _packetBytesRead;
 		private int _currentPacketCounter = 0;
 
-		// https://blog.stephencleary.com/2009/04/message-framing.html
+        public PacketSplitter(string sourceDestAddress)
+        {
+            SourceDestAddress = sourceDestAddress;
+        }
+
+        // https://blog.stephencleary.com/2009/04/message-framing.html
 		public void DataReceived(long ticks, byte[] data)
 		{
 			var i = 0;

@@ -37,7 +37,7 @@ namespace Faolan.PacketAnalyzer
 		public string ServiceNameDisplay { get; }
 
 		[JsonIgnore]
-		public string Opcode => ConanPacket?.Opcode.ToHex();
+		public string Opcode { get; set; }//=> ConanPacket?.Opcode.ToHex();
 
 		[JsonIgnore]
 		public string GameServerOpcode { get; }
@@ -66,22 +66,32 @@ namespace Faolan.PacketAnalyzer
 			BytesStringDisplay = Bytes?.GetPrintable();
 			ServiceNameDisplay = $"{ServiceName} {(IsDownload ? "DL" : "UP")}";
 
-			if (serviceName.Contains("gs") && conanPacket.SenderBytes[1] != 0x48 && conanPacket.Data != null)
+			if (serviceName.Contains("gs")&& conanPacket.Data != null /* && conanPacket.SenderBytes[1] != 0x48 */)
 			{
 				var pbLength = conanPacket.Data.ReadUInt32();
 
                 if (isDownload)
                 {
+                    var opcode = (GameServerRespondOpcodes)conanPacket.Opcode;
+                    Opcode = Enum.IsDefined(opcode) ? $"{opcode} ({opcode.ToHex()})" : opcode.ToHex();
+                    
                     var pbOpcode = conanPacket.Data.ReadUInt32<GameServer0X2000RespondsOpcodes>();
                     //Console.WriteLine("OPCODE: " + pbOpcode);
-                    GameServerOpcode = Enum.IsDefined(pbOpcode) ? pbOpcode.ToString() : pbOpcode.ToHex();
+                    GameServerOpcode = Enum.IsDefined(pbOpcode) ? $"{pbOpcode} ({pbOpcode.ToHex()})" : pbOpcode.ToHex();
                 }
                 else
                 {
+                    var opcode = (GameServerOpcodes)conanPacket.Opcode;
+                    Opcode = Enum.IsDefined(opcode) ? $"{opcode} ({opcode.ToHex()})" : opcode.ToHex();
+
                     var pbOpcode = conanPacket.Data.ReadUInt32<GameServer0X2000Opcodes>();
                     //Console.WriteLine("OPCODE: " + pbOpcode);
-                    GameServerOpcode = Enum.IsDefined(pbOpcode) ? pbOpcode.ToString() : pbOpcode.ToHex();
+                    GameServerOpcode = Enum.IsDefined(pbOpcode) ? $"{pbOpcode} ({pbOpcode.ToHex()})" : pbOpcode.ToHex();
                 }
+            }
+            else
+            {
+                Opcode = conanPacket.Opcode.ToHex();
             }
 		}
 

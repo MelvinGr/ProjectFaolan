@@ -5,24 +5,25 @@ namespace Faolan.Core.Network
 {
 	public abstract class Packet
 	{
+		public readonly byte[] Bytes; // for serializing/testing
+
 		protected PacketStream Stream { get; }
 		public ConanStream Data { get; protected init; }
 		public uint Length { get; protected init; }
 
 		public abstract bool IsValid { get; }
 
-		protected Packet(PacketStream stream)
-		{
-			Stream = stream;
-			stream.Position = 0;
+		protected Packet(byte[] bytes)
+        {
+            Bytes = bytes;
+            Stream = new PacketStream(bytes);
+			Stream.Position = 0;
 		}
 	}
 
 	public class ConanPacket : Packet
 	{
-		public readonly byte[] Bytes; // for serializing/testing
-
-		public readonly uint Crc32;
+        public readonly uint Crc32;
 		public readonly ConanStream HeaderData;
 		public readonly uint HeaderLength;
 		public readonly uint Opcode;
@@ -33,9 +34,8 @@ namespace Faolan.Core.Network
 
 		public override bool IsValid => Crc32 == Crypt.Crc32.Calculate(Stream);
 
-		public ConanPacket(byte[] bytes) : base(new PacketStream(bytes))
+		public ConanPacket(byte[] bytes) : base(bytes)
 		{
-			Bytes = bytes;
 			Length = Stream.ReadUInt32();
 
 			Crc32 = Stream.ReadUInt32();

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
@@ -78,7 +79,7 @@ namespace Faolan.PacketAnalyzer
         {
             var selectedItems = packetDataGrid.SelectedItems.OfType<PacketWrapper>().ToArray();
 
-            var x = selectedItems.Select((i, ii) => PacketUtils.PacketToCsCode(i.ConanPacket, i.Ticks + "_" +ii, useTicksInSRCheckBox.IsChecked == true)).JoinAsString("\r\n");
+            var x = selectedItems.Select((i, ii) => PacketUtils.PacketToCsCode(i.ConanPacket as ConanPacket, i.Ticks + "_" +ii, useTicksInSRCheckBox.IsChecked == true)).JoinAsString("\r\n");
 
             try
             {
@@ -101,7 +102,7 @@ namespace Faolan.PacketAnalyzer
             var packetWrapper = (PacketWrapper)packetDataGrid.Items[packetDataGrid.SelectedIndex];
 
             notesTextBox.DataContext = packetWrapper;
-            outputTextBox.Text = PacketUtils.PacketToCsCode(packetWrapper.ConanPacket, packetWrapper.Ticks, useTicksInSRCheckBox.IsChecked == true);
+            outputTextBox.Text = PacketUtils.PacketToCsCode(packetWrapper.ConanPacket as ConanPacket, packetWrapper.Ticks, useTicksInSRCheckBox.IsChecked == true);
             outputHexTextBox.Text = packetWrapper.ConanPacket.Bytes.HexDump();
         }
 
@@ -110,7 +111,7 @@ namespace Faolan.PacketAnalyzer
             outputTextBox.Text = "";
             PacketWrappers.Clear();
 
-            ReadDump(@"C:\Users\Melvin\Desktop\mellie.pcapng");
+            ReadDump(@"C:\Users\Melvin\Desktop\conann.pcapng");
             UpdateSourceComboBox();
         }
 
@@ -226,23 +227,25 @@ namespace Faolan.PacketAnalyzer
 
             if (!sourceDestAddress.Contains("ageofconan.com"))
                 return;
-
+            
             var serviceName = (sourceAddress.Contains("localhost") ? destAddress : sourceAddress).Replace(".ageofconan.com", "");
             var isDownload = destAddress.Contains("localhost");
             var isFromGameServer = sourceAddress.StartsWith("gs0");
+            var isAgentServer = tcpPacket.DestinationPort == 7002 || tcpPacket.SourcePort == 7002;
+
+            if (isAgentServer)
+            {
+                Console.WriteLine("Got AgentServer packet!");
+                return;
+            }
 
             if (!_packetSplitters.ContainsKey(sourceDestAddress))
             {
-                _packetSplitters[sourceDestAddress] = new PacketSplitter();
+                _packetSplitters[sourceDestAddress] = new PacketSplitter(sourceDestAddress);
                 _packetSplitters[sourceDestAddress].ReceivedPacket += (ticks, packet) =>
                 {
-                    if (PacketWrappers.Count > 1000)
-                    {
-                        //_captureFileReaderDevice.StopCapture();
-                        //return;
-                    }
-
-                    Dispatcher.Invoke(() => PacketWrappers.Add(new PacketWrapper(ticks, serviceName, isDownload, packet)));
+                    
+                        Dispatcher.Invoke(() => PacketWrappers.Add(new PacketWrapper(ticks, serviceName, isDownload, packet)));
                 };
             }
 

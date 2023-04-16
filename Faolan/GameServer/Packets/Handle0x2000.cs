@@ -83,6 +83,8 @@ namespace Faolan.GameServer
 					if (client.Character.Name == null)
 						HandleNewCharacter(client, packet);
 
+
+
 					break;
 				}
 

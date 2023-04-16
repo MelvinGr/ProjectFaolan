@@ -18,7 +18,14 @@ namespace Faolan.CSPlayerAgent
 		{
 		}
 
-		protected override async Task ReceivedPacket(INetworkClient client, ConanPacket packet)
+        protected override void ClientConnected(INetworkClient client)
+        {
+            base.ClientConnected(client); // 7013
+
+            Console.WriteLine();
+        }
+
+        protected override async Task ReceivedPacket(INetworkClient client, ConanPacket packet)
 		{
 			Logger.LogInformation($"Received opcode: {(CsPlayerAgentOpcodes)packet.Opcode} ({packet.Opcode.ToHex()})");
 

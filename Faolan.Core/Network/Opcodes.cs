@@ -44,9 +44,10 @@
 			Ox205E = 0x205E,
 			Ox205F = 0x205F,
 			Ox206D = 0x206D,
-			Ox2085 = 0x2085,
-			Ox207E = 0x207E
-		}
+            LatencyCheck = 0x2085,
+			Ox207E = 0x207E,
+            Ox2071 = 0x2071
+        }
 
 		public enum GameServerRespondOpcodes : ushort
 		{
@@ -56,8 +57,9 @@
 			AckAuthentication = 0x2001,
 			ReadyForPlayScreen = 0x2024,
 			SpawnCheck = 0x2008,
-			GcPing = 0x207D
-		}
+			GcPing = 0x207D,
+            LatencyCheckResponse = 0x00002082
+        }
 
 		public enum GameServer0X2000Opcodes : uint
 		{

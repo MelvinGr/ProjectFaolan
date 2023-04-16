@@ -76,9 +76,12 @@ namespace Faolan.Core.Network
 		}
 
 		public static string PacketToCsCode(ConanPacket packet, string index = null, bool useIndexForSr = true)
-		{
-			var indexStr = useIndexForSr ? index?.ToString() : null;
-			var indexStr2 = index?.ToString();
+        {
+            if (packet == null)
+                return "";
+
+			var indexStr = useIndexForSr ? index : null;
+			var indexStr2 = index;
 
 			return
 				//(comment != null ? "// " + comment + "\r\n" : "") +
