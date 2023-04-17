@@ -1,5 +1,10 @@
+using System;
+using System.Threading.Tasks;
+using Faolan.Core.Data;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Conan;
 using Microsoft.Extensions.Logging;
 
 // ReSharper disable once CheckNamespace
@@ -7,243 +12,306 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-		private void HandleCommandPacket(INetworkClient client, ConanPacket packet)
+		// Applies one editor SetMorphValue callback to the character's body. The body sliders (arm/chest/...)
+		// map directly to CharacterBody fields with the 0-100 value; the resource refs (*hairmesh/*texscript/
+		// *beardmesh) and any face sliders not yet seen in captures are logged and skipped for now.
+		private void ApplyMorph(Character character, string morph, uint value)
 		{
-			var recObjTyp = packet.Data.ReadUInt32();
-			var recClientInst = packet.Data.ReadUInt32();
-			var unk0 = packet.Data.ReadByte();
-			var recDataLength = packet.Data.ReadUInt32();
-			var unk2 = packet.Data.ReadUInt32();
-			var unk3 = packet.Data.ReadByte();
-			var runByte = packet.Data.ReadByte();
-
-			uint recVal = 0;
-			var runId = 0;
-			while (runByte != 0x22)
+			var body = EnsureBody(character);
+			switch (morph)
 			{
-				switch (runId)
+				case "arm":
+					body.Arm = value;
+					break;
+				case "chest":
+					body.Chest = value;
+					break;
+				case "bosom":
+					body.Bosom = value;
+					break;
+				case "stomach":
+					body.Stomach = value;
+					break;
+				case "arse":
+					body.Arse = value;
+					break;
+				case "thigh":
+					body.Thigh = value;
+					break;
+				case "leg":
+					body.Leg = value;
+					break;
+				default:
+					Logger.LogDebug("Character-editor: unmapped morph '{Morph}'={Value} (resource ref or face slider not yet modelled).", morph, value);
+					break;
+			}
+		}
+
+		private async Task CommitCharacterName(INetworkClient client, string name)
+		{
+			var character = client.Session.Character;
+			if (character == null || string.IsNullOrWhiteSpace(name))
+				return;
+
+			if (string.Equals(character.Name, name, StringComparison.Ordinal))
+				return;
+
+			// ClientInstance is no longer a foreign key, so a normal SaveChanges no longer trips the temp
+			// create-instance FK; this persists the name together with the editor's other character edits
+			// (sex/race/class/...). A UNIQUE-constraint violation (name already taken) surfaces as an
+			// exception we tolerate so the client can retry with another name.
+			try
+			{
+				character.Name = name;
+				// Persist the whole accumulated editor graph (name + sex/race/morphs Body) as one unit of work.
+				await Database.SaveCharacter(character);
+				Logger.LogInformation("Character-editor: committed character name '{Name}' for character {CharacterId:X8}.", name, character.Id);
+			}
+			catch (Exception e)
+			{
+				character.Name = null;
+				Logger.LogWarning(e, "Character-editor: failed to commit character name '{Name}' (possibly already taken).", name);
+			}
+		}
+
+		// Handles the client->server 0xA36D3B74 character-creation script callbacks.
+		//
+		// Wire format (after the 0x2000 wrapper and the 0xA36D3B74 subopcode have been consumed):
+		//   uint32 ack            (0x0000C350)
+		//   uint32 clientInstance (the create-editor temp instance, e.g. 0x021662C8)
+		//   byte   reserved       (always 0x00)
+		//   uint32 pbLength       (length of the protobuf message that follows)
+		//   protobuf message:
+		//     field 1 (varint) = 5      (constant)
+		//     field 2 (varint) = 2      (constant)
+		//     field 3 (varint) = numeric value   (e.g. ChangeSex sex id, ChangeHeadMesh mesh id)
+		//     field 4 (string) = token            (the callback name, e.g. "TheNameIs")
+		//     field 5 (string) = value            (optional string, e.g. the chosen character name)
+		//     field 6 (bytes)  = trailing nested block (ignored)
+		//
+		// These callbacks are how the editor reports the player's choices (sex/race/head/size/class/
+		// voice/name) and lifecycle events (IntroDone, ClientLoadingDone, Move). The retail capture
+		// account-stricken998-character-strickenen-create-random-actions.json proves the server sends
+		// NO responses to any of these (ChangeSex/Finish/SetMorphValue/TheNameIs all stream client->server
+		// with zero downstream replies); the client self-advances. So this handler is parse-only.
+		//
+		// The chosen name is captured into Session.PendingCharacterName rather than Character.Name, so the
+		// create-editor gating (which keys on Character.Name == null) is not disturbed mid-stream;
+		// promoting it to a persisted character is the separate enter-world step.
+		private async Task HandleCommandPacket(INetworkClient client, ConanPacket packet)
+		{
+			var ack = packet.Body.ReadUInt32();
+			var clientInstance = packet.Body.ReadUInt32();
+			var reserved = packet.Body.ReadByte();
+			var pbLength = packet.Body.ReadUInt32();
+			var pbEnd = packet.Body.Position + pbLength;
+
+			uint numericValue = 0;
+			string token = null;
+			string valueString = null;
+
+			while (packet.Body.Position < pbEnd)
+			{
+				var tag = packet.Body.ReadByte();
+				var field = tag >> 3;
+				var wireType = tag & 0x07;
+
+				switch (wireType)
 				{
-					case 0:
+					case 0: // varint
 					{
-						recVal = runByte;
+						var v = ReadProtobufVarint(packet.Body);
+						if (field == 3)
+							numericValue = (uint)v;
 						break;
 					}
 
-					case 1:
+					case 2: // length-delimited (string / bytes)
 					{
-						recVal += runByte * 0x100u;
+						var s = packet.Body.ReadStringByteLength();
+						if (field == 4)
+							token = s;
+						else if (field == 5)
+							valueString = s;
 						break;
 					}
 
-					case 2:
+					default:
 					{
-						recVal += runByte * 0x10000u;
-						break;
-					}
-
-					case 3:
-					{
-						recVal += runByte * 0x1000000u;
+						// Unexpected wire type; bail out to avoid desyncing the rest of the packet.
+						packet.Body.Position = pbEnd;
 						break;
 					}
 				}
-
-				runByte = packet.Data.ReadByte();
-				runId++;
 			}
 
-			var recCmd = packet.Data.ReadStringByteLength();
-			var strEnd = packet.Data.ReadByte();
-			var unk4 = packet.Data.ReadUInt16(); // MELVIN
-			var recSecCmd = packet.Data.ReadStringByteLength();
+			var character = client.Session.Character;
+			Logger.LogInformation("Character-editor script callback: token={Token}, numericValue={NumericValue} (0x{NumericValueHex:X}), value={Value}, clientInstance={ClientInstance:X8}.", token, numericValue, numericValue,
+				valueString ?? "", clientInstance);
 
-			switch (recCmd)
+			switch (token)
 			{
-				case "IntroDone":
-				{
-					var aBuffer = new PacketStream();
-					aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
-					aBuffer.WriteUInt32(0x00000019);
-					aBuffer.WriteUInt32(0x96b8dc59);
-					aBuffer.WriteUInt32(0x0000c350);
-					aBuffer.WriteUInt32(client.Account.ClientInstance);
-					aBuffer.WriteByte(0);
-					aBuffer.WriteUInt32(0x00000001);
-					aBuffer.WriteUInt32(0x000000ba);
-					aBuffer.WriteUInt32(0);
-					aBuffer.Send(client);
-					break;
-				}
-
 				case "ChangeSex":
 				{
-					client.Character.Sex = (Sex)recVal;
+					if (character != null)
+						character.Sex = (Sex)numericValue;
 					break;
 				}
 
 				case "ChangeRace":
 				{
-					client.Character.Race = (Race)recVal;
-					break;
-				}
-
-				case "ChangeHeadMesh":
-				{
-					client.Character.Body.HeadMesh = recVal;
-					break;
-				}
-
-				case "ChangeSize":
-				{
-					client.Character.Body.Size = (byte)recVal;
+					if (character != null)
+						character.Race = (Race)numericValue;
 					break;
 				}
 
 				case "ChangeClass":
 				{
-					client.Character.Class = (Class)recVal;
+					if (character != null)
+						character.Class = (Class)numericValue;
+					break;
+				}
+
+				case "ChangeHeadMesh":
+				{
+					if (character != null)
+						EnsureBody(character).HeadMesh = numericValue;
+					break;
+				}
+
+				case "ChangeSize":
+				{
+					if (character != null)
+						EnsureBody(character).Size = (byte)numericValue;
 					break;
 				}
 
 				case "ChangeVoice":
 				{
-					client.Character.Body.Voice = (byte)recVal;
-					break;
-				}
-
-				case "SetMorphValue":
-				{
-					Logger.LogInformation($"Second Command: {recSecCmd} with value: {recVal}");
-					if (recSecCmd.Length > 0)
-					{
-						//vector<string> scriptData = String::splitString(recSecCmd, "_");
-						//Logger.Info("Splitted String: %s - " + scriptData[0], scriptData[1]);
-						client.Account.CreateCounter++;
-						client.Account.CreateState = 1;
-
-						new PacketStream().WriteHeader(Sender2, Receiver2, null, 0x2000)
-							.WriteArrayUInt32Length(new ConanStream()
-								//aBuffer.WriteUInt32(recSecCmd.Length + (5*4) + (1*2) + (2*1)); // length
-								.WriteUInt32(0xbadf5a4b)
-								.WriteUInt32(0x0000c350)
-								.WriteUInt32(client.Account.ClientInstance)
-								.WriteByte(0)
-								.WriteString(recSecCmd)
-								.WriteUInt32(0x3f800000)
-								.WriteByte(0)
-								.WriteUInt32(client.Account.CreateCounter + 1))
-							.Send(client);
-					}
-					else
-						client.Account.CreateCounter = 0;
-
+					if (character != null)
+						EnsureBody(character).Voice = (byte)numericValue;
 					break;
 				}
 
 				case "TheNameIs":
 				{
-					Logger.LogInformation($"Attempt to create Char with the name: {recSecCmd}");
-					client.Character.Name = recSecCmd;
+					// Commit the chosen name to the character row so the later world-entry Hello (a
+					// separate connection/session that re-loads the character from the database) sees a
+					// named character and takes the normal world-entry path. The client may try several
+					// names (e.g. Stricken -> Strickennn -> Strickenen); the last one that sticks wins.
+					client.Session.PendingCharacterName = valueString;
+					await CommitCharacterName(client, valueString);
 
-					//MELVIN 
-					/*if (!Database.isValidCharName(client.client.Account.charInfo.Name))
+					// Only confirm the name to the client (NicknameOk + CharCreationFinished) if it actually
+					// persisted - a UNIQUE-constraint failure leaves Character.Name null, in which case retail
+					// would reject the name and the client retries with another. (Reject path not yet
+					// implemented; the client simply re-sends TheNameIs with a new name.)
+					if (client.Session.Character?.Name == valueString)
 					{
-					    //TODO add missing return packet
-					    Logger.Info("Charname is incorrect !");
-					    closesocket(client.client.Account.clientSocket);
-					    break;
-					*/
+						await SendNicknameAccepted(client, valueString);
 
-					var aBuffer = new PacketStream();
-					aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
-					aBuffer.WriteUInt32(client.Character.Name.Length + 5 * 4 + 1 * 2 + 1 * 1);
-					aBuffer.WriteUInt32(0xadce0cda);
-					aBuffer.WriteUInt32(0x0000c350);
-					aBuffer.WriteUInt32(client.Account.ClientInstance);
-					aBuffer.WriteUInt32(0);
-					aBuffer.WriteUInt32(0x03010000);
-					aBuffer.WriteByte(0);
-					aBuffer.WriteString(client.Character.Name);
-					aBuffer.Send(client);
+						// The character is now named; its NEXT GameServer connection (opened after the 0x2002
+						// enter-world handoff) is the create-world entry and must get the intro/cutscene. Mark it
+						// pending so the world Hello recognises that connection (and not later normal logins).
+						PendingCreateWorldEntry.Add(client.Session.Character.Id);
+						Logger.LogInformation("Create-editor: character {CharacterId:X8} named '{Name}'; marked pending create-world entry.", client.Session.Character.Id, valueString);
+					}
 
-					var data = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x1f, 0x08, 0x05, 0x10, 0x02, 0x18, 0x00, 0x22 };
-					aBuffer = new PacketStream();
-					aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
-					aBuffer.WriteUInt32(client.Character.Name.Length + 10 + 1 + data.Length + 4 * 4 + 1 * 2 + 2 * 1);
-					aBuffer.WriteUInt32(0xa36d3b74);
-					aBuffer.WriteUInt32(0x0000c350);
-					aBuffer.WriteUInt32(client.Account.ClientInstance);
-					aBuffer.WriteArray(data);
-					aBuffer.WriteString("NicknameOk");
-					aBuffer.WriteByte(0x2a);
-					aBuffer.WriteString(client.Character.Name);
-					aBuffer.WriteUInt32(0x32040800);
-					aBuffer.WriteUInt16(0x1000);
-					aBuffer.Send(client);
+					break;
+				}
 
-					var data2 = new byte[]
+				case "Finish":
+				{
+					// The editor is done customizing; its SetMorphValue stream follows (only for changed
+					// morphs, so the set varies and may be empty if nothing was morphed). Debounce the
+					// post-morph trio off Finish + each morph so it fires once the stream goes quiet,
+					// regardless of which morphs were sent.
+					SchedulePostMorphBurst(client);
+					break;
+				}
+
+				case "SetMorphValue":
+				{
+					// The retail creator acks every non-empty morph with a 0xBADF5A4B packet that echoes the
+					// morph value. (Confirmed from the dikketest capture, whose creator DL the analyzer
+					// decoded - strickenen only LOOKED silent because its creator DL was dropped by the
+					// compression-cut.) The post-morph trio is debounced off Finish + each morph rather than
+					// keyed to a specific morph, since leaving the body default means "thigh"/body morphs are
+					// never sent.
+					if (!string.IsNullOrEmpty(valueString))
 					{
-						0x00, 0x00, 0x00, 0x07, 0xe2, 0x00, 0x00, 0xcf, 0xef, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
-						0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x46, 0x37, 0x00, 0x00, 0x00, 0x00, 0x00
-					};
-					aBuffer = new PacketStream();
-					aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
-					aBuffer.WriteUInt32(data2.Length + 3 * 4);
-					aBuffer.WriteUInt32(0xf508f4c1);
-					aBuffer.WriteUInt32(0x0000c350);
-					aBuffer.WriteUInt32(client.Account.ClientInstance);
-					aBuffer.WriteArray(data2);
-					aBuffer.Send(client);
+						if (character != null)
+							ApplyMorph(character, valueString, numericValue);
+						await SendMorphValueAck(client, valueString);
+					}
 
-					var data3 = new byte[]
+					SchedulePostMorphBurst(client);
+					break;
+				}
+
+				case "IntroDone":
+				{
+					// On the post-creation WORLD connection this is the last cutscene trigger (the beach /
+					// ApproachCasilda finale) - send the next chunk. On the EDITOR connection it instead marks
+					// the editor interactive (the editor connection then drives itself; see the create flow).
+					if (IsCreateWorldConnection(client))
 					{
-						0x00, 0x00, 0x00, 0x00, 0x24, 0x08, 0x05, 0x10, 0x02, 0x18, 0x00, 0x22, 0x14, 0x43, 0x68, 0x61, 0x72, 0x43, 0x72, 0x65, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x46, 0x69, 0x6e, 0x69, 0x73, 0x68, 0x65, 0x64,
-						0x2a, 0x00, 0x32, 0x04, 0x08, 0x00, 0x10, 0x00
-					};
-					aBuffer = new PacketStream();
-					aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
-					aBuffer.WriteUInt32(data3.Length + 3 * 4);
-					aBuffer.WriteUInt32(0xa36d3b74);
-					aBuffer.WriteUInt32(0x0000c350);
-					aBuffer.WriteUInt32(client.Account.ClientInstance);
-					aBuffer.WriteArray(data3);
-					aBuffer.Send(client);
+						await SendNextCreateWorldChunk(client);
+						break;
+					}
 
-					var data4 = new byte[] { 0x00, 0x00, 0xc3, 0x50, 0x00, 0x00, 0x27, 0xf6, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0a, 0x08, 0xc5, 0xc3, 0x02, 0x18, 0x01, 0x28, 0x18, 0x30, 0x00 };
-					aBuffer = new PacketStream();
-					aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
-					aBuffer.WriteUInt32(data4.Length + 1 * 4);
-					aBuffer.WriteUInt32(0x642cd3d6);
-					aBuffer.WriteArray(data4);
-					aBuffer.Send(client);
+					client.Session.CharacterEditorInteractive = true;
+					Logger.LogInformation("Character-editor: IntroDone - editor is interactive; the editor connection is now silent until enter-world.");
+					break;
+				}
 
-					var data5 = new byte[] { 0x00, 0x00, 0xc3, 0x50, 0x00, 0x00, 0x27, 0xf7, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0a, 0x08, 0xc5, 0xc3, 0x02, 0x18, 0x01, 0x28, 0x18, 0x30, 0x00 };
-					aBuffer = new PacketStream();
-					aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
-					aBuffer.WriteUInt32(data5.Length + 1 * 4);
-					aBuffer.WriteUInt32(0x642cd3d6);
-					aBuffer.WriteArray(data5);
-					aBuffer.Send(client);
-
-					var data6 = new byte[] { 0x01, 0x00, 0x00, 0x00, 0x6a, 0x00, 0x00, 0x00, 0x14 };
-					aBuffer = new PacketStream();
-					aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
-					aBuffer.WriteUInt32(data6.Length + 3 * 4);
-					aBuffer.WriteUInt32(0xf98e10b3);
-					aBuffer.WriteUInt32(0x0000c350);
-					aBuffer.WriteUInt32(client.Account.ClientInstance);
-					aBuffer.WriteArray(data6);
-					aBuffer.Send(client);
-
+				// The intro cutscene is delivered one chunk per client script trigger, in order
+				// (ClientLoadingDone -> StartScript -> StartScript -> Move -> IntroDone), matching retail.
+				case "ClientLoadingDone":
+				case "StartScript":
+				case "Move":
+				{
+					if (IsCreateWorldConnection(client))
+						await SendNextCreateWorldChunk(client);
 					break;
 				}
 
 				default:
 				{
-					Logger.LogInformation("Receive unknown command: {0} with value {1}", recCmd, recVal);
+					Logger.LogInformation("Character-editor: unhandled script callback token '{Token}' (numericValue={NumericValue}, value={Value}).", token, numericValue, valueString ?? "");
 					break;
 				}
 			}
+		}
+
+		// Persists the chosen character name so the subsequent world-entry Hello (a fresh session that
+		// re-loads the character from the database) sees a named character. Tolerates duplicate-name
+		// failures (unique index) without dropping the editor connection.
+		// Lazily creates and tracks the character's body row so the editor's morph / head-mesh / size / voice
+		// edits have somewhere to persist (CharacterBodies was previously never populated). The body is saved
+		// together with the character when the name is committed.
+		private static CharacterBody EnsureBody(Character character)
+		{
+			// In-memory only: the body accumulates editor edits on the cached session character and is persisted as
+			// part of the character graph at name-commit (SaveCharacter). No DB context is held during editing.
+			character.Body ??= new CharacterBody { CharacterId = character.Id };
+			return character.Body;
+		}
+
+		private static ulong ReadProtobufVarint(FaolanStream body)
+		{
+			ulong result = 0;
+			var shift = 0;
+			byte b;
+			do
+			{
+				b = body.ReadByte();
+				result |= (ulong)(b & 0x7F) << shift;
+				shift += 7;
+			}
+			while ((b & 0x80) != 0 && shift < 64);
+
+			return result;
 		}
 	}
 }

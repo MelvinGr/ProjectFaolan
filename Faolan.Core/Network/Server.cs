@@ -1,35 +1,40 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Interfaces;
+using Faolan.Core.Network.Packets;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.Core.Network
 {
-	public abstract class Server<TPacket> : BackgroundService where TPacket : Packet
+	public abstract class Server<TPacket, TPacketFactory, TMessageFramer> : BackgroundService where TPacket : Packet where TPacketFactory : IPacketFactory<TPacket>, new() where TMessageFramer : IMessageFramer, new()
 	{
-		private readonly TcpListener _tcpListener;
 		protected readonly IConfiguration Configuration;
-
 		protected readonly IDatabaseRepository Database;
 		protected readonly ILogger Logger;
-		protected readonly SynchronizedCollection<INetworkClient> NetworkClients = new();
+		private readonly ConcurrentDictionary<INetworkClient, byte> _clients = [];
+		private readonly IPacketLogger _outgoingPacketLogger;
+		private readonly TcpListener _tcpListener;
 
-		public IPEndPoint LocalEndPoint => (IPEndPoint)_tcpListener?.LocalEndpoint;
-        //public ushort Port => (ushort)(LocalEndPoint?.Port ?? 0);
+		public IPEndPoint LocalEndPoint => (IPEndPoint)_tcpListener.LocalEndpoint;
 
-        // ReSharper disable once SuggestBaseTypeForParameter
-        protected Server(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database)
+		protected IEnumerable<INetworkClient> NetworkClients => _clients.Keys;
+
+		protected Server(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database, IPacketLogger? outgoingPacketLogger = null)
 		{
 			Logger = logger;
 			Configuration = configuration;
 			Database = database;
+			_outgoingPacketLogger = outgoingPacketLogger ?? NullPacketLogger.Instance;
 			_tcpListener = new TcpListener(IPAddress.Any, port);
 		}
 
@@ -40,11 +45,11 @@ namespace Faolan.Core.Network
 				_tcpListener.Start();
 				cancellationToken.Register(_tcpListener.Stop);
 
-				Logger.LogInformation($"Started on port: {LocalEndPoint.Port}");
+				Logger.LogInformation("Listening on port {Port}.", LocalEndPoint.Port);
 			}
 			catch (Exception e)
 			{
-				Logger.LogError(e, $"Failed to start on port: {LocalEndPoint.Port}");
+				Logger.LogError(e, "Failed to start listener on port {Port}.", LocalEndPoint.Port);
 				return;
 			}
 
@@ -53,19 +58,47 @@ namespace Faolan.Core.Network
 				try
 				{
 					var socket = await _tcpListener.AcceptSocketAsync(cancellationToken);
-					var networkClient = (NetworkClient)Activator.CreateInstance(typeof(NetworkClient<TPacket>), socket, Logger);
-					if (networkClient == null)
-						throw new Exception("networkClient == null");
 
-					networkClient.Disconnected = ClientDisconnected;
-					networkClient.ReceivedPacket = (s, e) => ReceivedPacket(s, (TPacket)e);
+					var networkClient = new NetworkClient<TPacket, TMessageFramer, TPacketFactory>(socket, Logger, _outgoingPacketLogger)
+					{
+						Disconnected = client =>
+						{
+							try
+							{
+								_clients.TryRemove(client, out _);
+								ClientDisconnected(client);
+							}
+							catch (Exception ex)
+							{
+								Logger.LogError(ex, "Exception in Disconnected");
+							}
+						},
+						ReceivedPacket = async (client, packet) =>
+						{
+							try
+							{
+								await ReceivedPacket(client, (TPacket)packet);
+							}
+							catch (Exception ex)
+							{
+								Logger.LogError(ex, "Exception in ReceivedPacket");
+								client.Stop();
+							}
+						}
+					};
+
+					_clients.TryAdd(networkClient, 0);
 					ClientConnected(networkClient);
 
 					networkClient.Start();
 				}
 				catch (SocketException) when (cancellationToken.IsCancellationRequested)
 				{
-					Logger.LogInformation("Stopped listening because cancellation was requested.");
+					Logger.LogInformation("Listener stopped because cancellation was requested.");
+				}
+				catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+				{
+					Logger.LogInformation("Listener stopped because cancellation was requested.");
 				}
 				catch (Exception ex)
 				{
@@ -76,14 +109,74 @@ namespace Faolan.Core.Network
 
 		protected virtual void ClientConnected(INetworkClient client)
 		{
-			NetworkClients.Add(client);
-			Logger.LogInformation($"Client with address: {client.IpAddress} connected!");
+			Logger.LogInformation("Client connected: {IpAddress}", client.IpAddress);
 		}
 
-        protected virtual void ClientDisconnected(INetworkClient client)
+		protected virtual void ClientDisconnected(INetworkClient client)
 		{
-			NetworkClients.Remove(client);
-			Logger.LogInformation($"Client with address: {client.IpAddress} disconnected!");
+			Logger.LogInformation("Client disconnected: {IpAddress}", client.IpAddress);
+		}
+
+		protected INetworkClient ClientForAccount(uint accountId)
+		{
+			return NetworkClients.FirstOrDefault(nc => nc.Session?.Account?.Id == accountId);
+		}
+
+		protected INetworkClient ClientForCharacter(uint characterId)
+		{
+			return NetworkClients.FirstOrDefault(nc => nc.Session?.Account?.ClientInstance == characterId || nc.Session?.Character?.Id == characterId);
+		}
+
+		protected void LogPacketBodyDebug(string label, byte[] bytes)
+		{
+			if (bytes?.Length > 0 && Logger.IsEnabled(LogLevel.Debug))
+				Logger.LogDebug("{Label} ({Length} bytes): {Bytes}", label, bytes.Length, bytes.ToHex());
+		}
+
+		protected void LogPacketReceived(Packet packet, Enum opcode)
+		{
+			var opcodeName = Enum.IsDefined(opcode.GetType(), opcode)
+				? opcode.ToString()
+				: "Unknown";
+
+			Logger.LogInformation("=> [{OpcodeName} ({OpcodeHex})] bodyLength={BodyLength}, packetLength={PacketLength}", opcodeName, opcode.ToHex(), packet.Body?.Length ?? 0, packet.Bytes?.Length ?? 0);
+			LogPacketBodyDebug($"=> [{opcodeName} ({opcode.ToHex()})] body", packet.Body?.ToArray());
+		}
+
+		protected void LogPacketReceived(Packet packet, ushort opcode, string opcodeName = "Unknown")
+		{
+			Logger.LogInformation("=> [{OpcodeName} ({OpcodeHex})] bodyLength={BodyLength}, packetLength={PacketLength}", opcodeName, opcode.ToHex(), packet.Body?.Length ?? 0, packet.Bytes?.Length ?? 0);
+			LogPacketBodyDebug($"=> [{opcodeName} ({opcode.ToHex()})] body", packet.Body?.ToArray());
+		}
+
+		protected void LogPacketReceived(Enum opcode)
+		{
+			var opcodeName = Enum.IsDefined(opcode.GetType(), opcode)
+				? opcode.ToString()
+				: "Unknown";
+
+			Logger.LogInformation("=> [{OpcodeName} ({OpcodeHex})]", opcodeName, opcode.ToHex());
+		}
+
+		protected void LogPacketReceived(ushort opcode, string opcodeName = "Unknown")
+		{
+			Logger.LogInformation("=> [{OpcodeName} ({OpcodeHex})]", opcodeName, opcode.ToHex());
+		}
+
+		protected void LogUnknownPacket(Packet packet, Enum opcode)
+		{
+			var opcodeName = Enum.IsDefined(opcode.GetType(), opcode)
+				? opcode.ToString()
+				: "Unknown";
+
+			Logger.LogWarning("Unhandled packet [{OpcodeName} ({OpcodeHex})], bodyLength={BodyLength}, packetLength={PacketLength}.", opcodeName, opcode.ToHex(), packet.Body?.Length ?? 0, packet.Bytes?.Length ?? 0);
+			LogPacketBodyDebug($"Unhandled packet [{opcodeName} ({opcode.ToHex()})] body", packet.Body?.ToArray());
+		}
+
+		protected void LogUnknownPacket(Packet packet, ushort opcode, string opcodeName = "Unknown")
+		{
+			Logger.LogWarning("Unhandled packet [{OpcodeName} ({OpcodeHex})], bodyLength={BodyLength}, packetLength={PacketLength}.", opcodeName, opcode.ToHex(), packet.Body?.Length ?? 0, packet.Bytes?.Length ?? 0);
+			LogPacketBodyDebug($"Unhandled packet [{opcodeName} ({opcode.ToHex()})] body", packet.Body?.ToArray());
 		}
 
 		protected abstract Task ReceivedPacket(INetworkClient client, TPacket packet);

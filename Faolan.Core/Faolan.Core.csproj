@@ -1,28 +1,19 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-	<PropertyGroup>
-		<OutputType>Library</OutputType>
-		<TargetFramework>net7.0</TargetFramework>
-		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-		<OutputPath>..\bin\$(Configuration)\</OutputPath>
-		<DefineConstants>$(Configuration.ToUpper());TRACE</DefineConstants>
-		<BuildDate>$([System.DateTime]::UTCNow.ToString("HH:mm:ss dd-MM-yyyy"))</BuildDate>
-	</PropertyGroup>
+    <PropertyGroup>
+        <OutputType>Library</OutputType>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    </PropertyGroup>
 
-	<PropertyGroup>
-		<Authors>Project Faolan</Authors>
-		<PackageId>Faolan.Core</PackageId>
-		<Version>0.1.0</Version>
-		<Description>$(BuildDate)</Description>
-	</PropertyGroup>
-
-	<ItemGroup>
-		<PackageReference Include="GitVersion.MsBuild" Version="5.12.0">
-			<PrivateAssets>all</PrivateAssets>
-			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-		</PackageReference>
-		<!--<PackageReference Include="SharpZipLib" Version="1.4.2" />-->
-		<PackageReference Include="System.ServiceModel.Primitives" Version="4.10.2" />
-		<PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.1" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Proxies" Version="7.0.4" />
-	</ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="GitVersion.MsBuild" Version="6.7.0">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="protobuf-net" Version="3.2.56"/>
+        <PackageReference Include="SharpZipLib" Version="1.4.2"/>
+        <PackageReference Include="System.ServiceModel.Primitives" Version="10.0.652802"/>
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8"/>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Proxies" Version="10.0.8"/>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.8"/>
+    </ItemGroup>
 </Project>

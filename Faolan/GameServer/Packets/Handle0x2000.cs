@@ -1,7 +1,13 @@
+using System;
+using System.Buffers.Binary;
+using System.Threading.Tasks;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Opcodes;
+using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.GameServer.Packets.Protobuf;
 using Microsoft.Extensions.Logging;
 
 // ReSharper disable once CheckNamespace
@@ -9,31 +15,75 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-		private void Handle0X2000(INetworkClient client, ConanPacket packet)
+		private async Task Handle0X2000(INetworkClient client, ConanPacket packet)
 		{
-			var pbLength = packet.Data.ReadUInt32();
-			var pbOpcode = packet.Data.ReadUInt32<GameServer0X2000Opcodes>();
-			Logger.LogInformation($"Received data opcode: {pbOpcode} ({pbOpcode.ToHex()})");
+			// Snapshot the entire 0x2000 sub-payload before consuming it, so every
+			// case below can dump the raw bytes for offline reverse-engineering.
+			// This is the data starting at the 4-byte pbLength header.
+			var rawPayload = packet.Body.ToArray();
+
+			var pbLength = packet.Body.ReadUInt32();
+			var pbOpcode = packet.Body.ReadUInt32<GameServer0X2000Opcodes>();
+
+			Logger.LogInformation("GameServer 0x2000 subopcode {SubOpcodeName} ({SubOpcodeHex}), payloadLength={PayloadLength}, rawLength={RawLength}", pbOpcode, pbOpcode.ToHex(), pbLength, rawPayload.Length);
+			if (Logger.IsEnabled(LogLevel.Debug))
+				Logger.LogDebug("GameServer 0x2000 raw payload for {SubOpcodeName} ({SubOpcodeHex}) ({RawLength} bytes): {RawPayload}", pbOpcode, pbOpcode.ToHex(), rawPayload.Length, rawPayload.ToHex());
+
+			// During the create-editor handshake the client echoes its own instance id as the 0x2000 subopcode.
+			// Retail used a fixed id (0x021662C8, or Strie's 0x02165EFF); we hand out the character's real id, so
+			// the subopcode is dynamic - match it against the session instance and route it to the echo handler.
+			if (client.Session.Character?.Name == null && client.Session.Account != null && (uint)pbOpcode == client.Session.Account.ClientInstance)
+			{
+				await HandleCreateEditorInstanceEcho(client, packet);
+				return;
+			}
 
 			switch (pbOpcode)
 			{
 				case GameServer0X2000Opcodes.Oxf98E10B3:
 				{
-					Handle0Xf98E10B3(client, packet);
+					if (client.Session.Character?.Name == null)
+					{
+						if (IsRetailCreateEditorFlow(client))
+						{
+							Logger.LogInformation("Observed retail create-editor 0xF98E10B3 while pendingPost205F={PendingPost205F}, pendingReady={PendingReady}.", client.Session.HasPendingPost205FFollowUp,
+								client.Session.HasPendingCreateEditorReadyFollowUp);
+							break;
+						}
+
+						if (client.Session.HasPendingPost205FFollowUp)
+						{
+							client.Session.Post205FF98E10B3Count++;
+							Logger.LogInformation("Queued new-character 0xF98E10B3 #{Count} while post-0x205F handoff is still pending.", client.Session.Post205FF98E10B3Count);
+						}
+						else
+							Logger.LogInformation("Ignoring standalone new-character 0xF98E10B3 because the post-0x205F handoff has already been flushed.");
+					}
+
 					break;
 				}
 
-				case GameServer0X2000Opcodes.Ox36D3B74:
+				case GameServer0X2000Opcodes.Ox02165Eff:
+				case GameServer0X2000Opcodes.Ox021662C8:
 				{
-					HandleCommandPacket(client, packet);
+					// Legacy fixed-instance echoes from older captures (retail 0x021662C8 / Strie 0x02165EFF).
+					// The normal path is the dynamic-instance pre-switch check above; this stays as a fallback.
+					await HandleCreateEditorInstanceEcho(client, packet);
+					break;
+				}
+
+				case GameServer0X2000Opcodes.OxA36D3B74:
+				{
+					await HandleCommandPacket(client, packet);
 					break;
 				}
 
 				case GameServer0X2000Opcodes.Move:
 				{
-					var dataobjdec = packet.Data.ReadUInt32();
-					var dataclientinst = packet.Data.ReadUInt32();
-					var movingType = packet.Data.ReadUInt16<MovingType>();
+					//Logger.LogInformation($"[DUMP] Move ({rawPayload.Length} bytes): {rawPayload.ToHex()}");
+					var dataobjdec = packet.Body.ReadUInt32();
+					var dataclientinst = packet.Body.ReadUInt32();
+					var movingType = packet.Body.ReadUInt16<MovingType>();
 
 					switch (movingType)
 					{
@@ -43,33 +93,38 @@ namespace Faolan.GameServer
 						case MovingType.WalkJump:
 						case MovingType.MountedJump:
 						case MovingType.Falling:
-						case MovingType.Ox011A: // run
-						case MovingType.Ox011E: // rotate?
+						case MovingType.Ox011A:
 						case MovingType.Ox001E:
 						case MovingType.Ox001A:
+						case MovingType.Sprint:
+						case MovingType.Rotate:
 						{
-							var charCoords = packet.Data.ReadVector3();
-                            var datadat = packet.Data.ReadRemainingArray();//.ReadArray(pbLength - 6 * 4 + 1 * 2);
+							var sessionCharacter = client.Session.Character ?? client.Session.Account.Character;
+							if (sessionCharacter == null)
+							{
+								Logger.LogWarning(
+									"Ignoring movement packet {MovingType} because no resolved character is attached to the GameServer session yet. dataobjdec=0x{DataObject:X}, dataclientinst=0x{DataClientInstance:X}.",
+									movingType, dataobjdec, dataclientinst);
+								break;
+							}
 
-							Database.UpdateCharacterPosition(dataclientinst, charCoords);
+							sessionCharacter.Position = packet.Body.ReadVector3();
+							sessionCharacter.Rotation = packet.Body.ReadVector3(); // not sure if this is correct
+							var datadat = packet.Body.ReadRemainingArray();
 
-							// send to all (nearby) clients?
-							new PacketStream().WriteHeader(Sender5, Receiver5, null, 0x2000)
-								.WriteArrayUInt32Length(new ConanStream()
-									.WriteUInt32(pbOpcode)
-									.WriteUInt32(dataobjdec)
-									.WriteUInt32(dataclientinst)
-									.WriteUInt16(movingType)
-									.WriteVector3(charCoords)
-									.WriteArray(datadat))
-								.Send(client);
+							// send to all (nearby) clients? (single client for now -> the session conversation;
+							// retail's move broadcast uses sender 0d13ce71b110 58 + receiver = the moving entity's
+							// instance, confirmed across Strie/dikketest/demol80 captures)
+							await new PacketStream().WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x2000).WriteArrayUInt32Length(s =>
+								s.WriteUInt32(pbOpcode).WriteUInt32(dataobjdec).WriteUInt32(dataclientinst).WriteUInt16(movingType).WriteVector3(sessionCharacter.Position).WriteVector3(sessionCharacter.Rotation)
+									.WriteArray(datadat)).SendAsync(client);
 
 							break;
 						}
 
 						default:
 						{
-							Logger.LogInformation($"Received unknown moving type: {movingType.ToHex()}");
+							await LogToClient($"Received unknown moving type: {movingType.ToHex()}");
 							break;
 						}
 					}
@@ -79,119 +134,196 @@ namespace Faolan.GameServer
 
 				case GameServer0X2000Opcodes.ReadyForPlayScreen: //peer0_160
 				{
-					SendReadyForPlayScreen(client);
-					if (client.Character.Name == null)
-						HandleNewCharacter(client, packet);
+					//Logger.LogInformation($"[DUMP] ReadyForPlayScreen ({rawPayload.Length} bytes): {rawPayload.ToHex()}");
+					//Logger.LogInformation($"Completing world entry for {client.Session.Account?.UserName ?? client.IpAddress}.");
+
+					if (client.Session.Character?.Name == null)
+					{
+						if (IsRetailCreateEditorFlow(client))
+						{
+							client.Session.CreateEditorTempInstanceCount = 0;
+							client.Session.CreateEditorReadyRequestIds.Clear();
+							client.Session.HasPendingCreateEditorReadyFollowUp = true;
+							Logger.LogInformation("Queued retail create-editor ReadyForPlayScreen follow-up; waiting for the post-ready 0x021662C8 burst before replying.");
+						}
+						else
+						{
+							await SendReadyForPlayScreen(client);
+							await HandleNewCharacter(client, packet);
+						}
+					}
+					else
+					{
+						await SendReadyForPlayScreen(client);
+						await SendExistingCharacterPostReadyFollowUp(client);
+					}
 
 					break;
 				}
 
 				case GameServer0X2000Opcodes.Interact:
 				{
-					var cInstPreId = packet.Data.ReadUInt32();
-					var clientInst = packet.Data.ReadUInt32();
-					var unk0 = packet.Data.ReadUInt16();
-					var actionType = packet.Data.ReadUInt32<ActionType>();
-					var unkData = packet.Data.ReadArrayUInt32Length();
-					var unk1 = packet.Data.ReadUInt32(); // fromid?
-					var target = packet.Data.ReadUInt32();
-					var unk2 = packet.Data.ReadUInt32();
+					//Logger.LogInformation($"[DUMP] Interact ({rawPayload.Length} bytes): {rawPayload.ToHex()}");
+					// Important capture observation:
+					// world-object interactions appear to be the likely trigger path for the container-style
+					// response family 0xF096251E, which carries names like "Chest [N7FU]" and "object_closed".
+					// Representative samples split into a small object/position block, a 125-byte metadata block,
+					// and a variable nested entry block that currently decodes as 2, 3, or 4 repeated entries.
+					// New random-actions evidence suggests the player bag is more likely part of the giant 0x737A6DF9
+					// initial-state dump, while 0xF096251E still looks like remote chest/container data.
+					var unk0 = packet.Body.ReadUInt32();
+					var clientInst = packet.Body.ReadUInt32();
+					var unk1 = packet.Body.ReadUInt16();
+					var actionType = packet.Body.ReadUInt32<ActionType>();
+					var args = packet.Body.ReadProtobufUInt32Length<InteractArgs>();
 
-					/*
-					    switch weapons button:
-					    unk0: 3
-					    actionType: 2e (46)
-					    unkdata: 08 f3 ca 04 10 01 28 0a 30 00
-					    unk1: 0
-					    targetSlotId: 0
-					    unk2: 0
+					if (actionType == ActionType.SwitchWeaponsButton)
+					{
+						// Has no extra data
 
-					    move helm to slot 30 (bottom right)
-					    unk0: 3
-					    actionType: 9
-					    unkdata: 08 9a c8 02 10 01 28 0a 30 00
-					    unk1: 2
-					    targetSlotId: 1d (29)
-					    unk2: 0
+						await LogToClient($"SwitchWeaponsButton: {args}");
+					}
+					else
+					{
+						// Not every action carries from/target after the args (e.g. TalkToNpc only has a short
+						// trailer - the NPC handle lives in args.SpellTarget). Read defensively to avoid overrunning.
+						var from = packet.Body.Length - packet.Body.Position >= sizeof(uint)
+							? packet.Body.ReadUInt32()
+							: 0; // fromid or slotid depending on actionType, see below
+						var target = packet.Body.Length - packet.Body.Position >= sizeof(uint)
+							? packet.Body.ReadUInt32()
+							: 0;
+						var unk2 = packet.Body.ReadRemainingArray();
 
-					    move cape to slot 29
-					    unk0: 3
-					    actionType: 9
-					    unkdata: 08 9a c8 02 10 01 28 0a 30 00
-					    unk1: 0b
-					    targetSlotId: 1c
-					    unk2: 0
-
-					    move vanity helm to slot 30 (bottom right)
-					    unk0: 3
-					    actionType: 9
-					    unkdata: 08 9a c8 02 10 01 28 0a 30 00
-					    unk1: 03ea
-					    targetSlotId: 1d (29)
-					    unk2: 0
-
-					    cast spell "cannibalism"
-					    unk0: 3
-					    actionType: 4
-					    unkdata: 08 c0 e8 0a 10 01 28 08 30 00 52 09 08 d0 86 03 10 d4 cb 8b 40
-					    unk1: 1
-					    targetSlotId: 0x00142fd4
-					    unk2: 0x01000000
-					    */
-
-					switch (actionType)
-                    {
-                        case ActionType.RightClickItem:
-                        {
-                            Logger.LogInformation($"Player with ID: {clientInst.ToHex()} RightClickItem");
-                            break;
-                        }
-
-                            case ActionType.CastSpell:
+						switch (actionType)
 						{
-							Logger.LogInformation($"Player with ID: {clientInst.ToHex()} CastSpell");
-							break;
-						}
+							case ActionType.SummonMount:
+							{
+								// Fading black horse
+								// from = 0x3E34F1
+								// unk2 = 0x00, 0x00, 0x02, 0x26, 0x01
 
-						case ActionType.Emote:
-						{
-							Logger.LogInformation($"Player with ID: {clientInst.ToHex()} Emote");
+								// Swift fading black horse
+								// from = 0x3E34F2
+								// unk2 = 0x00, 0x00, 0x02, 0x27, 0x01
 
-							break;
-						}
+								// for both:
+								// target = 0
 
-						case ActionType.MoveEquippedToInventory:
-						{
-							var fromSlot = (CharacterEquipmentSlot)unk1;
-							var targetSlotId = (CharacterEquipmentSlot)target;
+								await LogToClient($"SummonMount: {args}");
 
-							Logger.LogInformation($"Player with ID: {clientInst.ToHex()} MoveEquipedToInventory ({fromSlot} -> {targetSlotId})");
+								break;
+							}
 
-							break;
-						}
+							case ActionType.RightClickItem:
+							{
+								await LogToClient($"RightClickItem: {args}");
 
-						case ActionType.SwitchWeaponsButton:
-						{
-							Logger.LogInformation($"Player with ID: {clientInst.ToHex()} SwitchWeaponsButton");
-							break;
-						}
+								break;
+							}
 
-						default:
-						{
-							Logger.LogInformation($"Player with ID: {clientInst} UNKNOWN ACTION: {actionType.ToHex()}");
-							break;
+							case ActionType.CastSpell:
+							{
+								var spellId = args.TypeId;
+								var targetHandle = args.SpellTarget?.TargetHandle;
+
+								await LogToClient($"CastSpell spell={spellId} target=0x{targetHandle:X} {args}");
+
+								break;
+							}
+
+							case ActionType.Emote:
+							{
+								await LogToClient($"Emote: {args}");
+
+								break;
+							}
+
+							case ActionType.TalkToNpc:
+							{
+								// The clicked NPC's entity handle rides in the interact args (field 10 / field 2);
+								// (TypeId, Mode, Field3) select the conversation node the client is requesting.
+								var npcHandle = (uint)(args.SpellTarget?.TargetHandle ?? 0);
+								Logger.LogInformation("TalkToNpc: from=0x{From:X}, target=0x{Target:X}, npcHandle=0x{NpcHandle:X}, args={Args}", from, target, npcHandle, args);
+
+								// Real branching dialogue: replay the captured conversation node for whichever NPC/node
+								// the client asked for, re-addressed to the clicked NPC.
+								if (await TryReplayConversation(client, (uint)args.TypeId, (uint)args.Mode, (uint)args.Field3, npcHandle))
+									break;
+
+								// Fallback: the Kalanthes post-creation intro, only in the create-world cutscene context.
+								if (client.Session.IsCreateWorldSession && npcHandle != 0)
+									await SendNpcIntroConversation(client, npcHandle);
+
+								break;
+							}
+
+							case ActionType.MoveEquippedToFromInventory:
+							{
+								// bag slot starts top left, continue counting on next page
+
+								var direction = (MoveItemInInventoryDirection)args.TypeId;
+								switch (direction)
+								{
+									case MoveItemInInventoryDirection.InventoryToEquipped:
+									{
+										var fromSlot = from;
+										var targetSlot = (CharacterEquipmentSlot)target;
+
+										await LogToClient($"InventoryToEquipped: ({fromSlot} -> {targetSlot}) {args}");
+
+										// The trailing struct (after from/target) carries the item's template handle as a
+										// big-endian uint32; persist the equip into CharacterEquipment.
+										var equipHandle = unk2.Length >= 4
+											? BinaryPrimitives.ReadUInt32BigEndian(unk2.AsSpan(0, 4))
+											: 0;
+										if (equipHandle != 0)
+											await PersistEquip(client, targetSlot, equipHandle);
+
+										break;
+									}
+
+									case MoveItemInInventoryDirection.EquippedToInventory:
+									{
+										var fromSlot = (CharacterEquipmentSlot)from;
+										var targetSlot = target;
+
+										await LogToClient($"EquippedToInventory: ({fromSlot} -> {targetSlot}) {args}");
+
+										// Unequip is identified by the source equip slot (the trailing handle is 0).
+										await PersistUnequip(client, fromSlot);
+
+										break;
+									}
+
+									default:
+									{
+										await LogToClient($"MoveEquippedToFromInventory: unknown direction={direction} {args}");
+
+										break;
+									}
+								}
+
+								break;
+							}
+
+							default:
+							{
+								await LogToClient($"UNKNOWN-{actionType.ToHex()}: {args}");
+								break;
+							}
 						}
 					}
 
 					break;
 				}
 
-				case GameServer0X2000Opcodes.CloseGame:
+				case GameServer0X2000Opcodes.CloseGame: // Also received when Activating feat point ??
 				{
-					var unk0 = packet.Data.ReadUInt32();
-					var accountId = packet.Data.ReadUInt32();
+					var unk0 = packet.Body.ReadUInt32();
+					var clientInst = packet.Body.ReadUInt32();
 
-					Logger.LogInformation($"Account with ID: {accountId.ToHex()} Has logged off");
+					Logger.LogInformation("GameServer close request for character {CharacterId}", clientInst.ToHex());
 
 					// is handled in ClientDisconnected
 					//account.Character.SaveDataToDatabase(Database);
@@ -200,114 +332,199 @@ namespace Faolan.GameServer
 
 				case GameServer0X2000Opcodes.SelectDeselect:
 				{
-					var length = packet.Data.Length - 4;
+					var data = packet.Body.ReadRemainingArray();
 
-					var data = packet.Data.ToArray();
-					Logger.LogInformation("GameServerDataOpcodes.SelectDeselect");
-
-					/*switch(length)
-					    {
-					        case PassBlob::SELECT_NPC:
-					            {
-					                Log.Debug("Receive GA_PassBlob - SELECT_OBJECT - SELECT_NPC\n");
-					                try
-					                {
-					                    uint32 data = packet->data->read<uint32>();
-					                    uint32 ClientInst = packet->data->read<uint32>();
-					                    uint8 unk0 = packet->data->read<uint8>();
-					                    uint32 data2 = packet->data->read<uint32>();
-					                    client->charInfo.combat.target = packet->data->read<uint32>();
-					                    uint32 unk1 = packet->data->read<uint32>();
-					                    uint32 unk2 = packet->data->read<uint32>();
-					                    uint32 end = packet->data->read<uint32>();
-
-					                    PacketBuffer aBuffer(500);
-					                    aBuffer.writeHeader("GameAgent", "GameInterface", gameUnknown1, 0, client->nClientInst, 0, GI_PassBlob);
-					                    aBuffer.write<uint32>(length);
-					                    aBuffer.write<uint32>(SELECT_OBJECT);
-					                    aBuffer.write<uint32>(data);
-					                    aBuffer.write<uint32>(ClientInst);
-					                    aBuffer.write<uint8>(unk0);
-					                    aBuffer.write<uint32>(data2);
-					                    aBuffer.write<uint32>(client->charInfo.combat.target);
-					                    aBuffer.write<uint32>(unk1);
-					                    aBuffer.write<uint32>(unk2);
-					                    aBuffer.write<uint32>(end);
-					                    aBuffer.doItAll(client->clientSocket);
-					                    Log.Debug("Sent GI_PassBlob - SELECT_OBJECT - SELECT_NPC\n");
-					                }
-					                catch(char* errMsg)
-					                {
-					                    Log.Error("Error at receiving SelectionDatas @ SELECT_NPC - SelectObjet.cpp\nError Message:\n%s\n", errMsg);
-					                }
-					                break;
-					            }
-
-					        default:
-					            {
-					                Log.Debug("Receive GA_PassBlob - SELECT_OBJECT - Unknown Length: 0x%08x\n", length);
-					                try
-					                {
-					                    PacketBuffer aBuffer(500);
-					                    aBuffer.writeHeader("GameAgent", "GameInterface", gameUnknown1, 0, client->nClientInst, 0, 0x00);
-					                    aBuffer.write<uint32>(length);
-					                    aBuffer.write<uint32>(SELECT_OBJECT);
-					                    aBuffer.writeArray(packet->data->readArray(length-4), length-4);
-					                    aBuffer.doItAll(client->clientSocket);
-					                    Log.Debug("Sent GI_PassBlob - SELECT_OBJECT - Unknown\n");
-					                }
-					                catch(char* errMsg)
-					                {
-					                    Log.Error("Error at receiving SelectionDatas @ SELECT_NPC - SelectObjet.cpp\nError Message:\n%s\n", errMsg);
-					                }
-					                break;
-					            }
-					    }                    
-					    */
+					await LogToClient($"SelectDeselect: {data.ToHex()}");
 
 					break;
 				}
 
 				case GameServer0X2000Opcodes.DropItem:
 				{
-					var data = packet.Data.ToArray();
-					Logger.LogInformation("DROP ITEM!");
+					var unk0 = packet.Body.ReadUInt32(); // c350
+					var clientInst = packet.Body.ReadUInt32();
+					var reserved = packet.Body.ReadUInt32();
+					var move = packet.Body.ReadProtobufByteLength<MoveItemInInventoryArgs>();
+
+					await LogToClient($"DropItem: {move}");
 
 					break;
 				}
 
 				case GameServer0X2000Opcodes.MoveItemInInventory:
 				{
-					var data = packet.Data.ToArray();
-					Logger.LogInformation("MoveItemInInventory");
+					//Logger.LogInformation($"[DUMP] MoveItemInInventory ({rawPayload.Length} bytes): {rawPayload.ToHex()}");
+					// Random-actions capture observations:
+					// - protobuf cleanly decodes Source/Target item references plus FromSlot/ToSlot
+					// - observed sample moves reused the same second reference value inside slotOrContainer=104
+					//   across many different slot moves, and 0x737A6DF9 reuses that same value for sibling blocks
+					//   101/104/112/113 in the nested field-6 chain; this makes ItemReference.ItemHandle a likely
+					//   misnomer in current research
+					//   (it behaves more like a container-owner/root handle than a per-item instance id)
+					// - no server->client packet followed these moves; the same reference value only appeared earlier
+					//   in the huge 0x737A6DF9 download, not in Spawn or 0xF096251E
+
+					var protocolConstant = packet.Body.ReadUInt32();
+					var characterHandle = packet.Body.ReadUInt32();
+					var reserved = packet.Body.ReadUInt32();
+					var move = packet.Body.ReadProtobufByteLength<MoveItemInInventoryArgs>();
+
+					await LogToClient($"MoveItemInInventory: {move}");
 
 					break;
 				}
 
 				case GameServer0X2000Opcodes.DeleteQuest:
 				{
-					var data = packet.Data.ToArray();
-					Logger.LogInformation("DeleteQuest");
+					var unk0 = packet.Body.ReadUInt32();
+					var clientInst = packet.Body.ReadUInt32();
+					var unk1 = packet.Body.ReadByte();
+					var unk2 = packet.Body.ReadUInt32();
+					var unk3 = packet.Body.ReadUInt32();
+					var questId = packet.Body.ReadUInt32(); // probably
+					var unk4 = packet.Body.ReadUInt32();
+
+					/*
+						// Shadows of the past
+						0x00, 0x00, 0xC3, 0x50,
+						0x11, 0x01, 0xB4, 0xF5, // clientInst
+						0x00,
+						0x00, 0x00, 0x00, 0x01,
+						0x00, 0x00, 0x00, 0x04,
+						0x00, 0x00, 0x4B, 0xA4, // questId?
+						0x00, 0x00, 0x00, 0x00
+
+					    // Summoned
+					    0x00, 0x00, 0xC3, 0x50,
+					    0x11, 0x01, 0xB4, 0xF5, // clientInst
+					    0x00,
+					    0x00, 0x00, 0x00, 0x01,
+					    0x00, 0x00, 0x00, 0x04,
+					    0x00, 0x00, 0x46, 0x20, // questId?
+					    0x00, 0x00, 0x00, 0x00
+
+					    // Storming the gate
+					    0x00, 0x00, 0xC3, 0x50,
+					    0x11, 0x01, 0xB4, 0xF5, // clientInst
+					    0x00,
+					    0x00, 0x00, 0x00, 0x01,
+					    0x00, 0x00, 0x00, 0x04,
+					    0x00, 0x00, 0x36, 0x47, // questId?
+					    0x00, 0x00, 0x00, 0x00
+					 */
 
 					break;
 				}
 
 				case GameServer0X2000Opcodes.InventoryClaimsButton:
 				{
-					var data = packet.Data.ToArray();
-					Logger.LogInformation("InventoryClaimsButton");
+					var data = packet.Body.ReadRemainingArray();
+					//Logger.LogInformation($"[DUMP] InventoryClaimsButton ({rawPayload.Length} bytes): {rawPayload.ToHex()}");
+
+					break;
+				}
+
+				case GameServer0X2000Opcodes.Ox1101B4F6:
+				{
+					var data = packet.Body.ReadRemainingArray();
+					//Logger.LogInformation($"[DUMP] Ox1101B4F6 ({rawPayload.Length} bytes): {rawPayload.ToHex()}\r\nremaining: {data.ToHex()}");
 
 					break;
 				}
 
 				default:
 				{
-					var data = packet.Data.ToArray();
-					Logger.LogWarning($"Unknown data Opcode: {pbOpcode.ToHex()}\r\n{data.ToHex()}");
+					var data = packet.Body.ReadRemainingArray();
+
+					// In-world the client streams 0x2000 packets whose sub-opcode is its OWN instance id
+					// (the client-instance ack/keepalive stream). With the create flow now using the real
+					// character id, that id is dynamic (not a fixed enum value like the old 0x021662C8), so
+					// it lands here. Treat it as a benign ping: log quietly, don't spam system messages.
+					if ((uint)pbOpcode == client.Session.Account.ClientInstance || (uint)pbOpcode == client.Session.Character?.Id)
+					{
+						Logger.LogDebug("GameServer 0x2000 client-instance ping {SubOpcodeHex} ({RawLength} bytes).", pbOpcode.ToHex(), rawPayload.Length);
+						break;
+					}
+
+					Logger.LogWarning("Unhandled GameServer 0x2000 subopcode {SubOpcodeHex} ({RawLength} bytes).", pbOpcode.ToHex(), rawPayload.Length);
+					if (Logger.IsEnabled(LogLevel.Debug))
+						Logger.LogDebug("Unhandled GameServer 0x2000 subopcode {SubOpcodeHex} raw payload: {RawPayload}", pbOpcode.ToHex(), rawPayload.ToHex());
+					await _agentServerDispatcher.SendSystemMessage(client.Session.Account.ClientInstance, $"Unknown 0x2000 Opcode: {pbOpcode.ToHex()} ({rawPayload.Length} bytes)");
 
 					break;
 				}
 			}
+
+			return;
+
+			async Task LogToClient(string message)
+			{
+				Logger.LogInformation(message);
+				await _agentServerDispatcher.SendSystemMessage(client.Session.Account.ClientInstance, message);
+			}
+		}
+
+		// Handles the create-editor "instance echo": the client repeats its own client instance id as a 0x2000
+		// subopcode while the editor is loading. We count these to time the post-0x205F and post-ready bursts,
+		// exactly as retail does, and ack standalone ones. (Retail used a fixed instance; we hand out the
+		// character's real id, so the matching is done dynamically by the caller.)
+		private async Task HandleCreateEditorInstanceEcho(INetworkClient client, ConanPacket packet)
+		{
+			if (client.Session.Character?.Name != null)
+				return;
+
+			uint? requestId = null;
+			if (packet.Body.Length - packet.Body.Position >= sizeof(uint) * 2)
+			{
+				var ack0 = packet.Body.ReadUInt32();
+				requestId = packet.Body.ReadUInt32();
+				Logger.LogInformation("Create-editor instance-echo decoded: ack0={Ack0:X}, requestId={RequestId:X}.", ack0, requestId.Value);
+
+				if (!client.Session.CreateEditorObservedRequestIds.Contains(requestId.Value))
+					client.Session.CreateEditorObservedRequestIds.Add(requestId.Value);
+			}
+
+			client.Session.CreateEditorTempInstanceCount++;
+
+			if (client.Session.HasPendingPost205FFollowUp)
+			{
+				Logger.LogInformation("Queued create-editor instance-echo #{Count} while post-0x205F follow-up is pending.", client.Session.CreateEditorTempInstanceCount);
+
+				if (client.Session.CreateEditorTempInstanceCount >= 3)
+				{
+					Logger.LogInformation("Flushing create-editor post-0x205F burst after {Count}x instance echo.", client.Session.CreateEditorTempInstanceCount);
+					await SendRetailCreateEditorPost205FBurst(client);
+					client.Session.HasPendingPost205FFollowUp = false;
+					client.Session.HasFlushedCreateWorldEntryBurst = true;
+					client.Session.CreateEditorTempInstanceCount = 0;
+				}
+			}
+			else if (client.Session.HasPendingCreateEditorReadyFollowUp)
+			{
+				if (requestId.HasValue && !client.Session.CreateEditorReadyRequestIds.Contains(requestId.Value))
+					client.Session.CreateEditorReadyRequestIds.Add(requestId.Value);
+
+				Logger.LogInformation("Queued create-editor post-ready instance-echo #{Count}; uniqueRequestIds={UniqueCount}.", client.Session.CreateEditorTempInstanceCount, client.Session.CreateEditorReadyRequestIds.Count);
+
+				// Retail waits for at least one post-ready echo before sending the 0x2024 / 0x864CFEF8 /
+				// 0xF508F4C1 follow-up; the live client can stall before the full 5-id burst, so flush on the
+				// first decoded post-ready request and let later standalone ones flow through the ack path.
+				if (requestId.HasValue)
+				{
+					Logger.LogInformation("Flushing create-editor post-ready burst using observed request ids [{RequestIds}].", string.Join(", ", client.Session.CreateEditorReadyRequestIds.ConvertAll(id => id.ToString("X"))));
+					await SendRetailCreateEditorPostReadyBurst(client, client.Session.CreateEditorReadyRequestIds);
+					client.Session.HasPendingCreateEditorReadyFollowUp = false;
+					client.Session.CreateEditorTempInstanceCount = 0;
+					client.Session.CreateEditorReadyRequestIds.Clear();
+				}
+			}
+			else if (requestId.HasValue)
+			{
+				Logger.LogInformation("Acknowledging standalone create-editor instance-echo with requestId={RequestId:X}.", requestId.Value);
+				await SendRetailCreateEditorPostReadyAck(client, requestId.Value);
+			}
+			else
+				Logger.LogInformation("Ignoring standalone create-editor instance-echo after the expected bursts already flushed.");
 		}
 	}
 }

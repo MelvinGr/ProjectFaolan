@@ -252,8 +252,8 @@ ModelManifest.xml
 # FAKE - F# Make
 .fake/
 
-/Faolan.Core/faolan.db-wal
-/Faolan.Core/faolan.db-shm
-/.contextkeeper/
-/Faolan/faolan.db-wal
-/Faolan/faolan.db-shm
+.idea/
+
+/faolan.db-shm
+/faolan.db-wal
+/logs.txt

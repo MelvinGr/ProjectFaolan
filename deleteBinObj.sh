@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+find . \
+  -path ./.git -prune -o \
+  -type d \( -name bin -o -name obj \) -prune -exec rm -rf {} +

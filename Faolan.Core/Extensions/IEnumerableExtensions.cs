@@ -14,21 +14,20 @@ namespace Faolan.Core.Extensions
 			if (bytes == null)
 				return "<null>";
 
-			var bytesLength = bytes.Count();
+			var bytesArray = bytes.ToArray();
+			var bytesLength = bytesArray.Length;
 
 			var hexChars = new[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
 
 			var firstHexColumn = 8 // 8 characters for the address
 			                     + 3; // 3 spaces
 
-			var firstCharColumn = firstHexColumn
-			                      + bytesPerLine * 3 // - 2 digit for the hexadecimal value and 1 space
-			                      + (bytesPerLine - 1) / 8 // - 1 extra space every 8 characters from the 9th
-			                      + 2; // 2 spaces 
+			var firstCharColumn = firstHexColumn + bytesPerLine * 3 // - 2 digit for the hexadecimal value and 1 space
+			                                     + (bytesPerLine - 1) / 8 // - 1 extra space every 8 characters from the 9th
+			                                     + 2; // 2 spaces
 
-			var lineLength = firstCharColumn
-			                 + bytesPerLine // - characters to show the ascii value
-			                 + Environment.NewLine.Length; // Carriage return and line feed (should normally be 2)
+			var lineLength = firstCharColumn + bytesPerLine // - characters to show the ascii value
+			                                 + Environment.NewLine.Length; // Carriage return and line feed (should normally be 2)
 
 			var line = (new string(' ', lineLength - Environment.NewLine.Length) + Environment.NewLine).ToCharArray();
 			var expectedLines = (bytesLength + bytesPerLine - 1) / bytesPerLine;
@@ -60,10 +59,12 @@ namespace Faolan.Core.Extensions
 					}
 					else
 					{
-						var b = bytes.ElementAt(i + j);
+						var b = bytesArray.ElementAt(i + j);
 						line[hexColumn] = hexChars[(b >> 4) & 0xF];
 						line[hexColumn + 1] = hexChars[b & 0xF];
-						line[charColumn] = b < 32 ? '·' : (char)b;
+						line[charColumn] = b < 32
+							? 'ï¿½'
+							: (char)b;
 					}
 
 					hexColumn += 3;
@@ -76,12 +77,20 @@ namespace Faolan.Core.Extensions
 			return result.ToString();
 		}
 
-        public static List<T> AppendRange<T>(this IEnumerable<T> items, IEnumerable<T> items2)
-        {
-            var x = items.ToList();
-            x.AddRange(items2);
+		extension<T>(IEnumerable<T> items)
+		{
+			public List<T> AppendRange(IEnumerable<T> items2)
+			{
+				var x = items.ToList();
+				x.AddRange(items2);
 
-            return x;
-        }
+				return x;
+			}
+
+			public string JoinAsString(string separator)
+			{
+				return string.Join(separator, items);
+			}
+		}
 	}
 }

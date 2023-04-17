@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 using System.Net;
 using Microsoft.Extensions.Configuration;
@@ -8,46 +9,22 @@ namespace Faolan.Core.Extensions
 	// ReSharper disable once InconsistentNaming
 	public static class IConfigurationExtensions
 	{
-		public static string ServerIpAddress(this IConfiguration config)
+		extension(IConfiguration config)
 		{
-			return config["ServerIpAddress"];
-		}
+			public string DatabasePath =>
+				Path.GetFullPath(config[Statics.IsDebug
+					? "DatabasePathDev"
+					: "DatabasePath"]);
 
-		public static long ServerIpAddressLong(this IConfiguration config)
-		{
-#pragma warning disable 618
-			return IPAddress.HostToNetworkOrder(IPAddress.TryParse(config.ServerIpAddress(), out var ip) ? ip.Address : throw new Exception("!IPAddress.TryParse"));
-#pragma warning restore 618
-		}
+			public string ServerIpAddress => config["ServerIpAddress"];
 
-		public static ushort UniverseAgentPort(this IConfiguration config)
-		{
-			return ushort.Parse(config["UniverseAgentPort"]);
-		}
+			public string WelcomeString => config["WelcomeString"];
+			public uint ServerIpAddressLong => BinaryPrimitives.ReadUInt32BigEndian(IPAddress.Parse(config.ServerIpAddress).GetAddressBytes());
+			public ushort AgentServerPort => Convert.ToUInt16(config["AgentServerPort"]);
+			public ushort CsPlayerAgentPort => Convert.ToUInt16(config["CsPlayerAgentPort"]);
+			public ushort PlayerAgentPort => Convert.ToUInt16(config["PlayerAgentPort"]);
 
-		public static ushort PlayerAgentPort(this IConfiguration config)
-		{
-			return ushort.Parse(config["PlayerAgentPort"]);
-		}
-
-		public static ushort CsPlayerAgentPort(this IConfiguration config)
-		{
-			return ushort.Parse(config["CsPlayerAgentPort"]);
-		}
-
-		public static ushort AgentServerPort(this IConfiguration config)
-		{
-			return ushort.Parse(config["AgentServerPort"]);
-		}
-
-		public static string DatabasePath(this IConfiguration config)
-		{
-			return Path.GetFullPath(Statics.IsDebug ? config["DatabasePathDev"] : config["DatabasePath"]);
-		}
-
-		public static string WelcomeString(this IConfiguration config)
-		{
-			return config["WelcomeString"].Replace("$BUILDSTRING", Statics.BuildString);
+			public ushort UniverseAgentPort => Convert.ToUInt16(config["UniverseAgentPort"]);
 		}
 	}
 }

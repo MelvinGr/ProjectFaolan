@@ -11,10 +11,7 @@ namespace Faolan.Core.Extensions
 		{
 			try
 			{
-				return Enumerable.Range(0, hex.Length)
-					.Where(x => x % 2 == 0)
-					.Select(x => Convert.ToByte(hex.Substring(x, 2), 16))
-					.ToArray();
+				return Enumerable.Range(0, hex.Length).Where(x => x % 2 == 0).Select(x => Convert.ToByte(hex.Substring(x, 2), 16)).ToArray();
 			}
 			catch
 			{
@@ -22,9 +19,13 @@ namespace Faolan.Core.Extensions
 			}
 		}
 
-		public static string ToHex(this IEnumerable<byte> value)
+		public static string ToHex(this IEnumerable<byte> value, bool asArray = false)
 		{
-			return "{ " + string.Join(", ", value.Select(e => e.ToHex())) + " }";
+			return (asArray
+				? "[ "
+				: "{ ") + string.Join(", ", value.Select(e => e.ToHex())) + (asArray
+				? " ]"
+				: " }");
 		}
 
 		public static string ToHex(this Enum value)

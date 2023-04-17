@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:5.0-focal AS base
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS base
 
 WORKDIR /app
 EXPOSE 7010
@@ -6,7 +6,7 @@ EXPOSE 7011
 EXPOSE 7012
 EXPOSE 7013
 
-FROM mcr.microsoft.com/dotnet/sdk:5.0-focal AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY . .
 

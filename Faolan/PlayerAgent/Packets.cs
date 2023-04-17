@@ -1,37 +1,59 @@
 using System;
 using System.Threading.Tasks;
+using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Opcodes;
-using Faolan.Extensions;
-using Microsoft.EntityFrameworkCore;
+using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Packets.Opcodes;
 
 namespace Faolan.PlayerAgent
 {
 	partial class PlayerAgentListener
 	{
-		private static readonly byte[] Sender = { 0x0d, 0x84, 0x04, 0xf2, 0x82, 0x10, 0x02 };
-		private static readonly byte[] Receiver = { 0x0d, 0x38, 0x57, 0x15, 0x7d, 0x10, 0xeb, 0x8e, 0x95, 0xbf, 0x05 };
-		private static readonly byte[] Sender3 = { 0x0D, 0x16, 0x91, 0x35, 0x1D, 0x10, 0x46 };
-		private static readonly byte[] Receiver3 = { 0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0xEC, 0xEB, 0x80, 0xDE, 0x03 };
-		private static readonly byte[] Sender0 = { 0x0D, 0x16, 0x91, 0x35, 0x1D, 0x10, 0x4C };
-		private static readonly byte[] Sender2 = { 0x0D, 0x16, 0x91, 0x35, 0x1D, 0x10, 0x64 };
-		private static readonly byte[] Sender4 = { 0x0d, 0x84, 0x04, 0xf2, 0x82, 0x10, 0x03 };
+		private static readonly byte[] AgentServerHeader = [0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xFA, 0xE5, 0x98, 0x9D, 0x02];
+		private static readonly byte[] CsPlayerAgentHeader = [0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE0, 0xD4, 0xB4, 0xD7, 0x05];
+		private static readonly byte[] GameServerHeader = [0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xF9, 0xD8, 0xD9, 0xC5, 0x0D];
+
+		private static readonly byte[] GameServerPayloadPrefix =
+		[
+			0x62,
+			0x00, 0x00, 0xC7, 0x9C,
+			0x00, 0x00, 0x0F, 0xAA,
+			0x00, 0x00, 0x00, 0x00
+		];
+
+		private static readonly byte[] GameServerPayloadSuffix =
+		[
+			0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x08,
+			0x00, 0x00, 0x9C, 0x50,
+			0x01, 0xC9, 0x43, 0xC1,
+			0x00
+		];
+
+		private static readonly byte[] Sender = [0x0d, 0x84, 0x04, 0xf2, 0x82, 0x10, 0x02];
+		private static readonly byte[] Sender4 = [0x0d, 0x84, 0x04, 0xf2, 0x82, 0x10, 0x03];
+		private static readonly byte[] ServiceConnectionSender = [0x0D, 0x16, 0x91, 0x35, 0x1D, 0x10, 0x5A];
+
+		private Task SendAgentServer(INetworkClient client)
+		{
+			return new PacketStream().WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.Ox1A07, AgentServerHeader).WriteUInt32(Configuration.ServerIpAddressLong)
+				.WriteUInt16(Configuration.AgentServerPort).WriteUInt32(client.Session.Account.Id).WriteUInt32(0x0000c350).WriteUInt32(client.Session.Account.ClientInstance).SendAsync(client);
+		}
 
 		private async Task SendCharacterList(INetworkClient client)
 		{
-			var characters = await Database.GetCharactersByAccount(client.Account.Id);
+			var characters = await Database.GetCharactersByAccount(client.Session.Account.Id);
 
 			var aBuffer = new PacketStream();
-			aBuffer.WriteHeader(Sender, Receiver, new byte[] { 0x8b, 0xd3, 0xa0, 0x0c },
-				PlayerAgentResponseOpcodes.SendCharacterList);
-			aBuffer.WriteUInt32(client.Account.ClientInstance);
+			aBuffer.WriteHeader(Sender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.SendCharacterList, [0x8b, 0xd3, 0xa0, 0x0c]);
+			aBuffer.WriteUInt32(client.Session.Account.ClientInstance);
 			aBuffer.WriteUInt32((characters.Length + 1) * 1009); // number of characters
 
 			foreach (var character in characters)
 			{
 				aBuffer.WriteUInt32(character.Id);
-				aBuffer.WriteUInt32(client.Account.ClientInstance); // PlayerInstance
+				aBuffer.WriteUInt32(client.Session.Account.ClientInstance); // PlayerInstance
 				aBuffer.WriteUInt32(character.Id);
 				aBuffer.WriteString(character.Name);
 				aBuffer.WriteUInt32(character.RealmId ?? throw new Exception("character.RealmId == null"));
@@ -49,7 +71,7 @@ namespace Faolan.PlayerAgent
 				aBuffer.WriteString(character.Language); // enEN
 				aBuffer.WriteUInt32(0x00000000);
 				aBuffer.WriteUInt32(0x00000000);
-				aBuffer.WriteString("8f58a8a3cd66eb5c5e20c15d4ec6f978");
+				aBuffer.WriteString(character.AuthChallenge); // 8f58a8a3cd66eb5c5e20c15d4ec6f978 for conanhimself
 				aBuffer.WriteUInt32(0x00000000);
 				aBuffer.WriteUInt32(0x00000001);
 			}
@@ -59,7 +81,7 @@ namespace Faolan.PlayerAgent
 			aBuffer.WriteUInt32(0x00000001);
 			aBuffer.WriteUInt32(0x00000002);
 			aBuffer.WriteUInt32(0x00000014);
-			aBuffer.WriteUInt32(client.Account.ClientInstance); // 0x3bc035ec
+			aBuffer.WriteUInt32(client.Session.Account.ClientInstance); // 0x3bc035ec
 			aBuffer.WriteUInt32(0x000c0001);
 			aBuffer.WriteUInt32(0x00018181);
 			aBuffer.WriteUInt32(0x00000015);
@@ -69,16 +91,48 @@ namespace Faolan.PlayerAgent
 			aBuffer.WriteString("https://www.facebook.com/dialog/oauth?client_id=.....");
 			aBuffer.WriteUInt32(0x00000000);
 			aBuffer.WriteUInt32(0x00000001);
-			aBuffer.Send(client);
+
+			await aBuffer.SendAsync(client);
+		}
+
+		private Task SendCsPlayerAgent(INetworkClient client)
+		{
+			return new PacketStream() // send CSPlayerAgent
+				.WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.Ox1A07, CsPlayerAgentHeader).WriteUInt32(Configuration.ServerIpAddressLong)
+				.WriteUInt16(Configuration.CsPlayerAgentPort).WriteUInt32(client.Session.Account.Id).WriteUInt32(0x0000c350).WriteUInt32(client.Session.Account.ClientInstance).SendAsync(client);
+		}
+
+		private async Task SendGameServer(INetworkClient client)
+		{
+			var account = client.Session.Account;
+
+			// Resolve the active character via the repository (the session no longer lazy-loads Account.Characters):
+			// GetCharacterForAccount returns the direct id match, else the most-recently-created character.
+			var activeCharacter = account.Character ?? await Database.GetCharacterForAccount(account.Id, account.ClientInstance) ??
+				throw new Exception($"Unable to resolve active character for account {account.Id:X8} and client instance {account.ClientInstance:X8}");
+
+			var realm = activeCharacter.RealmId.HasValue
+				? await Database.GetRealm(activeCharacter.RealmId.Value)
+				: null;
+			if (realm == null)
+				throw new Exception($"Character {activeCharacter.Id:X8} has no realm to advertise the GameServer for.");
+
+			await new PacketStream().WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.Ox1A07, GameServerHeader).WriteString($"{realm.IpAddress}:{realm.Port}")
+				.WriteUInt32(account.Id).WriteUInt32(0x0000C350).WriteUInt32(account.ClientInstance).WriteArray(GameServerPayloadPrefix).WriteUInt32(account.ClientInstance).WriteArray(GameServerPayloadSuffix).SendAsync(client);
+		}
+
+		private Task SendOx20B9(INetworkClient client)
+		{
+			return new PacketStream().WriteHeader(Sender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.Ox20B9, [0x8B, 0xD8, 0x99, 0x02]).WriteUInt32(0x0000C350).WriteUInt32(client.Session.Account.ClientInstance)
+				.WriteUInt32(0).SendAsync(client);
 		}
 
 		private async Task SendRealmList(INetworkClient client)
 		{
-			var realms = await Database.Context.Realms.ToArrayAsync();
+			var realms = await Database.GetRealms();
 
 			var aBuffer = new PacketStream();
-			aBuffer.WriteHeader(Sender, Receiver, new byte[] { 0xe2, 0xe6, 0xc4, 0x0f },
-				PlayerAgentResponseOpcodes.SendRealmList);
+			aBuffer.WriteHeader(Sender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.SendRealmList, [0xe2, 0xe6, 0xc4, 0x0f]);
 
 			aBuffer.WriteUInt32(realms.Length);
 			foreach (var realm in realms)
@@ -89,7 +143,7 @@ namespace Faolan.PlayerAgent
 				aBuffer.WriteUInt32(0x00000001); //u2
 				aBuffer.WriteUInt32(0x00000000); //u3
 				aBuffer.WriteUInt32(0x00000000); //u4
-				aBuffer.WriteUInt32(realm.FullStatus);
+				aBuffer.WriteUInt32(realm.LoadStatus == RealmLoadStatus.Full);
 				aBuffer.WriteUInt32(realm.LoadStatus);
 				aBuffer.WriteUInt16(0x0000);
 				aBuffer.WriteByte(0x00);
@@ -98,94 +152,29 @@ namespace Faolan.PlayerAgent
 				aBuffer.WriteByte(0x00);
 			}
 
-			aBuffer.Send(client);
+			await aBuffer.SendAsync(client);
 		}
 
-		private void SendCsPlayerAgent(INetworkClient client)
-        {
-            var sender638167354496472670 = new byte[] { 0x0D, 0x16, 0x91, 0x35, 0x1D, 0x10, 0x54 };
-            var receiver638167354496472670 = new byte[] { 0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0xEC, 0xEB, 0x80, 0xDE, 0x03 };
-
-            var headerData0 = new byte[] { 0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE0, 0xD4, 0xB4, 0xD7, 0x05 };
-
-			new PacketStream() // send CSPlayerAgent
-				.WriteHeader(sender638167354496472670, receiver638167354496472670, headerData0, PlayerAgentResponseOpcodes.SendCsPlayerAgent)
-				.WriteUInt32(Configuration.ServerIpAddressLong())
-				.WriteUInt16(Configuration.CsPlayerAgentPort())
-				.WriteUInt32(client.Account.Id)
-				.WriteUInt32(0x0000c350)
-				.WriteUInt32(client.Account.ClientInstance)
-				.Send(client);
-
-            /*var headerData638167354496472670 = new byte[] { 0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE0, 0xD4, 0xB4, 0xD7, 0x05 };
-            var packetData638167354496472670 = new byte[]
-            {
-                0x25, 0x12, 0xC0, 0x2B, 
-                0x1B, 0x65, // 7013
-                0x02, 0x8C, 0x26, 0xAF,
-                0x00, 0x00, 0xC3, 0x50,
-                0x08, 0x02, 0xE5, 0xD4
-            };
-            new PacketStream()
-                .WriteHeader(sender638167354496472670, receiver638167354496472670, headerData638167354496472670, 0x00001A07, true)
-                .WriteArray(packetData638167354496472670)
-                .Send(client);*/
-        }
-
-        private void SendAgentServer(INetworkClient client)
-        {
-            var sender638167354496472670 = new byte[] { 0x0D, 0x16, 0x91, 0x35, 0x1D, 0x10, 0x54 };
-            var receiver638167354496472670 = new byte[] { 0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0xEC, 0xEB, 0x80, 0xDE, 0x03 };
-
-            var headerData0 = new byte[] { 0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xFA, 0xE5, 0x98, 0x9D, 0x02 };
-
-			new PacketStream() 
-				.WriteHeader(sender638167354496472670, receiver638167354496472670, headerData0, PlayerAgentResponseOpcodes.SendAgentServer)
-				.WriteUInt32(Configuration.ServerIpAddressLong())
-				.WriteUInt16(Configuration.AgentServerPort())
-				.WriteUInt32(client.Account.Id)
-				.WriteUInt32(0x0000c350)
-				.WriteUInt32(client.Account.ClientInstance)
-				.Send(client);
-
-            /*var headerData638167354496472670 = new byte[] { 0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xFA, 0xE5, 0x98, 0x9D, 0x02 };
-            var packetData638167354496472670 = new byte[]
-            {
-                0x25, 0x12, 0xC0, 0x2B, 
-                0x1B, 0x5A, // 7002
-                0x02, 0x8C, 0x26, 0xAF,
-                0x00, 0x00, 0xC3, 0x50,
-                0x08, 0x02, 0xE5, 0xD4
-            };
-            new PacketStream()
-                .WriteHeader(sender638167354496472670, receiver638167354496472670, headerData638167354496472670, 0x00001A07, true)
-                .WriteArray(packetData638167354496472670)
-                .Send(client);*/
-        }
-
-        private void SendGameServer(INetworkClient client)
+		// The small character list (id + auth challenge per named character). Sent in response to
+		// RequestSmallCharList and again after a delete so the client refreshes. Entry layout is exactly
+		// Id + AuthChallenge (length-prefixed string), verified against retail (faolanx-charlogin: all bytes
+		// consumed, no per-entry trailer - an extra field shifts every following entry and the client loops
+		// once there is more than one character).
+		private async Task SendSmallCharList(INetworkClient client)
 		{
-			var headerData2 = new byte[] { 0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xF9, 0xD8, 0xD9, 0xC5, 0x0D };
-			var sender2 = new byte[] { 0x0D, 0x16, 0x91, 0x35, 0x1D, 0x10, 0x64 };
-			var receiver2 = new byte[] { 0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0xEC, 0xEB, 0x80, 0xDE, 0x03 };
+			var characters = await Database.GetCharactersByAccount(client.Session.Account.Id);
 
-			new PacketStream()
-				.WriteHeader(sender2, receiver2, headerData2, 0x00001A07)
-				.WriteString($"{client.Character.Realm.IpAddress}:{client.Character.Realm.Port}")
-				.WriteUInt32(client.Account.Id) // 0x5679E2CF
-				.WriteUInt32(0x0000C350)
-				.WriteUInt32(client.Account.ClientInstance)
-				.WriteArray(0x62,
-					0x00, 0x00, 0xC7, 0x9C,
-					0x00, 0x00, 0x07, 0xD0,
-					0x00, 0x00, 0x00, 0x00,
-					0x00, 0x00, 0x00, 0x00,
-					0x00, 0x00, 0x00, 0x00,
-					0x00, 0x00, 0x00, 0x01,
-					0x00, 0x00, 0x9C, 0x50,
-					0x00, 0x34, 0x3C, 0xC4,
-					0x00)
-				.Send(client);
+			var buffer = new PacketStream();
+			buffer.WriteHeader(Sender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.SmallCharList, [0x94, 0xa7, 0x60]);
+			buffer.WriteUInt32((characters.Length + 1) * 1009);
+
+			foreach (var character in characters)
+			{
+				buffer.WriteUInt32(character.Id);
+				buffer.WriteString(character.AuthChallenge);
+			}
+
+			await buffer.SendAsync(client);
 		}
 	}
 }

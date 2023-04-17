@@ -1,46 +1,44 @@
+using System.Threading.Tasks;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Opcodes;
-using Faolan.Extensions;
+using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Packets.Opcodes;
 
 namespace Faolan.UniverseAgent
 {
 	partial class UniverseAgentListener
 	{
-		private static readonly byte[] Sender = { 0x0d, 0xa0, 0xdb, 0x4d, 0x60, 0x10, 0x01 };
-		private static readonly byte[] Receiver = { 0x0d, 0x54, 0x40, 0x38, 0x0c, 0x10, 0x99, 0xA7, 0x42 };
-		private static readonly byte[] Receiver2 = { 0x0d, 0x54, 0x40, 0x38, 0x0c, 0x10, 0xec, 0xeb, 0x80, 0xde, 0x03 };
+		private static readonly byte[] Sender = [0x0d, 0xa0, 0xdb, 0x4d, 0x60, 0x10, 0x01];
 
-		private void SendPlayerAgentRealm(INetworkClient client)
+		public enum InvalidLoginReasons : byte
 		{
-			new PacketStream()
-				.WriteHeader(Sender, Receiver2, null, UniverseAgentResponseOpcodes.SendPlayerAgentRealm)
-				.WriteUInt32(client.Account.AuthStatus) // authstatus 0x01
-				.WriteUInt64(client.Account.LongId)
-				.WriteString($"{Configuration.ServerIpAddress()}:{Configuration.PlayerAgentPort()}")
-				.WriteUInt32(client.Account.Id)
-				.WriteUInt32(0x00000000)
-				.Send(client);
+			InternalSystemError = 0x04,
+			InvalidLogin = 0x0e,
+			AccountFrozen = 0x17
 		}
 
-		private static void InitAuth(INetworkClient client)
+		private Task SendPlayerAgentRealm(INetworkClient client)
 		{
-			new PacketStream()
-				.WriteHeader(Sender, Receiver, null, UniverseAgentResponseOpcodes.InitiateAuthentication)
-				.WriteString(client.Account.AuthChallenge)
-				.Send(client);
+			return new PacketStream().WriteHeader(Sender, client.Session.ClientConversation, UniverseAgentResponseOpcodes.SendPlayerAgentRealm).WriteUInt32(client.Session.Account.AuthStatus) // authstatus 0x01
+				.WriteUInt64(client.Session.Account.LongId).WriteString($"{Configuration.ServerIpAddress}:{Configuration.PlayerAgentPort}").WriteUInt32(client.Session.Account.Id).WriteUInt32(0x00000000).SendAsync(client);
 		}
 
-		private static void SetRegionState(INetworkClient client)
+		private static Task InitAuth(INetworkClient client)
 		{
-			new PacketStream()
-				.WriteHeader(Sender, Receiver2, null, UniverseAgentResponseOpcodes.SetRegion)
-				.WriteArray(0x01, 0x01, 0x01, 0x01,
-					0x3f, 0x80, 0x00, 0x00,
-					0x3f, 0x80, 0x00, 0x00,
-					0x01, 0x01,
-					0x00)
-				.Send(client);
+			return new PacketStream().WriteHeader(Sender, [0x0d, 0x54, 0x40, 0x38, 0x0c, 0x10, 0x99, 0xA7, 0x42], UniverseAgentResponseOpcodes.InitiateAuthentication).WriteString(client.Session.Account.AuthChallenge)
+				.SendAsync(client);
+		}
+
+		private static Task SendInvalidLogin(INetworkClient client, InvalidLoginReasons reason)
+		{
+			return new PacketStream().WriteHeader(Sender, client.Session.ClientConversation, 0x00002001)
+				.WriteArray(0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00).WriteByte(reason).SendAsync(client);
+		}
+
+		private static Task SetRegionState(INetworkClient client)
+		{
+			return new PacketStream().WriteHeader(Sender, client.Session.ClientConversation, UniverseAgentResponseOpcodes.SetRegion)
+				.WriteArray(0x01, 0x01, 0x01, 0x01, 0x3f, 0x80, 0x00, 0x00, 0x3f, 0x80, 0x00, 0x00, 0x01, 0x01, 0x00).SendAsync(client);
 		}
 	}
 }

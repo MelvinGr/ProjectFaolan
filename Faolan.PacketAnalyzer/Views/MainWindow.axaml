@@ -1,0 +1,267 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Faolan.PacketAnalyzer.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+        x:Class="Faolan.PacketAnalyzer.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="Faolan.PacketAnalyzer"
+        Width="1500"
+        Height="920"
+        MinWidth="1120"
+        MinHeight="720">
+
+    <Design.DataContext>
+        <!-- This only sets the DataContext for the previewer in an IDE, to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
+        <vm:MainWindowViewModel />
+    </Design.DataContext>
+
+    <Window.Styles>
+        <Style Selector="Border.card">
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="14" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="#22000000" />
+            <Setter Property="Background" Value="#08000000" />
+        </Style>
+        <Style Selector="TextBlock.sectionTitle">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,10" />
+        </Style>
+        <Style Selector="TextBlock.metaLabel">
+            <Setter Property="Opacity" Value="0.7" />
+            <Setter Property="FontSize" Value="11" />
+        </Style>
+        <Style Selector="TextBlock.metaValue">
+            <Setter Property="FontSize" Value="18" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+    </Window.Styles>
+
+    <Grid Margin="12" RowDefinitions="Auto,*,280" ColumnDefinitions="*,340" RowSpacing="12" ColumnSpacing="12">
+        <Border Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Classes="card">
+            <Grid ColumnDefinitions="2.5*,Auto,Auto,Auto" ColumnSpacing="24">
+                <StackPanel Spacing="4">
+                    <TextBlock FontSize="24" FontWeight="Bold" Text="Packet Analyzer" />
+                    <TextBlock Opacity="0.75"
+                               Text="Inspect captured traffic, review protocol handoffs, and drill into decoded packet details." />
+                    <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsBusy}">
+                        <ProgressBar Width="180" IsIndeterminate="True" />
+                        <TextBlock VerticalAlignment="Center" Text="{Binding BusyText}" />
+                    </StackPanel>
+                    <TextBlock MaxWidth="720" Foreground="Tomato" Text="{Binding StatusMessage}" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" HorizontalAlignment="Right" Spacing="2">
+                    <TextBlock Classes="metaLabel" Text="Capture" />
+                    <TextBlock MaxWidth="220" Classes="metaValue" Text="{Binding CaptureName}" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" HorizontalAlignment="Right" Spacing="2">
+                    <TextBlock Classes="metaLabel" Text="Packets" />
+                    <TextBlock Classes="metaValue" Text="{Binding TotalPacketsText}" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="3" HorizontalAlignment="Right" Spacing="2">
+                    <TextBlock Classes="metaLabel" Text="Bytes" />
+                    <TextBlock Classes="metaValue" Text="{Binding TotalBytesText}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="1" Grid.Column="0" Classes="card">
+            <Grid RowDefinitions="Auto,*" RowSpacing="10">
+                <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+                    <StackPanel Spacing="2">
+                        <TextBlock Classes="sectionTitle" Margin="0" Text="Captured packets" />
+                        <TextBlock Opacity="0.7" Text="Selection updates the detail tabs below." />
+                    </StackPanel>
+
+                    <Border Grid.Column="1" Margin="12,0,0,0" Padding="10,6" CornerRadius="8" Background="#10000000">
+                        <StackPanel Spacing="1">
+                            <TextBlock Classes="metaLabel" Text="Download" />
+                            <TextBlock FontWeight="SemiBold" Text="{Binding DownloadPacketsText}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="2" Margin="8,0,0,0" Padding="10,6" CornerRadius="8" Background="#10000000">
+                        <StackPanel Spacing="1">
+                            <TextBlock Classes="metaLabel" Text="Upload" />
+                            <TextBlock FontWeight="SemiBold" Text="{Binding UploadPacketsText}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Column="3" Margin="8,0,0,0" Padding="10,6" CornerRadius="8" Background="#10000000">
+                        <StackPanel Spacing="1">
+                            <TextBlock Classes="metaLabel" Text="Unknown" />
+                            <TextBlock FontWeight="SemiBold" Text="{Binding UnknownPacketsText}" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <DataGrid Grid.Row="1"
+                          Name="packetDataGrid"
+                          ItemsSource="{Binding PacketRows}"
+                          AutoGenerateColumns="False"
+                          ScrollViewer.HorizontalScrollBarVisibility="Visible"
+                          ScrollViewer.VerticalScrollBarVisibility="Auto"
+                          SelectionChanged="packetDataGrid_SelectionChanged">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Ticks" Binding="{Binding Ticks}" IsReadOnly="True" Width="120" />
+                        <DataGridTextColumn Header="Dir" Binding="{Binding DirectionName}" IsReadOnly="True" Width="90" />
+                        <DataGridTextColumn Header="Flow" Binding="{Binding EndpointDisplay}" IsReadOnly="True"
+                                            Width="320" />
+                        <DataGridTextColumn Header="Service" Binding="{Binding ServiceNameDisplay}" IsReadOnly="True"
+                                            Width="220" />
+                        <DataGridTextColumn Header="Opcode" Binding="{Binding Opcode}" IsReadOnly="True" Width="220" />
+                        <DataGridTextColumn Header="Sub Opcode" Binding="{Binding GameServerOpcode}" IsReadOnly="True"
+                                            Width="220" />
+                        <DataGridTextColumn Header="Strings" Binding="{Binding BytesStringDisplay}" IsReadOnly="True"
+                                            Width="480" />
+                        <DataGridTextColumn Header="Size" Binding="{Binding LengthDisplay}" IsReadOnly="True"
+                                            Width="100" />
+                        <DataGridTextColumn Header="Notes" Binding="{Binding Notes}" IsReadOnly="True" Width="180" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+
+        <ScrollViewer Grid.Row="1" Grid.Column="1" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Spacing="12">
+                <Border Classes="card">
+                    <StackPanel Spacing="10">
+                        <TextBlock Classes="sectionTitle" Text="Actions &amp; filters" />
+
+                        <StackPanel Spacing="4">
+                            <TextBlock Classes="metaLabel" Text="Search packet text" />
+                            <TextBox Name="searchTextTextBox" PlaceholderText="Type to search..." />
+                        </StackPanel>
+
+                        <StackPanel Spacing="4">
+                            <TextBlock Classes="metaLabel" Text="Service filter" />
+                            <ComboBox Name="sourceComboBox" SelectionChanged="sourceComboBox_SelectionChanged" />
+                        </StackPanel>
+
+                        <CheckBox Name="useTicksInSRCheckBox" Content="Include ticks in generated send/receive names"
+                                  IsChecked="True" />
+
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8" RowDefinitions="Auto,Auto">
+                            <Button Grid.Row="0" Grid.Column="0" Name="importButton" Content="Import capture"
+                                    Click="importButton_Click" />
+                            <Button Grid.Row="0" Grid.Column="1" Name="loadButton" Content="Load JSON"
+                                    Click="loadButton_Click" />
+                            <Button Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Name="saveButton"
+                                    Content="Save selection/dump" Click="saveButton_Click" />
+                        </Grid>
+
+                        <TextBlock Opacity="0.75"
+                                   Text="Analyzer ports are learned from the imported dump and displayed read-only below."
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="card">
+                    <StackPanel Spacing="10">
+                        <TextBlock Classes="sectionTitle" Text="Analyzer ports" />
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8"
+                              RowSpacing="8">
+                            <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Universe" />
+                            <TextBox Grid.Row="0" Grid.Column="1" IsReadOnly="True"
+                                     Text="{Binding UniverseAgentPortText}" />
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Player" />
+                            <TextBox Grid.Row="1" Grid.Column="1" IsReadOnly="True"
+                                     Text="{Binding PlayerAgentPortText}" />
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="CS Player" />
+                            <TextBox Grid.Row="2" Grid.Column="1" IsReadOnly="True"
+                                     Text="{Binding CsPlayerAgentPortText}" />
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="Agent" />
+                            <TextBox Grid.Row="3" Grid.Column="1" IsReadOnly="True"
+                                     Text="{Binding AgentServerPortText}" />
+
+                            <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="Game" />
+                            <TextBox Grid.Row="4" Grid.Column="1" IsReadOnly="True" Text="{Binding GameServerPortText}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="card">
+                    <StackPanel Spacing="10">
+                        <TextBlock Classes="sectionTitle" Text="Capture summary" />
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+                              ColumnSpacing="8" RowSpacing="6">
+                            <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Packets" />
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding TotalPacketsText}" />
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Download" />
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding DownloadPacketsText}" />
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="Upload" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding UploadPacketsText}" />
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="Unknown" />
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding UnknownPacketsText}" />
+
+                            <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="Services" />
+                            <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding UniqueServicesText}" />
+
+                            <TextBlock Grid.Row="5" Grid.Column="0" VerticalAlignment="Center" Text="Opcodes" />
+                            <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding UniqueOpcodesText}" />
+
+                            <TextBlock Grid.Row="6" Grid.Column="0" VerticalAlignment="Center" Text="Bytes" />
+                            <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding TotalBytesText}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="card">
+                    <StackPanel Spacing="10">
+                        <TextBlock Classes="sectionTitle" Text="Protocol traffic" />
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8"
+                              RowSpacing="6">
+                            <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="UniverseAgent" />
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding UniverseAgentPacketCountText}" />
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="PlayerAgent" />
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding PlayerAgentPacketCountText}" />
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Text="CSPlayerAgent" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding CsPlayerAgentPacketCountText}" />
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" VerticalAlignment="Center" Text="Agent" />
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding AgentServerPacketCountText}" />
+
+                            <TextBlock Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" Text="Game" />
+                            <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding GameServerPacketCountText}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Classes="card">
+            <StackPanel Spacing="10">
+                <TextBlock Classes="sectionTitle" Text="Selected packet details" />
+                <TabControl>
+                    <TabItem Header="Notes">
+                        <TextBox Margin="0,8,0,0" Name="notesTextBox" Text="{Binding SelectedPacketNotes}"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap" />
+                    </TabItem>
+                    <TabItem Header="Hex / raw">
+                        <TextBox Margin="0,8,0,0" Name="outputHexTextBox" IsReadOnly="True" AcceptsReturn="True"
+                                 TextWrapping="Wrap" />
+                    </TabItem>
+                    <TabItem Header="Generated code">
+                        <TextBox Margin="0,8,0,0" Name="outputTextBox" IsReadOnly="True" AcceptsReturn="True"
+                                 TextWrapping="Wrap" />
+                    </TabItem>
+                </TabControl>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

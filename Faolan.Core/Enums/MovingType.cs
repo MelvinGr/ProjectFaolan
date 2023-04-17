@@ -9,8 +9,11 @@ namespace Faolan.Core.Enums
 		MountedJump = 0x0142,
 		Falling = 0x0116,
 		Ox011A = 0x011a,
-		Ox011E = 0x011e,
+		Rotate = 0x011e,
 		Ox001E = 0x001e,
-		Ox001A = 0x001a
+		Ox001A = 0x001a,
+
+		Sprint = 0x013A
+		// 0x0112
 	}
 }

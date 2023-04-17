@@ -1,68 +1,34 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net7.0</TargetFramework>
-    <OutputPath>..\bin\$(Configuration)\</OutputPath>
-    <DefineConstants>$(Configuration.ToUpper());TRACE</DefineConstants>
-    <BuildDate>$([System.DateTime]::UTCNow.ToString("HH:mm:ss dd-MM-yyyy"))</BuildDate>
-  </PropertyGroup>
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+    </PropertyGroup>
 
-  <PropertyGroup>
-    <Authors>Project Faolan</Authors>
-    <PackageId>Faolan</PackageId>
-    <Version>0.1.0</Version>
-    <Description>$(BuildDate)</Description>
-  </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\Faolan.Core\Faolan.Core.csproj"/>
+    </ItemGroup>
 
-  <ItemGroup>
-    <None Remove="faolan.db-shm" />
-    <None Remove="faolan.db-wal" />
-  </ItemGroup>
+    <ItemGroup>
+        <InternalsVisibleTo Include="Faolan.PacketAnalyzer.Tests"/>
+    </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\Faolan.Core\Faolan.Core.csproj" />
-  </ItemGroup>
+    <ItemGroup>
+        <!-- Replay scaffolding (transitional; world-burst is replaced by DB-driven world entry per
+             docs/spawn-dissection-plan.md). Game DATA (incl. conversations) is NOT embedded - it lives in the
+             committed faolan.db, (re)built by Faolan.Importer. -->
+        <EmbeddedResource Include="GameServer\Data\strie-login-worldburst.bin"/>
+        <EmbeddedResource Include="GameServer\Data\spawn-player-template.bin"/>
+    </ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="7.0.4" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="7.0.4">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="7.0.4">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.1" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="7.0.4" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Resource Include="Resources\bigboy.hex" />
-    <Resource Include="Resources\dumphex-culled.txt" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Update="Properties\Resources.Designer.cs">
-      <DesignTime>True</DesignTime>
-      <AutoGen>True</AutoGen>
-      <DependentUpon>Resources.resx</DependentUpon>
-    </Compile>
-  </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Update="Properties\Resources.resx">
-      <Generator>ResXFileCodeGenerator</Generator>
-      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
-    </EmbeddedResource>
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Update="faolan.db" Condition="'$(Configuration)'=='Release'">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="faolan.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.8"/>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.8">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.8">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8"/>
+    </ItemGroup>
 </Project>

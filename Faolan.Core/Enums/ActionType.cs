@@ -4,8 +4,10 @@ namespace Faolan.Core.Enums
 	{
 		CastSpell = 0x4,
 		Emote = 0x5,
-		MoveEquippedToInventory = 0x9,
+		MoveEquippedToFromInventory = 0x9,
 		SwitchWeaponsButton = 0x2e,
-        RightClickItem = 0x0e
-    }
+		RightClickItem = 0x0e,
+		SummonMount = 0xa,
+		TalkToNpc = 0x16 // interacting with / talking to an NPC (opens its conversation)
+	}
 }

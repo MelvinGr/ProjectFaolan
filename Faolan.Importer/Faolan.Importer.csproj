@@ -1,0 +1,13 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- Faolan: the importers (CaptureItemImporter) + EF model. PacketAnalyzer: the pcap read/reassembly/
+             inflation pipeline (PacketAnalysisService). -->
+        <ProjectReference Include="..\Faolan\Faolan.csproj"/>
+        <ProjectReference Include="..\Faolan.PacketAnalyzer\Faolan.PacketAnalyzer.csproj"/>
+    </ItemGroup>
+</Project>

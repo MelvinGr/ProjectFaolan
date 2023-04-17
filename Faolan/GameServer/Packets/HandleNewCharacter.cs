@@ -1,11 +1,14 @@
+using System.Threading.Tasks;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Packets;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-		private static void HandleNewCharacter(INetworkClient client, ConanPacket packet)
+		private static async Task HandleNewCharacter(INetworkClient client, ConanPacket packet)
 		{
 			var blobData7 = new byte[] { 0x00, 0x00, 0x00, 0x89, 0xf5, 0x08, 0xf4, 0xc1, 0x00, 0x00, 0xc3, 0x50 };
 			var blobData71 = new byte[]
@@ -15,14 +18,14 @@ namespace Faolan.GameServer
 			};
 
 			var aBuffer = new PacketStream();
-			aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
+			aBuffer.WriteHeader(Sender2, Receiver2, 0x2000);
 			aBuffer.WriteArray(blobData7);
-			aBuffer.WriteUInt32(client.Account.ClientInstance);
+			aBuffer.WriteUInt32(client.Session.Account.ClientInstance);
 			aBuffer.WriteArray(blobData71);
 			aBuffer.WriteString("MaleTemplate=50000:10232;FemaleTemplate=50000:10233;StygianSlaver=50000:10234");
 			aBuffer.WriteByte(0);
 			aBuffer.WriteUInt32(0);
-			aBuffer.Send(client);
+			await aBuffer.SendAsync(client);
 
 			var blobData81 = new byte[]
 			{
@@ -33,22 +36,22 @@ namespace Faolan.GameServer
 			};
 
 			aBuffer = new PacketStream();
-			aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
+			aBuffer.WriteHeader(Sender2, Receiver2, 0x2000);
 			aBuffer.WriteUInt32(0x00000089);
 			aBuffer.WriteUInt32(0xf508f4c1);
 			aBuffer.WriteUInt32(0x0000c350);
-			aBuffer.WriteUInt32(client.Account.ClientInstance);
+			aBuffer.WriteUInt32(client.Session.Account.ClientInstance);
 			aBuffer.WriteArray(blobData81);
-			aBuffer.Send(client);
+			await aBuffer.SendAsync(client);
 
 			var blobData4 = new byte[] { 0x00, 0x00, 0x00, 0x15, 0xf9, 0x8e, 0x10, 0xb3, 0x00, 0x00, 0xc3, 0x50 };
 			var blobData41 = new byte[] { 0x00, 0x00, 0x00, 0x03, 0x60, 0x00, 0x00, 0x00, 0x02 };
 			aBuffer = new PacketStream();
-			aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
+			aBuffer.WriteHeader(Sender2, Receiver2, 0x2000);
 			aBuffer.WriteArray(blobData4);
-			aBuffer.WriteUInt32(client.Account.ClientInstance);
+			aBuffer.WriteUInt32(client.Session.Account.ClientInstance);
 			aBuffer.WriteArray(blobData41);
-			aBuffer.Send(client);
+			await aBuffer.SendAsync(client);
 
 			var blobData5 = new byte[] { 0x00, 0x00, 0x00, 0x4c, 0x6b, 0x87, 0xe3, 0x16, 0x00, 0x00, 0xc3, 0x50 };
 			var blobData51 = new byte[] { 0x00, 0x00, 0x00, 0x0b, 0x90, 0x00, 0x00, 0x00, 0xc3, 0x50 };
@@ -58,22 +61,22 @@ namespace Faolan.GameServer
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x02, 0x3c, 0x4b, 0xa3
 			};
 			aBuffer = new PacketStream();
-			aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
+			aBuffer.WriteHeader(Sender2, Receiver2, 0x2000);
 			aBuffer.WriteArray(blobData5);
-			aBuffer.WriteUInt32(client.Account.ClientInstance);
+			aBuffer.WriteUInt32(client.Session.Account.ClientInstance);
 			aBuffer.WriteArray(blobData51);
-			aBuffer.WriteUInt32(client.Account.ClientInstance);
+			aBuffer.WriteUInt32(client.Session.Account.ClientInstance);
 			aBuffer.WriteArray(blobData52);
-			aBuffer.Send(client);
+			await aBuffer.SendAsync(client);
 
 			var blobData6 = new byte[] { 0x00, 0x00, 0x00, 0x11, 0x40, 0x74, 0x9b, 0x8a, 0x00, 0x00, 0xc3, 0x50 };
 			var blobData61 = new byte[] { 0x01, 0x00, 0x00, 0x00, 0x00 };
 			aBuffer = new PacketStream();
-			aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
+			aBuffer.WriteHeader(Sender2, Receiver2, 0x2000);
 			aBuffer.WriteArray(blobData6);
-			aBuffer.WriteUInt32(client.Account.ClientInstance);
+			aBuffer.WriteUInt32(client.Session.Account.ClientInstance);
 			aBuffer.WriteArray(blobData61);
-			aBuffer.Send(client);
+			await aBuffer.SendAsync(client);
 
 			var blobData9 = new byte[] { 0x00, 0x00, 0x03, 0x06, 0xa3, 0x6d, 0x3b, 0x74, 0x00, 0x00, 0xc3, 0x50 };
 			var blobData91 = new byte[]
@@ -102,20 +105,21 @@ namespace Faolan.GameServer
 				0x33, 0x31, 0x3b, 0x31, 0x30, 0x31, 0x30, 0x32, 0x30, 0x37, 0x3a, 0x31, 0x36, 0x37, 0x31, 0x38, 0x33, 0x32, 0x08, 0x08, 0x95, 0xb1, 0x27, 0x10, 0x99, 0xf7, 0x31
 			};
 			aBuffer = new PacketStream();
-			aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
+			aBuffer.WriteHeader(Sender2, Receiver2, 0x2000);
 			aBuffer.WriteArray(blobData9);
-			aBuffer.WriteUInt32(client.Account.ClientInstance);
+			aBuffer.WriteUInt32(client.Session.Account.ClientInstance);
 			aBuffer.WriteArray(blobData91);
-			aBuffer.Send(client);
+			await aBuffer.SendAsync(client);
 
 			var blobData10 = new byte[] { 0x00, 0x00, 0x00, 0x2b, 0xa3, 0x6d, 0x3b, 0x74, 0x00, 0x00, 0xc3, 0x50 };
+			// Protobuf-like tags: 0x08 (f1), 0x10 (f2), 0x18 (f3), 0x22 (f4, length-delimited)
 			var blobData101 = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x1a, 0x08, 0x05, 0x10, 0x02, 0x18, 0x00, 0x22, 0x0a, 0x50, 0x6c, 0x61, 0x79, 0x4f, 0x72, 0x53, 0x6b, 0x69, 0x70, 0x2a, 0x00, 0x32, 0x04, 0x08, 0x00, 0x10, 0x00 };
 			aBuffer = new PacketStream();
-			aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
+			aBuffer.WriteHeader(Sender2, Receiver2, 0x2000);
 			aBuffer.WriteArray(blobData10);
-			aBuffer.WriteUInt32(client.Account.ClientInstance);
+			aBuffer.WriteUInt32(client.Session.Account.ClientInstance);
 			aBuffer.WriteArray(blobData101);
-			aBuffer.Send(client);
+			await aBuffer.SendAsync(client);
 
 			var blobData11 = new byte[]
 			{
@@ -123,9 +127,9 @@ namespace Faolan.GameServer
 				0x3f, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01
 			};
 			aBuffer = new PacketStream();
-			aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
+			aBuffer.WriteHeader(Sender2, Receiver2, 0x2000);
 			aBuffer.WriteArray(blobData11);
-			aBuffer.Send(client);
+			await aBuffer.SendAsync(client);
 
 			var blobData12 = new byte[]
 			{
@@ -133,36 +137,37 @@ namespace Faolan.GameServer
 				0x3f, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01
 			};
 			aBuffer = new PacketStream();
-			aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
+			aBuffer.WriteHeader(Sender2, Receiver2, 0x2000);
 			aBuffer.WriteArray(blobData12);
-			aBuffer.Send(client);
+			await aBuffer.SendAsync(client);
 
+			// Protobuf-like tags: 0x08 (f1), 0x18 (f3), 0x28 (f5), 0x30 (f6)
 			var blobData13 = new byte[]
 			{
 				0x00, 0x00, 0x00, 0x20, 0x64, 0x2c, 0xd3, 0xd6, 0x00, 0x00, 0xc3, 0x50, 0x00, 0x00, 0x27, 0xf8, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0a, 0x08, 0xd3, 0x9e, 0x05, 0x18, 0x02, 0x28, 0x18, 0x30,
 				0x00
 			};
 			aBuffer = new PacketStream();
-			aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
+			aBuffer.WriteHeader(Sender2, Receiver2, 0x2000);
 			aBuffer.WriteArray(blobData13);
-			aBuffer.Send(client);
+			await aBuffer.SendAsync(client);
 
 			var blobData14 = new byte[] { 0x00, 0x00, 0x00, 0x29, 0xba, 0xdf, 0x5a, 0x4b, 0x00, 0x00, 0xc3, 0x50 };
 			var blobData141 = new byte[]
 			{
-				//0x00, 
-				//0x00, 0x11, 
-				//0x2a, 0x74, 0x65, 0x78, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x5f, 0x31, 0x38, 0x33, 0x38, 0x37, 0x35, 
+				//0x00,
+				//0x00, 0x11,
+				//0x2a, 0x74, 0x65, 0x78, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x5f, 0x31, 0x38, 0x33, 0x38, 0x37, 0x35,
 				0x3f, 0x80, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01
 			};
 			aBuffer = new PacketStream();
-			aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
+			aBuffer.WriteHeader(Sender2, Receiver2, 0x2000);
 			aBuffer.WriteArray(blobData14);
-			aBuffer.WriteUInt32(client.Account.ClientInstance);
+			aBuffer.WriteUInt32(client.Session.Account.ClientInstance);
 			aBuffer.WriteByte(0);
 			aBuffer.WriteString("*texscript_183875");
 			aBuffer.WriteArray(blobData141);
-			aBuffer.Send(client);
+			await aBuffer.SendAsync(client);
 
 			var blobData15 = new byte[]
 			{
@@ -170,9 +175,9 @@ namespace Faolan.GameServer
 				0x35, 0x3f, 0x80, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02
 			};
 			aBuffer = new PacketStream();
-			aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
+			aBuffer.WriteHeader(Sender2, Receiver2, 0x2000);
 			aBuffer.WriteArray(blobData15);
-			aBuffer.Send(client);
+			await aBuffer.SendAsync(client);
 
 			var blobData16 = new byte[]
 			{
@@ -180,9 +185,9 @@ namespace Faolan.GameServer
 				0x35, 0x3f, 0x80, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02
 			};
 			aBuffer = new PacketStream();
-			aBuffer.WriteHeader(Sender2, Receiver2, null, 0x2000);
+			aBuffer.WriteHeader(Sender2, Receiver2, 0x2000);
 			aBuffer.WriteArray(blobData16);
-			aBuffer.Send(client);
+			await aBuffer.SendAsync(client);
 		}
 	}
 }

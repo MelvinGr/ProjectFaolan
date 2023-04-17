@@ -1,0 +1,27 @@
+<Solution>
+  <Folder Name="/Solution Files/">
+    <File Path=".dockerignore" />
+    <File Path=".gitattributes" />
+    <File Path=".gitignore" />
+    <File Path="AGENTS.md" />
+    <File Path="build.sh" />
+    <File Path="deleteBinObj.sh" />
+    <File Path="Directory.Build.props" />
+    <File Path="Dockerfile" />
+    <File Path="docs\spawn-dissection-plan.md" />
+    <File Path="faolan.db" />
+    <File Path="faolan.json" />
+    <File Path="logo.ico" />
+    <File Path="logo.png" />
+    <File Path="ProjectFaolan.sln.DotSettings" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="Faolan.PacketAnalyzer.Tests/Faolan.PacketAnalyzer.Tests.csproj" />
+  </Folder>
+  <Project Path="Faolan.Core/Faolan.Core.csproj" />
+  <Project Path="Faolan.DatabaseEditor/Faolan.DatabaseEditor.csproj" />
+  <Project Path="Faolan.Importer/Faolan.Importer.csproj" />
+  <Project Path="Faolan.PacketAnalyzer/Faolan.PacketAnalyzer.csproj" />
+  <Project Path="Faolan/Faolan.csproj" />
+</Solution>

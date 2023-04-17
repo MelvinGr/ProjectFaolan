@@ -1,275 +1,213 @@
 using System;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
-using Faolan.Core.Data;
-using Microsoft.Extensions.Configuration;
+using Faolan.Core.Extensions;
+using Faolan.Core.Network.Interfaces;
+using Faolan.Core.Network.Packets;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.Core.Network
 {
 	public interface INetworkClient
 	{
+		INetworkClientSession Session { get; }
 		string IpAddress { get; }
-		Account Account { get; set; }
-		Character Character { get; }
 
 		void Send(byte[] value);
+		Task SendAsync(byte[] value, CancellationToken cancellationToken = default);
+
+		void Start();
+		void Stop();
 	}
 
 	public abstract class NetworkClient : INetworkClient
 	{
-		public delegate void NetworkClientDelegate(INetworkClient client);
-
-		public delegate Task ReceivedPacketDelegate(INetworkClient client, Packet packet);
-
 		protected readonly ILogger Logger;
-        protected Socket Socket;
-        protected readonly bool _isAgentServer;
+		protected readonly Socket Socket;
+		public Action<INetworkClient>? Disconnected { get; init; }
 
-		public ReceivedPacketDelegate ReceivedPacket { get; set; }
-		public NetworkClientDelegate Disconnected { get; set; }
+		public Func<INetworkClient, Packet, Task>? ReceivedPacket { get; init; }
 
-		protected NetworkClient(Socket socket, ILogger logger, bool isAgentServer)
+		public INetworkClientSession Session { get; } = new NetworkClientSession();
+
+		public string? IpAddress => field ??= (Socket.RemoteEndPoint as IPEndPoint)?.Address.ToString();
+
+		protected NetworkClient(Socket socket, ILogger logger)
 		{
 			Socket = socket;
 			Logger = logger;
-            _isAgentServer = isAgentServer;
-        }
-
-		public string IpAddress => ((IPEndPoint)Socket.RemoteEndPoint)?.Address.ToString();
-        //public ushort LocalPort => (ushort)(((IPEndPoint)Socket.LocalEndPoint)?.Port ?? 0);
-
-		public Account Account { get; set; }
-		public Character Character => Account?.Character;
+		}
 
 		public abstract void Send(byte[] value);
+		public abstract Task SendAsync(byte[] value, CancellationToken cancellationToken = default);
+
 		public abstract void Start();
+		public abstract void Stop();
 	}
 
-	public class NetworkClient<TPacket> : NetworkClient
-		where TPacket : Packet
+	public sealed class NetworkClient<TPacket, TMessageFramer, TPacketFactory> : NetworkClient where TPacket : Packet where TMessageFramer : IMessageFramer, new() where TPacketFactory : IPacketFactory<TPacket>, new()
 	{
-		private readonly object _lock = new();
-		private readonly byte[] _packetLengthBuffer = new byte[sizeof(int)];
 		private readonly byte[] _tcpBuffer = new byte[0xFFFF];
+		private readonly IMessageFramer _messageFramer;
+		private readonly IPacketFactory<TPacket> _packetFactory;
+		private readonly IPacketLogger _outgoingPacketLogger;
+		private readonly SemaphoreSlim _sendLock = new SemaphoreSlim(1, 1);
 
-		private byte[] _packetBuffer;
-		private int _packetBytesRead;
-        //private Inflater _inflater;
+		private CancellationTokenSource? _cancellationTokenSource;
+		private int _stopped;
+		private Task? _receiveTask;
 
-        public NetworkClient(Socket socket, ILogger logger)
-			: base(socket, logger, typeof(TPacket).Name.Contains("AgentServerPacket"))
-        {
-			//
-        }
-
-		public override void Start()
+		public NetworkClient(Socket socket, ILogger logger, IPacketLogger outgoingPacketLogger) : base(socket, logger)
 		{
-			BeginReceive( /*token*/);
+			_messageFramer = new TMessageFramer();
+			_packetFactory = new TPacketFactory();
+			_outgoingPacketLogger = outgoingPacketLogger ?? throw new ArgumentNullException(nameof(outgoingPacketLogger));
 		}
 
 		public override void Send(byte[] value)
 		{
-			/*var stream = new ConanStream(value);
-			_ = stream.ReadUInt32();
-			_ = stream.ReadUInt32();
-			_ = stream.ReadUInt32();
-			_ = stream.ReadByte();
-			_ = stream.ReadArrayPrependLengthByte();
-			_ = stream.ReadByte();
-			_ = stream.ReadArrayPrependLengthByte();
-			var opcode = stream.ReadUInt16();            
-			Console.WriteLine($"Send opcode: 0x{opcode:X4}");*/
+			ArgumentNullException.ThrowIfNull(value);
 
-			lock (_lock)
+			_outgoingPacketLogger.Log(value);
+			LogRawPacket("<=", value);
+
+			_sendLock.Wait();
+			try
 			{
-				try
-				{
-					Socket?.Send(value);
-
-					/*Socket?.BeginSend(value, 0, value.Length, 0, ar =>
-					{
-					    try
-					    {
-					        Socket.EndSend(ar);
-					    }
-					    catch // (Exception e)
-					    {
-					        Disconnected?.Invoke(this);
-					        Socket = null;
-					    }
-					}, null);*/
-				}
-				catch // (Exception e)
-				{
-					Disconnected?.Invoke(this);
-					Socket = null;
-				}
+				Socket.Send(value, SocketFlags.None);
+			}
+			finally
+			{
+				_sendLock.Release();
 			}
 		}
 
-		private void BeginReceive( /*token*/)
+		public override async Task SendAsync(byte[] value, CancellationToken cancellationToken = default)
+		{
+			ArgumentNullException.ThrowIfNull(value);
+
+			_outgoingPacketLogger.Log(value);
+			LogRawPacket("<=", value);
+
+			await _sendLock.WaitAsync(cancellationToken);
+			try
+			{
+				await Socket.SendAsync(value, SocketFlags.None, cancellationToken);
+			}
+			finally
+			{
+				_sendLock.Release();
+			}
+		}
+
+		public override void Start()
+		{
+			if (_receiveTask is not null)
+				return;
+
+			_cancellationTokenSource = new CancellationTokenSource();
+			_receiveTask = ReceiveLoopAsync(_cancellationTokenSource.Token);
+		}
+
+		public override void Stop()
+		{
+			if (Interlocked.Exchange(ref _stopped, 1) == 1)
+				return;
+
+			try
+			{
+				_cancellationTokenSource?.Cancel();
+			}
+			catch
+			{
+				// Ignore cancellation/disposing races.
+			}
+
+			try
+			{
+				Socket.Shutdown(SocketShutdown.Both);
+			}
+			catch
+			{
+				// Socket may already be closed/reset.
+			}
+
+			Socket.Close();
+			Disconnected?.Invoke(this);
+		}
+
+		private async Task DataReceivedAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
+		{
+			foreach (var frame in _messageFramer.PushBytes(data.ToArray(), data.Length))
+			{
+				cancellationToken.ThrowIfCancellationRequested();
+				LogRawPacket("=>", frame);
+
+				var packet = _packetFactory.Create(frame);
+
+				if (packet?.IsValid != true)
+					throw new InvalidOperationException($"{typeof(TPacket).Name} was invalid");
+
+				if (ReceivedPacket is not null)
+					await ReceivedPacket(this, packet);
+			}
+		}
+
+		private void LogRawPacket(string direction, byte[] bytes)
+		{
+			if (!Logger.IsEnabled(LogLevel.Debug))
+				return;
+
+			Logger.LogDebug("{Direction} {PacketType} raw ({Length} bytes): {Bytes}", direction, typeof(TPacket).Name, bytes.Length, bytes.ToHex());
+		}
+
+		private async Task ReceiveLoopAsync(CancellationToken cancellationToken)
 		{
 			try
 			{
-				Socket?.BeginReceive(_tcpBuffer, 0, _tcpBuffer.Length, 0, ar =>
+				while (!cancellationToken.IsCancellationRequested)
 				{
-					try
+					var bytesRead = await Socket.ReceiveAsync(_tcpBuffer, SocketFlags.None, cancellationToken);
+					if (bytesRead == 0)
 					{
-						var bytesRead = Socket.EndReceive(ar);
-						if (bytesRead == 0)
-							return;
-
-						var buffer = _tcpBuffer.Take(bytesRead).ToArray();
-
-						// zlib compression (0x80000005)
-						if (buffer[0] == 0x80 && buffer[1] == 0x00 && buffer[2] == 0x00 && buffer[3] == 0x05)
-						{
-                            BeginReceive();
-							return;
-
-                            //_inflater = new Inflater();
-                            //buffer = Decompress(buffer.Skip(9).ToArray());
-                        }
-                        //else if (_inflater != null)
-                        //    buffer = Decompress(buffer);
-
-                        DataReceived(buffer, bytesRead);
-						BeginReceive();
+						Stop();
+						return;
 					}
-					catch // (Exception e)
+
+					var buffer = _tcpBuffer.AsMemory(0, bytesRead);
+
+					// zlib compression marker: 0x80000005
+					if (buffer.Length >= 4 && buffer.Span[0] == 0x80 && buffer.Span[1] == 0x00 && buffer.Span[2] == 0x00 && buffer.Span[3] == 0x05)
 					{
-						Disconnected?.Invoke(this);
-						Socket = null;
+						// TODO: handle compressed stream.
+						// buffer = Decompress(buffer[9..]);
+
+						continue;
 					}
-				}, null);
+
+					await DataReceivedAsync(buffer, cancellationToken);
+				}
 			}
-			catch // (Exception e)
+			catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
 			{
-				Disconnected?.Invoke(this);
-				Socket = null;
+				// Normal shutdown.
+			}
+			catch (ObjectDisposedException)
+			{
+				// Normal shutdown.
+			}
+			catch (SocketException ex)
+			{
+				Logger.LogDebug(ex, "Socket receive failed for {PacketType}; closing client.", typeof(TPacket).Name);
+				Stop();
+			}
+			catch (Exception ex)
+			{
+				Logger.LogDebug(ex, "Receive processing failed for {PacketType}; closing client.", typeof(TPacket).Name);
+				Stop();
 			}
 		}
-
-		// https://blog.stephencleary.com/2009/04/message-framing.html
-		private void DataReceived(byte[] data, int length)
-		{
-            if (_isAgentServer)
-            {
-                var packet = (TPacket)Activator.CreateInstance(typeof(TPacket), data);
-                if (packet?.IsValid == true)
-                    ReceivedPacket?.Invoke(this, packet);
-                else
-                    throw new Exception("packet?.IsValid != true");
-
-                return;
-            }
-
-			var i = 0;
-			while (i != length)
-			{
-				var bytesAvailable = data.Length - i;
-				if (_packetBuffer != null)
-				{
-					// We're reading into the data buffer
-					var bytesRequested = _packetBuffer.Length - _packetBytesRead;
-
-					var bytesTransferred = Math.Min(bytesRequested, bytesAvailable);
-					Array.Copy(data, i, _packetBuffer, _packetBytesRead, bytesTransferred);
-					i += bytesTransferred;
-
-					ReadCompleted(bytesTransferred);
-				}
-				else
-				{
-					// We're reading into the length prefix buffer
-					var bytesRequested = _packetLengthBuffer.Length - _packetBytesRead;
-
-					var bytesTransferred = Math.Min(bytesRequested, bytesAvailable);
-					Array.Copy(data, i, _packetLengthBuffer, _packetBytesRead, bytesTransferred);
-					i += bytesTransferred;
-
-					ReadCompleted(bytesTransferred);
-				}
-			}
-		}
-
-		private void ReadCompleted(int count)
-		{
-			_packetBytesRead += count;
-
-			if (_packetBuffer == null)
-			{
-				// We're currently receiving the length buffer
-				if (_packetBytesRead == sizeof(int))
-				{
-					var length = BitConverter.ToInt32(_packetLengthBuffer.Reverse().ToArray(), 0);
-
-					// Sanity check for length < 0
-					if (length < 0)
-						throw new ProtocolViolationException("Message length is less than zero");
-
-					// Another sanity check is needed here for very large packets, to prevent denial-of-service attacks
-					/* if (MaxMessageSize > 0 && length > MaxMessageSize)
-					    throw new ProtocolViolationException($"Message length {length} is larger than maximum message size {MaxMessageSize}"); */
-
-					// Zero-length packets are allowed as keepalives
-					if (length == 0)
-					{
-						_packetBytesRead = 0;
-						//GotCompletePacket(Array.Empty<byte>());
-					}
-					else
-					{
-						// Create the data buffer and start reading into it
-						_packetBuffer = new byte[length];
-						_packetBytesRead = 0;
-					}
-				}
-			}
-			else
-			{
-				if (_packetBytesRead == _packetBuffer.Length)
-				{
-					// We've gotten an entire packet, add back the length
-					var completePacket = _packetLengthBuffer.Concat(_packetBuffer).ToArray();
-
-					var packet = (TPacket)Activator.CreateInstance(typeof(TPacket), completePacket);
-					if (packet?.IsValid == true)
-						ReceivedPacket?.Invoke(this, packet);
-					else
-						throw new Exception("packet?.IsValid != true");
-
-					// Start reading the length buffer again
-					_packetBuffer = null;
-					_packetBytesRead = 0;
-				}
-			}
-		}
-
-        /*private byte[] Decompress(byte[] input)
-        {
-            try
-            {
-                _inflater.SetInput(input);
-
-                var bos = new MemoryStream(input.Length);
-
-                var buf = new byte[10240];
-                while (!_inflater.IsFinished && !_inflater.IsNeedingInput)
-                {
-                    var count = _inflater.Inflate(buf);
-                    bos.Write(buf, 0, count);
-                }
-
-                return bos.ToArray();
-            }
-            catch //(Exception e)
-            {
-                return null;
-            }
-        }*/
-    }
+	}
 }
