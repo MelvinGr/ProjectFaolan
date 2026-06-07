@@ -14,10 +14,9 @@ namespace Faolan.Importer
 {
 	// Rebuilds the database from the raw capture sources. The DB is the single source of truth (committed
 	// faolan.db); this tool is the one way to (re)populate it from `Captures/` - no embedded data blobs in the
-	// server. Imports item identities (inventory snapshots) and NPC conversations; maps/NPCs/spells follow (see
-	// docs/faolan-importer-plan.md).
-	// TODO: IMPORTER conversations should not delete anything.
-	// TODO: show before and after stats at the end of import
+	// server. Imports (all upsert, no wipes): item identities + cast spell ids (inventory/ApplySpell), maps
+	// (MapChange), NPC conversations; and with --archive, the ability/spell definitions. Prints a before/after
+	// delta. NPCs are next. See docs/faolan-importer-plan.md.
 	internal static class Program
 	{
 		private const string RepoRoot = "/home/melvin/Development/C#/Project Faolan";
@@ -25,10 +24,11 @@ namespace Faolan.Importer
 		private static async Task<int> Main(string[] args)
 		{
 			var dbPath = GetOption(args, "--db") ?? Path.Combine(RepoRoot, "faolan.db");
-			var capturesDir = args.FirstOrDefault(a => !a.StartsWith("--")) ?? Path.Combine(RepoRoot, "Captures");
+			var capturesDir = GetOption(args, "--captures") ?? Path.Combine(RepoRoot, "Captures");
+			var archiveDir = GetOption(args, "--archive"); // dir with aocdatabase.sql (one-time ability/spell defs)
 			var dryRun = args.Contains("--dry-run");
 
-			Console.WriteLine($"Faolan.Importer: db={dbPath}  captures={capturesDir}  dryRun={dryRun}");
+			Console.WriteLine($"Faolan.Importer: db={dbPath}  captures={capturesDir}  archive={archiveDir ?? "(none)"}  dryRun={dryRun}");
 
 			if (!Directory.Exists(capturesDir))
 			{
@@ -62,38 +62,75 @@ namespace Faolan.Importer
 			await using var db = new DatabaseContext(options);
 			await db.Database.MigrateAsync();
 
-			var (total, inserted) = await CaptureItemImporter.ImportAsync(db, itemPackets);
-			Console.WriteLine($"Items: upserted {total} ({inserted} new). DB now: {await db.Items.CountAsync()} items, {await db.Items.CountAsync(i => i.Archetype != 0)} buildable.");
+			var before = await Snapshot(db);
 
-			var newMaps = await CaptureMapImporter.ImportAsync(db, itemPackets);
-			Console.WriteLine($"Maps: {newMaps} new inserted. DB now: {await db.Maps.CountAsync()} maps.");
+			if (archiveDir != null)
+			{
+				var (abilities, classAbilities) = await ArchiveSqlImporter.ImportAsync(db, archiveDir);
+				Console.WriteLine($"Archive: {abilities} abilities, {classAbilities} class-ability rows.");
+			}
 
+			await CaptureItemImporter.ImportAsync(db, itemPackets);
+			await CaptureMapImporter.ImportAsync(db, itemPackets);
+			await CaptureSpellImporter.ImportAsync(db, itemPackets);
 			await ImportConversations(db, conversations);
-			Console.WriteLine($"Conversations: {await db.ConversationNodes.CountAsync()} nodes, {await db.ConversationPackets.CountAsync()} packets.");
+
+			var after = await Snapshot(db);
+			PrintDelta(before, after);
 
 			return 0;
 		}
 
-		// Full replace: conversation nodes are entirely derived from captures, so rebuild them every run.
+		// Upsert (never wipe): update each extracted node's handles + replace its own packets, insert new nodes, and
+		// leave any node not in this run's captures untouched.
 		private static async Task ImportConversations(DatabaseContext db, List<ConversationEntry> conversations)
 		{
-			await db.ConversationPackets.ExecuteDeleteAsync();
-			await db.ConversationNodes.ExecuteDeleteAsync();
-
 			foreach (var e in conversations)
 			{
-				db.ConversationNodes.Add(new ConversationNode
+				var node = await db.ConversationNodes.Include(n => n.Packets)
+					.FirstOrDefaultAsync(n => n.TypeId == e.TypeId && n.Mode == e.Mode && n.Field3 == e.Field3);
+
+				if (node == null)
 				{
-					TypeId = e.TypeId,
-					Mode = e.Mode,
-					Field3 = e.Field3,
-					CapturedNpcHandle = e.CapturedNpcHandle,
-					CapturedInstance = e.CapturedInstance,
-					Packets = e.Packets.Select((p, i) => new ConversationPacket { Sequence = i, Data = p }).ToList()
-				});
+					node = new ConversationNode { TypeId = e.TypeId, Mode = e.Mode, Field3 = e.Field3 };
+					db.ConversationNodes.Add(node);
+				}
+				else if (node.Packets != null)
+				{
+					db.ConversationPackets.RemoveRange(node.Packets); // refresh this node's packets
+				}
+
+				node.CapturedNpcHandle = e.CapturedNpcHandle;
+				node.CapturedInstance = e.CapturedInstance;
+				node.Packets = e.Packets.Select((p, i) => new ConversationPacket { Sequence = i, Data = p }).ToList();
 			}
 
 			await db.SaveChangesAsync();
+		}
+
+		private static async Task<Dictionary<string, int>> Snapshot(DatabaseContext db) => new()
+		{
+			["Items"] = await db.Items.CountAsync(),
+			["Items(buildable)"] = await db.Items.CountAsync(i => i.Archetype != 0),
+			["Spells"] = await db.Spells.CountAsync(),
+			["Abilities"] = await db.Abilities.CountAsync(),
+			["ClassAbilities"] = await db.ClassAbilities.CountAsync(),
+			["Maps"] = await db.Maps.CountAsync(),
+			["ConversationNodes"] = await db.ConversationNodes.CountAsync(),
+			["ConversationPackets"] = await db.ConversationPackets.CountAsync()
+		};
+
+		private static void PrintDelta(Dictionary<string, int> before, Dictionary<string, int> after)
+		{
+			Console.WriteLine("\n  table                 before    after    delta");
+			Console.WriteLine("  ------------------------------------------------");
+			foreach (var (key, a) in after)
+			{
+				var b = before[key];
+				var delta = a - b;
+				var deltaText = (delta >= 0 ? "+" : "") + delta;
+				Console.WriteLine($"  {key,-20} {b,7} {a,8} {deltaText,7}");
+			}
 		}
 
 		private static List<List<CapturedPacket>> ReadCaptures(string capturesDir)

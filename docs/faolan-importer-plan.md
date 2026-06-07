@@ -155,7 +155,14 @@ the last to move.
   the position is the character's spawn at map change (representative, not canonical), so it only seeds new rows;
   the curated maps' positions still carry an old decimal-shift bug - a separate cleanup.
 - **Phase 4** — NPC identity spike, then `NpcExtractor` (or staging table).
-- **Phase 5** — `SpellExtractor` (spell/skill/ability defs -> `Spell`, known set -> `CharacterSpells`).
+- **Phase 5 — DONE (2026-06-08).** Spike found the spellbook is NOT in captures (class/level-derived client-side);
+  captures only carry cast-spell ids (ApplySpell). So spells = two sources: (1) **archive** ability/spell defs -
+  `ArchiveSqlImporter` (`--archive <dir>`) imports `p_abilities` -> `Ability` (id + Data0..4 identity quad) and
+  `const_abilitys` -> `ClassAbility` (class/level -> ability+spell id lists); new tables, migration `AddAbilities`,
+  upsert (no deletes). (2) **captures** - `CaptureSpellImporter` harvests cast spell ids from ApplySpell
+  (0x6B87E316; spell id at inner[13]) and catalogs them id-only in `Spells` (~119 from the dumps). Names/params
+  stay client-side/`spelldata`. Tests: `ArchiveSqlImporterTests`, `CaptureSpellImporterTests`. NOTE: archive defs
+  are tiny (2 abilities / 3 class rows - all the archive has); the rest of the spell catalog is the harvested ids.
 - **Phase 6** — appearance/stats extractors, once the encodings are cracked (stats screenshots are ground truth).
 - **Cleanup** — delete the Python scripts and the regenerator test once their C# extractors land (keep
   `compare_log_to_dump.py` only if still useful for diffing).

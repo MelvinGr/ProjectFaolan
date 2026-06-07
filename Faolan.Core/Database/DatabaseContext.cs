@@ -23,6 +23,8 @@ namespace Faolan.Core.Database
 		DbSet<Spell> Spells { get; }
 		DbSet<ConversationNode> ConversationNodes { get; }
 		DbSet<ConversationPacket> ConversationPackets { get; }
+		DbSet<Ability> Abilities { get; }
+		DbSet<ClassAbility> ClassAbilities { get; }
 		Task<int> SaveChangesAsync(CancellationToken cancellationToken = default); // from DbContext
 	}
 
@@ -45,6 +47,8 @@ namespace Faolan.Core.Database
 		public DbSet<Spell> Spells { get; set; }
 		public DbSet<ConversationNode> ConversationNodes { get; set; }
 		public DbSet<ConversationPacket> ConversationPackets { get; set; }
+		public DbSet<Ability> Abilities { get; set; }
+		public DbSet<ClassAbility> ClassAbilities { get; set; }
 
 		public DatabaseContext(DbContextOptions<DatabaseContext> dbContextOptions) : base(dbContextOptions)
 		{
@@ -69,6 +73,8 @@ namespace Faolan.Core.Database
 			// A conversation node is uniquely identified by the player's TalkToNpc args; its packets cascade-delete.
 			modelBuilder.Entity<ConversationNode>().HasIndex(n => new { n.TypeId, n.Mode, n.Field3 }).IsUnique();
 			modelBuilder.Entity<ConversationNode>().HasMany(n => n.Packets).WithOne(p => p.Node).OnDelete(DeleteBehavior.Cascade);
+
+			modelBuilder.Entity<ClassAbility>().HasIndex(c => new { c.Class, c.Level }).IsUnique();
 		}
 	}
 }

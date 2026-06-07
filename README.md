@@ -63,10 +63,13 @@ Game data is (re)built from the raw sources by the **`Faolan.Importer`** tool (s
 extracted data straight into the DB. It imports: **item identities** from inventory snapshots
 (`CaptureItemImporter` + `ArchetypeHarvester`: template id + `Data1..4` quad + archetype → `Items`,
 ~**384 items / 177 buildable**); **NPC conversations** (`ConversationExtractor` → `ConversationNode`/
-`ConversationPacket`); and **maps** from `MapChange` packets (`CaptureMapImporter` → new `Map` rows). The OLD C++
-server's base data (`p_items`/`spelldata`/`npcs`) was imported once and now lives in the committed DB (the archive
-`.sql` files were deleted after that one-time import; the `Archive/` zips remain the historical source). NPCs and
-spells/skills move into the importer next.
+`ConversationPacket`); **maps** from `MapChange` packets (`CaptureMapImporter` → new `Map` rows); and **cast
+spell ids** from `ApplySpell` (`CaptureSpellImporter` → id-only `Spell` rows; names/params are client-side). With
+`--archive <dir>` it also imports the archive's **ability/spell definitions** (`p_abilities` → `Ability`,
+`const_abilitys` → `ClassAbility`) - the spellbook is class/level-derived, not in captures. Each run prints a
+before/after delta table; imports upsert (no wipes). The OLD C++ server's base data (`p_items`/`spelldata`/`npcs`)
+was imported once and now lives in the committed DB (the archive `.sql` files were deleted after that one-time
+import; the `Archive/` zips remain the historical source). NPCs (session-handle identity spike) come next.
 
 ## Working conventions
 
