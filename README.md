@@ -66,8 +66,10 @@ extracted data straight into the DB. It imports: **item identities** from invent
 `ConversationPacket`); **maps** from `MapChange` packets (`CaptureMapImporter` → new `Map` rows); and **cast
 spell ids** from `ApplySpell` (`CaptureSpellImporter` → id-only `Spell` rows; names/params are client-side). With
 `--archive <dir>` it also imports the archive's **ability/spell definitions** (`p_abilities` → `Ability`,
-`const_abilitys` → `ClassAbility`) - the spellbook is class/level-derived, not in captures. Each run prints a
-before/after delta table; imports upsert (no wipes). The OLD C++ server's base data (`p_items`/`spelldata`/`npcs`)
+`const_abilitys` → `ClassAbility`) - the spellbook is class/level-derived, not in captures. It also catalogs
+**NPC spawns** per map (`NpcSpawnExtractor` → `NpcSpawn`) and stores each map's full **world burst**
+(`MapWorldBurstExtractor` → `MapWorldBurst`) - the data the login path replays to render any map. Each run prints
+a before/after delta table; imports upsert (no wipes). The OLD C++ server's base data (`p_items`/`spelldata`/`npcs`)
 was imported once and now lives in the committed DB (the archive `.sql` files were deleted after that one-time
 import; the `Archive/` zips remain the historical source). NPCs (session-handle identity spike) come next.
 
@@ -221,16 +223,18 @@ Key sub-protocol facts:
 ### World-burst replay + progressive DB-driven rebuild (`RetailLoginReplay.cs`)
 
 A real login is ~244 packets (about half of them world build) with character-specific bodies, so the working
-path **replays the retail Strie login world burst** and rewrites it for the logged-in character. The 71-packet
-initial world burst (every `0x2000` download before the first `0x2020`) is embedded at
-`Faolan/GameServer/Data/strie-login-worldburst.bin`; `ReplayStrieLoginWorldBurst` sends it and
-`SendSpawnCheckResponse` answers the `0x2020` polls. This is the **any-beach-character** path (gated on
-`Character.MapId == 0xFAA`), confirmed in-client for non-Strie ids. What we now do to each burst packet:
+path **replays a captured world burst from the DB** and rewrites it for the logged-in character. Each map's burst
+(every `0x2000` download from `MapChange` to the first `0x2020` poll) lives in the **`MapWorldBurst` /
+`MapWorldBurstPacket`** tables, imported from the captures by `Faolan.Importer` (`MapWorldBurstExtractor`). On
+existing-character login, if the character's map has a stored burst, `ReplayMapWorldBurst` sends it (re-addressed
+from the burst's `CapturedInstance` to the live character) and `SendSpawnCheckResponse` answers the `0x2020`
+polls; otherwise a hand-built fallback (no NPCs) runs. This **generalizes the old beach-only path to any map** -
+the beach (4010) is just the burst whose source is the proven 71-packet blob (seeded into the DB by the importer;
+the embedded resource was retired). What we do to each burst packet:
 
-- **Instance re-address** (`RewriteBurstInstance`): the capture's instance `0x02165EFF` is replaced with the
-  live character instance everywhere - as the receiver/inventory varint (`FF BD D9 10`) and as the raw entity
-  handle/owner uint32 (`02 16 5E FF`). Both are 4 bytes for in-range ids (`0x02000000..0x0FFFFFFF`), so it is
-  length-preserving; the CRC is recomputed.
+- **Instance re-address** (`RewriteBurstInstance`): the burst's captured instance is replaced with the live
+  character instance everywhere - as the receiver/inventory varint and the raw entity handle/owner uint32. Both
+  are 4 bytes for in-range ids (`0x02000000..0x0FFFFFFF`), so it is length-preserving; the CRC is recomputed.
 - **Player spawn from DB** (`TryRebuildPlayerSpawnFromDb` + `Spawn/SpawnPacketBuilder.cs`): the player's own
   `FA015807` is rebuilt with the DB character's **position** and **name** (`SetSpawnName` adjusts the name's
   nested length prefixes). Rotation is kept verbatim (DB rotation rebuild stalled the client). Race lives at
@@ -380,9 +384,10 @@ today); and ultimately the full DB-built snapshot incl. the tails.
 
 ## Notes
 
-- The repository still contains several hardcoded/verbatim protocol payloads (the `Retail*Burst.cs` files) and
-  embedded data under `Faolan/GameServer/Data/`: capture blobs (world burst, conversations, spawn template) and
-  `Data/` (the replay scaffolding only). Game data is NOT embedded - it lives in the committed `faolan.db`, (re)built
+- The repository still contains hardcoded/verbatim protocol payloads (the `Retail*Burst.cs` create-flow files).
+  The only embedded data left in the server is `Faolan/GameServer/Data/spawn-player-template.bin` (used to rebuild
+  the player's own spawn). The `strie-login-worldburst.bin` file stays in the repo only as the import source for
+  the beach burst (not embedded). Game data + world bursts are NOT embedded - they live in the committed `faolan.db`, (re)built
   from `Captures/` by the `Faolan.Importer` tool.
 - Generating EF migrations needs the design-time factory in `Faolan/Helpers/DatabaseContextDesignTimeFactory.cs`
   (the runtime `ConfigureFaolanDatabase` registration - now a pooled `DbContextFactory` - can't be used by

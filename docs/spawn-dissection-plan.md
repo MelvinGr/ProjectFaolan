@@ -363,9 +363,14 @@ are proven safe); model the bag as a list; then the full DB-assembled `737A6DF9`
 and the op-`0x1d` live add path.
 
 **Phase 6 — Static world & retire the replay.**
-Dissect `66AEDD50` / `F096251E` / `33A56FB0` and source from `Maps` / `MapObjects` (these may be largely
-map-constant, so a per-map cached blob built once is acceptable). Once Phases 1–6 reproduce the burst, delete
-`strie-login-worldburst.bin` + `RetailLoginReplay.cs` and route all logins through the dynamic path.
+DONE (2026-06-08, partial): the world burst is now **DB-driven per map**. `Faolan.Importer`
+(`MapWorldBurstExtractor`) stores each captured map's full burst in the `MapWorldBurst` tables; on login
+`ReplayMapWorldBurst` replays the burst for the character's map (re-addressed to the live char), so ANY captured
+map renders - not just the beach. The embedded `strie-login-worldburst.bin` is retired (the beach burst is seeded
+into the DB from that blob, byte-identical). The burst is still the captured RAW packets, not reconstructed from
+`Maps`/`MapObjects` - so the LITERAL static-world dissection (`66AEDD50`/`F096251E`/`33A56FB0` -> DB-built) is
+still the remaining work, but logins no longer need an embedded blob and any map with a capture works. KNOWN: a
+couple of maps whose captured player instance is out of the 4-byte-varint range don't re-address cleanly yet.
 
 ## Phase 7 — NPC conversations (dialogue)
 

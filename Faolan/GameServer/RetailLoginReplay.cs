@@ -32,21 +32,6 @@ namespace Faolan.GameServer
 		// archetype), keyed by the CharacterEquipment slot they go in. Slot-appropriate so the client accepts them.
 		private const uint StarterWristItem = 3361557; // Slave Manacles (wrist, 0x12)
 
-		// The character instance baked into the Strie login capture. When a character logs in with exactly
-		// this id, the embedded world-burst is sent verbatim (the capture's receivers/bodies already address
-		// this instance), which is why no rewriting is needed yet. This is the milestone-1 proof that the
-		// retail static-world setup makes the client render NPCs; generalising to any instance (varint/body
-		// substitution) is the follow-up.
-		private const uint StrieLoginInstance = 0x02165EFF;
-
-		// The verbatim Strie-login initial world burst: every GameServer download (opcode 0x2000) sent before
-		// the client's first 0x2020 spawn poll - MapChange, the world objects/geometry (66AEDD50 / F096251E /
-		// 33A56FB0), the entity Spawns (FA015807) and their 96C46740 registrations, plus the inventory dump.
-		// Our hand-built login path omitted all the world-object setup, so the client never built the playfield
-		// and discarded the spawns. Extracted by Captures/compare_log_to_dump.py's sibling extractor; format is
-		// [uint32 count][ uint32 length + bytes ]*, all big-endian, each record a complete on-wire Conan packet.
-		private static readonly Lazy<byte[][]> StrieLoginWorldBurst = new Lazy<byte[][]>(LoadStrieLoginWorldBurst);
-
 		private static readonly ulong[] EquippedSlotIds = [0x01, 0x02, 0x03, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0e, 0x0f, 0x10, 0x12, 0x14, 0x15];
 
 		// Applies the DB inventory to the parsed snapshot: replaces each captured Equipped entry whose slot the
@@ -172,12 +157,15 @@ namespace Faolan.GameServer
 				recordId, count);
 		}
 
-		// Replays the captured Strie-login world burst verbatim. Used in place of the hand-built
-		// MapChange/SpawnPlayer/beach login path when the logged-in character is the Strie test instance.
-		private async Task ReplayStrieLoginWorldBurst(INetworkClient client)
+		// Replays a map's captured world burst (from the DB) in place of the hand-built MapChange/SpawnPlayer path,
+		// re-addressed from the burst's captured instance to the logged-in character. Works for ANY map that has a
+		// stored burst (beach included - its burst is the proven blob, seeded into the DB by Faolan.Importer).
+		private async Task ReplayMapWorldBurst(INetworkClient client, MapWorldBurst burst)
 		{
-			var packets = StrieLoginWorldBurst.Value;
-			Logger.LogInformation("Replaying the verbatim Strie-login world burst ({Count} packets) for clientInstance={ClientInstance:X8}.", packets.Length, client.Session.Account.ClientInstance);
+			var packets = burst.Packets.OrderBy(p => p.Sequence).Select(p => p.Data).ToList();
+			var capturedInstance = burst.CapturedInstance;
+			var liveInstance = client.Session.Account.ClientInstance;
+			Logger.LogInformation("Replaying world burst for map {Map} ({Count} packets, instance {Old:X8} -> {New:X8}).", burst.MapId, packets.Count, capturedInstance, liveInstance);
 
 			client.Session.UsedWorldBurstReplay = true;
 
@@ -194,12 +182,12 @@ namespace Faolan.GameServer
 			// - doing that mid-loop adds a CPU stall between sends that reshapes the burst's TCP segmentation, and
 			// the client (no reassembly on the uncompressed download) then misframes and hangs on the loading
 			// screen. Pre-building keeps the actual send loop tight and uniform.
-			var toSend = new List<byte[]>(packets.Length);
+			var toSend = new List<byte[]>(packets.Count);
 			foreach (var packet in packets)
 			{
-				// Phase 2: re-address the capture's instance (0x02165EFF) to the logged-in character so the burst
-				// works for ANY beach character, not just Strie. The NPC handles in the burst are left as-is.
-				var pkt = RewriteBurstInstance(packet, client.Session.Account.ClientInstance);
+				// Re-address the capture's instance to the logged-in character so the burst works for any character.
+				// The NPC handles in the burst are left as-is.
+				var pkt = RewriteBurstInstance(packet, capturedInstance, liveInstance);
 
 				if (dbInventory.Count > 0 && IsInventorySnapshot(pkt))
 					pkt = BuildBeachInventoryPacket(pkt, dbInventory);
@@ -315,37 +303,6 @@ namespace Faolan.GameServer
 			return bodyStart + 8 <= packet.Length && BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(bodyStart + 4, 4)) == 0x737A6DF9u;
 		}
 
-		private static byte[][] LoadStrieLoginWorldBurst()
-		{
-			var asm = Assembly.GetExecutingAssembly();
-			var name = asm.GetManifestResourceNames().First(n => n.EndsWith("strie-login-worldburst.bin", StringComparison.Ordinal));
-
-			using var stream = asm.GetManifestResourceStream(name)!;
-			using var ms = new MemoryStream();
-			stream.CopyTo(ms);
-			var data = ms.ToArray();
-
-			var offset = 0;
-
-			uint ReadU32()
-			{
-				var v = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(offset, 4));
-				offset += 4;
-				return v;
-			}
-
-			var count = ReadU32();
-			var packets = new List<byte[]>((int)count);
-			for (var i = 0; i < count; i++)
-			{
-				var len = (int)ReadU32();
-				packets.Add(data[offset..(offset + len)]);
-				offset += len;
-			}
-
-			return packets.ToArray();
-		}
-
 		// Replaces every non-overlapping occurrence of find with repl (equal length) in buffer, after the 8-byte
 		// length+crc prefix.
 		private static void ReplaceAll(byte[] buffer, byte[] find, byte[] repl)
@@ -395,19 +352,19 @@ namespace Faolan.GameServer
 		// varint(0x02165EFF) = FF BD D9 10; entity handles / body fields appear as the raw uint32 02 16 5E FF. Both
 		// are 4 bytes for in-range ids (0x02000000..0x0FFFFFFF), so substitution is length-preserving; we then
 		// recompute the CRC. Out-of-range instances (varint length != 4) are left unchanged (caller stays on Strie).
-		private static byte[] RewriteBurstInstance(byte[] packet, uint newInstance)
+		private static byte[] RewriteBurstInstance(byte[] packet, uint oldInstance, uint newInstance)
 		{
-			if (newInstance == StrieLoginInstance)
+			if (oldInstance == newInstance)
 				return packet;
 
-			var oldVarint = EncodeVarint(StrieLoginInstance);
+			var oldVarint = EncodeVarint(oldInstance);
 			var newVarint = EncodeVarint(newInstance);
 			if (oldVarint.Length != newVarint.Length)
 				return packet; // can't substitute without shifting lengths; leave verbatim
 
 			var oldRaw = new byte[4];
 			var newRaw = new byte[4];
-			BinaryPrimitives.WriteUInt32BigEndian(oldRaw, StrieLoginInstance);
+			BinaryPrimitives.WriteUInt32BigEndian(oldRaw, oldInstance);
 			BinaryPrimitives.WriteUInt32BigEndian(newRaw, newInstance);
 
 			var p = (byte[])packet.Clone();

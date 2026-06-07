@@ -74,6 +74,9 @@ namespace Faolan.Importer
 			await CaptureMapImporter.ImportAsync(db, itemPackets);
 			await CaptureSpellImporter.ImportAsync(db, itemPackets);
 			await ImportConversations(db, conversations);
+			await ImportNpcSpawns(db, NpcSpawnExtractor.Merge(captures.SelectMany(NpcSpawnExtractor.Extract)));
+			await ImportMapWorldBursts(db, MapWorldBurstExtractor.Merge(captures.SelectMany(MapWorldBurstExtractor.Extract)));
+			await SeedBeachBurstFromBlob(db); // beach (4010) uses the proven 71-packet blob, not the captured window
 
 			var after = await Snapshot(db);
 			PrintDelta(before, after);
@@ -108,6 +111,101 @@ namespace Faolan.Importer
 			await db.SaveChangesAsync();
 		}
 
+		// Beach map 4010: seed its world burst from the proven embedded blob (strie-login-worldburst.bin, 71 packets,
+		// instance 0x02165EFF) rather than the captured window, so the long-working beach login is byte-identical.
+		// The blob file stays in the repo only as this import source (it is no longer embedded in the server).
+		private static async Task SeedBeachBurstFromBlob(DatabaseContext db)
+		{
+			const uint beachMap = 0x00000FAA;
+			const uint strieInstance = 0x02165EFF;
+			var blobPath = Path.Combine(RepoRoot, "Faolan", "GameServer", "Data", "strie-login-worldburst.bin");
+			if (!File.Exists(blobPath))
+				return;
+
+			var data = await File.ReadAllBytesAsync(blobPath);
+			var packets = new List<byte[]>();
+			var offset = 0;
+			uint ReadU32()
+			{
+				var v = (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
+				offset += 4;
+				return v;
+			}
+
+			var count = ReadU32();
+			for (var i = 0; i < count; i++)
+			{
+				var len = (int)ReadU32();
+				packets.Add(data[offset..(offset + len)]);
+				offset += len;
+			}
+
+			var burst = await db.MapWorldBursts.Include(b => b.Packets).FirstOrDefaultAsync(b => b.MapId == beachMap);
+			if (burst == null)
+			{
+				burst = new MapWorldBurst { MapId = beachMap };
+				db.MapWorldBursts.Add(burst);
+			}
+			else if (burst.Packets != null)
+			{
+				db.MapWorldBurstPackets.RemoveRange(burst.Packets);
+			}
+
+			burst.CapturedInstance = strieInstance;
+			burst.Packets = packets.Select((p, i) => new MapWorldBurstPacket { Sequence = i, Data = p }).ToList();
+			await db.SaveChangesAsync();
+		}
+
+		// Upsert per map: replace that map's burst (instance + packets); leave other maps untouched.
+		private static async Task ImportMapWorldBursts(DatabaseContext db, List<MapWorldBurstEntry> bursts)
+		{
+			foreach (var e in bursts)
+			{
+				var burst = await db.MapWorldBursts.Include(b => b.Packets).FirstOrDefaultAsync(b => b.MapId == e.MapId);
+				if (burst == null)
+				{
+					burst = new MapWorldBurst { MapId = e.MapId };
+					db.MapWorldBursts.Add(burst);
+				}
+				else if (burst.Packets != null)
+				{
+					db.MapWorldBurstPackets.RemoveRange(burst.Packets);
+				}
+
+				burst.CapturedInstance = e.CapturedInstance;
+				burst.Packets = e.Packets.Select((p, i) => new MapWorldBurstPacket { Sequence = i, Data = p }).ToList();
+			}
+
+			await db.SaveChangesAsync();
+		}
+
+		// Upsert by (map, spawn point); never wipe.
+		private static async Task ImportNpcSpawns(DatabaseContext db, List<NpcSpawnEntry> spawns)
+		{
+			foreach (var e in spawns)
+			{
+				var existing = await db.NpcSpawns.FirstOrDefaultAsync(n =>
+					n.MapId == e.MapId && n.PositionX == e.X && n.PositionY == e.Y && n.PositionZ == e.Z);
+
+				if (existing == null)
+				{
+					db.NpcSpawns.Add(new NpcSpawn
+					{
+						MapId = e.MapId, Name = e.Name, CapturedHandle = e.Handle,
+						PositionX = e.X, PositionY = e.Y, PositionZ = e.Z, Data = e.Data
+					});
+				}
+				else
+				{
+					existing.Name = e.Name;
+					existing.CapturedHandle = e.Handle;
+					existing.Data = e.Data;
+				}
+			}
+
+			await db.SaveChangesAsync();
+		}
+
 		private static async Task<Dictionary<string, int>> Snapshot(DatabaseContext db) => new()
 		{
 			["Items"] = await db.Items.CountAsync(),
@@ -116,6 +214,8 @@ namespace Faolan.Importer
 			["Abilities"] = await db.Abilities.CountAsync(),
 			["ClassAbilities"] = await db.ClassAbilities.CountAsync(),
 			["Maps"] = await db.Maps.CountAsync(),
+			["MapWorldBursts"] = await db.MapWorldBursts.CountAsync(),
+			["NpcSpawns"] = await db.NpcSpawns.CountAsync(),
 			["ConversationNodes"] = await db.ConversationNodes.CountAsync(),
 			["ConversationPackets"] = await db.ConversationPackets.CountAsync()
 		};

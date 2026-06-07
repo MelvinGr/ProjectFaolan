@@ -31,6 +31,8 @@ namespace Faolan.Core.Database
 
 		Task<ConversationNode> GetConversationNode(uint typeId, uint mode, uint field3);
 
+		Task<MapWorldBurst> GetMapWorldBurst(uint mapId);
+
 		Task<Map> GetMap(uint id);
 		Task<Map[]> GetMaps();
 
@@ -224,6 +226,14 @@ namespace Faolan.Core.Database
 			return await ctx.ConversationNodes
 				.Include(n => n.Packets)
 				.FirstOrDefaultAsync(n => n.TypeId == typeId && n.Mode == mode && n.Field3 == field3);
+		}
+
+		public async Task<MapWorldBurst> GetMapWorldBurst(uint mapId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.MapWorldBursts
+				.Include(b => b.Packets)
+				.FirstOrDefaultAsync(b => b.MapId == mapId);
 		}
 
 		public async Task<Map> GetMap(uint id)

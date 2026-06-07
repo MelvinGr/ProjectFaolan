@@ -12,10 +12,10 @@
     </ItemGroup>
 
     <ItemGroup>
-        <!-- Replay scaffolding (transitional; world-burst is replaced by DB-driven world entry per
-             docs/spawn-dissection-plan.md). Game DATA (incl. conversations) is NOT embedded - it lives in the
-             committed faolan.db, (re)built by Faolan.Importer. -->
-        <EmbeddedResource Include="GameServer\Data\strie-login-worldburst.bin"/>
+        <!-- spawn-player-template.bin is the only remaining embedded scaffolding (used by SpawnPacketBuilder to
+             rebuild the player's own spawn). All game data + the world bursts live in the committed faolan.db,
+             (re)built by Faolan.Importer. The strie-login-worldburst.bin file stays in the repo only as the
+             import source for the beach burst (no longer embedded). -->
         <EmbeddedResource Include="GameServer\Data\spawn-player-template.bin"/>
     </ItemGroup>
 

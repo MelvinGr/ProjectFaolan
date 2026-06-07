@@ -25,6 +25,9 @@ namespace Faolan.Core.Database
 		DbSet<ConversationPacket> ConversationPackets { get; }
 		DbSet<Ability> Abilities { get; }
 		DbSet<ClassAbility> ClassAbilities { get; }
+		DbSet<NpcSpawn> NpcSpawns { get; }
+		DbSet<MapWorldBurst> MapWorldBursts { get; }
+		DbSet<MapWorldBurstPacket> MapWorldBurstPackets { get; }
 		Task<int> SaveChangesAsync(CancellationToken cancellationToken = default); // from DbContext
 	}
 
@@ -49,6 +52,9 @@ namespace Faolan.Core.Database
 		public DbSet<ConversationPacket> ConversationPackets { get; set; }
 		public DbSet<Ability> Abilities { get; set; }
 		public DbSet<ClassAbility> ClassAbilities { get; set; }
+		public DbSet<NpcSpawn> NpcSpawns { get; set; }
+		public DbSet<MapWorldBurst> MapWorldBursts { get; set; }
+		public DbSet<MapWorldBurstPacket> MapWorldBurstPackets { get; set; }
 
 		public DatabaseContext(DbContextOptions<DatabaseContext> dbContextOptions) : base(dbContextOptions)
 		{
@@ -75,6 +81,13 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<ConversationNode>().HasMany(n => n.Packets).WithOne(p => p.Node).OnDelete(DeleteBehavior.Cascade);
 
 			modelBuilder.Entity<ClassAbility>().HasIndex(c => new { c.Class, c.Level }).IsUnique();
+
+			// A captured NPC spawn is deduped by its (map, spawn point); the entity handle is session-scoped.
+			modelBuilder.Entity<NpcSpawn>().HasIndex(n => new { n.MapId, n.PositionX, n.PositionY, n.PositionZ }).IsUnique();
+
+			// One world burst per map; its packets cascade-delete.
+			modelBuilder.Entity<MapWorldBurst>().HasIndex(b => b.MapId).IsUnique();
+			modelBuilder.Entity<MapWorldBurst>().HasMany(b => b.Packets).WithOne(p => p.Burst).OnDelete(DeleteBehavior.Cascade);
 		}
 	}
 }

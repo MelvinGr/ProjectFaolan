@@ -154,7 +154,15 @@ the last to move.
   the captures (9 -> 12). Test: `CaptureMapImporterTests` (real King Conan's Castle MapChange -> map 2040). NOTE:
   the position is the character's spawn at map change (representative, not canonical), so it only seeds new rows;
   the curated maps' positions still carry an old decimal-shift bug - a separate cleanup.
-- **Phase 4** — NPC identity spike, then `NpcExtractor` (or staging table).
+- **Phase 4 — DONE (2026-06-08).** Spike: the FA015807 spawn carries the NPC **name** + position + appearance but
+  NOT the archive's numeric id/model, and entity **handles are session-scoped** - so the stable key is (map,
+  position). Chose the **raw-spawn catalog**: `NpcSpawn` table (MapId, Name, CapturedHandle, position, raw FA015807
+  Data), migration `AddNpcSpawns`, unique index (MapId, position). `NpcSpawnExtractor` tracks the current map
+  (MapChange) and, per spawn, reads handle@body12 (skips the player - handle >= 0x02000000), position@24/29/34 (LE),
+  and a best-effort name (`0A <len> <ascii>` scan past the position block). Imported **1528 distinct NPC spawns
+  across 9 maps**, all named (Conarch Village Guard, Nikulas the Smith, ...). Upsert by (map, position), no wipe.
+  Tests: `NpcSpawnExtractorTests`. CONSUMER: future - a world-entry-from-DB step replays these per map (re-addressing
+  the handle) the way the beach world-burst does today (see docs/spawn-dissection-plan.md).
 - **Phase 5 — DONE (2026-06-08).** Spike found the spellbook is NOT in captures (class/level-derived client-side);
   captures only carry cast-spell ids (ApplySpell). So spells = two sources: (1) **archive** ability/spell defs -
   `ArchiveSqlImporter` (`--archive <dir>`) imports `p_abilities` -> `Ability` (id + Data0..4 identity quad) and
@@ -163,6 +171,14 @@ the last to move.
   (0x6B87E316; spell id at inner[13]) and catalogs them id-only in `Spells` (~119 from the dumps). Names/params
   stay client-side/`spelldata`. Tests: `ArchiveSqlImporterTests`, `CaptureSpellImporterTests`. NOTE: archive defs
   are tiny (2 abilities / 3 class rows - all the archive has); the rest of the spell catalog is the harvested ids.
+- **World bursts — DONE (2026-06-08).** `MapWorldBurstExtractor` stores each map's full login world build (the
+  `0x2000` downloads from MapChange to the first `0x2020`, + the captured player instance) in `MapWorldBurst`/
+  `MapWorldBurstPacket` (migration `AddMapWorldBursts`). Beach (4010) is seeded from the proven embedded blob
+  (`SeedBeachBurstFromBlob`, 71 packets) so it stays byte-identical; other maps from captures. CONSUMER (done):
+  `ReplayMapWorldBurst` replays the burst per map on login (re-addressed to the live char), generalizing and
+  retiring the embedded beach-only path. So login now renders ANY map with a captured burst. Tests:
+  `MapWorldBurstExtractorTests`. KNOWN: maps whose captured player instance is out of the 4-byte-varint range
+  (e.g. 1000/11040) don't re-address cleanly yet (extractor mis-detected the instance there).
 - **Phase 6** — appearance/stats extractors, once the encodings are cracked (stats screenshots are ground truth).
 - **Cleanup** — delete the Python scripts and the regenerator test once their C# extractors land (keep
   `compare_log_to_dump.py` only if still useful for diffing).

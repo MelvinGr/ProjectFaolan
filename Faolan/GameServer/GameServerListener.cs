@@ -155,30 +155,23 @@ namespace Faolan.GameServer
 						Logger.LogInformation("New-character create connection (clientInstance={ClientInstance:X8}): sending the character-creator (editor) burst.", clientInstance);
 						await SendRetailCreateEditorInitialBurst(client);
 					}
-					else if (client.Session.Character.MapId == 0x00000FAA)
+					else if (await Database.GetMapWorldBurst(client.Session.Character.MapId ?? 0) is { } worldBurst)
 					{
-						// Existing-character login on the Tortage beach: replay the captured retail world burst
-						// (MapChange + world objects + entity spawns), re-addressed to this character's instance, so
-						// the client builds the playfield and renders the NPCs. The hand-built path below omitted the
-						// static-world setup and never rendered NPCs. The 0x201c handshake still comes from us. The
-						// player's own position is rebuilt from the DB; appearance/name are still the capture's
-						// (Phase 3 / name-rebuild follow-ups).
-						Logger.LogInformation("Beach login (clientInstance={ClientInstance:X8}, '{Name}'): replaying the world burst.", clientInstance, client.Session.Character.Name);
+						// Existing-character login on a map that has a captured world burst in the DB (the beach plus
+						// the player's other maps): replay it, re-addressed to this character, so the client builds the
+						// playfield and renders the NPCs. The 0x201c handshake still comes from us; the player's own
+						// position/name are rebuilt from the DB. This generalizes (and retired) the embedded beach blob.
+						Logger.LogInformation("World-burst login (map={Map}, '{Name}'): replaying {Count} packets from the DB.", client.Session.Character.MapId, client.Session.Character.Name, worldBurst.Packets.Count);
 						await Send0X201C(client);
-						await ReplayStrieLoginWorldBurst(client);
+						await ReplayMapWorldBurst(client, worldBurst);
 					}
 					else
 					{
+						// No captured world burst for this map: the hand-built fallback (no NPCs/world objects).
 						await Send0X201C(client);
 						await MapChange(client);
 						await SpawnPlayer(client);
 						await Send0x2000_0x737A6DF9_Test(client);
-
-						// On the Tortage beach (the creation map), spawn the same persistent NPCs the create-world
-						// flow streams (Casilda, Kalanthes, crocodiles, pillagers, ...) so login and create arrive
-						// at the same beach.
-						if (client.Session.Character.MapId == 0x00000FAA)
-							await SpawnTortageBeach(client);
 
 						await SetTimeOfDay(client);
 
