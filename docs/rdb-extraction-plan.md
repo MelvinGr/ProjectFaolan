@@ -146,7 +146,45 @@ with record *i*'s (type, idx) — alignable by index without parsing the variabl
    index reads: `TEXTSCRIPT` (dialogue/strings), then whatever type holds item templates (cross-ref captured
    health-potion template 180450), then `MONSTERDATA` (NPC HP).
 
-### Phase 0 conclusion (2026-06-08)
+### BREAKTHROUGH (2026-06-08): the index is `le.idx` (v5), pipeline validated end-to-end
+
+The whole `RDBHashIndex.bin` v6 effort was a **dead end / wrong file** — that's just the patch *hash* index
+(MD5s, no offsets). The real offset index is **`le.idx`** (was missed by the first `find`; it has no `.bin`/
+`rdb` in the name). Confirmed via the TSW community docs (`joakibj/tswrdb` `docs/DOCUMENTATION.md` — TSW and AoC
+share the format). And crucially **our `le.idx` is version 5**, which rdbreader already fully supports. No v6 RE
+needed.
+
+**`le.idx` layout (v5, validated against our files):**
+- Header 28 B: magic `IBDR`(4) + version(4)=**5** + MD5(16) + `NumEntries`(4) = 873,588.
+- Index: `NumEntries × 8` = `(RDB Type u32, RDB Id u32)` pairs. (195 distinct types.)
+- Detail: `NumEntries × 44` (v5 = 11×u32; v7 is 28 B). Fields: `unk0, offset, size, unk3..unk10`;
+  **`.rdbdata` file number = `unk0 & 0xff`**, `offset`/`size` locate the entry. (det starts at `28 + N*8`.)
+- Then a bundles section.
+
+**`.rdbdata` entry (validated):** at `offset-16` there's a 16 B pre-header `(type, id, len, len+2)`; at `offset`
+the data begins with wrapper `IOz1`(4) + uncompressedSize(4) + a **zlib** stream (`78 da`). Decompress
+`raw[8:]`; the result starts with the 12 B RDB-Id-data header then the type-specific payload.
+
+**Proven end-to-end:** TextStrings entry (type 1030002, id 211656, file 8) → read 10402 B → `IOz1`/uncomp=28704
+→ zlib-inflate to exactly 28704 B → `TDC2` string collection → real strings extracted: *Flags, Health, Volume
+Mass, Attack Speed, Clan, Team*.
+
+**What's available (entry counts in our `le.idx`):** TextStrings `1030002`=**1,103**, MONSTERDATA `1010201`=
+**3,185** (NPC stats incl. HP), TextScript `1010035`=819, Playfield `1070003`=520, Treasure `1000083`=1,018,
+Filenames `1000010`=1 (the id→filename table). Item-template type still TBD (sample types; cross-ref health
+potion 180450). TextStrings = the dialogue/UI text (the `TDC2` format is documented); `1030002` category +
+the `/data/text/*.tdbl` language lists map strings to languages.
+
+### Implementation (next)
+1. **`Faolan.Importer --rdb <RDB dir>`**: parse `le.idx` (v5), select wanted types, read each entry from
+   `NN.rdbdata`, strip `IOz1`+size, zlib-inflate, parse the type payload, upsert into the DB. One-time/optional
+   like `--archive`; only derived rows land in `faolan.db` (27 GB not committed). Handle entries that aren't
+   `IOz1`/zlib-wrapped (some may be stored raw) defensively.
+2. First targets: **TextStrings (1030002 `TDC2`)** → dialogue/UI text by id (unblocks conversation content),
+   then **MONSTERDATA (1010201)** → NPC HP for combat, then find the item-template type, then Playfield/Treasure.
+3. Cross-validate against our ground truth (captured item identities, the lvl-23 sheet, conversation nodes).
+
+### Phase 0 conclusion (2026-06-08)  [superseded by the breakthrough above]
 v6 is **fully reverse-engineerable but it's a real project, not a quick crack.** Mapped so far: the resource
 TYPE enum, the type+idx section (pinned: 294,125 records at 40,308,696..42,661,696, confirmed real type/idx),
 and that the front ~40 MB is multi-layered — header + a hash table (16-byte hashes, sorted by hash so NOT in
