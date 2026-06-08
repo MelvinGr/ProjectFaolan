@@ -306,9 +306,13 @@ namespace Faolan.GameServer
 						client.Session.LastGameServer2020RequestId = requestId;
 
 						// 0x2020 is the client polling a spawned entity (requestId = the entity handle). Retail
-						// answers each with a 0x2008 SpawnCheck echoing the handle. Gated to world-burst-replay
-						// sessions (the create-world flow has its own 0x2020 handling).
-						if (client.Session.UsedWorldBurstReplay)
+						// answers each with a 0x2008 SpawnCheck echoing that handle (verified: dikketest world conn
+						// polls Kalanthes 0x535A0 and gets a SpawnCheck for 0x535A0). This is what completes/renders
+						// each entity. Both existing-character login (world-burst replay) AND post-creation world
+						// entry need it: the create-world flow's old hand-built batch answered the wrong, hardcoded
+						// capture handles (0x818xx) on Strie's instance, so its entities (incl. Kalanthes) were never
+						// confirmed and the intro cinematic ("invalid camera path Kalanthes") failed.
+						if (client.Session.UsedWorldBurstReplay || client.Session.IsCreateWorldSession)
 							await SendSpawnCheckResponse(client, requestId);
 
 						if (client.Session.Character?.Name == null && client.Session.HasPendingPost205FFollowUp)
