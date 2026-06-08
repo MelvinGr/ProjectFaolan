@@ -283,10 +283,16 @@ Dump a capture to JSON (stdout):
 dotnet '/home/melvin/Development/C#/Project Faolan/Faolan.PacketAnalyzer/bin/Debug/net10.0/Faolan.PacketAnalyzer.dll' --dump '/home/melvin/Development/C#/Project Faolan/Captures/<capture>.pcapng' > '/home/melvin/Development/C#/Project Faolan/Captures/<capture>.json'
 ```
 
-The analyzer now does **TCP reassembly** (orders by sequence, drops retransmits, buffers gaps) before
+The analyzer does **TCP reassembly** (orders by sequence, drops retransmits, buffers gaps) before
 inflating - without it, retransmitted/out-of-order segments corrupt the single zlib GameServer download
-stream and ~2/3 of the stream is lost. **Re-dump any capture made before this fix** - older JSON dumps are
-truncated.
+stream and ~2/3 of the stream is lost.
+
+It also detects GameServer downloads by **content, not port**: any server→client (7000-range) flow is offered
+to the `0x80000005` zlib-marker detector, and a confirmed flow is relabeled GameServer
+(`PacketCaptureReader.TransformPayload` + `PacketProtocolDetector.MarkGameServerEndpoint`). This matters
+because the world GameServer is assigned a fresh port on every **playfield change** (and the same port number
+can be a different service on another server IP), so port-based detection mislabeled and dropped those
+secondary world streams. **Re-dump any capture made before these fixes** - older JSON dumps are truncated/mislabeled.
 
 ### GameServer download compression
 
