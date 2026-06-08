@@ -120,6 +120,10 @@ namespace Faolan.Core.Database
 					MapId = CreationMapId
 				};
 
+				// Seed default vitals (cascade-inserts with the character). Class isn't chosen yet at row
+				// allocation, so this is the level-1 rogue-default baseline; regenerate when class is committed.
+				character.MaxStats = CharacterMaxStats.CreateDefaults(character.Class, character.Level);
+
 				ApplyCreationSpawn(character);
 				ctx.Characters.Add(character);
 				await ctx.SaveChangesAsync();
@@ -178,8 +182,9 @@ namespace Faolan.Core.Database
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			// Include Body so the create-editor can resume an existing character's morphs without creating a
-			// duplicate body row. No other navs are loaded, so SaveCharacter's graph stays Character (+Body).
-			return await ctx.Characters.Include(c => c.Body).FirstOrDefaultAsync(c => c.Id == id);
+			// duplicate body row, and MaxStats so vitals are available. SaveCharacter's graph stays
+			// Character (+Body, +MaxStats).
+			return await ctx.Characters.Include(c => c.Body).Include(c => c.MaxStats).FirstOrDefaultAsync(c => c.Id == id);
 		}
 
 		// --- equipment -------------------------------------------------------------------------------------
@@ -197,11 +202,11 @@ namespace Faolan.Core.Database
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 
-			var directMatch = await ctx.Characters.Include(c => c.Body).FirstOrDefaultAsync(c => c.AccountId == accountId && c.Id == clientInstance);
+			var directMatch = await ctx.Characters.Include(c => c.Body).Include(c => c.MaxStats).FirstOrDefaultAsync(c => c.AccountId == accountId && c.Id == clientInstance);
 			if (directMatch != null)
 				return directMatch;
 
-			return await ctx.Characters.Include(c => c.Body).Where(c => c.AccountId == accountId).OrderByDescending(c => c.Id).FirstOrDefaultAsync();
+			return await ctx.Characters.Include(c => c.Body).Include(c => c.MaxStats).Where(c => c.AccountId == accountId).OrderByDescending(c => c.Id).FirstOrDefaultAsync();
 		}
 
 		public async Task<Character[]> GetCharactersByAccount(uint id, bool skipUninitialized = true)
@@ -231,9 +236,16 @@ namespace Faolan.Core.Database
 		public async Task<MapWorldBurst> GetMapWorldBurst(uint mapId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.MapWorldBursts
+			var burst = await ctx.MapWorldBursts
 				.Include(b => b.Packets)
 				.FirstOrDefaultAsync(b => b.MapId == mapId);
+
+			// Guard: a burst whose captured instance is outside the 4-byte-varint range can't be re-addressed by the
+			// length-preserving rewrite (would corrupt the world build). Treat it as absent so login falls back.
+			if (burst != null && (burst.CapturedInstance < 0x02000000 || burst.CapturedInstance > 0x0FFFFFFF))
+				return null;
+
+			return burst;
 		}
 
 		public async Task<Map> GetMap(uint id)

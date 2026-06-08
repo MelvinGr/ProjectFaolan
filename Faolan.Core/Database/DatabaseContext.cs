@@ -13,6 +13,7 @@ namespace Faolan.Core.Database
 		DbSet<Character> Characters { get; }
 		DbSet<CharacterBody> CharacterBodies { get; }
 		DbSet<CharacterEquipment> CharacterEquipment { get; }
+		DbSet<CharacterMaxStats> CharacterMaxStats { get; }
 		DbSet<Item> Items { get; }
 		DbSet<Map> Maps { get; }
 		DbSet<MapObject> MapObjects { get; }
@@ -39,7 +40,7 @@ namespace Faolan.Core.Database
 
 		public DbSet<CharacterEquipment> CharacterEquipment { get; set; }
 
-		//public DbSet<CharacterMaxStats> CharacterMaxStats { get; set; }
+		public DbSet<CharacterMaxStats> CharacterMaxStats { get; set; }
 		public DbSet<Item> Items { get; set; }
 		public DbSet<Map> Maps { get; set; }
 		public DbSet<MapObject> MapObjects { get; set; }
@@ -75,6 +76,9 @@ namespace Faolan.Core.Database
 			// instance is the same byte length as the capture placeholder everywhere it is substituted (header
 			// varint, body raw uint32, body nested varint) - keeping the verbatim packets' length prefixes valid.
 			modelBuilder.Entity<Character>().Property(c => c.Id).ValueGeneratedNever();
+
+			// One-to-one Character <-> CharacterMaxStats, keyed by CharacterId; deletes cascade with the character.
+			modelBuilder.Entity<Character>().HasOne(c => c.MaxStats).WithOne(s => s.Character).HasForeignKey<CharacterMaxStats>(s => s.CharacterId).OnDelete(DeleteBehavior.Cascade);
 
 			// A conversation node is uniquely identified by the player's TalkToNpc args; its packets cascade-delete.
 			modelBuilder.Entity<ConversationNode>().HasIndex(n => new { n.TypeId, n.Mode, n.Field3 }).IsUnique();

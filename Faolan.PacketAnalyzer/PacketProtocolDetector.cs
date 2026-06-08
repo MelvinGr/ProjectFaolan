@@ -181,20 +181,25 @@ namespace Faolan.PacketAnalyzer
 
 		private void ObserveUniverseAdvertisement(string sourceKey, ushort sourcePort, bool isDownload, ConanPacket packet)
 		{
-			// UniverseAgent SendPlayerAgentRealm and GameServer AckAuthentication share opcode 0x2001, so
-			// this must only fire for traffic actually from the UniverseAgent port - otherwise a GameServer's
-			// AckAuthentication gets mistaken for a Universe advertisement and re-labels the game endpoint as
-			// UniverseAgent (which then stops its downloads from being decompressed).
-			if (!isDownload || sourcePort != _portSettings.UniverseAgentPort || packet.Opcode != (uint)UniverseAgentResponseOpcodes.SendPlayerAgentRealm || packet.Body == null)
+			// UniverseAgent SendPlayerAgentRealm and GameServer AckAuthentication share opcode 0x2001. Distinguish
+			// them by the body: only the Universe advertisement carries a "host:port" PlayerAgent address, so we
+			// require that to parse before treating this as a Universe advertisement. This both lets unconfigured
+			// (Empty) settings bootstrap detection from the advertisement AND keeps a GameServer's AckAuthentication
+			// (no host:port body) from being mistaken for one and relabeling the game endpoint as UniverseAgent
+			// (which would stop its downloads from being decompressed).
+			if (!isDownload || packet.Opcode != (uint)UniverseAgentResponseOpcodes.SendPlayerAgentRealm || packet.Body == null)
 				return;
 
-			var universeEndpointKey = sourceKey;
-			var universePort = sourcePort;
+			// When the UniverseAgent port is known, additionally require the packet to come from it so a game
+			// endpoint can never relabel itself; when ports are unconfigured the host:port parse alone gates it.
+			if (_portSettings.UniverseAgentPort != 0 && sourcePort != _portSettings.UniverseAgentPort)
+				return;
 
-			RegisterProtocol(universeEndpointKey, universePort, PacketProtocolInfo.UniverseAgentProtocolName);
+			if (!PacketAdvertisedEndpointParser.TryFindHostPort(packet.Body.ToArray(), out var port))
+				return;
 
-			if (PacketAdvertisedEndpointParser.TryFindHostPort(packet.Body.ToArray(), out var port))
-				RegisterPortProtocol(port, PacketProtocolInfo.PlayerAgentProtocolName, true);
+			RegisterProtocol(sourceKey, sourcePort, PacketProtocolInfo.UniverseAgentProtocolName);
+			RegisterPortProtocol(port, PacketProtocolInfo.PlayerAgentProtocolName, true);
 		}
 
 		private void PromoteKnownPortProtocol(string endpointKey, ushort port)

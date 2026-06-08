@@ -15,8 +15,12 @@ namespace Faolan.Importer
 		private const uint Opcode2000 = 0x2000;
 		private const uint Opcode2020 = 0x2020; // client spawn poll - ends the world-build window
 		private const uint MapChangeSubOpcode = 0x5D85BFC7;
-		private const uint SpawnSubOpcode = 0xFA015807;
-		private const uint InstanceRangeStart = 0x02000000;
+		private const uint InstanceRangeStart = 0x02000000; // 4-byte-varint range [0x02000000, 0x0FFFFFFF]
+		private const uint InstanceRangeEnd = 0x0FFFFFFF;
+
+		// The LoginWorld receiver conversation id "0D 47 C1 67 6C 10 <varint>" - its trailing varint is the client
+		// instance the packet was sent to (the local player), unambiguous even when other players are spawned.
+		private static readonly byte[] ReceiverMarker = [0x47, 0xC1, 0x67, 0x6C, 0x10];
 
 		// Per capture: each MapChange begins a world-build window of the following DOWNLOAD packets, until the first
 		// 0x2020 poll or the next MapChange. Returns the largest window per map (most complete).
@@ -46,6 +50,12 @@ namespace Faolan.Importer
 					Flush();
 					currentMap = body.Length >= 38 ? BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(34, 4)) : 0;
 					current = new List<byte[]> { p.Bytes };
+
+					// The receiver conversation id of the world-build downloads is the local player's instance -
+					// read it from the first packet's header (unambiguous even when other players are spawned).
+					var inst = ExtractReceiverInstance(p.Bytes);
+					if (inst != 0)
+						capturedInstance = inst;
 					continue;
 				}
 
@@ -62,12 +72,12 @@ namespace Faolan.Importer
 				{
 					current.Add(p.Bytes);
 
-					// The player's own spawn handle is the session instance (used to re-address the burst).
-					if (subop == SpawnSubOpcode && body.Length >= 16)
+					// Backfill the instance from any download in the window if the MapChange header lacked it.
+					if (capturedInstance == 0)
 					{
-						var handle = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
-						if (handle >= InstanceRangeStart)
-							capturedInstance = handle;
+						var inst = ExtractReceiverInstance(p.Bytes);
+						if (inst != 0)
+							capturedInstance = inst;
 					}
 				}
 			}
@@ -82,7 +92,10 @@ namespace Faolan.Importer
 			var best = new Dictionary<uint, MapWorldBurstEntry>();
 			foreach (var e in all)
 			{
-				if (e.CapturedInstance == 0)
+				// Drop bursts whose captured instance is unknown or outside the 4-byte-varint range - the
+				// length-preserving rewrite can only re-address ids in [0x02000000, 0x0FFFFFFF] (maps 1000/11040
+				// captured an out-of-range instance like 0x110099BD and can't be replayed cleanly).
+				if (e.CapturedInstance < InstanceRangeStart || e.CapturedInstance > InstanceRangeEnd)
 					continue;
 
 				if (!best.TryGetValue(e.MapId, out var cur) || e.Packets.Count > cur.Packets.Count)
@@ -90,6 +103,60 @@ namespace Faolan.Importer
 			}
 
 			return best.Values.ToList();
+		}
+
+		// Reads the local player's client instance from the receiver conversation id "...47 C1 67 6C 10 <varint>"
+		// embedded in the packet header. Returns 0 if the marker isn't present.
+		private static uint ExtractReceiverInstance(byte[] full)
+		{
+			var idx = IndexOf(full, ReceiverMarker);
+			if (idx < 0)
+				return 0;
+
+			var pos = idx + ReceiverMarker.Length;
+			return ReadVarint(full, pos);
+		}
+
+		// Little-endian base-128 varint (the receiver-tail encoding). Stops at the buffer end / a non-continuation
+		// byte; the instance ids of interest fit in 32 bits.
+		private static uint ReadVarint(byte[] buf, int pos)
+		{
+			uint value = 0;
+			var shift = 0;
+			while (pos < buf.Length && shift < 32)
+			{
+				var b = buf[pos++];
+				value |= (uint)(b & 0x7F) << shift;
+				if ((b & 0x80) == 0)
+					break;
+				shift += 7;
+			}
+
+			return value;
+		}
+
+		private static int IndexOf(byte[] haystack, byte[] needle)
+		{
+			if (needle.Length == 0 || haystack.Length < needle.Length)
+				return -1;
+
+			for (var i = 0; i <= haystack.Length - needle.Length; i++)
+			{
+				var match = true;
+				for (var j = 0; j < needle.Length; j++)
+				{
+					if (haystack[i + j] != needle[j])
+					{
+						match = false;
+						break;
+					}
+				}
+
+				if (match)
+					return i;
+			}
+
+			return -1;
 		}
 
 		private static byte[] GetBody(byte[] full)

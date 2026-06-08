@@ -146,6 +146,86 @@ namespace Faolan.PacketAnalyzer.Tests
 			}
 		}
 
+		[Fact]
+		public async Task CreateCharacter_SeedsDefaultMaxStats_AndLoadsThem()
+		{
+			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-repo-{Guid.NewGuid():N}.db");
+			try
+			{
+				const uint accountId = 1;
+				const uint realmId = 1;
+
+				var (repo, factory) = NewRepo(dbPath);
+				await using (var ctx = await factory.CreateDbContextAsync())
+				{
+					await ctx.Database.EnsureCreatedAsync();
+					ctx.Accounts.Add(new Account { Id = accountId, UserName = "t", Password = "t", AuthChallenge = "", LastIpAddress = "" });
+					ctx.Realms.Add(new Realm { Id = realmId, Name = "Test", IpAddress = "127.0.0.1" });
+					await ctx.SaveChangesAsync();
+				}
+
+				// CreateCharacter should cascade-insert a default MaxStats row (level-1 baseline).
+				var created = await repo.CreateCharacter(accountId, realmId);
+				Assert.NotNull(created.MaxStats);
+
+				// Reload across a fresh context: the MaxStats row is loaded with the character.
+				var loaded = await repo.GetCharacterForAccount(accountId, created.Id);
+				Assert.NotNull(loaded!.MaxStats);
+				Assert.True(loaded.MaxStats!.Health > 0);
+				Assert.True(loaded.MaxStats.Stamina > 0);
+			}
+			finally
+			{
+				if (File.Exists(dbPath))
+					File.Delete(dbPath);
+			}
+		}
+
+		[Fact]
+		public async Task RegenerateMaxStats_OnNameCommit_UpdatesSingleRow()
+		{
+			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-repo-{Guid.NewGuid():N}.db");
+			try
+			{
+				const uint accountId = 1;
+				const uint realmId = 1;
+
+				var (repo, factory) = NewRepo(dbPath);
+				await using (var ctx = await factory.CreateDbContextAsync())
+				{
+					await ctx.Database.EnsureCreatedAsync();
+					ctx.Accounts.Add(new Account { Id = accountId, UserName = "t", Password = "t", AuthChallenge = "", LastIpAddress = "" });
+					ctx.Realms.Add(new Realm { Id = realmId, Name = "Test", IpAddress = "127.0.0.1" });
+					await ctx.SaveChangesAsync();
+				}
+
+				// Creation seeds the level-1 rogue baseline.
+				var created = await repo.CreateCharacter(accountId, realmId);
+
+				// Simulate the editor: choose a mage class + level, regenerate, and commit (as CommitCharacterName does).
+				var character = await repo.GetCharacterForAccount(accountId, created.Id);
+				character!.Class = Faolan.Core.Enums.Class.Necromancer;
+				character.Level = 20;
+				character.Name = "Mage";
+				character.RegenerateMaxStats();
+				await repo.SaveCharacter(character);
+
+				// Reload: stats reflect the chosen class, and exactly one MaxStats row exists (updated in place).
+				var reloaded = await repo.GetCharacterForAccount(accountId, created.Id);
+				var expected = CharacterMaxStats.CreateDefaults(Faolan.Core.Enums.Class.Necromancer, 20);
+				Assert.Equal(expected.Mana, reloaded!.MaxStats!.Mana);
+				Assert.Equal(expected.Health, reloaded.MaxStats.Health);
+
+				await using (var ctx = await factory.CreateDbContextAsync())
+					Assert.Equal(1, await ctx.CharacterMaxStats.CountAsync(s => s.CharacterId == created.Id));
+			}
+			finally
+			{
+				if (File.Exists(dbPath))
+					File.Delete(dbPath);
+			}
+		}
+
 		private static (DatabaseRepository repo, IDbContextFactory<DatabaseContext> factory) NewRepo(string path)
 		{
 			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={path}").Options;

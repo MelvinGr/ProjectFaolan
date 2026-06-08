@@ -117,7 +117,7 @@
 			Ox96C46740 = 0x96C46740, // float-heavy state block in captures; does not resemble bag or slot inventory data
 			ApplySpell = 0x6B87E316,
 			OxF98E10B3 = 0xF98E10B3,
-			Ox96B8Dc59 = 0x96B8DC59, // Does not apply buff (also with SitOnMount)
+			Ox96B8Dc59 = 0x96B8DC59, // entity vitals / stat update: 0000C350 + entityHandle + 00000000 + count(1) + N×(u32 statId,u32 value); carries combat HP/Stamina/Mana (docs/quests-and-combat.md)
 
 			Ox737A6Df9 = 0x737A6DF9 // very large initial state dump in captures
 			// strongest current candidate for player inventory/bag serialization

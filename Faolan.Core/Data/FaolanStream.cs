@@ -223,13 +223,39 @@ namespace Faolan.Core.Data
 			return this;
 		}
 
-		// TODO: This should be fixed i think? Does not make sense to write floats in little endian, but client crashes with Big endian, even though floats are read as such in ReadFloat
+		// RESOLVED (2026-06-08, from retail captures): the wire uses TWO float encodings depending on context, which
+		// is why WriteFloat (LE) and ReadFloat (BE) intentionally differ - they serve different contexts:
+		//   * Protobuf fixed32 fields (tags 0x0D/0x15/0x1D/0x25, e.g. Send0x2000_SpawnPlayer, texture floats) are
+		//     little-endian by the protobuf spec. WriteFloat is LE because that is its dominant use; flipping it to
+		//     big-endian corrupts those fields and crashes the client (the old "client crashes with Big endian").
+		//   * Raw packet bodies (MapChange position @ body+13, Move 0x4517AA81 position/rotation) are big-endian.
+		//     ReadFloat is BE because it parses those raw client uploads. Verified: client Move sends 995.3/115.2/...
+		//     as BE; the protobuf spawn sends 1019.36/127.74/... as LE.
+		// So: use WriteFloat/WriteVector3 in protobuf contexts, WriteFloatBigEndian/WriteVector3BigEndian in raw ones.
 		public FaolanStream WriteFloat(float value)
 		{
 			Span<byte> buffer = stackalloc byte[sizeof(float)];
-			BinaryPrimitives.WriteSingleLittleEndian(buffer, value); // WriteSingleLittleEndian is intentional, client crashes with Big endian, even though floats are read as such in ReadFloat
+			BinaryPrimitives.WriteSingleLittleEndian(buffer, value); // protobuf fixed32 is little-endian; see note above
 
 			return WriteArray(buffer);
+		}
+
+		// Big-endian float for RAW packet bodies (not protobuf fields). Matches ReadFloat and the retail wire format
+		// for raw positions (MapChange, Move). See the WriteFloat note above.
+		public FaolanStream WriteFloatBigEndian(float value)
+		{
+			Span<byte> buffer = stackalloc byte[sizeof(float)];
+			BinaryPrimitives.WriteSingleBigEndian(buffer, value);
+
+			return WriteArray(buffer);
+		}
+
+		// Big-endian Vector3 for raw packet bodies (the round-trip partner of ReadVector3).
+		public FaolanStream WriteVector3BigEndian(Vector3 value)
+		{
+			WriteFloatBigEndian(value.X);
+			WriteFloatBigEndian(value.Y);
+			return WriteFloatBigEndian(value.Z);
 		}
 
 		public FaolanStream WriteProtobuf(FaolanProtobufMessage value)

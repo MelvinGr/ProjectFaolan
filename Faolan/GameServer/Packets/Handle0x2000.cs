@@ -116,7 +116,7 @@ namespace Faolan.GameServer
 							// retail's move broadcast uses sender 0d13ce71b110 58 + receiver = the moving entity's
 							// instance, confirmed across Strie/dikketest/demol80 captures)
 							await new PacketStream().WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x2000).WriteArrayUInt32Length(s =>
-								s.WriteUInt32(pbOpcode).WriteUInt32(dataobjdec).WriteUInt32(dataclientinst).WriteUInt16(movingType).WriteVector3(sessionCharacter.Position).WriteVector3(sessionCharacter.Rotation)
+								s.WriteUInt32(pbOpcode).WriteUInt32(dataobjdec).WriteUInt32(dataclientinst).WriteUInt16(movingType).WriteVector3BigEndian(sessionCharacter.Position).WriteVector3BigEndian(sessionCharacter.Rotation)
 									.WriteArray(datadat)).SendAsync(client);
 
 							break;

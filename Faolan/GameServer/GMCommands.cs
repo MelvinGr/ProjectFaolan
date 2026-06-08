@@ -18,47 +18,51 @@ namespace Faolan.GameServer
 			return ApplySpell(client, client.Session.Character.Id, client.Session.Character.Id, id);
 		}
 
-		private async Task DoTeleport(uint characterId, uint mapId) // Not functional
+		// .teleport <mapId>  - move the character to a map and rebuild the world there.
+		//
+		// Re-runs the proven world-entry render path for the target map - the same world-burst replay (or
+		// hand-built fallback) that login uses, which is the only sequence confirmed to build the playfield and
+		// render NPCs. NOTE: a retail teleport actually hands the client off to a (possibly different) world
+		// server - the old server sends teleport-prep packets (0x10D27BC0 / 0x5A32F0D7 / vitals) and a 0x2002
+		// world-address advert, then the client reconnects and does a full world entry (capture
+		// account-faolan-...-changemap, idx 6091-6103, ports 7027 -> 7030). Our single-host server can't do that
+		// handoff, so we soft-change the map on the current connection instead.
+		private async Task DoTeleport(uint characterId, uint mapId)
 		{
-			/*if (!arguments.TryParseNormalOrHex(out uint mapId))
-			{
-			    _agentServerListener?.SendSystemMessage(client.Account, $"Invalid input: '{arguments}'");
-			    return;
-			}*/
+			var client = ClientForCharacter(characterId);
+			if (client?.Session.Character == null)
+				return;
 
 			var map = await Database.GetMap(mapId);
 			if (map == null)
-				//_agentServerListener?.SendSystemMessage(client.Account, $"Unknown mapId: '{arguments}'");
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"<span style=\"color: red;\">Unknown map id: {mapId}</span>");
 				return;
+			}
 
-			var client = ClientForCharacter(characterId);
-
+			// Move the character to the map's spawn point (importer-added maps carry the real captured spawn;
+			// older seeded maps carry a placeholder) and persist so a relog lands on the new map.
 			client.Session.Character.MapId = map.Id;
-			//client.Session.Character.Position = map.Position;
+			client.Session.Character.Position = map.Position;
 			client.Session.Character.Rotation = map.Rotation;
+			await Database.SaveCharacter(client.Session.Character);
 
-			await new PacketStream().WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x2000).WriteArrayUInt32Length(s =>
-				s.WriteUInt32(0x10d27bc0).WriteUInt32(0x0000c350).WriteUInt32(client.Session.Account.ClientInstance).WriteUInt16(0x0162).WriteUInt32(0x0000c79c)
-					.WriteUInt32(client.Session.Character.MapId ?? throw new Exception("client.Character.MapId == null")).WriteUInt32(0x00000000).WriteUInt32(client.Session.Account.ClientInstance).WriteByte(0x00)
-					.WriteUInt32(0x00000000).WriteUInt32(0x00000000).WriteUInt32(0x00000000)).SendAsync(client);
-
-			var pack20 = new byte[]
+			if (await Database.GetMapWorldBurst(map.Id) is { } worldBurst)
 			{
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3f, 0x80, 0x00, 0x00, 0x62, 0x00, 0x00, 0xc7, 0x9c
-			};
-
-			var pack21 = new byte[]
+				await Send0X201C(client);
+				await ReplayMapWorldBurst(client, worldBurst);
+			}
+			else
 			{
-				0x00, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x9c, 0x50, 0x00, 0x28, 0x3a, 0x0c, //instance
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x14, 0x00, 0x01, 0x87, 0x04
-			};
+				await Send0X201C(client);
+				await MapChange(client);
+				await SpawnPlayer(client);
+				await Send0x2000_0x737A6DF9_Test(client);
+				await SetTimeOfDay(client);
+			}
 
-			await new PacketStream().WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x2000).WriteArrayUInt32Length(s =>
-				s.WriteUInt32(0x5a32f0d7).WriteUInt32(0x0000c350).WriteUInt32(client.Session.Account.ClientInstance).WriteArray(pack20)
-					.WriteUInt32(client.Session.Character.MapId ?? throw new Exception("client.Character.MapId == null")).WriteUInt32(0).WriteUInt32(client.Session.Account.ClientInstance).WriteArray(pack21)
-					.WriteVector3(client.Session.Character.Position).WriteUInt32(0x00000032).WriteByte(0)).SendAsync(client);
-
-			// UNFINISHED
+			var mapLabel = string.IsNullOrEmpty(map.Name) ? map.Id.ToString() : $"{map.Name} ({map.Id})";
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Teleported to {mapLabel}.");
 		}
 
 		private async Task HandleGmCommand(INetworkClient client, string commandText)
@@ -100,8 +104,37 @@ namespace Faolan.GameServer
 				["spells"] = (client, _) => SendListAllSpells(client.Session.Character.Id),
 				["teleport"] = (client, arguments) => DoTeleport(client.Session.Character.Id, uint.Parse(arguments)),
 				["spelltest"] = (client, arguments) => ApplySpellTest(client.Session.Character.Id, uint.Parse(arguments)),
+				["vitals"] = (client, arguments) => SetVitalsCommand(client, arguments),
+				["setstat"] = (client, arguments) => SetStatCommand(client, arguments),
 				["test"] = (client, _) => Test(client.Session.Character.Id)
 			};
+		}
+
+		// .vitals [health] [stamina] [mana]  - push a 0x96B8DC59 vitals update. With no args, sends the character's
+		// own MaxStats (or class/level defaults). With args (player-facing values; the ×100 scale is applied),
+		// missing stamina/mana default to the health value.
+		private Task SetVitalsCommand(INetworkClient client, string arguments)
+		{
+			var parts = (arguments ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+			if (parts.Length == 0)
+				return SendVitals(client);
+
+			var health = uint.Parse(parts[0]);
+			var stamina = parts.Length > 1 ? uint.Parse(parts[1]) : health;
+			var mana = parts.Length > 2 ? uint.Parse(parts[2]) : health;
+
+			return SendVitals(client, health, stamina, mana);
+		}
+
+		// .setstat <statIdHex> <displayValue>  - push a single 0x96B8DC59 stat record (e.g. ".setstat 36 25" sets
+		// Level to 25). The stat's wire scale is applied automatically.
+		private Task SetStatCommand(INetworkClient client, string arguments)
+		{
+			var parts = (arguments ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+			var statId = (Packets._0x737A6DF9_Test.LegacyCharacterStatId)Convert.ToUInt32(parts[0], 16);
+			var value = uint.Parse(parts[1]);
+
+			return SendStatUpdate(client, new Packets._0x737A6DF9_Test.CharacterStatBlock().Set(statId, value));
 		}
 
 		private async Task SaveChanges(uint characterId)

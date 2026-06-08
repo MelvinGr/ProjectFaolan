@@ -159,6 +159,18 @@ namespace Faolan.Importer
 		// Upsert per map: replace that map's burst (instance + packets); leave other maps untouched.
 		private static async Task ImportMapWorldBursts(DatabaseContext db, List<MapWorldBurstEntry> bursts)
 		{
+			// Purge any existing rows whose captured instance is outside the 4-byte-varint range - the
+			// length-preserving rewrite can't re-address them, so a stale row (e.g. maps 1000/11040 captured
+			// 0x110099BD) would break the world build. Merge() already filters new bursts; this clears old ones.
+			var stale = await db.MapWorldBursts.Include(b => b.Packets)
+				.Where(b => b.CapturedInstance < 0x02000000 || b.CapturedInstance > 0x0FFFFFFF)
+				.ToListAsync();
+			if (stale.Count > 0)
+			{
+				db.MapWorldBurstPackets.RemoveRange(stale.SelectMany(b => b.Packets));
+				db.MapWorldBursts.RemoveRange(stale);
+			}
+
 			foreach (var e in bursts)
 			{
 				var burst = await db.MapWorldBursts.Include(b => b.Packets).FirstOrDefaultAsync(b => b.MapId == e.MapId);

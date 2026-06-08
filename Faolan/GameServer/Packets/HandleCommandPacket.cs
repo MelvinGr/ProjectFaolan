@@ -63,7 +63,10 @@ namespace Faolan.GameServer
 			try
 			{
 				character.Name = name;
-				// Persist the whole accumulated editor graph (name + sex/race/morphs Body) as one unit of work.
+				// The class is chosen before naming (the final editor step), so regenerate vitals from the now-known
+				// class/level - replacing the level-1 rogue baseline seeded at row allocation.
+				character.RegenerateMaxStats();
+				// Persist the whole accumulated editor graph (name + sex/race/morphs Body + MaxStats) as one unit of work.
 				await Database.SaveCharacter(character);
 				Logger.LogInformation("Character-editor: committed character name '{Name}' for character {CharacterId:X8}.", name, character.Id);
 			}

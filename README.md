@@ -382,6 +382,49 @@ crackable from the available captures - needs chars differing in one morph at a 
 entries** so persisted gear renders in any slot on relogin (only slots present in the captured snapshot reflect
 today); and ultimately the full DB-built snapshot incl. the tails.
 
+## TODO
+
+Concrete next steps, grouped by area. See `docs/` for the dissection writeups behind each.
+
+### Stats & combat (`docs/player-stats.md`, `docs/quests-and-combat.md`)
+- [ ] **Level-up path**: bump `Character.Level`, call `Character.RegenerateMaxStats()`, `SaveCharacter`, then
+      push a `0x96B8DC59` vitals update (`SendVitals`) so the client sees the new stats. (Hold until the vitals
+      packet is confirmed rendering in-client.)
+- [ ] **Verify the `0x96B8DC59` vitals packet in-client** (test live with `.vitals` / `.setstat`), then wire
+      `SendVitals(client)` into the world-entry sequence so vitals show on login.
+- [ ] Confirm **ApplySpell (`0x6B87E316`) magnitude** sign/scale, and whether damage is carried in the cast or
+      only in the following vitals update.
+- [ ] Fix the wrong stat ids in `CapturedCharacterStats.cs`: `MaxHealth 0x01` (decodes to ~196, not max),
+      `MaxStamina 0x1F9` / `MaxMana 0x1FB` (suspect); find the real max-* ids or confirm max==current-when-full.
+- [ ] Determine whether **attributes** (Str/Int/Con/Wis/Dex) are sent at all or computed client-side from
+      gear/buffs (their sheet values don't appear as plain stat records).
+- [ ] Decode the high-volume combat entity-update sub-ops `0xFEC4158A` / `0xD751EBB4` / `0x04B82B2D`
+      (animation / aggro / buff state, unconfirmed).
+
+### Quests (`docs/quests-and-combat.md`, `docs/capture-events.md`)
+- [ ] Isolate the **quest accept vs decline** action and the **quest-log / objective state** packet (numeric
+      quest ids; candidate `0x2038` title / `0x20a5` tracker pair, bodies undecoded).
+- [ ] Decode the **quest-complete / reward grant** beyond the `0xA36D3B74` "QuestRewards" token (the actual
+      reward/turn-in state change).
+- [ ] Isolate the **level-up "ding"** event packet (Level rises in the snapshot/vitals, but the event packet
+      isn't pinned).
+
+### World entry & rendering (`docs/spawn-dissection-plan.md`)
+- [ ] **Appearance morphs**: decode the spawn appearance encoding (blocked — needs captures of characters
+      differing by one morph at a time).
+- [ ] **Add/remove inventory entries** so persisted gear renders in any slot on relogin (today only slots
+      present in the captured snapshot reflect).
+- [ ] Build the **full DB snapshot incl. tails** (retire the captured-burst replay entirely).
+- [ ] **NPCs from the DB** (session-handle identity) instead of verbatim burst spawns.
+
+### Mail / auction / trade-post (`docs/capture-events.md`)
+- [ ] Implement the **`0x2002 category=629`** token remoteformats (`TradePostGUI_*`) — the mail/auction/
+      trade-post UI protocol.
+
+### Cleanup
+- [ ] Fix the malformed **`OverrideGameTweaks` (`0x2085...`)** packet — client logs `stream bad after
+      'overrides'` and drops that route every session (harmless, not a login blocker).
+
 ## Notes
 
 - The repository still contains hardcoded/verbatim protocol payloads (the `Retail*Burst.cs` create-flow files).
@@ -393,5 +436,5 @@ today); and ultimately the full DB-built snapshot incl. the tails.
   (the runtime `ConfigureFaolanDatabase` registration - now a pooled `DbContextFactory` - can't be used by
   `dotnet ef`).
 - Build: `dotnet build '/home/melvin/Development/C#/Project Faolan/ProjectFaolan.slnx' -v q`. Tests:
-  `dotnet test Faolan.PacketAnalyzer.Tests/Faolan.PacketAnalyzer.Tests.csproj` (one pre-existing unrelated
-  `PacketProtocolDetectorTests` failure; the spawn/inventory round-trip tests are the ones that matter).
+  `dotnet test Faolan.PacketAnalyzer.Tests/Faolan.PacketAnalyzer.Tests.csproj` (the spawn/inventory round-trip
+  tests are the acceptance gate before anything ships dynamic).

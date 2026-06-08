@@ -527,8 +527,8 @@ namespace Faolan.GameServer
 					0x00
 				];
 
-			return new PacketStream().WriteHeader(sender, receiver, GameServerRespondOpcodes.ReadyForPlayScreen).WriteVector3(client.Session.Character!.Position).WriteUInt32(0x000007E2)
-				.WriteVector3(client.Session.Character.Position).WriteArray(tail).SendAsync(client);
+			return new PacketStream().WriteHeader(sender, receiver, GameServerRespondOpcodes.ReadyForPlayScreen).WriteVector3BigEndian(client.Session.Character!.Position).WriteUInt32(0x000007E2)
+				.WriteVector3BigEndian(client.Session.Character.Position).WriteArray(tail).SendAsync(client);
 		}
 
 		private static Task SendRetailCreatePost205FAccessWindow(INetworkClient client)
