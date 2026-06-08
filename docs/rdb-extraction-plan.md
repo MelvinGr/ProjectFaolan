@@ -163,17 +163,47 @@ needed.
 
 **`.rdbdata` entry (validated):** at `offset-16` there's a 16 B pre-header `(type, id, len, len+2)`; at `offset`
 the data begins with wrapper `IOz1`(4) + uncompressedSize(4) + a **zlib** stream (`78 da`). Decompress
-`raw[8:]`; the result starts with the 12 B RDB-Id-data header then the type-specific payload.
+`raw[8:]`; the result starts with the 12 B RDB-Id-data header then the type-specific payload. Some entries have
+no wrapper (the 12 B header is the first thing); a few are `RDBH`-wrapped (see encryption below).
+
+### RDB encryption (`RDBH`) — what we know (2026-06-08)
+Investigation findings from this client's RDB. **Only item-templates are encrypted; nothing else is.**
+
+- **Scope:** of every resource type, **only `1000020` (item-templates) carries `RDBH` resources** — and ~all of
+  them are wrapped (sampled 98,048 entries; a small minority are plain binary item structs, the rest `RDBH`).
+  No other type (models, text, playfields, treasure, combos, …) is ever `RDBH`. TSW, same engine (rdbreader /
+  tswrdb), encrypts **nothing** — `RDBH` is an AoC-only protection applied surgically to the item database.
+- **Container layout (20-byte header + ciphertext):**
+  `"RDBH"`(4) + `version u32 = 1` + `flags u32 = 1` + `plainLen u32` (unpadded plaintext length) +
+  `reserved u32 = 0`, then the ciphertext = `entrySize - 20` bytes.
+- **64-bit block cipher:** the ciphertext length is **always a multiple of 8**; `plainLen` is the true length and
+  `ciphertextLen - plainLen` is uniformly 0..7 (block padding). Multiple of 8 but **not** 16 → an 8-byte-block
+  cipher (Blowfish/DES/TEA/XTEA/CAST/IDEA family), **not AES**.
+- **Not ECB:** across 5,537 items / 129,371 ciphertext blocks, **zero** 8-byte blocks repeat anywhere (intra- or
+  inter-resource). With 98k items sharing common plaintext (the `1000000` marker + shared archetype fields) ECB
+  would collide massively → it's **CBC** (per-resource IV, presumably derived from `type`/`id` since the header
+  has no IV field) or a per-resource-keyed stream/CTR mode. Byte histogram is uniform (256 values, ~0.39% each)
+  → real encryption, not a short XOR/obfuscation.
+- **Known-plaintext is available but doesn't help recover the key:** plaintext block 0 = `type(1000020 LE)` +
+  `id(LE)` (fully known per resource), and the *plain* `1000020` resources reveal the whole binary item-template
+  layout (12 B RDB-Id header `type,id,marker=1000000`, then binary fields). Known PT/CT pairs do not break a
+  proper 64-bit cipher.
+- **The key is in the client.** The client decrypts at runtime, so the cipher + key live in the AoC executable.
+  The only realistic decryption path is **static RE of the client binary** (locate the `RDBH` reader / the
+  decrypt routine + embedded key) or a **runtime hook / memory dump** of the decrypt function. No public tool
+  (rdbreader, tswrdb) implements any `RDBH` decryption. **Out of scope for now** — buildable item identity still
+  comes from captures.
 
 **Proven end-to-end:** TextStrings entry (type 1030002, id 211656, file 8) → read 10402 B → `IOz1`/uncomp=28704
 → zlib-inflate to exactly 28704 B → `TDC2` string collection → real strings extracted: *Flags, Health, Volume
 Mass, Attack Speed, Clan, Team*.
 
 **What's available (entry counts in our `le.idx`):** TextStrings `1030002`=**1,103**, MONSTERDATA `1010201`=
-**3,185** (NPC stats incl. HP), TextScript `1010035`=819, Playfield `1070003`=520, Treasure `1000083`=1,018,
-Filenames `1000010`=1 (the id→filename table). Item-template type still TBD (sample types; cross-ref health
-potion 180450). TextStrings = the dialogue/UI text (the `TDC2` format is documented); `1030002` category +
-the `/data/text/*.tdbl` language lists map strings to languages.
+**3,185** (model/skeleton/mesh defs — NOT combat stats; see the MONSTERDATA note below), TextScript
+`1010035`=819, Playfield `1070003`=520, Treasure `1000083`=1,018, **item-template `1000020`=98,048 (RDBH-
+encrypted — see the encryption section)**, Filenames `1000010`=1 (the id→filename table). TextStrings = the
+dialogue/UI text (the `TDC2` format is documented); `1030002` category + the `/data/text/*.tdbl` language lists
+map strings to languages.
 
 ### Implementation
 **Done:** `Faolan.Importer --rdb <RDB dir>` with `RdbReader` (le.idx v5/v7 parse + `IOz1`/zlib entry decode,
