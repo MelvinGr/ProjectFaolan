@@ -3,10 +3,15 @@
 // inventory / character / looks / quest / command protocol; field numbers + types are authoritative (proto2 -
 // note the required/optional labels). Compiles with:
 //   protoc --proto_path=. --descriptor_set_out=aoc.desc aoc-client-protos.proto
+// C# (protobuf-net) classes are generated to Faolan.Core/Network/Protobuf/AocProtocol.g.cs via:
+//   dotnet tool install -g protobuf-net.Protogen
+//   protogen --csharp_out=Faolan.Core/Network/Protobuf --proto_path=docs aoc-client-protos.proto
+//   # then rename the emitted aoc-client-protos.cs -> AocProtocol.g.cs
 // Notably: ProtoAcgItem.{key1,key2,key3}=ProtoDecryptionKey carry the per-item TEA decryption keys (= the
 // Items.Data1..4 quad) that unlock the RDBH item templates - see docs/rdb-extraction-plan.md.
 syntax = "proto2";
 package aoc;
+option csharp_namespace = "Faolan.Core.Network.Protobuf";
 
 // ===== Util.proto =====
 message ProtoEmptyMessage {

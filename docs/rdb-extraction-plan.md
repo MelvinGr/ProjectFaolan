@@ -257,8 +257,28 @@ vs the partial snapshot.
   `Item.Name` only when empty (captured names stay authoritative): **143 names recovered** (e.g. "Dusklight Tunic",
   "Misery of Dagon"), 26 items still nameless (their names are localized-string ids, resolvable via TextStrings
   `1030002` TDC2 if ever needed).
-- **Remaining:** reverse the rest of the template field block (the leading u32s before the name — stats/level/
-  flags) into `Item` columns. The decrypted templates dump cleanly via `--dump-templates` for that RE.
+### Template body format (partly reversed)
+The decrypted template body (after the 12-byte RDB-Id header) is a **typed attribute stream**, not a flat array.
+- **Strings**: `tag 0x21 (u32) + length (u32) + ASCII`, re-aligned to 4 after. First underscore-free string = name
+  (done above); a later one is usually the description ("No description available").
+- **Scalars**: a sequence of u32 attribute fields. Several positions are constant across all items
+  (`[2]=15, [3]=23, [5]=76, [7]=30, [11]=298`) = a fixed sub-header; from there it looks like `(attrId, value)`
+  with attrIds drawn from a small repeating vocabulary (499, 496, 360, 74, 54, 41, 21, …). BUT a naive
+  `0x21→string / else (id,u32) pair` walk only consumes the body exactly for **31/387** templates — so the
+  non-string attributes are **variable-width / multiple types** (not all 8-byte id+u32). Fully mapping them needs
+  more RE (per-attribute type table — best read from the client's deserializer), and the item stat-id vocabulary
+  here differs from the character `LegacyCharacterStatId` space. **Deliberately NOT shipped** as a parser (an 8%-
+  correct stat parser would poison the DB). The decrypt + `--dump-templates` infra makes this RE doable anytime.
+- **Done into `Item`:** `Name` (143 filled). **Remaining:** level/stats once the attribute type table is reversed.
+
+### Typed protobuf decoding (docs/aoc-client-protos.proto → C#)
+The recovered schema is generated to **`Faolan.Core/Network/Protobuf/AocProtocol.g.cs`** (protobuf-net, the
+project's existing protobuf runtime). Test `AocProtocolDecodeTests` decodes a **real captured** inventory entry
+(Slave Manacles) with the generated `ProtoInventoryGame.InventoryListEntry` and asserts the decoded
+`ProtoAcgItem.key1` (a `ProtoDecryptionKey`) == the item's `Data1..4` and `template1` == the item id — proving the
+schema matches the wire and that the "identity quad" is the TEA key. This makes the whole IIR/inventory/character/
+looks/quest protocol available as typed C# classes for the server/analyzer (richer than the hand-rolled
+`ProtoMessage` byte-walking: `stat_list`, `creator_name`, gem slots, `NpcStats`, etc.).
 
 **Proven end-to-end:** TextStrings entry (type 1030002, id 211656, file 8) → read 10402 B → `IOz1`/uncomp=28704
 → zlib-inflate to exactly 28704 B → `TDC2` string collection → real strings extracted: *Flags, Health, Volume

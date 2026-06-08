@@ -1,0 +1,90 @@
+using System;
+using System.IO;
+using System.Threading.Tasks;
+using Faolan.Core.Data;
+using Faolan.Core.Database;
+using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Protobuf;
+using Faolan.GameServer.Packets._0x737A6DF9_Test;
+using Faolan.Helpers;
+using Faolan.Importer;
+using Microsoft.EntityFrameworkCore;
+using ProtoBuf;
+using Xunit;
+
+namespace Faolan.PacketAnalyzer.Tests
+{
+	// Proves the protobuf schema reverse-engineered from AgeOfConan.exe (docs/aoc-client-protos.proto, generated to
+	// Faolan.Core/Network/Protobuf/AocProtocol.g.cs) decodes the REAL captured inventory wire bytes - and that the
+	// decoded ProtoAcgItem.key1 (a ProtoDecryptionKey) is exactly the item's Data1..4 quad, i.e. the per-item TEA
+	// key that unlocks its RDBH item template. Ties capture -> typed protobuf -> decryption key together.
+	public class AocProtocolDecodeTests
+	{
+		private const string InventoryCapture = "/home/melvin/Development/C#/Project Faolan/Captures/strie-login-inventory.bin";
+		private const uint SlaveManaclesId = 3361557;
+		private const uint Archetype = 1129664565;
+		private const ulong Slot = 18;
+
+		[Fact]
+		public async Task GeneratedSchema_Decodes_CapturedInventoryEntry_KeysMatchDataQuad()
+		{
+			if (!File.Exists(InventoryCapture))
+				return;
+
+			// 1) Pull the real captured Slave Manacles equipped entry bytes (an InventoryGame list entry).
+			var packet = new ConanPacket(await File.ReadAllBytesAsync(InventoryCapture));
+			var body = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+			body.ReadUInt32();
+			body.ReadUInt32();
+			body.ReadUInt32();
+			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(body);
+			var equipped = InventorySnapshotInspector.GetContainer(parts.Root, InventorySnapshotInspector.ContainerKind.Equipped);
+			var captured = InventorySnapshotInspector.GetEntryBySlot(equipped, Slot);
+			Assert.NotNull(captured);
+
+			// 2) Decode those bytes with the generated, schema-accurate types.
+			using var ms = new MemoryStream(captured!.MessageValue!.ToArray());
+			var entry = Serializer.Deserialize<ProtoInventoryGame.InventoryListEntry>(ms);
+
+			Assert.NotNull(entry.Item);
+			var acg = entry.Item.ItemData;
+			Assert.NotNull(acg);
+			Assert.NotNull(acg.Key1);
+			Assert.Equal(SlaveManaclesId, acg.Template1); // the RDB item-template id
+			Assert.Equal(Archetype, acg.Hash);            // tail.f8 = ProtoAcgItem.hash (what we call "archetype")
+
+			// 3) The decoded ProtoDecryptionKey must equal the Data1..4 we import from the same capture - proving the
+			//    "identity quad" is the TEA key.
+			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-proto-{Guid.NewGuid():N}.db");
+			try
+			{
+				Item item;
+				await using (var db = NewContext(dbPath))
+				{
+					await db.Database.EnsureCreatedAsync();
+					await CaptureItemImporter.ImportAsync(db, [await File.ReadAllBytesAsync(InventoryCapture)]);
+					item = await db.Items.FindAsync(SlaveManaclesId);
+				}
+
+				Assert.NotNull(item);
+				Assert.Equal(item!.Data1, acg.Key1.Key1);
+				Assert.Equal(item.Data2, acg.Key1.Key2);
+				Assert.Equal(item.Data3, acg.Key1.Key3);
+				Assert.Equal(item.Data4, acg.Key1.Key4);
+			}
+			finally
+			{
+				if (File.Exists(dbPath))
+					File.Delete(dbPath);
+			}
+		}
+
+		private static DatabaseContext NewContext(string path)
+		{
+			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={path}", x => x.MigrationsAssembly("Faolan")).Options;
+			return new DatabaseContext(options);
+		}
+	}
+}
