@@ -146,6 +146,26 @@ with record *i*'s (type, idx) — alignable by index without parsing the variabl
    index reads: `TEXTSCRIPT` (dialogue/strings), then whatever type holds item templates (cross-ref captured
    health-potion template 180450), then `MONSTERDATA` (NPC HP).
 
+### Phase 0 conclusion (2026-06-08)
+v6 is **fully reverse-engineerable but it's a real project, not a quick crack.** Mapped so far: the resource
+TYPE enum, the type+idx section (pinned: 294,125 records at 40,308,696..42,661,696, confirmed real type/idx),
+and that the front ~40 MB is multi-layered — header + a hash table (16-byte hashes, sorted by hash so NOT in
+type+idx record order) + name strings + a large **reference/dependency table** (~28–40 MB; a commonly-shared
+resource like `1010003:3147889` appears ~190× there as `(type,idx)` cross-refs). The **detail table
+(file/offset/size) is NOT a fixed-stride block** — every stride/field-arrangement tried resolves <11% of
+records against the `.rdbdata` files, so offsets are encoded differently (variable records, packed, or a
+separate structure keyed off the hash table). Cracking it needs sustained RE (hash-function identification or
+full section delimitation), not more brute-force.
+
+**Recommended pragmatic path: side-step v6 with a v5 client.** rdbreader *fully* supports RDB index **v5
+(Age of Conan)**, and the game DATA (items / NPC stats / dialogue / spells) is essentially the same across
+client builds. So obtaining an **older AoC client build whose RDB is v5** lets the existing, working tool
+extract everything cleanly — no v6 RE required. Order of preference:
+1. Run rdbreader on a v5 AoC client RDB (fastest; reuses a working tool). ← recommended
+2. Find a community RDB extractor that already handles current-era (v6) AoC clients.
+3. Commit to a focused v6 RE session (anchor: identify the hash function and/or fully delimit the front
+   sections; the type+idx section is already solved as a (record→type,idx) map).
+
 ## Decision gate
 After **Phase 0 + Phase 1** (cheap: index parse + type inventory) we'll know whether the structured game data is
 present and extractable. Green-light Phase 2 only if at least the **string table** or **item definitions** look
