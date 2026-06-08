@@ -1,36 +1,29 @@
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Protobuf;
 using ProtoBuf;
 
 namespace Faolan.GameServer.Packets.Protobuf
 {
+	// Client->server move/drop item args. Maps 1:1 onto the client's ProtoMoveInventoryItemIIR (recovered schema,
+	// docs/aoc-client-protos.proto): { source_container_id, source_item_pos, destination_container_id,
+	// destination_item_pos }. The container ids use the generated ProtoID32 { type, instance } typed message.
+	// The outer args stay a wire-tolerant (non-required) model rather than reusing the generated
+	// ProtoMoveInventoryItemIIR, because DropItem sends only the source side and that type's IsRequired fields
+	// would throw on the missing destination.
 	[ProtoContract]
 	public sealed class MoveItemInInventoryArgs : FaolanProtobufMessage
 	{
 		[ProtoMember(1)]
-		public ItemReference? Source { get; set; }
+		public ProtoID32? SourceContainerId { get; set; }
+
+		[ProtoMember(2)]
+		public uint SourceItemPos { get; set; }
 
 		[ProtoMember(3)]
-		public ItemReference? Target { get; set; }
-
-		[ProtoMember(2)]
-		public uint FromSlot { get; set; }
+		public ProtoID32? DestinationContainerId { get; set; }
 
 		[ProtoMember(4)]
-		public uint ToSlot { get; set; }
-	}
-
-	[ProtoContract]
-	public sealed class ItemReference : FaolanProtobufMessage
-	{
-		// Current name is provisional:
-		// random-actions + 0x737A6DF9 analysis show the same value reused across sibling
-		// container blocks (101/104/112/113), so this may be a shared container-owner/root
-		// handle rather than a per-item instance id.
-		[ProtoMember(2)]
-		public uint ItemHandle { get; set; }
-
-		[ProtoMember(1)]
-		public uint SlotOrContainer { get; set; }
+		public uint DestinationItemPos { get; set; }
 	}
 
 	public enum MoveItemInInventoryDirection

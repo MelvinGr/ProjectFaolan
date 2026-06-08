@@ -365,15 +365,12 @@ namespace Faolan.GameServer
 				case GameServer0X2000Opcodes.MoveItemInInventory:
 				{
 					//Logger.LogInformation($"[DUMP] MoveItemInInventory ({rawPayload.Length} bytes): {rawPayload.ToHex()}");
-					// Random-actions capture observations:
-					// - protobuf cleanly decodes Source/Target item references plus FromSlot/ToSlot
-					// - observed sample moves reused the same second reference value inside slotOrContainer=104
-					//   across many different slot moves, and 0x737A6DF9 reuses that same value for sibling blocks
-					//   101/104/112/113 in the nested field-6 chain; this makes ItemReference.ItemHandle a likely
-					//   misnomer in current research
-					//   (it behaves more like a container-owner/root handle than a per-item instance id)
-					// - no server->client packet followed these moves; the same reference value only appeared earlier
-					//   in the huge 0x737A6DF9 download, not in Spawn or 0xF096251E
+					// The recovered client schema names this message ProtoMoveInventoryItemIIR:
+					//   { source_container_id, source_item_pos, destination_container_id, destination_item_pos }
+					// where each container id is a ProtoID32 { type, instance }. This resolves the old research note
+					// that the reference's second value (reused across sibling container blocks 101/104/112/113 in
+					// the 0x737A6DF9 field-6 chain) "behaves like a container-owner handle" - it is the container's
+					// ProtoID32.instance, not a per-item id. No server->client packet follows these moves.
 
 					var protocolConstant = packet.Body.ReadUInt32();
 					var characterHandle = packet.Body.ReadUInt32();

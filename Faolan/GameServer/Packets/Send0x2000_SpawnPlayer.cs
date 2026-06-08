@@ -347,44 +347,44 @@ namespace Faolan.GameServer
 		// Editable typed model. Serialization is expected to reproduce the previous protobuf bytes.
 		private static readonly SpawnPlayerSummary SpawnPlayerPacketData0_2_PlayerSummary = new SpawnPlayerSummary
 		{
-			Unknown1 = 2,
-			Unknown2 = 0,
-			Unknown3 = 3,
-			Unknown4 = 102,
-			Unknown5 = 0,
+			Sex = 2,
+			Side = 0,
+			Race = 3,
+			MonsterScale = 102,
+			MonsterData = 0,
 			MaxHealthRaw = 237100,
 			HealthRaw = 594900,
-			Unknown8 = 0,
+			MaxStaminaRaw = 0,
 			StaminaRaw = 100,
 			MaxManaRaw = 261000,
 			ManaRaw = 583000,
-			Unknown12 = 0,
-			Unknown14 = 100,
-			Unknown15 = 0,
-			Unknown16 = 1,
-			Unknown17 = 793575,
+			LooksPackage = 0,
+			MountScale = 100,
+			MountFlags = 0,
+			Flags = 1,
+			HeadMesh = 793575,
 			VisibleLevel = 80,
-			VisibleLevelDuplicate = 80,
-			Unknown20 = 100,
-			Unknown21 = 12488,
-			Unknown22 = 1,
-			Unknown26 = 20,
-			Unknown29 = 0,
-			Unknown32 = 60,
-			Unknown34 = 1
+			ApprenticeLevel = 80,
+			RadiusRaw = 100,
+			Bcc = 12488,
+			BccState = 1,
+			TradeskillFlags = 20,
+			CarsGroup = 0,
+			RunSpeed = 60,
+			OrientationMode = 1
 		};
 
 		// f6: SummaryStats
 		// Editable typed model. Confirmed: kills=145, deaths=204.
 		private static readonly SpawnSummaryStats SpawnPlayerPacketData0_2_SummaryStats = new SpawnSummaryStats
 		{
-			Unknown1 = 1,
+			PvpLevel = 1,
 			OverallKills = 145,
 			OverallDeaths = 204,
-			Unknown8 = 32,
-			Unknown11 = 10,
-			Unknown13 = 98689,
-			Unknown16 = 0
+			PlayerFlags = 32,
+			Strength = 10,
+			SubscriptionFlags = 98689,
+			HardcoreLevel = 0
 		};
 
 		private static byte[] BuildSpawnPlayerPacketData0_2()
