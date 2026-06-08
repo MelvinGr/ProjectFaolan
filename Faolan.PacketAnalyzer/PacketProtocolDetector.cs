@@ -52,6 +52,19 @@ namespace Faolan.PacketAnalyzer
 			return TryGetKnownProtocol(ipAddress, port);
 		}
 
+		// Forces a specific server endpoint to GameServer. Called when the GameServer zlib-stream marker
+		// (0x80000005) is detected on its download stream. Content detection beats port classification here: the
+		// world GameServer moves to a fresh port on every playfield change, and the same port number can be a
+		// different service on another server IP - so a port-based label mislabels these streams (and the importer
+		// then drops them). Endpoint-scoped (IP:port) and authoritative so later inference can't override it.
+		public void MarkGameServerEndpoint(string ipAddress, ushort port)
+		{
+			var key = CreateEndpointKey(ipAddress, port);
+			_endpointProtocols[key] = PacketProtocolInfo.GameServerProtocolName;
+			_authoritativeEndpoints.Add(key);
+			_knownPorts.Add(port);
+		}
+
 		public DetectedService ObservePacket(string sourceAddress, string destinationAddress, string sourceIpAddress, string destinationIpAddress, ushort sourcePort, ushort destinationPort, bool isSourceLocal,
 			bool isDestinationLocal, bool isDownload, ConanPacket packet)
 		{

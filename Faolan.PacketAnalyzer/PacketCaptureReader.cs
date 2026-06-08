@@ -81,10 +81,12 @@ namespace Faolan.PacketAnalyzer
 
 		private byte[]? TransformPayload(PacketCaptureContext context, byte[] bytes)
 		{
-			var sourceProtocolName = _protocolDetector.GetKnownProtocol(context.SourceIpAddress, context.SourcePort);
-			var isFromGameServer = !context.IsSourceLocal && string.Equals(sourceProtocolName, PacketProtocolInfo.GameServerProtocolName, StringComparison.OrdinalIgnoreCase);
-
-			if (!isFromGameServer || bytes.Length == 0)
+			// Detect GameServer downloads by CONTENT (the 0x80000005 zlib-stream marker), not by port. The world
+			// GameServer moves to a fresh port on every playfield change, and the same port number can be a
+			// different service on another server IP, so port classification mislabels these streams and the
+			// importer drops them. Any server->client (download) flow is offered to the marker detector; non-GS
+			// flows lack the marker and pass through untouched.
+			if (context.IsSourceLocal || bytes.Length == 0)
 				return bytes;
 
 			var state = GetCompressionState(context.FlowKey);
@@ -92,10 +94,17 @@ namespace Faolan.PacketAnalyzer
 			if (state.Inflater != null)
 				return DecompressFlowBytes(context.FlowKey, state, bytes);
 
-			if (state.PendingHeaderCount > 0 || CouldStartCompressionHeader(bytes))
-				return TryProcessCompressionHeader(context.FlowKey, state, bytes);
+			if (state.PendingHeaderCount == 0 && !CouldStartCompressionHeader(bytes))
+				return bytes;
 
-			return bytes;
+			var result = TryProcessCompressionHeader(context.FlowKey, state, bytes);
+
+			// Once the compression header is confirmed and inflation begins, this endpoint IS a GameServer:
+			// relabel it (endpoint-scoped + authoritative) so its packets are kept/labeled as GameServer.
+			if (state.Inflater != null)
+				_protocolDetector.MarkGameServerEndpoint(context.SourceIpAddress, context.SourcePort);
+
+			return result;
 		}
 
 		private byte[]? TryProcessCompressionHeader(string flowKey, GameServerCompressionState state, byte[] bytes)
