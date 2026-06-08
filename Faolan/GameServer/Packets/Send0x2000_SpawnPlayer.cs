@@ -4,7 +4,7 @@ using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
-using Faolan.GameServer.Packets.Protobuf;
+using Faolan.Core.Network.Protobuf;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer
@@ -345,27 +345,29 @@ namespace Faolan.GameServer
 		// Field tags like 0x08, 0x10, 0x18 are Varint fields.
 		// f4: PlayerSummary
 		// Editable typed model. Serialization is expected to reproduce the previous protobuf bytes.
-		private static readonly SpawnPlayerSummary SpawnPlayerPacketData0_2_PlayerSummary = new SpawnPlayerSummary
+		// The client's own CharacterStats message (recovered schema). NOTE radius (field 20) is sint32/zig-zag in
+		// the schema, so the wire value 100 corresponds to a semantic radius of 50 (zig-zag(50)=100).
+		private static readonly ProtoCoreCharacterIIR.CharacterStats SpawnPlayerPacketData0_2_PlayerSummary = new ProtoCoreCharacterIIR.CharacterStats
 		{
 			Sex = 2,
 			Side = 0,
 			Race = 3,
 			MonsterScale = 102,
 			MonsterData = 0,
-			MaxHealthRaw = 237100,
-			HealthRaw = 594900,
-			MaxStaminaRaw = 0,
-			StaminaRaw = 100,
-			MaxManaRaw = 261000,
-			ManaRaw = 583000,
+			Life = 237100,
+			Health = 594900,
+			MaxStamina = 0,
+			Stamina = 100,
+			MaxMana = 261000,
+			Mana = 583000,
 			LooksPackage = 0,
 			MountScale = 100,
 			MountFlags = 0,
 			Flags = 1,
 			HeadMesh = 793575,
-			VisibleLevel = 80,
+			Level = 80,
 			ApprenticeLevel = 80,
-			RadiusRaw = 100,
+			Radius = 50,
 			Bcc = 12488,
 			BccState = 1,
 			TradeskillFlags = 20,
@@ -374,13 +376,12 @@ namespace Faolan.GameServer
 			OrientationMode = 1
 		};
 
-		// f6: SummaryStats
-		// Editable typed model. Confirmed: kills=145, deaths=204.
-		private static readonly SpawnSummaryStats SpawnPlayerPacketData0_2_SummaryStats = new SpawnSummaryStats
+		// f6: the client's PlayerStats message. Confirmed: kills=145, deaths=204.
+		private static readonly ProtoCoreCharacterIIR.PlayerStats SpawnPlayerPacketData0_2_SummaryStats = new ProtoCoreCharacterIIR.PlayerStats
 		{
 			PvpLevel = 1,
-			OverallKills = 145,
-			OverallDeaths = 204,
+			PvpTotalKills = 145,
+			PvpTotalDeaths = 204,
 			PlayerFlags = 32,
 			Strength = 10,
 			SubscriptionFlags = 98689,
@@ -401,7 +402,7 @@ namespace Faolan.GameServer
 				//   likely arrives through a separate inventory/container packet family.
 				// Editable protobuf-like blocks. Change values in the typed object initializers below,
 				// not in raw hex.
-				.WriteByte(0x22).WriteArrayByteLength(SpawnPlayerPacketData0_2_PlayerSummary.ToProtobuf()).WriteByte(0x32).WriteArrayByteLength(SpawnPlayerPacketData0_2_SummaryStats.ToProtobuf())
+				.WriteByte(0x22).WriteArrayByteLength(SpawnPlayerPacketData0_2_PlayerSummary.ToProtobufBytes()).WriteByte(0x32).WriteArrayByteLength(SpawnPlayerPacketData0_2_SummaryStats.ToProtobufBytes())
 				.WriteArray(SpawnPlayerPacketData0_2_AuxiliaryState).WriteArray(SpawnPlayerPacketData0_2_Flags);
 
 			foreach (var appearanceEntry in SpawnPlayerPacketData0_2_AppearanceEntries)

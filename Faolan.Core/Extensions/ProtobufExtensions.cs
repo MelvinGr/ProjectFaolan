@@ -18,5 +18,14 @@ namespace Faolan.Core.Extensions
 			Serializer.NonGeneric.Serialize(ms, obj);
 			return ms.ToArray();
 		}
+
+		// Serializes any protobuf-net contract (e.g. the generated client schema types in
+		// Faolan.Core.Network.Protobuf) to bytes.
+		public static byte[] ToProtobufBytes<T>(this T obj)
+		{
+			using var ms = new MemoryStream();
+			Serializer.Serialize(ms, obj);
+			return ms.ToArray();
+		}
 	}
 }
