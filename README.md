@@ -450,6 +450,12 @@ Concrete next steps, grouped by area. See `docs/` for the dissection writeups be
 ### Cleanup
 - [ ] Fix the malformed **`OverrideGameTweaks` (`0x2085...`)** packet — client logs `stream bad after
       'overrides'` and drops that route every session (harmless, not a login blocker).
+- [ ] **Analyzer tail-drop on ~3 GS streams.** Verified the analyzer vs the Wireshark plugin + python-zlib
+      across all 33 GS streams: 19 byte-identical, 11 where the plugin's C inflater fails partway and the
+      analyzer is more complete (analyzer correct), but 3 (Strie-create/Strie-login `:7029`, faolanx-charcreation
+      `:7018`) where the analyzer inflates ~7 KB short of ground truth (e.g. Strie-login 80735 vs true 88147,
+      no capture truncation). Likely the reassembler/inflater stopping before `Z_STREAM_END` on those streams;
+      investigate `PacketCaptureReader.Decompress` / `TcpStreamReassembler` tail handling.
 
 ## Notes
 
