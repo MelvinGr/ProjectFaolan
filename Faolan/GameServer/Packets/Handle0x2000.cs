@@ -224,10 +224,19 @@ namespace Faolan.GameServer
 
 							case ActionType.CastSpell:
 							{
-								var spellId = args.TypeId;
-								var targetHandle = args.SpellTarget?.TargetHandle;
+								var spellId = (uint)(args.SpellTarget?.SpellId ?? args.TypeId);
+								var casterHandle = client.Session.Account.ClientInstance;
+								var targetHandle = (uint)(args.SpellTarget?.TargetHandle ?? 0);
 
 								await LogToClient($"CastSpell spell={spellId} target=0x{targetHandle:X} {args}");
+
+								// Play the cast (caster -> target, or self when no target), then resolve its effect.
+								await ApplySpell(client, casterHandle, targetHandle == 0 ? casterHandle : targetHandle, spellId);
+
+								// An offensive cast at another entity applies damage + pushes the target's vitals; a
+								// self/no-target cast is treated as a buff (no damage) until spell data distinguishes them.
+								if (targetHandle != 0 && targetHandle != casterHandle)
+									await ResolveOffensiveCast(client, casterHandle, targetHandle, spellId);
 
 								break;
 							}

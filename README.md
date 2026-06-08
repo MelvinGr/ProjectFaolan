@@ -393,7 +393,13 @@ Concrete next steps, grouped by area. See `docs/` for the dissection writeups be
 - [ ] **Verify the `0x96B8DC59` vitals packet in-client** (test live with `.vitals` / `.setstat`), then wire
       `SendVitals(client)` into the world-entry sequence so vitals show on login.
 - [ ] Confirm **ApplySpell (`0x6B87E316`) magnitude** sign/scale, and whether damage is carried in the cast or
-      only in the following vitals update.
+      only in the following vitals update. (Combat loop is implemented in `Faolan/GameServer/Combat/`:
+      `CastSpell` → ApplySpell + damage + `0x96B8DC59` vitals update; damage formula is provisional.)
+- [ ] **Combat death/XP**: decode the death/despawn packet and the XP grant; wire into `ResolveOffensiveCast`
+      (currently HP→0 is detected and logged only). Real **NPC max HP** (placeholder today).
+- [ ] **Mounts**: the summon spell is `0x3BAD7D` (channeled ApplySpell `0x6B87E316`, decoded from demol80's
+      `very_long_loading` capture; `.mount` broadcasts it). Still needed for full mounting: spawn the mount
+      entity (`0xFA015807`, e.g. "Fading Black Horse") and drive the MountedRun (`MovingType 0x010A`) transition.
 - [ ] Fix the wrong stat ids in `CapturedCharacterStats.cs`: `MaxHealth 0x01` (decodes to ~196, not max),
       `MaxStamina 0x1F9` / `MaxMana 0x1FB` (suspect); find the real max-* ids or confirm max==current-when-full.
 - [ ] Determine whether **attributes** (Str/Int/Con/Wis/Dex) are sent at all or computed client-side from

@@ -106,6 +106,9 @@ namespace Faolan.GameServer
 				["spelltest"] = (client, arguments) => ApplySpellTest(client.Session.Character.Id, uint.Parse(arguments)),
 				["vitals"] = (client, arguments) => SetVitalsCommand(client, arguments),
 				["setstat"] = (client, arguments) => SetStatCommand(client, arguments),
+				["hurt"] = (client, arguments) => AdjustOwnHealthCommand(client, arguments, false),
+				["heal"] = (client, arguments) => AdjustOwnHealthCommand(client, arguments, true),
+				["mount"] = (client, arguments) => MountCommand(client, arguments),
 				["test"] = (client, _) => Test(client.Session.Character.Id)
 			};
 		}
@@ -135,6 +138,32 @@ namespace Faolan.GameServer
 			var value = uint.Parse(parts[1]);
 
 			return SendStatUpdate(client, new Packets._0x737A6DF9_Test.CharacterStatBlock().Set(statId, value));
+		}
+
+		// .hurt [amount] / .heal [amount]  - apply a health delta to the player's own live vitals and push the
+		// 0x96B8DC59 update so the health bar moves (combat-loop test without needing a target). Default 100.
+		private Task AdjustOwnHealthCommand(INetworkClient client, string arguments, bool heal)
+		{
+			var amount = int.TryParse(arguments, out var parsed) ? parsed : 100;
+			var vitals = GetOrAddPlayerVitals(client);
+			vitals.ApplyHealthDelta(heal ? amount : -amount);
+
+			return SendStatUpdate(client, vitals.ToVitalsBlock());
+		}
+
+		// .mount [spellIdHex]  - cast the mount-summon spell on the player. Default 0x3BAD7D, the mount spell
+		// observed in demol80's "very_long_loading" capture: a channeled ApplySpell 0x6B87E316 (spell 0x3BAD7D,
+		// repeated ~11x with 0xF508F4C1) immediately precedes the "Fading Black Horse" entity registering
+		// (0x96C46740) and the player switching to MountedRun (MovingType 0x010A). This broadcasts the cast; full
+		// mounting also needs the mount entity spawn + the MountedRun transition (not yet built - see TODO).
+		private Task MountCommand(INetworkClient client, string arguments)
+		{
+			var spellId = string.IsNullOrWhiteSpace(arguments)
+				? 0x3BAD7Du
+				: Convert.ToUInt32(arguments.Trim().Replace("0x", "", StringComparison.OrdinalIgnoreCase), 16);
+
+			var self = client.Session.Account.ClientInstance;
+			return ApplySpell(client, self, self, spellId);
 		}
 
 		private async Task SaveChanges(uint characterId)
