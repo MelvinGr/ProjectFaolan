@@ -407,6 +407,15 @@ Concrete next steps, grouped by area. See `docs/` for the dissection writeups be
 - [ ] Decode the high-volume combat entity-update sub-ops `0xFEC4158A` / `0xD751EBB4` / `0x04B82B2D`
       (animation / aggro / buff state, unconfirmed).
 
+### Conversations / NPC routing
+- [ ] **Wrong NPC dialogue** (e.g. talking to Casilda shows Kalanthes text). Two causes: (1) the create-world
+      fallback `SendNpcIntroConversation` sends ONE hardcoded conversation (id 12493) for every NPC; (2) DB nodes
+      are keyed by `(TypeId, Mode, Field3)` only. Partial fix done: `TryReplayConversation` now also runs in
+      create-world sessions (DB routes by the client's NPC-specific Mode/Field3), with the hardcoded intro as a
+      last-resort fallback. STILL TODO: verify the client sends NPC-distinct `(Mode, Field3)` (needs a create-flow
+      capture talking to Casilda); decode the NPC spawn's stable conversation/dialogue id so handle→conversation
+      is unambiguous; rebuild the create-world intro per-NPC instead of the single hardcoded 12493.
+
 ### Quests (`docs/quests-and-combat.md`, `docs/capture-events.md`)
 - [ ] Isolate the **quest accept vs decline** action and the **quest-log / objective state** packet (numeric
       quest ids; candidate `0x2038` title / `0x20a5` tracker pair, bodies undecoded).

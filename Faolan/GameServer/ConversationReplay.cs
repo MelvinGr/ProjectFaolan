@@ -16,11 +16,13 @@ namespace Faolan.GameServer
 	{
 		// Replays the captured conversation node matching the player's TalkToNpc args, re-addressed to the NPC
 		// they actually clicked and to the live character instance. Returns true if a node matched (and was sent).
-		// Gated to world-burst-replay (beach) sessions, where the captured beach NPC conversations apply. The nodes
-		// live in the DB (ConversationNode/ConversationPacket), imported from captures by Faolan.Importer.
+		// Runs for both world-burst (beach login) AND create-world sessions: the client picks (Mode, Field3) from
+		// the NPC it clicked, so the DB lookup routes to that NPC's dialogue - far better than the single hardcoded
+		// intro the create-world fallback sends for every NPC. The nodes live in the DB (ConversationNode/
+		// ConversationPacket), imported from captures by Faolan.Importer.
 		private async Task<bool> TryReplayConversation(INetworkClient client, uint typeId, uint mode, uint field3, uint clickedNpcHandle)
 		{
-			if (!client.Session.UsedWorldBurstReplay)
+			if (!client.Session.UsedWorldBurstReplay && !client.Session.IsCreateWorldSession)
 				return false;
 
 			var node = await Database.GetConversationNode(typeId, mode, field3);

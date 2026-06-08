@@ -260,7 +260,9 @@ namespace Faolan.GameServer
 								if (await TryReplayConversation(client, (uint)args.TypeId, (uint)args.Mode, (uint)args.Field3, npcHandle))
 									break;
 
-								// Fallback: the Kalanthes post-creation intro, only in the create-world cutscene context.
+								// Last-resort fallback ONLY when the DB has no node for this NPC: the single hardcoded
+								// post-creation intro (conversation 12493). It is NPC-agnostic, so it shows the same text
+								// for every NPC - the DB path above is what routes the correct dialogue per NPC.
 								if (client.Session.IsCreateWorldSession && npcHandle != 0)
 									await SendNpcIntroConversation(client, npcHandle);
 
