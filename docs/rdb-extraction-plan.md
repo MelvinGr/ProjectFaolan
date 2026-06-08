@@ -266,12 +266,22 @@ is also a **packed field** (e.g. `@40 = 0x0X000001`, X differs per item) that is
 naive `[id u32][value u32]` walk only consumes the body exactly for 160/387 (and mis-fires when a value == 33,
 the string marker). **Strings** are `0x21 (u32) + len (u32) + ASCII`, unaligned (no realign after), holding the
 name (done) and usually a description.
-- **Conclusion:** correct stat extraction needs the struct's **field map** (offsets → meaning), which means either
-  (a) finishing the static RE of the client's type-`1000020` deserializer in `AgeOfConan.exe` (the decrypt path
-  `RDBServerSource::Decrypt` is mapped; the body reader is dispatched indirectly and wasn't pinned in this pass —
-  the `1000020` refs at `0x7cd99c`/`0x8c5c70`/`0x8d8250` are resource-handle/instance code, not the body struct),
-  or (b) a dynamic dump (hook the client's template parser and read the populated struct). The packed `@40` field
-  and the fixed stat-slot layout are the anchors to resume from.
+- **Conclusion:** correct stat extraction needs the struct's **field map** (offsets → meaning). RE pass 2 traced
+  the parser chain (anchors below), which revealed *why* this is non-trivial:
+  - Factory: `0x10603b0(creatorFn, type)` registers a creator per RDB type; type `1000020`/`1000620`/`1040005`/
+    `1000621` all use creator **`0x4e29f0`** → worker **`0x4e8600`** which allocs a 0x90-byte object, sets vtable
+    **`0x1fdd11c`**, class RTTI = **`RDBItemData_c`**.
+  - `RDBItemData_c` is a **lazy buffer wrapper**: vtable slot 17 (`0x8d68f0`) stores the source buffer at
+    `[obj+0x88]` and reads only the **12-byte RDB-Id header** (`call [stream_vt+0x18]`, len `0xc`); the field
+    getters (slots 7-16, `0x4ec7xx`) are **stubs** (`ret`/`return 1`/`return [ecx+0x78]`). So there is **no single
+    deserialize** that reads the stat fields - consumers read them on demand from the stream (read-u32 primitive
+    `0x48f900`; the base header reader `0x1060370` calls it ×3). Mapping every field therefore means tracing the
+    distributed consumer reads - a sizeable effort, not a quick pin.
+  - **Resume anchors:** `RDBItemData_c` vtable `0x1fdd11c`; buffer at obj `+0x88`; stream read-u32 `0x48f900`;
+    the name field is the `0x21`-tagged string in the stream; the fixed stat-slot offsets (@20=76, @60=499, …) and
+    packed `@40` are the on-disk landmarks. Cross-validate any field map against the `--dump-templates` blobs.
+  - Alternative: **(b) dynamic dump** - run the client (Wine) with our inventory and hook `RDBItemData_c`'s reads
+    to log offset→value; authoritative but needs a full client-run + debugger setup (also not quick).
 - **Deliberately NOT shipped** as a parser — a fixed-struct guess without the field map would write wrong stats to
   the DB. The decrypt + `--dump-templates` infra preserves every template for that RE whenever it's picked up.
 - **Done into `Item`:** `Name` (143 filled). **Remaining:** level/stats once the struct field map is reversed.
