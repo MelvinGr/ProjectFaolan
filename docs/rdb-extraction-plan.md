@@ -186,11 +186,20 @@ get from the client** (item-template identity, NPC stats, spawn/treasure tables)
 The `TDC2` text format is fully decoded (validated: dialogue in categories like 50013/50014) and can resolve a
 specific id on demand for dev, but we won't dump all ~hundreds-of-thousands of strings into `faolan.db`.
 
+**Items from RDB — INVESTIGATED, BLOCKED (encrypted). 2026-06-08.**
+Item-template type = **1000020** (98,048 entries; captured health-potion 180450 = record index 31805). Decisive
+cross-check against ground truth: of **191** DB buildable items, **190** are present in RDB(1000020), and **all
+190 are `RDBH`-wrapped** (0 plain), high-entropy (~7.0), no standard decompression (zlib/IOz1/raw) yields
+anything; **0 of the 190 contain the known item `Data1` quad value, and 0 contain the `Archetype` value.** The
+plain ~28% of 1000020 resources are test items ("TESTITEM Spell uploader"), not shippable identity. Conclusion:
+the buildable identity (archetype + `Data1..4` quad) is **absent / intentionally `RDBH`-encrypted** in the RDB
+and **cannot be extracted** without breaking the `RDBH` cipher (a separate major effort). **Buildable items must
+still come from captures** (ArchetypeHarvester on `0x737A6DF9` snapshots) — the RDB does not shortcut this.
+
 **Next (structured data → DB):**
-1. Find the **item-template** type id (cross-ref the captured health-potion template 180450 / archetype
-   `0x4847505A`) and decode its payload → item `Data1..4` + archetype → `Items` (makes all items buildable).
+1. ~~Item-template identity~~ — **blocked** (see above; `RDBH`-encrypted, identity absent).
 2. Decode **MONSTERDATA (1010201, 3,185 entries)** payload → NPC max HP → combat (`CharacterMaxStats`-style or
-   an NPC-stats table).
+   an NPC-stats table). NOTE: likely the same `RDBH` wrapping as items — check the wrapper before investing.
 3. (later) conversation/quest structure (which ids to reference), Playfield/Treasure.
    Each needs per-type payload RE (the inventory + RdbReader make this straightforward to iterate). Cross-validate
    against ground truth (captured item identities, the lvl-23 sheet, conversation nodes).
