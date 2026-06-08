@@ -27,6 +27,8 @@ namespace Faolan.Importer
 			var capturesDir = GetOption(args, "--captures") ?? Path.Combine(RepoRoot, "Captures");
 			var archiveDir = GetOption(args, "--archive"); // dir with aocdatabase.sql (one-time ability/spell defs)
 			var rdbDir = GetOption(args, "--rdb"); // client RDB dir (le.idx + NN.rdbdata) - one-time text/data import
+			var rdbItems = args.Contains("--rdb-items"); // decrypt each keyed item's RDB template (needs --rdb)
+			var dumpTemplatesDir = GetOption(args, "--dump-templates"); // optional: write decrypted templates here
 			var dryRun = args.Contains("--dry-run");
 
 			Console.WriteLine($"Faolan.Importer: db={dbPath}  captures={capturesDir}  archive={archiveDir ?? "(none)"}  rdb={rdbDir ?? "(none)"}  dryRun={dryRun}");
@@ -88,6 +90,14 @@ namespace Faolan.Importer
 			if (rdbDir != null)
 				ImportRdb(rdbDir);
 
+			if (rdbItems)
+			{
+				if (rdbDir == null)
+					Console.Error.WriteLine("--rdb-items needs --rdb <RDB dir>.");
+				else
+					await ImportRdbItems(db, rdbDir, dumpTemplatesDir);
+			}
+
 			var after = await Snapshot(db);
 			PrintDelta(before, after);
 
@@ -118,6 +128,18 @@ namespace Faolan.Importer
 			Console.WriteLine("  ----------------------------------------");
 			foreach (var (type, count) in rdb.TypeCounts())
 				Console.WriteLine($"  {type,-10}  {count,6}  {(names.TryGetValue(type, out var n) ? n : "")}");
+		}
+
+		// --rdb-items: decrypt the client RDB item-template for every item we have a key for (Item.Data1..4 =
+		// the item's ProtoDecryptionKey). Validates the decrypt end-to-end (RDB-Id header must match) and, with
+		// --dump-templates <dir>, writes each decrypted template for the field-layout reversing step. See
+		// docs/rdb-extraction-plan.md.
+		private static async Task ImportRdbItems(DatabaseContext db, string rdbDir, string dumpDir)
+		{
+			var r = await RdbItemImporter.ImportAsync(db, rdbDir, dumpDir);
+			Console.WriteLine($"RDB items: {r.Decrypted}/{r.Keyed} keyed items decrypted+validated; {r.NamesAdded} names filled"
+				+ $"  (noEntry={r.NoEntry}, headerMismatch={r.HeaderMismatch}, decryptFailed={r.DecryptFailed})"
+				+ (dumpDir != null ? $"  -> templates dumped to {dumpDir}" : ""));
 		}
 
 		// Upsert (never wipe): update each extracted node's handles + replace its own packets, insert new nodes, and

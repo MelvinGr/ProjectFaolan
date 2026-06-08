@@ -43,7 +43,32 @@ namespace Faolan.Importer
 		// begin with the 12-byte RDB-Id data header), or the raw bytes if it isn't an IOz1/zlib entry.
 		public byte[] ReadDecompressed(Entry e)
 		{
+			return UnwrapIOz1(ReadRaw(e));
+		}
+
+		// Reads an RDBH-encrypted entry (only item-templates, RDB types 1000020/1000620, are RDBH). The 20-byte
+		// header is `"RDBH" + ver=1 + flags=1 + plainLen + reserved`; the ciphertext is TEA-ECB encrypted with the
+		// item's per-template key (= ProtoDecryptionKey = Item.Data1..4). Decrypts, truncates to plainLen, then
+		// unwraps the inner IOz1/zlib. If the entry isn't RDBH, falls back to the plain IOz1 unwrap (key ignored).
+		public byte[] ReadDecrypted(Entry e, ReadOnlySpan<uint> teaKey)
+		{
 			var raw = ReadRaw(e);
+			if (!IsRdbh(raw))
+				return UnwrapIOz1(raw);
+
+			var plainLen = (int)BinaryPrimitives.ReadUInt32LittleEndian(raw.AsSpan(12, 4));
+			var decrypted = Tea.DecryptEcb(raw.AsSpan(20), teaKey);
+			var inner = plainLen >= 0 && plainLen <= decrypted.Length ? decrypted[..plainLen] : decrypted;
+			return UnwrapIOz1(inner);
+		}
+
+		public static bool IsRdbh(ReadOnlySpan<byte> raw)
+		{
+			return raw.Length >= 20 && raw[0] == (byte)'R' && raw[1] == (byte)'D' && raw[2] == (byte)'B' && raw[3] == (byte)'H';
+		}
+
+		private static byte[] UnwrapIOz1(byte[] raw)
+		{
 			if (raw.Length >= 8 && raw[0] == (byte)'I' && raw[1] == (byte)'O' && raw[2] == (byte)'z' && raw[3] == (byte)'1')
 			{
 				var uncompressed = BinaryPrimitives.ReadUInt32LittleEndian(raw.AsSpan(4, 4));

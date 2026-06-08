@@ -1,0 +1,529 @@
+// AoC client protobuf schema, reverse-engineered from the embedded FileDescriptorProto blobs in
+// AgeOfConan.exe (54 messages across 16 .proto files). Wire-format ground truth for the GameServer IIR /
+// inventory / character / looks / quest / command protocol; field numbers + types are authoritative (proto2 -
+// note the required/optional labels). Compiles with:
+//   protoc --proto_path=. --descriptor_set_out=aoc.desc aoc-client-protos.proto
+// Notably: ProtoAcgItem.{key1,key2,key3}=ProtoDecryptionKey carry the per-item TEA decryption keys (= the
+// Items.Data1..4 quad) that unlock the RDBH item templates - see docs/rdb-extraction-plan.md.
+syntax = "proto2";
+package aoc;
+
+// ===== Util.proto =====
+message ProtoEmptyMessage {
+}
+message ProtoID32 {
+  optional uint32 type = 1;
+  optional uint32 instance = 2;
+}
+message ProtoVec3 {
+  optional float x = 1;
+  optional float y = 2;
+  optional float z = 3;
+}
+message ProtoQuat {
+  optional float x = 1;
+  optional float y = 2;
+  optional float z = 3;
+  optional float w = 4;
+}
+message ProtoDecryptionKey {
+  optional fixed32 key1 = 1;
+  optional fixed32 key2 = 2;
+  optional fixed32 key3 = 3;
+  optional fixed32 key4 = 4;
+}
+message ProtoAcgItem {
+  optional ProtoDecryptionKey key1 = 1;
+  optional ProtoDecryptionKey key2 = 2;
+  optional ProtoDecryptionKey key3 = 3;
+  optional fixed32 template1 = 4;
+  optional fixed32 template2 = 5;
+  optional fixed32 template3 = 6;
+  optional uint32 level = 7;
+  optional fixed32 hash = 8;
+}
+message ProtoInventoryGameEntry {
+  message StatValue {
+    optional uint32 stat = 1;
+    optional uint32 value = 2;
+  }
+  message SlotMap {
+    optional uint32 slot = 1;
+    optional ProtoAcgItem item = 2;
+  }
+  optional uint64 item_id = 1;
+  repeated ProtoInventoryGameEntry.StatValue stat_list = 2;
+  optional ProtoAcgItem item_data = 3;
+  repeated ProtoInventoryGameEntry.SlotMap slot_map = 4;
+  optional string creator_name = 5;
+  optional string maxAvailableItems = 6;
+}
+message ProtoInventoryGame {
+  message InventoryListEntry {
+    required uint32 pos = 1;
+    required ProtoInventoryGameEntry item = 2;
+  }
+  required ProtoID32 inventory_id = 1;
+  optional uint32 max_size = 2;
+  optional uint32 disabled_slots_count = 3;
+  repeated ProtoInventoryGame.InventoryListEntry items = 4;
+}
+message ProtoEndpoint {
+  optional fixed32 type = 1;
+  optional uint32 instance = 2;
+  optional uint32 token = 3;
+}
+message RpcHeader {
+  required ProtoEndpoint caller_id = 1;
+  required ProtoEndpoint endpoint_id = 2;
+  repeated ProtoEndpoint routing_destination = 5;
+  repeated ProtoEndpoint full_routing_context = 3;
+  required uint32 method_instance = 4;
+}
+
+// ===== LooksPacket.proto =====
+message LooksPacket {
+  message LooksPacketSlot {
+    optional uint32 RdbId = 1;
+    optional bool Tuck = 2;
+    optional int64 Tint1 = 3;
+    optional int64 Tint2 = 4;
+    optional int32 DecalU = 5;
+    optional int32 DecalV = 6;
+    optional LooksPacket.LooksPacketSlot Parent = 7;
+    optional string MeshName = 8;
+    optional int32 BodyLocation = 9;
+    optional bool HasAttractorPlacement = 10;
+    optional int32 AttractorPlacement = 11;
+    optional bool ArmTuck = 12;
+    optional int64 TintMask1 = 13;
+    optional int64 TintMask2 = 14;
+    optional int64 TintMask3 = 15;
+    optional int64 TintMask4 = 16;
+    optional int64 TintMask5 = 17;
+    optional int64 TintMask6 = 18;
+  }
+  optional string Name = 1;
+  optional string Description = 2;
+  repeated LooksPacket.LooksPacketSlot Slots = 3;
+}
+
+// ===== ContainerAddItemIIR.proto =====
+message ProtoMoveInventoryItemIIR {
+  required ProtoID32 source_container_id = 1;
+  required int32 source_item_pos = 2;
+  required ProtoID32 destination_container_id = 3;
+  required int32 destination_item_pos = 4;
+}
+message ProtoDeleteItemIIR {
+  required ProtoID32 container_id = 1;
+  required int32 item_pos = 2;
+  required ProtoID32 template_id = 3;
+}
+
+// ===== FullCharacterIIR.proto =====
+message ProtoFullCharacterIIR {
+  repeated uint32 character_tag = 1;
+  optional uint32 free_feat_respecs = 2;
+  optional uint32 feat_resets = 3;
+  optional uint32 expansion_flags = 4;
+  optional uint32 subscription_flags = 5;
+  repeated ProtoInventoryGame inventory = 6;
+  optional bool has_new_claim_items = 7;
+  optional bool has_spellbook = 8;
+}
+
+// ===== SimpleDynelIIR.proto =====
+message ProtoSimpleDynelIIR {
+  optional uint32 kdtree = 1;
+  optional string name = 2;
+  optional string display_name = 3;
+  optional bool show_popup_on_use = 4;
+  optional uint32 cars_group = 5;
+  optional uint32 quest_item_effect = 6;
+  optional uint32 waypoint_type = 7;
+  optional uint32 template_item_id = 8;
+  optional bool is_hidden = 9;
+  optional bool is_trap = 10;
+  optional bool is_locked = 11;
+  optional bool is_closed = 12;
+  optional bool can_be_lockpicked = 13;
+  optional uint32 ressurection_point_id = 14;
+  optional uint32 trap_owner = 15;
+  optional uint32 tag_id = 16;
+}
+
+// ===== LootBagIIR.proto =====
+message ProtoLootBagIIR {
+  message SpecialLootOwnerEntry {
+    required uint32 pos = 1;
+    optional ProtoID32 owner = 2;
+  }
+  optional uint32 cash = 1;
+  optional ProtoID32 current_looter_id = 2;
+  optional ProtoID32 owner_id = 3;
+  optional ProtoID32 dropper_id = 4;
+  optional ProtoID32 allowed_looter_id = 5;
+  repeated ProtoLootBagIIR.SpecialLootOwnerEntry special_loot_owner = 6;
+  optional bool has_master_looter = 7;
+  optional ProtoInventoryGame inventory = 8;
+}
+
+// ===== CommandMessage.proto =====
+message CommandMessage {
+  optional uint32 bcc_action_id = 1;
+  optional uint32 commandqueue_client_id = 2;
+  optional uint32 commandqueue_server_id = 3;
+  optional uint32 anim_random = 4;
+  optional uint32 flags = 5;
+  optional uint32 execution_status = 6;
+  optional uint32 combo_id = 7;
+  optional uint32 combo_attack_num = 8;
+  optional uint32 combo_attack_hits = 9;
+  optional ProtoID32 target = 10;
+  optional uint32 recharge_time = 11;
+  optional uint32 activation_time = 12;
+}
+
+// ===== GameCodeDynelIIR.proto =====
+message ProtoGameCodeDynelIIR {
+  message RunningEffects {
+    optional uint32 effect_id = 1;
+    optional float run_time = 2;
+  }
+  optional ProtoVec3 position = 1;
+  optional ProtoQuat rotation = 2;
+  optional uint32 playfield_instance = 3;
+  repeated ProtoGameCodeDynelIIR.RunningEffects running_effects = 4;
+}
+
+// ===== QuestGiverList.proto =====
+message QuestGiverList {
+  enum QuestGiverType {
+    BoundedArea = 0;
+    Dynel = 1;
+    NPC = 2;
+  }
+  message MainQuestReward {
+    optional uint32 template_id = 1;
+    optional uint32 type = 2;
+  }
+  message MainQuest {
+    optional uint32 template_id = 1;
+    optional string hash = 2;
+    optional string name = 3;
+    optional uint32 first_quest_template_id = 4;
+    optional uint32 last_quest_template_id = 5;
+    optional uint32 condition_script_id = 6;
+    optional uint32 type = 7;
+    optional uint32 prev_template_id = 8;
+    optional uint32 next_template_id = 9;
+    optional uint32 tier = 10;
+    optional uint32 first_main_quest_template_id = 11;
+    optional uint32 last_main_quest_template_id = 12;
+    repeated QuestGiverList.MainQuestReward reward = 13;
+    repeated QuestGiverList.MainQuestReward optional_reward = 14;
+    optional uint32 xp_reward = 15;
+    optional uint32 cash_reward = 16;
+  }
+  message Quest {
+    optional uint32 template_id = 1;
+    optional string hash = 2;
+    optional string name = 3;
+    optional uint32 main_quest_template_id = 4;
+    optional uint32 start_scry_script_id = 5;
+    optional uint32 tier = 6;
+    optional bool start_new_tier = 7;
+  }
+  message QuestGoal {
+    optional uint32 template_id = 1;
+    optional string hash = 2;
+    optional string name = 3;
+    optional uint32 quest_template_id = 4;
+    optional uint32 phase = 5;
+  }
+  message QuestGiverPos {
+    optional QuestGiverList.QuestGiverType type = 1;
+    optional uint32 object_id = 2;
+    optional uint32 playfield_id = 3;
+    optional ProtoVec3 pos = 4;
+  }
+  message QuestGiver {
+    optional QuestGiverList.QuestGiverType type = 1;
+    optional uint32 object_id = 2;
+    optional uint32 id = 9;
+    optional uint32 main_quest_template_id = 13;
+  }
+  optional uint32 version = 1;
+  repeated QuestGiverList.QuestGiver quest_giver = 2;
+  repeated QuestGiverList.MainQuest main_quest = 3;
+  repeated QuestGiverList.Quest quest = 4;
+  repeated QuestGiverList.QuestGiverPos quest_giver_pos = 5;
+  repeated QuestGiverList.QuestGoal quest_goal = 6;
+}
+
+// ===== ScryScriptIIR.proto =====
+message ProtoScryScriptIIR {
+  enum Type {
+    StartScriptGroupOnClient = 0;
+    StartScriptGroupOnClientWait = 1;
+    ScriptMessage = 2;
+    StopScriptGroupOnClient = 3;
+    RestartScriptGroupOnClient = 4;
+    ScriptCompleted = 5;
+    PlayOrSkipQuestion = 6;
+    PreloadAssets = 7;
+    PlayOrSkipResultPlay = 8;
+    PlayOrSkipResultSkip = 9;
+  }
+  message Variable {
+    optional string name = 1;
+    optional ProtoID32 id_value = 2;
+  }
+  optional uint32 version = 1;
+  optional ProtoScryScriptIIR.Type type = 2;
+  optional sint32 int_parameter = 3;
+  optional string string_parameter_one = 4;
+  optional string string_parameter_two = 5;
+  optional ProtoID32 id_parameter = 6;
+  repeated ProtoScryScriptIIR.Variable variable = 7;
+}
+
+// ===== LuaScriptList.proto =====
+message LuaScriptList {
+  message LuaScript {
+    enum Source {
+      EngineStartup = 0;
+      MainQuestCondition = 1;
+      QuestGoalCondition = 2;
+      Anim = 3;
+      Scry = 4;
+      EffectTimelineCondition = 5;
+      ClientEngineStartup = 6;
+      ServerEngineStartup = 7;
+      Code = 8;
+      GameTrigger = 9;
+      MagicSpell = 11;
+      LuaLib = 12;
+      GenericClientServer = 13;
+      ToolOnly = 14;
+      GenericServer = 15;
+      ModuleServer = 16;
+      ModuleClientServer = 17;
+    }
+    optional uint32 id = 1;
+    optional LuaScriptList.LuaScript.Source source = 2;
+    optional string raw_script = 3;
+    optional bytes compiled_script = 4;
+  }
+  optional uint32 version = 1;
+  repeated LuaScriptList.LuaScript script = 2;
+  optional uint32 max_id = 3;
+}
+
+// ===== CollisionMaterial.proto =====
+message CollisionMaterialMessage {
+  message Properties {
+    optional uint32 materialid = 1;
+    optional string name = 2;
+    optional float directocclusion = 3;
+    optional float reverbocclusion = 4;
+    optional bool additiveocclusion = 5;
+  }
+  required uint32 version = 1;
+  repeated CollisionMaterialMessage.Properties properties = 2;
+}
+
+// ===== LoreTreeBuf.proto =====
+message LoreTreeBuf {
+  enum LinkType {
+    Tag = 0;
+    Stat = 1;
+  }
+  message LoreStat {
+    optional uint32 id = 1;
+    optional uint32 action = 2;
+    optional int32 int_value = 3;
+    optional float float_value = 4;
+    optional string string_value = 5;
+  }
+  message LoreMedia {
+    optional uint32 rdb_id = 1;
+    optional uint32 type = 2;
+  }
+  message LoreReward {
+    optional uint32 reward_id = 1;
+    optional uint32 type = 2;
+  }
+  message LoreLink {
+    optional LoreTreeBuf.LinkType type = 1;
+    optional uint32 id = 2;
+  }
+  message LoreNode {
+    optional uint32 id = 1;
+    optional uint32 parent_id = 2;
+    optional string name = 3;
+    repeated uint32 child_id = 4;
+    repeated LoreTreeBuf.LoreLink link = 5;
+    optional uint32 criteria_lua_script_id = 6;
+    optional uint32 reward_lua_script_id = 7;
+    optional bool is_invisible = 8;
+    optional uint32 node_type = 9;
+    repeated LoreTreeBuf.LoreStat node_stats = 10;
+    repeated LoreTreeBuf.LoreMedia node_media = 11;
+    repeated LoreTreeBuf.LoreReward node_rewards = 12;
+  }
+  optional uint32 version = 1;
+  repeated LoreTreeBuf.LoreNode node = 2;
+  optional uint32 max_id = 3;
+}
+
+// ===== CharacterTagTypeBuf.proto =====
+message CharacterTagTypeBuf {
+  message TagType {
+    optional uint32 id = 1;
+    optional string name = 8;
+  }
+  optional uint32 version = 1;
+  repeated CharacterTagTypeBuf.TagType tag_type = 2;
+  optional uint32 max_tag_type_id = 3;
+}
+
+// ===== CoreCharacterIIR.proto =====
+message ProtoCoreCharacterIIR {
+  message CharacterStats {
+    optional uint32 sex = 1;
+    optional uint32 side = 2;
+    optional uint32 race = 3;
+    optional uint32 monster_scale = 4;
+    optional uint32 monster_data = 5;
+    optional uint32 life = 6;
+    optional uint32 health = 7;
+    optional uint32 max_stamina = 8;
+    optional uint32 stamina = 9;
+    optional uint32 max_mana = 10;
+    optional uint32 mana = 11;
+    optional uint32 looks_package = 12;
+    optional uint32 mount_mesh = 13;
+    optional uint32 mount_scale = 14;
+    optional uint32 mount_flags = 15;
+    optional uint32 flags = 16;
+    optional uint32 head_mesh = 17;
+    optional uint32 level = 18;
+    optional uint32 apprentice_level = 19;
+    optional sint32 radius = 20;
+    optional uint32 bcc = 21;
+    optional uint32 bcc_state = 22;
+    optional uint32 blood_type = 23;
+    optional uint32 skulk = 24;
+    optional uint32 max_skulk = 25;
+    optional uint32 tradeskill_flags = 26;
+    optional uint32 client_scry_script = 27;
+    optional uint32 sound_scry_script = 28;
+    optional uint32 cars_group = 29;
+    optional uint32 movement_multiplier = 30;
+    optional uint32 ooc_movement_multiplier = 31;
+    optional uint32 run_speed = 32;
+    optional uint32 max_run_speed = 33;
+    optional uint32 orientation_mode = 34;
+    optional uint32 guild_id = 35;
+    optional uint32 voice_set = 36;
+    optional uint32 chat_id = 37;
+  }
+  message CharacterBcc {
+    optional uint32 anim_idle_id = 1;
+    optional float anim_idle_timer = 2;
+    optional bool anim_idle_blend = 3;
+    optional uint32 anim_action_id = 4;
+    optional float anim_action_timer = 5;
+    optional bool anim_action_blend = 6;
+    optional uint32 anim_forced_id = 7;
+    optional float anim_forced_timer = 8;
+    optional bool anim_forced_blend = 9;
+    optional uint32 anim_flags = 10;
+  }
+  message PlayerStats {
+    optional uint32 pvp_level = 1;
+    optional uint32 pvp_total_kills = 2;
+    optional uint32 pvp_total_deaths = 3;
+    optional uint32 ride_skill = 4;
+    optional uint32 gm_level = 5;
+    optional uint32 gm_ldb_name = 6;
+    optional uint32 gm_cloak_level = 7;
+    optional uint32 player_flags = 8;
+    optional uint32 expansion = 9;
+    optional uint32 heroic_mode = 10;
+    optional uint32 strength = 11;
+    optional uint32 expansion_flags = 12;
+    optional uint32 subscription_flags = 13;
+    optional uint32 pvp_total_kills_seasonal = 14;
+    optional uint32 pvp_total_deaths_seasonal = 15;
+    optional int32 hardcore_level = 16;
+  }
+  message NpcStats {
+    optional uint32 sight_skill = 1;
+    optional uint32 hearing_skill = 2;
+    optional uint32 smelling_skill = 3;
+    optional fixed32 template_id = 4;
+    optional uint32 super_family = 5;
+    optional uint32 community = 6;
+    optional uint32 los_height = 7;
+    optional uint32 spawn_animation = 8;
+    optional uint32 npc_flags = 9;
+    optional uint32 normalset = 10;
+    optional uint32 profession_name = 11;
+    optional uint32 profession_type = 12;
+    optional uint32 faction_id = 13;
+    optional uint32 npc_type = 14;
+  }
+  message InventoryEntry {
+    message GemSlot {
+      optional uint32 pos = 1;
+      optional ProtoAcgItem item = 2;
+    }
+    optional uint32 pos = 1;
+    optional ProtoAcgItem item = 2;
+    repeated ProtoCoreCharacterIIR.InventoryEntry.GemSlot gem_slots = 3;
+  }
+  optional string name = 1;
+  optional string firstname = 2;
+  optional string lastname = 3;
+  optional ProtoCoreCharacterIIR.CharacterStats stats = 4;
+  optional ProtoCoreCharacterIIR.NpcStats npc_stats = 5;
+  optional ProtoCoreCharacterIIR.PlayerStats player_stats = 6;
+  optional ProtoCoreCharacterIIR.CharacterBcc bcc = 7;
+  optional uint32 pet_owner_instance = 8;
+  optional uint32 pet_type = 9;
+  optional uint32 pet_points = 10;
+  optional uint32 character_kdtree = 11;
+  optional ProtoID32 offensive_target = 12;
+  optional ProtoID32 defensive_target = 13;
+  optional ProtoID32 team_id = 14;
+  optional ProtoID32 team_leader_id = 15;
+  optional ProtoID32 team_leader_guild_id = 16;
+  optional ProtoID32 raid_id = 17;
+  optional ProtoID32 raid_leader_id = 18;
+  optional ProtoID32 locked_to = 19;
+  optional bool can_fall = 20;
+  optional uint32 movement_mode = 21;
+  repeated uint32 generic_stats = 22;
+  repeated ProtoCoreCharacterIIR.InventoryEntry inventory_entry = 23;
+}
+
+// ===== GameTriggerBuf.proto =====
+message GameTriggerBuf {
+  message Trigger {
+    optional uint32 id = 1;
+    optional uint32 type = 2;
+    optional uint32 script_id = 3;
+    optional uint32 id_value = 4;
+    optional string hash1_value = 5;
+    optional string hash2_value = 6;
+    optional sint32 int_value = 7;
+    optional string str_value = 8;
+    optional uint32 playfield_id = 9;
+  }
+  optional uint32 version = 1;
+  repeated GameTriggerBuf.Trigger trigger = 2;
+  optional uint32 max_trigger_id = 3;
+}

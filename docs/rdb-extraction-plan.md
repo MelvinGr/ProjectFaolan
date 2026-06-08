@@ -188,11 +188,77 @@ Investigation findings from this client's RDB. **Only item-templates are encrypt
   `id(LE)` (fully known per resource), and the *plain* `1000020` resources reveal the whole binary item-template
   layout (12 B RDB-Id header `type,id,marker=1000000`, then binary fields). Known PT/CT pairs do not break a
   proper 64-bit cipher.
-- **The key is in the client.** The client decrypts at runtime, so the cipher + key live in the AoC executable.
-  The only realistic decryption path is **static RE of the client binary** (locate the `RDBH` reader / the
-  decrypt routine + embedded key) or a **runtime hook / memory dump** of the decrypt function. No public tool
-  (rdbreader, tswrdb) implements any `RDBH` decryption. **Out of scope for now** — buildable item identity still
-  comes from captures.
+- ~~**The key is in the client.**~~ **SUPERSEDED — see the binary RE below: the cipher is TEA, but the key is
+  NOT in the client; it is server-issued per template.**
+
+### RDBH cracked via static RE of AgeOfConan.exe (2026-06-08)
+Reverse-engineered the client (capstone/pefile; no ghidra). **The cipher is TEA and the routine is identified;
+the remaining wall is the KEY, which is a server secret, not unknown crypto.**
+
+- **Cipher = standard TEA** (the 8-byte-block guess was right). Decrypt routine at exe va **`0xa8f550`**:
+  32 rounds, sum starts `0xc6ef3720`, step `-0x9e3779b9` (the single occurrence of `0xc6ef3720` in `.text` is
+  inside it). Key = 4 LE u32 read at `[ctx+0]..[ctx+0xc]`; standard TEA decrypt order
+  (`v1 -= ((v0<<4)+k2)^(v0+sum)^((v0>>5)+k3); v0 -= ((v1<<4)+k0)^(v1+sum)^((v1>>5)+k1)`). Same TEA *family* as
+  login (`tea_unexpand`), but a **different, separate use** — see below.
+- **Call chain:** `RDBServerSource::Decrypt` (vtable `0x203655c`, **slot 5** = va `0x1064d40`) → `0x106fcb0`
+  (reads the `RDBH` magic `cmp eax,0x48424452`, dispatches on version/flags) → `0x106fef0` → TEA `0xa8f550`.
+  Module strings: `RDBSource.cpp`, `RDBSource`, `RDBServerSource.log`. The MD5 (`0x67452301…` init consts) seen
+  nearby is the **cache-integrity** check (`Deleted a corrupted entry from the cache (wrong MD5)`), *not* the
+  TEA key.
+- **The key is server-issued, per template.** The decrypt path requires `!cID.GetDecryptionKey().IsNull()` and
+  logs `Resource %u:%u does not have a decryption key`. The key is a **`DecryptionKey_c`** delivered over the
+  network: protobuf field **`ProtoDecryptionKey`**, and
+  `GameCharAgentProxy_t::RequestRecipeInfo(uint32 levelId, uint32 templateId1, uint32 templateId2,
+  DecryptionKey_c key1, DecryptionKey_c key2)` — i.e. **keys are paired with specific template ids** ⇒ per-template,
+  no single master key in the client. Gate at va `0x8cb40d`: only types **`1000020`** (item-templates) and
+  **`1000620`** (recipe-templates) are encrypted; `Template item %u:%u (type %u) was used without a decryption
+  key` is the missing-key warning.
+- **Why it works this way:** in normal play the client never decrypts these RDB blobs — item data arrives in
+  server snapshots (`0x737A6DF9`). The encrypted RDB templates are decrypted **only for the crafting/recipe UI**,
+  using keys the server streams for the specific recipe. This is item-template DRM: the client ships the
+  encrypted DB, the server hands out per-recipe keys on demand.
+
+### FULLY CRACKED + validated (2026-06-08)
+The keys were never missing — **they're the per-item `ProtoDecryptionKey` the server sends in inventory, which we
+already capture and store as the item `Data1..Data4` quad** (mislabeled "item identity"). From the client's own
+protobuf (`docs/aoc-client-protos.proto`):
+```
+ProtoDecryptionKey { fixed32 key1; key2; key3; key4 }          // 4 LE u32 = the 128-bit TEA key
+ProtoAcgItem { ProtoDecryptionKey key1,key2,key3; fixed32 template1,template2,template3; uint32 level; fixed32 hash }
+ProtoInventoryGameEntry { ... ProtoAcgItem item_data = 3; ... } // inventory entries embed the keys
+```
+This maps onto our `SnapshotItemBuilder` tail: the three `{f1..f4 fixed32}` "identity payloads" (= `Data1..Data4`)
+are `key1/key2/key3`; `tail.f4/f5` (= `Item.Id`) are `template1/template2`; `tail.f8` (we called "archetype") is
+`hash`.
+
+**Decryption recipe (verified):** RDBH blob → ciphertext = `entrySize-20` → **TEA in ECB** (not CBC; the earlier
+"not ECB" assumed a shared key, but **each item has its own key** so blocks never collide) with key =
+`(Data1,Data2,Data3,Data4)` as 4 LE u32 → truncate to `plainLen` → `IOz1` + `uncompressedSize` + zlib → inflate →
+item template (`12B RDB-Id hdr: type,id,marker=1000000` + binary fields).
+
+**Proof:** health-potion `type 1000020 id 180450`, key from `faolan.db Items.Data1..4` =
+`807024719, 3628954689, 2634994156, 3227556839`, decrypts to a valid 329-byte template with header
+`type=1000020 id=180450 marker=1000000`. (Script: `/tmp/tea_decrypt.py`.)
+
+**So:** every captured item (anything with `Data1..4` in `faolan.db`) can now have its **full canonical RDB
+template** extracted — coverage = items we hold keys for (= captured items), but yielding the complete template
+vs the partial snapshot.
+
+### Implemented in Faolan.Importer (2026-06-08)
+- `Tea.cs` — TEA (32-round, ECB) cipher.
+- `RdbReader.ReadDecrypted(entry, teaKey)` — detects `RDBH`, TEA-ECB-decrypts, truncates to `plainLen`, unwraps
+  the inner `IOz1`/zlib.
+- `RdbItemImporter` + `--rdb-items` (with optional `--dump-templates <dir>`): for every DB item with a key
+  (`Data1..4`), looks up RDB `1000020`/`1000620` id=Item.Id, decrypts, validates the RDB-Id header.
+  **Result on our DB: 387/388 keyed items decrypt + validate** (the 1 "miss" is a DB id that collides with a
+  *plain* TESTITEM entry, correctly rejected). 
+- **Template string fields** are `tag 0x21 (u32) + len (u32) + ASCII`. The first underscore-free such string is the
+  display name (internal mesh/asset names contain `_`; names-by-localized-id have none inline). The importer fills
+  `Item.Name` only when empty (captured names stay authoritative): **143 names recovered** (e.g. "Dusklight Tunic",
+  "Misery of Dagon"), 26 items still nameless (their names are localized-string ids, resolvable via TextStrings
+  `1030002` TDC2 if ever needed).
+- **Remaining:** reverse the rest of the template field block (the leading u32s before the name — stats/level/
+  flags) into `Item` columns. The decrypted templates dump cleanly via `--dump-templates` for that RE.
 
 **Proven end-to-end:** TextStrings entry (type 1030002, id 211656, file 8) → read 10402 B → `IOz1`/uncomp=28704
 → zlib-inflate to exactly 28704 B → `TDC2` string collection → real strings extracted: *Flags, Health, Volume
