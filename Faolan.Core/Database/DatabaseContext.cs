@@ -80,8 +80,11 @@ namespace Faolan.Core.Database
 			// One-to-one Character <-> CharacterMaxStats, keyed by CharacterId; deletes cascade with the character.
 			modelBuilder.Entity<Character>().HasOne(c => c.MaxStats).WithOne(s => s.Character).HasForeignKey<CharacterMaxStats>(s => s.CharacterId).OnDelete(DeleteBehavior.Cascade);
 
-			// A conversation node is uniquely identified by the player's TalkToNpc args; its packets cascade-delete.
-			modelBuilder.Entity<ConversationNode>().HasIndex(n => new { n.TypeId, n.Mode, n.Field3 }).IsUnique();
+			// A conversation node is identified by the clicked NPC + the player's TalkToNpc args. The NPC handle is
+			// part of the key because (TypeId, Mode, Field3) is NOT NPC-unique: the same mode means different
+			// conversations for different NPCs / quest states (e.g. mode 1 is Casilda's create intro but Kalanthes's
+			// regular login dialog). Handles are stable because scenes are replayed verbatim. Packets cascade-delete.
+			modelBuilder.Entity<ConversationNode>().HasIndex(n => new { n.CapturedNpcHandle, n.TypeId, n.Mode, n.Field3 }).IsUnique();
 			modelBuilder.Entity<ConversationNode>().HasMany(n => n.Packets).WithOne(p => p.Node).OnDelete(DeleteBehavior.Cascade);
 
 			modelBuilder.Entity<ClassAbility>().HasIndex(c => new { c.Class, c.Level }).IsUnique();

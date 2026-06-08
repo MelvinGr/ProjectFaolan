@@ -25,7 +25,10 @@ namespace Faolan.GameServer
 			if (!client.Session.UsedWorldBurstReplay && !client.Session.IsCreateWorldSession)
 				return false;
 
-			var node = await Database.GetConversationNode(typeId, mode, field3);
+			// In create-world (the Tortage intro) require an exact per-NPC match: the args-only fallback would serve
+			// some other NPC's conversation (e.g. Kalanthes's dialog for Casilda), so prefer the scripted intro
+			// fallback when this NPC's own conversation isn't captured. Login allows the args-only fallback.
+			var node = await Database.GetConversationNode(clickedNpcHandle, typeId, mode, field3, client.Session.IsCreateWorldSession);
 			if (node == null)
 				return false;
 

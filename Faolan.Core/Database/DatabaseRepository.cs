@@ -29,7 +29,7 @@ namespace Faolan.Core.Database
 
 		Task<Item> GetItem(uint id);
 
-		Task<ConversationNode> GetConversationNode(uint typeId, uint mode, uint field3);
+		Task<ConversationNode> GetConversationNode(uint npcHandle, uint typeId, uint mode, uint field3, bool exactHandleOnly = false);
 
 		Task<MapWorldBurst> GetMapWorldBurst(uint mapId);
 
@@ -225,12 +225,27 @@ namespace Faolan.Core.Database
 			return await ctx.Items.FirstOrDefaultAsync(i => i.Id == id);
 		}
 
-		public async Task<ConversationNode> GetConversationNode(uint typeId, uint mode, uint field3)
+		public async Task<ConversationNode> GetConversationNode(uint npcHandle, uint typeId, uint mode, uint field3, bool exactHandleOnly = false)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
+
+			// Prefer the node captured for THIS exact NPC handle - the correct per-NPC dialogue (handles are stable
+			// because scenes are replayed verbatim). (TypeId, Mode, Field3) is NOT NPC-unique, so the args-only
+			// match can be the wrong NPC's conversation.
+			var exact = await ctx.ConversationNodes
+				.Include(n => n.Packets)
+				.FirstOrDefaultAsync(n => n.CapturedNpcHandle == npcHandle && n.TypeId == typeId && n.Mode == mode && n.Field3 == field3);
+			if (exact != null || exactHandleOnly)
+				return exact;
+
+			// Args-only fallback (the pre-handle behaviour) so a captured conversation still plays for an NPC whose
+			// handle differs from the replayed scene's. Callers that can't tolerate a wrong-NPC match (the create
+			// world intro, where the scripted fallback is preferable) pass exactHandleOnly.
 			return await ctx.ConversationNodes
 				.Include(n => n.Packets)
-				.FirstOrDefaultAsync(n => n.TypeId == typeId && n.Mode == mode && n.Field3 == field3);
+				.Where(n => n.TypeId == typeId && n.Mode == mode && n.Field3 == field3)
+				.OrderByDescending(n => n.Packets.Count)
+				.FirstOrDefaultAsync();
 		}
 
 		public async Task<MapWorldBurst> GetMapWorldBurst(uint mapId)

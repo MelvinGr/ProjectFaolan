@@ -74,12 +74,15 @@ namespace Faolan.Importer
 
 		// Merges nodes from many captures, deduped by (TypeId, Mode, Field3). Prefers an entry whose captured player
 		// instance is a 4-byte varint (in-range, so it re-addresses to any normal character), then the most packets.
+		// Deduped by (CapturedNpcHandle, TypeId, Mode, Field3) - the NPC handle is part of the key because
+		// (TypeId, Mode, Field3) is not NPC-unique (the same mode is a different conversation per NPC/quest-state).
+		// Prefers an entry whose captured player instance is a 4-byte varint, then the most packets.
 		public static List<ConversationEntry> Merge(IEnumerable<ConversationEntry> all)
 		{
-			var best = new Dictionary<(uint, uint, uint), (int score, ConversationEntry entry)>();
+			var best = new Dictionary<(uint, uint, uint, uint), (int score, ConversationEntry entry)>();
 			foreach (var e in all)
 			{
-				var key = (e.TypeId, e.Mode, e.Field3);
+				var key = (e.CapturedNpcHandle, e.TypeId, e.Mode, e.Field3);
 				var score = (VarintLength(e.CapturedInstance) == 4 ? 1_000_000 : 0) + e.Packets.Count;
 				if (!best.TryGetValue(key, out var cur) || score > cur.score)
 					best[key] = (score, e);

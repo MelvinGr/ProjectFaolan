@@ -408,13 +408,18 @@ Concrete next steps, grouped by area. See `docs/` for the dissection writeups be
       (animation / aggro / buff state, unconfirmed).
 
 ### Conversations / NPC routing
-- [ ] **Wrong NPC dialogue** (e.g. talking to Casilda shows Kalanthes text). Two causes: (1) the create-world
-      fallback `SendNpcIntroConversation` sends ONE hardcoded conversation (id 12493) for every NPC; (2) DB nodes
-      are keyed by `(TypeId, Mode, Field3)` only. Partial fix done: `TryReplayConversation` now also runs in
-      create-world sessions (DB routes by the client's NPC-specific Mode/Field3), with the hardcoded intro as a
-      last-resort fallback. STILL TODO: verify the client sends NPC-distinct `(Mode, Field3)` (needs a create-flow
-      capture talking to Casilda); decode the NPC spawn's stable conversation/dialogue id so handle→conversation
-      is unambiguous; rebuild the create-world intro per-NPC instead of the single hardcoded 12493.
+- [x] **Wrong NPC dialogue routing.** Root cause: `(TypeId, Mode, Field3)` is NOT NPC-unique - `mode` is quest-
+      state/context dependent (mode 1 is Casilda's create intro but Kalanthes's regular login dialog), so the
+      merged DB node served the wrong NPC. Fixed by keying `ConversationNode` on `CapturedNpcHandle` too
+      (migration `ConversationKeyByNpcHandle`); lookup prefers the exact clicked-handle node (handles are stable
+      since scenes replay verbatim), with an args-only fallback for login and exact-only for create-world.
+- [ ] **Casilda's create-world dialogue isn't in the DB.** The dikketest create capture's conversation packets
+      aren't recoverable by the analyzer (truncated/compressed - the TCP-reassembly gap; the hand-built
+      `SendNpcIntroConversation` came from the Wireshark plugin). So in create-world, clicking Casilda still falls
+      through to the scripted Kalanthes intro. To finish: capture/extract Casilda's create-flow conversation
+      (Wireshark plugin or a fresh capture) keyed by her handle, then reimport.
+- [ ] Decode the NPC spawn's stable conversation/dialogue id (so handle→conversation survives across sessions,
+      not just verbatim-replayed scenes).
 
 ### Quests (`docs/quests-and-combat.md`, `docs/capture-events.md`)
 - [ ] Isolate the **quest accept vs decline** action and the **quest-log / objective state** packet (numeric

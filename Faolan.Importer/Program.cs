@@ -91,11 +91,11 @@ namespace Faolan.Importer
 			foreach (var e in conversations)
 			{
 				var node = await db.ConversationNodes.Include(n => n.Packets)
-					.FirstOrDefaultAsync(n => n.TypeId == e.TypeId && n.Mode == e.Mode && n.Field3 == e.Field3);
+					.FirstOrDefaultAsync(n => n.CapturedNpcHandle == e.CapturedNpcHandle && n.TypeId == e.TypeId && n.Mode == e.Mode && n.Field3 == e.Field3);
 
 				if (node == null)
 				{
-					node = new ConversationNode { TypeId = e.TypeId, Mode = e.Mode, Field3 = e.Field3 };
+					node = new ConversationNode { TypeId = e.TypeId, Mode = e.Mode, Field3 = e.Field3, CapturedNpcHandle = e.CapturedNpcHandle };
 					db.ConversationNodes.Add(node);
 				}
 				else if (node.Packets != null)
