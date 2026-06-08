@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using Faolan.Importer;
 using Xunit;
 
-namespace Faolan.PacketAnalyzer.Tests
+namespace Faolan.Tests
 {
 	// A MapChange opens the world-build window; the following download 0x2000 packets are collected until the first
 	// 0x2020 poll ends it. The captured instance is read from the receiver conversation id in the packet header.

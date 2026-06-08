@@ -8,7 +8,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <InternalsVisibleTo Include="Faolan.PacketAnalyzer.Tests"/>
+        <InternalsVisibleTo Include="Faolan.Tests"/>
     </ItemGroup>
 
     <ItemGroup>

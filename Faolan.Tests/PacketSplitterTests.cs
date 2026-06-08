@@ -2,9 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Network.Packets;
+using Faolan.PacketAnalyzer;
 using Xunit;
 
-namespace Faolan.PacketAnalyzer.Tests
+namespace Faolan.Tests
 {
 	public class PacketSplitterTests
 	{

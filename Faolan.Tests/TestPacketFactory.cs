@@ -1,7 +1,7 @@
 using Faolan.Core.Network.Packets;
 using Faolan.PacketAnalyzer.Models;
 
-namespace Faolan.PacketAnalyzer.Tests
+namespace Faolan.Tests
 {
 	internal static class TestPacketFactory
 	{

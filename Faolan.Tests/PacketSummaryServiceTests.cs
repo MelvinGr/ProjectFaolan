@@ -1,7 +1,8 @@
+using Faolan.PacketAnalyzer;
 using Faolan.PacketAnalyzer.Models;
 using Xunit;
 
-namespace Faolan.PacketAnalyzer.Tests
+namespace Faolan.Tests
 {
 	public class PacketSummaryServiceTests
 	{

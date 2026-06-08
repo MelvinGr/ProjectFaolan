@@ -7,7 +7,7 @@ using Faolan.Importer;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace Faolan.PacketAnalyzer.Tests
+namespace Faolan.Tests
 {
 	// A real captured ApplySpell (0x2000 / 0x6B87E316) must yield the cast spell id (0x3dfa48 = 4061768) and
 	// catalog it in Spells if absent.

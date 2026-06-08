@@ -14,7 +14,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
-namespace Faolan.PacketAnalyzer.Tests
+namespace Faolan.Tests
 {
 	// Proves the full chain capture -> CaptureItemImporter -> DB Item -> SnapshotItemBuilder -> on-wire bytes:
 	// building the "Slave Manacles" entry from the imported Item (id 3361557) reproduces the captured snapshot

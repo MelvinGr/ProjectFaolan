@@ -5,7 +5,7 @@ using System.Text;
 using Faolan.Importer;
 using Xunit;
 
-namespace Faolan.PacketAnalyzer.Tests
+namespace Faolan.Tests
 {
 	// Locks the NPC spawn extraction: MapChange sets the current map; a following FA015807 with a small (NPC) handle
 	// yields a spawn with name/position/map, while a spawn whose handle is in the instance range (the player's own)

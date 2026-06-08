@@ -2,7 +2,7 @@ using Faolan.GameServer.Combat;
 using Faolan.GameServer.Packets._0x737A6DF9_Test;
 using Xunit;
 
-namespace Faolan.PacketAnalyzer.Tests
+namespace Faolan.Tests
 {
 	// The combat foundation: live entity vitals, the damage resolver, and the in-memory state store. The vitals
 	// block these produce is the 0x96B8DC59 update verified byte-for-byte in CharacterStatBlockTests.

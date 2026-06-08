@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
-namespace Faolan.PacketAnalyzer.Tests
+namespace Faolan.Tests
 {
 	// Replicates PersistEquip/PersistUnequip's exact EF operations against a temp DB (lazy-loading proxies, same as
 	// the runtime context) and verifies the change is visible in a SEPARATE context - i.e. it actually hit disk.

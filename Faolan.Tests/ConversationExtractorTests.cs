@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using Faolan.Importer;
 using Xunit;
 
-namespace Faolan.PacketAnalyzer.Tests
+namespace Faolan.Tests
 {
 	// Locks the ported conversation extraction: a synthetic TalkToNpc (Interact 642CD3D6, actionType 0x16) followed
 	// by server response packets must yield one node with the args (TypeId/Mode/Field3/NPC) and the responses, and

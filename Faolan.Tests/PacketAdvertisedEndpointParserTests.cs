@@ -1,9 +1,10 @@
 using System;
 using System.Buffers.Binary;
 using System.Text;
+using Faolan.PacketAnalyzer;
 using Xunit;
 
-namespace Faolan.PacketAnalyzer.Tests
+namespace Faolan.Tests
 {
 	public class PacketAdvertisedEndpointParserTests
 	{

@@ -2,7 +2,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Xunit;
 
-namespace Faolan.PacketAnalyzer.Tests
+namespace Faolan.Tests
 {
 	// Class/level vitals defaults. Anchored on assassinl23 (Assassin lvl 23 -> sheet Health 1270, Mana 74,
 	// Stamina 1148); the rogue archetype should land close. See docs/player-stats.md.

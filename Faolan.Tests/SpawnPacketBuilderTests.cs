@@ -5,7 +5,7 @@ using System.Text;
 using Faolan.GameServer.Spawn;
 using Xunit;
 
-namespace Faolan.PacketAnalyzer.Tests
+namespace Faolan.Tests
 {
 	public class SpawnPacketBuilderTests
 	{

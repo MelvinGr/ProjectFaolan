@@ -4,7 +4,7 @@ using ProtoBuf;
 
 namespace Faolan.Core.Data
 {
-	[ProtoContract]
+	[ProtoContract] // TODO: Obsolete, replace with generated ProtoQuat
 	public sealed class ProtoQuaternion : FaolanProtobufMessage
 	{
 		[ProtoMember(4, IsRequired = true, DataFormat = DataFormat.FixedSize)]

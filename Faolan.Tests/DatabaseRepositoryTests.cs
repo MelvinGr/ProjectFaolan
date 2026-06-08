@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
-namespace Faolan.PacketAnalyzer.Tests
+namespace Faolan.Tests
 {
 	// Validates the refactored repository's unit-of-work model end-to-end: each call uses a fresh short-lived
 	// context from a pooled factory, and detached entities round-trip correctly across calls. This is the safety

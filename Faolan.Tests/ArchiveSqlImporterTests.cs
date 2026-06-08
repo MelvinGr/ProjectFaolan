@@ -7,7 +7,7 @@ using Faolan.Importer;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace Faolan.PacketAnalyzer.Tests
+namespace Faolan.Tests
 {
 	// The archive SQL importer parses p_abilities + const_abilitys (MySQL dump rows, quoted + unquoted + NULL) and
 	// upserts Abilities + ClassAbilities.

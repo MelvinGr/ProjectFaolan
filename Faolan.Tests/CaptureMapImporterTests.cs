@@ -8,7 +8,7 @@ using Faolan.Importer;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace Faolan.PacketAnalyzer.Tests
+namespace Faolan.Tests
 {
 	// A real captured MapChange (0x2000 / 0x5D85BFC7, King Conan's Castle = map 2040) must be parsed and inserted
 	// with its spawn position; an already-present map must be left untouched.

@@ -1,7 +1,7 @@
 using Faolan.Core.Data;
 using Xunit;
 
-namespace Faolan.PacketAnalyzer.Tests
+namespace Faolan.Tests
 {
 	// Locks in the deliberate float-endianness contract (see FaolanStream / docs note + protocol_float_endianness):
 	// protobuf fixed32 floats are LITTLE-endian (WriteFloat), raw packet-body floats are BIG-endian

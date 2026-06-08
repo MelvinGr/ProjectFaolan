@@ -4,7 +4,7 @@ using ProtoBuf;
 
 namespace Faolan.Core.Data
 {
-	[ProtoContract]
+	[ProtoContract] // TODO: Obsolete, replace with generated ProtoVec3
 	public sealed class ProtoVector3 : FaolanProtobufMessage
 	{
 		[ProtoMember(1, IsRequired = true, DataFormat = DataFormat.FixedSize)]

@@ -14,7 +14,7 @@ using Microsoft.EntityFrameworkCore;
 using ProtoBuf;
 using Xunit;
 
-namespace Faolan.PacketAnalyzer.Tests
+namespace Faolan.Tests
 {
 	// Proves the protobuf schema reverse-engineered from AgeOfConan.exe (docs/aoc-client-protos.proto, generated to
 	// Faolan.Core/Network/Protobuf/AocProtocol.g.cs) decodes the REAL captured inventory wire bytes - and that the

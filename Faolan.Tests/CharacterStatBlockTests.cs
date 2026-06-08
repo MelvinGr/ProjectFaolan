@@ -1,7 +1,7 @@
 using Faolan.GameServer.Packets._0x737A6DF9_Test;
 using Xunit;
 
-namespace Faolan.PacketAnalyzer.Tests
+namespace Faolan.Tests
 {
 	// The stat-record block is a 1-byte count followed by N × [uint32 statId BE][uint32 value BE], with vitals
 	// scaled ×100. Verified against a captured 0x96B8DC59 vitals packet (entity 0x0002324B, Health/Stamina/Mana

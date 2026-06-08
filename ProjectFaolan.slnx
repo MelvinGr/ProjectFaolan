@@ -16,12 +16,10 @@
     <File Path="ProjectFaolan.sln.DotSettings" />
     <File Path="README.md" />
   </Folder>
-  <Folder Name="/Tests/">
-    <Project Path="Faolan.PacketAnalyzer.Tests/Faolan.PacketAnalyzer.Tests.csproj" />
-  </Folder>
   <Project Path="Faolan.Core/Faolan.Core.csproj" />
   <Project Path="Faolan.DatabaseEditor/Faolan.DatabaseEditor.csproj" />
   <Project Path="Faolan.Importer/Faolan.Importer.csproj" />
   <Project Path="Faolan.PacketAnalyzer/Faolan.PacketAnalyzer.csproj" />
+  <Project Path="Faolan.Tests\Faolan.Tests.csproj" />
   <Project Path="Faolan/Faolan.csproj" />
 </Solution>

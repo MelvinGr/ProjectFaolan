@@ -91,7 +91,7 @@ namespace Faolan.GameServer
 
 		// Maps an equip slot to its CharacterEquipment item nav. Mirrors EquippedSlotItem but keyed by
 		// the CharacterEquipmentSlot enum.
-		internal static Item GetEquipmentSlot(CharacterEquipment e, CharacterEquipmentSlot slot)
+		public static Item GetEquipmentSlot(CharacterEquipment e, CharacterEquipmentSlot slot)
 		{
 			return slot switch
 			{
@@ -113,7 +113,7 @@ namespace Faolan.GameServer
 		}
 
 		// Sets an equip slot's CharacterEquipment item nav. Returns false for an unmapped slot.
-		internal static bool SetEquipmentSlot(CharacterEquipment e, CharacterEquipmentSlot slot, Item item)
+		public static bool SetEquipmentSlot(CharacterEquipment e, CharacterEquipmentSlot slot, Item item)
 		{
 			switch (slot)
 			{

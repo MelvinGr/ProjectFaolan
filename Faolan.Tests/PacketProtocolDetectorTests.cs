@@ -1,9 +1,10 @@
 using System.Text;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.PacketAnalyzer;
 using Xunit;
 
-namespace Faolan.PacketAnalyzer.Tests
+namespace Faolan.Tests
 {
 	public class PacketProtocolDetectorTests
 	{

@@ -1,9 +1,10 @@
 using System;
+using Faolan.PacketAnalyzer;
 using Faolan.PacketAnalyzer.Models;
 using Faolan.PacketAnalyzer.ViewModels;
 using Xunit;
 
-namespace Faolan.PacketAnalyzer.Tests
+namespace Faolan.Tests
 {
 	public class PacketDumpFileServiceTests
 	{

@@ -9,7 +9,7 @@ using Faolan.Core.Network.Packets;
 using Faolan.GameServer.Packets._0x737A6DF9_Test;
 using Xunit;
 
-namespace Faolan.PacketAnalyzer.Tests
+namespace Faolan.Tests
 {
 	public class InventorySnapshotTests
 	{

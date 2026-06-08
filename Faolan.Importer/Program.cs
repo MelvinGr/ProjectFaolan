@@ -25,7 +25,7 @@ namespace Faolan.Importer
 		{
 			var dbPath = GetOption(args, "--db") ?? Path.Combine(RepoRoot, "faolan.db");
 			var capturesDir = GetOption(args, "--captures") ?? Path.Combine(RepoRoot, "Captures");
-			var archiveDir = GetOption(args, "--archive"); // dir with aocdatabase.sql (one-time ability/spell defs)
+			var archiveDir = GetOption(args, "--archive"); // dir with aocdatabase.sql (one-time ability/spell defs) // TODO: old sql import support can be removed
 			var rdbDir = GetOption(args, "--rdb"); // client RDB dir (le.idx + NN.rdbdata) - one-time text/data import
 			var rdbItems = args.Contains("--rdb-items"); // decrypt each keyed item's RDB template (needs --rdb)
 			var dumpTemplatesDir = GetOption(args, "--dump-templates"); // optional: write decrypted templates here
