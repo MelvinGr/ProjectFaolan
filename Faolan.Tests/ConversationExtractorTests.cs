@@ -16,13 +16,13 @@ namespace Faolan.Tests
 		{
 			var packets = new List<CapturedPacket>
 			{
-				Talk(typeId: 42008, mode: 2, field3: 0, npc: 0x9D42, instance: 0x02000005),
+				Talk(42008, 2, 0, 0x9D42, 0x02000005),
 				Response(0x2000, 0x4A3D899A),
 				Response(0x2000, 0xF164A4A5),
 				Response(0x2000, 0x12345678), // not a conversation sub-opcode -> ignored
-				Response(0x2015, 0),            // 0x2015 select -> included
-				Talk(typeId: 42009, mode: 1, field3: 0, npc: 0x9D42, instance: 0x02000005), // next talk -> window ends
-				Response(0x2000, 0x4A3D899A)    // belongs to the second talk
+				Response(0x2015, 0), // 0x2015 select -> included
+				Talk(42009, 1, 0, 0x9D42, 0x02000005), // next talk -> window ends
+				Response(0x2000, 0x4A3D899A) // belongs to the second talk
 			};
 
 			var entries = ConversationExtractor.Extract(packets);
@@ -43,43 +43,17 @@ namespace Faolan.Tests
 		[Fact]
 		public void Merge_PrefersVarint4InstanceThenMostPackets()
 		{
-			var outOfRange = new ConversationEntry(1, 0, 0, 0x10, 0xFFFFFFFF, new List<byte[]> { new byte[] { 1 }, new byte[] { 2 }, new byte[] { 3 } }); // 5-byte varint
-			var inRange = new ConversationEntry(1, 0, 0, 0x10, 0x02000005, new List<byte[]> { new byte[] { 1 } }); // 4-byte varint, fewer packets
+			var outOfRange = new ConversationEntry(1, 0, 0, 0x10, 0xFFFFFFFF, [
+				[1],
+				[2],
+				[3]
+			]); // 5-byte varint
+			var inRange = new ConversationEntry(1, 0, 0, 0x10, 0x02000005, [[1]]); // 4-byte varint, fewer packets
 
-			var merged = ConversationExtractor.Merge(new[] { outOfRange, inRange });
+			var merged = ConversationExtractor.Merge([outOfRange, inRange]);
 
 			Assert.Single(merged);
 			Assert.Equal(0x02000005u, merged[0].CapturedInstance); // in-range instance wins despite fewer packets
-		}
-
-		// Builds a full on-wire-ish packet [len4][crc4][headerLen4=0][body]; GetBody reads headerLen at [8..12]=0.
-		private static CapturedPacket Talk(uint typeId, uint mode, uint field3, uint npc, uint instance)
-		{
-			var args = BuildInteractArgs(typeId, mode, field3, npc);
-
-			// body: [bodylen4][642cd3d6][c350][inst][u16][actiontype=0x16][arglen4][args]
-			var body = new byte[26 + args.Length];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)body.Length);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), 0x642CD3D6);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), 0x0000C350);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(12, 4), instance);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(18, 4), 0x16); // actionType TalkToNpc (overlaps the u16 slot, fine)
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(22, 4), (uint)args.Length);
-			args.CopyTo(body, 26);
-
-			return new CapturedPacket(0, IsDownload: false, Opcode: 0x2000, SubOpcode: 0x642CD3D6, Bytes: Frame(body));
-		}
-
-		private static CapturedPacket Response(uint opcode, uint subOpcode)
-		{
-			return new CapturedPacket(0, IsDownload: true, Opcode: opcode, SubOpcode: subOpcode, Bytes: Frame(new byte[8]));
-		}
-
-		private static byte[] Frame(byte[] body)
-		{
-			var full = new byte[12 + body.Length]; // [len4][crc4][headerLen4=0][body]
-			body.CopyTo(full, 12);
-			return full;
 		}
 
 		private static byte[] BuildInteractArgs(uint typeId, uint mode, uint field3, uint npc)
@@ -99,6 +73,36 @@ namespace Faolan.Tests
 			return b.ToArray();
 		}
 
+		private static byte[] Frame(byte[] body)
+		{
+			var full = new byte[12 + body.Length]; // [len4][crc4][headerLen4=0][body]
+			body.CopyTo(full, 12);
+			return full;
+		}
+
+		private static CapturedPacket Response(uint opcode, uint subOpcode)
+		{
+			return new CapturedPacket(0, true, opcode, subOpcode, Frame(new byte[8]));
+		}
+
+		// Builds a full on-wire-ish packet [len4][crc4][headerLen4=0][body]; GetBody reads headerLen at [8..12]=0.
+		private static CapturedPacket Talk(uint typeId, uint mode, uint field3, uint npc, uint instance)
+		{
+			var args = BuildInteractArgs(typeId, mode, field3, npc);
+
+			// body: [bodylen4][642cd3d6][c350][inst][u16][actiontype=0x16][arglen4][args]
+			var body = new byte[26 + args.Length];
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)body.Length);
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), 0x642CD3D6);
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), 0x0000C350);
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(12, 4), instance);
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(18, 4), 0x16); // actionType TalkToNpc (overlaps the u16 slot, fine)
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(22, 4), (uint)args.Length);
+			args.CopyTo(body, 26);
+
+			return new CapturedPacket(0, false, 0x2000, 0x642CD3D6, Frame(body));
+		}
+
 		private static void WriteField(List<byte> b, int field, uint value)
 		{
 			b.Add((byte)((field << 3) | 0));
@@ -111,9 +115,11 @@ namespace Faolan.Tests
 			{
 				var x = (byte)(v & 0x7f);
 				v >>= 7;
-				if (v != 0) x |= 0x80;
+				if (v != 0)
+					x |= 0x80;
 				b.Add(x);
-			} while (v != 0);
+			}
+			while (v != 0);
 		}
 	}
 }

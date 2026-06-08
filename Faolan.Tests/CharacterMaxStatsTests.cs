@@ -9,14 +9,13 @@ namespace Faolan.Tests
 	public class CharacterMaxStatsTests
 	{
 		[Fact]
-		public void Defaults_RogueAtLevel23_ApproximatesAssassinL23()
+		public void Defaults_LevelZero_TreatedAsLevelOne()
 		{
-			var stats = CharacterMaxStats.CreateDefaults(Class.Assassin, 23);
+			var atZero = CharacterMaxStats.CreateDefaults(Class.Assassin, 0);
+			var atOne = CharacterMaxStats.CreateDefaults(Class.Assassin, 1);
 
-			// 200 + 23*47 = 1281 (sheet 1270), 200 + 23*41 = 1143 (sheet 1148), 50 + 23 = 73 (sheet 74)
-			Assert.Equal(1281u, stats.Health);
-			Assert.Equal(1143u, stats.Stamina);
-			Assert.Equal(73u, stats.Mana);
+			Assert.Equal(atOne.Health, atZero.Health);
+			Assert.Equal(atOne.Mana, atZero.Mana);
 		}
 
 		[Fact]
@@ -30,13 +29,30 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void Defaults_LevelZero_TreatedAsLevelOne()
+		public void Defaults_RogueAtLevel23_ApproximatesAssassinL23()
 		{
-			var atZero = CharacterMaxStats.CreateDefaults(Class.Assassin, 0);
-			var atOne = CharacterMaxStats.CreateDefaults(Class.Assassin, 1);
+			var stats = CharacterMaxStats.CreateDefaults(Class.Assassin, 23);
 
-			Assert.Equal(atOne.Health, atZero.Health);
-			Assert.Equal(atOne.Mana, atZero.Mana);
+			// 200 + 23*47 = 1281 (sheet 1270), 200 + 23*41 = 1143 (sheet 1148), 50 + 23 = 73 (sheet 74)
+			Assert.Equal(1281u, stats.Health);
+			Assert.Equal(1143u, stats.Stamina);
+			Assert.Equal(73u, stats.Mana);
+		}
+
+		[Fact]
+		public void RegenerateMaxStats_CreatesRow_WhenMissing()
+		{
+			var character = new Character
+			{
+				Class = Class.Guardian,
+				Level = 5
+			};
+			Assert.Null(character.MaxStats);
+
+			character.RegenerateMaxStats();
+
+			Assert.NotNull(character.MaxStats);
+			Assert.Equal(CharacterMaxStats.CreateDefaults(Class.Guardian, 5).Health, character.MaxStats!.Health);
 		}
 
 		[Fact]
@@ -56,18 +72,6 @@ namespace Faolan.Tests
 			Assert.Same(seeded, character.MaxStats); // same tracked row, not a replacement
 			Assert.Equal(42u, character.MaxStats!.Id);
 			Assert.Equal(CharacterMaxStats.CreateDefaults(Class.Necromancer, 20).Mana, character.MaxStats.Mana);
-		}
-
-		[Fact]
-		public void RegenerateMaxStats_CreatesRow_WhenMissing()
-		{
-			var character = new Character { Class = Class.Guardian, Level = 5 };
-			Assert.Null(character.MaxStats);
-
-			character.RegenerateMaxStats();
-
-			Assert.NotNull(character.MaxStats);
-			Assert.Equal(CharacterMaxStats.CreateDefaults(Class.Guardian, 5).Health, character.MaxStats!.Health);
 		}
 	}
 }

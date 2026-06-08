@@ -3,7 +3,6 @@ using System.IO;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
-using Faolan.Helpers;
 using Faolan.Importer;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -30,10 +29,17 @@ namespace Faolan.Tests
 				{
 					await db.Database.EnsureCreatedAsync();
 					// Pre-existing curated map 2040 would be left alone; here it's absent so it gets inserted.
-					db.Maps.Add(new Map { Id = 4010, Name = "Tortage Beach", PositionX = 1, PositionY = 2, PositionZ = 3 });
+					db.Maps.Add(new Map
+					{
+						Id = 4010,
+						Name = "Tortage Beach",
+						PositionX = 1,
+						PositionY = 2,
+						PositionZ = 3
+					});
 					await db.SaveChangesAsync();
 
-					var inserted = await CaptureMapImporter.ImportAsync(db, new[] { packet });
+					var inserted = await CaptureMapImporter.ImportAsync(db, [packet]);
 					Assert.Equal(1, inserted);
 				}
 
@@ -54,7 +60,8 @@ namespace Faolan.Tests
 			}
 			finally
 			{
-				if (File.Exists(dbPath)) File.Delete(dbPath);
+				if (File.Exists(dbPath))
+					File.Delete(dbPath);
 			}
 		}
 

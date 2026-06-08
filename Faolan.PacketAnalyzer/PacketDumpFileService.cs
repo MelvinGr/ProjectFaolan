@@ -106,13 +106,13 @@ namespace Faolan.PacketAnalyzer
 	public sealed class PacketDumpDocument
 	{
 		[JsonPropertyOrder(0)]
-		public PacketDumpCaptureInfo Capture { get; init; } = new();
-
-		[JsonPropertyOrder(1)]
-		public PacketDumpSummary Summary { get; init; } = new();
+		public PacketDumpCaptureInfo Capture { get; init; } = new PacketDumpCaptureInfo();
 
 		[JsonPropertyOrder(2)]
 		public PacketDumpPacket[] Packets { get; init; } = [];
+
+		[JsonPropertyOrder(1)]
+		public PacketDumpSummary Summary { get; init; } = new PacketDumpSummary();
 
 		[JsonPropertyOrder(3)]
 		public string SchemaVersion { get; init; } = PacketDumpFileService.CurrentSchemaVersion;

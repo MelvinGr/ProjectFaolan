@@ -52,6 +52,11 @@ namespace Faolan.Core.Database.Tables
 		public uint? RealmId { get; set; }
 		public ushort Level { get; set; }
 
+		public override string ToString()
+		{
+			return $"{base.ToString()}: {Name}";
+		}
+
 		//[NotMapped]
 		//public string LastConnectionRealmString => DateTimeOffset.FromUnixTimeSeconds(LastConnection).ToString("MM/dd/yyyy HH:mm:ss");
 
@@ -71,11 +76,6 @@ namespace Faolan.Core.Database.Tables
 			MaxStats.Mana = defaults.Mana;
 			MaxStats.Stamina = defaults.Stamina;
 		}
-
-		public override string ToString()
-		{
-			return $"{base.ToString()}: {Name}";
-		}
 	}
 
 	public class CharacterMaxStats : BaseEntity
@@ -94,7 +94,9 @@ namespace Faolan.Core.Database.Tables
 		// Values are intentionally rough; combat/levelling will replace these once those systems land.
 		public static CharacterMaxStats CreateDefaults(Class @class, ushort level)
 		{
-			var lvl = level == 0 ? (ushort)1 : level;
+			var lvl = level == 0
+				? (ushort)1
+				: level;
 			var (healthPerLevel, manaBase, manaPerLevel) = Archetype(@class);
 
 			return new CharacterMaxStats

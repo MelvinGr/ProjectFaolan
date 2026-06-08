@@ -15,8 +15,6 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 	{
 		private const uint InventorySubOpcode = 0x737A6DF9;
 
-		public readonly record struct CapturedItem(uint Data1, uint Data2, uint Data3, uint Data4, uint Archetype);
-
 		// Parses one on-wire packet; if it is an inventory snapshot, merges every (templateId -> CapturedItem) found
 		// in its containers into `into`. Conflicting identities for the same template are reported (should not happen).
 		public static void Harvest(byte[] packetBytes, IDictionary<uint, CapturedItem> into, IList<string> conflicts = null)
@@ -88,5 +86,7 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 			root = InventorySnapshotInspector.ParseInventoryPacketBody(body).Root;
 			return true;
 		}
+
+		public readonly record struct CapturedItem(uint Data1, uint Data2, uint Data3, uint Data4, uint Archetype);
 	}
 }

@@ -13,11 +13,13 @@ namespace Faolan.Importer
 	// Validated end-to-end against a real client (TextStrings 1030002 -> TDC2 strings).
 	public sealed class RdbReader : IDisposable
 	{
-		public readonly record struct Entry(uint Type, uint Id, int File, uint Offset, uint Size);
+		private readonly Dictionary<int, FileStream> _dataFiles = new Dictionary<int, FileStream>();
+		private readonly List<Entry> _entries = [];
 
 		private readonly string _rdbDir;
-		private readonly List<Entry> _entries = new();
-		private readonly Dictionary<int, FileStream> _dataFiles = new();
+
+		public int Count => _entries.Count;
+		public IReadOnlyList<Entry> Entries => _entries;
 
 		public RdbReader(string rdbDir)
 		{
@@ -25,18 +27,16 @@ namespace Faolan.Importer
 			ParseIndex(Path.Combine(rdbDir, "le.idx"));
 		}
 
-		public int Count => _entries.Count;
-		public IReadOnlyList<Entry> Entries => _entries;
+		public void Dispose()
+		{
+			foreach (var fs in _dataFiles.Values)
+				fs.Dispose();
+			_dataFiles.Clear();
+		}
 
 		public IEnumerable<Entry> EntriesOfType(uint type)
 		{
 			return _entries.Where(e => e.Type == type);
-		}
-
-		// Counts entries per type (for the type-inventory phase).
-		public IEnumerable<(uint Type, int Count)> TypeCounts()
-		{
-			return _entries.GroupBy(e => e.Type).Select(g => (g.Key, g.Count())).OrderByDescending(x => x.Item2);
 		}
 
 		// Reads an entry's payload, unwrapping the IOz1 + zlib container. Returns the decompressed bytes (which
@@ -58,57 +58,16 @@ namespace Faolan.Importer
 
 			var plainLen = (int)BinaryPrimitives.ReadUInt32LittleEndian(raw.AsSpan(12, 4));
 			var decrypted = Tea.DecryptEcb(raw.AsSpan(20), teaKey);
-			var inner = plainLen >= 0 && plainLen <= decrypted.Length ? decrypted[..plainLen] : decrypted;
+			var inner = plainLen >= 0 && plainLen <= decrypted.Length
+				? decrypted[..plainLen]
+				: decrypted;
 			return UnwrapIOz1(inner);
 		}
 
-		public static bool IsRdbh(ReadOnlySpan<byte> raw)
+		// Counts entries per type (for the type-inventory phase).
+		public IEnumerable<(uint Type, int Count)> TypeCounts()
 		{
-			return raw.Length >= 20 && raw[0] == (byte)'R' && raw[1] == (byte)'D' && raw[2] == (byte)'B' && raw[3] == (byte)'H';
-		}
-
-		private static byte[] UnwrapIOz1(byte[] raw)
-		{
-			if (raw.Length >= 8 && raw[0] == (byte)'I' && raw[1] == (byte)'O' && raw[2] == (byte)'z' && raw[3] == (byte)'1')
-			{
-				var uncompressed = BinaryPrimitives.ReadUInt32LittleEndian(raw.AsSpan(4, 4));
-				try
-				{
-					return Inflate(raw, 8, (int)uncompressed);
-				}
-				catch
-				{
-					return raw; // not a clean zlib stream - hand back raw so the caller can decide
-				}
-			}
-
-			return raw;
-		}
-
-		private byte[] ReadRaw(Entry e)
-		{
-			var fs = GetDataFile(e.File);
-			fs.Seek(e.Offset, SeekOrigin.Begin);
-			var buf = new byte[e.Size];
-			var read = 0;
-			while (read < buf.Length)
-			{
-				var n = fs.Read(buf, read, buf.Length - read);
-				if (n <= 0)
-					break;
-				read += n;
-			}
-
-			return buf;
-		}
-
-		private static byte[] Inflate(byte[] data, int offset, int expectedSize)
-		{
-			using var input = new MemoryStream(data, offset, data.Length - offset);
-			using var zlib = new ZLibStream(input, CompressionMode.Decompress);
-			using var output = expectedSize > 0 ? new MemoryStream(expectedSize) : new MemoryStream();
-			zlib.CopyTo(output);
-			return output.ToArray();
+			return _entries.GroupBy(e => e.Type).Select(g => (g.Key, g.Count())).OrderByDescending(x => x.Item2);
 		}
 
 		private FileStream GetDataFile(int file)
@@ -132,7 +91,9 @@ namespace Faolan.Importer
 
 			// Detail record: v5 = 11 u32 (44 B), v7 = 28 B. Both put file at byte 0 (low byte), offset at byte 4,
 			// size at byte 8 - only the stride differs.
-			var detailStride = version == 5 ? 44 : 28;
+			var detailStride = version == 5
+				? 44
+				: 28;
 
 			var indexOff = 28;
 			var detailOff = indexOff + numEntries * 8;
@@ -152,11 +113,58 @@ namespace Faolan.Importer
 			}
 		}
 
-		public void Dispose()
+		private byte[] ReadRaw(Entry e)
 		{
-			foreach (var fs in _dataFiles.Values)
-				fs.Dispose();
-			_dataFiles.Clear();
+			var fs = GetDataFile(e.File);
+			fs.Seek(e.Offset, SeekOrigin.Begin);
+			var buf = new byte[e.Size];
+			var read = 0;
+			while (read < buf.Length)
+			{
+				var n = fs.Read(buf, read, buf.Length - read);
+				if (n <= 0)
+					break;
+
+				read += n;
+			}
+
+			return buf;
 		}
+
+		public static bool IsRdbh(ReadOnlySpan<byte> raw)
+		{
+			return raw.Length >= 20 && raw[0] == (byte)'R' && raw[1] == (byte)'D' && raw[2] == (byte)'B' && raw[3] == (byte)'H';
+		}
+
+		private static byte[] Inflate(byte[] data, int offset, int expectedSize)
+		{
+			using var input = new MemoryStream(data, offset, data.Length - offset);
+			using var zlib = new ZLibStream(input, CompressionMode.Decompress);
+			using var output = expectedSize > 0
+				? new MemoryStream(expectedSize)
+				: new MemoryStream();
+			zlib.CopyTo(output);
+			return output.ToArray();
+		}
+
+		private static byte[] UnwrapIOz1(byte[] raw)
+		{
+			if (raw.Length >= 8 && raw[0] == (byte)'I' && raw[1] == (byte)'O' && raw[2] == (byte)'z' && raw[3] == (byte)'1')
+			{
+				var uncompressed = BinaryPrimitives.ReadUInt32LittleEndian(raw.AsSpan(4, 4));
+				try
+				{
+					return Inflate(raw, 8, (int)uncompressed);
+				}
+				catch
+				{
+					return raw; // not a clean zlib stream - hand back raw so the caller can decide
+				}
+			}
+
+			return raw;
+		}
+
+		public readonly record struct Entry(uint Type, uint Id, int File, uint Offset, uint Size);
 	}
 }

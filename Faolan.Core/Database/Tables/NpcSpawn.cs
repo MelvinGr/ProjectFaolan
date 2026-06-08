@@ -6,12 +6,12 @@ namespace Faolan.Core.Database.Tables
 	// the name is best-effort. Imported from captures by Faolan.Importer (NpcSpawnExtractor).
 	public class NpcSpawn : BaseEntity
 	{
-		public uint MapId { get; set; }
-		public string Name { get; set; }
-		public uint CapturedHandle { get; set; }
+		public byte[] Data { get; set; }
 		public float PositionX { get; set; }
 		public float PositionY { get; set; }
 		public float PositionZ { get; set; }
-		public byte[] Data { get; set; }
+		public string Name { get; set; }
+		public uint CapturedHandle { get; set; }
+		public uint MapId { get; set; }
 	}
 }

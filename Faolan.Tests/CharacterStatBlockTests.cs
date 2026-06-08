@@ -11,17 +11,20 @@ namespace Faolan.Tests
 		[Fact]
 		public void Build_VitalsBlock_MatchesCapturedBytes()
 		{
-			var block = new CharacterStatBlock()
-				.Set(LegacyCharacterStatId.Health, 63)
-				.Set(LegacyCharacterStatId.Stamina, 63)
-				.Set(LegacyCharacterStatId.Mana, 63);
+			var block = new CharacterStatBlock().Set(LegacyCharacterStatId.Health, 63).Set(LegacyCharacterStatId.Stamina, 63).Set(LegacyCharacterStatId.Mana, 63);
 
 			Assert.Equal(3, block.Count);
 
 			// count(03) + Health(001B)=189C + Stamina(01F8)=189C + Mana(01FA)=189C
-			Assert.Equal(
-				"030000001b0000189c000001f80000189c000001fa0000189c",
-				ToHex(block.ToArray()));
+			Assert.Equal("030000001b0000189c000001f80000189c000001fa0000189c", ToHex(block.ToArray()));
+		}
+
+		[Fact]
+		public void Set_AppliesVitalsScale()
+		{
+			// Health is a ×100 vital: display 63 -> raw 6300 (0x189C).
+			var block = new CharacterStatBlock().Set(LegacyCharacterStatId.Health, 63);
+			Assert.Equal("010000001b0000189c", ToHex(block.ToArray()));
 		}
 
 		[Fact]
@@ -31,14 +34,6 @@ namespace Faolan.Tests
 
 			// count(01) + Level(0036) = 25 (0x19), unscaled
 			Assert.Equal("010000003600000019", ToHex(block.ToArray()));
-		}
-
-		[Fact]
-		public void Set_AppliesVitalsScale()
-		{
-			// Health is a ×100 vital: display 63 -> raw 6300 (0x189C).
-			var block = new CharacterStatBlock().Set(LegacyCharacterStatId.Health, 63);
-			Assert.Equal("010000001b0000189c", ToHex(block.ToArray()));
 		}
 
 		private static string ToHex(byte[] bytes)

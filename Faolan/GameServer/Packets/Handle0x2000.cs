@@ -231,7 +231,9 @@ namespace Faolan.GameServer
 								await LogToClient($"CastSpell spell={spellId} target=0x{targetHandle:X} {args}");
 
 								// Play the cast (caster -> target, or self when no target), then resolve its effect.
-								await ApplySpell(client, casterHandle, targetHandle == 0 ? casterHandle : targetHandle, spellId);
+								await ApplySpell(client, casterHandle, targetHandle == 0
+									? casterHandle
+									: targetHandle, spellId);
 
 								// An offensive cast at another entity applies damage + pushes the target's vitals; a
 								// self/no-target cast is treated as a buff (no damage) until spell data distinguishes them.

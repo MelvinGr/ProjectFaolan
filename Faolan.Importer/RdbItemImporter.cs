@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Microsoft.EntityFrameworkCore;
@@ -17,7 +18,6 @@ namespace Faolan.Importer
 	// dumps the templates for analysis.
 	public static class RdbItemImporter
 	{
-		private static readonly uint[] ItemTemplateTypes = { 1000020, 1000620 };
 		private const uint MarkerItem = 1000000;
 
 		// String fields inside a template are encoded `tag 0x21 (u32) + length (u32) + <length> ASCII bytes`. The
@@ -25,10 +25,13 @@ namespace Faolan.Importer
 		// underscores, so we skip those and take the first underscore-free string. Items whose display name is a
 		// localized-string id (not inline) yield none - we leave their captured name untouched.
 		private const uint StringTag = 0x21;
+		private static readonly uint[] ItemTemplateTypes = [1000020, 1000620];
 
 		public static string ExtractName(ReadOnlySpan<byte> template)
 		{
-			var body = template.Length > 12 ? template[12..] : default;
+			var body = template.Length > 12
+				? template[12..]
+				: default;
 			var i = 0;
 			while (i + 8 <= body.Length)
 			{
@@ -40,9 +43,10 @@ namespace Faolan.Importer
 						var s = body.Slice(i + 8, len);
 						if (IsPrintableAscii(s))
 						{
-							var text = System.Text.Encoding.ASCII.GetString(s);
+							var text = Encoding.ASCII.GetString(s);
 							if (!text.Contains('_'))
 								return text;
+
 							i += 8 + len;
 							continue;
 						}
@@ -55,16 +59,6 @@ namespace Faolan.Importer
 			return null;
 		}
 
-		private static bool IsPrintableAscii(ReadOnlySpan<byte> s)
-		{
-			foreach (var c in s)
-				if (c < 32 || c > 126)
-					return false;
-			return true;
-		}
-
-		public readonly record struct Result(int Keyed, int Decrypted, int NoEntry, int HeaderMismatch, int DecryptFailed, int NamesAdded);
-
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string dumpDir = null)
 		{
 			using var rdb = new RdbReader(rdbDir);
@@ -72,13 +66,13 @@ namespace Faolan.Importer
 			// (type, id) -> entry for the template types, skipping empty/sentinel entries.
 			var byTypeId = new Dictionary<(uint, uint), RdbReader.Entry>();
 			foreach (var type in ItemTemplateTypes)
-				foreach (var e in rdb.EntriesOfType(type))
-					if (e.Size > 0 && e.File != 0xff)
-						byTypeId[(type, e.Id)] = e;
+			foreach (var e in rdb.EntriesOfType(type))
+			{
+				if (e.Size > 0 && e.File != 0xff)
+					byTypeId[(type, e.Id)] = e;
+			}
 
-			var items = await db.Items
-				.Where(i => i.Data1 != 0 || i.Data2 != 0 || i.Data3 != 0 || i.Data4 != 0)
-				.ToListAsync();
+			var items = await db.Items.Where(i => i.Data1 != 0 || i.Data2 != 0 || i.Data3 != 0 || i.Data4 != 0).ToListAsync();
 
 			if (dumpDir != null)
 				Directory.CreateDirectory(dumpDir);
@@ -93,11 +87,13 @@ namespace Faolan.Importer
 				RdbReader.Entry entry = default;
 				uint matchedType = 0;
 				foreach (var type in ItemTemplateTypes)
+				{
 					if (byTypeId.TryGetValue((type, item.Id), out entry))
 					{
 						matchedType = type;
 						break;
 					}
+				}
 
 				if (matchedType == 0)
 				{
@@ -117,10 +113,8 @@ namespace Faolan.Importer
 				}
 
 				// Validate the 12-byte RDB-Id header: type + id must match what we asked for, marker == 1000000.
-				if (template.Length < 12
-				    || BinaryPrimitives.ReadUInt32LittleEndian(template.AsSpan(0, 4)) != matchedType
-				    || BinaryPrimitives.ReadUInt32LittleEndian(template.AsSpan(4, 4)) != item.Id
-				    || BinaryPrimitives.ReadUInt32LittleEndian(template.AsSpan(8, 4)) != MarkerItem)
+				if (template.Length < 12 || BinaryPrimitives.ReadUInt32LittleEndian(template.AsSpan(0, 4)) != matchedType || BinaryPrimitives.ReadUInt32LittleEndian(template.AsSpan(4, 4)) != item.Id ||
+				    BinaryPrimitives.ReadUInt32LittleEndian(template.AsSpan(8, 4)) != MarkerItem)
 				{
 					headerMismatch++;
 					continue;
@@ -155,5 +149,18 @@ namespace Faolan.Importer
 
 			return new Result(items.Count, decrypted, noEntry, headerMismatch, decryptFailed, namesAdded);
 		}
+
+		private static bool IsPrintableAscii(ReadOnlySpan<byte> s)
+		{
+			foreach (var c in s)
+			{
+				if (c < 32 || c > 126)
+					return false;
+			}
+
+			return true;
+		}
+
+		public readonly record struct Result(int Keyed, int Decrypted, int NoEntry, int HeaderMismatch, int DecryptFailed, int NamesAdded);
 	}
 }

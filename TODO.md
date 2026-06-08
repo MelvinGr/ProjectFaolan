@@ -12,10 +12,14 @@ conversation key change.
 
 ---
 
+I PUT THE LOGS IN ./logs-test
+
+---
+
 ## 1. Vitals packet `0x96B8DC59`  (commit: combat loop)
 The decoded vitals/HP packet, wired to GM commands.
-- [ ] `.hurt 200` — your health bar should drop by ~200.
-- [ ] `.heal 200` — health bar should rise (clamped at max).
+- [works] `.hurt 200` — your health bar should drop by ~200.
+- [work up to 247, even though max says 3668] `.heal 200` — health bar should rise (clamped at max).
 - [ ] `.vitals` (no args) — should set the bar to your character's MaxStats (class/level defaults).
 - [ ] `.vitals 1000 800 500` — sets health/stamina/mana to those values.
 - [ ] `.setstat 36 25` — sets Level to 25 on the sheet (statId 0x36 = Level).
@@ -23,21 +27,21 @@ The decoded vitals/HP packet, wired to GM commands.
 
 ## 2. Mounts  (commit: combat loop / mount summon)
 Real mount spell decoded as `0x3BAD7D` (Fading Black Horse summon).
-- [ ] `.mount` — should trigger the mount summon cast (and ideally put you on the horse).
-- [ ] If nothing mounts, try `.mount 3BAD7D` explicitly, and tell me what (if anything) happens
+- [does nothing] `.mount` — should trigger the mount summon cast (and ideally put you on the horse).
+- [same] If nothing mounts, try `.mount 3BAD7D` explicitly, and tell me what (if anything) happens
       (cast bar? horse spawns? you ride?). Full mounting may still need the mount-entity spawn — your
       observation tells me what's missing.
 
 ## 3. Combat (cast → damage → vitals)  (commit: combat loop)
-- [ ] Cast a damaging spell at an NPC/mob. The target's health bar should drop, and on 0 HP the server
+- [Character has no spells / attacks] Cast a damaging spell at an NPC/mob. The target's health bar should drop, and on 0 HP the server
       logs a kill (despawn/XP not implemented yet).
 **Expected:** target HP visibly decreases. Damage is a provisional formula for now.
 
 ## 4. Teleport GM command  (commit: fix teleport)
 Rewritten to reuse the world-entry render path.
-- [ ] `.teleport 2010` (also try `2040`, `3000`) — these maps have a stored world burst AND a real spawn
+- [Does move player & apply buff, but maps does not change] `.teleport 2010` (also try `2040`, `3000`) — these maps have a stored world burst AND a real spawn
       position, so they're the best targets. You should load into the new map with NPCs.
-- [ ] `.teleport 4010` (Tortage Beach) should also work.
+- [same] `.teleport 4010` (Tortage Beach) should also work.
 **Expected:** map changes and renders. Note: retail teleport reconnects to a new world server; ours does a
 soft map-change on the same connection, so it may differ.
 
@@ -48,14 +52,14 @@ soft map-change on the same connection, so it may differ.
 
 ## 6. Conversations — right NPC, right dialog  (commit: key conversations by NPC handle)
 On a **beach login** (existing character), not the create flow:
-- [ ] Talk to **Casilda** — she should give HER dialogue, not Kalanthes's regular dialog.
-- [ ] Talk to **Kalanthes** — his dialogue.
+- [first dialog is kalanthes, sfter selecting first option it switches to second dialog of casilda, advancing to third step locks the chat (unable to exit with esc)] Talk to **Casilda** — she should give HER dialogue, not Kalanthes's regular dialog.
+- [ Dialos opens normally, and camera focuses on him. But no dialog lines to select, can exit conversation with esc] Talk to **Kalanthes** — his dialogue.
 **Known limit:** in the *create-world* flow specifically, Casilda may still fall back to the scripted intro —
 her create-world conversation isn't in the captures the analyzer can extract yet (needs a fresh capture).
 
 ## 7. Create-world Kalanthes intro  (commit: answer create-world spawn polls per-entity) ⭐ highest priority
 The auto-cutscene where you wash ashore and Kalanthes walks up + starts the chat.
-- [ ] Create a NEW character → enter world → does Kalanthes walk up and the conversation auto-start?
+- [No, still as bugged as before. after char create the game is in a not normal state. relog is required] Create a NEW character → enter world → does Kalanthes walk up and the conversation auto-start?
 - [ ] **Grab `AgeOfConan.log` either way.** Specifically check whether
       `CinematicCamera_c::InitPath tried to set an invalid camera path "Kalanthes"` is GONE.
       - Error gone + Kalanthes works → fixed.
@@ -66,12 +70,12 @@ The auto-cutscene where you wash ashore and Kalanthes walks up + starts the chat
 I changed `MapChange`, `ReadyForPlayScreen`, the Move echo, and the `/setpos`-style GM packet to write raw
 position floats **big-endian** (they were wrongly little-endian). This touches the **login path**, so it's the
 most likely to regress something.
-- [ ] Normal login — do you still spawn at the correct position/orientation (not at 0,0,0 or somewhere weird)?
-- [ ] Movement still works normally?
+- [Works] Normal login — do you still spawn at the correct position/orientation (not at 0,0,0 or somewhere weird)?
+- [Works] Movement still works normally?
 **If a character spawns in the wrong place or login breaks, this change is the first suspect.**
 
 ## 9. Map rendering after instance-detection fix  (commit: fix instance detection)
-- [ ] Maps that have a world burst (2000, 2010, 2040, 3000, 4000, 4010) should render on login/teleport.
+- [The out of range ones need to be supported as well i assume, if they are in the dumps that must mean they exist. Wrong parse?] Maps that have a world burst (2000, 2010, 2040, 3000, 4000, 4010) should render on login/teleport.
       Maps 1000 and 11040 were intentionally dropped (their captured instance was out of range) — they'll
       fall back to the no-NPC hand-built path.
 

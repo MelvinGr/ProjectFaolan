@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
-using Faolan.Helpers;
 using Faolan.Importer;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -28,7 +27,7 @@ namespace Faolan.Tests
 				await using (var db = NewContext(dbPath))
 				{
 					await db.Database.EnsureCreatedAsync();
-					var (seen, inserted) = await CaptureSpellImporter.ImportAsync(db, new[] { packet });
+					var (seen, inserted) = await CaptureSpellImporter.ImportAsync(db, [packet]);
 					Assert.Equal(1, seen);
 					Assert.Equal(1, inserted);
 				}
@@ -41,7 +40,8 @@ namespace Faolan.Tests
 			}
 			finally
 			{
-				if (File.Exists(dbPath)) File.Delete(dbPath);
+				if (File.Exists(dbPath))
+					File.Delete(dbPath);
 			}
 		}
 

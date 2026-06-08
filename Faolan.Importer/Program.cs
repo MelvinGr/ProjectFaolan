@@ -6,7 +6,6 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
-using Faolan.Helpers;
 using Faolan.PacketAnalyzer;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,6 +19,158 @@ namespace Faolan.Importer
 	internal static class Program
 	{
 		private const string RepoRoot = "/home/melvin/Development/C#/Project Faolan";
+
+		// Friendly names for the RDB resource types we care about (from rdbreader's TYPES enum). Used by the
+		// type inventory so we can spot the item-template / NPC-stat / dialogue resources.
+		private static readonly (uint Type, string Name)[] RdbTypeNames =
+		[
+			(0, "ScriptGroup"), (1000010, "Filenames"), (1000077, "ContentSpawnDataExport"), (1000078, "AcgSpawnDataExport"), (1000079, "NpcSpawnDataExport"), (1000083, "TreasureDataExport"),
+			(1000090, "ResurrectionPointsExport"), (1010001, "3DModel"), (1010004, "Texture/FCTX"), (1010035, "TextScript"), (1010201, "MonsterData"), (1010223, "LuaArchive"), (1010700, "CharacterCreator"), (1020003, "Lip"),
+			(1030002, "TextStrings"), (1070003, "PlayfieldDescription")
+		];
+
+		private static uint GetNestedValue(JsonElement packet, string property)
+		{
+			return packet.TryGetProperty(property, out var obj) && obj.ValueKind == JsonValueKind.Object && obj.TryGetProperty("Value", out var v) && v.TryGetUInt32(out var value)
+				? value
+				: 0;
+		}
+
+		private static string? GetOption(string[] args, string name)
+		{
+			var i = Array.IndexOf(args, name);
+			return i >= 0 && i + 1 < args.Length
+				? args[i + 1]
+				: null;
+		}
+
+		// Upsert (never wipe): update each extracted node's handles + replace its own packets, insert new nodes, and
+		// leave any node not in this run's captures untouched.
+		private static async Task ImportConversations(DatabaseContext db, List<ConversationEntry> conversations)
+		{
+			foreach (var e in conversations)
+			{
+				var node = await db.ConversationNodes.Include(n => n.Packets).FirstOrDefaultAsync(n => n.CapturedNpcHandle == e.CapturedNpcHandle && n.TypeId == e.TypeId && n.Mode == e.Mode && n.Field3 == e.Field3);
+
+				if (node == null)
+				{
+					node = new ConversationNode
+					{
+						TypeId = e.TypeId,
+						Mode = e.Mode,
+						Field3 = e.Field3,
+						CapturedNpcHandle = e.CapturedNpcHandle
+					};
+					db.ConversationNodes.Add(node);
+				}
+				else if (node.Packets != null)
+					db.ConversationPackets.RemoveRange(node.Packets); // refresh this node's packets
+
+				node.CapturedNpcHandle = e.CapturedNpcHandle;
+				node.CapturedInstance = e.CapturedInstance;
+				node.Packets = e.Packets.Select((p, i) => new ConversationPacket
+				{
+					Sequence = i,
+					Data = p
+				}).ToList();
+			}
+
+			await db.SaveChangesAsync();
+		}
+
+		// Upsert per map: replace that map's burst (instance + packets); leave other maps untouched.
+		private static async Task ImportMapWorldBursts(DatabaseContext db, List<MapWorldBurstEntry> bursts)
+		{
+			// Purge any existing rows whose captured instance is outside the 4-byte-varint range - the
+			// length-preserving rewrite can't re-address them, so a stale row (e.g. maps 1000/11040 captured
+			// 0x110099BD) would break the world build. Merge() already filters new bursts; this clears old ones.
+			var stale = await db.MapWorldBursts.Include(b => b.Packets).Where(b => b.CapturedInstance < 0x02000000 || b.CapturedInstance > 0x0FFFFFFF).ToListAsync();
+			if (stale.Count > 0)
+			{
+				db.MapWorldBurstPackets.RemoveRange(stale.SelectMany(b => b.Packets));
+				db.MapWorldBursts.RemoveRange(stale);
+			}
+
+			foreach (var e in bursts)
+			{
+				var burst = await db.MapWorldBursts.Include(b => b.Packets).FirstOrDefaultAsync(b => b.MapId == e.MapId);
+				if (burst == null)
+				{
+					burst = new MapWorldBurst { MapId = e.MapId };
+					db.MapWorldBursts.Add(burst);
+				}
+				else if (burst.Packets != null)
+					db.MapWorldBurstPackets.RemoveRange(burst.Packets);
+
+				burst.CapturedInstance = e.CapturedInstance;
+				burst.Packets = e.Packets.Select((p, i) => new MapWorldBurstPacket
+				{
+					Sequence = i,
+					Data = p
+				}).ToList();
+			}
+
+			await db.SaveChangesAsync();
+		}
+
+		// Upsert by (map, spawn point); never wipe.
+		private static async Task ImportNpcSpawns(DatabaseContext db, List<NpcSpawnEntry> spawns)
+		{
+			foreach (var e in spawns)
+			{
+				var existing = await db.NpcSpawns.FirstOrDefaultAsync(n => n.MapId == e.MapId && n.PositionX == e.X && n.PositionY == e.Y && n.PositionZ == e.Z);
+
+				if (existing == null)
+				{
+					db.NpcSpawns.Add(new NpcSpawn
+					{
+						MapId = e.MapId,
+						Name = e.Name,
+						CapturedHandle = e.Handle,
+						PositionX = e.X,
+						PositionY = e.Y,
+						PositionZ = e.Z,
+						Data = e.Data
+					});
+				}
+				else
+				{
+					existing.Name = e.Name;
+					existing.CapturedHandle = e.Handle;
+					existing.Data = e.Data;
+				}
+			}
+
+			await db.SaveChangesAsync();
+		}
+
+		// --rdb: read the client RDB index and inventory the resource types. The server references text by id (the
+		// client renders it from its own RDB), so we DON'T bulk-store strings; this inventory is the foundation for
+		// locating + importing the structured data the server actually needs (item-template identity, NPC stats).
+		private static void ImportRdb(string rdbDir)
+		{
+			using var rdb = new RdbReader(rdbDir);
+			Console.WriteLine($"RDB: {rdb.Count} index entries in {rdbDir}");
+
+			var names = RdbTypeNames.ToDictionary(t => t.Type, t => t.Name);
+			Console.WriteLine("  type        count   name");
+			Console.WriteLine("  ----------------------------------------");
+			foreach (var (type, count) in rdb.TypeCounts())
+				Console.WriteLine($"  {type,-10}  {count,6}  {(names.TryGetValue(type, out var n) ? n : "")}");
+		}
+
+		// --rdb-items: decrypt the client RDB item-template for every item we have a key for (Item.Data1..4 =
+		// the item's ProtoDecryptionKey). Validates the decrypt end-to-end (RDB-Id header must match) and, with
+		// --dump-templates <dir>, writes each decrypted template for the field-layout reversing step. See
+		// docs/rdb-extraction-plan.md.
+		private static async Task ImportRdbItems(DatabaseContext db, string rdbDir, string dumpDir)
+		{
+			var r = await RdbItemImporter.ImportAsync(db, rdbDir, dumpDir);
+			Console.WriteLine($"RDB items: {r.Decrypted}/{r.Keyed} keyed items decrypted+validated; {r.NamesAdded} names filled" + $"  (noEntry={r.NoEntry}, headerMismatch={r.HeaderMismatch}, decryptFailed={r.DecryptFailed})" +
+			                  (dumpDir != null
+				                  ? $"  -> templates dumped to {dumpDir}"
+				                  : ""));
+		}
 
 		private static async Task<int> Main(string[] args)
 		{
@@ -36,22 +187,26 @@ namespace Faolan.Importer
 			var doCaptures = Directory.Exists(capturesDir);
 			if (!doCaptures && rdbDir == null)
 			{
-				Console.Error.WriteLine($"Captures directory not found: {capturesDir}");
+				await Console.Error.WriteLineAsync($"Captures directory not found: {capturesDir}");
 				return 1;
 			}
 
 			if (!File.Exists(dbPath))
 			{
-				Console.Error.WriteLine($"Database not found: {dbPath} (the DB is the source of truth; point --db at it).");
+				await Console.Error.WriteLineAsync($"Database not found: {dbPath} (the DB is the source of truth; point --db at it).");
 				return 1;
 			}
 
 			// One ordered GameServer packet list per capture (conversations need per-capture sequence + metadata).
-			var captures = doCaptures ? ReadCaptures(capturesDir) : new List<List<CapturedPacket>>();
+			var captures = doCaptures
+				? ReadCaptures(capturesDir)
+				: [];
 			var itemPackets = captures.SelectMany(c => c.Select(p => p.Bytes)).ToList();
 			if (doCaptures)
+			{
 				foreach (var bin in Directory.EnumerateFiles(capturesDir, "*.bin"))
-					itemPackets.Add(File.ReadAllBytes(bin));
+					itemPackets.Add(await File.ReadAllBytesAsync(bin));
+			}
 
 			var conversations = ConversationExtractor.Merge(captures.SelectMany(ConversationExtractor.Extract));
 
@@ -93,7 +248,7 @@ namespace Faolan.Importer
 			if (rdbItems)
 			{
 				if (rdbDir == null)
-					Console.Error.WriteLine("--rdb-items needs --rdb <RDB dir>.");
+					await Console.Error.WriteLineAsync("--rdb-items needs --rdb <RDB dir>.");
 				else
 					await ImportRdbItems(db, rdbDir, dumpTemplatesDir);
 			}
@@ -104,192 +259,6 @@ namespace Faolan.Importer
 			return 0;
 		}
 
-		// Friendly names for the RDB resource types we care about (from rdbreader's TYPES enum). Used by the
-		// type inventory so we can spot the item-template / NPC-stat / dialogue resources.
-		private static readonly (uint Type, string Name)[] RdbTypeNames =
-		{
-			(0, "ScriptGroup"), (1000010, "Filenames"), (1000077, "ContentSpawnDataExport"),
-			(1000078, "AcgSpawnDataExport"), (1000079, "NpcSpawnDataExport"), (1000083, "TreasureDataExport"),
-			(1000090, "ResurrectionPointsExport"), (1010001, "3DModel"), (1010004, "Texture/FCTX"),
-			(1010035, "TextScript"), (1010201, "MonsterData"), (1010223, "LuaArchive"), (1010700, "CharacterCreator"),
-			(1020003, "Lip"), (1030002, "TextStrings"), (1070003, "PlayfieldDescription")
-		};
-
-		// --rdb: read the client RDB index and inventory the resource types. The server references text by id (the
-		// client renders it from its own RDB), so we DON'T bulk-store strings; this inventory is the foundation for
-		// locating + importing the structured data the server actually needs (item-template identity, NPC stats).
-		private static void ImportRdb(string rdbDir)
-		{
-			using var rdb = new RdbReader(rdbDir);
-			Console.WriteLine($"RDB: {rdb.Count} index entries in {rdbDir}");
-
-			var names = RdbTypeNames.ToDictionary(t => t.Type, t => t.Name);
-			Console.WriteLine("  type        count   name");
-			Console.WriteLine("  ----------------------------------------");
-			foreach (var (type, count) in rdb.TypeCounts())
-				Console.WriteLine($"  {type,-10}  {count,6}  {(names.TryGetValue(type, out var n) ? n : "")}");
-		}
-
-		// --rdb-items: decrypt the client RDB item-template for every item we have a key for (Item.Data1..4 =
-		// the item's ProtoDecryptionKey). Validates the decrypt end-to-end (RDB-Id header must match) and, with
-		// --dump-templates <dir>, writes each decrypted template for the field-layout reversing step. See
-		// docs/rdb-extraction-plan.md.
-		private static async Task ImportRdbItems(DatabaseContext db, string rdbDir, string dumpDir)
-		{
-			var r = await RdbItemImporter.ImportAsync(db, rdbDir, dumpDir);
-			Console.WriteLine($"RDB items: {r.Decrypted}/{r.Keyed} keyed items decrypted+validated; {r.NamesAdded} names filled"
-				+ $"  (noEntry={r.NoEntry}, headerMismatch={r.HeaderMismatch}, decryptFailed={r.DecryptFailed})"
-				+ (dumpDir != null ? $"  -> templates dumped to {dumpDir}" : ""));
-		}
-
-		// Upsert (never wipe): update each extracted node's handles + replace its own packets, insert new nodes, and
-		// leave any node not in this run's captures untouched.
-		private static async Task ImportConversations(DatabaseContext db, List<ConversationEntry> conversations)
-		{
-			foreach (var e in conversations)
-			{
-				var node = await db.ConversationNodes.Include(n => n.Packets)
-					.FirstOrDefaultAsync(n => n.CapturedNpcHandle == e.CapturedNpcHandle && n.TypeId == e.TypeId && n.Mode == e.Mode && n.Field3 == e.Field3);
-
-				if (node == null)
-				{
-					node = new ConversationNode { TypeId = e.TypeId, Mode = e.Mode, Field3 = e.Field3, CapturedNpcHandle = e.CapturedNpcHandle };
-					db.ConversationNodes.Add(node);
-				}
-				else if (node.Packets != null)
-				{
-					db.ConversationPackets.RemoveRange(node.Packets); // refresh this node's packets
-				}
-
-				node.CapturedNpcHandle = e.CapturedNpcHandle;
-				node.CapturedInstance = e.CapturedInstance;
-				node.Packets = e.Packets.Select((p, i) => new ConversationPacket { Sequence = i, Data = p }).ToList();
-			}
-
-			await db.SaveChangesAsync();
-		}
-
-		// Beach map 4010: seed its world burst from the proven embedded blob (strie-login-worldburst.bin, 71 packets,
-		// instance 0x02165EFF) rather than the captured window, so the long-working beach login is byte-identical.
-		// The blob file stays in the repo only as this import source (it is no longer embedded in the server).
-		private static async Task SeedBeachBurstFromBlob(DatabaseContext db)
-		{
-			const uint beachMap = 0x00000FAA;
-			const uint strieInstance = 0x02165EFF;
-			var blobPath = Path.Combine(RepoRoot, "Faolan", "GameServer", "Data", "strie-login-worldburst.bin");
-			if (!File.Exists(blobPath))
-				return;
-
-			var data = await File.ReadAllBytesAsync(blobPath);
-			var packets = new List<byte[]>();
-			var offset = 0;
-			uint ReadU32()
-			{
-				var v = (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
-				offset += 4;
-				return v;
-			}
-
-			var count = ReadU32();
-			for (var i = 0; i < count; i++)
-			{
-				var len = (int)ReadU32();
-				packets.Add(data[offset..(offset + len)]);
-				offset += len;
-			}
-
-			var burst = await db.MapWorldBursts.Include(b => b.Packets).FirstOrDefaultAsync(b => b.MapId == beachMap);
-			if (burst == null)
-			{
-				burst = new MapWorldBurst { MapId = beachMap };
-				db.MapWorldBursts.Add(burst);
-			}
-			else if (burst.Packets != null)
-			{
-				db.MapWorldBurstPackets.RemoveRange(burst.Packets);
-			}
-
-			burst.CapturedInstance = strieInstance;
-			burst.Packets = packets.Select((p, i) => new MapWorldBurstPacket { Sequence = i, Data = p }).ToList();
-			await db.SaveChangesAsync();
-		}
-
-		// Upsert per map: replace that map's burst (instance + packets); leave other maps untouched.
-		private static async Task ImportMapWorldBursts(DatabaseContext db, List<MapWorldBurstEntry> bursts)
-		{
-			// Purge any existing rows whose captured instance is outside the 4-byte-varint range - the
-			// length-preserving rewrite can't re-address them, so a stale row (e.g. maps 1000/11040 captured
-			// 0x110099BD) would break the world build. Merge() already filters new bursts; this clears old ones.
-			var stale = await db.MapWorldBursts.Include(b => b.Packets)
-				.Where(b => b.CapturedInstance < 0x02000000 || b.CapturedInstance > 0x0FFFFFFF)
-				.ToListAsync();
-			if (stale.Count > 0)
-			{
-				db.MapWorldBurstPackets.RemoveRange(stale.SelectMany(b => b.Packets));
-				db.MapWorldBursts.RemoveRange(stale);
-			}
-
-			foreach (var e in bursts)
-			{
-				var burst = await db.MapWorldBursts.Include(b => b.Packets).FirstOrDefaultAsync(b => b.MapId == e.MapId);
-				if (burst == null)
-				{
-					burst = new MapWorldBurst { MapId = e.MapId };
-					db.MapWorldBursts.Add(burst);
-				}
-				else if (burst.Packets != null)
-				{
-					db.MapWorldBurstPackets.RemoveRange(burst.Packets);
-				}
-
-				burst.CapturedInstance = e.CapturedInstance;
-				burst.Packets = e.Packets.Select((p, i) => new MapWorldBurstPacket { Sequence = i, Data = p }).ToList();
-			}
-
-			await db.SaveChangesAsync();
-		}
-
-		// Upsert by (map, spawn point); never wipe.
-		private static async Task ImportNpcSpawns(DatabaseContext db, List<NpcSpawnEntry> spawns)
-		{
-			foreach (var e in spawns)
-			{
-				var existing = await db.NpcSpawns.FirstOrDefaultAsync(n =>
-					n.MapId == e.MapId && n.PositionX == e.X && n.PositionY == e.Y && n.PositionZ == e.Z);
-
-				if (existing == null)
-				{
-					db.NpcSpawns.Add(new NpcSpawn
-					{
-						MapId = e.MapId, Name = e.Name, CapturedHandle = e.Handle,
-						PositionX = e.X, PositionY = e.Y, PositionZ = e.Z, Data = e.Data
-					});
-				}
-				else
-				{
-					existing.Name = e.Name;
-					existing.CapturedHandle = e.Handle;
-					existing.Data = e.Data;
-				}
-			}
-
-			await db.SaveChangesAsync();
-		}
-
-		private static async Task<Dictionary<string, int>> Snapshot(DatabaseContext db) => new()
-		{
-			["Items"] = await db.Items.CountAsync(),
-			["Items(buildable)"] = await db.Items.CountAsync(i => i.Archetype != 0),
-			["Spells"] = await db.Spells.CountAsync(),
-			["Abilities"] = await db.Abilities.CountAsync(),
-			["ClassAbilities"] = await db.ClassAbilities.CountAsync(),
-			["Maps"] = await db.Maps.CountAsync(),
-			["MapWorldBursts"] = await db.MapWorldBursts.CountAsync(),
-			["NpcSpawns"] = await db.NpcSpawns.CountAsync(),
-			["ConversationNodes"] = await db.ConversationNodes.CountAsync(),
-			["ConversationPackets"] = await db.ConversationPackets.CountAsync()
-		};
-
 		private static void PrintDelta(Dictionary<string, int> before, Dictionary<string, int> after)
 		{
 			Console.WriteLine("\n  table                 before    after    delta");
@@ -298,7 +267,9 @@ namespace Faolan.Importer
 			{
 				var b = before[key];
 				var delta = a - b;
-				var deltaText = (delta >= 0 ? "+" : "") + delta;
+				var deltaText = (delta >= 0
+					? "+"
+					: "") + delta;
 				Console.WriteLine($"  {key,-20} {b,7} {a,8} {deltaText,7}");
 			}
 		}
@@ -327,21 +298,6 @@ namespace Faolan.Importer
 			}
 
 			return captures;
-		}
-
-		private static List<CapturedPacket> ReadPcapCapture(PacketAnalysisService analysis, string pcap)
-		{
-			var list = new List<CapturedPacket>();
-			var tick = 0L;
-			foreach (var p in analysis.AnalyzeCapture(pcap).Packets)
-			{
-				if (p.ProtocolName != "GameServer")
-					continue;
-
-				list.Add(new CapturedPacket(tick++, p.IsDownload, p.OpcodeValue, p.SubOpcodeValue ?? 0, p.Bytes));
-			}
-
-			return list; // analyzer order is chronological
 		}
 
 		private static List<CapturedPacket> ReadJsonCapture(string jsonPath)
@@ -380,7 +336,9 @@ namespace Faolan.Importer
 						continue;
 					}
 
-					var ticks = p.TryGetProperty("TimestampTicks", out var t) && t.TryGetInt64(out var tv) ? tv : 0L;
+					var ticks = p.TryGetProperty("TimestampTicks", out var t) && t.TryGetInt64(out var tv)
+						? tv
+						: 0L;
 					var isDownload = p.TryGetProperty("IsDownload", out var d) && d.ValueKind == JsonValueKind.True;
 					var opcode = GetNestedValue(p, "Opcode");
 					var subOpcode = GetNestedValue(p, "SubOpcode");
@@ -393,17 +351,84 @@ namespace Faolan.Importer
 			return list;
 		}
 
-		private static uint GetNestedValue(JsonElement packet, string property)
+		private static List<CapturedPacket> ReadPcapCapture(PacketAnalysisService analysis, string pcap)
 		{
-			return packet.TryGetProperty(property, out var obj) && obj.ValueKind == JsonValueKind.Object && obj.TryGetProperty("Value", out var v) && v.TryGetUInt32(out var value)
-				? value
-				: 0;
+			var list = new List<CapturedPacket>();
+			var tick = 0L;
+			foreach (var p in analysis.AnalyzeCapture(pcap).Packets)
+			{
+				if (p.ProtocolName != "GameServer")
+					continue;
+
+				list.Add(new CapturedPacket(tick++, p.IsDownload, p.OpcodeValue, p.SubOpcodeValue ?? 0, p.Bytes));
+			}
+
+			return list; // analyzer order is chronological
 		}
 
-		private static string? GetOption(string[] args, string name)
+		// Beach map 4010: seed its world burst from the proven embedded blob (strie-login-worldburst.bin, 71 packets,
+		// instance 0x02165EFF) rather than the captured window, so the long-working beach login is byte-identical.
+		// The blob file stays in the repo only as this import source (it is no longer embedded in the server).
+		private static async Task SeedBeachBurstFromBlob(DatabaseContext db)
 		{
-			var i = Array.IndexOf(args, name);
-			return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
+			const uint beachMap = 0x00000FAA;
+			const uint strieInstance = 0x02165EFF;
+			var blobPath = Path.Combine(RepoRoot, "Faolan", "GameServer", "Data", "strie-login-worldburst.bin");
+			if (!File.Exists(blobPath))
+				return;
+
+			var data = await File.ReadAllBytesAsync(blobPath);
+			var packets = new List<byte[]>();
+			var offset = 0;
+
+			uint ReadU32()
+			{
+				var v = (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
+				offset += 4;
+				return v;
+			}
+
+			var count = ReadU32();
+			for (var i = 0; i < count; i++)
+			{
+				var len = (int)ReadU32();
+				packets.Add(data[offset..(offset + len)]);
+				offset += len;
+			}
+
+			var burst = await db.MapWorldBursts.Include(b => b.Packets).FirstOrDefaultAsync(b => b.MapId == beachMap);
+			if (burst == null)
+			{
+				burst = new MapWorldBurst { MapId = beachMap };
+				db.MapWorldBursts.Add(burst);
+			}
+			else if (burst.Packets != null)
+				db.MapWorldBurstPackets.RemoveRange(burst.Packets);
+
+			burst.CapturedInstance = strieInstance;
+			burst.Packets = packets.Select((p, i) => new MapWorldBurstPacket
+			{
+				Sequence = i,
+				Data = p
+			}).ToList();
+			await db.SaveChangesAsync();
+		}
+
+		private static async Task<Dictionary<string, int>> Snapshot(DatabaseContext db)
+		{
+			return new Dictionary<string, int>
+			{
+				["Items"] = await db.Items.CountAsync(),
+				["Items(buildable)"] = await db.Items.CountAsync(i => i.Archetype != 0),
+				["Spells"] = await db.Spells.CountAsync(),
+				["Abilities"] = await db.Abilities.CountAsync(),
+				["ClassAbilities"] = await db.ClassAbilities.CountAsync(),
+				["Maps"] = await db.Maps.CountAsync(),
+				["MapWorldBursts"] = await db.MapWorldBursts.CountAsync(),
+				["NpcSpawns"] = await db.NpcSpawns.CountAsync(),
+				["ConversationNodes"] = await db.ConversationNodes.CountAsync(),
+				["ConversationPackets"] = await db.ConversationPackets.CountAsync()
+			};
 		}
 	}
 }

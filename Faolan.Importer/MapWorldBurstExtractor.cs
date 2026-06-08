@@ -12,11 +12,11 @@ namespace Faolan.Importer
 
 	public static class MapWorldBurstExtractor
 	{
+		private const uint InstanceRangeEnd = 0x0FFFFFFF;
+		private const uint InstanceRangeStart = 0x02000000; // 4-byte-varint range [0x02000000, 0x0FFFFFFF]
+		private const uint MapChangeSubOpcode = 0x5D85BFC7;
 		private const uint Opcode2000 = 0x2000;
 		private const uint Opcode2020 = 0x2020; // client spawn poll - ends the world-build window
-		private const uint MapChangeSubOpcode = 0x5D85BFC7;
-		private const uint InstanceRangeStart = 0x02000000; // 4-byte-varint range [0x02000000, 0x0FFFFFFF]
-		private const uint InstanceRangeEnd = 0x0FFFFFFF;
 
 		// The LoginWorld receiver conversation id "0D 47 C1 67 6C 10 <varint>" - its trailing varint is the client
 		// instance the packet was sent to (the local player), unambiguous even when other players are spawned.
@@ -43,13 +43,17 @@ namespace Faolan.Importer
 			foreach (var p in packets)
 			{
 				var body = GetBody(p.Bytes);
-				var subop = body.Length >= 8 ? BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)) : 0;
+				var subop = body.Length >= 8
+					? BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4))
+					: 0;
 
 				if (p.Opcode == Opcode2000 && subop == MapChangeSubOpcode && p.IsDownload)
 				{
 					Flush();
-					currentMap = body.Length >= 38 ? BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(34, 4)) : 0;
-					current = new List<byte[]> { p.Bytes };
+					currentMap = body.Length >= 38
+						? BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(34, 4))
+						: 0;
+					current = [p.Bytes];
 
 					// The receiver conversation id of the world-build downloads is the local player's instance -
 					// read it from the first packet's header (unambiguous even when other players are spawned).
@@ -117,22 +121,16 @@ namespace Faolan.Importer
 			return ReadVarint(full, pos);
 		}
 
-		// Little-endian base-128 varint (the receiver-tail encoding). Stops at the buffer end / a non-continuation
-		// byte; the instance ids of interest fit in 32 bits.
-		private static uint ReadVarint(byte[] buf, int pos)
+		private static byte[] GetBody(byte[] full)
 		{
-			uint value = 0;
-			var shift = 0;
-			while (pos < buf.Length && shift < 32)
-			{
-				var b = buf[pos++];
-				value |= (uint)(b & 0x7F) << shift;
-				if ((b & 0x80) == 0)
-					break;
-				shift += 7;
-			}
+			if (full.Length < 12)
+				return [];
 
-			return value;
+			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(8, 4));
+			var bodyStart = 12 + headerLen;
+			return bodyStart <= full.Length
+				? full[bodyStart..]
+				: [];
 		}
 
 		private static int IndexOf(byte[] haystack, byte[] needle)
@@ -159,14 +157,23 @@ namespace Faolan.Importer
 			return -1;
 		}
 
-		private static byte[] GetBody(byte[] full)
+		// Little-endian base-128 varint (the receiver-tail encoding). Stops at the buffer end / a non-continuation
+		// byte; the instance ids of interest fit in 32 bits.
+		private static uint ReadVarint(byte[] buf, int pos)
 		{
-			if (full.Length < 12)
-				return [];
+			uint value = 0;
+			var shift = 0;
+			while (pos < buf.Length && shift < 32)
+			{
+				var b = buf[pos++];
+				value |= (uint)(b & 0x7F) << shift;
+				if ((b & 0x80) == 0)
+					break;
 
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(8, 4));
-			var bodyStart = 12 + headerLen;
-			return bodyStart <= full.Length ? full[bodyStart..] : [];
+				shift += 7;
+			}
+
+			return value;
 		}
 	}
 }

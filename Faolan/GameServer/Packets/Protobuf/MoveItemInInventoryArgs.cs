@@ -13,17 +13,17 @@ namespace Faolan.GameServer.Packets.Protobuf
 	[ProtoContract]
 	public sealed class MoveItemInInventoryArgs : FaolanProtobufMessage
 	{
-		[ProtoMember(1)]
-		public ProtoID32? SourceContainerId { get; set; }
-
-		[ProtoMember(2)]
-		public uint SourceItemPos { get; set; }
-
 		[ProtoMember(3)]
 		public ProtoID32? DestinationContainerId { get; set; }
 
+		[ProtoMember(1)]
+		public ProtoID32? SourceContainerId { get; set; }
+
 		[ProtoMember(4)]
 		public uint DestinationItemPos { get; set; }
+
+		[ProtoMember(2)]
+		public uint SourceItemPos { get; set; }
 	}
 
 	public enum MoveItemInInventoryDirection

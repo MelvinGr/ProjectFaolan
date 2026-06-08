@@ -37,7 +37,11 @@ namespace Faolan.Importer
 				if (existing.Contains(id))
 					continue;
 
-				db.Spells.Add(new Spell { Id = id, Name = string.Empty });
+				db.Spells.Add(new Spell
+				{
+					Id = id,
+					Name = string.Empty
+				});
 				inserted++;
 			}
 

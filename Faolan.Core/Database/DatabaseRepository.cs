@@ -27,14 +27,14 @@ namespace Faolan.Core.Database
 		Task<Character> GetCharacterForAccount(uint accountId, uint clientInstance);
 		Task<Character[]> GetCharactersByAccount(uint id, bool skipUninitialized = true);
 
-		Task<Item> GetItem(uint id);
-
 		Task<ConversationNode> GetConversationNode(uint npcHandle, uint typeId, uint mode, uint field3, bool exactHandleOnly = false);
 
-		Task<MapWorldBurst> GetMapWorldBurst(uint mapId);
+		Task<Item> GetItem(uint id);
 
 		Task<Map> GetMap(uint id);
 		Task<Map[]> GetMaps();
+
+		Task<MapWorldBurst> GetMapWorldBurst(uint mapId);
 
 		Task<Realm> GetRealm(uint id);
 		Task<Realm[]> GetRealms();
@@ -219,12 +219,6 @@ namespace Faolan.Core.Database
 			return await q.ToArrayAsync();
 		}
 
-		public async Task<Item> GetItem(uint id)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Items.FirstOrDefaultAsync(i => i.Id == id);
-		}
-
 		public async Task<ConversationNode> GetConversationNode(uint npcHandle, uint typeId, uint mode, uint field3, bool exactHandleOnly = false)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -232,35 +226,20 @@ namespace Faolan.Core.Database
 			// Prefer the node captured for THIS exact NPC handle - the correct per-NPC dialogue (handles are stable
 			// because scenes are replayed verbatim). (TypeId, Mode, Field3) is NOT NPC-unique, so the args-only
 			// match can be the wrong NPC's conversation.
-			var exact = await ctx.ConversationNodes
-				.Include(n => n.Packets)
-				.FirstOrDefaultAsync(n => n.CapturedNpcHandle == npcHandle && n.TypeId == typeId && n.Mode == mode && n.Field3 == field3);
+			var exact = await ctx.ConversationNodes.Include(n => n.Packets).FirstOrDefaultAsync(n => n.CapturedNpcHandle == npcHandle && n.TypeId == typeId && n.Mode == mode && n.Field3 == field3);
 			if (exact != null || exactHandleOnly)
 				return exact;
 
 			// Args-only fallback (the pre-handle behaviour) so a captured conversation still plays for an NPC whose
 			// handle differs from the replayed scene's. Callers that can't tolerate a wrong-NPC match (the create
 			// world intro, where the scripted fallback is preferable) pass exactHandleOnly.
-			return await ctx.ConversationNodes
-				.Include(n => n.Packets)
-				.Where(n => n.TypeId == typeId && n.Mode == mode && n.Field3 == field3)
-				.OrderByDescending(n => n.Packets.Count)
-				.FirstOrDefaultAsync();
+			return await ctx.ConversationNodes.Include(n => n.Packets).Where(n => n.TypeId == typeId && n.Mode == mode && n.Field3 == field3).OrderByDescending(n => n.Packets.Count).FirstOrDefaultAsync();
 		}
 
-		public async Task<MapWorldBurst> GetMapWorldBurst(uint mapId)
+		public async Task<Item> GetItem(uint id)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var burst = await ctx.MapWorldBursts
-				.Include(b => b.Packets)
-				.FirstOrDefaultAsync(b => b.MapId == mapId);
-
-			// Guard: a burst whose captured instance is outside the 4-byte-varint range can't be re-addressed by the
-			// length-preserving rewrite (would corrupt the world build). Treat it as absent so login falls back.
-			if (burst != null && (burst.CapturedInstance < 0x02000000 || burst.CapturedInstance > 0x0FFFFFFF))
-				return null;
-
-			return burst;
+			return await ctx.Items.FirstOrDefaultAsync(i => i.Id == id);
 		}
 
 		public async Task<Map> GetMap(uint id)
@@ -273,6 +252,19 @@ namespace Faolan.Core.Database
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Maps.OrderBy(m => m.Id).ToArrayAsync();
+		}
+
+		public async Task<MapWorldBurst> GetMapWorldBurst(uint mapId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var burst = await ctx.MapWorldBursts.Include(b => b.Packets).FirstOrDefaultAsync(b => b.MapId == mapId);
+
+			// Guard: a burst whose captured instance is outside the 4-byte-varint range can't be re-addressed by the
+			// length-preserving rewrite (would corrupt the world build). Treat it as absent so login falls back.
+			if (burst != null && (burst.CapturedInstance < 0x02000000 || burst.CapturedInstance > 0x0FFFFFFF))
+				return null;
+
+			return burst;
 		}
 
 		// --- reference data --------------------------------------------------------------------------------

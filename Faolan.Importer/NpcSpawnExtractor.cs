@@ -14,10 +14,10 @@ namespace Faolan.Importer
 	// (>= 0x02000000), whereas NPC handles are small. Dedup key is (map, position); the handle/name vary.
 	public static class NpcSpawnExtractor
 	{
-		private const uint Opcode2000 = 0x2000;
-		private const uint MapChangeSubOpcode = 0x5D85BFC7;
-		private const uint SpawnSubOpcode = 0xFA015807;
 		private const uint InstanceRangeStart = 0x02000000; // player/own-entity handles live in the instance range
+		private const uint MapChangeSubOpcode = 0x5D85BFC7;
+		private const uint Opcode2000 = 0x2000;
+		private const uint SpawnSubOpcode = 0xFA015807;
 
 		public static List<NpcSpawnEntry> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
@@ -68,16 +68,6 @@ namespace Faolan.Importer
 			return seen.Values.ToList();
 		}
 
-		private static byte[] GetBody(byte[] full)
-		{
-			if (full.Length < 12)
-				return [];
-
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(8, 4));
-			var bodyStart = 12 + headerLen;
-			return bodyStart <= full.Length ? full[bodyStart..] : [];
-		}
-
 		// The entity name is a `0A <len> <utf8>` field whose offset varies; scan past the position block for the
 		// first plausible printable-ASCII run. Best-effort (display only - not the dedup key).
 		private static string ExtractName(byte[] body)
@@ -99,6 +89,18 @@ namespace Faolan.Importer
 			return string.Empty;
 		}
 
+		private static byte[] GetBody(byte[] full)
+		{
+			if (full.Length < 12)
+				return [];
+
+			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(8, 4));
+			var bodyStart = 12 + headerLen;
+			return bodyStart <= full.Length
+				? full[bodyStart..]
+				: [];
+		}
+
 		private static bool IsPrintableName(ReadOnlySpan<byte> s)
 		{
 			var hasLetter = false;
@@ -106,6 +108,7 @@ namespace Faolan.Importer
 			{
 				if (c < 32 || c > 126)
 					return false;
+
 				if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'))
 					hasLetter = true;
 			}

@@ -38,7 +38,14 @@ namespace Faolan.Importer
 				if (existingSet.Contains(id))
 					continue;
 
-				db.Maps.Add(new Map { Id = id, Name = string.Empty, PositionX = pos.X, PositionY = pos.Y, PositionZ = pos.Z });
+				db.Maps.Add(new Map
+				{
+					Id = id,
+					Name = string.Empty,
+					PositionX = pos.X,
+					PositionY = pos.Y,
+					PositionZ = pos.Z
+				});
 				inserted++;
 			}
 

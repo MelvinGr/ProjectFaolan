@@ -21,7 +21,13 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 	{
 		public static ProtoField BuildEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, uint archetype, ulong flags = 1, ulong f7 = 1)
 		{
-			var key = new ProtoDecryptionKey { Key1 = item.Data1, Key2 = item.Data2, Key3 = item.Data3, Key4 = item.Data4 };
+			var key = new ProtoDecryptionKey
+			{
+				Key1 = item.Data1,
+				Key2 = item.Data2,
+				Key3 = item.Data3,
+				Key4 = item.Data4
+			};
 
 			var entry = new ProtoInventoryGame.InventoryListEntry
 			{
@@ -31,9 +37,21 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 					ItemId = itemId,
 					StatLists =
 					{
-						new ProtoInventoryGameEntry.StatValue { Stat = 0, Value = (uint)flags },
-						new ProtoInventoryGameEntry.StatValue { Stat = 23, Value = (uint)recordId },
-						new ProtoInventoryGameEntry.StatValue { Stat = 26, Value = (uint)count }
+						new ProtoInventoryGameEntry.StatValue
+						{
+							Stat = 0,
+							Value = (uint)flags
+						},
+						new ProtoInventoryGameEntry.StatValue
+						{
+							Stat = 23,
+							Value = (uint)recordId
+						},
+						new ProtoInventoryGameEntry.StatValue
+						{
+							Stat = 26,
+							Value = (uint)count
+						}
 					},
 					ItemData = new ProtoAcgItem
 					{

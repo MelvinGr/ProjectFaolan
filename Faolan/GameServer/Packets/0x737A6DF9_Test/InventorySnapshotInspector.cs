@@ -200,6 +200,22 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 			return countMessage?.Fields.FirstOrDefault(x => x.FieldNumber == 2 && x.WireType == 0)?.VarintValue;
 		}
 
+		// The item's stable identity quad (Data1..Data4) = the four fixed32s of the tail's first identity payload
+		// (tail field 1). The same value appears in `p_items.Data1..4`; harvesting it from captures makes any item a
+		// player has held buildable without a p_items row.
+		public static (uint Data1, uint Data2, uint Data3, uint Data4)? GetEntryIdentityQuad(ProtoField entry)
+		{
+			var tail = GetEntryTail(entry);
+			var payload = tail?.Fields.FirstOrDefault(x => x.FieldNumber == 1 && x.MessageValue != null)?.MessageValue;
+			if (payload == null)
+				return null;
+
+			var f = payload.Fields.Where(x => x.WireType == 5).Select(x => x.Fixed32Value).ToArray();
+			return f.Length < 4
+				? null
+				: (f[0], f[1], f[2], f[3]);
+		}
+
 		public static ulong? GetEntryItemId(ProtoField entry)
 		{
 			var itemDetails = GetItemDetails(entry);
@@ -225,20 +241,6 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 			var tail = GetEntryTail(entry);
 
 			return tail?.Fields.FirstOrDefault(x => x.FieldNumber == 4 && x.WireType == 5)?.Fixed32Value;
-		}
-
-		// The item's stable identity quad (Data1..Data4) = the four fixed32s of the tail's first identity payload
-		// (tail field 1). The same value appears in `p_items.Data1..4`; harvesting it from captures makes any item a
-		// player has held buildable without a p_items row.
-		public static (uint Data1, uint Data2, uint Data3, uint Data4)? GetEntryIdentityQuad(ProtoField entry)
-		{
-			var tail = GetEntryTail(entry);
-			var payload = tail?.Fields.FirstOrDefault(x => x.FieldNumber == 1 && x.MessageValue != null)?.MessageValue;
-			if (payload == null)
-				return null;
-
-			var f = payload.Fields.Where(x => x.WireType == 5).Select(x => x.Fixed32Value).ToArray();
-			return f.Length < 4 ? null : (f[0], f[1], f[2], f[3]);
 		}
 
 		// Offsets the item's "stable identity" tail GUID (tail fields 1/2/3 are three identical 20-byte payloads,

@@ -18,9 +18,9 @@ namespace Faolan.Importer
 	// across captures and writes ConversationNode/ConversationPacket rows.
 	public static class ConversationExtractor
 	{
+		private const uint InteractSubOpcode = 0x642CD3D6;
 		private const uint Opcode2000 = 0x2000;
 		private const uint Opcode2015 = 0x2015;
-		private const uint InteractSubOpcode = 0x642CD3D6;
 		private const uint TalkToNpcActionType = 0x16;
 
 		// The conversation-display response sub-opcodes (642CD3D6 echo excluded: it is a generic interact ack).
@@ -83,7 +83,9 @@ namespace Faolan.Importer
 			foreach (var e in all)
 			{
 				var key = (e.CapturedNpcHandle, e.TypeId, e.Mode, e.Field3);
-				var score = (VarintLength(e.CapturedInstance) == 4 ? 1_000_000 : 0) + e.Packets.Count;
+				var score = (VarintLength(e.CapturedInstance) == 4
+					? 1_000_000
+					: 0) + e.Packets.Count;
 				if (!best.TryGetValue(key, out var cur) || score > cur.score)
 					best[key] = (score, e);
 			}
@@ -99,7 +101,9 @@ namespace Faolan.Importer
 
 			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(8, 4));
 			var bodyStart = 12 + headerLen;
-			return bodyStart <= full.Length ? full[bodyStart..] : [];
+			return bodyStart <= full.Length
+				? full[bodyStart..]
+				: [];
 		}
 
 		// Walks the InteractArgs protobuf -> (typeId f1, mode f2, field3 f3, npc handle = field10.SpellTarget.f2).
@@ -114,9 +118,12 @@ namespace Faolan.Importer
 				if (wt == 0)
 				{
 					var v = ReadVarint(a, ref i);
-					if (fn == 1) typeId = (uint)v;
-					else if (fn == 2) mode = (uint)v;
-					else if (fn == 3) field3 = (uint)v;
+					if (fn == 1)
+						typeId = (uint)v;
+					else if (fn == 2)
+						mode = (uint)v;
+					else if (fn == 3)
+						field3 = (uint)v;
 				}
 				else if (wt == 2)
 				{
@@ -133,19 +140,16 @@ namespace Faolan.Importer
 							if (w2 == 0)
 							{
 								var v2 = ReadVarint(sub, ref j);
-								if (f2 == 2) npc = (uint)v2;
+								if (f2 == 2)
+									npc = (uint)v2;
 							}
 							else
-							{
 								break;
-							}
 						}
 					}
 				}
 				else
-				{
 					break;
-				}
 			}
 
 			return (typeId, mode, field3, npc);
@@ -161,6 +165,7 @@ namespace Faolan.Importer
 				r |= (ulong)(x & 0x7f) << shift;
 				if ((x & 0x80) == 0)
 					return r;
+
 				shift += 7;
 			}
 		}

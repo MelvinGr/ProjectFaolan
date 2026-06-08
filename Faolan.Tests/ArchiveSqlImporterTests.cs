@@ -14,11 +14,11 @@ namespace Faolan.Tests
 	public class ArchiveSqlImporterTests
 	{
 		private const string Sql = """
-			INSERT INTO `p_abilities` VALUES('Normal Attack Left', '769094', '1', '1263352118', '3236668225', '2153842419', '314062142', '3015939650');
-			INSERT INTO `p_abilities` VALUES('Normal Attack Front', '769099', '1', '1227967307', '3443694845', '1660108369', '1296666148', '2957995211');
-			INSERT INTO `const_abilitys` VALUES (29, 1, '769094_1-769099_1', NULL, '165241', NULL);
-			INSERT INTO `const_abilitys` VALUES (18, 1, '769094_1-769099_1', NULL, NULL, NULL);
-			""";
+		                           INSERT INTO `p_abilities` VALUES('Normal Attack Left', '769094', '1', '1263352118', '3236668225', '2153842419', '314062142', '3015939650');
+		                           INSERT INTO `p_abilities` VALUES('Normal Attack Front', '769099', '1', '1227967307', '3443694845', '1660108369', '1296666148', '2957995211');
+		                           INSERT INTO `const_abilitys` VALUES (29, 1, '769094_1-769099_1', NULL, '165241', NULL);
+		                           INSERT INTO `const_abilitys` VALUES (18, 1, '769094_1-769099_1', NULL, NULL, NULL);
+		                           """;
 
 		[Fact]
 		public async Task Import_UpsertsAbilitiesAndClassAbilities()
@@ -61,7 +61,8 @@ namespace Faolan.Tests
 			}
 			finally
 			{
-				if (Directory.Exists(dir)) Directory.Delete(dir, true);
+				if (Directory.Exists(dir))
+					Directory.Delete(dir, true);
 			}
 		}
 

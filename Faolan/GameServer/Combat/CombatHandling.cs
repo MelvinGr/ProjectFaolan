@@ -11,7 +11,7 @@ namespace Faolan.GameServer
 	{
 		// Live world combat state (current vitals per entity handle). In-memory and world-authoritative; never
 		// persisted (only CharacterMaxStats is). Shared across the listener's clients.
-		private readonly CombatState _combat = new();
+		private readonly CombatState _combat = new CombatState();
 
 		// The player's own live vitals, seeded from CharacterMaxStats (or class/level defaults) on first use.
 		private EntityVitals GetOrAddPlayerVitals(INetworkClient client)
@@ -29,8 +29,7 @@ namespace Faolan.GameServer
 		// is a TODO - the death/despawn packet isn't decoded yet (docs/quests-and-combat.md).
 		private async Task ResolveOffensiveCast(INetworkClient client, uint casterHandle, uint targetHandle, uint spellId)
 		{
-			var target = _combat.GetOrAdd(targetHandle,
-				() => EntityVitals.FromMax(CombatResolver.DefaultNpcMaxHealth, 0, CombatResolver.DefaultNpcMaxHealth));
+			var target = _combat.GetOrAdd(targetHandle, () => EntityVitals.FromMax(CombatResolver.DefaultNpcMaxHealth, 0, CombatResolver.DefaultNpcMaxHealth));
 
 			var casterLevel = client.Session.Character?.Level ?? 1;
 			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel);

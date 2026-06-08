@@ -1,5 +1,4 @@
 using Faolan.GameServer.Combat;
-using Faolan.GameServer.Packets._0x737A6DF9_Test;
 using Xunit;
 
 namespace Faolan.Tests
@@ -26,12 +25,29 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void ToVitalsBlock_EmitsHealthStaminaMana_AtVitalsScale()
+		public void CombatState_GetOrAdd_SeedsOnceThenReturnsSameInstance()
 		{
-			var v = EntityVitals.FromMax(63, 63, 63);
+			var state = new CombatState();
+			var created = 0;
 
-			// count(03) + Health(001B)=189C + Stamina(01F8)=189C + Mana(01FA)=189C  (63 * 100 = 6300 = 0x189C)
-			Assert.Equal("030000001b0000189c000001f80000189c000001fa0000189c", ToHex(v.ToVitalsBlock().ToArray()));
+			var first = state.GetOrAdd(0x2C58, () =>
+			{
+				created++;
+				return EntityVitals.FromMax(100, 0, 100);
+			});
+			first.ApplyHealthDelta(-40);
+			var second = state.GetOrAdd(0x2C58, () =>
+			{
+				created++;
+				return EntityVitals.FromMax(100, 0, 100);
+			});
+
+			Assert.Equal(1, created); // factory ran once
+			Assert.Same(first, second); // same tracked entity
+			Assert.Equal(60u, second.Health); // damage persisted in the store
+
+			state.Remove(0x2C58);
+			Assert.False(state.TryGet(0x2C58, out _));
 		}
 
 		[Fact]
@@ -44,21 +60,12 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void CombatState_GetOrAdd_SeedsOnceThenReturnsSameInstance()
+		public void ToVitalsBlock_EmitsHealthStaminaMana_AtVitalsScale()
 		{
-			var state = new CombatState();
-			var created = 0;
+			var v = EntityVitals.FromMax(63, 63, 63);
 
-			var first = state.GetOrAdd(0x2C58, () => { created++; return EntityVitals.FromMax(100, 0, 100); });
-			first.ApplyHealthDelta(-40);
-			var second = state.GetOrAdd(0x2C58, () => { created++; return EntityVitals.FromMax(100, 0, 100); });
-
-			Assert.Equal(1, created);          // factory ran once
-			Assert.Same(first, second);        // same tracked entity
-			Assert.Equal(60u, second.Health);  // damage persisted in the store
-
-			state.Remove(0x2C58);
-			Assert.False(state.TryGet(0x2C58, out _));
+			// count(03) + Health(001B)=189C + Stamina(01F8)=189C + Mana(01FA)=189C  (63 * 100 = 6300 = 0x189C)
+			Assert.Equal("030000001b0000189c000001f80000189c000001fa0000189c", ToHex(v.ToVitalsBlock().ToArray()));
 		}
 
 		private static string ToHex(byte[] bytes)

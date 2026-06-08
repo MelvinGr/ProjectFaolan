@@ -128,17 +128,8 @@ namespace Faolan.PacketAnalyzer
 
 		public bool ShouldInspect(string sourceIpAddress, ushort sourcePort, string destinationIpAddress, ushort destinationPort)
 		{
-			return TryGetKnownProtocol(sourceIpAddress, sourcePort) != null || TryGetKnownProtocol(destinationIpAddress, destinationPort) != null || _knownPorts.Contains(sourcePort) || _knownPorts.Contains(destinationPort)
-				|| IsGameServiceRange(sourcePort) || IsGameServiceRange(destinationPort);
-		}
-
-		// All Conan services live in the 7000-range, and the world GameServer is assigned a fresh port there on
-		// every playfield change. Inspect any 7000-range flow so content-based GameServer detection
-		// (the 0x80000005 zlib marker, see PacketCaptureReader) can find streams on ports we didn't pre-classify;
-		// non-GS flows still get their normal protocol label from ObservePacket.
-		private static bool IsGameServiceRange(ushort port)
-		{
-			return port >= 7000 && port < 7100;
+			return TryGetKnownProtocol(sourceIpAddress, sourcePort) != null || TryGetKnownProtocol(destinationIpAddress, destinationPort) != null || _knownPorts.Contains(sourcePort) || _knownPorts.Contains(destinationPort) ||
+			       IsGameServiceRange(sourcePort) || IsGameServiceRange(destinationPort);
 		}
 
 		public bool TryGetPort(string protocolName, out ushort port)
@@ -320,6 +311,15 @@ namespace Faolan.PacketAnalyzer
 		private static string CreateEndpointKey(string ipAddress, ushort port)
 		{
 			return $"{ipAddress}:{port}";
+		}
+
+		// All Conan services live in the 7000-range, and the world GameServer is assigned a fresh port there on
+		// every playfield change. Inspect any 7000-range flow so content-based GameServer detection
+		// (the 0x80000005 zlib marker, see PacketCaptureReader) can find streams on ports we didn't pre-classify;
+		// non-GS flows still get their normal protocol label from ObservePacket.
+		private static bool IsGameServiceRange(ushort port)
+		{
+			return port >= 7000 && port < 7100;
 		}
 
 		internal readonly record struct DetectedService(string ServiceName, string ProtocolName);

@@ -16,11 +16,12 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(255)]
 		public string Name { get; set; }
 
+		public uint Archetype { get; set; }
+
 		public uint Data0 { get; set; }
 		public uint Data1 { get; set; }
 		public uint Data2 { get; set; }
 		public uint Data3 { get; set; }
 		public uint Data4 { get; set; }
-		public uint Archetype { get; set; }
 	}
 }

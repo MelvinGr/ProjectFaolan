@@ -52,11 +52,13 @@ namespace Faolan.Tests
 
 			var firstDiff = -1;
 			for (var i = 0; i < Math.Min(original.Length, produced.Length); i++)
+			{
 				if (original[i] != produced[i])
 				{
 					firstDiff = i;
 					break;
 				}
+			}
 
 			Assert.True(original.Length == produced.Length && firstDiff == -1,
 				$"len orig={original.Length} produced={produced.Length} firstDiff={firstDiff} " + $"origHead={Convert.ToHexString(original, 0, 40)} prodHead={Convert.ToHexString(produced, 0, 40)}");
@@ -93,11 +95,13 @@ namespace Faolan.Tests
 			// Report the first divergence offset to locate the lossy region (prefix/root/tails).
 			var firstDiff = -1;
 			for (var i = 0; i < Math.Min(original.Length, produced.Length); i++)
+			{
 				if (original[i] != produced[i])
 				{
 					firstDiff = i;
 					break;
 				}
+			}
 
 			Assert.True(original.Length == produced.Length && firstDiff == -1, $"len orig={original.Length} produced={produced.Length} firstDiff={firstDiff}");
 		}
@@ -147,11 +151,13 @@ namespace Faolan.Tests
 
 			var firstDiff = -1;
 			for (var i = 0; i < Math.Min(substituted.Length, produced.Length); i++)
+			{
 				if (substituted[i] != produced[i])
 				{
 					firstDiff = i;
 					break;
 				}
+			}
 
 			Assert.True(substituted.Length == produced.Length && firstDiff == -1, $"len sub={substituted.Length} produced={produced.Length} firstDiff={firstDiff}");
 		}
@@ -214,11 +220,13 @@ namespace Faolan.Tests
 			{
 				var match = true;
 				for (var j = 0; j < find.Length; j++)
+				{
 					if (buffer[i + j] != find[j])
 					{
 						match = false;
 						break;
 					}
+				}
 
 				if (match)
 				{

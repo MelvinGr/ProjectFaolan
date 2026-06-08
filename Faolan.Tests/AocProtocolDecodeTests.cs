@@ -5,10 +5,8 @@ using Faolan.Core.Data;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Conan;
-using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.Packets._0x737A6DF9_Test;
-using Faolan.Helpers;
 using Faolan.Importer;
 using Microsoft.EntityFrameworkCore;
 using ProtoBuf;
@@ -23,8 +21,8 @@ namespace Faolan.Tests
 	public class AocProtocolDecodeTests
 	{
 		private const string InventoryCapture = "/home/melvin/Development/C#/Project Faolan/Captures/strie-login-inventory.bin";
-		private const uint SlaveManaclesId = 3361557;
 		private const uint Archetype = 1129664565;
+		private const uint SlaveManaclesId = 3361557;
 		private const ulong Slot = 18;
 
 		[Fact]
@@ -53,7 +51,7 @@ namespace Faolan.Tests
 			Assert.NotNull(acg);
 			Assert.NotNull(acg.Key1);
 			Assert.Equal(SlaveManaclesId, acg.Template1); // the RDB item-template id
-			Assert.Equal(Archetype, acg.Hash);            // tail.f8 = ProtoAcgItem.hash (what we call "archetype")
+			Assert.Equal(Archetype, acg.Hash); // tail.f8 = ProtoAcgItem.hash (what we call "archetype")
 
 			// 3) The decoded ProtoDecryptionKey must equal the Data1..4 we import from the same capture - proving the
 			//    "identity quad" is the TEA key.

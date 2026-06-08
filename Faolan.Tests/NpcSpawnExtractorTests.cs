@@ -13,13 +13,21 @@ namespace Faolan.Tests
 	public class NpcSpawnExtractorTests
 	{
 		[Fact]
+		public void Extract_IgnoresSpawnsBeforeAnyMapChange()
+		{
+			var entries = NpcSpawnExtractor.Extract(new List<CapturedPacket> { Spawn(0x0004DE8A, 1f, 2f, 3f, "Orphan") });
+
+			Assert.Empty(entries); // no current map yet
+		}
+
+		[Fact]
 		public void Extract_TracksMap_SkipsPlayer_ReadsNpc()
 		{
 			var packets = new List<CapturedPacket>
 			{
 				MapChange(2040),
-				Spawn(handle: 0x0004DE8A, x: 333.2f, y: 146.3f, z: 706.0f, name: "Kalanthes"),
-				Spawn(handle: 0x0802E5D4, x: 10f, y: 20f, z: 30f, name: "NecroL80") // player (handle >= 0x02000000) -> skipped
+				Spawn(0x0004DE8A, 333.2f, 146.3f, 706.0f, "Kalanthes"),
+				Spawn(0x0802E5D4, 10f, 20f, 30f, "NecroL80") // player (handle >= 0x02000000) -> skipped
 			};
 
 			var entries = NpcSpawnExtractor.Extract(packets);
@@ -32,37 +40,11 @@ namespace Faolan.Tests
 			Assert.Equal(333.2f, npc.X, 0.1f);
 		}
 
-		[Fact]
-		public void Extract_IgnoresSpawnsBeforeAnyMapChange()
-		{
-			var entries = NpcSpawnExtractor.Extract(new List<CapturedPacket>
-			{
-				Spawn(handle: 0x0004DE8A, x: 1f, y: 2f, z: 3f, name: "Orphan")
-			});
-
-			Assert.Empty(entries); // no current map yet
-		}
-
 		private static CapturedPacket MapChange(uint mapId)
 		{
 			var content = new byte[34];
 			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(0, 4), 0x5D85BFC7);
 			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(30, 4), mapId);
-			return Packet(content);
-		}
-
-		private static CapturedPacket Spawn(uint handle, float x, float y, float z, string name)
-		{
-			var nameBytes = Encoding.ASCII.GetBytes(name);
-			var content = new byte[42 + nameBytes.Length];
-			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(0, 4), 0xFA015807);
-			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(8, 4), handle);   // body@12
-			BinaryPrimitives.WriteSingleLittleEndian(content.AsSpan(20, 4), x);    // body@24
-			BinaryPrimitives.WriteSingleLittleEndian(content.AsSpan(25, 4), y);    // body@29
-			BinaryPrimitives.WriteSingleLittleEndian(content.AsSpan(30, 4), z);    // body@34
-			content[40] = 0x0A;                                                    // body@44: name marker (>40)
-			content[41] = (byte)nameBytes.Length;
-			nameBytes.CopyTo(content.AsSpan(42));
 			return Packet(content);
 		}
 
@@ -76,7 +58,22 @@ namespace Faolan.Tests
 			var full = new byte[12 + body.Length]; // headerLen (full[8..12]) stays 0
 			body.CopyTo(full, 12);
 
-			return new CapturedPacket(0, IsDownload: true, Opcode: 0x2000, SubOpcode: 0, Bytes: full);
+			return new CapturedPacket(0, true, 0x2000, 0, full);
+		}
+
+		private static CapturedPacket Spawn(uint handle, float x, float y, float z, string name)
+		{
+			var nameBytes = Encoding.ASCII.GetBytes(name);
+			var content = new byte[42 + nameBytes.Length];
+			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(0, 4), 0xFA015807);
+			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(8, 4), handle); // body@12
+			BinaryPrimitives.WriteSingleLittleEndian(content.AsSpan(20, 4), x); // body@24
+			BinaryPrimitives.WriteSingleLittleEndian(content.AsSpan(25, 4), y); // body@29
+			BinaryPrimitives.WriteSingleLittleEndian(content.AsSpan(30, 4), z); // body@34
+			content[40] = 0x0A; // body@44: name marker (>40)
+			content[41] = (byte)nameBytes.Length;
+			nameBytes.CopyTo(content.AsSpan(42));
+			return Packet(content);
 		}
 	}
 }

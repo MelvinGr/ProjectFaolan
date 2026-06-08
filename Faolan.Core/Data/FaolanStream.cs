@@ -250,14 +250,6 @@ namespace Faolan.Core.Data
 			return WriteArray(buffer);
 		}
 
-		// Big-endian Vector3 for raw packet bodies (the round-trip partner of ReadVector3).
-		public FaolanStream WriteVector3BigEndian(Vector3 value)
-		{
-			WriteFloatBigEndian(value.X);
-			WriteFloatBigEndian(value.Y);
-			return WriteFloatBigEndian(value.Z);
-		}
-
 		public FaolanStream WriteProtobuf(FaolanProtobufMessage value)
 		{
 			return WriteArray(value.ToProtobuf());
@@ -352,6 +344,14 @@ namespace Faolan.Core.Data
 			WriteFloat(value.X);
 			WriteFloat(value.Y);
 			return WriteFloat(value.Z);
+		}
+
+		// Big-endian Vector3 for raw packet bodies (the round-trip partner of ReadVector3).
+		public FaolanStream WriteVector3BigEndian(Vector3 value)
+		{
+			WriteFloatBigEndian(value.X);
+			WriteFloatBigEndian(value.Y);
+			return WriteFloatBigEndian(value.Z);
 		}
 	}
 }

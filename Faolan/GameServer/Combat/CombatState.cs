@@ -10,16 +10,16 @@ namespace Faolan.GameServer.Combat
 	/// </summary>
 	public sealed class CombatState
 	{
-		private readonly ConcurrentDictionary<uint, EntityVitals> _vitals = new();
+		private readonly ConcurrentDictionary<uint, EntityVitals> _vitals = new ConcurrentDictionary<uint, EntityVitals>();
 
 		public EntityVitals GetOrAdd(uint handle, Func<EntityVitals> factory)
 		{
 			return _vitals.GetOrAdd(handle, _ => factory());
 		}
 
-		public bool TryGet(uint handle, out EntityVitals vitals)
+		public void Remove(uint handle)
 		{
-			return _vitals.TryGetValue(handle, out vitals);
+			_vitals.TryRemove(handle, out _);
 		}
 
 		public void Set(uint handle, EntityVitals vitals)
@@ -27,9 +27,9 @@ namespace Faolan.GameServer.Combat
 			_vitals[handle] = vitals;
 		}
 
-		public void Remove(uint handle)
+		public bool TryGet(uint handle, out EntityVitals vitals)
 		{
-			_vitals.TryRemove(handle, out _);
+			return _vitals.TryGetValue(handle, out vitals);
 		}
 	}
 }

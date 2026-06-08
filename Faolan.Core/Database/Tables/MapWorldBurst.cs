@@ -8,19 +8,19 @@ namespace Faolan.Core.Database.Tables
 	// character. Generalizes the embedded beach world-burst to any map. Imported by Faolan.Importer.
 	public class MapWorldBurst : BaseEntity
 	{
-		public uint MapId { get; set; }
-		public uint CapturedInstance { get; set; }
 		public virtual ICollection<MapWorldBurstPacket> Packets { get; set; }
+		public uint CapturedInstance { get; set; }
+		public uint MapId { get; set; }
 	}
 
 	public class MapWorldBurstPacket : BaseEntity
 	{
-		public uint MapWorldBurstId { get; set; }
-
 		[ForeignKey(nameof(MapWorldBurstId))]
 		public virtual MapWorldBurst Burst { get; set; }
 
-		public int Sequence { get; set; }
 		public byte[] Data { get; set; }
+
+		public int Sequence { get; set; }
+		public uint MapWorldBurstId { get; set; }
 	}
 }

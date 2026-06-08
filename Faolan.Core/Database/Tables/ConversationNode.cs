@@ -7,13 +7,12 @@ namespace Faolan.Core.Database.Tables
 	// substitutes for the live ones. Imported from captures by Faolan.Importer; replayed by ConversationReplay.
 	public class ConversationNode : BaseEntity
 	{
-		public uint TypeId { get; set; }
-		public uint Mode { get; set; }
-		public uint Field3 { get; set; }
-
-		public uint CapturedNpcHandle { get; set; }
+		public virtual ICollection<ConversationPacket> Packets { get; set; }
 		public uint CapturedInstance { get; set; }
 
-		public virtual ICollection<ConversationPacket> Packets { get; set; }
+		public uint CapturedNpcHandle { get; set; }
+		public uint Field3 { get; set; }
+		public uint Mode { get; set; }
+		public uint TypeId { get; set; }
 	}
 }

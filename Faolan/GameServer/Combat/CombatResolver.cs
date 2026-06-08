@@ -12,7 +12,9 @@ namespace Faolan.GameServer.Combat
 
 		public static int ResolveSpellDamage(uint spellId, ushort casterLevel)
 		{
-			var level = casterLevel == 0 ? (ushort)1 : casterLevel;
+			var level = casterLevel == 0
+				? (ushort)1
+				: casterLevel;
 			return 20 + level * 5;
 		}
 	}

@@ -5,12 +5,28 @@ using System.Threading.Tasks;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
+using Faolan.GameServer.Packets._0x737A6DF9_Test;
 
 namespace Faolan.GameServer
 {
 	partial class GameServerListener
 	{
 		private static Dictionary<string, GmCommandDelegate> _gmCommandsDict;
+
+		// .hurt [amount] / .heal [amount]  - apply a health delta to the player's own live vitals and push the
+		// 0x96B8DC59 update so the health bar moves (combat-loop test without needing a target). Default 100.
+		private Task AdjustOwnHealthCommand(INetworkClient client, string arguments, bool heal)
+		{
+			var amount = int.TryParse(arguments, out var parsed)
+				? parsed
+				: 100;
+			var vitals = GetOrAddPlayerVitals(client);
+			vitals.ApplyHealthDelta(heal
+				? amount
+				: -amount);
+
+			return SendStatUpdate(client, vitals.ToVitalsBlock());
+		}
 
 		private Task ApplySpellTest(uint characterId, uint id)
 		{
@@ -61,7 +77,9 @@ namespace Faolan.GameServer
 				await SetTimeOfDay(client);
 			}
 
-			var mapLabel = string.IsNullOrEmpty(map.Name) ? map.Id.ToString() : $"{map.Name} ({map.Id})";
+			var mapLabel = string.IsNullOrEmpty(map.Name)
+				? map.Id.ToString()
+				: $"{map.Name} ({map.Id})";
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Teleported to {mapLabel}.");
 		}
 
@@ -113,44 +131,6 @@ namespace Faolan.GameServer
 			};
 		}
 
-		// .vitals [health] [stamina] [mana]  - push a 0x96B8DC59 vitals update. With no args, sends the character's
-		// own MaxStats (or class/level defaults). With args (player-facing values; the ×100 scale is applied),
-		// missing stamina/mana default to the health value.
-		private Task SetVitalsCommand(INetworkClient client, string arguments)
-		{
-			var parts = (arguments ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
-			if (parts.Length == 0)
-				return SendVitals(client);
-
-			var health = uint.Parse(parts[0]);
-			var stamina = parts.Length > 1 ? uint.Parse(parts[1]) : health;
-			var mana = parts.Length > 2 ? uint.Parse(parts[2]) : health;
-
-			return SendVitals(client, health, stamina, mana);
-		}
-
-		// .setstat <statIdHex> <displayValue>  - push a single 0x96B8DC59 stat record (e.g. ".setstat 36 25" sets
-		// Level to 25). The stat's wire scale is applied automatically.
-		private Task SetStatCommand(INetworkClient client, string arguments)
-		{
-			var parts = (arguments ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
-			var statId = (Packets._0x737A6DF9_Test.LegacyCharacterStatId)Convert.ToUInt32(parts[0], 16);
-			var value = uint.Parse(parts[1]);
-
-			return SendStatUpdate(client, new Packets._0x737A6DF9_Test.CharacterStatBlock().Set(statId, value));
-		}
-
-		// .hurt [amount] / .heal [amount]  - apply a health delta to the player's own live vitals and push the
-		// 0x96B8DC59 update so the health bar moves (combat-loop test without needing a target). Default 100.
-		private Task AdjustOwnHealthCommand(INetworkClient client, string arguments, bool heal)
-		{
-			var amount = int.TryParse(arguments, out var parsed) ? parsed : 100;
-			var vitals = GetOrAddPlayerVitals(client);
-			vitals.ApplyHealthDelta(heal ? amount : -amount);
-
-			return SendStatUpdate(client, vitals.ToVitalsBlock());
-		}
-
 		// .mount [spellIdHex]  - cast the mount-summon spell on the player. Default 0x3BAD7D, the mount spell
 		// observed in demol80's "very_long_loading" capture: a channeled ApplySpell 0x6B87E316 (spell 0x3BAD7D,
 		// repeated ~11x with 0xF508F4C1) immediately precedes the "Fading Black Horse" entity registering
@@ -191,6 +171,37 @@ namespace Faolan.GameServer
 		{
 			var spells = await Database.GetSpells();
 			await _agentServerDispatcher.SendSystemMessage(characterId, spells.Select(s => $"{s.Id}: {s.Name}").JoinAsString("<br />"));
+		}
+
+		// .setstat <statIdHex> <displayValue>  - push a single 0x96B8DC59 stat record (e.g. ".setstat 36 25" sets
+		// Level to 25). The stat's wire scale is applied automatically.
+		private Task SetStatCommand(INetworkClient client, string arguments)
+		{
+			var parts = (arguments ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+			var statId = (LegacyCharacterStatId)Convert.ToUInt32(parts[0], 16);
+			var value = uint.Parse(parts[1]);
+
+			return SendStatUpdate(client, new CharacterStatBlock().Set(statId, value));
+		}
+
+		// .vitals [health] [stamina] [mana]  - push a 0x96B8DC59 vitals update. With no args, sends the character's
+		// own MaxStats (or class/level defaults). With args (player-facing values; the ×100 scale is applied),
+		// missing stamina/mana default to the health value.
+		private Task SetVitalsCommand(INetworkClient client, string arguments)
+		{
+			var parts = (arguments ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+			if (parts.Length == 0)
+				return SendVitals(client);
+
+			var health = uint.Parse(parts[0]);
+			var stamina = parts.Length > 1
+				? uint.Parse(parts[1])
+				: health;
+			var mana = parts.Length > 2
+				? uint.Parse(parts[2])
+				: health;
+
+			return SendVitals(client, health, stamina, mana);
 		}
 
 		private async Task Test(uint characterId)

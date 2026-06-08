@@ -1,9 +1,6 @@
 using System;
 using System.Buffers.Binary;
-using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Threading.Tasks;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
@@ -77,6 +74,5 @@ namespace Faolan.GameServer
 				}
 			}
 		}
-
 	}
 }

@@ -10,19 +10,18 @@ namespace Faolan.GameServer.Combat
 	/// </summary>
 	public sealed class EntityVitals
 	{
-		public uint Health { get; set; }
-		public uint MaxHealth { get; set; }
-		public uint Mana { get; set; }
-		public uint MaxMana { get; set; }
-		public uint Stamina { get; set; }
-		public uint MaxStamina { get; set; }
-
 		public bool IsDead => Health == 0;
+		public uint Health { get; set; }
+		public uint Mana { get; set; }
+		public uint MaxHealth { get; set; }
+		public uint MaxMana { get; set; }
+		public uint MaxStamina { get; set; }
+		public uint Stamina { get; set; }
 
 		/// <summary>Applies a health delta (negative = damage, positive = heal), clamped to <c>[0, MaxHealth]</c>.</summary>
 		public void ApplyHealthDelta(int delta)
 		{
-			var next = Health + (long)delta;
+			var next = Health + delta;
 			if (next < 0)
 				next = 0;
 			else if (next > MaxHealth)
@@ -34,10 +33,7 @@ namespace Faolan.GameServer.Combat
 		/// <summary>The current vitals as a Health/Stamina/Mana stat block for a <c>0x96B8DC59</c> update.</summary>
 		public CharacterStatBlock ToVitalsBlock()
 		{
-			return new CharacterStatBlock()
-				.Set(LegacyCharacterStatId.Health, Health)
-				.Set(LegacyCharacterStatId.Stamina, Stamina)
-				.Set(LegacyCharacterStatId.Mana, Mana);
+			return new CharacterStatBlock().Set(LegacyCharacterStatId.Health, Health).Set(LegacyCharacterStatId.Stamina, Stamina).Set(LegacyCharacterStatId.Mana, Mana);
 		}
 
 		/// <summary>Creates a full-health entity (current == max) from max values.</summary>

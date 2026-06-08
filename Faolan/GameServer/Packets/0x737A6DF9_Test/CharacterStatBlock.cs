@@ -14,7 +14,7 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 	/// </summary>
 	public sealed class CharacterStatBlock
 	{
-		private readonly List<(uint StatId, uint RawValue)> _records = new();
+		private readonly List<(uint StatId, uint RawValue)> _records = [];
 
 		public int Count => _records.Count;
 
@@ -31,6 +31,13 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 			return this;
 		}
 
+		public byte[] ToArray()
+		{
+			using var stream = new FaolanStream();
+			WriteTo(stream);
+			return stream.ToArray();
+		}
+
 		/// <summary>Writes <c>[count:1][N×(statId:u32, value:u32)]</c> (big-endian) into <paramref name="stream" />.</summary>
 		public FaolanStream WriteTo(FaolanStream stream)
 		{
@@ -39,13 +46,6 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 				stream.WriteUInt32(statId).WriteUInt32(rawValue);
 
 			return stream;
-		}
-
-		public byte[] ToArray()
-		{
-			using var stream = new FaolanStream();
-			WriteTo(stream);
-			return stream.ToArray();
 		}
 	}
 }

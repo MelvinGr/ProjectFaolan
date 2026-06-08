@@ -66,8 +66,11 @@ namespace Faolan.Tests
 			Assert.Equal(template.Length, renamed.Length);
 			var diffs = 0;
 			for (var i = 0; i < template.Length; i++)
+			{
 				if (template[i] != renamed[i])
 					diffs++;
+			}
+
 			Assert.Equal(5, diffs);
 			Assert.Equal("Conan", Encoding.ASCII.GetString(renamed, SpawnPacketBuilder.NameTagOffset + 2, 5));
 		}

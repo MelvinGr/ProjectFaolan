@@ -19,11 +19,11 @@ namespace Faolan.Tests
 			const uint instance = 0x02165EFF; // in-range 4-byte-varint instance
 			var packets = new List<CapturedPacket>
 			{
-				MapChange(2040, instance),                     // header carries the receiver instance
-				Download2000(0x66AEDD50),                      // a world object
-				Download2000(0xFA015807),                      // an NPC spawn
-				Poll2020(),                                    // ends the window
-				Download2000(0x4517AA81)                       // after the poll -> excluded
+				MapChange(2040, instance), // header carries the receiver instance
+				Download2000(0x66AEDD50), // a world object
+				Download2000(0xFA015807), // an NPC spawn
+				Poll2020(), // ends the window
+				Download2000(0x4517AA81) // after the poll -> excluded
 			};
 
 			var bursts = MapWorldBurstExtractor.Merge(MapWorldBurstExtractor.Extract(packets));
@@ -52,14 +52,6 @@ namespace Faolan.Tests
 			Assert.Empty(bursts);
 		}
 
-		private static CapturedPacket MapChange(uint mapId, uint instance)
-		{
-			var content = new byte[34];
-			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(0, 4), 0x5D85BFC7);
-			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(30, 4), mapId);
-			return Packet(0x2000, true, content, ReceiverHeader(instance));
-		}
-
 		private static CapturedPacket Download2000(uint subop)
 		{
 			var content = new byte[38];
@@ -67,26 +59,12 @@ namespace Faolan.Tests
 			return Packet(0x2000, true, content);
 		}
 
-		private static CapturedPacket Poll2020() => Packet(0x2020, false, new byte[8]);
-
-		// Receiver conversation id = marker + little-endian base-128 varint of the instance.
-		private static byte[] ReceiverHeader(uint instance)
+		private static CapturedPacket MapChange(uint mapId, uint instance)
 		{
-			var varint = new List<byte>();
-			var v = instance;
-			do
-			{
-				var b = (byte)(v & 0x7F);
-				v >>= 7;
-				if (v != 0)
-					b |= 0x80;
-				varint.Add(b);
-			} while (v != 0);
-
-			var header = new byte[ReceiverMarker.Length + varint.Count];
-			ReceiverMarker.CopyTo(header, 0);
-			varint.CopyTo(header, ReceiverMarker.Length);
-			return header;
+			var content = new byte[34];
+			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(0, 4), 0x5D85BFC7);
+			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(30, 4), mapId);
+			return Packet(0x2000, true, content, ReceiverHeader(instance));
 		}
 
 		private static CapturedPacket Packet(uint opcode, bool isDownload, byte[] content, byte[] header = null)
@@ -103,6 +81,32 @@ namespace Faolan.Tests
 			body.CopyTo(full, 12 + header.Length);
 
 			return new CapturedPacket(0, isDownload, opcode, 0, full);
+		}
+
+		private static CapturedPacket Poll2020()
+		{
+			return Packet(0x2020, false, new byte[8]);
+		}
+
+		// Receiver conversation id = marker + little-endian base-128 varint of the instance.
+		private static byte[] ReceiverHeader(uint instance)
+		{
+			var varint = new List<byte>();
+			var v = instance;
+			do
+			{
+				var b = (byte)(v & 0x7F);
+				v >>= 7;
+				if (v != 0)
+					b |= 0x80;
+				varint.Add(b);
+			}
+			while (v != 0);
+
+			var header = new byte[ReceiverMarker.Length + varint.Count];
+			ReceiverMarker.CopyTo(header, 0);
+			varint.CopyTo(header, ReceiverMarker.Length);
+			return header;
 		}
 	}
 }

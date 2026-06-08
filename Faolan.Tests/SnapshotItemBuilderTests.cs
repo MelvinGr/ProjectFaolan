@@ -8,10 +8,8 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.GameServer.Packets._0x737A6DF9_Test;
-using Faolan.Helpers;
 using Faolan.Importer;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Faolan.Tests

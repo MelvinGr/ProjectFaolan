@@ -6,13 +6,12 @@ namespace Faolan.Core.Database.Tables
 	// packet; the runtime substitutes the live NPC handle + instance and recomputes the CRC before sending.
 	public class ConversationPacket : BaseEntity
 	{
-		public uint ConversationNodeId { get; set; }
-
 		[ForeignKey(nameof(ConversationNodeId))]
 		public virtual ConversationNode Node { get; set; }
 
-		public int Sequence { get; set; }
-
 		public byte[] Data { get; set; }
+
+		public int Sequence { get; set; }
+		public uint ConversationNodeId { get; set; }
 	}
 }

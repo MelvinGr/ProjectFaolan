@@ -32,7 +32,11 @@ namespace Faolan.Importer
 			{
 				if (!existing.TryGetValue(id, out var item))
 				{
-					item = new Item { Id = id, Name = string.Empty };
+					item = new Item
+					{
+						Id = id,
+						Name = string.Empty
+					};
 					db.Items.Add(item);
 					inserted++;
 				}

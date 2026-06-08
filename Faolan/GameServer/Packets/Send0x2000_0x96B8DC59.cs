@@ -1,5 +1,4 @@
 using System.Threading.Tasks;
-using Faolan.Core.Data;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
@@ -48,10 +47,7 @@ namespace Faolan.GameServer
 		// CharacterStatBlock applies the ×100 vitals scale.
 		private static Task SendVitals(INetworkClient client, uint health, uint stamina, uint mana)
 		{
-			var stats = new CharacterStatBlock()
-				.Set(LegacyCharacterStatId.Health, health)
-				.Set(LegacyCharacterStatId.Stamina, stamina)
-				.Set(LegacyCharacterStatId.Mana, mana);
+			var stats = new CharacterStatBlock().Set(LegacyCharacterStatId.Health, health).Set(LegacyCharacterStatId.Stamina, stamina).Set(LegacyCharacterStatId.Mana, mana);
 
 			return SendStatUpdate(client, stats);
 		}
