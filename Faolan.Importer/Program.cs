@@ -26,11 +26,13 @@ namespace Faolan.Importer
 			var dbPath = GetOption(args, "--db") ?? Path.Combine(RepoRoot, "faolan.db");
 			var capturesDir = GetOption(args, "--captures") ?? Path.Combine(RepoRoot, "Captures");
 			var archiveDir = GetOption(args, "--archive"); // dir with aocdatabase.sql (one-time ability/spell defs)
+			var rdbDir = GetOption(args, "--rdb"); // client RDB dir (le.idx + NN.rdbdata) - one-time text/data import
 			var dryRun = args.Contains("--dry-run");
 
-			Console.WriteLine($"Faolan.Importer: db={dbPath}  captures={capturesDir}  archive={archiveDir ?? "(none)"}  dryRun={dryRun}");
+			Console.WriteLine($"Faolan.Importer: db={dbPath}  captures={capturesDir}  archive={archiveDir ?? "(none)"}  rdb={rdbDir ?? "(none)"}  dryRun={dryRun}");
 
-			if (!Directory.Exists(capturesDir))
+			var doCaptures = Directory.Exists(capturesDir);
+			if (!doCaptures && rdbDir == null)
 			{
 				Console.Error.WriteLine($"Captures directory not found: {capturesDir}");
 				return 1;
@@ -43,14 +45,16 @@ namespace Faolan.Importer
 			}
 
 			// One ordered GameServer packet list per capture (conversations need per-capture sequence + metadata).
-			var captures = ReadCaptures(capturesDir);
+			var captures = doCaptures ? ReadCaptures(capturesDir) : new List<List<CapturedPacket>>();
 			var itemPackets = captures.SelectMany(c => c.Select(p => p.Bytes)).ToList();
-			foreach (var bin in Directory.EnumerateFiles(capturesDir, "*.bin"))
-				itemPackets.Add(File.ReadAllBytes(bin));
+			if (doCaptures)
+				foreach (var bin in Directory.EnumerateFiles(capturesDir, "*.bin"))
+					itemPackets.Add(File.ReadAllBytes(bin));
 
 			var conversations = ConversationExtractor.Merge(captures.SelectMany(ConversationExtractor.Extract));
 
-			Console.WriteLine($"Read {captures.Count} captures, {itemPackets.Count} item-candidate packets; extracted {conversations.Count} conversation nodes.");
+			if (doCaptures)
+				Console.WriteLine($"Read {captures.Count} captures, {itemPackets.Count} item-candidate packets; extracted {conversations.Count} conversation nodes.");
 
 			if (dryRun)
 			{
@@ -70,18 +74,50 @@ namespace Faolan.Importer
 				Console.WriteLine($"Archive: {abilities} abilities, {classAbilities} class-ability rows.");
 			}
 
-			await CaptureItemImporter.ImportAsync(db, itemPackets);
-			await CaptureMapImporter.ImportAsync(db, itemPackets);
-			await CaptureSpellImporter.ImportAsync(db, itemPackets);
-			await ImportConversations(db, conversations);
-			await ImportNpcSpawns(db, NpcSpawnExtractor.Merge(captures.SelectMany(NpcSpawnExtractor.Extract)));
-			await ImportMapWorldBursts(db, MapWorldBurstExtractor.Merge(captures.SelectMany(MapWorldBurstExtractor.Extract)));
-			await SeedBeachBurstFromBlob(db); // beach (4010) uses the proven 71-packet blob, not the captured window
+			if (doCaptures)
+			{
+				await CaptureItemImporter.ImportAsync(db, itemPackets);
+				await CaptureMapImporter.ImportAsync(db, itemPackets);
+				await CaptureSpellImporter.ImportAsync(db, itemPackets);
+				await ImportConversations(db, conversations);
+				await ImportNpcSpawns(db, NpcSpawnExtractor.Merge(captures.SelectMany(NpcSpawnExtractor.Extract)));
+				await ImportMapWorldBursts(db, MapWorldBurstExtractor.Merge(captures.SelectMany(MapWorldBurstExtractor.Extract)));
+				await SeedBeachBurstFromBlob(db); // beach (4010) uses the proven 71-packet blob, not the captured window
+			}
+
+			if (rdbDir != null)
+				ImportRdb(rdbDir);
 
 			var after = await Snapshot(db);
 			PrintDelta(before, after);
 
 			return 0;
+		}
+
+		// Friendly names for the RDB resource types we care about (from rdbreader's TYPES enum). Used by the
+		// type inventory so we can spot the item-template / NPC-stat / dialogue resources.
+		private static readonly (uint Type, string Name)[] RdbTypeNames =
+		{
+			(0, "ScriptGroup"), (1000010, "Filenames"), (1000077, "ContentSpawnDataExport"),
+			(1000078, "AcgSpawnDataExport"), (1000079, "NpcSpawnDataExport"), (1000083, "TreasureDataExport"),
+			(1000090, "ResurrectionPointsExport"), (1010001, "3DModel"), (1010004, "Texture/FCTX"),
+			(1010035, "TextScript"), (1010201, "MonsterData"), (1010223, "LuaArchive"), (1010700, "CharacterCreator"),
+			(1020003, "Lip"), (1030002, "TextStrings"), (1070003, "PlayfieldDescription")
+		};
+
+		// --rdb: read the client RDB index and inventory the resource types. The server references text by id (the
+		// client renders it from its own RDB), so we DON'T bulk-store strings; this inventory is the foundation for
+		// locating + importing the structured data the server actually needs (item-template identity, NPC stats).
+		private static void ImportRdb(string rdbDir)
+		{
+			using var rdb = new RdbReader(rdbDir);
+			Console.WriteLine($"RDB: {rdb.Count} index entries in {rdbDir}");
+
+			var names = RdbTypeNames.ToDictionary(t => t.Type, t => t.Name);
+			Console.WriteLine("  type        count   name");
+			Console.WriteLine("  ----------------------------------------");
+			foreach (var (type, count) in rdb.TypeCounts())
+				Console.WriteLine($"  {type,-10}  {count,6}  {(names.TryGetValue(type, out var n) ? n : "")}");
 		}
 
 		// Upsert (never wipe): update each extracted node's handles + replace its own packets, insert new nodes, and
