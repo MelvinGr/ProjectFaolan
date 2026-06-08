@@ -62,7 +62,7 @@ Game data is (re)built from the raw sources by the **`Faolan.Importer`** tool (s
 `docs/faolan-importer-plan.md`): it reads the `Captures/` (pcapng / their json dumps / .bin) and upserts the
 extracted data straight into the DB. It imports: **item identities** from inventory snapshots
 (`CaptureItemImporter` + `ArchetypeHarvester`: template id + `Data1..4` quad + archetype → `Items`,
-~**384 items / 177 buildable**); **NPC conversations** (`ConversationExtractor` → `ConversationNode`/
+~**388 items / 191 buildable**); **NPC conversations** (`ConversationExtractor` → `ConversationNode`/
 `ConversationPacket`); **maps** from `MapChange` packets (`CaptureMapImporter` → new `Map` rows); and **cast
 spell ids** from `ApplySpell` (`CaptureSpellImporter` → id-only `Spell` rows; names/params are client-side). With
 `--archive <dir>` it also imports the archive's **ability/spell definitions** (`p_abilities` → `Ability`,
@@ -72,6 +72,13 @@ spell ids** from `ApplySpell` (`CaptureSpellImporter` → id-only `Spell` rows; 
 a before/after delta table; imports upsert (no wipes). The OLD C++ server's base data (`p_items`/`spelldata`/`npcs`)
 was imported once and now lives in the committed DB (the archive `.sql` files were deleted after that one-time
 import; the `Archive/` zips remain the historical source). NPCs (session-handle identity spike) come next.
+
+**Buildable item identity only comes from the player's own inventory snapshot.** Vendor stock and auction-house
+listings do NOT yield more buildable items (verified): AoC sends those by *referencing* item template ids (the
+client renders them from its local RDB), so the full `Data1..4` quad + archetype the builder needs is never on
+the wire there - the item-identity quad signature appears in zero non-`0x737A6DF9` packets in the trader/auction
+captures. To grow the item set, capture the player actually holding/equipping more diverse items (their snapshot
+is harvested); vendor/AH/NPC-gear packets don't help.
 
 ## Working conventions
 
