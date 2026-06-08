@@ -257,19 +257,24 @@ vs the partial snapshot.
   `Item.Name` only when empty (captured names stay authoritative): **143 names recovered** (e.g. "Dusklight Tunic",
   "Misery of Dagon"), 26 items still nameless (their names are localized-string ids, resolvable via TextStrings
   `1030002` TDC2 if ever needed).
-### Template body format (partly reversed)
-The decrypted template body (after the 12-byte RDB-Id header) is a **typed attribute stream**, not a flat array.
-- **Strings**: `tag 0x21 (u32) + length (u32) + ASCII`, re-aligned to 4 after. First underscore-free string = name
-  (done above); a later one is usually the description ("No description available").
-- **Scalars**: a sequence of u32 attribute fields. Several positions are constant across all items
-  (`[2]=15, [3]=23, [5]=76, [7]=30, [11]=298`) = a fixed sub-header; from there it looks like `(attrId, value)`
-  with attrIds drawn from a small repeating vocabulary (499, 496, 360, 74, 54, 41, 21, …). BUT a naive
-  `0x21→string / else (id,u32) pair` walk only consumes the body exactly for **31/387** templates — so the
-  non-string attributes are **variable-width / multiple types** (not all 8-byte id+u32). Fully mapping them needs
-  more RE (per-attribute type table — best read from the client's deserializer), and the item stat-id vocabulary
-  here differs from the character `LegacyCharacterStatId` space. **Deliberately NOT shipped** as a parser (an 8%-
-  correct stat parser would poison the DB). The decrypt + `--dump-templates` infra makes this RE doable anytime.
-- **Done into `Item`:** `Name` (143 filled). **Remaining:** level/stats once the attribute type table is reversed.
+### Template body format (characterized 2026-06-08)
+The decrypted template body (after the 12-byte RDB-Id header) is a **fixed-layout struct**, NOT a generic TLV.
+Evidence: aligning two unrelated items by their constant values, the constants land at **identical byte offsets**
+(`@20=76, @28=30, @44=298, @52=88, @60=499, @68=496, @76=360` in both a simple key and a weapon) — i.e. fixed
+stat *slots* whose ids are the same for all items, with the per-item *values* in interleaved fixed fields. There
+is also a **packed field** (e.g. `@40 = 0x0X000001`, X differs per item) that is not a plain u32, which is why a
+naive `[id u32][value u32]` walk only consumes the body exactly for 160/387 (and mis-fires when a value == 33,
+the string marker). **Strings** are `0x21 (u32) + len (u32) + ASCII`, unaligned (no realign after), holding the
+name (done) and usually a description.
+- **Conclusion:** correct stat extraction needs the struct's **field map** (offsets → meaning), which means either
+  (a) finishing the static RE of the client's type-`1000020` deserializer in `AgeOfConan.exe` (the decrypt path
+  `RDBServerSource::Decrypt` is mapped; the body reader is dispatched indirectly and wasn't pinned in this pass —
+  the `1000020` refs at `0x7cd99c`/`0x8c5c70`/`0x8d8250` are resource-handle/instance code, not the body struct),
+  or (b) a dynamic dump (hook the client's template parser and read the populated struct). The packed `@40` field
+  and the fixed stat-slot layout are the anchors to resume from.
+- **Deliberately NOT shipped** as a parser — a fixed-struct guess without the field map would write wrong stats to
+  the DB. The decrypt + `--dump-templates` infra preserves every template for that RE whenever it's picked up.
+- **Done into `Item`:** `Name` (143 filled). **Remaining:** level/stats once the struct field map is reversed.
 
 ### Typed protobuf decoding (docs/aoc-client-protos.proto → C#)
 The recovered schema is generated to **`Faolan.Core/Network/Protobuf/AocProtocol.g.cs`** (protobuf-net, the
