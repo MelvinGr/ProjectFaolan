@@ -294,6 +294,12 @@ because the world GameServer is assigned a fresh port on every **playfield chang
 can be a different service on another server IP), so port-based detection mislabeled and dropped those
 secondary world streams. **Re-dump any capture made before these fixes** - older JSON dumps are truncated/mislabeled.
 
+Verified against the Wireshark plugin + python-zlib across all 33 GS streams in the captures: 19 byte-identical,
+11 where the plugin's C inflater fails partway and the analyzer is more complete, and 3 where some captures have
+genuine small 8-byte sequence gaps (lost segments) - the analyzer correctly stops at the gap (the plugin's data
+past such a gap is garbage, since zlib desyncs). So the analyzer is at least as complete as the plugin on every
+stream, and strictly better on the long ones.
+
 ### GameServer download compression
 
 The GameServer download stream is one continuous zlib stream, prefixed by a 9-byte header that starts with
@@ -450,12 +456,13 @@ Concrete next steps, grouped by area. See `docs/` for the dissection writeups be
 ### Cleanup
 - [ ] Fix the malformed **`OverrideGameTweaks` (`0x2085...`)** packet — client logs `stream bad after
       'overrides'` and drops that route every session (harmless, not a login blocker).
-- [ ] **Analyzer tail-drop on ~3 GS streams.** Verified the analyzer vs the Wireshark plugin + python-zlib
-      across all 33 GS streams: 19 byte-identical, 11 where the plugin's C inflater fails partway and the
-      analyzer is more complete (analyzer correct), but 3 (Strie-create/Strie-login `:7029`, faolanx-charcreation
-      `:7018`) where the analyzer inflates ~7 KB short of ground truth (e.g. Strie-login 80735 vs true 88147,
-      no capture truncation). Likely the reassembler/inflater stopping before `Z_STREAM_END` on those streams;
-      investigate `PacketCaptureReader.Decompress` / `TcpStreamReassembler` tail handling.
+- [x] **Analyzer "tail-drop" on ~3 GS streams — NOT A BUG (verified).** Re-checked by replaying the
+      reassembler in python: those 3 captures (Strie-create/Strie-login `:7029`, faolanx-charcreation `:7018`)
+      have genuine small **8-byte sequence gaps** (segments lost during capture, e.g. 7029 missing 8 bytes at
+      offsets 28648/31292/32866). The analyzer correctly stops at the first gap rather than feeding
+      discontinuous data to the stateful zlib inflater; the plugin inflates *past* the gap, but an 8-byte gap
+      desyncs zlib so its extra ~7 KB is garbage (python errors `invalid stored block lengths` exactly at the
+      gap). So the analyzer is the more-correct one here too. No fix needed.
 
 ## Notes
 
