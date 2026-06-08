@@ -110,30 +110,59 @@ namespace Faolan.PacketAnalyzer
 		private byte[]? TryProcessCompressionHeader(string flowKey, GameServerCompressionState state, byte[] bytes)
 		{
 			var consumed = state.AppendHeaderBytes(bytes);
+
+			// Early reject: once the first 4 bytes are known and they aren't the 0x80000005 marker, this isn't a
+			// GameServer compression header - pass the buffered bytes through unchanged.
+			if (state.PendingHeaderCount >= CompressionHeaderPrefix.Length && !state.HasCompressionHeaderPrefix)
+				return FlushHeaderPassthrough(state, bytes, consumed);
+
+			// Need the 9-byte marker header PLUS the 2-byte zlib header to validate (see below).
 			if (state.PendingHeaderCount < GameServerCompressionState.HeaderLength)
 				return null;
 
-			var remainingBytes = bytes.Length > consumed
-				? bytes[consumed..]
-				: [];
+			var remainingBytes = bytes.Length > consumed ? bytes[consumed..] : [];
 
-			if (!state.HasCompressionHeaderPrefix)
-			{
-				var passthroughBytes = new byte[state.PendingHeaderCount + remainingBytes.Length];
-				Array.Copy(state.PendingHeaderBuffer, 0, passthroughBytes, 0, state.PendingHeaderCount);
-				if (remainingBytes.Length > 0)
-					Array.Copy(remainingBytes, 0, passthroughBytes, state.PendingHeaderCount, remainingBytes.Length);
+			// Content validation: a real GameServer stream is 0x80000005 + a 5-byte framing tail, then a zlib
+			// stream (CM=8, header checksum %31==0). The 0x80000005 byte sequence also occurs incidentally inside
+			// uncompressed auth traffic at a reassembly-chunk boundary; without this check those flows would be
+			// misdetected as GameServer and their data corrupted by a bogus inflate. If the zlib header isn't
+			// valid, treat the marker as coincidental and pass everything through.
+			var cmf = state.PendingHeaderBuffer[GameServerCompressionState.MarkerLength];
+			var flg = state.PendingHeaderBuffer[GameServerCompressionState.MarkerLength + 1];
+			if (!IsValidZlibHeader(cmf, flg))
+				return FlushHeaderPassthrough(state, bytes, consumed);
 
-				state.ResetHeader();
-				return passthroughBytes;
-			}
-
+			// Confirmed GameServer: feed the 2 buffered zlib-header bytes plus the rest to a fresh inflater.
 			state.Inflater = new Inflater();
 			state.ResetHeader();
 
-			return remainingBytes.Length > 0
-				? DecompressFlowBytes(flowKey, state, remainingBytes)
-				: null;
+			var zlibBytes = new byte[2 + remainingBytes.Length];
+			zlibBytes[0] = cmf;
+			zlibBytes[1] = flg;
+			if (remainingBytes.Length > 0)
+				Array.Copy(remainingBytes, 0, zlibBytes, 2, remainingBytes.Length);
+
+			return DecompressFlowBytes(flowKey, state, zlibBytes);
+		}
+
+		// Returns the buffered header bytes + the rest of this chunk unchanged (the marker was incomplete or
+		// coincidental), and clears the header buffer.
+		private static byte[] FlushHeaderPassthrough(GameServerCompressionState state, byte[] bytes, int consumed)
+		{
+			var remainingBytes = bytes.Length > consumed ? bytes[consumed..] : [];
+			var passthroughBytes = new byte[state.PendingHeaderCount + remainingBytes.Length];
+			Array.Copy(state.PendingHeaderBuffer, 0, passthroughBytes, 0, state.PendingHeaderCount);
+			if (remainingBytes.Length > 0)
+				Array.Copy(remainingBytes, 0, passthroughBytes, state.PendingHeaderCount, remainingBytes.Length);
+
+			state.ResetHeader();
+			return passthroughBytes;
+		}
+
+		// A valid zlib header: low nibble of CMF is 8 (deflate) and the 16-bit (CMF<<8 | FLG) is a multiple of 31.
+		private static bool IsValidZlibHeader(byte cmf, byte flg)
+		{
+			return (cmf & 0x0F) == 8 && ((cmf << 8) | flg) % 31 == 0;
 		}
 
 		private static bool CouldStartCompressionHeader(byte[] bytes)
@@ -171,7 +200,10 @@ namespace Faolan.PacketAnalyzer
 
 		private sealed class GameServerCompressionState
 		{
-			public const int HeaderLength = 9;
+			// The 0x80000005 marker + 5-byte framing tail. The 2 bytes after it are the zlib header, which we also
+			// buffer (HeaderLength) so the stream can be validated as real zlib before committing to inflation.
+			public const int MarkerLength = 9;
+			public const int HeaderLength = MarkerLength + 2;
 
 			public bool HasCompressionHeaderPrefix =>
 				PendingHeaderCount >= CompressionHeaderPrefix.Length && PendingHeaderBuffer[0] == CompressionHeaderPrefix[0] && PendingHeaderBuffer[1] == CompressionHeaderPrefix[1] &&
