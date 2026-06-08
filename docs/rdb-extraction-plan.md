@@ -196,13 +196,25 @@ the buildable identity (archetype + `Data1..4` quad) is **absent / intentionally
 and **cannot be extracted** without breaking the `RDBH` cipher (a separate major effort). **Buildable items must
 still come from captures** (ArchetypeHarvester on `0x737A6DF9` snapshots) — the RDB does not shortcut this.
 
+**MONSTERDATA checked 2026-06-08 — it is NOT combat stats, and NOT encrypted.**
+1010201 (3,185 entries) decodes to **plain XML** (12-byte RDB-Id header `type,id,1000002`, then `<?xml …>`;
+no `IOz1`/`RDBH`). But it's the monster **model/render definition** — `<monsterdata animsys= skeleton= name=
+movementset= …>` with `<mesh>`, `<previewset>`, `<soundscript>`, `<fxscript>`. **No HP / level / armor /
+damage.** A sweep of every XML resource type found **no `<creature>`/`<npc>` stat table**: the gameplay-adjacent
+plain-XML types are `1010206 <combo>` (player ability chains — `level`/`stamina` attrs, not creature HP),
+`1010219 <fatalitygroup>`, `1070003 <playfielddescriptiondata>`, `1000083 <treasuredata>` (empty in this
+client), text `1010035`/`1030002`, `1010030 <MeshIndexFile>`, `1010214 <effectset>`. **Conclusion: NPC combat
+stats (HP) are not in the client RDB** — they were server-authoritative in retail (the `Archive/` C++ `p_*`
+tables). Combat HP must come from **captures or the Archive C++ server data**, not the RDB. Of the gameplay
+data only items (`1000020`) are `RDBH`-encrypted; everything else is plain XML and extractable if ever needed.
+(Index note: detail entries with file byte `0xff`/255 are absent/empty sentinels — skip them.)
+
 **Next (structured data → DB):**
-1. ~~Item-template identity~~ — **blocked** (see above; `RDBH`-encrypted, identity absent).
-2. Decode **MONSTERDATA (1010201, 3,185 entries)** payload → NPC max HP → combat (`CharacterMaxStats`-style or
-   an NPC-stats table). NOTE: likely the same `RDBH` wrapping as items — check the wrapper before investing.
-3. (later) conversation/quest structure (which ids to reference), Playfield/Treasure.
-   Each needs per-type payload RE (the inventory + RdbReader make this straightforward to iterate). Cross-validate
-   against ground truth (captured item identities, the lvl-23 sheet, conversation nodes).
+1. ~~Item-template identity~~ — **blocked** (`RDBH`-encrypted, identity absent; from captures only).
+2. ~~MONSTERDATA → NPC HP~~ — **not applicable** (1010201 is the model def, not stats; HP isn't in the RDB).
+   NPC combat stats come from captures / the `Archive/` C++ server data instead.
+3. (optional, if ever needed) the plain-XML gameplay types above are trivially extractable via `RdbReader`
+   (combos, fatalities, playfield/treasure, text). None are required for the current create→login→play work.
 
 ### Phase 0 conclusion (2026-06-08)  [superseded by the breakthrough above]
 v6 is **fully reverse-engineerable but it's a real project, not a quick crack.** Mapped so far: the resource
