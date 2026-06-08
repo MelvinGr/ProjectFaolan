@@ -1,42 +1,63 @@
+using System.IO;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Protobuf;
+using ProtoBuf;
 
 namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 {
-	// Builds a 0x737A6DF9 inventory container-entry (the field-4 message inside a container) from a DB Item
-	// template, so an inventory can be assembled from `CharacterEquipment`/`player_items` joined to the imported
-	// `p_items` (Items) - instead of patching a captured snapshot. The mapping was proven byte-exact against the
-	// captured "Slave Manacles" entry (see SnapshotItemBuilderTests / docs/spawn-dissection-plan.md Phase 5):
-	//
-	//   entry.f1                = slot
-	//   entry.f2 (details).f1   = itemId           (per-instance GUID, NOT from the template)
-	//   details.f2 {f1=0,f2=v}  = flags property
-	//   details.f2 {f1=23,f2=v} = inventory record id (per-instance)
-	//   details.f2 {f1=26,f2=v} = stack count
-	//   details.f3 (tail).f1/f2/f3 = three identical identity payloads {f1..f4 fixed32 = Item.Data1..Data4}
-	//   tail.f4 = tail.f5       = Item.Id (the item template id)
-	//   tail.f7                 = 1
-	//   tail.f8                 = archetype  (the ONE field not in p_items - must be supplied/harvested)
+	// Builds a 0x737A6DF9 inventory container-entry (ProtoInventoryGame.items, field 4) from a DB Item template,
+	// using the typed protobuf schema recovered from the client exe (Faolan.Core/Network/Protobuf, see
+	// docs/aoc-client-protos.proto). The layout is the client's own:
+	//   entry  = InventoryListEntry { pos = slot, item = ProtoInventoryGameEntry }
+	//   item   = ProtoInventoryGameEntry { item_id, stat_list[ (0,flags),(23,recordId),(26,count) ], item_data }
+	//   data   = ProtoAcgItem { key1=key2=key3 = ProtoDecryptionKey(Data1..4), template1=template2 = Item.Id,
+	//                           level, hash = archetype }
+	// The per-instance state (itemId GUID, inventory record id, stack count, slot) is kept; the template identity -
+	// the Data1..4 quad (which is the item's ProtoDecryptionKey) plus the archetype hash - comes from the DB Item.
+	// Proven byte-exact against the captured "Slave Manacles" entry (SnapshotItemBuilderTests); the typed schema is
+	// proven to re-serialize the wire byte-for-byte (AocProtocolDecodeTests).
 	public static class SnapshotItemBuilder
 	{
 		public static ProtoField BuildEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, uint archetype, ulong flags = 1, ulong f7 = 1)
 		{
-			var details = new ProtoMessage();
-			details.Fields.Add(Varint(1, itemId));
-			details.Fields.Add(Msg(2, Property(0, flags)));
-			details.Fields.Add(Msg(2, Property(23, recordId)));
-			details.Fields.Add(Msg(2, Property(26, count)));
-			details.Fields.Add(Msg(3, BuildTail(item, archetype, f7)));
+			var key = new ProtoDecryptionKey { Key1 = item.Data1, Key2 = item.Data2, Key3 = item.Data3, Key4 = item.Data4 };
 
-			var entry = new ProtoMessage();
-			entry.Fields.Add(Varint(1, slot));
-			entry.Fields.Add(Msg(2, details));
+			var entry = new ProtoInventoryGame.InventoryListEntry
+			{
+				Pos = (uint)slot,
+				Item = new ProtoInventoryGameEntry
+				{
+					ItemId = itemId,
+					StatLists =
+					{
+						new ProtoInventoryGameEntry.StatValue { Stat = 0, Value = (uint)flags },
+						new ProtoInventoryGameEntry.StatValue { Stat = 23, Value = (uint)recordId },
+						new ProtoInventoryGameEntry.StatValue { Stat = 26, Value = (uint)count }
+					},
+					ItemData = new ProtoAcgItem
+					{
+						Key1 = key,
+						Key2 = key,
+						Key3 = key,
+						Template1 = item.Id,
+						Template2 = item.Id,
+						Level = (uint)f7,
+						Hash = archetype
+					}
+				}
+			};
 
+			using var ms = new MemoryStream();
+			Serializer.Serialize(ms, entry);
+
+			// Wrap the serialized entry as the container's field-4 message (the live path swaps this into the parsed
+			// ProtoMessage snapshot tree, which stays the lossless carrier for the rest of the packet).
 			return new ProtoField
 			{
 				FieldNumber = 4,
 				WireType = 2,
-				MessageValue = entry
+				MessageValue = ProtoMessage.Parse(ms.ToArray())
 			};
 		}
 
@@ -50,67 +71,6 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 
 			entry = BuildEntry(slot, itemId, recordId, count, item, item.Archetype, flags, f7);
 			return true;
-		}
-
-		private static ProtoMessage BuildTail(Item item, uint archetype, ulong f7)
-		{
-			var tail = new ProtoMessage();
-			tail.Fields.Add(Msg(1, IdentityPayload(item)));
-			tail.Fields.Add(Msg(2, IdentityPayload(item)));
-			tail.Fields.Add(Msg(3, IdentityPayload(item)));
-			tail.Fields.Add(Fixed32(4, item.Id));
-			tail.Fields.Add(Fixed32(5, item.Id));
-			tail.Fields.Add(Varint(7, f7));
-			tail.Fields.Add(Fixed32(8, archetype));
-			return tail;
-		}
-
-		private static ProtoField Fixed32(int field, uint value)
-		{
-			return new ProtoField
-			{
-				FieldNumber = field,
-				WireType = 5,
-				Fixed32Value = value
-			};
-		}
-
-		private static ProtoMessage IdentityPayload(Item item)
-		{
-			var payload = new ProtoMessage();
-			payload.Fields.Add(Fixed32(1, item.Data1));
-			payload.Fields.Add(Fixed32(2, item.Data2));
-			payload.Fields.Add(Fixed32(3, item.Data3));
-			payload.Fields.Add(Fixed32(4, item.Data4));
-			return payload;
-		}
-
-		private static ProtoField Msg(int field, ProtoMessage value)
-		{
-			return new ProtoField
-			{
-				FieldNumber = field,
-				WireType = 2,
-				MessageValue = value
-			};
-		}
-
-		private static ProtoMessage Property(ulong kind, ulong value)
-		{
-			var m = new ProtoMessage();
-			m.Fields.Add(Varint(1, kind));
-			m.Fields.Add(Varint(2, value));
-			return m;
-		}
-
-		private static ProtoField Varint(int field, ulong value)
-		{
-			return new ProtoField
-			{
-				FieldNumber = field,
-				WireType = 0,
-				VarintValue = value
-			};
 		}
 	}
 }
