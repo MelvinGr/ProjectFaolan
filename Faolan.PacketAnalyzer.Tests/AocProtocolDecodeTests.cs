@@ -81,6 +81,39 @@ namespace Faolan.PacketAnalyzer.Tests
 			}
 		}
 
+		// Proves protobuf-net re-serializes BYTE-IDENTICALLY to the captured wire - both a single inventory entry and
+		// the whole 0x737A6DF9 snapshot body (ProtoFullCharacterIIR). This is the guarantee that lets the typed schema
+		// replace the hand-rolled SnapshotItemBuilder / InventorySnapshotInspector without changing any output byte.
+		[Fact]
+		public async Task GeneratedSchema_RoundTrips_CapturedSnapshot_ByteIdentical()
+		{
+			if (!File.Exists(InventoryCapture))
+				return;
+
+			var packet = new ConanPacket(await File.ReadAllBytesAsync(InventoryCapture));
+			var body = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+			body.ReadUInt32();
+			body.ReadUInt32();
+			body.ReadUInt32();
+			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(body);
+
+			// One inventory entry round-trips exactly.
+			var equipped = InventorySnapshotInspector.GetContainer(parts.Root, InventorySnapshotInspector.ContainerKind.Equipped);
+			var entryBytes = InventorySnapshotInspector.GetEntryBySlot(equipped, Slot)!.MessageValue!.ToArray();
+			var entry = Serializer.Deserialize<ProtoInventoryGame.InventoryListEntry>(new MemoryStream(entryBytes));
+			using var em = new MemoryStream();
+			Serializer.Serialize(em, entry);
+			Assert.Equal(Convert.ToHexString(entryBytes), Convert.ToHexString(em.ToArray()));
+
+			// The whole snapshot body round-trips exactly through ProtoFullCharacterIIR (unknown fields preserved
+			// via IExtensible).
+			var rootBytes = parts.Root.ToArray();
+			var root = Serializer.Deserialize<ProtoFullCharacterIIR>(new MemoryStream(rootBytes));
+			using var rm = new MemoryStream();
+			Serializer.Serialize(rm, root);
+			Assert.Equal(Convert.ToHexString(rootBytes), Convert.ToHexString(rm.ToArray()));
+		}
+
 		private static DatabaseContext NewContext(string path)
 		{
 			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={path}", x => x.MigrationsAssembly("Faolan")).Options;
