@@ -119,14 +119,32 @@ Significant de-risking — the tool and format are identified:
   is why fixed-stride scans for the detail/offset columns failed). The header field at offset 8 is 873,588
   (a hash-bucket count, not the record count). Exact v6 record/hash/name byte layout is the remaining unknown.
 
+### v6 layout (refined)
+v6 **reorders** the sections vs v5 (and adds a hash + name-string section):
+```
+[header 36 B]  RDHI, version=6, then 7×u32 (873588=hash buckets, 195, 3, 3727, 0, 198, 0)
+[section1]     per-record: 16-byte hash + detail fields (~28 B stride looks most likely:
+              hash(16) + ~3×u32 holding file(low byte)/offset/size). 36 .. ~7.5 MB.
+[name strings] variable-length resource names/paths (~33 MB) — why fixed-stride offset scans fail.
+[type+idx]     at the END (bytes ~40.51 M .. 42.66 M): contiguous (type, idx) u32 pairs, 268,792 records.
+              CONFIRMED with real values (e.g. type 1000020 with sequential idx 1093924,1093925,...).
+[trailer]     ~80 KB.
+```
+Section1 and the type+idx section are in the **same record order**, so record *i*'s detail (section1) pairs
+with record *i*'s (type, idx) — alignable by index without parsing the variable name section.
+
 ### Concrete next steps
-1. **Crack the v6 record layout:** with recordCount≈268,792 and the type+idx section located at the end, work
-   backwards to find the detail section (validate by `unk0&0xff ∈ 0..26`, `offset < 1 GB`, `size` sane) and the
-   hash/name sections. Validate end-to-end by resolving one record → seek `offset` in `NN.rdbdata` → confirm a
-   plausible resource header (FCTX/PNG/zlib/etc.).
-2. **Decide tool vs own parser:** either patch rdbreader to accept v6 (add the v6 header delta + section order),
-   or write a small v6 index reader in C# (`Faolan.Importer`), reusing the v5/v7 field meanings.
-3. Then proceed to Phase 1 (type inventory) and Phase 2 (per-type parse), as below.
+1. **Crack the v6 detail encoding by ANCHORING on a known resource** (blind validation is too noisy):
+   take a known `(type, idx)` from a packet — e.g. the create-world script references `1010003:3147889`,
+   `1010003:137283`, ... (the `playorskip` payload) — find that exact `(type,idx)` pair in the type+idx
+   section to get its record index *i*, read section1 record *i*, and confirm which u32s give a `(file, offset,
+   size)` that resolves to a real resource in `NN.rdbdata`. That pins the detail layout and section1 stride.
+2. **Decide tool vs own parser:** either patch the cloned rdbreader's v5 path for the v6 deltas (header size +
+   section reorder + detail stride), or write a small v6 index reader in C# (`Faolan.Importer`) reusing the
+   v5/v7 field meanings (`file = byte & 0xff`, `offset`, `size`).
+3. Then proceed to Phase 1 (type inventory) and Phase 2 (per-type parse), as below. First targets once the
+   index reads: `TEXTSCRIPT` (dialogue/strings), then whatever type holds item templates (cross-ref captured
+   health-potion template 180450), then `MONSTERDATA` (NPC HP).
 
 ## Decision gate
 After **Phase 0 + Phase 1** (cheap: index parse + type inventory) we'll know whether the structured game data is
