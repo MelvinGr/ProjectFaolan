@@ -175,14 +175,25 @@ Filenames `1000010`=1 (the id→filename table). Item-template type still TBD (s
 potion 180450). TextStrings = the dialogue/UI text (the `TDC2` format is documented); `1030002` category +
 the `/data/text/*.tdbl` language lists map strings to languages.
 
-### Implementation (next)
-1. **`Faolan.Importer --rdb <RDB dir>`**: parse `le.idx` (v5), select wanted types, read each entry from
-   `NN.rdbdata`, strip `IOz1`+size, zlib-inflate, parse the type payload, upsert into the DB. One-time/optional
-   like `--archive`; only derived rows land in `faolan.db` (27 GB not committed). Handle entries that aren't
-   `IOz1`/zlib-wrapped (some may be stored raw) defensively.
-2. First targets: **TextStrings (1030002 `TDC2`)** → dialogue/UI text by id (unblocks conversation content),
-   then **MONSTERDATA (1010201)** → NPC HP for combat, then find the item-template type, then Playfield/Treasure.
-3. Cross-validate against our ground truth (captured item identities, the lvl-23 sheet, conversation nodes).
+### Implementation
+**Done:** `Faolan.Importer --rdb <RDB dir>` with `RdbReader` (le.idx v5/v7 parse + `IOz1`/zlib entry decode,
+validated against the real client - 873,588 entries) and a **resource-type inventory** (counts + friendly
+names; the foundation for locating the data resources).
+
+**Design decision — do NOT bulk-store text in the DB.** The server references strings by `id`+`category` and
+the client renders them from its own RDB, so the runtime DB only needs the **structured data the server can't
+get from the client** (item-template identity, NPC stats, spawn/treasure tables) plus the **ids** to reference.
+The `TDC2` text format is fully decoded (validated: dialogue in categories like 50013/50014) and can resolve a
+specific id on demand for dev, but we won't dump all ~hundreds-of-thousands of strings into `faolan.db`.
+
+**Next (structured data → DB):**
+1. Find the **item-template** type id (cross-ref the captured health-potion template 180450 / archetype
+   `0x4847505A`) and decode its payload → item `Data1..4` + archetype → `Items` (makes all items buildable).
+2. Decode **MONSTERDATA (1010201, 3,185 entries)** payload → NPC max HP → combat (`CharacterMaxStats`-style or
+   an NPC-stats table).
+3. (later) conversation/quest structure (which ids to reference), Playfield/Treasure.
+   Each needs per-type payload RE (the inventory + RdbReader make this straightforward to iterate). Cross-validate
+   against ground truth (captured item identities, the lvl-23 sheet, conversation nodes).
 
 ### Phase 0 conclusion (2026-06-08)  [superseded by the breakthrough above]
 v6 is **fully reverse-engineerable but it's a real project, not a quick crack.** Mapped so far: the resource
