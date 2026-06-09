@@ -29,7 +29,7 @@ namespace Faolan.ClientLauncher
 			var exe = Environment.GetEnvironmentVariable("AOC_EXE") ?? DefaultExe;
 			string? username = null, password = null, charname = null, wine = null, universeAddr = null;
 			var proton = Environment.GetEnvironmentVariable("PROTON") ?? DefaultProton;
-			bool dx10 = false, dryRun = false, noConsole = true, streamOutput = false, patchLogin = false;
+			bool dx10 = false, dryRun = false, noConsole = true, streamOutput = false, patchLogin = false, detach = false;
 
 			for (var i = 0; i < args.Length; i++)
 			{
@@ -51,6 +51,9 @@ namespace Faolan.ClientLauncher
 					// wineconsole window). Also drops -noconsole so the client doesn't suppress its own logging.
 					case "--console": noConsole = false; streamOutput = true; break;
 					case "--patch-login": patchLogin = true; break;
+					// Fire-and-forget: with --universeaddr, revert the config shortly after the client has read it
+					// and return, instead of holding the foreground until the client exits.
+					case "--detach": detach = true; break;
 					case "--dry-run" or "-n": dryRun = true; break;
 					case "--help" or "-h": PrintHelp(); return 0;
 					default:
@@ -191,6 +194,12 @@ namespace Faolan.ClientLauncher
 
 					DumpNewLogContent(logPath, pos);
 				}
+				else if (originalUniverseAddr is not null && detach)
+				{
+					// Wait only until the client has read LocalConfig, then fall through to revert and return -
+					// the client keeps running.
+					WaitForClientStartup();
+				}
 				else if (originalUniverseAddr is not null)
 				{
 					proc.WaitForExit();
@@ -276,6 +285,41 @@ namespace Faolan.ClientLauncher
 			{
 				return pos;
 			}
+		}
+
+		// For --detach: wait until the client process is up (it reads LocalConfig at startup) plus a grace window,
+		// so we don't revert UniverseAddr before the client has read it. Proton cold-start can be slow, hence the
+		// generous timeout + grace.
+		private static void WaitForClientStartup()
+		{
+			var deadline = Environment.TickCount64 + 60_000;
+			while (Environment.TickCount64 < deadline && !ClientIsRunning())
+				Thread.Sleep(250);
+
+			Thread.Sleep(12_000); // grace for the engine to read UniverseAddr after the process appears
+		}
+
+		private static bool ClientIsRunning()
+		{
+			if (OperatingSystem.IsWindows())
+				return Process.GetProcessesByName("AgeOfConan").Length > 0 || Process.GetProcessesByName("AgeOfConanDX10").Length > 0;
+
+			foreach (var dir in Directory.EnumerateDirectories("/proc"))
+			{
+				if (!int.TryParse(Path.GetFileName(dir), out _))
+					continue;
+				try
+				{
+					if (File.ReadAllText(Path.Combine(dir, "comm")).Trim().StartsWith("AgeOfConan", StringComparison.Ordinal))
+						return true;
+				}
+				catch
+				{
+					// vanished/unreadable
+				}
+			}
+
+			return false;
 		}
 
 		// Set a child-process env var only if it isn't already set in the real environment (so the shell can override).
@@ -396,6 +440,8 @@ namespace Faolan.ClientLauncher
 				  -c, --charname <s>  auto-enter this character
 				  --universeaddr [a]  point LocalConfig.xml <UniverseAddr> (the login server) at `a` for this
 				                      session, reverted on exit; bare flag = 127.0.0.1:7010 (replaces /etc/hosts)
+				  --detach            with --universeaddr: revert + return once the client has read the config,
+				                      instead of holding the foreground until the client exits
 				  --console           run in the foreground and tail AgeOfConan.log into THIS terminal (same content
 				                      as the client console, no separate wineconsole window); also drops -noconsole
 				  --patch-login       patch the client's DH key (Funcom -> CELLAO) in memory after launch so the
