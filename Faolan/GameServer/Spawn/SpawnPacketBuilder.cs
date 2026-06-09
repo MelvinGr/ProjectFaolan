@@ -119,6 +119,42 @@ namespace Faolan.GameServer.Spawn
 			return result;
 		}
 
+		// Rebuilds the CharacterStats component (the 0x22 field right after the name) from a typed CharacterStats,
+		// adjusting the same enclosing length prefixes SetSpawnName does (@0 body length, @133, @304 - both enclose
+		// this block) by the size delta. Operates on the known Strie-template layout (0x22 at CharacterStatsTagOffset,
+		// single-byte length prefix), returning the body unchanged otherwise. Apply BEFORE SetSpawnName: this block
+		// follows the name, so the name's own splice is unaffected, but this offset is only valid while the name is
+		// still the template's. Re-encoding the captured stats unchanged is a byte-identical no-op (the build-side
+		// oracle); override only the fields whose DB mapping is confirmed.
+		public static byte[] SetCharacterStats(byte[] body, ProtoCoreCharacterIIR.CharacterStats stats)
+		{
+			if (body.Length <= CharacterStatsTagOffset + 1 || body[CharacterStatsTagOffset] != 0x22)
+				return body;
+
+			var oldLen = body[CharacterStatsTagOffset + 1];
+			if (oldLen >= 0x80)
+				return body; // multi-byte length prefix not handled
+
+			var payload = stats.ToProtobufBytes();
+			if (payload.Length >= 0x80)
+				return body; // keep the length prefix a single byte
+
+			var delta = payload.Length - oldLen;
+			var payloadStart = CharacterStatsTagOffset + 2;
+			var afterSrc = payloadStart + oldLen;
+
+			var result = new byte[body.Length + delta];
+			Array.Copy(body, 0, result, 0, payloadStart); // through the 0x22 tag + length byte
+			result[CharacterStatsTagOffset + 1] = (byte)payload.Length;
+			payload.CopyTo(result, payloadStart);
+			Array.Copy(body, afterSrc, result, payloadStart + payload.Length, body.Length - afterSrc);
+
+			AddBigEndian(result, 0, delta); // body length field
+			AddBigEndian(result, NameOuterLengthOffset, delta); // @133 (encloses name + CharacterStats)
+			AddBigEndian(result, NameInnerLengthOffset, delta); // @304
+			return result;
+		}
+
 		private static void AddBigEndian(byte[] buffer, int offset, int delta)
 		{
 			var value = (uint)(BinaryPrimitives.ReadUInt32BigEndian(buffer.AsSpan(offset, 4)) + delta);

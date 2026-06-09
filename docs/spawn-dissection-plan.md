@@ -32,11 +32,21 @@ which is the bulk of the FA015807 body and the hardest dissection.
   **re-encodes byte-identical** (`CharacterStatsRoundTripTests`), so it can be built from a typed object — the
   build-side oracle for sourcing it from the DB is in place.
 
+- **CharacterStats splice BUILT** (2026-06): `SpawnPacketBuilder.SetCharacterStats(body, stats)` rebuilds the
+  component from a typed `CharacterStats`, length-adjusting @0/@133/@304 like `SetSpawnName`
+  (`CharacterStatsRoundTripTests`: captured-stats splice is a byte-identical no-op; a growing override adjusts all
+  three prefixes). NOT wired into the live replay yet — see the field-mapping blocker below.
+- **Field-mapping status** (for sourcing from DB): `race` (field 3) maps cleanly to the `Race` enum
+  (Aquilonian=1 / Cimmerian=2 / Stygian=3 == decoded values). `sex` (field 1) does NOT: the wire carries 2/3 while
+  the `Sex` enum is Male=0/Female=1 (looks like an offset/encoding — UNCONFIRMED, needs a known-sex capture).
+  `life`/`health` scale vs `CharacterMaxStats` also unconfirmed.
+
 Next up:
-1. **Phase 3 — appearance from DB**: rebuild the CharacterStats component from the DB character (sex/race/class +
-   `CharacterMaxStats`), splicing it in like `SetSpawnName` (it sits after the variable-length name and is itself
-   variable-length, so the enclosing length prefixes need the same delta treatment). Then the LooksPacket
-   (meshes/morphs/tints) — the bulk.
+1. **Phase 3 — wire CharacterStats from DB**: override `race` (clean) + the vitals once their scale is confirmed,
+   via `SetCharacterStats` in `TryRebuildPlayerSpawnFromDb` (apply BEFORE `SetSpawnName`). Hold `sex` until the
+   2/3-vs-0/1 mapping is pinned. CAUTION: identity fields must stay consistent with the appearance meshes
+   (LooksPacket) or the client may render/​crash wrong — so the safe live cut-over may wait until looks are mapped.
+   Then the LooksPacket (meshes/morphs/tints) — the bulk.
 2. **Phase 4 — NPC spawns from `Npcs`/`NpcBodies`** (the builder already generalizes to NPC FA015807 bodies).
 3. Conversation content import (full dialogue trees) — separate, larger.
 
