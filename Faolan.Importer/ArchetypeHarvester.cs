@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using Faolan.Core.Data;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
+using Faolan.GameServer.Packets._0x737A6DF9_Test;
 
-namespace Faolan.GameServer.Packets._0x737A6DF9_Test
+namespace Faolan.Importer
 {
 	// Harvests the full identity of every item seen in captured 0x737A6DF9 snapshots: the template id, the
 	// Data1..4 identity quad (tail field-1 payload), and the archetype (tail.f8). The quad + archetype are exactly

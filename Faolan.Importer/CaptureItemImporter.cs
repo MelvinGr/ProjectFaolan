@@ -3,7 +3,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
-using Faolan.GameServer.Packets._0x737A6DF9_Test;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
