@@ -202,9 +202,13 @@ and tied to an open TODO. Ranked by value.
    beach chunk in burst chunks 0–1 (early, not truncated). So the scry sequence is server-side-correct — the
    `invalid camera path` / unbound-Kalanthes failure is upstream, in the EDITOR (galley) phase (see TODO #7 pin;
    next step is a live create-world loopback pcap diff, which needs running the server+client, not static RE).
-7. **The Lua `GameInterface` API as a Rosetta stone.** 101 `com.GameInterface.*` namespaces (FactionInterface,
-   FeatWindows, ProgressBars, Targeting, …) + the UI Lua scripts in the RDB map "server packet → what the UI does",
-   useful for verifying any of the above (quest tracker, feat windows, mail, target frames).
+7. **The Lua `GameInterface` API as a Rosetta stone** — ✅ EXE-SIDE CATALOG DONE (2026-06-09) →
+   **`docs/aoc-gameinterface-api.md`**. Extracted the 42 `GameInterface.*` UI module namespaces + 50+ classes
+   from `AgeOfConan.exe` and tied the gameplay ones to the server packets that drive them (`Game.Dynel`←spawns,
+   `Game.TargetingInterface`←target frame, `ProgressBars`←vitals `0x96B8DC59`, `Game.BuffData`←ApplySpell/ability
+   grant, `Game.Camera`/`ScryWidgets`←cutscene, `Fifo`←`ShowClientFIFO`, `Inventory`←snapshot, etc.). **The
+   method-level "server event → UI action" map is NOT in the exe** — it's in the RDB `com.GameInterface.*` Lua
+   scripts (the deeper layer, pull per-module when a specific UI needs tracing). Verification aid, not a fix.
 8. **Lower-but-cheap:** login/version constants (`territoryVersion` / `communityVersion` fields seen in the
    `Authenticate` proxy sigs); and using the validation strings themselves as a **build safety net** — emitting
    fields in the client's stated order guarantees packets it accepts (avoids `Dispatcher call ... failed`
