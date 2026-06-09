@@ -64,8 +64,12 @@ namespace Faolan.Tests
 		{
 			var v = EntityVitals.FromMax(63, 63, 63);
 
-			// count(03) + Health(001B)=189C + Stamina(01F8)=189C + Mana(01FA)=189C  (63 * 100 = 6300 = 0x189C)
-			Assert.Equal("030000001b0000189c000001f80000189c000001fa0000189c", ToHex(v.ToVitalsBlock().ToArray()));
+			// Full entity (current == max == 63 -> raw 6300 = 0x189C). Emits the current AND max id per vital:
+			// count(06) + HealthCurrent(0001) + HealthMax(001B) + StaminaCurrent(01F9) + StaminaMax(01F8)
+			//           + ManaCurrent(01FB) + ManaMax(01FA), each = 0x189C.
+			Assert.Equal(
+				"06000000010000189c0000001b0000189c000001f90000189c000001f80000189c000001fb0000189c000001fa0000189c",
+				ToHex(v.ToVitalsBlock().ToArray()));
 		}
 
 		private static string ToHex(byte[] bytes)

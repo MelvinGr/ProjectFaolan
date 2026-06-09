@@ -30,10 +30,17 @@ namespace Faolan.GameServer.Combat
 			Health = (uint)next;
 		}
 
-		/// <summary>The current vitals as a Health/Stamina/Mana stat block for a <c>0x96B8DC59</c> update.</summary>
+		/// <summary>
+		///     The vitals as a <c>0x96B8DC59</c> stat block, emitting the current AND max id for each of
+		///     Health/Stamina/Mana (the retail pairing - see docs/player-stats.md). Previously this sent the current
+		///     value under the MAX id, so a damaged entity reported max == currentHP and the health bar never moved.
+		/// </summary>
 		public CharacterStatBlock ToVitalsBlock()
 		{
-			return new CharacterStatBlock().Set(LegacyCharacterStatId.Health, Health).Set(LegacyCharacterStatId.Stamina, Stamina).Set(LegacyCharacterStatId.Mana, Mana);
+			return new CharacterStatBlock()
+				.Set(LegacyCharacterStatId.HealthCurrent, Health).Set(LegacyCharacterStatId.HealthMax, MaxHealth)
+				.Set(LegacyCharacterStatId.StaminaCurrent, Stamina).Set(LegacyCharacterStatId.StaminaMax, MaxStamina)
+				.Set(LegacyCharacterStatId.ManaCurrent, Mana).Set(LegacyCharacterStatId.ManaMax, MaxMana);
 		}
 
 		/// <summary>Creates a full-health entity (current == max) from max values.</summary>

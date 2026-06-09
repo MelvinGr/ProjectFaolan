@@ -11,19 +11,20 @@ namespace Faolan.Tests
 		[Fact]
 		public void Build_VitalsBlock_MatchesCapturedBytes()
 		{
-			var block = new CharacterStatBlock().Set(LegacyCharacterStatId.Health, 63).Set(LegacyCharacterStatId.Stamina, 63).Set(LegacyCharacterStatId.Mana, 63);
+			// Captured packet sends the MAX ids (0x1B/0x1F8/0x1FA) - an entity announcing its full vitals on spawn.
+			var block = new CharacterStatBlock().Set(LegacyCharacterStatId.HealthMax, 63).Set(LegacyCharacterStatId.StaminaMax, 63).Set(LegacyCharacterStatId.ManaMax, 63);
 
 			Assert.Equal(3, block.Count);
 
-			// count(03) + Health(001B)=189C + Stamina(01F8)=189C + Mana(01FA)=189C
+			// count(03) + HealthMax(001B)=189C + StaminaMax(01F8)=189C + ManaMax(01FA)=189C
 			Assert.Equal("030000001b0000189c000001f80000189c000001fa0000189c", ToHex(block.ToArray()));
 		}
 
 		[Fact]
 		public void Set_AppliesVitalsScale()
 		{
-			// Health is a ×100 vital: display 63 -> raw 6300 (0x189C).
-			var block = new CharacterStatBlock().Set(LegacyCharacterStatId.Health, 63);
+			// HealthMax is a ×100 vital: display 63 -> raw 6300 (0x189C).
+			var block = new CharacterStatBlock().Set(LegacyCharacterStatId.HealthMax, 63);
 			Assert.Equal("010000001b0000189c", ToHex(block.ToArray()));
 		}
 

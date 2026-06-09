@@ -8,18 +8,22 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 	/// </summary>
 	public enum LegacyCharacterStatId : uint
 	{
-		MaxHealth = 0x0001,
-		Health = 0x001B,
+		// Vitals are sent as a (current, max) pair per stat in the 0x96B8DC59 update. Verified across 90 capture
+		// records (the invariant current &lt;= max holds 100%, see docs/player-stats.md): the LARGER-valued id of
+		// each pair is the max. The pair ids are adjacent for stamina/mana but NOT for health (current = 0x0001).
+		// NOTE: this corrects the previous labels, which had current/max swapped on all three vitals.
+		HealthCurrent = 0x0001,
+		HealthMax = 0x001B,
 		PvpExp = 0x0033,
 		Exp = 0x0034,
 		Level = 0x0036,
 		PvpLevel = 0x0046,
 		MaxExp = 0x015E,
 		PvpMaxExp = 0x0161,
-		Stamina = 0x01F8,
-		MaxStamina = 0x01F9,
-		Mana = 0x01FA,
-		MaxMana = 0x01FB,
+		StaminaMax = 0x01F8,
+		StaminaCurrent = 0x01F9,
+		ManaMax = 0x01FA,
+		ManaCurrent = 0x01FB,
 		KillingBlows = 0x0290,
 		Death = 0x0292,
 		AnnihilationWin = 0x029A,
@@ -58,7 +62,7 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 		{
 			return statId switch
 			{
-				LegacyCharacterStatId.MaxHealth or LegacyCharacterStatId.Health or LegacyCharacterStatId.Stamina or LegacyCharacterStatId.MaxStamina or LegacyCharacterStatId.Mana or LegacyCharacterStatId.MaxMana => 100,
+				LegacyCharacterStatId.HealthCurrent or LegacyCharacterStatId.HealthMax or LegacyCharacterStatId.StaminaMax or LegacyCharacterStatId.StaminaCurrent or LegacyCharacterStatId.ManaMax or LegacyCharacterStatId.ManaCurrent => 100,
 
 				LegacyCharacterStatId.Strength or LegacyCharacterStatId.Constitution or LegacyCharacterStatId.Intelligence or LegacyCharacterStatId.Wisdom or LegacyCharacterStatId.Dexterity => 10,
 
@@ -76,31 +80,31 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 	/// </summary>
 	public sealed class CapturedCharacterStats
 	{
-		public decimal? Health =>
-			HealthRaw is null
+		public decimal? HealthMax =>
+			HealthMaxRaw is null
 				? null
-				: HealthRaw.Value / 100m;
+				: HealthMaxRaw.Value / 100m;
 
-		public decimal? Mana =>
-			ManaRaw is null
+		public decimal? ManaMax =>
+			ManaMaxRaw is null
 				? null
-				: ManaRaw.Value / 100m;
+				: ManaMaxRaw.Value / 100m;
 
-		public decimal? MaxStamina =>
-			MaxStaminaRaw is null
+		public decimal? StaminaCurrent =>
+			StaminaCurrentRaw is null
 				? null
-				: MaxStaminaRaw.Value / 100m;
+				: StaminaCurrentRaw.Value / 100m;
 
 		public uint? AnnihilationLosses { get; set; }
 		public uint? CaptureSkullLosses { get; set; }
 		public uint? CaptureSkullWins { get; set; }
-		public uint? HealthRaw { get; set; }
+		public uint? HealthMaxRaw { get; set; }
 
 		public uint? Level { get; set; }
 
-		public uint? ManaRaw { get; set; }
+		public uint? ManaMaxRaw { get; set; }
 
-		public uint? MaxStaminaRaw { get; set; }
+		public uint? StaminaCurrentRaw { get; set; }
 		public uint? OverallDeaths { get; set; }
 		public uint? OverallKills { get; set; }
 		public uint? PvpLevel { get; set; }
@@ -109,16 +113,16 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 		{
 			switch (entry.StatId)
 			{
-				case LegacyCharacterStatId.Health:
-					HealthRaw = entry.RawValue;
+				case LegacyCharacterStatId.HealthMax:
+					HealthMaxRaw = entry.RawValue;
 					break;
 
-				case LegacyCharacterStatId.Mana:
-					ManaRaw = entry.RawValue;
+				case LegacyCharacterStatId.ManaMax:
+					ManaMaxRaw = entry.RawValue;
 					break;
 
-				case LegacyCharacterStatId.MaxStamina:
-					MaxStaminaRaw = entry.RawValue;
+				case LegacyCharacterStatId.StaminaCurrent:
+					StaminaCurrentRaw = entry.RawValue;
 					break;
 
 				case LegacyCharacterStatId.Level:

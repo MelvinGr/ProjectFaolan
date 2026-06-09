@@ -47,7 +47,9 @@ namespace Faolan.GameServer
 		// CharacterStatBlock applies the ×100 vitals scale.
 		private static Task SendVitals(INetworkClient client, uint health, uint stamina, uint mana)
 		{
-			var stats = new CharacterStatBlock().Set(LegacyCharacterStatId.Health, health).Set(LegacyCharacterStatId.Stamina, stamina).Set(LegacyCharacterStatId.Mana, mana);
+			// Values are the character's MAX stats, so emit them under the max ids (matches the retail spawn
+			// pattern, which sends max-only and lets the client show full bars).
+			var stats = new CharacterStatBlock().Set(LegacyCharacterStatId.HealthMax, health).Set(LegacyCharacterStatId.StaminaMax, stamina).Set(LegacyCharacterStatId.ManaMax, mana);
 
 			return SendStatUpdate(client, stats);
 		}

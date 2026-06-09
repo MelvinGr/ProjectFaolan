@@ -172,12 +172,17 @@ and tied to an open TODO. Ranked by value.
      the client's failing resource ids are playfield *child* lookups (local RDB), not server-sent — which
      reinforces the client-side-RDB diagnosis. See the TODO #7 pin for the one remaining server-side check (the
      later Tortage Beach scry chunk).
-4. **Stat / attribute id table** (TODO: wrong stat ids in `CapturedCharacterStats.cs`) — ⚠ NOT strings-easy
-   (probed 2026-06-09). `Strength`, `Constitution`, `Dexterity`, `Intelligence`, `Wisdom`, `MaxHealth`,
-   `MaxStamina`, `MaxMana`, `Level` are all strings in the binary, but the name↔**id** pairing is NOT in the
-   string table (the ids are small enums, e.g. Level=0x36, defined in a header/`luabind` enum registration or the
-   RDB stat DataTable). Recovering it needs disasm of the enum registration OR the RDB stat table — not a grep.
-   Fix targets: the bogus `MaxHealth 0x01` / suspect `MaxStamina 0x1F9` / `MaxMana 0x1FB`.
+4. **Stat / attribute id table** (was: wrong stat ids in `CapturedCharacterStats.cs`) — ✅ VITALS DONE FROM
+   CAPTURES (2026-06-09), no disasm needed; attributes still open. The name↔**id** pairing isn't in the string
+   table (ids are small enums), BUT the vitals current/max ids fell out of the `0x96B8DC59` packet directly: the
+   6-record updates carry a (current, max) pair per Health/Stamina/Mana, and the `current <= max` invariant holds
+   100% across the captures, so the larger-valued id of each pair is the max. Result (overturns the old swapped
+   labels): Health cur=`0x0001`/max=`0x001B`, Stamina cur=`0x01F9`/max=`0x01F8`, Mana cur=`0x01FB`/max=`0x01FA`.
+   Fixed in `LegacyCharacterStatId` + `EntityVitals.ToVitalsBlock` (now emits both ids per vital — the old code
+   sent the current value under the max id, so damaged entities reported `max == currentHP`). See
+   `docs/player-stats.md`. **Still open:** the **attributes** (`Strength`/`Constitution`/`Dexterity`/`Intelligence`/
+   `Wisdom`) — probed earlier as NOT plain stat records (likely client-computed base+gear+buffs); recovering those
+   would need the RDB stat DataTable or disasm of the enum registration.
 5. **Appearance morphs** (TODO: currently "blocked, needs one-morph-at-a-time captures"). `SetMorphValueIIR`
    layout + the morph-slot enum from the binary could unblock this WITHOUT the captures, since the client defines
    the morph id space.
