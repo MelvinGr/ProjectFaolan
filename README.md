@@ -374,7 +374,8 @@ name). The launcher runs e.g. `AgeOfConan.exe -noconsole -clienthash <md5> -key 
 (`Faolan.Core.Crypt.ConanLaunchToken` is the `-key` generator, reusing the shared `Tea` cipher; verified to
 reproduce a captured launcher key). Run `dotnet run --project Faolan.ClientLauncher -- --dry-run` to see the
 computed flags, or add `-u/-p/-c` for auto-login. For real password validation, also run
-`tools/patch_aoc_login_key.py` against the running client.
+`tools/patch_aoc_login_key.py` against the running client. **Full guide (all flags, the `--universeaddr` server
+redirect, the ConanPatcher RE, and the loopback-capture automated-testing workflow): `docs/client-launcher.md`.**
 
 ### Client-side logs (ground truth for "why did the client reject it")
 
