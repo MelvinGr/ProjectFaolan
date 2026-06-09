@@ -32,7 +32,8 @@ namespace Faolan.PlayerAgent
 		];
 
 		private static readonly byte[] Sender = [0x0d, 0x84, 0x04, 0xf2, 0x82, 0x10, 0x02];
-		private static readonly byte[] ServiceConnectionSender = [0x0D, 0x16, 0x91, 0x35, 0x1D, 0x10, 0x5A];
+		// Sub-id 0x08 confirmed from the login dump (the 0x1A07 service handoffs all use ...10 08).
+		private static readonly byte[] ServiceConnectionSender = [0x0D, 0x16, 0x91, 0x35, 0x1D, 0x10, 0x08];
 
 		private Task SendAgentServer(INetworkClient client)
 		{

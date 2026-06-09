@@ -123,7 +123,9 @@ namespace Faolan.CSPlayerAgent
 
 				case CsPlayerAgentOpcodes.Ox2077:
 				{
-					// Logger.LogInformation("Opcodes.Ox2077");
+					// The client polls GroupFinder activity summaries with 0x2077; retail answers each with a 0x20A5
+					// (verified in the login dump: four 0x2077 -> four 0x20A5). Same response body as 0x202F.
+					await SendQuickGuildSummary(client, packet);
 
 					break;
 				}

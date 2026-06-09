@@ -163,8 +163,9 @@ namespace Faolan.PlayerAgent
 
 				case PlayerAgentOpcodes.Ox20EC: // after 0x20B9
 				{
-					await SendAgentServer(client);
+					// Retail order (login dump): CsPlayerAgent, then AgentServer, then GameServer, then gametweaks.
 					await SendCsPlayerAgent(client);
+					await SendAgentServer(client);
 					await SendGameServer(client);
 
 					await new PacketStream()

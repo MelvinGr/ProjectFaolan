@@ -66,6 +66,19 @@ namespace Faolan.AgentServer
 
 					Logger.LogInformation("AgentServer hello decoded: unk0={Unk0:X}, clientInstance={ClientInstance:X8}, accountId={AccountId:X8}", unk0, clientInstance, accountId);
 
+					// Retail sends the full chat-channel subscription list FIRST (one 0x003C per channel), then the
+					// 0x0005 ready marker, the 0x0014 character info, and finally the welcome message. Verified from
+					// the raw pcap (the analyzer drops AgentServer S->C). Channel ids/types are fixed per channel,
+					// except ~Playfield whose id is the character's current map. ~Trial carries 0x00008244, the rest
+					// 0x00008044 (a per-channel flag).
+					var mapId = client.Session.Character?.MapId ?? 0x00000FAA;
+					await SendChannelSubscription(client, 0x04, 0x0000232A, "~Trial", 0x00008244);
+					await SendChannelSubscription(client, 0x04, 0x00002328, "~Global", 0x00008044);
+					await SendChannelSubscription(client, 0x04, 0x00002329, "~LFG", 0x00008044);
+					await SendChannelSubscription(client, 0x11, 0x00002335, "~GlobalEnglish", 0x00008044);
+					await SendChannelSubscription(client, 0x90, mapId, "~Playfield", 0x00008044);
+					await SendChannelSubscription(client, 0x87, 0x001E8480, "~NewbieHelp", 0x00008044);
+
 					await new FaolanStream().WriteUInt32(0x00050000).SendAsync(client);
 
 					await new FaolanStream().WriteUInt16(AgentServerRespondsOpcodes.Ox0014).WriteArrayUInt16Length(s => s.WriteUInt32(client.Session.Account.ClientInstance).WriteUInt32(0x00000000).WriteString(
@@ -75,9 +88,6 @@ namespace Faolan.AgentServer
 
 					await SendSystemMessage(client, Configuration.WelcomeString); //.Replace("$BUILDSTRING", Statics.BuildString));
 					await SendSystemMessage(client, Statics.BuildString.Replace("\n", "<br />"));
-
-					await new FaolanStream().WriteUInt16(AgentServerRespondsOpcodes.Ox003C).WriteArrayUInt16Length(s => s.WriteByte(0x04).WriteUInt32(0x0000232A).WriteString("~Trial").WriteUInt32(0x00008044).WriteUInt16(0x0000))
-						.SendAsync(client);
 
 					break;
 				}
