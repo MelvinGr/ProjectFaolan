@@ -32,11 +32,18 @@ namespace Faolan.Tests
 				await File.WriteAllBytesAsync(path, bytes);
 			}
 
-			Assert.Equal(await File.ReadAllBytesAsync(path), bytes);
+			var golden = await File.ReadAllBytesAsync(path);
+			if (!golden.SequenceEqual(bytes))
+				await File.WriteAllBytesAsync(path + ".actual", bytes);
+			Assert.Equal(golden, bytes);
 		}
 
 		[Fact]
 		public Task CreationScriptBurst_IsByteStable() =>
 			AssertBurstStable("CreationScriptBurst", GameServerListener.SendRetailCreateEditorCreationScriptBurst);
+
+		[Fact]
+		public Task InitialBurst_IsByteStable() =>
+			AssertBurstStable("InitialBurst", GameServerListener.SendRetailCreateEditorInitialBurst);
 	}
 }
