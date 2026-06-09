@@ -76,11 +76,18 @@ script-trigger sequence is essentially working.
   CLIENT-SIDE intro script couldn't bind Kalanthes) — consistent with the scene/AI data not loading.
 
 These `... does not exist in any RDB sources` lookups are the client's LOCAL RDB; the server doesn't serve RDB
-resources. So the root blocker is a **client data gap** (this install's RDB lacks the Tortage-intro playfield
-cinematic / static-AI-point child resources). No server packet change fixes a missing client resource.
-- NEXT: confirm whether `1000519:4000` / `1066604:4010` exist in this client's RDB (rdb-extraction tooling) vs
-  the client the captures came from. If genuinely absent → cutscene can't render here regardless of server;
-  pivot to making the post-cutscene state playable. If present → we're advertising the wrong playfield instance.
+resources. **Retail plays this cutscene on this same client, and the 27 GB rdbdata is intact (`Found 974.5 MB
+Unused space in all rdbdata files`) — so the data is NOT absent.** Corrected read (2026-06-09):
+- NOT a server packet defect, NOT data-absence. The leading suspect is the client-side
+  `ERROR: ResourceManager - No project defined, ... running dreamworld control center and selecting a project
+  should fix it` (log line 3). The client recovers enough to load base geometry/names, but **project-scoped**
+  resources — exactly the intro cinematic camera paths + static-AI-points — don't resolve, so EVERY camera path
+  fails uniformly. Geometry loads; cinematic doesn't. That's a client project-config issue, not our server.
+- Our `le.idx` (importer index) is a CURATED SUBSET (195 types, lacks playfield type 51100 entirely) — it CANNOT
+  confirm/deny these resources. Definitive check needs parsing the client's real `RDBHashIndex.bin` (RDHI v6).
+- NEXT: (a) CLIENT — check/repair the Dreamworld project config (the `No project defined` error); cheap, possibly
+  decisive. (b) TOOLING — parse `RDBHashIndex.bin` to confirm the cinematic resources for pf 4000/4010 exist (we
+  have the dumps), proving the data's present and the issue is resolution/config, not absence.
 
 **Secondary server-side cleanups (won't alone fix the cutscene, but worth doing):**
 - `rpc - ... OverrideGameTweaks() ... stream bad after 'overrides'!` → `Dispatcher call ... (OverrideGameTweaks)
