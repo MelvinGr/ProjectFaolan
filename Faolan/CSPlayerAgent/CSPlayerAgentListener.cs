@@ -144,6 +144,15 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
+				case CsPlayerAgentOpcodes.Ox20C5:
+				{
+					// The client echoes a GroupFinder remoteformat back to us (e.g.
+					// token="GroupFinderCharacterLeftPlayfield") - a notification the server consumes; no response
+					// needed (retail pushes its own 0x20C5 downloads separately). Consume it so it isn't logged
+					// as an unhandled packet.
+					break;
+				}
+
 				case CsPlayerAgentOpcodes.Ox20D0:
 				{
 					var unk0 = packet.Body.ReadUInt32();
