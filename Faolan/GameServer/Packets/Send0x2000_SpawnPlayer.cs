@@ -454,12 +454,24 @@ namespace Faolan.GameServer
 
 			return new PacketStream().WriteHeader(sender0, receiver0, 0x00002000).WriteArrayUInt32Length(s => s.WriteUInt32(GameServer0X2000RespondsOpcodes.Spawn).WriteUInt32(0x0000C350)
 				.WriteUInt32(client.Session.Account.ClientInstance).WriteUInt32(0x00000000)
-				// more protobuf stuff
-				.WriteByte(0x2C).WriteByte(0x0A).WriteByte(0x0F).WriteByte(0x0D).WriteFloat(client.Session.Character.Position.X).WriteByte(0x15).WriteFloat(client.Session.Character.Position.Y).WriteByte(0x1D)
-				.WriteFloat(client.Session.Character.Position.Z).WriteByte(0x12).WriteByte(0x14)
-				// This exact 20-byte section is normal protobuf fixed32 data:
-				// 0x0D field 1, 0x15 field 2, 0x1D field 3, 0x25 field 4.
-				.WriteByte(0x0D).WriteFloat(rotation.X).WriteByte(0x15).WriteFloat(rotation.Y).WriteByte(0x1D).WriteFloat(rotation.Z).WriteByte(0x25).WriteFloat(rotation.W).WriteArray(packetData0_1)
+				// Position (ProtoVec3, field 1) + rotation (ProtoQuat, field 2): both fixed32-float messages,
+				// built from the generated schema types (protobuf-net writes the floats little-endian, same as
+				// WriteFloat). Locked byte-identical to the old hand-rolled tags by SpawnTransformGoldenTests.
+				.WriteByte(0x2C)
+				.WriteByte(0x0A).WriteArrayByteLength(new ProtoVec3
+				{
+					X = client.Session.Character.Position.X,
+					Y = client.Session.Character.Position.Y,
+					Z = client.Session.Character.Position.Z
+				}.ToProtobufBytes())
+				.WriteByte(0x12).WriteArrayByteLength(new ProtoQuat
+				{
+					X = rotation.X,
+					Y = rotation.Y,
+					Z = rotation.Z,
+					W = rotation.W
+				}.ToProtobufBytes())
+				.WriteArray(packetData0_1)
 				// During character creation the row is not named yet; use a placeholder so the world
 				// entry (which is what gets the client off the loading screen) can spawn the player.
 				// The real name is committed later via the TheNameIs script callback.
