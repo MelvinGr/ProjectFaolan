@@ -209,19 +209,35 @@ and tied to an open TODO. Ranked by value.
    grant, `Game.Camera`/`ScryWidgets`←cutscene, `Fifo`←`ShowClientFIFO`, `Inventory`←snapshot, etc.). **The
    method-level "server event → UI action" map is NOT in the exe** — it's in the RDB `com.GameInterface.*` Lua
    scripts (the deeper layer, pull per-module when a specific UI needs tracing). Verification aid, not a fix.
-8. **Lower-but-cheap:** login/version constants (`territoryVersion` / `communityVersion` fields seen in the
-   `Authenticate` proxy sigs); and using the validation strings themselves as a **build safety net** — emitting
-   fields in the client's stated order guarantees packets it accepts (avoids `Dispatcher call ... failed`
-   disconnects), which de-risks every new packet we craft.
+8. **Lower-but-cheap:** login/version constants + the field-order safety net — ✅ CHECKED, NO ACTION NEEDED
+   (2026-06-09). The version fields are the **3rd Authenticate arg** in all three variants (`PlayerAgent`
+   `territoryVersion`, `CSPlayerAgent` `communityVersion`, `GameAgent` `Authenticate2 cGameClientVersionString`)
+   and are **client→server** — the client computes them at runtime from its data (the exe has only the
+   `CommunityVersion`/`TerritoryVersion` config-key strings, **no static numeric constant** to extract). We
+   receive them and don't need to generate or validate them (login is stubbed to accept anything, see
+   [[login_encryption]]); login works. The "build safety net" (emit fields in the client's stated order) is
+   already the project's standing methodology — every packet is cross-checked against `Captures/*.json` and
+   "retail bytes win" ([[client_protobuf_schema]]). So nothing to do here.
 
-Progress (2026-06-09): the genuinely **easy** parts are done — #1 (full field-order catalog + type legend), the
-`reverse_hash_ids.py` tool for #2, and the **`OverrideGameTweaks` fix** (#2's named-tweak lead — done + de-magicked,
-turned out to be plaintext not hashed; see above). #2 is now CLOSED with no productive target left (both its leads —
-gametweaks and TradePost — proved to be plaintext-token protocols, not name-hashes). #4 (stat ids) and #5/#6 still
-need more than `strings` (packet-structure decoding, RDB, or disasm). **Best next spike: #3** — re-run the
-proto descriptor dump and pair each IIR message to its Stage-3a id; one pass makes the whole `0x2000` channel
-(combat / quests / morphs / loot) typed-decodable, and is the prerequisite that makes #2's "targeted" body-id
-naming actually usable.
+Progress (2026-06-09): **the entire Stage-5 backlog (#1–#8) has now been worked through.** Outcomes:
+- **#1** field-order catalog + type legend — ✅ done.
+- **#2** reverse-hash body ids — ✅ CLOSED, no productive target (both leads, gametweaks + TradePost, proved to be
+  plaintext-token protocols, not name-hashes); the `OverrideGameTweaks` disconnect was fixed + de-magicked.
+- **#3** IIR↔id pairing — ✅ investigated (3 wire-mapped descriptors; the combat/quest IIRs are raw-stream).
+- **#4** stat ids — ✅ vitals current/max ids recovered **from captures** (no disasm), combat HP-bar bug fixed;
+  attributes still open (client-computed / RDB).
+- **#5** morphs — ⚠ binary angle dead (RDB-defined), but the editor embeds the slot in the name; mapped the
+  captured face morphs. Rendering still blocked on a looks/`SetMorphValueIIR` broadcast (raw IIR layout).
+- **#6** cutscene/scry — ✅ fully decoded + server-side replay VERIFIED correct on both connections; the bug is in
+  the editor (galley) phase, which needs a live loopback pcap diff (not static RE).
+- **#7** GameInterface UI catalog — ✅ exe-side catalog done (`docs/aoc-gameinterface-api.md`); method-level map is
+  in the RDB Lua scripts.
+- **#8** login/version constants — ✅ checked, no action (client-computed, client→server, login works).
+
+**What's left is no longer static RE** — the open threads now need either (a) a live create-world loopback capture
+(#6 editor-phase diff, the TODO #7 ⭐ pin), or (b) RDB extraction (#5 face-morph table, #7 Lua scripts, #4
+attributes), or (c) building new packets (the #5 looks broadcast, the mail/auction feature). The `strings`/RTTI/
+BKDR-31 toolbox has given everything it can.
 
 ## Risks / unknowns
 - **Hash input ambiguity** (bare vs namespaced vs decorated) — mitigated by the multi-anchor brute in Stage 2.
