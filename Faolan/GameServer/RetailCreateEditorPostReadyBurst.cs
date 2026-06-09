@@ -1,14 +1,13 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 
 namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-		// Receiver family prefix; the per-session client instance varint is appended at send time.
-		private static readonly byte[] RetailCreateEditorPostReadyAckReceiverPrefix = [0x0D, 0x48, 0x76, 0x37, 0x28, 0x10];
 		private static readonly byte[] RetailCreateEditorPostReadyAckSender = [0x0D, 0xFC, 0x56, 0x97, 0x5B, 0x10, 0x59];
 
 		private static uint GetRetailCreateEditorPostReadyAckStatus(uint requestId)
@@ -20,7 +19,7 @@ namespace Faolan.GameServer
 
 		private static Task SendRetailCreateEditorPostReadyAck(INetworkClient client, uint requestId)
 		{
-			return new PacketStream().WriteHeader(RetailCreateEditorPostReadyAckSender, ReceiverWithInstance(RetailCreateEditorPostReadyAckReceiverPrefix, client.Session.Account.ClientInstance), 0x2000).WriteUInt32(0x0000C350)
+			return new PacketStream().WriteHeader(RetailCreateEditorPostReadyAckSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameServerIdType, client.Session.Account.ClientInstance), 0x2000).WriteUInt32(0x0000C350)
 				.WriteUInt32(requestId).WriteUInt32(GetRetailCreateEditorPostReadyAckStatus(requestId)).SendAsync(client);
 		}
 

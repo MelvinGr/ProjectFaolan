@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Conan;
 
 namespace Faolan.GameServer
 {
@@ -49,12 +50,12 @@ namespace Faolan.GameServer
 
 		private static byte[] LoginWorld201CReceiver(INetworkClient client)
 		{
-			return AppendVarint([0x0D, 0x91, 0xF7, 0x87, 0x8B, 0x10], client.Session.Account.ClientInstance);
+			return ConanEndpoints.EndpointBytes(ConanEndpoints.GameSpawnEndpointType, client.Session.Account.ClientInstance);
 		}
 
 		private static byte[] LoginWorldReceiver(INetworkClient client)
 		{
-			return AppendVarint([0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10], client.Session.Account.ClientInstance);
+			return ConanEndpoints.EndpointBytes(ConanEndpoints.GamePlayerType, client.Session.Account.ClientInstance);
 		}
 	}
 }

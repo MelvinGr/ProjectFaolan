@@ -2,6 +2,8 @@ using System;
 using System.Threading.Tasks;
 using Faolan.Core.Crypt;
 using Faolan.Core.Data;
+using Faolan.Core.Extensions;
+using Faolan.Core.Network.Protobuf;
 
 namespace Faolan.Core.Network.Packets
 {
@@ -69,6 +71,14 @@ namespace Faolan.Core.Network.Packets
 				WriteArray(headerData);
 
 			return this;
+		}
+
+		// Typed header: build the sender/receiver ProtoEndpoints (type + instance) instead of hand-rolled byte
+		// arrays. Serializes each endpoint to its [0x0D <type> 0x10 <instance>] bytes and reuses the byte[] framing,
+		// so the output is byte-identical to the literal-array overload (locked by ProtoEndpointGoldenTests).
+		public PacketStream WriteHeader<T>(ProtoEndpoint sender, ProtoEndpoint receiver, T opcode, byte[] headerData = null) where T : struct
+		{
+			return WriteHeader(sender.ToProtobufBytes(), receiver.ToProtobufBytes(), opcode, headerData);
 		}
 
 		public PacketStream WriteHeaderProto<T>(byte[] sender, byte[] receiver, T opcode, byte[] headerData = null) where T : struct

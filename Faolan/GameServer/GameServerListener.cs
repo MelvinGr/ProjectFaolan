@@ -549,11 +549,12 @@ namespace Faolan.GameServer
 			}
 		}
 
-		// The create-editor 0x2000 receiver: a fixed conversation-family prefix followed by the session's
-		// client instance encoded as a varint. Replaces the old hardcoded receiver that baked in 0x021662C8.
+		// The create-editor 0x2000 receiver: the player object (GamePlayerType) addressed to this session's
+		// client instance. Built as a typed ProtoEndpoint so the type+instance can't drift (the old hardcoded
+		// receiver baked in 0x021662C8; see ConanEndpoints / ProtoEndpointGoldenTests).
 		private static byte[] CreateEditorReceiver(INetworkClient client)
 		{
-			return ReceiverWithInstance([0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10], client.Session.Account.ClientInstance);
+			return ConanEndpoints.EndpointBytes(ConanEndpoints.GamePlayerType, client.Session.Account.ClientInstance);
 		}
 
 		// The post-creation WORLD connection: the second (world) connection opened after the 0x2002 enter-world
@@ -569,16 +570,6 @@ namespace Faolan.GameServer
 		private static bool IsRetailCreateEditorFlow(INetworkClient client)
 		{
 			return client.Session.Character?.Name == null;
-		}
-
-		// Builds a conversation id from a family prefix and the client instance encoded as a varint tail.
-		private static byte[] ReceiverWithInstance(byte[] prefix, uint instance)
-		{
-			var instanceVarint = EncodeVarint(instance);
-			var receiver = new byte[prefix.Length + instanceVarint.Length];
-			Array.Copy(prefix, receiver, prefix.Length);
-			Array.Copy(instanceVarint, 0, receiver, prefix.Length, instanceVarint.Length);
-			return receiver;
 		}
 
 		private static byte[] WithEmbeddedCharacterId(byte[] payload, int offset, uint characterId)
