@@ -9,16 +9,29 @@ namespace Faolan.Core
 	public sealed class FileLoggerProvider : ILoggerProvider
 	{
 		private readonly StreamWriter _streamWriter;
+		private readonly Timer _flushTimer;
 
 		public FileLoggerProvider(string path)
 		{
 			Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
-			_streamWriter = new StreamWriter(new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite)) { AutoFlush = true };
+			// AutoFlush is OFF: flushing on every line turns each log call into a synchronous disk write under a
+			// lock, which causes severe lag spikes under the in-world packet stream (hundreds of log lines/sec).
+			// Buffer the writes and flush on a timer instead - logs still appear within ~1s, without the per-line
+			// disk I/O on the hot path.
+			_streamWriter = new StreamWriter(new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite)) { AutoFlush = false };
+			_flushTimer = new Timer(_ =>
+			{
+				lock (FileLogger.Lock)
+					_streamWriter.Flush();
+			}, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
 		}
 
 		public void Dispose()
 		{
+			_flushTimer.Dispose();
+			lock (FileLogger.Lock)
+				_streamWriter.Flush();
 			_streamWriter.Dispose();
 		}
 
@@ -30,7 +43,7 @@ namespace Faolan.Core
 
 	public sealed class FileLogger : ILogger
 	{
-		private static readonly Lock Lock = new Lock();
+		internal static readonly Lock Lock = new Lock();
 		private readonly string _categoryName;
 		private readonly TextWriter _writer;
 

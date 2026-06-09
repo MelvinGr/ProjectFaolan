@@ -50,8 +50,13 @@ namespace Faolan.GameServer
 				? (uint)((reqTail[^4] << 24) | (reqTail[^3] << 16) | (reqTail[^2] << 8) | reqTail[^1])
 				: 0u;
 
+			// Only deal damage to a real enemy: an attack with no target selected (or one that resolves to the
+			// player's own handle) must NOT hit the player - that was the "attack hits myself" bug.
+			var hasEnemyTarget = targetHandle != 0 && targetHandle != instance;
 			var level = (ushort)(client.Session.Character?.Level ?? 1);
-			var damage = (uint)CombatResolver.ResolveSpellDamage(abilityId, level);
+			var damage = hasEnemyTarget
+				? (uint)CombatResolver.ResolveSpellDamage(abilityId, level)
+				: 0u;
 			var next = (ushort)(seq + 1);
 
 			// 1) BehaviorControlCenterIIR ack - releases the swing.
@@ -62,7 +67,7 @@ namespace Faolan.GameServer
 					.WriteUInt32(1).WriteUInt32(0x0000C350u).WriteUInt32(instance).WriteUInt32(0) // result: count, c350, actor=player, 0
 					.WriteByte(0x06).WriteUInt32(0x000000CDu).WriteUInt32(0).WriteUInt32(1).WriteUInt32(damage).WriteUInt32(2).WriteUInt32(0).WriteUInt32(0)).SendAsync(client);
 
-			if (targetHandle != 0)
+			if (hasEnemyTarget)
 			{
 				// 2) DamageResultIIR - the hit / floating number.
 				await new PacketStream().WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x2000).WriteArrayUInt32Length(s =>
