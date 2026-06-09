@@ -87,6 +87,22 @@ her create-world conversation isn't in the captures the analyzer can extract yet
 ## 7. Create-world Kalanthes intro  (commit: answer create-world spawn polls per-entity) ⭐ highest priority
 The auto-cutscene where you wash ashore and Kalanthes walks up + starts the chat.
 
+### ⭐ LATEST 2026-06-09 (end of session) — PINNED. Two-port done; cutscene bug is in the EDITOR phase.
+DONE & confirmed in-client: (a) **two-port GameServer** — `WorldGameServerListener` on realm.Port+1 (7015), handoff
+advertises it, client does a real `redir=1` reconnect (commits 6bb3cdc + 2513fc2); (b) **gametweaks** apply (19)
+(commit 40d4bc0); (c) **create-world burst rebuilt clean** from the hoxxling capture via constructive PacketStream
+(commit e8be7ba, generator `Captures/gen_createworld_burst.py`).
+**The cutscene STILL fails identically** (invalid camera paths, `ThisIsKalanthes`=123456789, broken geometry,
+disconnect). **DECISIVE: two totally different world bursts (dikketest vs hoxxling) → byte-identical failure ⇒ the
+world-burst content is irrelevant.** Ruled out: client is fine (same client plays the intro on RETAIL — user
+confirmed); RDB-miss + sex/race errors are benign; transition mechanics match retail (plain 0x206E→0x2002; retail
+beach is also a ~300ms Pf-Proxy load — the earlier "loading screen / same-port" theory below is therefore a RED
+HERRING for the cutscene). The editor burst was the CONSTANT across both world-burst tests ⇒ **the bug is in the
+EDITOR (galley) phase** (the drowning cutscene should play on the galley right after PlayOrSkip but never does).
+**NEXT (pinned):** capture our create-world loopback pcap (7014/7015), `--dump` it, and diff the EDITOR stream
+packet-by-packet vs the hoxxling editor `:7018` to find the first divergence that arms the cutscene. Full diagnosis
+in the auto-memory `createworld_cutscene_diagnosis`. Everything below is earlier (partly superseded) analysis.
+
 ### PINNED 2026-06-09 (logs-test/AgeOfConan.log + logs.txt + screenshot)
 **The intro now TRIGGERS — real progress.** Server sends MapChange→4000 (Slave Galley) + 16 SpawnObject +
 6 FA015807 entity spawns + answers the spawn-polls with SpawnChecks. Client receives the `PlayOrSkip` then
