@@ -155,26 +155,14 @@ namespace Faolan.GameServer
 						Logger.LogInformation("New-character create connection (clientInstance={ClientInstance:X8}): sending the character-creator (editor) burst.", clientInstance);
 						await SendRetailCreateEditorInitialBurst(client);
 					}
-					else if (await Database.GetMapWorldBurst(client.Session.Character.MapId ?? 0) is { } worldBurst)
+					else
 					{
-						// Existing-character login on a map that has a captured world burst in the DB (the beach plus
-						// the player's other maps): replay it, re-addressed to this character, so the client builds the
-						// playfield and renders the NPCs. The 0x201c handshake still comes from us; the player's own
-						// position/name are rebuilt from the DB. This generalizes (and retired) the embedded beach blob.
-						Logger.LogInformation("World-burst login (map={Map}, '{Name}'): replaying {Count} packets from the DB.", client.Session.Character.MapId, client.Session.Character.Name, worldBurst.Packets.Count);
-						await Send0X201C(client);
-						await ReplayMapWorldBurst(client, worldBurst);
-						await GrantStartingAbilities(client);
-					}
-					else // TODO: Convert previous else statement + this one to normal login flow, with data from db etc.
-					{
-						// No captured world burst for this map: the hand-built fallback (no NPCs/world objects).
-						await Send0X201C(client);
-						await MapChange(client);
-						await SpawnPlayer(client);
-						await Send0x2000_0x737A6DF9_Test(client);
-
-						await SetTimeOfDay(client);
+						// Existing-character login: the DB-driven world entry - replay the character's current-map
+						// world burst (or the beach burst as a universal fallback), re-addressed to this character, so
+						// the client builds the playfield and renders the NPCs. The 0x201c handshake comes from us; the
+						// player's own position/name/inventory are rebuilt from the DB. (The old hand-built fallback -
+						// MapChange/SpawnPlayer + a hardcoded-path inventory .bin - was removed; see SendWorldEntry.)
+						await SendWorldEntry(client);
 						await GrantStartingAbilities(client);
 					}
 

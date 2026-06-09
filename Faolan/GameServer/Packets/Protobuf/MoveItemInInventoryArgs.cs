@@ -1,3 +1,4 @@
+using System;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protobuf;
 using ProtoBuf;
@@ -10,7 +11,7 @@ namespace Faolan.GameServer.Packets.Protobuf
 	// The outer args stay a wire-tolerant (non-required) model rather than reusing the generated
 	// ProtoMoveInventoryItemIIR, because DropItem sends only the source side and that type's IsRequired fields
 	// would throw on the missing destination.
-	[ProtoContract]
+	[ProtoContract, Obsolete("Use generated")]
 	public sealed class MoveItemInInventoryArgs : FaolanProtobufMessage
 	{
 		[ProtoMember(3)]

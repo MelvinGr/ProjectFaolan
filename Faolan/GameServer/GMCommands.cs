@@ -63,19 +63,7 @@ namespace Faolan.GameServer
 			client.Session.Character.Rotation = map.Rotation;
 			await Database.SaveCharacter(client.Session.Character);
 
-			if (await Database.GetMapWorldBurst(map.Id) is { } worldBurst)
-			{
-				await Send0X201C(client);
-				await ReplayMapWorldBurst(client, worldBurst);
-			}
-			else
-			{
-				await Send0X201C(client);
-				await MapChange(client);
-				await SpawnPlayer(client);
-				await Send0x2000_0x737A6DF9_Test(client);
-				await SetTimeOfDay(client);
-			}
+			await SendWorldEntry(client);
 
 			var mapLabel = string.IsNullOrEmpty(map.Name)
 				? map.Id.ToString()

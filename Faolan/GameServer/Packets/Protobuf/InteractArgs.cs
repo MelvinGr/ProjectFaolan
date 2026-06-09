@@ -1,9 +1,10 @@
+using System;
 using Faolan.Core.Network.Packets;
 using ProtoBuf;
 
 namespace Faolan.GameServer.Packets.Protobuf
 {
-	[ProtoContract]
+	[ProtoContract, Obsolete("Use generated")]
 	public sealed class InteractArgs : FaolanProtobufMessage
 	{
 		[ProtoMember(10)]
@@ -25,7 +26,7 @@ namespace Faolan.GameServer.Packets.Protobuf
 		public ulong TypeId { get; set; }
 	}
 
-	[ProtoContract]
+	[ProtoContract, Obsolete("Use generated")]
 	public sealed class CastSpellTarget
 	{
 		[ProtoMember(1)]

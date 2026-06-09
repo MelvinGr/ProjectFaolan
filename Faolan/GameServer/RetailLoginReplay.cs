@@ -155,9 +155,35 @@ namespace Faolan.GameServer
 				recordId, count);
 		}
 
-		// Replays a map's captured world burst (from the DB) in place of the hand-built MapChange/SpawnPlayer path,
-		// re-addressed from the burst's captured instance to the logged-in character. Works for ANY map that has a
-		// stored burst (beach included - its burst is the proven blob, seeded into the DB by Faolan.Importer).
+		// Tortage Beach (0xFAA/4010) - the universal fallback world. Its burst is always seeded (the proven blob), so
+		// any character whose own map has no usable burst still enters a real, rendered world instead of a hand-built
+		// one. (There is no hand-built login/teleport path anymore.)
+		private const uint DefaultWorldMapId = 0x00000FAA;
+
+		// The single existing-character WORLD ENTRY used by both login and the teleport GM command: send the 0x201c
+		// channel handshake, then replay the character's current-map world burst from the DB (MapChange + world
+		// objects + NPC spawns + the player spawn + the inventory snapshot, all re-addressed and DB-driven). Falls
+		// back to the beach burst for any map without a usable burst. The caller has already set Character.MapId/Pos.
+		private async Task SendWorldEntry(INetworkClient client)
+		{
+			await Send0X201C(client);
+
+			var mapId = client.Session.Character.MapId ?? 0;
+			var worldBurst = await Database.GetMapWorldBurst(mapId) ?? await Database.GetMapWorldBurst(DefaultWorldMapId);
+			if (worldBurst == null)
+			{
+				Logger.LogError("World entry (map={Map}, '{Name}'): no world burst available (not even the beach); the world cannot be built.", mapId, client.Session.Character?.Name);
+				return;
+			}
+
+			Logger.LogInformation("World entry (map={Map}, '{Name}'): replaying {Count} packets from the DB ({Source}).", mapId, client.Session.Character?.Name, worldBurst.Packets.Count,
+				worldBurst.MapId == mapId ? "own map" : $"beach fallback (map {worldBurst.MapId})");
+			await ReplayMapWorldBurst(client, worldBurst);
+		}
+
+		// Replays a map's captured world burst (from the DB), re-addressed from the burst's captured instance to the
+		// logged-in character. Works for ANY map that has a stored burst (beach included - its burst is the proven
+		// blob, seeded into the DB by Faolan.Importer).
 		private async Task ReplayMapWorldBurst(INetworkClient client, MapWorldBurst burst)
 		{
 			var packets = burst.Packets.OrderBy(p => p.Sequence).Select(p => p.Data).ToList();
