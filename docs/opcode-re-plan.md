@@ -131,11 +131,15 @@ and tied to an open TODO. Ranked by value.
    `Captures/reverse_hash_ids.py` BKDR-31-matches 32-bit body words against every exe identifier, but a **blind**
    scan is too noisy: the hash over ~60k tokens collides with random 4-byte windows (lengths/floats/strings), so
    the non-opcode hits are mostly junk (`wTrL`, `PjES`, `ShadowMapType`). It only pays off **targeted at a field
-   already located by packet structure**. Concrete leads it still serves: the **TradePost/RemoteFormat tokens**
-   (`TradePostGUI_*`, `NPCChatTextType_e`, `</remoteformat>`, `DispatchShowClientFIFO(remoteFormat)`), and the
-   **`OverrideGameTweaks` disconnect** — the method is `DispatchOverrideGameTweaks(overrides)` (Player + GameChar
-   interfaces); `overrides` is a *collection* of `GameTweak<H/I/M/N/_N>` (int/uint/float/bool, from the
-   `RDBGameTweaks` DataTable), so fixing our malformed packet needs that nested per-tweak encoding — NOT easy.
+   already located by packet structure**. Concrete lead it still serves: the **TradePost/RemoteFormat tokens**
+   (`TradePostGUI_*`, `NPCChatTextType_e`, `</remoteformat>`, `DispatchShowClientFIFO(remoteFormat)`).
+   - **`OverrideGameTweaks` disconnect — ✅ DONE (2026-06-09), and it turned out NOT to be a reverse-hash case.**
+     `DispatchOverrideGameTweaks(overrides)` (Player + GameChar interfaces); `overrides` is a collection of
+     tweaks, but the tweak names are **plaintext length-prefixed strings on the wire**, NOT name-hashes — so no
+     reverse-hashing was needed. Wire format decoded: `[u32 header 0x00004ED4][ per tweak: u16 nameLen, ASCII
+     name, f64 BE value ] *`. The fix (40d4bc0) replayed retail's 630-byte body verbatim; now de-magicked into the
+     named `GameTweaks` catalog (`Faolan/PlayerAgent/GameTweaks.cs`, the 19 tweaks as `(name, value)` pairs +
+     `WriteDoubleBigEndian`), guarded byte-for-byte by `GameTweaksTests`. Client applies all 19 tweaks; no disconnect.
 3. **Pair the protobuf IIR descriptors to the Stage-3a ids.** ✅ INVESTIGATED (2026-06-09) — premise corrected.
    Re-ran the descriptor dump: the exe embeds exactly **16** `FileDescriptorProto`s (Util, CoreCharacterIIR,
    FullCharacterIIR, ContainerAddItemIIR, GameCodeDynelIIR, SimpleDynelIIR, LootBagIIR, ScryScriptIIR,
@@ -179,9 +183,11 @@ and tied to an open TODO. Ranked by value.
    fields in the client's stated order guarantees packets it accepts (avoids `Dispatcher call ... failed`
    disconnects), which de-risks every new packet we craft.
 
-Progress (2026-06-09): the genuinely **easy** parts are done — #1 (full field-order catalog + type legend) and the
-`reverse_hash_ids.py` tool for #2. Probing showed #2 (blind), #4 (stat ids), #5/#6 and the `OverrideGameTweaks`
-fix all need more than `strings` (packet-structure decoding, RDB, or disasm). **Best next spike: #3** — re-run the
+Progress (2026-06-09): the genuinely **easy** parts are done — #1 (full field-order catalog + type legend), the
+`reverse_hash_ids.py` tool for #2, and the **`OverrideGameTweaks` fix** (#2's named-tweak lead — done + de-magicked,
+turned out to be plaintext not hashed; see above). Probing showed #2 (blind), #4 (stat ids), and #5/#6 still need
+more than `strings` (packet-structure decoding, RDB, or disasm); #2's remaining live lead is the TradePost tokens.
+**Best next spike: #3** — re-run the
 proto descriptor dump and pair each IIR message to its Stage-3a id; one pass makes the whole `0x2000` channel
 (combat / quests / morphs / loot) typed-decodable, and is the prerequisite that makes #2's "targeted" body-id
 naming actually usable.

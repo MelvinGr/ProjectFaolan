@@ -353,10 +353,10 @@ The AoC client writes its own log - invaluable when the client silently stalls/d
 `/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/AgeOfConan.log` (current session) and
 `.../OldLogs/AgeOfConan<UTC-timestamp>.log` (rotated). Timestamps are `Z`/UTC (local = UTC+2). Look for
 `stream bad`, `Dispatcher call ... failed`, `Playfield.Loading`, and `ResourceManager ... does not exist`
-(the last are expected - the client is missing most RDB assets). KNOWN PRE-EXISTING (every session, harmless):
+(the last are expected - the client is missing most RDB assets). (FIXED 40d4bc0 + de-magicked: the
 `DispatchOverrideGameTweaks ... stream bad after 'overrides'` / `Dispatcher call 2085091171 (OverrideGameTweaks)
-failed` - a game-tweaks/overrides packet we send is malformed; the client disconnects that one route but
-recovers. Worth fixing for cleanliness; not a login blocker.
+failed` disconnect is gone - the client now applies all 19 gametweaks; the body is built from the named
+`GameTweaks` catalog, see `Faolan/PlayerAgent/GameTweaks.cs` + `GameTweaksTests`.)
 
 ### Dissection workbench & tooling (`Captures/*.py`, `Faolan/GameServer/Spawn/`)
 
@@ -533,8 +533,9 @@ Concrete next steps, grouped by area. See `docs/` for the dissection writeups be
       trade-post UI protocol.
 
 ### Cleanup
-- [ ] Fix the malformed **`OverrideGameTweaks` (`0x2085...`)** packet — client logs `stream bad after
-      'overrides'` and drops that route every session (harmless, not a login blocker).
+- [x] **Fix the malformed `OverrideGameTweaks` packet** — DONE (40d4bc0; de-magicked into the named
+      `GameTweaks` catalog + `GameTweaksTests`). Client applies all 19 gametweaks; the `stream bad after
+      'overrides'` disconnect is gone.
 - [x] **Analyzer "tail-drop" on ~3 GS streams — NOT A BUG (verified).** Re-checked by replaying the
       reassembler in python: those 3 captures (Strie-create/Strie-login `:7029`, faolanx-charcreation `:7018`)
       have genuine small **8-byte sequence gaps** (segments lost during capture, e.g. 7029 missing 8 bytes at

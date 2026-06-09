@@ -144,8 +144,8 @@ Diffed `logs-test/retail-client.log` (working retail create-world) against `logs
 | `No project defined` | 1 | 1 | **BENIGN** (both) — NOT the cause |
 | `does not exist in any RDB` | **182** | 128 | **BENIGN** — retail has MORE missing-RDB and still works |
 | `invalid camera path` | **0** | 7 | ours-only — the real symptom |
-| `OverrideGameTweaks` stream-bad/disconnect | 0 | 1 | ours-only |
-| `ApplyDynamicGameTweaks: Applying N gametweaks` | **19** | 0 | retail applies 19; ours applies 0 (the OverrideGameTweaks fails) |
+| `OverrideGameTweaks` stream-bad/disconnect | 0 | ~~1~~ 0 | **FIXED** (40d4bc0 + de-magicked into `GameTweaks` catalog) |
+| `ApplyDynamicGameTweaks: Applying N gametweaks` | **19** | ~~0~~ 19 | **FIXED** — ours now applies all 19 too |
 | `ThisIsKalanthes` object | (resolves) | `123456789:123456789` | ours: Kalanthes dynel unbound |
 
 So the RDB-missing + No-project errors are **benign** (retail has them, more even) — the prior client-RDB/

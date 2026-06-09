@@ -33,9 +33,21 @@ namespace Faolan.PacketAnalyzer
 			_compressionStates.Clear();
 			_protocolDetector = new PacketProtocolDetector(_portSettings, endpointProtocols: _endpointProtocols);
 
-			_captureScanner.Process(path, ShouldInspectPacket, TransformPayload, OnPacketReceived);
+			_captureScanner.Process(path, ShouldInspectPacket, TransformPayload, OnPacketReceived, ResolveFramingMode);
 
 			return _packets.ToArray();
+		}
+
+		// The AgentServer speaks inline-framed packets ([u16 opcode][u16 length][body]) in BOTH directions, unlike
+		// the length-prefixed ConanPacket servers. Without this its server->client stream is read as length-prefixed
+		// and silently dropped (the first 0x003C channel packet is mistaken for a multi-megabyte length). Key off the
+		// detected AgentServer port so both the client Hello and the server's channel/char-info/welcome burst parse.
+		private PacketFramingMode ResolveFramingMode(PacketCaptureContext context)
+		{
+			var agentServerPort = _portSettings.AgentServerPort;
+			return agentServerPort != 0 && (context.SourcePort == agentServerPort || context.DestinationPort == agentServerPort)
+				? PacketFramingMode.AgentServerInline
+				: PacketFramingMode.LengthPrefixed;
 		}
 
 		private byte[]? DecompressFlowBytes(string flowKey, GameServerCompressionState state, byte[] bytes)

@@ -255,6 +255,16 @@ namespace Faolan.Core.Data
 			return WriteArray(buffer);
 		}
 
+		// Big-endian double for RAW packet bodies (not protobuf fields). Matches the wire format for the
+		// OverrideGameTweaks values; see WriteFloatBigEndian above for the raw-body endianness rationale.
+		public FaolanStream WriteDoubleBigEndian(double value)
+		{
+			Span<byte> buffer = stackalloc byte[sizeof(double)];
+			BinaryPrimitives.WriteDoubleBigEndian(buffer, value);
+
+			return WriteArray(buffer);
+		}
+
 		public FaolanStream WriteQuaternion(Quaternion value)
 		{
 			WriteFloat(value.X);
