@@ -20,6 +20,7 @@ namespace Faolan.PacketAnalyzer
 
 		private readonly PacketFramingMode _framingMode;
 		private byte[]? _packetBuffer;
+		private byte[] _inlineBuffer = [];
 		private int _currentPacketCounter;
 		private int _markerTailRemaining;
 		private int _packetBytesRead;
@@ -195,27 +196,39 @@ namespace Faolan.PacketAnalyzer
 
 		private void ReadInlinePackets(long ticks, byte[] data)
 		{
+			// AgentServer packets ([u16 opcode][u16 bodyLength][body]) can span TCP segments, so buffer the leftover
+			// bytes between calls instead of dropping a partial packet (which desynced the stream and fed a garbage
+			// length to the parser).
+			_inlineBuffer = _inlineBuffer.Length == 0
+				? data
+				: _inlineBuffer.Concat(data).ToArray();
+
 			var offset = 0;
-			while (offset + sizeof(ushort) * 2 <= data.Length)
+			while (offset + sizeof(ushort) * 2 <= _inlineBuffer.Length)
 			{
-				var length = BitConverter.ToUInt16(data.Skip(offset + sizeof(ushort)).Take(sizeof(ushort)).Reverse().ToArray(), 0);
-				if (length == 0)
-					return;
+				var bodyLength = (ushort)((_inlineBuffer[offset + 2] << 8) | _inlineBuffer[offset + 3]);
+				var totalPacketLength = bodyLength + sizeof(ushort) * 2;
+				if (offset + totalPacketLength > _inlineBuffer.Length)
+					break; // incomplete packet - wait for the next segment
 
-				var totalPacketLength = length + sizeof(ushort) * 2;
-				if (offset + totalPacketLength > data.Length)
-					return;
+				if (bodyLength > 0)
+				{
+					var packetBytes = new byte[totalPacketLength];
+					Array.Copy(_inlineBuffer, offset, packetBytes, 0, totalPacketLength);
+					var packet = new AgentServerPacket(packetBytes);
+					if (packet.IsValid)
+					{
+						ReceivedPacket?.Invoke(ticks + "_" + _currentPacketCounter, packet);
+						_currentPacketCounter++;
+					}
+				}
 
-				var packetBytes = new byte[totalPacketLength];
-				Array.Copy(data, offset, packetBytes, 0, totalPacketLength);
-				var packet = new AgentServerPacket(packetBytes);
-				if (!packet.IsValid)
-					return;
-
-				ReceivedPacket?.Invoke(ticks + "_" + _currentPacketCounter, packet);
-				_currentPacketCounter++;
 				offset += totalPacketLength;
 			}
+
+			_inlineBuffer = offset == 0
+				? _inlineBuffer
+				: _inlineBuffer[offset..];
 		}
 
 		private void ResetPacketState()

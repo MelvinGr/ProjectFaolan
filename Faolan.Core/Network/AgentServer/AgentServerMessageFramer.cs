@@ -16,16 +16,17 @@ namespace Faolan.Core.Network.AgentServer
 
 			while (_buffer.Length >= sizeof(ushort) * 2)
 			{
-				var packetLength = (ushort)((_buffer[2] << 8) | _buffer[3]);
+				// Wire format is [u16 opcode][u16 bodyLength][body]; the length field is the BODY size, so the full
+				// packet is bodyLength + the 4-byte header (matches what the server itself sends via
+				// WriteUInt16(opcode).WriteArrayUInt16Length(...) and the retail captures).
+				var bodyLength = (ushort)((_buffer[2] << 8) | _buffer[3]);
+				var totalLength = bodyLength + sizeof(ushort) * 2;
 
-				if (packetLength < sizeof(ushort) * 2)
-					throw new InvalidOperationException($"Invalid AgentServer packet length: {packetLength}");
-
-				if (_buffer.Length < packetLength)
+				if (_buffer.Length < totalLength)
 					break;
 
-				packets.Add(_buffer.Take(packetLength).ToArray());
-				_buffer = _buffer.Skip(packetLength).ToArray();
+				packets.Add(_buffer.Take(totalLength).ToArray());
+				_buffer = _buffer.Skip(totalLength).ToArray();
 			}
 
 			return packets;
