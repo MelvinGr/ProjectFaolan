@@ -356,7 +356,7 @@ The AoC client writes its own log - invaluable when the client silently stalls/d
 (the last are expected - the client is missing most RDB assets). (FIXED 40d4bc0 + de-magicked: the
 `DispatchOverrideGameTweaks ... stream bad after 'overrides'` / `Dispatcher call 2085091171 (OverrideGameTweaks)
 failed` disconnect is gone - the client now applies all 19 gametweaks; the body is built from the named
-`GameTweaks` catalog, see `Faolan/PlayerAgent/GameTweaks.cs` + `GameTweaksTests`.)
+named `(name, value)` tweak list in `PlayerAgentListener` (Ox20EC handler) + `GameTweaksTests`.)
 
 ### Dissection workbench & tooling (`Captures/*.py`, `Faolan/GameServer/Spawn/`)
 
@@ -530,7 +530,10 @@ Concrete next steps, grouped by area. See `docs/` for the dissection writeups be
 
 ### Mail / auction / trade-post (`docs/capture-events.md`)
 - [ ] Implement the **`0x2002 category=629`** token remoteformats (`TradePostGUI_*`) — the mail/auction/
-      trade-post UI protocol.
+      trade-post UI protocol. It's plaintext `remoteformat` XML (token/category/`<parameter>` all human-readable,
+      no name-hashing — confirmed via reverse-hash, see opcode-re-plan #2), but **blocked on captures**: only
+      ONE token (`TradePostGUI_MailItemBought`) appears across all captures; the listing/buy/sell flow needs a
+      fresh capture before it can be built.
 
 ### Cleanup
 - [x] **Fix the malformed `OverrideGameTweaks` packet** — DONE (40d4bc0; de-magicked into the named
