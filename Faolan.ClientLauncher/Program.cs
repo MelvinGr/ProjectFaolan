@@ -29,7 +29,7 @@ namespace Faolan.ClientLauncher
 			var exe = Environment.GetEnvironmentVariable("AOC_EXE") ?? DefaultExe;
 			string? username = null, password = null, charname = null, wine = null, universeAddr = null;
 			var proton = Environment.GetEnvironmentVariable("PROTON") ?? DefaultProton;
-			bool dx10 = false, dryRun = false, noConsole = true, streamOutput = false, patchLogin = false, detach = false;
+			bool dx10 = false, dryRun = false, noConsole = true, streamOutput = false, patchLogin = false, detach = false, restore = false;
 
 			for (var i = 0; i < args.Length; i++)
 			{
@@ -54,6 +54,7 @@ namespace Faolan.ClientLauncher
 					// Fire-and-forget: with --universeaddr, revert the config shortly after the client has read it
 					// and return, instead of holding the foreground until the client exits.
 					case "--detach": detach = true; break;
+					case "--restore": restore = true; break;
 					case "--dry-run" or "-n": dryRun = true; break;
 					case "--help" or "-h": PrintHelp(); return 0;
 					default:
@@ -74,6 +75,14 @@ namespace Faolan.ClientLauncher
 			{
 				Console.Error.WriteLine($"Client not found: {exe}\nPass --exe <path> or set the AOC_EXE env var.");
 				return 1;
+			}
+
+			// --restore: just heal a UniverseAddr left redirected by a hard-killed run (via the sidecar) and exit.
+			if (restore)
+			{
+				RecoverUniverseAddr(Path.GetDirectoryName(exe)!);
+				Console.WriteLine("restore done.");
+				return 0;
 			}
 
 			// Keep the exe as a GUI subsystem app: a CUI flip makes Wine spawn a separate wineconsole window, which
@@ -106,14 +115,26 @@ namespace Faolan.ClientLauncher
 
 			var gameDir = Path.GetDirectoryName(exe)!;
 
-			// Point the client's login server (LocalConfig.xml <UniverseAddr>) at ours for this session, reverting
-			// it after the client exits (and on Ctrl+C / process exit) so the file is left as we found it.
+			// Heal a UniverseAddr left redirected by a previous run that was hard-killed before it could revert
+			// (SIGKILL is uncatchable; `dotnet run` may not forward signals). The sidecar holds the real value.
+			RecoverUniverseAddr(gameDir);
+
+			// Point the client's login server (LocalConfig.xml <UniverseAddr>) at ours for this session. The
+			// original value is written to a sidecar first so the redirect survives a crash (next run heals it),
+			// and reverted after the client exits (and on Ctrl+C / process exit).
 			var originalUniverseAddr = universeAddr is null ? null : SetUniverseAddr(gameDir, universeAddr);
 			if (originalUniverseAddr is not null)
 			{
+				File.WriteAllText(SidecarPath(gameDir), originalUniverseAddr);
 				var revertTo = originalUniverseAddr;
-				Console.CancelKeyPress += (_, _) => SetUniverseAddr(gameDir, revertTo);
-				AppDomain.CurrentDomain.ProcessExit += (_, _) => SetUniverseAddr(gameDir, revertTo);
+				void Revert()
+				{
+					SetUniverseAddr(gameDir, revertTo);
+					try { File.Delete(SidecarPath(gameDir)); } catch { /* ignore */ }
+				}
+
+				Console.CancelKeyPress += (_, _) => Revert();
+				AppDomain.CurrentDomain.ProcessExit += (_, _) => Revert();
 			}
 
 			var psi = new ProcessStartInfo
@@ -210,11 +231,39 @@ namespace Faolan.ClientLauncher
 				if (originalUniverseAddr is not null)
 				{
 					SetUniverseAddr(gameDir, originalUniverseAddr);
+					try { File.Delete(SidecarPath(gameDir)); } catch { /* ignore */ }
 					Console.WriteLine($"reverted UniverseAddr -> {originalUniverseAddr}");
 				}
 			}
 
 			return proc.HasExited ? proc.ExitCode : 0;
+		}
+
+		// Sidecar holding the real <UniverseAddr> while we've redirected it, so a hard-killed run can be healed.
+		private static string SidecarPath(string gameDir) => Path.Combine(gameDir, "LocalConfig.xml.faolan-revert");
+
+		// If a prior run left the sidecar (redirect not reverted), restore UniverseAddr from it and remove it.
+		private static void RecoverUniverseAddr(string gameDir)
+		{
+			var sidecar = SidecarPath(gameDir);
+			if (!File.Exists(sidecar))
+				return;
+
+			try
+			{
+				var saved = File.ReadAllText(sidecar).Trim();
+				if (saved.Length > 0)
+				{
+					SetUniverseAddr(gameDir, saved);
+					Console.WriteLine($"recovered stale UniverseAddr redirect -> {saved}");
+				}
+
+				File.Delete(sidecar);
+			}
+			catch (Exception e)
+			{
+				Console.Error.WriteLine($"UniverseAddr recovery failed: {e.Message}");
+			}
 		}
 
 		// Set LocalConfig.xml's <UniverseAddr> (the client's login server) to `addr`, returning the previous value
@@ -442,6 +491,7 @@ namespace Faolan.ClientLauncher
 				                      session, reverted on exit; bare flag = 127.0.0.1:7010 (replaces /etc/hosts)
 				  --detach            with --universeaddr: revert + return once the client has read the config,
 				                      instead of holding the foreground until the client exits
+				  --restore           heal a UniverseAddr left redirected by a hard-killed run (via the sidecar), exit
 				  --console           run in the foreground and tail AgeOfConan.log into THIS terminal (same content
 				                      as the client console, no separate wineconsole window); also drops -noconsole
 				  --patch-login       patch the client's DH key (Funcom -> CELLAO) in memory after launch so the

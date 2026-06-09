@@ -61,9 +61,11 @@ Faolan.ClientLauncher [options]
   -p, --password <s>  auto-login password
   -c, --charname <s>  auto-enter this character
   --universeaddr [a]  point LocalConfig.xml <UniverseAddr> at `a` for the session (bare = 127.0.0.1:7010),
-                      reverted on exit (and on Ctrl+C / process exit). Replaces an /etc/hosts override.
+                      reverted on exit (and on Ctrl+C / process exit). Replaces an /etc/hosts override. The
+                      original is recorded in a sidecar first, so a hard-killed run self-heals on the next launch.
   --detach            with --universeaddr: revert + return once the client has read the config (fire-and-forget),
                       instead of holding the foreground until the client exits
+  --restore           heal a UniverseAddr left redirected by a hard-killed run (via the sidecar), then exit
   --console           foreground; tail AgeOfConan.log into THIS terminal (same content as the client console,
                       no separate wineconsole window); also drops -noconsole
   --patch-login       patch the client's DH key (Funcom -> CELLAO) in memory after launch (password validation;
@@ -141,11 +143,17 @@ Faolan.ClientLauncher --universeaddr --console -u faolan -p aa -c tester
 Stop the client (`pkill -9 -f AgeOfConan` + the proton process) and the server; `--universeaddr` reverts
 `LocalConfig.xml` automatically on the launcher's exit.
 
+### Harness (`tools/client-smoke-test.sh`)
+A ready-made version of the above: starts the server, captures loopback, launches the client unattended, asserts
+the battery of markers (login → EnterWorld → GameServer traffic, gametweaks, no Dispatcher failures, pcap on
+7010+7014), and tears down (reverting `UniverseAddr`). Writes a PASS/FAIL report to `/tmp/faolan-test-report.txt`.
+
 ### Proven run (2026-06-10)
-`Faolan.ClientLauncher -u faolan -p aa -c tester --universeaddr 127.0.0.1:7010` → Proton launched the client →
-the server logged login → `EnterWorld` → in-world GameServer traffic, with **no manual interaction**; the
-launcher then reverted `UniverseAddr`. This unblocks the **TODO #7** create-world loopback-capture diff (its
-pinned next step needed exactly this repeatable live run).
+`tools/client-smoke-test.sh` → **14/14 PASS**: Proton launched the client → server logged `login accepted` →
+`RequestAuth` → `EnterWorld (0x20B6)` → CSPlayerAgent auth → in-world GameServer traffic; client applied the
+gametweaks with no Dispatcher failures; the loopback pcap held 360 packets across 7010+7014; the launcher reverted
+`UniverseAddr` and cleaned up its sidecar — all with **no manual interaction**. This unblocks the **TODO #7**
+create-world loopback-capture diff (its pinned next step needed exactly this repeatable live run).
 
 ---
 
