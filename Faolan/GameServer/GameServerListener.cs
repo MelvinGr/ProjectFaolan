@@ -434,7 +434,7 @@ namespace Faolan.GameServer
 					//Logger.LogInformation("GcPing: " + packet.Data.ToArray().ToHex());
 
 					var counter = packet.Body.ReadUInt32();
-					var time = (uint)DateTimeOffset.Now.ToUnixTimeSeconds();
+					var time = checked((uint)DateTimeOffset.Now.ToUnixTimeSeconds());
 
 					await new PacketStream().WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameServerRespondOpcodes.GcPing).WriteUInt32(counter).WriteUInt32(0x0000004E)
 						// counter  retvalue
@@ -443,7 +443,7 @@ namespace Faolan.GameServer
 						// 3        0x2c, 0x7e, 0xc6, 0xb8 -> p.540
 						// 4        0x2c, 0x7e, 0xc6, 0xb8 -> p.541
 						// 5        0x2c, 0xa6, 0xb1, 0x78 -> p.564
-						.WriteUInt32(time) // not the correct value? But still working
+						.WriteUInt32(time) // TODO: not the correct value? But still working
 						.SendAsync(client);
 
 					break;

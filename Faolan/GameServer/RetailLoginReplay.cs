@@ -351,6 +351,7 @@ namespace Faolan.GameServer
 		// raw form is always 4 bytes; the live id's varint is padded (overlong) to the captured varint's byte length
 		// so the substitution stays length-preserving even for maps whose captured instance encodes to more bytes
 		// (1000/11040 captured a 5-byte instance like 0x110099BD). We then recompute the CRC.
+		[Obsolete]
 		private static byte[] RewriteBurstInstance(byte[] packet, uint oldInstance, uint newInstance)
 		{
 			if (oldInstance == newInstance)

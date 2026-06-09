@@ -7,6 +7,7 @@ using Faolan.Core.Network.Protobuf;
 
 namespace Faolan.Core.Network.Packets
 {
+	// TODO: Unifi all the WriteHeader variants into just the ProtoEndpoint version
 	public class PacketStream : FaolanStream
 	{
 		public PacketStream()
@@ -47,6 +48,7 @@ namespace Faolan.Core.Network.Packets
 			return this;
 		}
 
+		[Obsolete("Use WriteHeader(ProtoEndpoint sender, ProtoEndpoint receiver, T opcode, byte[] headerData = null) instead.")]
 		public PacketStream WriteHeader<T>(byte[] sender, byte[] receiver, T opcode, byte[] headerData = null) where T : struct
 		{
 			WriteUInt32(0); // Write empty length

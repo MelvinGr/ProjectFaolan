@@ -83,46 +83,6 @@ namespace Faolan.GameServer
 		private static readonly byte[] Sender8 = [0x0D, 0x5D, 0xB9, 0xEC, 0xA9, 0x10, 0x4C];
 		private static readonly byte[] Sender99 = [0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x0b];
 
-		private async Task FlushPendingNewCharacterPost205FFollowUp(INetworkClient client)
-		{
-			if (!client.Session.HasPendingPost205FFollowUp || client.Session.Character?.Name != null)
-				return;
-
-			// Retail create: after 0x205F the client sends 8x 0xF98E10B3 then 5x 0x02165EFF, and the server
-			// only then sends its world-completion handoff. The live client, however, sometimes skips the
-			// 0xF98E10B3 stage entirely and only sends 0x02165EFF, so gating on 0xF98E10B3 deadlocked the
-			// handoff forever (endless loading screen). Gate solely on the 0x02165EFF count: in retail the
-			// 0xF98E10B3 burst always precedes the 5th 0x02165EFF, so retail timing is preserved, while the
-			// live flow that never emits 0xF98E10B3 can still progress past the loading screen.
-			if (client.Session.Post205F02165EFFCount < 5)
-			{
-				Logger.LogInformation(
-					$"Waiting to flush new-character post-0x205F follow-up: 0x2020={client.Session.Post205F2020Count}, 0xF98E10B3={client.Session.Post205FF98E10B3Count}, 0x02165EFF={client.Session.Post205F02165EFFCount}.");
-				return;
-			}
-
-			Logger.LogInformation(
-				$"Flushing delayed new-character post-0x205F follow-up after retail-style handoff: 0x2020={client.Session.Post205F2020Count}, 0xF98E10B3={client.Session.Post205FF98E10B3Count}, 0x02165EFF={client.Session.Post205F02165EFFCount}.");
-			// Replay the ENTIRE retail post-0x205F world-entry download verbatim (capture rows 65-114):
-			// AccessWindow (0x737A6DF9) + SetDayTime + 27x 0xF98E10B3 + 21x SpawnCheck, byte-for-byte.
-			// Earlier the AccessWindow + SetDayTime were rebuilt by hand and the AccessWindow came out one
-			// byte too long (8083-byte payload vs retail's 8082), so the download was not byte-identical to
-			// retail and the client disconnected as it began entering the world. SendRetailCreatePost205F-
-			// WorldEntryBurst now includes those two packets verbatim, so they must not be sent again here.
-			await SendRetailCreatePost205FWorldEntryBurst(client);
-			// Retail does not go silent after the world-entry download: it answers the client's 0x02165EFF
-			// request ids (0x000818A2-0x000818A6) and streams an in-world 0x96B8DC59/0x642CD3D6/0xF98E10B3
-			// burst (capture rows 116-130, 149-174, 197-201) before the client sends ReadyForPlayScreen.
-			// Without it the new character flooded unanswered 0x02165EFF and hung on the loading screen, so
-			// replay that post-download in-world burst verbatim too.
-			await SendRetailCreatePost205FInWorldBurst(client);
-			client.Session.HasPendingPost205FFollowUp = false;
-			// Mark the one-shot create world-entry download as done so any later 0x205F (e.g. the one the
-			// client sends after ReadyForPlayScreen) does NOT re-arm and re-replay this burst. Retail sends
-			// no download in response to the second 0x205F.
-			client.Session.HasFlushedCreateWorldEntryBurst = true;
-			Logger.LogInformation("Cleared pending post-0x205F follow-up flag for new-character flow.");
-		}
 
 		private async Task FlushPendingPost205FFollowUp(INetworkClient client)
 		{

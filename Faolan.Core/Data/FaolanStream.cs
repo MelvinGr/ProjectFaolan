@@ -217,6 +217,11 @@ namespace Faolan.Core.Data
 			return WriteByte(Convert.ToByte(value));
 		}
 
+		public FaolanStream WriteByte(bool value)
+		{
+			return WriteByte(Convert.ToByte(value));
+		}
+
 		public new FaolanStream WriteByte(byte value)
 		{
 			base.WriteByte(value);
@@ -250,17 +255,20 @@ namespace Faolan.Core.Data
 			return WriteArray(buffer);
 		}
 
-		public FaolanStream WriteProtobuf(FaolanProtobufMessage value)
-		{
-			return WriteArray(value.ToProtobuf());
-		}
-
 		public FaolanStream WriteQuaternion(Quaternion value)
 		{
 			WriteFloat(value.X);
 			WriteFloat(value.Y);
 			WriteFloat(value.Z);
 			return WriteFloat(value.W);
+		}
+
+		public FaolanStream WriteQuaternionBigEndian(Quaternion value)
+		{
+			WriteFloatBigEndian(value.X);
+			WriteFloatBigEndian(value.Y);
+			WriteFloatBigEndian(value.Z);
+			return WriteFloatBigEndian(value.W);
 		}
 
 		public FaolanStream WriteString(string value)
@@ -281,6 +289,11 @@ namespace Faolan.Core.Data
 		public FaolanStream WriteUInt16(short value)
 		{
 			return WriteUInt16((ushort)value);
+		}
+
+		public FaolanStream WriteUInt16(bool value)
+		{
+			return WriteUInt16(Convert.ToUInt16(value));
 		}
 
 		public FaolanStream WriteUInt16(ushort value)
@@ -306,19 +319,17 @@ namespace Faolan.Core.Data
 			return WriteUInt32((uint)value);
 		}
 
+		public FaolanStream WriteUInt32(bool value)
+		{
+			return WriteUInt32(Convert.ToUInt32(value));
+		}
+
 		public FaolanStream WriteUInt32(uint value)
 		{
 			Span<byte> buffer = stackalloc byte[sizeof(uint)];
 			BinaryPrimitives.WriteUInt32BigEndian(buffer, value);
 
 			return WriteArray(buffer);
-		}
-
-		public FaolanStream WriteUInt32(bool value)
-		{
-			return WriteUInt32(value
-				? 1
-				: 0);
 		}
 
 		public FaolanStream WriteUInt64(Enum value)

@@ -27,7 +27,7 @@ The decoded vitals/HP packet, wired to GM commands.
 
 ## 2. Mounts  (commit: combat loop / mount summon)
 Real mount spell decoded as `0x3BAD7D` (Fading Black Horse summon).
-- [does nothing] `.mount` — should trigger the mount summon cast (and ideally put you on the horse).
+- [does nothing, shows nothing] `.mount` — should trigger the mount summon cast (and ideally put you on the horse).
 - [same] If nothing mounts, try `.mount 3BAD7D` explicitly, and tell me what (if anything) happens
       (cast bar? horse spawns? you ride?). Full mounting may still need the mount-entity spawn — your
       observation tells me what's missing.

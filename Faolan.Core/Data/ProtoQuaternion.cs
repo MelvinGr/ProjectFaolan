@@ -1,10 +1,11 @@
+using System;
 using System.Numerics;
 using Faolan.Core.Network.Packets;
 using ProtoBuf;
 
 namespace Faolan.Core.Data
 {
-	[ProtoContract] // TODO: Obsolete, replace with generated ProtoQuat
+	[ProtoContract, Obsolete("Use generated ProtoQuat instead")]
 	public sealed class ProtoQuaternion : FaolanProtobufMessage
 	{
 		[ProtoMember(4, IsRequired = true, DataFormat = DataFormat.FixedSize)]
