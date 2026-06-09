@@ -23,7 +23,7 @@ The decoded vitals/HP packet, wired to GM commands.
 - [ ] `.vitals` (no args) — should set the bar to your character's MaxStats (class/level defaults).
 - [ ] `.vitals 1000 800 500` — sets health/stamina/mana to those values.
 - [ ] `.setstat 36 25` — sets Level to 25 on the sheet (statId 0x36 = Level).
-**Expected:** the health/stamina/mana bars actually move. If nothing happens, grab the client log.
+**Expected:** the health/stamina/mana bars actually move. If nothing happens, grab the client log.bbbbbbb
 
 ## 2. Mounts  (commit: combat loop / mount summon)
 Real mount spell decoded as `0x3BAD7D` (Fading Black Horse summon).
