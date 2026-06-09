@@ -146,8 +146,9 @@ Stop the client (`pkill -9 -f AgeOfConan` + the proton process) and the server; 
 ### Harness (`tools/client-smoke-test.sh`)
 A ready-made version of the above: starts the server, captures loopback, launches the client unattended, asserts
 the battery of markers (login → EnterWorld → GameServer traffic, gametweaks, no Dispatcher failures, pcap on
-7010+7014), **grabs a screen frame once in-world** (`grim`/`spectacle`/`import` on the Wayland session →
-`/tmp/faolan-session-screenshot.png`), and tears down (reverting `UniverseAddr`). Writes a PASS/FAIL report to
+7010+7014), **grabs a frame of the game window once in-world** (the game is an X11/XWayland window, so
+`import -window $(xdotool search --name "Age of Conan")`, full-screen fallback) →
+`/tmp/faolan-session-screenshot.png`, and tears down (reverting `UniverseAddr`). Writes a PASS/FAIL report to
 `/tmp/faolan-test-report.txt`. The screenshot is the visual-assertion layer — confirm the client actually rendered
 (world/character-select/cutscene), which logs+packets can only hint at.
 

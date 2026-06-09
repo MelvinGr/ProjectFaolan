@@ -57,10 +57,14 @@ entered=1
 for i in $(seq 1 120); do grep -q "EnterWorld" "$SRVLOG" 2>/dev/null && { entered=0; break; }; sleep 1; done
 sleep 8  # let in-world traffic accrue + the world render a frame
 
-# 4b. visual check: capture a screen frame now that the client should be in-world
+# 4b. visual check: capture a frame now that the client should be in-world. The game is an X11/XWayland window,
+#     so grab just it (import -window <id>); fall back to a full-screen capture if not found.
 rm -f "$SHOT"
-( grim "$SHOT" 2>/dev/null || spectacle -b -n -o "$SHOT" 2>/dev/null || import -window root "$SHOT" 2>/dev/null )
-[ -s "$SHOT" ]; check $? "captured in-world screenshot ($SHOT)"
+WID=$(DISPLAY=:1 xdotool search --name "Age of Conan" 2>/dev/null | tail -1)
+if [ -n "$WID" ] && DISPLAY=:1 import -window "$WID" "$SHOT" 2>/dev/null; then :; else
+  grim "$SHOT" 2>/dev/null || spectacle -b -n -o "$SHOT" 2>/dev/null || DISPLAY=:1 import -window root "$SHOT" 2>/dev/null
+fi
+[ -s "$SHOT" ]; check $? "captured in-world screenshot ($SHOT)${WID:+ [game window $WID]}"
 
 # 5. assertions on the server log
 grep -q "UniverseAddr: dm09-nj4.ageofconan.com:7010 -> 127.0.0.1:7010" "$LAUNLOG"; check $? "launcher redirected UniverseAddr -> localhost"
