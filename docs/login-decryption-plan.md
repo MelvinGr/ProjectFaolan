@@ -100,6 +100,17 @@ The cipher being TEA (not OpenSSL) is confirmed by the client string `tea_unexpa
 
 ## Work item 1 — patch the client's embedded DH public key
 
+**For testing there's now a no-file-touch variant: `tools/patch_aoc_login_key.py`** (run as root). It finds the
+running `AgeOfConan*.exe`, locates the Funcom pubkey string in `/proc/<pid>/mem`, and overwrites it with
+CELLAO_PUB. The client maps its PE `MAP_PRIVATE`, so the write copies-on-write — only the live process changes,
+the game file on disk is untouched (no backup, no Steam "verify integrity" fallout). Run after launch / before
+login; `--restore` reverses it, `--dry-run` just locates it. Verified 2026-06-09: the key sits in an `r--p` anon
+region (Wine copies the PE data section to private anonymous memory), found at one address — so the COW write
+applies cleanly. **NOTE: this is a no-op until work item 2 is wired in** (the server still ignores the encrypted
+block today). The static binary-patch variant below is the permanent (non-test) alternative.
+
+### Static binary patch (permanent variant)
+
 The client stores Funcom's public key as an ASCII hex C-string. Replace it with our public key (same length:
 256 hex chars). `N` and `g` are unchanged (the launcher leaves the prime alone; it overwrites only the public).
 
