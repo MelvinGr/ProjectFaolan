@@ -59,12 +59,36 @@ her create-world conversation isn't in the captures the analyzer can extract yet
 
 ## 7. Create-world Kalanthes intro  (commit: answer create-world spawn polls per-entity) ⭐ highest priority
 The auto-cutscene where you wash ashore and Kalanthes walks up + starts the chat.
-- [No, still as bugged as before. after char create the game is in a not normal state. relog is required] Create a NEW character → enter world → does Kalanthes walk up and the conversation auto-start?
-- [ ] **Grab `AgeOfConan.log` either way.** Specifically check whether
-      `CinematicCamera_c::InitPath tried to set an invalid camera path "Kalanthes"` is GONE.
-      - Error gone + Kalanthes works → fixed.
-      - Error gone but still no walk-up → entities now confirmed, something else in the cinematic; send the log.
-      - Error still present → spawn confirmation still off; send the log.
+
+### PINNED 2026-06-09 (logs-test/AgeOfConan.log + logs.txt + screenshot)
+**The intro now TRIGGERS — real progress.** Server sends MapChange→4000 (Slave Galley) + 16 SpawnObject +
+6 FA015807 entity spawns + answers the spawn-polls with SpawnChecks. Client receives the `PlayOrSkip` then
+`ThisIsKalanthes` scry messages and *attempts* the full drowning→Kalanthes cinematic. So the world-build and
+script-trigger sequence is essentially working.
+
+**It breaks on MISSING CLIENT PLAYFIELD RESOURCES, not a server packet defect.** Client log:
+- `ResourceManager - class Playfield requested child resource 1000519:4000 / 1000103:4000 / 1000519:4010 /
+  1066604:4010 does not exist in any RDB sources`
+- `GameData.Playfield - PlayfieldStaticPoints_c::ReadBlob: Error reading the static ai points`
+- → EVERY cinematic camera path is invalid (`CC_Drowning_Above/TiltDown/TrackUpFromBeneath`, `Awake`,
+  `Kalanthes`, `GetUp`) → camera stuck → the grey, untextured scene in the screenshot.
+- `ThisIsKalanthes` carries object `123456789:123456789` = the client's "unresolved object" sentinel (the
+  CLIENT-SIDE intro script couldn't bind Kalanthes) — consistent with the scene/AI data not loading.
+
+These `... does not exist in any RDB sources` lookups are the client's LOCAL RDB; the server doesn't serve RDB
+resources. So the root blocker is a **client data gap** (this install's RDB lacks the Tortage-intro playfield
+cinematic / static-AI-point child resources). No server packet change fixes a missing client resource.
+- NEXT: confirm whether `1000519:4000` / `1066604:4010` exist in this client's RDB (rdb-extraction tooling) vs
+  the client the captures came from. If genuinely absent → cutscene can't render here regardless of server;
+  pivot to making the post-cutscene state playable. If present → we're advertising the wrong playfield instance.
+
+**Secondary server-side cleanups (won't alone fix the cutscene, but worth doing):**
+- `rpc - ... OverrideGameTweaks() ... stream bad after 'overrides'!` → `Dispatcher call ... (OverrideGameTweaks)
+  failed. Disconnecting ( Route ... => PlayerInterface)`. Known overrides bug, but here it DISCONNECTS a route
+  mid-create-world. Confirm it isn't severing anything the intro needs (the intro did proceed, so likely tolerated).
+- `GameCode.Chars - GameCodeDynelFullUpdateIIR::Activate Ignoring IIR for already existing Dynel 50000 <inst>`
+  (341446/341448/341468/341469) — server RE-sends beach entities the client already has; client ignores the dupes.
+  Indicates a double-spawn (initial create-world entry + world-burst replay). Not fatal; de-dupe it.
 
 ## 8. ⚠️ Float endianness on raw-body packets  (commit: float endianness)
 I changed `MapChange`, `ReadyForPlayScreen`, the Move echo, and the `/setpos`-style GM packet to write raw
