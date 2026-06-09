@@ -146,7 +146,15 @@ Stop the client (`pkill -9 -f AgeOfConan` + the proton process) and the server; 
 ### Harness (`tools/client-smoke-test.sh`)
 A ready-made version of the above: starts the server, captures loopback, launches the client unattended, asserts
 the battery of markers (login → EnterWorld → GameServer traffic, gametweaks, no Dispatcher failures, pcap on
-7010+7014), and tears down (reverting `UniverseAddr`). Writes a PASS/FAIL report to `/tmp/faolan-test-report.txt`.
+7010+7014), **grabs a screen frame once in-world** (`grim`/`spectacle`/`import` on the Wayland session →
+`/tmp/faolan-session-screenshot.png`), and tears down (reverting `UniverseAddr`). Writes a PASS/FAIL report to
+`/tmp/faolan-test-report.txt`. The screenshot is the visual-assertion layer — confirm the client actually rendered
+(world/character-select/cutscene), which logs+packets can only hint at.
+
+### Limits
+Auto-login enters an **existing** character only. **New-character creation** (and thus the create-world cutscene)
+needs interactive editor input, which the launcher flags can't provide — it'd require input injection
+(only `xdotool`/XWayland is present; no Wayland injector, `/dev/uinput` is root-only).
 
 ### Proven run (2026-06-10)
 `tools/client-smoke-test.sh` → **14/14 PASS**: Proton launched the client → server logged `login accepted` →

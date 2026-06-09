@@ -9,6 +9,7 @@ GD="/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan"
 SRVLOG=/tmp/faolan-srv.log
 LAUNLOG=/tmp/faolan-laun.log
 PCAP=/tmp/faolan-session.pcap
+SHOT=/tmp/faolan-session-screenshot.png
 CLIENTLOG="$GD/AgeOfConan.log"
 REPORT=/tmp/faolan-test-report.txt
 cd "$REPO" || exit 1
@@ -54,7 +55,12 @@ nohup dotnet "$LAUNCHER_DLL" \
 # 4. wait for the success marker (EnterWorld), up to 120s (Proton cold start)
 entered=1
 for i in $(seq 1 120); do grep -q "EnterWorld" "$SRVLOG" 2>/dev/null && { entered=0; break; }; sleep 1; done
-sleep 6  # let in-world traffic accrue
+sleep 8  # let in-world traffic accrue + the world render a frame
+
+# 4b. visual check: capture a screen frame now that the client should be in-world
+rm -f "$SHOT"
+( grim "$SHOT" 2>/dev/null || spectacle -b -n -o "$SHOT" 2>/dev/null || import -window root "$SHOT" 2>/dev/null )
+[ -s "$SHOT" ]; check $? "captured in-world screenshot ($SHOT)"
 
 # 5. assertions on the server log
 grep -q "UniverseAddr: dm09-nj4.ageofconan.com:7010 -> 127.0.0.1:7010" "$LAUNLOG"; check $? "launcher redirected UniverseAddr -> localhost"
@@ -81,4 +87,4 @@ grep -q "<UniverseAddr>dm09-nj4.ageofconan.com:7010</UniverseAddr>" "$GD/LocalCo
 [ ! -f "$GD/LocalConfig.xml.faolan-revert" ]; check $? "revert sidecar cleaned up"
 
 echo "=== RESULT: $pass passed, $fail failed ===" | tee -a "$REPORT"
-echo "(server log: $SRVLOG | launcher: $LAUNLOG | pcap: $PCAP | client log: $CLIENTLOG)" | tee -a "$REPORT"
+echo "(server log: $SRVLOG | launcher: $LAUNLOG | pcap: $PCAP | screenshot: $SHOT | client log: $CLIENTLOG)" | tee -a "$REPORT"
