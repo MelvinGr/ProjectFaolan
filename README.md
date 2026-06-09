@@ -141,6 +141,17 @@ The client instance goes into the body via `WriteUInt32(id)` and into the receiv
 via `AppendVarint([family-prefix], id)` (helpers in `Faolan/GameServer/PacketBurstHelper.cs`). To make any
 other field editable, split that `WriteArray(...)` and write the value.
 
+**Converting the verbatim `Retail*Burst.cs` blobs (in progress).** Now that the IIR sub-opcodes are decoded,
+the literal byte-blob bursts are being converted to named `Iir()`/`IirId()` helper calls (0x2000 envelope ->
+`WriteUInt32(<IIR enum>).WriteArray(body)`, auto-computed length). Each conversion is proven **byte-identical** by
+a golden test: `Faolan.Tests/BurstGoldenTests.cs` + `RecordingNetworkClient` capture each burst's exact bytes to a
+committed `Faolan.Tests/Golden/<name>.bin`, so a single changed wire byte fails (the client only accepts the exact
+retail bytes). `Captures/convert_burst.py` is the codemod: it converts only GameAgent->GameInterface 0x2000 IIR
+packets with pure-byte bodies and leaves everything else verbatim (other opcodes/families, or packets with
+computed sub-arrays like `EncodeVarint(id)`). Done: `CreationScriptBurst`, `InitialBurst`, `WorldPrepBurst`.
+TODO: `RetailCreateWorldEntryBurst` (instance method, 391 packets across 3 families - needs per-family helpers);
+`Post205FBurst` uses different families with no IIR sub-opcode (codemod N/A).
+
 `Account.ClientInstance` is the session's client-used id (the real character id throughout the create flow
 and during play). It is deliberately **not** a foreign key, so deleting a character never cascades into
 deleting the account.
