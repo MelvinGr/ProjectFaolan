@@ -244,17 +244,21 @@ most likely to regress something.
 
 ## 10. World burst is incomplete — under-populated vs retail  (found 2026-06-10 via the automated harness diff)
 The automated login→world run + `Captures/compare_log_to_dump.py` vs the Strie login capture shows we send **78
-`0x2000` packets vs retail's 101**, and **`0x2076` 0× vs retail 1×**. Root cause: `MapWorldBurstExtractor` ends the
-burst window at the **first `0x2020` client poll** (its comment: "until the first 0x2020 poll"), so the stored burst
-is only the pre-poll SCENE and omits the world-population packets retail sends DURING the spawn phase — the
-`0x000bbc4x` entity spawns and their **`0x2076` index manifest** (verified: the beach burst in faolan.db has
-SpawnCheck handle `0x081906` but NOT `0xbbc46`; the Strie capture HAS both the spawns and the 0x2076).
-**Fix approach (do carefully — login currently passes 15/15, don't regress it):** extend the extraction window past
-the first poll to capture the world-population downloads, but EXCLUDE the dynamically-generated opcodes our server
-already emits per-poll (`0x2008` SpawnCheck, `0x2052` ability grant, `0x2009` Pong, `0x2082` LatencyCheck, `0x201c`)
-so the static burst gains the `0xbbc4x` spawns + `0x2076` without duplicating the dynamic responses. Re-import the
-beach burst and re-run `tools/client-smoke-test.sh` (it now reports the divergence count). Note: NOT directly
-visible — this client install is asset-stripped, so the extra NPCs won't render even when present.
+`0x2000` packets vs retail's 101**, and **`0x2076` 0× vs retail 1×**. The stored burst is only the pre-poll SCENE and
+omits the world-population packets retail sends DURING the spawn phase — the `0x000bbc4x` entity spawns and their
+**`0x2076` index manifest** (verified: the beach burst in faolan.db has SpawnCheck handle `0x081906` but NOT
+`0xbbc46`; the Strie capture HAS both the spawns and the 0x2076).
+- **BEACH (4010, the default/test map):** its burst is **NOT** from the extractor — it's seeded from the proven
+  71-packet blob `strie-login-worldburst.bin` (`Faolan.Importer.SeedBeachBurstFromBlob`, instance 0x02165EFF), which
+  is the pre-poll SCENE only. Fix = **regenerate that blob** from the Strie capture's FULL world-build (SCENE +
+  post-poll `0x2000` spawns + `0x2076`), excluding the dynamically-generated `0x2008`/`0x2052`/`0x2009`/`0x2082`/
+  `0x201c` our server emits per-poll.
+- **OTHER maps:** `MapWorldBurstExtractor` ends the window at the first `0x2020` poll (same omission); same fix,
+  applied in the extractor.
+**Do carefully — login passes 16/16; don't regress it. Watch packet ORDER (the 0x2076 must follow the spawns it
+indexes) and the static/dynamic split.** Re-run `tools/client-smoke-test.sh` (it now reports the divergence count +
+the MISSING 0x2076). NOT directly visible — this client install is asset-stripped, so the extra NPCs won't render
+even when present; the value is protocol-correctness + a future full-asset client.
 
 ---
 
