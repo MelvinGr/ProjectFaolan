@@ -242,6 +242,20 @@ most likely to regress something.
       Maps 1000 and 11040 were intentionally dropped (their captured instance was out of range) — they'll
       fall back to the no-NPC hand-built path.
 
+## 10. World burst is incomplete — under-populated vs retail  (found 2026-06-10 via the automated harness diff)
+The automated login→world run + `Captures/compare_log_to_dump.py` vs the Strie login capture shows we send **78
+`0x2000` packets vs retail's 101**, and **`0x2076` 0× vs retail 1×**. Root cause: `MapWorldBurstExtractor` ends the
+burst window at the **first `0x2020` client poll** (its comment: "until the first 0x2020 poll"), so the stored burst
+is only the pre-poll SCENE and omits the world-population packets retail sends DURING the spawn phase — the
+`0x000bbc4x` entity spawns and their **`0x2076` index manifest** (verified: the beach burst in faolan.db has
+SpawnCheck handle `0x081906` but NOT `0xbbc46`; the Strie capture HAS both the spawns and the 0x2076).
+**Fix approach (do carefully — login currently passes 15/15, don't regress it):** extend the extraction window past
+the first poll to capture the world-population downloads, but EXCLUDE the dynamically-generated opcodes our server
+already emits per-poll (`0x2008` SpawnCheck, `0x2052` ability grant, `0x2009` Pong, `0x2082` LatencyCheck, `0x201c`)
+so the static burst gains the `0xbbc4x` spawns + `0x2076` without duplicating the dynamic responses. Re-import the
+beach burst and re-run `tools/client-smoke-test.sh` (it now reports the divergence count). Note: NOT directly
+visible — this client install is asset-stripped, so the extra NPCs won't render even when present.
+
 ---
 
 ## Notes / known non-blockers (no action needed unless curious)

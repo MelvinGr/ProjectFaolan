@@ -77,6 +77,15 @@ grep -q "GameServerListener" "$SRVLOG"; check $? "GameServer: in-world traffic"
 # 6. client-log markers
 grep -qi "Applying .* gametweaks" "$CLIENTLOG" 2>/dev/null; check $? "client: ApplyDynamicGameTweaks"
 ! grep -qi "Dispatcher call .* failed" "$CLIENTLOG" 2>/dev/null; check $? "client: no 'Dispatcher call failed' (login-blocking)"
+! grep -qi "Unhandled packet" "$SRVLOG" 2>/dev/null; check $? "server: no unhandled packets"
+
+# 6b. protocol divergence vs a retail login capture (informational - the world-burst is a known partial; see TODO)
+DUMP="$REPO/Captures/account-stricken997-character-Strie-login.json"
+if [ -f "$DUMP" ]; then
+  python3 "$REPO/Captures/compare_log_to_dump.py" "$SRVLOG" "$DUMP" > /tmp/faolan-diff.txt 2>&1
+  echo "INFO  protocol divergences vs retail login: $(grep -cE 'DIFF|MISSING' /tmp/faolan-diff.txt) (opcodes that differ; see /tmp/faolan-diff.txt)" | tee -a "$REPORT"
+  grep -E "MISSING" /tmp/faolan-diff.txt | sed 's/^/      /' | tee -a "$REPORT"
+fi
 
 # 7. pcap
 sleep 1; pkill -f "tshark.*portrange" 2>/dev/null; sleep 1
