@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using Faolan.Core.Crypt;
 
 namespace Faolan.ClientLauncher
@@ -26,7 +27,7 @@ namespace Faolan.ClientLauncher
 		private static int Main(string[] args)
 		{
 			var exe = Environment.GetEnvironmentVariable("AOC_EXE") ?? DefaultExe;
-			string? username = null, password = null, charname = null, wine = null;
+			string? username = null, password = null, charname = null, wine = null, universeAddr = null;
 			var proton = Environment.GetEnvironmentVariable("PROTON") ?? DefaultProton;
 			bool dx10 = false, dryRun = false, noConsole = true, streamOutput = false, patchLogin = false;
 
@@ -41,6 +42,11 @@ namespace Faolan.ClientLauncher
 					case "--wine": wine = args[++i]; break;
 					case "--proton": proton = args[++i]; break;
 					case "--dx10": dx10 = true; break;
+					// Point LocalConfig.xml <UniverseAddr> at our server for this session (reverted on exit). Bare
+					// flag defaults to Faolan's 127.0.0.1:7010; replaces the need for an /etc/hosts override.
+					case "--universeaddr":
+						universeAddr = i + 1 < args.Length && !args[i + 1].StartsWith('-') ? args[++i] : "127.0.0.1:7010";
+						break;
 					// Run in the foreground and stream the client's stdout/stderr into THIS terminal (no separate
 					// wineconsole window). Also drops -noconsole so the client doesn't suppress its own logging.
 					case "--console": noConsole = false; streamOutput = true; break;
@@ -96,6 +102,17 @@ namespace Faolan.ClientLauncher
 			KillRunningClients();
 
 			var gameDir = Path.GetDirectoryName(exe)!;
+
+			// Point the client's login server (LocalConfig.xml <UniverseAddr>) at ours for this session, reverting
+			// it after the client exits (and on Ctrl+C / process exit) so the file is left as we found it.
+			var originalUniverseAddr = universeAddr is null ? null : SetUniverseAddr(gameDir, universeAddr);
+			if (originalUniverseAddr is not null)
+			{
+				var revertTo = originalUniverseAddr;
+				Console.CancelKeyPress += (_, _) => SetUniverseAddr(gameDir, revertTo);
+				AppDomain.CurrentDomain.ProcessExit += (_, _) => SetUniverseAddr(gameDir, revertTo);
+			}
+
 			var psi = new ProcessStartInfo
 			{
 				WorkingDirectory = gameDir,
@@ -158,21 +175,80 @@ namespace Faolan.ClientLauncher
 			if (patchLogin && !OperatingSystem.IsWindows())
 				Task.Run(() => LoginKeyPatcher.PatchWhenReady());
 
-			if (streamOutput)
+			// Stay in the foreground (tailing the log and/or holding the UniverseAddr override) until the client
+			// exits, then revert the config. Without either, launch detached and return.
+			try
 			{
-				Console.WriteLine($"tailing {logPath} (Ctrl+C to stop) ...");
-				var pos = logStart;
-				while (!proc.HasExited)
+				if (streamOutput)
 				{
-					pos = DumpNewLogContent(logPath, pos);
-					Thread.Sleep(200);
-				}
+					Console.WriteLine($"tailing {logPath} (Ctrl+C to stop) ...");
+					var pos = logStart;
+					while (!proc.HasExited)
+					{
+						pos = DumpNewLogContent(logPath, pos);
+						Thread.Sleep(200);
+					}
 
-				DumpNewLogContent(logPath, pos);
-				return proc.ExitCode;
+					DumpNewLogContent(logPath, pos);
+				}
+				else if (originalUniverseAddr is not null)
+				{
+					proc.WaitForExit();
+				}
+			}
+			finally
+			{
+				if (originalUniverseAddr is not null)
+				{
+					SetUniverseAddr(gameDir, originalUniverseAddr);
+					Console.WriteLine($"reverted UniverseAddr -> {originalUniverseAddr}");
+				}
 			}
 
-			return 0;
+			return proc.HasExited ? proc.ExitCode : 0;
+		}
+
+		// Set LocalConfig.xml's <UniverseAddr> (the client's login server) to `addr`, returning the previous value
+		// (so the caller can revert), or null if nothing changed / the file or field is missing. Re-enables a
+		// LocalConfig.xml.disabled if that's all that's present.
+		private static string? SetUniverseAddr(string gameDir, string addr)
+		{
+			try
+			{
+				var path = Path.Combine(gameDir, "LocalConfig.xml");
+				if (!File.Exists(path))
+				{
+					var disabled = path + ".disabled";
+					if (!File.Exists(disabled))
+					{
+						Console.Error.WriteLine("UniverseAddr: LocalConfig.xml not found; skipped.");
+						return null;
+					}
+
+					File.Move(disabled, path);
+				}
+
+				var text = File.ReadAllText(path);
+				var match = Regex.Match(text, "(<UniverseAddr>)(.*?)(</UniverseAddr>)");
+				if (!match.Success)
+				{
+					Console.Error.WriteLine("UniverseAddr: no <UniverseAddr> in LocalConfig.xml; skipped.");
+					return null;
+				}
+
+				var current = match.Groups[2].Value;
+				if (current == addr)
+					return null;
+
+				File.WriteAllText(path, Regex.Replace(text, "(<UniverseAddr>)(.*?)(</UniverseAddr>)", m => m.Groups[1].Value + addr + m.Groups[3].Value));
+				Console.WriteLine($"UniverseAddr: {current} -> {addr}");
+				return current;
+			}
+			catch (Exception e)
+			{
+				Console.Error.WriteLine($"UniverseAddr update failed: {e.Message}");
+				return null;
+			}
 		}
 
 		// Print any AgeOfConan.log content past `pos`; returns the new position. Resets to 0 if the file shrank
@@ -318,6 +394,8 @@ namespace Faolan.ClientLauncher
 				  -u, --username <s>  auto-login account name
 				  -p, --password <s>  auto-login password
 				  -c, --charname <s>  auto-enter this character
+				  --universeaddr [a]  point LocalConfig.xml <UniverseAddr> (the login server) at `a` for this
+				                      session, reverted on exit; bare flag = 127.0.0.1:7010 (replaces /etc/hosts)
 				  --console           run in the foreground and tail AgeOfConan.log into THIS terminal (same content
 				                      as the client console, no separate wineconsole window); also drops -noconsole
 				  --patch-login       patch the client's DH key (Funcom -> CELLAO) in memory after launch so the
