@@ -28,7 +28,7 @@ namespace Faolan.ClientLauncher
 			var exe = Environment.GetEnvironmentVariable("AOC_EXE") ?? DefaultExe;
 			string? username = null, password = null, charname = null, wine = null;
 			var proton = Environment.GetEnvironmentVariable("PROTON") ?? DefaultProton;
-			bool dx10 = false, dryRun = false, noConsole = true, allocConsole = false, patchLogin = false;
+			bool dx10 = false, dryRun = false, noConsole = true, streamOutput = false, patchLogin = false;
 
 			for (var i = 0; i < args.Length; i++)
 			{
@@ -41,8 +41,9 @@ namespace Faolan.ClientLauncher
 					case "--wine": wine = args[++i]; break;
 					case "--proton": proton = args[++i]; break;
 					case "--dx10": dx10 = true; break;
-					// A console for a GUI exe needs the PE subsystem flipped to CUI, so --console implies that.
-					case "--console": noConsole = false; allocConsole = true; break;
+					// Run in the foreground and stream the client's stdout/stderr into THIS terminal (no separate
+					// wineconsole window). Also drops -noconsole so the client doesn't suppress its own logging.
+					case "--console": noConsole = false; streamOutput = true; break;
 					case "--patch-login": patchLogin = true; break;
 					case "--dry-run" or "-n": dryRun = true; break;
 					case "--help" or "-h": PrintHelp(); return 0;
@@ -66,12 +67,11 @@ namespace Faolan.ClientLauncher
 				return 1;
 			}
 
-			// AgeOfConan.exe is a GUI-subsystem app and never calls AllocConsole, so it has no console of its own
-			// (-noconsole is a no-op under Proton). Flipping the PE subsystem to CUI makes Wine give it a console
-			// (stdout -> terminal). Keep the exe consistent with the flag: CUI when --alloc-console, GUI otherwise.
-			// (This rewrites one byte in the exe; do it before the md5 so -clienthash matches the launched file.)
+			// Keep the exe as a GUI subsystem app: a CUI flip makes Wine spawn a separate wineconsole window, which
+			// we don't want - we stream the client's stdio into this terminal instead (see --console below). This
+			// also undoes any earlier CUI patch. Done before the md5 so -clienthash matches the launched file.
 			if (!dryRun)
-				SetConsoleSubsystem(exe, allocConsole);
+				SetConsoleSubsystem(exe, console: false);
 
 			// -clienthash = md5 of the exe we launch; -key = a fresh launch token.
 			var clientHash = Md5Hex(exe);
@@ -133,10 +133,19 @@ namespace Faolan.ClientLauncher
 			foreach (var a in launchArgs)
 				psi.ArgumentList.Add(a);
 
+			// --console: capture the client's stdout/stderr (pipes, so Wine writes to them instead of popping a
+			// wineconsole window) and echo into this terminal. Otherwise launch detached and return immediately.
+			if (streamOutput)
+			{
+				psi.RedirectStandardOutput = true;
+				psi.RedirectStandardError = true;
+			}
+
+			Process proc;
 			try
 			{
-				var proc = Process.Start(psi);
-				Console.WriteLine($"launched: {psi.FileName} (pid {proc?.Id})");
+				proc = Process.Start(psi)!;
+				Console.WriteLine($"launched: {psi.FileName} (pid {proc.Id})");
 			}
 			catch (Exception e)
 			{
@@ -145,9 +154,20 @@ namespace Faolan.ClientLauncher
 			}
 
 			// Patch the client's embedded DH pubkey (Funcom -> CELLAO) in memory so the server can validate the
-			// password (the in-launcher version of tools/patch_aoc_login_key.py). Needs root; harmless if skipped.
+			// password (the in-launcher port of tools/patch_aoc_login_key.py). Runs alongside the client; needs
+			// ptrace permission (sudo if it can't); harmless if skipped.
 			if (patchLogin && !OperatingSystem.IsWindows())
-				LoginKeyPatcher.PatchWhenReady();
+				Task.Run(() => LoginKeyPatcher.PatchWhenReady());
+
+			if (streamOutput)
+			{
+				proc.OutputDataReceived += (_, e) => { if (e.Data is not null) Console.WriteLine(e.Data); };
+				proc.ErrorDataReceived += (_, e) => { if (e.Data is not null) Console.Error.WriteLine(e.Data); };
+				proc.BeginOutputReadLine();
+				proc.BeginErrorReadLine();
+				proc.WaitForExit();
+				return proc.ExitCode;
+			}
 
 			return 0;
 		}
@@ -268,8 +288,8 @@ namespace Faolan.ClientLauncher
 				  -u, --username <s>  auto-login account name
 				  -p, --password <s>  auto-login password
 				  -c, --charname <s>  auto-enter this character
-				  --console           give the client a real console (drops -noconsole AND flips the PE subsystem to
-				                      CUI so a GUI exe shows console output; reverted to GUI on a normal launch)
+				  --console           run in the foreground and stream the client's stdout/stderr into THIS terminal
+				                      (no separate wineconsole window); also drops -noconsole
 				  --patch-login       patch the client's DH key (Funcom -> CELLAO) in memory after launch so the
 				                      server can validate the real password (needs ptrace permission; sudo if it can't)
 				  --proton <path>     Proton 'proton' script (or set PROTON; defaults to the Steam Proton-Experimental)
@@ -277,13 +297,12 @@ namespace Faolan.ClientLauncher
 				  -n, --dry-run       print the computed clienthash/key/args without launching
 				  -h, --help          this help
 
-				The client never calls AllocConsole, so -noconsole is a no-op without --console (which flips the PE
-				subsystem GUI->CUI; a 1-byte file edit, reverted automatically on a non-console launch).
+				--console keeps the client in the foreground and pipes its output here (instead of Wine popping a
+				separate console window). The exe is kept GUI-subsystem so no wineconsole window is spawned.
 				Kills any already-running client first (clean test launches). Off Windows it launches via Proton
 				('proton run <exe>') with the Steam compat env (mirroring launchClient.sh); pass --wine to use a
 				plain wine runner instead. Computes -clienthash (md5 of the exe) and -key (TEA-encrypted timestamp;
-				see Faolan.Core.Crypt.ConanLaunchToken). For real password validation also run
-				tools/patch_aoc_login_key.py against the running client.
+				see Faolan.Core.Crypt.ConanLaunchToken).
 				""");
 	}
 }
