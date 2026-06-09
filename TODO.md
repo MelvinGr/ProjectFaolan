@@ -120,7 +120,46 @@ child resources).
 create-world flow is chunked per client trigger; confirm that beach scry chunk (and its manifest) is actually
 replayed and not truncated at the `ApproachCasilda` finale. Use `Captures/decode_scryscript.py` to compare.
 
-**It breaks on MISSING CLIENT PLAYFIELD RESOURCES, not a server packet defect.** Client log:
+### ⭐ DECISIVE 2026-06-09: retail-vs-faolan client-log DIFF — the old "client RDB" read below is WRONG.
+Diffed `logs-test/retail-client.log` (working retail create-world) against `logs-test/faolan-client.log` (ours):
+
+| marker | retail | faolan | meaning |
+|---|---|---|---|
+| `No project defined` | 1 | 1 | **BENIGN** (both) — NOT the cause |
+| `does not exist in any RDB` | **182** | 128 | **BENIGN** — retail has MORE missing-RDB and still works |
+| `invalid camera path` | **0** | 7 | ours-only — the real symptom |
+| `OverrideGameTweaks` stream-bad/disconnect | 0 | 1 | ours-only |
+| `ApplyDynamicGameTweaks: Applying N gametweaks` | **19** | 0 | retail applies 19; ours applies 0 (the OverrideGameTweaks fails) |
+| `ThisIsKalanthes` object | (resolves) | `123456789:123456789` | ours: Kalanthes dynel unbound |
+
+So the RDB-missing + No-project errors are **benign** (retail has them, more even) — the prior client-RDB/
+project-config diagnosis (below) is **disproven**. The failure is **server-side**, in our create→world entry.
+
+**Root cause (user-observed + confirmed): retail does `click enter-world → LOADING SCREEN → cinematic`; ours
+SKIPS the loading screen.** Evidence:
+- **Same-port handoff.** Both our creator (`PlayerAgent.SendGameServer`, Packets.cs:119) AND our enter-world
+  handoff (`0x2002`, `CreateWorldHandshake.SendWorldHandoff`:181) advertise the SAME `realm.IpAddress:realm.Port`
+  (`127.0.0.1:7014`). Retail advertises a DIFFERENT world port (this capture: `:7027`; dikketest: creator `:7016`
+  → world `:7012`). The client only does the full "new world server" load (loading screen → cinematic resources)
+  when the world is a different endpoint → ours skips it. (User's hypothesis, matches the code.)
+- **Timing confirms it:** retail `CharCreationFinished` 17:17:04 → **12s gap (enter-world + loading)** → beach
+  playfield loads 17:17:16 → cinematic OK. Ours `CharCreationFinished` 16:19:49 → **1s** → beach loads 16:19:50 →
+  cinematic fails 16:19:52. No enter-world/loading gap in ours.
+- **Beach playfield Subgroup differs:** retail `Subgroup=35021789` (character-tied), ours `Subgroup=33554432`
+  (= 0x02000000, the CreationInstanceBase placeholder) — our beach world-instance is set up with a placeholder.
+- **Gametweaks not applied:** the malformed `OverrideGameTweaks` (route `=> PlayerInterface` disconnect) means our
+  client applies 0 of the 19 gametweaks retail applies — those may gate cinematic/loading behavior.
+
+**NEXT (server-side, ranked):**
+1. **Advertise a DIFFERENT world port** in the `0x2002` enter-world handoff (and run a 2nd GameServer listener on
+   it) so the client does a real new-world connect → loading screen → cinematic-resource load. Most likely fix.
+2. **Fix the malformed `OverrideGameTweaks`** so the 19 gametweaks apply (the packet's `overrides` collection /
+   nested `GameTweak<H/I/M/N/_N>` encoding — see docs/opcode-re-plan.md). Removes the PlayerInterface disconnect.
+3. **Use a real beach Subgroup/instance** instead of 0x02000000 in the world-entry.
+Compare against the full retail pcap: `logs-test/retail`.
+
+---
+**(SUPERSEDED — kept for history) It breaks on MISSING CLIENT PLAYFIELD RESOURCES, not a server packet defect.** Client log:
 - `ResourceManager - class Playfield requested child resource 1000519:4000 / 1000103:4000 / 1000519:4010 /
   1066604:4010 does not exist in any RDB sources`
 - `GameData.Playfield - PlayfieldStaticPoints_c::ReadBlob: Error reading the static ai points`
