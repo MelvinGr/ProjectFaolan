@@ -243,6 +243,32 @@ namespace Faolan.GameServer
 								break;
 							}
 
+							case ActionType.NormalAttack:
+							{
+								// The melee swing / auto-attack. Retail acks the behavior with a BehaviorControlCenterIIR
+								// (same 0x642CD3D6 id) that echoes the request with the sequence counter incremented;
+								// without that ack the client stalls on the swing (movement feels fine because Move IS
+								// acked). Echo the client's own behavior block back with seq+1 - structurally safe, since
+								// they are the client's valid bytes - to release the swing. Damage/energy resolution is
+								// layered on next once this confirms the stall is gone.
+								//
+								// rawPayload is the whole 0x2000 sub-payload: [len4][subop4][c350 4][instance 4][seq 2]...
+								// Drop the 4-byte length prefix (WriteArrayUInt32Length re-adds it) and bump the seq.
+								var ack = rawPayload[4..];
+								if (ack.Length >= 14)
+								{
+									var seq = (ushort)((ack[12] << 8) | ack[13]);
+									var next = (ushort)(seq + 1);
+									ack[12] = (byte)(next >> 8);
+									ack[13] = (byte)next;
+
+									await new PacketStream().WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x2000).WriteArrayUInt32Length(s => s.WriteArray(ack)).SendAsync(client);
+									await LogToClient($"NormalAttack: target=0x{(uint)(args.SpellTarget?.TargetHandle ?? 0):X} - acked behavior seq {seq}->{next}");
+								}
+
+								break;
+							}
+
 							case ActionType.Emote:
 							{
 								await LogToClient($"Emote: {args}");
