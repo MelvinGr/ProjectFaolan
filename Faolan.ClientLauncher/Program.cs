@@ -133,13 +133,12 @@ namespace Faolan.ClientLauncher
 			foreach (var a in launchArgs)
 				psi.ArgumentList.Add(a);
 
-			// --console: capture the client's stdout/stderr (pipes, so Wine writes to them instead of popping a
-			// wineconsole window) and echo into this terminal. Otherwise launch detached and return immediately.
-			if (streamOutput)
-			{
-				psi.RedirectStandardOutput = true;
-				psi.RedirectStandardError = true;
-			}
+			// The client writes its console output (WriteConsoleW) to a Wine console - lost when we don't flip to
+			// CUI - but the SAME content also goes to AgeOfConan.log. So --console tails that log into this terminal
+			// (proton's own messages still inherit our stdio). Record the log's pre-launch size so we only show this
+			// session (the client truncates/rotates it on start).
+			var logPath = Path.Combine(gameDir, "AgeOfConan.log");
+			var logStart = streamOutput && File.Exists(logPath) ? new FileInfo(logPath).Length : 0;
 
 			Process proc;
 			try
@@ -161,15 +160,46 @@ namespace Faolan.ClientLauncher
 
 			if (streamOutput)
 			{
-				proc.OutputDataReceived += (_, e) => { if (e.Data is not null) Console.WriteLine(e.Data); };
-				proc.ErrorDataReceived += (_, e) => { if (e.Data is not null) Console.Error.WriteLine(e.Data); };
-				proc.BeginOutputReadLine();
-				proc.BeginErrorReadLine();
-				proc.WaitForExit();
+				Console.WriteLine($"tailing {logPath} (Ctrl+C to stop) ...");
+				var pos = logStart;
+				while (!proc.HasExited)
+				{
+					pos = DumpNewLogContent(logPath, pos);
+					Thread.Sleep(200);
+				}
+
+				DumpNewLogContent(logPath, pos);
 				return proc.ExitCode;
 			}
 
 			return 0;
+		}
+
+		// Print any AgeOfConan.log content past `pos`; returns the new position. Resets to 0 if the file shrank
+		// (a new session truncated/recreated it). Shared-read so the client can keep writing/rotating it.
+		private static long DumpNewLogContent(string path, long pos)
+		{
+			try
+			{
+				if (!File.Exists(path))
+					return pos;
+
+				using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+				if (fs.Length < pos)
+					pos = 0;
+
+				fs.Seek(pos, SeekOrigin.Begin);
+				using var reader = new StreamReader(fs);
+				var text = reader.ReadToEnd();
+				if (text.Length > 0)
+					Console.Write(text);
+
+				return fs.Position;
+			}
+			catch
+			{
+				return pos;
+			}
 		}
 
 		// Set a child-process env var only if it isn't already set in the real environment (so the shell can override).
@@ -288,8 +318,8 @@ namespace Faolan.ClientLauncher
 				  -u, --username <s>  auto-login account name
 				  -p, --password <s>  auto-login password
 				  -c, --charname <s>  auto-enter this character
-				  --console           run in the foreground and stream the client's stdout/stderr into THIS terminal
-				                      (no separate wineconsole window); also drops -noconsole
+				  --console           run in the foreground and tail AgeOfConan.log into THIS terminal (same content
+				                      as the client console, no separate wineconsole window); also drops -noconsole
 				  --patch-login       patch the client's DH key (Funcom -> CELLAO) in memory after launch so the
 				                      server can validate the real password (needs ptrace permission; sudo if it can't)
 				  --proton <path>     Proton 'proton' script (or set PROTON; defaults to the Steam Proton-Experimental)
@@ -297,8 +327,8 @@ namespace Faolan.ClientLauncher
 				  -n, --dry-run       print the computed clienthash/key/args without launching
 				  -h, --help          this help
 
-				--console keeps the client in the foreground and pipes its output here (instead of Wine popping a
-				separate console window). The exe is kept GUI-subsystem so no wineconsole window is spawned.
+				--console keeps the client in the foreground and tails AgeOfConan.log here (its console output also
+				goes to that file). The exe stays GUI-subsystem so no separate wineconsole window is spawned.
 				Kills any already-running client first (clean test launches). Off Windows it launches via Proton
 				('proton run <exe>') with the Steam compat env (mirroring launchClient.sh); pass --wine to use a
 				plain wine runner instead. Computes -clienthash (md5 of the exe) and -key (TEA-encrypted timestamp;
