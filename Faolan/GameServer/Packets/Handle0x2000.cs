@@ -235,6 +235,10 @@ namespace Faolan.GameServer
 									? casterHandle
 									: targetHandle, spellId);
 
+								// Casting costs mana - drain the caster's mana bar (the spell analogue of the melee
+								// stamina cost). Applies to offensive and self/buff casts alike.
+								await SpendCasterMana(client, spellId);
+
 								// An offensive cast at another entity applies damage + pushes the target's vitals; a
 								// self/no-target cast is treated as a buff (no damage) until spell data distinguishes them.
 								if (targetHandle != 0 && targetHandle != casterHandle)

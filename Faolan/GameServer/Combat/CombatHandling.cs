@@ -87,6 +87,21 @@ namespace Faolan.GameServer
 				.WriteArrayUInt32Length(s => s.WriteUInt32(0x40749B8Au).WriteUInt32(0x0000C350u).WriteUInt32(instance).WriteByte(0x01).WriteUInt32(player.Stamina)).SendAsync(client);
 		}
 
+		// Spends the caster's mana for a cast and pushes the caster's own 0x96B8DC59 update so the mana bar drops -
+		// the spell/mana analogue of the melee swing's stamina cost. (Mana isn't carried by EnergyIIR, which is
+		// stamina-only in the captures; it rides the vitals stat block.) Per-spell costs aren't decoded yet, so the
+		// cost is provisional. No-op if the player has no mana pool.
+		private async Task SpendCasterMana(INetworkClient client, uint spellId)
+		{
+			var player = GetOrAddPlayerVitals(client);
+			if (player.MaxMana == 0)
+				return;
+
+			var cost = CombatResolver.ResolveSpellManaCost(spellId, (ushort)(client.Session.Character?.Level ?? 1));
+			player.ApplyManaDelta(-(int)cost);
+			await SendStatUpdate(client, player.ToVitalsBlock(), client.Session.Account.ClientInstance);
+		}
+
 		// Resolves an offensive cast: applies damage to the target's live vitals and pushes a 0x96B8DC59 update so
 		// its health bar moves. The ApplySpell cast itself is broadcast by the caller. Death handling (despawn + XP)
 		// is a TODO - the death/despawn packet isn't decoded yet (docs/quests-and-combat.md).

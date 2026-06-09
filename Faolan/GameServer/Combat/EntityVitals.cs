@@ -30,6 +30,18 @@ namespace Faolan.GameServer.Combat
 			Health = (uint)next;
 		}
 
+		/// <summary>Applies a mana delta (negative = spend, positive = restore), clamped to <c>[0, MaxMana]</c>.</summary>
+		public void ApplyManaDelta(int delta)
+		{
+			var next = Mana + delta;
+			if (next < 0)
+				next = 0;
+			else if (next > MaxMana)
+				next = MaxMana;
+
+			Mana = (uint)next;
+		}
+
 		/// <summary>
 		///     The vitals as a <c>0x96B8DC59</c> stat block, emitting the current AND max id for each of
 		///     Health/Stamina/Mana (the retail pairing - see docs/player-stats.md). Previously this sent the current
