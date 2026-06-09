@@ -171,21 +171,6 @@ namespace Faolan.GameServer
 
 				case GameServerOpcodes.Ox2000:
 				{
-					/*if (packet.SenderBytes[1] == 0x48)
-					{
-					    var sId1 = packet.Data.ReadUInt32();
-					    var sId2 = packet.Data.ReadUInt32();
-					    var sId3 = packet.Data.ReadUInt32();
-					    var sId4 = packet.Data.ReadUInt32();
-
-					    var aBuffer = new PacketStream();
-					    aBuffer.WriteHeader(Sender3, Receiver3, null, 0x2000);
-					    aBuffer.WriteUInt32(sId3);
-					    aBuffer.WriteUInt32(sId4);
-					    aBuffer.WriteUInt32(sId4 != 0x000027f9 ? 0x00000002 : 0x00000000);
-					    aBuffer.Send(client);
-					}
-					else*/
 					await Handle0X2000(client, packet);
 
 					break;
