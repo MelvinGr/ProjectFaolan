@@ -40,7 +40,7 @@ namespace Faolan.GameServer
 
 			switch (pbOpcode)
 			{
-				case GameServer0X2000Opcodes.Oxf98E10B3:
+				case GameServer0X2000Opcodes.StatIIR:
 				{
 					if (client.Session.Character?.Name == null)
 					{
@@ -63,8 +63,8 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.Ox02165Eff:
-				case GameServer0X2000Opcodes.Ox021662C8:
+				case GameServer0X2000Opcodes.LegacyCreateEchoInstanceStrie:
+				case GameServer0X2000Opcodes.LegacyCreateEchoInstanceRetail:
 				{
 					// Legacy fixed-instance echoes from older captures (retail 0x021662C8 / Strie 0x02165EFF).
 					// The normal path is the dynamic-instance pre-switch check above; this stays as a fallback.
@@ -72,7 +72,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.OxA36D3B74:
+				case GameServer0X2000Opcodes.ScryScriptIIR:
 				{
 					await HandleCommandPacket(client, packet);
 					break;
@@ -434,7 +434,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.Ox1101B4F6:
+				case GameServer0X2000Opcodes.LegacyConanHimselfInstance:
 				{
 					var data = packet.Body.ReadRemainingArray();
 					//Logger.LogInformation($"[DUMP] Ox1101B4F6 ({rawPayload.Length} bytes): {rawPayload.ToHex()}\r\nremaining: {data.ToHex()}");

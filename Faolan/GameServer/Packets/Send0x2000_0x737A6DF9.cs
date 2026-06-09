@@ -236,7 +236,7 @@ namespace Faolan.GameServer
 
 			var newStream = new PacketStream().WriteHeader(LoginWorldSender, LoginWorldReceiver(client), conanPacket.Opcode).WriteArrayUInt32Length(s =>
 			{
-				s.WriteUInt32(GameServer0X2000RespondsOpcodes.Ox737A6Df9); // subOpcode
+				s.WriteUInt32(GameServer0X2000RespondsOpcodes.FullPlayerCharacterIIR); // subOpcode
 				s.WriteUInt32(unknownStuff1); // unknownStuff1 (c350)
 				s.WriteUInt32(client.Session.Account.ClientInstance); // oldClientInstance
 				s.WriteArray(packetBody.Prefix);

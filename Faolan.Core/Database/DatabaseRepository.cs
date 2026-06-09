@@ -18,8 +18,12 @@ namespace Faolan.Core.Database
 		// reads/writes that do not have a dedicated method. Entities returned are detached.
 		Task Execute(Func<IDatabaseContext, Task> work);
 
+		Task<Ability> GetAbility(uint id);
+
 		Task<Account> GetAccount(uint id);
 		Task<Account> GetAccount(string userName);
+
+		Task<ClassAbility> GetClassAbility(uint @class, uint level);
 
 		Task<Character> GetCharacter(uint id);
 
@@ -163,6 +167,20 @@ namespace Faolan.Core.Database
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			await work(ctx);
+		}
+
+		public async Task<Ability> GetAbility(uint id)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.Abilities.FirstOrDefaultAsync(a => a.Id == id);
+		}
+
+		// The class/level row that lists which abilities (and spells) a character of this class+level should have.
+		// Falls back to the highest captured level at or below the requested one so any level still resolves a grant.
+		public async Task<ClassAbility> GetClassAbility(uint @class, uint level)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.ClassAbilities.Where(c => c.Class == @class && c.Level <= level).OrderByDescending(c => c.Level).FirstOrDefaultAsync();
 		}
 
 		public async Task<Account> GetAccount(uint id)

@@ -443,7 +443,7 @@ namespace Faolan.GameServer
 		private static Task SendPost205FOxf98E10B3Prompt(INetworkClient client)
 		{
 			return new PacketStream().WriteHeader(ExistingCharacterWorldEntryPromptSender, AppendVarint(ExistingCharacterWorldEntryPromptReceiverPrefix, client.Session.Account.ClientInstance), 0x2000).WriteArrayUInt32Length(s =>
-					s.WriteUInt32(GameServer0X2000RespondsOpcodes.OxF98E10B3).WriteUInt32(0x0000C350).WriteUInt32(client.Session.Account.ClientInstance).WriteByte(0x01).WriteUInt32(0x00000013).WriteUInt32(0x00000000))
+					s.WriteUInt32(GameServer0X2000RespondsOpcodes.StatIIR).WriteUInt32(0x0000C350).WriteUInt32(client.Session.Account.ClientInstance).WriteByte(0x01).WriteUInt32(0x00000013).WriteUInt32(0x00000000))
 				.SendAsync(client);
 		}
 

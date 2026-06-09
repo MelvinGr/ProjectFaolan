@@ -164,6 +164,7 @@ namespace Faolan.GameServer
 						Logger.LogInformation("World-burst login (map={Map}, '{Name}'): replaying {Count} packets from the DB.", client.Session.Character.MapId, client.Session.Character.Name, worldBurst.Packets.Count);
 						await Send0X201C(client);
 						await ReplayMapWorldBurst(client, worldBurst);
+						await GrantStartingAbilities(client);
 					}
 					else // TODO: Convert previous else statement + this one to normal login flow, with data from db etc.
 					{
@@ -174,6 +175,7 @@ namespace Faolan.GameServer
 						await Send0x2000_0x737A6DF9_Test(client);
 
 						await SetTimeOfDay(client);
+						await GrantStartingAbilities(client);
 					}
 
 					break;

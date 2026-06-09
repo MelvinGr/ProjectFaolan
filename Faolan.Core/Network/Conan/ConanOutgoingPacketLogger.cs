@@ -41,7 +41,7 @@ namespace Faolan.Core.Network.Conan
 						payloadLength, packet.Body.Length, packet.Bytes.Length);
 					LogDebugDetails(opcodeName, packet);
 
-					if (subOpcodeValue == (uint)GameServer0X2000RespondsOpcodes.OxF98E10B3 && data.Length >= 25)
+					if (subOpcodeValue == (uint)GameServer0X2000RespondsOpcodes.StatIIR && data.Length >= 25)
 					{
 						var unk0 = data.ReadUInt32();
 						var characterId = data.ReadUInt32();

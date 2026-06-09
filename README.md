@@ -86,8 +86,9 @@ is harvested); vendor/AH/NPC-gear packets don't help.
 - Verify a packet against a capture (`Faolan.PacketAnalyzer --dump`, or the `Captures/*.json`) before
   changing related code. Prefer pcap-backed changes over speculative guesses.
 - Build: `dotnet build '/home/melvin/Development/C#/Project Faolan/ProjectFaolan.slnx' -v q`
-- `faolan.db` is the SQLite database; it is migrated and seeded on startup (see Architecture -> Database & seed
-  data). The DB is a persistence boundary touched only at save/load points - never a live per-request context.
+- `faolan.db` is the SQLite database; the server only **migrates the schema** on startup and reads (it carries no
+  embedded game data and does not seed - data is built by `Faolan.Importer`; see "Database & data"). The DB is a
+  persistence boundary touched only at save/load points - never a live per-request context.
 
 ## Character creation -> world flow (implemented)
 
@@ -156,6 +157,12 @@ Every Conan packet header carries a **sender** and **receiver** conversation id,
 message: a `fixed32` family tag + a varint sub-id, e.g. sender `0D 13 CE 71 B1 10 <sub>` and receiver
 `0D 47 C1 67 6C 10 <varint clientInstance>`. The receiver's trailing varint is the **client instance**
 (`0x021662C8` -> `C8 C5 D9 10`); a few server->client packets instead carry the instance in the sender tail.
+
+The `fixed32` family tag is a **BKDR-31 hash of the client interface/agent class name** (recovered by RE'ing
+`AgeOfConan.exe` - see "Client reverse-engineering" below): the login `0D 13 CE 71 B1` = `hash("GameAgent")`
+(`0xB171CE13`, little-endian) and `0D 47 C1 67 6C` = `hash("GameInterface")` (`0x6C67C147`); the `0x201C` spawn
+family `0D 91 F7 87 8B` = `hash("GameCharInterface")` and its caller `hash("GameCharAgent")`. The constants and
+their real names live in `Faolan.Core/Network/Conan/ConanEndpoints.cs`.
 
 A whole world session rides **one conversation**. Confirmed from the Strie login capture, the entire login
 world-entry (auth `200B/200C/2001`, `MapChange`, world objects, the player spawn, **all NPC spawns**, time)
@@ -226,6 +233,19 @@ Key sub-protocol facts:
   the server answers each with `0x2008` SpawnCheck (9 bytes `C350 <handle> <status>`, status `0x02` for the
   player's own avatar, else `0x00`) on the `0x91F7878B10` (201C) conversation.
 - The entity handle is assigned by the `FA015807` Spawn packet; the player's own handle is the first spawn.
+
+### Ability grants (`Send0x2052_GrantAbilities.cs`)
+
+The player's castable attacks are delivered by the **`0x2052`** opcode (a top-level opcode on the spawn/`0x201C`
+conversation - **not** a `0x2000` sub-opcode), one packet per ability. The old C++ scheme (`addAbility` opcode
+`0x4d`) is dead; `0x2052` is the retail packet, decoded from the `strickenbla` combat capture (pkt #399/#401).
+Body after the 16-bit opcode (big-endian u32s): `[slot][id][id][0][1][data0][data1..4][data1..4][constA][constB]
+[constA][constB][1][0][u8 flag]`, where `constA=0xB290805C`/`constB=0x29E627CA` are fixed for every ability and
+`slot` is the ability's template word (`Abilities.Slot`, recovered from the old archive `abilities.slot` since
+`p_abilities` lacks it). `GrantStartingAbilities` parses the character's `ClassAbilities.Abilities` list, loads
+each `Ability`, and sends `BuildAbilityGrantBody` (byte-for-byte locked by `AbilityGrantTests`) after the
+world-burst replay. The universal melee attacks (769094 "Normal Attack Left" / 769099 "Normal Attack Front") are
+granted to every class; the cast itself is the already-working `Interact`/`ApplySpell` combat path.
 
 ### World-burst replay + progressive DB-driven rebuild (`RetailLoginReplay.cs`)
 
@@ -385,10 +405,38 @@ a freshly-created char rather than `ConanHimself` for retail-faithful instance b
 - `0x2000` is overloaded: `GameServer.AckAuthentication` and `UniverseAgent.SendPlayerAgentRealm` are both
   `0x2001`; the analyzer disambiguates by port.
 - World build + spawn polling (`0x2020`/`0x2008`/`0x2076`/`0x2052`): see "Existing-character login" above.
-  The static world objects must be sent before entity spawns or nothing renders.
+  The static world objects must be sent before entity spawns or nothing renders. (`0x2052` is the ability-grant
+  method - the player's starting melee attacks; see "Abilities" / `GrantStartingAbilities`.)
 - `Captures/compare_log_to_dump.py` decodes our `logs.txt` and a capture JSON into (conversation family,
   opcode) counts + a chronological timeline, independent of the client instance - the primary tool for
   finding which world-entry packets we send wrong or omit. Default dump: the Strie login.
+
+## Client reverse-engineering (opcode / message names)
+
+The protocol's numeric ids were recovered by RE'ing the client `AgeOfConan.exe` (same exe as the `.proto` schema
+and DH-login work). The full plan + findings: **`docs/opcode-re-plan.md`**. Key results:
+
+- **The id hash is BKDR-31** (`h = 0; h = h*31 + c` over the ASCII class name, == Java `String.hashCode`).
+  Cracked by brute-forcing known anchors (18/18). Two id systems use it:
+  - **`ProtoEndpoint.type`** (the conversation family tags) = `hash(interface/agent name)`:
+    `GameAgent`/`GameInterface` (player+world), `GameCharAgent`/`GameCharInterface` (the `0x201C` spawn handshake),
+    `GameCharAgentProject`/`GameCharInterfaceProject`, plus `Player`/`CSPlayer`/`Universe`/`Tradepost`.
+  - **The 32-bit sub-opcodes inside `0x2000`** = `hash(IIR message-type name)`. The whole `0x2000` channel is the
+    client's "IIR" (Incremental Information Replication) system; e.g. `0x96B8DC59`=`StatUpdateIIR`,
+    `0x6B87E316`=`MagicBuffIIR` (what we call ApplySpell), `0xFA015807`=`SimpleCharFullUpdateIIR` (Spawn),
+    `0x5D85BFC7`=`PlayfieldFIIR` (MapChange), `0x642CD3D6`=`BehaviorControlCenterIIR` (the action channel),
+    `0xA36D3B74`=`ScryScriptIIR` (cutscene scripts), the `Knubot*IIR` family (NPC dialogue). The full decoded table
+    across **all servers** is `docs/aoc-opcode-ids.md`; the named enum is `GameServer0X2000RespondsOpcodes`.
+- **RPC method catalog** (`docs/aoc-client-rpc-methods.md`): 14 interfaces, 777 methods, recovered from the
+  client's own log strings - method names, **param names in wire order** (from `stream bad after '<field>'`
+  traces), and typed client->server signatures, with a Hungarian-prefix -> wire-type legend (`i_c`=ID32 handle,
+  `i_n`=int, `b`=bool, `i_v`=vector). This is "what every server<->client method is and how its body is laid out".
+- **Embedded protobuf descriptors**: exactly 16 IIR message types are protobuf (`Faolan.Core/Network/Protobuf/
+  aoc-client-protos.proto` -> generated `AocProtocol.g.cs`); the rest (combat/quest/morph/move) are raw-stream.
+- **16-bit RpcHeader opcodes** (`0x2052`, `0x2008`, ...) are framework-assigned method indices, **not** hashes -
+  not yet mapped (would need Ghidra; deprioritized since the IIR channel is the bulk and is decoded).
+- Tooling (reproducible from the exe): `Captures/extract_rpc_catalog.py`, `decode_opcode_ids.py`,
+  `reverse_hash_ids.py`, `decode_scryscript.py`.
 
 ## Roadmap / current focus
 
@@ -406,6 +454,12 @@ today); and ultimately the full DB-built snapshot incl. the tails.
 Concrete next steps, grouped by area. See `docs/` for the dissection writeups behind each.
 
 ### Stats & combat (`docs/player-stats.md`, `docs/quests-and-combat.md`)
+- [x] **Grant starting attacks on login**: the player is sent its `ClassAbilities` (the universal melee attacks
+      769094/769099) via the retail **`0x2052`** ability-grant packet, rebuilt DB-driven from the `Abilities` rows
+      (identity quad + the `Slot` word). See "Ability grants" below; enables the combat cast→damage→vitals test.
+- [ ] **Grant actual spells** (vs melee abilities): `ClassAbilities.Spells` lists spell ids (e.g. class 29's
+      165241) but the retail spell-grant packet isn't decoded/wired yet (the C++ `addSpell` opcode `0x09` is the
+      dead old scheme, like `0x4d` was for abilities). Find it in a capture, then wire it next to the ability grant.
 - [ ] **Level-up path**: bump `Character.Level`, call `Character.RegenerateMaxStats()`, `SaveCharacter`, then
       push a `0x96B8DC59` vitals update (`SendVitals`) so the client sees the new stats. (Hold until the vitals
       packet is confirmed rendering in-client.)
@@ -423,8 +477,9 @@ Concrete next steps, grouped by area. See `docs/` for the dissection writeups be
       `MaxStamina 0x1F9` / `MaxMana 0x1FB` (suspect); find the real max-* ids or confirm max==current-when-full.
 - [ ] Determine whether **attributes** (Str/Int/Con/Wis/Dex) are sent at all or computed client-side from
       gear/buffs (their sheet values don't appear as plain stat records).
-- [ ] Decode the high-volume combat entity-update sub-ops `0xFEC4158A` / `0xD751EBB4` / `0x04B82B2D`
-      (animation / aggro / buff state, unconfirmed).
+- [~] The high-volume combat entity-update sub-ops are now **named** (RE, `docs/aoc-opcode-ids.md`):
+      `0xFEC4158A`=`DamageResultIIR`, `0xD751EBB4`=`StopIIR` (stop moving), `0x04B82B2D`=`n3ToClientQuitIIR`,
+      `0x96C46740`=`MoveTaskIIR`, `0xF98E10B3`=`StatIIR`. Bodies still need raw-stream field decode (not protobuf).
 
 ### Conversations / NPC routing
 - [x] **Wrong NPC dialogue routing.** Root cause: `(TypeId, Mode, Field3)` is NOT NPC-unique - `mode` is quest-

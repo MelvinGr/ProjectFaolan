@@ -7,6 +7,13 @@ namespace Faolan.Core.Database.Tables
 	{
 		public byte Level { get; set; }
 		public string Name { get; set; }
+
+		// The ability's wire "slot"/template word: the leading u32 of the 0x2052 ability-grant packet (verified
+		// against the strickenbla combat capture: 769094->108, 769099->112). It is the old archive `abilities.slot`
+		// column; `p_abilities` does NOT carry it, so the importer backfills it from the old sqlite. Despite the
+		// "slot" name it is ability-intrinsic metadata, not a hotbar position.
+		public uint Slot { get; set; }
+
 		public uint Data0 { get; set; }
 		public uint Data1 { get; set; }
 		public uint Data2 { get; set; }

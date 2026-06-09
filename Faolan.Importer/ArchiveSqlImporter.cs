@@ -15,6 +15,19 @@ namespace Faolan.Importer
 	// `--archive <dir-containing-aocdatabase.sql>`. Upserts (no deletes), so it is safe to re-run.
 	public static class ArchiveSqlImporter
 	{
+		// The ability "slot" (0x2052 grant leading word) lives in the OLD archive sqlite `abilities` table, not in
+		// `p_abilities`, so we carry it here keyed by ability id (mirrors the AddAbilitySlot migration backfill).
+		private static readonly Dictionary<uint, uint> AbilitySlots = new()
+		{
+			[269272] = 106,   // Rest
+			[769094] = 108,   // Normal Attack Left
+			[769095] = 109,   // Normal Attack Right
+			[769099] = 112,   // Normal Attack Front
+			[3316611] = 1250, // toggle combat
+			[3675584] = 259   // switch weapon
+		};
+
+
 		public static async Task<(int Abilities, int ClassAbilities)> ImportAsync(IDatabaseContext db, string sqlDir)
 		{
 			var sql = await File.ReadAllTextAsync(Path.Combine(sqlDir, "aocdatabase.sql"));
@@ -38,6 +51,8 @@ namespace Faolan.Importer
 				a.Data2 = U(r[5]);
 				a.Data3 = U(r[6]);
 				a.Data4 = U(r[7]);
+				if (AbilitySlots.TryGetValue(id, out var slot))
+					a.Slot = slot;
 			}
 
 			// const_abilitys: class, level, abilitys, abilitysNew, spells, spellsNew

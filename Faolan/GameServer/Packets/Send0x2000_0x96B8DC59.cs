@@ -25,7 +25,7 @@ namespace Faolan.GameServer
 
 			return new PacketStream().WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x00002000).WriteArrayUInt32Length(s =>
 			{
-				s.WriteUInt32(GameServer0X2000RespondsOpcodes.Ox96B8Dc59);
+				s.WriteUInt32(GameServer0X2000RespondsOpcodes.StatUpdateIIR);
 				s.WriteUInt32(VitalsMarker);
 				s.WriteUInt32(handle);
 				s.WriteUInt32(0x00000000);

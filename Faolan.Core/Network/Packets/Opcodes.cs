@@ -79,49 +79,118 @@
 			LatencyCheckResponse = 0x2082
 		}
 
+		// The 0x2000 sub-opcodes the GameServer HANDLES (client->server). These are the same IIR ids as
+		// GameServer0X2000RespondsOpcodes (the full catalog); kept as a separate handler-facing enum with the
+		// descriptive names the handler switch reads by, with the real client IIR type noted per line. The three
+		// "LegacyCreateEcho*" values are NOT IIR ids - they are client instance ids the create-editor client echoes
+		// back as the sub-opcode (the normal path matches the live instance dynamically; these are static fallbacks).
 		public enum GameServer0X2000Opcodes : uint
 		{
-			Interact = 0x642CD3D6, // generic action channel: world-object interaction, spells, right-click item, inventory/equipment actions
-			CloseGame = 0x6B6FD368,
-			ReadyForPlayScreen = 0x864cfef8,
-			Move = 0x4517aa81,
-			OxA36D3B74 = 0xa36d3b74, // character-editor script callbacks (IntroDone, ChangeSex, TheNameIs, ClientLoadingDone, ...)
-			Oxf98E10B3 = 0xf98e10b3,
-			Ox02165Eff = 0x02165EFF, // observed repeated client-side create-flow request in the older retail create capture
-			Ox021662C8 = 0x021662C8, // observed repeated client-side create-flow request in account-stricken998-character-create-no-worldenter
-			SelectDeselect = 0x0D155695,
-			DropItem = 0x72491DE9, // client-side inventory action; no matching bag-content response packet is decoded yet
-			MoveItemInInventory = 0x2A8A1B49, // client-side slot move action; likely pairs with a separate inventory/container sync family
-			DeleteQuest = 0x97E02314,
-			InventoryClaimsButton = 0x06EC1255, // observed as a tiny post-ready/request-side packet, not as actual bag contents
-			Ox1101B4F6 = 0x1101B4F6
+			Interact = 0x642CD3D6, // = BehaviorControlCenterIIR_c: generic action channel (world-object interaction, spells, right-click, inventory/equipment)
+			CloseGame = 0x6B6FD368, // = CharacterActionIIR_t
+			ReadyForPlayScreen = 0x864cfef8, // = CharInPlayIIR_t
+			Move = 0x4517aa81, // = CharDCMoveIIR_t
+			ScryScriptIIR = 0xa36d3b74, // = ScryScriptIIR_c: cutscene/scry scripts + char-editor callbacks (IntroDone, ChangeSex, TheNameIs, ClientLoadingDone, ...)
+			StatIIR = 0xf98e10b3, // = StatIIR_t
+			SelectDeselect = 0x0D155695, // = LookAtIIR_t
+			DropItem = 0x72491DE9, // = DeleteItemIIR_t: client-side inventory action; no matching bag-content response packet is decoded yet
+			MoveItemInInventory = 0x2A8A1B49, // = MoveInventoryItemIIR_t: client-side slot move action
+			DeleteQuest = 0x97E02314, // = QuestIIR_c
+			InventoryClaimsButton = 0x06EC1255, // = CoreClaimIIR: tiny post-ready/request-side packet, not actual bag contents
+			LegacyCreateEchoInstanceStrie = 0x02165EFF, // create-flow client instance echo (Strie, older retail create capture) - NOT an IIR id
+			LegacyCreateEchoInstanceRetail = 0x021662C8, // create-flow client instance echo (account-stricken998 create-no-worldenter) - NOT an IIR id
+			LegacyConanHimselfInstance = 0x1101B4F6 // ConanHimself manual char instance - NOT an IIR id
 		}
 
+		// Every 32-bit sub-opcode carried inside a 0x2000 packet is an "IIR" (Incremental Information Replication)
+		// message id = the BKDR-31 hash of the client's IIR C++ type name (h = h*31 + c; == Java String.hashCode),
+		// recovered by RE'ing AgeOfConan.exe (docs/opcode-re-plan.md + docs/aoc-opcode-ids.md). Members are named
+		// after the real client type (with the _t/_c template suffix dropped); the comment gives the exact type and
+		// the occurrence count across all captures. This is the full catalog of every IIR id observed on the wire
+		// (server->client AND client->server - the id is the message type, direction-independent), even ones the
+		// server doesn't emit yet. The few descriptive aliases the server code uses are at the bottom.
 		public enum GameServer0X2000RespondsOpcodes : uint
 		{
-			MapChange = 0x5D85BFC7,
-			Ox33A56Fb0 = 0x33A56FB0, // capture examples look like location/object label style payloads (e.g. City of Tortage)
-			SpawnObject = 0x66AEDD50,
-			Spawn = 0xFA015807,
-			SetDayTime = 0x4F57DC08,
-			OxF096251E = 0xF096251E, // container/chest-style packet family in captures
+			AreaFormulaIIR = 0xCE30BE4E, // AreaFormulaIIR_t  (x42)
+			BankIIR = 0x0BA1C1CB, // BankIIR_t  (x3)
+			BehaviorControlCenterIIR = 0x642CD3D6, // BehaviorControlCenterIIR_c  (x22474) - the generic action/behavior channel ("Interact")
+			ChainKillIIR = 0x0EED7068, // ChainKillIIR_t  (x28)
+			CharDCMoveIIR = 0x4517AA81, // CharDCMoveIIR_t  (x11005) - entity move ("Move"); raw-body floats are big-endian
+			CharInPlayIIR = 0x864CFEF8, // CharInPlayIIR_t  (x74) - "ReadyForPlayScreen"
+			CharacterActionIIR = 0x6B6FD368, // CharacterActionIIR_t  (x136) - "CloseGame"
+			ChatTextIIR = 0xE0B51102, // ChatTextIIR_t  (x1)
+			ClimbingDynelFullUpdateIIR = 0x1FD6412B, // ClimbingDynelFullUpdateIIR_c  (x87)
+			CombatReactiveIIR = 0x54C02089, // CombatReactiveIIR_c  (x17)
+			CombatShieldIIR = 0xCFFD0519, // CombatShieldIIR_c  (x79)
+			ComboBookIIR = 0xA8BBEB7F, // ComboBookIIR_c  (x65)
+			CoreClaimIIR = 0x06EC1255, // CoreClaimIIR  (x8) - "InventoryClaimsButton"
+			CrimeIIR = 0xC7954504, // CrimeIIR_c  (x3)
+			DamageResultIIR = 0xFEC4158A, // DamageResultIIR_c  (x1134) - combat damage result
+			DeleteItemIIR = 0x72491DE9, // DeleteItemIIR_t - "DropItem"
+			DestructibleFullUpdateIIR = 0x6BD56736, // DestructibleFullUpdateIIR_c  (x189)
+			DoorFullUpdateIIR = 0x33A56FB0, // DoorFullUpdateIIR_c  (x89) - world door/object full update
+			EnergyIIR = 0x40749B8A, // EnergyIIR  (x1039)
+			FeedbackIIR = 0xBA1FD222, // FeedbackIIR_t  (x5)
+			FormatFeedbackIIR = 0x8D5A8B6B, // FormatFeedbackIIR_t  (x68)
+			FullPlayerCharacterIIR = 0x737A6DF9, // FullPlayerCharacterIIR  (x33) - the whole player character (inc. inventory); see carve-out below
+			GameActionListIIR = 0xF508F4C1, // GameActionListIIR_t  (x366)
+			GameTimeIIR = 0x4F57DC08, // GameTimeIIR_t  (x33) - "SetDayTime"
+			GuildUpdateIIR = 0x2550C99A, // GuildUpdateIIR_c  (x3)
+			HateListUpdateIIR = 0x8A01E5A1, // HateListUpdateIIR  (x61)
+			IntendedTeleportIIR = 0x10D27BC0, // IntendedTeleportIIR_c  (x15)
+			KnubotAnswerIIR = 0x4D7D9123, // KnubotAnswerIIR_c  (x194) - NPC dialogue ("Knubot" = the NPC dialogue system)
+			KnubotAnswerListIIR = 0xF164A4A5, // KnubotAnswerListIIR_c  (x177)
+			KnubotAppendTextIIR = 0x4A3D899A, // KnubotAppendTextIIR_c  (x217)
+			KnubotCloseChatWindowIIR = 0xC4AF39EB, // KnubotCloseChatWindowIIR_c  (x44)
+			KnubotFinishTradeIIR = 0x7446F3FA, // KnubotFinishTradeIIR_c  (x2)
+			KnubotOpenChatWindowIIR = 0x045B0B0F, // KnubotOpenChatWindowIIR_c  (x43)
+			KnubotStartTradeIIR = 0x4B2A47BF, // KnubotStartTradeIIR_c  (x2)
+			LockedToChangedIIR = 0x6B0AEC58, // LockedToChangedIIR_t  (x58)
+			LookAtIIR = 0x0D155695, // LookAtIIR_t  (x812) - "SelectDeselect"
+			LootBagFullUpdateIIR = 0xF096251E, // LootBagFullUpdateIIR_c  (x102) - loot bag (NOT the player bag)
+			LootRemoveItemsIIR = 0x70010162, // LootRemoveItemsIIR_c  (x42)
+			MagicBuffIIR = 0x6B87E316, // MagicBuffIIR_c  (x728) - a magic buff/effect ("ApplySpell")
+			MoveInventoryItemIIR = 0x2A8A1B49, // MoveInventoryItemIIR_t  (x16) - "MoveItemInInventory"
+			MoveTaskIIR = 0x96C46740, // MoveTaskIIR_c  (x5564) - movement task (the float-heavy state block)
+			NewAllowedLooterIIR = 0x1E2E0139, // NewAllowedLooterIIR_c  (x59)
+			NewCurrentLooterIIR = 0xD06568C8, // NewCurrentLooterIIR_c  (x60)
+			PetIIR = 0x1F4CB0F7, // PetIIR_c  (x6)
+			PlayfieldFIIR = 0x5D85BFC7, // PlayfieldFIIR_t  (x33) - "MapChange"
+			QuestFullUpdateIIR = 0x63268258, // QuestFullUpdateIIR  (x28)
+			QuestGoalIIR = 0x0774C8C1, // QuestGoalIIR_c  (x27)
+			QuestIIR = 0x97E02314, // QuestIIR_c  (x34) - "DeleteQuest"
+			QuestJournalIIR = 0x79F8C7A1, // QuestJournalIIR_c  (x17)
+			RegenIIR = 0x28D0AC99, // RegenIIR_c  (x554)
+			ScryScriptIIR = 0xA36D3B74, // ScryScriptIIR_c  (x390) - cutscene/scry scripts + char-editor callbacks (IntroDone, TheNameIs, ...)
+			SetMorphValueIIR = 0xBADF5A4B, // SetMorphValueIIR_c  (x101) - character-creator morph ack
+			SetNameIIR = 0xADCE0CDA, // SetNameIIR_t  (x4) - name commit in the create flow
+			SetPosIIR = 0x04B80B24, // SetPosIIR_c  (x29)
+			SimpleCharFullUpdateIIR = 0xFA015807, // SimpleCharFullUpdateIIR_t  (x3407) - entity spawn ("Spawn")
+			SimpleCharKilledByUpdateIIR = 0xB066AFC2, // SimpleCharKilledByUpdateIIR_t  (x2) - kill/death
+			SimpleDynelFullUpdateIIR = 0x66AEDD50, // SimpleDynelFullUpdateIIR_c  (x1575) - world object spawn ("SpawnObject")
+			SimpleDynelVisualChangeIIR = 0xE7F4F8F8, // SimpleDynelVisualChangeIIR_c  (x548)
+			SpellBookIIR = 0x6BA10936, // SpellBookIIR_t  (x1)
+			StatDamageIIR = 0xE9F24184, // StatDamageIIR_t  (x450)
+			StatIIR = 0xF98E10B3, // StatIIR_t  (x8167)
+			StatUpdateIIR = 0x96B8DC59, // StatUpdateIIR_c  (x1595) - entity vitals/stat update (combat HP/Stamina/Mana); see docs/quests-and-combat.md
+			StopIIR = 0xD751EBB4, // StopIIR_c  (x2097) - stop moving
+			TemplateActionIIR = 0x6C300937, // TemplateActionIIR_t  (x7)
+			ThreatLevelIIR = 0x1745EF6C, // ThreatLevelIIR_c  (x162)
+			TombStoneFullUpdateIIR = 0x0D80E7C9, // TombStoneFullUpdateIIR_c  (x6)
+			UpdateInventoryIIR = 0xA74D2814, // UpdateInventoryIIR_t  (x30)
+			UpdateSimpleDynelIIR = 0x30536411, // UpdateSimpleDynelIIR_c  (x30)
+			N3TeleportIIR = 0x5A32F0D7, // n3TeleportIIR_t  (x27) - teleport
+			N3ToClientFadeIIR = 0x66180B20, // n3ToClientFadeIIR_t  (x87) - screen fade
+			N3ToClientQuitIIR = 0x04B82B2D, // n3ToClientQuitIIR_t  (x3249)
 
-			// stable observations so far:
-			// - embeds names like "Chest [N7FU]", "Acheronian Chest", and "object_closed"
-			// - payload sizes vary widely (e.g. 540/543/659/778/781), suggesting repeated item/container entries
-			// - begins with the same world-object style position block, then a 125-byte metadata block
-			//   carrying container name/remoteformat metadata, then a variable nested entry block
-			// - the chest samples currently decode as 2, 3, or 4 repeated nested entries (indices 0..n-1)
-			// - still looks like remote world-container/chest data, not the player bag snapshot
-			Ox642Cd3D6 = 0x642CD3D6,
-			Ox96C46740 = 0x96C46740, // float-heavy state block in captures; does not resemble bag or slot inventory data
-			ApplySpell = 0x6B87E316,
-			OxF98E10B3 = 0xF98E10B3,
-			Ox96B8Dc59 = 0x96B8DC59, // entity vitals / stat update: 0000C350 + entityHandle + 00000000 + count(1) + N×(u32 statId,u32 value); carries combat HP/Stamina/Mana (docs/quests-and-combat.md)
+			// --- descriptive aliases used by the server code (same value as the IIR member above) ---
+			MapChange = PlayfieldFIIR,
+			Spawn = SimpleCharFullUpdateIIR,
+			SpawnObject = SimpleDynelFullUpdateIIR,
+			SetDayTime = GameTimeIIR,
+			ApplySpell = MagicBuffIIR,
 
-			Ox737A6Df9 = 0x737A6DF9 // very large initial state dump in captures
-			// strongest current candidate for player inventory/bag serialization
-			// stable carve-out so far from the random-actions capture:
+			// FullPlayerCharacterIIR (0x737A6DF9) carve-out - the player inventory/bag serialization:
 			// - after a 34-byte preamble, the body contains nested container-style blocks linked by field 6:
 			//   101 -> f6 -> 104 -> f6 -> 112 -> f6 -> 113 -> f7=0
 			// - each block currently looks like { f1=containerRef, f2=?, f3=?, repeated f4=itemEntry, f6=nextBlock? }

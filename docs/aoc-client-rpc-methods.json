@@ -1,0 +1,5211 @@
+{
+ "CSPlayerAgent": {
+  "client_to_server": [
+   {
+    "method": "Authenticate",
+    "params": [
+     "ID32::InstanceType nCharacterInstance",
+     "uint32 nCookie",
+     "unsigned int communityVersion"
+    ]
+   },
+   {
+    "method": "CharacterAuthenticated",
+    "params": [
+     "ID32::InstanceType nCharacterInstance"
+    ]
+   },
+   {
+    "method": "CharacterDisconnected",
+    "params": [
+     "ID32::InstanceType nCharacterInstance"
+    ]
+   },
+   {
+    "method": "TeamInvite",
+    "params": [
+     "const ID32& i_cTargetID",
+     "const std::string& i_cMessage",
+     "bool i_bCheckCriminalStatus"
+    ]
+   },
+   {
+    "method": "TeamInviteByName",
+    "params": [
+     "const std::string& i_cCharacterName",
+     "const std::string& i_cMessage",
+     "bool i_bCheckCriminalStatus"
+    ]
+   },
+   {
+    "method": "TeamApply",
+    "params": [
+     "const ID32& i_cTeamID"
+    ]
+   },
+   {
+    "method": "TeamSetLootOption",
+    "params": [
+     "int i_eLootMode",
+     "bool i_bUseNeedGreed",
+     "int i_nNewLootThreshold"
+    ]
+   },
+   {
+    "method": "TeamSetMasterLooter",
+    "params": [
+     "const ID32& i_cCharacterID"
+    ]
+   },
+   {
+    "method": "AcceptTeamInvite",
+    "params": [
+     "const ID32& i_cInviterID"
+    ]
+   },
+   {
+    "method": "DeclineTeamInvite",
+    "params": [
+     "const ID32& i_cInviterID"
+    ]
+   },
+   {
+    "method": "CharacterSearch",
+    "params": [
+     "int i_eSearchmode",
+     "const InstanceVec_t& i_cPlayfieldVec",
+     "int i_nMinLevel",
+     "int i_nMaxLevel",
+     "const IntVec_t& i_nClassVec",
+     "const IntVec_t& i_nRaceVec",
+     "uint32 i_nSkipResults",
+     "const String& i_cNameSearch"
+    ]
+   },
+   {
+    "method": "SearchForTeam",
+    "params": [
+     "const InstanceVec_t& i_cPlayfieldVec",
+     "int i_nMinLevel",
+     "int i_nMaxLevel",
+     "int memberCountMin",
+     "int memberCountMax",
+     "uint32 i_nSkipResults"
+    ]
+   },
+   {
+    "method": "SetNewTeamLeader",
+    "params": [
+     "const ID32& i_cNewLeaderID"
+    ]
+   },
+   {
+    "method": "SummonCharacters",
+    "params": [
+     "const ID64Vec_t& i_cCharacterVec"
+    ]
+   },
+   {
+    "method": "AcceptSummon",
+    "params": []
+   },
+   {
+    "method": "DeclineSummon",
+    "params": []
+   },
+   {
+    "method": "GetExtendedCharacterInfo",
+    "params": [
+     "const ID32& i_cCharacterID"
+    ]
+   },
+   {
+    "method": "GetExtendedCharacterInfoByName",
+    "params": [
+     "int i_nWindowId",
+     "const std::string& i_cCharacterName"
+    ]
+   },
+   {
+    "method": "SetLookingForTeamStatus",
+    "params": [
+     "bool i_bLookingForTeam",
+     "const std::string& i_cMessage"
+    ]
+   },
+   {
+    "method": "SetLookingForMemberStatus",
+    "params": [
+     "bool i_bLookingForMember",
+     "const std::string& i_cMessage"
+    ]
+   },
+   {
+    "method": "GetLookingForTeamStatus",
+    "params": []
+   },
+   {
+    "method": "GetLookingForMemberStatus",
+    "params": []
+   },
+   {
+    "method": "SetCommunityServerOptions",
+    "params": [
+     "const CommunityServerOptions_c& i_cOptions"
+    ]
+   },
+   {
+    "method": "StartVoteKick",
+    "params": [
+     "const ID32& i_cCharacterID"
+    ]
+   },
+   {
+    "method": "VoteKickAnswer",
+    "params": [
+     "const ID32& i_cCharacterID",
+     "bool kick"
+    ]
+   },
+   {
+    "method": "StartVoteRetreat",
+    "params": []
+   },
+   {
+    "method": "VoteRetreatAccept",
+    "params": []
+   },
+   {
+    "method": "VoteRetreatReject",
+    "params": []
+   },
+   {
+    "method": "AcceptGuildInvitation",
+    "params": [
+     "const ID32& i_cGuildID"
+    ]
+   },
+   {
+    "method": "DeclineGuildInvitation",
+    "params": [
+     "const ID32& i_cGuildID"
+    ]
+   },
+   {
+    "method": "ClientRequestGuildInfo",
+    "params": [
+     "const ID32& i_cCharacter"
+    ]
+   },
+   {
+    "method": "ClientRequestGuildName",
+    "params": [
+     "const ID32 i_cGuildID"
+    ]
+   },
+   {
+    "method": "ClientRequestCharIDByName",
+    "params": [
+     "const String& i_cCharacterName"
+    ]
+   },
+   {
+    "method": "CreateGuild",
+    "params": [
+     "const std::string& i_cGuildName",
+     "uint8 i_nGoverningForm",
+     "uint8 i_nTax",
+     "uint8 i_nLookingForMember"
+    ]
+   },
+   {
+    "method": "GuildInviteByName",
+    "params": [
+     "const String& i_cName"
+    ]
+   },
+   {
+    "method": "GuildInvite",
+    "params": [
+     "const ID32& i_cCharacter"
+    ]
+   },
+   {
+    "method": "RemoveGuildInvitationCooldown",
+    "params": [
+     "const ID32& guildID",
+     "const ID32& characterID"
+    ]
+   },
+   {
+    "method": "GuildPromote",
+    "params": [
+     "const ID32& i_cCharacter"
+    ]
+   },
+   {
+    "method": "GuildDemote",
+    "params": [
+     "const ID32& i_cCharacter"
+    ]
+   },
+   {
+    "method": "GuildKick",
+    "params": [
+     "const ID32& i_cCharacter"
+    ]
+   },
+   {
+    "method": "GuildLeave",
+    "params": []
+   },
+   {
+    "method": "GuildTax",
+    "params": [
+     "int nTax"
+    ]
+   },
+   {
+    "method": "GuildGovernmentForm",
+    "params": [
+     "uint i_nGovernmentForm"
+    ]
+   },
+   {
+    "method": "GuildRecruitmentMode",
+    "params": [
+     "uint8 i_nRecruitmentMode"
+    ]
+   },
+   {
+    "method": "GuildName",
+    "params": [
+     "const std::string& i_cGuildName"
+    ]
+   },
+   {
+    "method": "GuildDescription",
+    "params": [
+     "const std::string& i_cGuildDescription"
+    ]
+   },
+   {
+    "method": "GuildMessageOfTheDay",
+    "params": [
+     "const std::string& i_cGuildMessageOfTheDay"
+    ]
+   },
+   {
+    "method": "GuildRequestMemberList",
+    "params": []
+   },
+   {
+    "method": "GuildApplication",
+    "params": [
+     "const ID32& i_cGuildID",
+     "std::string i_cApplicationText"
+    ]
+   },
+   {
+    "method": "GuildRejectApplication",
+    "params": [
+     "const ID32::InstanceType& i_cApplicant",
+     "const ID32::InstanceType& i_cGuildMember"
+    ]
+   },
+   {
+    "method": "SetLookingForGuild",
+    "params": [
+     "uint8 i_nState",
+     "const std::string& i_cAbout"
+    ]
+   },
+   {
+    "method": "GuildMergeRequest",
+    "params": [
+     "const ID32& i_cOtherLeader"
+    ]
+   },
+   {
+    "method": "GuildMergeReply",
+    "params": [
+     "const ID32& i_cOtherLeader",
+     "int nReply"
+    ]
+   },
+   {
+    "method": "GuildWithdrawMoney",
+    "params": [
+     "uint64 i_nAmount"
+    ]
+   },
+   {
+    "method": "GetPvpPointsInfo",
+    "params": [
+     "const ID32& i_cCharacter"
+    ]
+   },
+   {
+    "method": "AddPvpPoints",
+    "params": [
+     "const ID32& i_cCharacter",
+     "uint32 i_nAmount"
+    ]
+   },
+   {
+    "method": "RemovePvpPoints",
+    "params": [
+     "const ID32& i_cCharacter",
+     "uint32 i_nAmount"
+    ]
+   },
+   {
+    "method": "ClearPvpPoints",
+    "params": [
+     "const ID32& i_cCharacter"
+    ]
+   },
+   {
+    "method": "GetGuildRenownInfo",
+    "params": [
+     "const ID32& character"
+    ]
+   },
+   {
+    "method": "AddGuildRenown",
+    "params": [
+     "const ID32& character",
+     "uint8 grType",
+     "uint64 amount",
+     "bool onlyGuild"
+    ]
+   },
+   {
+    "method": "RemoveGuildRenown",
+    "params": [
+     "const ID32& character",
+     "uint8 grType",
+     "uint64 amount",
+     "bool onlyGuild"
+    ]
+   },
+   {
+    "method": "SetGuildRenown",
+    "params": [
+     "const ID32& character",
+     "uint8 grType",
+     "uint64 amount",
+     "bool onlyGuild"
+    ]
+   },
+   {
+    "method": "CalculateRankings",
+    "params": []
+   },
+   {
+    "method": "UnlockGuildRenown",
+    "params": []
+   },
+   {
+    "method": "RequestRenownHistory",
+    "params": []
+   },
+   {
+    "method": "RequestRenownRankings",
+    "params": []
+   },
+   {
+    "method": "RequestBattleKeepInformation",
+    "params": [
+     "IntVec_t areaIDVec"
+    ]
+   },
+   {
+    "method": "SearchForGuilds",
+    "params": [
+     "uint16 i_nMinMembers",
+     "uint16 i_nMaxMembers",
+     "uint8 i_nMinLevel",
+     "uint8 i_nMaxLevel",
+     "const String& i_cNameSearch"
+    ]
+   },
+   {
+    "method": "GMGuildName",
+    "params": [
+     "const ID32& i_cCharacter",
+     "const std::string& i_cGuildName"
+    ]
+   },
+   {
+    "method": "RequestGuildCitySpot",
+    "params": [
+     "const ID32& i_cCharacter",
+     "const ID32& i_cGuildID",
+     "const ID32& i_cPlayfieldModelID"
+    ]
+   },
+   {
+    "method": "ApplyForMassivePVPBattleQueue",
+    "params": [
+     "const ID32& i_cCharacter",
+     "const ID32& i_cGuildID",
+     "int i_nArea"
+    ]
+   },
+   {
+    "method": "WithdrawFromMassivePVPBattleQueue",
+    "params": [
+     "const ID32& i_cCharacter",
+     "const ID32& i_cGuildID",
+     "int i_nArea"
+    ]
+   },
+   {
+    "method": "MassivePvPBattleQueueGMCommand",
+    "params": [
+     "const ID32& i_cCharacter",
+     "const ID32& i_cGuildID",
+     "int i_nArea",
+     "int i_nMode"
+    ]
+   },
+   {
+    "method": "MassivePvpBattleQueueStatusRequest",
+    "params": [
+     "const ID32& i_cGuild"
+    ]
+   },
+   {
+    "method": "PvPMatchMakingCreateMatch",
+    "params": [
+     "const PvPMatchRules_c& i_cMatch"
+    ]
+   },
+   {
+    "method": "PvPMatchMakingJoinMatch",
+    "params": [
+     "ID32::InstanceType i_nMatchID",
+     "bool i_bBringTeam",
+     "const std::string& i_cPassword"
+    ]
+   },
+   {
+    "method": "PvPMatchMakingSetSide",
+    "params": [
+     "int i_nSide"
+    ]
+   },
+   {
+    "method": "PvPMatchMakingMatchSay",
+    "params": [
+     "const std::string& i_cMessage"
+    ]
+   },
+   {
+    "method": "PvPMatchMakingLeaveMatch",
+    "params": []
+   },
+   {
+    "method": "PvPMatchMakingSearchForMatches",
+    "params": [
+     "const PvPMatchMakingSearchFilter_c& i_cSearchFilter"
+    ]
+   },
+   {
+    "method": "PvPMatchMakingGetMatchInfo",
+    "params": [
+     "ID32::InstanceType i_nMatchID"
+    ]
+   },
+   {
+    "method": "PvPMatchMakingTeleportToMinigame",
+    "params": []
+   },
+   {
+    "method": "PvPMatchMakingPutIntoMatchMaking",
+    "params": [
+     "ID32::InstanceType i_nMap",
+     "int i_nType",
+     "bool i_bBringTeam",
+     "int i_QueueType"
+    ]
+   },
+   {
+    "method": "PvPMatchMakingRemoveFromMatchMaking",
+    "params": []
+   },
+   {
+    "method": "PvPMatchMakingRequestInfo",
+    "params": [
+     "int i_QueueType"
+    ]
+   },
+   {
+    "method": "PvPMatchMakingIsInMatchMaking",
+    "params": []
+   },
+   {
+    "method": "PvPMatchMakingKickPlayer",
+    "params": [
+     "const ID32& i_cCharacterID",
+     "const std::string& i_cMessage"
+    ]
+   },
+   {
+    "method": "PvPMatchMakingBanPlayer",
+    "params": [
+     "const ID32& i_cCharacterID",
+     "const std::string& i_cMessage"
+    ]
+   },
+   {
+    "method": "PvPMatchMakingMakePlayerMatchOwner",
+    "params": [
+     "const ID32& i_cCharacterID"
+    ]
+   },
+   {
+    "method": "PvPMatchMakingForceSide",
+    "params": [
+     "const ID32& i_cCharacterID",
+     "int i_nSide"
+    ]
+   },
+   {
+    "method": "PvPMatchMakingStartMatch",
+    "params": []
+   },
+   {
+    "method": "DebugPvPMatchMakingShowDebugInfo",
+    "params": []
+   },
+   {
+    "method": "DebugPvPMatchMakingStopAllMatches",
+    "params": [
+     "const std::string& i_cMessage"
+    ]
+   },
+   {
+    "method": "DebugPvPMatchMakingStopCurrentMatch",
+    "params": [
+     "const std::string& i_cMessage"
+    ]
+   },
+   {
+    "method": "DebugPvPMatchMakingSetNewTimeLimit",
+    "params": [
+     "uint32 i_nNewTimeLimit"
+    ]
+   },
+   {
+    "method": "DebugPvPMatchMakingRestart",
+    "params": []
+   },
+   {
+    "method": "DebugPvPMatchForcePlayerIntoCurrentMatch",
+    "params": [
+     "const std::string& i_cName",
+     "int i_nSide"
+    ]
+   },
+   {
+    "method": "DebugPvPMatchMakingDoMatchMaking",
+    "params": [
+     "int i_nPlayers",
+     "int i_nSides",
+     "int i_nMap",
+     "int i_nGameType",
+     "int i_nTier",
+     "int i_nTimeLimit",
+     "int i_QueueType"
+    ]
+   },
+   {
+    "method": "DebugPvPMatchForceStartMatch",
+    "params": []
+   },
+   {
+    "method": "DebugPvPMatchForceEnterAll",
+    "params": []
+   },
+   {
+    "method": "DebugCommunityServerModuleStart",
+    "params": [
+     "int i_nModule",
+     "int i_nLogLevel"
+    ]
+   },
+   {
+    "method": "DebugCommunityServerModuleStop",
+    "params": [
+     "int i_nModule"
+    ]
+   },
+   {
+    "method": "SetAsyncEnabled",
+    "params": [
+     "bool asyncEnabled"
+    ]
+   },
+   {
+    "method": "SetNumWorkerThreads",
+    "params": [
+     "size_t numWorkers"
+    ]
+   },
+   {
+    "method": "RaidCreate",
+    "params": []
+   },
+   {
+    "method": "RaidLeave",
+    "params": []
+   },
+   {
+    "method": "RaidInviteTeam",
+    "params": [
+     "const ID32& i_cTeamID"
+    ]
+   },
+   {
+    "method": "RaidInviteTeamAccept",
+    "params": [
+     "const ID32& i_cTeamID"
+    ]
+   },
+   {
+    "method": "RaidInviteTeamDecline",
+    "params": [
+     "const ID32& i_cTeamID"
+    ]
+   },
+   {
+    "method": "RaidKickTeam",
+    "params": [
+     "const ID32& i_cTeamID"
+    ]
+   },
+   {
+    "method": "RaidKickCharacter",
+    "params": [
+     "const ID32& i_cCharacterID"
+    ]
+   },
+   {
+    "method": "RaidMoveTeamMember",
+    "params": [
+     "const ID32& i_cCharacterID",
+     "const ID32& i_cDestinationTeamID"
+    ]
+   },
+   {
+    "method": "RaidSwapCharacters",
+    "params": [
+     "const ID32& i_cCharacterID",
+     "const ID32& i_cCharacterID2"
+    ]
+   },
+   {
+    "method": "RaidInviteCharacter",
+    "params": [
+     "const ID32& i_cCharID",
+     "const std::string& i_cMessage"
+    ]
+   },
+   {
+    "method": "RaidInviteCharacterByName",
+    "params": [
+     "const std::string& i_CharName",
+     "const std::string& i_cMessage"
+    ]
+   },
+   {
+    "method": "RaidAcceptInvite",
+    "params": [
+     "const ID32& i_cCharID"
+    ]
+   },
+   {
+    "method": "RaidDeclineInvite",
+    "params": [
+     "const ID32& i_cCharID"
+    ]
+   },
+   {
+    "method": "RaidSetLootOption",
+    "params": [
+     "int i_eLootMode",
+     "bool i_bUseNeedGreed",
+     "int i_nLootThreshold"
+    ]
+   },
+   {
+    "method": "RaidSetMasterLooter",
+    "params": [
+     "const ID32& i_cCharacterID"
+    ]
+   },
+   {
+    "method": "MassivePvpInfoRequest",
+    "params": []
+   },
+   {
+    "method": "SendTeamInfo",
+    "params": [
+     "const ID32& i_cTeamID"
+    ]
+   },
+   {
+    "method": "GMRequestGuildInfoFromChar",
+    "params": [
+     "const ID32& i_cCharID"
+    ]
+   },
+   {
+    "method": "QueueGroupFinder",
+    "params": [
+     "const std::vector<uint32>& activites",
+     "bool wantsLeader",
+     "bool privateTeam"
+    ]
+   },
+   {
+    "method": "SelectGroupFinderRoles",
+    "params": [
+     "uint32 roles"
+    ]
+   },
+   {
+    "method": "LeaveGroupFinder",
+    "params": []
+   },
+   {
+    "method": "ReadyGroupFinder",
+    "params": [
+     "bool ready",
+     "bool isTimeout"
+    ]
+   },
+   {
+    "method": "RequestRaidQueueInfo",
+    "params": [
+     "uint32 raidID"
+    ]
+   },
+   {
+    "method": "UpdateDefaultRaid",
+    "params": [
+     "uint32 raidActivityId",
+     "uint32 childActivityId"
+    ]
+   },
+   {
+    "method": "SetFeaturedRaid",
+    "params": [
+     "uint32 raidID"
+    ]
+   },
+   {
+    "method": "RequestFeaturedRaidNeededRole",
+    "params": [
+     "uint32 difficulty"
+    ]
+   },
+   {
+    "method": "RequestNeededRole",
+    "params": [
+     "uint32 activityId"
+    ]
+   },
+   {
+    "method": "RequestRotatingActivityChildInfo",
+    "params": [
+     "uint32 activityId"
+    ]
+   },
+   {
+    "method": "GetWorldStat",
+    "params": [
+     "uint32 statHash",
+     "int type1",
+     "int type2",
+     "int dimID"
+    ]
+   },
+   {
+    "method": "RequestItemSalesBalance",
+    "params": []
+   },
+   {
+    "method": "RequestItemSalesCoupons",
+    "params": [
+     "uint salesID"
+    ]
+   }
+  ],
+  "server_to_client": []
+ },
+ "CSPlayerInterface": {
+  "client_to_server": [],
+  "server_to_client": [
+   {
+    "method": "DispatchAuthenticateAck",
+    "fields": [
+     "nStatus"
+    ]
+   },
+   {
+    "method": "DispatchTeamInvite",
+    "fields": [
+     "i_cWho",
+     "i_cMessage"
+    ]
+   },
+   {
+    "method": "DispatchTargetIsBusy",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchTargetIsCriminal",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchTeamCharacterApplied",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchYouAlreadySentRequest",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchTargetIsAlreadyInTeam",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchTeamInvitationTimedOut",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchTargetDeclinedTeamInvite",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchYouAreNoLongerInvited",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchYouInvitedToTeam",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchInviteWithInviterFactionPoints",
+    "fields": [
+     "inviter",
+     "message",
+     "factionPoints"
+    ]
+   },
+   {
+    "method": "DispatchExtendedCharacterInfo",
+    "fields": [
+     "i_cWho",
+     "i_nWindowId",
+     "i_cLookingForTeamMessage"
+    ]
+   },
+   {
+    "method": "DispatchExtendedCharacterInfoNotFound",
+    "fields": [
+     "i_nWindowId"
+    ]
+   },
+   {
+    "method": "DispatchYouJoinedTeam",
+    "fields": [
+     "i_cTeamInfo"
+    ]
+   },
+   {
+    "method": "DispatchTeamSearchResult",
+    "fields": [
+     "i_cResult",
+     "i_bMoreHits"
+    ]
+   },
+   {
+    "method": "DispatchCharacterSearchResult",
+    "fields": [
+     "i_cResult",
+     "i_bMoreHits"
+    ]
+   },
+   {
+    "method": "DispatchCharacterNameSearchResult",
+    "fields": [
+     "i_cCharacter",
+     "i_cCharacterName"
+    ]
+   },
+   {
+    "method": "DispatchTeamLeave",
+    "fields": [
+     "i_cTeamID",
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchTeamJoin",
+    "fields": [
+     "i_cTeamID",
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchTeamMemberUpdate",
+    "fields": [
+     "i_cTeamID",
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchTeamDisband",
+    "fields": [
+     "i_cTeamID"
+    ]
+   },
+   {
+    "method": "DispatchSetNewTeamLeader",
+    "fields": [
+     "i_cTeamID",
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchTeamLootOptionChanged",
+    "fields": [
+     "i_eLootMode",
+     "i_bUseNeedGreed",
+     "i_nNewLootThreshold"
+    ]
+   },
+   {
+    "method": "DispatchTeamMasterLooterChanged",
+    "fields": [
+     "i_cCharacterID"
+    ]
+   },
+   {
+    "method": "DispatchTeamSummonRequest",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchTeamSummonTimedOut",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchYouAreNoLongerSummoned",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchTeamSummonRequestDeclined",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchTeamSummonRequestAccepted",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchTeamSummonRequestFailedInvalidPF",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchTeamSummonRequestFailedAlreadyInSameInstance",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchWarningTeamSizeTooLarge",
+    "fields": [
+     "i_nDisbandInSeconds"
+    ]
+   },
+   {
+    "method": "DispatchYouGotKickedFromTeam",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchVoteKickStarted",
+    "fields": [
+     "i_cInitiatorID",
+     "i_cKickedID",
+     "i_cKickedName"
+    ]
+   },
+   {
+    "method": "DispatchVoteKickFailed",
+    "fields": [
+     "i_cMessage"
+    ]
+   },
+   {
+    "method": "DispatchVoteKickEnded",
+    "fields": [
+     "i_cTargetID"
+    ]
+   },
+   {
+    "method": "DispatchCharacterLookingForTeamStatus",
+    "fields": [
+     "i_bLookingForTeam",
+     "i_cMessage"
+    ]
+   },
+   {
+    "method": "DispatchTeamLookingForMemberStatus",
+    "fields": [
+     "i_bLookingForMember",
+     "i_cMessage"
+    ]
+   },
+   {
+    "method": "DispatchDeleteCanceledMail",
+    "fields": [
+     "mailId"
+    ]
+   },
+   {
+    "method": "DispatchDeleteCanceledMailItem",
+    "fields": [
+     "mailId",
+     "itemId"
+    ]
+   },
+   {
+    "method": "DispatchGuildInvite",
+    "fields": [
+     "i_cGuildID",
+     "i_cGuildName",
+     "i_cCharacter",
+     "i_cInviterName"
+    ]
+   },
+   {
+    "method": "DispatchGuildMemberLeft",
+    "fields": [
+     "i_cMember",
+     "i_cMemberName"
+    ]
+   },
+   {
+    "method": "DispatchGuildMemberJoined",
+    "fields": [
+     "i_cMember",
+     "i_cMemberName"
+    ]
+   },
+   {
+    "method": "DispatchGuildMemberUpdate",
+    "fields": [
+     "i_cElement"
+    ]
+   },
+   {
+    "method": "DispatchGuildInviteReplyToInviter",
+    "fields": [
+     "i_cMessage",
+     "i_bJoined"
+    ]
+   },
+   {
+    "method": "DispatchGuildGMPromoteFeedback",
+    "fields": [
+     "i_nGoverningForm",
+     "i_nOldRank",
+     "i_nNewRank",
+     "i_cName"
+    ]
+   },
+   {
+    "method": "DispatchGuildGMDemoteFeedback",
+    "fields": [
+     "i_nGoverningForm",
+     "i_nOldRank",
+     "i_nNewRank",
+     "i_cName"
+    ]
+   },
+   {
+    "method": "DispatchGuildInviteNoSuchName",
+    "fields": [
+     "i_cName"
+    ]
+   },
+   {
+    "method": "DispatchGuildPvPPointInfo",
+    "fields": [
+     "i_cGuildName",
+     "i_nPoints"
+    ]
+   },
+   {
+    "method": "DispatchGuildRenownInfo",
+    "fields": [
+     "infoText"
+    ]
+   },
+   {
+    "method": "DispatchGuildRankingsUpdate",
+    "fields": [
+     "guildList",
+     "topRankingsMap",
+     "nextCalculationTime"
+    ]
+   },
+   {
+    "method": "DispatchGuildRenownHistoryUpdate",
+    "fields": [
+     "currentEntry",
+     "lastEntry",
+     "highestEntry",
+     "averageEntry"
+    ]
+   },
+   {
+    "method": "DispatchClientAddGuildRenown",
+    "fields": [
+     "renownType",
+     "amount",
+     "guildOnly",
+     "capType"
+    ]
+   },
+   {
+    "method": "DispatchInformAboutRankings",
+    "fields": [
+     "overallRanking",
+     "gloryRanking",
+     "valorRanking",
+     "artistryRanking"
+    ]
+   },
+   {
+    "method": "DispatchInformAboutRankingWinners",
+    "fields": [
+     "overallWinner",
+     "gloryWinner",
+     "valorWinner",
+     "artistryWinner"
+    ]
+   },
+   {
+    "method": "DispatchRankingCaluculationCountdown",
+    "fields": [
+     "hoursUntilCaclulation"
+    ]
+   },
+   {
+    "method": "DispatchPersonalRenownCapReached",
+    "fields": [
+     "renownType"
+    ]
+   },
+   {
+    "method": "DispatchGuildUpdate",
+    "fields": [
+     "i_pcGuild",
+     "i_pcMember",
+     "i_cMemberList"
+    ]
+   },
+   {
+    "method": "DispatchGuildRenownUpdate",
+    "fields": [
+     "pcGuild"
+    ]
+   },
+   {
+    "method": "DispatchGuildName",
+    "fields": [
+     "i_nGuildInstance",
+     "i_cGuildName"
+    ]
+   },
+   {
+    "method": "DispatchGuildUpdateMember",
+    "fields": [
+     "i_nCharInstance",
+     "i_cGuildID",
+     "i_pcMember"
+    ]
+   },
+   {
+    "method": "DispatchGuildUpdateOther",
+    "fields": [
+     "i_nCharInstance",
+     "i_cGuildID",
+     "i_pcGuild"
+    ]
+   },
+   {
+    "method": "DispatchGuildCreated",
+    "fields": [
+     "i_cMember",
+     "i_cGuild"
+    ]
+   },
+   {
+    "method": "DispatchGuildNonAlphanumericName",
+    "fields": [
+     "cIllegalCharacters"
+    ]
+   },
+   {
+    "method": "DispatchGuildBadName",
+    "fields": [
+     "i_cBadword"
+    ]
+   },
+   {
+    "method": "DispatchGuildNameWaitTime",
+    "fields": [
+     "i_nTimeLeft"
+    ]
+   },
+   {
+    "method": "DispatchGuildOnInviteCooldown",
+    "fields": [
+     "inviteCooldownStop"
+    ]
+   },
+   {
+    "method": "DispatchGuildTaxError",
+    "fields": [
+     "i_nNewTax"
+    ]
+   },
+   {
+    "method": "DispatchGuildInvalidGoverningForm",
+    "fields": [
+     "i_cGoverningForm"
+    ]
+   },
+   {
+    "method": "DispatchGuildUpdateCash",
+    "fields": [
+     "i_nCash"
+    ]
+   },
+   {
+    "method": "DispatchGuildTaxChanged",
+    "fields": [
+     "i_nTax"
+    ]
+   },
+   {
+    "method": "DispatchGuildGoverningFormChanged",
+    "fields": [
+     "governingForm",
+     "newLeader"
+    ]
+   },
+   {
+    "method": "DispatchGuildRecruitmentModeChanged",
+    "fields": [
+     "i_nRecruitmentMode"
+    ]
+   },
+   {
+    "method": "DispatchGuildMessageOfTheDayChanged",
+    "fields": [
+     "i_cMessageOfTheDay"
+    ]
+   },
+   {
+    "method": "DispatchGuildNameChanged",
+    "fields": [
+     "i_cNewName"
+    ]
+   },
+   {
+    "method": "DispatchGMGuildNameChanged",
+    "fields": [
+     "i_nGuildInstance",
+     "i_cNewName"
+    ]
+   },
+   {
+    "method": "DispatchGuildMemberList",
+    "fields": [
+     "i_cMembers"
+    ]
+   },
+   {
+    "method": "DispatchGuildSearchResult",
+    "fields": [
+     "i_cResult",
+     "i_nMoreResults"
+    ]
+   },
+   {
+    "method": "DispatchGuildSetPvPPoints",
+    "fields": [
+     "i_nPoints"
+    ]
+   },
+   {
+    "method": "DispatchGuildSetPvPKillPoints",
+    "fields": [
+     "i_nPoints"
+    ]
+   },
+   {
+    "method": "DispatchGuildSetPvPTotalKills",
+    "fields": [
+     "i_nKills"
+    ]
+   },
+   {
+    "method": "DispatchGuildSetPvPSeasonalKills",
+    "fields": [
+     "i_nKills"
+    ]
+   },
+   {
+    "method": "DispatchGuildSetGuildWar",
+    "fields": [
+     "guildwarID"
+    ]
+   },
+   {
+    "method": "DispatchGuildSetGuildAsDefenderOfWar",
+    "fields": [
+     "guildwarID"
+    ]
+   },
+   {
+    "method": "DispatchAddGuildFeat",
+    "fields": [
+     "i_nFeatID"
+    ]
+   },
+   {
+    "method": "DispatchRemoveGuildFeat",
+    "fields": [
+     "i_nFeatID"
+    ]
+   },
+   {
+    "method": "DispatchGuildRankChanged",
+    "fields": [
+     "newRank",
+     "oldRank"
+    ]
+   },
+   {
+    "method": "DispatchGuildApplicationRequest",
+    "fields": [
+     "i_cName",
+     "i_cApplicationText",
+     "i_cApplicant"
+    ]
+   },
+   {
+    "method": "DispatchGuildApplicationRejected",
+    "fields": [
+     "i_cName"
+    ]
+   },
+   {
+    "method": "DispatchGuildMergeRequest",
+    "fields": [
+     "i_nGuidInstance",
+     "i_nOtherLeader"
+    ]
+   },
+   {
+    "method": "DispatchGuildMergeRequestFailed",
+    "fields": [
+     "i_nReason"
+    ]
+   },
+   {
+    "method": "DispatchGuildCityBooked",
+    "fields": [
+     "i_nCitySpotId",
+     "i_nCityPlayfieldModelInstance",
+     "i_nCitySubgroup"
+    ]
+   },
+   {
+    "method": "DispatchGuildCityBookingFailed",
+    "fields": [
+     "i_nErrorCode"
+    ]
+   },
+   {
+    "method": "DispatchNewVulnerabilityWindowData",
+    "fields": [
+     "i_cNewAreaInfo",
+     "i_nTimeStamp"
+    ]
+   },
+   {
+    "method": "DispatchGuildIsMassivePvPCityOwner",
+    "fields": [
+     "i_bNewValue"
+    ]
+   },
+   {
+    "method": "DispatchGuildIsMassivePvPCityAttacker",
+    "fields": [
+     "i_bNewValue"
+    ]
+   },
+   {
+    "method": "DispatchFeedbackMessage",
+    "fields": [
+     "message"
+    ]
+   },
+   {
+    "method": "DispatchRequestBattleKeepInformation",
+    "fields": [
+     "areaIDVec"
+    ]
+   },
+   {
+    "method": "DispatchGMReplyGuildInfoFromChar",
+    "fields": [
+     "i_cGuild",
+     "i_cMembers"
+    ]
+   },
+   {
+    "method": "DispatchPvPMatchMakingWantsToStart",
+    "fields": [
+     "i_nKickedInSeconds"
+    ]
+   },
+   {
+    "method": "DispatchPvPMatchMakingPlayerJoined",
+    "fields": [
+     "i_cPlayer",
+     "i_nSide"
+    ]
+   },
+   {
+    "method": "DispatchPvPMatchMakingPlayerChangedSide",
+    "fields": [
+     "i_cPlayer",
+     "i_nNewSide"
+    ]
+   },
+   {
+    "method": "DispatchPvPMatchMakingPlayerLeft",
+    "fields": [
+     "i_cCharacterID"
+    ]
+   },
+   {
+    "method": "DispatchPvPMatchMakingPlayerKicked",
+    "fields": [
+     "i_cCharacterID",
+     "i_cMessage"
+    ]
+   },
+   {
+    "method": "DispatchPvPMatchMakingErrorCode",
+    "fields": [
+     "i_nErrorCode"
+    ]
+   },
+   {
+    "method": "DispatchPvPMatchMakingYouJoinedMatch",
+    "fields": [
+     "i_cMatch"
+    ]
+   },
+   {
+    "method": "DispatchPvPMatchMakingMatchInfo",
+    "fields": [
+     "i_cMatch"
+    ]
+   },
+   {
+    "method": "DispatchPvPMatchMakingSearchResult",
+    "fields": [
+     "i_cMatches"
+    ]
+   },
+   {
+    "method": "DispatchPvPMatchMakingStartClicked",
+    "fields": [
+     "i_nTeleportInSeconds"
+    ]
+   },
+   {
+    "method": "DispatchPvPMatchMakingYouAreInMatchMaking",
+    "fields": [
+     "i_nMap",
+     "i_nType",
+     "i_ShowFifo",
+     "i_AsTeamMember",
+     "i_queueType"
+    ]
+   },
+   {
+    "method": "DispatchPvPMatchMakingMatchSay",
+    "fields": [
+     "i_cFrom",
+     "i_cMessage",
+     "i_bFifo"
+    ]
+   },
+   {
+    "method": "DispatchPvPMatchMakingCollectingMorePlayers",
+    "fields": [
+     "i_nSecondsUntilForcedStart"
+    ]
+   },
+   {
+    "method": "DispatchPvPMatchMakingNewMatchLeader",
+    "fields": [
+     "i_cNewMatchLeader"
+    ]
+   },
+   {
+    "method": "DispatchPvPMatchMakingTeamLeaderSignedUpForMatchMaking",
+    "fields": [
+     "i_nMap",
+     "i_nType"
+    ]
+   },
+   {
+    "method": "DispatchPvPMatchMakingCantStartMatchNotAllPlayersHaveSide",
+    "fields": [
+     "i_cPlayesWithoutSide"
+    ]
+   },
+   {
+    "method": "DispatchPvPMatchMakingCantLockToSideMustPickASideFirst",
+    "fields": [
+     "i_cChar"
+    ]
+   },
+   {
+    "method": "DispatchPvPMatchMakingCantChangeSideYouHaveBeenLockedToSide",
+    "fields": [
+     "i_nSide"
+    ]
+   },
+   {
+    "method": "DispatchPvPMatchMakingCharacterNowLockedToSide",
+    "fields": [
+     "i_cCharID",
+     "i_nSide"
+    ]
+   },
+   {
+    "method": "DispatchPvPMatchMakingCharacterNoLongerLockedToSide",
+    "fields": [
+     "i_cCharID"
+    ]
+   },
+   {
+    "method": "DispatchPvPMatchMakingInfoRequestReturn",
+    "fields": [
+     "i_cList",
+     "i_nNumberOfAnyApplies"
+    ]
+   },
+   {
+    "method": "DispatchYouJoinedRaid",
+    "fields": [
+     "i_cMatch"
+    ]
+   },
+   {
+    "method": "DispatchRaidTeamJoined",
+    "fields": [
+     "i_cTeam"
+    ]
+   },
+   {
+    "method": "DispatchRaidTeamLeft",
+    "fields": [
+     "i_cTeamID"
+    ]
+   },
+   {
+    "method": "DispatchRaidTeamUpdate",
+    "fields": [
+     "i_cTeam"
+    ]
+   },
+   {
+    "method": "DispatchRaidCharacterUpdate",
+    "fields": [
+     "i_cCharacter"
+    ]
+   },
+   {
+    "method": "DispatchRaidNewRaidLeader",
+    "fields": [
+     "i_cTeamID"
+    ]
+   },
+   {
+    "method": "DispatchRaidLootOptionChanged",
+    "fields": [
+     "i_eLootMode",
+     "i_bUseNeedGreed",
+     "i_nNewLootThreshold"
+    ]
+   },
+   {
+    "method": "DispatchRaidNewMasterLooter",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchRaidInvite",
+    "fields": [
+     "i_cWho",
+     "i_cMessage"
+    ]
+   },
+   {
+    "method": "DispatchRaidTargetIsBusy",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchRaidIsAlreadyInRaid",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchRaidInvitationTimedOut",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchRaidTargetDeclinedRaidInvite",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchRaidYouAreNoLongerInvited",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchRaidCantInviteInvalidSubscriptionFlags",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchRaidCantCreateInvalidMemberSubscriptionFlags",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchMassivePvpInfoRequestReturn",
+    "fields": [
+     "i_nLastLoadTime",
+     "i_cList",
+     "i_nTimeRegionOffset"
+    ]
+   },
+   {
+    "method": "DispatchMassivePvPBattleQueueFeedback",
+    "fields": [
+     "i_nFeedbackType",
+     "i_nFeedbackValue"
+    ]
+   },
+   {
+    "method": "DispatchMassivePvpStartCountDown",
+    "fields": [
+     "i_cEndTime"
+    ]
+   },
+   {
+    "method": "DispatchMassivePvpBattleQueueStatusUpdate",
+    "fields": [
+     "i_nArea",
+     "i_inQueue"
+    ]
+   },
+   {
+    "method": "DispatchBattleKeepInfoRequestReturnPhase1And2",
+    "fields": [
+     "bkInfoVec"
+    ]
+   },
+   {
+    "method": "DispatchBattleKeepInfoRequestReturnPhase3And4",
+    "fields": [
+     "bkInfoVec"
+    ]
+   },
+   {
+    "method": "DispatchYouGotMailNotification",
+    "fields": [
+     "nMailId"
+    ]
+   },
+   {
+    "method": "DispatchDebugFullGameServerList",
+    "fields": [
+     "i_cGameServerList"
+    ]
+   },
+   {
+    "method": "DispatchDebugGameServerConnected",
+    "fields": [
+     "i_cGameServerID"
+    ]
+   },
+   {
+    "method": "DispatchDebugGameServerDisconnected",
+    "fields": [
+     "i_cGameServerID"
+    ]
+   },
+   {
+    "method": "DispatchDebugClientConnected",
+    "fields": [
+     "i_cCharacter",
+     "i_nGameServerID",
+     "i_nGmLevel",
+     "i_bLinkDead"
+    ]
+   },
+   {
+    "method": "DispatchDebugClientChanged",
+    "fields": [
+     "i_cCharacter",
+     "i_nGameServerID",
+     "i_nGmLevel",
+     "i_bLinkDead"
+    ]
+   },
+   {
+    "method": "DispatchDebugClientDisconnected",
+    "fields": [
+     "i_cCharacterID"
+    ]
+   },
+   {
+    "method": "DispatchDebugFullClientList",
+    "fields": [
+     "i_cCharacterList",
+     "i_cGameServerList",
+     "i_nGmLevelList",
+     "i_cLinkDeadVec"
+    ]
+   },
+   {
+    "method": "DispatchDebugFullTeamListBurst",
+    "fields": [
+     "i_cTeamList"
+    ]
+   },
+   {
+    "method": "DispatchDebugAddTeam",
+    "fields": [
+     "i_cTeamInfo"
+    ]
+   },
+   {
+    "method": "DispatchDebugRemoveTeam",
+    "fields": [
+     "i_cTeamID"
+    ]
+   },
+   {
+    "method": "DispatchDebugUpdateTeam",
+    "fields": [
+     "i_cTeamInfo"
+    ]
+   },
+   {
+    "method": "DispatchDebugFullMatchListBurst",
+    "fields": [
+     "i_cMatchList",
+     "i_cGameServerList"
+    ]
+   },
+   {
+    "method": "DispatchDebugAddMatch",
+    "fields": [
+     "i_cMatch"
+    ]
+   },
+   {
+    "method": "DispatchDebugMatchChanged",
+    "fields": [
+     "i_cMatch",
+     "i_nGameServer"
+    ]
+   },
+   {
+    "method": "DispatchDebugRemoveMatch",
+    "fields": [
+     "i_cMatchID"
+    ]
+   },
+   {
+    "method": "DispatchDebugAddIDToMatchMaking",
+    "fields": [
+     "i_cID",
+     "i_Map",
+     "i_Type",
+     "i_Tier",
+     "i_Queue"
+    ]
+   },
+   {
+    "method": "DispatchDebugRemoveIDFromMatchMaking",
+    "fields": [
+     "i_cID"
+    ]
+   },
+   {
+    "method": "DispatchItemSalesUpdateBalance",
+    "fields": [
+     "balance"
+    ]
+   },
+   {
+    "method": "DispatchItemSalesCoupons",
+    "fields": [
+     "saleID",
+     "coupons"
+    ]
+   },
+   {
+    "method": "DispatchCSFeedback",
+    "fields": [
+     "message"
+    ]
+   },
+   {
+    "method": "DispatchGroupFinderSignupFailed",
+    "fields": [
+     "message"
+    ]
+   },
+   {
+    "method": "DispatchGroupFinderSignupSuccess",
+    "fields": [
+     "activities",
+     "silent"
+    ]
+   },
+   {
+    "method": "DispatchGroupFinderRemoved",
+    "fields": [
+     "reason",
+     "silent"
+    ]
+   },
+   {
+    "method": "DispatchGroupFinderReadyCheck",
+    "fields": [
+     "queue",
+     "role"
+    ]
+   },
+   {
+    "method": "DispatchGroupFinderReadyCheckStatus",
+    "fields": [
+     "ready",
+     "declines",
+     "total"
+    ]
+   },
+   {
+    "method": "DispatchGroupFinderReadyCheckRejected",
+    "fields": [
+     "reason"
+    ]
+   },
+   {
+    "method": "DispatchGroupFinderPlayfieldInfo",
+    "fields": [
+     "currPlayfield",
+     "nextPlayfield",
+     "neededRole"
+    ]
+   },
+   {
+    "method": "DispatchGroupFinderFeaturedPlayfieldInfo",
+    "fields": [
+     "raidId",
+     "playfieldId",
+     "difficultyCount",
+     "supportsPrivateTeam",
+     "neededRole"
+    ]
+   },
+   {
+    "method": "DispatchGroupFinderFeaturedRaidNeededRoleUpdated",
+    "fields": [
+     "neededRole"
+    ]
+   },
+   {
+    "method": "DispatchGroupFinderReceivedNeededRole",
+    "fields": [
+     "activityId",
+     "neededRole"
+    ]
+   },
+   {
+    "method": "DispatchGroupFinderReceivedRotatingActivityChildInfo",
+    "fields": [
+     "activityId",
+     "currentChildIndex",
+     "nextChildIndex"
+    ]
+   },
+   {
+    "method": "DispatchGroupFinderUpdateFeaturedActivities",
+    "fields": [
+     "activities"
+    ]
+   },
+   {
+    "method": "DispatchReturnWorldStat",
+    "fields": [
+     "statHash",
+     "value",
+     "type1",
+     "type2",
+     "dimID"
+    ]
+   },
+   {
+    "method": "DispatchInvalidWorldStat",
+    "fields": [
+     "statHash"
+    ]
+   }
+  ]
+ },
+ "GameAgent": {
+  "client_to_server": [
+   {
+    "method": "PassBlob",
+    "params": [
+     "BinaryStream& b"
+    ]
+   },
+   {
+    "method": "Ping",
+    "params": [
+     "uint32 sequenceId"
+    ]
+   },
+   {
+    "method": "ChatVicinity",
+    "params": [
+     "const ID32& cSenderID",
+     "int nMode",
+     "BinaryStream& cMsg"
+    ]
+   },
+   {
+    "method": "Authenticate2",
+    "params": [
+     "ID32::InstanceType nClientInst",
+     "uint nCookie",
+     "const String& cGameClientVersionString"
+    ]
+   },
+   {
+    "method": "GetStats",
+    "params": []
+   },
+   {
+    "method": "UpdateGameServerStats",
+    "params": []
+   },
+   {
+    "method": "DataSink",
+    "params": [
+     "BinaryStream& cMsg"
+    ]
+   },
+   {
+    "method": "ClientDisconnected",
+    "params": [
+     "ID32::InstanceType i_nClientID"
+    ]
+   },
+   {
+    "method": "SaveFacebookToken",
+    "params": [
+     "uint64 facebookUserId",
+     "const String& tokenToStore"
+    ]
+   },
+   {
+    "method": "RecruitFacebookFriends",
+    "params": [
+     "const FacebookNS::FacebookFriendsMap& fbFriends"
+    ]
+   },
+   {
+    "method": "UpdateFacebookFriends",
+    "params": [
+     "const std::vector<uint64>& fbFriendIds"
+    ]
+   }
+  ],
+  "server_to_client": []
+ },
+ "GameCharAgent": {
+  "client_to_server": [
+   {
+    "method": "RequestAggroStatus",
+    "params": [
+     "const ID32& i_cCharID",
+     "const ID32& i_cTargetID"
+    ]
+   },
+   {
+    "method": "RequestCharName",
+    "params": [
+     "ID32::InstanceType nCharID"
+    ]
+   },
+   {
+    "method": "RequestBindLocation",
+    "params": [
+     "const ID32& i_cCharID"
+    ]
+   },
+   {
+    "method": "SetTutorialStats",
+    "params": [
+     "int nValue"
+    ]
+   },
+   {
+    "method": "UpdateCharGuildMemberInfo",
+    "params": [
+     "const ID32& i_cCharID",
+     "const GuildMemberElement_c& i_pcMember",
+     "const ID32& i_cGuildID"
+    ]
+   },
+   {
+    "method": "GuildInfoUpdate",
+    "params": [
+     "const GuildElement_c& cGuild"
+    ]
+   },
+   {
+    "method": "JoinedGuild",
+    "params": [
+     "const ID32& i_cCharID",
+     "const GuildMemberElement_c& i_pcMember",
+     "const ID32& i_cGuildID"
+    ]
+   },
+   {
+    "method": "LeftGuild",
+    "params": [
+     "const ID32& i_cCharID"
+    ]
+   },
+   {
+    "method": "LeaveTeam",
+    "params": []
+   },
+   {
+    "method": "KickFromTeam",
+    "params": [
+     "const ID32& kickedCharId"
+    ]
+   },
+   {
+    "method": "CreatedGuild",
+    "params": [
+     "const ID32& i_cCharID",
+     "const GuildMemberElement_c& i_pcMember",
+     "const GuildElement_c& i_cGuild"
+    ]
+   },
+   {
+    "method": "AddGuildFeat",
+    "params": [
+     "const ID32& i_cGuildID",
+     "uint32 i_nFeatID"
+    ]
+   },
+   {
+    "method": "RemoveGuildFeat",
+    "params": [
+     "const ID32& i_cGuildID",
+     "uint32 i_nFeatID"
+    ]
+   },
+   {
+    "method": "GuildGMPromote",
+    "params": [
+     "const ID32& i_cTarget"
+    ]
+   },
+   {
+    "method": "GuildGMDemote",
+    "params": [
+     "const ID32& i_cTarget"
+    ]
+   },
+   {
+    "method": "GuildTaxChanged",
+    "params": [
+     "Instance64_t i_nGuildInstance",
+     "int i_nTax"
+    ]
+   },
+   {
+    "method": "GuildGoverningFormChanged",
+    "params": [
+     "Instance64_t i_nGuildInstance",
+     "int i_bGoverningForm"
+    ]
+   },
+   {
+    "method": "GuildTransferMoney",
+    "params": [
+     "uint64 i_nGuildInstance",
+     "Explicit64_c i_cAmount"
+    ]
+   },
+   {
+    "method": "GuildWithdrawMoney",
+    "params": [
+     "const ID32& i_cOfficer"
+    ]
+   },
+   {
+    "method": "GuildDisbanded",
+    "params": [
+     "ID32::InstanceType i_nGuildInstance",
+     "uint i_nSubgroup",
+     "uint i_nModelInstance",
+     "const String i_cCityName"
+    ]
+   },
+   {
+    "method": "GuildBookedCity",
+    "params": [
+     "uint i_nSubgroup",
+     "uint i_nModelInstance",
+     "const String i_cCityName",
+     "uint i_nCityNameId",
+     "const std::vector<ID32>& i_cMembers"
+    ]
+   },
+   {
+    "method": "GuildCityOwnershipChange",
+    "params": [
+     "const std::vector<ID32>& i_cMembers",
+     "bool i_bNewValue"
+    ]
+   },
+   {
+    "method": "GuildChangeRank",
+    "params": [
+     "ID32 i_cChar",
+     "uint8 i_nOldRank",
+     "uint8 i_nNewRank"
+    ]
+   },
+   {
+    "method": "GuildUpdateGuildBank",
+    "params": [
+     "const ID32& i_cCharacter"
+    ]
+   },
+   {
+    "method": "SendGuildInfoToObservers",
+    "params": [
+     "ID32 i_cChar",
+     "const std::string& i_cGuildName"
+    ]
+   },
+   {
+    "method": "GuildRankingsUpdate",
+    "params": [
+     "const GuildCommonRankingMap& guildList",
+     "const GuildRankingMap& topRankingsMap"
+    ]
+   },
+   {
+    "method": "ValidateGuildBadges",
+    "params": []
+   },
+   {
+    "method": "OpenGuildBank",
+    "params": []
+   },
+   {
+    "method": "CloseBank",
+    "params": []
+   },
+   {
+    "method": "SplitInventoryItem",
+    "params": [
+     "const ID32& i_cInventory",
+     "int i_nSrcPos",
+     "int i_nSplitSize",
+     "int i_nDstPos"
+    ]
+   },
+   {
+    "method": "CancelBuff",
+    "params": [
+     "uint32 i_nSpellID",
+     "ID32::InstanceID_t i_nCaster"
+    ]
+   },
+   {
+    "method": "StackInventoryItemIfPossible",
+    "params": [
+     "const ID32& i_cSrcContainerID",
+     "uint8 i_nSrcPos",
+     "const ID32& i_cDstContainerID",
+     "uint8 i_nDstPos"
+    ]
+   },
+   {
+    "method": "UpdateQuestMarkerNPC",
+    "params": [
+     "const ID32& i_cNPC",
+     "const ID32& i_cClientChar"
+    ]
+   },
+   {
+    "method": "MagicForgetSpell",
+    "params": [
+     "int i_nSpellID"
+    ]
+   },
+   {
+    "method": "ResurrectMe",
+    "params": [
+     "uint32 resurrectSpellID"
+    ]
+   },
+   {
+    "method": "CancelResurrectionRequest",
+    "params": [
+     "const ID32& resurrectRequesterID",
+     "uint32 resurrectSpellID"
+    ]
+   },
+   {
+    "method": "RespawnMe",
+    "params": [
+     "uint32 i_nSpawnPointID"
+    ]
+   },
+   {
+    "method": "SignUpForWaveRespawn",
+    "params": [
+     "uint32 spawnPointID",
+     "uint32 playerFaction"
+    ]
+   },
+   {
+    "method": "UpdateWaveRespawn",
+    "params": [
+     "uint32 spawnPointID",
+     "uint32 playerFaction"
+    ]
+   },
+   {
+    "method": "CancelWaveRespawn",
+    "params": [
+     "uint32 spawnPointID",
+     "uint32 playerFaction"
+    ]
+   },
+   {
+    "method": "RequestWaveRespawnTimerUpdate",
+    "params": []
+   },
+   {
+    "method": "RespawnMeHere",
+    "params": []
+   },
+   {
+    "method": "GMRequestSpellData",
+    "params": [
+     "const ID32& i_cTarget"
+    ]
+   },
+   {
+    "method": "RM_GetQuestFromQuestgiver",
+    "params": [
+     "int idQuestGiver",
+     "const ID32& questGiverInstanceID"
+    ]
+   },
+   {
+    "method": "GMRequestFeatData",
+    "params": []
+   },
+   {
+    "method": "GMRequestFeatClassData",
+    "params": []
+   },
+   {
+    "method": "AdjustSkill",
+    "params": [
+     "int i_nSkill",
+     "int i_nAmount"
+    ]
+   },
+   {
+    "method": "RequestPCDebugData",
+    "params": [
+     "ID32::InstanceType nCharID"
+    ]
+   },
+   {
+    "method": "GetLootDataForID",
+    "params": [
+     "const ID32& i_cCharacter"
+    ]
+   },
+   {
+    "method": "SimulateLootForID",
+    "params": [
+     "const ID32& i_cCharacter",
+     "int nCount"
+    ]
+   },
+   {
+    "method": "CloseShop",
+    "params": [
+     "const ID32& i_cShopID"
+    ]
+   },
+   {
+    "method": "BuyItem",
+    "params": [
+     "const ID32& i_cShopID",
+     "int i_nPos"
+    ]
+   },
+   {
+    "method": "SellItem",
+    "params": [
+     "const ID32& i_cShopID",
+     "const ID32& i_cInventoryID",
+     "int i_nPos"
+    ]
+   },
+   {
+    "method": "UndoLastSoldItem",
+    "params": [
+     "const ID32& i_cShopID"
+    ]
+   },
+   {
+    "method": "FormationSetData",
+    "params": [
+     "const CreatePlayerFormation_c& i_cFormation"
+    ]
+   },
+   {
+    "method": "FormationClaimPosition",
+    "params": [
+     "int i_nPositionID"
+    ]
+   },
+   {
+    "method": "FormationClear",
+    "params": []
+   },
+   {
+    "method": "FormationLeave",
+    "params": []
+   },
+   {
+    "method": "FormationUpdatePosRot",
+    "params": [
+     "const Vector3_c& i_cPos",
+     "const Quaternion_c& i_cRot"
+    ]
+   },
+   {
+    "method": "ScryMessageBoxAnswer",
+    "params": [
+     "int nAnswer",
+     "int nScriptThreadCtxId",
+     "uint64 nCtxCookie"
+    ]
+   },
+   {
+    "method": "ScryOptionsBoxAnswer",
+    "params": [
+     "int nAnswer",
+     "int nScriptThreadCtxId",
+     "uint64 nCtxCookie",
+     "const ScenarioPacket& packet"
+    ]
+   },
+   {
+    "method": "ExitScenarioResults",
+    "params": [
+     "int nAnswer",
+     "int nScriptThreadCtxId",
+     "uint64 nCtxCookie"
+    ]
+   },
+   {
+    "method": "FeatUntrainAnswer",
+    "params": [
+     "bool bYes",
+     "int i_nCategory",
+     "int i_nScriptThreadCtxId",
+     "uint64 i_nCtxCookie"
+    ]
+   },
+   {
+    "method": "CraftUntrain",
+    "params": [
+     "int nCraftID"
+    ]
+   },
+   {
+    "method": "PlantCTFFlags",
+    "params": []
+   },
+   {
+    "method": "UntrainFeat",
+    "params": [
+     "int featID"
+    ]
+   },
+   {
+    "method": "TryOpenLootBag",
+    "params": [
+     "const ID32& i_cLootBagID"
+    ]
+   },
+   {
+    "method": "TryLootAll",
+    "params": [
+     "const ID32& i_cLootBagID"
+    ]
+   },
+   {
+    "method": "CloseLootBag",
+    "params": [
+     "const ID32& i_cLootBagID"
+    ]
+   },
+   {
+    "method": "TryLootCash",
+    "params": [
+     "const ID32& i_cLootBagID"
+    ]
+   },
+   {
+    "method": "TryLootItem",
+    "params": [
+     "const ID32& i_cLootBagID",
+     "int i_nItemPos",
+     "const ID32& i_cCharID",
+     "int i_nDesiredPosition"
+    ]
+   },
+   {
+    "method": "PassNeedGreedForItem",
+    "params": [
+     "const ID32& i_cLootBagID",
+     "int i_nItemPos"
+    ]
+   },
+   {
+    "method": "DoNeedGreedRollForItem",
+    "params": [
+     "const ID32& i_cLootBagID",
+     "int i_nItemPos",
+     "bool i_bNeed"
+    ]
+   },
+   {
+    "method": "LootLockedItem",
+    "params": [
+     "const ID32& lootBagID",
+     "int itemPos"
+    ]
+   },
+   {
+    "method": "SlaveLooterAnswer",
+    "params": [
+     "const ID32& i_cLootBagID",
+     "int i_nItemPos",
+     "bool i_bAccept"
+    ]
+   },
+   {
+    "method": "MasterLooterOffer",
+    "params": [
+     "const ID32& i_cLootBagID",
+     "int i_nItemPos",
+     "const ID32& i_cReceiver"
+    ]
+   },
+   {
+    "method": "MasterLooterCancelOffer",
+    "params": [
+     "const ID32& i_cLootBagID",
+     "int i_nItemPos",
+     "const ID32& i_cReceiver"
+    ]
+   },
+   {
+    "method": "SetPassOnLootLevel",
+    "params": [
+     "int i_Level"
+    ]
+   },
+   {
+    "method": "UnbindItem",
+    "params": [
+     "const ID32& inventoryID",
+     "int unbindItemLocation",
+     "int itemLocation"
+    ]
+   },
+   {
+    "method": "ShareQuest",
+    "params": [
+     "const ID32& i_cQuestId"
+    ]
+   },
+   {
+    "method": "ShareQuestDeclined",
+    "params": [
+     "const ID32& i_cRequesterId"
+    ]
+   },
+   {
+    "method": "ShareQuestAccepted",
+    "params": [
+     "const InstanceID_t& i_cQuestId"
+    ]
+   },
+   {
+    "method": "ShareQuestBusy",
+    "params": [
+     "const ID32& i_cRequesterId"
+    ]
+   },
+   {
+    "method": "RequestNextQuestPendingReward",
+    "params": [
+     "const ID32& i_cRequesterId"
+    ]
+   },
+   {
+    "method": "RequestTeamQuestList",
+    "params": []
+   },
+   {
+    "method": "AddQuestList",
+    "params": [
+     "const std::vector<InstanceID_t>& cAvailableQuestList"
+    ]
+   },
+   {
+    "method": "AcceptNextAwaitingQuest",
+    "params": []
+   },
+   {
+    "method": "QuestManagerMsg",
+    "params": [
+     "const ID32& requestingCharacter",
+     "const ID32& targetCharacter",
+     "int taskTemplate",
+     "int msgType"
+    ]
+   },
+   {
+    "method": "StartQuickTeleport",
+    "params": [
+     "const ID32& i_cRequesterId",
+     "uint i_nPlayfieldProxyModelType",
+     "uint i_nPlayfieldProxyModelInstance",
+     "uint i_nPosX",
+     "uint i_nPosY",
+     "uint i_nPosZ",
+     "uint i_nSubgroup",
+     "uint i_nDifficulty"
+    ]
+   },
+   {
+    "method": "DoPaintballQuery",
+    "params": [
+     "const PaintballClientServer_c& i_cPaintball"
+    ]
+   },
+   {
+    "method": "PerformSpecialAction",
+    "params": [
+     "int i_nActionPos"
+    ]
+   },
+   {
+    "method": "QueuePetCommand",
+    "params": [
+     "const ID32& i_cPetID",
+     "uint i_nPetCommand"
+    ]
+   },
+   {
+    "method": "DoSkillSellback",
+    "params": [
+     "int i_eStat"
+    ]
+   },
+   {
+    "method": "PetSetGroundTargetPos",
+    "params": [
+     "float i_vX",
+     "float i_vY",
+     "float i_vZ"
+    ]
+   },
+   {
+    "method": "PlayStockphraseAsSubtitle",
+    "params": [
+     "const ID32& i_cNpcId",
+     "const String i_cStockphrase",
+     "int i_nThreadContextInstanceNr"
+    ]
+   },
+   {
+    "method": "CinematicTransition",
+    "params": [
+     "const ID32& i_cClientId",
+     "const bool i_bEntering"
+    ]
+   },
+   {
+    "method": "RequestACGTeleport",
+    "params": [
+     "const PlayfieldProxy& i_cProxy"
+    ]
+   },
+   {
+    "method": "RequestClearOwnACG",
+    "params": [
+     "ID32::InstanceType i_nPlayfieldID"
+    ]
+   },
+   {
+    "method": "RequestDropTeamBind",
+    "params": [
+     "ID32::InstanceType i_nPlayfieldID"
+    ]
+   },
+   {
+    "method": "DebugSetOceanData",
+    "params": [
+     "float i_vOceanAlt",
+     "float i_vOceanWave"
+    ]
+   },
+   {
+    "method": "RequestTrade",
+    "params": [
+     "const ID32& i_cTargetID"
+    ]
+   },
+   {
+    "method": "StartTrade",
+    "params": [
+     "const ID32& i_cTargetID"
+    ]
+   },
+   {
+    "method": "DeclineTrade",
+    "params": [
+     "const ID32& i_cTargetID"
+    ]
+   },
+   {
+    "method": "SetTradeCash",
+    "params": [
+     "uint64 i_nCash"
+    ]
+   },
+   {
+    "method": "AddTradeItem",
+    "params": [
+     "const ID32& i_cIventoryID",
+     "int i_nItemPos",
+     "int i_nDestPos"
+    ]
+   },
+   {
+    "method": "RemoveTradeItem",
+    "params": [
+     "int i_nDestPos"
+    ]
+   },
+   {
+    "method": "MoveTradeItemInternal",
+    "params": [
+     "int i_nItemPos1",
+     "int i_nItemPos2"
+    ]
+   },
+   {
+    "method": "AcceptTrade",
+    "params": []
+   },
+   {
+    "method": "AbortTrade",
+    "params": []
+   },
+   {
+    "method": "RequestShortcutBar",
+    "params": []
+   },
+   {
+    "method": "AddShortcut",
+    "params": [
+     "int i_eType",
+     "int i_nPosition",
+     "uint32 i_nData",
+     "uint32 i_nInventoryType"
+    ]
+   },
+   {
+    "method": "UpdateShortcut",
+    "params": [
+     "int i_nPosition",
+     "uint32 i_nData",
+     "uint32 i_nInventoryType"
+    ]
+   },
+   {
+    "method": "MoveShortcut",
+    "params": [
+     "int i_nFromPos",
+     "int i_nToPos"
+    ]
+   },
+   {
+    "method": "RemoveShortcut",
+    "params": [
+     "int i_nPosition"
+    ]
+   },
+   {
+    "method": "StartMinigame",
+    "params": [
+     "const PvPMatchInfo_c& i_cMatchInfo"
+    ]
+   },
+   {
+    "method": "NewMinigamePlayer",
+    "params": [
+     "ID32::InstanceType i_nMatchID",
+     "const ID32& i_cPlayerID",
+     "int i_nSide"
+    ]
+   },
+   {
+    "method": "DropMinigamePlayer",
+    "params": [
+     "ID32::InstanceType i_nMatchID",
+     "const ID32& i_cPlayerID"
+    ]
+   },
+   {
+    "method": "ResendMinigameInfoToPlayer",
+    "params": [
+     "ID32::InstanceType i_nMatchID",
+     "const ID32& i_cPlayerID"
+    ]
+   },
+   {
+    "method": "FlagAsCoward",
+    "params": [
+     "const ID32& i_cPlayerID"
+    ]
+   },
+   {
+    "method": "ForceStopMinigame",
+    "params": [
+     "ID32::InstanceType i_nMatchID",
+     "const std::string& i_cMessage"
+    ]
+   },
+   {
+    "method": "ForceSetMinigameTime",
+    "params": [
+     "ID32::InstanceType i_nMatchID",
+     "uint32 i_nNewTimeInSeconds"
+    ]
+   },
+   {
+    "method": "PrepareMinigameTime",
+    "params": [
+     "ID32::InstanceType i_nMatchID"
+    ]
+   },
+   {
+    "method": "PrepareToMinigameTime",
+    "params": [
+     "ID32::InstanceType i_nMatchID"
+    ]
+   },
+   {
+    "method": "GetInstanceListForCurrentPlayfield",
+    "params": []
+   },
+   {
+    "method": "ShiftInstanceForCurrentPlayfield",
+    "params": [
+     "uint32 i_nInstanceIndex"
+    ]
+   },
+   {
+    "method": "EnableHeroicMode",
+    "params": [
+     "bool i_bEnabled"
+    ]
+   },
+   {
+    "method": "SetHideInspectOption",
+    "params": [
+     "bool i_bEnabled"
+    ]
+   },
+   {
+    "method": "SetPlayfieldInstanceList",
+    "params": [
+     "ID32::InstanceType uCharInst",
+     "const PlayfieldInstanceList_t& cPlayfieldList"
+    ]
+   },
+   {
+    "method": "InstanceWillResetOnShutdown",
+    "params": [
+     "const ID32& i_cCharID",
+     "const ID32& i_cRequester"
+    ]
+   },
+   {
+    "method": "InstanceHasBeenLocked",
+    "params": [
+     "const PlayfieldProxy& i_cPlayfield"
+    ]
+   },
+   {
+    "method": "InstanceHasBeenUnLocked",
+    "params": [
+     "const PlayfieldProxy& i_cPlayfield"
+    ]
+   },
+   {
+    "method": "RequestTeamMemberPosList",
+    "params": [
+     "const std::vector<uint32>& i_cRequestedIDs"
+    ]
+   },
+   {
+    "method": "TradepostSearchResult",
+    "params": [
+     "const ID32& i_cChar",
+     "const TradepostSearchResult_t& i_cTradepostResult"
+    ]
+   },
+   {
+    "method": "Ping",
+    "params": [
+     "uint32 i_nSequence"
+    ]
+   },
+   {
+    "method": "ShiftTeamInstance",
+    "params": []
+   },
+   {
+    "method": "SubscriptionFlagsUpdated",
+    "params": [
+     "const ID32& characterId",
+     "int threadId",
+     "int subscriptionFlags"
+    ]
+   },
+   {
+    "method": "PlayerServicesUpdated",
+    "params": [
+     "const ID32& characterId",
+     "const PlayerServiceMap& playerServiceMap"
+    ]
+   },
+   {
+    "method": "PassiveAbilityEquip",
+    "params": [
+     "uint32 abilityPos",
+     "uint32 templateID"
+    ]
+   },
+   {
+    "method": "PassiveAbilityUnequip",
+    "params": [
+     "uint32 abilityPos"
+    ]
+   },
+   {
+    "method": "ExitPassiveMode",
+    "params": []
+   },
+   {
+    "method": "EnterPassiveMode",
+    "params": []
+   },
+   {
+    "method": "RequestMassivePvPScoreData",
+    "params": []
+   },
+   {
+    "method": "RequestScorePlayerNames",
+    "params": [
+     "const std::vector<uint>& i_cPlayerList"
+    ]
+   },
+   {
+    "method": "SetVulnerabilityWindowStartTime",
+    "params": [
+     "const String& i_cCityName",
+     "long i_cVulnerabilityWindowStartTime"
+    ]
+   },
+   {
+    "method": "RequestRecipeInfo",
+    "params": [
+     "uint32 levelId",
+     "uint32 templateId1",
+     "uint32 templateId2",
+     "DecryptionKey_c key1",
+     "DecryptionKey_c key2"
+    ]
+   },
+   {
+    "method": "RequestTeamInvite",
+    "params": [
+     "const GroupElement_c& i_cWho",
+     "const String& i_cMessage"
+    ]
+   },
+   {
+    "method": "RequestNewJoinHasHostileInFriends",
+    "params": [
+     "const GroupElement_c& i_cWho"
+    ]
+   },
+   {
+    "method": "RequestTeamInviteWithInviterFactionPoints",
+    "params": [
+     "const GroupElement_c& inviter",
+     "const std::string& message",
+     "const FactionsList& factionPoints"
+    ]
+   },
+   {
+    "method": "RequestItemSalesData",
+    "params": []
+   },
+   {
+    "method": "RequestItemSaleLimitedItemList",
+    "params": []
+   },
+   {
+    "method": "RequestItemSaleFavoriteData",
+    "params": []
+   },
+   {
+    "method": "SetFakeBillingConnection",
+    "params": [
+     "bool fake"
+    ]
+   },
+   {
+    "method": "AddFavoriteItem",
+    "params": [
+     "uint32 saleID"
+    ]
+   },
+   {
+    "method": "RemoveFavoriteItem",
+    "params": [
+     "uint32 saleID"
+    ]
+   },
+   {
+    "method": "BuyItemSalesItem",
+    "params": [
+     "uint32 saleID",
+     "uint32 couponID"
+    ]
+   },
+   {
+    "method": "CSBuyItemReply",
+    "params": [
+     "uint64 transactionID",
+     "uint32 currentBalance",
+     "int64 cdlID",
+     "int64 uniqueSaleID",
+     "uint32 couponID",
+     "int32 errorCode",
+     "String errorString"
+    ]
+   },
+   {
+    "method": "CSRollbackResponse",
+    "params": [
+     "uint64 transactionID",
+     "uint32 currentBalance",
+     "int32 errorCode",
+     "String errorString"
+    ]
+   },
+   {
+    "method": "ExecuteChatCommand",
+    "params": [
+     "const ID32& target",
+     "int chatWindowID",
+     "const chatcommands::ChatTreeNodeIDList& matchedNodes",
+     "const chatcommands::ParameterMap& parameterMap"
+    ]
+   },
+   {
+    "method": "ReplyUpdatedDimensionDB",
+    "params": []
+   },
+   {
+    "method": "RequestUseTeleportSpell",
+    "params": [
+     "uint32 playfieldId",
+     "uint32 teleportId"
+    ]
+   },
+   {
+    "method": "UnlockFromPlayfield",
+    "params": [
+     "uint32 playfieldId"
+    ]
+   },
+   {
+    "method": "UpdateMailBank",
+    "params": [
+     "const ID32& characterId"
+    ]
+   },
+   {
+    "method": "SetSelectedTag",
+    "params": [
+     "uint32 tagId"
+    ]
+   },
+   {
+    "method": "SetSelectedBadgeTag",
+    "params": [
+     "uint32 tagId"
+    ]
+   },
+   {
+    "method": "KickPlayerFromGroupPlayfield",
+    "params": [
+     "const ID32& i_cPlayerID"
+    ]
+   },
+   {
+    "method": "WorldStatChanged",
+    "params": [
+     "uint32 statHash",
+     "int value",
+     "int type1",
+     "int type2",
+     "int dimID"
+    ]
+   },
+   {
+    "method": "UpdateNoXPGainStat",
+    "params": [
+     "bool isOn"
+    ]
+   },
+   {
+    "method": "SendReport",
+    "params": [
+     "ID32 reporter",
+     "ID32 reported",
+     "const String& text",
+     "int8 reason"
+    ]
+   },
+   {
+    "method": "RunLua",
+    "params": [
+     "const std::string& luaScript"
+    ]
+   }
+  ],
+  "server_to_client": []
+ },
+ "GameCharAgentProject": {
+  "client_to_server": [
+   {
+    "method": "RequestAggroStatus",
+    "params": [
+     "const ID32& i_cCharID",
+     "const ID32& i_cTargetID"
+    ]
+   },
+   {
+    "method": "GetProcDataForID",
+    "params": [
+     "const ID32& i_cCharacter"
+    ]
+   },
+   {
+    "method": "AcceptApprenticeTeacher",
+    "params": [
+     "const ID32& i_cTeacherID"
+    ]
+   },
+   {
+    "method": "DeclineApprenticeTeacher",
+    "params": [
+     "const ID32& i_cTeacherID"
+    ]
+   },
+   {
+    "method": "RequestApprenticeStudent",
+    "params": [
+     "const ID32& i_cStudentID"
+    ]
+   },
+   {
+    "method": "LeaveApprenticeMode",
+    "params": []
+   },
+   {
+    "method": "RequestHitAndMitigationTables",
+    "params": [
+     "const ID32& target"
+    ]
+   },
+   {
+    "method": "StartOfflineTrainingSystem",
+    "params": [
+     "uint32 featId"
+    ]
+   },
+   {
+    "method": "ResetOfflineTrainingSystem",
+    "params": []
+   },
+   {
+    "method": "RefreshEquippedAbilities",
+    "params": []
+   },
+   {
+    "method": "EnableRangerTracking",
+    "params": [
+     "const ID32& target"
+    ]
+   },
+   {
+    "method": "ToggleVanityArmorFilter",
+    "params": [
+     "int slot",
+     "uint32 removeditemOccupySlots",
+     "bool toggleState"
+    ]
+   },
+   {
+    "method": "SetSprintInputState",
+    "params": [
+     "bool sprintInput",
+     "bool clientCheck"
+    ]
+   }
+  ],
+  "server_to_client": []
+ },
+ "GameCharInterface": {
+  "client_to_server": [],
+  "server_to_client": [
+   {
+    "method": "DispatchUpdateAggroStatus",
+    "fields": [
+     "cID",
+     "cCategory"
+    ]
+   },
+   {
+    "method": "DispatchUpdateName",
+    "fields": [
+     "nCharID",
+     "cName"
+    ]
+   },
+   {
+    "method": "DispatchUpdateBindLocation",
+    "fields": [
+     "nPlayfieldInstanceID"
+    ]
+   },
+   {
+    "method": "DispatchGuildNotEnoughCash",
+    "fields": [
+     "i_nAmount"
+    ]
+   },
+   {
+    "method": "DispatchUpdateCash",
+    "fields": [
+     "i_nCash",
+     "i_nFeedback"
+    ]
+   },
+   {
+    "method": "DispatchUpdateCashRepository",
+    "fields": [
+     "newCash",
+     "feedback"
+    ]
+   },
+   {
+    "method": "DispatchMoveInventoryItemToOrFromGuildBank",
+    "fields": [
+     "i_cSrcInv",
+     "i_nSrcPos",
+     "i_cDstInv",
+     "i_nDstPos"
+    ]
+   },
+   {
+    "method": "DispatchSetQuestMarker",
+    "fields": [
+     "i_cNPC",
+     "i_eMarker"
+    ]
+   },
+   {
+    "method": "DispatchChangeItemStackSize",
+    "fields": [
+     "i_cInventoryID",
+     "i_nItemPos",
+     "i_nValue"
+    ]
+   },
+   {
+    "method": "DispatchLearnSpell",
+    "fields": [
+     "i_nSpellID"
+    ]
+   },
+   {
+    "method": "DispatchForgetSpell",
+    "fields": [
+     "i_nSpellID"
+    ]
+   },
+   {
+    "method": "DispatchTradeskillComplete",
+    "fields": [
+     "i_nRecepieID"
+    ]
+   },
+   {
+    "method": "DispatchClearRecipe",
+    "fields": [
+     "i_nRecepieID"
+    ]
+   },
+   {
+    "method": "DispatchRemoveRecipesByGroupClient",
+    "fields": [
+     "i_cRecipeList"
+    ]
+   },
+   {
+    "method": "DispatchUntrainSingleFeat",
+    "fields": [
+     "i_nFeatID"
+    ]
+   },
+   {
+    "method": "DispatchDisplayItemLootChatMessage",
+    "fields": [
+     "acgData"
+    ]
+   },
+   {
+    "method": "DispatchSendNPCAutoTradeCashAmount",
+    "fields": [
+     "i_nAmount"
+    ]
+   },
+   {
+    "method": "DispatchSetDialogueCamera",
+    "fields": [
+     "i_cTargetID",
+     "i_cOther",
+     "nShotSize",
+     "nShotType",
+     "nShotEmphasis",
+     "nShotFov",
+     "nShotTilt",
+     "bAutoface",
+     "i_vHeadPaddingY"
+    ]
+   },
+   {
+    "method": "DispatchAddTag",
+    "fields": [
+     "tagID"
+    ]
+   },
+   {
+    "method": "DispatchRemoveTag",
+    "fields": [
+     "tagID"
+    ]
+   },
+   {
+    "method": "DispatchResurrectRequest",
+    "fields": [
+     "i_cResurrectorID",
+     "i_nSpellTemplate",
+     "i_castSpellOnResurrect"
+    ]
+   },
+   {
+    "method": "DispatchSetDbDebugCategory",
+    "fields": [
+     "i_cStr",
+     "i_nLevel"
+    ]
+   },
+   {
+    "method": "DispatchSetDbDebugLevel",
+    "fields": [
+     "i_nLevel"
+    ]
+   },
+   {
+    "method": "DispatchSetItemStat",
+    "fields": [
+     "i_cInventoryID",
+     "i_nItemPos",
+     "i_nStat",
+     "i_nValue"
+    ]
+   },
+   {
+    "method": "DispatchAddToItemSlot",
+    "fields": [
+     "i_inventoryID",
+     "i_itemPos",
+     "i_itemSlot",
+     "i_acgItem"
+    ]
+   },
+   {
+    "method": "DispatchRemoveFromItemSlot",
+    "fields": [
+     "i_inventoryID",
+     "i_itemPos",
+     "i_itemSlot"
+    ]
+   },
+   {
+    "method": "DispatchRemoveItem",
+    "fields": [
+     "i_cInventoryID",
+     "i_nItemPos",
+     "i_nAmountToRemove"
+    ]
+   },
+   {
+    "method": "DispatchAddItem",
+    "fields": [
+     "i_cInventoryID",
+     "i_nItemPos",
+     "i_cEntry",
+     "i_nFeedback"
+    ]
+   },
+   {
+    "method": "DispatchMoveInventoryItemToGuildBank",
+    "fields": [
+     "i_cInventoryID",
+     "i_nItemPos",
+     "i_nDstPos"
+    ]
+   },
+   {
+    "method": "DispatchMoveInventoryItemFromGuildBank",
+    "fields": [
+     "i_cInventoryID",
+     "i_nItemPos",
+     "i_nDstPos"
+    ]
+   },
+   {
+    "method": "DispatchCharacterNameReply",
+    "fields": [
+     "i_cCharID",
+     "i_cName"
+    ]
+   },
+   {
+    "method": "DispatchValidResurrectionSpots",
+    "fields": [
+     "i_cPosition",
+     "i_cValidResSpots"
+    ]
+   },
+   {
+    "method": "DispatchReplyPCDebugData",
+    "fields": [
+     "i_cPCData"
+    ]
+   },
+   {
+    "method": "DispatchReplyLootForCharacter",
+    "fields": [
+     "i_nTemplateInstance",
+     "i_nMonsterLevel",
+     "i_cCharThatDidMostDamage",
+     "i_vFactor",
+     "i_nNumHashes"
+    ]
+   },
+   {
+    "method": "DispatchReplyLootForCharacterAddHash",
+    "fields": [
+     "i_nNumber",
+     "i_nHash",
+     "nChance",
+     "nRepeatCount",
+     "nItemUse"
+    ]
+   },
+   {
+    "method": "DispatchReplyLootForCharacterTemplateClusterOk",
+    "fields": [
+     "i_nHash",
+     "i_nMinLvl",
+     "i_nMaxLvl",
+     "nTemplateType",
+     "i_nNumTemplates"
+    ]
+   },
+   {
+    "method": "DispatchReplyLootForCharacterTemplateClusterError",
+    "fields": [
+     "i_nHash",
+     "i_cError"
+    ]
+   },
+   {
+    "method": "DispatchReplyLootForCharacterAddTreasureTemplate",
+    "fields": [
+     "nTemplateInstance",
+     "i_nLevel"
+    ]
+   },
+   {
+    "method": "DispatchReplySimulateLootForID",
+    "fields": [
+     "i_cDebugLootMap",
+     "nCash",
+     "nSimulations"
+    ]
+   },
+   {
+    "method": "DispatchFormationSetData",
+    "fields": [
+     "i_cFormation"
+    ]
+   },
+   {
+    "method": "DispatchFormationClaimPosition",
+    "fields": [
+     "i_cCharID",
+     "i_nPositionID",
+     "i_bOccupied"
+    ]
+   },
+   {
+    "method": "DispatchFormationUpdatePosition",
+    "fields": [
+     "i_nPositionID",
+     "i_bOccupied"
+    ]
+   },
+   {
+    "method": "DispatchFormationClearPosition",
+    "fields": [
+     "i_nPositionID"
+    ]
+   },
+   {
+    "method": "DispatchFormationUpdatePosRot",
+    "fields": [
+     "i_cPos",
+     "i_cRot"
+    ]
+   },
+   {
+    "method": "DispatchShopData",
+    "fields": [
+     "i_cShopID",
+     "i_cShopParentID",
+     "i_cShopContent"
+    ]
+   },
+   {
+    "method": "DispatchCloseShop",
+    "fields": [
+     "i_cShopID"
+    ]
+   },
+   {
+    "method": "DispatchItemSoldToShop",
+    "fields": [
+     "inventoryID",
+     "inventoryPos"
+    ]
+   },
+   {
+    "method": "DispatchItemBoughtBack",
+    "fields": [
+     "inventoryID",
+     "inventoryPos",
+     "itemEntry"
+    ]
+   },
+   {
+    "method": "DispatchOpenLootBag",
+    "fields": [
+     "i_cLootBagID"
+    ]
+   },
+   {
+    "method": "DispatchCloseLootBag",
+    "fields": [
+     "i_cLootBagID"
+    ]
+   },
+   {
+    "method": "DispatchDoNeedGreedRollForItemsInLootBag",
+    "fields": [
+     "i_cLootBagID",
+     "i_nItemPos",
+     "i_cFallbackLootBagItems"
+    ]
+   },
+   {
+    "method": "DispatchCancelNeedGreedRollForItemsInLootBag",
+    "fields": [
+     "i_cLootBagID"
+    ]
+   },
+   {
+    "method": "DispatchOpenDialogForLockedItemsInLootBag",
+    "fields": [
+     "lootBagID",
+     "itemPosList",
+     "fallbackLootBagItems"
+    ]
+   },
+   {
+    "method": "DispatchCloseDialogForLockedItemsInLootBag",
+    "fields": [
+     "i_cLootBagID"
+    ]
+   },
+   {
+    "method": "DispatchMasterLooterOfferItemTo",
+    "fields": [
+     "masterLooterName",
+     "i_cLootBagID",
+     "i_nItemPos",
+     "i_cFallbackLootBagItems"
+    ]
+   },
+   {
+    "method": "DispatchSlaveLooterAnswer",
+    "fields": [
+     "i_cLootBagID",
+     "i_nItemPos",
+     "i_cSlaveID",
+     "i_bAccept",
+     "i_cFallbackLootBagItems"
+    ]
+   },
+   {
+    "method": "DispatchMasterLooterCancelOffer",
+    "fields": [
+     "i_cLootBagID",
+     "i_nItemPos",
+     "i_cMasterLooterID",
+     "i_cFallbackLootBagItems"
+    ]
+   },
+   {
+    "method": "DispatchOverrideGameTweaks",
+    "fields": [
+     "overrides"
+    ]
+   },
+   {
+    "method": "DispatchShowClientFIFO",
+    "fields": [
+     "remoteFormat"
+    ]
+   },
+   {
+    "method": "DispatchAddFormation",
+    "fields": [
+     "i_nFormationID"
+    ]
+   },
+   {
+    "method": "DispatchRemoveFormation",
+    "fields": [
+     "i_nFormationID"
+    ]
+   },
+   {
+    "method": "DispatchUpgradeCombo",
+    "fields": [
+     "i_nComboID",
+     "i_nRecharge",
+     "i_nDamage",
+     "i_bReverse"
+    ]
+   },
+   {
+    "method": "DispatchUpgradeComboStep",
+    "fields": [
+     "i_nComboID",
+     "i_nStep",
+     "i_nDPSIncrease",
+     "i_nCritIncrease",
+     "i_nHateIncrease",
+     "i_nDamageType",
+     "i_bReverse"
+    ]
+   },
+   {
+    "method": "DispatchXPSelectClass",
+    "fields": [
+     "i_nClass"
+    ]
+   },
+   {
+    "method": "DispatchNextQuestAvailable",
+    "fields": [
+     "nextAwaitingQuest",
+     "questName"
+    ]
+   },
+   {
+    "method": "DispatchQuestShareGlobalFeedback",
+    "fields": [
+     "i_nFeedbackType",
+     "i_nFeedbackValue"
+    ]
+   },
+   {
+    "method": "DispatchQuestShareIndividualFeedback",
+    "fields": [
+     "i_nFeedbackType",
+     "i_cFeedbackValue"
+    ]
+   },
+   {
+    "method": "DispatchQuestShareRequest",
+    "fields": [
+     "i_cCharID",
+     "i_nStartTaskTemplate",
+     "i_cQuestName"
+    ]
+   },
+   {
+    "method": "DispatchUpdateTeamQuestList",
+    "fields": [
+     "cQuestData"
+    ]
+   },
+   {
+    "method": "DispatchCancelTeamQuestList",
+    "fields": [
+     "nQuestShareCode"
+    ]
+   },
+   {
+    "method": "DispatchUpdateTokenAmount",
+    "fields": [
+     "tokenID",
+     "gained",
+     "spent",
+     "includeBonus"
+    ]
+   },
+   {
+    "method": "DispatchLockTemplate",
+    "fields": [
+     "i_nTemplateID",
+     "i_vSeconds"
+    ]
+   },
+   {
+    "method": "DispatchApplyFactionRank",
+    "fields": [
+     "i_FactionId",
+     "i_Rank"
+    ]
+   },
+   {
+    "method": "DispatchApplyFactionPoints",
+    "fields": [
+     "i_FactionId",
+     "i_Points"
+    ]
+   },
+   {
+    "method": "DispatchAddSpecialAbility",
+    "fields": [
+     "i_nAbilityID",
+     "i_cItem",
+     "i_nType",
+     "i_nResourceID",
+     "i_bDoFeedback"
+    ]
+   },
+   {
+    "method": "DispatchRemoveSpecialAbility",
+    "fields": [
+     "i_nAbilityID",
+     "i_cItem"
+    ]
+   },
+   {
+    "method": "DispatchPerformSpecialAction",
+    "fields": [
+     "i_nActionPos"
+    ]
+   },
+   {
+    "method": "DispatchQueuePetCommand",
+    "fields": [
+     "i_cPetID",
+     "i_nPetCommand"
+    ]
+   },
+   {
+    "method": "DispatchACGTeleportChoice",
+    "fields": [
+     "i_nPlayfieldModelID",
+     "i_cOwnerOfTargetInstanceIfAny",
+     "i_cDestination",
+     "i_bCanReset"
+    ]
+   },
+   {
+    "method": "DispatchACGSelfInstanceCleared",
+    "fields": [
+     "i_nPlayfieldModelID"
+    ]
+   },
+   {
+    "method": "DispatchACGTeamBindChanged",
+    "fields": [
+     "i_nPlayfieldModelID",
+     "i_cNewCharID"
+    ]
+   },
+   {
+    "method": "DispatchOverrideJumpHeight",
+    "fields": [
+     "i_vOverride"
+    ]
+   },
+   {
+    "method": "DispatchOverrideJumpSpeed",
+    "fields": [
+     "i_vOverride"
+    ]
+   },
+   {
+    "method": "DispatchVisualSimulateNpc",
+    "fields": [
+     "subject",
+     "monsterData",
+     "headMesh",
+     "morphValues",
+     "i_nChatWndID"
+    ]
+   },
+   {
+    "method": "DispatchReceivedStockPhraseText",
+    "fields": [
+     "i_nThreadContextInstanceNr",
+     "i_rfText"
+    ]
+   },
+   {
+    "method": "DispatchScryShowMessageBox",
+    "fields": [
+     "cText",
+     "nText1",
+     "nText2",
+     "nText3",
+     "nTip1",
+     "nTip2",
+     "nTip3",
+     "nScriptThreadCtxId",
+     "cCustomName",
+     "nCtxCookie"
+    ]
+   },
+   {
+    "method": "DispatchScryCloseMessageBox",
+    "fields": [
+     "nCtxCookie"
+    ]
+   },
+   {
+    "method": "DispatchScryShowOptionsBox",
+    "fields": [
+     "nScriptThreadCtxId",
+     "nCtxCookie"
+    ]
+   },
+   {
+    "method": "DispatchScryCloseOptionsBox",
+    "fields": [
+     "nCtxCookie"
+    ]
+   },
+   {
+    "method": "DispatchOpenScenarioResults",
+    "fields": [
+     "packet",
+     "context",
+     "cookie"
+    ]
+   },
+   {
+    "method": "DispatchScrySendCustomGUIData",
+    "fields": [
+     "packet"
+    ]
+   },
+   {
+    "method": "DispatchFeatUntrainMessageBox",
+    "fields": [
+     "i_nCategory",
+     "nScriptThreadCtxId",
+     "nCtxCookie"
+    ]
+   },
+   {
+    "method": "DispatchCraftUntrainMessageBox",
+    "fields": [
+     "nCost",
+     "nCraftID"
+    ]
+   },
+   {
+    "method": "DispatchUnbindItemReply",
+    "fields": [
+     "inventoryID",
+     "itemLocation"
+    ]
+   },
+   {
+    "method": "DispatchBroadcastMessage",
+    "fields": [
+     "i_cMessage"
+    ]
+   },
+   {
+    "method": "DispatchRequestTrade",
+    "fields": [
+     "i_cWhoID"
+    ]
+   },
+   {
+    "method": "DispatchStartTrade",
+    "fields": [
+     "i_cWhoID"
+    ]
+   },
+   {
+    "method": "DispatchPartnerAcceptedTrade",
+    "fields": [
+     "i_cWhoID"
+    ]
+   },
+   {
+    "method": "DispatchPartnerUpdatedCash",
+    "fields": [
+     "i_nCash"
+    ]
+   },
+   {
+    "method": "DispatchTradePartnerAddedItem",
+    "fields": [
+     "i_cItem",
+     "i_nItemPos"
+    ]
+   },
+   {
+    "method": "DispatchTradeAddedItem",
+    "fields": [
+     "i_cItem",
+     "i_nItemPos"
+    ]
+   },
+   {
+    "method": "DispatchTradePartnerRemovedItem",
+    "fields": [
+     "i_nItemPos"
+    ]
+   },
+   {
+    "method": "DispatchTradeRemovedItem",
+    "fields": [
+     "i_nItemPos"
+    ]
+   },
+   {
+    "method": "DispatchShortcutBarReply",
+    "fields": [
+     "i_cShortcuts"
+    ]
+   },
+   {
+    "method": "DispatchAddWayPoint",
+    "fields": [
+     "i_cID",
+     "i_nPlayfieldID",
+     "i_cPos",
+     "i_vRadius",
+     "i_nLabel",
+     "i_nToolTip"
+    ]
+   },
+   {
+    "method": "DispatchRemoveWayPoint",
+    "fields": [
+     "i_cID",
+     "i_nPlayfieldID"
+    ]
+   },
+   {
+    "method": "DispatchReplyWaveRespawnTimerUpdate",
+    "fields": [
+     "timeLeft",
+     "factionCounter"
+    ]
+   },
+   {
+    "method": "DispatchGMReplySpellData",
+    "fields": [
+     "i_cSpellBook"
+    ]
+   },
+   {
+    "method": "DispatchGMReplyFeatData",
+    "fields": [
+     "i_cFeatMap"
+    ]
+   },
+   {
+    "method": "DispatchGMReplyFeatClassData",
+    "fields": [
+     "i_cFeatClassMap"
+    ]
+   },
+   {
+    "method": "DispatchInstanceSelectionForCurrentPlayfield",
+    "fields": [
+     "i_cInstanceList"
+    ]
+   },
+   {
+    "method": "DispatchApprenticeModeOnOff",
+    "fields": [
+     "i_bOnOff"
+    ]
+   },
+   {
+    "method": "DispatchPong",
+    "fields": [
+     "i_nSequence",
+     "i_nServerTime"
+    ]
+   },
+   {
+    "method": "DispatchUpdateTeamMemberPosList",
+    "fields": [
+     "i_cTeamMemberPosList"
+    ]
+   },
+   {
+    "method": "DispatchDynamicSpaceDebugInfo",
+    "fields": [
+     "i_nLayer",
+     "i_cSpaceBounds"
+    ]
+   },
+   {
+    "method": "DispatchSetGameTweakValue",
+    "fields": [
+     "i_cName",
+     "i_vValue"
+    ]
+   },
+   {
+    "method": "DispatchMinigameScoreChanged",
+    "fields": [
+     "i_cUpdatelist"
+    ]
+   },
+   {
+    "method": "DispatchMinigameFullScore",
+    "fields": [
+     "i_cScore"
+    ]
+   },
+   {
+    "method": "DispatchMinigameMatchStarted",
+    "fields": [
+     "i_nSecondsSinceStarted"
+    ]
+   },
+   {
+    "method": "DispatchMinigameMatchEnded",
+    "fields": [
+     "i_eWinningSide",
+     "i_eYourResult"
+    ]
+   },
+   {
+    "method": "DispatchMinigameCaptureZoneUpdate",
+    "fields": [
+     "i_nSensorVolumeID",
+     "i_vCaptureState",
+     "i_nCurrentOwnerSide",
+     "i_nCurrentOwner",
+     "i_bInsideCaptureZone"
+    ]
+   },
+   {
+    "method": "DispatchMinigameCaptureZoneList",
+    "fields": [
+     "i_cSensorVolumeIDs",
+     "i_cSensorVolumeNames",
+     "i_cOwnerVec"
+    ]
+   },
+   {
+    "method": "DispatchMinigameCaptureZoneLeaveEnter",
+    "fields": [
+     "i_nSensorVolumeID",
+     "i_bLeave"
+    ]
+   },
+   {
+    "method": "DispatchForceStopMinigame",
+    "fields": [
+     "i_cMessage"
+    ]
+   },
+   {
+    "method": "DispatchSetMinigameTime",
+    "fields": [
+     "i_nNewTimeLimit"
+    ]
+   },
+   {
+    "method": "DispatchMinigameStartsInXSeconds",
+    "fields": [
+     "i_nSeconds"
+    ]
+   },
+   {
+    "method": "DispatchMassivePvPFullScoreUpdate",
+    "fields": [
+     "i_cMassivePvPScore"
+    ]
+   },
+   {
+    "method": "DispatchMassivePvPGuildScoreUpdate",
+    "fields": [
+     "i_cScoreList"
+    ]
+   },
+   {
+    "method": "DispatchMassivePvPPlayerScoreUpdate",
+    "fields": [
+     "i_cScoreList"
+    ]
+   },
+   {
+    "method": "DispatchMassivePvPScoreNames",
+    "fields": [
+     "i_cNameMap"
+    ]
+   },
+   {
+    "method": "DispatchShowVulnerabilityWindowGui",
+    "fields": [
+     "i_cAreaEditInfo"
+    ]
+   },
+   {
+    "method": "DispatchPassiveAbilityEquip",
+    "fields": [
+     "abilityPos",
+     "templateID"
+    ]
+   },
+   {
+    "method": "DispatchPassiveAbilityUnequip",
+    "fields": [
+     "abilityPos"
+    ]
+   },
+   {
+    "method": "DispatchReplyRecipeInfo",
+    "fields": [
+     "i_RecipeId",
+     "i_Recipe"
+    ]
+   },
+   {
+    "method": "DispatchAddEffectPackage",
+    "fields": [
+     "i_nPackageID",
+     "i_cTargets"
+    ]
+   },
+   {
+    "method": "DispatchEnterExitGamingRoom",
+    "fields": [
+     "entering"
+    ]
+   },
+   {
+    "method": "DispatchReplyTeamInvite",
+    "fields": [
+     "i_cWho",
+     "i_cMessage",
+     "hasHostileInFriends"
+    ]
+   },
+   {
+    "method": "DispatchReplyNewJoinHasHostileInFriends",
+    "fields": [
+     "i_cWho"
+    ]
+   },
+   {
+    "method": "DispatchReplyItemForCashSaleSetData",
+    "fields": [
+     "data"
+    ]
+   },
+   {
+    "method": "DispatchReplyItemForCashSaleUpdateData",
+    "fields": [
+     "data"
+    ]
+   },
+   {
+    "method": "DispatchItemSaleResult",
+    "fields": [
+     "saleID",
+     "status",
+     "externalErrorCode",
+     "externalErrorString"
+    ]
+   },
+   {
+    "method": "DispatchReplyItemSaleFavoriteData",
+    "fields": [
+     "data"
+    ]
+   },
+   {
+    "method": "DispatchItemSalesUpdateBalance",
+    "fields": [
+     "balance"
+    ]
+   },
+   {
+    "method": "DispatchPlayfieldAccessDenied",
+    "fields": [
+     "playfieldId"
+    ]
+   },
+   {
+    "method": "DispatchPlayfieldAccessGranted",
+    "fields": [
+     "playfieldId",
+     "hours",
+     "allCharacters"
+    ]
+   },
+   {
+    "method": "DispatchSendPlayfieldAccessData",
+    "fields": [
+     "playfieldId",
+     "accessInfo"
+    ]
+   },
+   {
+    "method": "DispatchSendPlayfieldLockoutData",
+    "fields": [
+     "playfieldId",
+     "lockoutInfo"
+    ]
+   },
+   {
+    "method": "DispatchLockAllSpells",
+    "fields": [
+     "cooldown",
+     "onlyIncrease"
+    ]
+   },
+   {
+    "method": "DispatchAddSpellResistance",
+    "fields": [
+     "metaType",
+     "percentage"
+    ]
+   },
+   {
+    "method": "DispatchRemoveSpellResistance",
+    "fields": [
+     "metaType",
+     "percentage"
+    ]
+   },
+   {
+    "method": "DispatchSetStackinglineResists",
+    "fields": [
+     "resistsMap"
+    ]
+   },
+   {
+    "method": "DispatchPlayerServicesUpdated",
+    "fields": [
+     "playerServiceMap"
+    ]
+   },
+   {
+    "method": "DispatchOnFacebookTokenResult",
+    "fields": [
+     "storedToken",
+     "shouldAskToSignIntoFacebook"
+    ]
+   },
+   {
+    "method": "DispatchOnUpdateFacebookFriends",
+    "fields": [
+     "fbFriends"
+    ]
+   },
+   {
+    "method": "DispatchOnFacebookFriendSignedUp",
+    "fields": [
+     "fbFriend"
+    ]
+   },
+   {
+    "method": "DispatchRequestGetEffect",
+    "fields": [
+     "nEffect"
+    ]
+   },
+   {
+    "method": "DispatchSignalWorldStatChanged",
+    "fields": [
+     "hash",
+     "value",
+     "type1",
+     "type2",
+     "dimID"
+    ]
+   }
+  ]
+ },
+ "GameCharInterfaceProject": {
+  "client_to_server": [],
+  "server_to_client": [
+   {
+    "method": "DispatchUpdateAggroStatus",
+    "fields": [
+     "cID",
+     "cCategory"
+    ]
+   },
+   {
+    "method": "DispatchGuildBankData",
+    "fields": [
+     "i_cShopContent",
+     "i_eFeedback"
+    ]
+   },
+   {
+    "method": "DispatchRequestApprentice",
+    "fields": [
+     "i_cTeacher"
+    ]
+   },
+   {
+    "method": "DispatchAddApprenticeEntry",
+    "fields": [
+     "i_cTeacher",
+     "i_cStudent"
+    ]
+   },
+   {
+    "method": "DispatchRemoveApprenticeEntry",
+    "fields": [
+     "i_cTeacher",
+     "i_cStudent"
+    ]
+   },
+   {
+    "method": "DispatchDoYouWantToShiftTeamInstance",
+    "fields": [
+     "i_bFailedPreviousInstanceShift"
+    ]
+   },
+   {
+    "method": "DispatchInDungeonPlayfield",
+    "fields": [
+     "inDungeon"
+    ]
+   },
+   {
+    "method": "DispatchReplyDebugGetProcData",
+    "fields": [
+     "o_cSelfTemplate",
+     "o_cOtherTemplate",
+     "o_cProcRate",
+     "o_cProcFlags",
+     "o_cListID",
+     "o_cReactive"
+    ]
+   },
+   {
+    "method": "DispatchReplyDebugGetSpellProcData",
+    "fields": [
+     "i_cSpellTemplate",
+     "i_cStackinglines",
+     "o_cSelfTemplate",
+     "o_cOtherTemplate",
+     "o_cProcRate"
+    ]
+   },
+   {
+    "method": "DispatchSendHitAndMitigationTable",
+    "fields": [
+     "tables"
+    ]
+   },
+   {
+    "method": "DispatchSetIsSprinting",
+    "fields": [
+     "isSprinting"
+    ]
+   },
+   {
+    "method": "DispatchSyncCanSprint",
+    "fields": [
+     "canSprint"
+    ]
+   },
+   {
+    "method": "DispatchSyncRegenDelayed",
+    "fields": [
+     "regenDelayed"
+    ]
+   },
+   {
+    "method": "DispatchUpdateSprintbar",
+    "fields": [
+     "energyValue",
+     "forceUpdate"
+    ]
+   },
+   {
+    "method": "DispatchOpenSiteInBrowserOnClient",
+    "fields": [
+     "siteName"
+    ]
+   }
+  ]
+ },
+ "GameInterface": {
+  "client_to_server": [],
+  "server_to_client": [
+   {
+    "method": "DispatchPassBlob",
+    "fields": [
+     "b"
+    ]
+   },
+   {
+    "method": "DispatchAckAuthenticate",
+    "fields": [
+     "nStatus"
+    ]
+   },
+   {
+    "method": "DispatchRedirectToServer",
+    "fields": [
+     "cOtherGameAgentAddr"
+    ]
+   },
+   {
+    "method": "DispatchPong",
+    "fields": [
+     "sequenceId"
+    ]
+   },
+   {
+    "method": "DispatchPongWithPacketTiming",
+    "fields": [
+     "sequenceId",
+     "proxyTiming",
+     "dispatchTiming"
+    ]
+   },
+   {
+    "method": "DispatchInfoToUser",
+    "fields": [
+     "cInfoFromServer"
+    ]
+   },
+   {
+    "method": "DispatchGameStats",
+    "fields": [
+     "cStats"
+    ]
+   },
+   {
+    "method": "DispatchGameServerStats",
+    "fields": [
+     "nGSFrameRate",
+     "uGSFrameCount",
+     "nGSCpuUsage"
+    ]
+   },
+   {
+    "method": "DispatchGameServerDataset",
+    "fields": [
+     "projectID",
+     "datasetID",
+     "datasetName"
+    ]
+   },
+   {
+    "method": "DispatchReportDimesionID",
+    "fields": [
+     "cDimId"
+    ]
+   },
+   {
+    "method": "DispatchReportServerID",
+    "fields": [
+     "nServerId",
+     "nServerIndex"
+    ]
+   },
+   {
+    "method": "DispatchDataSink",
+    "fields": [
+     "cMsg"
+    ]
+   },
+   {
+    "method": "DispatchDisplayPlayfieldAccessPopup",
+    "fields": [
+     "playfieldID"
+    ]
+   }
+  ]
+ },
+ "PlayerAgent": {
+  "client_to_server": [
+   {
+    "method": "Authenticate",
+    "params": [
+     "ID32::InstanceType nAccount",
+     "unsigned int nCookie",
+     "unsigned int territoryVersion"
+    ]
+   },
+   {
+    "method": "AuthenticateLoggedIn",
+    "params": [
+     "ID32::InstanceType playerInstance",
+     "unsigned int cookie"
+    ]
+   },
+   {
+    "method": "LoginFromCrash",
+    "params": [
+     "uint32 player",
+     "uint32 cookie",
+     "uint32 character"
+    ]
+   },
+   {
+    "method": "CreateCharacter",
+    "params": [
+     "uint i_nDimID",
+     "const std::string& cRDBDSN",
+     "const uint16 regionCode",
+     "const uint16 ageCode",
+     "const uint16 genderCode",
+     "const String& igrID",
+     "const uint32 userType",
+     "const uint32 serviceType"
+    ]
+   },
+   {
+    "method": "CreateCharacterWithData",
+    "params": [
+     "uint dim",
+     "StrStrMap& dataMap",
+     "const uint16 regionCode",
+     "const uint16 ageCode",
+     "const uint16 genderCode",
+     "const String& igrID",
+     "const uint32 userType",
+     "const uint32 serviceType"
+    ]
+   },
+   {
+    "method": "LoginCharacter",
+    "params": [
+     "ID32::InstanceType nCharInstance",
+     "const StrStrMap& dataMap",
+     "const std::string& cClientLanguage",
+     "const uint16 regionCode",
+     "const uint16 ageCode",
+     "const uint16 genderCode",
+     "const String& igrID",
+     "const uint32 userType",
+     "const uint32 serviceType"
+    ]
+   },
+   {
+    "method": "RenameCharacter",
+    "params": [
+     "ID32::InstanceType nCharInstance",
+     "String& cNewName"
+    ]
+   },
+   {
+    "method": "RequestDeleteCharacter",
+    "params": [
+     "ID32::InstanceType nCharacterInstance"
+    ]
+   },
+   {
+    "method": "VerifyLanguageSetting",
+    "params": [
+     "const int nClientLanguage"
+    ]
+   },
+   {
+    "method": "AddOfflineLevel",
+    "params": [
+     "ID32::InstanceType nCharInstance"
+    ]
+   },
+   {
+    "method": "UnlockCharacter",
+    "params": [
+     "ID32::InstanceType charInstance"
+    ]
+   },
+   {
+    "method": "SetHardcoreLevel",
+    "params": [
+     "ID32::InstanceType charInstance",
+     "int nHardcoreLevel"
+    ]
+   },
+   {
+    "method": "GetDimensionList",
+    "params": []
+   },
+   {
+    "method": "RequestSuggestNickname",
+    "params": [
+     "int i_nRace",
+     "int i_nSex"
+    ]
+   },
+   {
+    "method": "GetStartupData",
+    "params": [
+     "const String& md5"
+    ]
+   },
+   {
+    "method": "LoadFacebookToken",
+    "params": []
+   },
+   {
+    "method": "SaveFacebookToken",
+    "params": [
+     "uint64 facebookUserId",
+     "const String& tokenToStore"
+    ]
+   },
+   {
+    "method": "UpdateFacebookFriends",
+    "params": [
+     "const std::vector<uint64>& fbFriendIds"
+    ]
+   },
+   {
+    "method": "RecruitFacebookFriends",
+    "params": [
+     "const FacebookNS::FacebookFriendsMap& fbFriends"
+    ]
+   },
+   {
+    "method": "UpdateSubscriptionSettings",
+    "params": [
+     "IOBuffer& data",
+     "const String& md5"
+    ]
+   },
+   {
+    "method": "UpdateCharacterSettings",
+    "params": [
+     "const ID32& characterId",
+     "IOBuffer& data",
+     "const String& md5"
+    ]
+   },
+   {
+    "method": "UpdateCharacterPreview",
+    "params": [
+     "const ID32& characterId",
+     "IOBuffer& data"
+    ]
+   },
+   {
+    "method": "FinishGetStartupData",
+    "params": [
+     "const CharacterCheckSumMap& characterMap"
+    ]
+   },
+   {
+    "method": "ReceivedCharacterSettings",
+    "params": []
+   },
+   {
+    "method": "ClientReplyKeepCookie",
+    "params": []
+   }
+  ],
+  "server_to_client": []
+ },
+ "PlayerInterface": {
+  "client_to_server": [],
+  "server_to_client": [
+   {
+    "method": "DispatchOnFacebookTokenResult",
+    "fields": [
+     "storedToken",
+     "shouldAskToSignIntoFacebook"
+    ]
+   },
+   {
+    "method": "DispatchOnUpdateFacebookFriends",
+    "fields": [
+     "fbFriends"
+    ]
+   },
+   {
+    "method": "DispatchOnFacebookFriendSignedUp",
+    "fields": [
+     "fbFriend"
+    ]
+   },
+   {
+    "method": "DispatchAuthenticateAck",
+    "fields": [
+     "nStatus"
+    ]
+   },
+   {
+    "method": "DispatchLoginConnectReady",
+    "fields": [
+     "gameServerAddr",
+     "nCookie",
+     "cClientCharacterID",
+     "cPF"
+    ]
+   },
+   {
+    "method": "DispatchCSServerConnectReady",
+    "fields": [
+     "i_nAddress",
+     "nCookie",
+     "cClientCharacterID"
+    ]
+   },
+   {
+    "method": "DispatchChatServerConnectReady",
+    "fields": [
+     "address",
+     "cookie",
+     "characterID"
+    ]
+   },
+   {
+    "method": "DispatchUpdateClientPlayerData",
+    "fields": [
+     "clientPlayerData",
+     "fidData",
+     "territoryID"
+    ]
+   },
+   {
+    "method": "DispatchSetDimensionList",
+    "fields": [
+     "cDimensionList"
+    ]
+   },
+   {
+    "method": "DispatchSetStats",
+    "fields": [
+     "cStatsStr"
+    ]
+   },
+   {
+    "method": "DispatchSuggestNicknameResult",
+    "fields": [
+     "cSuggestionName"
+    ]
+   },
+   {
+    "method": "DispatchPlayerSetupComplete",
+    "fields": [
+     "nAuthStatus"
+    ]
+   },
+   {
+    "method": "DispatchLoginQueuePosition",
+    "fields": [
+     "i_nDimensionID",
+     "i_nCharID",
+     "i_nQueuePosition"
+    ]
+   },
+   {
+    "method": "DispatchOfflineLevelApplied",
+    "fields": [
+     "nCharInstance"
+    ]
+   },
+   {
+    "method": "DispatchCharacterUnlocked",
+    "fields": [
+     "charInstance"
+    ]
+   },
+   {
+    "method": "DispatchHardcoreLevelSet",
+    "fields": [
+     "nCharInstance",
+     "nHardcoreLevel"
+    ]
+   },
+   {
+    "method": "DispatchSendSubscriptionSettings",
+    "fields": [
+     "data"
+    ]
+   },
+   {
+    "method": "DispatchSendCharacterSettings",
+    "fields": [
+     "characterID",
+     "data"
+    ]
+   },
+   {
+    "method": "DispatchSendCharacterPreview",
+    "fields": [
+     "characterID",
+     "data"
+    ]
+   },
+   {
+    "method": "DispatchSendCharacterSettingsCheckSumMap",
+    "fields": [
+     "charMD5Map"
+    ]
+   },
+   {
+    "method": "DispatchOverrideGameTweaks",
+    "fields": [
+     "overrides"
+    ]
+   },
+   {
+    "method": "DispatchCharacterNeedsNewName",
+    "fields": [
+     "nCharInstance",
+     "nLDBReason",
+     "cRequestedName"
+    ]
+   },
+   {
+    "method": "DispatchLoginProblem",
+    "fields": [
+     "eStatus"
+    ]
+   },
+   {
+    "method": "DispatchTeleportProblem",
+    "fields": [
+     "cReason"
+    ]
+   },
+   {
+    "method": "DispatchResetLanguage",
+    "fields": [
+     "nNewLanguage"
+    ]
+   }
+  ]
+ },
+ "TradepostAgent": {
+  "client_to_server": [
+   {
+    "method": "GetAllMails",
+    "params": []
+   },
+   {
+    "method": "GetMailByID",
+    "params": [
+     "Instance64_t mailID"
+    ]
+   },
+   {
+    "method": "SendMail",
+    "params": [
+     "const String& cRecpName",
+     "const String& cMessageBody",
+     "uint64 nMoney",
+     "const std::vector<uint>& cBankItemIndices"
+    ]
+   },
+   {
+    "method": "MarkMailRead",
+    "params": [
+     "Instance64_t mailID"
+    ]
+   },
+   {
+    "method": "CheckNewMail",
+    "params": []
+   },
+   {
+    "method": "GetMailItems",
+    "params": [
+     "Instance64_t mailID"
+    ]
+   },
+   {
+    "method": "GetMailItem",
+    "params": [
+     "Instance64_t mailID",
+     "Instance64_t itemID"
+    ]
+   },
+   {
+    "method": "GetItemData",
+    "params": [
+     "Instance64_t mailID"
+    ]
+   },
+   {
+    "method": "DeleteMail",
+    "params": [
+     "Instance64_t mailID"
+    ]
+   },
+   {
+    "method": "CancelMail",
+    "params": [
+     "Instance64_t itemID"
+    ]
+   },
+   {
+    "method": "TradepostSellItem",
+    "params": [
+     "uint nBankItemSlot",
+     "uint64 nPrice"
+    ]
+   },
+   {
+    "method": "TradepostChangeItemPrice",
+    "params": [
+     "uint nBankItemSlot",
+     "uint64 nPrice"
+    ]
+   },
+   {
+    "method": "TradepostCancelSellItem",
+    "params": [
+     "uint nBankItemSlot"
+    ]
+   },
+   {
+    "method": "TradepostItemSearch",
+    "params": [
+     "TradepostSearch_c& cSearch"
+    ]
+   },
+   {
+    "method": "TradepostBuyItem",
+    "params": [
+     "Instance64_t nItemId",
+     "uint64 i_nSearchResultID"
+    ]
+   },
+   {
+    "method": "TradepostOpen",
+    "params": [
+     "float vMaxRadius"
+    ]
+   },
+   {
+    "method": "TradepostClose",
+    "params": []
+   },
+   {
+    "method": "TradepostUpdateItemTimeouts",
+    "params": []
+   },
+   {
+    "method": "SetAsyncEnabled",
+    "params": [
+     "bool asyncEnabled"
+    ]
+   },
+   {
+    "method": "SetNumWorkerThreads",
+    "params": [
+     "size_t numWorkers"
+    ]
+   }
+  ],
+  "server_to_client": []
+ },
+ "TradepostInterface": {
+  "client_to_server": [],
+  "server_to_client": [
+   {
+    "method": "DispatchOpenTradepost",
+    "fields": [
+     "cAccessPos",
+     "vMaxDistance"
+    ]
+   },
+   {
+    "method": "DispatchMailMessage",
+    "fields": [
+     "cMailMessage"
+    ]
+   },
+   {
+    "method": "DispatchSendMailResult",
+    "fields": [
+     "bSuccess",
+     "cErrorMessage"
+    ]
+   },
+   {
+    "method": "DispatchRetrieveMailResult",
+    "fields": [
+     "bSuccess"
+    ]
+   },
+   {
+    "method": "DispatchTradepostSearchResults",
+    "fields": [
+     "cSearchResults"
+    ]
+   },
+   {
+    "method": "DispatchDeleteCanceledMail",
+    "fields": [
+     "mailId"
+    ]
+   },
+   {
+    "method": "DispatchDeleteCanceledMailItem",
+    "fields": [
+     "mailId",
+     "itemId"
+    ]
+   }
+  ]
+ },
+ "UniverseAgent": {
+  "client_to_server": [
+   {
+    "method": "InitiateAuthentication",
+    "params": [
+     "const std::string& username",
+     "const uint32 nGameID"
+    ]
+   },
+   {
+    "method": "AnswerChallenge",
+    "params": [
+     "const std::string& cAnswerChallenge"
+    ]
+   },
+   {
+    "method": "ClientDisconnected",
+    "params": [
+     "ID32::InstanceType nConnectionID"
+    ]
+   }
+  ],
+  "server_to_client": []
+ },
+ "UniverseInterface": {
+  "client_to_server": [],
+  "server_to_client": [
+   {
+    "method": "DispatchChallenge",
+    "fields": [
+     "data"
+    ]
+   },
+   {
+    "method": "DispatchAckAuthenticate",
+    "fields": [
+     "nAuthStatus",
+     "cPlayerID",
+     "cTerritoryManagerAddr",
+     "uCookie",
+     "eReason"
+    ]
+   },
+   {
+    "method": "DispatchLoginProblem",
+    "fields": [
+     "eLoginStatus"
+    ]
+   },
+   {
+    "method": "DispatchSetUpdateManager",
+    "fields": [
+     "cUpdateManagerAddr"
+    ]
+   },
+   {
+    "method": "DispatchSetUniverseManagerError",
+    "fields": [
+     "nErrorCode"
+    ]
+   },
+   {
+    "method": "DispatchSetRegionState",
+    "fields": [
+     "cRegionData"
+    ]
+   }
+  ]
+ }
+}

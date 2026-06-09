@@ -32,10 +32,24 @@ Real mount spell decoded as `0x3BAD7D` (Fading Black Horse summon).
       (cast bar? horse spawns? you ride?). Full mounting may still need the mount-entity spawn — your
       observation tells me what's missing.
 
-## 3. Combat (cast → damage → vitals)  (commit: combat loop)
-- [Character has no spells / attacks] Cast a damaging spell at an NPC/mob. The target's health bar should drop, and on 0 HP the server
-      logs a kill (despawn/XP not implemented yet).
-**Expected:** target HP visibly decreases. Damage is a provisional formula for now.
+## 3. Combat (cast → damage → vitals)  (commit: grant starting abilities on login)
+### FIX 2026-06-09: the player is now GRANTED their starting attacks on login.
+On login the server sends the character's ClassAbilities (the universal melee attacks 769094 "Normal Attack
+Left" / 769099 "Normal Attack Front") via the retail 0x2052 ability-grant packet, rebuilt DB-driven from the
+Abilities rows (identity quad + the new `Slot` word). Byte-for-byte verified against the strickenbla combat
+capture (AbilityGrantTests). They ride the spawn conversation, sent right after the world-burst replay.
+- [ ] After a beach login, the two basic attacks should appear (drag to the hotbar from the abilities/feats
+      window if not auto-placed).
+- [ ] Target an NPC/mob and use an attack. The target's health bar should drop, and on 0 HP the server logs a
+      kill (despawn/XP not implemented yet).
+**Expected:** target HP visibly decreases. Damage is a provisional formula for now. If NO abilities show up at
+all, grab the client log — the grant may need to fire at a different point in the world-entry sequence.
+
+**Follow-up (not done):** only the universal melee *abilities* are granted (every class gets 769094/769099) —
+enough to exercise cast→damage→vitals. Actual *spells* (e.g. class 29's spell 165241 in ClassAbilities.Spells)
+use a SEPARATE grant packet that isn't decoded/wired yet. The C++ archive's addSpell (opcode 0x09, just the
+spell id) is the OLD scheme and almost certainly dead like the old 0x4d ability grant was — needs the retail
+spell-grant packet found in a capture before wiring.
 
 ## 4. Teleport GM command  (commit: fix teleport)
 Rewritten to reuse the world-entry render path.
@@ -75,6 +89,33 @@ The auto-cutscene where you wash ashore and Kalanthes walks up + starts the chat
 6 FA015807 entity spawns + answers the spawn-polls with SpawnChecks. Client receives the `PlayOrSkip` then
 `ThisIsKalanthes` scry messages and *attempts* the full drowning→Kalanthes cinematic. So the world-build and
 script-trigger sequence is essentially working.
+
+### DECODED 2026-06-09: the retail ScryScript cutscene sequence (incl. the resource manifest)
+The cutscene is driven by `ScryScriptIIR` (IIR sub-opcode **0xA36D3B74**, protobuf `ProtoScryScriptIIR`), now
+fully decodable — run `Captures/decode_scryscript.py` on the dikketest create capture. The retail server->client
+sequence is:
+1. **PreloadAssets** — token `playorskip(72)|onclientconnected(1)|NEW_character_creation Slave Galley (server-side)`,
+   **+ a big RDB resource manifest** in string-param-2: `1010004:793713; 1070003:4000; 1000097:4000; 1010030:156211;
+   1000059:4000; 1010300:4000; 1000049:4000; 1066611:4000; 1010506:4000; 1000058:4000; ...` (the Slave Galley 4000
+   playfield + cutscene assets the client must load).
+2. **ScriptMessage "PlayOrSkip"** → `StartScriptGroupOnClient(35820)` → `ScriptMessage NicknameOk/<name>` →
+   `ScriptMessage CharCreationFinished` → `StartScriptGroupOnClient(48126)`.
+3. **PlayOrSkipQuestion** — token `...character_creation Tortage Beach (server-side)` + the Beach (4010) resource
+   manifest (`1010003:3147889; ...`) → `StartScriptGroupOnClient(385910)` → **ScriptMessage `ThisIsKalanthes`** →
+   `StartScriptGroupOnClient` → `ScriptMessage WelcomeTutorial`.
+**Checked against our server (2026-06-09): we ALREADY send the Slave Galley `PreloadAssets` with the full manifest
+verbatim** (`RetailCreateEditorCreationScriptBurst.cs:94-117`, the `playorskip(72)` packet + the entire
+`1010004:793713;...` resource list) followed by `PlayOrSkip`. So a missing/empty `PreloadAssets` is NOT the gap.
+Moreover the failing ids in the client log (`1000519:4000`, `1000103:4000`, `1066604:4010`) are **not in the
+manifest at all** — they are `class Playfield requested CHILD resource` lookups, i.e. resources the playfield pulls
+from the client's LOCAL RDB, not server-sent. **This reinforces the existing client-side RDB / project-config
+diagnosis below** (the server is feeding the right script + manifest; the client can't resolve the playfield's own
+child resources).
+**Still worth checking (the one server-side unknown):** the SECOND scry stage — the Tortage Beach (4010)
+`PlayOrSkipQuestion` with its own manifest (`1010003:3147889;...`), then `StartScriptGroupOnClient(385910)` →
+`ThisIsKalanthes` → `WelcomeTutorial` — arrives LATER in retail (decode #7-#12), after the beach map-change. Our
+create-world flow is chunked per client trigger; confirm that beach scry chunk (and its manifest) is actually
+replayed and not truncated at the `ApproachCasilda` finale. Use `Captures/decode_scryscript.py` to compare.
 
 **It breaks on MISSING CLIENT PLAYFIELD RESOURCES, not a server packet defect.** Client log:
 - `ResourceManager - class Playfield requested child resource 1000519:4000 / 1000103:4000 / 1000519:4010 /

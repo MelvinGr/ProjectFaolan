@@ -18,13 +18,17 @@ namespace Faolan.Core.Network.Conan
 	// the client schema and verified against 109k captured endpoints.
 	public static class ConanEndpoints
 	{
-		// GameServer object-class type ids (ProtoEndpoint.type, fixed32).
-		public const uint GamePlayerType = 0x6C67C147; // the player character object (instance = character id)
-		public const uint GameWorldType = 0xB171CE13; // the world / zone object (instance = zone id)
-		public const uint GameSpawnCallerType = 0xA9ECB95D; // 0x201C spawn-handshake caller
-		public const uint GameSpawnEndpointType = 0x8B87F791; // 0x201C spawn-handshake endpoint
-		public const uint GamePostReadyType = 0x5B9756FC; // post-ready / ready-for-play family
-		public const uint GameServerIdType = 0x28377648; // report-server-id family
+		// GameServer object-class type ids (ProtoEndpoint.type, fixed32). Each id = BKDR-31 hash of the client's
+		// interface/agent class name (h = h*31 + c; == Java String.hashCode), cracked by RE'ing AgeOfConan.exe -
+		// see docs/opcode-re-plan.md + docs/aoc-opcode-ids.md. The C# constant names are kept for compatibility, but
+		// the REAL client class name is noted per line (our originals were guesses). "Agent" = client->server proxy
+		// side, "Interface" = server->client dispatch side.
+		public const uint GamePlayerType = 0x6C67C147; // = hash("GameInterface")
+		public const uint GameWorldType = 0xB171CE13; // = hash("GameAgent")
+		public const uint GameSpawnCallerType = 0xA9ECB95D; // = hash("GameCharAgent")      (0x201C spawn-handshake caller)
+		public const uint GameSpawnEndpointType = 0x8B87F791; // = hash("GameCharInterface")  (0x201C spawn-handshake endpoint)
+		public const uint GamePostReadyType = 0x5B9756FC; // = hash("GameCharAgentProject")     (post-ready family)
+		public const uint GameServerIdType = 0x28377648; // = hash("GameCharInterfaceProject")  (report-server-id family)
 
 		public static ProtoEndpoint Endpoint(uint type, uint instance) => new() { Type = type, Instance = instance };
 
