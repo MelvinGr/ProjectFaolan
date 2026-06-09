@@ -28,7 +28,7 @@ namespace Faolan.ClientLauncher
 			var exe = Environment.GetEnvironmentVariable("AOC_EXE") ?? DefaultExe;
 			string? username = null, password = null, charname = null, wine = null;
 			var proton = Environment.GetEnvironmentVariable("PROTON") ?? DefaultProton;
-			bool dx10 = false, dryRun = false, noConsole = true;
+			bool dx10 = false, dryRun = false, noConsole = true, allocConsole = false, patchLogin = false;
 
 			for (var i = 0; i < args.Length; i++)
 			{
@@ -41,7 +41,9 @@ namespace Faolan.ClientLauncher
 					case "--wine": wine = args[++i]; break;
 					case "--proton": proton = args[++i]; break;
 					case "--dx10": dx10 = true; break;
-					case "--console": noConsole = false; break;
+					// A console for a GUI exe needs the PE subsystem flipped to CUI, so --console implies that.
+					case "--console": noConsole = false; allocConsole = true; break;
+					case "--patch-login": patchLogin = true; break;
 					case "--dry-run" or "-n": dryRun = true; break;
 					case "--help" or "-h": PrintHelp(); return 0;
 					default:
@@ -64,6 +66,13 @@ namespace Faolan.ClientLauncher
 				return 1;
 			}
 
+			// AgeOfConan.exe is a GUI-subsystem app and never calls AllocConsole, so it has no console of its own
+			// (-noconsole is a no-op under Proton). Flipping the PE subsystem to CUI makes Wine give it a console
+			// (stdout -> terminal). Keep the exe consistent with the flag: CUI when --alloc-console, GUI otherwise.
+			// (This rewrites one byte in the exe; do it before the md5 so -clienthash matches the launched file.)
+			if (!dryRun)
+				SetConsoleSubsystem(exe, allocConsole);
+
 			// -clienthash = md5 of the exe we launch; -key = a fresh launch token.
 			var clientHash = Md5Hex(exe);
 			var key = ConanLaunchToken.Now();
@@ -82,6 +91,9 @@ namespace Faolan.ClientLauncher
 
 			if (dryRun)
 				return 0;
+
+			// Kill any client already running first (so repeated test launches start clean).
+			KillRunningClients();
 
 			var gameDir = Path.GetDirectoryName(exe)!;
 			var psi = new ProcessStartInfo
@@ -113,6 +125,9 @@ namespace Faolan.ClientLauncher
 				SetIfUnset(psi, "SteamAppId", SteamAppId);
 				SetIfUnset(psi, "SteamGameId", SteamAppId);
 				SetIfUnset(psi, "WINEDEBUG", "-all");
+
+				SetIfUnset(psi, "PROTON_USE_WINED3D", "1");
+				SetIfUnset(psi, "PROTON_NO_ESYNC", "1");
 			}
 
 			foreach (var a in launchArgs)
@@ -122,13 +137,19 @@ namespace Faolan.ClientLauncher
 			{
 				var proc = Process.Start(psi);
 				Console.WriteLine($"launched: {psi.FileName} (pid {proc?.Id})");
-				return 0;
 			}
 			catch (Exception e)
 			{
 				Console.Error.WriteLine($"launch failed: {e.Message}");
 				return 1;
 			}
+
+			// Patch the client's embedded DH pubkey (Funcom -> CELLAO) in memory so the server can validate the
+			// password (the in-launcher version of tools/patch_aoc_login_key.py). Needs root; harmless if skipped.
+			if (patchLogin && !OperatingSystem.IsWindows())
+				LoginKeyPatcher.PatchWhenReady();
+
+			return 0;
 		}
 
 		// Set a child-process env var only if it isn't already set in the real environment (so the shell can override).
@@ -138,10 +159,103 @@ namespace Faolan.ClientLauncher
 				psi.Environment[name] = value;
 		}
 
+		// Kill any running AgeOfConan client. On Windows that's the named process; under Wine/Proton it's a Linux
+		// process whose /proc comm is the exe name (or whose cmdline references it - excluding this launcher).
+		private static void KillRunningClients()
+		{
+			var killed = 0;
+
+			if (OperatingSystem.IsWindows())
+			{
+				foreach (var name in new[] { "AgeOfConan", "AgeOfConanDX10" })
+				foreach (var p in Process.GetProcessesByName(name))
+					killed += TryKill(p.Id);
+			}
+			else
+			{
+				var self = Environment.ProcessId;
+				foreach (var dir in Directory.EnumerateDirectories("/proc"))
+				{
+					if (!int.TryParse(Path.GetFileName(dir), out var pid) || pid == self)
+						continue;
+
+					try
+					{
+						var comm = File.ReadAllText(Path.Combine(dir, "comm")).Trim();
+						var isClient = comm.StartsWith("AgeOfConan", StringComparison.Ordinal);
+						if (!isClient)
+						{
+							var cmdline = File.ReadAllText(Path.Combine(dir, "cmdline")).Replace('\0', ' ');
+							isClient = cmdline.Contains("AgeOfConan.exe", StringComparison.Ordinal)
+								&& !cmdline.Contains("Faolan.ClientLauncher", StringComparison.Ordinal)
+								&& comm != "dotnet";
+						}
+
+						if (isClient)
+							killed += TryKill(pid);
+					}
+					catch
+					{
+						// process vanished or unreadable; ignore.
+					}
+				}
+			}
+
+			if (killed > 0)
+				Console.WriteLine($"killed {killed} running client instance(s)");
+		}
+
+		private static int TryKill(int pid)
+		{
+			try
+			{
+				using var p = Process.GetProcessById(pid);
+				p.Kill(entireProcessTree: true);
+				return 1;
+			}
+			catch
+			{
+				return 0;
+			}
+		}
+
 		private static string Md5Hex(string path)
 		{
 			using var stream = File.OpenRead(path);
 			return Convert.ToHexString(MD5.HashData(stream)).ToLowerInvariant();
+		}
+
+		// Flip the PE subsystem byte: GUI(2) <-> CUI/console(3). The offset is computed from the PE header (no magic
+		// constant); only writes when it differs and the current value is a sane 2/3 (so we never corrupt the exe).
+		private static void SetConsoleSubsystem(string exe, bool console)
+		{
+			try
+			{
+				using var fs = new FileStream(exe, FileMode.Open, FileAccess.ReadWrite);
+				using var br = new BinaryReader(fs, System.Text.Encoding.ASCII, leaveOpen: true);
+
+				fs.Position = 0x3c;
+				var peOffset = br.ReadInt32();
+				fs.Position = peOffset;
+				if (br.ReadUInt32() != 0x0000_4550) // "PE\0\0"
+					return;
+
+				var subsystemOffset = peOffset + 4 + 20 + 68; // PE sig + COFF header + Subsystem offset in optional header
+				fs.Position = subsystemOffset;
+				var current = br.ReadByte();
+				var want = (byte)(console ? 3 : 2);
+
+				if (current is not (2 or 3) || current == want)
+					return;
+
+				fs.Position = subsystemOffset;
+				fs.WriteByte(want);
+				Console.WriteLine($"patched PE subsystem -> {(console ? "CUI (console)" : "GUI")}");
+			}
+			catch (Exception e)
+			{
+				Console.Error.WriteLine($"subsystem patch skipped: {e.Message}");
+			}
 		}
 
 		private static void PrintHelp() =>
@@ -154,16 +268,22 @@ namespace Faolan.ClientLauncher
 				  -u, --username <s>  auto-login account name
 				  -p, --password <s>  auto-login password
 				  -c, --charname <s>  auto-enter this character
-				  --console           keep the debug console (omit -noconsole)
+				  --console           give the client a real console (drops -noconsole AND flips the PE subsystem to
+				                      CUI so a GUI exe shows console output; reverted to GUI on a normal launch)
+				  --patch-login       patch the client's DH key (Funcom -> CELLAO) in memory after launch so the
+				                      server can validate the real password (needs ptrace permission; sudo if it can't)
 				  --proton <path>     Proton 'proton' script (or set PROTON; defaults to the Steam Proton-Experimental)
 				  --wine <cmd>        use this runner instead of Proton (e.g. 'wine')
 				  -n, --dry-run       print the computed clienthash/key/args without launching
 				  -h, --help          this help
 
-				Off Windows it launches via Proton ('proton run <exe>') with the Steam compat env (mirroring
-				launchClient.sh); pass --wine to use a plain wine runner instead. Computes -clienthash (md5 of the
-				exe) and -key (TEA-encrypted timestamp; see Faolan.Core.Crypt.ConanLaunchToken). For real password
-				validation also run tools/patch_aoc_login_key.py against the running client.
+				The client never calls AllocConsole, so -noconsole is a no-op without --console (which flips the PE
+				subsystem GUI->CUI; a 1-byte file edit, reverted automatically on a non-console launch).
+				Kills any already-running client first (clean test launches). Off Windows it launches via Proton
+				('proton run <exe>') with the Steam compat env (mirroring launchClient.sh); pass --wine to use a
+				plain wine runner instead. Computes -clienthash (md5 of the exe) and -key (TEA-encrypted timestamp;
+				see Faolan.Core.Crypt.ConanLaunchToken). For real password validation also run
+				tools/patch_aoc_login_key.py against the running client.
 				""");
 	}
 }
