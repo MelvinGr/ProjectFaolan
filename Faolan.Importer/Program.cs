@@ -48,31 +48,28 @@ namespace Faolan.Importer
 		// leave any node not in this run's captures untouched.
 		private static async Task ImportConversations(DatabaseContext db, List<ConversationEntry> conversations)
 		{
+			// Conversations are fully derived from the captures, so refresh from a clean slate: this also clears any
+			// stale rows from before the NpcName re-key (handle-keyed nodes with no name would otherwise linger).
+			var existing = await db.ConversationNodes.Include(n => n.Packets).ToListAsync();
+			db.ConversationPackets.RemoveRange(existing.SelectMany(n => n.Packets));
+			db.ConversationNodes.RemoveRange(existing);
+
 			foreach (var e in conversations)
 			{
-				var node = await db.ConversationNodes.Include(n => n.Packets).FirstOrDefaultAsync(n => n.CapturedNpcHandle == e.CapturedNpcHandle && n.TypeId == e.TypeId && n.Mode == e.Mode && n.Field3 == e.Field3);
-
-				if (node == null)
+				db.ConversationNodes.Add(new ConversationNode
 				{
-					node = new ConversationNode
+					TypeId = e.TypeId,
+					Mode = e.Mode,
+					Field3 = e.Field3,
+					CapturedNpcHandle = e.CapturedNpcHandle,
+					NpcName = e.NpcName,
+					CapturedInstance = e.CapturedInstance,
+					Packets = e.Packets.Select((p, i) => new ConversationPacket
 					{
-						TypeId = e.TypeId,
-						Mode = e.Mode,
-						Field3 = e.Field3,
-						CapturedNpcHandle = e.CapturedNpcHandle
-					};
-					db.ConversationNodes.Add(node);
-				}
-				else if (node.Packets != null)
-					db.ConversationPackets.RemoveRange(node.Packets); // refresh this node's packets
-
-				node.CapturedNpcHandle = e.CapturedNpcHandle;
-				node.CapturedInstance = e.CapturedInstance;
-				node.Packets = e.Packets.Select((p, i) => new ConversationPacket
-				{
-					Sequence = i,
-					Data = p
-				}).ToList();
+						Sequence = i,
+						Data = p
+					}).ToList()
+				});
 			}
 
 			await db.SaveChangesAsync();

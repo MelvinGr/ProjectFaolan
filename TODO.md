@@ -50,7 +50,17 @@ soft map-change on the same connection, so it may differ.
       Health/Mana/Stamina should reflect that class (e.g. a mage has more mana, a soldier more health),
       not the level-1 rogue default.
 
-## 6. Conversations — right NPC, right dialog  (commit: key conversations by NPC handle)
+## 6. Conversations — right NPC, right dialog  (commit: route conversations by NPC name)
+### FIX 2026-06-09: root cause = session-volatile NPC handles; now routed by NPC NAME.
+The beach burst spawns Kalanthes=530599/Casilda=530694, but the conversation nodes were captured in a different
+session (handles 319114/319209) — so the old handle key never matched and the fallback served the wrong NPC.
+Now: ConversationNode carries NpcName (resolved at import from the capture's spawn); the burst replay records live
+handle→name; clicks route by name → right NPC or nothing, never wrong. RE-TEST a beach login:
+- Casilda should give HER dialog (or nothing if her quest-mode isn't captured), NOT Kalanthes's.
+- Kalanthes should give his own lines.
+(Coverage caveat: if the live player's quest mode for an NPC isn't in the captures, no dialog shows — that's a
+data gap, not mis-routing now.)
+
 On a **beach login** (existing character), not the create flow:
 - [first dialog is kalanthes, sfter selecting first option it switches to second dialog of casilda, advancing to third step locks the chat (unable to exit with esc)] Talk to **Casilda** — she should give HER dialogue, not Kalanthes's regular dialog.
 - [ Dialos opens normally, and camera focuses on him. But no dialog lines to select, can exit conversation with esc] Talk to **Kalanthes** — his dialogue.

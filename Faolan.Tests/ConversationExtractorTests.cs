@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Text;
 using Faolan.Importer;
 using Xunit;
 
@@ -47,13 +48,47 @@ namespace Faolan.Tests
 				[1],
 				[2],
 				[3]
-			]); // 5-byte varint
-			var inRange = new ConversationEntry(1, 0, 0, 0x10, 0x02000005, [[1]]); // 4-byte varint, fewer packets
+			], "Casilda"); // 5-byte varint
+			var inRange = new ConversationEntry(1, 0, 0, 0x10, 0x02000005, [[1]], "Casilda"); // 4-byte varint, fewer packets
 
 			var merged = ConversationExtractor.Merge([outOfRange, inRange]);
 
 			Assert.Single(merged);
 			Assert.Equal(0x02000005u, merged[0].CapturedInstance); // in-range instance wins despite fewer packets
+		}
+
+		[Fact]
+		public void Extract_ResolvesNpcNameFromSpawn()
+		{
+			var packets = new List<CapturedPacket>
+			{
+				Spawn(0x9D42, "Casilda"), // FA015807 spawn for the handle the talk targets
+				Talk(42008, 5, 0, 0x9D42, 0x02000005),
+				Response(0x2000, 0x4A3D899A)
+			};
+
+			var entries = ConversationExtractor.Extract(packets);
+
+			Assert.Single(entries);
+			Assert.Equal("Casilda", entries[0].NpcName);
+		}
+
+		// The same NPC captured in two sessions has DIFFERENT handles but the same name; Merge keys by name, so they
+		// collapse to one node (handle alone would have kept them as two, the bug behind wrong-NPC routing).
+		[Fact]
+		public void Merge_DedupesSameNpcAcrossDifferentHandles()
+		{
+			var sessionA = new ConversationEntry(42008, 5, 0, 0x4DEE9, 0x02000005, [[1]], "Casilda");
+			var sessionB = new ConversationEntry(42008, 5, 0, 0x81906, 0x02000006, [
+				[1],
+				[2]
+			], "Casilda"); // different handle, more packets
+
+			var merged = ConversationExtractor.Merge([sessionA, sessionB]);
+
+			Assert.Single(merged);
+			Assert.Equal("Casilda", merged[0].NpcName);
+			Assert.Equal(2, merged[0].Packets.Count); // the richer capture wins
 		}
 
 		private static byte[] BuildInteractArgs(uint typeId, uint mode, uint field3, uint npc)
@@ -83,6 +118,21 @@ namespace Faolan.Tests
 		private static CapturedPacket Response(uint opcode, uint subOpcode)
 		{
 			return new CapturedPacket(0, true, opcode, subOpcode, Frame(new byte[8]));
+		}
+
+		// A download FA015807 spawn: 20-byte prefix [len][subop][c350][handle][fieldA] then the name as 0x0A<len><utf8>.
+		private static CapturedPacket Spawn(uint handle, string name)
+		{
+			var nb = Encoding.ASCII.GetBytes(name);
+			var body = new byte[20 + 2 + nb.Length];
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)body.Length);
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), 0xFA015807);
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), 0x0000C350);
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(12, 4), handle);
+			body[20] = 0x0A;
+			body[21] = (byte)nb.Length;
+			nb.CopyTo(body, 22);
+			return new CapturedPacket(0, true, 0x2000, 0xFA015807, Frame(body));
 		}
 
 		// Builds a full on-wire-ish packet [len4][crc4][headerLen4=0][body]; GetBody reads headerLen at [8..12]=0.

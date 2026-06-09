@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
 using Microsoft.Extensions.Logging;
@@ -22,10 +23,19 @@ namespace Faolan.GameServer
 			if (!client.Session.UsedWorldBurstReplay && !client.Session.IsCreateWorldSession)
 				return false;
 
-			// In create-world (the Tortage intro) require an exact per-NPC match: the args-only fallback would serve
-			// some other NPC's conversation (e.g. Kalanthes's dialog for Casilda), so prefer the scripted intro
-			// fallback when this NPC's own conversation isn't captured. Login allows the args-only fallback.
-			var node = await Database.GetConversationNode(clickedNpcHandle, typeId, mode, field3, client.Session.IsCreateWorldSession);
+			// Route by the clicked NPC's stable NAME when we know it (resolved from the world-burst spawns this
+			// session). NPC dynel handles are session-volatile - the burst we replay and the captured conversation
+			// came from different sessions - so a handle/args-only lookup serves the WRONG NPC (Kalanthes's dialog
+			// for Casilda). The name pins the right NPC; (Mode, Field3) still select the branch.
+			ConversationNode node;
+			if (client.Session.SpawnedNpcNamesByHandle.TryGetValue(clickedNpcHandle, out var npcName))
+				node = await Database.GetConversationNodeByName(npcName, typeId, mode, field3);
+			else
+				// No name on file (e.g. an NPC not spawned via the world-burst replay): fall back to the handle/args
+				// lookup. Create-world requires an exact per-NPC handle match (the scripted intro is the better
+				// fallback there); login allows the args-only fallback.
+				node = await Database.GetConversationNode(clickedNpcHandle, typeId, mode, field3, client.Session.IsCreateWorldSession);
+
 			if (node == null)
 				return false;
 

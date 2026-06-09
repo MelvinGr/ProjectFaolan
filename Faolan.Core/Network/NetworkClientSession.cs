@@ -36,6 +36,11 @@ namespace Faolan.Core.Network
 		// not the create-world flow (which has its own 0x2020 handling).
 		bool UsedWorldBurstReplay { get; set; }
 
+		// Live NPC entity handle -> name, captured from the world-burst spawns (FA015807) actually sent this session.
+		// NPC dynel handles are session-volatile, so this is how a clicked handle is resolved to the stable NPC name
+		// that conversation routing keys on. Populated when the burst is replayed.
+		Dictionary<uint, string> SpawnedNpcNamesByHandle { get; }
+
 		// The client's conversation id for this connection (the value bytes of the incoming packet's sender
 		// field), captured per packet. Auth-handoff responses (UniverseAgent/PlayerAgent) echo this back as the
 		// receiver, exactly as retail does, instead of a hardcoded capture-derived id.
@@ -84,6 +89,7 @@ namespace Faolan.Core.Network
 		public bool IsCreateWorldSession { get; set; }
 		public bool PostMorphBurstSent { get; set; }
 		public bool UsedWorldBurstReplay { get; set; }
+		public Dictionary<uint, string> SpawnedNpcNamesByHandle { get; } = new Dictionary<uint, string>();
 		public byte[] ClientConversation { get; set; }
 
 		public Character Character

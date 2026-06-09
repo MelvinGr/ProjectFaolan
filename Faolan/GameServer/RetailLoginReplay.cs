@@ -192,12 +192,71 @@ namespace Faolan.GameServer
 				else if (TryRebuildPlayerSpawnFromDb(client, pkt, out var rebuilt))
 					pkt = rebuilt;
 
+				// Record each spawned NPC's handle -> name so a clicked handle can be routed to its conversation by
+				// the stable name (handles are session-volatile). Reads the final bytes the client receives.
+				RecordSpawnedNpcName(client, pkt);
+
 				toSend.Add(pkt);
 			}
 
 			// Tight send loop - no per-packet computation here.
 			foreach (var bytes in toSend)
 				await client.SendAsync(bytes);
+		}
+
+		// Records a world-burst spawn's handle -> NPC name into the session map (for conversation routing). No-op for
+		// non-FA015807 packets and the player's own spawn (handle == client instance).
+		private static void RecordSpawnedNpcName(INetworkClient client, byte[] packet)
+		{
+			if (packet.Length < 12)
+				return;
+
+			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
+			var bodyStart = 12 + headerLen;
+			if (bodyStart + 16 > packet.Length)
+				return;
+
+			var body = packet.AsSpan(bodyStart);
+			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != 0xFA015807u)
+				return;
+
+			var handle = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(12, 4));
+			if (handle == client.Session.Account.ClientInstance)
+				return; // the player's own spawn
+
+			var name = ReadSpawnName(body);
+			if (name != null)
+				client.Session.SpawnedNpcNamesByHandle[handle] = name;
+		}
+
+		// The entity name is the first `0x0A <len 1..63> <printable-ascii>` run in the spawn body.
+		private static string ReadSpawnName(ReadOnlySpan<byte> body)
+		{
+			for (var i = 16; i + 2 < body.Length; i++)
+			{
+				if (body[i] != 0x0A)
+					continue;
+
+				int len = body[i + 1];
+				if (len is < 1 or > 63 || i + 2 + len > body.Length)
+					continue;
+
+				var ok = true;
+				for (var j = 0; j < len; j++)
+				{
+					var c = body[i + 2 + j];
+					if (c is < 0x20 or > 0x7E)
+					{
+						ok = false;
+						break;
+					}
+				}
+
+				if (ok)
+					return System.Text.Encoding.ASCII.GetString(body.Slice(i + 2, len));
+			}
+
+			return null;
 		}
 
 		// Answers a client 0x2020 spawn poll with a 0x2008 SpawnCheck on the 201C conversation: body is

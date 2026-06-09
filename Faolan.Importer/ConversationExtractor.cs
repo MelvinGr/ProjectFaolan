@@ -10,8 +10,9 @@ namespace Faolan.Importer
 	public readonly record struct CapturedPacket(long Ticks, bool IsDownload, uint Opcode, uint SubOpcode, byte[] Bytes);
 
 	// One extracted conversation node: the player's TalkToNpc key + the captured NPC handle/instance + the ordered
-	// server response packets to replay.
-	public sealed record ConversationEntry(uint TypeId, uint Mode, uint Field3, uint CapturedNpcHandle, uint CapturedInstance, List<byte[]> Packets);
+	// server response packets to replay. NpcName is resolved from the same capture's FA015807 spawn for the handle
+	// (null if that spawn wasn't captured) - the stable identity the runtime routes on instead of the volatile handle.
+	public sealed record ConversationEntry(uint TypeId, uint Mode, uint Field3, uint CapturedNpcHandle, uint CapturedInstance, List<byte[]> Packets, string NpcName);
 
 	// Ports Captures/extract_conversations.py: find each player TalkToNpc (Interact 642CD3D6, actionType 0x16),
 	// read its args, and collect the server conversation packets that follow until the next talk. Caller merges
@@ -26,9 +27,12 @@ namespace Faolan.Importer
 		// The conversation-display response sub-opcodes (642CD3D6 echo excluded: it is a generic interact ack).
 		private static readonly HashSet<uint> ResponseSubOpcodes = [0x4A3D899A, 0xF164A4A5, 0x045B0B0F];
 
+		private const uint SpawnSubOpcode = 0xFA015807;
+
 		// `packets` must be one capture's GameServer packets in chronological order.
 		public static List<ConversationEntry> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
+			var namesByHandle = BuildSpawnNameMap(packets);
 			var talkIndices = new List<int>();
 			for (var i = 0; i < packets.Count; i++)
 			{
@@ -66,10 +70,63 @@ namespace Faolan.Importer
 				}
 
 				if (resp.Count > 0)
-					entries.Add(new ConversationEntry(typeId, mode, field3, npc, instance, resp));
+					entries.Add(new ConversationEntry(typeId, mode, field3, npc, instance, resp, namesByHandle.GetValueOrDefault(npc)));
 			}
 
 			return entries;
+		}
+
+		// Maps each FA015807 spawn's handle to its embedded name (0x0A <len> <utf8>), so a conversation's NPC handle
+		// can be resolved to a stable name within the same capture.
+		private static Dictionary<uint, string> BuildSpawnNameMap(IReadOnlyList<CapturedPacket> packets)
+		{
+			var map = new Dictionary<uint, string>();
+			foreach (var p in packets)
+			{
+				if (!p.IsDownload || p.Opcode != Opcode2000 || p.SubOpcode != SpawnSubOpcode)
+					continue;
+
+				var body = GetBody(p.Bytes);
+				if (body.Length < 16)
+					continue;
+
+				var handle = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
+				var name = ReadSpawnName(body);
+				if (name != null)
+					map[handle] = name;
+			}
+
+			return map;
+		}
+
+		// The entity name is the first `0x0A <len 1..63> <printable-ascii>` run in the spawn body.
+		private static string ReadSpawnName(ReadOnlySpan<byte> body)
+		{
+			for (var i = 16; i + 2 < body.Length; i++)
+			{
+				if (body[i] != 0x0A)
+					continue;
+
+				int len = body[i + 1];
+				if (len is < 1 or > 63 || i + 2 + len > body.Length)
+					continue;
+
+				var ok = true;
+				for (var j = 0; j < len; j++)
+				{
+					var c = body[i + 2 + j];
+					if (c is < 0x20 or > 0x7E)
+					{
+						ok = false;
+						break;
+					}
+				}
+
+				if (ok)
+					return System.Text.Encoding.ASCII.GetString(body.Slice(i + 2, len));
+			}
+
+			return null;
 		}
 
 		// Merges nodes from many captures, deduped by (TypeId, Mode, Field3). Prefers an entry whose captured player
@@ -79,10 +136,16 @@ namespace Faolan.Importer
 		// Prefers an entry whose captured player instance is a 4-byte varint, then the most packets.
 		public static List<ConversationEntry> Merge(IEnumerable<ConversationEntry> all)
 		{
-			var best = new Dictionary<(uint, uint, uint, uint), (int score, ConversationEntry entry)>();
+			var best = new Dictionary<(string, uint, uint, uint), (int score, ConversationEntry entry)>();
 			foreach (var e in all)
 			{
-				var key = (e.CapturedNpcHandle, e.TypeId, e.Mode, e.Field3);
+				// Key by NPC NAME (stable identity), not the session-volatile handle: the same NPC from different
+				// captures has different handles but the same name, so this correctly merges them into one node.
+				// Fall back to the handle string when a name couldn't be resolved so unrelated nodes don't collapse.
+				var identity = string.IsNullOrEmpty(e.NpcName)
+					? $"#{e.CapturedNpcHandle}"
+					: e.NpcName;
+				var key = (identity, e.TypeId, e.Mode, e.Field3);
 				var score = (VarintLength(e.CapturedInstance) == 4
 					? 1_000_000
 					: 0) + e.Packets.Count;

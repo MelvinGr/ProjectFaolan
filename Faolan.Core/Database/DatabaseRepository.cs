@@ -28,6 +28,7 @@ namespace Faolan.Core.Database
 		Task<Character[]> GetCharactersByAccount(uint id, bool skipUninitialized = true);
 
 		Task<ConversationNode> GetConversationNode(uint npcHandle, uint typeId, uint mode, uint field3, bool exactHandleOnly = false);
+		Task<ConversationNode> GetConversationNodeByName(string npcName, uint typeId, uint mode, uint field3);
 
 		Task<Item> GetItem(uint id);
 
@@ -234,6 +235,18 @@ namespace Faolan.Core.Database
 			// handle differs from the replayed scene's. Callers that can't tolerate a wrong-NPC match (the create
 			// world intro, where the scripted fallback is preferable) pass exactHandleOnly.
 			return await ctx.ConversationNodes.Include(n => n.Packets).Where(n => n.TypeId == typeId && n.Mode == mode && n.Field3 == field3).OrderByDescending(n => n.Packets.Count).FirstOrDefaultAsync();
+		}
+
+		// Routes a conversation by the clicked NPC's stable NAME (handles are session-volatile). Exact match on
+		// (NpcName, TypeId, Mode, Field3) - the (Mode, Field3) still select the branch within that NPC's dialogue;
+		// the name guarantees the RIGHT NPC, which the old handle/args-only lookup could not across captures.
+		public async Task<ConversationNode> GetConversationNodeByName(string npcName, uint typeId, uint mode, uint field3)
+		{
+			if (string.IsNullOrEmpty(npcName))
+				return null;
+
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.ConversationNodes.Include(n => n.Packets).FirstOrDefaultAsync(n => n.NpcName == npcName && n.TypeId == typeId && n.Mode == mode && n.Field3 == field3);
 		}
 
 		public async Task<Item> GetItem(uint id)
