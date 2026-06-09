@@ -5,16 +5,20 @@ using System.Linq;
 using System.Numerics;
 using System.Reflection;
 using System.Text;
+using Faolan.Core.Data;
+using Faolan.Core.Extensions;
+using Faolan.Core.Network.Protobuf;
 
 namespace Faolan.GameServer.Spawn
 {
-	// Builds an FA015807 entity Spawn body from a captured template by overwriting the fixed-offset fields we
-	// have mapped so far (handle, position, rotation). Appearance / equipment / the embedded name stay as the
-	// template's until they are dissected and parameterized (see docs/spawn-dissection-plan.md and
+	// Builds an FA015807 entity Spawn body. The header (subop/ack/handle/fieldA) and the transform - the entity's
+	// position + rotation, i.e. ProtoGameCodeDynelIIR.position/rotation as typed ProtoVec3/ProtoQuat - are
+	// CONSTRUCTED; the remaining body (appearance / equipment / stats / the embedded name) is still copied verbatim
+	// from the captured template until those IIR components are dissected (see docs/spawn-dissection-plan.md and
 	// Captures/dissect_spawn.py). The body is the 0x2000 sub-content:
 	//   [u32 len][u32 0xFA015807][u32 0x0000C350][u32 handle][u32 fieldA] 0x2C 0x0A <pos> 0x12 <rot> ...
-	// Length is never changed here, so every nested length prefix stays valid; the outer Conan length + CRC are
-	// (re)computed by PacketStream when the wrapped 0x2000 packet is sent.
+	// The transform is always the same size, so this stays length-preserving (every nested length prefix in the
+	// tail remains valid); the outer Conan length + CRC are (re)computed by the caller / PacketStream.
 	public static class SpawnPacketBuilder
 	{
 		// Offsets within the FA015807 body, verified against the Strie player spawn (Captures/dissect_spawn.py).
@@ -34,6 +38,7 @@ namespace Faolan.GameServer.Spawn
 		public const int RotXOffset = 41; // quaternion floats little-endian
 		public const int RotYOffset = 46;
 		public const int RotZOffset = 51;
+		private const int TransformEndOffset = RotWOffset + 4; // first byte after the constructed transform (60)
 		private const byte TemplateNameLength = 5; // "Strie"
 
 		public static byte[] PlayerTemplateBytes => PlayerTemplate.Value;
@@ -45,19 +50,40 @@ namespace Faolan.GameServer.Spawn
 			return BuildSpawnBody(PlayerTemplate.Value, handle, position, rotation);
 		}
 
-		// Clones a captured FA015807 body and overwrites the mapped fields.
+		// Constructs the FA015807 header + transform (position/rotation as typed ProtoVec3/ProtoQuat) and appends the
+		// rest of the captured template body via WriteArray (appearance / stats / name - not yet dissected). The
+		// header's subop/ack/fieldA and the body length are carried over from the template; only the handle and the
+		// transform are parameterized. Byte-identical to the captured body when fed the captured handle/position/
+		// rotation - SpawnPacketBuilderTests round-trips the embedded player template.
 		public static byte[] BuildSpawnBody(byte[] template, uint handle, Vector3 position, Quaternion rotation)
 		{
-			var body = (byte[])template.Clone();
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(HandleOffset, 4), handle);
-			BinaryPrimitives.WriteSingleLittleEndian(body.AsSpan(PosXOffset, 4), position.X);
-			BinaryPrimitives.WriteSingleLittleEndian(body.AsSpan(PosYOffset, 4), position.Y);
-			BinaryPrimitives.WriteSingleLittleEndian(body.AsSpan(PosZOffset, 4), position.Z);
-			BinaryPrimitives.WriteSingleLittleEndian(body.AsSpan(RotXOffset, 4), rotation.X);
-			BinaryPrimitives.WriteSingleLittleEndian(body.AsSpan(RotYOffset, 4), rotation.Y);
-			BinaryPrimitives.WriteSingleLittleEndian(body.AsSpan(RotZOffset, 4), rotation.Z);
-			BinaryPrimitives.WriteSingleLittleEndian(body.AsSpan(RotWOffset, 4), rotation.W);
-			return body;
+			var bodyLength = BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(0, 4));
+			var subOpcode = BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(4, 4));
+			var ack = BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(8, 4));
+			var fieldA = BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(16, 4));
+
+			return new FaolanStream()
+				.WriteUInt32(bodyLength)
+				.WriteUInt32(subOpcode)
+				.WriteUInt32(ack)
+				.WriteUInt32(handle)
+				.WriteUInt32(fieldA)
+				.WriteByte(0x2C) // IIR group frame for the transform component
+				.WriteByte(0x0A).WriteArrayByteLength(new ProtoVec3
+				{
+					X = position.X,
+					Y = position.Y,
+					Z = position.Z
+				}.ToProtobufBytes())
+				.WriteByte(0x12).WriteArrayByteLength(new ProtoQuat
+				{
+					X = rotation.X,
+					Y = rotation.Y,
+					Z = rotation.Z,
+					W = rotation.W
+				}.ToProtobufBytes())
+				.WriteArray(template.AsSpan(TransformEndOffset))
+				.ToArray();
 		}
 
 		// Returns a copy of a Strie-template spawn body with the name replaced. Adjusts the two enclosing length
