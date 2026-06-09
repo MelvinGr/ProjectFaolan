@@ -183,9 +183,17 @@ and tied to an open TODO. Ranked by value.
    `docs/player-stats.md`. **Still open:** the **attributes** (`Strength`/`Constitution`/`Dexterity`/`Intelligence`/
    `Wisdom`) — probed earlier as NOT plain stat records (likely client-computed base+gear+buffs); recovering those
    would need the RDB stat DataTable or disasm of the enum registration.
-5. **Appearance morphs** (TODO: currently "blocked, needs one-morph-at-a-time captures"). `SetMorphValueIIR`
-   layout + the morph-slot enum from the binary could unblock this WITHOUT the captures, since the client defines
-   the morph id space.
+5. **Appearance morphs** — ⚠ BINARY ANGLE DEAD, partial fix landed (2026-06-09). The premise (recover the morph
+   names/slot enum from the binary) is **wrong**: the morph names are **not in `AgeOfConan.exe` at all**
+   (`BrowLow`/`CheekForward`/`NoseWide`/… = 0 hits) — they're RDB-defined, like the gametweak/tradepost tokens.
+   BUT the editor's `SetMorphValue` callbacks (client→server) already name each morph in plaintext AND **embed the
+   slot id in the name** (`02_BrowLow`, `33_NoseCrookedRight` → slot 2, 33), so captures + the `NN_` convention
+   give us what we need without the binary. Captures show 15 morphs: 7 body sliders + `ears` + 7 slot-prefixed
+   face sliders. **Fixed in `ApplyMorph`**: now maps `ears` + the 7 captured face morphs to their `CharacterBody`
+   columns (was dropping them). **Still blocked for *rendering*:** `CharacterBody` is persisted but never read back
+   into any packet — there is no looks/`SetMorphValueIIR` broadcast yet, and that IIR is raw-stream (not strings/
+   protobuf, per #3), so building it needs packet-structure RE from captures, and the full slot→column map needs
+   the RDB face-morph table (we only see the 7 morphs the test users happened to change).
 6. **Cutscene / ScryScript decode** (TODO #7). `ScryScript` is Lua-bound (`ResourceScryscriptID`,
    `ScryScriptGUIView_c`). The scry message layout + valid camera-path / playfield-resource names should pinpoint
    the `invalid camera path` failures — possibly a missing field or resource id we can supply.

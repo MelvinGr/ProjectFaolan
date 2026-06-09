@@ -18,7 +18,16 @@ namespace Faolan.GameServer
 		private void ApplyMorph(Character character, string morph, uint value)
 		{
 			var body = EnsureBody(character);
-			switch (morph)
+
+			// Face morphs arrive slot-prefixed, e.g. "33_NoseCrookedRight" (the leading NN is the client's morph
+			// slot id - the names themselves are RDB-defined, not in the binary). Strip the prefix and map by the
+			// base name; body sliders ("arm", "ears", ...) have no prefix. Face values are NOT 0-100 (e.g.
+			// CheekForward reaches 278), so they're stored as-is in the float column.
+			var name = morph.Length > 3 && morph[0] is >= '0' and <= '9' && morph[1] is >= '0' and <= '9' && morph[2] == '_'
+				? morph[3..]
+				: morph;
+
+			switch (name)
 			{
 				case "arm":
 					body.Arm = value;
@@ -41,6 +50,33 @@ namespace Faolan.GameServer
 				case "leg":
 					body.Leg = value;
 					break;
+				case "ears":
+					body.Ears = value;
+					break;
+
+				// Face sliders (slot-prefixed). Mapped to the matching CharacterBody column.
+				case "NoseWide":
+					body.NoseWidth = value;
+					break;
+				case "NoseCrookedRight":
+					body.CrookedNose = value;
+					break;
+				case "EyeAngle1":
+					body.EyesAngle = value;
+					break;
+				case "EyesHigh":
+					body.EyesVerticalPos = value;
+					break;
+				case "MouthLow":
+					body.MouthVerticalPos = value;
+					break;
+				case "CheekForward":
+					body.CheekDepth = value;
+					break;
+				case "BrowLow":
+					body.EyebrowScale = value;
+					break;
+
 				default:
 					Logger.LogDebug("Character-editor: unmapped morph '{Morph}'={Value} (resource ref or face slider not yet modelled).", morph, value);
 					break;
