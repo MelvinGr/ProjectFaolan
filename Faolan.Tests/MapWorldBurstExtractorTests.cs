@@ -36,13 +36,32 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void Merge_DropsBurst_WhenInstanceOutOfVarintRange()
+		public void Merge_KeepsBurst_WhenInstanceOutOfVarintRange()
 		{
-			// Maps 1000/11040 captured an out-of-range instance (e.g. 0x110099BD) the length-preserving rewrite
-			// can't re-address - those bursts must be dropped, not stored.
+			// Maps 1000/11040 captured an out-of-range instance (e.g. 0x110099BD, a 5-byte varint). These are kept
+			// now: RewriteBurstInstance pads the live id's varint to the captured length, so the re-address stays
+			// length-preserving. Only an unknown instance (0) is dropped.
 			var packets = new List<CapturedPacket>
 			{
 				MapChange(1000, 0x110099BD),
+				Download2000(0x66AEDD50),
+				Poll2020()
+			};
+
+			var bursts = MapWorldBurstExtractor.Merge(MapWorldBurstExtractor.Extract(packets));
+
+			Assert.Single(bursts);
+			Assert.Equal(1000u, bursts[0].MapId);
+			Assert.Equal(0x110099BDu, bursts[0].CapturedInstance);
+		}
+
+		[Fact]
+		public void Merge_DropsBurst_WhenInstanceUnknown()
+		{
+			// No receiver header -> CapturedInstance stays 0 -> can't re-address -> dropped.
+			var packets = new List<CapturedPacket>
+			{
+				Packet(0x2000, true, MapChangeContent(1000)),
 				Download2000(0x66AEDD50),
 				Poll2020()
 			};
@@ -61,10 +80,15 @@ namespace Faolan.Tests
 
 		private static CapturedPacket MapChange(uint mapId, uint instance)
 		{
+			return Packet(0x2000, true, MapChangeContent(mapId), ReceiverHeader(instance));
+		}
+
+		private static byte[] MapChangeContent(uint mapId)
+		{
 			var content = new byte[34];
 			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(0, 4), 0x5D85BFC7);
 			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(30, 4), mapId);
-			return Packet(0x2000, true, content, ReceiverHeader(instance));
+			return content;
 		}
 
 		private static CapturedPacket Packet(uint opcode, bool isDownload, byte[] content, byte[] header = null)

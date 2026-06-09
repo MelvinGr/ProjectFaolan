@@ -259,9 +259,10 @@ namespace Faolan.Core.Database
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var burst = await ctx.MapWorldBursts.Include(b => b.Packets).FirstOrDefaultAsync(b => b.MapId == mapId);
 
-			// Guard: a burst whose captured instance is outside the 4-byte-varint range can't be re-addressed by the
-			// length-preserving rewrite (would corrupt the world build). Treat it as absent so login falls back.
-			if (burst != null && (burst.CapturedInstance < 0x02000000 || burst.CapturedInstance > 0x0FFFFFFF))
+			// Guard: a burst with an unknown captured instance (0) can't be re-addressed, so treat it as absent and
+			// let login fall back. Out-of-range instances ARE supported now - RewriteBurstInstance pads the live id's
+			// varint to the captured length (overlong), keeping the substitution length-preserving.
+			if (burst != null && burst.CapturedInstance == 0)
 				return null;
 
 			return burst;

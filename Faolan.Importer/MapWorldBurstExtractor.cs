@@ -12,8 +12,6 @@ namespace Faolan.Importer
 
 	public static class MapWorldBurstExtractor
 	{
-		private const uint InstanceRangeEnd = 0x0FFFFFFF;
-		private const uint InstanceRangeStart = 0x02000000; // 4-byte-varint range [0x02000000, 0x0FFFFFFF]
 		private const uint MapChangeSubOpcode = 0x5D85BFC7;
 		private const uint Opcode2000 = 0x2000;
 		private const uint Opcode2020 = 0x2020; // client spawn poll - ends the world-build window
@@ -96,10 +94,11 @@ namespace Faolan.Importer
 			var best = new Dictionary<uint, MapWorldBurstEntry>();
 			foreach (var e in all)
 			{
-				// Drop bursts whose captured instance is unknown or outside the 4-byte-varint range - the
-				// length-preserving rewrite can only re-address ids in [0x02000000, 0x0FFFFFFF] (maps 1000/11040
-				// captured an out-of-range instance like 0x110099BD and can't be replayed cleanly).
-				if (e.CapturedInstance < InstanceRangeStart || e.CapturedInstance > InstanceRangeEnd)
+				// Drop only bursts with an unknown captured instance - those can't be re-addressed. Out-of-range
+				// instances (maps 1000/11040 captured e.g. 0x110099BD, a 5-byte varint) ARE kept now: the runtime
+				// RewriteBurstInstance pads the live id's varint to the captured length, so the substitution stays
+				// length-preserving.
+				if (e.CapturedInstance == 0)
 					continue;
 
 				if (!best.TryGetValue(e.MapId, out var cur) || e.Packets.Count > cur.Packets.Count)

@@ -347,18 +347,19 @@ namespace Faolan.GameServer
 
 		// Re-addresses every reference to the captured Strie instance (0x02165EFF) in a burst packet to the live
 		// character instance: the receiver-conversation varint (header) and the inventory nested varints appear as
-		// varint(0x02165EFF) = FF BD D9 10; entity handles / body fields appear as the raw uint32 02 16 5E FF. Both
-		// are 4 bytes for in-range ids (0x02000000..0x0FFFFFFF), so substitution is length-preserving; we then
-		// recompute the CRC. Out-of-range instances (varint length != 4) are left unchanged (caller stays on Strie).
+		// varint(0x02165EFF) = FF BD D9 10; entity handles / body fields appear as the raw uint32 02 16 5E FF. The
+		// raw form is always 4 bytes; the live id's varint is padded (overlong) to the captured varint's byte length
+		// so the substitution stays length-preserving even for maps whose captured instance encodes to more bytes
+		// (1000/11040 captured a 5-byte instance like 0x110099BD). We then recompute the CRC.
 		private static byte[] RewriteBurstInstance(byte[] packet, uint oldInstance, uint newInstance)
 		{
 			if (oldInstance == newInstance)
 				return packet;
 
 			var oldVarint = EncodeVarint(oldInstance);
-			var newVarint = EncodeVarint(newInstance);
-			if (oldVarint.Length != newVarint.Length)
-				return packet; // can't substitute without shifting lengths; leave verbatim
+			var newVarint = EncodeVarintPadded(newInstance, oldVarint.Length);
+			if (newVarint == null)
+				return packet; // live id needs more varint bytes than the captured id; can't substitute in place
 
 			var oldRaw = new byte[4];
 			var newRaw = new byte[4];
@@ -372,6 +373,31 @@ namespace Faolan.GameServer
 			var crc = Crc32.Calculate(p[8..]);
 			BinaryPrimitives.WriteUInt32BigEndian(p.AsSpan(4, 4), crc);
 			return p;
+		}
+
+		// Encodes value as a base-128 varint of EXACTLY byteLength bytes, padding the high groups with overlong
+		// (non-minimal) continuation bytes when value needs fewer. Overlong varints are valid - a decoder reads the
+		// continuation bytes and reconstructs the same value - so this keeps a varint substitution length-preserving
+		// when the captured id encodes to more bytes than the live id. Returns null if value does not fit in
+		// byteLength*7 bits (the live id can't be made to fit the captured slot without shifting later bytes).
+		internal static byte[] EncodeVarintPadded(uint value, int byteLength)
+		{
+			if (byteLength is < 1 or > 5)
+				return null;
+
+			var bytes = new byte[byteLength];
+			var v = value;
+			for (var i = 0; i < byteLength; i++)
+			{
+				bytes[i] = (byte)((v & 0x7F) | (i < byteLength - 1
+					? 0x80u
+					: 0u));
+				v >>= 7;
+			}
+
+			return v != 0
+				? null // value didn't fit in byteLength 7-bit groups
+				: bytes;
 		}
 
 		// The character's DB-resolved inventory: which equipped-container slot ids (and the first bag slot) have a
