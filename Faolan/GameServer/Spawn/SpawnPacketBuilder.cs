@@ -31,6 +31,9 @@ namespace Faolan.GameServer.Spawn
 		// within @133's 802-byte block, 167 + (4 + @304's 469-byte block) + 162 = 802), then the body length and
 		// the packet length. Changing the name length must add the same delta to all four.
 		public const int NameTagOffset = 308; // 0x0A
+		// The CharacterStats IIR component (sex/side/race/class/health/... = ProtoCoreCharacterIIR.CharacterStats) is
+		// a 0x22 length-delimited field immediately after the name. Strie template: 0x22 @315, 67-byte payload @317.
+		public const int CharacterStatsTagOffset = 315;
 		public const int PosXOffset = 24; // float little-endian
 		public const int PosYOffset = 29;
 		public const int PosZOffset = 34;

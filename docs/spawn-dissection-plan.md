@@ -21,8 +21,22 @@ So a non-Strie beach character now: renders the world+NPCs, spawns at its DB pos
 open NPC dialogue. Remaining for a fully DB-driven player: **appearance** (race/sex/class/morphs/equipment),
 which is the bulk of the FA015807 body and the hardest dissection.
 
+- **Transform now CONSTRUCTED** (2026-06): `SpawnPacketBuilder.BuildSpawnBody` builds the header + transform
+  (position/rotation = typed `ProtoVec3`/`ProtoQuat`, i.e. `ProtoGameCodeDynelIIR`) instead of offset-patching a
+  clone, then appends the undissected tail via `WriteArray`. Byte-identical round-trip kept (`SpawnPacketBuilderTests`).
+- **Phase 3 landmark found — CharacterStats** (2026-06): the identity/stat component (sex/side/race/class/morph
+  scale/life/health/...) is a `0x22` length-delimited field **immediately after the name**, carrying the generated
+  `ProtoCoreCharacterIIR.CharacterStats`. Strie template: `0x22` @315, 67-byte payload (`SpawnPacketBuilder.
+  CharacterStatsTagOffset`). Fields: 1=sex 2=side 3=race 4=monster_scale 5=monster_data 6=life 7=health ...
+  Decoded across all player captures (sex/race vary: Strie 3/1, hoxxling/necrol80/demol80 2/3). The generated type
+  **re-encodes byte-identical** (`CharacterStatsRoundTripTests`), so it can be built from a typed object — the
+  build-side oracle for sourcing it from the DB is in place.
+
 Next up:
-1. **Phase 3 — appearance from DB** (race/sex/class first via differential analysis across player spawns).
+1. **Phase 3 — appearance from DB**: rebuild the CharacterStats component from the DB character (sex/race/class +
+   `CharacterMaxStats`), splicing it in like `SetSpawnName` (it sits after the variable-length name and is itself
+   variable-length, so the enclosing length prefixes need the same delta treatment). Then the LooksPacket
+   (meshes/morphs/tints) — the bulk.
 2. **Phase 4 — NPC spawns from `Npcs`/`NpcBodies`** (the builder already generalizes to NPC FA015807 bodies).
 3. Conversation content import (full dialogue trees) — separate, larger.
 
