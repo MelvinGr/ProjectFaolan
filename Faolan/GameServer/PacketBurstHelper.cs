@@ -21,6 +21,13 @@ namespace Faolan.GameServer
 		// playfield and render them (the player avatar renders regardless, but NPCs do not).
 		private static readonly byte[] LoginWorldSender = [0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x58];
 
+		// Ping/latency replies ride a different conversation SUB-ID (0x08) than the world burst (0x58) - confirmed
+		// from gameplay dumps (Pong 0x2009 and LatencyCheckResponse 0x2082 both consistently use 0x08). Same
+		// endpoint TYPEs as the world conversation: Pong from GameAgent (0x13CE71B1), latency from GameCharAgent
+		// (0xA9ECB95D).
+		private static readonly byte[] PingResponseSender = [0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x08];
+		private static readonly byte[] LatencyResponseSender = [0x0D, 0x5D, 0xB9, 0xEC, 0xA9, 0x10, 0x08];
+
 		// Appends a uint32, protobuf-varint encoded, to a conversation-id prefix (the receiver/sender family),
 		// producing the full conversation id that addresses the given client instance.
 		private static byte[] AppendVarint(byte[] prefix, uint value)

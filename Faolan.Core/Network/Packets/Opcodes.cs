@@ -46,7 +46,6 @@
 			Hello = 0x2003,
 			Ping = 0x2005,
 			SpawnCheck = 0x201F,
-			GcPing = 0x2082,
 			Ox2000 = 0x2000,
 			Ox206A = 0x206a,
 			Ox207B = 0x207b,
@@ -75,7 +74,6 @@
 			AckAuthentication = 0x2001,
 			ReadyForPlayScreen = 0x2024,
 			SpawnCheck = 0x2008,
-			GcPing = 0x207D,
 			LatencyCheckResponse = 0x2082
 		}
 

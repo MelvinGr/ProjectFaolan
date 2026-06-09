@@ -301,12 +301,17 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerOpcodes.LatencyCheck: // latency check
+				case GameServerOpcodes.LatencyCheck: // latency check (client 0x2085 -> server 0x2082)
 				{
 					var counter = packet.Body.ReadUInt32();
 
-					await new PacketStream().WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameServerRespondOpcodes.LatencyCheckResponse, [0x01]).WriteUInt32(counter).WriteUInt32(0x0000003C)
-						.WriteUInt32(0x65F17240).SendAsync(client);
+					// Retail reply body = [counter echoed][0x00000012][server tick]. The tick is a monotonically
+					// increasing microsecond timer (gameplay dumps: ~5,000,000 per ~5s latency interval, ms
+					// precision). Sent on the GameCharAgent conversation sub-id 0x08 with headerData 0x01.
+					var tick = unchecked((uint)(Environment.TickCount64 * 1000L));
+
+					await new PacketStream().WriteHeader(LatencyResponseSender, LoginWorld201CReceiver(client), GameServerRespondOpcodes.LatencyCheckResponse, [0x01]).WriteUInt32(counter).WriteUInt32(0x00000012)
+						.WriteUInt32(tick).SendAsync(client);
 
 					break;
 				}
@@ -377,9 +382,12 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerOpcodes.Ping:
+				case GameServerOpcodes.Ping: // client 0x2005 (empty) -> server Pong 0x2009
 				{
-					await new PacketStream().WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameServerRespondOpcodes.Pong).WriteUInt32(0x42B32A07) // old = 0x42c80000, new = 0x42B32A07
+					// Reply on the GameAgent conversation sub-id 0x08. Body = [float][0][0]; retail's leading
+					// float is a varying server-load/fps metric (~80-83 in dumps) - we have no equivalent, so a
+					// fixed plausible value (0x42B32A07 = ~89.6) is sent. The client just treats it as a readout.
+					await new PacketStream().WriteHeader(PingResponseSender, LoginWorldReceiver(client), GameServerRespondOpcodes.Pong).WriteUInt32(0x42B32A07)
 						.WriteUInt32(0).WriteUInt32(0).SendAsync(client);
 
 					break;
@@ -400,26 +408,6 @@ namespace Faolan.GameServer
 					    .WriteUInt32(spawnId)
 					    .WriteByte(0)
 					    .Send(client);*/
-
-					break;
-				}
-
-				case GameServerOpcodes.GcPing:
-				{
-					//Logger.LogInformation("GcPing: " + packet.Data.ToArray().ToHex());
-
-					var counter = packet.Body.ReadUInt32();
-					var time = checked((uint)DateTimeOffset.Now.ToUnixTimeSeconds());
-
-					await new PacketStream().WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameServerRespondOpcodes.GcPing).WriteUInt32(counter).WriteUInt32(0x0000004E)
-						// counter  retvalue
-						// 1        0x2B, 0x95, 0x70, 0x58 -> p.167
-						// 2        0x2C, 0x70, 0x01, 0x78 -> p.448
-						// 3        0x2c, 0x7e, 0xc6, 0xb8 -> p.540
-						// 4        0x2c, 0x7e, 0xc6, 0xb8 -> p.541
-						// 5        0x2c, 0xa6, 0xb1, 0x78 -> p.564
-						.WriteUInt32(time) // TODO: not the correct value? But still working
-						.SendAsync(client);
 
 					break;
 				}
