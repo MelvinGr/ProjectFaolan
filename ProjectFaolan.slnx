@@ -17,6 +17,7 @@
     <File Path="README.md" />
     <File Path="TODO.md" />
   </Folder>
+  <Project Path="Faolan.ClientLauncher/Faolan.ClientLauncher.csproj" />
   <Project Path="Faolan.Core/Faolan.Core.csproj" />
   <Project Path="Faolan.DatabaseEditor/Faolan.DatabaseEditor.csproj" />
   <Project Path="Faolan.Importer/Faolan.Importer.csproj" />

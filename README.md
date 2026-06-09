@@ -347,6 +347,35 @@ The GameServer download stream is one continuous zlib stream, prefixed by a 9-by
 the marker `0x80 00 00 05`. The **decompressed** stream also contains in-band 9-byte `0x80000005` markers
 between packet groups (literal stream framing, not packet lengths) - the framer skips them.
 
+### Client launch flags (`AgeOfConan.exe -flag …`)
+
+Recovered by RE (UTF-16 flag table in `AgeOfConan.exe`; the client strips the leading `-` and matches the bare
+name). The launcher runs e.g. `AgeOfConan.exe -noconsole -clienthash <md5> -key <hex>`. Full set:
+
+- **Boolean:** `-noconsole` (no debug console), `-no3dlauncher` (skip the 3D launcher), `-novideo` (skip intro
+  movies), `-nautotest` / `-openautomate` (automation hooks), `-32bit` (32-bit render path), `-mce` (Media Center).
+- **Value:** `-username <name>` and `-password <pass>` (**auto-login**), `-charslot <n>` / `-charname <name>` /
+  `-charpf <n>` (auto-enter a character/playfield), `-clienthash <md5>` (client-integrity hash; the only flag with
+  its own `"Invalid clienthash arg"` validator), `-key <hex>` (8-byte companion to `-clienthash`),
+  `-loginkey <…>`, `-logindata <…>`, `-statindex <n>`, `-processidpath <path>` (launcher PID handshake).
+- **No `-server`/`-host`/`-port` flag exists** — the connection endpoint comes from config/registry/the patch, not
+  the command line. For testing, `-username`/`-password`/`-charname` skip the login + character screens entirely.
+
+**Launching directly (bypassing ConanPatcher).** Running `AgeOfConan.exe` with no flags bounces to
+`ConanPatcher.exe`, because the client requires a valid fresh `-key`. Both gate flags were recovered by RE of
+`ConanPatcher.exe`:
+- `-clienthash` = **MD5 of `AgeOfConan.exe`** (lowercase hex; the patcher's `cHash.size()==32` check).
+- `-key` = **TEA-encrypt(`t‖t`)** where `t` = `time(NULL)` (unix seconds), key
+  `[0x5BCE568E, 0xFB2E8CBC, 0xA324E6D8, 0xF22BF865]`, delta `0x9E3779B9`, 32 rounds, printed `%08x%08x`. It's a
+  launch-freshness token: decrypting yields `{t, t}` (equal halves) and the time must be recent.
+  (`ConanPatcher.exe`: `sub_4bcf93` = `time()`, `sub_439140` = TEA.)
+
+**`Faolan.ClientLauncher`** is a minimal stand-in for the patcher: it computes both flags and starts the client
+(`Faolan.Core.Crypt.ConanLaunchToken` is the `-key` generator, reusing the shared `Tea` cipher; verified to
+reproduce a captured launcher key). Run `dotnet run --project Faolan.ClientLauncher -- --dry-run` to see the
+computed flags, or add `-u/-p/-c` for auto-login. For real password validation, also run
+`tools/patch_aoc_login_key.py` against the running client.
+
 ### Client-side logs (ground truth for "why did the client reject it")
 
 The AoC client writes its own log - invaluable when the client silently stalls/disconnects:
