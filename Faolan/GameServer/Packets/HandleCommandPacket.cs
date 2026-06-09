@@ -154,24 +154,30 @@ namespace Faolan.GameServer
 
 			switch (token)
 			{
+				// The editor sends class/race as 2x the real id (verified against captured char-lists: editor
+				// 36/68/86/82 -> class 0x12/0x22/0x2B/0x29; editor race 2/6 -> race 1/3). Store the halved
+				// canonical id so the character-list packet (and everything else) gets a valid class/race; sending
+				// the raw 2x value makes the client show dashes for race/class on the select screen.
 				case "ChangeSex":
 				{
 					if (character != null)
-						character.Sex = (Sex)numericValue;
+						// Sex isn't a simple 2x: the editor sends 6 for male (confirmed; all captured chars are
+						// male=0). Map 6 -> Male, the other toggle value (4) -> Female.
+						character.Sex = numericValue == 6 ? Sex.Male : Sex.Female;
 					break;
 				}
 
 				case "ChangeRace":
 				{
 					if (character != null)
-						character.Race = (Race)numericValue;
+						character.Race = (Race)(numericValue / 2);
 					break;
 				}
 
 				case "ChangeClass":
 				{
 					if (character != null)
-						character.Class = (Class)numericValue;
+						character.Class = (Class)(numericValue / 2);
 					break;
 				}
 
