@@ -45,5 +45,9 @@ namespace Faolan.Tests
 		[Fact]
 		public Task InitialBurst_IsByteStable() =>
 			AssertBurstStable("InitialBurst", GameServerListener.SendRetailCreateEditorInitialBurst);
+
+		[Fact]
+		public Task WorldPrepBurst_IsByteStable() =>
+			AssertBurstStable("WorldPrepBurst", GameServerListener.SendWorldPrepBurst);
 	}
 }
