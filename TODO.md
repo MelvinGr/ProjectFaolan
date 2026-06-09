@@ -89,6 +89,22 @@ Unused space in all rdbdata files`) — so the data is NOT absent.** Corrected r
   decisive. (b) TOOLING — parse `RDBHashIndex.bin` to confirm the cinematic resources for pf 4000/4010 exist (we
   have the dumps), proving the data's present and the issue is resolution/config, not absence.
 
+### AWAITING: retail client log (user will capture at home) — DIFF against logs-test/AgeOfConan.log
+The decisive test. Capture an `AgeOfConan.log` from a retail/working run of the SAME create-world intro, then
+compare line-for-line with ours. What each outcome tells us:
+1. **`ResourceManager - No project defined`** — present in retail too? → benign startup noise, NOT the cause.
+   Absent in retail? → our client's project config is the culprit (client-side, not our server).
+2. **`class Playfield requested child resource 1000519:4000 ... does not exist`** + static-AI-point errors —
+   present in retail too (yet cutscene works)? → benign; real failure is elsewhere. Absent in retail? → retail
+   resolves those resources; ours doesn't (config/resolution, or we put the client in a different playfield state).
+3. **`CinematicCamera_c::InitPath ... invalid camera path "CC_Drowning_*/Awake/Kalanthes/GetUp"`** — gone in
+   retail? → confirms the camera paths DO resolve normally; our failure is downstream of the missing pf resources.
+4. **`ThisIsKalanthes` scry msg** — retail's `msgobject.name` should be a REAL dynel id, not our `123456789:
+   123456789` sentinel. Confirms whether the Kalanthes binding (server-supplied handle) differs.
+5. Bonus: compare the `Playfield.Loading - Loading stats for Pf Proxy` lines (Model/RunningPlayfield/Subgroup)
+   to see if retail loads pf 4000/4010 with different Subgroup/instance than ours.
+Put the retail log in `logs-test/` (e.g. `AgeOfConan-retail.log`) so it sits next to ours for the diff.
+
 **Secondary server-side cleanups (won't alone fix the cutscene, but worth doing):**
 - `rpc - ... OverrideGameTweaks() ... stream bad after 'overrides'!` → `Dispatcher call ... (OverrideGameTweaks)
   failed. Disconnecting ( Route ... => PlayerInterface)`. Known overrides bug, but here it DISCONNECTS a route
