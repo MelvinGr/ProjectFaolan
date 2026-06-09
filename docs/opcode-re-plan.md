@@ -194,9 +194,14 @@ and tied to an open TODO. Ranked by value.
    into any packet — there is no looks/`SetMorphValueIIR` broadcast yet, and that IIR is raw-stream (not strings/
    protobuf, per #3), so building it needs packet-structure RE from captures, and the full slot→column map needs
    the RDB face-morph table (we only see the 7 morphs the test users happened to change).
-6. **Cutscene / ScryScript decode** (TODO #7). `ScryScript` is Lua-bound (`ResourceScryscriptID`,
-   `ScryScriptGUIView_c`). The scry message layout + valid camera-path / playfield-resource names should pinpoint
-   the `invalid camera path` failures — possibly a missing field or resource id we can supply.
+6. **Cutscene / ScryScript decode** (TODO #7) — ✅ SCRY FULLY DECODED + server-side replay VERIFIED (2026-06-09);
+   the bug is NOT here. `Captures/decode_scryscript.py` decodes the full 12-step retail cutscene; splitting it by
+   source port shows #1–#5 (galley) on the **creator** conn (:7016) and #6–#12 (beach `PlayOrSkipQuestion`,
+   `ThisIsKalanthes`, `WelcomeTutorial`) on the **world** conn (:7012). Our server replays BOTH on the matching
+   connections (`RetailCreateEditorCreationScriptBurst` creator + `RetailCreateWorldEntryBurst` world), with the
+   beach chunk in burst chunks 0–1 (early, not truncated). So the scry sequence is server-side-correct — the
+   `invalid camera path` / unbound-Kalanthes failure is upstream, in the EDITOR (galley) phase (see TODO #7 pin;
+   next step is a live create-world loopback pcap diff, which needs running the server+client, not static RE).
 7. **The Lua `GameInterface` API as a Rosetta stone.** 101 `com.GameInterface.*` namespaces (FactionInterface,
    FeatWindows, ProgressBars, Targeting, …) + the UI Lua scripts in the RDB map "server packet → what the UI does",
    useful for verifying any of the above (quest tracker, feat windows, mail, target frames).

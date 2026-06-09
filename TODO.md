@@ -130,11 +130,18 @@ manifest at all** — they are `class Playfield requested CHILD resource` lookup
 from the client's LOCAL RDB, not server-sent. **This reinforces the existing client-side RDB / project-config
 diagnosis below** (the server is feeding the right script + manifest; the client can't resolve the playfield's own
 child resources).
-**Still worth checking (the one server-side unknown):** the SECOND scry stage — the Tortage Beach (4010)
-`PlayOrSkipQuestion` with its own manifest (`1010003:3147889;...`), then `StartScriptGroupOnClient(385910)` →
-`ThisIsKalanthes` → `WelcomeTutorial` — arrives LATER in retail (decode #7-#12), after the beach map-change. Our
-create-world flow is chunked per client trigger; confirm that beach scry chunk (and its manifest) is actually
-replayed and not truncated at the `ApproachCasilda` finale. Use `Captures/decode_scryscript.py` to compare.
+**✅ CHECKED 2026-06-09 — the beach scry stage IS replayed correctly (no server-side gap).** Verified the SECOND
+scry stage — Tortage Beach (4010) `PlayOrSkipQuestion` + manifest (`1010003:3147889;...`) →
+`StartScriptGroupOnClient(385910)` → `ThisIsKalanthes` → `WelcomeTutorial` — is present in
+`RetailCreateWorldEntryBurst`: the beach `PlayOrSkipQuestion`+manifest is in chunk 0 (SCENE, line 344),
+`ThisIsKalanthes` in chunk 1 (case 0, line 366) — early, NOT truncated at the `ApproachCasilda` finale.
+**Crucially, the connection split matches retail exactly:** splitting retail's 12-step scry by source port shows
+#1–#5 (galley: PreloadAssets/PlayOrSkip/CharCreationFinished) on the **creator** conn (:7016) and #6–#12 (beach
+`PlayOrSkipQuestion`, `ThisIsKalanthes`, `WelcomeTutorial`) on the **world** conn (:7012) — which is exactly our
+`RetailCreateEditorCreationScriptBurst` (creator) vs `RetailCreateWorldEntryBurst` (world) split. So the scry
+sequence is server-side-correct on the right connections; this reinforces the pinned diagnosis that the bug is
+NOT a missing/misplaced/truncated scry — it's in the EDITOR (galley) phase. (Split via `decode_scryscript.py` +
+the per-step `srcPort`.)
 
 ### ⭐ DECISIVE 2026-06-09: retail-vs-faolan client-log DIFF — the old "client RDB" read below is WRONG.
 Diffed `logs-test/retail-client.log` (working retail create-world) against `logs-test/faolan-client.log` (ours):
