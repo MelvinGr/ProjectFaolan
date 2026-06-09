@@ -108,6 +108,8 @@ namespace Faolan.GameServer
 				["help"] = (client, _) => SendGmHelpText(client.Session.Character.Id),
 				["maps"] = (client, _) => SendListAllMaps(client.Session.Character.Id),
 				["spells"] = (client, _) => SendListAllSpells(client.Session.Character.Id),
+				["spelllist"] = (client, _) => SendGrantableAbilityList(client.Session.Character.Id),
+				["grantspell"] = (client, arguments) => GrantSpellCommand(client, arguments),
 				["teleport"] = (client, arguments) => DoTeleport(client.Session.Character.Id, uint.Parse(arguments)),
 				["spelltest"] = (client, arguments) => ApplySpellTest(client.Session.Character.Id, uint.Parse(arguments)),
 				["vitals"] = (client, arguments) => SetVitalsCommand(client, arguments),
@@ -159,6 +161,49 @@ namespace Faolan.GameServer
 		{
 			var spells = await Database.GetSpells();
 			await _agentServerDispatcher.SendSystemMessage(characterId, spells.Select(s => $"{s.Id}: {s.Name}").JoinAsString("<br />"));
+		}
+
+		// .spelllist  - list the grantable ability catalog (id / name / slot) for use with .grantspell. These are
+		// what can actually be handed out via the proven 0x2052 grant; the Spell table (.spells) has no grant
+		// identity quad, so its rows can be cast but not granted. A trailing * marks the universal starting kit.
+		private async Task SendGrantableAbilityList(uint characterId)
+		{
+			var abilities = await Database.GetAbilities();
+			if (abilities.Length == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "No abilities in the catalog.");
+				return;
+			}
+
+			var lines = abilities.Select(a => $"{a.Id}: {(string.IsNullOrEmpty(a.Name) ? "(unnamed)" : a.Name)} [slot {a.Slot}]{(a.IsStartingAbility ? " *" : "")}").JoinAsString("<br />");
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Grantable abilities (.grantspell &lt;id&gt;):<br />{lines}");
+		}
+
+		// .grantspell <id>  - grant an ability from the catalog to the player via the 0x2052 ability-grant (the only
+		// proven grant packet - real spell grants aren't decoded, and the Spell table has no grant identity quad).
+		// Makes the ability appear so it can be dragged to the hotbar and cast, which is how the spell/mana drain is
+		// tested. The grant is transient (not persisted) - it is re-sent only by login's GrantStartingAbilities.
+		private async Task GrantSpellCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			if (!uint.TryParse((arguments ?? "").Trim(), out var id))
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .grantspell &lt;abilityId&gt;  (see .spelllist)");
+				return;
+			}
+
+			var ability = await Database.GetAbility(id);
+			if (ability == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"<span style=\"color: red;\">No grantable ability with id {id} (see .spelllist).</span>");
+				return;
+			}
+
+			await SendAbilityGrant(client, ability);
+			var label = string.IsNullOrEmpty(ability.Name)
+				? id.ToString()
+				: ability.Name;
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Granted {label} (id {id}, slot {ability.Slot}). Drag it to your hotbar to use it.");
 		}
 
 		// .setstat <statIdHex> <displayValue>  - push a single 0x96B8DC59 stat record (e.g. ".setstat 36 25" sets

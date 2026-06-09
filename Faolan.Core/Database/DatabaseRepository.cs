@@ -19,6 +19,7 @@ namespace Faolan.Core.Database
 		Task Execute(Func<IDatabaseContext, Task> work);
 
 		Task<Ability> GetAbility(uint id);
+		Task<Ability[]> GetAbilities();
 		Task<Ability[]> GetStartingAbilities(uint level);
 
 		Task<Account> GetAccount(uint id);
@@ -174,6 +175,15 @@ namespace Faolan.Core.Database
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Abilities.FirstOrDefaultAsync(a => a.Id == id);
+		}
+
+		// The whole ability catalog (starting kit + harvested class/higher-level abilities). Used by the GM
+		// .spelllist/.grantspell commands - the only things grantable via the proven 0x2052 packet (the Spell table
+		// has no grant identity quad).
+		public async Task<Ability[]> GetAbilities()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.Abilities.OrderBy(a => a.Id).ToArrayAsync();
 		}
 
 		// The universal starting ability kit (IsStartingAbility) - the abilities every new character receives via
