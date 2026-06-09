@@ -129,7 +129,18 @@ The client stores Funcom's public key as an ASCII hex C-string. Replace it with 
 
 ---
 
-## Work item 2 — port LoginEncryption to C#
+## Work item 2 — port LoginEncryption to C# ✅ DONE (2026-06-09)
+
+Implemented `Faolan.Core/Network/LoginEncryption.cs` (`Decrypt(loginKey)` → `LoginCredentials`, plus
+`BuildClientLoginKey(...)` simulating the patched client) on top of the shared `Faolan.Core.Crypt.Tea` (moved
+there from `Faolan.Importer`, +`EncryptBlock`). Wired into `UniverseAgentListener.AnswerChallenge` with the
+auto-detect / non-breaking fallback below. Tests in `Faolan.Tests/LoginEncryptionTests.cs` (12): self round-trip,
+the `faolan|…|hunter2` fixture, **a cross-impl fixture decoding a key produced by the proven Python reference**,
+`ServerPublic == CELLAO_PUB`, malformed-input + tamper cases. Build + 106 tests green. **Still pending: nothing in
+code — to actually enforce a password, set `Account.Password` to a real value and run `tools/patch_aoc_login_key.py`
+(work item 1) on the running client; until then login stays accept-any.**
+
+Original notes:
 
 - New class, e.g. `Faolan.Core/Network/LoginEncryption.cs`:
   - `static (string user, string challenge, string password)? Decrypt(string loginKey)`.

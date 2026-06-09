@@ -47,41 +47,46 @@ namespace Faolan.UniverseAgent
 
 				case UniverseAgentOpcodes.AnswerChallenge:
 				{
-					var cAnswerChallenge = packet.Body.ReadString();
+					var loginKey = packet.Body.ReadString();
+					var account = client.Session.Account;
 
-					/*var decryptedData = client.Username + "|" + client.AuthChallenge + "|PASSWORD";
-					var decryptedDataVector = decryptedData.Split('|');
-
-					if (decryptedDataVector.Length != 3) // wrong decryption
+					// Decrypt the DH+TEA login block. This only succeeds for a PATCHED client (one using our DH
+					// public key - see tools/patch_aoc_login_key.py). When it decrypts and the challenge round-trips
+					// we enforce the real password; an unpatched client (block undecryptable to us, or a challenge
+					// mismatch) keeps the legacy accept-any behaviour, so turning this on never breaks login.
+					var credentials = LoginEncryption.Decrypt(loginKey);
+					bool authenticated;
+					if (credentials is not null && credentials.Challenge == account.AuthChallenge)
 					{
-					    SendInvalidLogin(client, InvalidLoginReasons.InternalSystemError);
-					    break;
+						// Patched client: enforce the password, unless none is configured (the "-" sentinel).
+						authenticated = string.IsNullOrEmpty(account.Password) || account.Password == "-" ||
+							(credentials.Username == account.UserName && credentials.Password == account.Password);
+
+						if (authenticated)
+							Logger.LogInformation("UniverseAgent login: password validated for {UserName} (patched client).", account.UserName);
+						else
+							Logger.LogWarning("UniverseAgent login: WRONG PASSWORD for {UserName} (patched client).", account.UserName);
+					}
+					else
+					{
+						Logger.LogDebug("UniverseAgent login: block not decryptable (unpatched client); accepting {UserName} without password check.", account.UserName);
+						authenticated = true;
 					}
 
-					var username = decryptedDataVector[0];
-					var nChallenge = decryptedDataVector[1];
-					var password = decryptedDataVector[2];
-
-					if (nChallenge != client.AuthChallenge) // wrong auth
-					{
-					    SendInvalidLogin(client, InvalidLoginReasons.InternalSystemError);
-					    break;
-					}*/
-
-					if (!await Database.CheckLogin(client.Session.Account.UserName, "-"))
+					if (!authenticated)
 					{
 						await SendInvalidLogin(client, InvalidLoginReasons.InvalidLogin);
 						break;
 					}
 
-					if (client.Session.Account.State != AccountState.Active)
+					if (account.State != AccountState.Active)
 					{
 						await SendInvalidLogin(client, InvalidLoginReasons.AccountFrozen);
 						break;
 					}
 
-					Logger.LogInformation("UniverseAgent login accepted for user {UserName} ({AccountId})", client.Session.Account.UserName, client.Session.Account.Id.ToHex());
-					await Database.UpdateLastInfo(client.Session.Account, client);
+					Logger.LogInformation("UniverseAgent login accepted for user {UserName} ({AccountId})", account.UserName, account.Id.ToHex());
+					await Database.UpdateLastInfo(account, client);
 
 					await SetRegionState(client);
 					await SendPlayerAgentRealm(client);

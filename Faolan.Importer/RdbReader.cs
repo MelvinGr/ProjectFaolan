@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using Faolan.Core.Crypt;
 
 namespace Faolan.Importer
 {

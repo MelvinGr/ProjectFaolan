@@ -1,19 +1,17 @@
 using System;
 using System.Buffers.Binary;
 
-namespace Faolan.Importer
+namespace Faolan.Core.Crypt
 {
-	// TEA (Tiny Encryption Algorithm) - the cipher the AoC client uses for RDBH item-template resources (the
-	// decrypt routine is at AgeOfConan.exe va 0xa8f550; same cipher family as the login `tea_unexpand`). 64-bit
-	// block, 128-bit key (4 LE u32), 32 rounds. RDBH item templates (RDB types 1000020/1000620) are encrypted in
-	// ECB mode with a per-item key = the item's ProtoDecryptionKey, which the server streams in inventory and we
-	// store as Item.Data1..Data4. See docs/rdb-extraction-plan.md ("RDBH cracked").
+	// TEA (Tiny Encryption Algorithm) - the cipher the AoC client uses for both the login block (TEA-CBC, see
+	// LoginEncryption) and the RDBH item-template resources (TEA-ECB; decrypt routine at AgeOfConan.exe va
+	// 0xa8f550, the client string `tea_unexpand`). 64-bit block, 128-bit key (4 LE u32), 32 rounds.
 	public static class Tea
 	{
 		private const uint Delta = 0x9E3779B9;
 
-		// Decrypts one 64-bit block (v0,v1) with the 128-bit key k[0..3]. Matches the client's standard TEA decrypt
-		// (sum starts at delta*32 = 0xC6EF3720 and counts down).
+		// Decrypts one 64-bit block (v0,v1) with the 128-bit key k[0..3]. Standard TEA decrypt: sum starts at
+		// delta*32 = 0xC6EF3720 and counts down.
 		public static void DecryptBlock(ref uint v0, ref uint v1, ReadOnlySpan<uint> k)
 		{
 			unchecked
@@ -24,6 +22,22 @@ namespace Faolan.Importer
 					v1 -= ((v0 << 4) + k[2]) ^ (v0 + sum) ^ ((v0 >> 5) + k[3]);
 					v0 -= ((v1 << 4) + k[0]) ^ (v1 + sum) ^ ((v1 >> 5) + k[1]);
 					sum -= Delta;
+				}
+			}
+		}
+
+		// Encrypts one 64-bit block - the inverse of DecryptBlock (sum starts at 0 and counts up). Used to simulate
+		// the patched client in tests/launcher work; the server itself only decrypts.
+		public static void EncryptBlock(ref uint v0, ref uint v1, ReadOnlySpan<uint> k)
+		{
+			unchecked
+			{
+				var sum = 0u;
+				for (var i = 0; i < 32; i++)
+				{
+					sum += Delta;
+					v0 += ((v1 << 4) + k[0]) ^ (v1 + sum) ^ ((v1 >> 5) + k[1]);
+					v1 += ((v0 << 4) + k[2]) ^ (v0 + sum) ^ ((v0 >> 5) + k[3]);
 				}
 			}
 		}
