@@ -232,6 +232,14 @@ namespace Faolan.Importer
 				await CaptureItemImporter.ImportAsync(db, itemPackets);
 				await CaptureMapImporter.ImportAsync(db, itemPackets);
 				await CaptureSpellImporter.ImportAsync(db, itemPackets);
+				// The starting ability kit = what every new character gets during creation, so detect it from the
+				// CREATE-flow captures only (filenames contain "creat"); the rest are higher-level/class abilities.
+				var createPackets = Directory.EnumerateFiles(capturesDir, "*.json")
+					.Where(f => Path.GetFileName(f).Contains("creat", StringComparison.OrdinalIgnoreCase))
+					.SelectMany(f => ReadJsonCapture(f).Select(p => p.Bytes))
+					.ToList();
+				var (abSeen, abNew, abUpd) = await CaptureAbilityImporter.ImportAsync(db, itemPackets, createPackets);
+				Console.WriteLine($"Abilities (0x2052 grants): {abSeen} seen, {abNew} new, {abUpd} updated.");
 				await ImportConversations(db, conversations);
 				await ImportNpcSpawns(db, NpcSpawnExtractor.Merge(captures.SelectMany(NpcSpawnExtractor.Extract)));
 				await ImportMapWorldBursts(db, MapWorldBurstExtractor.Merge(captures.SelectMany(MapWorldBurstExtractor.Extract)));

@@ -19,6 +19,7 @@ namespace Faolan.Core.Database
 		Task Execute(Func<IDatabaseContext, Task> work);
 
 		Task<Ability> GetAbility(uint id);
+		Task<Ability[]> GetStartingAbilities(uint level);
 
 		Task<Account> GetAccount(uint id);
 		Task<Account> GetAccount(string userName);
@@ -173,6 +174,17 @@ namespace Faolan.Core.Database
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Abilities.FirstOrDefaultAsync(a => a.Id == id);
+		}
+
+		// The universal starting ability kit (IsStartingAbility) - the abilities every new character receives via
+		// 0x2052 during creation (3 Normal Attack directions + toggle-combat / switch-weapon / utility), imported
+		// from the retail create-flow grants by CaptureAbilityImporter. The `level` is reserved for future
+		// level-gating; today the whole starting kit is level 1. The catalog also holds higher-level / class
+		// abilities (IsStartingAbility = false) which are NOT granted here.
+		public async Task<Ability[]> GetStartingAbilities(uint level)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.Abilities.Where(a => a.IsStartingAbility && a.Level <= level).OrderBy(a => a.Slot).ToArrayAsync();
 		}
 
 		// The class/level row that lists which abilities (and spells) a character of this class+level should have.

@@ -241,11 +241,14 @@ conversation - **not** a `0x2000` sub-opcode), one packet per ability. The old C
 `0x4d`) is dead; `0x2052` is the retail packet, decoded from the `strickenbla` combat capture (pkt #399/#401).
 Body after the 16-bit opcode (big-endian u32s): `[slot][id][id][0][1][data0][data1..4][data1..4][constA][constB]
 [constA][constB][1][0][u8 flag]`, where `constA=0xB290805C`/`constB=0x29E627CA` are fixed for every ability and
-`slot` is the ability's template word (`Abilities.Slot`, recovered from the old archive `abilities.slot` since
-`p_abilities` lacks it). `GrantStartingAbilities` parses the character's `ClassAbilities.Abilities` list, loads
-each `Ability`, and sends `BuildAbilityGrantBody` (byte-for-byte locked by `AbilityGrantTests`) after the
-world-burst replay. The universal melee attacks (769094 "Normal Attack Left" / 769099 "Normal Attack Front") are
-granted to every class; the cast itself is the already-working `Interact`/`ApplySpell` combat path.
+`slot` is the ability's template word (`Abilities.Slot`). The grant set is **data-driven from the captures**:
+`CaptureAbilityImporter` harvests every 0x2052 grant into the `Abilities` table (id + Slot + identity quad), and
+flags the ones seen in the CREATE-flow captures as `IsStartingAbility` - the universal kit every new character
+gets (8: 769094/769095/769099 Normal Attack L/R/Front, Toggle Combat, Switch Weapon, Rest, + 2 utility). The
+table also catalogs the higher-level/class abilities from gameplay captures (26 total, not granted at start).
+`GrantStartingAbilities` sends `BuildAbilityGrantBody` (byte-for-byte locked by `AbilityGrantTests`) for each
+starting ability after the world-burst replay, for every class. The cast itself is the already-working
+`Interact`/`ApplySpell` combat path. (Spells are a separate grant not present in any capture - see the TODO.)
 
 ### World-burst replay + progressive DB-driven rebuild (`RetailLoginReplay.cs`)
 
@@ -454,12 +457,15 @@ today); and ultimately the full DB-built snapshot incl. the tails.
 Concrete next steps, grouped by area. See `docs/` for the dissection writeups behind each.
 
 ### Stats & combat (`docs/player-stats.md`, `docs/quests-and-combat.md`)
-- [x] **Grant starting attacks on login**: the player is sent its `ClassAbilities` (the universal melee attacks
-      769094/769099) via the retail **`0x2052`** ability-grant packet, rebuilt DB-driven from the `Abilities` rows
-      (identity quad + the `Slot` word). See "Ability grants" below; enables the combat cast→damage→vitals test.
-- [ ] **Grant actual spells** (vs melee abilities): `ClassAbilities.Spells` lists spell ids (e.g. class 29's
-      165241) but the retail spell-grant packet isn't decoded/wired yet (the C++ `addSpell` opcode `0x09` is the
-      dead old scheme, like `0x4d` was for abilities). Find it in a capture, then wire it next to the ability grant.
+- [x] **Grant the starting ability kit on login**: the player is sent the universal starting abilities (the 8
+      flagged `IsStartingAbility` - 3 Normal Attack directions + Toggle Combat / Switch Weapon / Rest / utility)
+      via the retail **`0x2052`** packet, rebuilt DB-driven from the `Abilities` rows (`Slot` + identity quad).
+      The kit is harvested from the CREATE-flow captures by `CaptureAbilityImporter`; the table also catalogs the
+      higher-level/class abilities (26 total). See "Ability grants" below; enables the cast→damage→vitals test.
+- [ ] **Grant actual spells** (vs abilities) - BLOCKED on data: the spell-grant packet is in NO capture (even a
+      caster only gets the 8 abilities via 0x2052; `SpellBookIIR` 0x6BA10936 is a stub notification; the RE'd
+      `DispatchLearnSpell(i_nSpellID)` is never exercised). Needs a fresh capture of a caster learning a spell
+      (e.g. class 29's 165241). The C++ `addSpell` (0x09) is the dead old scheme.
 - [ ] **Level-up path**: bump `Character.Level`, call `Character.RegenerateMaxStats()`, `SaveCharacter`, then
       push a `0x96B8DC59` vitals update (`SendVitals`) so the client sees the new stats. (Hold until the vitals
       packet is confirmed rendering in-client.)

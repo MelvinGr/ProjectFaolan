@@ -23,7 +23,7 @@ namespace Faolan.Core.Network.Protobuf
 	public partial class ProtoQuat
 	{
 		public static implicit operator ProtoQuat(Quaternion value)
-		{wwwwwwwwwwwwwwwwwwwwww
+		{
 			return new ProtoQuat
 			{
 				X = value.X,

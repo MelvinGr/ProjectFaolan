@@ -14,6 +14,12 @@ namespace Faolan.Core.Database.Tables
 		// "slot" name it is ability-intrinsic metadata, not a hotbar position.
 		public uint Slot { get; set; }
 
+		// True for the universal starting kit granted to EVERY new character during creation (the 7 abilities seen
+		// in every create-flow capture: 3 Normal Attack directions + toggle-combat / switch-weapon / utility). The
+		// table also catalogs higher-level / class abilities harvested from gameplay captures (IsStartingAbility =
+		// false); only the starting set is granted on login (GrantStartingAbilities). Set by CaptureAbilityImporter.
+		public bool IsStartingAbility { get; set; }
+
 		public uint Data0 { get; set; }
 		public uint Data1 { get; set; }
 		public uint Data2 { get; set; }

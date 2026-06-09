@@ -33,23 +33,26 @@ Real mount spell decoded as `0x3BAD7D` (Fading Black Horse summon).
       observation tells me what's missing.
 
 ## 3. Combat (cast → damage → vitals)  (commit: grant starting abilities on login)
-### FIX 2026-06-09: the player is now GRANTED their starting attacks on login.
-On login the server sends the character's ClassAbilities (the universal melee attacks 769094 "Normal Attack
-Left" / 769099 "Normal Attack Front") via the retail 0x2052 ability-grant packet, rebuilt DB-driven from the
-Abilities rows (identity quad + the new `Slot` word). Byte-for-byte verified against the strickenbla combat
-capture (AbilityGrantTests). They ride the spawn conversation, sent right after the world-burst replay.
-- [ ] After a beach login, the two basic attacks should appear (drag to the hotbar from the abilities/feats
+### FIX 2026-06-09: the player is now GRANTED the full retail starting ability kit on login.
+On login the server grants the **universal starting abilities** via the retail 0x2052 ability-grant packet,
+rebuilt DB-driven from the `Abilities` rows (Slot + identity quad; byte-for-byte vs the strickenbla capture,
+AbilityGrantTests). The kit is harvested from the CREATE-flow captures by `CaptureAbilityImporter` and flagged
+`IsStartingAbility` (8 abilities: 3 Normal Attack directions 769094/769095/769099, Toggle Combat, Switch Weapon,
+Rest, + 2 utility). Sent right after the world-burst replay. (`Abilities` also now catalogs 26 abilities total -
+the higher-level/class ones from gameplay captures - but only the starting kit is granted.)
+- [ ] After a beach login, the Normal Attack abilities should appear (drag to the hotbar from the abilities/feats
       window if not auto-placed).
 - [ ] Target an NPC/mob and use an attack. The target's health bar should drop, and on 0 HP the server logs a
       kill (despawn/XP not implemented yet).
 **Expected:** target HP visibly decreases. Damage is a provisional formula for now. If NO abilities show up at
 all, grab the client log — the grant may need to fire at a different point in the world-entry sequence.
 
-**Follow-up (not done):** only the universal melee *abilities* are granted (every class gets 769094/769099) —
-enough to exercise cast→damage→vitals. Actual *spells* (e.g. class 29's spell 165241 in ClassAbilities.Spells)
-use a SEPARATE grant packet that isn't decoded/wired yet. The C++ archive's addSpell (opcode 0x09, just the
-spell id) is the OLD scheme and almost certainly dead like the old 0x4d ability grant was — needs the retail
-spell-grant packet found in a capture before wiring.
+**Follow-up — SPELLS are blocked on data (investigated 2026-06-09):** only *abilities* are granted. Casting
+*spells* needs the spell-grant packet, which **is not in any capture** — even a caster (`hoxxling`) only ever
+receives the same 8 abilities via 0x2052; none of the granted ids are in the `Spells` table, `SpellBookIIR`
+(0x6BA10936) is just a tiny notification, and the RE'd `DispatchLearnSpell(i_nSpellID)` method is never exercised.
+So wiring real spells needs a FRESH capture of a caster actually learning/having a spell (e.g. class 29's 165241).
+The C++ `addSpell` (0x09) is the dead old scheme.
 
 ## 4. Teleport GM command  (commit: fix teleport)
 Rewritten to reuse the world-entry render path.

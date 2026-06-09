@@ -16,42 +16,22 @@ namespace Faolan.GameServer
 		private const uint AbilityGrantConstantB = 0x29E627CA;
 
 		// Grants the character's starting abilities so the player has castable attacks in-world (enables the combat
-		// test, TODO #3). The set is data-driven: ClassAbilities lists "<id>_<level>" pairs per class/level (e.g. the
-		// two universal melee attacks 769094/769099), and each id resolves to an Ability row for its identity quad.
-		// Sent on the spawn conversation (same family as the 0x201c handshake), after the world has been built.
+		// test, TODO #3). The set is the universal starting kit every captured character receives via 0x2052 on
+		// login - the `Abilities` table, imported from the retail grants by CaptureAbilityImporter (3 Normal Attack
+		// directions + toggle-combat / switch-weapon / utility). Sent on the spawn conversation (same family as the
+		// 0x201c handshake), after the world has been built. (Class-specific SPELLS are a separate, not-yet-decoded
+		// grant - no capture exercises it; see TODO #3 / docs/opcode-re-plan.md.)
 		private async Task GrantStartingAbilities(INetworkClient client)
 		{
 			var character = client.Session.Character;
 			if (character == null)
 				return;
 
-			var classAbility = await Database.GetClassAbility((uint)character.Class, character.Level);
-			if (classAbility == null || string.IsNullOrWhiteSpace(classAbility.Abilities))
-			{
-				Logger.LogInformation("GrantStartingAbilities: no ClassAbilities row for class={Class} level={Level}; granting nothing.", character.Class, character.Level);
-				return;
-			}
-
-			var granted = 0;
-			foreach (var token in classAbility.Abilities.Split('-', StringSplitOptions.RemoveEmptyEntries))
-			{
-				// token = "<abilityId>_<level>" (the trailing level is the C++ const_abilitys grant level, unused here).
-				var idText = token.Split('_', 2)[0];
-				if (!uint.TryParse(idText, out var abilityId))
-					continue;
-
-				var ability = await Database.GetAbility(abilityId);
-				if (ability == null)
-				{
-					Logger.LogWarning("GrantStartingAbilities: ability {AbilityId} listed for class={Class} not found in Abilities.", abilityId, character.Class);
-					continue;
-				}
-
+			var abilities = await Database.GetStartingAbilities(character.Level);
+			foreach (var ability in abilities)
 				await SendAbilityGrant(client, ability);
-				granted++;
-			}
 
-			Logger.LogInformation("GrantStartingAbilities: granted {Count} abilities to '{Name}' (class={Class}, level={Level}).", granted, character.Name, character.Class, character.Level);
+			Logger.LogInformation("GrantStartingAbilities: granted {Count} abilities to '{Name}' (class={Class}, level={Level}).", abilities.Length, character.Name, character.Class, character.Level);
 		}
 
 		// Builds a single 0x2052 ability-grant packet from an Ability row, byte-for-byte matching the retail capture
