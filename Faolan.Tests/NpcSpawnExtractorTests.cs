@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
 using Faolan.Importer;
+using Faolan.Tests.Support;
 using Xunit;
 
 namespace Faolan.Tests
@@ -40,6 +41,32 @@ namespace Faolan.Tests
 			Assert.Equal(333.2f, npc.X, 0.1f);
 		}
 
+		// Against a REAL captured body, the extractor lifts the dissected identity from the CharacterIIR: a humanoid
+		// (Casilda) with worn equipment and an animal (Crocodile, no equipment), each with its NpcStats.template_id.
+		[Theory]
+		[InlineData("SpawnNpcCasilda", "Casilda", 9411u, 83u, 3u, true)]
+		[InlineData("SpawnNpcCrocodile", "Crocodile", 14049u, 64u, 0u, false)]
+		public void Extract_LiftsIdentityFromCapturedIir(string golden, string name, uint templateId, uint race, uint sex, bool hasEquipment)
+		{
+			var packets = new List<CapturedPacket> { MapChange(4010), RawSpawn(Golden.Bytes(golden)) };
+
+			var entry = Assert.Single(NpcSpawnExtractor.Extract(packets));
+
+			Assert.Equal(name, entry.Name);
+			Assert.Equal(templateId, entry.TemplateId);
+			Assert.Equal(race, entry.Race);
+			Assert.Equal(sex, entry.Sex);
+			Assert.Equal(hasEquipment, entry.HasEquipment);
+		}
+
+		// Wraps a raw FA015807 body (golden = the post-header body) as a 0x2000 packet (12-byte zero header).
+		private static CapturedPacket RawSpawn(byte[] body)
+		{
+			var full = new byte[12 + body.Length];
+			body.CopyTo(full, 12);
+			return new CapturedPacket(0, true, 0x2000, 0, full);
+		}
+
 		private static CapturedPacket MapChange(uint mapId)
 		{
 			var content = new byte[34];
@@ -64,7 +91,7 @@ namespace Faolan.Tests
 		private static CapturedPacket Spawn(uint handle, float x, float y, float z, string name)
 		{
 			var nameBytes = Encoding.ASCII.GetBytes(name);
-			var content = new byte[42 + nameBytes.Length];
+			var content = new byte[Math.Max(56, 42 + nameBytes.Length)]; // >= the transform end (body offset 60)
 			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(0, 4), 0xFA015807);
 			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(8, 4), handle); // body@12
 			BinaryPrimitives.WriteSingleLittleEndian(content.AsSpan(20, 4), x); // body@24

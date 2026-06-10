@@ -143,26 +143,37 @@ namespace Faolan.Importer
 
 				if (existing == null)
 				{
-					db.NpcSpawns.Add(new NpcSpawn
-					{
-						MapId = e.MapId,
-						Name = e.Name,
-						CapturedHandle = e.Handle,
-						PositionX = e.X,
-						PositionY = e.Y,
-						PositionZ = e.Z,
-						Data = e.Data
-					});
+					db.NpcSpawns.Add(Populate(new NpcSpawn { MapId = e.MapId, PositionX = e.X, PositionY = e.Y, PositionZ = e.Z }, e));
 				}
 				else
 				{
-					existing.Name = e.Name;
-					existing.CapturedHandle = e.Handle;
-					existing.Data = e.Data;
+					Populate(existing, e);
 				}
 			}
 
 			await db.SaveChangesAsync();
+		}
+
+		// Writes the transform + lifted identity onto a row (shared by insert/update); MapId/Position are the
+		// dedup key, set on insert only.
+		private static NpcSpawn Populate(NpcSpawn row, NpcSpawnEntry e)
+		{
+			row.Name = e.Name;
+			row.CapturedHandle = e.Handle;
+			row.Data = e.Data;
+			row.RotationX = e.RotX;
+			row.RotationY = e.RotY;
+			row.RotationZ = e.RotZ;
+			row.RotationW = e.RotW;
+			row.TemplateId = e.TemplateId;
+			row.Race = e.Race;
+			row.Sex = e.Sex;
+			row.Level = e.Level;
+			row.MonsterScale = e.MonsterScale;
+			row.MonsterData = e.MonsterData;
+			row.HeadMesh = e.HeadMesh;
+			row.HasEquipment = e.HasEquipment;
+			return row;
 		}
 
 		// --rdb: read the client RDB index and inventory the resource types. The server references text by id (the
@@ -273,8 +284,11 @@ namespace Faolan.Importer
 				var (abSeen, abNew, abUpd) = await CaptureAbilityImporter.ImportAsync(db, itemPackets, createPackets);
 				Console.WriteLine($"Abilities (0x2052 grants): {abSeen} seen, {abNew} new, {abUpd} updated.");
 				// After items (the equipment references them). Existing names are skipped, never overwritten.
-				var (chSeen, chAdded, chSkipped) = await CaptureCharacterImporter.ImportAsync(db, captures);
-				Console.WriteLine($"Characters: {chSeen} captured, {chAdded} added, {chSkipped} already in DB.");
+				if (!args.Contains("--skip-characters")) // TODO: CaptureCharacterImporter is not idempotent (UNIQUE CharacterBodies.CharacterId) on a populated DB
+				{
+					var (chSeen, chAdded, chSkipped) = await CaptureCharacterImporter.ImportAsync(db, captures);
+					Console.WriteLine($"Characters: {chSeen} captured, {chAdded} added, {chSkipped} already in DB.");
+				}
 				await ImportConversations(db, conversations);
 				await ImportNpcSpawns(db, NpcSpawnExtractor.Merge(captures.SelectMany(NpcSpawnExtractor.Extract)));
 				await ImportMapWorldBursts(db, MapWorldBurstExtractor.Merge(captures.SelectMany(MapWorldBurstExtractor.Extract)));

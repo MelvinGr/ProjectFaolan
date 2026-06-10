@@ -3,14 +3,30 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Faolan.GameServer.Spawn;
 
 namespace Faolan.Importer
 {
-	public sealed record NpcSpawnEntry(uint MapId, string Name, uint Handle, float X, float Y, float Z, byte[] Data);
+	public sealed record NpcSpawnEntry(uint MapId, string Name, uint Handle, float X, float Y, float Z, byte[] Data)
+	{
+		public float RotX { get; init; }
+		public float RotY { get; init; }
+		public float RotZ { get; init; }
+		public float RotW { get; init; }
+		public uint TemplateId { get; init; }
+		public uint Race { get; init; }
+		public uint Sex { get; init; }
+		public uint Level { get; init; }
+		public uint MonsterScale { get; init; }
+		public uint MonsterData { get; init; }
+		public uint HeadMesh { get; init; }
+		public bool HasEquipment { get; init; }
+	}
 
 	// Extracts NPC entity spawns (FA015807) per map from a capture: tracks the current map (MapChange 5D85BFC7),
-	// then for each spawn reads the handle (body@12), position (body@24/29/34, LE) and a best-effort name (the
-	// `0A <len> <ascii>` marker). The player's own spawn is skipped - its handle is the session client instance
+	// then for each spawn reads the handle (body@12), transform (position @24/29/34 + rotation @41.., LE) and the
+	// identity/appearance lifted from the CharacterIIR (ProtoCoreCharacterIIR via PlayerSpawnReader - the same
+	// decode the player spawn uses). The player's own spawn is skipped - its handle is the session client instance
 	// (>= 0x02000000), whereas NPC handles are small. Dedup key is (map, position); the handle/name vary.
 	public static class NpcSpawnExtractor
 	{
@@ -43,16 +59,34 @@ namespace Faolan.Importer
 
 				if (subop != SpawnSubOpcode || currentMap == 0)
 					continue;
+				if (body.Length < SpawnPacketBuilder.RotWOffset + 4)
+					continue; // too short to hold the transform (position + rotation)
 
 				var handle = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
 				if (handle >= InstanceRangeStart)
 					continue; // the player's own spawn
 
-				var x = BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(24, 4));
-				var y = BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(29, 4));
-				var z = BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(34, 4));
+				var x = ReadLE(body, SpawnPacketBuilder.PosXOffset);
+				var y = ReadLE(body, SpawnPacketBuilder.PosYOffset);
+				var z = ReadLE(body, SpawnPacketBuilder.PosZOffset);
 
-				entries.Add(new NpcSpawnEntry(currentMap, ExtractName(body), handle, x, y, z, p.Bytes));
+				var identity = LiftIdentity(body);
+				var name = !string.IsNullOrEmpty(identity.Name) ? identity.Name : ExtractName(body);
+
+				entries.Add(identity with
+				{
+					MapId = currentMap,
+					Name = name,
+					Handle = handle,
+					X = x,
+					Y = y,
+					Z = z,
+					Data = p.Bytes,
+					RotX = ReadLE(body, SpawnPacketBuilder.RotXOffset),
+					RotY = ReadLE(body, SpawnPacketBuilder.RotYOffset),
+					RotZ = ReadLE(body, SpawnPacketBuilder.RotZOffset),
+					RotW = ReadLE(body, SpawnPacketBuilder.RotWOffset)
+				});
 			}
 
 			return entries;
@@ -66,6 +100,35 @@ namespace Faolan.Importer
 				seen.TryAdd((e.MapId, e.X, e.Y, e.Z), e);
 
 			return seen.Values.ToList();
+		}
+
+		// Decodes the CharacterIIR (ProtoCoreCharacterIIR) and lifts the NPC identity/appearance. Returns an empty
+		// entry (all defaults) if the body has no decodable IIR - the offset-based transform/name path still works.
+		private static NpcSpawnEntry LiftIdentity(byte[] body)
+		{
+			var empty = new NpcSpawnEntry(0, string.Empty, 0, 0, 0, 0, null);
+			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+				return empty;
+
+			var msg = read.Message;
+			var stats = msg.Stats;
+			return empty with
+			{
+				Name = msg.Name ?? string.Empty,
+				TemplateId = msg.npc_stats?.TemplateId ?? 0, // NpcStats f4 (fixed32) = the stable per-type identity
+				Race = stats?.Race ?? 0,
+				Sex = stats?.Sex ?? 0,
+				Level = stats?.Level ?? 0,
+				MonsterScale = stats?.MonsterScale ?? 0,
+				MonsterData = stats?.MonsterData ?? 0,
+				HeadMesh = stats?.HeadMesh ?? 0,
+				HasEquipment = msg.InventoryEntries.Count > 0
+			};
+		}
+
+		private static float ReadLE(byte[] body, int offset)
+		{
+			return BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(offset, 4));
 		}
 
 		// The entity name is a `0A <len> <utf8>` field whose offset varies; scan past the position block for the
