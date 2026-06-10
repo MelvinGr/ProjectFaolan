@@ -460,6 +460,25 @@ into the DB from that blob, byte-identical). The burst is still the captured RAW
 still the remaining work, but logins no longer need an embedded blob and any map with a capture works. KNOWN: a
 couple of maps whose captured player instance is out of the 4-byte-varint range don't re-address cleanly yet.
 
+STATIC-WORLD DISSECTION DONE (2026-06-10) — workbench `Captures/dissect_world_object.py` (`one <handle-hex>` =
+full decode, no-arg = table). The three world-object sub-opcodes share the FA015807 header + 0x2C transform
+group but are SIMPLER than entity spawns - there is NO 228-byte pre-IIR float block; the object message's u32
+length prefix immediately follows the transform:
+```
+[0:20]   header: bodyLen, subOp, ack, handle, fieldA
+[20:~65] transform group 0x2C: 0A vec3(pos), 12 quat(rot), 18 playfield-varint   (no pre-IIR block)
+@msg     [u32 BE msgLen][object message]: f1=id(varint), f2=name(string), f3=nested (e.g. a remoteformat XML
+         for interactive props), f5/f8/f12 = trailers
+[msgEnd:] tail (post scaffold: an `object_*` state string + bounding-box floats + collision/interaction triples;
+          the same `0a14 0d<x>15<y>1d<z>` 20-byte vec pattern as the spawn equipment, still raw)
+```
+Sub-opcode = object CLASS: `66AEDD50` = decor/props (`004709_..._decor_chain_hangingwoman`, "Broken Bottle",
+"Acheronian Chest/Gate"), `F096251E` = interactive containers ("Chest [N7FU]", carries the remoteformat in f3),
+`33A56FB0` = zone/city label ("City of Tortage"). Beach has 12 (5+6+1). The identity is the object message
+(id/name/nested); per-instance is handle + transform. CONSTRUCTION (same arc as NPC spawns): a `MapObjects`
+table (subOp + handle + transform + the object message, tail raw at first), a `MapObjectBuilder`
+(transform from columns + message), wired into world entry byte-identical-first, then retire the burst objects.
+
 ## Phase 7 — NPC conversations (dialogue)
 
 Clicking an NPC sends an `Interact` (`642CD3D6`, actionType `0x16` = TalkToNpc); the clicked NPC's entity
