@@ -19,9 +19,13 @@ namespace Faolan.Core.Database.Tables
 		// inventory snapshot. See [[CharacterInventory]] / docs/player-spawn-generation-plan.md.
 		public virtual System.Collections.Generic.ICollection<CharacterInventory> Inventory { get; set; }
 
-		// The spawn's IIR attribute + skill/feat scaffold, structured so it can be generated instead of template-copied.
+		// The spawn's IIR scaffold, structured so it can be generated instead of template-copied: the uniform
+		// entry table (Attributes), the feat/ability ID list (Skills), the two ending pair lists (ScaffoldPairs)
+		// and the raw pre-IIR frame + scalars (SpawnFrame). See docs/player-spawn-generation-plan.md.
 		public virtual System.Collections.Generic.ICollection<CharacterAttribute> Attributes { get; set; }
 		public virtual System.Collections.Generic.ICollection<CharacterSkill> Skills { get; set; }
+		public virtual System.Collections.Generic.ICollection<CharacterScaffoldPair> ScaffoldPairs { get; set; }
+		public virtual CharacterSpawnFrame SpawnFrame { get; set; }
 
 		// One-to-one max-stat block (Health/Mana/Stamina, player-facing values). Created with class/level
 		// defaults on character creation; the ×100 vitals wire scale is applied when sending (CharacterStatBlock).

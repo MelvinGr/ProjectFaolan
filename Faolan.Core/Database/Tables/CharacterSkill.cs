@@ -2,10 +2,10 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Faolan.Core.Database.Tables
 {
-	// One of a character's skills/feats - an entry in the spawn's IIR skill scaffold (the [skillId][value][weight]
-	// table after the ProtoCoreCharacterIIR; weight is the 0x3F800000 = 1.0 marker). Per-character (the cross-capture
-	// diff proved this block varies by character), so it must come from the DB to generate the spawn without the
-	// template. See docs/player-spawn-generation-plan.md / [[CharacterAttribute]].
+	// One entry of the spawn scaffold's feat/ability ID list (the 5-byte [u8 rank][u32 id] groups after the
+	// entry table, ascending ids, 0x3F1-terminated on the wire). Per-character progression data - fresh
+	// characters start with ~20 ids, geared ones have 40+. See docs/player-spawn-generation-plan.md
+	// "VALIDATED GRAMMAR" / [[CharacterAttribute]].
 	public class CharacterSkill : BaseEntity
 	{
 		[ForeignKey(nameof(CharacterId))]
@@ -13,13 +13,10 @@ namespace Faolan.Core.Database.Tables
 
 		public uint CharacterId { get; set; }
 
-		// The skill / feat id (the IIR skill key).
+		// The feat/ability id (wire order is ascending SkillId).
 		public uint SkillId { get; set; }
 
-		// The skill value / rank.
-		public uint Value { get; set; }
-
-		// The per-entry weight (captured as 1.0 / 0x3F800000); kept for byte-faithful regeneration.
-		public float Weight { get; set; } = 1.0f;
+		// The per-id rank/slot byte (0 on fresh characters; geared captures carry values like 0x08/0x41-0x4B).
+		public byte Rank { get; set; }
 	}
 }
