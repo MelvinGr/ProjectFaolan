@@ -11,7 +11,7 @@ namespace Faolan.Tests
 	{
 		// A different position/handle changes only the mapped bytes and nothing else (length is preserved).
 		[Fact]
-		public void BuildPlayerSpawnBody_WithNewValues_OnlyChangesMappedFields()
+		public void BuildSpawnBody_WithNewValues_OnlyChangesMappedFields()
 		{
 			var template = SpawnPacketBuilder.PlayerTemplateBytes;
 			var built = SpawnPacketBuilder.BuildSpawnBody(template, 0x02000001u, new Vector3(100f, 50f, 200f), Quaternion.Identity);
@@ -26,7 +26,7 @@ namespace Faolan.Tests
 		// must reproduce the captured bytes exactly. This validates the field offsets - any mis-mapped offset
 		// corrupts the body and fails here before anything is sent to a client.
 		[Fact]
-		public void BuildPlayerSpawnBody_WithTemplateValues_IsByteIdentical()
+		public void BuildSpawnBody_WithTemplateValues_IsByteIdentical()
 		{
 			var template = SpawnPacketBuilder.PlayerTemplateBytes;
 

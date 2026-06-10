@@ -1,9 +1,6 @@
 using System;
 using System.Buffers.Binary;
-using System.IO;
-using System.Linq;
 using System.Numerics;
-using System.Reflection;
 using System.Text;
 using Faolan.Core.Data;
 using Faolan.Core.Extensions;
@@ -47,11 +44,6 @@ namespace Faolan.GameServer.Spawn
 		public static byte[] PlayerTemplateBytes => PlayerTemplate.Value;
 
 		private static readonly Lazy<byte[]> PlayerTemplate = new Lazy<byte[]>(() => PlayerSpawnTemplate.Bytes);
-
-		public static byte[] BuildPlayerSpawnBody(uint handle, Vector3 position, Quaternion rotation)
-		{
-			return BuildSpawnBody(PlayerTemplate.Value, handle, position, rotation);
-		}
 
 		// Constructs the FA015807 header + transform (position/rotation as typed ProtoVec3/ProtoQuat) and appends the
 		// rest of the captured template body via WriteArray (appearance / stats / name - not yet dissected). The
@@ -115,42 +107,6 @@ namespace Faolan.GameServer.Spawn
 			// Every enclosing length sits before the name, so its offset is unchanged; only the value grows by delta.
 			AddBigEndian(result, 0, delta); // body length field
 			AddBigEndian(result, NameOuterLengthOffset, delta); // @133
-			AddBigEndian(result, NameInnerLengthOffset, delta); // @304
-			return result;
-		}
-
-		// Rebuilds the CharacterStats component (the 0x22 field right after the name) from a typed CharacterStats,
-		// adjusting the same enclosing length prefixes SetSpawnName does (@0 body length, @133, @304 - both enclose
-		// this block) by the size delta. Operates on the known Strie-template layout (0x22 at CharacterStatsTagOffset,
-		// single-byte length prefix), returning the body unchanged otherwise. Apply BEFORE SetSpawnName: this block
-		// follows the name, so the name's own splice is unaffected, but this offset is only valid while the name is
-		// still the template's. Re-encoding the captured stats unchanged is a byte-identical no-op (the build-side
-		// oracle); override only the fields whose DB mapping is confirmed.
-		public static byte[] SetCharacterStats(byte[] body, ProtoCoreCharacterIIR.CharacterStats stats)
-		{
-			if (body.Length <= CharacterStatsTagOffset + 1 || body[CharacterStatsTagOffset] != 0x22)
-				return body;
-
-			var oldLen = body[CharacterStatsTagOffset + 1];
-			if (oldLen >= 0x80)
-				return body; // multi-byte length prefix not handled
-
-			var payload = stats.ToProtobufBytes();
-			if (payload.Length >= 0x80)
-				return body; // keep the length prefix a single byte
-
-			var delta = payload.Length - oldLen;
-			var payloadStart = CharacterStatsTagOffset + 2;
-			var afterSrc = payloadStart + oldLen;
-
-			var result = new byte[body.Length + delta];
-			Array.Copy(body, 0, result, 0, payloadStart); // through the 0x22 tag + length byte
-			result[CharacterStatsTagOffset + 1] = (byte)payload.Length;
-			payload.CopyTo(result, payloadStart);
-			Array.Copy(body, afterSrc, result, payloadStart + payload.Length, body.Length - afterSrc);
-
-			AddBigEndian(result, 0, delta); // body length field
-			AddBigEndian(result, NameOuterLengthOffset, delta); // @133 (encloses name + CharacterStats)
 			AddBigEndian(result, NameInnerLengthOffset, delta); // @304
 			return result;
 		}
