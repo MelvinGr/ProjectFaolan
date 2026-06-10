@@ -504,10 +504,22 @@ transform's LE). Stable structure:
 ...     a speed float, a repeated path segment, an orientation, and a trailer (..bf..3f5da8df..00 01)
 ```
 Beach: 16 MoveTasks, waypoint counts 5..25 (a wandering NPC like Kalanthes has many; a near-static one has 2).
-This is the world burst's LARGEST/most-variable remaining family and carries patrol-AI data not in any table.
-STILL TO DO: nail the control-byte grammar between waypoints byte-exact (the per-segment count/flag bytes,
-speed, orientation, trailer) -> a `PatrolPath`/`MoveTask` schema (handle + waypoint list + params) -> a builder
-keyed by the spawn handle -> wire it in. The hardest of the remaining burst families.
+The full form is a MULTI-SEGMENT movement script: each segment is prefixed `04 01 XX YY 01 ZZ` and carries a
+speed float + per-segment param floats + a waypoint count, then its waypoints; segment count + params vary
+widely. This is the world burst's largest/most-variable family and carries patrol-AI data not in any table.
+
+MINIMAL STATIONARY FORM — BUILT (2026-06-10, commit 3b8dfa4). A non-patrolling NPC's MoveTask is a constant
+31-byte body (confirmed across 58 captured instances): `[bodyLen=27][96C46740][ack=0xC350][handle][00 00][vec3
+pos BIG-ENDIAN][06]` (the `06` terminator vs `04` = a movement segment follows). `MoveTaskBuilder.BuildStationary
+(handle, position)` constructs it byte-exact (`MoveTaskBuilderTests`). This UNBLOCKS the burst-free NPC path:
+an NPC needs only its position (already in NpcSpawns) to register + render standing still, so the full
+multi-segment patrol grammar becomes an ENHANCEMENT, not a blocker.
+
+STILL TO DO: the full patrol-path grammar (the per-segment control bytes/speed/params byte-exact) -> a
+`PatrolPath` schema -> a full builder, IF moving NPCs are wanted. For now `BuildStationary` + the spawn position
+is enough to construct an NPC's registration from scratch. Wiring the burst-free spawn (NpcSpawn -> built spawn +
+built stationary MoveTask + built world objects, allocating fresh handles) is the in-client step that finally
+retires the MapWorldBurst blob.
 
 ## Phase 7 — NPC conversations (dialogue)
 
