@@ -119,8 +119,14 @@ is 0x00/0x01, subindex small, value a float-encoded 32-bit (e.g. 0x3D343958). Th
 face morphs. (Strie's spawn-player-template.bin login spawn looked different only because she'd progressed a little;
 the base format is the uniform one.) Maps onto CharacterSkill {SkillId=index, Value=value, + type/subindex columns}.
 The fresh-char scaffold (header + 7 weighted attribute entries + this uniform feat-list + the 0003F1 tail) is now
-fully parseable -> generation is unblocked; scaffold-A (the ~constant attribute block before the CharacterIIR) is the
-last piece to dissect.
+fully parseable -> generation is unblocked; scaffold-A is the last piece - and it's NEAR-CONSTANT: across fresh chars
+(Dikketest vs Strickenen) only ONE byte differs (offset 15, 0x08 vs 0x21; a small per-char value), the rest is a fixed
+block (zeros + float 15.0 / 0x07E2 / 0x03F1 / 0x41000082 08). **So the dissection is COMPLETE - no RE unknowns left.**
+The whole fresh-char scaffold = fixed constants + the char's 7 attribute values (CharacterAttribute) + the uniform
+feat/skill list (CharacterSkill) + the one scaffold-A variant byte. Retiring PlayerSpawnTemplate is now pure
+implementation: a scaffold codec (parse a fresh spawn -> rows + generate rows -> bytes, byte-exact oracle on e.g.
+Dikketest), extract to seed a char's rows, generate scaffold-A(const+byte)+scaffold-B(attrs+feats)+tail, splice in
+place of the template scaffold, harness-verify (finicky spawn), delete the constant.
 
 **Tail = a feat/ability ID list (dissected further).** After the 7 weighted attribute entries: one more weighted
 entry (idx 7, a float weight, not 1.0) then a **variable-width sorted ID list** with its own header (`01 2c ...`) of
