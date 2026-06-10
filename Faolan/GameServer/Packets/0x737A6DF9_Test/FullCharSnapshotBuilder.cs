@@ -28,7 +28,8 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 		// The first bag cell of a fresh character's snapshot is pos 1 (Strie's captured starter bag).
 		private const uint BagFirstPos = 1;
 
-		public static List<ProtoInventoryGame> BuildContainers(uint instance, IReadOnlyDictionary<ulong, (Item Item, uint Archetype)> equipped, (Item Item, uint Archetype)? bagFirst)
+		public static List<ProtoInventoryGame> BuildContainers(uint instance, IReadOnlyDictionary<ulong, (Item Item, uint Archetype)> equipped, (Item Item, uint Archetype)? bagFirst,
+			IReadOnlyCollection<CharacterInventory> inventoryRows = null)
 		{
 			var containers = new List<ProtoInventoryGame>
 			{
@@ -41,8 +42,34 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 			foreach (var (slot, resolved) in equipped.OrderBy(kv => kv.Key))
 				containers[0].Items.Add(SnapshotItemBuilder.BuildListEntry(slot, ItemId(instance, EquippedKind, slot), RecordId(instance, EquippedKind, slot), 1, resolved.Item, resolved.Archetype));
 
-			if (bagFirst != null)
+			// CharacterInventory rows fill their container by kind (bag rows from unequip persistence; resource/
+			// quest rows once something writes them). Buildable items only - a row without real identity is
+			// silently absent, like the equipped path.
+			var byKind = containers.ToDictionary(c => c.InventoryId.Type);
+			var bagSlotsTaken = new HashSet<ulong>();
+			foreach (var row in (inventoryRows ?? []).Where(r => r.Item is { Archetype: not 0 }).OrderBy(r => r.Slot))
+			{
+				if (!byKind.TryGetValue((uint)row.Container, out var container))
+					continue;
+
+				var slot = (ulong)row.Slot;
+				container.Items.Add(SnapshotItemBuilder.BuildListEntry(slot, ItemId(instance, (uint)row.Container, slot), RecordId(instance, (uint)row.Container, slot), row.Count, row.Item, row.Item.Archetype));
+				if (container.InventoryId.Type == BagKind)
+					bagSlotsTaken.Add(slot);
+			}
+
+			// The seeded starter-bag item (legacy FirstPosBag nav) renders at the captured fresh-bag cell unless
+			// a persisted row already occupies it.
+			if (bagFirst != null && !bagSlotsTaken.Contains(BagFirstPos))
 				containers[1].Items.Add(SnapshotItemBuilder.BuildListEntry(BagFirstPos, ItemId(instance, BagKind, BagFirstPos), RecordId(instance, BagKind, BagFirstPos), 1, bagFirst.Value.Item, bagFirst.Value.Archetype));
+
+			// Captured containers list entries in ascending pos.
+			foreach (var container in containers)
+			{
+				var sorted = container.Items.OrderBy(e => e.Pos).ToList();
+				container.Items.Clear();
+				container.Items.AddRange(sorted);
+			}
 
 			return containers;
 		}

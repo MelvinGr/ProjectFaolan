@@ -80,6 +80,28 @@ namespace Faolan.Tests
 			}
 		}
 
+		// Persisted CharacterInventory rows fill their container by kind: bag rows render at their cells (the
+		// seeded FirstPosBag yields its cell to a persisted row), entries stay pos-ascending, and rows without
+		// buildable identity are absent.
+		[Fact]
+		public void BuildContainers_RendersPersistedBagRows()
+		{
+			var rows = new[]
+			{
+				new CharacterInventory { Container = 104, Slot = 3, Item = Manacles, ItemId = Manacles.Id, Count = 2 },
+				new CharacterInventory { Container = 104, Slot = 1, Item = Signet, ItemId = Signet.Id }, // occupies the FirstPosBag cell
+				new CharacterInventory { Container = 104, Slot = 5, Item = new Item { Id = 9, Archetype = 0 }, ItemId = 9 } // not buildable
+			};
+
+			var containers = FullCharSnapshotBuilder.BuildContainers(0x02000005, new Dictionary<ulong, (Item, uint)>(), (Manacles, Manacles.Archetype), rows);
+
+			var bag = containers[1].Items;
+			Assert.Equal(new uint[] { 1, 3 }, bag.Select(e => e.Pos)); // row at 1 wins over FirstPosBag; pos-ascending
+			Assert.Equal(Signet.Id, bag[0].Item.ItemData.Template1);
+			Assert.Equal(Manacles.Id, bag[1].Item.ItemData.Template1);
+			Assert.Equal(2u, bag[1].Item.StatLists.Single(s => s.Stat == 26).Value); // stack count from the row
+		}
+
 		[Fact]
 		public void BuildContainers_AllocatesUniqueStableIds()
 		{

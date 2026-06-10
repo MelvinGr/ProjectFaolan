@@ -1,8 +1,10 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Faolan.GameServer.Packets._0x737A6DF9_Test;
 using Microsoft.Extensions.Logging;
 
 // ReSharper disable once CheckNamespace
@@ -15,8 +17,9 @@ namespace Faolan.GameServer
 	public partial class GameServerListener
 	{
 		// Player equipped an item: bag slot `fromBagSlot` -> equip slot `targetSlot`, carrying the item's template
-		// handle (the p_items/Items id). Persists targetSlot = item and clears the bag source if it held it.
-		private async Task PersistEquip(INetworkClient client, CharacterEquipmentSlot targetSlot, uint itemHandle)
+		// handle (the p_items/Items id). Persists targetSlot = item and consumes the bag source: the
+		// CharacterInventory row at fromBagSlot when it holds this template, plus the legacy FirstPosBag nav.
+		private async Task PersistEquip(INetworkClient client, CharacterEquipmentSlot targetSlot, uint itemHandle, int fromBagSlot)
 		{
 			var character = client.Session.Character;
 			if (character == null)
@@ -48,7 +51,14 @@ namespace Faolan.GameServer
 					equipment.FirstPosBag = null;
 
 				await Database.SaveCharacterEquipment(equipment);
-				Logger.LogInformation("Persisted EQUIP: {Name} ({Id}) -> {Slot} for character {CharacterId}.", item.Name, item.Id, targetSlot, character.Id);
+
+				// Consume the bag row the item came from (no-op when the source was the seeded FirstPosBag or a
+				// captured-only entry).
+				var bagRows = await Database.GetCharacterInventory(character.Id);
+				if (bagRows.Any(r => r.Container == (int)FullCharSnapshotBuilder.BagKind && r.Slot == fromBagSlot && r.ItemId == item.Id))
+					await Database.SetCharacterInventorySlot(character.Id, (int)FullCharSnapshotBuilder.BagKind, fromBagSlot, null);
+
+				Logger.LogInformation("Persisted EQUIP: {Name} ({Id}) bag[{BagSlot}] -> {Slot} for character {CharacterId}.", item.Name, item.Id, fromBagSlot, targetSlot, character.Id);
 			}
 			catch (Exception ex)
 			{
@@ -56,9 +66,10 @@ namespace Faolan.GameServer
 			}
 		}
 
-		// Player unequipped the item in equip slot `fromSlot` (into the bag). Persists fromSlot = empty and parks the
-		// item in the bag (FirstPosBag) so it is not lost.
-		private async Task PersistUnequip(INetworkClient client, CharacterEquipmentSlot fromSlot)
+		// Player unequipped the item in equip slot `fromSlot` into bag cell `targetBagSlot`. Persists fromSlot =
+		// empty and parks the item as a CharacterInventory bag row at that cell, so multiple unequips coexist
+		// (the old behavior parked everything into the single FirstPosBag nav - a second unequip lost the first).
+		private async Task PersistUnequip(INetworkClient client, CharacterEquipmentSlot fromSlot, int targetBagSlot)
 		{
 			var character = client.Session.Character;
 			if (character == null)
@@ -78,10 +89,10 @@ namespace Faolan.GameServer
 				}
 
 				SetEquipmentSlot(equipment, fromSlot, null);
-				equipment.FirstPosBag = current; // park it in the bag
-
 				await Database.SaveCharacterEquipment(equipment);
-				Logger.LogInformation("Persisted UNEQUIP: {Name} ({Id}) from {Slot} -> bag for character {CharacterId}.", current.Name, current.Id, fromSlot, character.Id);
+				await Database.SetCharacterInventorySlot(character.Id, (int)FullCharSnapshotBuilder.BagKind, targetBagSlot, current.Id);
+
+				Logger.LogInformation("Persisted UNEQUIP: {Name} ({Id}) from {Slot} -> bag[{BagSlot}] for character {CharacterId}.", current.Name, current.Id, fromSlot, targetBagSlot, character.Id);
 			}
 			catch (Exception ex)
 			{

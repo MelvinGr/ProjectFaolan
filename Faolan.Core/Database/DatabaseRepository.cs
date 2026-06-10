@@ -31,6 +31,8 @@ namespace Faolan.Core.Database
 		Task<Character> GetCharacter(uint id);
 
 		Task<CharacterEquipment> GetCharacterEquipment(uint characterId);
+		Task<CharacterInventory[]> GetCharacterInventory(uint characterId);
+		Task SetCharacterInventorySlot(uint characterId, int container, int slot, uint? itemId, uint count = 1);
 		Task<Character> GetCharacterForAccount(uint accountId, uint clientInstance);
 		Task<Character> GetCharacterScaffold(uint characterId);
 		Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names);
@@ -282,6 +284,48 @@ namespace Faolan.Core.Database
 			return await ctx.CharacterEquipment.Include(e => e.Neck).Include(e => e.Head).Include(e => e.Tokens).Include(e => e.Chest).Include(e => e.MainHandLeft).Include(e => e.MainHandRight).Include(e => e.OffHandLeft)
 				.Include(e => e.OffHandRight).Include(e => e.Belt).Include(e => e.RingLeft).Include(e => e.RingRight).Include(e => e.Cloak).Include(e => e.Shoulder).Include(e => e.Boots).Include(e => e.Hands).Include(e => e.Legs)
 				.Include(e => e.FirstPosBag).Include(e => e.Wrist).FirstOrDefaultAsync(e => e.CharacterId == characterId);
+		}
+
+		// The character's non-worn carried items (bag/resource/quest container rows), with the item navs for the
+		// snapshot builder. Detached like every read here.
+		public async Task<CharacterInventory[]> GetCharacterInventory(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.CharacterInventory.Include(i => i.Item).Where(i => i.CharacterId == characterId).ToArrayAsync();
+		}
+
+		// Upserts (itemId set) or clears (itemId null) ONE container cell - the persistence unit of the client's
+		// inventory moves (equip consumes the source cell, unequip parks into the target cell).
+		public async Task SetCharacterInventorySlot(uint characterId, int container, int slot, uint? itemId, uint count = 1)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var row = await ctx.CharacterInventory.FirstOrDefaultAsync(i => i.CharacterId == characterId && i.Container == container && i.Slot == slot);
+
+			if (itemId == null)
+			{
+				if (row == null)
+					return;
+
+				ctx.CharacterInventory.Remove(row);
+			}
+			else if (row == null)
+			{
+				ctx.CharacterInventory.Add(new CharacterInventory
+				{
+					CharacterId = characterId,
+					Container = container,
+					Slot = slot,
+					ItemId = itemId,
+					Count = count
+				});
+			}
+			else
+			{
+				row.ItemId = itemId;
+				row.Count = count;
+			}
+
+			await ctx.SaveChangesAsync();
 		}
 
 		public async Task<Character> GetCharacterForAccount(uint accountId, uint clientInstance)

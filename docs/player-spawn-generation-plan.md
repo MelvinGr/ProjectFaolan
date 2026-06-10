@@ -195,6 +195,13 @@ The same playbook applied to the FullChar/inventory snapshot:
   Smoke-verified in-client 16/16: generated containers + patched tails live in the same session, no
   fallback warnings in the server log.
 
+- **Bag rows WIRED (same day)**: `CharacterInventory` now has its writer — unequip parks the item as a bag
+  row at the client-given cell (multiple unequips coexist; the old single-`FirstPosBag` parking lost items),
+  equip consumes the source row; world entry renders the rows in their containers by kind (`BuildContainers`
+  inventoryRows; the seeded FirstPosBag yields its cell to a persisted row; entries pos-ascending). Locked
+  by `InventorySlot_UpsertAndClear_RoundTripAcrossContexts` + `BuildContainers_RendersPersistedBagRows`;
+  smoke 16/16 with a live bag item rendered from rows.
+
 Remaining for full FullChar generation:
 - **Tails beyond live values**: quest/`remoteformat` XML records + the access-window table are progression
   state (captured verbatim today); a from-scratch fresh-character tails build would need those modeled.
@@ -203,7 +210,7 @@ Remaining for full FullChar generation:
   XML appears in the tails — dikketest has X=1 with zero XML; per-session changes track quest activity:
   Strie 2→1, necrol80 15↔43, demol80 70/71; the access-window count is constant 172 and unrelated). Y remains
   session-varying (fresh: 0x44/0x49 by account type). Cracking X exactly belongs with the quest system.
-- **Bag beyond slot 1** from `CharacterInventory` rows (table exists; bag capacity must track upgrades).
+- ~~Bag beyond slot 1~~ — DONE (rows wired, see above); bag capacity still fixed at the starter 24 (track upgrades when bags become acquirable).
 
 ## Remaining (optional)
 

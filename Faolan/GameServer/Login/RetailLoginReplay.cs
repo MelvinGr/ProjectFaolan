@@ -108,7 +108,7 @@ namespace Faolan.GameServer
 			{
 				var typedRoot = ((ReadOnlySpan<byte>)rootBytes).FromProtobuf<ProtoFullCharacterIIR>();
 				typedRoot.Inventories.Clear();
-				foreach (var container in FullCharSnapshotBuilder.BuildContainers(instance, dbInventory.Equipped, dbInventory.BagFirst))
+				foreach (var container in FullCharSnapshotBuilder.BuildContainers(instance, dbInventory.Equipped, dbInventory.BagFirst, dbInventory.Rows))
 					typedRoot.Inventories.Add(container);
 				rootBytes = typedRoot.ToProtobufBytes();
 				Logger.LogInformation("Inventory containers GENERATED from DB: {Equipped} equipped + {Bag} bag item(s).", dbInventory.Equipped.Count, dbInventory.BagFirst.HasValue ? 1 : 0);
@@ -308,7 +308,10 @@ namespace Faolan.GameServer
 			// same slot/itemId/recordId, so the entry count and the tails stay byte-stable (the safe path proven in
 			// client). Resolved once here (async) so the send loop stays tight. Empty => inventory sent verbatim.
 			var equipment = await EnsureBeachStarterEquipment(client.Session.Character);
-			var dbInventory = ResolveDbInventory(equipment);
+			var inventoryRows = client.Session.Character != null
+				? await Database.GetCharacterInventory(client.Session.Character.Id)
+				: [];
+			var dbInventory = ResolveDbInventory(equipment, inventoryRows);
 
 			// The spawn-scaffold rows (entry table / feat-ID list / pre-IIR frame) drive the player spawn's
 			// scaffold frame; characters without rows are seeded with the fresh-character defaults once.
@@ -602,9 +605,12 @@ namespace Faolan.GameServer
 		}
 
 		// Resolves which CharacterEquipment slots hold a fully-buildable item (template in Items + archetype harvested).
-		private static DbInventory ResolveDbInventory(CharacterEquipment equipment)
+		private static DbInventory ResolveDbInventory(CharacterEquipment equipment, CharacterInventory[] inventoryRows)
 		{
-			var inventory = new DbInventory();
+			var inventory = new DbInventory
+			{
+				Rows = inventoryRows ?? []
+			};
 			if (equipment == null)
 				return inventory;
 
@@ -685,8 +691,11 @@ namespace Faolan.GameServer
 			public readonly Dictionary<ulong, (Item Item, uint Archetype)> Equipped = new Dictionary<ulong, (Item Item, uint Archetype)>();
 			public (Item Item, uint Archetype)? BagFirst;
 
+			// Persisted CharacterInventory rows (bag cells from unequips; resource/quest once written).
+			public CharacterInventory[] Rows = [];
+
 			public int Count =>
-				Equipped.Count + (BagFirst.HasValue
+				Equipped.Count + Rows.Length + (BagFirst.HasValue
 					? 1
 					: 0);
 		}

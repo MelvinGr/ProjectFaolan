@@ -304,7 +304,7 @@ namespace Faolan.GameServer
 											? BinaryPrimitives.ReadUInt32BigEndian(unk2.AsSpan(0, 4))
 											: 0;
 										if (equipHandle != 0)
-											await PersistEquip(client, targetSlot, equipHandle);
+											await PersistEquip(client, targetSlot, equipHandle, (int)fromSlot);
 
 										break;
 									}
@@ -316,8 +316,9 @@ namespace Faolan.GameServer
 
 										await LogToClient($"EquippedToInventory: ({fromSlot} -> {targetSlot}) {args}");
 
-										// Unequip is identified by the source equip slot (the trailing handle is 0).
-										await PersistUnequip(client, fromSlot);
+										// Unequip is identified by the source equip slot (the trailing handle is 0);
+										// `target` is the bag cell the item lands in.
+										await PersistUnequip(client, fromSlot, (int)targetSlot);
 
 										break;
 									}
