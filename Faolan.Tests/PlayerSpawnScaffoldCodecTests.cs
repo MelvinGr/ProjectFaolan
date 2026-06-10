@@ -10,8 +10,8 @@ namespace Faolan.Tests
 	// Locks the PlayerSpawnScaffoldCodec round-trip: a player FA015807 body decomposed into the structured
 	// scaffold (transform / pre-IIR frame / CharacterIIR / entry table / ID list / end pairs / buff records)
 	// and regenerated must be byte-for-byte identical. The golden fixtures are real captured player spawns
-	// covering every layout variant the captures contain (the Python prototype proved the grammar over all 34
-	// player-own spawns; these pin the C# port):
+	// covering every layout variant the captures contain (the Python prototype proved the grammar over all 37
+	// player-own spawns, including captures added after the codec was written; these pin the C# port):
 	//   SpawnEditorPreview      - in-editor preview, 228-byte constant pre frame, empty scaffold
 	//   SpawnDikketestLogin     - fresh char at world entry (the fresh-character generation reference)
 	//   SpawnNecroL80KingsCastle  - geared char, 339-byte pre frame with the 26-slot table, end pairs
