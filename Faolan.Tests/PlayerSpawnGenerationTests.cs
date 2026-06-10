@@ -49,6 +49,20 @@ namespace Faolan.Tests
 			Assert.NotNull(decoded.Bcc);
 		}
 
+		// The dynamic reader locates the CharacterIIR in any spawn; on the Strie template it must agree with the fixed
+		// SpawnPacketBuilder offsets (NameTagOffset / NameInnerLengthOffset).
+		[Fact]
+		public void PlayerSpawnReader_LocatesCharacterMessage_OnTemplate()
+		{
+			var body = SpawnPacketBuilder.PlayerTemplateBytes;
+			var innerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(SpawnPacketBuilder.NameInnerLengthOffset, 4));
+
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var result));
+			Assert.Equal(SpawnPacketBuilder.NameTagOffset, result.Offset);
+			Assert.Equal(innerLen, result.Length);
+			Assert.Equal("Strie", result.Message.Name);
+		}
+
 		// Build-side oracle: replacing the CharacterIIR component with its own decoded form is a byte-identical no-op.
 		[Fact]
 		public void SetCharacterMessage_WithUnchangedDecodedMessage_IsByteIdentical()
