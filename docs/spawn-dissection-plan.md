@@ -475,9 +475,21 @@ length prefix immediately follows the transform:
 Sub-opcode = object CLASS: `66AEDD50` = decor/props (`004709_..._decor_chain_hangingwoman`, "Broken Bottle",
 "Acheronian Chest/Gate"), `F096251E` = interactive containers ("Chest [N7FU]", carries the remoteformat in f3),
 `33A56FB0` = zone/city label ("City of Tortage"). Beach has 12 (5+6+1). The identity is the object message
-(id/name/nested); per-instance is handle + transform. CONSTRUCTION (same arc as NPC spawns): a `MapObjects`
-table (subOp + handle + transform + the object message, tail raw at first), a `MapObjectBuilder`
-(transform from columns + message), wired into world entry byte-identical-first, then retire the burst objects.
+(id/name/nested) + tail; the per-session bits are handle + playfield (the world/zone instance id) + transform.
+
+CONSTRUCTION DONE (2026-06-10, commits 7fce36c + 842f5fd) — same arc as NPC spawns:
+- `WorldObject` table (NOTE: the pre-existing `MapObject` is the unrelated archive table) + migration;
+  `WorldObjectExtractor` lifts subOpcode/transform/id/name; importer populates faolan.db (644 objects: 548
+  decor, 51 containers, 45 zones, all named). `IDatabaseRepository.GetWorldObjects(mapId)`.
+- `WorldObjectBuilder.TryBuild` (full body from columns — for the future burst-free build) + byte-exact tests
+  across all three classes (`WorldObjectBuilderTests`/`WorldObjectExtractorTests`).
+- Wired into `ReplayMapWorldBurst`: each burst object is matched to its row by position and built via
+  `WorldObjectBuilder.TryBuildOntoLivePlacement` - keeps the LIVE placement (handle/transform/playfield) and
+  splices in only the DB object identity (message + tail), put on the wire when byte-identical. Beach: 4/12
+  (the static zone + decor) now come from the table byte-identical, zero risk.
+- REMAINING: the 8 interactive chests differ in the tail (per-session instance ids + collision floats = object
+  state), so they keep the verbatim burst body until that state is normalized (in-client). Then a per-class
+  `WorldObject` build from columns + fresh handle/playfield to fully retire the burst objects.
 
 ## Phase 7 — NPC conversations (dialogue)
 
