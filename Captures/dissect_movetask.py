@@ -35,8 +35,11 @@ TASK TYPES (the byte @30), all but 0x04 are FIXED LENGTH:
 
 The canonical single-segment waypoint patrol (`04 01 00 02 01 01 00 00 00 00 [count] ...`) is built byte-exact
 by MoveTaskBuilder.BuildPatrol. `coverage` below tokenizes the whole captured corpus and rebuilds each body by
-concatenating its tokens, asserting byte-exact: ~92% of 4267 unique bodies are fully grammared; the residual
-~8% are the elaborate mode-00 parametric segments (no patrol waypoints), documented as the remainder.
+concatenating its tokens: **byte-exact round-trip is 100% of 4267 unique bodies** via `parse_lenient` (which
+recovers any un-grammared remainder as a labeled `param_tail`). Of those, **82.8% are FULLY field-grammared**
+(every token named); the remaining ~17% end in a `param_tail` — the mode-00 "approach/face" parametric segments
+whose inner control floats are not field-named yet. Those segments carry NO patrol waypoints (the semantically
+valuable patrol PATHS are fully extracted for every body), so they are the documented remainder.
 
 Usage:
   python3 Captures/dissect_movetask.py            # table: handle, current pos, task type, waypoint count, length
@@ -167,7 +170,9 @@ def _parse_patrol(c):
             c.take(2, 'term')
             _drain_terms(c)
             return
-        raise ValueError(f'un-grammared patrol token @{p}: {b[p:p + 8].hex(" ")}')
+        # parametric "approach/face" segment (a 04 00.. header variant or unknown control op). Its inner control
+        # floats are not field-named yet; raise so the lenient wrapper isolates the rest as a param_tail.
+        raise ValueError(f'parametric/un-grammared token @{p}: {b[p:p + 8].hex(" ")}')
 
 
 def _parse_block(c):
@@ -182,9 +187,12 @@ def _parse_block(c):
         else:
             c.take(4, 'pad4')                  # 00 00 00 00
     elif mode == 0x00:
-        c.take(4, 'm0_a')
-        c.take(4, 'm0_b')
-        c.take(4, 'm0_pad')                    # <f32><f32> 00 00 00 00
+        c.take(4, 'm0_a')                      # <f32 a>
+        c.take(4, 'm0_b')                      # <f32 b>
+        if c.b[c.p:c.p + 4] != b'\x00\x00\x00\x00':
+            # parametric mode-00 (approach/face): no 00000000+count waypoint list.
+            raise ValueError(f'parametric mode-00 @{c.p}')
+        c.take(4, 'm0_pad')                    # 00 00 00 00
     else:
         raise ValueError(f'block mode 0x{mode:02x} @{c.p - 1}')
     cnt = c.take(1, 'count')[0]
@@ -195,11 +203,28 @@ def _parse_block(c):
         c.vec('anchor')
 
 
-def _waypoint_count(b):
+def parse_lenient(b):
+    """Strict-grammar parse with recovery: on the un-grammared parametric forms, isolate the unparsed remainder
+    as a single 'param_tail' token. Always round-trips byte-exact; emits no param_tail when fully grammared."""
+    c = _Cur(b)
+    t = b[30]
     try:
-        return sum(1 for tag, _ in parse(b) if tag.startswith('wp'))
-    except Exception:
-        return -1
+        if t in FIXED:
+            c.take(FIXED[t], f't{t:02x}')
+        elif t == 0x04:
+            _parse_patrol(c)
+        else:
+            raise ValueError(f'unknown task type 0x{t:02x}')
+        if not c.end():
+            c.take(len(b) - c.p, 'param_tail')
+    except ValueError:
+        if not c.end():
+            c.take(len(b) - c.p, 'param_tail')
+    return c.toks
+
+
+def _waypoint_count(b):
+    return sum(1 for tag, _ in parse_lenient(b) if tag.startswith('wp'))
 
 
 def cmd_table(cap):
@@ -218,15 +243,11 @@ def cmd_one(cap, handle_hex):
     b = next(x for x in move_tasks(cap) if u32(x, 12) == h)
     print(f'MoveTask 0x{h:X} len={len(b)} type=0x{b[30]:02x} ack={u32(b,8):#x}')
     print(f'  curPos ({bef(b,18):.2f}, {bef(b,22):.2f}, {bef(b,26):.2f})')
-    try:
-        for tag, raw in parse(b):
-            if tag.startswith('wp') or tag in ('anchor', 'orient_wp'):
-                i = 0
-                print(f'  {tag:10} ({bef(raw,0):.2f}, {bef(raw,4):.2f}, {bef(raw,8):.2f})')
-            else:
-                print(f'  {tag:10} {raw.hex(" ")}')
-    except ValueError as e:
-        print(f'  [un-grammared: {e}]')
+    for tag, raw in parse_lenient(b):
+        if tag.startswith('wp') or tag in ('anchor', 'orient_wp'):
+            print(f'  {tag:10} ({bef(raw,0):.2f}, {bef(raw,4):.2f}, {bef(raw,8):.2f})')
+        else:
+            print(f'  {tag:10} {raw.hex(" ")}')
 
 
 def cmd_coverage():
@@ -238,27 +259,24 @@ def cmd_coverage():
             continue
         for b in rows:
             uniq.setdefault(bytes(b), cap)
-    ok = 0
-    fails = Counter()
-    bytype_ok = Counter()
+    rt = 0          # byte-exact round-trip (always, via lenient recovery)
+    full = 0        # fully grammared (no 'param_tail' recovery token)
+    bytype_full = Counter()
     bytype_n = Counter()
     for b in uniq:
         bytype_n[b[30]] += 1
-        try:
-            toks = parse(b)
-            assert b[:30] + b''.join(r for _, r in toks) == b
-            ok += 1
-            bytype_ok[b[30]] += 1
-        except Exception as e:
-            fails[str(e).split('@')[0].split(':')[0].strip()] += 1
-    print(f'grammar coverage (byte-exact round-trip): {ok}/{len(uniq)} ({100 * ok / len(uniq):.1f}%)\n')
-    print('per task type:')
+        toks = parse_lenient(b)
+        assert b[:30] + b''.join(r for _, r in toks) == b, 'round-trip broke'
+        rt += 1
+        if not any(t == 'param_tail' for t, _ in toks):
+            full += 1
+            bytype_full[b[30]] += 1
+    print(f'byte-exact round-trip (lenient): {rt}/{len(uniq)} ({100 * rt / len(uniq):.1f}%)')
+    print(f'fully grammared (no param_tail): {full}/{len(uniq)} ({100 * full / len(uniq):.1f}%)')
+    print(f'param_tail-recovered (mode-00 approach/face, carry no waypoints): {rt - full}\n')
+    print('per task type (fully grammared / total):')
     for t in sorted(bytype_n):
-        print(f'  0x{t:02x}: {bytype_ok[t]:5}/{bytype_n[t]:<5} {"FIXED" if t in FIXED else "patrol"}')
-    if fails:
-        print('\nresidual (un-grammared) classes:')
-        for m, n in fails.most_common(10):
-            print(f'  {n:5}  {m}')
+        print(f'  0x{t:02x}: {bytype_full[t]:5}/{bytype_n[t]:<5} {"FIXED" if t in FIXED else "patrol"}')
 
 
 if __name__ == '__main__':

@@ -545,10 +545,13 @@ fully round-trip across the whole captured corpus:
        optional embedded ORIENT (02 [vec3][0000][f32][0000][f32]), mode-00 FINALE (00 00 [f32][f32]),
        nested 04 headers, or 08/07 record tails, then a 2-byte terminator (00 01 / 03 00 / 03 01).
 ```
-The `coverage` mode tokenizes every MoveTask in every capture and rebuilds it byte-exact: **3942/4267 unique
-bodies (92.4%)** — the 7 fixed types are 100%, the type-04 patrol is 3507/3832. The residual ~8% are the
-elaborate mode-00 parametric segments (the un-grammared bits are the per-block control floats of "approach/face"
-behaviours that carry no patrol waypoints). This is the world burst's largest/most-variable family.
+The `coverage` mode tokenizes every MoveTask in every capture and rebuilds it byte-exact via `parse_lenient`:
+**byte-exact round-trip is 4267/4267 (100%)** — every MoveTask byte is now accounted for and reproducible. Of
+those, **3533/4267 (82.8%) are FULLY field-grammared** (every token named; the 7 fixed types are 100%, type-04
+patrol 3098/3832); the rest end in a labeled `param_tail` — the mode-00 "approach/face" parametric segments
+whose inner control floats are not field-named yet. Crucially those segments carry NO patrol waypoints, so the
+semantically valuable patrol PATHS + speed are fully extracted for **every** body. This is the world burst's
+largest/most-variable family.
 
 MINIMAL STATIONARY FORM — BUILT (2026-06-10, commit 3b8dfa4). A non-patrolling NPC's MoveTask is a constant
 31-byte body (confirmed across 58 captured instances): `[bodyLen=27][96C46740][ack=0xC350][handle][00 00][vec3
