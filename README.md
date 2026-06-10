@@ -7,8 +7,10 @@ The solution contains:
 - `Faolan/` - the server implementation (UniverseAgent, PlayerAgent, CsPlayerAgent, AgentServer, GameServer)
 - `Faolan.Core/` - shared data, networking, enums, crypto, and database code
 - `Faolan.PacketAnalyzer/` - packet capture dump/analyzer tooling (pcapng -> JSON)
-- `Faolan.Importer/` - CLI that (re)builds the DB from the captures (pcap -> DB); see `docs/faolan-importer-plan.md`
+- `Faolan.Importer/` - CLI that (re)builds the DB from the captures + client RDB (pcap -> DB); see `docs/faolan-importer-plan.md`
+- `Faolan.ClientLauncher/` - launches the retail client unattended (patcher stand-in; auto-login; see `docs/client-launcher.md`)
 - `Faolan.Wireshark/` - a Wireshark/tshark C plugin that inflates GameServer zlib streams
+- `Faolan.Tests/` - the unit/golden test suite (byte-exact round-trips are the acceptance gates)
 - `Captures/` - reference `.pcapng` and `.json` traces used for protocol comparison
 
 ## Server flow
@@ -66,9 +68,12 @@ extracted data straight into the DB. It imports: **item identities** from invent
 `ConversationPacket`); **maps** from `MapChange` packets (`CaptureMapImporter` → new `Map` rows); and **cast
 spell ids** from `ApplySpell` (`CaptureSpellImporter` → id-only `Spell` rows; names/params are client-side). With
 `--archive <dir>` it also imports the archive's **ability/spell definitions** (`p_abilities` → `Ability`,
-`const_abilitys` → `ClassAbility`) - the spellbook is class/level-derived, not in captures. It also catalogs
-**NPC spawns** per map (`NpcSpawnExtractor` → `NpcSpawn`) and stores each map's full **world burst**
-(`MapWorldBurstExtractor` → `MapWorldBurst`) - the data the login path replays to render any map. Each run prints
+`const_abilitys` → `ClassAbility`) - the spellbook is class/level-derived, not in captures. With `--rdb <dir>`
+it imports the client's **character-customization registry** (RDB type 1000076 → `MorphTarget`, 1,072 rows:
+every selectable appearance target; wire tag = registry id − 1 — what resolves the editor's resource refs into
+the spawn's weighted entries). It also catalogs **NPC spawns** per map (`NpcSpawnExtractor` → `NpcSpawn`) and
+stores each map's full **world burst**
+(`MapWorldBurstExtractor` → `MapWorldBurst`/`MapWorldBurstEntity`) - the data the login path replays to render any map. Each run prints
 a before/after delta table; imports upsert (no wipes). The OLD C++ server's base data (`p_items`/`spelldata`/`npcs`)
 was imported once and now lives in the committed DB (the archive `.sql` files were deleted after that one-time
 import; the `Archive/` zips remain the historical source). NPCs (session-handle identity spike) come next.
@@ -116,10 +121,12 @@ magic const). This mirrors retail, where the whole create session uses a single 
    - The post-`IntroDone` chunk is truncated at the `ApproachCasilda` finale; the recorded gameplay tail
      (combat spawns, movement, the NPC conversation) is dropped. The intro NPC conversation is replayed only
      when the player clicks the NPC (an `Interact` / `ActionType 0x16`), keeping it interaction-driven.
-   - The player spawn in the scene is the **retail player Spawn packet** (capture `dikketest` idx 484, the
-     `0xFA015807` for the player), constructed for the session instance, so position/orientation/pose match
-     retail. (It still carries the capture's appearance + name until per-character customization is
-     persisted.) The hand-built `SpawnPlayer` is used for the normal login path.
+   - The player spawn is **generated from the character's own DB rows** - name, race/sex/class, level,
+     vitals, equipment, AND the full editor appearance: head mesh / voice / size (IIR `CharacterStats`,
+     each = the editor value ÷ 2), the chosen resources (hair/beard mesh, hair/eye/skin color, tattoos,
+     scars - the scaffold's weighted entries, resolved via the imported `MorphTarget` registry) and the
+     morph sliders (zigzag-decoded editor values; spawn float = value/1000). See
+     `docs/player-spawn-generation-plan.md`.
 
 The flow lives in `Faolan/GameServer/Retail*Burst.cs` (sender methods), the handshake logic in
 `Faolan/GameServer/CreateWorldHandshake.cs`, and the `0xA36D3B74` handler in
@@ -266,7 +273,7 @@ starting ability after the world-burst replay, for every class. The cast itself 
 A real login is ~244 packets (about half of them world build) with character-specific bodies, so the working
 path **replays a captured world burst from the DB** and rewrites it for the logged-in character. Each map's burst
 (every `0x2000` download from `MapChange` to the first `0x2020` poll) lives in the **`MapWorldBurst` /
-`MapWorldBurstPacket`** tables, imported from the captures by `Faolan.Importer` (`MapWorldBurstExtractor`). On
+`MapWorldBurstEntity`** tables, imported from the captures by `Faolan.Importer` (`MapWorldBurstExtractor`). On
 existing-character login, if the character's map has a stored burst, `ReplayMapWorldBurst` sends it (re-addressed
 from the burst's `CapturedInstance` to the live character) and `SendSpawnCheckResponse` answers the `0x2020`
 polls; otherwise a hand-built fallback (no NPCs) runs. This **generalizes the old beach-only path to any map** -
@@ -276,25 +283,27 @@ the embedded resource was retired). What we do to each burst packet:
 - **Instance re-address** (`RewriteBurstInstance`): the burst's captured instance is replaced with the live
   character instance everywhere - as the receiver/inventory varint and the raw entity handle/owner uint32. Both
   are 4 bytes for in-range ids (`0x02000000..0x0FFFFFFF`), so it is length-preserving; the CRC is recomputed.
-- **Player spawn from DB** (`TryRebuildPlayerSpawnFromDb` + `Spawn/SpawnPacketBuilder.cs`): the player's own
-  `FA015807` is rebuilt with the DB character's **position** and **name** (`SetSpawnName` adjusts the name's
-  nested length prefixes). Rotation is kept verbatim (DB rotation rebuild stalled the client). Race lives at
-  `field4.field1` (enum-confirmed); morphs/appearance are not yet decoded into the spawn.
-- **Inventory from the DB** (`Packets/0x737A6DF9_Test/`): the `0x737A6DF9` snapshot is parsed
-  (`InventorySnapshotInspector`), then entries are replaced **in place** from the character's
-  `CharacterEquipment` and re-serialized (parse->rebuild is byte-exact, tests). An item entry is built from a
-  real DB `Item`: tail `f4/f5` = `Item.Id`, the identity payloads = `Item.Data1..4`, and `tail.f8` = `Item.Archetype`.
-  `SnapshotItemBuilder.BuildEntry` reproduces a captured entry byte-for-byte (the proof that a real-identity item
-  is accepted in-client). Items in the DB come from the one-time `p_items` base import (named templates + quad)
-  plus the **`Faolan.Importer`** tool, which harvests the full identity (quad + archetype) of every item seen in a
-  real captured inventory straight into `Items` (`CaptureItemImporter` + `ArchetypeHarvester`; re-run the tool
-  when adding captures). An item is **buildable iff `Archetype != 0`** (~177 items today; archetype is only in
-  captures, not `p_items`). Beach characters are seeded default starter
-  gear (`EnsureBeachStarterEquipment`); equip/unequip persists back to `CharacterEquipment`
-  (`EquipmentPersistence.cs`, from the `0x642CD3D6` `MoveEquippedToFromInventory` action). This settled the old
-  "add/remove stalls" problem: the stall was a *fabricated* item identity - a real item works. Replace-in-place
-  only reflects slots the captured snapshot already has; rendering items in new equip slots (e.g. a ring) on
-  relogin needs ADD/REMOVE of entries (next step).
+- **Player spawn GENERATED from DB** (`TryRebuildPlayerSpawnFromDb` + `Spawn/`): the player's own `FA015807`
+  is fully generated - position + name, identity (race/sex/level/vitals from `Character`/`CharacterMaxStats`),
+  worn equipment (`PlayerSpawnEquipment`, all 17 retail slots mapped incl. Tokens=3 / OffHandWeapon=8 /
+  RangedWeapon=20 / Ammo=21), the IIR looks (head mesh / voice / scale = editor values ÷ 2 from
+  `CharacterBody`) and the whole scaffold frame (`PlayerSpawnScaffoldCodec`/`Rows`: weighted appearance
+  entries from `CharacterBodyResource` × the `MorphTarget` registry, morph-slider entries from
+  `CharacterBody`, feat-ID list, pair lists - byte-exact against all 37 captured player spawns). Rotation
+  is kept verbatim (DB rotation rebuild stalled the client). See `docs/player-spawn-generation-plan.md`.
+- **Inventory (FullChar `0x737A6DF9`) GENERATED from the DB** (`Packets/0x737A6DF9_Test/`): the snapshot's
+  protobuf root decodes as the recovered `ProtoFullCharacterIIR` (byte-exact round-trip on 37/39 captured
+  snapshots) and its four containers (Equipped 101 / Bag 104 / Resource 112 / Quest 113) are built wholesale
+  from the character's items (`FullCharSnapshotBuilder`: `CharacterEquipment` + persisted `CharacterInventory`
+  bag rows; deterministic instance+slot entry ids). The tails get the LIVE level / current vitals / XP
+  patched in (`BigboyTailsFile`); quest XML + access windows still ride from the capture. An item entry is
+  built from a real DB `Item`: templates = `Item.Id`, identity = `Item.Data1..4`, archetype = `Item.Archetype`
+  (`SnapshotItemBuilder`, byte-exact vs a captured entry). Items come from the one-time `p_items` base import
+  plus `Faolan.Importer` capture harvesting; an item is **buildable iff `Archetype != 0`** (~177 today).
+  Beach characters get seeded starter gear (`EnsureBeachStarterEquipment`); equip/unequip persists to
+  `CharacterEquipment` + `CharacterInventory` bag rows (`EquipmentPersistence.cs` - unequip parks the item at
+  the exact bag cell, multiple unequips coexist), so persisted gear renders in ANY slot on relogin. (The old
+  "add/remove stalls" problem was a *fabricated* item identity - real-identity entries add/remove fine.)
 
 GOTCHA - the send loop must be tight. Burst packets go out one raw `client.SendAsync(byte[])` after another;
 the GameServer download is uncompressed and the client frames it per TCP read, so **any heavy CPU work between
@@ -484,14 +493,15 @@ and DH-login work). The full plan + findings: **`docs/opcode-re-plan.md`**. Key 
 
 ## Roadmap / current focus
 
-`docs/spawn-dissection-plan.md` is the living plan for replacing the verbatim replay with DB-driven world
-entry. Status: world + NPCs render for any beach character; player **position** and **name** come from the DB;
-NPC **dialogue** works (coverage-bound); the archive **item/spell/NPC data** is imported; **inventory** items
-are built from the DB (`CharacterEquipment` x `Items`) and **equip/unequip persists**; ~177 items are buildable
-(every item seen in a real captured inventory). In progress / blocked: **appearance morphs** (spawn encoding not
-crackable from the available captures - needs chars differing in one morph at a time); **add/remove of inventory
-entries** so persisted gear renders in any slot on relogin (only slots present in the captured snapshot reflect
-today); and ultimately the full DB-built snapshot incl. the tails.
+`docs/spawn-dissection-plan.md` + `docs/player-spawn-generation-plan.md` are the living plans for replacing
+the verbatim replay with DB-driven world entry. Status: world + NPCs render for any captured map; the player's
+own **spawn is fully generated** from DB rows (identity, vitals, equipment, scaffold frame, and the complete
+editor **appearance**: morph sliders, chosen resources via the RDB `MorphTarget` registry, head/voice/size);
+the **FullChar snapshot's containers are generated** from `CharacterEquipment` + `CharacterInventory` (live
+level/vitals/XP patched into the tails); **equip/unequip/inventory moves persist** and render in any slot on
+relogin; NPC **dialogue** works (coverage-bound); ~177 items buildable. Remaining: from-scratch fresh tails
+(quest XML + access windows - belongs with the quest system, like the prefix's quest counter), **NPCs from
+the DB** (vs verbatim burst spawns), and the gameplay systems (quests, combat death/XP, mounts).
 
 ## TODO
 
@@ -550,12 +560,17 @@ Concrete next steps, grouped by area. See `docs/` for the dissection writeups be
 - [ ] Isolate the **level-up "ding"** event packet (Level rises in the snapshot/vitals, but the event packet
       isn't pinned).
 
-### World entry & rendering (`docs/spawn-dissection-plan.md`)
-- [ ] **Appearance morphs**: decode the spawn appearance encoding (blocked — needs captures of characters
-      differing by one morph at a time).
-- [ ] **Add/remove inventory entries** so persisted gear renders in any slot on relogin (today only slots
-      present in the captured snapshot reflect).
-- [ ] Build the **full DB snapshot incl. tails** (retire the captured-burst replay entirely).
+### World entry & rendering (`docs/spawn-dissection-plan.md`, `docs/player-spawn-generation-plan.md`)
+- [x] **Appearance** — fully cracked & generated (2026-06-10): morph sliders are zigzag-encoded editor
+      values (spawn float = value/1000), the weighted entries are the chosen resources resolved via the
+      client RDB customization registry (`MorphTarget`, wire tag = registry id − 1), and the IIR looks are
+      the editor's head/voice/size ÷ 2. Bit-exact against every create capture.
+- [x] **Add/remove inventory entries** — the FullChar containers are generated wholesale from
+      `CharacterEquipment` + `CharacterInventory` rows; unequip parks items at their exact bag cell, equip
+      consumes the row; persisted gear renders in any slot on relogin.
+- [~] **Full DB snapshot incl. tails** — root containers generated, live level/vitals/XP patched into the
+      tails; remaining: from-scratch quest-XML/access-window tails + the `[u32 X][u8 Y]` prefix (X = quest
+      counter, best fit — belongs with the quest system).
 - [ ] **NPCs from the DB** (session-handle identity) instead of verbatim burst spawns.
 
 ### Mail / auction / trade-post (`docs/capture-events.md`)
