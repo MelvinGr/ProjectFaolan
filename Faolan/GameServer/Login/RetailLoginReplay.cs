@@ -358,11 +358,23 @@ namespace Faolan.GameServer
 				if (message.Stats != null && (uint)character.Race != 0)
 				{
 					// CharacterStats.race == the Race enum (Aquilonian=1, Cimmerian=2, Stygian=3); the spawn's sex code
-					// is the Sex enum + 2 (Male=2, Female=3, both in the captured-valid range). Other CharacterStats
-					// fields (head_mesh, looks_package, ...) stay from the template until they're DB-driven too.
+					// is the Sex enum + 2 (Male=2, Female=3, both in the captured-valid range).
 					message.Stats.Sex = (uint)character.Sex + 2;
 					message.Stats.Race = (uint)character.Race;
 					message.Stats.Level = character.Level;
+
+					// Vitals (cur==max) from the persisted MaxStats, on the ×100 wire scale (Strie's life 9000 = 90).
+					var maxStats = character.MaxStats;
+					if (maxStats != null)
+					{
+						message.Stats.Life = maxStats.Health * 100;
+						message.Stats.Health = maxStats.Health * 100;
+						message.Stats.MaxStamina = maxStats.Stamina * 100;
+						message.Stats.Stamina = maxStats.Stamina * 100;
+						message.Stats.MaxMana = maxStats.Mana * 100;
+						message.Stats.Mana = maxStats.Mana * 100;
+					}
+					// Remaining CharacterStats fields (head_mesh, looks_package, side, ...) stay from the template.
 				}
 
 				// Replace the worn equipment with the character's own (when it has fully-buildable gear).
