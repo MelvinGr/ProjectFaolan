@@ -26,7 +26,6 @@ namespace Faolan.Core.Database
 		DbSet<ConversationPacket> ConversationPackets { get; }
 		DbSet<Item> Items { get; }
 		DbSet<Map> Maps { get; }
-		DbSet<MapObject> MapObjects { get; }
 		DbSet<MapWorldBurst> MapWorldBursts { get; }
 		DbSet<MapWorldBurstEntity> MapWorldBurstEntities { get; }
 		DbSet<MorphTarget> MorphTargets { get; }
@@ -61,7 +60,6 @@ namespace Faolan.Core.Database
 		public DbSet<ConversationPacket> ConversationPackets { get; set; }
 		public DbSet<Item> Items { get; set; }
 		public DbSet<Map> Maps { get; set; }
-		public DbSet<MapObject> MapObjects { get; set; }
 		public DbSet<MapWorldBurst> MapWorldBursts { get; set; }
 		public DbSet<MapWorldBurstEntity> MapWorldBurstEntities { get; set; }
 		public DbSet<MorphTarget> MorphTargets { get; set; }

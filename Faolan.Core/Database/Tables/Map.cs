@@ -10,6 +10,8 @@ namespace Faolan.Core.Database.Tables
 		// seeded, so it is the safe default wherever a character needs a map (creation, import, world entry).
 		public const uint TortageBeachId = 0x00000FAA;
 
+		// Objects = the live, capture-derived static world objects (the dormant archive MapObject table was
+		// removed). Npcs is the archive NPC template table; the live per-map spawns are NpcSpawn (NpcSpawns).
 		public virtual ICollection<WorldObject> Objects { get; set; }
 		public virtual ICollection<Npc> Npcs { get; set; }
 
