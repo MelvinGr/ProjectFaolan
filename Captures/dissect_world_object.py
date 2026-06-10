@@ -103,6 +103,35 @@ def walk(b, base=0, ind=0):
             return
 
 
+def decode_tail(t):
+    """Decompose a world-object tail into labeled fields. Round-trips byte-exact on 1854/1854 captured objects.
+
+    Grammar:  [u32 stateHandle][u32 b][u32 strLen][state string][00 00 00 00][bbox: 6x f32 BE][f32 scale]
+              [interaction protobuf]
+    The state string is the object STATE ('object_closed'/'object_open'/'Open', empty for decor/zones); the
+    bbox is the collision bounds (decor carries tiny normal-like floats, chests/gates the 7f7fffee default);
+    `interaction` is the per-session collision/interaction protobuf (empty for decor, big for chests). The
+    stateHandle + interaction coords are the per-session state that differs cross-capture.
+    """
+    if len(t) < 40:
+        return None
+    state_handle = u32(t, 0)
+    b1 = u32(t, 4)
+    slen = u32(t, 8)
+    o = 12
+    if o + slen + 28 > len(t):
+        return None
+    state = t[o:o + slen]
+    o += slen
+    pad = t[o:o + 4]
+    o += 4
+    bbox = [struct.unpack('>f', t[o + 4 * k:o + 4 * k + 4])[0] for k in range(6)]
+    o += 24
+    scale = struct.unpack('>f', t[o:o + 4])[0]
+    o += 4
+    return dict(state_handle=state_handle, b=b1, state=state, pad=pad, bbox=bbox, scale=scale, interaction=t[o:])
+
+
 def objects():
     out = []
     for p in cdt.from_dump(CAP):
@@ -153,11 +182,49 @@ def cmd_one(handle_hex):
     print(f'pos={fvec(b[22:22 + b[21]])}  playfield={rv(b, transform_end(b) - 1)[0] if False else "-"}')
     print('object message:')
     walk(msg, mo, 1)
-    print(f'tail ({len(tail)}b): {tail.hex(" ")}')
+    d = decode_tail(tail)
+    if d is None:
+        print(f'tail ({len(tail)}b, undecoded): {tail.hex(" ")}')
+    else:
+        print(f'tail ({len(tail)}b):')
+        print(f'  state_handle = 0x{d["state_handle"]:08X}   b = 0x{d["b"]:08X}')
+        print(f'  state        = {d["state"].decode("ascii", "replace")!r}')
+        print(f'  bbox         = {[round(f, 3) for f in d["bbox"]]}')
+        print(f'  scale        = {d["scale"]}')
+        print(f'  interaction  = {len(d["interaction"])}b protobuf: {d["interaction"][:32].hex(" ")}{"..." if len(d["interaction"]) > 32 else ""}')
+
+
+def cmd_coverage():
+    import glob
+    total = ok = 0
+    states = {}
+    for cap in sorted(glob.glob(str(ROOT / 'Captures/*.json'))):
+        try:
+            rows = [p[4] for p in cdt.from_dump(cap)
+                    if p[2] == 0x2000 and len(p[4]) >= 20 and p[4][4:8].hex() in SUBOPS]
+        except Exception:
+            continue
+        for b in rows:
+            mo, ml, msg, tail = message(b)
+            total += 1
+            d = decode_tail(tail)
+            if d is None:
+                continue
+            rebuilt = (tail[:8] + len(d['state']).to_bytes(4, 'big') + d['state'] + d['pad']
+                       + b''.join(struct.pack('>f', f) for f in d['bbox'])
+                       + struct.pack('>f', d['scale']) + d['interaction'])
+            if rebuilt == tail:
+                ok += 1
+                s = d['state'].decode('ascii', 'replace')
+                states[s] = states.get(s, 0) + 1
+    print(f'tail grammar round-trip: {ok}/{total}')
+    print(f'object states: {states}')
 
 
 if __name__ == '__main__':
-    if len(sys.argv) > 2 and sys.argv[1] == 'one':
+    if len(sys.argv) > 1 and sys.argv[1] == 'coverage':
+        cmd_coverage()
+    elif len(sys.argv) > 2 and sys.argv[1] == 'one':
         cmd_one(sys.argv[2])
     else:
         cmd_table()

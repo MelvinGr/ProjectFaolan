@@ -482,13 +482,20 @@ length prefix immediately follows the transform:
 [20:~65] transform group 0x2C: 0A vec3(pos), 12 quat(rot), 18 playfield-varint   (no pre-IIR block)
 @msg     [u32 BE msgLen][object message]: f1=id(varint), f2=name(string), f3=nested (e.g. a remoteformat XML
          for interactive props), f5/f8/f12 = trailers
-[msgEnd:] tail (post scaffold: an `object_*` state string + bounding-box floats + collision/interaction triples;
-          the same `0a14 0d<x>15<y>1d<z>` 20-byte vec pattern as the spawn equipment, still raw)
+[msgEnd:] tail — DISSECTED 2026-06-11 (workbench `coverage` mode round-trips 1854/1854 captured tails byte-exact):
+          [u32 stateHandle][u32 b][u32 strLen][state string][00 00 00 00][bbox: 6x f32 BE][f32 scale][interaction]
 ```
+Tail fields: `stateHandle` = the per-session object-state handle; `state` = the object STATE string
+(`object_closed`/`object_open`/`Open`, EMPTY for decor & zones); `bbox` = collision bounds (decor carries tiny
+normal-like floats, chests/gates the `7f7fffee` = ±3.4e38 "infinite" default); `scale` = 1.0; `interaction` =
+the per-session collision/interaction protobuf (empty for decor, ~290B for a chest, with the nested coord
+triples). So the tail's STABLE part (state string + bbox + scale) is now structured; the per-session part is
+exactly `stateHandle` + the `interaction` protobuf coords.
 Sub-opcode = object CLASS: `66AEDD50` = decor/props (`004709_..._decor_chain_hangingwoman`, "Broken Bottle",
 "Acheronian Chest/Gate"), `F096251E` = interactive containers ("Chest [N7FU]", carries the remoteformat in f3),
 `33A56FB0` = zone/city label ("City of Tortage"). Beach has 12 (5+6+1). The identity is the object message
-(id/name/nested) + tail; the per-session bits are handle + playfield (the world/zone instance id) + transform.
+(id/name/nested) + tail; the per-session bits are handle + playfield (the world/zone instance id) + transform +
+the tail's `stateHandle`/`interaction`.
 
 CONSTRUCTION DONE (2026-06-10, commits 7fce36c + 842f5fd) — same arc as NPC spawns:
 - `WorldObject` table (NOTE: the pre-existing `MapObject` is the unrelated archive table) + migration;
@@ -500,9 +507,11 @@ CONSTRUCTION DONE (2026-06-10, commits 7fce36c + 842f5fd) — same arc as NPC sp
   `WorldObjectBuilder.TryBuildOntoLivePlacement` - keeps the LIVE placement (handle/transform/playfield) and
   splices in only the DB object identity (message + tail), put on the wire when byte-identical. Beach: 4/12
   (the static zone + decor) now come from the table byte-identical, zero risk.
-- REMAINING: the 8 interactive chests differ in the tail (per-session instance ids + collision floats = object
-  state), so they keep the verbatim burst body until that state is normalized (in-client). Then a per-class
-  `WorldObject` build from columns + fresh handle/playfield to fully retire the burst objects.
+- REMAINING: the 8 interactive chests differ in the tail's `stateHandle` + `interaction` protobuf (the
+  now-isolated per-session object state — see the tail dissection above), so they keep the verbatim burst body
+  until that state is normalized (needs in-client to validate re-addressing). The tail's stable part (state
+  string + bbox + scale) is dissected; a per-class `WorldObject` build from columns + fresh handle/playfield +
+  a normalized stateHandle is what fully retires the burst objects.
 
 96C46740 MoveTask (per-entity movement registration) — GRAMMAR CRACKED 2026-06-11 (workbench
 `Captures/dissect_movetask.py`, `coverage` mode). Each FA015807 spawn is paired with a 96C46740 MoveTask that
