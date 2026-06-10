@@ -338,6 +338,19 @@ namespace Faolan.GameServer
 			// scaffold frame; characters without rows are seeded with the fresh-character defaults once.
 			var scaffoldCharacter = await EnsureSpawnScaffoldRows(client.Session.Character);
 
+			// NPC spawns sourced from the NpcSpawns table so each NPC's FA015807 body is BUILT from its row
+			// (transform columns + IIR) via NpcSpawnBuilder rather than taken verbatim from the burst. Keyed by the
+			// stable spawn POSITION (the dedup key) - NOT the handle, which is session-volatile - and rebuilt with
+			// the burst's own handle so it stays paired with the burst's 96C46740 registration. Same-source rows
+			// rebuild byte-identical; cross-session rows are a genuine reconstruction of the same NPC at the same
+			// spot. The player's own spawn and non-NPC records are untouched.
+			var npcRows = await Database.GetNpcSpawns(burst.MapId);
+			var npcByPosition = new Dictionary<(int, int, int), NpcSpawn>();
+			foreach (var n in npcRows)
+				npcByPosition.TryAdd(PositionKey(n.PositionX, n.PositionY, n.PositionZ), n);
+			var npcBuilt = 0;
+			var npcIdentical = 0;
+
 			// IMPORTANT: do ALL per-packet work (instance rewrite, player-spawn rebuild, inventory parse/rebuild)
 			// HERE, before the send loop. The inventory rebuild in particular parses ~9 KB of tails and re-serializes
 			// - doing that mid-loop adds a CPU stall between sends that reshapes the burst's TCP segmentation, and
@@ -359,6 +372,19 @@ namespace Faolan.GameServer
 					pkt = BuildBeachInventoryPacket(pkt, dbInventory, client.Session.Character);
 				else if (TryRebuildPlayerSpawnFromDb(client, equipment, scaffoldCharacter, pkt, out var rebuilt))
 					pkt = rebuilt;
+				else if (TryRebuildNpcSpawnFromDb(client, npcByPosition, pkt, out var npcRebuilt, out var wasIdentical))
+				{
+					npcBuilt++;
+					// Only put the table-built body on the wire when it is byte-identical to the (re-addressed) burst
+					// body - that proves the NpcSpawns row reconstructs this exact NPC with zero render risk. A
+					// cross-session row differs (different handle/scaffold/instance refs baked in); driving those is
+					// the next, in-client-verified step, so they keep the verbatim burst body for now.
+					if (wasIdentical)
+					{
+						pkt = npcRebuilt;
+						npcIdentical++;
+					}
+				}
 
 				// Record each spawned NPC's handle -> name so a clicked handle can be routed to its conversation by
 				// the stable name (handles are session-volatile). Reads the final bytes the client receives.
@@ -366,6 +392,9 @@ namespace Faolan.GameServer
 
 				toSend.Add(pkt);
 			}
+
+			if (npcByPosition.Count > 0)
+				Logger.LogInformation("NPC spawns for map {Map}: {Identical}/{Built} table-built spawns put on the wire byte-identical (the rest kept verbatim, cross-session), {Rows} rows available.", burst.MapId, npcIdentical, npcBuilt, npcByPosition.Count);
 
 			// The player's own vitals are server-generated from the live character (not the captured player's), emitted
 			// after the player has spawned in the burst.
@@ -533,6 +562,55 @@ namespace Faolan.GameServer
 
 			Logger.LogInformation("Rebuilt player spawn from DB: handle=0x{Handle:X}, name='{Name}', pos=({X},{Y},{Z}).", handle, character.Name, character.Position.X, character.Position.Y, character.Position.Z);
 			return true;
+		}
+
+		// If the (already re-addressed) burst packet is an NPC entity Spawn (FA015807 whose handle is NOT the
+		// player's instance) and a matching NpcSpawns row exists at the same spawn position, rebuild its body from
+		// that row via NpcSpawnBuilder (addressed to the burst's own handle) and splice it in - keeping the burst
+		// packet's re-addressed header + framing, exactly like the player-spawn rebuild. `wasIdentical` reports
+		// whether the built body equals the burst's (true for same-source rows: the table reproduces the capture).
+		// Falls back (returns false) when there is no matching row or the build fails, so the NPC keeps its burst body.
+		private bool TryRebuildNpcSpawnFromDb(INetworkClient client, IReadOnlyDictionary<(int, int, int), NpcSpawn> npcByPosition, byte[] packet, out byte[] rebuilt, out bool wasIdentical)
+		{
+			rebuilt = null;
+			wasIdentical = false;
+			if (packet.Length < 12)
+				return false;
+
+			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
+			var bodyStart = 12 + headerLen;
+			if (bodyStart + SpawnPacketBuilder.PosZOffset + 4 > packet.Length)
+				return false;
+
+			var body = packet.AsSpan(bodyStart);
+			var subOpcode = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4));
+			var handle = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(12, 4));
+			if (subOpcode != 0xFA015807u || handle == client.Session.Account.ClientInstance)
+				return false; // not a spawn, or the player's own (handled by TryRebuildPlayerSpawnFromDb)
+
+			var key = PositionKey(BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosXOffset, 4)), BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosYOffset, 4)),
+				BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosZOffset, 4)));
+			if (!npcByPosition.TryGetValue(key, out var row) || !NpcSpawnBuilder.TryBuild(row, handle, out var newBody))
+				return false;
+
+			// Keep the burst packet's header (already re-addressed to the live player); swap only the FA015807 body.
+			wasIdentical = packet.Length - bodyStart == newBody.Length && packet.AsSpan(bodyStart).SequenceEqual(newBody);
+
+			rebuilt = new byte[bodyStart + newBody.Length];
+			Array.Copy(packet, 0, rebuilt, 0, bodyStart); // [len][crc][headerLen][header]
+			newBody.CopyTo(rebuilt, bodyStart);
+
+			BinaryPrimitives.WriteUInt32BigEndian(rebuilt.AsSpan(0, 4), (uint)(rebuilt.Length - 4));
+			var crc = Crc32.Calculate(rebuilt[8..]);
+			BinaryPrimitives.WriteUInt32BigEndian(rebuilt.AsSpan(4, 4), crc);
+			return true;
+		}
+
+		// Quantizes a world position to cm (0.01) so a burst spawn matches its NpcSpawns row across float
+		// round-trips; collisions (two NPCs within a cm) are not a concern at beach scale.
+		private static (int, int, int) PositionKey(float x, float y, float z)
+		{
+			return ((int)MathF.Round(x * 100f), (int)MathF.Round(y * 100f), (int)MathF.Round(z * 100f));
 		}
 
 		// Encodes value as a base-128 varint of EXACTLY byteLength bytes, padding the high groups with overlong

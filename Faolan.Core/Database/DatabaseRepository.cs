@@ -44,6 +44,7 @@ namespace Faolan.Core.Database
 		Task<Map[]> GetMaps();
 
 		Task<MapWorldBurst> GetMapWorldBurst(uint mapId);
+		Task<NpcSpawn[]> GetNpcSpawns(uint mapId);
 		Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names);
 
 		Task<Realm> GetRealm(uint id);
@@ -399,6 +400,17 @@ namespace Faolan.Core.Database
 				return null;
 
 			return burst;
+		}
+
+		// The captured NPC entity spawns for a map (FA015807 bodies in Data + the lifted identity/transform
+		// columns). The world-entry path builds each NPC's spawn from its row via NpcSpawnBuilder.
+		public async Task<NpcSpawn[]> GetNpcSpawns(uint mapId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.NpcSpawns
+				.Where(n => n.MapId == mapId && n.Data != null)
+				.ToArrayAsync();
 		}
 
 		// Resolves appearance resource refs ("*texscript_1108153") to their client-registry entries (imported
