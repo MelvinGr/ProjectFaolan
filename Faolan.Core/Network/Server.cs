@@ -59,6 +59,13 @@ namespace Faolan.Core.Network
 				{
 					var socket = await _tcpListener.AcceptSocketAsync(cancellationToken);
 
+					// Disable Nagle. The client frames the uncompressed world-entry burst per TCP segment (no
+					// reassembly), so it needs one-packet-per-segment. With Nagle on, rapid small burst packets get
+					// coalesced into segments by ACK/CPU timing, which varies run-to-run - intermittently misframing
+					// the burst and hanging the client on the loading screen. NoDelay flushes each send as its own
+					// segment, making the segmentation deterministic.
+					socket.NoDelay = true;
+
 					var networkClient = new NetworkClient<TPacket, TMessageFramer, TPacketFactory>(socket, Logger, _outgoingPacketLogger)
 					{
 						Disconnected = client =>
