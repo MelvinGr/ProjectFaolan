@@ -646,10 +646,11 @@ namespace Faolan.GameServer
 			if (subOpcode is not (0x66AEDD50u or 0xF096251Eu or 0x33A56FB0u))
 				return false;
 
-			var handle = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(12, 4));
 			var key = PositionKey(BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosXOffset, 4)), BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosYOffset, 4)),
 				BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosZOffset, 4)));
-			if (!objectByPosition.TryGetValue(key, out var row) || !WorldObjectBuilder.TryBuild(row, handle, out var newBody))
+			// Splice the DB object identity onto the LIVE placement (handle/transform/playfield from the burst body),
+			// so the per-session playfield + handle stay correct and only the object definition comes from the table.
+			if (!objectByPosition.TryGetValue(key, out var row) || !WorldObjectBuilder.TryBuildOntoLivePlacement(row, body, out var newBody))
 				return false;
 
 			wasIdentical = packet.Length - bodyStart == newBody.Length && packet.AsSpan(bodyStart).SequenceEqual(newBody);

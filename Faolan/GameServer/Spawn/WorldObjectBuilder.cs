@@ -25,6 +25,52 @@ namespace Faolan.GameServer.Spawn
 			return true;
 		}
 
+		// Builds a body by splicing the DB row's object IDENTITY (the length-delimited message + the raw tail,
+		// everything after the transform) onto the LIVE placement (`liveBody`'s header + transform + playfield).
+		// The placement (handle / position / playfield = the per-session world id) stays live; only the object
+		// definition comes from the table. For the same object captured in another session this is byte-identical
+		// to `liveBody` (the identity is session-independent - only the handle + playfield vary), so it drives the
+		// object from the DB with zero render risk. Returns false if either body's transform can't be parsed.
+		public static bool TryBuildOntoLivePlacement(WorldObject row, ReadOnlySpan<byte> liveBody, out byte[] body)
+		{
+			body = null;
+			var template = ExtractBody(row?.Data);
+			if (template == null || !TryMessageOffset(liveBody, out var liveOffset) || !TryMessageOffset(template, out var rowOffset))
+				return false;
+
+			body = new byte[liveOffset + (template.Length - rowOffset)];
+			liveBody[..liveOffset].CopyTo(body);
+			template.AsSpan(rowOffset).CopyTo(body.AsSpan(liveOffset));
+			return true;
+		}
+
+		// Offset where the object message's u32 length prefix begins: just after the 0x2C transform group
+		// (0A vec3, 12 quat, optional 25 scale, 18 playfield-varint). No pre-IIR block, unlike entity spawns.
+		private static bool TryMessageOffset(ReadOnlySpan<byte> b, out int offset)
+		{
+			offset = 0;
+			var i = 20;
+			if (b.Length <= i || b[i] != 0x2C)
+				return false;
+			i++;
+			if (i + 1 >= b.Length || b[i] != 0x0A)
+				return false;
+			i += 2 + b[i + 1]; // 0A vec3
+			if (i + 1 >= b.Length || b[i] != 0x12)
+				return false;
+			i += 2 + b[i + 1]; // 12 quat
+			if (i < b.Length && b[i] == 0x25)
+				i += 5; // optional 25 scale
+			if (i >= b.Length || b[i] != 0x18)
+				return false;
+			i++;
+			while (i < b.Length && (b[i] & 0x80) != 0) // playfield varint
+				i++;
+			i++;
+			offset = i;
+			return i + 4 <= b.Length;
+		}
+
 		// The captured `Data` is the full Conan packet ([u32 len][u32 crc][u32 headerLen][header][body]); the
 		// object body starts after the 12-byte prefix + the header. Returns null if the framing is malformed.
 		private static byte[] ExtractBody(byte[] data)
