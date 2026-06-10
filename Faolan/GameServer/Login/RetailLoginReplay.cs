@@ -223,7 +223,7 @@ namespace Faolan.GameServer
 
 				if (dbInventory.Count > 0 && IsInventorySnapshot(pkt))
 					pkt = BuildBeachInventoryPacket(pkt, dbInventory);
-				else if (TryRebuildPlayerSpawnFromDb(client, pkt, out var rebuilt))
+				else if (TryRebuildPlayerSpawnFromDb(client, equipment, pkt, out var rebuilt))
 					pkt = rebuilt;
 
 				// Record each spawned NPC's handle -> name so a clicked handle can be routed to its conversation by
@@ -313,7 +313,7 @@ namespace Faolan.GameServer
 
 		// If the burst packet is the player's own entity Spawn (FA015807 whose handle is the client instance),
 		// overwrite its position/rotation fields from the DB character and return the rebuilt packet.
-		private bool TryRebuildPlayerSpawnFromDb(INetworkClient client, byte[] packet, out byte[] rebuilt)
+		private bool TryRebuildPlayerSpawnFromDb(INetworkClient client, CharacterEquipment equipment, byte[] packet, out byte[] rebuilt)
 		{
 			rebuilt = null;
 
@@ -343,11 +343,25 @@ namespace Faolan.GameServer
 			var keptRotation = new Quaternion(BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.RotXOffset, 4)), BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.RotYOffset, 4)),
 				BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.RotZOffset, 4)), BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.RotWOffset, 4)));
 
-			// Rebuild the body from the DB: position (fixed-length) then the name (variable-length, which adjusts the
-			// body's nested length prefixes). The name change resizes the body, so reassemble the full packet from
-			// the unchanged header + new body rather than splicing in place.
+			// Rebuild the body from the DB: position (fixed-length) then the character message. If the character has
+			// fully-buildable worn gear, rebuild the whole CharacterIIR (name + the worn equipment as its
+			// InventoryEntries) from the DB via the typed message; otherwise fall back to the proven name-only splice.
 			var newBody = SpawnPacketBuilder.BuildSpawnBody(body, handle, character.Position, keptRotation);
-			newBody = SpawnPacketBuilder.SetSpawnName(newBody, character.Name);
+
+			var wornEquipment = PlayerSpawnEquipment.BuildInventoryEntries(equipment);
+			if (wornEquipment.Count > 0 && PlayerSpawnReader.TryReadCharacterMessage(newBody, out var read))
+			{
+				var message = read.Message;
+				message.Name = character.Name;
+				message.InventoryEntries.Clear();
+				foreach (var entry in wornEquipment)
+					message.InventoryEntries.Add(entry);
+				newBody = SpawnPacketBuilder.SetCharacterMessage(newBody, message);
+			}
+			else
+			{
+				newBody = SpawnPacketBuilder.SetSpawnName(newBody, character.Name);
+			}
 
 			rebuilt = new byte[bodyStart + newBody.Length];
 			Array.Copy(packet, 0, rebuilt, 0, bodyStart); // [len][crc][headerLen][header]
