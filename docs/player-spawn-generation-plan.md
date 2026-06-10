@@ -96,4 +96,22 @@ InventoryEntries from the DB, and calls `SetCharacterMessage`; verify with the h
 3. **Wire `TryRebuildPlayerSpawnFromDb`** (decode template -> override name/stats/inventory -> `SetCharacterMessage`),
    harness-verify, then drop `spawn-player-template.bin`.
 
+## Scaffold wire format (dissected 2026-06-10)
+
+Data model done (commit 921ab0e): `CharacterAttribute {StatId, Value}` + `CharacterSkill {SkillId, Value, Weight}`.
+The IIR scaffold-B (after the ProtoCoreCharacterIIR, before the tail) decodes as:
+- **header** `00000000 00000004` (8 bytes, constant).
+- **7 weighted attribute entries**, each ending in `3F800000` (=1.0): entry 1 = `[u32 2][u32 0x3F1][u32 value]
+  [u32 0xB7]` (16b), entries 2-7 = `[u32 index 1..6][u32 0][u16 value]` (10b). The **value field is char-variant**
+  (Strie 7/0x311/0x147/... vs necrol80 0xE/0x85/0x144/...); 0x3F1 / 0xB7 are constant. -> CharacterAttribute rows.
+- **extended skill/feat list** (the tail): `[u32 index 7,8,9,...][u32 0][value+data]` entries, variable count
+  (necrol80 has ~14+, Strie few) and mixed widths (some `01 XX <4 bytes>`). This is the per-character skill/feat set
+  -> CharacterSkill rows. Full tail-entry widths still need nailing across more captures before byte-exact regen.
+
+scaffold-A (before the CharacterIIR, 167b, ~constant across chars per the diff) = the attribute/derived-stat block;
+mostly fixed, dissect last.
+
+Remaining: finish the tail-entry format, write the extract (capture spawn -> CharacterAttribute/CharacterSkill rows)
++ the generator (rows -> scaffold bytes), wire into the spawn, harness, delete spawn-player-template.bin.
+
 See [[world_entry_from_db]] for the surrounding burst/server-generation architecture.
