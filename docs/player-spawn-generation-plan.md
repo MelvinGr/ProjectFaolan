@@ -104,7 +104,49 @@ InventoryEntries from the DB, and calls `SetCharacterMessage`; verify with the h
 3. **Wire `TryRebuildPlayerSpawnFromDb`** (decode template -> override name/stats/inventory -> `SetCharacterMessage`),
    harness-verify, then drop `spawn-player-template.bin`.
 
-## Scaffold wire format (dissected 2026-06-10)
+## Scaffold wire format — VALIDATED GRAMMAR (2026-06-10, second pass; supersedes the section below)
+
+`Captures/parse_spawn_scaffold.py` parses + regenerates **all 34 captured player-own spawns and the
+PlayerSpawnTemplate byte-exact** (`players` / `template` commands). Several earlier readings were WRONG; the
+validated grammar of the FA015807 player body is:
+
+- `[u32 bodyLen=len-4][u32 FA015807][u32 ack=C350][u32 handle][u32 fieldA]`
+- transform group `0x2C`: `0A <len> vec3, 12 <len> quat, (25 <fixed32 scale>,) 18 <varint playfield>`
+- **pre-IIR frame** (between the transform and the CharacterIIR length prefix), 3 variants:
+  - **228 bytes (in-editor preview spawns): fully constant**, zero per-char data.
+  - **239 bytes (normal logins)**: constant skeleton + per-char value islands at fixed absolute offsets:
+    u16 @135 (Strie 0x322, Dikketest 0x312, Hoxxling 0x42B, ...), u16 @158 (the doc's "one variant byte":
+    Dikketest 0x08 vs Strickenen 0x21; also session-variant, e.g. Hoxxling 0x3ED vs 0x36B0), bytes @145/@163/
+    @167/@246, 3 bytes @81 (usually 0), final marker byte @303 (08, once 0a). Constants include 0x7E2 (=2018)
+    @178 and 0x3F1 @186 and the `41 00 00 82 08|0a` closer.
+    **The "outer length prefix @133" was a MISREAD** — the u32 there does NOT track any length (Hoxxling's
+    stays 1067 while his post-IIR varies by ±280 bytes; assassinl23's is 2018 = the 0x7E2 constant; several chars
+    have no length-consistent u32 at all). It is the u16 island @135. (`SetSpawnName`/`SetCharacterMessage`
+    adjust it on resize today — the client tolerates that, but generation should treat it as a value.)
+  - **339 bytes (geared necrol80/demol80)**: adds XP-ish u32s @77-91, a few bytes @102-111, and a 26-slot table
+    @188-291 of `[00][type 01|06][u16 value]` entries (slot types constant across chars, values per-char).
+- `[u32 innerLen]` + the **ProtoCoreCharacterIIR** (byte-identical typed round-trip, as before).
+- **post-IIR stream** (contiguous to EOF; nothing else follows):
+  - header `[u32 0][u32 4]`
+  - `[u32 2][u32 0x3F1 * (nBuffs+1)]` — the second field encodes the count of **60-byte buff/timer records**
+    that follow: `[t0][0x7E2][0][0x1207CF][a][b][0][seq from 4][0xC350][handle][5x u32 0]` (only on chars with
+    active buffs; fresh chars: bare 0x3F1).
+  - `[u32 count][u32 X]` + (`[f32 1.0]` iff count>0) — count of the entry table, X per-char (Strie 0xB7,
+    necrol80 0x2B6; editor 0x3F1).
+  - **count entries, UNIFORM 14 bytes**: `[u32 idx][u32 0][6-byte payload]`. The payload reads as
+    `[u16 value][f32 1.0]` for the weighted attribute entries, `[u8 type][u8 subindex][f32-encoded u32]` for
+    feats, `[u16 a][u32 b]` for the last entry — the earlier "7 weighted entries + entry7 + `01 2c` list
+    header" reading was this same uniform table misframed (the `01 2c` was the last entry's payload).
+  - iff count>0: **ID list of 5-byte groups `[u8 val][u32 id]`**, ids ascending, terminated by the group with
+    id 0x3F1 (the earlier "u40 ids" reading was an aliased misframe; vals are small ranks/slots, e.g. necrol80
+    has 0x0A/0x41-0x4B on ability ids). Iff count==0: a bare `[u32 0x3F1]` terminator instead.
+  - ending: TWO count-prefixed pair lists `[u32 N][N x (u32 id, s32 value)]` (ids are decades 10,20,...,110;
+    demol80 has both lists non-empty) + final `[u32 0x3F1]`.
+
+NPC FA015807 bodies use a different post-IIR header (`[0][5]`, `[0][0x129]`, ...) — out of scope (replayed
+from the burst).
+
+## Scaffold wire format (dissected 2026-06-10) — first pass, partly superseded above
 
 Data model done (commit 921ab0e): `CharacterAttribute {StatId, Value}` + `CharacterSkill {SkillId, Value, Weight}`.
 The IIR scaffold-B (after the ProtoCoreCharacterIIR, before the tail) decodes as:
