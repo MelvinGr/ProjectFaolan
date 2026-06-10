@@ -111,6 +111,13 @@ The IIR scaffold-B (after the ProtoCoreCharacterIIR, before the tail) decodes as
 scaffold-A (before the CharacterIIR, 167b, ~constant across chars per the diff) = the attribute/derived-stat block;
 mostly fixed, dissect last.
 
+**Feat-list format cracked for geared chars (2026-06-10).** For leveled/geared characters (necrol80 on maps
+2000/2010/3000, and the 2040 char) the feat entries are UNIFORM 14 bytes: `[u32 index][u32 0][0x01][u8 subindex]
+[u32 value]`, index incrementing (7,8,9,...). The `value`s are a few repeating 32-bit constants (look like floats,
+e.g. 0x3C03126F). The TEMPLATE char (Strie, 4010, fresh/low-level) uses a DIFFERENT, simpler format
+(`[index][0][float]` + a `01 2c...` block) - so the feat encoding varies by character progression, and byte-exact
+generation must handle both forms. Geared-char form -> CharacterSkill {SkillId=index, Value, + subindex/type}.
+
 **Tail = a feat/ability ID list (dissected further).** After the 7 weighted attribute entries: one more weighted
 entry (idx 7, a float weight, not 1.0) then a **variable-width sorted ID list** with its own header (`01 2c ...`) of
 the character's feats/abilities (Strie few, necrol80 many; IDs ascending, mixed 2-4 byte widths), ending in the
