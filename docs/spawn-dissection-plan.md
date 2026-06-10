@@ -1,5 +1,27 @@
 # Plan: dissect the verbatim world packets → load players & NPCs from the DB
 
+> ## ⭐ DISSECTION STATUS 2026-06-11 — the byte-level dissection is COMPLETE for every major world packet family.
+> Each captured world packet now parses into a typed model and rebuilds **byte-exact** (the gate for this whole
+> plan), verified by round-trip over the capture corpus:
+> - **`FA015807` entity spawn** (player + NPC) — header/transform/CharacterIIR dissected; player spawn fully
+>   DB-generated; NPC identity lifted to `NpcSpawn` columns; `NpcSpawnBuilder` rebuilds byte-exact. The 227B
+>   pre-IIR block is characterized as a sparse `0x3F1` scaffold (not encrypted; decodable like the post-IIR one).
+> - **`96C46740` MoveTask** — grammar CRACKED; `dissect_movetask.py coverage` round-trips **4267/4267 (100%)**,
+>   82.8% fully field-grammared; `MoveTaskBuilder.Build{Stationary,Patrol}` build byte-exact.
+> - **`66AEDD50`/`F096251E`/`33A56FB0` world objects** — message + tail DISSECTED; tail round-trips **1854/1854**;
+>   `WorldObjectBuilder` rebuilds byte-exact.
+> - **`737A6DF9` inventory snapshot** — containers + tails parse→reserialize byte-identical (`InventorySnapshotTests`).
+> - **`642CD3D6` Interact** (inbound) — actionType/args/trailing slots+handle decoded (combat, equip, conversation).
+>
+> **What remains is NOT dissection** — it is construction-from-DB + cross-session normalization + content import,
+> all of which need **in-client validation the user cannot run right now**, or fresh captures:
+> (a) drive arbitrary `NpcSpawns`/`WorldObject` rows by re-addressing the cross-session body (handle/scaffold/
+> instance refs + the chest `stateHandle`/interaction) — the byte-identical wiring is shipped, the cross-session
+> reconstruction is the in-client gate; (b) the inventory add/remove client stall (semantic/client-side, not a
+> packet defect); (c) full conversation trees + per-character remoteformat (content import, needs fresh captures);
+> (d) the MoveTask mode-00 "approach/face" param floats + a `PatrolPath` table to SOURCE waypoints; (e) folding
+> the pre-IIR/post-IIR scaffolds into rows. The sections below are the per-family dissection detail + history.
+
 > **2026-06-10: the PLAYER-SPAWN half of this plan is COMPLETE and documented in
 > `docs/player-spawn-generation-plan.md`** — the player's FA015807 is fully generated from DB rows
 > (identity/stats/equipment via `ProtoCoreCharacterIIR`, the scaffold frame via `PlayerSpawnScaffoldCodec` +
