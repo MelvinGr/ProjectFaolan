@@ -14,6 +14,7 @@ namespace Faolan.Core.Database
 		DbSet<Character> Characters { get; }
 		DbSet<CharacterBody> CharacterBodies { get; }
 		DbSet<CharacterEquipment> CharacterEquipment { get; }
+		DbSet<CharacterInventory> CharacterInventory { get; }
 		DbSet<CharacterMaxStats> CharacterMaxStats { get; }
 		DbSet<ClassAbility> ClassAbilities { get; }
 		DbSet<ConversationNode> ConversationNodes { get; }
@@ -40,6 +41,7 @@ namespace Faolan.Core.Database
 		public DbSet<CharacterBody> CharacterBodies { get; set; }
 
 		public DbSet<CharacterEquipment> CharacterEquipment { get; set; }
+		public DbSet<CharacterInventory> CharacterInventory { get; set; }
 
 		public DbSet<CharacterMaxStats> CharacterMaxStats { get; set; }
 		public DbSet<ClassAbility> ClassAbilities { get; set; }
@@ -79,6 +81,7 @@ namespace Faolan.Core.Database
 
 			// One-to-one Character <-> CharacterMaxStats, keyed by CharacterId; deletes cascade with the character.
 			modelBuilder.Entity<Character>().HasOne(c => c.MaxStats).WithOne(s => s.Character).HasForeignKey<CharacterMaxStats>(s => s.CharacterId).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<Character>().HasMany(c => c.Inventory).WithOne(i => i.Character).HasForeignKey(i => i.CharacterId).OnDelete(DeleteBehavior.Cascade);
 
 			// A conversation node is identified by the clicked NPC + the player's TalkToNpc args. The NPC handle is
 			// part of the key because (TypeId, Mode, Field3) is NOT NPC-unique: the same mode means different

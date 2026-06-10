@@ -15,6 +15,10 @@ namespace Faolan.Core.Database.Tables
 		public virtual CharacterBody Body { get; set; }
 		public virtual CharacterEquipment Equipment { get; set; }
 
+		// Non-worn carried items (bag/backpack/quest/resources); worn items are in Equipment. Drives the FullChar
+		// inventory snapshot. See [[CharacterInventory]] / docs/player-spawn-generation-plan.md.
+		public virtual System.Collections.Generic.ICollection<CharacterInventory> Inventory { get; set; }
+
 		// One-to-one max-stat block (Health/Mana/Stamina, player-facing values). Created with class/level
 		// defaults on character creation; the ×100 vitals wire scale is applied when sending (CharacterStatBlock).
 		public virtual CharacterMaxStats MaxStats { get; set; }
