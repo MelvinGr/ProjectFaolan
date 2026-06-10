@@ -139,6 +139,51 @@ namespace Faolan.GameServer
 			}
 		}
 
+		// Loads the character's spawn-scaffold rows, seeding the fresh-character defaults once for characters that
+		// have none (like EnsureBeachStarterEquipment seeds starter gear). Returns null on failure - the spawn
+		// then keeps the captured scaffold frame.
+		private async Task<Character> EnsureSpawnScaffoldRows(Character character)
+		{
+			if (character == null)
+				return null;
+
+			try
+			{
+				var scaffoldCharacter = await Database.GetCharacterScaffold(character.Id) ?? character;
+				if (!PlayerSpawnScaffoldRows.EnsureFreshRows(scaffoldCharacter))
+					return scaffoldCharacter;
+
+				await Database.SaveCharacterScaffold(scaffoldCharacter);
+				Logger.LogInformation("Seeded fresh spawn-scaffold rows for character {CharacterId}.", character.Id);
+				return scaffoldCharacter;
+			}
+			catch (Exception ex)
+			{
+				Logger.LogWarning(ex, "Failed to load/seed spawn-scaffold rows for {CharacterId}; keeping the captured scaffold frame.", character.Id);
+				return null;
+			}
+		}
+
+		// Regenerates the spawn body's scaffold frame from the character's DB rows via the byte-exact codec
+		// (PlayerSpawnScaffoldCodec round-trips every captured player spawn). Returns the body unchanged when it
+		// doesn't parse or the character has no rows.
+		private byte[] RebuildScaffoldFromRows(byte[] body, Character scaffoldCharacter)
+		{
+			if (scaffoldCharacter == null)
+				return body;
+
+			if (!PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out var error))
+			{
+				Logger.LogWarning("Player spawn body did not parse as a scaffold ({Error}); keeping the captured frame.", error);
+				return body;
+			}
+
+			if (!PlayerSpawnScaffoldRows.TryApplyFrom(scaffoldCharacter, scaffold))
+				return body;
+
+			return PlayerSpawnScaffoldCodec.Generate(scaffold);
+		}
+
 		// Replaces one container entry with a DB-built entry for `item`, preserving the original slot/itemId/record id
 		// (and count unless forced) so the surrounding structure and the tails stay byte-stable.
 		private void ReplaceEntryInPlace(ProtoMessage container, ProtoField original, Item item, uint archetype, ulong? forceCount = null)
@@ -204,6 +249,10 @@ namespace Faolan.GameServer
 			var equipment = await EnsureBeachStarterEquipment(client.Session.Character);
 			var dbInventory = ResolveDbInventory(equipment);
 
+			// The spawn-scaffold rows (entry table / feat-ID list / pre-IIR frame) drive the player spawn's
+			// scaffold frame; characters without rows are seeded with the fresh-character defaults once.
+			var scaffoldCharacter = await EnsureSpawnScaffoldRows(client.Session.Character);
+
 			// IMPORTANT: do ALL per-packet work (instance rewrite, player-spawn rebuild, inventory parse/rebuild)
 			// HERE, before the send loop. The inventory rebuild in particular parses ~9 KB of tails and re-serializes
 			// - doing that mid-loop adds a CPU stall between sends that reshapes the burst's TCP segmentation, and
@@ -223,7 +272,7 @@ namespace Faolan.GameServer
 
 				if (dbInventory.Count > 0 && IsInventorySnapshot(pkt))
 					pkt = BuildBeachInventoryPacket(pkt, dbInventory);
-				else if (TryRebuildPlayerSpawnFromDb(client, equipment, pkt, out var rebuilt))
+				else if (TryRebuildPlayerSpawnFromDb(client, equipment, scaffoldCharacter, pkt, out var rebuilt))
 					pkt = rebuilt;
 
 				// Record each spawned NPC's handle -> name so a clicked handle can be routed to its conversation by
@@ -313,7 +362,7 @@ namespace Faolan.GameServer
 
 		// If the burst packet is the player's own entity Spawn (FA015807 whose handle is the client instance),
 		// overwrite its position/rotation fields from the DB character and return the rebuilt packet.
-		private bool TryRebuildPlayerSpawnFromDb(INetworkClient client, CharacterEquipment equipment, byte[] packet, out byte[] rebuilt)
+		private bool TryRebuildPlayerSpawnFromDb(INetworkClient client, CharacterEquipment equipment, Character scaffoldCharacter, byte[] packet, out byte[] rebuilt)
 		{
 			rebuilt = null;
 
@@ -387,6 +436,11 @@ namespace Faolan.GameServer
 				}
 
 				newBody = SpawnPacketBuilder.SetCharacterMessage(newBody, message);
+
+				// Regenerate the scaffold frame (pre-IIR islands + entry table + feat-ID list + pair lists) from
+				// the character's own DB rows, replacing the captured player's scaffold. No-op fallback when the
+				// body doesn't parse or the character has no rows.
+				newBody = RebuildScaffoldFromRows(newBody, scaffoldCharacter);
 			}
 			else
 			{

@@ -41,10 +41,6 @@ namespace Faolan.GameServer.Spawn
 		private const int TransformEndOffset = RotWOffset + 4; // first byte after the constructed transform (60)
 		private const byte TemplateNameLength = 5; // "Strie"
 
-		public static byte[] PlayerTemplateBytes => PlayerTemplate.Value;
-
-		private static readonly Lazy<byte[]> PlayerTemplate = new Lazy<byte[]>(() => PlayerSpawnTemplate.Bytes);
-
 		// Constructs the FA015807 header + transform (position/rotation as typed ProtoVec3/ProtoQuat) and appends the
 		// rest of the captured template body via WriteArray (appearance / stats / name - not yet dissected). The
 		// header's subop/ack/fieldA and the body length are carried over from the template; only the handle and the

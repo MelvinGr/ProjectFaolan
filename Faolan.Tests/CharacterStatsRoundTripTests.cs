@@ -16,7 +16,7 @@ namespace Faolan.Tests
 	{
 		private static ReadOnlySpan<byte> TemplateCharacterStatsPayload(out byte[] template)
 		{
-			template = SpawnPacketBuilder.PlayerTemplateBytes;
+			template = Support.Golden.Bytes("SpawnStrieTemplate");
 			var p = SpawnPacketBuilder.CharacterStatsTagOffset;
 			Assert.Equal(0x22, template[p]); // 0x22 length-delimited field tag
 			int len = template[p + 1]; // 67 < 128, single-byte length

@@ -31,6 +31,7 @@ namespace Faolan.Core.Database
 
 		Task<CharacterEquipment> GetCharacterEquipment(uint characterId);
 		Task<Character> GetCharacterForAccount(uint accountId, uint clientInstance);
+		Task<Character> GetCharacterScaffold(uint characterId);
 		Task<Character[]> GetCharactersByAccount(uint id, bool skipUninitialized = true);
 
 		Task<ConversationNode> GetConversationNode(uint npcHandle, uint typeId, uint mode, uint field3, bool exactHandleOnly = false);
@@ -52,6 +53,7 @@ namespace Faolan.Core.Database
 		Task SaveAccount(Account account);
 		Task SaveCharacter(Character character);
 		Task SaveCharacterEquipment(CharacterEquipment equipment);
+		Task SaveCharacterScaffold(Character character);
 		Task<int> SetCreationSpawn(Character character);
 
 		Task<bool> UpdateLastInfo(Account account, INetworkClient client);
@@ -226,6 +228,37 @@ namespace Faolan.Core.Database
 			// duplicate body row, and MaxStats so vitals are available. SaveCharacter's graph stays
 			// Character (+Body, +MaxStats).
 			return await ctx.Characters.Include(c => c.Body).Include(c => c.MaxStats).FirstOrDefaultAsync(c => c.Id == id);
+		}
+
+		// Loads the character with ONLY its spawn-scaffold rows (entry table / feat-ID list / ending pair lists /
+		// pre-IIR frame) for the player-spawn generation path. Detached like every read here.
+		public async Task<Character> GetCharacterScaffold(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.Characters.Include(c => c.Attributes).Include(c => c.Skills).Include(c => c.ScaffoldPairs).Include(c => c.SpawnFrame).FirstOrDefaultAsync(c => c.Id == characterId);
+		}
+
+		// Replaces the character's spawn-scaffold rows with the given detached ones (delete-and-insert; the rows
+		// are small and only rewritten on extraction/seeding, never per-login).
+		public async Task SaveCharacterScaffold(Character character)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+
+			ctx.CharacterAttributes.RemoveRange(ctx.CharacterAttributes.Where(a => a.CharacterId == character.Id));
+			ctx.CharacterSkills.RemoveRange(ctx.CharacterSkills.Where(s => s.CharacterId == character.Id));
+			ctx.CharacterScaffoldPairs.RemoveRange(ctx.CharacterScaffoldPairs.Where(p => p.CharacterId == character.Id));
+			ctx.CharacterSpawnFrames.RemoveRange(ctx.CharacterSpawnFrames.Where(f => f.CharacterId == character.Id));
+
+			if (character.Attributes != null)
+				ctx.CharacterAttributes.AddRange(character.Attributes);
+			if (character.Skills != null)
+				ctx.CharacterSkills.AddRange(character.Skills);
+			if (character.ScaffoldPairs != null)
+				ctx.CharacterScaffoldPairs.AddRange(character.ScaffoldPairs);
+			if (character.SpawnFrame != null)
+				ctx.CharacterSpawnFrames.Add(character.SpawnFrame);
+
+			await ctx.SaveChangesAsync();
 		}
 
 		// --- equipment -------------------------------------------------------------------------------------

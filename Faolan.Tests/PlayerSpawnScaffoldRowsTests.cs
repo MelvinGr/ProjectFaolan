@@ -43,7 +43,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Template_ExtractThenApply_RegeneratesByteIdentically()
 		{
-			var body = SpawnPacketBuilder.PlayerTemplateBytes;
+			var body = Support.Golden.Bytes("SpawnStrieTemplate");
 
 			Assert.Equal(Convert.ToHexString(body), Convert.ToHexString(RoundTripThroughRows(body)));
 		}

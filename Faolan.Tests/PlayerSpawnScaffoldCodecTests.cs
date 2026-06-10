@@ -42,7 +42,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void ParseThenGenerate_Template_IsByteIdentical()
 		{
-			var body = SpawnPacketBuilder.PlayerTemplateBytes;
+			var body = Support.Golden.Bytes("SpawnStrieTemplate");
 
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out var error), $"parse failed: {error}");
 
@@ -52,7 +52,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Parse_Template_LiftsTheDocumentedScaffold()
 		{
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(SpawnPacketBuilder.PlayerTemplateBytes, out var s, out _));
+			Assert.True(PlayerSpawnScaffoldCodec.TryParse(Support.Golden.Bytes("SpawnStrieTemplate"), out var s, out _));
 
 			Assert.Equal(0x02165EFFu, s.Handle);
 			Assert.Equal(5235752UL, s.Playfield);
@@ -108,7 +108,7 @@ namespace Faolan.Tests
 		public void Generate_AfterCharacterIirSwap_StaysParseable()
 		{
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(Golden("SpawnDikketestLogin"), out var s, out _));
-			var donor = SpawnPacketBuilder.PlayerTemplateBytes;
+			var donor = Support.Golden.Bytes("SpawnStrieTemplate");
 			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(donor, out var strie));
 
 			s.CharacterIir = donor.AsSpan(strie.Offset, strie.Length).ToArray(); // different length than Dikketest's

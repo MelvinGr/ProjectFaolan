@@ -31,7 +31,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void PlayerCharacterMessage_RoundTripsByteIdentically()
 		{
-			var message = CharacterMessage(SpawnPacketBuilder.PlayerTemplateBytes);
+			var message = CharacterMessage(Support.Golden.Bytes("SpawnStrieTemplate"));
 
 			var decoded = ((ReadOnlySpan<byte>)message).FromProtobuf<ProtoCoreCharacterIIR>();
 			var reencoded = decoded.ToProtobufBytes();
@@ -43,7 +43,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void PlayerCharacterMessage_DecodesExpectedIdentity()
 		{
-			var decoded = ((ReadOnlySpan<byte>)CharacterMessage(SpawnPacketBuilder.PlayerTemplateBytes)).FromProtobuf<ProtoCoreCharacterIIR>();
+			var decoded = ((ReadOnlySpan<byte>)CharacterMessage(Support.Golden.Bytes("SpawnStrieTemplate"))).FromProtobuf<ProtoCoreCharacterIIR>();
 
 			Assert.Equal("Strie", decoded.Name);
 			Assert.NotNull(decoded.Stats);
@@ -81,7 +81,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void PlayerSpawnReader_LocatesCharacterMessage_OnTemplate()
 		{
-			var body = SpawnPacketBuilder.PlayerTemplateBytes;
+			var body = Support.Golden.Bytes("SpawnStrieTemplate");
 			var innerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(SpawnPacketBuilder.NameInnerLengthOffset, 4));
 
 			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var result));
@@ -94,7 +94,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void SetCharacterMessage_WithUnchangedDecodedMessage_IsByteIdentical()
 		{
-			var body = SpawnPacketBuilder.PlayerTemplateBytes;
+			var body = Support.Golden.Bytes("SpawnStrieTemplate");
 			var message = ((ReadOnlySpan<byte>)CharacterMessage(body)).FromProtobuf<ProtoCoreCharacterIIR>();
 
 			var rebuilt = SpawnPacketBuilder.SetCharacterMessage(body, message);
@@ -107,7 +107,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void SetCharacterMessage_ChangingName_ResizesAndStaysConsistent()
 		{
-			var body = SpawnPacketBuilder.PlayerTemplateBytes;
+			var body = Support.Golden.Bytes("SpawnStrieTemplate");
 			var message = ((ReadOnlySpan<byte>)CharacterMessage(body)).FromProtobuf<ProtoCoreCharacterIIR>();
 			message.Name = "Tester"; // 6 chars vs "Strie" (5)
 
