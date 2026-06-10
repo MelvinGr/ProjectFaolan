@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
@@ -32,6 +33,7 @@ namespace Faolan.Core.Database
 		Task<CharacterEquipment> GetCharacterEquipment(uint characterId);
 		Task<Character> GetCharacterForAccount(uint accountId, uint clientInstance);
 		Task<Character> GetCharacterScaffold(uint characterId);
+		Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names);
 		Task<Character[]> GetCharactersByAccount(uint id, bool skipUninitialized = true);
 
 		Task<ConversationNode> GetConversationNode(uint npcHandle, uint typeId, uint mode, uint field3, bool exactHandleOnly = false);
@@ -231,12 +233,21 @@ namespace Faolan.Core.Database
 		}
 
 		// Loads the character with its spawn-scaffold rows (entry table / feat-ID list / ending pair lists /
-		// pre-IIR frame) plus Body, so first-entry seeding can generate the morph entries from the editor
-		// sliders. Detached like every read here.
+		// pre-IIR frame) plus Body and BodyResources, so first-entry seeding can generate the morph and
+		// weighted-appearance entries from the editor choices. Detached like every read here.
 		public async Task<Character> GetCharacterScaffold(uint characterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Characters.Include(c => c.Attributes).Include(c => c.Skills).Include(c => c.ScaffoldPairs).Include(c => c.SpawnFrame).Include(c => c.Body).FirstOrDefaultAsync(c => c.Id == characterId);
+			return await ctx.Characters.Include(c => c.Attributes).Include(c => c.Skills).Include(c => c.ScaffoldPairs).Include(c => c.SpawnFrame).Include(c => c.Body).Include(c => c.BodyResources)
+				.FirstOrDefaultAsync(c => c.Id == characterId);
+		}
+
+		// Resolves appearance resource refs ("*texscript_1108153") to their client-registry entries (imported
+		// from RDB 1000076 by Faolan.Importer --rdb). Empty when the registry hasn't been imported.
+		public async Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.MorphTargets.Where(t => names.Contains(t.Name)).ToDictionaryAsync(t => t.Name);
 		}
 
 		// Replaces the character's spawn-scaffold rows with the given detached ones (delete-and-insert; the rows

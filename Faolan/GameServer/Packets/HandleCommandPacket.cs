@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Data;
 using Faolan.Core.Database.Tables;
@@ -15,13 +17,36 @@ namespace Faolan.GameServer
 	{
 		// Applies one editor SetMorphValue callback to the character's body. The value is a ZIGZAG-encoded
 		// signed slider value; CharacterMorphs decodes it and stores the signed value in the matching
-		// CharacterBody column (the spawn morph float is that value / 1000 - see CharacterMorphs). The
-		// resource refs (*hairmesh/*texscript/*beardmesh) and any sliders not yet seen in captures are
-		// logged and skipped.
+		// CharacterBody column (the spawn morph float is that value / 1000 - see CharacterMorphs). Resource
+		// refs (*hairmesh/*beardmesh/*texscript - the chosen hair/colors/tattoos/scars) are recorded in
+		// editor send order; they become the spawn scaffold's weighted entries via MorphTarget. Sliders not
+		// yet seen in captures are logged and skipped.
 		private void ApplyMorph(Character character, string morph, uint value)
 		{
+			if (morph[0] == '*')
+			{
+				RecordBodyResource(character, morph);
+				return;
+			}
+
 			if (!CharacterMorphs.TryApply(EnsureBody(character), morph, value))
-				Logger.LogDebug("Character-editor: unmapped morph '{Morph}'={Value} (resource ref or slider not yet modelled).", morph, value);
+				Logger.LogDebug("Character-editor: unmapped morph '{Morph}'={Value} (slider not yet modelled).", morph, value);
+		}
+
+		// Appends the resource ref to the character's chosen-appearance list (deduplicated; the editor can
+		// resend the set when a creation session is resumed). Persisted with the character graph at name-commit.
+		private static void RecordBodyResource(Character character, string resourceRef)
+		{
+			character.BodyResources ??= new List<CharacterBodyResource>();
+			if (character.BodyResources.Any(r => r.Ref == resourceRef))
+				return;
+
+			character.BodyResources.Add(new CharacterBodyResource
+			{
+				CharacterId = character.Id,
+				Sequence = character.BodyResources.Count,
+				Ref = resourceRef
+			});
 		}
 
 		private async Task CommitCharacterName(INetworkClient client, string name)

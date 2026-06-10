@@ -257,7 +257,10 @@ namespace Faolan.Importer
 			}
 
 			if (rdbDir != null)
+			{
 				ImportRdb(rdbDir);
+				await RdbMorphTargetImporter.ImportAsync(db, rdbDir);
+			}
 
 			if (rdbItems)
 			{

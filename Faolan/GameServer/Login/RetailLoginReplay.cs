@@ -150,7 +150,21 @@ namespace Faolan.GameServer
 			try
 			{
 				var scaffoldCharacter = await Database.GetCharacterScaffold(character.Id) ?? character;
-				if (!PlayerSpawnScaffoldRows.EnsureFreshRows(scaffoldCharacter))
+
+				// Resolve the character's chosen appearance resources (editor SetMorphValue refs) to the
+				// weighted entry tags via the imported client registry; null (nothing stored / registry not
+				// imported) falls back to the Dikketest defaults inside EnsureFreshRows.
+				List<ScaffoldEntry> weighted = null;
+				if (scaffoldCharacter.BodyResources is { Count: > 0 })
+				{
+					var registry = await Database.GetMorphTargets(scaffoldCharacter.BodyResources.Select(r => r.Ref).ToArray());
+					weighted = PlayerSpawnScaffoldRows.BuildWeightedEntries(scaffoldCharacter.BodyResources, registry);
+					if (weighted == null)
+						Logger.LogWarning("Character {CharacterId} has {Count} chosen appearance resources but none resolved via MorphTargets (registry imported?); using the default weighted entries.", character.Id,
+							scaffoldCharacter.BodyResources.Count);
+				}
+
+				if (!PlayerSpawnScaffoldRows.EnsureFreshRows(scaffoldCharacter, weighted))
 					return scaffoldCharacter;
 
 				await Database.SaveCharacterScaffold(scaffoldCharacter);

@@ -114,19 +114,48 @@ cracked and implemented (`CharacterMorphs`, used by `ApplyMorph` and `EnsureFres
   always moves them together anyway.)
 - **Wire entry order = editor send order**: face by ascending slot, then body alphabetically. Unmoved
   sliders produce NO entry (strickenbla, zero morphs: 6 weighted attributes + closer at idx 7).
-- The 6 weighted (1.0) attribute tags and the closing record are also per-character (likely race/class/head
-  presets — NOT cracked); fresh characters keep Dikketest's proven set.
-
 Locked by `CharacterMorphsTests` (Hoxxling's raw editor stream → his 28 wire entries bit-exact) and the
 re-pointed `FreshRows_OverDikketestBody_AreByteIdenticalToTheCapture` (Dikketest's raw stream → his captured
 spawn byte-for-byte). The old verdict in spawn-dissection-plan.md ("the floats are progression skills, NOT
 morphs") was wrong.
 
+## Weighted attributes — CRACKED & WIRED (2026-06-10, fourth session)
+
+The weighted (1.0) entries at the top of the entry table are the character's **chosen appearance resources**
+(hair/beard mesh, hair/eye/skin color, tattoos, scars) — NOT race/class presets, NOT progression:
+
+- The client RDB carries a **customization registry: type 1000076 id 0** — 1,072 records
+  `[nameLen][name][u32 category][u32 defaultBits][f32 weight][u32 id]` covering ALL appearance targets:
+  the face sliders (category 0, "02_BrowLow"), body sliders (1), and the choosable resources
+  (3 hairmesh / 4 beardmesh / 5 piercingmesh / 6 hair color / 7 eye color / 8 skin color / 9+10
+  tattoos+scars / 2 face paint).
+- **Wire tag = registry id − 1** — for the weighted entries AND the morph sliders (one unified id space:
+  "02_BrowLow" id 3 → wire 2 = the slot prefix; "arm" id 0x101 → wire 0x100).
+- The editor's `SetMorphValue` **resource refs** ("*texscript_1108153" = the chosen options) ARE the
+  weighted-entry source: wire order = editor send order, weight = the registry weight (1.0), and
+  **category 2 (face paint, the always-sent `*texscript_183875`) is never emitted**. faolanx resolves
+  **7/7 bit-exact** against this client's registry; the other five create chars resolve 4-6 of 6, the
+  residuals (e.g. tint_char_blank consistently −4) being live-server↔client data-version drift — the same
+  drift visible in the body sliders, where retail's wire (arse=0x104/thigh=0x105/leg=0x106, proven across
+  37 spawns) disagrees with this client's registry (arse=0x106/thigh=0x107/leg=0x37). Generation follows
+  the **client's own registry** (it's the table this client ships) with the retail-proven morph table kept
+  for the sliders.
+- Implementation: `Faolan.Importer --rdb` imports the registry → `MorphTarget` (Id = wire tag);
+  `ApplyMorph` records the editor's refs → `CharacterBodyResource` (send order); world-entry seeding
+  resolves refs → `PlayerSpawnScaffoldRows.BuildWeightedEntries` (falls back to Dikketest's set when
+  nothing resolves). Locked by `WeightedAppearanceTests` (faolanx 7/7).
+- **The closing record is session state, not character data**: its tag is always a multiple of **0x3F1**
+  (the grammar's magic: Dikketest 22×0x3F1, Hoxxling 18/19/22/32×0x3F1 across his logins — same char,
+  different sessions) and its value one of 100/300/400. Like the buff records it varies per login, so the
+  stored Dikketest closer (22×0x3F1 / 300) is kept for generated spawns.
+
 ## Remaining (optional)
 
-- **Weighted-attribute / closer tags** (above) — per-character, semantics uncracked (fresh chars use
-  Dikketest's).
 - **Unmapped equip `pos` values** 3/8/20/21 (extend `CharacterEquipmentSlot` when an item needs them).
+- **IIR "looks" fields** — the spawn's rendered appearance (head mesh, hair, colors) inside the
+  ProtoCoreCharacterIIR is still the captured template's; wiring `CharacterBody.HeadMesh` + the
+  `CharacterBodyResource` refs into the IIR looks fields is the next appearance step (schema known:
+  docs/aoc-client-protos.proto).
 - **FullChar (0x737A6DF9)** is the analogous next generation target (test the `ProtoFullCharacterIIR`
   round-trip first, same playbook).
 - Extraction of CAPTURED characters into rows currently exists as the test-side mapping

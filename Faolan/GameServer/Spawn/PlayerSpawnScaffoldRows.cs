@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Database.Tables;
@@ -72,9 +73,34 @@ namespace Faolan.GameServer.Spawn
 			return true;
 		}
 
+		// Builds the weighted (1.0) appearance entries from the character's chosen editor resources, resolved
+		// against the imported client registry (MorphTarget; wire tag = registry id - 1). Wire order = editor
+		// send order (Sequence). Category 2 (face paint, e.g. the always-sent *texscript_183875) is never
+		// emitted in captured spawns and is skipped; unresolvable refs are skipped too. Returns null when
+		// nothing resolves - the caller then falls back to the Dikketest defaults.
+		public static List<ScaffoldEntry> BuildWeightedEntries(IEnumerable<CharacterBodyResource> resources, IReadOnlyDictionary<string, MorphTarget> registry)
+		{
+			if (resources == null || registry == null)
+				return null;
+
+			var entries = new List<ScaffoldEntry>();
+			foreach (var resource in resources.OrderBy(r => r.Sequence))
+			{
+				if (!registry.TryGetValue(resource.Ref, out var target) || target.Category == 2)
+					continue;
+
+				entries.Add(new ScaffoldEntry((uint)entries.Count + 1, (ushort)target.Id, BitConverter.SingleToUInt32Bits(target.Weight)));
+			}
+
+			return entries.Count > 0
+				? entries
+				: null;
+		}
+
 		// Seeds a character that has no scaffold rows yet with the fresh-character defaults. Returns true when it
-		// seeded (caller persists).
-		public static bool EnsureFreshRows(Character character)
+		// seeded (caller persists). weightedAppearance (from BuildWeightedEntries) replaces the Dikketest
+		// weighted-attribute defaults when the character's own editor choices are resolvable.
+		public static bool EnsureFreshRows(Character character, IReadOnlyList<ScaffoldEntry> weightedAppearance = null)
 		{
 			if (character.SpawnFrame?.PreFrame != null && character.Attributes is { Count: > 0 })
 				return false;
@@ -86,10 +112,11 @@ namespace Faolan.GameServer.Spawn
 				EntryTableX = 0xB7
 			};
 
-			// Entry table: the 6 weighted attributes (idx 1-6), then the character's OWN editor morphs
-			// (CharacterMorphs - absent sliders yield no entry, the captured shape of an unmorphed character),
-			// then the closing record. Indices and Sequence both follow that wire order.
-			var entries = new List<ScaffoldEntry>(FreshWeightedAttributes);
+			// Entry table: the weighted appearance entries (the character's chosen resources, or Dikketest's
+			// proven set when none resolve), then the character's OWN editor morphs (CharacterMorphs - absent
+			// sliders yield no entry, the captured shape of an unmorphed character), then the closing record.
+			// Indices and Sequence both follow that wire order.
+			var entries = new List<ScaffoldEntry>(weightedAppearance ?? FreshWeightedAttributes);
 			entries.AddRange(CharacterMorphs.BuildEntries(character.Body, (uint)entries.Count + 1));
 			entries.Add(new ScaffoldEntry((uint)entries.Count + 1, FreshCloserTag, FreshCloserValue));
 

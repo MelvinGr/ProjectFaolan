@@ -33,6 +33,8 @@ namespace Faolan.Core.Database
 		DbSet<NpcEquipment> NpcEquipment { get; }
 		DbSet<NpcSpawn> NpcSpawns { get; }
 		DbSet<Realm> Realms { get; }
+		DbSet<CharacterBodyResource> CharacterBodyResources { get; }
+		DbSet<MorphTarget> MorphTargets { get; }
 		DbSet<Spell> Spells { get; }
 		Task<int> SaveChangesAsync(CancellationToken cancellationToken = default); // from DbContext
 	}
@@ -60,6 +62,8 @@ namespace Faolan.Core.Database
 		public DbSet<MapObject> MapObjects { get; set; }
 		public DbSet<MapWorldBurst> MapWorldBursts { get; set; }
 		public DbSet<MapWorldBurstEntity> MapWorldBurstEntities { get; set; }
+		public DbSet<CharacterBodyResource> CharacterBodyResources { get; set; }
+		public DbSet<MorphTarget> MorphTargets { get; set; }
 		public DbSet<Npc> Npcs { get; set; }
 		public DbSet<NpcBody> NpcBodies { get; set; }
 		public DbSet<NpcEquipment> NpcEquipment { get; set; }
@@ -94,6 +98,11 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<Character>().HasMany(c => c.Skills).WithOne(s => s.Character).HasForeignKey(s => s.CharacterId).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Character>().HasMany(c => c.ScaffoldPairs).WithOne(s => s.Character).HasForeignKey(s => s.CharacterId).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Character>().HasOne(c => c.SpawnFrame).WithOne(s => s.Character).HasForeignKey<CharacterSpawnFrame>(s => s.CharacterId).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<Character>().HasMany(c => c.BodyResources).WithOne(r => r.Character).HasForeignKey(r => r.CharacterId).OnDelete(DeleteBehavior.Cascade);
+
+			// MorphTarget.Id IS the wire tag (the client registry's 1-based id minus 1) - assigned by the
+			// importer, never generated.
+			modelBuilder.Entity<MorphTarget>().Property(t => t.Id).ValueGeneratedNever();
 
 			// A conversation node is identified by the clicked NPC + the player's TalkToNpc args. The NPC handle is
 			// part of the key because (TypeId, Mode, Field3) is NOT NPC-unique: the same mode means different

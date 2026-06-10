@@ -13,6 +13,10 @@ namespace Faolan.Core.Database.Tables
 		public virtual Account Account { get; set; }
 
 		public virtual CharacterBody Body { get; set; }
+
+		// The appearance resources chosen in the create editor (hair/beard mesh, hair/eye/skin color, tattoos,
+		// scars), in editor send order. Resolved via MorphTarget into the spawn scaffold's weighted entries.
+		public virtual System.Collections.Generic.ICollection<CharacterBodyResource> BodyResources { get; set; }
 		public virtual CharacterEquipment Equipment { get; set; }
 
 		// Non-worn carried items (bag/backpack/quest/resources); worn items are in Equipment. Drives the FullChar
