@@ -260,15 +260,21 @@ CONSTRUCTION PROGRESS (2026-06-10):
   asserts the lift against the real Casilda/Crocodile bodies. (Importer needs `--skip-characters` on a populated
   DB — the known non-idempotent `CaptureCharacterImporter`, UNIQUE CharacterBodies.CharacterId, still TODO.)
 
-STILL TO DO to retire `Data` and build NPC spawns server-side:
-1. Lift the 273B pre-IIR float block + the post-IIR scaffold into rows the way the player spawn does
-   (`PlayerSpawnScaffoldCodec`/`PlayerSpawnScaffoldRows` — the post-IIR header word is 4→5 for NPCs, animal
-   minimal is a constant 41B). These are per-instance and the last opaque part of `Data`.
-2. A per-template `Npc` row set (one representative CharacterIIR per template_id) so instances need only
-   handle/pos/rot/monster_scale, and build the FA015807 via `SpawnPacketBuilder` (`BuildSpawnBody` +
-   `SetCharacterMessage`). Gate: a beach NPC built from its row equals the captured FA015807 byte-for-byte.
-3. Server world-entry: emit built NPC spawns + the paired 96C46740 registrations instead of the per-map
-   MapWorldBurst blob (the delicate part — see [[protocol-201c-spawn-subprotocol]]).
+- ✓ Full construction primitives (commit 84b14dd): `SetCharacterMessage` generalized to locate the IIR via
+  `PlayerSpawnReader` (works for NPC + player; adjusts body-length @0 + IIR-length @iirOff-4; the @133 island is
+  player-only), and `SpawnPacketBuilder.BuildSpawn(template, handle, pos, rot, iir)` composes transform + IIR.
+  Rebuilding Casilda/Crocodile from their own transform + decoded IIR is byte-identical.
+- ✓ DB-row → wire-body bridge (commit d10faa6): `NpcSpawnBuilder.TryBuild(NpcSpawn row, handle)` drives the
+  transform from the row's columns and the IIR + raw pre/post-IIR scaffold from the row's `Data`; byte-identical
+  to the capture when the columns match, re-addressing changes only the handle (`NpcSpawnBuilderTests`).
+
+STILL TO DO:
+1. Server world-entry: call `NpcSpawnBuilder` per map (allocate a session handle, emit the built spawn + the
+   paired 96C46740 registration) instead of replaying the MapWorldBurst blob. THE DELICATE PART — needs
+   in-client verification (the spawn gate, see [[protocol-201c-spawn-subprotocol]]); can't be byte-gated here.
+2. Then retire `Data`: lift the 273B pre-IIR float block + the post-IIR scaffold into rows the way the player
+   spawn does (`PlayerSpawnScaffoldCodec`/`Rows` — the NPC post-IIR header word is 4→5, animal minimal is a
+   constant 41B), and add a per-template `Npc` row set so instances need only handle/pos/rot/monster_scale.
 
 **Phase 5 — Inventory & equipment.** (IN PROGRESS — significant existing work.)
 The `0x737A6DF9` giant inventory snapshot is already parsed: `Faolan/GameServer/Packets/0x737A6DF9_Test/`
