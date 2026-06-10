@@ -176,6 +176,35 @@ namespace Faolan.Importer
 			return row;
 		}
 
+		// Static world objects (decor/containers/zones), deduped by (map, position) like the NPC spawns.
+		private static async Task ImportWorldObjects(DatabaseContext db, List<WorldObjectEntry> objects)
+		{
+			foreach (var e in objects)
+			{
+				var existing = await db.WorldObjects.FirstOrDefaultAsync(o => o.MapId == e.MapId && o.PositionX == e.X && o.PositionY == e.Y && o.PositionZ == e.Z);
+				if (existing == null)
+					db.WorldObjects.Add(PopulateObject(new WorldObject { MapId = e.MapId, PositionX = e.X, PositionY = e.Y, PositionZ = e.Z }, e));
+				else
+					PopulateObject(existing, e);
+			}
+
+			await db.SaveChangesAsync();
+		}
+
+		private static WorldObject PopulateObject(WorldObject row, WorldObjectEntry e)
+		{
+			row.SubOpcode = e.SubOpcode;
+			row.Name = e.Name;
+			row.ObjectId = e.ObjectId;
+			row.CapturedHandle = e.Handle;
+			row.Data = e.Data;
+			row.RotationX = e.RotX;
+			row.RotationY = e.RotY;
+			row.RotationZ = e.RotZ;
+			row.RotationW = e.RotW;
+			return row;
+		}
+
 		// --rdb: read the client RDB index and inventory the resource types. The server references text by id (the
 		// client renders it from its own RDB), so we DON'T bulk-store strings; this inventory is the foundation for
 		// locating + importing the structured data the server actually needs (item-template identity, NPC stats).
@@ -291,6 +320,7 @@ namespace Faolan.Importer
 				}
 				await ImportConversations(db, conversations);
 				await ImportNpcSpawns(db, NpcSpawnExtractor.Merge(captures.SelectMany(NpcSpawnExtractor.Extract)));
+				await ImportWorldObjects(db, WorldObjectExtractor.Merge(captures.SelectMany(WorldObjectExtractor.Extract)));
 				await ImportMapWorldBursts(db, MapWorldBurstExtractor.Merge(captures.SelectMany(MapWorldBurstExtractor.Extract)));
 			}
 
@@ -435,6 +465,7 @@ namespace Faolan.Importer
 				["Maps"] = await db.Maps.CountAsync(),
 				["MapWorldBursts"] = await db.MapWorldBursts.CountAsync(),
 				["NpcSpawns"] = await db.NpcSpawns.CountAsync(),
+			["WorldObjects"] = await db.WorldObjects.CountAsync(),
 				["ConversationNodes"] = await db.ConversationNodes.CountAsync(),
 				["ConversationPackets"] = await db.ConversationPackets.CountAsync()
 			};

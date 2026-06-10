@@ -45,6 +45,7 @@ namespace Faolan.Core.Database
 
 		Task<MapWorldBurst> GetMapWorldBurst(uint mapId);
 		Task<NpcSpawn[]> GetNpcSpawns(uint mapId);
+		Task<WorldObject[]> GetWorldObjects(uint mapId);
 		Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names);
 
 		Task<Realm> GetRealm(uint id);
@@ -410,6 +411,17 @@ namespace Faolan.Core.Database
 			return await ctx
 				.NpcSpawns
 				.Where(n => n.MapId == mapId && n.Data != null)
+				.ToArrayAsync();
+		}
+
+		// The captured static world objects for a map (decor/containers/zones). The world-entry path builds each
+		// object's body from its row via WorldObjectBuilder, like the NPC spawns.
+		public async Task<WorldObject[]> GetWorldObjects(uint mapId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.WorldObjects
+				.Where(o => o.MapId == mapId && o.Data != null)
 				.ToArrayAsync();
 		}
 

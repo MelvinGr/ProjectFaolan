@@ -34,6 +34,7 @@ namespace Faolan.Core.Database
 		DbSet<NpcBody> NpcBodies { get; }
 		DbSet<NpcEquipment> NpcEquipment { get; }
 		DbSet<NpcSpawn> NpcSpawns { get; }
+		DbSet<WorldObject> WorldObjects { get; }
 		DbSet<Realm> Realms { get; }
 		DbSet<Spell> Spells { get; }
 		Task<int> SaveChangesAsync(CancellationToken cancellationToken = default); // from DbContext
@@ -68,6 +69,7 @@ namespace Faolan.Core.Database
 		public DbSet<NpcBody> NpcBodies { get; set; }
 		public DbSet<NpcEquipment> NpcEquipment { get; set; }
 		public DbSet<NpcSpawn> NpcSpawns { get; set; }
+		public DbSet<WorldObject> WorldObjects { get; set; }
 		public DbSet<Realm> Realms { get; set; }
 		public DbSet<Spell> Spells { get; set; }
 
@@ -200,6 +202,18 @@ namespace Faolan.Core.Database
 					n.PositionX,
 					n.PositionY,
 					n.PositionZ
+				})
+				.IsUnique();
+
+			// A captured world object is deduped by its (map, spawn point), like the NPC spawns.
+			modelBuilder
+				.Entity<WorldObject>()
+				.HasIndex(o => new
+				{
+					o.MapId,
+					o.PositionX,
+					o.PositionY,
+					o.PositionZ
 				})
 				.IsUnique();
 

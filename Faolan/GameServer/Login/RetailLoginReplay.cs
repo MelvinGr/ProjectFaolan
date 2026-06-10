@@ -351,6 +351,16 @@ namespace Faolan.GameServer
 			var npcBuilt = 0;
 			var npcIdentical = 0;
 
+			// Static world objects (decor/containers/zones) sourced from the WorldObjects table the same way -
+			// keyed by position, rebuilt via WorldObjectBuilder with the burst's handle, put on the wire only when
+			// byte-identical to the re-addressed burst body (zero render risk).
+			var worldObjectRows = await Database.GetWorldObjects(burst.MapId);
+			var objectByPosition = new Dictionary<(int, int, int), WorldObject>();
+			foreach (var o in worldObjectRows)
+				objectByPosition.TryAdd(PositionKey(o.PositionX, o.PositionY, o.PositionZ), o);
+			var objectBuilt = 0;
+			var objectIdentical = 0;
+
 			// IMPORTANT: do ALL per-packet work (instance rewrite, player-spawn rebuild, inventory parse/rebuild)
 			// HERE, before the send loop. The inventory rebuild in particular parses ~9 KB of tails and re-serializes
 			// - doing that mid-loop adds a CPU stall between sends that reshapes the burst's TCP segmentation, and
@@ -385,6 +395,15 @@ namespace Faolan.GameServer
 						npcIdentical++;
 					}
 				}
+				else if (TryRebuildWorldObjectFromDb(objectByPosition, pkt, out var objRebuilt, out var objIdentical))
+				{
+					objectBuilt++;
+					if (objIdentical)
+					{
+						pkt = objRebuilt;
+						objectIdentical++;
+					}
+				}
 
 				// Record each spawned NPC's handle -> name so a clicked handle can be routed to its conversation by
 				// the stable name (handles are session-volatile). Reads the final bytes the client receives.
@@ -395,6 +414,8 @@ namespace Faolan.GameServer
 
 			if (npcByPosition.Count > 0)
 				Logger.LogInformation("NPC spawns for map {Map}: {Identical}/{Built} table-built spawns put on the wire byte-identical (the rest kept verbatim, cross-session), {Rows} rows available.", burst.MapId, npcIdentical, npcBuilt, npcByPosition.Count);
+			if (objectByPosition.Count > 0)
+				Logger.LogInformation("World objects for map {Map}: {Identical}/{Built} table-built objects put on the wire byte-identical, {Rows} rows available.", burst.MapId, objectIdentical, objectBuilt, objectByPosition.Count);
 
 			// The player's own vitals are server-generated from the live character (not the captured player's), emitted
 			// after the player has spawned in the burst.
@@ -598,6 +619,43 @@ namespace Faolan.GameServer
 
 			rebuilt = new byte[bodyStart + newBody.Length];
 			Array.Copy(packet, 0, rebuilt, 0, bodyStart); // [len][crc][headerLen][header]
+			newBody.CopyTo(rebuilt, bodyStart);
+
+			BinaryPrimitives.WriteUInt32BigEndian(rebuilt.AsSpan(0, 4), (uint)(rebuilt.Length - 4));
+			var crc = Crc32.Calculate(rebuilt[8..]);
+			BinaryPrimitives.WriteUInt32BigEndian(rebuilt.AsSpan(4, 4), crc);
+			return true;
+		}
+
+		// As TryRebuildNpcSpawnFromDb, for the static world objects (66AEDD50/F096251E/33A56FB0). Matched by
+		// position, rebuilt with the burst's handle via WorldObjectBuilder; `wasIdentical` is the safety signal.
+		private bool TryRebuildWorldObjectFromDb(IReadOnlyDictionary<(int, int, int), WorldObject> objectByPosition, byte[] packet, out byte[] rebuilt, out bool wasIdentical)
+		{
+			rebuilt = null;
+			wasIdentical = false;
+			if (packet.Length < 12)
+				return false;
+
+			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
+			var bodyStart = 12 + headerLen;
+			if (bodyStart + SpawnPacketBuilder.PosZOffset + 4 > packet.Length)
+				return false;
+
+			var body = packet.AsSpan(bodyStart);
+			var subOpcode = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4));
+			if (subOpcode is not (0x66AEDD50u or 0xF096251Eu or 0x33A56FB0u))
+				return false;
+
+			var handle = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(12, 4));
+			var key = PositionKey(BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosXOffset, 4)), BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosYOffset, 4)),
+				BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosZOffset, 4)));
+			if (!objectByPosition.TryGetValue(key, out var row) || !WorldObjectBuilder.TryBuild(row, handle, out var newBody))
+				return false;
+
+			wasIdentical = packet.Length - bodyStart == newBody.Length && packet.AsSpan(bodyStart).SequenceEqual(newBody);
+
+			rebuilt = new byte[bodyStart + newBody.Length];
+			Array.Copy(packet, 0, rebuilt, 0, bodyStart);
 			newBody.CopyTo(rebuilt, bodyStart);
 
 			BinaryPrimitives.WriteUInt32BigEndian(rebuilt.AsSpan(0, 4), (uint)(rebuilt.Length - 4));
