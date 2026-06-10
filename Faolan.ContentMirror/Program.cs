@@ -64,10 +64,18 @@ namespace Faolan.ContentMirror
                 var query = ctx.Request.QueryString.Value ?? "";
                 var localPath = Path.Combine(storeDir, tag, "upm", rest.Replace('/', Path.DirectorySeparatorChar));
 
+                // The patcher fetches <ControlHttpPatchAddr>/<folder>/LocalConfig.xml and OVERWRITES the local copy
+                // with it - which would revert our redirect to the real CDN. So for that file we archive the real
+                // bytes but serve a copy whose three patch-addr keys point back at this mirror, keeping the redirect
+                // sticky across a patch run.
+                var isConfig = tag == "control" && rest.EndsWith("LocalConfig.xml", StringComparison.OrdinalIgnoreCase);
+
                 if (query.Length == 0 && File.Exists(localPath))
                 {
                     Interlocked.Increment(ref hits);
-                    return Results.File(localPath, "application/octet-stream");
+                    return isConfig
+                        ? Results.File(RewriteConfig(await File.ReadAllBytesAsync(localPath), port), "application/octet-stream")
+                        : Results.File(localPath, "application/octet-stream");
                 }
 
                 // Single-flight per path so 5 patcher connections don't all fetch the same blob.
@@ -78,7 +86,9 @@ namespace Faolan.ContentMirror
                     if (query.Length == 0 && File.Exists(localPath))
                     {
                         Interlocked.Increment(ref hits);
-                        return Results.File(localPath, "application/octet-stream");
+                        return isConfig
+                            ? Results.File(RewriteConfig(await File.ReadAllBytesAsync(localPath), port), "application/octet-stream")
+                            : Results.File(localPath, "application/octet-stream");
                     }
 
                     var url = $"{upstreamBase}/upm/{rest}{query}";
@@ -105,7 +115,7 @@ namespace Faolan.ContentMirror
                     if (m % 100 == 0)
                         log.LogInformation("progress: {Misses} stored, {Hits} hits, {MB:F1} MB", m, Interlocked.Read(ref hits), b / 1048576.0);
                     log.LogInformation("MISS {Tag} {Rest} ({Size}b)", tag, rest, body.Length);
-                    return Results.File(body, "application/octet-stream");
+                    return Results.File(isConfig ? RewriteConfig(body, port) : body, "application/octet-stream");
                 }
                 finally
                 {
@@ -172,6 +182,16 @@ namespace Faolan.ContentMirror
             doc.Save(cfg);
             Console.WriteLine($"patched {cfg} (backup at {backup}); run --restore to revert");
             return 0;
+        }
+
+        // Replace the three real CDN /upm bases in a served LocalConfig.xml with this mirror, so a patcher that
+        // overwrites its local config from the control server stays pointed at us.
+        private static byte[] RewriteConfig(byte[] body, int port)
+        {
+            var text = System.Text.Encoding.UTF8.GetString(body);
+            foreach (var (tag, host) in Upstreams)
+                text = text.Replace($"{host}/upm", $"http://127.0.0.1:{port}/{tag}/upm");
+            return System.Text.Encoding.UTF8.GetBytes(text);
         }
 
         private static string? GetOption(string[] args, string name)
