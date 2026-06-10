@@ -268,10 +268,19 @@ CONSTRUCTION PROGRESS (2026-06-10):
   transform from the row's columns and the IIR + raw pre/post-IIR scaffold from the row's `Data`; byte-identical
   to the capture when the columns match, re-addressing changes only the handle (`NpcSpawnBuilderTests`).
 
+- ✓ Wired into world entry (commit da1489d): `ReplayMapWorldBurst` matches each burst NPC spawn to its
+  `NpcSpawns` row by spawn POSITION (the stable dedup key — handles are session-volatile, only 16/41 matched by
+  handle vs 40/42 by position) and rebuilds the body via `NpcSpawnBuilder` addressed to the burst's handle
+  (keeps the 96C46740 pairing). The table-built body goes on the wire ONLY when byte-identical to the
+  re-addressed burst body — zero render risk (beach: ~17/40 matched spawns are byte-identical; the rest are
+  cross-session and kept verbatim). `IDatabaseRepository.GetNpcSpawns(mapId)` added.
+
 STILL TO DO:
-1. Server world-entry: call `NpcSpawnBuilder` per map (allocate a session handle, emit the built spawn + the
-   paired 96C46740 registration) instead of replaying the MapWorldBurst blob. THE DELICATE PART — needs
-   in-client verification (the spawn gate, see [[protocol-201c-spawn-subprotocol]]); can't be byte-gated here.
+1. Drive the cross-session (non-identical) reconstructions and then fresh server-allocated handles + DB
+   positions — the genuine construct path. Needs IN-CLIENT verification (the delicate spawn gate, see
+   [[protocol-201c-spawn-subprotocol]]); can't be byte-gated. A cross-session row differs because it bakes a
+   different handle/scaffold/instance refs — re-addressing the rebuilt body + remapping the paired 96C46740 is
+   the work.
 2. Then retire `Data`: lift the 273B pre-IIR float block + the post-IIR scaffold into rows the way the player
    spawn does (`PlayerSpawnScaffoldCodec`/`Rows` — the NPC post-IIR header word is 4→5, animal minimal is a
    constant 41B), and add a per-template `Npc` row set so instances need only handle/pos/rot/monster_scale.
