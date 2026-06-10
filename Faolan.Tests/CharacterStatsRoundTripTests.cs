@@ -7,11 +7,10 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The build-side oracle for Phase 3 (appearance/identity from DB, docs/spawn-dissection-plan.md). The entity
-	// Spawn's CharacterStats component (sex/side/race/class/health/...) is the generated ProtoCoreCharacterIIR.
-	// CharacterStats. Proving that decoding the real captured block and re-encoding it is byte-identical means we
-	// can BUILD this component from a typed object (eventually from DB character data) and the client will accept
-	// the exact bytes - so the next strangler step can replace it the way the transform already is.
+	// The build-side oracle for the spawn's CharacterStats component (sex/side/race/class/health/... = the
+	// generated ProtoCoreCharacterIIR.CharacterStats): decoding the real captured block and re-encoding it is
+	// byte-identical, so the component is BUILT from a typed object populated from DB character data - which is
+	// what TryRebuildPlayerSpawnFromDb ships today (docs/player-spawn-generation-plan.md).
 	public class CharacterStatsRoundTripTests
 	{
 		private static ReadOnlySpan<byte> TemplateCharacterStatsPayload(out byte[] template)

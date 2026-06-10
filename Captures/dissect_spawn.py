@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """FA015807 (entity Spawn) dissection workbench.
 
-Pulls every Spawn body from one or more captures and breaks it into the parts we understand so far, so we
-can parameterize the SpawnPacketBuilder field-by-field (Phase 1+ of the dissection plan). Also diffs two
-spawns byte-for-byte to surface which regions are per-entity (handle / position / appearance / name) vs
-fixed scaffolding.
+Early dissection workbench (Phase 0/1): pulls every Spawn body from one or more captures, annotates the
+transform/name, and diffs two spawns byte-for-byte. SUPERSEDED for the full player-spawn format by
+Captures/parse_spawn_scaffold.py (the validated grammar - parses + regenerates every captured player spawn
+byte-exact; see docs/player-spawn-generation-plan.md). Kept for quick NPC-spawn poking.
 
 Layout discovered so far:
   [u32 len][u32 0xFA015807][u32 0x0000C350][u32 handle][u32 fieldA]
   0x2c <block>   where <block> begins protobuf-ish nested messages:
      0x0a <len> { 0d <x:f32 LE> 15 <y:f32 LE> 1d <z:f32 LE> }     position
      0x12 <len> { 0d <rx> 15 <ry> 1d <rz> 25 <rw> ... }           rotation/quaternion
-     ... (appearance / equipment / name still to map)
+     ... (the rest is fully mapped - see parse_spawn_scaffold.py)
 
 Usage:
   python3 Captures/dissect_spawn.py                 # annotate the Strie player + 2 NPC spawns

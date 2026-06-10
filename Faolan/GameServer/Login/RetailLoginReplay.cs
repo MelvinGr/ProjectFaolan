@@ -361,7 +361,9 @@ namespace Faolan.GameServer
 		}
 
 		// If the burst packet is the player's own entity Spawn (FA015807 whose handle is the client instance),
-		// overwrite its position/rotation fields from the DB character and return the rebuilt packet.
+		// rebuild it from the DB character: transform (position from the DB, rotation kept), the
+		// ProtoCoreCharacterIIR (name/sex/race/level/vitals + worn equipment) and the scaffold frame (from the
+		// character's scaffold rows via the codec). Each step falls back to the captured bytes on mismatch.
 		private bool TryRebuildPlayerSpawnFromDb(INetworkClient client, CharacterEquipment equipment, Character scaffoldCharacter, byte[] packet, out byte[] rebuilt)
 		{
 			rebuilt = null;
@@ -402,8 +404,8 @@ namespace Faolan.GameServer
 				var message = read.Message;
 				message.Name = character.Name;
 
-				// Override the player's identity (model) from the DB when set; otherwise keep the template's stats
-				// (a race/sex of 0 would be an invalid model). The remaining CharacterStats fields stay from the template.
+				// Override the player's identity (model) from the DB when set; otherwise keep the captured stats
+				// (a race/sex of 0 would be an invalid model). The remaining CharacterStats fields stay captured.
 				if (message.Stats != null && (uint)character.Race != 0)
 				{
 					// CharacterStats.race == the Race enum (Aquilonian=1, Cimmerian=2, Stygian=3); the spawn's sex code
@@ -423,7 +425,7 @@ namespace Faolan.GameServer
 						message.Stats.MaxMana = maxStats.Mana * 100;
 						message.Stats.Mana = maxStats.Mana * 100;
 					}
-					// Remaining CharacterStats fields (head_mesh, looks_package, side, ...) stay from the template.
+					// Remaining CharacterStats fields (head_mesh, looks_package, side, ...) stay captured.
 				}
 
 				// Replace the worn equipment with the character's own (when it has fully-buildable gear).

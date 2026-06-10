@@ -8,28 +8,36 @@ using Faolan.Core.Network.Protobuf;
 
 namespace Faolan.GameServer.Spawn
 {
-	// Builds an FA015807 entity Spawn body. The header (subop/ack/handle/fieldA) and the transform - the entity's
-	// position + rotation, i.e. ProtoGameCodeDynelIIR.position/rotation as typed ProtoVec3/ProtoQuat - are
-	// CONSTRUCTED; the remaining body (appearance / equipment / stats / the embedded name) is still copied verbatim
-	// from the captured template until those IIR components are dissected (see docs/spawn-dissection-plan.md and
-	// Captures/dissect_spawn.py). The body is the 0x2000 sub-content:
+	// SPLICE-side builder for an FA015807 entity Spawn body: takes a captured spawn (the map burst's player
+	// spawn) as the base, constructs the header + transform (position/rotation as typed ProtoVec3/ProtoQuat,
+	// i.e. ProtoGameCodeDynelIIR), and splices the per-character ProtoCoreCharacterIIR (name/stats/equipment)
+	// over the captured one (SetCharacterMessage). The scaffold frame around the CharacterIIR is then
+	// regenerated from the character's DB rows by PlayerSpawnScaffoldCodec/PlayerSpawnScaffoldRows (the
+	// GENERATION side - see docs/player-spawn-generation-plan.md). The body is the 0x2000 sub-content:
 	//   [u32 len][u32 0xFA015807][u32 0x0000C350][u32 handle][u32 fieldA] 0x2C 0x0A <pos> 0x12 <rot> ...
-	// The transform is always the same size, so this stays length-preserving (every nested length prefix in the
-	// tail remains valid); the outer Conan length + CRC are (re)computed by the caller / PacketStream.
+	// The transform is always the same size, so BuildSpawnBody stays length-preserving; the outer Conan length
+	// + CRC are (re)computed by the caller / PacketStream.
 	public static class SpawnPacketBuilder
 	{
-		// Offsets within the FA015807 body, verified against the Strie player spawn (Captures/dissect_spawn.py).
+		// Offsets within the FA015807 body, valid for the Strie-shaped beach layout (the burst's player spawn and
+		// the SpawnStrieTemplate test golden; other characters' spawns shift with name/equipment length - use
+		// PlayerSpawnReader / PlayerSpawnScaffoldCodec for those).
 		public const int HandleOffset = 12; // uint32 big-endian
-		public const int NameInnerLengthOffset = 304; // 4-byte BE enclosing length (@304 = 469)
-		public const int NameOuterLengthOffset = 133; // 4-byte BE enclosing length (@133 = 802)
+		public const int NameInnerLengthOffset = 304; // 4-byte BE length prefix of the ProtoCoreCharacterIIR (@304 = 469)
 
-		// The entity name lives at a fixed offset in the Strie player template as a length-prefixed protobuf string
-		// `0A <len> <utf8>`. It is enclosed by two 4-byte big-endian length prefixes (verified self-consistent:
-		// within @133's 802-byte block, 167 + (4 + @304's 469-byte block) + 162 = 802), then the body length and
-		// the packet length. Changing the name length must add the same delta to all four.
+		// NOT a length: an early misread. The u32 @133 is a per-character VALUE island in the pre-IIR scaffold
+		// frame (Strie 0x322, Hoxxling 0x42B - his stays fixed while the body size varies; see the validated
+		// grammar in docs/player-spawn-generation-plan.md). The splice methods below still delta-adjust it on
+		// resize - the client demonstrably tolerates that, and the rows-generated frame (PlayerSpawnScaffoldRows)
+		// overwrites it with the stored value anyway.
+		public const int NameOuterLengthOffset = 133;
+
+		// The entity name (the CharacterIIR's first field) at its fixed offset in the Strie-shaped layout, as a
+		// length-prefixed protobuf string `0A <len> <utf8>`. Resizing it must delta-adjust the CharacterIIR length
+		// prefix (@304), the value @133 (see above) and the body length @0.
 		public const int NameTagOffset = 308; // 0x0A
 		// The CharacterStats IIR component (sex/side/race/class/health/... = ProtoCoreCharacterIIR.CharacterStats) is
-		// a 0x22 length-delimited field immediately after the name. Strie template: 0x22 @315, 67-byte payload @317.
+		// a 0x22 length-delimited field immediately after the name. Strie layout: 0x22 @315, 67-byte payload @317.
 		public const int CharacterStatsTagOffset = 315;
 		public const int PosXOffset = 24; // float little-endian
 		public const int PosYOffset = 29;
@@ -39,13 +47,14 @@ namespace Faolan.GameServer.Spawn
 		public const int RotYOffset = 46;
 		public const int RotZOffset = 51;
 		private const int TransformEndOffset = RotWOffset + 4; // first byte after the constructed transform (60)
-		private const byte TemplateNameLength = 5; // "Strie"
+		private const byte BaseNameLength = 5; // "Strie" - the captured base body's name
 
-		// Constructs the FA015807 header + transform (position/rotation as typed ProtoVec3/ProtoQuat) and appends the
-		// rest of the captured template body via WriteArray (appearance / stats / name - not yet dissected). The
-		// header's subop/ack/fieldA and the body length are carried over from the template; only the handle and the
-		// transform are parameterized. Byte-identical to the captured body when fed the captured handle/position/
-		// rotation - SpawnPacketBuilderTests round-trips the embedded player template.
+		// Constructs the FA015807 header + transform (position/rotation as typed ProtoVec3/ProtoQuat) and appends
+		// the rest of the captured base body via WriteArray (the CharacterIIR + scaffold are replaced downstream
+		// by SetCharacterMessage / the rows-generated frame). The header's subop/ack/fieldA and the body length
+		// are carried over from the base; only the handle and the transform are parameterized. Byte-identical to
+		// the captured body when fed the captured handle/position/rotation (SpawnPacketBuilderTests, against the
+		// SpawnStrieTemplate golden).
 		public static byte[] BuildSpawnBody(byte[] template, uint handle, Vector3 position, Quaternion rotation)
 		{
 			var bodyLength = BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(0, 4));
@@ -77,17 +86,19 @@ namespace Faolan.GameServer.Spawn
 				.ToArray();
 		}
 
-		// Returns a copy of a Strie-template spawn body with the name replaced. Adjusts the two enclosing length
-		// prefixes and the body length field by the name-length delta. If the body does not look like the Strie
-		// template (the name marker is not where expected) or the name is unusable, returns the body unchanged.
+		// Returns a copy of a Strie-shaped spawn body with the name replaced. Delta-adjusts the CharacterIIR
+		// length prefix (@304), the @133 value (see NameOuterLengthOffset) and the body length. If the body does
+		// not look like the Strie-shaped layout (the name marker is not where expected) or the name is unusable,
+		// returns the body unchanged. Fallback path only - the main path replaces the whole CharacterIIR via
+		// SetCharacterMessage.
 		public static byte[] SetSpawnName(byte[] body, string name)
 		{
 			var nameBytes = Encoding.UTF8.GetBytes(name ?? string.Empty);
 			if (nameBytes.Length is 0 or > 127)
 				return body;
 
-			// Guard: only operate on the known template layout (0x0A tag + the template's name length).
-			if (body.Length <= NameTagOffset + 1 || body[NameTagOffset] != 0x0A || body[NameTagOffset + 1] != TemplateNameLength)
+			// Guard: only operate on the known layout (0x0A tag + the base body's "Strie" name length).
+			if (body.Length <= NameTagOffset + 1 || body[NameTagOffset] != 0x0A || body[NameTagOffset + 1] != BaseNameLength)
 				return body;
 
 			var oldLen = body[NameTagOffset + 1];
@@ -100,20 +111,20 @@ namespace Faolan.GameServer.Spawn
 			var afterSrc = NameTagOffset + 2 + oldLen;
 			Array.Copy(body, afterSrc, result, NameTagOffset + 2 + nameBytes.Length, body.Length - afterSrc);
 
-			// Every enclosing length sits before the name, so its offset is unchanged; only the value grows by delta.
+			// Both adjusted fields sit before the name, so their offsets are unchanged; only the values change.
 			AddBigEndian(result, 0, delta); // body length field
-			AddBigEndian(result, NameOuterLengthOffset, delta); // @133
-			AddBigEndian(result, NameInnerLengthOffset, delta); // @304
+			AddBigEndian(result, NameOuterLengthOffset, delta); // @133 value island (legacy adjust, tolerated)
+			AddBigEndian(result, NameInnerLengthOffset, delta); // @304 CharacterIIR length prefix
 			return result;
 		}
 
 		// Replaces the ENTIRE ProtoCoreCharacterIIR component (the player char message: name / stats / player_stats /
-		// bcc / ... / inventory_entry) with a re-encoded one, adjusting the three enclosing length prefixes (@0 body
-		// length, @133, @304) by the size delta. This is how equipment is rebuilt: the worn items are the message's
-		// InventoryEntries, so the caller decodes the template's ProtoCoreCharacterIIR, overrides name/stats/inventory
-		// from the DB, and re-encodes here. The message round-trips byte-identically (PlayerSpawnGenerationTests), so
-		// re-encoding the decoded template unchanged is a byte-identical no-op (the build-side oracle). Returns the
-		// body unchanged if it is not the known template layout (0x0A name tag at NameTagOffset).
+		// bcc / ... / inventory_entry) with a re-encoded one, delta-adjusting the body length @0, the @133 value
+		// island and the CharacterIIR length prefix @304. This is how identity + equipment are rebuilt: the caller
+		// decodes the captured base's ProtoCoreCharacterIIR, overrides name/stats/inventory from the DB, and
+		// re-encodes here. The message round-trips byte-identically (PlayerSpawnGenerationTests), so re-encoding
+		// the decoded message unchanged is a byte-identical no-op (the build-side oracle). Returns the body
+		// unchanged if it is not the known layout (0x0A name tag at NameTagOffset).
 		public static byte[] SetCharacterMessage(byte[] body, ProtoCoreCharacterIIR character)
 		{
 			if (body.Length <= NameTagOffset || body[NameTagOffset] != 0x0A)

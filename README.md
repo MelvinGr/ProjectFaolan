@@ -579,14 +579,14 @@ Concrete next steps, grouped by area. See `docs/` for the dissection writeups be
 
 ## Notes
 
-- The repository still contains hardcoded/verbatim protocol payloads (the `Retail*Burst.cs` create-flow files).
-  The only embedded data left in the server is `Faolan/GameServer/Data/spawn-player-template.bin` (used to rebuild
-  the player's own spawn). The `strie-login-worldburst.bin` file stays in the repo only as the import source for
-  the beach burst (not embedded). Game data + world bursts are NOT embedded - they live in the committed `faolan.db`, (re)built
-  from `Captures/` by the `Faolan.Importer` tool.
+- The repository still contains hardcoded/verbatim protocol payloads (the `Retail*Burst.cs` create-flow files),
+  but the server embeds NO game/spawn data: game data, world bursts and the player-spawn scaffold all live in
+  the committed `faolan.db` ((re)built from `Captures/` by `Faolan.Importer`; the player spawn is generated
+  from the character's rows - see docs/player-spawn-generation-plan.md). `spawn-player-template.bin` is gone;
+  `Captures/strie-login-worldburst.bin` remains only as a Faolan.Importer source file for the beach burst.
 - Generating EF migrations needs the design-time factory in `Faolan/Helpers/DatabaseContextDesignTimeFactory.cs`
   (the runtime `ConfigureFaolanDatabase` registration - now a pooled `DbContextFactory` - can't be used by
   `dotnet ef`).
 - Build: `dotnet build '/home/melvin/Development/C#/Project Faolan/ProjectFaolan.slnx' -v q`. Tests:
-  `dotnet test Faolan.PacketAnalyzer.Tests/Faolan.PacketAnalyzer.Tests.csproj` (the spawn/inventory round-trip
-  tests are the acceptance gate before anything ships dynamic).
+  `dotnet test Faolan.Tests` (the spawn/inventory round-trip tests are the acceptance gate before anything
+  ships dynamic), plus `tools/client-smoke-test.sh` for the in-client gate.

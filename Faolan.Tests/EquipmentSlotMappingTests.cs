@@ -3,7 +3,7 @@ using Faolan.Core.Enums;
 using Faolan.GameServer;
 using Xunit;
 
-namespace Faolan.PacketAnalyzer.Tests
+namespace Faolan.Tests
 {
 	// The equip/unequip persistence maps a CharacterEquipmentSlot to a CharacterEquipment item nav by switch; a typo
 	// there would silently drop or misplace gear. This locks the mapping: set each slot, read it back, and confirm

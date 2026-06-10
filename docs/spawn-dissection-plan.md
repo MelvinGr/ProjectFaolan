@@ -1,5 +1,14 @@
 # Plan: dissect the verbatim world packets → load players & NPCs from the DB
 
+> **2026-06-10: the PLAYER-SPAWN half of this plan is COMPLETE and documented in
+> `docs/player-spawn-generation-plan.md`** — the player's FA015807 is fully generated from DB rows
+> (identity/stats/equipment via `ProtoCoreCharacterIIR`, the scaffold frame via `PlayerSpawnScaffoldCodec` +
+> the CharacterAttribute/CharacterSkill/CharacterScaffoldPair/CharacterSpawnFrame rows);
+> `spawn-player-template.bin` and the `PlayerSpawnTemplate` constant are both gone. The morph-encoding
+> blocker recorded below is SUPERSEDED: the editor sliders are the float-valued scaffold entries (only the
+> slider→float mapping remains). The sections below stand for the still-open phases (NPC spawns from DB,
+> static-world dissection, conversation content) and as dissection history.
+
 ## Status (updated 2026-06-07)
 
 - **Phase 0 DONE** — workbench (`dissect_spawn.py`), `SpawnPacketBuilder`, `SpawnHandleTable`, tests 5/5 pass.
@@ -18,8 +27,9 @@
 - **Per-character name confirmed in-client** — renamed char spawns with its own (different-length) name and loads.
 
 So a non-Strie beach character now: renders the world+NPCs, spawns at its DB position with its DB name, and can
-open NPC dialogue. Remaining for a fully DB-driven player: **appearance** (race/sex/class/morphs/equipment),
-which is the bulk of the FA015807 body and the hardest dissection.
+open NPC dialogue. The then-remaining piece — appearance/equipment/scaffold, the bulk of the FA015807 body — was
+finished 2026-06-10 (see the banner at the top + docs/player-spawn-generation-plan.md); only the morph
+slider→float mapping is still open.
 
 - **Transform now CONSTRUCTED** (2026-06): `SpawnPacketBuilder.BuildSpawnBody` builds the header + transform
   (position/rotation = typed `ProtoVec3`/`ProtoQuat`, i.e. `ProtoGameCodeDynelIIR`) instead of offset-patching a
@@ -35,20 +45,15 @@ which is the bulk of the FA015807 body and the hardest dissection.
 - **CharacterStats splice BUILT** (2026-06): `SpawnPacketBuilder.SetCharacterStats(body, stats)` rebuilds the
   component from a typed `CharacterStats`, length-adjusting @0/@133/@304 like `SetSpawnName`
   (`CharacterStatsRoundTripTests`: captured-stats splice is a byte-identical no-op; a growing override adjusts all
-  three prefixes). NOT wired into the live replay yet — see the field-mapping blocker below.
-- **Field-mapping status** (for sourcing from DB): `race` (field 3) maps cleanly to the `Race` enum
-  (Aquilonian=1 / Cimmerian=2 / Stygian=3 == decoded values). `sex` (field 1) does NOT: the wire carries 2/3 while
-  the `Sex` enum is Male=0/Female=1 (looks like an offset/encoding — UNCONFIRMED, needs a known-sex capture).
-  `life`/`health` scale vs `CharacterMaxStats` also unconfirmed.
+  three prefixes).
+- **Field mapping RESOLVED + wired (2026-06-10)**: `race` (field 3) = the `Race` enum; `sex` (field 1) = the
+  `Sex` enum + 2 (Male=2, Female=3); `life`/`health` are ×100 the player-facing `CharacterMaxStats` values.
+  All driven from the DB in `TryRebuildPlayerSpawnFromDb` (Phase 3 DONE — the player spawn is fully DB-driven,
+  see docs/player-spawn-generation-plan.md).
 
 Next up:
-1. **Phase 3 — wire CharacterStats from DB**: override `race` (clean) + the vitals once their scale is confirmed,
-   via `SetCharacterStats` in `TryRebuildPlayerSpawnFromDb` (apply BEFORE `SetSpawnName`). Hold `sex` until the
-   2/3-vs-0/1 mapping is pinned. CAUTION: identity fields must stay consistent with the appearance meshes
-   (LooksPacket) or the client may render/​crash wrong — so the safe live cut-over may wait until looks are mapped.
-   Then the LooksPacket (meshes/morphs/tints) — the bulk.
-2. **Phase 4 — NPC spawns from `Npcs`/`NpcBodies`** (the builder already generalizes to NPC FA015807 bodies).
-3. Conversation content import (full dialogue trees) — separate, larger.
+1. **Phase 4 — NPC spawns from `Npcs`/`NpcBodies`** (the builder already generalizes to NPC FA015807 bodies).
+2. Conversation content import (full dialogue trees) — separate, larger.
 
 ## Goal
 
@@ -95,11 +100,11 @@ the existing `ProtoMessage` parser; the rest is differential.
 ## Tooling to build (Phase 0) — DONE
 
 Implemented: `Captures/dissect_spawn.py` (workbench: decodes handle/position/rotation/name per spawn, plus a
-`diff` mode); `Faolan/GameServer/Spawn/SpawnPacketBuilder.cs` (static, template-based, overwrites the mapped
-fixed-offset fields handle@12 BE + position@24/29/34 + rotation@41/46/51/56 LE; `spawn-player-template.bin`
-embedded); `Faolan/GameServer/Spawn/SpawnHandleTable.cs` (per-session unique/stable handle allocator, base
-0x00090000); tests in `Faolan.PacketAnalyzer.Tests/` (`SpawnPacketBuilderTests` byte-exact rebuild +
-`SpawnHandleTableTests`, 5/5 pass). Phase 0 complete.
+`diff` mode); `Faolan/GameServer/Spawn/SpawnPacketBuilder.cs` (then template-based; the embedded
+`spawn-player-template.bin` has since been retired — spawns are generated, see the top banner);
+`Faolan/GameServer/Spawn/SpawnHandleTable.cs` (per-session unique/stable handle allocator, base 0x00090000);
+`SpawnPacketBuilderTests` byte-exact rebuild + `SpawnHandleTableTests` (the spawn tests now live in
+`Faolan.Tests/`). Phase 0 complete.
 
 The handle allocator is built but NOT yet wired - it activates in Phase 2 when spawns are built with our own
 handles instead of replayed with the capture's. Until then the verbatim handles are used.
@@ -183,7 +188,9 @@ protobuf message (the message that starts with `field1`=name at body offset 308)
 - `field1` = **Race** (enum-confirmed: Cimmerian=2, Stygian=3 -> Strie=3 Stygian, Faolanx/DemoL80=2 Cimmerian).
 - `field2` = likely **Sex** (0=Male for all three test chars; unconfirmed - need a female capture).
 - `field3` (1/3), `field4` (92/103) = other appearance params (face/body presets, TBD).
-- `field6/7/8/9` = large values (9000/23000/...) = **morphs** (face/body customization).
+- `field6/7/8/9` = large values (9000/23000/...) — guessed "morphs" at the time; WRONG: this message is the
+  `ProtoCoreCharacterIIR.CharacterStats` (field6/7 are life/health on the ×100 scale, e.g. 9000 = 90 HP) and
+  the real morphs live in the post-IIR scaffold entries (see the 2026-06-10 banner).
 - **Class is NOT in the spawn** (no 0x12-0x2C value anywhere) - it's char-list metadata, not spawn-visual.
 
 MORPH PERSISTENCE — DONE (needs in-client test via the create flow). The create-editor handlers
@@ -191,25 +198,18 @@ MORPH PERSISTENCE — DONE (needs in-client test via the create flow). The creat
 `ChangeHeadMesh/Size/Voice` write to it (were no-ops); `SetMorphValue` body sliders (arm/chest/bosom/stomach/
 arse/thigh/leg, value 0-100) map to the matching `CharacterBody` float fields; resource refs (`*hairmesh/
 *texscript/*beardmesh`) and face sliders not yet seen are logged+skipped. Saved with the character at
-name-commit. STILL TODO: dissect how these values encode into the spawn's `field4` morph fields (e.g. SetMorph
-arm=59 vs spawn field6=9000) before appearance can actually render from the DB.
+name-commit. (The "STILL TODO: how do these encode into the spawn" question is answered 2026-06-10: they encode
+as the post-IIR scaffold's float-valued entries, NOT into `field4` — see SPAWN MORPH ENCODING below; the
+slider→float mapping is the last open piece before appearance renders from `CharacterBodies`.)
 
-Earlier blocker (now addressed): morphs (`field6+`) need data from `CharacterBodies`, which WAS empty.
-
-SPAWN MORPH ENCODING — BLOCKED (insufficient correlation data). Tried to map editor sliders -> spawn `field4`
-morphs using the create captures. dikketest is the ONLY retail char with both a known slider set
-(arm=59/arse=14/bosom=30/chest=59/leg=59/stomach=14/thigh=59) AND a captured world-spawn; strickenen's slider
-set is known but its spawn was dropped by the compression-cut. The dikketest sliders do NOT appear in its spawn
-as raw bytes (59 appears only 2x, 30 never), nor as floats (0.59/59.0/etc. - no match). field4 varint subfields
-(field6=11000,7=10030,8=17200,9=1145) don't fingerprint the slider pattern, and diffing against same-race Strie
-is confounded by face/individual differences. Cracking the encoding needs chars differing ONLY in body morphs,
-or per-slider editor-preview spawns - neither is in the capture set, and we can't generate retail captures. So
-full morph-accurate appearance is parked. Achievable appearance piece remains RACE (field1, enum-confirmed) +
-likely Sex (field2) - but those need the Change{Race,Sex,Class} capture fixed first (editor sends 6/6/62, not
-the enum values). Race/Sex ARE in
-the `Characters` table and could be driven now (1-byte varints in `field4`, length-safe), but yield only a
-race-correct body with the template's (Strie's) morphs - partial and visually mismatched. Field offsets shift
-with the name length, so any appearance write must happen relative to the (possibly rebuilt) name.
+SPAWN MORPH ENCODING — ~~BLOCKED~~ **SOLVED for the location (2026-06-10): the morphs are NOT in `field4`.**
+The earlier search failed because it looked in the wrong place: the editor sliders are the **float-valued
+entries of the post-CharacterIIR scaffold entry table** (now `CharacterAttribute` rows, payload
+`[u8 type][u8 sliderId][f32 bits]`). Dikketest's 7 type-0x01 entries (slider ids 0x00-0x06) match his editor
+slider multiset {59×4, 14×2, 30×1} exactly; Hoxxling, who modified ALL sliders, has ~26 type-0x00 entries
+(face slider ids 0x02-0x24). Only the exact slider→float mapping remains (59 → −0.03, 14 → +0.007,
+30 → +0.015 for Dikketest — not a simple linear map). Full grammar + remaining work in
+docs/player-spawn-generation-plan.md.
 
 **Phase 3 — Appearance & orientation fidelity.**
 Dissect the morph/appearance region of `FA015807` and source it from `CharacterBodies` (populated from the

@@ -256,8 +256,8 @@ Big architectural pass. Full detail in **`docs/player-spawn-generation-plan.md`*
 - **The player's own spawn reflects the live character from the DB:** name + race + sex + level + vitals + EQUIPMENT
   (`PlayerSpawnReader` decodes the CharacterIIR, `PlayerSpawnEquipment` builds the worn items, `SetCharacterMessage`
   re-encodes). New tables: `CharacterInventory`, `CharacterAttribute`, `CharacterSkill`.
-- **`spawn-player-template.bin` removed** — relocated to the `PlayerSpawnTemplate` C# constant (the create-world-burst
-  pattern). The char-data is generated on top; only the non-rendering IIR scaffold frame is still the constant.
+- **`spawn-player-template.bin` removed** — first relocated to the `PlayerSpawnTemplate` C# constant, which the
+  second session then DELETED outright (the scaffold frame is generated from DB rows; see the block below).
 - The original "under-populated vs retail" gap (beach 0x2076 / post-poll spawns) is folded in: the beach burst is a
   committed DB seed with the full window; OTHER maps still truncate at the first `0x2020` poll in
   `MapWorldBurstExtractor` (lower priority; asset-stripped client won't render the extra NPCs anyway).

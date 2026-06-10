@@ -7,7 +7,7 @@ using Faolan.Core.Network.Protobuf;
 namespace Faolan.GameServer.Spawn
 {
 	// Locates and decodes the ProtoCoreCharacterIIR (name / stats / player_stats / bcc / ... / inventory_entry) inside
-	// an arbitrary SimpleCharFullUpdate (FA015807) body - unlike SpawnPacketBuilder's fixed Strie-template offsets,
+	// an arbitrary SimpleCharFullUpdate (FA015807) body - unlike SpawnPacketBuilder's fixed Strie-layout offsets,
 	// this works for any character's spawn (different name length, different amount of equipment -> different size).
 	// It is the read side of player-spawn generation: decoding a captured spawn (e.g. necrol80's, which is in the DB
 	// burst) yields the worn equipment (InventoryEntries) + stats to extract into CharacterEquipment/CharacterInventory.

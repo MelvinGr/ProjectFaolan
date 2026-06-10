@@ -102,8 +102,8 @@ pcapng ──▶ PacketAnalysisService.AnalyzeCapture ──▶ AnalyzedPacket[]
 
 `faolan.db` is committed in git, so the database *is* already the versioned store. The embedded data resources
 (`archive/*.sql`, `captured-items.tsv`, `conversations-*.bin`, `strie-login-worldburst.bin`,
-`spawn-player-template.bin`) and the startup auto-seed exist only to self-heal an empty DB - they duplicate what
-the committed DB already holds. New model:
+`spawn-player-template.bin` - ALL since retired) and the startup auto-seed existed only to self-heal an empty
+DB - they duplicated what the committed DB already holds. New model:
 
 - **The server carries NO embedded data** and does NOT auto-seed; `DatabaseMigrator` only migrates the schema.
   Everything is read from the committed `faolan.db` at runtime.
@@ -112,10 +112,11 @@ the committed DB already holds. New model:
   tool, not blobs compiled into the server).
 - Reverting `faolan.db` restores the committed, data-full DB; re-run the importer when captures/sources change.
 
-Migration order: items/spells/NPCs (archive SQL + pcap items) first - DONE here; conversations -> a DB table
-(Phase 2) retires `conversations-*.bin`; the replay scaffolding (`strie-login-worldburst.bin`,
-`spawn-player-template.bin`) is transitional (the dissection plan replaces it with DB-driven world entry) and is
-the last to move.
+Migration order: items/spells/NPCs (archive SQL + pcap items) first - DONE; conversations -> a DB table
+(Phase 2) retired `conversations-*.bin`; the replay scaffolding moved last and is now ALSO DONE -
+`strie-login-worldburst.bin` became the DB-seeded beach burst (2026-06-08) and `spawn-player-template.bin` /
+the `PlayerSpawnTemplate` constant were replaced by DB-generated player spawns (2026-06-10, see
+docs/player-spawn-generation-plan.md). The server embeds no spawn/burst data.
 
 ## Relationship to the current seed path
 

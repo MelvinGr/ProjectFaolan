@@ -10,13 +10,13 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Foundation for GENERATING the player's own SimpleCharFullUpdate spawn from DB character data (replacing the
-	// captured spawn-player-template.bin). The player char message inside the spawn body is a ProtoCoreCharacterIIR
-	// (name / firstname / lastname / stats / npc_stats / player_stats / bcc / targets / generic_stats / inventory).
-	// This locks the key enabler: that whole message decodes and RE-ENCODES byte-identically through the client
-	// schema, so the spawn's identity/stats half can be built from a typed object (populated from the character)
-	// rather than spliced out of a captured template. The remaining half (the dynel-IIR wrapper + LooksPacket
-	// appearance/equipment) is the next step. See docs/spawn-dissection-plan.md / [[world_entry_from_db]].
+	// Locks the CharacterIIR half of player-spawn generation: the char message inside the spawn body is a
+	// ProtoCoreCharacterIIR (name / firstname / lastname / stats / npc_stats / player_stats / bcc / targets /
+	// generic_stats / inventory) that decodes and RE-ENCODES byte-identically through the client schema, so the
+	// spawn's identity/stats/equipment is built from a typed object populated from the character. The scaffold
+	// frame around it is covered by PlayerSpawnScaffoldCodecTests/RowsTests. The Strie bytes used here are a
+	// golden test oracle only (SpawnStrieTemplate.bin) - the server embeds no captured spawn. See
+	// docs/player-spawn-generation-plan.md.
 	public class PlayerSpawnGenerationTests
 	{
 		// The ProtoCoreCharacterIIR sub-message sits at NameTagOffset (its first field, name=0x0A) and is enclosed by
