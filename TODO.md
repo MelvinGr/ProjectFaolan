@@ -262,11 +262,20 @@ Big architectural pass. Full detail in **`docs/player-spawn-generation-plan.md`*
   committed DB seed with the full window; OTHER maps still truncate at the first `0x2020` poll in
   `MapWorldBurstExtractor` (lower priority; asset-stripped client won't render the extra NPCs anyway).
 
-**OPTIONAL remaining (zero functional payoff — the constant works; do only for architectural tidiness):**
-- Retire the `PlayerSpawnTemplate` constant by GENERATING the scaffold from `CharacterAttribute`/`CharacterSkill`. The
-  RE is COMPLETE (feat-list = `[index][0][type][subidx][value]`; scaffold-A near-constant; the `01 2c` feat-ID list is
-  the last framing detail) — it's a large from-scratch body-composer build, fully specced in the plan doc.
-- Wire the appearance: `CharacterBody` face morphs are currently **write-only** (stored on create, never sent).
+**DONE 2026-06-10 (second session): scaffold generation + template retirement.** The spawn scaffold is now
+GENERATED from DB rows (`PlayerSpawnScaffoldCodec` + `PlayerSpawnScaffoldRows`; new/reshaped tables
+CharacterAttribute/CharacterSkill/CharacterScaffoldPair/CharacterSpawnFrame, migration `SpawnScaffoldRows`);
+fresh characters are seeded with Dikketest-derived defaults; `PlayerSpawnTemplate` deleted (Strie bytes are a
+test golden only). Harness 16/16; the generated scaffold confirmed on the wire via pcap.
+- [ ] RE-TEST a normal beach login in-client: world renders, your character looks/loads normally. The player
+      spawn now carries a FRESH scaffold (Dikketest's defaults: 6 attributes, 7 morph entries, 20 feat ids)
+      instead of Strie's progressed one — if anything about the character sheet/feats/abilities looks off after
+      login, grab the client log.
+
+**OPTIONAL remaining:**
+- Wire the appearance: the editor morph sliders ARE the float-valued scaffold entries (discovered 2026-06-10;
+  Dikketest's 7 entries match his slider multiset) — crack the exact slider→float mapping, then generate the
+  morph entries from `CharacterBody` instead of the Dikketest defaults.
 - `MapWorldBurstExtractor` full-window fix for non-beach maps.
 
 ---

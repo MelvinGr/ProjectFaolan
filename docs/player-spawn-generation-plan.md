@@ -3,13 +3,19 @@
 Goal: generate the player's own `SimpleCharFullUpdate` (0xFA015807) spawn entirely from DB character data, with
 **full equipment rendering**, so `spawn-player-template.bin` can be deleted. Chosen 2026-06-10.
 
-> **STATUS 2026-06-10 (session end):** DONE — the spawn reflects the live character's name/race/sex/level/vitals/
-> equipment from the DB; `spawn-player-template.bin` removed (scaffold frame relocated to the `PlayerSpawnTemplate`
-> C# constant). The scaffold RE is COMPLETE (see below). What's LEFT is OPTIONAL with **zero functional payoff**:
-> generating the non-rendering scaffold frame from `CharacterAttribute`/`CharacterSkill` to retire the constant — a
-> large from-scratch body-composer build. Confirmed robust: `IirRecordCodec` roundtrips byte-exact over **all 68,264
-> captured IIR records across all 24 dumps**; `PlayerSpawnReader` decodes 3,442/3,443 spawns; 124 unit tests + harness
-> 16/16. Don't regress the working login to chase the constant retirement.
+> **STATUS 2026-06-10 (second session): COMPLETE — the whole plan is done, including the optional remainder.**
+> The spawn scaffold is now GENERATED from the character's DB rows (`CharacterAttribute` entry table /
+> `CharacterSkill` feat-ID list / `CharacterScaffoldPair` / `CharacterSpawnFrame`) via the byte-exact
+> `PlayerSpawnScaffoldCodec`; fresh characters are lazily seeded with the Dikketest-derived defaults
+> (`PlayerSpawnScaffoldRows`). **`PlayerSpawnTemplate` is RETIRED** — the server embeds no captured spawn frame;
+> the Strie bytes live on only as a test oracle (`Faolan.Tests/Golden/SpawnStrieTemplate.bin`).
+> Verified: grammar regen byte-exact over all 34 captured player spawns (`Captures/parse_spawn_scaffold.py`);
+> rows→bytes oracle locked in `PlayerSpawnScaffoldRows/CodecTests`; harness 16/16 with the generated scaffold
+> on the wire (pcap-confirmed); 142 unit tests.
+> **BONUS FINDING:** the editor morph sliders ARE in the spawn — they're the float-valued scaffold entries
+> (Dikketest's 7 type-0x01 entries match his slider multiset {59×4, 14×2, 30×1}; Hoxxling, who modified all
+> sliders, has ~26 type-0x00 entries). The old "SPAWN MORPH ENCODING — BLOCKED" verdict in
+> spawn-dissection-plan.md is superseded; only the exact slider→float mapping remains to wire CharacterBody in.
 
 ## What's proven / available
 
