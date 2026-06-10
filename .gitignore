@@ -257,3 +257,6 @@ ModelManifest.xml
 /faolan.db-shm
 /faolan.db-wal
 /logs.txt
+
+# Faolan.ContentMirror runtime cache
+mirror-store/
