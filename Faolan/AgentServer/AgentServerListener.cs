@@ -71,12 +71,14 @@ namespace Faolan.AgentServer
 					// the raw pcap (the analyzer drops AgentServer S->C). Channel ids/types are fixed per channel,
 					// except ~Playfield whose id is the character's current map. ~Trial carries 0x00008244, the rest
 					// 0x00008044 (a per-channel flag).
-					var mapId = client.Session.Character?.MapId ?? 0x00000FAA;
 					await SendChannelSubscription(client, 0x04, 0x0000232A, "~Trial", 0x00008244);
 					await SendChannelSubscription(client, 0x04, 0x00002328, "~Global", 0x00008044);
 					await SendChannelSubscription(client, 0x04, 0x00002329, "~LFG", 0x00008044);
 					await SendChannelSubscription(client, 0x11, 0x00002335, "~GlobalEnglish", 0x00008044);
-					await SendChannelSubscription(client, 0x90, mapId, "~Playfield", 0x00008044);
+
+					if(client.Session.Character?.MapId > 0)
+						await SendChannelSubscription(client, 0x90, client.Session.Character.MapId, "~Playfield", 0x00008044);
+
 					await SendChannelSubscription(client, 0x87, 0x001E8480, "~NewbieHelp", 0x00008044);
 
 					await new FaolanStream().WriteUInt32(0x00050000).SendAsync(client);

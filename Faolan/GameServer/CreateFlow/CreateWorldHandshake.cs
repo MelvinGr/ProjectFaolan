@@ -179,7 +179,7 @@ namespace Faolan.GameServer
 		// now-named character takes the create-world entry path. Body = [0x00][byteLen "host:port"].
 		private async Task SendWorldHandoff(INetworkClient client)
 		{
-			var realm = await Database.GetRealm(client.Session.Character.RealmId ?? 0);
+			var realm = await Database.GetRealm(client.Session.Character.RealmId);
 			var worldPort = (ushort)(realm.Port + 1);
 			var address = $"{realm.IpAddress}:{worldPort}";
 

@@ -18,7 +18,7 @@ namespace Faolan.GameServer
 		// this generalises beyond the beach (currently only the beach burst omits its MapChange).
 		internal static byte[] BuildMapChange(INetworkClient client)
 		{
-			var mapId = client.Session.Character.MapId ?? 0;
+			var mapId = client.Session.Character.MapId;
 			var instance = client.Session.Account.ClientInstance;
 
 			var ps = new PacketStream();

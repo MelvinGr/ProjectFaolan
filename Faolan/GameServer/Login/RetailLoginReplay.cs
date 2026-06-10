@@ -265,7 +265,7 @@ namespace Faolan.GameServer
 		// Tortage Beach (0xFAA/4010) - the universal fallback world. Its burst is always seeded (the proven blob), so
 		// any character whose own map has no usable burst still enters a real, rendered world instead of a hand-built
 		// one. (There is no hand-built login/teleport path anymore.)
-		private const uint DefaultWorldMapId = 0x00000FAA;
+		private const uint DefaultWorldMapId = Map.TortageBeachId;
 
 		// The single existing-character WORLD ENTRY used by both login and the teleport GM command: send the 0x201c
 		// channel handshake, then replay the character's current-map world burst from the DB (MapChange + world
@@ -275,7 +275,7 @@ namespace Faolan.GameServer
 		{
 			await Send0X201C(client);
 
-			var mapId = client.Session.Character.MapId ?? 0;
+			var mapId = client.Session.Character.MapId;
 			var worldBurst = await Database.GetMapWorldBurst(mapId) ?? await Database.GetMapWorldBurst(DefaultWorldMapId);
 			if (worldBurst == null)
 			{

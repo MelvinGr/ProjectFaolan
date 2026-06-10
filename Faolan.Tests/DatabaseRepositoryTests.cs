@@ -89,11 +89,14 @@ namespace Faolan.Tests
 						AuthChallenge = "",
 						LastIpAddress = ""
 					});
+					ctx.Realms.Add(new Realm { Id = 1, Name = "Test", IpAddress = "127.0.0.1" });
+					ctx.Maps.Add(new Map { Id = Map.TortageBeachId, Name = "Tortage Beach" });
 					ctx.Characters.Add(new Character
 					{
 						Id = characterId,
 						Name = "Tester",
-						AccountId = accountId
+						AccountId = accountId,
+						RealmId = 1
 					});
 					await ctx.SaveChangesAsync();
 				}
@@ -217,10 +220,13 @@ namespace Faolan.Tests
 						AuthChallenge = "",
 						LastIpAddress = ""
 					});
+					ctx.Realms.Add(new Realm { Id = 1, Name = "Test", IpAddress = "127.0.0.1" });
+					ctx.Maps.Add(new Map { Id = Map.TortageBeachId, Name = "Tortage Beach" });
 					ctx.Characters.Add(new Character
 					{
 						Id = characterId,
-						AccountId = accountId
+						AccountId = accountId,
+						RealmId = 1
 					});
 					await ctx.SaveChangesAsync();
 				}
@@ -263,7 +269,9 @@ namespace Faolan.Tests
 				{
 					await ctx.Database.EnsureCreatedAsync();
 					ctx.Accounts.Add(new Account { Id = 1, UserName = "t", Password = "t", AuthChallenge = "", LastIpAddress = "" });
-					ctx.Characters.Add(new Character { Id = 5, Name = "T", AccountId = 1 });
+					ctx.Realms.Add(new Realm { Id = 1, Name = "Test", IpAddress = "127.0.0.1" });
+					ctx.Maps.Add(new Map { Id = Map.TortageBeachId, Name = "Tortage Beach" });
+					ctx.Characters.Add(new Character { Id = 5, Name = "T", AccountId = 1, RealmId = 1 });
 					ctx.Items.Add(new Item { Id = 100, Name = "A" });
 					ctx.Items.Add(new Item { Id = 200, Name = "B" });
 					await ctx.SaveChangesAsync();

@@ -116,7 +116,7 @@ namespace Faolan.GameServer
 							? CreateEditorReceiver(client)
 							: null;
 
-						await ReportDimensionId(client, client.Session.Character.RealmId ?? throw new Exception(), authSender, authReceiver); // 1
+						await ReportDimensionId(client, client.Session.Character.RealmId, authSender, authReceiver); // 1
 						await ReportServerId(client, 1, authSender, authReceiver); // 0x00000006
 						await AckAuthentication(client, 1, authSender, authReceiver);
 					}
@@ -238,8 +238,8 @@ namespace Faolan.GameServer
 					if (packet.Body != null)
 						LogPacketBodyDebug("GameServer 0x200C body", packet.Body.ToArray());
 
-					if (client.Session.Character?.RealmId != null)
-						await ReportDimensionId(client, client.Session.Character.RealmId.Value);
+					if (client.Session.Character != null)
+						await ReportDimensionId(client, client.Session.Character.RealmId);
 
 					break;
 				}

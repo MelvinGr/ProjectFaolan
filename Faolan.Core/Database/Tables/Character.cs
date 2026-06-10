@@ -63,9 +63,11 @@ namespace Faolan.Core.Database.Tables
 		public uint AccountId { get; set; }
 		public uint Experience { get; set; }
 
-		public uint? MapId { get; set; }
+		// Required: a character always lives on a map; Tortage Beach is the universal fallback world.
+		public uint MapId { get; set; } = Map.TortageBeachId;
 
-		public uint? RealmId { get; set; }
+		// Required: set on creation (CreateCharacter) and by the capture importer.
+		public uint RealmId { get; set; }
 		public ushort Level { get; set; }
 
 

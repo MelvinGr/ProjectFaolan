@@ -74,7 +74,7 @@ namespace Faolan.Core.Database
 		// Slave Galley (character-creation) map. 0xFAA/4010 is the map the retail create capture's world
 		// entry uses (account-stricken998-character-strickenen-create-random-actions) and it exists in the
 		// seeded Maps table; 0xFA0/4000 does NOT exist and caused a Map foreign-key failure on save.
-		private const uint CreationMapId = 0x00000FAA;
+		private const uint CreationMapId = Map.TortageBeachId;
 
 		// Tortage Beach intro spawn, taken verbatim (exact IEEE-754 bits) from the dikketest world-entry
 		// MapChange so a newly created character loads at the correct intro location instead of (0,0,0).

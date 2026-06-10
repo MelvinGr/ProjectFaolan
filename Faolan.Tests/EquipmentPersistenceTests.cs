@@ -39,12 +39,15 @@ namespace Faolan.Tests
 						AuthChallenge = "",
 						LastIpAddress = ""
 					});
+					db.Realms.Add(new Realm { Id = 1, Name = "Test", IpAddress = "127.0.0.1" });
+					db.Maps.Add(new Map { Id = Map.TortageBeachId, Name = "Tortage Beach" });
 					await db.SaveChangesAsync();
 					db.Characters.Add(new Character
 					{
 						Id = characterId,
 						Name = "Tester",
-						AccountId = 1
+						AccountId = 1,
+						RealmId = 1
 					});
 					db.CharacterEquipment.Add(new CharacterEquipment
 					{

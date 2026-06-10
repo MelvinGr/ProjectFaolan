@@ -113,6 +113,7 @@ namespace Faolan.Importer
 			var accountId = AccountId != 0
 				? AccountId
 				: await FindOrCreateImportAccount(db);
+			var realmId = await FindOrCreateRealm(db);
 
 			var added = 0;
 			var skipped = 0;
@@ -133,14 +134,14 @@ namespace Faolan.Importer
 				// only exists for the capturing account's own characters and serves as the cross-check.
 				var classId = charList.GetValueOrDefault(name)?.Class ?? (body.Length > 136 ? body[136] : 0u);
 
-				await AddCharacter(db, accountId, name, mapId, classId, scaffold, read.Message, snapshots.GetValueOrDefault(handle), charList.GetValueOrDefault(name));
+				await AddCharacter(db, accountId, realmId, name, mapId, classId, scaffold, read.Message, snapshots.GetValueOrDefault(handle), charList.GetValueOrDefault(name));
 				added++;
 			}
 
 			return (best.Count, added, skipped);
 		}
 
-		private static async Task<uint?> ResolveMapId(DatabaseContext db, uint spawnMapId, CharListEntry listEntry)
+		private static async Task<uint> ResolveMapId(DatabaseContext db, uint spawnMapId, CharListEntry listEntry)
 		{
 			foreach (var candidate in new[] { spawnMapId, listEntry?.MapId ?? 0 })
 			{
@@ -148,7 +149,35 @@ namespace Faolan.Importer
 					return candidate;
 			}
 
-			return null;
+			// MapId is required: fall back to Tortage Beach (the universal fallback world), making sure
+			// its Map row exists so the foreign key can never fail.
+			if (!await db.Maps.AnyAsync(m => m.Id == Map.TortageBeachId))
+			{
+				db.Maps.Add(new Map { Id = Map.TortageBeachId, Name = "Tortage Beach" });
+				await db.SaveChangesAsync();
+			}
+
+			return Map.TortageBeachId;
+		}
+
+		// RealmId is required and captures don't carry our local realm ids, so imported characters join the
+		// server's (first) realm, creating a default one when the DB has none yet.
+		private static async Task<uint> FindOrCreateRealm(DatabaseContext db)
+		{
+			var realm = await db.Realms.OrderBy(r => r.Id).FirstOrDefaultAsync();
+			if (realm == null)
+			{
+				realm = new Realm
+				{
+					Name = "Project Faolan",
+					IpAddress = "127.0.0.1"
+				};
+				db.Realms.Add(realm);
+				await db.SaveChangesAsync();
+				Console.WriteLine($"Characters: created default realm '{realm.Name}' (id {realm.Id}).");
+			}
+
+			return realm.Id;
 		}
 
 		private static async Task<uint> FindOrCreateImportAccount(DatabaseContext db)
@@ -221,7 +250,7 @@ namespace Faolan.Importer
 			}
 		}
 
-		private static async Task AddCharacter(DatabaseContext db, uint accountId, string name, uint mapId, uint classId, PlayerSpawnScaffold scaffold, ProtoCoreCharacterIIR message, List<byte[]> snapshots, CharListEntry listEntry)
+		private static async Task AddCharacter(DatabaseContext db, uint accountId, uint realmId, string name, uint mapId, uint classId, PlayerSpawnScaffold scaffold, ProtoCoreCharacterIIR message, List<byte[]> snapshots, CharListEntry listEntry)
 		{
 			var stats = message.Stats ?? new ProtoCoreCharacterIIR.CharacterStats();
 
@@ -249,9 +278,10 @@ namespace Faolan.Importer
 					? Sex.Male
 					: Sex.Female,
 				// The map active when the spawn was sent (MapChange tracking; the transform's "playfield"
-				// varint is a session instance id, NOT the map), else the char list's persisted map. Only
-				// when the Map row exists (FK).
-				MapId = await ResolveMapId(db, mapId, listEntry)
+				// varint is a session instance id, NOT the map), else the char list's persisted map (when
+				// the Map row exists - FK), else the Tortage Beach fallback.
+				MapId = await ResolveMapId(db, mapId, listEntry),
+				RealmId = realmId
 			};
 
 			// The transform's Vec3 payload is a protobuf message (ProtoVec3): tagged fixed32 fields
@@ -341,7 +371,7 @@ namespace Faolan.Importer
 
 			await db.SaveChangesAsync();
 
-			Console.WriteLine($"Character '{name}': id {character.Id:X8}{(originalId == 0 ? " (generated)" : "")}, level {character.Level} {character.Sex} {character.Race} {character.Class}, map {character.MapId?.ToString() ?? "(none)"}, {worn}/{message.InventoryEntries.Count} worn, {carried}/{carriedTotal} carried, {character.Attributes.Count} scaffold entries, {character.Skills.Count} skill ids.");
+			Console.WriteLine($"Character '{name}': id {character.Id:X8}{(originalId == 0 ? " (generated)" : "")}, level {character.Level} {character.Sex} {character.Race} {character.Class}, map {character.MapId}, {worn}/{message.InventoryEntries.Count} worn, {carried}/{carriedTotal} carried, {character.Attributes.Count} scaffold entries, {character.Skills.Count} skill ids.");
 		}
 
 		// Parses the snapshot's ProtoFullCharacterIIR root and stores the Bag/Resource/Quest container entries

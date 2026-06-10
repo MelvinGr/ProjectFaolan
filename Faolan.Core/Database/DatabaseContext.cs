@@ -83,7 +83,10 @@ namespace Faolan.Core.Database
 		protected override void OnModelCreating(ModelBuilder modelBuilder)
 		{
 			modelBuilder.Entity<Character>().HasOne(c => c.Account).WithMany(r => r.Characters).OnDelete(DeleteBehavior.Cascade);
-			modelBuilder.Entity<Character>().HasOne(c => c.Realm).WithMany(r => r.Characters).OnDelete(DeleteBehavior.SetNull);
+			// MapId/RealmId are required, so SetNull is no longer possible - and cascading would delete
+			// characters with their map/realm; a map or realm with characters cannot be deleted instead.
+			modelBuilder.Entity<Character>().HasOne(c => c.Realm).WithMany(r => r.Characters).OnDelete(DeleteBehavior.Restrict);
+			modelBuilder.Entity<Character>().HasOne(c => c.Map).WithMany().OnDelete(DeleteBehavior.Restrict);
 
 			// Character ids double as the on-wire client instance and are DB-generated (SQLite max+1). The old
 			// manual in-range allocation is gone: the burst replay's instance rewrite pads varints

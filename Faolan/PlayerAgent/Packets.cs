@@ -56,11 +56,11 @@ namespace Faolan.PlayerAgent
 				aBuffer.WriteUInt32(client.Session.Account.ClientInstance); // PlayerInstance
 				aBuffer.WriteUInt32(character.Id);
 				aBuffer.WriteString(character.Name);
-				aBuffer.WriteUInt32(character.RealmId ?? throw new Exception("character.RealmId == null"));
+				aBuffer.WriteUInt32(character.RealmId);
 				aBuffer.WriteUInt32(character.Sex);
 				aBuffer.WriteString((character.LastConnection ?? character.CreationDate).ToString("MM/dd/yyyy HH:mm:ss"));
 				aBuffer.WriteUInt32(0x00000000);
-				aBuffer.WriteUInt32(character.MapId ?? throw new Exception("client.MapId == null"));
+				aBuffer.WriteUInt32(character.MapId);
 				aBuffer.WriteUInt32(character.Level);
 				aBuffer.WriteUInt32(character.Class);
 				aBuffer.WriteUInt32(0x00000000);
@@ -111,9 +111,7 @@ namespace Faolan.PlayerAgent
 			var activeCharacter = account.Character ?? await Database.GetCharacterForAccount(account.Id, account.ClientInstance) ??
 				throw new Exception($"Unable to resolve active character for account {account.Id:X8} and client instance {account.ClientInstance:X8}");
 
-			var realm = activeCharacter.RealmId.HasValue
-				? await Database.GetRealm(activeCharacter.RealmId.Value)
-				: null;
+			var realm = await Database.GetRealm(activeCharacter.RealmId);
 			if (realm == null)
 				throw new Exception($"Character {activeCharacter.Id:X8} has no realm to advertise the GameServer for.");
 
