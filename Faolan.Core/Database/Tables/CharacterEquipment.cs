@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Faolan.Core.Database.Tables
@@ -32,8 +33,11 @@ namespace Faolan.Core.Database.Tables
 		// The remaining two serialized string fields below therefore likely correspond to
 		// the other non-equipment blocks (tentatively Resources and Quest), but that mapping
 		// is still evidence-based rather than protocol-confirmed.
+		[Obsolete]
 		public string Bag { get; set; }
+		[Obsolete]
 		public string Quest { get; set; }
+		[Obsolete]
 		public string Resources { get; set; }
 		public uint CharacterId { get; set; }
 	}

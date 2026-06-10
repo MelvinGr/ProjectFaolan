@@ -155,6 +155,37 @@ namespace Faolan.GameServer.Spawn
 			return result;
 		}
 
+		// Replaces the ENTIRE ProtoCoreCharacterIIR component (the player char message: name / stats / player_stats /
+		// bcc / ... / inventory_entry) with a re-encoded one, adjusting the three enclosing length prefixes (@0 body
+		// length, @133, @304) by the size delta. This is how equipment is rebuilt: the worn items are the message's
+		// InventoryEntries, so the caller decodes the template's ProtoCoreCharacterIIR, overrides name/stats/inventory
+		// from the DB, and re-encodes here. The message round-trips byte-identically (PlayerSpawnGenerationTests), so
+		// re-encoding the decoded template unchanged is a byte-identical no-op (the build-side oracle). Returns the
+		// body unchanged if it is not the known template layout (0x0A name tag at NameTagOffset).
+		public static byte[] SetCharacterMessage(byte[] body, ProtoCoreCharacterIIR character)
+		{
+			if (body.Length <= NameTagOffset || body[NameTagOffset] != 0x0A)
+				return body;
+
+			var oldLen = (int)BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(NameInnerLengthOffset, 4));
+			if (NameTagOffset + oldLen > body.Length)
+				return body;
+
+			var payload = character.ToProtobufBytes();
+			var delta = payload.Length - oldLen;
+
+			var result = new byte[body.Length + delta];
+			Array.Copy(body, 0, result, 0, NameTagOffset); // through the @304 length prefix, up to the message
+			payload.CopyTo(result, NameTagOffset);
+			var afterSrc = NameTagOffset + oldLen;
+			Array.Copy(body, afterSrc, result, NameTagOffset + payload.Length, body.Length - afterSrc);
+
+			AddBigEndian(result, 0, delta); // body length field
+			AddBigEndian(result, NameOuterLengthOffset, delta); // @133 (encloses the CharacterIIR + scaffolds)
+			AddBigEndian(result, NameInnerLengthOffset, delta); // @304 (the CharacterIIR's own length prefix)
+			return result;
+		}
+
 		private static void AddBigEndian(byte[] buffer, int offset, int delta)
 		{
 			var value = (uint)(BinaryPrimitives.ReadUInt32BigEndian(buffer.AsSpan(offset, 4)) + delta);
