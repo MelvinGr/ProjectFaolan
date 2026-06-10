@@ -248,11 +248,27 @@ monster_scale). STILL RAW after this pass: the 273B pre-IIR float block and the 
 with the player and treatable the same way — `PlayerSpawnScaffoldCodec` already generates the player's; the
 post-IIR header word 4→5 and the NPC-shaped 41B minimal are the only deltas to fold in).
 
-NEXT (construction): extend `NpcSpawn`/`Npcs` with the dissected columns (template_id + the CharacterStats/
-NpcStats field set + equipment), have the importer lift them instead of storing `Data`, and build the NPC
-FA015807 via `SpawnPacketBuilder` (it already generalizes — `BuildSpawnBody` + `SetCharacterMessage` take any
-`ProtoCoreCharacterIIR`). Gate: a beach NPC built from its row must equal the captured FA015807 byte-for-byte
-(the player-spawn acceptance pattern).
+CONSTRUCTION PROGRESS (2026-06-10):
+- ✓ The machinery generalizes (commit 3897e05, `NpcSpawnConstructionTests`): `BuildSpawnBody` reconstructs an
+  NPC body (animal + humanoid) byte-exact from its typed pos/rot, and `PlayerSpawnReader` decodes the NPC
+  CharacterIIR with a byte-identical re-encode (the splice oracle). Golden fixtures `SpawnNpcCrocodile`/
+  `SpawnNpcCasilda`.
+- ✓ Identity lifted into `NpcSpawn` columns (commit 9734fc7): the importer (`NpcSpawnExtractor`) decodes the
+  CharacterIIR and lifts TemplateId/Race/Sex/Level/MonsterScale/MonsterData/HeadMesh/HasEquipment + the rotation
+  quaternion (only position was stored before). Populated in faolan.db: 1645/1704 spawns carry a template_id
+  (the rest are world objects with no NPC IIR), 1422 humanoids flagged with equipment. `NpcSpawnExtractorTests`
+  asserts the lift against the real Casilda/Crocodile bodies. (Importer needs `--skip-characters` on a populated
+  DB — the known non-idempotent `CaptureCharacterImporter`, UNIQUE CharacterBodies.CharacterId, still TODO.)
+
+STILL TO DO to retire `Data` and build NPC spawns server-side:
+1. Lift the 273B pre-IIR float block + the post-IIR scaffold into rows the way the player spawn does
+   (`PlayerSpawnScaffoldCodec`/`PlayerSpawnScaffoldRows` — the post-IIR header word is 4→5 for NPCs, animal
+   minimal is a constant 41B). These are per-instance and the last opaque part of `Data`.
+2. A per-template `Npc` row set (one representative CharacterIIR per template_id) so instances need only
+   handle/pos/rot/monster_scale, and build the FA015807 via `SpawnPacketBuilder` (`BuildSpawnBody` +
+   `SetCharacterMessage`). Gate: a beach NPC built from its row equals the captured FA015807 byte-for-byte.
+3. Server world-entry: emit built NPC spawns + the paired 96C46740 registrations instead of the per-map
+   MapWorldBurst blob (the delicate part — see [[protocol-201c-spawn-subprotocol]]).
 
 **Phase 5 — Inventory & equipment.** (IN PROGRESS — significant existing work.)
 The `0x737A6DF9` giant inventory snapshot is already parsed: `Faolan/GameServer/Packets/0x737A6DF9_Test/`
