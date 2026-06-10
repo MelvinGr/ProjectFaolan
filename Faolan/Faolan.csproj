@@ -11,13 +11,6 @@
         <InternalsVisibleTo Include="Faolan.Tests"/>
     </ItemGroup>
 
-    <ItemGroup>
-        <!-- spawn-player-template.bin is the only remaining embedded scaffolding (used by SpawnPacketBuilder to
-             rebuild the player's own spawn). All game data + the world bursts live in the committed faolan.db,
-             (re)built by Faolan.Importer. The strie-login-worldburst.bin file stays in the repo only as the
-             import source for the beach burst (no longer embedded). -->
-        <EmbeddedResource Include="GameServer\Data\spawn-player-template.bin"/>
-    </ItemGroup>
 
     <ItemGroup>
         <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.8"/>

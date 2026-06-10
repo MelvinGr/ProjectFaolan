@@ -46,7 +46,7 @@ namespace Faolan.GameServer.Spawn
 
 		public static byte[] PlayerTemplateBytes => PlayerTemplate.Value;
 
-		private static readonly Lazy<byte[]> PlayerTemplate = new Lazy<byte[]>(() => LoadEmbedded("spawn-player-template.bin"));
+		private static readonly Lazy<byte[]> PlayerTemplate = new Lazy<byte[]>(() => PlayerSpawnTemplate.Bytes);
 
 		public static byte[] BuildPlayerSpawnBody(uint handle, Vector3 position, Quaternion rotation)
 		{
@@ -190,16 +190,6 @@ namespace Faolan.GameServer.Spawn
 		{
 			var value = (uint)(BinaryPrimitives.ReadUInt32BigEndian(buffer.AsSpan(offset, 4)) + delta);
 			BinaryPrimitives.WriteUInt32BigEndian(buffer.AsSpan(offset, 4), value);
-		}
-
-		private static byte[] LoadEmbedded(string suffix)
-		{
-			var asm = Assembly.GetExecutingAssembly();
-			var name = asm.GetManifestResourceNames().First(n => n.EndsWith(suffix, StringComparison.Ordinal));
-			using var stream = asm.GetManifestResourceStream(name)!;
-			using var ms = new MemoryStream();
-			stream.CopyTo(ms);
-			return ms.ToArray();
 		}
 	}
 }
