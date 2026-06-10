@@ -198,7 +198,11 @@ The same playbook applied to the FullChar/inventory snapshot:
 Remaining for full FullChar generation:
 - **Tails beyond live values**: quest/`remoteformat` XML records + the access-window table are progression
   state (captured verbatim today); a from-scratch fresh-character tails build would need those modeled.
-- **Prefix `[u32 X][u8 Y]`** semantics (progression/session counters — fresh defaults 0/0x44 known).
+- **Prefix `[u32 X][u8 Y]`** semantics. Best fit from all captures: **X = the granted/active quest count**
+  (0 in the editor preview, 1 immediately at world entry = the auto-granted intro quest BEFORE any quest
+  XML appears in the tails — dikketest has X=1 with zero XML; per-session changes track quest activity:
+  Strie 2→1, necrol80 15↔43, demol80 70/71; the access-window count is constant 172 and unrelated). Y remains
+  session-varying (fresh: 0x44/0x49 by account type). Cracking X exactly belongs with the quest system.
 - **Bag beyond slot 1** from `CharacterInventory` rows (table exists; bag capacity must track upgrades).
 
 ## Remaining (optional)
