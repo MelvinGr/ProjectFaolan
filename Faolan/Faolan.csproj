@@ -11,10 +11,6 @@
         <InternalsVisibleTo Include="Faolan.Tests"/>
     </ItemGroup>
 
-    <ItemGroup>
-        <!-- The retail post-0x2024 login record stream (Strie 4010 capture), replayed verbatim re-addressed. -->
-        <EmbeddedResource Include="GameServer/Data/strie-login-postready.bin"/>
-    </ItemGroup>
 
 
     <ItemGroup>

@@ -697,44 +697,8 @@ namespace Faolan.GameServer
 			return inventory;
 		}
 
-		// After 0x2024 ReadyForPlayScreen + abilities, retail streams ~20 more game-server records (world state /
-		// quest / UI). We replay them verbatim from the Strie 4010 login capture (strie-login-postready.bin), each
-		// re-addressed from the captured instance (0x02165EFF) to the live character, same byte-preserving path as
-		// the initial burst. This is the piece that lets the client leave the loading screen. (Strie-specific data
-		// for now; per-map/DB-driven import is the follow-up once this is proven to be the gate.)
-		private const uint StrieLoginInstance = 0x02165EFF;
-
-		private async Task SendPostReadyBurst(INetworkClient client)
-		{
-			byte[] blob;
-			await using (var s = typeof(GameServerListener).Assembly.GetManifestResourceStream("Faolan.GameServer.Data.strie-login-postready.bin"))
-			{
-				if (s == null)
-				{
-					Logger.LogWarning("Post-ready burst resource missing; skipping.");
-					return;
-				}
-
-				using var ms = new System.IO.MemoryStream();
-				await s.CopyToAsync(ms);
-				blob = ms.ToArray();
-			}
-
-			var live = client.Session.Account.ClientInstance;
-			var o = 0;
-			var count = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(blob.AsSpan(o, 4));
-			o += 4;
-			for (var i = 0u; i < count; i++)
-			{
-				var len = (int)System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(blob.AsSpan(o, 4));
-				o += 4;
-				var rec = blob[o..(o + len)];
-				o += len;
-				await client.SendAsync(RewriteBurstInstance(rec, StrieLoginInstance, live));
-			}
-
-			Logger.LogInformation("Replayed {Count} post-0x2024 login records.", count);
-		}
+		// SendPostReadyBurst (the post-0x2024 login record stream) is built as explicit PacketStream sends
+		// in PostReadyBurst.cs.
 
 		// Re-addresses every reference to the captured Strie instance (0x02165EFF) in a burst packet to the live
 		// character instance: the receiver-conversation varint (header) and the inventory nested varints appear as

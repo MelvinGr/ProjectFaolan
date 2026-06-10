@@ -547,10 +547,5 @@ namespace Faolan.GameServer
 			return client.Session.Character?.Name == null;
 		}
 
-		private static byte[] WithEmbeddedCharacterId(byte[] payload, int offset, uint characterId)
-		{
-			BinaryPrimitives.WriteUInt32BigEndian(payload.AsSpan(offset, sizeof(uint)), characterId);
-			return payload;
-		}
 	}
 }
