@@ -109,6 +109,8 @@ namespace Faolan.GameServer
 			{
 				Logger.LogInformation("Existing-character login: sending 0x2024 ReadyForPlayScreen after the spawn handshake.");
 				await SendReadyForPlayScreen(client);
+				// Retail grants the starting abilities (0x2052) right after 0x2024, not during world entry.
+				await GrantStartingAbilities(client);
 			}
 
 			if (client.Session.Character?.Name == null)

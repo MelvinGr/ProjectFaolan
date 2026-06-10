@@ -163,7 +163,9 @@ namespace Faolan.GameServer
 						// player's own position/name/inventory are rebuilt from the DB. (The old hand-built fallback -
 						// MapChange/SpawnPlayer + a hardcoded-path inventory .bin - was removed; see SendWorldEntry.)
 						await SendWorldEntry(client);
-						await GrantStartingAbilities(client);
+						// Abilities (0x2052) are granted AFTER 0x2024 ReadyForPlayScreen (in FlushPendingPost205FFollowUp),
+						// matching the retail login order (handshake -> 0x2024 -> 0x2052). Granting them eagerly here -
+						// before the client polled/was ready - is a divergence from the Strie login dump.
 					}
 
 					break;
