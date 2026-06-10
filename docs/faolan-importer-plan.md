@@ -162,8 +162,21 @@ docs/player-spawn-generation-plan.md). The server embeds no spawn/burst data.
   (MapChange) and, per spawn, reads handle@body12 (skips the player - handle >= 0x02000000), position@24/29/34 (LE),
   and a best-effort name (`0A <len> <ascii>` scan past the position block). Imported **1528 distinct NPC spawns
   across 9 maps**, all named (Conarch Village Guard, Nikulas the Smith, ...). Upsert by (map, position), no wipe.
-  Tests: `NpcSpawnExtractorTests`. CONSUMER: future - a world-entry-from-DB step replays these per map (re-addressing
-  the handle) the way the beach world-burst does today (see docs/spawn-dissection-plan.md).
+  Tests: `NpcSpawnExtractorTests`.
+  - **EXTENDED (2026-06-10):** `NpcSpawnExtractor` now also LIFTS the dissected identity from the CharacterIIR
+    onto each row (migration `AddNpcSpawnIdentityColumns`): `TemplateId` (NpcStats.f4 = the stable per-type id),
+    `Race/Sex/Level/MonsterScale/MonsterData/HeadMesh/HasEquipment`, + the rotation quaternion (only position was
+    stored before). faolan.db: 1645/1704 rows carry a template_id (the rest are world objects with no NPC IIR).
+  - **CONSUMER WIRED (2026-06-10/11):** `NpcSpawnBuilder` builds the FA015807 from a row; `ReplayMapWorldBurst`
+    sources each burst NPC from its row (matched by POSITION) and ships it when byte-identical. The from-scratch
+    construct (built spawn + built stationary MoveTask, fresh handle) is in-client-proven; cross-session row
+    bodies are the remaining blocker. See docs/spawn-dissection-plan.md Phase 4 for the full arc.
+- **World objects — DONE (2026-06-10).** Sibling of NpcSpawn for the static world (decor/props `66AEDD50`,
+  interactive containers `F096251E`, zone labels `33A56FB0`). `WorldObjectExtractor` -> `WorldObject` table
+  (migration `AddWorldObjects`, unique index (map, position)): subOpcode (class) + transform + the object
+  message's id/name lifted, raw packet in `Data`. faolan.db: 644 objects (548 decor, 51 containers, 45 zones),
+  all named. `WorldObjectBuilder` + `ReplayMapWorldBurst` source them by position (splice DB identity onto live
+  placement, byte-identical). Tests: `WorldObjectExtractorTests`/`WorldObjectBuilderTests`.
 - **Phase 5 — DONE (2026-06-08).** Spike found the spellbook is NOT in captures (class/level-derived client-side);
   captures only carry cast-spell ids (ApplySpell). So spells = two sources: (1) **archive** ability/spell defs -
   `ArchiveSqlImporter` (`--archive <dir>`) imports `p_abilities` -> `Ability` (id + Data0..4 identity quad) and
@@ -186,7 +199,10 @@ docs/player-spawn-generation-plan.md). The server embeds no spawn/burst data.
 
 ## Risks / open questions
 
-- **NPC stable identity** from session-scoped handles (Phase 4) — needs a dissection spike; biggest unknown.
+- **NPC stable identity** — RESOLVED (2026-06-10): it is `NpcStats.template_id` (CharacterIIR f5.f4), lifted onto
+  `NpcSpawn.TemplateId`. Dedup stays keyed by (map, position) since handles are session-scoped, but the
+  per-type identity is now a column. (The open blocker moved downstream: cross-session row Data is rejected
+  in-client — see docs/spawn-dissection-plan.md Phase 4.)
 - **Conversation storage**: new `NpcConversations` table vs. keep the embedded `.bin`. A table is cleaner and
   query-able; the `.bin` is what `ConversationReplay` already reads. Pick when starting Phase 2.
 - **Capture-derived data provenance**: keep a `source` column (capture file name) on imported rows for

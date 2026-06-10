@@ -275,15 +275,28 @@ CONSTRUCTION PROGRESS (2026-06-10):
   re-addressed burst body — zero render risk (beach: ~17/40 matched spawns are byte-identical; the rest are
   cross-session and kept verbatim). `IDatabaseRepository.GetNpcSpawns(mapId)` added.
 
+- ✓ BURST-FREE CONSTRUCT VALIDATED IN-CLIENT (commit a7e6841, 2026-06-11). A from-scratch entity — built
+  FA015807 (`NpcSpawnBuilder`) + built stationary 96C46740 (`MoveTaskBuilder.BuildStationary`) on a fresh server
+  handle (0x90001), framed onto a live burst header — is POLLED by the client (0x2020→SpawnCheck) and renders
+  standing put beside the player. Isolated step-by-step via the `FAOLAN_BUILT_NPC_TEST=1` harness
+  (`RetailLoginReplay.InjectBuiltTestNpc`): a clone of a real spawn renders (mechanism/handle/ordering OK), the
+  built spawn renders (builder OK), the built stationary MoveTask keeps it put (MoveTaskBuilder OK). So the
+  construct-from-scratch path WORKS against the real client. NOTE: the client only polls entities near the
+  player's spawn (a far-off injection was ignored), and the SpawnCheck is reactive (answers any polled handle),
+  so no manifest entry is needed for an injected spawn.
+
 STILL TO DO:
-1. Drive the cross-session (non-identical) reconstructions and then fresh server-allocated handles + DB
-   positions — the genuine construct path. Needs IN-CLIENT verification (the delicate spawn gate, see
-   [[protocol-201c-spawn-subprotocol]]); can't be byte-gated. A cross-session row differs because it bakes a
-   different handle/scaffold/instance refs — re-addressing the rebuilt body + remapping the paired 96C46740 is
-   the work.
+1. THE BLOCKER for driving arbitrary `NpcSpawns` rows: a row whose `Data` is from ANOTHER session is REJECTED by
+   the client (the first built attempt, a cross-session Crocodile, never polled); only same-session/byte-identical
+   bodies render. The cross-session body bakes a different handle/scaffold/instance refs — re-addressing the
+   rebuilt body + remapping the paired 96C46740 is the work. This is the same cross-session problem deferred for
+   the byte-identical wiring, now confirmed in-client as the gate.
 2. Then retire `Data`: lift the 273B pre-IIR float block + the post-IIR scaffold into rows the way the player
    spawn does (`PlayerSpawnScaffoldCodec`/`Rows` — the NPC post-IIR header word is 4→5, animal minimal is a
    constant 41B), and add a per-template `Npc` row set so instances need only handle/pos/rot/monster_scale.
+3. Assemble the full burst-free world entry (built spawns + built stationary MoveTasks + built world objects,
+   all with server-allocated handles) as an alternative to the MapWorldBurst replay — the primitives are now
+   in-client-proven; the cross-session body fix (#1) is the prerequisite for using the table rows directly.
 
 **Phase 5 — Inventory & equipment.** (IN PROGRESS — significant existing work.)
 The `0x737A6DF9` giant inventory snapshot is already parsed: `Faolan/GameServer/Packets/0x737A6DF9_Test/`
@@ -513,13 +526,15 @@ MINIMAL STATIONARY FORM — BUILT (2026-06-10, commit 3b8dfa4). A non-patrolling
 pos BIG-ENDIAN][06]` (the `06` terminator vs `04` = a movement segment follows). `MoveTaskBuilder.BuildStationary
 (handle, position)` constructs it byte-exact (`MoveTaskBuilderTests`). This UNBLOCKS the burst-free NPC path:
 an NPC needs only its position (already in NpcSpawns) to register + render standing still, so the full
-multi-segment patrol grammar becomes an ENHANCEMENT, not a blocker.
+multi-segment patrol grammar becomes an ENHANCEMENT, not a blocker. CONFIRMED IN-CLIENT 2026-06-11 (commit
+a7e6841): a built spawn paired with this built stationary MoveTask is polled by the client and renders standing
+put — see the Phase-4 "BURST-FREE CONSTRUCT VALIDATED IN-CLIENT" entry.
 
 STILL TO DO: the full patrol-path grammar (the per-segment control bytes/speed/params byte-exact) -> a
 `PatrolPath` schema -> a full builder, IF moving NPCs are wanted. For now `BuildStationary` + the spawn position
-is enough to construct an NPC's registration from scratch. Wiring the burst-free spawn (NpcSpawn -> built spawn +
-built stationary MoveTask + built world objects, allocating fresh handles) is the in-client step that finally
-retires the MapWorldBurst blob.
+is enough to construct an NPC's registration from scratch (proven in-client). The burst-free spawn primitives
+(built spawn + built stationary MoveTask + built world objects, fresh handles) are validated; the remaining gate
+before they retire the MapWorldBurst blob is the cross-session body fix (Phase 4 STILL-TO-DO #1).
 
 ## Phase 7 — NPC conversations (dialogue)
 
