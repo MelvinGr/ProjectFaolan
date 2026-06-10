@@ -310,7 +310,7 @@ namespace Faolan.Core.Database
 		public async Task<MapWorldBurst> GetMapWorldBurst(uint mapId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var burst = await ctx.MapWorldBursts.Include(b => b.Packets).FirstOrDefaultAsync(b => b.MapId == mapId);
+			var burst = await ctx.MapWorldBursts.Include(b => b.Entities).FirstOrDefaultAsync(b => b.MapId == mapId);
 
 			// Guard: a burst with an unknown captured instance (0) can't be re-addressed, so treat it as absent and
 			// let login fall back. Out-of-range instances ARE supported now - RewriteBurstInstance pads the live id's

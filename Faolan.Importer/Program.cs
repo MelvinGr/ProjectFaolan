@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network;
 using Faolan.PacketAnalyzer;
 using Microsoft.EntityFrameworkCore;
 
@@ -75,35 +76,41 @@ namespace Faolan.Importer
 			await db.SaveChangesAsync();
 		}
 
-		// Upsert per map: replace that map's burst (instance + packets); leave other maps untouched.
+		// The beach (4010) is a committed DB seed: its full world build (MapChange -> ReadyForPlayScreen) was assembled
+		// from the Strie login capture and committed as structured rows. The plain capture-window extractor only reaches
+		// the first 0x2020 poll, so re-deriving it here would TRUNCATE the beach - skip it until the extractor learns
+		// the full window (see TODO #10 / docs/spawn-dissection-plan.md).
+		private const uint BeachMapId = 0x00000FAA;
+
+		// Upsert per map: replace that map's burst (instance + structured IIR records); leave other maps untouched.
 		private static async Task ImportMapWorldBursts(DatabaseContext db, List<MapWorldBurstEntry> bursts)
 		{
 			// Purge any existing rows with an unknown captured instance (0) - those can't be re-addressed. Out-of-range
 			// instances are kept now (RewriteBurstInstance pads the live id's varint to the captured length).
-			var stale = await db.MapWorldBursts.Include(b => b.Packets).Where(b => b.CapturedInstance == 0).ToListAsync();
+			var stale = await db.MapWorldBursts.Include(b => b.Entities).Where(b => b.CapturedInstance == 0).ToListAsync();
 			if (stale.Count > 0)
 			{
-				db.MapWorldBurstPackets.RemoveRange(stale.SelectMany(b => b.Packets));
+				db.MapWorldBurstEntities.RemoveRange(stale.SelectMany(b => b.Entities));
 				db.MapWorldBursts.RemoveRange(stale);
 			}
 
 			foreach (var e in bursts)
 			{
-				var burst = await db.MapWorldBursts.Include(b => b.Packets).FirstOrDefaultAsync(b => b.MapId == e.MapId);
+				if (e.MapId == BeachMapId)
+					continue; // committed seed; the capture window is truncated (see BeachMapId remark).
+
+				var burst = await db.MapWorldBursts.Include(b => b.Entities).FirstOrDefaultAsync(b => b.MapId == e.MapId);
 				if (burst == null)
 				{
 					burst = new MapWorldBurst { MapId = e.MapId };
 					db.MapWorldBursts.Add(burst);
 				}
-				else if (burst.Packets != null)
-					db.MapWorldBurstPackets.RemoveRange(burst.Packets);
+				else if (burst.Entities != null)
+					db.MapWorldBurstEntities.RemoveRange(burst.Entities);
 
 				burst.CapturedInstance = e.CapturedInstance;
-				burst.Packets = e.Packets.Select((p, i) => new MapWorldBurstPacket
-				{
-					Sequence = i,
-					Data = p
-				}).ToList();
+				// Decompose each raw download into a structured IIR record (round-trip lossless, see IirRecordCodec).
+				burst.Entities = e.Packets.Select((p, i) => IirRecordCodec.Parse(p, i)).ToList();
 			}
 
 			await db.SaveChangesAsync();
@@ -243,7 +250,6 @@ namespace Faolan.Importer
 				await ImportConversations(db, conversations);
 				await ImportNpcSpawns(db, NpcSpawnExtractor.Merge(captures.SelectMany(NpcSpawnExtractor.Extract)));
 				await ImportMapWorldBursts(db, MapWorldBurstExtractor.Merge(captures.SelectMany(MapWorldBurstExtractor.Extract)));
-				await SeedBeachBurstFromBlob(db); // beach (4010) uses the proven 71-packet blob, not the captured window
 			}
 
 			if (rdbDir != null)
@@ -368,54 +374,6 @@ namespace Faolan.Importer
 			}
 
 			return list; // analyzer order is chronological
-		}
-
-		// Beach map 4010: seed its world burst from the proven embedded blob (strie-login-worldburst.bin, 71 packets,
-		// instance 0x02165EFF) rather than the captured window, so the long-working beach login is byte-identical.
-		// The blob file stays in the repo only as this import source (it is no longer embedded in the server).
-		private static async Task SeedBeachBurstFromBlob(DatabaseContext db)
-		{
-			const uint beachMap = 0x00000FAA;
-			const uint strieInstance = 0x02165EFF;
-			var blobPath = Path.Combine(RepoRoot, "Faolan", "GameServer", "Data", "strie-login-worldburst.bin");
-			if (!File.Exists(blobPath))
-				return;
-
-			var data = await File.ReadAllBytesAsync(blobPath);
-			var packets = new List<byte[]>();
-			var offset = 0;
-
-			uint ReadU32()
-			{
-				var v = (uint)((data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]);
-				offset += 4;
-				return v;
-			}
-
-			var count = ReadU32();
-			for (var i = 0; i < count; i++)
-			{
-				var len = (int)ReadU32();
-				packets.Add(data[offset..(offset + len)]);
-				offset += len;
-			}
-
-			var burst = await db.MapWorldBursts.Include(b => b.Packets).FirstOrDefaultAsync(b => b.MapId == beachMap);
-			if (burst == null)
-			{
-				burst = new MapWorldBurst { MapId = beachMap };
-				db.MapWorldBursts.Add(burst);
-			}
-			else if (burst.Packets != null)
-				db.MapWorldBurstPackets.RemoveRange(burst.Packets);
-
-			burst.CapturedInstance = strieInstance;
-			burst.Packets = packets.Select((p, i) => new MapWorldBurstPacket
-			{
-				Sequence = i,
-				Data = p
-			}).ToList();
-			await db.SaveChangesAsync();
 		}
 
 		private static async Task<Dictionary<string, int>> Snapshot(DatabaseContext db)

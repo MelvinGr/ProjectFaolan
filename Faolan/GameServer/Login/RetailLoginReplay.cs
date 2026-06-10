@@ -176,7 +176,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			Logger.LogInformation("World entry (map={Map}, '{Name}'): replaying {Count} packets from the DB ({Source}).", mapId, client.Session.Character?.Name, worldBurst.Packets.Count,
+			Logger.LogInformation("World entry (map={Map}, '{Name}'): replaying {Count} IIR records from the DB ({Source}).", mapId, client.Session.Character?.Name, worldBurst.Entities.Count,
 				worldBurst.MapId == mapId ? "own map" : $"beach fallback (map {worldBurst.MapId})");
 			await ReplayMapWorldBurst(client, worldBurst);
 		}
@@ -186,7 +186,9 @@ namespace Faolan.GameServer
 		// blob, seeded into the DB by Faolan.Importer).
 		private async Task ReplayMapWorldBurst(INetworkClient client, MapWorldBurst burst)
 		{
-			var packets = burst.Packets.OrderBy(p => p.Sequence).Select(p => p.Data).ToList();
+			// Rebuild the exact original packet bytes from the structured IIR records (IirRecordCodec is round-trip
+			// lossless), then drive the same proven byte-preserving replay (instance rewrite + inventory/spawn rebuild).
+			var packets = burst.Entities.OrderBy(e => e.Sequence).Select(IirRecordCodec.Rebuild).ToList();
 			var capturedInstance = burst.CapturedInstance;
 			var liveInstance = client.Session.Account.ClientInstance;
 			Logger.LogInformation("Replaying world burst for map {Map} ({Count} packets, instance {Old:X8} -> {New:X8}).", burst.MapId, packets.Count, capturedInstance, liveInstance);
