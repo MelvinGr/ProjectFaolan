@@ -704,30 +704,35 @@ namespace Faolan.GameServer
 				return;
 
 			const uint builtHandle = 0x00090001; // above the burst's 0x000818xx handles and below the instance range
-			var source = npcRows.FirstOrDefault(n => n.Data != null && n.TemplateId != 0);
-			if (source == null)
-				return;
+			var playerPos = client.Session.Character.Position;
+			var pos = new Vector3(playerPos.X + 4f, playerPos.Y, playerPos.Z + 4f);
 
-			// A transient copy shifted a few metres aside so the built NPC stands visibly beside the original
-			// (proves render without overlapping it); same Data/rotation, so identity/appearance are unchanged.
-			var row = new NpcSpawn
+			// VALIDATE NpcSpawnBuilder: build the spawn FROM the template's own (known-good) bytes via the builder
+			// (transform rebuilt to `pos`, CharacterIIR re-encoded), and pair it with the proven cloned MoveTask.
+			// If this renders + polls, NpcSpawnBuilder produces client-acceptable output and the only open issue is
+			// cross-session DB row data (the earlier built Crocodile came from a different session's capture).
+			var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(spawnTemplate.AsSpan(8, 4));
+			var templateRow = new NpcSpawn
 			{
-				Data = source.Data,
-				PositionX = source.PositionX + 4f,
-				PositionY = source.PositionY,
-				PositionZ = source.PositionZ + 4f,
-				RotationX = source.RotationX,
-				RotationY = source.RotationY,
-				RotationZ = source.RotationZ,
-				RotationW = source.RotationW
+				Data = spawnTemplate,
+				PositionX = pos.X,
+				PositionY = pos.Y,
+				PositionZ = pos.Z,
+				RotationX = BinaryPrimitives.ReadSingleLittleEndian(spawnTemplate.AsSpan(bodyStart + SpawnPacketBuilder.RotXOffset, 4)),
+				RotationY = BinaryPrimitives.ReadSingleLittleEndian(spawnTemplate.AsSpan(bodyStart + SpawnPacketBuilder.RotYOffset, 4)),
+				RotationZ = BinaryPrimitives.ReadSingleLittleEndian(spawnTemplate.AsSpan(bodyStart + SpawnPacketBuilder.RotZOffset, 4)),
+				RotationW = BinaryPrimitives.ReadSingleLittleEndian(spawnTemplate.AsSpan(bodyStart + SpawnPacketBuilder.RotWOffset, 4))
 			};
-			if (!NpcSpawnBuilder.TryBuild(row, builtHandle, out var spawnBody))
+			if (!NpcSpawnBuilder.TryBuild(templateRow, builtHandle, out var spawnBody))
 				return;
 
-			var moveBody = MoveTaskBuilder.BuildStationary(builtHandle, new Vector3(row.PositionX, row.PositionY, row.PositionZ));
+			// Validate the minimal STATIONARY MoveTask (MoveTaskBuilder): if she now spawns by the player and STAYS
+			// (no drag to a patrol route), the built stationary MoveTask is accepted - the full burst-free primitive
+			// set (built spawn + built stationary MoveTask) is proven in-client.
+			var moveBody = MoveTaskBuilder.BuildStationary(builtHandle, pos);
 			toSend.Add(FrameLikeTemplate(spawnTemplate, spawnBody));
 			toSend.Add(FrameLikeTemplate(moveTaskTemplate, moveBody));
-			Logger.LogInformation("Injected built test NPC '{Name}' (template {Template}) at handle 0x{Handle:X} pos ({X},{Y},{Z}).", source.Name, source.TemplateId, builtHandle, row.PositionX, row.PositionY, row.PositionZ);
+			Logger.LogInformation("Injected BUILT spawn + BUILT stationary MoveTask at handle 0x{Handle:X} pos ({X},{Y},{Z}).", builtHandle, pos.X, pos.Y, pos.Z);
 		}
 
 		// Frames a built body as a full Conan packet by reusing a template packet's header (its live receiver/
