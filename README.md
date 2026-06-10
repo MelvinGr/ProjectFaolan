@@ -31,6 +31,8 @@ service via `AddScopedHostedService<...>`: `UniverseAgentListener`, `PlayerAgent
 `CsPlayerAgentListener`, `AgentServerListener`, `GameServerListener`, plus `DatabaseMigrator` (startup
 migrate + data import). Each listener is a `Server<ConanPacket, ...>` accepting TCP clients; per-client state
 lives on `client.Session` (account, character, conversation id, world-entry flags) as plain in-memory objects.
+The same host also runs an **in-process MCP server** (`Faolan/Mcp/`) for Claude tooling - see "Claude / MCP
+tooling" below.
 
 ### Data access (game-server persistence model)
 
@@ -90,6 +92,36 @@ client renders them from its local RDB), so the full `Data1..4` quad + archetype
 the wire there - the item-identity quad signature appears in zero non-`0x737A6DF9` packets in the trader/auction
 captures. To grow the item set, capture the player actually holding/equipping more diverse items (their snapshot
 is harvested); vendor/AH/NPC-gear packets don't help.
+
+## Claude / MCP tooling
+
+The server hosts an **in-process MCP server** (streamable HTTP) so Claude can both query the DB and interact
+with the **live** running server. It lives in `Faolan/Mcp/` and is registered with one line
+(`builder.Services.AddFaolanMcp()` in `Program.cs`).
+
+- **Transport / hosting.** A nested ASP.NET Core / Kestrel app (`FaolanMcpHostedService`) runs as an ordinary
+  hosted service on `McpPort` (faolan.json, default **7099**), serving `/mcp`. The generic host is otherwise
+  untouched (no Web SDK switch); `Faolan.csproj` adds `<FrameworkReference Include="Microsoft.AspNetCore.App"/>`
+  + `<AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>` (NETSDK1226) and the
+  `ModelContextProtocol.AspNetCore` package. The nested host **shares Faolan's root-container singletons by
+  instance** (`IDatabaseRepository`, `IAgentServerDispatcher`, `IGameServerDispatcher`), so tools observe the
+  exact same live objects the server uses - that is what lets them inspect/drive the running server, not just
+  the DB file.
+- **Connect Claude** (server must be running): `claude mcp add --transport http faolan http://127.0.0.1:7099/mcp`.
+- **Tools** (`Faolan/Mcp/Tools/`, attribute-based `[McpServerToolType]`/`[McpServerTool]`, one-per-action):
+  - DB reads via `IDatabaseRepository`: `get_item`, `get_spell`, `list_maps`, `get_map_npc_spawns`,
+    `get_map_world_objects`.
+  - Live agent sessions: `list_sessions`.
+  - Live world: `list_world_sessions`, `run_gm_command`, `teleport_character`. **Mutating** world tools are
+    gated behind `confirm=true`.
+- **GameServer dispatcher.** World actions route through a `IGameServerDispatcher` that mirrors the agent
+  dispatcher but is **multi-provider**: both GameServer listeners (creator + world ports) register, sessions
+  aggregate across them, and a GM command routes to whichever listener holds the character. The listener
+  implements the provider by reusing the already-validated GM command paths (`ClientForCharacter` +
+  `HandleGmCommand`) rather than hand-rolled spawn protocol - so e.g. `run_gm_command(... "test")` spawns the
+  test NPC and `teleport_character` wraps `.teleport`.
+- **Open ends:** native MCP elicitation for the confirm step (currently a `confirm` bool); a dedicated
+  on-demand spawn tool over the burst-free `NpcSpawnBuilder`/`MoveTaskBuilder` path (needs in-client validation).
 
 ## Working conventions
 
