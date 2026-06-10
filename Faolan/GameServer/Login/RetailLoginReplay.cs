@@ -188,7 +188,8 @@ namespace Faolan.GameServer
 		{
 			// Rebuild the exact original packet bytes from the structured IIR records (IirRecordCodec is round-trip
 			// lossless), then drive the same proven byte-preserving replay (instance rewrite + inventory/spawn rebuild).
-			var packets = burst.Entities.OrderBy(e => e.Sequence).Select(IirRecordCodec.Rebuild).ToList();
+			var records = burst.Entities.OrderBy(e => e.Sequence).ToList();
+			var packets = records.Select(IirRecordCodec.Rebuild).ToList();
 			var capturedInstance = burst.CapturedInstance;
 			var liveInstance = client.Session.Account.ClientInstance;
 			Logger.LogInformation("Replaying world burst for map {Map} ({Count} packets, instance {Old:X8} -> {New:X8}).", burst.MapId, packets.Count, capturedInstance, liveInstance);
@@ -208,7 +209,13 @@ namespace Faolan.GameServer
 			// - doing that mid-loop adds a CPU stall between sends that reshapes the burst's TCP segmentation, and
 			// the client (no reassembly on the uncompressed download) then misframes and hangs on the loading
 			// screen. Pre-building keeps the actual send loop tight and uniform.
-			var toSend = new List<byte[]>(packets.Count);
+			var toSend = new List<byte[]>(packets.Count + 2);
+
+			// MapChange must lead the world build. It's a global record the server generates from the live map/instance;
+			// if the burst no longer stores one (entities-only beach), emit the generated one first.
+			if (records.All(e => e.IirType != MapChangeIir))
+				toSend.Add(BuildMapChange(client));
+
 			foreach (var packet in packets)
 			{
 				// Re-address the capture's instance to the logged-in character so the burst works for any character.
@@ -226,6 +233,10 @@ namespace Faolan.GameServer
 
 				toSend.Add(pkt);
 			}
+
+			// GameTime (the world clock) is a global record the server generates; append it if the burst omits one.
+			if (records.All(e => e.IirType != GameTimeIir))
+				toSend.Add(BuildGameTime(client));
 
 			// Tight send loop - no per-packet computation here.
 			foreach (var bytes in toSend)
