@@ -111,7 +111,18 @@ The IIR scaffold-B (after the ProtoCoreCharacterIIR, before the tail) decodes as
 scaffold-A (before the CharacterIIR, 167b, ~constant across chars per the diff) = the attribute/derived-stat block;
 mostly fixed, dissect last.
 
-Remaining: finish the tail-entry format, write the extract (capture spawn -> CharacterAttribute/CharacterSkill rows)
-+ the generator (rows -> scaffold bytes), wire into the spawn, harness, delete spawn-player-template.bin.
+**Tail = a feat/ability ID list (dissected further).** After the 7 weighted attribute entries: one more weighted
+entry (idx 7, a float weight, not 1.0) then a **variable-width sorted ID list** with its own header (`01 2c ...`) of
+the character's feats/abilities (Strie few, necrol80 many; IDs ascending, mixed 2-4 byte widths), ending in the
+`...0003F1 00000000 ...0003F1` sentinel. Byte-exact regeneration needs the ID-list width/header encoding cracked
+across more captures - a multi-capture RE task, not a quick finish.
+
+**Conclusion (the binary choice to delete spawn-player-template.bin):** after all the char-data generation
+(CharacterIIR: name/race/sex/level/vitals/equipment - done), the ONLY thing the template still supplies is the
+non-CharacterIIR "scaffold frame" (~520 bytes: scaffold-A + the attribute/feat scaffold-B + tail). That frame can come
+from exactly one of two places - (a) a documented C# constant (relocation, the RetailCreateWorldEntryBurst pattern;
+removes the file but isn't "from char data"), or (b) generated from CharacterAttribute/CharacterSkill once the
+feat-list wire format is fully cracked (the multi-session RE above). There is no third option; the frame is either a
+constant or generated.
 
 See [[world_entry_from_db]] for the surrounding burst/server-generation architecture.
