@@ -100,6 +100,17 @@ namespace Faolan.GameServer
 				return;
 			}
 
+			// Existing-character login: retail sends 0x2024 ReadyForPlayScreen right after the spawn handshake
+			// (0x2076) - the "leave the loading screen and enter the world" signal. We were sending the manifest
+			// but never this, so the client finished the handshake (0x2020 -> 0x2008 -> 0x2076) and then sat on the
+			// loading screen forever. Confirmed by diffing a 4010 login against the Strie dump: 0x2024 ours=0 /
+			// dump=1. The new-character create flow sends its own 0x2024 elsewhere, so gate this to named characters.
+			if (client.Session.Character?.Name != null)
+			{
+				Logger.LogInformation("Existing-character login: sending 0x2024 ReadyForPlayScreen after the spawn handshake.");
+				await SendReadyForPlayScreen(client);
+			}
+
 			if (client.Session.Character?.Name == null)
 			{
 				Logger.LogInformation("Sending deferred new-character AccessWindow/SetDayTime after the post-0x205F follow-up.");
