@@ -13,14 +13,18 @@ namespace Faolan.GameServer.Spawn
 	// captured player's equipment in the spawn (see SpawnPacketBuilder.SetCharacterMessage / PlayerSpawnReader).
 	public static class PlayerSpawnEquipment
 	{
-		// Worn CharacterEquipment slot -> the spawn's equip-slot id (CharacterEquipmentSlot enum; pos in the capture).
+		// Worn CharacterEquipment slot -> the spawn's equip-slot id (CharacterEquipmentSlot enum; pos in the
+		// capture). MainWeapon is main_hand_LEFT (the melee pair is 6/8; the ranged pair MainHandRight/
+		// OffHandRight is 20/21) - matching EquippedSlotItem and the equip/unequip persistence.
 		private static readonly (CharacterEquipmentSlot Slot, System.Func<CharacterEquipment, Item> Get)[] SlotMap =
 		[
 			(CharacterEquipmentSlot.Neck, e => e.Neck),
 			(CharacterEquipmentSlot.Head, e => e.Head),
+			(CharacterEquipmentSlot.Tokens, e => e.Tokens),
 			(CharacterEquipmentSlot.Chest, e => e.Chest),
-			(CharacterEquipmentSlot.MainWeapon, e => e.MainHandRight),
+			(CharacterEquipmentSlot.MainWeapon, e => e.MainHandLeft),
 			(CharacterEquipmentSlot.Belt, e => e.Belt),
+			(CharacterEquipmentSlot.OffHandWeapon, e => e.OffHandLeft),
 			(CharacterEquipmentSlot.LeftRing, e => e.RingLeft),
 			(CharacterEquipmentSlot.RightRing, e => e.RingRight),
 			(CharacterEquipmentSlot.Cape, e => e.Cloak),
@@ -29,6 +33,8 @@ namespace Faolan.GameServer.Spawn
 			(CharacterEquipmentSlot.Hands, e => e.Hands),
 			(CharacterEquipmentSlot.Legs, e => e.Legs),
 			(CharacterEquipmentSlot.Wrist, e => e.Wrist),
+			(CharacterEquipmentSlot.RangedWeapon, e => e.MainHandRight),
+			(CharacterEquipmentSlot.Ammo, e => e.OffHandRight),
 		];
 
 		public static List<ProtoCoreCharacterIIR.InventoryEntry> BuildInventoryEntries(CharacterEquipment equipment)

@@ -95,20 +95,24 @@ namespace Faolan.GameServer
 		{
 			return slot switch
 			{
-				CharacterEquipmentSlot.Neck       => e.Neck,
-				CharacterEquipmentSlot.Head       => e.Head,
-				CharacterEquipmentSlot.Chest      => e.Chest,
-				CharacterEquipmentSlot.MainWeapon => e.MainHandLeft,
-				CharacterEquipmentSlot.Belt       => e.Belt,
-				CharacterEquipmentSlot.LeftRing   => e.RingLeft,
-				CharacterEquipmentSlot.RightRing  => e.RingRight,
-				CharacterEquipmentSlot.Cape       => e.Cloak,
-				CharacterEquipmentSlot.Shoulder   => e.Shoulder,
-				CharacterEquipmentSlot.Boots      => e.Boots,
-				CharacterEquipmentSlot.Hands      => e.Hands,
-				CharacterEquipmentSlot.Legs       => e.Legs,
-				CharacterEquipmentSlot.Wrist      => e.Wrist,
-				_                                 => null
+				CharacterEquipmentSlot.Neck          => e.Neck,
+				CharacterEquipmentSlot.Head          => e.Head,
+				CharacterEquipmentSlot.Tokens        => e.Tokens,
+				CharacterEquipmentSlot.Chest         => e.Chest,
+				CharacterEquipmentSlot.MainWeapon    => e.MainHandLeft,
+				CharacterEquipmentSlot.Belt          => e.Belt,
+				CharacterEquipmentSlot.OffHandWeapon => e.OffHandLeft,
+				CharacterEquipmentSlot.LeftRing      => e.RingLeft,
+				CharacterEquipmentSlot.RightRing     => e.RingRight,
+				CharacterEquipmentSlot.Cape          => e.Cloak,
+				CharacterEquipmentSlot.Shoulder      => e.Shoulder,
+				CharacterEquipmentSlot.Boots         => e.Boots,
+				CharacterEquipmentSlot.Hands         => e.Hands,
+				CharacterEquipmentSlot.Legs          => e.Legs,
+				CharacterEquipmentSlot.Wrist         => e.Wrist,
+				CharacterEquipmentSlot.RangedWeapon  => e.MainHandRight,
+				CharacterEquipmentSlot.Ammo          => e.OffHandRight,
+				_                                    => null
 			};
 		}
 
@@ -155,6 +159,18 @@ namespace Faolan.GameServer
 					return true;
 				case CharacterEquipmentSlot.Wrist:
 					e.Wrist = item;
+					return true;
+				case CharacterEquipmentSlot.Tokens:
+					e.Tokens = item;
+					return true;
+				case CharacterEquipmentSlot.OffHandWeapon:
+					e.OffHandLeft = item;
+					return true;
+				case CharacterEquipmentSlot.RangedWeapon:
+					e.MainHandRight = item;
+					return true;
+				case CharacterEquipmentSlot.Ammo:
+					e.OffHandRight = item;
 					return true;
 				default:
 					return false;

@@ -48,9 +48,12 @@ captured spawn extracts to the same rows as its unbuffed form (locked by
 - **The equipment lives inside it**: `ProtoCoreCharacterIIR.InventoryEntries` (field 23, repeated
   `InventoryEntry { pos, item: ProtoAcgItem, gem_slots[] }`); `ProtoAcgItem { key1/2/3: ProtoDecryptionKey
   (= Item.Data1..4), template1/2 = Item.Id, hash = archetype, level }`.
-- **`pos` → `CharacterEquipmentSlot` enum** (Neck=1, Head=2, Chest=5, MainWeapon=6, Belt=7, LeftRing=9,
-  RightRing=10, Cape=11, Shoulder=12, Boots=14, Hands=15, Legs=16, Wrist=18). 13/17 of necrol80's worn slots
-  map; pos 3/8/20/21 are still unmapped (likely face/offhand/vanity — extend the enum when needed).
+- **`pos` → `CharacterEquipmentSlot` enum** — all 17 retail slots mapped (2026-06-10): Neck=1, Head=2,
+  **Tokens=3**, Chest=5, MainWeapon=6 (main_hand_LEFT), Belt=7, **OffHandWeapon=8** (Ceremonial Dagger),
+  LeftRing=9, RightRing=10, Cape=11, Shoulder=12, Boots=14, Hands=15, Legs=16, Wrist=18,
+  **RangedWeapon=20** (Executioner Crossbow), **Ammo=21** (Bolt Quiver); gaps at 4/13/19, bag=17. The melee
+  pair is 6/8 (left navs), the ranged pair 20/21 (right navs) - fixing a spawn-builder bug where MainWeapon
+  read MainHandRight while persistence wrote MainHandLeft.
 - The player spawn is the FINICKIEST packet — historically even a rotation change hung the client on the
   loading screen. Every generation step keeps a verbatim fallback, and changes are gated on the smoke test.
 
@@ -163,7 +166,7 @@ IIR (head/voice/scale) + weighted entries (chosen resources) + morph entries (sl
 
 ## Remaining (optional)
 
-- **Unmapped equip `pos` values** 3/8/20/21 (extend `CharacterEquipmentSlot` when an item needs them).
+- (none — equip `pos` 3/8/20/21 mapped 2026-06-10: Tokens/OffHandWeapon/RangedWeapon/Ammo, see above.)
 - **FullChar (0x737A6DF9)** is the analogous next generation target (test the `ProtoFullCharacterIIR`
   round-trip first, same playbook).
 - Extraction of CAPTURED characters into rows currently exists as the test-side mapping

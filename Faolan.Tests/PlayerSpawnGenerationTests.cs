@@ -89,6 +89,33 @@ namespace Faolan.Tests
 			Assert.Same(head.Key1, head.Key2); // keys reuse the same quad (matches SnapshotItemBuilder)
 		}
 
+		// The melee weapons render from the LEFT-hand navs (the wire melee pair is 6/8); the ranged pair
+		// (MainHandRight/OffHandRight) is 20/21 - necrol80's crossbow/quiver slots. A swap here makes weapons
+		// silently not render (the bug this fixed: MainWeapon read MainHandRight).
+		[Fact]
+		public void PlayerSpawnEquipment_MapsWeaponPairsToTheCorrectHands()
+		{
+			var equipment = new CharacterEquipment
+			{
+				MainHandLeft = new Item { Id = 1, Data1 = 1, Archetype = 1 },
+				OffHandLeft = new Item { Id = 2, Data1 = 2, Archetype = 2 },
+				MainHandRight = new Item { Id = 3, Data1 = 3, Archetype = 3 },
+				OffHandRight = new Item { Id = 4, Data1 = 4, Archetype = 4 },
+				Tokens = new Item { Id = 5, Data1 = 5, Archetype = 5 },
+			};
+
+			var entries = PlayerSpawnEquipment.BuildInventoryEntries(equipment);
+
+			Assert.Equal(new[]
+			{
+				((uint)CharacterEquipmentSlot.Tokens, 5u),
+				((uint)CharacterEquipmentSlot.MainWeapon, 1u),
+				((uint)CharacterEquipmentSlot.OffHandWeapon, 2u),
+				((uint)CharacterEquipmentSlot.RangedWeapon, 3u),
+				((uint)CharacterEquipmentSlot.Ammo, 4u),
+			}, entries.Select(e => (e.Pos, e.Item.Template1)).ToArray());
+		}
+
 		// The dynamic reader locates the CharacterIIR in any spawn; on the Strie template it must agree with the fixed
 		// SpawnPacketBuilder offsets (NameTagOffset / NameInnerLengthOffset).
 		[Fact]
