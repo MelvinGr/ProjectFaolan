@@ -97,19 +97,35 @@ Workbench: `Captures/parse_spawn_scaffold.py` (`template` / `players` / `all` / 
 NPC FA015807 bodies use a different post-IIR header (`[0][5]`, `[0][0x129]`, ...) — out of scope (NPCs are
 replayed from the burst).
 
-## Morph finding (2026-06-10) — supersedes "SPAWN MORPH ENCODING — BLOCKED"
+## Morph mapping — CRACKED & WIRED (2026-06-10, third session)
 
-The editor morph sliders ARE in the spawn: they are the float-valued scaffold entries. Dikketest's 7
-type-0x01 entries (slider ids 0x00-0x06) match his editor slider multiset {59×4, 14×2, 30×1} exactly;
-Hoxxling, who modified ALL sliders in the editor, has ~26 type-0x00 entries (face slider ids 0x02-0x24).
-The old verdict in spawn-dissection-plan.md ("the floats are progression skills, NOT morphs") was wrong.
-Remaining to wire `CharacterBody` in: the exact slider→float mapping (59 → −0.03, 14 → +0.007, 30 → +0.015
-for Dikketest — not a simple linear map), then generate the morph entries from `CharacterBody` instead of
-the Dikketest defaults.
+The editor morph sliders ARE in the spawn (the float-valued scaffold entries), and the mapping is now fully
+cracked and implemented (`CharacterMorphs`, used by `ApplyMorph` and `EnsureFreshRows`):
+
+- **The editor's `SetMorphValue` numeric value is a ZIGZAG-encoded signed slider value** ("arse"=31 means
+  −16, "arm"=200 means +100). `CharacterBody` stores the decoded signed value.
+- **The spawn morph float is simply `signedValue / 1000`** (single-precision). All 35 captured slider values
+  across Hoxxling (28, ALL sliders modified) / Dikketest (7) / Strickenen (7) reproduce **bit-exact**; the
+  earlier "not a simple linear map" read was the un-decoded zigzag values.
+- **Face sliders**: the name's slot prefix ("33_NoseCrookedRight") IS the wire sliderId of the type-0x00
+  entry (20 sliders, slots 2..36, one CharacterBody column each).
+- **Body sliders**: type-0x01 with fixed ids — arm=0, chest=1, bosom=2, stomach=3, arse=4, thigh=5, leg=6;
+  **ears is the odd one out: type 0x00, sliderId 0xFF**. (arm/chest 0↔1 settled by send order; the editor
+  always moves them together anyway.)
+- **Wire entry order = editor send order**: face by ascending slot, then body alphabetically. Unmoved
+  sliders produce NO entry (strickenbla, zero morphs: 6 weighted attributes + closer at idx 7).
+- The 6 weighted (1.0) attribute tags and the closing record are also per-character (likely race/class/head
+  presets — NOT cracked); fresh characters keep Dikketest's proven set.
+
+Locked by `CharacterMorphsTests` (Hoxxling's raw editor stream → his 28 wire entries bit-exact) and the
+re-pointed `FreshRows_OverDikketestBody_AreByteIdenticalToTheCapture` (Dikketest's raw stream → his captured
+spawn byte-for-byte). The old verdict in spawn-dissection-plan.md ("the floats are progression skills, NOT
+morphs") was wrong.
 
 ## Remaining (optional)
 
-- **Morph mapping** (above) — generate the morph entries from the character's `CharacterBody` sliders.
+- **Weighted-attribute / closer tags** (above) — per-character, semantics uncracked (fresh chars use
+  Dikketest's).
 - **Unmapped equip `pos` values** 3/8/20/21 (extend `CharacterEquipmentSlot` when an item needs them).
 - **FullChar (0x737A6DF9)** is the analogous next generation target (test the `ProtoFullCharacterIIR`
   round-trip first, same playbook).

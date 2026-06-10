@@ -85,7 +85,15 @@ namespace Faolan.GameServer.Spawn
 				PreFrame = FreshPreFrame(),
 				EntryTableX = 0xB7
 			};
-			character.Attributes = FreshEntries.Select((e, sequence) => new CharacterAttribute
+
+			// Entry table: the 6 weighted attributes (idx 1-6), then the character's OWN editor morphs
+			// (CharacterMorphs - absent sliders yield no entry, the captured shape of an unmorphed character),
+			// then the closing record. Indices and Sequence both follow that wire order.
+			var entries = new List<ScaffoldEntry>(FreshWeightedAttributes);
+			entries.AddRange(CharacterMorphs.BuildEntries(character.Body, (uint)entries.Count + 1));
+			entries.Add(new ScaffoldEntry((uint)entries.Count + 1, FreshCloserTag, FreshCloserValue));
+
+			character.Attributes = entries.Select((e, sequence) => new CharacterAttribute
 			{
 				CharacterId = character.Id,
 				Sequence = sequence,
@@ -125,25 +133,24 @@ namespace Faolan.GameServer.Spawn
 			return f;
 		}
 
-		// Dikketest's entry table: 6 weighted attributes (weight 1.0), 7 morph entries (the editor body sliders;
-		// ids 0x0100..0x0106, float-bit values) and the closing [u16][u32] record.
-		private static readonly ScaffoldEntry[] FreshEntries =
+		// Dikketest's 6 weighted attributes (weight 1.0). The tags are per-character (likely the chosen
+		// race/class/head presets - mapping not yet cracked), so fresh characters keep Dikketest's proven set.
+		// The character's morph entries are generated from its CharacterBody (see CharacterMorphs), not stored here.
+		private static readonly ScaffoldEntry[] FreshWeightedAttributes =
 		{
 			new ScaffoldEntry(1, 0x00B0, 0x3F800000),
 			new ScaffoldEntry(2, 0x0147, 0x3F800000),
 			new ScaffoldEntry(3, 0x0154, 0x3F800000),
 			new ScaffoldEntry(4, 0x0191, 0x3F800000),
 			new ScaffoldEntry(5, 0x010B, 0x3F800000),
-			new ScaffoldEntry(6, 0x01DE, 0x3F800000),
-			new ScaffoldEntry(7, 0x0100, 0xBCF5C28F),
-			new ScaffoldEntry(8, 0x0104, 0x3BE56042),
-			new ScaffoldEntry(9, 0x0102, 0x3C75C28F),
-			new ScaffoldEntry(10, 0x0101, 0xBCF5C28F),
-			new ScaffoldEntry(11, 0x0106, 0xBCF5C28F),
-			new ScaffoldEntry(12, 0x0103, 0x3BE56042),
-			new ScaffoldEntry(13, 0x0105, 0xBCF5C28F),
-			new ScaffoldEntry(14, 0x56B6, 0x0000012C)
+			new ScaffoldEntry(6, 0x01DE, 0x3F800000)
 		};
+
+		// The closing [u16 tag][u32 value] entry-table record. Also per-character on the wire (Dikketest
+		// 0x56B6/0x12C, strickenbla 0x4ED4/0x64, Hoxxling 0x46F2/0x190; semantics unknown) - fresh characters
+		// keep Dikketest's proven values.
+		private const ushort FreshCloserTag = 0x56B6;
+		private const uint FreshCloserValue = 0x0000012C;
 
 		// Dikketest's feat/ability ID list (all rank 0).
 		private static readonly uint[] FreshSkillIds =

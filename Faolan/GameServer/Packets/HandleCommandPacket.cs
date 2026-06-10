@@ -5,6 +5,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
+using Faolan.GameServer.Spawn;
 using Microsoft.Extensions.Logging;
 
 // ReSharper disable once CheckNamespace
@@ -12,75 +13,15 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-		// Applies one editor SetMorphValue callback to the character's body. The body sliders (arm/chest/...)
-		// map directly to CharacterBody fields with the 0-100 value; the resource refs (*hairmesh/*texscript/
-		// *beardmesh) and any face sliders not yet seen in captures are logged and skipped for now.
+		// Applies one editor SetMorphValue callback to the character's body. The value is a ZIGZAG-encoded
+		// signed slider value; CharacterMorphs decodes it and stores the signed value in the matching
+		// CharacterBody column (the spawn morph float is that value / 1000 - see CharacterMorphs). The
+		// resource refs (*hairmesh/*texscript/*beardmesh) and any sliders not yet seen in captures are
+		// logged and skipped.
 		private void ApplyMorph(Character character, string morph, uint value)
 		{
-			var body = EnsureBody(character);
-
-			// Face morphs arrive slot-prefixed, e.g. "33_NoseCrookedRight" (the leading NN is the client's morph
-			// slot id - the names themselves are RDB-defined, not in the binary). Strip the prefix and map by the
-			// base name; body sliders ("arm", "ears", ...) have no prefix. Face values are NOT 0-100 (e.g.
-			// CheekForward reaches 278), so they're stored as-is in the float column.
-			var name = morph.Length > 3 && morph[0] is >= '0' and <= '9' && morph[1] is >= '0' and <= '9' && morph[2] == '_'
-				? morph[3..]
-				: morph;
-
-			switch (name)
-			{
-				case "arm":
-					body.Arm = value;
-					break;
-				case "chest":
-					body.Chest = value;
-					break;
-				case "bosom":
-					body.Bosom = value;
-					break;
-				case "stomach":
-					body.Stomach = value;
-					break;
-				case "arse":
-					body.Arse = value;
-					break;
-				case "thigh":
-					body.Thigh = value;
-					break;
-				case "leg":
-					body.Leg = value;
-					break;
-				case "ears":
-					body.Ears = value;
-					break;
-
-				// Face sliders (slot-prefixed). Mapped to the matching CharacterBody column.
-				case "NoseWide":
-					body.NoseWidth = value;
-					break;
-				case "NoseCrookedRight":
-					body.CrookedNose = value;
-					break;
-				case "EyeAngle1":
-					body.EyesAngle = value;
-					break;
-				case "EyesHigh":
-					body.EyesVerticalPos = value;
-					break;
-				case "MouthLow":
-					body.MouthVerticalPos = value;
-					break;
-				case "CheekForward":
-					body.CheekDepth = value;
-					break;
-				case "BrowLow":
-					body.EyebrowScale = value;
-					break;
-
-				default:
-					Logger.LogDebug("Character-editor: unmapped morph '{Morph}'={Value} (resource ref or face slider not yet modelled).", morph, value);
-					break;
-			}
+			if (!CharacterMorphs.TryApply(EnsureBody(character), morph, value))
+				Logger.LogDebug("Character-editor: unmapped morph '{Morph}'={Value} (resource ref or slider not yet modelled).", morph, value);
 		}
 
 		private async Task CommitCharacterName(INetworkClient client, string name)

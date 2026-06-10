@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using Faolan.Core.Database.Tables;
 using Faolan.GameServer.Spawn;
@@ -60,20 +61,39 @@ namespace Faolan.Tests
 			Assert.Equal(Convert.ToHexString(PlayerSpawnScaffoldCodec.Generate(expected)), Convert.ToHexString(RoundTripThroughRows(body)));
 		}
 
-		// The fresh-character defaults ARE Dikketest's extracted scaffold, so seeding a blank character and
-		// generating over Dikketest's transform/CharacterIIR must reproduce his captured spawn byte-for-byte.
+		// The fresh-character defaults are Dikketest's extracted scaffold, with the morph entries now GENERATED
+		// from the character's editor sliders: seeding a character that carries Dikketest's CharacterBody (the
+		// raw editor stream from his create capture, zigzag-decoded by CharacterMorphs.TryApply) and generating
+		// over his transform/CharacterIIR must reproduce his captured spawn byte-for-byte.
 		[Fact]
 		public void FreshRows_OverDikketestBody_AreByteIdenticalToTheCapture()
 		{
 			var body = Golden("SpawnDikketestLogin");
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out _));
 
-			var character = new Character { Id = 0x02000005 };
+			var character = new Character { Id = 0x02000005, Body = new CharacterBody() };
+			foreach (var (morph, raw) in new (string, uint)[] { ("arm", 59), ("arse", 14), ("bosom", 30), ("chest", 59), ("leg", 59), ("stomach", 14), ("thigh", 59) })
+				Assert.True(CharacterMorphs.TryApply(character.Body, morph, raw));
+
 			Assert.True(PlayerSpawnScaffoldRows.EnsureFreshRows(character));
 			Assert.False(PlayerSpawnScaffoldRows.EnsureFreshRows(character)); // idempotent
 			Assert.True(PlayerSpawnScaffoldRows.TryApplyFrom(character, scaffold));
 
 			Assert.Equal(Convert.ToHexString(body), Convert.ToHexString(PlayerSpawnScaffoldCodec.Generate(scaffold)));
+		}
+
+		// A character that never touched a slider (no CharacterBody) gets no morph entries at all: 6 weighted
+		// attributes + the closer at idx 7 - the exact entry-table shape of strickenbla's captured spawn.
+		[Fact]
+		public void FreshRows_WithoutBody_HaveNoMorphEntries()
+		{
+			var character = new Character { Id = 0x02000006 };
+			Assert.True(PlayerSpawnScaffoldRows.EnsureFreshRows(character));
+
+			Assert.Equal(7, character.Attributes.Count);
+			var closer = character.Attributes.Single(a => a.Sequence == 6);
+			Assert.Equal(7u, closer.StatId);
+			Assert.Equal(0x56B6, closer.Tag);
 		}
 
 		[Fact]

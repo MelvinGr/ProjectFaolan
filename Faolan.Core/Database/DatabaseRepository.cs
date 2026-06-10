@@ -230,12 +230,13 @@ namespace Faolan.Core.Database
 			return await ctx.Characters.Include(c => c.Body).Include(c => c.MaxStats).FirstOrDefaultAsync(c => c.Id == id);
 		}
 
-		// Loads the character with ONLY its spawn-scaffold rows (entry table / feat-ID list / ending pair lists /
-		// pre-IIR frame) for the player-spawn generation path. Detached like every read here.
+		// Loads the character with its spawn-scaffold rows (entry table / feat-ID list / ending pair lists /
+		// pre-IIR frame) plus Body, so first-entry seeding can generate the morph entries from the editor
+		// sliders. Detached like every read here.
 		public async Task<Character> GetCharacterScaffold(uint characterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Characters.Include(c => c.Attributes).Include(c => c.Skills).Include(c => c.ScaffoldPairs).Include(c => c.SpawnFrame).FirstOrDefaultAsync(c => c.Id == characterId);
+			return await ctx.Characters.Include(c => c.Attributes).Include(c => c.Skills).Include(c => c.ScaffoldPairs).Include(c => c.SpawnFrame).Include(c => c.Body).FirstOrDefaultAsync(c => c.Id == characterId);
 		}
 
 		// Replaces the character's spawn-scaffold rows with the given detached ones (delete-and-insert; the rows
