@@ -192,8 +192,8 @@ The same playbook applied to the FullChar/inventory snapshot:
   (`CurrentXp`, slot 80, ×10) into the snapshot tails before sending — the captured player's values no
   longer ride along. Best-effort with the captured values as fallback; locked by the bigboy round-trip in
   `FullCharSnapshotBuilderTests` (the stat table MUST be recognized on the reference fixture).
-  ⚠ In-client smoke verification of this patch is PENDING (client was busy when it landed; the container
-  generation before it is smoke-proven).
+  Smoke-verified in-client 16/16: generated containers + patched tails live in the same session, no
+  fallback warnings in the server log.
 
 Remaining for full FullChar generation:
 - **Tails beyond live values**: quest/`remoteformat` XML records + the access-window table are progression
