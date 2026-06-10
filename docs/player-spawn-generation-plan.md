@@ -111,12 +111,16 @@ The IIR scaffold-B (after the ProtoCoreCharacterIIR, before the tail) decodes as
 scaffold-A (before the CharacterIIR, 167b, ~constant across chars per the diff) = the attribute/derived-stat block;
 mostly fixed, dissect last.
 
-**Feat-list format cracked for geared chars (2026-06-10).** For leveled/geared characters (necrol80 on maps
-2000/2010/3000, and the 2040 char) the feat entries are UNIFORM 14 bytes: `[u32 index][u32 0][0x01][u8 subindex]
-[u32 value]`, index incrementing (7,8,9,...). The `value`s are a few repeating 32-bit constants (look like floats,
-e.g. 0x3C03126F). The TEMPLATE char (Strie, 4010, fresh/low-level) uses a DIFFERENT, simpler format
-(`[index][0][float]` + a `01 2c...` block) - so the feat encoding varies by character progression, and byte-exact
-generation must handle both forms. Geared-char form -> CharacterSkill {SkillId=index, Value, + subindex/type}.
+**Feat-list format CRACKED (2026-06-10, confirmed across fresh + geared chars).** The feat entries are UNIFORM
+14 bytes: `[u32 index][u32 0][u8 type][u8 subindex][u32 value]`, index incrementing from 7. Verified on the create
+captures' fresh chars (Hoxxling, Dikketest, Strickenen) AND the geared necrol80/2040 chars - all the same layout. type
+is 0x00/0x01, subindex small, value a float-encoded 32-bit (e.g. 0x3D343958). The entry COUNT grows with level
+(Strickenbla, leveled, has many; a brand-new char few) -> these are progression-gained skills/feats, NOT the fixed
+face morphs. (Strie's spawn-player-template.bin login spawn looked different only because she'd progressed a little;
+the base format is the uniform one.) Maps onto CharacterSkill {SkillId=index, Value=value, + type/subindex columns}.
+The fresh-char scaffold (header + 7 weighted attribute entries + this uniform feat-list + the 0003F1 tail) is now
+fully parseable -> generation is unblocked; scaffold-A (the ~constant attribute block before the CharacterIIR) is the
+last piece to dissect.
 
 **Tail = a feat/ability ID list (dissected further).** After the 7 weighted attribute entries: one more weighted
 entry (idx 7, a float weight, not 1.0) then a **variable-width sorted ID list** with its own header (`01 2c ...`) of
