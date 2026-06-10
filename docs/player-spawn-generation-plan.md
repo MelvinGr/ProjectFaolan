@@ -149,13 +149,21 @@ The weighted (1.0) entries at the top of the entry table are the character's **c
   different sessions) and its value one of 100/300/400. Like the buff records it varies per login, so the
   stored Dikketest closer (22×0x3F1 / 300) is kept for generated spawns.
 
+## IIR looks fields — WIRED (2026-06-10, fifth session)
+
+The CharacterIIR's looks are three `CharacterStats` fields, each **half the editor value** (the same 2×
+convention as race/class): `head_mesh` = ChangeHeadMesh/2 (dikketest 2285694 → 1142847), `voice_set` =
+ChangeVoice/2 (10 → 5), `monster_scale` = ChangeSize/2 (194 → 97) — verified on all five create captures.
+The spawn rebuild (`TryRebuildPlayerSpawnFromDb`) now overrides them from `CharacterBody`
+(HeadMesh/Voice/Size, raw editor values in the DB); unset values keep the captured field. Locked by
+`PlayerCharacterMessage_LooksFields_AreHalfTheEditorValues` against the dikketest golden. Hair/beard mesh,
+colors, tattoos and scars have NO IIR fields — they render from the scaffold's weighted entries +
+morph entries (both DB-generated above), so the visual appearance pipeline for fresh characters is complete:
+IIR (head/voice/scale) + weighted entries (chosen resources) + morph entries (sliders).
+
 ## Remaining (optional)
 
 - **Unmapped equip `pos` values** 3/8/20/21 (extend `CharacterEquipmentSlot` when an item needs them).
-- **IIR "looks" fields** — the spawn's rendered appearance (head mesh, hair, colors) inside the
-  ProtoCoreCharacterIIR is still the captured template's; wiring `CharacterBody.HeadMesh` + the
-  `CharacterBodyResource` refs into the IIR looks fields is the next appearance step (schema known:
-  docs/aoc-client-protos.proto).
 - **FullChar (0x737A6DF9)** is the analogous next generation target (test the `ProtoFullCharacterIIR`
   round-trip first, same playbook).
 - Extraction of CAPTURED characters into rows currently exists as the test-side mapping

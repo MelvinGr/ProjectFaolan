@@ -51,6 +51,19 @@ namespace Faolan.Tests
 			Assert.NotNull(decoded.Bcc);
 		}
 
+		// Locks the editor->wire looks convention used by the spawn rebuild: the editor reports head mesh /
+		// voice / size as 2x the wire value (like race/class), so CharacterStats carries ChangeHeadMesh/2,
+		// ChangeVoice/2 and ChangeSize/2. Dikketest's create capture chose head 2285694, voice 10, size 194.
+		[Fact]
+		public void PlayerCharacterMessage_LooksFields_AreHalfTheEditorValues()
+		{
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(Support.Golden.Bytes("SpawnDikketestLogin"), out var read));
+
+			Assert.Equal(2285694u / 2, read.Message.Stats.HeadMesh);
+			Assert.Equal(10u / 2, read.Message.Stats.VoiceSet);
+			Assert.Equal(194u / 2, read.Message.Stats.MonsterScale);
+		}
+
 		[Fact]
 		public void PlayerSpawnEquipment_BuildsInventoryEntriesFromWornItems()
 		{

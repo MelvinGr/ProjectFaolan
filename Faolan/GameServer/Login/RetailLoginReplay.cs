@@ -439,7 +439,22 @@ namespace Faolan.GameServer
 						message.Stats.MaxMana = maxStats.Mana * 100;
 						message.Stats.Mana = maxStats.Mana * 100;
 					}
-					// Remaining CharacterStats fields (head_mesh, looks_package, side, ...) stay captured.
+					// Remaining CharacterStats fields (looks_package, side, ...) stay captured.
+				}
+
+				// The rendered looks from the editor choices (CharacterBody). The editor reports head mesh /
+				// voice / size as 2x the wire value - the same convention as race/class - so: head_mesh =
+				// ChangeHeadMesh/2, voice_set = ChangeVoice/2, monster_scale = ChangeSize/2 (verified on all
+				// five create captures, e.g. dikketest 2285694 -> 1142847, voice 10 -> 5, size 194 -> 97).
+				// Unset values (no editor choice) keep the captured field.
+				if (message.Stats != null && character.Body != null)
+				{
+					if (character.Body.HeadMesh != 0)
+						message.Stats.HeadMesh = character.Body.HeadMesh / 2;
+					if (character.Body.Voice != 0)
+						message.Stats.VoiceSet = character.Body.Voice / 2u;
+					if (character.Body.Size != 0)
+						message.Stats.MonsterScale = character.Body.Size / 2u;
 				}
 
 				// Replace the worn equipment with the character's own (when it has fully-buildable gear).
