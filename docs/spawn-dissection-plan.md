@@ -504,22 +504,36 @@ CONSTRUCTION DONE (2026-06-10, commits 7fce36c + 842f5fd) — same arc as NPC sp
   state), so they keep the verbatim burst body until that state is normalized (in-client). Then a per-class
   `WorldObject` build from columns + fresh handle/playfield to fully retire the burst objects.
 
-96C46740 MoveTask (per-NPC patrol path) — PARTIAL DISSECTION (2026-06-10, workbench
-`Captures/dissect_movetask.py`). Each FA015807 spawn is paired with a 96C46740 MoveTask that registers the
-NPC's movement. It does NOT use the 0x2C transform framing; its floats are BIG-ENDIAN (unlike the spawn
-transform's LE). Stable structure:
+96C46740 MoveTask (per-entity movement registration) — GRAMMAR CRACKED 2026-06-11 (workbench
+`Captures/dissect_movetask.py`, `coverage` mode). Each FA015807 spawn is paired with a 96C46740 MoveTask that
+registers the entity's movement. It does NOT use the 0x2C transform framing; its floats are BIG-ENDIAN (unlike
+the spawn transform's LE). Body = `[u32 bodyLen][96C46740][ack=0xC350][u32 handle][00 00][curPos vec3 BE][TASK
+TYPE byte @30][payload]`. The byte @30 is a TASK-TYPE discriminator; **all types but 0x04 are FIXED-LENGTH** and
+fully round-trip across the whole captured corpus:
 ```
-[0:16]  header: bodyLen, subOp=96C46740, ack=0xC350, handle (== the paired spawn's handle)
-[16:18] prefix 00 00
-@18     current position: vec3 of 3 big-endian floats
-...     movement control bytes (04 01 00 02 01 01 ... type/flags), a count, then the waypoint list:
-@..     N x waypoint vec3 (BE) - the patrol PATH; N varies widely (beach: 2..8+ points, total len 125..370)
-...     a speed float, a repeated path segment, an orientation, and a trailer (..bf..3f5da8df..00 01)
+  0x06 len31  stationary  [06]                                        (BuildStationary)
+  0x00 len32  idle        [00 01]
+  0x02 len61  orient      [02][vec3][0000][f32][0000][f32][00 00]
+  0x07 len55  follow?     [07][00 00 c3 50][00 04][f32][...]
+  0x08 len49  anchor-id   [08][00 00 c3 50][id u32][01][8B][00]
+  0x05 len69  pace        [05][const 12][f32][vec3][vec3][00]
+  0x01 len90  patrol2     fixed 2-waypoint segment variant
+  0x04 VARIABLE  patrol   -> a SEGMENT LIST (the real waypoint patrol path):
+       04 [f1][kind] 01                       segment-list header (kind in {02,03,04})
+       then >=1 MOVE BLOCK, each:
+         01 [mode]
+           mode 01: 00 00 00 00   |   12 <f32> 00 00 00    (optional inline param)
+           mode 00: <f32 a><f32 b> 00 00 00 00             (parametric "approach/face", no waypoints)
+         [count u8][count x waypoint vec3 BE]               the patrol PATH
+         [flag 00/01][speed f32 BE][12x 00]                block trailer
+         [anchor vec3 BE]                                  return/anchor point
+       optional embedded ORIENT (02 [vec3][0000][f32][0000][f32]), mode-00 FINALE (00 00 [f32][f32]),
+       nested 04 headers, or 08/07 record tails, then a 2-byte terminator (00 01 / 03 00 / 03 01).
 ```
-Beach: 16 MoveTasks, waypoint counts 5..25 (a wandering NPC like Kalanthes has many; a near-static one has 2).
-The full form is a MULTI-SEGMENT movement script: each segment is prefixed `04 01 XX YY 01 ZZ` and carries a
-speed float + per-segment param floats + a waypoint count, then its waypoints; segment count + params vary
-widely. This is the world burst's largest/most-variable family and carries patrol-AI data not in any table.
+The `coverage` mode tokenizes every MoveTask in every capture and rebuilds it byte-exact: **3942/4267 unique
+bodies (92.4%)** — the 7 fixed types are 100%, the type-04 patrol is 3507/3832. The residual ~8% are the
+elaborate mode-00 parametric segments (the un-grammared bits are the per-block control floats of "approach/face"
+behaviours that carry no patrol waypoints). This is the world burst's largest/most-variable family.
 
 MINIMAL STATIONARY FORM — BUILT (2026-06-10, commit 3b8dfa4). A non-patrolling NPC's MoveTask is a constant
 31-byte body (confirmed across 58 captured instances): `[bodyLen=27][96C46740][ack=0xC350][handle][00 00][vec3
@@ -530,11 +544,21 @@ multi-segment patrol grammar becomes an ENHANCEMENT, not a blocker. CONFIRMED IN
 a7e6841): a built spawn paired with this built stationary MoveTask is polled by the client and renders standing
 put — see the Phase-4 "BURST-FREE CONSTRUCT VALIDATED IN-CLIENT" entry.
 
-STILL TO DO: the full patrol-path grammar (the per-segment control bytes/speed/params byte-exact) -> a
-`PatrolPath` schema -> a full builder, IF moving NPCs are wanted. For now `BuildStationary` + the spawn position
-is enough to construct an NPC's registration from scratch (proven in-client). The burst-free spawn primitives
-(built spawn + built stationary MoveTask + built world objects, fresh handles) are validated; the remaining gate
-before they retire the MapWorldBurst blob is the cross-session body fix (Phase 4 STILL-TO-DO #1).
+CANONICAL PATROL FORM — BUILT 2026-06-11 (commit pending). The dominant single-segment waypoint patrol
+(`04 01 00 02 01 01 00 00 00 00 [count] [count x WP] 00 [speed f32] [12x00] [anchor=curPos] 00 01`) is
+constructed byte-exact by `MoveTaskBuilder.BuildPatrol(handle, currentPosition, waypoints, speed)` — proven
+against the captured golden `Faolan.Tests/Golden/MoveTaskPatrol.bin` (handle 0x17E03, 2 waypoints) in
+`MoveTaskBuilderTests`. So a MOVING NPC's registration can now be constructed from {position, waypoint path,
+speed} — the data a `PatrolPath` schema would hold — complementing `BuildStationary` for non-movers. 165 of the
+captured beach/world patrols match this canonical header byte-for-byte.
+
+STILL TO DO: (a) the residual ~8% type-04 forms (the mode-00 parametric "approach/face" segments and a few
+multi-block tail variants — workbench `coverage` lists them); (b) a `PatrolPath` table + extractor to SOURCE the
+waypoints (they're per-NPC AI data in no table yet), then drive `BuildPatrol` from rows. For now `BuildStationary`
++ the spawn position constructs a non-moving NPC's registration (proven in-client); `BuildPatrol` constructs a
+mover when the path is supplied. The burst-free spawn primitives (built spawn + built MoveTask + built world
+objects, fresh handles) are validated; the remaining gate before they retire the MapWorldBurst blob is the
+cross-session body fix (Phase 4 STILL-TO-DO #1).
 
 ## Phase 7 — NPC conversations (dialogue)
 

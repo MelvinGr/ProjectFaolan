@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Collections.Generic;
 using System.Numerics;
 
 namespace Faolan.GameServer.Spawn
@@ -30,6 +31,61 @@ namespace Faolan.GameServer.Spawn
 			BinaryPrimitives.WriteSingleBigEndian(body.AsSpan(26, 4), position.Z);
 			body[30] = 0x06; // stationary terminator (vs 0x04 = a movement segment follows)
 			return body;
+		}
+
+		// Builds the canonical single-segment PATROL MoveTask (task type 0x04, the waypoint-list form). This is
+		// what a moving NPC needs: a current position plus a list of waypoints it walks between at `speed`. The
+		// grammar (docs/spawn-dissection-plan.md, dissect_movetask.py) for this dominant form is:
+		//   [00 00][curPos vec3 BE]
+		//   04 01 00 02 01 01 00 00 00 00          segment-list + move-block header (flag bytes constant here)
+		//   [count u8][count x waypoint vec3 BE]    the patrol path
+		//   00 [speed f32 BE][12x 00]              block trailer (flag 00 + speed + pad)
+		//   [anchor vec3 BE = curPos]              the return/anchor point
+		//   00 01                                  terminator
+		// All floats are BIG-ENDIAN (unlike the spawn transform's little-endian). Reproduces the captured patrol
+		// body byte-for-byte (MoveTaskBuilderTests). The multi-segment and parametric ("approach/face") forms are
+		// the documented remainder - see the workbench coverage report.
+		public static byte[] BuildPatrol(uint handle, Vector3 currentPosition, IReadOnlyList<Vector3> waypoints, float speed)
+		{
+			if (waypoints == null || waypoints.Count == 0)
+				throw new ArgumentException("a patrol needs at least one waypoint", nameof(waypoints));
+			if (waypoints.Count > byte.MaxValue)
+				throw new ArgumentOutOfRangeException(nameof(waypoints), "waypoint count exceeds one byte");
+
+			int total = 16 + 2 + 12 + 10 + 1 + 12 * waypoints.Count + 17 + 12 + 2;
+			var body = new byte[total];
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)(total - 4));
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), SubOpcode);
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), Ack);
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(12, 4), handle);
+			// body[16..18] stay 0x00 0x00 (the prefix)
+			WriteVec3(body, 18, currentPosition);
+
+			int p = 30;
+			// segment-list + move-block header (04 01 00 02 01 01 00 00 00 00)
+			body[p++] = 0x04; body[p++] = 0x01; body[p++] = 0x00; body[p++] = 0x02; body[p++] = 0x01;
+			body[p++] = 0x01; body[p++] = 0x00; body[p++] = 0x00; body[p++] = 0x00; body[p++] = 0x00;
+			body[p++] = (byte)waypoints.Count;
+			foreach (var wp in waypoints)
+			{
+				WriteVec3(body, p, wp);
+				p += 12;
+			}
+			// block trailer: flag 00, speed, 12 pad bytes
+			body[p++] = 0x00;
+			BinaryPrimitives.WriteSingleBigEndian(body.AsSpan(p, 4), speed);
+			p += 4 + 12;
+			WriteVec3(body, p, currentPosition); // anchor
+			p += 12;
+			body[p++] = 0x00; body[p] = 0x01; // terminator
+			return body;
+		}
+
+		private static void WriteVec3(byte[] body, int offset, Vector3 v)
+		{
+			BinaryPrimitives.WriteSingleBigEndian(body.AsSpan(offset, 4), v.X);
+			BinaryPrimitives.WriteSingleBigEndian(body.AsSpan(offset + 4, 4), v.Y);
+			BinaryPrimitives.WriteSingleBigEndian(body.AsSpan(offset + 8, 4), v.Z);
 		}
 	}
 }
