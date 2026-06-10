@@ -8,9 +8,11 @@ using Faolan.AgentServer;
 using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Network.AgentServer;
+using Faolan.Core.Network.GameServer;
 using Faolan.CSPlayerAgent;
 using Faolan.GameServer;
 using Faolan.Helpers;
+using Faolan.Mcp;
 using Faolan.PlayerAgent;
 using Faolan.UniverseAgent;
 using Microsoft.Extensions.Configuration;
@@ -62,12 +64,20 @@ namespace Faolan
 			builder.Services.AddSingleton<IAgentServerDispatcher, AgentServerDispatcher>();
 			builder.Services.AddScopedHostedService<AgentServerListener>();
 
+			// Live seam into the GameServer listeners (creator + world ports): aggregates world sessions and routes
+			// GM commands. Mirrors the agent dispatcher; lets the MCP server spawn/teleport via validated GM paths.
+			builder.Services.AddSingleton<IGameServerDispatcher, GameServerDispatcher>();
+
+			// In-process MCP server (Claude tooling) on a localhost Kestrel port; shares the live singletons above.
+			builder.Services.AddFaolanMcp();
+
 			builder.Services.AddScopedHostedService(provider =>
 			{
 				var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
 				var configuration = provider.GetRequiredService<IConfiguration>();
 				var dataRepository = provider.GetRequiredService<IDatabaseRepository>();
 				var agentServerDispatcher = provider.GetRequiredService<IAgentServerDispatcher>();
+				var gameServerDispatcher = provider.GetRequiredService<IGameServerDispatcher>();
 
 				// One-time startup resolution of the listener's realm/port; blocking here is fine (host build).
 				var realm = dataRepository
@@ -78,7 +88,7 @@ namespace Faolan
 				if (realm == null)
 					throw new Exception("realm == null");
 
-				return new GameServerListener(loggerFactory.CreateLogger($"{typeof(GameServerListener).FullName}-{realm.Id}"), configuration, dataRepository, realm.Port, agentServerDispatcher);
+				return new GameServerListener(loggerFactory.CreateLogger($"{typeof(GameServerListener).FullName}-{realm.Id}"), configuration, dataRepository, realm.Port, agentServerDispatcher, gameServerDispatcher);
 			});
 
 			// Second GameServer listener on the WORLD port (creator port + 1). Retail runs the GameServer on two
@@ -90,6 +100,7 @@ namespace Faolan
 				var configuration = provider.GetRequiredService<IConfiguration>();
 				var dataRepository = provider.GetRequiredService<IDatabaseRepository>();
 				var agentServerDispatcher = provider.GetRequiredService<IAgentServerDispatcher>();
+				var gameServerDispatcher = provider.GetRequiredService<IGameServerDispatcher>();
 
 				var realm = dataRepository
 					.GetRealms()
@@ -100,7 +111,7 @@ namespace Faolan
 					throw new Exception("realm == null");
 
 				var worldPort = (ushort)(realm.Port + 1);
-				return new WorldGameServerListener(loggerFactory.CreateLogger($"{typeof(WorldGameServerListener).FullName}-{realm.Id}"), configuration, dataRepository, worldPort, agentServerDispatcher);
+				return new WorldGameServerListener(loggerFactory.CreateLogger($"{typeof(WorldGameServerListener).FullName}-{realm.Id}"), configuration, dataRepository, worldPort, agentServerDispatcher, gameServerDispatcher);
 			});
 
 			var host = builder.Build();

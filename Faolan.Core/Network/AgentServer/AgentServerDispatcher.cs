@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -51,6 +52,12 @@ namespace Faolan.Core.Network.AgentServer
 		{
 			if (_provider != null)
 				await _provider.SystemBroadcast(message);
+		}
+
+		public IReadOnlyList<SessionInfo> GetSessions()
+		{
+			lock (_lock)
+				return _provider?.GetSessions() ?? Array.Empty<SessionInfo>();
 		}
 	}
 }

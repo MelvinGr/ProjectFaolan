@@ -5,6 +5,7 @@
   "PlayerAgentPort": 7011,
   "CSPlayerAgentPort": 7001,
   "AgentServerPort": 7012,
+  "McpPort": 7099,
 
   "DatabasePath": "faolan.db",
   "DatabasePathDev": "../../../faolan.db",

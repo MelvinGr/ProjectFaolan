@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core;
@@ -33,6 +35,25 @@ namespace Faolan.AgentServer
 		{
 			_dispatcher.Unregister(this);
 			return base.StopAsync(cancellationToken);
+		}
+
+		public IReadOnlyList<SessionInfo> GetSessions()
+		{
+			return NetworkClients
+				.Select(nc =>
+				{
+					var account = nc.Session?.Account;
+					var character = nc.Session?.Character;
+					return new SessionInfo(
+						nc.IpAddress,
+						account?.Id,
+						account?.UserName,
+						account?.ClientInstance ?? 0,
+						character?.Id,
+						character?.Name,
+						character?.Level);
+				})
+				.ToArray();
 		}
 
 		protected override async Task ReceivedPacket(INetworkClient client, AgentServerPacket packet)

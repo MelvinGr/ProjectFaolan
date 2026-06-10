@@ -1,11 +1,13 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.AgentServer;
+using Faolan.Core.Network.GameServer;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
@@ -23,13 +25,27 @@ namespace Faolan.GameServer
 		// because the editor and world connections are different sessions but hit the same listener instance.
 		private static readonly HashSet<uint> PendingCreateWorldEntry = [];
 		private readonly IAgentServerDispatcher _agentServerDispatcher;
+		private readonly IGameServerDispatcher _gameServerDispatcher;
 
-		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, ushort port, IAgentServerDispatcher agentServerDispatcher) : base(port, logger, configuration, database,
+		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, ushort port, IAgentServerDispatcher agentServerDispatcher, IGameServerDispatcher gameServerDispatcher) : base(port, logger, configuration, database,
 			new ConanOutgoingPacketLogger(logger, "GameServer", typeof(GameServerRespondOpcodes), typeof(GameServer0X2000RespondsOpcodes)))
 		{
 			_agentServerDispatcher = agentServerDispatcher;
+			_gameServerDispatcher = gameServerDispatcher;
 
 			InitGmCommands();
+		}
+
+		public override Task StartAsync(CancellationToken cancellationToken)
+		{
+			_gameServerDispatcher.Register(this);
+			return base.StartAsync(cancellationToken);
+		}
+
+		public override Task StopAsync(CancellationToken cancellationToken)
+		{
+			_gameServerDispatcher.Unregister(this);
+			return base.StopAsync(cancellationToken);
 		}
 
 		protected override async Task ReceivedPacket(INetworkClient client, ConanPacket packet)
