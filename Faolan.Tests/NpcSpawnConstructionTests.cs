@@ -69,6 +69,52 @@ namespace Faolan.Tests
 			Assert.Equal(body.AsSpan(result.Offset, result.Length).ToArray(), reEncoded);
 		}
 
+		// The full construction oracle: rebuilding the whole NPC body from its own transform AND its own decoded
+		// CharacterIIR (transform via BuildSpawnBody, identity/equipment via the now-generic SetCharacterMessage)
+		// reproduces the captured bytes exactly. This is the gate for driving an NPC spawn from structured data -
+		// swap any field and the body stays valid.
+		[Theory]
+		[InlineData("SpawnNpcCrocodile")]
+		[InlineData("SpawnNpcCasilda")]
+		public void BuildSpawn_FromOwnTransformAndIir_IsByteIdentical(string golden)
+		{
+			var template = Golden.Bytes(golden);
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(template, out var read));
+
+			var handle = BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(SpawnPacketBuilder.HandleOffset, 4));
+			var position = new Vector3(ReadLE(template, SpawnPacketBuilder.PosXOffset), ReadLE(template, SpawnPacketBuilder.PosYOffset), ReadLE(template, SpawnPacketBuilder.PosZOffset));
+			var rotation = new Quaternion(ReadLE(template, SpawnPacketBuilder.RotXOffset), ReadLE(template, SpawnPacketBuilder.RotYOffset), ReadLE(template, SpawnPacketBuilder.RotZOffset),
+				ReadLE(template, SpawnPacketBuilder.RotWOffset));
+
+			var built = SpawnPacketBuilder.BuildSpawn(template, handle, position, rotation, read.Message);
+
+			Assert.Equal(template, built);
+		}
+
+		// Renaming an NPC (a length change) grows the body and adjusts the two NPC length prefixes (body length @0
+		// and the CharacterIIR length prefix @iirOff-4) - and only those; NPCs have no @133 outer island.
+		[Fact]
+		public void SetCharacterMessage_NpcRename_AdjustsBodyAndIirLengths()
+		{
+			var body = Golden.Bytes("SpawnNpcCrocodile");
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var read));
+			var iirLenOffset = read.Offset - 4;
+			var oldBodyLen = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(0, 4));
+			var oldIirLen = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(iirLenOffset, 4));
+
+			read.Message.Name = "Ancient Crocodile"; // +8 chars
+			var rebuilt = SpawnPacketBuilder.SetCharacterMessage(body, read.Message);
+
+			var delta = rebuilt.Length - body.Length;
+			Assert.Equal(8, delta);
+			Assert.Equal((uint)(oldBodyLen + delta), BinaryPrimitives.ReadUInt32BigEndian(rebuilt.AsSpan(0, 4)));
+			Assert.Equal((uint)(oldIirLen + delta), BinaryPrimitives.ReadUInt32BigEndian(rebuilt.AsSpan(iirLenOffset, 4)));
+
+			// Re-reading the rebuilt body yields the new name (the splice is structurally valid).
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(rebuilt, out var reread));
+			Assert.Equal("Ancient Crocodile", reread.Message.Name);
+		}
+
 		private static float ReadLE(byte[] b, int offset)
 		{
 			return BinaryPrimitives.ReadSingleLittleEndian(b.AsSpan(offset, 4));

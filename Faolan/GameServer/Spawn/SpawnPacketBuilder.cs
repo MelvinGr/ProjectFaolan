@@ -89,35 +89,47 @@ namespace Faolan.GameServer.Spawn
 				.ToArray();
 		}
 
-		// Replaces the ENTIRE ProtoCoreCharacterIIR component (the player char message: name / stats / player_stats /
-		// bcc / ... / inventory_entry) with a re-encoded one, delta-adjusting the body length @0, the @133 value
-		// island and the CharacterIIR length prefix @304. This is how identity + equipment are rebuilt: the caller
-		// decodes the captured base's ProtoCoreCharacterIIR, overrides name/stats/inventory from the DB, and
-		// re-encodes here. The message round-trips byte-identically (PlayerSpawnGenerationTests), so re-encoding
-		// the decoded message unchanged is a byte-identical no-op (the build-side oracle). Returns the body
-		// unchanged if it is not the known layout (0x0A name tag at NameTagOffset).
+		// Replaces the ENTIRE ProtoCoreCharacterIIR component (name / stats / player_stats / bcc / ... /
+		// inventory_entry) with a re-encoded one. Works for ANY FA015807 body (player OR NPC - they share the
+		// grammar, see docs/spawn-dissection-plan.md Phase 4): the CharacterIIR is located by its name signature
+		// via PlayerSpawnReader (not the fixed Strie offset), and on resize the body length @0 and the IIR's own
+		// length prefix @(iirOff-4) are delta-adjusted. The Strie-shaped player layout additionally carries the
+		// @133 value island, adjusted only there (NPCs have no such outer length). This is how identity + equipment
+		// are rebuilt: the caller decodes the captured base's IIR, overrides fields from the DB, and re-encodes
+		// here. The message round-trips byte-identically (PlayerSpawnGenerationTests / NpcSpawnConstructionTests),
+		// so re-encoding the decoded message unchanged is a byte-identical no-op (the build-side oracle). Returns
+		// the body unchanged if no CharacterIIR is found.
 		public static byte[] SetCharacterMessage(byte[] body, ProtoCoreCharacterIIR character)
 		{
-			if (body.Length <= NameTagOffset || body[NameTagOffset] != 0x0A)
+			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
 				return body;
 
-			var oldLen = (int)BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(NameInnerLengthOffset, 4));
-			if (NameTagOffset + oldLen > body.Length)
-				return body;
-
+			var iirOffset = read.Offset;
+			var oldLen = read.Length;
 			var payload = character.ToProtobufBytes();
 			var delta = payload.Length - oldLen;
 
 			var result = new byte[body.Length + delta];
-			Array.Copy(body, 0, result, 0, NameTagOffset); // through the @304 length prefix, up to the message
-			payload.CopyTo(result, NameTagOffset);
-			var afterSrc = NameTagOffset + oldLen;
-			Array.Copy(body, afterSrc, result, NameTagOffset + payload.Length, body.Length - afterSrc);
+			Array.Copy(body, 0, result, 0, iirOffset); // through the @(iirOff-4) length prefix, up to the message
+			payload.CopyTo(result, iirOffset);
+			var afterSrc = iirOffset + oldLen;
+			Array.Copy(body, afterSrc, result, iirOffset + payload.Length, body.Length - afterSrc);
 
 			AddBigEndian(result, 0, delta); // body length field
-			AddBigEndian(result, NameOuterLengthOffset, delta); // @133 (encloses the CharacterIIR + scaffolds)
-			AddBigEndian(result, NameInnerLengthOffset, delta); // @304 (the CharacterIIR's own length prefix)
+			AddBigEndian(result, iirOffset - 4, delta); // the CharacterIIR's own length prefix
+			if (iirOffset == NameTagOffset) // Strie-shaped player layout: also the @133 value island (player only)
+				AddBigEndian(result, NameOuterLengthOffset, delta);
 			return result;
+		}
+
+		// Builds a complete FA015807 body from a base template + a typed transform + a CharacterIIR: the transform
+		// (handle/position/rotation) is reconstructed by BuildSpawnBody and the identity/appearance/equipment is
+		// spliced in by SetCharacterMessage. The pre-IIR float block and the post-IIR scaffold are carried over
+		// from the template verbatim (still raw, per the player spawn). Byte-identical to the captured body when
+		// fed the template's own handle/transform + decoded IIR (the construction oracle).
+		public static byte[] BuildSpawn(byte[] template, uint handle, Vector3 position, Quaternion rotation, ProtoCoreCharacterIIR character)
+		{
+			return SetCharacterMessage(BuildSpawnBody(template, handle, position, rotation), character);
 		}
 
 		// Returns a copy of a Strie-shaped spawn body with the name replaced. Delta-adjusts the CharacterIIR
