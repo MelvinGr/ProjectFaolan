@@ -85,11 +85,11 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<Character>().HasOne(c => c.Account).WithMany(r => r.Characters).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Character>().HasOne(c => c.Realm).WithMany(r => r.Characters).OnDelete(DeleteBehavior.SetNull);
 
-			// Character ids double as the on-wire client instance for the create/world flow. We assign them
-			// explicitly (in the 4-byte protobuf-varint range) instead of using SQLite autoincrement, so the
-			// instance is the same byte length as the capture placeholder everywhere it is substituted (header
-			// varint, body raw uint32, body nested varint) - keeping the verbatim packets' length prefixes valid.
-			modelBuilder.Entity<Character>().Property(c => c.Id).ValueGeneratedNever();
+			// Character ids double as the on-wire client instance and are DB-generated (SQLite max+1). The old
+			// manual in-range allocation is gone: the burst replay's instance rewrite pads varints
+			// (EncodeVarintPadded), so any id below 2^28 substitutes length-preserving into the captured 4-byte
+			// slots - and generated ids continue from the existing 0x0200xxxx rows, far below that.
+			modelBuilder.Entity<Character>().Property(c => c.Id).ValueGeneratedOnAdd();
 
 			// One-to-one Character <-> CharacterMaxStats, keyed by CharacterId; deletes cascade with the character.
 			modelBuilder.Entity<Character>().HasOne(c => c.MaxStats).WithOne(s => s.Character).HasForeignKey<CharacterMaxStats>(s => s.CharacterId).OnDelete(DeleteBehavior.Cascade);

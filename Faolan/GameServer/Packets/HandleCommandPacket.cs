@@ -163,9 +163,10 @@ namespace Faolan.GameServer
 				case "ChangeSex":
 				{
 					if (character != null)
-						// Sex isn't a simple 2x: the editor sends 6 for male (confirmed; all captured chars are
-						// male=0). Map 6 -> Male, the other toggle value (4) -> Female.
-						character.Sex = numericValue == 6 ? Sex.Male : Sex.Female;
+						// Sex IS the editor's usual 2x convention: 4 -> wire 2 = MALE, 6 -> wire 3 = FEMALE
+						// (anchored on Hoxxling, who is male: ChangeSex 4 + a chosen beardmesh; the earlier
+						// "6 = male" read was inverted).
+						character.Sex = numericValue == 4 ? Sex.Male : Sex.Female;
 					break;
 				}
 

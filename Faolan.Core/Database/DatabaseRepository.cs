@@ -66,14 +66,10 @@ namespace Faolan.Core.Database
 
 	public class DatabaseRepository : IDatabaseRepository
 	{
-		// Character ids are allocated in the 4-byte protobuf-varint range [0x02000000, 0x0FFFFFFF] so the id
-		// (which doubles as the on-wire client instance) always encodes to a 4-byte varint - the same length as
-		// the capture placeholder 0x021662C8 - keeping the verbatim packets' nested length prefixes valid when
-		// the instance is substituted. (SQLite autoincrement was seeded high by a manual char and produced
-		// 5-byte-varint ids, which corrupted those prefixes.)
-		private const uint CreationInstanceBase = 0x02000000;
-
-		private const uint CreationInstanceMax = 0x0FFFFFFF;
+		// Character ids (which double as the on-wire client instance) are DB-generated (SQLite max+1,
+		// continuing from the existing 0x0200xxxx rows). The old manual in-range allocation is gone: the
+		// burst replay pads varints (EncodeVarintPadded), so any id below 2^28 substitutes length-preserving
+		// into the captured packets.
 
 		// Slave Galley (character-creation) map. 0xFAA/4010 is the map the retail create capture's world
 		// entry uses (account-stricken998-character-strickenen-create-random-actions) and it exists in the
@@ -112,7 +108,7 @@ namespace Faolan.Core.Database
 
 			// Only reuse an in-range unnamed row; an out-of-range leftover (e.g. created before the
 			// 4-byte-varint id scheme) would yield a 5-byte instance, so drop those and allocate fresh.
-			var character = await ctx.Characters.FirstOrDefaultAsync(c => c.AccountId == accountId && c.Name == null && c.Id >= CreationInstanceBase && c.Id <= CreationInstanceMax);
+			var character = await ctx.Characters.FirstOrDefaultAsync(c => c.AccountId == accountId && c.Name == null);
 			if (character == null)
 			{
 				var stale = await ctx.Characters.Where(c => c.AccountId == accountId && c.Name == null).ToListAsync();
@@ -124,7 +120,6 @@ namespace Faolan.Core.Database
 
 				character = new Character
 				{
-					Id = await AllocateCharacterId(ctx),
 					AccountId = accountId,
 					RealmId = realmId,
 					AuthChallenge = Guid.NewGuid().ToString("N"),
@@ -555,14 +550,6 @@ namespace Faolan.Core.Database
 		}
 
 		// --- helpers --------------------------------------------------------------------------------------
-
-		// Allocates the next character id in the 4-byte protobuf-varint range, one past the highest existing
-		// in-range id (so it stays unique without colliding with out-of-range manually-inserted rows).
-		private static async Task<uint> AllocateCharacterId(DatabaseContext ctx)
-		{
-			var maxInRange = await ctx.Characters.Where(c => c.Id >= CreationInstanceBase && c.Id <= CreationInstanceMax).Select(c => (uint?)c.Id).MaxAsync();
-			return (maxInRange ?? CreationInstanceBase - 1) + 1;
-		}
 
 		private static void ApplyCreationSpawn(Character character)
 		{

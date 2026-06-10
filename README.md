@@ -71,7 +71,13 @@ spell ids** from `ApplySpell` (`CaptureSpellImporter` → id-only `Spell` rows; 
 `const_abilitys` → `ClassAbility`) - the spellbook is class/level-derived, not in captures. With `--rdb <dir>`
 it imports the client's **character-customization registry** (RDB type 1000076 → `MorphTarget`, 1,072 rows:
 every selectable appearance target; wire tag = registry id − 1 — what resolves the editor's resource refs into
-the spawn's weighted entries). It also catalogs **NPC spawns** per map (`NpcSpawnExtractor` → `NpcSpawn`) and
+the spawn's weighted entries). It **materializes the captured characters** (`CaptureCharacterImporter`): every
+named player spawn (own chars AND other players visible in gameplay) becomes a playable DB character on its
+ORIGINAL retail id — identity, class (the pre-IIR frame island @135's low byte; cross-checked against the
+PlayerAgent 0x20EF char lists), looks, vitals, position/map, worn equipment, carried bag/quest inventory (from
+the FullChar snapshots) and the full spawn-scaffold rows; existing names are skipped (re-runs never overwrite),
+and they land on the dedicated `captured` account (`CaptureCharacterImporter.AccountId` to override). It also
+catalogs **NPC spawns** per map (`NpcSpawnExtractor` → `NpcSpawn`) and
 stores each map's full **world burst**
 (`MapWorldBurstExtractor` → `MapWorldBurst`/`MapWorldBurstEntity`) - the data the login path replays to render any map. Each run prints
 a before/after delta table; imports upsert (no wipes). The OLD C++ server's base data (`p_items`/`spelldata`/`npcs`)

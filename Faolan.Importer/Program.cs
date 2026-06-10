@@ -251,6 +251,9 @@ namespace Faolan.Importer
 					.ToList();
 				var (abSeen, abNew, abUpd) = await CaptureAbilityImporter.ImportAsync(db, itemPackets, createPackets);
 				Console.WriteLine($"Abilities (0x2052 grants): {abSeen} seen, {abNew} new, {abUpd} updated.");
+				// After items (the equipment references them). Existing names are skipped, never overwritten.
+				var (chSeen, chAdded, chSkipped) = await CaptureCharacterImporter.ImportAsync(db, captures);
+				Console.WriteLine($"Characters: {chSeen} captured, {chAdded} added, {chSkipped} already in DB.");
 				await ImportConversations(db, conversations);
 				await ImportNpcSpawns(db, NpcSpawnExtractor.Merge(captures.SelectMany(NpcSpawnExtractor.Extract)));
 				await ImportMapWorldBursts(db, MapWorldBurstExtractor.Merge(captures.SelectMany(MapWorldBurstExtractor.Extract)));
@@ -387,6 +390,7 @@ namespace Faolan.Importer
 		{
 			return new Dictionary<string, int>
 			{
+				["Characters"] = await db.Characters.CountAsync(),
 				["Items"] = await db.Items.CountAsync(),
 				["Items(buildable)"] = await db.Items.CountAsync(i => i.Archetype != 0),
 				["Spells"] = await db.Spells.CountAsync(),

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Crypt;
 using Faolan.Core.Data;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
@@ -472,8 +473,10 @@ namespace Faolan.GameServer
 				// (a race/sex of 0 would be an invalid model). The remaining CharacterStats fields stay captured.
 				if (message.Stats != null && (uint)character.Race != 0)
 				{
-					// CharacterStats.race == the Race enum (Aquilonian=1, Cimmerian=2, Stygian=3); the spawn's sex code
-					// is the Sex enum + 2 (Male=2, Female=3, both in the captured-valid range).
+					// CharacterStats.race == the Race enum (Aquilonian=1, Cimmerian=2, Stygian=3); the spawn's sex
+					// code is the Sex enum + 2 (MALE=2 / FEMALE=3 - the editor's ChangeSex 4/6 halved, the same
+					// 2x convention as race/class; anchored on Hoxxling, who is male: editor 4 -> wire 2 and a
+					// chosen beardmesh).
 					message.Stats.Sex = (uint)character.Sex + 2;
 					message.Stats.Race = (uint)character.Race;
 					message.Stats.Level = character.Level;
