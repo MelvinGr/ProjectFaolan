@@ -18,9 +18,9 @@ namespace Faolan.GameServer.Spawn
 
 		// Transform component payloads (the 0x2C group), kept as raw field payloads: 0x0A vec3 (3 x fixed32),
 		// 0x12 quat (4 x fixed32), optional 0x25 scale (4 bytes), 0x18 playfield varint.
-		public byte[] Vec3 { get; set; }
+		public byte[] Vec3 { get; set; } // todo: coNVERT TO VECTOR3 OR 3 FLAOTS
 
-		public byte[] Quat { get; set; }
+		public byte[] Quat { get; set; } // TODO: COnvert to Quaterion, or 4 floats
 		public byte[] Scale { get; set; } // null when absent
 		public ulong Playfield { get; set; }
 
