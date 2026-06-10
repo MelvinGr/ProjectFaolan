@@ -221,6 +221,39 @@ Reuse `SpawnPacketBuilder` for NPCs sourced from `Npcs` / `NpcBodies` / `NpcEqui
 `SpawnTortageBeach`'s verbatim dikketest blobs with built spawns; allocate NPC handles from the table; add to
 the `0x2076` manifest. Verify a beach NPC built from a seeded `Npcs` row matches its captured `FA015807`.
 
+DISSECTION DONE (2026-06-10) — workbench `Captures/dissect_npc_spawn.py` (`one <handle-hex>` = full field
+dump, no-arg = table of every NPC in the Strie login burst). **An NPC spawn is the exact same FA015807 grammar
+as the player spawn** — only the field VALUES differ; the byte layout is identical:
+```
+[0:20]    header: bodyLen, subOp=FA015807, ack=0xC350, handle, fieldA
+[20:~66]  transform group 0x2C: 0A vec3(pos LE), 12 quat(rot LE), 18 playfield-varint
+[66:293]  pre-IIR block — FIXED SIZE 273B, per-NPC float CONTENT (extended transform / bounds), still RAW
+@297      ProtoCoreCharacterIIR (u32 length prefix @293; iirOff is a CONSTANT 297 for every beach NPC):
+            f1  name
+            f4  CharacterStats   sex/side/race/monster_scale/monster_data/life/health/.../head_mesh/level/radius
+            f5  NpcStats         f4=template_id (NPC identity), super_family, community, npc_flags, npc_type
+            f7  CharacterBcc     idle/action anim ids
+            f23 inventory_entry  worn equipment (humanoids only; ABSENT on animals — Crocodile/Panther)
+[iirEnd:] post-IIR scaffold — same 0x3F1-marked family as the player but header 00000000_00000005 (player
+          =...0004); minimal (animal) form is a CONSTANT 41B; bigger NPCs add 60B buff/state records
+```
+The whole identity/appearance/stats/equipment of an NPC lives in the CharacterIIR, which decodes cleanly with
+the existing `ProtoCoreCharacterIIR` type (the same one the player spawn already round-trips byte-exact). Key
+finding: **`NpcStats.template_id` (IIR f5.f4, fixed32) is the stable per-type identity** — Crocodile=14049,
+Pillager=8756/14040 (two variants), Kalanthes=2704 (= the archive `npcs` MODEL id, not the npc row id), Casilda
+=9411. Instances of the same template share race/sex/monster_data/head_mesh; `monster_scale` (f4) carries the
+per-spawn size jitter (e.g. crocodiles 129–136). So an NPC spawn is reconstructable from a per-template row
+(name, the CharacterStats/NpcStats/Bcc field set, equipment list) + per-instance (handle, position, rotation,
+monster_scale). STILL RAW after this pass: the 273B pre-IIR float block and the post-IIR scaffold (both shared
+with the player and treatable the same way — `PlayerSpawnScaffoldCodec` already generates the player's; the
+post-IIR header word 4→5 and the NPC-shaped 41B minimal are the only deltas to fold in).
+
+NEXT (construction): extend `NpcSpawn`/`Npcs` with the dissected columns (template_id + the CharacterStats/
+NpcStats field set + equipment), have the importer lift them instead of storing `Data`, and build the NPC
+FA015807 via `SpawnPacketBuilder` (it already generalizes — `BuildSpawnBody` + `SetCharacterMessage` take any
+`ProtoCoreCharacterIIR`). Gate: a beach NPC built from its row must equal the captured FA015807 byte-for-byte
+(the player-spawn acceptance pattern).
+
 **Phase 5 — Inventory & equipment.** (IN PROGRESS — significant existing work.)
 The `0x737A6DF9` giant inventory snapshot is already parsed: `Faolan/GameServer/Packets/0x737A6DF9_Test/`
 (`InventorySnapshotInspector` = container/item/stats model; `BigboyTailsFile` = the stats/quest tails;
