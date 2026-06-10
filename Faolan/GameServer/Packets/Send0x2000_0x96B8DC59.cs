@@ -19,18 +19,41 @@ namespace Faolan.GameServer
 		private const uint VitalsMarker = 0x0000C350;
 
 		// Sends a stat block for the given entity handle (defaults to the session's own client instance).
-		private static Task SendStatUpdate(INetworkClient client, CharacterStatBlock stats, uint? entityHandle = null)
+		// Builds a 0x96B8DC59 stat block for an entity (returns the wire bytes; used by the world-entry replay to
+		// emit the player's own vitals, which are server-generated and no longer stored in the burst).
+		internal static byte[] BuildStatUpdate(INetworkClient client, CharacterStatBlock stats, uint? entityHandle = null)
 		{
 			var handle = entityHandle ?? client.Session.Account.ClientInstance;
 
-			return new PacketStream().WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x00002000).WriteArrayUInt32Length(s =>
+			var ps = new PacketStream();
+			ps.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x00002000).WriteArrayUInt32Length(s =>
 			{
 				s.WriteUInt32(GameServer0X2000RespondsOpcodes.StatUpdateIIR);
 				s.WriteUInt32(VitalsMarker);
 				s.WriteUInt32(handle);
 				s.WriteUInt32(0x00000000);
 				stats.WriteTo(s);
-			}).SendAsync(client);
+			});
+			return ps.WriteLengthHash().ToArray();
+		}
+
+		private static Task SendStatUpdate(INetworkClient client, CharacterStatBlock stats, uint? entityHandle = null)
+		{
+			return client.SendAsync(BuildStatUpdate(client, stats, entityHandle));
+		}
+
+		// Builds the player's own vitals (0x96B8DC59) from the live character's MaxStats - the world-entry replay
+		// emits this instead of replaying the captured player's vitals.
+		internal static byte[] BuildVitals(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			var stats = character.MaxStats ?? CharacterMaxStats.CreateDefaults(character.Class, character.Level);
+			var block = new CharacterStatBlock()
+				.Set(LegacyCharacterStatId.HealthMax, stats.Health)
+				.Set(LegacyCharacterStatId.StaminaMax, stats.Stamina)
+				.Set(LegacyCharacterStatId.ManaMax, stats.Mana);
+
+			return BuildStatUpdate(client, block);
 		}
 
 		// Pushes the character's own vitals from its persisted MaxStats (or class/level defaults if a legacy

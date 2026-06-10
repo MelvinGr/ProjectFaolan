@@ -113,7 +113,7 @@ namespace Faolan.Importer
 				// dropping the server-generated records (globals + player-state) - the server emits those on world entry.
 				burst.Entities = e.Packets
 					.Select((p, i) => IirRecordCodec.Parse(p, i))
-					.Where(r => !IirMessageTypes.IsServerGenerated(r.IirType))
+					.Where(r => !IirMessageTypes.IsServerGenerated(r.IirType, r.Handle, e.CapturedInstance))
 					.ToList();
 			}
 

@@ -233,6 +233,10 @@ namespace Faolan.GameServer
 				toSend.Add(pkt);
 			}
 
+			// The player's own vitals are server-generated from the live character (not the captured player's), emitted
+			// after the player has spawned in the burst.
+			toSend.Add(BuildVitals(client));
+
 			// GameTime (the world clock) is a global record the server always generates - never stored in the burst.
 			toSend.Add(BuildGameTime(client));
 

@@ -27,11 +27,17 @@ namespace Faolan.Core.Network
 		public const uint DoorFullUpdate = 0x33A56FB0;
 		public const uint GameActionList = 0xF508F4C1;
 
-		// Types the server now generates from live state, and therefore does NOT store in any map's burst. This set
-		// grows as each generator lands (see WorldEntryGeneratedRecords); the importer drops these on import and the
-		// replay emits the generated equivalents.
-		private static readonly HashSet<uint> ServerGeneratedTypes = [MapChange, GameTime];
+		// Global records the server always generates (handle 0) - never stored in any burst.
+		private static readonly HashSet<uint> GlobalGeneratedTypes = [MapChange, GameTime];
 
-		public static bool IsServerGenerated(uint iirType) => ServerGeneratedTypes.Contains(iirType);
+		// Player-state records the server generates from the live character - server-generated only when the record
+		// targets the player; the SAME type targeting another entity (e.g. an NPC's vitals) is real world data and is
+		// kept. Both sets grow as each generator lands (see WorldEntryGeneratedRecords).
+		private static readonly HashSet<uint> PlayerGeneratedTypes = [Vitals];
+
+		// True if this record is server-generated on world entry (so it must NOT be stored in the burst). Globals are
+		// always generated; player-state types only when they target the player instance.
+		public static bool IsServerGenerated(uint iirType, uint handle, uint playerInstance) =>
+			GlobalGeneratedTypes.Contains(iirType) || (handle == playerInstance && PlayerGeneratedTypes.Contains(iirType));
 	}
 }
