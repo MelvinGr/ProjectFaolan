@@ -7,9 +7,11 @@ using System.Threading.Tasks;
 using Faolan.Core.Crypt;
 using Faolan.Core.Data;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Protobuf;
 using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.Packets._0x737A6DF9_Test;
 using Faolan.GameServer.Spawn;
@@ -69,9 +71,28 @@ namespace Faolan.GameServer
 			var instance = body.ReadUInt32();
 			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(body);
 
-			// Drive the inventory from CharacterEquipment: replace each captured entry whose slot the character has a
-			// buildable DB item for, IN PLACE (keeping itemId/recordId so the entry count + tails stay byte-stable).
-			ApplyDbInventory(parts.Root, dbInventory);
+			// GENERATE the four inventory containers from the character's DB items (typed ProtoFullCharacterIIR,
+			// proven byte-faithful by the 37/39 round-trip oracle), replacing the captured player's containers
+			// wholesale - entry count included (real-identity items are accepted in-client; add proven by the
+			// Royal Signet test). The prefix ([u32 X][u8 Y] + the root's leading character_tag/flags fields) and
+			// the tails stay captured. Falls back to the older in-place entry swap if the captured root does not
+			// decode typed.
+			var rootBytes = parts.Root.ToArray();
+			try
+			{
+				var typedRoot = ((ReadOnlySpan<byte>)rootBytes).FromProtobuf<ProtoFullCharacterIIR>();
+				typedRoot.Inventories.Clear();
+				foreach (var container in FullCharSnapshotBuilder.BuildContainers(instance, dbInventory.Equipped, dbInventory.BagFirst))
+					typedRoot.Inventories.Add(container);
+				rootBytes = typedRoot.ToProtobufBytes();
+				Logger.LogInformation("Inventory containers GENERATED from DB: {Equipped} equipped + {Bag} bag item(s).", dbInventory.Equipped.Count, dbInventory.BagFirst.HasValue ? 1 : 0);
+			}
+			catch (Exception ex)
+			{
+				Logger.LogWarning(ex, "Typed container generation failed; falling back to the in-place entry swap.");
+				ApplyDbInventory(parts.Root, dbInventory);
+				rootBytes = parts.Root.ToArray();
+			}
 
 			// Body content: [subop][c350][instance][prefix][root][tails], then prefixed by its uint32 length.
 			using var contentStream = new FaolanStream();
@@ -79,7 +100,7 @@ namespace Faolan.GameServer
 			contentStream.WriteUInt32(c350);
 			contentStream.WriteUInt32(instance);
 			contentStream.WriteArray(parts.Prefix);
-			contentStream.WriteArray(parts.Root.ToArray());
+			contentStream.WriteArray(rootBytes);
 			contentStream.WriteArray(parts.Tails.ToArray());
 			var bodyContent = contentStream.ToArray();
 

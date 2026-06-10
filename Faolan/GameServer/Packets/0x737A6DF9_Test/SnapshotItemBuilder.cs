@@ -21,6 +21,24 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 	{
 		public static ProtoField BuildEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, uint archetype, ulong flags = 1, ulong f7 = 1)
 		{
+			var entry = BuildListEntry(slot, itemId, recordId, count, item, archetype, flags, f7);
+
+			using var ms = new MemoryStream();
+			Serializer.Serialize(ms, entry);
+
+			// Wrap the serialized entry as the container's field-4 message (the live path swaps this into the parsed
+			// ProtoMessage snapshot tree, which stays the lossless carrier for the rest of the packet).
+			return new ProtoField
+			{
+				FieldNumber = 4,
+				WireType = 2,
+				MessageValue = ProtoMessage.Parse(ms.ToArray())
+			};
+		}
+
+		// The typed form, used directly by FullCharSnapshotBuilder's generated containers.
+		public static ProtoInventoryGame.InventoryListEntry BuildListEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, uint archetype, ulong flags = 1, ulong f7 = 1)
+		{
 			var key = new ProtoDecryptionKey
 			{
 				Key1 = item.Data1,
@@ -29,7 +47,7 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 				Key4 = item.Data4
 			};
 
-			var entry = new ProtoInventoryGame.InventoryListEntry
+			return new ProtoInventoryGame.InventoryListEntry
 			{
 				Pos = (uint)slot,
 				Item = new ProtoInventoryGameEntry
@@ -64,18 +82,6 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 						Hash = archetype
 					}
 				}
-			};
-
-			using var ms = new MemoryStream();
-			Serializer.Serialize(ms, entry);
-
-			// Wrap the serialized entry as the container's field-4 message (the live path swaps this into the parsed
-			// ProtoMessage snapshot tree, which stays the lossless carrier for the rest of the packet).
-			return new ProtoField
-			{
-				FieldNumber = 4,
-				WireType = 2,
-				MessageValue = ProtoMessage.Parse(ms.ToArray())
 			};
 		}
 

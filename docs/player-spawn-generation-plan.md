@@ -164,9 +164,38 @@ colors, tattoos and scars have NO IIR fields — they render from the scaffold's
 morph entries (both DB-generated above), so the visual appearance pipeline for fresh characters is complete:
 IIR (head/voice/scale) + weighted entries (chosen resources) + morph entries (sliders).
 
+## FullChar (0x737A6DF9) generation — IN PROGRESS (2026-06-10, sixth session)
+
+The same playbook applied to the FullChar/inventory snapshot:
+
+- **Round-trip oracle PROVEN**: the snapshot's protobuf root decodes as the recovered `ProtoFullCharacterIIR`
+  and re-encodes **byte-identically on 37/39 captured snapshots** (`FullCharIirRoundTripTests`; 2 skipped =
+  truncated analyzer captures).
+- **Frame grammar**: body after `[subop][c350][instance]` = `[u32 X][u8 Y]` + the **ProtoFullCharacterIIR
+  root** (fields: 1 packed character_tag, 4 expansion_flags ≈0xC0001 (expansion accounts only),
+  5 subscription_flags, 4× field-6 containers in kind order 101/104/112/113, 7, 8) + the tails
+  (`BigboyTailsFile`). NOTE: the inspector's `Prefix` currently lumps `[u32 X][u8 Y]` + the leading root
+  fields 1/4/5 (its root finder starts at the first container) — harmless, they ride verbatim.
+  `X` is a progression counter (0 fresh; necrol80 15→43, demol80 70; quest-ish), `Y` session-varying
+  (fresh chars: 0x44 base accounts / 0x49 expansion accounts). Container constants (all captures):
+  max_size 1028/24/48/48 (24 = starter bag, grows with upgrades), disabled_slots_count 0/0/12/0, owner =
+  instance. Entry ids: itemId = epoch **0x20D82B63**<<32 | server-counter; record id (stat 23) another
+  counter; stat 0 = flags (1 / 0x4000001), stat 26 = stack.
+- **Container generation WIRED & PROVEN IN-CLIENT**: `FullCharSnapshotBuilder` builds the 4 containers
+  entirely from the character's DB items (typed; deterministic instance+slot-derived ids); the world-entry
+  snapshot now replaces the captured player's containers wholesale — entry count included (smoke test
+  16/16 with a 2-entry Equipped container vs the capture's 4; the old in-place swap survives only as the
+  fallback when the captured root doesn't decode).
+
+Remaining for full FullChar generation:
+- **Tails**: stats (`CharacterStatBlock` records) from the live character; quest/`remoteformat` XML records
+  + the access-window table are progression state (captured verbatim today).
+- **Prefix `[u32 X][u8 Y]`** semantics (progression/session counters — fresh defaults 0/0x44 known).
+- **Bag beyond slot 1** from `CharacterInventory` rows (table exists; bag capacity must track upgrades).
+
 ## Remaining (optional)
 
-- (none — equip `pos` 3/8/20/21 mapped 2026-06-10: Tokens/OffHandWeapon/RangedWeapon/Ammo, see above.)
+- (equip `pos` 3/8/20/21 mapped 2026-06-10: Tokens/OffHandWeapon/RangedWeapon/Ammo, see above.)
 - **FullChar (0x737A6DF9)** is the analogous next generation target (test the `ProtoFullCharacterIIR`
   round-trip first, same playbook).
 - Extraction of CAPTURED characters into rows currently exists as the test-side mapping
