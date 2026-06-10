@@ -74,7 +74,26 @@ integration is gated on **character data-model groundwork**, not on packet build
    `InventoryEntry.pos` mapping for free.
 
 Once those exist: `TryRebuildPlayerSpawnFromDb` decodes the template `ProtoCoreCharacterIIR`, overrides Name + Stats +
-InventoryEntries from the DB, and calls `SetCharacterMessage`; verify with the harness (expect iteration). Only name
-is overridable today (which `SetSpawnName` already does), which is why the live step stops here.
+InventoryEntries from the DB, and calls `SetCharacterMessage`; verify with the harness (expect iteration).
+
+## Unblocked (2026-06-10) - reader + extraction proven
+
+- **`PlayerSpawnReader.TryReadCharacterMessage(body)`** decodes the `ProtoCoreCharacterIIR` from ANY spawn (proven on
+  Strie's template AND necrol80's geared spawn from faolan.db map 2000). NecroL80: name=AssassinL23, sex=2/race=3/level=23,
+  **17 worn `InventoryEntries`** each with slot `pos`, the item's `ProtoDecryptionKey` quad (= Item.Data1..4),
+  `Template1` (= item id), and `Level`. So the equipment is fully extractable from a captured spawn.
+- **`pos` -> slot = `CharacterEquipmentSlot` enum** (Neck=1, Head=2, Chest=5, MainWeapon=6, Belt=7, LeftRing=9,
+  RightRing=10, Cape=11, Shoulder=12, Boots=14, Hands=15, Legs=16, Wrist=18). 13/17 of necrol80's slots map; pos
+  3/8/20/21 are still unmapped (extend the enum - likely face/amulet, offhand, vanity, ...).
+
+### Remaining build (all dependencies resolved)
+
+1. **Extraction importer** (Faolan.Importer): for a captured char's spawn, `PlayerSpawnReader` -> create partial `Item`
+   rows (Id=Template1, Data1..4=key quad, Archetype=hash, Level) + `CharacterEquipment` rows (pos->slot enum) + the
+   `Stats` (needs the race/class/sex/level fields above) for a Character. Run it on necrol80 -> a geared test character.
+2. **Equipment builder**: `CharacterEquipment` worn items -> `InventoryEntry { pos, ProtoAcgItem }` (ProtoAcgItem via
+   `SnapshotItemBuilder` logic). Unit-oracle: build from necrol80's extracted rows == her decoded `InventoryEntries`.
+3. **Wire `TryRebuildPlayerSpawnFromDb`** (decode template -> override name/stats/inventory -> `SetCharacterMessage`),
+   harness-verify, then drop `spawn-player-template.bin`.
 
 See [[world_entry_from_db]] for the surrounding burst/server-generation architecture.
