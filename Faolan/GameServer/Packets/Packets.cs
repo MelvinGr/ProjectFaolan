@@ -493,8 +493,10 @@ namespace Faolan.GameServer
 				? NewCharacterReadyForPlayScreenReceiver
 				: AppendVarint(ExistingCharacterReadyForPlayScreenReceiverPrefix, client.Session.Account.ClientInstance);
 
-			byte[] tail = client.Session.Character?.Name == null
-				?
+			if (client.Session.Character?.Name == null)
+			{
+				// New-character create flow (unchanged): pos1 twice + the create tail.
+				byte[] newTail =
 				[
 					0x00, 0x00, 0xC7, 0x9E,
 					0x00, 0x00, 0x0F, 0xAA,
@@ -504,25 +506,42 @@ namespace Faolan.GameServer
 					0x00, 0x00, 0x00, 0x00,
 					0x00, 0x64,
 					0x00
-				]
-				:
-				[
-					0x00, 0x00, 0xC7, 0xA0,
-					0x00, 0x00, 0x0F, 0xAA,
-					0x00, 0x00, 0x00, 0x00,
-					0x00, 0x00, 0x00, 0x00,
-					0x00, 0x00, 0x00, 0x00,
-					0x00, 0x00, 0xBF, 0x76,
-					0xC0, 0x00, 0x00, 0x0A,
-					0x00
 				];
+
+				return new PacketStream()
+					.WriteHeader(sender, receiver, GameServerRespondOpcodes.ReadyForPlayScreen)
+					.WriteVector3BigEndian(client.Session.Character!.Position)
+					.WriteUInt32(0x000007E2)
+					.WriteVector3BigEndian(client.Session.Character.Position)
+					.WriteArray(newTail)
+					.SendAsync(client);
+			}
+
+			// Existing-character login: emit pos1 (the character's live position) + 0x7E2 + pos2 + tail EXACTLY as
+			// the Strie 4010 capture (idx 236). The old code wrote pos2 = pos1 and a nibble-shifted tail constant
+			// (0BF76C -> BF76C0), so the client got a malformed ReadyForPlayScreen and ignored it. pos2 and the tail
+			// are taken verbatim from the capture (the map-4010 "ready" point); if they turn out to be per-map they
+			// move to the Map row later.
+			byte[] pos2AndTail =
+			[
+				// pos2 = (336.309, 148.967, 660.968) BE
+				0x43, 0xA8, 0x27, 0x8D, 0x43, 0x14, 0xF7, 0x8D, 0x44, 0x25, 0x3D, 0xF4,
+				// tail
+				0x00, 0x00, 0xC7, 0xA0,
+				0x00, 0x00, 0x0F, 0xAA,
+				0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x00,
+				0x00, 0x0B, 0xF7, 0x6C,
+				0x00, 0x00, 0x00, 0x0A,
+				0x00
+			];
 
 			return new PacketStream()
 				.WriteHeader(sender, receiver, GameServerRespondOpcodes.ReadyForPlayScreen)
 				.WriteVector3BigEndian(client.Session.Character!.Position)
 				.WriteUInt32(0x000007E2)
-				.WriteVector3BigEndian(client.Session.Character.Position)
-				.WriteArray(tail)
+				.WriteArray(pos2AndTail)
 				.SendAsync(client);
 		}
 
