@@ -260,3 +260,6 @@ ModelManifest.xml
 
 # Faolan.ContentMirror runtime cache
 mirror-store/
+
+# design-time EF factory artifact
+Faolan/faolan.db
