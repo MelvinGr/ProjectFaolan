@@ -12,10 +12,6 @@ namespace Faolan.GameServer
 	// byte-identical to its capture - see WorldEntryGeneratedRecordsTests.
 	public partial class GameServerListener
 	{
-		// IIR message types handled here (so the replay can detect their presence in / absence from a burst).
-		internal const uint MapChangeIir = 0x5D85BFC7;
-		internal const uint GameTimeIir = 0x4F57DC08;
-
 		// 0x5D85BFC7 MapChange - tells the client which playfield/instance the player is entering. Built from the
 		// character's map + live instance; the remaining fields are the map-build constants from the world capture
 		// (playfield 0x004FE428, view/fog constants, ...). TODO: source the per-map constants from the Map table so
@@ -28,7 +24,7 @@ namespace Faolan.GameServer
 			var ps = new PacketStream();
 			ps.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x00002000).WriteArrayUInt32Length(s =>
 			{
-				s.WriteUInt32(MapChangeIir);
+				s.WriteUInt32(IirMessageTypes.MapChange);
 				s.WriteUInt32(0x00000000); // TypeTag (global record)
 				s.WriteUInt32(0x00000000); // Handle (global record)
 				s.WriteUInt32(0x0043A140); // FieldA
@@ -68,7 +64,7 @@ namespace Faolan.GameServer
 			var ps = new PacketStream();
 			ps.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x00002000).WriteArrayUInt32Length(s =>
 			{
-				s.WriteUInt32(GameTimeIir);
+				s.WriteUInt32(IirMessageTypes.GameTime);
 				s.WriteUInt32(0x00000000); // TypeTag
 				s.WriteUInt32(0x00000000); // Handle (global)
 				s.WriteUInt32(0x01472BDD); // FieldA

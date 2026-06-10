@@ -42,7 +42,7 @@ namespace Faolan.Tests
 			var record = IirRecordCodec.Parse(GameServerListener.BuildMapChange(BeachClient()), 0);
 
 			Assert.Equal(IirRecordCodec.IirOpcode, record.Opcode);
-			Assert.Equal(GameServerListener.MapChangeIir, record.IirType);
+			Assert.Equal(IirMessageTypes.MapChange, record.IirType);
 			Assert.Equal(0u, record.Handle);
 			Assert.Equal(0x0043A140u, record.FieldA);
 			Assert.Equal(CapturedMapChangeBody, record.Body);
@@ -54,7 +54,7 @@ namespace Faolan.Tests
 			var record = IirRecordCodec.Parse(GameServerListener.BuildGameTime(BeachClient()), 0);
 
 			Assert.Equal(IirRecordCodec.IirOpcode, record.Opcode);
-			Assert.Equal(GameServerListener.GameTimeIir, record.IirType);
+			Assert.Equal(IirMessageTypes.GameTime, record.IirType);
 			Assert.Equal(0u, record.Handle);
 			Assert.Equal(0x01472BDDu, record.FieldA);
 			Assert.Equal(CapturedGameTimeBody, record.Body);

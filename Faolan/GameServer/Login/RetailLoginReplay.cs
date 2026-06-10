@@ -211,10 +211,9 @@ namespace Faolan.GameServer
 			// screen. Pre-building keeps the actual send loop tight and uniform.
 			var toSend = new List<byte[]>(packets.Count + 2);
 
-			// MapChange must lead the world build. It's a global record the server generates from the live map/instance;
-			// if the burst no longer stores one (entities-only beach), emit the generated one first.
-			if (records.All(e => e.IirType != MapChangeIir))
-				toSend.Add(BuildMapChange(client));
+			// MapChange must lead the world build. It's a global record the server always generates from the live
+			// map/instance - it is never stored in the burst - so emit it first.
+			toSend.Add(BuildMapChange(client));
 
 			foreach (var packet in packets)
 			{
@@ -234,9 +233,8 @@ namespace Faolan.GameServer
 				toSend.Add(pkt);
 			}
 
-			// GameTime (the world clock) is a global record the server generates; append it if the burst omits one.
-			if (records.All(e => e.IirType != GameTimeIir))
-				toSend.Add(BuildGameTime(client));
+			// GameTime (the world clock) is a global record the server always generates - never stored in the burst.
+			toSend.Add(BuildGameTime(client));
 
 			// Tight send loop - no per-packet computation here.
 			foreach (var bytes in toSend)

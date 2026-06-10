@@ -109,8 +109,12 @@ namespace Faolan.Importer
 					db.MapWorldBurstEntities.RemoveRange(burst.Entities);
 
 				burst.CapturedInstance = e.CapturedInstance;
-				// Decompose each raw download into a structured IIR record (round-trip lossless, see IirRecordCodec).
-				burst.Entities = e.Packets.Select((p, i) => IirRecordCodec.Parse(p, i)).ToList();
+				// Decompose each raw download into a structured IIR record (round-trip lossless, see IirRecordCodec),
+				// dropping the server-generated records (globals + player-state) - the server emits those on world entry.
+				burst.Entities = e.Packets
+					.Select((p, i) => IirRecordCodec.Parse(p, i))
+					.Where(r => !IirMessageTypes.IsServerGenerated(r.IirType))
+					.ToList();
 			}
 
 			await db.SaveChangesAsync();
