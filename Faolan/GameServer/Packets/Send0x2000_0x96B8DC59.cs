@@ -26,20 +26,19 @@ namespace Faolan.GameServer
 			var handle = entityHandle ?? client.Session.Account.ClientInstance;
 
 			var ps = new PacketStream();
-			ps.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x00002000).WriteArrayUInt32Length(s =>
-			{
-				s.WriteUInt32(GameServer0X2000RespondsOpcodes.StatUpdateIIR);
-				s.WriteUInt32(VitalsMarker);
-				s.WriteUInt32(handle);
-				s.WriteUInt32(0x00000000);
-				stats.WriteTo(s);
-			});
-			return ps.WriteLengthHash().ToArray();
-		}
-
-		private static Task SendStatUpdate(INetworkClient client, CharacterStatBlock stats, uint? entityHandle = null)
-		{
-			return client.SendAsync(BuildStatUpdate(client, stats, entityHandle));
+			ps
+				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x00002000)
+				.WriteArrayUInt32Length(s =>
+				{
+					s.WriteUInt32(GameServer0X2000RespondsOpcodes.StatUpdateIIR);
+					s.WriteUInt32(VitalsMarker);
+					s.WriteUInt32(handle);
+					s.WriteUInt32(0x00000000);
+					stats.WriteTo(s);
+				});
+			return ps
+				.WriteLengthHash()
+				.ToArray();
 		}
 
 		// Builds the player's own vitals (0x96B8DC59) from the live character's MaxStats - the world-entry replay
@@ -54,6 +53,11 @@ namespace Faolan.GameServer
 				.Set(LegacyCharacterStatId.ManaMax, stats.Mana);
 
 			return BuildStatUpdate(client, block);
+		}
+
+		private static Task SendStatUpdate(INetworkClient client, CharacterStatBlock stats, uint? entityHandle = null)
+		{
+			return client.SendAsync(BuildStatUpdate(client, stats, entityHandle));
 		}
 
 		// Pushes the character's own vitals from its persisted MaxStats (or class/level defaults if a legacy
@@ -72,7 +76,10 @@ namespace Faolan.GameServer
 		{
 			// Values are the character's MAX stats, so emit them under the max ids (matches the retail spawn
 			// pattern, which sends max-only and lets the client show full bars).
-			var stats = new CharacterStatBlock().Set(LegacyCharacterStatId.HealthMax, health).Set(LegacyCharacterStatId.StaminaMax, stamina).Set(LegacyCharacterStatId.ManaMax, mana);
+			var stats = new CharacterStatBlock()
+				.Set(LegacyCharacterStatId.HealthMax, health)
+				.Set(LegacyCharacterStatId.StaminaMax, stamina)
+				.Set(LegacyCharacterStatId.ManaMax, mana);
 
 			return SendStatUpdate(client, stats);
 		}

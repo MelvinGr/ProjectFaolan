@@ -7,6 +7,7 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Importer;
+using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -24,19 +25,27 @@ namespace Faolan.Tests
 			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-charimp-{Guid.NewGuid():N}.db");
 			try
 			{
-				var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={dbPath}").Options;
+				var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={dbPath}")
+					.Options;
 				await using var db = new DatabaseContext(options);
 				await db.Database.EnsureCreatedAsync();
-				db.Accounts.Add(new Account { Id = 7, UserName = "t", Password = "t", AuthChallenge = "", LastIpAddress = "" });
-				db.Maps.Add(new Map { Id = 4000, Name = "Slave Galley" });
+				db.Accounts.Add(new Account
+				{
+					Id = 7,
+					UserName = "t",
+					Password = "t",
+					AuthChallenge = "",
+					LastIpAddress = ""
+				});
+				db.Maps.Add(new Map
+				{
+					Id = 4000,
+					Name = "Slave Galley"
+				});
 				await db.SaveChangesAsync();
 
 				// One capture: a MapChange to 4000, then the golden dikketest spawn (a real captured body).
-				var capture = new[]
-				{
-					new CapturedPacket(0, true, 0x2000, 0x5D85BFC7, MapChangePacket(4000)),
-					new CapturedPacket(1, true, 0x2000, 0xFA015807, WrapBody(Support.Golden.Bytes("SpawnDikketestLogin")))
-				};
+				var capture = new[] { new CapturedPacket(0, true, 0x2000, 0x5D85BFC7, MapChangePacket(4000)), new CapturedPacket(1, true, 0x2000, 0xFA015807, WrapBody(Golden.Bytes("SpawnDikketestLogin"))) };
 
 				CaptureCharacterImporter.AccountId = 7;
 				(int, int, int) result;
@@ -51,7 +60,13 @@ namespace Faolan.Tests
 
 				Assert.Equal((1, 1, 0), result);
 
-				var character = await db.Characters.Include(c => c.MaxStats).Include(c => c.Body).Include(c => c.Attributes).Include(c => c.Skills).SingleAsync(c => c.Name == "Dikketest");
+				var character = await db
+					.Characters
+					.Include(c => c.MaxStats)
+					.Include(c => c.Body)
+					.Include(c => c.Attributes)
+					.Include(c => c.Skills)
+					.SingleAsync(c => c.Name == "Dikketest");
 				Assert.Equal(0x01316D2Bu, character.Id); // the ORIGINAL retail id (the spawn handle)
 				Assert.Equal(7u, character.AccountId);
 				Assert.Equal(Sex.Female, character.Sex); // dikketest: editor ChangeSex 6 -> wire 3 = female
@@ -59,7 +74,11 @@ namespace Faolan.Tests
 				Assert.Equal(18u, (uint)character.Class); // the pre-frame island's low byte @135/136
 				Assert.Equal(4000u, character.MapId);
 				// RealmId is required; the importer find-or-creates the server's realm (none seeded here).
-				Assert.Equal(await db.Realms.OrderBy(r => r.Id).Select(r => r.Id).FirstAsync(), character.RealmId);
+				Assert.Equal(await db
+					.Realms
+					.OrderBy(r => r.Id)
+					.Select(r => r.Id)
+					.FirstAsync(), character.RealmId);
 				Assert.Equal(2285694u, character.Body!.HeadMesh); // editor 2x units (wire 1142847)
 				Assert.Equal(322.5f, character.PositionX); // the Tortage beach intro spawn (ProtoVec3 fields)
 				Assert.Equal(145.3113250732f, character.PositionY, 0.001f);
@@ -80,6 +99,15 @@ namespace Faolan.Tests
 			}
 		}
 
+		private static byte[] MapChangePacket(uint mapId)
+		{
+			var body = new byte[40];
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)body.Length - 4);
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), 0x5D85BFC7);
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(34, 4), mapId);
+			return WrapBody(body);
+		}
+
 		// Wraps a raw packet body (incl. its leading u32 length) in the Conan framing the importer expects:
 		// [len4][crc4][headerLen4=0][body].
 		private static byte[] WrapBody(byte[] body)
@@ -88,15 +116,6 @@ namespace Faolan.Tests
 			BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(0, 4), (uint)(packet.Length - 4));
 			body.CopyTo(packet, 12);
 			return packet;
-		}
-
-		private static byte[] MapChangePacket(uint mapId)
-		{
-			var body = new byte[40];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)body.Length - 4);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), 0x5D85BFC7);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(34, 4), mapId);
-			return WrapBody(body);
 		}
 	}
 }

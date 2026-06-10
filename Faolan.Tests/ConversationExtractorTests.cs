@@ -42,22 +42,6 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void Merge_PrefersVarint4InstanceThenMostPackets()
-		{
-			var outOfRange = new ConversationEntry(1, 0, 0, 0x10, 0xFFFFFFFF, [
-				[1],
-				[2],
-				[3]
-			], "Casilda"); // 5-byte varint
-			var inRange = new ConversationEntry(1, 0, 0, 0x10, 0x02000005, [[1]], "Casilda"); // 4-byte varint, fewer packets
-
-			var merged = ConversationExtractor.Merge([outOfRange, inRange]);
-
-			Assert.Single(merged);
-			Assert.Equal(0x02000005u, merged[0].CapturedInstance); // in-range instance wins despite fewer packets
-		}
-
-		[Fact]
 		public void Extract_ResolvesNpcNameFromSpawn()
 		{
 			var packets = new List<CapturedPacket>
@@ -89,6 +73,22 @@ namespace Faolan.Tests
 			Assert.Single(merged);
 			Assert.Equal("Casilda", merged[0].NpcName);
 			Assert.Equal(2, merged[0].Packets.Count); // the richer capture wins
+		}
+
+		[Fact]
+		public void Merge_PrefersVarint4InstanceThenMostPackets()
+		{
+			var outOfRange = new ConversationEntry(1, 0, 0, 0x10, 0xFFFFFFFF, [
+				[1],
+				[2],
+				[3]
+			], "Casilda"); // 5-byte varint
+			var inRange = new ConversationEntry(1, 0, 0, 0x10, 0x02000005, [[1]], "Casilda"); // 4-byte varint, fewer packets
+
+			var merged = ConversationExtractor.Merge([outOfRange, inRange]);
+
+			Assert.Single(merged);
+			Assert.Equal(0x02000005u, merged[0].CapturedInstance); // in-range instance wins despite fewer packets
 		}
 
 		private static byte[] BuildInteractArgs(uint typeId, uint mode, uint field3, uint npc)

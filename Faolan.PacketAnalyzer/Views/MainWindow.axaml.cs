@@ -58,11 +58,16 @@ namespace Faolan.PacketAnalyzer.Views
 			var colorsMenuItem = new MenuItem { Header = "Colors" };
 			contextMenu.Items.Add(colorsMenuItem);
 
-			var colors = typeof(Colors).GetProperties(BindingFlags.Static | BindingFlags.Public).Where(p => p.Name.StartsWith("Light", StringComparison.Ordinal)).Select(p => new
-			{
-				p.Name,
-				Value = p.GetValue(null, null)
-			}).Where(p => p.Value is Color).ToDictionary(p => p.Name, p => new SolidColorBrush((Color)p.Value!));
+			var colors = typeof(Colors)
+				.GetProperties(BindingFlags.Static | BindingFlags.Public)
+				.Where(p => p.Name.StartsWith("Light", StringComparison.Ordinal))
+				.Select(p => new
+				{
+					p.Name,
+					Value = p.GetValue(null, null)
+				})
+				.Where(p => p.Value is Color)
+				.ToDictionary(p => p.Name, p => new SolidColorBrush((Color)p.Value!));
 
 			foreach (var item in colors)
 			{
@@ -103,7 +108,9 @@ namespace Faolan.PacketAnalyzer.Views
 		private void ApplyFilters()
 		{
 			var selectedPacketTicks = ViewModel.SelectedPacket?.Ticks;
-			var filteredPackets = _allPacketRows.Where(MatchesCurrentFilters).ToArray();
+			var filteredPackets = _allPacketRows
+				.Where(MatchesCurrentFilters)
+				.ToArray();
 
 			PacketRows.Clear();
 			foreach (var packet in filteredPackets)
@@ -147,15 +154,21 @@ namespace Faolan.PacketAnalyzer.Views
 
 		private async void ExportMenuItemOnClick(object? sender, RoutedEventArgs e)
 		{
-			var selectedItems = packetDataGrid.SelectedItems.OfType<PacketRowViewModel>().ToArray();
+			var selectedItems = packetDataGrid
+				.SelectedItems
+				.OfType<PacketRowViewModel>()
+				.ToArray();
 			if (selectedItems.Length == 0)
 			{
 				ViewModel.StatusMessage = "Select one or more packets to export.";
 				return;
 			}
 
-			var output = selectedItems.Select((i, ii) => i.ConanPacket.PacketToCsCode(i.Ticks + "_" + ii, useTicksInSRCheckBox.IsChecked == true)).JoinAsString("\r\n");
-			var clipboard = GetTopLevel(this)?.Clipboard;
+			var output = selectedItems
+				.Select((i, ii) => i.ConanPacket.PacketToCsCode(i.Ticks + "_" + ii, useTicksInSRCheckBox.IsChecked == true))
+				.JoinAsString("\r\n");
+			var clipboard = GetTopLevel(this)
+				?.Clipboard;
 			if (clipboard == null)
 			{
 				ViewModel.StatusMessage = "Clipboard is not available in the current environment.";
@@ -411,7 +424,10 @@ namespace Faolan.PacketAnalyzer.Views
 			sourceComboBox.Items.Clear();
 			sourceComboBox.Items.Add(DefaultKey);
 
-			foreach (var v in _allPacketRows.Select(p => p.ServiceName).Distinct().OrderBy(p => p))
+			foreach (var v in _allPacketRows
+				         .Select(p => p.ServiceName)
+				         .Distinct()
+				         .OrderBy(p => p))
 				sourceComboBox.Items.Add(v);
 
 			SourceComboBoxSelectedItem = DefaultKey;

@@ -14,9 +14,14 @@ namespace Faolan.AgentServer
 			// should only send to nearby players, but this will do for now.
 			foreach (var client in NetworkClients)
 			{
-				await new FaolanStream().WriteUInt16(AgentServerRespondsOpcodes.CharacterChat) // opcode
-					.WriteArrayUInt16Length(s => s.WriteUInt32(characterId).WriteString(message).WriteUInt16(0x0001) // type?
-						.WriteByte(0)).SendAsync(client);
+				await new FaolanStream()
+					.WriteUInt16(AgentServerRespondsOpcodes.CharacterChat) // opcode
+					.WriteArrayUInt16Length(s => s
+						.WriteUInt32(characterId)
+						.WriteString(message)
+						.WriteUInt16(0x0001) // type?
+						.WriteByte(0))
+					.SendAsync(client);
 			}
 		}
 
@@ -37,18 +42,31 @@ namespace Faolan.AgentServer
 			return Task.WhenAll(NetworkClients.Select(c => SendSystemMessage(c, message)));
 		}
 
-		private Task SendSystemMessage(INetworkClient client, string message)
-		{
-			return new FaolanStream().WriteUInt16(AgentServerRespondsOpcodes.SystemMessage).WriteArrayUInt16Length(s => s.WriteUInt16(0x0000).WriteString(message).WriteUInt16(0x0000)).SendAsync(client);
-		}
-
 		// A chat-channel subscription (0x003C): [type][id][name][flag][0x0000]. Sent on AgentServer connect for each
 		// channel the character joins (~Trial/~Global/~LFG/~GlobalEnglish/~Playfield/~NewbieHelp). Byte layout
 		// verified from the raw login pcap.
 		private Task SendChannelSubscription(INetworkClient client, byte type, uint id, string name, uint flag)
 		{
-			return new FaolanStream().WriteUInt16(AgentServerRespondsOpcodes.Ox003C)
-				.WriteArrayUInt16Length(s => s.WriteByte(type).WriteUInt32(id).WriteString(name).WriteUInt32(flag).WriteUInt16(0x0000)).SendAsync(client);
+			return new FaolanStream()
+				.WriteUInt16(AgentServerRespondsOpcodes.Ox003C)
+				.WriteArrayUInt16Length(s => s
+					.WriteByte(type)
+					.WriteUInt32(id)
+					.WriteString(name)
+					.WriteUInt32(flag)
+					.WriteUInt16(0x0000))
+				.SendAsync(client);
+		}
+
+		private Task SendSystemMessage(INetworkClient client, string message)
+		{
+			return new FaolanStream()
+				.WriteUInt16(AgentServerRespondsOpcodes.SystemMessage)
+				.WriteArrayUInt16Length(s => s
+					.WriteUInt16(0x0000)
+					.WriteString(message)
+					.WriteUInt16(0x0000))
+				.SendAsync(client);
 		}
 	}
 }

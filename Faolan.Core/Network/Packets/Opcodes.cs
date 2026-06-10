@@ -187,7 +187,7 @@
 			Spawn = SimpleCharFullUpdateIIR,
 			SpawnObject = SimpleDynelFullUpdateIIR,
 			SetDayTime = GameTimeIIR,
-			ApplySpell = MagicBuffIIR,
+			ApplySpell = MagicBuffIIR
 
 			// FullPlayerCharacterIIR (0x737A6DF9) carve-out - the player inventory/bag serialization:
 			// - after a 34-byte preamble, the body contains nested container-style blocks linked by field 6:

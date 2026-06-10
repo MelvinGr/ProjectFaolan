@@ -68,7 +68,7 @@ namespace Faolan.AgentServer
 
 					// Retail sends the full chat-channel subscription list FIRST (one 0x003C per channel), then the
 					// 0x0005 ready marker, the 0x0014 character info, and finally the welcome message. Verified from
-					// the raw pcap (the analyzer drops AgentServer S->C). Channel ids/types are fixed per channel,
+					// the raw pcap. Channel ids/types are fixed per channel,
 					// except ~Playfield whose id is the character's current map. ~Trial carries 0x00008244, the rest
 					// 0x00008044 (a per-channel flag).
 					await SendChannelSubscription(client, 0x04, 0x0000232A, "~Trial", 0x00008244);
@@ -76,17 +76,24 @@ namespace Faolan.AgentServer
 					await SendChannelSubscription(client, 0x04, 0x00002329, "~LFG", 0x00008044);
 					await SendChannelSubscription(client, 0x11, 0x00002335, "~GlobalEnglish", 0x00008044);
 
-					if(client.Session.Character?.MapId > 0)
+					if (client.Session.Character?.MapId > 0)
 						await SendChannelSubscription(client, 0x90, client.Session.Character.MapId, "~Playfield", 0x00008044);
 
 					await SendChannelSubscription(client, 0x87, 0x001E8480, "~NewbieHelp", 0x00008044);
 
-					await new FaolanStream().WriteUInt32(0x00050000).SendAsync(client);
+					await new FaolanStream()
+						.WriteUInt32(0x00050000)
+						.SendAsync(client);
 
-					await new FaolanStream().WriteUInt16(AgentServerRespondsOpcodes.Ox0014).WriteArrayUInt16Length(s => s.WriteUInt32(client.Session.Account.ClientInstance).WriteUInt32(0x00000000).WriteString(
-						client.Session.Character?.Name?.Length > 0
-							? client.Session.Character.Name
-							: $"Character{client.Session.Account.ClientInstance}")).SendAsync(client);
+					await new FaolanStream()
+						.WriteUInt16(AgentServerRespondsOpcodes.Ox0014)
+						.WriteArrayUInt16Length(s => s
+							.WriteUInt32(client.Session.Account.ClientInstance)
+							.WriteUInt32(0x00000000)
+							.WriteString(client.Session.Character?.Name?.Length > 0
+								? client.Session.Character.Name
+								: $"Character{client.Session.Account.ClientInstance}"))
+						.SendAsync(client);
 
 					await SendSystemMessage(client, Configuration.WelcomeString); //.Replace("$BUILDSTRING", Statics.BuildString));
 					await SendSystemMessage(client, Statics.BuildString.Replace("\n", "<br />"));

@@ -24,16 +24,27 @@ namespace Faolan.Core.Network.Conan
 		// the REAL client class name is noted per line (our originals were guesses). "Agent" = client->server proxy
 		// side, "Interface" = server->client dispatch side.
 		public const uint GamePlayerType = 0x6C67C147; // = hash("GameInterface")
-		public const uint GameWorldType = 0xB171CE13; // = hash("GameAgent")
-		public const uint GameSpawnCallerType = 0xA9ECB95D; // = hash("GameCharAgent")      (0x201C spawn-handshake caller)
-		public const uint GameSpawnEndpointType = 0x8B87F791; // = hash("GameCharInterface")  (0x201C spawn-handshake endpoint)
 		public const uint GamePostReadyType = 0x5B9756FC; // = hash("GameCharAgentProject")     (post-ready family)
 		public const uint GameServerIdType = 0x28377648; // = hash("GameCharInterfaceProject")  (report-server-id family)
+		public const uint GameSpawnCallerType = 0xA9ECB95D; // = hash("GameCharAgent")      (0x201C spawn-handshake caller)
+		public const uint GameSpawnEndpointType = 0x8B87F791; // = hash("GameCharInterface")  (0x201C spawn-handshake endpoint)
+		public const uint GameWorldType = 0xB171CE13; // = hash("GameAgent")
 
-		public static ProtoEndpoint Endpoint(uint type, uint instance) => new() { Type = type, Instance = instance };
+		public static ProtoEndpoint Endpoint(uint type, uint instance)
+		{
+			return new ProtoEndpoint
+			{
+				Type = type,
+				Instance = instance
+			};
+		}
 
 		// The serialized [0x0D <type LE32> 0x10 <instance varint>] bytes, for the byte[]-based WriteHeader overload
 		// and other call sites that still pass raw endpoint blobs.
-		public static byte[] EndpointBytes(uint type, uint instance) => Endpoint(type, instance).ToProtobufBytes();
+		public static byte[] EndpointBytes(uint type, uint instance)
+		{
+			return Endpoint(type, instance)
+				.ToProtobufBytes();
+		}
 	}
 }

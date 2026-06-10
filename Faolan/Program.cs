@@ -70,7 +70,11 @@ namespace Faolan
 				var agentServerDispatcher = provider.GetRequiredService<IAgentServerDispatcher>();
 
 				// One-time startup resolution of the listener's realm/port; blocking here is fine (host build).
-				var realm = dataRepository.GetRealms().GetAwaiter().GetResult().FirstOrDefault();
+				var realm = dataRepository
+					.GetRealms()
+					.GetAwaiter()
+					.GetResult()
+					.FirstOrDefault();
 				if (realm == null)
 					throw new Exception("realm == null");
 
@@ -87,7 +91,11 @@ namespace Faolan
 				var dataRepository = provider.GetRequiredService<IDatabaseRepository>();
 				var agentServerDispatcher = provider.GetRequiredService<IAgentServerDispatcher>();
 
-				var realm = dataRepository.GetRealms().GetAwaiter().GetResult().FirstOrDefault();
+				var realm = dataRepository
+					.GetRealms()
+					.GetAwaiter()
+					.GetResult()
+					.FirstOrDefault();
 				if (realm == null)
 					throw new Exception("realm == null");
 

@@ -19,7 +19,12 @@ namespace Faolan.Core.Extensions
 			public string ServerIpAddress => config["ServerIpAddress"];
 
 			public string WelcomeString => config["WelcomeString"];
-			public uint ServerIpAddressLong => BinaryPrimitives.ReadUInt32BigEndian(IPAddress.Parse(config.ServerIpAddress).GetAddressBytes());
+
+			public uint ServerIpAddressLong =>
+				BinaryPrimitives.ReadUInt32BigEndian(IPAddress
+					.Parse(config.ServerIpAddress)
+					.GetAddressBytes());
+
 			public ushort AgentServerPort => Convert.ToUInt16(config["AgentServerPort"]);
 			public ushort CsPlayerAgentPort => Convert.ToUInt16(config["CsPlayerAgentPort"]);
 			public ushort PlayerAgentPort => Convert.ToUInt16(config["PlayerAgentPort"]);

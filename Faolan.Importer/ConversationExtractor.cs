@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 namespace Faolan.Importer
 {
@@ -22,12 +23,12 @@ namespace Faolan.Importer
 		private const uint InteractSubOpcode = 0x642CD3D6;
 		private const uint Opcode2000 = 0x2000;
 		private const uint Opcode2015 = 0x2015;
+
+		private const uint SpawnSubOpcode = 0xFA015807;
 		private const uint TalkToNpcActionType = 0x16;
 
 		// The conversation-display response sub-opcodes (642CD3D6 echo excluded: it is a generic interact ack).
 		private static readonly HashSet<uint> ResponseSubOpcodes = [0x4A3D899A, 0xF164A4A5, 0x045B0B0F];
-
-		private const uint SpawnSubOpcode = 0xFA015807;
 
 		// `packets` must be one capture's GameServer packets in chronological order.
 		public static List<ConversationEntry> Extract(IReadOnlyList<CapturedPacket> packets)
@@ -76,59 +77,6 @@ namespace Faolan.Importer
 			return entries;
 		}
 
-		// Maps each FA015807 spawn's handle to its embedded name (0x0A <len> <utf8>), so a conversation's NPC handle
-		// can be resolved to a stable name within the same capture.
-		private static Dictionary<uint, string> BuildSpawnNameMap(IReadOnlyList<CapturedPacket> packets)
-		{
-			var map = new Dictionary<uint, string>();
-			foreach (var p in packets)
-			{
-				if (!p.IsDownload || p.Opcode != Opcode2000 || p.SubOpcode != SpawnSubOpcode)
-					continue;
-
-				var body = GetBody(p.Bytes);
-				if (body.Length < 16)
-					continue;
-
-				var handle = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
-				var name = ReadSpawnName(body);
-				if (name != null)
-					map[handle] = name;
-			}
-
-			return map;
-		}
-
-		// The entity name is the first `0x0A <len 1..63> <printable-ascii>` run in the spawn body.
-		private static string ReadSpawnName(ReadOnlySpan<byte> body)
-		{
-			for (var i = 16; i + 2 < body.Length; i++)
-			{
-				if (body[i] != 0x0A)
-					continue;
-
-				int len = body[i + 1];
-				if (len is < 1 or > 63 || i + 2 + len > body.Length)
-					continue;
-
-				var ok = true;
-				for (var j = 0; j < len; j++)
-				{
-					var c = body[i + 2 + j];
-					if (c is < 0x20 or > 0x7E)
-					{
-						ok = false;
-						break;
-					}
-				}
-
-				if (ok)
-					return System.Text.Encoding.ASCII.GetString(body.Slice(i + 2, len));
-			}
-
-			return null;
-		}
-
 		// Merges nodes from many captures, deduped by (TypeId, Mode, Field3). Prefers an entry whose captured player
 		// instance is a 4-byte varint (in-range, so it re-addresses to any normal character), then the most packets.
 		// Deduped by (CapturedNpcHandle, TypeId, Mode, Field3) - the NPC handle is part of the key because
@@ -153,7 +101,33 @@ namespace Faolan.Importer
 					best[key] = (score, e);
 			}
 
-			return best.Values.Select(v => v.entry).ToList();
+			return best
+				.Values
+				.Select(v => v.entry)
+				.ToList();
+		}
+
+		// Maps each FA015807 spawn's handle to its embedded name (0x0A <len> <utf8>), so a conversation's NPC handle
+		// can be resolved to a stable name within the same capture.
+		private static Dictionary<uint, string> BuildSpawnNameMap(IReadOnlyList<CapturedPacket> packets)
+		{
+			var map = new Dictionary<uint, string>();
+			foreach (var p in packets)
+			{
+				if (!p.IsDownload || p.Opcode != Opcode2000 || p.SubOpcode != SpawnSubOpcode)
+					continue;
+
+				var body = GetBody(p.Bytes);
+				if (body.Length < 16)
+					continue;
+
+				var handle = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
+				var name = ReadSpawnName(body);
+				if (name != null)
+					map[handle] = name;
+			}
+
+			return map;
 		}
 
 		// The 0x2000 body within the full on-wire packet: [len4][crc4][headerLen4][header][body].
@@ -216,6 +190,36 @@ namespace Faolan.Importer
 			}
 
 			return (typeId, mode, field3, npc);
+		}
+
+		// The entity name is the first `0x0A <len 1..63> <printable-ascii>` run in the spawn body.
+		private static string ReadSpawnName(ReadOnlySpan<byte> body)
+		{
+			for (var i = 16; i + 2 < body.Length; i++)
+			{
+				if (body[i] != 0x0A)
+					continue;
+
+				int len = body[i + 1];
+				if (len is < 1 or > 63 || i + 2 + len > body.Length)
+					continue;
+
+				var ok = true;
+				for (var j = 0; j < len; j++)
+				{
+					var c = body[i + 2 + j];
+					if (c is < 0x20 or > 0x7E)
+					{
+						ok = false;
+						break;
+					}
+				}
+
+				if (ok)
+					return Encoding.ASCII.GetString(body.Slice(i + 2, len));
+			}
+
+			return null;
 		}
 
 		private static ulong ReadVarint(ReadOnlySpan<byte> b, ref int i)

@@ -14,39 +14,35 @@ namespace Faolan.Tests
 	// all 10 maps; these synthetic packets reproduce the exact framing and lock the codec's behaviour.)
 	public class IirRecordCodecTests
 	{
-		// Builds a packet with the real framing: [u32 size][u32 hash][u32 innerLen][endpoints][opcode] then the body.
-		// innerLen (at offset 8) covers the endpoint section + the 2-byte opcode, so bodyStart = 12 + innerLen.
-		private static byte[] BuildPacket(byte[] endpoints, ushort opcode, byte[] afterOpcode)
+		[Fact]
+		public void Parse_LiftsIirHeaderFields()
 		{
-			var innerLen = endpoints.Length + 2;
-			var packet = new byte[12 + innerLen + afterOpcode.Length];
-			BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(0, 4), (uint)packet.Length); // size (cosmetic here)
-			BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(4, 4), 0xDEADBEEF);            // hash (cosmetic here)
-			BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(8, 4), (uint)innerLen);
-			endpoints.CopyTo(packet, 12);
-			BinaryPrimitives.WriteUInt16BigEndian(packet.AsSpan(12 + endpoints.Length, 2), opcode);
-			afterOpcode.CopyTo(packet, 12 + innerLen);
-			return packet;
+			var endpoints = Endpoints()
+				.First();
+			var packet = BuildPacket(endpoints, IirRecordCodec.IirOpcode, IirBody(0x5D85BFC7, 0xABCD, 0x00081906, 0x00000F42, [0xAA, 0xBB]));
+
+			var record = IirRecordCodec.Parse(packet, 7);
+			Assert.Equal(IirRecordCodec.IirOpcode, record.Opcode);
+			Assert.Equal(0x5D85BFC7u, record.IirType);
+			Assert.Equal(0xABCDu, record.TypeTag);
+			Assert.Equal(0x00081906u, record.Handle);
+			Assert.Equal(0x00000F42u, record.FieldA);
+			Assert.Equal(7, record.Sequence);
+			Assert.Equal(new byte[] { 0xAA, 0xBB }, record.Body);
 		}
 
-		private static byte[] IirBody(uint iirType, uint typeTag, uint handle, uint fieldA, byte[] payload)
+		[Fact]
+		public void Parse_NonIirOpcode_KeepsWholeBody()
 		{
-			var body = new byte[20 + payload.Length];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)(16 + payload.Length)); // bodyLen
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), iirType);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), typeTag);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(12, 4), handle);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(16, 4), fieldA);
-			payload.CopyTo(body, 20);
-			return body;
-		}
+			var endpoints = Endpoints()
+				.First();
+			var manifest = BuildPacket(endpoints, 0x2076, [0x01, 0x02, 0x03]);
 
-		// A few endpoint-section lengths (varying instance varint widths) to exercise the bodyStart computation.
-		private static IEnumerable<byte[]> Endpoints() =>
-		[
-			new byte[] { 0x0A, 0x07, 0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x58, 0x12, 0x0A, 0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, 0xFF, 0xBD, 0xD9, 0x10 },
-			new byte[] { 0x0A, 0x05, 0x0D, 0x01, 0x02, 0x03, 0x04, 0x12, 0x08, 0x0D, 0x05, 0x06, 0x07, 0x08, 0x10, 0x42 },
-		];
+			var record = IirRecordCodec.Parse(manifest, 0);
+			Assert.Equal((ushort)0x2076, record.Opcode);
+			Assert.Equal(0u, record.IirType);
+			Assert.Equal(new byte[] { 0x01, 0x02, 0x03 }, record.Body);
+		}
 
 		[Fact]
 		public void ParseThenRebuild_IsByteIdentical_ForIirAndPlainPackets()
@@ -67,32 +63,41 @@ namespace Faolan.Tests
 			}
 		}
 
-		[Fact]
-		public void Parse_LiftsIirHeaderFields()
+		// Builds a packet with the real framing: [u32 size][u32 hash][u32 innerLen][endpoints][opcode] then the body.
+		// innerLen (at offset 8) covers the endpoint section + the 2-byte opcode, so bodyStart = 12 + innerLen.
+		private static byte[] BuildPacket(byte[] endpoints, ushort opcode, byte[] afterOpcode)
 		{
-			var endpoints = Endpoints().First();
-			var packet = BuildPacket(endpoints, IirRecordCodec.IirOpcode, IirBody(0x5D85BFC7, 0xABCD, 0x00081906, 0x00000F42, [0xAA, 0xBB]));
-
-			var record = IirRecordCodec.Parse(packet, 7);
-			Assert.Equal(IirRecordCodec.IirOpcode, record.Opcode);
-			Assert.Equal(0x5D85BFC7u, record.IirType);
-			Assert.Equal(0xABCDu, record.TypeTag);
-			Assert.Equal(0x00081906u, record.Handle);
-			Assert.Equal(0x00000F42u, record.FieldA);
-			Assert.Equal(7, record.Sequence);
-			Assert.Equal(new byte[] { 0xAA, 0xBB }, record.Body);
+			var innerLen = endpoints.Length + 2;
+			var packet = new byte[12 + innerLen + afterOpcode.Length];
+			BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(0, 4), (uint)packet.Length); // size (cosmetic here)
+			BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(4, 4), 0xDEADBEEF); // hash (cosmetic here)
+			BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(8, 4), (uint)innerLen);
+			endpoints.CopyTo(packet, 12);
+			BinaryPrimitives.WriteUInt16BigEndian(packet.AsSpan(12 + endpoints.Length, 2), opcode);
+			afterOpcode.CopyTo(packet, 12 + innerLen);
+			return packet;
 		}
 
-		[Fact]
-		public void Parse_NonIirOpcode_KeepsWholeBody()
+		// A few endpoint-section lengths (varying instance varint widths) to exercise the bodyStart computation.
+		private static IEnumerable<byte[]> Endpoints()
 		{
-			var endpoints = Endpoints().First();
-			var manifest = BuildPacket(endpoints, 0x2076, [0x01, 0x02, 0x03]);
+			return
+			[
+				new byte[] { 0x0A, 0x07, 0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x58, 0x12, 0x0A, 0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, 0xFF, 0xBD, 0xD9, 0x10 },
+				new byte[] { 0x0A, 0x05, 0x0D, 0x01, 0x02, 0x03, 0x04, 0x12, 0x08, 0x0D, 0x05, 0x06, 0x07, 0x08, 0x10, 0x42 }
+			];
+		}
 
-			var record = IirRecordCodec.Parse(manifest, 0);
-			Assert.Equal((ushort)0x2076, record.Opcode);
-			Assert.Equal(0u, record.IirType);
-			Assert.Equal(new byte[] { 0x01, 0x02, 0x03 }, record.Body);
+		private static byte[] IirBody(uint iirType, uint typeTag, uint handle, uint fieldA, byte[] payload)
+		{
+			var body = new byte[20 + payload.Length];
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)(16 + payload.Length)); // bodyLen
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), iirType);
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), typeTag);
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(12, 4), handle);
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(16, 4), fieldA);
+			payload.CopyTo(body, 20);
+			return body;
 		}
 	}
 }

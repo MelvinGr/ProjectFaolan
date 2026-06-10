@@ -19,12 +19,13 @@ namespace Faolan.Core.Network
 	{
 		public const ushort IirOpcode = 0x2000;
 		private const int EndpointLengthOffset = 8; // u32 BE: endpoint section + opcode length, measured from offset 12
-		private const int IirHeaderFields = 20;     // bodyLen + IirType + TypeTag + Handle + FieldA
+		private const int IirHeaderFields = 20; // bodyLen + IirType + TypeTag + Handle + FieldA
 
 		// Splits a raw burst packet into its structured form. `sequence` is the packet's order within the burst.
 		public static MapWorldBurstEntity Parse(byte[] packet, int sequence)
 		{
-			if (packet == null) throw new ArgumentNullException(nameof(packet));
+			if (packet == null)
+				throw new ArgumentNullException(nameof(packet));
 
 			var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(EndpointLengthOffset, 4));
 			var opcode = BinaryPrimitives.ReadUInt16BigEndian(packet.AsSpan(bodyStart - 2, 2));
@@ -33,7 +34,7 @@ namespace Faolan.Core.Network
 			{
 				Sequence = sequence,
 				Opcode = opcode,
-				Header = packet[..bodyStart],
+				Header = packet[..bodyStart]
 			};
 
 			if (opcode == IirOpcode)
@@ -46,9 +47,7 @@ namespace Faolan.Core.Network
 				record.Body = packet[(bodyStart + IirHeaderFields)..];
 			}
 			else
-			{
 				record.Body = packet[bodyStart..];
-			}
 
 			return record;
 		}
@@ -56,7 +55,9 @@ namespace Faolan.Core.Network
 		// Reconstructs the exact original packet bytes from a structured record.
 		public static byte[] Rebuild(MapWorldBurstEntity record)
 		{
-			if (record == null) throw new ArgumentNullException(nameof(record));
+			if (record == null)
+				throw new ArgumentNullException(nameof(record));
+
 			var header = record.Header ?? Array.Empty<byte>();
 			var body = record.Body ?? Array.Empty<byte>();
 

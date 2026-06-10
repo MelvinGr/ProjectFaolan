@@ -87,7 +87,10 @@ namespace Faolan.DatabaseEditor.ViewModels
 
 			_context = contextFactory.CreateDbContext();
 
-			var accounts = _context.Accounts.Include(a => a.Characters).ToList();
+			var accounts = _context
+				.Accounts
+				.Include(a => a.Characters)
+				.ToList();
 
 			foreach (var account in accounts)
 				Accounts.Add(account);
@@ -142,7 +145,13 @@ namespace Faolan.DatabaseEditor.ViewModels
 
 		private static void AddEditors(ObservableCollection<PropertyEditorViewModel> editors, object model)
 		{
-			var properties = model.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public).Where(p => p.CanRead && p.CanWrite).Where(p => p.GetIndexParameters().Length == 0).Where(p => IsEditableType(p.PropertyType))
+			var properties = model
+				.GetType()
+				.GetProperties(BindingFlags.Instance | BindingFlags.Public)
+				.Where(p => p.CanRead && p.CanWrite)
+				.Where(p => p.GetIndexParameters()
+					.Length == 0)
+				.Where(p => IsEditableType(p.PropertyType))
 				.OrderBy(p => p.Name);
 
 			foreach (var property in properties)

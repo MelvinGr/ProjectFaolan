@@ -18,25 +18,22 @@ namespace Faolan.Core.Database
 		// Ad-hoc unit of work: runs `work` against a fresh short-lived context and disposes it. Use for one-off
 		// reads/writes that do not have a dedicated method. Entities returned are detached.
 		Task Execute(Func<IDatabaseContext, Task> work);
+		Task<Ability[]> GetAbilities();
 
 		Task<Ability> GetAbility(uint id);
-		Task<Ability[]> GetAbilities();
-		Task<Ability[]> GetStartingAbilities(uint level);
 
 		Task<Account> GetAccount(uint id);
 		Task<Account> GetAccount(string userName);
 
-		Task<ClassAbility> GetClassAbility(uint @class, uint level);
-
 		Task<Character> GetCharacter(uint id);
 
 		Task<CharacterEquipment> GetCharacterEquipment(uint characterId);
-		Task<CharacterInventory[]> GetCharacterInventory(uint characterId);
-		Task SetCharacterInventorySlot(uint characterId, int container, int slot, uint? itemId, uint count = 1);
 		Task<Character> GetCharacterForAccount(uint accountId, uint clientInstance);
-		Task<Character> GetCharacterScaffold(uint characterId);
-		Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names);
+		Task<CharacterInventory[]> GetCharacterInventory(uint characterId);
 		Task<Character[]> GetCharactersByAccount(uint id, bool skipUninitialized = true);
+		Task<Character> GetCharacterScaffold(uint characterId);
+
+		Task<ClassAbility> GetClassAbility(uint @class, uint level);
 
 		Task<ConversationNode> GetConversationNode(uint npcHandle, uint typeId, uint mode, uint field3, bool exactHandleOnly = false);
 		Task<ConversationNode> GetConversationNodeByName(string npcName, uint typeId, uint mode, uint field3);
@@ -47,17 +44,20 @@ namespace Faolan.Core.Database
 		Task<Map[]> GetMaps();
 
 		Task<MapWorldBurst> GetMapWorldBurst(uint mapId);
+		Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names);
 
 		Task<Realm> GetRealm(uint id);
 		Task<Realm[]> GetRealms();
 
 		Task<Spell> GetSpell(uint id);
 		Task<Spell[]> GetSpells();
+		Task<Ability[]> GetStartingAbilities(uint level);
 		Task<T> Query<T>(Func<IDatabaseContext, Task<T>> work);
 		Task SaveAccount(Account account);
 		Task SaveCharacter(Character character);
 		Task SaveCharacterEquipment(CharacterEquipment equipment);
 		Task SaveCharacterScaffold(Character character);
+		Task SetCharacterInventorySlot(uint characterId, int container, int slot, uint? itemId, uint count = 1);
 		Task<int> SetCreationSpawn(Character character);
 
 		Task<bool> UpdateLastInfo(Account account, INetworkClient client);
@@ -111,7 +111,10 @@ namespace Faolan.Core.Database
 			var character = await ctx.Characters.FirstOrDefaultAsync(c => c.AccountId == accountId && c.Name == null);
 			if (character == null)
 			{
-				var stale = await ctx.Characters.Where(c => c.AccountId == accountId && c.Name == null).ToListAsync();
+				var stale = await ctx
+					.Characters
+					.Where(c => c.AccountId == accountId && c.Name == null)
+					.ToListAsync();
 				if (stale.Count > 0)
 				{
 					ctx.Characters.RemoveRange(stale);
@@ -122,7 +125,9 @@ namespace Faolan.Core.Database
 				{
 					AccountId = accountId,
 					RealmId = realmId,
-					AuthChallenge = Guid.NewGuid().ToString("N"),
+					AuthChallenge = Guid
+						.NewGuid()
+						.ToString("N"),
 					Level = 1,
 					CreationDate = DateTime.UtcNow,
 					MapId = CreationMapId
@@ -172,38 +177,22 @@ namespace Faolan.Core.Database
 			await work(ctx);
 		}
 
-		public async Task<Ability> GetAbility(uint id)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Abilities.FirstOrDefaultAsync(a => a.Id == id);
-		}
-
 		// The whole ability catalog (starting kit + harvested class/higher-level abilities). Used by the GM
 		// .spelllist/.grantspell commands - the only things grantable via the proven 0x2052 packet (the Spell table
 		// has no grant identity quad).
 		public async Task<Ability[]> GetAbilities()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Abilities.OrderBy(a => a.Id).ToArrayAsync();
+			return await ctx
+				.Abilities
+				.OrderBy(a => a.Id)
+				.ToArrayAsync();
 		}
 
-		// The universal starting ability kit (IsStartingAbility) - the abilities every new character receives via
-		// 0x2052 during creation (3 Normal Attack directions + toggle-combat / switch-weapon / utility), imported
-		// from the retail create-flow grants by CaptureAbilityImporter. The `level` is reserved for future
-		// level-gating; today the whole starting kit is level 1. The catalog also holds higher-level / class
-		// abilities (IsStartingAbility = false) which are NOT granted here.
-		public async Task<Ability[]> GetStartingAbilities(uint level)
+		public async Task<Ability> GetAbility(uint id)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Abilities.Where(a => a.IsStartingAbility && a.Level <= level).OrderBy(a => a.Slot).ToArrayAsync();
-		}
-
-		// The class/level row that lists which abilities (and spells) a character of this class+level should have.
-		// Falls back to the highest captured level at or below the requested one so any level still resolves a grant.
-		public async Task<ClassAbility> GetClassAbility(uint @class, uint level)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.ClassAbilities.Where(c => c.Class == @class && c.Level <= level).OrderByDescending(c => c.Level).FirstOrDefaultAsync();
+			return await ctx.Abilities.FirstOrDefaultAsync(a => a.Id == id);
 		}
 
 		public async Task<Account> GetAccount(uint id)
@@ -226,48 +215,11 @@ namespace Faolan.Core.Database
 			// Include Body so the create-editor can resume an existing character's morphs without creating a
 			// duplicate body row, and MaxStats so vitals are available. SaveCharacter's graph stays
 			// Character (+Body, +MaxStats).
-			return await ctx.Characters.Include(c => c.Body).Include(c => c.MaxStats).FirstOrDefaultAsync(c => c.Id == id);
-		}
-
-		// Loads the character with its spawn-scaffold rows (entry table / feat-ID list / ending pair lists /
-		// pre-IIR frame) plus Body and BodyResources, so first-entry seeding can generate the morph and
-		// weighted-appearance entries from the editor choices. Detached like every read here.
-		public async Task<Character> GetCharacterScaffold(uint characterId)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Characters.Include(c => c.Attributes).Include(c => c.Skills).Include(c => c.ScaffoldPairs).Include(c => c.SpawnFrame).Include(c => c.Body).Include(c => c.BodyResources)
-				.FirstOrDefaultAsync(c => c.Id == characterId);
-		}
-
-		// Resolves appearance resource refs ("*texscript_1108153") to their client-registry entries (imported
-		// from RDB 1000076 by Faolan.Importer --rdb). Empty when the registry hasn't been imported.
-		public async Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.MorphTargets.Where(t => names.Contains(t.Name)).ToDictionaryAsync(t => t.Name);
-		}
-
-		// Replaces the character's spawn-scaffold rows with the given detached ones (delete-and-insert; the rows
-		// are small and only rewritten on extraction/seeding, never per-login).
-		public async Task SaveCharacterScaffold(Character character)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-
-			ctx.CharacterAttributes.RemoveRange(ctx.CharacterAttributes.Where(a => a.CharacterId == character.Id));
-			ctx.CharacterSkills.RemoveRange(ctx.CharacterSkills.Where(s => s.CharacterId == character.Id));
-			ctx.CharacterScaffoldPairs.RemoveRange(ctx.CharacterScaffoldPairs.Where(p => p.CharacterId == character.Id));
-			ctx.CharacterSpawnFrames.RemoveRange(ctx.CharacterSpawnFrames.Where(f => f.CharacterId == character.Id));
-
-			if (character.Attributes != null)
-				ctx.CharacterAttributes.AddRange(character.Attributes);
-			if (character.Skills != null)
-				ctx.CharacterSkills.AddRange(character.Skills);
-			if (character.ScaffoldPairs != null)
-				ctx.CharacterScaffoldPairs.AddRange(character.ScaffoldPairs);
-			if (character.SpawnFrame != null)
-				ctx.CharacterSpawnFrames.Add(character.SpawnFrame);
-
-			await ctx.SaveChangesAsync();
+			return await ctx
+				.Characters
+				.Include(c => c.Body)
+				.Include(c => c.MaxStats)
+				.FirstOrDefaultAsync(c => c.Id == id);
 		}
 
 		// --- equipment -------------------------------------------------------------------------------------
@@ -276,9 +228,48 @@ namespace Faolan.Core.Database
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			// Eager-load every equip-slot item nav + the bag slot so the inventory builder can read them detached.
-			return await ctx.CharacterEquipment.Include(e => e.Neck).Include(e => e.Head).Include(e => e.Tokens).Include(e => e.Chest).Include(e => e.MainHandLeft).Include(e => e.MainHandRight).Include(e => e.OffHandLeft)
-				.Include(e => e.OffHandRight).Include(e => e.Belt).Include(e => e.RingLeft).Include(e => e.RingRight).Include(e => e.Cloak).Include(e => e.Shoulder).Include(e => e.Boots).Include(e => e.Hands).Include(e => e.Legs)
-				.Include(e => e.FirstPosBag).Include(e => e.Wrist).FirstOrDefaultAsync(e => e.CharacterId == characterId);
+			return await ctx
+				.CharacterEquipment
+				.Include(e => e.Neck)
+				.Include(e => e.Head)
+				.Include(e => e.Tokens)
+				.Include(e => e.Chest)
+				.Include(e => e.MainHandLeft)
+				.Include(e => e.MainHandRight)
+				.Include(e => e.OffHandLeft)
+				.Include(e => e.OffHandRight)
+				.Include(e => e.Belt)
+				.Include(e => e.RingLeft)
+				.Include(e => e.RingRight)
+				.Include(e => e.Cloak)
+				.Include(e => e.Shoulder)
+				.Include(e => e.Boots)
+				.Include(e => e.Hands)
+				.Include(e => e.Legs)
+				.Include(e => e.FirstPosBag)
+				.Include(e => e.Wrist)
+				.FirstOrDefaultAsync(e => e.CharacterId == characterId);
+		}
+
+		public async Task<Character> GetCharacterForAccount(uint accountId, uint clientInstance)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+
+			var directMatch = await ctx
+				.Characters
+				.Include(c => c.Body)
+				.Include(c => c.MaxStats)
+				.FirstOrDefaultAsync(c => c.AccountId == accountId && c.Id == clientInstance);
+			if (directMatch != null)
+				return directMatch;
+
+			return await ctx
+				.Characters
+				.Include(c => c.Body)
+				.Include(c => c.MaxStats)
+				.Where(c => c.AccountId == accountId)
+				.OrderByDescending(c => c.Id)
+				.FirstOrDefaultAsync();
 		}
 
 		// The character's non-worn carried items (bag/resource/quest container rows), with the item navs for the
@@ -286,52 +277,11 @@ namespace Faolan.Core.Database
 		public async Task<CharacterInventory[]> GetCharacterInventory(uint characterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.CharacterInventory.Include(i => i.Item).Where(i => i.CharacterId == characterId).ToArrayAsync();
-		}
-
-		// Upserts (itemId set) or clears (itemId null) ONE container cell - the persistence unit of the client's
-		// inventory moves (equip consumes the source cell, unequip parks into the target cell).
-		public async Task SetCharacterInventorySlot(uint characterId, int container, int slot, uint? itemId, uint count = 1)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var row = await ctx.CharacterInventory.FirstOrDefaultAsync(i => i.CharacterId == characterId && i.Container == container && i.Slot == slot);
-
-			if (itemId == null)
-			{
-				if (row == null)
-					return;
-
-				ctx.CharacterInventory.Remove(row);
-			}
-			else if (row == null)
-			{
-				ctx.CharacterInventory.Add(new CharacterInventory
-				{
-					CharacterId = characterId,
-					Container = container,
-					Slot = slot,
-					ItemId = itemId,
-					Count = count
-				});
-			}
-			else
-			{
-				row.ItemId = itemId;
-				row.Count = count;
-			}
-
-			await ctx.SaveChangesAsync();
-		}
-
-		public async Task<Character> GetCharacterForAccount(uint accountId, uint clientInstance)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-
-			var directMatch = await ctx.Characters.Include(c => c.Body).Include(c => c.MaxStats).FirstOrDefaultAsync(c => c.AccountId == accountId && c.Id == clientInstance);
-			if (directMatch != null)
-				return directMatch;
-
-			return await ctx.Characters.Include(c => c.Body).Include(c => c.MaxStats).Where(c => c.AccountId == accountId).OrderByDescending(c => c.Id).FirstOrDefaultAsync();
+			return await ctx
+				.CharacterInventory
+				.Include(i => i.Item)
+				.Where(i => i.CharacterId == characterId)
+				.ToArrayAsync();
 		}
 
 		public async Task<Character[]> GetCharactersByAccount(uint id, bool skipUninitialized = true)
@@ -344,6 +294,35 @@ namespace Faolan.Core.Database
 			return await q.ToArrayAsync();
 		}
 
+		// Loads the character with its spawn-scaffold rows (entry table / feat-ID list / ending pair lists /
+		// pre-IIR frame) plus Body and BodyResources, so first-entry seeding can generate the morph and
+		// weighted-appearance entries from the editor choices. Detached like every read here.
+		public async Task<Character> GetCharacterScaffold(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.Characters
+				.Include(c => c.Attributes)
+				.Include(c => c.Skills)
+				.Include(c => c.ScaffoldPairs)
+				.Include(c => c.SpawnFrame)
+				.Include(c => c.Body)
+				.Include(c => c.BodyResources)
+				.FirstOrDefaultAsync(c => c.Id == characterId);
+		}
+
+		// The class/level row that lists which abilities (and spells) a character of this class+level should have.
+		// Falls back to the highest captured level at or below the requested one so any level still resolves a grant.
+		public async Task<ClassAbility> GetClassAbility(uint @class, uint level)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.ClassAbilities
+				.Where(c => c.Class == @class && c.Level <= level)
+				.OrderByDescending(c => c.Level)
+				.FirstOrDefaultAsync();
+		}
+
 		public async Task<ConversationNode> GetConversationNode(uint npcHandle, uint typeId, uint mode, uint field3, bool exactHandleOnly = false)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -351,14 +330,22 @@ namespace Faolan.Core.Database
 			// Prefer the node captured for THIS exact NPC handle - the correct per-NPC dialogue (handles are stable
 			// because scenes are replayed verbatim). (TypeId, Mode, Field3) is NOT NPC-unique, so the args-only
 			// match can be the wrong NPC's conversation.
-			var exact = await ctx.ConversationNodes.Include(n => n.Packets).FirstOrDefaultAsync(n => n.CapturedNpcHandle == npcHandle && n.TypeId == typeId && n.Mode == mode && n.Field3 == field3);
+			var exact = await ctx
+				.ConversationNodes
+				.Include(n => n.Packets)
+				.FirstOrDefaultAsync(n => n.CapturedNpcHandle == npcHandle && n.TypeId == typeId && n.Mode == mode && n.Field3 == field3);
 			if (exact != null || exactHandleOnly)
 				return exact;
 
 			// Args-only fallback (the pre-handle behaviour) so a captured conversation still plays for an NPC whose
 			// handle differs from the replayed scene's. Callers that can't tolerate a wrong-NPC match (the create
 			// world intro, where the scripted fallback is preferable) pass exactHandleOnly.
-			return await ctx.ConversationNodes.Include(n => n.Packets).Where(n => n.TypeId == typeId && n.Mode == mode && n.Field3 == field3).OrderByDescending(n => n.Packets.Count).FirstOrDefaultAsync();
+			return await ctx
+				.ConversationNodes
+				.Include(n => n.Packets)
+				.Where(n => n.TypeId == typeId && n.Mode == mode && n.Field3 == field3)
+				.OrderByDescending(n => n.Packets.Count)
+				.FirstOrDefaultAsync();
 		}
 
 		// Routes a conversation by the clicked NPC's stable NAME (handles are session-volatile). Exact match on
@@ -370,7 +357,10 @@ namespace Faolan.Core.Database
 				return null;
 
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.ConversationNodes.Include(n => n.Packets).FirstOrDefaultAsync(n => n.NpcName == npcName && n.TypeId == typeId && n.Mode == mode && n.Field3 == field3);
+			return await ctx
+				.ConversationNodes
+				.Include(n => n.Packets)
+				.FirstOrDefaultAsync(n => n.NpcName == npcName && n.TypeId == typeId && n.Mode == mode && n.Field3 == field3);
 		}
 
 		public async Task<Item> GetItem(uint id)
@@ -388,13 +378,19 @@ namespace Faolan.Core.Database
 		public async Task<Map[]> GetMaps()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Maps.OrderBy(m => m.Id).ToArrayAsync();
+			return await ctx
+				.Maps
+				.OrderBy(m => m.Id)
+				.ToArrayAsync();
 		}
 
 		public async Task<MapWorldBurst> GetMapWorldBurst(uint mapId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var burst = await ctx.MapWorldBursts.Include(b => b.Entities).FirstOrDefaultAsync(b => b.MapId == mapId);
+			var burst = await ctx
+				.MapWorldBursts
+				.Include(b => b.Entities)
+				.FirstOrDefaultAsync(b => b.MapId == mapId);
 
 			// Guard: a burst with an unknown captured instance (0) can't be re-addressed, so treat it as absent and
 			// let login fall back. Out-of-range instances ARE supported now - RewriteBurstInstance pads the live id's
@@ -403,6 +399,17 @@ namespace Faolan.Core.Database
 				return null;
 
 			return burst;
+		}
+
+		// Resolves appearance resource refs ("*texscript_1108153") to their client-registry entries (imported
+		// from RDB 1000076 by Faolan.Importer --rdb). Empty when the registry hasn't been imported.
+		public async Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.MorphTargets
+				.Where(t => names.Contains(t.Name))
+				.ToDictionaryAsync(t => t.Name);
 		}
 
 		// --- reference data --------------------------------------------------------------------------------
@@ -416,7 +423,10 @@ namespace Faolan.Core.Database
 		public async Task<Realm[]> GetRealms()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Realms.OrderBy(r => r.Id).ToArrayAsync();
+			return await ctx
+				.Realms
+				.OrderBy(r => r.Id)
+				.ToArrayAsync();
 		}
 
 		public async Task<Spell> GetSpell(uint id)
@@ -428,7 +438,25 @@ namespace Faolan.Core.Database
 		public async Task<Spell[]> GetSpells()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Spells.OrderBy(s => s.Id).ToArrayAsync();
+			return await ctx
+				.Spells
+				.OrderBy(s => s.Id)
+				.ToArrayAsync();
+		}
+
+		// The universal starting ability kit (IsStartingAbility) - the abilities every new character receives via
+		// 0x2052 during creation (3 Normal Attack directions + toggle-combat / switch-weapon / utility), imported
+		// from the retail create-flow grants by CaptureAbilityImporter. The `level` is reserved for future
+		// level-gating; today the whole starting kit is level 1. The catalog also holds higher-level / class
+		// abilities (IsStartingAbility = false) which are NOT granted here.
+		public async Task<Ability[]> GetStartingAbilities(uint level)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.Abilities
+				.Where(a => a.IsStartingAbility && a.Level <= level)
+				.OrderBy(a => a.Slot)
+				.ToArrayAsync();
 		}
 
 		public async Task<T> Query<T>(Func<IDatabaseContext, Task<T>> work)
@@ -492,6 +520,63 @@ namespace Faolan.Core.Database
 			tracked.Bag = equipment.Bag;
 			tracked.Quest = equipment.Quest;
 			tracked.Resources = equipment.Resources;
+
+			await ctx.SaveChangesAsync();
+		}
+
+		// Replaces the character's spawn-scaffold rows with the given detached ones (delete-and-insert; the rows
+		// are small and only rewritten on extraction/seeding, never per-login).
+		public async Task SaveCharacterScaffold(Character character)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+
+			ctx.CharacterAttributes.RemoveRange(ctx.CharacterAttributes.Where(a => a.CharacterId == character.Id));
+			ctx.CharacterSkills.RemoveRange(ctx.CharacterSkills.Where(s => s.CharacterId == character.Id));
+			ctx.CharacterScaffoldPairs.RemoveRange(ctx.CharacterScaffoldPairs.Where(p => p.CharacterId == character.Id));
+			ctx.CharacterSpawnFrames.RemoveRange(ctx.CharacterSpawnFrames.Where(f => f.CharacterId == character.Id));
+
+			if (character.Attributes != null)
+				ctx.CharacterAttributes.AddRange(character.Attributes);
+			if (character.Skills != null)
+				ctx.CharacterSkills.AddRange(character.Skills);
+			if (character.ScaffoldPairs != null)
+				ctx.CharacterScaffoldPairs.AddRange(character.ScaffoldPairs);
+			if (character.SpawnFrame != null)
+				ctx.CharacterSpawnFrames.Add(character.SpawnFrame);
+
+			await ctx.SaveChangesAsync();
+		}
+
+		// Upserts (itemId set) or clears (itemId null) ONE container cell - the persistence unit of the client's
+		// inventory moves (equip consumes the source cell, unequip parks into the target cell).
+		public async Task SetCharacterInventorySlot(uint characterId, int container, int slot, uint? itemId, uint count = 1)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var row = await ctx.CharacterInventory.FirstOrDefaultAsync(i => i.CharacterId == characterId && i.Container == container && i.Slot == slot);
+
+			if (itemId == null)
+			{
+				if (row == null)
+					return;
+
+				ctx.CharacterInventory.Remove(row);
+			}
+			else if (row == null)
+			{
+				ctx.CharacterInventory.Add(new CharacterInventory
+				{
+					CharacterId = characterId,
+					Container = container,
+					Slot = slot,
+					ItemId = itemId,
+					Count = count
+				});
+			}
+			else
+			{
+				row.ItemId = itemId;
+				row.Count = count;
+			}
 
 			await ctx.SaveChangesAsync();
 		}
@@ -568,9 +653,27 @@ namespace Faolan.Core.Database
 
 		private static Task<CharacterEquipment> LoadTrackedEquipment(DatabaseContext ctx, uint id)
 		{
-			return ctx.CharacterEquipment.Include(e => e.Neck).Include(e => e.Head).Include(e => e.Tokens).Include(e => e.Chest).Include(e => e.MainHandLeft).Include(e => e.MainHandRight).Include(e => e.OffHandLeft)
-				.Include(e => e.OffHandRight).Include(e => e.Belt).Include(e => e.RingLeft).Include(e => e.RingRight).Include(e => e.Cloak).Include(e => e.Shoulder).Include(e => e.Boots).Include(e => e.Hands).Include(e => e.Legs)
-				.Include(e => e.FirstPosBag).Include(e => e.Wrist).FirstOrDefaultAsync(e => e.Id == id);
+			return ctx
+				.CharacterEquipment
+				.Include(e => e.Neck)
+				.Include(e => e.Head)
+				.Include(e => e.Tokens)
+				.Include(e => e.Chest)
+				.Include(e => e.MainHandLeft)
+				.Include(e => e.MainHandRight)
+				.Include(e => e.OffHandLeft)
+				.Include(e => e.OffHandRight)
+				.Include(e => e.Belt)
+				.Include(e => e.RingLeft)
+				.Include(e => e.RingRight)
+				.Include(e => e.Cloak)
+				.Include(e => e.Shoulder)
+				.Include(e => e.Boots)
+				.Include(e => e.Hands)
+				.Include(e => e.Legs)
+				.Include(e => e.FirstPosBag)
+				.Include(e => e.Wrist)
+				.FirstOrDefaultAsync(e => e.Id == id);
 		}
 
 		private static async Task<Item> ResolveItem(DatabaseContext ctx, uint? id)

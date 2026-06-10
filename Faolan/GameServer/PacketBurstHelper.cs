@@ -7,6 +7,8 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
+		private static readonly byte[] LatencyResponseSender = [0x0D, 0x5D, 0xB9, 0xEC, 0xA9, 0x10, 0x08];
+
 		// The 0x201C handshake uses a different conversation family, but the same sub-id 0x58 + instance tail.
 		private static readonly byte[] LoginWorld201CSender = [0x0D, 0x5D, 0xB9, 0xEC, 0xA9, 0x10, 0x58];
 		// The create-flow packets are written explicitly (PacketStream.WriteHeader + WriteArray + WriteUInt32)
@@ -26,7 +28,6 @@ namespace Faolan.GameServer
 		// endpoint TYPEs as the world conversation: Pong from GameAgent (0x13CE71B1), latency from GameCharAgent
 		// (0xA9ECB95D).
 		private static readonly byte[] PingResponseSender = [0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x08];
-		private static readonly byte[] LatencyResponseSender = [0x0D, 0x5D, 0xB9, 0xEC, 0xA9, 0x10, 0x08];
 
 		// Appends a uint32, protobuf-varint encoded, to a conversation-id prefix (the receiver/sender family),
 		// producing the full conversation id that addresses the given client instance.

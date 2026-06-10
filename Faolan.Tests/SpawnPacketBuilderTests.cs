@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Numerics;
 using System.Text;
 using Faolan.GameServer.Spawn;
+using Faolan.Tests.Support;
 using Xunit;
 
 namespace Faolan.Tests
@@ -13,7 +14,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildSpawnBody_WithNewValues_OnlyChangesMappedFields()
 		{
-			var template = Support.Golden.Bytes("SpawnStrieTemplate");
+			var template = Golden.Bytes("SpawnStrieTemplate");
 			var built = SpawnPacketBuilder.BuildSpawnBody(template, 0x02000001u, new Vector3(100f, 50f, 200f), Quaternion.Identity);
 
 			Assert.Equal(template.Length, built.Length);
@@ -28,7 +29,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildSpawnBody_WithTemplateValues_IsByteIdentical()
 		{
-			var template = Support.Golden.Bytes("SpawnStrieTemplate");
+			var template = Golden.Bytes("SpawnStrieTemplate");
 
 			var handle = BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(SpawnPacketBuilder.HandleOffset, 4));
 			var position = new Vector3(ReadLE(template, SpawnPacketBuilder.PosXOffset), ReadLE(template, SpawnPacketBuilder.PosYOffset), ReadLE(template, SpawnPacketBuilder.PosZOffset));
@@ -45,7 +46,7 @@ namespace Faolan.Tests
 		[Theory, InlineData("Bob", -2), InlineData("Conanofcimmeria", 10)]
 		public void SetSpawnName_DifferentLength_AdjustsEnclosingLengths(string name, int expectedDelta)
 		{
-			var template = Support.Golden.Bytes("SpawnStrieTemplate");
+			var template = Golden.Bytes("SpawnStrieTemplate");
 			var renamed = SpawnPacketBuilder.SetSpawnName(template, name);
 
 			Assert.Equal(template.Length + expectedDelta, renamed.Length);
@@ -60,7 +61,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void SetSpawnName_SameLength_OnlyChangesNameBytes()
 		{
-			var template = Support.Golden.Bytes("SpawnStrieTemplate");
+			var template = Golden.Bytes("SpawnStrieTemplate");
 			var renamed = SpawnPacketBuilder.SetSpawnName(template, "Conan");
 
 			Assert.Equal(template.Length, renamed.Length);
@@ -79,7 +80,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void SetSpawnName_UnchangedName_IsByteIdentical()
 		{
-			var template = Support.Golden.Bytes("SpawnStrieTemplate");
+			var template = Golden.Bytes("SpawnStrieTemplate");
 			Assert.Equal(template, SpawnPacketBuilder.SetSpawnName(template, "Strie"));
 		}
 

@@ -10,13 +10,13 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; }
 
-		public uint CharacterId { get; set; }
-
 		// 0 = the first ending pair list, 1 = the second.
 		public byte ListIndex { get; set; }
 
-		public uint PairId { get; set; }
-
 		public int Value { get; set; }
+
+		public uint CharacterId { get; set; }
+
+		public uint PairId { get; set; }
 	}
 }

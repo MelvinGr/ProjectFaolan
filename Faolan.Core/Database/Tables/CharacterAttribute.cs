@@ -13,18 +13,18 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; }
 
-		public uint CharacterId { get; set; }
-
 		// The entry's position in the wire table.
 		public int Sequence { get; set; }
+
+		public uint CharacterId { get; set; }
 
 		// The entry index on the wire (usually but not always ascending, 1-based).
 		public uint StatId { get; set; }
 
-		// The first two payload bytes (attribute value / morph id / the closer's u16).
-		public ushort Tag { get; set; }
-
 		// The last four payload bytes (weight 1.0 for attributes, float bits for morphs, the closer's u32).
 		public uint Value { get; set; }
+
+		// The first two payload bytes (attribute value / morph id / the closer's u16).
+		public ushort Tag { get; set; }
 	}
 }

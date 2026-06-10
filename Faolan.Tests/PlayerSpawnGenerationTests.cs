@@ -6,6 +6,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.Spawn;
+using Faolan.Tests.Support;
 using Xunit;
 
 namespace Faolan.Tests
@@ -19,31 +20,10 @@ namespace Faolan.Tests
 	// docs/player-spawn-generation-plan.md.
 	public class PlayerSpawnGenerationTests
 	{
-		// The ProtoCoreCharacterIIR sub-message sits at NameTagOffset (its first field, name=0x0A) and is enclosed by
-		// the 4-byte length prefix at NameInnerLengthOffset.
-		private static byte[] CharacterMessage(byte[] template)
-		{
-			var length = (int)BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(SpawnPacketBuilder.NameInnerLengthOffset, 4));
-			Assert.Equal(0x0A, template[SpawnPacketBuilder.NameTagOffset]); // field 1 (name)
-			return template.AsSpan(SpawnPacketBuilder.NameTagOffset, length).ToArray();
-		}
-
-		[Fact]
-		public void PlayerCharacterMessage_RoundTripsByteIdentically()
-		{
-			var message = CharacterMessage(Support.Golden.Bytes("SpawnStrieTemplate"));
-
-			var decoded = ((ReadOnlySpan<byte>)message).FromProtobuf<ProtoCoreCharacterIIR>();
-			var reencoded = decoded.ToProtobufBytes();
-
-			Assert.Equal(message.Length, reencoded.Length);
-			Assert.True(message.SequenceEqual(reencoded), "ProtoCoreCharacterIIR did not re-encode byte-identically");
-		}
-
 		[Fact]
 		public void PlayerCharacterMessage_DecodesExpectedIdentity()
 		{
-			var decoded = ((ReadOnlySpan<byte>)CharacterMessage(Support.Golden.Bytes("SpawnStrieTemplate"))).FromProtobuf<ProtoCoreCharacterIIR>();
+			var decoded = ((ReadOnlySpan<byte>)CharacterMessage(Golden.Bytes("SpawnStrieTemplate"))).FromProtobuf<ProtoCoreCharacterIIR>();
 
 			Assert.Equal("Strie", decoded.Name);
 			Assert.NotNull(decoded.Stats);
@@ -57,7 +37,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void PlayerCharacterMessage_LooksFields_AreHalfTheEditorValues()
 		{
-			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(Support.Golden.Bytes("SpawnDikketestLogin"), out var read));
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(Golden.Bytes("SpawnDikketestLogin"), out var read));
 
 			Assert.Equal(2285694u / 2, read.Message.Stats.HeadMesh);
 			Assert.Equal(10u / 2, read.Message.Stats.VoiceSet);
@@ -65,13 +45,45 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void PlayerCharacterMessage_RoundTripsByteIdentically()
+		{
+			var message = CharacterMessage(Golden.Bytes("SpawnStrieTemplate"));
+
+			var decoded = ((ReadOnlySpan<byte>)message).FromProtobuf<ProtoCoreCharacterIIR>();
+			var reencoded = decoded.ToProtobufBytes();
+
+			Assert.Equal(message.Length, reencoded.Length);
+			Assert.True(message.SequenceEqual(reencoded), "ProtoCoreCharacterIIR did not re-encode byte-identically");
+		}
+
+		[Fact]
 		public void PlayerSpawnEquipment_BuildsInventoryEntriesFromWornItems()
 		{
 			var equipment = new CharacterEquipment
 			{
-				Head = new Item { Id = 0x00308E19, Data1 = 0x4C95E6E3, Data2 = 0xDF665726, Data3 = 0x09000E2A, Data4 = 0x892A0B17, Archetype = 0x1234 },
-				Chest = new Item { Id = 0x000035F9, Data1 = 0x6B18BD73, Data2 = 0xCCEBE6CF, Data3 = 0xED8B315D, Data4 = 0x1E1E835F, Archetype = 0x5678 },
-				Belt = new Item { Id = 0x99, Archetype = 0 }, // not buildable (no archetype) -> skipped
+				Head = new Item
+				{
+					Id = 0x00308E19,
+					Data1 = 0x4C95E6E3,
+					Data2 = 0xDF665726,
+					Data3 = 0x09000E2A,
+					Data4 = 0x892A0B17,
+					Archetype = 0x1234
+				},
+				Chest = new Item
+				{
+					Id = 0x000035F9,
+					Data1 = 0x6B18BD73,
+					Data2 = 0xCCEBE6CF,
+					Data3 = 0xED8B315D,
+					Data4 = 0x1E1E835F,
+					Archetype = 0x5678
+				},
+				Belt = new Item
+				{
+					Id = 0x99,
+					Archetype = 0
+				} // not buildable (no archetype) -> skipped
 			};
 
 			var entries = PlayerSpawnEquipment.BuildInventoryEntries(equipment);
@@ -97,23 +109,48 @@ namespace Faolan.Tests
 		{
 			var equipment = new CharacterEquipment
 			{
-				MainHandLeft = new Item { Id = 1, Data1 = 1, Archetype = 1 },
-				OffHandLeft = new Item { Id = 2, Data1 = 2, Archetype = 2 },
-				MainHandRight = new Item { Id = 3, Data1 = 3, Archetype = 3 },
-				OffHandRight = new Item { Id = 4, Data1 = 4, Archetype = 4 },
-				Tokens = new Item { Id = 5, Data1 = 5, Archetype = 5 },
+				MainHandLeft = new Item
+				{
+					Id = 1,
+					Data1 = 1,
+					Archetype = 1
+				},
+				OffHandLeft = new Item
+				{
+					Id = 2,
+					Data1 = 2,
+					Archetype = 2
+				},
+				MainHandRight = new Item
+				{
+					Id = 3,
+					Data1 = 3,
+					Archetype = 3
+				},
+				OffHandRight = new Item
+				{
+					Id = 4,
+					Data1 = 4,
+					Archetype = 4
+				},
+				Tokens = new Item
+				{
+					Id = 5,
+					Data1 = 5,
+					Archetype = 5
+				}
 			};
 
 			var entries = PlayerSpawnEquipment.BuildInventoryEntries(equipment);
 
-			Assert.Equal(new[]
-			{
-				((uint)CharacterEquipmentSlot.Tokens, 5u),
-				((uint)CharacterEquipmentSlot.MainWeapon, 1u),
-				((uint)CharacterEquipmentSlot.OffHandWeapon, 2u),
-				((uint)CharacterEquipmentSlot.RangedWeapon, 3u),
-				((uint)CharacterEquipmentSlot.Ammo, 4u),
-			}, entries.Select(e => (e.Pos, e.Item.Template1)).ToArray());
+			Assert.Equal(
+				new[]
+				{
+					((uint)CharacterEquipmentSlot.Tokens, 5u), ((uint)CharacterEquipmentSlot.MainWeapon, 1u), ((uint)CharacterEquipmentSlot.OffHandWeapon, 2u), ((uint)CharacterEquipmentSlot.RangedWeapon, 3u),
+					((uint)CharacterEquipmentSlot.Ammo, 4u)
+				}, entries
+					.Select(e => (e.Pos, e.Item.Template1))
+					.ToArray());
 		}
 
 		// The dynamic reader locates the CharacterIIR in any spawn; on the Strie template it must agree with the fixed
@@ -121,7 +158,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void PlayerSpawnReader_LocatesCharacterMessage_OnTemplate()
 		{
-			var body = Support.Golden.Bytes("SpawnStrieTemplate");
+			var body = Golden.Bytes("SpawnStrieTemplate");
 			var innerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(SpawnPacketBuilder.NameInnerLengthOffset, 4));
 
 			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var result));
@@ -130,24 +167,12 @@ namespace Faolan.Tests
 			Assert.Equal("Strie", result.Message.Name);
 		}
 
-		// Build-side oracle: replacing the CharacterIIR component with its own decoded form is a byte-identical no-op.
-		[Fact]
-		public void SetCharacterMessage_WithUnchangedDecodedMessage_IsByteIdentical()
-		{
-			var body = Support.Golden.Bytes("SpawnStrieTemplate");
-			var message = ((ReadOnlySpan<byte>)CharacterMessage(body)).FromProtobuf<ProtoCoreCharacterIIR>();
-
-			var rebuilt = SpawnPacketBuilder.SetCharacterMessage(body, message);
-
-			Assert.Equal(body, rebuilt);
-		}
-
 		// Changing the message (here the name, a different length) resizes the body, keeps it decodable, and fixes up
 		// the enclosing length prefixes (the body-length field @0 == total - 4).
 		[Fact]
 		public void SetCharacterMessage_ChangingName_ResizesAndStaysConsistent()
 		{
-			var body = Support.Golden.Bytes("SpawnStrieTemplate");
+			var body = Golden.Bytes("SpawnStrieTemplate");
 			var message = ((ReadOnlySpan<byte>)CharacterMessage(body)).FromProtobuf<ProtoCoreCharacterIIR>();
 			message.Name = "Tester"; // 6 chars vs "Strie" (5)
 
@@ -158,6 +183,29 @@ namespace Faolan.Tests
 			var back = ((ReadOnlySpan<byte>)CharacterMessage(rebuilt)).FromProtobuf<ProtoCoreCharacterIIR>();
 			Assert.Equal("Tester", back.Name);
 			Assert.NotNull(back.Bcc); // the tail (after the name) survived the splice
+		}
+
+		// Build-side oracle: replacing the CharacterIIR component with its own decoded form is a byte-identical no-op.
+		[Fact]
+		public void SetCharacterMessage_WithUnchangedDecodedMessage_IsByteIdentical()
+		{
+			var body = Golden.Bytes("SpawnStrieTemplate");
+			var message = ((ReadOnlySpan<byte>)CharacterMessage(body)).FromProtobuf<ProtoCoreCharacterIIR>();
+
+			var rebuilt = SpawnPacketBuilder.SetCharacterMessage(body, message);
+
+			Assert.Equal(body, rebuilt);
+		}
+
+		// The ProtoCoreCharacterIIR sub-message sits at NameTagOffset (its first field, name=0x0A) and is enclosed by
+		// the 4-byte length prefix at NameInnerLengthOffset.
+		private static byte[] CharacterMessage(byte[] template)
+		{
+			var length = (int)BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(SpawnPacketBuilder.NameInnerLengthOffset, 4));
+			Assert.Equal(0x0A, template[SpawnPacketBuilder.NameTagOffset]); // field 1 (name)
+			return template
+				.AsSpan(SpawnPacketBuilder.NameTagOffset, length)
+				.ToArray();
 		}
 	}
 }

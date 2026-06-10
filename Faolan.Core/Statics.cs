@@ -26,7 +26,9 @@ namespace Faolan.Core
 
 		static Statics()
 		{
-			var assemblyMetadata = Assembly.GetEntryAssembly()!.GetCustomAttributes<AssemblyMetadataAttribute>().ToDictionary(k => k.Key, v => v.Value);
+			var assemblyMetadata = Assembly.GetEntryAssembly()!
+				.GetCustomAttributes<AssemblyMetadataAttribute>()
+				.ToDictionary(k => k.Key, v => v.Value);
 
 			BuildConfiguration = assemblyMetadata["BuildConfiguration"];
 			BuildDateTimeUtc = DateTime.Parse(assemblyMetadata["BuildDateTimeUtc"], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);

@@ -31,9 +31,15 @@ namespace Faolan.DatabaseEditor
 			builder.Services.AddSingleton<MainWindow>();
 			builder.Services.AddTransient<MainWindowViewModel>();
 
-			Services = builder.Build().Services;
+			Services = builder.Build()
+				.Services;
 
-			AppBuilder.Configure<App>().UsePlatformDetect().WithInterFont().LogToTrace().StartWithClassicDesktopLifetime(args);
+			AppBuilder
+				.Configure<App>()
+				.UsePlatformDetect()
+				.WithInterFont()
+				.LogToTrace()
+				.StartWithClassicDesktopLifetime(args);
 
 			return 0;
 		}

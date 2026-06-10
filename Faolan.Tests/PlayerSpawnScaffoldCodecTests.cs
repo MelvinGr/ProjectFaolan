@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using Faolan.GameServer.Spawn;
 using Xunit;
@@ -19,34 +18,53 @@ namespace Faolan.Tests
 	//   SpawnHoxxlingBuffed     - active buffs (two 60-byte buff records)
 	public class PlayerSpawnScaffoldCodecTests
 	{
-		private static string GoldenDir([CallerFilePath] string thisFile = "") => Path.Combine(Path.GetDirectoryName(thisFile)!, "Golden");
-
-		private static byte[] Golden(string name) => File.ReadAllBytes(Path.Combine(GoldenDir(), name + ".bin"));
-
-		[Theory]
-		[InlineData("SpawnEditorPreview")]
-		[InlineData("SpawnDikketestLogin")]
-		[InlineData("SpawnNecroL80KingsCastle")]
-		[InlineData("SpawnDemoL80RandomActions")]
-		[InlineData("SpawnHoxxlingBuffed")]
-		public void ParseThenGenerate_IsByteIdentical(string name)
+		// The generated CharacterIIR component slot must agree with the existing splice path: re-encoding the
+		// decoded scaffold of the template and feeding its CharacterIir through SetCharacterMessage's oracle.
+		[Fact]
+		public void Generate_AfterCharacterIirSwap_StaysParseable()
 		{
-			var body = Golden(name);
+			Assert.True(PlayerSpawnScaffoldCodec.TryParse(Golden("SpawnDikketestLogin"), out var s, out _));
+			var donor = Support.Golden.Bytes("SpawnStrieTemplate");
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(donor, out var strie));
 
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out var error), $"parse failed: {error}");
-			var rebuilt = PlayerSpawnScaffoldCodec.Generate(scaffold);
+			s.CharacterIir = donor
+				.AsSpan(strie.Offset, strie.Length)
+				.ToArray(); // different length than Dikketest's
+			var rebuilt = PlayerSpawnScaffoldCodec.Generate(s);
 
-			Assert.Equal(Convert.ToHexString(body), Convert.ToHexString(rebuilt));
+			Assert.True(PlayerSpawnScaffoldCodec.TryParse(rebuilt, out var back, out var error), $"reparse failed: {error}");
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(rebuilt, out var name));
+			Assert.Equal("Strie", name.Message.Name);
+			Assert.Equal(s.Entries.Count, back.Entries.Count);
 		}
 
 		[Fact]
-		public void ParseThenGenerate_Template_IsByteIdentical()
+		public void Parse_BuffedSpawn_LiftsBuffRecords()
 		{
-			var body = Support.Golden.Bytes("SpawnStrieTemplate");
+			Assert.True(PlayerSpawnScaffoldCodec.TryParse(Golden("SpawnHoxxlingBuffed"), out var s, out _));
 
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out var error), $"parse failed: {error}");
+			Assert.Equal(2, s.BuffRecords.Count);
+			Assert.All(s.BuffRecords, r => Assert.Equal(60, r.Length));
+			Assert.Equal(35, s.Entries.Count);
+		}
 
-			Assert.Equal(Convert.ToHexString(body), Convert.ToHexString(PlayerSpawnScaffoldCodec.Generate(scaffold)));
+		[Fact]
+		public void Parse_GearedSpawn_LiftsEndPairsAndPreTable()
+		{
+			Assert.True(PlayerSpawnScaffoldCodec.TryParse(Golden("SpawnNecroL80KingsCastle"), out var s, out _));
+
+			Assert.Equal(339, s.PreFrame.Length); // the geared variant with the 26-slot table
+			Assert.Equal(14, s.Entries.Count);
+			Assert.Equal(0x2B6u, s.EntryTableX);
+			Assert.Equal(8, s.EndPairs.Count);
+			Assert.Equal(new ScaffoldPair(10, -14375), s.EndPairs[0]);
+		}
+
+		[Fact]
+		public void Parse_RejectsNonSpawnBodies()
+		{
+			Assert.False(PlayerSpawnScaffoldCodec.TryParse(new byte[] { 1, 2, 3 }, out _, out _));
+			Assert.False(PlayerSpawnScaffoldCodec.TryParse(new byte[64], out _, out _));
 		}
 
 		[Fact]
@@ -73,51 +91,35 @@ namespace Faolan.Tests
 			Assert.Empty(s.EndPairs2);
 		}
 
-		[Fact]
-		public void Parse_GearedSpawn_LiftsEndPairsAndPreTable()
+		[Theory, InlineData("SpawnEditorPreview"), InlineData("SpawnDikketestLogin"), InlineData("SpawnNecroL80KingsCastle"), InlineData("SpawnDemoL80RandomActions"), InlineData("SpawnHoxxlingBuffed")]
+		public void ParseThenGenerate_IsByteIdentical(string name)
 		{
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(Golden("SpawnNecroL80KingsCastle"), out var s, out _));
+			var body = Golden(name);
 
-			Assert.Equal(339, s.PreFrame.Length); // the geared variant with the 26-slot table
-			Assert.Equal(14, s.Entries.Count);
-			Assert.Equal(0x2B6u, s.EntryTableX);
-			Assert.Equal(8, s.EndPairs.Count);
-			Assert.Equal(new ScaffoldPair(10, -14375), s.EndPairs[0]);
+			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out var error), $"parse failed: {error}");
+			var rebuilt = PlayerSpawnScaffoldCodec.Generate(scaffold);
+
+			Assert.Equal(Convert.ToHexString(body), Convert.ToHexString(rebuilt));
 		}
 
 		[Fact]
-		public void Parse_BuffedSpawn_LiftsBuffRecords()
+		public void ParseThenGenerate_Template_IsByteIdentical()
 		{
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(Golden("SpawnHoxxlingBuffed"), out var s, out _));
+			var body = Support.Golden.Bytes("SpawnStrieTemplate");
 
-			Assert.Equal(2, s.BuffRecords.Count);
-			Assert.All(s.BuffRecords, r => Assert.Equal(60, r.Length));
-			Assert.Equal(35, s.Entries.Count);
+			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out var error), $"parse failed: {error}");
+
+			Assert.Equal(Convert.ToHexString(body), Convert.ToHexString(PlayerSpawnScaffoldCodec.Generate(scaffold)));
 		}
 
-		[Fact]
-		public void Parse_RejectsNonSpawnBodies()
+		private static byte[] Golden(string name)
 		{
-			Assert.False(PlayerSpawnScaffoldCodec.TryParse(new byte[] { 1, 2, 3 }, out _, out _));
-			Assert.False(PlayerSpawnScaffoldCodec.TryParse(new byte[64], out _, out _));
+			return File.ReadAllBytes(Path.Combine(GoldenDir(), name + ".bin"));
 		}
 
-		// The generated CharacterIIR component slot must agree with the existing splice path: re-encoding the
-		// decoded scaffold of the template and feeding its CharacterIir through SetCharacterMessage's oracle.
-		[Fact]
-		public void Generate_AfterCharacterIirSwap_StaysParseable()
+		private static string GoldenDir([CallerFilePath] string thisFile = "")
 		{
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(Golden("SpawnDikketestLogin"), out var s, out _));
-			var donor = Support.Golden.Bytes("SpawnStrieTemplate");
-			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(donor, out var strie));
-
-			s.CharacterIir = donor.AsSpan(strie.Offset, strie.Length).ToArray(); // different length than Dikketest's
-			var rebuilt = PlayerSpawnScaffoldCodec.Generate(s);
-
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(rebuilt, out var back, out var error), $"reparse failed: {error}");
-			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(rebuilt, out var name));
-			Assert.Equal("Strie", name.Message.Name);
-			Assert.Equal(s.Entries.Count, back.Entries.Count);
+			return Path.Combine(Path.GetDirectoryName(thisFile)!, "Golden");
 		}
 	}
 }

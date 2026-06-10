@@ -12,7 +12,9 @@ namespace Faolan.Core.Network.Packets
 
 		public byte[] ToArray()
 		{
-			return Fields.SelectMany(x => x.ToArray()).ToArray();
+			return Fields
+				.SelectMany(x => x.ToArray())
+				.ToArray();
 		}
 
 		public static ProtoMessage Parse(MemoryStream stream, int? max = null)

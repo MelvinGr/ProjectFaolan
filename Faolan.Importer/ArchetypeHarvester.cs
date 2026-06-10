@@ -84,7 +84,8 @@ namespace Faolan.Importer
 			body.ReadUInt32(); // c350
 			body.ReadUInt32(); // instance
 
-			root = InventorySnapshotInspector.ParseInventoryPacketBody(body).Root;
+			root = InventorySnapshotInspector.ParseInventoryPacketBody(body)
+				.Root;
 			return true;
 		}
 

@@ -35,10 +35,13 @@ namespace Faolan.Core.Database.Tables
 		// is still evidence-based rather than protocol-confirmed.
 		[Obsolete]
 		public string Bag { get; set; }
+
 		[Obsolete]
 		public string Quest { get; set; }
+
 		[Obsolete]
 		public string Resources { get; set; }
+
 		public uint CharacterId { get; set; }
 	}
 

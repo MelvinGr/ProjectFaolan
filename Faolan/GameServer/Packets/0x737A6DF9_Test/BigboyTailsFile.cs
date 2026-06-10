@@ -243,7 +243,9 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 
 			for (var i = startOffset; i <= data.Length - pattern.Length; i++)
 			{
-				if (data.AsSpan(i, pattern.Length).SequenceEqual(pattern))
+				if (data
+				    .AsSpan(i, pattern.Length)
+				    .SequenceEqual(pattern))
 					return i;
 			}
 
@@ -280,7 +282,9 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 			if (data[nameEndOffset] != 0)
 				return false;
 
-			return data.AsSpan(nameOffset, nameLength).StartsWith("PFAccessWindow_"u8);
+			return data
+				.AsSpan(nameOffset, nameLength)
+				.StartsWith("PFAccessWindow_"u8);
 		}
 
 		private static PfAccessWindowChild ReadAccessWindowChild(FaolanStream reader, byte[] data, byte childMode)

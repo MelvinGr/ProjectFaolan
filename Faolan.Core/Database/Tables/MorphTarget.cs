@@ -9,16 +9,15 @@ namespace Faolan.Core.Database.Tables
 	// docs/player-spawn-generation-plan.md "Weighted attributes".
 	public class MorphTarget : BaseEntity
 	{
-		// Id (from BaseEntity) = the wire tag = the registry's 1-based id minus 1.
-
-		// The registry name: a slider name ("arm", "02_BrowLow") or a resource ref ("*texscript_1108153").
-		public string Name { get; set; }
-
 		// The registry's category: 0 face sliders, 1 body sliders, 2 face paint (never emitted in spawns),
 		// 3 hairmesh, 4 beardmesh, 5 piercingmesh, 6 hair color, 7 eye color, 8 skin color, 9/10 tattoos+scars.
 		public byte Category { get; set; }
 
 		// The registry weight (1.0 for resources; sliders carry 0.1/0.3/0.5).
 		public float Weight { get; set; }
+		// Id (from BaseEntity) = the wire tag = the registry's 1-based id minus 1.
+
+		// The registry name: a slider name ("arm", "02_BrowLow") or a resource ref ("*texscript_1108153").
+		public string Name { get; set; }
 	}
 }

@@ -22,9 +22,6 @@ namespace Faolan.Core.Crypt
 			return $"{v0:x8}{v1:x8}";
 		}
 
-		/// <summary>The <c>-key</c> value for the current time.</summary>
-		public static string Now() => ForUnixTime((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds());
-
 		/// <summary>
 		///     Inverse: recover the timestamp from a token, or null if it's malformed or the decrypted halves don't
 		///     match (i.e. not a genuine token). This is what a strict server would check, plus a freshness window.
@@ -36,15 +33,23 @@ namespace Faolan.Core.Crypt
 
 			try
 			{
-				uint v0 = Convert.ToUInt32(token[..8], 16);
-				uint v1 = Convert.ToUInt32(token[8..], 16);
+				var v0 = Convert.ToUInt32(token[..8], 16);
+				var v1 = Convert.ToUInt32(token[8..], 16);
 				Tea.DecryptBlock(ref v0, ref v1, PatcherKey);
-				return v0 == v1 ? v0 : null;
+				return v0 == v1
+					? v0
+					: null;
 			}
 			catch (FormatException)
 			{
 				return null;
 			}
+		}
+
+		/// <summary>The <c>-key</c> value for the current time.</summary>
+		public static string Now()
+		{
+			return ForUnixTime((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds());
 		}
 	}
 }

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
@@ -89,8 +90,17 @@ namespace Faolan.Tests
 						AuthChallenge = "",
 						LastIpAddress = ""
 					});
-					ctx.Realms.Add(new Realm { Id = 1, Name = "Test", IpAddress = "127.0.0.1" });
-					ctx.Maps.Add(new Map { Id = Map.TortageBeachId, Name = "Tortage Beach" });
+					ctx.Realms.Add(new Realm
+					{
+						Id = 1,
+						Name = "Test",
+						IpAddress = "127.0.0.1"
+					});
+					ctx.Maps.Add(new Map
+					{
+						Id = Map.TortageBeachId,
+						Name = "Tortage Beach"
+					});
 					ctx.Characters.Add(new Character
 					{
 						Id = characterId,
@@ -134,6 +144,86 @@ namespace Faolan.Tests
 				account!.ClientInstance = characterId;
 				await repo.SaveAccount(account);
 				Assert.Equal(characterId, (await repo.GetAccount(accountId))!.ClientInstance);
+			}
+			finally
+			{
+				if (File.Exists(dbPath))
+					File.Delete(dbPath);
+			}
+		}
+
+		// The inventory-cell unit of work behind equip/unequip persistence: upsert parks an item into a bag
+		// cell, a second upsert in another cell coexists (the FirstPosBag regression this replaces), re-upsert
+		// updates in place, clear removes the row - all across short-lived contexts.
+		[Fact]
+		public async Task InventorySlot_UpsertAndClear_RoundTripAcrossContexts()
+		{
+			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-repo-{Guid.NewGuid():N}.db");
+			try
+			{
+				var (repo, factory) = NewRepo(dbPath);
+				await using (var ctx = await factory.CreateDbContextAsync())
+				{
+					await ctx.Database.EnsureCreatedAsync();
+					ctx.Accounts.Add(new Account
+					{
+						Id = 1,
+						UserName = "t",
+						Password = "t",
+						AuthChallenge = "",
+						LastIpAddress = ""
+					});
+					ctx.Realms.Add(new Realm
+					{
+						Id = 1,
+						Name = "Test",
+						IpAddress = "127.0.0.1"
+					});
+					ctx.Maps.Add(new Map
+					{
+						Id = Map.TortageBeachId,
+						Name = "Tortage Beach"
+					});
+					ctx.Characters.Add(new Character
+					{
+						Id = 5,
+						Name = "T",
+						AccountId = 1,
+						RealmId = 1
+					});
+					ctx.Items.Add(new Item
+					{
+						Id = 100,
+						Name = "A"
+					});
+					ctx.Items.Add(new Item
+					{
+						Id = 200,
+						Name = "B"
+					});
+					await ctx.SaveChangesAsync();
+				}
+
+				await repo.SetCharacterInventorySlot(5, 104, 2, 100);
+				await repo.SetCharacterInventorySlot(5, 104, 7, 200, 3); // a second cell coexists
+
+				var rows = await repo.GetCharacterInventory(5);
+				Assert.Equal(2, rows.Length);
+				Assert.Equal(100u, Enumerable.Single(rows, r => r.Slot == 2)
+					.ItemId);
+				Assert.Equal("A", Enumerable.Single(rows, r => r.Slot == 2)
+					.Item!.Name); // Item nav loaded
+				Assert.Equal(3u, Enumerable.Single(rows, r => r.Slot == 7)
+					.Count);
+
+				await repo.SetCharacterInventorySlot(5, 104, 2, 200); // re-upsert updates in place
+				await repo.SetCharacterInventorySlot(5, 104, 7, null); // clear removes
+				await repo.SetCharacterInventorySlot(5, 104, 9, null); // clearing an empty cell is a no-op
+
+				rows = await repo.GetCharacterInventory(5);
+				var only = Assert.Single(rows);
+				Assert.Equal(2, only.Slot);
+				Assert.Equal(200u, only.ItemId);
 			}
 			finally
 			{
@@ -220,8 +310,17 @@ namespace Faolan.Tests
 						AuthChallenge = "",
 						LastIpAddress = ""
 					});
-					ctx.Realms.Add(new Realm { Id = 1, Name = "Test", IpAddress = "127.0.0.1" });
-					ctx.Maps.Add(new Map { Id = Map.TortageBeachId, Name = "Tortage Beach" });
+					ctx.Realms.Add(new Realm
+					{
+						Id = 1,
+						Name = "Test",
+						IpAddress = "127.0.0.1"
+					});
+					ctx.Maps.Add(new Map
+					{
+						Id = Map.TortageBeachId,
+						Name = "Tortage Beach"
+					});
 					ctx.Characters.Add(new Character
 					{
 						Id = characterId,
@@ -255,56 +354,10 @@ namespace Faolan.Tests
 			}
 		}
 
-		// The inventory-cell unit of work behind equip/unequip persistence: upsert parks an item into a bag
-		// cell, a second upsert in another cell coexists (the FirstPosBag regression this replaces), re-upsert
-		// updates in place, clear removes the row - all across short-lived contexts.
-		[Fact]
-		public async Task InventorySlot_UpsertAndClear_RoundTripAcrossContexts()
-		{
-			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-repo-{Guid.NewGuid():N}.db");
-			try
-			{
-				var (repo, factory) = NewRepo(dbPath);
-				await using (var ctx = await factory.CreateDbContextAsync())
-				{
-					await ctx.Database.EnsureCreatedAsync();
-					ctx.Accounts.Add(new Account { Id = 1, UserName = "t", Password = "t", AuthChallenge = "", LastIpAddress = "" });
-					ctx.Realms.Add(new Realm { Id = 1, Name = "Test", IpAddress = "127.0.0.1" });
-					ctx.Maps.Add(new Map { Id = Map.TortageBeachId, Name = "Tortage Beach" });
-					ctx.Characters.Add(new Character { Id = 5, Name = "T", AccountId = 1, RealmId = 1 });
-					ctx.Items.Add(new Item { Id = 100, Name = "A" });
-					ctx.Items.Add(new Item { Id = 200, Name = "B" });
-					await ctx.SaveChangesAsync();
-				}
-
-				await repo.SetCharacterInventorySlot(5, 104, 2, 100);
-				await repo.SetCharacterInventorySlot(5, 104, 7, 200, 3); // a second cell coexists
-
-				var rows = await repo.GetCharacterInventory(5);
-				Assert.Equal(2, rows.Length);
-				Assert.Equal(100u, System.Linq.Enumerable.Single(rows, r => r.Slot == 2).ItemId);
-				Assert.Equal("A", System.Linq.Enumerable.Single(rows, r => r.Slot == 2).Item!.Name); // Item nav loaded
-				Assert.Equal(3u, System.Linq.Enumerable.Single(rows, r => r.Slot == 7).Count);
-
-				await repo.SetCharacterInventorySlot(5, 104, 2, 200); // re-upsert updates in place
-				await repo.SetCharacterInventorySlot(5, 104, 7, null); // clear removes
-				await repo.SetCharacterInventorySlot(5, 104, 9, null); // clearing an empty cell is a no-op
-
-				rows = await repo.GetCharacterInventory(5);
-				var only = Assert.Single(rows);
-				Assert.Equal(2, only.Slot);
-				Assert.Equal(200u, only.ItemId);
-			}
-			finally
-			{
-				if (File.Exists(dbPath))
-					File.Delete(dbPath);
-			}
-		}
-
 		private static (DatabaseRepository repo, IDbContextFactory<DatabaseContext> factory) NewRepo(string path)
 		{
-			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={path}").Options;
+			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={path}")
+				.Options;
 			var factory = new TestContextFactory(options);
 			return (new DatabaseRepository(factory), factory);
 		}

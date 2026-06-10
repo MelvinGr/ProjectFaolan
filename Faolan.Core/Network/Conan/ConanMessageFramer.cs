@@ -48,7 +48,9 @@ namespace Faolan.Core.Network.Conan
 
 					if (_packetBytesRead == _packetBuffer.Length)
 					{
-						packets.Add(_packetLengthBuffer.Concat(_packetBuffer).ToArray());
+						packets.Add(_packetLengthBuffer
+							.Concat(_packetBuffer)
+							.ToArray());
 						_packetBuffer = null;
 						_packetBytesRead = 0;
 					}
@@ -64,7 +66,9 @@ namespace Faolan.Core.Network.Conan
 
 					if (_packetBytesRead == sizeof(int))
 					{
-						var packetLength = BitConverter.ToInt32(_packetLengthBuffer.Reverse().ToArray(), 0);
+						var packetLength = BitConverter.ToInt32(_packetLengthBuffer
+							.Reverse()
+							.ToArray(), 0);
 
 						if (packetLength < 0 || packetLength > MaxPacketSize)
 						{
@@ -94,7 +98,9 @@ namespace Faolan.Core.Network.Conan
 
 			var input = bytes.Length == length
 				? bytes
-				: bytes.Take(length).ToArray();
+				: bytes
+					.Take(length)
+					.ToArray();
 
 			if (HasInflateStartSequence(input))
 			{
@@ -102,7 +108,9 @@ namespace Faolan.Core.Network.Conan
 				ResetPacketState();
 
 				return input.Length > 9
-					? Decompress(_inflater, input.Skip(9).ToArray()) ?? []
+					? Decompress(_inflater, input
+						.Skip(9)
+						.ToArray()) ?? []
 					: [];
 			}
 

@@ -17,16 +17,15 @@ namespace Faolan.Importer
 	{
 		// The ability "slot" (0x2052 grant leading word) lives in the OLD archive sqlite `abilities` table, not in
 		// `p_abilities`, so we carry it here keyed by ability id (mirrors the AddAbilitySlot migration backfill).
-		private static readonly Dictionary<uint, uint> AbilitySlots = new()
+		private static readonly Dictionary<uint, uint> AbilitySlots = new Dictionary<uint, uint>
 		{
-			[269272] = 106,   // Rest
-			[769094] = 108,   // Normal Attack Left
-			[769095] = 109,   // Normal Attack Right
-			[769099] = 112,   // Normal Attack Front
+			[269272] = 106, // Rest
+			[769094] = 108, // Normal Attack Left
+			[769095] = 109, // Normal Attack Right
+			[769099] = 112, // Normal Attack Front
 			[3316611] = 1250, // toggle combat
-			[3675584] = 259   // switch weapon
+			[3675584] = 259 // switch weapon
 		};
-
 
 		public static async Task<(int Abilities, int ClassAbilities)> ImportAsync(IDatabaseContext db, string sqlDir)
 		{

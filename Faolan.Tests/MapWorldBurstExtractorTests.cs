@@ -36,6 +36,22 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void Merge_DropsBurst_WhenInstanceUnknown()
+		{
+			// No receiver header -> CapturedInstance stays 0 -> can't re-address -> dropped.
+			var packets = new List<CapturedPacket>
+			{
+				Packet(0x2000, true, MapChangeContent(1000)),
+				Download2000(0x66AEDD50),
+				Poll2020()
+			};
+
+			var bursts = MapWorldBurstExtractor.Merge(MapWorldBurstExtractor.Extract(packets));
+
+			Assert.Empty(bursts);
+		}
+
+		[Fact]
 		public void Merge_KeepsBurst_WhenInstanceOutOfVarintRange()
 		{
 			// Maps 1000/11040 captured an out-of-range instance (e.g. 0x110099BD, a 5-byte varint). These are kept
@@ -53,22 +69,6 @@ namespace Faolan.Tests
 			Assert.Single(bursts);
 			Assert.Equal(1000u, bursts[0].MapId);
 			Assert.Equal(0x110099BDu, bursts[0].CapturedInstance);
-		}
-
-		[Fact]
-		public void Merge_DropsBurst_WhenInstanceUnknown()
-		{
-			// No receiver header -> CapturedInstance stays 0 -> can't re-address -> dropped.
-			var packets = new List<CapturedPacket>
-			{
-				Packet(0x2000, true, MapChangeContent(1000)),
-				Download2000(0x66AEDD50),
-				Poll2020()
-			};
-
-			var bursts = MapWorldBurstExtractor.Merge(MapWorldBurstExtractor.Extract(packets));
-
-			Assert.Empty(bursts);
 		}
 
 		private static CapturedPacket Download2000(uint subop)

@@ -50,9 +50,12 @@ namespace Faolan.GameServer.Combat
 		public CharacterStatBlock ToVitalsBlock()
 		{
 			return new CharacterStatBlock()
-				.Set(LegacyCharacterStatId.HealthCurrent, Health).Set(LegacyCharacterStatId.HealthMax, MaxHealth)
-				.Set(LegacyCharacterStatId.StaminaCurrent, Stamina).Set(LegacyCharacterStatId.StaminaMax, MaxStamina)
-				.Set(LegacyCharacterStatId.ManaCurrent, Mana).Set(LegacyCharacterStatId.ManaMax, MaxMana);
+				.Set(LegacyCharacterStatId.HealthCurrent, Health)
+				.Set(LegacyCharacterStatId.HealthMax, MaxHealth)
+				.Set(LegacyCharacterStatId.StaminaCurrent, Stamina)
+				.Set(LegacyCharacterStatId.StaminaMax, MaxStamina)
+				.Set(LegacyCharacterStatId.ManaCurrent, Mana)
+				.Set(LegacyCharacterStatId.ManaMax, MaxMana);
 		}
 
 		/// <summary>Creates a full-health entity (current == max) from max values.</summary>

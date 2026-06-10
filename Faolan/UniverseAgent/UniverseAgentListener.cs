@@ -59,8 +59,7 @@ namespace Faolan.UniverseAgent
 					if (credentials is not null && credentials.Challenge == account.AuthChallenge)
 					{
 						// Patched client: enforce the password, unless none is configured (the "-" sentinel).
-						authenticated = string.IsNullOrEmpty(account.Password) || account.Password == "-" ||
-							(credentials.Username == account.UserName && credentials.Password == account.Password);
+						authenticated = string.IsNullOrEmpty(account.Password) || account.Password == "-" || (credentials.Username == account.UserName && credentials.Password == account.Password);
 
 						if (authenticated)
 							Logger.LogInformation("UniverseAgent login: password validated for {UserName} (patched client).", account.UserName);

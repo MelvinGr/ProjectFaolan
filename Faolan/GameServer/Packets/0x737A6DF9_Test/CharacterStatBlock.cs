@@ -43,7 +43,9 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 		{
 			stream.WriteByte((byte)_records.Count);
 			foreach (var (statId, rawValue) in _records)
-				stream.WriteUInt32(statId).WriteUInt32(rawValue);
+				stream
+					.WriteUInt32(statId)
+					.WriteUInt32(rawValue);
 
 			return stream;
 		}

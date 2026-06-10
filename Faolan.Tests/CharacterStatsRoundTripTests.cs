@@ -1,8 +1,8 @@
 using System;
-using System.Buffers.Binary;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.Spawn;
+using Faolan.Tests.Support;
 using Xunit;
 
 namespace Faolan.Tests
@@ -13,15 +13,6 @@ namespace Faolan.Tests
 	// what TryRebuildPlayerSpawnFromDb ships today (docs/player-spawn-generation-plan.md).
 	public class CharacterStatsRoundTripTests
 	{
-		private static ReadOnlySpan<byte> TemplateCharacterStatsPayload(out byte[] template)
-		{
-			template = Support.Golden.Bytes("SpawnStrieTemplate");
-			var p = SpawnPacketBuilder.CharacterStatsTagOffset;
-			Assert.Equal(0x22, template[p]); // 0x22 length-delimited field tag
-			int len = template[p + 1]; // 67 < 128, single-byte length
-			return template.AsSpan(p + 2, len);
-		}
-
 		[Fact]
 		public void TemplateCharacterStats_DecodesExpectedIdentity()
 		{
@@ -46,5 +37,13 @@ namespace Faolan.Tests
 			Assert.Equal(Convert.ToHexString(payload), Convert.ToHexString(reEncoded));
 		}
 
+		private static ReadOnlySpan<byte> TemplateCharacterStatsPayload(out byte[] template)
+		{
+			template = Golden.Bytes("SpawnStrieTemplate");
+			var p = SpawnPacketBuilder.CharacterStatsTagOffset;
+			Assert.Equal(0x22, template[p]); // 0x22 length-delimited field tag
+			int len = template[p + 1]; // 67 < 128, single-byte length
+			return template.AsSpan(p + 2, len);
+		}
 	}
 }

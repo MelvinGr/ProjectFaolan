@@ -25,22 +25,18 @@ namespace Faolan.Importer
 	// overwrites; the biggest captured spawn per name wins (geared late-game spawns carry the most data).
 	public static class CaptureCharacterImporter
 	{
+		private const string ImportAccountName = "captured";
+		private const uint CharacterListOpcode = 0x20EF; // PlayerAgent SendCharacterList
+		private const uint InventorySnapshotSubOpcode = 0x737A6DF9;
+		private const uint MapChangeSubOpcode = 0x5D85BFC7;
+
+		private const uint Opcode2000 = 0x2000;
+
 		// The account imported characters are attached to. 0 = find-or-create the dedicated "captured"
 		// account (login validation is stubbed, so logging in as captured/captured works). Imported
 		// characters deliberately do NOT join an existing play account: a 20+ entry character list breaks
 		// the client's auto-enter flow (observed with the smoke account).
 		public static uint AccountId = 0;
-
-		private const string ImportAccountName = "captured";
-
-		private const uint Opcode2000 = 0x2000;
-		private const uint MapChangeSubOpcode = 0x5D85BFC7;
-		private const uint InventorySnapshotSubOpcode = 0x737A6DF9;
-		private const uint CharacterListOpcode = 0x20EF; // PlayerAgent SendCharacterList
-
-		// One retail character-list entry (PlayerAgent 0x20EF): the only wire source for the CLASS, and the
-		// character's persisted map (vs the spawn-time MapChange).
-		private sealed record CharListEntry(uint Class, uint Level, uint MapId);
 
 		public static async Task<(int Seen, int Added, int Skipped)> ImportAsync(DatabaseContext db, IEnumerable<IReadOnlyList<CapturedPacket>> captures)
 		{
@@ -132,7 +128,10 @@ namespace Faolan.Importer
 				// the class id (verified 10/10 against the captured character lists, all pre-frame variants;
 				// the high byte is an archetype group). This covers OTHER players too - the char list (0x20EF)
 				// only exists for the capturing account's own characters and serves as the cross-check.
-				var classId = charList.GetValueOrDefault(name)?.Class ?? (body.Length > 136 ? body[136] : 0u);
+				var classId = charList.GetValueOrDefault(name)
+					?.Class ?? (body.Length > 136
+					? body[136]
+					: 0u);
 
 				await AddCharacter(db, accountId, realmId, name, mapId, classId, scaffold, read.Message, snapshots.GetValueOrDefault(handle), charList.GetValueOrDefault(name));
 				added++;
@@ -141,116 +140,8 @@ namespace Faolan.Importer
 			return (best.Count, added, skipped);
 		}
 
-		private static async Task<uint> ResolveMapId(DatabaseContext db, uint spawnMapId, CharListEntry listEntry)
-		{
-			foreach (var candidate in new[] { spawnMapId, listEntry?.MapId ?? 0 })
-			{
-				if (candidate != 0 && await db.Maps.AnyAsync(m => m.Id == candidate))
-					return candidate;
-			}
-
-			// MapId is required: fall back to Tortage Beach (the universal fallback world), making sure
-			// its Map row exists so the foreign key can never fail.
-			if (!await db.Maps.AnyAsync(m => m.Id == Map.TortageBeachId))
-			{
-				db.Maps.Add(new Map { Id = Map.TortageBeachId, Name = "Tortage Beach" });
-				await db.SaveChangesAsync();
-			}
-
-			return Map.TortageBeachId;
-		}
-
-		// RealmId is required and captures don't carry our local realm ids, so imported characters join the
-		// server's (first) realm, creating a default one when the DB has none yet.
-		private static async Task<uint> FindOrCreateRealm(DatabaseContext db)
-		{
-			var realm = await db.Realms.OrderBy(r => r.Id).FirstOrDefaultAsync();
-			if (realm == null)
-			{
-				realm = new Realm
-				{
-					Name = "Project Faolan",
-					IpAddress = "127.0.0.1"
-				};
-				db.Realms.Add(realm);
-				await db.SaveChangesAsync();
-				Console.WriteLine($"Characters: created default realm '{realm.Name}' (id {realm.Id}).");
-			}
-
-			return realm.Id;
-		}
-
-		private static async Task<uint> FindOrCreateImportAccount(DatabaseContext db)
-		{
-			var existing = await db.Accounts.FirstOrDefaultAsync(a => a.UserName == ImportAccountName);
-			if (existing != null)
-				return existing.Id;
-
-			var account = new Account
-			{
-				UserName = ImportAccountName,
-				Password = ImportAccountName,
-				AuthChallenge = "",
-				LastIpAddress = ""
-			};
-			db.Accounts.Add(account);
-			await db.SaveChangesAsync();
-			Console.WriteLine($"Characters: created import account '{ImportAccountName}' (id {account.Id}).");
-			return account.Id;
-		}
-
-		// The creator names its temp instances "Character<instance>" until the real name is committed.
-		private static bool IsCreatorTempName(string name)
-		{
-			return name.Length > 9 && name.StartsWith("Character", StringComparison.Ordinal) && name.Skip(9).All(char.IsAsciiDigit);
-		}
-
-		// Parses a retail PlayerAgent character list (the SendCharacterList layout) into name -> entry;
-		// later lists overwrite earlier ones (latest capture state wins).
-		private static void HarvestCharacterList(byte[] packet, Dictionary<string, CharListEntry> charList)
-		{
-			try
-			{
-				var headerLen = BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
-				var stream = new FaolanStream(packet[(12 + (int)headerLen)..]);
-				stream.ReadUInt32(); // client instance
-				var count = (int)(stream.ReadUInt32() / 1009) - 1;
-				for (var i = 0; i < count; i++)
-				{
-					stream.ReadUInt32(); // character id
-					stream.ReadUInt32(); // player instance
-					stream.ReadUInt32(); // character id again
-					var name = stream.ReadString();
-					stream.ReadUInt32(); // realm
-					stream.ReadUInt32(); // sex
-					stream.ReadString(); // last-connection date
-					stream.ReadUInt32();
-					var mapId = stream.ReadUInt32();
-					var level = stream.ReadUInt32();
-					var @class = stream.ReadUInt32();
-					stream.ReadUInt32();
-					stream.ReadUInt32();
-					stream.ReadUInt32(); // 0x60355308
-					stream.ReadUInt32(); // 2
-					stream.ReadUInt32(); // race
-					stream.ReadString(); // language
-					stream.ReadUInt32();
-					stream.ReadUInt32();
-					stream.ReadString(); // auth challenge
-					stream.ReadUInt32();
-					stream.ReadUInt32();
-
-					if (!string.IsNullOrEmpty(name))
-						charList[name] = new CharListEntry(@class, level, mapId);
-				}
-			}
-			catch
-			{
-				// truncated/foreign 0x20EF body - ignore; the class just stays unknown for its characters
-			}
-		}
-
-		private static async Task AddCharacter(DatabaseContext db, uint accountId, uint realmId, string name, uint mapId, uint classId, PlayerSpawnScaffold scaffold, ProtoCoreCharacterIIR message, List<byte[]> snapshots, CharListEntry listEntry)
+		private static async Task AddCharacter(DatabaseContext db, uint accountId, uint realmId, string name, uint mapId, uint classId, PlayerSpawnScaffold scaffold, ProtoCoreCharacterIIR message, List<byte[]> snapshots,
+			CharListEntry listEntry)
 		{
 			var stats = message.Stats ?? new ProtoCoreCharacterIIR.CharacterStats();
 
@@ -267,7 +158,9 @@ namespace Faolan.Importer
 				Id = originalId,
 				AccountId = accountId,
 				Name = name,
-				AuthChallenge = Guid.NewGuid().ToString("N"),
+				AuthChallenge = Guid
+					.NewGuid()
+					.ToString("N"),
 				CreationDate = DateTime.UtcNow,
 				Level = (ushort)Math.Max(1, stats.Level),
 				Race = (Race)stats.Race,
@@ -371,7 +264,109 @@ namespace Faolan.Importer
 
 			await db.SaveChangesAsync();
 
-			Console.WriteLine($"Character '{name}': id {character.Id:X8}{(originalId == 0 ? " (generated)" : "")}, level {character.Level} {character.Sex} {character.Race} {character.Class}, map {character.MapId}, {worn}/{message.InventoryEntries.Count} worn, {carried}/{carriedTotal} carried, {character.Attributes.Count} scaffold entries, {character.Skills.Count} skill ids.");
+			Console.WriteLine(
+				$"Character '{name}': id {character.Id:X8}{(originalId == 0 ? " (generated)" : "")}, level {character.Level} {character.Sex} {character.Race} {character.Class}, map {character.MapId}, {worn}/{message.InventoryEntries.Count} worn, {carried}/{carriedTotal} carried, {character.Attributes.Count} scaffold entries, {character.Skills.Count} skill ids.");
+		}
+
+		private static async Task<uint> FindOrCreateImportAccount(DatabaseContext db)
+		{
+			var existing = await db.Accounts.FirstOrDefaultAsync(a => a.UserName == ImportAccountName);
+			if (existing != null)
+				return existing.Id;
+
+			var account = new Account
+			{
+				UserName = ImportAccountName,
+				Password = ImportAccountName,
+				AuthChallenge = "",
+				LastIpAddress = ""
+			};
+			db.Accounts.Add(account);
+			await db.SaveChangesAsync();
+			Console.WriteLine($"Characters: created import account '{ImportAccountName}' (id {account.Id}).");
+			return account.Id;
+		}
+
+		// RealmId is required and captures don't carry our local realm ids, so imported characters join the
+		// server's (first) realm, creating a default one when the DB has none yet.
+		private static async Task<uint> FindOrCreateRealm(DatabaseContext db)
+		{
+			var realm = await db
+				.Realms
+				.OrderBy(r => r.Id)
+				.FirstOrDefaultAsync();
+			if (realm == null)
+			{
+				realm = new Realm
+				{
+					Name = "Project Faolan",
+					IpAddress = "127.0.0.1"
+				};
+				db.Realms.Add(realm);
+				await db.SaveChangesAsync();
+				Console.WriteLine($"Characters: created default realm '{realm.Name}' (id {realm.Id}).");
+			}
+
+			return realm.Id;
+		}
+
+		// Returns the packet body INCLUDING its leading u32 length - the scaffold codec's input layout
+		// ([u32 bodyLen][u32 FA015807][...]).
+		private static byte[] GetBody(byte[] packet)
+		{
+			if (packet.Length < 16)
+				return [];
+
+			var headerLen = BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
+			var bodyStart = 12 + (int)headerLen;
+			return headerLen > packet.Length || bodyStart + 8 > packet.Length
+				? []
+				: packet[bodyStart..];
+		}
+
+		// Parses a retail PlayerAgent character list (the SendCharacterList layout) into name -> entry;
+		// later lists overwrite earlier ones (latest capture state wins).
+		private static void HarvestCharacterList(byte[] packet, Dictionary<string, CharListEntry> charList)
+		{
+			try
+			{
+				var headerLen = BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
+				var stream = new FaolanStream(packet[(12 + (int)headerLen)..]);
+				stream.ReadUInt32(); // client instance
+				var count = (int)(stream.ReadUInt32() / 1009) - 1;
+				for (var i = 0; i < count; i++)
+				{
+					stream.ReadUInt32(); // character id
+					stream.ReadUInt32(); // player instance
+					stream.ReadUInt32(); // character id again
+					var name = stream.ReadString();
+					stream.ReadUInt32(); // realm
+					stream.ReadUInt32(); // sex
+					stream.ReadString(); // last-connection date
+					stream.ReadUInt32();
+					var mapId = stream.ReadUInt32();
+					var level = stream.ReadUInt32();
+					var @class = stream.ReadUInt32();
+					stream.ReadUInt32();
+					stream.ReadUInt32();
+					stream.ReadUInt32(); // 0x60355308
+					stream.ReadUInt32(); // 2
+					stream.ReadUInt32(); // race
+					stream.ReadString(); // language
+					stream.ReadUInt32();
+					stream.ReadUInt32();
+					stream.ReadString(); // auth challenge
+					stream.ReadUInt32();
+					stream.ReadUInt32();
+
+					if (!string.IsNullOrEmpty(name))
+						charList[name] = new CharListEntry(@class, level, mapId);
+				}
+			}
+			catch
+			{
+				// truncated/foreign 0x20EF body - ignore; the class just stays unknown for its characters
+			}
 		}
 
 		// Parses the snapshot's ProtoFullCharacterIIR root and stores the Bag/Resource/Quest container entries
@@ -424,7 +419,8 @@ namespace Faolan.Importer
 						Container = (int)container.InventoryId.Type,
 						Slot = (int)entry.Pos,
 						ItemId = templateId,
-						Count = entry.Item.StatLists.FirstOrDefault(s => s.Stat == 26)?.Value ?? 1
+						Count = entry.Item.StatLists.FirstOrDefault(s => s.Stat == 26)
+							?.Value ?? 1
 					});
 					stored++;
 				}
@@ -433,18 +429,39 @@ namespace Faolan.Importer
 			return (stored, total);
 		}
 
-		// Returns the packet body INCLUDING its leading u32 length - the scaffold codec's input layout
-		// ([u32 bodyLen][u32 FA015807][...]).
-		private static byte[] GetBody(byte[] packet)
+		// The creator names its temp instances "Character<instance>" until the real name is committed.
+		private static bool IsCreatorTempName(string name)
 		{
-			if (packet.Length < 16)
-				return [];
-
-			var headerLen = BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
-			var bodyStart = 12 + (int)headerLen;
-			return headerLen > packet.Length || bodyStart + 8 > packet.Length
-				? []
-				: packet[bodyStart..];
+			return name.Length > 9 && name.StartsWith("Character", StringComparison.Ordinal) && name
+				.Skip(9)
+				.All(char.IsAsciiDigit);
 		}
+
+		private static async Task<uint> ResolveMapId(DatabaseContext db, uint spawnMapId, CharListEntry listEntry)
+		{
+			foreach (var candidate in new[] { spawnMapId, listEntry?.MapId ?? 0 })
+			{
+				if (candidate != 0 && await db.Maps.AnyAsync(m => m.Id == candidate))
+					return candidate;
+			}
+
+			// MapId is required: fall back to Tortage Beach (the universal fallback world), making sure
+			// its Map row exists so the foreign key can never fail.
+			if (!await db.Maps.AnyAsync(m => m.Id == Map.TortageBeachId))
+			{
+				db.Maps.Add(new Map
+				{
+					Id = Map.TortageBeachId,
+					Name = "Tortage Beach"
+				});
+				await db.SaveChangesAsync();
+			}
+
+			return Map.TortageBeachId;
+		}
+
+		// One retail character-list entry (PlayerAgent 0x20EF): the only wire source for the CLASS, and the
+		// character's persisted map (vs the spawn-time MapChange).
+		private sealed record CharListEntry(uint Class, uint Level, uint MapId);
 	}
 }

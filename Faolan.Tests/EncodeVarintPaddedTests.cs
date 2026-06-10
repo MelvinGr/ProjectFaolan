@@ -1,4 +1,3 @@
-using System;
 using Faolan.GameServer;
 using Xunit;
 
@@ -10,26 +9,11 @@ namespace Faolan.Tests
 	// length-preserving; a padded (non-minimal) varint must still decode to the original value.
 	public class EncodeVarintPaddedTests
 	{
-		private static ulong DecodeVarint(byte[] bytes)
-		{
-			ulong value = 0;
-			var shift = 0;
-			foreach (var b in bytes)
-			{
-				value |= (ulong)(b & 0x7F) << shift;
-				shift += 7;
-				if ((b & 0x80) == 0)
-					break;
-			}
-
-			return value;
-		}
-
-		[Theory]
-		[InlineData(0x02000005u, 4)] // in-range live id, natural 4-byte length (no padding)
-		[InlineData(0x02000005u, 5)] // same id padded to a 5-byte slot (captured out-of-range instance)
-		[InlineData(1u, 5)] // small value padded into a long slot
-		[InlineData(0xFFFFFFFFu, 5)] // 32-bit max needs the full 5 bytes
+		[Theory, InlineData(0x02000005u, 4), InlineData(0x02000005u, 5), InlineData(1u, 5), InlineData(0xFFFFFFFFu, 5)]
+		// in-range live id, natural 4-byte length (no padding)
+		// same id padded to a 5-byte slot (captured out-of-range instance)
+		// small value padded into a long slot
+			// 32-bit max needs the full 5 bytes
 		public void Padded_HasRequestedLength_AndRoundTrips(uint value, int byteLength)
 		{
 			var bytes = GameServerListener.EncodeVarintPadded(value, byteLength);
@@ -48,6 +32,21 @@ namespace Faolan.Tests
 		{
 			// 0xFFFFFFFF needs 5 varint bytes; it can't be squeezed into a 4-byte captured slot.
 			Assert.Null(GameServerListener.EncodeVarintPadded(0xFFFFFFFFu, 4));
+		}
+
+		private static ulong DecodeVarint(byte[] bytes)
+		{
+			ulong value = 0;
+			var shift = 0;
+			foreach (var b in bytes)
+			{
+				value |= (ulong)(b & 0x7F) << shift;
+				shift += 7;
+				if ((b & 0x80) == 0)
+					break;
+			}
+
+			return value;
 		}
 	}
 }

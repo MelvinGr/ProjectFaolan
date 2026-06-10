@@ -3,17 +3,17 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Crypt;
 using Faolan.Core.Data;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Protobuf;
 using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.Packets._0x737A6DF9_Test;
 using Faolan.GameServer.Spawn;
 using Microsoft.Extensions.Logging;
@@ -23,6 +23,11 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
+		// Tortage Beach (0xFAA/4010) - the universal fallback world. Its burst is always seeded (the proven blob), so
+		// any character whose own map has no usable burst still enters a real, rendered world instead of a hand-built
+		// one. (There is no hand-built login/teleport path anymore.)
+		private const uint DefaultWorldMapId = Map.TortageBeachId;
+
 		// The one beach NPC whose SpawnCheck answer carries status 0x02 (it is Casilda / the intro NPC, handle
 		// 0x00081906 in the capture); every other polled entity gets status 0x00. This is an NPC handle from the
 		// burst, NOT the player (the client never polls its own handle), so it is unchanged across characters.
@@ -41,7 +46,9 @@ namespace Faolan.GameServer
 		private void ApplyDbInventory(ProtoMessage root, DbInventory dbInventory)
 		{
 			var equipped = InventorySnapshotInspector.GetContainer(root, InventorySnapshotInspector.ContainerKind.Equipped);
-			foreach (var entry in InventorySnapshotInspector.GetContainerEntries(equipped).ToList())
+			foreach (var entry in InventorySnapshotInspector
+				         .GetContainerEntries(equipped)
+				         .ToList())
 			{
 				var slot = InventorySnapshotInspector.GetEntrySlot(entry) ?? 0;
 				if (dbInventory.Equipped.TryGetValue(slot, out var resolved))
@@ -51,7 +58,9 @@ namespace Faolan.GameServer
 			if (dbInventory.BagFirst.HasValue)
 			{
 				var bag = InventorySnapshotInspector.GetContainer(root, InventorySnapshotInspector.ContainerKind.Bag);
-				var firstBag = InventorySnapshotInspector.GetContainerEntries(bag).FirstOrDefault();
+				var firstBag = InventorySnapshotInspector
+					.GetContainerEntries(bag)
+					.FirstOrDefault();
 				if (firstBag != null)
 					ReplaceEntryInPlace(bag, firstBag, dbInventory.BagFirst.Value.Item, dbInventory.BagFirst.Value.Archetype, 1);
 			}
@@ -112,7 +121,9 @@ namespace Faolan.GameServer
 				foreach (var container in FullCharSnapshotBuilder.BuildContainers(instance, dbInventory.Equipped, dbInventory.BagFirst, dbInventory.Rows))
 					typedRoot.Inventories.Add(container);
 				rootBytes = typedRoot.ToProtobufBytes();
-				Logger.LogInformation("Inventory containers GENERATED from DB: {Equipped} equipped + {Bag} bag item(s).", dbInventory.Equipped.Count, dbInventory.BagFirst.HasValue ? 1 : 0);
+				Logger.LogInformation("Inventory containers GENERATED from DB: {Equipped} equipped + {Bag} bag item(s).", dbInventory.Equipped.Count, dbInventory.BagFirst.HasValue
+					? 1
+					: 0);
 			}
 			catch (Exception ex)
 			{
@@ -205,11 +216,16 @@ namespace Faolan.GameServer
 				List<ScaffoldEntry> weighted = null;
 				if (scaffoldCharacter.BodyResources is { Count: > 0 })
 				{
-					var registry = await Database.GetMorphTargets(scaffoldCharacter.BodyResources.Select(r => r.Ref).ToArray());
+					var registry = await Database.GetMorphTargets(scaffoldCharacter
+						.BodyResources
+						.Select(r => r.Ref)
+						.ToArray());
 					weighted = PlayerSpawnScaffoldRows.BuildWeightedEntries(scaffoldCharacter.BodyResources, registry);
 					if (weighted == null)
+					{
 						Logger.LogWarning("Character {CharacterId} has {Count} chosen appearance resources but none resolved via MorphTargets (registry imported?); using the default weighted entries.", character.Id,
 							scaffoldCharacter.BodyResources.Count);
+					}
 				}
 
 				if (!PlayerSpawnScaffoldRows.EnsureFreshRows(scaffoldCharacter, weighted))
@@ -262,32 +278,6 @@ namespace Faolan.GameServer
 				recordId, count);
 		}
 
-		// Tortage Beach (0xFAA/4010) - the universal fallback world. Its burst is always seeded (the proven blob), so
-		// any character whose own map has no usable burst still enters a real, rendered world instead of a hand-built
-		// one. (There is no hand-built login/teleport path anymore.)
-		private const uint DefaultWorldMapId = Map.TortageBeachId;
-
-		// The single existing-character WORLD ENTRY used by both login and the teleport GM command: send the 0x201c
-		// channel handshake, then replay the character's current-map world burst from the DB (MapChange + world
-		// objects + NPC spawns + the player spawn + the inventory snapshot, all re-addressed and DB-driven). Falls
-		// back to the beach burst for any map without a usable burst. The caller has already set Character.MapId/Pos.
-		private async Task SendWorldEntry(INetworkClient client)
-		{
-			await Send0X201C(client);
-
-			var mapId = client.Session.Character.MapId;
-			var worldBurst = await Database.GetMapWorldBurst(mapId) ?? await Database.GetMapWorldBurst(DefaultWorldMapId);
-			if (worldBurst == null)
-			{
-				Logger.LogError("World entry (map={Map}, '{Name}'): no world burst available (not even the beach); the world cannot be built.", mapId, client.Session.Character?.Name);
-				return;
-			}
-
-			Logger.LogInformation("World entry (map={Map}, '{Name}'): replaying {Count} IIR records from the DB ({Source}).", mapId, client.Session.Character?.Name, worldBurst.Entities.Count,
-				worldBurst.MapId == mapId ? "own map" : $"beach fallback (map {worldBurst.MapId})");
-			await ReplayMapWorldBurst(client, worldBurst);
-		}
-
 		// Replays a map's captured world burst (from the DB), re-addressed from the burst's captured instance to the
 		// logged-in character. Works for ANY map that has a stored burst (beach included - its burst is the proven
 		// blob, seeded into the DB by Faolan.Importer).
@@ -295,8 +285,13 @@ namespace Faolan.GameServer
 		{
 			// Rebuild the exact original packet bytes from the structured IIR records (IirRecordCodec is round-trip
 			// lossless), then drive the same proven byte-preserving replay (instance rewrite + inventory/spawn rebuild).
-			var records = burst.Entities.OrderBy(e => e.Sequence).ToList();
-			var packets = records.Select(IirRecordCodec.Rebuild).ToList();
+			var records = burst
+				.Entities
+				.OrderBy(e => e.Sequence)
+				.ToList();
+			var packets = records
+				.Select(IirRecordCodec.Rebuild)
+				.ToList();
 			var capturedInstance = burst.CapturedInstance;
 			var liveInstance = client.Session.Account.ClientInstance;
 			Logger.LogInformation("Replaying world burst for map {Map} ({Count} packets, instance {Old:X8} -> {New:X8}).", burst.MapId, packets.Count, capturedInstance, liveInstance);
@@ -359,61 +354,6 @@ namespace Faolan.GameServer
 				await client.SendAsync(bytes);
 		}
 
-		// Records a world-burst spawn's handle -> NPC name into the session map (for conversation routing). No-op for
-		// non-FA015807 packets and the player's own spawn (handle == client instance).
-		private static void RecordSpawnedNpcName(INetworkClient client, byte[] packet)
-		{
-			if (packet.Length < 12)
-				return;
-
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
-			var bodyStart = 12 + headerLen;
-			if (bodyStart + 16 > packet.Length)
-				return;
-
-			var body = packet.AsSpan(bodyStart);
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != 0xFA015807u)
-				return;
-
-			var handle = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(12, 4));
-			if (handle == client.Session.Account.ClientInstance)
-				return; // the player's own spawn
-
-			var name = ReadSpawnName(body);
-			if (name != null)
-				client.Session.SpawnedNpcNamesByHandle[handle] = name;
-		}
-
-		// The entity name is the first `0x0A <len 1..63> <printable-ascii>` run in the spawn body.
-		private static string ReadSpawnName(ReadOnlySpan<byte> body)
-		{
-			for (var i = 16; i + 2 < body.Length; i++)
-			{
-				if (body[i] != 0x0A)
-					continue;
-
-				int len = body[i + 1];
-				if (len is < 1 or > 63 || i + 2 + len > body.Length)
-					continue;
-
-				var ok = true;
-				for (var j = 0; j < len; j++)
-				{
-					var c = body[i + 2 + j];
-					if (c is < 0x20 or > 0x7E)
-					{
-						ok = false;
-						break;
-					}
-				}
-
-				if (ok)
-					return System.Text.Encoding.ASCII.GetString(body.Slice(i + 2, len));
-			}
-
-			return null;
-		}
-
 		// Answers a client 0x2020 spawn poll with a 0x2008 SpawnCheck on the 201C conversation: body is
 		// 0x0000C350 + the polled entity handle + a status byte (0x02 for the player's own avatar, else 0x00).
 		private Task SendSpawnCheckResponse(INetworkClient client, uint handle)
@@ -422,7 +362,34 @@ namespace Faolan.GameServer
 				? 0x02
 				: 0x00);
 
-			return new PacketStream().WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameServerRespondOpcodes.SpawnCheck).WriteUInt32(0x0000C350).WriteUInt32(handle).WriteByte(status).SendAsync(client);
+			return new PacketStream()
+				.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameServerRespondOpcodes.SpawnCheck)
+				.WriteUInt32(0x0000C350)
+				.WriteUInt32(handle)
+				.WriteByte(status)
+				.SendAsync(client);
+		}
+
+		// The single existing-character WORLD ENTRY used by both login and the teleport GM command: send the 0x201c
+		// channel handshake, then replay the character's current-map world burst from the DB (MapChange + world
+		// objects + NPC spawns + the player spawn + the inventory snapshot, all re-addressed and DB-driven). Falls
+		// back to the beach burst for any map without a usable burst. The caller has already set Character.MapId/Pos.
+		private async Task SendWorldEntry(INetworkClient client)
+		{
+			await Send0X201C(client);
+
+			var mapId = client.Session.Character.MapId;
+			var worldBurst = await Database.GetMapWorldBurst(mapId) ?? await Database.GetMapWorldBurst(DefaultWorldMapId);
+			if (worldBurst == null)
+			{
+				Logger.LogError("World entry (map={Map}, '{Name}'): no world burst available (not even the beach); the world cannot be built.", mapId, client.Session.Character?.Name);
+				return;
+			}
+
+			Logger.LogInformation("World entry (map={Map}, '{Name}'): replaying {Count} IIR records from the DB ({Source}).", mapId, client.Session.Character?.Name, worldBurst.Entities.Count, worldBurst.MapId == mapId
+				? "own map"
+				: $"beach fallback (map {worldBurst.MapId})");
+			await ReplayMapWorldBurst(client, worldBurst);
 		}
 
 		// If the burst packet is the player's own entity Spawn (FA015807 whose handle is the client instance),
@@ -527,9 +494,7 @@ namespace Faolan.GameServer
 				newBody = RebuildScaffoldFromRows(newBody, scaffoldCharacter);
 			}
 			else
-			{
 				newBody = SpawnPacketBuilder.SetSpawnName(newBody, character.Name);
-			}
 
 			rebuilt = new byte[bodyStart + newBody.Length];
 			Array.Copy(packet, 0, rebuilt, 0, bodyStart); // [len][crc][headerLen][header]
@@ -543,6 +508,31 @@ namespace Faolan.GameServer
 
 			Logger.LogInformation("Rebuilt player spawn from DB: handle=0x{Handle:X}, name='{Name}', pos=({X},{Y},{Z}).", handle, character.Name, character.Position.X, character.Position.Y, character.Position.Z);
 			return true;
+		}
+
+		// Encodes value as a base-128 varint of EXACTLY byteLength bytes, padding the high groups with overlong
+		// (non-minimal) continuation bytes when value needs fewer. Overlong varints are valid - a decoder reads the
+		// continuation bytes and reconstructs the same value - so this keeps a varint substitution length-preserving
+		// when the captured id encodes to more bytes than the live id. Returns null if value does not fit in
+		// byteLength*7 bits (the live id can't be made to fit the captured slot without shifting later bytes).
+		internal static byte[] EncodeVarintPadded(uint value, int byteLength)
+		{
+			if (byteLength is < 1 or > 5)
+				return null;
+
+			var bytes = new byte[byteLength];
+			var v = value;
+			for (var i = 0; i < byteLength; i++)
+			{
+				bytes[i] = (byte)((v & 0x7F) | (i < byteLength - 1
+					? 0x80u
+					: 0u));
+				v >>= 7;
+			}
+
+			return v != 0
+				? null // value didn't fit in byteLength 7-bit groups
+				: bytes;
 		}
 
 		// Maps an equipped-container slot id (matching the archive player_items/npc_items slot bytes) to the matching
@@ -583,6 +573,61 @@ namespace Faolan.GameServer
 			return bodyStart + 8 <= packet.Length && BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(bodyStart + 4, 4)) == 0x737A6DF9u;
 		}
 
+		// The entity name is the first `0x0A <len 1..63> <printable-ascii>` run in the spawn body.
+		private static string ReadSpawnName(ReadOnlySpan<byte> body)
+		{
+			for (var i = 16; i + 2 < body.Length; i++)
+			{
+				if (body[i] != 0x0A)
+					continue;
+
+				int len = body[i + 1];
+				if (len is < 1 or > 63 || i + 2 + len > body.Length)
+					continue;
+
+				var ok = true;
+				for (var j = 0; j < len; j++)
+				{
+					var c = body[i + 2 + j];
+					if (c is < 0x20 or > 0x7E)
+					{
+						ok = false;
+						break;
+					}
+				}
+
+				if (ok)
+					return Encoding.ASCII.GetString(body.Slice(i + 2, len));
+			}
+
+			return null;
+		}
+
+		// Records a world-burst spawn's handle -> NPC name into the session map (for conversation routing). No-op for
+		// non-FA015807 packets and the player's own spawn (handle == client instance).
+		private static void RecordSpawnedNpcName(INetworkClient client, byte[] packet)
+		{
+			if (packet.Length < 12)
+				return;
+
+			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
+			var bodyStart = 12 + headerLen;
+			if (bodyStart + 16 > packet.Length)
+				return;
+
+			var body = packet.AsSpan(bodyStart);
+			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != 0xFA015807u)
+				return;
+
+			var handle = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(12, 4));
+			if (handle == client.Session.Account.ClientInstance)
+				return; // the player's own spawn
+
+			var name = ReadSpawnName(body);
+			if (name != null)
+				client.Session.SpawnedNpcNamesByHandle[handle] = name;
+		}
+
 		// Replaces every non-overlapping occurrence of find with repl (equal length) in buffer, after the 8-byte
 		// length+crc prefix.
 		private static void ReplaceAll(byte[] buffer, byte[] find, byte[] repl)
@@ -610,10 +655,7 @@ namespace Faolan.GameServer
 		// Resolves which CharacterEquipment slots hold a fully-buildable item (template in Items + archetype harvested).
 		private static DbInventory ResolveDbInventory(CharacterEquipment equipment, CharacterInventory[] inventoryRows)
 		{
-			var inventory = new DbInventory
-			{
-				Rows = inventoryRows ?? []
-			};
+			var inventory = new DbInventory { Rows = inventoryRows ?? [] };
 			if (equipment == null)
 				return inventory;
 
@@ -659,31 +701,6 @@ namespace Faolan.GameServer
 			var crc = Crc32.Calculate(p[8..]);
 			BinaryPrimitives.WriteUInt32BigEndian(p.AsSpan(4, 4), crc);
 			return p;
-		}
-
-		// Encodes value as a base-128 varint of EXACTLY byteLength bytes, padding the high groups with overlong
-		// (non-minimal) continuation bytes when value needs fewer. Overlong varints are valid - a decoder reads the
-		// continuation bytes and reconstructs the same value - so this keeps a varint substitution length-preserving
-		// when the captured id encodes to more bytes than the live id. Returns null if value does not fit in
-		// byteLength*7 bits (the live id can't be made to fit the captured slot without shifting later bytes).
-		internal static byte[] EncodeVarintPadded(uint value, int byteLength)
-		{
-			if (byteLength is < 1 or > 5)
-				return null;
-
-			var bytes = new byte[byteLength];
-			var v = value;
-			for (var i = 0; i < byteLength; i++)
-			{
-				bytes[i] = (byte)((v & 0x7F) | (i < byteLength - 1
-					? 0x80u
-					: 0u));
-				v >>= 7;
-			}
-
-			return v != 0
-				? null // value didn't fit in byteLength 7-bit groups
-				: bytes;
 		}
 
 		// The character's DB-resolved inventory: which equipped-container slot ids (and the first bag slot) have a

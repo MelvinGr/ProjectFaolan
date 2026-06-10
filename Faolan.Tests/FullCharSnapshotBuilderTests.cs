@@ -1,6 +1,9 @@
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using Faolan.Core.Data;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Conan;
 using Faolan.GameServer.Packets._0x737A6DF9_Test;
 using Xunit;
 
@@ -12,8 +15,59 @@ namespace Faolan.Tests
 	// and are unique per item.
 	public class FullCharSnapshotBuilderTests
 	{
-		private static readonly Item Manacles = new Item { Id = 3361557, Data1 = 1, Data2 = 2, Data3 = 3, Data4 = 4, Archetype = 0x43555035 };
-		private static readonly Item Signet = new Item { Id = 3774542, Data1 = 5, Data2 = 6, Data3 = 7, Data4 = 8, Archetype = 0x12345678 };
+		private static readonly Item Manacles = new Item
+		{
+			Id = 3361557,
+			Data1 = 1,
+			Data2 = 2,
+			Data3 = 3,
+			Data4 = 4,
+			Archetype = 0x43555035
+		};
+
+		private static readonly Item Signet = new Item
+		{
+			Id = 3774542,
+			Data1 = 5,
+			Data2 = 6,
+			Data3 = 7,
+			Data4 = 8,
+			Archetype = 0x12345678
+		};
+
+		[Fact]
+		public void BuildContainers_AllocatesUniqueStableIds()
+		{
+			var equipped = new Dictionary<ulong, (Item, uint)>
+			{
+				[0x05] = (Manacles, Manacles.Archetype),
+				[0x12] = (Manacles, Manacles.Archetype)
+			};
+
+			var first = FullCharSnapshotBuilder.BuildContainers(0x02000005, equipped, (Signet, Signet.Archetype));
+			var second = FullCharSnapshotBuilder.BuildContainers(0x02000005, equipped, (Signet, Signet.Archetype));
+
+			var ids = first
+				.SelectMany(c => c.Items)
+				.Select(e => e.Item.ItemId)
+				.ToList();
+			var recordIds = first
+				.SelectMany(c => c.Items)
+				.SelectMany(e => e.Item.StatLists.Where(s => s.Stat == 23))
+				.Select(s => s.Value)
+				.ToList();
+
+			Assert.Equal(ids.Count, ids
+				.Distinct()
+				.Count());
+			Assert.Equal(recordIds.Count, recordIds
+				.Distinct()
+				.Count());
+			Assert.Equal(ids, second
+				.SelectMany(c => c.Items)
+				.Select(e => e.Item.ItemId)
+				.ToList()); // stable across logins
+		}
 
 		[Fact]
 		public void BuildContainers_MatchesTheCapturedShape()
@@ -41,6 +95,55 @@ namespace Faolan.Tests
 			Assert.Empty(containers[3].Items);
 		}
 
+		// Persisted CharacterInventory rows fill their container by kind: bag rows render at their cells (the
+		// seeded FirstPosBag yields its cell to a persisted row), entries stay pos-ascending, and rows without
+		// buildable identity are absent.
+		[Fact]
+		public void BuildContainers_RendersPersistedBagRows()
+		{
+			var rows = new[]
+			{
+				new CharacterInventory
+				{
+					Container = 104,
+					Slot = 3,
+					Item = Manacles,
+					ItemId = Manacles.Id,
+					Count = 2
+				},
+				new CharacterInventory
+				{
+					Container = 104,
+					Slot = 1,
+					Item = Signet,
+					ItemId = Signet.Id
+				}, // occupies the FirstPosBag cell
+				new CharacterInventory
+				{
+					Container = 104,
+					Slot = 5,
+					Item = new Item
+					{
+						Id = 9,
+						Archetype = 0
+					},
+					ItemId = 9
+				} // not buildable
+			};
+
+			var containers = FullCharSnapshotBuilder.BuildContainers(0x02000005, new Dictionary<ulong, (Item, uint)>(), (Manacles, Manacles.Archetype), rows);
+
+			var bag = containers[1].Items;
+			Assert.Equal(new uint[] { 1, 3 }, bag.Select(e => e.Pos)); // row at 1 wins over FirstPosBag; pos-ascending
+			Assert.Equal(Signet.Id, bag[0].Item.ItemData.Template1);
+			Assert.Equal(Manacles.Id, bag[1].Item.ItemData.Template1);
+			Assert.Equal(2u, bag[1]
+				.Item
+				.StatLists
+				.Single(s => s.Stat == 26)
+				.Value); // stack count from the row
+		}
+
 		// The world-entry tail patch (live level + current vitals) must survive the tails serialize and leave
 		// everything else byte-stable: re-serializing with the SAME values is a no-op, and a changed level
 		// reads back changed.
@@ -48,11 +151,11 @@ namespace Faolan.Tests
 		public void TailPatch_RoundTripsThroughTheTailsModel()
 		{
 			const string bigboy = "/home/melvin/Development/C#/Project Faolan/Captures/account-stricken997-character-Strie-login-randomActions-bigboy.bin";
-			if (!System.IO.File.Exists(bigboy))
+			if (!File.Exists(bigboy))
 				return;
 
-			var packet = new Faolan.Core.Network.Conan.ConanPacket(System.IO.File.ReadAllBytes(bigboy));
-			var body = new Faolan.Core.Data.FaolanStream(packet.Body.ReadArrayUInt32Length());
+			var packet = new ConanPacket(File.ReadAllBytes(bigboy));
+			var body = new FaolanStream(packet.Body.ReadArrayUInt32Length());
 			body.ReadUInt32();
 			body.ReadUInt32();
 			body.ReadUInt32();
@@ -65,7 +168,8 @@ namespace Faolan.Tests
 			parts.Tails.Level = 42;
 			var patched = BigboyTailsFile.Deserialize(parts.Tails.ToArray());
 			Assert.Equal(42u, patched.Level);
-			Assert.Equal(original.Length, parts.Tails.ToArray().Length); // fixed-width patch, no resize
+			Assert.Equal(original.Length, parts.Tails.ToArray()
+				.Length); // fixed-width patch, no resize
 
 			// The live-vitals/XP patch slots round-trip too. The bigboy capture is the tails model's reference
 			// fixture, so its stat table MUST be recognized - a silent skip here would mean the world-entry
@@ -78,48 +182,6 @@ namespace Faolan.Tests
 				Assert.Equal(1234u, statPatched.PostAccessBlock!.CurrentHp);
 				Assert.Equal(5678u, statPatched.PostAccessBlock.CurrentXp);
 			}
-		}
-
-		// Persisted CharacterInventory rows fill their container by kind: bag rows render at their cells (the
-		// seeded FirstPosBag yields its cell to a persisted row), entries stay pos-ascending, and rows without
-		// buildable identity are absent.
-		[Fact]
-		public void BuildContainers_RendersPersistedBagRows()
-		{
-			var rows = new[]
-			{
-				new CharacterInventory { Container = 104, Slot = 3, Item = Manacles, ItemId = Manacles.Id, Count = 2 },
-				new CharacterInventory { Container = 104, Slot = 1, Item = Signet, ItemId = Signet.Id }, // occupies the FirstPosBag cell
-				new CharacterInventory { Container = 104, Slot = 5, Item = new Item { Id = 9, Archetype = 0 }, ItemId = 9 } // not buildable
-			};
-
-			var containers = FullCharSnapshotBuilder.BuildContainers(0x02000005, new Dictionary<ulong, (Item, uint)>(), (Manacles, Manacles.Archetype), rows);
-
-			var bag = containers[1].Items;
-			Assert.Equal(new uint[] { 1, 3 }, bag.Select(e => e.Pos)); // row at 1 wins over FirstPosBag; pos-ascending
-			Assert.Equal(Signet.Id, bag[0].Item.ItemData.Template1);
-			Assert.Equal(Manacles.Id, bag[1].Item.ItemData.Template1);
-			Assert.Equal(2u, bag[1].Item.StatLists.Single(s => s.Stat == 26).Value); // stack count from the row
-		}
-
-		[Fact]
-		public void BuildContainers_AllocatesUniqueStableIds()
-		{
-			var equipped = new Dictionary<ulong, (Item, uint)>
-			{
-				[0x05] = (Manacles, Manacles.Archetype),
-				[0x12] = (Manacles, Manacles.Archetype)
-			};
-
-			var first = FullCharSnapshotBuilder.BuildContainers(0x02000005, equipped, (Signet, Signet.Archetype));
-			var second = FullCharSnapshotBuilder.BuildContainers(0x02000005, equipped, (Signet, Signet.Archetype));
-
-			var ids = first.SelectMany(c => c.Items).Select(e => e.Item.ItemId).ToList();
-			var recordIds = first.SelectMany(c => c.Items).SelectMany(e => e.Item.StatLists.Where(s => s.Stat == 23)).Select(s => s.Value).ToList();
-
-			Assert.Equal(ids.Count, ids.Distinct().Count());
-			Assert.Equal(recordIds.Count, recordIds.Distinct().Count());
-			Assert.Equal(ids, second.SelectMany(c => c.Items).Select(e => e.Item.ItemId).ToList()); // stable across logins
 		}
 	}
 }

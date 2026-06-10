@@ -12,13 +12,9 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; }
 
-		public uint CharacterId { get; set; }
-
 		// The item definition in this slot (real p_items identity + Data1..4 visual quad). Null = empty slot.
 		[ForeignKey(nameof(ItemId))]
 		public virtual Item Item { get; set; }
-
-		public uint? ItemId { get; set; }
 
 		// Which container this stack lives in (the captured inventory is a nested chain of containers, e.g. the normal
 		// backpack vs quest vs resources). Stored as the container's id so the snapshot's container chain can be rebuilt.
@@ -27,7 +23,11 @@ namespace Faolan.Core.Database.Tables
 		// Position within the container.
 		public int Slot { get; set; }
 
+		public uint CharacterId { get; set; }
+
 		// Stack size (1 for non-stackable gear).
 		public uint Count { get; set; } = 1;
+
+		public uint? ItemId { get; set; }
 	}
 }

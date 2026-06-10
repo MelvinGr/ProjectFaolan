@@ -62,7 +62,8 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 		{
 			return statId switch
 			{
-				LegacyCharacterStatId.HealthCurrent or LegacyCharacterStatId.HealthMax or LegacyCharacterStatId.StaminaMax or LegacyCharacterStatId.StaminaCurrent or LegacyCharacterStatId.ManaMax or LegacyCharacterStatId.ManaCurrent => 100,
+				LegacyCharacterStatId.HealthCurrent or LegacyCharacterStatId.HealthMax or LegacyCharacterStatId.StaminaMax or LegacyCharacterStatId.StaminaCurrent or LegacyCharacterStatId.ManaMax
+					or LegacyCharacterStatId.ManaCurrent => 100,
 
 				LegacyCharacterStatId.Strength or LegacyCharacterStatId.Constitution or LegacyCharacterStatId.Intelligence or LegacyCharacterStatId.Wisdom or LegacyCharacterStatId.Dexterity => 10,
 
@@ -103,11 +104,11 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 		public uint? Level { get; set; }
 
 		public uint? ManaMaxRaw { get; set; }
-
-		public uint? StaminaCurrentRaw { get; set; }
 		public uint? OverallDeaths { get; set; }
 		public uint? OverallKills { get; set; }
 		public uint? PvpLevel { get; set; }
+
+		public uint? StaminaCurrentRaw { get; set; }
 
 		public void Apply(LegacyCharacterStatEntry entry)
 		{

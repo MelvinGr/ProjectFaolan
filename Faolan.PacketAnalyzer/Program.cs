@@ -9,7 +9,11 @@ namespace Faolan.PacketAnalyzer
 		// Avalonia configuration, don't remove; also used by visual designer.
 		public static AppBuilder BuildAvaloniaApp()
 		{
-			return AppBuilder.Configure<App>().UsePlatformDetect().WithInterFont().LogToTrace();
+			return AppBuilder
+				.Configure<App>()
+				.UsePlatformDetect()
+				.WithInterFont()
+				.LogToTrace();
 		}
 
 		// Initialization code. Don't use any Avalonia, third-party APIs or any
@@ -23,7 +27,8 @@ namespace Faolan.PacketAnalyzer
 			if (TryGetDumpPath(args, out var dumpPath))
 				return DumpCapture(dumpPath);
 
-			BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+			BuildAvaloniaApp()
+				.StartWithClassicDesktopLifetime(args);
 			return 0;
 		}
 

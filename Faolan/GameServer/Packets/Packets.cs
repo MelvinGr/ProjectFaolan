@@ -67,7 +67,6 @@ namespace Faolan.GameServer
 		private static readonly byte[] RetailCreatePost205FSender = [0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x59];
 		private static readonly byte[] Sender2 = [0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x14];
 
-
 		private async Task FlushPendingPost205FFollowUp(INetworkClient client)
 		{
 			if (!client.Session.HasPendingPost205FFollowUp)
@@ -106,7 +105,8 @@ namespace Faolan.GameServer
 				Logger.LogInformation("Sending deferred new-character AccessWindow/SetDayTime after the post-0x205F follow-up.");
 
 				await new PacketStream() // AccessWindow packet
-					.WriteHeader([0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x0E], [0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, 0xF4, 0xF0, 0xC1, 0x09], 0x00002000).WriteArray(WithEmbeddedCharacterId([
+					.WriteHeader([0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x0E], [0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, 0xF4, 0xF0, 0xC1, 0x09], 0x00002000)
+					.WriteArray(WithEmbeddedCharacterId([
 						0x00, 0x00, 0x1F, 0x93, 0x73, 0x7A, 0x6D, 0xF9, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x49, 0x20, 0x81, 0x80, 0x30, 0x28, 0x81, 0x83, 0x06, 0x32, 0x0E, 0x0A, 0x07, 0x08,
 						0x65, 0x10, 0xF4, 0xF0, 0xC1, 0x09, 0x10, 0x84, 0x08, 0x18, 0x00, 0x32, 0x0D, 0x0A, 0x07, 0x08, 0x68, 0x10, 0xF4, 0xF0, 0xC1, 0x09, 0x10, 0x18, 0x18, 0x00, 0x32, 0x0D, 0x0A, 0x07, 0x08, 0x70, 0x10, 0xF4,
 						0xF0, 0xC1, 0x09, 0x10, 0x30, 0x18, 0x0C, 0x32, 0x0D, 0x0A, 0x07, 0x08, 0x71, 0x10, 0xF4, 0xF0, 0xC1, 0x09, 0x10, 0x30, 0x18, 0x00, 0x38, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x03, 0xF1,
@@ -345,7 +345,8 @@ namespace Faolan.GameServer
 						0x00, 0x00, 0x00, 0x02, 0x9C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x70, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x9B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x6A, 0x00, 0x00, 0x00, 0x00, 0x00,
 						0x00, 0x02, 0x9A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x69, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x67, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02,
 						0x92, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x66, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x90, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-					], 12, client.Session.Account.ClientInstance)).SendAsync(client);
+					], 12, client.Session.Account.ClientInstance))
+					.SendAsync(client);
 
 				await SetTimeOfDay(client);
 			}
@@ -359,7 +360,10 @@ namespace Faolan.GameServer
 			var sender0 = sender ?? LoginWorldSender;
 			var receiver0 = receiver ?? LoginWorldReceiver(client);
 
-			return new PacketStream().WriteHeader(sender0, receiver0, GameServerRespondOpcodes.AckAuthentication).WriteUInt32(value).SendAsync(client);
+			return new PacketStream()
+				.WriteHeader(sender0, receiver0, GameServerRespondOpcodes.AckAuthentication)
+				.WriteUInt32(value)
+				.SendAsync(client);
 		}
 		// Receiver for the create-editor (clientInstance=0x021662C8) conversation family.
 		// The create-editor 0x2000 receiver is built per session from the character's real instance id -
@@ -381,11 +385,18 @@ namespace Faolan.GameServer
 
 			data ??= spellData;
 
-			return new PacketStream().WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x2000).WriteArrayUInt32Length(s => s.WriteUInt32(GameServer0X2000RespondsOpcodes.ApplySpell).WriteUInt32(0x0000C350)
-				.WriteUInt32(applyTo) //Apply to ?
-				.WriteUInt16(0x0000).WriteUInt32(spellId) // SpellID
-				.WriteUInt32(0x0000C350).WriteUInt32(applyFrom) // apply from ?
-				.WriteArray(data)).SendAsync(client);
+			return new PacketStream()
+				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x2000)
+				.WriteArrayUInt32Length(s => s
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.ApplySpell)
+					.WriteUInt32(0x0000C350)
+					.WriteUInt32(applyTo) //Apply to ?
+					.WriteUInt16(0x0000)
+					.WriteUInt32(spellId) // SpellID
+					.WriteUInt32(0x0000C350)
+					.WriteUInt32(applyFrom) // apply from ?
+					.WriteArray(data))
+				.SendAsync(client);
 		}
 
 		private static Task ReportDimensionId(INetworkClient client, uint realmId, byte[] sender = null, byte[] receiver = null)
@@ -393,7 +404,10 @@ namespace Faolan.GameServer
 			var sender0 = sender ?? LoginWorldSender;
 			var receiver0 = receiver ?? LoginWorldReceiver(client);
 
-			return new PacketStream().WriteHeader(sender0, receiver0, GameServerRespondOpcodes.ReportDimensionId).WriteString(realmId.ToString()).SendAsync(client);
+			return new PacketStream()
+				.WriteHeader(sender0, receiver0, GameServerRespondOpcodes.ReportDimensionId)
+				.WriteString(realmId.ToString())
+				.SendAsync(client);
 		}
 
 		private static Task ReportServerId(INetworkClient client, uint value, byte[] sender = null, byte[] receiver = null)
@@ -402,13 +416,22 @@ namespace Faolan.GameServer
 			var receiver0 = receiver ?? LoginWorldReceiver(client);
 			var packetData0 = new byte[] { 0x00, 0x00, 0x00, 0x54, 0x00, 0x00, 0x00, 0x01 };
 
-			return new PacketStream().WriteHeader(sender0, receiver0, GameServerRespondOpcodes.ReportServerId).WriteArray(packetData0).SendAsync(client);
+			return new PacketStream()
+				.WriteHeader(sender0, receiver0, GameServerRespondOpcodes.ReportServerId)
+				.WriteArray(packetData0)
+				.SendAsync(client);
 		}
 
 		private static Task SendExistingCharacterPostReadyDataPacket(INetworkClient client, uint opcode, byte[] tail)
 		{
-			return new PacketStream().WriteHeader(ExistingCharacterWorldEntryPromptSender, AppendVarint(ExistingCharacterWorldEntryPromptReceiverPrefix, client.Session.Account.ClientInstance), 0x2000).WriteArrayUInt32Length(s =>
-				s.WriteUInt32(opcode).WriteUInt32(0x0000C350).WriteUInt32(client.Session.Account.ClientInstance).WriteArray(SubstitutePostReadyInstance(tail, client.Session.Account.ClientInstance))).SendAsync(client);
+			return new PacketStream()
+				.WriteHeader(ExistingCharacterWorldEntryPromptSender, AppendVarint(ExistingCharacterWorldEntryPromptReceiverPrefix, client.Session.Account.ClientInstance), 0x2000)
+				.WriteArrayUInt32Length(s => s
+					.WriteUInt32(opcode)
+					.WriteUInt32(0x0000C350)
+					.WriteUInt32(client.Session.Account.ClientInstance)
+					.WriteArray(SubstitutePostReadyInstance(tail, client.Session.Account.ClientInstance)))
+				.SendAsync(client);
 		}
 
 		private static async Task SendExistingCharacterPostReadyFollowUp(INetworkClient client)
@@ -416,8 +439,10 @@ namespace Faolan.GameServer
 			await SendExistingCharacterPostReadyDataPacket(client, 0x06EC1255, ExistingCharacterPostReady06Ec1255Tail);
 			await SendExistingCharacterPostReadyDataPacket(client, 0x864CFEF8, ExistingCharacterPostReady864CfeF8Tail);
 
-			await new PacketStream().WriteHeader(ExistingCharacterPostReadyReportServerIdSender, AppendVarint(ExistingCharacterPostReadyReportServerIdReceiverPrefix, client.Session.Account.ClientInstance),
-				GameServerRespondOpcodes.ReportServerId).WriteByte(0x01).SendAsync(client);
+			await new PacketStream()
+				.WriteHeader(ExistingCharacterPostReadyReportServerIdSender, AppendVarint(ExistingCharacterPostReadyReportServerIdReceiverPrefix, client.Session.Account.ClientInstance), GameServerRespondOpcodes.ReportServerId)
+				.WriteByte(0x01)
+				.SendAsync(client);
 
 			await SendExistingCharacterPostReadyDataPacket(client, 0xA36D3B74, ExistingCharacterPostReadyA36D3B74StartFixed3DTail);
 			await SendExistingCharacterPostReadyDataPacket(client, 0xA36D3B74, ExistingCharacterPostReadyA36D3B74FelasTail);
@@ -426,8 +451,15 @@ namespace Faolan.GameServer
 
 		private static Task SendPost205FOxf98E10B3Prompt(INetworkClient client)
 		{
-			return new PacketStream().WriteHeader(ExistingCharacterWorldEntryPromptSender, AppendVarint(ExistingCharacterWorldEntryPromptReceiverPrefix, client.Session.Account.ClientInstance), 0x2000).WriteArrayUInt32Length(s =>
-					s.WriteUInt32(GameServer0X2000RespondsOpcodes.StatIIR).WriteUInt32(0x0000C350).WriteUInt32(client.Session.Account.ClientInstance).WriteByte(0x01).WriteUInt32(0x00000013).WriteUInt32(0x00000000))
+			return new PacketStream()
+				.WriteHeader(ExistingCharacterWorldEntryPromptSender, AppendVarint(ExistingCharacterWorldEntryPromptReceiverPrefix, client.Session.Account.ClientInstance), 0x2000)
+				.WriteArrayUInt32Length(s => s
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.StatIIR)
+					.WriteUInt32(0x0000C350)
+					.WriteUInt32(client.Session.Account.ClientInstance)
+					.WriteByte(0x01)
+					.WriteUInt32(0x00000013)
+					.WriteUInt32(0x00000000))
 				.SendAsync(client);
 		}
 
@@ -435,7 +467,10 @@ namespace Faolan.GameServer
 		{
 			return new PacketStream()
 				.WriteHeader(ExistingCharacterReadyForPlayScreenSender, AppendVarint(ExistingCharacterReadyForPlayScreenReceiverPrefix, client.Session.Account.ClientInstance), GameServerRespondOpcodes.SpawnCheck)
-				.WriteUInt32(0x0000C350).WriteUInt32(client.Session.Account.ClientInstance).WriteByte(0).SendAsync(client);
+				.WriteUInt32(0x0000C350)
+				.WriteUInt32(client.Session.Account.ClientInstance)
+				.WriteByte(0)
+				.SendAsync(client);
 		}
 
 		private static Task SendReadyForPlayScreen(INetworkClient client)
@@ -471,8 +506,13 @@ namespace Faolan.GameServer
 					0x00
 				];
 
-			return new PacketStream().WriteHeader(sender, receiver, GameServerRespondOpcodes.ReadyForPlayScreen).WriteVector3BigEndian(client.Session.Character!.Position).WriteUInt32(0x000007E2)
-				.WriteVector3BigEndian(client.Session.Character.Position).WriteArray(tail).SendAsync(client);
+			return new PacketStream()
+				.WriteHeader(sender, receiver, GameServerRespondOpcodes.ReadyForPlayScreen)
+				.WriteVector3BigEndian(client.Session.Character!.Position)
+				.WriteUInt32(0x000007E2)
+				.WriteVector3BigEndian(client.Session.Character.Position)
+				.WriteArray(tail)
+				.SendAsync(client);
 		}
 
 		private static Task SetTimeOfDay(INetworkClient client)
@@ -480,17 +520,21 @@ namespace Faolan.GameServer
 			var sender0 = LoginWorldSender;
 			var receiver0 = LoginWorldReceiver(client);
 
-			return new PacketStream().WriteHeader(sender0, receiver0, 0x2000).WriteArrayUInt32Length(s => s.WriteUInt32(GameServer0X2000RespondsOpcodes.SetDayTime)
-				/*.WriteArray(
-				    0x00, 0x00, 0x00, 0x00,
-				    0x00, 0x00, 0x00, 0x00,
-				    0x01, 0x46, 0xA8, 0xD8,
-				    0x00, 0x00, 0x00, 0x00,
-				    0x03,
-				    0x00, 0x01, 0x42, 0x10,
-				    0x54, 0xEB, 0x48, 0xD4,
-				    0x3F, 0x80)*/
-				.WriteArray(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x47, 0x59, 0x92, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x6C, 0xD7, 0x60, 0x32, 0xDC, 0x20, 0x3F, 0x80, 0x00, 0x00)).SendAsync(client);
+			return new PacketStream()
+				.WriteHeader(sender0, receiver0, 0x2000)
+				.WriteArrayUInt32Length(s => s
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.SetDayTime)
+					/*.WriteArray(
+					    0x00, 0x00, 0x00, 0x00,
+					    0x00, 0x00, 0x00, 0x00,
+					    0x01, 0x46, 0xA8, 0xD8,
+					    0x00, 0x00, 0x00, 0x00,
+					    0x03,
+					    0x00, 0x01, 0x42, 0x10,
+					    0x54, 0xEB, 0x48, 0xD4,
+					    0x3F, 0x80)*/
+					.WriteArray(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x47, 0x59, 0x92, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x6C, 0xD7, 0x60, 0x32, 0xDC, 0x20, 0x3F, 0x80, 0x00, 0x00))
+				.SendAsync(client);
 		}
 
 		// The captured post-ready A36D tails embed the old session instance (0x01307874 = F4 F0 C1 09) as a

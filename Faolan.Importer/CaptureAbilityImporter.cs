@@ -23,7 +23,7 @@ namespace Faolan.Importer
 		private const ushort AbilityGrantOpcode = 0x2052;
 
 		// The few human-readable names the old archive knows (the rest are client-side / unknown).
-		private static readonly Dictionary<uint, string> KnownNames = new()
+		private static readonly Dictionary<uint, string> KnownNames = new Dictionary<uint, string>
 		{
 			[769094] = "Normal Attack Left",
 			[769095] = "Normal Attack Right",
@@ -49,7 +49,10 @@ namespace Faolan.Importer
 				return (0, 0, 0);
 
 			var ids = grants.Keys.ToList();
-			var existing = await db.Abilities.Where(a => ids.Contains(a.Id)).ToDictionaryAsync(a => a.Id);
+			var existing = await db
+				.Abilities
+				.Where(a => ids.Contains(a.Id))
+				.ToDictionaryAsync(a => a.Id);
 
 			var inserted = 0;
 			var updated = 0;
@@ -57,15 +60,18 @@ namespace Faolan.Importer
 			{
 				if (!existing.TryGetValue(id, out var a))
 				{
-					a = new Ability { Id = id, Level = 1, Name = KnownNames.GetValueOrDefault(id, string.Empty) };
+					a = new Ability
+					{
+						Id = id,
+						Level = 1,
+						Name = KnownNames.GetValueOrDefault(id, string.Empty)
+					};
 					db.Abilities.Add(a);
 					existing[id] = a;
 					inserted++;
 				}
 				else
-				{
 					updated++;
-				}
 
 				a.Slot = g.Slot;
 				a.Data0 = g.D0;
@@ -96,7 +102,10 @@ namespace Faolan.Importer
 				if (body.Length < 40)
 					return;
 
-				uint U(int i) => BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(i * 4, 4));
+				uint U(int i)
+				{
+					return BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(i * 4, 4));
+				}
 
 				var slot = U(0);
 				var id = U(1);

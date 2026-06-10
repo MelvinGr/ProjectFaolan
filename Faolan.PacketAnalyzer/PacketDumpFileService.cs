@@ -32,7 +32,10 @@ namespace Faolan.PacketAnalyzer
 				: fallbackCaptureName;
 
 			var portSettings = document.Capture?.Ports?.ToPacketAnalyzerPortSettings() ?? PacketAnalyzerPortSettings.Empty;
-			var packetsFromDocument = document.Packets?.Select(packet => packet.ToPacketRowViewModel()).ToArray() ?? [];
+			var packetsFromDocument = document
+				.Packets
+				?.Select(packet => packet.ToPacketRowViewModel())
+				.ToArray() ?? [];
 			return new PacketDumpLoadResult(captureName, portSettings, packetsFromDocument, document.SchemaVersion);
 		}
 
@@ -68,7 +71,9 @@ namespace Faolan.PacketAnalyzer
 					Ports = PacketDumpPortSettings.From(portSettings)
 				},
 				Summary = PacketDumpSummary.From(summary),
-				Packets = packetArray.Select(packet => PacketDumpPacket.From(packet)).ToArray()
+				Packets = packetArray
+					.Select(packet => PacketDumpPacket.From(packet))
+					.ToArray()
 			};
 
 			return JsonConvert.SerializeObject(document, formatting);
@@ -76,7 +81,9 @@ namespace Faolan.PacketAnalyzer
 
 		public string Serialize(string captureName, PacketAnalyzerPortSettings portSettings, IReadOnlyCollection<PacketRowViewModel> packets, Formatting formatting = Formatting.Indented)
 		{
-			return Serialize(captureName, portSettings, packets.Select(packet => packet.Packet).ToArray(), packets, formatting);
+			return Serialize(captureName, portSettings, packets
+				.Select(packet => packet.Packet)
+				.ToArray(), packets, formatting);
 		}
 
 		private string Serialize(string captureName, PacketAnalyzerPortSettings portSettings, IReadOnlyCollection<AnalyzedPacket> packets, IReadOnlyCollection<PacketRowViewModel> wrappers, Formatting formatting)
@@ -94,9 +101,11 @@ namespace Faolan.PacketAnalyzer
 					Ports = PacketDumpPortSettings.From(portSettings)
 				},
 				Summary = PacketDumpSummary.From(summary),
-				Packets = packetArray.Select(packet => PacketDumpPacket.From(packet, wrapperByTicks.TryGetValue(packet.Ticks, out var wrapper)
-					? wrapper?.Notes
-					: null)).ToArray()
+				Packets = packetArray
+					.Select(packet => PacketDumpPacket.From(packet, wrapperByTicks.TryGetValue(packet.Ticks, out var wrapper)
+						? wrapper?.Notes
+						: null))
+					.ToArray()
 			};
 
 			return JsonConvert.SerializeObject(document, formatting);

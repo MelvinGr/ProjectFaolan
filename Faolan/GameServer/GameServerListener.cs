@@ -182,7 +182,9 @@ namespace Faolan.GameServer
 					{
 						LogPacketBodyDebug("GameServer 0x207E body", packet.Body.ToArray());
 						if (packet.Body.Length > 0)
-							Logger.LogInformation("0x207E decoded: value0={Value0:X2}", packet.Body.ToArray()[0]);
+							Logger.LogInformation("0x207E decoded: value0={Value0:X2}", packet
+								.Body
+								.ToArray()[0]);
 					}
 
 					break;
@@ -310,8 +312,12 @@ namespace Faolan.GameServer
 					// precision). Sent on the GameCharAgent conversation sub-id 0x08 with headerData 0x01.
 					var tick = unchecked((uint)(Environment.TickCount64 * 1000L));
 
-					await new PacketStream().WriteHeader(LatencyResponseSender, LoginWorld201CReceiver(client), GameServerRespondOpcodes.LatencyCheckResponse, [0x01]).WriteUInt32(counter).WriteUInt32(0x00000012)
-						.WriteUInt32(tick).SendAsync(client);
+					await new PacketStream()
+						.WriteHeader(LatencyResponseSender, LoginWorld201CReceiver(client), GameServerRespondOpcodes.LatencyCheckResponse, [0x01])
+						.WriteUInt32(counter)
+						.WriteUInt32(0x00000012)
+						.WriteUInt32(tick)
+						.SendAsync(client);
 
 					break;
 				}
@@ -387,8 +393,12 @@ namespace Faolan.GameServer
 					// Reply on the GameAgent conversation sub-id 0x08. Body = [float][0][0]; retail's leading
 					// float is a varying server-load/fps metric (~80-83 in dumps) - we have no equivalent, so a
 					// fixed plausible value (0x42B32A07 = ~89.6) is sent. The client just treats it as a readout.
-					await new PacketStream().WriteHeader(PingResponseSender, LoginWorldReceiver(client), GameServerRespondOpcodes.Pong).WriteUInt32(0x42B32A07)
-						.WriteUInt32(0).WriteUInt32(0).SendAsync(client);
+					await new PacketStream()
+						.WriteHeader(PingResponseSender, LoginWorldReceiver(client), GameServerRespondOpcodes.Pong)
+						.WriteUInt32(0x42B32A07)
+						.WriteUInt32(0)
+						.WriteUInt32(0)
+						.SendAsync(client);
 
 					break;
 				}

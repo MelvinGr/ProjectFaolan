@@ -8,8 +8,14 @@ namespace Faolan.Tests.Support
 	// spawns from the character's DB scaffold rows (PlayerSpawnScaffoldRows).
 	public static class Golden
 	{
-		public static byte[] Bytes(string name) => File.ReadAllBytes(Path.Combine(Dir(), name + ".bin"));
+		public static byte[] Bytes(string name)
+		{
+			return File.ReadAllBytes(Path.Combine(Dir(), name + ".bin"));
+		}
 
-		private static string Dir([CallerFilePath] string thisFile = "") => Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(thisFile)!)!, "Golden");
+		private static string Dir([CallerFilePath] string thisFile = "")
+		{
+			return Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(thisFile)!)!, "Golden");
+		}
 	}
 }

@@ -72,7 +72,10 @@ namespace Faolan.Importer
 					byTypeId[(type, e.Id)] = e;
 			}
 
-			var items = await db.Items.Where(i => i.Data1 != 0 || i.Data2 != 0 || i.Data3 != 0 || i.Data4 != 0).ToListAsync();
+			var items = await db
+				.Items
+				.Where(i => i.Data1 != 0 || i.Data2 != 0 || i.Data3 != 0 || i.Data4 != 0)
+				.ToListAsync();
 
 			if (dumpDir != null)
 				Directory.CreateDirectory(dumpDir);

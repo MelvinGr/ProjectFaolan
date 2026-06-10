@@ -116,7 +116,9 @@ namespace Faolan.Tests
 				var parts = InventorySnapshotInspector.ParseInventoryPacketBody(body);
 
 				var bag = InventorySnapshotInspector.GetContainer(parts.Root, InventorySnapshotInspector.ContainerKind.Bag);
-				var before = InventorySnapshotInspector.GetContainerEntries(bag).ToList();
+				var before = InventorySnapshotInspector
+					.GetContainerEntries(bag)
+					.ToList();
 				var original = before[0];
 				var slot = InventorySnapshotInspector.GetEntrySlot(original) ?? 0;
 				var itemId = InventorySnapshotInspector.GetEntryItemId(original) ?? 0;
@@ -129,7 +131,9 @@ namespace Faolan.Tests
 				// Re-serialize the whole root and re-parse, as the live path does.
 				var reparsed = ProtoMessage.Parse(parts.Root.ToArray());
 				var bag2 = InventorySnapshotInspector.GetContainer(reparsed, InventorySnapshotInspector.ContainerKind.Bag);
-				var after = InventorySnapshotInspector.GetContainerEntries(bag2).ToList();
+				var after = InventorySnapshotInspector
+					.GetContainerEntries(bag2)
+					.ToList();
 
 				Assert.Equal(before.Count, after.Count); // entry count unchanged (in-place replace)
 				var first = InventorySnapshotInspector.GetEntryBySlot(bag2, slot);
@@ -147,7 +151,8 @@ namespace Faolan.Tests
 
 		private static DatabaseContext NewContext(string path)
 		{
-			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={path}", x => x.MigrationsAssembly("Faolan")).Options;
+			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={path}", x => x.MigrationsAssembly("Faolan"))
+				.Options;
 			return new DatabaseContext(options);
 		}
 	}

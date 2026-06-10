@@ -26,22 +26,6 @@ namespace Faolan.Core.Crypt
 			}
 		}
 
-		// Encrypts one 64-bit block - the inverse of DecryptBlock (sum starts at 0 and counts up). Used to simulate
-		// the patched client in tests/launcher work; the server itself only decrypts.
-		public static void EncryptBlock(ref uint v0, ref uint v1, ReadOnlySpan<uint> k)
-		{
-			unchecked
-			{
-				var sum = 0u;
-				for (var i = 0; i < 32; i++)
-				{
-					sum += Delta;
-					v0 += ((v1 << 4) + k[0]) ^ (v1 + sum) ^ ((v1 >> 5) + k[1]);
-					v1 += ((v0 << 4) + k[2]) ^ (v0 + sum) ^ ((v0 >> 5) + k[3]);
-				}
-			}
-		}
-
 		// Decrypts a buffer in ECB mode (independent 8-byte blocks, little-endian words). Any trailing bytes that
 		// don't fill a block are copied through unchanged (RDBH ciphertext is always a whole number of blocks).
 		public static byte[] DecryptEcb(ReadOnlySpan<byte> data, ReadOnlySpan<uint> key)
@@ -60,6 +44,22 @@ namespace Faolan.Core.Crypt
 			}
 
 			return outBuf;
+		}
+
+		// Encrypts one 64-bit block - the inverse of DecryptBlock (sum starts at 0 and counts up). Used to simulate
+		// the patched client in tests/launcher work; the server itself only decrypts.
+		public static void EncryptBlock(ref uint v0, ref uint v1, ReadOnlySpan<uint> k)
+		{
+			unchecked
+			{
+				var sum = 0u;
+				for (var i = 0; i < 32; i++)
+				{
+					sum += Delta;
+					v0 += ((v1 << 4) + k[0]) ^ (v1 + sum) ^ ((v1 >> 5) + k[1]);
+					v1 += ((v0 << 4) + k[2]) ^ (v0 + sum) ^ ((v0 >> 5) + k[3]);
+				}
+			}
 		}
 	}
 }

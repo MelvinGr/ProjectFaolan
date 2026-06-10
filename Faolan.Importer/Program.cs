@@ -21,6 +21,12 @@ namespace Faolan.Importer
 	{
 		private const string RepoRoot = "/home/melvin/Development/C#/Project Faolan";
 
+		// The beach (4010) is a committed DB seed: its full world build (MapChange -> ReadyForPlayScreen) was assembled
+		// from the Strie login capture and committed as structured rows. The plain capture-window extractor only reaches
+		// the first 0x2020 poll, so re-deriving it here would TRUNCATE the beach - skip it until the extractor learns
+		// the full window (see TODO #10 / docs/spawn-dissection-plan.md).
+		private const uint BeachMapId = 0x00000FAA;
+
 		// Friendly names for the RDB resource types we care about (from rdbreader's TYPES enum). Used by the
 		// type inventory so we can spot the item-template / NPC-stat / dialogue resources.
 		private static readonly (uint Type, string Name)[] RdbTypeNames =
@@ -51,7 +57,10 @@ namespace Faolan.Importer
 		{
 			// Conversations are fully derived from the captures, so refresh from a clean slate: this also clears any
 			// stale rows from before the NpcName re-key (handle-keyed nodes with no name would otherwise linger).
-			var existing = await db.ConversationNodes.Include(n => n.Packets).ToListAsync();
+			var existing = await db
+				.ConversationNodes
+				.Include(n => n.Packets)
+				.ToListAsync();
 			db.ConversationPackets.RemoveRange(existing.SelectMany(n => n.Packets));
 			db.ConversationNodes.RemoveRange(existing);
 
@@ -65,29 +74,30 @@ namespace Faolan.Importer
 					CapturedNpcHandle = e.CapturedNpcHandle,
 					NpcName = e.NpcName,
 					CapturedInstance = e.CapturedInstance,
-					Packets = e.Packets.Select((p, i) => new ConversationPacket
-					{
-						Sequence = i,
-						Data = p
-					}).ToList()
+					Packets = e
+						.Packets
+						.Select((p, i) => new ConversationPacket
+						{
+							Sequence = i,
+							Data = p
+						})
+						.ToList()
 				});
 			}
 
 			await db.SaveChangesAsync();
 		}
 
-		// The beach (4010) is a committed DB seed: its full world build (MapChange -> ReadyForPlayScreen) was assembled
-		// from the Strie login capture and committed as structured rows. The plain capture-window extractor only reaches
-		// the first 0x2020 poll, so re-deriving it here would TRUNCATE the beach - skip it until the extractor learns
-		// the full window (see TODO #10 / docs/spawn-dissection-plan.md).
-		private const uint BeachMapId = 0x00000FAA;
-
 		// Upsert per map: replace that map's burst (instance + structured IIR records); leave other maps untouched.
 		private static async Task ImportMapWorldBursts(DatabaseContext db, List<MapWorldBurstEntry> bursts)
 		{
 			// Purge any existing rows with an unknown captured instance (0) - those can't be re-addressed. Out-of-range
 			// instances are kept now (RewriteBurstInstance pads the live id's varint to the captured length).
-			var stale = await db.MapWorldBursts.Include(b => b.Entities).Where(b => b.CapturedInstance == 0).ToListAsync();
+			var stale = await db
+				.MapWorldBursts
+				.Include(b => b.Entities)
+				.Where(b => b.CapturedInstance == 0)
+				.ToListAsync();
 			if (stale.Count > 0)
 			{
 				db.MapWorldBurstEntities.RemoveRange(stale.SelectMany(b => b.Entities));
@@ -99,7 +109,10 @@ namespace Faolan.Importer
 				if (e.MapId == BeachMapId)
 					continue; // committed seed; the capture window is truncated (see BeachMapId remark).
 
-				var burst = await db.MapWorldBursts.Include(b => b.Entities).FirstOrDefaultAsync(b => b.MapId == e.MapId);
+				var burst = await db
+					.MapWorldBursts
+					.Include(b => b.Entities)
+					.FirstOrDefaultAsync(b => b.MapId == e.MapId);
 				if (burst == null)
 				{
 					burst = new MapWorldBurst { MapId = e.MapId };
@@ -111,7 +124,8 @@ namespace Faolan.Importer
 				burst.CapturedInstance = e.CapturedInstance;
 				// Decompose each raw download into a structured IIR record (round-trip lossless, see IirRecordCodec),
 				// dropping the server-generated records (globals + player-state) - the server emits those on world entry.
-				burst.Entities = e.Packets
+				burst.Entities = e
+					.Packets
 					.Select((p, i) => IirRecordCodec.Parse(p, i))
 					.Where(r => !IirMessageTypes.IsServerGenerated(r.IirType, r.Handle, e.CapturedInstance))
 					.ToList();
@@ -208,7 +222,9 @@ namespace Faolan.Importer
 			var captures = doCaptures
 				? ReadCaptures(capturesDir)
 				: [];
-			var itemPackets = captures.SelectMany(c => c.Select(p => p.Bytes)).ToList();
+			var itemPackets = captures
+				.SelectMany(c => c.Select(p => p.Bytes))
+				.ToList();
 			if (doCaptures)
 			{
 				foreach (var bin in Directory.EnumerateFiles(capturesDir, "*.bin"))
@@ -226,7 +242,8 @@ namespace Faolan.Importer
 				return 0;
 			}
 
-			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={dbPath}", x => x.MigrationsAssembly("Faolan")).Options;
+			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={dbPath}", x => x.MigrationsAssembly("Faolan"))
+				.Options;
 			await using var db = new DatabaseContext(options);
 			await db.Database.MigrateAsync();
 
@@ -245,9 +262,13 @@ namespace Faolan.Importer
 				await CaptureSpellImporter.ImportAsync(db, itemPackets);
 				// The starting ability kit = what every new character gets during creation, so detect it from the
 				// CREATE-flow captures only (filenames contain "creat"); the rest are higher-level/class abilities.
-				var createPackets = Directory.EnumerateFiles(capturesDir, "*.json")
-					.Where(f => Path.GetFileName(f).Contains("creat", StringComparison.OrdinalIgnoreCase))
-					.SelectMany(f => ReadJsonCapture(f).Select(p => p.Bytes))
+				var createPackets = Directory
+					.EnumerateFiles(capturesDir, "*.json")
+					.Where(f => Path
+						.GetFileName(f)
+						.Contains("creat", StringComparison.OrdinalIgnoreCase))
+					.SelectMany(f => ReadJsonCapture(f)
+						.Select(p => p.Bytes))
 					.ToList();
 				var (abSeen, abNew, abUpd) = await CaptureAbilityImporter.ImportAsync(db, itemPackets, createPackets);
 				Console.WriteLine($"Abilities (0x2052 grants): {abSeen} seen, {abNew} new, {abUpd} updated.");
@@ -375,7 +396,8 @@ namespace Faolan.Importer
 		{
 			var list = new List<CapturedPacket>();
 			var tick = 0L;
-			foreach (var p in analysis.AnalyzeCapture(pcap).Packets)
+			foreach (var p in analysis.AnalyzeCapture(pcap)
+				         .Packets)
 			{
 				if (p.ProtocolName != "GameServer")
 					continue;

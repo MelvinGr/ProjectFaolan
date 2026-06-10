@@ -62,7 +62,8 @@ namespace Faolan.PacketAnalyzer
 				return false;
 
 			var span = payload.AsSpan();
-			var ipBytes = span[..sizeof(uint)].ToArray();
+			var ipBytes = span[..sizeof(uint)]
+				.ToArray();
 			port = BinaryPrimitives.ReadUInt16BigEndian(span.Slice(sizeof(uint), sizeof(ushort)));
 			if (port == 0)
 				return false;

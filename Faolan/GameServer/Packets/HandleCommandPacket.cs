@@ -33,22 +33,6 @@ namespace Faolan.GameServer
 				Logger.LogDebug("Character-editor: unmapped morph '{Morph}'={Value} (slider not yet modelled).", morph, value);
 		}
 
-		// Appends the resource ref to the character's chosen-appearance list (deduplicated; the editor can
-		// resend the set when a creation session is resumed). Persisted with the character graph at name-commit.
-		private static void RecordBodyResource(Character character, string resourceRef)
-		{
-			character.BodyResources ??= new List<CharacterBodyResource>();
-			if (character.BodyResources.Any(r => r.Ref == resourceRef))
-				return;
-
-			character.BodyResources.Add(new CharacterBodyResource
-			{
-				CharacterId = character.Id,
-				Sequence = character.BodyResources.Count,
-				Ref = resourceRef
-			});
-		}
-
 		private async Task CommitCharacterName(INetworkClient client, string name)
 		{
 			var character = client.Session.Character;
@@ -166,7 +150,9 @@ namespace Faolan.GameServer
 						// Sex IS the editor's usual 2x convention: 4 -> wire 2 = MALE, 6 -> wire 3 = FEMALE
 						// (anchored on Hoxxling, who is male: ChangeSex 4 + a chosen beardmesh; the earlier
 						// "6 = male" read was inverted).
-						character.Sex = numericValue == 4 ? Sex.Male : Sex.Female;
+						character.Sex = numericValue == 4
+							? Sex.Male
+							: Sex.Female;
 					break;
 				}
 
@@ -187,21 +173,24 @@ namespace Faolan.GameServer
 				case "ChangeHeadMesh":
 				{
 					if (character != null)
-						EnsureBody(character).HeadMesh = numericValue;
+						EnsureBody(character)
+							.HeadMesh = numericValue;
 					break;
 				}
 
 				case "ChangeSize":
 				{
 					if (character != null)
-						EnsureBody(character).Size = (byte)numericValue;
+						EnsureBody(character)
+							.Size = (byte)numericValue;
 					break;
 				}
 
 				case "ChangeVoice":
 				{
 					if (character != null)
-						EnsureBody(character).Voice = (byte)numericValue;
+						EnsureBody(character)
+							.Voice = (byte)numericValue;
 					break;
 				}
 
@@ -324,6 +313,22 @@ namespace Faolan.GameServer
 			while ((b & 0x80) != 0 && shift < 64);
 
 			return result;
+		}
+
+		// Appends the resource ref to the character's chosen-appearance list (deduplicated; the editor can
+		// resend the set when a creation session is resumed). Persisted with the character graph at name-commit.
+		private static void RecordBodyResource(Character character, string resourceRef)
+		{
+			character.BodyResources ??= new List<CharacterBodyResource>();
+			if (character.BodyResources.Any(r => r.Ref == resourceRef))
+				return;
+
+			character.BodyResources.Add(new CharacterBodyResource
+			{
+				CharacterId = character.Id,
+				Sequence = character.BodyResources.Count,
+				Ref = resourceRef
+			});
 		}
 	}
 }

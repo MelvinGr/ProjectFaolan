@@ -12,7 +12,10 @@ namespace Faolan.Tests
 		public void Build_VitalsBlock_MatchesCapturedBytes()
 		{
 			// Captured packet sends the MAX ids (0x1B/0x1F8/0x1FA) - an entity announcing its full vitals on spawn.
-			var block = new CharacterStatBlock().Set(LegacyCharacterStatId.HealthMax, 63).Set(LegacyCharacterStatId.StaminaMax, 63).Set(LegacyCharacterStatId.ManaMax, 63);
+			var block = new CharacterStatBlock()
+				.Set(LegacyCharacterStatId.HealthMax, 63)
+				.Set(LegacyCharacterStatId.StaminaMax, 63)
+				.Set(LegacyCharacterStatId.ManaMax, 63);
 
 			Assert.Equal(3, block.Count);
 

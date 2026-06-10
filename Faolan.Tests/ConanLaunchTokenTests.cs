@@ -16,16 +16,24 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void ForUnixTime_RoundTrips()
+		{
+			const uint t = 1700000000;
+			Assert.Equal(t, ConanLaunchToken.GetUnixTime(ConanLaunchToken.ForUnixTime(t)));
+		}
+
+		[Fact]
 		public void GetUnixTime_RecoversTheTimestamp()
 		{
 			Assert.Equal(1781038901u, ConanLaunchToken.GetUnixTime("495cd3b8c7047b47"));
 		}
 
-		[Fact]
-		public void ForUnixTime_RoundTrips()
+		[Theory, InlineData(""), InlineData("tooShort"), InlineData("zzzzzzzzzzzzzzzz"), InlineData("0123456789abcdef00")]
+		// right length, not hex
+			// wrong length
+		public void GetUnixTime_RejectsMalformed(string token)
 		{
-			const uint t = 1700000000;
-			Assert.Equal(t, ConanLaunchToken.GetUnixTime(ConanLaunchToken.ForUnixTime(t)));
+			Assert.Null(ConanLaunchToken.GetUnixTime(token));
 		}
 
 		[Fact]
@@ -34,16 +42,6 @@ namespace Faolan.Tests
 			var token = ConanLaunchToken.Now();
 			Assert.Equal(16, token.Length);
 			Assert.NotNull(ConanLaunchToken.GetUnixTime(token));
-		}
-
-		[Theory]
-		[InlineData("")]
-		[InlineData("tooShort")]
-		[InlineData("zzzzzzzzzzzzzzzz")]       // right length, not hex
-		[InlineData("0123456789abcdef00")]     // wrong length
-		public void GetUnixTime_RejectsMalformed(string token)
-		{
-			Assert.Null(ConanLaunchToken.GetUnixTime(token));
 		}
 	}
 }

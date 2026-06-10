@@ -19,7 +19,8 @@ namespace Faolan.PacketAnalyzer
 					HostNames[ip] = "localhost";
 				else if (!HostNames.ContainsKey(ip) || string.IsNullOrEmpty(HostNames[ip]))
 				{
-					var hostName = Dns.GetHostEntry(ip).HostName;
+					var hostName = Dns.GetHostEntry(ip)
+						.HostName;
 					HostNames[ip] = string.Equals(hostName, "localhost", StringComparison.OrdinalIgnoreCase) || string.Equals(hostName, ip, StringComparison.OrdinalIgnoreCase)
 						? ip
 						: hostName;

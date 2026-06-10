@@ -11,7 +11,11 @@ namespace Faolan.Core.Extensions
 		{
 			try
 			{
-				return Enumerable.Range(0, hex.Length).Where(x => x % 2 == 0).Select(x => Convert.ToByte(hex.Substring(x, 2), 16)).ToArray();
+				return Enumerable
+					.Range(0, hex.Length)
+					.Where(x => x % 2 == 0)
+					.Select(x => Convert.ToByte(hex.Substring(x, 2), 16))
+					.ToArray();
 			}
 			catch
 			{
@@ -33,17 +37,29 @@ namespace Faolan.Core.Extensions
 			var enumType = Enum.GetUnderlyingType(value.GetType());
 
 			if (enumType == typeof(byte) || enumType == typeof(sbyte))
-				return Convert.ToByte(value).ToHex();
+				return Convert
+					.ToByte(value)
+					.ToHex();
 			if (enumType == typeof(ushort) || enumType == typeof(short))
-				return Convert.ToUInt16(value).ToHex();
+				return Convert
+					.ToUInt16(value)
+					.ToHex();
 			if (enumType == typeof(uint) || enumType == typeof(int))
-				return Convert.ToUInt32(value).ToHex();
+				return Convert
+					.ToUInt32(value)
+					.ToHex();
 			if (enumType == typeof(ulong) || enumType == typeof(long))
-				return Convert.ToUInt64(value).ToHex();
+				return Convert
+					.ToUInt64(value)
+					.ToHex();
 			if (enumType == typeof(float))
-				return Convert.ToUInt32(value).ToHex();
+				return Convert
+					.ToUInt32(value)
+					.ToHex();
 			if (enumType == typeof(double))
-				return Convert.ToUInt64(value).ToHex();
+				return Convert
+					.ToUInt64(value)
+					.ToHex();
 
 			throw new Exception("Unknown enum type!");
 		}

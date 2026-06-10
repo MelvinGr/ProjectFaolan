@@ -32,13 +32,20 @@ namespace Faolan.PlayerAgent
 		];
 
 		private static readonly byte[] Sender = [0x0d, 0x84, 0x04, 0xf2, 0x82, 0x10, 0x02];
+
 		// Sub-id 0x08 confirmed from the login dump (the 0x1A07 service handoffs all use ...10 08).
 		private static readonly byte[] ServiceConnectionSender = [0x0D, 0x16, 0x91, 0x35, 0x1D, 0x10, 0x08];
 
 		private Task SendAgentServer(INetworkClient client)
 		{
-			return new PacketStream().WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.Ox1A07, AgentServerHeader).WriteUInt32(Configuration.ServerIpAddressLong)
-				.WriteUInt16(Configuration.AgentServerPort).WriteUInt32(client.Session.Account.Id).WriteUInt32(0x0000c350).WriteUInt32(client.Session.Account.ClientInstance).SendAsync(client);
+			return new PacketStream()
+				.WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.Ox1A07, AgentServerHeader)
+				.WriteUInt32(Configuration.ServerIpAddressLong)
+				.WriteUInt16(Configuration.AgentServerPort)
+				.WriteUInt32(client.Session.Account.Id)
+				.WriteUInt32(0x0000c350)
+				.WriteUInt32(client.Session.Account.ClientInstance)
+				.SendAsync(client);
 		}
 
 		private async Task SendCharacterList(INetworkClient client)
@@ -98,8 +105,13 @@ namespace Faolan.PlayerAgent
 		private Task SendCsPlayerAgent(INetworkClient client)
 		{
 			return new PacketStream() // send CSPlayerAgent
-				.WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.Ox1A07, CsPlayerAgentHeader).WriteUInt32(Configuration.ServerIpAddressLong)
-				.WriteUInt16(Configuration.CsPlayerAgentPort).WriteUInt32(client.Session.Account.Id).WriteUInt32(0x0000c350).WriteUInt32(client.Session.Account.ClientInstance).SendAsync(client);
+				.WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.Ox1A07, CsPlayerAgentHeader)
+				.WriteUInt32(Configuration.ServerIpAddressLong)
+				.WriteUInt16(Configuration.CsPlayerAgentPort)
+				.WriteUInt32(client.Session.Account.Id)
+				.WriteUInt32(0x0000c350)
+				.WriteUInt32(client.Session.Account.ClientInstance)
+				.SendAsync(client);
 		}
 
 		private async Task SendGameServer(INetworkClient client)
@@ -115,14 +127,26 @@ namespace Faolan.PlayerAgent
 			if (realm == null)
 				throw new Exception($"Character {activeCharacter.Id:X8} has no realm to advertise the GameServer for.");
 
-			await new PacketStream().WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.Ox1A07, GameServerHeader).WriteString($"{realm.IpAddress}:{realm.Port}")
-				.WriteUInt32(account.Id).WriteUInt32(0x0000C350).WriteUInt32(account.ClientInstance).WriteArray(GameServerPayloadPrefix).WriteUInt32(account.ClientInstance).WriteArray(GameServerPayloadSuffix).SendAsync(client);
+			await new PacketStream()
+				.WriteHeader(ServiceConnectionSender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.Ox1A07, GameServerHeader)
+				.WriteString($"{realm.IpAddress}:{realm.Port}")
+				.WriteUInt32(account.Id)
+				.WriteUInt32(0x0000C350)
+				.WriteUInt32(account.ClientInstance)
+				.WriteArray(GameServerPayloadPrefix)
+				.WriteUInt32(account.ClientInstance)
+				.WriteArray(GameServerPayloadSuffix)
+				.SendAsync(client);
 		}
 
 		private Task SendOx20B9(INetworkClient client)
 		{
-			return new PacketStream().WriteHeader(Sender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.Ox20B9, [0x8B, 0xD8, 0x99, 0x02]).WriteUInt32(0x0000C350).WriteUInt32(client.Session.Account.ClientInstance)
-				.WriteUInt32(0).SendAsync(client);
+			return new PacketStream()
+				.WriteHeader(Sender, client.Session.ClientConversation, PlayerAgentResponseOpcodes.Ox20B9, [0x8B, 0xD8, 0x99, 0x02])
+				.WriteUInt32(0x0000C350)
+				.WriteUInt32(client.Session.Account.ClientInstance)
+				.WriteUInt32(0)
+				.SendAsync(client);
 		}
 
 		private async Task SendRealmList(INetworkClient client)

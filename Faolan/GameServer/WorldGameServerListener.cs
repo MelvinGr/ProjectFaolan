@@ -18,8 +18,8 @@ namespace Faolan.GameServer
 	// both listener instances.
 	public sealed class WorldGameServerListener : GameServerListener
 	{
-		public WorldGameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, ushort port, IAgentServerDispatcher agentServerDispatcher)
-			: base(logger, configuration, database, port, agentServerDispatcher)
+		public WorldGameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, ushort port, IAgentServerDispatcher agentServerDispatcher) : base(logger, configuration, database, port,
+			agentServerDispatcher)
 		{
 		}
 	}

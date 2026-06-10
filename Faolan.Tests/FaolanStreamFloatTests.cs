@@ -22,7 +22,9 @@ namespace Faolan.Tests
 		[Fact]
 		public void WriteFloat_IsLittleEndian()
 		{
-			var bytes = new FaolanStream().Also(s => s.WriteFloat(1.0f)).ToArray();
+			var bytes = new FaolanStream()
+				.Also(s => s.WriteFloat(1.0f))
+				.ToArray();
 			// 1.0f = 0x3F800000; little-endian on the wire.
 			Assert.Equal(new byte[] { 0x00, 0x00, 0x80, 0x3F }, bytes);
 		}
@@ -30,7 +32,9 @@ namespace Faolan.Tests
 		[Fact]
 		public void WriteFloatBigEndian_IsBigEndian_AndRoundTripsWithReadFloat()
 		{
-			var bytes = new FaolanStream().Also(s => s.WriteFloatBigEndian(1.0f)).ToArray();
+			var bytes = new FaolanStream()
+				.Also(s => s.WriteFloatBigEndian(1.0f))
+				.ToArray();
 			Assert.Equal(new byte[] { 0x3F, 0x80, 0x00, 0x00 }, bytes);
 
 			// ReadFloat is big-endian, so it round-trips a big-endian write.
@@ -40,7 +44,9 @@ namespace Faolan.Tests
 		[Fact]
 		public void WriteVector3BigEndian_WritesThreeBigEndianFloats()
 		{
-			var bytes = new FaolanStream().Also(s => s.WriteVector3BigEndian(new Vector3(1.0f, 2.0f, 0.0f))).ToArray();
+			var bytes = new FaolanStream()
+				.Also(s => s.WriteVector3BigEndian(new Vector3(1.0f, 2.0f, 0.0f)))
+				.ToArray();
 			// 1.0=0x3F800000, 2.0=0x40000000, 0.0=0x00000000, all big-endian.
 			Assert.Equal(new byte[] { 0x3F, 0x80, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }, bytes);
 		}

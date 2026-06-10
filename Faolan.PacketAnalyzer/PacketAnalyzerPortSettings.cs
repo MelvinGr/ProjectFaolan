@@ -64,7 +64,9 @@ namespace Faolan.PacketAnalyzer
 				AddDuplicateLabel(duplicatePorts, agentServerPort, "AgentServer");
 				AddDuplicateLabel(duplicatePorts, gameServerPort, "GameServer");
 
-				var duplicateDescription = string.Join(", ", duplicatePorts.Where(p => p.Value.Count > 1).Select(p => $"{p.Key} ({string.Join(" / ", p.Value)})"));
+				var duplicateDescription = string.Join(", ", duplicatePorts
+					.Where(p => p.Value.Count > 1)
+					.Select(p => $"{p.Key} ({string.Join(" / ", p.Value)})"));
 				errorMessage = $"Each configured packet analyzer port must be unique. Duplicate assignments: {duplicateDescription}";
 				return false;
 			}

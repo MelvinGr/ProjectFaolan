@@ -1,6 +1,5 @@
 using System;
 using System.Buffers.Binary;
-using System.Text;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Protobuf;
 
@@ -18,8 +17,6 @@ namespace Faolan.GameServer.Spawn
 	// preceding length matches a decodable ProtoCoreCharacterIIR, and return it.
 	public static class PlayerSpawnReader
 	{
-		public readonly record struct Result(int Offset, int Length, ProtoCoreCharacterIIR Message);
-
 		public static bool TryReadCharacterMessage(byte[] body, out Result result)
 		{
 			result = default;
@@ -43,7 +40,9 @@ namespace Faolan.GameServer.Spawn
 
 				try
 				{
-					var message = ((ReadOnlySpan<byte>)body.AsSpan(i, messageLength)).FromProtobuf<ProtoCoreCharacterIIR>();
+					var message = body
+						.AsSpan(i, messageLength)
+						.FromProtobuf<ProtoCoreCharacterIIR>();
 					if (!string.IsNullOrEmpty(message.Name) && message.Name.Length == nameLen)
 					{
 						result = new Result(i, messageLength, message);
@@ -62,9 +61,14 @@ namespace Faolan.GameServer.Spawn
 		private static bool IsPrintableAscii(byte[] data, int start, int length)
 		{
 			for (var i = start; i < start + length; i++)
+			{
 				if (data[i] < 0x20 || data[i] > 0x7E)
 					return false;
+			}
+
 			return true;
 		}
+
+		public readonly record struct Result(int Offset, int Length, ProtoCoreCharacterIIR Message);
 	}
 }

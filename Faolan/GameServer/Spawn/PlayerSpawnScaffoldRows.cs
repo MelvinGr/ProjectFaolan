@@ -14,64 +14,24 @@ namespace Faolan.GameServer.Spawn
 	// genuinely fresh scaffold). See docs/player-spawn-generation-plan.md "VALIDATED GRAMMAR".
 	public static class PlayerSpawnScaffoldRows
 	{
-		// Replaces the character's scaffold rows with the scaffold's content (extraction: captured spawn -> rows).
-		public static void ExtractTo(Character character, PlayerSpawnScaffold scaffold)
+		private const uint FreshCloserValue = 0x0000012C;
+
+		// The closing [u16 tag][u32 value] entry-table record. Also per-character on the wire (Dikketest
+		// 0x56B6/0x12C, strickenbla 0x4ED4/0x64, Hoxxling 0x46F2/0x190; semantics unknown) - fresh characters
+		// keep Dikketest's proven values.
+		private const ushort FreshCloserTag = 0x56B6;
+
+		// Dikketest's 6 weighted attributes (weight 1.0). The tags are per-character (likely the chosen
+		// race/class/head presets - mapping not yet cracked), so fresh characters keep Dikketest's proven set.
+		// The character's morph entries are generated from its CharacterBody (see CharacterMorphs), not stored here.
+		private static readonly ScaffoldEntry[] FreshWeightedAttributes =
 		{
-			character.Attributes = scaffold.Entries.Select((e, sequence) => new CharacterAttribute
-			{
-				CharacterId = character.Id,
-				Sequence = sequence,
-				StatId = e.Index,
-				Tag = e.Tag,
-				Value = e.Value
-			}).ToList();
+			new ScaffoldEntry(1, 0x00B0, 0x3F800000), new ScaffoldEntry(2, 0x0147, 0x3F800000), new ScaffoldEntry(3, 0x0154, 0x3F800000), new ScaffoldEntry(4, 0x0191, 0x3F800000), new ScaffoldEntry(5, 0x010B, 0x3F800000),
+			new ScaffoldEntry(6, 0x01DE, 0x3F800000)
+		};
 
-			character.Skills = scaffold.IdList.Select(s => new CharacterSkill
-			{
-				CharacterId = character.Id,
-				SkillId = s.Id,
-				Rank = s.Rank
-			}).ToList();
-
-			character.ScaffoldPairs = scaffold.EndPairs.Select(p => Pair(character.Id, 0, p))
-				.Concat(scaffold.EndPairs2.Select(p => Pair(character.Id, 1, p))).ToList();
-
-			character.SpawnFrame = new CharacterSpawnFrame
-			{
-				CharacterId = character.Id,
-				PreFrame = scaffold.PreFrame,
-				EntryTableX = scaffold.EntryTableX
-			};
-		}
-
-		// Fills the scaffold's per-character parts from the rows (generation: rows -> wire). Returns false when
-		// the character has no scaffold rows yet (caller falls back to the captured-spawn splice path).
-		public static bool TryApplyFrom(Character character, PlayerSpawnScaffold scaffold)
-		{
-			if (character?.SpawnFrame?.PreFrame == null || character.Attributes == null || character.Attributes.Count == 0)
-				return false;
-
-			scaffold.PreFrame = character.SpawnFrame.PreFrame;
-			scaffold.EntryTableX = character.SpawnFrame.EntryTableX;
-			scaffold.BuffRecords.Clear();
-
-			scaffold.Entries.Clear();
-			scaffold.Entries.AddRange(character.Attributes.OrderBy(a => a.Sequence).Select(a => new ScaffoldEntry(a.StatId, a.Tag, a.Value)));
-
-			scaffold.IdList.Clear();
-			if (character.Skills != null)
-				scaffold.IdList.AddRange(character.Skills.OrderBy(s => s.SkillId).Select(s => new ScaffoldIdEntry(s.Rank, s.SkillId)));
-
-			scaffold.EndPairs.Clear();
-			scaffold.EndPairs2.Clear();
-			if (character.ScaffoldPairs != null)
-			{
-				scaffold.EndPairs.AddRange(character.ScaffoldPairs.Where(p => p.ListIndex == 0).OrderBy(p => p.PairId).Select(p => new ScaffoldPair(p.PairId, p.Value)));
-				scaffold.EndPairs2.AddRange(character.ScaffoldPairs.Where(p => p.ListIndex == 1).OrderBy(p => p.PairId).Select(p => new ScaffoldPair(p.PairId, p.Value)));
-			}
-
-			return true;
-		}
+		// Dikketest's feat/ability ID list (all rank 0).
+		private static readonly uint[] FreshSkillIds = { 1800, 6000, 6100, 6200, 6300, 6600, 6800, 6900, 7100, 8100, 8305, 8400, 13600, 14600, 124400, 318400, 318800, 328700, 328900, 331300 };
 
 		// Builds the weighted (1.0) appearance entries from the character's chosen editor resources, resolved
 		// against the imported client registry (MorphTarget; wire tag = registry id - 1). Wire order = editor
@@ -120,21 +80,64 @@ namespace Faolan.GameServer.Spawn
 			entries.AddRange(CharacterMorphs.BuildEntries(character.Body, (uint)entries.Count + 1));
 			entries.Add(new ScaffoldEntry((uint)entries.Count + 1, FreshCloserTag, FreshCloserValue));
 
-			character.Attributes = entries.Select((e, sequence) => new CharacterAttribute
-			{
-				CharacterId = character.Id,
-				Sequence = sequence,
-				StatId = e.Index,
-				Tag = e.Tag,
-				Value = e.Value
-			}).ToList();
-			character.Skills = FreshSkillIds.Select(id => new CharacterSkill
-			{
-				CharacterId = character.Id,
-				SkillId = id
-			}).ToList();
+			character.Attributes = entries
+				.Select((e, sequence) => new CharacterAttribute
+				{
+					CharacterId = character.Id,
+					Sequence = sequence,
+					StatId = e.Index,
+					Tag = e.Tag,
+					Value = e.Value
+				})
+				.ToList();
+			character.Skills = FreshSkillIds
+				.Select(id => new CharacterSkill
+				{
+					CharacterId = character.Id,
+					SkillId = id
+				})
+				.ToList();
 			character.ScaffoldPairs = new List<CharacterScaffoldPair>();
 			return true;
+		}
+
+		// Replaces the character's scaffold rows with the scaffold's content (extraction: captured spawn -> rows).
+		public static void ExtractTo(Character character, PlayerSpawnScaffold scaffold)
+		{
+			character.Attributes = scaffold
+				.Entries
+				.Select((e, sequence) => new CharacterAttribute
+				{
+					CharacterId = character.Id,
+					Sequence = sequence,
+					StatId = e.Index,
+					Tag = e.Tag,
+					Value = e.Value
+				})
+				.ToList();
+
+			character.Skills = scaffold
+				.IdList
+				.Select(s => new CharacterSkill
+				{
+					CharacterId = character.Id,
+					SkillId = s.Id,
+					Rank = s.Rank
+				})
+				.ToList();
+
+			character.ScaffoldPairs = scaffold
+				.EndPairs
+				.Select(p => Pair(character.Id, 0, p))
+				.Concat(scaffold.EndPairs2.Select(p => Pair(character.Id, 1, p)))
+				.ToList();
+
+			character.SpawnFrame = new CharacterSpawnFrame
+			{
+				CharacterId = character.Id,
+				PreFrame = scaffold.PreFrame,
+				EntryTableX = scaffold.EntryTableX
+			};
 		}
 
 		// The normal-login pre-IIR frame (239 bytes) with the fresh-character island values: the near-constant
@@ -160,31 +163,48 @@ namespace Faolan.GameServer.Spawn
 			return f;
 		}
 
-		// Dikketest's 6 weighted attributes (weight 1.0). The tags are per-character (likely the chosen
-		// race/class/head presets - mapping not yet cracked), so fresh characters keep Dikketest's proven set.
-		// The character's morph entries are generated from its CharacterBody (see CharacterMorphs), not stored here.
-		private static readonly ScaffoldEntry[] FreshWeightedAttributes =
+		// Fills the scaffold's per-character parts from the rows (generation: rows -> wire). Returns false when
+		// the character has no scaffold rows yet (caller falls back to the captured-spawn splice path).
+		public static bool TryApplyFrom(Character character, PlayerSpawnScaffold scaffold)
 		{
-			new ScaffoldEntry(1, 0x00B0, 0x3F800000),
-			new ScaffoldEntry(2, 0x0147, 0x3F800000),
-			new ScaffoldEntry(3, 0x0154, 0x3F800000),
-			new ScaffoldEntry(4, 0x0191, 0x3F800000),
-			new ScaffoldEntry(5, 0x010B, 0x3F800000),
-			new ScaffoldEntry(6, 0x01DE, 0x3F800000)
-		};
+			if (character?.SpawnFrame?.PreFrame == null || character.Attributes == null || character.Attributes.Count == 0)
+				return false;
 
-		// The closing [u16 tag][u32 value] entry-table record. Also per-character on the wire (Dikketest
-		// 0x56B6/0x12C, strickenbla 0x4ED4/0x64, Hoxxling 0x46F2/0x190; semantics unknown) - fresh characters
-		// keep Dikketest's proven values.
-		private const ushort FreshCloserTag = 0x56B6;
-		private const uint FreshCloserValue = 0x0000012C;
+			scaffold.PreFrame = character.SpawnFrame.PreFrame;
+			scaffold.EntryTableX = character.SpawnFrame.EntryTableX;
+			scaffold.BuffRecords.Clear();
 
-		// Dikketest's feat/ability ID list (all rank 0).
-		private static readonly uint[] FreshSkillIds =
-		{
-			1800, 6000, 6100, 6200, 6300, 6600, 6800, 6900, 7100, 8100,
-			8305, 8400, 13600, 14600, 124400, 318400, 318800, 328700, 328900, 331300
-		};
+			scaffold.Entries.Clear();
+			scaffold.Entries.AddRange(character
+				.Attributes
+				.OrderBy(a => a.Sequence)
+				.Select(a => new ScaffoldEntry(a.StatId, a.Tag, a.Value)));
+
+			scaffold.IdList.Clear();
+			if (character.Skills != null)
+				scaffold.IdList.AddRange(character
+					.Skills
+					.OrderBy(s => s.SkillId)
+					.Select(s => new ScaffoldIdEntry(s.Rank, s.SkillId)));
+
+			scaffold.EndPairs.Clear();
+			scaffold.EndPairs2.Clear();
+			if (character.ScaffoldPairs != null)
+			{
+				scaffold.EndPairs.AddRange(character
+					.ScaffoldPairs
+					.Where(p => p.ListIndex == 0)
+					.OrderBy(p => p.PairId)
+					.Select(p => new ScaffoldPair(p.PairId, p.Value)));
+				scaffold.EndPairs2.AddRange(character
+					.ScaffoldPairs
+					.Where(p => p.ListIndex == 1)
+					.OrderBy(p => p.PairId)
+					.Select(p => new ScaffoldPair(p.PairId, p.Value)));
+			}
+
+			return true;
+		}
 
 		private static CharacterScaffoldPair Pair(uint characterId, byte listIndex, ScaffoldPair p)
 		{

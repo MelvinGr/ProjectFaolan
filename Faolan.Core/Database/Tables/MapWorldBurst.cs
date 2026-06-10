@@ -29,32 +29,32 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(MapWorldBurstId))]
 		public virtual MapWorldBurst Burst { get; set; }
 
-		public uint MapWorldBurstId { get; set; }
-
-		// Order within the burst (the replay sends in this order).
-		public int Sequence { get; set; }
-
-		// The packet opcode at the marker: 0x2000 for an IIR record, otherwise a framing opcode (e.g. 0x2076 manifest).
-		public ushort Opcode { get; set; }
-
-		// --- IIR header (populated when Opcode == 0x2000) -------------------------------------------------------
-		// The IIR message type (sub-opcode), e.g. 0xFA015807 SimpleCharFullUpdate, 0x66AEDD50 SimpleDynelFullUpdate.
-		public uint IirType { get; set; }
-
-		// The per-type class/version tag that precedes the handle (0xC350 char, 0xC878 dynel, 0xC87A lootbag, ...).
-		public uint TypeTag { get; set; }
-
-		// The target entity handle this record addresses (0 for global records like MapChange / GameTime).
-		public uint Handle { get; set; }
-
-		// The field following the handle (usually 0; a stat id for StatIIR, a sub-count for FullChar, etc.).
-		public uint FieldA { get; set; }
+		// The IIR component payload (everything after the lifted header fields), verbatim until dissected.
+		public byte[] Body { get; set; }
 
 		// --- raw remainder (shrinks as components are dissected into typed columns) ------------------------------
 		// RpcHeader + the 2-byte opcode marker, verbatim. Carries the source endpoint + (re-addressable) instance.
 		public byte[] Header { get; set; }
 
-		// The IIR component payload (everything after the lifted header fields), verbatim until dissected.
-		public byte[] Body { get; set; }
+		// Order within the burst (the replay sends in this order).
+		public int Sequence { get; set; }
+
+		// The field following the handle (usually 0; a stat id for StatIIR, a sub-count for FullChar, etc.).
+		public uint FieldA { get; set; }
+
+		// The target entity handle this record addresses (0 for global records like MapChange / GameTime).
+		public uint Handle { get; set; }
+
+		// --- IIR header (populated when Opcode == 0x2000) -------------------------------------------------------
+		// The IIR message type (sub-opcode), e.g. 0xFA015807 SimpleCharFullUpdate, 0x66AEDD50 SimpleDynelFullUpdate.
+		public uint IirType { get; set; }
+
+		public uint MapWorldBurstId { get; set; }
+
+		// The per-type class/version tag that precedes the handle (0xC350 char, 0xC878 dynel, 0xC87A lootbag, ...).
+		public uint TypeTag { get; set; }
+
+		// The packet opcode at the marker: 0x2000 for an IIR record, otherwise a framing opcode (e.g. 0x2076 manifest).
+		public ushort Opcode { get; set; }
 	}
 }

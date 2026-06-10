@@ -135,26 +135,35 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 
 		public static IEnumerable<ProtoField> FindEntriesByTemplateId(ProtoMessage? container, uint templateId)
 		{
-			return GetContainerEntries(container).Where(x => GetEntryTemplateId(x) == templateId);
+			return GetContainerEntries(container)
+				.Where(x => GetEntryTemplateId(x) == templateId);
 		}
 
 		public static IEnumerable<TailHashedValueRecord> FindHashedTailValues(IEnumerable<ITailRecord> records, params uint[] values)
 		{
 			var set = values.ToHashSet();
 
-			return records.OfType<TailHashedValueRecord>().Where(x => set.Contains(x.Value));
+			return records
+				.OfType<TailHashedValueRecord>()
+				.Where(x => set.Contains(x.Value));
 		}
 
 		public static IEnumerable<TailStructRecord> FindStructTailValues(IEnumerable<ITailRecord> records, params uint[] values)
 		{
 			var set = values.ToHashSet();
 
-			return records.OfType<TailStructRecord>().Where(x => set.Contains(x.Field0) || set.Contains(x.Field1) || set.Contains(x.Field2) || set.Contains(x.Field3) || set.Contains(x.Field4));
+			return records
+				.OfType<TailStructRecord>()
+				.Where(x => set.Contains(x.Field0) || set.Contains(x.Field1) || set.Contains(x.Field2) || set.Contains(x.Field3) || set.Contains(x.Field4));
 		}
 
 		public static ProtoMessage? GetContainer(ProtoMessage root, ContainerKind kind)
 		{
-			return root.Fields.Where(x => x.FieldNumber == 6 && x.MessageValue != null).Select(x => x.MessageValue!).FirstOrDefault(x => GetContainerKind(x) == (ulong)kind);
+			return root
+				.Fields
+				.Where(x => x.FieldNumber == 6 && x.MessageValue != null)
+				.Select(x => x.MessageValue!)
+				.FirstOrDefault(x => GetContainerKind(x) == (ulong)kind);
 		}
 
 		public static IEnumerable<ProtoField> GetContainerEntries(ProtoMessage? container)
@@ -169,24 +178,29 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 		{
 			var wrapper = container.Fields.FirstOrDefault(x => x.FieldNumber == 1 && x.MessageValue != null);
 
-			return wrapper?.MessageValue?.Fields.FirstOrDefault(x => x.FieldNumber == 1 && x.WireType == 0)?.VarintValue;
+			return wrapper?.MessageValue?.Fields.FirstOrDefault(x => x.FieldNumber == 1 && x.WireType == 0)
+				?.VarintValue;
 		}
 
 		public static IReadOnlyList<InventoryEntrySummary> GetContainerSummary(ProtoMessage? container)
 		{
-			return GetContainerEntries(container).Select(ToEntrySummary).ToArray();
+			return GetContainerEntries(container)
+				.Select(ToEntrySummary)
+				.ToArray();
 		}
 
 		public static uint? GetEntryArchetype(ProtoField entry)
 		{
 			var tail = GetEntryTail(entry);
 
-			return tail?.Fields.FirstOrDefault(x => x.FieldNumber == 8 && x.WireType == 5)?.Fixed32Value;
+			return tail?.Fields.FirstOrDefault(x => x.FieldNumber == 8 && x.WireType == 5)
+				?.Fixed32Value;
 		}
 
 		public static ProtoField? GetEntryBySlot(ProtoMessage? container, ulong slot)
 		{
-			return GetContainerEntries(container).FirstOrDefault(x => GetEntrySlot(x) == slot);
+			return GetContainerEntries(container)
+				.FirstOrDefault(x => GetEntrySlot(x) == slot);
 		}
 
 		public static ulong? GetEntryCount(ProtoField entry)
@@ -195,9 +209,14 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 			if (itemDetails == null)
 				return null;
 
-			var countMessage = itemDetails.Fields.Where(x => x.FieldNumber == 2 && x.MessageValue != null).Select(x => x.MessageValue!).FirstOrDefault(x => IsTinyMessageKind(x, 26));
+			var countMessage = itemDetails
+				.Fields
+				.Where(x => x.FieldNumber == 2 && x.MessageValue != null)
+				.Select(x => x.MessageValue!)
+				.FirstOrDefault(x => IsTinyMessageKind(x, 26));
 
-			return countMessage?.Fields.FirstOrDefault(x => x.FieldNumber == 2 && x.WireType == 0)?.VarintValue;
+			return countMessage?.Fields.FirstOrDefault(x => x.FieldNumber == 2 && x.WireType == 0)
+				?.VarintValue;
 		}
 
 		// The item's stable identity quad (Data1..Data4) = the four fixed32s of the tail's first identity payload
@@ -206,11 +225,16 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 		public static (uint Data1, uint Data2, uint Data3, uint Data4)? GetEntryIdentityQuad(ProtoField entry)
 		{
 			var tail = GetEntryTail(entry);
-			var payload = tail?.Fields.FirstOrDefault(x => x.FieldNumber == 1 && x.MessageValue != null)?.MessageValue;
+			var payload = tail?.Fields.FirstOrDefault(x => x.FieldNumber == 1 && x.MessageValue != null)
+				?.MessageValue;
 			if (payload == null)
 				return null;
 
-			var f = payload.Fields.Where(x => x.WireType == 5).Select(x => x.Fixed32Value).ToArray();
+			var f = payload
+				.Fields
+				.Where(x => x.WireType == 5)
+				.Select(x => x.Fixed32Value)
+				.ToArray();
 			return f.Length < 4
 				? null
 				: (f[0], f[1], f[2], f[3]);
@@ -220,27 +244,35 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 		{
 			var itemDetails = GetItemDetails(entry);
 
-			return itemDetails?.Fields.FirstOrDefault(x => x.FieldNumber == 1 && x.WireType == 0)?.VarintValue;
+			return itemDetails?.Fields.FirstOrDefault(x => x.FieldNumber == 1 && x.WireType == 0)
+				?.VarintValue;
 		}
 
 		// Property 23 = the item's local inventory record id (present on every item).
 		public static ulong? GetEntryRecordId(ProtoField entry)
 		{
 			var details = GetItemDetails(entry);
-			var record = details?.Fields.Where(x => x.FieldNumber == 2 && x.MessageValue != null).Select(x => x.MessageValue!).FirstOrDefault(x => IsTinyMessageKind(x, 23));
-			return record?.Fields.FirstOrDefault(x => x.FieldNumber == 2 && x.WireType == 0)?.VarintValue;
+			var record = details
+				?.Fields
+				.Where(x => x.FieldNumber == 2 && x.MessageValue != null)
+				.Select(x => x.MessageValue!)
+				.FirstOrDefault(x => IsTinyMessageKind(x, 23));
+			return record?.Fields.FirstOrDefault(x => x.FieldNumber == 2 && x.WireType == 0)
+				?.VarintValue;
 		}
 
 		public static ulong? GetEntrySlot(ProtoField entry)
 		{
-			return entry.MessageValue?.Fields.FirstOrDefault(x => x.FieldNumber == 1 && x.WireType == 0)?.VarintValue;
+			return entry.MessageValue?.Fields.FirstOrDefault(x => x.FieldNumber == 1 && x.WireType == 0)
+				?.VarintValue;
 		}
 
 		public static uint? GetEntryTemplateId(ProtoField entry)
 		{
 			var tail = GetEntryTail(entry);
 
-			return tail?.Fields.FirstOrDefault(x => x.FieldNumber == 4 && x.WireType == 5)?.Fixed32Value;
+			return tail?.Fields.FirstOrDefault(x => x.FieldNumber == 4 && x.WireType == 5)
+				?.Fixed32Value;
 		}
 
 		// Offsets the item's "stable identity" tail GUID (tail fields 1/2/3 are three identical 20-byte payloads,
@@ -252,7 +284,10 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 			if (tail == null)
 				return;
 
-			foreach (var payload in tail.Fields.Where(x => x.FieldNumber is 1 or 2 or 3 && x.MessageValue != null).Select(x => x.MessageValue!))
+			foreach (var payload in tail
+				         .Fields
+				         .Where(x => x.FieldNumber is 1 or 2 or 3 && x.MessageValue != null)
+				         .Select(x => x.MessageValue!))
 			{
 				var first = payload.Fields.FirstOrDefault(x => x.WireType == 5);
 				if (first != null)
@@ -337,7 +372,10 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 			if (itemDetails == null)
 				return false;
 
-			var countMessageField = itemDetails.Fields.Where(x => x.FieldNumber == 2 && x.MessageValue != null).FirstOrDefault(x => IsTinyMessageKind(x.MessageValue!, 26));
+			var countMessageField = itemDetails
+				.Fields
+				.Where(x => x.FieldNumber == 2 && x.MessageValue != null)
+				.FirstOrDefault(x => IsTinyMessageKind(x.MessageValue!, 26));
 
 			if (countMessageField != null)
 			{
@@ -395,7 +433,11 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 		public static void SetEntryRecordId(ProtoField entry, ulong recordId)
 		{
 			var details = GetItemDetails(entry);
-			var record = details?.Fields.Where(x => x.FieldNumber == 2 && x.MessageValue != null).Select(x => x.MessageValue!).FirstOrDefault(x => IsTinyMessageKind(x, 23));
+			var record = details
+				?.Fields
+				.Where(x => x.FieldNumber == 2 && x.MessageValue != null)
+				.Select(x => x.MessageValue!)
+				.FirstOrDefault(x => IsTinyMessageKind(x, 23));
 			var field = record?.Fields.FirstOrDefault(x => x.FieldNumber == 2 && x.WireType == 0);
 			if (field != null)
 				field.VarintValue = recordId;
@@ -412,24 +454,33 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 		{
 			var itemDetails = GetItemDetails(entry);
 
-			var properties = itemDetails?.Fields.Where(x => x.FieldNumber == 2 && x.MessageValue != null).Select(x =>
-			{
-				var message = x.MessageValue!;
+			var properties = itemDetails
+				?.Fields
+				.Where(x => x.FieldNumber == 2 && x.MessageValue != null)
+				.Select(x =>
+				{
+					var message = x.MessageValue!;
 
-				var kind = message.Fields.FirstOrDefault(f => f.FieldNumber == 1 && f.WireType == 0)?.VarintValue;
+					var kind = message.Fields.FirstOrDefault(f => f.FieldNumber == 1 && f.WireType == 0)
+						?.VarintValue;
 
-				var value = message.Fields.FirstOrDefault(f => f.FieldNumber == 2 && f.WireType == 0)?.VarintValue;
+					var value = message.Fields.FirstOrDefault(f => f.FieldNumber == 2 && f.WireType == 0)
+						?.VarintValue;
 
-				return $"{kind}:{value}";
-			}).ToArray() ?? [];
+					return $"{kind}:{value}";
+				})
+				.ToArray() ?? [];
 
 			var tail = GetEntryTail(entry);
 
-			var templateA = tail?.Fields.FirstOrDefault(x => x.FieldNumber == 4 && x.WireType == 5)?.Fixed32Value;
+			var templateA = tail?.Fields.FirstOrDefault(x => x.FieldNumber == 4 && x.WireType == 5)
+				?.Fixed32Value;
 
-			var templateB = tail?.Fields.FirstOrDefault(x => x.FieldNumber == 5 && x.WireType == 5)?.Fixed32Value;
+			var templateB = tail?.Fields.FirstOrDefault(x => x.FieldNumber == 5 && x.WireType == 5)
+				?.Fixed32Value;
 
-			var archetype = tail?.Fields.FirstOrDefault(x => x.FieldNumber == 8 && x.WireType == 5)?.Fixed32Value;
+			var archetype = tail?.Fields.FirstOrDefault(x => x.FieldNumber == 8 && x.WireType == 5)
+				?.Fixed32Value;
 
 			return new InventoryEntrySummary(GetEntrySlot(entry), GetEntryItemId(entry), properties, templateA, templateB, archetype);
 		}
@@ -482,17 +533,20 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 		{
 			var itemDetails = GetItemDetails(entry);
 
-			return itemDetails?.Fields.FirstOrDefault(x => x.FieldNumber == 3 && x.MessageValue != null)?.MessageValue;
+			return itemDetails?.Fields.FirstOrDefault(x => x.FieldNumber == 3 && x.MessageValue != null)
+				?.MessageValue;
 		}
 
 		private static ProtoMessage? GetItemDetails(ProtoField entry)
 		{
-			return entry.MessageValue?.Fields.FirstOrDefault(x => x.FieldNumber == 2 && x.MessageValue != null)?.MessageValue;
+			return entry.MessageValue?.Fields.FirstOrDefault(x => x.FieldNumber == 2 && x.MessageValue != null)
+				?.MessageValue;
 		}
 
 		private static bool IsTinyMessageKind(ProtoMessage message, ulong kind)
 		{
-			return message.Fields.FirstOrDefault(x => x.FieldNumber == 1 && x.WireType == 0)?.VarintValue == kind;
+			return message.Fields.FirstOrDefault(x => x.FieldNumber == 1 && x.WireType == 0)
+				?.VarintValue == kind;
 		}
 
 		private static bool LooksLikeInventoryRootAt(FaolanStream bodyStream, long offset)

@@ -68,7 +68,10 @@ namespace Faolan.Importer
 		// Counts entries per type (for the type-inventory phase).
 		public IEnumerable<(uint Type, int Count)> TypeCounts()
 		{
-			return _entries.GroupBy(e => e.Type).Select(g => (g.Key, g.Count())).OrderByDescending(x => x.Item2);
+			return _entries
+				.GroupBy(e => e.Type)
+				.Select(g => (g.Key, g.Count()))
+				.OrderByDescending(x => x.Item2);
 		}
 
 		private FileStream GetDataFile(int file)

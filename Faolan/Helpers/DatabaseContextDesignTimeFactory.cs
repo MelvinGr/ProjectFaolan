@@ -13,7 +13,8 @@ namespace Faolan.Helpers
 	{
 		public DatabaseContext CreateDbContext(string[] args)
 		{
-			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite("Data Source=faolan.db", sqlite => sqlite.MigrationsAssembly("Faolan")).Options;
+			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite("Data Source=faolan.db", sqlite => sqlite.MigrationsAssembly("Faolan"))
+				.Options;
 
 			return new DatabaseContext(options);
 		}

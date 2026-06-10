@@ -23,7 +23,9 @@ namespace Faolan.Importer
 		public static async Task<int> ImportAsync(DatabaseContext db, string rdbDir)
 		{
 			using var rdb = new RdbReader(rdbDir);
-			var entry = rdb.EntriesOfType(RegistryType).FirstOrDefault();
+			var entry = rdb
+				.EntriesOfType(RegistryType)
+				.FirstOrDefault();
 			if (entry.Size == 0)
 			{
 				Console.WriteLine($"RDB morph targets: registry type {RegistryType} not found; skipping.");

@@ -39,7 +39,11 @@ namespace Faolan.GameServer
 			if (node == null)
 				return false;
 
-			var orderedPackets = node.Packets.OrderBy(p => p.Sequence).Select(p => p.Data).ToList();
+			var orderedPackets = node
+				.Packets
+				.OrderBy(p => p.Sequence)
+				.Select(p => p.Data)
+				.ToList();
 
 			var liveInstance = client.Session.Account.ClientInstance;
 			Logger.LogInformation("Conversation node (typeId={TypeId}, mode={Mode}, field3={Field3}) -> {Count} packets for NPC 0x{Npc:X}.", typeId, mode, field3, orderedPackets.Count, clickedNpcHandle);

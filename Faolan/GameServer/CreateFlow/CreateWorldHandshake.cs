@@ -61,39 +61,45 @@ namespace Faolan.GameServer
 		private Task SendA36DCallback(INetworkClient client, string token, string value)
 		{
 			var instance = client.Session.Account.ClientInstance;
-			return new PacketStream().WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), 0x2000).WriteArrayUInt32Length(s =>
-			{
-				s.WriteUInt32(0xA36D3B74u);
-				s.WriteUInt32(0x0000C350u);
-				s.WriteUInt32(instance);
-				s.WriteByte(0x00);
-				s.WriteArrayUInt32Length(pb =>
+			return new PacketStream()
+				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), 0x2000)
+				.WriteArrayUInt32Length(s =>
 				{
-					pb.WriteByte(0x08);
-					pb.WriteByte(0x05);
-					pb.WriteByte(0x10);
-					pb.WriteByte(0x02);
-					pb.WriteByte(0x18);
-					pb.WriteByte(0x00);
-					pb.WriteByte(0x22);
-					pb.WriteStringByteLength(token);
-					pb.WriteByte(0x2A);
-					pb.WriteStringByteLength(value);
-					pb.WriteArray(0x32, 0x04, 0x08, 0x00, 0x10, 0x00);
-				});
-			}).SendAsync(client);
+					s.WriteUInt32(0xA36D3B74u);
+					s.WriteUInt32(0x0000C350u);
+					s.WriteUInt32(instance);
+					s.WriteByte(0x00);
+					s.WriteArrayUInt32Length(pb =>
+					{
+						pb.WriteByte(0x08);
+						pb.WriteByte(0x05);
+						pb.WriteByte(0x10);
+						pb.WriteByte(0x02);
+						pb.WriteByte(0x18);
+						pb.WriteByte(0x00);
+						pb.WriteByte(0x22);
+						pb.WriteStringByteLength(token);
+						pb.WriteByte(0x2A);
+						pb.WriteStringByteLength(value);
+						pb.WriteArray(0x32, 0x04, 0x08, 0x00, 0x10, 0x00);
+					});
+				})
+				.SendAsync(client);
 		}
 
 		// Builds a creator-connection 0x2000 packet: subOpcode + ack(0xC350) + clientInstance + fixed tail.
 		private Task SendCreateEditor2000(INetworkClient client, uint subOpcode, byte[] tail, uint instance)
 		{
-			return new PacketStream().WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), 0x2000).WriteArrayUInt32Length(s =>
-			{
-				s.WriteUInt32(subOpcode);
-				s.WriteUInt32(0x0000C350u);
-				s.WriteUInt32(instance);
-				s.WriteArray(tail);
-			}).SendAsync(client);
+			return new PacketStream()
+				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), 0x2000)
+				.WriteArrayUInt32Length(s =>
+				{
+					s.WriteUInt32(subOpcode);
+					s.WriteUInt32(0x0000C350u);
+					s.WriteUInt32(instance);
+					s.WriteArray(tail);
+				})
+				.SendAsync(client);
 		}
 
 		// Sends the 0xBADF5A4B ack for one SetMorphValue. The wire layout (after the 0x2000 wrapper) is:
@@ -113,17 +119,20 @@ namespace Faolan.GameServer
 				? 0x3F800000u
 				: 0xBCF5C28Fu;
 
-			return new PacketStream().WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), 0x2000).WriteArrayUInt32Length(s =>
-			{
-				s.WriteUInt32(0xBADF5A4Bu);
-				s.WriteUInt32(0x0000C350u);
-				s.WriteUInt32(instance);
-				s.WriteUInt16((ushort)0);
-				s.WriteStringByteLength(morphValue);
-				s.WriteUInt32(floatBits);
-				s.WriteByte(0);
-				s.WriteUInt32(counter);
-			}).SendAsync(client);
+			return new PacketStream()
+				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), 0x2000)
+				.WriteArrayUInt32Length(s =>
+				{
+					s.WriteUInt32(0xBADF5A4Bu);
+					s.WriteUInt32(0x0000C350u);
+					s.WriteUInt32(instance);
+					s.WriteUInt16((ushort)0);
+					s.WriteStringByteLength(morphValue);
+					s.WriteUInt32(floatBits);
+					s.WriteByte(0);
+					s.WriteUInt32(counter);
+				})
+				.SendAsync(client);
 		}
 
 		// Step 2: answer the client's TheNameIs callback so it knows the name was accepted and advances to
@@ -133,17 +142,20 @@ namespace Faolan.GameServer
 		{
 			var instance = client.Session.Account.ClientInstance;
 
-			await new PacketStream().WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), 0x2000).WriteArrayUInt32Length(s =>
-			{
-				s.WriteUInt32(0xADCE0CDAu);
-				s.WriteUInt32(0x0000C350u);
-				s.WriteUInt32(instance);
-				s.WriteUInt32(0u);
-				s.WriteByte(0x03);
-				s.WriteByte(0x01);
-				s.WriteUInt32(0u);
-				s.WriteStringByteLength(name);
-			}).SendAsync(client);
+			await new PacketStream()
+				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), 0x2000)
+				.WriteArrayUInt32Length(s =>
+				{
+					s.WriteUInt32(0xADCE0CDAu);
+					s.WriteUInt32(0x0000C350u);
+					s.WriteUInt32(instance);
+					s.WriteUInt32(0u);
+					s.WriteByte(0x03);
+					s.WriteByte(0x01);
+					s.WriteUInt32(0u);
+					s.WriteStringByteLength(name);
+				})
+				.SendAsync(client);
 
 			await SendA36DCallback(client, "NicknameOk", name);
 			await SendCreateEditor2000(client, 0xF508F4C1u, [
@@ -183,7 +195,11 @@ namespace Faolan.GameServer
 			var worldPort = (ushort)(realm.Port + 1);
 			var address = $"{realm.IpAddress}:{worldPort}";
 
-			await new PacketStream().WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), 0x2002).WriteByte(0x00).WriteStringByteLength(address).SendAsync(client);
+			await new PacketStream()
+				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), 0x2002)
+				.WriteByte(0x00)
+				.WriteStringByteLength(address)
+				.SendAsync(client);
 
 			Logger.LogInformation("Create-editor: sent enter-world handoff (0x2002) advertising world server {Address}.", address);
 		}

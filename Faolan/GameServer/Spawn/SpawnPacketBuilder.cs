@@ -19,6 +19,10 @@ namespace Faolan.GameServer.Spawn
 	// + CRC are (re)computed by the caller / PacketStream.
 	public static class SpawnPacketBuilder
 	{
+		// The CharacterStats IIR component (sex/side/race/class/health/... = ProtoCoreCharacterIIR.CharacterStats) is
+		// a 0x22 length-delimited field immediately after the name. Strie layout: 0x22 @315, 67-byte payload @317.
+		public const int CharacterStatsTagOffset = 315;
+
 		// Offsets within the FA015807 body, valid for the Strie-shaped beach layout (the burst's player spawn and
 		// the SpawnStrieTemplate test golden; other characters' spawns shift with name/equipment length - use
 		// PlayerSpawnReader / PlayerSpawnScaffoldCodec for those).
@@ -36,9 +40,6 @@ namespace Faolan.GameServer.Spawn
 		// length-prefixed protobuf string `0A <len> <utf8>`. Resizing it must delta-adjust the CharacterIIR length
 		// prefix (@304), the value @133 (see above) and the body length @0.
 		public const int NameTagOffset = 308; // 0x0A
-		// The CharacterStats IIR component (sex/side/race/class/health/... = ProtoCoreCharacterIIR.CharacterStats) is
-		// a 0x22 length-delimited field immediately after the name. Strie layout: 0x22 @315, 67-byte payload @317.
-		public const int CharacterStatsTagOffset = 315;
 		public const int PosXOffset = 24; // float little-endian
 		public const int PosYOffset = 29;
 		public const int PosZOffset = 34;
@@ -46,8 +47,8 @@ namespace Faolan.GameServer.Spawn
 		public const int RotXOffset = 41; // quaternion floats little-endian
 		public const int RotYOffset = 46;
 		public const int RotZOffset = 51;
-		private const int TransformEndOffset = RotWOffset + 4; // first byte after the constructed transform (60)
 		private const byte BaseNameLength = 5; // "Strie" - the captured base body's name
+		private const int TransformEndOffset = RotWOffset + 4; // first byte after the constructed transform (60)
 
 		// Constructs the FA015807 header + transform (position/rotation as typed ProtoVec3/ProtoQuat) and appends
 		// the rest of the captured base body via WriteArray (the CharacterIIR + scaffold are replaced downstream
@@ -69,13 +70,15 @@ namespace Faolan.GameServer.Spawn
 				.WriteUInt32(handle)
 				.WriteUInt32(fieldA)
 				.WriteByte(0x2C) // IIR group frame for the transform component
-				.WriteByte(0x0A).WriteArrayByteLength(new ProtoVec3
+				.WriteByte(0x0A)
+				.WriteArrayByteLength(new ProtoVec3
 				{
 					X = position.X,
 					Y = position.Y,
 					Z = position.Z
 				}.ToProtobufBytes())
-				.WriteByte(0x12).WriteArrayByteLength(new ProtoQuat
+				.WriteByte(0x12)
+				.WriteArrayByteLength(new ProtoQuat
 				{
 					X = rotation.X,
 					Y = rotation.Y,
@@ -84,6 +87,37 @@ namespace Faolan.GameServer.Spawn
 				}.ToProtobufBytes())
 				.WriteArray(template.AsSpan(TransformEndOffset))
 				.ToArray();
+		}
+
+		// Replaces the ENTIRE ProtoCoreCharacterIIR component (the player char message: name / stats / player_stats /
+		// bcc / ... / inventory_entry) with a re-encoded one, delta-adjusting the body length @0, the @133 value
+		// island and the CharacterIIR length prefix @304. This is how identity + equipment are rebuilt: the caller
+		// decodes the captured base's ProtoCoreCharacterIIR, overrides name/stats/inventory from the DB, and
+		// re-encodes here. The message round-trips byte-identically (PlayerSpawnGenerationTests), so re-encoding
+		// the decoded message unchanged is a byte-identical no-op (the build-side oracle). Returns the body
+		// unchanged if it is not the known layout (0x0A name tag at NameTagOffset).
+		public static byte[] SetCharacterMessage(byte[] body, ProtoCoreCharacterIIR character)
+		{
+			if (body.Length <= NameTagOffset || body[NameTagOffset] != 0x0A)
+				return body;
+
+			var oldLen = (int)BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(NameInnerLengthOffset, 4));
+			if (NameTagOffset + oldLen > body.Length)
+				return body;
+
+			var payload = character.ToProtobufBytes();
+			var delta = payload.Length - oldLen;
+
+			var result = new byte[body.Length + delta];
+			Array.Copy(body, 0, result, 0, NameTagOffset); // through the @304 length prefix, up to the message
+			payload.CopyTo(result, NameTagOffset);
+			var afterSrc = NameTagOffset + oldLen;
+			Array.Copy(body, afterSrc, result, NameTagOffset + payload.Length, body.Length - afterSrc);
+
+			AddBigEndian(result, 0, delta); // body length field
+			AddBigEndian(result, NameOuterLengthOffset, delta); // @133 (encloses the CharacterIIR + scaffolds)
+			AddBigEndian(result, NameInnerLengthOffset, delta); // @304 (the CharacterIIR's own length prefix)
+			return result;
 		}
 
 		// Returns a copy of a Strie-shaped spawn body with the name replaced. Delta-adjusts the CharacterIIR
@@ -115,37 +149,6 @@ namespace Faolan.GameServer.Spawn
 			AddBigEndian(result, 0, delta); // body length field
 			AddBigEndian(result, NameOuterLengthOffset, delta); // @133 value island (legacy adjust, tolerated)
 			AddBigEndian(result, NameInnerLengthOffset, delta); // @304 CharacterIIR length prefix
-			return result;
-		}
-
-		// Replaces the ENTIRE ProtoCoreCharacterIIR component (the player char message: name / stats / player_stats /
-		// bcc / ... / inventory_entry) with a re-encoded one, delta-adjusting the body length @0, the @133 value
-		// island and the CharacterIIR length prefix @304. This is how identity + equipment are rebuilt: the caller
-		// decodes the captured base's ProtoCoreCharacterIIR, overrides name/stats/inventory from the DB, and
-		// re-encodes here. The message round-trips byte-identically (PlayerSpawnGenerationTests), so re-encoding
-		// the decoded message unchanged is a byte-identical no-op (the build-side oracle). Returns the body
-		// unchanged if it is not the known layout (0x0A name tag at NameTagOffset).
-		public static byte[] SetCharacterMessage(byte[] body, ProtoCoreCharacterIIR character)
-		{
-			if (body.Length <= NameTagOffset || body[NameTagOffset] != 0x0A)
-				return body;
-
-			var oldLen = (int)BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(NameInnerLengthOffset, 4));
-			if (NameTagOffset + oldLen > body.Length)
-				return body;
-
-			var payload = character.ToProtobufBytes();
-			var delta = payload.Length - oldLen;
-
-			var result = new byte[body.Length + delta];
-			Array.Copy(body, 0, result, 0, NameTagOffset); // through the @304 length prefix, up to the message
-			payload.CopyTo(result, NameTagOffset);
-			var afterSrc = NameTagOffset + oldLen;
-			Array.Copy(body, afterSrc, result, NameTagOffset + payload.Length, body.Length - afterSrc);
-
-			AddBigEndian(result, 0, delta); // body length field
-			AddBigEndian(result, NameOuterLengthOffset, delta); // @133 (encloses the CharacterIIR + scaffolds)
-			AddBigEndian(result, NameInnerLengthOffset, delta); // @304 (the CharacterIIR's own length prefix)
 			return result;
 		}
 

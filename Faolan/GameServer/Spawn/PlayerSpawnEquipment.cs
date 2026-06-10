@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Database.Tables;
@@ -16,7 +17,7 @@ namespace Faolan.GameServer.Spawn
 		// Worn CharacterEquipment slot -> the spawn's equip-slot id (CharacterEquipmentSlot enum; pos in the
 		// capture). MainWeapon is main_hand_LEFT (the melee pair is 6/8; the ranged pair MainHandRight/
 		// OffHandRight is 20/21) - matching EquippedSlotItem and the equip/unequip persistence.
-		private static readonly (CharacterEquipmentSlot Slot, System.Func<CharacterEquipment, Item> Get)[] SlotMap =
+		private static readonly (CharacterEquipmentSlot Slot, Func<CharacterEquipment, Item> Get)[] SlotMap =
 		[
 			(CharacterEquipmentSlot.Neck, e => e.Neck),
 			(CharacterEquipmentSlot.Head, e => e.Head),
@@ -34,8 +35,34 @@ namespace Faolan.GameServer.Spawn
 			(CharacterEquipmentSlot.Legs, e => e.Legs),
 			(CharacterEquipmentSlot.Wrist, e => e.Wrist),
 			(CharacterEquipmentSlot.RangedWeapon, e => e.MainHandRight),
-			(CharacterEquipmentSlot.Ammo, e => e.OffHandRight),
+			(CharacterEquipmentSlot.Ammo, e => e.OffHandRight)
 		];
+
+		public static ProtoCoreCharacterIIR.InventoryEntry BuildEntry(uint pos, Item item)
+		{
+			var key = new ProtoDecryptionKey
+			{
+				Key1 = item.Data1,
+				Key2 = item.Data2,
+				Key3 = item.Data3,
+				Key4 = item.Data4
+			};
+
+			return new ProtoCoreCharacterIIR.InventoryEntry
+			{
+				Pos = pos,
+				Item = new ProtoAcgItem
+				{
+					Key1 = key,
+					Key2 = key,
+					Key3 = key,
+					Template1 = item.Id,
+					Template2 = item.Id,
+					Level = 1,
+					Hash = item.Archetype
+				}
+			};
+		}
 
 		public static List<ProtoCoreCharacterIIR.InventoryEntry> BuildInventoryEntries(CharacterEquipment equipment)
 		{
@@ -52,33 +79,9 @@ namespace Faolan.GameServer.Spawn
 				entries.Add(BuildEntry((uint)slot, item));
 			}
 
-			return entries.OrderBy(e => e.Pos).ToList();
-		}
-
-		public static ProtoCoreCharacterIIR.InventoryEntry BuildEntry(uint pos, Item item)
-		{
-			var key = new ProtoDecryptionKey
-			{
-				Key1 = item.Data1,
-				Key2 = item.Data2,
-				Key3 = item.Data3,
-				Key4 = item.Data4,
-			};
-
-			return new ProtoCoreCharacterIIR.InventoryEntry
-			{
-				Pos = pos,
-				Item = new ProtoAcgItem
-				{
-					Key1 = key,
-					Key2 = key,
-					Key3 = key,
-					Template1 = item.Id,
-					Template2 = item.Id,
-					Level = 1,
-					Hash = item.Archetype,
-				},
-			};
+			return entries
+				.OrderBy(e => e.Pos)
+				.ToList();
 		}
 	}
 }

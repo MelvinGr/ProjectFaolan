@@ -6,7 +6,6 @@ using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Packets;
 
 namespace Faolan.Core.Data
 {
@@ -228,6 +227,16 @@ namespace Faolan.Core.Data
 			return this;
 		}
 
+		// Big-endian double for RAW packet bodies (not protobuf fields). Matches the wire format for the
+		// OverrideGameTweaks values; see WriteFloatBigEndian above for the raw-body endianness rationale.
+		public FaolanStream WriteDoubleBigEndian(double value)
+		{
+			Span<byte> buffer = stackalloc byte[sizeof(double)];
+			BinaryPrimitives.WriteDoubleBigEndian(buffer, value);
+
+			return WriteArray(buffer);
+		}
+
 		// RESOLVED (2026-06-08, from retail captures): the wire uses TWO float encodings depending on context, which
 		// is why WriteFloat (LE) and ReadFloat (BE) intentionally differ - they serve different contexts:
 		//   * Protobuf fixed32 fields (tags 0x0D/0x15/0x1D/0x25, e.g. Send0x2000_SpawnPlayer, texture floats) are
@@ -251,16 +260,6 @@ namespace Faolan.Core.Data
 		{
 			Span<byte> buffer = stackalloc byte[sizeof(float)];
 			BinaryPrimitives.WriteSingleBigEndian(buffer, value);
-
-			return WriteArray(buffer);
-		}
-
-		// Big-endian double for RAW packet bodies (not protobuf fields). Matches the wire format for the
-		// OverrideGameTweaks values; see WriteFloatBigEndian above for the raw-body endianness rationale.
-		public FaolanStream WriteDoubleBigEndian(double value)
-		{
-			Span<byte> buffer = stackalloc byte[sizeof(double)];
-			BinaryPrimitives.WriteDoubleBigEndian(buffer, value);
 
 			return WriteArray(buffer);
 		}

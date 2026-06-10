@@ -35,7 +35,10 @@ namespace Faolan.PacketAnalyzer
 			{
 				captureFileReaderDevice.Open();
 				captureFileReaderDevice.StartCapture();
-				captureCompleted.Task.GetAwaiter().GetResult();
+				captureCompleted
+					.Task
+					.GetAwaiter()
+					.GetResult();
 			}
 			finally
 			{

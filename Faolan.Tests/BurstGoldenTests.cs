@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -17,13 +18,32 @@ namespace Faolan.Tests
 	{
 		private const uint TestInstance = 0x02000001; // a valid 4-byte-varint character id (retail range)
 
-		private static string GoldenDir([CallerFilePath] string thisFile = "") => Path.Combine(Path.GetDirectoryName(thisFile)!, "Golden");
+		[Fact]
+		public Task CreationScriptBurst_IsByteStable()
+		{
+			return AssertBurstStable("CreationScriptBurst", GameServerListener.SendRetailCreateEditorCreationScriptBurst);
+		}
 
-		private static async Task AssertBurstStable(string name, System.Func<RecordingNetworkClient, Task> run)
+		[Fact]
+		public Task InitialBurst_IsByteStable()
+		{
+			return AssertBurstStable("InitialBurst", GameServerListener.SendRetailCreateEditorInitialBurst);
+		}
+
+		[Fact]
+		public Task WorldPrepBurst_IsByteStable()
+		{
+			return AssertBurstStable("WorldPrepBurst", GameServerListener.SendWorldPrepBurst);
+		}
+
+		private static async Task AssertBurstStable(string name, Func<RecordingNetworkClient, Task> run)
 		{
 			var client = new RecordingNetworkClient(TestInstance);
 			await run(client);
-			var bytes = client.Sent.SelectMany(p => p).ToArray();
+			var bytes = client
+				.Sent
+				.SelectMany(p => p)
+				.ToArray();
 
 			var path = Path.Combine(GoldenDir(), name + ".bin");
 			if (!File.Exists(path))
@@ -33,21 +53,14 @@ namespace Faolan.Tests
 			}
 
 			var golden = await File.ReadAllBytesAsync(path);
-			if (!golden.SequenceEqual(bytes))
+			if (!Enumerable.SequenceEqual(golden, bytes))
 				await File.WriteAllBytesAsync(path + ".actual", bytes);
 			Assert.Equal(golden, bytes);
 		}
 
-		[Fact]
-		public Task CreationScriptBurst_IsByteStable() =>
-			AssertBurstStable("CreationScriptBurst", GameServerListener.SendRetailCreateEditorCreationScriptBurst);
-
-		[Fact]
-		public Task InitialBurst_IsByteStable() =>
-			AssertBurstStable("InitialBurst", GameServerListener.SendRetailCreateEditorInitialBurst);
-
-		[Fact]
-		public Task WorldPrepBurst_IsByteStable() =>
-			AssertBurstStable("WorldPrepBurst", GameServerListener.SendWorldPrepBurst);
+		private static string GoldenDir([CallerFilePath] string thisFile = "")
+		{
+			return Path.Combine(Path.GetDirectoryName(thisFile)!, "Golden");
+		}
 	}
 }

@@ -30,51 +30,6 @@ namespace Faolan.Tests
 			_output = output;
 		}
 
-		// All 0x737A6DF9 bodies (after [subop][c350][instance]) we can harvest: the two .bin fixtures + every
-		// snapshot in the analyzer JSON captures.
-		private static IEnumerable<(string Source, byte[] Body)> SnapshotBodies()
-		{
-			foreach (var bin in new[] { "account-stricken997-character-Strie-login-randomActions-bigboy.bin", "strie-login-inventory.bin" })
-			{
-				var path = Path.Combine(CapturesDir, bin);
-				if (!File.Exists(path))
-					continue;
-
-				var packet = new ConanPacket(File.ReadAllBytes(path));
-				yield return (bin, packet.Body.ReadArrayUInt32Length());
-			}
-
-			if (!Directory.Exists(CapturesDir))
-				yield break;
-
-			foreach (var json in Directory.EnumerateFiles(CapturesDir, "*.json").OrderBy(f => f))
-			{
-				using var doc = JsonDocument.Parse(File.ReadAllBytes(json));
-				if (!doc.RootElement.TryGetProperty("Packets", out var packets))
-					continue;
-
-				var index = 0;
-				foreach (var p in packets.EnumerateArray())
-				{
-					var raw = Convert.FromBase64String(p.GetProperty("RawBytesBase64").GetString() ?? "");
-					if (raw.Length < 32)
-						continue;
-
-					// [len4][crc4][headerLen4][header][body]; body = [len4][subop4]... Non-GameServer packets
-					// (other protocols / framings) yield nonsense header lengths - skip them.
-					var headerLen = BinaryPrimitives.ReadUInt32BigEndian(raw.AsSpan(8, 4));
-					if (headerLen > (uint)raw.Length)
-						continue;
-
-					var bodyStart = 12 + (int)headerLen;
-					if (bodyStart + 8 > raw.Length || BinaryPrimitives.ReadUInt32BigEndian(raw.AsSpan(bodyStart + 4, 4)) != 0x737A6DF9u)
-						continue;
-
-					yield return ($"{Path.GetFileName(json)}#{index++}", raw[(bodyStart + 4)..]);
-				}
-			}
-		}
-
 		[Fact]
 		public void FullCharRoot_RoundTripsByteIdentically_OnEveryParseableSnapshot()
 		{
@@ -114,6 +69,55 @@ namespace Faolan.Tests
 
 			_output.WriteLine($"round-tripped {ok}/{total} snapshots ({skipped} skipped: truncated/non-splitting)");
 			Assert.True(ok >= 2, $"expected at least the two .bin fixtures to round-trip (ok={ok}, total={total})");
+		}
+
+		// All 0x737A6DF9 bodies (after [subop][c350][instance]) we can harvest: the two .bin fixtures + every
+		// snapshot in the analyzer JSON captures.
+		private static IEnumerable<(string Source, byte[] Body)> SnapshotBodies()
+		{
+			foreach (var bin in new[] { "account-stricken997-character-Strie-login-randomActions-bigboy.bin", "strie-login-inventory.bin" })
+			{
+				var path = Path.Combine(CapturesDir, bin);
+				if (!File.Exists(path))
+					continue;
+
+				var packet = new ConanPacket(File.ReadAllBytes(path));
+				yield return (bin, packet.Body.ReadArrayUInt32Length());
+			}
+
+			if (!Directory.Exists(CapturesDir))
+				yield break;
+
+			foreach (var json in Directory
+				         .EnumerateFiles(CapturesDir, "*.json")
+				         .OrderBy(f => f))
+			{
+				using var doc = JsonDocument.Parse(File.ReadAllBytes(json));
+				if (!doc.RootElement.TryGetProperty("Packets", out var packets))
+					continue;
+
+				var index = 0;
+				foreach (var p in packets.EnumerateArray())
+				{
+					var raw = Convert.FromBase64String(p
+						.GetProperty("RawBytesBase64")
+						.GetString() ?? "");
+					if (raw.Length < 32)
+						continue;
+
+					// [len4][crc4][headerLen4][header][body]; body = [len4][subop4]... Non-GameServer packets
+					// (other protocols / framings) yield nonsense header lengths - skip them.
+					var headerLen = BinaryPrimitives.ReadUInt32BigEndian(raw.AsSpan(8, 4));
+					if (headerLen > (uint)raw.Length)
+						continue;
+
+					var bodyStart = 12 + (int)headerLen;
+					if (bodyStart + 8 > raw.Length || BinaryPrimitives.ReadUInt32BigEndian(raw.AsSpan(bodyStart + 4, 4)) != 0x737A6DF9u)
+						continue;
+
+					yield return ($"{Path.GetFileName(json)}#{index++}", raw[(bodyStart + 4)..]);
+				}
+			}
 		}
 	}
 }

@@ -15,7 +15,9 @@ namespace Faolan.Tests
 			var splitter = new PacketSplitter("test-flow");
 			var firstPacketBytes = BuildPacketBytes(0x2001, [0x01, 0x02]);
 			var secondPacketBytes = BuildPacketBytes(0x2002, [0x03, 0x04, 0x05]);
-			var combinedBytes = firstPacketBytes.Concat(secondPacketBytes).ToArray();
+			var combinedBytes = firstPacketBytes
+				.Concat(secondPacketBytes)
+				.ToArray();
 			var receivedPackets = new List<Packet>();
 			var receivedTicks = new List<string>();
 

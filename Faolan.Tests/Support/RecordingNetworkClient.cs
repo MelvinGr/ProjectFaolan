@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
@@ -12,13 +13,34 @@ namespace Faolan.Tests.Support
 	// blob to explicit WriteHeader()/Write*() calls MUST be byte-identical - these tests lock that.
 	public sealed class RecordingNetworkClient : INetworkClient
 	{
-		public List<byte[]> Sent { get; } = new List<byte[]>();
 		public INetworkClientSession Session { get; } = new NetworkClientSession();
+		public List<byte[]> Sent { get; } = new List<byte[]>();
 		public string IpAddress => "127.0.0.1";
 
 		public RecordingNetworkClient(uint clientInstance)
 		{
 			Session.Account = new Account { ClientInstance = clientInstance };
+		}
+
+		public void Send(byte[] value)
+		{
+			Sent.Add(value);
+		}
+
+		public Task SendAsync(byte[] value, CancellationToken cancellationToken = default)
+		{
+			Sent.Add(value);
+			return Task.CompletedTask;
+		}
+
+		public void Start()
+		{
+			throw new NotSupportedException();
+		}
+
+		public void Stop()
+		{
+			throw new NotSupportedException();
 		}
 
 		// All sent packets concatenated, as one lowercase hex string - the golden form.
@@ -28,23 +50,12 @@ namespace Faolan.Tests.Support
 			foreach (var p in Sent)
 				total += p.Length;
 
-			var sb = new System.Text.StringBuilder(total * 2);
+			var sb = new StringBuilder(total * 2);
 			foreach (var p in Sent)
-				foreach (var b in p)
-					sb.Append(b.ToString("x2"));
+			foreach (var b in p)
+				sb.Append(b.ToString("x2"));
 
 			return sb.ToString();
 		}
-
-		public void Send(byte[] value) => Sent.Add(value);
-
-		public Task SendAsync(byte[] value, CancellationToken cancellationToken = default)
-		{
-			Sent.Add(value);
-			return Task.CompletedTask;
-		}
-
-		public void Start() => throw new NotSupportedException();
-		public void Stop() => throw new NotSupportedException();
 	}
 }

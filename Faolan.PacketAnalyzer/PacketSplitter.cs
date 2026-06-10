@@ -19,8 +19,8 @@ namespace Faolan.PacketAnalyzer
 		private readonly byte[] _packetLengthBuffer = new byte[sizeof(int)];
 
 		private readonly PacketFramingMode _framingMode;
-		private byte[]? _packetBuffer;
 		private byte[] _inlineBuffer = [];
+		private byte[]? _packetBuffer;
 		private int _currentPacketCounter;
 		private int _markerTailRemaining;
 		private int _packetBytesRead;
@@ -116,7 +116,9 @@ namespace Faolan.PacketAnalyzer
 						return true;
 					}
 
-					var length = BitConverter.ToInt32(_packetLengthBuffer.Reverse().ToArray(), 0);
+					var length = BitConverter.ToInt32(_packetLengthBuffer
+						.Reverse()
+						.ToArray(), 0);
 
 					// Sanity check for length < 0
 					if (length < 0)
@@ -155,7 +157,9 @@ namespace Faolan.PacketAnalyzer
 				if (_packetBytesRead == packetBuffer.Length)
 				{
 					// We've gotten an entire packet, add back the length
-					var completePacket = _packetLengthBuffer.Concat(packetBuffer).ToArray();
+					var completePacket = _packetLengthBuffer
+						.Concat(packetBuffer)
+						.ToArray();
 
 					Packet? packet = null;
 					try
@@ -201,7 +205,9 @@ namespace Faolan.PacketAnalyzer
 			// length to the parser).
 			_inlineBuffer = _inlineBuffer.Length == 0
 				? data
-				: _inlineBuffer.Concat(data).ToArray();
+				: _inlineBuffer
+					.Concat(data)
+					.ToArray();
 
 			var offset = 0;
 			while (offset + sizeof(ushort) * 2 <= _inlineBuffer.Length)

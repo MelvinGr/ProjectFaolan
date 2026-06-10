@@ -13,17 +13,11 @@ namespace Faolan.Core.Network.Conan
 		public readonly ProtoMessage SenderBytes;
 		public readonly uint Crc32;
 		public readonly ushort Opcode;
+		public ProtoEndpoint Receiver => DecodeEndpoint(ReceiverBytes);
 
 		// Typed view of the header endpoints. Sender = RpcHeader.caller_id, Receiver = RpcHeader.endpoint_id; each
 		// carries Type (object-class id) + Instance (the addressed object). See ConanEndpoints.
 		public ProtoEndpoint Sender => DecodeEndpoint(SenderBytes);
-		public ProtoEndpoint Receiver => DecodeEndpoint(ReceiverBytes);
-
-		private static ProtoEndpoint DecodeEndpoint(ProtoMessage field)
-		{
-			var inner = field.Fields.Count > 0 ? field.Fields[0].RawBytes : null;
-			return inner != null ? ((ReadOnlySpan<byte>)inner).FromProtobuf<ProtoEndpoint>() : new ProtoEndpoint();
-		}
 
 		public ConanPacket(byte[] bytes) : base(bytes)
 		{
@@ -46,6 +40,16 @@ namespace Faolan.Core.Network.Conan
 		public override string ToString()
 		{
 			return $"Opcode: {Opcode.ToHex()} Length: {Length}{(Body != null ? Environment.NewLine + Body.ToArray().ToHex() : "")}";
+		}
+
+		private static ProtoEndpoint DecodeEndpoint(ProtoMessage field)
+		{
+			var inner = field.Fields.Count > 0
+				? field.Fields[0].RawBytes
+				: null;
+			return inner != null
+				? ((ReadOnlySpan<byte>)inner).FromProtobuf<ProtoEndpoint>()
+				: new ProtoEndpoint();
 		}
 	}
 }

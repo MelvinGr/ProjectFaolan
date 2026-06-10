@@ -11,8 +11,13 @@ namespace Faolan.Tests
 	// The framing (RpcHeader + 0x2000) comes from the proven WriteHeader path; these assert the field-by-field body.
 	public class WorldEntryGeneratedRecordsTests
 	{
-		private const uint StriePlayerInstance = 0x02165EFF;
 		private const uint BeachMapId = 0x00000FAA;
+		private const uint StriePlayerInstance = 0x02165EFF;
+
+		private static readonly byte[] CapturedGameTimeBody =
+		[
+			0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x92, 0x0C, 0x6A, 0x02, 0x4E, 0x93, 0x3F, 0x80, 0x00, 0x00
+		];
 
 		private static readonly byte[] CapturedMapChangeBody =
 		[
@@ -21,19 +26,19 @@ namespace Faolan.Tests
 			0x00, 0x02, 0x00, 0x00, 0x9C, 0x50, 0x00, 0x4F, 0xE4, 0x28, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00,
 			0x00, 0x00, 0x18, 0x00, 0x00, 0x00, 0x01, 0x00, 0x4F, 0xE4, 0x28, 0x00, 0x00, 0xCB, 0x20, 0x41,
 			0x70, 0x00, 0x00, 0x40, 0xE3, 0x94, 0x4F, 0x00, 0x00, 0x00, 0x03, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x00,
+			0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x00
 		];
 
-		private static readonly byte[] CapturedGameTimeBody =
-		[
-			0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x92, 0x0C, 0x6A, 0x02, 0x4E, 0x93, 0x3F, 0x80, 0x00, 0x00,
-		];
-
-		private static RecordingNetworkClient BeachClient()
+		[Fact]
+		public void BuildGameTime_ReproducesCapturedRecord()
 		{
-			var client = new RecordingNetworkClient(StriePlayerInstance);
-			client.Session.Character = new Character { MapId = BeachMapId };
-			return client;
+			var record = IirRecordCodec.Parse(GameServerListener.BuildGameTime(BeachClient()), 0);
+
+			Assert.Equal(IirRecordCodec.IirOpcode, record.Opcode);
+			Assert.Equal(IirMessageTypes.GameTime, record.IirType);
+			Assert.Equal(0u, record.Handle);
+			Assert.Equal(0x01472BDDu, record.FieldA);
+			Assert.Equal(CapturedGameTimeBody, record.Body);
 		}
 
 		[Fact]
@@ -48,16 +53,11 @@ namespace Faolan.Tests
 			Assert.Equal(CapturedMapChangeBody, record.Body);
 		}
 
-		[Fact]
-		public void BuildGameTime_ReproducesCapturedRecord()
+		private static RecordingNetworkClient BeachClient()
 		{
-			var record = IirRecordCodec.Parse(GameServerListener.BuildGameTime(BeachClient()), 0);
-
-			Assert.Equal(IirRecordCodec.IirOpcode, record.Opcode);
-			Assert.Equal(IirMessageTypes.GameTime, record.IirType);
-			Assert.Equal(0u, record.Handle);
-			Assert.Equal(0x01472BDDu, record.FieldA);
-			Assert.Equal(CapturedGameTimeBody, record.Body);
+			var client = new RecordingNetworkClient(StriePlayerInstance);
+			client.Session.Character = new Character { MapId = BeachMapId };
+			return client;
 		}
 	}
 }

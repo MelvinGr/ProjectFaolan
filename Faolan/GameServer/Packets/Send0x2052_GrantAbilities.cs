@@ -1,5 +1,5 @@
-using System;
 using System.Threading.Tasks;
+using Faolan.Core.Data;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
@@ -40,7 +40,8 @@ namespace Faolan.GameServer
 		// repeated data quad is its identity (already proven by the cast path).
 		private Task SendAbilityGrant(INetworkClient client, Ability ability)
 		{
-			return new PacketStream().WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), (ushort)0x2052)
+			return new PacketStream()
+				.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), (ushort)0x2052)
 				.WriteArray(BuildAbilityGrantBody(ability))
 				.SendAsync(client);
 		}
@@ -49,20 +50,28 @@ namespace Faolan.GameServer
 		// the strickenbla capture's pkt#399). See SendAbilityGrant for the field meaning.
 		internal static byte[] BuildAbilityGrantBody(Ability ability)
 		{
-			return new Faolan.Core.Data.FaolanStream()
+			return new FaolanStream()
 				.WriteUInt32(ability.Slot)
 				.WriteUInt32(ability.Id)
 				.WriteUInt32(ability.Id)
 				.WriteUInt32(0x00000000)
 				.WriteUInt32(0x00000001)
 				.WriteUInt32(ability.Data0)
-				.WriteUInt32(ability.Data1).WriteUInt32(ability.Data2).WriteUInt32(ability.Data3).WriteUInt32(ability.Data4)
-				.WriteUInt32(ability.Data1).WriteUInt32(ability.Data2).WriteUInt32(ability.Data3).WriteUInt32(ability.Data4)
-				.WriteUInt32(AbilityGrantConstantA).WriteUInt32(AbilityGrantConstantB)
-				.WriteUInt32(AbilityGrantConstantA).WriteUInt32(AbilityGrantConstantB)
+				.WriteUInt32(ability.Data1)
+				.WriteUInt32(ability.Data2)
+				.WriteUInt32(ability.Data3)
+				.WriteUInt32(ability.Data4)
+				.WriteUInt32(ability.Data1)
+				.WriteUInt32(ability.Data2)
+				.WriteUInt32(ability.Data3)
+				.WriteUInt32(ability.Data4)
+				.WriteUInt32(AbilityGrantConstantA)
+				.WriteUInt32(AbilityGrantConstantB)
+				.WriteUInt32(AbilityGrantConstantA)
+				.WriteUInt32(AbilityGrantConstantB)
 				.WriteUInt32(0x00000001)
 				.WriteUInt32(0x00000000)
-				.WriteByte((byte)0x01)
+				.WriteByte(0x01)
 				.ToArray();
 		}
 	}

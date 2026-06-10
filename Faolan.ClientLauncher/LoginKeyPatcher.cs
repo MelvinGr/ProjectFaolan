@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Microsoft.Win32.SafeHandles;
 
 namespace Faolan.ClientLauncher
 {
@@ -10,20 +11,12 @@ namespace Faolan.ClientLauncher
 	// launching ancestor under the default yama ptrace_scope.
 	internal static class LoginKeyPatcher
 	{
+		private static readonly byte[] Cellao = Encoding.ASCII.GetBytes("26b5a3b4ac1177f24a2d9de44bafef477ff23ef1cb5f646919b1be2651605303" + "0b65d5afb60cef6f49de539958ba0b7922a099319b8016a8673cb27a696ae4b6" +
+		                                                                "0fdece25ddcdad42e7f0056b87fc35687fe033b242e17e960d79806fd46c4a79" + "cbc64f558660a50cabc1c242dace70de6af452e3433f97e30e202567f187de70");
+
 		// Both 256-char ASCII hex DH public keys (g^priv mod N over the 1024-bit prime).
-		private static readonly byte[] Funcom = Encoding.ASCII.GetBytes(
-			"9c32cc23d559ca90fc31be72df817d0e124769e809f936bc14360ff4bed758f2" +
-			"60a0d596584eacbbc2b88bdd410416163e11dbf62173393fbc0c6fefb2d855f1" +
-			"a03dec8e9f105bbad91b3437d8eb73fe2f44159597aa4053cf788d2f9d7012fb8" +
-			"d7c4ce3876f7d6cd5d0c31754f4cd96166708641958de54a6def5657b9f2e92");
-
-		private static readonly byte[] Cellao = Encoding.ASCII.GetBytes(
-			"26b5a3b4ac1177f24a2d9de44bafef477ff23ef1cb5f646919b1be2651605303" +
-			"0b65d5afb60cef6f49de539958ba0b7922a099319b8016a8673cb27a696ae4b6" +
-			"0fdece25ddcdad42e7f0056b87fc35687fe033b242e17e960d79806fd46c4a79" +
-			"cbc64f558660a50cabc1c242dace70de6af452e3433f97e30e202567f187de70");
-
-		private enum Result { NotReady, Patched, NoPermission }
+		private static readonly byte[] Funcom = Encoding.ASCII.GetBytes("9c32cc23d559ca90fc31be72df817d0e124769e809f936bc14360ff4bed758f2" + "60a0d596584eacbbc2b88bdd410416163e11dbf62173393fbc0c6fefb2d855f1" +
+		                                                                "a03dec8e9f105bbad91b3437d8eb73fe2f44159597aa4053cf788d2f9d7012fb8" + "d7c4ce3876f7d6cd5d0c31754f4cd96166708641958de54a6def5657b9f2e92");
 
 		// Poll for the client process + its DH key and patch it, before it logs in. The key is mapped at startup,
 		// so polling beats the (network) login handshake.
@@ -43,8 +36,7 @@ namespace Faolan.ClientLauncher
 							Console.WriteLine($"login-key: patched DH pubkey in pid {pid} (password validation enabled).");
 							return;
 						case Result.NoPermission:
-							Console.Error.WriteLine("login-key: need ptrace permission to patch (run the launcher with sudo); " +
-								"launching without password validation.");
+							Console.Error.WriteLine("login-key: need ptrace permission to patch (run the launcher with sudo); " + "launching without password validation.");
 							return;
 					}
 				}
@@ -63,9 +55,13 @@ namespace Faolan.ClientLauncher
 			{
 				if (!int.TryParse(Path.GetFileName(dir), out var pid))
 					continue;
+
 				try
 				{
-					if (File.ReadAllText(Path.Combine(dir, "comm")).Trim().StartsWith("AgeOfConan", StringComparison.Ordinal))
+					if (File
+					    .ReadAllText(Path.Combine(dir, "comm"))
+					    .Trim()
+					    .StartsWith("AgeOfConan", StringComparison.Ordinal))
 						return pid;
 				}
 				catch
@@ -77,9 +73,24 @@ namespace Faolan.ClientLauncher
 			return null;
 		}
 
+		private static int IndexOf(byte[] haystack, byte[] needle, int start)
+		{
+			var last = haystack.Length - needle.Length;
+			for (var i = start; i <= last; i++)
+			{
+				var j = 0;
+				while (j < needle.Length && haystack[i + j] == needle[j])
+					j++;
+				if (j == needle.Length)
+					return i;
+			}
+
+			return -1;
+		}
+
 		private static Result TryPatch(int pid)
 		{
-			Microsoft.Win32.SafeHandles.SafeFileHandle handle;
+			SafeFileHandle handle;
 			try
 			{
 				handle = File.OpenHandle($"/proc/{pid}/mem", FileMode.Open, FileAccess.ReadWrite);
@@ -116,8 +127,7 @@ namespace Faolan.ClientLauncher
 						continue;
 					if (line[space + 1] != 'r') // need read to scan
 						continue;
-					if (!ulong.TryParse(line.AsSpan(0, dash), NumberStyles.HexNumber, null, out var start) ||
-					    !ulong.TryParse(line.AsSpan(dash + 1, space - dash - 1), NumberStyles.HexNumber, null, out var end))
+					if (!ulong.TryParse(line.AsSpan(0, dash), NumberStyles.HexNumber, null, out var start) || !ulong.TryParse(line.AsSpan(dash + 1, space - dash - 1), NumberStyles.HexNumber, null, out var end))
 						continue;
 					if (line.EndsWith("[vvar]", StringComparison.Ordinal) || line.EndsWith("[vsyscall]", StringComparison.Ordinal))
 						continue;
@@ -126,7 +136,7 @@ namespace Faolan.ClientLauncher
 					byte[] prevTail = [];
 					while (pos < end)
 					{
-						var want = (int)Math.Min((ulong)chunk, end - pos);
+						var want = (int)Math.Min(chunk, end - pos);
 						var data = new byte[want];
 						int read;
 						try
@@ -154,7 +164,9 @@ namespace Faolan.ClientLauncher
 								RandomAccess.Write(handle, Cellao, hitAddr);
 								var verify = new byte[Cellao.Length];
 								RandomAccess.Read(handle, verify, hitAddr);
-								if (verify.AsSpan().SequenceEqual(Cellao))
+								if (verify
+								    .AsSpan()
+								    .SequenceEqual(Cellao))
 									return Result.Patched;
 							}
 							catch (UnauthorizedAccessException)
@@ -167,7 +179,9 @@ namespace Faolan.ClientLauncher
 							}
 						}
 
-						prevTail = read >= overlap ? data[(read - overlap)..] : data[..read];
+						prevTail = read >= overlap
+							? data[(read - overlap)..]
+							: data[..read];
 						pos += (ulong)read;
 					}
 				}
@@ -176,19 +190,11 @@ namespace Faolan.ClientLauncher
 			return Result.NotReady;
 		}
 
-		private static int IndexOf(byte[] haystack, byte[] needle, int start)
+		private enum Result
 		{
-			var last = haystack.Length - needle.Length;
-			for (var i = start; i <= last; i++)
-			{
-				var j = 0;
-				while (j < needle.Length && haystack[i + j] == needle[j])
-					j++;
-				if (j == needle.Length)
-					return i;
-			}
-
-			return -1;
+			NotReady,
+			Patched,
+			NoPermission
 		}
 	}
 }

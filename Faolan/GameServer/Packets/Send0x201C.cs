@@ -27,7 +27,13 @@ namespace Faolan.GameServer
 
 		private static Task Send0X201CEntry(INetworkClient client, byte[] sender, byte[] receiver, uint prefix, uint state, uint ticket)
 		{
-			return new PacketStream().WriteHeader(sender, receiver, 0x0000201C).WriteUInt32(prefix).WriteUInt32(client.Session.Account.ClientInstance).WriteUInt32(state).WriteUInt32(0x00000017).WriteUInt32(ticket)
+			return new PacketStream()
+				.WriteHeader(sender, receiver, 0x0000201C)
+				.WriteUInt32(prefix)
+				.WriteUInt32(client.Session.Account.ClientInstance)
+				.WriteUInt32(state)
+				.WriteUInt32(0x00000017)
+				.WriteUInt32(ticket)
 				.SendAsync(client);
 		}
 	}

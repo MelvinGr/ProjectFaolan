@@ -82,7 +82,12 @@ namespace Faolan.PacketAnalyzer
 			// Representative port per protocol (the endpoint with the strongest support), for the summary.
 			ushort PortFor(string protocolName)
 			{
-				return endpointProtocols.Where(entry => entry.Value == protocolName).OrderByDescending(entry => _votesByEndpoint[entry.Key].Votes[protocolName]).Select(entry => _votesByEndpoint[entry.Key].Port).FirstOrDefault();
+				return endpointProtocols
+					.Where(entry => entry.Value == protocolName)
+					.OrderByDescending(entry => _votesByEndpoint[entry.Key]
+						.Votes[protocolName])
+					.Select(entry => _votesByEndpoint[entry.Key].Port)
+					.FirstOrDefault();
 			}
 
 			var settings = new PacketAnalyzerPortSettings(_universeAgentPort, PortFor(PacketProtocolInfo.PlayerAgentProtocolName), PortFor(PacketProtocolInfo.CsPlayerAgentProtocolName),

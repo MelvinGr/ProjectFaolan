@@ -64,14 +64,23 @@ namespace Faolan.CSPlayerAgent
 					client.Session.Account = account;
 					client.Session.Character = character;
 
-					await new PacketStream().WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CsPlayerAgentResponseOpcodes.Authenticate).WriteUInt32(authReply).SendAsync(client);
+					await new PacketStream()
+						.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CsPlayerAgentResponseOpcodes.Authenticate)
+						.WriteUInt32(authReply)
+						.SendAsync(client);
 
-					await new PacketStream().WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CsPlayerAgentResponseOpcodes.Ox20D0, [0x01]).WriteArray(0x00, 0x00, 0x03, 0xF1).SendAsync(client);
+					await new PacketStream()
+						.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CsPlayerAgentResponseOpcodes.Ox20D0, [0x01])
+						.WriteArray(0x00, 0x00, 0x03, 0xF1)
+						.SendAsync(client);
 
 					//if(character.Name == null)
 					{
-						await new PacketStream().WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CsPlayerAgentResponseOpcodes.Ox20C5, [0x01])
-							.WriteString("<remoteformat token=\"GroupFinderCharacterLeftPlayfield\" category=\"100\" key=\"nKY&amp;+hL^I7&#36;M@PO`z&#39;Y0\" knubot=\"0\"  ></remoteformat>").WriteByte(0x01).SendAsync(client);
+						await new PacketStream()
+							.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CsPlayerAgentResponseOpcodes.Ox20C5, [0x01])
+							.WriteString("<remoteformat token=\"GroupFinderCharacterLeftPlayfield\" category=\"100\" key=\"nKY&amp;+hL^I7&#36;M@PO`z&#39;Y0\" knubot=\"0\"  ></remoteformat>")
+							.WriteByte(0x01)
+							.SendAsync(client);
 					}
 
 					break;

@@ -29,7 +29,11 @@ namespace Faolan.Importer
 				return (0, 0);
 
 			var idList = ids.ToList();
-			var existing = (await db.Spells.Where(s => idList.Contains(s.Id)).Select(s => s.Id).ToListAsync()).ToHashSet();
+			var existing = (await db
+				.Spells
+				.Where(s => idList.Contains(s.Id))
+				.Select(s => s.Id)
+				.ToListAsync()).ToHashSet();
 
 			var inserted = 0;
 			foreach (var id in ids)

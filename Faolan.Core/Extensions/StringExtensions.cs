@@ -25,7 +25,9 @@ namespace Faolan.Core.Extensions
 			{
 				var spaces = totalLength - str.Length;
 				var padLeft = spaces / 2 + str.Length;
-				return str.PadLeft(padLeft, c).PadRight(totalLength, c);
+				return str
+					.PadLeft(padLeft, c)
+					.PadRight(totalLength, c);
 			}
 
 			public string ToTitleCase(bool force = true)
