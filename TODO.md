@@ -242,24 +242,32 @@ most likely to regress something.
       Maps 1000 and 11040 were intentionally dropped (their captured instance was out of range) — they'll
       fall back to the no-NPC hand-built path.
 
-## 10. World burst is incomplete — under-populated vs retail  (found 2026-06-10 via the automated harness diff)
-The automated login→world run + `Captures/compare_log_to_dump.py` vs the Strie login capture shows we send **78
-`0x2000` packets vs retail's 101**, and **`0x2076` 0× vs retail 1×**. The stored burst is only the pre-poll SCENE and
-omits the world-population packets retail sends DURING the spawn phase — the `0x000bbc4x` entity spawns and their
-**`0x2076` index manifest** (verified: the beach burst in faolan.db has SpawnCheck handle `0x081906` but NOT
-`0xbbc46`; the Strie capture HAS both the spawns and the 0x2076).
-- **BEACH (4010, the default/test map): ✅ FIXED 2026-06-10.** Regenerated `strie-login-worldburst.bin` from the
-  Strie capture's FULL world-build (MapChange → ReadyForPlayScreen), keeping only `0x2000`+`0x2076` downloads and
-  excluding the dynamically-generated `0x2008`/`0x2052`/`0x2009`/`0x2082`/`0x201c`/`0x2024`. Blob 71 → 83 packets
-  (the 71 SCENE are byte-identical, +11 post-poll `0x2000` spawns +1 `0x2076`), faolan.db beach burst updated to
-  match. Verified by the harness: **16/16, no regression**, `0x2076` now 1 (= retail), `0x2000` 78 → 89, no new
-  client/server errors.
-- **OTHER maps:** `MapWorldBurstExtractor` ends the window at the first `0x2020` poll (same omission); same fix,
-  applied in the extractor.
-**Do carefully — login passes 16/16; don't regress it. Watch packet ORDER (the 0x2076 must follow the spawns it
-indexes) and the static/dynamic split.** Re-run `tools/client-smoke-test.sh` (it now reports the divergence count +
-the MISSING 0x2076). NOT directly visible — this client install is asset-stripped, so the extra NPCs won't render
-even when present; the value is protocol-correctness + a future full-asset client.
+## 10. World burst + player spawn — RESTRUCTURED & server-generated  (2026-06-10 session, 30 commits)
+Big architectural pass. Full detail in **`docs/player-spawn-generation-plan.md`** + the `world_entry_from_db` memory.
+
+**DONE & harness-verified (16/16, 124 unit tests, roundtrip-confirmed over all 24 dumps):**
+- **World burst is now STRUCTURED IIR data**, not opaque packet blobs. `IirRecordCodec` decomposes each burst packet
+  into a `MapWorldBurstEntity` row {Opcode, IirType, Const, Handle, FieldA, Header, Body} and rebuilds it byte-exact
+  (proven lossless on 68,264 captured IIR records). The `MapWorldBurstPacket` raw table + **`strie-login-worldburst.bin`
+  are gone**.
+- **Globals + player-state are SERVER-GENERATED, not stored:** MapChange + GameTime (built from the live map/instance),
+  the player's Vitals (from MaxStats), and StatIIR dropped as redundant. NPC vitals/stats (handle != player) are kept.
+  `IirMessageTypes.IsServerGenerated(type,handle,playerInstance)` is the rule; the importer drops them on import.
+- **The player's own spawn reflects the live character from the DB:** name + race + sex + level + vitals + EQUIPMENT
+  (`PlayerSpawnReader` decodes the CharacterIIR, `PlayerSpawnEquipment` builds the worn items, `SetCharacterMessage`
+  re-encodes). New tables: `CharacterInventory`, `CharacterAttribute`, `CharacterSkill`.
+- **`spawn-player-template.bin` removed** — relocated to the `PlayerSpawnTemplate` C# constant (the create-world-burst
+  pattern). The char-data is generated on top; only the non-rendering IIR scaffold frame is still the constant.
+- The original "under-populated vs retail" gap (beach 0x2076 / post-poll spawns) is folded in: the beach burst is a
+  committed DB seed with the full window; OTHER maps still truncate at the first `0x2020` poll in
+  `MapWorldBurstExtractor` (lower priority; asset-stripped client won't render the extra NPCs anyway).
+
+**OPTIONAL remaining (zero functional payoff — the constant works; do only for architectural tidiness):**
+- Retire the `PlayerSpawnTemplate` constant by GENERATING the scaffold from `CharacterAttribute`/`CharacterSkill`. The
+  RE is COMPLETE (feat-list = `[index][0][type][subidx][value]`; scaffold-A near-constant; the `01 2c` feat-ID list is
+  the last framing detail) — it's a large from-scratch body-composer build, fully specced in the plan doc.
+- Wire the appearance: `CharacterBody` face morphs are currently **write-only** (stored on create, never sent).
+- `MapWorldBurstExtractor` full-window fix for non-beach maps.
 
 ---
 

@@ -3,6 +3,14 @@
 Goal: generate the player's own `SimpleCharFullUpdate` (0xFA015807) spawn entirely from DB character data, with
 **full equipment rendering**, so `spawn-player-template.bin` can be deleted. Chosen 2026-06-10.
 
+> **STATUS 2026-06-10 (session end):** DONE — the spawn reflects the live character's name/race/sex/level/vitals/
+> equipment from the DB; `spawn-player-template.bin` removed (scaffold frame relocated to the `PlayerSpawnTemplate`
+> C# constant). The scaffold RE is COMPLETE (see below). What's LEFT is OPTIONAL with **zero functional payoff**:
+> generating the non-rendering scaffold frame from `CharacterAttribute`/`CharacterSkill` to retire the constant — a
+> large from-scratch body-composer build. Confirmed robust: `IirRecordCodec` roundtrips byte-exact over **all 68,264
+> captured IIR records across all 24 dumps**; `PlayerSpawnReader` decodes 3,442/3,443 spawns; 124 unit tests + harness
+> 16/16. Don't regress the working login to chase the constant retirement.
+
 ## What's proven / available
 
 - The char message inside the spawn body is a **`ProtoCoreCharacterIIR`** and decodes + re-encodes
