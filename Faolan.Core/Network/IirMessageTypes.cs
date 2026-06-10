@@ -30,10 +30,12 @@ namespace Faolan.Core.Network
 		// Global records the server always generates (handle 0) - never stored in any burst.
 		private static readonly HashSet<uint> GlobalGeneratedTypes = [MapChange, GameTime];
 
-		// Player-state records the server generates from the live character - server-generated only when the record
-		// targets the player; the SAME type targeting another entity (e.g. an NPC's vitals) is real world data and is
-		// kept. Both sets grow as each generator lands (see WorldEntryGeneratedRecords).
-		private static readonly HashSet<uint> PlayerGeneratedTypes = [Vitals];
+		// Player-state records the server is responsible for (not stored) when they target the player. The SAME type
+		// targeting another entity (e.g. an NPC's vitals) is real world data and is kept. The server either emits a
+		// generated version (Vitals, from the live MaxStats) or drops it as redundant (StatIir - incidental mid-stream
+		// per-stat ticks of the captured player; the live player's stats are carried by the FullChar snapshot). Both
+		// sets grow as each generator lands (see WorldEntryGeneratedRecords).
+		private static readonly HashSet<uint> PlayerGeneratedTypes = [Vitals, StatIir];
 
 		// True if this record is server-generated on world entry (so it must NOT be stored in the burst). Globals are
 		// always generated; player-state types only when they target the player instance.
