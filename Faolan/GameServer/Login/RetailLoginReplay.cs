@@ -348,14 +348,32 @@ namespace Faolan.GameServer
 			// InventoryEntries) from the DB via the typed message; otherwise fall back to the proven name-only splice.
 			var newBody = SpawnPacketBuilder.BuildSpawnBody(body, handle, character.Position, keptRotation);
 
-			var wornEquipment = PlayerSpawnEquipment.BuildInventoryEntries(equipment);
-			if (wornEquipment.Count > 0 && PlayerSpawnReader.TryReadCharacterMessage(newBody, out var read))
+			if (PlayerSpawnReader.TryReadCharacterMessage(newBody, out var read))
 			{
 				var message = read.Message;
 				message.Name = character.Name;
-				message.InventoryEntries.Clear();
-				foreach (var entry in wornEquipment)
-					message.InventoryEntries.Add(entry);
+
+				// Override the player's identity (model) from the DB when set; otherwise keep the template's stats
+				// (a race/sex of 0 would be an invalid model). The remaining CharacterStats fields stay from the template.
+				if (message.Stats != null && (uint)character.Race != 0)
+				{
+					// CharacterStats.race == the Race enum (Aquilonian=1, Cimmerian=2, Stygian=3); the spawn's sex code
+					// is the Sex enum + 2 (Male=2, Female=3, both in the captured-valid range). Other CharacterStats
+					// fields (head_mesh, looks_package, ...) stay from the template until they're DB-driven too.
+					message.Stats.Sex = (uint)character.Sex + 2;
+					message.Stats.Race = (uint)character.Race;
+					message.Stats.Level = character.Level;
+				}
+
+				// Replace the worn equipment with the character's own (when it has fully-buildable gear).
+				var wornEquipment = PlayerSpawnEquipment.BuildInventoryEntries(equipment);
+				if (wornEquipment.Count > 0)
+				{
+					message.InventoryEntries.Clear();
+					foreach (var entry in wornEquipment)
+						message.InventoryEntries.Add(entry);
+				}
+
 				newBody = SpawnPacketBuilder.SetCharacterMessage(newBody, message);
 			}
 			else

@@ -56,6 +56,7 @@ namespace Faolan.Core.Database.Tables
 		public uint? RealmId { get; set; }
 		public ushort Level { get; set; }
 
+
 		public override string ToString()
 		{
 			return $"{base.ToString()}: {Name}";
