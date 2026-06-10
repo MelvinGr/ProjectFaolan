@@ -491,6 +491,24 @@ CONSTRUCTION DONE (2026-06-10, commits 7fce36c + 842f5fd) — same arc as NPC sp
   state), so they keep the verbatim burst body until that state is normalized (in-client). Then a per-class
   `WorldObject` build from columns + fresh handle/playfield to fully retire the burst objects.
 
+96C46740 MoveTask (per-NPC patrol path) — PARTIAL DISSECTION (2026-06-10, workbench
+`Captures/dissect_movetask.py`). Each FA015807 spawn is paired with a 96C46740 MoveTask that registers the
+NPC's movement. It does NOT use the 0x2C transform framing; its floats are BIG-ENDIAN (unlike the spawn
+transform's LE). Stable structure:
+```
+[0:16]  header: bodyLen, subOp=96C46740, ack=0xC350, handle (== the paired spawn's handle)
+[16:18] prefix 00 00
+@18     current position: vec3 of 3 big-endian floats
+...     movement control bytes (04 01 00 02 01 01 ... type/flags), a count, then the waypoint list:
+@..     N x waypoint vec3 (BE) - the patrol PATH; N varies widely (beach: 2..8+ points, total len 125..370)
+...     a speed float, a repeated path segment, an orientation, and a trailer (..bf..3f5da8df..00 01)
+```
+Beach: 16 MoveTasks, waypoint counts 5..25 (a wandering NPC like Kalanthes has many; a near-static one has 2).
+This is the world burst's LARGEST/most-variable remaining family and carries patrol-AI data not in any table.
+STILL TO DO: nail the control-byte grammar between waypoints byte-exact (the per-segment count/flag bytes,
+speed, orientation, trailer) -> a `PatrolPath`/`MoveTask` schema (handle + waypoint list + params) -> a builder
+keyed by the spawn handle -> wire it in. The hardest of the remaining burst families.
+
 ## Phase 7 — NPC conversations (dialogue)
 
 Clicking an NPC sends an `Interact` (`642CD3D6`, actionType `0x16` = TalkToNpc); the clicked NPC's entity
