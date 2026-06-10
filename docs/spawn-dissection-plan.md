@@ -244,9 +244,15 @@ Pillager=8756/14040 (two variants), Kalanthes=2704 (= the archive `npcs` MODEL i
 =9411. Instances of the same template share race/sex/monster_data/head_mesh; `monster_scale` (f4) carries the
 per-spawn size jitter (e.g. crocodiles 129–136). So an NPC spawn is reconstructable from a per-template row
 (name, the CharacterStats/NpcStats/Bcc field set, equipment list) + per-instance (handle, position, rotation,
-monster_scale). STILL RAW after this pass: the 273B pre-IIR float block and the post-IIR scaffold (both shared
+monster_scale). STILL RAW after this pass: the 227B pre-IIR block and the post-IIR scaffold (both shared
 with the player and treatable the same way — `PlayerSpawnScaffoldCodec` already generates the player's; the
 post-IIR header word 4→5 and the NPC-shaped 41B minimal are the only deltas to fold in).
+PRE-IIR BLOCK CHARACTERIZED 2026-06-11: it is the (body-relative) [66:293] = 227-byte region. Constant/varying
+analysis over the 42 beach NPCs: only ~8% of bytes are constant, ~152/227 are zero (sparsely, different
+positions per NPC), and it carries the **`03 f1` (0x3F1) marker @112-113** — the SAME scaffold-entry family as
+the dissected POST-IIR scaffold. So it is NOT encrypted/opaque; it is another sparse 0x3F1-keyed scaffold
+region (extended transform/bounds + state entries) that yields to the same pair-list decode as
+`PlayerSpawnScaffoldCodec` — a dedicated effort, not a blocker (NpcSpawnBuilder ships it raw from `Data` today).
 
 CONSTRUCTION PROGRESS (2026-06-10):
 - ✓ The machinery generalizes (commit 3897e05, `NpcSpawnConstructionTests`): `BuildSpawnBody` reconstructs an
