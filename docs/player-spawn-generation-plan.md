@@ -53,4 +53,28 @@ CharacterIIR (name/stats/**equipment via inventory_entry** - the bulk), and the 
    transform-template dependency. FullChar (0x737A6DF9) is the analogous next target (test `ProtoFullCharacterIIR`
    round-trip).
 
+## Prerequisites (blockers found 2026-06-10 while wiring it live)
+
+The packet-construction half is done (`SetCharacterMessage`, the round-trip, `CharacterInventory`). The live
+integration is gated on **character data-model groundwork**, not on packet building:
+
+1. **No race/class/sex/level on `Character`.** `Character` has Name/Experience/Map/Realm + nav props (Body, Equipment,
+   MaxStats) but NOT race/class/sex/level. The spawn's `CharacterStats` (sex=1, side=2, race=3, life/health, level=18,
+   …) currently comes only from the captured template. Need to surface race/class/sex/level (likely add to `Character`
+   or `CharacterBody`; the create-character flow chooses them - check where they're persisted) and a
+   `Character -> ProtoCoreCharacterIIR.CharacterStats` builder.
+2. **Geared test character = necrol80 (from the captures).** The `account-faolan-character-me*` dumps have a fully
+   geared character with plenty of inventory/equipment, and **necrol80's player spawn is already in `faolan.db`** as a
+   burst entity (e.g. map 2000, the FA015807 whose handle == that burst's CapturedInstance, ~2319 bytes - vs Tester's
+   ~970). So the data and the **byte-identity oracle** are already present: decode necrol80's captured `ProtoCoreCharacterIIR`,
+   extract its `InventoryEntries` (pos + ProtoAcgItem keys = the worn items) + `Stats` (sex/race/class/level/health)
+   into `CharacterEquipment` / `CharacterInventory` / a stats source for a "necrol80" Character, then GENERATE her spawn
+   from those rows and assert it byte-matches the captured one. That extraction (captured spawn/FullChar ->
+   structured character) is the next build; it doubles as the importer for real characters and gives the equip-slot ->
+   `InventoryEntry.pos` mapping for free.
+
+Once those exist: `TryRebuildPlayerSpawnFromDb` decodes the template `ProtoCoreCharacterIIR`, overrides Name + Stats +
+InventoryEntries from the DB, and calls `SetCharacterMessage`; verify with the harness (expect iteration). Only name
+is overridable today (which `SetSpawnName` already does), which is why the live step stops here.
+
 See [[world_entry_from_db]] for the surrounding burst/server-generation architecture.
