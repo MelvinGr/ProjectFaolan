@@ -187,9 +187,17 @@ The same playbook applied to the FullChar/inventory snapshot:
   16/16 with a 2-entry Equipped container vs the capture's 4; the old in-place swap survives only as the
   fallback when the captured root doesn't decode).
 
+- **Live tail values PATCHED from the character** (same session): world entry now writes the LIVE level
+  (tails header), current HP/mana/stamina (`TailsPostAccessBlock`, ×100 slots 54/64/68) and XP
+  (`CurrentXp`, slot 80, ×10) into the snapshot tails before sending — the captured player's values no
+  longer ride along. Best-effort with the captured values as fallback; locked by the bigboy round-trip in
+  `FullCharSnapshotBuilderTests` (the stat table MUST be recognized on the reference fixture).
+  ⚠ In-client smoke verification of this patch is PENDING (client was busy when it landed; the container
+  generation before it is smoke-proven).
+
 Remaining for full FullChar generation:
-- **Tails**: stats (`CharacterStatBlock` records) from the live character; quest/`remoteformat` XML records
-  + the access-window table are progression state (captured verbatim today).
+- **Tails beyond live values**: quest/`remoteformat` XML records + the access-window table are progression
+  state (captured verbatim today); a from-scratch fresh-character tails build would need those modeled.
 - **Prefix `[u32 X][u8 Y]`** semantics (progression/session counters — fresh defaults 0/0x44 known).
 - **Bag beyond slot 1** from `CharacterInventory` rows (table exists; bag capacity must track upgrades).
 

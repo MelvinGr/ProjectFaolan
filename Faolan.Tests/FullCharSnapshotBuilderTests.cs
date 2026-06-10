@@ -41,6 +41,45 @@ namespace Faolan.Tests
 			Assert.Empty(containers[3].Items);
 		}
 
+		// The world-entry tail patch (live level + current vitals) must survive the tails serialize and leave
+		// everything else byte-stable: re-serializing with the SAME values is a no-op, and a changed level
+		// reads back changed.
+		[Fact]
+		public void TailPatch_RoundTripsThroughTheTailsModel()
+		{
+			const string bigboy = "/home/melvin/Development/C#/Project Faolan/Captures/account-stricken997-character-Strie-login-randomActions-bigboy.bin";
+			if (!System.IO.File.Exists(bigboy))
+				return;
+
+			var packet = new Faolan.Core.Network.Conan.ConanPacket(System.IO.File.ReadAllBytes(bigboy));
+			var body = new Faolan.Core.Data.FaolanStream(packet.Body.ReadArrayUInt32Length());
+			body.ReadUInt32();
+			body.ReadUInt32();
+			body.ReadUInt32();
+			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(body);
+
+			var original = parts.Tails.ToArray();
+			parts.Tails.Level = parts.Tails.Level; // same-value writes are a no-op
+			Assert.Equal(original, parts.Tails.ToArray());
+
+			parts.Tails.Level = 42;
+			var patched = BigboyTailsFile.Deserialize(parts.Tails.ToArray());
+			Assert.Equal(42u, patched.Level);
+			Assert.Equal(original.Length, parts.Tails.ToArray().Length); // fixed-width patch, no resize
+
+			// The live-vitals/XP patch slots round-trip too. The bigboy capture is the tails model's reference
+			// fixture, so its stat table MUST be recognized - a silent skip here would mean the world-entry
+			// patch never fires.
+			Assert.True(parts.Tails.HasKnownRepeatedStatTable);
+			{
+				parts.Tails.PostAccessBlock!.CurrentHp = 1234;
+				parts.Tails.PostAccessBlock.CurrentXp = 5678;
+				var statPatched = BigboyTailsFile.Deserialize(parts.Tails.ToArray());
+				Assert.Equal(1234u, statPatched.PostAccessBlock!.CurrentHp);
+				Assert.Equal(5678u, statPatched.PostAccessBlock.CurrentXp);
+			}
+		}
+
 		[Fact]
 		public void BuildContainers_AllocatesUniqueStableIds()
 		{

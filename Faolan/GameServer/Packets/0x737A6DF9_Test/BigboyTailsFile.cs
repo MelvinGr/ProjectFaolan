@@ -42,7 +42,7 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 
 		public TailsPostAccessBlock? PostAccessBlock { get; init; }
 		public uint Header0 { get; init; }
-		public uint Level { get; init; }
+		public uint Level { get; set; } // settable: world entry patches the LIVE character level in (the rest of the header stays captured)
 		public uint PrimaryRemoteFormatId { get; init; }
 		public uint PrimaryRemoteFormatIdAgain { get; init; }
 		public uint Unknown0Marker { get; init; }
@@ -837,6 +837,12 @@ namespace Faolan.GameServer.Packets._0x737A6DF9_Test
 		{
 			get => GetValue(CharacterValueIndex.CurrentStamina) / 100;
 			set => SetValue(CharacterValueIndex.CurrentStamina, value * 100);
+		}
+
+		public uint CurrentXp
+		{
+			get => GetValue(CharacterValueIndex.CurrentXp) / 10;
+			set => SetValue(CharacterValueIndex.CurrentXp, value * 10);
 		}
 
 		public uint Marker0 { get; init; }

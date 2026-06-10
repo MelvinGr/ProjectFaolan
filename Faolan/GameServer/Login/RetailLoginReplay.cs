@@ -61,7 +61,7 @@ namespace Faolan.GameServer
 		// the ORIGINAL packet's header copied verbatim - NOT via PacketStream/WriteLengthHash. An earlier
 		// PacketStream-based rebuild stalled the client on the loading screen even though its output was byte-exact
 		// (same class of issue as the Phase 1 player-spawn rebuild), whereas the manual byte path works.
-		private byte[] BuildBeachInventoryPacket(byte[] substitutedPacket, DbInventory dbInventory)
+		private byte[] BuildBeachInventoryPacket(byte[] substitutedPacket, DbInventory dbInventory, Character character)
 		{
 			var conanPacket = new ConanPacket(substitutedPacket);
 			var body = new FaolanStream(conanPacket.Body.ReadArrayUInt32Length());
@@ -70,6 +70,32 @@ namespace Faolan.GameServer
 			var c350 = body.ReadUInt32();
 			var instance = body.ReadUInt32();
 			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(body);
+
+			// Patch the LIVE character's level + current vitals into the tails (the captured player's values
+			// otherwise ride along; tail stat edits are proven safe in-client). Full vitals at login; the
+			// 0x96B8DC59 vitals update after the spawn sets the max side. Best-effort: a tails layout this
+			// model can't index just keeps the captured values.
+			try
+			{
+				if (character != null)
+				{
+					parts.Tails.Level = character.Level;
+					if (parts.Tails.HasKnownRepeatedStatTable)
+					{
+						parts.Tails.PostAccessBlock.CurrentXp = character.Experience;
+						if (character.MaxStats != null)
+						{
+							parts.Tails.PostAccessBlock.CurrentHp = character.MaxStats.Health;
+							parts.Tails.PostAccessBlock.CurrentMana = character.MaxStats.Mana;
+							parts.Tails.PostAccessBlock.CurrentStamina = character.MaxStats.Stamina;
+						}
+					}
+				}
+			}
+			catch (Exception ex)
+			{
+				Logger.LogWarning(ex, "Tail stat patch failed; keeping the captured tail values.");
+			}
 
 			// GENERATE the four inventory containers from the character's DB items (typed ProtoFullCharacterIIR,
 			// proven byte-faithful by the 37/39 round-trip oracle), replacing the captured player's containers
@@ -306,7 +332,7 @@ namespace Faolan.GameServer
 				var pkt = RewriteBurstInstance(packet, capturedInstance, liveInstance);
 
 				if (dbInventory.Count > 0 && IsInventorySnapshot(pkt))
-					pkt = BuildBeachInventoryPacket(pkt, dbInventory);
+					pkt = BuildBeachInventoryPacket(pkt, dbInventory, client.Session.Character);
 				else if (TryRebuildPlayerSpawnFromDb(client, equipment, scaffoldCharacter, pkt, out var rebuilt))
 					pkt = rebuilt;
 
