@@ -248,11 +248,12 @@ The automated login→world run + `Captures/compare_log_to_dump.py` vs the Strie
 omits the world-population packets retail sends DURING the spawn phase — the `0x000bbc4x` entity spawns and their
 **`0x2076` index manifest** (verified: the beach burst in faolan.db has SpawnCheck handle `0x081906` but NOT
 `0xbbc46`; the Strie capture HAS both the spawns and the 0x2076).
-- **BEACH (4010, the default/test map):** its burst is **NOT** from the extractor — it's seeded from the proven
-  71-packet blob `strie-login-worldburst.bin` (`Faolan.Importer.SeedBeachBurstFromBlob`, instance 0x02165EFF), which
-  is the pre-poll SCENE only. Fix = **regenerate that blob** from the Strie capture's FULL world-build (SCENE +
-  post-poll `0x2000` spawns + `0x2076`), excluding the dynamically-generated `0x2008`/`0x2052`/`0x2009`/`0x2082`/
-  `0x201c` our server emits per-poll.
+- **BEACH (4010, the default/test map): ✅ FIXED 2026-06-10.** Regenerated `strie-login-worldburst.bin` from the
+  Strie capture's FULL world-build (MapChange → ReadyForPlayScreen), keeping only `0x2000`+`0x2076` downloads and
+  excluding the dynamically-generated `0x2008`/`0x2052`/`0x2009`/`0x2082`/`0x201c`/`0x2024`. Blob 71 → 83 packets
+  (the 71 SCENE are byte-identical, +11 post-poll `0x2000` spawns +1 `0x2076`), faolan.db beach burst updated to
+  match. Verified by the harness: **16/16, no regression**, `0x2076` now 1 (= retail), `0x2000` 78 → 89, no new
+  client/server errors.
 - **OTHER maps:** `MapWorldBurstExtractor` ends the window at the first `0x2020` poll (same omission); same fix,
   applied in the extractor.
 **Do carefully — login passes 16/16; don't regress it. Watch packet ORDER (the 0x2076 must follow the spawns it
