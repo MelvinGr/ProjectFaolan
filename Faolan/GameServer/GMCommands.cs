@@ -166,14 +166,35 @@ namespace Faolan.GameServer
 			return ApplySpell(client, self, self, spellId);
 		}
 
+		// .save  - flush the live world state to the DB. The WorldEntity is the source of truth for live transform
+		// (docs/server-architecture-roadmap.md) and movement is not otherwise persisted, so this snapshots every
+		// connected player's authoritative position/map back onto their persisted Character and saves it. (Extends to
+		// more live state - vitals, buffs, … - as those become persisted.)
 		private async Task SaveChanges(uint characterId)
 		{
-			var client = ClientForCharacter(characterId);
-			if (client?.Session.Character == null)
-				return;
+			var saved = await FlushWorldState();
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Flushed {saved} player(s)' live world state to the database.");
+		}
 
-			await Database.SaveCharacter(client.Session.Character);
-			await _agentServerDispatcher.SendSystemMessage(characterId, "Saved character to the database.");
+		// Writes each connected player's live WorldEntity transform onto their Character and persists it. Returns the
+		// number of players saved.
+		private async Task<int> FlushWorldState()
+		{
+			var saved = 0;
+			foreach (var pair in _playerEntities)
+			{
+				var character = pair.Key.Session?.Character;
+				if (character == null)
+					continue;
+
+				var entity = pair.Value;
+				character.MapId = entity.MapId;
+				character.Position = entity.Position;
+				await Database.SaveCharacter(character);
+				saved++;
+			}
+
+			return saved;
 		}
 
 		private Task SendGmHelpText(uint characterId)
