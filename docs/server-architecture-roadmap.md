@@ -8,6 +8,19 @@
 Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see also
 `world_packets_construct_not_replay`, `protocol_stats_and_combat`, `docs/chat.md`, `docs/quests-and-combat.md`.
 
+> ## PROGRESS (2026-06-11) — the milestone-1 foundation is in (harness-verified; the in-client payoff is pending)
+> - **In-memory world model** ✓ `WorldEntity`/`Zone`/`WorldState`; players registered on entry, removed on
+>   disconnect. **`WorldEntity` is the single source of truth for live transform**; `Character` is the persisted seed.
+> - **Interest management** ✓ `InterestManager` (spawn/move/despawn diff, unit-tested) + the cross-player broadcast
+>   (capture each player's spawn body, re-frame per recipient, forward moves) — **NEEDS 2-client in-client check**;
+>   despawn packet not built yet (ghost on leave/disconnect).
+> - **Persistence** ✓ event-driven (disconnect + teleport + `.save` flushes live world state) + a 5-min autosave
+>   timer. No game loop needed for it.
+> - **Game loop** ✓ a 1 Hz fixed tick (`GameTickLoop`) → `WorldState.Tick(dt)` (NPC-AI seam, no-op today) +
+>   vitals regeneration (provisional rates, pushes only on change). Raise cadence + dt-scaling when NPC AI lands.
+> **NEXT:** put NPCs in the world model (shared per-zone, from `NpcSpawns`) so the tick can drive AI/movement and the
+> burst becomes a seed — this is where the loop and "construct, don't replay" meet. Then combat/death/respawn, quests.
+
 ## What we already have (strong foundation)
 
 - **Protocol mastery — the moat.** Framing, opcodes, and **byte-exact** world packets: spawn (`FA015807`),
