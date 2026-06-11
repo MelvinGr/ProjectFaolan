@@ -47,6 +47,9 @@ namespace Faolan.GameServer
 		// LootBagFullUpdateIIR_c - the world-object sub-opcode a loot bag spawns as.
 		private const uint LootBagSubOpcode = 0xF096251E;
 
+		// The RDB Lua VM (conversation/quest scripting); stateless + reusable.
+		private readonly Scripting.LuaScriptVm _luaVm = new();
+
 		// Monotonic allocator for dropped-loot handles, in a high range to avoid colliding with player/NPC handles.
 		private int _nextLootHandle = 0x40000000;
 

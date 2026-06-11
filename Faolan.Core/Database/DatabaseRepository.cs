@@ -49,6 +49,9 @@ namespace Faolan.Core.Database
 		Task<RespawnPoint[]> GetRespawnPoints(uint mapId);
 		Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId);
 		Task DiscoverRespawnPoint(uint characterId, uint respawnPointId);
+		Task<LuaScript> GetLuaScript(uint scriptId);
+		Task<uint[]> GetCharacterTags(uint characterId);
+		Task AddCharacterTag(uint characterId, uint tagId);
 		Task<CharacterQuest[]> GetCharacterQuests(uint characterId);
 		Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0, string goalTargetName = null);
 		Task RemoveCharacterQuest(uint characterId, uint questId);
@@ -448,6 +451,29 @@ namespace Faolan.Core.Database
 				.Where(c => c.CharacterId == characterId)
 				.Select(c => c.RespawnPointId)
 				.ToArrayAsync();
+		}
+
+		public async Task<LuaScript> GetLuaScript(uint scriptId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.LuaScripts.FirstOrDefaultAsync(s => s.Id == scriptId);
+		}
+
+		public async Task<uint[]> GetCharacterTags(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.CharacterTags.Where(t => t.CharacterId == characterId).Select(t => t.TagId).ToArrayAsync();
+		}
+
+		// Sets a tag on a character (idempotent - no duplicate row).
+		public async Task AddCharacterTag(uint characterId, uint tagId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			if (await ctx.CharacterTags.AnyAsync(t => t.CharacterId == characterId && t.TagId == tagId))
+				return;
+
+			ctx.CharacterTags.Add(new CharacterTag { CharacterId = characterId, TagId = tagId });
+			await ctx.SaveChangesAsync();
 		}
 
 		public async Task<CharacterQuest[]> GetCharacterQuests(uint characterId)

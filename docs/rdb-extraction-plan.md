@@ -70,10 +70,15 @@ index and (b) lets us pull resources by **type id**.
 >
 > So a faithful RDB conversation engine needs a **Lua interpreter + a player-tag/quest-state system + TextStrings(TDC2)
 > resolution + Knubot script extraction + a server Knubot VM** — a major multi-session subsystem entangled with quests.
-> **Decision: defer until a quest/tag system exists** (building dialogue branching == building quests). The shipped
-> capture-replay (stage machine + graceful close, see `protocol_conversation_routing`) is the interim for captured
-> paths. An optional incremental win that does NOT need the VM: resolve dialogue TEXT from TextStrings(TDC2) to widen
-> text coverage — but it yields no structure/branching on its own.
+>
+> **ENGINE BUILT (2026-06-11) — the VM is no longer pinned (`lua_vm` memory).** The 1992 LuaArchive scripts are
+> extracted (`--rdb-lua` → `LuaScripts` table); a `CharacterTag` store backs `player:HasTag/AddTag`; `LuaScriptVm`
+> (MoonSharp, sandboxed) runs real scripts against a character (the full `player` API: HasTag/AddTag/HasCompletedQuest/
+> GetIntStat/Count/SpawnItem/SolveGoal/CastSpell), proven by `LuaVmTests` + `.lua run <id>` / `.tag` GM commands.
+> REMAINING: wire scripts into the conversation/quest flow (run a node's condition scripts to pick options, its effect
+> scripts on choice → drive `QuestGoal`/grants), map conversation nodes → script ids, and TextStrings(TDC2) text
+> resolution. The shipped capture-replay (stage machine + graceful close, `protocol_conversation_routing`) remains the
+> interim until the VM is wired into the live dialogue path.
 
 ### Phase 2 — targeted extraction + parse (one data type at a time, by value)
 Prioritise by payoff/effort:
@@ -114,9 +119,9 @@ Significant de-risking — the tool and format are identified:
 - **`rdbreader` is itself a Project Faolan tool** ("Server Emulator for Age of Conan, © 2009–2012 The Project
   Faolan Team", GPLv3) — same lineage as our `Archive/` C++ server, written for AoC's RDB. Source cloned for
   reference. It supports **RDB index version 5 (Age of Conan)** and **7 (The Secret World)**.
-- **Our client is RDB index version 6** (`RDBHashIndex.bin` magic `RDHI`, `version=6`) — a newer AoC build,
-  **between** v5 and v7, so rdbreader rejects it as-is ("does not support this version"). v6 must be patched in
-  or parsed ourselves; it's bracketed by the two supported versions.
+- **(Resolved — see "The index is `le.idx` (v5)" below.)** `RDBHashIndex.bin` (RDHI v6) is only the patch hash
+  index; the real offset index is `le.idx` **version 5**, which rdbreader supports — there was never a v6 index to
+  reverse. (This bullet's original "client is v6, unsupported, must patch" worry was the dead end.)
 - **The `TYPES` enum (structs.h) is the resource-type map we need**: `MONSTERDATA=1010201` (creature MODEL data -
   animsys/skeleton/mesh refs + name, NOT combat stats; checked 2026-06-11 - NPC **HP is NOT in the client RDB**, it
   was server-authoritative: use the captured spawn `CharacterStats.health` / the Archive-imported `Npc.Health`),

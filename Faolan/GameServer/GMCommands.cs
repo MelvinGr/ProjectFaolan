@@ -148,6 +148,8 @@ namespace Faolan.GameServer
 				["mount"] = (client, arguments) => MountCommand(client, arguments),
 				["world"] = (client, _) => SendWorldInfo(client),
 				["quest"] = (client, arguments) => QuestCommand(client, arguments),
+				["tag"] = (client, arguments) => TagCommand(client, arguments),
+				["lua"] = (client, arguments) => LuaCommand(client, arguments),
 				["test"] = (client, _) => Test(client.Session.Character.Id)
 			};
 		}
@@ -202,6 +204,58 @@ namespace Faolan.GameServer
 					await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .quest add|remove <questId> | .quest list");
 					break;
 			}
+		}
+
+		// .tag add <id> | .tag list  - manage the player's quest-state tags (the flags RDB Lua scripts read/write).
+		private async Task TagCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var parts = (arguments ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+			if (parts.Length >= 2 && parts[0].Equals("add", StringComparison.OrdinalIgnoreCase) && uint.TryParse(parts[1], out var tagId))
+			{
+				await Database.AddCharacterTag(characterId, tagId);
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"Tag {tagId} set.");
+				return;
+			}
+
+			var tags = await Database.GetCharacterTags(characterId);
+			await _agentServerDispatcher.SendSystemMessage(characterId, tags.Length == 0
+				? "No tags."
+				: $"Tags: {string.Join(", ", tags)}");
+		}
+
+		// .lua run <scriptId>  - run an RDB LuaArchive script against the player (the conversation/quest VM engine):
+		// reads the player's tags/quests, runs the script, persists any tags it adds, and reports its effects. Proves
+		// the Lua VM end-to-end on a real character (see protocol_conversation_routing).
+		private async Task LuaCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var parts = (arguments ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+			if (parts.Length < 2 || !parts[0].Equals("run", StringComparison.OrdinalIgnoreCase) || !uint.TryParse(parts[1], out var scriptId))
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .lua run <scriptId>");
+				return;
+			}
+
+			var script = await Database.GetLuaScript(scriptId);
+			if (script?.Source == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"<span style=\"color: red;\">No Lua script {scriptId} (run --rdb-lua to import).</span>");
+				return;
+			}
+
+			var tags = await Database.GetCharacterTags(characterId);
+			var completed = (await Database.GetCharacterQuests(characterId))
+				.Where(q => q.State == Core.Database.Tables.QuestState.Completed)
+				.Select(q => q.QuestId);
+			var player = new Scripting.GameLuaPlayer(tags, completed);
+
+			var ok = _luaVm.RunEffect(script.Source, player);
+			foreach (var t in player.AddedTags)
+				await Database.AddCharacterTag(characterId, (uint)t);
+
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				$"Lua {scriptId}: ran={ok}, +tags [{string.Join(",", player.AddedTags)}], spawned {player.SpawnedItems.Count}, solvedGoals [{string.Join(",", player.SolvedGoals)}], cast [{string.Join(",", player.CastSpells)}].");
 		}
 
 		// .mount [spellIdHex]  - cast the mount-summon spell on the player. Default 0x3BAD7D, the mount spell

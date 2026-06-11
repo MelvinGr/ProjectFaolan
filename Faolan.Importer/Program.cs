@@ -320,6 +320,20 @@ namespace Faolan.Importer
 				return 0;
 			}
 
+			// --rdb-lua: import the LuaArchive (type 1010223) - the conversation/quest script logic - into LuaScripts.
+			if (args.Contains("--rdb-lua"))
+			{
+				if (rdbDir == null)
+				{
+					await Console.Error.WriteLineAsync("--rdb-lua needs --rdb <RDB dir>.");
+					return 1;
+				}
+
+				var n = await RdbLuaImporter.ImportAsync(db, rdbDir);
+				Console.WriteLine($"RDB lua: imported {n} scripts into LuaScripts.");
+				return 0;
+			}
+
 			// --rdb-respawns: import resurrection points (type 1000090) for our maps. On-demand records are fetched
 			// from the CDN by content hash (--cdn to override the host). Isolated; touches only RespawnPoints.
 			if (args.Contains("--rdb-respawns"))
