@@ -100,8 +100,12 @@ The Knubot opcodes are now named: `0x045B0B0F` OpenChatWindow, `0x4A3D899A` Appe
   option → reply → next option, one step per click. (Linear replay of the captured path; it ignores WHICH option you
   pick, so branching still follows the capture — full branching needs RDB dialogue trees.)
 - **Still expected (data gap, not a bug): "no lines" / wrong-looking dialog** when the live quest-state branch isn't
-  in any capture. The real fix is RDB-driven conversation trees (dialogue that works for ANY quest state), not
-  capture replay — a separate, larger effort.
+  in any capture. The proper fix is RDB-driven dialogue (works for ANY quest state), not capture replay.
+  **⛔ PINNED/DEFERRED 2026-06-11:** scoped the RDB — dialogue branching is Lua (LuaArchive 1010223) keyed on
+  quest-state TAGS (`player:HasTag/AddTag`), text in TextStrings(TDC2); there's no static conversation-tree resource.
+  So it needs a Lua + tag/quest VM — a quest-engine-sized effort entangled with quests. Defer until a quest/tag
+  system exists. Full scoping in `docs/rdb-extraction-plan.md` + `protocol_conversation_routing` memory. The shipped
+  capture-replay (stage machine + graceful close) is the interim.
 
 ## 7. Create-world Kalanthes intro  (commit: answer create-world spawn polls per-entity) ⭐ highest priority
 The auto-cutscene where you wash ashore and Kalanthes walks up + starts the chat.

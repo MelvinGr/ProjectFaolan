@@ -60,6 +60,21 @@ index and (b) lets us pull resources by **type id**.
 - [ ] Map type id → meaning (build a legend, like `docs/capture-events.md` does for packets). Lean on AO/AoC
       community docs where they exist.
 
+> ## ⭐ CONVERSATIONS — SCOPED & PINNED (2026-06-11): RDB dialogue is a quest VM, not a table import. DEFERRED.
+> Inspected the dialogue resources in the live client RDB (`Faolan.Importer --rdb`):
+> - **TextStrings (1030002, TDC2)** = the dialogue TEXT, by string-id — resolvable for any NPC/state.
+> - **LuaArchive (1010223)** = the dialogue LOGIC/branching, as **Lua** with quest-state TAG conditions
+>   (`if player:HasTag(3104) then return false else return true end ... player:AddTag(2742)`).
+> - **TextScript (1010035)** = a generic XML node-graph (textures etc.), mixed-purpose; **ScriptGroup (0)** = 0 entries.
+> - There is **NO single "conversation tree export" type** — branching IS the quest system (player tags).
+>
+> So a faithful RDB conversation engine needs a **Lua interpreter + a player-tag/quest-state system + TextStrings(TDC2)
+> resolution + Knubot script extraction + a server Knubot VM** — a major multi-session subsystem entangled with quests.
+> **Decision: defer until a quest/tag system exists** (building dialogue branching == building quests). The shipped
+> capture-replay (stage machine + graceful close, see `protocol_conversation_routing`) is the interim for captured
+> paths. An optional incremental win that does NOT need the VM: resolve dialogue TEXT from TextStrings(TDC2) to widen
+> text coverage — but it yields no structure/branching on its own.
+
 ### Phase 2 — targeted extraction + parse (one data type at a time, by value)
 Prioritise by payoff/effort:
 1. **Localized strings / `remoteformat` text** — likely the easiest win and unblocks all dialogue/UI text.
