@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Numerics;
 using Faolan.Core.Network;
 
@@ -31,5 +32,14 @@ namespace Faolan.GameServer.World
 		public uint MapId { get; set; }
 		public Vector3 Position { get; set; }
 		public Vector3 Rotation { get; set; }
+
+		// For a player: the handles this player currently sees (has been sent a spawn for). Interest management diffs
+		// against this set to decide what to spawn/despawn as entities move in and out of range. Unused for NPCs.
+		public HashSet<uint> Known { get; } = new HashSet<uint>();
+
+		// For a player: the FA015807 spawn BODY (the bytes after the RPC header) that renders this entity on another
+		// client - captured when the player entered the world, re-framed per recipient by the broadcaster. Null until
+		// captured / for entities with no spawn.
+		public byte[] SpawnBody { get; set; }
 	}
 }
