@@ -38,40 +38,23 @@ namespace Faolan.GameServer
 		// archetype), keyed by the CharacterEquipment slot they go in. Slot-appropriate so the client accepts them.
 		private const uint StarterWristItem = 3361557; // Slave Manacles (wrist, 0x12)
 
-		private static readonly ulong[] EquippedSlotIds = [0x01, 0x02, 0x03, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0e, 0x0f, 0x10, 0x12, 0x14, 0x15];
-
-		// Applies the DB inventory to the parsed snapshot: replaces each captured Equipped entry whose slot the
-		// character has a buildable item for, plus the first Bag entry from FirstPosBag - all IN PLACE (preserving the
-		// captured entry's itemId/record id, so the entry count and the tails are unchanged).
-		private void ApplyDbInventory(ProtoMessage root, DbInventory dbInventory)
-		{
-			var equipped = InventorySnapshotInspector.GetContainer(root, InventorySnapshotInspector.ContainerKind.Equipped);
-			foreach (var entry in InventorySnapshotInspector
-				         .GetContainerEntries(equipped)
-				         .ToList())
-			{
-				var slot = InventorySnapshotInspector.GetEntrySlot(entry) ?? 0;
-				if (dbInventory.Equipped.TryGetValue(slot, out var resolved))
-					ReplaceEntryInPlace(equipped, entry, resolved.Item, resolved.Archetype);
-			}
-
-			if (dbInventory.BagFirst.HasValue)
-			{
-				var bag = InventorySnapshotInspector.GetContainer(root, InventorySnapshotInspector.ContainerKind.Bag);
-				var firstBag = InventorySnapshotInspector
-					.GetContainerEntries(bag)
-					.FirstOrDefault();
-				if (firstBag != null)
-					ReplaceEntryInPlace(bag, firstBag, dbInventory.BagFirst.Value.Item, dbInventory.BagFirst.Value.Archetype, 1);
-			}
-		}
-
-		// Parses the (already instance-substituted) inventory snapshot, applies the current inventory experiment,
-		// and rebuilds it into a raw packet. IMPORTANT: built entirely with manual byte assembly + manual CRC and
-		// the ORIGINAL packet's header copied verbatim - NOT via PacketStream/WriteLengthHash. An earlier
-		// PacketStream-based rebuild stalled the client on the loading screen even though its output was byte-exact
-		// (same class of issue as the Phase 1 player-spawn rebuild), whereas the manual byte path works.
-		private byte[] BuildBeachInventoryPacket(byte[] substitutedPacket, DbInventory dbInventory, Character character)
+		// Rebuilds the (already instance-substituted) world-entry inventory snapshot (0x737A6DF9), patching the LIVE
+		// character's level/vitals into the tails while keeping the captured inventory CONTAINERS verbatim.
+		//
+		// We deliberately do NOT substitute the character's DB items into this snapshot. Doing so - by ANY method,
+		// in-place entry swap OR wholesale typed-container generation - stalls the client's world-load completion:
+		// the client tries to resolve each item's RDB resources, thrashes ("Out of scratch memories") on items it
+		// can't find locally, and never reaches the state where it dials the chat/CommunityServer. The result is the
+		// chat-channels regression (AgentServer gets zero TCP accepts). Verified by bisecting the live client: any
+		// container mutation breaks chat; verbatim containers + this tail patch keep it. The player's VISIBLE worn
+		// gear is DB-driven via the entity spawn (TryRebuildPlayerSpawnFromDb), which is chat-safe. Delivering the
+		// real backpack inventory must happen AFTER world load (a post-ready inventory update), not in this snapshot.
+		// See [[protocol_chat_connection_regression]].
+		//
+		// IMPORTANT: built entirely with manual byte assembly + manual CRC and the ORIGINAL packet's header copied
+		// verbatim - NOT via PacketStream/WriteLengthHash. An earlier PacketStream-based rebuild stalled the client
+		// on the loading screen even though its output was byte-exact, whereas the manual byte path works.
+		private byte[] BuildBeachInventoryPacket(byte[] substitutedPacket, Character character)
 		{
 			var conanPacket = new ConanPacket(substitutedPacket);
 			var body = new FaolanStream(conanPacket.Body.ReadArrayUInt32Length());
@@ -82,9 +65,9 @@ namespace Faolan.GameServer
 			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(body);
 
 			// Patch the LIVE character's level + current vitals into the tails (the captured player's values
-			// otherwise ride along; tail stat edits are proven safe in-client). Full vitals at login; the
-			// 0x96B8DC59 vitals update after the spawn sets the max side. Best-effort: a tails layout this
-			// model can't index just keeps the captured values.
+			// otherwise ride along; tail stat edits are proven safe in-client - they do NOT affect the chat gate).
+			// Full vitals at login; the 0x96B8DC59 vitals update after the spawn sets the max side. Best-effort: a
+			// tails layout this model can't index just keeps the captured values.
 			try
 			{
 				if (character != null)
@@ -107,30 +90,9 @@ namespace Faolan.GameServer
 				Logger.LogWarning(ex, "Tail stat patch failed; keeping the captured tail values.");
 			}
 
-			// GENERATE the four inventory containers from the character's DB items (typed ProtoFullCharacterIIR,
-			// proven byte-faithful by the 37/39 round-trip oracle), replacing the captured player's containers
-			// wholesale - entry count included (real-identity items are accepted in-client; add proven by the
-			// Royal Signet test). The prefix ([u32 X][u8 Y] + the root's leading character_tag/flags fields) and
-			// the tails stay captured. Falls back to the older in-place entry swap if the captured root does not
-			// decode typed.
+			// Containers VERBATIM (the captured inventory tree, re-serialized losslessly - proven byte-identical by
+			// InventorySnapshotTests). No DB item substitution here (see the method header).
 			var rootBytes = parts.Root.ToArray();
-			try
-			{
-				var typedRoot = ((ReadOnlySpan<byte>)rootBytes).FromProtobuf<ProtoFullCharacterIIR>();
-				typedRoot.Inventories.Clear();
-				foreach (var container in FullCharSnapshotBuilder.BuildContainers(instance, dbInventory.Equipped, dbInventory.BagFirst, dbInventory.Rows))
-					typedRoot.Inventories.Add(container);
-				rootBytes = typedRoot.ToProtobufBytes();
-				Logger.LogInformation("Inventory containers GENERATED from DB: {Equipped} equipped + {Bag} bag item(s).", dbInventory.Equipped.Count, dbInventory.BagFirst.HasValue
-					? 1
-					: 0);
-			}
-			catch (Exception ex)
-			{
-				Logger.LogWarning(ex, "Typed container generation failed; falling back to the in-place entry swap.");
-				ApplyDbInventory(parts.Root, dbInventory);
-				rootBytes = parts.Root.ToArray();
-			}
 
 			// Body content: [subop][c350][instance][prefix][root][tails], then prefixed by its uint32 length.
 			using var contentStream = new FaolanStream();
@@ -155,11 +117,6 @@ namespace Faolan.GameServer
 			BinaryPrimitives.WriteUInt32BigEndian(rebuilt.AsSpan(0, 4), (uint)(rebuilt.Length - 4));
 			var crc = Crc32.Calculate(rebuilt[8..]);
 			BinaryPrimitives.WriteUInt32BigEndian(rebuilt.AsSpan(4, 4), crc);
-
-			// The swap changes the one item's bytes, so the rebuilt packet legitimately differs from the verbatim
-			// input here (it is no longer a no-op). The parse/re-serialize machinery itself is proven lossless by
-			// InventorySnapshotTests; this just logs the size delta for visibility.
-			Logger.LogInformation("Inventory DB-swap rebuilt: verbatim={VerbatimLen} -> rebuilt={RebuiltLen} bytes.", substitutedPacket.Length, rebuilt.Length);
 
 			return rebuilt;
 		}
@@ -301,22 +258,6 @@ namespace Faolan.GameServer
 			return PlayerSpawnScaffoldCodec.Generate(scaffold);
 		}
 
-		// Replaces one container entry with a DB-built entry for `item`, preserving the original slot/itemId/record id
-		// (and count unless forced) so the surrounding structure and the tails stay byte-stable.
-		private void ReplaceEntryInPlace(ProtoMessage container, ProtoField original, Item item, uint archetype, ulong? forceCount = null)
-		{
-			var slot = InventorySnapshotInspector.GetEntrySlot(original) ?? 0;
-			var itemId = InventorySnapshotInspector.GetEntryItemId(original) ?? 0;
-			var recordId = InventorySnapshotInspector.GetEntryRecordId(original) ?? 0;
-			var count = forceCount ?? InventorySnapshotInspector.GetEntryCount(original) ?? 1;
-
-			var built = SnapshotItemBuilder.BuildEntry(slot, itemId, recordId, count, item, archetype);
-			container.Fields[container.Fields.IndexOf(original)] = built;
-
-			Logger.LogInformation("Inventory: slot {Slot} -> DB item {Name} (template {Template}, archetype {Archetype}), keeping itemId {ItemId}/record {RecordId}/count {Count}.", slot, item.Name, item.Id, archetype, itemId,
-				recordId, count);
-		}
-
 		// Replays a map's captured world burst (from the DB), re-addressed from the burst's captured instance to the
 		// logged-in character. Works for ANY map that has a stored burst (beach included - its burst is the proven
 		// blob, seeded into the DB by Faolan.Importer).
@@ -352,16 +293,13 @@ namespace Faolan.GameServer
 
 			client.Session.UsedWorldBurstReplay = true;
 
-			// Phase 5b: drive the inventory from the character's CharacterEquipment. Beach characters are seeded with
-			// default starter gear (if they have none), then every captured inventory entry whose slot the character
-			// has a fully-buildable DB item for (real p_items identity + harvested archetype) is REPLACED IN PLACE -
-			// same slot/itemId/recordId, so the entry count and the tails stay byte-stable (the safe path proven in
-			// client). Resolved once here (async) so the send loop stays tight. Empty => inventory sent verbatim.
+			// Load the character's CharacterEquipment (seeding default starter gear once for new beach characters).
+			// This drives the player's WORN gear into their entity SPAWN (TryRebuildPlayerSpawnFromDb), which is the
+			// chat-safe, DB-driven path for visible equipment. The world-entry inventory SNAPSHOT (0x737A6DF9), by
+			// contrast, is sent verbatim - substituting DB items into it stalls the client's world-load completion
+			// (it can't resolve arbitrary items' RDB resources) so it never dials the chat server. See
+			// BuildBeachInventoryPacket / [[protocol_chat_connection_regression]].
 			var equipment = await EnsureBeachStarterEquipment(client.Session.Character);
-			var inventoryRows = client.Session.Character != null
-				? await Database.GetCharacterInventory(client.Session.Character.Id)
-				: [];
-			var dbInventory = ResolveDbInventory(equipment, inventoryRows);
 
 			// The spawn-scaffold rows (entry table / feat-ID list / pre-IIR frame) drive the player spawn's
 			// scaffold frame; characters without rows are seeded with the fresh-character defaults once.
@@ -412,8 +350,8 @@ namespace Faolan.GameServer
 				// The NPC handles in the burst are left as-is.
 				var pkt = RewriteBurstInstance(packet, capturedInstance, liveInstance);
 
-				if (dbInventory.Count > 0 && IsInventorySnapshot(pkt))
-					pkt = BuildBeachInventoryPacket(pkt, dbInventory, client.Session.Character);
+				if (IsInventorySnapshot(pkt))
+					pkt = BuildBeachInventoryPacket(pkt, client.Session.Character);
 				else if (TryRebuildPlayerSpawnFromDb(client, equipment, scaffoldCharacter, pkt, out var rebuilt))
 				{
 					pkt = rebuilt;
@@ -770,33 +708,6 @@ namespace Faolan.GameServer
 				moveTaskTemplate = packet;
 		}
 
-		// Maps an equipped-container slot id (matching the archive player_items/npc_items slot bytes) to the matching
-		// CharacterEquipment item nav. 0x11 (first_pos_bag) is handled separately as the bag's first slot.
-		private static Item EquippedSlotItem(CharacterEquipment e, ulong slot)
-		{
-			return slot switch
-			{
-				0x01 => e.Neck,
-				0x02 => e.Head,
-				0x03 => e.Tokens,
-				0x05 => e.Chest,
-				0x06 => e.MainHandLeft,
-				0x07 => e.Belt,
-				0x08 => e.OffHandLeft,
-				0x09 => e.RingLeft,
-				0x0a => e.RingRight,
-				0x0b => e.Cloak,
-				0x0c => e.Shoulder,
-				0x0e => e.Boots,
-				0x0f => e.Hands,
-				0x10 => e.Legs,
-				0x12 => e.Wrist,
-				0x14 => e.MainHandRight,
-				0x15 => e.OffHandRight,
-				_    => null
-			};
-		}
-
 		// Frames a built body as a full Conan packet by reusing a template packet's header (its live receiver/
 		// instance), then setting the packet length and recomputing the CRC over everything after it.
 		private static byte[] FrameLikeTemplate(byte[] template, byte[] body)
@@ -920,26 +831,6 @@ namespace Faolan.GameServer
 			}
 		}
 
-		// Resolves which CharacterEquipment slots hold a fully-buildable item (template in Items + archetype harvested).
-		private static DbInventory ResolveDbInventory(CharacterEquipment equipment, CharacterInventory[] inventoryRows)
-		{
-			var inventory = new DbInventory { Rows = inventoryRows ?? [] };
-			if (equipment == null)
-				return inventory;
-
-			foreach (var slot in EquippedSlotIds)
-			{
-				var item = EquippedSlotItem(equipment, slot);
-				if (item != null && item.Archetype != 0)
-					inventory.Equipped[slot] = (item, item.Archetype);
-			}
-
-			if (equipment.FirstPosBag is { Archetype: not 0 })
-				inventory.BagFirst = (equipment.FirstPosBag, equipment.FirstPosBag.Archetype);
-
-			return inventory;
-		}
-
 		// SendPostReadyBurst (the post-0x2024 login record stream) is built as explicit PacketStream sends
 		// in PostReadyBurst.cs.
 
@@ -972,23 +863,6 @@ namespace Faolan.GameServer
 			var crc = Crc32.Calculate(p[8..]);
 			BinaryPrimitives.WriteUInt32BigEndian(p.AsSpan(4, 4), crc);
 			return p;
-		}
-
-		// The character's DB-resolved inventory: which equipped-container slot ids (and the first bag slot) have a
-		// fully-buildable item (real p_items identity + harvested archetype). Only these get swapped in; everything
-		// else stays verbatim.
-		private sealed class DbInventory
-		{
-			public readonly Dictionary<ulong, (Item Item, uint Archetype)> Equipped = new Dictionary<ulong, (Item Item, uint Archetype)>();
-			public (Item Item, uint Archetype)? BagFirst;
-
-			// Persisted CharacterInventory rows (bag cells from unequips; resource/quest once written).
-			public CharacterInventory[] Rows = [];
-
-			public int Count =>
-				Equipped.Count + Rows.Length + (BagFirst.HasValue
-					? 1
-					: 0);
 		}
 	}
 }
