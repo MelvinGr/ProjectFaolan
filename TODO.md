@@ -58,10 +58,18 @@ args.SpellTarget.field2** and parses correctly — so "self" is NOT a target-par
   mob's counter-attack/animation; ours always uses the player instance → likely the "random / self" animation.
 - result-block constant is `0x06 000000CB`; ours writes `0x000000CD` (wrong).
 - ack 3 carries **multiple** result entries (one per accumulated target in the tail); ours sends one fixed block.
-So our simplified ack desyncs the behaviour FSM after the first swing → the symptom. **A faithful fix = reproduce
-the retail behaviour protocol (per-swing phase, player+NPC behaviour acks, multi-result block, correct constants),
-which needs in-client iteration (the FSM's field semantics aren't fully decoded, and only the client can confirm).**
-Did NOT ship blind byte-guesses to the finicky combat path.
+So our simplified ack desyncs the behaviour FSM after the first swing → the symptom.
+
+**FIXED 2026-06-11 (high-confidence pieces; needs in-client re-test):**
+- **THE bug — empty args.** `argsLen` is a u32 at rawPayload offset 22; the code read it as a u16 at 22 (= the
+  zero high half), so the ack echoed NO args. Fixed (read u32@22, args@26). This alone likely fixes the desync.
+- **field3 phase** now spliced into the echoed args (monotonic per-ack counter). `InsertBehaviorPhaseField`
+  reproduces the captured swing-1 BccAck args BYTE-FOR-BYTE (BehaviorPhaseFieldTests).
+- **0xCD → 0xCB** result constant (matches the capture).
+With these, the ack args match the retail capture byte-for-byte. **Still NOT reproduced (next, in-client):**
+the SECOND ack retail sends for the NPC's OWN behaviour (actor = target handle, drives the mob's counter-attack)
+and the multi-result block — so the mob may not visibly fight back yet. Also the phase counter starts at 1
+(retail's capture started mid-session at 3; monotonic is what matters, exact start may need tuning in-client).
 
 **FIXED 2026-06-11 (separate, secondary bug): NPC combat HP.** Was a flat placeholder (`DefaultNpcMaxHealth=100`);
 now seeded from the NPC's real spawn `CharacterStats.health` (e.g. 6300/100 = 63 for beach mobs). The burst replay
