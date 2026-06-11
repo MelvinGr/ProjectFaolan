@@ -942,8 +942,8 @@ namespace Faolan.GameServer
 		// varint(0x02165EFF) = FF BD D9 10; entity handles / body fields appear as the raw uint32 02 16 5E FF. The
 		// raw form is always 4 bytes; the live id's varint is padded (overlong) to the captured varint's byte length
 		// so the substitution stays length-preserving even for maps whose captured instance encodes to more bytes
-		// (1000/11040 captured a 5-byte instance like 0x110099BD). We then recompute the CRC.
-		[Obsolete]
+		// (1000/11040 captured a 5-byte instance like 0x110099BD). We then recompute the CRC. (This is the interim
+		// burst-replay path; construct-don't-replay supersedes it per-entity, but this is still the active fallback.)
 		private static byte[] RewriteBurstInstance(byte[] packet, uint oldInstance, uint newInstance)
 		{
 			if (oldInstance == newInstance)

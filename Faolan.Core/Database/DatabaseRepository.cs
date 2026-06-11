@@ -665,9 +665,6 @@ namespace Faolan.Core.Database
 			tracked.Legs = await ResolveItem(ctx, equipment.Legs?.Id);
 			tracked.FirstPosBag = await ResolveItem(ctx, equipment.FirstPosBag?.Id);
 			tracked.Wrist = await ResolveItem(ctx, equipment.Wrist?.Id);
-			tracked.Bag = equipment.Bag;
-			tracked.Quest = equipment.Quest;
-			tracked.Resources = equipment.Resources;
 
 			await ctx.SaveChangesAsync();
 		}

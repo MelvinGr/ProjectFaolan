@@ -1,4 +1,3 @@
-using System;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Faolan.Core.Database.Tables
@@ -26,21 +25,6 @@ namespace Faolan.Core.Database.Tables
 		public virtual Item? Shoulder { get; set; }
 		public virtual Item? Tokens { get; set; }
 		public virtual Item? Wrist { get; set; }
-
-		// Capture analysis note:
-		// the large 0x737A6DF9 initial-state packet currently looks like a nested chain
-		// 101 -> 104 -> 112 -> 113, where 104 is the strongest normal bag candidate.
-		// The remaining two serialized string fields below therefore likely correspond to
-		// the other non-equipment blocks (tentatively Resources and Quest), but that mapping
-		// is still evidence-based rather than protocol-confirmed.
-		[Obsolete]
-		public string Bag { get; set; }
-
-		[Obsolete]
-		public string Quest { get; set; }
-
-		[Obsolete]
-		public string Resources { get; set; }
 
 		public uint CharacterId { get; set; }
 	}
