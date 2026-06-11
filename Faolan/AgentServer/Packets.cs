@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Data;
@@ -9,11 +10,18 @@ namespace Faolan.AgentServer
 {
 	partial class AgentServerListener
 	{
-		public async Task CharacterSay(uint characterId, string message)
+		public async Task CharacterSay(uint characterId, string message, IReadOnlyCollection<uint> recipientCharacterIds = null)
 		{
-			// should only send to nearby players, but this will do for now.
+			// "say" is proximity chat: the GameServer (which holds the live positions) passes the in-range character
+			// ids in `recipientCharacterIds`; we deliver the CharacterChat (0x0022) only to those clients. A null list
+			// means server-wide (kept for any non-proximity caller). The sender is included by the GameServer, so they
+			// always see their own message.
 			foreach (var client in NetworkClients)
 			{
+				var recipientId = client.Session?.Character?.Id ?? client.Session?.Account?.ClientInstance ?? 0;
+				if (recipientCharacterIds != null && !recipientCharacterIds.Contains(recipientId))
+					continue;
+
 				await new FaolanStream()
 					.WriteUInt16(AgentServerRespondsOpcodes.CharacterChat) // opcode
 					.WriteArrayUInt16Length(s => s

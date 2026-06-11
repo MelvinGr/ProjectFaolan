@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
@@ -34,6 +35,34 @@ namespace Faolan.GameServer
 			_gameServerDispatcher = gameServerDispatcher;
 
 			InitGmCommands();
+		}
+
+		// Local-say range in world units. Built-NPC tests showed a +4-unit offset renders "beside" the player, so
+		// units are ~metres; ~50 is a generous "nearby" for /say. Tunable; same-map is the hard filter either way.
+		private const float SayRangeUnits = 50f;
+
+		// The character ids that should hear a proximity "say" from `sender`: every connected GameServer player on the
+		// same map within SayRangeUnits, plus the sender (you always hear yourself). The GameServer holds the live
+		// per-session positions (updated on Move), which the AgentServer connection does not, so the scope is computed
+		// here and the in-range ids handed to the AgentServer for delivery.
+		private IReadOnlyCollection<uint> SayRecipients(INetworkClient sender)
+		{
+			var senderChar = sender.Session?.Character;
+			var ids = new HashSet<uint>();
+			if (senderChar == null)
+				return ids;
+
+			ids.Add(senderChar.Id);
+			foreach (var c in NetworkClients)
+			{
+				var ch = c.Session?.Character;
+				if (ch == null || ch.Id == senderChar.Id || ch.MapId != senderChar.MapId)
+					continue;
+				if (Vector3.Distance(ch.Position, senderChar.Position) <= SayRangeUnits)
+					ids.Add(ch.Id);
+			}
+
+			return ids;
 		}
 
 		public override Task StartAsync(CancellationToken cancellationToken)
@@ -476,7 +505,9 @@ namespace Faolan.GameServer
 					if (text.Length > 2 && text[0] == '.' && text[1] != '.' && client.Session.Account.Type >= AccountType.GameMaster)
 						await HandleGmCommand(client, text);
 					else
-						await _agentServerDispatcher.CharacterSay(client.Session.Character.Id, text);
+						// "say" is proximity chat - only same-map players within range hear it (the sender always does).
+							// The GameServer owns the live positions, so it picks the recipients here.
+							await _agentServerDispatcher.CharacterSay(client.Session.Character.Id, text, SayRecipients(client));
 
 					break;
 				}

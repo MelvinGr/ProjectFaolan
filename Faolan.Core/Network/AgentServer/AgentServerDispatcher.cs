@@ -36,10 +36,10 @@ namespace Faolan.Core.Network.AgentServer
 			}
 		}
 
-		public async Task CharacterSay(uint characterId, string message)
+		public async Task CharacterSay(uint characterId, string message, IReadOnlyCollection<uint> recipientCharacterIds = null)
 		{
 			if (_provider != null)
-				await _provider.CharacterSay(characterId, message);
+				await _provider.CharacterSay(characterId, message, recipientCharacterIds);
 		}
 
 		public async Task SendSystemMessage(uint characterId, string message)
