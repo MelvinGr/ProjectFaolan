@@ -142,7 +142,9 @@ The auto-cutscene where you wash ashore and Kalanthes walks up + starts the chat
 
 ### ⭐ LATEST 2026-06-09 (end of session) — PINNED. Two-port done; cutscene bug is in the EDITOR phase.
 DONE & confirmed in-client: (a) **two-port GameServer** — `WorldGameServerListener` on realm.Port+1 (7015), handoff
-advertises it, client does a real `redir=1` reconnect (commits 6bb3cdc + 2513fc2); (b) **gametweaks** apply (19)
+advertises it, client does a real `redir=1` reconnect (commits 6bb3cdc + 2513fc2)
+[SUPERSEDED 2026-06-11: `WorldGameServerListener` REMOVED — the 0x2002 handoff carries the address explicitly, so we
+now advertise the SAME GameServer port and serve both connections on one listener]; (b) **gametweaks** apply (19)
 (commit 40d4bc0); (c) **create-world burst rebuilt clean** from the hoxxling capture via constructive PacketStream
 (commit e8be7ba, generator `Captures/gen_createworld_burst.py`).
 **The cutscene STILL fails identically** (invalid camera paths, `ThisIsKalanthes`=123456789, broken geometry,
