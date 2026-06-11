@@ -142,7 +142,12 @@ namespace Faolan.GameServer
 				return;
 
 			var handle = client.Session.Account.ClientInstance;
-			var entity = _playerEntities.GetOrAdd(client, _ => new World.WorldEntity(handle, character.MapId, true, character.Name ?? $"Character{handle}", client));
+			// Seed the player's live vitals on the WorldEntity (single source of truth, like NPCs) on first entry; it
+			// persists across re-entry/teleport/respawn (GetOrAdd returns the existing entity, so Vitals isn't reset).
+			var entity = _playerEntities.GetOrAdd(client, _ => new World.WorldEntity(handle, character.MapId, true, character.Name ?? $"Character{handle}", client)
+			{
+				Vitals = PlayerVitalsSeed(character)
+			});
 			var zone = _world.Place(entity, character.MapId, character.Position, character.Rotation);
 			var nearby = zone.PlayersInRange(character.Position, PlayerInterestRange, handle).Count();
 			Logger.LogInformation("World: player {Name} (0x{Handle:X8}) entered map {Map} at {Pos}; {Nearby} other player(s) in range.", entity.Name, handle, character.MapId, character.Position, nearby);

@@ -14,19 +14,28 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-		// Live world combat state (current vitals per entity handle). In-memory and world-authoritative; never
-		// persisted (only CharacterMaxStats is). Shared across the listener's clients.
+		// Fallback vitals store for NPCs NOT in the world model (e.g. the built-NPC test) - model NPCs and players
+		// keep their vitals on their WorldEntity (the single source of truth). In-memory, never persisted.
 		private readonly CombatState _combat = new CombatState();
 
-		// The player's own live vitals, seeded from CharacterMaxStats (or class/level defaults) on first use.
+		// The player's own live vitals - the WORLD MODEL is the single source of truth: they live on the player's
+		// WorldEntity (like NPCs'), seeded from CharacterMaxStats. World-authoritative, never persisted (only
+		// CharacterMaxStats is). Falls back to a transient seed only if the player isn't in the world yet (no combat/
+		// regen happens then, so this is just defensive).
 		private EntityVitals GetOrAddPlayerVitals(INetworkClient client)
 		{
-			var character = client.Session.Character;
-			return _combat.GetOrAdd(client.Session.Account.ClientInstance, () =>
-			{
-				var max = character.MaxStats ?? CharacterMaxStats.CreateDefaults(character.Class, character.Level);
-				return EntityVitals.FromMax(max.Health, max.Mana, max.Stamina);
-			});
+			var entity = PlayerWorldEntity(client);
+			if (entity == null)
+				return PlayerVitalsSeed(client.Session.Character);
+
+			return entity.Vitals ??= PlayerVitalsSeed(client.Session.Character);
+		}
+
+		// Full-health vitals from the character's max stats (class/level defaults if none).
+		private static EntityVitals PlayerVitalsSeed(Character character)
+		{
+			var max = character.MaxStats ?? CharacterMaxStats.CreateDefaults(character.Class, character.Level);
+			return EntityVitals.FromMax(max.Health, max.Mana, max.Stamina);
 		}
 
 		// A target NPC's live vitals, seeded from its real spawn health (recorded when the world burst spawned it)

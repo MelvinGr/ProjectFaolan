@@ -10,7 +10,9 @@ Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see a
 
 > ## PROGRESS (2026-06-11) — the milestone-1 foundation is in (harness-verified; the in-client payoff is pending)
 > - **In-memory world model** ✓ `WorldEntity`/`Zone`/`WorldState`; players registered on entry, removed on
->   disconnect. **`WorldEntity` is the single source of truth for live transform**; `Character` is the persisted seed.
+>   disconnect. **`WorldEntity` is the single source of truth for live transform AND vitals** (players' live
+>   vitals seeded onto their `WorldEntity` from `MaxStats`, like NPCs — no separate per-session store);
+>   `Character`/`CharacterMaxStats` are the persisted seed.
 > - **Interest management** ✓ `InterestManager` (spawn/move/despawn diff, unit-tested) + the cross-player broadcast
 >   (capture each player's spawn body, re-frame per recipient, forward moves) — **NEEDS 2-client in-client check**.
 >   **Despawn (`n3ToClientQuit` 0x04B82B2D) now DECODED** (2026-06-11, all 3271 records): 21 B,
