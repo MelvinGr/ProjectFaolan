@@ -27,6 +27,14 @@ namespace Faolan.Importer
 			[0x642CD3D6] = "BehaviorControlCenter/Interact (no table)",
 			[0xF508F4C1] = "GameActionList (no table)",
 			[0xF98E10B3] = "NPC StatIir (no NPC-stats table)",
+			// FullUpdate spawns - structural, lift to the WorldObjects path (siblings of SimpleDynel/Door/LootBag).
+			[0x6BD56736] = "DestructibleFullUpdate (structural -> WorldObjects)",
+			[0x1FD6412B] = "ClimbingDynelFullUpdate (structural -> WorldObjects)",
+			// Transient candidates - likely droppable like Move/combat, but each needs an in-client check first.
+			[0xE7F4F8F8] = "SimpleDynelVisualChange (transient? in-client check)",
+			[0xD751EBB4] = "StopIIR (transient? in-client check)",
+			[0x04B80B24] = "SetPosIIR (transient? in-client check)",
+			[0x8D5A8B6B] = "FormatFeedback (transient? in-client check)",
 		};
 
 		public static async Task RunAsync(DatabaseContext db)
