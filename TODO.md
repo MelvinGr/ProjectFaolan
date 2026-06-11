@@ -416,3 +416,34 @@ All of the below are harness-verified (unit tests) but **need in-client check** 
 
 **Surveyed, no action needed:** the other four servers (UniverseAgent / PlayerAgent / AgentServer /
 CSPlayerAgent) are clean, appropriately-sized switch dispatchers — no god-class, correct request/response framing.
+
+---
+
+## ⭐ Chat channels broken in-client (REGRESSION) — dedicated follow-up
+
+**Symptom:** in-world, only the local "say" tab exists — Global/LFG/Trial/etc. channels are missing. The client
+logs `Connecting to CommunityServer` → `Authenticating` → ~20s timeout → `HandleDisconnect redir=0`. The
+**AgentServer (chat, 7012) gets ZERO TCP accepts** — the client connects to every other server but never the chat
+server. No connection → no channel subscriptions → no channels.
+
+**Root cause (bisected):** the **world-entry construct-don't-replay rewrite**. Chat works on raw-blob-replay
+commits (`3d20d34`), broken on every construct commit (`e58b06c`→HEAD). The client opens the chat connection only
+after it finishes the initial world build; the construct path dropped/changed world-build packets so it never
+reaches "loaded". Exact commit is in the stuck-loading era (untestable for chat), but the rewrite is the culprit.
+
+**Ruled out:** character/id (`0x02000000` works at 3d20d34, fails at HEAD), the AgentServer advertisement
+(byte-identical, correct host:port), the post-ready burst (chat connects *before* ReadyForPlayScreen), the NPC
+death-loop (separate, fixed). NOT environment/hosts/LocalConfig.
+
+**Tried, none fixed it:** restored the dropped `CoreClaimIIR 0x06EC1255` (committed 4ebce3f — correct anyway);
+removed 2 spurious `N3ToClientQuit` despawns; dropped the `0x2076` manifest. The single gate is still
+unidentified — likely a content/ordering diff invisible at the opcode level.
+
+- [ ] **Fix:** loopback-capture a working raw-blob login (`3d20d34`) vs HEAD and **byte-diff the world-build
+      stream** (post-0x201c handshake → spawn-check stream), OR re-extract the 4010 burst **without over-filtering**
+      (suspect: `ea84a38` "reject gameplay-polluted windows" + `13bd715` "drop transient rows") and byte-compare to
+      the raw blob. Don't diff opcode counts — too noisy.
+
+**Test method:** server from `Faolan/bin/Debug` (`dotnet Faolan.dll`); drive client headless with
+`Faolan.ClientLauncher --console --universeaddr 127.0.0.1:7010 -u faolan -p any -c <char>`; chat connected iff the
+server log shows `AgentServerListener[0] Client connected`. Test on HEAD (aggro gated, no death-loop).
