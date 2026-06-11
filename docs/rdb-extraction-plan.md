@@ -148,6 +148,16 @@ Significant de-risking — the tool and format are identified:
 > maps' resurrection records are actually LOCAL (240 local / 784 CDN); the CDN path is only for the on-demand ones.
 > (MONSTERDATA = model data, not HP — NPC HP comes from the captured spawn / Archive `Npc.Health`, not the RDB.)
 
+> **Loot tables — NOT extractable (checked 2026-06-11).** `TREASUREDATA` (1000083, 1018 recs, per-playfield XML) is
+> treasure-container PLACEMENT only (position/level/name/mesh/`ScryScriptID`), NO item contents. Neither the RDB nor
+> the Archive C++ DB (`Archive/projectfaolan.db`: 15 tables - `npc_items` = NPC worn equipment, `items` = item DB,
+> NO loot/drops table) has probabilistic loot tables — AoC loot was server-script-driven (ScryScripts), which we
+> don't have. So loot-bag contents can't be sourced from data; loot stays blocked (no contents + the in-client-gated
+> live grant). The Archive `npcs` has real `health`/`getExp` but our `Npcs` table imported only 4 rows, so it's not a
+> useful HP/XP source either (captured-spawn HP is the real source already in use). **The data-extraction thread's
+> high-value results are done: map names, resurrection points, the CDN fetch-by-hash+archive pipeline, real spawn HP.
+> Remaining gameplay values (loot, most XP) are server-authoritative / absent — pivot to gameplay, not more extraction.**
+
 > **Map names + ids (1070003) — EXTRACTED (2026-06-11).** `PLAYFIELDDESCRIPTIONDATA` has 520 entries; **241 are
 > v5-reachable** (file < 0xFF), 279 v6-gated. Each readable record is XML `<playfielddescriptiondata>` with
 > `<playfield Name=".." ID=".."/>` (+ `ShowInGUI`); the **RDB record id == playfield id == our `Map.Id`** (verified
