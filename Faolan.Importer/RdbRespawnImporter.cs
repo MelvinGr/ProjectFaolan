@@ -27,11 +27,10 @@ namespace Faolan.Importer
 			"<resurrectionpoint\\b[^>]*?\\bname=\"([^\"]*)\"[^>]*?\\bdiscoverable=\"([^\"]*)\"[^>]*?>\\s*<position\\s+x=\"([-0-9.]+)\"\\s+y=\"([-0-9.]+)\"\\s+z=\"([-0-9.]+)\"",
 			RegexOptions.Compiled | RegexOptions.Singleline);
 
-		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string cdnBase)
+		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string cdnBase, string storeDir = null)
 		{
 			using var rdb = new RdbReader(rdbDir);
-			using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(40) };
-			http.DefaultRequestHeaders.AcceptEncoding.ParseAdd("identity");
+			using var cdn = new RdbCdnCache(cdnBase, storeDir);
 
 			var ourMaps = (await db.Maps.Select(m => m.Id).ToListAsync()).ToHashSet();
 
@@ -46,7 +45,7 @@ namespace Faolan.Importer
 				byte[] dec;
 				try
 				{
-					dec = e.IsLocal ? rdb.ReadDecompressed(e) : RdbReader.UnwrapIOz1Public(await FetchFromCdn(http, cdnBase, e.Hash));
+					dec = e.IsLocal ? rdb.ReadDecompressed(e) : RdbReader.UnwrapIOz1Public(await cdn.FetchRawAsync(e.Hash));
 				}
 				catch
 				{
@@ -88,13 +87,6 @@ namespace Faolan.Importer
 
 			await db.SaveChangesAsync();
 			return new Result(maps, points, empty, fetchFailed);
-		}
-
-		private static async Task<byte[]> FetchFromCdn(HttpClient http, string cdnBase, byte[] hash)
-		{
-			var h = Convert.ToHexString(hash).ToLowerInvariant();
-			var url = $"{cdnBase}/upm/rdb/res/{h[..2]}/{h.Substring(2, 1)}/{h[3..]}";
-			return await http.GetByteArrayAsync(url);
 		}
 
 		public readonly record struct Result(int Maps, int Points, int Empty, int FetchFailed);

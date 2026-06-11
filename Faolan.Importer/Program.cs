@@ -331,8 +331,10 @@ namespace Faolan.Importer
 				}
 
 				var cdnBase = GetOption(args, "--cdn") ?? RdbRespawnImporter.DefaultCdnBase;
-				var rr = await RdbRespawnImporter.ImportAsync(db, rdbDir, cdnBase);
-				Console.WriteLine($"RDB respawns: {rr.Points} points across {rr.Maps} maps ({rr.Empty} maps with no points, {rr.FetchFailed} fetch failures).");
+				var store = GetOption(args, "--store"); // archive fetched CDN blobs here (mirror layout); read-first
+				var rr = await RdbRespawnImporter.ImportAsync(db, rdbDir, cdnBase, store);
+				Console.WriteLine($"RDB respawns: {rr.Points} points across {rr.Maps} maps ({rr.Empty} maps with no points, {rr.FetchFailed} fetch failures)." +
+				                  (store != null ? $" Archived to {store}." : ""));
 				return 0;
 			}
 

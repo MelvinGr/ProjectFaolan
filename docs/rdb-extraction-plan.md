@@ -117,8 +117,10 @@ Significant de-risking — the tool and format are identified:
 - **Our client is RDB index version 6** (`RDBHashIndex.bin` magic `RDHI`, `version=6`) — a newer AoC build,
   **between** v5 and v7, so rdbreader rejects it as-is ("does not support this version"). v6 must be patched in
   or parsed ourselves; it's bracketed by the two supported versions.
-- **The `TYPES` enum (structs.h) is the resource-type map we need**: `MONSTERDATA=1010201` (NPC/creature stats →
-  combat HP), `TEXTSCRIPT=1010035` (text/dialogue), `SCRIPTGROUP=0` (scripts/cinematics), `LUAARCHIVE=1010223`,
+- **The `TYPES` enum (structs.h) is the resource-type map we need**: `MONSTERDATA=1010201` (creature MODEL data -
+  animsys/skeleton/mesh refs + name, NOT combat stats; checked 2026-06-11 - NPC **HP is NOT in the client RDB**, it
+  was server-authoritative: use the captured spawn `CharacterStats.health` / the Archive-imported `Npc.Health`),
+  `TEXTSCRIPT=1010035` (text/dialogue), `SCRIPTGROUP=0` (scripts/cinematics), `LUAARCHIVE=1010223`,
   `NPCSPAWNDATAEXPORT=1000079` / `CONTENTSPAWNDATAEXPORT=1000077` / `TREASUREDATAEXPORT=1000083` (spawns/loot),
   `PLAYFIELDDESCRIPTIONDATA=1070003` (maps), `RESURRECTIONPOINTSEXPORT=1000090`, `CHARACTERCREATOR=1010700`,
   plus media (PNG/JPEG/FCTX/OGG/LIP). **There is NO explicit ITEM type in the enum** (it's a partial list) —
@@ -141,7 +143,10 @@ Significant de-risking — the tool and format are identified:
 > <dir> --rdb-respawns` (RdbRespawnImporter, host via `--cdn`) fetches type 1000090 for our maps, parses the XML
 > (`<resurrectionpoint name discoverable><position x y z>`; record id == playfield/map id; `discoverable="false"` =>
 > AlwaysKnown), and fills `RespawnPoints` — imported **351 points across 145 maps** (beach 4010 = 3 real points). The
-> SAME path now unlocks the other v6-gated types (the ~279 v6 maps, MONSTERDATA NPC HP, TREASUREDATA) — fetch by hash.
+> SAME path now unlocks the other v6-gated types (the ~279 v6 maps, TREASUREDATA) — fetch by hash. Fetches archive to
+> the local mirror store with `--store <dir>` (store-and-forward, ContentMirror layout, read-first). NOTE most of our
+> maps' resurrection records are actually LOCAL (240 local / 784 CDN); the CDN path is only for the on-demand ones.
+> (MONSTERDATA = model data, not HP — NPC HP comes from the captured spawn / Archive `Npc.Health`, not the RDB.)
 
 > **Map names + ids (1070003) — EXTRACTED (2026-06-11).** `PLAYFIELDDESCRIPTIONDATA` has 520 entries; **241 are
 > v5-reachable** (file < 0xFF), 279 v6-gated. Each readable record is XML `<playfielddescriptiondata>` with

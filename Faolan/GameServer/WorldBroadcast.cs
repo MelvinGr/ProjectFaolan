@@ -129,8 +129,10 @@ namespace Faolan.GameServer
 			var zone = _world.ZoneFor(mapId);
 			foreach (var npc in npcs)
 			{
-				// Seed killable vitals (level-scaled max) so combat can damage/kill it and the tick can respawn it.
-				var vitals = Combat.EntityVitals.FromMax(Combat.CombatResolver.NpcMaxHealthForLevel(npc.Level), 0, Combat.CombatResolver.NpcMaxHealthForLevel(npc.Level));
+				// Seed killable vitals from the NPC's REAL captured max health (its spawn CharacterStats), falling back
+				// to a level-scaled value only when the spawn carries none.
+				var maxHealth = RealNpcMaxHealth(npc.Data) ?? Combat.CombatResolver.NpcMaxHealthForLevel(npc.Level);
+				var vitals = Combat.EntityVitals.FromMax(maxHealth, 0, maxHealth);
 				var entity = WorldEntity.ForNpc(npc.CapturedHandle, mapId,
 					new Vector3(npc.PositionX, npc.PositionY, npc.PositionZ),
 					new Vector3(npc.RotationX, npc.RotationY, npc.RotationZ),
@@ -146,6 +148,27 @@ namespace Faolan.GameServer
 			}
 
 			Logger.LogInformation("World: loaded {Count} NPC(s) into map {Map}'s zone.", npcs.Length, mapId);
+		}
+
+		// The NPC's real max health from its captured FA015807 spawn (CharacterStats.health, else .life; ×100 on the
+		// wire) - the same value the runtime records for the per-session combat seed. Null if the spawn carries none.
+		private static uint? RealNpcMaxHealth(byte[] data)
+		{
+			if (data == null || data.Length < 12)
+				return null;
+
+			var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(8, 4));
+			if (bodyStart > data.Length)
+				return null;
+
+			if (Spawn.PlayerSpawnReader.TryReadCharacterMessage(data[bodyStart..], out var read) && read.Message.Stats is { } stats)
+			{
+				var wire = stats.Health != 0 ? stats.Health : stats.Life;
+				if (wire >= 100) // ×100 scale; ignore implausibly small/absent values
+					return wire / 100;
+			}
+
+			return null;
 		}
 
 		// After a player's Move: update interest and broadcast the resulting spawns/moves to nearby players.
