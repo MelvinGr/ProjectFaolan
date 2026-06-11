@@ -54,9 +54,25 @@ Mana/Stamina, clamped deltas), `CombatState` (in-memory per-handle vitals store;
 persisted), `CombatResolver` (provisional level-scaled damage; spell power/mitigation TBD). The client's
 `CastSpell` interact (`ActionType 0x4`) now broadcasts the `0x6B87E316` ApplySpell and, for a cast at another
 entity, calls `ResolveOffensiveCast` → applies damage to the target's vitals → pushes a `0x96B8DC59` update so
-its health bar moves. NPC targets are lazily seeded with a placeholder max (real NPC HP not decoded). Death is
-detected (HP→0) but despawn + XP are TODO (packet not decoded). GM test commands: `.hurt [n]` / `.heal [n]`
-(adjust own vitals + push update), `.spelltest <id>` (self-cast). Tests: `CombatTests`.
+its health bar moves. Death is detected (HP→0) but despawn + XP are TODO (packet not decoded). GM test commands:
+`.hurt [n]` / `.heal [n]` (adjust own vitals + push update), `.spelltest <id>` (self-cast). Tests: `CombatTests`.
+
+**Melee auto-attack — a BehaviorControlCenter FSM** (2026-06-11). NormalAttack = `0x642CD3D6` Interact actionType
+**0xf**, not a one-shot: the client sends one swing per press (args field2 = swing counter; the attack direction
+ability 769094/95/99 cycles in the request tail; the target is `args.SpellTarget.field2`). The server's BccAck
+(`0x642CD3D6` download) echoes the request args **with field3 (a monotonic "phase" counter) inserted after
+field2**, plus a result block (constant `0x06 000000CB`). `SendNormalAttackResponse` builds this; the field3
+splice (`InsertBehaviorPhaseField`) reproduces the captured swing-1 ack args byte-for-byte (`BehaviorPhaseFieldTests`).
+- **Fixed 2026-06-11:** the ack was reading argsLen as a u16 at offset 22 (it's a u32 → high half 0), so it echoed
+  EMPTY args and desynced the FSM after one swing ("attack runs once, then random / hits self"). Now reads u32@22,
+  args@26.
+- **NPC combat HP** is now seeded from the NPC's spawn `CharacterStats.health` (÷100; recorded per live handle in
+  `Session.SpawnedNpcMaxHealthByHandle` during the burst replay, used by `GetOrAddNpcVitals`) instead of the flat
+  placeholder, so a damaged mob's bar matches the HP the client rendered.
+- **Still TODO (needs in-client + a multi-swing capture):** retail also sends a SECOND ack for the NPC's OWN
+  behaviour (actor = target handle) that drives the mob's counter-attack, plus a multi-result block — not yet
+  reproduced, so mobs may not visibly fight back. The phase counter's absolute start is also unconfirmed (the
+  capture began mid-session at 3; ours starts at 1 — monotonic is what matters). See TODO #3.
 
 ### Mounts (summon spell found)
 Decoded from demol80's `...very_long_loading_screen_after_field_change` capture (the player rides: 122 MountedRun
