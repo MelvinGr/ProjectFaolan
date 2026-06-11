@@ -52,32 +52,38 @@ namespace Faolan.GameServer
 		// units are ~metres; ~50 is a generous "nearby" for /say. Tunable; same-map is the hard filter either way.
 		private const float SayRangeUnits = 50f;
 
-		// The character ids that should hear a proximity "say" from `sender`: every connected GameServer player on the
-		// same map within SayRangeUnits, plus the sender (you always hear yourself). The GameServer holds the live
-		// per-session positions (updated on Move), which the AgentServer connection does not, so the scope is computed
-		// here and the in-range ids handed to the AgentServer for delivery.
+		// The player's live world entity for this connection (the authoritative transform), or null if not yet in the
+		// world. Registered on world entry; the live transform lives here, not on the persisted Character.
+		private World.WorldEntity PlayerWorldEntity(INetworkClient client)
+		{
+			return _playerEntities.TryGetValue(client, out var entity) ? entity : null;
+		}
+
+		// The character ids that should hear a proximity "say" from `sender`: same-map players within SayRangeUnits of
+		// the sender, plus the sender (you always hear yourself). Resolved against the live world model (the
+		// authoritative positions); the in-range ids are handed to the AgentServer for delivery.
 		private IReadOnlyCollection<uint> SayRecipients(INetworkClient sender)
 		{
-			var senderChar = sender.Session?.Character;
 			var ids = new HashSet<uint>();
-			if (senderChar == null)
-				return ids;
-
-			ids.Add(senderChar.Id);
-			foreach (var c in NetworkClients)
+			var entity = PlayerWorldEntity(sender);
+			if (entity == null)
 			{
-				var ch = c.Session?.Character;
-				if (ch == null || ch.Id == senderChar.Id || ch.MapId != senderChar.MapId)
-					continue;
-				if (Vector3.Distance(ch.Position, senderChar.Position) <= SayRangeUnits)
-					ids.Add(ch.Id);
+				// Not in the world model yet - fall back to just the sender so they still see their own message.
+				if (sender.Session?.Character != null)
+					ids.Add(sender.Session.Character.Id);
+				return ids;
 			}
+
+			ids.Add(entity.Handle);
+			foreach (var near in _world.ZoneFor(entity.MapId).PlayersInRange(entity.Position, SayRangeUnits, entity.Handle))
+				ids.Add(near.Handle);
 
 			return ids;
 		}
 
-		// Registers (or relocates) the player in the live world after world entry, so the shared model reflects who is
-		// actually in each map. Idempotent: re-entry/teleport reuses the same entity.
+		// Registers (or relocates) the player in the live world after world entry, SEEDING the authoritative WorldEntity
+		// transform from the persisted Character (the loaded spawn point / teleport target). After this the WorldEntity
+		// is the source of truth for live position; the Character is only re-read on a fresh entry/teleport. Idempotent.
 		private void RegisterPlayerInWorld(INetworkClient client)
 		{
 			var character = client.Session?.Character;
@@ -89,17 +95,6 @@ namespace Faolan.GameServer
 			var zone = _world.Place(entity, character.MapId, character.Position, character.Rotation);
 			var nearby = zone.PlayersInRange(character.Position, PlayerInterestRange, handle).Count();
 			Logger.LogInformation("World: player {Name} (0x{Handle:X8}) entered map {Map} at {Pos}; {Nearby} other player(s) in range.", entity.Name, handle, character.MapId, character.Position, nearby);
-		}
-
-		// Updates the player's live world position/rotation on Move (bookkeeping; the interest-managed broadcast to
-		// nearby players is the next step).
-		private void UpdatePlayerWorldPosition(INetworkClient client)
-		{
-			var character = client.Session?.Character;
-			if (character == null || !_playerEntities.TryGetValue(client, out var entity))
-				return;
-
-			_world.Place(entity, character.MapId, character.Position, character.Rotation);
 		}
 
 		protected override void ClientDisconnected(INetworkClient client)

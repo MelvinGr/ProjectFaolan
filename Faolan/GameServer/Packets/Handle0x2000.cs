@@ -108,17 +108,33 @@ namespace Faolan.GameServer
 								break;
 							}
 
-							sessionCharacter.Position = packet.Body.ReadVector3();
-							sessionCharacter.Rotation = packet.Body.ReadVector3(); // not sure if this is correct
+							var movePosition = packet.Body.ReadVector3();
+							var moveRotation = packet.Body.ReadVector3(); // not sure if this is correct
 							var datadat = packet.Body.ReadRemainingArray();
 
-							// Keep the live world model in sync (docs/server-architecture-roadmap.md). Interest-managed
-							// broadcast of this move to nearby players is the next step; for now this is bookkeeping.
-							UpdatePlayerWorldPosition(client);
+							// The WorldEntity owns the live transform (docs/server-architecture-roadmap.md); the
+							// persisted Character is only the spawn seed (movement is never persisted live). Update the
+							// authoritative entity and broadcast from it; fall back to the Character only if the player
+							// isn't in the world model yet.
+							var moveEntity = PlayerWorldEntity(client);
+							if (moveEntity != null)
+							{
+								moveEntity.Position = movePosition;
+								moveEntity.Rotation = moveRotation;
+							}
+							else
+							{
+								sessionCharacter.Position = movePosition;
+								sessionCharacter.Rotation = moveRotation;
+							}
+
+							var livePosition = moveEntity?.Position ?? sessionCharacter.Position;
+							var liveRotation = moveEntity?.Rotation ?? sessionCharacter.Rotation;
 
 							// send to all (nearby) clients? (single client for now -> the session conversation;
 							// retail's move broadcast uses sender 0d13ce71b110 58 + receiver = the moving entity's
-							// instance, confirmed across Strie/dikketest/demol80 captures)
+							// instance, confirmed across Strie/dikketest/demol80 captures). Interest-managed broadcast to
+							// nearby players is the next step.
 							await new PacketStream()
 								.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x2000)
 								.WriteArrayUInt32Length(s => s
@@ -126,8 +142,8 @@ namespace Faolan.GameServer
 									.WriteUInt32(dataobjdec)
 									.WriteUInt32(dataclientinst)
 									.WriteUInt16(movingType)
-									.WriteVector3BigEndian(sessionCharacter.Position)
-									.WriteVector3BigEndian(sessionCharacter.Rotation)
+									.WriteVector3BigEndian(livePosition)
+									.WriteVector3BigEndian(liveRotation)
 									.WriteArray(datadat))
 								.SendAsync(client);
 
