@@ -21,10 +21,10 @@ namespace Faolan.Importer
 	{
 		private const string RepoRoot = "/home/melvin/Development/C#/Project Faolan";
 
-		// The beach (4010) is a committed DB seed: its full world build (MapChange -> ReadyForPlayScreen) was assembled
-		// from the Strie login capture and committed as structured rows. The plain capture-window extractor only reaches
-		// the first 0x2020 poll, so re-deriving it here would TRUNCATE the beach - skip it until the extractor learns
-		// the full window (see TODO #10 / docs/spawn-dissection-plan.md).
+		// The beach (4010) is a committed DB seed: its full world build (MapChange -> spawn burst -> 0x2076 manifest)
+		// was hand-assembled from the Strie login capture and is the ONE in-client-proven world blob. The extractor now
+		// derives the same full window for every other map (pre-poll spawn burst + the post-poll 0x2076 manifest), but
+		// the beach is still skipped on import so the proven seed is never regenerated/perturbed by a capture re-run.
 		private const uint BeachMapId = 0x00000FAA;
 
 		// Friendly names for the RDB resource types we care about (from rdbreader's TYPES enum). Used by the
@@ -107,7 +107,7 @@ namespace Faolan.Importer
 			foreach (var e in bursts)
 			{
 				if (e.MapId == BeachMapId)
-					continue; // committed seed; the capture window is truncated (see BeachMapId remark).
+					continue; // proven committed seed - never regenerate it from captures (see BeachMapId remark).
 
 				var burst = await db
 					.MapWorldBursts

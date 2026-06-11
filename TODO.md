@@ -276,7 +276,14 @@ test golden only). Harness 16/16; the generated scaffold confirmed on the wire v
 - Wire the appearance: the editor morph sliders ARE the float-valued scaffold entries (discovered 2026-06-10;
   Dikketest's 7 entries match his slider multiset) — crack the exact slider→float mapping, then generate the
   morph entries from `CharacterBody` instead of the Dikketest defaults.
-- `MapWorldBurstExtractor` full-window fix for non-beach maps.
+- ~~`MapWorldBurstExtractor` full-window fix for non-beach maps.~~ **DONE 2026-06-11.** The extractor's window no
+  longer ends at the first `0x2020` poll: it keeps the window open and also captures the single post-poll `0x2076`
+  spawn manifest (entity handle→slot table) the client needs — the one structural record the hand-seeded beach
+  carried that extractor-derived maps lacked. Post-poll noise (0x2008 SpawnCheck, StatIir, 0x2024 ReadyForPlayScreen,
+  gameplay) is still excluded; only `0x2076` is taken. Verified across all 29 captures: maps 1000/2000/2010/2040/4022
+  each gained exactly +1 manifest, beach (4010) untouched (proven committed seed, still skipped on import), maps
+  whose winning capture lacks a clean manifest (3000/4000/4020/11040) correctly gained nothing. faolan.db regenerated;
+  187 unit tests pass (3 new extractor tests). Also confirmed #9: out-of-range maps 1000/11040 ARE imported now.
 
 ---
 

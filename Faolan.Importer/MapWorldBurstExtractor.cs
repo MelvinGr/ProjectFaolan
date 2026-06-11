@@ -14,20 +14,28 @@ namespace Faolan.Importer
 	{
 		private const uint MapChangeSubOpcode = 0x5D85BFC7;
 		private const uint Opcode2000 = 0x2000;
-		private const uint Opcode2020 = 0x2020; // client spawn poll - ends the world-build window
+		private const uint Opcode2020 = 0x2020; // client spawn poll - ends the pre-poll spawn burst
+		private const uint Opcode2076 = 0x2076; // spawn manifest (entity handle -> slot table), sent after the poll flood
 
 		// The LoginWorld receiver conversation id "0D 47 C1 67 6C 10 <varint>" - its trailing varint is the client
 		// instance the packet was sent to (the local player), unambiguous even when other players are spawned.
 		private static readonly byte[] ReceiverMarker = [0x47, 0xC1, 0x67, 0x6C, 0x10];
 
-		// Per capture: each MapChange begins a world-build window of the following DOWNLOAD packets, until the first
-		// 0x2020 poll or the next MapChange. Returns the largest window per map (most complete).
+		// Per capture: each MapChange begins a world-build window. The FULL window is the pre-poll spawn burst (every
+		// 0x2000 download up to the client's first 0x2020 poll) PLUS the single 0x2076 spawn manifest the server sends
+		// after the poll flood - the entity handle->slot table the client needs to instantiate the spawned entities.
+		// (Retail order: MapChange -> 0x2000 spawn burst -> client 0x2020 poll flood -> server 0x2008 SpawnCheck +
+		// 0x2076 manifest -> 0x2024 ReadyForPlayScreen.) Everything else in the post-poll region is server-generated
+		// (0x2008 SpawnCheck, StatIir, ReadyForPlayScreen - all rebuilt live on world entry) or gameplay, so only the
+		// 0x2076 is taken. The window ends at the next MapChange (or end of capture). Returns the largest window per
+		// map. This is what the committed beach (4010) seed carries by hand; the extractor now derives it for any map.
 		public static List<MapWorldBurstEntry> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
 			var bursts = new List<MapWorldBurstEntry>();
 			List<byte[]> current = null;
 			uint currentMap = 0;
 			uint capturedInstance = 0;
+			var sawPoll = false; // per-window: has the client's first 0x2020 poll passed? (ends the pre-poll burst)
 
 			void Flush()
 			{
@@ -36,6 +44,17 @@ namespace Faolan.Importer
 				current = null;
 				currentMap = 0;
 				capturedInstance = 0;
+				sawPoll = false;
+			}
+
+			void BackfillInstance(byte[] full)
+			{
+				if (capturedInstance != 0)
+					return;
+
+				var inst = ExtractReceiverInstance(full);
+				if (inst != 0)
+					capturedInstance = inst;
 			}
 
 			foreach (var p in packets)
@@ -55,32 +74,36 @@ namespace Faolan.Importer
 
 					// The receiver conversation id of the world-build downloads is the local player's instance -
 					// read it from the first packet's header (unambiguous even when other players are spawned).
-					var inst = ExtractReceiverInstance(p.Bytes);
-					if (inst != 0)
-						capturedInstance = inst;
+					BackfillInstance(p.Bytes);
 					continue;
 				}
 
 				if (current == null)
 					continue;
 
+				// The first 0x2020 poll ends the pre-poll spawn burst but NOT the window - the 0x2076 manifest is
+				// still to come. Keep the window open and switch to manifest-only collection.
 				if (p.Opcode == Opcode2020)
 				{
-					Flush(); // first spawn poll ends the world build
+					sawPoll = true;
 					continue;
 				}
 
-				if (p.Opcode == Opcode2000 && p.IsDownload)
+				if (!sawPoll)
 				{
-					current.Add(p.Bytes);
-
-					// Backfill the instance from any download in the window if the MapChange header lacked it.
-					if (capturedInstance == 0)
+					// Pre-poll spawn burst: every 0x2000 download (world objects, entity spawns, the player spawn).
+					if (p.Opcode == Opcode2000 && p.IsDownload)
 					{
-						var inst = ExtractReceiverInstance(p.Bytes);
-						if (inst != 0)
-							capturedInstance = inst;
+						current.Add(p.Bytes);
+						BackfillInstance(p.Bytes); // backfill if the MapChange header lacked the instance
 					}
+				}
+				else if (p.Opcode == Opcode2076 && p.IsDownload)
+				{
+					// Post-poll: the one structural record worth keeping - the spawn manifest. Everything else here is
+					// server-generated or gameplay and is deliberately skipped.
+					current.Add(p.Bytes);
+					BackfillInstance(p.Bytes);
 				}
 			}
 
