@@ -1,3 +1,5 @@
+using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
@@ -67,21 +69,27 @@ namespace Faolan.GameServer
 		// aren't decoded yet, only that v4 == the swing damage).
 		private async Task SendNormalAttackResponse(INetworkClient client, byte[] rawPayload, uint targetHandle)
 		{
-			// rawPayload = [len4][subop4][c350 4][instance 4][seq 2][behaviorId 4][0000 2][argsLen 2][args][reqTail]
+			// rawPayload = [bodyLen u32][subop u32][c350 u32][instance u32][seq u16][behaviorId u32][argsLen u32][args][reqTail]
 			if (rawPayload.Length < 26)
 				return;
 
 			var instance = client.Session.Account.ClientInstance;
 			var seq = (ushort)((rawPayload[16] << 8) | rawPayload[17]);
-			var argsLen = (ushort)((rawPayload[22] << 8) | rawPayload[23]);
-			if (24 + argsLen > rawPayload.Length)
+			// argsLen is the u32 at offset 22 (the request args length). The old code read it as a u16 at 22 (= the
+			// high half = 0), so the ack echoed EMPTY args and the client's behaviour FSM desynced after one swing.
+			var argsLen = (int)BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(22, 4));
+			if (26 + argsLen > rawPayload.Length)
 				return;
 
-			var argBytes = rawPayload[24..(24 + argsLen)];
-			var reqTail = rawPayload[(24 + argsLen)..];
+			var argBytes = rawPayload[26..(26 + argsLen)];
+			var reqTail = rawPayload[(26 + argsLen)..];
 			var abilityId = reqTail.Length >= 4
 				? (uint)((reqTail[^4] << 24) | (reqTail[^3] << 16) | (reqTail[^2] << 8) | reqTail[^1])
 				: 0u;
+
+			// Retail's ack echoes the request args with a field3 "phase" inserted - a monotonic per-swing-ack counter
+			// the client uses to sequence behaviour responses. Stamp our running counter and splice it in.
+			var echoedArgs = InsertBehaviorPhaseField(argBytes, (uint)(++client.Session.NormalAttackAckPhase));
 
 			// Only deal damage to a real enemy: an attack with no target selected (or one that resolves to the
 			// player's own handle) must NOT hit the player - that was the "attack hits myself" bug.
@@ -101,9 +109,8 @@ namespace Faolan.GameServer
 					.WriteUInt32(instance)
 					.WriteUInt16(next)
 					.WriteUInt32(0x0000000Fu)
-					.WriteUInt16(0)
-					.WriteUInt16(argsLen)
-					.WriteArray(argBytes)
+					.WriteUInt32((uint)echoedArgs.Length)
+					.WriteArray(echoedArgs)
 					.WriteUInt32(0)
 					.WriteUInt32(0)
 					.WriteUInt32(1) // result block: count
@@ -118,7 +125,7 @@ namespace Faolan.GameServer
 					.WriteUInt32(instance)
 					.WriteUInt32(0) // result: count, c350, actor=player, 0
 					.WriteByte(0x06)
-					.WriteUInt32(0x000000CDu)
+					.WriteUInt32(0x000000CBu) // result constant (was 0xCD; the capture's BccAck result block uses 0xCB)
 					.WriteUInt32(0)
 					.WriteUInt32(1)
 					.WriteUInt32(damage)
@@ -183,6 +190,76 @@ namespace Faolan.GameServer
 			var cost = CombatResolver.ResolveSpellManaCost(spellId, client.Session.Character?.Level ?? 1);
 			player.ApplyManaDelta(-(int)cost);
 			await SendStatUpdate(client, player.ToVitalsBlock(), client.Session.Account.ClientInstance);
+		}
+
+		// Splices field3 (the behaviour "phase", tag 0x18 varint) into the request args right after field2, matching
+		// retail's BccAck echo. Protobuf is tag-addressed so position isn't strictly required, but this mirrors the
+		// capture's byte layout. If field2 is absent/malformed the phase is appended at the end.
+		internal static byte[] InsertBehaviorPhaseField(byte[] args, uint phase)
+		{
+			var phaseField = EncodeBehaviorPhase(phase);
+			var insertAt = System.Math.Min(OffsetAfterField(args, 2), args.Length);
+			var result = new byte[args.Length + phaseField.Length];
+			System.Array.Copy(args, 0, result, 0, insertAt);
+			phaseField.CopyTo(result, insertAt);
+			System.Array.Copy(args, insertAt, result, insertAt + phaseField.Length, args.Length - insertAt);
+			return result;
+		}
+
+		// Byte offset just after `fieldNumber`'s value in a protobuf message (the message end if absent/malformed).
+		private static int OffsetAfterField(byte[] msg, int fieldNumber)
+		{
+			var i = 0;
+			while (i < msg.Length)
+			{
+				var tag = msg[i++];
+				var fn = tag >> 3;
+				var wt = tag & 7;
+				if (wt == 0)
+				{
+					while (i < msg.Length && (msg[i] & 0x80) != 0)
+						i++;
+					i++;
+				}
+				else if (wt == 2)
+				{
+					int len = 0, shift = 0;
+					while (i < msg.Length)
+					{
+						var b = msg[i++];
+						len |= (b & 0x7f) << shift;
+						if ((b & 0x80) == 0)
+							break;
+						shift += 7;
+					}
+
+					i += len;
+				}
+				else
+					return msg.Length; // unsupported wiretype -> append at end
+
+				if (fn == fieldNumber)
+					return i;
+			}
+
+			return msg.Length;
+		}
+
+		// field3 as protobuf: tag 0x18 (field 3, varint) + the base-128 varint of `value`.
+		private static byte[] EncodeBehaviorPhase(uint value)
+		{
+			var bytes = new List<byte> { 0x18 };
+			do
+			{
+				var b = (byte)(value & 0x7f);
+				value >>= 7;
+				if (value != 0)
+					b |= 0x80;
+				bytes.Add(b);
+			}
+			while (value != 0);
+
+			return bytes.ToArray();
 		}
 	}
 }

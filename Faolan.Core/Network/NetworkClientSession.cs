@@ -85,6 +85,10 @@ namespace Faolan.Core.Network
 		// the next reply - instead of dumping the whole tree at once. Re-addressed packets, ready to send.
 		List<List<byte[]>> ConversationStages { get; set; }
 		int ConversationStageIndex { get; set; }
+
+		// Monotonic counter stamped as field3 (the "phase") into each NormalAttack BehaviorControlCenter ack. In the
+		// capture it increments by 1 per player swing-ack; the client uses it to sequence the behaviour responses.
+		int NormalAttackAckPhase { get; set; }
 	}
 
 	public sealed class NetworkClientSession : INetworkClientSession
@@ -127,5 +131,6 @@ namespace Faolan.Core.Network
 		public ulong GameServerInboundPacketSequence { get; set; }
 		public List<List<byte[]>> ConversationStages { get; set; }
 		public int ConversationStageIndex { get; set; }
+		public int NormalAttackAckPhase { get; set; }
 	}
 }
