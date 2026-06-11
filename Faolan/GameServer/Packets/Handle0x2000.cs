@@ -288,6 +288,11 @@ namespace Faolan.GameServer
 								// for every NPC - the DB path above is what routes the correct dialogue per NPC.
 								if (client.Session.IsCreateWorldSession && npcHandle != 0)
 									await SendNpcIntroConversation(client, npcHandle);
+								// Beach login with no captured node for this (Mode, Field3): close the chat window so the
+								// client doesn't hang waiting for a reply (the "advance a step -> chat locks, can't ESC"
+								// bug). Conversation replay is coverage-bound, so an un-captured branch is expected.
+								else if (client.Session.UsedWorldBurstReplay)
+									await SendConversationClose(client);
 
 								break;
 							}
