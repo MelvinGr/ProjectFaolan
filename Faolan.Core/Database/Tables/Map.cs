@@ -11,7 +11,6 @@ namespace Faolan.Core.Database.Tables
 		public const uint TortageBeachId = 0x00000FAA;
 
 		public virtual ICollection<WorldObject> Objects { get; set; }
-		public virtual ICollection<Npc> Npcs { get; set; }
 
 		[MaxLength(128)]
 		public string Name { get; set; }

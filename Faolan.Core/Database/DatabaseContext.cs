@@ -29,9 +29,6 @@ namespace Faolan.Core.Database
 		DbSet<MapWorldBurst> MapWorldBursts { get; }
 		DbSet<MapWorldBurstEntity> MapWorldBurstEntities { get; }
 		DbSet<MorphTarget> MorphTargets { get; }
-		DbSet<Npc> Npcs { get; }
-		DbSet<NpcBody> NpcBodies { get; }
-		DbSet<NpcEquipment> NpcEquipment { get; }
 		DbSet<NpcSpawn> NpcSpawns { get; }
 		DbSet<WorldObject> WorldObjects { get; }
 		DbSet<Realm> Realms { get; }
@@ -68,9 +65,6 @@ namespace Faolan.Core.Database
 		public DbSet<MapWorldBurst> MapWorldBursts { get; set; }
 		public DbSet<MapWorldBurstEntity> MapWorldBurstEntities { get; set; }
 		public DbSet<MorphTarget> MorphTargets { get; set; }
-		public DbSet<Npc> Npcs { get; set; }
-		public DbSet<NpcBody> NpcBodies { get; set; }
-		public DbSet<NpcEquipment> NpcEquipment { get; set; }
 		public DbSet<NpcSpawn> NpcSpawns { get; set; }
 		public DbSet<WorldObject> WorldObjects { get; set; }
 		public DbSet<Realm> Realms { get; set; }
