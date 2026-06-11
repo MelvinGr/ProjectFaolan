@@ -18,6 +18,13 @@ namespace Faolan.GameServer
 		{
 			var instance = client.Session.Account.ClientInstance;
 
+			// record -1: CoreClaimIIR (0x06EC1255). Retail (and our old raw-blob replay) sends this immediately
+			// before the CharInPlay record - it is the world-CLAIM signal that tells the client the playfield is
+			// fully claimed/loaded. WITHOUT it the world renders but the client never finishes "loading", so it
+			// never opens the CommunityServer (chat) connection - the channels-missing bug. It was lost when this
+			// post-ready stream was rebuilt as explicit sends; restore it here (byte-for-byte via the helper).
+			await SendExistingCharacterPostReadyDataPacket(client, 0x06EC1255, ExistingCharacterPostReady06Ec1255Tail);
+
 			// record 0: 0x00002000, 17-byte body
 			await new PacketStream()
 				.WriteHeader(ExistingCharacterWorldEntryPromptSender, AppendVarint(ExistingCharacterWorldEntryPromptReceiverPrefix, instance), 0x00002000u)
