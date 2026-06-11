@@ -36,5 +36,13 @@ namespace Faolan.GameServer.World
 			if (_zones.TryGetValue(entity.MapId, out var zone))
 				zone.Remove(entity.Handle);
 		}
+
+		// Advances the world model by `deltaSeconds` - the game-loop seam where NPC AI/movement/respawn will run once
+		// NPCs are in the model (docs/server-architecture-roadmap.md). Player transforms are driven by Move packets,
+		// not the tick, so there is nothing to advance for them yet; this is the hook the loop calls each tick.
+		public void Tick(double deltaSeconds)
+		{
+			// No-op until NPC entities live in the zones. Intentionally present so the loop wiring + cadence land now.
+		}
 	}
 }

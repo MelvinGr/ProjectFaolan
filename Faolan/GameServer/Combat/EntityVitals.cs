@@ -43,6 +43,40 @@ namespace Faolan.GameServer.Combat
 		}
 
 		/// <summary>
+		///     Regenerates the three pools by the given amounts, each clamped to its max. Returns true if any pool
+		///     actually increased, so the caller can skip pushing a vitals update when nothing changed (e.g. at full).
+		///     Driven by the game loop (docs/server-architecture-roadmap.md).
+		/// </summary>
+		public bool Regenerate(uint health, uint stamina, uint mana)
+		{
+			var changed = false;
+			if (health > 0 && Health < MaxHealth)
+			{
+				Health = ClampToMax(Health + health, MaxHealth);
+				changed = true;
+			}
+
+			if (stamina > 0 && Stamina < MaxStamina)
+			{
+				Stamina = ClampToMax(Stamina + stamina, MaxStamina);
+				changed = true;
+			}
+
+			if (mana > 0 && Mana < MaxMana)
+			{
+				Mana = ClampToMax(Mana + mana, MaxMana);
+				changed = true;
+			}
+
+			return changed;
+		}
+
+		private static uint ClampToMax(uint value, uint max)
+		{
+			return value > max ? max : value;
+		}
+
+		/// <summary>
 		///     The vitals as a <c>0x96B8DC59</c> stat block, emitting the current AND max id for each of
 		///     Health/Stamina/Mana (the retail pairing - see docs/player-stats.md). Previously this sent the current
 		///     value under the MAX id, so a damaged entity reported max == currentHP and the health bar never moved.

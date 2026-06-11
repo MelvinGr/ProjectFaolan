@@ -42,6 +42,10 @@ namespace Faolan.GameServer
 		// Periodic world-state autosave cadence (crash safety; logout/teleport/.save are the event-driven saves).
 		private const int AutoSaveIntervalMinutes = 5;
 
+		// Game-loop cadence. 1 Hz is plenty for the current behaviour (vitals regen); raise it (with dt-scaling and
+		// per-behaviour accumulators) when NPC AI/movement lands, which needs ~10-20 Hz.
+		private const double GameTickSeconds = 1.0;
+
 		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, ushort port, IAgentServerDispatcher agentServerDispatcher, IGameServerDispatcher gameServerDispatcher) : base(port, logger, configuration, database,
 			new ConanOutgoingPacketLogger(logger, "GameServer", typeof(GameServerRespondOpcodes), typeof(GameServer0X2000RespondsOpcodes)))
 		{
@@ -118,7 +122,60 @@ namespace Faolan.GameServer
 		{
 			_gameServerDispatcher.Register(this);
 			_ = AutoSaveLoop(cancellationToken); // periodic crash-safety flush of the live world state
+			_ = GameTickLoop(cancellationToken); // the simulation tick (regen now; NPC AI/movement later)
 			return base.StartAsync(cancellationToken);
+		}
+
+		// The server game loop: a fixed-cadence tick that advances the world model and runs time-based behaviour
+		// (docs/server-architecture-roadmap.md). Today it advances the (player-only) world model - a no-op - and
+		// regenerates connected players' vitals; NPC AI/movement/respawn join it as those land. Cancelled on shutdown.
+		private async Task GameTickLoop(CancellationToken cancellationToken)
+		{
+			using var timer = new System.Threading.PeriodicTimer(System.TimeSpan.FromSeconds(GameTickSeconds));
+			try
+			{
+				while (await timer.WaitForNextTickAsync(cancellationToken))
+				{
+					_world.Tick(GameTickSeconds);
+					await RegenerateConnectedPlayers();
+				}
+			}
+			catch (System.OperationCanceledException)
+			{
+				// server shutting down
+			}
+			catch (System.Exception ex)
+			{
+				Logger.LogError(ex, "Game tick loop failed.");
+			}
+		}
+
+		// Regenerates each connected player's vitals one tick's worth and pushes a 0x96B8DC59 update only when a pool
+		// actually rose (a player at full HP/stamina/mana costs nothing). Rates are provisional fractions of max.
+		private async Task RegenerateConnectedPlayers()
+		{
+			foreach (var pair in _playerEntities)
+			{
+				var client = pair.Key;
+				if (client.Session?.Character == null)
+					continue;
+
+				var vitals = GetOrAddPlayerVitals(client);
+				var changed = vitals.Regenerate(
+					RegenAmount(vitals.MaxHealth, 0.05), // ~5% hp / sec (provisional)
+					RegenAmount(vitals.MaxStamina, 0.10), // ~10% stamina / sec
+					RegenAmount(vitals.MaxMana, 0.05)); // ~5% mana / sec
+				if (changed)
+					await SendStatUpdate(client, vitals.ToVitalsBlock(), client.Session.Account.ClientInstance);
+			}
+		}
+
+		private static uint RegenAmount(uint max, double fraction)
+		{
+			var amount = (uint)(max * fraction);
+			return amount > 0
+				? amount
+				: 1;
 		}
 
 		// Periodically flushes the live world state to the DB so a crash loses at most one interval. Persistence is
