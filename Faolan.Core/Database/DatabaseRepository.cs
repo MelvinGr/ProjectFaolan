@@ -49,6 +49,9 @@ namespace Faolan.Core.Database
 		Task<RespawnPoint[]> GetRespawnPoints(uint mapId);
 		Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId);
 		Task DiscoverRespawnPoint(uint characterId, uint respawnPointId);
+		Task<CharacterQuest[]> GetCharacterQuests(uint characterId);
+		Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0);
+		Task RemoveCharacterQuest(uint characterId, uint questId);
 		Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names);
 
 		Task<Realm> GetRealm(uint id);
@@ -445,6 +448,49 @@ namespace Faolan.Core.Database
 				.Where(c => c.CharacterId == characterId)
 				.Select(c => c.RespawnPointId)
 				.ToArrayAsync();
+		}
+
+		public async Task<CharacterQuest[]> GetCharacterQuests(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.CharacterQuests.Where(q => q.CharacterId == characterId).ToArrayAsync();
+		}
+
+		// Upserts a character's quest state/progress.
+		public async Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var row = await ctx.CharacterQuests.FirstOrDefaultAsync(q => q.CharacterId == characterId && q.QuestId == questId);
+			if (row == null)
+			{
+				ctx.CharacterQuests.Add(new CharacterQuest
+				{
+					CharacterId = characterId,
+					QuestId = questId,
+					State = state,
+					GoalProgress = goalProgress,
+					GoalRequired = goalRequired
+				});
+			}
+			else
+			{
+				row.State = state;
+				row.GoalProgress = goalProgress;
+				row.GoalRequired = goalRequired;
+			}
+
+			await ctx.SaveChangesAsync();
+		}
+
+		public async Task RemoveCharacterQuest(uint characterId, uint questId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var row = await ctx.CharacterQuests.FirstOrDefaultAsync(q => q.CharacterId == characterId && q.QuestId == questId);
+			if (row == null)
+				return;
+
+			ctx.CharacterQuests.Remove(row);
+			await ctx.SaveChangesAsync();
 		}
 
 		// Records that a character has discovered a respawn point (idempotent - no duplicate row).

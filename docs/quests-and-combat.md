@@ -150,10 +150,21 @@ running the real script. Heaviest build piece = the inventory item-grant (Contai
   callbacks — overloaded by token string).
 - `0xFA015807` — the quest-giver NPC spawn (e.g. "Casilda").
 
-### Quest state / journal (open)
-No obvious ASCII quest-state block found; the journal/objective tracking is likely numeric quest ids in a
-state packet (candidate: a `0x2038`/`0x20a5` quest-title/tracker pair, see `docs/capture-events.md`). Not yet
-isolated.
+### Quest state / journal (DECODED 2026-06-11)
+Quest state is driven by four IIR records (decoded from `hoxxling-login-gameplay`, quest `0x34A7`=13479):
+- **`0x97E02314` `QuestIIR`** (add/update/remove): `[ack][playerHandle][0][0x01][u32 state][u32 questId][0]` —
+  state `2` = active/added (the only confirmed code). 29 B.
+- **`0x0774C8C1` `QuestGoal`**: `[ack][playerHandle][0x01][u32 questId][u32 goalId][u32 count][0][0]` — objective
+  progress. 33 B.
+- **`0x63268258` `QuestFullUpdate`** / **`0x79F8C7A1` `QuestJournal`**: questId + `remoteformat` text refs
+  (categories 50300–50302); the client renders the title/description/journal text from its RDB **by id**, so the
+  server only sends ids + state, never the text.
+
+**Built:** `WorldQuest` (byte-exact `QuestIIR`/`QuestGoal` builders) + a `CharacterQuest` table (per-character
+quest id + state + goal progress, migration `AddCharacterQuests`) + repo upsert/remove + restore-on-login
+(`RestorePlayerQuests`) + a `.quest add|remove|list` GM command. This is the quest STATE foundation; the
+accept-from-dialogue trigger, objective auto-tracking (e.g. on kill), rewards/turn-in (`0xA36D3B74 QuestRewards`),
+and branching are the pinned RDB Lua quest VM ([[protocol_conversation_routing]]).
 
 ## Next steps
 - Confirm ApplySpell magnitude sign/scale and whether damage is in the cast or only in the following vitals

@@ -147,8 +147,52 @@ namespace Faolan.GameServer
 				["heal"] = (client, arguments) => AdjustOwnHealthCommand(client, arguments, true),
 				["mount"] = (client, arguments) => MountCommand(client, arguments),
 				["world"] = (client, _) => SendWorldInfo(client),
+				["quest"] = (client, arguments) => QuestCommand(client, arguments),
 				["test"] = (client, _) => Test(client.Session.Character.Id)
 			};
+		}
+
+		// .quest add|remove <id> | .quest list  - manage the player's quest journal. `add` records the quest +
+		// sends QuestIIR so it appears (the client renders the quest text from its RDB by id); `remove` drops it;
+		// `list` shows the player's active quests. Quest IDs are RDB quest ids (e.g. 13479). The full accept/branch
+		// logic is the pinned RDB Lua quest VM - this is the state foundation (docs/quests-and-combat.md).
+		private async Task QuestCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var parts = (arguments ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+			var sub = parts.Length > 0 ? parts[0].ToLowerInvariant() : "list";
+
+			if (sub == "list")
+			{
+				var quests = await Database.GetCharacterQuests(characterId);
+				var active = quests.Where(q => q.State == Core.Database.Tables.QuestState.Active).Select(q => q.QuestId).ToList();
+				await _agentServerDispatcher.SendSystemMessage(characterId, active.Count == 0
+					? "No active quests."
+					: $"Active quests: {string.Join(", ", active)}");
+				return;
+			}
+
+			if (parts.Length < 2 || !uint.TryParse(parts[1], out var questId))
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .quest add|remove <questId> | .quest list");
+				return;
+			}
+
+			switch (sub)
+			{
+				case "add":
+					await Database.SetCharacterQuest(characterId, questId, Core.Database.Tables.QuestState.Active);
+					await SendQuestIir(client, questId, World.WorldQuest.StateActive);
+					await _agentServerDispatcher.SendSystemMessage(characterId, $"Quest {questId} added to journal.");
+					break;
+				case "remove":
+					await Database.RemoveCharacterQuest(characterId, questId);
+					await _agentServerDispatcher.SendSystemMessage(characterId, $"Quest {questId} removed.");
+					break;
+				default:
+					await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .quest add|remove <questId> | .quest list");
+					break;
+			}
 		}
 
 		// .mount [spellIdHex]  - cast the mount-summon spell on the player. Default 0x3BAD7D, the mount spell

@@ -338,6 +338,42 @@ namespace Faolan.GameServer
 			return (uint)System.Threading.Interlocked.Increment(ref _nextLootHandle);
 		}
 
+		// Sends a QuestIIR (add/update a quest in the player's journal) to the player.
+		private Task SendQuestIir(INetworkClient client, uint questId, uint state)
+		{
+			return new PacketStream()
+				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x2000)
+				.WriteArrayUInt32Length(s => s.WriteArray(World.WorldQuest.BuildQuestIir(client.Session.Account.ClientInstance, questId, state)))
+				.SendAsync(client);
+		}
+
+		// Sends a QuestGoal (objective progress) to the player.
+		private Task SendQuestGoal(INetworkClient client, uint questId, uint goalId, uint count)
+		{
+			return new PacketStream()
+				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x2000)
+				.WriteArrayUInt32Length(s => s.WriteArray(World.WorldQuest.BuildQuestGoal(client.Session.Account.ClientInstance, questId, goalId, count)))
+				.SendAsync(client);
+		}
+
+		// On world entry: re-send the player's persisted active quests so their journal is restored.
+		private async Task RestorePlayerQuests(INetworkClient client)
+		{
+			var character = client.Session?.Character;
+			if (character == null)
+				return;
+
+			foreach (var quest in await Database.GetCharacterQuests(character.Id))
+			{
+				if (quest.State != Core.Database.Tables.QuestState.Active)
+					continue;
+
+				await SendQuestIir(client, quest.QuestId, World.WorldQuest.StateActive);
+				if (quest.GoalRequired > 0)
+					await SendQuestGoal(client, quest.QuestId, 0, quest.GoalProgress);
+			}
+		}
+
 		// On disconnect/logout: despawn the leaving player for everyone who could see it (n3ToClientQuit), before it is
 		// removed from the zone. Returns the dispatch task so the caller can fire-and-forget (the connection is going
 		// away). Single-player is a no-op (no viewers).

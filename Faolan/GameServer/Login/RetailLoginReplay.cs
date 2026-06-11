@@ -478,6 +478,9 @@ namespace Faolan.GameServer
 
 			// Now that the spawn body is captured, run interest: spawn this player to nearby players and them to it.
 			await BroadcastPlayerEntry(client);
+
+			// Restore the player's persisted quest journal.
+			await RestorePlayerQuests(client);
 		}
 
 		// If the burst packet is the player's own entity Spawn (FA015807 whose handle is the client instance),
