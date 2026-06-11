@@ -36,6 +36,10 @@ namespace Faolan.GameServer
 		private readonly System.Collections.Concurrent.ConcurrentDictionary<INetworkClient, World.WorldEntity> _playerEntities =
 			new System.Collections.Concurrent.ConcurrentDictionary<INetworkClient, World.WorldEntity>();
 
+		// Maps whose NPCs have been loaded into the world model (once per map, on first entry).
+		private readonly System.Collections.Concurrent.ConcurrentDictionary<uint, byte> _npcLoadedZones =
+			new System.Collections.Concurrent.ConcurrentDictionary<uint, byte>();
+
 		// How far a player perceives other players (world-entity interest radius; wider than say range).
 		private const float PlayerInterestRange = 150f;
 

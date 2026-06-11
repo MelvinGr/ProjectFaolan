@@ -83,6 +83,21 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void MovingNearNpc_DoesNotSpawnTheNpc_StillBurstRendered()
+		{
+			var zone = new Zone(2040);
+			var a = Player(1, 0, 0);
+			var npc = WorldEntity.ForNpc(99, 2040, new Vector3(5, 0, 0), Vector3.Zero, "Mob"); // right next to A
+			zone.Add(a);
+			zone.Add(npc);
+
+			var (events, _) = MoveTo(zone, a, 1, 0);
+
+			Assert.False(events.Has(1, 99, InterestEventType.Spawn)); // NPC comes from the burst, not interest (yet)
+			Assert.False(a.Known.Contains(99));
+		}
+
+		[Fact]
 		public void Remove_DespawnsForEveryoneWhoKnew()
 		{
 			var zone = new Zone(2040);

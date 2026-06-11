@@ -146,6 +146,7 @@ namespace Faolan.GameServer
 				["hurt"] = (client, arguments) => AdjustOwnHealthCommand(client, arguments, false),
 				["heal"] = (client, arguments) => AdjustOwnHealthCommand(client, arguments, true),
 				["mount"] = (client, arguments) => MountCommand(client, arguments),
+				["world"] = (client, _) => SendWorldInfo(client),
 				["test"] = (client, _) => Test(client.Session.Character.Id)
 			};
 		}
@@ -211,6 +212,22 @@ namespace Faolan.GameServer
 				Logger.LogWarning(ex, "Failed to flush world state for {Name} (0x{Handle:X8}).", entity.Name, entity.Handle);
 				return false;
 			}
+		}
+
+		// .world  - report the live world model around the caller: their map, the players/NPCs in that zone, and how
+		// many entities are within interest range. A window into the shared simulation (handy for the 2-player test).
+		private Task SendWorldInfo(INetworkClient client)
+		{
+			var entity = PlayerWorldEntity(client);
+			if (entity == null)
+				return _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, "World: you are not registered in the world model yet.");
+
+			var zone = _world.ZoneFor(entity.MapId);
+			var players = zone.Entities.Count(e => e.IsPlayer);
+			var npcs = zone.Entities.Count(e => !e.IsPlayer);
+			var nearby = zone.EntitiesInRange(entity.Position, PlayerInterestRange, entity.Handle).Count();
+			return _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
+				$"World map {entity.MapId}: {players} player(s), {npcs} NPC(s) in zone; {nearby} entity(ies) within {PlayerInterestRange:0} of you.");
 		}
 
 		private Task SendGmHelpText(uint characterId)

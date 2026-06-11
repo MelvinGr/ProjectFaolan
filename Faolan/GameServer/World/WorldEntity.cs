@@ -19,6 +19,16 @@ namespace Faolan.GameServer.World
 			Client = client;
 		}
 
+		// Convenience factory for an NPC (no owning client) placed at a fixed transform.
+		public static WorldEntity ForNpc(uint handle, uint mapId, Vector3 position, Vector3 rotation, string name)
+		{
+			return new WorldEntity(handle, mapId, false, name, null)
+			{
+				Position = position,
+				Rotation = rotation
+			};
+		}
+
 		// The wire handle other entities address this one by (the player's client instance / an NPC's spawn handle).
 		public uint Handle { get; }
 

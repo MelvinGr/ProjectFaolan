@@ -96,6 +96,28 @@ namespace Faolan.GameServer
 				entity.SpawnBody = spawnPacket[bodyStart..];
 		}
 
+		// Loads a map's NPCs from NpcSpawns into the world model ONCE (on first entry), so the server has an
+		// authoritative shared view of the map's NPCs - the model fix at the heart of the roadmap (NPCs are otherwise
+		// only per-player burst replays the server doesn't track). The tick/AI/combat will drive these; clients still
+		// render them from the burst for now, so this is model bookkeeping (no wire change).
+		private async Task EnsureZoneNpcs(uint mapId)
+		{
+			if (!_npcLoadedZones.TryAdd(mapId, 0))
+				return;
+
+			var npcs = await Database.GetNpcSpawns(mapId);
+			var zone = _world.ZoneFor(mapId);
+			foreach (var npc in npcs)
+			{
+				zone.Add(WorldEntity.ForNpc(npc.CapturedHandle, mapId,
+					new Vector3(npc.PositionX, npc.PositionY, npc.PositionZ),
+					new Vector3(npc.RotationX, npc.RotationY, npc.RotationZ),
+					npc.Name ?? "NPC"));
+			}
+
+			Logger.LogInformation("World: loaded {Count} NPC(s) into map {Map}'s zone.", npcs.Length, mapId);
+		}
+
 		// After a player's Move: update interest and broadcast the resulting spawns/moves to nearby players.
 		private async Task BroadcastPlayerMove(INetworkClient client, uint moveSubop, uint dataObject, uint dataClientInstance, ushort movingType, Vector3 position, Vector3 rotation, byte[] tail)
 		{

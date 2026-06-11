@@ -463,8 +463,10 @@ namespace Faolan.GameServer
 			Logger.LogInformation("World entry (map={Map}, '{Name}'): replaying {Count} IIR records from the DB ({Source}).", mapId, client.Session.Character?.Name, worldBurst.Entities.Count, worldBurst.MapId == mapId
 				? "own map"
 				: $"beach fallback (map {worldBurst.MapId})");
-			// Register in the live model BEFORE the burst so the player's own spawn body can be captured into the
-			// entity during the replay (docs/server-architecture-roadmap.md).
+			// Populate the shared world model: the map's NPCs (once) + this player. Registered BEFORE the burst so
+			// the player's own spawn body can be captured into the entity during the replay
+			// (docs/server-architecture-roadmap.md).
+			await EnsureZoneNpcs(mapId);
 			RegisterPlayerInWorld(client);
 			await ReplayMapWorldBurst(client, worldBurst);
 

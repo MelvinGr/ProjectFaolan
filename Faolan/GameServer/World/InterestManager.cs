@@ -26,12 +26,15 @@ namespace Faolan.GameServer.World
 		{
 			var events = new List<InterestEvent>();
 
-			// (1) The mover's own view (only a player receives packets): entities it came into range of are spawned,
+			// (1) The mover's own view (only a player receives packets): players it came into range of are spawned,
 			//     ones it left are despawned. (Others moving is handled by their own ResolveMove call.)
+			//     TRANSITIONAL: only PLAYERS here - NPCs are still rendered by the per-player world-burst replay, so
+			//     spawning them via interest too would double them. When NPCs become model-driven (burst retired),
+			//     widen this to EntitiesInRange so a player walking into a region streams its NPCs.
 			if (mover.IsPlayer)
 			{
 				var inRange = new HashSet<uint>();
-				foreach (var other in zone.EntitiesInRange(mover.Position, range, mover.Handle))
+				foreach (var other in zone.PlayersInRange(mover.Position, range, mover.Handle))
 				{
 					inRange.Add(other.Handle);
 					if (mover.Known.Add(other.Handle))
