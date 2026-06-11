@@ -5,7 +5,6 @@ using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
-using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer
 {
@@ -20,7 +19,9 @@ namespace Faolan.Importer
 		public static async Task<int> ImportAsync(DatabaseContext db, string rdbDir)
 		{
 			using var rdb = new RdbReader(rdbDir);
-			var entry = rdb.EntriesOfType(LuaArchiveType).FirstOrDefault(e => e.Size > 0);
+			var entry = rdb
+				.EntriesOfType(LuaArchiveType)
+				.FirstOrDefault(e => e.Size > 0);
 			if (entry.Size == 0)
 				return 0;
 
@@ -30,7 +31,11 @@ namespace Faolan.Importer
 			db.LuaScripts.RemoveRange(db.LuaScripts);
 			await db.SaveChangesAsync();
 			foreach (var (id, source) in scripts)
-				db.LuaScripts.Add(new LuaScript { Id = id, Source = source });
+				db.LuaScripts.Add(new LuaScript
+				{
+					Id = id,
+					Source = source
+				});
 			await db.SaveChangesAsync();
 
 			return scripts.Count;
@@ -86,7 +91,7 @@ namespace Faolan.Importer
 			return outv;
 		}
 
-		private static ulong ReadVarint(System.ReadOnlySpan<byte> b, ref int p)
+		private static ulong ReadVarint(ReadOnlySpan<byte> b, ref int p)
 		{
 			ulong v = 0;
 			var shift = 0;
@@ -96,6 +101,7 @@ namespace Faolan.Importer
 				v |= (ulong)(x & 0x7f) << shift;
 				if ((x & 0x80) == 0)
 					break;
+
 				shift += 7;
 			}
 

@@ -11,10 +11,10 @@ namespace Faolan.Tests
 	// dumping the whole tree at once. A stage ends at an answer-list (0xF164A4A5) or close-window (0xC4AF39EB).
 	public class ConversationStageSegmentationTests
 	{
-		private const uint OpenWindow = 0x045B0B0F;
-		private const uint AppendText = 0x4A3D899A;
 		private const uint AnswerList = 0xF164A4A5;
+		private const uint AppendText = 0x4A3D899A;
 		private const uint CloseWindow = 0xC4AF39EB;
+		private const uint OpenWindow = 0x045B0B0F;
 
 		[Fact]
 		public void Segments_AtAnswerListAndCloseWindow_OneStagePerExchange()
@@ -22,9 +22,13 @@ namespace Faolan.Tests
 			// A bundled three-stage conversation: greeting+options, an option reply+options, then a closing reply.
 			var packets = new List<byte[]>
 			{
-				Packet(OpenWindow), Packet(AppendText), Packet(AnswerList), // stage 0
-				Packet(AppendText), Packet(AnswerList), // stage 1
-				Packet(AppendText), Packet(CloseWindow) // stage 2 (ends the conversation)
+				Packet(OpenWindow),
+				Packet(AppendText),
+				Packet(AnswerList), // stage 0
+				Packet(AppendText),
+				Packet(AnswerList), // stage 1
+				Packet(AppendText),
+				Packet(CloseWindow) // stage 2 (ends the conversation)
 			};
 
 			var stages = GameServerListener.SegmentConversationStages(packets);
@@ -36,11 +40,28 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void Segments_SingleStage_WhenNoFurtherOptions()
+		{
+			var packets = new List<byte[]>
+			{
+				Packet(OpenWindow),
+				Packet(AppendText),
+				Packet(AnswerList)
+			};
+
+			var stages = GameServerListener.SegmentConversationStages(packets);
+
+			Assert.Single(stages);
+			Assert.Equal(3, stages[0].Count);
+		}
+
+		[Fact]
 		public void Segments_TrailingPacketsWithoutTerminator_FormAFinalStage()
 		{
 			var packets = new List<byte[]>
 			{
-				Packet(OpenWindow), Packet(AnswerList), // stage 0
+				Packet(OpenWindow),
+				Packet(AnswerList), // stage 0
 				Packet(AppendText) // a trailing reply with no answer-list/close -> its own final stage
 			};
 
@@ -48,17 +69,6 @@ namespace Faolan.Tests
 
 			Assert.Equal(2, stages.Count);
 			Assert.Single(stages[1]);
-		}
-
-		[Fact]
-		public void Segments_SingleStage_WhenNoFurtherOptions()
-		{
-			var packets = new List<byte[]> { Packet(OpenWindow), Packet(AppendText), Packet(AnswerList) };
-
-			var stages = GameServerListener.SegmentConversationStages(packets);
-
-			Assert.Single(stages);
-			Assert.Equal(3, stages[0].Count);
 		}
 
 		// A minimal on-wire packet: [len][crc][headerLen=0][u32 bodyLen][u32 subOpcode]. SegmentConversationStages

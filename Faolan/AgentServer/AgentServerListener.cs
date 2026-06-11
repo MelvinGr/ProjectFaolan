@@ -25,6 +25,18 @@ namespace Faolan.AgentServer
 			_dispatcher = dispatcher;
 		}
 
+		public IReadOnlyList<SessionInfo> GetSessions()
+		{
+			return NetworkClients
+				.Select(nc =>
+				{
+					var account = nc.Session?.Account;
+					var character = nc.Session?.Character;
+					return new SessionInfo(nc.IpAddress, account?.Id, account?.UserName, account?.ClientInstance ?? 0, character?.Id, character?.Name, character?.Level);
+				})
+				.ToArray();
+		}
+
 		public override Task StartAsync(CancellationToken cancellationToken)
 		{
 			_dispatcher.Register(this);
@@ -35,25 +47,6 @@ namespace Faolan.AgentServer
 		{
 			_dispatcher.Unregister(this);
 			return base.StopAsync(cancellationToken);
-		}
-
-		public IReadOnlyList<SessionInfo> GetSessions()
-		{
-			return NetworkClients
-				.Select(nc =>
-				{
-					var account = nc.Session?.Account;
-					var character = nc.Session?.Character;
-					return new SessionInfo(
-						nc.IpAddress,
-						account?.Id,
-						account?.UserName,
-						account?.ClientInstance ?? 0,
-						character?.Id,
-						character?.Name,
-						character?.Level);
-				})
-				.ToArray();
 		}
 
 		protected override async Task ReceivedPacket(INetworkClient client, AgentServerPacket packet)
@@ -134,8 +127,7 @@ namespace Faolan.AgentServer
 					var channelId = packet.Body.ReadUInt32();
 					var message = packet.Body.ReadString();
 
-					Logger.LogInformation("AgentServer channel chat from {Character} on channel {Type:X2}/{Id:X8}: {Message}",
-						client.Session.Character?.Name ?? "?", channelType, channelId, message);
+					Logger.LogInformation("AgentServer channel chat from {Character} on channel {Type:X2}/{Id:X8}: {Message}", client.Session.Character?.Name ?? "?", channelType, channelId, message);
 
 					await BroadcastChannelChat(client, channelType, channelId, message);
 

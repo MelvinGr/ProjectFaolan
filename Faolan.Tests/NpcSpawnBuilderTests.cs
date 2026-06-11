@@ -12,9 +12,7 @@ namespace Faolan.Tests
 	// new session handle changes only the handle field.
 	public class NpcSpawnBuilderTests
 	{
-		[Theory]
-		[InlineData("SpawnNpcCrocodile")]
-		[InlineData("SpawnNpcCasilda")]
+		[Theory, InlineData("SpawnNpcCrocodile"), InlineData("SpawnNpcCasilda")]
 		public void TryBuild_FromCapturedRow_ReproducesCapturedBody(string golden)
 		{
 			var capturedBody = Golden.Bytes(golden);
@@ -43,6 +41,11 @@ namespace Faolan.Tests
 			}
 		}
 
+		private static float ReadLE(byte[] b, int offset)
+		{
+			return BinaryPrimitives.ReadSingleLittleEndian(b.AsSpan(offset, 4));
+		}
+
 		// Builds an NpcSpawn row the way the importer does: Data = the full captured packet (12-byte zero header
 		// wrapping the body), transform columns read from the captured body's transform offsets.
 		private static NpcSpawn RowFromCapturedBody(byte[] body)
@@ -60,11 +63,6 @@ namespace Faolan.Tests
 				RotationZ = ReadLE(body, SpawnPacketBuilder.RotZOffset),
 				RotationW = ReadLE(body, SpawnPacketBuilder.RotWOffset)
 			};
-		}
-
-		private static float ReadLE(byte[] b, int offset)
-		{
-			return BinaryPrimitives.ReadSingleLittleEndian(b.AsSpan(offset, 4));
 		}
 	}
 }

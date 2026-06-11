@@ -18,26 +18,26 @@ namespace Faolan.Core.Database
 		DbSet<CharacterEquipment> CharacterEquipment { get; }
 		DbSet<CharacterInventory> CharacterInventory { get; }
 		DbSet<CharacterMaxStats> CharacterMaxStats { get; }
+		DbSet<CharacterQuest> CharacterQuests { get; }
+		DbSet<CharacterRespawnPoint> CharacterRespawnPoints { get; }
 		DbSet<CharacterScaffoldPair> CharacterScaffoldPairs { get; }
 		DbSet<CharacterSkill> CharacterSkills { get; }
 		DbSet<CharacterSpawnFrame> CharacterSpawnFrames { get; }
+		DbSet<CharacterTag> CharacterTags { get; }
 		DbSet<ClassAbility> ClassAbilities { get; }
 		DbSet<ConversationNode> ConversationNodes { get; }
 		DbSet<ConversationPacket> ConversationPackets { get; }
 		DbSet<Item> Items { get; }
+		DbSet<LuaScript> LuaScripts { get; }
 		DbSet<Map> Maps { get; }
 		DbSet<MapWorldBurst> MapWorldBursts { get; }
 		DbSet<MapWorldBurstEntity> MapWorldBurstEntities { get; }
 		DbSet<MorphTarget> MorphTargets { get; }
 		DbSet<NpcSpawn> NpcSpawns { get; }
-		DbSet<WorldObject> WorldObjects { get; }
 		DbSet<Realm> Realms { get; }
-		DbSet<Spell> Spells { get; }
 		DbSet<RespawnPoint> RespawnPoints { get; }
-		DbSet<CharacterRespawnPoint> CharacterRespawnPoints { get; }
-		DbSet<CharacterQuest> CharacterQuests { get; }
-		DbSet<LuaScript> LuaScripts { get; }
-		DbSet<CharacterTag> CharacterTags { get; }
+		DbSet<Spell> Spells { get; }
+		DbSet<WorldObject> WorldObjects { get; }
 		Task<int> SaveChangesAsync(CancellationToken cancellationToken = default); // from DbContext
 	}
 
@@ -54,26 +54,26 @@ namespace Faolan.Core.Database
 		public DbSet<CharacterInventory> CharacterInventory { get; set; }
 
 		public DbSet<CharacterMaxStats> CharacterMaxStats { get; set; }
+		public DbSet<CharacterQuest> CharacterQuests { get; set; }
+		public DbSet<CharacterRespawnPoint> CharacterRespawnPoints { get; set; }
 		public DbSet<CharacterScaffoldPair> CharacterScaffoldPairs { get; set; }
 		public DbSet<CharacterSkill> CharacterSkills { get; set; }
 		public DbSet<CharacterSpawnFrame> CharacterSpawnFrames { get; set; }
+		public DbSet<CharacterTag> CharacterTags { get; set; }
 		public DbSet<ClassAbility> ClassAbilities { get; set; }
 		public DbSet<ConversationNode> ConversationNodes { get; set; }
 		public DbSet<ConversationPacket> ConversationPackets { get; set; }
 		public DbSet<Item> Items { get; set; }
+		public DbSet<LuaScript> LuaScripts { get; set; }
 		public DbSet<Map> Maps { get; set; }
 		public DbSet<MapWorldBurst> MapWorldBursts { get; set; }
 		public DbSet<MapWorldBurstEntity> MapWorldBurstEntities { get; set; }
 		public DbSet<MorphTarget> MorphTargets { get; set; }
 		public DbSet<NpcSpawn> NpcSpawns { get; set; }
-		public DbSet<WorldObject> WorldObjects { get; set; }
 		public DbSet<Realm> Realms { get; set; }
-		public DbSet<Spell> Spells { get; set; }
 		public DbSet<RespawnPoint> RespawnPoints { get; set; }
-		public DbSet<CharacterRespawnPoint> CharacterRespawnPoints { get; set; }
-		public DbSet<CharacterQuest> CharacterQuests { get; set; }
-		public DbSet<LuaScript> LuaScripts { get; set; }
-		public DbSet<CharacterTag> CharacterTags { get; set; }
+		public DbSet<Spell> Spells { get; set; }
+		public DbSet<WorldObject> WorldObjects { get; set; }
 
 		public DatabaseContext(DbContextOptions<DatabaseContext> dbContextOptions) : base(dbContextOptions)
 		{

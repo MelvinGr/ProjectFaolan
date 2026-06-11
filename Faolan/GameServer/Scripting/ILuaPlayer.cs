@@ -6,15 +6,15 @@ namespace Faolan.GameServer.Scripting
 	// use an in-memory implementation. Unknown/rare calls can no-op safely (the VM is permissive).
 	public interface ILuaPlayer
 	{
-		bool HasTag(int tagId);
 		void AddTag(int tagId);
-		bool HasCompletedQuest(int questId);
-		int GetIntStat(int statId);
-		void Count(int counterId);
-		void SpawnItem(int resourceHash, int count);
-		void SolveGoal(int goalId);
 		void CastSpell(int spellId);
+		void Count(int counterId);
+		int GetIntStat(int statId);
 		string GetTagName(int tagId);
 		bool HasBuff(int buffId);
+		bool HasCompletedQuest(int questId);
+		bool HasTag(int tagId);
+		void SolveGoal(int goalId);
+		void SpawnItem(int resourceHash, int count);
 	}
 }

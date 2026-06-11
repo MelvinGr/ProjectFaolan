@@ -72,9 +72,12 @@ namespace Faolan.GameServer.Combat
 			return changed;
 		}
 
-		private static uint ClampToMax(uint value, uint max)
+		/// <summary>Restores all three pools to their max (a full revive, e.g. on respawn).</summary>
+		public void ReviveToFull()
 		{
-			return value > max ? max : value;
+			Health = MaxHealth;
+			Stamina = MaxStamina;
+			Mana = MaxMana;
 		}
 
 		/// <summary>
@@ -91,14 +94,6 @@ namespace Faolan.GameServer.Combat
 				.Set(LegacyCharacterStatId.StaminaMax, MaxStamina)
 				.Set(LegacyCharacterStatId.ManaCurrent, Mana)
 				.Set(LegacyCharacterStatId.ManaMax, MaxMana);
-		}
-
-		/// <summary>Restores all three pools to their max (a full revive, e.g. on respawn).</summary>
-		public void ReviveToFull()
-		{
-			Health = MaxHealth;
-			Stamina = MaxStamina;
-			Mana = MaxMana;
 		}
 
 		/// <summary>
@@ -124,6 +119,13 @@ namespace Faolan.GameServer.Combat
 				Stamina = stamina,
 				MaxStamina = stamina
 			};
+		}
+
+		private static uint ClampToMax(uint value, uint max)
+		{
+			return value > max
+				? max
+				: value;
 		}
 	}
 }

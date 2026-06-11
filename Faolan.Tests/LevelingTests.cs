@@ -8,11 +8,20 @@ namespace Faolan.Tests
 	public class LevelingTests
 	{
 		[Fact]
-		public void XpForNextLevel_RampsWithLevel()
+		public void Apply_CapsAtMaxLevel_NoOverflow()
 		{
-			Assert.Equal(100u, LevelingResolver.XpForNextLevel(1));
-			Assert.Equal(200u, LevelingResolver.XpForNextLevel(2));
-			Assert.Equal(LevelingResolver.XpForNextLevel(1), LevelingResolver.XpForNextLevel(0)); // 0 treated as 1
+			var (gained, remaining) = LevelingResolver.Apply(LevelingResolver.MaxLevel, 999999);
+			Assert.Equal(0u, gained);
+			Assert.Equal(0u, remaining); // bar sits empty at cap
+		}
+
+		[Fact]
+		public void Apply_MultiLevelInOneAward()
+		{
+			// from level 1: 100 (->2) + 200 (->3) = 300 consumed; 350 -> +2 levels, 50 left.
+			var (gained, remaining) = LevelingResolver.Apply(1, 350);
+			Assert.Equal(2u, gained);
+			Assert.Equal(50u, remaining);
 		}
 
 		[Fact]
@@ -33,27 +42,18 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void Apply_MultiLevelInOneAward()
-		{
-			// from level 1: 100 (->2) + 200 (->3) = 300 consumed; 350 -> +2 levels, 50 left.
-			var (gained, remaining) = LevelingResolver.Apply(1, 350);
-			Assert.Equal(2u, gained);
-			Assert.Equal(50u, remaining);
-		}
-
-		[Fact]
-		public void Apply_CapsAtMaxLevel_NoOverflow()
-		{
-			var (gained, remaining) = LevelingResolver.Apply(LevelingResolver.MaxLevel, 999999);
-			Assert.Equal(0u, gained);
-			Assert.Equal(0u, remaining); // bar sits empty at cap
-		}
-
-		[Fact]
 		public void Apply_StopsExactlyAtMaxLevel()
 		{
 			var (gained, _) = LevelingResolver.Apply(LevelingResolver.MaxLevel - 1, 999999);
 			Assert.Equal(1u, gained); // only the one level up to the cap
+		}
+
+		[Fact]
+		public void XpForNextLevel_RampsWithLevel()
+		{
+			Assert.Equal(100u, LevelingResolver.XpForNextLevel(1));
+			Assert.Equal(200u, LevelingResolver.XpForNextLevel(2));
+			Assert.Equal(LevelingResolver.XpForNextLevel(1), LevelingResolver.XpForNextLevel(0)); // 0 treated as 1
 		}
 	}
 }

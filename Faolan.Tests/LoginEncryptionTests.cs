@@ -20,7 +20,7 @@ namespace Faolan.Tests
 		// empty ciphertext
 		// empty clientPub
 		// ciphertext not a whole number of 8-byte blocks (needs 16 hex/block)
-			// non-hex clientPub
+		// non-hex clientPub
 		public void Decrypt_Malformed_ReturnsNull(string loginKey)
 		{
 			Assert.Null(LoginEncryption.Decrypt(loginKey));

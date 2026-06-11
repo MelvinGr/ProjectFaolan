@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
+using Faolan.GameServer.World;
 
 namespace Faolan.GameServer
 {
@@ -22,7 +23,7 @@ namespace Faolan.GameServer
 		// login packet on this single conversation is what lets the client tie the spawns to the loaded
 		// playfield and render them (the player avatar renders regardless, but NPCs do not). The bytes live on
 		// World.WorldFraming (the single source shared with the WorldBroadcaster); these delegate to it.
-		private static readonly byte[] LoginWorldSender = World.WorldFraming.Sender;
+		private static readonly byte[] LoginWorldSender = WorldFraming.Sender;
 
 		// Ping/latency replies ride a different conversation SUB-ID (0x08) than the world burst (0x58) - confirmed
 		// from gameplay dumps (Pong 0x2009 and LatencyCheckResponse 0x2082 both consistently use 0x08). Same
@@ -64,7 +65,7 @@ namespace Faolan.GameServer
 
 		private static byte[] LoginWorldReceiver(INetworkClient client)
 		{
-			return World.WorldFraming.Receiver(client);
+			return WorldFraming.Receiver(client);
 		}
 	}
 }

@@ -25,46 +25,6 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void Regenerate_RaisesPoolsTowardMax_AndReportsChange()
-		{
-			var v = EntityVitals.FromMax(100, 100, 100);
-			v.ApplyHealthDelta(-50); // 50/100 hp
-			v.ApplyManaDelta(-40); // 60/100 mana
-			v.Stamina = 80;
-
-			var changed = v.Regenerate(10, 10, 10);
-
-			Assert.True(changed);
-			Assert.Equal(60u, v.Health);
-			Assert.Equal(90u, v.Stamina);
-			Assert.Equal(70u, v.Mana);
-		}
-
-		[Fact]
-		public void Regenerate_ClampsAtMax()
-		{
-			var v = EntityVitals.FromMax(100, 100, 100);
-			v.ApplyHealthDelta(-5); // 95/100
-
-			v.Regenerate(50, 50, 50); // would overshoot
-
-			Assert.Equal(100u, v.Health);
-			Assert.Equal(100u, v.Stamina);
-			Assert.Equal(100u, v.Mana);
-		}
-
-		[Fact]
-		public void Regenerate_AtFull_DoesNothing_AndReportsNoChange()
-		{
-			var v = EntityVitals.FromMax(100, 100, 100); // current == max
-
-			var changed = v.Regenerate(10, 10, 10);
-
-			Assert.False(changed); // nothing to regen -> caller skips the vitals push
-			Assert.Equal(100u, v.Health);
-		}
-
-		[Fact]
 		public void CombatState_GetOrAdd_SeedsOnceThenReturnsSameInstance()
 		{
 			var state = new CombatState();
@@ -91,6 +51,57 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void Regenerate_AtFull_DoesNothing_AndReportsNoChange()
+		{
+			var v = EntityVitals.FromMax(100, 100, 100); // current == max
+
+			var changed = v.Regenerate(10, 10, 10);
+
+			Assert.False(changed); // nothing to regen -> caller skips the vitals push
+			Assert.Equal(100u, v.Health);
+		}
+
+		[Fact]
+		public void Regenerate_ClampsAtMax()
+		{
+			var v = EntityVitals.FromMax(100, 100, 100);
+			v.ApplyHealthDelta(-5); // 95/100
+
+			v.Regenerate(50, 50, 50); // would overshoot
+
+			Assert.Equal(100u, v.Health);
+			Assert.Equal(100u, v.Stamina);
+			Assert.Equal(100u, v.Mana);
+		}
+
+		[Fact]
+		public void Regenerate_RaisesPoolsTowardMax_AndReportsChange()
+		{
+			var v = EntityVitals.FromMax(100, 100, 100);
+			v.ApplyHealthDelta(-50); // 50/100 hp
+			v.ApplyManaDelta(-40); // 60/100 mana
+			v.Stamina = 80;
+
+			var changed = v.Regenerate(10, 10, 10);
+
+			Assert.True(changed);
+			Assert.Equal(60u, v.Health);
+			Assert.Equal(90u, v.Stamina);
+			Assert.Equal(70u, v.Mana);
+		}
+
+		[Fact]
+		public void ResolveKillXp_ScalesWithNpcLevel()
+		{
+			Assert.Equal(10u + 1 * 25u, CombatResolver.ResolveKillXp(1));
+			Assert.Equal(10u + 20 * 25u, CombatResolver.ResolveKillXp(20));
+			// Higher-level NPCs are worth more.
+			Assert.True(CombatResolver.ResolveKillXp(20) > CombatResolver.ResolveKillXp(5));
+			// Level 0 is treated as 1.
+			Assert.Equal(CombatResolver.ResolveKillXp(1), CombatResolver.ResolveKillXp(0));
+		}
+
+		[Fact]
 		public void ResolveSpellDamage_ScalesWithCasterLevel()
 		{
 			Assert.Equal(20 + 1 * 5, CombatResolver.ResolveSpellDamage(123, 1));
@@ -113,17 +124,6 @@ namespace Faolan.Tests
 			Assert.Equal(v.MaxHealth, v.Health);
 			Assert.Equal(v.MaxStamina, v.Stamina);
 			Assert.Equal(v.MaxMana, v.Mana);
-		}
-
-		[Fact]
-		public void ResolveKillXp_ScalesWithNpcLevel()
-		{
-			Assert.Equal(10u + 1 * 25u, CombatResolver.ResolveKillXp(1));
-			Assert.Equal(10u + 20 * 25u, CombatResolver.ResolveKillXp(20));
-			// Higher-level NPCs are worth more.
-			Assert.True(CombatResolver.ResolveKillXp(20) > CombatResolver.ResolveKillXp(5));
-			// Level 0 is treated as 1.
-			Assert.Equal(CombatResolver.ResolveKillXp(1), CombatResolver.ResolveKillXp(0));
 		}
 
 		[Fact]

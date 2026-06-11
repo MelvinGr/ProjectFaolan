@@ -9,24 +9,21 @@ namespace Faolan.Tests
 	// the spatial range queries interest management uses to send moves/spawns to nearby players only.
 	public class WorldStateTests
 	{
-		private static WorldEntity Player(uint handle, float x, float z) =>
-			new WorldEntity(handle, 0, true, $"P{handle}", null) { Position = new Vector3(x, 0, z) };
-
-		private static WorldEntity Npc(uint handle, float x, float z) =>
-			new WorldEntity(handle, 0, false, $"N{handle}", null) { Position = new Vector3(x, 0, z) };
-
 		[Fact]
-		public void ZoneFor_MintsAMonotonicPlayfieldToken()
+		public void EntitiesInRange_IncludesNpcs_WithinRange()
 		{
-			var world = new WorldState();
+			var zone = new Zone(2040);
+			zone.Add(Player(1, 0, 0));
+			zone.Add(Npc(4, 5, 0));
+			zone.Add(Npc(5, 100, 0));
 
-			var first = world.ZoneFor(2040).PlayfieldToken;
-			var second = world.ZoneFor(4010).PlayfieldToken;
+			var seen = zone
+				.EntitiesInRange(new Vector3(0, 0, 0), 50f)
+				.Select(e => e.Handle)
+				.OrderBy(h => h)
+				.ToArray();
 
-			Assert.NotEqual(0u, first); // every zone has a token from creation (despawns never skipped for lack of one)
-			Assert.True(second > first, "playfield tokens are allocated monotonically");
-			// re-fetching the same map returns the same zone, not a fresh token
-			Assert.Equal(first, world.ZoneFor(2040).PlayfieldToken);
+			Assert.Equal(new uint[] { 1, 4 }, seen); // self + near npc; the far npc is out of range
 		}
 
 		[Fact]
@@ -44,25 +41,18 @@ namespace Faolan.Tests
 
 			world.Place(e, 2040, new Vector3(10, 0, 10), Vector3.Zero);
 			Assert.Equal(2040u, e.MapId);
-			Assert.Equal(1, world.ZoneFor(2040).Count);
+			Assert.Equal(1, world.ZoneFor(2040)
+				.Count);
 
 			// A map change moves the entity out of the old zone into the new one.
 			world.Place(e, 3000, new Vector3(5, 0, 5), Vector3.Zero);
-			Assert.Equal(0, world.ZoneFor(2040).Count);
-			Assert.Equal(1, world.ZoneFor(3000).Count);
-			Assert.True(world.ZoneFor(3000).TryGet(1, out _));
-		}
-
-		[Fact]
-		public void Remove_TakesEntityOutOfItsZone()
-		{
-			var world = new WorldState();
-			var e = Player(1, 0, 0);
-			world.Place(e, 2040, Vector3.Zero, Vector3.Zero);
-
-			world.Remove(e);
-
-			Assert.Equal(0, world.ZoneFor(2040).Count);
+			Assert.Equal(0, world.ZoneFor(2040)
+				.Count);
+			Assert.Equal(1, world.ZoneFor(3000)
+				.Count);
+			Assert.True(world
+				.ZoneFor(3000)
+				.TryGet(1, out _));
 		}
 
 		[Fact]
@@ -76,7 +66,8 @@ namespace Faolan.Tests
 			foreach (var e in new[] { self, near, far, npc })
 				zone.Add(e);
 
-			var seen = zone.PlayersInRange(self.Position, 50f, excludeHandle: self.Handle)
+			var seen = zone
+				.PlayersInRange(self.Position, 50f, self.Handle)
 				.Select(e => e.Handle)
 				.OrderBy(h => h)
 				.ToArray();
@@ -85,19 +76,43 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void EntitiesInRange_IncludesNpcs_WithinRange()
+		public void Remove_TakesEntityOutOfItsZone()
 		{
-			var zone = new Zone(2040);
-			zone.Add(Player(1, 0, 0));
-			zone.Add(Npc(4, 5, 0));
-			zone.Add(Npc(5, 100, 0));
+			var world = new WorldState();
+			var e = Player(1, 0, 0);
+			world.Place(e, 2040, Vector3.Zero, Vector3.Zero);
 
-			var seen = zone.EntitiesInRange(new Vector3(0, 0, 0), 50f)
-				.Select(e => e.Handle)
-				.OrderBy(h => h)
-				.ToArray();
+			world.Remove(e);
 
-			Assert.Equal(new uint[] { 1, 4 }, seen); // self + near npc; the far npc is out of range
+			Assert.Equal(0, world.ZoneFor(2040)
+				.Count);
+		}
+
+		[Fact]
+		public void ZoneFor_MintsAMonotonicPlayfieldToken()
+		{
+			var world = new WorldState();
+
+			var first = world.ZoneFor(2040)
+				.PlayfieldToken;
+			var second = world.ZoneFor(4010)
+				.PlayfieldToken;
+
+			Assert.NotEqual(0u, first); // every zone has a token from creation (despawns never skipped for lack of one)
+			Assert.True(second > first, "playfield tokens are allocated monotonically");
+			// re-fetching the same map returns the same zone, not a fresh token
+			Assert.Equal(first, world.ZoneFor(2040)
+				.PlayfieldToken);
+		}
+
+		private static WorldEntity Npc(uint handle, float x, float z)
+		{
+			return new WorldEntity(handle, 0, false, $"N{handle}", null) { Position = new Vector3(x, 0, z) };
+		}
+
+		private static WorldEntity Player(uint handle, float x, float z)
+		{
+			return new WorldEntity(handle, 0, true, $"P{handle}", null) { Position = new Vector3(x, 0, z) };
 		}
 	}
 }

@@ -82,10 +82,12 @@ namespace Faolan.Core.Network.Conan
 				_logger.LogDebug("<= [{Channel} {OpcodeName}] headerData ({HeaderDataLength} bytes): {HeaderData}", _channelName, opcodeName, packet.HeaderData.Length, packet.HeaderData.ToHex());
 
 			if (packet.Body?.Length > 0)
+			{
 				_logger.LogDebug("<= [{Channel} {OpcodeName}] body ({BodyLength} bytes): {Body}", _channelName, opcodeName, packet.Body.Length, packet
 					.Body
 					.ToArray()
 					.ToHex());
+			}
 		}
 
 		private static string FormatOpcodeName(Type enumType, ushort opcode)

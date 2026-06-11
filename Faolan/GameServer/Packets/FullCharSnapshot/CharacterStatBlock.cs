@@ -43,9 +43,11 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		{
 			stream.WriteByte((byte)_records.Count);
 			foreach (var (statId, rawValue) in _records)
+			{
 				stream
 					.WriteUInt32(statId)
 					.WriteUInt32(rawValue);
+			}
 
 			return stream;
 		}

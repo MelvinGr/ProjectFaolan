@@ -14,10 +14,7 @@ namespace Faolan.GameServer.Spawn
 	{
 		public static bool TryBuild(WorldObject row, uint handle, out byte[] body)
 		{
-			return TryBuild(row, handle,
-				new Vector3(row?.PositionX ?? 0, row?.PositionY ?? 0, row?.PositionZ ?? 0),
-				new Quaternion(row?.RotationX ?? 0, row?.RotationY ?? 0, row?.RotationZ ?? 0, row?.RotationW ?? 1),
-				out body);
+			return TryBuild(row, handle, new Vector3(row?.PositionX ?? 0, row?.PositionY ?? 0, row?.PositionZ ?? 0), new Quaternion(row?.RotationX ?? 0, row?.RotationY ?? 0, row?.RotationZ ?? 0, row?.RotationW ?? 1), out body);
 		}
 
 		// As TryBuild, but places the object at an EXPLICIT transform rather than the row's captured one - used to
@@ -47,36 +44,12 @@ namespace Faolan.GameServer.Spawn
 				return false;
 
 			body = new byte[liveOffset + (template.Length - rowOffset)];
-			liveBody[..liveOffset].CopyTo(body);
-			template.AsSpan(rowOffset).CopyTo(body.AsSpan(liveOffset));
+			liveBody[..liveOffset]
+				.CopyTo(body);
+			template
+				.AsSpan(rowOffset)
+				.CopyTo(body.AsSpan(liveOffset));
 			return true;
-		}
-
-		// Offset where the object message's u32 length prefix begins: just after the 0x2C transform group
-		// (0A vec3, 12 quat, optional 25 scale, 18 playfield-varint). No pre-IIR block, unlike entity spawns.
-		private static bool TryMessageOffset(ReadOnlySpan<byte> b, out int offset)
-		{
-			offset = 0;
-			var i = 20;
-			if (b.Length <= i || b[i] != 0x2C)
-				return false;
-			i++;
-			if (i + 1 >= b.Length || b[i] != 0x0A)
-				return false;
-			i += 2 + b[i + 1]; // 0A vec3
-			if (i + 1 >= b.Length || b[i] != 0x12)
-				return false;
-			i += 2 + b[i + 1]; // 12 quat
-			if (i < b.Length && b[i] == 0x25)
-				i += 5; // optional 25 scale
-			if (i >= b.Length || b[i] != 0x18)
-				return false;
-			i++;
-			while (i < b.Length && (b[i] & 0x80) != 0) // playfield varint
-				i++;
-			i++;
-			offset = i;
-			return i + 4 <= b.Length;
 		}
 
 		// The captured `Data` is the full Conan packet ([u32 len][u32 crc][u32 headerLen][header][body]); the
@@ -91,6 +64,37 @@ namespace Faolan.GameServer.Spawn
 			return bodyStart <= data.Length
 				? data[bodyStart..]
 				: null;
+		}
+
+		// Offset where the object message's u32 length prefix begins: just after the 0x2C transform group
+		// (0A vec3, 12 quat, optional 25 scale, 18 playfield-varint). No pre-IIR block, unlike entity spawns.
+		private static bool TryMessageOffset(ReadOnlySpan<byte> b, out int offset)
+		{
+			offset = 0;
+			var i = 20;
+			if (b.Length <= i || b[i] != 0x2C)
+				return false;
+
+			i++;
+			if (i + 1 >= b.Length || b[i] != 0x0A)
+				return false;
+
+			i += 2 + b[i + 1]; // 0A vec3
+			if (i + 1 >= b.Length || b[i] != 0x12)
+				return false;
+
+			i += 2 + b[i + 1]; // 12 quat
+			if (i < b.Length && b[i] == 0x25)
+				i += 5; // optional 25 scale
+			if (i >= b.Length || b[i] != 0x18)
+				return false;
+
+			i++;
+			while (i < b.Length && (b[i] & 0x80) != 0) // playfield varint
+				i++;
+			i++;
+			offset = i;
+			return i + 4 <= b.Length;
 		}
 	}
 }

@@ -25,9 +25,11 @@ namespace Faolan.ClientLauncher
 		private static bool ClientIsRunning()
 		{
 			if (OperatingSystem.IsWindows())
+			{
 				return Process.GetProcessesByName("AgeOfConan")
 					.Length > 0 || Process.GetProcessesByName("AgeOfConanDX10")
 					.Length > 0;
+			}
 
 			foreach (var dir in Directory.EnumerateDirectories("/proc"))
 			{

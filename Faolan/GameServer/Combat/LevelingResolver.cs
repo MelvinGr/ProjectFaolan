@@ -9,13 +9,6 @@ namespace Faolan.GameServer.Combat
 		// AoC's level cap.
 		public const uint MaxLevel = 80;
 
-		// Experience required to advance FROM `level` to level+1. Linear ramp (level 1->2 = 100, 2->3 = 200, ...).
-		public static uint XpForNextLevel(uint level)
-		{
-			var l = level == 0 ? 1u : level;
-			return 100u * l;
-		}
-
 		// Spends accumulated `experience` against the curve from `level`: returns how many levels were gained and the
 		// leftover within-level experience. Stops at MaxLevel (no overflow - leftover is zeroed at the cap).
 		public static (uint LevelsGained, uint RemainingXp) Apply(uint level, uint experience)
@@ -26,6 +19,7 @@ namespace Faolan.GameServer.Combat
 				var need = XpForNextLevel(level + gained);
 				if (experience < need)
 					break;
+
 				experience -= need;
 				gained++;
 			}
@@ -34,6 +28,15 @@ namespace Faolan.GameServer.Combat
 				experience = 0; // capped: the bar sits empty at max level
 
 			return (gained, experience);
+		}
+
+		// Experience required to advance FROM `level` to level+1. Linear ramp (level 1->2 = 100, 2->3 = 200, ...).
+		public static uint XpForNextLevel(uint level)
+		{
+			var l = level == 0
+				? 1u
+				: level;
+			return 100u * l;
 		}
 	}
 }

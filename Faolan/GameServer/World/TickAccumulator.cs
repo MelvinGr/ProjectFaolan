@@ -16,7 +16,9 @@ namespace Faolan.GameServer.World
 		public TickAccumulator(double intervalSeconds)
 		{
 			// A non-positive interval would fire every tick; clamp to a tiny positive value so it stays well-defined.
-			_interval = intervalSeconds > 0 ? intervalSeconds : double.Epsilon;
+			_interval = intervalSeconds > 0
+				? intervalSeconds
+				: double.Epsilon;
 		}
 
 		// Adds `dt` seconds. When the accumulated time reaches the interval, returns true with `elapsed` = the total

@@ -9,12 +9,12 @@ namespace Faolan.Importer
 {
 	public sealed record WorldObjectEntry(uint MapId, uint SubOpcode, uint Handle, float X, float Y, float Z, byte[] Data)
 	{
+		public float RotW { get; init; }
 		public float RotX { get; init; }
 		public float RotY { get; init; }
 		public float RotZ { get; init; }
-		public float RotW { get; init; }
-		public uint ObjectId { get; init; }
 		public string Name { get; init; } = string.Empty;
+		public uint ObjectId { get; init; }
 	}
 
 	// Extracts the static world objects per map from a capture: tracks the current map (MapChange 5D85BFC7), then
@@ -83,6 +83,23 @@ namespace Faolan.Importer
 			return seen.Values.ToList();
 		}
 
+		private static byte[] GetBody(byte[] full)
+		{
+			if (full.Length < 12)
+				return [];
+
+			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(8, 4));
+			var bodyStart = 12 + headerLen;
+			return bodyStart <= full.Length
+				? full[bodyStart..]
+				: [];
+		}
+
+		private static float ReadLE(byte[] body, int offset)
+		{
+			return BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(offset, 4));
+		}
+
 		// The object message is [u32 BE length][message] right after the 0x2C transform group (no pre-IIR block).
 		// Reads field 1 (id, varint) and field 2 (name, string). Returns (0, "") if the layout is unexpected.
 		private static (uint Id, string Name) ReadMessage(byte[] body)
@@ -111,12 +128,14 @@ namespace Faolan.Importer
 					case 0:
 						if (!TryReadVarint(body, ref i, end, out var v))
 							return (id, name);
+
 						if (field == 1)
 							id = (uint)v;
 						break;
 					case 2:
 						if (!TryReadVarint(body, ref i, end, out var sl) || i + (int)sl > end)
 							return (id, name);
+
 						if (field == 2)
 							name = Encoding.ASCII.GetString(body, i, (int)sl);
 						i += (int)sl;
@@ -142,19 +161,25 @@ namespace Faolan.Importer
 			var i = 20;
 			if (b.Length <= i || b[i] != 0x2C)
 				return -1;
+
 			i++;
 			if (i + 1 >= b.Length || b[i] != 0x0A)
 				return -1;
+
 			i += 2 + b[i + 1]; // 0A vec3
 			if (i + 1 >= b.Length || b[i] != 0x12)
 				return -1;
+
 			i += 2 + b[i + 1]; // 12 quat
 			if (i < b.Length && b[i] == 0x25)
 				i += 5; // optional 25 scale
 			if (i >= b.Length || b[i] != 0x18)
 				return -1;
+
 			i++;
-			return TryReadVarint(b, ref i, b.Length, out _) ? i : -1;
+			return TryReadVarint(b, ref i, b.Length, out _)
+				? i
+				: -1;
 		}
 
 		private static bool TryReadVarint(byte[] b, ref int i, int end, out ulong value)
@@ -167,27 +192,11 @@ namespace Faolan.Importer
 				value |= (ulong)(x & 0x7F) << shift;
 				if ((x & 0x80) == 0)
 					return true;
+
 				shift += 7;
 			}
 
 			return false;
-		}
-
-		private static float ReadLE(byte[] body, int offset)
-		{
-			return BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(offset, 4));
-		}
-
-		private static byte[] GetBody(byte[] full)
-		{
-			if (full.Length < 12)
-				return [];
-
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(8, 4));
-			var bodyStart = 12 + headerLen;
-			return bodyStart <= full.Length
-				? full[bodyStart..]
-				: [];
 		}
 	}
 }

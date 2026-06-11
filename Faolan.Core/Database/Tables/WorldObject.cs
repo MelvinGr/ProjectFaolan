@@ -13,17 +13,17 @@ namespace Faolan.Core.Database.Tables
 	public class WorldObject : BaseEntity
 	{
 		public byte[] Data { get; set; }
-		public uint SubOpcode { get; set; }
 		public float PositionX { get; set; }
 		public float PositionY { get; set; }
 		public float PositionZ { get; set; }
+		public float RotationW { get; set; }
 		public float RotationX { get; set; }
 		public float RotationY { get; set; }
 		public float RotationZ { get; set; }
-		public float RotationW { get; set; }
 		public string Name { get; set; }
-		public uint ObjectId { get; set; }
 		public uint CapturedHandle { get; set; }
 		public uint MapId { get; set; }
+		public uint ObjectId { get; set; }
+		public uint SubOpcode { get; set; }
 	}
 }

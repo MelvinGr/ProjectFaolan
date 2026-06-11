@@ -15,27 +15,22 @@ using Microsoft.Extensions.Logging;
 namespace Faolan.Mcp
 {
 	/// <summary>
-	/// Hosts an MCP server (streamable HTTP) on a localhost port from inside the live Faolan process.
-	/// It runs a nested ASP.NET Core / Kestrel app whose DI shares Faolan's live singletons by instance,
-	/// so MCP tools observe the exact same <see cref="IDatabaseRepository"/> and
-	/// <see cref="IAgentServerDispatcher"/> the running server uses — that's what makes the tools able to
-	/// inspect and (later) drive the live server rather than just the database file.
-	///
-	/// Connect Claude with:  claude mcp add --transport http faolan http://127.0.0.1:&lt;McpPort&gt;/mcp
+	///     Hosts an MCP server (streamable HTTP) on a localhost port from inside the live Faolan process.
+	///     It runs a nested ASP.NET Core / Kestrel app whose DI shares Faolan's live singletons by instance,
+	///     so MCP tools observe the exact same <see cref="IDatabaseRepository" /> and
+	///     <see cref="IAgentServerDispatcher" /> the running server uses — that's what makes the tools able to
+	///     inspect and (later) drive the live server rather than just the database file.
+	///     Connect Claude with:  claude mcp add --transport http faolan http://127.0.0.1:&lt;McpPort&gt;/mcp
 	/// </summary>
 	public sealed class FaolanMcpHostedService : IHostedService
 	{
-		private readonly IServiceProvider _parentServices;
 		private readonly IConfiguration _configuration;
-		private readonly ILoggerFactory _loggerFactory;
 		private readonly ILogger<FaolanMcpHostedService> _logger;
+		private readonly ILoggerFactory _loggerFactory;
+		private readonly IServiceProvider _parentServices;
 		private WebApplication? _app;
 
-		public FaolanMcpHostedService(
-			IServiceProvider parentServices,
-			IConfiguration configuration,
-			ILoggerFactory loggerFactory,
-			ILogger<FaolanMcpHostedService> logger)
+		public FaolanMcpHostedService(IServiceProvider parentServices, IConfiguration configuration, ILoggerFactory loggerFactory, ILogger<FaolanMcpHostedService> logger)
 		{
 			_parentServices = parentServices;
 			_configuration = configuration;
@@ -60,7 +55,8 @@ namespace Faolan.Mcp
 			builder.Services.AddSingleton(_parentServices.GetRequiredService<IAgentServerDispatcher>());
 			builder.Services.AddSingleton(_parentServices.GetRequiredService<IGameServerDispatcher>());
 
-			builder.Services
+			builder
+				.Services
 				.AddMcpServer()
 				.WithHttpTransport()
 				.WithTools<DatabaseTools>()

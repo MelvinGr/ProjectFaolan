@@ -50,6 +50,16 @@ namespace Faolan.GameServer.Spawn
 		private const byte BaseNameLength = 5; // "Strie" - the captured base body's name
 		private const int TransformEndOffset = RotWOffset + 4; // first byte after the constructed transform (60)
 
+		// Builds a complete FA015807 body from a base template + a typed transform + a CharacterIIR: the transform
+		// (handle/position/rotation) is reconstructed by BuildSpawnBody and the identity/appearance/equipment is
+		// spliced in by SetCharacterMessage. The pre-IIR float block and the post-IIR scaffold are carried over
+		// from the template verbatim (still raw, per the player spawn). Byte-identical to the captured body when
+		// fed the template's own handle/transform + decoded IIR (the construction oracle).
+		public static byte[] BuildSpawn(byte[] template, uint handle, Vector3 position, Quaternion rotation, ProtoCoreCharacterIIR character)
+		{
+			return SetCharacterMessage(BuildSpawnBody(template, handle, position, rotation), character);
+		}
+
 		// Constructs the FA015807 header + transform (position/rotation as typed ProtoVec3/ProtoQuat) and appends
 		// the rest of the captured base body via WriteArray (the CharacterIIR + scaffold are replaced downstream
 		// by SetCharacterMessage / the rows-generated frame). The header's subop/ack/fieldA and the body length
@@ -120,16 +130,6 @@ namespace Faolan.GameServer.Spawn
 			if (iirOffset == NameTagOffset) // Strie-shaped player layout: also the @133 value island (player only)
 				AddBigEndian(result, NameOuterLengthOffset, delta);
 			return result;
-		}
-
-		// Builds a complete FA015807 body from a base template + a typed transform + a CharacterIIR: the transform
-		// (handle/position/rotation) is reconstructed by BuildSpawnBody and the identity/appearance/equipment is
-		// spliced in by SetCharacterMessage. The pre-IIR float block and the post-IIR scaffold are carried over
-		// from the template verbatim (still raw, per the player spawn). Byte-identical to the captured body when
-		// fed the template's own handle/transform + decoded IIR (the construction oracle).
-		public static byte[] BuildSpawn(byte[] template, uint handle, Vector3 position, Quaternion rotation, ProtoCoreCharacterIIR character)
-		{
-			return SetCharacterMessage(BuildSpawnBody(template, handle, position, rotation), character);
 		}
 
 		// Returns a copy of a Strie-shaped spawn body with the name replaced. Delta-adjusts the CharacterIIR

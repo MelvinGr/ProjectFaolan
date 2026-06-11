@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Packets;
 using Faolan.GameServer.Packets.FullCharSnapshot;
+using Faolan.GameServer.Scripting;
+using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
@@ -70,6 +72,20 @@ namespace Faolan.GameServer
 				? map.Id.ToString()
 				: $"{map.Name} ({map.Id})";
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Teleported to {mapLabel}.");
+		}
+
+		// Writes each connected player's live WorldEntity transform onto their Character and persists it. Returns the
+		// number of players saved.
+		private async Task<int> FlushWorldState()
+		{
+			var saved = 0;
+			foreach (var pair in _simulation.Players)
+			{
+				if (await SavePlayerState(pair.Key, pair.Value))
+					saved++;
+			}
+
+			return saved;
 		}
 
 		// .grantspell <id>  - grant an ability from the catalog to the player via the 0x2052 ability-grant (the only
@@ -153,84 +169,17 @@ namespace Faolan.GameServer
 			};
 		}
 
-		// .quest add|remove <id> | .quest list  - manage the player's quest journal. `add` records the quest +
-		// sends QuestIIR so it appears (the client renders the quest text from its RDB by id); `remove` drops it;
-		// `list` shows the player's active quests. Quest IDs are RDB quest ids (e.g. 13479). The full accept/branch
-		// logic is the pinned RDB Lua quest VM - this is the state foundation (docs/quests-and-combat.md).
-		private async Task QuestCommand(INetworkClient client, string arguments)
-		{
-			var characterId = client.Session.Character.Id;
-			var parts = (arguments ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-			var sub = parts.Length > 0 ? parts[0].ToLowerInvariant() : "list";
-
-			if (sub == "list")
-			{
-				var quests = await Database.GetCharacterQuests(characterId);
-				var active = quests.Where(q => q.State == Core.Database.Tables.QuestState.Active).Select(q => q.QuestId).ToList();
-				await _agentServerDispatcher.SendSystemMessage(characterId, active.Count == 0
-					? "No active quests."
-					: $"Active quests: {string.Join(", ", active)}");
-				return;
-			}
-
-			if (parts.Length < 2 || !uint.TryParse(parts[1], out var questId))
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .quest add|remove <questId> | .quest list");
-				return;
-			}
-
-			switch (sub)
-			{
-				case "add":
-				{
-					// .quest add <id> [count] [target name...] - optional kill objective: kill <count> of <target>.
-					var required = parts.Length > 2 && uint.TryParse(parts[2], out var c) ? c : 0;
-					var target = parts.Length > 3 ? string.Join(' ', parts.Skip(3)) : null;
-					await Database.SetCharacterQuest(characterId, questId, Core.Database.Tables.QuestState.Active, 0, required, target);
-					await _broadcaster.SendQuestIir(client, questId, World.WorldQuest.StateActive);
-					if (required > 0)
-						await _broadcaster.SendQuestGoal(client, questId, 0, 0);
-					await _agentServerDispatcher.SendSystemMessage(characterId, target != null
-						? $"Quest {questId} added: kill {required} {target}."
-						: $"Quest {questId} added to journal.");
-					break;
-				}
-				case "remove":
-					await Database.RemoveCharacterQuest(characterId, questId);
-					await _agentServerDispatcher.SendSystemMessage(characterId, $"Quest {questId} removed.");
-					break;
-				default:
-					await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .quest add|remove <questId> | .quest list");
-					break;
-			}
-		}
-
-		// .tag add <id> | .tag list  - manage the player's quest-state tags (the flags RDB Lua scripts read/write).
-		private async Task TagCommand(INetworkClient client, string arguments)
-		{
-			var characterId = client.Session.Character.Id;
-			var parts = (arguments ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-			if (parts.Length >= 2 && parts[0].Equals("add", StringComparison.OrdinalIgnoreCase) && uint.TryParse(parts[1], out var tagId))
-			{
-				await Database.AddCharacterTag(characterId, tagId);
-				await _agentServerDispatcher.SendSystemMessage(characterId, $"Tag {tagId} set.");
-				return;
-			}
-
-			var tags = await Database.GetCharacterTags(characterId);
-			await _agentServerDispatcher.SendSystemMessage(characterId, tags.Length == 0
-				? "No tags."
-				: $"Tags: {string.Join(", ", tags)}");
-		}
-
 		// .lua run <scriptId>  - run an RDB LuaArchive script against the player (the conversation/quest VM engine):
 		// reads the player's tags/quests, runs the script, persists any tags it adds, and reports its effects. Proves
 		// the Lua VM end-to-end on a real character (see protocol_conversation_routing).
 		private async Task LuaCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
-			var parts = (arguments ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-			if (parts.Length < 2 || !parts[0].Equals("run", StringComparison.OrdinalIgnoreCase) || !uint.TryParse(parts[1], out var scriptId))
+			var parts = (arguments ?? "")
+				.Trim()
+				.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+			if (parts.Length < 2 || !parts[0]
+				    .Equals("run", StringComparison.OrdinalIgnoreCase) || !uint.TryParse(parts[1], out var scriptId))
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .lua run <scriptId>");
 				return;
@@ -245,9 +194,9 @@ namespace Faolan.GameServer
 
 			var tags = await Database.GetCharacterTags(characterId);
 			var completed = (await Database.GetCharacterQuests(characterId))
-				.Where(q => q.State == Core.Database.Tables.QuestState.Completed)
+				.Where(q => q.State == QuestState.Completed)
 				.Select(q => q.QuestId);
-			var player = new Scripting.GameLuaPlayer(tags, completed);
+			var player = new GameLuaPlayer(tags, completed);
 
 			var ok = _luaVm.RunEffect(script.Source, player);
 			foreach (var t in player.AddedTags)
@@ -276,6 +225,71 @@ namespace Faolan.GameServer
 			await _broadcaster.SpawnMountForPlayer(client, "Fading Black Horse"); // the decoded mount for the default summon 0x3BAD7D
 		}
 
+		// .quest add|remove <id> | .quest list  - manage the player's quest journal. `add` records the quest +
+		// sends QuestIIR so it appears (the client renders the quest text from its RDB by id); `remove` drops it;
+		// `list` shows the player's active quests. Quest IDs are RDB quest ids (e.g. 13479). The full accept/branch
+		// logic is the pinned RDB Lua quest VM - this is the state foundation (docs/quests-and-combat.md).
+		private async Task QuestCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var parts = (arguments ?? "")
+				.Trim()
+				.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+			var sub = parts.Length > 0
+				? parts[0]
+					.ToLowerInvariant()
+				: "list";
+
+			if (sub == "list")
+			{
+				var quests = await Database.GetCharacterQuests(characterId);
+				var active = quests
+					.Where(q => q.State == QuestState.Active)
+					.Select(q => q.QuestId)
+					.ToList();
+				await _agentServerDispatcher.SendSystemMessage(characterId, active.Count == 0
+					? "No active quests."
+					: $"Active quests: {string.Join(", ", active)}");
+				return;
+			}
+
+			if (parts.Length < 2 || !uint.TryParse(parts[1], out var questId))
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .quest add|remove <questId> | .quest list");
+				return;
+			}
+
+			switch (sub)
+			{
+				case "add":
+				{
+					// .quest add <id> [count] [target name...] - optional kill objective: kill <count> of <target>.
+					var required = parts.Length > 2 && uint.TryParse(parts[2], out var c)
+						? c
+						: 0;
+					var target = parts.Length > 3
+						? string.Join(' ', parts.Skip(3))
+						: null;
+					await Database.SetCharacterQuest(characterId, questId, QuestState.Active, 0, required, target);
+					await _broadcaster.SendQuestIir(client, questId, WorldQuest.StateActive);
+					if (required > 0)
+						await _broadcaster.SendQuestGoal(client, questId, 0, 0);
+					await _agentServerDispatcher.SendSystemMessage(characterId, target != null
+						? $"Quest {questId} added: kill {required} {target}."
+						: $"Quest {questId} added to journal.");
+					break;
+				}
+
+				case "remove":
+					await Database.RemoveCharacterQuest(characterId, questId);
+					await _agentServerDispatcher.SendSystemMessage(characterId, $"Quest {questId} removed.");
+					break;
+				default:
+					await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .quest add|remove <questId> | .quest list");
+					break;
+			}
+		}
+
 		// .save  - flush the live world state to the DB. The WorldEntity is the source of truth for live transform
 		// (docs/server-architecture-roadmap.md) and movement is not otherwise persisted, so this snapshots every
 		// connected player's authoritative position/map back onto their persisted Character and saves it. (Extends to
@@ -286,23 +300,9 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Flushed {saved} player(s)' live world state to the database.");
 		}
 
-		// Writes each connected player's live WorldEntity transform onto their Character and persists it. Returns the
-		// number of players saved.
-		private async Task<int> FlushWorldState()
-		{
-			var saved = 0;
-			foreach (var pair in _simulation.Players)
-			{
-				if (await SavePlayerState(pair.Key, pair.Value))
-					saved++;
-			}
-
-			return saved;
-		}
-
 		// Flushes one player's authoritative live transform (the WorldEntity) onto their persisted Character and
 		// saves it. Used by the autosave loop, .save, and disconnect. Errors are logged (callers may not await).
-		private async Task<bool> SavePlayerState(INetworkClient client, World.WorldEntity entity)
+		private async Task<bool> SavePlayerState(INetworkClient client, WorldEntity entity)
 		{
 			var character = client.Session?.Character;
 			if (character == null)
@@ -320,22 +320,6 @@ namespace Faolan.GameServer
 				Logger.LogWarning(ex, "Failed to flush world state for {Name} (0x{Handle:X8}).", entity.Name, entity.Handle);
 				return false;
 			}
-		}
-
-		// .world  - report the live world model around the caller: their map, the players/NPCs in that zone, and how
-		// many entities are within interest range. A window into the shared simulation (handy for the 2-player test).
-		private Task SendWorldInfo(INetworkClient client)
-		{
-			var entity = PlayerWorldEntity(client);
-			if (entity == null)
-				return _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, "World: you are not registered in the world model yet.");
-
-			var zone = _simulation.World.ZoneFor(entity.MapId);
-			var players = zone.Entities.Count(e => e.IsPlayer);
-			var npcs = zone.Entities.Count(e => !e.IsPlayer);
-			var nearby = zone.EntitiesInRange(entity.Position, World.WorldSimulation.PlayerInterestRange, entity.Handle).Count();
-			return _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
-				$"World map {entity.MapId}: {players} player(s), {npcs} NPC(s) in zone; {nearby} entity(ies) within {World.WorldSimulation.PlayerInterestRange:0} of you.");
 		}
 
 		private Task SendGmHelpText(uint characterId)
@@ -377,6 +361,24 @@ namespace Faolan.GameServer
 				.JoinAsString("<br />"));
 		}
 
+		// .world  - report the live world model around the caller: their map, the players/NPCs in that zone, and how
+		// many entities are within interest range. A window into the shared simulation (handy for the 2-player test).
+		private Task SendWorldInfo(INetworkClient client)
+		{
+			var entity = PlayerWorldEntity(client);
+			if (entity == null)
+				return _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, "World: you are not registered in the world model yet.");
+
+			var zone = _simulation.World.ZoneFor(entity.MapId);
+			var players = zone.Entities.Count(e => e.IsPlayer);
+			var npcs = zone.Entities.Count(e => !e.IsPlayer);
+			var nearby = zone
+				.EntitiesInRange(entity.Position, WorldSimulation.PlayerInterestRange, entity.Handle)
+				.Count();
+			return _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
+				$"World map {entity.MapId}: {players} player(s), {npcs} NPC(s) in zone; {nearby} entity(ies) within {WorldSimulation.PlayerInterestRange:0} of you.");
+		}
+
 		// .setstat <statIdHex> <displayValue>  - push a single 0x96B8DC59 stat record (e.g. ".setstat 36 25" sets
 		// Level to 25). The stat's wire scale is applied automatically.
 		private Task SetStatCommand(INetworkClient client, string arguments)
@@ -406,6 +408,27 @@ namespace Faolan.GameServer
 				: health;
 
 			return SendVitals(client, health, stamina, mana);
+		}
+
+		// .tag add <id> | .tag list  - manage the player's quest-state tags (the flags RDB Lua scripts read/write).
+		private async Task TagCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var parts = (arguments ?? "")
+				.Trim()
+				.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+			if (parts.Length >= 2 && parts[0]
+				    .Equals("add", StringComparison.OrdinalIgnoreCase) && uint.TryParse(parts[1], out var tagId))
+			{
+				await Database.AddCharacterTag(characterId, tagId);
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"Tag {tagId} set.");
+				return;
+			}
+
+			var tags = await Database.GetCharacterTags(characterId);
+			await _agentServerDispatcher.SendSystemMessage(characterId, tags.Length == 0
+				? "No tags."
+				: $"Tags: {string.Join(", ", tags)}");
 		}
 
 		private delegate Task GmCommandDelegate(INetworkClient client, string arguments);

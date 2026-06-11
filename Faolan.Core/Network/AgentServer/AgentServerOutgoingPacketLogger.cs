@@ -28,10 +28,12 @@ namespace Faolan.Core.Network.AgentServer
 				_logger.LogInformation("<= [AgentServer {OpcodeName}] bodyLength={BodyLength}, packetLength={PacketLength}", opcodeName, packet.Body?.Length ?? 0, packet.Bytes.Length);
 
 				if (_logger.IsEnabled(LogLevel.Debug) && packet.Body?.Length > 0)
+				{
 					_logger.LogDebug("<= [AgentServer {OpcodeName}] body ({BodyLength} bytes): {Body}", opcodeName, packet.Body.Length, packet
 						.Body
 						.ToArray()
 						.ToHex());
+				}
 			}
 			catch (Exception ex)
 			{

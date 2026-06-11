@@ -14,6 +14,40 @@ namespace Faolan.GameServer.Scripting
 			UserData.RegisterType<LuaPlayerProxy>();
 		}
 
+		// Evaluates a CONDITION script (returns true/false). On error or a non-boolean result, defaults to `permissive`
+		// so a missing/odd condition never hard-blocks a dialogue option.
+		public bool RunCondition(string source, ILuaPlayer player, bool permissive = true)
+		{
+			try
+			{
+				var result = Build(player)
+					.DoString(source);
+				return result.Type == DataType.Boolean
+					? result.Boolean
+					: permissive;
+			}
+			catch (InterpreterException)
+			{
+				return permissive;
+			}
+		}
+
+		// Runs an EFFECT script (AddTag/SpawnItem/...). Returns false (swallowed) on a script error so one bad script
+		// doesn't break the caller; true if it ran clean.
+		public bool RunEffect(string source, ILuaPlayer player)
+		{
+			try
+			{
+				Build(player)
+					.DoString(source);
+				return true;
+			}
+			catch (InterpreterException)
+			{
+				return false;
+			}
+		}
+
 		private static Script Build(ILuaPlayer player)
 		{
 			var script = new Script(CoreModules.Preset_HardSandbox); // no IO/os/loadfile - safe to run untrusted RDB Lua
@@ -29,36 +63,6 @@ namespace Faolan.GameServer.Scripting
 			script.Globals["Resource"] = resource;
 
 			return script;
-		}
-
-		// Runs an EFFECT script (AddTag/SpawnItem/...). Returns false (swallowed) on a script error so one bad script
-		// doesn't break the caller; true if it ran clean.
-		public bool RunEffect(string source, ILuaPlayer player)
-		{
-			try
-			{
-				Build(player).DoString(source);
-				return true;
-			}
-			catch (InterpreterException)
-			{
-				return false;
-			}
-		}
-
-		// Evaluates a CONDITION script (returns true/false). On error or a non-boolean result, defaults to `permissive`
-		// so a missing/odd condition never hard-blocks a dialogue option.
-		public bool RunCondition(string source, ILuaPlayer player, bool permissive = true)
-		{
-			try
-			{
-				var result = Build(player).DoString(source);
-				return result.Type == DataType.Boolean ? result.Boolean : permissive;
-			}
-			catch (InterpreterException)
-			{
-				return permissive;
-			}
 		}
 
 		// Resource.Hash("ABCD") - the client's 4-char resource code → an id. We don't have the resource registry, so
@@ -85,18 +89,68 @@ namespace Faolan.GameServer.Scripting
 			_p = p;
 		}
 
-		public bool HasTag(int tagId) => _p.HasTag(tagId);
-		public void AddTag(int tagId) => _p.AddTag(tagId);
-		public bool HasCompletedQuest(int questId) => _p.HasCompletedQuest(questId);
-		public int GetIntStat(int statId) => _p.GetIntStat(statId);
-		public void Count(int counterId) => _p.Count(counterId);
-		public void SpawnItem(int resourceHash, int count) => _p.SpawnItem(resourceHash, count);
-		public void SolveGoal(int goalId) => _p.SolveGoal(goalId);
-		public void CastSpell(int spellId) => _p.CastSpell(spellId);
-		public void castspell(int spellId) => _p.CastSpell(spellId); // lowercase variant in some scripts
-		public string GetTagName(int tagId) => _p.GetTagName(tagId);
-		public bool HasBuff(int buffId) => _p.HasBuff(buffId);
-		public void OpenSiteInBrowser(string url) { }
-		public void TriggerGetEffect(int effectId) { }
+		public void AddTag(int tagId)
+		{
+			_p.AddTag(tagId);
+		}
+
+		public void castspell(int spellId)
+		{
+			_p.CastSpell(spellId);
+			// lowercase variant in some scripts
+		}
+
+		public void CastSpell(int spellId)
+		{
+			_p.CastSpell(spellId);
+		}
+
+		public void Count(int counterId)
+		{
+			_p.Count(counterId);
+		}
+
+		public int GetIntStat(int statId)
+		{
+			return _p.GetIntStat(statId);
+		}
+
+		public string GetTagName(int tagId)
+		{
+			return _p.GetTagName(tagId);
+		}
+
+		public bool HasBuff(int buffId)
+		{
+			return _p.HasBuff(buffId);
+		}
+
+		public bool HasCompletedQuest(int questId)
+		{
+			return _p.HasCompletedQuest(questId);
+		}
+
+		public bool HasTag(int tagId)
+		{
+			return _p.HasTag(tagId);
+		}
+
+		public void OpenSiteInBrowser(string url)
+		{
+		}
+
+		public void SolveGoal(int goalId)
+		{
+			_p.SolveGoal(goalId);
+		}
+
+		public void SpawnItem(int resourceHash, int count)
+		{
+			_p.SpawnItem(resourceHash, count);
+		}
+
+		public void TriggerGetEffect(int effectId)
+		{
+		}
 	}
 }

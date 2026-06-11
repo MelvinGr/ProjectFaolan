@@ -150,9 +150,12 @@ namespace Faolan.GameServer
 						// Sex IS the editor's usual 2x convention: 4 -> wire 2 = MALE, 6 -> wire 3 = FEMALE
 						// (anchored on Hoxxling, who is male: ChangeSex 4 + a chosen beardmesh; the earlier
 						// "6 = male" read was inverted).
+					{
 						character.Sex = numericValue == 4
 							? Sex.Male
 							: Sex.Female;
+					}
+
 					break;
 				}
 
@@ -173,24 +176,33 @@ namespace Faolan.GameServer
 				case "ChangeHeadMesh":
 				{
 					if (character != null)
+					{
 						EnsureBody(character)
 							.HeadMesh = numericValue;
+					}
+
 					break;
 				}
 
 				case "ChangeSize":
 				{
 					if (character != null)
+					{
 						EnsureBody(character)
 							.Size = (byte)numericValue;
+					}
+
 					break;
 				}
 
 				case "ChangeVoice":
 				{
 					if (character != null)
+					{
 						EnsureBody(character)
 							.Voice = (byte)numericValue;
+					}
+
 					break;
 				}
 

@@ -10,10 +10,12 @@ namespace Faolan.Core.Database
 {
 	public interface IDatabaseRepository
 	{
+		Task AddCharacterTag(uint characterId, uint tagId);
 		Task<bool> CheckLogin(string username, string password);
 		Task<Character> CreateCharacter(uint accountId, uint realmId);
 
 		Task<bool> DeleteCharacter(uint characterId);
+		Task DiscoverRespawnPoint(uint characterId, uint respawnPointId);
 
 		// Ad-hoc unit of work: runs `work` against a fresh short-lived context and disposes it. Use for one-off
 		// reads/writes that do not have a dedicated method. Entities returned are detached.
@@ -30,46 +32,44 @@ namespace Faolan.Core.Database
 		Task<CharacterEquipment> GetCharacterEquipment(uint characterId);
 		Task<Character> GetCharacterForAccount(uint accountId, uint clientInstance);
 		Task<CharacterInventory[]> GetCharacterInventory(uint characterId);
+		Task<CharacterQuest[]> GetCharacterQuests(uint characterId);
 		Task<Character[]> GetCharactersByAccount(uint id, bool skipUninitialized = true);
 		Task<Character> GetCharacterScaffold(uint characterId);
+		Task<uint[]> GetCharacterTags(uint characterId);
 
 		Task<ClassAbility> GetClassAbility(uint @class, uint level);
 
 		Task<ConversationNode> GetConversationNode(uint npcHandle, uint typeId, uint mode, uint field3, bool exactHandleOnly = false);
 		Task<ConversationNode> GetConversationNodeByName(string npcName, uint typeId, uint mode, uint field3);
+		Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId);
 
 		Task<Item> GetItem(uint id);
+		Task<LuaScript> GetLuaScript(uint scriptId);
 
 		Task<Map> GetMap(uint id);
 		Task<Map[]> GetMaps();
 
 		Task<MapWorldBurst> GetMapWorldBurst(uint mapId);
-		Task<NpcSpawn[]> GetNpcSpawns(uint mapId);
-		Task<NpcSpawn> GetNpcSpawnByName(string name);
-		Task<WorldObject[]> GetWorldObjects(uint mapId);
-		Task<RespawnPoint[]> GetRespawnPoints(uint mapId);
-		Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId);
-		Task DiscoverRespawnPoint(uint characterId, uint respawnPointId);
-		Task<LuaScript> GetLuaScript(uint scriptId);
-		Task<uint[]> GetCharacterTags(uint characterId);
-		Task AddCharacterTag(uint characterId, uint tagId);
-		Task<CharacterQuest[]> GetCharacterQuests(uint characterId);
-		Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0, string goalTargetName = null);
-		Task RemoveCharacterQuest(uint characterId, uint questId);
 		Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names);
+		Task<NpcSpawn> GetNpcSpawnByName(string name);
+		Task<NpcSpawn[]> GetNpcSpawns(uint mapId);
 
 		Task<Realm> GetRealm(uint id);
 		Task<Realm[]> GetRealms();
+		Task<RespawnPoint[]> GetRespawnPoints(uint mapId);
 
 		Task<Spell> GetSpell(uint id);
 		Task<Spell[]> GetSpells();
 		Task<Ability[]> GetStartingAbilities(uint level);
+		Task<WorldObject[]> GetWorldObjects(uint mapId);
 		Task<T> Query<T>(Func<IDatabaseContext, Task<T>> work);
+		Task RemoveCharacterQuest(uint characterId, uint questId);
 		Task SaveAccount(Account account);
 		Task SaveCharacter(Character character);
 		Task SaveCharacterEquipment(CharacterEquipment equipment);
 		Task SaveCharacterScaffold(Character character);
 		Task SetCharacterInventorySlot(uint characterId, int container, int slot, uint? itemId, uint count = 1);
+		Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0, string goalTargetName = null);
 		Task<int> SetCreationSpawn(Character character);
 
 		Task<bool> UpdateLastInfo(Account account, INetworkClient client);
@@ -99,6 +99,21 @@ namespace Faolan.Core.Database
 		public DatabaseRepository(IDbContextFactory<DatabaseContext> contextFactory)
 		{
 			_contextFactory = contextFactory;
+		}
+
+		// Sets a tag on a character (idempotent - no duplicate row).
+		public async Task AddCharacterTag(uint characterId, uint tagId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			if (await ctx.CharacterTags.AnyAsync(t => t.CharacterId == characterId && t.TagId == tagId))
+				return;
+
+			ctx.CharacterTags.Add(new CharacterTag
+			{
+				CharacterId = characterId,
+				TagId = tagId
+			});
+			await ctx.SaveChangesAsync();
 		}
 
 		// --- login / account -----------------------------------------------------------------------------------
@@ -179,6 +194,22 @@ namespace Faolan.Core.Database
 			ctx.Characters.Remove(character);
 			await ctx.SaveChangesAsync();
 			return true;
+		}
+
+		// Records that a character has discovered a respawn point (idempotent - no duplicate row).
+		public async Task DiscoverRespawnPoint(uint characterId, uint respawnPointId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var exists = await ctx.CharacterRespawnPoints.AnyAsync(c => c.CharacterId == characterId && c.RespawnPointId == respawnPointId);
+			if (exists)
+				return;
+
+			ctx.CharacterRespawnPoints.Add(new CharacterRespawnPoint
+			{
+				CharacterId = characterId,
+				RespawnPointId = respawnPointId
+			});
+			await ctx.SaveChangesAsync();
 		}
 
 		// --- ad-hoc units of work ------------------------------------------------------------------------------
@@ -296,6 +327,15 @@ namespace Faolan.Core.Database
 				.ToArrayAsync();
 		}
 
+		public async Task<CharacterQuest[]> GetCharacterQuests(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.CharacterQuests
+				.Where(q => q.CharacterId == characterId)
+				.ToArrayAsync();
+		}
+
 		public async Task<Character[]> GetCharactersByAccount(uint id, bool skipUninitialized = true)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -321,6 +361,16 @@ namespace Faolan.Core.Database
 				.Include(c => c.Body)
 				.Include(c => c.BodyResources)
 				.FirstOrDefaultAsync(c => c.Id == characterId);
+		}
+
+		public async Task<uint[]> GetCharacterTags(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.CharacterTags
+				.Where(t => t.CharacterId == characterId)
+				.Select(t => t.TagId)
+				.ToArrayAsync();
 		}
 
 		// The class/level row that lists which abilities (and spells) a character of this class+level should have.
@@ -375,10 +425,26 @@ namespace Faolan.Core.Database
 				.FirstOrDefaultAsync(n => n.NpcName == npcName && n.TypeId == typeId && n.Mode == mode && n.Field3 == field3);
 		}
 
+		public async Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.CharacterRespawnPoints
+				.Where(c => c.CharacterId == characterId)
+				.Select(c => c.RespawnPointId)
+				.ToArrayAsync();
+		}
+
 		public async Task<Item> GetItem(uint id)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Items.FirstOrDefaultAsync(i => i.Id == id);
+		}
+
+		public async Task<LuaScript> GetLuaScript(uint scriptId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.LuaScripts.FirstOrDefaultAsync(s => s.Id == scriptId);
 		}
 
 		public async Task<Map> GetMap(uint id)
@@ -413,142 +479,6 @@ namespace Faolan.Core.Database
 			return burst;
 		}
 
-		// The captured NPC entity spawns for a map (FA015807 bodies in Data + the lifted identity/transform
-		// columns). The world-entry path builds each NPC's spawn from its row via NpcSpawnBuilder.
-		public async Task<NpcSpawn[]> GetNpcSpawns(uint mapId)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx
-				.NpcSpawns
-				.Where(n => n.MapId == mapId && n.Data != null)
-				.ToArrayAsync();
-		}
-
-		// The captured static world objects for a map (decor/containers/zones). The world-entry path builds each
-		// object's body from its row via WorldObjectBuilder, like the NPC spawns.
-		// A captured NPC spawn by name, any map (used to fetch a mount-entity template like "Fading Black Horse" to
-		// spawn at the player). Prefers a row that has spawn Data.
-		public async Task<NpcSpawn> GetNpcSpawnByName(string name)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.NpcSpawns
-				.Where(n => n.Name == name && n.Data != null)
-				.FirstOrDefaultAsync();
-		}
-
-		public async Task<WorldObject[]> GetWorldObjects(uint mapId)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx
-				.WorldObjects
-				.Where(o => o.MapId == mapId && o.Data != null)
-				.ToArrayAsync();
-		}
-
-		public async Task<RespawnPoint[]> GetRespawnPoints(uint mapId)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx
-				.RespawnPoints
-				.Where(r => r.MapId == mapId)
-				.ToArrayAsync();
-		}
-
-		public async Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx
-				.CharacterRespawnPoints
-				.Where(c => c.CharacterId == characterId)
-				.Select(c => c.RespawnPointId)
-				.ToArrayAsync();
-		}
-
-		public async Task<LuaScript> GetLuaScript(uint scriptId)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.LuaScripts.FirstOrDefaultAsync(s => s.Id == scriptId);
-		}
-
-		public async Task<uint[]> GetCharacterTags(uint characterId)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.CharacterTags.Where(t => t.CharacterId == characterId).Select(t => t.TagId).ToArrayAsync();
-		}
-
-		// Sets a tag on a character (idempotent - no duplicate row).
-		public async Task AddCharacterTag(uint characterId, uint tagId)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			if (await ctx.CharacterTags.AnyAsync(t => t.CharacterId == characterId && t.TagId == tagId))
-				return;
-
-			ctx.CharacterTags.Add(new CharacterTag { CharacterId = characterId, TagId = tagId });
-			await ctx.SaveChangesAsync();
-		}
-
-		public async Task<CharacterQuest[]> GetCharacterQuests(uint characterId)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.CharacterQuests.Where(q => q.CharacterId == characterId).ToArrayAsync();
-		}
-
-		// Upserts a character's quest state/progress.
-		public async Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0, string goalTargetName = null)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var row = await ctx.CharacterQuests.FirstOrDefaultAsync(q => q.CharacterId == characterId && q.QuestId == questId);
-			if (row == null)
-			{
-				ctx.CharacterQuests.Add(new CharacterQuest
-				{
-					CharacterId = characterId,
-					QuestId = questId,
-					State = state,
-					GoalProgress = goalProgress,
-					GoalRequired = goalRequired,
-					GoalTargetName = goalTargetName
-				});
-			}
-			else
-			{
-				row.State = state;
-				row.GoalProgress = goalProgress;
-				row.GoalRequired = goalRequired;
-				row.GoalTargetName = goalTargetName;
-			}
-
-			await ctx.SaveChangesAsync();
-		}
-
-		public async Task RemoveCharacterQuest(uint characterId, uint questId)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var row = await ctx.CharacterQuests.FirstOrDefaultAsync(q => q.CharacterId == characterId && q.QuestId == questId);
-			if (row == null)
-				return;
-
-			ctx.CharacterQuests.Remove(row);
-			await ctx.SaveChangesAsync();
-		}
-
-		// Records that a character has discovered a respawn point (idempotent - no duplicate row).
-		public async Task DiscoverRespawnPoint(uint characterId, uint respawnPointId)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var exists = await ctx.CharacterRespawnPoints
-				.AnyAsync(c => c.CharacterId == characterId && c.RespawnPointId == respawnPointId);
-			if (exists)
-				return;
-
-			ctx.CharacterRespawnPoints.Add(new CharacterRespawnPoint
-			{
-				CharacterId = characterId,
-				RespawnPointId = respawnPointId
-			});
-			await ctx.SaveChangesAsync();
-		}
-
 		// Resolves appearance resource refs ("*texscript_1108153") to their client-registry entries (imported
 		// from RDB 1000076 by Faolan.Importer --rdb). Empty when the registry hasn't been imported.
 		public async Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names)
@@ -558,6 +488,30 @@ namespace Faolan.Core.Database
 				.MorphTargets
 				.Where(t => names.Contains(t.Name))
 				.ToDictionaryAsync(t => t.Name);
+		}
+
+		// The captured static world objects for a map (decor/containers/zones). The world-entry path builds each
+		// object's body from its row via WorldObjectBuilder, like the NPC spawns.
+		// A captured NPC spawn by name, any map (used to fetch a mount-entity template like "Fading Black Horse" to
+		// spawn at the player). Prefers a row that has spawn Data.
+		public async Task<NpcSpawn> GetNpcSpawnByName(string name)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.NpcSpawns
+				.Where(n => n.Name == name && n.Data != null)
+				.FirstOrDefaultAsync();
+		}
+
+		// The captured NPC entity spawns for a map (FA015807 bodies in Data + the lifted identity/transform
+		// columns). The world-entry path builds each NPC's spawn from its row via NpcSpawnBuilder.
+		public async Task<NpcSpawn[]> GetNpcSpawns(uint mapId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.NpcSpawns
+				.Where(n => n.MapId == mapId && n.Data != null)
+				.ToArrayAsync();
 		}
 
 		// --- reference data --------------------------------------------------------------------------------
@@ -574,6 +528,15 @@ namespace Faolan.Core.Database
 			return await ctx
 				.Realms
 				.OrderBy(r => r.Id)
+				.ToArrayAsync();
+		}
+
+		public async Task<RespawnPoint[]> GetRespawnPoints(uint mapId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.RespawnPoints
+				.Where(r => r.MapId == mapId)
 				.ToArrayAsync();
 		}
 
@@ -607,10 +570,30 @@ namespace Faolan.Core.Database
 				.ToArrayAsync();
 		}
 
+		public async Task<WorldObject[]> GetWorldObjects(uint mapId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.WorldObjects
+				.Where(o => o.MapId == mapId && o.Data != null)
+				.ToArrayAsync();
+		}
+
 		public async Task<T> Query<T>(Func<IDatabaseContext, Task<T>> work)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await work(ctx);
+		}
+
+		public async Task RemoveCharacterQuest(uint characterId, uint questId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var row = await ctx.CharacterQuests.FirstOrDefaultAsync(q => q.CharacterId == characterId && q.QuestId == questId);
+			if (row == null)
+				return;
+
+			ctx.CharacterQuests.Remove(row);
+			await ctx.SaveChangesAsync();
 		}
 
 		// Persists the per-session mutable Account scalars (auth status + the on-wire client instance, which the
@@ -721,6 +704,34 @@ namespace Faolan.Core.Database
 			{
 				row.ItemId = itemId;
 				row.Count = count;
+			}
+
+			await ctx.SaveChangesAsync();
+		}
+
+		// Upserts a character's quest state/progress.
+		public async Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0, string goalTargetName = null)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var row = await ctx.CharacterQuests.FirstOrDefaultAsync(q => q.CharacterId == characterId && q.QuestId == questId);
+			if (row == null)
+			{
+				ctx.CharacterQuests.Add(new CharacterQuest
+				{
+					CharacterId = characterId,
+					QuestId = questId,
+					State = state,
+					GoalProgress = goalProgress,
+					GoalRequired = goalRequired,
+					GoalTargetName = goalTargetName
+				});
+			}
+			else
+			{
+				row.State = state;
+				row.GoalProgress = goalProgress;
+				row.GoalRequired = goalRequired;
+				row.GoalTargetName = goalTargetName;
 			}
 
 			await ctx.SaveChangesAsync();

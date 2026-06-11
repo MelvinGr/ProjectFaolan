@@ -45,6 +45,7 @@ namespace Faolan.GameServer.World
 				{
 					if (inRange.Contains(knownHandle))
 						continue;
+
 					mover.Known.Remove(knownHandle);
 					if (zone.TryGet(knownHandle, out var gone))
 						events.Add(new InterestEvent(mover, gone, InterestEventType.Despawn));
@@ -59,9 +60,11 @@ namespace Faolan.GameServer.World
 					continue;
 
 				if (Vector3.Distance(viewer.Position, mover.Position) <= range)
+				{
 					events.Add(new InterestEvent(viewer, mover, viewer.Known.Add(mover.Handle)
 						? InterestEventType.Spawn
 						: InterestEventType.Move));
+				}
 				else if (viewer.Known.Remove(mover.Handle))
 					events.Add(new InterestEvent(viewer, mover, InterestEventType.Despawn));
 			}

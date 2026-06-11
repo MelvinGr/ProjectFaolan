@@ -10,11 +10,12 @@ namespace Faolan.Tests
 	// 0x2020 poll ends it. The captured instance is read from the receiver conversation id in the packet header.
 	public class MapWorldBurstExtractorTests
 	{
+		private const uint Opcode2076 = 0x2076; // spawn manifest
+
+		private static readonly byte[] ManifestSentinel = [0xDE, 0xAD, 0xBE, 0xEF]; // marks the synthetic manifest body
+
 		// The receiver conversation id "...47 C1 67 6C 10 <varint>" - its trailing varint is the local instance.
 		private static readonly byte[] ReceiverMarker = [0x47, 0xC1, 0x67, 0x6C, 0x10];
-
-		private const uint Opcode2076 = 0x2076; // spawn manifest
-		private static readonly byte[] ManifestSentinel = [0xDE, 0xAD, 0xBE, 0xEF]; // marks the synthetic manifest body
 
 		[Fact]
 		public void Extract_CollectsPrePollBurst_AndCapturesInstance()
@@ -66,6 +67,38 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void Extract_KeepsWindow_WithFewEntityQuits()
+		{
+			const uint instance = 0x02165EFF;
+			const uint quit = 0x04B82B2D;
+			var packets = new List<CapturedPacket> { MapChange(2040, instance) };
+			for (var n = 0; n < 5; n++) // a clean-ish window with minor churn (tolerated, like the 4020 capture)
+				packets.Add(Download2000(quit));
+			packets.Add(Download2000(0xFA015807));
+			packets.Add(Poll2020());
+
+			var bursts = MapWorldBurstExtractor.Extract(packets);
+
+			Assert.Single(bursts); // kept: 5 quits is within tolerance
+		}
+
+		[Fact]
+		public void Extract_RejectsWindow_PollutedWithEntityQuits()
+		{
+			const uint instance = 0x02165EFF;
+			const uint quit = 0x04B82B2D; // N3ToClientQuit
+			var packets = new List<CapturedPacket> { MapChange(11040, instance) };
+			for (var n = 0; n < 20; n++) // a mid-session window: entities leaving (gameplay churn, not a world build)
+				packets.Add(Download2000(quit));
+			packets.Add(Download2000(0xFA015807));
+			packets.Add(Poll2020());
+
+			var bursts = MapWorldBurstExtractor.Extract(packets);
+
+			Assert.Empty(bursts); // rejected: >10 entity-quits marks a mid-session capture
+		}
+
+		[Fact]
 		public void Extract_StartsFreshBurst_OnNextMapChange_AfterManifest()
 		{
 			const uint instance = 0x02165EFF;
@@ -88,38 +121,6 @@ namespace Faolan.Tests
 			Assert.Equal(3, bursts[0].Packets.Count); // MapChange + spawn + manifest
 			Assert.Equal(3000u, bursts[1].MapId);
 			Assert.Equal(2, bursts[1].Packets.Count); // MapChange + world object (manifest-less window)
-		}
-
-		[Fact]
-		public void Extract_RejectsWindow_PollutedWithEntityQuits()
-		{
-			const uint instance = 0x02165EFF;
-			const uint quit = 0x04B82B2D; // N3ToClientQuit
-			var packets = new List<CapturedPacket> { MapChange(11040, instance) };
-			for (var n = 0; n < 20; n++) // a mid-session window: entities leaving (gameplay churn, not a world build)
-				packets.Add(Download2000(quit));
-			packets.Add(Download2000(0xFA015807));
-			packets.Add(Poll2020());
-
-			var bursts = MapWorldBurstExtractor.Extract(packets);
-
-			Assert.Empty(bursts); // rejected: >10 entity-quits marks a mid-session capture
-		}
-
-		[Fact]
-		public void Extract_KeepsWindow_WithFewEntityQuits()
-		{
-			const uint instance = 0x02165EFF;
-			const uint quit = 0x04B82B2D;
-			var packets = new List<CapturedPacket> { MapChange(2040, instance) };
-			for (var n = 0; n < 5; n++) // a clean-ish window with minor churn (tolerated, like the 4020 capture)
-				packets.Add(Download2000(quit));
-			packets.Add(Download2000(0xFA015807));
-			packets.Add(Poll2020());
-
-			var bursts = MapWorldBurstExtractor.Extract(packets);
-
-			Assert.Single(bursts); // kept: 5 quits is within tolerance
 		}
 
 		[Fact]
@@ -158,11 +159,39 @@ namespace Faolan.Tests
 			Assert.Equal(0x110099BDu, bursts[0].CapturedInstance);
 		}
 
+		private static bool ContainsSentinel(byte[] packet, byte[] sentinel)
+		{
+			for (var i = 0; i + sentinel.Length <= packet.Length; i++)
+			{
+				var match = true;
+				for (var j = 0; j < sentinel.Length; j++)
+				{
+					if (packet[i + j] != sentinel[j])
+					{
+						match = false;
+						break;
+					}
+				}
+
+				if (match)
+					return true;
+			}
+
+			return false;
+		}
+
 		private static CapturedPacket Download2000(uint subop)
 		{
 			var content = new byte[38];
 			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(0, 4), subop);
 			return Packet(0x2000, true, content);
+		}
+
+		// The post-poll spawn manifest (opcode 0x2076), carrying a recognizable sentinel body so the test can confirm
+		// THIS record - and not a server-generated neighbour - is the one kept from the post-poll region.
+		private static CapturedPacket Manifest2076()
+		{
+			return Packet(Opcode2076, true, ManifestSentinel);
 		}
 
 		private static CapturedPacket MapChange(uint mapId, uint instance)
@@ -197,34 +226,6 @@ namespace Faolan.Tests
 		private static CapturedPacket Poll2020()
 		{
 			return Packet(0x2020, false, new byte[8]);
-		}
-
-		// The post-poll spawn manifest (opcode 0x2076), carrying a recognizable sentinel body so the test can confirm
-		// THIS record - and not a server-generated neighbour - is the one kept from the post-poll region.
-		private static CapturedPacket Manifest2076()
-		{
-			return Packet(Opcode2076, true, ManifestSentinel);
-		}
-
-		private static bool ContainsSentinel(byte[] packet, byte[] sentinel)
-		{
-			for (var i = 0; i + sentinel.Length <= packet.Length; i++)
-			{
-				var match = true;
-				for (var j = 0; j < sentinel.Length; j++)
-				{
-					if (packet[i + j] != sentinel[j])
-					{
-						match = false;
-						break;
-					}
-				}
-
-				if (match)
-					return true;
-			}
-
-			return false;
 		}
 
 		// Receiver conversation id = marker + little-endian base-128 varint of the instance.

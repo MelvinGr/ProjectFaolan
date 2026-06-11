@@ -209,11 +209,11 @@ namespace Faolan.Tests
 
 				var rows = await repo.GetCharacterInventory(5);
 				Assert.Equal(2, rows.Length);
-				Assert.Equal(100u, Enumerable.Single(rows, r => r.Slot == 2)
+				Assert.Equal(100u, rows.Single(r => r.Slot == 2)
 					.ItemId);
-				Assert.Equal("A", Enumerable.Single(rows, r => r.Slot == 2)
+				Assert.Equal("A", rows.Single(r => r.Slot == 2)
 					.Item!.Name); // Item nav loaded
-				Assert.Equal(3u, Enumerable.Single(rows, r => r.Slot == 7)
+				Assert.Equal(3u, rows.Single(r => r.Slot == 7)
 					.Count);
 
 				await repo.SetCharacterInventorySlot(5, 104, 2, 200); // re-upsert updates in place

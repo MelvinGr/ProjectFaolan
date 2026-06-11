@@ -27,12 +27,16 @@ namespace Faolan.Core.Extensions
 
 			public ushort AgentServerPort => Convert.ToUInt16(config["AgentServerPort"]);
 			public ushort CsPlayerAgentPort => Convert.ToUInt16(config["CsPlayerAgentPort"]);
+
+			// Localhost port for the in-process MCP server (Claude tooling). Defaults to 7099 when unset.
+			public ushort McpPort =>
+				ushort.TryParse(config["McpPort"], out var p)
+					? p
+					: (ushort)7099;
+
 			public ushort PlayerAgentPort => Convert.ToUInt16(config["PlayerAgentPort"]);
 
 			public ushort UniverseAgentPort => Convert.ToUInt16(config["UniverseAgentPort"]);
-
-			// Localhost port for the in-process MCP server (Claude tooling). Defaults to 7099 when unset.
-			public ushort McpPort => ushort.TryParse(config["McpPort"], out var p) ? p : (ushort)7099;
 		}
 	}
 }

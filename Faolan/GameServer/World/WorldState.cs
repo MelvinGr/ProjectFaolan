@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Numerics;
@@ -10,6 +11,11 @@ namespace Faolan.GameServer.World
 	// placed when a player/NPC enters a map and removed on disconnect/despawn. Map changes move an entity between zones.
 	public sealed class WorldState
 	{
+		// Seconds between an aggroed NPC's swings.
+		public const double NpcAttackInterval = 2.0;
+
+		// How close a player must be for a hostile NPC to aggro + attack (world units).
+		public const float NpcAggroRange = 20f;
 		private readonly ConcurrentDictionary<uint, Zone> _zones = new ConcurrentDictionary<uint, Zone>();
 
 		// Server-global monotonic allocator for playfield-instance tokens, mirroring retail's behaviour (a steadily
@@ -25,11 +31,6 @@ namespace Faolan.GameServer.World
 		public uint NextPlayfieldToken()
 		{
 			return Interlocked.Increment(ref _nextPlayfieldToken);
-		}
-
-		public Zone ZoneFor(uint mapId)
-		{
-			return _zones.GetOrAdd(mapId, m => new Zone(m) { PlayfieldToken = NextPlayfieldToken() });
 		}
 
 		// Adds the entity to `mapId`'s zone with the given transform, removing it from its previous zone if its map
@@ -53,12 +54,6 @@ namespace Faolan.GameServer.World
 			if (_zones.TryGetValue(entity.MapId, out var zone))
 				zone.Remove(entity.Handle);
 		}
-
-		// How close a player must be for a hostile NPC to aggro + attack (world units).
-		public const float NpcAggroRange = 20f;
-
-		// Seconds between an aggroed NPC's swings.
-		public const double NpcAttackInterval = 2.0;
 
 		// Advances the world model by `deltaSeconds` (docs/server-architecture-roadmap.md) and returns the wire-visible
 		// effects for the caller to broadcast: dead NPCs whose respawn delay elapsed (revived here - vitals + transform
@@ -94,7 +89,9 @@ namespace Faolan.GameServer.World
 						continue;
 
 					// Only hostile NPCs (mobs) aggro; talk-to NPCs (quest-givers/vendors) never attack.
-					var target = entity.Hostile ? NearestPlayerInRange(zone, entity, NpcAggroRange) : null;
+					var target = entity.Hostile
+						? NearestPlayerInRange(zone, entity, NpcAggroRange)
+						: null;
 					if (target == null)
 					{
 						entity.ArmAttackCooldown(NpcAttackInterval); // re-aggro shouldn't swing instantly
@@ -111,7 +108,12 @@ namespace Faolan.GameServer.World
 				}
 			}
 
-			return effects ?? (IReadOnlyList<WorldTickEffect>)System.Array.Empty<WorldTickEffect>();
+			return effects ?? (IReadOnlyList<WorldTickEffect>)Array.Empty<WorldTickEffect>();
+		}
+
+		public Zone ZoneFor(uint mapId)
+		{
+			return _zones.GetOrAdd(mapId, m => new Zone(m) { PlayfieldToken = NextPlayfieldToken() });
 		}
 
 		// The closest player within `range` of the NPC (its aggro target), or null if none.

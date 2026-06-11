@@ -13,6 +13,73 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
+		// The instance baked into the captured KnubotCloseChatWindow body (hoxxling's clientInstance), re-addressed
+		// to the live player on send.
+		private const uint CloseChatWindowCapturedInstance = 0x01316E71;
+
+		// The Knubot packets that END a conversation stage: an answer list (the next options) or a close-window.
+		private const uint KnubotAnswerListSubOpcode = 0xF164A4A5;
+		private const uint KnubotCloseChatWindowSubOpcode = 0xC4AF39EB;
+
+		// A KnubotCloseChatWindow (0xC4AF39EB) body, captured verbatim. It closes the NPC chat window with an EMPTY
+		// answer list (the remoteformat is id="0" with no options) - retail's "this NPC has nothing (more) to say"
+		// reply. The remoteformat (incl. its key) is byte-identical across every capture, so it is a reusable
+		// constant; only the player instance @offset 12 is re-addressed. See SendConversationClose.
+		private static readonly byte[] KnubotCloseChatWindowBody =
+		[
+			0x00, 0x00, 0x00, 0x7C, 0xC4, 0xAF, 0x39, 0xEB, 0x00, 0x00, 0xC3, 0x50, 0x01, 0x31, 0x6E, 0x71, 0x00, 0x00,
+			0x01, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x5F, 0x3C, 0x72, 0x65,
+			0x6D, 0x6F, 0x74, 0x65, 0x66, 0x6F, 0x72, 0x6D, 0x61, 0x74, 0x20, 0x69, 0x64, 0x3D, 0x22, 0x30, 0x22, 0x20,
+			0x63, 0x61, 0x74, 0x65, 0x67, 0x6F, 0x72, 0x79, 0x3D, 0x22, 0x31, 0x30, 0x30, 0x22, 0x20, 0x6B, 0x65, 0x79,
+			0x3D, 0x22, 0x2E, 0x66, 0x7A, 0x54, 0x75, 0x45, 0x79, 0x69, 0x75, 0x37, 0x42, 0x26, 0x23, 0x39, 0x32, 0x3B,
+			0x5A, 0x59, 0x5A, 0x4D, 0x6F, 0x71, 0x31, 0x2D, 0x22, 0x20, 0x6B, 0x6E, 0x75, 0x62, 0x6F, 0x74, 0x3D, 0x22,
+			0x30, 0x22, 0x20, 0x20, 0x3E, 0x3C, 0x2F, 0x72, 0x65, 0x6D, 0x6F, 0x74, 0x65, 0x66, 0x6F, 0x72, 0x6D, 0x61,
+			0x74, 0x3E
+		];
+
+		// Closes the NPC chat window gracefully (KnubotCloseChatWindow with an empty answer list), re-addressed to the
+		// live player. Sent when a TalkToNpc has NO matching conversation node, so the client never hangs mid-dialogue
+		// waiting for a reply that won't come - the "advance a step with no captured branch -> chat locks, can't ESC"
+		// bug. (Conversation replay is coverage-bound: (Mode, Field3) is quest-state-dependent and the captures cover
+		// only some states per NPC, so an un-captured branch is expected; closing the window is the right answer.)
+		internal Task SendConversationClose(INetworkClient client)
+		{
+			client.Session.ConversationStages = null; // end any active staged conversation
+			var id = client.Session.Account.ClientInstance;
+			var body = (byte[])KnubotCloseChatWindowBody.Clone();
+			SubstituteUInt32(body, CloseChatWindowCapturedInstance, id);
+
+			return new PacketStream()
+				.WriteHeader([0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x08], AppendVarint([0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10], id), 0x2000u)
+				.WriteArray(body)
+				.SendAsync(client);
+		}
+
+		// Sends the next pending conversation stage (the player clicked the NPC, or answered an option). Returns true
+		// if a stage was sent. When the stages are exhausted, clears the session conversation and closes the window so
+		// a further answer can't hang the client.
+		internal async Task<bool> SendNextConversationStage(INetworkClient client)
+		{
+			var stages = client.Session.ConversationStages;
+			var index = client.Session.ConversationStageIndex;
+			if (stages == null || index >= stages.Count)
+			{
+				if (stages != null) // an answer past the captured path: end the conversation gracefully
+				{
+					client.Session.ConversationStages = null;
+					await SendConversationClose(client);
+				}
+
+				return false;
+			}
+
+			foreach (var packet in stages[index])
+				await new PacketStream((byte[])packet.Clone()).SendAsync(client);
+
+			client.Session.ConversationStageIndex = index + 1;
+			return true;
+		}
+
 		// Replays the captured conversation node matching the player's TalkToNpc args, re-addressed to the NPC
 		// they actually clicked and to the live character instance. Returns true if a node matched (and was sent).
 		// Runs for both world-burst (beach login) AND create-world sessions: the client picks (Mode, Field3) from
@@ -64,17 +131,14 @@ namespace Faolan.GameServer
 				.ToList();
 
 			var stages = SegmentConversationStages(readdressed);
-			Logger.LogInformation("Conversation node (typeId={TypeId}, mode={Mode}, field3={Field3}) -> {Packets} packets in {Stages} stage(s) for NPC 0x{Npc:X}.", typeId, mode, field3, readdressed.Count, stages.Count, clickedNpcHandle);
+			Logger.LogInformation("Conversation node (typeId={TypeId}, mode={Mode}, field3={Field3}) -> {Packets} packets in {Stages} stage(s) for NPC 0x{Npc:X}.", typeId, mode, field3, readdressed.Count, stages.Count,
+				clickedNpcHandle);
 
 			client.Session.ConversationStages = stages;
 			client.Session.ConversationStageIndex = 0;
 			await SendNextConversationStage(client); // stage 0 (greeting + first answer list)
 			return true;
 		}
-
-		// The Knubot packets that END a conversation stage: an answer list (the next options) or a close-window.
-		private const uint KnubotAnswerListSubOpcode = 0xF164A4A5;
-		private const uint KnubotCloseChatWindowSubOpcode = 0xC4AF39EB;
 
 		// Splits the re-addressed node packets into stages. A stage runs up to and including the first answer-list or
 		// close-window packet; the trailing packets (a final reply with no further options) form the last stage.
@@ -99,31 +163,6 @@ namespace Faolan.GameServer
 			return stages;
 		}
 
-		// Sends the next pending conversation stage (the player clicked the NPC, or answered an option). Returns true
-		// if a stage was sent. When the stages are exhausted, clears the session conversation and closes the window so
-		// a further answer can't hang the client.
-		internal async Task<bool> SendNextConversationStage(INetworkClient client)
-		{
-			var stages = client.Session.ConversationStages;
-			var index = client.Session.ConversationStageIndex;
-			if (stages == null || index >= stages.Count)
-			{
-				if (stages != null) // an answer past the captured path: end the conversation gracefully
-				{
-					client.Session.ConversationStages = null;
-					await SendConversationClose(client);
-				}
-
-				return false;
-			}
-
-			foreach (var packet in stages[index])
-				await new PacketStream((byte[])packet.Clone()).SendAsync(client);
-
-			client.Session.ConversationStageIndex = index + 1;
-			return true;
-		}
-
 		// The 0x2000 IIR sub-opcode (body[4:8]) of an on-wire packet, or 0 if it can't be read.
 		private static uint ConversationSubOpcode(byte[] packet)
 		{
@@ -134,44 +173,6 @@ namespace Faolan.GameServer
 			return bodyStart + 8 <= packet.Length
 				? BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(bodyStart + 4, 4))
 				: 0;
-		}
-
-		// The instance baked into the captured KnubotCloseChatWindow body (hoxxling's clientInstance), re-addressed
-		// to the live player on send.
-		private const uint CloseChatWindowCapturedInstance = 0x01316E71;
-
-		// A KnubotCloseChatWindow (0xC4AF39EB) body, captured verbatim. It closes the NPC chat window with an EMPTY
-		// answer list (the remoteformat is id="0" with no options) - retail's "this NPC has nothing (more) to say"
-		// reply. The remoteformat (incl. its key) is byte-identical across every capture, so it is a reusable
-		// constant; only the player instance @offset 12 is re-addressed. See SendConversationClose.
-		private static readonly byte[] KnubotCloseChatWindowBody =
-		[
-			0x00, 0x00, 0x00, 0x7C, 0xC4, 0xAF, 0x39, 0xEB, 0x00, 0x00, 0xC3, 0x50, 0x01, 0x31, 0x6E, 0x71, 0x00, 0x00,
-			0x01, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x5F, 0x3C, 0x72, 0x65,
-			0x6D, 0x6F, 0x74, 0x65, 0x66, 0x6F, 0x72, 0x6D, 0x61, 0x74, 0x20, 0x69, 0x64, 0x3D, 0x22, 0x30, 0x22, 0x20,
-			0x63, 0x61, 0x74, 0x65, 0x67, 0x6F, 0x72, 0x79, 0x3D, 0x22, 0x31, 0x30, 0x30, 0x22, 0x20, 0x6B, 0x65, 0x79,
-			0x3D, 0x22, 0x2E, 0x66, 0x7A, 0x54, 0x75, 0x45, 0x79, 0x69, 0x75, 0x37, 0x42, 0x26, 0x23, 0x39, 0x32, 0x3B,
-			0x5A, 0x59, 0x5A, 0x4D, 0x6F, 0x71, 0x31, 0x2D, 0x22, 0x20, 0x6B, 0x6E, 0x75, 0x62, 0x6F, 0x74, 0x3D, 0x22,
-			0x30, 0x22, 0x20, 0x20, 0x3E, 0x3C, 0x2F, 0x72, 0x65, 0x6D, 0x6F, 0x74, 0x65, 0x66, 0x6F, 0x72, 0x6D, 0x61,
-			0x74, 0x3E
-		];
-
-		// Closes the NPC chat window gracefully (KnubotCloseChatWindow with an empty answer list), re-addressed to the
-		// live player. Sent when a TalkToNpc has NO matching conversation node, so the client never hangs mid-dialogue
-		// waiting for a reply that won't come - the "advance a step with no captured branch -> chat locks, can't ESC"
-		// bug. (Conversation replay is coverage-bound: (Mode, Field3) is quest-state-dependent and the captures cover
-		// only some states per NPC, so an un-captured branch is expected; closing the window is the right answer.)
-		internal Task SendConversationClose(INetworkClient client)
-		{
-			client.Session.ConversationStages = null; // end any active staged conversation
-			var id = client.Session.Account.ClientInstance;
-			var body = (byte[])KnubotCloseChatWindowBody.Clone();
-			SubstituteUInt32(body, CloseChatWindowCapturedInstance, id);
-
-			return new PacketStream()
-				.WriteHeader([0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x08], AppendVarint([0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10], id), 0x2000u)
-				.WriteArray(body)
-				.SendAsync(client);
 		}
 
 		// Replaces every big-endian uint32 occurrence of oldVal with newVal after the 8-byte length+crc prefix.

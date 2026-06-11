@@ -40,9 +40,11 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			};
 
 			foreach (var (slot, resolved) in equipped.OrderBy(kv => kv.Key))
+			{
 				containers[0]
 					.Items
 					.Add(SnapshotItemBuilder.BuildListEntry(slot, ItemId(instance, EquippedKind, slot), RecordId(instance, EquippedKind, slot), 1, resolved.Item, resolved.Archetype));
+			}
 
 			// CharacterInventory rows fill their container by kind (bag rows from unequip persistence; resource/
 			// quest rows once something writes them). Buildable items only - a row without real identity is
@@ -65,9 +67,11 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			// The seeded starter-bag item (legacy FirstPosBag nav) renders at the captured fresh-bag cell unless
 			// a persisted row already occupies it.
 			if (bagFirst != null && !bagSlotsTaken.Contains(BagFirstPos))
+			{
 				containers[1]
 					.Items
 					.Add(SnapshotItemBuilder.BuildListEntry(BagFirstPos, ItemId(instance, BagKind, BagFirstPos), RecordId(instance, BagKind, BagFirstPos), 1, bagFirst.Value.Item, bagFirst.Value.Archetype));
+			}
 
 			// Captured containers list entries in ascending pos.
 			foreach (var container in containers)

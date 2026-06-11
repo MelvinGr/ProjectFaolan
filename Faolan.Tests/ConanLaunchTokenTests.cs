@@ -30,7 +30,7 @@ namespace Faolan.Tests
 
 		[Theory, InlineData(""), InlineData("tooShort"), InlineData("zzzzzzzzzzzzzzzz"), InlineData("0123456789abcdef00")]
 		// right length, not hex
-			// wrong length
+		// wrong length
 		public void GetUnixTime_RejectsMalformed(string token)
 		{
 			Assert.Null(ConanLaunchToken.GetUnixTime(token));

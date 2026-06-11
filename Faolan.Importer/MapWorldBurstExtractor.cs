@@ -12,10 +12,8 @@ namespace Faolan.Importer
 
 	public static class MapWorldBurstExtractor
 	{
+		private const int MaxEntityQuitsInWorldBuild = 10;
 		private const uint MapChangeSubOpcode = 0x5D85BFC7;
-		private const uint Opcode2000 = 0x2000;
-		private const uint Opcode2020 = 0x2020; // client spawn poll - ends the pre-poll spawn burst
-		private const uint Opcode2076 = 0x2076; // spawn manifest (entity handle -> slot table), sent after the poll flood
 
 		// N3ToClientQuit (entity leaving). A clean world-build never contains one - entities are spawned, not removed -
 		// so its presence above a small tolerance marks a window captured MID-SESSION (the player active in a populated
@@ -24,7 +22,9 @@ namespace Faolan.Importer
 		// capture has 5); the only polluted window, the city map 11040, has 72 - a 14x margin - alongside 2375 packets
 		// (next-largest clean window: 282) and 1194 NPC StatIir ticks (next: 15). The threshold isolates it cleanly.
 		private const uint N3ToClientQuitSubOpcode = 0x04B82B2D;
-		private const int MaxEntityQuitsInWorldBuild = 10;
+		private const uint Opcode2000 = 0x2000;
+		private const uint Opcode2020 = 0x2020; // client spawn poll - ends the pre-poll spawn burst
+		private const uint Opcode2076 = 0x2076; // spawn manifest (entity handle -> slot table), sent after the poll flood
 
 		// The LoginWorld receiver conversation id "0D 47 C1 67 6C 10 <varint>" - its trailing varint is the client
 		// instance the packet was sent to (the local player), unambiguous even when other players are spawned.
@@ -142,18 +142,6 @@ namespace Faolan.Importer
 			return best.Values.ToList();
 		}
 
-		// Reads the local player's client instance from the receiver conversation id "...47 C1 67 6C 10 <varint>"
-		// embedded in the packet header. Returns 0 if the marker isn't present.
-		private static uint ExtractReceiverInstance(byte[] full)
-		{
-			var idx = IndexOf(full, ReceiverMarker);
-			if (idx < 0)
-				return 0;
-
-			var pos = idx + ReceiverMarker.Length;
-			return ReadVarint(full, pos);
-		}
-
 		// Counts window packets whose IIR sub-opcode (body[4:8]) equals `subOpcode` - used by the mid-session
 		// hygiene gate to tally entity-quit churn.
 		private static int CountSubOpcode(IEnumerable<byte[]> window, uint subOpcode)
@@ -167,6 +155,18 @@ namespace Faolan.Importer
 			}
 
 			return n;
+		}
+
+		// Reads the local player's client instance from the receiver conversation id "...47 C1 67 6C 10 <varint>"
+		// embedded in the packet header. Returns 0 if the marker isn't present.
+		private static uint ExtractReceiverInstance(byte[] full)
+		{
+			var idx = IndexOf(full, ReceiverMarker);
+			if (idx < 0)
+				return 0;
+
+			var pos = idx + ReceiverMarker.Length;
+			return ReadVarint(full, pos);
 		}
 
 		private static byte[] GetBody(byte[] full)

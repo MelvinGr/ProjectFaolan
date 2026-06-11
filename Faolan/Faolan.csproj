@@ -4,17 +4,17 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Faolan.Core\Faolan.Core.csproj" />
+        <ProjectReference Include="..\Faolan.Core\Faolan.Core.csproj"/>
         <!-- In-process MCP server (Claude tooling); call services.AddMcp(). -->
-        <ProjectReference Include="..\Faolan.Mcp\Faolan.Mcp.csproj" />
+        <ProjectReference Include="..\Faolan.Mcp\Faolan.Mcp.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
-        <InternalsVisibleTo Include="Faolan.Tests" />
+        <InternalsVisibleTo Include="Faolan.Tests"/>
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.8" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.8"/>
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.8">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -23,7 +23,7 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
-        <PackageReference Include="MoonSharp" Version="2.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8"/>
+        <PackageReference Include="MoonSharp" Version="2.0.0"/>
     </ItemGroup>
 </Project>

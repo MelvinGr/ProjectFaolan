@@ -5,11 +5,10 @@ namespace Faolan.Core.Database.Tables
 	// respawns at the CLOSEST point they know. Position/rotation come from Base3DEntity.
 	public class RespawnPoint : Base3DEntity
 	{
-		public uint MapId { get; set; }
-
-		public string Name { get; set; }
-
 		// True for the always-available starter point (e.g. Tortage Beach) - known without discovery.
 		public bool AlwaysKnown { get; set; }
+
+		public string Name { get; set; }
+		public uint MapId { get; set; }
 	}
 }

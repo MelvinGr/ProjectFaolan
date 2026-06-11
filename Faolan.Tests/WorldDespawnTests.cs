@@ -44,6 +44,13 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void TryExtractPlayfieldToken_ReturnsFalseWhenAbsent()
+		{
+			Assert.False(WorldDespawn.TryExtractPlayfieldToken(new byte[] { 0x01, 0x02, 0x03, 0x04 }, out var token));
+			Assert.Equal(0u, token);
+		}
+
+		[Fact]
 		public void TryExtractPlayfieldToken_SkipsPrefixWithoutSuffix()
 		{
 			// A 000000BF that is NOT followed by the 0000040B suffix must be skipped, not mistaken for the token frame.
@@ -59,13 +66,6 @@ namespace Faolan.Tests
 
 			Assert.True(WorldDespawn.TryExtractPlayfieldToken(snapshot, out var token));
 			Assert.Equal(0x01EA985Cu, token);
-		}
-
-		[Fact]
-		public void TryExtractPlayfieldToken_ReturnsFalseWhenAbsent()
-		{
-			Assert.False(WorldDespawn.TryExtractPlayfieldToken(new byte[] { 0x01, 0x02, 0x03, 0x04 }, out var token));
-			Assert.Equal(0u, token);
 		}
 	}
 }

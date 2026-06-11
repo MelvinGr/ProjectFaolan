@@ -113,7 +113,9 @@ namespace Faolan.Importer
 				var offset = BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan(d + 4, 4));
 				var size = BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan(d + 8, 4));
 
-				var hash = b.AsSpan(d + 28, 16).ToArray(); // 16-byte content hash = CDN path md5 for file==0xFF resources
+				var hash = b
+					.AsSpan(d + 28, 16)
+					.ToArray(); // 16-byte content hash = CDN path md5 for file==0xFF resources
 				_entries.Add(new Entry(type, id, file, offset, size, hash));
 			}
 		}
@@ -141,6 +143,11 @@ namespace Faolan.Importer
 			return raw.Length >= 20 && raw[0] == (byte)'R' && raw[1] == (byte)'D' && raw[2] == (byte)'B' && raw[3] == (byte)'H';
 		}
 
+		public static byte[] UnwrapIOz1Public(byte[] raw)
+		{
+			return UnwrapIOz1(raw);
+		}
+
 		private static byte[] Inflate(byte[] data, int offset, int expectedSize)
 		{
 			using var input = new MemoryStream(data, offset, data.Length - offset);
@@ -151,8 +158,6 @@ namespace Faolan.Importer
 			zlib.CopyTo(output);
 			return output.ToArray();
 		}
-
-		public static byte[] UnwrapIOz1Public(byte[] raw) => UnwrapIOz1(raw);
 
 		private static byte[] UnwrapIOz1(byte[] raw)
 		{

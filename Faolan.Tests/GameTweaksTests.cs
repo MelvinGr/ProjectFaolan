@@ -50,9 +50,11 @@ namespace Faolan.Tests
 			var stream = new FaolanStream();
 			stream.WriteUInt32(0x00004ED4u);
 			foreach (var (name, value) in Tweaks)
+			{
 				stream
 					.WriteString(name)
 					.WriteDoubleBigEndian(value);
+			}
 
 			Assert.Equal(RetailGameTweaksBody, stream.ToArray());
 		}

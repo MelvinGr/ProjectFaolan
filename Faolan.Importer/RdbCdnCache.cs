@@ -13,9 +13,12 @@ namespace Faolan.Importer
 	public sealed class RdbCdnCache : IDisposable
 	{
 		private const string Tag = "gameupdate"; // the on-demand RDB host's mirror tag
+		private readonly HttpClient _http;
 		private readonly string _cdnBase;
 		private readonly string _storeDir;
-		private readonly HttpClient _http;
+		public int Fetched { get; private set; }
+
+		public int Hits { get; private set; }
 
 		public RdbCdnCache(string cdnBase, string storeDir)
 		{
@@ -25,13 +28,17 @@ namespace Faolan.Importer
 			_http.DefaultRequestHeaders.AcceptEncoding.ParseAdd("identity");
 		}
 
-		public int Hits { get; private set; }
-		public int Fetched { get; private set; }
+		public void Dispose()
+		{
+			_http.Dispose();
+		}
 
 		// The raw (IOz1+zlib) blob for a content hash. Served from the store if archived, else fetched + archived.
 		public async Task<byte[]> FetchRawAsync(byte[] hash)
 		{
-			var h = Convert.ToHexString(hash).ToLowerInvariant();
+			var h = Convert
+				.ToHexString(hash)
+				.ToLowerInvariant();
 			var rest = $"rdb/res/{h[..2]}/{h.Substring(2, 1)}/{h[3..]}";
 
 			var stored = _storeDir == null
@@ -54,11 +61,6 @@ namespace Faolan.Importer
 			}
 
 			return raw;
-		}
-
-		public void Dispose()
-		{
-			_http.Dispose();
 		}
 	}
 }

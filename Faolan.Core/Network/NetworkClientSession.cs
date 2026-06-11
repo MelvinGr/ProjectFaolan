@@ -51,10 +51,21 @@ namespace Faolan.Core.Network
 		// from the world-burst spawns. Combat seeds an NPC's vitals from this so its health bar matches what the
 		// client rendered from the spawn, instead of a flat placeholder. Populated alongside SpawnedNpcNamesByHandle.
 		Dictionary<uint, uint> SpawnedNpcMaxHealthByHandle { get; }
+		int ConversationStageIndex { get; set; }
 
 		// Index of the next post-creation world cutscene chunk to send. Advanced once per client script
 		// trigger (ClientLoadingDone, StartScript, Move, IntroDone) so each chunk is sent in order.
 		int CreateWorldChunkIndex { get; set; }
+
+		// Monotonic counter stamped as field3 (the "phase") into each NormalAttack BehaviorControlCenter ack. In the
+		// capture it increments by 1 per player swing-ack; the client uses it to sequence the behaviour responses.
+		int NormalAttackAckPhase { get; set; }
+
+		// The active NPC conversation, served one STAGE at a time. A captured conversation node bundles every stage
+		// the player walked through (greeting + each option's reply); the runtime segments it into stages (each ends
+		// at a Knubot answer-list / close-window packet) so a click serves the greeting and each KnubotAnswer serves
+		// the next reply - instead of dumping the whole tree at once. Re-addressed packets, ready to send.
+		List<List<byte[]>> ConversationStages { get; set; }
 		List<uint> CreateEditorObservedRequestIds { get; }
 		List<uint> CreateEditorReadyRequestIds { get; }
 
@@ -78,17 +89,6 @@ namespace Faolan.Core.Network
 		uint Post205FF98E10B3Count { get; set; }
 		uint? LastGameServer2020RequestId { get; set; }
 		ulong GameServerInboundPacketSequence { get; set; }
-
-		// The active NPC conversation, served one STAGE at a time. A captured conversation node bundles every stage
-		// the player walked through (greeting + each option's reply); the runtime segments it into stages (each ends
-		// at a Knubot answer-list / close-window packet) so a click serves the greeting and each KnubotAnswer serves
-		// the next reply - instead of dumping the whole tree at once. Re-addressed packets, ready to send.
-		List<List<byte[]>> ConversationStages { get; set; }
-		int ConversationStageIndex { get; set; }
-
-		// Monotonic counter stamped as field3 (the "phase") into each NormalAttack BehaviorControlCenter ack. In the
-		// capture it increments by 1 per player swing-ack; the client uses it to sequence the behaviour responses.
-		int NormalAttackAckPhase { get; set; }
 	}
 
 	public sealed class NetworkClientSession : INetworkClientSession
@@ -115,8 +115,11 @@ namespace Faolan.Core.Network
 
 		public Dictionary<uint, string> SpawnedNpcNamesByHandle { get; } = new Dictionary<uint, string>();
 		public Dictionary<uint, uint> SpawnedNpcMaxHealthByHandle { get; } = new Dictionary<uint, uint>();
+		public int ConversationStageIndex { get; set; }
 
 		public int CreateWorldChunkIndex { get; set; }
+		public int NormalAttackAckPhase { get; set; }
+		public List<List<byte[]>> ConversationStages { get; set; }
 		public List<uint> CreateEditorObservedRequestIds { get; } = [];
 		public List<uint> CreateEditorReadyRequestIds { get; } = [];
 		public string PendingCharacterName { get; set; }
@@ -129,8 +132,5 @@ namespace Faolan.Core.Network
 
 		public uint? LastGameServer2020RequestId { get; set; }
 		public ulong GameServerInboundPacketSequence { get; set; }
-		public List<List<byte[]>> ConversationStages { get; set; }
-		public int ConversationStageIndex { get; set; }
-		public int NormalAttackAckPhase { get; set; }
 	}
 }

@@ -21,7 +21,7 @@ namespace Faolan.Importer
 	{
 		// Known IIR types that have no table/builder yet, so they can only come from the stored burst (the work that
 		// remains). Anything not here and not a spawn/object/player record is reported as an unknown type to chase.
-		private static readonly Dictionary<uint, string> BurstOnlyFamilies = new()
+		private static readonly Dictionary<uint, string> BurstOnlyFamilies = new Dictionary<uint, string>
 		{
 			[0x96C46740] = "MoveTask (no patrol-path table)",
 			[0x642CD3D6] = "BehaviorControlCenter/Interact (no table)",
@@ -31,7 +31,7 @@ namespace Faolan.Importer
 			[0xE7F4F8F8] = "SimpleDynelVisualChange (transient? in-client check)",
 			[0xD751EBB4] = "StopIIR (transient? in-client check)",
 			[0x04B80B24] = "SetPosIIR (transient? in-client check)",
-			[0x8D5A8B6B] = "FormatFeedback (transient? in-client check)",
+			[0x8D5A8B6B] = "FormatFeedback (transient? in-client check)"
 		};
 
 		public static async Task RunAsync(DatabaseContext db)
@@ -77,7 +77,9 @@ namespace Faolan.Importer
 
 				var total = burst.Entities.Count;
 				var burstOnly = total - built;
-				var pct = total == 0 ? 100.0 : 100.0 * built / total;
+				var pct = total == 0
+					? 100.0
+					: 100.0 * built / total;
 				var breakdown = string.Join(", ", residual.Select(kv => $"{kv.Value} {kv.Key}"));
 				Console.WriteLine($"  {burst.MapId,-7} {total,6} {built,13} {burstOnly,12} {pct,7:0.0}   {breakdown}");
 
@@ -88,7 +90,9 @@ namespace Faolan.Importer
 			}
 
 			var grandResidualCount = grandTotal - grandBuilt;
-			var grandPct = grandTotal == 0 ? 100.0 : 100.0 * grandBuilt / grandTotal;
+			var grandPct = grandTotal == 0
+				? 100.0
+				: 100.0 * grandBuilt / grandTotal;
 			Console.WriteLine("  -------------------------------------------------------------------------------------");
 			Console.WriteLine($"  ALL     {grandTotal,6} {grandBuilt,13} {grandResidualCount,12} {grandPct,7:0.0}");
 			Console.WriteLine();
@@ -97,12 +101,28 @@ namespace Faolan.Importer
 				Console.WriteLine($"    {kv.Value,5}  {kv.Key}");
 		}
 
+		private static void Bump(IDictionary<string, int> counts, string key, int by = 1)
+		{
+			counts.TryGetValue(key, out var n);
+			counts[key] = n + by;
+		}
+
+		private static Dictionary<(int, int, int), T> Index<T>(IEnumerable<T> rows, Func<T, (float, float, float)> pos)
+		{
+			var map = new Dictionary<(int, int, int), T>();
+			foreach (var row in rows)
+			{
+				var (x, y, z) = pos(row);
+				map.TryAdd(PositionKey(x, y, z), row);
+			}
+
+			return map;
+		}
+
 		// True if this record is already reproducible without the burst: a server-generated global/player record, or a
 		// world entity whose table row (matched by spawn position) rebuilds byte-identical via the same builder the
 		// replay uses. Otherwise it is still burst-only; `residualFamily` names why so the report can tally it.
-		private static bool IsConstructable(MapWorldBurstEntity e, uint playerInstance,
-			IReadOnlyDictionary<(int, int, int), NpcSpawn> npcs, IReadOnlyDictionary<(int, int, int), WorldObject> objects,
-			out string residualFamily)
+		private static bool IsConstructable(MapWorldBurstEntity e, uint playerInstance, IReadOnlyDictionary<(int, int, int), NpcSpawn> npcs, IReadOnlyDictionary<(int, int, int), WorldObject> objects, out string residualFamily)
 		{
 			residualFamily = null;
 
@@ -123,15 +143,18 @@ namespace Faolan.Importer
 					// The player's own spawn (handle == the live instance) is fully DB-generated.
 					if (e.Handle == playerInstance)
 						return true;
+
 					if (!TryReadBodyAndKey(e, out var npcBodyArr, out var npcKey))
 					{
 						residualFamily = "NPC spawn (malformed body)";
 						return false;
 					}
 
-					if (npcs.TryGetValue(npcKey, out var npcRow) && NpcSpawnBuilder.TryBuild(npcRow, e.Handle, out var npcBody)
-					    && npcBodyArr.AsSpan().SequenceEqual(npcBody))
+					if (npcs.TryGetValue(npcKey, out var npcRow) && NpcSpawnBuilder.TryBuild(npcRow, e.Handle, out var npcBody) && npcBodyArr
+						    .AsSpan()
+						    .SequenceEqual(npcBody))
 						return true;
+
 					residualFamily = npcs.ContainsKey(npcKey)
 						? "NPC spawn (cross-session: scaffold not yet lifted to columns)"
 						: "NPC spawn (no NpcSpawns row)";
@@ -160,14 +183,18 @@ namespace Faolan.Importer
 						return false;
 					}
 
-					if (objBodyArr.AsSpan().SequenceEqual(objBody))
+					if (objBodyArr
+					    .AsSpan()
+					    .SequenceEqual(objBody))
 						return true;
+
 					residualFamily = "world object (cross-session: identity differs from table row)";
 					return false;
 
 				case 0x737A6DF9: // FullChar - the player's own (inventory snapshot) is rebuilt live; an NPC's is not.
 					if (e.Handle == playerInstance)
 						return true;
+
 					residualFamily = "FullChar (non-player, no table)";
 					return false;
 
@@ -177,6 +204,11 @@ namespace Faolan.Importer
 						: $"0x{e.IirType:X8} (unknown IIR type)";
 					return false;
 			}
+		}
+
+		private static (int, int, int) PositionKey(float x, float y, float z)
+		{
+			return ((int)MathF.Round(x * 100f), (int)MathF.Round(y * 100f), (int)MathF.Round(z * 100f));
 		}
 
 		// Rebuilds the entity's full packet, slices out the IIR body (what the builders compare against) and reads the
@@ -192,34 +224,9 @@ namespace Faolan.Importer
 				return false;
 
 			body = full[bodyStart..];
-			key = PositionKey(
-				BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.PosXOffset, 4)),
-				BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.PosYOffset, 4)),
+			key = PositionKey(BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.PosXOffset, 4)), BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.PosYOffset, 4)),
 				BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.PosZOffset, 4)));
 			return true;
-		}
-
-		private static Dictionary<(int, int, int), T> Index<T>(IEnumerable<T> rows, Func<T, (float, float, float)> pos)
-		{
-			var map = new Dictionary<(int, int, int), T>();
-			foreach (var row in rows)
-			{
-				var (x, y, z) = pos(row);
-				map.TryAdd(PositionKey(x, y, z), row);
-			}
-
-			return map;
-		}
-
-		private static (int, int, int) PositionKey(float x, float y, float z)
-		{
-			return ((int)MathF.Round(x * 100f), (int)MathF.Round(y * 100f), (int)MathF.Round(z * 100f));
-		}
-
-		private static void Bump(IDictionary<string, int> counts, string key, int by = 1)
-		{
-			counts.TryGetValue(key, out var n);
-			counts[key] = n + by;
 		}
 	}
 }

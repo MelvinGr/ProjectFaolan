@@ -15,7 +15,9 @@ namespace Faolan.GameServer.Combat
 		// to the level-1 value.
 		public static uint NpcMaxHealthForLevel(uint level)
 		{
-			var lvl = level == 0 ? 1u : level;
+			var lvl = level == 0
+				? 1u
+				: level;
 			return DefaultNpcMaxHealth + lvl * 20u;
 		}
 
@@ -23,7 +25,9 @@ namespace Faolan.GameServer.Combat
 		// difference scaling isn't modelled yet, like the damage values). Level 0 maps to the level-1 award.
 		public static uint ResolveKillXp(uint npcLevel)
 		{
-			var lvl = npcLevel == 0 ? 1u : npcLevel;
+			var lvl = npcLevel == 0
+				? 1u
+				: npcLevel;
 			return 10u + lvl * 25u;
 		}
 
@@ -31,7 +35,9 @@ namespace Faolan.GameServer.Combat
 		// real NPC weapon/mitigation data isn't modelled yet). Level 0 maps to level 1.
 		public static uint ResolveNpcAttackDamage(uint npcLevel)
 		{
-			var lvl = npcLevel == 0 ? 1u : npcLevel;
+			var lvl = npcLevel == 0
+				? 1u
+				: npcLevel;
 			return 5u + lvl * 3u;
 		}
 

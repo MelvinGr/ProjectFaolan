@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Faolan.Core.Network;
 using Faolan.Core.Network.AgentServer;
 using Faolan.Core.Network.GameServer;
 
@@ -18,14 +17,7 @@ namespace Faolan.GameServer
 				{
 					var account = nc.Session?.Account;
 					var character = nc.Session?.Character;
-					return new SessionInfo(
-						nc.IpAddress,
-						account?.Id,
-						account?.UserName,
-						account?.ClientInstance ?? 0,
-						character?.Id,
-						character?.Name,
-						character?.Level);
+					return new SessionInfo(nc.IpAddress, account?.Id, account?.UserName, account?.ClientInstance ?? 0, character?.Id, character?.Name, character?.Level);
 				})
 				.ToArray();
 		}

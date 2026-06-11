@@ -25,12 +25,12 @@ namespace Faolan.GameServer.Combat
 		// Fallback vitals store for NPCs NOT in the world model (e.g. the built-NPC test) - model NPCs and players
 		// keep their vitals on their WorldEntity (the single source of truth). In-memory, never persisted.
 		private readonly CombatState _combat = new CombatState();
+		private readonly IAgentServerDispatcher _agents;
+		private readonly IDatabaseRepository _database;
+		private readonly ILogger _logger;
+		private readonly WorldBroadcaster _broadcaster;
 
 		private readonly WorldSimulation _sim;
-		private readonly WorldBroadcaster _broadcaster;
-		private readonly IDatabaseRepository _database;
-		private readonly IAgentServerDispatcher _agents;
-		private readonly ILogger _logger;
 
 		public CombatService(WorldSimulation sim, WorldBroadcaster broadcaster, IDatabaseRepository database, IAgentServerDispatcher agents, ILogger logger)
 		{
@@ -54,18 +54,6 @@ namespace Faolan.GameServer.Combat
 			return entity.Vitals ??= EntityVitals.FromCharacter(client.Session.Character);
 		}
 
-		// A target NPC's live vitals, seeded from its real spawn health (recorded when the world burst spawned it)
-		// so its health bar moves relative to the HP the client rendered; falls back to the placeholder for NPCs
-		// not spawned via the burst (e.g. the built-NPC test).
-		private EntityVitals GetOrAddNpcVitals(INetworkClient client, uint targetHandle)
-		{
-			return _combat.GetOrAdd(targetHandle, () =>
-			{
-				var maxHealth = client.Session.SpawnedNpcMaxHealthByHandle.GetValueOrDefault(targetHandle, CombatResolver.DefaultNpcMaxHealth);
-				return EntityVitals.FromMax(maxHealth, 0, maxHealth);
-			});
-		}
-
 		// Resolves an offensive cast: applies damage to the target's live vitals and pushes a 0x96B8DC59 update so
 		// its health bar moves. The ApplySpell cast itself is broadcast by the caller.
 		public async Task ResolveOffensiveCast(INetworkClient client, uint casterHandle, uint targetHandle, uint spellId)
@@ -73,135 +61,6 @@ namespace Faolan.GameServer.Combat
 			var casterLevel = client.Session.Character?.Level ?? 1;
 			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel);
 			await ApplyNpcDamage(client, targetHandle, damage, $"spell {spellId} from 0x{casterHandle:X8}");
-		}
-
-		// Applies `damage` to an NPC and pushes its 0x96B8DC59 health update; on death, runs the kill lifecycle
-		// (despawn + scheduled respawn). Vitals resolve from the WORLD MODEL when the target is a model NPC (the
-		// authoritative owner), else fall back to the per-session store (e.g. the built-NPC test). Shared by the melee
-		// and spell paths.
-		private async Task ApplyNpcDamage(INetworkClient client, uint targetHandle, int damage, string cause)
-		{
-			var target = ResolveNpcVitals(client, targetHandle, out var npcEntity);
-			if (target.IsDead)
-				return; // already dead this life; ignore overkill until it respawns
-
-			target.ApplyHealthDelta(-damage);
-			await SendStatUpdate(client, target.ToVitalsBlock(), targetHandle);
-
-			if (target.IsDead)
-				await OnNpcKilled(client, targetHandle, npcEntity, cause);
-		}
-
-		// The NPC's authoritative live vitals: the world-model entity's if it is a tracked NPC (also returned, so the
-		// caller can run its death lifecycle), otherwise the per-session vitals (npcEntity null).
-		private EntityVitals ResolveNpcVitals(INetworkClient client, uint targetHandle, out WorldEntity npcEntity)
-		{
-			var player = _sim.PlayerWorldEntity(client);
-			if (player != null && _sim.World.ZoneFor(player.MapId).TryGet(targetHandle, out npcEntity) && !npcEntity.IsPlayer && npcEntity.Vitals != null)
-				return npcEntity.Vitals;
-
-			npcEntity = null;
-			return GetOrAddNpcVitals(client, targetHandle);
-		}
-
-		// An NPC was killed by `killer`: a model NPC is marked dead (starting its respawn timer), despawned for nearby
-		// players (the tick respawns it), and awards the killer XP. A non-model NPC (no world entity) is just dropped
-		// from the session store.
-		private async Task OnNpcKilled(INetworkClient killer, uint targetHandle, WorldEntity npcEntity, string cause)
-		{
-			if (npcEntity != null)
-			{
-				npcEntity.MarkDead();
-				await _broadcaster.BroadcastEntityDespawn(npcEntity);
-				_logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); despawned, respawns in {Delay}s.", npcEntity.Name, targetHandle, cause, npcEntity.RespawnDelaySeconds);
-				await AwardKillXp(killer, npcEntity.Level);
-				await _broadcaster.TrySpawnLoot(npcEntity);
-				await AdvanceKillQuests(killer, npcEntity.Name);
-				return;
-			}
-
-			_logger.LogInformation("Combat: entity 0x{Target:X8} killed ({Cause}); not in world model, no respawn.", targetHandle, cause);
-			_combat.Remove(targetHandle);
-		}
-
-		// Advances the killer's quest kill-objectives for an NPC of `npcName`: any active quest whose GoalTargetName
-		// matches gets GoalProgress++ (persisted) and a QuestGoal push; reaching GoalRequired completes it (state +
-		// system message). The objective DEFINITIONS (target/count) are set when the quest is added (the pinned RDB
-		// Lua VM would set them); this is the auto-tracking engine on top.
-		private async Task AdvanceKillQuests(INetworkClient killer, string npcName)
-		{
-			var character = killer?.Session?.Character;
-			if (character == null || string.IsNullOrEmpty(npcName))
-				return;
-
-			foreach (var quest in await _database.GetCharacterQuests(character.Id))
-			{
-				if (!QuestProgress.AdvancesOnKill(quest, npcName))
-					continue;
-
-				var progress = quest.GoalProgress + 1;
-				var completed = progress >= quest.GoalRequired;
-				await _database.SetCharacterQuest(character.Id, quest.QuestId,
-					completed ? QuestState.Completed : QuestState.Active,
-					progress, quest.GoalRequired, quest.GoalTargetName);
-				await _broadcaster.SendQuestGoal(killer, quest.QuestId, 0, progress);
-
-				if (completed)
-					await _agents.SendSystemMessage(character.Id, $"Quest {quest.QuestId} complete!");
-				else
-					await _agents.SendSystemMessage(character.Id, $"{npcName} slain ({progress}/{quest.GoalRequired}).");
-			}
-		}
-
-		// Awards the killer XP for a kill, advancing levels when the XP bar fills (LevelingResolver), and pushes a
-		// 0x96B8DC59 stat update so the XP bar (and, on a ding, level + new vitals) move. Experience is within-level
-		// progress; XP/level accrue on the persisted Character (saved by the usual disconnect/autosave/.save points).
-		private async Task AwardKillXp(INetworkClient killer, uint npcLevel)
-		{
-			var character = killer?.Session?.Character;
-			if (character == null)
-				return;
-
-			var xp = CombatResolver.ResolveKillXp(npcLevel);
-			character.Experience += xp;
-
-			var (levelsGained, remaining) = LevelingResolver.Apply(character.Level, character.Experience);
-			character.Experience = remaining;
-
-			if (levelsGained > 0)
-			{
-				character.Level = (ushort)Math.Min(character.Level + levelsGained, LevelingResolver.MaxLevel);
-				character.RegenerateMaxStats();
-				await PushLevelUp(killer, character);
-				_logger.LogInformation("Combat: {Name} gained {Xp} XP and reached level {Level}.", character.Name, xp, character.Level);
-				return;
-			}
-
-			var block = new CharacterStatBlock()
-				.Set(LegacyCharacterStatId.Exp, character.Experience)
-				.Set(LegacyCharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
-			await SendStatUpdate(killer, block, killer.Session.Account.ClientInstance);
-			_logger.LogInformation("Combat: {Name} gained {Xp} XP ({Exp}/{Max}).", character.Name, xp, character.Experience, LevelingResolver.XpForNextLevel(character.Level));
-		}
-
-		// On level-up: raise the player's live vitals to the new max and refill them (a ding heals), then push the new
-		// Level + Exp/MaxExp + full vitals in one 0x96B8DC59 update.
-		private async Task PushLevelUp(INetworkClient killer, Character character)
-		{
-			var vitals = GetOrAddPlayerVitals(killer);
-			var max = character.MaxStats ?? CharacterMaxStats.CreateDefaults(character.Class, character.Level);
-			vitals.MaxHealth = max.Health;
-			vitals.MaxStamina = max.Stamina;
-			vitals.MaxMana = max.Mana;
-			vitals.Health = max.Health;
-			vitals.Stamina = max.Stamina;
-			vitals.Mana = max.Mana;
-
-			var block = vitals.ToVitalsBlock()
-				.Set(LegacyCharacterStatId.Level, character.Level)
-				.Set(LegacyCharacterStatId.Exp, character.Experience)
-				.Set(LegacyCharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
-			await SendStatUpdate(killer, block, killer.Session.Account.ClientInstance);
 		}
 
 		// The melee swing / auto-attack (Interact ActionType 0x0F). Retail's response sequence, reproduced from the
@@ -329,10 +188,149 @@ namespace Faolan.GameServer.Combat
 			await SendStatUpdate(client, player.ToVitalsBlock(), client.Session.Account.ClientInstance);
 		}
 
-		// Pushes a 0x96B8DC59 stat block to the client (shared wire builder on World.VitalsPacket).
-		private static Task SendStatUpdate(INetworkClient client, CharacterStatBlock stats, uint? entityHandle = null)
+		// Advances the killer's quest kill-objectives for an NPC of `npcName`: any active quest whose GoalTargetName
+		// matches gets GoalProgress++ (persisted) and a QuestGoal push; reaching GoalRequired completes it (state +
+		// system message). The objective DEFINITIONS (target/count) are set when the quest is added (the pinned RDB
+		// Lua VM would set them); this is the auto-tracking engine on top.
+		private async Task AdvanceKillQuests(INetworkClient killer, string npcName)
 		{
-			return client.SendAsync(VitalsPacket.BuildStatUpdate(client, stats, entityHandle));
+			var character = killer?.Session?.Character;
+			if (character == null || string.IsNullOrEmpty(npcName))
+				return;
+
+			foreach (var quest in await _database.GetCharacterQuests(character.Id))
+			{
+				if (!QuestProgress.AdvancesOnKill(quest, npcName))
+					continue;
+
+				var progress = quest.GoalProgress + 1;
+				var completed = progress >= quest.GoalRequired;
+				await _database.SetCharacterQuest(character.Id, quest.QuestId, completed
+					? QuestState.Completed
+					: QuestState.Active, progress, quest.GoalRequired, quest.GoalTargetName);
+				await _broadcaster.SendQuestGoal(killer, quest.QuestId, 0, progress);
+
+				if (completed)
+					await _agents.SendSystemMessage(character.Id, $"Quest {quest.QuestId} complete!");
+				else
+					await _agents.SendSystemMessage(character.Id, $"{npcName} slain ({progress}/{quest.GoalRequired}).");
+			}
+		}
+
+		// Applies `damage` to an NPC and pushes its 0x96B8DC59 health update; on death, runs the kill lifecycle
+		// (despawn + scheduled respawn). Vitals resolve from the WORLD MODEL when the target is a model NPC (the
+		// authoritative owner), else fall back to the per-session store (e.g. the built-NPC test). Shared by the melee
+		// and spell paths.
+		private async Task ApplyNpcDamage(INetworkClient client, uint targetHandle, int damage, string cause)
+		{
+			var target = ResolveNpcVitals(client, targetHandle, out var npcEntity);
+			if (target.IsDead)
+				return; // already dead this life; ignore overkill until it respawns
+
+			target.ApplyHealthDelta(-damage);
+			await SendStatUpdate(client, target.ToVitalsBlock(), targetHandle);
+
+			if (target.IsDead)
+				await OnNpcKilled(client, targetHandle, npcEntity, cause);
+		}
+
+		// Awards the killer XP for a kill, advancing levels when the XP bar fills (LevelingResolver), and pushes a
+		// 0x96B8DC59 stat update so the XP bar (and, on a ding, level + new vitals) move. Experience is within-level
+		// progress; XP/level accrue on the persisted Character (saved by the usual disconnect/autosave/.save points).
+		private async Task AwardKillXp(INetworkClient killer, uint npcLevel)
+		{
+			var character = killer?.Session?.Character;
+			if (character == null)
+				return;
+
+			var xp = CombatResolver.ResolveKillXp(npcLevel);
+			character.Experience += xp;
+
+			var (levelsGained, remaining) = LevelingResolver.Apply(character.Level, character.Experience);
+			character.Experience = remaining;
+
+			if (levelsGained > 0)
+			{
+				character.Level = (ushort)Math.Min(character.Level + levelsGained, LevelingResolver.MaxLevel);
+				character.RegenerateMaxStats();
+				await PushLevelUp(killer, character);
+				_logger.LogInformation("Combat: {Name} gained {Xp} XP and reached level {Level}.", character.Name, xp, character.Level);
+				return;
+			}
+
+			var block = new CharacterStatBlock()
+				.Set(LegacyCharacterStatId.Exp, character.Experience)
+				.Set(LegacyCharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
+			await SendStatUpdate(killer, block, killer.Session.Account.ClientInstance);
+			_logger.LogInformation("Combat: {Name} gained {Xp} XP ({Exp}/{Max}).", character.Name, xp, character.Experience, LevelingResolver.XpForNextLevel(character.Level));
+		}
+
+		// A target NPC's live vitals, seeded from its real spawn health (recorded when the world burst spawned it)
+		// so its health bar moves relative to the HP the client rendered; falls back to the placeholder for NPCs
+		// not spawned via the burst (e.g. the built-NPC test).
+		private EntityVitals GetOrAddNpcVitals(INetworkClient client, uint targetHandle)
+		{
+			return _combat.GetOrAdd(targetHandle, () =>
+			{
+				var maxHealth = client.Session.SpawnedNpcMaxHealthByHandle.GetValueOrDefault(targetHandle, CombatResolver.DefaultNpcMaxHealth);
+				return EntityVitals.FromMax(maxHealth, 0, maxHealth);
+			});
+		}
+
+		// An NPC was killed by `killer`: a model NPC is marked dead (starting its respawn timer), despawned for nearby
+		// players (the tick respawns it), and awards the killer XP. A non-model NPC (no world entity) is just dropped
+		// from the session store.
+		private async Task OnNpcKilled(INetworkClient killer, uint targetHandle, WorldEntity npcEntity, string cause)
+		{
+			if (npcEntity != null)
+			{
+				npcEntity.MarkDead();
+				await _broadcaster.BroadcastEntityDespawn(npcEntity);
+				_logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); despawned, respawns in {Delay}s.", npcEntity.Name, targetHandle, cause, npcEntity.RespawnDelaySeconds);
+				await AwardKillXp(killer, npcEntity.Level);
+				await _broadcaster.TrySpawnLoot(npcEntity);
+				await AdvanceKillQuests(killer, npcEntity.Name);
+				return;
+			}
+
+			_logger.LogInformation("Combat: entity 0x{Target:X8} killed ({Cause}); not in world model, no respawn.", targetHandle, cause);
+			_combat.Remove(targetHandle);
+		}
+
+		// On level-up: raise the player's live vitals to the new max and refill them (a ding heals), then push the new
+		// Level + Exp/MaxExp + full vitals in one 0x96B8DC59 update.
+		private async Task PushLevelUp(INetworkClient killer, Character character)
+		{
+			var vitals = GetOrAddPlayerVitals(killer);
+			var max = character.MaxStats ?? CharacterMaxStats.CreateDefaults(character.Class, character.Level);
+			vitals.MaxHealth = max.Health;
+			vitals.MaxStamina = max.Stamina;
+			vitals.MaxMana = max.Mana;
+			vitals.Health = max.Health;
+			vitals.Stamina = max.Stamina;
+			vitals.Mana = max.Mana;
+
+			var block = vitals
+				.ToVitalsBlock()
+				.Set(LegacyCharacterStatId.Level, character.Level)
+				.Set(LegacyCharacterStatId.Exp, character.Experience)
+				.Set(LegacyCharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
+			await SendStatUpdate(killer, block, killer.Session.Account.ClientInstance);
+		}
+
+		// The NPC's authoritative live vitals: the world-model entity's if it is a tracked NPC (also returned, so the
+		// caller can run its death lifecycle), otherwise the per-session vitals (npcEntity null).
+		private EntityVitals ResolveNpcVitals(INetworkClient client, uint targetHandle, out WorldEntity npcEntity)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player != null && _sim
+				    .World
+				    .ZoneFor(player.MapId)
+				    .TryGet(targetHandle, out npcEntity) && !npcEntity.IsPlayer && npcEntity.Vitals != null)
+				return npcEntity.Vitals;
+
+			npcEntity = null;
+			return GetOrAddNpcVitals(client, targetHandle);
 		}
 
 		// Splices field3 (the behaviour "phase", tag 0x18 varint) into the request args right after field2, matching
@@ -347,6 +345,23 @@ namespace Faolan.GameServer.Combat
 			phaseField.CopyTo(result, insertAt);
 			Array.Copy(args, insertAt, result, insertAt + phaseField.Length, args.Length - insertAt);
 			return result;
+		}
+
+		// field3 as protobuf: tag 0x18 (field 3, varint) + the base-128 varint of `value`.
+		private static byte[] EncodeBehaviorPhase(uint value)
+		{
+			var bytes = new List<byte> { 0x18 };
+			do
+			{
+				var b = (byte)(value & 0x7f);
+				value >>= 7;
+				if (value != 0)
+					b |= 0x80;
+				bytes.Add(b);
+			}
+			while (value != 0);
+
+			return bytes.ToArray();
 		}
 
 		// Byte offset just after `fieldNumber`'s value in a protobuf message (the message end if absent/malformed).
@@ -373,6 +388,7 @@ namespace Faolan.GameServer.Combat
 						len |= (b & 0x7f) << shift;
 						if ((b & 0x80) == 0)
 							break;
+
 						shift += 7;
 					}
 
@@ -388,21 +404,10 @@ namespace Faolan.GameServer.Combat
 			return msg.Length;
 		}
 
-		// field3 as protobuf: tag 0x18 (field 3, varint) + the base-128 varint of `value`.
-		private static byte[] EncodeBehaviorPhase(uint value)
+		// Pushes a 0x96B8DC59 stat block to the client (shared wire builder on World.VitalsPacket).
+		private static Task SendStatUpdate(INetworkClient client, CharacterStatBlock stats, uint? entityHandle = null)
 		{
-			var bytes = new List<byte> { 0x18 };
-			do
-			{
-				var b = (byte)(value & 0x7f);
-				value >>= 7;
-				if (value != 0)
-					b |= 0x80;
-				bytes.Add(b);
-			}
-			while (value != 0);
-
-			return bytes.ToArray();
+			return client.SendAsync(VitalsPacket.BuildStatUpdate(client, stats, entityHandle));
 		}
 	}
 }

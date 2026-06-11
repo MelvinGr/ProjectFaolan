@@ -135,8 +135,7 @@ namespace Faolan.Importer
 				burst.Entities = e
 					.Packets
 					.Select((p, i) => IirRecordCodec.Parse(p, i))
-					.Where(r => !IirMessageTypes.IsServerGenerated(r.IirType, r.Handle, e.CapturedInstance)
-					            && !IirMessageTypes.IsTransientGameplay(r.IirType))
+					.Where(r => !IirMessageTypes.IsServerGenerated(r.IirType, r.Handle, e.CapturedInstance) && !IirMessageTypes.IsTransientGameplay(r.IirType))
 					.ToList();
 			}
 
@@ -151,69 +150,18 @@ namespace Faolan.Importer
 				var existing = await db.NpcSpawns.FirstOrDefaultAsync(n => n.MapId == e.MapId && n.PositionX == e.X && n.PositionY == e.Y && n.PositionZ == e.Z);
 
 				if (existing == null)
-				{
-					db.NpcSpawns.Add(Populate(new NpcSpawn { MapId = e.MapId, PositionX = e.X, PositionY = e.Y, PositionZ = e.Z }, e));
-				}
+					db.NpcSpawns.Add(Populate(new NpcSpawn
+					{
+						MapId = e.MapId,
+						PositionX = e.X,
+						PositionY = e.Y,
+						PositionZ = e.Z
+					}, e));
 				else
-				{
 					Populate(existing, e);
-				}
 			}
 
 			await db.SaveChangesAsync();
-		}
-
-		// Writes the transform + lifted identity onto a row (shared by insert/update); MapId/Position are the
-		// dedup key, set on insert only.
-		private static NpcSpawn Populate(NpcSpawn row, NpcSpawnEntry e)
-		{
-			row.Name = e.Name;
-			row.CapturedHandle = e.Handle;
-			row.Data = e.Data;
-			row.RotationX = e.RotX;
-			row.RotationY = e.RotY;
-			row.RotationZ = e.RotZ;
-			row.RotationW = e.RotW;
-			row.TemplateId = e.TemplateId;
-			row.Race = e.Race;
-			row.Sex = e.Sex;
-			row.Level = e.Level;
-			row.MonsterScale = e.MonsterScale;
-			row.MonsterData = e.MonsterData;
-			row.HeadMesh = e.HeadMesh;
-			row.HasEquipment = e.HasEquipment;
-			row.Health = e.Health;
-			row.Community = e.Community;
-			return row;
-		}
-
-		// Static world objects (decor/containers/zones), deduped by (map, position) like the NPC spawns.
-		private static async Task ImportWorldObjects(DatabaseContext db, List<WorldObjectEntry> objects)
-		{
-			foreach (var e in objects)
-			{
-				var existing = await db.WorldObjects.FirstOrDefaultAsync(o => o.MapId == e.MapId && o.PositionX == e.X && o.PositionY == e.Y && o.PositionZ == e.Z);
-				if (existing == null)
-					db.WorldObjects.Add(PopulateObject(new WorldObject { MapId = e.MapId, PositionX = e.X, PositionY = e.Y, PositionZ = e.Z }, e));
-				else
-					PopulateObject(existing, e);
-			}
-
-			await db.SaveChangesAsync();
-		}
-
-		private static WorldObject PopulateObject(WorldObject row, WorldObjectEntry e)
-		{
-			row.SubOpcode = e.SubOpcode;
-			row.Name = e.Name;
-			row.ObjectId = e.ObjectId;
-			row.CapturedHandle = e.Handle;
-			row.Data = e.Data;
-			row.RotationX = e.RotX;
-			row.RotationY = e.RotY;
-			row.RotationZ = e.RotZ;
-			row.RotationW = e.RotW;
-			return row;
 		}
 
 		// --rdb: read the client RDB index and inventory the resource types. The server references text by id (the
@@ -242,6 +190,27 @@ namespace Faolan.Importer
 			                  (dumpDir != null
 				                  ? $"  -> templates dumped to {dumpDir}"
 				                  : ""));
+		}
+
+		// Static world objects (decor/containers/zones), deduped by (map, position) like the NPC spawns.
+		private static async Task ImportWorldObjects(DatabaseContext db, List<WorldObjectEntry> objects)
+		{
+			foreach (var e in objects)
+			{
+				var existing = await db.WorldObjects.FirstOrDefaultAsync(o => o.MapId == e.MapId && o.PositionX == e.X && o.PositionY == e.Y && o.PositionZ == e.Z);
+				if (existing == null)
+					db.WorldObjects.Add(PopulateObject(new WorldObject
+					{
+						MapId = e.MapId,
+						PositionX = e.X,
+						PositionY = e.Y,
+						PositionZ = e.Z
+					}, e));
+				else
+					PopulateObject(existing, e);
+			}
+
+			await db.SaveChangesAsync();
 		}
 
 		private static async Task<int> Main(string[] args)
@@ -349,8 +318,9 @@ namespace Faolan.Importer
 				var cdnBase = GetOption(args, "--cdn") ?? RdbRespawnImporter.DefaultCdnBase;
 				var store = GetOption(args, "--store"); // archive fetched CDN blobs here (mirror layout); read-first
 				var rr = await RdbRespawnImporter.ImportAsync(db, rdbDir, cdnBase, store);
-				Console.WriteLine($"RDB respawns: {rr.Points} points across {rr.Maps} maps ({rr.Empty} maps with no points, {rr.FetchFailed} fetch failures)." +
-				                  (store != null ? $" Archived to {store}." : ""));
+				Console.WriteLine($"RDB respawns: {rr.Points} points across {rr.Maps} maps ({rr.Empty} maps with no points, {rr.FetchFailed} fetch failures)." + (store != null
+					? $" Archived to {store}."
+					: ""));
 				return 0;
 			}
 
@@ -385,6 +355,7 @@ namespace Faolan.Importer
 					var (chSeen, chAdded, chSkipped) = await CaptureCharacterImporter.ImportAsync(db, captures);
 					Console.WriteLine($"Characters: {chSeen} captured, {chAdded} added, {chSkipped} already in DB.");
 				}
+
 				await ImportConversations(db, conversations);
 				await ImportNpcSpawns(db, NpcSpawnExtractor.Merge(captures.SelectMany(NpcSpawnExtractor.Extract)));
 				await ImportWorldObjects(db, WorldObjectExtractor.Merge(captures.SelectMany(WorldObjectExtractor.Extract)));
@@ -409,6 +380,44 @@ namespace Faolan.Importer
 			PrintDelta(before, after);
 
 			return 0;
+		}
+
+		// Writes the transform + lifted identity onto a row (shared by insert/update); MapId/Position are the
+		// dedup key, set on insert only.
+		private static NpcSpawn Populate(NpcSpawn row, NpcSpawnEntry e)
+		{
+			row.Name = e.Name;
+			row.CapturedHandle = e.Handle;
+			row.Data = e.Data;
+			row.RotationX = e.RotX;
+			row.RotationY = e.RotY;
+			row.RotationZ = e.RotZ;
+			row.RotationW = e.RotW;
+			row.TemplateId = e.TemplateId;
+			row.Race = e.Race;
+			row.Sex = e.Sex;
+			row.Level = e.Level;
+			row.MonsterScale = e.MonsterScale;
+			row.MonsterData = e.MonsterData;
+			row.HeadMesh = e.HeadMesh;
+			row.HasEquipment = e.HasEquipment;
+			row.Health = e.Health;
+			row.Community = e.Community;
+			return row;
+		}
+
+		private static WorldObject PopulateObject(WorldObject row, WorldObjectEntry e)
+		{
+			row.SubOpcode = e.SubOpcode;
+			row.Name = e.Name;
+			row.ObjectId = e.ObjectId;
+			row.CapturedHandle = e.Handle;
+			row.Data = e.Data;
+			row.RotationX = e.RotX;
+			row.RotationY = e.RotY;
+			row.RotationZ = e.RotZ;
+			row.RotationW = e.RotW;
+			return row;
 		}
 
 		private static void PrintDelta(Dictionary<string, int> before, Dictionary<string, int> after)
@@ -532,7 +541,7 @@ namespace Faolan.Importer
 				["Maps"] = await db.Maps.CountAsync(),
 				["MapWorldBursts"] = await db.MapWorldBursts.CountAsync(),
 				["NpcSpawns"] = await db.NpcSpawns.CountAsync(),
-			["WorldObjects"] = await db.WorldObjects.CountAsync(),
+				["WorldObjects"] = await db.WorldObjects.CountAsync(),
 				["ConversationNodes"] = await db.ConversationNodes.CountAsync(),
 				["ConversationPackets"] = await db.ConversationPackets.CountAsync()
 			};

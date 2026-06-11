@@ -53,8 +53,8 @@ namespace Faolan.Core.Network
 			0x04B82B2D, // N3ToClientQuit (entity leaving)
 			0x6B87E316, // MagicBuff (combat)
 			0xE9F24184, // StatDamage (combat)
-			Vitals,     // 0x96B8DC59 - server-regenerated for the player, a per-frame tick for NPCs
-			0x28D0AC99, // Regen (stat tick)
+			Vitals, // 0x96B8DC59 - server-regenerated for the player, a per-frame tick for NPCs
+			0x28D0AC99 // Regen (stat tick)
 		];
 
 		// True if this record is server-generated on world entry (so it must NOT be stored in the burst). Globals are

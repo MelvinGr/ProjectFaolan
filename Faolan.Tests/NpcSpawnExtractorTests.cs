@@ -21,6 +21,26 @@ namespace Faolan.Tests
 			Assert.Empty(entries); // no current map yet
 		}
 
+		// Against a REAL captured body, the extractor lifts the dissected identity from the CharacterIIR: a humanoid
+		// (Casilda) with worn equipment and an animal (Crocodile, no equipment), each with its NpcStats.template_id.
+		[Theory, InlineData("SpawnNpcCasilda", "Casilda", 9411u, 83u, 3u, true), InlineData("SpawnNpcCrocodile", "Crocodile", 14049u, 64u, 0u, false)]
+		public void Extract_LiftsIdentityFromCapturedIir(string golden, string name, uint templateId, uint race, uint sex, bool hasEquipment)
+		{
+			var packets = new List<CapturedPacket>
+			{
+				MapChange(4010),
+				RawSpawn(Golden.Bytes(golden))
+			};
+
+			var entry = Assert.Single(NpcSpawnExtractor.Extract(packets));
+
+			Assert.Equal(name, entry.Name);
+			Assert.Equal(templateId, entry.TemplateId);
+			Assert.Equal(race, entry.Race);
+			Assert.Equal(sex, entry.Sex);
+			Assert.Equal(hasEquipment, entry.HasEquipment);
+		}
+
 		[Fact]
 		public void Extract_TracksMap_SkipsPlayer_ReadsNpc()
 		{
@@ -41,32 +61,6 @@ namespace Faolan.Tests
 			Assert.Equal(333.2f, npc.X, 0.1f);
 		}
 
-		// Against a REAL captured body, the extractor lifts the dissected identity from the CharacterIIR: a humanoid
-		// (Casilda) with worn equipment and an animal (Crocodile, no equipment), each with its NpcStats.template_id.
-		[Theory]
-		[InlineData("SpawnNpcCasilda", "Casilda", 9411u, 83u, 3u, true)]
-		[InlineData("SpawnNpcCrocodile", "Crocodile", 14049u, 64u, 0u, false)]
-		public void Extract_LiftsIdentityFromCapturedIir(string golden, string name, uint templateId, uint race, uint sex, bool hasEquipment)
-		{
-			var packets = new List<CapturedPacket> { MapChange(4010), RawSpawn(Golden.Bytes(golden)) };
-
-			var entry = Assert.Single(NpcSpawnExtractor.Extract(packets));
-
-			Assert.Equal(name, entry.Name);
-			Assert.Equal(templateId, entry.TemplateId);
-			Assert.Equal(race, entry.Race);
-			Assert.Equal(sex, entry.Sex);
-			Assert.Equal(hasEquipment, entry.HasEquipment);
-		}
-
-		// Wraps a raw FA015807 body (golden = the post-header body) as a 0x2000 packet (12-byte zero header).
-		private static CapturedPacket RawSpawn(byte[] body)
-		{
-			var full = new byte[12 + body.Length];
-			body.CopyTo(full, 12);
-			return new CapturedPacket(0, true, 0x2000, 0, full);
-		}
-
 		private static CapturedPacket MapChange(uint mapId)
 		{
 			var content = new byte[34];
@@ -85,6 +79,14 @@ namespace Faolan.Tests
 			var full = new byte[12 + body.Length]; // headerLen (full[8..12]) stays 0
 			body.CopyTo(full, 12);
 
+			return new CapturedPacket(0, true, 0x2000, 0, full);
+		}
+
+		// Wraps a raw FA015807 body (golden = the post-header body) as a 0x2000 packet (12-byte zero header).
+		private static CapturedPacket RawSpawn(byte[] body)
+		{
+			var full = new byte[12 + body.Length];
+			body.CopyTo(full, 12);
 			return new CapturedPacket(0, true, 0x2000, 0, full);
 		}
 

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using Faolan.GameServer.World;
@@ -10,25 +11,6 @@ namespace Faolan.Tests
 	public class InterestManagerTests
 	{
 		private const float Range = 50f;
-
-		private static WorldEntity Player(uint handle, float x, float z) =>
-			new WorldEntity(handle, 2040, true, $"P{handle}", null) { Position = new Vector3(x, 0, z) };
-
-		private static (WorldEvents events, Zone zone) MoveTo(Zone zone, WorldEntity mover, float x, float z)
-		{
-			mover.Position = new Vector3(x, 0, z);
-			return (new WorldEvents(InterestManager.ResolveMove(zone, mover, Range)), zone);
-		}
-
-		// tiny helper to query the returned event list
-		private sealed class WorldEvents
-		{
-			private readonly System.Collections.Generic.List<InterestEvent> _e;
-			public WorldEvents(System.Collections.Generic.List<InterestEvent> e) => _e = e;
-			public bool Has(uint recipient, uint subject, InterestEventType t) =>
-				_e.Any(ev => ev.Recipient.Handle == recipient && ev.Subject.Handle == subject && ev.Type == t);
-			public int Count => _e.Count;
-		}
 
 		[Fact]
 		public void MovingIntoRange_SpawnsBothWays()
@@ -48,20 +30,18 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void MovingWhileKnown_ForwardsMove_NotSpawn()
+		public void MovingNearNpc_DoesNotSpawnTheNpc_StillBurstRendered()
 		{
 			var zone = new Zone(2040);
 			var a = Player(1, 0, 0);
-			var b = Player(2, 10, 0);
+			var npc = WorldEntity.ForNpc(99, 2040, new Vector3(5, 0, 0), Vector3.Zero, "Mob"); // right next to A
 			zone.Add(a);
-			zone.Add(b);
-			InterestManager.ResolveMove(zone, a, Range); // establish mutual visibility
+			zone.Add(npc);
 
-			// A takes a step (still near B).
-			var (events, _) = MoveTo(zone, a, 12, 0);
+			var (events, _) = MoveTo(zone, a, 1, 0);
 
-			Assert.True(events.Has(2, 1, InterestEventType.Move)); // B sees A move (already known -> Move, not Spawn)
-			Assert.False(events.Has(2, 1, InterestEventType.Spawn));
+			Assert.False(events.Has(1, 99, InterestEventType.Spawn)); // NPC comes from the burst, not interest (yet)
+			Assert.False(a.Known.Contains(99));
 		}
 
 		[Fact]
@@ -83,18 +63,20 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void MovingNearNpc_DoesNotSpawnTheNpc_StillBurstRendered()
+		public void MovingWhileKnown_ForwardsMove_NotSpawn()
 		{
 			var zone = new Zone(2040);
 			var a = Player(1, 0, 0);
-			var npc = WorldEntity.ForNpc(99, 2040, new Vector3(5, 0, 0), Vector3.Zero, "Mob"); // right next to A
+			var b = Player(2, 10, 0);
 			zone.Add(a);
-			zone.Add(npc);
+			zone.Add(b);
+			InterestManager.ResolveMove(zone, a, Range); // establish mutual visibility
 
-			var (events, _) = MoveTo(zone, a, 1, 0);
+			// A takes a step (still near B).
+			var (events, _) = MoveTo(zone, a, 12, 0);
 
-			Assert.False(events.Has(1, 99, InterestEventType.Spawn)); // NPC comes from the burst, not interest (yet)
-			Assert.False(a.Known.Contains(99));
+			Assert.True(events.Has(2, 1, InterestEventType.Move)); // B sees A move (already known -> Move, not Spawn)
+			Assert.False(events.Has(2, 1, InterestEventType.Spawn));
 		}
 
 		[Fact]
@@ -111,6 +93,35 @@ namespace Faolan.Tests
 
 			Assert.True(events.Has(2, 1, InterestEventType.Despawn)); // B told A is gone
 			Assert.False(b.Known.Contains(1));
+		}
+
+		private static (WorldEvents events, Zone zone) MoveTo(Zone zone, WorldEntity mover, float x, float z)
+		{
+			mover.Position = new Vector3(x, 0, z);
+			return (new WorldEvents(InterestManager.ResolveMove(zone, mover, Range)), zone);
+		}
+
+		private static WorldEntity Player(uint handle, float x, float z)
+		{
+			return new WorldEntity(handle, 2040, true, $"P{handle}", null) { Position = new Vector3(x, 0, z) };
+		}
+
+		// tiny helper to query the returned event list
+		private sealed class WorldEvents
+		{
+			private readonly List<InterestEvent> _e;
+
+			public int Count => _e.Count;
+
+			public WorldEvents(List<InterestEvent> e)
+			{
+				_e = e;
+			}
+
+			public bool Has(uint recipient, uint subject, InterestEventType t)
+			{
+				return _e.Any(ev => ev.Recipient.Handle == recipient && ev.Subject.Handle == subject && ev.Type == t);
+			}
 		}
 	}
 }

@@ -33,6 +33,23 @@ namespace Faolan.AgentServer
 			}
 		}
 
+		public async Task SendSystemMessage(uint characterId, string message)
+		{
+			var client = ClientForCharacter(characterId);
+			if (client == null)
+			{
+				Logger.LogInformation("Skipping AgentServer system message for character {CharacterId:X8} because no AgentServer client is connected yet. Message: {Message}", characterId, message);
+				return;
+			}
+
+			await SendSystemMessage(client, message);
+		}
+
+		public Task SystemBroadcast(string message)
+		{
+			return Task.WhenAll(NetworkClients.Select(c => SendSystemMessage(c, message)));
+		}
+
 		// Relays a channel chat message (0x0041) to every connected client, preceded by the sender's identity
 		// (0x0014) so the client can show the speaker's name. The channel (type+id) from the original post is kept
 		// verbatim - the client only displays it in a channel it is subscribed to, so the per-channel routing is the
@@ -65,23 +82,6 @@ namespace Faolan.AgentServer
 						.WriteUInt16(0x0000))
 					.SendAsync(client);
 			}
-		}
-
-		public async Task SendSystemMessage(uint characterId, string message)
-		{
-			var client = ClientForCharacter(characterId);
-			if (client == null)
-			{
-				Logger.LogInformation("Skipping AgentServer system message for character {CharacterId:X8} because no AgentServer client is connected yet. Message: {Message}", characterId, message);
-				return;
-			}
-
-			await SendSystemMessage(client, message);
-		}
-
-		public Task SystemBroadcast(string message)
-		{
-			return Task.WhenAll(NetworkClients.Select(c => SendSystemMessage(c, message)));
 		}
 
 		// A chat-channel subscription (0x003C): [type][id][name][flag][0x0000]. Sent on AgentServer connect for each

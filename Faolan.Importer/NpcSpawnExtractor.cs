@@ -9,24 +9,24 @@ namespace Faolan.Importer
 {
 	public sealed record NpcSpawnEntry(uint MapId, string Name, uint Handle, float X, float Y, float Z, byte[] Data)
 	{
+		public bool HasEquipment { get; init; }
+		public float RotW { get; init; }
 		public float RotX { get; init; }
 		public float RotY { get; init; }
 		public float RotZ { get; init; }
-		public float RotW { get; init; }
-		public uint TemplateId { get; init; }
-		public uint Race { get; init; }
-		public uint Sex { get; init; }
-		public uint Level { get; init; }
-		public uint MonsterScale { get; init; }
-		public uint MonsterData { get; init; }
-		public uint HeadMesh { get; init; }
-		public bool HasEquipment { get; init; }
-
-		// Max health (player-facing; wire CharacterStats.health/life is ×100) - the real per-NPC combat HP.
-		public uint Health { get; init; }
 
 		// NpcStats.community = the faction id: 0 = neutral/friendly, > 0 = a hostile faction (drives aggro hostility).
 		public uint Community { get; init; }
+		public uint HeadMesh { get; init; }
+
+		// Max health (player-facing; wire CharacterStats.health/life is ×100) - the real per-NPC combat HP.
+		public uint Health { get; init; }
+		public uint Level { get; init; }
+		public uint MonsterData { get; init; }
+		public uint MonsterScale { get; init; }
+		public uint Race { get; init; }
+		public uint Sex { get; init; }
+		public uint TemplateId { get; init; }
 	}
 
 	// Extracts NPC entity spawns (FA015807) per map from a capture: tracks the current map (MapChange 5D85BFC7),
@@ -77,7 +77,9 @@ namespace Faolan.Importer
 				var z = ReadLE(body, SpawnPacketBuilder.PosZOffset);
 
 				var identity = LiftIdentity(body);
-				var name = !string.IsNullOrEmpty(identity.Name) ? identity.Name : ExtractName(body);
+				var name = !string.IsNullOrEmpty(identity.Name)
+					? identity.Name
+					: ExtractName(body);
 
 				entries.Add(identity with
 				{
@@ -106,38 +108,6 @@ namespace Faolan.Importer
 				seen.TryAdd((e.MapId, e.X, e.Y, e.Z), e);
 
 			return seen.Values.ToList();
-		}
-
-		// Decodes the CharacterIIR (ProtoCoreCharacterIIR) and lifts the NPC identity/appearance. Returns an empty
-		// entry (all defaults) if the body has no decodable IIR - the offset-based transform/name path still works.
-		private static NpcSpawnEntry LiftIdentity(byte[] body)
-		{
-			var empty = new NpcSpawnEntry(0, string.Empty, 0, 0, 0, 0, null);
-			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
-				return empty;
-
-			var msg = read.Message;
-			var stats = msg.Stats;
-			var wireHealth = stats == null ? 0 : stats.Health != 0 ? stats.Health : stats.Life;
-			return empty with
-			{
-				Name = msg.Name ?? string.Empty,
-				TemplateId = msg.npc_stats?.TemplateId ?? 0, // NpcStats f4 (fixed32) = the stable per-type identity
-				Race = stats?.Race ?? 0,
-				Sex = stats?.Sex ?? 0,
-				Level = stats?.Level ?? 0,
-				MonsterScale = stats?.MonsterScale ?? 0,
-				MonsterData = stats?.MonsterData ?? 0,
-				HeadMesh = stats?.HeadMesh ?? 0,
-				HasEquipment = msg.InventoryEntries.Count > 0,
-				Health = wireHealth >= 100 ? wireHealth / 100 : 0, // ×100 scale; ignore absent/implausible
-				Community = msg.npc_stats?.Community ?? 0
-			};
-		}
-
-		private static float ReadLE(byte[] body, int offset)
-		{
-			return BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(offset, 4));
 		}
 
 		// The entity name is a `0A <len> <utf8>` field whose offset varies; scan past the position block for the
@@ -186,6 +156,41 @@ namespace Faolan.Importer
 			}
 
 			return hasLetter;
+		}
+
+		// Decodes the CharacterIIR (ProtoCoreCharacterIIR) and lifts the NPC identity/appearance. Returns an empty
+		// entry (all defaults) if the body has no decodable IIR - the offset-based transform/name path still works.
+		private static NpcSpawnEntry LiftIdentity(byte[] body)
+		{
+			var empty = new NpcSpawnEntry(0, string.Empty, 0, 0, 0, 0, null);
+			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+				return empty;
+
+			var msg = read.Message;
+			var stats = msg.Stats;
+			var wireHealth = stats == null ? 0 : stats.Health != 0 ? stats.Health : stats.Life;
+			return empty with
+			{
+				Name = msg.Name ?? string.Empty,
+				TemplateId = msg.npc_stats?.TemplateId ?? 0,
+				// NpcStats f4 (fixed32) = the stable per-type identity
+				Race = stats?.Race ?? 0,
+				Sex = stats?.Sex ?? 0,
+				Level = stats?.Level ?? 0,
+				MonsterScale = stats?.MonsterScale ?? 0,
+				MonsterData = stats?.MonsterData ?? 0,
+				HeadMesh = stats?.HeadMesh ?? 0,
+				HasEquipment = msg.InventoryEntries.Count > 0,
+				Health = wireHealth >= 100
+					? wireHealth / 100
+					: 0, // ×100 scale; ignore absent/implausible
+				Community = msg.npc_stats?.Community ?? 0
+			};
+		}
+
+		private static float ReadLE(byte[] body, int offset)
+		{
+			return BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(offset, 4));
 		}
 	}
 }

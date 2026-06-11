@@ -28,6 +28,7 @@ namespace Faolan.Core.Network
 		                                                "8248e8fa778703b418408249440b2c1edd28853e240d8a7e49540b76d120d3b1ad2878b1b99490eb4a2a5e84caa8a91c" + "ecbdb1aa7c816e8be343246f80c637abc653b893fd91686cf8d32d6cfe5f2a6f");
 
 		private static readonly BigInteger G = 5;
+
 		// 1024-bit safe prime + generator, baked into the client.
 
 		// Our (CellAO/Faolan) DH keypair. ServerPrivate stays server-side; ServerPublic is what gets patched into

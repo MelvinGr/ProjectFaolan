@@ -1,8 +1,6 @@
 using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -23,8 +21,7 @@ namespace Faolan.Importer
 		public const string DefaultCdnBase = "http://aoc-eu-gameupdate.live.ageofconan.com";
 		private const uint ResurrectionPointsType = 1000090;
 
-		private static readonly Regex PointRx = new(
-			"<resurrectionpoint\\b[^>]*?\\bname=\"([^\"]*)\"[^>]*?\\bdiscoverable=\"([^\"]*)\"[^>]*?>\\s*<position\\s+x=\"([-0-9.]+)\"\\s+y=\"([-0-9.]+)\"\\s+z=\"([-0-9.]+)\"",
+		private static readonly Regex PointRx = new Regex("<resurrectionpoint\\b[^>]*?\\bname=\"([^\"]*)\"[^>]*?\\bdiscoverable=\"([^\"]*)\"[^>]*?>\\s*<position\\s+x=\"([-0-9.]+)\"\\s+y=\"([-0-9.]+)\"\\s+z=\"([-0-9.]+)\"",
 			RegexOptions.Compiled | RegexOptions.Singleline);
 
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string cdnBase, string storeDir = null)
@@ -32,7 +29,10 @@ namespace Faolan.Importer
 			using var rdb = new RdbReader(rdbDir);
 			using var cdn = new RdbCdnCache(cdnBase, storeDir);
 
-			var ourMaps = (await db.Maps.Select(m => m.Id).ToListAsync()).ToHashSet();
+			var ourMaps = (await db
+				.Maps
+				.Select(m => m.Id)
+				.ToListAsync()).ToHashSet();
 
 			// Fresh import: drop existing points (cascade clears CharacterRespawnPoints) and rebuild from the CDN.
 			db.CharacterRespawnPoints.RemoveRange(db.CharacterRespawnPoints);
@@ -40,12 +40,16 @@ namespace Faolan.Importer
 			await db.SaveChangesAsync();
 
 			int maps = 0, points = 0, fetchFailed = 0, empty = 0;
-			foreach (var e in rdb.EntriesOfType(ResurrectionPointsType).Where(e => ourMaps.Contains(e.Id)))
+			foreach (var e in rdb
+				         .EntriesOfType(ResurrectionPointsType)
+				         .Where(e => ourMaps.Contains(e.Id)))
 			{
 				byte[] dec;
 				try
 				{
-					dec = e.IsLocal ? rdb.ReadDecompressed(e) : RdbReader.UnwrapIOz1Public(await cdn.FetchRawAsync(e.Hash));
+					dec = e.IsLocal
+						? rdb.ReadDecompressed(e)
+						: RdbReader.UnwrapIOz1Public(await cdn.FetchRawAsync(e.Hash));
 				}
 				catch
 				{
@@ -58,7 +62,10 @@ namespace Faolan.Importer
 				foreach (Match m in PointRx.Matches(xml))
 				{
 					var name = m.Groups[1].Value;
-					var alwaysKnown = m.Groups[2].Value.Equals("false", StringComparison.OrdinalIgnoreCase);
+					var alwaysKnown = m
+						.Groups[2]
+						.Value
+						.Equals("false", StringComparison.OrdinalIgnoreCase);
 					var x = float.Parse(m.Groups[3].Value, CultureInfo.InvariantCulture);
 					var y = float.Parse(m.Groups[4].Value, CultureInfo.InvariantCulture);
 					var z = float.Parse(m.Groups[5].Value, CultureInfo.InvariantCulture);
@@ -80,9 +87,7 @@ namespace Faolan.Importer
 					points += found;
 				}
 				else
-				{
 					empty++;
-				}
 			}
 
 			await db.SaveChangesAsync();

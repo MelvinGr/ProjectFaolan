@@ -242,6 +242,45 @@ namespace Faolan.GameServer
 			}
 		}
 
+		// Builds one NpcSpawn row from scratch (spawn + stationary MoveTask) with a fresh server handle and appends
+		// it to the burst. Opt-in (FAOLAN_BUILT_NPC_TEST=1); a no-op without the templates or a usable row.
+		private void InjectBuiltTestNpc(INetworkClient client, NpcSpawn[] npcRows, byte[] spawnTemplate, byte[] moveTaskTemplate, List<byte[]> toSend)
+		{
+			if (Environment.GetEnvironmentVariable("FAOLAN_BUILT_NPC_TEST") != "1" || spawnTemplate == null || moveTaskTemplate == null)
+				return;
+
+			const uint builtHandle = 0x00090001; // above the burst's 0x000818xx handles and below the instance range
+			var playerPos = client.Session.Character.Position;
+			var pos = new Vector3(playerPos.X + 4f, playerPos.Y, playerPos.Z + 4f);
+
+			// VALIDATE NpcSpawnBuilder: build the spawn FROM the template's own (known-good) bytes via the builder
+			// (transform rebuilt to `pos`, CharacterIIR re-encoded), and pair it with the proven cloned MoveTask.
+			// If this renders + polls, NpcSpawnBuilder produces client-acceptable output and the only open issue is
+			// cross-session DB row data (the earlier built Crocodile came from a different session's capture).
+			var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(spawnTemplate.AsSpan(8, 4));
+			var templateRow = new NpcSpawn
+			{
+				Data = spawnTemplate,
+				PositionX = pos.X,
+				PositionY = pos.Y,
+				PositionZ = pos.Z,
+				RotationX = BinaryPrimitives.ReadSingleLittleEndian(spawnTemplate.AsSpan(bodyStart + SpawnPacketBuilder.RotXOffset, 4)),
+				RotationY = BinaryPrimitives.ReadSingleLittleEndian(spawnTemplate.AsSpan(bodyStart + SpawnPacketBuilder.RotYOffset, 4)),
+				RotationZ = BinaryPrimitives.ReadSingleLittleEndian(spawnTemplate.AsSpan(bodyStart + SpawnPacketBuilder.RotZOffset, 4)),
+				RotationW = BinaryPrimitives.ReadSingleLittleEndian(spawnTemplate.AsSpan(bodyStart + SpawnPacketBuilder.RotWOffset, 4))
+			};
+			if (!NpcSpawnBuilder.TryBuild(templateRow, builtHandle, out var spawnBody))
+				return;
+
+			// Validate the minimal STATIONARY MoveTask (MoveTaskBuilder): if she now spawns by the player and STAYS
+			// (no drag to a patrol route), the built stationary MoveTask is accepted - the full burst-free primitive
+			// set (built spawn + built stationary MoveTask) is proven in-client.
+			var moveBody = MoveTaskBuilder.BuildStationary(builtHandle, pos);
+			toSend.Add(FrameLikeTemplate(spawnTemplate, spawnBody));
+			toSend.Add(FrameLikeTemplate(moveTaskTemplate, moveBody));
+			Logger.LogInformation("Injected BUILT spawn + BUILT stationary MoveTask at handle 0x{Handle:X} pos ({X},{Y},{Z}).", builtHandle, pos.X, pos.Y, pos.Z);
+		}
+
 		// Regenerates the spawn body's scaffold frame from the character's DB rows via the byte-exact codec
 		// (PlayerSpawnScaffoldCodec round-trips every captured player spawn). Returns the body unchanged when it
 		// doesn't parse or the character has no rows.
@@ -418,9 +457,11 @@ namespace Faolan.GameServer
 			InjectBuiltTestNpc(client, npcRows, spawnTemplate, moveTaskTemplate, toSend);
 
 			if (npcByPosition.Count > 0)
-				Logger.LogInformation("NPC spawns for map {Map}: {Identical}/{Built} table-built spawns put on the wire byte-identical (the rest kept verbatim, cross-session), {Rows} rows available.", burst.MapId, npcIdentical, npcBuilt, npcByPosition.Count);
+				Logger.LogInformation("NPC spawns for map {Map}: {Identical}/{Built} table-built spawns put on the wire byte-identical (the rest kept verbatim, cross-session), {Rows} rows available.", burst.MapId, npcIdentical,
+					npcBuilt, npcByPosition.Count);
 			if (objectByPosition.Count > 0)
-				Logger.LogInformation("World objects for map {Map}: {Identical}/{Built} table-built objects put on the wire byte-identical, {Rows} rows available.", burst.MapId, objectIdentical, objectBuilt, objectByPosition.Count);
+				Logger.LogInformation("World objects for map {Map}: {Identical}/{Built} table-built objects put on the wire byte-identical, {Rows} rows available.", burst.MapId, objectIdentical, objectBuilt,
+					objectByPosition.Count);
 
 			// The player's own vitals are server-generated from the live character (not the captured player's), emitted
 			// after the player has spawned in the burst.
@@ -481,6 +522,50 @@ namespace Faolan.GameServer
 
 			// Restore the player's persisted quest journal.
 			await _broadcaster.RestorePlayerQuests(client);
+		}
+
+		// If the (already re-addressed) burst packet is an NPC entity Spawn (FA015807 whose handle is NOT the
+		// player's instance) and a matching NpcSpawns row exists at the same spawn position, rebuild its body from
+		// that row via NpcSpawnBuilder (addressed to the burst's own handle) and splice it in - keeping the burst
+		// packet's re-addressed header + framing, exactly like the player-spawn rebuild. `wasIdentical` reports
+		// whether the built body equals the burst's (true for same-source rows: the table reproduces the capture).
+		// Falls back (returns false) when there is no matching row or the build fails, so the NPC keeps its burst body.
+		private bool TryRebuildNpcSpawnFromDb(INetworkClient client, IReadOnlyDictionary<(int, int, int), NpcSpawn> npcByPosition, byte[] packet, out byte[] rebuilt, out bool wasIdentical)
+		{
+			rebuilt = null;
+			wasIdentical = false;
+			if (packet.Length < 12)
+				return false;
+
+			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
+			var bodyStart = 12 + headerLen;
+			if (bodyStart + SpawnPacketBuilder.PosZOffset + 4 > packet.Length)
+				return false;
+
+			var body = packet.AsSpan(bodyStart);
+			var subOpcode = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4));
+			var handle = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(12, 4));
+			if (subOpcode != 0xFA015807u || handle == client.Session.Account.ClientInstance)
+				return false; // not a spawn, or the player's own (handled by TryRebuildPlayerSpawnFromDb)
+
+			var key = PositionKey(BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosXOffset, 4)), BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosYOffset, 4)),
+				BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosZOffset, 4)));
+			if (!npcByPosition.TryGetValue(key, out var row) || !NpcSpawnBuilder.TryBuild(row, handle, out var newBody))
+				return false;
+
+			// Keep the burst packet's header (already re-addressed to the live player); swap only the FA015807 body.
+			wasIdentical = packet.Length - bodyStart == newBody.Length && packet
+				.AsSpan(bodyStart)
+				.SequenceEqual(newBody);
+
+			rebuilt = new byte[bodyStart + newBody.Length];
+			Array.Copy(packet, 0, rebuilt, 0, bodyStart); // [len][crc][headerLen][header]
+			newBody.CopyTo(rebuilt, bodyStart);
+
+			BinaryPrimitives.WriteUInt32BigEndian(rebuilt.AsSpan(0, 4), (uint)(rebuilt.Length - 4));
+			var crc = Crc32.Calculate(rebuilt[8..]);
+			BinaryPrimitives.WriteUInt32BigEndian(rebuilt.AsSpan(4, 4), crc);
+			return true;
 		}
 
 		// If the burst packet is the player's own entity Spawn (FA015807 whose handle is the client instance),
@@ -601,48 +686,6 @@ namespace Faolan.GameServer
 			return true;
 		}
 
-		// If the (already re-addressed) burst packet is an NPC entity Spawn (FA015807 whose handle is NOT the
-		// player's instance) and a matching NpcSpawns row exists at the same spawn position, rebuild its body from
-		// that row via NpcSpawnBuilder (addressed to the burst's own handle) and splice it in - keeping the burst
-		// packet's re-addressed header + framing, exactly like the player-spawn rebuild. `wasIdentical` reports
-		// whether the built body equals the burst's (true for same-source rows: the table reproduces the capture).
-		// Falls back (returns false) when there is no matching row or the build fails, so the NPC keeps its burst body.
-		private bool TryRebuildNpcSpawnFromDb(INetworkClient client, IReadOnlyDictionary<(int, int, int), NpcSpawn> npcByPosition, byte[] packet, out byte[] rebuilt, out bool wasIdentical)
-		{
-			rebuilt = null;
-			wasIdentical = false;
-			if (packet.Length < 12)
-				return false;
-
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
-			var bodyStart = 12 + headerLen;
-			if (bodyStart + SpawnPacketBuilder.PosZOffset + 4 > packet.Length)
-				return false;
-
-			var body = packet.AsSpan(bodyStart);
-			var subOpcode = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4));
-			var handle = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(12, 4));
-			if (subOpcode != 0xFA015807u || handle == client.Session.Account.ClientInstance)
-				return false; // not a spawn, or the player's own (handled by TryRebuildPlayerSpawnFromDb)
-
-			var key = PositionKey(BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosXOffset, 4)), BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosYOffset, 4)),
-				BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosZOffset, 4)));
-			if (!npcByPosition.TryGetValue(key, out var row) || !NpcSpawnBuilder.TryBuild(row, handle, out var newBody))
-				return false;
-
-			// Keep the burst packet's header (already re-addressed to the live player); swap only the FA015807 body.
-			wasIdentical = packet.Length - bodyStart == newBody.Length && packet.AsSpan(bodyStart).SequenceEqual(newBody);
-
-			rebuilt = new byte[bodyStart + newBody.Length];
-			Array.Copy(packet, 0, rebuilt, 0, bodyStart); // [len][crc][headerLen][header]
-			newBody.CopyTo(rebuilt, bodyStart);
-
-			BinaryPrimitives.WriteUInt32BigEndian(rebuilt.AsSpan(0, 4), (uint)(rebuilt.Length - 4));
-			var crc = Crc32.Calculate(rebuilt[8..]);
-			BinaryPrimitives.WriteUInt32BigEndian(rebuilt.AsSpan(4, 4), crc);
-			return true;
-		}
-
 		// As TryRebuildNpcSpawnFromDb, for the static world objects (66AEDD50/F096251E/33A56FB0). Matched by
 		// position, rebuilt with the burst's handle via WorldObjectBuilder; `wasIdentical` is the safety signal.
 		private bool TryRebuildWorldObjectFromDb(IReadOnlyDictionary<(int, int, int), WorldObject> objectByPosition, byte[] packet, out byte[] rebuilt, out bool wasIdentical)
@@ -669,7 +712,9 @@ namespace Faolan.GameServer
 			if (!objectByPosition.TryGetValue(key, out var row) || !WorldObjectBuilder.TryBuildOntoLivePlacement(row, body, out var newBody))
 				return false;
 
-			wasIdentical = packet.Length - bodyStart == newBody.Length && packet.AsSpan(bodyStart).SequenceEqual(newBody);
+			wasIdentical = packet.Length - bodyStart == newBody.Length && packet
+				.AsSpan(bodyStart)
+				.SequenceEqual(newBody);
 
 			rebuilt = new byte[bodyStart + newBody.Length];
 			Array.Copy(packet, 0, rebuilt, 0, bodyStart);
@@ -679,85 +724,6 @@ namespace Faolan.GameServer
 			var crc = Crc32.Calculate(rebuilt[8..]);
 			BinaryPrimitives.WriteUInt32BigEndian(rebuilt.AsSpan(4, 4), crc);
 			return true;
-		}
-
-		// Captures the first live-addressed NPC spawn (FA015807, non-player handle) and MoveTask (96C46740) packets
-		// as framing templates for the additive built-NPC test (their header carries the live receiver/instance).
-		private static void CaptureInjectionTemplate(INetworkClient client, byte[] packet, ref byte[] spawnTemplate, ref byte[] moveTaskTemplate)
-		{
-			if (packet.Length < 12)
-				return;
-
-			var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
-			if (bodyStart + 16 > packet.Length)
-				return;
-
-			var subOpcode = BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(bodyStart + 4, 4));
-			var handle = BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(bodyStart + 12, 4));
-			if (spawnTemplate == null && subOpcode == 0xFA015807u && handle != client.Session.Account.ClientInstance)
-				spawnTemplate = packet;
-			else if (moveTaskTemplate == null && subOpcode == MoveTaskBuilder.SubOpcode)
-				moveTaskTemplate = packet;
-		}
-
-		// Builds one NpcSpawn row from scratch (spawn + stationary MoveTask) with a fresh server handle and appends
-		// it to the burst. Opt-in (FAOLAN_BUILT_NPC_TEST=1); a no-op without the templates or a usable row.
-		private void InjectBuiltTestNpc(INetworkClient client, NpcSpawn[] npcRows, byte[] spawnTemplate, byte[] moveTaskTemplate, List<byte[]> toSend)
-		{
-			if (Environment.GetEnvironmentVariable("FAOLAN_BUILT_NPC_TEST") != "1" || spawnTemplate == null || moveTaskTemplate == null)
-				return;
-
-			const uint builtHandle = 0x00090001; // above the burst's 0x000818xx handles and below the instance range
-			var playerPos = client.Session.Character.Position;
-			var pos = new Vector3(playerPos.X + 4f, playerPos.Y, playerPos.Z + 4f);
-
-			// VALIDATE NpcSpawnBuilder: build the spawn FROM the template's own (known-good) bytes via the builder
-			// (transform rebuilt to `pos`, CharacterIIR re-encoded), and pair it with the proven cloned MoveTask.
-			// If this renders + polls, NpcSpawnBuilder produces client-acceptable output and the only open issue is
-			// cross-session DB row data (the earlier built Crocodile came from a different session's capture).
-			var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(spawnTemplate.AsSpan(8, 4));
-			var templateRow = new NpcSpawn
-			{
-				Data = spawnTemplate,
-				PositionX = pos.X,
-				PositionY = pos.Y,
-				PositionZ = pos.Z,
-				RotationX = BinaryPrimitives.ReadSingleLittleEndian(spawnTemplate.AsSpan(bodyStart + SpawnPacketBuilder.RotXOffset, 4)),
-				RotationY = BinaryPrimitives.ReadSingleLittleEndian(spawnTemplate.AsSpan(bodyStart + SpawnPacketBuilder.RotYOffset, 4)),
-				RotationZ = BinaryPrimitives.ReadSingleLittleEndian(spawnTemplate.AsSpan(bodyStart + SpawnPacketBuilder.RotZOffset, 4)),
-				RotationW = BinaryPrimitives.ReadSingleLittleEndian(spawnTemplate.AsSpan(bodyStart + SpawnPacketBuilder.RotWOffset, 4))
-			};
-			if (!NpcSpawnBuilder.TryBuild(templateRow, builtHandle, out var spawnBody))
-				return;
-
-			// Validate the minimal STATIONARY MoveTask (MoveTaskBuilder): if she now spawns by the player and STAYS
-			// (no drag to a patrol route), the built stationary MoveTask is accepted - the full burst-free primitive
-			// set (built spawn + built stationary MoveTask) is proven in-client.
-			var moveBody = MoveTaskBuilder.BuildStationary(builtHandle, pos);
-			toSend.Add(FrameLikeTemplate(spawnTemplate, spawnBody));
-			toSend.Add(FrameLikeTemplate(moveTaskTemplate, moveBody));
-			Logger.LogInformation("Injected BUILT spawn + BUILT stationary MoveTask at handle 0x{Handle:X} pos ({X},{Y},{Z}).", builtHandle, pos.X, pos.Y, pos.Z);
-		}
-
-		// Frames a built body as a full Conan packet by reusing a template packet's header (its live receiver/
-		// instance), then setting the packet length and recomputing the CRC over everything after it.
-		private static byte[] FrameLikeTemplate(byte[] template, byte[] body)
-		{
-			var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(8, 4));
-			var packet = new byte[bodyStart + body.Length];
-			Array.Copy(template, 0, packet, 0, bodyStart); // [len][crc][headerLen][header]
-			body.CopyTo(packet, bodyStart);
-
-			BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(0, 4), (uint)(packet.Length - 4));
-			BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(4, 4), Crc32.Calculate(packet[8..]));
-			return packet;
-		}
-
-		// Quantizes a world position to cm (0.01) so a burst spawn matches its NpcSpawns row across float
-		// round-trips; collisions (two NPCs within a cm) are not a concern at beach scale.
-		private static (int, int, int) PositionKey(float x, float y, float z)
-		{
-			return ((int)MathF.Round(x * 100f), (int)MathF.Round(y * 100f), (int)MathF.Round(z * 100f));
 		}
 
 		// Encodes value as a base-128 varint of EXACTLY byteLength bytes, padding the high groups with overlong
@@ -783,6 +749,25 @@ namespace Faolan.GameServer
 			return v != 0
 				? null // value didn't fit in byteLength 7-bit groups
 				: bytes;
+		}
+
+		// Captures the first live-addressed NPC spawn (FA015807, non-player handle) and MoveTask (96C46740) packets
+		// as framing templates for the additive built-NPC test (their header carries the live receiver/instance).
+		private static void CaptureInjectionTemplate(INetworkClient client, byte[] packet, ref byte[] spawnTemplate, ref byte[] moveTaskTemplate)
+		{
+			if (packet.Length < 12)
+				return;
+
+			var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
+			if (bodyStart + 16 > packet.Length)
+				return;
+
+			var subOpcode = BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(bodyStart + 4, 4));
+			var handle = BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(bodyStart + 12, 4));
+			if (spawnTemplate == null && subOpcode == 0xFA015807u && handle != client.Session.Account.ClientInstance)
+				spawnTemplate = packet;
+			else if (moveTaskTemplate == null && subOpcode == MoveTaskBuilder.SubOpcode)
+				moveTaskTemplate = packet;
 		}
 
 		// Maps an equipped-container slot id (matching the archive player_items/npc_items slot bytes) to the matching
@@ -812,6 +797,20 @@ namespace Faolan.GameServer
 			};
 		}
 
+		// Frames a built body as a full Conan packet by reusing a template packet's header (its live receiver/
+		// instance), then setting the packet length and recomputing the CRC over everything after it.
+		private static byte[] FrameLikeTemplate(byte[] template, byte[] body)
+		{
+			var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(8, 4));
+			var packet = new byte[bodyStart + body.Length];
+			Array.Copy(template, 0, packet, 0, bodyStart); // [len][crc][headerLen][header]
+			body.CopyTo(packet, bodyStart);
+
+			BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(0, 4), (uint)(packet.Length - 4));
+			BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(4, 4), Crc32.Calculate(packet[8..]));
+			return packet;
+		}
+
 		// True if the packet is the 0x2000 inventory snapshot (sub-opcode 0x737A6DF9).
 		private static bool IsInventorySnapshot(byte[] packet)
 		{
@@ -821,6 +820,13 @@ namespace Faolan.GameServer
 			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
 			var bodyStart = 12 + headerLen;
 			return bodyStart + 8 <= packet.Length && BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(bodyStart + 4, 4)) == 0x737A6DF9u;
+		}
+
+		// Quantizes a world position to cm (0.01) so a burst spawn matches its NpcSpawns row across float
+		// round-trips; collisions (two NPCs within a cm) are not a concern at beach scale.
+		private static (int, int, int) PositionKey(float x, float y, float z)
+		{
+			return ((int)MathF.Round(x * 100f), (int)MathF.Round(y * 100f), (int)MathF.Round(z * 100f));
 		}
 
 		// The entity name is the first `0x0A <len 1..63> <printable-ascii>` run in the spawn body.

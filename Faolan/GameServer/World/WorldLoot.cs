@@ -9,26 +9,24 @@ namespace Faolan.GameServer.World
 	// the u32 length prefix).
 	public static class WorldLoot
 	{
-		public const uint LootTypeTag = 0x0000C87A; // the loot-bag class typetag
-		public const uint EntityTypeTag = 0x0000C350; // the entity-frame typetag carried inside NewCurrentLooter
-		public const uint NewCurrentLooterSubOpcode = 0xD06568C8; // NewCurrentLooterIIR_c
-		public const uint FadeSubOpcode = 0x66180B20; // n3ToClientFadeIIR_t - graceful fade-out despawn
-		public const uint VisualChangeSubOpcode = 0xE7F4F8F8; // SimpleDynelVisualChangeIIR_c - "Open" opens the loot window
 		public const float DefaultFadeSeconds = 3.0f;
+		public const uint EntityTypeTag = 0x0000C350; // the entity-frame typetag carried inside NewCurrentLooter
+		public const uint FadeSubOpcode = 0x66180B20; // n3ToClientFadeIIR_t - graceful fade-out despawn
+		public const uint LootTypeTag = 0x0000C87A; // the loot-bag class typetag
+		public const uint NewCurrentLooterSubOpcode = 0xD06568C8; // NewCurrentLooterIIR_c
+		public const uint VisualChangeSubOpcode = 0xE7F4F8F8; // SimpleDynelVisualChangeIIR_c - "Open" opens the loot window
 
-		// Opens the loot WINDOW on the object (SimpleDynelVisualChange carrying the state string "Open"). 19 + len B:
-		// [subop][typetag][handle][00000000][0x00][u16 strLen][ascii]. The bag stays in the world; this just opens its UI.
-		public static byte[] BuildOpenWindowBody(uint typeTag, uint handle, string state = "Open")
+		// The graceful fade-out despawn (the loot-consumed / loot-expired variant of n3ToClientQuit). 17 B:
+		// [subop][typetag][handle][0x00 marker][float fadeSeconds, big-endian]. Marker 0x00 + a FLOAT distinguishes it
+		// from n3ToClientQuit's 0x01 marker + u32 playfield token.
+		public static byte[] BuildFadeBody(uint typeTag, uint handle, float fadeSeconds)
 		{
-			var text = Encoding.ASCII.GetBytes(state);
-			var body = new byte[19 + text.Length];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), VisualChangeSubOpcode);
+			var body = new byte[17];
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), FadeSubOpcode);
 			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), typeTag);
 			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), handle);
-			// body[12..16] stays 0x00000000
-			body[16] = 0x00;
-			BinaryPrimitives.WriteUInt16BigEndian(body.AsSpan(17, 2), (ushort)text.Length);
-			text.CopyTo(body, 19);
+			body[12] = 0x00;
+			BinaryPrimitives.WriteSingleBigEndian(body.AsSpan(13, 4), fadeSeconds);
 			return body;
 		}
 
@@ -46,17 +44,19 @@ namespace Faolan.GameServer.World
 			return body;
 		}
 
-		// The graceful fade-out despawn (the loot-consumed / loot-expired variant of n3ToClientQuit). 17 B:
-		// [subop][typetag][handle][0x00 marker][float fadeSeconds, big-endian]. Marker 0x00 + a FLOAT distinguishes it
-		// from n3ToClientQuit's 0x01 marker + u32 playfield token.
-		public static byte[] BuildFadeBody(uint typeTag, uint handle, float fadeSeconds)
+		// Opens the loot WINDOW on the object (SimpleDynelVisualChange carrying the state string "Open"). 19 + len B:
+		// [subop][typetag][handle][00000000][0x00][u16 strLen][ascii]. The bag stays in the world; this just opens its UI.
+		public static byte[] BuildOpenWindowBody(uint typeTag, uint handle, string state = "Open")
 		{
-			var body = new byte[17];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), FadeSubOpcode);
+			var text = Encoding.ASCII.GetBytes(state);
+			var body = new byte[19 + text.Length];
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), VisualChangeSubOpcode);
 			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), typeTag);
 			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), handle);
-			body[12] = 0x00;
-			BinaryPrimitives.WriteSingleBigEndian(body.AsSpan(13, 4), fadeSeconds);
+			// body[12..16] stays 0x00000000
+			body[16] = 0x00;
+			BinaryPrimitives.WriteUInt16BigEndian(body.AsSpan(17, 2), (ushort)text.Length);
+			text.CopyTo(body, 19);
 			return body;
 		}
 	}

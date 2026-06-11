@@ -13,7 +13,7 @@ namespace Faolan.Tests
 		// in-range live id, natural 4-byte length (no padding)
 		// same id padded to a 5-byte slot (captured out-of-range instance)
 		// small value padded into a long slot
-			// 32-bit max needs the full 5 bytes
+		// 32-bit max needs the full 5 bytes
 		public void Padded_HasRequestedLength_AndRoundTrips(uint value, int byteLength)
 		{
 			var bytes = GameServerListener.EncodeVarintPadded(value, byteLength);

@@ -43,14 +43,20 @@ namespace Faolan.GameServer.World
 			while (i >= 0 && i + 12 <= snapshotBody.Length)
 			{
 				var tokenStart = i + 4;
-				if (snapshotBody.Slice(tokenStart + 4, 4).SequenceEqual(TokenSuffixMarker))
+				if (snapshotBody
+				    .Slice(tokenStart + 4, 4)
+				    .SequenceEqual(TokenSuffixMarker))
 				{
 					token = BinaryPrimitives.ReadUInt32BigEndian(snapshotBody.Slice(tokenStart, 4));
 					return true;
 				}
 
-				var next = snapshotBody.Slice(i + 1).IndexOf(TokenPrefixMarker);
-				i = next < 0 ? -1 : i + 1 + next;
+				var next = snapshotBody
+					.Slice(i + 1)
+					.IndexOf(TokenPrefixMarker);
+				i = next < 0
+					? -1
+					: i + 1 + next;
 			}
 
 			return false;

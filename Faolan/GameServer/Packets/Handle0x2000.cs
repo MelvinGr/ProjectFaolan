@@ -165,7 +165,6 @@ namespace Faolan.GameServer
 
 				case GameServer0X2000Opcodes.ReadyForPlayScreen: //peer0_160
 				{
-
 					if (client.Session.Character?.Name == null)
 					{
 						if (IsRetailCreateEditorFlow(client))

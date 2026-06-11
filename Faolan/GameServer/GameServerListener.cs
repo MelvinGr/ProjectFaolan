@@ -1,53 +1,53 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
-using System.Linq;
-using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.AgentServer;
-using Faolan.Core.Network.GameServer;
 using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.GameServer;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.GameServer.Combat;
+using Faolan.GameServer.Scripting;
+using Faolan.GameServer.World;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
-	public partial class GameServerListener : Server<ConanPacket, ConanPacketFactory, ConanMessageFramer>, World.IWorldOutbound
+	public partial class GameServerListener : Server<ConanPacket, ConanPacketFactory, ConanMessageFramer>, IWorldOutbound
 	{
+		// Periodic world-state autosave cadence (crash safety; logout/teleport/.save are the event-driven saves).
+		private const int AutoSaveIntervalMinutes = 5;
+
 		// Character ids that have just been named in the create-editor and are about to open their FIRST world
 		// connection (the second GameServer connection, after the 0x2002 enter-world handoff). The id is added
 		// when the name is committed and removed (consumed) on the world Hello, which is how that connection is
 		// recognised as the create-world entry (and given the intro/cutscene) rather than a normal login. Static
 		// because the editor and world connections are different sessions but hit the same listener instance.
 		private static readonly HashSet<uint> PendingCreateWorldEntry = [];
+
+		// Combat domain logic: melee/spell damage, NPC kill lifecycle, XP/leveling, kill-quest tracking + the combat
+		// wire packets. The opcode dispatch (Handle0x2000) and GM .hurt/.heal call into it. See Combat/CombatService.cs.
+		private readonly CombatService _combat;
 		private readonly IAgentServerDispatcher _agentServerDispatcher;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 
 		// The RDB Lua VM (conversation/quest scripting); stateless + reusable.
-		private readonly Scripting.LuaScriptVm _luaVm = new();
-
-		// The live world simulation: owns the world model, the connected players' authoritative entities, and the
-		// 10 Hz tick (NPC respawn/AI, vitals regen, player death/respawn, resurrection discovery). The listener is its
-		// IWorldOutbound port. Built in the ctor (after the dispatchers are assigned). See World/WorldSimulation.cs.
-		private readonly World.WorldSimulation _simulation;
+		private readonly LuaScriptVm _luaVm = new LuaScriptVm();
 
 		// Builds + sends the world-event packets (spawns/moves/despawns, NPC respawn/loot/mount renders, loot-window
 		// and quest-journal packets). Reads the world model via the simulation; the listener delegates its IWorldOutbound
 		// port + the loot/quest opcode handlers to it. See World/WorldBroadcaster.cs.
-		private readonly World.WorldBroadcaster _broadcaster;
+		private readonly WorldBroadcaster _broadcaster;
 
-		// Combat domain logic: melee/spell damage, NPC kill lifecycle, XP/leveling, kill-quest tracking + the combat
-		// wire packets. The opcode dispatch (Handle0x2000) and GM .hurt/.heal call into it. See Combat/CombatService.cs.
-		private readonly Combat.CombatService _combat;
-
-		// Periodic world-state autosave cadence (crash safety; logout/teleport/.save are the event-driven saves).
-		private const int AutoSaveIntervalMinutes = 5;
+		// The live world simulation: owns the world model, the connected players' authoritative entities, and the
+		// 10 Hz tick (NPC respawn/AI, vitals regen, player death/respawn, resurrection discovery). The listener is its
+		// IWorldOutbound port. Built in the ctor (after the dispatchers are assigned). See World/WorldSimulation.cs.
+		private readonly WorldSimulation _simulation;
 
 		// Background loops (the autosave loop is owned here; the simulation owns its own tick) and their lifetime token.
 		// Held (not fire-and-forget) so StopAsync can signal them and await a clean shutdown, and so any unobserved
@@ -55,32 +55,65 @@ namespace Faolan.GameServer
 		private CancellationTokenSource _loopCts;
 		private Task _autoSaveTask = Task.CompletedTask;
 
-		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, ushort port, IAgentServerDispatcher agentServerDispatcher, IGameServerDispatcher gameServerDispatcher) : base(port, logger, configuration, database,
-			new ConanOutgoingPacketLogger(logger, "GameServer", typeof(GameServerRespondOpcodes), typeof(GameServer0X2000RespondsOpcodes)))
+		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, ushort port, IAgentServerDispatcher agentServerDispatcher, IGameServerDispatcher gameServerDispatcher) : base(port,
+			logger, configuration, database, new ConanOutgoingPacketLogger(logger, "GameServer", typeof(GameServerRespondOpcodes), typeof(GameServer0X2000RespondsOpcodes)))
 		{
 			_agentServerDispatcher = agentServerDispatcher;
 			_gameServerDispatcher = gameServerDispatcher;
-			_simulation = new World.WorldSimulation(this, database, agentServerDispatcher, logger);
-			_broadcaster = new World.WorldBroadcaster(_simulation, database, logger);
-			_combat = new Combat.CombatService(_simulation, _broadcaster, database, agentServerDispatcher, logger);
+			_simulation = new WorldSimulation(this, database, agentServerDispatcher, logger);
+			_broadcaster = new WorldBroadcaster(_simulation, database, logger);
+			_combat = new CombatService(_simulation, _broadcaster, database, agentServerDispatcher, logger);
 
 			InitGmCommands();
 		}
 
-		// The player's live world entity for this connection (the authoritative transform + vitals), or null if not yet
-		// in the world. Thin delegate to the simulation, which owns the player registry; kept so the other listener
-		// partials (broadcast, combat, GM) read it unchanged.
-		private World.WorldEntity PlayerWorldEntity(INetworkClient client)
+		Task IWorldOutbound.BroadcastEntityFade(WorldEntity entity)
 		{
-			return _simulation.PlayerWorldEntity(client);
+			return _broadcaster.BroadcastEntityFade(entity);
 		}
 
 		// --- IWorldOutbound: the wire side of the simulation tick (broadcaster builds packets; listener owns vitals
 		// send + the world-entry replay) -----------------------------------------------------------------------------
-		Task World.IWorldOutbound.BroadcastNpcRespawn(World.WorldEntity npc) => _broadcaster.BroadcastNpcRespawn(npc);
-		Task World.IWorldOutbound.BroadcastEntityFade(World.WorldEntity entity) => _broadcaster.BroadcastEntityFade(entity);
-		Task World.IWorldOutbound.PushVitals(INetworkClient client, Combat.EntityVitals vitals) => SendStatUpdate(client, vitals.ToVitalsBlock(), client.Session.Account.ClientInstance);
-		Task World.IWorldOutbound.ReenterWorld(INetworkClient client) => SendWorldEntry(client);
+		Task IWorldOutbound.BroadcastNpcRespawn(WorldEntity npc)
+		{
+			return _broadcaster.BroadcastNpcRespawn(npc);
+		}
+
+		Task IWorldOutbound.PushVitals(INetworkClient client, EntityVitals vitals)
+		{
+			return SendStatUpdate(client, vitals.ToVitalsBlock(), client.Session.Account.ClientInstance);
+		}
+
+		Task IWorldOutbound.ReenterWorld(INetworkClient client)
+		{
+			return SendWorldEntry(client);
+		}
+
+		public override Task StartAsync(CancellationToken cancellationToken)
+		{
+			_gameServerDispatcher.Register(this);
+			// Own lifetime token (linked to startup) so StopAsync can cancel the loops independently of any single
+			// connection. Tasks are stored so they can be awaited on shutdown.
+			_loopCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+			_autoSaveTask = AutoSaveLoop(_loopCts.Token); // periodic crash-safety flush of the live world state
+			_simulation.Start(_loopCts.Token); // the simulation tick (regen, NPC AI, death/respawn, discovery)
+			return base.StartAsync(cancellationToken);
+		}
+
+		public override async Task StopAsync(CancellationToken cancellationToken)
+		{
+			_gameServerDispatcher.Unregister(this);
+
+			// Signal the background loops and await their (clean) exit so shutdown doesn't race a mid-tick save. The
+			// loops swallow their own OperationCanceledException, so WhenAll completes normally; bounded by the host's
+			// shutdown token either way.
+			if (_loopCts != null)
+				await _loopCts.CancelAsync();
+			await Task.WhenAll(_simulation.StopAsync(), _autoSaveTask);
+			_loopCts?.Dispose();
+
+			await base.StopAsync(cancellationToken);
+		}
 
 		protected override void ClientDisconnected(INetworkClient client)
 		{
@@ -98,57 +131,6 @@ namespace Faolan.GameServer
 			}
 
 			base.ClientDisconnected(client);
-		}
-
-		public override Task StartAsync(CancellationToken cancellationToken)
-		{
-			_gameServerDispatcher.Register(this);
-			// Own lifetime token (linked to startup) so StopAsync can cancel the loops independently of any single
-			// connection. Tasks are stored so they can be awaited on shutdown.
-			_loopCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-			_autoSaveTask = AutoSaveLoop(_loopCts.Token); // periodic crash-safety flush of the live world state
-			_simulation.Start(_loopCts.Token); // the simulation tick (regen, NPC AI, death/respawn, discovery)
-			return base.StartAsync(cancellationToken);
-		}
-
-		// Periodically flushes the live world state to the DB so a crash loses at most one interval. Persistence is
-		// otherwise event-driven (disconnect, teleport, .save) and needs no game loop; this is just a cheap timer
-		// (docs/server-architecture-roadmap.md). The simulation tick, when it lands, can absorb this.
-		private async Task AutoSaveLoop(CancellationToken cancellationToken)
-		{
-			using var timer = new System.Threading.PeriodicTimer(System.TimeSpan.FromMinutes(AutoSaveIntervalMinutes));
-			try
-			{
-				while (await timer.WaitForNextTickAsync(cancellationToken))
-				{
-					var saved = await FlushWorldState();
-					if (saved > 0)
-						Logger.LogInformation("Autosave: flushed {Count} player(s)' live world state.", saved);
-				}
-			}
-			catch (System.OperationCanceledException)
-			{
-				// server shutting down
-			}
-			catch (System.Exception ex)
-			{
-				Logger.LogError(ex, "Autosave loop failed.");
-			}
-		}
-
-		public override async Task StopAsync(CancellationToken cancellationToken)
-		{
-			_gameServerDispatcher.Unregister(this);
-
-			// Signal the background loops and await their (clean) exit so shutdown doesn't race a mid-tick save. The
-			// loops swallow their own OperationCanceledException, so WhenAll completes normally; bounded by the host's
-			// shutdown token either way.
-			if (_loopCts != null)
-				await _loopCts.CancelAsync();
-			await Task.WhenAll(_simulation.StopAsync(), _autoSaveTask);
-			_loopCts?.Dispose();
-
-			await base.StopAsync(cancellationToken);
 		}
 
 		protected override async Task ReceivedPacket(INetworkClient client, ConanPacket packet)
@@ -303,9 +285,11 @@ namespace Faolan.GameServer
 					{
 						LogPacketBodyDebug("GameServer 0x207E body", packet.Body.ToArray());
 						if (packet.Body.Length > 0)
+						{
 							Logger.LogInformation("0x207E decoded: value0={Value0:X2}", packet
 								.Body
 								.ToArray()[0]);
+						}
 					}
 
 					break;
@@ -597,8 +581,8 @@ namespace Faolan.GameServer
 						await HandleGmCommand(client, text);
 					else
 						// "say" is proximity chat - only same-map players within range hear it (the sender always does).
-							// The GameServer owns the live positions, so it picks the recipients here.
-							await _agentServerDispatcher.CharacterSay(client.Session.Character.Id, text, _simulation.SayRecipients(client));
+						// The GameServer owns the live positions, so it picks the recipients here.
+						await _agentServerDispatcher.CharacterSay(client.Session.Character.Id, text, _simulation.SayRecipients(client));
 
 					break;
 				}
@@ -662,6 +646,39 @@ namespace Faolan.GameServer
 			}
 		}
 
+		// Periodically flushes the live world state to the DB so a crash loses at most one interval. Persistence is
+		// otherwise event-driven (disconnect, teleport, .save) and needs no game loop; this is just a cheap timer
+		// (docs/server-architecture-roadmap.md). The simulation tick, when it lands, can absorb this.
+		private async Task AutoSaveLoop(CancellationToken cancellationToken)
+		{
+			using var timer = new PeriodicTimer(TimeSpan.FromMinutes(AutoSaveIntervalMinutes));
+			try
+			{
+				while (await timer.WaitForNextTickAsync(cancellationToken))
+				{
+					var saved = await FlushWorldState();
+					if (saved > 0)
+						Logger.LogInformation("Autosave: flushed {Count} player(s)' live world state.", saved);
+				}
+			}
+			catch (OperationCanceledException)
+			{
+				// server shutting down
+			}
+			catch (Exception ex)
+			{
+				Logger.LogError(ex, "Autosave loop failed.");
+			}
+		}
+
+		// The player's live world entity for this connection (the authoritative transform + vitals), or null if not yet
+		// in the world. Thin delegate to the simulation, which owns the player registry; kept so the other listener
+		// partials (broadcast, combat, GM) read it unchanged.
+		private WorldEntity PlayerWorldEntity(INetworkClient client)
+		{
+			return _simulation.PlayerWorldEntity(client);
+		}
+
 		// The create-editor 0x2000 receiver: the player object (GamePlayerType) addressed to this session's
 		// client instance. Built as a typed ProtoEndpoint so the type+instance can't drift (the old hardcoded
 		// receiver baked in 0x021662C8; see ConanEndpoints / ProtoEndpointGoldenTests).
@@ -684,6 +701,5 @@ namespace Faolan.GameServer
 		{
 			return client.Session.Character?.Name == null;
 		}
-
 	}
 }

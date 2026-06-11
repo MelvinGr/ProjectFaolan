@@ -42,6 +42,12 @@ namespace Faolan.Core.Network.AgentServer
 				await _provider.CharacterSay(characterId, message, recipientCharacterIds);
 		}
 
+		public IReadOnlyList<SessionInfo> GetSessions()
+		{
+			lock (_lock)
+				return _provider?.GetSessions() ?? Array.Empty<SessionInfo>();
+		}
+
 		public async Task SendSystemMessage(uint characterId, string message)
 		{
 			if (_provider != null)
@@ -52,12 +58,6 @@ namespace Faolan.Core.Network.AgentServer
 		{
 			if (_provider != null)
 				await _provider.SystemBroadcast(message);
-		}
-
-		public IReadOnlyList<SessionInfo> GetSessions()
-		{
-			lock (_lock)
-				return _provider?.GetSessions() ?? Array.Empty<SessionInfo>();
 		}
 	}
 }

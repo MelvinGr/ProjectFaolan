@@ -16,7 +16,7 @@ namespace Faolan.Importer
 	public static class RdbMapImporter
 	{
 		private const uint PlayfieldDescriptionType = 1070003;
-		private static readonly Regex PlayfieldRx = new("<playfield\\s+Name=\"([^\"]*)\"\\s+ID=\"(\\d+)\"", RegexOptions.Compiled);
+		private static readonly Regex PlayfieldRx = new Regex("<playfield\\s+Name=\"([^\"]*)\"\\s+ID=\"(\\d+)\"", RegexOptions.Compiled);
 
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir)
 		{
@@ -28,6 +28,7 @@ namespace Faolan.Importer
 			{
 				if (e.Size == 0)
 					continue;
+
 				if (e.File == 0xff) // v6 content-addressed - not in the v5 NN.rdbdata files
 				{
 					gated++;
@@ -62,7 +63,11 @@ namespace Faolan.Importer
 				}
 				else
 				{
-					var created2 = new Map { Id = id, Name = name };
+					var created2 = new Map
+					{
+						Id = id,
+						Name = name
+					};
 					db.Maps.Add(created2);
 					maps[id] = created2;
 					created++;

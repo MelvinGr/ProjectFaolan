@@ -1,9 +1,8 @@
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Packets;
-using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.Packets.FullCharSnapshot;
+using Faolan.GameServer.World;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer
@@ -15,7 +14,7 @@ namespace Faolan.GameServer
 		// (login replay, GM, the regen tick) are unchanged.
 		internal static byte[] BuildStatUpdate(INetworkClient client, CharacterStatBlock stats, uint? entityHandle = null)
 		{
-			return World.VitalsPacket.BuildStatUpdate(client, stats, entityHandle);
+			return VitalsPacket.BuildStatUpdate(client, stats, entityHandle);
 		}
 
 		// Builds the player's own vitals (0x96B8DC59) from the live character's MaxStats - the world-entry replay

@@ -10,35 +10,35 @@ namespace Faolan.Core.Database.Tables
 	// float block + post-IIR scaffold are also lifted into scaffold rows (the same blocks the player spawn keeps).
 	public class NpcSpawn : BaseEntity
 	{
+		public bool HasEquipment { get; set; }
 		public byte[] Data { get; set; }
 		public float PositionX { get; set; }
 		public float PositionY { get; set; }
 		public float PositionZ { get; set; }
+		public float RotationW { get; set; }
 		public float RotationX { get; set; }
 		public float RotationY { get; set; }
 		public float RotationZ { get; set; }
-		public float RotationW { get; set; }
 		public string Name { get; set; }
 		public uint CapturedHandle { get; set; }
-		public uint MapId { get; set; }
-
-		// Identity/appearance, lifted from the CharacterIIR (ProtoCoreCharacterIIR). TemplateId (NpcStats.f4) is
-		// the stable per-type identity; MonsterScale carries the per-instance size jitter.
-		public uint TemplateId { get; set; }
-		public uint Race { get; set; }
-		public uint Sex { get; set; }
-		public uint Level { get; set; }
-		public uint MonsterScale { get; set; }
-		public uint MonsterData { get; set; }
-		public uint HeadMesh { get; set; }
-		public bool HasEquipment { get; set; }
-
-		// Real per-NPC max health (player-facing) lifted from the spawn's CharacterStats.health - the combat HP vs the
-		// level-scaled placeholder. 0 = the spawn carried none.
-		public uint Health { get; set; }
 
 		// Faction/community lifted from NpcStats.community: 0 = neutral/friendly, > 0 = a hostile faction. Drives NPC
 		// aggro hostility (server-architecture-roadmap).
 		public uint Community { get; set; }
+		public uint HeadMesh { get; set; }
+
+		// Real per-NPC max health (player-facing) lifted from the spawn's CharacterStats.health - the combat HP vs the
+		// level-scaled placeholder. 0 = the spawn carried none.
+		public uint Health { get; set; }
+		public uint Level { get; set; }
+		public uint MapId { get; set; }
+		public uint MonsterData { get; set; }
+		public uint MonsterScale { get; set; }
+		public uint Race { get; set; }
+		public uint Sex { get; set; }
+
+		// Identity/appearance, lifted from the CharacterIIR (ProtoCoreCharacterIIR). TemplateId (NpcStats.f4) is
+		// the stable per-type identity; MonsterScale carries the per-instance size jitter.
+		public uint TemplateId { get; set; }
 	}
 }

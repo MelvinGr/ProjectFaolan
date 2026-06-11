@@ -13,12 +13,7 @@ namespace Faolan.Tests
 	// Re-addressing changes only the handle.
 	public class WorldObjectBuilderTests
 	{
-		[Theory]
-		[InlineData("WorldObjDecor")]
-		[InlineData("WorldObjChest")]
-		[InlineData("WorldObjZone")]
-		[InlineData("WorldObjDestructible")]
-		[InlineData("WorldObjClimbing")]
+		[Theory, InlineData("WorldObjDecor"), InlineData("WorldObjChest"), InlineData("WorldObjZone"), InlineData("WorldObjDestructible"), InlineData("WorldObjClimbing")]
 		public void TryBuild_FromCapturedRow_ReproducesCapturedBody(string golden)
 		{
 			var capturedBody = Golden.Bytes(golden);
@@ -47,6 +42,11 @@ namespace Faolan.Tests
 			}
 		}
 
+		private static float ReadLE(byte[] b, int offset)
+		{
+			return BinaryPrimitives.ReadSingleLittleEndian(b.AsSpan(offset, 4));
+		}
+
 		private static WorldObject RowFromCapturedBody(byte[] body)
 		{
 			var data = new byte[12 + body.Length]; // headerLen = 0
@@ -63,11 +63,6 @@ namespace Faolan.Tests
 				RotationZ = ReadLE(body, SpawnPacketBuilder.RotZOffset),
 				RotationW = ReadLE(body, SpawnPacketBuilder.RotWOffset)
 			};
-		}
-
-		private static float ReadLE(byte[] b, int offset)
-		{
-			return BinaryPrimitives.ReadSingleLittleEndian(b.AsSpan(offset, 4));
 		}
 	}
 }

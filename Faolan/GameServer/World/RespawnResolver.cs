@@ -9,12 +9,6 @@ namespace Faolan.GameServer.World
 	// the player's discovered set so it is unit-testable; the caller supplies the data and applies the move.
 	public static class RespawnResolver
 	{
-		// True if `point` is usable as a respawn target for a player with `discoveredIds` (always-known, or discovered).
-		public static bool IsKnown(RespawnPoint point, ISet<uint> discoveredIds)
-		{
-			return point.AlwaysKnown || (discoveredIds != null && discoveredIds.Contains(point.Id));
-		}
-
 		// The known respawn point closest to `from`, or null if the player knows none on this map.
 		public static RespawnPoint ClosestKnown(Vector3 from, IEnumerable<RespawnPoint> points, ISet<uint> discoveredIds)
 		{
@@ -34,6 +28,12 @@ namespace Faolan.GameServer.World
 			}
 
 			return best;
+		}
+
+		// True if `point` is usable as a respawn target for a player with `discoveredIds` (always-known, or discovered).
+		public static bool IsKnown(RespawnPoint point, ISet<uint> discoveredIds)
+		{
+			return point.AlwaysKnown || (discoveredIds != null && discoveredIds.Contains(point.Id));
 		}
 	}
 }
