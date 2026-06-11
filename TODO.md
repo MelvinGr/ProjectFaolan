@@ -84,6 +84,19 @@ On a **beach login** (existing character), not the create flow:
 **Known limit:** in the *create-world* flow specifically, Casilda may still fall back to the scripted intro —
 her create-world conversation isn't in the captures the analyzer can extract yet (needs a fresh capture).
 
+### UPDATE 2026-06-11: the chat-LOCK is fixed; the "no lines / wrong NPC" is a CONTENT-COVERAGE gap.
+Diagnosed: conversation replay is coverage-bound. The `(Mode, Field3)` the client sends is QUEST-STATE-dependent,
+and our captures cover only some states per NPC — e.g. the dikketest capture clicks Casilda `mode=1 field3=0` then
+`field3=2`, but the DB has Casilda `field3=0/1`, NOT `2`. So a live click on an un-captured branch found no node.
+The Knubot opcodes are now named: `0x045B0B0F` OpenChatWindow, `0x4A3D899A` AppendText, `0xF164A4A5` **AnswerList**
+(the selectable lines → "no lines to select" = an empty/absent AnswerList for that node), `0xC4AF39EB` CloseChatWindow.
+- **FIXED (needs re-test): the chat-lock.** On a no-match beach login the server sent NOTHING, so the client hung
+  (can't ESC). It now sends `KnubotCloseChatWindow` (graceful "nothing more to say" close). RE-TEST: advancing to an
+  un-captured step should now CLOSE the window cleanly instead of locking.
+- **Still expected (data gap, not a bug): "no lines" / wrong-looking dialog** when the live quest-state branch isn't
+  in any capture. The real fix is RDB-driven conversation trees (dialogue that works for ANY quest state), not
+  capture replay — a separate, larger effort.
+
 ## 7. Create-world Kalanthes intro  (commit: answer create-world spawn polls per-entity) ⭐ highest priority
 The auto-cutscene where you wash ashore and Kalanthes walks up + starts the chat.
 
