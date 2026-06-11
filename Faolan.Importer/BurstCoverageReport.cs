@@ -148,12 +148,21 @@ namespace Faolan.Importer
 						return false;
 					}
 
-					if (objects.TryGetValue(objKey, out var objRow) && WorldObjectBuilder.TryBuildOntoLivePlacement(objRow, objBodyArr, out var objBody)
-					    && objBodyArr.AsSpan().SequenceEqual(objBody))
+					if (!objects.TryGetValue(objKey, out var objRow))
+					{
+						residualFamily = "world object (no WorldObjects row)";
+						return false;
+					}
+
+					if (!WorldObjectBuilder.TryBuildOntoLivePlacement(objRow, objBodyArr, out var objBody))
+					{
+						residualFamily = "world object (row template unparseable)";
+						return false;
+					}
+
+					if (objBodyArr.AsSpan().SequenceEqual(objBody))
 						return true;
-					residualFamily = objects.ContainsKey(objKey)
-						? "world object (cross-session: differs from table row)"
-						: "world object (no WorldObjects row)";
+					residualFamily = "world object (cross-session: identity differs from table row)";
 					return false;
 
 				case 0x737A6DF9: // FullChar - the player's own (inventory snapshot) is rebuilt live; an NPC's is not.
