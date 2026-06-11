@@ -171,46 +171,14 @@ Significant de-risking — the tool and format are identified:
   recordCount(u32)`; then a section of `(type, idx)` u32 pairs; then a detail section per record:
   `unk0, offset, size, unk3..unk6` (v7) plus `unk7..unk10` (v5). **File resolution: the `.rdbdata` file number
   is `unk0 & 0xff`; `offset`/`size` locate the blob within `NN.rdbdata`.** (27 data files ⇒ low byte 0..26.)
-- **v6 layout (reversed so far):** `recordCount ≈ 268,792`. The `(type,idx)` section is at the **END** of the
-  index (bytes ~40.51M..42.66M, 8 bytes/record, exactly 268,792 records). The front ~40.5M holds the header +
-  hash table + detail records + (almost certainly) variable-length resource **name strings** (that variability
-  is why fixed-stride scans for the detail/offset columns failed). The header field at offset 8 is 873,588
-  (a hash-bucket count, not the record count). Exact v6 record/hash/name byte layout is the remaining unknown.
+### The index is `le.idx` (v5); there is no "v6 index" to crack
 
-### v6 layout (refined)
-v6 **reorders** the sections vs v5 (and adds a hash + name-string section):
-```
-[header 36 B]  RDHI, version=6, then 7×u32 (873588=hash buckets, 195, 3, 3727, 0, 198, 0)
-[section1]     per-record: 16-byte hash + detail fields (~28 B stride looks most likely:
-              hash(16) + ~3×u32 holding file(low byte)/offset/size). 36 .. ~7.5 MB.
-[name strings] variable-length resource names/paths (~33 MB) — why fixed-stride offset scans fail.
-[type+idx]     at the END (bytes ~40.51 M .. 42.66 M): contiguous (type, idx) u32 pairs, 268,792 records.
-              CONFIRMED with real values (e.g. type 1000020 with sequential idx 1093924,1093925,...).
-[trailer]     ~80 KB.
-```
-Section1 and the type+idx section are in the **same record order**, so record *i*'s detail (section1) pairs
-with record *i*'s (type, idx) — alignable by index without parsing the variable name section.
-
-### Concrete next steps
-1. **Crack the v6 detail encoding by ANCHORING on a known resource** (blind validation is too noisy):
-   take a known `(type, idx)` from a packet — e.g. the create-world script references `1010003:3147889`,
-   `1010003:137283`, ... (the `playorskip` payload) — find that exact `(type,idx)` pair in the type+idx
-   section to get its record index *i*, read section1 record *i*, and confirm which u32s give a `(file, offset,
-   size)` that resolves to a real resource in `NN.rdbdata`. That pins the detail layout and section1 stride.
-2. **Decide tool vs own parser:** either patch the cloned rdbreader's v5 path for the v6 deltas (header size +
-   section reorder + detail stride), or write a small v6 index reader in C# (`Faolan.Importer`) reusing the
-   v5/v7 field meanings (`file = byte & 0xff`, `offset`, `size`).
-3. Then proceed to Phase 1 (type inventory) and Phase 2 (per-type parse), as below. First targets once the
-   index reads: `TEXTSCRIPT` (dialogue/strings), then whatever type holds item templates (cross-ref captured
-   health-potion template 180450), then `MONSTERDATA` (NPC HP).
-
-### BREAKTHROUGH (2026-06-08): the index is `le.idx` (v5), pipeline validated end-to-end
-
-The whole `RDBHashIndex.bin` v6 effort was a **dead end / wrong file** — that's just the patch *hash* index
-(MD5s, no offsets). The real offset index is **`le.idx`** (was missed by the first `find`; it has no `.bin`/
-`rdb` in the name). Confirmed via the TSW community docs (`joakibj/tswrdb` `docs/DOCUMENTATION.md` — TSW and AoC
-share the format). And crucially **our `le.idx` is version 5**, which rdbreader already fully supports. No v6 RE
-needed.
+(Supersedes an earlier dead-end effort to reverse `RDBHashIndex.bin` as a v6 offset index.) `RDBHashIndex.bin`
+(RDHI v6) is just the patch **hash** index (per-resource md5s, NO offsets). The real offset index is **`le.idx`,
+version 5**, which rdbreader fully supports — no v6 RE needed. Confirmed via the TSW community docs
+(`joakibj/tswrdb`; TSW and AoC share the format). A resource's data is either packed in the local `NN.rdbdata`
+(`le.idx` detail gives `file`/`offset`/`size`) or, when `file==0xFF`, **not local at all** — it's CDN content
+fetched by the 16-byte content hash (see the "CRACKED" note above; the hash is the CDN path md5).
 
 **`le.idx` layout (v5, validated against our files):**
 - Header 28 B: magic `IBDR`(4) + version(4)=**5** + MD5(16) + `NumEntries`(4) = 873,588.

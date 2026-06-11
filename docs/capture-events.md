@@ -30,7 +30,7 @@ human-readable `remoteformat`/`localized` XML + object/NPC name strings (with th
 | `2005`/`2085`/`2082`/`2009` | create-editor + name/region setup family |
 | `A36D3B74` | client script callback (create editor) AND "QuestRewards" (quest turn-in rewards) |
 | `205a` | gameplay state (frequent during play; unidentified) |
-| `04B82B2D` `D751EBB4` `FEC4158A` `0802E5D4`/`08006F31`/`0131xxxx` | gameplay/entity-update + per-session handle ids (unidentified) |
+| `04B82B2D`=`n3ToClientQuit` (entity despawn, `protocol_despawn_n3toclientquit`), `D751EBB4`=`StopIIR` (stop moving), `FEC4158A`=`DamageResultIIR` (combat hit); `0802E5D4`/`08006F31`/`0131xxxx` = per-session handle ids (names in `docs/aoc-opcode-ids.md`) |
 
 ## Per-capture events
 

@@ -345,3 +345,38 @@ test golden only). Harness 16/16; the generated scaffold confirmed on the wire v
   one route; harmless, pre-existing.
 - Analyzer tail-drop on ~3 GS streams (Strie-create/login, faolanx-charcreation) — a few KB short vs ground
   truth; doesn't affect gameplay, logged in README.
+
+---
+
+## Session 2026-06-11 (part 2) — live world simulation + RDB/CDN extraction
+
+DB schema added this session (migrations auto-apply on server start; or re-run `Faolan.Importer`):
+`AddRespawnPoints`, `AddCharacterQuests`, `AddQuestGoalTarget`. faolan.db is committed with these + reimported
+map names (242) and resurrection points (351). See `docs/server-architecture-roadmap.md`.
+
+All of the below are harness-verified (unit tests) but **need in-client check** — most are 2-client or live-combat:
+
+### Combat loop (both directions)
+- [ ] Kill an NPC → it despawns, you gain XP (bar moves), loot bag may drop at the corpse. On enough XP you
+      **level up** (level + full vitals push). Real NPC HP now comes from the spawn (not the flat placeholder).
+- [ ] Stand near a hostile NPC → it **aggros and hits you** every ~2s (your HP bar drops via `0x96B8DC59`).
+- [ ] Let an NPC kill you → after ~10s you **respawn** at the closest known resurrection point (full HP).
+- [ ] Walk near an undiscovered resurrection point → "Resurrection point discovered" system message; you can
+      then respawn there.
+
+### Loot bag (open/fade — item grant still gated)
+- [ ] Click a dropped loot bag → a loot **window opens** (NewCurrentLooter + SimpleDynelVisualChange "Open"),
+      bag stays. Close it (or it expires ~120s) → it **fades** (`n3ToClientFade`). NOTE: taking items into
+      inventory is NOT wired (the live `ContainerAddItem` grant is RE-gated).
+
+### Quests
+- [ ] `.quest add 13479 5 Scavenger Lackey` → quest appears in journal; kill 5 → goal advances + "complete".
+      `.quest list` / `.quest remove <id>`. Quests persist across relog. (Accept-from-dialogue is VM-gated.)
+
+### Cross-player (needs TWO clients)
+- [ ] Two players on the beach should **see each other** spawn, move, and despawn (on logout / out of range).
+      The despawn token is `0x004fe428` for the beach — open question is whether the client enforces the token.
+
+### Map names
+- [ ] `.maps` / teleport labels should now show real names (e.g. 4010 = "Tortage Island", 2040 = "Castle of
+      King Conan") — imported from the client RDB.

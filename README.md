@@ -537,9 +537,12 @@ own **spawn is fully generated** from DB rows (identity, vitals, equipment, scaf
 editor **appearance**: morph sliders, chosen resources via the RDB `MorphTarget` registry, head/voice/size);
 the **FullChar snapshot's containers are generated** from `CharacterEquipment` + `CharacterInventory` (live
 level/vitals/XP patched into the tails); **equip/unequip/inventory moves persist** and render in any slot on
-relogin; NPC **dialogue** works (coverage-bound); ~177 items buildable. Remaining: from-scratch fresh tails
-(quest XML + access windows - belongs with the quest system, like the prefix's quest counter), **NPCs from
-the DB** (vs verbatim burst spawns), and the gameplay systems (quests, combat death/XP, mounts).
+relogin; NPC **dialogue** works (coverage-bound); ~177 items buildable. A **live world simulation** now runs on
+top (per-zone model + 10 Hz tick + interest management): NPC death→despawn/XP/level/loot, NPC aggro + fight-back,
+player death→respawn at the closest known resurrection point, a quest-state engine with kill-objective tracking,
+and cross-player spawn/move/despawn broadcast (see `docs/server-architecture-roadmap.md`). Remaining: the pinned
+**RDB Lua quest/dialogue VM** (branching content), NPC **movement** (MoveTask grammar), the live loot item-grant,
+NPCs reconstructed from the DB (vs verbatim burst spawns), and mounts.
 
 ## TODO
 
@@ -555,16 +558,21 @@ Concrete next steps, grouped by area. See `docs/` for the dissection writeups be
       caster only gets the 8 abilities via 0x2052; `SpellBookIIR` 0x6BA10936 is a stub notification; the RE'd
       `DispatchLearnSpell(i_nSpellID)` is never exercised). Needs a fresh capture of a caster learning a spell
       (e.g. class 29's 165241). The C++ `addSpell` (0x09) is the dead old scheme.
-- [ ] **Level-up path**: bump `Character.Level`, call `Character.RegenerateMaxStats()`, `SaveCharacter`, then
-      push a `0x96B8DC59` vitals update (`SendVitals`) so the client sees the new stats. (Hold until the vitals
-      packet is confirmed rendering in-client.)
+- [x] **Level-up path** (2026-06-11): kill XP (`LevelingResolver`) bumps `Character.Level`, calls
+      `RegenerateMaxStats()`, refills + raises live vitals, and pushes `Level`/`Exp`/`MaxExp` + vitals via
+      `0x96B8DC59`. Real per-NPC kill XP isn't in the data (Archive `npcs.getExp` only 4 rows), so XP is
+      level-scaled (`CombatResolver.ResolveKillXp`).
 - [ ] **Verify the `0x96B8DC59` vitals packet in-client** (test live with `.vitals` / `.setstat`), then wire
       `SendVitals(client)` into the world-entry sequence so vitals show on login.
 - [ ] Confirm **ApplySpell (`0x6B87E316`) magnitude** sign/scale, and whether damage is carried in the cast or
       only in the following vitals update. (Combat loop is implemented in `Faolan/GameServer/Combat/`:
       `CastSpell` → ApplySpell + damage + `0x96B8DC59` vitals update; damage formula is provisional.)
-- [ ] **Combat death/XP**: decode the death/despawn packet and the XP grant; wire into `ResolveOffensiveCast`
-      (currently HP→0 is detected and logged only). Real **NPC max HP** (placeholder today).
+- [x] **Combat death/XP/loot + NPC fight-back + player death/respawn** (2026-06-11, `docs/server-architecture-roadmap.md`):
+      the death/despawn packet (`n3ToClientQuit` 0x04B82B2D) and fade (`n3ToClientFade` 0x66180B20) are decoded;
+      NPC death → despawn + XP + level-up + loot-bag drop; NPCs aggro + swing back (vitals hit) on the tick; a
+      killed player respawns at the closest known resurrection point. Real **NPC max HP** now comes from the
+      captured spawn `CharacterStats.health` (not a placeholder). Remaining gating: the live loot item-grant
+      (in-client/RE-gated) and cross-player visual confirmation (2-client test).
 - [ ] **Mounts**: the summon spell is `0x3BAD7D` (channeled ApplySpell `0x6B87E316`, decoded from demol80's
       `very_long_loading` capture; `.mount` broadcasts it). Still needed for full mounting: spawn the mount
       entity (`0xFA015807`, e.g. "Fading Black Horse") and drive the MountedRun (`MovingType 0x010A`) transition.
@@ -590,13 +598,16 @@ Concrete next steps, grouped by area. See `docs/` for the dissection writeups be
 - [ ] Decode the NPC spawn's stable conversation/dialogue id (so handle→conversation survives across sessions,
       not just verbatim-replayed scenes).
 
-### Quests (`docs/quests-and-combat.md`, `docs/capture-events.md`)
-- [ ] Isolate the **quest accept vs decline** action and the **quest-log / objective state** packet (numeric
-      quest ids; candidate `0x2038` title / `0x20a5` tracker pair, bodies undecoded).
-- [ ] Decode the **quest-complete / reward grant** beyond the `0xA36D3B74` "QuestRewards" token (the actual
-      reward/turn-in state change).
-- [ ] Isolate the **level-up "ding"** event packet (Level rises in the snapshot/vitals, but the event packet
-      isn't pinned).
+### Quests (`docs/quests-and-combat.md`, `protocol_quest_state`)
+- [x] **Quest state decoded + engine built** (2026-06-11): `QuestIIR` 0x97E02314 (add/update), `QuestGoal`
+      0x0774C8C1 (objective progress), `QuestFullUpdate` 0x63268258 / `QuestJournal` 0x79F8C7A1 (questId +
+      `remoteformat` text refs - the client renders text from its RDB by id). Built: `CharacterQuest` table +
+      `WorldQuest` byte-exact builders + restore-on-login + `.quest add|remove|list` + **kill-objective
+      auto-tracking** (a matching NPC kill advances/completes the quest goal).
+- [ ] **Quest CONTENT is the pinned RDB Lua quest VM** — accept-from-dialogue (the accept packet carries no
+      quest id; the server grants from the quest-giver→quest definition), branching, reward/turn-in
+      (`0xA36D3B74` QuestRewards). Needs a Lua interpreter + a player-tag system + TextStrings(TDC2) resolution
+      (`protocol_conversation_routing`, `docs/rdb-extraction-plan.md`).
 
 ### World entry & rendering (`docs/spawn-dissection-plan.md`, `docs/player-spawn-generation-plan.md`)
 - [x] **Appearance** — fully cracked & generated (2026-06-10): morph sliders are zigzag-encoded editor
