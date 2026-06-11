@@ -170,6 +170,13 @@ quest is added (`.quest add <id> [count] [target...]`) since the real definition
 Remaining VM pieces: accept-from-dialogue trigger, rewards/turn-in (`0xA36D3B74 QuestRewards`), branching,
 QuestFullUpdate replay ([[protocol_conversation_routing]]).
 
+**Accept-from-dialogue is VM-gated (checked 2026-06-11).** In `hoxxling-login-gameplay` the `QuestIIR(add)` for quest
+`0x34A7` follows a chain of quest-giver Interacts; the client's accept Interact (`actionType 0x0F`) carries **no quest
+id** — `0x34A7` appears nowhere in it. So the server grants the quest from data it already holds (this NPC's
+conversation grants quest X) = the quest-giver→quest definition, which is the pinned RDB Lua quest VM. Wiring accept
+without the VM would require a capture-mined NPC→quest map (yields only the 1–2 captured quests) — low value. The quest
+ENGINE (state + kill-objective tracking + `.quest`) is done; the CONTENT (accept/branch/reward defs) needs the VM.
+
 ## Next steps
 - Confirm ApplySpell magnitude sign/scale and whether damage is in the cast or only in the following vitals
   update.
