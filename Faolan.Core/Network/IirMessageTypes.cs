@@ -39,11 +39,36 @@ namespace Faolan.Core.Network
 		// sets grow as each generator lands (see WorldEntryGeneratedRecords).
 		private static readonly HashSet<uint> PlayerGeneratedTypes = [Vitals, StatIir];
 
+		// Transient gameplay records (movement, look-at, leaving, combat buffs/damage, regen ticks, per-frame vitals).
+		// They reference entities as if already live in the world, so replaying them during world ENTRY stalls the
+		// client - a burst imported from a mid-session capture carries them, a clean login has none. They are never
+		// part of the structural world build, so the importer drops them from the stored burst and the replay drops
+		// any that slip through (the two filters share this set so they cannot drift). Vitals (0x96B8DC59) belong here
+		// regardless of target: the player's are server-regenerated (BuildVitals) and an NPC's are per-frame ticks the
+		// world build does not need.
+		private static readonly HashSet<uint> TransientGameplayTypes =
+		[
+			0x4517AA81, // Move (CharDCMove)
+			0x0D155695, // SelectDeselect (look-at)
+			0x04B82B2D, // N3ToClientQuit (entity leaving)
+			0x6B87E316, // MagicBuff (combat)
+			0xE9F24184, // StatDamage (combat)
+			Vitals,     // 0x96B8DC59 - server-regenerated for the player, a per-frame tick for NPCs
+			0x28D0AC99, // Regen (stat tick)
+		];
+
 		// True if this record is server-generated on world entry (so it must NOT be stored in the burst). Globals are
 		// always generated; player-state types only when they target the player instance.
 		public static bool IsServerGenerated(uint iirType, uint handle, uint playerInstance)
 		{
 			return GlobalGeneratedTypes.Contains(iirType) || (handle == playerInstance && PlayerGeneratedTypes.Contains(iirType));
+		}
+
+		// True if this record is a transient gameplay event (not part of the structural world build). Dropped from the
+		// stored burst at import and again at replay (the replay drop is a no-op on an already-clean burst).
+		public static bool IsTransientGameplay(uint iirType)
+		{
+			return TransientGameplayTypes.Contains(iirType);
 		}
 	}
 }

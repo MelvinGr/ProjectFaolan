@@ -278,22 +278,6 @@ namespace Faolan.GameServer
 				recordId, count);
 		}
 
-		// Transient per-frame/gameplay IIR records that pollute a world-entry burst captured mid-session: entity
-		// movement, look-at, leaving, combat buffs/damage, regen ticks and per-frame vitals. They reference entities
-		// as if already live in the world, so replaying them during entry stalls the client. Structural records
-		// (every *FullUpdate spawn, doors, loot bags, MoveTask/Interact registrations, the FullChar player, StatIir,
-		// SetPos) are kept. Vitals (0x96B8DC59) are dropped here because the server regenerates them (BuildVitals).
-		private static readonly System.Collections.Generic.HashSet<uint> TransientGameplayIirTypes =
-		[
-			0x4517AA81, // Move (CharDCMove)
-			0x0D155695, // SelectDeselect (look-at)
-			0x04B82B2D, // N3ToClientQuit (entity leaving)
-			0x6B87E316, // MagicBuff (combat)
-			0xE9F24184, // StatDamage (combat)
-			0x96B8DC59, // Vitals (server-regenerated)
-			0x28D0AC99, // Regen (stat tick)
-		];
-
 		// Replays a map's captured world burst (from the DB), re-addressed from the burst's captured instance to the
 		// logged-in character. Works for ANY map that has a stored burst (beach included - its burst is the proven
 		// blob, seeded into the DB by Faolan.Importer).
@@ -301,15 +285,15 @@ namespace Faolan.GameServer
 		{
 			// Rebuild the exact original packet bytes from the structured IIR records (IirRecordCodec is round-trip
 			// lossless), then drive the same proven byte-preserving replay (instance rewrite + inventory/spawn rebuild).
-			// Drop transient gameplay records: a burst imported from a mid-session capture (e.g. map 4020: 78 Move +
-			// combat/quit/regen records vs a clean login's spawns-only) feeds the client movement/combat for entities
-			// that never cleanly spawned, so it can't build the playfield and never starts polling 0x2020. Keeping only
-			// the structural FullUpdate/spawn/world records leaves a clean world-entry burst (no-op on an already-clean
-			// burst, which has none of these). Vitals are dropped here and server-generated below (BuildVitals).
+			// Drop transient gameplay records (movement/combat/regen from a mid-session capture) that would feed the
+			// client movement/combat for entities that never cleanly spawned, stalling the playfield build. The
+			// importer already drops these (IirMessageTypes.IsTransientGameplay), so this is a no-op on a freshly
+			// imported burst - kept as defense-in-depth against an older/dirty burst. Vitals are server-generated
+			// below (BuildVitals).
 			var records = burst
 				.Entities
 				.OrderBy(e => e.Sequence)
-				.Where(e => !TransientGameplayIirTypes.Contains(e.IirType))
+				.Where(e => !IirMessageTypes.IsTransientGameplay(e.IirType))
 				.ToList();
 			var dropped = burst.Entities.Count - records.Count;
 			if (dropped > 0)

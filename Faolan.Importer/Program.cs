@@ -123,11 +123,15 @@ namespace Faolan.Importer
 
 				burst.CapturedInstance = e.CapturedInstance;
 				// Decompose each raw download into a structured IIR record (round-trip lossless, see IirRecordCodec),
-				// dropping the server-generated records (globals + player-state) - the server emits those on world entry.
+				// dropping records the replay never sends: the server-generated ones (globals + player-state, emitted
+				// live on world entry) and the transient gameplay events (movement/combat/regen from mid-session
+				// captures, which stall the client during entry). Storing either is pure dead weight - the replay
+				// filters them anyway - so the burst holds only the structural world build.
 				burst.Entities = e
 					.Packets
 					.Select((p, i) => IirRecordCodec.Parse(p, i))
-					.Where(r => !IirMessageTypes.IsServerGenerated(r.IirType, r.Handle, e.CapturedInstance))
+					.Where(r => !IirMessageTypes.IsServerGenerated(r.IirType, r.Handle, e.CapturedInstance)
+					            && !IirMessageTypes.IsTransientGameplay(r.IirType))
 					.ToList();
 			}
 
