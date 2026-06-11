@@ -73,6 +73,13 @@ namespace Faolan.Core.Network
 		uint Post205FF98E10B3Count { get; set; }
 		uint? LastGameServer2020RequestId { get; set; }
 		ulong GameServerInboundPacketSequence { get; set; }
+
+		// The active NPC conversation, served one STAGE at a time. A captured conversation node bundles every stage
+		// the player walked through (greeting + each option's reply); the runtime segments it into stages (each ends
+		// at a Knubot answer-list / close-window packet) so a click serves the greeting and each KnubotAnswer serves
+		// the next reply - instead of dumping the whole tree at once. Re-addressed packets, ready to send.
+		List<List<byte[]>> ConversationStages { get; set; }
+		int ConversationStageIndex { get; set; }
 	}
 
 	public sealed class NetworkClientSession : INetworkClientSession
@@ -112,5 +119,7 @@ namespace Faolan.Core.Network
 
 		public uint? LastGameServer2020RequestId { get; set; }
 		public ulong GameServerInboundPacketSequence { get; set; }
+		public List<List<byte[]>> ConversationStages { get; set; }
+		public int ConversationStageIndex { get; set; }
 	}
 }

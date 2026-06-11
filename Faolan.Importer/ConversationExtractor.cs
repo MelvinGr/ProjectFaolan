@@ -27,8 +27,11 @@ namespace Faolan.Importer
 		private const uint SpawnSubOpcode = 0xFA015807;
 		private const uint TalkToNpcActionType = 0x16;
 
-		// The conversation-display response sub-opcodes (642CD3D6 echo excluded: it is a generic interact ack).
-		private static readonly HashSet<uint> ResponseSubOpcodes = [0x4A3D899A, 0xF164A4A5, 0x045B0B0F];
+		// The Knubot conversation-display response sub-opcodes (642CD3D6 echo excluded: it is a generic interact ack):
+		// OpenChatWindow (045B0B0F), AppendText (4A3D899A), AnswerList (F164A4A5), CloseChatWindow (C4AF39EB). The
+		// close is captured too so a replayed conversation ends by closing the window (and the stage segmenter has its
+		// final terminator) instead of leaving it open.
+		private static readonly HashSet<uint> ResponseSubOpcodes = [0x4A3D899A, 0xF164A4A5, 0x045B0B0F, 0xC4AF39EB];
 
 		// `packets` must be one capture's GameServer packets in chronological order.
 		public static List<ConversationEntry> Extract(IReadOnlyList<CapturedPacket> packets)

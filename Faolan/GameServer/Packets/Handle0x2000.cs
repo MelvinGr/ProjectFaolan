@@ -169,6 +169,16 @@ namespace Faolan.GameServer
 					break;
 				}
 
+				case GameServer0X2000Opcodes.KnubotAnswer:
+				{
+					// The player picked a dialogue option: advance the active conversation by one stage (the captured
+					// node is segmented into stages; each answer serves the next reply + its options). No active
+					// conversation -> nothing to advance.
+					await SendNextConversationStage(client);
+
+					break;
+				}
+
 				case GameServer0X2000Opcodes.Interact:
 				{
 					//Logger.LogInformation($"[DUMP] Interact ({rawPayload.Length} bytes): {rawPayload.ToHex()}");

@@ -92,6 +92,7 @@
 			ScryScriptIIR = 0xa36d3b74, // = ScryScriptIIR_c: cutscene/scry scripts + char-editor callbacks (IntroDone, ChangeSex, TheNameIs, ClientLoadingDone, ...)
 			StatIIR = 0xf98e10b3, // = StatIIR_t
 			SelectDeselect = 0x0D155695, // = LookAtIIR_t
+			KnubotAnswer = 0x4D7D9123, // = KnubotAnswerIIR_c: the player picked a dialogue option (NPC chat); advances the conversation one stage
 			DropItem = 0x72491DE9, // = DeleteItemIIR_t: client-side inventory action; no matching bag-content response packet is decoded yet
 			MoveItemInInventory = 0x2A8A1B49, // = MoveInventoryItemIIR_t: client-side slot move action
 			DeleteQuest = 0x97E02314, // = QuestIIR_c

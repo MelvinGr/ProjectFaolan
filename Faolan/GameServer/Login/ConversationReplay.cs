@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
@@ -39,34 +40,100 @@ namespace Faolan.GameServer
 			if (node == null)
 				return false;
 
-			var orderedPackets = node
-				.Packets
-				.OrderBy(p => p.Sequence)
-				.Select(p => p.Data)
-				.ToList();
-
 			var liveInstance = client.Session.Account.ClientInstance;
-			Logger.LogInformation("Conversation node (typeId={TypeId}, mode={Mode}, field3={Field3}) -> {Count} packets for NPC 0x{Npc:X}.", typeId, mode, field3, orderedPackets.Count, clickedNpcHandle);
-
 			var oldInstanceVarint = EncodeVarint(node.CapturedInstance);
 			var newInstanceVarint = EncodeVarint(liveInstance);
 
-			foreach (var captured in orderedPackets)
+			// Re-address every captured packet (NPC handle + instance as raw uint32s, plus the instance varint in the
+			// receiver id) up front, then SEGMENT the node into conversation stages. A captured node bundles the whole
+			// path the player walked (greeting + every option's reply); each stage ends at a Knubot answer-list /
+			// close-window packet. We serve stage 0 now and one further stage per inbound KnubotAnswer, so the dialogue
+			// advances option -> reply -> next option instead of dumping every stage at once.
+			var readdressed = node
+				.Packets
+				.OrderBy(p => p.Sequence)
+				.Select(p =>
+				{
+					var packet = (byte[])p.Data.Clone();
+					SubstituteUInt32(packet, node.CapturedNpcHandle, clickedNpcHandle);
+					SubstituteUInt32(packet, node.CapturedInstance, liveInstance);
+					if (oldInstanceVarint.Length == newInstanceVarint.Length)
+						ReplaceAll(packet, oldInstanceVarint, newInstanceVarint);
+					return packet;
+				})
+				.ToList();
+
+			var stages = SegmentConversationStages(readdressed);
+			Logger.LogInformation("Conversation node (typeId={TypeId}, mode={Mode}, field3={Field3}) -> {Packets} packets in {Stages} stage(s) for NPC 0x{Npc:X}.", typeId, mode, field3, readdressed.Count, stages.Count, clickedNpcHandle);
+
+			client.Session.ConversationStages = stages;
+			client.Session.ConversationStageIndex = 0;
+			await SendNextConversationStage(client); // stage 0 (greeting + first answer list)
+			return true;
+		}
+
+		// The Knubot packets that END a conversation stage: an answer list (the next options) or a close-window.
+		private const uint KnubotAnswerListSubOpcode = 0xF164A4A5;
+		private const uint KnubotCloseChatWindowSubOpcode = 0xC4AF39EB;
+
+		// Splits the re-addressed node packets into stages. A stage runs up to and including the first answer-list or
+		// close-window packet; the trailing packets (a final reply with no further options) form the last stage.
+		internal static List<List<byte[]>> SegmentConversationStages(List<byte[]> packets)
+		{
+			var stages = new List<List<byte[]>>();
+			var current = new List<byte[]>();
+			foreach (var packet in packets)
 			{
-				var packet = (byte[])captured.Clone();
-
-				// NPC handle + instance appear as raw uint32s in the bodies; the instance ALSO appears as a protobuf
-				// varint in the receiver conversation id, which must be substituted in its varint form too.
-				SubstituteUInt32(packet, node.CapturedNpcHandle, clickedNpcHandle);
-				SubstituteUInt32(packet, node.CapturedInstance, liveInstance);
-				if (oldInstanceVarint.Length == newInstanceVarint.Length)
-					ReplaceAll(packet, oldInstanceVarint, newInstanceVarint);
-
-				// PacketStream.SendAsync recomputes the length + CRC, so the byte-substitution doesn't need to.
-				await new PacketStream(packet).SendAsync(client);
+				current.Add(packet);
+				var subOpcode = ConversationSubOpcode(packet);
+				if (subOpcode is KnubotAnswerListSubOpcode or KnubotCloseChatWindowSubOpcode)
+				{
+					stages.Add(current);
+					current = [];
+				}
 			}
 
+			if (current.Count > 0)
+				stages.Add(current);
+
+			return stages;
+		}
+
+		// Sends the next pending conversation stage (the player clicked the NPC, or answered an option). Returns true
+		// if a stage was sent. When the stages are exhausted, clears the session conversation and closes the window so
+		// a further answer can't hang the client.
+		internal async Task<bool> SendNextConversationStage(INetworkClient client)
+		{
+			var stages = client.Session.ConversationStages;
+			var index = client.Session.ConversationStageIndex;
+			if (stages == null || index >= stages.Count)
+			{
+				if (stages != null) // an answer past the captured path: end the conversation gracefully
+				{
+					client.Session.ConversationStages = null;
+					await SendConversationClose(client);
+				}
+
+				return false;
+			}
+
+			foreach (var packet in stages[index])
+				await new PacketStream((byte[])packet.Clone()).SendAsync(client);
+
+			client.Session.ConversationStageIndex = index + 1;
 			return true;
+		}
+
+		// The 0x2000 IIR sub-opcode (body[4:8]) of an on-wire packet, or 0 if it can't be read.
+		private static uint ConversationSubOpcode(byte[] packet)
+		{
+			if (packet.Length < 12)
+				return 0;
+
+			var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
+			return bodyStart + 8 <= packet.Length
+				? BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(bodyStart + 4, 4))
+				: 0;
 		}
 
 		// The instance baked into the captured KnubotCloseChatWindow body (hoxxling's clientInstance), re-addressed
@@ -96,6 +163,7 @@ namespace Faolan.GameServer
 		// only some states per NPC, so an un-captured branch is expected; closing the window is the right answer.)
 		internal Task SendConversationClose(INetworkClient client)
 		{
+			client.Session.ConversationStages = null; // end any active staged conversation
 			var id = client.Session.Account.ClientInstance;
 			var body = (byte[])KnubotCloseChatWindowBody.Clone();
 			SubstituteUInt32(body, CloseChatWindowCapturedInstance, id);
