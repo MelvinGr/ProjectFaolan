@@ -75,10 +75,16 @@ index and (b) lets us pull resources by **type id**.
 > extracted (`--rdb-lua` → `LuaScripts` table); a `CharacterTag` store backs `player:HasTag/AddTag`; `LuaScriptVm`
 > (MoonSharp, sandboxed) runs real scripts against a character (the full `player` API: HasTag/AddTag/HasCompletedQuest/
 > GetIntStat/Count/SpawnItem/SolveGoal/CastSpell), proven by `LuaVmTests` + `.lua run <id>` / `.tag` GM commands.
-> REMAINING: wire scripts into the conversation/quest flow (run a node's condition scripts to pick options, its effect
-> scripts on choice → drive `QuestGoal`/grants), map conversation nodes → script ids, and TextStrings(TDC2) text
-> resolution. The shipped capture-replay (stage machine + graceful close, `protocol_conversation_routing`) remains the
-> interim until the VM is wired into the live dialogue path.
+> REMAINING — and **WALLED (checked 2026-06-11):** wiring the VM into conversations/quests needs the TREE definition
+> (which node runs which script, which option → which next node, which quest has which goals). That tree is **NOT in
+> the client RDB** — inventoried all 195 types: the RDB has the SCRIPTS (LuaArchive) + TEXT (TextStrings) but no
+> conversation/quest/knubot/dialog definition type (the XML types are textures/effects/playfield/animation/combo/
+> fatality only). The tree was **server-authoritative content, never shipped to clients**, so it's not recoverable
+> from the RDB. Consequence: the VM can RUN any script (and apply effects) but we can't know which scripts retail's
+> conversations/quests used. So: capture-replay (`protocol_conversation_routing`) stays the way to reproduce captured
+> NPC dialogue; the VM is usable for HAND-AUTHORED / server-defined scripted content. Reconstructing trees from
+> captures (correlate each KnubotAnswer with the following AddTag/QuestIIR effect) is the only data-driven path, and
+> it only covers captured conversations.
 
 ### Phase 2 — targeted extraction + parse (one data type at a time, by value)
 Prioritise by payoff/effort:
