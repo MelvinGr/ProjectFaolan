@@ -109,6 +109,28 @@ namespace Faolan.GameServer
 				await GrantStartingAbilities(client);
 				// Then the post-ready world-state/quest record stream (verbatim from the Strie login capture).
 				await SendPostReadyBurst(client);
+
+				// Post-load backpack delivery (EXPERIMENTAL, off by default - FAOLAN_POSTLOAD_INVENTORY=1): the
+				// world-entry inventory snapshot (0x737A6DF9) went out VERBATIM (chat-safe). The DB-built snapshot
+				// carrying the player's real items was stashed during the burst; send it now, after the post-ready
+				// burst, when the client is out of the constrained world-load phase.
+				//
+				// PROVEN (live client, 2026-06-12): the post-load TIMING is safe - both chat servers (AgentServer +
+				// CSPlayerAgent) connect and the player spawns/moves in-world BEFORE this send, so it does NOT break
+				// the chat gate. BUT the WHOLESALE-typed snapshot itself is malformed: BuildDbInventorySnapshot
+				// rebuilds the root via FromProtobuf<ProtoFullCharacterIIR> -> ToProtobufBytes(), which drops the raw
+				// IIR subclass version byte (0x18). The client rejects it with "CoreFullPlayerCharacterIIR::
+				// ReadSubClass() Wrong IIR_t version 6144 (current is 24)", then thrashes ("Out of scratch memories")
+				// and the WatchDog kills the session. So this is gated OFF until the snapshot is built by EDITING the
+				// verbatim root IN PLACE (InventorySnapshotInspector.GetContainer/CloneEntry/SetEntry*), which
+				// preserves the IIR framing, instead of the framing-losing wholesale typed rebuild. See
+				// [[protocol_containeradditem]].
+				if (client.Session.PendingPostLoadInventory != null && Environment.GetEnvironmentVariable("FAOLAN_POSTLOAD_INVENTORY") == "1")
+				{
+					Logger.LogInformation("Sending post-load DB inventory snapshot ({Bytes} bytes) to update the backpack.", client.Session.PendingPostLoadInventory.Length);
+					await client.SendAsync(client.Session.PendingPostLoadInventory);
+				}
+				client.Session.PendingPostLoadInventory = null;
 			}
 
 			if (client.Session.Character?.Name == null)
