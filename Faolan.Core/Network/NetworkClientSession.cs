@@ -47,6 +47,11 @@ namespace Faolan.Core.Network
 		// that conversation routing keys on. Populated when the burst is replayed.
 		Dictionary<uint, string> SpawnedNpcNamesByHandle { get; }
 
+		// Live NPC entity handle -> max health (player-facing = the spawn's CharacterStats.health / 100), captured
+		// from the world-burst spawns. Combat seeds an NPC's vitals from this so its health bar matches what the
+		// client rendered from the spawn, instead of a flat placeholder. Populated alongside SpawnedNpcNamesByHandle.
+		Dictionary<uint, uint> SpawnedNpcMaxHealthByHandle { get; }
+
 		// Index of the next post-creation world cutscene chunk to send. Advanced once per client script
 		// trigger (ClientLoadingDone, StartScript, Move, IntroDone) so each chunk is sent in order.
 		int CreateWorldChunkIndex { get; set; }
@@ -105,6 +110,7 @@ namespace Faolan.Core.Network
 		}
 
 		public Dictionary<uint, string> SpawnedNpcNamesByHandle { get; } = new Dictionary<uint, string>();
+		public Dictionary<uint, uint> SpawnedNpcMaxHealthByHandle { get; } = new Dictionary<uint, uint>();
 
 		public int CreateWorldChunkIndex { get; set; }
 		public List<uint> CreateEditorObservedRequestIds { get; } = [];

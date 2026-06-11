@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
@@ -25,12 +26,24 @@ namespace Faolan.GameServer
 			});
 		}
 
+		// A target NPC's live vitals, seeded from its real spawn health (recorded when the world burst spawned it)
+		// so its health bar moves relative to the HP the client rendered; falls back to the placeholder for NPCs
+		// not spawned via the burst (e.g. the built-NPC test).
+		private EntityVitals GetOrAddNpcVitals(INetworkClient client, uint targetHandle)
+		{
+			return _combat.GetOrAdd(targetHandle, () =>
+			{
+				var maxHealth = client.Session.SpawnedNpcMaxHealthByHandle.GetValueOrDefault(targetHandle, CombatResolver.DefaultNpcMaxHealth);
+				return EntityVitals.FromMax(maxHealth, 0, maxHealth);
+			});
+		}
+
 		// Resolves an offensive cast: applies damage to the target's live vitals and pushes a 0x96B8DC59 update so
 		// its health bar moves. The ApplySpell cast itself is broadcast by the caller. Death handling (despawn + XP)
 		// is a TODO - the death/despawn packet isn't decoded yet (docs/quests-and-combat.md).
 		private async Task ResolveOffensiveCast(INetworkClient client, uint casterHandle, uint targetHandle, uint spellId)
 		{
-			var target = _combat.GetOrAdd(targetHandle, () => EntityVitals.FromMax(CombatResolver.DefaultNpcMaxHealth, 0, CombatResolver.DefaultNpcMaxHealth));
+			var target = GetOrAddNpcVitals(client, targetHandle);
 
 			var casterLevel = client.Session.Character?.Level ?? 1;
 			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel);
@@ -133,7 +146,7 @@ namespace Faolan.GameServer
 					.SendAsync(client);
 
 				// Apply to the target's live vitals and push its health bar (0x96B8DC59).
-				var target = _combat.GetOrAdd(targetHandle, () => EntityVitals.FromMax(CombatResolver.DefaultNpcMaxHealth, 0, CombatResolver.DefaultNpcMaxHealth));
+				var target = GetOrAddNpcVitals(client, targetHandle);
 				target.ApplyHealthDelta(-(int)damage);
 				await SendStatUpdate(client, target.ToVitalsBlock(), targetHandle);
 

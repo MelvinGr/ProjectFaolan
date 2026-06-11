@@ -61,9 +61,13 @@ args.SpellTarget.field2** and parses correctly — so "self" is NOT a target-par
 So our simplified ack desyncs the behaviour FSM after the first swing → the symptom. **A faithful fix = reproduce
 the retail behaviour protocol (per-swing phase, player+NPC behaviour acks, multi-result block, correct constants),
 which needs in-client iteration (the FSM's field semantics aren't fully decoded, and only the client can confirm).**
-Did NOT ship blind byte-guesses to the finicky combat path. Secondary (separate) bug also confirmed: NPC combat HP
-uses a flat placeholder (`DefaultNpcMaxHealth=100`) instead of the NPC's real spawn `CharacterStats.health` (e.g.
-6300/100 = 63 for beach mobs) — seed it from the spawn so the bar matches; lower priority than the FSM.
+Did NOT ship blind byte-guesses to the finicky combat path.
+
+**FIXED 2026-06-11 (separate, secondary bug): NPC combat HP.** Was a flat placeholder (`DefaultNpcMaxHealth=100`);
+now seeded from the NPC's real spawn `CharacterStats.health` (e.g. 6300/100 = 63 for beach mobs). The burst replay
+records each spawned NPC's max health into `Session.SpawnedNpcMaxHealthByHandle` (alongside the name), and combat
+seeds the target's vitals from it (`GetOrAddNpcVitals`), so the bar moves relative to the HP the client rendered.
+Falls back to the placeholder for NPCs not spawned via the burst. (Does NOT fix the FSM desync above — orthogonal.)
 
 **Follow-up — SPELLS are blocked on data (investigated 2026-06-09):** only *abilities* are granted. Casting
 *spells* needs the spell-grant packet, which **is not in any capture** — even a caster (`hoxxling`) only ever

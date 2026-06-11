@@ -856,6 +856,18 @@ namespace Faolan.GameServer
 			var name = ReadSpawnName(body);
 			if (name != null)
 				client.Session.SpawnedNpcNamesByHandle[handle] = name;
+
+			// Record the NPC's real max health from its spawn CharacterStats (health, else life; both ×100 on the
+			// wire), so combat seeds its vitals from this instead of the flat DefaultNpcMaxHealth placeholder - the
+			// bar then moves relative to the HP the client actually rendered from this spawn.
+			if (PlayerSpawnReader.TryReadCharacterMessage(packet[bodyStart..], out var read) && read.Message.Stats is { } stats)
+			{
+				var wireHealth = stats.Health != 0
+					? stats.Health
+					: stats.Life;
+				if (wireHealth >= 100) // ×100 scale; ignore implausibly small/absent values
+					client.Session.SpawnedNpcMaxHealthByHandle[handle] = wireHealth / 100;
+			}
 		}
 
 		// Replaces every non-overlapping occurrence of find with repl (equal length) in buffer, after the 8-byte
