@@ -320,6 +320,22 @@ namespace Faolan.Importer
 				return 0;
 			}
 
+			// --rdb-respawns: import resurrection points (type 1000090) for our maps. On-demand records are fetched
+			// from the CDN by content hash (--cdn to override the host). Isolated; touches only RespawnPoints.
+			if (args.Contains("--rdb-respawns"))
+			{
+				if (rdbDir == null)
+				{
+					await Console.Error.WriteLineAsync("--rdb-respawns needs --rdb <RDB dir>.");
+					return 1;
+				}
+
+				var cdnBase = GetOption(args, "--cdn") ?? RdbRespawnImporter.DefaultCdnBase;
+				var rr = await RdbRespawnImporter.ImportAsync(db, rdbDir, cdnBase);
+				Console.WriteLine($"RDB respawns: {rr.Points} points across {rr.Maps} maps ({rr.Empty} maps with no points, {rr.FetchFailed} fetch failures).");
+				return 0;
+			}
+
 			var before = await Snapshot(db);
 
 			if (archiveDir != null)

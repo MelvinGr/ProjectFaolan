@@ -113,7 +113,8 @@ namespace Faolan.Importer
 				var offset = BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan(d + 4, 4));
 				var size = BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan(d + 8, 4));
 
-				_entries.Add(new Entry(type, id, file, offset, size));
+				var hash = b.AsSpan(d + 28, 16).ToArray(); // 16-byte content hash = CDN path md5 for file==0xFF resources
+				_entries.Add(new Entry(type, id, file, offset, size, hash));
 			}
 		}
 
@@ -151,6 +152,8 @@ namespace Faolan.Importer
 			return output.ToArray();
 		}
 
+		public static byte[] UnwrapIOz1Public(byte[] raw) => UnwrapIOz1(raw);
+
 		private static byte[] UnwrapIOz1(byte[] raw)
 		{
 			if (raw.Length >= 8 && raw[0] == (byte)'I' && raw[1] == (byte)'O' && raw[2] == (byte)'z' && raw[3] == (byte)'1')
@@ -169,6 +172,10 @@ namespace Faolan.Importer
 			return raw;
 		}
 
-		public readonly record struct Entry(uint Type, uint Id, int File, uint Offset, uint Size);
+		public readonly record struct Entry(uint Type, uint Id, int File, uint Offset, uint Size, byte[] Hash)
+		{
+			// On-demand resources live on the CDN, not the local NN.rdbdata files (sentinel file 0xFF).
+			public bool IsLocal => File != 0xff;
+		}
 	}
 }

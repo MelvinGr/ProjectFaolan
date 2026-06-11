@@ -132,6 +132,17 @@ Significant de-risking — the tool and format are identified:
 > detail-encoding crack below. The RdbReader v5 path (which works for items, type 1000020, `file<0xFF`) can't reach
 > these. Bottom line: respawn-point coordinates exist in the RDB; extracting them is blocked on the v6 work.
 
+> **CRACKED (2026-06-11) — `file==0xFF` resources are CDN content, fetched by hash.** There is NO local v6 index to
+> crack: the resurrection content hash is in ZERO of the 28 `NN.rdbdata` files. `file==0xFF` simply means the resource
+> isn't packed locally — it's on-demand CDN content. **The le.idx 16-byte content hash IS the CDN path md5**:
+> `<gameupdate host>/upm/rdb/res/<h[0:2]>/<h[2:3]>/<h[3:]>` returns the SAME `IOz1`+zlib blob as the local store
+> (verified HTTP 200, byte-sizes match le.idx). So any `file==0xFF` resource is readable: take its le.idx hash → fetch
+> → UnwrapIOz1. `RdbReader.Entry` now exposes `Hash` + `IsLocal`. **Resurrection points DONE**: `Faolan.Importer --rdb
+> <dir> --rdb-respawns` (RdbRespawnImporter, host via `--cdn`) fetches type 1000090 for our maps, parses the XML
+> (`<resurrectionpoint name discoverable><position x y z>`; record id == playfield/map id; `discoverable="false"` =>
+> AlwaysKnown), and fills `RespawnPoints` — imported **351 points across 145 maps** (beach 4010 = 3 real points). The
+> SAME path now unlocks the other v6-gated types (the ~279 v6 maps, MONSTERDATA NPC HP, TREASUREDATA) — fetch by hash.
+
 > **Map names + ids (1070003) — EXTRACTED (2026-06-11).** `PLAYFIELDDESCRIPTIONDATA` has 520 entries; **241 are
 > v5-reachable** (file < 0xFF), 279 v6-gated. Each readable record is XML `<playfielddescriptiondata>` with
 > `<playfield Name=".." ID=".."/>` (+ `ShowInGUI`); the **RDB record id == playfield id == our `Map.Id`** (verified
