@@ -64,7 +64,7 @@ namespace Faolan
 			builder.Services.AddSingleton<IAgentServerDispatcher, AgentServerDispatcher>();
 			builder.Services.AddScopedHostedService<AgentServerListener>();
 
-			// Live seam into the GameServer listeners (creator + world ports): aggregates world sessions and routes
+			// Live seam into the GameServer listener: aggregates world sessions and routes
 			// GM commands. Mirrors the agent dispatcher; lets the MCP server spawn/teleport via validated GM paths.
 			builder.Services.AddSingleton<IGameServerDispatcher, GameServerDispatcher>();
 
@@ -92,28 +92,10 @@ namespace Faolan
 				return new GameServerListener(loggerFactory.CreateLogger($"{typeof(GameServerListener).FullName}-{realm.Id}"), configuration, dataRepository, realm.Port, agentServerDispatcher, gameServerDispatcher);
 			});
 
-			// Second GameServer listener on the WORLD port (creator port + 1). Retail runs the GameServer on two
-			// ports; the create-flow 0x2002 handoff advertises this port so the client opens a fresh world
-			// connection (HandleDisconnect redir=1) for the intro phase. See WorldGameServerListener.
-			builder.Services.AddScopedHostedService(provider =>
-			{
-				var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
-				var configuration = provider.GetRequiredService<IConfiguration>();
-				var dataRepository = provider.GetRequiredService<IDatabaseRepository>();
-				var agentServerDispatcher = provider.GetRequiredService<IAgentServerDispatcher>();
-				var gameServerDispatcher = provider.GetRequiredService<IGameServerDispatcher>();
-
-				var realm = dataRepository
-					.GetRealms()
-					.GetAwaiter()
-					.GetResult()
-					.FirstOrDefault();
-				if (realm == null)
-					throw new Exception("realm == null");
-
-				var worldPort = (ushort)(realm.Port + 1);
-				return new WorldGameServerListener(loggerFactory.CreateLogger($"{typeof(WorldGameServerListener).FullName}-{realm.Id}"), configuration, dataRepository, worldPort, agentServerDispatcher, gameServerDispatcher);
-			});
+			// A single GameServer listener serves both the create-editor connection and the post-create world
+			// connection: the 0x2002 enter-world handoff (SendWorldHandoff) advertises this same port, so the
+			// client's fresh world connection lands back here. (Retail used a separate world port = creator + 1;
+			// since the handoff carries the address explicitly, the same port works and avoids a second listener.)
 
 			var host = builder.Build();
 			await host.RunAsync();

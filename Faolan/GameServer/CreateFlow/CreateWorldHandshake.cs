@@ -184,16 +184,15 @@ namespace Faolan.GameServer
 		}
 
 		// Step 4: the enter-world handoff. The client learns the world server address ONLY from this 0x2002
-		// packet (the port is never derivable - see the protocol note). Retail advertises a DIFFERENT port
-		// here than the creator connection (e.g. creator :7027 -> world :7031); the client opens a brand-new
-		// connection to that world port, which triggers the loading screen where the intro cinematic resources
-		// load. So we advertise the WORLD port (creator port + 1), served by WorldGameServerListener, where the
-		// now-named character takes the create-world entry path. Body = [0x00][byteLen "host:port"].
+		// packet (the address is carried explicitly here, not derived). The client opens a brand-new connection
+		// to that address, which triggers the loading screen where the intro cinematic resources load. Retail used
+		// a SEPARATE world port (creator + 1); we advertise the SAME GameServer port, so the fresh connection
+		// lands back on the one GameServerListener (which serves the create-world entry path for the now-named
+		// character). Body = [0x00][byteLen "host:port"].
 		private async Task SendWorldHandoff(INetworkClient client)
 		{
 			var realm = await Database.GetRealm(client.Session.Character.RealmId);
-			var worldPort = (ushort)(realm.Port + 1);
-			var address = $"{realm.IpAddress}:{worldPort}";
+			var address = $"{realm.IpAddress}:{realm.Port}";
 
 			await new PacketStream()
 				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), 0x2002)
