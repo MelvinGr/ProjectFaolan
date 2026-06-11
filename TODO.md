@@ -47,6 +47,24 @@ the higher-level/class ones from gameplay captures - but only the starting kit i
 **Expected:** target HP visibly decreases. Damage is a provisional formula for now. If NO abilities show up at
 all, grab the client log — the grant may need to fire at a different point in the world-entry sequence.
 
+### DIAGNOSED 2026-06-11 (user: "attack executes once, then random, sometimes hits self"). NEEDS IN-CLIENT RE.
+NormalAttack (`0x642CD3D6` Interact, actionType `0xf`) is a **BehaviorControlCenter behaviour FSM**, not a one-shot.
+Traced the strickenbla combat capture: the client sends a swing per press (args field2 = a swing counter that
+increments 1,3,4,9,…; the attack DIRECTION ability id 769094/95/99 cycles in the request tail; the **target is in
+args.SpellTarget.field2** and parses correctly — so "self" is NOT a target-parse bug). The retail server's BccAck
+(`0x642CD3D6` download) is far richer than ours (`SendNormalAttackResponse`):
+- it **inserts a field3 phase** (`18 0X`) into the echoed args and bumps argsLen (+2); ours echoes verbatim.
+- its **actor word varies** — retail also acks the **NPC's own** behaviour (actor = target handle), driving the
+  mob's counter-attack/animation; ours always uses the player instance → likely the "random / self" animation.
+- result-block constant is `0x06 000000CB`; ours writes `0x000000CD` (wrong).
+- ack 3 carries **multiple** result entries (one per accumulated target in the tail); ours sends one fixed block.
+So our simplified ack desyncs the behaviour FSM after the first swing → the symptom. **A faithful fix = reproduce
+the retail behaviour protocol (per-swing phase, player+NPC behaviour acks, multi-result block, correct constants),
+which needs in-client iteration (the FSM's field semantics aren't fully decoded, and only the client can confirm).**
+Did NOT ship blind byte-guesses to the finicky combat path. Secondary (separate) bug also confirmed: NPC combat HP
+uses a flat placeholder (`DefaultNpcMaxHealth=100`) instead of the NPC's real spawn `CharacterStats.health` (e.g.
+6300/100 = 63 for beach mobs) — seed it from the spawn so the bar matches; lower priority than the FSM.
+
 **Follow-up — SPELLS are blocked on data (investigated 2026-06-09):** only *abilities* are granted. Casting
 *spells* needs the spell-grant packet, which **is not in any capture** — even a caster (`hoxxling`) only ever
 receives the same 8 abilities via 0x2052; none of the granted ids are in the `Spells` table, `SpellBookIIR`
