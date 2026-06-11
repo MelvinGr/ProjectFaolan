@@ -76,7 +76,8 @@ namespace Faolan.Tests
 			var world = new WorldState();
 			var zone = world.ZoneFor(2040);
 			zone.Add(WorldEntity.ForNpc(1, 2040, Vector3.Zero, Vector3.Zero, "Alive", EntityVitals.FromMax(50, 0, 50)));
-			zone.Add(new WorldEntity(2, 2040, true, "Player", null));
+			// Player far out of aggro range, so the living NPC neither respawns (alive) nor attacks (out of range).
+			zone.Add(new WorldEntity(2, 2040, true, "Player", null) { Position = new Vector3(1000, 0, 1000) });
 
 			Assert.Empty(world.Tick(100.0));
 		}

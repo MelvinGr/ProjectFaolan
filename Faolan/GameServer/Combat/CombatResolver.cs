@@ -27,6 +27,14 @@ namespace Faolan.GameServer.Combat
 			return 10u + lvl * 25u;
 		}
 
+		// Provisional damage an NPC's swing deals to a player, scaled by the NPC's level (mirrors ResolveSpellDamage;
+		// real NPC weapon/mitigation data isn't modelled yet). Level 0 maps to level 1.
+		public static uint ResolveNpcAttackDamage(uint npcLevel)
+		{
+			var lvl = npcLevel == 0 ? 1u : npcLevel;
+			return 5u + lvl * 3u;
+		}
+
 		public static int ResolveSpellDamage(uint spellId, ushort casterLevel)
 		{
 			var level = casterLevel == 0

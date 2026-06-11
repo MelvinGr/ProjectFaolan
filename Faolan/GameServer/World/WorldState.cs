@@ -54,10 +54,17 @@ namespace Faolan.GameServer.World
 				zone.Remove(entity.Handle);
 		}
 
+		// How close a player must be for a hostile NPC to aggro + attack (world units).
+		public const float NpcAggroRange = 20f;
+
+		// Seconds between an aggroed NPC's swings.
+		public const double NpcAttackInterval = 2.0;
+
 		// Advances the world model by `deltaSeconds` (docs/server-architecture-roadmap.md) and returns the wire-visible
 		// effects for the caller to broadcast: dead NPCs whose respawn delay elapsed (revived here - vitals + transform
-		// reset) and loot bags whose lifetime expired (to be despawned + removed). Player transforms are driven by Move
-		// packets, not the tick; NPC AI/movement joins here later.
+		// reset), loot bags whose lifetime expired (despawned + removed), and aggroed NPCs swinging at a nearby player.
+		// Player transforms are driven by Move packets, not the tick; NPC movement joins here once the MoveTask grammar
+		// lands. The model stays network-free - it reports effects and the listener turns them into packets.
 		public IReadOnlyList<WorldTickEffect> Tick(double deltaSeconds)
 		{
 			List<WorldTickEffect> effects = null;
@@ -69,15 +76,54 @@ namespace Faolan.GameServer.World
 					{
 						if (entity.TickExpiry(deltaSeconds))
 							(effects ??= new List<WorldTickEffect>()).Add(new WorldTickEffect(entity, WorldTickEffectType.LootExpired));
+						continue;
 					}
-					else if (!entity.IsPlayer && entity.TickRespawn(deltaSeconds))
+
+					if (entity.IsPlayer)
+						continue;
+
+					// A dead NPC counts down to respawn; a living one runs its AI (aggro nearest player + attack).
+					if (entity.IsDead)
 					{
-						(effects ??= new List<WorldTickEffect>()).Add(new WorldTickEffect(entity, WorldTickEffectType.NpcRespawned));
+						if (entity.TickRespawn(deltaSeconds))
+							(effects ??= new List<WorldTickEffect>()).Add(new WorldTickEffect(entity, WorldTickEffectType.NpcRespawned));
+						continue;
 					}
+
+					if (entity.Vitals == null)
+						continue;
+
+					var target = NearestPlayerInRange(zone, entity, NpcAggroRange);
+					if (target == null)
+					{
+						entity.ArmAttackCooldown(NpcAttackInterval); // re-aggro shouldn't swing instantly
+						continue;
+					}
+
+					if (entity.TickAttackReady(deltaSeconds, NpcAttackInterval))
+						(effects ??= new List<WorldTickEffect>()).Add(new WorldTickEffect(entity, WorldTickEffectType.NpcAttack, target));
 				}
 			}
 
 			return effects ?? (IReadOnlyList<WorldTickEffect>)System.Array.Empty<WorldTickEffect>();
+		}
+
+		// The closest player within `range` of the NPC (its aggro target), or null if none.
+		private static WorldEntity NearestPlayerInRange(Zone zone, WorldEntity npc, float range)
+		{
+			WorldEntity nearest = null;
+			var nearestDist = float.MaxValue;
+			foreach (var player in zone.PlayersInRange(npc.Position, range))
+			{
+				var dist = Vector3.Distance(player.Position, npc.Position);
+				if (dist < nearestDist)
+				{
+					nearestDist = dist;
+					nearest = player;
+				}
+			}
+
+			return nearest;
 		}
 	}
 }

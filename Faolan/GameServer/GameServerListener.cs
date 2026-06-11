@@ -188,6 +188,9 @@ namespace Faolan.GameServer
 								await BroadcastEntityFade(effect.Entity); // graceful fade-out (n3ToClientFade)
 								_world.Remove(effect.Entity);
 								break;
+							case World.WorldTickEffectType.NpcAttack:
+								await ApplyNpcAttack(effect.Entity, effect.Target);
+								break;
 						}
 					}
 
@@ -225,6 +228,28 @@ namespace Faolan.GameServer
 				if (changed)
 					await SendStatUpdate(client, vitals.ToVitalsBlock(), client.Session.Account.ClientInstance);
 			}
+		}
+
+		// Applies an aggroed NPC's swing to the target player: reduce the player's live vitals and push a 0x96B8DC59
+		// update so their HP bar drops. The NPC's attack ANIMATION packet isn't decoded yet (see protocol_stats_and_combat),
+		// so this delivers the damage effect only. Player death/respawn isn't implemented yet - a lethal hit is logged
+		// and the player is left at 0 HP (the regen tick will revive them toward full for now).
+		private async Task ApplyNpcAttack(World.WorldEntity npc, World.WorldEntity target)
+		{
+			var client = target?.Client;
+			if (client?.Session?.Character == null)
+				return;
+
+			var vitals = GetOrAddPlayerVitals(client);
+			if (vitals.IsDead)
+				return;
+
+			var damage = (int)Combat.CombatResolver.ResolveNpcAttackDamage(npc.Level);
+			vitals.ApplyHealthDelta(-damage);
+			await SendStatUpdate(client, vitals.ToVitalsBlock(), client.Session.Account.ClientInstance);
+
+			if (vitals.IsDead)
+				Logger.LogInformation("Combat: {Player} was killed by {Npc} (player death/respawn not yet implemented).", client.Session.Character.Name, npc.Name);
 		}
 
 		// The per-`elapsedSeconds` regen for one pool: `fraction` of max per second, scaled by elapsed. Rounds up to at

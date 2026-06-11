@@ -31,9 +31,14 @@ Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see a
 > - **Persistence** ✓ event-driven (disconnect + teleport + `.save` flushes live world state) + a 5-min autosave
 >   timer. No game loop needed for it.
 > - **Game loop** ✓ a **10 Hz base tick** (`GameTickLoop`) measuring real wall-clock dt. Continuous systems run every
->   tick with that dt (`WorldState.Tick` — respawn now, AI later); rate-based systems run via a per-behaviour
->   `TickAccumulator` at their own interval, dt-scaled (vitals regen at 1 Hz, pushes only on change). A long stall
->   fires a behaviour once with the whole elapsed (no catch-up storm). Ready for ~10–20 Hz AI/movement.
+>   tick with that dt (`WorldState.Tick`); rate-based systems run via a per-behaviour `TickAccumulator` at their own
+>   interval, dt-scaled (vitals regen at 1 Hz, pushes only on change). A long stall fires a behaviour once with the
+>   whole elapsed (no catch-up storm).
+> - **NPC AI — aggro + fight-back** ✓ on the tick a living NPC aggros the nearest player within `NpcAggroRange` (20u)
+>   and swings every `NpcAttackInterval` (2s), emitting an `NpcAttack` effect; the listener applies level-scaled damage
+>   (`ResolveNpcAttackDamage`) to the player's vitals and pushes `0x96B8DC59` so their HP bar drops. The attack
+>   ANIMATION packet is undecoded (damage effect only); **player death/respawn is the next gap** (a lethal hit is
+>   logged, the regen tick revives for now). NPC *movement* still waits on the pinned MoveTask grammar. 5 tests.
 > - **NPC death → respawn** ✓ NPC vitals live on `WorldEntity` (seeded level-scaled at zone load, world-authoritative).
 >   Combat routes NPC damage through the model (`ApplyNpcDamage`/`ResolveNpcVitals`); on death the NPC is marked dead +
 >   despawned for nearby players (`BroadcastNpcDespawn`), and `WorldState.Tick` counts down `RespawnDelaySeconds` and

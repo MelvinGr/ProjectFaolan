@@ -112,6 +112,27 @@ namespace Faolan.GameServer.World
 			return _expiryRemaining <= 0;
 		}
 
+		// Time (seconds) until this NPC may swing again; counts down while it has a target in range.
+		private double _attackCooldownRemaining;
+
+		// Advances the attack cooldown by dt; returns true (and re-arms for `interval`) when a swing is ready. Used by
+		// the AI tick so an aggroed NPC attacks at a fixed cadence regardless of the base tick rate.
+		public bool TickAttackReady(double dt, double interval)
+		{
+			_attackCooldownRemaining -= dt;
+			if (_attackCooldownRemaining > 0)
+				return false;
+
+			_attackCooldownRemaining = interval;
+			return true;
+		}
+
+		// Resets the attack cooldown (e.g. when no target is in range), so re-aggro doesn't swing instantly.
+		public void ArmAttackCooldown(double interval)
+		{
+			_attackCooldownRemaining = interval;
+		}
+
 		// Marks the entity dead (call once its vitals reach 0) and starts the respawn countdown. Idempotent per death.
 		public void MarkDead()
 		{
