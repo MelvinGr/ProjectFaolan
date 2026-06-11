@@ -122,6 +122,16 @@ Significant de-risking — the tool and format are identified:
   `NPCSPAWNDATAEXPORT=1000079` / `CONTENTSPAWNDATAEXPORT=1000077` / `TREASUREDATAEXPORT=1000083` (spawns/loot),
   `PLAYFIELDDESCRIPTIONDATA=1070003` (maps), `RESURRECTIONPOINTSEXPORT=1000090`, `CHARACTERCREATOR=1010700`,
   plus media (PNG/JPEG/FCTX/OGG/LIP). **There is NO explicit ITEM type in the enum** (it's a partial list) —
+
+> **Resurrection points (1000090) — present but v6-gated (checked 2026-06-11).** `le.idx` (v5) has **1024**
+> `RESURRECTIONPOINTSEXPORT` entries (sizes ~148–350 B = room for map id + coords + name), but their detail records
+> carry **`file=0xFF` (sentinel, not in the numbered `NN.rdbdata`)** + a **16-byte content hash**
+> (e.g. `d90f6ce15e8c6b48c0e761980e6072ee`). That hash resolves in **`RDBHashIndex.bin` (v6, RDHI)** — its 32-byte
+> detail record is `[size:u32][pad][16-byte hash][trailing 8B]`, size matching le.idx. So the data IS local and
+> locatable, but reading the bytes needs the **v6 content-addressed resolution (hash → blob offset)** = the open v6
+> detail-encoding crack below. The RdbReader v5 path (which works for items, type 1000020, `file<0xFF`) can't reach
+> these. Bottom line: respawn-point coordinates exist in the RDB; extracting them is blocked on the v6 work.
+
   finding the item-template type id is an early task (sample types not in the enum; cross-ref the known captured
   health-potion template 180450 / archetype `0x4847505A`).
 - **v5/v7 index format** (from rdbreader.cpp): header = `magic(4) + version(u32) + hash1..hash4(4×u32) +
