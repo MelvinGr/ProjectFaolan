@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,6 +28,16 @@ namespace Faolan.GameServer
 		private static readonly HashSet<uint> PendingCreateWorldEntry = [];
 		private readonly IAgentServerDispatcher _agentServerDispatcher;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
+
+		// The live in-memory world (docs/server-architecture-roadmap.md). Players are registered on world entry,
+		// their position updated on Move, and removed on disconnect. Currently bookkeeping + interest queries; the
+		// interest-managed cross-player broadcast (so two players see each other) is the next step.
+		private readonly World.WorldState _world = new World.WorldState();
+		private readonly System.Collections.Concurrent.ConcurrentDictionary<INetworkClient, World.WorldEntity> _playerEntities =
+			new System.Collections.Concurrent.ConcurrentDictionary<INetworkClient, World.WorldEntity>();
+
+		// How far a player perceives other players (world-entity interest radius; wider than say range).
+		private const float PlayerInterestRange = 150f;
 
 		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, ushort port, IAgentServerDispatcher agentServerDispatcher, IGameServerDispatcher gameServerDispatcher) : base(port, logger, configuration, database,
 			new ConanOutgoingPacketLogger(logger, "GameServer", typeof(GameServerRespondOpcodes), typeof(GameServer0X2000RespondsOpcodes)))
@@ -63,6 +74,43 @@ namespace Faolan.GameServer
 			}
 
 			return ids;
+		}
+
+		// Registers (or relocates) the player in the live world after world entry, so the shared model reflects who is
+		// actually in each map. Idempotent: re-entry/teleport reuses the same entity.
+		private void RegisterPlayerInWorld(INetworkClient client)
+		{
+			var character = client.Session?.Character;
+			if (character == null)
+				return;
+
+			var handle = client.Session.Account.ClientInstance;
+			var entity = _playerEntities.GetOrAdd(client, _ => new World.WorldEntity(handle, character.MapId, true, character.Name ?? $"Character{handle}", client));
+			var zone = _world.Place(entity, character.MapId, character.Position, character.Rotation);
+			var nearby = zone.PlayersInRange(character.Position, PlayerInterestRange, handle).Count();
+			Logger.LogInformation("World: player {Name} (0x{Handle:X8}) entered map {Map} at {Pos}; {Nearby} other player(s) in range.", entity.Name, handle, character.MapId, character.Position, nearby);
+		}
+
+		// Updates the player's live world position/rotation on Move (bookkeeping; the interest-managed broadcast to
+		// nearby players is the next step).
+		private void UpdatePlayerWorldPosition(INetworkClient client)
+		{
+			var character = client.Session?.Character;
+			if (character == null || !_playerEntities.TryGetValue(client, out var entity))
+				return;
+
+			_world.Place(entity, character.MapId, character.Position, character.Rotation);
+		}
+
+		protected override void ClientDisconnected(INetworkClient client)
+		{
+			if (_playerEntities.TryRemove(client, out var entity))
+			{
+				_world.Remove(entity);
+				Logger.LogInformation("World: player {Name} (0x{Handle:X8}) left map {Map}.", entity.Name, entity.Handle, entity.MapId);
+			}
+
+			base.ClientDisconnected(client);
 		}
 
 		public override Task StartAsync(CancellationToken cancellationToken)

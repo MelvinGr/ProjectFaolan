@@ -461,6 +461,9 @@ namespace Faolan.GameServer
 				? "own map"
 				: $"beach fallback (map {worldBurst.MapId})");
 			await ReplayMapWorldBurst(client, worldBurst);
+
+			// The player is now in the world - register them in the live model (docs/server-architecture-roadmap.md).
+			RegisterPlayerInWorld(client);
 		}
 
 		// If the burst packet is the player's own entity Spawn (FA015807 whose handle is the client instance),

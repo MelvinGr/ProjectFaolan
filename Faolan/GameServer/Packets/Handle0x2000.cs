@@ -112,6 +112,10 @@ namespace Faolan.GameServer
 							sessionCharacter.Rotation = packet.Body.ReadVector3(); // not sure if this is correct
 							var datadat = packet.Body.ReadRemainingArray();
 
+							// Keep the live world model in sync (docs/server-architecture-roadmap.md). Interest-managed
+							// broadcast of this move to nearby players is the next step; for now this is bookkeeping.
+							UpdatePlayerWorldPosition(client);
+
 							// send to all (nearby) clients? (single client for now -> the session conversation;
 							// retail's move broadcast uses sender 0d13ce71b110 58 + receiver = the moving entity's
 							// instance, confirmed across Strie/dikketest/demol80 captures)
