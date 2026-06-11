@@ -305,6 +305,12 @@ namespace Faolan.GameServer
 			var liveInstance = client.Session.Account.ClientInstance;
 			Logger.LogInformation("Replaying world burst for map {Map} ({Count} packets, instance {Old:X8} -> {New:X8}).", burst.MapId, packets.Count, capturedInstance, liveInstance);
 
+			// Record this playfield's despawn token from its 0x737A6DF9 snapshot tail (preserved verbatim in our
+			// regenerated snapshot), so n3ToClientQuit removals carry the value the client learned here (WorldDespawn).
+			var fullChar = records.FirstOrDefault(e => e.IirType == IirMessageTypes.FullChar);
+			if (fullChar?.Body != null)
+				CapturePlayfieldToken(burst.MapId, fullChar.Body);
+
 			client.Session.UsedWorldBurstReplay = true;
 
 			// Phase 5b: drive the inventory from the character's CharacterEquipment. Beach characters are seeded with

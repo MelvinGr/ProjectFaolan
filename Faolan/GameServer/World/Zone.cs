@@ -20,6 +20,12 @@ namespace Faolan.GameServer.World
 
 		public uint MapId { get; }
 
+		// The per-playfield-instance token the client associated with this zone at world entry (the value woven into
+		// the 0x737A6DF9 snapshot tail; see WorldDespawn). Stamped into every despawn so the client scopes the removal
+		// to this playfield. Extracted from the burst we actually send (WorldDespawn.TryExtractPlayfieldToken); 0 until
+		// known, in which case the broadcaster skips the despawn rather than guess.
+		public uint PlayfieldToken { get; set; }
+
 		public int Count => _entities.Count;
 
 		public IReadOnlyCollection<WorldEntity> Entities => _entities.Values.ToArray();

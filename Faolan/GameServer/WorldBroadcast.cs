@@ -42,7 +42,7 @@ namespace Faolan.GameServer
 						await SendWorldMove(recipient, move.Value);
 						break;
 					case InterestEventType.Despawn:
-						Logger.LogDebug("World: TODO despawn {Subject:X8} for {Recipient:X8} (remove packet not built yet).", ev.Subject.Handle, ev.Recipient.Handle);
+						await SendWorldDespawn(recipient, ev.Recipient.MapId, ev.Subject.Handle);
 						break;
 				}
 			}
@@ -63,6 +63,26 @@ namespace Faolan.GameServer
 			return new PacketStream()
 				.WriteHeader(LoginWorldSender, LoginWorldReceiver(recipient), 0x2000)
 				.WriteArray(body)
+				.SendAsync(recipient);
+		}
+
+		// Removes the subject from `recipient`'s view - the n3ToClientQuit despawn (WorldDespawn). Stamped with the
+		// recipient zone's playfield token (what the client learned at entry); if that token is unknown (0) we skip
+		// rather than send a guessed value, leaving a traceable log (a stale ghost is better than a malformed packet).
+		// NEEDS IN-CLIENT VERIFICATION with two players (the only open question is whether the client enforces the
+		// token match or removes regardless).
+		private Task SendWorldDespawn(INetworkClient recipient, uint recipientMapId, uint subjectHandle)
+		{
+			var token = _world.ZoneFor(recipientMapId).PlayfieldToken;
+			if (token == 0)
+			{
+				Logger.LogDebug("World: skip despawn {Subject:X8} for a viewer on map {Map} (playfield token unknown).", subjectHandle, recipientMapId);
+				return Task.CompletedTask;
+			}
+
+			return new PacketStream()
+				.WriteHeader(LoginWorldSender, LoginWorldReceiver(recipient), 0x2000)
+				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(subjectHandle, token)))
 				.SendAsync(recipient);
 		}
 
@@ -138,6 +158,31 @@ namespace Faolan.GameServer
 
 			var events = InterestManager.ResolveMove(_world.ZoneFor(entity.MapId), entity, PlayerInterestRange);
 			await DispatchInterest(events, move: null);
+		}
+
+		// On disconnect/logout: despawn the leaving player for everyone who could see it (n3ToClientQuit), before it is
+		// removed from the zone. Returns the dispatch task so the caller can fire-and-forget (the connection is going
+		// away). Single-player is a no-op (no viewers).
+		private Task BroadcastPlayerDespawn(WorldEntity leaver)
+		{
+			var events = InterestManager.ResolveRemove(_world.ZoneFor(leaver.MapId), leaver);
+			return DispatchInterest(events, move: null);
+		}
+
+		// Records the playfield token the client will associate with this zone, read from the 0x737A6DF9 snapshot we
+		// actually send (so the despawn token matches what the client learned, by construction; see WorldDespawn).
+		// Idempotent - the token is constant per playfield.
+		private void CapturePlayfieldToken(uint mapId, ReadOnlySpan<byte> snapshotBody)
+		{
+			var zone = _world.ZoneFor(mapId);
+			if (zone.PlayfieldToken != 0)
+				return;
+
+			if (WorldDespawn.TryExtractPlayfieldToken(snapshotBody, out var token))
+			{
+				zone.PlayfieldToken = token;
+				Logger.LogInformation("World: map {Map} playfield token = 0x{Token:X8} (despawns enabled).", mapId, token);
+			}
 		}
 	}
 }

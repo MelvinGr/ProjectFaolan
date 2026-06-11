@@ -1,0 +1,59 @@
+using System;
+using System.Buffers.Binary;
+
+namespace Faolan.GameServer.World
+{
+	// The despawn / "entity left your view" packet - n3ToClientQuit (0x04B82B2D). DECODED 2026-06-11 from all 3271
+	// retail records (server->client only); see protocol_despawn_n3toclientquit. The 0x2000 IIR body is:
+	//   [subop=04B82B2D][typeTag/ack=0000C350][handle = entity to remove][0x01 marker][u32 playfield-instance token]
+	// The marker is always 0x01. The token is NOT a handle - it's the per-playfield id the server announces at
+	// world-entry (woven into the 0x737A6DF9 snapshot tails, between markers 000000BF and 0000040B) and stamps into
+	// every despawn so the client scopes the removal to that playfield instance. We extract it from the snapshot we
+	// actually send (TryExtractPlayfieldToken), so the despawn token matches what the client learned, by construction.
+	public static class WorldDespawn
+	{
+		public const uint SubOpcode = 0x04B82B2D; // n3ToClientQuitIIR_t
+		public const uint TypeTagAck = 0x0000C350; // the ack TypeTag shared by the IIR record family
+		private const byte RecordMarker = 0x01; // constant in 3271/3271 records (record-count / type marker)
+
+		// The markers that bracket the playfield token inside the 0x737A6DF9 snapshot tail: ...000000BF <token> 0000040B
+		// (verified identical in the seeded beach burst (token 0x004FE428) and the hoxxling gameplay capture (0x01EA985C)).
+		private static readonly byte[] TokenPrefixMarker = { 0x00, 0x00, 0x00, 0xBF };
+		private static readonly byte[] TokenSuffixMarker = { 0x00, 0x00, 0x04, 0x0B };
+
+		// Builds the 17-byte IIR body (the bytes after the u32 length prefix) for removing `handle` in playfield `token`.
+		public static byte[] BuildBody(uint handle, uint token)
+		{
+			var body = new byte[17];
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), SubOpcode);
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), TypeTagAck);
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), handle);
+			body[12] = RecordMarker;
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(13, 4), token);
+			return body;
+		}
+
+		// Finds the playfield token in a 0x737A6DF9 snapshot body: the 4 bytes framed by 000000BF ... 0000040B
+		// (prefix immediately precedes the token, suffix immediately follows it). Returns false if the framing isn't
+		// present (then we don't know the token and must not send a despawn with a guessed value).
+		public static bool TryExtractPlayfieldToken(ReadOnlySpan<byte> snapshotBody, out uint token)
+		{
+			token = 0;
+			var i = snapshotBody.IndexOf(TokenPrefixMarker);
+			while (i >= 0 && i + 12 <= snapshotBody.Length)
+			{
+				var tokenStart = i + 4;
+				if (snapshotBody.Slice(tokenStart + 4, 4).SequenceEqual(TokenSuffixMarker))
+				{
+					token = BinaryPrimitives.ReadUInt32BigEndian(snapshotBody.Slice(tokenStart, 4));
+					return true;
+				}
+
+				var next = snapshotBody.Slice(i + 1).IndexOf(TokenPrefixMarker);
+				i = next < 0 ? -1 : i + 1 + next;
+			}
+
+			return false;
+		}
+	}
+}

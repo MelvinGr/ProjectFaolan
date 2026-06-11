@@ -112,6 +112,10 @@ namespace Faolan.GameServer
 		{
 			if (_playerEntities.TryRemove(client, out var entity))
 			{
+				// Tell everyone who could see this player that it left (n3ToClientQuit), then drop it from the zone.
+				// Fire-and-forget: the connection is going away so we can't await. Despawn first so ResolveRemove still
+				// sees the leaver's viewers.
+				_ = BroadcastPlayerDespawn(entity);
 				_world.Remove(entity);
 				// Persist the player's final live state - movement isn't otherwise saved, so without this a logout
 				// loses where they were. Fire-and-forget: the connection is going away so we can't await; logged.

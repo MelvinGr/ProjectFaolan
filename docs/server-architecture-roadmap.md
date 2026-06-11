@@ -12,8 +12,19 @@ Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see a
 > - **In-memory world model** ✓ `WorldEntity`/`Zone`/`WorldState`; players registered on entry, removed on
 >   disconnect. **`WorldEntity` is the single source of truth for live transform**; `Character` is the persisted seed.
 > - **Interest management** ✓ `InterestManager` (spawn/move/despawn diff, unit-tested) + the cross-player broadcast
->   (capture each player's spawn body, re-frame per recipient, forward moves) — **NEEDS 2-client in-client check**;
->   despawn packet not built yet (ghost on leave/disconnect).
+>   (capture each player's spawn body, re-frame per recipient, forward moves) — **NEEDS 2-client in-client check**.
+>   **Despawn (`n3ToClientQuit` 0x04B82B2D) now DECODED** (2026-06-11, all 3271 records): 21 B,
+>   `[len=0x11][04b82b2d][ack=0000c350][handle = entity to remove][0x01 marker][u32 playfield-instance token]`. The
+>   token is *not* a handle — it's the per-playfield id the server announces at world-entry (`0x1A07` init + once in
+>   the world-burst playfield header) and stamps into every despawn; a server-global monotonic counter (two pools:
+>   `0x004f–0x0050xxxx` / `0x01eaxxxx`), constant per session, new on map change. **Buildable:** we replay the burst
+>   verbatim, so the client already learned the captured token (beach = `0x004fe428`) — a despawn reuses it.
+>   **Despawn now WIRED** (`WorldDespawn.BuildBody` + `SendWorldDespawn`): emitted on disconnect
+>   (`BroadcastPlayerDespawn` in `ClientDisconnected`) and on range-out (the `Despawn` branch of `DispatchInterest`).
+>   The playfield token is extracted at entry from the `0x737A6DF9` snapshot we send (framed by `000000BF`…`0000040B`,
+>   `WorldDespawn.TryExtractPlayfieldToken` → `Zone.PlayfieldToken`), so it matches what the client learned by
+>   construction; if unknown (0) the broadcaster skips rather than guess. 4 unit tests. Still **2-client in-client
+>   gated** on the one open question: whether the client enforces the token match or removes regardless.
 > - **Persistence** ✓ event-driven (disconnect + teleport + `.save` flushes live world state) + a 5-min autosave
 >   timer. No game loop needed for it.
 > - **Game loop** ✓ a 1 Hz fixed tick (`GameTickLoop`) → `WorldState.Tick(dt)` (NPC-AI seam, no-op today) +
