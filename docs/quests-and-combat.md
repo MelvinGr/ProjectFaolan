@@ -162,9 +162,13 @@ Quest state is driven by four IIR records (decoded from `hoxxling-login-gameplay
 
 **Built:** `WorldQuest` (byte-exact `QuestIIR`/`QuestGoal` builders) + a `CharacterQuest` table (per-character
 quest id + state + goal progress, migration `AddCharacterQuests`) + repo upsert/remove + restore-on-login
-(`RestorePlayerQuests`) + a `.quest add|remove|list` GM command. This is the quest STATE foundation; the
-accept-from-dialogue trigger, objective auto-tracking (e.g. on kill), rewards/turn-in (`0xA36D3B74 QuestRewards`),
-and branching are the pinned RDB Lua quest VM ([[protocol_conversation_routing]]).
+(`RestorePlayerQuests`) + a `.quest add|remove|list` GM command. This is the quest STATE foundation. **Objective auto-tracking on kill is wired**: `CharacterQuest.GoalTargetName`
+(+ `GoalProgress`/`GoalRequired`) holds a kill objective; the NPC-death path calls `AdvanceKillQuests`, which
+(`QuestProgress.AdvancesOnKill`) bumps any active quest whose target matches the slain NPC, pushes `QuestGoal`,
+persists, and completes at the required count (state + system message). The objective target/count is set when the
+quest is added (`.quest add <id> [count] [target...]`) since the real definitions are the pinned RDB Lua quest VM.
+Remaining VM pieces: accept-from-dialogue trigger, rewards/turn-in (`0xA36D3B74 QuestRewards`), branching,
+QuestFullUpdate replay ([[protocol_conversation_routing]]).
 
 ## Next steps
 - Confirm ApplySpell magnitude sign/scale and whether damage is in the cast or only in the following vitals

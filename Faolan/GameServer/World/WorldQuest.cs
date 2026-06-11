@@ -1,8 +1,23 @@
 using System;
 using System.Buffers.Binary;
+using Faolan.Core.Database.Tables;
 
 namespace Faolan.GameServer.World
 {
+	// Pure quest objective-tracking rules (docs/quests-and-combat.md) - testable without the DB/network.
+	public static class QuestProgress
+	{
+		// True if killing an NPC named `npcName` advances this quest's kill objective (active, matching, not yet done).
+		public static bool AdvancesOnKill(CharacterQuest quest, string npcName)
+		{
+			return quest.State == QuestState.Active
+			       && !string.IsNullOrEmpty(quest.GoalTargetName)
+			       && !string.IsNullOrEmpty(npcName)
+			       && quest.GoalTargetName.Equals(npcName, StringComparison.OrdinalIgnoreCase)
+			       && quest.GoalProgress < quest.GoalRequired;
+		}
+	}
+
 	// Quest state packets, decoded from captures (docs/quests-and-combat.md). These build the 0x2000 IIR record
 	// bodies (after the u32 length prefix). Quest text (title/desc/journal) is NOT sent here - the client renders it
 	// from its RDB by quest id; the server only drives quest STATE + objective progress. The full accept/branch logic

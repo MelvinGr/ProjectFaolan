@@ -181,10 +181,19 @@ namespace Faolan.GameServer
 			switch (sub)
 			{
 				case "add":
-					await Database.SetCharacterQuest(characterId, questId, Core.Database.Tables.QuestState.Active);
+				{
+					// .quest add <id> [count] [target name...] - optional kill objective: kill <count> of <target>.
+					var required = parts.Length > 2 && uint.TryParse(parts[2], out var c) ? c : 0;
+					var target = parts.Length > 3 ? string.Join(' ', parts.Skip(3)) : null;
+					await Database.SetCharacterQuest(characterId, questId, Core.Database.Tables.QuestState.Active, 0, required, target);
 					await SendQuestIir(client, questId, World.WorldQuest.StateActive);
-					await _agentServerDispatcher.SendSystemMessage(characterId, $"Quest {questId} added to journal.");
+					if (required > 0)
+						await SendQuestGoal(client, questId, 0, 0);
+					await _agentServerDispatcher.SendSystemMessage(characterId, target != null
+						? $"Quest {questId} added: kill {required} {target}."
+						: $"Quest {questId} added to journal.");
 					break;
+				}
 				case "remove":
 					await Database.RemoveCharacterQuest(characterId, questId);
 					await _agentServerDispatcher.SendSystemMessage(characterId, $"Quest {questId} removed.");

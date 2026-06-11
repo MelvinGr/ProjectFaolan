@@ -50,7 +50,7 @@ namespace Faolan.Core.Database
 		Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId);
 		Task DiscoverRespawnPoint(uint characterId, uint respawnPointId);
 		Task<CharacterQuest[]> GetCharacterQuests(uint characterId);
-		Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0);
+		Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0, string goalTargetName = null);
 		Task RemoveCharacterQuest(uint characterId, uint questId);
 		Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names);
 
@@ -457,7 +457,7 @@ namespace Faolan.Core.Database
 		}
 
 		// Upserts a character's quest state/progress.
-		public async Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0)
+		public async Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0, string goalTargetName = null)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var row = await ctx.CharacterQuests.FirstOrDefaultAsync(q => q.CharacterId == characterId && q.QuestId == questId);
@@ -469,7 +469,8 @@ namespace Faolan.Core.Database
 					QuestId = questId,
 					State = state,
 					GoalProgress = goalProgress,
-					GoalRequired = goalRequired
+					GoalRequired = goalRequired,
+					GoalTargetName = goalTargetName
 				});
 			}
 			else
@@ -477,6 +478,7 @@ namespace Faolan.Core.Database
 				row.State = state;
 				row.GoalProgress = goalProgress;
 				row.GoalRequired = goalRequired;
+				row.GoalTargetName = goalTargetName;
 			}
 
 			await ctx.SaveChangesAsync();

@@ -91,11 +91,41 @@ namespace Faolan.GameServer
 				Logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); despawned, respawns in {Delay}s.", npcEntity.Name, targetHandle, cause, npcEntity.RespawnDelaySeconds);
 				await AwardKillXp(killer, npcEntity.Level);
 				await TrySpawnLoot(npcEntity);
+				await AdvanceKillQuests(killer, npcEntity.Name);
 				return;
 			}
 
 			Logger.LogInformation("Combat: entity 0x{Target:X8} killed ({Cause}); not in world model, no respawn.", targetHandle, cause);
 			_combat.Remove(targetHandle);
+		}
+
+		// Advances the killer's quest kill-objectives for an NPC of `npcName`: any active quest whose GoalTargetName
+		// matches gets GoalProgress++ (persisted) and a QuestGoal push; reaching GoalRequired completes it (state +
+		// system message). The objective DEFINITIONS (target/count) are set when the quest is added (the pinned RDB
+		// Lua VM would set them); this is the auto-tracking engine on top.
+		private async Task AdvanceKillQuests(INetworkClient killer, string npcName)
+		{
+			var character = killer?.Session?.Character;
+			if (character == null || string.IsNullOrEmpty(npcName))
+				return;
+
+			foreach (var quest in await Database.GetCharacterQuests(character.Id))
+			{
+				if (!World.QuestProgress.AdvancesOnKill(quest, npcName))
+					continue;
+
+				var progress = quest.GoalProgress + 1;
+				var completed = progress >= quest.GoalRequired;
+				await Database.SetCharacterQuest(character.Id, quest.QuestId,
+					completed ? Core.Database.Tables.QuestState.Completed : Core.Database.Tables.QuestState.Active,
+					progress, quest.GoalRequired, quest.GoalTargetName);
+				await SendQuestGoal(killer, quest.QuestId, 0, progress);
+
+				if (completed)
+					await _agentServerDispatcher.SendSystemMessage(character.Id, $"Quest {quest.QuestId} complete!");
+				else
+					await _agentServerDispatcher.SendSystemMessage(character.Id, $"{npcName} slain ({progress}/{quest.GoalRequired}).");
+			}
 		}
 
 		// Awards the killer XP for a kill, advancing levels when the XP bar fills (LevelingResolver), and pushes a

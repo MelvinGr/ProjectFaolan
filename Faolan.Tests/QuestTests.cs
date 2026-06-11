@@ -1,3 +1,4 @@
+using Faolan.Core.Database.Tables;
 using Faolan.GameServer.World;
 using Xunit;
 
@@ -23,6 +24,25 @@ namespace Faolan.Tests
 			Assert.Equal(
 				"0774c8c10000c35001316e7101000034a700001670000000010000000000000000",
 				System.Convert.ToHexString(body).ToLowerInvariant());
+		}
+
+		private static CharacterQuest KillQuest(string target, uint progress, uint required, QuestState state = QuestState.Active) =>
+			new CharacterQuest { QuestId = 1, State = state, GoalTargetName = target, GoalProgress = progress, GoalRequired = required };
+
+		[Fact]
+		public void AdvancesOnKill_MatchesActiveIncompleteTarget()
+		{
+			Assert.True(QuestProgress.AdvancesOnKill(KillQuest("Scavenger Lackey", 0, 5), "Scavenger Lackey"));
+			Assert.True(QuestProgress.AdvancesOnKill(KillQuest("Scavenger Lackey", 4, 5), "scavenger lackey")); // case-insensitive
+		}
+
+		[Fact]
+		public void AdvancesOnKill_RejectsNonMatching()
+		{
+			Assert.False(QuestProgress.AdvancesOnKill(KillQuest("Scavenger Lackey", 0, 5), "Wolf")); // wrong target
+			Assert.False(QuestProgress.AdvancesOnKill(KillQuest("Scavenger Lackey", 5, 5), "Scavenger Lackey")); // already done
+			Assert.False(QuestProgress.AdvancesOnKill(KillQuest("Scavenger Lackey", 0, 5, QuestState.Completed), "Scavenger Lackey")); // completed
+			Assert.False(QuestProgress.AdvancesOnKill(KillQuest(null, 0, 5), "Scavenger Lackey")); // no kill objective
 		}
 	}
 }
