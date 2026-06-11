@@ -9,6 +9,7 @@ namespace Faolan.Core.Enums
 		SwitchWeaponsButton = 0x2e,
 		RightClickItem = 0x0e,
 		SummonMount = 0xa,
+		UseObject = 0x12, // startobjectaction(18): use a world object (e.g. open a loot bag / chest)
 		TalkToNpc = 0x16 // interacting with / talking to an NPC (opens its conversation)
 	}
 }

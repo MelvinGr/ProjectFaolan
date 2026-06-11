@@ -45,6 +45,26 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void BuildNewCurrentLooterBody_MatchesCapture()
+		{
+			// hoxxling-login-gameplay: bag 0x000021FE -> looter player 0x01316E71.
+			var body = WorldLoot.BuildNewCurrentLooterBody(0x000021FE, 0x01316E71);
+			Assert.Equal(
+				"d06568c80000c87a000021fe000000c35001316e71",
+				System.Convert.ToHexString(body).ToLowerInvariant());
+		}
+
+		[Fact]
+		public void BuildFadeBody_MatchesCapture()
+		{
+			// hoxxling-login-gameplay: fade bag 0x000021FE over 3.0s (0x40400000 big-endian float).
+			var body = WorldLoot.BuildFadeBody(WorldLoot.LootTypeTag, 0x000021FE, 3.0f);
+			Assert.Equal(
+				"66180b200000c87a000021fe0040400000",
+				System.Convert.ToHexString(body).ToLowerInvariant());
+		}
+
+		[Fact]
 		public void WorldStateTick_ExpiresLootAndReportsIt()
 		{
 			var world = new WorldState();

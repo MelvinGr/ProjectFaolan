@@ -45,12 +45,14 @@ Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see a
 >   (and on a ding `Level` + full vitals) via `0x96B8DC59`. Persists via the usual save points.
 > - **Loot on kill** ✓ a kill may drop a loot bag (`LootResolver` coin-flip): a world object (`LootBagFullUpdateIIR_c`
 >   0xF096251E) built from a captured "Bag of loot" row at the death spot with a fresh handle, added to the zone +
->   spawned for nearby players, and expired off the tick (`WorldState.Tick` → `LootExpired` → despawn + remove). 4
->   tests. **Looting the bag (open → contents → take) is the remaining piece** (`lootbag_open` 0x642CD3D6 →
->   `LootRemoveItemsIIR_c` 0x70010162 → grant item) — that interaction protocol needs decoding (gated). Level-up
->   (XP curve → `Level++` + `MaxStats` recompute) is the other open progression piece.
-> **NEXT:** loot open/take interaction + level-up; then NPC AI movement (the pinned MoveTask patrol grammar) so the
-> tick drives motion and the burst becomes a pure seed — where the loop and "construct, don't replay" meet. Then quests.
+>   spawned for nearby players. The full open interaction is DECODED (`protocol_loot_interaction`,
+>   `docs/quests-and-combat.md`) and the **open handshake is wired**: using a bag (`Interact` action `0x12` = `UseObject`)
+>   → `NewCurrentLooter` (0xD06568C8) → fade the bag (`n3ToClientFade` 0x66180B20, the graceful despawn) + remove. Loot
+>   expiry now fades too. Packet builders (`WorldLoot`) are byte-exact vs the capture. **The item GRANT
+>   (`ContainerAddItem` 0x79F8C7A1/0x63268258 into live inventory) is the remaining, heavy/in-client-gated piece** — no
+>   live inventory-add path exists yet.
+> **NEXT:** the loot item-grant (live ContainerAddItem); then NPC AI movement (the pinned MoveTask patrol grammar) so
+> the tick drives motion and the burst becomes a pure seed — where the loop and "construct, don't replay" meet. Then quests.
 
 ## What we already have (strong foundation)
 

@@ -305,6 +305,15 @@ namespace Faolan.GameServer
 								break;
 							}
 
+							case ActionType.UseObject:
+							{
+								// Using a world object - the loot path: `target` is the object handle (its typetag,
+								// 0xC87A for loot bags, rides in `from`). Opens the bag if it's a loot bag in the zone.
+								await OpenLootBag(client, target);
+
+								break;
+							}
+
 							case ActionType.TalkToNpc:
 							{
 								// The clicked NPC's entity handle rides in the interact args (field 10 / field 2);

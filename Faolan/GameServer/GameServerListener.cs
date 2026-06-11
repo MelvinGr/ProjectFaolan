@@ -185,7 +185,7 @@ namespace Faolan.GameServer
 								await BroadcastNpcRespawn(effect.Entity);
 								break;
 							case World.WorldTickEffectType.LootExpired:
-								await BroadcastEntityDespawn(effect.Entity);
+								await BroadcastEntityFade(effect.Entity); // graceful fade-out (n3ToClientFade)
 								_world.Remove(effect.Entity);
 								break;
 						}

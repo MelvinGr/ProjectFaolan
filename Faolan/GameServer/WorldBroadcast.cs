@@ -196,6 +196,45 @@ namespace Faolan.GameServer
 			}
 		}
 
+		// A player used (opened) a world object. If it's a loot bag in their zone, run the loot interaction: assign the
+		// player as the current looter, then consume the bag - fade it out for nearby players and remove it from the
+		// zone. The item GRANT (ContainerAddItem into the player's inventory) is the remaining, in-client-gated piece;
+		// for now opening a bag assigns + consumes it (the decoded handshake). No-op for non-loot / unknown objects.
+		private async Task OpenLootBag(INetworkClient client, uint objectHandle)
+		{
+			var player = PlayerWorldEntity(client);
+			if (player == null || !_world.ZoneFor(player.MapId).TryGet(objectHandle, out var bag) || !bag.IsLoot)
+				return;
+
+			// You are the looter.
+			await new PacketStream()
+				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x2000)
+				.WriteArrayUInt32Length(s => s.WriteArray(World.WorldLoot.BuildNewCurrentLooterBody(bag.Handle, player.Handle)))
+				.SendAsync(client);
+
+			Logger.LogInformation("Loot: {Name} opened {Bag} 0x{Handle:X8} (item grant pending); fading the bag.", player.Name, bag.Name, bag.Handle);
+
+			// Consume the bag: fade it for everyone who can see it, then drop it from the model.
+			await BroadcastEntityFade(bag);
+			_world.Remove(bag);
+		}
+
+		// Fade an entity out for every player in range (n3ToClientFadeIIR_t) - the graceful despawn used for loot bags
+		// (consumed or expired). Loot bags carry the 0xC87A typetag.
+		private async Task BroadcastEntityFade(WorldEntity entity)
+		{
+			var body = World.WorldLoot.BuildFadeBody(World.WorldLoot.LootTypeTag, entity.Handle, World.WorldLoot.DefaultFadeSeconds);
+			foreach (var viewer in _world.ZoneFor(entity.MapId).PlayersInRange(entity.Position, PlayerInterestRange))
+			{
+				if (viewer.Client == null)
+					continue;
+				await new PacketStream()
+					.WriteHeader(LoginWorldSender, LoginWorldReceiver(viewer.Client), 0x2000)
+					.WriteArrayUInt32Length(s => s.WriteArray(body))
+					.SendAsync(viewer.Client);
+			}
+		}
+
 		// On a kill, maybe drop a loot bag at the dead NPC's spot (LootResolver coin-flip). The bag is a world object
 		// (LootBagFullUpdateIIR_c 0xF096251E) built from a captured "Bag of loot" row for the map, placed at the death
 		// position with a fresh handle, added to the zone, and spawned for nearby players. It expires off the tick
