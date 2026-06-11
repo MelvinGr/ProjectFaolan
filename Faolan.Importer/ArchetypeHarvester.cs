@@ -1,36 +1,50 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using Faolan.Core.Data;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.GameServer.Packets.FullCharSnapshot;
+using Faolan.GameServer.Spawn;
 
 namespace Faolan.Importer
 {
-	// Harvests the full identity of every item seen in captured 0x737A6DF9 snapshots: the template id, the
-	// Data1..4 identity quad (tail field-1 payload), and the archetype (tail.f8). The quad + archetype are exactly
-	// what `SnapshotItemBuilder` needs to build an item, so harvesting them makes any item a player has actually
-	// held buildable - even ones absent from `p_items`. The merged result is embedded as
+	// Harvests the full identity of every item seen in captures: the template id, the Data1..4 identity quad, and
+	// the archetype. Two sources, both yielding (template -> CapturedItem): the 0x737A6DF9 inventory snapshot
+	// (bag/equipped container entries, tail.f8 archetype) AND the FA015807 character SPAWN's worn-equipment entries
+	// (ProtoAcgItem: Key1..4 = the quad, Template1 = id, Hash = archetype). The spawn source is what makes items a
+	// character only ever WORE (never carried in a bag snapshot - e.g. Seadog's Shorts) buildable, so the spawn
+	// equipment renderer (PlayerSpawnEquipment, gated on Archetype != 0) can draw them. The quad + archetype are
+	// exactly what SnapshotItemBuilder / PlayerSpawnEquipment need. Merged result is embedded as
 	// Data/archive/captured-items.tsv and imported into the `Items` table. See docs/spawn-dissection-plan.md Phase 5.
 	public static class ArchetypeHarvester
 	{
 		private const uint InventorySubOpcode = 0x737A6DF9;
 
-		// Parses one on-wire packet; if it is an inventory snapshot, merges every (templateId -> CapturedItem) found
-		// in its containers into `into`. Conflicting identities for the same template are reported (should not happen).
+		// Parses one on-wire packet and merges every (templateId -> CapturedItem) it can recover - from an inventory
+		// snapshot's containers AND/OR a character spawn's worn equipment - into `into`. Conflicting identities for the
+		// same template are reported (should not happen).
 		public static void Harvest(byte[] packetBytes, IDictionary<uint, CapturedItem> into, IList<string> conflicts = null)
 		{
-			Dictionary<uint, CapturedItem> found;
+			var found = new Dictionary<uint, CapturedItem>();
 			try
 			{
-				if (!TryReadInventoryRoot(packetBytes, out var root))
-					return;
-
-				found = ExtractFromRoot(root);
+				if (TryReadInventoryRoot(packetBytes, out var root))
+					found = ExtractFromRoot(root);
 			}
 			catch
 			{
-				return; // not a parseable inventory packet
+				// not a parseable inventory packet - fall through to the spawn-equipment source
+			}
+
+			// Also harvest worn equipment from a character spawn (additive; either source may be absent).
+			try
+			{
+				ExtractFromSpawnEquipment(packetBytes, found);
+			}
+			catch
+			{
+				// not a parseable spawn packet
 			}
 
 			foreach (var (template, item) in found)
@@ -66,6 +80,39 @@ namespace Faolan.Importer
 			}
 
 			return map;
+		}
+
+		// Recovers (template -> CapturedItem) from a character SPAWN's worn equipment. The spawn body holds a
+		// ProtoCoreCharacterIIR whose InventoryEntries are the worn items, each a ProtoAcgItem carrying the same
+		// identity the inventory snapshot does (Key1.Key1..4 = the Data quad, Template1 = the template id, Hash =
+		// the archetype). PlayerSpawnReader scans the body for the character message, so this works on any packet
+		// that contains a spawn (FA015807) - we just try it on every packet's Conan body.
+		private static void ExtractFromSpawnEquipment(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
+		{
+			if (packetBytes == null || packetBytes.Length < 12)
+				return;
+
+			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(packetBytes.AsSpan(8, 4));
+			var bodyStart = 12 + headerLen;
+			if (bodyStart >= packetBytes.Length)
+				return;
+
+			if (!PlayerSpawnReader.TryReadCharacterMessage(packetBytes[bodyStart..], out var read))
+				return;
+
+			foreach (var entry in read.Message.InventoryEntries)
+			{
+				var acg = entry.Item;
+				if (acg?.Key1 == null)
+					continue;
+
+				var template = acg.Template1;
+				var archetype = acg.Hash;
+				if (template == 0 || archetype == 0)
+					continue; // need both a template and a real archetype to be buildable
+
+				into[template] = new CapturedItem(acg.Key1.Key1, acg.Key1.Key2, acg.Key1.Key3, acg.Key1.Key4, archetype);
+			}
 		}
 
 		private static bool TryReadInventoryRoot(byte[] packetBytes, out ProtoMessage root)
