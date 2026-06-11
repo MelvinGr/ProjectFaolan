@@ -226,6 +226,7 @@ namespace Faolan.GameServer
 					client.Session.HasPendingPost205FFollowUp = false;
 					client.Session.HasPendingCreateEditorReadyFollowUp = false;
 					client.Session.HasFlushedCreateWorldEntryBurst = false;
+					client.Session.HasFlushedCreateEditorPostReady = false;
 					client.Session.Post205F2020Count = 0;
 					client.Session.Post205FF98E10B3Count = 0;
 					client.Session.Post205F02165EFFCount = 0;

@@ -18,6 +18,7 @@ namespace Faolan.Core.Network
 		// no morph acks); any stray downstream packet corrupts the client editor and stalls naming.
 		bool CharacterEditorInteractive { get; set; }
 		bool HasFlushedCreateWorldEntryBurst { get; set; }
+		bool HasFlushedCreateEditorPostReady { get; set; }
 		bool HasPendingCreateEditorReadyFollowUp { get; set; }
 		bool HasPendingPost205FFollowUp { get; set; }
 
@@ -99,6 +100,7 @@ namespace Faolan.Core.Network
 		public bool AwaitingEnterWorld { get; set; }
 		public bool CharacterEditorInteractive { get; set; }
 		public bool HasFlushedCreateWorldEntryBurst { get; set; }
+		public bool HasFlushedCreateEditorPostReady { get; set; }
 		public bool HasPendingCreateEditorReadyFollowUp { get; set; }
 		public bool HasPendingPost205FFollowUp { get; set; }
 		public bool IsCreateEditorConnection { get; set; }

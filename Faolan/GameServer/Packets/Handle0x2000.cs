@@ -169,10 +169,17 @@ namespace Faolan.GameServer
 					{
 						if (IsRetailCreateEditorFlow(client))
 						{
-							client.Session.CreateEditorTempInstanceCount = 0;
-							client.Session.CreateEditorReadyRequestIds.Clear();
-							client.Session.HasPendingCreateEditorReadyFollowUp = true;
-							Logger.LogInformation("Queued retail create-editor ReadyForPlayScreen follow-up; waiting for the post-ready 0x021662C8 burst before replying.");
+							if (client.Session.HasFlushedCreateEditorPostReady)
+							{
+								Logger.LogInformation("Client sent ReadyForPlayScreen after the deadlock-breaker already flushed the post-ready burst; not re-flushing.");
+							}
+							else
+							{
+								client.Session.CreateEditorTempInstanceCount = 0;
+								client.Session.CreateEditorReadyRequestIds.Clear();
+								client.Session.HasPendingCreateEditorReadyFollowUp = true;
+								Logger.LogInformation("Queued retail create-editor ReadyForPlayScreen follow-up; waiting for the post-ready 0x021662C8 burst before replying.");
+							}
 						}
 						else
 						{
@@ -592,6 +599,29 @@ namespace Faolan.GameServer
 			}
 			else if (requestId.HasValue)
 			{
+				// Break the create-editor DEADLOCK. Retail's client sends its own ReadyForPlayScreen once the editor
+				// scene finishes loading, which arms HasPendingCreateEditorReadyFollowUp and flushes the post-ready
+				// burst (the 0x2024 + the 0xA36D3B74 "NEW_character_creation" script that actually LAUNCHES the editor).
+				// Our live client never reaches that point - it just re-echoes its preview instances (e.g. 9FF92-96)
+				// forever while we only ack them, so the editor never appears (black/loading screen). So once the
+				// post-0x205F burst has flushed and the client has settled into re-echoing a few distinct preview
+				// instances, flush the post-ready burst OURSELVES (once) to launch the editor.
+				if (client.Session.HasFlushedCreateWorldEntryBurst && !client.Session.HasFlushedCreateEditorPostReady)
+				{
+					if (!client.Session.CreateEditorReadyRequestIds.Contains(requestId.Value))
+						client.Session.CreateEditorReadyRequestIds.Add(requestId.Value);
+
+					if (client.Session.CreateEditorReadyRequestIds.Count >= 3)
+					{
+						Logger.LogInformation("Create-editor deadlock breaker: client never sent ReadyForPlayScreen; proactively flushing the post-ready burst using observed request ids [{RequestIds}].",
+							string.Join(", ", client.Session.CreateEditorReadyRequestIds.ConvertAll(id => id.ToString("X"))));
+						await SendRetailCreateEditorPostReadyBurst(client, client.Session.CreateEditorReadyRequestIds);
+						client.Session.HasFlushedCreateEditorPostReady = true;
+						client.Session.CreateEditorReadyRequestIds.Clear();
+						return;
+					}
+				}
+
 				Logger.LogInformation("Acknowledging standalone create-editor instance-echo with requestId={RequestId:X}.", requestId.Value);
 				await SendRetailCreateEditorPostReadyAck(client, requestId.Value);
 			}
