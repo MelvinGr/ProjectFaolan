@@ -1,24 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <!-- Required when referencing Microsoft.AspNetCore.App from the non-Web SDK on .NET 10 (NETSDK1226). -->
-        <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
     </PropertyGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\Faolan.Core\Faolan.Core.csproj"/>
+        <!-- In-process MCP server (Claude tooling); call services.AddMcp(). -->
+        <ProjectReference Include="..\Faolan.Mcp\Faolan.Mcp.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
         <InternalsVisibleTo Include="Faolan.Tests"/>
-    </ItemGroup>
-
-
-
-    <ItemGroup>
-        <!-- In-process MCP server (Claude tooling) hosted on a localhost Kestrel port. -->
-        <FrameworkReference Include="Microsoft.AspNetCore.App"/>
-        <PackageReference Include="ModelContextProtocol.AspNetCore" Version="1.4.0"/>
     </ItemGroup>
 
     <ItemGroup>

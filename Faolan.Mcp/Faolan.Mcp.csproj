@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Library</OutputType>
+        <!-- Required when referencing Microsoft.AspNetCore.App from the non-Web SDK on .NET 10 (NETSDK1226). -->
+        <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Faolan.Core\Faolan.Core.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- In-process MCP server (Claude tooling) hosted on a localhost Kestrel port. -->
+        <FrameworkReference Include="Microsoft.AspNetCore.App"/>
+        <PackageReference Include="ModelContextProtocol.AspNetCore" Version="1.4.0"/>
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8"/>
+    </ItemGroup>
+</Project>

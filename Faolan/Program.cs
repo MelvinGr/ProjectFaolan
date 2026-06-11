@@ -69,6 +69,7 @@ namespace Faolan
 			builder.Services.AddSingleton<IGameServerDispatcher, GameServerDispatcher>();
 
 			// In-process MCP server (Claude tooling) on a localhost Kestrel port; shares the live singletons above.
+			// if(settings.EnableMCp)
 			builder.Services.AddFaolanMcp();
 
 			builder.Services.AddScopedHostedService(provider =>
