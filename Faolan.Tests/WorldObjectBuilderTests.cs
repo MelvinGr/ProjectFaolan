@@ -8,14 +8,17 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Locks the static-world-object construction: building a WorldObject whose columns + Data come from a capture
-	// reproduces the captured body byte-for-byte (addressed to its own handle, sub-opcode preserved), across all
-	// three classes (decor 66AEDD50, container F096251E, zone 33A56FB0). Re-addressing changes only the handle.
+	// reproduces the captured body byte-for-byte (addressed to its own handle, sub-opcode preserved), across every
+	// class (decor 66AEDD50, container F096251E, zone 33A56FB0, destructible 6BD56736, climbing dynel 1FD6412B).
+	// Re-addressing changes only the handle.
 	public class WorldObjectBuilderTests
 	{
 		[Theory]
 		[InlineData("WorldObjDecor")]
 		[InlineData("WorldObjChest")]
 		[InlineData("WorldObjZone")]
+		[InlineData("WorldObjDestructible")]
+		[InlineData("WorldObjClimbing")]
 		public void TryBuild_FromCapturedRow_ReproducesCapturedBody(string golden)
 		{
 			var capturedBody = Golden.Bytes(golden);

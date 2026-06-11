@@ -27,9 +27,6 @@ namespace Faolan.Importer
 			[0x642CD3D6] = "BehaviorControlCenter/Interact (no table)",
 			[0xF508F4C1] = "GameActionList (no table)",
 			[0xF98E10B3] = "NPC StatIir (no NPC-stats table)",
-			// FullUpdate spawns - structural, lift to the WorldObjects path (siblings of SimpleDynel/Door/LootBag).
-			[0x6BD56736] = "DestructibleFullUpdate (structural -> WorldObjects)",
-			[0x1FD6412B] = "ClimbingDynelFullUpdate (structural -> WorldObjects)",
 			// Transient candidates - likely droppable like Move/combat, but each needs an in-client check first.
 			[0xE7F4F8F8] = "SimpleDynelVisualChange (transient? in-client check)",
 			[0xD751EBB4] = "StopIIR (transient? in-client check)",
@@ -143,6 +140,8 @@ namespace Faolan.Importer
 				case 0x66AEDD50: // SimpleDynel
 				case 0xF096251E: // LootBag
 				case 0x33A56FB0: // Door
+				case 0x6BD56736: // Destructible
+				case 0x1FD6412B: // ClimbingDynel
 					if (!TryReadBodyAndKey(e, out var objBodyArr, out var objKey))
 					{
 						residualFamily = "world object (malformed body)";

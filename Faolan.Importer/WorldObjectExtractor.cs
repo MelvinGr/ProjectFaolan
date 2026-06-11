@@ -17,16 +17,17 @@ namespace Faolan.Importer
 		public string Name { get; init; } = string.Empty;
 	}
 
-	// Extracts the static world objects (66AEDD50 decor/props, F096251E interactive containers, 33A56FB0 zone
-	// labels) per map from a capture: tracks the current map (MapChange 5D85BFC7), then for each world-object
-	// packet reads the handle + transform (same offsets as the entity spawns) and the object message's id (f1) +
-	// name (f2). Sibling of NpcSpawnExtractor; dedup key is (map, position).
+	// Extracts the static world objects per map from a capture: tracks the current map (MapChange 5D85BFC7), then
+	// for each world-object packet reads the handle + transform (same offsets as the entity spawns) and the object
+	// message's id (f1) + name (f2). The object classes are the FullUpdate families that share the object transform
+	// grammar (0x2C group, no pre-IIR block): 66AEDD50 decor/props, F096251E interactive containers, 33A56FB0 zone
+	// labels, 6BD56736 destructibles, 1FD6412B climbing dynels. Sibling of NpcSpawnExtractor; dedup key is (map, pos).
 	public static class WorldObjectExtractor
 	{
 		private const uint MapChangeSubOpcode = 0x5D85BFC7;
 		private const uint Opcode2000 = 0x2000;
 
-		private static readonly HashSet<uint> ObjectSubOpcodes = [0x66AEDD50, 0xF096251E, 0x33A56FB0];
+		private static readonly HashSet<uint> ObjectSubOpcodes = [0x66AEDD50, 0xF096251E, 0x33A56FB0, 0x6BD56736, 0x1FD6412B];
 
 		public static List<WorldObjectEntry> Extract(IReadOnlyList<CapturedPacket> packets)
 		{

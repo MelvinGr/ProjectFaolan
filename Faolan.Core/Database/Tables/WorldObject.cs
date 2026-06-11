@@ -1,7 +1,8 @@
 namespace Faolan.Core.Database.Tables
 {
-	// A captured static world object on a map - the decor/props (66AEDD50), interactive containers (F096251E)
-	// and zone/city labels (33A56FB0) that build the world alongside the NPC spawns ([[NpcSpawn]]'s sibling).
+	// A captured static world object on a map - the decor/props (66AEDD50), interactive containers (F096251E),
+	// zone/city labels (33A56FB0), destructibles (6BD56736) and climbing dynels (1FD6412B) that build the world
+	// alongside the NPC spawns ([[NpcSpawn]]'s sibling). All share the object transform grammar (no pre-IIR block).
 	// Keyed for dedup by (MapId, Position) - the stable spawn point; the handle is session-scoped. Imported from
 	// captures by Faolan.Importer (WorldObjectExtractor); built into a wire body by WorldObjectBuilder.
 	//

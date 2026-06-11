@@ -639,8 +639,8 @@ namespace Faolan.GameServer
 
 			var body = packet.AsSpan(bodyStart);
 			var subOpcode = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4));
-			if (subOpcode is not (0x66AEDD50u or 0xF096251Eu or 0x33A56FB0u))
-				return false;
+			if (subOpcode is not (0x66AEDD50u or 0xF096251Eu or 0x33A56FB0u or 0x6BD56736u or 0x1FD6412Bu))
+				return false; // decor/container/zone + destructible (6BD56736) + climbing dynel (1FD6412B)
 
 			var key = PositionKey(BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosXOffset, 4)), BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosYOffset, 4)),
 				BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosZOffset, 4)));

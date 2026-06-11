@@ -5,11 +5,11 @@ using Faolan.Core.Database.Tables;
 
 namespace Faolan.GameServer.Spawn
 {
-	// Bridges a stored WorldObject row to a wire body (66AEDD50/F096251E/33A56FB0), addressed to a live session
-	// handle. Sibling of NpcSpawnBuilder, but simpler: a world object has no CharacterIIR to splice, so only the
-	// transform is rebuilt (from the row's columns) - the object message + raw tail are carried over from the
-	// row's captured Data. The sub-opcode is preserved from the template, so one builder handles all three
-	// classes. Byte-identical to the captured body when the row's columns match the capture (WorldObjectBuilderTests).
+	// Bridges a stored WorldObject row to a wire body (66AEDD50/F096251E/33A56FB0/6BD56736/1FD6412B), addressed to a
+	// live session handle. Sibling of NpcSpawnBuilder, but simpler: a world object has no CharacterIIR to splice, so
+	// only the transform is rebuilt (from the row's columns) - the object message + raw tail are carried over from
+	// the row's captured Data. The sub-opcode is preserved from the template, so one builder handles every object
+	// class. Byte-identical to the captured body when the row's columns match the capture (WorldObjectBuilderTests).
 	public static class WorldObjectBuilder
 	{
 		public static bool TryBuild(WorldObject row, uint handle, out byte[] body)
