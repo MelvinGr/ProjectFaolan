@@ -104,14 +104,17 @@ namespace Faolan.Core.Database
 				.WithMany()
 				.OnDelete(DeleteBehavior.Restrict);
 
-			// Character ids double as the on-wire client instance and are DB-generated (SQLite max+1). The old
-			// manual in-range allocation is gone: the burst replay's instance rewrite pads varints
-			// (EncodeVarintPadded), so any id below 2^28 substitutes length-preserving into the captured 4-byte
-			// slots - and generated ids continue from the existing 0x0200xxxx rows, far below that.
+			// Character ids double as the on-wire client instance. They MUST stay <= 0x0FFFFFFF (4-byte protobuf
+			// varint): the world-entry burst is still REPLAYED with instance SUBSTITUTION (RewriteBurstInstance pads
+			// the live id into the captured 4-byte varint slot via EncodeVarintPadded) - it is not fully rebuilt - so a
+			// 5-byte id (> 2^28) can't substitute, leaving the captured instance in the burst and crashing the client.
+			// SQLite max+1 alone is NOT safe: a high-id captured character imported from a 5-byte-instance capture (e.g.
+			// 0x110099BD) poisons the sequence. So DatabaseRepository.CreateCharacter allocates the id explicitly from
+			// the in-range max; the id is settable (not DB-generated).
 			modelBuilder
 				.Entity<Character>()
 				.Property(c => c.Id)
-				.ValueGeneratedOnAdd();
+				.ValueGeneratedNever();
 
 			// One-to-one Character <-> CharacterMaxStats, keyed by CharacterId; deletes cascade with the character.
 			modelBuilder

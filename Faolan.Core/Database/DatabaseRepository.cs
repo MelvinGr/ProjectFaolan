@@ -88,6 +88,12 @@ namespace Faolan.Core.Database
 		// seeded Maps table; 0xFA0/4000 does NOT exist and caused a Map foreign-key failure on save.
 		private const uint CreationMapId = Map.TortageBeachId;
 
+		// Character ids ARE the on-wire client instance and the burst replay substitutes them into captured 4-byte
+		// protobuf-varint slots, so they must encode to <= 4 varint bytes (id <= 0x0FFFFFFF). Allocate from this base
+		// continuing the existing 0x013xxxxx rows; a 5-byte id (> 0x0FFFFFFF) crashes the client (see DatabaseContext).
+		private const uint FirstCharacterId = 0x02000000;
+		private const uint MaxCharacterId = 0x0FFFFFFF;
+
 		// Tortage Beach intro spawn, taken verbatim (exact IEEE-754 bits) from the dikketest world-entry
 		// MapChange so a newly created character loads at the correct intro location instead of (0,0,0).
 		private static readonly float CreationSpawnX = BitConverter.Int32BitsToSingle(0x43A14000); // 322.5
@@ -133,9 +139,10 @@ namespace Faolan.Core.Database
 			// Maps table is missing it.
 			await EnsureMapExists(ctx, CreationMapId, "Tortage Beach");
 
-			// Only reuse an in-range unnamed row; an out-of-range leftover (e.g. created before the
-			// 4-byte-varint id scheme) would yield a 5-byte instance, so drop those and allocate fresh.
-			var character = await ctx.Characters.FirstOrDefaultAsync(c => c.AccountId == accountId && c.Name == null);
+			// Only reuse an IN-RANGE unnamed row; an out-of-range leftover (>0x0FFFFFFF, e.g. created when a high-id
+			// captured char poisoned the sequence) would yield a 5-byte instance the burst substitution can't pad, so
+			// drop those and allocate fresh in range.
+			var character = await ctx.Characters.FirstOrDefaultAsync(c => c.AccountId == accountId && c.Name == null && c.Id <= MaxCharacterId);
 			if (character == null)
 			{
 				var stale = await ctx
@@ -148,8 +155,22 @@ namespace Faolan.Core.Database
 					await ctx.SaveChangesAsync();
 				}
 
+				// Allocate the id explicitly from the IN-RANGE max (ignore high-id captured chars), so it stays a
+				// 4-byte varint (<= 0x0FFFFFFF). The id IS the on-wire client instance and the burst substitution
+				// pads it into the captured 4-byte slot - a 5-byte id breaks every nested length prefix and crashes
+				// the client. See DatabaseContext (Character.Id ValueGeneratedNever).
+				var maxInRange = await ctx
+					.Characters
+					.Where(c => c.Id <= MaxCharacterId)
+					.Select(c => (uint?)c.Id)
+					.MaxAsync() ?? (FirstCharacterId - 1);
+				var nextId = maxInRange + 1;
+				if (nextId > MaxCharacterId)
+					throw new InvalidOperationException($"Character id space exhausted in the 4-byte varint range (max {MaxCharacterId:X}).");
+
 				character = new Character
 				{
+					Id = nextId,
 					AccountId = accountId,
 					RealmId = realmId,
 					AuthChallenge = Guid
