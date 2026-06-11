@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Numerics;
+using System.Threading;
 
 namespace Faolan.GameServer.World
 {
@@ -10,9 +11,24 @@ namespace Faolan.GameServer.World
 	{
 		private readonly ConcurrentDictionary<uint, Zone> _zones = new ConcurrentDictionary<uint, Zone>();
 
+		// Server-global monotonic allocator for playfield-instance tokens, mirroring retail's behaviour (a steadily
+		// increasing per-instance id stamped into despawns; see protocol_despawn_n3toclientquit). Every Zone gets a
+		// fresh token on creation as a FALLBACK. For a REPLAYED playfield the burst's own token then overrides it (the
+		// client learned that one from the burst - WorldDespawn.TryExtractPlayfieldToken). This minted value becomes
+		// the AUTHORITATIVE source once we GENERATE playfields (construct-don't-replay) and write the token into the
+		// generated entry packets ourselves. Seeded clear of the observed retail pools (~0x004F.. / ~0x01EA..) so a
+		// minted token is recognisably ours in a capture.
+		private uint _nextPlayfieldToken = 0x00A00000;
+
+		// Mints the next playfield-instance token. Thread-safe (zones can be created from any connection).
+		public uint NextPlayfieldToken()
+		{
+			return Interlocked.Increment(ref _nextPlayfieldToken);
+		}
+
 		public Zone ZoneFor(uint mapId)
 		{
-			return _zones.GetOrAdd(mapId, m => new Zone(m));
+			return _zones.GetOrAdd(mapId, m => new Zone(m) { PlayfieldToken = NextPlayfieldToken() });
 		}
 
 		// Adds the entity to `mapId`'s zone with the given transform, removing it from its previous zone if its map

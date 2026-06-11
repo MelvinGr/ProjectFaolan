@@ -23,8 +23,11 @@ Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see a
 >   (`BroadcastPlayerDespawn` in `ClientDisconnected`) and on range-out (the `Despawn` branch of `DispatchInterest`).
 >   The playfield token is extracted at entry from the `0x737A6DF9` snapshot we send (framed by `000000BF`…`0000040B`,
 >   `WorldDespawn.TryExtractPlayfieldToken` → `Zone.PlayfieldToken`), so it matches what the client learned by
->   construction; if unknown (0) the broadcaster skips rather than guess. 4 unit tests. Still **2-client in-client
->   gated** on the one open question: whether the client enforces the token match or removes regardless.
+>   construction. Every zone is also minted a token by a `WorldState` monotonic allocator (`NextPlayfieldToken`) on
+>   creation as a fallback (the burst value overrides it for a replayed playfield); this allocator becomes the
+>   authoritative source once we GENERATE playfields and write the token into the generated entry packets. 6 unit
+>   tests. Still **2-client in-client gated** on the one open question: whether the client enforces the token match or
+>   removes regardless.
 > - **Persistence** ✓ event-driven (disconnect + teleport + `.save` flushes live world state) + a 5-min autosave
 >   timer. No game loop needed for it.
 > - **Game loop** ✓ a 1 Hz fixed tick (`GameTickLoop`) → `WorldState.Tick(dt)` (NPC-AI seam, no-op today) +

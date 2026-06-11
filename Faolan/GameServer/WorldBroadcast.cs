@@ -67,8 +67,8 @@ namespace Faolan.GameServer
 		}
 
 		// Removes the subject from `recipient`'s view - the n3ToClientQuit despawn (WorldDespawn). Stamped with the
-		// recipient zone's playfield token (what the client learned at entry); if that token is unknown (0) we skip
-		// rather than send a guessed value, leaving a traceable log (a stale ghost is better than a malformed packet).
+		// recipient zone's playfield token: the burst's value for a replayed playfield (what the client learned at
+		// entry), else WorldState's minted fallback. The token-is-0 guard is just defensive (ZoneFor always mints one).
 		// NEEDS IN-CLIENT VERIFICATION with two players (the only open question is whether the client enforces the
 		// token match or removes regardless).
 		private Task SendWorldDespawn(INetworkClient recipient, uint recipientMapId, uint subjectHandle)
@@ -170,19 +170,21 @@ namespace Faolan.GameServer
 		}
 
 		// Records the playfield token the client will associate with this zone, read from the 0x737A6DF9 snapshot we
-		// actually send (so the despawn token matches what the client learned, by construction; see WorldDespawn).
-		// Idempotent - the token is constant per playfield.
+		// actually send (so the despawn token matches what the client learned, by construction; see WorldDespawn). This
+		// OVERRIDES the token WorldState minted at zone creation - for a replayed playfield the burst's value is the
+		// authoritative one (the client learned it from the burst, not from us). Idempotent: the token is constant per
+		// playfield, so a re-entry re-extracts the same value; logged only when it actually changes.
 		private void CapturePlayfieldToken(uint mapId, ReadOnlySpan<byte> snapshotBody)
 		{
-			var zone = _world.ZoneFor(mapId);
-			if (zone.PlayfieldToken != 0)
+			if (!WorldDespawn.TryExtractPlayfieldToken(snapshotBody, out var token))
 				return;
 
-			if (WorldDespawn.TryExtractPlayfieldToken(snapshotBody, out var token))
-			{
-				zone.PlayfieldToken = token;
-				Logger.LogInformation("World: map {Map} playfield token = 0x{Token:X8} (despawns enabled).", mapId, token);
-			}
+			var zone = _world.ZoneFor(mapId);
+			if (zone.PlayfieldToken == token)
+				return;
+
+			zone.PlayfieldToken = token;
+			Logger.LogInformation("World: map {Map} playfield token = 0x{Token:X8} (from burst; overrides minted fallback).", mapId, token);
 		}
 	}
 }

@@ -16,6 +16,27 @@ namespace Faolan.Tests
 			new WorldEntity(handle, 0, false, $"N{handle}", null) { Position = new Vector3(x, 0, z) };
 
 		[Fact]
+		public void ZoneFor_MintsAMonotonicPlayfieldToken()
+		{
+			var world = new WorldState();
+
+			var first = world.ZoneFor(2040).PlayfieldToken;
+			var second = world.ZoneFor(4010).PlayfieldToken;
+
+			Assert.NotEqual(0u, first); // every zone has a token from creation (despawns never skipped for lack of one)
+			Assert.True(second > first, "playfield tokens are allocated monotonically");
+			// re-fetching the same map returns the same zone, not a fresh token
+			Assert.Equal(first, world.ZoneFor(2040).PlayfieldToken);
+		}
+
+		[Fact]
+		public void NextPlayfieldToken_IsMonotonic()
+		{
+			var world = new WorldState();
+			Assert.True(world.NextPlayfieldToken() < world.NextPlayfieldToken());
+		}
+
+		[Fact]
 		public void Place_AddsToMapZone_AndRelocatesOnMapChange()
 		{
 			var world = new WorldState();
