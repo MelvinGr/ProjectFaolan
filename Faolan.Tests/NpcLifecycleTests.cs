@@ -63,9 +63,10 @@ namespace Faolan.Tests
 			zone.Add(npc);
 
 			Assert.Empty(world.Tick(1.0)); // 1s, still dead
-			var respawned = world.Tick(1.0); // 2s -> respawns
-			Assert.Single(respawned);
-			Assert.Same(npc, respawned[0]);
+			var effects = world.Tick(1.0); // 2s -> respawns
+			Assert.Single(effects);
+			Assert.Same(npc, effects[0].Entity);
+			Assert.Equal(WorldTickEffectType.NpcRespawned, effects[0].Type);
 			Assert.False(npc.IsDead);
 		}
 

@@ -170,15 +170,15 @@ namespace Faolan.GameServer
 			await DispatchInterest(events, move: null);
 		}
 
-		// An NPC died: despawn it for every player currently in range (NPCs are seen by everyone in the zone via the
-		// burst, not tracked in per-player Known sets, so this is range-based rather than ResolveRemove). Uses the same
-		// n3ToClientQuit packet as player despawns.
-		private async Task BroadcastNpcDespawn(WorldEntity npc)
+		// Despawn a world-owned entity (a killed NPC, an expired loot bag) for every player currently in range. These
+		// are seen by everyone in the zone (burst / direct spawn), not tracked in per-player Known sets, so this is
+		// range-based rather than ResolveRemove. Uses the same n3ToClientQuit packet as player despawns.
+		private async Task BroadcastEntityDespawn(WorldEntity entity)
 		{
-			foreach (var viewer in _world.ZoneFor(npc.MapId).PlayersInRange(npc.Position, PlayerInterestRange))
+			foreach (var viewer in _world.ZoneFor(entity.MapId).PlayersInRange(entity.Position, PlayerInterestRange))
 			{
 				if (viewer.Client != null)
-					await SendWorldDespawn(viewer.Client, viewer.MapId, npc.Handle);
+					await SendWorldDespawn(viewer.Client, viewer.MapId, entity.Handle);
 			}
 		}
 
@@ -194,6 +194,64 @@ namespace Faolan.GameServer
 				if (viewer.Client != null)
 					await SendWorldSpawn(viewer.Client, npc);
 			}
+		}
+
+		// On a kill, maybe drop a loot bag at the dead NPC's spot (LootResolver coin-flip). The bag is a world object
+		// (LootBagFullUpdateIIR_c 0xF096251E) built from a captured "Bag of loot" row for the map, placed at the death
+		// position with a fresh handle, added to the zone, and spawned for nearby players. It expires off the tick
+		// (WorldState.Tick -> LootExpired -> despawn + remove). Opening/looting the bag is a separate (gated) step.
+		private async Task TrySpawnLoot(WorldEntity deadNpc)
+		{
+			if (!Combat.LootResolver.RollsDrop(System.Random.Shared.NextDouble()))
+				return;
+
+			var template = await GetLootTemplate(deadNpc.MapId);
+			if (template == null)
+				return;
+
+			var handle = NextLootHandle();
+			if (!Spawn.WorldObjectBuilder.TryBuild(template, handle, deadNpc.Position,
+				    new System.Numerics.Quaternion(deadNpc.Rotation.X, deadNpc.Rotation.Y, deadNpc.Rotation.Z, 1f), out var body))
+				return;
+
+			var bag = WorldEntity.ForLoot(handle, deadNpc.MapId, deadNpc.Position, deadNpc.Rotation,
+				template.Name ?? "Bag of loot", body, Combat.LootResolver.LootExpirySeconds);
+			_world.ZoneFor(deadNpc.MapId).Add(bag);
+
+			foreach (var viewer in _world.ZoneFor(deadNpc.MapId).PlayersInRange(bag.Position, PlayerInterestRange))
+			{
+				if (viewer.Client != null)
+					await SendWorldSpawn(viewer.Client, bag);
+			}
+
+			Logger.LogInformation("Loot: dropped {Name} 0x{Handle:X8} at {Pos} on map {Map} (expires in {Expiry}s).", bag.Name, handle, bag.Position, deadNpc.MapId, Combat.LootResolver.LootExpirySeconds);
+		}
+
+		// The captured loot-bag template (LootBagFullUpdateIIR_c) for a map, cached on first use. Null if the map has
+		// no captured loot bag to template from.
+		private async Task<Core.Database.Tables.WorldObject> GetLootTemplate(uint mapId)
+		{
+			if (_lootTemplateByMap.TryGetValue(mapId, out var cached))
+				return cached;
+
+			var objects = await Database.GetWorldObjects(mapId);
+			Core.Database.Tables.WorldObject template = null;
+			foreach (var o in objects)
+			{
+				if (o.SubOpcode == LootBagSubOpcode && o.Name != null && o.Name.Contains("loot", System.StringComparison.OrdinalIgnoreCase))
+				{
+					template = o;
+					break;
+				}
+			}
+
+			_lootTemplateByMap[mapId] = template; // cache misses too (null) so we don't re-query a loot-less map
+			return template;
+		}
+
+		private uint NextLootHandle()
+		{
+			return (uint)System.Threading.Interlocked.Increment(ref _nextLootHandle);
 		}
 
 		// On disconnect/logout: despawn the leaving player for everyone who could see it (n3ToClientQuit), before it is

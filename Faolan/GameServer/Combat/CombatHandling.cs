@@ -87,9 +87,10 @@ namespace Faolan.GameServer
 			if (npcEntity != null)
 			{
 				npcEntity.MarkDead();
-				await BroadcastNpcDespawn(npcEntity);
+				await BroadcastEntityDespawn(npcEntity);
 				Logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); despawned, respawns in {Delay}s.", npcEntity.Name, targetHandle, cause, npcEntity.RespawnDelaySeconds);
 				await AwardKillXp(killer, npcEntity.Level);
+				await TrySpawnLoot(npcEntity);
 				return;
 			}
 

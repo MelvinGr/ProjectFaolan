@@ -34,6 +34,21 @@ namespace Faolan.GameServer.World
 			};
 		}
 
+		// A transient loot bag dropped on a kill (a world object, not a player/NPC): no vitals, no respawn; it sits at
+		// its drop spot until its expiry elapses, then the tick despawns + removes it. `spawnBody` is its prebuilt
+		// FA-family world-object body (re-framed per recipient like any spawn).
+		public static WorldEntity ForLoot(uint handle, uint mapId, Vector3 position, Vector3 rotation, string name, byte[] spawnBody, double expirySeconds)
+		{
+			return new WorldEntity(handle, mapId, false, name, null)
+			{
+				Position = position,
+				Rotation = rotation,
+				SpawnBody = spawnBody,
+				IsLoot = true,
+				_expiryRemaining = expirySeconds
+			};
+		}
+
 		// Default time a killed NPC stays dead before the tick respawns it.
 		public const double DefaultRespawnDelaySeconds = 15.0;
 
@@ -77,8 +92,25 @@ namespace Faolan.GameServer.World
 		// Dead = has vitals and they hit zero. A dead entity is excluded from combat and counts down to respawn.
 		public bool IsDead => Vitals?.IsDead == true;
 
+		// A transient loot bag (expires + despawns) rather than a player/NPC.
+		public bool IsLoot { get; private init; }
+
 		// Remaining time (seconds) until respawn while dead; meaningless when alive.
 		private double _respawnRemaining;
+
+		// Remaining time (seconds) until a loot bag expires.
+		private double _expiryRemaining;
+
+		// Counts down a loot bag's lifetime by dt; returns true the tick it expires (caller despawns + removes it).
+		// No-op (false) for anything that isn't a loot bag.
+		public bool TickExpiry(double dt)
+		{
+			if (!IsLoot)
+				return false;
+
+			_expiryRemaining -= dt;
+			return _expiryRemaining <= 0;
+		}
 
 		// Marks the entity dead (call once its vitals reach 0) and starts the respawn countdown. Idempotent per death.
 		public void MarkDead()

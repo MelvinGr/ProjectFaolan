@@ -40,6 +40,16 @@ namespace Faolan.GameServer
 		private readonly System.Collections.Concurrent.ConcurrentDictionary<uint, byte> _npcLoadedZones =
 			new System.Collections.Concurrent.ConcurrentDictionary<uint, byte>();
 
+		// Cached loot-bag template (a captured "Bag of loot" world object) per map; null values cache loot-less maps.
+		private readonly System.Collections.Concurrent.ConcurrentDictionary<uint, Core.Database.Tables.WorldObject> _lootTemplateByMap =
+			new System.Collections.Concurrent.ConcurrentDictionary<uint, Core.Database.Tables.WorldObject>();
+
+		// LootBagFullUpdateIIR_c - the world-object sub-opcode a loot bag spawns as.
+		private const uint LootBagSubOpcode = 0xF096251E;
+
+		// Monotonic allocator for dropped-loot handles, in a high range to avoid colliding with player/NPC handles.
+		private int _nextLootHandle = 0x40000000;
+
 		// How far a player perceives other players (world-entity interest radius; wider than say range).
 		private const float PlayerInterestRange = 150f;
 
@@ -165,9 +175,21 @@ namespace Faolan.GameServer
 					var dt = System.Diagnostics.Stopwatch.GetElapsedTime(lastTimestamp, now).TotalSeconds;
 					lastTimestamp = now;
 
-					// Continuous-time systems: every base tick, with the actual elapsed dt.
-					foreach (var respawned in _world.Tick(dt))
-						await BroadcastNpcRespawn(respawned);
+					// Continuous-time systems: every base tick, with the actual elapsed dt. The tick returns the
+					// wire-visible effects (NPC respawns, loot expiry) for us to broadcast.
+					foreach (var effect in _world.Tick(dt))
+					{
+						switch (effect.Type)
+						{
+							case World.WorldTickEffectType.NpcRespawned:
+								await BroadcastNpcRespawn(effect.Entity);
+								break;
+							case World.WorldTickEffectType.LootExpired:
+								await BroadcastEntityDespawn(effect.Entity);
+								_world.Remove(effect.Entity);
+								break;
+						}
+					}
 
 					// Rate-based systems: fire on their own cadence, scaled by the time actually elapsed since last fire.
 					if (regen.Advance(dt, out var regenElapsed))

@@ -41,10 +41,14 @@ Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see a
 >   tests. Visual confirmation is 2-client/in-client gated; the lifecycle logic is harness-verified.
 > - **XP on kill** ✓ killing a model NPC awards level-scaled XP (`CombatResolver.ResolveKillXp`) to `Character.Experience`
 >   and pushes an `Exp` (0x0034) stat update via `0x96B8DC59` so the bar moves; XP persists via the usual save points.
->   **Loot + level-up are the remaining progression pieces** (loot needs item-drop tables; level-up needs an XP curve →
->   `Level++` + `MaxStats` recompute).
-> **NEXT:** loot tables + level-up; then NPC AI movement (the pinned MoveTask patrol grammar) so the tick drives motion
-> and the burst becomes a pure seed — where the loop and "construct, don't replay" meet. Then quests.
+> - **Loot on kill** ✓ a kill may drop a loot bag (`LootResolver` coin-flip): a world object (`LootBagFullUpdateIIR_c`
+>   0xF096251E) built from a captured "Bag of loot" row at the death spot with a fresh handle, added to the zone +
+>   spawned for nearby players, and expired off the tick (`WorldState.Tick` → `LootExpired` → despawn + remove). 4
+>   tests. **Looting the bag (open → contents → take) is the remaining piece** (`lootbag_open` 0x642CD3D6 →
+>   `LootRemoveItemsIIR_c` 0x70010162 → grant item) — that interaction protocol needs decoding (gated). Level-up
+>   (XP curve → `Level++` + `MaxStats` recompute) is the other open progression piece.
+> **NEXT:** loot open/take interaction + level-up; then NPC AI movement (the pinned MoveTask patrol grammar) so the
+> tick drives motion and the burst becomes a pure seed — where the loop and "construct, don't replay" meet. Then quests.
 
 ## What we already have (strong foundation)
 

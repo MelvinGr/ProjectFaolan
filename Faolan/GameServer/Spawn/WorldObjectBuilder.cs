@@ -14,13 +14,21 @@ namespace Faolan.GameServer.Spawn
 	{
 		public static bool TryBuild(WorldObject row, uint handle, out byte[] body)
 		{
+			return TryBuild(row, handle,
+				new Vector3(row?.PositionX ?? 0, row?.PositionY ?? 0, row?.PositionZ ?? 0),
+				new Quaternion(row?.RotationX ?? 0, row?.RotationY ?? 0, row?.RotationZ ?? 0, row?.RotationW ?? 1),
+				out body);
+		}
+
+		// As TryBuild, but places the object at an EXPLICIT transform rather than the row's captured one - used to
+		// drop a templated object (e.g. a loot bag) at a runtime location like an NPC's death spot.
+		public static bool TryBuild(WorldObject row, uint handle, Vector3 position, Quaternion rotation, out byte[] body)
+		{
 			body = null;
 			var template = ExtractBody(row?.Data);
 			if (template == null || template.Length < SpawnPacketBuilder.RotWOffset + 4)
 				return false;
 
-			var position = new Vector3(row.PositionX, row.PositionY, row.PositionZ);
-			var rotation = new Quaternion(row.RotationX, row.RotationY, row.RotationZ, row.RotationW);
 			body = SpawnPacketBuilder.BuildSpawnBody(template, handle, position, rotation);
 			return true;
 		}

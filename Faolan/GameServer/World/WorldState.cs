@@ -54,23 +54,30 @@ namespace Faolan.GameServer.World
 				zone.Remove(entity.Handle);
 		}
 
-		// Advances the world model by `deltaSeconds` (docs/server-architecture-roadmap.md). Today it runs the NPC
-		// respawn timers: any dead NPC whose respawn delay elapsed this tick is revived (vitals + transform reset) and
-		// returned so the caller can re-spawn it for nearby players. Player transforms are driven by Move packets, not
-		// the tick; NPC AI/movement joins here later.
-		public IReadOnlyList<WorldEntity> Tick(double deltaSeconds)
+		// Advances the world model by `deltaSeconds` (docs/server-architecture-roadmap.md) and returns the wire-visible
+		// effects for the caller to broadcast: dead NPCs whose respawn delay elapsed (revived here - vitals + transform
+		// reset) and loot bags whose lifetime expired (to be despawned + removed). Player transforms are driven by Move
+		// packets, not the tick; NPC AI/movement joins here later.
+		public IReadOnlyList<WorldTickEffect> Tick(double deltaSeconds)
 		{
-			List<WorldEntity> respawned = null;
+			List<WorldTickEffect> effects = null;
 			foreach (var zone in _zones.Values)
 			{
 				foreach (var entity in zone.Entities)
 				{
-					if (!entity.IsPlayer && entity.TickRespawn(deltaSeconds))
-						(respawned ??= new List<WorldEntity>()).Add(entity);
+					if (entity.IsLoot)
+					{
+						if (entity.TickExpiry(deltaSeconds))
+							(effects ??= new List<WorldTickEffect>()).Add(new WorldTickEffect(entity, WorldTickEffectType.LootExpired));
+					}
+					else if (!entity.IsPlayer && entity.TickRespawn(deltaSeconds))
+					{
+						(effects ??= new List<WorldTickEffect>()).Add(new WorldTickEffect(entity, WorldTickEffectType.NpcRespawned));
+					}
 				}
 			}
 
-			return respawned ?? (IReadOnlyList<WorldEntity>)System.Array.Empty<WorldEntity>();
+			return effects ?? (IReadOnlyList<WorldTickEffect>)System.Array.Empty<WorldTickEffect>();
 		}
 	}
 }
