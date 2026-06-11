@@ -50,6 +50,12 @@ namespace Faolan.GameServer
 		// per-behaviour accumulators) when NPC AI/movement lands, which needs ~10-20 Hz.
 		private const double GameTickSeconds = 1.0;
 
+		// Background loops (game tick + autosave) and their lifetime token. Held (not fire-and-forget) so StopAsync can
+		// signal them and await a clean shutdown, and so any unobserved fault surfaces instead of being swallowed.
+		private CancellationTokenSource _loopCts;
+		private Task _gameTickTask = Task.CompletedTask;
+		private Task _autoSaveTask = Task.CompletedTask;
+
 		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, ushort port, IAgentServerDispatcher agentServerDispatcher, IGameServerDispatcher gameServerDispatcher) : base(port, logger, configuration, database,
 			new ConanOutgoingPacketLogger(logger, "GameServer", typeof(GameServerRespondOpcodes), typeof(GameServer0X2000RespondsOpcodes)))
 		{
@@ -129,8 +135,11 @@ namespace Faolan.GameServer
 		public override Task StartAsync(CancellationToken cancellationToken)
 		{
 			_gameServerDispatcher.Register(this);
-			_ = AutoSaveLoop(cancellationToken); // periodic crash-safety flush of the live world state
-			_ = GameTickLoop(cancellationToken); // the simulation tick (regen now; NPC AI/movement later)
+			// Own lifetime token (linked to startup) so StopAsync can cancel the loops independently of any single
+			// connection. Tasks are stored so they can be awaited on shutdown.
+			_loopCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+			_autoSaveTask = AutoSaveLoop(_loopCts.Token); // periodic crash-safety flush of the live world state
+			_gameTickTask = GameTickLoop(_loopCts.Token); // the simulation tick (regen now; NPC AI/movement later)
 			return base.StartAsync(cancellationToken);
 		}
 
@@ -211,10 +220,19 @@ namespace Faolan.GameServer
 			}
 		}
 
-		public override Task StopAsync(CancellationToken cancellationToken)
+		public override async Task StopAsync(CancellationToken cancellationToken)
 		{
 			_gameServerDispatcher.Unregister(this);
-			return base.StopAsync(cancellationToken);
+
+			// Signal the background loops and await their (clean) exit so shutdown doesn't race a mid-tick save. The
+			// loops swallow their own OperationCanceledException, so WhenAll completes normally; bounded by the host's
+			// shutdown token either way.
+			if (_loopCts != null)
+				await _loopCts.CancelAsync();
+			await Task.WhenAll(_gameTickTask, _autoSaveTask);
+			_loopCts?.Dispose();
+
+			await base.StopAsync(cancellationToken);
 		}
 
 		protected override async Task ReceivedPacket(INetworkClient client, ConanPacket packet)
