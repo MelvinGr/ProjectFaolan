@@ -46,6 +46,9 @@ namespace Faolan.Core.Database
 		Task<MapWorldBurst> GetMapWorldBurst(uint mapId);
 		Task<NpcSpawn[]> GetNpcSpawns(uint mapId);
 		Task<WorldObject[]> GetWorldObjects(uint mapId);
+		Task<RespawnPoint[]> GetRespawnPoints(uint mapId);
+		Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId);
+		Task DiscoverRespawnPoint(uint characterId, uint respawnPointId);
 		Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names);
 
 		Task<Realm> GetRealm(uint id);
@@ -423,6 +426,42 @@ namespace Faolan.Core.Database
 				.WorldObjects
 				.Where(o => o.MapId == mapId && o.Data != null)
 				.ToArrayAsync();
+		}
+
+		public async Task<RespawnPoint[]> GetRespawnPoints(uint mapId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.RespawnPoints
+				.Where(r => r.MapId == mapId)
+				.ToArrayAsync();
+		}
+
+		public async Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.CharacterRespawnPoints
+				.Where(c => c.CharacterId == characterId)
+				.Select(c => c.RespawnPointId)
+				.ToArrayAsync();
+		}
+
+		// Records that a character has discovered a respawn point (idempotent - no duplicate row).
+		public async Task DiscoverRespawnPoint(uint characterId, uint respawnPointId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var exists = await ctx.CharacterRespawnPoints
+				.AnyAsync(c => c.CharacterId == characterId && c.RespawnPointId == respawnPointId);
+			if (exists)
+				return;
+
+			ctx.CharacterRespawnPoints.Add(new CharacterRespawnPoint
+			{
+				CharacterId = characterId,
+				RespawnPointId = respawnPointId
+			});
+			await ctx.SaveChangesAsync();
 		}
 
 		// Resolves appearance resource refs ("*texscript_1108153") to their client-registry entries (imported

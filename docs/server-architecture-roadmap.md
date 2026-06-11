@@ -38,11 +38,14 @@ Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see a
 >   and swings every `NpcAttackInterval` (2s), emitting an `NpcAttack` effect; the listener applies level-scaled damage
 >   (`ResolveNpcAttackDamage`) to the player's vitals and pushes `0x96B8DC59` so their HP bar drops. The attack
 >   ANIMATION packet is undecoded (damage effect only). NPC *movement* still waits on the pinned MoveTask grammar.
-> - **Player death → respawn** ✓ when a player's vitals hit 0 (the killing hit pushes HP=0 = the client's death state)
->   a respawn countdown starts (`TickPlayerDeaths`, 10s); corpses don't regen and NPCs stop hitting them. On expiry
->   they're revived to full (`EntityVitals.ReviveToFull`) and re-entered at the map's spawn point (`RespawnPlayer`,
->   reusing `SendWorldEntry` — the proven world-entry render path, no gated warp packet). The combat loop is now closed
->   both ways. A dedicated death/rebirth-UI packet (if any) is undecoded; the HP=0 push is the death signal.
+> - **Player death → respawn at the closest known resurrection point** ✓ when a player's vitals hit 0 (HP=0 push =
+>   the client's death state) a respawn countdown starts (`TickPlayerDeaths`, 10s); corpses don't regen and NPCs stop
+>   hitting them. On expiry they're revived to full (`EntityVitals.ReviveToFull`) and re-entered (`RespawnPlayer`,
+>   reusing `SendWorldEntry`, no gated warp) at the **closest resurrection point they KNOW** (`RespawnResolver`).
+>   `RespawnPoint`/`CharacterRespawnPoint` tables (migration `AddRespawnPoints`): each point is always-known (the
+>   seeded Tortage-Beach starter) or must be **discovered** by walking near it (`DiscoverNearbyRespawnPoints`, persisted
+>   + a system message); respawn falls back to the map spawn if none known. Combat loop closed both ways. A dedicated
+>   death/rebirth-UI packet (if any) is undecoded; the HP=0 push is the death signal.
 > - **NPC death → respawn** ✓ NPC vitals live on `WorldEntity` (seeded level-scaled at zone load, world-authoritative).
 >   Combat routes NPC damage through the model (`ApplyNpcDamage`/`ResolveNpcVitals`); on death the NPC is marked dead +
 >   despawned for nearby players (`BroadcastNpcDespawn`), and `WorldState.Tick` counts down `RespawnDelaySeconds` and

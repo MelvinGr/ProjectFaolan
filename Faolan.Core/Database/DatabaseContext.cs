@@ -36,6 +36,8 @@ namespace Faolan.Core.Database
 		DbSet<WorldObject> WorldObjects { get; }
 		DbSet<Realm> Realms { get; }
 		DbSet<Spell> Spells { get; }
+		DbSet<RespawnPoint> RespawnPoints { get; }
+		DbSet<CharacterRespawnPoint> CharacterRespawnPoints { get; }
 		Task<int> SaveChangesAsync(CancellationToken cancellationToken = default); // from DbContext
 	}
 
@@ -70,6 +72,8 @@ namespace Faolan.Core.Database
 		public DbSet<WorldObject> WorldObjects { get; set; }
 		public DbSet<Realm> Realms { get; set; }
 		public DbSet<Spell> Spells { get; set; }
+		public DbSet<RespawnPoint> RespawnPoints { get; set; }
+		public DbSet<CharacterRespawnPoint> CharacterRespawnPoints { get; set; }
 
 		public DatabaseContext(DbContextOptions<DatabaseContext> dbContextOptions) : base(dbContextOptions)
 		{

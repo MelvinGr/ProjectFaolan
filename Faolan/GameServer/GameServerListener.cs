@@ -72,6 +72,15 @@ namespace Faolan.GameServer
 		private readonly System.Collections.Concurrent.ConcurrentDictionary<INetworkClient, double> _playerRespawnRemaining =
 			new System.Collections.Concurrent.ConcurrentDictionary<INetworkClient, double>();
 
+		// How close a player must get to discover a resurrection point.
+		private const float RespawnDiscoveryRange = 15f;
+
+		// Per-map resurrection points + per-character discovered sets, cached to keep the discovery tick off the DB.
+		private readonly System.Collections.Concurrent.ConcurrentDictionary<uint, Core.Database.Tables.RespawnPoint[]> _respawnPointsByMap =
+			new System.Collections.Concurrent.ConcurrentDictionary<uint, Core.Database.Tables.RespawnPoint[]>();
+		private readonly System.Collections.Concurrent.ConcurrentDictionary<uint, System.Collections.Generic.HashSet<uint>> _discoveredRespawnByCharacter =
+			new System.Collections.Concurrent.ConcurrentDictionary<uint, System.Collections.Generic.HashSet<uint>>();
+
 		// Background loops (game tick + autosave) and their lifetime token. Held (not fire-and-forget) so StopAsync can
 		// signal them and await a clean shutdown, and so any unobserved fault surfaces instead of being swallowed.
 		private CancellationTokenSource _loopCts;
@@ -206,7 +215,10 @@ namespace Faolan.GameServer
 
 					// Rate-based systems: fire on their own cadence, scaled by the time actually elapsed since last fire.
 					if (regen.Advance(dt, out var regenElapsed))
+					{
 						await RegenerateConnectedPlayers(regenElapsed);
+						await DiscoverNearbyRespawnPoints();
+					}
 				}
 			}
 			catch (System.OperationCanceledException)
@@ -280,23 +292,95 @@ namespace Faolan.GameServer
 			}
 		}
 
-		// Revives a dead player: full vitals, moved to the map's spawn point, and re-entered (the proven world-entry
-		// render path, same as a teleport) so they reappear alive away from whatever killed them. No gated warp packet
-		// needed - reuses SendWorldEntry.
+		// Revives a dead player: full vitals, moved to the CLOSEST resurrection point they know (the always-known
+		// starter + any discovered; RespawnResolver), and re-entered (the proven world-entry render path, same as a
+		// teleport) so they reappear alive away from whatever killed them. Falls back to the map's spawn point if the
+		// map has no points. No gated warp packet needed - reuses SendWorldEntry.
 		private async Task RespawnPlayer(INetworkClient client, Combat.EntityVitals vitals)
 		{
 			var character = client.Session.Character;
 			vitals.ReviveToFull();
 
-			var map = await Database.GetMap(character.MapId);
-			if (map != null)
+			var deathPos = PlayerWorldEntity(client)?.Position ?? character.Position;
+			var points = await GetRespawnPointsCached(character.MapId);
+			var target = points.Length > 0
+				? World.RespawnResolver.ClosestKnown(deathPos, points, await GetDiscoveredRespawnCached(character.Id))
+				: null;
+
+			if (target != null)
 			{
-				character.Position = map.Position;
-				character.Rotation = map.Rotation;
+				character.Position = target.Position;
+				character.Rotation = target.Rotation;
+				Logger.LogInformation("Combat: {Player} respawned at '{Point}' (map {Map}).", character.Name, target.Name, character.MapId);
+			}
+			else
+			{
+				var map = await Database.GetMap(character.MapId);
+				if (map != null)
+				{
+					character.Position = map.Position;
+					character.Rotation = map.Rotation;
+				}
+
+				Logger.LogInformation("Combat: {Player} respawned at the map {Map} spawn point (no known resurrection point).", character.Name, character.MapId);
 			}
 
 			await SendWorldEntry(client);
-			Logger.LogInformation("Combat: {Player} respawned at the map {Map} spawn point.", character.Name, character.MapId);
+		}
+
+		// A map's resurrection points, cached on first use (rarely changes within a run).
+		private async Task<Core.Database.Tables.RespawnPoint[]> GetRespawnPointsCached(uint mapId)
+		{
+			if (_respawnPointsByMap.TryGetValue(mapId, out var cached))
+				return cached;
+
+			var points = await Database.GetRespawnPoints(mapId);
+			_respawnPointsByMap[mapId] = points;
+			return points;
+		}
+
+		// A character's discovered respawn-point ids, cached (loaded once, updated on discovery) to keep the discovery
+		// tick off the DB.
+		private async Task<System.Collections.Generic.HashSet<uint>> GetDiscoveredRespawnCached(uint characterId)
+		{
+			if (_discoveredRespawnByCharacter.TryGetValue(characterId, out var cached))
+				return cached;
+
+			var set = new System.Collections.Generic.HashSet<uint>(await Database.GetDiscoveredRespawnPointIds(characterId));
+			_discoveredRespawnByCharacter[characterId] = set;
+			return set;
+		}
+
+		// Discovers any resurrection point a living player has walked near (so they can respawn there later). Run at the
+		// regen cadence (1 Hz) to keep it cheap; always-known points need no discovery. Persists + notifies on a new find.
+		private async Task DiscoverNearbyRespawnPoints()
+		{
+			foreach (var pair in _playerEntities)
+			{
+				var client = pair.Key;
+				var character = client.Session?.Character;
+				if (character == null)
+					continue;
+
+				var entity = pair.Value;
+				var points = await GetRespawnPointsCached(entity.MapId);
+				if (points.Length == 0)
+					continue;
+
+				var discovered = await GetDiscoveredRespawnCached(character.Id);
+				foreach (var point in points)
+				{
+					if (point.AlwaysKnown || discovered.Contains(point.Id))
+						continue;
+					if (System.Numerics.Vector3.Distance(point.Position, entity.Position) > RespawnDiscoveryRange)
+						continue;
+
+					await Database.DiscoverRespawnPoint(character.Id, point.Id);
+					discovered.Add(point.Id);
+					await _agentServerDispatcher.SendSystemMessage(character.Id, $"Resurrection point discovered: {point.Name}");
+					Logger.LogInformation("World: {Player} discovered resurrection point '{Point}'.", character.Name, point.Name);
+				}
+			}
 		}
 
 		// Applies an aggroed NPC's swing to the target player: reduce the player's live vitals and push a 0x96B8DC59
