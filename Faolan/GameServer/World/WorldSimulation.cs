@@ -44,6 +44,15 @@ namespace Faolan.GameServer.World
 		// How far a player perceives other players (world-entity interest radius; wider than say range).
 		public const float PlayerInterestRange = 150f;
 
+		// NPC auto-attack damage is GATED OFF. The hostile-NPC swing is delivered as model-only damage via the
+		// 0x96B8DC59 vitals packet because the attack ANIMATION ack is undecoded (see protocol_stats_and_combat) -
+		// so the player takes invisible damage, dies with no on-screen cause, and the respawn re-runs SendWorldEntry.
+		// On a zone with many hostiles (Tortage Beach has ~400) that becomes a death-loop: the client re-enters the
+		// world every ~10s and never finishes loading (e.g. never opens the chat connection, which retail does only
+		// after world load completes). Aggro tracking still runs; only the damage is suppressed. Re-enable once the
+		// NPC attack animation is decoded so the hit is visible and survivable.
+		private const bool NpcAutoAttackEnabled = false;
+
 		// Base game-loop cadence: 10 Hz. Continuous systems run every base tick with the real elapsed dt so they stay
 		// smooth; slower rate-based systems run via a TickAccumulator at their own interval. The loop measures
 		// wall-clock dt, not the nominal period, so a late tick doesn't desync the rates.
@@ -336,7 +345,10 @@ namespace Faolan.GameServer.World
 								World.Remove(effect.Entity);
 								break;
 							case WorldTickEffectType.NpcAttack:
-								await ApplyNpcAttack(effect.Entity, effect.Target);
+								// Gated off until the attack animation is decoded - see NpcAutoAttackEnabled. Invisible
+								// model damage was killing players in a respawn/world-re-entry death-loop.
+								if (NpcAutoAttackEnabled)
+									await ApplyNpcAttack(effect.Entity, effect.Target);
 								break;
 						}
 					}
