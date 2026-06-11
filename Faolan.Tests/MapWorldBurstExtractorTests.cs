@@ -91,6 +91,38 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void Extract_RejectsWindow_PollutedWithEntityQuits()
+		{
+			const uint instance = 0x02165EFF;
+			const uint quit = 0x04B82B2D; // N3ToClientQuit
+			var packets = new List<CapturedPacket> { MapChange(11040, instance) };
+			for (var n = 0; n < 20; n++) // a mid-session window: entities leaving (gameplay churn, not a world build)
+				packets.Add(Download2000(quit));
+			packets.Add(Download2000(0xFA015807));
+			packets.Add(Poll2020());
+
+			var bursts = MapWorldBurstExtractor.Extract(packets);
+
+			Assert.Empty(bursts); // rejected: >10 entity-quits marks a mid-session capture
+		}
+
+		[Fact]
+		public void Extract_KeepsWindow_WithFewEntityQuits()
+		{
+			const uint instance = 0x02165EFF;
+			const uint quit = 0x04B82B2D;
+			var packets = new List<CapturedPacket> { MapChange(2040, instance) };
+			for (var n = 0; n < 5; n++) // a clean-ish window with minor churn (tolerated, like the 4020 capture)
+				packets.Add(Download2000(quit));
+			packets.Add(Download2000(0xFA015807));
+			packets.Add(Poll2020());
+
+			var bursts = MapWorldBurstExtractor.Extract(packets);
+
+			Assert.Single(bursts); // kept: 5 quits is within tolerance
+		}
+
+		[Fact]
 		public void Merge_DropsBurst_WhenInstanceUnknown()
 		{
 			// No receiver header -> CapturedInstance stays 0 -> can't re-address -> dropped.

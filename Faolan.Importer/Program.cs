@@ -91,12 +91,17 @@ namespace Faolan.Importer
 		// Upsert per map: replace that map's burst (instance + structured IIR records); leave other maps untouched.
 		private static async Task ImportMapWorldBursts(DatabaseContext db, List<MapWorldBurstEntry> bursts)
 		{
-			// Purge any existing rows with an unknown captured instance (0) - those can't be re-addressed. Out-of-range
-			// instances are kept now (RewriteBurstInstance pads the live id's varint to the captured length).
+			// Purge existing rows the current extraction no longer produces, so the DB reflects the captures: any row
+			// with an unknown captured instance (0, can't be re-addressed) OR a map the extractor now rejects (e.g. a
+			// mid-session window dropped by the hygiene gate - see MapWorldBurstExtractor). The beach is exempt (its
+			// burst is a committed seed the extractor deliberately skips, not a captured map).
+			var keptMaps = bursts
+				.Select(e => e.MapId)
+				.ToHashSet();
 			var stale = await db
 				.MapWorldBursts
 				.Include(b => b.Entities)
-				.Where(b => b.CapturedInstance == 0)
+				.Where(b => b.CapturedInstance == 0 || (b.MapId != BeachMapId && !keptMaps.Contains(b.MapId)))
 				.ToListAsync();
 			if (stale.Count > 0)
 			{
