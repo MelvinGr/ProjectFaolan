@@ -262,8 +262,9 @@ namespace Faolan.GameServer
 		// observed in demol80's "very_long_loading" capture: a channeled ApplySpell 0x6B87E316 (spell 0x3BAD7D,
 		// repeated ~11x with 0xF508F4C1) immediately precedes the "Fading Black Horse" entity registering
 		// (0x96C46740) and the player switching to MountedRun (MovingType 0x010A). This broadcasts the cast; full
-		// mounting also needs the mount entity spawn + the MountedRun transition (not yet built - see TODO).
-		private Task MountCommand(INetworkClient client, string arguments)
+		// mounting: broadcasts the summon cast AND spawns the mount entity at the player (it appears). The player
+		// actually RIDING (the MountedRun movement transition) is the client's part and in-client-gated.
+		private async Task MountCommand(INetworkClient client, string arguments)
 		{
 			var spellId = string.IsNullOrWhiteSpace(arguments)
 				? 0x3BAD7Du
@@ -272,7 +273,8 @@ namespace Faolan.GameServer
 					.Replace("0x", "", StringComparison.OrdinalIgnoreCase), 16);
 
 			var self = client.Session.Account.ClientInstance;
-			return ApplySpell(client, self, self, spellId);
+			await ApplySpell(client, self, self, spellId); // the channeled summon cast (broadcast)
+			await SpawnMountForPlayer(client, "Fading Black Horse"); // the decoded mount for the default summon 0x3BAD7D
 		}
 
 		// .save  - flush the live world state to the DB. The WorldEntity is the source of truth for live transform

@@ -45,6 +45,7 @@ namespace Faolan.Core.Database
 
 		Task<MapWorldBurst> GetMapWorldBurst(uint mapId);
 		Task<NpcSpawn[]> GetNpcSpawns(uint mapId);
+		Task<NpcSpawn> GetNpcSpawnByName(string name);
 		Task<WorldObject[]> GetWorldObjects(uint mapId);
 		Task<RespawnPoint[]> GetRespawnPoints(uint mapId);
 		Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId);
@@ -425,6 +426,16 @@ namespace Faolan.Core.Database
 
 		// The captured static world objects for a map (decor/containers/zones). The world-entry path builds each
 		// object's body from its row via WorldObjectBuilder, like the NPC spawns.
+		// A captured NPC spawn by name, any map (used to fetch a mount-entity template like "Fading Black Horse" to
+		// spawn at the player). Prefers a row that has spawn Data.
+		public async Task<NpcSpawn> GetNpcSpawnByName(string name)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.NpcSpawns
+				.Where(n => n.Name == name && n.Data != null)
+				.FirstOrDefaultAsync();
+		}
+
 		public async Task<WorldObject[]> GetWorldObjects(uint mapId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();

@@ -573,9 +573,11 @@ Concrete next steps, grouped by area. See `docs/` for the dissection writeups be
       killed player respawns at the closest known resurrection point. Real **NPC max HP** now comes from the
       captured spawn `CharacterStats.health` (not a placeholder). Remaining gating: the live loot item-grant
       (in-client/RE-gated) and cross-player visual confirmation (2-client test).
-- [ ] **Mounts**: the summon spell is `0x3BAD7D` (channeled ApplySpell `0x6B87E316`, decoded from demol80's
-      `very_long_loading` capture; `.mount` broadcasts it). Still needed for full mounting: spawn the mount
-      entity (`0xFA015807`, e.g. "Fading Black Horse") and drive the MountedRun (`MovingType 0x010A`) transition.
+- [~] **Mounts**: the summon spell is `0x3BAD7D` (channeled ApplySpell `0x6B87E316`). `.mount` now broadcasts the
+      cast **and spawns the mount entity** (the captured "Fading Black Horse" `0xFA015807` NpcSpawn, built byte-exact
+      via `NpcSpawnBuilder` at the player's position, `SpawnMountForPlayer`) so the horse appears. Remaining (in-client
+      gated): the player actually RIDING — the MountedRun (`MovingType 0x010A`) movement transition is the client's
+      part once it binds the summoned mount.
 - [ ] Fix the wrong stat ids in `CapturedCharacterStats.cs`: `MaxHealth 0x01` (decodes to ~196, not max),
       `MaxStamina 0x1F9` / `MaxMana 0x1FB` (suspect); find the real max-* ids or confirm max==current-when-full.
 - [ ] Determine whether **attributes** (Str/Int/Con/Wis/Dex) are sent at all or computed client-side from

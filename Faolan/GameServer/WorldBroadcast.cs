@@ -263,6 +263,38 @@ namespace Faolan.GameServer
 			}
 		}
 
+		// Spawns a mount entity (a captured FA015807 "Horse" NpcSpawn, e.g. "Fading Black Horse") at the player's
+		// position and renders it for nearby players - the summon's visible payoff. Built byte-exact via NpcSpawnBuilder
+		// (like NPC/loot spawns), re-framed + position-patched per recipient by SendWorldSpawn. The cast is broadcast
+		// separately; the player actually RIDING (the MountedRun movement transition) is the client's part and
+		// in-client-gated. The mount has no vitals (not killable) and is non-hostile.
+		private async Task SpawnMountForPlayer(INetworkClient client, string mountName)
+		{
+			var player = PlayerWorldEntity(client);
+			if (player == null)
+				return;
+
+			var mount = await Database.GetNpcSpawnByName(mountName);
+			var handle = NextLootHandle(); // a fresh summoned-entity handle (high range, no player/NPC collision)
+			if (mount == null || !Spawn.NpcSpawnBuilder.TryBuild(mount, handle, out var body))
+			{
+				Logger.LogInformation("Mount: no spawnable '{Mount}' template found.", mountName);
+				return;
+			}
+
+			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, mountName);
+			entity.SpawnBody = body;
+			_world.ZoneFor(player.MapId).Add(entity);
+
+			foreach (var viewer in _world.ZoneFor(player.MapId).PlayersInRange(player.Position, PlayerInterestRange))
+			{
+				if (viewer.Client != null)
+					await SendWorldSpawn(viewer.Client, entity);
+			}
+
+			Logger.LogInformation("Mount: spawned {Mount} 0x{Handle:X8} for {Player} at {Pos}.", mountName, handle, player.Name, player.Position);
+		}
+
 		// On a kill, maybe drop a loot bag at the dead NPC's spot (LootResolver coin-flip). The bag is a world object
 		// (LootBagFullUpdateIIR_c 0xF096251E) built from a captured "Bag of loot" row for the map, placed at the death
 		// position with a fresh handle, added to the zone, and spawned for nearby players. It expires off the tick
