@@ -93,6 +93,12 @@ The Knubot opcodes are now named: `0x045B0B0F` OpenChatWindow, `0x4A3D899A` Appe
 - **FIXED (needs re-test): the chat-lock.** On a no-match beach login the server sent NOTHING, so the client hung
   (can't ESC). It now sends `KnubotCloseChatWindow` (graceful "nothing more to say" close). RE-TEST: advancing to an
   un-captured step should now CLOSE the window cleanly instead of locking.
+- **FIXED (needs re-test): "all stages played at once".** Picking an option is a KnubotAnswer (0x4D7D9123) upload,
+  not a TalkToNpc — the extractor only split at TalkToNpc, so it bundled every stage into one node and replayed the
+  whole tree on the first click. Now the node is segmented into stages (each ends at an answer-list/close-window);
+  TalkToNpc serves stage 0, each KnubotAnswer serves the next stage. RE-TEST: dialogue should advance greeting →
+  option → reply → next option, one step per click. (Linear replay of the captured path; it ignores WHICH option you
+  pick, so branching still follows the capture — full branching needs RDB dialogue trees.)
 - **Still expected (data gap, not a bug): "no lines" / wrong-looking dialog** when the live quest-state branch isn't
   in any capture. The real fix is RDB-driven conversation trees (dialogue that works for ANY quest state), not
   capture replay — a separate, larger effort.
