@@ -182,6 +182,8 @@ namespace Faolan.Importer
 			row.MonsterData = e.MonsterData;
 			row.HeadMesh = e.HeadMesh;
 			row.HasEquipment = e.HasEquipment;
+			row.Health = e.Health;
+			row.Community = e.Community;
 			return row;
 		}
 

@@ -38,10 +38,11 @@ Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see a
 >   conversation; quest-givers/vendors are friendly and never aggro) aggros the nearest player within `NpcAggroRange`
 >   (20u) and swings every `NpcAttackInterval` (2s), emitting an `NpcAttack` effect; the listener applies level-scaled
 >   damage (`ResolveNpcAttackDamage`) + pushes `0x96B8DC59`. A damaged NPC with no player in range **leashes** — heals
->   back to full (no kiting from out of range / across pulls). Hostility is set at zone load from the spawn's
->   **`NpcStats.community`** (faction): `community > 0` = a faction mob (poachers 59, scavengers 60, picts 317,
->   crocs 374…) = hostile; `community 0` = the neutral/friendly community (quest-givers AND neutral critters like
->   Scorpion/Guard Dog); absent = not hostile. The attack ANIMATION packet is undecoded (damage effect only); NPC
+>   back to full (no kiting from out of range / across pulls). Both HP and hostility now come from columns the
+>   **importer lifts** from the spawn blob: **`NpcSpawn.Health`** (real per-NPC max HP, was a level-scaled guess) and
+>   **`NpcSpawn.Community`** (faction): `Community > 0` = a faction mob (poachers 59, scavengers 60, picts 317,
+>   crocs 374…) = hostile; `Community 0` = the neutral/friendly community (quest-givers AND neutral critters like
+>   Scorpion/Guard Dog). The attack ANIMATION packet is undecoded (damage effect only); NPC
 >   *movement* still waits on the pinned MoveTask grammar.
 > - **Player death → respawn at the closest known resurrection point** ✓ when a player's vitals hit 0 (HP=0 push =
 >   the client's death state) a respawn countdown starts (`TickPlayerDeaths`, 10s); corpses don't regen and NPCs stop

@@ -21,6 +21,12 @@ namespace Faolan.Importer
 		public uint MonsterData { get; init; }
 		public uint HeadMesh { get; init; }
 		public bool HasEquipment { get; init; }
+
+		// Max health (player-facing; wire CharacterStats.health/life is ×100) - the real per-NPC combat HP.
+		public uint Health { get; init; }
+
+		// NpcStats.community = the faction id: 0 = neutral/friendly, > 0 = a hostile faction (drives aggro hostility).
+		public uint Community { get; init; }
 	}
 
 	// Extracts NPC entity spawns (FA015807) per map from a capture: tracks the current map (MapChange 5D85BFC7),
@@ -112,6 +118,7 @@ namespace Faolan.Importer
 
 			var msg = read.Message;
 			var stats = msg.Stats;
+			var wireHealth = stats == null ? 0 : stats.Health != 0 ? stats.Health : stats.Life;
 			return empty with
 			{
 				Name = msg.Name ?? string.Empty,
@@ -122,7 +129,9 @@ namespace Faolan.Importer
 				MonsterScale = stats?.MonsterScale ?? 0,
 				MonsterData = stats?.MonsterData ?? 0,
 				HeadMesh = stats?.HeadMesh ?? 0,
-				HasEquipment = msg.InventoryEntries.Count > 0
+				HasEquipment = msg.InventoryEntries.Count > 0,
+				Health = wireHealth >= 100 ? wireHealth / 100 : 0, // ×100 scale; ignore absent/implausible
+				Community = msg.npc_stats?.Community ?? 0
 			};
 		}
 

@@ -32,5 +32,13 @@ namespace Faolan.Core.Database.Tables
 		public uint MonsterData { get; set; }
 		public uint HeadMesh { get; set; }
 		public bool HasEquipment { get; set; }
+
+		// Real per-NPC max health (player-facing) lifted from the spawn's CharacterStats.health - the combat HP vs the
+		// level-scaled placeholder. 0 = the spawn carried none.
+		public uint Health { get; set; }
+
+		// Faction/community lifted from NpcStats.community: 0 = neutral/friendly, > 0 = a hostile faction. Drives NPC
+		// aggro hostility (server-architecture-roadmap).
+		public uint Community { get; set; }
 	}
 }
