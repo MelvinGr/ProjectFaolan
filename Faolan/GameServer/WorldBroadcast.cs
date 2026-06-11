@@ -196,27 +196,49 @@ namespace Faolan.GameServer
 			}
 		}
 
-		// A player used (opened) a world object. If it's a loot bag in their zone, run the loot interaction: assign the
-		// player as the current looter, then consume the bag - fade it out for nearby players and remove it from the
-		// zone. The item GRANT (ContainerAddItem into the player's inventory) is the remaining, in-client-gated piece;
-		// for now opening a bag assigns + consumes it (the decoded handshake). No-op for non-loot / unknown objects.
+		// A player opened a world object (Interact UseObject). If it's a loot bag in their zone, OPEN ITS LOOT WINDOW
+		// per the decoded flow (protocol_loot_interaction): assign the player as the current looter and send the
+		// SimpleDynelVisualChange "Open" so the client shows the bag's contents. The bag STAYS in the world - it is
+		// consumed on close (0x2044), not on open. Taking an item (0x2043 -> grant + LootRemoveItems) is the remaining,
+		// in-client-gated piece. No-op for non-loot / unknown objects.
 		private async Task OpenLootBag(INetworkClient client, uint objectHandle)
 		{
 			var player = PlayerWorldEntity(client);
 			if (player == null || !_world.ZoneFor(player.MapId).TryGet(objectHandle, out var bag) || !bag.IsLoot)
 				return;
 
-			// You are the looter.
 			await new PacketStream()
 				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x2000)
 				.WriteArrayUInt32Length(s => s.WriteArray(World.WorldLoot.BuildNewCurrentLooterBody(bag.Handle, player.Handle)))
 				.SendAsync(client);
+			await new PacketStream()
+				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x2000)
+				.WriteArrayUInt32Length(s => s.WriteArray(World.WorldLoot.BuildOpenWindowBody(World.WorldLoot.LootTypeTag, bag.Handle)))
+				.SendAsync(client);
 
-			Logger.LogInformation("Loot: {Name} opened {Bag} 0x{Handle:X8} (item grant pending); fading the bag.", player.Name, bag.Name, bag.Handle);
+			Logger.LogInformation("Loot: {Name} opened the loot window on {Bag} 0x{Handle:X8}.", player.Name, bag.Name, bag.Handle);
+		}
 
-			// Consume the bag: fade it for everyone who can see it, then drop it from the model.
+		// A player clicked an item in the loot window (top-level 0x2043). The actual transfer - grant the item to the
+		// player's inventory (ContainerAddItem) + LootRemoveItems to clear it from the bag - is the in-client-gated
+		// piece not built yet (no live inventory-add path). Logged so the click is traceable.
+		private Task TakeLootItem(INetworkClient client, uint bagHandle)
+		{
+			Logger.LogInformation("Loot: take-item on bag 0x{Handle:X8} (item grant not yet implemented).", bagHandle);
+			return Task.CompletedTask;
+		}
+
+		// A player closed the loot window (top-level 0x2044): consume the bag - fade it out for nearby players and drop
+		// it from the model.
+		private async Task CloseLootBag(INetworkClient client, uint bagHandle)
+		{
+			var player = PlayerWorldEntity(client);
+			if (player == null || !_world.ZoneFor(player.MapId).TryGet(bagHandle, out var bag) || !bag.IsLoot)
+				return;
+
 			await BroadcastEntityFade(bag);
 			_world.Remove(bag);
+			Logger.LogInformation("Loot: {Name} closed loot bag 0x{Handle:X8}; faded + removed.", player.Name, bag.Handle);
 		}
 
 		// Fade an entity out for every player in range (n3ToClientFadeIIR_t) - the graceful despawn used for loot bags

@@ -65,6 +65,16 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void BuildOpenWindowBody_MatchesCapture()
+		{
+			// hoxxling-login-gameplay: SimpleDynelVisualChange "Open" on bag 0x000021FE opens the loot window.
+			var body = WorldLoot.BuildOpenWindowBody(WorldLoot.LootTypeTag, 0x000021FE);
+			Assert.Equal(
+				"e7f4f8f80000c87a000021fe000000000000044f70656e",
+				System.Convert.ToHexString(body).ToLowerInvariant());
+		}
+
+		[Fact]
 		public void WorldStateTick_ExpiresLootAndReportsIt()
 		{
 			var world = new WorldState();

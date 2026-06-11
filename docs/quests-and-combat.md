@@ -100,7 +100,18 @@ channel).
 ## Loot
 
 Decoded from `hoxxling-login-gameplay.json` (see `protocol_loot_interaction`). Loot bags use **typetag `0xC87A`**
-(not the `0xC350` the entity family uses). Pickup sequence (client USE → looter-assign → grant → fade):
+(not the `0xC350` the entity family uses). **The UX is a loot WINDOW + click-to-take** (an earlier "auto-loot on use"
+read was wrong — the take requests are top-level opcodes `0x2043`/`0x2044`, not `0x2000`). Full sequence:
+
+- spawn `LootBagFull` (`0xF096251E`) carries the bag **and its item contents**; client `LookAt` (`0x0D155695`) selects
+  it; `Interact UseObject` (`0x12`) opens it.
+- server `NewCurrentLooter` (`0xD06568C8`) + **`SimpleDynelVisualChange` (`0xE7F4F8F8`) "Open"** → the loot window opens
+  (the bag stays).
+- client clicks item → **`0x2043`** (take) → server `LootRemoveItems` (`0x70010162`) + the inventory grant
+  (`ContainerAddItem` `0x79F8C7A1`/`0x63268258`).
+- client **`0x2044`** (close) → bag `n3ToClientFade` (`0x66180B20`) then `n3ToClientQuit` (`0x04B82B2D`).
+
+Per-packet byte layouts (server→client):
 
 1. **`0xF096251E` `LootBagFullUpdateIIR_c`** (spawn, server→client) — a **world object** (`0x2C` transform group +
    object id + name "Chest [N7FU]"/"Bag of loot" + a `remoteformat … category=50026` TreasureChestScript). Built by

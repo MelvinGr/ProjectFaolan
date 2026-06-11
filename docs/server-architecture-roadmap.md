@@ -46,11 +46,12 @@ Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see a
 > - **Loot on kill** ✓ a kill may drop a loot bag (`LootResolver` coin-flip): a world object (`LootBagFullUpdateIIR_c`
 >   0xF096251E) built from a captured "Bag of loot" row at the death spot with a fresh handle, added to the zone +
 >   spawned for nearby players. The full open interaction is DECODED (`protocol_loot_interaction`,
->   `docs/quests-and-combat.md`) and the **open handshake is wired**: using a bag (`Interact` action `0x12` = `UseObject`)
->   → `NewCurrentLooter` (0xD06568C8) → fade the bag (`n3ToClientFade` 0x66180B20, the graceful despawn) + remove. Loot
->   expiry now fades too. Packet builders (`WorldLoot`) are byte-exact vs the capture. **The item GRANT
->   (`ContainerAddItem` 0x79F8C7A1/0x63268258 into live inventory) is the remaining, heavy/in-client-gated piece** — no
->   live inventory-add path exists yet.
+>   `docs/quests-and-combat.md`) — it's a loot **window + click-to-take**, not auto-loot. The **window flow is wired**:
+>   opening a bag (`Interact` action `0x12` `UseObject`) → `NewCurrentLooter` (0xD06568C8) + `SimpleDynelVisualChange`
+>   "Open" (0xE7F4F8F8) shows the contents and the bag STAYS; close (top-level `0x2044`) → fade (`n3ToClientFade`
+>   0x66180B20) + remove. Loot expiry fades too. All `WorldLoot` builders are byte-exact vs the capture. **Taking an
+>   item (`0x2043` → grant `ContainerAddItem` + `LootRemoveItems` 0x70010162) is the remaining, heavy/in-client-gated
+>   piece** — no live inventory-add path exists yet, so a click is logged but yields nothing.
 > **NEXT:** the loot item-grant (live ContainerAddItem); then NPC AI movement (the pinned MoveTask patrol grammar) so
 > the tick drives motion and the burst becomes a pure seed — where the loop and "construct, don't replay" meet. Then quests.
 

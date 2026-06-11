@@ -68,7 +68,9 @@
 			Ox207E = 0x207E,
 			Ox2071 = 0x2071,
 			Ox2020 = 0x2020,
-			MoveItemToBar = 0x206E
+			MoveItemToBar = 0x206E,
+			LootItem = 0x2043, // client clicks an item in an open loot window (take); body = [loot typetag][bag handle]
+			CloseLoot = 0x2044 // client closes the loot window; body = [loot typetag][bag handle]
 		}
 
 		public enum GameServerRespondOpcodes : ushort

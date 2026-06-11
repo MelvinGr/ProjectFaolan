@@ -550,6 +550,24 @@ namespace Faolan.GameServer
 					break;
 				}
 
+				case GameServerOpcodes.LootItem: // client took an item from an open loot window; body = [typetag][bag handle]
+				{
+					packet.Body.ReadUInt32(); // loot typetag (0xC87A)
+					var bagHandle = packet.Body.ReadUInt32();
+					await TakeLootItem(client, bagHandle);
+
+					break;
+				}
+
+				case GameServerOpcodes.CloseLoot: // client closed the loot window; body = [typetag][bag handle]
+				{
+					packet.Body.ReadUInt32(); // loot typetag (0xC87A)
+					var bagHandle = packet.Body.ReadUInt32();
+					await CloseLootBag(client, bagHandle);
+
+					break;
+				}
+
 				case GameServerOpcodes.LatencyCheck: // latency check (client 0x2085 -> server 0x2082)
 				{
 					var counter = packet.Body.ReadUInt32();

@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Text;
 
 namespace Faolan.GameServer.World
 {
@@ -12,7 +13,24 @@ namespace Faolan.GameServer.World
 		public const uint EntityTypeTag = 0x0000C350; // the entity-frame typetag carried inside NewCurrentLooter
 		public const uint NewCurrentLooterSubOpcode = 0xD06568C8; // NewCurrentLooterIIR_c
 		public const uint FadeSubOpcode = 0x66180B20; // n3ToClientFadeIIR_t - graceful fade-out despawn
+		public const uint VisualChangeSubOpcode = 0xE7F4F8F8; // SimpleDynelVisualChangeIIR_c - "Open" opens the loot window
 		public const float DefaultFadeSeconds = 3.0f;
+
+		// Opens the loot WINDOW on the object (SimpleDynelVisualChange carrying the state string "Open"). 19 + len B:
+		// [subop][typetag][handle][00000000][0x00][u16 strLen][ascii]. The bag stays in the world; this just opens its UI.
+		public static byte[] BuildOpenWindowBody(uint typeTag, uint handle, string state = "Open")
+		{
+			var text = Encoding.ASCII.GetBytes(state);
+			var body = new byte[19 + text.Length];
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), VisualChangeSubOpcode);
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), typeTag);
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), handle);
+			// body[12..16] stays 0x00000000
+			body[16] = 0x00;
+			BinaryPrimitives.WriteUInt16BigEndian(body.AsSpan(17, 2), (ushort)text.Length);
+			text.CopyTo(body, 19);
+			return body;
+		}
 
 		// "bag -> current looter = this player" (also used for NewAllowedLooter, same shape). 21 B:
 		// [subop][lootTypetag][bagHandle][0x00][entityTypetag][playerHandle].
