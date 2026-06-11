@@ -187,9 +187,9 @@ namespace Faolan.GameServer
 					var required = parts.Length > 2 && uint.TryParse(parts[2], out var c) ? c : 0;
 					var target = parts.Length > 3 ? string.Join(' ', parts.Skip(3)) : null;
 					await Database.SetCharacterQuest(characterId, questId, Core.Database.Tables.QuestState.Active, 0, required, target);
-					await SendQuestIir(client, questId, World.WorldQuest.StateActive);
+					await _broadcaster.SendQuestIir(client, questId, World.WorldQuest.StateActive);
 					if (required > 0)
-						await SendQuestGoal(client, questId, 0, 0);
+						await _broadcaster.SendQuestGoal(client, questId, 0, 0);
 					await _agentServerDispatcher.SendSystemMessage(characterId, target != null
 						? $"Quest {questId} added: kill {required} {target}."
 						: $"Quest {questId} added to journal.");
@@ -273,7 +273,7 @@ namespace Faolan.GameServer
 
 			var self = client.Session.Account.ClientInstance;
 			await ApplySpell(client, self, self, spellId); // the channeled summon cast (broadcast)
-			await SpawnMountForPlayer(client, "Fading Black Horse"); // the decoded mount for the default summon 0x3BAD7D
+			await _broadcaster.SpawnMountForPlayer(client, "Fading Black Horse"); // the decoded mount for the default summon 0x3BAD7D
 		}
 
 		// .save  - flush the live world state to the DB. The WorldEntity is the source of truth for live transform

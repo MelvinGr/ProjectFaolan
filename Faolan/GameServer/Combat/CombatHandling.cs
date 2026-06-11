@@ -96,10 +96,10 @@ namespace Faolan.GameServer
 			if (npcEntity != null)
 			{
 				npcEntity.MarkDead();
-				await BroadcastEntityDespawn(npcEntity);
+				await _broadcaster.BroadcastEntityDespawn(npcEntity);
 				Logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); despawned, respawns in {Delay}s.", npcEntity.Name, targetHandle, cause, npcEntity.RespawnDelaySeconds);
 				await AwardKillXp(killer, npcEntity.Level);
-				await TrySpawnLoot(npcEntity);
+				await _broadcaster.TrySpawnLoot(npcEntity);
 				await AdvanceKillQuests(killer, npcEntity.Name);
 				return;
 			}
@@ -128,7 +128,7 @@ namespace Faolan.GameServer
 				await Database.SetCharacterQuest(character.Id, quest.QuestId,
 					completed ? Core.Database.Tables.QuestState.Completed : Core.Database.Tables.QuestState.Active,
 					progress, quest.GoalRequired, quest.GoalTargetName);
-				await SendQuestGoal(killer, quest.QuestId, 0, progress);
+				await _broadcaster.SendQuestGoal(killer, quest.QuestId, 0, progress);
 
 				if (completed)
 					await _agentServerDispatcher.SendSystemMessage(character.Id, $"Quest {quest.QuestId} complete!");

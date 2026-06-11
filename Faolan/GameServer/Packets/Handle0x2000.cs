@@ -148,7 +148,7 @@ namespace Faolan.GameServer
 
 							// Interest-managed broadcast: spawn this player to newly-near players and forward the move
 							// to players who already see them (docs/server-architecture-roadmap.md). No-op solo.
-							await BroadcastPlayerMove(client, (uint)pbOpcode, dataobjdec, dataclientinst, (ushort)movingType, livePosition, liveRotation, datadat);
+							await _broadcaster.BroadcastPlayerMove(client, (uint)pbOpcode, dataobjdec, dataclientinst, (ushort)movingType, livePosition, liveRotation, datadat);
 
 							break;
 						}
@@ -305,7 +305,7 @@ namespace Faolan.GameServer
 							{
 								// Using a world object - the loot path: `target` is the object handle (its typetag,
 								// 0xC87A for loot bags, rides in `from`). Opens the bag if it's a loot bag in the zone.
-								await OpenLootBag(client, target);
+								await _broadcaster.OpenLootBag(client, target);
 
 								break;
 							}

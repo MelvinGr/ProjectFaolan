@@ -29,28 +29,18 @@ namespace Faolan.GameServer
 		private readonly IAgentServerDispatcher _agentServerDispatcher;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 
-		// Maps whose NPCs have been loaded into the world model (once per map, on first entry).
-		private readonly System.Collections.Concurrent.ConcurrentDictionary<uint, byte> _npcLoadedZones =
-			new System.Collections.Concurrent.ConcurrentDictionary<uint, byte>();
-
-		// Cached loot-bag template (a captured "Bag of loot" world object) per map; null values cache loot-less maps.
-		private readonly System.Collections.Concurrent.ConcurrentDictionary<uint, Core.Database.Tables.WorldObject> _lootTemplateByMap =
-			new System.Collections.Concurrent.ConcurrentDictionary<uint, Core.Database.Tables.WorldObject>();
-
-		// LootBagFullUpdateIIR_c - the world-object sub-opcode a loot bag spawns as.
-		private const uint LootBagSubOpcode = 0xF096251E;
-
 		// The RDB Lua VM (conversation/quest scripting); stateless + reusable.
 		private readonly Scripting.LuaScriptVm _luaVm = new();
 
-		// Monotonic allocator for dropped-loot handles, in a high range to avoid colliding with player/NPC handles.
-		private int _nextLootHandle = 0x40000000;
-
 		// The live world simulation: owns the world model, the connected players' authoritative entities, and the
 		// 10 Hz tick (NPC respawn/AI, vitals regen, player death/respawn, resurrection discovery). The listener is its
-		// IWorldOutbound port (packet construction + persistence still live here). Built in the ctor (after the
-		// dispatchers are assigned). See World/WorldSimulation.cs and docs/server-architecture-roadmap.md.
+		// IWorldOutbound port. Built in the ctor (after the dispatchers are assigned). See World/WorldSimulation.cs.
 		private readonly World.WorldSimulation _simulation;
+
+		// Builds + sends the world-event packets (spawns/moves/despawns, NPC respawn/loot/mount renders, loot-window
+		// and quest-journal packets). Reads the world model via the simulation; the listener delegates its IWorldOutbound
+		// port + the loot/quest opcode handlers to it. See World/WorldBroadcaster.cs.
+		private readonly World.WorldBroadcaster _broadcaster;
 
 		// Periodic world-state autosave cadence (crash safety; logout/teleport/.save are the event-driven saves).
 		private const int AutoSaveIntervalMinutes = 5;
@@ -67,6 +57,7 @@ namespace Faolan.GameServer
 			_agentServerDispatcher = agentServerDispatcher;
 			_gameServerDispatcher = gameServerDispatcher;
 			_simulation = new World.WorldSimulation(this, database, agentServerDispatcher, logger);
+			_broadcaster = new World.WorldBroadcaster(_simulation, database, logger);
 
 			InitGmCommands();
 		}
@@ -79,9 +70,10 @@ namespace Faolan.GameServer
 			return _simulation.PlayerWorldEntity(client);
 		}
 
-		// --- IWorldOutbound: the wire side of the simulation tick (the listener owns framing + send) -----------------
-		Task World.IWorldOutbound.BroadcastNpcRespawn(World.WorldEntity npc) => BroadcastNpcRespawn(npc);
-		Task World.IWorldOutbound.BroadcastEntityFade(World.WorldEntity entity) => BroadcastEntityFade(entity);
+		// --- IWorldOutbound: the wire side of the simulation tick (broadcaster builds packets; listener owns vitals
+		// send + the world-entry replay) -----------------------------------------------------------------------------
+		Task World.IWorldOutbound.BroadcastNpcRespawn(World.WorldEntity npc) => _broadcaster.BroadcastNpcRespawn(npc);
+		Task World.IWorldOutbound.BroadcastEntityFade(World.WorldEntity entity) => _broadcaster.BroadcastEntityFade(entity);
 		Task World.IWorldOutbound.PushVitals(INetworkClient client, Combat.EntityVitals vitals) => SendStatUpdate(client, vitals.ToVitalsBlock(), client.Session.Account.ClientInstance);
 		Task World.IWorldOutbound.ReenterWorld(INetworkClient client) => SendWorldEntry(client);
 
@@ -92,7 +84,7 @@ namespace Faolan.GameServer
 			{
 				// Tell everyone who could see this player that it left (n3ToClientQuit) BEFORE removing it from the
 				// zone, so ResolveRemove still sees the leaver's viewers. Fire-and-forget: the connection is going away.
-				_ = BroadcastPlayerDespawn(entity);
+				_ = _broadcaster.BroadcastPlayerDespawn(entity);
 				_simulation.RemovePlayer(client, out _);
 				// Persist the player's final live state - movement isn't otherwise saved, so without this a logout
 				// loses where they were. Fire-and-forget: the connection is going away so we can't await; logged.
@@ -431,7 +423,7 @@ namespace Faolan.GameServer
 				{
 					packet.Body.ReadUInt32(); // loot typetag (0xC87A)
 					var bagHandle = packet.Body.ReadUInt32();
-					await TakeLootItem(client, bagHandle);
+					await _broadcaster.TakeLootItem(client, bagHandle);
 
 					break;
 				}
@@ -440,7 +432,7 @@ namespace Faolan.GameServer
 				{
 					packet.Body.ReadUInt32(); // loot typetag (0xC87A)
 					var bagHandle = packet.Body.ReadUInt32();
-					await CloseLootBag(client, bagHandle);
+					await _broadcaster.CloseLootBag(client, bagHandle);
 
 					break;
 				}

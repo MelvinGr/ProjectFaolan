@@ -309,7 +309,7 @@ namespace Faolan.GameServer
 			// regenerated snapshot), so n3ToClientQuit removals carry the value the client learned here (WorldDespawn).
 			var fullChar = records.FirstOrDefault(e => e.IirType == IirMessageTypes.FullChar);
 			if (fullChar?.Body != null)
-				CapturePlayfieldToken(burst.MapId, fullChar.Body);
+				_broadcaster.CapturePlayfieldToken(burst.MapId, fullChar.Body);
 
 			client.Session.UsedWorldBurstReplay = true;
 
@@ -378,7 +378,7 @@ namespace Faolan.GameServer
 				else if (TryRebuildPlayerSpawnFromDb(client, equipment, scaffoldCharacter, pkt, out var rebuilt))
 				{
 					pkt = rebuilt;
-					CaptureOwnSpawnBody(client, pkt); // stash the player's FA015807 body so other players can be sent it
+					_broadcaster.CaptureOwnSpawnBody(client, pkt); // stash the player's FA015807 body so other players can be sent it
 				}
 				else if (TryRebuildNpcSpawnFromDb(client, npcByPosition, pkt, out var npcRebuilt, out var wasIdentical))
 				{
@@ -472,15 +472,15 @@ namespace Faolan.GameServer
 			// Populate the shared world model: the map's NPCs (once) + this player. Registered BEFORE the burst so
 			// the player's own spawn body can be captured into the entity during the replay
 			// (docs/server-architecture-roadmap.md).
-			await EnsureZoneNpcs(mapId);
+			await _broadcaster.EnsureZoneNpcs(mapId);
 			_simulation.RegisterPlayerInWorld(client);
 			await ReplayMapWorldBurst(client, worldBurst);
 
 			// Now that the spawn body is captured, run interest: spawn this player to nearby players and them to it.
-			await BroadcastPlayerEntry(client);
+			await _broadcaster.BroadcastPlayerEntry(client);
 
 			// Restore the player's persisted quest journal.
-			await RestorePlayerQuests(client);
+			await _broadcaster.RestorePlayerQuests(client);
 		}
 
 		// If the burst packet is the player's own entity Spawn (FA015807 whose handle is the client instance),
