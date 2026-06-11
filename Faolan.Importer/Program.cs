@@ -291,6 +291,15 @@ namespace Faolan.Importer
 			await using var db = new DatabaseContext(options);
 			await db.Database.MigrateAsync();
 
+			// --burst-coverage: read-only report of how much of each map's stored world burst is already reconstructable
+			// from the DB tables (the construct-don't-replay gate). Imports nothing; run it before/after a change to see
+			// the residual burst-only records shrink.
+			if (args.Contains("--burst-coverage"))
+			{
+				await BurstCoverageReport.RunAsync(db);
+				return 0;
+			}
+
 			var before = await Snapshot(db);
 
 			if (archiveDir != null)
