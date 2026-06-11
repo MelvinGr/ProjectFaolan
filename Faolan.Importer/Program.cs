@@ -305,6 +305,21 @@ namespace Faolan.Importer
 				return 0;
 			}
 
+			// --rdb-maps: import map names + ids from the client RDB PLAYFIELDDESCRIPTIONDATA (type 1070003). Isolated
+			// (no capture import) so it only touches the Maps table.
+			if (args.Contains("--rdb-maps"))
+			{
+				if (rdbDir == null)
+				{
+					await Console.Error.WriteLineAsync("--rdb-maps needs --rdb <RDB dir>.");
+					return 1;
+				}
+
+				var rm = await RdbMapImporter.ImportAsync(db, rdbDir);
+				Console.WriteLine($"RDB maps: {rm.Found} playfields read ({rm.Gated} v6-gated skipped); {rm.Created} created, {rm.Renamed} renamed.");
+				return 0;
+			}
+
 			var before = await Snapshot(db);
 
 			if (archiveDir != null)

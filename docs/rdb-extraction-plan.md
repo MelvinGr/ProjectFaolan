@@ -132,6 +132,13 @@ Significant de-risking — the tool and format are identified:
 > detail-encoding crack below. The RdbReader v5 path (which works for items, type 1000020, `file<0xFF`) can't reach
 > these. Bottom line: respawn-point coordinates exist in the RDB; extracting them is blocked on the v6 work.
 
+> **Map names + ids (1070003) — EXTRACTED (2026-06-11).** `PLAYFIELDDESCRIPTIONDATA` has 520 entries; **241 are
+> v5-reachable** (file < 0xFF), 279 v6-gated. Each readable record is XML `<playfielddescriptiondata>` with
+> `<playfield Name=".." ID=".."/>` (+ `ShowInGUI`); the **RDB record id == playfield id == our `Map.Id`** (verified
+> 4010 Tortage Island, 2040 Castle of King Conan, 3000 Khemi, 1000 Conarch Village, ...). `Faolan.Importer
+> --rdb <dir> --rdb-maps` (RdbMapImporter) imports them into `Maps` (id+name; creates reference rows for unknown
+> maps, renames existing) — isolated, touches only `Maps`. Imported: 241 read, 226 created, 8 renamed (242 maps total).
+
   finding the item-template type id is an early task (sample types not in the enum; cross-ref the known captured
   health-potion template 180450 / archetype `0x4847505A`).
 - **v5/v7 index format** (from rdbreader.cpp): header = `magic(4) + version(u32) + hash1..hash4(4×u32) +
