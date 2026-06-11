@@ -126,7 +126,6 @@ namespace Faolan.GameServer
 				return;
 
 			var npcs = await Database.GetNpcSpawns(mapId);
-			var friendlyNames = await GetConversationNpcNamesCached();
 			var zone = _world.ZoneFor(mapId);
 			foreach (var npc in npcs)
 			{
@@ -139,8 +138,10 @@ namespace Faolan.GameServer
 					new Vector3(npc.RotationX, npc.RotationY, npc.RotationZ),
 					npc.Name ?? "NPC", vitals);
 				entity.Level = npc.Level;
-				// Hostile = a mob (no conversation). Talk-to NPCs (quest-givers/vendors) don't aggro.
-				entity.Hostile = npc.Name == null || !friendlyNames.Contains(npc.Name);
+				// Hostile = a faction creature (NpcStats.community > 0). community 0 is the neutral/friendly community
+				// (quest-givers like Casilda/Kalanthes AND neutral critters like Scorpion/Guard Dog); faction mobs
+				// (poachers 59, scavengers 60, picts 317, crocs 374, ...) are > 0. Absent (players/specials) = not hostile.
+				entity.Hostile = RealNpcCommunity(npc.Data) > 0;
 
 				// Keep the NPC's FA015807 spawn body so respawn can re-render it for nearby players (built byte-exact
 				// from the row by NpcSpawnBuilder, the same path the burst-replacement uses).
@@ -174,12 +175,20 @@ namespace Faolan.GameServer
 			return null;
 		}
 
-		// The set of NPC names that have a conversation (= friendly / talk-to NPCs), loaded + cached once.
-		private System.Collections.Generic.HashSet<string> _friendlyNpcNames;
-
-		private async Task<System.Collections.Generic.HashSet<string>> GetConversationNpcNamesCached()
+		// The NPC's faction/community from its captured spawn (NpcStats.community); -1 if it carries no NpcStats
+		// (players/specials). community 0 = neutral/friendly, > 0 = a hostile faction (see EnsureZoneNpcs).
+		private static long RealNpcCommunity(byte[] data)
 		{
-			return _friendlyNpcNames ??= new System.Collections.Generic.HashSet<string>(await Database.GetConversationNpcNames());
+			if (data == null || data.Length < 12)
+				return -1;
+
+			var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(8, 4));
+			if (bodyStart > data.Length)
+				return -1;
+
+			return Spawn.PlayerSpawnReader.TryReadCharacterMessage(data[bodyStart..], out var read) && read.Message?.npc_stats is { } ns
+				? ns.Community
+				: -1;
 		}
 
 		// After a player's Move: update interest and broadcast the resulting spawns/moves to nearby players.
