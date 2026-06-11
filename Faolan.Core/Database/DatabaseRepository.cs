@@ -46,6 +46,7 @@ namespace Faolan.Core.Database
 		Task<MapWorldBurst> GetMapWorldBurst(uint mapId);
 		Task<NpcSpawn[]> GetNpcSpawns(uint mapId);
 		Task<WorldObject[]> GetWorldObjects(uint mapId);
+		Task<string[]> GetConversationNpcNames();
 		Task<RespawnPoint[]> GetRespawnPoints(uint mapId);
 		Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId);
 		Task DiscoverRespawnPoint(uint characterId, uint respawnPointId);
@@ -431,6 +432,18 @@ namespace Faolan.Core.Database
 			return await ctx
 				.WorldObjects
 				.Where(o => o.MapId == mapId && o.Data != null)
+				.ToArrayAsync();
+		}
+
+		// Distinct names of NPCs that have a conversation (quest-givers / vendors / talk-to NPCs). Used to mark which
+		// NPCs are friendly (non-hostile): a talkable NPC doesn't aggro, a mob (no conversation) does.
+		public async Task<string[]> GetConversationNpcNames()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.ConversationNodes
+				.Where(n => n.NpcName != null)
+				.Select(n => n.NpcName)
+				.Distinct()
 				.ToArrayAsync();
 		}
 

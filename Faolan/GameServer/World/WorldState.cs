@@ -93,10 +93,16 @@ namespace Faolan.GameServer.World
 					if (entity.Vitals == null)
 						continue;
 
-					var target = NearestPlayerInRange(zone, entity, NpcAggroRange);
+					// Only hostile NPCs (mobs) aggro; talk-to NPCs (quest-givers/vendors) never attack.
+					var target = entity.Hostile ? NearestPlayerInRange(zone, entity, NpcAggroRange) : null;
 					if (target == null)
 					{
 						entity.ArmAttackCooldown(NpcAttackInterval); // re-aggro shouldn't swing instantly
+						// Leash: a damaged NPC with no one in range has disengaged - heal back to full (so it can't be
+						// whittled down from out of range / across separate pulls). Mobs don't move yet, so "return home"
+						// is just the HP reset.
+						if (entity.Vitals.Health < entity.Vitals.MaxHealth)
+							entity.Vitals.ReviveToFull();
 						continue;
 					}
 

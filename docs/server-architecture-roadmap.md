@@ -34,10 +34,13 @@ Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see a
 >   tick with that dt (`WorldState.Tick`); rate-based systems run via a per-behaviour `TickAccumulator` at their own
 >   interval, dt-scaled (vitals regen at 1 Hz, pushes only on change). A long stall fires a behaviour once with the
 >   whole elapsed (no catch-up storm).
-> - **NPC AI — aggro + fight-back** ✓ on the tick a living NPC aggros the nearest player within `NpcAggroRange` (20u)
->   and swings every `NpcAttackInterval` (2s), emitting an `NpcAttack` effect; the listener applies level-scaled damage
->   (`ResolveNpcAttackDamage`) to the player's vitals and pushes `0x96B8DC59` so their HP bar drops. The attack
->   ANIMATION packet is undecoded (damage effect only). NPC *movement* still waits on the pinned MoveTask grammar.
+> - **NPC AI — aggro + fight-back + hostility + leash** ✓ on the tick a **hostile** NPC (a mob — i.e. one with no
+>   conversation; quest-givers/vendors are friendly and never aggro) aggros the nearest player within `NpcAggroRange`
+>   (20u) and swings every `NpcAttackInterval` (2s), emitting an `NpcAttack` effect; the listener applies level-scaled
+>   damage (`ResolveNpcAttackDamage`) + pushes `0x96B8DC59`. A damaged NPC with no player in range **leashes** — heals
+>   back to full (no kiting from out of range / across pulls). Hostility is set at zone load (`WorldEntity.Hostile` =
+>   name not in the conversation-NPC set). The attack ANIMATION packet is undecoded (damage effect only); NPC
+>   *movement* still waits on the pinned MoveTask grammar.
 > - **Player death → respawn at the closest known resurrection point** ✓ when a player's vitals hit 0 (HP=0 push =
 >   the client's death state) a respawn countdown starts (`TickPlayerDeaths`, 10s); corpses don't regen and NPCs stop
 >   hitting them. On expiry they're revived to full (`EntityVitals.ReviveToFull`) and re-entered (`RespawnPlayer`,

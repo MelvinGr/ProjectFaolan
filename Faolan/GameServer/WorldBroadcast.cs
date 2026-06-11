@@ -126,6 +126,7 @@ namespace Faolan.GameServer
 				return;
 
 			var npcs = await Database.GetNpcSpawns(mapId);
+			var friendlyNames = await GetConversationNpcNamesCached();
 			var zone = _world.ZoneFor(mapId);
 			foreach (var npc in npcs)
 			{
@@ -138,6 +139,8 @@ namespace Faolan.GameServer
 					new Vector3(npc.RotationX, npc.RotationY, npc.RotationZ),
 					npc.Name ?? "NPC", vitals);
 				entity.Level = npc.Level;
+				// Hostile = a mob (no conversation). Talk-to NPCs (quest-givers/vendors) don't aggro.
+				entity.Hostile = npc.Name == null || !friendlyNames.Contains(npc.Name);
 
 				// Keep the NPC's FA015807 spawn body so respawn can re-render it for nearby players (built byte-exact
 				// from the row by NpcSpawnBuilder, the same path the burst-replacement uses).
@@ -169,6 +172,14 @@ namespace Faolan.GameServer
 			}
 
 			return null;
+		}
+
+		// The set of NPC names that have a conversation (= friendly / talk-to NPCs), loaded + cached once.
+		private System.Collections.Generic.HashSet<string> _friendlyNpcNames;
+
+		private async Task<System.Collections.Generic.HashSet<string>> GetConversationNpcNamesCached()
+		{
+			return _friendlyNpcNames ??= new System.Collections.Generic.HashSet<string>(await Database.GetConversationNpcNames());
 		}
 
 		// After a player's Move: update interest and broadcast the resulting spawns/moves to nearby players.

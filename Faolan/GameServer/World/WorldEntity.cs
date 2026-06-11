@@ -64,6 +64,10 @@ namespace Faolan.GameServer.World
 		// The entity's level (NPCs: from their NpcSpawn row; drives the kill-XP award). 0 if unknown.
 		public uint Level { get; set; }
 
+		// Whether this NPC attacks players on sight. Mobs are hostile; talk-to NPCs (quest-givers/vendors, i.e. those
+		// with a conversation) are not. Set at zone load. Players are never hostile here.
+		public bool Hostile { get; set; }
+
 		// Live transform + map. Mutable: updated by Move (players) and the AI tick (NPCs, later).
 		public uint MapId { get; set; }
 		public Vector3 Position { get; set; }

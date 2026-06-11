@@ -10,9 +10,12 @@ namespace Faolan.Tests
 	// range swings on a fixed cadence, emitting an NpcAttack effect for the listener to turn into a vitals hit.
 	public class NpcAiTests
 	{
-		private static WorldEntity Npc(uint handle, float x, float z, uint level = 1) =>
-			WorldEntity.ForNpc(handle, 4010, new Vector3(x, 0, z), Vector3.Zero, "Mob",
-				EntityVitals.FromMax(100, 0, 100));
+		private static WorldEntity Npc(uint handle, float x, float z, uint level = 1, bool hostile = true)
+		{
+			var e = WorldEntity.ForNpc(handle, 4010, new Vector3(x, 0, z), Vector3.Zero, "Mob", EntityVitals.FromMax(100, 0, 100));
+			e.Hostile = hostile;
+			return e;
+		}
 
 		private static WorldEntity Player(uint handle, float x, float z) =>
 			new WorldEntity(handle, 4010, true, $"P{handle}", null) { Position = new Vector3(x, 0, z) };
@@ -80,6 +83,45 @@ namespace Faolan.Tests
 
 			var effects = world.Tick(WorldState.NpcAttackInterval);
 			Assert.Same(near, Assert.Single(effects).Target);
+		}
+
+		[Fact]
+		public void NonHostileNpc_DoesNotAttack()
+		{
+			var world = new WorldState();
+			var zone = world.ZoneFor(4010);
+			zone.Add(Npc(1, 0, 0, hostile: false)); // a quest-giver / vendor
+			zone.Add(Player(2, 3, 0)); // right next to it
+
+			Assert.Empty(world.Tick(WorldState.NpcAttackInterval));
+		}
+
+		[Fact]
+		public void DamagedNpc_LeashHealsWhenNoPlayerInRange()
+		{
+			var world = new WorldState();
+			var zone = world.ZoneFor(4010);
+			var npc = Npc(1, 0, 0);
+			npc.Vitals.ApplyHealthDelta(-50); // hurt to 50/100
+			zone.Add(npc);
+			zone.Add(Player(2, 1000, 1000)); // fled far away
+
+			world.Tick(0.1);
+			Assert.Equal(npc.Vitals.MaxHealth, npc.Vitals.Health); // healed back to full
+		}
+
+		[Fact]
+		public void DamagedNpc_DoesNotHealWhilePlayerInRange()
+		{
+			var world = new WorldState();
+			var zone = world.ZoneFor(4010);
+			var npc = Npc(1, 0, 0);
+			npc.Vitals.ApplyHealthDelta(-50);
+			zone.Add(npc);
+			zone.Add(Player(2, 3, 0)); // still in combat range
+
+			world.Tick(0.1);
+			Assert.Equal(50u, npc.Vitals.Health); // still damaged - no leash heal mid-fight
 		}
 
 		[Fact]
