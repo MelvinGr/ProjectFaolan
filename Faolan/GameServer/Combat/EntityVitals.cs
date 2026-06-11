@@ -1,3 +1,4 @@
+using Faolan.Core.Database.Tables;
 using Faolan.GameServer.Packets._0x737A6DF9_Test;
 
 namespace Faolan.GameServer.Combat
@@ -98,6 +99,17 @@ namespace Faolan.GameServer.Combat
 			Health = MaxHealth;
 			Stamina = MaxStamina;
 			Mana = MaxMana;
+		}
+
+		/// <summary>
+		///     Full-health vitals seeded from a character's persisted max stats (class/level defaults if it has none).
+		///     The world model's single seed point for a player's live vitals - used both by combat and by the world
+		///     simulation when a player is registered.
+		/// </summary>
+		public static EntityVitals FromCharacter(Character character)
+		{
+			var max = character.MaxStats ?? CharacterMaxStats.CreateDefaults(character.Class, character.Level);
+			return FromMax(max.Health, max.Mana, max.Stamina);
 		}
 
 		/// <summary>Creates a full-health entity (current == max) from max values.</summary>

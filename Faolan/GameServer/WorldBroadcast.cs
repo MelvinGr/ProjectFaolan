@@ -73,7 +73,7 @@ namespace Faolan.GameServer
 		// token match or removes regardless).
 		private Task SendWorldDespawn(INetworkClient recipient, uint recipientMapId, uint subjectHandle)
 		{
-			var token = _world.ZoneFor(recipientMapId).PlayfieldToken;
+			var token = _simulation.World.ZoneFor(recipientMapId).PlayfieldToken;
 			if (token == 0)
 			{
 				Logger.LogDebug("World: skip despawn {Subject:X8} for a viewer on map {Map} (playfield token unknown).", subjectHandle, recipientMapId);
@@ -126,7 +126,7 @@ namespace Faolan.GameServer
 				return;
 
 			var npcs = await Database.GetNpcSpawns(mapId);
-			var zone = _world.ZoneFor(mapId);
+			var zone = _simulation.World.ZoneFor(mapId);
 			foreach (var npc in npcs)
 			{
 				// Seed killable vitals from the NPC's REAL max health (lifted from the spawn into NpcSpawn.Health by the
@@ -161,7 +161,7 @@ namespace Faolan.GameServer
 			if (entity == null)
 				return;
 
-			var events = InterestManager.ResolveMove(_world.ZoneFor(entity.MapId), entity, PlayerInterestRange);
+			var events = InterestManager.ResolveMove(_simulation.World.ZoneFor(entity.MapId), entity, World.WorldSimulation.PlayerInterestRange);
 			await DispatchInterest(events, new MoveForward(moveSubop, dataObject, dataClientInstance, movingType, position, rotation, tail));
 		}
 
@@ -172,7 +172,7 @@ namespace Faolan.GameServer
 			if (entity?.SpawnBody == null)
 				return;
 
-			var events = InterestManager.ResolveMove(_world.ZoneFor(entity.MapId), entity, PlayerInterestRange);
+			var events = InterestManager.ResolveMove(_simulation.World.ZoneFor(entity.MapId), entity, World.WorldSimulation.PlayerInterestRange);
 			await DispatchInterest(events, move: null);
 		}
 
@@ -181,7 +181,7 @@ namespace Faolan.GameServer
 		// range-based rather than ResolveRemove. Uses the same n3ToClientQuit packet as player despawns.
 		private async Task BroadcastEntityDespawn(WorldEntity entity)
 		{
-			foreach (var viewer in _world.ZoneFor(entity.MapId).PlayersInRange(entity.Position, PlayerInterestRange))
+			foreach (var viewer in _simulation.World.ZoneFor(entity.MapId).PlayersInRange(entity.Position, World.WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client != null)
 					await SendWorldDespawn(viewer.Client, viewer.MapId, entity.Handle);
@@ -195,7 +195,7 @@ namespace Faolan.GameServer
 			if (npc.SpawnBody == null)
 				return;
 
-			foreach (var viewer in _world.ZoneFor(npc.MapId).PlayersInRange(npc.Position, PlayerInterestRange))
+			foreach (var viewer in _simulation.World.ZoneFor(npc.MapId).PlayersInRange(npc.Position, World.WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client != null)
 					await SendWorldSpawn(viewer.Client, npc);
@@ -210,7 +210,7 @@ namespace Faolan.GameServer
 		private async Task OpenLootBag(INetworkClient client, uint objectHandle)
 		{
 			var player = PlayerWorldEntity(client);
-			if (player == null || !_world.ZoneFor(player.MapId).TryGet(objectHandle, out var bag) || !bag.IsLoot)
+			if (player == null || !_simulation.World.ZoneFor(player.MapId).TryGet(objectHandle, out var bag) || !bag.IsLoot)
 				return;
 
 			await new PacketStream()
@@ -239,11 +239,11 @@ namespace Faolan.GameServer
 		private async Task CloseLootBag(INetworkClient client, uint bagHandle)
 		{
 			var player = PlayerWorldEntity(client);
-			if (player == null || !_world.ZoneFor(player.MapId).TryGet(bagHandle, out var bag) || !bag.IsLoot)
+			if (player == null || !_simulation.World.ZoneFor(player.MapId).TryGet(bagHandle, out var bag) || !bag.IsLoot)
 				return;
 
 			await BroadcastEntityFade(bag);
-			_world.Remove(bag);
+			_simulation.World.Remove(bag);
 			Logger.LogInformation("Loot: {Name} closed loot bag 0x{Handle:X8}; faded + removed.", player.Name, bag.Handle);
 		}
 
@@ -252,7 +252,7 @@ namespace Faolan.GameServer
 		private async Task BroadcastEntityFade(WorldEntity entity)
 		{
 			var body = World.WorldLoot.BuildFadeBody(World.WorldLoot.LootTypeTag, entity.Handle, World.WorldLoot.DefaultFadeSeconds);
-			foreach (var viewer in _world.ZoneFor(entity.MapId).PlayersInRange(entity.Position, PlayerInterestRange))
+			foreach (var viewer in _simulation.World.ZoneFor(entity.MapId).PlayersInRange(entity.Position, World.WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client == null)
 					continue;
@@ -284,9 +284,9 @@ namespace Faolan.GameServer
 
 			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, mountName);
 			entity.SpawnBody = body;
-			_world.ZoneFor(player.MapId).Add(entity);
+			_simulation.World.ZoneFor(player.MapId).Add(entity);
 
-			foreach (var viewer in _world.ZoneFor(player.MapId).PlayersInRange(player.Position, PlayerInterestRange))
+			foreach (var viewer in _simulation.World.ZoneFor(player.MapId).PlayersInRange(player.Position, World.WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client != null)
 					await SendWorldSpawn(viewer.Client, entity);
@@ -315,9 +315,9 @@ namespace Faolan.GameServer
 
 			var bag = WorldEntity.ForLoot(handle, deadNpc.MapId, deadNpc.Position, deadNpc.Rotation,
 				template.Name ?? "Bag of loot", body, Combat.LootResolver.LootExpirySeconds);
-			_world.ZoneFor(deadNpc.MapId).Add(bag);
+			_simulation.World.ZoneFor(deadNpc.MapId).Add(bag);
 
-			foreach (var viewer in _world.ZoneFor(deadNpc.MapId).PlayersInRange(bag.Position, PlayerInterestRange))
+			foreach (var viewer in _simulation.World.ZoneFor(deadNpc.MapId).PlayersInRange(bag.Position, World.WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client != null)
 					await SendWorldSpawn(viewer.Client, bag);
@@ -394,7 +394,7 @@ namespace Faolan.GameServer
 		// away). Single-player is a no-op (no viewers).
 		private Task BroadcastPlayerDespawn(WorldEntity leaver)
 		{
-			var events = InterestManager.ResolveRemove(_world.ZoneFor(leaver.MapId), leaver);
+			var events = InterestManager.ResolveRemove(_simulation.World.ZoneFor(leaver.MapId), leaver);
 			return DispatchInterest(events, move: null);
 		}
 
@@ -408,7 +408,7 @@ namespace Faolan.GameServer
 			if (!WorldDespawn.TryExtractPlayfieldToken(snapshotBody, out var token))
 				return;
 
-			var zone = _world.ZoneFor(mapId);
+			var zone = _simulation.World.ZoneFor(mapId);
 			if (zone.PlayfieldToken == token)
 				return;
 

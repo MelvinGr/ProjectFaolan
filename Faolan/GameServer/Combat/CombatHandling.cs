@@ -31,11 +31,11 @@ namespace Faolan.GameServer
 			return entity.Vitals ??= PlayerVitalsSeed(client.Session.Character);
 		}
 
-		// Full-health vitals from the character's max stats (class/level defaults if none).
+		// Full-health vitals from the character's max stats (class/level defaults if none). The seed logic lives on
+		// EntityVitals so the world simulation (which also seeds player vitals on registration) shares it.
 		private static EntityVitals PlayerVitalsSeed(Character character)
 		{
-			var max = character.MaxStats ?? CharacterMaxStats.CreateDefaults(character.Class, character.Level);
-			return EntityVitals.FromMax(max.Health, max.Mana, max.Stamina);
+			return EntityVitals.FromCharacter(character);
 		}
 
 		// A target NPC's live vitals, seeded from its real spawn health (recorded when the world burst spawned it)
@@ -81,7 +81,7 @@ namespace Faolan.GameServer
 		private EntityVitals ResolveNpcVitals(INetworkClient client, uint targetHandle, out World.WorldEntity npcEntity)
 		{
 			var player = PlayerWorldEntity(client);
-			if (player != null && _world.ZoneFor(player.MapId).TryGet(targetHandle, out npcEntity) && !npcEntity.IsPlayer && npcEntity.Vitals != null)
+			if (player != null && _simulation.World.ZoneFor(player.MapId).TryGet(targetHandle, out npcEntity) && !npcEntity.IsPlayer && npcEntity.Vitals != null)
 				return npcEntity.Vitals;
 
 			npcEntity = null;

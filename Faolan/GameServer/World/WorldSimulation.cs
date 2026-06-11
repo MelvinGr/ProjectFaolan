@@ -1,0 +1,408 @@
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Numerics;
+using System.Threading;
+using System.Threading.Tasks;
+using Faolan.Core.Database;
+using Faolan.Core.Database.Tables;
+using Faolan.Core.Network;
+using Faolan.Core.Network.AgentServer;
+using Faolan.GameServer.Combat;
+using Microsoft.Extensions.Logging;
+
+namespace Faolan.GameServer.World
+{
+	// The wire side of the world simulation: the operations the tick needs to push to clients. Implemented by the
+	// GameServer listener (which owns the packet framing + send), so the simulation depends on this narrow port
+	// rather than on the whole listener. Lets the simulation own world STATE + TIMING without owning networking.
+	public interface IWorldOutbound
+	{
+		// Re-render a respawned NPC for the players in range (its stored FA015807 spawn body).
+		Task BroadcastNpcRespawn(WorldEntity npc);
+
+		// Gracefully fade an entity out for the players in range (n3ToClientFade) - used for expired loot.
+		Task BroadcastEntityFade(WorldEntity entity);
+
+		// Push a 0x96B8DC59 vitals update for the player (regen tick, NPC-attack damage).
+		Task PushVitals(INetworkClient client, EntityVitals vitals);
+
+		// Re-run the world-entry render path for the player (used to respawn them at a resurrection point).
+		Task ReenterWorld(INetworkClient client);
+	}
+
+	// The live in-memory world (docs/server-architecture-roadmap.md): owns the world model + the connected players'
+	// authoritative transforms/vitals, and drives the 10 Hz simulation tick (NPC respawn/AI, vitals regen, player
+	// death/respawn, resurrection-point discovery). Extracted out of GameServerListener so the simulation's state +
+	// timing are no longer fused with the networking front-door; it reaches the wire through IWorldOutbound. Packet
+	// CONSTRUCTION (spawn/move/loot broadcasts) and persistence still live on the listener for now (see the
+	// architecture roadmap's later decomposition increments).
+	public sealed class WorldSimulation
+	{
+		// How far a player perceives other players (world-entity interest radius; wider than say range).
+		public const float PlayerInterestRange = 150f;
+
+		// Local-say range in world units. Built-NPC tests showed a +4-unit offset renders "beside" the player, so
+		// units are ~metres; ~50 is a generous "nearby" for /say. Tunable; same-map is the hard filter either way.
+		private const float SayRangeUnits = 50f;
+
+		// Base game-loop cadence: 10 Hz. Continuous systems run every base tick with the real elapsed dt so they stay
+		// smooth; slower rate-based systems run via a TickAccumulator at their own interval. The loop measures
+		// wall-clock dt, not the nominal period, so a late tick doesn't desync the rates.
+		private const double BaseTickSeconds = 0.1;
+
+		// Vitals regen cadence (rate-based; dt-scaled by the real elapsed time when it fires).
+		private const double RegenIntervalSeconds = 1.0;
+
+		// How long a killed player lies dead before respawning at the closest known resurrection point.
+		private const double PlayerRespawnDelaySeconds = 10.0;
+
+		// How close a player must get to discover a resurrection point.
+		private const float RespawnDiscoveryRange = 15f;
+
+		private readonly IWorldOutbound _output;
+		private readonly IDatabaseRepository _database;
+		private readonly IAgentServerDispatcher _agents;
+		private readonly ILogger _logger;
+
+		// The live world model + the connected players' authoritative world entities (transform + vitals).
+		public WorldState World { get; } = new WorldState();
+		public ConcurrentDictionary<INetworkClient, WorldEntity> Players { get; } = new();
+
+		// Players currently dead, with the seconds remaining until respawn (counted down every tick).
+		private readonly ConcurrentDictionary<INetworkClient, double> _playerRespawnRemaining = new();
+
+		// Per-map resurrection points + per-character discovered sets, cached to keep the discovery tick off the DB.
+		private readonly ConcurrentDictionary<uint, RespawnPoint[]> _respawnPointsByMap = new();
+		private readonly ConcurrentDictionary<uint, HashSet<uint>> _discoveredRespawnByCharacter = new();
+
+		private Task _tickTask = Task.CompletedTask;
+
+		public WorldSimulation(IWorldOutbound output, IDatabaseRepository database, IAgentServerDispatcher agents, ILogger logger)
+		{
+			_output = output;
+			_database = database;
+			_agents = agents;
+			_logger = logger;
+		}
+
+		// Starts the simulation tick on the given lifetime token (owned by the listener so startup/shutdown stay in one
+		// place). The task is held so StopAsync can await a clean exit.
+		public void Start(CancellationToken cancellationToken)
+		{
+			_tickTask = RunTickLoop(cancellationToken);
+		}
+
+		// Awaits the tick loop's (cancelled) exit. The loop swallows its own OperationCanceledException, so this
+		// completes normally once the lifetime token has been cancelled by the listener.
+		public Task StopAsync()
+		{
+			return _tickTask;
+		}
+
+		// The player's live world entity for this connection (authoritative transform + vitals), or null if not in the
+		// world yet.
+		public WorldEntity PlayerWorldEntity(INetworkClient client)
+		{
+			return Players.TryGetValue(client, out var entity) ? entity : null;
+		}
+
+		// Registers (or relocates) the player in the live world after world entry, SEEDING the authoritative WorldEntity
+		// transform + vitals from the persisted Character. After this the WorldEntity is the source of truth for live
+		// position/vitals; the Character is only re-read on a fresh entry/teleport. Idempotent (GetOrAdd keeps the
+		// existing entity, so vitals aren't reset across re-entry/teleport/respawn).
+		public void RegisterPlayerInWorld(INetworkClient client)
+		{
+			var character = client.Session?.Character;
+			if (character == null)
+				return;
+
+			var handle = client.Session.Account.ClientInstance;
+			var entity = Players.GetOrAdd(client, _ => new WorldEntity(handle, character.MapId, true, character.Name ?? $"Character{handle}", client)
+			{
+				Vitals = EntityVitals.FromCharacter(character)
+			});
+			var zone = World.Place(entity, character.MapId, character.Position, character.Rotation);
+			var nearby = zone.PlayersInRange(character.Position, PlayerInterestRange, handle).Count();
+			_logger.LogInformation("World: player {Name} (0x{Handle:X8}) entered map {Map} at {Pos}; {Nearby} other player(s) in range.", entity.Name, handle, character.MapId, character.Position, nearby);
+		}
+
+		// Removes the player from the world model on disconnect. The caller broadcasts the despawn FIRST (while the
+		// leaver is still in the zone so its viewers resolve), then calls this. Returns false if the player wasn't in
+		// the world.
+		public bool RemovePlayer(INetworkClient client, out WorldEntity entity)
+		{
+			if (!Players.TryRemove(client, out entity))
+				return false;
+
+			World.Remove(entity);
+			_playerRespawnRemaining.TryRemove(client, out _);
+			return true;
+		}
+
+		// The character ids that should hear a proximity "say" from `sender`: same-map players within SayRangeUnits of
+		// the sender, plus the sender (you always hear yourself). Resolved against the live world model.
+		public IReadOnlyCollection<uint> SayRecipients(INetworkClient sender)
+		{
+			var ids = new HashSet<uint>();
+			var entity = PlayerWorldEntity(sender);
+			if (entity == null)
+			{
+				// Not in the world model yet - fall back to just the sender so they still see their own message.
+				if (sender.Session?.Character != null)
+					ids.Add(sender.Session.Character.Id);
+				return ids;
+			}
+
+			ids.Add(entity.Handle);
+			foreach (var near in World.ZoneFor(entity.MapId).PlayersInRange(entity.Position, SayRangeUnits, entity.Handle))
+				ids.Add(near.Handle);
+
+			return ids;
+		}
+
+		// The server game loop (docs/server-architecture-roadmap.md): a 10 Hz base tick that advances continuous systems
+		// every tick with the REAL elapsed dt (NPC respawn/AI, player death timers) and runs rate-based systems (vitals
+		// regen) via a TickAccumulator at their own interval, dt-scaled. Wall-clock dt is measured so a late tick
+		// doesn't desync the rates. Cancelled on shutdown.
+		private async Task RunTickLoop(CancellationToken cancellationToken)
+		{
+			using var timer = new PeriodicTimer(TimeSpan.FromSeconds(BaseTickSeconds));
+			var regen = new TickAccumulator(RegenIntervalSeconds);
+			var lastTimestamp = System.Diagnostics.Stopwatch.GetTimestamp();
+			try
+			{
+				while (await timer.WaitForNextTickAsync(cancellationToken))
+				{
+					var now = System.Diagnostics.Stopwatch.GetTimestamp();
+					var dt = System.Diagnostics.Stopwatch.GetElapsedTime(lastTimestamp, now).TotalSeconds;
+					lastTimestamp = now;
+
+					// Continuous-time systems: every base tick, with the actual elapsed dt. The tick returns the
+					// wire-visible effects (NPC respawns, loot expiry, NPC attacks) for us to broadcast.
+					foreach (var effect in World.Tick(dt))
+					{
+						switch (effect.Type)
+						{
+							case WorldTickEffectType.NpcRespawned:
+								await _output.BroadcastNpcRespawn(effect.Entity);
+								break;
+							case WorldTickEffectType.LootExpired:
+								await _output.BroadcastEntityFade(effect.Entity); // graceful fade-out (n3ToClientFade)
+								World.Remove(effect.Entity);
+								break;
+							case WorldTickEffectType.NpcAttack:
+								await ApplyNpcAttack(effect.Entity, effect.Target);
+								break;
+						}
+					}
+
+					// Player death/respawn timers run every tick (continuous), scaled by real dt.
+					await TickPlayerDeaths(dt);
+
+					// Rate-based systems: fire on their own cadence, scaled by the time actually elapsed since last fire.
+					if (regen.Advance(dt, out var regenElapsed))
+					{
+						await RegenerateConnectedPlayers(regenElapsed);
+						await DiscoverNearbyRespawnPoints();
+					}
+				}
+			}
+			catch (OperationCanceledException)
+			{
+				// server shutting down
+			}
+			catch (Exception ex)
+			{
+				_logger.LogError(ex, "Game tick loop failed.");
+			}
+		}
+
+		// Regenerates each connected player's vitals by `elapsedSeconds` worth and pushes a 0x96B8DC59 update only when
+		// a pool actually rose (a player at full HP/stamina/mana costs nothing). Rates are provisional fractions of max
+		// per second, scaled by the elapsed time so the cadence is independent of the base tick rate.
+		private async Task RegenerateConnectedPlayers(double elapsedSeconds)
+		{
+			foreach (var pair in Players)
+			{
+				var client = pair.Key;
+				var character = client.Session?.Character;
+				if (character == null)
+					continue;
+
+				var vitals = pair.Value.Vitals ??= EntityVitals.FromCharacter(character);
+				if (vitals.IsDead)
+					continue; // corpses don't regen - the respawn timer revives them
+
+				var changed = vitals.Regenerate(
+					RegenAmount(vitals.MaxHealth, 0.05, elapsedSeconds), // ~5% hp / sec (provisional)
+					RegenAmount(vitals.MaxStamina, 0.10, elapsedSeconds), // ~10% stamina / sec
+					RegenAmount(vitals.MaxMana, 0.05, elapsedSeconds)); // ~5% mana / sec
+				if (changed)
+					await _output.PushVitals(client, vitals);
+			}
+		}
+
+		// Advances player death/respawn. A player whose vitals hit 0 starts a respawn countdown; when it elapses they
+		// are revived to full and re-entered at the closest known resurrection point (RespawnPlayer). Living players are
+		// untracked.
+		private async Task TickPlayerDeaths(double dt)
+		{
+			foreach (var pair in Players)
+			{
+				var client = pair.Key;
+				var character = client.Session?.Character;
+				if (character == null)
+					continue;
+
+				var vitals = pair.Value.Vitals ??= EntityVitals.FromCharacter(character);
+				if (!vitals.IsDead)
+				{
+					_playerRespawnRemaining.TryRemove(client, out _);
+					continue;
+				}
+
+				if (!_playerRespawnRemaining.TryGetValue(client, out var remaining))
+				{
+					_playerRespawnRemaining[client] = PlayerRespawnDelaySeconds;
+					_logger.LogInformation("Combat: {Player} died; respawning in {Delay}s.", character.Name, PlayerRespawnDelaySeconds);
+					continue;
+				}
+
+				remaining -= dt;
+				if (remaining > 0)
+				{
+					_playerRespawnRemaining[client] = remaining;
+					continue;
+				}
+
+				_playerRespawnRemaining.TryRemove(client, out _);
+				await RespawnPlayer(client, vitals);
+			}
+		}
+
+		// Revives a dead player: full vitals, moved to the CLOSEST resurrection point they know (the always-known
+		// starter + any discovered; RespawnResolver), and re-entered (the proven world-entry render path, same as a
+		// teleport) so they reappear alive away from whatever killed them. Falls back to the map's spawn point if the
+		// map has no points.
+		private async Task RespawnPlayer(INetworkClient client, EntityVitals vitals)
+		{
+			var character = client.Session.Character;
+			vitals.ReviveToFull();
+
+			var deathPos = PlayerWorldEntity(client)?.Position ?? character.Position;
+			var points = await GetRespawnPointsCached(character.MapId);
+			var target = points.Length > 0
+				? RespawnResolver.ClosestKnown(deathPos, points, await GetDiscoveredRespawnCached(character.Id))
+				: null;
+
+			if (target != null)
+			{
+				character.Position = target.Position;
+				character.Rotation = target.Rotation;
+				_logger.LogInformation("Combat: {Player} respawned at '{Point}' (map {Map}).", character.Name, target.Name, character.MapId);
+			}
+			else
+			{
+				var map = await _database.GetMap(character.MapId);
+				if (map != null)
+				{
+					character.Position = map.Position;
+					character.Rotation = map.Rotation;
+				}
+
+				_logger.LogInformation("Combat: {Player} respawned at the map {Map} spawn point (no known resurrection point).", character.Name, character.MapId);
+			}
+
+			await _output.ReenterWorld(client);
+		}
+
+		// A map's resurrection points, cached on first use (rarely changes within a run).
+		private async Task<RespawnPoint[]> GetRespawnPointsCached(uint mapId)
+		{
+			if (_respawnPointsByMap.TryGetValue(mapId, out var cached))
+				return cached;
+
+			var points = await _database.GetRespawnPoints(mapId);
+			_respawnPointsByMap[mapId] = points;
+			return points;
+		}
+
+		// A character's discovered respawn-point ids, cached (loaded once, updated on discovery) to keep the discovery
+		// tick off the DB.
+		private async Task<HashSet<uint>> GetDiscoveredRespawnCached(uint characterId)
+		{
+			if (_discoveredRespawnByCharacter.TryGetValue(characterId, out var cached))
+				return cached;
+
+			var set = new HashSet<uint>(await _database.GetDiscoveredRespawnPointIds(characterId));
+			_discoveredRespawnByCharacter[characterId] = set;
+			return set;
+		}
+
+		// Discovers any resurrection point a living player has walked near (so they can respawn there later). Run at the
+		// regen cadence (1 Hz) to keep it cheap; always-known points need no discovery. Persists + notifies on a new find.
+		private async Task DiscoverNearbyRespawnPoints()
+		{
+			foreach (var pair in Players)
+			{
+				var client = pair.Key;
+				var character = client.Session?.Character;
+				if (character == null)
+					continue;
+
+				var entity = pair.Value;
+				var points = await GetRespawnPointsCached(entity.MapId);
+				if (points.Length == 0)
+					continue;
+
+				var discovered = await GetDiscoveredRespawnCached(character.Id);
+				foreach (var point in points)
+				{
+					if (point.AlwaysKnown || discovered.Contains(point.Id))
+						continue;
+					if (Vector3.Distance(point.Position, entity.Position) > RespawnDiscoveryRange)
+						continue;
+
+					await _database.DiscoverRespawnPoint(character.Id, point.Id);
+					discovered.Add(point.Id);
+					await _agents.SendSystemMessage(character.Id, $"Resurrection point discovered: {point.Name}");
+					_logger.LogInformation("World: {Player} discovered resurrection point '{Point}'.", character.Name, point.Name);
+				}
+			}
+		}
+
+		// Applies an aggroed NPC's swing to the target player: reduce the player's live vitals and push a 0x96B8DC59
+		// update so their HP bar drops. The NPC's attack ANIMATION packet isn't decoded yet (see
+		// protocol_stats_and_combat), so this delivers the damage effect only.
+		private async Task ApplyNpcAttack(WorldEntity npc, WorldEntity target)
+		{
+			var client = target?.Client;
+			var character = client?.Session?.Character;
+			if (character == null)
+				return;
+
+			var vitals = target.Vitals ??= EntityVitals.FromCharacter(character);
+			if (vitals.IsDead)
+				return;
+
+			var damage = (int)CombatResolver.ResolveNpcAttackDamage(npc.Level);
+			vitals.ApplyHealthDelta(-damage);
+			await _output.PushVitals(client, vitals);
+
+			if (vitals.IsDead)
+				_logger.LogInformation("Combat: {Player} was killed by {Npc}.", character.Name, npc.Name);
+		}
+
+		// The per-`elapsedSeconds` regen for one pool: `fraction` of max per second, scaled by elapsed. Rounds up to at
+		// least 1 so a pool below max always ticks toward it (never stalls on rounding).
+		private static uint RegenAmount(uint max, double fraction, double elapsedSeconds)
+		{
+			var amount = (uint)(max * fraction * elapsedSeconds);
+			return amount > 0
+				? amount
+				: 1;
+		}
+	}
+}

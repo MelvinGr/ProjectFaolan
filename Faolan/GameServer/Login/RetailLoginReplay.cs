@@ -473,7 +473,7 @@ namespace Faolan.GameServer
 			// the player's own spawn body can be captured into the entity during the replay
 			// (docs/server-architecture-roadmap.md).
 			await EnsureZoneNpcs(mapId);
-			RegisterPlayerInWorld(client);
+			_simulation.RegisterPlayerInWorld(client);
 			await ReplayMapWorldBurst(client, worldBurst);
 
 			// Now that the spawn body is captured, run interest: spawn this player to nearby players and them to it.

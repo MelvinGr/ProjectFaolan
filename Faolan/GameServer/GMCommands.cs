@@ -291,7 +291,7 @@ namespace Faolan.GameServer
 		private async Task<int> FlushWorldState()
 		{
 			var saved = 0;
-			foreach (var pair in _playerEntities)
+			foreach (var pair in _simulation.Players)
 			{
 				if (await SavePlayerState(pair.Key, pair.Value))
 					saved++;
@@ -330,12 +330,12 @@ namespace Faolan.GameServer
 			if (entity == null)
 				return _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, "World: you are not registered in the world model yet.");
 
-			var zone = _world.ZoneFor(entity.MapId);
+			var zone = _simulation.World.ZoneFor(entity.MapId);
 			var players = zone.Entities.Count(e => e.IsPlayer);
 			var npcs = zone.Entities.Count(e => !e.IsPlayer);
-			var nearby = zone.EntitiesInRange(entity.Position, PlayerInterestRange, entity.Handle).Count();
+			var nearby = zone.EntitiesInRange(entity.Position, World.WorldSimulation.PlayerInterestRange, entity.Handle).Count();
 			return _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
-				$"World map {entity.MapId}: {players} player(s), {npcs} NPC(s) in zone; {nearby} entity(ies) within {PlayerInterestRange:0} of you.");
+				$"World map {entity.MapId}: {players} player(s), {npcs} NPC(s) in zone; {nearby} entity(ies) within {World.WorldSimulation.PlayerInterestRange:0} of you.");
 		}
 
 		private Task SendGmHelpText(uint characterId)
