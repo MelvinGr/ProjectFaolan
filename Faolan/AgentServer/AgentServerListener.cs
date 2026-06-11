@@ -122,6 +122,37 @@ namespace Faolan.AgentServer
 					break;
 				}
 
+				case AgentServerOpcodes.ChannelChat:
+				{
+					// The client posted a message to a chat channel: [byte type][u32 channelId][string][0000].
+					// Relay it to every connected client as the sender's identity (0x0014) + the message (0x0041
+					// with the sender id inserted). The channel (type+id) is preserved, so each client's own channel
+					// subscriptions decide whether/where it shows - that is what makes the multiple channels work
+					// (global channels reach everyone; ~Playfield's id is a map, so only same-map clients are
+					// subscribed to it and the rest ignore it).
+					var channelType = packet.Body.ReadByte();
+					var channelId = packet.Body.ReadUInt32();
+					var message = packet.Body.ReadString();
+
+					Logger.LogInformation("AgentServer channel chat from {Character} on channel {Type:X2}/{Id:X8}: {Message}",
+						client.Session.Character?.Name ?? "?", channelType, channelId, message);
+
+					await BroadcastChannelChat(client, channelType, channelId, message);
+
+					break;
+				}
+
+				case AgentServerOpcodes.ChatReady:
+				{
+					// Small chat-init handshake (body 00 01 02); retail echoes it back verbatim.
+					await new FaolanStream()
+						.WriteUInt16(AgentServerRespondsOpcodes.Ox0064)
+						.WriteArrayUInt16Length(s => s.WriteArray(packet.Body.ReadRemainingArray()))
+						.SendAsync(client);
+
+					break;
+				}
+
 				default:
 				{
 					LogUnknownPacket(packet, packet.Opcode);

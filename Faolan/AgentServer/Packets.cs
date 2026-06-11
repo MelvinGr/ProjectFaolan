@@ -25,6 +25,40 @@ namespace Faolan.AgentServer
 			}
 		}
 
+		// Relays a channel chat message (0x0041) to every connected client, preceded by the sender's identity
+		// (0x0014) so the client can show the speaker's name. The channel (type+id) from the original post is kept
+		// verbatim - the client only displays it in a channel it is subscribed to, so the per-channel routing is the
+		// client's subscription filter (global channels reach everyone; ~Playfield's id is a map id, so only same-map
+		// clients are subscribed to it and the rest ignore it). The sender sees their own message too.
+		private async Task BroadcastChannelChat(INetworkClient sender, byte channelType, uint channelId, string message)
+		{
+			var senderId = sender.Session.Account?.ClientInstance ?? 0;
+			var senderName = sender.Session.Character?.Name?.Length > 0
+				? sender.Session.Character.Name
+				: $"Character{senderId}";
+
+			foreach (var client in NetworkClients)
+			{
+				await new FaolanStream()
+					.WriteUInt16(AgentServerRespondsOpcodes.Ox0014)
+					.WriteArrayUInt16Length(s => s
+						.WriteUInt32(senderId)
+						.WriteUInt32(0x00000000)
+						.WriteString(senderName))
+					.SendAsync(client);
+
+				await new FaolanStream()
+					.WriteUInt16(AgentServerRespondsOpcodes.ChannelChat)
+					.WriteArrayUInt16Length(s => s
+						.WriteByte(channelType)
+						.WriteUInt32(channelId)
+						.WriteUInt32(senderId)
+						.WriteString(message)
+						.WriteUInt16(0x0000))
+					.SendAsync(client);
+			}
+		}
+
 		public async Task SendSystemMessage(uint characterId, string message)
 		{
 			var client = ClientForCharacter(characterId);

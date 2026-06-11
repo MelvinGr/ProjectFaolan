@@ -4,15 +4,19 @@
 	{
 		public enum AgentServerOpcodes : ushort
 		{
-			Hello = 0x0000
+			Hello = 0x0000,
+			ChannelChat = 0x0041, // client posts a message to a chat channel: [byte type][u32 channelId][string][0000]
+			ChatReady = 0x0064 // small chat-init handshake the client sends after the channel subscriptions (000102)
 		}
 
 		public enum AgentServerRespondsOpcodes : ushort
 		{
 			CharacterChat = 0x0022,
 			SystemMessage = 0x0023,
-			Ox0014 = 0x0014,
-			Ox003C = 0x003c
+			ChannelChat = 0x0041, // a channel message relayed to a client: [byte type][u32 channelId][u32 senderId][string][0000]
+			Ox0014 = 0x0014, // sender id + name; also sent before a ChannelChat so the client can show the speaker
+			Ox003C = 0x003c,
+			Ox0064 = 0x0064 // echo of the client's chat-init handshake
 		}
 
 		public enum CsPlayerAgentOpcodes : ushort
