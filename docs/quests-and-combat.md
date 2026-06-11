@@ -97,6 +97,30 @@ slowly-incrementing 4-byte counter — per-entity sequence/tick, NOT confirmed a
 false-positive); client action `0x01316D8A` upload (same value as the player handle — the player's action
 channel).
 
+## Loot
+
+Decoded from `hoxxling-login-gameplay.json` (see `protocol_loot_interaction`). Loot bags use **typetag `0xC87A`**
+(not the `0xC350` the entity family uses). Pickup sequence (client USE → looter-assign → grant → fade):
+
+1. **`0xF096251E` `LootBagFullUpdateIIR_c`** (spawn, server→client) — a **world object** (`0x2C` transform group +
+   object id + name "Chest [N7FU]"/"Bag of loot" + a `remoteformat … category=50026` TreasureChestScript). Built by
+   `WorldObjectBuilder` already. **Contents are not in this body** — they arrive on open.
+2. **`0x642CD3D6` Interact** (open, client→server) — `… [playerHandle] [seq] 00000012 [pbLen] <protobuf> [c87a]
+   [bagHandle] 00000001`, where `0x12`=18 = `startobjectaction(18)` = USE; the bag's typetag+handle ride the tail. A
+   larger variant carries the full `lootbag_open` TreasureChestScript remoteformat; the server echoes it.
+3. **`0xD06568C8` `NewCurrentLooterIIR_c`** + **`0x1E2E0139` `NewAllowedLooterIIR_c`** (server→client, 21 B):
+   `<subop> [c87a] [bagHandle] 00 0000c350 [playerHandle]` = "bag → current/allowed looter = this player".
+4. **Grant** — the player's big inventory snapshots (`0x79F8C7A1`, `0x63268258`, the ContainerAddItem path) +
+   **`0x70010162` `LootRemoveItemsIIR_c`** (25 B): `<subop> [c87a] [bagHandle] 00000000 [slot/count] [5B tail]`
+   removing the item from the bag. No separate "take" upload → Tortage starter loot is **auto-loot on use**.
+5. **`0x66180B20` `n3ToClientFadeIIR_t`** (fade, 17 B): `<subop> [c87a] [bagHandle] 00 [float fadeSeconds]` (e.g.
+   `40400000`=3.0). The **graceful despawn** variant: marker `0x00` + a FLOAT fade-time, vs `n3ToClientQuit`'s marker
+   `0x01` + u32 playfield token (`protocol_despawn_n3toclientquit`). Good fit for loot expiry (and possibly death).
+
+**Gate / path:** the open is mediated by an RDB Lua `TreasureChestScript` (same VM PINNED for conversations), but is
+**bypassable** like conversations — answer the use-Interact directly with NewCurrentLooter → item grant → fade without
+running the real script. Heaviest build piece = the inventory item-grant (ContainerAddItem). All in-client-gated.
+
 ## Quests
 
 ### Dialogue (quest giver conversation)
