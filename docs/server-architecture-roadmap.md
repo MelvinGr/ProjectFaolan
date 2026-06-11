@@ -39,8 +39,10 @@ Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see a
 >   despawned for nearby players (`BroadcastNpcDespawn`), and `WorldState.Tick` counts down `RespawnDelaySeconds` and
 >   revives it at its spawn point, re-rendered via `BroadcastNpcRespawn` (the NPC's `NpcSpawnBuilder` body). 5 unit
 >   tests. Visual confirmation is 2-client/in-client gated; the lifecycle logic is harness-verified.
-> - **XP on kill** ✓ killing a model NPC awards level-scaled XP (`CombatResolver.ResolveKillXp`) to `Character.Experience`
->   and pushes an `Exp` (0x0034) stat update via `0x96B8DC59` so the bar moves; XP persists via the usual save points.
+> - **XP + level-up on kill** ✓ killing a model NPC awards level-scaled XP (`CombatResolver.ResolveKillXp`); experience
+>   is within-level progress and `LevelingResolver.Apply` spends it against the curve, dinging `Character.Level`
+>   (multi-level safe, capped at 80) → `RegenerateMaxStats` → live vitals raised + refilled. Pushes `Exp`/`MaxExp`
+>   (and on a ding `Level` + full vitals) via `0x96B8DC59`. Persists via the usual save points.
 > - **Loot on kill** ✓ a kill may drop a loot bag (`LootResolver` coin-flip): a world object (`LootBagFullUpdateIIR_c`
 >   0xF096251E) built from a captured "Bag of loot" row at the death spot with a fresh handle, added to the zone +
 >   spawned for nearby players, and expired off the tick (`WorldState.Tick` → `LootExpired` → despawn + remove). 4

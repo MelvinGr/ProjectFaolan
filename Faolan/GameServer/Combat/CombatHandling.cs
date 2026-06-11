@@ -98,9 +98,9 @@ namespace Faolan.GameServer
 			_combat.Remove(targetHandle);
 		}
 
-		// Awards the killer XP for a kill and pushes an Exp stat update (0x96B8DC59) so the XP bar moves. XP accrues on
-		// the persisted Character (saved by the usual disconnect/autosave/.save points). Level-up (XP curve ->
-		// Level++ + MaxStats recompute) is the next progression step; for now only Exp is granted.
+		// Awards the killer XP for a kill, advancing levels when the XP bar fills (LevelingResolver), and pushes a
+		// 0x96B8DC59 stat update so the XP bar (and, on a ding, level + new vitals) move. Experience is within-level
+		// progress; XP/level accrue on the persisted Character (saved by the usual disconnect/autosave/.save points).
 		private async Task AwardKillXp(INetworkClient killer, uint npcLevel)
 		{
 			var character = killer?.Session?.Character;
@@ -110,9 +110,43 @@ namespace Faolan.GameServer
 			var xp = CombatResolver.ResolveKillXp(npcLevel);
 			character.Experience += xp;
 
-			var block = new CharacterStatBlock().Set(LegacyCharacterStatId.Exp, character.Experience);
+			var (levelsGained, remaining) = LevelingResolver.Apply(character.Level, character.Experience);
+			character.Experience = remaining;
+
+			if (levelsGained > 0)
+			{
+				character.Level = (ushort)System.Math.Min(character.Level + levelsGained, LevelingResolver.MaxLevel);
+				character.RegenerateMaxStats();
+				await PushLevelUp(killer, character);
+				Logger.LogInformation("Combat: {Name} gained {Xp} XP and reached level {Level}.", character.Name, xp, character.Level);
+				return;
+			}
+
+			var block = new CharacterStatBlock()
+				.Set(LegacyCharacterStatId.Exp, character.Experience)
+				.Set(LegacyCharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
 			await SendStatUpdate(killer, block, killer.Session.Account.ClientInstance);
-			Logger.LogInformation("Combat: {Name} gained {Xp} XP (total {Total}).", character.Name, xp, character.Experience);
+			Logger.LogInformation("Combat: {Name} gained {Xp} XP ({Exp}/{Max}).", character.Name, xp, character.Experience, LevelingResolver.XpForNextLevel(character.Level));
+		}
+
+		// On level-up: raise the player's live vitals to the new max and refill them (a ding heals), then push the new
+		// Level + Exp/MaxExp + full vitals in one 0x96B8DC59 update.
+		private async Task PushLevelUp(INetworkClient killer, Core.Database.Tables.Character character)
+		{
+			var vitals = GetOrAddPlayerVitals(killer);
+			var max = character.MaxStats ?? Core.Database.Tables.CharacterMaxStats.CreateDefaults(character.Class, character.Level);
+			vitals.MaxHealth = max.Health;
+			vitals.MaxStamina = max.Stamina;
+			vitals.MaxMana = max.Mana;
+			vitals.Health = max.Health;
+			vitals.Stamina = max.Stamina;
+			vitals.Mana = max.Mana;
+
+			var block = vitals.ToVitalsBlock()
+				.Set(LegacyCharacterStatId.Level, character.Level)
+				.Set(LegacyCharacterStatId.Exp, character.Experience)
+				.Set(LegacyCharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
+			await SendStatUpdate(killer, block, killer.Session.Account.ClientInstance);
 		}
 
 		// The melee swing / auto-attack (Interact ActionType 0x0F). Retail's response sequence, reproduced from the
