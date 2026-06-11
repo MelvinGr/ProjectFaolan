@@ -175,17 +175,28 @@ namespace Faolan.GameServer
 					? (equipment.FirstPosBag, equipment.FirstPosBag.Archetype)
 					: null;
 
-				var typedRoot = ((ReadOnlySpan<byte>)parts.Root.ToArray()).FromProtobuf<ProtoFullCharacterIIR>();
+				var verbatimRoot = parts.Root.ToArray();
+
+				var typedRoot = ((ReadOnlySpan<byte>)verbatimRoot).FromProtobuf<ProtoFullCharacterIIR>();
 				typedRoot.Inventories.Clear();
 				foreach (var container in FullCharSnapshotBuilder.BuildContainers(instance, equipped, bagFirst, inventoryRows ?? []))
 					typedRoot.Inventories.Add(container);
 				var rootBytes = typedRoot.ToProtobufBytes();
 
+				// The client reads the FullCharacterIIR protobuf root by a length the snapshot carries in its 8-byte
+				// IIR prefix: a varint at prefix offset 4 (after the 4-byte base-class version) equals
+				// constant + rootLength (proven across two captures: prefix byte tracks the root length 1:1, delta 5
+				// = root delta 5). Kept verbatim it stays the CAPTURED root's length, so a regenerated root of a
+				// different size desyncs the client - it over/under-reads the protobuf and misframes the following
+				// subclass version ("ReadSubClass Wrong IIR_t version ..."). Delta-adjust that varint by the
+				// root-length change, exactly as SetCharacterMessage delta-adjusts the spawn's CharacterIIR length.
+				var prefix = AdjustSnapshotPrefixRootLength(parts.Prefix, rootBytes.Length - verbatimRoot.Length);
+
 				using var contentStream = new FaolanStream();
 				contentStream.WriteUInt32(subOpcode);
 				contentStream.WriteUInt32(c350);
 				contentStream.WriteUInt32(instance);
-				contentStream.WriteArray(parts.Prefix);
+				contentStream.WriteArray(prefix);
 				contentStream.WriteArray(rootBytes);
 				contentStream.WriteArray(parts.Tails.ToArray());
 				var bodyContent = contentStream.ToArray();
@@ -208,6 +219,54 @@ namespace Faolan.GameServer
 				Logger.LogWarning(ex, "Post-load DB inventory snapshot build failed; backpack stays verbatim.");
 				return null;
 			}
+		}
+
+		// Delta-adjusts the snapshot IIR prefix's embedded root-length varint by `delta`. The prefix is
+		// [4-byte base-class version][varint = const + rootLength][trailing varint(s)]; the client uses that
+		// varint to delimit the protobuf root from the following subclass (the tails). Reads the varint at
+		// offset 4, adds delta, and re-encodes in place (variable width), preserving the bytes around it.
+		// Returns the prefix unchanged when delta is 0 or the layout isn't the known 8-byte shape.
+		internal static byte[] AdjustSnapshotPrefixRootLength(byte[] prefix, int delta)
+		{
+			const int varintOffset = 4;
+			if (delta == 0 || prefix.Length < varintOffset + 2)
+				return prefix;
+
+			// Read the varint at offset 4.
+			ulong value = 0;
+			var shift = 0;
+			var end = varintOffset;
+			while (end < prefix.Length)
+			{
+				var b = prefix[end++];
+				value |= (ulong)(b & 0x7F) << shift;
+				if ((b & 0x80) == 0)
+					break;
+
+				shift += 7;
+			}
+
+			var adjusted = (long)value + delta;
+			if (adjusted < 0)
+				return prefix;
+
+			// Re-encode and splice: [0..offset) + varint(adjusted) + [end..].
+			var newVarint = new List<byte>();
+			var v = (ulong)adjusted;
+			do
+			{
+				var b = (byte)(v & 0x7F);
+				v >>= 7;
+				if (v != 0)
+					b |= 0x80;
+				newVarint.Add(b);
+			} while (v != 0);
+
+			var result = new byte[varintOffset + newVarint.Count + (prefix.Length - end)];
+			Array.Copy(prefix, 0, result, 0, varintOffset);
+			newVarint.CopyTo(result, varintOffset);
+			Array.Copy(prefix, end, result, varintOffset + newVarint.Count, prefix.Length - end);
+			return result;
 		}
 
 		// Loads the character's CharacterEquipment (creating it and seeding default starter gear if absent), with the
