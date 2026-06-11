@@ -6,6 +6,7 @@ using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
 using Faolan.GameServer.Packets._0x737A6DF9_Test;
+using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
@@ -183,18 +184,33 @@ namespace Faolan.GameServer
 			var saved = 0;
 			foreach (var pair in _playerEntities)
 			{
-				var character = pair.Key.Session?.Character;
-				if (character == null)
-					continue;
-
-				var entity = pair.Value;
-				character.MapId = entity.MapId;
-				character.Position = entity.Position;
-				await Database.SaveCharacter(character);
-				saved++;
+				if (await SavePlayerState(pair.Key, pair.Value))
+					saved++;
 			}
 
 			return saved;
+		}
+
+		// Flushes one player's authoritative live transform (the WorldEntity) onto their persisted Character and
+		// saves it. Used by the autosave loop, .save, and disconnect. Errors are logged (callers may not await).
+		private async Task<bool> SavePlayerState(INetworkClient client, World.WorldEntity entity)
+		{
+			var character = client.Session?.Character;
+			if (character == null)
+				return false;
+
+			try
+			{
+				character.MapId = entity.MapId;
+				character.Position = entity.Position;
+				await Database.SaveCharacter(character);
+				return true;
+			}
+			catch (Exception ex)
+			{
+				Logger.LogWarning(ex, "Failed to flush world state for {Name} (0x{Handle:X8}).", entity.Name, entity.Handle);
+				return false;
+			}
 		}
 
 		private Task SendGmHelpText(uint characterId)

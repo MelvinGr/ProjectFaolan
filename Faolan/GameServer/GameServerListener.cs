@@ -39,6 +39,9 @@ namespace Faolan.GameServer
 		// How far a player perceives other players (world-entity interest radius; wider than say range).
 		private const float PlayerInterestRange = 150f;
 
+		// Periodic world-state autosave cadence (crash safety; logout/teleport/.save are the event-driven saves).
+		private const int AutoSaveIntervalMinutes = 5;
+
 		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, ushort port, IAgentServerDispatcher agentServerDispatcher, IGameServerDispatcher gameServerDispatcher) : base(port, logger, configuration, database,
 			new ConanOutgoingPacketLogger(logger, "GameServer", typeof(GameServerRespondOpcodes), typeof(GameServer0X2000RespondsOpcodes)))
 		{
@@ -102,6 +105,9 @@ namespace Faolan.GameServer
 			if (_playerEntities.TryRemove(client, out var entity))
 			{
 				_world.Remove(entity);
+				// Persist the player's final live state - movement isn't otherwise saved, so without this a logout
+				// loses where they were. Fire-and-forget: the connection is going away so we can't await; logged.
+				_ = SavePlayerState(client, entity);
 				Logger.LogInformation("World: player {Name} (0x{Handle:X8}) left map {Map}.", entity.Name, entity.Handle, entity.MapId);
 			}
 
@@ -111,7 +117,33 @@ namespace Faolan.GameServer
 		public override Task StartAsync(CancellationToken cancellationToken)
 		{
 			_gameServerDispatcher.Register(this);
+			_ = AutoSaveLoop(cancellationToken); // periodic crash-safety flush of the live world state
 			return base.StartAsync(cancellationToken);
+		}
+
+		// Periodically flushes the live world state to the DB so a crash loses at most one interval. Persistence is
+		// otherwise event-driven (disconnect, teleport, .save) and needs no game loop; this is just a cheap timer
+		// (docs/server-architecture-roadmap.md). The simulation tick, when it lands, can absorb this.
+		private async Task AutoSaveLoop(CancellationToken cancellationToken)
+		{
+			using var timer = new System.Threading.PeriodicTimer(System.TimeSpan.FromMinutes(AutoSaveIntervalMinutes));
+			try
+			{
+				while (await timer.WaitForNextTickAsync(cancellationToken))
+				{
+					var saved = await FlushWorldState();
+					if (saved > 0)
+						Logger.LogInformation("Autosave: flushed {Count} player(s)' live world state.", saved);
+				}
+			}
+			catch (System.OperationCanceledException)
+			{
+				// server shutting down
+			}
+			catch (System.Exception ex)
+			{
+				Logger.LogError(ex, "Autosave loop failed.");
+			}
 		}
 
 		public override Task StopAsync(CancellationToken cancellationToken)
