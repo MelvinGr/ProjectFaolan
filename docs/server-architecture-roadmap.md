@@ -30,8 +30,10 @@ Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see a
 >   removes regardless.
 > - **Persistence** ✓ event-driven (disconnect + teleport + `.save` flushes live world state) + a 5-min autosave
 >   timer. No game loop needed for it.
-> - **Game loop** ✓ a 1 Hz fixed tick (`GameTickLoop`) → `WorldState.Tick(dt)` + vitals regeneration (provisional
->   rates, pushes only on change). Raise cadence + dt-scaling when NPC AI lands.
+> - **Game loop** ✓ a **10 Hz base tick** (`GameTickLoop`) measuring real wall-clock dt. Continuous systems run every
+>   tick with that dt (`WorldState.Tick` — respawn now, AI later); rate-based systems run via a per-behaviour
+>   `TickAccumulator` at their own interval, dt-scaled (vitals regen at 1 Hz, pushes only on change). A long stall
+>   fires a behaviour once with the whole elapsed (no catch-up storm). Ready for ~10–20 Hz AI/movement.
 > - **NPC death → respawn** ✓ NPC vitals live on `WorldEntity` (seeded level-scaled at zone load, world-authoritative).
 >   Combat routes NPC damage through the model (`ApplyNpcDamage`/`ResolveNpcVitals`); on death the NPC is marked dead +
 >   despawned for nearby players (`BroadcastNpcDespawn`), and `WorldState.Tick` counts down `RespawnDelaySeconds` and

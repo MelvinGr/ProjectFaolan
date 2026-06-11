@@ -46,9 +46,14 @@ namespace Faolan.GameServer
 		// Periodic world-state autosave cadence (crash safety; logout/teleport/.save are the event-driven saves).
 		private const int AutoSaveIntervalMinutes = 5;
 
-		// Game-loop cadence. 1 Hz is plenty for the current behaviour (vitals regen); raise it (with dt-scaling and
-		// per-behaviour accumulators) when NPC AI/movement lands, which needs ~10-20 Hz.
-		private const double GameTickSeconds = 1.0;
+		// Base game-loop cadence: 10 Hz. Continuous systems (NPC respawn timers now; AI/movement later) run every base
+		// tick with the real elapsed dt so they stay smooth. Slower rate-based systems run via a TickAccumulator at
+		// their own interval (see RegenIntervalSeconds). The loop measures wall-clock dt, not the nominal period, so a
+		// late tick doesn't desync the rates.
+		private const double BaseTickSeconds = 0.1;
+
+		// Vitals regen cadence (rate-based; dt-scaled by the real elapsed time when it fires).
+		private const double RegenIntervalSeconds = 1.0;
 
 		// Background loops (game tick + autosave) and their lifetime token. Held (not fire-and-forget) so StopAsync can
 		// signal them and await a clean shutdown, and so any unobserved fault surfaces instead of being swallowed.
@@ -143,19 +148,30 @@ namespace Faolan.GameServer
 			return base.StartAsync(cancellationToken);
 		}
 
-		// The server game loop: a fixed-cadence tick that advances the world model and runs time-based behaviour
-		// (docs/server-architecture-roadmap.md). Today it advances the (player-only) world model - a no-op - and
-		// regenerates connected players' vitals; NPC AI/movement/respawn join it as those land. Cancelled on shutdown.
+		// The server game loop (docs/server-architecture-roadmap.md): a 10 Hz base tick that advances continuous systems
+		// every tick with the REAL elapsed dt (NPC respawn timers now; AI/movement later) and runs rate-based systems
+		// (vitals regen) via a per-behaviour TickAccumulator at their own interval, dt-scaled. Wall-clock dt is measured
+		// so a late tick doesn't desync the rates. Cancelled on shutdown.
 		private async Task GameTickLoop(CancellationToken cancellationToken)
 		{
-			using var timer = new System.Threading.PeriodicTimer(System.TimeSpan.FromSeconds(GameTickSeconds));
+			using var timer = new System.Threading.PeriodicTimer(System.TimeSpan.FromSeconds(BaseTickSeconds));
+			var regen = new World.TickAccumulator(RegenIntervalSeconds);
+			var lastTimestamp = System.Diagnostics.Stopwatch.GetTimestamp();
 			try
 			{
 				while (await timer.WaitForNextTickAsync(cancellationToken))
 				{
-					foreach (var respawned in _world.Tick(GameTickSeconds))
+					var now = System.Diagnostics.Stopwatch.GetTimestamp();
+					var dt = System.Diagnostics.Stopwatch.GetElapsedTime(lastTimestamp, now).TotalSeconds;
+					lastTimestamp = now;
+
+					// Continuous-time systems: every base tick, with the actual elapsed dt.
+					foreach (var respawned in _world.Tick(dt))
 						await BroadcastNpcRespawn(respawned);
-					await RegenerateConnectedPlayers();
+
+					// Rate-based systems: fire on their own cadence, scaled by the time actually elapsed since last fire.
+					if (regen.Advance(dt, out var regenElapsed))
+						await RegenerateConnectedPlayers(regenElapsed);
 				}
 			}
 			catch (System.OperationCanceledException)
@@ -168,9 +184,10 @@ namespace Faolan.GameServer
 			}
 		}
 
-		// Regenerates each connected player's vitals one tick's worth and pushes a 0x96B8DC59 update only when a pool
-		// actually rose (a player at full HP/stamina/mana costs nothing). Rates are provisional fractions of max.
-		private async Task RegenerateConnectedPlayers()
+		// Regenerates each connected player's vitals by `elapsedSeconds` worth and pushes a 0x96B8DC59 update only when
+		// a pool actually rose (a player at full HP/stamina/mana costs nothing). Rates are provisional fractions of max
+		// per second, scaled by the elapsed time so the cadence is independent of the base tick rate.
+		private async Task RegenerateConnectedPlayers(double elapsedSeconds)
 		{
 			foreach (var pair in _playerEntities)
 			{
@@ -180,17 +197,19 @@ namespace Faolan.GameServer
 
 				var vitals = GetOrAddPlayerVitals(client);
 				var changed = vitals.Regenerate(
-					RegenAmount(vitals.MaxHealth, 0.05), // ~5% hp / sec (provisional)
-					RegenAmount(vitals.MaxStamina, 0.10), // ~10% stamina / sec
-					RegenAmount(vitals.MaxMana, 0.05)); // ~5% mana / sec
+					RegenAmount(vitals.MaxHealth, 0.05, elapsedSeconds), // ~5% hp / sec (provisional)
+					RegenAmount(vitals.MaxStamina, 0.10, elapsedSeconds), // ~10% stamina / sec
+					RegenAmount(vitals.MaxMana, 0.05, elapsedSeconds)); // ~5% mana / sec
 				if (changed)
 					await SendStatUpdate(client, vitals.ToVitalsBlock(), client.Session.Account.ClientInstance);
 			}
 		}
 
-		private static uint RegenAmount(uint max, double fraction)
+		// The per-`elapsedSeconds` regen for one pool: `fraction` of max per second, scaled by elapsed. Rounds up to at
+		// least 1 so a pool below max always ticks toward it (never stalls on rounding).
+		private static uint RegenAmount(uint max, double fraction, double elapsedSeconds)
 		{
-			var amount = (uint)(max * fraction);
+			var amount = (uint)(max * fraction * elapsedSeconds);
 			return amount > 0
 				? amount
 				: 1;
