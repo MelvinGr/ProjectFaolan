@@ -147,6 +147,10 @@ namespace Faolan.GameServer
 									.WriteArray(datadat))
 								.SendAsync(client);
 
+							// Interest-managed broadcast: spawn this player to newly-near players and forward the move
+							// to players who already see them (docs/server-architecture-roadmap.md). No-op solo.
+							await BroadcastPlayerMove(client, (uint)pbOpcode, dataobjdec, dataclientinst, (ushort)movingType, livePosition, liveRotation, datadat);
+
 							break;
 						}
 

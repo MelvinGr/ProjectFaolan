@@ -370,7 +370,10 @@ namespace Faolan.GameServer
 				if (dbInventory.Count > 0 && IsInventorySnapshot(pkt))
 					pkt = BuildBeachInventoryPacket(pkt, dbInventory, client.Session.Character);
 				else if (TryRebuildPlayerSpawnFromDb(client, equipment, scaffoldCharacter, pkt, out var rebuilt))
+				{
 					pkt = rebuilt;
+					CaptureOwnSpawnBody(client, pkt); // stash the player's FA015807 body so other players can be sent it
+				}
 				else if (TryRebuildNpcSpawnFromDb(client, npcByPosition, pkt, out var npcRebuilt, out var wasIdentical))
 				{
 					npcBuilt++;
@@ -460,10 +463,13 @@ namespace Faolan.GameServer
 			Logger.LogInformation("World entry (map={Map}, '{Name}'): replaying {Count} IIR records from the DB ({Source}).", mapId, client.Session.Character?.Name, worldBurst.Entities.Count, worldBurst.MapId == mapId
 				? "own map"
 				: $"beach fallback (map {worldBurst.MapId})");
+			// Register in the live model BEFORE the burst so the player's own spawn body can be captured into the
+			// entity during the replay (docs/server-architecture-roadmap.md).
+			RegisterPlayerInWorld(client);
 			await ReplayMapWorldBurst(client, worldBurst);
 
-			// The player is now in the world - register them in the live model (docs/server-architecture-roadmap.md).
-			RegisterPlayerInWorld(client);
+			// Now that the spawn body is captured, run interest: spawn this player to nearby players and them to it.
+			await BroadcastPlayerEntry(client);
 		}
 
 		// If the burst packet is the player's own entity Spawn (FA015807 whose handle is the client instance),
