@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Numerics;
 using System.Threading;
 
@@ -53,12 +54,23 @@ namespace Faolan.GameServer.World
 				zone.Remove(entity.Handle);
 		}
 
-		// Advances the world model by `deltaSeconds` - the game-loop seam where NPC AI/movement/respawn will run once
-		// NPCs are in the model (docs/server-architecture-roadmap.md). Player transforms are driven by Move packets,
-		// not the tick, so there is nothing to advance for them yet; this is the hook the loop calls each tick.
-		public void Tick(double deltaSeconds)
+		// Advances the world model by `deltaSeconds` (docs/server-architecture-roadmap.md). Today it runs the NPC
+		// respawn timers: any dead NPC whose respawn delay elapsed this tick is revived (vitals + transform reset) and
+		// returned so the caller can re-spawn it for nearby players. Player transforms are driven by Move packets, not
+		// the tick; NPC AI/movement joins here later.
+		public IReadOnlyList<WorldEntity> Tick(double deltaSeconds)
 		{
-			// No-op until NPC entities live in the zones. Intentionally present so the loop wiring + cadence land now.
+			List<WorldEntity> respawned = null;
+			foreach (var zone in _zones.Values)
+			{
+				foreach (var entity in zone.Entities)
+				{
+					if (!entity.IsPlayer && entity.TickRespawn(deltaSeconds))
+						(respawned ??= new List<WorldEntity>()).Add(entity);
+				}
+			}
+
+			return respawned ?? (IReadOnlyList<WorldEntity>)System.Array.Empty<WorldEntity>();
 		}
 	}
 }

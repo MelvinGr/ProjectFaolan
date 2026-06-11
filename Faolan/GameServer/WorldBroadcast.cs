@@ -129,10 +129,19 @@ namespace Faolan.GameServer
 			var zone = _world.ZoneFor(mapId);
 			foreach (var npc in npcs)
 			{
-				zone.Add(WorldEntity.ForNpc(npc.CapturedHandle, mapId,
+				// Seed killable vitals (level-scaled max) so combat can damage/kill it and the tick can respawn it.
+				var vitals = Combat.EntityVitals.FromMax(Combat.CombatResolver.NpcMaxHealthForLevel(npc.Level), 0, Combat.CombatResolver.NpcMaxHealthForLevel(npc.Level));
+				var entity = WorldEntity.ForNpc(npc.CapturedHandle, mapId,
 					new Vector3(npc.PositionX, npc.PositionY, npc.PositionZ),
 					new Vector3(npc.RotationX, npc.RotationY, npc.RotationZ),
-					npc.Name ?? "NPC"));
+					npc.Name ?? "NPC", vitals);
+
+				// Keep the NPC's FA015807 spawn body so respawn can re-render it for nearby players (built byte-exact
+				// from the row by NpcSpawnBuilder, the same path the burst-replacement uses).
+				if (NpcSpawnBuilder.TryBuild(npc, npc.CapturedHandle, out var spawnBody))
+					entity.SpawnBody = spawnBody;
+
+				zone.Add(entity);
 			}
 
 			Logger.LogInformation("World: loaded {Count} NPC(s) into map {Map}'s zone.", npcs.Length, mapId);
@@ -158,6 +167,32 @@ namespace Faolan.GameServer
 
 			var events = InterestManager.ResolveMove(_world.ZoneFor(entity.MapId), entity, PlayerInterestRange);
 			await DispatchInterest(events, move: null);
+		}
+
+		// An NPC died: despawn it for every player currently in range (NPCs are seen by everyone in the zone via the
+		// burst, not tracked in per-player Known sets, so this is range-based rather than ResolveRemove). Uses the same
+		// n3ToClientQuit packet as player despawns.
+		private async Task BroadcastNpcDespawn(WorldEntity npc)
+		{
+			foreach (var viewer in _world.ZoneFor(npc.MapId).PlayersInRange(npc.Position, PlayerInterestRange))
+			{
+				if (viewer.Client != null)
+					await SendWorldDespawn(viewer.Client, viewer.MapId, npc.Handle);
+			}
+		}
+
+		// An NPC respawned (its timer elapsed on the tick): re-render it for every player in range by re-sending its
+		// stored FA015807 spawn body (re-framed + position-patched per recipient by SendWorldSpawn).
+		private async Task BroadcastNpcRespawn(WorldEntity npc)
+		{
+			if (npc.SpawnBody == null)
+				return;
+
+			foreach (var viewer in _world.ZoneFor(npc.MapId).PlayersInRange(npc.Position, PlayerInterestRange))
+			{
+				if (viewer.Client != null)
+					await SendWorldSpawn(viewer.Client, npc);
+			}
 		}
 
 		// On disconnect/logout: despawn the leaving player for everyone who could see it (n3ToClientQuit), before it is

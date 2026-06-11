@@ -30,10 +30,16 @@ Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see a
 >   removes regardless.
 > - **Persistence** ✓ event-driven (disconnect + teleport + `.save` flushes live world state) + a 5-min autosave
 >   timer. No game loop needed for it.
-> - **Game loop** ✓ a 1 Hz fixed tick (`GameTickLoop`) → `WorldState.Tick(dt)` (NPC-AI seam, no-op today) +
->   vitals regeneration (provisional rates, pushes only on change). Raise cadence + dt-scaling when NPC AI lands.
-> **NEXT:** put NPCs in the world model (shared per-zone, from `NpcSpawns`) so the tick can drive AI/movement and the
-> burst becomes a seed — this is where the loop and "construct, don't replay" meet. Then combat/death/respawn, quests.
+> - **Game loop** ✓ a 1 Hz fixed tick (`GameTickLoop`) → `WorldState.Tick(dt)` + vitals regeneration (provisional
+>   rates, pushes only on change). Raise cadence + dt-scaling when NPC AI lands.
+> - **NPC death → respawn** ✓ NPC vitals live on `WorldEntity` (seeded level-scaled at zone load, world-authoritative).
+>   Combat routes NPC damage through the model (`ApplyNpcDamage`/`ResolveNpcVitals`); on death the NPC is marked dead +
+>   despawned for nearby players (`BroadcastNpcDespawn`), and `WorldState.Tick` counts down `RespawnDelaySeconds` and
+>   revives it at its spawn point, re-rendered via `BroadcastNpcRespawn` (the NPC's `NpcSpawnBuilder` body). 5 unit
+>   tests. **XP + loot are the next combat piece** (need an XP wire-push + item-drop tables). Visual confirmation is
+>   2-client/in-client gated; the lifecycle logic is harness-verified.
+> **NEXT:** XP/loot on kill; then NPC AI movement (the pinned MoveTask patrol grammar) so the tick drives motion and
+> the burst becomes a pure seed — where the loop and "construct, don't replay" meet. Then quests.
 
 ## What we already have (strong foundation)
 

@@ -153,7 +153,8 @@ namespace Faolan.GameServer
 			{
 				while (await timer.WaitForNextTickAsync(cancellationToken))
 				{
-					_world.Tick(GameTickSeconds);
+					foreach (var respawned in _world.Tick(GameTickSeconds))
+						await BroadcastNpcRespawn(respawned);
 					await RegenerateConnectedPlayers();
 				}
 			}

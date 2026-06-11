@@ -41,23 +41,58 @@ namespace Faolan.GameServer
 		}
 
 		// Resolves an offensive cast: applies damage to the target's live vitals and pushes a 0x96B8DC59 update so
-		// its health bar moves. The ApplySpell cast itself is broadcast by the caller. Death handling (despawn + XP)
-		// is a TODO - the death/despawn packet isn't decoded yet (docs/quests-and-combat.md).
+		// its health bar moves. The ApplySpell cast itself is broadcast by the caller.
 		private async Task ResolveOffensiveCast(INetworkClient client, uint casterHandle, uint targetHandle, uint spellId)
 		{
-			var target = GetOrAddNpcVitals(client, targetHandle);
-
 			var casterLevel = client.Session.Character?.Level ?? 1;
 			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel);
-			target.ApplyHealthDelta(-damage);
+			await ApplyNpcDamage(client, targetHandle, damage, $"spell {spellId} from 0x{casterHandle:X8}");
+		}
 
+		// Applies `damage` to an NPC and pushes its 0x96B8DC59 health update; on death, runs the kill lifecycle
+		// (despawn + scheduled respawn). Vitals resolve from the WORLD MODEL when the target is a model NPC (the
+		// authoritative owner), else fall back to the per-session store (e.g. the built-NPC test). Shared by the melee
+		// and spell paths.
+		private async Task ApplyNpcDamage(INetworkClient client, uint targetHandle, int damage, string cause)
+		{
+			var target = ResolveNpcVitals(client, targetHandle, out var npcEntity);
+			if (target.IsDead)
+				return; // already dead this life; ignore overkill until it respawns
+
+			target.ApplyHealthDelta(-damage);
 			await SendStatUpdate(client, target.ToVitalsBlock(), targetHandle);
 
 			if (target.IsDead)
+				await OnNpcKilled(targetHandle, npcEntity, cause);
+		}
+
+		// The NPC's authoritative live vitals: the world-model entity's if it is a tracked NPC (also returned, so the
+		// caller can run its death lifecycle), otherwise the per-session vitals (npcEntity null).
+		private EntityVitals ResolveNpcVitals(INetworkClient client, uint targetHandle, out World.WorldEntity npcEntity)
+		{
+			var player = PlayerWorldEntity(client);
+			if (player != null && _world.ZoneFor(player.MapId).TryGet(targetHandle, out npcEntity) && !npcEntity.IsPlayer && npcEntity.Vitals != null)
+				return npcEntity.Vitals;
+
+			npcEntity = null;
+			return GetOrAddNpcVitals(client, targetHandle);
+		}
+
+		// An NPC was killed: a model NPC is marked dead (starting its respawn timer) and despawned for nearby players;
+		// the tick respawns it. A non-model NPC (no world entity) is just dropped from the session store. XP/loot are
+		// the next step (docs/server-architecture-roadmap.md).
+		private async Task OnNpcKilled(uint targetHandle, World.WorldEntity npcEntity, string cause)
+		{
+			if (npcEntity != null)
 			{
-				Logger.LogInformation("Combat: entity 0x{Target:X8} killed by spell {SpellId} cast from 0x{Caster:X8} (despawn/XP not yet implemented).", targetHandle, spellId, casterHandle);
-				_combat.Remove(targetHandle);
+				npcEntity.MarkDead();
+				await BroadcastNpcDespawn(npcEntity);
+				Logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); despawned, respawns in {Delay}s.", npcEntity.Name, targetHandle, cause, npcEntity.RespawnDelaySeconds);
+				return;
 			}
+
+			Logger.LogInformation("Combat: entity 0x{Target:X8} killed ({Cause}); not in world model, no respawn.", targetHandle, cause);
+			_combat.Remove(targetHandle);
 		}
 
 		// The melee swing / auto-attack (Interact ActionType 0x0F). Retail's response sequence, reproduced from the
@@ -152,16 +187,9 @@ namespace Faolan.GameServer
 						.WriteUInt32(0))
 					.SendAsync(client);
 
-				// Apply to the target's live vitals and push its health bar (0x96B8DC59).
-				var target = GetOrAddNpcVitals(client, targetHandle);
-				target.ApplyHealthDelta(-(int)damage);
-				await SendStatUpdate(client, target.ToVitalsBlock(), targetHandle);
-
-				if (target.IsDead)
-				{
-					Logger.LogInformation("Combat: entity 0x{Target:X8} killed by melee attack from 0x{Caster:X8} (despawn/XP not yet implemented).", targetHandle, instance);
-					_combat.Remove(targetHandle);
-				}
+				// Apply to the target's live vitals (world-authoritative), push its health bar, and run the kill
+				// lifecycle (despawn + scheduled respawn) on death.
+				await ApplyNpcDamage(client, targetHandle, (int)damage, $"melee from 0x{instance:X8}");
 			}
 
 			// 3) EnergyIIR - the player's stamina after the swing.

@@ -10,6 +10,15 @@ namespace Faolan.GameServer.Combat
 		// Placeholder NPC max health until NPC stats are decoded from the spawn/snapshot data.
 		public const uint DefaultNpcMaxHealth = 100;
 
+		// Provisional NPC max health from its level - used to seed a model NPC's vitals so its health bar scales with
+		// level (the real per-template HP isn't lifted from the spawn data yet, like ResolveSpellDamage). Level 0 maps
+		// to the level-1 value.
+		public static uint NpcMaxHealthForLevel(uint level)
+		{
+			var lvl = level == 0 ? 1u : level;
+			return DefaultNpcMaxHealth + lvl * 20u;
+		}
+
 		public static int ResolveSpellDamage(uint spellId, ushort casterLevel)
 		{
 			var level = casterLevel == 0
