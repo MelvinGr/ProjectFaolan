@@ -816,7 +816,6 @@ namespace Faolan.GameServer
 					        aBuffer.Send(client);*/
 
 					//var packetData = packet.Data?.ToArray().ToHexString();
-					//Logger.LogInformation("0x206A: " + (packet.Data?.ToArray()).ToHex());
 
 					break;
 				}

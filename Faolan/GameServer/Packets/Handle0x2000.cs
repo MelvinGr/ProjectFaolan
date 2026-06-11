@@ -80,7 +80,6 @@ namespace Faolan.GameServer
 
 				case GameServer0X2000Opcodes.Move:
 				{
-					//Logger.LogInformation($"[DUMP] Move ({rawPayload.Length} bytes): {rawPayload.ToHex()}");
 					var dataobjdec = packet.Body.ReadUInt32();
 					var dataclientinst = packet.Body.ReadUInt32();
 					var movingType = packet.Body.ReadUInt16<MovingType>();
@@ -166,8 +165,6 @@ namespace Faolan.GameServer
 
 				case GameServer0X2000Opcodes.ReadyForPlayScreen: //peer0_160
 				{
-					//Logger.LogInformation($"[DUMP] ReadyForPlayScreen ({rawPayload.Length} bytes): {rawPayload.ToHex()}");
-					//Logger.LogInformation($"Completing world entry for {client.Session.Account?.UserName ?? client.IpAddress}.");
 
 					if (client.Session.Character?.Name == null)
 					{
@@ -205,7 +202,6 @@ namespace Faolan.GameServer
 
 				case GameServer0X2000Opcodes.Interact:
 				{
-					//Logger.LogInformation($"[DUMP] Interact ({rawPayload.Length} bytes): {rawPayload.ToHex()}");
 					// Important capture observation:
 					// world-object interactions appear to be the likely trigger path for the container-style
 					// response family 0xF096251E, which carries names like "Chest [N7FU]" and "object_closed".
@@ -436,7 +432,6 @@ namespace Faolan.GameServer
 
 				case GameServer0X2000Opcodes.MoveItemInInventory:
 				{
-					//Logger.LogInformation($"[DUMP] MoveItemInInventory ({rawPayload.Length} bytes): {rawPayload.ToHex()}");
 					// The recovered client schema names this message ProtoMoveInventoryItemIIR:
 					//   { source_container_id, source_item_pos, destination_container_id, destination_item_pos }
 					// where each container id is a ProtoID32 { type, instance }. This resolves the old research note
@@ -499,7 +494,6 @@ namespace Faolan.GameServer
 				case GameServer0X2000Opcodes.InventoryClaimsButton:
 				{
 					var data = packet.Body.ReadRemainingArray();
-					//Logger.LogInformation($"[DUMP] InventoryClaimsButton ({rawPayload.Length} bytes): {rawPayload.ToHex()}");
 
 					break;
 				}
@@ -507,7 +501,6 @@ namespace Faolan.GameServer
 				case GameServer0X2000Opcodes.LegacyConanHimselfInstance:
 				{
 					var data = packet.Body.ReadRemainingArray();
-					//Logger.LogInformation($"[DUMP] Ox1101B4F6 ({rawPayload.Length} bytes): {rawPayload.ToHex()}\r\nremaining: {data.ToHex()}");
 
 					break;
 				}

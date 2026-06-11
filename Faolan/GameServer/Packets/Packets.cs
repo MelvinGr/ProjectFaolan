@@ -89,8 +89,6 @@ namespace Faolan.GameServer
 			}
 			else if (client.Session.Character?.Name != null)
 			{
-				//Logger.LogInformation($"No observed 0x2020 request id is available while flushing; using existing-character fallback requestId={ExistingCharacterFallback2020RequestId:X}.");
-				//Logger.LogInformation($"Pending post-0x205F follow-up flushed without any observed 0x2020 request id; using retail existing-character fallback request id {ExistingCharacterFallback2020RequestId:X} for SpawnCheck.");
 				await SendPost205FSpawnCheck(client);
 			}
 			else
