@@ -21,7 +21,7 @@ namespace Faolan.GameServer
 			var amount = int.TryParse(arguments, out var parsed)
 				? parsed
 				: 100;
-			var vitals = GetOrAddPlayerVitals(client);
+			var vitals = _combat.GetOrAddPlayerVitals(client);
 			vitals.ApplyHealthDelta(heal
 				? amount
 				: -amount);

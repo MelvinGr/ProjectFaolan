@@ -2,40 +2,56 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
+using Faolan.Core.Network.AgentServer;
 using Faolan.Core.Network.Packets;
-using Faolan.GameServer.Combat;
 using Faolan.GameServer.Packets._0x737A6DF9_Test;
+using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
-// ReSharper disable once CheckNamespace
-namespace Faolan.GameServer
+namespace Faolan.GameServer.Combat
 {
-	public partial class GameServerListener
+	// Combat domain logic: resolves melee swings and spell casts into damage, drives the NPC kill lifecycle
+	// (despawn + scheduled respawn via the world model), awards XP / levels, tracks kill-objective quest progress, and
+	// builds the combat wire packets (the BehaviorControlCenter ack, DamageResult, Energy, and 0x96B8DC59 vitals).
+	// Extracted out of the GameServer listener as a composed collaborator (like WorldBroadcaster): it reads/writes the
+	// world model via the WorldSimulation, broadcasts world effects via the WorldBroadcaster, and frames its own
+	// packets on the world conversation (WorldFraming). Vitals resolve from the world model (the authoritative owner);
+	// a per-session CombatState backs NPCs not in the model (e.g. the built-NPC test). See protocol_stats_and_combat.
+	public sealed class CombatService
 	{
 		// Fallback vitals store for NPCs NOT in the world model (e.g. the built-NPC test) - model NPCs and players
 		// keep their vitals on their WorldEntity (the single source of truth). In-memory, never persisted.
 		private readonly CombatState _combat = new CombatState();
 
+		private readonly WorldSimulation _sim;
+		private readonly WorldBroadcaster _broadcaster;
+		private readonly IDatabaseRepository _database;
+		private readonly IAgentServerDispatcher _agents;
+		private readonly ILogger _logger;
+
+		public CombatService(WorldSimulation sim, WorldBroadcaster broadcaster, IDatabaseRepository database, IAgentServerDispatcher agents, ILogger logger)
+		{
+			_sim = sim;
+			_broadcaster = broadcaster;
+			_database = database;
+			_agents = agents;
+			_logger = logger;
+		}
+
 		// The player's own live vitals - the WORLD MODEL is the single source of truth: they live on the player's
 		// WorldEntity (like NPCs'), seeded from CharacterMaxStats. World-authoritative, never persisted (only
 		// CharacterMaxStats is). Falls back to a transient seed only if the player isn't in the world yet (no combat/
 		// regen happens then, so this is just defensive).
-		private EntityVitals GetOrAddPlayerVitals(INetworkClient client)
+		public EntityVitals GetOrAddPlayerVitals(INetworkClient client)
 		{
-			var entity = PlayerWorldEntity(client);
+			var entity = _sim.PlayerWorldEntity(client);
 			if (entity == null)
-				return PlayerVitalsSeed(client.Session.Character);
+				return EntityVitals.FromCharacter(client.Session.Character);
 
-			return entity.Vitals ??= PlayerVitalsSeed(client.Session.Character);
-		}
-
-		// Full-health vitals from the character's max stats (class/level defaults if none). The seed logic lives on
-		// EntityVitals so the world simulation (which also seeds player vitals on registration) shares it.
-		private static EntityVitals PlayerVitalsSeed(Character character)
-		{
-			return EntityVitals.FromCharacter(character);
+			return entity.Vitals ??= EntityVitals.FromCharacter(client.Session.Character);
 		}
 
 		// A target NPC's live vitals, seeded from its real spawn health (recorded when the world burst spawned it)
@@ -52,7 +68,7 @@ namespace Faolan.GameServer
 
 		// Resolves an offensive cast: applies damage to the target's live vitals and pushes a 0x96B8DC59 update so
 		// its health bar moves. The ApplySpell cast itself is broadcast by the caller.
-		private async Task ResolveOffensiveCast(INetworkClient client, uint casterHandle, uint targetHandle, uint spellId)
+		public async Task ResolveOffensiveCast(INetworkClient client, uint casterHandle, uint targetHandle, uint spellId)
 		{
 			var casterLevel = client.Session.Character?.Level ?? 1;
 			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel);
@@ -78,10 +94,10 @@ namespace Faolan.GameServer
 
 		// The NPC's authoritative live vitals: the world-model entity's if it is a tracked NPC (also returned, so the
 		// caller can run its death lifecycle), otherwise the per-session vitals (npcEntity null).
-		private EntityVitals ResolveNpcVitals(INetworkClient client, uint targetHandle, out World.WorldEntity npcEntity)
+		private EntityVitals ResolveNpcVitals(INetworkClient client, uint targetHandle, out WorldEntity npcEntity)
 		{
-			var player = PlayerWorldEntity(client);
-			if (player != null && _simulation.World.ZoneFor(player.MapId).TryGet(targetHandle, out npcEntity) && !npcEntity.IsPlayer && npcEntity.Vitals != null)
+			var player = _sim.PlayerWorldEntity(client);
+			if (player != null && _sim.World.ZoneFor(player.MapId).TryGet(targetHandle, out npcEntity) && !npcEntity.IsPlayer && npcEntity.Vitals != null)
 				return npcEntity.Vitals;
 
 			npcEntity = null;
@@ -90,21 +106,21 @@ namespace Faolan.GameServer
 
 		// An NPC was killed by `killer`: a model NPC is marked dead (starting its respawn timer), despawned for nearby
 		// players (the tick respawns it), and awards the killer XP. A non-model NPC (no world entity) is just dropped
-		// from the session store. Loot is the next step (docs/server-architecture-roadmap.md).
-		private async Task OnNpcKilled(INetworkClient killer, uint targetHandle, World.WorldEntity npcEntity, string cause)
+		// from the session store.
+		private async Task OnNpcKilled(INetworkClient killer, uint targetHandle, WorldEntity npcEntity, string cause)
 		{
 			if (npcEntity != null)
 			{
 				npcEntity.MarkDead();
 				await _broadcaster.BroadcastEntityDespawn(npcEntity);
-				Logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); despawned, respawns in {Delay}s.", npcEntity.Name, targetHandle, cause, npcEntity.RespawnDelaySeconds);
+				_logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); despawned, respawns in {Delay}s.", npcEntity.Name, targetHandle, cause, npcEntity.RespawnDelaySeconds);
 				await AwardKillXp(killer, npcEntity.Level);
 				await _broadcaster.TrySpawnLoot(npcEntity);
 				await AdvanceKillQuests(killer, npcEntity.Name);
 				return;
 			}
 
-			Logger.LogInformation("Combat: entity 0x{Target:X8} killed ({Cause}); not in world model, no respawn.", targetHandle, cause);
+			_logger.LogInformation("Combat: entity 0x{Target:X8} killed ({Cause}); not in world model, no respawn.", targetHandle, cause);
 			_combat.Remove(targetHandle);
 		}
 
@@ -118,22 +134,22 @@ namespace Faolan.GameServer
 			if (character == null || string.IsNullOrEmpty(npcName))
 				return;
 
-			foreach (var quest in await Database.GetCharacterQuests(character.Id))
+			foreach (var quest in await _database.GetCharacterQuests(character.Id))
 			{
-				if (!World.QuestProgress.AdvancesOnKill(quest, npcName))
+				if (!QuestProgress.AdvancesOnKill(quest, npcName))
 					continue;
 
 				var progress = quest.GoalProgress + 1;
 				var completed = progress >= quest.GoalRequired;
-				await Database.SetCharacterQuest(character.Id, quest.QuestId,
-					completed ? Core.Database.Tables.QuestState.Completed : Core.Database.Tables.QuestState.Active,
+				await _database.SetCharacterQuest(character.Id, quest.QuestId,
+					completed ? QuestState.Completed : QuestState.Active,
 					progress, quest.GoalRequired, quest.GoalTargetName);
 				await _broadcaster.SendQuestGoal(killer, quest.QuestId, 0, progress);
 
 				if (completed)
-					await _agentServerDispatcher.SendSystemMessage(character.Id, $"Quest {quest.QuestId} complete!");
+					await _agents.SendSystemMessage(character.Id, $"Quest {quest.QuestId} complete!");
 				else
-					await _agentServerDispatcher.SendSystemMessage(character.Id, $"{npcName} slain ({progress}/{quest.GoalRequired}).");
+					await _agents.SendSystemMessage(character.Id, $"{npcName} slain ({progress}/{quest.GoalRequired}).");
 			}
 		}
 
@@ -154,10 +170,10 @@ namespace Faolan.GameServer
 
 			if (levelsGained > 0)
 			{
-				character.Level = (ushort)System.Math.Min(character.Level + levelsGained, LevelingResolver.MaxLevel);
+				character.Level = (ushort)Math.Min(character.Level + levelsGained, LevelingResolver.MaxLevel);
 				character.RegenerateMaxStats();
 				await PushLevelUp(killer, character);
-				Logger.LogInformation("Combat: {Name} gained {Xp} XP and reached level {Level}.", character.Name, xp, character.Level);
+				_logger.LogInformation("Combat: {Name} gained {Xp} XP and reached level {Level}.", character.Name, xp, character.Level);
 				return;
 			}
 
@@ -165,15 +181,15 @@ namespace Faolan.GameServer
 				.Set(LegacyCharacterStatId.Exp, character.Experience)
 				.Set(LegacyCharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
 			await SendStatUpdate(killer, block, killer.Session.Account.ClientInstance);
-			Logger.LogInformation("Combat: {Name} gained {Xp} XP ({Exp}/{Max}).", character.Name, xp, character.Experience, LevelingResolver.XpForNextLevel(character.Level));
+			_logger.LogInformation("Combat: {Name} gained {Xp} XP ({Exp}/{Max}).", character.Name, xp, character.Experience, LevelingResolver.XpForNextLevel(character.Level));
 		}
 
 		// On level-up: raise the player's live vitals to the new max and refill them (a ding heals), then push the new
 		// Level + Exp/MaxExp + full vitals in one 0x96B8DC59 update.
-		private async Task PushLevelUp(INetworkClient killer, Core.Database.Tables.Character character)
+		private async Task PushLevelUp(INetworkClient killer, Character character)
 		{
 			var vitals = GetOrAddPlayerVitals(killer);
-			var max = character.MaxStats ?? Core.Database.Tables.CharacterMaxStats.CreateDefaults(character.Class, character.Level);
+			var max = character.MaxStats ?? CharacterMaxStats.CreateDefaults(character.Class, character.Level);
 			vitals.MaxHealth = max.Health;
 			vitals.MaxStamina = max.Stamina;
 			vitals.MaxMana = max.Mana;
@@ -195,7 +211,7 @@ namespace Faolan.GameServer
 		// the sequence incremented; its 81-byte result tail is the capture's layout with the live actor=player and
 		// the computed damage in the damage slot (the v1/v3/v5 metadata constants are templated - their semantics
 		// aren't decoded yet, only that v4 == the swing damage).
-		private async Task SendNormalAttackResponse(INetworkClient client, byte[] rawPayload, uint targetHandle)
+		public async Task SendNormalAttackResponse(INetworkClient client, byte[] rawPayload, uint targetHandle)
 		{
 			// rawPayload = [bodyLen u32][subop u32][c350 u32][instance u32][seq u16][behaviorId u32][argsLen u32][args][reqTail]
 			if (rawPayload.Length < 26)
@@ -230,7 +246,7 @@ namespace Faolan.GameServer
 
 			// 1) BehaviorControlCenterIIR ack - releases the swing.
 			await new PacketStream()
-				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x2000)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), 0x2000)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(0x642CD3D6u)
 					.WriteUInt32(0x0000C350u)
@@ -266,7 +282,7 @@ namespace Faolan.GameServer
 			{
 				// 2) DamageResultIIR - the hit / floating number.
 				await new PacketStream()
-					.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x2000)
+					.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), 0x2000)
 					.WriteArrayUInt32Length(s => s
 						.WriteUInt32(0xFEC4158Au)
 						.WriteUInt32(0x0000C350u)
@@ -288,7 +304,7 @@ namespace Faolan.GameServer
 			// 3) EnergyIIR - the player's stamina after the swing.
 			var player = GetOrAddPlayerVitals(client);
 			await new PacketStream()
-				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x2000)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), 0x2000)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(0x40749B8Au)
 					.WriteUInt32(0x0000C350u)
@@ -302,7 +318,7 @@ namespace Faolan.GameServer
 		// the spell/mana analogue of the melee swing's stamina cost. (Mana isn't carried by EnergyIIR, which is
 		// stamina-only in the captures; it rides the vitals stat block.) Per-spell costs aren't decoded yet, so the
 		// cost is provisional. No-op if the player has no mana pool.
-		private async Task SpendCasterMana(INetworkClient client, uint spellId)
+		public async Task SpendCasterMana(INetworkClient client, uint spellId)
 		{
 			var player = GetOrAddPlayerVitals(client);
 			if (player.MaxMana == 0)
@@ -313,17 +329,23 @@ namespace Faolan.GameServer
 			await SendStatUpdate(client, player.ToVitalsBlock(), client.Session.Account.ClientInstance);
 		}
 
+		// Pushes a 0x96B8DC59 stat block to the client (shared wire builder on World.VitalsPacket).
+		private static Task SendStatUpdate(INetworkClient client, CharacterStatBlock stats, uint? entityHandle = null)
+		{
+			return client.SendAsync(VitalsPacket.BuildStatUpdate(client, stats, entityHandle));
+		}
+
 		// Splices field3 (the behaviour "phase", tag 0x18 varint) into the request args right after field2, matching
 		// retail's BccAck echo. Protobuf is tag-addressed so position isn't strictly required, but this mirrors the
 		// capture's byte layout. If field2 is absent/malformed the phase is appended at the end.
 		internal static byte[] InsertBehaviorPhaseField(byte[] args, uint phase)
 		{
 			var phaseField = EncodeBehaviorPhase(phase);
-			var insertAt = System.Math.Min(OffsetAfterField(args, 2), args.Length);
+			var insertAt = Math.Min(OffsetAfterField(args, 2), args.Length);
 			var result = new byte[args.Length + phaseField.Length];
-			System.Array.Copy(args, 0, result, 0, insertAt);
+			Array.Copy(args, 0, result, 0, insertAt);
 			phaseField.CopyTo(result, insertAt);
-			System.Array.Copy(args, insertAt, result, insertAt + phaseField.Length, args.Length - insertAt);
+			Array.Copy(args, insertAt, result, insertAt + phaseField.Length, args.Length - insertAt);
 			return result;
 		}
 

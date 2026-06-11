@@ -42,6 +42,10 @@ namespace Faolan.GameServer
 		// port + the loot/quest opcode handlers to it. See World/WorldBroadcaster.cs.
 		private readonly World.WorldBroadcaster _broadcaster;
 
+		// Combat domain logic: melee/spell damage, NPC kill lifecycle, XP/leveling, kill-quest tracking + the combat
+		// wire packets. The opcode dispatch (Handle0x2000) and GM .hurt/.heal call into it. See Combat/CombatService.cs.
+		private readonly Combat.CombatService _combat;
+
 		// Periodic world-state autosave cadence (crash safety; logout/teleport/.save are the event-driven saves).
 		private const int AutoSaveIntervalMinutes = 5;
 
@@ -58,6 +62,7 @@ namespace Faolan.GameServer
 			_gameServerDispatcher = gameServerDispatcher;
 			_simulation = new World.WorldSimulation(this, database, agentServerDispatcher, logger);
 			_broadcaster = new World.WorldBroadcaster(_simulation, database, logger);
+			_combat = new Combat.CombatService(_simulation, _broadcaster, database, agentServerDispatcher, logger);
 
 			InitGmCommands();
 		}

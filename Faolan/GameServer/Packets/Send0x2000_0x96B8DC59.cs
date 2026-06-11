@@ -10,35 +10,12 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-		// 0x96B8DC59 - entity vitals / stat-update packet. Pushes a set of stat records to the client for one
-		// entity (the moment-to-moment counterpart of the big 0x737A6DF9 snapshot's stat block). Confirmed wire
-		// layout from captures (docs/quests-and-combat.md):
-		//   [subop 96B8DC59][0000C350][entityHandle:4][00000000:4][count:1][count × (statId:u32, value:u32)]
-		// This is what carries combat HP/Stamina/Mana changes; the stat-record encoding is shared with the
-		// snapshot via CharacterStatBlock.
-		private const uint VitalsMarker = 0x0000C350;
-
-		// Sends a stat block for the given entity handle (defaults to the session's own client instance).
-		// Builds a 0x96B8DC59 stat block for an entity (returns the wire bytes; used by the world-entry replay to
-		// emit the player's own vitals, which are server-generated and no longer stored in the burst).
+		// 0x96B8DC59 - entity vitals / stat-update packet. The wire builder now lives on World.VitalsPacket (shared
+		// with the CombatService); this delegates so the existing SendStatUpdate/SendVitals/BuildVitals callers
+		// (login replay, GM, the regen tick) are unchanged.
 		internal static byte[] BuildStatUpdate(INetworkClient client, CharacterStatBlock stats, uint? entityHandle = null)
 		{
-			var handle = entityHandle ?? client.Session.Account.ClientInstance;
-
-			var ps = new PacketStream();
-			ps
-				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x00002000)
-				.WriteArrayUInt32Length(s =>
-				{
-					s.WriteUInt32(GameServer0X2000RespondsOpcodes.StatUpdateIIR);
-					s.WriteUInt32(VitalsMarker);
-					s.WriteUInt32(handle);
-					s.WriteUInt32(0x00000000);
-					stats.WriteTo(s);
-				});
-			return ps
-				.WriteLengthHash()
-				.ToArray();
+			return World.VitalsPacket.BuildStatUpdate(client, stats, entityHandle);
 		}
 
 		// Builds the player's own vitals (0x96B8DC59) from the live character's MaxStats - the world-entry replay
