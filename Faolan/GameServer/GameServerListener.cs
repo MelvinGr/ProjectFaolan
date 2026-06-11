@@ -65,6 +65,13 @@ namespace Faolan.GameServer
 		// Vitals regen cadence (rate-based; dt-scaled by the real elapsed time when it fires).
 		private const double RegenIntervalSeconds = 1.0;
 
+		// How long a killed player lies dead before respawning at the map's spawn point.
+		private const double PlayerRespawnDelaySeconds = 10.0;
+
+		// Players currently dead, with the seconds remaining until respawn (counted down every tick).
+		private readonly System.Collections.Concurrent.ConcurrentDictionary<INetworkClient, double> _playerRespawnRemaining =
+			new System.Collections.Concurrent.ConcurrentDictionary<INetworkClient, double>();
+
 		// Background loops (game tick + autosave) and their lifetime token. Held (not fire-and-forget) so StopAsync can
 		// signal them and await a clean shutdown, and so any unobserved fault surfaces instead of being swallowed.
 		private CancellationTokenSource _loopCts;
@@ -194,6 +201,9 @@ namespace Faolan.GameServer
 						}
 					}
 
+					// Player death/respawn timers run every tick (continuous), scaled by real dt.
+					await TickPlayerDeaths(dt);
+
 					// Rate-based systems: fire on their own cadence, scaled by the time actually elapsed since last fire.
 					if (regen.Advance(dt, out var regenElapsed))
 						await RegenerateConnectedPlayers(regenElapsed);
@@ -221,6 +231,9 @@ namespace Faolan.GameServer
 					continue;
 
 				var vitals = GetOrAddPlayerVitals(client);
+				if (vitals.IsDead)
+					continue; // corpses don't regen - the respawn timer revives them
+
 				var changed = vitals.Regenerate(
 					RegenAmount(vitals.MaxHealth, 0.05, elapsedSeconds), // ~5% hp / sec (provisional)
 					RegenAmount(vitals.MaxStamina, 0.10, elapsedSeconds), // ~10% stamina / sec
@@ -228,6 +241,62 @@ namespace Faolan.GameServer
 				if (changed)
 					await SendStatUpdate(client, vitals.ToVitalsBlock(), client.Session.Account.ClientInstance);
 			}
+		}
+
+		// Advances player death/respawn (docs/server-architecture-roadmap.md). A player whose vitals hit 0 (the killing
+		// hit already pushed HP=0, which the client shows as death) starts a respawn countdown; when it elapses they are
+		// revived to full and re-entered at the map's spawn point (RespawnPlayer). Living players are untracked.
+		private async Task TickPlayerDeaths(double dt)
+		{
+			foreach (var pair in _playerEntities)
+			{
+				var client = pair.Key;
+				if (client.Session?.Character == null)
+					continue;
+
+				var vitals = GetOrAddPlayerVitals(client);
+				if (!vitals.IsDead)
+				{
+					_playerRespawnRemaining.TryRemove(client, out _);
+					continue;
+				}
+
+				if (!_playerRespawnRemaining.TryGetValue(client, out var remaining))
+				{
+					_playerRespawnRemaining[client] = PlayerRespawnDelaySeconds;
+					Logger.LogInformation("Combat: {Player} died; respawning in {Delay}s.", client.Session.Character.Name, PlayerRespawnDelaySeconds);
+					continue;
+				}
+
+				remaining -= dt;
+				if (remaining > 0)
+				{
+					_playerRespawnRemaining[client] = remaining;
+					continue;
+				}
+
+				_playerRespawnRemaining.TryRemove(client, out _);
+				await RespawnPlayer(client, vitals);
+			}
+		}
+
+		// Revives a dead player: full vitals, moved to the map's spawn point, and re-entered (the proven world-entry
+		// render path, same as a teleport) so they reappear alive away from whatever killed them. No gated warp packet
+		// needed - reuses SendWorldEntry.
+		private async Task RespawnPlayer(INetworkClient client, Combat.EntityVitals vitals)
+		{
+			var character = client.Session.Character;
+			vitals.ReviveToFull();
+
+			var map = await Database.GetMap(character.MapId);
+			if (map != null)
+			{
+				character.Position = map.Position;
+				character.Rotation = map.Rotation;
+			}
+
+			await SendWorldEntry(client);
+			Logger.LogInformation("Combat: {Player} respawned at the map {Map} spawn point.", character.Name, character.MapId);
 		}
 
 		// Applies an aggroed NPC's swing to the target player: reduce the player's live vitals and push a 0x96B8DC59

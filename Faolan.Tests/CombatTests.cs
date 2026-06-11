@@ -100,6 +100,22 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void ReviveToFull_RestoresAllPools()
+		{
+			var v = EntityVitals.FromMax(100, 50, 80);
+			v.ApplyHealthDelta(-100); // dead
+			v.ApplyManaDelta(-50);
+			Assert.True(v.IsDead);
+
+			v.ReviveToFull();
+
+			Assert.False(v.IsDead);
+			Assert.Equal(v.MaxHealth, v.Health);
+			Assert.Equal(v.MaxStamina, v.Stamina);
+			Assert.Equal(v.MaxMana, v.Mana);
+		}
+
+		[Fact]
 		public void ResolveKillXp_ScalesWithNpcLevel()
 		{
 			Assert.Equal(10u + 1 * 25u, CombatResolver.ResolveKillXp(1));

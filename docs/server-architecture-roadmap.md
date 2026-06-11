@@ -37,8 +37,12 @@ Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see a
 > - **NPC AI — aggro + fight-back** ✓ on the tick a living NPC aggros the nearest player within `NpcAggroRange` (20u)
 >   and swings every `NpcAttackInterval` (2s), emitting an `NpcAttack` effect; the listener applies level-scaled damage
 >   (`ResolveNpcAttackDamage`) to the player's vitals and pushes `0x96B8DC59` so their HP bar drops. The attack
->   ANIMATION packet is undecoded (damage effect only); **player death/respawn is the next gap** (a lethal hit is
->   logged, the regen tick revives for now). NPC *movement* still waits on the pinned MoveTask grammar. 5 tests.
+>   ANIMATION packet is undecoded (damage effect only). NPC *movement* still waits on the pinned MoveTask grammar.
+> - **Player death → respawn** ✓ when a player's vitals hit 0 (the killing hit pushes HP=0 = the client's death state)
+>   a respawn countdown starts (`TickPlayerDeaths`, 10s); corpses don't regen and NPCs stop hitting them. On expiry
+>   they're revived to full (`EntityVitals.ReviveToFull`) and re-entered at the map's spawn point (`RespawnPlayer`,
+>   reusing `SendWorldEntry` — the proven world-entry render path, no gated warp packet). The combat loop is now closed
+>   both ways. A dedicated death/rebirth-UI packet (if any) is undecoded; the HP=0 push is the death signal.
 > - **NPC death → respawn** ✓ NPC vitals live on `WorldEntity` (seeded level-scaled at zone load, world-authoritative).
 >   Combat routes NPC damage through the model (`ApplyNpcDamage`/`ResolveNpcVitals`); on death the NPC is marked dead +
 >   despawned for nearby players (`BroadcastNpcDespawn`), and `WorldState.Tick` counts down `RespawnDelaySeconds` and

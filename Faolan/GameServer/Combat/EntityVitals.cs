@@ -92,6 +92,14 @@ namespace Faolan.GameServer.Combat
 				.Set(LegacyCharacterStatId.ManaMax, MaxMana);
 		}
 
+		/// <summary>Restores all three pools to their max (a full revive, e.g. on respawn).</summary>
+		public void ReviveToFull()
+		{
+			Health = MaxHealth;
+			Stamina = MaxStamina;
+			Mana = MaxMana;
+		}
+
 		/// <summary>Creates a full-health entity (current == max) from max values.</summary>
 		public static EntityVitals FromMax(uint health, uint mana, uint stamina)
 		{
