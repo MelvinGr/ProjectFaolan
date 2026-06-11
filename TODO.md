@@ -382,3 +382,37 @@ All of the below are harness-verified (unit tests) but **need in-client check** 
 ### Map names
 - [ ] `.maps` / teleport labels should now show real names (e.g. 4010 = "Tortage Island", 2040 = "Castle of
       King Conan") — imported from the client RDB.
+
+---
+
+## Architecture / refactoring (2026-06-11, part 3) — GameServer decomposition
+
+**DONE this session (mechanical, behaviour-preserving; 261 tests green throughout):**
+- DB cleanup: dropped obsolete `CharacterEquipment.Bag/Quest/Resources`; dropped dead legacy `Npc`/`NpcBody`/
+  `NpcEquipment` tables; removed 1051 orphaned character-child rows (FK integrity now clean).
+- `GameServerListener` god-class decomposition — extracted three composed collaborators out of the listener
+  (was one type across 26 partials / ~15.3k lines, now ~14.2k):
+  - `World/WorldSimulation` — world model + 10 Hz tick + regen/death/respawn/AI/discovery, behind an
+    `IWorldOutbound` port the listener implements.
+  - `World/WorldBroadcaster` (+ `World/WorldFraming`) — world-event packet construction.
+  - `Combat/CombatService` (+ `World/VitalsPacket`) — combat domain logic + combat wire packets.
+- Removed `WorldGameServerListener` — the 0x2002 handoff advertises the world address explicitly, so we
+  advertise the SAME GameServer port and serve both connections on one listener.
+- Renamed `Packets/0x737A6DF9_Test/` → `Packets/FullCharSnapshot/` (it's production code, not tests).
+- Removed dead char-preview block in `PlayerAgentListener`.
+
+**Remaining architecture follow-ups (in priority order):**
+- [ ] **#1 — embedded capture data out of source code (HIGH VALUE).** `CreateFlow/` is ~8.8k lines, 80%+ raw
+      hex byte-literals (`RetailCreateWorldEntryBurst.cs` alone = 6,957 lines). This is data-as-code. Move it to
+      a DB table + importer (mirror `MapWorldBurst`/`IirRecordCodec`), with a **byte-equality test (DB-loaded ==
+      embedded arrays)** as the safety net, then delete the embedded file. Catch: the burst weaves the live
+      instance id into ~324 packets via `AppendVarint`, so it needs a template-with-substitution capture, not a
+      flat blob — a real design effort. Verifiable WITHOUT the client (the byte-equality oracle). Scope first.
+- [ ] **Fold `Packets.cs` sender-bytes duplication into `World/WorldFraming`** — it still has its own copy of the
+      world-conversation sender literal (`ExistingCharacterWorldEntryPromptSender` etc. — verify which are truly
+      the same conversation vs. semantically distinct before merging). Small, safe.
+- [ ] **Rename `Packets/FullCharSnapshot/BigboyTailsFile.cs`** — unprofessional name; pick something descriptive
+      for the class + file. Trivial.
+
+**Surveyed, no action needed:** the other four servers (UniverseAgent / PlayerAgent / AgentServer /
+CSPlayerAgent) are clean, appropriately-sized switch dispatchers — no god-class, correct request/response framing.
