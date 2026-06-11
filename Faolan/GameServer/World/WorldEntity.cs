@@ -46,6 +46,9 @@ namespace Faolan.GameServer.World
 		public bool IsPlayer { get; }
 		public string Name { get; }
 
+		// The entity's level (NPCs: from their NpcSpawn row; drives the kill-XP award). 0 if unknown.
+		public uint Level { get; set; }
+
 		// Live transform + map. Mutable: updated by Move (players) and the AI tick (NPCs, later).
 		public uint MapId { get; set; }
 		public Vector3 Position { get; set; }

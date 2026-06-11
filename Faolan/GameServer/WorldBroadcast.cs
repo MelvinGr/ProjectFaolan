@@ -135,6 +135,7 @@ namespace Faolan.GameServer
 					new Vector3(npc.PositionX, npc.PositionY, npc.PositionZ),
 					new Vector3(npc.RotationX, npc.RotationY, npc.RotationZ),
 					npc.Name ?? "NPC", vitals);
+				entity.Level = npc.Level;
 
 				// Keep the NPC's FA015807 spawn body so respawn can re-render it for nearby players (built byte-exact
 				// from the row by NpcSpawnBuilder, the same path the burst-replacement uses).

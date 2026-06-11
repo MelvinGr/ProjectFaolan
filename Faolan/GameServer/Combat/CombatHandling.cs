@@ -6,6 +6,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
 using Faolan.GameServer.Combat;
+using Faolan.GameServer.Packets._0x737A6DF9_Test;
 using Microsoft.Extensions.Logging;
 
 // ReSharper disable once CheckNamespace
@@ -63,7 +64,7 @@ namespace Faolan.GameServer
 			await SendStatUpdate(client, target.ToVitalsBlock(), targetHandle);
 
 			if (target.IsDead)
-				await OnNpcKilled(targetHandle, npcEntity, cause);
+				await OnNpcKilled(client, targetHandle, npcEntity, cause);
 		}
 
 		// The NPC's authoritative live vitals: the world-model entity's if it is a tracked NPC (also returned, so the
@@ -78,21 +79,39 @@ namespace Faolan.GameServer
 			return GetOrAddNpcVitals(client, targetHandle);
 		}
 
-		// An NPC was killed: a model NPC is marked dead (starting its respawn timer) and despawned for nearby players;
-		// the tick respawns it. A non-model NPC (no world entity) is just dropped from the session store. XP/loot are
-		// the next step (docs/server-architecture-roadmap.md).
-		private async Task OnNpcKilled(uint targetHandle, World.WorldEntity npcEntity, string cause)
+		// An NPC was killed by `killer`: a model NPC is marked dead (starting its respawn timer), despawned for nearby
+		// players (the tick respawns it), and awards the killer XP. A non-model NPC (no world entity) is just dropped
+		// from the session store. Loot is the next step (docs/server-architecture-roadmap.md).
+		private async Task OnNpcKilled(INetworkClient killer, uint targetHandle, World.WorldEntity npcEntity, string cause)
 		{
 			if (npcEntity != null)
 			{
 				npcEntity.MarkDead();
 				await BroadcastNpcDespawn(npcEntity);
 				Logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); despawned, respawns in {Delay}s.", npcEntity.Name, targetHandle, cause, npcEntity.RespawnDelaySeconds);
+				await AwardKillXp(killer, npcEntity.Level);
 				return;
 			}
 
 			Logger.LogInformation("Combat: entity 0x{Target:X8} killed ({Cause}); not in world model, no respawn.", targetHandle, cause);
 			_combat.Remove(targetHandle);
+		}
+
+		// Awards the killer XP for a kill and pushes an Exp stat update (0x96B8DC59) so the XP bar moves. XP accrues on
+		// the persisted Character (saved by the usual disconnect/autosave/.save points). Level-up (XP curve ->
+		// Level++ + MaxStats recompute) is the next progression step; for now only Exp is granted.
+		private async Task AwardKillXp(INetworkClient killer, uint npcLevel)
+		{
+			var character = killer?.Session?.Character;
+			if (character == null)
+				return;
+
+			var xp = CombatResolver.ResolveKillXp(npcLevel);
+			character.Experience += xp;
+
+			var block = new CharacterStatBlock().Set(LegacyCharacterStatId.Exp, character.Experience);
+			await SendStatUpdate(killer, block, killer.Session.Account.ClientInstance);
+			Logger.LogInformation("Combat: {Name} gained {Xp} XP (total {Total}).", character.Name, xp, character.Experience);
 		}
 
 		// The melee swing / auto-attack (Interact ActionType 0x0F). Retail's response sequence, reproduced from the

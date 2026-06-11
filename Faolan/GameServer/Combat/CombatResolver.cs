@@ -19,6 +19,14 @@ namespace Faolan.GameServer.Combat
 			return DefaultNpcMaxHealth + lvl * 20u;
 		}
 
+		// Provisional XP awarded for killing an NPC of the given level. Level-scaled (a real XP curve / level
+		// difference scaling isn't modelled yet, like the damage values). Level 0 maps to the level-1 award.
+		public static uint ResolveKillXp(uint npcLevel)
+		{
+			var lvl = npcLevel == 0 ? 1u : npcLevel;
+			return 10u + lvl * 25u;
+		}
+
 		public static int ResolveSpellDamage(uint spellId, ushort casterLevel)
 		{
 			var level = casterLevel == 0

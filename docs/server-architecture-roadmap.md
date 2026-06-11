@@ -38,10 +38,13 @@ Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see a
 >   Combat routes NPC damage through the model (`ApplyNpcDamage`/`ResolveNpcVitals`); on death the NPC is marked dead +
 >   despawned for nearby players (`BroadcastNpcDespawn`), and `WorldState.Tick` counts down `RespawnDelaySeconds` and
 >   revives it at its spawn point, re-rendered via `BroadcastNpcRespawn` (the NPC's `NpcSpawnBuilder` body). 5 unit
->   tests. **XP + loot are the next combat piece** (need an XP wire-push + item-drop tables). Visual confirmation is
->   2-client/in-client gated; the lifecycle logic is harness-verified.
-> **NEXT:** XP/loot on kill; then NPC AI movement (the pinned MoveTask patrol grammar) so the tick drives motion and
-> the burst becomes a pure seed — where the loop and "construct, don't replay" meet. Then quests.
+>   tests. Visual confirmation is 2-client/in-client gated; the lifecycle logic is harness-verified.
+> - **XP on kill** ✓ killing a model NPC awards level-scaled XP (`CombatResolver.ResolveKillXp`) to `Character.Experience`
+>   and pushes an `Exp` (0x0034) stat update via `0x96B8DC59` so the bar moves; XP persists via the usual save points.
+>   **Loot + level-up are the remaining progression pieces** (loot needs item-drop tables; level-up needs an XP curve →
+>   `Level++` + `MaxStats` recompute).
+> **NEXT:** loot tables + level-up; then NPC AI movement (the pinned MoveTask patrol grammar) so the tick drives motion
+> and the burst becomes a pure seed — where the loop and "construct, don't replay" meet. Then quests.
 
 ## What we already have (strong foundation)
 

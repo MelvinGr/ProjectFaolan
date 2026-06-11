@@ -100,6 +100,17 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void ResolveKillXp_ScalesWithNpcLevel()
+		{
+			Assert.Equal(10u + 1 * 25u, CombatResolver.ResolveKillXp(1));
+			Assert.Equal(10u + 20 * 25u, CombatResolver.ResolveKillXp(20));
+			// Higher-level NPCs are worth more.
+			Assert.True(CombatResolver.ResolveKillXp(20) > CombatResolver.ResolveKillXp(5));
+			// Level 0 is treated as 1.
+			Assert.Equal(CombatResolver.ResolveKillXp(1), CombatResolver.ResolveKillXp(0));
+		}
+
+		[Fact]
 		public void ToVitalsBlock_EmitsHealthStaminaMana_AtVitalsScale()
 		{
 			var v = EntityVitals.FromMax(63, 63, 63);
