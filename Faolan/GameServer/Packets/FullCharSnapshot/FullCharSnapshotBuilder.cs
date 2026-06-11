@@ -3,7 +3,7 @@ using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Protobuf;
 
-namespace Faolan.GameServer.Packets._0x737A6DF9_Test
+namespace Faolan.GameServer.Packets.FullCharSnapshot
 {
 	// Builds the FullChar (0x737A6DF9) snapshot's four inventory containers entirely from the character's DB
 	// items - the generation counterpart of the older in-place entry swap. Layout facts from every captured

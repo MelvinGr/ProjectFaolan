@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
-using Faolan.GameServer.Packets._0x737A6DF9_Test;
+using Faolan.GameServer.Packets.FullCharSnapshot;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer

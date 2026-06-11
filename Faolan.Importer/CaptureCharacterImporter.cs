@@ -10,7 +10,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer;
-using Faolan.GameServer.Packets._0x737A6DF9_Test;
+using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.GameServer.Spawn;
 using Microsoft.EntityFrameworkCore;
 

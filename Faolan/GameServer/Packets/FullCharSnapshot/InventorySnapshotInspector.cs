@@ -6,7 +6,7 @@ using System.Text;
 using Faolan.Core.Data;
 using Faolan.Core.Network.Packets;
 
-namespace Faolan.GameServer.Packets._0x737A6DF9_Test
+namespace Faolan.GameServer.Packets.FullCharSnapshot
 {
 	public static class InventorySnapshotInspector
 	{

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Faolan.Core.Data;
 
-namespace Faolan.GameServer.Packets._0x737A6DF9_Test
+namespace Faolan.GameServer.Packets.FullCharSnapshot
 {
 	/// <summary>
 	///     Builds the count-prefixed stat-record block shared by the <c>0x737A6DF9</c> snapshot and the

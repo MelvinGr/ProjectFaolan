@@ -4,7 +4,7 @@ using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protobuf;
 using ProtoBuf;
 
-namespace Faolan.GameServer.Packets._0x737A6DF9_Test
+namespace Faolan.GameServer.Packets.FullCharSnapshot
 {
 	// Builds a 0x737A6DF9 inventory container-entry (ProtoInventoryGame.items, field 4) from a DB Item template,
 	// using the typed protobuf schema recovered from the client exe (Faolan.Core/Network/Protobuf, see

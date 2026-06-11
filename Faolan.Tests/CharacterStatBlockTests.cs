@@ -1,4 +1,4 @@
-using Faolan.GameServer.Packets._0x737A6DF9_Test;
+using Faolan.GameServer.Packets.FullCharSnapshot;
 using Xunit;
 
 namespace Faolan.Tests

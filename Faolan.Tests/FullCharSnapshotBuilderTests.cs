@@ -4,7 +4,7 @@ using System.Linq;
 using Faolan.Core.Data;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Conan;
-using Faolan.GameServer.Packets._0x737A6DF9_Test;
+using Faolan.GameServer.Packets.FullCharSnapshot;
 using Xunit;
 
 namespace Faolan.Tests

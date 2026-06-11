@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Faolan.Core.Data;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
-using Faolan.GameServer.Packets._0x737A6DF9_Test;
+using Faolan.GameServer.Packets.FullCharSnapshot;
 
 namespace Faolan.Importer
 {

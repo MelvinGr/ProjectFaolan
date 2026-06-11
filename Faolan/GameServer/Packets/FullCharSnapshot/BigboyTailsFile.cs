@@ -5,7 +5,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using Faolan.Core.Data;
 
-namespace Faolan.GameServer.Packets._0x737A6DF9_Test
+namespace Faolan.GameServer.Packets.FullCharSnapshot
 {
 	public sealed class BigboyTailsFile
 	{

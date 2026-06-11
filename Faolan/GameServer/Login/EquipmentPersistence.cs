@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
-using Faolan.GameServer.Packets._0x737A6DF9_Test;
+using Faolan.GameServer.Packets.FullCharSnapshot;
 using Microsoft.Extensions.Logging;
 
 // ReSharper disable once CheckNamespace

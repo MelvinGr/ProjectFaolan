@@ -1,5 +1,5 @@
 using Faolan.Core.Database.Tables;
-using Faolan.GameServer.Packets._0x737A6DF9_Test;
+using Faolan.GameServer.Packets.FullCharSnapshot;
 
 namespace Faolan.GameServer.Combat
 {

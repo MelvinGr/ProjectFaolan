@@ -7,7 +7,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.AgentServer;
 using Faolan.Core.Network.Packets;
-using Faolan.GameServer.Packets._0x737A6DF9_Test;
+using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 

@@ -8,7 +8,7 @@ using Faolan.Core.Data;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Protobuf;
-using Faolan.GameServer.Packets._0x737A6DF9_Test;
+using Faolan.GameServer.Packets.FullCharSnapshot;
 using Xunit;
 using Xunit.Abstractions;
 

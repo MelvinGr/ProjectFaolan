@@ -1,4 +1,4 @@
-namespace Faolan.GameServer.Packets._0x737A6DF9_Test
+namespace Faolan.GameServer.Packets.FullCharSnapshot
 {
 	/// <summary>
 	///     Known legacy stat ids seen in the mixed SpawnPlayer / bigboy capture families.
