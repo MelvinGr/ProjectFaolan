@@ -179,8 +179,14 @@ buy-delivery path (seller's item + buyer's payment move through mail).
       saleId/handle/seller/price/qty/itemId + a self-delimited `ProtoAcgItem`; sorted by price ascending). Mail
       attachment isolated (`GetMailItem` → 629→754 B; `[01][itemInstanceId:u64][protoLen:u32][ProtoAcgItem]`).
       **Both reuse the same `ProtoAcgItem` our inventory/spawn builders already emit.** `docs/tradepost-protocol.md`.
-- [ ] **Step 2b:** capture-replay PoC — replay a captured `0x2005` (+ `DispatchOpenTradepost`) so the AH window
-      renders in-client, like the conversation stage machine. Verifies the framing live before going DB-backed.
+- [~] **Step 2b (in progress):** server wiring.
+  - [x] Dispatch routing — tradepost packets are routed by RPC class id (`TradepostProtocol.IsInbound`, since the
+        0x20xx methods collide with ordinary opcodes) to `Faolan/GameServer/Tradepost/TradepostHandler`, which
+        decodes + LOGS each method (Open/Search w/ query/Buy/Close/mail). Next live AH interaction confirms our
+        captured grammar on real traffic. Builds clean, additive (early-return guard).
+  - [ ] Reply to `TradepostOpen` with `DispatchOpenTradepost` (access pos + 15.0 radius) and to
+        `TradepostItemSearch` with a replayed `DispatchTradepostSearchResults` so the AH window renders in-client
+        (like the conversation stage machine). **Needs an in-client render check (user side).**
 - [ ] **Step 3:** go DB-backed — `TradepostListing` + `Mail`/`MailAttachment` tables, search, money/escrow,
       buy→mail grant. NB: tradepost sells from the **bank** (`nBankItemSlot`) — leans on bank/money support;
       `CSBuyItemReply` hints at a commerce/CS path. All on the existing GameServer dispatcher (no new connection).

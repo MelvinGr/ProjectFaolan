@@ -138,6 +138,14 @@ namespace Faolan.GameServer
 			var opcode = (GameServerOpcodes)packet.Opcode;
 			client.Session.GameServerInboundPacketSequence++;
 
+			// Tradepost (auction house) + mail ride the GameServer RPC layer; their 0x20xx methods COLLIDE with
+			// ordinary opcodes, so route them by RPC class id before the opcode switch (docs/tradepost-protocol.md).
+			if (Tradepost.TradepostProtocol.IsInbound(packet))
+			{
+				Tradepost.TradepostHandler.Handle(client, packet, Logger);
+				return;
+			}
+
 			if (opcode is not (GameServerOpcodes.Ping or GameServerOpcodes.LatencyCheck))
 				LogPacketReceived(packet, opcode);
 
