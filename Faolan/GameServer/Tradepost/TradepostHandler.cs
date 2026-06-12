@@ -19,8 +19,9 @@ namespace Faolan.GameServer.Tradepost
 			switch (method)
 			{
 				case TradepostProtocol.AgentMethod.Open:
+					// The client sends Open AFTER it received DispatchOpenTradepost (triggered by the auctioneer
+					// interaction / the .ah GM command), so there is nothing to send back here - just log.
 					logger.LogInformation("Tradepost: {Char} opened the auction house.", CharName(client));
-					await TradepostResponses.SendOpenTradepost(client, packet);
 					break;
 
 				case TradepostProtocol.AgentMethod.ItemSearch:

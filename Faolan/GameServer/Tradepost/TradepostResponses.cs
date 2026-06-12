@@ -1,5 +1,7 @@
 using System;
+using System.Numerics;
 using System.Threading.Tasks;
+using Faolan.Core.Data;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
@@ -9,7 +11,8 @@ namespace Faolan.GameServer.Tradepost
 {
 	// Server->client Tradepost responses. Endpoints/bodies validated byte-exact against the captures
 	// (docs/tradepost-protocol.md): the response Sender is the server's GameCharAgent endpoint, the Receiver is the
-	// client's TradepostInterface (its instance is echoed from the inbound request's Sender).
+	// client's TradepostInterface (its instance is echoed from the inbound request, or the observed constant for a
+	// server-initiated open).
 	public static class TradepostResponses
 	{
 		// Server source endpoint for tradepost dispatches: GameCharAgent (hash "GameCharAgent") sub-id 0x59,
@@ -17,18 +20,22 @@ namespace Faolan.GameServer.Tradepost
 		private const uint GameCharAgentType = ConanEndpoints.GameSpawnCallerType; // 0xA9ECB95D
 		private const uint GameCharAgentInstance = 0x59;
 
-		// DispatchOpenTradepost body = the auctioneer access point: [posX][posY][posZ][maxRadius] as big-endian
-		// floats. PoC value = the captured Tortage tradepost location + 15.0 radius (DB-driven from the auctioneer
-		// NPC in Step 3). The client only opens the window when the player is within maxRadius of this point.
-		private static readonly byte[] AccessPointBody =
+		// The client's TradepostInterface object instance - constant 0x08006F31 across both captures (different
+		// chars/sessions), so it appears to be a deterministic client-side allocation. Used when the server opens
+		// the tradepost without an inbound packet to echo (the auctioneer-interact / GM trigger).
+		public const uint DefaultInterfaceInstance = 0x08006F31;
+
+		private const float AccessRadius = 15.0f;
+
+		// DispatchOpenTradepost body = the auctioneer access point [posX][posY][posZ][maxRadius] (big-endian floats).
+		// This captured value (Tortage auctioneer + 15.0) is kept only as the golden-test oracle; live opens build
+		// the body from the player's position (BuildAccessPointBody) so the client's within-radius check passes.
+		private static readonly byte[] CapturedAccessPointBody =
 		{
-			0x44, 0x7D, 0x70, 0x0C, // X = 1013.75
-			0x42, 0xE6, 0x2E, 0x00, // Y = 115.09
-			0x44, 0x1A, 0x8D, 0xDB, // Z = 618.22
-			0x41, 0x70, 0x00, 0x00  // maxRadius = 15.0
+			0x44, 0x7D, 0x70, 0x0C, 0x42, 0xE6, 0x2E, 0x00, 0x44, 0x1A, 0x8D, 0xDB, 0x41, 0x70, 0x00, 0x00
 		};
 
-		// DispatchTradepostSearchResults body — PoC REPLAY of a captured single-row listing (necrol80 auctionhouse
+		// DispatchTradepostSearchResults body - PoC REPLAY of a captured single-row listing (necrol80 auctionhouse
 		// pkt#1028: seller "Jocko", item 0x755D, price 1,000,000, qty 1, + the item's ProtoAcgItem). [head:u32][row]*
 		// per docs/tradepost-protocol.md. Step 3 replaces this with DB-built rows (TradepostListing + the existing
 		// ProtoAcgItem builder); the embedded blob is the interim, like the beach seed (TODO #7 data-as-code).
@@ -38,18 +45,29 @@ namespace Faolan.GameServer.Tradepost
 			"d1061a530a140de5971bd61556c078261d9280fde2255a5c7bf112140de5971bd61556c078261d9280fde2255a5c7bf1" +
 			"1a140de5971bd61556c078261d9280fde2255a5c7bf125970a3e002d970a3e0038014500000000");
 
-		// Reply to TradepostOpen so the client opens the auction-house window. `inbound` is the client's
-		// TradepostOpen packet (its Sender = the client's TradepostInterface, whose instance we echo back).
-		public static Task SendOpenTradepost(INetworkClient client, ConanPacket inbound) =>
-			Build(TradepostProtocol.InterfaceMethod.DispatchOpenTradepost, AccessPointBody, inbound.Sender.Instance)
+		// Open the auction house at `position` (the auctioneer/player location) so the client's within-radius check
+		// passes. The real trigger is the player interacting with an auctioneer NPC; for now a GM command supplies
+		// the player's live position (the capture shows DispatchOpenTradepost precedes TradepostOpen).
+		public static Task SendOpenTradepost(INetworkClient client, Vector3 position, uint interfaceInstance = DefaultInterfaceInstance) =>
+			Build(TradepostProtocol.InterfaceMethod.DispatchOpenTradepost, BuildAccessPointBody(position, AccessRadius), interfaceInstance)
 				.SendAsync(client);
 
 		// Reply to TradepostItemSearch so the auction-house listing grid renders. PoC: replays a captured listing
 		// regardless of the query (the client renders whatever rows we send). Step 3 builds rows from DB listings
-		// matching the searched itemId.
+		// matching the searched itemId. Echoes the inbound TradepostInterface instance.
 		public static Task SendSearchResults(INetworkClient client, ConanPacket inbound) =>
 			Build(TradepostProtocol.InterfaceMethod.DispatchSearchResults, SearchResultsReplayBody, inbound.Sender.Instance)
 				.SendAsync(client);
+
+		private static byte[] BuildAccessPointBody(Vector3 position, float radius)
+		{
+			var s = new FaolanStream(new byte[16], writable: true);
+			s.WriteFloatBigEndian(position.X);
+			s.WriteFloatBigEndian(position.Y);
+			s.WriteFloatBigEndian(position.Z);
+			s.WriteFloatBigEndian(radius);
+			return s.ToArray();
+		}
 
 		private static PacketStream Build(TradepostProtocol.InterfaceMethod method, byte[] body, uint interfaceInstance)
 		{
@@ -63,8 +81,9 @@ namespace Faolan.GameServer.Tradepost
 		}
 
 		// Finalized on-the-wire bytes (length + crc filled) — for byte-exact golden tests vs the captured packets.
+		// Open uses the captured access-point body (the oracle); search uses the replay body.
 		public static byte[] BuildOpenTradepostBytes(uint interfaceInstance) =>
-			Finalize(Build(TradepostProtocol.InterfaceMethod.DispatchOpenTradepost, AccessPointBody, interfaceInstance));
+			Finalize(Build(TradepostProtocol.InterfaceMethod.DispatchOpenTradepost, CapturedAccessPointBody, interfaceInstance));
 
 		public static byte[] BuildSearchResultsBytes(uint interfaceInstance) =>
 			Finalize(Build(TradepostProtocol.InterfaceMethod.DispatchSearchResults, SearchResultsReplayBody, interfaceInstance));

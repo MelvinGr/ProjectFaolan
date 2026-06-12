@@ -20,6 +20,15 @@ connection. Mail rides the **same** agent, and a bought item is delivered to the
   (server→client). On S→C the receiver endpoint is the player's session class `0xA9ECB95D` (GameCharInterface inst).
 - The `method` is a **per-class selector** in the `0x20xx` range (NOT a name-hash, NOT a GameServer transport opcode).
 
+## Open trigger (important)
+
+`DispatchOpenTradepost` is **not** a reply to `TradepostOpen` — the capture shows the opposite order: the player
+**interacts with the auctioneer NPC** (`Interact 0x642CD3D6`) → the server sends `DispatchOpenTradepost` (+ a
+`BankIIR 0x0BA1C1CB`) → *then* the client opens the window and sends `TradepostOpen`, then searches. So the open is
+triggered by the NPC interaction (PoC: the `.ah` GM command sends it at the player's position); replying to
+`TradepostOpen` would be circular and never bootstraps the window. The access-point `maxRadius` (15.0) is a
+client-side proximity check, so the access position must be within 15 units of the player.
+
 ## Method map
 
 | dir | method | name | body |

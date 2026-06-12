@@ -200,9 +200,15 @@ buy-delivery path (seller's item + buyer's payment move through mail).
   - [x] Reply to `TradepostItemSearch` with `DispatchTradepostSearchResults` — PoC replays a captured single-row
         listing (seller "Jocko", item 0x755D). **Byte-exact golden test passes** (`TradepostResponseTests`). Still
         needs an in-client render check (user side); Step 3 swaps the replay for DB-built rows matching the query.
-  - [ ] **In-client check (user side):** open the auction house → confirm the window opens (Open reply) and the
-        listing grid shows the replayed row. Grab the client log on failure (`stream bad`, `invalid ...`). If it
-        renders, the framing/endpoints are confirmed live and Step 3 (DB-backed) can proceed.
+  - [x] **Open trigger fixed.** The capture shows `DispatchOpenTradepost` precedes `TradepostOpen` — it's
+        triggered by interacting with the auctioneer NPC, not by `TradepostOpen` (replying to Open is circular).
+        PoC bootstrap = the **`.ah` GM command**, which sends `DispatchOpenTradepost` at the player's live position
+        (so the within-15-radius check passes). 277 tests green.
+  - [ ] **In-client check (user side):** stand somewhere, type `.ah` → does the auction-house window open? Then
+        search → does the listing grid show the replayed row ("Jocko", item 0x755D)? Grab the client log on
+        failure (`stream bad`, `invalid ...`, `ResourceManager ... does not exist`). Candidates if it doesn't
+        open: the `BankIIR 0x0BA1C1CB` that accompanies `DispatchOpenTradepost`, or the interface instance
+        (0x08006F31) not matching this client. If it renders, framing/endpoints are confirmed live → Step 3.
 - [ ] **Step 3:** go DB-backed — `TradepostListing` + `Mail`/`MailAttachment` tables, search, money/escrow,
       buy→mail grant. NB: tradepost sells from the **bank** (`nBankItemSlot`) — leans on bank/money support;
       `CSBuyItemReply` hints at a commerce/CS path. All on the existing GameServer dispatcher (no new connection).

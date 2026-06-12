@@ -165,8 +165,26 @@ namespace Faolan.GameServer
 				["world"] = (client, _) => SendWorldInfo(client),
 				["quest"] = (client, arguments) => QuestCommand(client, arguments),
 				["tag"] = (client, arguments) => TagCommand(client, arguments),
-				["lua"] = (client, arguments) => LuaCommand(client, arguments)
+				["lua"] = (client, arguments) => LuaCommand(client, arguments),
+				["ah"] = (client, _) => OpenAuctionHouseCommand(client)
 			};
+		}
+
+		// .ah  - open the auction house at the player's position (PoC bootstrap for the Tradepost; the real trigger
+		// is interacting with an auctioneer NPC). Sends DispatchOpenTradepost so the client opens the AH window and
+		// then sends TradepostOpen + searches, which the TradepostHandler answers with listings.
+		private async Task OpenAuctionHouseCommand(INetworkClient client)
+		{
+			var characterId = client.Session.Character.Id;
+			var entity = PlayerWorldEntity(client);
+			if (entity == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "No world entity for the player yet.");
+				return;
+			}
+
+			await Tradepost.TradepostResponses.SendOpenTradepost(client, entity.Position);
+			await _agentServerDispatcher.SendSystemMessage(characterId, "Opened the auction house (PoC) at your position.");
 		}
 
 		// .lua run <scriptId>  - run an RDB LuaArchive script against the player (the conversation/quest VM engine):
