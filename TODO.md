@@ -232,6 +232,13 @@ tag system exists. → memory `lua_vm`, `protocol_conversation_routing`; `docs/a
 
 ## 8. Lower-priority / future
 
+- [ ] **Add Claude to the friends list** (Melvin, 2026-06-13): see whether the synthetic Claude identity
+      (ClaudeChannel.SenderId 0xC1A0DE05, the 0x0014-announced "Claude" sender) can appear on a player's
+      in-game friends list - needs the friends-list protocol decoded first (add/remove/status packets are
+      uncaptured; capture a retail friend-add to start). Whispers to Claude already route to the MCP bridge,
+      so a friends entry would mainly give presence/easy access.
+
+
 - [x] **Expand the tshark/Wireshark plugin to fully decode packets (headers)** — DONE (2026-06-12):
       `Faolan.Wireshark` now dissects the full Conan protocol: per-direction packet framing with in-band
       compression transitions, RpcHeader ProtoEndpoints (class ids resolved to the 14 recovered class
