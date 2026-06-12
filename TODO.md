@@ -149,6 +149,46 @@ tag system exists. → memory `lua_vm`, `protocol_conversation_routing`; `docs/a
 
 ---
 
+## 9. Player economy — auction house, then vendor  ⭐ NEXT FEATURE (queued 2026-06-12)
+
+Two separate systems; do them in order. Both are feasible now — we have RE'd RPC surfaces + captures + real DB
+item identity + the proven analyzer→decode→construct-from-DB toolchain. Neither is blocked on missing data.
+Captures (cover both): `Captures/account-faolan-character-necrol80-login-sell_items_to_trader-intract-with-auctionhouse`
+and `...-assassinl23-login-buy_from_autionhouse_get_mail-...` (~3.8k / ~2.8k packets).
+
+### 9a. Auction house = "Tradepost" + mail (FIRST)
+**Mail is a hard dependency, not a bonus:** a bought item is delivered to the buyer **via in-game mail**, and
+the mail system lives on the *same* `TradepostAgent` — so build mail alongside the AH (or first). Mail API on
+the agent: `SendMail(recpName, body, money, bankItemIndices)`, `GetAllMails`, `GetMailByID`, `GetMailItems`,
+`MarkMailRead`, `DeleteMail`; server→client `DispatchMailMessage`, `DispatchSendMailResult`,
+`DispatchRetrieveMailResult`. Needs a `Mail` + `MailItem`/`MailAttachment` DB model (sender, recipient, body,
+attached money + items, read flag) and item escrow on send → grant on retrieve. This is exactly the AH
+buy-delivery path (seller's item + buyer's payment move through mail).
+- `TradepostAgent` (class **29**, opcode `0x3D744981`) — client→server: `TradepostOpen`, `TradepostItemSearch`,
+  `TradepostSellItem(nBankItemSlot, nPrice)`, `TradepostBuyItem`, `TradepostChangeItemPrice`,
+  `TradepostCancelSellItem` + full mail API (`SendMail`/`GetAllMails`/…).
+- `TradepostInterface` (class **56**, opcode `0xF2C2D5B5`) — server→client: `DispatchOpenTradepost`,
+  `DispatchTradepostSearchResults`, `DispatchMailMessage`, …
+- [ ] **Step 1 (gate, client-free):** analyzer pass on both captures → locate the class-29/56 traffic and decode
+      `open → search → results` + `sell`/`buy` round-trips **byte-exact**. The undecoded structs are
+      `TradepostSearch_c` (query), `cSearchResults`/`TradepostSearchResult_t` (result list), and the mail message.
+- [ ] **Step 2:** capture-replay PoC (open AH → render captured search results in-client, like the conversation
+      stage machine), then go DB-backed (listings table + search + money/escrow + mail). NB: tradepost sells from
+      the **bank** (`nBankItemSlot`) — leans on bank/money support; `CSBuyItemReply` hints at a commerce/CS path.
+
+### 9b. NPC vendor / shop buy-sell (AFTER 9a — simpler)
+Rides on **`GameCharAgent`/`GameCharInterface`** — the main GameServer connection, already fully wired; **no new
+connection needed**, and likely simpler than the AH (no listings/search/mail).
+- client→server (`GameCharAgent`): `OpenShop`, `CloseShop`, `BuyItem(i_cShopID, i_nPos)`,
+  `SellItem(i_cShopID, i_cInventoryID, i_nPos)`, `UndoLastSoldItem`.
+- server→client (`GameCharInterface`): `DispatchShopData(shopID, parentID, shopContent)`,
+  `DispatchItemSoldToShop(inventoryID, pos)`, `DispatchCloseShop`.
+- [ ] Decode the shop flow from the `sell_items_to_trader` capture (`OpenShop`→`DispatchShopData` shop inventory
+      → `Buy/SellItem` → inventory update), then build a DB-backed vendor (shop-content table per NPC + price +
+      money debit/credit on buy/sell).
+
+---
+
 ## Known non-blockers (no action unless curious)
 
 - `OverrideGameTweaks` (`0x2085...`) — client logs `stream bad after 'overrides'` and drops that one route every
