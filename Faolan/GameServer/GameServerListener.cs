@@ -281,14 +281,14 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerOpcodes.Ox2000:
+				case GameServerOpcodes.PassBlob:
 				{
 					await Handle0X2000(client, packet);
 
 					break;
 				}
 
-				case GameServerOpcodes.Ox207E:
+				case GameServerOpcodes.SetHideInspectOption:
 				{
 					if (packet.Body != null)
 					{
@@ -304,7 +304,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerOpcodes.Ox205F:
+				case GameServerOpcodes.CinematicTransition:
 				{
 					var unk0 = packet.Body.ReadUInt32(); // 0xc350
 					var characterId = packet.Body.ReadUInt32();
@@ -349,7 +349,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerOpcodes.Ox200C: // request change map(?)
+				case GameServerOpcodes.SetSprintInputState: // request change map(?)
 				{
 					if (packet.Body != null)
 						LogPacketBodyDebug("GameServer 0x200C body", packet.Body.ToArray());
@@ -360,7 +360,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerOpcodes.Ox2020:
+				case GameServerOpcodes.UpdateQuestMarkerNPC:
 				{
 					if (packet.Body?.Length >= sizeof(uint) * 4)
 					{
@@ -394,7 +394,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerOpcodes.Ox205C:
+				case GameServerOpcodes.DoSkillSellback:
 				{
 					if (packet.Body != null)
 						LogPacketBodyDebug("GameServer 0x205C body", packet.Body.ToArray());
@@ -402,7 +402,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerOpcodes.Ox205E:
+				case GameServerOpcodes.PlayStockphraseAsSubtitle:
 				{
 					if (packet.Body != null)
 						LogPacketBodyDebug("GameServer 0x205E body", packet.Body.ToArray());
@@ -410,14 +410,14 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerOpcodes.Ox206D:
+				case GameServerOpcodes.RequestShortcutBar:
 				{
 					Logger.LogInformation("Received opcode 0x206D.");
 
 					break;
 				}
 
-				case GameServerOpcodes.LootItem: // client took an item from an open loot window; body = [typetag][bag handle]
+				case GameServerOpcodes.TryLootAll: // client took an item from an open loot window; body = [typetag][bag handle]
 				{
 					packet.Body.ReadUInt32(); // loot typetag (0xC87A)
 					var bagHandle = packet.Body.ReadUInt32();
@@ -426,7 +426,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerOpcodes.CloseLoot: // client closed the loot window; body = [typetag][bag handle]
+				case GameServerOpcodes.CloseLootBag: // client closed the loot window; body = [typetag][bag handle]
 				{
 					packet.Body.ReadUInt32(); // loot typetag (0xC87A)
 					var bagHandle = packet.Body.ReadUInt32();
@@ -454,7 +454,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerOpcodes.Ox206A: // request change map(?)
+				case GameServerOpcodes.MoveTradeItemInternal: // request change map(?)
 				{
 					/*byte[] sender = { 0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x14 };
 					        byte[] receiver = { 0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0x84, 0x80, 0x80, 0x08 };
@@ -501,7 +501,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerOpcodes.Ox207B: // When the 'Select instance' button is clicked
+				case GameServerOpcodes.GetInstanceListForCurrentPlayfield: // When the 'Select instance' button is clicked
 				{
 					LogPacketBodyDebug("GameServer 0x207B body", packet.Body?.ToArray());
 
@@ -510,7 +510,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerOpcodes.Ox205A:
+				case GameServerOpcodes.PerformSpecialAction:
 				{
 					var counter = packet.Body.ReadUInt32();
 
@@ -534,7 +534,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerOpcodes.SpawnCheck: // p.160&161
+				case GameServerOpcodes.StackInventoryItemIfPossible: // p.160&161
 				{
 					LogPacketBodyDebug("GameServer SpawnCheck body", packet.Body?.ToArray());
 
@@ -606,7 +606,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerOpcodes.Ox2071:
+				case GameServerOpcodes.RemoveShortcut:
 				{
 					var counter = packet.Body.ReadUInt32();
 
@@ -615,7 +615,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerOpcodes.MoveItemToBar:
+				case GameServerOpcodes.AddShortcut:
 				{
 					// 0x206E collides: in-game it's MoveItemToBar, but on the character-creator connection it's
 					// the "enter world" signal. The client sends it several times; answer the first with the

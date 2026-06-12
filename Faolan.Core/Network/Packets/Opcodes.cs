@@ -19,32 +19,151 @@
 			Ox0064 = 0x0064 // echo of the client's chat-init handshake
 		}
 
-		// Client->server methods. The 16-bit opcode is a METHOD INDEX (0x2000 + position) into the recovered
-		// CSPlayerAgent.client_to_server table (docs/aoc-client-rpc-methods.json); alignment verified against the
-		// hoxxling guild capture (0x201C = AcceptGuildInvitation fired exactly once on the accept). See
-		// Captures/decode_guild.py for the decoded guild flow.
+		// Client->server methods - the COMPLETE recovered CSPlayerAgent.client_to_server table. The 16-bit opcode
+		// is a METHOD INDEX (0x2000 + position) into docs/aoc-client-rpc-methods.json; alignment verified against
+		// the hoxxling guild capture (0x2000 Authenticate, 0x201C AcceptGuildInvitation fired exactly once on the
+		// accept, 0x201E/0x202F/0x2040/0x2041/0x2077 all behave as named). See Captures/decode_guild.py.
 		public enum CsPlayerAgentOpcodes : ushort
 		{
 			Authenticate = 0x2000,
-			Ox2019 = 0x2019,
+			CharacterAuthenticated = 0x2001,
+			CharacterDisconnected = 0x2002,
+			TeamInvite = 0x2003,
+			TeamInviteByName = 0x2004,
+			TeamApply = 0x2005,
+			TeamSetLootOption = 0x2006,
+			TeamSetMasterLooter = 0x2007,
+			AcceptTeamInvite = 0x2008,
+			DeclineTeamInvite = 0x2009,
+			CharacterSearch = 0x200A,
+			SearchForTeam = 0x200B,
+			SetNewTeamLeader = 0x200C,
+			SummonCharacters = 0x200D,
+			AcceptSummon = 0x200E,
+			DeclineSummon = 0x200F,
+			GetExtendedCharacterInfo = 0x2010,
+			GetExtendedCharacterInfoByName = 0x2011,
+			SetLookingForTeamStatus = 0x2012,
+			SetLookingForMemberStatus = 0x2013,
+			GetLookingForTeamStatus = 0x2014,
+			GetLookingForMemberStatus = 0x2015,
+			SetCommunityServerOptions = 0x2016,
+			StartVoteKick = 0x2017,
+			VoteKickAnswer = 0x2018,
+			StartVoteRetreat = 0x2019, // observed body [u32 0xC350][u32 clientInstance] at login - semantics unconfirmed
+			VoteRetreatAccept = 0x201A,
+			VoteRetreatReject = 0x201B,
 			AcceptGuildInvitation = 0x201C,
 			DeclineGuildInvitation = 0x201D,
 			ClientRequestGuildInfo = 0x201E,
+			ClientRequestGuildName = 0x201F,
+			ClientRequestCharIDByName = 0x2020,
 			CreateGuild = 0x2021,
 			GuildInviteByName = 0x2022,
 			GuildInvite = 0x2023,
+			RemoveGuildInvitationCooldown = 0x2024,
+			GuildPromote = 0x2025,
+			GuildDemote = 0x2026,
+			GuildKick = 0x2027,
 			GuildLeave = 0x2028,
+			GuildTax = 0x2029,
+			GuildGovernmentForm = 0x202A,
+			GuildRecruitmentMode = 0x202B,
+			GuildName = 0x202C,
+			GuildDescription = 0x202D,
 			GuildMessageOfTheDay = 0x202E,
 			GuildRequestMemberList = 0x202F,
-			Ox202A = 0x202a,
-			Ox203B = 0x203b,
-			Ox203C = 0x203c,
+			GuildApplication = 0x2030,
+			GuildRejectApplication = 0x2031,
+			SetLookingForGuild = 0x2032,
+			GuildMergeRequest = 0x2033,
+			GuildMergeReply = 0x2034,
+			GuildWithdrawMoney = 0x2035,
+			GetPvpPointsInfo = 0x2036,
+			AddPvpPoints = 0x2037,
+			RemovePvpPoints = 0x2038,
+			ClearPvpPoints = 0x2039,
+			GetGuildRenownInfo = 0x203A,
+			AddGuildRenown = 0x203B,
+			RemoveGuildRenown = 0x203C,
+			SetGuildRenown = 0x203D,
+			CalculateRankings = 0x203E,
+			UnlockGuildRenown = 0x203F,
 			RequestRenownHistory = 0x2040,
 			RequestRenownRankings = 0x2041,
-			Ox2072 = 0x2072,
+			RequestBattleKeepInformation = 0x2042,
+			SearchForGuilds = 0x2043,
+			GMGuildName = 0x2044,
+			RequestGuildCitySpot = 0x2045,
+			ApplyForMassivePVPBattleQueue = 0x2046,
+			WithdrawFromMassivePVPBattleQueue = 0x2047,
+			MassivePvPBattleQueueGMCommand = 0x2048,
+			MassivePvpBattleQueueStatusRequest = 0x2049,
+			PvPMatchMakingCreateMatch = 0x204A,
+			PvPMatchMakingJoinMatch = 0x204B,
+			PvPMatchMakingSetSide = 0x204C,
+			PvPMatchMakingMatchSay = 0x204D,
+			PvPMatchMakingLeaveMatch = 0x204E,
+			PvPMatchMakingSearchForMatches = 0x204F,
+			PvPMatchMakingGetMatchInfo = 0x2050,
+			PvPMatchMakingTeleportToMinigame = 0x2051,
+			PvPMatchMakingPutIntoMatchMaking = 0x2052,
+			PvPMatchMakingRemoveFromMatchMaking = 0x2053,
+			PvPMatchMakingRequestInfo = 0x2054,
+			PvPMatchMakingIsInMatchMaking = 0x2055,
+			PvPMatchMakingKickPlayer = 0x2056,
+			PvPMatchMakingBanPlayer = 0x2057,
+			PvPMatchMakingMakePlayerMatchOwner = 0x2058,
+			PvPMatchMakingForceSide = 0x2059,
+			PvPMatchMakingStartMatch = 0x205A,
+			DebugPvPMatchMakingShowDebugInfo = 0x205B,
+			DebugPvPMatchMakingStopAllMatches = 0x205C,
+			DebugPvPMatchMakingStopCurrentMatch = 0x205D,
+			DebugPvPMatchMakingSetNewTimeLimit = 0x205E,
+			DebugPvPMatchMakingRestart = 0x205F,
+			DebugPvPMatchForcePlayerIntoCurrentMatch = 0x2060,
+			DebugPvPMatchMakingDoMatchMaking = 0x2061,
+			DebugPvPMatchForceStartMatch = 0x2062,
+			DebugPvPMatchForceEnterAll = 0x2063,
+			DebugCommunityServerModuleStart = 0x2064,
+			DebugCommunityServerModuleStop = 0x2065,
+			SetAsyncEnabled = 0x2066,
+			SetNumWorkerThreads = 0x2067,
+			RaidCreate = 0x2068,
+			RaidLeave = 0x2069,
+			RaidInviteTeam = 0x206A,
+			RaidInviteTeamAccept = 0x206B,
+			RaidInviteTeamDecline = 0x206C,
+			RaidKickTeam = 0x206D,
+			RaidKickCharacter = 0x206E,
+			RaidMoveTeamMember = 0x206F,
+			RaidSwapCharacters = 0x2070,
+			RaidInviteCharacter = 0x2071,
+			RaidInviteCharacterByName = 0x2072,
+			RaidAcceptInvite = 0x2073,
+			RaidDeclineInvite = 0x2074,
+			RaidSetLootOption = 0x2075,
+			RaidSetMasterLooter = 0x2076,
 			MassivePvpInfoRequest = 0x2077,
-			Ox2038 = 0x2038,
-			Ox20C5 = 0x20C5,
+			SendTeamInfo = 0x2078,
+			GMRequestGuildInfoFromChar = 0x2079,
+			QueueGroupFinder = 0x207A,
+			SelectGroupFinderRoles = 0x207B,
+			LeaveGroupFinder = 0x207C,
+			ReadyGroupFinder = 0x207D,
+			RequestRaidQueueInfo = 0x207E,
+			UpdateDefaultRaid = 0x207F,
+			SetFeaturedRaid = 0x2080,
+			RequestFeaturedRaidNeededRole = 0x2081,
+			RequestNeededRole = 0x2082,
+			RequestRotatingActivityChildInfo = 0x2083,
+			GetWorldStat = 0x2084,
+			RequestItemSalesBalance = 0x2085,
+			RequestItemSalesCoupons = 0x2086,
+
+			// Beyond the recovered table (the live build has more methods): the client ECHOES these
+			// server->client GroupFinder values back on the upload path.
+			Ox20C5 = 0x20C5, // GroupFinder remoteformat echo
 			Ox20D0 = 0x20D0
 		}
 
@@ -66,33 +185,46 @@
 			Ox20D0 = 0x20D0
 		}
 
+		// Handler-facing opcodes for the GameServer connection's blanket switch. The connection MULTIPLEXES four
+		// RPC class-pairs (GameAgent, GameCharAgent, GameCharAgentProject, TradepostAgent - see
+		// docs/aoc-opcode-ids.md), so the same 16-bit value can be different methods per receiver class; the
+		// correct dispatch key is (class id, opcode) and tradepost already routes by class. The small class
+		// tables top out at 0x2013 (TradepostAgent) / 0x200C (project) / 0x200A (GameAgent), so every value
+		// >= 0x2014 is unambiguously a GameCharAgent method and is named from that table; lower values keep their
+		// behavior-derived names with the per-class candidates noted. Full per-class catalogs are below
+		// (GameAgentOpcodes / GameCharAgentOpcodes / GameCharAgentProjectOpcodes).
 		public enum GameServerOpcodes : ushort
 		{
-			Hello = 0x2003,
-			Ping = 0x2005,
-			SpawnCheck = 0x201F,
-			Ox2000 = 0x2000,
-			Ox206A = 0x206a,
-			Ox207B = 0x207b,
-			Ox205A = 0x205a,
-			SplitStack = 0x201D,
-			ChatCommand = 0x2002,
-			Ox200C = 0x200c,
-			Ox205C = 0x205c,
-			VanityToggle = 0x200B,
+			Hello = 0x2003, // GameAgent.Authenticate2 (the auth packet); COLLIDES with GameCharAgent.SetTutorialStats (x80 in captures)
+			Ping = 0x2005, // GameAgent.Ping; GameCharAgent.GuildInfoUpdate shares the value
+			PassBlob = 0x2000, // GameAgent.PassBlob - the IIR carrier (sub-opcode in body); COLLIDES with GameCharAgentProject.RequestAggroStatus (x7621)
+			ChatCommand = 0x2002, // GameAgent.ChatVicinity (typed chat, carries GM commands); COLLIDES with GameCharAgent.RequestBindLocation (x49)
+			SetSprintInputState = 0x200C, // GameCharAgentProject.SetSprintInputState (x2092 - the sprint key)
+			VanityToggle = 0x200B, // GameCharAgentProject.ToggleVanityArmorFilter
 
-			Ox205E = 0x205E,
-			Ox205F = 0x205F,
-			Ox206D = 0x206D,
-			LatencyCheck = 0x2085,
-			Ox207E = 0x207E,
-			Ox2071 = 0x2071,
-			Ox2020 = 0x2020,
-			MoveItemToBar = 0x206E,
-			LootItem = 0x2043, // client clicks an item in an open loot window (take); body = [loot typetag][bag handle]
-			CloseLoot = 0x2044 // client closes the loot window; body = [loot typetag][bag handle]
+			// >= 0x2014: GameCharAgent methods (unambiguous).
+			SplitStack = 0x201D, // GameCharAgent.SplitInventoryItem
+			StackInventoryItemIfPossible = 0x201F, // (handled as "SpawnCheck" historically, after the C++ Faolan docs p.160-161; only logged)
+			UpdateQuestMarkerNPC = 0x2020, // ALSO the world-entry spawn-poll trigger we answer with 0x2008 (x5631)
+			TryLootAll = 0x2043, // loot-window take; body = [loot typetag][bag handle]
+			CloseLootBag = 0x2044, // client closes the loot window; body = [loot typetag][bag handle]
+			PerformSpecialAction = 0x205A,
+			DoSkillSellback = 0x205C,
+			PlayStockphraseAsSubtitle = 0x205E,
+			CinematicTransition = 0x205F, // heavy in the create flow (the post-205F follow-up gate)
+			MoveTradeItemInternal = 0x206A, // (was "request change map(?)" - the old guess predates the table)
+			RequestShortcutBar = 0x206D, // sent at login
+			AddShortcut = 0x206E, // drag an item/ability onto the hotbar
+			RemoveShortcut = 0x2071,
+			GetInstanceListForCurrentPlayfield = 0x207B, // the 'Select instance' button
+			SetHideInspectOption = 0x207E,
+			LatencyCheck = 0x2085 // GameCharAgent.Ping (client 0x2085 -> server 0x2082)
 		}
 
+		// Server->client opcodes on the GameServer connection. The s2c interface tables (GameInterface,
+		// GameCharInterface) DRIFT vs the recovered names - the live build inserted unnamed methods (e.g. the
+		// observed Pong is 0x2009 but the table says GameInterface.DispatchPong = 0x2003) - so these stay named
+		// by decoded CONTENT; do not map them through docs/aoc-client-rpc-methods.json by index.
 		public enum GameServerRespondOpcodes : ushort
 		{
 			Pong = 0x2009,
@@ -102,6 +234,219 @@
 			ReadyForPlayScreen = 0x2024,
 			SpawnCheck = 0x2008,
 			LatencyCheckResponse = 0x2082
+		}
+
+		// --- Full client->server method catalogs for the GameServer connection's RPC classes, generated from
+		// --- docs/aoc-client-rpc-methods.json (opcode = 0x2000 + table position). Most are not handled yet;
+		// --- they are here so future packets can be identified and routed by (class id, opcode).
+
+		// GameAgent (caller GameInterface) - the connection-level service: auth, ping, the PassBlob IIR carrier.
+		public enum GameAgentOpcodes : ushort
+		{
+			PassBlob = 0x2000,
+			Ping = 0x2001,
+			ChatVicinity = 0x2002,
+			Authenticate2 = 0x2003,
+			GetStats = 0x2004,
+			UpdateGameServerStats = 0x2005,
+			DataSink = 0x2006,
+			ClientDisconnected = 0x2007,
+			SaveFacebookToken = 0x2008,
+			RecruitFacebookFriends = 0x2009,
+			UpdateFacebookFriends = 0x200A
+		}
+
+		// GameCharAgentProject (caller GameCharInterfaceProject) - per-character "project" extras.
+		public enum GameCharAgentProjectOpcodes : ushort
+		{
+			RequestAggroStatus = 0x2000,
+			GetProcDataForID = 0x2001,
+			AcceptApprenticeTeacher = 0x2002,
+			DeclineApprenticeTeacher = 0x2003,
+			RequestApprenticeStudent = 0x2004,
+			LeaveApprenticeMode = 0x2005,
+			RequestHitAndMitigationTables = 0x2006,
+			StartOfflineTrainingSystem = 0x2007,
+			ResetOfflineTrainingSystem = 0x2008,
+			RefreshEquippedAbilities = 0x2009,
+			EnableRangerTracking = 0x200A,
+			ToggleVanityArmorFilter = 0x200B,
+			SetSprintInputState = 0x200C
+		}
+
+		// GameCharAgent (caller GameCharInterface) - the main per-character world service (guild sync, loot,
+		// quests, trade, shop, shortcuts, instances, minigames).
+		public enum GameCharAgentOpcodes : ushort
+		{
+			RequestAggroStatus = 0x2000,
+			RequestCharName = 0x2001,
+			RequestBindLocation = 0x2002,
+			SetTutorialStats = 0x2003,
+			UpdateCharGuildMemberInfo = 0x2004,
+			GuildInfoUpdate = 0x2005,
+			JoinedGuild = 0x2006,
+			LeftGuild = 0x2007,
+			LeaveTeam = 0x2008,
+			KickFromTeam = 0x2009,
+			CreatedGuild = 0x200A,
+			AddGuildFeat = 0x200B,
+			RemoveGuildFeat = 0x200C,
+			GuildGMPromote = 0x200D,
+			GuildGMDemote = 0x200E,
+			GuildTaxChanged = 0x200F,
+			GuildGoverningFormChanged = 0x2010,
+			GuildTransferMoney = 0x2011,
+			GuildWithdrawMoney = 0x2012,
+			GuildDisbanded = 0x2013,
+			GuildBookedCity = 0x2014,
+			GuildCityOwnershipChange = 0x2015,
+			GuildChangeRank = 0x2016,
+			GuildUpdateGuildBank = 0x2017,
+			SendGuildInfoToObservers = 0x2018,
+			GuildRankingsUpdate = 0x2019,
+			ValidateGuildBadges = 0x201A,
+			OpenGuildBank = 0x201B,
+			CloseBank = 0x201C,
+			SplitInventoryItem = 0x201D,
+			CancelBuff = 0x201E,
+			StackInventoryItemIfPossible = 0x201F,
+			UpdateQuestMarkerNPC = 0x2020,
+			MagicForgetSpell = 0x2021,
+			ResurrectMe = 0x2022,
+			CancelResurrectionRequest = 0x2023,
+			RespawnMe = 0x2024,
+			SignUpForWaveRespawn = 0x2025,
+			UpdateWaveRespawn = 0x2026,
+			CancelWaveRespawn = 0x2027,
+			RequestWaveRespawnTimerUpdate = 0x2028,
+			RespawnMeHere = 0x2029,
+			GMRequestSpellData = 0x202A,
+			RMGetQuestFromQuestgiver = 0x202B,
+			GMRequestFeatData = 0x202C,
+			GMRequestFeatClassData = 0x202D,
+			AdjustSkill = 0x202E,
+			RequestPCDebugData = 0x202F,
+			GetLootDataForID = 0x2030,
+			SimulateLootForID = 0x2031,
+			CloseShop = 0x2032,
+			BuyItem = 0x2033,
+			SellItem = 0x2034,
+			UndoLastSoldItem = 0x2035,
+			FormationSetData = 0x2036,
+			FormationClaimPosition = 0x2037,
+			FormationClear = 0x2038,
+			FormationLeave = 0x2039,
+			FormationUpdatePosRot = 0x203A,
+			ScryMessageBoxAnswer = 0x203B,
+			ScryOptionsBoxAnswer = 0x203C,
+			ExitScenarioResults = 0x203D,
+			FeatUntrainAnswer = 0x203E,
+			CraftUntrain = 0x203F,
+			PlantCTFFlags = 0x2040,
+			UntrainFeat = 0x2041,
+			TryOpenLootBag = 0x2042,
+			TryLootAll = 0x2043,
+			CloseLootBag = 0x2044,
+			TryLootCash = 0x2045,
+			TryLootItem = 0x2046,
+			PassNeedGreedForItem = 0x2047,
+			DoNeedGreedRollForItem = 0x2048,
+			LootLockedItem = 0x2049,
+			SlaveLooterAnswer = 0x204A,
+			MasterLooterOffer = 0x204B,
+			MasterLooterCancelOffer = 0x204C,
+			SetPassOnLootLevel = 0x204D,
+			UnbindItem = 0x204E,
+			ShareQuest = 0x204F,
+			ShareQuestDeclined = 0x2050,
+			ShareQuestAccepted = 0x2051,
+			ShareQuestBusy = 0x2052,
+			RequestNextQuestPendingReward = 0x2053,
+			RequestTeamQuestList = 0x2054,
+			AddQuestList = 0x2055,
+			AcceptNextAwaitingQuest = 0x2056,
+			QuestManagerMsg = 0x2057,
+			StartQuickTeleport = 0x2058,
+			DoPaintballQuery = 0x2059,
+			PerformSpecialAction = 0x205A,
+			QueuePetCommand = 0x205B,
+			DoSkillSellback = 0x205C,
+			PetSetGroundTargetPos = 0x205D,
+			PlayStockphraseAsSubtitle = 0x205E,
+			CinematicTransition = 0x205F,
+			RequestACGTeleport = 0x2060,
+			RequestClearOwnACG = 0x2061,
+			RequestDropTeamBind = 0x2062,
+			DebugSetOceanData = 0x2063,
+			RequestTrade = 0x2064,
+			StartTrade = 0x2065,
+			DeclineTrade = 0x2066,
+			SetTradeCash = 0x2067,
+			AddTradeItem = 0x2068,
+			RemoveTradeItem = 0x2069,
+			MoveTradeItemInternal = 0x206A,
+			AcceptTrade = 0x206B,
+			AbortTrade = 0x206C,
+			RequestShortcutBar = 0x206D,
+			AddShortcut = 0x206E,
+			UpdateShortcut = 0x206F,
+			MoveShortcut = 0x2070,
+			RemoveShortcut = 0x2071,
+			StartMinigame = 0x2072,
+			NewMinigamePlayer = 0x2073,
+			DropMinigamePlayer = 0x2074,
+			ResendMinigameInfoToPlayer = 0x2075,
+			FlagAsCoward = 0x2076,
+			ForceStopMinigame = 0x2077,
+			ForceSetMinigameTime = 0x2078,
+			PrepareMinigameTime = 0x2079,
+			PrepareToMinigameTime = 0x207A,
+			GetInstanceListForCurrentPlayfield = 0x207B,
+			ShiftInstanceForCurrentPlayfield = 0x207C,
+			EnableHeroicMode = 0x207D,
+			SetHideInspectOption = 0x207E,
+			SetPlayfieldInstanceList = 0x207F,
+			InstanceWillResetOnShutdown = 0x2080,
+			InstanceHasBeenLocked = 0x2081,
+			InstanceHasBeenUnLocked = 0x2082,
+			RequestTeamMemberPosList = 0x2083,
+			TradepostSearchResult = 0x2084,
+			Ping = 0x2085,
+			ShiftTeamInstance = 0x2086,
+			SubscriptionFlagsUpdated = 0x2087,
+			PlayerServicesUpdated = 0x2088,
+			PassiveAbilityEquip = 0x2089,
+			PassiveAbilityUnequip = 0x208A,
+			ExitPassiveMode = 0x208B,
+			EnterPassiveMode = 0x208C,
+			RequestMassivePvPScoreData = 0x208D,
+			RequestScorePlayerNames = 0x208E,
+			SetVulnerabilityWindowStartTime = 0x208F,
+			RequestRecipeInfo = 0x2090,
+			RequestTeamInvite = 0x2091,
+			RequestNewJoinHasHostileInFriends = 0x2092,
+			RequestTeamInviteWithInviterFactionPoints = 0x2093,
+			RequestItemSalesData = 0x2094,
+			RequestItemSaleLimitedItemList = 0x2095,
+			RequestItemSaleFavoriteData = 0x2096,
+			SetFakeBillingConnection = 0x2097,
+			AddFavoriteItem = 0x2098,
+			RemoveFavoriteItem = 0x2099,
+			BuyItemSalesItem = 0x209A,
+			CSBuyItemReply = 0x209B,
+			CSRollbackResponse = 0x209C,
+			ExecuteChatCommand = 0x209D,
+			ReplyUpdatedDimensionDB = 0x209E,
+			RequestUseTeleportSpell = 0x209F,
+			UnlockFromPlayfield = 0x20A0,
+			UpdateMailBank = 0x20A1,
+			SetSelectedTag = 0x20A2,
+			SetSelectedBadgeTag = 0x20A3,
+			KickPlayerFromGroupPlayfield = 0x20A4,
+			WorldStatChanged = 0x20A5,
+			UpdateNoXPGainStat = 0x20A6,
+			SendReport = 0x20A7,
+			RunLua = 0x20A8
 		}
 
 		// The 0x2000 sub-opcodes the GameServer HANDLES (client->server). These are the same IIR ids as
@@ -246,6 +591,9 @@
 			//   appears to learn the initial bag state here rather than via a small incremental sync packet
 		}
 
+		// PlayerAgent opcodes do NOT map onto the recovered PlayerAgent/PlayerInterface tables (25 methods, max
+		// 0x2018) - the observed wire values run 0x2083..0x20F5, so the live build's table is much larger than
+		// the recovered one in both directions. These stay behavior-derived names.
 		public enum PlayerAgentOpcodes : ushort
 		{
 			RequestAuth = 0x2083,
@@ -275,17 +623,24 @@
 			Ox1A07 = 0x1A07
 		}
 
+		// UniverseAgent client->server: matches the recovered table exactly (3 methods).
 		public enum UniverseAgentOpcodes : ushort
 		{
 			InitiateAuthentication = 0x2000,
-			AnswerChallenge = 0x2001
+			AnswerChallenge = 0x2001,
+			ClientDisconnected = 0x2002
 		}
 
+		// UniverseInterface server->client: the recovered table aligns here (0x2000 is the DH challenge,
+		// 0x2005 sets the region state - both match observed behavior), unlike the bigger drifting interfaces.
 		public enum UniverseAgentResponseOpcodes : ushort
 		{
-			InitiateAuthentication = 0x2000,
-			SendPlayerAgentRealm = 0x2001,
-			SetRegion = 0x2005
+			DispatchChallenge = 0x2000, // (was "InitiateAuthentication" - it carries the DH challenge reply)
+			DispatchAckAuthenticate = 0x2001, // carries the PlayerAgent realm handoff (was "SendPlayerAgentRealm")
+			DispatchLoginProblem = 0x2002,
+			DispatchSetUpdateManager = 0x2003,
+			DispatchSetUniverseManagerError = 0x2004,
+			DispatchSetRegionState = 0x2005 // (was "SetRegion")
 		}
 	}
 }

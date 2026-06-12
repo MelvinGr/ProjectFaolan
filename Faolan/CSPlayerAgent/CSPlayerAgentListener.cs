@@ -101,7 +101,7 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.Ox2019: // register?
+				case CsPlayerAgentOpcodes.StartVoteRetreat: // register?
 				{
 					var unk0 = packet.Body.ReadUInt32(); // 0x00, 0x00, 0xC3, 0x50
 					var nClientInst = packet.Body.ReadUInt32();
@@ -111,27 +111,27 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.Ox2072:
+				case CsPlayerAgentOpcodes.RaidInviteCharacterByName:
 				{
 					// Logger.LogInformation("Opcodes.Ox2072");
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.Ox202A:
+				case CsPlayerAgentOpcodes.GuildGovernmentForm:
 				{
 					// Logger.LogInformation("Opcodes.Ox202a");
 
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.Ox203B:
+				case CsPlayerAgentOpcodes.AddGuildRenown:
 				{
 					// Logger.LogInformation("Opcodes.Ox203b");
 
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.Ox203C:
+				case CsPlayerAgentOpcodes.RemoveGuildRenown:
 				{
 					// Logger.LogInformation("Opcodes.Ox203c");
 
@@ -240,7 +240,7 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.Ox2038:
+				case CsPlayerAgentOpcodes.RemovePvpPoints:
 				{
 					var data = packet.Body.ReadRemainingArray();
 

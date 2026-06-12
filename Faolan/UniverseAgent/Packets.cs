@@ -20,7 +20,7 @@ namespace Faolan.UniverseAgent
 		private Task SendPlayerAgentRealm(INetworkClient client)
 		{
 			return new PacketStream()
-				.WriteHeader(Sender, client.Session.ClientConversation, UniverseAgentResponseOpcodes.SendPlayerAgentRealm)
+				.WriteHeader(Sender, client.Session.ClientConversation, UniverseAgentResponseOpcodes.DispatchAckAuthenticate)
 				.WriteUInt32(client.Session.Account.AuthStatus) // authstatus 0x01
 				.WriteUInt64(client.Session.Account.LongId)
 				.WriteString($"{Configuration.ServerIpAddress}:{Configuration.PlayerAgentPort}")
@@ -32,7 +32,7 @@ namespace Faolan.UniverseAgent
 		private static Task InitAuth(INetworkClient client)
 		{
 			return new PacketStream()
-				.WriteHeader(Sender, [0x0d, 0x54, 0x40, 0x38, 0x0c, 0x10, 0x99, 0xA7, 0x42], UniverseAgentResponseOpcodes.InitiateAuthentication)
+				.WriteHeader(Sender, [0x0d, 0x54, 0x40, 0x38, 0x0c, 0x10, 0x99, 0xA7, 0x42], UniverseAgentResponseOpcodes.DispatchChallenge)
 				.WriteString(client.Session.Account.AuthChallenge)
 				.SendAsync(client);
 		}
@@ -49,7 +49,7 @@ namespace Faolan.UniverseAgent
 		private static Task SetRegionState(INetworkClient client)
 		{
 			return new PacketStream()
-				.WriteHeader(Sender, client.Session.ClientConversation, UniverseAgentResponseOpcodes.SetRegion)
+				.WriteHeader(Sender, client.Session.ClientConversation, UniverseAgentResponseOpcodes.DispatchSetRegionState)
 				.WriteArray(0x01, 0x01, 0x01, 0x01, 0x3f, 0x80, 0x00, 0x00, 0x3f, 0x80, 0x00, 0x00, 0x01, 0x01, 0x00)
 				.SendAsync(client);
 		}

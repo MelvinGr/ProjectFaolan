@@ -113,7 +113,7 @@ namespace Faolan.PacketAnalyzer
 			subOpcode = 0;
 			subOpcodeName = null;
 
-			if (!string.Equals(protocolName, GameServerProtocolName, StringComparison.OrdinalIgnoreCase) || packet.Opcode != (uint)GameServerOpcodes.Ox2000 || packet.Body == null || packet.Body.Length < sizeof(uint) * 2)
+			if (!string.Equals(protocolName, GameServerProtocolName, StringComparison.OrdinalIgnoreCase) || packet.Opcode != (uint)GameServerOpcodes.PassBlob || packet.Body == null || packet.Body.Length < sizeof(uint) * 2)
 				return false;
 
 			var data = new FaolanStream(packet.Body.ToArray());
@@ -127,7 +127,7 @@ namespace Faolan.PacketAnalyzer
 
 		public static bool TryInferProtocolName(ConanPacket packet, bool isDownload, out string protocolName)
 		{
-			if (packet.Opcode == (uint)GameServerOpcodes.Ox2000 && packet.Body?.Length >= sizeof(uint) * 2)
+			if (packet.Opcode == (uint)GameServerOpcodes.PassBlob && packet.Body?.Length >= sizeof(uint) * 2)
 			{
 				var data = new FaolanStream(packet.Body.ToArray());
 				_ = data.ReadUInt32();

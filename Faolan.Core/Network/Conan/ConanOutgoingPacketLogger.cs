@@ -30,7 +30,7 @@ namespace Faolan.Core.Network.Conan
 				var opcode = packet.Opcode;
 				var opcodeName = FormatOpcodeName(_opcodeEnumType, opcode);
 
-				if (_subOpcodeEnumType != null && opcode == (ushort)GameServerOpcodes.Ox2000 && packet.Body?.Length >= sizeof(uint) * 2)
+				if (_subOpcodeEnumType != null && opcode == (ushort)GameServerOpcodes.PassBlob && packet.Body?.Length >= sizeof(uint) * 2)
 				{
 					var data = new FaolanStream(packet.Body.ToArray());
 					var payloadLength = data.ReadUInt32();

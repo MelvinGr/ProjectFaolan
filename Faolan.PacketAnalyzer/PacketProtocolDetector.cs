@@ -201,7 +201,7 @@ namespace Faolan.PacketAnalyzer
 			// (Empty) settings bootstrap detection from the advertisement AND keeps a GameServer's AckAuthentication
 			// (no host:port body) from being mistaken for one and relabeling the game endpoint as UniverseAgent
 			// (which would stop its downloads from being decompressed).
-			if (!isDownload || packet.Opcode != (uint)UniverseAgentResponseOpcodes.SendPlayerAgentRealm || packet.Body == null)
+			if (!isDownload || packet.Opcode != (uint)UniverseAgentResponseOpcodes.DispatchAckAuthenticate || packet.Body == null)
 				return;
 
 			// When the UniverseAgent port is known, additionally require the packet to come from it so a game

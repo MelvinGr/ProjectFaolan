@@ -12,7 +12,7 @@ namespace Faolan.Tests
 		public void ObservePacket_DetectsPlayerAgentPort_FromUniverseAdvertisement()
 		{
 			var detector = new PacketProtocolDetector(PacketAnalyzerPortSettings.Empty);
-			var packetBytes = TestPacketFactory.BuildPacketBytes((ushort)UniverseAgentResponseOpcodes.SendPlayerAgentRealm, Encoding.ASCII.GetBytes("37.18.192.43:7011"));
+			var packetBytes = TestPacketFactory.BuildPacketBytes((ushort)UniverseAgentResponseOpcodes.DispatchAckAuthenticate, Encoding.ASCII.GetBytes("37.18.192.43:7011"));
 			var packet = new ConanPacket(packetBytes);
 
 			detector.ObservePacket("37.18.192.43:7010", "192.168.1.10:5000", "37.18.192.43", "192.168.1.10", 7010, 5000, false, true, true, packet);

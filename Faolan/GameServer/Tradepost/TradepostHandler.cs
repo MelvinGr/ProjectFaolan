@@ -18,9 +18,10 @@ namespace Faolan.GameServer.Tradepost
 			var method = (TradepostProtocol.AgentMethod)packet.Opcode;
 			switch (method)
 			{
-				case TradepostProtocol.AgentMethod.Open:
-					// The client sends Open AFTER it received DispatchOpenTradepost (triggered by the auctioneer
-					// interaction / the .ah GM command), so there is nothing to send back here - just log.
+				case TradepostProtocol.AgentMethod.UpdateItemTimeouts:
+					// The client sends UpdateItemTimeouts (empty body) AFTER it received DispatchOpenTradepost
+					// (triggered by the auctioneer interaction / the .ah GM command) - the observed "window
+					// opened" signal; nothing to send back, just log.
 					logger.LogInformation("Tradepost: {Char} opened the auction house.", CharName(client));
 					break;
 
@@ -41,11 +42,12 @@ namespace Faolan.GameServer.Tradepost
 					logger.LogInformation("Tradepost: {Char} closed the auction house.", CharName(client));
 					break;
 
-				case TradepostProtocol.AgentMethod.GetMail:
+				case TradepostProtocol.AgentMethod.GetMailByID:
 				case TradepostProtocol.AgentMethod.GetMailItems:
+				case TradepostProtocol.AgentMethod.GetItemData:
 				case TradepostProtocol.AgentMethod.GetMailItem:
-				case TradepostProtocol.AgentMethod.DeleteOrMarkMail:
-				case TradepostProtocol.AgentMethod.MailPoll:
+				case TradepostProtocol.AgentMethod.MarkMailRead:
+				case TradepostProtocol.AgentMethod.GetAllMails:
 					logger.LogInformation("Tradepost/mail: {Char} {Method} (bodylen={Len}).",
 						CharName(client), method, packet.Body?.Length ?? 0);
 					break;
