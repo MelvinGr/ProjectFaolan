@@ -232,6 +232,11 @@ tag system exists. → memory `lua_vm`, `protocol_conversation_routing`; `docs/a
 
 ## 8. Lower-priority / future
 
+- [ ] **Persist chat history to the DB** (Melvin, 2026-06-13): chat is currently fire-and-forget (the Claude
+      channel log is in-memory, capped at 500, lost on restart; channel chat / says / whispers aren't recorded
+      at all). Add a ChatLog table (timestamp, kind: channel/say/whisper/system, channel id, sender id+name,
+      recipient for whispers, text) appended from the AgentServer paths, so history survives restarts and the
+      Claude bridge can rewind from the DB instead of skipping backlog.
 - [ ] **Add Claude to the friends list** (Melvin, 2026-06-13): see whether the synthetic Claude identity
       (ClaudeChannel.SenderId 0xC1A0DE05, the 0x0014-announced "Claude" sender) can appear on a player's
       in-game friends list - needs the friends-list protocol decoded first (add/remove/status packets are
