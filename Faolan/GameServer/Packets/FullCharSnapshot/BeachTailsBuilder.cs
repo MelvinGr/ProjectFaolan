@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using Faolan.Core.Database.Tables;
+using Faolan.GameServer.World;
 
 namespace Faolan.GameServer.Packets.FullCharSnapshot
 {
@@ -35,6 +36,17 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		public static byte[] Build(Character character)
 		{
 			return Build(character, TemplateInstance);
+		}
+
+		// As Build(character, instance), and additionally stamps `playfieldToken` over the template's baked-in
+		// (beach-capture) token - the marker-framed per-playfield id the client learns from this snapshot and the
+		// despawn protocol scopes on (WorldDespawn). Required when the tails are assembled for any map other than
+		// the template's own playfield.
+		public static byte[] Build(Character character, uint instance, uint playfieldToken)
+		{
+			var bytes = Build(character, instance);
+			WorldDespawn.TryReplacePlayfieldToken(bytes, playfieldToken);
+			return bytes;
 		}
 
 		// As Build(character), but re-addresses the template's captured instance to `instance` (the live character's

@@ -63,6 +63,12 @@ prior diagnoses are in `docs/archive/todo-history.md`.
 **Inventory / loot** → memory `protocol_containeradditem`
 - [ ] Backpack shows the seeded `CharacterInventory` items; moves / drops / stack-splits survive relog; chat stays
       connected. (Delivered post-load; beach snapshot built from scratch — both default on.)
+- [ ] `.additem <id>` mid-session: the item appears in the bag live (rebuilt-snapshot resend), chat stays up.
+- [ ] From-scratch snapshot on a NON-beach map (gate removed 2026-06-12): enter world / `.teleport` on a captured
+      map → no IIR errors, chat connects, despawns still work (the re-stamped playfield token must match what the
+      client learned). ALSO check a captured/leveled char (e.g. Hoxxling): the scratch tails replace its captured
+      progression block with the fresh-char skeleton — verify the client tolerates that (stats/feats UI). Opt out
+      with `FAOLAN_SCRATCH_BEACH_SNAPSHOT=0` if it regresses.
 - [ ] Click a dropped loot bag → loot window opens, bag stays; close/expire → it fades. (Taking items into the bag
       is client-side; no server add-item packet exists.)
 
@@ -96,10 +102,12 @@ Full detail: `docs/archive/spawn-dissection-plan.md`.
   - [ ] **Typed protobuf root** (`ProtoFullCharacterIIR` parsed from the captured root; only `Inventories` is
         regenerated) — author the remaining root fields from character rows (round-trip is 37/39; see memory
         `fullchar_generation`).
-  - [ ] **Prefix + tails, non-beach maps** (scratch path is beach-only: `BeachSnapshotPrefix` +
-        `BeachTailsBuilder`; other maps carry the captured prefix/tails + `AdjustSnapshotPrefixRootLength`) —
-        generalize the tails template per map, or decode the per-char `UnknownBefore` region (the 739 B → 441 KB
-        blob; see memory `snapshot_tails_construction_scope`).
+  - [x] **Prefix + tails** — beach-map gate REMOVED 2026-06-12: the scratch path (`BeachSnapshotPrefix` +
+        `BeachTailsBuilder`) now runs on every map, with the live map's playfield token lifted from the captured
+        tails and stamped over the template's baked-in beach token (`WorldDespawn.TryReplacePlayfieldToken`;
+        no extractable token = keep captured tails). Remaining: author the per-char `UnknownBefore` progression
+        region (739 B → 441 KB blob) + the prefix quest-count field; see memory
+        `snapshot_tails_construction_scope` and the in-client check in §2.
 
   Once all three are server-owned, `.additem`/post-load can build the snapshot with zero captured bytes and the
   session template becomes dead code.

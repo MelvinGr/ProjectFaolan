@@ -38,16 +38,35 @@ namespace Faolan.GameServer.World
 		// present (then we don't know the token and must not send a despawn with a guessed value).
 		public static bool TryExtractPlayfieldToken(ReadOnlySpan<byte> snapshotBody, out uint token)
 		{
+			return TryLocateFramedToken(snapshotBody, out token, out _);
+		}
+
+		// Overwrites the marker-framed playfield token in a snapshot tails/body buffer IN PLACE (used when assembling
+		// tails from the server-owned template, whose baked-in token is the template capture's - the live map's token
+		// must be stamped over it). Returns false (buffer untouched) when the framing isn't present.
+		public static bool TryReplacePlayfieldToken(byte[] snapshotBody, uint token)
+		{
+			if (!TryLocateFramedToken(snapshotBody, out _, out var tokenStart))
+				return false;
+
+			BinaryPrimitives.WriteUInt32BigEndian(snapshotBody.AsSpan(tokenStart, 4), token);
+			return true;
+		}
+
+		private static bool TryLocateFramedToken(ReadOnlySpan<byte> snapshotBody, out uint token, out int tokenStart)
+		{
 			token = 0;
+			tokenStart = -1;
 			var i = snapshotBody.IndexOf(TokenPrefixMarker);
 			while (i >= 0 && i + 12 <= snapshotBody.Length)
 			{
-				var tokenStart = i + 4;
+				var start = i + 4;
 				if (snapshotBody
-				    .Slice(tokenStart + 4, 4)
+				    .Slice(start + 4, 4)
 				    .SequenceEqual(TokenSuffixMarker))
 				{
-					token = BinaryPrimitives.ReadUInt32BigEndian(snapshotBody.Slice(tokenStart, 4));
+					token = BinaryPrimitives.ReadUInt32BigEndian(snapshotBody.Slice(start, 4));
+					tokenStart = start;
 					return true;
 				}
 

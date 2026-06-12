@@ -16,6 +16,7 @@ using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.GameServer.Spawn;
+using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
 // ReSharper disable once CheckNamespace
@@ -193,18 +194,23 @@ namespace Faolan.GameServer
 				var prefix = AdjustSnapshotPrefixRootLength(parts.Prefix, rootBytes.Length - verbatimRoot.Length);
 				var tailsBytes = parts.Tails.ToArray();
 
-				// FROM-SCRATCH beach path (default on; opt out with FAOLAN_SCRATCH_BEACH_SNAPSHOT=0): on the beach,
-				// build the prefix and tails from the ground up - the prefix from BeachSnapshotPrefix (constants +
-				// root length, no captured prefix / no delta-adjust) and the tails from the server-owned
-				// BeachTailsBuilder template (level + vitals generated, instance re-addressed) - instead of carrying
-				// the captured burst's prefix/tails. Both are proven byte-identical to the capture
-				// (BeachSnapshotConstructionTests) and construct in-client with 0 IIR errors. Gated to the beach map;
-				// other maps keep the burst prefix/tails + delta-adjust. See [[snapshot_tails_construction_scope]].
-				if (Environment.GetEnvironmentVariable("FAOLAN_SCRATCH_BEACH_SNAPSHOT") != "0" && character?.MapId == DefaultWorldMapId && BeachTailsBuilder.IsAvailable)
+				// FROM-SCRATCH path (default on; opt out with FAOLAN_SCRATCH_BEACH_SNAPSHOT=0): build the prefix
+				// and tails from the ground up - the prefix from BeachSnapshotPrefix (constants + root length, no
+				// captured prefix / no delta-adjust) and the tails from the server-owned BeachTailsBuilder template
+				// (level + vitals generated, instance re-addressed) - instead of carrying the captured burst's
+				// prefix/tails. Proven byte-identical to the beach capture (BeachSnapshotConstructionTests) and
+				// in-client with 0 IIR errors. The template came from a beach capture but is not map-bound EXCEPT
+				// for the playfield token baked into it, so the live map's token is lifted from the captured tails
+				// and stamped over it; no extractable token = keep the captured prefix/tails (never guess a token,
+				// despawn scoping depends on it). NOTE the template's record skeleton is fresh-character-shaped:
+				// captured/leveled characters lose their captured progression block here (in-client check pending,
+				// TODO 2; we author progression for our own characters so fresh-shaped is the intended end state).
+				if (Environment.GetEnvironmentVariable("FAOLAN_SCRATCH_BEACH_SNAPSHOT") != "0" && BeachTailsBuilder.IsAvailable && WorldDespawn.TryExtractPlayfieldToken(tailsBytes, out var playfieldToken))
 				{
 					prefix = BeachSnapshotPrefix.Build(rootBytes.Length);
-					tailsBytes = BeachTailsBuilder.Build(character, instance);
-					Logger.LogInformation("From-scratch beach snapshot: built prefix ({Prefix} b) + server-owned tails ({Tails} b).", prefix.Length, tailsBytes.Length);
+					tailsBytes = BeachTailsBuilder.Build(character, instance, playfieldToken);
+					Logger.LogInformation("From-scratch snapshot: built prefix ({Prefix} b) + server-owned tails ({Tails} b), playfield token 0x{Token:X8}.", prefix.Length, tailsBytes.Length,
+						playfieldToken);
 				}
 
 				using var contentStream = new FaolanStream();
