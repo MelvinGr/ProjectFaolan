@@ -59,5 +59,29 @@ namespace Faolan.GameServer.Spawn
 			MinimalBody.CopyTo(post, 12);
 			return post;
 		}
+
+		// Replaces an FA015807 body's post-IIR scaffold with the minimal session-independent form, adjusting the
+		// inner body-length field (@0, which tracks total body size 1:1 - same convention as
+		// SpawnPacketBuilder.SetCharacterMessage). A cross-session NpcSpawn row's captured post-IIR carries another
+		// session's runtime state (movement waypoints / buff timers) that the client rejects; swapping in the
+		// minimal form is the candidate fix for the cross-session render rejection (see
+		// [[world-packets-construct-not-replay]]). No-op (returns the body unchanged) if no CharacterIIR is found.
+		public static byte[] WithMinimalPostIir(byte[] body)
+		{
+			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+				return body;
+
+			var postStart = read.Offset + read.Length;
+			var minimal = BuildMinimalPostIir();
+
+			var result = new byte[postStart + minimal.Length];
+			Array.Copy(body, 0, result, 0, postStart); // header + transform + pre-IIR + the IIR itself (unchanged)
+			minimal.CopyTo(result, postStart);
+
+			var delta = result.Length - body.Length;
+			var bodyLength = BinaryPrimitives.ReadUInt32BigEndian(result.AsSpan(0, 4));
+			BinaryPrimitives.WriteUInt32BigEndian(result.AsSpan(0, 4), (uint)(bodyLength + delta));
+			return result;
+		}
 	}
 }

@@ -392,6 +392,16 @@ namespace Faolan.GameServer
 			if (!NpcSpawnBuilder.TryBuild(templateRow, builtHandle, out var spawnBody))
 				return;
 
+			// Opt-in (FAOLAN_MINIMAL_SCAFFOLD=1): swap the carried post-IIR for the minimal session-independent
+			// form. The in-client experiment for the cross-session render fix - if the built NPC still renders with
+			// the minimal scaffold, it is client-acceptable and the cross-session row's stale post-IIR was the
+			// rejection cause (see NpcSpawnScaffold / [[world-packets-construct-not-replay]]).
+			if (Environment.GetEnvironmentVariable("FAOLAN_MINIMAL_SCAFFOLD") == "1")
+			{
+				spawnBody = NpcSpawnScaffold.WithMinimalPostIir(spawnBody);
+				Logger.LogInformation("Built NPC: swapped in the minimal session-independent post-IIR scaffold (body now {Len}B).", spawnBody.Length);
+			}
+
 			// Validate the minimal STATIONARY MoveTask (MoveTaskBuilder): if she now spawns by the player and STAYS
 			// (no drag to a patrol route), the built stationary MoveTask is accepted - the full burst-free primitive
 			// set (built spawn + built stationary MoveTask) is proven in-client.

@@ -33,5 +33,34 @@ namespace Faolan.Tests
 			Assert.Equal(1u, BinaryPrimitives.ReadUInt32BigEndian(post.AsSpan(8, 4))); // single record group
 			Assert.Equal(0x03F1u, BinaryPrimitives.ReadUInt32BigEndian(post.AsSpan(post.Length - 4, 4))); // final 0x3F1 marker
 		}
+
+		[Fact]
+		public void WithMinimalPostIir_OnAlreadyMinimalBody_IsAByteIdenticalNoOp()
+		{
+			var body = Golden.Bytes("SpawnNpcCrocodile"); // post-IIR already the minimal 41B form
+
+			Assert.Equal(body, NpcSpawnScaffold.WithMinimalPostIir(body));
+		}
+
+		[Fact]
+		public void WithMinimalPostIir_OnRuntimeStateBody_StripsToMinimalAndFixesBodyLength()
+		{
+			var body = Golden.Bytes("SpawnNpcCasilda"); // a 250B runtime-state post-IIR
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var before));
+
+			var stripped = NpcSpawnScaffold.WithMinimalPostIir(body);
+
+			// The body shrank by exactly (oldPost - minimalPost), the IIR is untouched, and the post-IIR is minimal.
+			var oldPostLen = body.Length - (before.Offset + before.Length);
+			Assert.Equal(body.Length - (oldPostLen - NpcSpawnScaffold.MinimalPostIirLength), stripped.Length);
+
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(stripped, out var after));
+			Assert.Equal(before.Offset, after.Offset);
+			Assert.Equal(before.Length, after.Length); // IIR unchanged
+			Assert.Equal(NpcSpawnScaffold.BuildMinimalPostIir(), stripped[(after.Offset + after.Length)..]);
+
+			// Inner body-length field (@0) == total body length - 4 (the captured convention).
+			Assert.Equal((uint)(stripped.Length - 4), BinaryPrimitives.ReadUInt32BigEndian(stripped.AsSpan(0, 4)));
+		}
 	}
 }
