@@ -67,3 +67,23 @@ restarts. In-client render of the channel is not yet verified (needs a live clie
 - **World/system chat via `ChatTextIIR` (0xE0B51102)** — a GameServer remoteformat-XML chat seen once in captures;
   not implemented (the local-say `0x0022` path covers player say).
 - Tune `SayRangeUnits` if the in-client range feels off.
+
+## The in-game Claude channel and the Claude Code channel bridge
+
+Every client is subscribed to the server-defined **"Claude" chat channel** (04/0x00C1A0DE) on AgentServer
+login. Player posts on it land in the in-memory `ClaudeChannel` log; the MCP tools `read_claude_channel`
+(cursor by sequence) and `send_claude_channel_message` (broadcast in-game as "Claude") bridge it to Claude.
+
+**Push delivery (2026-06-12):** `Faolan.Mcp.ChannelBridge` (the assembly's exe entry point) is a Claude Code
+*channel* (research preview, code.claude.com/docs/en/channels-reference): Claude Code spawns it over stdio
+(`.mcp.json` server `faolan-chat`), it polls the game server's MCP endpoint every ~1.5 s, and pushes each new
+player post into the running Claude Code session as a `notifications/claude/channel` event - so Claude reacts
+to in-game chat without polling. Replies go back through its `reply` tool. Enable per session:
+
+```bash
+claude --dangerously-load-development-channels server:faolan-chat
+```
+
+(Custom channels are not on the research-preview allowlist, hence the development flag. The bridge tolerates
+game-server restarts and skips the pre-launch backlog. SDK note: the experimental capability value must be a
+JsonElement - a boxed Dictionary breaks the SDK's source-generated initialize serialization.)

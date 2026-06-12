@@ -1,6 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <OutputType>Library</OutputType>
+        <!-- Dual-role assembly: a LIBRARY hosted in-process by the game server (FaolanMcpHostedService), and an
+             EXECUTABLE whose entry point is the Claude Code channel bridge (ChannelBridge.Main - spawned by
+             Claude Code over stdio via .mcp.json "faolan-chat"). Exe-to-exe project references are fine. -->
+        <OutputType>Exe</OutputType>
+        <StartupObject>Faolan.Mcp.ChannelBridge</StartupObject>
         <!-- Required when referencing Microsoft.AspNetCore.App from the non-Web SDK on .NET 10 (NETSDK1226). -->
         <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
     </PropertyGroup>
