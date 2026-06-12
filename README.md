@@ -456,7 +456,15 @@ are byte-exact against the analyzer JSON dumps on the reference captures, plus r
 can't do (compressed-stream packets across TCP segment boundaries). See `Faolan.Wireshark/README.md`.
 
 ```zsh
-# recommended for captures with retransmissions (Wireshark hides retransmitted frames from plugins)
+# build + install once
+cmake -S Faolan.Wireshark -B Faolan.Wireshark/build && cmake --build Faolan.Wireshark/build -j \
+  && cmake --build Faolan.Wireshark/build --target install-faolan-plugin
+
+# analyzer-style JSON dump (one record per Conan/chat packet, jq-friendly)
+Captures/tshark_dump.sh 'Captures/<capture>.pcapng'   # -> <capture>.tshark.json
+
+# ad-hoc field extraction; the -o pref matters on captures with retransmissions
+# (Wireshark hides retransmitted frames from plugins otherwise)
 tshark -r '<capture>.pcapng' -o tcp.analyze_sequence_numbers:FALSE \
   -Y 'faolan.pkt.opcode' -T fields -e frame.number -e faolan.pkt.receiver_class -e faolan.pkt.opcode
 ```

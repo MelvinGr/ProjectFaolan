@@ -32,6 +32,14 @@ dotnet run --project Faolan.Importer -- --skip-characters    # [--captures dir] 
 # Dump a pcap to the JSON the dissectors read
 dotnet run --project Faolan.PacketAnalyzer -- --dump Captures/<capture>.pcapng
 
+# Wireshark plugin: full Conan+chat dissection (auto-follows the session from port 7010);
+# build+install once, then open captures in Wireshark (filter: faolan) or dump to JSON.
+cmake -S Faolan.Wireshark -B Faolan.Wireshark/build && cmake --build Faolan.Wireshark/build -j \
+  && cmake --build Faolan.Wireshark/build --target install-faolan-plugin
+Captures/tshark_dump.sh Captures/<capture>.pcapng   # analyzer-style JSON, one record per packet;
+# more complete than the PacketAnalyzer dump (TCP-reassembled, includes compressed DL packets).
+# Lossy captures in the Wireshark GUI: set TCP pref analyze_sequence_numbers off (the script does).
+
 # EF migrations (context lives in Faolan.Core, migrations in Faolan/Migrations)
 dotnet ef migrations add <Name> --project Faolan
 # GOTCHA: plain `database update` runs with CWD = Faolan/ and creates a stray Faolan/faolan.db.
