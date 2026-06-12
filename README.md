@@ -525,9 +525,36 @@ and DH-login work). The full plan + findings: **`docs/archive/opcode-re-plan.md`
 - **Embedded protobuf descriptors**: exactly 16 IIR message types are protobuf (`Faolan.Core/Network/Protobuf/
   aoc-client-protos.proto` -> generated `AocProtocol.g.cs`); the rest (combat/quest/morph/move) are raw-stream.
 - **16-bit RpcHeader opcodes** (`0x2052`, `0x2008`, ...) are framework-assigned method indices, **not** hashes -
-  not yet mapped (would need Ghidra; deprioritized since the IIR channel is the bulk and is decoded).
+  and they ARE mapped now (cracked 2026-06-12 during the guild work, no Ghidra needed): the opcode is simply
+  **`0x2000` + the method's position in the recovered RPC catalog** (`docs/aoc-client-rpc-methods.json`), i.e.
+  the client and server agree on the method order of each interface and dispatch by index. How it was verified:
+  - **Hypothesis from a known anchor**: in the guild invite-accept capture, the one packet the player sent on
+    clicking "accept" was CsPlayerAgent `0x201C` - and `CSPlayerAgent.client_to_server[0x1C]` is
+    `AcceptGuildInvitation`. Every other upload in that capture matched its table name's expected behavior too
+    (`0x201E`=`ClientRequestGuildInfo` fired per inspected player, `0x202F`=`GuildRequestMemberList` on opening
+    the guild window, `0x2040`/`0x2041`=renown history/rankings on the renown tabs, `0x2000`=`Authenticate`).
+  - **Bulk confirmation across classes**: a packet's RpcHeader names its RPC class (the BKDR-31 endpoint type),
+    so every `(receiver class, opcode)` pair observed across all capture JSONs was tabulated and checked against
+    that class's table. Independent semantic hits everywhere: `GameCharAgentProject[0x0B]` =
+    `ToggleVanityArmorFilter` (our previously decoded "VanityToggle"), `GameCharAgent[0x1D]` =
+    `SplitInventoryItem` (our "SplitStack"), `[0x44]`=`CloseLootBag` (our "CloseLoot"), `[0x6E]`=`AddShortcut`
+    (our "MoveItemToBar"), `[0x85]`=`Ping` (our "LatencyCheck"), `TradepostAgent[0x0D/0x0E/0x10]` =
+    ItemSearch/BuyItem/Close (the decoded tradepost methods).
+  - **Disambiguation rule**: one GameServer connection multiplexes four RPC classes, so the same value can be
+    different methods per class - the dispatch key is `(class id, opcode)`. The small tables top out early
+    (TradepostAgent `0x2013`, project `0x200C`, GameAgent `0x200A`), so any GameServer opcode `>= 0x2014` is
+    unambiguously GameCharAgent.
+  - **The drift caveat**: this only holds for **client->server** tables. The **server->client** interface tables
+    (CSPlayerInterface, GameInterface, TradepostInterface, PlayerAgent in both directions) have unnamed extra
+    methods in the live build, so observed indices drift upward vs the recovered names (e.g. the observed Pong is
+    `0x2009`, the table says `0x2003`) - downloads stay named by decoded content, never by table index.
+
+  The complete per-class catalogs now live in `Faolan.Core/Network/Packets/Opcodes.cs` (`GameAgentOpcodes`,
+  `GameCharAgentOpcodes` (169), `GameCharAgentProjectOpcodes`, the full 135-method `CsPlayerAgentOpcodes`,
+  `TradepostProtocol.AgentMethod`), each annotated with collisions and drift warnings.
 - Tooling (reproducible from the exe): `Captures/extract_rpc_catalog.py`, `decode_opcode_ids.py`,
-  `reverse_hash_ids.py`, `decode_scryscript.py`, `decode_tradepost.py` (auction-house/mail RPC).
+  `reverse_hash_ids.py`, `decode_scryscript.py`, `decode_tradepost.py` (auction-house/mail RPC),
+  `decode_guild.py` (the guild flow + the method-index verification).
 
 ## Roadmap / current focus
 
