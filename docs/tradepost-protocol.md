@@ -48,15 +48,26 @@ connection. Mail rides the **same** agent, and a bought item is delivered to the
 [filter2: 8 bytes 0xFF][0x00…]
 ```
 
-## DispatchTradepostSearchResults rows (S→C `0x2005`)
+## DispatchTradepostSearchResults rows (S→C `0x2005`) — VALIDATED byte-exact
 
-Per-row (offsets still being fully grammared, but the key fields are confirmed):
 ```
-[head:u32] [saleId:u64] [handle:u32] [nameLen:u16][seller ascii] …pad…
-… [price:u64] [qty:u32] [itemId:u32] …
+[head:u32]                    # ≈ total quantity of that item available across the AH (scales with listings)
+[ row ]*                      # rows concatenated, sorted by price ASCENDING
 ```
-Observed: seller names ("Ponakin", "Zykyn", "Fireonme", "Jocko", "Elgarama"), price e.g. `0x0F4240`=1,000,000,
-the `itemId` echoes the query's. The buy targets a row's `saleId` (e.g. `20d82b62d02b198b` → `TradepostBuyItem`).
+Per row:
+```
+[saleId:u64]                  # unique listing id; the buy targets this
+[handle:u32]
+[nameLen:u16][seller ascii]
+[price:u64]
+[qty:u32]
+[itemId:u32]                  # echoes the query's item
+[item: ProtoAcgItem protobuf] # self-delimited, variable length — the SAME item proto our inventory/spawn
+                              # builders already emit (SnapshotItemBuilder / PlayerSpawnEquipment).
+```
+Validated on the 8-row packet #991 (item 0x753F): sellers Elgarama/Zykyn/Feiyan/… prices 30 → 1,800 → 500,000 →
+1,000,000 (ascending), qty 2 each, unique saleIds. Rows are split in the decoder on the session-constant saleId
+high bytes (`20 d8 2b`); in C# the boundary falls out of encoding the `ProtoAcgItem` (known length).
 
 ## Buy → mail delivery (confirmed)
 
@@ -76,6 +87,22 @@ mail, not "from self". The body is a remoteformat string:
 `<remoteformat token="TradePostGUI_MailItemBought" category="629" key="…"><parameter value="7;AssassinL23"/>
 <parameter value="1;<itemInstanceId>"/><parameter value="7;&lt;remoteformat id=&quot;<itemId>&quot;…"/>` — i.e.
 the buyer name, the bought item's instance id, and a nested remoteformat describing the item.
+
+### Mail attachment (the bought item)
+
+The base `DispatchMailMessage` has no item; the client fetches it with `GetMailItem(0x2006)` and the server
+replies with a `DispatchMailMessage` that has the attachment **appended** (verified: 629 B without → 754 B with,
+only the tail differs):
+```
+…[base mail body]…
+[0x01]                        # has-attachment flag
+[itemInstanceId:u64]          # = the bought saleId (20d82b62d02b198b)
+[protoLen:u32]
+[item: ProtoAcgItem protobuf] # same item proto as the search rows
+[footer]
+```
+So both the listing rows and the mail attachment carry the **same `ProtoAcgItem`** — one reusable builder serves
+search results, the AH window, and the mail item.
 
 ## Implementation notes (for TODO §9a)
 

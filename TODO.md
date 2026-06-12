@@ -175,9 +175,12 @@ buy-delivery path (seller's item + buyer's payment move through mail).
       query (byte-exact), the `DispatchTradepostSearchResults` rows (saleId/seller/price/qty/itemId), and the
       **buy→mail** delivery: `TradepostBuyItem(saleId)` → `DispatchMailMessage` (recipient=buyer, sender=EMPTY
       system mail, body = remoteformat `TradePostGUI_MailItemBought` with the item attachment).
-- [ ] **Step 2:** finish grammaring the `0x2005` result-row offsets + the mail attachment item bytes (one more
-      decode pass), then capture-replay PoC (open AH → render captured search results in-client, like the
-      conversation stage machine).
+- [x] **Step 2 (grammar) — DONE 2026-06-12.** `0x2005` rows validated byte-exact (`[head:u32][row]*`, row =
+      saleId/handle/seller/price/qty/itemId + a self-delimited `ProtoAcgItem`; sorted by price ascending). Mail
+      attachment isolated (`GetMailItem` → 629→754 B; `[01][itemInstanceId:u64][protoLen:u32][ProtoAcgItem]`).
+      **Both reuse the same `ProtoAcgItem` our inventory/spawn builders already emit.** `docs/tradepost-protocol.md`.
+- [ ] **Step 2b:** capture-replay PoC — replay a captured `0x2005` (+ `DispatchOpenTradepost`) so the AH window
+      renders in-client, like the conversation stage machine. Verifies the framing live before going DB-backed.
 - [ ] **Step 3:** go DB-backed — `TradepostListing` + `Mail`/`MailAttachment` tables, search, money/escrow,
       buy→mail grant. NB: tradepost sells from the **bank** (`nBankItemSlot`) — leans on bank/money support;
       `CSBuyItemReply` hints at a commerce/CS path. All on the existing GameServer dispatcher (no new connection).

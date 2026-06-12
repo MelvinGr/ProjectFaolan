@@ -86,15 +86,38 @@ def parse_search_query(b):
     rest = b[i:]
     return f'lang={lang} cat={cat} page={page} cat2={cat2} itemId=0x{itemId:04X} filter+price={rest.hex()}'
 
-def parse_first_result_row(b):
-    """First row of DispatchTradepostSearchResults (offsets still being grammared)."""
+SALE_PREFIX = bytes.fromhex('20d82b')   # session-constant high bytes of every saleId in these captures
+
+def parse_result_row(b):
+    """One DispatchTradepostSearchResults row (the item ProtoAcgItem trails, variable-length)."""
+    saleId = struct.unpack('>Q', b[0:8])[0]
+    handle = struct.unpack('>I', b[8:12])[0]
+    nl = struct.unpack('>H', b[12:14])[0]
+    seller = b[14:14+nl].decode('latin1', 'replace'); i = 14+nl
+    price = struct.unpack('>Q', b[i:i+8])[0]; i += 8
+    qty = struct.unpack('>I', b[i:i+4])[0]; i += 4
+    itemId = struct.unpack('>I', b[i:i+4])[0]; i += 4
+    return dict(saleId=saleId, handle=handle, seller=seller, price=price, qty=qty, itemId=itemId, protoOff=i)
+
+def parse_results(b):
+    """[head:u32][row]* — split rows on the shared saleId prefix."""
     head = struct.unpack('>I', b[0:4])[0]
-    saleId = b[4:12].hex()
-    mid = b[12:16].hex()
-    nl = struct.unpack('>H', b[16:18])[0]
-    seller = b[18:18+nl].decode('latin1', 'replace'); i = 18+nl
-    # after the name: padding to fixed width, then price/qty/itemId
-    return f'head=0x{head:08X} saleId={saleId} h={mid} seller="{seller}" tail={b[i:i+24].hex()}'
+    starts = [k for k in range(4, len(b)-8) if b[k:k+3] == SALE_PREFIX]
+    starts.append(len(b))
+    rows = []
+    for k in range(len(starts)-1):
+        seg = b[starts[k]:starts[k+1]]
+        try: rows.append(parse_result_row(seg))
+        except Exception: pass
+    return head, rows
+
+def parse_first_result_row(b):
+    head, rows = parse_results(b)
+    if not rows: return f'head=0x{head:08X} <no rows>'
+    r = rows[0]
+    extra = '' if len(rows) == 1 else f' (+{len(rows)-1} more rows)'
+    return (f'head=0x{head:08X} rows={len(rows)} | row0: seller="{r["seller"]}" '
+            f'price={r["price"]} qty={r["qty"]} itemId=0x{r["itemId"]:04X} saleId=0x{r["saleId"]:016X}{extra}')
 
 def parse_mail(b):
     """DispatchMailMessage body: mailId, recipient endpoint, sender endpoint, remoteformat body.
@@ -142,5 +165,7 @@ def main(path):
         print(f"#{r['idx']:5} {d_} 0x{r['method']:04X} {mn:32} len={len(b):5}  {detail}")
 
 if __name__ == '__main__':
-    main(sys.argv[1] if len(sys.argv) > 1 else
-         'account-faolan-character-necrol80-login-sell_items_to_trader-intract-with-auctionhouse.json')
+    import os
+    default = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           'account-faolan-character-necrol80-login-sell_items_to_trader-intract-with-auctionhouse.json')
+    main(sys.argv[1] if len(sys.argv) > 1 else default)
