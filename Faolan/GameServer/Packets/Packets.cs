@@ -110,27 +110,13 @@ namespace Faolan.GameServer
 				// Then the post-ready world-state/quest record stream (verbatim from the Strie login capture).
 				await SendPostReadyBurst(client);
 
-				// Post-load backpack delivery - SUPERSEDED (2026-06-12) by the world-entry DB-container substitution
-				// (BuildBeachInventoryPacket, default ON): the client ignores or rejects a SECOND 0x737A6DF9 for an
-				// identity it already constructed (live-verified: even an EMPTY rebuilt snapshot fails ReadSubClass,
-				// and when it does construct the UI never re-reads it), so this second send delivers nothing and
-				// just logs a client-side IIR error. Kept behind FAOLAN_POSTLOAD_INVENTORY=1 for experiments; the
-				// world-entry substitution is the real inventory delivery.
-				if (client.Session.PendingPostLoadInventory != null && Environment.GetEnvironmentVariable("FAOLAN_POSTLOAD_INVENTORY") == "1")
-				{
-					Logger.LogInformation("Sending post-load DB inventory snapshot ({Bytes} bytes) to update the backpack.", client.Session.PendingPostLoadInventory.Length);
-					await client.SendAsync(client.Session.PendingPostLoadInventory);
-				}
-				client.Session.PendingPostLoadInventory = null;
+				// (The post-load second-snapshot delivery was removed 2026-06-12: the client ignores/rejects a
+				// second 0x737A6DF9 for an already-constructed identity. Inventory rides the WORLD-ENTRY snapshot,
+				// see BuildBeachInventoryPacket.)
 
 				// Wallet sync: retail does NOT push a 0x2005 at login (the initial balance presumably rides the
 				// FullChar snapshot, location undecoded) - this is our interim so a moneyed character doesn't
 				// show 0 until the first change. Reason 0 = a plain sync, not a gain celebration.
-				// ORDER MATTERS: this MUST come AFTER the post-load snapshot. A 0x2005 sent between the post-ready
-				// burst and the snapshot makes the client REJECT the snapshot ("CoreFullPlayerCharacterIIR::
-				// ReadSubClass() Wrong IIR_t version", construct fails) - isolated 2026-06-12 by diffing a working
-				// vs failing session: identical snapshot bytes, the only delta was this push firing (Money > 0)
-				// before the snapshot. Mechanism undecoded; the ordering constraint is the empirical fact.
 				if (client.Session.Character.Money > 0)
 					await SendMoneyUpdate(client, client.Session.Character.Money, MoneyUpdateReason.Spend);
 

@@ -77,7 +77,7 @@ namespace Faolan.Mcp.Tools
 
 		[McpServerTool(Name = "add_item"),
 		 Description(
-			 "Add an item by faolan.db item id to a connected character's bag - persisted and delivered live via the rebuilt inventory snapshot (wrapper over the .additem GM command; find ids with search_items). MUTATING: set confirm=true to actually add.")]
+			 "Add an item by faolan.db item id to a connected character's bag - persisted; it appears on the character's NEXT LOGIN (no live add packet exists; the world-entry snapshot is the delivery). Wrapper over the .additem GM command; find ids with search_items. MUTATING: set confirm=true to actually add.")]
 		public async Task<string> AddItem([Description("Character id of a currently-connected player")] uint characterId, [Description("Item id (see search_items / get_item)")] uint itemId,
 			[Description("Stack count (default 1)")] uint count = 1, [Description("Must be true to execute.")] bool confirm = false)
 		{

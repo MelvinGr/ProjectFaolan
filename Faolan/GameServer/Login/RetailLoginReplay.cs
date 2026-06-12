@@ -169,119 +169,6 @@ namespace Faolan.GameServer
 			(0x0a, e => e.RingRight), (0x0b, e => e.Cloak), (0x0c, e => e.Shoulder), (0x0e, e => e.Boots), (0x0f, e => e.Hands), (0x10, e => e.Legs), (0x12, e => e.Wrist), (0x14, e => e.MainHandRight), (0x15, e => e.OffHandRight)
 		];
 
-		// Builds the player's DB inventory snapshot (0x737A6DF9) from the verbatim world-entry snapshot packet:
-		// GENERATES the four containers from the character's DB items (equipped + first bag + persisted bag rows),
-		// keeping the captured prefix + tails (with the live level/vitals patch). This is the SAME generation that
-		// stalls the client when sent DURING world load - it is only ever sent AFTER the post-ready burst (post-load),
-		// when the client is out of the constrained load phase, so it updates the bag without risking the chat gate.
-		// Returns null if it can't be built (then nothing is sent and the verbatim snapshot stands).
-		private byte[] BuildDbInventorySnapshot(byte[] verbatimPacket, Character character, CharacterEquipment equipment, CharacterInventory[] inventoryRows)
-		{
-			if (equipment == null)
-				return null;
-
-			try
-			{
-				var conanPacket = new ConanPacket(verbatimPacket);
-				var body = new FaolanStream(conanPacket.Body.ReadArrayUInt32Length());
-				var subOpcode = body.ReadUInt32();
-				var c350 = body.ReadUInt32();
-				var instance = body.ReadUInt32();
-				var parts = InventorySnapshotInspector.ParseInventoryPacketBody(body);
-
-				if (character != null)
-				{
-					parts.Tails.Level = character.Level;
-					if (parts.Tails.HasKnownRepeatedStatTable)
-					{
-						parts.Tails.PostAccessBlock.CurrentXp = character.Experience;
-						if (character.MaxStats != null)
-						{
-							parts.Tails.PostAccessBlock.CurrentHp = character.MaxStats.Health;
-							parts.Tails.PostAccessBlock.CurrentMana = character.MaxStats.Mana;
-							parts.Tails.PostAccessBlock.CurrentStamina = character.MaxStats.Stamina;
-						}
-					}
-				}
-
-				var equipped = new Dictionary<ulong, (Item Item, uint Archetype)>();
-				foreach (var (slot, get) in InventoryEquippedSlots)
-				{
-					var item = get(equipment);
-					if (item is { Archetype: not 0 })
-						equipped[slot] = (item, item.Archetype);
-				}
-
-				(Item, uint)? bagFirst = equipment.FirstPosBag is { Archetype: not 0 }
-					? (equipment.FirstPosBag, equipment.FirstPosBag.Archetype)
-					: null;
-
-				var verbatimRoot = parts.Root.ToArray();
-
-				var typedRoot = ((ReadOnlySpan<byte>)verbatimRoot).FromProtobuf<ProtoFullCharacterIIR>();
-				typedRoot.Inventories.Clear();
-				foreach (var container in FullCharSnapshotBuilder.BuildContainers(instance, equipped, bagFirst, inventoryRows ?? []))
-					typedRoot.Inventories.Add(container);
-				var rootBytes = typedRoot.ToProtobufBytes();
-
-				// The client reads the FullCharacterIIR protobuf root by a length the snapshot carries in its 8-byte
-				// IIR prefix: a varint at prefix offset 4 (after the 4-byte base-class version) equals
-				// constant + rootLength (proven across two captures: prefix byte tracks the root length 1:1, delta 5
-				// = root delta 5). Kept verbatim it stays the CAPTURED root's length, so a regenerated root of a
-				// different size desyncs the client - it over/under-reads the protobuf and misframes the following
-				// subclass version ("ReadSubClass Wrong IIR_t version ..."). Delta-adjust that varint by the
-				// root-length change, exactly as SetCharacterMessage delta-adjusts the spawn's CharacterIIR length.
-				var prefix = AdjustSnapshotPrefixRootLength(parts.Prefix, rootBytes.Length - verbatimRoot.Length);
-				var tailsBytes = parts.Tails.ToArray();
-
-				// FROM-SCRATCH path (default on; opt out with FAOLAN_SCRATCH_BEACH_SNAPSHOT=0): build the prefix
-				// and tails from the ground up - the prefix from BeachSnapshotPrefix (constants + root length, no
-				// captured prefix / no delta-adjust) and the tails from the server-owned BeachTailsBuilder template
-				// (level + vitals generated, instance re-addressed) - instead of carrying the captured burst's
-				// prefix/tails. Proven byte-identical to the beach capture (BeachSnapshotConstructionTests) and
-				// in-client with 0 IIR errors. The template came from a beach capture but is not map-bound EXCEPT
-				// for the playfield token baked into it, so the live map's token is lifted from the captured tails
-				// and stamped over it; no extractable token = keep the captured prefix/tails (never guess a token,
-				// despawn scoping depends on it). NOTE the template's record skeleton is fresh-character-shaped:
-				// captured/leveled characters lose their captured progression block here (in-client check pending,
-				// TODO 2; we author progression for our own characters so fresh-shaped is the intended end state).
-				if (Environment.GetEnvironmentVariable("FAOLAN_SCRATCH_BEACH_SNAPSHOT") != "0" && BeachTailsBuilder.IsAvailable && WorldDespawn.TryExtractPlayfieldToken(tailsBytes, out var playfieldToken))
-				{
-					prefix = BeachSnapshotPrefix.Build(rootBytes.Length);
-					tailsBytes = BeachTailsBuilder.Build(character, instance, playfieldToken);
-					Logger.LogInformation("From-scratch snapshot: built prefix ({Prefix} b) + server-owned tails ({Tails} b), playfield token 0x{Token:X8}.", prefix.Length, tailsBytes.Length,
-						playfieldToken);
-				}
-
-				using var contentStream = new FaolanStream();
-				contentStream.WriteUInt32(subOpcode);
-				contentStream.WriteUInt32(c350);
-				contentStream.WriteUInt32(instance);
-				contentStream.WriteArray(prefix);
-				contentStream.WriteArray(rootBytes);
-				contentStream.WriteArray(tailsBytes);
-				var bodyContent = contentStream.ToArray();
-
-				var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(verbatimPacket.AsSpan(8, 4));
-				var bodyStart = 12 + headerLen;
-				var rebuilt = new byte[bodyStart + 4 + bodyContent.Length];
-				Array.Copy(verbatimPacket, 0, rebuilt, 0, bodyStart);
-				BinaryPrimitives.WriteUInt32BigEndian(rebuilt.AsSpan(bodyStart, 4), (uint)bodyContent.Length);
-				bodyContent.CopyTo(rebuilt, bodyStart + 4);
-				BinaryPrimitives.WriteUInt32BigEndian(rebuilt.AsSpan(0, 4), (uint)(rebuilt.Length - 4));
-				BinaryPrimitives.WriteUInt32BigEndian(rebuilt.AsSpan(4, 4), Crc32.Calculate(rebuilt[8..]));
-				Logger.LogInformation("Post-load DB inventory snapshot built: {Equipped} equipped + {Bag} bag-first + {Rows} rows.", equipped.Count, bagFirst.HasValue
-					? 1
-					: 0, (inventoryRows ?? []).Length);
-				return rebuilt;
-			}
-			catch (Exception ex)
-			{
-				Logger.LogWarning(ex, "Post-load DB inventory snapshot build failed; backpack stays verbatim.");
-				return null;
-			}
-		}
-
 		// Delta-adjusts the snapshot IIR prefix's embedded root-length varint by `delta`. The prefix is
 		// [4-byte base-class version][varint = const + rootLength][trailing varint(s)]; the client uses that
 		// varint to delimit the protobuf root from the following subclass (the tails). Reads the varint at
@@ -574,13 +461,8 @@ namespace Faolan.GameServer
 
 				if (IsInventorySnapshot(pkt))
 				{
-					// Send the world-entry snapshot VERBATIM (chat-safe). Build the player's DB inventory snapshot
-					// from the same packet and stash it - it is sent AFTER the post-ready burst (post-load) so the
-					// backpack shows the player's real items without risking the world-load/chat gate. The verbatim
-					// packet is also kept for the session so mid-session inventory changes (.additem) can rebuild
-					// + re-send the snapshot through the same proven path.
-					client.Session.InventorySnapshotTemplate = pkt;
-					client.Session.PendingPostLoadInventory = BuildDbInventorySnapshot(pkt, client.Session.Character, equipment, inventoryRows);
+					// The world-entry snapshot: tails patched to the live character, containers substituted with the
+					// player's DB items (BuildBeachInventoryPacket) - this is THE inventory delivery (bag + doll).
 					pkt = BuildBeachInventoryPacket(pkt, client.Session.Character, equipment, inventoryRows);
 				}
 				else if (TryRebuildPlayerSpawnFromDb(client, equipment, scaffoldCharacter, pkt, out var rebuilt))

@@ -455,22 +455,10 @@ namespace Faolan.GameServer
 
 			await Database.SetCharacterInventorySlot(characterId, (int)FullCharSnapshotBuilder.BagKind, slot.Value, itemId, count);
 
-			// Live delivery: rebuild the inventory snapshot from the stashed verbatim template + the fresh rows
-			// and re-send it (the proven post-load path, just later in the session).
-			var delivered = false;
-			if (client.Session.InventorySnapshotTemplate != null)
-			{
-				var freshRows = await Database.GetCharacterInventory(characterId);
-				var snapshot = BuildDbInventorySnapshot(client.Session.InventorySnapshotTemplate, character, equipment, freshRows);
-				if (snapshot != null)
-				{
-					await client.SendAsync(snapshot);
-					delivered = true;
-				}
-			}
-
+			// No live delivery exists: the client ignores/rejects a second 0x737A6DF9 for an already-constructed
+			// identity (verified 2026-06-12), so the item rides the next login's world-entry snapshot.
 			await _agentServerDispatcher.SendSystemMessage(characterId,
-				$"Added {count}x '{item.Name}' (id {itemId}) to bag slot {slot}.{(delivered ? "" : " No live snapshot path on this session - it appears on next login.")}");
+				$"Added {count}x '{item.Name}' (id {itemId}) to bag slot {slot}. It appears on the next login (no live add packet exists).");
 		}
 
 		// .quest add|remove <id> | .quest list  - manage the player's quest journal. `add` records the quest +
