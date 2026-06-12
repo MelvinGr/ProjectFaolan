@@ -372,6 +372,7 @@ namespace Faolan.GameServer.World
 
 					// Player death/respawn timers run every tick (continuous), scaled by real dt.
 					await TickPlayerDeaths(dt);
+					TickBuffExpiry();
 
 					// Rate-based systems: fire on their own cadence, scaled by the time actually elapsed since last fire.
 					if (regen.Advance(dt, out var regenElapsed))
@@ -394,6 +395,21 @@ namespace Faolan.GameServer.World
 		// Advances player death/respawn. A player whose vitals hit 0 starts a respawn countdown; when it elapses they
 		// are revived to full and re-entered at the closest known resurrection point (RespawnPlayer). Living players are
 		// untracked.
+		// Drops expired buffs (those with a known duration - none until the RDB spell defs land, but the model is
+		// live). No packet: the client expires its own icon from the ApplySpell data.
+		private void TickBuffExpiry()
+		{
+			var now = DateTimeOffset.UtcNow;
+			foreach (var pair in Players)
+			{
+				foreach (var buff in pair.Value.ActiveBuffs)
+				{
+					if (buff.Value.Expired(now) && pair.Value.ActiveBuffs.TryRemove(buff.Key, out _))
+						_logger.LogInformation("Buff 0x{Buff:X8} expired on {Player}.", buff.Key, pair.Key.Session?.Character?.Name);
+				}
+			}
+		}
+
 		private async Task TickPlayerDeaths(double dt)
 		{
 			foreach (var pair in Players)

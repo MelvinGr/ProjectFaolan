@@ -115,8 +115,12 @@ First pass IMPLEMENTED 2026-06-12 (same day); what remains is the deeper model w
             (`use_totem_of_origin` capture exists).
 - [x] **`TryLootCash` 0x2045** — consumed gracefully (no more unknown-packet noise); the actual coin grant is
       blocked on the money model (§9c) — Tortage starter bags carry no cash, so no retail reply to mimic yet.
-- [x] **`CancelBuff` 0x201E** — parsed ([u32 buffId][u32 charId]) + logged; a server-side buff model doesn't
-      exist yet (buffs are client-tracked ApplySpell effects).
+- [x] **`CancelBuff` 0x201E** — full buff model (2026-06-12): `WorldEntity.ActiveBuffs` registry, self/no-target
+      casts register, CancelBuff removes (retail sends no removal IIR — just a FormatFeedback text; the client
+      clears its own icon), tick expires entries with durations, `.buffs` GM command.
+      - [ ] Durations + stat effects need the RDB spell definitions (§5); all entries are duration-less until then.
+      - [ ] Mount buff and other direct ApplySpell sends bypass the registry (only the Handle0x2000 cast path
+            registers).
 - [x] **Hotbar persistence (server side)** — `CharacterShortcuts` table; `AddShortcut` upserts,
       `RemoveShortcut` deletes (migration `AddCharacterShortcuts`).
       - [ ] The login RESTORE is undecoded: `RequestShortcutBar` gets no direct retail reply — the bar most

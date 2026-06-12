@@ -481,9 +481,13 @@ namespace Faolan.GameServer
 					var buffId = packet.Body.ReadUInt32();
 					var charId = packet.Body.ReadUInt32();
 
-					// No server-side buff model yet (buffs are ApplySpell effects the client tracks); the client
-					// removes the icon itself. Logged so the cancel is visible when the buff model lands.
-					Logger.LogInformation("CancelBuff: buff 0x{Buff:X8} cancelled by {CharId:X8} (no buff model; client-side only).", buffId, charId);
+					// The client removes its own icon (retail replies only a FormatFeedback text, no removal
+					// IIR); removing the entry from the server-side registry is what makes the cancel real.
+					var entity = _simulation.PlayerWorldEntity(client);
+					if (entity != null && entity.ActiveBuffs.TryRemove(buffId, out _))
+						Logger.LogInformation("CancelBuff: buff 0x{Buff:X8} removed from {CharId:X8}.", buffId, charId);
+					else
+						Logger.LogDebug("CancelBuff: buff 0x{Buff:X8} was not tracked for {CharId:X8} (cast before the registry, or an aura).", buffId, charId);
 
 					break;
 				}

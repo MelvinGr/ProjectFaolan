@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Numerics;
 using Faolan.Core.Network;
 using Faolan.GameServer.Combat;
@@ -50,6 +51,14 @@ namespace Faolan.GameServer.World
 		// Live vitals (NPCs are seeded at load; null for entities the combat/world layer doesn't track here yet).
 		// The world is the authoritative owner - combat applies damage to this, and the tick respawns off it.
 		public EntityVitals Vitals { get; set; }
+
+		// Active buffs/effects on this entity, keyed by buff (spell) id - reapplying refreshes the entry.
+		// Server-side bookkeeping only for now: the client tracks icon + duration itself from the ApplySpell
+		// data, and retail sends NO removal IIR on CancelBuff (just a FormatFeedback text), so removal here is
+		// what makes the cancel real. Durations come from the RDB spell defs once imported (TODO 5); entries
+		// with one expire on the tick, the rest live until cancel/disconnect. Stat effects land with the same
+		// spell-def work.
+		public ConcurrentDictionary<uint, ActiveBuff> ActiveBuffs { get; } = new ConcurrentDictionary<uint, ActiveBuff>();
 
 		// For a player: the handles this player currently sees (has been sent a spawn for). Interest management diffs
 		// against this set to decide what to spawn/despawn as entities move in and out of range. Unused for NPCs.

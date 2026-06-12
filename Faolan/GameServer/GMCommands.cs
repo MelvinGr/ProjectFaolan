@@ -168,8 +168,29 @@ namespace Faolan.GameServer
 				["lua"] = (client, arguments) => LuaCommand(client, arguments),
 				["ah"] = (client, _) => OpenAuctionHouseCommand(client),
 				["guild"] = (client, arguments) => GuildCommand(client, arguments),
-				["money"] = (client, arguments) => MoneyCommand(client, arguments)
+				["money"] = (client, arguments) => MoneyCommand(client, arguments),
+				["buffs"] = (client, _) => BuffsCommand(client)
 			};
+		}
+
+		// .buffs  - list the server-tracked active buffs on the player (the registry CancelBuff removes from).
+		private async Task BuffsCommand(INetworkClient client)
+		{
+			var characterId = client.Session.Character.Id;
+			var entity = PlayerWorldEntity(client);
+			if (entity == null || entity.ActiveBuffs.IsEmpty)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "No server-tracked buffs.");
+				return;
+			}
+
+			var now = DateTimeOffset.UtcNow;
+			var lines = entity
+				.ActiveBuffs
+				.Values
+				.OrderBy(b => b.AppliedAt)
+				.Select(b => $"0x{b.BuffId:X8} (for {(now - b.AppliedAt).TotalSeconds:F0}s{(b.DurationSeconds is double d ? $", expires after {d:F0}s" : "")})");
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Active buffs: {string.Join(", ", lines)}");
 		}
 
 		// .money            - show the wallet balance.
