@@ -5,7 +5,9 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 	// Constructs the beach 0x737A6DF9 snapshot's 8-byte IIR prefix FROM SCRATCH, instead of carrying the captured
 	// prefix and delta-adjusting its length varint (AdjustSnapshotPrefixRootLength). Layout, recovered by diffing
 	// captures:
-	//   [00 00 00 02]              base-class IIR version (2)
+	//   [00 00 00 02]              u32 X = the granted/active quest count (Strie's beach value is 2; see
+	//                              docs/player-spawn-generation-plan.md "FullChar"). PINNED to the beach template
+	//                              value here - generate it from the real quest count when the quest system lands.
 	//   [varint = const + rootLen] the root-length field the client uses to delimit the protobuf root from the
 	//                              trailing subclass (tails); the constant is a fixed offset into the (server-owned)
 	//                              beach tails template, so it is constant for the beach snapshot.

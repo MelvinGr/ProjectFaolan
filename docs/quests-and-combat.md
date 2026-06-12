@@ -107,8 +107,11 @@ read was wrong — the take requests are top-level opcodes `0x2043`/`0x2044`, no
   it; `Interact UseObject` (`0x12`) opens it.
 - server `NewCurrentLooter` (`0xD06568C8`) + **`SimpleDynelVisualChange` (`0xE7F4F8F8`) "Open"** → the loot window opens
   (the bag stays).
-- client clicks item → **`0x2043`** (take) → server `LootRemoveItems` (`0x70010162`) + the inventory grant
-  (`ContainerAddItem` `0x79F8C7A1`/`0x63268258`).
+- client clicks item → **`0x2043`** (take) → server `LootRemoveItems` (`0x70010162`). **There is NO server
+  add-item packet** — the client adds the looted item to the bag locally from the `LootBagFull` it already has.
+  (CORRECTION: `0x79F8C7A1`/`0x63268258` are **quest** packets, QuestJournalIIR/QuestFullUpdateIIR — NOT
+  ContainerAddItem. The only server inventory-delivery is the world-entry `0x737A6DF9` snapshot; see
+  memory `protocol_containeradditem`.)
 - client **`0x2044`** (close) → bag `n3ToClientFade` (`0x66180B20`) then `n3ToClientQuit` (`0x04B82B2D`).
 
 Per-packet byte layouts (server→client):
@@ -121,16 +124,19 @@ Per-packet byte layouts (server→client):
    larger variant carries the full `lootbag_open` TreasureChestScript remoteformat; the server echoes it.
 3. **`0xD06568C8` `NewCurrentLooterIIR_c`** + **`0x1E2E0139` `NewAllowedLooterIIR_c`** (server→client, 21 B):
    `<subop> [c87a] [bagHandle] 00 0000c350 [playerHandle]` = "bag → current/allowed looter = this player".
-4. **Grant** — the player's big inventory snapshots (`0x79F8C7A1`, `0x63268258`, the ContainerAddItem path) +
-   **`0x70010162` `LootRemoveItemsIIR_c`** (25 B): `<subop> [c87a] [bagHandle] 00000000 [slot/count] [5B tail]`
-   removing the item from the bag. No separate "take" upload → Tortage starter loot is **auto-loot on use**.
+4. **Remove** — **`0x70010162` `LootRemoveItemsIIR_c`** (25 B): `<subop> [c87a] [bagHandle] 00000000 [slot/count]
+   [5B tail]` removing the item from the bag. No separate "take" upload → Tortage starter loot is **auto-loot on
+   use**. The item lands in the player's bag **client-side** (no server add-item packet; the snapshots
+   `0x79F8C7A1`/`0x63268258` seen here are quest updates, not an inventory grant).
 5. **`0x66180B20` `n3ToClientFadeIIR_t`** (fade, 17 B): `<subop> [c87a] [bagHandle] 00 [float fadeSeconds]` (e.g.
    `40400000`=3.0). The **graceful despawn** variant: marker `0x00` + a FLOAT fade-time, vs `n3ToClientQuit`'s marker
    `0x01` + u32 playfield token (`protocol_despawn_n3toclientquit`). Good fit for loot expiry (and possibly death).
 
 **Gate / path:** the open is mediated by an RDB Lua `TreasureChestScript` (same VM PINNED for conversations), but is
-**bypassable** like conversations — answer the use-Interact directly with NewCurrentLooter → item grant → fade without
-running the real script. Heaviest build piece = the inventory item-grant (ContainerAddItem). All in-client-gated.
+**bypassable** like conversations — answer the use-Interact directly with NewCurrentLooter → LootRemoveItems → fade
+without running the real script. The looted item appears in the bag **client-side**; persisting it server-side means
+writing the `CharacterInventory` row on the take and re-sending the post-load `0x737A6DF9` snapshot (the only
+inventory-delivery mechanism — see memory `protocol_containeradditem`).
 
 ## Quests
 

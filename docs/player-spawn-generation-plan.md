@@ -202,15 +202,31 @@ The same playbook applied to the FullChar/inventory snapshot:
   by `InventorySlot_UpsertAndClear_RoundTripAcrossContexts` + `BuildContainers_RendersPersistedBagRows`;
   smoke 16/16 with a live bag item rendered from rows.
 
-Remaining for full FullChar generation:
-- **Tails beyond live values**: quest/`remoteformat` XML records + the access-window table are progression
-  state (captured verbatim today); a from-scratch fresh-character tails build would need those modeled.
-- **Prefix `[u32 X][u8 Y]`** semantics. Best fit from all captures: **X = the granted/active quest count**
-  (0 in the editor preview, 1 immediately at world entry = the auto-granted intro quest BEFORE any quest
-  XML appears in the tails — dikketest has X=1 with zero XML; per-session changes track quest activity:
-  Strie 2→1, necrol80 15↔43, demol80 70/71; the access-window count is constant 172 and unrelated). Y remains
-  session-varying (fresh: 0x44/0x49 by account type). Cracking X exactly belongs with the quest system.
-- ~~Bag beyond slot 1~~ — DONE (rows wired, see above); bag capacity still fixed at the starter 24 (track upgrades when bags become acquirable).
+### UPDATE 2026-06-12 — beach FullChar now CONSTRUCTED FROM SCRATCH
+
+The post-load DB backpack snapshot and a from-scratch **beach** snapshot landed (see
+`docs/backpack-inventory-handoff.md`, memory `snapshot_tails_construction_scope`):
+
+- **The "prefix" is decoded and built from scratch** (`BeachSnapshotPrefix`). The 8 bytes are
+  `[u32 X][varint root-length][trailing 0x81 0x06]`, NOT `[u32 X][u8 Y]` — the old "Y session-varying" byte
+  was actually the first byte of a **root-length varint** at prefix offset 4 (= const `4483` + rootLength) that
+  the client uses to delimit the protobuf root from the trailing subclass (tails). Regenerating the root (a
+  different length) requires adjusting that varint or the client misframes (`ReadSubClass Wrong IIR_t version`);
+  `AdjustSnapshotPrefixRootLength` (burst path) / `BeachSnapshotPrefix.Build` (from-scratch) handle it. The
+  leading `[u32 X]` (Strie's `00 00 00 02`) is still the **quest count** per the evidence above — pinned to the
+  template value for now; generate it with the quest system. (NB: `BeachSnapshotPrefix` currently labels it
+  "base version 2"; treat as X=quest-count pending the quest wiring.)
+- **The tails are built from scratch for beach** (`BeachTailsBuilder` + server-owned `BeachTailsTemplate.bin`):
+  level/vitals generated, instance re-addressed, the rest a content template. The `UnknownBefore` progression
+  block was DECODED — a sequence of `[u32 field-block][length-prefixed <remoteformat> XML]` records; for beach
+  it's byte-identical across characters EXCEPT the instance (proven), so the only per-character tails data is
+  {level, vitals, instance}. Default on (`FAOLAN_SCRATCH_BEACH_SNAPSHOT=0` to disable). Other maps still carry
+  the burst prefix/tails + delta-adjust.
+- Bag **moves/drops/splits persist** now (`EquipmentPersistence.cs`).
+
+Remaining: **progressed-character** tails (the `UnknownBefore` block grows to 100s of KB of feat/spell/quest
+records — generate from server-side progression when those systems exist); bag capacity upgrades; the quest-count
+`X` once quests are real.
 
 ## Remaining (optional)
 

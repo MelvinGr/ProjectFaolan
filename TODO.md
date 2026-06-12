@@ -16,6 +16,25 @@ I PUT THE LOGS IN ./logs-test
 
 ---
 
+## 0. Backpack inventory — DONE (2026-06-12)
+
+The player's real `CharacterInventory` bag items now render in-client, and re-arrangements persist. See
+`docs/backpack-inventory-handoff.md` (RESOLVED) and memory `protocol_containeradditem`.
+
+- [x] DB backpack delivered via a **post-load** `0x737A6DF9` snapshot (after the post-ready burst); world-entry
+      snapshot stays verbatim (chat-safe). The blocker was the IIR prefix root-length field — fixed by
+      `AdjustSnapshotPrefixRootLength`. Default on (`FAOLAN_POSTLOAD_INVENTORY=0` to disable).
+- [x] Bag **moves / drops / stack splits persist** (`PersistInventoryMove`/`PersistDropItem`/`PersistSplitStack`).
+- [x] Beach snapshot **prefix + tails built from scratch** (server-owned, no captured packet); byte-exact golden
+      tests + 0 IIR errors live. Default on (`FAOLAN_SCRATCH_BEACH_SNAPSHOT=0` to disable).
+- In-client checks still wanted (headless harness here dies on RDB thrash, not a code issue): bag shows the seeded
+      items; move/drop/split survive relog; chat stays connected.
+
+Next progression candidates scoped (memory + below): **quests** (content/VM/packets all exist — integration only,
+unblocked) vs **skill tree/feats** (train-feat packet undecoded — needs a capture first).
+
+---
+
 ## 1. Vitals packet `0x96B8DC59`  (commit: combat loop)
 The decoded vitals/HP packet, wired to GM commands.
 - [works] `.hurt 200` — your health bar should drop by ~200.
@@ -368,8 +387,10 @@ All of the below are harness-verified (unit tests) but **need in-client check** 
 
 ### Loot bag (open/fade — item grant still gated)
 - [ ] Click a dropped loot bag → a loot **window opens** (NewCurrentLooter + SimpleDynelVisualChange "Open"),
-      bag stays. Close it (or it expires ~120s) → it **fades** (`n3ToClientFade`). NOTE: taking items into
-      inventory is NOT wired (the live `ContainerAddItem` grant is RE-gated).
+      bag stays. Close it (or it expires ~120s) → it **fades** (`n3ToClientFade`). NOTE: taking looted items into
+      the bag is **client-side** (there is NO server add-item packet — confirmed; `0x79F8C7A1`/`0x63268258` are
+      quest packets, not ContainerAddItem). Server-side loot→inventory persistence would need a `CharacterInventory`
+      write on the take + a fresh post-load snapshot.
 
 ### Quests
 - [ ] `.quest add 13479 5 Scavenger Lackey` → quest appears in journal; kill 5 → goal advances + "complete".

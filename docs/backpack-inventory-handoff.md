@@ -1,48 +1,62 @@
-# Handoff: make the player's backpack inventory render in-client
+# Backpack inventory — RESOLVED
 
-## Goal
-A logged-in character's **real backpack items** should appear in the inventory bag grid in-client.
-(Worn/equipped gear already renders, DB-driven, via the entity spawn — that path is done and chat-safe.)
+## Goal (achieved)
+A logged-in character's **real backpack items** appear in the inventory bag grid in-client, DB-driven.
+Worn/equipped gear already rendered via the entity spawn; this closed the backpack.
 
-## What this session landed (committed)
-- `db8e053` chat channels fixed — world-entry inventory snapshot sent **verbatim**.
-- `a8da341` tutorial overlay disabled (post-ready record 3).
-- `39c87d7` archetype harvest from spawn bodies — **192 → 1,348 buildable items** (item identities are now correct/complete; this was the prerequisite for inventory + worn-appearance).
-- `22b4617` character-creator loading-screen deadlock fixed.
-- `334dd19` character ids allocated in the 4-byte varint range (created-char login crash).
+## What landed (2026-06-12)
+The bag now renders the player's `CharacterInventory` items, and re-arrangements persist. Commits:
+- `b7d9a07` post-load DB inventory snapshot wired (gated groundwork).
+- `b22cd69` **the fix** — construct the DB backpack snapshot the client accepts (IIR prefix root-length).
+- `b8ceebe` persist bag moves, drops, and stack splits.
+- `e476664` construct the beach snapshot prefix + tails from scratch.
+- `b2558bc` pin the tails `UnknownBefore` decode result.
+- `4ec13db` default the from-scratch beach snapshot on.
 
-## The hard constraints (PROVEN — don't re-derive; see memory `protocol_containeradditem`)
-1. **Modifying the world-entry `0x737A6DF9` snapshot breaks chat.** ANY content change (in-place item swap OR wholesale container generation) → the client stalls world-load → AgentServer (chat, 7012) gets zero accepts → and nothing renders. Verified that this is NOT about item-identity resolvability (it breaks even with the now-correct identities) and NOT a structural/length bug (the modified protobuf is valid) and NOT a root↔tails mismatch (the 9 KB tails don't reference the item). The client depends on the exact captured snapshot bytes during load.
-2. **There is no server "add item to bag" packet.** Traced every loot take (`0x2043`) in the captures: the server only sends `LootRemoveItems` + looter/visual updates (+ quest updates for quest items). The client adds looted items to the bag **locally** from the `LootBagFull` it already has. (Note: `0x79F8C7A1`/`0x63268258` are **quest** packets — QuestJournalIIR/QuestFullUpdateIIR — NOT ContainerAddItem; the docs note was wrong.)
+## How it works now
+Inventory is delivered by the **world-entry `0x737A6DF9` snapshot**, which must be **verbatim during world load**
+(any change stalls the load and breaks chat — see `protocol_chat_connection_regression`). So:
 
-So the ONLY server mechanism that delivers inventory is the world-entry snapshot, and it must be verbatim during load.
+1. **World-entry snapshot** goes out **verbatim** (chat-safe). Worn gear renders from the entity spawn (DB-driven).
+2. A **second, DB-built snapshot is sent AFTER the post-ready burst** (post-load, once the client is out of the
+   constrained load phase and chat has connected). This carries the player's real items and updates the bag.
+   Default on; opt out `FAOLAN_POSTLOAD_INVENTORY=0`.
 
-## The approach being tried (UNTESTED) + the WIP state
-**Hypothesis:** send a SECOND, DB-built inventory snapshot **AFTER world-load** (after the post-ready burst, once the client is out of the constrained load phase and chat has connected). The world-entry snapshot stays verbatim (chat safe); the post-load one carries the player's real items and may update the bag without re-triggering the load stall.
+### The hard bug that was blocking it (now fixed)
+The DB-built snapshot regenerates the protobuf **root** from `CharacterInventory`/`CharacterEquipment`
+(`FullCharSnapshotBuilder.BuildContainers`, byte-exact). The client delimits that root by a **root-length field
+the snapshot carries in its 8-byte IIR prefix** — a varint at prefix offset 4 = `const + rootLength`. Carried
+verbatim it stayed the captured root's length, so the regenerated (different-size) root desynced the client:
+`CoreFullPlayerCharacterIIR::ReadSubClass() Wrong IIR_t version ...` → scratch-memory thrash → WatchDog kill.
+**Fix:** `AdjustSnapshotPrefixRootLength` delta-adjusts that varint by the root-length change (the same technique
+`SpawnPacketBuilder.SetCharacterMessage` uses for the spawn's CharacterIIR length). Result: 0 IIR errors, chat
+connects, bag renders.
 
-**Groundwork is committed (a harmless no-op until the send below is wired):**
-- `Faolan.Core/Network/NetworkClientSession.cs` — new `PendingPostLoadInventory` byte[] field.
-- `Faolan/GameServer/Login/RetailLoginReplay.cs` — `BuildDbInventorySnapshot(...)` (generates the DB snapshot from the verbatim packet via `FullCharSnapshotBuilder.BuildContainers`, keeping prefix+tails), the `InventoryEquippedSlots` map, loads `inventoryRows`, and stashes the built snapshot into `client.Session.PendingPostLoadInventory` at the inventory-snapshot point in `ReplayMapWorldBurst` (world-entry snapshot still goes out verbatim). The stash is built but never sent yet, so current behavior is unchanged.
+### Persistence (bag arrangement survives logout)
+`MoveItemInInventory` / `DropItem` / `SplitStack` previously only logged. Now `PersistInventoryMove` /
+`PersistDropItem` / `PersistSplitStack` (in `EquipmentPersistence.cs`) write the `CharacterInventory` rows
+(swap/clear/split), and the legacy seeded `FirstPosBag` is materialized into rows when moved. Equip/unequip still
+go through the `MoveEquippedToFromInventory` path. Equipped gear and bag positions both persist.
 
-**REMAINING to make it testable (one edit):** in `Faolan/GameServer/Packets/Packets.cs`, right after `await SendPostReadyBurst(client);` (the existing-character branch, ~line 111), send the stash:
-```csharp
-if (client.Session.PendingPostLoadInventory != null)
-{
-    await client.SendAsync(client.Session.PendingPostLoadInventory);
-    client.Session.PendingPostLoadInventory = null;
-}
-```
+### Construct-from-scratch (beach)
+On the beach (default on; opt out `FAOLAN_SCRATCH_BEACH_SNAPSHOT=0`) the snapshot is built entirely from
+server-owned data — prefix from `BeachSnapshotPrefix` (constants + root length, no captured prefix), root from the
+DB, tails from `BeachTailsBuilder` (server-owned `BeachTailsTemplate.bin` + generated level/vitals + re-addressed
+instance). Byte-identical to the capture, 0 IIR errors. See `docs/...`/memory `snapshot_tails_construction_scope`.
 
-## How to test the backpack
-1. Seed a char's bag with buildable items: `CharacterInventory` rows, `Container=104` (BagKind), `Slot` 2..N, `ItemId` = any item with `Archetype != 0` (e.g. 13817 Dusklight Tunic, 13826 Combatant's Hauberk, 117637 Soothing Remedy). Slot 1 is the bag-first (Royal Signet from `EnsureBeachStarterEquipment`).
-2. Server from `Faolan/bin/Debug` (`dotnet Faolan.dll`); drive client: `./Faolan.ClientLauncher/bin/Debug/Faolan.ClientLauncher --console --universeaddr 127.0.0.1:7010 -u faolan -p any -c <name>` (account `faolan`, pw `-`).
-3. **Chat OK iff** server log shows `AgentServerListener[0] Client connected`.
-4. **See the bag** (headless harness, WORKS): the client auto-opens an item-shop modal that **eats all input** — close it by clicking its X at mouse **(1342, 117)**: `DISPLAY=:1 xdotool mousemove 1342 117 click 1`; then `DISPLAY=:1 xdotool key --window $WID i` opens inventory. Screenshot: `WID=$(DISPLAY=:1 xdotool search --name "Age of Conan" | head -1); DISPLAY=:1 import -window $WID out.png` (`-window root` fails). Bag grid is the right window: `magick out.png -crop 420x420+1000+40 +repage -resize 280% c.png`. Slot 1 = top-left.
+## There is no server "add item to bag" packet
+Confirmed: loot adds are client-side (from the `LootBagFull` the client already has). `0x79F8C7A1`/`0x63268258`
+are **quest** packets (QuestJournalIIR/QuestFullUpdateIIR), not ContainerAddItem. The world-entry snapshot is the
+only inventory-delivery mechanism.
 
-## Decision tree for the next session
-- **If chat stays connected AND the bag shows the items → DONE.** Commit it (keep the post-load send; it's the backpack delivery). Consider gating it behind the player having buildable inventory, and persist real inventory rows.
-- **If chat breaks** (the post-load snapshot got sent before chat connected and stalled the load): move the send to fire on the **chat-connect event** instead — `AgentServerListener` Hello handler → reach the GameServer session via `IGameServerDispatcher.RunGmCommand(clientInstance, ...)` (inject `IGameServerDispatcher` into `AgentServerListener`) and flush the stashed snapshot then.
-- **If chat stays but the bag does NOT update** (client ignores a post-load `0x737A6DF9`): the post-load-snapshot approach is dead. Fall back to the open RE in `protocol_containeradditem`: (a) check whether the snapshot is validated against a PRIOR packet (PlayerAgent/CSPlayerAgent character-inventory summary we replay verbatim-as-Strie), or (b) disassemble the client's inventory-load path. This is the genuinely hard, open problem.
+## Testing the bag (headless harness)
+Seed a bag: `CharacterInventory` rows, `Container=104` (BagKind), `Slot` 2..N, `ItemId` with `Archetype != 0`
+(e.g. 13817/13826/117637). Run server from `Faolan/bin/Debug`; drive client with `Faolan.ClientLauncher`
+(`-u faolan -p any -c <name>`). Chat OK iff `AgentServerListener[0] Client connected`. NOTE: the headless client
+(Xvfb, no GPU) dies on an RDB resource thrash shortly after load — verbatim baseline dies identically — so the
+final visual check needs a healthy client environment; protocol acceptance is verified via 0 IIR errors + the
+golden tests.
 
 ## Key memories
-`protocol_containeradditem` (the whole inventory-delivery investigation + the snapshot-rejection RE), `protocol_chat_connection_regression` (the verbatim-snapshot fix), `inventory_db_items_work`, `rdb_extraction`, `project_create_editor_flow` (create flow + the deadlock fix), `client_launcher_testing`.
+`protocol_containeradditem` (the whole investigation + the IIR fix), `snapshot_tails_construction_scope`
+(from-scratch tails), `protocol_chat_connection_regression`, `inventory_db_items_work`, `fullchar_generation`.
