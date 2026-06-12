@@ -562,11 +562,18 @@ Concrete next steps, grouped by area. See `docs/` for the dissection writeups be
       `RegenerateMaxStats()`, refills + raises live vitals, and pushes `Level`/`Exp`/`MaxExp` + vitals via
       `0x96B8DC59`. Real per-NPC kill XP isn't in the data (Archive `npcs.getExp` only 4 rows), so XP is
       level-scaled (`CombatResolver.ResolveKillXp`).
-- [ ] **Verify the `0x96B8DC59` vitals packet in-client** (test live with `.vitals` / `.setstat`), then wire
-      `SendVitals(client)` into the world-entry sequence so vitals show on login.
+- [~] **Vitals on login**: server-generated vitals (`BuildVitals`) are now emitted in the world-entry sequence
+      after the player spawns in the burst (`RetailLoginReplay.cs:578`), so the bars are populated from the live
+      character's `CharacterMaxStats` on login. Remaining (in-client/RE-gated): visual confirmation that the bars
+      render correctly (test live with `.vitals` / `.setstat`).
 - [ ] Confirm **ApplySpell (`0x6B87E316`) magnitude** sign/scale, and whether damage is carried in the cast or
       only in the following vitals update. (Combat loop is implemented in `Faolan/GameServer/Combat/`:
       `CastSpell` → ApplySpell + damage + `0x96B8DC59` vitals update; damage formula is provisional.)
+      **Blocked on a combat capture**: the gameplay captures contain ONLY self-cast buffs (one spell id, `3737143`
+      = `0x00390637`, at body offset +13; no target HP change), so there is no clean ApplySpell→vitals damage pair
+      to pin sign/scale against. The 80-byte "effect" body carries a `0x0190` (400) value at offset +36 that does
+      not move health (buff). Needs a capture where an ApplySpell visibly drops a *target's* HP. The doc's
+      `0x2710`/`0x02BC`/`0x03E8` magnitudes are from a different (unavailable) capture.
 - [x] **Combat death/XP/loot + NPC fight-back + player death/respawn** (2026-06-11, `docs/server-architecture-roadmap.md`):
       the death/despawn packet (`n3ToClientQuit` 0x04B82B2D) and fade (`n3ToClientFade` 0x66180B20) are decoded;
       NPC death → despawn + XP + level-up + loot-bag drop; NPCs aggro + swing back (vitals hit) on the tick; a
@@ -578,8 +585,11 @@ Concrete next steps, grouped by area. See `docs/` for the dissection writeups be
       via `NpcSpawnBuilder` at the player's position, `SpawnMountForPlayer`) so the horse appears. Remaining (in-client
       gated): the player actually RIDING — the MountedRun (`MovingType 0x010A`) movement transition is the client's
       part once it binds the summoned mount.
-- [ ] Fix the wrong stat ids in `CapturedCharacterStats.cs`: `MaxHealth 0x01` (decodes to ~196, not max),
-      `MaxStamina 0x1F9` / `MaxMana 0x1FB` (suspect); find the real max-* ids or confirm max==current-when-full.
+- [x] **Fixed the wrong stat ids in `CapturedCharacterStats.cs`**: the vitals current/max labels were swapped on
+      all three. Corrected to `HealthCurrent 0x01` / `HealthMax 0x1B`, `StaminaMax 0x1F8` / `StaminaCurrent 0x1F9`,
+      `ManaMax 0x1FA` / `ManaCurrent 0x1FB` — verified across 90 capture records (the `current <= max` invariant
+      holds 100%; the larger-valued id of each pair is the max). Matches the `001B`/`01F8`/`01FA` example in
+      `docs/quests-and-combat.md`.
 - [ ] Determine whether **attributes** (Str/Int/Con/Wis/Dex) are sent at all or computed client-side from
       gear/buffs (their sheet values don't appear as plain stat records).
 - [~] The high-volume combat entity-update sub-ops are now **named** (RE, `docs/aoc-opcode-ids.md`):
@@ -622,7 +632,14 @@ Concrete next steps, grouped by area. See `docs/` for the dissection writeups be
 - [~] **Full DB snapshot incl. tails** — root containers generated, live level/vitals/XP patched into the
       tails; remaining: from-scratch quest-XML/access-window tails + the `[u32 X][u8 Y]` prefix (X = quest
       counter, best fit — belongs with the quest system).
-- [ ] **NPCs from the DB** (session-handle identity) instead of verbatim burst spawns.
+- [~] **NPCs from the DB** instead of verbatim burst spawns — DB-built bodies are now the DEFAULT on the wire
+      (`RetailLoginReplay.cs`, the `wasIdentical` gate removed): every NPC matched to an `NpcSpawns` row renders
+      from that row (transform columns + re-encoded CharacterIIR via `NpcSpawnBuilder`), and the verbatim burst
+      body is dropped. The burst handle is kept so the spawn stays paired with the burst's `0x96C46740` MoveTask
+      registration. Remaining: (1) **server-owned session-handle identity** — allocate fresh handles and remap
+      them burst-wide (MoveTask/registration), so the server owns NPC identity instead of inheriting the capture's;
+      (2) cross-session rows still carry the source session's instance refs in the row's captured pre-IIR/scaffold
+      blocks (lift those columns, `docs/spawn-dissection-plan.md` Phase 4); (3) in-client render confirmation.
 
 ### Mail / auction / trade-post (`docs/capture-events.md`)
 - [ ] Implement the **`0x2002 category=629`** token remoteformats (`TradePostGUI_*`) — the mail/auction/

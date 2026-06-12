@@ -532,15 +532,16 @@ namespace Faolan.GameServer
 				else if (TryRebuildNpcSpawnFromDb(client, npcByPosition, pkt, out var npcRebuilt, out var wasIdentical))
 				{
 					npcBuilt++;
-					// Only put the table-built body on the wire when it is byte-identical to the (re-addressed) burst
-					// body - that proves the NpcSpawns row reconstructs this exact NPC with zero render risk. A
-					// cross-session row differs (different handle/scaffold/instance refs baked in); driving those is
-					// the next, in-client-verified step, so they keep the verbatim burst body for now.
+					// DB-built NPC bodies are now the DEFAULT on the wire - the verbatim burst body is dropped and each
+					// NPC renders from its NpcSpawns row (transform columns + re-encoded CharacterIIR). The burst handle
+					// is kept (TryRebuildNpcSpawnFromDb builds with it) so the spawn stays paired with the burst's
+					// 96C46740 MoveTask registration. wasIdentical still tracks how many rebuild byte-identical to the
+					// capture (the proven-exact subset) for the log; cross-session rows differ (the row's captured
+					// pre-IIR/scaffold blocks carry the source session's instance refs) - this is the from-DB render
+					// path that supersedes the verbatim burst.
+					pkt = npcRebuilt;
 					if (wasIdentical)
-					{
-						pkt = npcRebuilt;
 						npcIdentical++;
-					}
 				}
 				else if (TryRebuildWorldObjectFromDb(objectByPosition, pkt, out var objRebuilt, out var objIdentical))
 				{
@@ -567,8 +568,8 @@ namespace Faolan.GameServer
 			InjectBuiltTestNpc(client, npcRows, spawnTemplate, moveTaskTemplate, toSend);
 
 			if (npcByPosition.Count > 0)
-				Logger.LogInformation("NPC spawns for map {Map}: {Identical}/{Built} table-built spawns put on the wire byte-identical (the rest kept verbatim, cross-session), {Rows} rows available.", burst.MapId, npcIdentical,
-					npcBuilt, npcByPosition.Count);
+				Logger.LogInformation("NPC spawns for map {Map}: {Built} table-built spawns put on the wire (DB-driven, replacing the verbatim burst), {Identical} of them byte-identical to the capture; {Rows} rows available.", burst.MapId,
+					npcBuilt, npcIdentical, npcByPosition.Count);
 			if (objectByPosition.Count > 0)
 				Logger.LogInformation("World objects for map {Map}: {Identical}/{Built} table-built objects put on the wire byte-identical, {Rows} rows available.", burst.MapId, objectIdentical, objectBuilt,
 					objectByPosition.Count);
