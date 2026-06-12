@@ -565,6 +565,9 @@ namespace Faolan.GameServer
 					// 0x00, 0x00, 0x00, 0x1C, // 28 (target stack size)
 					// 0x00, 0x00, 0x00, 0x04  // target Slot
 
+					// Persist the split so both stacks survive logout (bag container; the packet carries no kind).
+					await PersistSplitStack(client, (int)sourceSlot, (int)targetSlot, targetStackSize);
+
 					break;
 				}
 

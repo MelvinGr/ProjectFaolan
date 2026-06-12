@@ -433,6 +433,9 @@ namespace Faolan.GameServer
 
 					await LogToClient($"DropItem: {move}");
 
+					// Remove the dropped item from the persisted bag so it doesn't reappear on relog.
+					await PersistDropItem(client, move);
+
 					break;
 				}
 
@@ -451,6 +454,10 @@ namespace Faolan.GameServer
 					var move = packet.Body.ReadProtobufByteLength<MoveItemInInventoryArgs>();
 
 					await LogToClient($"MoveItemInInventory: {move}");
+
+					// Persist the new slot positions so the player's bag arrangement survives logout (the world-entry
+					// snapshot rebuilds the bag from these CharacterInventory rows). No server->client packet follows.
+					await PersistInventoryMove(client, move);
 
 					break;
 				}

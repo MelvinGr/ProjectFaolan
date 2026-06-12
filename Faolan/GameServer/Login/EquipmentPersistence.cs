@@ -5,6 +5,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.GameServer.Packets.FullCharSnapshot;
+using Faolan.GameServer.Packets.Protobuf;
 using Microsoft.Extensions.Logging;
 
 // ReSharper disable once CheckNamespace
@@ -97,6 +98,154 @@ namespace Faolan.GameServer
 			catch (Exception ex)
 			{
 				Logger.LogWarning(ex, "Failed to persist unequip from {Slot}.", fromSlot);
+			}
+		}
+
+		// Persists a within-inventory item move (MoveItemInInventory / ProtoMoveInventoryItemIIR) so bag slot
+		// positions survive logout - the world-entry snapshot rebuilds the bag from these CharacterInventory rows
+		// (FullCharSnapshotBuilder.BuildContainers), so without this the client's re-arrangement reverts on relog.
+		// Handles the non-equipped grid containers (bag 104 / resource 112 / quest 113); equip/unequip moves go
+		// through MoveEquippedToFromInventory (PersistEquip/PersistUnequip). Swaps when the destination cell is
+		// occupied; a move onto an empty cell clears the source. The legacy seeded FirstPosBag (a CharacterEquipment
+		// nav that auto-renders at bag slot 1) is materialized into rows the moment it is moved or displaced, so it
+		// stops re-appearing at slot 1.
+		private async Task PersistInventoryMove(INetworkClient client, MoveItemInInventoryArgs move)
+		{
+			var character = client.Session.Character;
+			if (character == null || move?.SourceContainerId == null || move.DestinationContainerId == null)
+				return;
+
+			var sKind = (int)move.SourceContainerId.Type;
+			var dKind = (int)move.DestinationContainerId.Type;
+			var sPos = (int)move.SourceItemPos;
+			var dPos = (int)move.DestinationItemPos;
+
+			const int equipped = (int)FullCharSnapshotBuilder.EquippedKind;
+			if (sKind == equipped || dKind == equipped)
+				return; // equip/unequip is persisted via the MoveEquippedToFromInventory path
+
+			try
+			{
+				const int bag = (int)FullCharSnapshotBuilder.BagKind;
+				const int firstBagPos = 1; // FullCharSnapshotBuilder.BagFirstPos - the legacy FirstPosBag cell
+
+				var rows = await Database.GetCharacterInventory(character.Id);
+				var equipment = await Database.GetCharacterEquipment(character.Id);
+
+				// Resolve the DB item id + count at a (kind, pos), counting the legacy FirstPosBag at bag slot 1.
+				(uint? Id, uint Count, bool IsFirstBag) Resolve(int kind, int pos)
+				{
+					var row = rows.FirstOrDefault(r => r.Container == kind && r.Slot == pos);
+					if (row?.ItemId != null)
+						return (row.ItemId, row.Count, false);
+					if (kind == bag && pos == firstBagPos && equipment?.FirstPosBag != null)
+						return (equipment.FirstPosBag.Id, 1, true);
+
+					return (null, 1, false);
+				}
+
+				var (srcId, srcCount, srcIsFirst) = Resolve(sKind, sPos);
+				if (srcId == null)
+				{
+					Logger.LogInformation("Inventory move not persisted: no DB item at {Kind}[{Pos}] (captured-only or empty).", sKind, sPos);
+					return;
+				}
+
+				var (dstId, dstCount, dstIsFirst) = Resolve(dKind, dPos);
+
+				// Materialize the legacy FirstPosBag into real rows when it is the moved item or the displaced one,
+				// so it no longer auto-renders at slot 1 and the new positions stick.
+				if ((srcIsFirst || dstIsFirst) && equipment != null)
+				{
+					equipment.FirstPosBag = null;
+					await Database.SaveCharacterEquipment(equipment);
+				}
+
+				// Apply: item -> destination; the destination's previous occupant (if any) -> source (swap). A null
+				// dstId means the destination was empty, which clears the source row.
+				await Database.SetCharacterInventorySlot(character.Id, dKind, dPos, srcId, srcCount);
+				await Database.SetCharacterInventorySlot(character.Id, sKind, sPos, dstId, dstCount);
+
+				Logger.LogInformation("Persisted MOVE: item {Src} {SKind}[{SPos}] -> {DKind}[{DPos}]{Swap} for character {CharacterId}.", srcId, sKind, sPos, dKind, dPos, dstId.HasValue
+					? $" (swap with {dstId})"
+					: string.Empty, character.Id);
+			}
+			catch (Exception ex)
+			{
+				Logger.LogWarning(ex, "Failed to persist inventory move {SKind}[{SPos}] -> {DKind}[{DPos}].", sKind, sPos, dKind, dPos);
+			}
+		}
+
+		// Persists an item drop (DropItem - the client sends only the source side of MoveItemInInventoryArgs) by
+		// clearing the source cell, so the dropped item does not reappear in the bag on relog. (Whether a ground
+		// loot bag spawns is a separate world-sim concern; this only removes it from the player's persisted bag.)
+		private async Task PersistDropItem(INetworkClient client, MoveItemInInventoryArgs move)
+		{
+			var character = client.Session.Character;
+			if (character == null || move?.SourceContainerId == null)
+				return;
+
+			var kind = (int)move.SourceContainerId.Type;
+			var pos = (int)move.SourceItemPos;
+			if (kind == (int)FullCharSnapshotBuilder.EquippedKind)
+				return; // equipped items are unequipped, not dropped, through this path
+
+			try
+			{
+				const int bag = (int)FullCharSnapshotBuilder.BagKind;
+				const int firstBagPos = 1; // FullCharSnapshotBuilder.BagFirstPos
+
+				// Dropping the legacy seeded FirstPosBag (no row backs it) clears the equipment nav instead.
+				if (kind == bag && pos == firstBagPos)
+				{
+					var equipment = await Database.GetCharacterEquipment(character.Id);
+					var rows = await Database.GetCharacterInventory(character.Id);
+					if (equipment?.FirstPosBag != null && rows.All(r => !(r.Container == bag && r.Slot == firstBagPos)))
+					{
+						equipment.FirstPosBag = null;
+						await Database.SaveCharacterEquipment(equipment);
+						Logger.LogInformation("Persisted DROP: FirstPosBag (bag[{Pos}]) for character {CharacterId}.", pos, character.Id);
+						return;
+					}
+				}
+
+				await Database.SetCharacterInventorySlot(character.Id, kind, pos, null);
+				Logger.LogInformation("Persisted DROP: {Kind}[{Pos}] for character {CharacterId}.", kind, pos, character.Id);
+			}
+			catch (Exception ex)
+			{
+				Logger.LogWarning(ex, "Failed to persist drop {Kind}[{Pos}].", kind, pos);
+			}
+		}
+
+		// Persists a stack split (SplitStack): the bag stack at `sourceSlot` is reduced by `splitSize` and a new
+		// stack of `splitSize` is placed at `targetSlot`. Bag container only (the packet carries no container id;
+		// stackable items live in the bag). A no-op when the source isn't a splittable stack (count <= splitSize).
+		private async Task PersistSplitStack(INetworkClient client, int sourceSlot, int targetSlot, uint splitSize)
+		{
+			var character = client.Session.Character;
+			if (character == null || splitSize == 0)
+				return;
+
+			try
+			{
+				const int bag = (int)FullCharSnapshotBuilder.BagKind;
+				var rows = await Database.GetCharacterInventory(character.Id);
+				var src = rows.FirstOrDefault(r => r.Container == bag && r.Slot == sourceSlot);
+				if (src?.ItemId == null || src.Count <= splitSize)
+				{
+					Logger.LogInformation("Split not persisted: bag[{Slot}] is not a splittable stack (count <= split size).", sourceSlot);
+					return;
+				}
+
+				await Database.SetCharacterInventorySlot(character.Id, bag, sourceSlot, src.ItemId, src.Count - splitSize);
+				await Database.SetCharacterInventorySlot(character.Id, bag, targetSlot, src.ItemId, splitSize);
+				Logger.LogInformation("Persisted SPLIT: bag[{Src}] {Total} -> bag[{Src}] {Remaining} + bag[{Dst}] {Split} for character {CharacterId}.", sourceSlot, src.Count, src.Count - splitSize, targetSlot, splitSize,
+					character.Id);
+			}
+			catch (Exception ex)
+			{
+				Logger.LogWarning(ex, "Failed to persist stack split bag[{Src}] -> bag[{Dst}].", sourceSlot, targetSlot);
 			}
 		}
 
