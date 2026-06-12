@@ -76,7 +76,16 @@ namespace Faolan.Core.Network
 			_sendLock.Wait();
 			try
 			{
-				Socket.Send(value, SocketFlags.None);
+				// Socket.Send can write FEWER bytes than requested when the send buffer is full; loop until the
+				// whole frame is on the wire (see SendAsync for the bug this fixes).
+				var sent = 0;
+				while (sent < value.Length)
+				{
+					var n = Socket.Send(value, sent, value.Length - sent, SocketFlags.None);
+					if (n <= 0)
+						throw new SocketException((int)SocketError.ConnectionReset);
+					sent += n;
+				}
 			}
 			finally
 			{
@@ -94,7 +103,19 @@ namespace Faolan.Core.Network
 			await _sendLock.WaitAsync(cancellationToken);
 			try
 			{
-				await Socket.SendAsync(value, SocketFlags.None, cancellationToken);
+				// Socket.SendAsync can complete having written FEWER bytes than requested (send buffer full); the
+				// old code discarded the count, silently truncating large frames mid-stream. The client's framer
+				// then consumed the FOLLOWING packets as the truncated frame's remainder and misparsed everything
+				// after ("Wrong IIR_t version <garbage>" on the 10 KB post-load inventory snapshot, which goes out
+				// right behind the multi-hundred-KB world burst - isolated 2026-06-12). Loop until fully sent.
+				var sent = 0;
+				while (sent < value.Length)
+				{
+					var n = await Socket.SendAsync(value.AsMemory(sent), SocketFlags.None, cancellationToken);
+					if (n <= 0)
+						throw new SocketException((int)SocketError.ConnectionReset);
+					sent += n;
+				}
 			}
 			finally
 			{
