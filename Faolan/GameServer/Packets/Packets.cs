@@ -110,23 +110,6 @@ namespace Faolan.GameServer
 				// Then the post-ready world-state/quest record stream (verbatim from the Strie login capture).
 				await SendPostReadyBurst(client);
 
-				// Wallet sync: retail does NOT push a 0x2005 at login (the initial balance presumably rides the
-				// FullChar snapshot, location undecoded) - this is our interim so a moneyed character doesn't
-				// show 0 until the first change. Reason 0 = a plain sync, not a gain celebration. In-client
-				// verification pending; remove if the client double-counts once the snapshot field is found.
-				if (client.Session.Character.Money > 0)
-					await SendMoneyUpdate(client, client.Session.Character.Money, MoneyUpdateReason.Spend);
-
-				// Guilded character: set the in-world guild tag (0x2550C99A). Retail sends this once on guild
-				// JOIN; for logins the tag normally rides in the spawn data, which our DB spawn does not carry
-				// yet, so re-assert it here - the client applies it the same way.
-				if (client.Session.Character.GuildId is uint guildId)
-				{
-					var guild = await Database.GetGuild(guildId);
-					if (guild != null)
-						await client.SendAsync(BuildGuildTag(client, client.Session.Account.ClientInstance, guild.Name));
-				}
-
 				// Post-load backpack delivery: the world-entry inventory snapshot (0x737A6DF9) went out VERBATIM
 				// (chat-safe). The DB-built snapshot carrying the player's real items was stashed during the burst;
 				// send it now, after the post-ready burst, when the client is out of the constrained world-load
@@ -147,6 +130,28 @@ namespace Faolan.GameServer
 					await client.SendAsync(client.Session.PendingPostLoadInventory);
 				}
 				client.Session.PendingPostLoadInventory = null;
+
+				// Wallet sync: retail does NOT push a 0x2005 at login (the initial balance presumably rides the
+				// FullChar snapshot, location undecoded) - this is our interim so a moneyed character doesn't
+				// show 0 until the first change. Reason 0 = a plain sync, not a gain celebration.
+				// ORDER MATTERS: this MUST come AFTER the post-load snapshot. A 0x2005 sent between the post-ready
+				// burst and the snapshot makes the client REJECT the snapshot ("CoreFullPlayerCharacterIIR::
+				// ReadSubClass() Wrong IIR_t version", construct fails) - isolated 2026-06-12 by diffing a working
+				// vs failing session: identical snapshot bytes, the only delta was this push firing (Money > 0)
+				// before the snapshot. Mechanism undecoded; the ordering constraint is the empirical fact.
+				if (client.Session.Character.Money > 0)
+					await SendMoneyUpdate(client, client.Session.Character.Money, MoneyUpdateReason.Spend);
+
+				// Guilded character: set the in-world guild tag (0x2550C99A). Retail sends this once on guild
+				// JOIN; for logins the tag normally rides in the spawn data, which our DB spawn does not carry
+				// yet, so re-assert it here - the client applies it the same way. (After the snapshot, like the
+				// wallet sync - keep the burst -> snapshot gap clean.)
+				if (client.Session.Character.GuildId is uint guildId)
+				{
+					var guild = await Database.GetGuild(guildId);
+					if (guild != null)
+						await client.SendAsync(BuildGuildTag(client, client.Session.Account.ClientInstance, guild.Name));
+				}
 			}
 
 			if (client.Session.Character?.Name == null)
