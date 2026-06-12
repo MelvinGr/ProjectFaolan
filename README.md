@@ -527,7 +527,7 @@ and DH-login work). The full plan + findings: **`docs/archive/opcode-re-plan.md`
 - **16-bit RpcHeader opcodes** (`0x2052`, `0x2008`, ...) are framework-assigned method indices, **not** hashes -
   not yet mapped (would need Ghidra; deprioritized since the IIR channel is the bulk and is decoded).
 - Tooling (reproducible from the exe): `Captures/extract_rpc_catalog.py`, `decode_opcode_ids.py`,
-  `reverse_hash_ids.py`, `decode_scryscript.py`.
+  `reverse_hash_ids.py`, `decode_scryscript.py`, `decode_tradepost.py` (auction-house/mail RPC).
 
 ## Roadmap / current focus
 
@@ -540,7 +540,9 @@ level/vitals/XP patched into the tails); **equip/unequip/inventory moves persist
 relogin; NPC **dialogue** works (coverage-bound); ~177 items buildable. A **live world simulation** now runs on
 top (per-zone model + 10 Hz tick + interest management): NPC death→despawn/XP/level/loot, NPC aggro + fight-back,
 player death→respawn at the closest known resurrection point, a quest-state engine with kill-objective tracking,
-and cross-player spawn/move/despawn broadcast (see `docs/archive/server-architecture-roadmap.md`). Remaining: the pinned
+and cross-player spawn/move/despawn broadcast (see `docs/archive/server-architecture-roadmap.md`). The **auction
+house ("Tradepost") + mail** protocol is now decoded byte-exact and the open/search replies are wired +
+golden-tested — pinned awaiting an in-client render check (`docs/tradepost-protocol.md`). Remaining: the pinned
 **RDB Lua quest/dialogue VM** (branching content), NPC **movement** (MoveTask grammar), the live loot item-grant,
 NPCs reconstructed from the DB (vs verbatim burst spawns), and mounts.
 
@@ -654,12 +656,26 @@ Concrete next steps, grouped by area. See `docs/` for the dissection writeups be
       experiment above; (2) **server-owned session-handle identity** — allocate fresh handles and remap them
       burst-wide (MoveTask/registration), so the server owns NPC identity instead of inheriting the capture's.
 
-### Mail / auction / trade-post (`docs/capture-events.md`)
-- [ ] Implement the **`0x2002 category=629`** token remoteformats (`TradePostGUI_*`) — the mail/auction/
-      trade-post UI protocol. It's plaintext `remoteformat` XML (token/category/`<parameter>` all human-readable,
-      no name-hashing — confirmed via reverse-hash, see opcode-re-plan #2), but **blocked on captures**: only
-      ONE token (`TradePostGUI_MailItemBought`) appears across all captures; the listing/buy/sell flow needs a
-      fresh capture before it can be built.
+### Auction house ("Tradepost") + mail (`docs/tradepost-protocol.md`) — ⛔ PINNED, awaiting in-client test
+The AH is AoC's **Tradepost**, carried on the GameServer RPC layer (not a separate connection). The full wire
+protocol is **decoded byte-exact** from the necrol80/assassinl23 captures (`Captures/decode_tradepost.py`); the
+open + search replies are **wired and golden-tested**, pending an in-client render check. See `TODO.md` §9a.
+- [x] **Protocol decoded** (`docs/tradepost-protocol.md`): the RPC envelope (receiver/sender `ProtoEndpoint`s +
+      `0x20xx` method, which COLLIDES across classes so it's routed by class id), the method map (Open `0x2011` /
+      ItemSearch `0x200D` / Buy `0x200E` / Close `0x2010` + mail ops; S→C OpenTradepost `0x2000` / SearchResults
+      `0x2005` / MailMessage `0x2002`), the search **query** layout, the **result rows**
+      (`[head][saleId][handle][seller][price][qty][itemId][ProtoAcgItem]`, sorted by price), and the **buy→mail**
+      delivery (`DispatchMailMessage`: recipient = buyer, sender = EMPTY system mail, body = remoteformat
+      `TradePostGUI_MailItemBought` with the item attachment). Both rows and the mail attachment reuse the same
+      `ProtoAcgItem` our inventory/spawn builders emit.
+- [x] **Routing + decode-logging** (`Faolan/GameServer/Tradepost/TradepostHandler`): inbound tradepost RPC is
+      routed by class id (`TradepostProtocol.IsInbound`) and each method logged.
+- [x] **Open + search replies wired** (`TradepostResponses`, golden-tested vs the captures): `DispatchOpenTradepost`
+      (auctioneer access point, triggered by the auctioneer interaction — the `.ah` GM command supplies the
+      player's position for now) and a PoC `DispatchTradepostSearchResults` replay so the listing grid renders.
+- [ ] **In-client check (pinned):** `.ah` → does the AH window open + show the replayed listing? Then Step 3:
+      DB-backed listings (`TradepostListing` + the existing `ProtoAcgItem` builder) and the `Mail`/`MailAttachment`
+      model + buy→mail escrow/grant. NPC vendor/shop (`GameCharAgent` `OpenShop`/`Buy`/`Sell`) is queued after.
 
 ### Cleanup
 - [x] **Fix the malformed `OverrideGameTweaks` packet** — DONE (40d4bc0; de-magicked into the named

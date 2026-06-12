@@ -1,5 +1,11 @@
 # Tradepost (auction house) + mail protocol
 
+> **STATUS (2026-06-12): ⛔ PINNED — awaiting an in-client render check.** The protocol below is decoded
+> byte-exact and the open + search replies are wired + golden-tested (`Faolan/GameServer/Tradepost/`,
+> `TradepostResponseTests`). What's unverified is whether the client actually renders the AH window/listings —
+> test with the `.ah` GM command (sends `DispatchOpenTradepost` at the player's position). Once it renders,
+> proceed to Step 3 (DB-backed listings + the `Mail`/`MailAttachment` model + buy→mail). See `TODO.md` §9a.
+
 Decoded 2026-06-12 from two captures via `Captures/decode_tradepost.py`:
 - `account-faolan-character-necrol80-...-sell_items_to_trader-intract-with-auctionhouse` (browse/search)
 - `account-faolan-character-assassinl23-...-buy_from_autionhouse_get_mail-...` (buy + mail delivery)
