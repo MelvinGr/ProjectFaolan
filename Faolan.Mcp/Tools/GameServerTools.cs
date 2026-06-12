@@ -51,15 +51,15 @@ namespace Faolan.Mcp.Tools
 
 		[McpServerTool(Name = "spawn_npc"),
 		 Description(
-			 "Spawn a captured NPC by exact name at a connected character's position (convenience wrapper over the .spawn GM command). The NPC renders for nearby players and is killable/hostile per its captured row. Discover names via get_map_npc_spawns. MUTATING: set confirm=true to actually spawn.")]
+			 "Spawn a captured NPC by name (case-insensitive) at a connected character's position (convenience wrapper over the .spawnnpc GM command). The NPC renders for nearby players and is killable/hostile per its captured row. Discover names via get_map_npc_spawns. MUTATING: set confirm=true to actually spawn.")]
 		public async Task<string> SpawnNpc([Description("Character id of a currently-connected player (see list_world_sessions)")] uint characterId,
-			[Description("Exact NPC name as captured (e.g. \"Crocodile\"); see get_map_npc_spawns for names")] string npcName,
+			[Description("NPC name as captured, case-insensitive (e.g. \"Crocodile\"); see get_map_npc_spawns for names")] string npcName,
 			[Description("Must be true to execute.")] bool confirm = false)
 		{
 			if (!confirm)
 				return $"Would spawn NPC '{npcName}' at character {characterId}'s position. Call again with confirm=true to execute.";
 
-			var ok = await _dispatcher.RunGmCommand(characterId, $".spawn {npcName}");
+			var ok = await _dispatcher.RunGmCommand(characterId, $".spawnnpc {npcName}");
 			return ok
 				? $"Ran spawn of '{npcName}' at character {characterId}'s position (the in-game system-message reply states whether a matching captured NPC row was found)."
 				: $"Character {characterId} is not currently connected to any GameServer listener.";

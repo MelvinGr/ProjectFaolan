@@ -686,14 +686,15 @@ namespace Faolan.Core.Database
 
 		// The captured static world objects for a map (decor/containers/zones). The world-entry path builds each
 		// object's body from its row via WorldObjectBuilder, like the NPC spawns.
-		// A captured NPC spawn by name, any map (used to fetch a mount-entity template like "Fading Black Horse" to
-		// spawn at the player). Prefers a row that has spawn Data.
+		// A captured NPC spawn by name (case-insensitive), any map (used by .spawnnpc and to fetch a mount-entity
+		// template like "Fading Black Horse" to spawn at the player). Prefers a row that has spawn Data.
 		public async Task<NpcSpawn> GetNpcSpawnByName(string name)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var lowered = name.ToLowerInvariant();
 			return await ctx
 				.NpcSpawns
-				.Where(n => n.Name == name && n.Data != null)
+				.Where(n => n.Name != null && n.Name.ToLower() == lowered && n.Data != null)
 				.FirstOrDefaultAsync();
 		}
 
