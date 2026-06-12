@@ -44,12 +44,19 @@ prior diagnoses are in `docs/archive/todo-history.md`.
       UNKNOWN-0x00000011 and nothing happens. CAPTURE-GATED: Melvin records a retail unarmed-combat session
       (unequip in-session, attack-mode enter/leave, unarmed swings to a kill, re-equip); then decode → 
       dissector → server ack → golden test.
-- [ ] **Equipment window shows the template's gear, not the player's**: the doll is client-authoritative,
-      fed ONLY by the world-entry snapshot (the combat capture shows NO server-side doll refresh - equips are
-      just acked) - and that snapshot's containers are verbatim-captured (Strie's Marlin Spike at pos 6) under
-      the hard chat-gate constraint (BuildBeachInventoryPacket header). The post-load DB snapshot updates the
-      backpack but evidently not the doll. Candidate fix: re-test world-entry container substitution now that
-      the ContentMirror serves resources (the original stall was resource-thrash) - env-gated experiment.
+- [x] **Equipment window + bag now show the player's DB items** (2026-06-12, commit 20f2cc1): the world-entry
+      snapshot carries DB containers (default ON, FAOLAN_WORLDENTRY_DB_CONTAINERS=0 opts out) - the old
+      chat-gate constraint was the dead retail CDN, lifted by the ContentMirror. In-client verified incl.
+      equip-from-bag + persistence. En route: Socket partial-write truncation fixed (24fbed6); post-load
+      second-snapshot delivery retired (client rejects/ignores re-constructs - FAOLAN_POSTLOAD_INVENTORY=1
+      re-enables for experiments).
+- [ ] **Bag-poison items**: an item only ever captured WORN (never in an inventory container) renders the
+      WHOLE bag empty when placed in CharacterInventory (repro: 13826 Combatant's Hauberk; client shows
+      VisualMeshLoader 1010001 misses). Likely missing local bag/icon resources. Detect/exclude such items in
+      .additem + add_item, or solve the resource gap (mirror pre-seed / template decode).
+- [ ] **Mid-session item delivery does not exist**: a second 0x737A6DF9 is rejected/ignored by the client, so
+      .additem/add_item items appear on the NEXT LOGIN only. Find retail's live-add mechanism (if any) or
+      surface the relog requirement in the tools.
 - [x] **Equip/unequip persistence + acks** (2026-06-12, commit 226b16f): 0x09 grammar decoded from capture
       (TypeId = window pair incl. live 41842/41843, Mode = action counter, tail = [src][dest][item][item][0][flags]);
       both pairs persisted + retail's ack (identity quad / null filler) + 0x201C entry (0x65/destSlot, 0x68/0).
