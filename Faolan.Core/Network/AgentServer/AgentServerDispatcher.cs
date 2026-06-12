@@ -67,5 +67,13 @@ namespace Faolan.Core.Network.AgentServer
 
 			return 0;
 		}
+
+		public async Task<bool> SendClaudeWhisper(uint targetCharacterId, string message)
+		{
+			if (_provider != null)
+				return await _provider.SendClaudeWhisper(targetCharacterId, message);
+
+			return false;
+		}
 	}
 }

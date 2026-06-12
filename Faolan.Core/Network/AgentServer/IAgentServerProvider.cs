@@ -21,5 +21,11 @@ namespace Faolan.Core.Network.AgentServer
 		///     broadcast to every connected client. Returns the number of clients it was delivered to.
 		/// </summary>
 		Task<int> SendClaudeChannelMessage(string message);
+
+		/// <summary>
+		///     Whispers (0x001E tell) a single character as the synthetic "Claude" sender. Returns false when the
+		///     character has no connected AgentServer client.
+		/// </summary>
+		Task<bool> SendClaudeWhisper(uint targetCharacterId, string message);
 	}
 }

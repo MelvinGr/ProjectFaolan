@@ -51,6 +51,28 @@ namespace Faolan.AgentServer
 			return Task.WhenAll(NetworkClients.Select(c => SendSystemMessage(c, message)));
 		}
 
+		// Whispers a single character as the synthetic Claude identity: the 0x0014 sender info + the 0x001E tell
+		// (the exact delivery shape of a player tell - see the whisper capture / WhisperTests). Logged on the
+		// Claude channel log so the bridge conversation history stays complete.
+		public async Task<bool> SendClaudeWhisper(uint targetCharacterId, string message)
+		{
+			var target = ClientForCharacter(targetCharacterId);
+			if (target == null)
+				return false;
+
+			await new FaolanStream()
+				.WriteUInt16(AgentServerRespondsOpcodes.Ox0014)
+				.WriteArrayUInt16Length(s => s
+					.WriteUInt32(ClaudeChannel.SenderId)
+					.WriteUInt32(0x00000000)
+					.WriteString(ClaudeChannel.SenderName))
+				.SendAsync(target);
+			await target.SendAsync(BuildWhisper(ClaudeChannel.SenderId, message));
+
+			_claudeChannel.Append(ClaudeChannel.SenderId, ClaudeChannel.SenderName, $"(whisper to {targetCharacterId:X8}) {message}", fromClaude: true);
+			return true;
+		}
+
 		// An incoming tell (0x001E): [u32 peerCharacterId][string][00 01 00] - the peer slot carries the SENDER's
 		// id on delivery (and the target's id in the client's request, same shape both ways). Byte-exact against
 		// the whisper capture (WhisperTests). The receiving client resolves the name from the preceding 0x0014.

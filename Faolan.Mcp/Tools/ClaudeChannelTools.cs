@@ -36,6 +36,18 @@ namespace Faolan.Mcp.Tools
 			return JsonSerializer.Serialize(messages, JsonOptions);
 		}
 
+		[McpServerTool(Name = "send_claude_whisper"),
+		 Description("Whisper (private tell) a single connected character as \"Claude\" - only they see it, unlike the channel broadcast. Use the sender's character id from the channel log / channel event meta.")]
+		public async Task<string> SendClaudeWhisper([Description("Character id of the connected player to whisper.")] uint characterId, [Description("The whisper text.")] string message)
+		{
+			if (string.IsNullOrWhiteSpace(message))
+				return "Message is empty; nothing sent.";
+
+			return await _dispatcher.SendClaudeWhisper(characterId, message)
+				? $"Whispered character {characterId}."
+				: $"Character {characterId} has no connected chat client; nothing sent.";
+		}
+
 		[McpServerTool(Name = "send_claude_channel_message"),
 		 Description("Post a chat message to the in-game Claude channel as \"Claude\". Delivered immediately to every connected client (all players are subscribed to the channel on login).")]
 		public async Task<string> SendClaudeChannelMessage([Description("The chat message to post.")] string message)

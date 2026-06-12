@@ -57,14 +57,16 @@ namespace Faolan.Mcp
 				},
 				ServerInstructions = "In-game Age of Conan chat from the Faolan server's \"Claude\" channel arrives as "
 				                     + "<channel source=\"faolan-chat\" sender=\"...\" sender_id=\"...\">. These are players talking to you "
-				                     + "in-game. Reply with the faolan-chat reply tool (plain text, chat-length). The same log is also "
-				                     + "readable via the faolan MCP server's read_claude_channel tool."
+				                     + "in-game. Reply with the faolan-chat reply tool (plain text, chat-length): pass the event's sender_id "
+				                     + "as whisper_to to answer that player PRIVATELY as a whisper (the default conversational mode), or "
+				                     + "omit it to broadcast on the channel to everyone. The same log is also readable via the faolan MCP "
+				                     + "server's read_claude_channel tool."
 			};
 			options.ToolCollection ??= [];
 			options.ToolCollection.Add(McpServerTool.Create(Reply, new McpServerToolCreateOptions
 			{
 				Name = "reply",
-				Description = "Post a reply to the in-game Claude chat channel (broadcast to all connected players as \"Claude\")."
+				Description = "Reply in-game as \"Claude\": pass whisper_to (the channel event's sender_id) for a private whisper to that player, omit it to broadcast on the Claude channel."
 			}));
 
 			await using var server = McpServer.Create(new StdioServerTransport("faolan-chat"), options);
@@ -85,25 +87,28 @@ namespace Faolan.Mcp
 			}
 		}
 
-		[Description("Post a reply to the in-game Claude chat channel (broadcast to all connected players as \"Claude\").")]
-		private static async Task<string> Reply([Description("The chat message to send in-game.")] string text)
+		[Description("Reply in-game as \"Claude\": a private whisper to one player (pass whisper_to = the channel event's sender_id) or a broadcast on the Claude channel (omit whisper_to).")]
+		private static async Task<string> Reply([Description("The chat message to send in-game.")] string text,
+			[Description("Character id to whisper privately (the sender_id from the channel event). Omit to broadcast on the channel.")] string whisper_to = null)
 		{
 			try
 			{
-				return await SendInGame(text);
+				return await SendInGame(text, whisper_to);
 			}
 			catch
 			{
 				// One reconnect attempt - the game server may have restarted under us.
 				_gameServer = null;
-				return await SendInGame(text);
+				return await SendInGame(text, whisper_to);
 			}
 		}
 
-		private static async Task<string> SendInGame(string text)
+		private static async Task<string> SendInGame(string text, string whisperTo)
 		{
 			var client = await GameServer(CancellationToken.None);
-			var result = await client.CallToolAsync("send_claude_channel_message", new Dictionary<string, object> { ["message"] = text });
+			var result = uint.TryParse(whisperTo, out var characterId)
+				? await client.CallToolAsync("send_claude_whisper", new Dictionary<string, object> { ["characterId"] = characterId, ["message"] = text })
+				: await client.CallToolAsync("send_claude_channel_message", new Dictionary<string, object> { ["message"] = text });
 			return ResultText(result) ?? "sent";
 		}
 
