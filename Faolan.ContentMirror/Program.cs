@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Text;
 using System.Xml.Linq;
+using Faolan.Core;
 
 // Faolan.ContentMirror - a store-and-forward mirror of Age of Conan's UPM content CDN.
 //
@@ -138,6 +139,8 @@ namespace Faolan.ContentMirror
 				mb = Interlocked.Read(ref bytes) / 1048576.0,
 				storeDir
 			}));
+
+			//app.MapGet("launchernotes2.php", () => Results.Ok(Statics.StartupBanner));
 
 			log.LogInformation("Faolan.ContentMirror on http://127.0.0.1:{Port}  store={Store}", port, storeDir);
 			log.LogInformation("Patch a client: dotnet run --project Faolan.ContentMirror -- --patch \"<AoC dir>\" --port {Port}", port);
