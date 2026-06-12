@@ -20,7 +20,7 @@ namespace Faolan.Core.Network.Conan
 	{
 		// GameServer object-class type ids (ProtoEndpoint.type, fixed32). Each id = BKDR-31 hash of the client's
 		// interface/agent class name (h = h*31 + c; == Java String.hashCode), cracked by RE'ing AgeOfConan.exe -
-		// see docs/opcode-re-plan.md + docs/aoc-opcode-ids.md. The C# constant names are kept for compatibility, but
+		// see docs/archive/opcode-re-plan.md + docs/aoc-opcode-ids.md. The C# constant names are kept for compatibility, but
 		// the REAL client class name is noted per line (our originals were guesses). "Agent" = client->server proxy
 		// side, "Interface" = server->client dispatch side.
 		public const uint GamePlayerType = 0x6C67C147; // = hash("GameInterface")

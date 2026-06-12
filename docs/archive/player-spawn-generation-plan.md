@@ -205,7 +205,7 @@ The same playbook applied to the FullChar/inventory snapshot:
 ### UPDATE 2026-06-12 — beach FullChar now CONSTRUCTED FROM SCRATCH
 
 The post-load DB backpack snapshot and a from-scratch **beach** snapshot landed (see
-`docs/backpack-inventory-handoff.md`, memory `snapshot_tails_construction_scope`):
+`docs/archive/backpack-inventory-handoff.md`, memory `snapshot_tails_construction_scope`):
 
 - **The "prefix" is decoded and built from scratch** (`BeachSnapshotPrefix`). The 8 bytes are
   `[u32 X][varint root-length][trailing 0x81 0x06]`, NOT `[u32 X][u8 Y]` — the old "Y session-varying" byte
@@ -238,4 +238,4 @@ records — generate from server-side progression when those systems exist); bag
   geared character would reuse it as-is.
 
 See [[world_entry_from_db]] for the surrounding burst/server-generation architecture and
-docs/spawn-dissection-plan.md for the wider (NPC/inventory/conversation) dissection history.
+docs/archive/spawn-dissection-plan.md for the wider (NPC/inventory/conversation) dissection history.

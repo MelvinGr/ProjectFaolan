@@ -15,7 +15,7 @@ namespace Faolan.Importer
 	// 16-byte content hash = the CDN path md5: <gameupdate>/upm/rdb/res/<h0:2>/<h2:1>/<h3:>. The blob is the same
 	// IOz1+zlib wrapper as local resources; the payload is XML <resurrectionpoint name discoverable><position x y z>.
 	// The record id is the playfield/map id. discoverable="false" => AlwaysKnown (the starter). See
-	// docs/rdb-extraction-plan.md. Replaces all RespawnPoints with the real per-map data for the maps we have.
+	// docs/archive/rdb-extraction-plan.md. Replaces all RespawnPoints with the real per-map data for the maps we have.
 	public static class RdbRespawnImporter
 	{
 		public const string DefaultCdnBase = "http://aoc-eu-gameupdate.live.ageofconan.com";

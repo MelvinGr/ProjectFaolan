@@ -8,7 +8,7 @@ namespace Faolan.Core.Database.Tables
 	//
 	// `Data` is the still-raw captured packet (interim). The structured columns are lifted from the body: the
 	// SubOpcode (the object CLASS), the transform (position + rotation), and the object message's id + name
-	// (docs/spawn-dissection-plan.md Phase 6). These share the FA015807 transform grammar but have NO pre-IIR
+	// (docs/archive/spawn-dissection-plan.md Phase 6). These share the FA015807 transform grammar but have NO pre-IIR
 	// block - the object message's length prefix follows the transform directly.
 	public class WorldObject : BaseEntity
 	{

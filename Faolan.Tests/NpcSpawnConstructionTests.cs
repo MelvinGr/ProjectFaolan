@@ -10,7 +10,7 @@ namespace Faolan.Tests
 {
 	// Proves the player-spawn construction machinery (SpawnPacketBuilder + PlayerSpawnReader) generalizes to NPC
 	// FA015807 bodies - the dissection finding that an NPC spawn is the byte-identical grammar as the player
-	// spawn (docs/spawn-dissection-plan.md Phase 4). These are the acceptance gates for building NPC spawns from
+	// spawn (docs/archive/spawn-dissection-plan.md Phase 4). These are the acceptance gates for building NPC spawns from
 	// structured data: the transform is reconstructed from typed pos/rot, and the CharacterIIR (the NPC's
 	// identity/appearance/stats/equipment) round-trips through the typed ProtoCoreCharacterIIR.
 	public class NpcSpawnConstructionTests

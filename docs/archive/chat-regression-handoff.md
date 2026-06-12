@@ -1,5 +1,9 @@
 # Handoff: fix the in-client chat-channels regression
 
+> ✅ **SOLVED (2026-06-12).** Root cause: the world-entry inventory snapshot substituted DB items the client
+> couldn't resolve, stalling world-load so it never dialed chat. Fix: send the snapshot's containers verbatim.
+> See memory `protocol_chat_connection_regression`. Kept here as the investigation record.
+
 Paste the block below into a fresh session to resume. Full prior investigation is in
 memory `protocol_chat_connection_regression` (and `TODO.md` → "Chat channels broken in-client").
 

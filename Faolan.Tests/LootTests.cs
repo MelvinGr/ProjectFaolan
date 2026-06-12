@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Loot on kill (docs/server-architecture-roadmap.md): a kill may drop a loot bag (a transient world object) at the
+	// Loot on kill (docs/archive/server-architecture-roadmap.md): a kill may drop a loot bag (a transient world object) at the
 	// death spot that expires off the tick.
 	public class LootTests
 	{

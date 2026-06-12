@@ -16,7 +16,7 @@ namespace Faolan.Importer
 	// character only ever WORE (never carried in a bag snapshot - e.g. Seadog's Shorts) buildable, so the spawn
 	// equipment renderer (PlayerSpawnEquipment, gated on Archetype != 0) can draw them. The quad + archetype are
 	// exactly what SnapshotItemBuilder / PlayerSpawnEquipment need. Merged result is embedded as
-	// Data/archive/captured-items.tsv and imported into the `Items` table. See docs/spawn-dissection-plan.md Phase 5.
+	// Data/archive/captured-items.tsv and imported into the `Items` table. See docs/archive/spawn-dissection-plan.md Phase 5.
 	public static class ArchetypeHarvester
 	{
 		private const uint InventorySubOpcode = 0x737A6DF9;

@@ -15,7 +15,7 @@ namespace Faolan.GameServer.World
 	public readonly record struct InterestEvent(WorldEntity Recipient, WorldEntity Subject, InterestEventType Type);
 
 	// Computes the spawn/move/despawn packets needed to keep each player's view of the world correct as entities move
-	// (interest management - docs/server-architecture-roadmap.md). Pure over the world model + each player's Known set;
+	// (interest management - docs/archive/server-architecture-roadmap.md). Pure over the world model + each player's Known set;
 	// the caller turns the returned events into wire packets. Range is a flat radius for now; a grid/cell scheme is the
 	// scaling step.
 	public static class InterestManager

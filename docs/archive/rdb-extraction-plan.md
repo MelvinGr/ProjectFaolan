@@ -8,9 +8,9 @@ exactly the data we keep failing to obtain from packet captures:
 
 | Open gap | RDB resource that would solve it |
 |----------|----------------------------------|
-| Buildable items only from player inventory snapshots (`docs/faolan-importer-plan.md`; vendor/AH don't help) | item/template definitions (the client-side `p_items` equivalent: names, stats, archetype, the `Data1..4` identity) |
+| Buildable items only from player inventory snapshots (`docs/archive/faolan-importer-plan.md`; vendor/AH don't help) | item/template definitions (the client-side `p_items` equivalent: names, stats, archetype, the `Data1..4` identity) |
 | NPC dialogue coverage-bound; Casilda's create-world text not capturable (`protocol_conversation_routing`) | conversation/dialogue + `remoteformat`/`localized` string tables (text by id) |
-| Combat uses a placeholder NPC max HP (`docs/quests-and-combat.md`) | NPC/creature definitions (stats incl. health) |
+| Combat uses a placeholder NPC max HP (`docs/archive/quests-and-combat.md`) | NPC/creature definitions (stats incl. health) |
 | Spells are id-only, names client-side (`CaptureSpellImporter`) | spell/ability definitions (names, params) |
 | Create-world intro fails on `invalid camera path "Kalanthes"` (`project_create_editor_flow`) | the Tortage cinematic / camera-path resources |
 | World bursts are literal replayed packets, not reconstructed from Maps/MapObjects | playfield / map / spawn-template data |

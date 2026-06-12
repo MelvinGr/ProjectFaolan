@@ -6,7 +6,7 @@
 > authoritative, ticking, in-memory world on top of the wire layer that already works.
 
 Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see also
-`world_packets_construct_not_replay`, `protocol_stats_and_combat`, `docs/chat.md`, `docs/quests-and-combat.md`.
+`world_packets_construct_not_replay`, `protocol_stats_and_combat`, `docs/chat.md`, `docs/archive/quests-and-combat.md`.
 
 > ## PROGRESS (2026-06-11) — the milestone-1 foundation is in (harness-verified; the in-client payoff is pending)
 > - **In-memory world model** ✓ `WorldEntity`/`Zone`/`WorldState`; players registered on entry, removed on
@@ -66,7 +66,7 @@ Written 2026-06-11. Grounds: the GameServer/AgentServer code as it stands; see a
 > - **Loot on kill** ✓ a kill may drop a loot bag (`LootResolver` coin-flip): a world object (`LootBagFullUpdateIIR_c`
 >   0xF096251E) built from a captured "Bag of loot" row at the death spot with a fresh handle, added to the zone +
 >   spawned for nearby players. The full open interaction is DECODED (`protocol_loot_interaction`,
->   `docs/quests-and-combat.md`) — it's a loot **window + click-to-take**, not auto-loot. The **window flow is wired**:
+>   `docs/archive/quests-and-combat.md`) — it's a loot **window + click-to-take**, not auto-loot. The **window flow is wired**:
 >   opening a bag (`Interact` action `0x12` `UseObject`) → `NewCurrentLooter` (0xD06568C8) + `SimpleDynelVisualChange`
 >   "Open" (0xE7F4F8F8) shows the contents and the bag STAYS; close (top-level `0x2044`) → fade (`n3ToClientFade`
 >   0x66180B20) + remove. Loot expiry fades too. All `WorldLoot` builders are byte-exact vs the capture. **Taking an
@@ -135,11 +135,11 @@ So today it behaves like **single-player instances stitched from captures**, not
 - AI states (idle/patrol/aggro/chase/leash/flee), threat tables, spawn points + respawn timers. Combat: real
   damage/mitigation, abilities/spells with cooldowns + resources, death → despawn + loot + XP + respawn. The
   vitals / ApplySpell / DamageResult packets exist; the missing part is the *logic on the tick*. (NB: the
-  NormalAttack BehaviorControlCenter FSM also needs the NPC's own counter-attack ack — see `docs/quests-and-combat.md`.)
+  NormalAttack BehaviorControlCenter FSM also needs the NPC's own counter-attack ack — see `docs/archive/quests-and-combat.md`.)
 
 ### 5. Progression + quests
 - XP / leveling (`CharacterMaxStats.CreateDefaults` is a stub). The quest/tag state machine — the **same Lua-VM**
-  effort dialogue branching needs (pinned in `protocol_conversation_routing` / `docs/rdb-extraction-plan.md`).
+  effort dialogue branching needs (pinned in `protocol_conversation_routing` / `docs/archive/rdb-extraction-plan.md`).
 
 ### 6. State/persistence discipline & scaling (later)
 - Cleanly split **transient world state** (positions, vitals, buffs — live in the zone model) from **persisted

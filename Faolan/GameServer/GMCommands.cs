@@ -228,7 +228,7 @@ namespace Faolan.GameServer
 		// .quest add|remove <id> | .quest list  - manage the player's quest journal. `add` records the quest +
 		// sends QuestIIR so it appears (the client renders the quest text from its RDB by id); `remove` drops it;
 		// `list` shows the player's active quests. Quest IDs are RDB quest ids (e.g. 13479). The full accept/branch
-		// logic is the pinned RDB Lua quest VM - this is the state foundation (docs/quests-and-combat.md).
+		// logic is the pinned RDB Lua quest VM - this is the state foundation (docs/archive/quests-and-combat.md).
 		private async Task QuestCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -291,7 +291,7 @@ namespace Faolan.GameServer
 		}
 
 		// .save  - flush the live world state to the DB. The WorldEntity is the source of truth for live transform
-		// (docs/server-architecture-roadmap.md) and movement is not otherwise persisted, so this snapshots every
+		// (docs/archive/server-architecture-roadmap.md) and movement is not otherwise persisted, so this snapshots every
 		// connected player's authoritative position/map back onto their persisted Character and saves it. (Extends to
 		// more live state - vitals, buffs, … - as those become persisted.)
 		private async Task SaveChanges(uint characterId)

@@ -16,7 +16,7 @@ namespace Faolan.Importer
 	// faolan.db); this tool is the one way to (re)populate it from `Captures/` - no embedded data blobs in the
 	// server. Imports (all upsert, no wipes): item identities + cast spell ids (inventory/ApplySpell), maps
 	// (MapChange), NPC conversations; and with --archive, the ability/spell definitions. Prints a before/after
-	// delta. NPCs are next. See docs/faolan-importer-plan.md.
+	// delta. NPCs are next. See docs/archive/faolan-importer-plan.md.
 	internal static class Program
 	{
 		private const string RepoRoot = "/home/melvin/Development/C#/Project Faolan";
@@ -182,7 +182,7 @@ namespace Faolan.Importer
 		// --rdb-items: decrypt the client RDB item-template for every item we have a key for (Item.Data1..4 =
 		// the item's ProtoDecryptionKey). Validates the decrypt end-to-end (RDB-Id header must match) and, with
 		// --dump-templates <dir>, writes each decrypted template for the field-layout reversing step. See
-		// docs/rdb-extraction-plan.md.
+		// docs/archive/rdb-extraction-plan.md.
 		private static async Task ImportRdbItems(DatabaseContext db, string rdbDir, string dumpDir)
 		{
 			var r = await RdbItemImporter.ImportAsync(db, rdbDir, dumpDir);

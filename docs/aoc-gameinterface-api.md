@@ -1,6 +1,6 @@
 # AoC client GUI API catalog (`GameInterface.*`) — Rosetta stone
 
-Stage 5 #7 of `docs/opcode-re-plan.md`. The client's UI is Lua, bound to C++ GUI modules whose names are RTTI/
+Stage 5 #7 of `docs/archive/opcode-re-plan.md`. The client's UI is Lua, bound to C++ GUI modules whose names are RTTI/
 registration strings in `AgeOfConan.exe`. This catalogs those modules so a server packet can be tied to "what UI
 the client drives with it" — a verification aid when building/validating packets.
 

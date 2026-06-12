@@ -4,7 +4,7 @@ namespace Faolan.Core.Database.Tables
 	// point; the entity handle is session-scoped. Imported from captures by Faolan.Importer (NpcSpawnExtractor).
 	//
 	// `Data` is the still-raw captured FA015807 body (interim, like the world burst). The structured columns
-	// below are LIFTED from its ProtoCoreCharacterIIR by the dissection (docs/spawn-dissection-plan.md Phase 4):
+	// below are LIFTED from its ProtoCoreCharacterIIR by the dissection (docs/archive/spawn-dissection-plan.md Phase 4):
 	// transform (position + rotation) and the NPC identity/appearance (TemplateId/Race/Sex/Level/...). They make
 	// the identity first-class so the server can build the spawn from data; `Data` shrinks once the pre-IIR
 	// float block + post-IIR scaffold are also lifted into scaffold rows (the same blocks the player spawn keeps).

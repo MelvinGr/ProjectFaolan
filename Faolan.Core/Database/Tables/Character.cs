@@ -23,7 +23,7 @@ namespace Faolan.Core.Database.Tables
 
 		// The spawn's IIR scaffold, structured so it can be generated instead of template-copied: the uniform
 		// entry table (Attributes), the feat/ability ID list (Skills), the two ending pair lists (ScaffoldPairs)
-		// and the raw pre-IIR frame + scalars (SpawnFrame). See docs/player-spawn-generation-plan.md.
+		// and the raw pre-IIR frame + scalars (SpawnFrame). See docs/archive/player-spawn-generation-plan.md.
 		public virtual ICollection<CharacterAttribute> Attributes { get; set; }
 
 		// The appearance resources chosen in the create editor (hair/beard mesh, hair/eye/skin color, tattoos,
@@ -31,7 +31,7 @@ namespace Faolan.Core.Database.Tables
 		public virtual ICollection<CharacterBodyResource> BodyResources { get; set; }
 
 		// Non-worn carried items (bag/backpack/quest/resources); worn items are in Equipment. Drives the FullChar
-		// inventory snapshot. See [[CharacterInventory]] / docs/player-spawn-generation-plan.md.
+		// inventory snapshot. See [[CharacterInventory]] / docs/archive/player-spawn-generation-plan.md.
 		public virtual ICollection<CharacterInventory> Inventory { get; set; }
 		public virtual ICollection<CharacterScaffoldPair> ScaffoldPairs { get; set; }
 		public virtual ICollection<CharacterSkill> Skills { get; set; }

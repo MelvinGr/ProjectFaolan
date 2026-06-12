@@ -5,7 +5,7 @@ namespace Faolan.Core.Database.Tables
 	// A quest a character has in progress or completed (one row per character+quest). The quest DEFINITION (title /
 	// description / journal text) lives in the client RDB and is rendered by id (the server only sends quest ids +
 	// state via QuestIIR/QuestGoal/QuestFullUpdate); we just persist which quests a character has and their state +
-	// objective progress. The full accept/branch logic is the pinned RDB Lua quest VM (docs/quests-and-combat.md).
+	// objective progress. The full accept/branch logic is the pinned RDB Lua quest VM (docs/archive/quests-and-combat.md).
 	public class CharacterQuest : BaseEntity
 	{
 		[ForeignKey(nameof(CharacterId))]

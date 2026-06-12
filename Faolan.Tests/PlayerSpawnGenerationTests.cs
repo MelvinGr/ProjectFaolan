@@ -17,7 +17,7 @@ namespace Faolan.Tests
 	// spawn's identity/stats/equipment is built from a typed object populated from the character. The scaffold
 	// frame around it is covered by PlayerSpawnScaffoldCodecTests/RowsTests. The Strie bytes used here are a
 	// golden test oracle only (SpawnStrieTemplate.bin) - the server embeds no captured spawn. See
-	// docs/player-spawn-generation-plan.md.
+	// docs/archive/player-spawn-generation-plan.md.
 	public class PlayerSpawnGenerationTests
 	{
 		[Fact]

@@ -9,7 +9,7 @@ namespace Faolan.GameServer.Spawn
 	// (without it the client never polls 0x2020 for the entity). The full form carries a multi-segment patrol
 	// path; the MINIMAL stationary form - confirmed constant across 58 captured instances - is just the entity's
 	// position, which is all a non-patrolling NPC needs and is constructible from data we already have. NOTE: the
-	// MoveTask floats are BIG-ENDIAN, unlike the spawn transform's little-endian (docs/spawn-dissection-plan.md).
+	// MoveTask floats are BIG-ENDIAN, unlike the spawn transform's little-endian (docs/archive/spawn-dissection-plan.md).
 	//
 	//   [u32 bodyLen=27][u32 0x96C46740][u32 ack=0xC350][u32 handle][00 00][vec3 pos (3x BE f32)][06]
 	public static class MoveTaskBuilder
@@ -20,7 +20,7 @@ namespace Faolan.GameServer.Spawn
 
 		// Builds the canonical single-segment PATROL MoveTask (task type 0x04, the waypoint-list form). This is
 		// what a moving NPC needs: a current position plus a list of waypoints it walks between at `speed`. The
-		// grammar (docs/spawn-dissection-plan.md, dissect_movetask.py) for this dominant form is:
+		// grammar (docs/archive/spawn-dissection-plan.md, dissect_movetask.py) for this dominant form is:
 		//   [00 00][curPos vec3 BE]
 		//   04 01 00 02 01 01 00 00 00 00          segment-list + move-block header (flag bytes constant here)
 		//   [count u8][count x waypoint vec3 BE]    the patrol path

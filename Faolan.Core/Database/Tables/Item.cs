@@ -8,7 +8,7 @@ namespace Faolan.Core.Database.Tables
 	// known template (the add/remove stall). Sourced from the old C++ server's `p_items` (Archive/) AND harvested
 	// from real captured inventories (every item a player has held). Archetype (snapshot tail.f8) is a per-template
 	// hash NOT in p_items - only captures have it - so an item is fully buildable iff Archetype != 0 and it has a
-	// Data quad. See docs/spawn-dissection-plan.md Phase 5.
+	// Data quad. See docs/archive/spawn-dissection-plan.md Phase 5.
 	public class Item : BaseEntity
 	{
 		public byte Level { get; set; }

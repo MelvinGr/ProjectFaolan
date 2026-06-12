@@ -10,7 +10,7 @@ namespace Faolan.Importer
 {
 	// Reads the Age of Conan client Resource DataBase. The offset index is `le.idx` (magic IBDR, version 5 for
 	// AoC / 7 for TSW); the bulk data is in `NN.rdbdata`. Each entry maps a (type, id) to a (file, offset, size);
-	// the entry data is wrapped `IOz1` + uncompressedSize(4) + a zlib stream. Format: docs/rdb-extraction-plan.md.
+	// the entry data is wrapped `IOz1` + uncompressedSize(4) + a zlib stream. Format: docs/archive/rdb-extraction-plan.md.
 	// Validated end-to-end against a real client (TextStrings 1030002 -> TDC2 strings).
 	public sealed class RdbReader : IDisposable
 	{

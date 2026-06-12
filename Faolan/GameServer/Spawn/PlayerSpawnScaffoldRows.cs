@@ -11,7 +11,7 @@ namespace Faolan.GameServer.Spawn
 	// transient session state and are deliberately not stored - a buffed captured spawn extracts to the same rows
 	// as its unbuffed form. Fresh characters get the fresh-character defaults below (extracted from the Dikketest
 	// create capture - a just-created character at world entry; the same role Strie's template played, but with a
-	// genuinely fresh scaffold). See docs/player-spawn-generation-plan.md "VALIDATED GRAMMAR".
+	// genuinely fresh scaffold). See docs/archive/player-spawn-generation-plan.md "VALIDATED GRAMMAR".
 	public static class PlayerSpawnScaffoldRows
 	{
 		private const uint FreshCloserValue = 0x0000012C;

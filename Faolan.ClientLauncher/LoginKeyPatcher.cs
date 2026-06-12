@@ -5,7 +5,7 @@ using Microsoft.Win32.SafeHandles;
 namespace Faolan.ClientLauncher
 {
 	// In-launcher port of tools/patch_aoc_login_key.py: overwrite the client's embedded Funcom DH pubkey with
-	// CELLAO_PUB in memory so the server can validate the real password (see docs/login-decryption-plan.md). The
+	// CELLAO_PUB in memory so the server can validate the real password (see docs/archive/login-decryption-plan.md). The
 	// client maps its PE MAP_PRIVATE, so a /proc/<pid>/mem write copies-on-write and changes only the live process;
 	// the game file on disk is untouched. Needs ptrace permission for the target - works as root, and often as the
 	// launching ancestor under the default yama ptrace_scope.

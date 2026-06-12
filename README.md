@@ -7,7 +7,7 @@ The solution contains:
 - `Faolan/` - the server implementation (UniverseAgent, PlayerAgent, CsPlayerAgent, AgentServer, GameServer)
 - `Faolan.Core/` - shared data, networking, enums, crypto, and database code
 - `Faolan.PacketAnalyzer/` - packet capture dump/analyzer tooling (pcapng -> JSON)
-- `Faolan.Importer/` - CLI that (re)builds the DB from the captures + client RDB (pcap -> DB); see `docs/faolan-importer-plan.md`
+- `Faolan.Importer/` - CLI that (re)builds the DB from the captures + client RDB (pcap -> DB); see `docs/archive/faolan-importer-plan.md`
 - `Faolan.ClientLauncher/` - launches the retail client unattended (patcher stand-in; auto-login; see `docs/client-launcher.md`)
 - `Faolan.Wireshark/` - a Wireshark/tshark C plugin that inflates GameServer zlib streams
 - `Faolan.Tests/` - the unit/golden test suite (byte-exact round-trips are the acceptance gates)
@@ -63,7 +63,7 @@ live ORM context.
 **migrates the schema** (`DatabaseMigrator`) and reads — it carries no embedded game data and does not seed.
 
 Game data is (re)built from the raw sources by the **`Faolan.Importer`** tool (see
-`docs/faolan-importer-plan.md`): it reads the `Captures/` (pcapng / their json dumps / .bin) and upserts the
+`docs/archive/faolan-importer-plan.md`): it reads the `Captures/` (pcapng / their json dumps / .bin) and upserts the
 extracted data straight into the DB. It imports: **item identities** from inventory snapshots
 (`CaptureItemImporter` + `ArchetypeHarvester`: template id + `Data1..4` quad + archetype → `Items`,
 ~**388 items / 191 buildable**); **NPC conversations** (`ConversationExtractor` → `ConversationNode`/
@@ -164,7 +164,7 @@ magic const). This mirrors retail, where the whole create session uses a single 
      each = the editor value ÷ 2), the chosen resources (hair/beard mesh, hair/eye/skin color, tattoos,
      scars - the scaffold's weighted entries, resolved via the imported `MorphTarget` registry) and the
      morph sliders (zigzag-decoded editor values; spawn float = value/1000). See
-     `docs/player-spawn-generation-plan.md`.
+     `docs/archive/player-spawn-generation-plan.md`.
 
 The flow lives in `Faolan/GameServer/Retail*Burst.cs` (sender methods), the handshake logic in
 `Faolan/GameServer/CreateWorldHandshake.cs`, and the `0xA36D3B74` handler in
@@ -328,7 +328,7 @@ the embedded resource was retired). What we do to each burst packet:
   `CharacterBody`) and the whole scaffold frame (`PlayerSpawnScaffoldCodec`/`Rows`: weighted appearance
   entries from `CharacterBodyResource` × the `MorphTarget` registry, morph-slider entries from
   `CharacterBody`, feat-ID list, pair lists - byte-exact against all 37 captured player spawns). Rotation
-  is kept verbatim (DB rotation rebuild stalled the client). See `docs/player-spawn-generation-plan.md`.
+  is kept verbatim (DB rotation rebuild stalled the client). See `docs/archive/player-spawn-generation-plan.md`.
 - **Inventory (FullChar `0x737A6DF9`) GENERATED from the DB** (`Packets/0x737A6DF9_Test/`): the snapshot's
   protobuf root decodes as the recovered `ProtoFullCharacterIIR` (byte-exact round-trip on 37/39 captured
   snapshots) and its four containers (Equipped 101 / Bag 104 / Resource 112 / Quest 113) are built wholesale
@@ -349,7 +349,7 @@ sends (e.g. parsing/re-serializing the 9 KB inventory mid-loop, or PacketStream'
 the segmentation and the client misframes and hangs on the loading screen.** Pre-build every packet (instance
 rewrite, spawn rebuild, inventory rebuild) BEFORE the send loop, then send in a pure loop.
 
-This replaces the NPC-less hand-built path for beach logins. The end goal (see `docs/spawn-dissection-plan.md`)
+This replaces the NPC-less hand-built path for beach logins. The end goal (see `docs/archive/spawn-dissection-plan.md`)
 is to construct the whole world entry from the DB; in progress - done so far: position, name, handles,
 instance-generalization, the archive data import, and DB-driven inventory with equip/unequip persistence.
 
@@ -505,7 +505,7 @@ a freshly-created char rather than `ConanHimself` for retail-faithful instance b
 ## Client reverse-engineering (opcode / message names)
 
 The protocol's numeric ids were recovered by RE'ing the client `AgeOfConan.exe` (same exe as the `.proto` schema
-and DH-login work). The full plan + findings: **`docs/opcode-re-plan.md`**. Key results:
+and DH-login work). The full plan + findings: **`docs/archive/opcode-re-plan.md`**. Key results:
 
 - **The id hash is BKDR-31** (`h = 0; h = h*31 + c` over the ASCII class name, == Java `String.hashCode`).
   Cracked by brute-forcing known anchors (18/18). Two id systems use it:
@@ -531,7 +531,7 @@ and DH-login work). The full plan + findings: **`docs/opcode-re-plan.md`**. Key 
 
 ## Roadmap / current focus
 
-`docs/spawn-dissection-plan.md` + `docs/player-spawn-generation-plan.md` are the living plans for replacing
+`docs/archive/spawn-dissection-plan.md` + `docs/archive/player-spawn-generation-plan.md` are the living plans for replacing
 the verbatim replay with DB-driven world entry. Status: world + NPCs render for any captured map; the player's
 own **spawn is fully generated** from DB rows (identity, vitals, equipment, scaffold frame, and the complete
 editor **appearance**: morph sliders, chosen resources via the RDB `MorphTarget` registry, head/voice/size);
@@ -540,7 +540,7 @@ level/vitals/XP patched into the tails); **equip/unequip/inventory moves persist
 relogin; NPC **dialogue** works (coverage-bound); ~177 items buildable. A **live world simulation** now runs on
 top (per-zone model + 10 Hz tick + interest management): NPC death→despawn/XP/level/loot, NPC aggro + fight-back,
 player death→respawn at the closest known resurrection point, a quest-state engine with kill-objective tracking,
-and cross-player spawn/move/despawn broadcast (see `docs/server-architecture-roadmap.md`). Remaining: the pinned
+and cross-player spawn/move/despawn broadcast (see `docs/archive/server-architecture-roadmap.md`). Remaining: the pinned
 **RDB Lua quest/dialogue VM** (branching content), NPC **movement** (MoveTask grammar), the live loot item-grant,
 NPCs reconstructed from the DB (vs verbatim burst spawns), and mounts.
 
@@ -548,7 +548,7 @@ NPCs reconstructed from the DB (vs verbatim burst spawns), and mounts.
 
 Concrete next steps, grouped by area. See `docs/` for the dissection writeups behind each.
 
-### Stats & combat (`docs/player-stats.md`, `docs/quests-and-combat.md`)
+### Stats & combat (`docs/player-stats.md`, `docs/archive/quests-and-combat.md`)
 - [x] **Grant the starting ability kit on login**: the player is sent the universal starting abilities (the 8
       flagged `IsStartingAbility` - 3 Normal Attack directions + Toggle Combat / Switch Weapon / Rest / utility)
       via the retail **`0x2052`** packet, rebuilt DB-driven from the `Abilities` rows (`Slot` + identity quad).
@@ -574,7 +574,7 @@ Concrete next steps, grouped by area. See `docs/` for the dissection writeups be
       to pin sign/scale against. The 80-byte "effect" body carries a `0x0190` (400) value at offset +36 that does
       not move health (buff). Needs a capture where an ApplySpell visibly drops a *target's* HP. The doc's
       `0x2710`/`0x02BC`/`0x03E8` magnitudes are from a different (unavailable) capture.
-- [x] **Combat death/XP/loot + NPC fight-back + player death/respawn** (2026-06-11, `docs/server-architecture-roadmap.md`):
+- [x] **Combat death/XP/loot + NPC fight-back + player death/respawn** (2026-06-11, `docs/archive/server-architecture-roadmap.md`):
       the death/despawn packet (`n3ToClientQuit` 0x04B82B2D) and fade (`n3ToClientFade` 0x66180B20) are decoded;
       NPC death → despawn + XP + level-up + loot-bag drop; NPCs aggro + swing back (vitals hit) on the tick; a
       killed player respawns at the closest known resurrection point. Real **NPC max HP** now comes from the
@@ -589,7 +589,7 @@ Concrete next steps, grouped by area. See `docs/` for the dissection writeups be
       all three. Corrected to `HealthCurrent 0x01` / `HealthMax 0x1B`, `StaminaMax 0x1F8` / `StaminaCurrent 0x1F9`,
       `ManaMax 0x1FA` / `ManaCurrent 0x1FB` — verified across 90 capture records (the `current <= max` invariant
       holds 100%; the larger-valued id of each pair is the max). Matches the `001B`/`01F8`/`01FA` example in
-      `docs/quests-and-combat.md`.
+      `docs/archive/quests-and-combat.md`.
 - [ ] Determine whether **attributes** (Str/Int/Con/Wis/Dex) are sent at all or computed client-side from
       gear/buffs (their sheet values don't appear as plain stat records).
 - [~] The high-volume combat entity-update sub-ops are now **named** (RE, `docs/aoc-opcode-ids.md`):
@@ -610,7 +610,7 @@ Concrete next steps, grouped by area. See `docs/` for the dissection writeups be
 - [ ] Decode the NPC spawn's stable conversation/dialogue id (so handle→conversation survives across sessions,
       not just verbatim-replayed scenes).
 
-### Quests (`docs/quests-and-combat.md`, `protocol_quest_state`)
+### Quests (`docs/archive/quests-and-combat.md`, `protocol_quest_state`)
 - [x] **Quest state decoded + engine built** (2026-06-11): `QuestIIR` 0x97E02314 (add/update), `QuestGoal`
       0x0774C8C1 (objective progress), `QuestFullUpdate` 0x63268258 / `QuestJournal` 0x79F8C7A1 (questId +
       `remoteformat` text refs - the client renders text from its RDB by id). Built: `CharacterQuest` table +
@@ -619,9 +619,9 @@ Concrete next steps, grouped by area. See `docs/` for the dissection writeups be
 - [ ] **Quest CONTENT is the pinned RDB Lua quest VM** — accept-from-dialogue (the accept packet carries no
       quest id; the server grants from the quest-giver→quest definition), branching, reward/turn-in
       (`0xA36D3B74` QuestRewards). Needs a Lua interpreter + a player-tag system + TextStrings(TDC2) resolution
-      (`protocol_conversation_routing`, `docs/rdb-extraction-plan.md`).
+      (`protocol_conversation_routing`, `docs/archive/rdb-extraction-plan.md`).
 
-### World entry & rendering (`docs/spawn-dissection-plan.md`, `docs/player-spawn-generation-plan.md`)
+### World entry & rendering (`docs/archive/spawn-dissection-plan.md`, `docs/archive/player-spawn-generation-plan.md`)
 - [x] **Appearance** — fully cracked & generated (2026-06-10): morph sliders are zigzag-encoded editor
       values (spawn float = value/1000), the weighted entries are the chosen resources resolved via the
       client RDB customization registry (`MorphTarget`, wire tag = registry id − 1), and the IIR looks are
@@ -678,7 +678,7 @@ Concrete next steps, grouped by area. See `docs/` for the dissection writeups be
 - The repository still contains hardcoded/verbatim protocol payloads (the `Retail*Burst.cs` create-flow files),
   but the server embeds NO game/spawn data: game data, world bursts and the player-spawn scaffold all live in
   the committed `faolan.db` ((re)built from `Captures/` by `Faolan.Importer`; the player spawn is generated
-  from the character's rows - see docs/player-spawn-generation-plan.md). `spawn-player-template.bin` is gone;
+  from the character's rows - see docs/archive/player-spawn-generation-plan.md). `spawn-player-template.bin` is gone;
   `Captures/strie-login-worldburst.bin` remains only as a Faolan.Importer source file for the beach burst.
 - Generating EF migrations needs the design-time factory in `Faolan/Helpers/DatabaseContextDesignTimeFactory.cs`
   (the runtime `ConfigureFaolanDatabase` registration - now a pooled `DbContextFactory` - can't be used by

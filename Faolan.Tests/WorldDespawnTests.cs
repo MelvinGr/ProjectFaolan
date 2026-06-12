@@ -4,7 +4,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// The despawn packet (n3ToClientQuit 0x04B82B2D) and its playfield-token extraction
-	// (docs/server-architecture-roadmap.md, protocol_despawn_n3toclientquit). Body decoded from retail captures:
+	// (docs/archive/server-architecture-roadmap.md, protocol_despawn_n3toclientquit). Body decoded from retail captures:
 	// [04B82B2D][0000C350][handle][0x01 marker][u32 playfield token].
 	public class WorldDespawnTests
 	{

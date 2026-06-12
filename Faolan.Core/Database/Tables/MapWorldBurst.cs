@@ -23,7 +23,7 @@ namespace Faolan.Core.Database.Tables
 	// (RpcHeader + opcode marker, which carries the source endpoint + instance) is kept verbatim in Header, and the
 	// not-yet-dissected component payload in Body. IirRecordCodec.Rebuild reconstructs the exact original bytes
 	// (proven round-trip-lossless over all captured maps), so the proven byte-preserving replay path is unchanged.
-	// Field-level dissection (Body -> typed columns) proceeds per IIR type; see docs/spawn-dissection-plan.md.
+	// Field-level dissection (Body -> typed columns) proceeds per IIR type; see docs/archive/spawn-dissection-plan.md.
 	public class MapWorldBurstEntity : BaseEntity
 	{
 		[ForeignKey(nameof(MapWorldBurstId))]

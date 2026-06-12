@@ -652,7 +652,7 @@ namespace Faolan.GameServer
 
 		// Periodically flushes the live world state to the DB so a crash loses at most one interval. Persistence is
 		// otherwise event-driven (disconnect, teleport, .save) and needs no game loop; this is just a cheap timer
-		// (docs/server-architecture-roadmap.md). The simulation tick, when it lands, can absorb this.
+		// (docs/archive/server-architecture-roadmap.md). The simulation tick, when it lands, can absorb this.
 		private async Task AutoSaveLoop(CancellationToken cancellationToken)
 		{
 			using var timer = new PeriodicTimer(TimeSpan.FromMinutes(AutoSaveIntervalMinutes));

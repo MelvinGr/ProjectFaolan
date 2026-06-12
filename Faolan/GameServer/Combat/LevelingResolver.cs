@@ -1,6 +1,6 @@
 namespace Faolan.GameServer.Combat
 {
-	// Provisional levelling curve (docs/server-architecture-roadmap.md). Experience is treated as progress WITHIN the
+	// Provisional levelling curve (docs/archive/server-architecture-roadmap.md). Experience is treated as progress WITHIN the
 	// current level (the 0..MaxExp bar that resets on ding), not a running total. The real AoC curve isn't modelled
 	// yet (like the damage/XP values), so this is a simple linear ramp; pure + testable so the combat layer just feeds
 	// it the accumulated experience.

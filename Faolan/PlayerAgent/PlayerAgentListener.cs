@@ -141,7 +141,7 @@ namespace Faolan.PlayerAgent
 
 					// The PlayerInterface OverrideGameTweaks (0x1A07) payload: the server's "dynamic game tweaks" the client
 					// applies on login (ApplyDynamicGameTweaks: "Applying N gametweaks"). Reverse-engineered from the retail
-					// capture (logs-test/retail pkt#3) — see docs/opcode-re-plan.md item #2.
+					// capture (logs-test/retail pkt#3) — see docs/archive/opcode-re-plan.md item #2.
 					//
 					// Wire format of the `overrides` collection (raw stream, NOT protobuf):
 					//   [u32 header][ per tweak: [u16 nameLen][name ASCII][f64 value] ] *   — all multi-byte fields big-endian.

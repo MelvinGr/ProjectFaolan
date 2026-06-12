@@ -4,7 +4,7 @@ namespace Faolan.Core.Database.Tables
 	// with per-character value islands between the spawn transform and the CharacterIIR; 228/239/339-byte
 	// variants) and the per-character u32 that follows the entry-table count. Captured characters get these
 	// extracted from their spawn; fresh characters get the fresh-character defaults
-	// (PlayerSpawnScaffoldRows.FreshPreFrame). See docs/player-spawn-generation-plan.md "VALIDATED GRAMMAR".
+	// (PlayerSpawnScaffoldRows.FreshPreFrame). See docs/archive/player-spawn-generation-plan.md "VALIDATED GRAMMAR".
 	public class CharacterSpawnFrame : BaseEntity
 	{
 		public virtual Character Character { get; set; }

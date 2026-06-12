@@ -8,7 +8,7 @@ namespace Faolan.GameServer.Spawn
 	// Bridges a stored NpcSpawn row to a wire FA015807 (SimpleCharFullUpdate) body, addressed to a live session
 	// handle. The transform (position/rotation) is driven by the row's structured columns; the CharacterIIR
 	// (identity/appearance/equipment) and the still-raw pre-IIR float block + post-IIR scaffold come from the
-	// row's captured `Data` (docs/spawn-dissection-plan.md Phase 4 - those two blocks are the last un-lifted part).
+	// row's captured `Data` (docs/archive/spawn-dissection-plan.md Phase 4 - those two blocks are the last un-lifted part).
 	// Byte-identical to the captured body when the row's columns match the capture (NpcSpawnBuilderTests); this is
 	// the unit the world-entry path will call per map instead of replaying the MapWorldBurst blob.
 	public static class NpcSpawnBuilder

@@ -633,7 +633,7 @@ namespace Faolan.GameServer
 				: $"beach fallback (map {worldBurst.MapId})");
 			// Populate the shared world model: the map's NPCs (once) + this player. Registered BEFORE the burst so
 			// the player's own spawn body can be captured into the entity during the replay
-			// (docs/server-architecture-roadmap.md).
+			// (docs/archive/server-architecture-roadmap.md).
 			await _broadcaster.EnsureZoneNpcs(mapId);
 			_simulation.RegisterPlayerInWorld(client);
 			await ReplayMapWorldBurst(client, worldBurst);

@@ -14,7 +14,7 @@ namespace Faolan.GameServer
 	// Persists the player's equip/unequip actions (0x642CD3D6 / MoveEquippedToFromInventory) to the DB so gear
 	// changes survive logout. The world-burst replay then reflects the saved CharacterEquipment on next login.
 	// NOTE: reflecting an item moved into an equip slot the captured snapshot has no entry for (e.g. a ring) needs
-	// ADDING an equipped entry, not just the in-place replace we do today - see docs/spawn-dissection-plan.md.
+	// ADDING an equipped entry, not just the in-place replace we do today - see docs/archive/spawn-dissection-plan.md.
 	public partial class GameServerListener
 	{
 		// Player equipped an item: bag slot `fromBagSlot` -> equip slot `targetSlot`, carrying the item's template

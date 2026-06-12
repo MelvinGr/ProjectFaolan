@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Levelling curve (docs/server-architecture-roadmap.md): experience is within-level progress; Apply spends it
+	// Levelling curve (docs/archive/server-architecture-roadmap.md): experience is within-level progress; Apply spends it
 	// against the curve and reports the levels gained + leftover.
 	public class LevelingTests
 	{

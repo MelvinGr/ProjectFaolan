@@ -1,6 +1,6 @@
 namespace Faolan.GameServer.Combat
 {
-	// Provisional loot rules (docs/server-architecture-roadmap.md). A kill has a chance to drop a loot bag; the bag
+	// Provisional loot rules (docs/archive/server-architecture-roadmap.md). A kill has a chance to drop a loot bag; the bag
 	// is a world object spawned at the death spot that expires after a timeout. Drop chance / contents / per-NPC loot
 	// tables aren't modelled from real data yet (like the damage + XP values), so this is a simple coin-flip; the roll
 	// is passed in so the decision is pure + testable (the caller supplies the RNG).

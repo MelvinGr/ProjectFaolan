@@ -4,7 +4,7 @@ using Faolan.Core.Database.Tables;
 
 namespace Faolan.GameServer.World
 {
-	// Pure quest objective-tracking rules (docs/quests-and-combat.md) - testable without the DB/network.
+	// Pure quest objective-tracking rules (docs/archive/quests-and-combat.md) - testable without the DB/network.
 	public static class QuestProgress
 	{
 		// True if killing an NPC named `npcName` advances this quest's kill objective (active, matching, not yet done).
@@ -15,7 +15,7 @@ namespace Faolan.GameServer.World
 		}
 	}
 
-	// Quest state packets, decoded from captures (docs/quests-and-combat.md). These build the 0x2000 IIR record
+	// Quest state packets, decoded from captures (docs/archive/quests-and-combat.md). These build the 0x2000 IIR record
 	// bodies (after the u32 length prefix). Quest text (title/desc/journal) is NOT sent here - the client renders it
 	// from its RDB by quest id; the server only drives quest STATE + objective progress. The full accept/branch logic
 	// is the pinned RDB Lua quest VM.

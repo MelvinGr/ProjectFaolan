@@ -13,7 +13,7 @@ namespace Faolan.Core.Network
 	// AoC login crypto: Diffie-Hellman (prime N, g=5) key agreement + TEA-CBC. The client sends
 	// "<clientPub hex>-<TEA-CBC ciphertext hex>"; the low 128 bits of the DH shared secret are the TEA key. The
 	// server reproduces the secret with its OWN private key - which only works if the client used OUR public key
-	// (CELLAO_PUB), i.e. a patched/launched client (see docs/login-decryption-plan.md + tools/patch_aoc_login_key.py).
+	// (CELLAO_PUB), i.e. a patched/launched client (see docs/archive/login-decryption-plan.md + tools/patch_aoc_login_key.py).
 	// An unpatched retail client uses Funcom's public key, so Decrypt returns garbage that fails the challenge check
 	// -> the caller falls back to accept-any. Algorithm validated by round-trip (docs plan, 2026-06-08).
 	public static class LoginEncryption

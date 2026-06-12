@@ -116,7 +116,7 @@ Migration order: items/spells/NPCs (archive SQL + pcap items) first - DONE; conv
 (Phase 2) retired `conversations-*.bin`; the replay scaffolding moved last and is now ALSO DONE -
 `strie-login-worldburst.bin` became the DB-seeded beach burst (2026-06-08) and `spawn-player-template.bin` /
 the `PlayerSpawnTemplate` constant were replaced by DB-generated player spawns (2026-06-10, see
-docs/player-spawn-generation-plan.md). The server embeds no spawn/burst data.
+docs/archive/player-spawn-generation-plan.md). The server embeds no spawn/burst data.
 
 ## Relationship to the current seed path
 
@@ -170,7 +170,7 @@ docs/player-spawn-generation-plan.md). The server embeds no spawn/burst data.
   - **CONSUMER WIRED (2026-06-10/11):** `NpcSpawnBuilder` builds the FA015807 from a row; `ReplayMapWorldBurst`
     sources each burst NPC from its row (matched by POSITION) and ships it when byte-identical. The from-scratch
     construct (built spawn + built stationary MoveTask, fresh handle) is in-client-proven; cross-session row
-    bodies are the remaining blocker. See docs/spawn-dissection-plan.md Phase 4 for the full arc.
+    bodies are the remaining blocker. See docs/archive/spawn-dissection-plan.md Phase 4 for the full arc.
 - **World objects — DONE (2026-06-10).** Sibling of NpcSpawn for the static world (decor/props `66AEDD50`,
   interactive containers `F096251E`, zone labels `33A56FB0`). `WorldObjectExtractor` -> `WorldObject` table
   (migration `AddWorldObjects`, unique index (map, position)): subOpcode (class) + transform + the object
@@ -202,7 +202,7 @@ docs/player-spawn-generation-plan.md). The server embeds no spawn/burst data.
 - **NPC stable identity** — RESOLVED (2026-06-10): it is `NpcStats.template_id` (CharacterIIR f5.f4), lifted onto
   `NpcSpawn.TemplateId`. Dedup stays keyed by (map, position) since handles are session-scoped, but the
   per-type identity is now a column. (The open blocker moved downstream: cross-session row Data is rejected
-  in-client — see docs/spawn-dissection-plan.md Phase 4.)
+  in-client — see docs/archive/spawn-dissection-plan.md Phase 4.)
 - **Conversation storage**: new `NpcConversations` table vs. keep the embedded `.bin`. A table is cleaner and
   query-able; the `.bin` is what `ConversationReplay` already reads. Pick when starting Phase 2.
 - **Capture-derived data provenance**: keep a `source` column (capture file name) on imported rows for

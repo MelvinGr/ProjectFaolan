@@ -8,7 +8,7 @@ namespace Faolan.Helpers
 {
 	// Applies pending EF schema migrations on startup. The server does NOT seed data: the database is the single
 	// source of truth (committed faolan.db). Game data is (re)built from the raw sources by the Faolan.Importer
-	// tool, not embedded in the server. See docs/faolan-importer-plan.md.
+	// tool, not embedded in the server. See docs/archive/faolan-importer-plan.md.
 	public class DatabaseMigrator : BackgroundService
 	{
 		private readonly IDbContextFactory<DatabaseContext> _contextFactory;

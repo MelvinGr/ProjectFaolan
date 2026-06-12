@@ -6,7 +6,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 	/// <summary>
 	///     Builds the count-prefixed stat-record block shared by the <c>0x737A6DF9</c> snapshot and the
 	///     <c>0x96B8DC59</c> vitals/stat-update packet. Confirmed wire encoding (see docs/player-stats.md and
-	///     docs/quests-and-combat.md): a single-byte record count, then N records of
+	///     docs/archive/quests-and-combat.md): a single-byte record count, then N records of
 	///     <c>[uint32 statId BE][uint32 value BE]</c>.
 	///     Values are stored at wire scale: vitals (Health/Mana/Stamina) ×100, attributes ×10, everything else ×1
 	///     (see <see cref="LegacyCharacterStatEntry.GetScale" />). Use <see cref="Set" /> with the player-facing

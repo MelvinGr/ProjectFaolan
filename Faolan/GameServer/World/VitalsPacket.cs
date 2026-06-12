@@ -6,7 +6,7 @@ using Faolan.GameServer.Packets.FullCharSnapshot;
 namespace Faolan.GameServer.World
 {
 	// Builds the 0x96B8DC59 entity vitals / stat-update packet - the moment-to-moment counterpart of the big
-	// 0x737A6DF9 snapshot's stat block. Confirmed wire layout (docs/quests-and-combat.md):
+	// 0x737A6DF9 snapshot's stat block. Confirmed wire layout (docs/archive/quests-and-combat.md):
 	//   [subop 96B8DC59][0000C350][entityHandle:4][00000000:4][count:1][count × (statId:u32, value:u32)]
 	// Shared by everything that pushes stat/vitals changes (combat, the regen tick, the world-entry replay, GM
 	// commands), framed on the world conversation (WorldFraming). Pulled out of the listener so the CombatService can
