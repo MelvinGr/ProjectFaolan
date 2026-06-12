@@ -88,6 +88,21 @@ Full detail: `docs/archive/spawn-dissection-plan.md`.
 - [ ] Inventory add/remove client stall — semantic / client-side, not a packet defect.
 - [ ] MoveTask mode-00 "approach/face" param floats + a `PatrolPath` table to source waypoints.
 - [ ] Fold the pre-IIR / post-IIR scaffolds into rows.
+- [ ] Drop the inventory-snapshot template dependencies (`BuildDbInventorySnapshot` still consumes the captured
+      `0x737A6DF9` packet; kept per-session as `Session.InventorySnapshotTemplate` for the `.additem` mid-session
+      rebuild). Per remaining dependency type:
+  - [ ] **Framing** (RPC header bytes + subOpcode/c350/instance copied from the verbatim packet) — trivially
+        buildable via `WriteHeader` + the session's instance; no decode needed, just do it.
+  - [ ] **Typed protobuf root** (`ProtoFullCharacterIIR` parsed from the captured root; only `Inventories` is
+        regenerated) — author the remaining root fields from character rows (round-trip is 37/39; see memory
+        `fullchar_generation`).
+  - [ ] **Prefix + tails, non-beach maps** (scratch path is beach-only: `BeachSnapshotPrefix` +
+        `BeachTailsBuilder`; other maps carry the captured prefix/tails + `AdjustSnapshotPrefixRootLength`) —
+        generalize the tails template per map, or decode the per-char `UnknownBefore` region (the 739 B → 441 KB
+        blob; see memory `snapshot_tails_construction_scope`).
+
+  Once all three are server-owned, `.additem`/post-load can build the snapshot with zero captured bytes and the
+  session template becomes dead code.
 - [ ] Appearance: generate the morph entries from `CharacterBody` (the editor sliders → float-valued scaffold
       entries) instead of the Dikketest defaults. → `docs/archive/player-spawn-generation-plan.md` (COMPLETE; this is the
       one optional remainder)
