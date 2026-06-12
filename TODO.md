@@ -35,7 +35,7 @@ prior diagnoses are in `docs/archive/todo-history.md`.
       level-1 rogue default. → `docs/player-stats.md`
 - [ ] Login/movement still spawn at the correct position after the raw-body float-endianness fix. → `docs/archive/todo-history.md` §8
 
-**Combat** (loop both directions) → `docs/archive/quests-and-combat.md`, memory `protocol_stats_and_combat`
+**Combat** (loop both directions) → `docs/combat.md` (BCC ack protocol), `docs/archive/quests-and-combat.md`, memory `protocol_stats_and_combat`
 - [x] Normal-attack FSM re-test: the swing-1 BccAck now matches retail byte-for-byte (u32 argsLen fix, field3
       phase splice, 0xCB constant). VERIFIED in-client 2026-06-12 (Broken Oar equipped): armed swings land,
       no random/self-target. NOTE the earlier "broken attacks" were UNARMED (see next item).

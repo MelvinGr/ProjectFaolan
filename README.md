@@ -340,14 +340,21 @@ the embedded resource was retired). What we do to each burst packet:
   plus `Faolan.Importer` capture harvesting; an item is **buildable iff `Archetype != 0`** (~177 today).
   Beach characters get seeded starter gear (`EnsureBeachStarterEquipment`); equip/unequip persists to
   `CharacterEquipment` + `CharacterInventory` bag rows (`EquipmentPersistence.cs` - unequip parks the item at
-  the exact bag cell, multiple unequips coexist), so persisted gear renders in ANY slot on relogin. (The old
-  "add/remove stalls" problem was a *fabricated* item identity - real-identity entries add/remove fine.)
+  the exact bag cell, multiple unequips coexist), so persisted gear renders in ANY slot on relogin. The
+  DB containers ride the WORLD-ENTRY snapshot itself (the only delivery the client honors - a second
+  0x737A6DF9 mid-session is ignored/rejected, so `.additem` items appear at next login); the old "container
+  mutation stalls chat" rule was the dead retail CDN, lifted by the ContentMirror. Full grammar + delivery
+  model + known limits (bag-poison items): `docs/inventory.md`. Equip/unequip + swing-ack protocol:
+  `docs/combat.md`.
 
 GOTCHA - the send loop must be tight. Burst packets go out one raw `client.SendAsync(byte[])` after another;
 the GameServer download is uncompressed and the client frames it per TCP read, so **any heavy CPU work between
 sends (e.g. parsing/re-serializing the 9 KB inventory mid-loop, or PacketStream's synchronous CRC) reshapes
 the segmentation and the client misframes and hangs on the loading screen.** Pre-build every packet (instance
-rewrite, spawn rebuild, inventory rebuild) BEFORE the send loop, then send in a pure loop.
+rewrite, spawn rebuild, inventory rebuild) BEFORE the send loop, then send in a pure loop. Related (fixed
+2026-06-12, `24fbed6`): `Socket.Send/SendAsync` can write FEWER bytes than asked when the send buffer is
+full - the count was discarded, silently truncating large frames mid-stream (the client then consumed the
+NEXT packets as the frame's remainder and misparsed everything after). Sends now loop to completion.
 
 This replaces the NPC-less hand-built path for beach logins. The end goal (see `docs/archive/spawn-dissection-plan.md`)
 is to construct the whole world entry from the DB; in progress - done so far: position, name, handles,
