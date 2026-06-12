@@ -153,16 +153,17 @@ namespace Faolan.GameServer
 			{
 				case GameServerOpcodes.Hello:
 				{
-					// 0x2003 is overloaded: the connection Hello carries clientInstance + accountId + version
-					// (>= 12 bytes), but in-world the client also sends a 4-byte 0x2003 (a uint32 entity handle)
-					// as it streams entities into view. Retail sends no per-packet reply, so just note it and
-					// move on - parsing it as a Hello would read past the end of the body and drop the client.
+					// 0x2003 is overloaded BY CLASS: the >= 12-byte body is GameAgent.Authenticate2 (the
+					// connection Hello: clientInstance + accountId + version), while the 4-byte body is
+					// GameCharAgent.SetTutorialStats (a u32, usually 0 - the Tortage tutorial stat tracking;
+					// x80 in captures). Retail sends no per-packet reply, so just note it and move on -
+					// parsing it as a Hello would read past the end of the body and drop the client.
 					if (packet.Body.Length - packet.Body.Position < 12)
 					{
-						var entityHandle = packet.Body.Length - packet.Body.Position >= sizeof(uint)
+						var tutorialStat = packet.Body.Length - packet.Body.Position >= sizeof(uint)
 							? packet.Body.ReadUInt32()
 							: 0;
-						Logger.LogDebug("In-world 0x2003 entity notification (handle=0x{Handle:X8}); no reply.", entityHandle);
+						Logger.LogDebug("GameCharAgent.SetTutorialStats(0x{Value:X8}); no reply.", tutorialStat);
 						break;
 					}
 
@@ -349,8 +350,11 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerOpcodes.SetSprintInputState: // request change map(?)
+				case GameServerOpcodes.SetSprintInputState: // GameCharAgentProject - the sprint key (x2092 in captures)
 				{
+					// Historical behavior (predates the method-name mapping, when this was guessed to be a
+					// map-change request): reply with ReportDimensionId. Retail does NOT answer sprint inputs;
+					// kept until a live client run confirms removing it is safe.
 					if (packet.Body != null)
 						LogPacketBodyDebug("GameServer 0x200C body", packet.Body.ToArray());
 
@@ -410,14 +414,14 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerOpcodes.RequestShortcutBar:
+				case GameServerOpcodes.RequestShortcutBar: // client asks for its saved hotbar at login; no reply yet (hotbar persistence not implemented)
 				{
-					Logger.LogInformation("Received opcode 0x206D.");
+					Logger.LogInformation("RequestShortcutBar (hotbar persistence not implemented; no reply).");
 
 					break;
 				}
 
-				case GameServerOpcodes.TryLootAll: // client took an item from an open loot window; body = [typetag][bag handle]
+				case GameServerOpcodes.TryLootAll: // the loot-all click on an open loot window; body = [typetag][bag handle]. NOTE: TryLootCash (0x2045, x23 = every loot) is NOT handled yet - coins are never granted
 				{
 					packet.Body.ReadUInt32(); // loot typetag (0xC87A)
 					var bagHandle = packet.Body.ReadUInt32();
@@ -454,7 +458,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerOpcodes.MoveTradeItemInternal: // request change map(?)
+				case GameServerOpcodes.MoveTradeItemInternal: // player-to-player trade window item move; not implemented
 				{
 					/*byte[] sender = { 0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x14 };
 					        byte[] receiver = { 0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0x84, 0x80, 0x80, 0x08 };
@@ -534,9 +538,9 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerOpcodes.StackInventoryItemIfPossible: // p.160&161
+				case GameServerOpcodes.StackInventoryItemIfPossible: // (the old C++ docs called this "SpawnCheck", p.160-161)
 				{
-					LogPacketBodyDebug("GameServer SpawnCheck body", packet.Body?.ToArray());
+					LogPacketBodyDebug("GameServer StackInventoryItemIfPossible body", packet.Body?.ToArray());
 
 					/*var part1 = packet.Data.ReadUInt32();
 					var spawnId = packet.Data.ReadUInt32();

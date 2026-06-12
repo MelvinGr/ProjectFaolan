@@ -491,8 +491,10 @@ a freshly-created char rather than `ConanHimself` for retail-faithful instance b
   2+ characters).
 - Conversation ids: see the "Conversation ids" section above. The receiver's trailing varint is the client
   instance; a world session rides one conversation; hand-built packets must use the session conversation.
-- `0x2003` is overloaded: a 24-byte body is the connection `Hello` (clientInstance + accountId + version);
-  a 4-byte body is an in-world entity notification (a uint32 handle, no reply). Branch on body length.
+- `0x2003` is overloaded BY CLASS (resolved via the method-index mapping): the 24-byte body is
+  `GameAgent.Authenticate2` (the connection `Hello`: clientInstance + accountId + version); the 4-byte body is
+  `GameCharAgent.SetTutorialStats` (a u32, usually 0 - Tortage tutorial stat tracking, no reply). The handler
+  still branches on body length, which is equivalent in practice.
 - `0x2000` is overloaded: `GameServer.AckAuthentication` and `UniverseAgent.SendPlayerAgentRealm` are both
   `0x2001`; the analyzer disambiguates by port.
 - World build + spawn polling (`0x2020`/`0x2008`/`0x2076`/`0x2052`): see "Existing-character login" above.

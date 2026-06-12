@@ -101,6 +101,24 @@ management + combat/regen/death/respawn/AI) is in and harness-verified — the i
 and combat-loop items in §2. Forward milestones (shared zones, persistence, scaling) are in
 `docs/archive/server-architecture-roadmap.md`.
 
+### 4b. Named-but-unhandled client packets (surfaced by the opcode mapping, 2026-06-12)
+
+Observed in captures (counts in parens), now identified via the method-index tables, currently falling into the
+unknown-packet log. Each is a concrete gameplay gap with a known entry point:
+
+- [ ] **`TryLootCash` 0x2045 (x23 — every loot!)** — looting coins is never granted; pairs 1:1 with the handled
+      `TryLootAll` 0x2043. The missing half of the live loot item-grant (§2 inventory/loot).
+- [ ] **`RespawnMe` 0x2024 (x2)** — retail respawn is CLICK-driven (the "resurrect" button), ours is a tick
+      timer that auto-respawns. Handle the click; keep the timer as fallback. Related: **`RequestBindLocation`
+      0x2002 (x49)** — the client repeatedly asks for its bind/resurrection point and we never answer.
+- [ ] **`CancelBuff` 0x201E (x1)** — right-click-cancel a buff; ignored.
+- [ ] **`RequestShortcutBar` 0x206D (handled = logged only) + `UpdateShortcut` 0x206F (x3) + the handled
+      `AddShortcut`/`RemoveShortcut`/`MoveShortcut`** — the full hotbar-persistence protocol is now named;
+      persistence itself unimplemented.
+- [ ] `ScryMessageBoxAnswer` 0x203B (x1), `RequestMassivePvPScoreData` 0x208D (x1) — note only.
+- Suspicious historical behavior kept until a live check: we answer every `SetSprintInputState` 0x200C
+  (x2092 — the sprint key) with a `ReportDimensionId`; retail does not.
+
 ---
 
 ## 5. Content from the client RDB
@@ -154,8 +172,11 @@ tag system exists. → memory `lua_vm`, `protocol_conversation_routing`; `docs/a
 
 - [ ] **Real password validation** — login is DH + TEA-CBC; we accept any password (validation stubbed). Needs a
       client DH-key binary patch + C# port of the cipher. Fully understood, not implemented. → `docs/archive/login-decryption-plan.md`
-- [ ] **Recover real opcode / RPC names** — feasible (names are in `AgeOfConan.exe`); map recovered names → wire
-      ids. → `docs/archive/opcode-re-plan.md`, `docs/aoc-opcode-ids.md`, `docs/aoc-client-rpc-methods.md`
+- [x] **Recover real opcode / RPC names** — DONE for the meaningful parts (2026-06-12): IIR sub-opcodes = BKDR-31
+      name hashes (`docs/aoc-opcode-ids.md`), and the 16-bit RPC opcodes = method index (0x2000 + position) into
+      the recovered per-class client→server tables — full catalogs in `Opcodes.cs`. Remaining gap: the
+      server→client interface tables drift (live build has unnamed extra methods) so downloads stay
+      content-named; closing that would need Ghidra on the dispatch tables. → README "Client reverse-engineering"
 
 ---
 
@@ -216,8 +237,10 @@ buy-delivery path (seller's item + buyer's payment move through mail).
 ### 9b. NPC vendor / shop buy-sell (AFTER 9a — simpler)
 Rides on **`GameCharAgent`/`GameCharInterface`** — the main GameServer connection, already fully wired; **no new
 connection needed**, and likely simpler than the AH (no listings/search/mail).
-- client→server (`GameCharAgent`): `OpenShop`, `CloseShop`, `BuyItem(i_cShopID, i_nPos)`,
-  `SellItem(i_cShopID, i_cInventoryID, i_nPos)`, `UndoLastSoldItem`.
+- client→server (`GameCharAgent`, wire opcodes now confirmed in captures): `CloseShop` = 0x2032 (x12),
+  `BuyItem(i_cShopID, i_nPos)` = 0x2033 (x1), `SellItem(i_cShopID, i_cInventoryID, i_nPos)` = 0x2034 (x8),
+  `UndoLastSoldItem` = 0x2035. No `OpenShop` exists in the recovered GameCharAgent table — the window likely
+  opens via the dialogue/IIR side (`KnubotStartTradeIIR` 0x4B2A47BF, x2 in captures = the trader sessions).
 - server→client (`GameCharInterface`): `DispatchShopData(shopID, parentID, shopContent)`,
   `DispatchItemSoldToShop(inventoryID, pos)`, `DispatchCloseShop`.
 - [ ] Decode the shop flow from the `sell_items_to_trader` capture (`OpenShop`→`DispatchShopData` shop inventory
