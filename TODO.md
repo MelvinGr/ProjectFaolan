@@ -44,6 +44,18 @@ prior diagnoses are in `docs/archive/todo-history.md`.
       UNKNOWN-0x00000011 and nothing happens. CAPTURE-GATED: Melvin records a retail unarmed-combat session
       (unequip in-session, attack-mode enter/leave, unarmed swings to a kill, re-equip); then decode → 
       dissector → server ack → golden test.
+- [ ] **Equipment window shows the template's gear, not the player's**: the doll is client-authoritative,
+      fed ONLY by the world-entry snapshot (the combat capture shows NO server-side doll refresh - equips are
+      just acked) - and that snapshot's containers are verbatim-captured (Strie's Marlin Spike at pos 6) under
+      the hard chat-gate constraint (BuildBeachInventoryPacket header). The post-load DB snapshot updates the
+      backpack but evidently not the doll. Candidate fix: re-test world-entry container substitution now that
+      the ContentMirror serves resources (the original stall was resource-thrash) - env-gated experiment.
+- [x] **Equip/unequip persistence + acks** (2026-06-12, commit 226b16f): 0x09 grammar decoded from capture
+      (TypeId = window pair incl. live 41842/41843, Mode = action counter, tail = [src][dest][item][item][0][flags]);
+      both pairs persisted + retail's ack (identity quad / null filler) + 0x201C entry (0x65/destSlot, 0x68/0).
+- [x] **Unarmed attacks** (2026-06-12, commit 226b16f): Interact 0x11 echo-acked (phase = request Mode, no
+      result block - byte-exact golden tests); targeted unarmed damage rides the armed path (extension,
+      in-client check pending).
 - [ ] **Melee swings are cone/AoE**: an AoC melee swing damages every target in the arc, not just the selected
       one (Melvin, 2026-06-12). Current server resolves only SpellTarget.TargetHandle; needs arc/range target
       selection from the world model.

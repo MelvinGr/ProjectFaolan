@@ -303,7 +303,7 @@ namespace Faolan.GameServer
 							{
 								// The melee swing / auto-attack: ack the behavior + resolve the hit (see
 								// SendNormalAttackResponse). The target is in the request args (SpellTarget.TargetHandle).
-								await _combat.SendNormalAttackResponse(client, rawPayload, (uint)(args.SpellTarget?.TargetHandle ?? 0));
+								await _combat.SendNormalAttackResponse(client, rawPayload, (uint)(args.SpellTarget?.TargetHandle ?? 0), (uint)args.Mode);
 
 								break;
 							}

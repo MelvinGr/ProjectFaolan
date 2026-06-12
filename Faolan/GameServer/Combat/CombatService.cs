@@ -71,7 +71,7 @@ namespace Faolan.GameServer.Combat
 		// the sequence incremented; its 81-byte result tail is the capture's layout with the live actor=player and
 		// the computed damage in the damage slot (the v1/v3/v5 metadata constants are templated - their semantics
 		// aren't decoded yet, only that v4 == the swing damage).
-		public async Task SendNormalAttackResponse(INetworkClient client, byte[] rawPayload, uint targetHandle)
+		public async Task SendNormalAttackResponse(INetworkClient client, byte[] rawPayload, uint targetHandle, uint mode = 0)
 		{
 			// rawPayload = [bodyLen u32][subop u32][c350 u32][instance u32][seq u16][behaviorId u32][argsLen u32][args][reqTail]
 			if (rawPayload.Length < 26)
@@ -91,9 +91,13 @@ namespace Faolan.GameServer.Combat
 				? (uint)((reqTail[^4] << 24) | (reqTail[^3] << 16) | (reqTail[^2] << 8) | reqTail[^1])
 				: 0u;
 
-			// Retail's ack echoes the request args with a field3 "phase" inserted - a monotonic per-swing-ack counter
-			// the client uses to sequence behaviour responses. Stamp our running counter and splice it in.
-			var echoedArgs = InsertBehaviorPhaseField(argBytes, (uint)(++client.Session.NormalAttackAckPhase));
+			// Retail's ack echoes the request args with a field3 "phase" inserted. The 2026-06-12 armed+unarmed
+			// capture proves the phase value IS the request's own Mode (field 2) - the earlier "monotonic server
+			// counter" read was an artifact of Mode itself incrementing per action. Echo the Mode when the caller
+			// has it; fall back to the legacy session counter for callers that don't parse the args.
+			var echoedArgs = InsertBehaviorPhaseField(argBytes, mode != 0
+				? mode
+				: (uint)(++client.Session.NormalAttackAckPhase));
 
 			// Only deal damage to a real enemy: an attack with no target selected (or one that resolves to the
 			// player's own handle) must NOT hit the player - that was the "attack hits myself" bug.
