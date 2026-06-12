@@ -249,15 +249,18 @@ as the player spawn** — only the field VALUES differ; the byte layout is ident
 ```
 [0:20]    header: bodyLen, subOp=FA015807, ack=0xC350, handle, fieldA
 [20:~66]  transform group 0x2C: 0A vec3(pos LE), 12 quat(rot LE), 18 playfield-varint
-[66:293]  pre-IIR block — FIXED SIZE 273B, per-NPC float CONTENT (extended transform / bounds), still RAW
+[66:293]  pre-IIR block — FIXED SIZE 227B, per-NPC float CONTENT (extended transform / bounds), still RAW
 @297      ProtoCoreCharacterIIR (u32 length prefix @293; iirOff is a CONSTANT 297 for every beach NPC):
             f1  name
             f4  CharacterStats   sex/side/race/monster_scale/monster_data/life/health/.../head_mesh/level/radius
             f5  NpcStats         f4=template_id (NPC identity), super_family, community, npc_flags, npc_type
             f7  CharacterBcc     idle/action anim ids
             f23 inventory_entry  worn equipment (humanoids only; ABSENT on animals — Crocodile/Panther)
-[iirEnd:] post-IIR scaffold — same 0x3F1-marked family as the player but header 00000000_00000005 (player
-          =...0004); minimal (animal) form is a CONSTANT 41B; bigger NPCs add 60B buff/state records
+[iirEnd:] post-IIR scaffold — GRAMMAR CRACKED 2026-06-12: header [u32 0][u32 firstRecordLen=len-36][u32
+          recordCount]; word0=0 on ALL 42 NPCs (player has 2 there), recordCount=1 on 41/42. Minimal
+          freshly-spawned form is a CONSTANT 41B block (23/42 NPCs, single distinct value); larger blocks
+          concatenate runtime-state records (movement waypoint vec3 BE float triples + buff/timer pairs) past
+          the first. -> NpcSpawnScaffold.BuildMinimalPostIir() (C#, tested byte-exact vs the Crocodile golden).
 ```
 The whole identity/appearance/stats/equipment of an NPC lives in the CharacterIIR, which decodes cleanly with
 the existing `ProtoCoreCharacterIIR` type (the same one the player spawn already round-trips byte-exact). Key
@@ -266,9 +269,12 @@ Pillager=8756/14040 (two variants), Kalanthes=2704 (= the archive `npcs` MODEL i
 =9411. Instances of the same template share race/sex/monster_data/head_mesh; `monster_scale` (f4) carries the
 per-spawn size jitter (e.g. crocodiles 129–136). So an NPC spawn is reconstructable from a per-template row
 (name, the CharacterStats/NpcStats/Bcc field set, equipment list) + per-instance (handle, position, rotation,
-monster_scale). STILL RAW after this pass: the 227B pre-IIR block and the post-IIR scaffold (both shared
-with the player and treatable the same way — `PlayerSpawnScaffoldCodec` already generates the player's; the
-post-IIR header word 4→5 and the NPC-shaped 41B minimal are the only deltas to fold in).
+monster_scale). POST-IIR scaffold REGENERATABLE 2026-06-12: the freshly-spawned form is a constant 41B block
+(`NpcSpawnScaffold.BuildMinimalPostIir`), and `WithMinimalPostIir(body)` strips a body's post-IIR to it (the
+candidate fix for the cross-session render rejection — wired behind `FAOLAN_MINIMAL_SCAFFOLD=1`, run alongside
+`FAOLAN_BUILT_NPC_TEST=1` to test in-client). STILL RAW: the 227B pre-IIR block — it has NO constant form (only
+35/227 bytes stable even across the 10 freshly-spawned NPCs; the rest are per-instance handle/spatial values),
+so its minimal/stripped form is in-client-gated on that experiment.
 PRE-IIR BLOCK CHARACTERIZED 2026-06-11: it is the (body-relative) [66:293] = 227-byte region. Constant/varying
 analysis over the 42 beach NPCs: only ~8% of bytes are constant, ~152/227 are zero (sparsely, different
 positions per NPC), and it carries the **`03 f1` (0x3F1) marker @112-113** — the SAME scaffold-entry family as

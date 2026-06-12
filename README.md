@@ -636,10 +636,23 @@ Concrete next steps, grouped by area. See `docs/` for the dissection writeups be
       (`RetailLoginReplay.cs`, the `wasIdentical` gate removed): every NPC matched to an `NpcSpawns` row renders
       from that row (transform columns + re-encoded CharacterIIR via `NpcSpawnBuilder`), and the verbatim burst
       body is dropped. The burst handle is kept so the spawn stays paired with the burst's `0x96C46740` MoveTask
-      registration. Remaining: (1) **server-owned session-handle identity** — allocate fresh handles and remap
-      them burst-wide (MoveTask/registration), so the server owns NPC identity instead of inheriting the capture's;
-      (2) cross-session rows still carry the source session's instance refs in the row's captured pre-IIR/scaffold
-      blocks (lift those columns, `docs/spawn-dissection-plan.md` Phase 4); (3) in-client render confirmation.
+      registration. The from-scratch construct path (built spawn + built stationary MoveTask, fresh server handle)
+      is already proven to render in-client SAME-SESSION (`FAOLAN_BUILT_NPC_TEST=1`, commit a7e6841); the open
+      blocker is the CROSS-SESSION row, rejected by the client because the row's captured `Data` carries another
+      session's scaffold state. Progress on that:
+      - **NPC post-IIR scaffold grammar CRACKED** (workbench `Captures/dissect_npc_spawn.py`): header =
+        `[u32 0][u32 firstRecordLen=len-36][u32 recordCount]`; the freshly-spawned form is a CONSTANT 41-byte
+        minimal scaffold (the `0x3F1`-marked empty pair lists), encoded + tested as
+        `NpcSpawnScaffold.BuildMinimalPostIir()`. Larger blocks concatenate session RUNTIME state (movement
+        waypoints / buff timers), which a fresh spawn does NOT reproduce.
+      - `NpcSpawnScaffold.WithMinimalPostIir(body)` swaps a body's post-IIR for that minimal form. Wired into the
+        harness behind `FAOLAN_MINIMAL_SCAFFOLD=1` — the in-client experiment for the cross-session fix: run
+        `FAOLAN_BUILT_NPC_TEST=1 FAOLAN_MINIMAL_SCAFFOLD=1 dotnet Faolan.dll` (from `Faolan/bin/Debug`, config
+        `../../../faolan.json`); if the built NPC still renders, the minimal scaffold is client-acceptable.
+      Remaining: (1) the **pre-IIR** (~227B) has NO constant form — only 35/227 bytes are stable even across fresh
+      NPCs (the rest are per-instance handle/spatial values), so its minimal/stripped form is in-client-gated on the
+      experiment above; (2) **server-owned session-handle identity** — allocate fresh handles and remap them
+      burst-wide (MoveTask/registration), so the server owns NPC identity instead of inheriting the capture's.
 
 ### Mail / auction / trade-post (`docs/capture-events.md`)
 - [ ] Implement the **`0x2002 category=629`** token remoteformats (`TradePostGUI_*`) — the mail/auction/
