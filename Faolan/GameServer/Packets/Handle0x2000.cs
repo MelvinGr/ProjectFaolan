@@ -308,6 +308,17 @@ namespace Faolan.GameServer
 								break;
 							}
 
+							case ActionType.UnarmedAttack:
+							{
+								// Unarmed swing (empty main hand; behavior TypeIds 1089xx, ability id in the tail).
+								// Retail's reply is the plain behavior echo-ack - no result block (combat capture
+								// 2026-06-12); targeted damage reuses the armed path (the capture's unarmed swings
+								// hit air, so the damage part is an extension pending in-client validation).
+								await _combat.SendUnarmedAttackResponse(client, rawPayload, (uint)args.Mode, (uint)(args.SpellTarget?.TargetHandle ?? 0));
+
+								break;
+							}
+
 							case ActionType.Emote:
 							{
 								await LogToClient($"Emote: {args}");
@@ -357,34 +368,52 @@ namespace Faolan.GameServer
 								var direction = (MoveItemInInventoryDirection)args.TypeId;
 								switch (direction)
 								{
+									// Into-slot moves: tail = [srcBagCell][destEquipSlot][item][item][0][flags].
+									// 42011 and 41843 are the same grammar via different windows (capture + live).
 									case MoveItemInInventoryDirection.InventoryToEquipped:
+									case MoveItemInInventoryDirection.BagToEquipped:
 									{
 										var fromSlot = from;
 										var targetSlot = (CharacterEquipmentSlot)target;
 
-										await LogToClient($"InventoryToEquipped: ({fromSlot} -> {targetSlot}) {args}");
+										await LogToClient($"{direction}: ({fromSlot} -> {targetSlot}) {args}");
 
 										// The trailing struct (after from/target) carries the item's template handle as a
 										// big-endian uint32; persist the equip into CharacterEquipment.
 										var equipHandle = unk2.Length >= 4
 											? BinaryPrimitives.ReadUInt32BigEndian(unk2.AsSpan(0, 4))
 											: 0;
+										var movedItem = equipHandle != 0
+											? await Database.GetItem(equipHandle)
+											: null;
 										if (equipHandle != 0)
 											await PersistEquip(client, targetSlot, equipHandle, (int)fromSlot);
+
+										// Retail's reply: the behavior ack carrying the item's identity quad + a 0x201C
+										// entry (prefix 0x65, state = the destination slot). Capture frames 289-290.
+										await _combat.SendEquipMoveAck(client, rawPayload, (uint)args.Mode, movedItem);
+										await Send0X201CEntry(client, LoginWorld201CSender, LoginWorld201CReceiver(client), 0x00000065, target, 0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
 
 										break;
 									}
 
+									// Out-of-slot moves: tail = [srcEquipSlot][destBagCell][0...].
 									case MoveItemInInventoryDirection.EquippedToInventory:
+									case MoveItemInInventoryDirection.EquippedToBag:
 									{
 										var fromSlot = (CharacterEquipmentSlot)from;
 										var targetSlot = target;
 
-										await LogToClient($"EquippedToInventory: ({fromSlot} -> {targetSlot}) {args}");
+										await LogToClient($"{direction}: ({fromSlot} -> {targetSlot}) {args}");
 
 										// Unequip is identified by the source equip slot (the trailing handle is 0);
 										// `target` is the bag cell the item lands in.
 										await PersistUnequip(client, fromSlot, (int)targetSlot);
+
+										// Retail's reply: the behavior ack with null identity + a 0x201C entry
+										// (prefix 0x68, state 0). Capture frames 320-321.
+										await _combat.SendEquipMoveAck(client, rawPayload, (uint)args.Mode, null);
+										await Send0X201CEntry(client, LoginWorld201CSender, LoginWorld201CReceiver(client), 0x00000068, 0, 0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
 
 										break;
 									}

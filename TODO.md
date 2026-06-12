@@ -36,8 +36,17 @@ prior diagnoses are in `docs/archive/todo-history.md`.
 - [ ] Login/movement still spawn at the correct position after the raw-body float-endianness fix. → `docs/archive/todo-history.md` §8
 
 **Combat** (loop both directions) → `docs/archive/quests-and-combat.md`, memory `protocol_stats_and_combat`
-- [ ] Normal-attack FSM re-test: the swing-1 BccAck now matches retail byte-for-byte (u32 argsLen fix, field3
-      phase splice, 0xCB constant). Confirm attacks no longer go random/self after the first swing.
+- [x] Normal-attack FSM re-test: the swing-1 BccAck now matches retail byte-for-byte (u32 argsLen fix, field3
+      phase splice, 0xCB constant). VERIFIED in-client 2026-06-12 (Broken Oar equipped): armed swings land,
+      no random/self-target. NOTE the earlier "broken attacks" were UNARMED (see next item).
+- [ ] **Unarmed combat**: pressing attack with empty MainHand sends Interact action **0x11** (TypeIds
+      108996/108997/108998, Modes 2/7 enter/leave + 8/9), absent from every existing capture — server logs
+      UNKNOWN-0x00000011 and nothing happens. CAPTURE-GATED: Melvin records a retail unarmed-combat session
+      (unequip in-session, attack-mode enter/leave, unarmed swings to a kill, re-equip); then decode → 
+      dissector → server ack → golden test.
+- [ ] **Melee swings are cone/AoE**: an AoC melee swing damages every target in the arc, not just the selected
+      one (Melvin, 2026-06-12). Current server resolves only SpellTarget.TargetHandle; needs arc/range target
+      selection from the world model.
 - [ ] NPC **counter-attack** (the second ack retail sends for the mob's own behaviour, actor = target handle) —
       not yet reproduced; mob may not visibly fight back.
 - [ ] Kill an NPC → despawn + XP + possible loot bag; enough XP → level-up (level + full-vitals push).
@@ -213,6 +222,14 @@ tag system exists. → memory `lua_vm`, `protocol_conversation_routing`; `docs/a
       conversation and dissected too. Validated byte-exact (per-opcode counts, Conan + chat) against the
       analyzer JSON on 4 reference captures.
       Use `-o tcp.analyze_sequence_numbers:FALSE` on lossy captures. → `Faolan.Wireshark/README.md`
+
+- [ ] **Wireshark plugin: recover from capture holes (lost segments)** — a single lost inbound TCP segment
+      poisons the zlib stream and the dissector marks every later download "compression state: failed"
+      (whole combat phase of `account-stricken998-character-combat_armed-and-unarmed.pcapng` undissected;
+      lost segments at frames 104/119/138/171/180/228...). The stream has NO zlib sync-flush points
+      (0 `00 00 FF FF` markers), but the 9-byte `80 00 00 05` transition headers re-init the compression
+      state at packet boundaries — on inflate failure, scan forward to the next transition marker and
+      resume from its fresh zlib stream instead of failing terminally. Mark the gap with an expert info.
 
 - [ ] **ConanMessageFramer: handle mid-chunk compression transitions** — found while building the
       Wireshark dissector: the 9-byte `80 00 00 05` transition header occurs at PACKET boundaries (not

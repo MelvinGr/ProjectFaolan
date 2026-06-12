@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Faolan.Core.Data;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
@@ -161,6 +162,148 @@ namespace Faolan.GameServer.Combat
 			}
 
 			// 3) EnergyIIR - the player's stamina after the swing.
+			var player = GetOrAddPlayerVitals(client);
+			await new PacketStream()
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), 0x2000)
+				.WriteArrayUInt32Length(s => s
+					.WriteUInt32(0x40749B8Au)
+					.WriteUInt32(0x0000C350u)
+					.WriteUInt32(instance)
+					.WriteByte(0x01)
+					.WriteUInt32(player.Stamina))
+				.SendAsync(client);
+		}
+
+		// The 8-byte filler retail writes where an item identity quad would otherwise go in a behavior ack
+		// (B2 90 80 5C 29 E6 27 CA - the same null-identity padding as the 0xF result block and the 0x2052 grant).
+		internal static readonly byte[] NullIdentityFiller = [0xB2, 0x90, 0x80, 0x5C, 0x29, 0xE6, 0x27, 0xCA];
+
+		// Builds the generic BehaviorControlCenterIIR echo-ack body for an Interact request: retail acks every
+		// behavior request by echoing it with the sequence incremented and a field3 "phase" spliced into the args -
+		// and the phase value IS THE REQUEST'S OWN Mode (field 2), not a server counter (armed+unarmed combat
+		// capture 2026-06-12: every ack's 0x18 varint equals the request's 0x10 varint). The tail is echoed verbatim
+		// (or replaced by `tailOverride`) with 12 zero bytes appended. This is the complete ack for air swings; the
+		// result-block ack (SendNormalAttackResponse) is the targeted-hit variant.
+		internal static byte[] BuildBehaviorEchoAckBody(byte[] rawPayload, uint instance, uint phase, byte[] tailOverride = null)
+		{
+			// rawPayload = [bodyLen u32][subop u32][c350 u32][instance u32][seq u16][behaviorId u32][argsLen u32][args][tail]
+			var seq = (ushort)((rawPayload[16] << 8) | rawPayload[17]);
+			var behaviorId = BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(18, 4));
+			var argsLen = (int)BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(22, 4));
+			var echoedArgs = InsertBehaviorPhaseField(rawPayload[26..(26 + argsLen)], phase);
+			var tail = tailOverride ?? rawPayload[(26 + argsLen)..];
+
+			using var s = new FaolanStream();
+			s
+				.WriteUInt32(0x642CD3D6u)
+				.WriteUInt32(0x0000C350u)
+				.WriteUInt32(instance)
+				.WriteUInt16((ushort)(seq + 1))
+				.WriteUInt32(behaviorId)
+				.WriteUInt32((uint)echoedArgs.Length)
+				.WriteArray(echoedArgs)
+				.WriteArray(tail)
+				.WriteArray(new byte[12]);
+			return s.ToArray();
+		}
+
+		// The equip/unequip (Interact 0x09) ack: the echo-ack with the tail's zero padding replaced by an identity
+		// block - the first 28 tail bytes ([0/srcSlot][destSlot][item][item][0][flags][0]) echoed, then the moved
+		// item's Data1..4 key quad twice + the null filler twice (equip), or the null filler six times (unequip).
+		// Byte-exact against the capture's frames 289/320/375 (BehaviorAckTests).
+		internal static byte[] BuildEquipMoveAckBody(byte[] rawPayload, uint instance, uint phase, Item item)
+		{
+			var argsLen = (int)BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(22, 4));
+			var reqTail = rawPayload[(26 + argsLen)..];
+
+			using var tail = new FaolanStream();
+			tail.WriteArray(reqTail[..Math.Min(28, reqTail.Length)]);
+			if (item != null)
+			{
+				for (var i = 0; i < 2; i++)
+					tail
+						.WriteUInt32(item.Data1)
+						.WriteUInt32(item.Data2)
+						.WriteUInt32(item.Data3)
+						.WriteUInt32(item.Data4);
+				tail
+					.WriteArray(NullIdentityFiller)
+					.WriteArray(NullIdentityFiller);
+			}
+			else
+			{
+				for (var i = 0; i < 6; i++)
+					tail.WriteArray(NullIdentityFiller);
+			}
+
+			return BuildBehaviorEchoAckBody(rawPayload, instance, phase, tail.ToArray());
+		}
+
+		// The unarmed swing (Interact action 0x11, empty main hand; behavior TypeIds 1089xx, ability id in the
+		// tail). Retail's complete reply to an air swing is the plain echo-ack - no result block (combat capture
+		// 2026-06-12). Damage for a TARGETED unarmed swing was not in the capture (its swings hit air), so the
+		// damage resolution below reuses the proven armed path - an extension to validate in-client.
+		public async Task SendUnarmedAttackResponse(INetworkClient client, byte[] rawPayload, uint mode, uint targetHandle)
+		{
+			if (rawPayload.Length < 26)
+				return;
+
+			var instance = client.Session.Account.ClientInstance;
+			await SendWorldPacket(client, BuildBehaviorEchoAckBody(rawPayload, instance, mode));
+
+			var hasEnemyTarget = targetHandle != 0 && targetHandle != instance;
+			if (!hasEnemyTarget)
+				return;
+
+			var reqTail = rawPayload[(26 + (int)BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(22, 4)))..];
+			var abilityId = reqTail.Length >= 4
+				? BinaryPrimitives.ReadUInt32BigEndian(reqTail.AsSpan(reqTail.Length - 4, 4))
+				: 0u;
+			var damage = (uint)CombatResolver.ResolveSpellDamage(abilityId, client.Session.Character?.Level ?? 1);
+			await SendSwingDamage(client, instance, targetHandle, damage);
+		}
+
+		// Acks an equip/unequip move (Interact 0x09) and appends the 0x201C bookkeeping entry retail sends with it:
+		// prefix 0x65 + state = the destination equip slot for a move INTO a slot, prefix 0x68 + state 0 for a move
+		// OUT of one (combat capture frames 289-290/320-321/375-376).
+		public async Task SendEquipMoveAck(INetworkClient client, byte[] rawPayload, uint mode, Item movedItem)
+		{
+			if (rawPayload.Length < 26)
+				return;
+
+			await SendWorldPacket(client, BuildEquipMoveAckBody(rawPayload, client.Session.Account.ClientInstance, mode, movedItem));
+		}
+
+		// Frames a raw 0x2000 body on the world conversation.
+		private static Task SendWorldPacket(INetworkClient client, byte[] body)
+		{
+			return new PacketStream()
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), 0x2000)
+				.WriteArrayUInt32Length(s => s.WriteArray(body))
+				.SendAsync(client);
+		}
+
+		// The hit side of a swing: DamageResultIIR + the target's live-vitals application + the player's EnergyIIR
+		// stamina update (the retail post-ack trio of the armed swing path).
+		private async Task SendSwingDamage(INetworkClient client, uint instance, uint targetHandle, uint damage)
+		{
+			await new PacketStream()
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), 0x2000)
+				.WriteArrayUInt32Length(s => s
+					.WriteUInt32(0xFEC4158Au)
+					.WriteUInt32(0x0000C350u)
+					.WriteUInt32(instance)
+					.WriteByte(0x00)
+					.WriteUInt32(0x0000C350u)
+					.WriteUInt32(targetHandle)
+					.WriteUInt32(damage)
+					.WriteUInt32(2)
+					.WriteUInt32(0)
+					.WriteUInt32(0))
+				.SendAsync(client);
+
+			await ApplyNpcDamage(client, targetHandle, (int)damage, $"melee from 0x{instance:X8}");
+
 			var player = GetOrAddPlayerVitals(client);
 			await new PacketStream()
 				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), 0x2000)
