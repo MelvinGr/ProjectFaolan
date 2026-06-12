@@ -137,6 +137,16 @@ tag system exists. → memory `lua_vm`, `protocol_conversation_routing`; `docs/a
 - [ ] Fold `Packets.cs` sender-bytes duplication into `World/WorldFraming` (verify which conversation senders are
       truly identical before merging). Small, safe.
 - [ ] Rename `Packets/FullCharSnapshot/BigboyTailsFile.cs` to something descriptive. Trivial.
+- [ ] **GameServer dispatch hardening (not a blanket rewrite).** The GameServer multiplexes ~4 RPC class-pairs
+      over one connection; the `0x20xx` opcode is a per-class method selector that COLLIDES across classes, so the
+      correct dispatch key is `(endpoint class id, method opcode)`. Decided AGAINST rewriting the whole opcode
+      switch to class-first (it's in-client-verified, and class-first can't disambiguate the shared
+      `GameCharAgent`/`GameInterface` classes anyway). Instead, surgically: (a) route dedicated-class subprotocols
+      class-first (Tradepost done via `TradepostProtocol.IsInbound`); (b) for shared-class methods (e.g. vendor
+      `0x2034/0x2035` on `GameCharAgent`), add a one-line `Sender.Type ==` guard on any opcode case that collides
+      with a handled opcode; (c) **cheap win — log unknown `(class, method)` combos in the `default` branch**
+      instead of silently dropping them, so future collisions/new subprotocols surface as log lines. See memory
+      `protocol_gameserver_rpc_multiplexing`.
 
 ---
 
