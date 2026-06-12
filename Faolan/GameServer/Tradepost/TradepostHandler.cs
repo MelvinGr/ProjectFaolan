@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using Faolan.Core.Data;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
@@ -12,13 +13,14 @@ namespace Faolan.GameServer.Tradepost
 	// are the next increment.
 	public static class TradepostHandler
 	{
-		public static void Handle(INetworkClient client, ConanPacket packet, ILogger logger)
+		public static async Task Handle(INetworkClient client, ConanPacket packet, ILogger logger)
 		{
 			var method = (TradepostProtocol.AgentMethod)packet.Opcode;
 			switch (method)
 			{
 				case TradepostProtocol.AgentMethod.Open:
 					logger.LogInformation("Tradepost: {Char} opened the auction house.", CharName(client));
+					await TradepostResponses.SendOpenTradepost(client, packet);
 					break;
 
 				case TradepostProtocol.AgentMethod.ItemSearch:

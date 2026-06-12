@@ -184,9 +184,11 @@ buy-delivery path (seller's item + buyer's payment move through mail).
         0x20xx methods collide with ordinary opcodes) to `Faolan/GameServer/Tradepost/TradepostHandler`, which
         decodes + LOGS each method (Open/Search w/ query/Buy/Close/mail). Next live AH interaction confirms our
         captured grammar on real traffic. Builds clean, additive (early-return guard).
-  - [ ] Reply to `TradepostOpen` with `DispatchOpenTradepost` (access pos + 15.0 radius) and to
-        `TradepostItemSearch` with a replayed `DispatchTradepostSearchResults` so the AH window renders in-client
-        (like the conversation stage machine). **Needs an in-client render check (user side).**
+  - [x] Reply to `TradepostOpen` with `DispatchOpenTradepost` (access pos + 15.0 radius) — `TradepostResponses`,
+        echoes the client's TradepostInterface instance. **Byte-exact golden test vs the captured packet passes**
+        (`TradepostResponseTests`). Still needs an in-client render check (user side).
+  - [ ] Reply to `TradepostItemSearch` with a `DispatchTradepostSearchResults` (replay a captured one first, then
+        DB-built) so listings render. **Needs an in-client render check (user side).**
 - [ ] **Step 3:** go DB-backed — `TradepostListing` + `Mail`/`MailAttachment` tables, search, money/escrow,
       buy→mail grant. NB: tradepost sells from the **bank** (`nBankItemSlot`) — leans on bank/money support;
       `CSBuyItemReply` hints at a commerce/CS path. All on the existing GameServer dispatcher (no new connection).
