@@ -170,7 +170,7 @@ namespace Faolan.GameServer
 				["guild"] = (client, arguments) => GuildCommand(client, arguments),
 				["money"] = (client, arguments) => MoneyCommand(client, arguments),
 				["buffs"] = (client, _) => BuffsCommand(client),
-				["shop"] = (client, _) => OpenShopCommand(client)
+				["shop"] = (client, arguments) => OpenShopCommand(client, arguments)
 			};
 		}
 

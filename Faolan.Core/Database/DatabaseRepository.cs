@@ -59,6 +59,9 @@ namespace Faolan.Core.Database
 		Task<Map> GetMap(uint id);
 		Task<Map[]> GetMaps();
 
+		Task<Shop> GetShopByVendorName(string vendorName);
+		Task<Shop> GetFirstShop();
+
 		Task<MapWorldBurst> GetMapWorldBurst(uint mapId);
 		Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names);
 		Task<NpcSpawn> GetNpcSpawnByName(string name);
@@ -433,6 +436,27 @@ namespace Faolan.Core.Database
 				.Guilds
 				.Include(g => g.Members)
 				.FirstOrDefaultAsync(g => g.Id == id);
+		}
+
+		// --- shops -----------------------------------------------------------------------------------------
+
+		public async Task<Shop> GetShopByVendorName(string vendorName)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.Shops
+				.Include(s => s.Items)
+				.FirstOrDefaultAsync(s => s.VendorName == vendorName);
+		}
+
+		public async Task<Shop> GetFirstShop()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.Shops
+				.Include(s => s.Items)
+				.OrderBy(s => s.Id)
+				.FirstOrDefaultAsync();
 		}
 
 		// --- equipment -------------------------------------------------------------------------------------

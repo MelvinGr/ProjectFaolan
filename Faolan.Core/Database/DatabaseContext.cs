@@ -38,6 +38,8 @@ namespace Faolan.Core.Database
 		DbSet<NpcSpawn> NpcSpawns { get; }
 		DbSet<Realm> Realms { get; }
 		DbSet<RespawnPoint> RespawnPoints { get; }
+		DbSet<Shop> Shops { get; }
+		DbSet<ShopItem> ShopItems { get; }
 		DbSet<Spell> Spells { get; }
 		DbSet<WorldObject> WorldObjects { get; }
 		Task<int> SaveChangesAsync(CancellationToken cancellationToken = default); // from DbContext
@@ -76,6 +78,8 @@ namespace Faolan.Core.Database
 		public DbSet<NpcSpawn> NpcSpawns { get; set; }
 		public DbSet<Realm> Realms { get; set; }
 		public DbSet<RespawnPoint> RespawnPoints { get; set; }
+		public DbSet<Shop> Shops { get; set; }
+		public DbSet<ShopItem> ShopItems { get; set; }
 		public DbSet<Spell> Spells { get; set; }
 		public DbSet<WorldObject> WorldObjects { get; set; }
 
@@ -177,6 +181,14 @@ namespace Faolan.Core.Database
 				.HasOne(c => c.Guild)
 				.WithMany(g => g.Members)
 				.OnDelete(DeleteBehavior.SetNull);
+
+			// A shop's wares delete with the shop (the importer replaces a shop's items wholesale on re-import).
+			modelBuilder
+				.Entity<Shop>()
+				.HasMany(s => s.Items)
+				.WithOne(i => i.Shop)
+				.HasForeignKey(i => i.ShopId)
+				.OnDelete(DeleteBehavior.Cascade);
 
 			// MorphTarget.Id IS the wire tag (the client registry's 1-based id minus 1) - assigned by the
 			// importer, never generated.

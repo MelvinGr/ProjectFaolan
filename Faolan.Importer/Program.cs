@@ -357,6 +357,8 @@ namespace Faolan.Importer
 				}
 
 				await ImportConversations(db, conversations);
+				var (shopsSeen, shopsAdded, shopsUpdated) = await CaptureShopImporter.ImportAsync(db, captures.SelectMany(CaptureShopImporter.Extract));
+				Console.WriteLine($"Shops (0x2033 vendor windows): {shopsSeen} vendors, {shopsAdded} new, {shopsUpdated} updated.");
 				await ImportNpcSpawns(db, NpcSpawnExtractor.Merge(captures.SelectMany(NpcSpawnExtractor.Extract)));
 				await ImportWorldObjects(db, WorldObjectExtractor.Merge(captures.SelectMany(WorldObjectExtractor.Extract)));
 				await ImportMapWorldBursts(db, MapWorldBurstExtractor.Merge(captures.SelectMany(MapWorldBurstExtractor.Extract)));

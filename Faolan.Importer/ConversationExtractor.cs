@@ -112,7 +112,7 @@ namespace Faolan.Importer
 
 		// Maps each FA015807 spawn's handle to its embedded name (0x0A <len> <utf8>), so a conversation's NPC handle
 		// can be resolved to a stable name within the same capture.
-		private static Dictionary<uint, string> BuildSpawnNameMap(IReadOnlyList<CapturedPacket> packets)
+		internal static Dictionary<uint, string> BuildSpawnNameMap(IReadOnlyList<CapturedPacket> packets)
 		{
 			var map = new Dictionary<uint, string>();
 			foreach (var p in packets)

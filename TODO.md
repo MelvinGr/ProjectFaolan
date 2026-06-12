@@ -281,9 +281,16 @@ connection needed**, and likely simpler than the AH (no listings/search/mail).
       `.shop` GM command opens the captured trader window (PoC blob replay, like `.ah`). Golden tests `ShopTests`.
 - [ ] **In-client verify `.shop`**: window opens; selling a bag item clears the slot + wallet updates; undo
       restores. (The blob's embedded vendor handle is session-volatile — expected to open anyway, like `.ah`.)
-- [ ] **BUY side**: blocked on (a) the live inventory-add path (the same item-grant wall as loot,
-      `protocol_containeradditem`) and (b) decoding the shop-content protobuf (`i_cShopContent`) so positions
-      resolve to items/prices → then a DB-backed vendor (shop-content table per NPC).
+- [x] **Shop-content protobuf DECODED + DB-backed shops (2026-06-12)**: the content is a plain
+      `ProtoInventoryGame` (the bag message!) with container type 111; each ware is a standard
+      `InventoryListEntry` whose ProtoAcgItem tail carries the FULL item identity (Data1-4 quad + template +
+      archetype). `ShopContentCodec` parses + builds **byte-exact** (round-trip golden test vs the captured
+      trader blob). Importer: `CaptureShopImporter` (6 vendors, keyed by NPC name) + shop wares as
+      `ArchetypeHarvester`'s third source (+281 items, +324 buildable). `.shop [vendor]` now CONSTRUCTS the
+      window from `Shop`/`ShopItem`/`Items` rows (blob fallback only when no shops imported).
+- [ ] **BUY side**: positions now resolve to items via `ShopItem`; still blocked on the live inventory-add
+      path (the same item-grant wall as loot, `protocol_containeradditem`) and on prices (stat 356 semantics
+      unknown - not obviously a price; the client may price from the RDB item template).
 - [ ] **Real sell prices**: the RDB item templates carry item value (TEA key cracked, field not mapped);
       provisional price = level×2×count (`VendorPriceCopper`). Captured anchors: 19/23/92/392 copper.
 

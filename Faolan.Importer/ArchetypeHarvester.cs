@@ -47,6 +47,18 @@ namespace Faolan.Importer
 				// not a parseable spawn packet
 			}
 
+			// Third source: vendor windows (DispatchShopData 0x2033) - every ware carries the same ProtoAcgItem
+			// identity (quad + template + archetype), so a single shop capture adds its whole stock to the
+			// buildable-item catalog. See ShopContentCodec / Captures/decode_shopdata.py.
+			try
+			{
+				ExtractFromShopData(packetBytes, found);
+			}
+			catch
+			{
+				// not a parseable shop packet
+			}
+
 			foreach (var (template, item) in found)
 			{
 				if (into.TryGetValue(template, out var existing))
@@ -87,6 +99,24 @@ namespace Faolan.Importer
 		// identity the inventory snapshot does (Key1.Key1..4 = the Data quad, Template1 = the template id, Hash =
 		// the archetype). PlayerSpawnReader scans the body for the character message, so this works on any packet
 		// that contains a spawn (FA015807) - we just try it on every packet's Conan body.
+		private static void ExtractFromShopData(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
+		{
+			if (packetBytes.Length < 12 + 32)
+				return;
+
+			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(packetBytes.AsSpan(8, 4));
+			var bodyStart = 12 + headerLen;
+			if (bodyStart >= packetBytes.Length)
+				return;
+
+			var body = packetBytes[bodyStart..];
+			if (!ShopContentCodec.LooksLikeShopData(body))
+				return;
+
+			foreach (var e in ShopContentCodec.Parse(body).Entries)
+				into.TryAdd(e.Template, new CapturedItem(e.Data1, e.Data2, e.Data3, e.Data4, e.Archetype));
+		}
+
 		private static void ExtractFromSpawnEquipment(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
 		{
 			if (packetBytes == null || packetBytes.Length < 12)
