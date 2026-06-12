@@ -31,7 +31,7 @@ namespace Faolan.Core.Database.Tables
 		// value to a government label. Keep retail's default until the forms are mapped.
 		public byte GovernmentForm { get; set; } = 3;
 
-		// Guild bank, in copper (u64 on the wire).
+		// Guild bank, in tin (u64 on the wire; the wallet wire unit).
 		public ulong Cash { get; set; }
 
 		public uint Renown { get; set; }

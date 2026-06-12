@@ -198,8 +198,11 @@ namespace Faolan.GameServer
 		}
 
 		// .money            - show the wallet balance.
-		// .money <copper>   - set the balance (and push the 0x2005 wallet update so the client HUD reflects it).
-		// .money +<copper>  - add to the balance.
+		// .money <tin>      - set the balance (and push the 0x2005 wallet update so the client HUD reflects it).
+		// .money +<tin>     - add to the balance.
+		//
+		// The wallet wire unit is TIN, the game's smallest coin (100 tin = 1 copper, 100 copper = 1 silver,
+		// 100 silver = 1 gold) - verified in-client 2026-06-12: .money 100 displays as 1 copper.
 		private async Task MoneyCommand(INetworkClient client, string arguments)
 		{
 			var character = client.Session.Character;
@@ -213,7 +216,7 @@ namespace Faolan.GameServer
 					    ? arg[1..]
 					    : arg, out var amount))
 				{
-					await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .money [&lt;copper&gt; | +&lt;copper&gt;]");
+					await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .money [&lt;tin&gt; | +&lt;tin&gt;]");
 					return;
 				}
 
@@ -226,9 +229,9 @@ namespace Faolan.GameServer
 					: MoneyUpdateReason.Spend);
 			}
 
-			var copper = character.Money;
+			var tin = character.Money;
 			await _agentServerDispatcher.SendSystemMessage(characterId,
-				$"Wallet: {copper / 10000} gold {copper / 100 % 100} silver {copper % 100} copper ({copper} total).");
+				$"Wallet: {tin / 1000000} gold {tin / 10000 % 100} silver {tin / 100 % 100} copper {tin % 100} tin ({tin} tin total).");
 		}
 
 		// .guild create <name>  - create a guild with the player as leader (test bootstrap for the guild flow;

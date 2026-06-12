@@ -486,7 +486,7 @@ namespace Faolan.GameServer
 						character.Money += cash;
 						await Database.SaveCharacter(character);
 						await SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Gain);
-						Logger.LogInformation("Loot: {Player} looted {Cash} copper from bag 0x{Bag:X8} (wallet {Balance}).", character.Name, cash, bagHandle, character.Money);
+						Logger.LogInformation("Loot: {Player} looted {Cash} tin from bag 0x{Bag:X8} (wallet {Balance}).", character.Name, cash, bagHandle, character.Money);
 					}
 					else
 						Logger.LogDebug("TryLootCash for bag 0x{Bag:X8}: no coins to grant.", bagHandle);

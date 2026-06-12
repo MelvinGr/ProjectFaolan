@@ -243,7 +243,7 @@
 			ShopData = 0x2033,
 			// Confirms a SellItem: [u32 container][u32 charId][u32 slot] - the client clears the bag slot.
 			ItemSoldToShop = 0x2035,
-			// Wallet update: [u64 balanceCopper][u32 reason] (reason 3 = gain, 0 = spend/sync, 2 seen once).
+			// Wallet update: [u64 balanceTin][u32 reason] (reason 3 = gain, 0 = spend/sync, 2 seen once).
 			// Decoded from the sell/loot captures: values grow +2 per beach coin loot, jump on quest rewards,
 			// DECREASE on a purchase with reason 0, and persist across sessions. The same opcode value carries
 			// the TradepostInterface search results (different class/size); the money body is always 12 bytes.

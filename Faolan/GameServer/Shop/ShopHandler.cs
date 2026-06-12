@@ -23,14 +23,14 @@ namespace Faolan.GameServer
 	public partial class GameServerListener
 	{
 		// The last sale per connection, so UndoLastSoldItem can restore it (retail's undo is single-step too).
-		private sealed record LastShopSale(int Container, int Slot, uint ItemId, uint Count, uint PriceCopper);
+		private sealed record LastShopSale(int Container, int Slot, uint ItemId, uint Count, uint PriceTin);
 
 		private readonly ConcurrentDictionary<INetworkClient, LastShopSale> _lastShopSale = new();
 
-		// Provisional vendor price: the RDB item templates carry the real value (TEA-cracked but the value field
-		// is not mapped yet - the captured sales went for 19/23/92/392 copper); until then, scale with item level
-		// so better junk pays more.
-		internal static uint VendorPriceCopper(byte itemLevel, uint count)
+		// Provisional vendor price in tin, the wallet wire unit (the RDB item templates carry the real value -
+		// TEA-cracked but the value field is not mapped yet; the captured sales went for 19/23/92/392 tin);
+		// until then, scale with item level so better junk pays more.
+		internal static uint VendorPriceTin(byte itemLevel, uint count)
 		{
 			return (uint)System.Math.Max(1, itemLevel * 2) * System.Math.Max(1u, count);
 		}
@@ -68,7 +68,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			var price = VendorPriceCopper(row.Item.Level, row.Count);
+			var price = VendorPriceTin(row.Item.Level, row.Count);
 			await Database.SetCharacterInventorySlot(character.Id, (int)container, (int)slot, null);
 			character.Money += price;
 			await Database.SaveCharacter(character);
@@ -80,7 +80,7 @@ namespace Faolan.GameServer
 			await ps.SendAsync(client);
 			await SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Gain);
 
-			Logger.LogInformation("Shop: {Character} sold \"{Item}\" x{Count} (container {Container} slot {Slot}) for {Price} copper (wallet {Balance}).",
+			Logger.LogInformation("Shop: {Character} sold \"{Item}\" x{Count} (container {Container} slot {Slot}) for {Price} tin (wallet {Balance}).",
 				character.Name, row.Item.Name, row.Count, container, slot, price, character.Money);
 		}
 
@@ -95,14 +95,14 @@ namespace Faolan.GameServer
 			}
 
 			await Database.SetCharacterInventorySlot(character.Id, sale.Container, sale.Slot, sale.ItemId, sale.Count);
-			character.Money = character.Money >= sale.PriceCopper
-				? character.Money - sale.PriceCopper
+			character.Money = character.Money >= sale.PriceTin
+				? character.Money - sale.PriceTin
 				: 0;
 			await Database.SaveCharacter(character);
 			await SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Spend);
 
-			Logger.LogInformation("Shop: {Character} undid the sale of item {ItemId} (slot {Slot}); {Price} copper debited (wallet {Balance}).",
-				character.Name, sale.ItemId, sale.Slot, sale.PriceCopper, character.Money);
+			Logger.LogInformation("Shop: {Character} undid the sale of item {ItemId} (slot {Slot}); {Price} tin debited (wallet {Balance}).",
+				character.Name, sale.ItemId, sale.Slot, sale.PriceTin, character.Money);
 		}
 
 		// .shop [vendor name]  - open a vendor's shop window. The content protobuf is DECODED (a plain

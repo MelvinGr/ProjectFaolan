@@ -382,8 +382,8 @@ namespace Faolan.GameServer.World
 				    .TryGet(bagHandle, out var bag) || !bag.IsLoot)
 				return 0;
 
-			var cash = bag.CashCopper;
-			bag.CashCopper = 0;
+			var cash = bag.CashTin;
+			bag.CashTin = 0;
 			return cash;
 		}
 
@@ -405,7 +405,7 @@ namespace Faolan.GameServer.World
 				return;
 
 			var bag = WorldEntity.ForLoot(handle, deadNpc.MapId, deadNpc.Position, deadNpc.Rotation, template.Name ?? "Bag of loot", body, LootResolver.LootExpirySeconds);
-			bag.CashCopper = LootResolver.RollCash(Random.Shared.NextDouble(), deadNpc.Level);
+			bag.CashTin = LootResolver.RollCash(Random.Shared.NextDouble(), deadNpc.Level);
 			_sim
 				.World
 				.ZoneFor(deadNpc.MapId)

@@ -34,9 +34,9 @@ namespace Faolan.GameServer.World
 		// A transient loot bag (expires + despawns) rather than a player/NPC.
 		public bool IsLoot { get; private init; }
 
-		// Coins carried by a loot bag (copper), rolled when the bag drops; zeroed once looted (TryLootCash is
-		// granted exactly once per bag).
-		public uint CashCopper { get; set; }
+		// Coins carried by a loot bag (tin, the wallet wire unit), rolled when the bag drops; zeroed once looted
+		// (TryLootCash is granted exactly once per bag).
+		public uint CashTin { get; set; }
 
 		public bool IsPlayer { get; }
 

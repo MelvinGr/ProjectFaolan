@@ -91,18 +91,18 @@ namespace Faolan.Mcp.Tools
 		}
 
 		[McpServerTool(Name = "adjust_money"),
-		 Description("Set or add to a connected character's wallet, in copper (wrapper over the .money GM command; 10000 copper = 1 gold). The client HUD updates live. MUTATING: set confirm=true to actually change it.")]
-		public async Task<string> AdjustMoney([Description("Character id of a currently-connected player")] uint characterId, [Description("Amount in copper")] ulong copper,
+		 Description("Set or add to a connected character's wallet, in tin, the game's smallest coin (wrapper over the .money GM command; 100 tin = 1 copper, 1000000 tin = 1 gold). The client HUD updates live. MUTATING: set confirm=true to actually change it.")]
+		public async Task<string> AdjustMoney([Description("Character id of a currently-connected player")] uint characterId, [Description("Amount in tin")] ulong tin,
 			[Description("true = add to the balance, false = set the balance")] bool add = true, [Description("Must be true to execute.")] bool confirm = false)
 		{
 			if (!confirm)
-				return $"Would {(add ? "add" : "set")} {copper} copper {(add ? "to" : "as")} character {characterId}'s wallet. Call again with confirm=true to execute.";
+				return $"Would {(add ? "add" : "set")} {tin} tin {(add ? "to" : "as")} character {characterId}'s wallet. Call again with confirm=true to execute.";
 
 			var ok = await _dispatcher.RunGmCommand(characterId, add
-				? $".money +{copper}"
-				: $".money {copper}");
+				? $".money +{tin}"
+				: $".money {tin}");
 			return ok
-				? $"{(add ? "Added" : "Set")} {copper} copper {(add ? "to" : "as")} character {characterId}'s wallet."
+				? $"{(add ? "Added" : "Set")} {tin} tin {(add ? "to" : "as")} character {characterId}'s wallet."
 				: $"Character {characterId} is not currently connected to any GameServer listener.";
 		}
 

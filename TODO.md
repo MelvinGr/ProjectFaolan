@@ -293,10 +293,10 @@ Core model IMPLEMENTED 2026-06-12. The wallet-change packet was decoded from the
 spend/sync; the value is the ABSOLUTE balance — grows +2 per beach coin loot, decreases on purchases, persists
 across capture sessions). Golden-tested (`MoneyUpdateTests`).
 
-- [x] **Storage**: `Character.Money` (copper u64, migration `AddCharacterMoney`) + `SendMoneyUpdate` (0x2005).
+- [x] **Storage**: `Character.Money` (tin u64 - the wire unit, 100 tin = 1 copper; migration `AddCharacterMoney`) + `SendMoneyUpdate` (0x2005).
 - [x] **Loot cash**: bags roll coins at drop (`LootResolver.RollCash`, anchored on the observed 2c beach bags),
       `TryLootCash` grants once per bag, persists, pushes the balance.
-- [x] `.money [<copper> | +<copper>]` GM command.
+- [x] `.money [<tin> | +<tin>]` GM command (in-client verified: .money 100 displays 1 copper, so the wire unit is tin).
 - [ ] **In-client verify**: loot coins → wallet HUD updates; balance survives relog (we push an interim 0x2005
       sync at login — retail carries the initial balance in the FullChar snapshot instead, field undecoded; if
       the client ignores or double-counts the login push, find the snapshot field).
@@ -333,7 +333,7 @@ connection needed**, and likely simpler than the AH (no listings/search/mail).
       path (the same item-grant wall as loot, `protocol_containeradditem`) and on prices (stat 356 semantics
       unknown - not obviously a price; the client may price from the RDB item template).
 - [ ] **Real sell prices**: the RDB item templates carry item value (TEA key cracked, field not mapped);
-      provisional price = level×2×count (`VendorPriceCopper`). Captured anchors: 19/23/92/392 copper.
+      provisional price = level×2×count (`VendorPriceTin`). Captured anchors: 19/23/92/392 tin.
 
 ---
 
