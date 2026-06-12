@@ -59,5 +59,13 @@ namespace Faolan.Core.Network.AgentServer
 			if (_provider != null)
 				await _provider.SystemBroadcast(message);
 		}
+
+		public async Task<int> SendClaudeChannelMessage(string message)
+		{
+			if (_provider != null)
+				return await _provider.SendClaudeChannelMessage(message);
+
+			return 0;
+		}
 	}
 }

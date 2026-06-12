@@ -15,5 +15,11 @@ namespace Faolan.Core.Network.AgentServer
 
 		Task SendSystemMessage(uint characterId, string message);
 		Task SystemBroadcast(string message);
+
+		/// <summary>
+		///     Posts a message on the Claude channel (<see cref="ClaudeChannel" />) as the synthetic "Claude" sender,
+		///     broadcast to every connected client. Returns the number of clients it was delivered to.
+		/// </summary>
+		Task<int> SendClaudeChannelMessage(string message);
 	}
 }

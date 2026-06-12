@@ -37,6 +37,16 @@ The AgentServer wire format is `[u16 opcode][u16 bodyLen][body]` (`AgentServerMe
 - **`0x0023` SystemMessage** (out): `[u16 0000][u16-str message][u16 0000]` (message may be `<remoteformat>` XML).
 - **`0x0064` ChatReady** (in): a small chat-init handshake (body `00 01 02`); echoed back verbatim.
 
+## Claude channel (MCP bridge) — added 2026-06-12
+
+A server-defined channel **"Claude"** (`04/0x00C1A0DE/flag 0x8044`, id far outside the retail range) is
+appended to the login subscription list. Player posts on it broadcast normally AND are recorded in the
+in-memory `ClaudeChannel` log (`Faolan.Core/Network/AgentServer/ClaudeChannel.cs`, ring of 500, monotonic
+sequence numbers). The MCP tools `read_claude_channel` (poll by `afterSequence`) and
+`send_claude_channel_message` bridge it to Claude; Claude's replies broadcast in-game as the synthetic
+sender `0xC1A0DE05`/"Claude" via the standard `0x0014`+`0x0041` relay pair. Log is not persisted across
+restarts. In-client render of the channel is not yet verified (needs a live client).
+
 ## Local "say" flow + proximity
 
 1. Player types → **GameServer `ChatCommand` (0x2002)**: `[u32][u32][u32][u32][u16-str text]`. (A leading `.` from a

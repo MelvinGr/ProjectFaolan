@@ -18,11 +18,13 @@ namespace Faolan.AgentServer
 	public partial class AgentServerListener : Server<AgentServerPacket, AgentServerPacketFactory, AgentServerMessageFramer>, IAgentServerProvider
 	{
 		private readonly IAgentServerDispatcher _dispatcher;
+		private readonly ClaudeChannel _claudeChannel;
 
-		public AgentServerListener(ILogger<AgentServerListener> logger, IConfiguration configuration, IDatabaseRepository database, IAgentServerDispatcher dispatcher) : base(configuration.AgentServerPort, logger, configuration,
-			database, new AgentServerOutgoingPacketLogger(logger))
+		public AgentServerListener(ILogger<AgentServerListener> logger, IConfiguration configuration, IDatabaseRepository database, IAgentServerDispatcher dispatcher, ClaudeChannel claudeChannel) : base(
+			configuration.AgentServerPort, logger, configuration, database, new AgentServerOutgoingPacketLogger(logger))
 		{
 			_dispatcher = dispatcher;
+			_claudeChannel = claudeChannel;
 		}
 
 		public IReadOnlyList<SessionInfo> GetSessions()
@@ -95,6 +97,9 @@ namespace Faolan.AgentServer
 
 					await SendChannelSubscription(client, 0x87, 0x001E8480, "~NewbieHelp", 0x00008044);
 
+					// The server-defined Claude channel: posts on it are bridged to Claude via the MCP chat tools.
+					await SendChannelSubscription(client, ClaudeChannel.ChannelType, ClaudeChannel.ChannelId, ClaudeChannel.ChannelName, ClaudeChannel.ChannelFlag);
+
 					await new FaolanStream()
 						.WriteUInt32(0x00050000)
 						.SendAsync(client);
@@ -130,6 +135,17 @@ namespace Faolan.AgentServer
 					Logger.LogInformation("AgentServer channel chat from {Character} on channel {Type:X2}/{Id:X8}: {Message}", client.Session.Character?.Name ?? "?", channelType, channelId, message);
 
 					await BroadcastChannelChat(client, channelType, channelId, message);
+
+					// Posts on the Claude channel are additionally recorded for the MCP bridge (Claude polls the log
+					// and replies via SendClaudeChannelMessage); the normal broadcast above still shows them in-game.
+					if (channelId == ClaudeChannel.ChannelId)
+					{
+						var senderId = client.Session.Account?.ClientInstance ?? 0;
+						var senderName = client.Session.Character?.Name?.Length > 0
+							? client.Session.Character.Name
+							: $"Character{senderId}";
+						_claudeChannel.Append(senderId, senderName, message, fromClaude: false);
+					}
 
 					break;
 				}

@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Data;
 using Faolan.Core.Network;
+using Faolan.Core.Network.AgentServer;
 using Faolan.Core.Network.Packets.Opcodes;
 using Microsoft.Extensions.Logging;
 
@@ -48,6 +49,40 @@ namespace Faolan.AgentServer
 		public Task SystemBroadcast(string message)
 		{
 			return Task.WhenAll(NetworkClients.Select(c => SendSystemMessage(c, message)));
+		}
+
+		public async Task<int> SendClaudeChannelMessage(string message)
+		{
+			// Claude's post on the Claude channel: the same 0x0014 sender-info + 0x0041 relay pair as a player post
+			// (see BroadcastChannelChat), but under the synthetic Claude identity. Every client is subscribed to the
+			// channel (Hello sends the subscription), so a plain broadcast reaches everyone.
+			var delivered = 0;
+			foreach (var client in NetworkClients)
+			{
+				await new FaolanStream()
+					.WriteUInt16(AgentServerRespondsOpcodes.Ox0014)
+					.WriteArrayUInt16Length(s => s
+						.WriteUInt32(ClaudeChannel.SenderId)
+						.WriteUInt32(0x00000000)
+						.WriteString(ClaudeChannel.SenderName))
+					.SendAsync(client);
+
+				await new FaolanStream()
+					.WriteUInt16(AgentServerRespondsOpcodes.ChannelChat)
+					.WriteArrayUInt16Length(s => s
+						.WriteByte(ClaudeChannel.ChannelType)
+						.WriteUInt32(ClaudeChannel.ChannelId)
+						.WriteUInt32(ClaudeChannel.SenderId)
+						.WriteString(message)
+						.WriteUInt16(0x0000))
+					.SendAsync(client);
+
+				delivered++;
+			}
+
+			_claudeChannel.Append(ClaudeChannel.SenderId, ClaudeChannel.SenderName, message, fromClaude: true);
+
+			return delivered;
 		}
 
 		// Relays a channel chat message (0x0041) to every connected client, preceded by the sender's identity

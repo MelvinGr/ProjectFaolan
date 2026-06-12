@@ -54,6 +54,7 @@ namespace Faolan.Mcp
 			builder.Services.AddSingleton(_parentServices.GetRequiredService<IDatabaseRepository>());
 			builder.Services.AddSingleton(_parentServices.GetRequiredService<IAgentServerDispatcher>());
 			builder.Services.AddSingleton(_parentServices.GetRequiredService<IGameServerDispatcher>());
+			builder.Services.AddSingleton(_parentServices.GetRequiredService<ClaudeChannel>());
 
 			builder
 				.Services
@@ -61,7 +62,8 @@ namespace Faolan.Mcp
 				.WithHttpTransport()
 				.WithTools<DatabaseTools>()
 				.WithTools<SessionTools>()
-				.WithTools<GameServerTools>();
+				.WithTools<GameServerTools>()
+				.WithTools<ClaudeChannelTools>();
 
 			_app = builder.Build();
 			_app.Urls.Add($"http://127.0.0.1:{port}");
