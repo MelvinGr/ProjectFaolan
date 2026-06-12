@@ -132,6 +132,16 @@ namespace Faolan.Mcp
 						continue;
 					}
 
+					if (read.Latest < cursor.Value)
+					{
+						// The game server restarted: its channel log is in-memory, so sequences reset below our
+						// cursor and new posts became invisible to the old afterSequence filter. Rewind so
+						// everything posted since the restart gets delivered on the next poll.
+						await Console.Error.WriteLineAsync($"[faolan-chat] sequence rewind (latest {read.Latest} < cursor {cursor}); game server restarted - rewinding");
+						cursor = 0;
+						continue;
+					}
+
 					cursor = Math.Max(cursor.Value, read.Latest);
 					foreach (var message in read.Messages.Where(m => !m.FromClaude))
 					{
