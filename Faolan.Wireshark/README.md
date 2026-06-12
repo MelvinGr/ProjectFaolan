@@ -89,6 +89,22 @@ tshark -r capture.pcapng -o tcp.analyze_sequence_numbers:FALSE \
   -T fields -e frame.number -e faolan.pkt.opcode
 ```
 
+## JSON export (analyzer-style dumps via jq)
+
+`tshark -T json` emits the full dissection tree (one object per frame; each "Conan packet N"
+subtree is self-contained), and `Captures/tshark_to_dump.jq` re-groups that into an
+analyzer-style dump - one record per Faolan/chat packet with frame/time/endpoints/direction/
+opcode/classes/body:
+
+```zsh
+tshark -r capture.pcapng -o tcp.analyze_sequence_numbers:FALSE -T json \
+  | jq -f Captures/tshark_to_dump.jq > capture.tshark.json
+```
+
+Not schema-identical to the `Faolan.PacketAnalyzer` dumps, but carries the same essentials and
+additionally includes the compressed-stream packets the analyzer drops. (~27s for the largest
+12.8k-packet reference capture.)
+
 ## Validation
 
 Byte-exact parity with the `Faolan.PacketAnalyzer` JSON dumps (per-opcode packet counts) on:
