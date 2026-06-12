@@ -116,6 +116,12 @@ namespace Faolan.GameServer.World
 			return _zones.GetOrAdd(mapId, m => new Zone(m) { PlayfieldToken = NextPlayfieldToken() });
 		}
 
+		// Read-only zone lookup that does NOT mint a zone for an untracked map (for observers like the MCP tools).
+		public bool TryGetZone(uint mapId, out Zone zone)
+		{
+			return _zones.TryGetValue(mapId, out zone);
+		}
+
 		// The closest player within `range` of the NPC (its aggro target), or null if none.
 		private static WorldEntity NearestPlayerInRange(Zone zone, WorldEntity npc, float range)
 		{

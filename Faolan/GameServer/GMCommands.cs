@@ -163,6 +163,8 @@ namespace Faolan.GameServer
 				["heal"] = (client, arguments) => AdjustOwnHealthCommand(client, arguments, true),
 				["mount"] = (client, arguments) => MountCommand(client, arguments),
 				["spawnnpc"] = (client, arguments) => SpawnNpcCommand(client, arguments),
+				["despawnnpc"] = (client, arguments) => DespawnNpcCommand(client, arguments),
+				["additem"] = (client, arguments) => AddItemCommand(client, arguments),
 				["world"] = (client, _) => SendWorldInfo(client),
 				["quest"] = (client, arguments) => QuestCommand(client, arguments),
 				["tag"] = (client, arguments) => TagCommand(client, arguments),
@@ -358,6 +360,114 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, entity == null
 				? $"No spawnable NPC named '{name}' (needs a captured NpcSpawns row with spawn data; any map)."
 				: $"Spawned {entity.Name} (handle 0x{entity.Handle:X8}, level {entity.Level}{(entity.Hostile ? ", hostile" : "")}).");
+		}
+
+		// .despawnnpc <handle>  - despawn a non-player entity by its wire handle (hex with 0x prefix, or decimal)
+		// in the caller's zone: n3ToClientQuit to players in range + removal from the world model. The cleanup
+		// complement to .spawnnpc; handles come from list_zone_entities or the spawn message.
+		private async Task DespawnNpcCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var arg = (arguments ?? "").Trim();
+			uint handle = 0;
+			var parsed = arg.Length > 0;
+			try
+			{
+				if (parsed)
+				{
+					handle = arg.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+						? Convert.ToUInt32(arg[2..], 16)
+						: uint.Parse(arg);
+				}
+			}
+			catch (FormatException)
+			{
+				parsed = false;
+			}
+			catch (OverflowException)
+			{
+				parsed = false;
+			}
+
+			if (!parsed)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .despawnnpc <handle> (0x-hex or decimal)");
+				return;
+			}
+
+			var entity = await _broadcaster.DespawnEntityForPlayer(client, handle);
+			await _agentServerDispatcher.SendSystemMessage(characterId, entity == null
+				? $"No despawnable entity 0x{handle:X8} in this zone (unknown handle, or a player)."
+				: $"Despawned {entity.Name} (0x{handle:X8}).");
+		}
+
+		// .additem <itemId> [count]  - add an item (by faolan.db Items id) to the calling character's bag: persist
+		// a CharacterInventory row in the first free bag slot, then re-send the rebuilt 0x737A6DF9 inventory
+		// snapshot so it appears live (the snapshot is the ONLY item-delivery packet - there is no incremental
+		// server add-item; see protocol_containeradditem). Without a stashed snapshot template (pre-world or a
+		// non-replay session) the item still persists and renders on next login.
+		private async Task AddItemCommand(INetworkClient client, string arguments)
+		{
+			var character = client.Session.Character;
+			var characterId = character.Id;
+			var parts = (arguments ?? "")
+				.Trim()
+				.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+			uint count = 1;
+			if (parts.Length is < 1 or > 2 || !uint.TryParse(parts[0], out var itemId) || (parts.Length == 2 && !uint.TryParse(parts[1], out count)))
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .additem &lt;itemId&gt; [count]");
+				return;
+			}
+
+			var item = await Database.GetItem(itemId);
+			if (item is not { Archetype: not 0 })
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, item == null
+					? $"No item with id {itemId}."
+					: $"Item {itemId} ('{item.Name}') has no archetype - not snapshot-buildable.");
+				return;
+			}
+
+			// First free bag cell: skip slots taken by persisted rows and the captured starter-bag cell (pos 1)
+			// while the legacy FirstPosBag item still renders there.
+			var equipment = await Database.GetCharacterEquipment(characterId);
+			var rows = await Database.GetCharacterInventory(characterId);
+			var taken = rows
+				.Where(r => r.Container == (int)FullCharSnapshotBuilder.BagKind)
+				.Select(r => r.Slot)
+				.ToHashSet();
+			if (equipment?.FirstPosBag is { Archetype: not 0 })
+				taken.Add(1);
+			var slot = Enumerable
+				.Range(0, 24)
+				.Where(s => !taken.Contains(s))
+				.Cast<int?>()
+				.FirstOrDefault();
+			if (slot == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Bag is full (24 cells).");
+				return;
+			}
+
+			await Database.SetCharacterInventorySlot(characterId, (int)FullCharSnapshotBuilder.BagKind, slot.Value, itemId, count);
+
+			// Live delivery: rebuild the inventory snapshot from the stashed verbatim template + the fresh rows
+			// and re-send it (the proven post-load path, just later in the session).
+			var delivered = false;
+			if (client.Session.InventorySnapshotTemplate != null)
+			{
+				var freshRows = await Database.GetCharacterInventory(characterId);
+				var snapshot = BuildDbInventorySnapshot(client.Session.InventorySnapshotTemplate, character, equipment, freshRows);
+				if (snapshot != null)
+				{
+					await client.SendAsync(snapshot);
+					delivered = true;
+				}
+			}
+
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				$"Added {count}x '{item.Name}' (id {itemId}) to bag slot {slot}.{(delivered ? "" : " No live snapshot path on this session - it appears on next login.")}");
 		}
 
 		// .quest add|remove <id> | .quest list  - manage the player's quest journal. `add` records the quest +

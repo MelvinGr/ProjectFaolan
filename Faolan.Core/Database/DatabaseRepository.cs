@@ -54,6 +54,8 @@ namespace Faolan.Core.Database
 		Task<bool> SetCharacterGuild(uint characterId, uint? guildId, byte rank);
 
 		Task<Item> GetItem(uint id);
+		Task<Item[]> SearchItems(string nameSubstring, int limit = 25);
+		Task<NpcSpawn[]> SearchNpcSpawns(string nameSubstring, int limit = 50);
 		Task<LuaScript> GetLuaScript(uint scriptId);
 
 		Task<Map> GetMap(uint id);
@@ -633,6 +635,35 @@ namespace Faolan.Core.Database
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Items.FirstOrDefaultAsync(i => i.Id == id);
+		}
+
+		// Items whose name contains the substring, case-insensitive (LOWER() both sides). Discovery for the
+		// MCP search_items tool and .additem.
+		public async Task<Item[]> SearchItems(string nameSubstring, int limit = 25)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var lowered = nameSubstring.ToLowerInvariant();
+			return await ctx
+				.Items
+				.Where(i => i.Name != null && i.Name.ToLower().Contains(lowered))
+				.OrderBy(i => i.Name)
+				.Take(limit)
+				.ToArrayAsync();
+		}
+
+		// Captured NPC spawn rows whose name contains the substring, case-insensitive, any map. Rows without
+		// spawn Data are included (still useful to know the NPC exists) - callers check Data for spawnability.
+		public async Task<NpcSpawn[]> SearchNpcSpawns(string nameSubstring, int limit = 50)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var lowered = nameSubstring.ToLowerInvariant();
+			return await ctx
+				.NpcSpawns
+				.Where(n => n.Name != null && n.Name.ToLower().Contains(lowered))
+				.OrderBy(n => n.Name)
+				.ThenBy(n => n.MapId)
+				.Take(limit)
+				.ToArrayAsync();
 		}
 
 		public async Task<LuaScript> GetLuaScript(uint scriptId)

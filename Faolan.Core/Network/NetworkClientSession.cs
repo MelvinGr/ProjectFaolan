@@ -45,6 +45,11 @@ namespace Faolan.Core.Network
 		// The player's DB-built inventory snapshot (0x737A6DF9), stashed during world entry and sent AFTER the
 		// post-ready burst (post-load) - the world-entry snapshot itself must stay verbatim or chat stalls.
 		byte[] PendingPostLoadInventory { get; set; }
+
+		// The VERBATIM world-entry inventory snapshot packet (0x737A6DF9), kept for the whole session so the
+		// inventory can be rebuilt + re-sent when it changes mid-session (.additem): the rebuild parses this
+		// packet's prefix/tails and regenerates only the containers (BuildDbInventorySnapshot).
+		byte[] InventorySnapshotTemplate { get; set; }
 		Character Character { get; set; }
 
 		// Live NPC entity handle -> name, captured from the world-burst spawns (FA015807) actually sent this session.
@@ -110,6 +115,7 @@ namespace Faolan.Core.Network
 		public bool IsCreateEditorConnection { get; set; }
 		public bool IsCreateWorldSession { get; set; }
 		public byte[] PendingPostLoadInventory { get; set; }
+		public byte[] InventorySnapshotTemplate { get; set; }
 		public bool PostMorphBurstSent { get; set; }
 		public bool UsedWorldBurstReplay { get; set; }
 		public byte[] ClientConversation { get; set; }

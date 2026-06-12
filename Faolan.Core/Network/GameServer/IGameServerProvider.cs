@@ -28,5 +28,17 @@ namespace Faolan.Core.Network.GameServer
 		///     CsPlayerAgent guild flow so joining/leaving a guild updates the world view without a relog.
 		/// </summary>
 		Task<bool> SendGuildTag(uint characterId, string guildName);
+
+		/// <summary>
+		///     Snapshot of the live world model for a map: every entity in the zone (players, NPCs, loot bags)
+		///     with vitals/transform. Cheap, read-only; empty when this listener tracks nothing on the map.
+		/// </summary>
+		IReadOnlyList<ZoneEntityInfo> GetZoneEntities(uint mapId);
+
+		/// <summary>
+		///     The live world state of a connected character (position, vitals, buffs), or null when the
+		///     character is not connected to this listener (so a dispatcher can try the next provider).
+		/// </summary>
+		CharacterLiveState GetCharacterLiveState(uint characterId);
 	}
 }

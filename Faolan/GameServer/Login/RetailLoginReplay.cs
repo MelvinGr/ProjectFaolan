@@ -530,7 +530,10 @@ namespace Faolan.GameServer
 				{
 					// Send the world-entry snapshot VERBATIM (chat-safe). Build the player's DB inventory snapshot
 					// from the same packet and stash it - it is sent AFTER the post-ready burst (post-load) so the
-					// backpack shows the player's real items without risking the world-load/chat gate.
+					// backpack shows the player's real items without risking the world-load/chat gate. The verbatim
+					// packet is also kept for the session so mid-session inventory changes (.additem) can rebuild
+					// + re-send the snapshot through the same proven path.
+					client.Session.InventorySnapshotTemplate = pkt;
 					client.Session.PendingPostLoadInventory = BuildDbInventorySnapshot(pkt, client.Session.Character, equipment, inventoryRows);
 					pkt = BuildBeachInventoryPacket(pkt, client.Session.Character);
 				}

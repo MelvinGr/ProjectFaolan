@@ -63,6 +63,34 @@ namespace Faolan.Core.Network.GameServer
 			return false;
 		}
 
+		public IReadOnlyList<ZoneEntityInfo> GetZoneEntities(uint mapId)
+		{
+			IGameServerProvider[] providers;
+			lock (_lock)
+				providers = _providers.ToArray();
+
+			// The listeners share one world simulation, so the first non-empty view is THE view.
+			foreach (var provider in providers)
+			{
+				var entities = provider.GetZoneEntities(mapId);
+				if (entities.Count > 0)
+					return entities;
+			}
+
+			return [];
+		}
+
+		public CharacterLiveState GetCharacterLiveState(uint characterId)
+		{
+			IGameServerProvider[] providers;
+			lock (_lock)
+				providers = _providers.ToArray();
+
+			return providers
+				.Select(p => p.GetCharacterLiveState(characterId))
+				.FirstOrDefault(s => s != null);
+		}
+
 		public async Task<bool> SendGuildTag(uint characterId, string guildName)
 		{
 			IGameServerProvider[] providers;

@@ -35,5 +35,40 @@ namespace Faolan.GameServer
 			await HandleGmCommand(client, commandText);
 			return true;
 		}
+
+		public IReadOnlyList<ZoneEntityInfo> GetZoneEntities(uint mapId)
+		{
+			if (!_simulation.World.TryGetZone(mapId, out var zone))
+				return [];
+
+			return zone
+				.Entities
+				.Select(e => new ZoneEntityInfo(e.Handle, e.Name, e.IsPlayer
+						? "player"
+						: e.IsLoot
+							? "loot"
+							: "npc", e.Level, e.Hostile, e.IsDead, e.Vitals?.Health, e.Vitals?.MaxHealth, e.Position.X, e.Position.Y, e.Position.Z))
+				.OrderBy(e => e.Handle)
+				.ToArray();
+		}
+
+		public CharacterLiveState GetCharacterLiveState(uint characterId)
+		{
+			var client = ClientForCharacter(characterId);
+			var entity = client is null
+				? null
+				: _simulation.PlayerWorldEntity(client);
+			if (entity == null)
+				return null;
+
+			var buffs = entity
+				.ActiveBuffs
+				.Keys
+				.OrderBy(id => id)
+				.Select(id => $"0x{id:X8}")
+				.ToArray();
+			return new CharacterLiveState(characterId, entity.Name, entity.Handle, entity.MapId, entity.Position.X, entity.Position.Y, entity.Position.Z, entity.Vitals?.Health, entity.Vitals?.MaxHealth,
+				buffs);
+		}
 	}
 }

@@ -336,6 +336,32 @@ namespace Faolan.GameServer.World
 			return entity;
 		}
 
+		// Despawns a non-player entity by handle in the calling player's zone: the decoded n3ToClientQuit removal
+		// to every player in range + drop from the model (the cleanup complement to SpawnNpcForPlayer; also works
+		// on burst NPCs and loot bags). Returns the removed entity, or null when the handle is unknown or a player.
+		public async Task<WorldEntity> DespawnEntityForPlayer(INetworkClient client, uint entityHandle)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null || !_sim
+				    .World
+				    .ZoneFor(player.MapId)
+				    .TryGet(entityHandle, out var entity) || entity.IsPlayer)
+				return null;
+
+			foreach (var viewer in _sim
+				         .World
+				         .ZoneFor(player.MapId)
+				         .PlayersInRange(entity.Position, WorldSimulation.PlayerInterestRange))
+			{
+				if (viewer.Client != null)
+					await SendWorldDespawn(viewer.Client, player.MapId, entityHandle);
+			}
+
+			_sim.World.Remove(entity);
+			_logger.LogInformation("Despawn: removed {Name} 0x{Handle:X8} (by {Player}).", entity.Name, entityHandle, player.Name);
+			return entity;
+		}
+
 		// A player clicked an item in the loot window (top-level 0x2043). The actual transfer - grant the item to the
 		// player's inventory (ContainerAddItem) + LootRemoveItems to clear it from the bag - is the in-client-gated
 		// piece not built yet (no live inventory-add path). Logged so the click is traceable.
