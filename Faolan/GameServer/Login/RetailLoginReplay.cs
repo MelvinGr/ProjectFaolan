@@ -193,13 +193,14 @@ namespace Faolan.GameServer
 				var prefix = AdjustSnapshotPrefixRootLength(parts.Prefix, rootBytes.Length - verbatimRoot.Length);
 				var tailsBytes = parts.Tails.ToArray();
 
-				// FROM-SCRATCH beach path (opt-in FAOLAN_SCRATCH_BEACH_SNAPSHOT=1): on the beach, build the prefix and
-				// tails from the ground up - the prefix from BeachSnapshotPrefix (constants + root length, no captured
-				// prefix / no delta-adjust) and the tails from the server-owned BeachTailsBuilder template (level +
-				// vitals generated, instance re-addressed) - instead of carrying the captured burst's prefix/tails.
-				// Both are proven byte-identical to the capture (BeachSnapshotConstructionTests). Gated to the beach
-				// map and off by default until verified in a live client. See [[snapshot_tails_construction_scope]].
-				if (Environment.GetEnvironmentVariable("FAOLAN_SCRATCH_BEACH_SNAPSHOT") == "1" && character?.MapId == DefaultWorldMapId && BeachTailsBuilder.IsAvailable)
+				// FROM-SCRATCH beach path (default on; opt out with FAOLAN_SCRATCH_BEACH_SNAPSHOT=0): on the beach,
+				// build the prefix and tails from the ground up - the prefix from BeachSnapshotPrefix (constants +
+				// root length, no captured prefix / no delta-adjust) and the tails from the server-owned
+				// BeachTailsBuilder template (level + vitals generated, instance re-addressed) - instead of carrying
+				// the captured burst's prefix/tails. Both are proven byte-identical to the capture
+				// (BeachSnapshotConstructionTests) and construct in-client with 0 IIR errors. Gated to the beach map;
+				// other maps keep the burst prefix/tails + delta-adjust. See [[snapshot_tails_construction_scope]].
+				if (Environment.GetEnvironmentVariable("FAOLAN_SCRATCH_BEACH_SNAPSHOT") != "0" && character?.MapId == DefaultWorldMapId && BeachTailsBuilder.IsAvailable)
 				{
 					prefix = BeachSnapshotPrefix.Build(rootBytes.Length);
 					tailsBytes = BeachTailsBuilder.Build(character, instance);
