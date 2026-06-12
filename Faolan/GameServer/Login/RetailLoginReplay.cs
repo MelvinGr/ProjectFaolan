@@ -191,6 +191,20 @@ namespace Faolan.GameServer
 				// subclass version ("ReadSubClass Wrong IIR_t version ..."). Delta-adjust that varint by the
 				// root-length change, exactly as SetCharacterMessage delta-adjusts the spawn's CharacterIIR length.
 				var prefix = AdjustSnapshotPrefixRootLength(parts.Prefix, rootBytes.Length - verbatimRoot.Length);
+				var tailsBytes = parts.Tails.ToArray();
+
+				// FROM-SCRATCH beach path (opt-in FAOLAN_SCRATCH_BEACH_SNAPSHOT=1): on the beach, build the prefix and
+				// tails from the ground up - the prefix from BeachSnapshotPrefix (constants + root length, no captured
+				// prefix / no delta-adjust) and the tails from the server-owned BeachTailsBuilder template (level +
+				// vitals generated, instance re-addressed) - instead of carrying the captured burst's prefix/tails.
+				// Both are proven byte-identical to the capture (BeachSnapshotConstructionTests). Gated to the beach
+				// map and off by default until verified in a live client. See [[snapshot_tails_construction_scope]].
+				if (Environment.GetEnvironmentVariable("FAOLAN_SCRATCH_BEACH_SNAPSHOT") == "1" && character?.MapId == DefaultWorldMapId && BeachTailsBuilder.IsAvailable)
+				{
+					prefix = BeachSnapshotPrefix.Build(rootBytes.Length);
+					tailsBytes = BeachTailsBuilder.Build(character, instance);
+					Logger.LogInformation("From-scratch beach snapshot: built prefix ({Prefix} b) + server-owned tails ({Tails} b).", prefix.Length, tailsBytes.Length);
+				}
 
 				using var contentStream = new FaolanStream();
 				contentStream.WriteUInt32(subOpcode);
@@ -198,7 +212,7 @@ namespace Faolan.GameServer
 				contentStream.WriteUInt32(instance);
 				contentStream.WriteArray(prefix);
 				contentStream.WriteArray(rootBytes);
-				contentStream.WriteArray(parts.Tails.ToArray());
+				contentStream.WriteArray(tailsBytes);
 				var bodyContent = contentStream.ToArray();
 
 				var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(verbatimPacket.AsSpan(8, 4));

@@ -14,6 +14,12 @@
     </ItemGroup>
 
     <ItemGroup>
+        <!-- Server-owned beach 0x737A6DF9 tails template (content-fixed regions); BeachTailsBuilder assembles it
+             with the live character's generated fields instead of carrying the captured burst tails. -->
+        <EmbeddedResource Include="GameServer\Packets\FullCharSnapshot\BeachTailsTemplate.bin"/>
+    </ItemGroup>
+
+    <ItemGroup>
         <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.8"/>
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.8">
             <PrivateAssets>all</PrivateAssets>
