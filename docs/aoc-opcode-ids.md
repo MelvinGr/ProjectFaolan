@@ -3,7 +3,8 @@
 Stage 3 of `docs/archive/opcode-re-plan.md`. The client id hash is **BKDR-31** (`h = h*31 + c`, Java's
 `String.hashCode`), cracked in Stage 2 (18/18 known anchors). Ids below are resolved by hashing every
 identifier in `AgeOfConan.exe` and matching. `[?]` = no exe string hashes to it (name not in binary, or
-a collision picked wrong); 16-bit RpcHeader opcodes are method indices, not hashes (see Stage 3b).
+a collision picked wrong); 16-bit RpcHeader opcodes are method indices, not hashes — **RESOLVED 2026-06-12**
+(see Stage 3b below).
 
 
 ## ProtoEndpoint.type ids (object-class / interface names)
@@ -540,6 +541,21 @@ a collision picked wrong); 16-bit RpcHeader opcodes are method indices, not hash
 | 0x6505EEC3 | 1 | [?] | CsPlayerAgent |
 
 ## 16-bit RpcHeader opcodes per server (method indices - Stage 3b, NOT hashes)
+
+**RESOLVED (2026-06-12, guild work):** the opcode is `0x2000 + the method's position` in the recovered
+client→server RPC table (`docs/aoc-client-rpc-methods.json`) — registration order = table order. Anchored on
+CSPlayerAgent `0x201C` = `AcceptGuildInvitation` (fired exactly once on the guild-accept click) and bulk-verified
+by tabulating `(RpcHeader caller class, opcode)` across all capture JSONs (independent semantic hits:
+`SplitInventoryItem`, `ToggleVanityArmorFilter`, `AddShortcut`, `CloseLootBag`, `GameCharAgent.Ping`, the
+tradepost methods). **Client→server only** — the server→client interface tables (CSPlayerInterface,
+GameInterface, TradepostInterface, PlayerAgent both directions) have unnamed extra methods in the live build, so
+observed s2c indices drift upward vs the recovered names; downloads stay content-named. On the multiplexed
+GameServer connection the dispatch key is `(class id, opcode)`; the small class tables top out early
+(TradepostAgent `0x2013`, project `0x200C`, GameAgent `0x200A`), so any value `>= 0x2014` is unambiguously
+GameCharAgent. Full per-class catalogs: `Faolan.Core/Network/Packets/Opcodes.cs`; methodology: README
+"Client reverse-engineering"; verification corpus: `Captures/decode_guild.py`.
+
+The raw per-server counts below are kept as the original observation record:
 
 
 **CsPlayerAgent**: 0x201E(76) 0x2077(57) 0x20A5(56) 0x2030(48) 0x2000(47) 0x2040(34) 0x2041(34) 0x2038(33) 0x20D0(23) 0x20C5(23) 0x202F(18) 0x2043(18) 0x203A(10) 0x2042(8) 0x203F(4) 0x2039(3) 0x202E(1) 0x203D(1) 0x202A(1) 0x201C(1) 0x20AB(1)
