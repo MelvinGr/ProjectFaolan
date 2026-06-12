@@ -263,3 +263,7 @@ mirror-store/
 
 # design-time EF factory artifact
 Faolan/faolan.db
+
+# Python bytecode caches (Captures/*.py tooling)
+__pycache__/
+*.pyc
