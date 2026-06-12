@@ -421,7 +421,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerOpcodes.TryLootAll: // the loot-all click on an open loot window; body = [typetag][bag handle]. NOTE: TryLootCash (0x2045, x23 = every loot) is NOT handled yet - coins are never granted
+				case GameServerOpcodes.TryLootAll: // the loot-all click on an open loot window; body = [typetag][bag handle]
 				{
 					packet.Body.ReadUInt32(); // loot typetag (0xC87A)
 					var bagHandle = packet.Body.ReadUInt32();
@@ -435,6 +435,48 @@ namespace Faolan.GameServer
 					packet.Body.ReadUInt32(); // loot typetag (0xC87A)
 					var bagHandle = packet.Body.ReadUInt32();
 					await _broadcaster.CloseLootBag(client, bagHandle);
+
+					break;
+				}
+
+				case GameServerOpcodes.TryLootCash: // loot the bag's coins; fires on every loot alongside TryLootAll
+				{
+					packet.Body.ReadUInt32(); // loot typetag (0xC87A)
+					var bagHandle = packet.Body.ReadUInt32();
+
+					// No money model exists yet (no Character.Money, no coin grant packet decoded - the Tortage
+					// starter bags carry no cash, so retail shows no reply either). Consume the request so it
+					// stops logging as unknown; the grant lands with the money work (TODO §8 "money storage").
+					Logger.LogInformation("TryLootCash for bag 0x{Bag:X8}: no money model yet, nothing granted.", bagHandle);
+
+					break;
+				}
+
+				case GameServerOpcodes.RespawnMe: // the player's release/resurrect click; body = [u32 token]
+				{
+					var token = packet.Body?.Length >= sizeof(uint)
+						? packet.Body.ReadUInt32()
+						: 0;
+
+					// Retail respawn is click-driven (vitals restore + tombstone + teleport + re-render at the
+					// resurrection point); our simulation already implements that flow on a fallback timer - the
+					// click just triggers it immediately.
+					if (await _simulation.TryRespawnNow(client))
+						Logger.LogInformation("RespawnMe (token 0x{Token:X8}): player released; respawned.", token);
+					else
+						Logger.LogWarning("RespawnMe (token 0x{Token:X8}) from a player that is not dead; ignored.", token);
+
+					break;
+				}
+
+				case GameServerOpcodes.CancelBuff: // right-click-cancel a buff; body = [u32 buffId][u32 charId]
+				{
+					var buffId = packet.Body.ReadUInt32();
+					var charId = packet.Body.ReadUInt32();
+
+					// No server-side buff model yet (buffs are ApplySpell effects the client tracks); the client
+					// removes the icon itself. Logged so the cancel is visible when the buff model lands.
+					Logger.LogInformation("CancelBuff: buff 0x{Buff:X8} cancelled by {CharId:X8} (no buff model; client-side only).", buffId, charId);
 
 					break;
 				}
@@ -585,6 +627,26 @@ namespace Faolan.GameServer
 
 				case GameServerOpcodes.ChatCommand:
 				{
+					// 0x2002 collides by class: GameAgent.ChatVicinity (typed chat, the string body below) vs
+					// GameCharAgent.RequestBindLocation (body = exactly the player's ID32, sent repeatedly - the
+					// client resolving its bind/home playfield, i.e. the Totem of Origin destination). Retail
+					// answers each with a 4-byte 0x2002 [u32 playfieldId] (verified 1:1 across 13 captures).
+					if (packet.Body?.Length == sizeof(uint) * 2)
+					{
+						packet.Body.ReadUInt32(); // ID32 type (0x0000C350)
+						var requesterId = packet.Body.ReadUInt32();
+
+						// No bind/totem model yet: a character's bind playfield is its current map. TODO: persist a
+						// real bind location once binding (inn/wayfarer) and the totem teleport are implemented.
+						await new PacketStream()
+							.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, GameServerRespondOpcodes.BindLocation)
+							.WriteUInt32(client.Session.Character?.MapId ?? Core.Database.Tables.Map.TortageBeachId)
+							.SendAsync(client);
+						Logger.LogDebug("RequestBindLocation({RequesterId:X8}) -> bind playfield {MapId}.", requesterId, client.Session.Character?.MapId ?? 0);
+
+						break;
+					}
+
 					LogPacketBodyDebug("GameServer ChatCommand body", packet.Body?.ToArray());
 
 					var unk0 = packet.Body.ReadUInt32();
@@ -610,11 +672,24 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerOpcodes.RemoveShortcut:
+				case GameServerOpcodes.RemoveShortcut: // body = [u32 slot]
 				{
-					var counter = packet.Body.ReadUInt32();
+					var slot = packet.Body.ReadUInt32();
+					if (client.Session.Character != null)
+						await Database.RemoveCharacterShortcut(client.Session.Character.Id, slot);
 
-					Logger.LogInformation("0x2071 counter={Counter:X4}", counter);
+					Logger.LogInformation("RemoveShortcut slot 0x{Slot:X4}.", slot);
+
+					break;
+				}
+
+				case GameServerOpcodes.UpdateShortcut: // body = [u32 slot][u32 a][u32 b] - a/b semantics undecoded
+				{
+					var slot = packet.Body.ReadUInt32();
+					var a = packet.Body.ReadUInt32();
+					var bField = packet.Body.ReadUInt32();
+
+					Logger.LogInformation("UpdateShortcut slot 0x{Slot:X4} a={A} b=0x{B:X} (semantics undecoded; not persisted).", slot, a, bField);
 
 					break;
 				}
@@ -636,12 +711,18 @@ namespace Faolan.GameServer
 						break;
 					}
 
-					var type = packet.Body.ReadUInt32(); // 1 = item, 2 = spell/ability
-					var slotId = packet.Body.ReadUInt32(); // 1 = 0x64, 2 = 0x65, 3 = 0x66, etc
-					var sourceId = packet.Body.ReadUInt32(); // ability id or item slot
+					var type = packet.Body.ReadUInt32(); // observed 4 = ability (the ids match the 0x2052 grants), 2/3 = other
+					var slotId = packet.Body.ReadUInt32(); // client slot id (ranges 0x64.. and 0x4E20.. = bar pages)
+					var sourceId = packet.Body.ReadUInt32(); // ability id or item ref
 					var unk = packet.Body.ReadUInt32();
 
-					await LogToClient($"MoveItemToBar: type: {type:X8}, slotId: {slotId:X8}, sourceId: {sourceId:X8}, unk: {unk:X8}");
+					// Persist the slot (upsert - re-dragging overwrites). The login RESTORE is undecoded
+					// (RequestShortcutBar gets no direct retail reply; likely rides the FullChar snapshot), so
+					// for now this is bookkeeping for when that lands.
+					if (client.Session.Character != null)
+						await Database.SetCharacterShortcut(client.Session.Character.Id, slotId, type, sourceId);
+
+					Logger.LogInformation("AddShortcut: type {Type}, slot 0x{Slot:X4}, target 0x{Target:X8} (unk {Unk:X8}).", type, slotId, sourceId, unk);
 
 					break;
 				}

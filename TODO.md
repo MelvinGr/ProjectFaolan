@@ -103,18 +103,25 @@ and combat-loop items in §2. Forward milestones (shared zones, persistence, sca
 
 ### 4b. Named-but-unhandled client packets (surfaced by the opcode mapping, 2026-06-12)
 
-Observed in captures (counts in parens), now identified via the method-index tables, currently falling into the
-unknown-packet log. Each is a concrete gameplay gap with a known entry point:
+First pass IMPLEMENTED 2026-06-12 (same day); what remains is the deeper model work:
 
-- [ ] **`TryLootCash` 0x2045 (x23 — every loot!)** — looting coins is never granted; pairs 1:1 with the handled
-      `TryLootAll` 0x2043. The missing half of the live loot item-grant (§2 inventory/loot).
-- [ ] **`RespawnMe` 0x2024 (x2)** — retail respawn is CLICK-driven (the "resurrect" button), ours is a tick
-      timer that auto-respawns. Handle the click; keep the timer as fallback. Related: **`RequestBindLocation`
-      0x2002 (x49)** — the client repeatedly asks for its bind/resurrection point and we never answer.
-- [ ] **`CancelBuff` 0x201E (x1)** — right-click-cancel a buff; ignored.
-- [ ] **`RequestShortcutBar` 0x206D (handled = logged only) + `UpdateShortcut` 0x206F (x3) + the handled
-      `AddShortcut`/`RemoveShortcut`/`MoveShortcut`** — the full hotbar-persistence protocol is now named;
-      persistence itself unimplemented.
+- [x] **`RespawnMe` 0x2024** — respawn is now CLICK-driven (`WorldSimulation.TryRespawnNow`; the 10s tick timer
+      stays as the fallback). Retail reply sequence decoded for later fidelity: vitals → `TombStoneFullUpdateIIR`
+      (tombstone at the death spot, NOT sent yet) → teleport + re-render at the resurrection point (= our
+      existing flow).
+- [x] **`RequestBindLocation` 0x2002 (x49)** — answered with `0x2002 [u32 playfieldId]` (verified 1:1 across 13
+      captures). It is the **Totem of Origin home playfield**; we reply with the character's current map.
+      - [ ] Real bind model: persist a bind location (inn/wayfarer binding) + the totem teleport itself
+            (`use_totem_of_origin` capture exists).
+- [x] **`TryLootCash` 0x2045** — consumed gracefully (no more unknown-packet noise); the actual coin grant is
+      blocked on the money model (§9c) — Tortage starter bags carry no cash, so no retail reply to mimic yet.
+- [x] **`CancelBuff` 0x201E** — parsed ([u32 buffId][u32 charId]) + logged; a server-side buff model doesn't
+      exist yet (buffs are client-tracked ApplySpell effects).
+- [x] **Hotbar persistence (server side)** — `CharacterShortcuts` table; `AddShortcut` upserts,
+      `RemoveShortcut` deletes (migration `AddCharacterShortcuts`).
+      - [ ] The login RESTORE is undecoded: `RequestShortcutBar` gets no direct retail reply — the bar most
+            likely rides inside the FullChar 0x737A6DF9 snapshot (RE-gated). `UpdateShortcut` 0x206F
+            ([slot][a][b]) semantics also undecoded; logged, not persisted.
 - [ ] `ScryMessageBoxAnswer` 0x203B (x1), `RequestMassivePvPScoreData` 0x208D (x1) — note only.
 - Suspicious historical behavior kept until a live check: we answer every `SetSprintInputState` 0x200C
   (x2092 — the sprint key) with a `ReportDimensionId`; retail does not.
@@ -233,6 +240,17 @@ buy-delivery path (seller's item + buyer's payment move through mail).
 - [ ] **Step 3:** go DB-backed — `TradepostListing` + `Mail`/`MailAttachment` tables, search, money/escrow,
       buy→mail grant. NB: tradepost sells from the **bank** (`nBankItemSlot`) — leans on bank/money support;
       `CSBuyItemReply` hints at a commerce/CS path. All on the existing GameServer dispatcher (no new connection).
+
+### 9c. Money storage / usage (cross-cutting prerequisite)
+
+Nothing in the server models money yet; it blocks several flows that are otherwise ready:
+- [ ] **Storage**: `Character.Money` (copper, u64 — same unit as `Guild.Cash`). Where does the CLIENT learn the
+      balance? Find the money stat/field (likely a stat id in the 0x737A6DF9 snapshot stat block or a dedicated
+      IIR — `docs/player-stats.md`; the `BankIIR 0x0BA1C1CB` that accompanies DispatchOpenTradepost is another
+      candidate). Decode from a capture where money visibly changes (sell_items_to_trader has 8 SellItem calls).
+- [ ] **Usage paths once storage exists**: `TryLootCash` coin grant (§4b), vendor buy/sell debit/credit (§9b),
+      AH listing/buy + mail COD (§9a), guild bank deposits (`GuildTransferMoney`/`GuildWithdrawMoney`,
+      `Guild.Cash` is already persisted).
 
 ### 9b. NPC vendor / shop buy-sell (AFTER 9a — simpler)
 Rides on **`GameCharAgent`/`GameCharInterface`** — the main GameServer connection, already fully wired; **no new

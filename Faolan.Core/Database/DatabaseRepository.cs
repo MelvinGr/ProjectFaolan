@@ -36,7 +36,10 @@ namespace Faolan.Core.Database
 		Task<CharacterQuest[]> GetCharacterQuests(uint characterId);
 		Task<Character[]> GetCharactersByAccount(uint id, bool skipUninitialized = true);
 		Task<Character> GetCharacterScaffold(uint characterId);
+		Task<CharacterShortcut[]> GetCharacterShortcuts(uint characterId);
 		Task<uint[]> GetCharacterTags(uint characterId);
+		Task RemoveCharacterShortcut(uint characterId, uint slot);
+		Task SetCharacterShortcut(uint characterId, uint slot, uint shortcutType, uint targetId);
 
 		Task<ClassAbility> GetClassAbility(uint @class, uint level);
 
@@ -298,6 +301,51 @@ namespace Faolan.Core.Database
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Characters.FirstOrDefaultAsync(c => c.Name == name);
+		}
+
+		// --- hotbar shortcuts (persistence only; the login restore path is undecoded - see CharacterShortcut) ---
+
+		public async Task<CharacterShortcut[]> GetCharacterShortcuts(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.CharacterShortcuts
+				.Where(s => s.CharacterId == characterId)
+				.OrderBy(s => s.Slot)
+				.ToArrayAsync();
+		}
+
+		public async Task RemoveCharacterShortcut(uint characterId, uint slot)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await ctx
+				.CharacterShortcuts
+				.Where(s => s.CharacterId == characterId && s.Slot == slot)
+				.ExecuteDeleteAsync();
+		}
+
+		// Upserts a hotbar slot (the client re-sends AddShortcut for an occupied slot when it is overwritten).
+		public async Task SetCharacterShortcut(uint characterId, uint slot, uint shortcutType, uint targetId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var existing = await ctx.CharacterShortcuts.FirstOrDefaultAsync(s => s.CharacterId == characterId && s.Slot == slot);
+			if (existing == null)
+			{
+				ctx.CharacterShortcuts.Add(new CharacterShortcut
+				{
+					CharacterId = characterId,
+					Slot = slot,
+					ShortcutType = shortcutType,
+					TargetId = targetId
+				});
+			}
+			else
+			{
+				existing.ShortcutType = shortcutType;
+				existing.TargetId = targetId;
+			}
+
+			await ctx.SaveChangesAsync();
 		}
 
 		// --- guilds ----------------------------------------------------------------------------------------

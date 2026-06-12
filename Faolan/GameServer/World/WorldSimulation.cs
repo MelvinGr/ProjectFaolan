@@ -276,6 +276,23 @@ namespace Faolan.GameServer.World
 			}
 		}
 
+		// The player's "release/resurrect" click (GameCharAgent.RespawnMe 0x2024) - retail respawn is click-driven,
+		// the tick timer is only the fallback. Respawns immediately if the player is actually dead; returns false
+		// (and does nothing) otherwise.
+		public async Task<bool> TryRespawnNow(INetworkClient client)
+		{
+			if (!Players.TryGetValue(client, out var entity) || client.Session?.Character == null)
+				return false;
+
+			var vitals = entity.Vitals;
+			if (vitals == null || !vitals.IsDead)
+				return false;
+
+			_playerRespawnRemaining.TryRemove(client, out _);
+			await RespawnPlayer(client, vitals);
+			return true;
+		}
+
 		// Revives a dead player: full vitals, moved to the CLOSEST resurrection point they know (the always-known
 		// starter + any discovered; RespawnResolver), and re-entered (the proven world-entry render path, same as a
 		// teleport) so they reappear alive away from whatever killed them. Falls back to the map's spawn point if the

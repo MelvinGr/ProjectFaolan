@@ -204,18 +204,22 @@
 
 			// >= 0x2014: GameCharAgent methods (unambiguous).
 			SplitStack = 0x201D, // GameCharAgent.SplitInventoryItem
+			CancelBuff = 0x201E, // right-click-cancel a buff; body = [u32 buffId][u32 charId]
 			StackInventoryItemIfPossible = 0x201F, // (handled as "SpawnCheck" historically, after the C++ Faolan docs p.160-161; only logged)
 			UpdateQuestMarkerNPC = 0x2020, // ALSO the world-entry spawn-poll trigger we answer with 0x2008 (x5631)
+			RespawnMe = 0x2024, // the player's "release/resurrect" click; body = [u32 token] (corpse/request id)
 			TryLootAll = 0x2043, // loot-window take; body = [loot typetag][bag handle]
 			CloseLootBag = 0x2044, // client closes the loot window; body = [loot typetag][bag handle]
+			TryLootCash = 0x2045, // loot the bag's coins; body = [loot typetag][bag handle]; fires on every loot (1:1 with TryLootAll)
 			PerformSpecialAction = 0x205A,
 			DoSkillSellback = 0x205C,
 			PlayStockphraseAsSubtitle = 0x205E,
 			CinematicTransition = 0x205F, // heavy in the create flow (the post-205F follow-up gate)
 			MoveTradeItemInternal = 0x206A, // (was "request change map(?)" - the old guess predates the table)
 			RequestShortcutBar = 0x206D, // sent at login
-			AddShortcut = 0x206E, // drag an item/ability onto the hotbar
-			RemoveShortcut = 0x2071,
+			AddShortcut = 0x206E, // drag an item/ability onto the hotbar; body = [u32 type][u32 slot][u32 targetId][u32 0]
+			UpdateShortcut = 0x206F, // body = [u32 slot][u32 a][u32 b] (semantics not decoded; observed a=0/1, b=0x68)
+			RemoveShortcut = 0x2071, // body = [u32 slot]
 			GetInstanceListForCurrentPlayfield = 0x207B, // the 'Select instance' button
 			SetHideInspectOption = 0x207E,
 			LatencyCheck = 0x2085 // GameCharAgent.Ping (client 0x2085 -> server 0x2082)
@@ -227,6 +231,9 @@
 		// by decoded CONTENT; do not map them through docs/aoc-client-rpc-methods.json by index.
 		public enum GameServerRespondOpcodes : ushort
 		{
+			// Reply to GameCharAgent.RequestBindLocation: [u32 playfieldId] = the character's bind/home playfield
+			// (the Totem of Origin destination). Verified 1:1 request/reply across 13 captures.
+			BindLocation = 0x2002,
 			Pong = 0x2009,
 			ReportDimensionId = 0x200b,
 			ReportServerId = 0x200c,

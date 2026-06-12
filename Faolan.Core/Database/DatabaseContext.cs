@@ -21,6 +21,7 @@ namespace Faolan.Core.Database
 		DbSet<CharacterQuest> CharacterQuests { get; }
 		DbSet<CharacterRespawnPoint> CharacterRespawnPoints { get; }
 		DbSet<CharacterScaffoldPair> CharacterScaffoldPairs { get; }
+		DbSet<CharacterShortcut> CharacterShortcuts { get; }
 		DbSet<CharacterSkill> CharacterSkills { get; }
 		DbSet<CharacterSpawnFrame> CharacterSpawnFrames { get; }
 		DbSet<CharacterTag> CharacterTags { get; }
@@ -58,6 +59,7 @@ namespace Faolan.Core.Database
 		public DbSet<CharacterQuest> CharacterQuests { get; set; }
 		public DbSet<CharacterRespawnPoint> CharacterRespawnPoints { get; set; }
 		public DbSet<CharacterScaffoldPair> CharacterScaffoldPairs { get; set; }
+		public DbSet<CharacterShortcut> CharacterShortcuts { get; set; }
 		public DbSet<CharacterSkill> CharacterSkills { get; set; }
 		public DbSet<CharacterSpawnFrame> CharacterSpawnFrames { get; set; }
 		public DbSet<CharacterTag> CharacterTags { get; set; }
@@ -160,6 +162,13 @@ namespace Faolan.Core.Database
 				.HasMany(c => c.BodyResources)
 				.WithOne(r => r.Character)
 				.HasForeignKey(r => r.CharacterId)
+				.OnDelete(DeleteBehavior.Cascade);
+
+			// Hotbar shortcuts delete with the character.
+			modelBuilder
+				.Entity<CharacterShortcut>()
+				.HasOne(s => s.Character)
+				.WithMany()
 				.OnDelete(DeleteBehavior.Cascade);
 
 			// Guild membership: deleting a guild releases its members back to guildless instead of deleting them.
