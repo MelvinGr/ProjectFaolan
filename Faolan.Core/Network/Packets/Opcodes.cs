@@ -208,6 +208,10 @@
 			StackInventoryItemIfPossible = 0x201F, // (handled as "SpawnCheck" historically, after the C++ Faolan docs p.160-161; only logged)
 			UpdateQuestMarkerNPC = 0x2020, // ALSO the world-entry spawn-poll trigger we answer with 0x2008 (x5631)
 			RespawnMe = 0x2024, // the player's "release/resurrect" click; body = [u32 token] (corpse/request id)
+			CloseShop = 0x2032, // vendor window closed; body = [shop ID32]
+			BuyFromShop = 0x2033, // GameCharAgent.BuyItem; body = [shop ID32][u32 pos]
+			SellToShop = 0x2034, // GameCharAgent.SellItem; body = [shop ID32][u32 container][u32 charId][u32 slot]
+			UndoLastSoldItem = 0x2035, // body empty (single-step undo of the last sale)
 			TryLootAll = 0x2043, // loot-window take; body = [loot typetag][bag handle]
 			CloseLootBag = 0x2044, // client closes the loot window; body = [loot typetag][bag handle]
 			TryLootCash = 0x2045, // loot the bag's coins; body = [loot typetag][bag handle]; fires on every loot (1:1 with TryLootAll)
@@ -234,6 +238,11 @@
 			// Reply to GameCharAgent.RequestBindLocation: [u32 playfieldId] = the character's bind/home playfield
 			// (the Totem of Origin destination). Verified 1:1 request/reply across 13 captures.
 			BindLocation = 0x2002,
+			// Vendor window content: [shop ID32 (type 0xC75B)][vendor NPC ID32][protobuf shop content]
+			// (= GameCharInterface.DispatchShopData by content; the value collides with the c2s BuyItem).
+			ShopData = 0x2033,
+			// Confirms a SellItem: [u32 container][u32 charId][u32 slot] - the client clears the bag slot.
+			ItemSoldToShop = 0x2035,
 			// Wallet update: [u64 balanceCopper][u32 reason] (reason 3 = gain, 0 = spend/sync, 2 seen once).
 			// Decoded from the sell/loot captures: values grow +2 per beach coin loot, jump on quest rewards,
 			// DECREASE on a purchase with reason 0, and persist across sessions. The same opcode value carries

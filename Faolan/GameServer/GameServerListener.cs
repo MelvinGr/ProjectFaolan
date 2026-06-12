@@ -421,6 +421,41 @@ namespace Faolan.GameServer
 					break;
 				}
 
+				case GameServerOpcodes.SellToShop:
+				{
+					await HandleSellItemToShop(client, packet);
+
+					break;
+				}
+
+				case GameServerOpcodes.UndoLastSoldItem:
+				{
+					await HandleUndoLastSoldItem(client);
+
+					break;
+				}
+
+				case GameServerOpcodes.BuyFromShop:
+				{
+					packet.Body.ReadUInt32(); // shop ID32 type (0xC75B)
+					var shopId = packet.Body.ReadUInt32();
+					var pos = packet.Body.ReadUInt32();
+
+					// Buying GRANTS an item - blocked on the live inventory-add path (the same item-grant wall as
+					// loot, see protocol_containeradditem); the shop content protobuf is also undecoded, so the
+					// position can't be priced/resolved yet. Logged until both land.
+					Logger.LogInformation("BuyItem from shop {Shop:X}: position {Pos} (item grant not implemented).", shopId, pos);
+
+					break;
+				}
+
+				case GameServerOpcodes.CloseShop:
+				{
+					Logger.LogInformation("Shop closed by {Character}.", client.Session.Character?.Name);
+
+					break;
+				}
+
 				case GameServerOpcodes.TryLootAll: // the loot-all click on an open loot window; body = [typetag][bag handle]
 				{
 					packet.Body.ReadUInt32(); // loot typetag (0xC87A)

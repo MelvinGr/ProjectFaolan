@@ -259,8 +259,10 @@ across capture sessions). Golden-tested (`MoneyUpdateTests`).
 - [ ] **In-client verify**: loot coins → wallet HUD updates; balance survives relog (we push an interim 0x2005
       sync at login — retail carries the initial balance in the FullChar snapshot instead, field undecoded; if
       the client ignores or double-counts the login push, find the snapshot field).
-- [ ] **Remaining usage paths**: vendor buy/sell debit/credit (§9b), AH listing/buy + mail COD (§9a), guild bank
-      (`GuildTransferMoney`/`GuildWithdrawMoney`; `Guild.Cash` is persisted).
+- [x] **Vendor sell credit** (§9b sell side, 2026-06-12) — the first real money-usage path.
+- [ ] **Remaining usage paths**: vendor BUY debit (item-grant-gated, §9b), AH listing/buy + mail COD (§9a),
+      guild bank (`GuildTransferMoney`/`GuildWithdrawMoney`; `Guild.Cash` is persisted; no captures exercise
+      the bank UI, so the bodies are unknown).
 
 ### 9b. NPC vendor / shop buy-sell (AFTER 9a — simpler)
 Rides on **`GameCharAgent`/`GameCharInterface`** — the main GameServer connection, already fully wired; **no new
@@ -271,9 +273,19 @@ connection needed**, and likely simpler than the AH (no listings/search/mail).
   opens via the dialogue/IIR side (`KnubotStartTradeIIR` 0x4B2A47BF, x2 in captures = the trader sessions).
 - server→client (`GameCharInterface`): `DispatchShopData(shopID, parentID, shopContent)`,
   `DispatchItemSoldToShop(inventoryID, pos)`, `DispatchCloseShop`.
-- [ ] Decode the shop flow from the `sell_items_to_trader` capture (`OpenShop`→`DispatchShopData` shop inventory
-      → `Buy/SellItem` → inventory update), then build a DB-backed vendor (shop-content table per NPC + price +
-      money debit/credit on buy/sell).
+- [x] **Shop flow decoded + SELL side implemented (2026-06-12)**: DL `0x2033 DispatchShopData` = [shop ID32
+      (type 0xC75B)][vendor NPC ID32][protobuf shop content]; `SellItem` 0x2034 = [shop ID32][u32 container]
+      [u32 charId][u32 slot] (container 0x68 = the DB bag container 104, no mapping needed); reply =
+      `0x2035 DispatchItemSoldToShop` [container][charId][slot] + the 0x2005 wallet credit. Sell handler removes
+      the `CharacterInventory` row, credits `Character.Money`, supports `UndoLastSoldItem` (single-step restore).
+      `.shop` GM command opens the captured trader window (PoC blob replay, like `.ah`). Golden tests `ShopTests`.
+- [ ] **In-client verify `.shop`**: window opens; selling a bag item clears the slot + wallet updates; undo
+      restores. (The blob's embedded vendor handle is session-volatile — expected to open anyway, like `.ah`.)
+- [ ] **BUY side**: blocked on (a) the live inventory-add path (the same item-grant wall as loot,
+      `protocol_containeradditem`) and (b) decoding the shop-content protobuf (`i_cShopContent`) so positions
+      resolve to items/prices → then a DB-backed vendor (shop-content table per NPC).
+- [ ] **Real sell prices**: the RDB item templates carry item value (TEA key cracked, field not mapped);
+      provisional price = level×2×count (`VendorPriceCopper`). Captured anchors: 19/23/92/392 copper.
 
 ---
 

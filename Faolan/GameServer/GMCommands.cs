@@ -169,7 +169,8 @@ namespace Faolan.GameServer
 				["ah"] = (client, _) => OpenAuctionHouseCommand(client),
 				["guild"] = (client, arguments) => GuildCommand(client, arguments),
 				["money"] = (client, arguments) => MoneyCommand(client, arguments),
-				["buffs"] = (client, _) => BuffsCommand(client)
+				["buffs"] = (client, _) => BuffsCommand(client),
+				["shop"] = (client, _) => OpenShopCommand(client)
 			};
 		}
 
