@@ -16,8 +16,12 @@ NPC body layout (offsets body-relative; the beach NPCs all share iirOff=297):
               f5  NpcStats         f4=template_id (the NPC identity!), super_family, community, npc_flags, npc_type
               f7  CharacterBcc     idle/action anim ids
               f23 inventory_entry  worn equipment (humanoids only; absent on animals)
-  [iirEnd:]  post-IIR scaffold: header 00000000_00000005 (player=...0004), then 0x3F1-marked pair lists;
-             minimal (animal) = 41B constant; bigger NPCs add 60B buff/state records (same family as player)
+  [iirEnd:]  post-IIR scaffold (GRAMMAR CRACKED 2026-06-12): header [u32 0][u32 firstRecordLen=len-36][u32
+             recordCount]; word0=0 on ALL 42 (player has 2), recordCount=1 on 41/42. The MINIMAL freshly-spawned
+             form is a CONSTANT 41B (23/42 NPCs, single distinct value) = the 0x3F1-marked empty pair lists; it
+             is what from-scratch construction emits (-> NpcSpawnScaffold.BuildMinimalPostIir in C#). The larger
+             blocks concatenate RUNTIME-STATE records past the first (current movement / waypoint vec3 BE float
+             triples + active buff/timer pairs) - session state, not template data, so NOT reproduced at spawn.
 
 Usage:
   python3 Captures/dissect_npc_spawn.py                 # table of every NPC spawn in the Strie login burst
