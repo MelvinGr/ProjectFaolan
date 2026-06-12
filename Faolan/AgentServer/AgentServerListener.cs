@@ -98,7 +98,9 @@ namespace Faolan.AgentServer
 					await SendChannelSubscription(client, 0x87, 0x001E8480, "~NewbieHelp", 0x00008044);
 
 					// The server-defined Claude channel: posts on it are bridged to Claude via the MCP chat tools.
-					await SendChannelSubscription(client, ClaudeChannel.ChannelType, ClaudeChannel.ChannelId, ClaudeChannel.ChannelName, ClaudeChannel.ChannelFlag);
+					// Only offered while the MCP server is hosted - without it nothing reads the log or can reply.
+					if (Configuration.McpEnabled)
+						await SendChannelSubscription(client, ClaudeChannel.ChannelType, ClaudeChannel.ChannelId, ClaudeChannel.ChannelName, ClaudeChannel.ChannelFlag);
 
 					await new FaolanStream()
 						.WriteUInt32(0x00050000)
@@ -138,7 +140,7 @@ namespace Faolan.AgentServer
 
 					// Posts on the Claude channel are additionally recorded for the MCP bridge (Claude polls the log
 					// and replies via SendClaudeChannelMessage); the normal broadcast above still shows them in-game.
-					if (channelId == ClaudeChannel.ChannelId)
+					if (Configuration.McpEnabled && channelId == ClaudeChannel.ChannelId)
 					{
 						var senderId = client.Session.Account?.ClientInstance ?? 0;
 						var senderName = client.Session.Character?.Name?.Length > 0

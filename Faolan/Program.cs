@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Faolan.AgentServer;
 using Faolan.Core;
 using Faolan.Core.Database;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.AgentServer;
 using Faolan.Core.Network.GameServer;
 using Faolan.CSPlayerAgent;
@@ -70,8 +71,9 @@ namespace Faolan
 			builder.Services.AddSingleton<IGameServerDispatcher, GameServerDispatcher>();
 
 			// In-process MCP server (Claude tooling) on a localhost Kestrel port; shares the live singletons above.
-			// if(settings.EnableMCp)
-			builder.Services.AddFaolanMcp();
+			// When disabled the AgentServer also skips the Claude chat-channel subscription (nothing reads the log).
+			if (builder.Configuration.McpEnabled)
+				builder.Services.AddFaolanMcp();
 
 			builder.Services.AddScopedHostedService(provider =>
 			{
