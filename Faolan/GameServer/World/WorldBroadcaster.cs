@@ -278,25 +278,45 @@ namespace Faolan.GameServer.World
 		}
 
 		// Spawns a mount entity (a captured FA015807 "Horse" NpcSpawn, e.g. "Fading Black Horse") at the player's
-		// position and renders it for nearby players - the summon's visible payoff. Built byte-exact via NpcSpawnBuilder
-		// (like NPC/loot spawns), re-framed + position-patched per recipient by SendWorldSpawn. The cast is broadcast
-		// separately; the player actually RIDING (the MountedRun movement transition) is the client's part and
-		// in-client-gated. The mount has no vitals (not killable) and is non-hostile.
-		public async Task SpawnMountForPlayer(INetworkClient client, string mountName)
+		// position - the summon's visible payoff. The cast is broadcast separately; the player actually RIDING
+		// (the MountedRun movement transition) is the client's part and in-client-gated. The mount has no
+		// vitals (not killable) and is non-hostile.
+		public Task SpawnMountForPlayer(INetworkClient client, string mountName)
+		{
+			return SpawnNpcForPlayer(client, mountName, false);
+		}
+
+		// Spawns a captured NPC (any NpcSpawns row with spawn Data, matched by NAME - the stable key) at the
+		// player's position and renders it for nearby players. Built byte-exact via NpcSpawnBuilder (like the
+		// map-load NPC spawns), re-framed + position-patched per recipient by SendWorldSpawn. When killable, the
+		// entity gets vitals/level/hostility from its row exactly like EnsureZoneNpcs, so it joins combat + loot
+		// as a full world citizen. Returns the spawned entity, or null when no spawnable row matches the name.
+		public async Task<WorldEntity> SpawnNpcForPlayer(INetworkClient client, string npcName, bool killable = true)
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null)
-				return;
+				return null;
 
-			var mount = await _database.GetNpcSpawnByName(mountName);
+			var npc = await _database.GetNpcSpawnByName(npcName);
 			var handle = NextLootHandle(); // a fresh summoned-entity handle (high range, no player/NPC collision)
-			if (mount == null || !NpcSpawnBuilder.TryBuild(mount, handle, out var body))
+			if (npc == null || !NpcSpawnBuilder.TryBuild(npc, handle, out var body))
 			{
-				_logger.LogInformation("Mount: no spawnable '{Mount}' template found.", mountName);
-				return;
+				_logger.LogInformation("Spawn: no spawnable '{Npc}' template found.", npcName);
+				return null;
 			}
 
-			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, mountName);
+			EntityVitals vitals = null;
+			if (killable)
+			{
+				var maxHealth = npc.Health > 0
+					? npc.Health
+					: CombatResolver.NpcMaxHealthForLevel(npc.Level);
+				vitals = EntityVitals.FromMax(maxHealth, 0, maxHealth);
+			}
+
+			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npc.Name ?? npcName, vitals);
+			entity.Level = npc.Level;
+			entity.Hostile = killable && npc.Community > 0;
 			entity.SpawnBody = body;
 			_sim
 				.World
@@ -312,7 +332,8 @@ namespace Faolan.GameServer.World
 					await SendWorldSpawn(viewer.Client, entity);
 			}
 
-			_logger.LogInformation("Mount: spawned {Mount} 0x{Handle:X8} for {Player} at {Pos}.", mountName, handle, player.Name, player.Position);
+			_logger.LogInformation("Spawn: spawned {Npc} 0x{Handle:X8} for {Player} at {Pos}.", entity.Name, handle, player.Name, player.Position);
+			return entity;
 		}
 
 		// A player clicked an item in the loot window (top-level 0x2043). The actual transfer - grant the item to the

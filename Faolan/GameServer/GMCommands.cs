@@ -162,6 +162,7 @@ namespace Faolan.GameServer
 				["hurt"] = (client, arguments) => AdjustOwnHealthCommand(client, arguments, false),
 				["heal"] = (client, arguments) => AdjustOwnHealthCommand(client, arguments, true),
 				["mount"] = (client, arguments) => MountCommand(client, arguments),
+				["spawn"] = (client, arguments) => SpawnNpcCommand(client, arguments),
 				["world"] = (client, _) => SendWorldInfo(client),
 				["quest"] = (client, arguments) => QuestCommand(client, arguments),
 				["tag"] = (client, arguments) => TagCommand(client, arguments),
@@ -338,6 +339,25 @@ namespace Faolan.GameServer
 			var self = client.Session.Account.ClientInstance;
 			await ApplySpell(client, self, self, spellId); // the channeled summon cast (broadcast)
 			await _broadcaster.SpawnMountForPlayer(client, "Fading Black Horse"); // the decoded mount for the default summon 0x3BAD7D
+		}
+
+		// .spawn <npc name>  - spawn a captured NPC (any NpcSpawns row with spawn Data, matched by exact name,
+		// e.g. ".spawn Crocodile") at the player. Killable + hostile per its row; the test bootstrap for
+		// combat/AI work and the seam the MCP spawn_npc tool routes through.
+		private async Task SpawnNpcCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var name = (arguments ?? "").Trim();
+			if (name.Length == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .spawn <npc name> (exact captured name, e.g. .spawn Crocodile)");
+				return;
+			}
+
+			var entity = await _broadcaster.SpawnNpcForPlayer(client, name);
+			await _agentServerDispatcher.SendSystemMessage(characterId, entity == null
+				? $"No spawnable NPC named '{name}' (needs a captured NpcSpawns row with spawn data; exact name, any map)."
+				: $"Spawned {entity.Name} (handle 0x{entity.Handle:X8}, level {entity.Level}{(entity.Hostile ? ", hostile" : "")}).");
 		}
 
 		// .quest add|remove <id> | .quest list  - manage the player's quest journal. `add` records the quest +
