@@ -39,23 +39,21 @@ namespace Faolan.GameServer
 		// archetype), keyed by the CharacterEquipment slot they go in. Slot-appropriate so the client accepts them.
 		private const uint StarterWristItem = 3361557; // Slave Manacles (wrist, 0x12)
 
-		// Rebuilds the (already instance-substituted) world-entry inventory snapshot (0x737A6DF9), patching the LIVE
-		// character's level/vitals into the tails while keeping the captured inventory CONTAINERS verbatim.
+		// Rebuilds the (already instance-substituted) world-entry inventory snapshot (0x737A6DF9): patches the LIVE
+		// character's level/vitals into the tails and (default ON, see below) substitutes the player's DB containers
+		// for the captured ones - this snapshot is what drives the bag AND the equipment doll in-client.
 		//
-		// We deliberately do NOT substitute the character's DB items into this snapshot. Doing so - by ANY method,
-		// in-place entry swap OR wholesale typed-container generation - stalls the client's world-load completion:
-		// the client tries to resolve each item's RDB resources, thrashes ("Out of scratch memories") on items it
-		// can't find locally, and never reaches the state where it dials the chat/CommunityServer. The result is the
-		// chat-channels regression (AgentServer gets zero TCP accepts). Verified by bisecting the live client: any
-		// container mutation breaks chat; verbatim containers + this tail patch keep it. The player's VISIBLE worn
-		// gear is DB-driven via the entity spawn (TryRebuildPlayerSpawnFromDb), which is chat-safe. Delivering the
-		// real backpack inventory must happen AFTER world load (a post-ready inventory update), not in this snapshot.
-		// See [[protocol_chat_connection_regression]].
+		// HISTORY: container substitution used to stall world-load/chat ("any container mutation breaks chat",
+		// [[protocol_chat_connection_regression]]) - that bisect PRE-DATED the ContentMirror; the stall was the
+		// client thrashing on item resources it could not fetch from the dead retail CDN. With the mirror serving
+		// resources locally, substitution is in-client verified safe (2026-06-12: world loads, chat connects, DB
+		// items render in bag + doll). A SECOND snapshot later in the session is NOT a delivery mechanism - the
+		// client ignores/rejects re-constructs for the same identity (see Packets.cs post-load note).
 		//
 		// IMPORTANT: built entirely with manual byte assembly + manual CRC and the ORIGINAL packet's header copied
 		// verbatim - NOT via PacketStream/WriteLengthHash. An earlier PacketStream-based rebuild stalled the client
 		// on the loading screen even though its output was byte-exact, whereas the manual byte path works.
-		private byte[] BuildBeachInventoryPacket(byte[] substitutedPacket, Character character)
+		private byte[] BuildBeachInventoryPacket(byte[] substitutedPacket, Character character, CharacterEquipment equipment = null, CharacterInventory[] inventoryRows = null)
 		{
 			var conanPacket = new ConanPacket(substitutedPacket);
 			var body = new FaolanStream(conanPacket.Body.ReadArrayUInt32Length());
@@ -92,15 +90,57 @@ namespace Faolan.GameServer
 			}
 
 			// Containers VERBATIM (the captured inventory tree, re-serialized losslessly - proven byte-identical by
-			// InventorySnapshotTests). No DB item substitution here (see the method header).
+			// InventorySnapshotTests). No DB item substitution here by default (see the method header).
 			var rootBytes = parts.Root.ToArray();
+			var prefix = parts.Prefix;
+
+			// DB containers in the WORLD-ENTRY snapshot (default ON; opt out FAOLAN_WORLDENTRY_DB_CONTAINERS=0):
+			// the only delivery that demonstrably drives both the bag AND the equipment doll - in-client verified
+			// 2026-06-12 (bag items + worn gear render; world loads; chat connects). The historical "any container
+			// mutation stalls world-load/chat" bisect PRE-DATES the ContentMirror; with resources served locally
+			// the substitution is safe. The post-load second-snapshot delivery is a dead end (the client ignores
+			// or rejects a second 0x737A6DF9 for the same identity), so this is the inventory delivery.
+			// KNOWN LIMIT: an item whose bag/icon resources are missing locally (e.g. 13826 Combatant's Hauberk,
+			// only ever captured WORN, never in an inventory) makes the client render the WHOLE bag empty - keep
+			// such items out of CharacterInventory until the resource gap is solved (TODO).
+			if (Environment.GetEnvironmentVariable("FAOLAN_WORLDENTRY_DB_CONTAINERS") != "0" && equipment != null)
+			{
+				try
+				{
+					var equipped = new Dictionary<ulong, (Item Item, uint Archetype)>();
+					foreach (var (slot, get) in InventoryEquippedSlots)
+					{
+						var item = get(equipment);
+						if (item is { Archetype: not 0 })
+							equipped[slot] = (item, item.Archetype);
+					}
+
+					(Item, uint)? bagFirst = equipment.FirstPosBag is { Archetype: not 0 }
+						? (equipment.FirstPosBag, equipment.FirstPosBag.Archetype)
+						: null;
+
+					var typedRoot = ((ReadOnlySpan<byte>)rootBytes).FromProtobuf<ProtoFullCharacterIIR>();
+					typedRoot.Inventories.Clear();
+					foreach (var container in FullCharSnapshotBuilder.BuildContainers(instance, equipped, bagFirst, inventoryRows ?? []))
+						typedRoot.Inventories.Add(container);
+					var newRoot = typedRoot.ToProtobufBytes();
+					prefix = AdjustSnapshotPrefixRootLength(parts.Prefix, newRoot.Length - rootBytes.Length);
+					Logger.LogInformation("World-entry DB containers: root {Old} -> {New} bytes ({Equipped} equipped + {Rows} rows).", rootBytes.Length, newRoot.Length, equipped.Count,
+						(inventoryRows ?? []).Length);
+					rootBytes = newRoot;
+				}
+				catch (Exception ex)
+				{
+					Logger.LogWarning(ex, "World-entry DB container substitution failed; keeping verbatim containers.");
+				}
+			}
 
 			// Body content: [subop][c350][instance][prefix][root][tails], then prefixed by its uint32 length.
 			using var contentStream = new FaolanStream();
 			contentStream.WriteUInt32(subOpcode);
 			contentStream.WriteUInt32(c350);
 			contentStream.WriteUInt32(instance);
-			contentStream.WriteArray(parts.Prefix);
+			contentStream.WriteArray(prefix);
 			contentStream.WriteArray(rootBytes);
 			contentStream.WriteArray(parts.Tails.ToArray());
 			var bodyContent = contentStream.ToArray();
@@ -541,7 +581,7 @@ namespace Faolan.GameServer
 					// + re-send the snapshot through the same proven path.
 					client.Session.InventorySnapshotTemplate = pkt;
 					client.Session.PendingPostLoadInventory = BuildDbInventorySnapshot(pkt, client.Session.Character, equipment, inventoryRows);
-					pkt = BuildBeachInventoryPacket(pkt, client.Session.Character);
+					pkt = BuildBeachInventoryPacket(pkt, client.Session.Character, equipment, inventoryRows);
 				}
 				else if (TryRebuildPlayerSpawnFromDb(client, equipment, scaffoldCharacter, pkt, out var rebuilt))
 				{

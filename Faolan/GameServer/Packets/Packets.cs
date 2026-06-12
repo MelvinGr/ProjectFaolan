@@ -110,21 +110,13 @@ namespace Faolan.GameServer
 				// Then the post-ready world-state/quest record stream (verbatim from the Strie login capture).
 				await SendPostReadyBurst(client);
 
-				// Post-load backpack delivery: the world-entry inventory snapshot (0x737A6DF9) went out VERBATIM
-				// (chat-safe). The DB-built snapshot carrying the player's real items was stashed during the burst;
-				// send it now, after the post-ready burst, when the client is out of the constrained world-load
-				// phase, so the bag shows the player's real items.
-				//
-				// This snapshot is BUILT FROM SCRATCH from the DB (FullCharSnapshotBuilder.BuildContainers), not a
-				// substitution of captured bytes. The earlier blocker - the client rejecting it with
-				// "CoreFullPlayerCharacterIIR::ReadSubClass() Wrong IIR_t version ..." - was the regenerated protobuf
-				// root being a different length than the capture while the IIR prefix's root-length varint (which the
-				// client uses to delimit the root from the trailing subclass) stayed at the captured value.
-				// BuildDbInventorySnapshot now delta-adjusts that varint (AdjustSnapshotPrefixRootLength), so the
-				// regenerated snapshot constructs in-client cleanly - verified to produce a client lifecycle identical
-				// to the verbatim baseline (no IIR error, chat connects). Opt out with FAOLAN_POSTLOAD_INVENTORY=0.
-				// See [[protocol_containeradditem]].
-				if (client.Session.PendingPostLoadInventory != null && Environment.GetEnvironmentVariable("FAOLAN_POSTLOAD_INVENTORY") != "0")
+				// Post-load backpack delivery - SUPERSEDED (2026-06-12) by the world-entry DB-container substitution
+				// (BuildBeachInventoryPacket, default ON): the client ignores or rejects a SECOND 0x737A6DF9 for an
+				// identity it already constructed (live-verified: even an EMPTY rebuilt snapshot fails ReadSubClass,
+				// and when it does construct the UI never re-reads it), so this second send delivers nothing and
+				// just logs a client-side IIR error. Kept behind FAOLAN_POSTLOAD_INVENTORY=1 for experiments; the
+				// world-entry substitution is the real inventory delivery.
+				if (client.Session.PendingPostLoadInventory != null && Environment.GetEnvironmentVariable("FAOLAN_POSTLOAD_INVENTORY") == "1")
 				{
 					Logger.LogInformation("Sending post-load DB inventory snapshot ({Bytes} bytes) to update the backpack.", client.Session.PendingPostLoadInventory.Length);
 					await client.SendAsync(client.Session.PendingPostLoadInventory);
