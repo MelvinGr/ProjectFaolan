@@ -28,6 +28,7 @@ namespace Faolan.Core.Database
 		Task<Account> GetAccount(string userName);
 
 		Task<Character> GetCharacter(uint id);
+		Task<Character> GetCharacterByName(string name);
 
 		Task<CharacterEquipment> GetCharacterEquipment(uint characterId);
 		Task<Character> GetCharacterForAccount(uint accountId, uint clientInstance);
@@ -42,6 +43,12 @@ namespace Faolan.Core.Database
 		Task<ConversationNode> GetConversationNode(uint npcHandle, uint typeId, uint mode, uint field3, bool exactHandleOnly = false);
 		Task<ConversationNode> GetConversationNodeByName(string npcName, uint typeId, uint mode, uint field3);
 		Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId);
+
+		Task<Guild> CreateGuild(string name, uint leaderCharacterId);
+		Task<Guild> GetGuild(uint id);
+		Task<Guild> GetGuildByName(string name);
+		Task SaveGuild(Guild guild);
+		Task<bool> SetCharacterGuild(uint characterId, uint? guildId, byte rank);
 
 		Task<Item> GetItem(uint id);
 		Task<LuaScript> GetLuaScript(uint scriptId);
@@ -284,6 +291,100 @@ namespace Faolan.Core.Database
 				.Include(c => c.Body)
 				.Include(c => c.MaxStats)
 				.FirstOrDefaultAsync(c => c.Id == id);
+		}
+
+		// Character names are unique (guild invites and GM commands address players by name).
+		public async Task<Character> GetCharacterByName(string name)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.Characters.FirstOrDefaultAsync(c => c.Name == name);
+		}
+
+		// --- guilds ----------------------------------------------------------------------------------------
+
+		// Creates a guild with the given character as its leader. Returns null when the name is taken or the
+		// character is already in a guild.
+		public async Task<Guild> CreateGuild(string name, uint leaderCharacterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			if (await ctx.Guilds.AnyAsync(g => g.Name == name))
+				return null;
+
+			var leader = await ctx.Characters.FirstOrDefaultAsync(c => c.Id == leaderCharacterId);
+			if (leader == null || leader.GuildId != null)
+				return null;
+
+			var guild = new Guild
+			{
+				Name = name,
+				CreationDate = DateTimeOffset.UtcNow
+			};
+			ctx.Guilds.Add(guild);
+			await ctx.SaveChangesAsync();
+
+			leader.GuildId = guild.Id;
+			leader.GuildRank = Character.GuildLeaderRank;
+			await ctx.SaveChangesAsync();
+
+			return await LoadGuild(ctx, guild.Id);
+		}
+
+		public async Task<Guild> GetGuild(uint id)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await LoadGuild(ctx, id);
+		}
+
+		public async Task<Guild> GetGuildByName(string name)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var id = await ctx
+				.Guilds
+				.Where(g => g.Name == name)
+				.Select(g => g.Id)
+				.FirstOrDefaultAsync();
+
+			return id == 0
+				? null
+				: await LoadGuild(ctx, id);
+		}
+
+		public async Task SaveGuild(Guild guild)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			// Detach the members navigation: only the guild row itself (MOTD/description/cash/...) is saved here;
+			// membership changes go through SetCharacterGuild.
+			ctx.Entry(guild).State = EntityState.Modified;
+			await ctx.SaveChangesAsync();
+		}
+
+		// Sets (or clears, guildId = null) a character's guild membership. Returns false when the character does
+		// not exist or the guild does not exist.
+		public async Task<bool> SetCharacterGuild(uint characterId, uint? guildId, byte rank)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var character = await ctx.Characters.FirstOrDefaultAsync(c => c.Id == characterId);
+			if (character == null)
+				return false;
+
+			if (guildId != null && !await ctx.Guilds.AnyAsync(g => g.Id == guildId))
+				return false;
+
+			character.GuildId = guildId;
+			character.GuildRank = guildId == null
+				? (byte)0
+				: rank;
+			await ctx.SaveChangesAsync();
+			return true;
+		}
+
+		// Guild with the full member roster (the 0x203F full update needs every member's name/level/class).
+		private static Task<Guild> LoadGuild(DatabaseContext ctx, uint id)
+		{
+			return ctx
+				.Guilds
+				.Include(g => g.Members)
+				.FirstOrDefaultAsync(g => g.Id == id);
 		}
 
 		// --- equipment -------------------------------------------------------------------------------------

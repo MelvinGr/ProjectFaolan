@@ -21,5 +21,12 @@ namespace Faolan.Core.Network.GameServer
 		///     the next provider). The text must include the leading command prefix.
 		/// </summary>
 		Task<bool> RunGmCommand(uint characterId, string commandText);
+
+		/// <summary>
+		///     Pushes the in-world guild tag (0x2550C99A GuildUpdateIIR) onto the character's live world
+		///     connection, if connected to this listener. An empty name clears the tag. Used by the
+		///     CsPlayerAgent guild flow so joining/leaving a guild updates the world view without a relog.
+		/// </summary>
+		Task<bool> SendGuildTag(uint characterId, string guildName);
 	}
 }

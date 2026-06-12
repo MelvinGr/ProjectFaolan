@@ -19,28 +19,48 @@
 			Ox0064 = 0x0064 // echo of the client's chat-init handshake
 		}
 
+		// Client->server methods. The 16-bit opcode is a METHOD INDEX (0x2000 + position) into the recovered
+		// CSPlayerAgent.client_to_server table (docs/aoc-client-rpc-methods.json); alignment verified against the
+		// hoxxling guild capture (0x201C = AcceptGuildInvitation fired exactly once on the accept). See
+		// Captures/decode_guild.py for the decoded guild flow.
 		public enum CsPlayerAgentOpcodes : ushort
 		{
 			Authenticate = 0x2000,
 			Ox2019 = 0x2019,
-			Ox2072 = 0x2072,
+			AcceptGuildInvitation = 0x201C,
+			DeclineGuildInvitation = 0x201D,
+			ClientRequestGuildInfo = 0x201E,
+			CreateGuild = 0x2021,
+			GuildInviteByName = 0x2022,
+			GuildInvite = 0x2023,
+			GuildLeave = 0x2028,
+			GuildMessageOfTheDay = 0x202E,
+			GuildRequestMemberList = 0x202F,
 			Ox202A = 0x202a,
 			Ox203B = 0x203b,
 			Ox203C = 0x203c,
-			Ox2040 = 0x2040,
-			Ox2041 = 0x2041,
-			Ox201E = 0x201E,
-			Ox2077 = 0x2077,
-			Ox202F = 0x202F,
+			RequestRenownHistory = 0x2040,
+			RequestRenownRankings = 0x2041,
+			Ox2072 = 0x2072,
+			MassivePvpInfoRequest = 0x2077,
 			Ox2038 = 0x2038,
 			Ox20C5 = 0x20C5,
 			Ox20D0 = 0x20D0
 		}
 
+		// Server->client. The live build's CSPlayerInterface dispatch table has unnamed extra methods (indices
+		// drift vs the recovered name table), so these are named by decoded CONTENT, not by table position.
 		public enum CsPlayerAgentResponseOpcodes : ushort
 		{
 			Authenticate = 0x2000,
-			Ox2038 = 0x2038,
+			GuildInvite = 0x202A, // [guild ID32][guildName][invitee ID32][inviterName]
+			GuildMemberJoined = 0x202F, // [member ID32][member record]
+			GuildMemberUpdate = 0x2030, // [member record]
+			RenownRankings = 0x2038,
+			RenownHistory = 0x2039,
+			GuildFullUpdate = 0x203F, // guild header + MOTD + renown block + self record + roster
+			GuildInfoSameGuild = 0x2042,
+			GuildInfoOtherGuild = 0x2043,
 			Ox20A5 = 0x20A5,
 			Ox20C5 = 0x20C5,
 			Ox20D0 = 0x20D0

@@ -166,8 +166,48 @@ namespace Faolan.GameServer
 				["quest"] = (client, arguments) => QuestCommand(client, arguments),
 				["tag"] = (client, arguments) => TagCommand(client, arguments),
 				["lua"] = (client, arguments) => LuaCommand(client, arguments),
-				["ah"] = (client, _) => OpenAuctionHouseCommand(client)
+				["ah"] = (client, _) => OpenAuctionHouseCommand(client),
+				["guild"] = (client, arguments) => GuildCommand(client, arguments)
 			};
+		}
+
+		// .guild create <name>  - create a guild with the player as leader (test bootstrap for the guild flow;
+		// the capture-true path is the CreateGuild RPC on the CsPlayerAgent connection, which a guild registrar
+		// NPC window triggers). The in-world tag (0x2550C99A) shows immediately; the guild WINDOW state (0x203F)
+		// arrives on the CsPlayerAgent connection at the next login.
+		private async Task GuildCommand(INetworkClient client, string arguments)
+		{
+			var character = client.Session.Character;
+			var characterId = character.Id;
+			var parts = (arguments ?? "")
+				.Trim()
+				.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+			if (parts.Length < 2 || !parts[0]
+				    .Equals("create", StringComparison.OrdinalIgnoreCase))
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .guild create <name>");
+				return;
+			}
+
+			var name = parts[1]
+				.Trim();
+			if (character.GuildId != null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "<span style=\"color: red;\">You are already in a guild.</span>");
+				return;
+			}
+
+			var guild = await Database.CreateGuild(name, characterId);
+			if (guild == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"<span style=\"color: red;\">Guild name \"{name}\" is taken.</span>");
+				return;
+			}
+
+			character.GuildId = guild.Id;
+			character.GuildRank = Character.GuildLeaderRank;
+			await client.SendAsync(BuildGuildTag(client, client.Session.Account.ClientInstance, guild.Name));
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Guild \"{guild.Name}\" created (id {guild.Id}). Relog to load the guild window.");
 		}
 
 		// .ah  - open the auction house at the player's position (PoC bootstrap for the Tradepost; the real trigger

@@ -42,6 +42,9 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(RealmId))]
 		public virtual Realm Realm { get; set; }
 
+		[ForeignKey(nameof(GuildId))]
+		public virtual Guild Guild { get; set; }
+
 		public Class Class { get; set; }
 		public DateTimeOffset CreationDate { get; set; }
 
@@ -70,6 +73,13 @@ namespace Faolan.Core.Database.Tables
 		// Required: set on creation (CreateCharacter) and by the capture importer.
 		public uint RealmId { get; set; }
 		public ushort Level { get; set; }
+
+		// Guild membership; null = guildless. Rank 0 = fresh member (retail's invite-accept record), higher =
+		// promoted; the guild creator gets GuildLeaderRank. See Captures/decode_guild.py for the wire records.
+		public uint? GuildId { get; set; }
+		public byte GuildRank { get; set; }
+
+		public const byte GuildLeaderRank = 6;
 
 		public override string ToString()
 		{

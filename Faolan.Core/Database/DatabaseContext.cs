@@ -27,6 +27,7 @@ namespace Faolan.Core.Database
 		DbSet<ClassAbility> ClassAbilities { get; }
 		DbSet<ConversationNode> ConversationNodes { get; }
 		DbSet<ConversationPacket> ConversationPackets { get; }
+		DbSet<Guild> Guilds { get; }
 		DbSet<Item> Items { get; }
 		DbSet<LuaScript> LuaScripts { get; }
 		DbSet<Map> Maps { get; }
@@ -63,6 +64,7 @@ namespace Faolan.Core.Database
 		public DbSet<ClassAbility> ClassAbilities { get; set; }
 		public DbSet<ConversationNode> ConversationNodes { get; set; }
 		public DbSet<ConversationPacket> ConversationPackets { get; set; }
+		public DbSet<Guild> Guilds { get; set; }
 		public DbSet<Item> Items { get; set; }
 		public DbSet<LuaScript> LuaScripts { get; set; }
 		public DbSet<Map> Maps { get; set; }
@@ -159,6 +161,13 @@ namespace Faolan.Core.Database
 				.WithOne(r => r.Character)
 				.HasForeignKey(r => r.CharacterId)
 				.OnDelete(DeleteBehavior.Cascade);
+
+			// Guild membership: deleting a guild releases its members back to guildless instead of deleting them.
+			modelBuilder
+				.Entity<Character>()
+				.HasOne(c => c.Guild)
+				.WithMany(g => g.Members)
+				.OnDelete(DeleteBehavior.SetNull);
 
 			// MorphTarget.Id IS the wire tag (the client registry's 1-based id minus 1) - assigned by the
 			// importer, never generated.

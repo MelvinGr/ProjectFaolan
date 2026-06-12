@@ -110,6 +110,16 @@ namespace Faolan.GameServer
 				// Then the post-ready world-state/quest record stream (verbatim from the Strie login capture).
 				await SendPostReadyBurst(client);
 
+				// Guilded character: set the in-world guild tag (0x2550C99A). Retail sends this once on guild
+				// JOIN; for logins the tag normally rides in the spawn data, which our DB spawn does not carry
+				// yet, so re-assert it here - the client applies it the same way.
+				if (client.Session.Character.GuildId is uint guildId)
+				{
+					var guild = await Database.GetGuild(guildId);
+					if (guild != null)
+						await client.SendAsync(BuildGuildTag(client, client.Session.Account.ClientInstance, guild.Name));
+				}
+
 				// Post-load backpack delivery: the world-entry inventory snapshot (0x737A6DF9) went out VERBATIM
 				// (chat-safe). The DB-built snapshot carrying the player's real items was stashed during the burst;
 				// send it now, after the post-ready burst, when the client is out of the constrained world-load

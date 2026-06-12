@@ -62,5 +62,20 @@ namespace Faolan.Core.Network.GameServer
 
 			return false;
 		}
+
+		public async Task<bool> SendGuildTag(uint characterId, string guildName)
+		{
+			IGameServerProvider[] providers;
+			lock (_lock)
+				providers = _providers.ToArray();
+
+			foreach (var provider in providers)
+			{
+				if (await provider.SendGuildTag(characterId, guildName))
+					return true;
+			}
+
+			return false;
+		}
 	}
 }
