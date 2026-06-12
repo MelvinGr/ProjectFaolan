@@ -444,10 +444,17 @@ namespace Faolan.GameServer
 					packet.Body.ReadUInt32(); // loot typetag (0xC87A)
 					var bagHandle = packet.Body.ReadUInt32();
 
-					// No money model exists yet (no Character.Money, no coin grant packet decoded - the Tortage
-					// starter bags carry no cash, so retail shows no reply either). Consume the request so it
-					// stops logging as unknown; the grant lands with the money work (TODO §8 "money storage").
-					Logger.LogInformation("TryLootCash for bag 0x{Bag:X8}: no money model yet, nothing granted.", bagHandle);
+					var character = client.Session.Character;
+					var cash = _broadcaster.TakeLootCash(client, bagHandle);
+					if (cash > 0 && character != null)
+					{
+						character.Money += cash;
+						await Database.SaveCharacter(character);
+						await SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Gain);
+						Logger.LogInformation("Loot: {Player} looted {Cash} copper from bag 0x{Bag:X8} (wallet {Balance}).", character.Name, cash, bagHandle, character.Money);
+					}
+					else
+						Logger.LogDebug("TryLootCash for bag 0x{Bag:X8}: no coins to grant.", bagHandle);
 
 					break;
 				}

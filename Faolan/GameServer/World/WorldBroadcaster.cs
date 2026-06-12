@@ -324,6 +324,22 @@ namespace Faolan.GameServer.World
 			return Task.CompletedTask;
 		}
 
+		// TryLootCash (0x2045): takes the bag's coins exactly once - returns the amount and zeroes it on the bag
+		// (the caller credits the wallet + pushes the 0x2005 balance update). 0 = no bag / no coins / already taken.
+		public uint TakeLootCash(INetworkClient client, uint bagHandle)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null || !_sim
+				    .World
+				    .ZoneFor(player.MapId)
+				    .TryGet(bagHandle, out var bag) || !bag.IsLoot)
+				return 0;
+
+			var cash = bag.CashCopper;
+			bag.CashCopper = 0;
+			return cash;
+		}
+
 		// On a kill, maybe drop a loot bag at the dead NPC's spot (LootResolver coin-flip). The bag is a world object
 		// (LootBagFullUpdateIIR_c 0xF096251E) built from a captured "Bag of loot" row for the map, placed at the death
 		// position with a fresh handle, added to the zone, and spawned for nearby players. It expires off the tick
@@ -342,6 +358,7 @@ namespace Faolan.GameServer.World
 				return;
 
 			var bag = WorldEntity.ForLoot(handle, deadNpc.MapId, deadNpc.Position, deadNpc.Rotation, template.Name ?? "Bag of loot", body, LootResolver.LootExpirySeconds);
+			bag.CashCopper = LootResolver.RollCash(Random.Shared.NextDouble(), deadNpc.Level);
 			_sim
 				.World
 				.ZoneFor(deadNpc.MapId)

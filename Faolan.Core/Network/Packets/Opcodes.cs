@@ -234,6 +234,11 @@
 			// Reply to GameCharAgent.RequestBindLocation: [u32 playfieldId] = the character's bind/home playfield
 			// (the Totem of Origin destination). Verified 1:1 request/reply across 13 captures.
 			BindLocation = 0x2002,
+			// Wallet update: [u64 balanceCopper][u32 reason] (reason 3 = gain, 0 = spend/sync, 2 seen once).
+			// Decoded from the sell/loot captures: values grow +2 per beach coin loot, jump on quest rewards,
+			// DECREASE on a purchase with reason 0, and persist across sessions. The same opcode value carries
+			// the TradepostInterface search results (different class/size); the money body is always 12 bytes.
+			MoneyUpdate = 0x2005,
 			Pong = 0x2009,
 			ReportDimensionId = 0x200b,
 			ReportServerId = 0x200c,

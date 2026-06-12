@@ -110,6 +110,13 @@ namespace Faolan.GameServer
 				// Then the post-ready world-state/quest record stream (verbatim from the Strie login capture).
 				await SendPostReadyBurst(client);
 
+				// Wallet sync: retail does NOT push a 0x2005 at login (the initial balance presumably rides the
+				// FullChar snapshot, location undecoded) - this is our interim so a moneyed character doesn't
+				// show 0 until the first change. Reason 0 = a plain sync, not a gain celebration. In-client
+				// verification pending; remove if the client double-counts once the snapshot field is found.
+				if (client.Session.Character.Money > 0)
+					await SendMoneyUpdate(client, client.Session.Character.Money, MoneyUpdateReason.Spend);
+
 				// Guilded character: set the in-world guild tag (0x2550C99A). Retail sends this once on guild
 				// JOIN; for logins the tag normally rides in the spawn data, which our DB spawn does not carry
 				// yet, so re-assert it here - the client applies it the same way.

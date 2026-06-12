@@ -17,5 +17,14 @@ namespace Faolan.GameServer.Combat
 		{
 			return roll < dropChance;
 		}
+
+		// Coins a dropped bag carries (copper), scaled by the NPC's level. The retail beach bags consistently
+		// granted 2 copper per loot (the +2 steps in the 0x2005 wallet captures - level ~2-5 NPCs); higher-level
+		// values are extrapolated, not data-derived. Pure: the caller supplies the roll.
+		public static uint RollCash(double roll, uint npcLevel)
+		{
+			var max = 1 + npcLevel; // level 2 -> 1..3 copper, centred near the observed 2
+			return (uint)(1 + roll * max);
+		}
 	}
 }

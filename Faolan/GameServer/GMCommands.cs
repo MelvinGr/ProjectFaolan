@@ -167,8 +167,43 @@ namespace Faolan.GameServer
 				["tag"] = (client, arguments) => TagCommand(client, arguments),
 				["lua"] = (client, arguments) => LuaCommand(client, arguments),
 				["ah"] = (client, _) => OpenAuctionHouseCommand(client),
-				["guild"] = (client, arguments) => GuildCommand(client, arguments)
+				["guild"] = (client, arguments) => GuildCommand(client, arguments),
+				["money"] = (client, arguments) => MoneyCommand(client, arguments)
 			};
+		}
+
+		// .money            - show the wallet balance.
+		// .money <copper>   - set the balance (and push the 0x2005 wallet update so the client HUD reflects it).
+		// .money +<copper>  - add to the balance.
+		private async Task MoneyCommand(INetworkClient client, string arguments)
+		{
+			var character = client.Session.Character;
+			var characterId = character.Id;
+			var arg = (arguments ?? "").Trim();
+
+			if (arg.Length > 0)
+			{
+				var add = arg[0] == '+';
+				if (!ulong.TryParse(add
+					    ? arg[1..]
+					    : arg, out var amount))
+				{
+					await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .money [&lt;copper&gt; | +&lt;copper&gt;]");
+					return;
+				}
+
+				character.Money = add
+					? character.Money + amount
+					: amount;
+				await Database.SaveCharacter(character);
+				await SendMoneyUpdate(client, character.Money, add
+					? MoneyUpdateReason.Gain
+					: MoneyUpdateReason.Spend);
+			}
+
+			var copper = character.Money;
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				$"Wallet: {copper / 10000} gold {copper / 100 % 100} silver {copper % 100} copper ({copper} total).");
 		}
 
 		// .guild create <name>  - create a guild with the player as leader (test bootstrap for the guild flow;

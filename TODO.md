@@ -243,14 +243,20 @@ buy-delivery path (seller's item + buyer's payment move through mail).
 
 ### 9c. Money storage / usage (cross-cutting prerequisite)
 
-Nothing in the server models money yet; it blocks several flows that are otherwise ready:
-- [ ] **Storage**: `Character.Money` (copper, u64 — same unit as `Guild.Cash`). Where does the CLIENT learn the
-      balance? Find the money stat/field (likely a stat id in the 0x737A6DF9 snapshot stat block or a dedicated
-      IIR — `docs/player-stats.md`; the `BankIIR 0x0BA1C1CB` that accompanies DispatchOpenTradepost is another
-      candidate). Decode from a capture where money visibly changes (sell_items_to_trader has 8 SellItem calls).
-- [ ] **Usage paths once storage exists**: `TryLootCash` coin grant (§4b), vendor buy/sell debit/credit (§9b),
-      AH listing/buy + mail COD (§9a), guild bank deposits (`GuildTransferMoney`/`GuildWithdrawMoney`,
-      `Guild.Cash` is already persisted).
+Core model IMPLEMENTED 2026-06-12. The wallet-change packet was decoded from the loot/sell/buy captures:
+**DL `0x2005` (GameCharAgent conversation, 12 bytes) = `[u64 balanceCopper][u32 reason]`** (3 = gain, 0 =
+spend/sync; the value is the ABSOLUTE balance — grows +2 per beach coin loot, decreases on purchases, persists
+across capture sessions). Golden-tested (`MoneyUpdateTests`).
+
+- [x] **Storage**: `Character.Money` (copper u64, migration `AddCharacterMoney`) + `SendMoneyUpdate` (0x2005).
+- [x] **Loot cash**: bags roll coins at drop (`LootResolver.RollCash`, anchored on the observed 2c beach bags),
+      `TryLootCash` grants once per bag, persists, pushes the balance.
+- [x] `.money [<copper> | +<copper>]` GM command.
+- [ ] **In-client verify**: loot coins → wallet HUD updates; balance survives relog (we push an interim 0x2005
+      sync at login — retail carries the initial balance in the FullChar snapshot instead, field undecoded; if
+      the client ignores or double-counts the login push, find the snapshot field).
+- [ ] **Remaining usage paths**: vendor buy/sell debit/credit (§9b), AH listing/buy + mail COD (§9a), guild bank
+      (`GuildTransferMoney`/`GuildWithdrawMoney`; `Guild.Cash` is persisted).
 
 ### 9b. NPC vendor / shop buy-sell (AFTER 9a — simpler)
 Rides on **`GameCharAgent`/`GameCharInterface`** — the main GameServer connection, already fully wired; **no new

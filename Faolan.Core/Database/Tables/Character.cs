@@ -74,6 +74,10 @@ namespace Faolan.Core.Database.Tables
 		public uint RealmId { get; set; }
 		public ushort Level { get; set; }
 
+		// Wallet, in copper (the wire unit; 100 copper = 1 silver, 100 silver = 1 gold). Pushed to the client as
+		// a 0x2005 money update [u64 balance][u32 reason] whenever it changes; see Send0x2005_MoneyUpdate.
+		public ulong Money { get; set; }
+
 		// Guild membership; null = guildless. Rank 0 = fresh member (retail's invite-accept record), higher =
 		// promoted; the guild creator gets GuildLeaderRank. See Captures/decode_guild.py for the wire records.
 		public uint? GuildId { get; set; }
