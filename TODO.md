@@ -181,6 +181,11 @@ tag system exists. → memory `lua_vm`, `protocol_conversation_routing`; `docs/a
 
 ## 8. Lower-priority / future
 
+- [ ] **Expand the tshark/Wireshark plugin to fully decode packets (headers)** — today `Faolan.Wireshark`
+      only inflates the GameServer zlib streams; teach it the packet framing ([len][crc][RpcHeader
+      endpoints][opcode][body]), the ProtoEndpoint classes, and ideally the method-index opcode names so
+      ground-truth captures are readable directly in Wireshark without the JSON dump + Python dissectors.
+
 - [ ] **Real password validation** — login is DH + TEA-CBC; we accept any password (validation stubbed). Needs a
       client DH-key binary patch + C# port of the cipher. Fully understood, not implemented. → `docs/archive/login-decryption-plan.md`
 - [x] **Recover real opcode / RPC names** — DONE for the meaningful parts (2026-06-12): IIR sub-opcodes = BKDR-31

@@ -357,6 +357,9 @@ namespace Faolan.Importer
 				}
 
 				await ImportConversations(db, conversations);
+				// After characters exist: seed their observed live state (wallet balances, hotbar slots).
+				var (moneySeeded, shortcutsSeeded) = await CaptureCharacterStateImporter.ImportAsync(db, captures);
+				Console.WriteLine($"Character state: {moneySeeded} wallets, {shortcutsSeeded} hotbar slots seeded from captures.");
 				var (shopsSeen, shopsAdded, shopsUpdated) = await CaptureShopImporter.ImportAsync(db, captures.SelectMany(CaptureShopImporter.Extract));
 				Console.WriteLine($"Shops (0x2033 vendor windows): {shopsSeen} vendors, {shopsAdded} new, {shopsUpdated} updated.");
 				await ImportNpcSpawns(db, NpcSpawnExtractor.Merge(captures.SelectMany(NpcSpawnExtractor.Extract)));
