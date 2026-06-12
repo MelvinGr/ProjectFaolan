@@ -152,6 +152,50 @@ namespace Faolan.AgentServer
 					break;
 				}
 
+				case AgentServerOpcodes.Whisper:
+				{
+					// A tell: [u32 targetCharacterId][string text][00 01 00] - op 0x001E both directions (whisper
+					// capture 2026-06-12, Hoxxling <-> Settuc). Deliver to the target as the sender's identity
+					// (0x0014, like channel chat) + the same 0x001E shape with the SENDER's id in the peer slot.
+					// The sender's client renders its own outgoing tell locally - retail echoes nothing back.
+					var targetCharacterId = packet.Body.ReadUInt32();
+					var message = packet.Body.ReadString();
+					var senderId = client.Session.Account?.ClientInstance ?? 0;
+					var senderName = client.Session.Character?.Name?.Length > 0
+						? client.Session.Character.Name
+						: $"Character{senderId}";
+
+					Logger.LogInformation("AgentServer whisper {Sender} -> {Target:X8}: {Message}", senderName, targetCharacterId, message);
+
+					// A tell to Claude's synthetic identity goes into the MCP bridge log as a private message
+					// (the client learns Claude's id from the channel posts' 0x0014, so /tell Claude works).
+					if (Configuration.McpEnabled && targetCharacterId == ClaudeChannel.SenderId)
+					{
+						_claudeChannel.Append(senderId, senderName, $"(whisper) {message}", fromClaude: false);
+						break;
+					}
+
+					var target = ClientForCharacter(targetCharacterId);
+					if (target == null)
+					{
+						// Offline/unknown target: not captured (both sides were online); a system message is the
+						// graceful fallback so the tell doesn't vanish silently.
+						await SendSystemMessage(client, "Player is not online.");
+						break;
+					}
+
+					await new FaolanStream()
+						.WriteUInt16(AgentServerRespondsOpcodes.Ox0014)
+						.WriteArrayUInt16Length(s => s
+							.WriteUInt32(senderId)
+							.WriteUInt32(0x00000000)
+							.WriteString(senderName))
+						.SendAsync(target);
+					await target.SendAsync(BuildWhisper(senderId, message));
+
+					break;
+				}
+
 				case AgentServerOpcodes.ChatReady:
 				{
 					// Small chat-init handshake (body 00 01 02); retail echoes it back verbatim.

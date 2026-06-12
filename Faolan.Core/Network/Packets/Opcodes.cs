@@ -5,6 +5,7 @@
 		public enum AgentServerOpcodes : ushort
 		{
 			Hello = 0x0000,
+			Whisper = 0x001E, // client sends a tell: [u32 targetCharId][string][00 01 00] (whisper capture 2026-06-12)
 			ChannelChat = 0x0041, // client posts a message to a chat channel: [byte type][u32 channelId][string][0000]
 			ChatReady = 0x0064 // small chat-init handshake the client sends after the channel subscriptions (000102)
 		}
@@ -13,6 +14,7 @@
 		{
 			CharacterChat = 0x0022,
 			SystemMessage = 0x0023,
+			Whisper = 0x001E, // incoming tell: [u32 senderCharId][string][00 01 00], preceded by 0x0014 sender info
 			ChannelChat = 0x0041, // a channel message relayed to a client: [byte type][u32 channelId][u32 senderId][string][0000]
 			Ox0014 = 0x0014, // sender id + name; also sent before a ChannelChat so the client can show the speaker
 			Ox003C = 0x003c,

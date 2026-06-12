@@ -63,7 +63,19 @@ restarts. In-client render of the channel is not yet verified (needs a live clie
 
 - **In-client cross-player verification** (2+ clients): confirm a channel post reaches another player and a say is
   heard only within range.
-- **~Guild** channel (needs a guild/membership system) and **tells/whispers**.
+- **~Guild** channel (needs a guild/membership system).
+
+## Whispers / tells (0x001E) - decoded + implemented 2026-06-12
+
+Capture `account-faolan-character-hoxxling-login_move-from-night-to-day_send-and-receive-whisper`: the tell is
+op **0x001E both directions**, same body shape: `[u32 peerCharId][string][00 01 00]` (peer = the TARGET in the
+client's request, the SENDER on delivery). Delivery is preceded by a `0x0014` sender info, like channel chat;
+retail echoes nothing back to the sender (the client renders its own outgoing tell locally). Golden tests:
+`WhisperTests` (byte-exact both captured packets). Implemented in `AgentServerListener` (`BuildWhisper`);
+offline target -> system message (uncaptured fallback). A tell to Claude's synthetic identity
+(`/tell Claude`, id learned from the channel's 0x0014) lands in the MCP bridge log as a private message.
+LIMIT: the client whispers by character ID it already knows (from a 0x0014 it has seen); whispering a name the
+client has never seen chat may involve a name-lookup exchange that is NOT in this capture.
 - **World/system chat via `ChatTextIIR` (0xE0B51102)** — a GameServer remoteformat-XML chat seen once in captures;
   not implemented (the local-say `0x0022` path covers player say).
 - Tune `SayRangeUnits` if the in-client range feels off.
