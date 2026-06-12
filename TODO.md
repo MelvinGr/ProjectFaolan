@@ -169,12 +169,18 @@ buy-delivery path (seller's item + buyer's payment move through mail).
   `TradepostCancelSellItem` + full mail API (`SendMail`/`GetAllMails`/…).
 - `TradepostInterface` (class **56**, opcode `0xF2C2D5B5`) — server→client: `DispatchOpenTradepost`,
   `DispatchTradepostSearchResults`, `DispatchMailMessage`, …
-- [ ] **Step 1 (gate, client-free):** analyzer pass on both captures → locate the class-29/56 traffic and decode
-      `open → search → results` + `sell`/`buy` round-trips **byte-exact**. The undecoded structs are
-      `TradepostSearch_c` (query), `cSearchResults`/`TradepostSearchResult_t` (result list), and the mail message.
-- [ ] **Step 2:** capture-replay PoC (open AH → render captured search results in-client, like the conversation
-      stage machine), then go DB-backed (listings table + search + money/escrow + mail). NB: tradepost sells from
-      the **bank** (`nBankItemSlot`) — leans on bank/money support; `CSBuyItemReply` hints at a commerce/CS path.
+- [x] **Step 1 (gate, client-free) — DONE 2026-06-12.** Decoded both captures (`Captures/decode_tradepost.py`).
+      Full grammar in **`docs/tradepost-protocol.md`**: the generic RPC envelope (receiver/sender ProtoEndpoints +
+      `0x20xx` method), the method map (Open/Search/Buy/Close + mail get/dispatch), the `TradepostItemSearch`
+      query (byte-exact), the `DispatchTradepostSearchResults` rows (saleId/seller/price/qty/itemId), and the
+      **buy→mail** delivery: `TradepostBuyItem(saleId)` → `DispatchMailMessage` (recipient=buyer, sender=EMPTY
+      system mail, body = remoteformat `TradePostGUI_MailItemBought` with the item attachment).
+- [ ] **Step 2:** finish grammaring the `0x2005` result-row offsets + the mail attachment item bytes (one more
+      decode pass), then capture-replay PoC (open AH → render captured search results in-client, like the
+      conversation stage machine).
+- [ ] **Step 3:** go DB-backed — `TradepostListing` + `Mail`/`MailAttachment` tables, search, money/escrow,
+      buy→mail grant. NB: tradepost sells from the **bank** (`nBankItemSlot`) — leans on bank/money support;
+      `CSBuyItemReply` hints at a commerce/CS path. All on the existing GameServer dispatcher (no new connection).
 
 ### 9b. NPC vendor / shop buy-sell (AFTER 9a — simpler)
 Rides on **`GameCharAgent`/`GameCharInterface`** — the main GameServer connection, already fully wired; **no new
