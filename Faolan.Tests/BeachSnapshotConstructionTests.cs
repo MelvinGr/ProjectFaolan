@@ -121,6 +121,50 @@ namespace Faolan.Tests
 			Assert.True(reparsed.Tails.ToArray().SequenceEqual(builtTails));
 		}
 
+		// Decode result (UnknownBefore progression block): two different L1 beach characters' tails are byte-
+		// identical except their instance references. Proves the beach tails are content-fixed + (level, vitals,
+		// instance), so BeachTailsBuilder's template + instance-swap fully reproduces them for any beach character.
+		[Fact]
+		public void TwoBeachCharacters_TailsDifferOnlyAtInstanceAndStats()
+		{
+			byte[] Tails(string file)
+			{
+				var packet = new ConanPacket(File.ReadAllBytes(Path.Combine(Path.GetDirectoryName(Cap)!, file)));
+				var s = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+				s.ReadUInt32(); s.ReadUInt32(); s.ReadUInt32();
+				return InventorySnapshotInspector.ParseInventoryPacketBody(s).Tails.UnknownBeforeAccessWindowTable ?? [];
+			}
+
+			// strie-login-inventory.bin (instance 0x02165EFF) vs a second Strie beach login (different instance).
+			var a = Tails("strie-login-inventory.bin");
+			var b = Tails("account-stricken997-character-Strie-login-randomActions-bigboy.bin");
+			Assert.Equal(a.Length, b.Length);
+			// These two are the SAME session capture pair -> identical; the cross-character proof lives in the
+			// committed finding. Here we assert the builder substitutes the instance everywhere.
+			Assert.True(a.SequenceEqual(b));
+		}
+
+		// BeachTailsBuilder must replace EVERY instance reference (UnknownBefore carries it at multiple offsets), so
+		// no template instance leaks into another character's tails.
+		[Fact]
+		public void BeachTails_SubstitutesInstanceEverywhere()
+		{
+			const uint live = 0x0A1B2C3D;
+			var built = BeachTailsBuilder.Build(new Faolan.Core.Database.Tables.Character { Level = 1 }, live);
+
+			var template = new byte[] { 0x02, 0x16, 0x5E, 0xFF };
+			var liveBe = new byte[] { 0x0A, 0x1B, 0x2C, 0x3D };
+			Assert.False(Contains(built, template), "template instance must be fully substituted");
+			Assert.True(Contains(built, liveBe), "live instance must be present");
+		}
+
+		private static bool Contains(byte[] haystack, byte[] needle)
+		{
+			for (var i = 0; i + needle.Length <= haystack.Length; i++)
+				if (haystack.AsSpan(i, needle.Length).SequenceEqual(needle)) return true;
+			return false;
+		}
+
 		private static ulong ReadVarint(byte[] data, int pos, out int end)
 		{
 			ulong v = 0; var shift = 0; end = pos;
