@@ -25,6 +25,7 @@ namespace Faolan.GameServer.Tradepost
 
 				case TradepostProtocol.AgentMethod.ItemSearch:
 					logger.LogInformation("Tradepost: {Char} searched {Query}.", CharName(client), DescribeSearch(packet.Body));
+					await TradepostResponses.SendSearchResults(client, packet);
 					break;
 
 				case TradepostProtocol.AgentMethod.BuyItem:

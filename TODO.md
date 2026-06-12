@@ -197,8 +197,12 @@ buy-delivery path (seller's item + buyer's payment move through mail).
   - [x] Reply to `TradepostOpen` with `DispatchOpenTradepost` (access pos + 15.0 radius) — `TradepostResponses`,
         echoes the client's TradepostInterface instance. **Byte-exact golden test vs the captured packet passes**
         (`TradepostResponseTests`). Still needs an in-client render check (user side).
-  - [ ] Reply to `TradepostItemSearch` with a `DispatchTradepostSearchResults` (replay a captured one first, then
-        DB-built) so listings render. **Needs an in-client render check (user side).**
+  - [x] Reply to `TradepostItemSearch` with `DispatchTradepostSearchResults` — PoC replays a captured single-row
+        listing (seller "Jocko", item 0x755D). **Byte-exact golden test passes** (`TradepostResponseTests`). Still
+        needs an in-client render check (user side); Step 3 swaps the replay for DB-built rows matching the query.
+  - [ ] **In-client check (user side):** open the auction house → confirm the window opens (Open reply) and the
+        listing grid shows the replayed row. Grab the client log on failure (`stream bad`, `invalid ...`). If it
+        renders, the framing/endpoints are confirmed live and Step 3 (DB-backed) can proceed.
 - [ ] **Step 3:** go DB-backed — `TradepostListing` + `Mail`/`MailAttachment` tables, search, money/escrow,
       buy→mail grant. NB: tradepost sells from the **bank** (`nBankItemSlot`) — leans on bank/money support;
       `CSBuyItemReply` hints at a commerce/CS path. All on the existing GameServer dispatcher (no new connection).
