@@ -243,6 +243,51 @@ static int test_framer_oversize_resets(void)
     return ok;
 }
 
+static int test_chat_framer(void)
+{
+    /* AgentServer framing: [u16 opcode][u16 bodyLen][body]; a hello, a body-less packet and a
+       chat message, fed in awkward chunks. */
+    const uint8_t stream_bytes[] = {
+        0x00, 0x00, 0x00, 0x03, 0x01, 0x02, 0x03,
+        0x00, 0x64, 0x00, 0x00,
+        0x00, 0x41, 0x00, 0x05, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE,
+    };
+    const size_t chunks[] = {1, 4, 2, 5, 3};
+
+    faolan_conan_framer_t framer;
+    faolan_conan_framer_init(&framer);
+
+    faolan_framed_packet_t *packets = NULL;
+    size_t packet_count = 0;
+
+    size_t offset = 0;
+    size_t chunk_index = 0;
+    int ok = 1;
+    while (offset < sizeof(stream_bytes) && ok) {
+        const size_t want = chunks[chunk_index % (sizeof(chunks) / sizeof(chunks[0]))];
+        const size_t remaining = sizeof(stream_bytes) - offset;
+        const size_t take = want < remaining ? want : remaining;
+
+        ok = faolan_chat_framer_push(&framer, stream_bytes + offset, take, &packets, &packet_count);
+        offset += take;
+        chunk_index++;
+    }
+
+    ok = ok &&
+         packet_count == 3 &&
+         packets[0].len == 7 && memcmp(packets[0].data, stream_bytes, 7) == 0 &&
+         packets[1].len == 4 && memcmp(packets[1].data, stream_bytes + 7, 4) == 0 &&
+         packets[2].len == 9 && memcmp(packets[2].data, stream_bytes + 11, 9) == 0;
+
+    if (!ok) {
+        fprintf(stderr, "test_chat_framer failed (count=%zu)\n", packet_count);
+    }
+
+    faolan_framed_packets_free(packets, packet_count);
+    faolan_conan_framer_reset(&framer);
+    return ok;
+}
+
 int main(void)
 {
     const int ok1 = test_compressed_from_start();
@@ -250,11 +295,12 @@ int main(void)
     const int ok3 = test_invalid_compressed_data();
     const int ok4 = test_framer_chunked_packets();
     const int ok5 = test_framer_oversize_resets();
+    const int ok6 = test_chat_framer();
 
-    if (!ok1 || !ok2 || !ok3 || !ok4 || !ok5) {
+    if (!ok1 || !ok2 || !ok3 || !ok4 || !ok5 || !ok6) {
         return 1;
     }
 
-    printf("OK: compressed-from-start + midstream-plaintext-transition + invalid-data + framer tests passed\n");
+    printf("OK: compressed-from-start + midstream-plaintext-transition + invalid-data + framer + chat-framer tests passed\n");
     return 0;
 }

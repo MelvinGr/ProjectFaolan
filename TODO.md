@@ -186,7 +186,9 @@ tag system exists. → memory `lua_vm`, `protocol_conversation_routing`; `docs/a
       compression transitions, RpcHeader ProtoEndpoints (class ids resolved to the 14 recovered class
       names), raw opcodes (names deliberately not embedded), CRC verification, retransmission/out-of-order
       handling, and automatic following of the service-handoff addresses (a session decodes from just port
-      7010). Validated byte-exact (per-opcode counts) against the analyzer JSON on 4 reference captures.
+      7010). The AgentServer chat protocol ([u16 opcode][u16 bodyLen] framing) is auto-detected per
+      conversation and dissected too. Validated byte-exact (per-opcode counts, Conan + chat) against the
+      analyzer JSON on 4 reference captures.
       Use `-o tcp.analyze_sequence_numbers:FALSE` on lossy captures. → `Faolan.Wireshark/README.md`
 
 - [ ] **ConanMessageFramer: handle mid-chunk compression transitions** — found while building the

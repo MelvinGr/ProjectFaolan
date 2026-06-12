@@ -37,7 +37,9 @@ static bool emit_packet(
     }
 
     memcpy(data, framer->len_buf, sizeof(framer->len_buf));
-    memcpy(data + sizeof(framer->len_buf), framer->pkt_buf, framer->pkt_len);
+    if (framer->pkt_len > 0) {
+        memcpy(data + sizeof(framer->len_buf), framer->pkt_buf, framer->pkt_len);
+    }
 
     resized[*packet_count].data = data;
     resized[*packet_count].len = total;
@@ -154,6 +156,72 @@ bool faolan_conan_framer_push_scan(
     *hit_marker = false;
     *consumed = 0;
     return framer_push_internal(framer, bytes, len, packets, packet_count, consumed, hit_marker);
+}
+
+bool faolan_chat_framer_push(
+    faolan_conan_framer_t *framer,
+    const uint8_t *bytes,
+    size_t len,
+    faolan_framed_packet_t **packets,
+    size_t *packet_count)
+{
+    size_t offset = 0;
+
+    while (offset < len) {
+        const size_t available = len - offset;
+
+        if (framer->pkt_buf != NULL) {
+            const size_t requested = framer->pkt_len - framer->pkt_read;
+            const size_t transferred = requested < available ? requested : available;
+
+            memcpy(framer->pkt_buf + framer->pkt_read, bytes + offset, transferred);
+            offset += transferred;
+            framer->pkt_read += transferred;
+
+            if (framer->pkt_read == framer->pkt_len) {
+                if (!emit_packet(framer, packets, packet_count)) {
+                    return false;
+                }
+
+                free(framer->pkt_buf);
+                framer->pkt_buf = NULL;
+                framer->pkt_len = 0;
+                framer->pkt_read = 0;
+            }
+        } else {
+            const size_t requested = sizeof(framer->len_buf) - framer->len_buf_count;
+            const size_t transferred = requested < available ? requested : available;
+
+            memcpy(framer->len_buf + framer->len_buf_count, bytes + offset, transferred);
+            offset += transferred;
+            framer->len_buf_count += transferred;
+
+            if (framer->len_buf_count == sizeof(framer->len_buf)) {
+                /* len_buf = [u16 opcode][u16 bodyLen]; the body follows. */
+                const size_t body_len = ((size_t)framer->len_buf[2] << 8) | framer->len_buf[3];
+
+                if (body_len == 0) {
+                    if (!emit_packet(framer, packets, packet_count)) {
+                        return false;
+                    }
+
+                    framer->len_buf_count = 0;
+                    continue;
+                }
+
+                framer->pkt_buf = (uint8_t *)malloc(body_len);
+                if (framer->pkt_buf == NULL) {
+                    return false;
+                }
+
+                framer->pkt_len = body_len;
+                framer->pkt_read = 0;
+                framer->len_buf_count = 0;
+            }
+        }
+    }
+
+    return true;
 }
 
 void faolan_framed_packets_free(faolan_framed_packet_t *packets, size_t count)

@@ -23,8 +23,10 @@ Wireshark without the JSON dump + Python dissector pipeline.
 - **Auto-follow**: service handoffs advertise the next service's address (ASCII `host:port`
   or the binary `[u32 ip][u16 port]` form in the 0x1A07 handoffs). Advertised ports are
   registered automatically, so a whole session dissects from just the fixed UniverseAgent
-  port (7010, the default binding). AgentServer chat connections picked up this way are
-  detected (first-packet CRC validation) and skipped, not mis-framed.
+  port (7010, the default binding).
+- **AgentServer chat**: connections that fail Conan validation (first-packet CRC) but walk
+  cleanly as `[u16 opcode][u16 bodyLen][body]` framing are re-framed from their first byte
+  and dissected as chat packets (`faolan.chat.opcode` / `len` / `body`, raw values).
 - **Robust delivery**: per-direction TCP sequence tracking deduplicates retransmissions and
   reorders out-of-order segments. If a gap never fills (bytes missing from the capture), a
   plaintext direction resyncs at the next segment; a compressed direction keeps inflating
@@ -71,7 +73,8 @@ Useful fields:
 | `faolan.pkt.sender_class` / `receiver_class` | ProtoEndpoint class id, resolved to class name |
 | `faolan.pkt.sender_instance` / `receiver_instance` | character/zone instance |
 | `faolan.pkt.len` / `crc` / `header_len` / `header_extra` / `body` | packet layout fields |
-| `faolan.compression_state` | Plain / TransitionHeader / Compressed / Failed / Skipped |
+| `faolan.chat.opcode` / `faolan.chat.len` / `faolan.chat.body` | AgentServer chat packets |
+| `faolan.compression_state` | Plain / TransitionHeader / Compressed / Failed / Chat / Skipped |
 | `faolan.stream_note` | retransmission / out-of-order / capture-gap diagnostics |
 | `faolan.decompressed` | inflated bytes produced in this frame (own data source) |
 
@@ -93,7 +96,8 @@ Byte-exact parity with the `Faolan.PacketAnalyzer` JSON dumps (per-opcode packet
 - `account-stricken997-character-Strie-login.pcapng` (305/305, + post-capture-hole recovery
   the analyzer can't do)
 - `account-faolan-character-hoxxling-login-guild_invite_accepted-...pcapng` (6520/6520,
-  incl. both GameServer connections of the zone change)
+  incl. both GameServer connections of the zone change; chat opcode counts 94/94 + one
+  body-less `[op][len 0]` packet per session the C# stack drops as invalid)
 - `account-faolan-character-necrol80-login-sell_items_to_trader-...pcapng` (3765/3765)
 - `account-stricken997-character-Strie-create.pcapng` (673/673)
 
@@ -109,8 +113,6 @@ wireshark/plugin.c              plugin registration
 
 ## Known gaps / future work
 
-- The AgentServer chat protocol (`[u16 opcode][u16 len][body]`) is detected and skipped, not
-  dissected.
 - Opcode names: the per-class method tables exist in `docs/aoc-client-rpc-methods.json`;
   deliberately not embedded - opcodes display as raw hex.
 - A capture hole inside a compressed stream cannot be fully recovered (the deflate stream has

@@ -11,8 +11,10 @@
  *          [0x0D <class id fixed32 LE>][0x10 <instance varint>]; the class ids are BKDR-31
  *          hashes of the client's agent/interface class names (docs/aoc-opcode-ids.md).
  *
- * Applies to UniverseAgent, PlayerAgent, CSPlayerAgent and GameServer connections (the
- * AgentServer chat protocol uses a different [u16 opcode][u16 len] framing - not handled).
+ * Applies to UniverseAgent, PlayerAgent, CSPlayerAgent and GameServer connections. The
+ * AgentServer chat protocol ([u16 opcode][u16 bodyLen][body] framing) is auto-detected per
+ * conversation (first-packet CRC fails Conan + the stream walks as chat) and dissected with
+ * its own packet fields.
  *
  * The CRC is a plain CRC-32 (zlib crc32()) over everything after the 8-byte length+crc
  * prefix; verified against capture traffic.
@@ -62,10 +64,16 @@ static int hf_faolan_pkt_opcode = -1;
 static int hf_faolan_pkt_hdr_extra = -1;
 static int hf_faolan_pkt_body = -1;
 
+/* AgentServer chat packet fields */
+static int hf_faolan_chat_opcode = -1;
+static int hf_faolan_chat_len = -1;
+static int hf_faolan_chat_body = -1;
+
 static gint ett_faolan = -1;
 static gint ett_faolan_pkt = -1;
 static gint ett_faolan_pkt_sender = -1;
 static gint ett_faolan_pkt_receiver = -1;
+static gint ett_faolan_chat_pkt = -1;
 
 static expert_field ei_faolan_inflate_failed = EI_INIT;
 static expert_field ei_faolan_crc_mismatch = EI_INIT;
@@ -113,6 +121,12 @@ typedef struct faolan_stashed_seg
 typedef struct faolan_direction_state
 {
     faolan_conan_stream_t stream;
+    faolan_conan_framer_t chat_framer; /* used instead of `stream` on chat conversations */
+
+    /* Raw in-order bytes kept while the conversation protocol is undecided, so a connection
+       that turns out to be chat can be re-framed from its first byte. */
+    uint8_t *replay; /* wmem file scope */
+    uint32_t replay_len;
 
     /* In-order delivery: streams (especially the zlib phase) need the byte stream exactly
        once and in order, so retransmissions are dropped and out-of-order segments stashed. */
@@ -126,8 +140,12 @@ typedef struct faolan_direction_state
 typedef enum faolan_conv_validation {
     FAOLAN_CONV_UNVALIDATED = 0,
     FAOLAN_CONV_CONAN,
-    FAOLAN_CONV_NOT_CONAN
+    FAOLAN_CONV_CHAT, /* AgentServer chat: [u16 opcode][u16 bodyLen][body] framing */
+    FAOLAN_CONV_SKIP
 } faolan_conv_validation_t;
+
+/* Bytes a direction may accumulate while the conversation protocol is undecided. */
+#define FAOLAN_REPLAY_MAX_BYTES (128 * 1024)
 
 typedef struct faolan_conv_state
 {
@@ -139,6 +157,7 @@ typedef struct faolan_conv_state
 
 typedef struct faolan_frame_result
 {
+    bool is_chat; /* packets use AgentServer chat framing, not Conan */
     const char *compression_state;
     const char *stream_note; /* e.g. retransmission/out-of-order diagnostics */
     uint32_t input_bytes;
@@ -168,6 +187,8 @@ static faolan_conv_state_t *get_or_create_conv_state(packet_info *pinfo)
     state->endpoint_a_port = pinfo->srcport;
     faolan_conan_stream_init(&state->a_to_b.stream);
     faolan_conan_stream_init(&state->b_to_a.stream);
+    faolan_conan_framer_init(&state->a_to_b.chat_framer);
+    faolan_conan_framer_init(&state->b_to_a.chat_framer);
 
     conversation_add_proto_data(conversation, proto_faolan, state);
     return state;
@@ -508,6 +529,7 @@ static void follow_advertised_ports(const uint8_t *pkt, uint32_t len)
 /* Accumulates the output of (possibly several) stream pushes for one frame. */
 typedef struct faolan_push_acc
 {
+    faolan_conv_state_t *conv;
     faolan_framed_packet_t *packets;
     size_t packet_count;
     uint8_t *inflated; /* malloc, grown by append */
@@ -519,6 +541,25 @@ typedef struct faolan_push_acc
 static void push_bytes(faolan_direction_state_t *dir, const uint8_t *bytes, uint32_t len, faolan_push_acc_t *acc)
 {
     if (!acc->ok) {
+        return;
+    }
+
+    /* While the conversation protocol is undecided, keep the raw bytes so a connection that
+       turns out to be chat can be re-framed from its first byte. */
+    if (acc->conv != NULL &&
+        acc->conv->validation == FAOLAN_CONV_UNVALIDATED &&
+        dir->replay_len + len <= FAOLAN_REPLAY_MAX_BYTES) {
+        uint8_t *grown = (uint8_t *)wmem_realloc(wmem_file_scope(), dir->replay, dir->replay_len + len);
+        memcpy(grown + dir->replay_len, bytes, len);
+        dir->replay = grown;
+        dir->replay_len += len;
+    }
+
+    if (acc->conv != NULL && acc->conv->validation == FAOLAN_CONV_CHAT) {
+        acc->ok = faolan_chat_framer_push(&dir->chat_framer, bytes, len, &acc->packets, &acc->packet_count);
+        if (!acc->ok) {
+            acc->error_message = "chat framer allocation failed";
+        }
         return;
     }
 
@@ -539,6 +580,26 @@ static void push_bytes(faolan_direction_state_t *dir, const uint8_t *bytes, uint
     }
 
     free(inflated);
+}
+
+/* Sanity walk: does this byte stream look like AgentServer chat framing? Every packet is
+   [u16 opcode][u16 bodyLen][body] with small opcodes (0x0000..0x00FF observed). */
+static bool plausible_chat_stream(const uint8_t *data, uint32_t len)
+{
+    uint32_t pos = 0;
+    uint32_t count = 0;
+
+    while (pos + 4 <= len) {
+        const uint16_t opcode = (uint16_t)((data[pos] << 8) | data[pos + 1]);
+        if (opcode >= 0x0100) {
+            return false;
+        }
+
+        pos += 4 + (uint32_t)((data[pos + 2] << 8) | data[pos + 3]);
+        count++;
+    }
+
+    return count >= 1;
 }
 
 /* Feeds this segment - and any stashed segments it makes contiguous - to the stream in
@@ -639,6 +700,37 @@ static void deliver_in_order(
     }
 }
 
+/* Dissects one AgentServer chat packet: [u16 opcode][u16 bodyLen][body]. */
+static void dissect_chat_packet(
+    tvbuff_t *tvb,
+    packet_info *pinfo,
+    proto_tree *tree,
+    uint32_t offset,
+    uint32_t len,
+    uint32_t index)
+{
+    proto_item *pkt_item;
+    proto_tree *pkt_tree = proto_tree_add_subtree_format(
+        tree, tvb, offset, len, ett_faolan_chat_pkt, &pkt_item,
+        "Chat packet %u (%u bytes)", index, len);
+
+    if (len < 4) {
+        expert_add_info(pinfo, pkt_item, &ei_faolan_pkt_malformed);
+        return;
+    }
+
+    const uint16_t opcode = tvb_get_ntohs(tvb, offset);
+    proto_tree_add_item(pkt_tree, hf_faolan_chat_opcode, tvb, offset, 2, ENC_BIG_ENDIAN);
+    proto_tree_add_item(pkt_tree, hf_faolan_chat_len, tvb, offset + 2, 2, ENC_BIG_ENDIAN);
+
+    if (len > 4) {
+        proto_tree_add_item(pkt_tree, hf_faolan_chat_body, tvb, offset + 4, len - 4, ENC_NA);
+    }
+
+    proto_item_append_text(pkt_item, ": opcode 0x%04x, body %u bytes", opcode, len - 4);
+    col_append_sep_fstr(pinfo->cinfo, COL_INFO, ", ", "Chat 0x%04x", opcode);
+}
+
 static void process_first_pass(tvbuff_t *tvb, packet_info *pinfo, const struct tcpinfo *tcpinfo, faolan_frame_result_t *result)
 {
     faolan_conv_state_t *conv_state = get_or_create_conv_state(pinfo);
@@ -650,12 +742,13 @@ static void process_first_pass(tvbuff_t *tvb, packet_info *pinfo, const struct t
     const guint8 *payload = captured_len > 0 ? tvb_get_ptr(tvb, 0, captured_len) : NULL;
 
     faolan_push_acc_t acc = {0};
+    acc.conv = conv_state;
     acc.ok = true;
     const char *note = NULL;
 
-    if (conv_state->validation == FAOLAN_CONV_NOT_CONAN) {
+    if (conv_state->validation == FAOLAN_CONV_SKIP) {
         result->compression_state = "Skipped";
-        result->stream_note = "not a Conan stream (AgentServer chat?); skipped";
+        result->stream_note = "unrecognized protocol; skipped";
         result->input_bytes = (uint32_t)captured_len;
         result->ok = true;
         return;
@@ -669,8 +762,10 @@ static void process_first_pass(tvbuff_t *tvb, packet_info *pinfo, const struct t
         }
     }
 
-    /* The first completed packet decides whether this connection speaks the Conan protocol
-       at all (an auto-followed AgentServer chat port does not - different framing). */
+    /* The first completed packet decides the conversation protocol: a valid Conan CRC means
+       Conan; otherwise an AgentServer chat connection ([u16 opcode][u16 bodyLen] framing -
+       its arithmetic matches a Conan misframe for the first packet, so the CRC is the
+       discriminator). On chat, re-frame the conversation from its first byte. */
     if (conv_state->validation == FAOLAN_CONV_UNVALIDATED && acc.packet_count > 0) {
         const faolan_framed_packet_t *first = &acc.packets[0];
         const bool conan = first->len >= 12 &&
@@ -678,28 +773,55 @@ static void process_first_pass(tvbuff_t *tvb, packet_info *pinfo, const struct t
                 (((uint32_t)first->data[4] << 24) | ((uint32_t)first->data[5] << 16) |
                  ((uint32_t)first->data[6] << 8) | first->data[7]);
 
-        conv_state->validation = conan ? FAOLAN_CONV_CONAN : FAOLAN_CONV_NOT_CONAN;
+        if (conan) {
+            conv_state->validation = FAOLAN_CONV_CONAN;
+        } else if (dir->replay != NULL && plausible_chat_stream(dir->replay, dir->replay_len)) {
+            conv_state->validation = FAOLAN_CONV_CHAT;
 
-        if (!conan) {
+            /* Drop the Conan misframe and replay both directions through the chat framer. */
+            faolan_framed_packets_free(acc.packets, acc.packet_count);
+            free(acc.inflated);
+            memset(&acc, 0, sizeof(acc));
+            acc.conv = conv_state;
+            acc.ok = true;
+            note = "AgentServer chat connection";
+
+            faolan_direction_state_t *dirs[2] = {&conv_state->a_to_b, &conv_state->b_to_a};
+            for (int d = 0; d < 2; d++) {
+                if (dirs[d]->replay_len > 0) {
+                    push_bytes(dirs[d], dirs[d]->replay, dirs[d]->replay_len, &acc);
+                }
+            }
+        } else {
+            conv_state->validation = FAOLAN_CONV_SKIP;
             faolan_framed_packets_free(acc.packets, acc.packet_count);
             free(acc.inflated);
             result->compression_state = "Skipped";
-            result->stream_note = "not a Conan stream (AgentServer chat?); skipped";
+            result->stream_note = "unrecognized protocol; skipped";
             result->input_bytes = (uint32_t)captured_len;
             result->ok = true;
             return;
         }
+
+        conv_state->a_to_b.replay = NULL;
+        conv_state->a_to_b.replay_len = 0;
+        conv_state->b_to_a.replay = NULL;
+        conv_state->b_to_a.replay_len = 0;
     }
 
-    /* Auto-follow: pick up service ports advertised in handoff packets. */
-    for (size_t i = 0; i < acc.packet_count; i++) {
-        follow_advertised_ports(acc.packets[i].data, (uint32_t)acc.packets[i].len);
+    result->is_chat = conv_state->validation == FAOLAN_CONV_CHAT;
+
+    if (!result->is_chat) {
+        /* Auto-follow: pick up service ports advertised in handoff packets. */
+        for (size_t i = 0; i < acc.packet_count; i++) {
+            follow_advertised_ports(acc.packets[i].data, (uint32_t)acc.packets[i].len);
+        }
     }
 
     const faolan_framed_packet_t *packets = acc.packets;
     const size_t packet_count = acc.packet_count;
 
-    result->compression_state = faolan_stream_phase_to_string(dir->stream.phase);
+    result->compression_state = result->is_chat ? "Chat" : faolan_stream_phase_to_string(dir->stream.phase);
     result->stream_note = note;
     result->input_bytes = (uint32_t)captured_len;
     result->output_bytes = (uint32_t)acc.inflated_len;
@@ -796,12 +918,19 @@ static int dissect_faolan(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, v
             (int)frame_result->packets_blob_len,
             (int)frame_result->packets_blob_len);
 
-        add_new_data_source(pinfo, packets_tvb, "Faolan Conan packets");
+        add_new_data_source(pinfo, packets_tvb,
+            frame_result->is_chat ? "Faolan chat packets" : "Faolan Conan packets");
 
         for (uint32_t i = 0; i < frame_result->pkt_count; i++) {
-            dissect_conan_packet(
-                packets_tvb, pinfo, faolan_tree,
-                frame_result->pkt_offsets[i], frame_result->pkt_lens[i], i + 1);
+            if (frame_result->is_chat) {
+                dissect_chat_packet(
+                    packets_tvb, pinfo, faolan_tree,
+                    frame_result->pkt_offsets[i], frame_result->pkt_lens[i], i + 1);
+            } else {
+                dissect_conan_packet(
+                    packets_tvb, pinfo, faolan_tree,
+                    frame_result->pkt_offsets[i], frame_result->pkt_lens[i], i + 1);
+            }
         }
     }
 
@@ -829,6 +958,10 @@ void proto_register_faolan_gs_zlib(void)
         {&hf_faolan_pkt_opcode, {"Opcode", "faolan.pkt.opcode", FT_UINT16, BASE_HEX, NULL, 0x0, "Method index (0x2000 + position) into the receiver class's RPC table", HFILL}},
         {&hf_faolan_pkt_hdr_extra, {"Header Extra", "faolan.pkt.header_extra", FT_BYTES, BASE_NONE, NULL, 0x0, "Header bytes after the opcode", HFILL}},
         {&hf_faolan_pkt_body, {"Body", "faolan.pkt.body", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}},
+
+        {&hf_faolan_chat_opcode, {"Chat Opcode", "faolan.chat.opcode", FT_UINT16, BASE_HEX, NULL, 0x0, "AgentServer chat opcode", HFILL}},
+        {&hf_faolan_chat_len, {"Chat Body Length", "faolan.chat.len", FT_UINT16, BASE_DEC, NULL, 0x0, NULL, HFILL}},
+        {&hf_faolan_chat_body, {"Chat Body", "faolan.chat.body", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}},
     };
 
     static gint *ett[] = {
@@ -836,6 +969,7 @@ void proto_register_faolan_gs_zlib(void)
         &ett_faolan_pkt,
         &ett_faolan_pkt_sender,
         &ett_faolan_pkt_receiver,
+        &ett_faolan_chat_pkt,
     };
 
     static ei_register_info ei[] = {
