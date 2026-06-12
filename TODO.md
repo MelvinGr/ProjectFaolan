@@ -181,10 +181,21 @@ tag system exists. → memory `lua_vm`, `protocol_conversation_routing`; `docs/a
 
 ## 8. Lower-priority / future
 
-- [ ] **Expand the tshark/Wireshark plugin to fully decode packets (headers)** — today `Faolan.Wireshark`
-      only inflates the GameServer zlib streams; teach it the packet framing ([len][crc][RpcHeader
-      endpoints][opcode][body]), the ProtoEndpoint classes, and ideally the method-index opcode names so
-      ground-truth captures are readable directly in Wireshark without the JSON dump + Python dissectors.
+- [x] **Expand the tshark/Wireshark plugin to fully decode packets (headers)** — DONE (2026-06-12):
+      `Faolan.Wireshark` now dissects the full Conan protocol: per-direction packet framing with in-band
+      compression transitions, RpcHeader ProtoEndpoints (class ids resolved to the 14 recovered class
+      names), raw opcodes (names deliberately not embedded), CRC verification, retransmission/out-of-order
+      handling, and automatic following of the service-handoff addresses (a session decodes from just port
+      7010). Validated byte-exact (per-opcode counts) against the analyzer JSON on 4 reference captures.
+      Use `-o tcp.analyze_sequence_numbers:FALSE` on lossy captures. → `Faolan.Wireshark/README.md`
+
+- [ ] **ConanMessageFramer: handle mid-chunk compression transitions** — found while building the
+      Wireshark dissector: the 9-byte `80 00 00 05` transition header occurs at PACKET boundaries (not
+      only stream start), and its last byte is a compression FLAG (`00` = zlib follows, `01` = stream
+      stays plaintext; the retail client sends a flag-`01` one mid-stream on the GameServer connection).
+      `ConanMessageFramer.PrepareBytes` only checks receive-chunk starts and always assumes compression,
+      so a marker arriving mid-chunk silently discards the rest of that chunk (drops one client ping per
+      session in the reference captures; harmless today, but a correctness gap for the c2s path).
 
 - [ ] **Real password validation** — login is DH + TEA-CBC; we accept any password (validation stubbed). Needs a
       client DH-key binary patch + C# port of the cipher. Fully understood, not implemented. → `docs/archive/login-decryption-plan.md`

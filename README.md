@@ -9,7 +9,7 @@ The solution contains:
 - `Faolan.PacketAnalyzer/` - packet capture dump/analyzer tooling (pcapng -> JSON)
 - `Faolan.Importer/` - CLI that (re)builds the DB from the captures + client RDB (pcap -> DB); see `docs/archive/faolan-importer-plan.md`
 - `Faolan.ClientLauncher/` - launches the retail client unattended (patcher stand-in; auto-login; see `docs/client-launcher.md`)
-- `Faolan.Wireshark/` - a Wireshark/tshark C plugin that inflates GameServer zlib streams
+- `Faolan.Wireshark/` - a Wireshark/tshark C plugin that fully dissects the Conan protocol (framing, zlib, RpcHeader endpoints, opcodes, handoff auto-follow)
 - `Faolan.Tests/` - the unit/golden test suite (byte-exact round-trips are the acceptance gates)
 - `Captures/` - reference `.pcapng` and `.json` traces used for protocol comparison
 
@@ -447,18 +447,26 @@ named `(name, value)` tweak list in `PlayerAgentListener` (Ox20EC handler) + `Ga
 
 ### Wireshark plugin (ground truth)
 
-`Faolan.Wireshark/` builds an EPAN plugin (`faolan_gs_zlib.so`) that inflates GameServer streams with real
-zlib + Wireshark's TCP reassembly. Use it to validate the analyzer:
+`Faolan.Wireshark/` builds an EPAN plugin (`faolan_gs_zlib.so`) that fully dissects the Conan protocol:
+per-direction packet framing (with the in-band `80 00 00 05` compression transitions), zlib inflation,
+RpcHeader endpoints (class ids resolved to the recovered client class names), raw opcodes, CRC
+verification, and automatic following of the service-handoff addresses - open a capture and the whole
+session decodes from the fixed UniverseAgent port (7010). Filter with `faolan`; per-opcode packet counts
+are byte-exact against the analyzer JSON dumps on the reference captures, plus recovery the analyzer
+can't do (compressed-stream packets across TCP segment boundaries). See `Faolan.Wireshark/README.md`.
 
 ```zsh
-tshark -r '<capture>.pcapng' -d tcp.port==<gsPort>,faolan_gs \
-  -Y 'faolan_gs && faolan_gs.output_bytes>0 && ip.src==<gsIp> && tcp.srcport==<gsPort>' \
-  -T fields -e faolan_gs.output_blob
+# recommended for captures with retransmissions (Wireshark hides retransmitted frames from plugins)
+tshark -r '<capture>.pcapng' -o tcp.analyze_sequence_numbers:FALSE \
+  -Y 'faolan.pkt.opcode' -T fields -e frame.number -e faolan.pkt.receiver_class -e faolan.pkt.opcode
 ```
 
-GUI display filter: `(tcp.port >= 7000 && tcp.port < 7100) && (data || faolan_gs)`. Reassemble the
-`output_blob` bytes; they contain decompressed Conan packets with literal 9-byte `0x80000005` markers
-between groups.
+Protocol note discovered while building it: the 9-byte `80 00 00 05` transition header's last byte is a
+**compression flag** - `00` switches that direction to one continuous zlib stream, `01` keeps it
+plaintext - and the marker appears at packet boundaries (the client sends a flag-`01` one mid-stream on
+the GameServer connection). `ConanMessageFramer` only checks receive-chunk starts and assumes
+compression, which happens to work for the s2c stream but silently discards the rest of a chunk
+carrying the c2s marker (one ping packet per session in the reference captures).
 
 ## Retail reference values
 

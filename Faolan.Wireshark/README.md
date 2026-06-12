@@ -1,120 +1,117 @@
-# Faolan.Wireshark (v1 bootstrap)
+# Faolan.Wireshark
 
-This folder contains the initial code to start a Wireshark C plugin for **GameServer zlib stream decompression only**.
+A native Wireshark/tshark dissector plugin for the Age of Conan TCP services (UniverseAgent,
+PlayerAgent, CSPlayerAgent, GameServer). Ground-truth captures are readable directly in
+Wireshark without the JSON dump + Python dissector pipeline.
 
-Current state:
+## What it does
 
-- `src/faolan_zlib_stream.*`: standalone stream processor for
-  - marker detection: `0x80 00 00 05`
-  - 9-byte compression header buffering
-  - incremental zlib inflate across chunked input
-- `src/faolan_zlib_stream_cli.c`: tiny test runner covering
-  - valid chunked compressed stream
-  - non-compressed stream fallback
-  - invalid compressed data failure path
-- `wireshark/packet-faolan-gameserver-zlib.c`: initial dissector wiring with
-  - conversation-scoped state
-  - two directional stream states (`A -> B` and `B -> A`)
-  - per-frame decompression diagnostics
-  - raw decompressed byte blob field
+- **Conan packet framing** on every connection: `[u32 BE length][u32 crc32][u32 BE hdrlen]
+  [RpcHeader][body]`, reassembled across TCP segments per direction.
+- **In-band compression transitions**: at a packet boundary a peer may emit a 9-byte header
+  `[80 00 00 05][4 bytes][flag]`. Flag `00` switches the rest of that direction to one
+  continuous zlib deflate stream (framing continues on the inflated bytes); flag `01` leaves
+  it plaintext. Observed: GameServer s2c transitions at offset 0 with flag 00; the c2s side
+  transitions mid-stream with flag 01.
+  *(Note: the C# `ConanMessageFramer` only detects the marker at receive-chunk starts; this
+  plugin handles it at any packet boundary.)*
+- **RpcHeader dissection**: sender/receiver `ProtoEndpoint`s (class id resolved to the 14
+  recovered client class names - BKDR-31 hashes, see `docs/aoc-opcode-ids.md` - plus the
+  instance), the 16-bit method opcode (shown raw), trailing header bytes, body.
+- **CRC verification**: the packet crc is a plain CRC-32 (zlib `crc32()`) over everything
+  after the 8-byte length+crc prefix; mismatches get expert warnings.
+- **Auto-follow**: service handoffs advertise the next service's address (ASCII `host:port`
+  or the binary `[u32 ip][u16 port]` form in the 0x1A07 handoffs). Advertised ports are
+  registered automatically, so a whole session dissects from just the fixed UniverseAgent
+  port (7010, the default binding). AgentServer chat connections picked up this way are
+  detected (first-packet CRC validation) and skipped, not mis-framed.
+- **Robust delivery**: per-direction TCP sequence tracking deduplicates retransmissions and
+  reorders out-of-order segments. If a gap never fills (bytes missing from the capture), a
+  plaintext direction resyncs at the next segment; a compressed direction keeps inflating
+  across the hole - downstream packets usually survive and damaged ones are flagged by CRC.
 
-No packet decoding/framing is implemented yet.
-
-## Build and test the standalone harness
-
-```zsh
-cmake -S '/home/melvin/Development/C#/Project Faolan/Faolan.Wireshark' -B '/home/melvin/Development/C#/Project Faolan/Faolan.Wireshark/build'
-cmake --build '/home/melvin/Development/C#/Project Faolan/Faolan.Wireshark/build' -j
-'/home/melvin/Development/C#/Project Faolan/Faolan.Wireshark/build/faolan_zlib_stream_cli'
-```
-
-Expected output:
-
-- `OK: chunked success + non-compressed + invalid-data tests passed`
-
-## Build and install the Wireshark plugin
-
-This project now builds a loadable EPAN plugin module: `faolan_gs_zlib.so`.
-
-Default install target:
-
-- `/home/<user>/.local/lib/wireshark/plugins/<major.minor>/epan`
-
-Build + install to your personal plugin directory:
+## Build and install
 
 ```zsh
-cmake -S '/home/melvin/Development/C#/Project Faolan/Faolan.Wireshark' -B '/home/melvin/Development/C#/Project Faolan/Faolan.Wireshark/build'
-cmake --build '/home/melvin/Development/C#/Project Faolan/Faolan.Wireshark/build' -j
-cmake --build '/home/melvin/Development/C#/Project Faolan/Faolan.Wireshark/build' --target install-faolan-plugin
+cmake -S Faolan.Wireshark -B Faolan.Wireshark/build
+cmake --build Faolan.Wireshark/build -j
+cmake --build Faolan.Wireshark/build --target install-faolan-plugin   # -> ~/.local/lib/wireshark/plugins/<ver>/epan
+tshark -G plugins | grep -i faolan    # verify
 ```
 
-To override destination directory:
+Standalone stream/framer tests (no Wireshark needed):
 
 ```zsh
-cmake -S '/home/melvin/Development/C#/Project Faolan/Faolan.Wireshark' -B '/home/melvin/Development/C#/Project Faolan/Faolan.Wireshark/build' \
-  -DFAOLAN_PERSONAL_PLUGIN_DIR='/some/other/path/wireshark/plugins/4.6/epan'
+./Faolan.Wireshark/build/faolan_stream_tests
 ```
 
-## Verify plugin is loaded
+## Usage
+
+Open any AoC capture - the UniverseAgent port (7010) is bound by default and the rest of the
+session is followed automatically. Filter with `faolan`.
+
+**Recommended for captures with packet loss/retransmissions** (most real-internet captures):
 
 ```zsh
-tshark -G plugins | grep -i faolan | cat
-tshark -G fields | grep -E 'faolan_gs\.' | cat
+tshark -r capture.pcapng -o tcp.analyze_sequence_numbers:FALSE ...
 ```
 
-## Test with an existing capture
+Without it, Wireshark suppresses subdissector calls on frames it classifies as
+retransmissions, so a late retransmission that fills a gap never reaches the plugin and the
+compressed stream stalls at the hole. (Do NOT use `tcp.reassemble_out_of_order` - it withholds
+all data after a genuinely lost segment forever.) In the Wireshark UI set the same option under
+Edit > Preferences > Protocols > TCP, or bind extra ports via Decode As / the `faolan.tcp_ports`
+preference.
 
-Use decode-as on the known GameServer port (`7029` for this capture):
+Useful fields:
+
+| field | meaning |
+| --- | --- |
+| `faolan.pkt.opcode` | 16-bit method opcode (raw hex; method index 0x2000+position) |
+| `faolan.pkt.sender_class` / `receiver_class` | ProtoEndpoint class id, resolved to class name |
+| `faolan.pkt.sender_instance` / `receiver_instance` | character/zone instance |
+| `faolan.pkt.len` / `crc` / `header_len` / `header_extra` / `body` | packet layout fields |
+| `faolan.compression_state` | Plain / TransitionHeader / Compressed / Failed / Skipped |
+| `faolan.stream_note` | retransmission / out-of-order / capture-gap diagnostics |
+| `faolan.decompressed` | inflated bytes produced in this frame (own data source) |
+
+Packets completed in a frame appear under the "Faolan Conan packets" data source; the COL_INFO
+column shows `ReceiverClass 0xOPCODE` per packet.
+
+Example - everything the client asked the GameCharAgent:
 
 ```zsh
-tshark -r '/home/melvin/Development/C#/Project Faolan/Captures/account-stricken997-character-Strie-login-randomActions.pcapng' \
-  -d tcp.port==7029,faolan_gs \
-  -Y 'faolan_gs && faolan_gs.output_bytes > 0' \
-  -T fields \
-  -e frame.number \
-  -e faolan_gs.direction \
-  -e faolan_gs.compression_state \
-  -e faolan_gs.output_bytes | head -n 20 | cat
+tshark -r capture.pcapng -o tcp.analyze_sequence_numbers:FALSE \
+  -Y 'faolan.pkt.receiver_class == 0xa9ecb95d' \
+  -T fields -e frame.number -e faolan.pkt.opcode
 ```
 
-In Wireshark UI:
+## Validation
 
-1. Open the `.pcapng`
-2. `Analyze -> Decode As...`
-3. Map the GameServer TCP port to `FaolanGS`
-4. Filter with `faolan_gs`
+Byte-exact parity with the `Faolan.PacketAnalyzer` JSON dumps (per-opcode packet counts) on:
 
-To inspect decompressed bytes directly:
+- `account-stricken997-character-Strie-login.pcapng` (305/305, + post-capture-hole recovery
+  the analyzer can't do)
+- `account-faolan-character-hoxxling-login-guild_invite_accepted-...pcapng` (6520/6520,
+  incl. both GameServer connections of the zone change)
+- `account-faolan-character-necrol80-login-sell_items_to_trader-...pcapng` (3765/3765)
+- `account-stricken997-character-Strie-create.pcapng` (673/673)
 
-1. Select a packet where `faolan_gs.output_bytes > 0`
-2. In the packet details pane, expand `FaolanGS`
-3. Click the `Decompressed Bytes` field
-4. In the packet bytes pane, switch source to `Faolan decompressed stream bytes`
+## Layout
 
-That data source is the raw inflated output for that frame (no packet decoding applied).
-
-## Troubleshooting: `Compression State = Failed`
-
-If you see `Failed` immediately or repeatedly:
-
-1. Rebuild and reinstall the plugin.
-2. Fully restart Wireshark (it caches loaded plugins per process).
-3. Verify the loaded plugin path/version.
-
-```zsh
-cmake --build '/home/melvin/Development/C#/Project Faolan/Faolan.Wireshark/build' -j
-cmake --build '/home/melvin/Development/C#/Project Faolan/Faolan.Wireshark/build' --target install-faolan-plugin
-tshark -G plugins | grep -i faolan | cat
+```text
+src/faolan_conan_framer.{c,h}   packet framer ([u32 len] frames, transition-marker scan)
+src/faolan_conan_stream.{c,h}   per-direction stream: phases, transition header, zlib inflate
+src/faolan_stream_tests.c       standalone test harness for the two modules
+wireshark/packet-faolan-gameserver-zlib.c   the dissector (fields, seq tracking, auto-follow)
+wireshark/plugin.c              plugin registration
 ```
 
-Notes:
+## Known gaps / future work
 
-- Server direction usually becomes `Enabled`; client direction may stay `NotCompressed`.
-- In this capture set, that mixed direction state is expected.
-
-## Next steps
-
-1. Add explicit handling for TCP retransmission/re-dissect edge cases
-2. Decide whether direction mapping should use endpoint addresses in addition to ports
-3. Add a cap for decompressed bytes shown per frame to avoid UI/memory spikes
-4. Integrate this dissector file into a real Wireshark plugin build tree
+- The AgentServer chat protocol (`[u16 opcode][u16 len][body]`) is detected and skipped, not
+  dissected.
+- Opcode names: the per-class method tables exist in `docs/aoc-client-rpc-methods.json`;
+  deliberately not embedded - opcodes display as raw hex.
+- A capture hole inside a compressed stream cannot be fully recovered (the deflate stream has
+  no flush points); the plugin decompresses across the hole on a best-effort basis.

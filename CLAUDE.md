@@ -50,8 +50,10 @@ serves both the create-editor and world connections).
 **Projects:** `Faolan/` server host · `Faolan.Core/` shared networking/DB/protobuf/crypto ·
 `Faolan.Importer/` pcap+RDB -> DB CLI · `Faolan.PacketAnalyzer/` pcap -> JSON ·
 `Faolan.ClientLauncher/` unattended retail client · `Faolan.Tests/` the test suite ·
-`Faolan.Wireshark/` zlib-inflating dissector plugin (ground truth; the analyzer has no TCP reassembly
-and drops ~2/3 of compressed GameServer downloads) · `Captures/` reference traces + Python dissectors.
+`Faolan.Wireshark/` full Conan-protocol dissector plugin - framing + zlib + RpcHeader endpoints + raw
+opcodes + handoff auto-follow (ground truth; the analyzer has no TCP reassembly and drops ~2/3 of
+compressed GameServer downloads; use `-o tcp.analyze_sequence_numbers:FALSE` on lossy captures) ·
+`Captures/` reference traces + Python dissectors.
 
 **Listeners** are partial classes split across many files (`Packets.cs`, `GMCommands.cs`,
 `GuildHandlers.cs`, burst files...) — inspect all partials before changing behavior. They inherit

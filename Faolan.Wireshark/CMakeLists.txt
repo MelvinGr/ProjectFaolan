@@ -5,7 +5,7 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
-option(BUILD_STANDALONE_TEST "Build standalone zlib stream harness" ON)
+option(BUILD_STANDALONE_TEST "Build standalone stream/framer test harness" ON)
 option(BUILD_WIRESHARK_PLUGIN "Build Wireshark EPAN plugin module" ON)
 option(INSTALL_PLUGIN_TO_PERSONAL_DIR "Install plugin to personal Wireshark plugin directory" ON)
 
@@ -25,16 +25,17 @@ endif()
 set(FAOLAN_PERSONAL_PLUGIN_DIR "$ENV{HOME}/.local/lib/wireshark/plugins/${WIRESHARK_PLUGIN_ABI}/epan"
     CACHE PATH "Wireshark personal EPAN plugin directory")
 
-add_library(faolan_zlib_stream STATIC
-    src/faolan_zlib_stream.c
+add_library(faolan_stream STATIC
+    src/faolan_conan_stream.c
+    src/faolan_conan_framer.c
 )
 
-target_include_directories(faolan_zlib_stream
+target_include_directories(faolan_stream
     PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
 )
 
-target_link_libraries(faolan_zlib_stream
+target_link_libraries(faolan_stream
     PUBLIC
         ZLIB::ZLIB
 )
@@ -43,7 +44,8 @@ if(BUILD_WIRESHARK_PLUGIN)
     add_library(faolan_gs_zlib MODULE
         wireshark/plugin.c
         wireshark/packet-faolan-gameserver-zlib.c
-        src/faolan_zlib_stream.c
+        src/faolan_conan_stream.c
+        src/faolan_conan_framer.c
     )
 
     set_target_properties(faolan_gs_zlib PROPERTIES
@@ -79,12 +81,12 @@ if(BUILD_WIRESHARK_PLUGIN)
 endif()
 
 if(BUILD_STANDALONE_TEST)
-    add_executable(faolan_zlib_stream_cli
-        src/faolan_zlib_stream_cli.c
+    add_executable(faolan_stream_tests
+        src/faolan_stream_tests.c
     )
 
-    target_link_libraries(faolan_zlib_stream_cli
+    target_link_libraries(faolan_stream_tests
         PRIVATE
-            faolan_zlib_stream
+            faolan_stream
     )
 endif()
