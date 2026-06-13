@@ -43,9 +43,11 @@ Containers are built wholesale from the DB (`FullCharSnapshotBuilder.BuildContai
    ContentMirror: the stall was the client thrashing on item resources it couldn't fetch from the dead
    retail CDN. With the mirror serving resources, substitution is in-client verified safe.
 3. **A second 0x737A6DF9 for the same identity is dead on arrival.** The client either rejects it
-   (ReadSubClass error - even an EMPTY rebuild) or constructs it and never re-reads it into the UI. There
-   is no mid-session inventory delivery: `.additem` / `add_item` persist a row that appears on the NEXT
-   login. (There is also no server "add item to bag" packet in retail - loot adds are client-side.)
+   (ReadSubClass error - even an EMPTY rebuild) or constructs it and never re-reads it into the UI — so
+   re-sending the whole snapshot is NOT how you deliver a mid-session item. **UPDATE 2026-06-13:** the real
+   live-add IS a per-item packet — `DispatchAddItem` (s2c 0x2020), decoded + byte-exact + in-client verified
+   (`GrantItemToBackpack`; `DispatchAddItemTests`). `.additem` / `add_item` now both persist the row AND push the
+   live add (no relog needed). Live item-REMOVE (0x201F) is not built yet.
 4. **Bag-poison items**: an item only ever captured WORN (never inside an inventory container) can render
    the WHOLE bag empty when placed in `CharacterInventory` (repro: 13826 Combatant's Hauberk; client logs
    VisualMeshLoader 1010001 misses). Likely missing local bag/icon resources. Keep such items out of bags

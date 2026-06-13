@@ -40,6 +40,9 @@ prior diagnoses are in `docs/archive/todo-history.md`.
 - [ ] `.vitals` (no args → MaxStats), `.vitals 1000 800 500`, `.setstat 36 25` move the bars. (`.hurt`/`.heal` work.)
 - [ ] New character's sheet vitals reflect its **class** (mage = more mana, soldier = more health), not the
       level-1 rogue default. → `docs/player-stats.md`
+  - [ ] Decode follow-up (`docs/player-stats.md` "Open follow-ups"): determine whether base attributes
+        (str/dex/…) are sent on the wire at all, or derived client-side from class/level — drives whether the
+        snapshot/vitals block needs them.
 - [ ] **XP resets on relog** (Melvin, 2026-06-13): in-game XP is not persisted across logout — it reverts to 0 (or
       the snapshot default) on the next login. `character.Experience` is patched into the snapshot tails
       (`CurrentXp`, idx 80 ÷10) but is evidently never SAVED when it changes (kill/XP loop in §2). Persist
@@ -98,9 +101,11 @@ prior diagnoses are in `docs/archive/todo-history.md`.
       WHOLE bag empty when placed in CharacterInventory (repro: 13826 Combatant's Hauberk; client shows
       VisualMeshLoader 1010001 misses). Likely missing local bag/icon resources. Detect/exclude such items in
       .additem + add_item, or solve the resource gap (mirror pre-seed / template decode).
-- [ ] **Mid-session item delivery does not exist**: a second 0x737A6DF9 is rejected/ignored by the client, so
-      .additem/add_item items appear on the NEXT LOGIN only. Find retail's live-add mechanism (if any) or
-      surface the relog requirement in the tools.
+- [x] **Mid-session item delivery — SOLVED 2026-06-13** (`DispatchAddItem` s2c 0x2020): retail's live-add
+      mechanism, decoded + byte-exact (`DispatchAddItemTests`) + in-client verified (a connected player saw granted
+      gear render with no relog). Wired into `GrantItemToBackpack` (persist + live add), reused by `.additem` /
+      loot / `.spawnbag` / vendor BUY. (The old "a second 0x737A6DF9 is rejected" finding was about re-sending the
+      whole snapshot; the per-item add is the right path.) Live item-REMOVE `0x201F` not built yet.
 - [x] **Equip/unequip persistence + acks** (2026-06-12, commit 226b16f): 0x09 grammar decoded from capture
       (TypeId = window pair incl. live 41842/41843, Mode = action counter, tail = [src][dest][item][item][0][flags]);
       both pairs persisted + retail's ack (identity quad / null filler) + 0x201C entry (0x65/destSlot, 0x68/0).
@@ -489,6 +494,15 @@ tag system exists. → memory `lua_vm`, `protocol_conversation_routing`; `docs/a
       (RequestTrade / StartTrade / cash / add-remove item / accept), quest-share `0x2047`–`0x204C`
       (NextQuestAvailable / QuestShare* / UpdateTeamQuestList). Fully specified for whenever grouping lands; each
       builder needs a byte-exact capture/golden test.
+- [ ] **World/system chat via `ChatTextIIR` (0xE0B51102)** (from `docs/chat.md`): a GameServer remoteformat-XML
+      chat path seen once in captures, not implemented — the local-say `0x0022` path covers player say for now.
+- [ ] **Guild protocol gaps** (from `docs/guilds.md` "Open items" + `docs/capture-events.md`): no capture exercises
+      these, so the bodies are undecoded — (a) member-left / kick / promote / demote fan-out packets; (b) the
+      `0x202D` invite-reply-to-inviter + failure replies (bad name / on cooldown); (c) the guild-invite *accept*
+      packet (not isolated by sub-op — likely an Interact); (d) `0x203A` "counters update" (52 b, frequent, small
+      u32 counters, semantics unknown); (e) renown block internal framing — renown history `0x2039` / rankings
+      `0x2038` are still replayed blobs. Capture a retail guild-management session to decode. (Cross-player guild
+      tag visibility rides spawn data — future work with cross-player rendering.)
 
 
 - [x] **Expand the tshark/Wireshark plugin to fully decode packets (headers)** — DONE (2026-06-12):
