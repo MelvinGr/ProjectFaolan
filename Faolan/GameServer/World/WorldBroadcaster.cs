@@ -38,9 +38,12 @@ namespace Faolan.GameServer.World
 
 		private readonly WorldSimulation _sim;
 
-		// Monotonic allocator for dropped-loot / summoned-entity handles, in a high range to avoid colliding with
-		// player/NPC handles.
-		private int _nextLootHandle = 0x40000000;
+		// Monotonic allocator for dropped-loot / summoned-entity handles: a high range to avoid colliding with
+		// player/NPC handles, but it MUST stay <= 0x0FFFFFFF - on-wire entity handles (like character ids /
+		// client instances, see DatabaseContext) are 4-byte-protobuf-varint values; a handle > 2^28 (e.g. the old
+		// 0x40000000 base) is out of the client's valid range and the entity silently never renders. Real handles
+		// top out around 0x08xxxxxx, so 0x0F000000 sits safely above them and below the cap.
+		private int _nextLootHandle = 0x0F000000;
 
 		public WorldBroadcaster(WorldSimulation sim, IDatabaseRepository database, ILogger logger)
 		{
