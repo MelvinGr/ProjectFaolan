@@ -13,6 +13,12 @@ namespace Faolan.Core.Database.Tables
 		public byte Level { get; set; }
 		public string Name { get; set; }
 
+		// Which class this starting ability belongs to (the Class enum value). 0 = GENERIC: granted to every class
+		// (the universal kit - Normal Attack L/R/F, toggle-combat, switch-weapon, ...). A non-zero value = the ability
+		// is class-specific (it appeared in only one class's create-flow grants). GrantStartingAbilities grants the
+		// generic set plus the character's own class set. Set by CaptureAbilityImporter from the captures.
+		public uint Class { get; set; }
+
 		public uint Data0 { get; set; }
 		public uint Data1 { get; set; }
 		public uint Data2 { get; set; }

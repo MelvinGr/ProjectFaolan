@@ -74,7 +74,7 @@ namespace Faolan.Core.Database
 
 		Task<Spell> GetSpell(uint id);
 		Task<Spell[]> GetSpells();
-		Task<Ability[]> GetStartingAbilities(uint level);
+		Task<Ability[]> GetStartingAbilities(uint level, uint @class);
 		Task<WorldObject[]> GetWorldObjects(uint mapId);
 		Task<T> Query<T>(Func<IDatabaseContext, Task<T>> work);
 		Task RemoveCharacterQuest(uint characterId, uint questId);
@@ -762,12 +762,15 @@ namespace Faolan.Core.Database
 		// from the retail create-flow grants by CaptureAbilityImporter. The `level` is reserved for future
 		// level-gating; today the whole starting kit is level 1. The catalog also holds higher-level / class
 		// abilities (IsStartingAbility = false) which are NOT granted here.
-		public async Task<Ability[]> GetStartingAbilities(uint level)
+		// Starting abilities for a character: the generic kit (Class == 0, granted to everyone) plus the abilities
+		// specific to the character's own class, up to its level. Class-specific coverage is whatever the captures
+		// supplied (incomplete by design); the generic kit is always present.
+		public async Task<Ability[]> GetStartingAbilities(uint level, uint @class)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx
 				.Abilities
-				.Where(a => a.IsStartingAbility && a.Level <= level)
+				.Where(a => a.IsStartingAbility && a.Level <= level && (a.Class == 0 || a.Class == @class))
 				.OrderBy(a => a.Slot)
 				.ToArrayAsync();
 		}

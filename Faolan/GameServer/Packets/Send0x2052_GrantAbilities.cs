@@ -27,7 +27,7 @@ namespace Faolan.GameServer
 			if (character == null)
 				return;
 
-			var abilities = await Database.GetStartingAbilities(character.Level);
+			var abilities = await Database.GetStartingAbilities(character.Level, (uint)character.Class);
 			foreach (var ability in abilities)
 				await SendAbilityGrant(client, ability);
 

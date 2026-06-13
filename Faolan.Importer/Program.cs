@@ -338,15 +338,25 @@ namespace Faolan.Importer
 				await CaptureSpellImporter.ImportAsync(db, itemPackets);
 				// The starting ability kit = what every new character gets during creation, so detect it from the
 				// CREATE-flow captures only (filenames contain "creat"); the rest are higher-level/class abilities.
-				var createPackets = Directory
-					.EnumerateFiles(capturesDir, "*.json")
-					.Where(f => Path
-						.GetFileName(f)
-						.Contains("creat", StringComparison.OrdinalIgnoreCase))
-					.SelectMany(f => ReadJsonCapture(f)
-						.Select(p => p.Bytes))
-					.ToList();
-				var (abSeen, abNew, abUpd) = await CaptureAbilityImporter.ImportAsync(db, itemPackets, createPackets);
+				// Keep ONE packet list per capture (CaptureAbilityImporter attributes each capture's grants to the
+				// class chosen by its ChangeClass command). Prefer the tshark dump (it keeps the compressed 0x2052
+				// downloads the analyzer drops); fall back to the analyzer JSON for captures without a tshark dump.
+				var createCaptures = new List<IReadOnlyList<byte[]>>();
+				var createTsharkBases = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+				foreach (var f in Directory.EnumerateFiles(capturesDir, "*.tshark.json")
+					         .Where(f => Path.GetFileName(f).Contains("creat", StringComparison.OrdinalIgnoreCase)))
+				{
+					createCaptures.Add(TsharkCaptureReader.Read(f).Select(p => p.Bytes).ToList());
+					createTsharkBases.Add(StripSuffix(f, ".tshark.json"));
+				}
+
+				foreach (var f in Directory.EnumerateFiles(capturesDir, "*.json")
+					         .Where(f => !f.EndsWith(".tshark.json", StringComparison.OrdinalIgnoreCase)
+					                     && Path.GetFileName(f).Contains("creat", StringComparison.OrdinalIgnoreCase)
+					                     && !createTsharkBases.Contains(StripSuffix(f, ".json"))))
+					createCaptures.Add(ReadJsonCapture(f).Select(p => p.Bytes).ToList());
+
+				var (abSeen, abNew, abUpd) = await CaptureAbilityImporter.ImportAsync(db, itemPackets, createCaptures);
 				Console.WriteLine($"Abilities (0x2052 grants): {abSeen} seen, {abNew} new, {abUpd} updated.");
 				// After items (the equipment references them). Existing names are skipped, never overwritten.
 				if (!args.Contains("--skip-characters")) // TODO: CaptureCharacterImporter is not idempotent (UNIQUE CharacterBodies.CharacterId) on a populated DB

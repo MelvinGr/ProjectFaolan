@@ -66,7 +66,7 @@ namespace Faolan.Importer
 						? BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4))
 						: 0u;
 
-					var full = Rebuild(p, body);
+					var full = Rebuild(p, body, opcode);
 					if (full != null)
 						list.Add(new CapturedPacket(tick, isDownload, opcode, subOpcode, full));
 				}
@@ -77,7 +77,7 @@ namespace Faolan.Importer
 
 		// Rebuilds the exact on-wire packet from the dump's framing fields + body. Returns null if a required field
 		// is missing/malformed (so a partial record is skipped rather than corrupting the stream).
-		private static byte[] Rebuild(JsonElement p, byte[] body)
+		private static byte[] Rebuild(JsonElement p, byte[] body, uint opcode)
 		{
 			if (!TryEndpoint(p, "SenderClass", "SenderInstance", out var sender))
 				return null;
@@ -90,8 +90,11 @@ namespace Faolan.Importer
 			header.Add(0x12);
 			header.AddRange(Varint((ulong)receiver.Length));
 			header.AddRange(receiver);
-			header.Add(0x20);
-			header.Add(0x00);
+			// The opcode is the u16 ConanPacket reads right after the receiver (header.ReadUInt16). The previous code
+			// hardcoded 0x2000 here, so EVERY rebuilt packet reported opcode 0x2000 and consumers that key on the real
+			// opcode (e.g. the 0x2052 ability-grant importer) saw nothing. Write the dump's actual opcode (big-endian).
+			header.Add((byte)(opcode >> 8));
+			header.Add((byte)(opcode & 0xFF));
 			var headerBytes = header.ToArray();
 
 			// payload = [u32 headerLen][header][body]; crc32 covers it; totalLen = crc + payload.
