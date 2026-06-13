@@ -313,6 +313,25 @@ Full detail: `docs/archive/spawn-dissection-plan.md`.
 - [ ] Appearance: generate the morph entries from `CharacterBody` (the editor sliders → float-valued scaffold
       entries) instead of the Dikketest defaults. → `docs/archive/player-spawn-generation-plan.md` (COMPLETE; this is the
       one optional remainder)
+- [ ] **Player-spawn ROTATION is still verbatim** — `TryRebuildPlayerSpawnFromDb` keeps the captured rotation
+      bytes because a DB-driven rotation rebuild stalled the client. Decode the rotation encoding (quaternion vs
+      packed Euler) and author it from a stored facing so the spawn carries no captured bytes.
+
+### "All packets from scratch" — the endgame inventory
+The goal (`world_packets_construct_not_replay`) is that NO packet ships captured bytes; everything is built from
+DB rows + builders, proven byte-exact. What is STILL verbatim or replayed, and where each is tracked:
+- **World-entry burst** (`MapWorldBurst` replay, instance-rewritten) — the scaffold the login replays. Being
+  dismantled piecemeal: player spawn ✅ generated, inventory containers ✅ generated, NPCs/objects [~] (above);
+  the still-verbatim leftovers are the rotation (above), the NPC pre-/post-IIR scaffolds ("Fold the … scaffolds
+  into rows", above), and the snapshot `UnknownBefore`/tails region (above + §2).
+- **Create-flow bursts** (`RetailCreateWorldEntryBurst.cs` 6.9k lines, `Post205FBurst`) — verbatim hex; tracked
+  as the §7 "embedded capture data out of source code" (move to a DB table + importer, byte-equality oracle).
+- **Conversation packets** — replayed from the DB (`ConversationPacket`), instance-substituted but not
+  constructed from text; from-scratch construction is gated on the §6 RDB Lua/tag VM.
+- **Tradepost/AH** — search is DB-backed (the captured row is only a pre-import fallback, §9a); the mail
+  builders (`DispatchMailMessage` + attachment) are still to build from scratch (§9a).
+- **Test-only oracles** (`ShopReplayData`, the Tradepost `CapturedAccessPointBody`/`SearchResultsReplayBody`,
+  `Faolan.Tests/Golden/*.bin`) are intentionally kept as golden-test references, not live replays — leave them.
 
 ---
 
