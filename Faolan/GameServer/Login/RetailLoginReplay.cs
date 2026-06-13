@@ -526,8 +526,8 @@ namespace Faolan.GameServer
 			InjectBuiltTestNpc(client, npcRows, spawnTemplate, moveTaskTemplate, toSend);
 
 			if (npcByPosition.Count > 0)
-				Logger.LogInformation("NPC spawns for map {Map}: {Built} table-built spawns put on the wire (DB-driven, replacing the verbatim burst), {Identical} of them byte-identical to the capture; {Rows} rows available.", burst.MapId,
-					npcBuilt, npcIdentical, npcByPosition.Count);
+				Logger.LogInformation("NPC spawns for map {Map}: {Matched} burst NPCs matched a row; {Identical} put on the wire as byte-identical DB rebuilds, the other {Verbatim} kept VERBATIM (cross-session rebuild diverged); {Rows} rows available.", burst.MapId,
+					npcBuilt, npcIdentical, npcBuilt - npcIdentical, npcByPosition.Count);
 			if (objectByPosition.Count > 0)
 				Logger.LogInformation("World objects for map {Map}: {Identical}/{Built} table-built objects put on the wire byte-identical, {Rows} rows available.", burst.MapId, objectIdentical, objectBuilt,
 					objectByPosition.Count);
