@@ -364,6 +364,13 @@ Item templates + dialogue text are cracked (TEA-ECB, memory `rdb_extraction`); t
       acceptable). Could still extend to a per-(class,ability) many-to-many if a subset-shared ability ever appears.
 - [ ] Spell / ability definitions (names + params) — also unblocks real spell-grant (no capture has it; needs a
       fresh caster capture OR RDB import). → `docs/archive/todo-history.md` §3 "spells blocked on data"
+- [ ] **IDEA — scrape the AoC fandom wiki for catalog data (names + levels).** `https://aoc.fandom.com/wiki`
+      (`/wiki/Spells` has spell names + levels) is a ready-made source for the gaps captures can't fill: spell
+      names/levels and (likely) item level-requirements (the `Items.Level`-is-0 gap that blocked level-appropriate
+      gear, `protocol_midsession_spawn_blocked`'s sibling issue). Captures only ever show a handful of a char's
+      abilities — even a lvl-80 endgame capture (necrol80) yielded just 24 grants, all the standard combat set — so
+      the full spell catalog won't come from captures. Write a scraper → import names/levels into Spells/Items as a
+      supplement to RDB extraction. (Respect the wiki's license/attribution; cache scraped pages.)
 - [ ] Tortage cinematic / camera-path resources (ties into §1).
 - [ ] Playfield / map / spawn-template data → reconstruct world bursts instead of replaying packets.
 
