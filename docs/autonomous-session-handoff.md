@@ -112,3 +112,5 @@ log below, then pick the next item. If you exhaust the safe list, stop and summa
   `SnapshotBlobLengthTests` (BE32 model), dropped the two redundant varint-invariant tests + the dead method +
   `SnapshotPrefixLengthTests.cs`. 316 tests green.
 - 2026-06-14 — §7 **rename `BigboyTailsFile` → `SnapshotTails`** (file + class, 5 files; no behavior change). 316 green.
+- 2026-06-14 — §7 **fold `Packets.cs` sender duplication**: only `ExistingCharacterWorldEntryPromptSender` was
+  byte-identical to `WorldFraming.Sender` (now aliases it); the other senders differ (class/sub-id) and stay. 316 green.

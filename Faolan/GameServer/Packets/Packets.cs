@@ -58,7 +58,9 @@ namespace Faolan.GameServer
 		// is appended at send time via AppendVarint(prefix, ClientInstance).
 		private static readonly byte[] ExistingCharacterReadyForPlayScreenSender = [0x0D, 0x5D, 0xB9, 0xEC, 0xA9, 0x10, 0x58];
 		private static readonly byte[] ExistingCharacterWorldEntryPromptReceiverPrefix = [0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10];
-		private static readonly byte[] ExistingCharacterWorldEntryPromptSender = [0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x58];
+		// The world-entry prompt rides the world-system conversation (0x13CE71B1/0x58) - byte-identical to
+		// WorldFraming.Sender, so fold to that single source of truth rather than re-spelling the literal.
+		private static readonly byte[] ExistingCharacterWorldEntryPromptSender = World.WorldFraming.Sender;
 		private static readonly byte[] NewCharacterReadyForPlayScreenReceiver = [0x0D, 0x91, 0xF7, 0x87, 0x8B, 0x10, 0xC2, 0xDD, 0xD8, 0x10];
 
 		private static readonly byte[] NewCharacterReadyForPlayScreenSender = [0x0D, 0x5D, 0xB9, 0xEC, 0xA9, 0x10, 0x59];

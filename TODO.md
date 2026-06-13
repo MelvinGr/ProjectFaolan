@@ -475,8 +475,11 @@ tag system exists. → memory `lua_vm`, `protocol_conversation_routing`; `docs/a
       into `SnapshotBlobLengthTests.GeneratedSnapshot_ReassemblesConsistently` (now using `SetSnapshotBlobLength`'s
       BE32 model); the two redundant varint-invariant tests dropped (covered by the BE32 tests); `SnapshotPrefixLengthTests.cs`
       and the dead method deleted. 316 tests green.
-- [ ] Fold `Packets.cs` sender-bytes duplication into `World/WorldFraming` (verify which conversation senders are
-      truly identical before merging). Small, safe.
+- [x] Fold `Packets.cs` sender-bytes duplication into `World/WorldFraming` — DONE 2026-06-14. Verified senders:
+      only `ExistingCharacterWorldEntryPromptSender` (`0x13CE71B1/0x58`) is byte-identical to `WorldFraming.Sender`
+      (now aliases it; `LoginWorldSender` already did). The other listener senders use different class ids/sub-ids
+      (`ReadyForPlayScreen` 0xA9ECB95D, `PostReadyReportServerId` 0x5B9756FC, the create-flow 0x59 variants) — NOT
+      duplicates, left as-is. 316 tests green.
 - [x] Rename `Packets/FullCharSnapshot/BigboyTailsFile.cs` → `SnapshotTails.cs` (class `SnapshotTails`) — DONE
       2026-06-14. ("Bigboy" was a capture name, "File" a misnomer; it's the parsed 0x737A6DF9 tails region.)
 - [ ] **GameServer dispatch hardening (not a blanket rewrite).** The GameServer multiplexes ~4 RPC class-pairs
