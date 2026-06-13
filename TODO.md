@@ -185,6 +185,14 @@ prior diagnoses are in `docs/archive/todo-history.md`.
       `GrantItemToBackpack` (persist + live add) reused by `.additem`, loot, and `.spawnbag`.
 - [ ] **IN-CLIENT verify the live add**: `.additem <id>` → the item appears in the bag WITHOUT a relog (no IIR
       error, chat stays). Was believed impossible (snapshot-only); now has the real opcode + a proven body.
+      STRONG EVIDENCE 2026-06-13: a connected player (Darktemplarchar) saw a bag of `.additem`-granted gear with
+      readable level requirements in-client — needs an explicit "it rendered + chat fine" confirmation to mark [x].
+- [ ] **Live item REMOVE — `DispatchRemoveItem` (s2c 0x201F)**: build the counterpart to `DispatchAddItem`, so an
+      item can be pulled from a connected player's bag mid-session (there is currently NO way to undo an `.additem`
+      live). Opcode is in the recovered s2c table (`GameCharInterfaceDispatchOpcodes` / `docs/aoc-rpc-method-opcodes.md`);
+      body fields `i_cInventoryID, i_nItemPos, i_nAmountToRemove`. Decode against a capture, golden-test like
+      `DispatchAddItemTests`, then wire a `.removeitem`/`remove_item` MCP path that clears the `CharacterInventory`
+      row AND pushes the live remove. Also surfaces the bag-poison cleanup need (worn-only items in a bag).
 - [ ] Click a dropped loot bag → loot window opens, bag stays; `loot all` grants its items (live `DispatchAddItem`)
       + coins (`TryLootCash`); close/expire → it fades. Bags now carry random items (kill drop + `.spawnbag`); the
       loot-WINDOW item list display (DispatchReplyLootForCharacter*) is still undecoded — grant works via loot-all.
