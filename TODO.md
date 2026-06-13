@@ -357,6 +357,16 @@ First pass IMPLEMENTED 2026-06-12 (same day); what remains is the deeper model w
 - [ ] `ScryMessageBoxAnswer` 0x203B (x1), `RequestMassivePvPScoreData` 0x208D (x1) — note only.
 - Suspicious historical behavior kept until a live check: we answer every `SetSprintInputState` 0x200C
   (x2092 — the sprint key) with a `ReportDimensionId`; retail does not.
+- [ ] **Live spell / ability / feat grants** (opcode-recovery handoff §4 — names+opcodes recovered, builders not
+      built): grant spells/feats mid-session (level-up, quest-reward) without rebuilding the FullChar snapshot.
+      `0x200A DispatchLearnSpell` (`i_nSpellID` — the real spell-grant the RE flagged long ago), `0x200B
+      DispatchForgetSpell`, `0x2053 DispatchRemoveSpecialAbility`, `0x2011 DispatchUntrainSingleFeat`,
+      `0x209A/0x209B DispatchPassiveAbilityEquip/Unequip`. (`0x2052 DispatchAddSpecialAbility` already used by
+      `GrantStartingAbilities`.) Each needs a byte-exact capture/golden test before shipping.
+- [ ] **Resolve method names in the "unknown (class, opcode)" log** (handoff §7): every inbound `(receiver class,
+      opcode)` and outbound s2c opcode now maps to a real method name (`docs/aoc-rpc-method-opcodes.md`), so the
+      `default`-branch logging can print the method name instead of bare hex — quick triage win for spotting
+      named-but-unhandled client packets.
 
 ---
 
@@ -474,6 +484,11 @@ tag system exists. → memory `lua_vm`, `protocol_conversation_routing`; `docs/a
       in-game friends list - needs the friends-list protocol decoded first (add/remove/status packets are
       uncaptured; capture a retail friend-add to start). Whispers to Claude already route to the MCP bridge,
       so a friends entry would mainly give presence/easy access.
+- [ ] **Player↔player trade, quest sharing, team quests** (opcode-recovery handoff §5 — full named families
+      recovered, never implemented; gated on grouping/trading being picked up): trade `0x2068`–`0x2074`
+      (RequestTrade / StartTrade / cash / add-remove item / accept), quest-share `0x2047`–`0x204C`
+      (NextQuestAvailable / QuestShare* / UpdateTeamQuestList). Fully specified for whenever grouping lands; each
+      builder needs a byte-exact capture/golden test.
 
 
 - [x] **Expand the tshark/Wireshark plugin to fully decode packets (headers)** — DONE (2026-06-12):

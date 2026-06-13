@@ -39,8 +39,9 @@ proven **byte-exact against a capture** (golden test in `Faolan.Tests`) before i
   price) keeps wares from being flipped for free; real prices are RDB-template-gated. Golden/unit tests in
   `ShopTests`. Grant aborts cleanly on a full bag *before* any money moves.
 
-Still open from this handoff: §4 spell/feat grants, §5 trade/quest-share, §6 mail, §7 unknown-(class,opcode) name
-logging.
+Still open from this handoff — **now tracked in `TODO.md`** (the single tracker): §4 spell/feat live grants (§4b),
+§5 player trade / quest-share / team quests (§8), §6 mail + AH sell/buy→mail (§9a; AH search done), §7
+unknown-(class,opcode) name logging (§4b).
 
 ---
 
