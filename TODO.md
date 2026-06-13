@@ -118,17 +118,19 @@ prior diagnoses are in `docs/archive/todo-history.md`.
       `feedback_combat_not_contentmirror`).
 - [ ] NPC **counter-attack** (the second ack retail sends for the mob's own behaviour, actor = target handle) —
       not yet reproduced; mob may not visibly fight back.
-- [ ] **BLOCKER — mid-session entity spawn doesn't render (NPC/.spawnnpc, loot bag/.spawnbag, mount, interest
-      streaming).** Proven 2026-06-13 by a loopback capture of our own `.spawnnpc`: our outgoing FA015807 packet
-      is byte-structurally IDENTICAL to retail's mid-session spawn AND to our own login burst (sender
-      `0x13CE71B1:0x58`, receiver `GamePlayerType:charid`, body `[recordLen][fa015807][c350][handle][fieldA][2c
-      transform]`). The packet is correct; the client still drops it. Root cause is CLIENT SESSION STATE: the
-      client accepts the burst during world-load (construction phase, unvalidated) but never registers the
-      `0x13CE71B1:0x58` world conversation as known, so after entry it validates the sender, fails, treats it as
-      "from 0", and drops every mid-session world packet (the `n3ToClientQuit sent from 0 -> e_Impossible`
-      warning). FIX needs the conversation-REGISTRATION handshake retail does at world-entry (per-session sub-id
-      0x08/0x0b/0x58) so the client adds our world conversation to its table. Until then, only the login burst
-      renders entities. Handle-cap fix (0x40000000 -> 0x0F000000) and corpse-stays-on-loot are in but insufficient.
+- [ ] **BLOCKER (PINNED — needs client-side RE) — mid-session entity spawn doesn't render** (`.spawnnpc`,
+      `.spawnbag`/kill loot bags, `.mount`, interest streaming). Full writeup: **`docs/mid-session-spawn-blocker.md`**
+      / memory `protocol_midsession_spawn_blocked`. Decoded 2026-06-13 via loopback captures + the necrol80 mount
+      capture. **Render mechanism:** `FA015807` spawn → client POLLS `0x2020` for the handle → server `SpawnCheck
+      0x2008` → renders. Our client polls + renders the **world-entry burst** (264 SpawnCheck exchanges for
+      `0x000818xx` handles) but **never polls mid-session** — it refuses to register our pushed `FA015807` (capture
+      showed only `4517aa81` movement, zero `0x2020`), whereas retail's client registers + polls the same kind of
+      push (the mount). The packet is byte-correct; it's a **client load-vs-play gate** that rejects mid-session
+      entity registration from us (same root as `n3ToClientQuit sent from 0 -> e_Impossible`). RULED OUT: framing
+      (identical to the burst, consistent `0x58`), handle range (real bug; allocator `0x40000000`→`0x0F000000`→
+      **`0x00090000`**, the retail `0x000286xx` range — necessary, NOT sufficient), body bytes, missing-precursor.
+      **NEXT = Ghidra on the FA015807/interest dispatch + the play-mode conversation/object-set validation** —
+      packet analysis is exhausted. Until then only the burst renders; corpse-stays-on-loot is in but moot.
 - [ ] Kill an NPC → despawn + XP + possible loot bag; enough XP → level-up (level + full-vitals push).
 - [ ] Stand near a hostile NPC → it aggros and hits you (~2s); let it kill you → respawn (~10s) at nearest
       resurrection point; walk near an undiscovered point → "Resurrection point discovered".
