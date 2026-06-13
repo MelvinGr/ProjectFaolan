@@ -77,16 +77,31 @@ namespace Faolan.Mcp.Tools
 
 		[McpServerTool(Name = "add_item"),
 		 Description(
-			 "Add an item by faolan.db item id to a connected character's bag - persisted; it appears on the character's NEXT LOGIN (no live add packet exists; the world-entry snapshot is the delivery). Wrapper over the .additem GM command; find ids with search_items. MUTATING: set confirm=true to actually add.")]
+			 "Add an item by faolan.db item id to a connected character's bag - persisted AND delivered LIVE via the DispatchAddItem (0x2020) packet, so it appears in the bag without a relog. The item must be snapshot-buildable (Archetype != 0). Wrapper over the .additem GM command; find ids with search_items. MUTATING: set confirm=true to actually add.")]
 		public async Task<string> AddItem([Description("Character id of a currently-connected player")] uint characterId, [Description("Item id (see search_items / get_item)")] uint itemId,
 			[Description("Stack count (default 1)")] uint count = 1, [Description("Must be true to execute.")] bool confirm = false)
 		{
 			if (!confirm)
-				return $"Would add {count}x item {itemId} to character {characterId}'s bag. Call again with confirm=true to execute.";
+				return $"Would add {count}x item {itemId} to character {characterId}'s bag (live DispatchAddItem). Call again with confirm=true to execute.";
 
 			var ok = await _dispatcher.RunGmCommand(characterId, $".additem {itemId} {count}");
 			return ok
 				? $"Ran add of {count}x item {itemId} for character {characterId} (the in-game system-message reply states the bag slot, or why it failed)."
+				: $"Character {characterId} is not currently connected to any GameServer listener.";
+		}
+
+		[McpServerTool(Name = "spawn_bag"),
+		 Description(
+			 "Drop a loot bag at a connected character's feet with a couple of random items + coins (the same bag an NPC kill can drop). Open it in-client and \"loot all\" to grant the items live (DispatchAddItem) and the coins. Wrapper over the .spawnbag GM command. MUTATING: set confirm=true to actually spawn.")]
+		public async Task<string> SpawnBag([Description("Character id of a currently-connected player (see list_world_sessions)")] uint characterId,
+			[Description("Must be true to execute.")] bool confirm = false)
+		{
+			if (!confirm)
+				return $"Would drop a loot bag with random items + coins at character {characterId}'s position. Call again with confirm=true to execute.";
+
+			var ok = await _dispatcher.RunGmCommand(characterId, ".spawnbag");
+			return ok
+				? $"Ran .spawnbag for character {characterId} (the in-game system-message reply lists the bag handle + items, or why it failed)."
 				: $"Character {characterId} is not currently connected to any GameServer listener.";
 		}
 

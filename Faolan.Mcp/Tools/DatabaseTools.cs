@@ -55,13 +55,13 @@ namespace Faolan.Mcp.Tools
 			return Serialize(objects);
 		}
 
-		[McpServerTool(Name = "search_items"), Description("Search items by name substring (case-insensitive). Returns id/name/level/archetype - use get_item for the full record, add_item to grant one.")]
+		[McpServerTool(Name = "search_items"), Description("Search items by name substring (case-insensitive). Returns id/name/level/type/archetype (type = Normal/Quest/Resource/Equipped classification) - use get_item for the full record, add_item to grant one.")]
 		public async Task<string> SearchItems([Description("Name substring to match, e.g. \"potion\"")] string name, [Description("Max results (default 25)")] int limit = 25)
 		{
 			var items = await _db.SearchItems(name, limit);
 			return items.Length == 0
 				? $"No items matching '{name}'."
-				: Serialize(items.Select(i => new { i.Id, i.Name, i.Level, i.Archetype }));
+				: Serialize(items.Select(i => new { i.Id, i.Name, i.Level, Type = i.Type.ToString(), i.Archetype }));
 		}
 
 		[McpServerTool(Name = "search_npc_spawns"),
