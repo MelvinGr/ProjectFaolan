@@ -52,30 +52,36 @@ prior diagnoses are in `docs/archive/todo-history.md`.
       profession comes from char-select, the player spawn, a feat/profession packet, or client-side derivation —
       finding it needs that angle (likely client RE), NOT more snapshot decode. → memory `snapshot_tails_construction_scope`
 - [ ] Login/movement still spawn at the correct position after the raw-body float-endianness fix. → `docs/archive/todo-history.md` §8
-- [ ] **Chat broken again** (Melvin, 2026-06-13): in-game chat not working after world entry — the client never
-      opens a TCP socket to **AgentServer (7012)** even though the PlayerAgent handoff for it is well-formed
-      (frame 125 in `Captures/loopback2.pcapng`: discriminator `fae5989d02`=AgentServer, addr `127.0.0.1:7012`,
-      same format as the CsPlayerAgent handoff the client DOES act on). Confirmed by capture: client connects to
-      7010/7011/7014/7001 only, never 7012.
-      - [x] **Loading-screen hang FIXED (root cause #1, 2026-06-13)**: the client was stuck flooding
-            `RequestAggroStatus` (GameCharAgentProject `0x5B9756FC`, method 0x2000) ~450× for nearby NPCs and never
-            finishing load, because we never replied. We mis-dispatched it: `Handle0x2000` read the body's first two
-            u32s as `[pbLength][pbOpcode]`, and since the aggro body is `[0xC350][player][0xC350][target]` the
-            "pbOpcode" came out == the player instance → it hit the "client-instance ping" default and was dropped.
-            Fixed by routing class `0x5B9756FC` by id before the opcode switch (like Tradepost) and replying
-            `[0xC350][target][0x00000000]` (aggro=0). Verified: flood 450→19 (retail=17), and the post-entry stream
-            is now a healthy idle (periodic `0x2085→0x2082` + `0x2005` pings). → `HandleGameCharAgentProject.cs`,
-            memory `protocol_gameserver_rpc_multiplexing`.
-      - [ ] **Chat connection STILL not opened** after the aggro fix: client is fully in-world and idle but never
-            connects to 7012. In retail the chat + csplayer connections both open ~2s after world entry (~4ms
-            apart), so it's a post-world-entry trigger we're not satisfying. NOT the CSPlayerAgent dissect bug
-            (that's display-only, see Wireshark §). Remaining leads to chase: (a) does the client need the
-            CsPlayerAgent handshake to fully complete (retail finishes with a 4756-byte `0x2038` social/friends
-            dump on csplayer that we never send; ours stops after the `0x20D0/0x20C5` pair)? (b) is there a
-            per-session "social/community ready" flag in the world/snapshot data the client checks before opening
-            chat? Compare our post-entry GS stream to retail (`…kalantes_chat`) right around the chat-connect
-            moment. History: earlier chat regressions were the dead CDN / snapshot gate (now lifted) — memory
-            `protocol_chat_connection_regression`, `protocol_agentserver_chat`.
+- [x] **Chat broken again — FIXED (Melvin, 2026-06-13)**: chat + character names (floating + healthbar) work again
+      in-client. TWO root causes, both fixed this session:
+      - **#2 (the chat blocker), commit 5c7f2a8**: the DB-container world-entry snapshot
+        (`FAOLAN_WORLDENTRY_DB_CONTAINERS`, was default ON) rebuilt the `0x737A6DF9` root into a blob the client
+        REJECTS — `AgeOfConan.log`: "N3InfoItemRemote::Construct: ReadSubClass for IIR 1937403385
+        (FullPlayerCharacterIIR) failed! … Blob data may be inconsistant, data invalid". The client can't construct
+        the player's OWN character, so world entry never completes → names don't render → no CommunityServer (chat).
+        The hint was the client log past the RDB noise. Fixed by flipping the flag to opt-IN (default = the proven
+        VERBATIM snapshot, which is byte-valid). Verified: FullPlayerCharacterIIR error gone, client reaches
+        "Authenticating with CommunityServer", opens the 7012 socket, names render. See new DB-container TODO below.
+      - **#1 (the loading hang), commit 5c99a6a**: client flooded `RequestAggroStatus` (GameCharAgentProject
+        `0x5B9756FC` method 0x2000) ~450× because we mis-dispatched it (read `[pbLength][pbOpcode]` off a body that
+        is `[0xC350][player][0xC350][target]`, so "pbOpcode" == player instance → dropped as a client-ping). Routed
+        the class by id (like Tradepost), reply `[0xC350][target][0]`. Flood 450→19 (retail=17), post-entry now a
+        healthy idle. → `HandleGameCharAgentProject.cs`, memory `protocol_gameserver_rpc_multiplexing`.
+
+- [ ] **Re-enable DB-container world-entry inventory (re-prove the snapshot byte-valid)**: the equipment-doll + bag
+      DB-item delivery (`FAOLAN_WORLDENTRY_DB_CONTAINERS`, `FullCharSnapshotBuilder` + `AdjustSnapshotPrefixRootLength`
+      in `RetailLoginReplay.cs`) is now OPT-IN (=1) because its rebuilt `0x737A6DF9` root makes the client reject the
+      player's FullPlayerCharacterIIR (see chat fix above). It DID render bag+doll on 2026-06-12 (commit 20f2cc1), so
+      a world-entry change since then desynced the rebuilt root from the prefix/root-length the client expects. Diff
+      the rebuilt root vs the verbatim root for the SAME char, re-validate `AdjustSnapshotPrefixRootLength` against a
+      capture (memory `protocol_containeradditem`: the prefix carries a root-length varint @offset4 = const 4483 +
+      rootLen that MUST be delta-adjusted), and only flip the default back ON once a login is IIR-error-free in
+      `AgeOfConan.log`. Until then, equipment/bag show the verbatim capture's items, not the player's DB items.
+
+      (historical detail kept for reference) The client never opened a TCP socket to **AgentServer (7012)** even
+      though the PlayerAgent handoff for it is well-formed (frame 125 in `Captures/loopback2.pcapng`: discriminator
+      `fae5989d02`=AgentServer, addr `127.0.0.1:7012`) — because world entry never completed (invalid FullChar above).
+      Memory `protocol_chat_connection_regression`, `protocol_agentserver_chat`.
 
 **Combat** (loop both directions) → `docs/combat.md` (BCC ack protocol), `docs/archive/quests-and-combat.md`, memory `protocol_stats_and_combat`
 - [x] Normal-attack FSM re-test: the swing-1 BccAck now matches retail byte-for-byte (u32 argsLen fix, field3
