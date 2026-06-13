@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -7,6 +8,7 @@ namespace Faolan.Core.Database.Tables
 	// entry and re-addressed from CapturedInstance to the live character. Generalizes the embedded beach world-burst
 	// to any map. Imported by Faolan.Importer. The burst is stored as STRUCTURED IIR records (MapWorldBurstEntity),
 	// not opaque packet blobs - see IirRecordCodec.
+	[Obsolete("ALL PACKETS NEED TO BE BUILD FROM SCRATCH DB BACKED")]
 	public class MapWorldBurst : BaseEntity
 	{
 		// The ordered, decomposed IIR records that make up the world build (see MapWorldBurstEntity / IirRecordCodec).
@@ -24,6 +26,7 @@ namespace Faolan.Core.Database.Tables
 	// not-yet-dissected component payload in Body. IirRecordCodec.Rebuild reconstructs the exact original bytes
 	// (proven round-trip-lossless over all captured maps), so the proven byte-preserving replay path is unchanged.
 	// Field-level dissection (Body -> typed columns) proceeds per IIR type; see docs/archive/spawn-dissection-plan.md.
+	[Obsolete("ALL PACKETS NEED TO BE BUILD FROM SCRATCH DB BACKED")]
 	public class MapWorldBurstEntity : BaseEntity
 	{
 		[ForeignKey(nameof(MapWorldBurstId))]

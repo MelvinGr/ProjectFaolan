@@ -637,7 +637,13 @@ namespace Faolan.GameServer
 
 			var key = PositionKey(BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosXOffset, 4)), BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosYOffset, 4)),
 				BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosZOffset, 4)));
-			if (!npcByPosition.TryGetValue(key, out var row) || !NpcSpawnBuilder.TryBuild(row, handle, out var newBody, freshSpawn: true))
+			// NO freshSpawn here: the loading-screen burst MUST stay byte-exact to the capture (the proven path that
+			// loads without crashing). freshSpawn re-encodes the body (drops the transient NpcStats.SpawnAnimation),
+			// which shifts the IIR/body lengths for every NPC captured mid-animation - that re-shaped the burst and
+			// crashed the client on the loading screen. SpawnAnimation normalization belongs ONLY on the from-model
+			// spawn (EnsureZoneNpcs -> SendWorldSpawn), which is where Casilda actually streams in (she is outside
+			// the burst), so reverting here keeps the Casilda fix while restoring the working loading screen.
+			if (!npcByPosition.TryGetValue(key, out var row) || !NpcSpawnBuilder.TryBuild(row, handle, out var newBody))
 				return false;
 
 			// Keep the burst packet's header (already re-addressed to the live player); swap only the FA015807 body.
