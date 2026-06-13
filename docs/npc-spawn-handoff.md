@@ -15,10 +15,20 @@ frame name).
      crash. Reverted: `TryRebuildNpcSpawnFromDb` is byte-exact again (the proven path). `freshSpawn:true` stays
      ONLY on the from-model spawn (`EnsureZoneNpcs`/respawn in `WorldBroadcaster`), which is where Casilda
      actually streams in — so the Casilda fix is unaffected.
-  2. **Double-spawn flood (next-step #1) FIXED.** `EnsureZoneNpcs` now aligns the model NPC's handle to the
-     burst's wire handle **by POSITION** (`BuildBurstHandleByPosition`), not by handle. Handle-matching only
-     hit 18/42 beach NPCs (burst = one session, NpcSpawns = union of sessions); position hits **42/42**
-     (verified), so the entry Known-seeding now covers every burst NPC and the first move re-streams none.
+  2. **Double-spawn flood (next-step #1) FIXED — TWO bugs.**
+     - (a) Handle alignment: `EnsureZoneNpcs` now aligns the model NPC's handle to the burst's wire handle
+       **by POSITION** (`BuildBurstHandleByPosition`), not by handle (handle-matching only hit 18/42; position
+       hits 42/42). Necessary but NOT sufficient.
+     - (b) **THE REAL FLOOD CAUSE (found via `loopback3`):** `InterestManager.ResolveMove`'s despawn-prune
+       iterates the mover's ENTIRE `Known` set and despawns anything not in `inRange`. `BroadcastPlayerEntry`
+       runs a PLAYER-ONLY pass (`includeNonPlayers=false`) so `inRange` = players only → every NPC handle just
+       seeded into `Known` is pruned one line later (and emits a despawn). The seeding NEVER survived; the first
+       real move re-streamed the whole in-range zone (~95 spawns) and crashed the client. The handoff's
+       "seeding doesn't take / now knows 98" was THIS, not a handle mismatch. Fixed: the player-only pass no
+       longer prunes NPCs, AND entry now seeds EVERY in-range NPC into `Known` (not just burst ones) so the
+       first move streams ~0 — entry view == burst == retail; the surplus cross-session model dupes stay unsent.
+     - Diagnosis trail: `loopback3` had 0 spawns before the first move and a 95-spawn flood at the tail (capture
+       ends mid-flood = crash). Re-dump any loopback with `Captures/tshark_dump.sh`.
 - Run: `cd Faolan/bin/Debug && dotnet Faolan.dll`. Drive client: see CLAUDE.md. Client log:
   `/var/games/debian-installation/steamapps/common/Age of Conan/AgeOfConan.log`.
 - Loopback captures of OUR output: `Captures/loopback*.pcapng` (+ `.tshark.json`). Retail reference:
@@ -45,10 +55,13 @@ frame name).
    individual-spawn path streams the union.
 
 ## Next steps, in order
-0. **IN-CLIENT TEST the session-3 fixes (do this first).** Loading screen should load clean again (burst is
-   byte-exact), and on the first move the interest log should report `+0` burst re-spawns (was ~97). The model
-   handle was the mismatch (burst wire-handle ≠ model `CapturedHandle`); now aligned by position.
-1. ~~Fix the double-spawn / Known-seeding~~ **DONE** (position-keyed handle alignment, 42/42). Verify in-client.
+0. **IN-CLIENT TEST the session-3 fixes (do this first).** Restart the server (`cd Faolan/bin/Debug && dotnet
+   Faolan.dll`) so the new binary loads. Expect: loading screen clean (byte-exact burst), and the server log
+   line `World entry: <name> seeded N in-range NPC(s) into Known` with N ≈ the in-range count (~95), then the
+   first move's `Interest:` line should report `+0` (or a handful) spawns — NOT ~95. If the client now reaches
+   the world, the flood is dead.
+1. ~~Fix the double-spawn / Known-seeding~~ **DONE** (position alignment + ResolveMove prune fix + seed-all).
+   Verify in-client.
 2. **Then re-test the individual-spawn flag** (`FAOLAN_NPC_INDIVIDUAL_SPAWN=1`) — but first add cross-session
    **mob dedup** so the model is retail-shaped (~43, not 168). Friendly NPCs are already deduped by name in
    `EnsureZoneNpcs`; mobs still pile up by cell across sessions.
