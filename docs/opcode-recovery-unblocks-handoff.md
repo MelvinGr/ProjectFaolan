@@ -160,5 +160,8 @@ the actual method name instead of a bare hex value — useful for triaging the n
    state). Window render is still KnubotStartTrade-gated (same as SELL), but the buy round-trip is complete and
    golden/unit-tested. `DispatchItemBoughtBack (0x2036)` is the *buy-back* (repurchase a sold item) reply — a fresh
    buy uses DispatchAddItem, so it wasn't needed here; left for if/when the buy-back tab is wired.
-4. ⬜ Mail/AH delivery (§9) reuses the same add-item path for attachments — AH window + bank now open in-client;
-   AH search/sell + mail still to build.
+4. 🔶 Mail/AH delivery (§9) — AH window + bank open in-client. **AH SEARCH now DB-backed (2026-06-13):**
+   `TradepostListing` table + `TradepostListingCodec` (byte-exact, golden-tested) + search queries listings by
+   itemId, captured row as the pre-import fallback. Still to build: a listings importer/seed, SELL into the AH
+   (create a listing from a bank item + escrow), and BUY → mail delivery (reuses the same add-item path for the
+   attachment).

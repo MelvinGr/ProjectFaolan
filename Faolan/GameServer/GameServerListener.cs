@@ -142,7 +142,7 @@ namespace Faolan.GameServer
 			// ordinary opcodes, so route them by RPC class id before the opcode switch (docs/tradepost-protocol.md).
 			if (Tradepost.TradepostProtocol.IsInbound(packet))
 			{
-				await Tradepost.TradepostHandler.Handle(client, packet, Logger);
+				await Tradepost.TradepostHandler.Handle(client, packet, Logger, Database);
 				return;
 			}
 

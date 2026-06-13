@@ -67,26 +67,42 @@ client-side proximity check, so the access position must be within 15 units of t
 [filter2: 8 bytes 0xFF][0x00…]
 ```
 
-## DispatchTradepostSearchResults rows (S→C `0x2005`) — VALIDATED byte-exact
+## DispatchTradepostSearchResults rows (S→C `0x2005`) — VALIDATED byte-exact (full grammar 2026-06-13)
 
 ```
-[head:u32]                    # ≈ total quantity of that item available across the AH (scales with listings)
+[head:u32]                    # the query's category root (0x7E2 in the captures); echoed, NOT a quantity
 [ row ]*                      # rows concatenated, sorted by price ASCENDING
 ```
-Per row:
+Per row (all integers big-endian):
 ```
 [saleId:u64]                  # unique listing id; the buy targets this
 [handle:u32]
 [nameLen:u16][seller ascii]
 [price:u64]
 [qty:u32]
-[itemId:u32]                  # echoes the query's item
-[item: ProtoAcgItem protobuf] # self-delimited, variable length — the SAME item proto our inventory/spawn
-                              # builders already emit (SnapshotItemBuilder / PlayerSpawnEquipment).
+[itemId:u32]                  # the item template the listing is filed under (= the query's item)
+[instanceField:u64]           # 0 in the capture (buyout/reserved — undecoded, preserved verbatim)
+[itemHandle:u32]              # an item-handle-like u32 (undecoded, preserved verbatim)
+[entryLen:u32][ProtoInventoryGameEntry]   # the listed item, length-prefixed (NOT a bare/self-delimited proto)
 ```
-Validated on the 8-row packet #991 (item 0x753F): sellers Elgarama/Zykyn/Feiyan/… prices 30 → 1,800 → 500,000 →
-1,000,000 (ascending), qty 2 each, unique saleIds. Rows are split in the decoder on the session-constant saleId
-high bytes (`20 d8 2b`); in C# the boundary falls out of encoding the `ProtoAcgItem` (known length).
+The trailing entry is the **same `ProtoInventoryGameEntry`** the FullChar snapshot / shop window / live add-item
+use — so one codec serves them all (`TradepostListingCodec`, byte-exact golden test `TradepostListingCodecTests`):
+- `item_id` = the saleId
+- `stat_list` = `{0: flags (0x421), 26: qty, 258: price, 265: timestamp/expiry}` (the `0`/`265` semantics are still
+  loose, kept verbatim per listing like `ShopItem.Stat356`)
+- `item_data` = the listed **instance's** `ProtoAcgItem` (its own Data1..4 quad + Template1/2 + Level + Hash). The
+  instance's `Template` (0x3E0A97 in the capture) differs from the row's `itemId` (0x755D), so the listed identity
+  lives on the listing row (`TradepostListing` table), not via the `Items` template table.
+
+Validated byte-exact on pkt#1028 (seller "Jocko", item 0x755D, price 1,000,000, qty 1). The earlier "bare
+self-delimited ProtoAcgItem / split on the `20 d8 2b` saleId prefix" note was the Python dissector's display
+heuristic; the real entry boundary is the explicit `entryLen` u32, so C# reads it without prefix-sniffing.
+
+**Status (2026-06-13):** DB-backed search is WIRED — `TradepostItemSearch` queries `TradepostListing` rows by the
+searched `itemId` (cheapest first) and builds the grid byte-exact via `TradepostListingCodec.Build`; the captured
+single-row replay is the fallback when no listing matches (so the grid still renders pre-import). Still to build:
+a listings importer/seed (harvest the captured search rows into `TradepostListing`), SELL into the AH (create a
+listing from a bank item), and BUY → mail delivery.
 
 ## Buy → mail delivery (confirmed)
 

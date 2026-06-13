@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Data;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
@@ -52,10 +54,16 @@ namespace Faolan.GameServer.Tradepost
 			Build(TradepostProtocol.InterfaceMethod.DispatchOpenTradepost, BuildAccessPointBody(position, AccessRadius), interfaceInstance)
 				.SendAsync(client);
 
-		// Reply to TradepostItemSearch so the auction-house listing grid renders. PoC: replays a captured listing
-		// regardless of the query (the client renders whatever rows we send). Step 3 builds rows from DB listings
-		// matching the searched itemId. Echoes the inbound TradepostInterface instance.
-		public static Task SendSearchResults(INetworkClient client, ConanPacket inbound) =>
+		// Reply to TradepostItemSearch with DB-backed listings for the searched item (rows built byte-exact by
+		// TradepostListingCodec, cheapest first). `head` echoes the query's category. Echoes the inbound
+		// TradepostInterface instance so the client matches the reply to its window.
+		public static Task SendSearchResults(INetworkClient client, ConanPacket inbound, uint head, IReadOnlyCollection<TradepostListing> listings) =>
+			Build(TradepostProtocol.InterfaceMethod.DispatchSearchResults, TradepostListingCodec.Build(head, listings), inbound.Sender.Instance)
+				.SendAsync(client);
+
+		// Fallback when no DB listing matches the query: replay the captured single-row listing so the grid still
+		// renders something for the PoC (item-agnostic). Drops out naturally once listings are imported/seeded.
+		public static Task SendSearchResultsReplay(INetworkClient client, ConanPacket inbound) =>
 			Build(TradepostProtocol.InterfaceMethod.DispatchSearchResults, SearchResultsReplayBody, inbound.Sender.Instance)
 				.SendAsync(client);
 

@@ -589,17 +589,23 @@ buy-delivery path (seller's item + buyer's payment move through mail).
         `protocol_bank_storage`, `docs`-less): container kind 105 delivered via a **BankIIR (0x0BA1C1CB)** on the
         world conversation (separate channel from the tradepost AH/mail tabs), byte-exact `BankStorageTests`. The
         bank tab renders and the player can move items in/out in-client.
-  - [ ] **AH SEARCH is static replay - make it DB-backed** (Melvin, 2026-06-13): the search returns a captured
-        single-row listing ("Jocko", item 0x755D). Query a `TradepostListing` table for rows matching the search
-        and build `DispatchTradepostSearchResults` from them (the byte-exact builder exists; swap the replay blob
-        for DB rows).
+  - [x] **AH SEARCH is now DB-backed (2026-06-13).** `TradepostItemSearch` queries the new `TradepostListing`
+        table by the searched `itemId` (cheapest first) and builds `DispatchTradepostSearchResults` byte-exact via
+        `TradepostListingCodec` (round-trip golden test `TradepostListingCodecTests` vs the captured "Jocko" row).
+        The full row grammar was nailed: `[saleId][handle][seller][price][qty][itemId][u64][u32][entryLen]
+        [ProtoInventoryGameEntry]` — the entry is the SAME message the snapshot/shop/add-item use (item_id=saleId,
+        stats {0,26:qty,258:price,265:ts}, item_data=the listed instance's ProtoAcgItem). The captured single-row
+        replay is the FALLBACK when no listing matches (so the grid still renders pre-import). Remaining: a
+        listings importer/seed (harvest captured search rows into `TradepostListing`) so search returns real data
+        without the fallback.
   - [ ] **AH "offer for sale" should work** (Melvin, 2026-06-13): the c2s list-item request → create a
         `TradepostListing` (seller/price/qty/itemId), remove the item from the bank (container 105) into escrow, and
         the listing then shows in search. The tradepost sells from the BANK (`nBankItemSlot`).
   - [ ] **Bank deposit/withdraw must PERSIST**: moving items between the bank (container 105) and the bag must be
         written to `CharacterInventory` so the bank survives relog (the client move sends go through the inventory
         move handler - route bank-slot moves to/from container 105).
-- [ ] **Step 3:** go DB-backed — `TradepostListing` + `Mail`/`MailAttachment` tables, search, money/escrow,
+- [~] **Step 3:** go DB-backed. `TradepostListing` table + DB-backed search DONE (2026-06-13, above). Still:
+      `Mail`/`MailAttachment` tables, SELL into the AH (create a listing from a bank item + escrow), money debit,
       buy→mail grant. NB: tradepost sells from the **bank** (`nBankItemSlot`) — leans on bank/money support (the
       bank itself is now decoded + delivered); `CSBuyItemReply` hints at a commerce/CS path. All on the existing
       GameServer dispatcher (no new connection).

@@ -65,6 +65,8 @@ namespace Faolan.Core.Database
 		Task<Shop> GetShopByVendorName(string vendorName);
 		Task<Shop> GetFirstShop();
 
+		Task<List<TradepostListing>> GetTradepostListings(uint itemId);
+
 		Task<MapWorldBurst> GetMapWorldBurst(uint mapId);
 		Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names);
 		Task<NpcSpawn> GetNpcSpawnByName(string name);
@@ -460,6 +462,17 @@ namespace Faolan.Core.Database
 				.Include(s => s.Items)
 				.OrderBy(s => s.Id)
 				.FirstOrDefaultAsync();
+		}
+
+		// Auction-house listings for a searched item template, cheapest first (the order the grid renders).
+		public async Task<List<TradepostListing>> GetTradepostListings(uint itemId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.TradepostListings
+				.Where(l => l.ItemId == itemId)
+				.OrderBy(l => l.Price)
+				.ToListAsync();
 		}
 
 		// --- equipment -------------------------------------------------------------------------------------

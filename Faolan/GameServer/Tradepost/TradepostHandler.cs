@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Faolan.Core.Data;
+using Faolan.Core.Database;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Microsoft.Extensions.Logging;
@@ -13,7 +14,7 @@ namespace Faolan.GameServer.Tradepost
 	// are the next increment.
 	public static class TradepostHandler
 	{
-		public static async Task Handle(INetworkClient client, ConanPacket packet, ILogger logger)
+		public static async Task Handle(INetworkClient client, ConanPacket packet, ILogger logger, IDatabaseRepository database)
 		{
 			var method = (TradepostProtocol.AgentMethod)packet.Opcode;
 			switch (method)
@@ -26,9 +27,20 @@ namespace Faolan.GameServer.Tradepost
 					break;
 
 				case TradepostProtocol.AgentMethod.ItemSearch:
-					logger.LogInformation("Tradepost: {Char} searched {Query}.", CharName(client), DescribeSearch(packet.Body));
-					await TradepostResponses.SendSearchResults(client, packet);
+				{
+					var query = ParseSearch(packet.Body);
+					var listings = await database.GetTradepostListings(query.ItemId);
+					logger.LogInformation("Tradepost: {Char} searched lang={Lang} itemId=0x{Item:X} page={Page} -> {Count} listing(s).",
+						CharName(client), query.Lang, query.ItemId, query.Page, listings.Count);
+
+					if (listings.Count > 0)
+						await TradepostResponses.SendSearchResults(client, packet, query.Category, listings);
+					else
+						// No imported/seeded listing for this item yet - replay the captured row so the grid still
+						// renders (PoC). Drops out once listings exist for the searched item.
+						await TradepostResponses.SendSearchResultsReplay(client, packet);
 					break;
+				}
 
 				case TradepostProtocol.AgentMethod.BuyItem:
 				{
@@ -60,21 +72,24 @@ namespace Faolan.GameServer.Tradepost
 		}
 
 		// TradepostItemSearch query: [u16 len][lang ascii][cat:u32][page:u32][cat2:u32][itemId:u32][filter+price...].
-		private static string DescribeSearch(FaolanStream body)
+		// Category is echoed back as the search-results `head` (const 0x7E2 in the captures).
+		private readonly record struct SearchQuery(string Lang, uint Category, uint Page, uint ItemId);
+
+		private static SearchQuery ParseSearch(FaolanStream body)
 		{
-			if (body == null) return "(empty)";
+			if (body == null) return new SearchQuery("", 0x7e2, 0, 0);
 			try
 			{
 				var lang = System.Text.Encoding.ASCII.GetString(body.ReadArrayUInt16Length());
-				body.ReadUInt32();             // cat (const 0x7E2 in captures)
+				var cat = body.ReadUInt32();   // category root (const 0x7E2 in captures)
 				var page = body.ReadUInt32();
-				body.ReadUInt32();             // cat2
+				body.ReadUInt32();             // cat2 (mirror of cat)
 				var itemId = body.ReadUInt32();
-				return $"lang={lang} itemId=0x{itemId:X} page={page}";
+				return new SearchQuery(lang, cat, page, itemId);
 			}
 			catch (Exception)
 			{
-				return "(unparsed)";
+				return new SearchQuery("", 0x7e2, 0, 0);
 			}
 		}
 
