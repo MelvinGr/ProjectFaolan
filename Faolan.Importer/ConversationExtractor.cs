@@ -10,17 +10,26 @@ namespace Faolan.Importer
 	// .pcapng analyzer output.
 	public readonly record struct CapturedPacket(long Ticks, bool IsDownload, uint Opcode, uint SubOpcode, byte[] Bytes);
 
-	// One extracted conversation node: the player's TalkToNpc key + the captured NPC handle/instance + the ordered
-	// server response packets to replay. NpcName is resolved from the same capture's FA015807 spawn for the handle
-	// (null if that spawn wasn't captured) - the stable identity the runtime routes on instead of the volatile handle.
-	public sealed record ConversationEntry(uint TypeId, uint Mode, uint Field3, uint CapturedNpcHandle, uint CapturedInstance, List<byte[]> Packets, string NpcName);
+	// One extracted conversation SCREEN, keyed by its answer-index PATH within the NPC's dialogue tree. The path is
+	// the sequence of option indices the player picked to reach this screen ("" = the greeting, "0" = after picking
+	// option 0, "0>1" = then option 1, ...). Packets are the ordered server responses to replay for that screen.
+	// NpcName is resolved from the same capture's FA015807 spawn for the clicked handle (the stable identity the
+	// runtime routes on; the handle/instance are session-volatile and only used to re-address the replay).
+	// (Mode/Field3 were the OLD key but both are session-volatile counters, not branch ids - the AnswerPath is the
+	// stable branch key; memory protocol_conversation_routing.)
+	public sealed record ConversationEntry(uint TypeId, string AnswerPath, uint CapturedNpcHandle, uint CapturedInstance, List<byte[]> Packets, string NpcName);
 
-	// Ports Captures/extract_conversations.py: find each player TalkToNpc (Interact 642CD3D6, actionType 0x16),
-	// read its args, and collect the server conversation packets that follow until the next talk. Caller merges
-	// across captures and writes ConversationNode/ConversationPacket rows.
+	// Reconstructs each NPC's dialogue as a TREE of screens keyed by answer-index PATH, from the captured request/
+	// response flow. The grammar (memory protocol_conversation_routing): a conversation INSTANCE = TalkToNpc(f3=0)
+	// [greeting] then the run of server responses + the player's KnubotAnswer(idx) picks, until the next greeting (a
+	// re-walk). The greeting's responses are the "" screen; the responses after the player's first pick (idx i0) are
+	// the "i0" screen; after the next pick they're "i0>i1"; etc. The branches are spread across the re-walks (each
+	// Mode picked different options), so MERGING the instances by answer-path unions the full option tree.
+	// `packets` must be one capture's GameServer packets in chronological order.
 	public static class ConversationExtractor
 	{
 		private const uint InteractSubOpcode = 0x642CD3D6;
+		private const uint KnubotAnswerSubOpcode = 0x4D7D9123;
 		private const uint Opcode2000 = 0x2000;
 		private const uint Opcode2015 = 0x2015;
 
@@ -28,75 +37,91 @@ namespace Faolan.Importer
 		private const uint TalkToNpcActionType = 0x16;
 
 		// The Knubot conversation-display response sub-opcodes (642CD3D6 echo excluded: it is a generic interact ack):
-		// OpenChatWindow (045B0B0F), AppendText (4A3D899A), AnswerList (F164A4A5), CloseChatWindow (C4AF39EB). The
-		// close is captured too so a replayed conversation ends by closing the window (and the stage segmenter has its
-		// final terminator) instead of leaving it open.
+		// OpenChatWindow (045B0B0F), AppendText (4A3D899A), AnswerList (F164A4A5), CloseChatWindow (C4AF39EB).
 		private static readonly HashSet<uint> ResponseSubOpcodes = [0x4A3D899A, 0xF164A4A5, 0x045B0B0F, 0xC4AF39EB];
 
-		// `packets` must be one capture's GameServer packets in chronological order.
 		public static List<ConversationEntry> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
 			var namesByHandle = BuildSpawnNameMap(packets);
-			var talkIndices = new List<int>();
-			for (var i = 0; i < packets.Count; i++)
-			{
-				var p = packets[i];
-				if (p.IsDownload || p.Opcode != Opcode2000 || p.SubOpcode != InteractSubOpcode)
-					continue;
-
-				var body = GetBody(p.Bytes);
-				if (body.Length >= 22 && BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(18, 4)) == TalkToNpcActionType)
-					talkIndices.Add(i);
-			}
-
-			var talkSet = talkIndices.ToHashSet();
 			var entries = new List<ConversationEntry>();
 
-			foreach (var ti in talkIndices)
+			// Per-conversation-instance state, reset at each greeting (TalkToNpc f3=0).
+			var active = false;
+			uint typeId = 0, npc = 0, instance = 0;
+			var path = ""; // answer-index path of the CURRENT screen (the one whose responses we're collecting)
+			var screen = new List<byte[]>();
+
+			void Flush()
 			{
-				var body = GetBody(packets[ti].Bytes);
-				if (body.Length < 26)
-					continue;
-
-				var instance = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
-				var argLen = (int)BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(22, 4));
-				if (26 + argLen > body.Length)
-					continue;
-
-				var (typeId, mode, field3, npc) = ParseArgs(body.AsSpan(26, argLen));
-
-				var resp = new List<byte[]>();
-				for (var j = ti + 1; j < packets.Count && !talkSet.Contains(j); j++)
-				{
-					var r = packets[j];
-					if (r.IsDownload && (r.Opcode == Opcode2015 || (r.Opcode == Opcode2000 && ResponseSubOpcodes.Contains(r.SubOpcode))))
-						resp.Add(r.Bytes);
-				}
-
-				if (resp.Count > 0)
-					entries.Add(new ConversationEntry(typeId, mode, field3, npc, instance, resp, namesByHandle.GetValueOrDefault(npc)));
+				if (active && screen.Count > 0)
+					entries.Add(new ConversationEntry(typeId, path, npc, instance, [..screen], namesByHandle.GetValueOrDefault(npc)));
 			}
 
+			foreach (var p in packets)
+			{
+				if (!p.IsDownload && p.Opcode == Opcode2000 && p.SubOpcode == InteractSubOpcode)
+				{
+					var body = GetBody(p.Bytes);
+					if (body.Length < 26 || BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(18, 4)) != TalkToNpcActionType)
+						continue;
+
+					var argLen = (int)BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(22, 4));
+					if (26 + argLen > body.Length)
+						continue;
+
+					var (parsedTypeId, _, field3, parsedNpc) = ParseArgs(body.AsSpan(26, argLen));
+					if (field3 != 0)
+						continue; // a non-greeting TalkToNpc (retransmit / options re-request) - not an instance boundary
+
+					// A greeting opens a new conversation instance: flush the previous one's last screen, then reset.
+					Flush();
+					active = true;
+					typeId = parsedTypeId;
+					npc = parsedNpc;
+					instance = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
+					path = "";
+					screen = [];
+				}
+				else if (!p.IsDownload && p.Opcode == Opcode2000 && p.SubOpcode == KnubotAnswerSubOpcode && active)
+				{
+					// The player picked option `idx`: the current screen is complete (emit it), and the responses that
+					// follow belong to the child screen reached by that option.
+					var body = GetBody(p.Bytes);
+					if (body.Length < 4)
+						continue;
+
+					var idx = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(body.Length - 4, 4));
+					Flush();
+					path = path.Length == 0
+						? idx.ToString()
+						: $"{path}>{idx}";
+					screen = [];
+				}
+				else if (p.IsDownload && active &&
+				         (p.Opcode == Opcode2015 || (p.Opcode == Opcode2000 && ResponseSubOpcodes.Contains(p.SubOpcode))))
+				{
+					screen.Add(p.Bytes);
+				}
+			}
+
+			Flush();
 			return entries;
 		}
 
-		// Merges nodes from many captures, deduped by (TypeId, Mode, Field3). Prefers an entry whose captured player
-		// instance is a 4-byte varint (in-range, so it re-addresses to any normal character), then the most packets.
-		// Deduped by (CapturedNpcHandle, TypeId, Mode, Field3) - the NPC handle is part of the key because
-		// (TypeId, Mode, Field3) is not NPC-unique (the same mode is a different conversation per NPC/quest-state).
-		// Prefers an entry whose captured player instance is a 4-byte varint, then the most packets.
+		// Merges screens from many captures/instances, deduped by (NpcName, TypeId, AnswerPath) - the stable branch
+		// key. This is what UNIONS the option tree: each conversation re-walk (a different Mode) explored a different
+		// option at a screen, so it contributes a different answer-path screen; merging them assembles the full tree.
+		// Keyed by NPC NAME (stable), not the session-volatile handle. Prefers an entry whose captured player instance
+		// is a 4-byte varint (re-addresses to any normal character), then the most packets.
 		public static List<ConversationEntry> Merge(IEnumerable<ConversationEntry> all)
 		{
-			var best = new Dictionary<(string, uint, uint, uint), (int score, ConversationEntry entry)>();
+			var best = new Dictionary<(string, uint, string), (int score, ConversationEntry entry)>();
 			foreach (var e in all)
 			{
-				// Key by NPC NAME (stable identity), not the session-volatile handle: the same NPC from different
-				// captures has different handles but the same name, so this correctly merges them into one node.
-				// Fall back to the handle string when a name couldn't be resolved so unrelated nodes don't collapse.
 				var identity = string.IsNullOrEmpty(e.NpcName)
 					? $"#{e.CapturedNpcHandle}"
 					: e.NpcName;
-				var key = (identity, e.TypeId, e.Mode, e.Field3);
+				var key = (identity, e.TypeId, e.AnswerPath);
 				var score = (VarintLength(e.CapturedInstance) == 4
 					? 1_000_000
 					: 0) + e.Packets.Count;

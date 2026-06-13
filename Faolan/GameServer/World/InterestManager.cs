@@ -22,20 +22,27 @@ namespace Faolan.GameServer.World
 	{
 		// Recompute interest after `mover` changed position (or just entered). Updates Known sets and returns the
 		// events to dispatch. Symmetric: handles both what the mover now sees and who now sees the mover.
-		public static List<InterestEvent> ResolveMove(Zone zone, WorldEntity mover, float range)
+		// `includeNonPlayers` widens the mover's own view to NPCs (not just players): a player walking through the
+		// zone streams the NPCs it comes into range of and is sent despawns for the ones it leaves. NPCs already in
+		// the mover's Known set - the ones the world-burst replay rendered at entry, seeded by the caller - are
+		// skipped so they are never double-spawned. Off at entry (the burst already populated the load), on for moves.
+		public static List<InterestEvent> ResolveMove(Zone zone, WorldEntity mover, float range, bool includeNonPlayers = false)
 		{
 			var events = new List<InterestEvent>();
 
-			// (1) The mover's own view (only a player receives packets): players it came into range of are spawned,
-			//     ones it left are despawned. (Others moving is handled by their own ResolveMove call.)
-			//     TRANSITIONAL: only PLAYERS here - NPCs are still rendered by the per-player world-burst replay, so
-			//     spawning them via interest too would double them. When NPCs become model-driven (burst retired),
-			//     widen this to EntitiesInRange so a player walking into a region streams its NPCs.
+			// (1) The mover's own view (only a player receives packets): entities it came into range of are spawned,
+			//     ones it left are despawned. (Others moving is handled by their own ResolveMove call.) With
+			//     includeNonPlayers, "entities" is players + NPCs; otherwise just players.
 			if (mover.IsPlayer)
 			{
+				var candidates = includeNonPlayers
+					? zone.EntitiesInRange(mover.Position, range, mover.Handle)
+					: zone.PlayersInRange(mover.Position, range, mover.Handle);
 				var inRange = new HashSet<uint>();
-				foreach (var other in zone.PlayersInRange(mover.Position, range, mover.Handle))
+				foreach (var other in candidates)
 				{
+					if (other.IsLoot)
+						continue; // loot bags have their own open/fade lifecycle, not interest streaming
 					inRange.Add(other.Handle);
 					if (mover.Known.Add(other.Handle))
 						events.Add(new InterestEvent(mover, other, InterestEventType.Spawn));

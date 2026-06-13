@@ -155,7 +155,7 @@ namespace Faolan.GameServer
 
 						default:
 						{
-							await LogToClient($"Received unknown moving type: {movingType.ToHex()}");
+							Logger.LogInformation($"Received unknown moving type: {movingType.ToHex()}");
 							break;
 						}
 					}
@@ -198,10 +198,13 @@ namespace Faolan.GameServer
 
 				case GameServer0X2000Opcodes.KnubotAnswer:
 				{
-					// The player picked a dialogue option: advance the active conversation by one stage (the captured
-					// node is segmented into stages; each answer serves the next reply + its options). No active
-					// conversation -> nothing to advance.
-					await SendNextConversationStage(client);
+					// The player picked a dialogue option. The chosen option INDEX is the last u32 of the body; it
+					// selects the branch, so route to the child screen at the extended answer-path (AdvanceConversation).
+					// No active conversation -> no-op.
+					var answerIndex = rawPayload.Length >= 4
+						? BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(rawPayload.Length - 4, 4))
+						: 0u;
+					await AdvanceConversation(client, answerIndex);
 
 					break;
 				}
@@ -225,7 +228,7 @@ namespace Faolan.GameServer
 					{
 						// Has no extra data
 
-						await LogToClient($"SwitchWeaponsButton: {args}");
+						Logger.LogInformation($"SwitchWeaponsButton: {args}");
 					}
 					else
 					{
@@ -254,14 +257,14 @@ namespace Faolan.GameServer
 								// for both:
 								// target = 0
 
-								await LogToClient($"SummonMount: {args}");
+								Logger.LogInformation($"SummonMount: {args}");
 
 								break;
 							}
 
 							case ActionType.RightClickItem:
 							{
-								await LogToClient($"RightClickItem: {args}");
+								Logger.LogInformation($"RightClickItem: {args}");
 
 								break;
 							}
@@ -272,7 +275,7 @@ namespace Faolan.GameServer
 								var casterHandle = client.Session.Account.ClientInstance;
 								var targetHandle = (uint)(args.SpellTarget?.TargetHandle ?? 0);
 
-								await LogToClient($"CastSpell spell={spellId} target=0x{targetHandle:X} {args}");
+								Logger.LogInformation($"CastSpell spell={spellId} target=0x{targetHandle:X} {args}");
 
 								// Play the cast (caster -> target, or self when no target), then resolve its effect.
 								await ApplySpell(client, casterHandle, targetHandle == 0
@@ -321,7 +324,7 @@ namespace Faolan.GameServer
 
 							case ActionType.Emote:
 							{
-								await LogToClient($"Emote: {args}");
+								Logger.LogInformation($"Emote: {args}");
 
 								break;
 							}
@@ -344,7 +347,7 @@ namespace Faolan.GameServer
 
 								// Real branching dialogue: replay the captured conversation node for whichever NPC/node
 								// the client asked for, re-addressed to the clicked NPC.
-								if (await TryReplayConversation(client, (uint)args.TypeId, (uint)args.Mode, (uint)args.Field3, npcHandle))
+								if (await TryReplayConversation(client, (uint)args.TypeId, (uint)args.Field3, npcHandle))
 									break;
 
 								// Last-resort fallback ONLY when the DB has no node for this NPC: the single hardcoded
@@ -356,7 +359,11 @@ namespace Faolan.GameServer
 								// client doesn't hang waiting for a reply (the "advance a step -> chat locks, can't ESC"
 								// bug). Conversation replay is coverage-bound, so an un-captured branch is expected.
 								else if (client.Session.UsedWorldBurstReplay)
+								{
+									var routedName = client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var rn) ? rn : "<unmapped handle>";
+									Logger.LogInformation("TalkToNpc: no conversation node for npcHandle=0x{Npc:X} (name={Name}, typeId={TypeId}, mode={Mode}, field3={Field3}); closing the window.", npcHandle, routedName, args.TypeId, args.Mode, args.Field3);
 									await SendConversationClose(client);
+								}
 
 								break;
 							}
@@ -376,7 +383,7 @@ namespace Faolan.GameServer
 										var fromSlot = from;
 										var targetSlot = (CharacterEquipmentSlot)target;
 
-										await LogToClient($"{direction}: ({fromSlot} -> {targetSlot}) {args}");
+										Logger.LogInformation($"{direction}: ({fromSlot} -> {targetSlot}) {args}");
 
 										// The trailing struct (after from/target) carries the item's template handle as a
 										// big-endian uint32; persist the equip into CharacterEquipment.
@@ -404,7 +411,7 @@ namespace Faolan.GameServer
 										var fromSlot = (CharacterEquipmentSlot)from;
 										var targetSlot = target;
 
-										await LogToClient($"{direction}: ({fromSlot} -> {targetSlot}) {args}");
+										Logger.LogInformation($"{direction}: ({fromSlot} -> {targetSlot}) {args}");
 
 										// Unequip is identified by the source equip slot (the trailing handle is 0);
 										// `target` is the bag cell the item lands in.
@@ -420,7 +427,7 @@ namespace Faolan.GameServer
 
 									default:
 									{
-										await LogToClient($"MoveEquippedToFromInventory: unknown direction={direction} {args}");
+										Logger.LogInformation($"MoveEquippedToFromInventory: unknown direction={direction} {args}");
 
 										break;
 									}
@@ -431,7 +438,7 @@ namespace Faolan.GameServer
 
 							default:
 							{
-								await LogToClient($"UNKNOWN-{actionType.ToHex()}: {args}");
+								Logger.LogInformation($"UNKNOWN-{actionType.ToHex()}: {args}");
 								break;
 							}
 						}
@@ -456,7 +463,7 @@ namespace Faolan.GameServer
 				{
 					var data = packet.Body.ReadRemainingArray();
 
-					await LogToClient($"SelectDeselect: {data.ToHex()}");
+					Logger.LogInformation($"SelectDeselect: {data.ToHex()}");
 
 					break;
 				}
@@ -468,7 +475,7 @@ namespace Faolan.GameServer
 					var reserved = packet.Body.ReadUInt32();
 					var move = packet.Body.ReadProtobufByteLength<MoveItemInInventoryArgs>();
 
-					await LogToClient($"DropItem: {move}");
+					Logger.LogInformation($"DropItem: {move}");
 
 					// Remove the dropped item from the persisted bag so it doesn't reappear on relog.
 					await PersistDropItem(client, move);
@@ -490,7 +497,7 @@ namespace Faolan.GameServer
 					var reserved = packet.Body.ReadUInt32();
 					var move = packet.Body.ReadProtobufByteLength<MoveItemInInventoryArgs>();
 
-					await LogToClient($"MoveItemInInventory: {move}");
+					Logger.LogInformation($"MoveItemInInventory: {move}");
 
 					// Persist the new slot positions so the player's bag arrangement survives logout (the world-entry
 					// snapshot rebuilds the bag from these CharacterInventory rows). No server->client packet follows.
@@ -576,14 +583,6 @@ namespace Faolan.GameServer
 
 					break;
 				}
-			}
-
-			return;
-
-			async Task LogToClient(string message)
-			{
-				Logger.LogInformation(message);
-				await _agentServerDispatcher.SendSystemMessage(client.Session.Account.ClientInstance, message);
 			}
 		}
 

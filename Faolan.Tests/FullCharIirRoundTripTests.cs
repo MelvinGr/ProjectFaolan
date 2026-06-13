@@ -92,6 +92,9 @@ namespace Faolan.Tests
 				         .EnumerateFiles(CapturesDir, "*.json")
 				         .OrderBy(f => f))
 			{
+				if (json.EndsWith(".tshark.json", StringComparison.OrdinalIgnoreCase))
+					continue; // tshark dumps use a different schema (BodyHex, not RawBytesBase64) - not this test's input
+
 				using var doc = JsonDocument.Parse(File.ReadAllBytes(json));
 				if (!doc.RootElement.TryGetProperty("Packets", out var packets))
 					continue;
@@ -99,9 +102,9 @@ namespace Faolan.Tests
 				var index = 0;
 				foreach (var p in packets.EnumerateArray())
 				{
-					var raw = Convert.FromBase64String(p
-						.GetProperty("RawBytesBase64")
-						.GetString() ?? "");
+					if (!p.TryGetProperty("RawBytesBase64", out var rawEl))
+						continue;
+					var raw = Convert.FromBase64String(rawEl.GetString() ?? "");
 					if (raw.Length < 32)
 						continue;
 

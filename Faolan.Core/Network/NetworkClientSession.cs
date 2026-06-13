@@ -53,7 +53,6 @@ namespace Faolan.Core.Network
 		// from the world-burst spawns. Combat seeds an NPC's vitals from this so its health bar matches what the
 		// client rendered from the spawn, instead of a flat placeholder. Populated alongside SpawnedNpcNamesByHandle.
 		Dictionary<uint, uint> SpawnedNpcMaxHealthByHandle { get; }
-		int ConversationStageIndex { get; set; }
 
 		// Index of the next post-creation world cutscene chunk to send. Advanced once per client script
 		// trigger (ClientLoadingDone, StartScript, Move, IntroDone) so each chunk is sent in order.
@@ -63,11 +62,15 @@ namespace Faolan.Core.Network
 		// capture it increments by 1 per player swing-ack; the client uses it to sequence the behaviour responses.
 		int NormalAttackAckPhase { get; set; }
 
-		// The active NPC conversation, served one STAGE at a time. A captured conversation node bundles every stage
-		// the player walked through (greeting + each option's reply); the runtime segments it into stages (each ends
-		// at a Knubot answer-list / close-window packet) so a click serves the greeting and each KnubotAnswer serves
-		// the next reply - instead of dumping the whole tree at once. Re-addressed packets, ready to send.
-		List<List<byte[]>> ConversationStages { get; set; }
+		// The active NPC conversation's position in the dialogue TREE. The runtime serves the screen for the current
+		// AnswerPath ("" = greeting, "0", "0>1", ...); each KnubotAnswer appends the picked option index and serves the
+		// child screen. NpcName/TypeId identify the dialogue; NpcHandle is the live clicked handle the captured screen
+		// packets are re-addressed to. Null AnswerPath = no active conversation. (Replaces the old stage/Mode/Field3
+		// model - Mode and Field3 were session-volatile counters, not branch ids; memory protocol_conversation_routing.)
+		string ConversationNpcName { get; set; }
+		uint ConversationTypeId { get; set; }
+		string ConversationAnswerPath { get; set; }
+		uint ConversationNpcHandle { get; set; }
 		List<uint> CreateEditorObservedRequestIds { get; }
 		List<uint> CreateEditorReadyRequestIds { get; }
 
@@ -118,11 +121,13 @@ namespace Faolan.Core.Network
 
 		public Dictionary<uint, string> SpawnedNpcNamesByHandle { get; } = new Dictionary<uint, string>();
 		public Dictionary<uint, uint> SpawnedNpcMaxHealthByHandle { get; } = new Dictionary<uint, uint>();
-		public int ConversationStageIndex { get; set; }
 
 		public int CreateWorldChunkIndex { get; set; }
 		public int NormalAttackAckPhase { get; set; }
-		public List<List<byte[]>> ConversationStages { get; set; }
+		public string ConversationNpcName { get; set; }
+		public uint ConversationTypeId { get; set; }
+		public string ConversationAnswerPath { get; set; }
+		public uint ConversationNpcHandle { get; set; }
 		public List<uint> CreateEditorObservedRequestIds { get; } = [];
 		public List<uint> CreateEditorReadyRequestIds { get; } = [];
 		public string PendingCharacterName { get; set; }

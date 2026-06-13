@@ -45,6 +45,38 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void MovingNearNpc_WithIncludeNonPlayers_StreamsTheNpc()
+		{
+			var zone = new Zone(2040);
+			var a = Player(1, 0, 0);
+			var npc = WorldEntity.ForNpc(99, 2040, new Vector3(1000, 0, 0), Vector3.Zero, "Casilda"); // far
+			zone.Add(a);
+			zone.Add(npc);
+
+			a.Position = new Vector3(990, 0, 0); // A walks up to the NPC
+			var events = new WorldEvents(InterestManager.ResolveMove(zone, a, Range, includeNonPlayers: true));
+
+			Assert.True(events.Has(1, 99, InterestEventType.Spawn)); // NPC now streamed from the model
+			Assert.True(a.Known.Contains(99));
+		}
+
+		[Fact]
+		public void KnownBurstNpc_WithIncludeNonPlayers_NotReSpawned()
+		{
+			var zone = new Zone(2040);
+			var a = Player(1, 0, 0);
+			var npc = WorldEntity.ForNpc(99, 2040, new Vector3(5, 0, 0), Vector3.Zero, "Kalanthes"); // right next to A
+			zone.Add(a);
+			zone.Add(npc);
+			a.Known.Add(99); // entry seeded this: the burst already rendered it
+
+			a.Position = new Vector3(1, 0, 0);
+			var events = new WorldEvents(InterestManager.ResolveMove(zone, a, Range, includeNonPlayers: true));
+
+			Assert.False(events.Has(1, 99, InterestEventType.Spawn)); // already known -> not doubled
+		}
+
+		[Fact]
 		public void MovingOutOfRange_Despawns()
 		{
 			var zone = new Zone(2040);

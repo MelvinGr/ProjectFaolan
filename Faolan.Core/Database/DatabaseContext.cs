@@ -209,8 +209,7 @@ namespace Faolan.Core.Database
 				{
 					n.NpcName,
 					n.TypeId,
-					n.Mode,
-					n.Field3
+					n.AnswerPath
 				})
 				.IsUnique();
 			modelBuilder

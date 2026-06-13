@@ -44,7 +44,8 @@ namespace Faolan.GameServer
 		// only some states per NPC, so an un-captured branch is expected; closing the window is the right answer.)
 		internal Task SendConversationClose(INetworkClient client)
 		{
-			client.Session.ConversationStages = null; // end any active staged conversation
+			client.Session.ConversationAnswerPath = null; // end any active conversation
+			client.Session.ConversationNpcName = null;
 			var id = client.Session.Account.ClientInstance;
 			var body = (byte[])KnubotCloseChatWindowBody.Clone();
 			SubstituteUInt32(body, CloseChatWindowCapturedInstance, id);
@@ -55,124 +56,81 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 		}
 
-		// Sends the next pending conversation stage (the player clicked the NPC, or answered an option). Returns true
-		// if a stage was sent. When the stages are exhausted, clears the session conversation and closes the window so
-		// a further answer can't hang the client.
-		internal async Task<bool> SendNextConversationStage(INetworkClient client)
+		// Serves one dialogue SCREEN: re-addresses its captured response packets to the live player + clicked NPC and
+		// sends them, then records the screen as the session's position in the dialogue tree. Each ConversationNode IS
+		// one screen (the greeting, or an option's reply); the player's next KnubotAnswer picks the child.
+		private async Task ServeScreen(INetworkClient client, ConversationNode node, uint clickedNpcHandle)
 		{
-			var stages = client.Session.ConversationStages;
-			var index = client.Session.ConversationStageIndex;
-			if (stages == null || index >= stages.Count)
-			{
-				if (stages != null) // an answer past the captured path: end the conversation gracefully
-				{
-					client.Session.ConversationStages = null;
-					await SendConversationClose(client);
-				}
-
-				return false;
-			}
-
-			foreach (var packet in stages[index])
-				await new PacketStream((byte[])packet.Clone()).SendAsync(client);
-
-			client.Session.ConversationStageIndex = index + 1;
-			return true;
-		}
-
-		// Replays the captured conversation node matching the player's TalkToNpc args, re-addressed to the NPC
-		// they actually clicked and to the live character instance. Returns true if a node matched (and was sent).
-		// Runs for both world-burst (beach login) AND create-world sessions: the client picks (Mode, Field3) from
-		// the NPC it clicked, so the DB lookup routes to that NPC's dialogue - far better than the single hardcoded
-		// intro the create-world fallback sends for every NPC. The nodes live in the DB (ConversationNode/
-		// ConversationPacket), imported from captures by Faolan.Importer.
-		private async Task<bool> TryReplayConversation(INetworkClient client, uint typeId, uint mode, uint field3, uint clickedNpcHandle)
-		{
-			if (!client.Session.UsedWorldBurstReplay && !client.Session.IsCreateWorldSession)
-				return false;
-
-			// Route by the clicked NPC's stable NAME when we know it (resolved from the world-burst spawns this
-			// session). NPC dynel handles are session-volatile - the burst we replay and the captured conversation
-			// came from different sessions - so a handle/args-only lookup serves the WRONG NPC (Kalanthes's dialog
-			// for Casilda). The name pins the right NPC; (Mode, Field3) still select the branch.
-			ConversationNode node;
-			if (client.Session.SpawnedNpcNamesByHandle.TryGetValue(clickedNpcHandle, out var npcName))
-				node = await Database.GetConversationNodeByName(npcName, typeId, mode, field3);
-			else
-				// No name on file (e.g. an NPC not spawned via the world-burst replay): fall back to the handle/args
-				// lookup. Create-world requires an exact per-NPC handle match (the scripted intro is the better
-				// fallback there); login allows the args-only fallback.
-				node = await Database.GetConversationNode(clickedNpcHandle, typeId, mode, field3, client.Session.IsCreateWorldSession);
-
-			if (node == null)
-				return false;
-
 			var liveInstance = client.Session.Account.ClientInstance;
 			var oldInstanceVarint = EncodeVarint(node.CapturedInstance);
 			var newInstanceVarint = EncodeVarint(liveInstance);
 
-			// Re-address every captured packet (NPC handle + instance as raw uint32s, plus the instance varint in the
-			// receiver id) up front, then SEGMENT the node into conversation stages. A captured node bundles the whole
-			// path the player walked (greeting + every option's reply); each stage ends at a Knubot answer-list /
-			// close-window packet. We serve stage 0 now and one further stage per inbound KnubotAnswer, so the dialogue
-			// advances option -> reply -> next option instead of dumping every stage at once.
-			var readdressed = node
-				.Packets
-				.OrderBy(p => p.Sequence)
-				.Select(p =>
-				{
-					var packet = (byte[])p.Data.Clone();
-					SubstituteUInt32(packet, node.CapturedNpcHandle, clickedNpcHandle);
-					SubstituteUInt32(packet, node.CapturedInstance, liveInstance);
-					if (oldInstanceVarint.Length == newInstanceVarint.Length)
-						ReplaceAll(packet, oldInstanceVarint, newInstanceVarint);
-					return packet;
-				})
-				.ToList();
-
-			var stages = SegmentConversationStages(readdressed);
-			Logger.LogInformation("Conversation node (typeId={TypeId}, mode={Mode}, field3={Field3}) -> {Packets} packets in {Stages} stage(s) for NPC 0x{Npc:X}.", typeId, mode, field3, readdressed.Count, stages.Count,
-				clickedNpcHandle);
-
-			client.Session.ConversationStages = stages;
-			client.Session.ConversationStageIndex = 0;
-			await SendNextConversationStage(client); // stage 0 (greeting + first answer list)
-			return true;
-		}
-
-		// Splits the re-addressed node packets into stages. A stage runs up to and including the first answer-list or
-		// close-window packet; the trailing packets (a final reply with no further options) form the last stage.
-		internal static List<List<byte[]>> SegmentConversationStages(List<byte[]> packets)
-		{
-			var stages = new List<List<byte[]>>();
-			var current = new List<byte[]>();
-			foreach (var packet in packets)
+			foreach (var p in node.Packets.OrderBy(p => p.Sequence))
 			{
-				current.Add(packet);
-				var subOpcode = ConversationSubOpcode(packet);
-				if (subOpcode is KnubotAnswerListSubOpcode or KnubotCloseChatWindowSubOpcode)
-				{
-					stages.Add(current);
-					current = [];
-				}
+				var packet = (byte[])p.Data.Clone();
+				SubstituteUInt32(packet, node.CapturedNpcHandle, clickedNpcHandle);
+				SubstituteUInt32(packet, node.CapturedInstance, liveInstance);
+				if (oldInstanceVarint.Length == newInstanceVarint.Length)
+					ReplaceAll(packet, oldInstanceVarint, newInstanceVarint);
+				await new PacketStream(packet).SendAsync(client);
 			}
 
-			if (current.Count > 0)
-				stages.Add(current);
+			client.Session.ConversationNpcName = node.NpcName;
+			client.Session.ConversationTypeId = node.TypeId;
+			client.Session.ConversationAnswerPath = node.AnswerPath;
+			client.Session.ConversationNpcHandle = clickedNpcHandle;
 
-			return stages;
+			Logger.LogInformation("Conversation screen (npc={Name}, typeId={TypeId}, path='{Path}') -> {Packets} packet(s) for NPC 0x{Npc:X}.", node.NpcName, node.TypeId, node.AnswerPath, node.Packets.Count, clickedNpcHandle);
 		}
 
-		// The 0x2000 IIR sub-opcode (body[4:8]) of an on-wire packet, or 0 if it can't be read.
-		private static uint ConversationSubOpcode(byte[] packet)
+		// The player picked option `answerIndex` in the active conversation: navigate to the child screen at the
+		// extended answer-path and serve it. An un-walked branch (no captured screen) closes the window gracefully so
+		// the client never hangs. No-op when no conversation is active.
+		internal async Task AdvanceConversation(INetworkClient client, uint answerIndex)
 		{
-			if (packet.Length < 12)
-				return 0;
+			var path = client.Session.ConversationAnswerPath;
+			if (path == null)
+				return;
 
-			var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
-			return bodyStart + 8 <= packet.Length
-				? BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(bodyStart + 4, 4))
-				: 0;
+			var childPath = path.Length == 0
+				? answerIndex.ToString()
+				: $"{path}>{answerIndex}";
+			var screen = await Database.GetConversationScreen(client.Session.ConversationNpcName, client.Session.ConversationTypeId, childPath);
+			if (screen == null)
+			{
+				Logger.LogInformation("Conversation: no captured screen for npc={Name} path='{Path}' (un-walked branch); closing.", client.Session.ConversationNpcName, childPath);
+				await SendConversationClose(client);
+				return;
+			}
+
+			await ServeScreen(client, screen, client.Session.ConversationNpcHandle);
+		}
+
+		// Starts an NPC conversation from its greeting: routes by the clicked NPC's stable NAME (handles are
+		// session-volatile) to the dialogue's "" screen and serves it. Returns true if a greeting was found+served.
+		// Runs for world-burst (beach) AND create-world sessions; the create-world scripted intro stays the fallback
+		// for NPCs with no captured dialogue. The nodes live in the DB (ConversationNode/ConversationPacket), imported
+		// from captures by Faolan.Importer. (Option picks after the greeting are KnubotAnswers -> AdvanceConversation.)
+		private async Task<bool> TryReplayConversation(INetworkClient client, uint typeId, uint field3, uint clickedNpcHandle)
+		{
+			if (!client.Session.UsedWorldBurstReplay && !client.Session.IsCreateWorldSession)
+				return false;
+
+			// The client sends TalkToNpc(field3=0) [greeting] then a TalkToNpc(field3!=0) the same instant (retail
+			// answers that second one with nothing). Only the greeting opens the dialogue; a non-greeting click while a
+			// conversation is already active is absorbed (return true, no reply) so it doesn't reset or close it.
+			if (field3 != 0)
+				return client.Session.ConversationAnswerPath != null;
+
+			if (!client.Session.SpawnedNpcNamesByHandle.TryGetValue(clickedNpcHandle, out var npcName))
+				return false; // unknown NPC (not spawned this session) -> create-world scripted intro fallback
+
+			var greeting = await Database.GetConversationScreen(npcName, typeId, "");
+			if (greeting == null)
+				return false;
+
+			await ServeScreen(client, greeting, clickedNpcHandle);
+			return true;
 		}
 
 		// Replaces every big-endian uint32 occurrence of oldVal with newVal after the 8-byte length+crc prefix.

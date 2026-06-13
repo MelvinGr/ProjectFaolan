@@ -2,9 +2,10 @@ using System.Collections.Generic;
 
 namespace Faolan.Core.Database.Tables
 {
-	// One NPC-conversation node, keyed by the player's TalkToNpc args (TypeId, Mode, Field3). Holds the captured
-	// response packets to replay (ordered), plus the captured NPC handle + player instance that the runtime
-	// substitutes for the live ones. Imported from captures by Faolan.Importer; replayed by ConversationReplay.
+	// One NPC-conversation SCREEN, keyed by (NpcName, TypeId, AnswerPath) - the player's path through the dialogue
+	// tree. Holds the captured response packets to replay (ordered), plus the captured NPC handle + player instance
+	// that the runtime substitutes for the live ones. Imported from captures by Faolan.Importer; replayed by
+	// ConversationReplay (which routes a live KnubotAnswer index along the AnswerPath).
 	public class ConversationNode : BaseEntity
 	{
 		public virtual ICollection<ConversationPacket> Packets { get; set; }
@@ -16,8 +17,11 @@ namespace Faolan.Core.Database.Tables
 		public uint CapturedInstance { get; set; }
 
 		public uint CapturedNpcHandle { get; set; }
-		public uint Field3 { get; set; }
-		public uint Mode { get; set; }
+
+		// The answer-index path to this screen within the NPC's dialogue: "" = the greeting, "0" = after picking
+		// option 0, "0>1" = then option 1, ... The runtime tracks the live player's path and serves the matching
+		// screen. This is the STABLE branch key (the old Mode/Field3 were session-volatile counters).
+		public string AnswerPath { get; set; }
 		public uint TypeId { get; set; }
 	}
 }

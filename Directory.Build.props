@@ -8,14 +8,16 @@
         <!--<OutputPath>..\bin\$(Configuration)\</OutputPath>-->
         <Authors>Project Faolan</Authors>
         <ApplicationIcon>..\logo.ico</ApplicationIcon>
+        <!--<CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>-->
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.6"/>
+        <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.6" />
     </ItemGroup>
 
     <!--<PropertyGroup>
-        <ProjectNameSlug>$([System.String]::Copy('$(MSBuildProjectName)').Replace('.', '_').ToLower())</ProjectNameSlug>
+        <ProjectNameSlug>$([System.String]::Copy('$(MSBuildProjectName)').Replace('.',
+    '_').ToLower())</ProjectNameSlug>
 
         <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
         <DockerfilePath>../Dockerfile</DockerfilePath>
@@ -39,21 +41,23 @@
         </ItemGroup>
     </Target>
 
-    <Target Name="RemoveUnneededRuntimeFolders" AfterTargets="CopyFilesToOutputDirectory" Condition="'$(Configuration)' == 'Debug'">
+    <Target Name="RemoveUnneededRuntimeFolders" AfterTargets="CopyFilesToOutputDirectory"
+        Condition="'$(Configuration)' == 'Debug'">
         <ItemGroup>
-            <RuntimeFolders Include="$([System.IO.Directory]::GetDirectories('$(TargetDir)runtimes'))"
-                            Condition="Exists('$(TargetDir)runtimes')"/>
+            <RuntimeFolders
+                Include="$([System.IO.Directory]::GetDirectories('$(TargetDir)runtimes'))"
+                Condition="Exists('$(TargetDir)runtimes')" />
 
             <RuntimeFoldersToRemove Include="@(RuntimeFolders)"
-                                    Exclude="$(TargetDir)runtimes/linux-x64;$(TargetDir)runtimes/win-x64"/>
+                Exclude="$(TargetDir)runtimes/linux-x64;$(TargetDir)runtimes/win-x64" />
         </ItemGroup>
 
         <Message Importance="High"
-                 Text="Removing runtime folders: @(RuntimeFoldersToRemove)"
-                 Condition="'@(RuntimeFoldersToRemove)' != ''"/>
+            Text="Removing runtime folders: @(RuntimeFoldersToRemove)"
+            Condition="'@(RuntimeFoldersToRemove)' != ''" />
 
-        <RemoveDir Directories="@(RuntimeFoldersToRemove)"/>
+        <RemoveDir Directories="@(RuntimeFoldersToRemove)" />
     </Target>
 
-    <Import Project="Directory.Build.user.props" Condition="Exists('Directory.Build.user.props')"/>
+    <Import Project="Directory.Build.user.props" Condition="Exists('Directory.Build.user.props')" />
 </Project>

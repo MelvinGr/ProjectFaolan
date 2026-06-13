@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -110,13 +111,37 @@ namespace Faolan.GameServer.World
 		}
 
 		// After world entry (spawn body now captured): spawn the player to nearby players and them to the player.
+		// NPC streaming is deliberately NOT run here - the world-burst replay already rendered the entry-point NPCs
+		// and piling more spawns onto the load can reshape the burst's TCP segmentation and stall the client. Instead
+		// we (a) seed the burst NPCs into the player's Known set so the first move doesn't re-spawn them, and (b)
+		// register every in-range model NPC's handle -> name for conversation routing (so e.g. Kalanthes, whose burst
+		// handle differs from his captured-conversation handle, still resolves to his dialogue). NPCs the burst did
+		// not cover stream in on the first move (BroadcastPlayerMove, includeNonPlayers).
 		public async Task BroadcastPlayerEntry(INetworkClient client)
 		{
 			var entity = _sim.PlayerWorldEntity(client);
 			if (entity?.SpawnBody == null)
 				return;
 
-			var events = InterestManager.ResolveMove(_sim.World.ZoneFor(entity.MapId), entity, WorldSimulation.PlayerInterestRange);
+			// The handles the world-burst replay already rendered (RecordSpawnedNpcName populated this during the
+			// replay, before this runs). Snapshot them so we can tell burst NPCs (already on screen) from the rest.
+			var burstHandles = new HashSet<uint>(client.Session.SpawnedNpcNamesByHandle.Keys);
+
+			var zone = _sim.World.ZoneFor(entity.MapId);
+			foreach (var npc in zone.EntitiesInRange(entity.Position, WorldSimulation.PlayerInterestRange, entity.Handle))
+			{
+				if (npc.IsPlayer || npc.IsLoot || npc.Name == null || !burstHandles.Contains(npc.Handle))
+					continue;
+
+				// A burst-rendered NPC that is also in the model: mark it Known so the first move doesn't re-spawn it,
+				// and re-register its name from the model (authoritative) so the clicked-handle -> name -> conversation
+				// lookup resolves correctly even if the burst body's name read was off. NPCs the burst did NOT render
+				// are left out of Known so they stream in on the first move (and get named in DispatchInterest then).
+				entity.Known.Add(npc.Handle);
+				client.Session.SpawnedNpcNamesByHandle[npc.Handle] = npc.Name;
+			}
+
+			var events = InterestManager.ResolveMove(zone, entity, WorldSimulation.PlayerInterestRange);
 			await DispatchInterest(events, null);
 		}
 
@@ -127,7 +152,28 @@ namespace Faolan.GameServer.World
 			if (entity == null)
 				return;
 
-			var events = InterestManager.ResolveMove(_sim.World.ZoneFor(entity.MapId), entity, WorldSimulation.PlayerInterestRange);
+			// Advance the player's model position to where they actually are BEFORE computing interest - otherwise it
+			// stays frozen at the entry point and only entity ever within range of the wash-ashore spot streams (the
+			// "most NPCs missing" bug). This is also what makes other players see this one at its live position.
+			entity.Position = position;
+
+			// includeNonPlayers: stream the zone's NPCs to this player as they move (the burst only rendered the NPCs
+			// near the entry point; this fills in the rest of the map - e.g. Casilda, who is outside the captured
+			// burst). Burst NPCs are already in the player's Known set (seeded at entry) so they are not re-spawned.
+			var events = InterestManager.ResolveMove(_sim.World.ZoneFor(entity.MapId), entity, WorldSimulation.PlayerInterestRange, includeNonPlayers: true);
+			var spawns = 0;
+			var despawns = 0;
+			foreach (var ev in events)
+			{
+				if (ev.Recipient.Handle == entity.Handle && ev.Type == InterestEventType.Spawn)
+					spawns++;
+				else if (ev.Recipient.Handle == entity.Handle && ev.Type == InterestEventType.Despawn)
+					despawns++;
+			}
+
+			if (spawns > 0 || despawns > 0)
+				_logger.LogInformation("Interest: {Player} at {Pos} -> streamed +{Spawns} / -{Despawns} entities (now knows {Known}).", entity.Name, entity.Position, spawns, despawns, entity.Known.Count);
+
 			await DispatchInterest(events, new MoveForward(moveSubop, dataObject, dataClientInstance, movingType, position, rotation, tail));
 		}
 
@@ -189,8 +235,31 @@ namespace Faolan.GameServer.World
 
 			var npcs = await _database.GetNpcSpawns(mapId);
 			var zone = _sim.World.ZoneFor(mapId);
-			foreach (var npc in npcs)
+
+			// The NPC handles the map's world-burst renders (FA015807 spawns). Burst NPCs MUST keep their burst handle
+			// in the model so the per-player Known-set dedup lines up (entry seeds these) and they are never doubled.
+			var burst = await _database.GetMapWorldBurst(mapId);
+			var burstHandles = burst?.Entities
+				                   .Where(e => e.IirType == 0xFA015807u)
+				                   .Select(e => e.Handle)
+				                   .ToHashSet()
+			                   ?? new HashSet<uint>();
+
+			// NpcSpawns accretes one row per capture observation, so the same physical NPC appears many times - the
+			// same name at near-identical positions across sessions (e.g. Kalanthes captured 5×, all at his hideout).
+			// Keyed-by-handle Add already collapses same-handle rows; this collapses the cross-session re-captures too,
+			// by (name, coarse position cell), so the map isn't populated with stacked duplicates. Genuinely-separate
+			// mobs of the same name (Pillagers spread across the beach) fall in different cells and all survive.
+			// Burst-handle rows are ordered FIRST so they win their cell - the kept entity then coincides with the
+			// burst-rendered one (same handle) instead of stacking a second model NPC beside it.
+			var seenCells = new HashSet<(string, int, int, int)>();
+			foreach (var npc in npcs.OrderByDescending(n => burstHandles.Contains(n.CapturedHandle)))
 			{
+				const float cell = 8f; // re-captures cluster within a few units; 8 collapses them without merging distinct mobs
+				var dedupKey = (npc.Name ?? "", (int)(npc.PositionX / cell), (int)(npc.PositionY / cell), (int)(npc.PositionZ / cell));
+				if (!seenCells.Add(dedupKey))
+					continue;
+
 				// Seed killable vitals from the NPC's REAL max health (lifted from the spawn into NpcSpawn.Health by the
 				// importer), falling back to a level-scaled value when the spawn carried none.
 				var maxHealth = npc.Health > 0
@@ -212,7 +281,7 @@ namespace Faolan.GameServer.World
 				zone.Add(entity);
 			}
 
-			_logger.LogInformation("World: loaded {Count} NPC(s) into map {Map}'s zone.", npcs.Length, mapId);
+			_logger.LogInformation("World: loaded {Count} NPC(s) into map {Map}'s zone ({Raw} rows, {Collapsed} cross-session re-captures collapsed).", zone.Count, mapId, npcs.Length, npcs.Length - seenCells.Count);
 		}
 
 		// A player opened a world object (Interact UseObject). If it's a loot bag in their zone, OPEN ITS LOOT WINDOW
@@ -436,6 +505,10 @@ namespace Faolan.GameServer.World
 				switch (ev.Type)
 				{
 					case InterestEventType.Spawn when ev.Subject.SpawnBody != null:
+						// Register a streamed-in NPC's handle -> name so clicking it routes to the right conversation
+						// (the same map the world-burst spawns use; players are not conversation targets).
+						if (!ev.Subject.IsPlayer && !ev.Subject.IsLoot && ev.Subject.Name != null)
+							recipient.Session.SpawnedNpcNamesByHandle[ev.Subject.Handle] = ev.Subject.Name;
 						await SendWorldSpawn(recipient, ev.Subject);
 						break;
 					case InterestEventType.Move when move.HasValue:

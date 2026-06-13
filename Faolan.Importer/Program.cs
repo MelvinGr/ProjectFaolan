@@ -69,8 +69,7 @@ namespace Faolan.Importer
 				db.ConversationNodes.Add(new ConversationNode
 				{
 					TypeId = e.TypeId,
-					Mode = e.Mode,
-					Field3 = e.Field3,
+					AnswerPath = e.AnswerPath,
 					CapturedNpcHandle = e.CapturedNpcHandle,
 					NpcName = e.NpcName,
 					CapturedInstance = e.CapturedInstance,
@@ -444,14 +443,32 @@ namespace Faolan.Importer
 		{
 			var captures = new List<List<CapturedPacket>>();
 
+			// tshark dumps (*.tshark.json) TCP-reassemble and keep the compressed downloads the analyzer drops (notably
+			// the conversation RESPONSE packets) - they are the trustworthy source. They are read ADDITIVELY alongside
+			// the analyzer dumps (not as a replacement): each extractor's Merge dedups overlaps, so adding the tshark
+			// stream only FILLS IN the packets the analyzer lost, never removes what the analyzer captured. A capture
+			// with a tshark dump thus keeps its analyzer-derived rows AND gains the reassembled ones.
+			var tsharkBases = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+			foreach (var ts in Directory.EnumerateFiles(capturesDir, "*.tshark.json"))
+			{
+				captures.Add(TsharkCaptureReader.Read(ts));
+				tsharkBases.Add(StripSuffix(ts, ".tshark.json"));
+			}
+
 			foreach (var json in Directory.EnumerateFiles(capturesDir, "*.json"))
+			{
+				if (json.EndsWith(".tshark.json", StringComparison.OrdinalIgnoreCase))
+					continue; // already read above
+
 				captures.Add(ReadJsonCapture(json));
+			}
 
 			var analysis = new PacketAnalysisService();
 			foreach (var pcap in Directory.EnumerateFiles(capturesDir, "*.pcapng"))
 			{
-				if (File.Exists(Path.ChangeExtension(pcap, ".json")))
-					continue; // covered by its dump
+				var baseName = StripSuffix(pcap, ".pcapng");
+				if (tsharkBases.Contains(baseName) || File.Exists(Path.ChangeExtension(pcap, ".json")))
+					continue; // covered by a tshark dump or its analyzer dump
 
 				try
 				{
@@ -464,6 +481,14 @@ namespace Faolan.Importer
 			}
 
 			return captures;
+		}
+
+		// Strips a (possibly multi-part) extension like ".tshark.json" from a path, returning the capture base name.
+		private static string StripSuffix(string path, string suffix)
+		{
+			return path.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)
+				? path[..^suffix.Length]
+				: path;
 		}
 
 		private static List<CapturedPacket> ReadJsonCapture(string jsonPath)

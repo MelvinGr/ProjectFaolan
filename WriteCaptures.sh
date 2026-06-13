@@ -3,12 +3,12 @@ set -euo pipefail
 
 for file in Captures/*.pcapng; do
     name="${file%.pcapng}"
-    output="${name}.json"
+    output="${name}.tshark.json"
 
     if [[ -e "$output" ]]; then
         continue
     fi
 
     echo "$name"
-    ./Faolan.PacketAnalyzer/bin/Debug/Faolan.PacketAnalyzer --dump "$file" > "$output"
+    ./Captures/tshark_dump.sh "$file" "$output"
 done

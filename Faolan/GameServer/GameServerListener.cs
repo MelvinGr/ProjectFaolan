@@ -779,14 +779,6 @@ namespace Faolan.GameServer
 					break;
 				}
 			}
-
-			return;
-
-			async Task LogToClient(string message)
-			{
-				Logger.LogInformation(message);
-				await _agentServerDispatcher.SendSystemMessage(client.Session.Account.ClientInstance, message);
-			}
 		}
 
 		// Periodically flushes the live world state to the DB so a crash loses at most one interval. Persistence is

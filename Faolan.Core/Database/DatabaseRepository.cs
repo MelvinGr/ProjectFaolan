@@ -43,8 +43,7 @@ namespace Faolan.Core.Database
 
 		Task<ClassAbility> GetClassAbility(uint @class, uint level);
 
-		Task<ConversationNode> GetConversationNode(uint npcHandle, uint typeId, uint mode, uint field3, bool exactHandleOnly = false);
-		Task<ConversationNode> GetConversationNodeByName(string npcName, uint typeId, uint mode, uint field3);
+		Task<ConversationNode> GetConversationScreen(string npcName, uint typeId, string answerPath);
 		Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId);
 
 		Task<Guild> CreateGuild(string name, uint leaderCharacterId);
@@ -581,35 +580,12 @@ namespace Faolan.Core.Database
 				.FirstOrDefaultAsync();
 		}
 
-		public async Task<ConversationNode> GetConversationNode(uint npcHandle, uint typeId, uint mode, uint field3, bool exactHandleOnly = false)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-
-			// Prefer the node captured for THIS exact NPC handle - the correct per-NPC dialogue (handles are stable
-			// because scenes are replayed verbatim). (TypeId, Mode, Field3) is NOT NPC-unique, so the args-only
-			// match can be the wrong NPC's conversation.
-			var exact = await ctx
-				.ConversationNodes
-				.Include(n => n.Packets)
-				.FirstOrDefaultAsync(n => n.CapturedNpcHandle == npcHandle && n.TypeId == typeId && n.Mode == mode && n.Field3 == field3);
-			if (exact != null || exactHandleOnly)
-				return exact;
-
-			// Args-only fallback (the pre-handle behaviour) so a captured conversation still plays for an NPC whose
-			// handle differs from the replayed scene's. Callers that can't tolerate a wrong-NPC match (the create
-			// world intro, where the scripted fallback is preferable) pass exactHandleOnly.
-			return await ctx
-				.ConversationNodes
-				.Include(n => n.Packets)
-				.Where(n => n.TypeId == typeId && n.Mode == mode && n.Field3 == field3)
-				.OrderByDescending(n => n.Packets.Count)
-				.FirstOrDefaultAsync();
-		}
-
-		// Routes a conversation by the clicked NPC's stable NAME (handles are session-volatile). Exact match on
-		// (NpcName, TypeId, Mode, Field3) - the (Mode, Field3) still select the branch within that NPC's dialogue;
-		// the name guarantees the RIGHT NPC, which the old handle/args-only lookup could not across captures.
-		public async Task<ConversationNode> GetConversationNodeByName(string npcName, uint typeId, uint mode, uint field3)
+		// One screen in an NPC's dialogue tree, keyed by the stable (NpcName, TypeId, AnswerPath). The runtime serves
+		// the "" screen on the greeting click and the "path>idx" child screen on each KnubotAnswer (the answer index
+		// is the real branch selector; the old Mode/Field3 were session-volatile counters). Null = no captured screen
+		// for that path (an un-walked branch) -> the runtime closes the window gracefully. See memory
+		// protocol_conversation_routing.
+		public async Task<ConversationNode> GetConversationScreen(string npcName, uint typeId, string answerPath)
 		{
 			if (string.IsNullOrEmpty(npcName))
 				return null;
@@ -618,7 +594,7 @@ namespace Faolan.Core.Database
 			return await ctx
 				.ConversationNodes
 				.Include(n => n.Packets)
-				.FirstOrDefaultAsync(n => n.NpcName == npcName && n.TypeId == typeId && n.Mode == mode && n.Field3 == field3);
+				.FirstOrDefaultAsync(n => n.NpcName == npcName && n.TypeId == typeId && n.AnswerPath == answerPath);
 		}
 
 		public async Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId)
