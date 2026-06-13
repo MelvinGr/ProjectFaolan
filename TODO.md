@@ -183,10 +183,11 @@ prior diagnoses are in `docs/archive/todo-history.md`.
       byte-exact golden test `DispatchAddItemTests`; body = `[ID32 invType,charId][u32 pos][u32-len entry][u32
       feedback]`, entry = the bare `ProtoInventoryGameEntry` (snapshot `.Item`). Wired into a shared
       `GrantItemToBackpack` (persist + live add) reused by `.additem`, loot, and `.spawnbag`.
-- [ ] **IN-CLIENT verify the live add**: `.additem <id>` → the item appears in the bag WITHOUT a relog (no IIR
-      error, chat stays). Was believed impossible (snapshot-only); now has the real opcode + a proven body.
-      STRONG EVIDENCE 2026-06-13: a connected player (Darktemplarchar) saw a bag of `.additem`-granted gear with
-      readable level requirements in-client — needs an explicit "it rendered + chat fine" confirmation to mark [x].
+- [x] **IN-CLIENT VERIFIED 2026-06-13: the live add renders mid-session.** A connected player (Darktemplarchar)
+      received ~8 `.additem`/`add_item` gear pieces live (no relog), saw them in the bag WITH readable level
+      requirements, kept them, and chat stayed connected throughout — i.e. the bag rendered, no IIR error, session
+      intact. Overturns the long-standing "snapshot is the only delivery" belief. (Worn-only items in a bag still
+      risk the relog bag-poison; level-appropriate selection is gated on RDB item levels not yet in the DB.)
 - [ ] **Live item REMOVE — `DispatchRemoveItem` (s2c 0x201F)**: build the counterpart to `DispatchAddItem`, so an
       item can be pulled from a connected player's bag mid-session (there is currently NO way to undo an `.additem`
       live). Opcode is in the recovered s2c table (`GameCharInterfaceDispatchOpcodes` / `docs/aoc-rpc-method-opcodes.md`);
