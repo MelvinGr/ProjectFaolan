@@ -471,10 +471,10 @@ tag system exists. → memory `lua_vm`, `protocol_conversation_routing`; `docs/a
       the safety net, then delete the embedded file. Catch: the burst weaves the live instance id into ~324
       packets via `AppendVarint` — needs a template-with-substitution capture, not a flat blob. Verifiable
       without the client (the byte-equality oracle).
-- [ ] Remove the dead `AdjustSnapshotPrefixRootLength` (the old byte-misaligned prefix-length model, superseded by
-      `SetSnapshotBlobLength` — see `docs/archive/db-container-handoff.md`). It survives only in
-      `BeachSnapshotPrefix.cs` / `RetailLoginReplay.cs` for `SnapshotPrefixLengthTests`; migrate that test to the
-      `SetSnapshotBlobLength` framing and delete the old method. Small, safe.
+- [x] Remove the dead `AdjustSnapshotPrefixRootLength` — DONE 2026-06-14. The end-to-end reassembly test migrated
+      into `SnapshotBlobLengthTests.GeneratedSnapshot_ReassemblesConsistently` (now using `SetSnapshotBlobLength`'s
+      BE32 model); the two redundant varint-invariant tests dropped (covered by the BE32 tests); `SnapshotPrefixLengthTests.cs`
+      and the dead method deleted. 316 tests green.
 - [ ] Fold `Packets.cs` sender-bytes duplication into `World/WorldFraming` (verify which conversation senders are
       truly identical before merging). Small, safe.
 - [ ] Rename `Packets/FullCharSnapshot/BigboyTailsFile.cs` to something descriptive. Trivial.

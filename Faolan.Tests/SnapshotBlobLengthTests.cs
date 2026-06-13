@@ -1,9 +1,13 @@
 using System;
 using System.Buffers.Binary;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Faolan.Core.Data;
+using Faolan.Core.Database.Tables;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Xunit;
@@ -68,6 +72,68 @@ namespace Faolan.Tests
 
 			// Writing the original root length reproduces the captured prefix byte-for-byte.
 			Assert.Equal(prefix, GameServerListener.SetSnapshotBlobLength(prefix, rootLen));
+		}
+
+		// End-to-end: a DB-generated root with a DIFFERENT length than the capture, reassembled with the
+		// SetSnapshotBlobLength-corrected prefix, re-splits cleanly (tails byte-identical, root re-splits) AND the
+		// prefix BE32 blob length stays consistent with the new root. (Migrated from the retired SnapshotPrefixLengthTests,
+		// which exercised the byte-misaligned varint model AdjustSnapshotPrefixRootLength.)
+		[Fact]
+		public void GeneratedSnapshot_ReassemblesConsistently()
+		{
+			var (prefix, verbatimRootLen, tails, instance, verbatimRoot) = SplitFull("strie-login-inventory.bin");
+
+			Item Mk(uint id, uint d1, uint d2, uint d3, uint d4, uint arch) => new Item { Id = id, Data1 = d1, Data2 = d2, Data3 = d3, Data4 = d4, Archetype = arch };
+			var equipped = new Dictionary<ulong, (Item, uint)>
+			{
+				{ 0x12, (Mk(3361557, 3714105241, 1980330998, 2034888138, 2381170642, 1129664565), 1129664565) },
+			};
+			(Item, uint)? bagFirst = (Mk(3774542, 2515285418, 2815223308, 1368962356, 3023132244, 1347105359), 1347105359);
+			var rows = new[]
+			{
+				new CharacterInventory { Container = 104, Slot = 2, Count = 1, Item = Mk(13817, 1796783475, 3438012111, 3985322333, 505316191, 1177700698) },
+				new CharacterInventory { Container = 104, Slot = 3, Count = 1, Item = Mk(13826, 1761429601, 4267309034, 1871298002, 3660826526, 1160857399) },
+			};
+
+			var typed = ((ReadOnlySpan<byte>)verbatimRoot).FromProtobuf<ProtoFullCharacterIIR>();
+			typed.Inventories.Clear();
+			foreach (var c in FullCharSnapshotBuilder.BuildContainers(instance, equipped, bagFirst, rows))
+				typed.Inventories.Add(c);
+			var genRoot = typed.ToProtobufBytes();
+			Assert.NotEqual(verbatimRootLen, genRoot.Length); // a real resize, so the prefix MUST be corrected
+
+			var newPrefix = GameServerListener.SetSnapshotBlobLength(prefix, genRoot.Length);
+			Assert.Equal((uint)((prefix.Length - 5) + genRoot.Length), BinaryPrimitives.ReadUInt32BigEndian(newPrefix.AsSpan(1, 4)));
+
+			// Reassemble [subop][c350][instance][newPrefix][genRoot][tails] and re-split.
+			using var content = new FaolanStream();
+			content.WriteUInt32(0x737A6DF9);
+			content.WriteUInt32(0x0000C350);
+			content.WriteUInt32(instance);
+			content.WriteArray(newPrefix);
+			content.WriteArray(genRoot);
+			content.WriteArray(tails);
+
+			var s2 = new FaolanStream(content.ToArray());
+			s2.ReadUInt32();
+			s2.ReadUInt32();
+			s2.ReadUInt32();
+			var reparsed = InventorySnapshotInspector.ParseInventoryPacketBody(s2);
+			Assert.True(reparsed.Tails.ToArray().SequenceEqual(tails), "tails must survive intact after the regenerated root");
+			Assert.True(reparsed.Root.ToArray().SequenceEqual(genRoot), "the regenerated root must re-split byte-identically");
+		}
+
+		// Variant of Split that also returns the instance id and the verbatim root bytes (for the reassembly test).
+		private static (byte[] Prefix, int RootLen, byte[] Tails, uint Instance, byte[] Root) SplitFull(string bin)
+		{
+			var packet = new ConanPacket(File.ReadAllBytes(Path.Combine(CapturesDir, bin)));
+			var s = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+			s.ReadUInt32();
+			s.ReadUInt32();
+			var instance = s.ReadUInt32();
+			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(s);
+			var root = parts.Root.ToArray();
+			return (parts.Prefix, root.Length, parts.Tails.ToArray(), instance, root);
 		}
 	}
 }

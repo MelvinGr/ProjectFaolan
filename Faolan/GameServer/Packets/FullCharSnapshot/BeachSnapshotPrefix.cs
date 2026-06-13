@@ -3,8 +3,8 @@ using System.Collections.Generic;
 namespace Faolan.GameServer.Packets.FullCharSnapshot
 {
 	// Constructs the beach 0x737A6DF9 snapshot's 8-byte IIR prefix FROM SCRATCH, instead of carrying the captured
-	// prefix and delta-adjusting its length varint (AdjustSnapshotPrefixRootLength). Layout, recovered by diffing
-	// captures:
+	// prefix and rewriting its length field (on the live path that length is set by RetailLoginReplay.SetSnapshotBlobLength,
+	// the BE32 blob-length model — see SnapshotBlobLengthTests). Layout, recovered by diffing captures:
 	//   [00 00 00 02]              u32 X = the granted/active quest count (Strie's beach value is 2; see
 	//                              docs/archive/player-spawn-generation-plan.md "FullChar"). PINNED to the beach template
 	//                              value here - generate it from the real quest count when the quest system lands.

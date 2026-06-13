@@ -108,3 +108,6 @@ log below, then pick the next item. If you exhaust the safe list, stop and summa
 - 2026-06-14 — §4b/§7(c) **method-name logging DONE**. `GameServerMethodNames.Resolve(receiverClass, opcode)` names
   the multiplexed GameServer RPC by receiver-class catalog; the GameServer `default` branch now logs the method name
   instead of bare hex. Test `GameServerMethodNamesTests`. 318 tests green.
+- 2026-06-14 — §7 **dead `AdjustSnapshotPrefixRootLength` removed**. Migrated the end-to-end reassembly test into
+  `SnapshotBlobLengthTests` (BE32 model), dropped the two redundant varint-invariant tests + the dead method +
+  `SnapshotPrefixLengthTests.cs`. 316 tests green.

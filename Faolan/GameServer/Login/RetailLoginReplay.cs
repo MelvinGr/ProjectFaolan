@@ -191,56 +191,6 @@ namespace Faolan.GameServer
 			return result;
 		}
 
-		// Delta-adjusts the snapshot IIR prefix's embedded root-length varint by `delta`. The prefix is
-		// [4-byte base-class version][varint = const + rootLength][trailing varint(s)]; the client uses that
-		// varint to delimit the protobuf root from the following subclass (the tails). Reads the varint at
-		// offset 4, adds delta, and re-encodes in place (variable width), preserving the bytes around it.
-		// Returns the prefix unchanged when delta is 0 or the layout isn't the known 8-byte shape.
-		// DEPRECATED 2026-06-13: byte-misaligned model — the client reads a BE32 length, not this varint. Kept only
-		// for the existing SnapshotPrefixLengthTests until those are migrated to SetSnapshotBlobLength.
-		internal static byte[] AdjustSnapshotPrefixRootLength(byte[] prefix, int delta)
-		{
-			const int varintOffset = 4;
-			if (delta == 0 || prefix.Length < varintOffset + 2)
-				return prefix;
-
-			// Read the varint at offset 4.
-			ulong value = 0;
-			var shift = 0;
-			var end = varintOffset;
-			while (end < prefix.Length)
-			{
-				var b = prefix[end++];
-				value |= (ulong)(b & 0x7F) << shift;
-				if ((b & 0x80) == 0)
-					break;
-
-				shift += 7;
-			}
-
-			var adjusted = (long)value + delta;
-			if (adjusted < 0)
-				return prefix;
-
-			// Re-encode and splice: [0..offset) + varint(adjusted) + [end..].
-			var newVarint = new List<byte>();
-			var v = (ulong)adjusted;
-			do
-			{
-				var b = (byte)(v & 0x7F);
-				v >>= 7;
-				if (v != 0)
-					b |= 0x80;
-				newVarint.Add(b);
-			} while (v != 0);
-
-			var result = new byte[varintOffset + newVarint.Count + (prefix.Length - end)];
-			Array.Copy(prefix, 0, result, 0, varintOffset);
-			newVarint.CopyTo(result, varintOffset);
-			Array.Copy(prefix, end, result, varintOffset + newVarint.Count, prefix.Length - end);
-			return result;
-		}
-
 		// Loads the character's CharacterEquipment (creating it and seeding default starter gear if absent), with the
 		// item navs included so they can be built into the snapshot. Beach characters only.
 		private async Task<CharacterEquipment> EnsureBeachStarterEquipment(Character character)
