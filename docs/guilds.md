@@ -77,6 +77,8 @@ misalign the roster that follows. Cosmetic-only until decoded.
 
 ## Open items
 
+> Tracked in `TODO.md` §8 (the single tracker, "Guild protocol gaps"). The decode notes below are the context.
+
 - Member-left / kick / promote / demote fan-out packets: no capture exercises them.
 - The 0x202D invite-reply-to-inviter and failure replies (bad name, on cooldown): opcodes not decoded.
 - 0x203A "counters update" (52 b, frequent): small u32 counters, semantics unknown.

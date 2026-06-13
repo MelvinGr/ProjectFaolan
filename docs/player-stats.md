@@ -78,6 +78,8 @@ is clearest in the `0x96B8DC59` entity-vitals packet (`...<entityHandle><0000000
 `docs/archive/quests-and-combat.md`); the same record encoding is embedded in the larger `0x737A6DF9` snapshot.
 
 ## Open follow-ups
+> Tracked in `TODO.md` §2 (the single tracker). The notes below are the technical context.
+
 - ✅ ~~Locate real Max-Health / Max-Mana / Max-Stamina ids~~ — DONE (current/max pair table above).
 - Determine whether attributes are sent at all, or derived client-side.
 - Combat (HP changes mid-fight) should reuse this block — see the combat work in [[archive_cpp_reference]] and
