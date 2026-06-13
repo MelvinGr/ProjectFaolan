@@ -1,6 +1,7 @@
 ﻿using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 
@@ -123,6 +124,13 @@ namespace Faolan.Core.Database
 				.Entity<Character>()
 				.Property(c => c.Id)
 				.ValueGeneratedNever();
+
+			// ItemType.Normal (104) is the default classification - existing item rows backfill to Normal when the
+			// column is added; the importer reclassifies quest/resource items by the container they were seen in.
+			modelBuilder
+				.Entity<Item>()
+				.Property(i => i.Type)
+				.HasDefaultValue(ItemType.Normal);
 
 			// One-to-one Character <-> CharacterMaxStats, keyed by CharacterId; deletes cascade with the character.
 			modelBuilder

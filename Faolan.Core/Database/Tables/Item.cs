@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Faolan.Core.Enums;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -15,6 +16,9 @@ namespace Faolan.Core.Database.Tables
 
 		[MaxLength(255)]
 		public string Name { get; set; }
+
+		// Normal / Quest / Resource, set at import from the container an item was captured in (default Normal).
+		public ItemType Type { get; set; }
 
 		public uint Archetype { get; set; }
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Microsoft.EntityFrameworkCore;
 
@@ -628,15 +629,16 @@ namespace Faolan.Core.Database
 				.ToArrayAsync();
 		}
 
-		// A random sample of snapshot-buildable items (Archetype != 0, so SnapshotItemBuilder can render them).
-		// Used to fill loot bags with a couple of test items (.spawnbag, NPC-kill drops). SQLite RANDOM() order;
-		// fewer than `count` come back only when the item table has fewer buildable rows.
+		// A random sample of snapshot-buildable gear/normal items (Archetype != 0, so SnapshotItemBuilder can
+		// render them; not a Quest or Resource item, so those don't end up as random loot). Used to fill loot bags
+		// with a couple of test items (.spawnbag, NPC-kill drops). SQLite RANDOM() order; fewer than `count` come
+		// back only when the item table has fewer matching rows.
 		public async Task<Item[]> GetRandomBuildableItems(int count)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx
 				.Items
-				.Where(i => i.Archetype != 0 && i.Name != null && i.Name != "")
+				.Where(i => i.Archetype != 0 && i.Name != null && i.Name != "" && i.Type == ItemType.Normal)
 				.OrderBy(_ => EF.Functions.Random())
 				.Take(count)
 				.ToArrayAsync();

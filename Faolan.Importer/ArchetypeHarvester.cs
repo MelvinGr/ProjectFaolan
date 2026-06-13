@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using Faolan.Core.Data;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.GameServer.Packets.FullCharSnapshot;
@@ -24,13 +25,13 @@ namespace Faolan.Importer
 		// Parses one on-wire packet and merges every (templateId -> CapturedItem) it can recover - from an inventory
 		// snapshot's containers AND/OR a character spawn's worn equipment - into `into`. Conflicting identities for the
 		// same template are reported (should not happen).
-		public static void Harvest(byte[] packetBytes, IDictionary<uint, CapturedItem> into, IList<string> conflicts = null)
+		public static void Harvest(byte[] packetBytes, IDictionary<uint, CapturedItem> into, IList<string> conflicts = null, IDictionary<uint, ItemType> types = null)
 		{
 			var found = new Dictionary<uint, CapturedItem>();
 			try
 			{
 				if (TryReadInventoryRoot(packetBytes, out var root))
-					found = ExtractFromRoot(root);
+					found = ExtractFromRoot(root, types);
 			}
 			catch
 			{
@@ -72,13 +73,17 @@ namespace Faolan.Importer
 			}
 		}
 
-		private static Dictionary<uint, CapturedItem> ExtractFromRoot(ProtoMessage root)
+		// `types` (optional) receives the item's classification from the container it was found in - only the
+		// specific kinds (Quest/Resource) are recorded; Normal items are left to the DB default. Kept separate from
+		// CapturedItem so the identity quad's equality (the conflict check) is unaffected.
+		private static Dictionary<uint, CapturedItem> ExtractFromRoot(ProtoMessage root, IDictionary<uint, ItemType> types = null)
 		{
 			var map = new Dictionary<uint, CapturedItem>();
 
 			foreach (InventorySnapshotInspector.ContainerKind kind in Enum.GetValues(typeof(InventorySnapshotInspector.ContainerKind)))
 			{
 				var container = InventorySnapshotInspector.GetContainer(root, kind);
+				var itemType = ClassifyContainer(kind);
 
 				foreach (var entry in InventorySnapshotInspector.GetContainerEntries(container))
 				{
@@ -87,11 +92,23 @@ namespace Faolan.Importer
 					var quad = InventorySnapshotInspector.GetEntryIdentityQuad(entry);
 
 					if (template.HasValue && archetype.HasValue && quad.HasValue)
+					{
 						map[template.Value] = new CapturedItem(quad.Value.Data1, quad.Value.Data2, quad.Value.Data3, quad.Value.Data4, archetype.Value);
+						if (types != null && itemType != ItemType.Normal)
+							types[template.Value] = itemType;
+					}
 				}
 			}
 
 			return map;
+		}
+
+		// The container an item was captured in IS its kind: ItemType's values are the same protocol container-kind
+		// numbers as ContainerKind (Equipped 101 / Bag=Normal 104 / Resource 112 / Quest 113), so this is a direct
+		// cast.
+		private static ItemType ClassifyContainer(InventorySnapshotInspector.ContainerKind kind)
+		{
+			return (ItemType)(uint)kind;
 		}
 
 		// Recovers (template -> CapturedItem) from a character SPAWN's worn equipment. The spawn body holds a

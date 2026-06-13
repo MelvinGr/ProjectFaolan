@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -17,8 +18,9 @@ namespace Faolan.Importer
 		public static async Task<(int Total, int Inserted)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger logger = null)
 		{
 			var harvested = new Dictionary<uint, ArchetypeHarvester.CapturedItem>();
+			var types = new Dictionary<uint, ItemType>();
 			foreach (var packet in rawPackets)
-				ArchetypeHarvester.Harvest(packet, harvested);
+				ArchetypeHarvester.Harvest(packet, harvested, types: types);
 
 			if (harvested.Count == 0)
 				return (0, 0);
@@ -37,7 +39,8 @@ namespace Faolan.Importer
 					item = new Item
 					{
 						Id = id,
-						Name = string.Empty
+						Name = string.Empty,
+						Type = ItemType.Normal // upgraded below if a quest/resource container classified it
 					};
 					db.Items.Add(item);
 					inserted++;
@@ -48,6 +51,11 @@ namespace Faolan.Importer
 				item.Data3 = ci.Data3;
 				item.Data4 = ci.Data4;
 				item.Archetype = ci.Archetype;
+
+				// Classify Quest/Resource items by the container they were captured in; only ever UPGRADE from the
+				// default Normal so a classification survives a later capture that holds the item in a bag.
+				if (types.TryGetValue(id, out var type) && type != ItemType.Normal)
+					item.Type = type;
 			}
 
 			await db.SaveChangesAsync();
