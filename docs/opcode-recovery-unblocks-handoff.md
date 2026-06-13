@@ -12,7 +12,30 @@ proven **byte-exact against a capture** (golden test in `Faolan.Tests`) before i
 
 ---
 
-## 1. Incremental inventory delivery — the big one (corrects a prior dead end)
+## STATUS UPDATE (2026-06-13) — what's been done since this handoff
+
+- **§1 DispatchAddItem (0x2020) — DONE + IN-CLIENT VERIFIED.** Decoded, byte-exact golden test
+  (`DispatchAddItemTests`), wired into a shared `GrantItemToBackpack` (persist + live add) reused by `.additem`,
+  loot, and `.spawnbag`. A connected player received granted gear live with no relog. Memory
+  `[[protocol_containeradditem]]` updated. Body confirmed: `[ID32 invType,charId][u32 pos][u32-len entry][u32
+  feedback]`, entry = the bare `ProtoInventoryGameEntry` (the snapshot's `.Item`, no Pos wrapper).
+- **§3 Loot item GRANT — DONE.** `TryLootAll (0x2043)` → `GrantItemToBackpack` (live DispatchAddItem) for each bag
+  item; `TryLootCash (0x2045)` → wallet credit. Loot bags carry random items. ⚠️ Caveat: the loot **bag/corpse
+  visual doesn't render** — that's the separate mid-session-spawn blocker (`[[protocol_midsession_spawn_blocked]]`
+  / `docs/mid-session-spawn-blocker.md`), NOT a loot-protocol problem; the grant path works via loot-all.
+- **Suggested order steps 1 & 2 — DONE** (DispatchAddItem builder + loot grant). Steps 3 (vendor BUY) and 4
+  (mail/AH) are still open.
+- **The full s2c Dispatch tables were added to `Opcodes.cs`** as enums (`GameCharInterfaceDispatchOpcodes` etc.,
+  generated from `Captures/ghidra/s2c_tables.json`) — relevant to §7 (named routing).
+- **Bonus, unrelated to the table:** the personal BANK storage was decoded + delivered (BankIIR 0x0BA1C1CB,
+  container kind 105, in-client verified) — `[[protocol_bank_storage]]`.
+
+Still open from this handoff: §2 vendor BUY (gate gone, not built), §4 spell/feat grants, §5 trade/quest-share,
+§6 mail, §7 unknown-(class,opcode) name logging.
+
+---
+
+## 1. Incremental inventory delivery — the big one (corrects a prior dead end)  ✅ DONE (see status update above)
 
 `[[protocol_containeradditem]]` recorded "no server add-item packet; the world-entry snapshot is the only
 delivery." **That is now disproven.** GameCharInterface has a full incremental inventory s2c family:
@@ -52,7 +75,7 @@ round-trip. The item-grant that gated BUY is exactly §1. Implement BUY after th
 
 ---
 
-## 3. Loot item + cash grant — completes `[[protocol_loot_interaction]]`
+## 3. Loot item + cash grant — completes `[[protocol_loot_interaction]]`  ✅ GRANT DONE (bag VISUAL blocked, see status update)
 
 That memory left "item-grant still capture/RE-gated" and "`0x2045` TryLootCash UNHANDLED = coins never granted."
 The loot s2c reply family is now named: `0x2037` DispatchOpenLootBag (`i_cLootBagID`), `0x2038` DispatchCloseLootBag,
@@ -120,8 +143,10 @@ the actual method name instead of a bare hex value — useful for triaging the n
   `docs/aoc-rpc-method-opcodes.md` are known plaintext↔hash anchors if someone wants to crack it.
 
 ## Suggested order of attack
-1. **DispatchAddItem (`0x2020`) builder + golden test** — it is the keystone for §1/§2/§3 (inventory, buy, loot
-   grant). Find a loot/buy capture with a `0x2020`, validate `i_cEntry` against `SnapshotItemBuilder`.
-2. Wire loot grant (TryLootAll → add-item, TryLootCash → DispatchUpdateCash).
-3. Vendor BUY (BuyItem → DispatchItemBoughtBack/AddItem + cash).
-4. Mail/AH delivery (§9) reuses the same add-item path for attachments.
+1. ✅ **DONE — DispatchAddItem (`0x2020`) builder + golden test** — the keystone for §1/§2/§3. Built, golden-tested
+   (`DispatchAddItemTests`), in-client verified, wired into `GrantItemToBackpack`.
+2. ✅ **DONE — loot grant** (TryLootAll → add-item, TryLootCash → wallet credit). NB the loot bag VISUAL is blocked
+   by the mid-session-spawn issue, but the grant works.
+3. ⬜ Vendor BUY (BuyItem → DispatchItemBoughtBack/AddItem + cash) — gate is gone (DispatchAddItem); not built.
+4. ⬜ Mail/AH delivery (§9) reuses the same add-item path for attachments — AH window + bank now open in-client;
+   AH search/sell + mail still to build.
