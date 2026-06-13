@@ -6,9 +6,19 @@ floating name tags + healthbars (retail floats name+HP over every NPC; on Faolan
 frame name).
 
 ## Current state (committed, stable)
-- Branch `development`, HEAD around `fae8d4d`. Server runs clean; `FAOLAN_NPC_INDIVIDUAL_SPAWN` is **off by
-  default** (the burst path, ~retail-shaped, no crash). `faolan.db` is dirty from playtesting — `git
-  checkout -- faolan.db` to clean.
+- Branch `development`. Server runs clean; `FAOLAN_NPC_INDIVIDUAL_SPAWN` is **off by default** (the burst
+  path). `faolan.db` is dirty after playtesting — `git checkout -- faolan.db` to clean.
+- **Session-3 fixes (NEEDS IN-CLIENT TEST):**
+  1. **Loading-screen crash = the session-2 `freshSpawn:true` on the burst NPC rebuild.** It re-encoded every
+     burst NPC body (dropping the transient `NpcStats.SpawnAnimation`), shifting the IIR/body length prefixes
+     for NPCs captured mid-animation → re-shaped the loading-screen burst the client loads byte-for-byte →
+     crash. Reverted: `TryRebuildNpcSpawnFromDb` is byte-exact again (the proven path). `freshSpawn:true` stays
+     ONLY on the from-model spawn (`EnsureZoneNpcs`/respawn in `WorldBroadcaster`), which is where Casilda
+     actually streams in — so the Casilda fix is unaffected.
+  2. **Double-spawn flood (next-step #1) FIXED.** `EnsureZoneNpcs` now aligns the model NPC's handle to the
+     burst's wire handle **by POSITION** (`BuildBurstHandleByPosition`), not by handle. Handle-matching only
+     hit 18/42 beach NPCs (burst = one session, NpcSpawns = union of sessions); position hits **42/42**
+     (verified), so the entry Known-seeding now covers every burst NPC and the first move re-streams none.
 - Run: `cd Faolan/bin/Debug && dotnet Faolan.dll`. Drive client: see CLAUDE.md. Client log:
   `/var/games/debian-installation/steamapps/common/Age of Conan/AgeOfConan.log`.
 - Loopback captures of OUR output: `Captures/loopback*.pcapng` (+ `.tshark.json`). Retail reference:
@@ -35,11 +45,10 @@ frame name).
    individual-spawn path streams the union.
 
 ## Next steps, in order
-1. **Fix the double-spawn / Known-seeding** (`Faolan/GameServer/World/WorldBroadcaster.cs`
-   `BroadcastPlayerEntry`, ~line 120; `RetailLoginReplay.RecordSpawnedNpcName`). Figure out why
-   `SpawnedNpcNamesByHandle` is empty / handles mismatch when seeding runs (ordering vs the burst replay, or
-   burst wire-handle ≠ model `CapturedHandle`). After: first move should stream ~0 burst NPCs. This kills the
-   flood and is the prerequisite for everything else.
+0. **IN-CLIENT TEST the session-3 fixes (do this first).** Loading screen should load clean again (burst is
+   byte-exact), and on the first move the interest log should report `+0` burst re-spawns (was ~97). The model
+   handle was the mismatch (burst wire-handle ≠ model `CapturedHandle`); now aligned by position.
+1. ~~Fix the double-spawn / Known-seeding~~ **DONE** (position-keyed handle alignment, 42/42). Verify in-client.
 2. **Then re-test the individual-spawn flag** (`FAOLAN_NPC_INDIVIDUAL_SPAWN=1`) — but first add cross-session
    **mob dedup** so the model is retail-shaped (~43, not 168). Friendly NPCs are already deduped by name in
    `EnsureZoneNpcs`; mobs still pile up by cell across sessions.
