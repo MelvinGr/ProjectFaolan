@@ -1150,5 +1150,31 @@
 			DispatchReturnWorldStat = 0x20D1,
 			DispatchInvalidWorldStat = 0x20D2
 		}
+
+		// Resolves an inbound GameServer RPC (receiver class id, 16-bit method opcode) to its recovered method name
+		// for diagnostic logging. The GameServer connection multiplexes several RPC class-pairs, so the SAME 0x20xx
+		// opcode means different methods per class - the receiver endpoint's class id is the disambiguator (memory
+		// protocol_gameserver_rpc_multiplexing). Used by the listeners' default branch so an unhandled packet logs
+		// its method name instead of bare hex. Returns "Unknown" when the (class, opcode) pair has no recovered name.
+		public static class GameServerMethodNames
+		{
+			public static string Resolve(uint receiverClass, ushort opcode)
+			{
+				return receiverClass switch
+				{
+					Conan.ConanEndpoints.GameWorldType => Name<GameAgentOpcodes>(opcode),                 // GameAgent
+					Conan.ConanEndpoints.GameSpawnCallerType => Name<GameCharAgentOpcodes>(opcode),        // GameCharAgent
+					Conan.ConanEndpoints.GamePostReadyType => Name<GameCharAgentProjectOpcodes>(opcode),   // GameCharAgentProject
+					_ => "Unknown"
+				};
+			}
+
+			private static string Name<TEnum>(ushort opcode) where TEnum : struct, System.Enum
+			{
+				return System.Enum.IsDefined(typeof(TEnum), opcode)
+					? ((TEnum)(object)opcode).ToString()
+					: "Unknown";
+			}
+		}
 	}
 }

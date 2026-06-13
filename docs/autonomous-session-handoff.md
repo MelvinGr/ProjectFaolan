@@ -105,3 +105,6 @@ log below, then pick the next item. If you exhaust the safe list, stop and summa
   rows into `TradepostListing` (242 listings / 11 item ids seeded into faolan.db) so AH search returns real data;
   round-trip test `CaptureListingImporterTests`; importer `--listings-only` flag re-seeds just these (kept the db
   diff clean — a full re-import would churn Items/NpcSpawns from newer captures). 311 tests green.
+- 2026-06-14 — §4b/§7(c) **method-name logging DONE**. `GameServerMethodNames.Resolve(receiverClass, opcode)` names
+  the multiplexed GameServer RPC by receiver-class catalog; the GameServer `default` branch now logs the method name
+  instead of bare hex. Test `GameServerMethodNamesTests`. 318 tests green.

@@ -397,10 +397,11 @@ First pass IMPLEMENTED 2026-06-12 (same day); what remains is the deeper model w
         a caster only ever receives the 8 starting abilities via `0x2052`; `SpellBookIIR 0x6BA10936` is just a stub
         notification and `DispatchLearnSpell(i_nSpellID)` is never exercised. Needs a fresh capture of a caster
         learning a spell (e.g. class 29's 165241) to pin the body. (The C++ `addSpell 0x09` is the dead old scheme.)
-- [ ] **Resolve method names in the "unknown (class, opcode)" log** (handoff §7): every inbound `(receiver class,
-      opcode)` and outbound s2c opcode now maps to a real method name (`docs/aoc-rpc-method-opcodes.md`), so the
-      `default`-branch logging can print the method name instead of bare hex — quick triage win for spotting
-      named-but-unhandled client packets.
+- [x] **Resolve method names in the "unknown (class, opcode)" log** (handoff §7) — DONE 2026-06-14.
+      `GameServerMethodNames.Resolve(receiverClass, opcode)` (in `Opcodes.cs`) disambiguates the multiplexed
+      GameServer RPC by the receiver class id (GameAgent / GameCharAgent / GameCharAgentProject catalogs) and the
+      GameServer `default` branch now logs the method name instead of bare hex. Test `GameServerMethodNamesTests`.
+      (The other listeners already log enum names; only the multiplexed GameServer connection was bare hex.)
 
 ---
 
@@ -485,8 +486,9 @@ tag system exists. → memory `lua_vm`, `protocol_conversation_routing`; `docs/a
       class-first (Tradepost done via `TradepostProtocol.IsInbound`); (b) for shared-class methods (e.g. vendor
       `0x2034/0x2035` on `GameCharAgent`), add a one-line `Sender.Type ==` guard on any opcode case that collides
       with a handled opcode; (c) **cheap win — log unknown `(class, method)` combos in the `default` branch**
-      instead of silently dropping them, so future collisions/new subprotocols surface as log lines. See memory
-      `protocol_gameserver_rpc_multiplexing`.
+      instead of silently dropping them — DONE 2026-06-14 (`GameServerMethodNames.Resolve`; the GameServer default
+      branch names the method by receiver class), so collisions/new subprotocols surface as named log lines. See
+      memory `protocol_gameserver_rpc_multiplexing`.
 
 ---
 

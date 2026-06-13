@@ -795,7 +795,9 @@ namespace Faolan.GameServer
 
 				default:
 				{
-					LogUnknownPacket(packet, opcode);
+					// Resolve the method name from the (receiver class, opcode) pair (the GameServer multiplexes
+						// several RPC classes, so the opcode alone is ambiguous) - logs the name, not bare hex.
+						LogUnknownPacket(packet, packet.Opcode, GameServerMethodNames.Resolve(packet.Receiver.Type, packet.Opcode));
 					break;
 				}
 			}
