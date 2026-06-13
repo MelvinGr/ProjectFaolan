@@ -547,13 +547,27 @@ client→server RPC table (`docs/aoc-client-rpc-methods.json`) — registration 
 CSPlayerAgent `0x201C` = `AcceptGuildInvitation` (fired exactly once on the guild-accept click) and bulk-verified
 by tabulating `(RpcHeader caller class, opcode)` across all capture JSONs (independent semantic hits:
 `SplitInventoryItem`, `ToggleVanityArmorFilter`, `AddShortcut`, `CloseLootBag`, `GameCharAgent.Ping`, the
-tradepost methods). **Client→server only** — the server→client interface tables (CSPlayerInterface,
-GameInterface, TradepostInterface, PlayerAgent both directions) have unnamed extra methods in the live build, so
-observed s2c indices drift upward vs the recovered names; downloads stay content-named. On the multiplexed
-GameServer connection the dispatch key is `(class id, opcode)`; the small class tables top out early
-(TradepostAgent `0x2013`, project `0x200C`, GameAgent `0x200A`), so any value `>= 0x2014` is unambiguously
-GameCharAgent. Full per-class catalogs: `Faolan.Core/Network/Packets/Opcodes.cs`; methodology: README
-"Client reverse-engineering"; verification corpus: `Captures/decode_guild.py`.
+tradepost methods). On the multiplexed GameServer connection the dispatch key is `(class id, opcode)`; the
+small class tables top out early (TradepostAgent `0x2013`, project `0x200C`, GameAgent `0x200A`), so any value
+`>= 0x2014` is unambiguously GameCharAgent. Full per-class catalogs: `Faolan.Core/Network/Packets/Opcodes.cs`.
+
+**s2c tables RESOLVED (2026-06-13, Ghidra):** the server→client "drift" is now fully explained and the true
+tables recovered from `AgeOfConan.exe`. The base is `0x2000` for every interface **except PlayerAgent/
+PlayerInterface** (login; observed c2s wire `0x2083..0x20F5`, base ≠ 0x2000 — those opcodes stay
+behavior-derived). For all others, `wire = 0x2000 + registration index`. c2s registration order is *identical*
+to `aoc-client-rpc-methods.json` (proven: the proxy constructors register methods in that exact order). The s2c
+drift was caused by the live build inserting extra dispatch methods — mostly **no-arg** methods that emit no
+`stream bad` string, so the string-extracted catalog missed them and every later method shifted. Recovered by
+decompiling each `<Class>InterfaceDispatch_t::DispatchMethod` (a `switch(index)`; case N → handler N, named by
+the handler's own `Dispatch_t::<Method>` string). True s2c sizes vs catalog: UniverseInterface 6 (=), GameInterface
+16 (+3), GameCharInterfaceProject 16 (+1), TradepostInterface 8 (+1), GameCharInterface **181 (+24)**,
+CSPlayerInterface **211 (+33)**. Full tables: **`docs/aoc-rpc-method-opcodes.md`**; recovery scripts:
+`Captures/ghidra/`. In-client-verified anchors all match: s2c GameCharInterface DispatchUpdateBindLocation=0x2002,
+**DispatchUpdateCash=0x2005**, DispatchShopData=0x2033, DispatchItemSoldToShop=0x2035, DispatchAddSpecialAbility
+=0x2052, DispatchPong=0x2082. NOTE corrections to old content-guesses: GameServer s2c `0x2009`=DispatchChangeItem
+StackSize (not "Pong" — real per-char Pong is `0x2082`), `0x2008`=DispatchSetQuestMarker, and `0x2020`=
+**DispatchAddItem** exists. PlayerInterface s2c is still open (its dispatcher isn't a flat switch). Methodology:
+README "Client reverse-engineering"; verification corpus: `Captures/decode_guild.py` + `Captures/ghidra/`.
 
 The raw per-server counts below are kept as the original observation record:
 

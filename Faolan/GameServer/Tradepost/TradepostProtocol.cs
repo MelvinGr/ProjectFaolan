@@ -42,16 +42,20 @@ namespace Faolan.GameServer.Tradepost
 			SetNumWorkerThreads = 0x2013
 		}
 
-		// Server -> client methods. NOTE: the live build's TradepostInterface table DRIFTS vs the recovered names
-		// (recovered: DispatchTradepostSearchResults = 0x2004, observed = 0x2005), so these stay named by decoded
-		// CONTENT - do not renumber from docs/aoc-client-rpc-methods.json.
+		// Server -> client methods. The full TradepostInterface s2c table is now recovered from AgeOfConan.exe
+		// (Ghidra dispatcher switch, docs/aoc-rpc-method-opcodes.md): 8 methods, base 0x2000. The string-extracted
+		// catalog missed DispatchClose (0x2001, no-arg -> no "stream bad" string), which is why SearchResults was
+		// off by one (recovered-as-0x2004, true 0x2005). Values below are the TRUE registration order.
 		public enum InterfaceMethod : ushort
 		{
 			DispatchOpenTradepost = 0x2000,          // [posX][posY][posZ][maxRadius] floats (big-endian)
-			DispatchSearchResults = 0x2005,          // [head:u32][row]* (see TradepostSearchResults)
+			DispatchClose = 0x2001,                  // no-arg (the catalog-missed insertion)
 			DispatchMailMessage = 0x2002,            // [mailId][recipient ep][sender ep][remoteformat body](+attachment)
-			Ack = 0x2004,                            // 0x01
-			DispatchClose = 0x2001
+			DispatchSendMailResult = 0x2003,         // [bSuccess][cError]
+			DispatchRetrieveMailResult = 0x2004,     // (was nicknamed "Ack" - body 0x01)
+			DispatchSearchResults = 0x2005,          // DispatchTradepostSearchResults; [head:u32][row]* (see TradepostSearchResults)
+			DispatchDeleteCanceledMail = 0x2006,
+			DispatchDeleteCanceledMailItem = 0x2007
 		}
 
 		// Inbound (client->server) tradepost packets address the TradepostAgent endpoint. We accept either field

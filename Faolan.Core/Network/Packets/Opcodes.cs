@@ -231,10 +231,24 @@
 			LatencyCheck = 0x2085 // GameCharAgent.Ping (client 0x2085 -> server 0x2082)
 		}
 
-		// Server->client opcodes on the GameServer connection. The s2c interface tables (GameInterface,
-		// GameCharInterface) DRIFT vs the recovered names - the live build inserted unnamed methods (e.g. the
-		// observed Pong is 0x2009 but the table says GameInterface.DispatchPong = 0x2003) - so these stay named
-		// by decoded CONTENT; do not map them through docs/aoc-client-rpc-methods.json by index.
+		// Server->client opcodes on the GameServer connection. These VALUES are capture-replayed (retail
+		// byte-for-byte) and in-client verified; the names below are behavior nicknames. The true s2c method
+		// identities are now recovered from AgeOfConan.exe (docs/aoc-rpc-method-opcodes.md, Captures/ghidra/):
+		// the live build inserted extra (mostly no-arg) dispatch methods, which is why the values don't line up
+		// with the string-extracted catalog order. Ground-truth identities for the nicknames below:
+		//   MoneyUpdate 0x2005   = GameCharInterface.DispatchUpdateCash          (exact match)
+		//   BindLocation 0x2002  = GameCharInterface.DispatchUpdateBindLocation  (exact match)
+		//   ShopData 0x2033      = GameCharInterface.DispatchShopData            (exact match)
+		//   ItemSoldToShop 0x2035= GameCharInterface.DispatchItemSoldToShop      (exact match)
+		//   LatencyCheckResponse 0x2082 = GameCharInterface.DispatchPong         (the REAL per-char pong)
+		//   Pong 0x2009          = GameInterface.DispatchGameServerStats (reply to c2s GameAgent.UpdateGameServerStats
+		//                          0x2005; the "ping/pong" pair is really the game-server-stats keepalive)
+		//   SpawnCheck 0x2008    = GameCharInterface.DispatchSetQuestMarker      (per-char, not GameInterface)
+		//   ReadyForPlayScreen 0x2024 = GameCharInterface.DispatchValidResurrectionSpots
+		//   ReportDimensionId 0x200b = GameInterface.DispatchReportDimesionID; ReportServerId 0x200c = ...DispatchReportServerID
+		//   AckAuthentication 0x2001 = GameInterface/UniverseInterface.DispatchAckAuthenticate
+		// Keep the values; do NOT rename (they drive capture-replayed sends). 0x2020 s2c = DispatchAddItem (note for
+		// the inventory-delivery work - there IS a per-item add packet, separate from the snapshot).
 		public enum GameServerRespondOpcodes : ushort
 		{
 			// Reply to GameCharAgent.RequestBindLocation: [u32 playfieldId] = the character's bind/home playfield

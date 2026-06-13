@@ -266,11 +266,17 @@ and combat-loop items in §2. Forward milestones (shared zones, persistence, sca
 
 ### 4b. Named-but-unhandled client packets (surfaced by the opcode mapping, 2026-06-12)
 
-- [ ] **Recover the 16-bit RPC method opcodes via Ghidra (Stage 3b, parked)** → `docs/opcode-16bit-handoff.md`.
-      The `0x2000..0x20FF` wire opcode = `0x2000 + RPC registration index`; needs the analyzed Ghidra project
-      (ready at `/tmp/ghidra-aoc/proj`) to read each interface's registration order. Yields the real id↔name
-      table incl. the drifting s2c "Dispatch" tables → completes `Opcodes.cs` and unblocks the TradepostAgent
-      (mail/auction) opcodes for §9. Names+sigs already done (`docs/aoc-client-rpc-methods.json`).
+- [x] **Recover the 16-bit RPC method opcodes via Ghidra (Stage 3b)** — DONE 2026-06-13 →
+      `docs/aoc-rpc-method-opcodes.md` (full tables), `docs/aoc-opcode-ids.md` (Stage 3b summary),
+      `Captures/ghidra/` (recovery scripts + outputs). `wire = 0x2000 + registration index`, base 0x2000 for
+      every interface except PlayerAgent/PlayerInterface (hash dispatch — still open). c2s order == the catalog
+      (proven from the proxy constructors); the s2c "drift" is RESOLVED by the dispatcher switches — the live
+      build inserts mostly-no-arg dispatch methods the string-extracted catalog missed (true sizes: GameChar
+      Interface 181/+24, CSPlayerInterface 211/+33, GameInterface 16/+3, Tradepost 8/+1). In-client anchors all
+      match (DispatchUpdateCash 0x2005, DispatchShopData 0x2033, DispatchAddSpecialAbility 0x2052, ...).
+      `Opcodes.cs` GameServerRespondOpcodes annotated with true identities; TradepostProtocol.InterfaceMethod
+      corrected to the real 8-method table. Remaining: PlayerInterface hash fn; wiring specific s2c opcodes into
+      handlers with (class id) capture correlation; naming the no-arg insertions.
 
 First pass IMPLEMENTED 2026-06-12 (same day); what remains is the deeper model work:
 

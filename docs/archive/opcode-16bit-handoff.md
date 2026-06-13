@@ -1,5 +1,13 @@
 # 16-bit RPC method opcodes — Ghidra handoff (2026-06-13)
 
+> **RESOLVED 2026-06-13.** Tables recovered: `docs/aoc-rpc-method-opcodes.md`; summary in
+> `docs/aoc-opcode-ids.md` (Stage 3b); scripts/outputs in `Captures/ghidra/`. `wire = 0x2000 + registration
+> index`, base 0x2000 for all interfaces except PlayerAgent/PlayerInterface (32-bit hash dispatch — still
+> open). c2s order == the catalog (proven); s2c drift resolved via the dispatcher switches (the live build
+> inserts mostly-no-arg dispatch methods the string catalog missed). In-client anchors all match. This file
+> is kept for the methodology; the live result lives in the docs above.
+
+
 Recover the **16-bit interface method opcodes** (`0x2000..0x20FF`) from `AgeOfConan.exe`. This is the one
 explicitly-PARKED opcode gap (`docs/archive/opcode-re-plan.md` Stage 3b) — the cheap angles all failed because
 the id is **framework-assigned by RPC registration ORDER**, not a literal / hash / jump table. A full Ghidra
