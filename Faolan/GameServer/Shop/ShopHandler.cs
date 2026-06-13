@@ -1,8 +1,10 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Data;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
@@ -27,12 +29,34 @@ namespace Faolan.GameServer
 
 		private readonly ConcurrentDictionary<INetworkClient, LastShopSale> _lastShopSale = new();
 
-		// Provisional vendor price in tin, the wallet wire unit (the RDB item templates carry the real value -
+		// The shop window the client currently has open, recorded when we send DispatchShopData. BuyItem only
+		// carries the session-volatile shop instance + a slot position, so we need the open window's wares to
+		// resolve the position back to a template id and price it. Keyed by Pos (the shop-window slot).
+		private sealed record OpenShop(uint Instance, string VendorName, IReadOnlyDictionary<uint, ShopItem> WaresByPos);
+
+		private readonly ConcurrentDictionary<INetworkClient, OpenShop> _openShop = new();
+
+		// Session-volatile shop instance ids we hand the client in DispatchShopData (the value the BuyItem echoes
+		// back). Uniqueness only needs to hold within a session; a process-wide counter is plenty.
+		private static int _shopInstanceSeq;
+
+		// Provisional vendor SELL price in tin, the wallet wire unit (the RDB item templates carry the real value -
 		// TEA-cracked but the value field is not mapped yet; the captured sales went for 19/23/92/392 tin);
 		// until then, scale with item level so better junk pays more.
 		internal static uint VendorPriceTin(byte itemLevel, uint count)
 		{
 			return (uint)System.Math.Max(1, itemLevel * 2) * System.Math.Max(1u, count);
+		}
+
+		// Provisional vendor BUY price in tin. Real prices are RDB-template-gated (undecoded, like the sell value),
+		// so until then a vendor sells dearer than it buys: a flat markup over VendorPriceTin keeps buy > sell so
+		// the wares can't be flipped for free. The shop-entry's TailLevel is the closest level signal we carry
+		// (Items.Level is mostly 0), so price off that.
+		internal const uint VendorBuyMarkup = 4;
+
+		internal static uint VendorBuyPriceTin(uint tailLevel, uint count)
+		{
+			return (uint)System.Math.Max(1, (int)tailLevel * 2) * System.Math.Max(1u, count) * VendorBuyMarkup;
 		}
 
 		// DL 0x2035 - tells the client the bag slot was sold (it clears the slot itself).
@@ -103,6 +127,83 @@ namespace Faolan.GameServer
 
 			Logger.LogInformation("Shop: {Character} undid the sale of item {ItemId} (slot {Slot}); {Price} tin debited (wallet {Balance}).",
 				character.Name, sale.ItemId, sale.Slot, sale.PriceTin, character.Money);
+		}
+
+		// DL 0x2033 DispatchShopData: serve a vendor's window and remember it for this session so BuyItem can
+		// resolve a clicked slot. `npcHandle` is the vendor's world-entity handle (the client renders the window
+		// against it). NB: the window only OPENS in-client off the client's own NPC trade-initiation (the shop is
+		// KnubotStartTrade-gated, same family as the mid-session-spawn blocker); a cold push doesn't pop the
+		// window. This sets up the server-side state so the BUY round-trip is complete and exercisable.
+		internal async Task SendShopData(INetworkClient client, Faolan.Core.Database.Tables.Shop shop, uint npcHandle)
+		{
+			// The codec's item resolver is synchronous; pre-resolve each ware's Items row up front.
+			var resolved = new Dictionary<uint, Item>();
+			foreach (var ware in shop.Items)
+				if (!resolved.ContainsKey(ware.ItemTemplateId))
+					resolved[ware.ItemTemplateId] = await Database.GetItem(ware.ItemTemplateId);
+
+			var instance = (uint)(0x00010000 + (Interlocked.Increment(ref _shopInstanceSeq) & 0xFFFF));
+			var body = ShopContentCodec.Build(instance, npcHandle, shop.MaxSize, shop.Items, id => resolved.GetValueOrDefault(id));
+
+			// Track only the wares that actually resolved (the codec skips the rest, so their slots aren't on the wire).
+			var waresByPos = shop.Items
+				.Where(w => resolved.GetValueOrDefault(w.ItemTemplateId) != null)
+				.ToDictionary(w => w.Pos);
+			_openShop[client] = new OpenShop(instance, shop.VendorName, waresByPos);
+
+			var ps = new PacketStream();
+			ps.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameServerRespondOpcodes.ShopData);
+			ps.WriteArray(body);
+			await ps.SendAsync(client);
+
+			Logger.LogInformation("Shop: served \"{Vendor}\" (instance 0x{Instance:X}, {Count} wares) to {Character}.",
+				shop.VendorName, instance, waresByPos.Count, client.Session.Character?.Name);
+		}
+
+		// UL 0x2033 BuyItem [shop ID32 type][shop instance][slot]: resolve the clicked slot against the open shop,
+		// price it, debit the wallet (DispatchUpdateCash) and grant the item live (DispatchAddItem via
+		// GrantItemToBackpack). Refuses on no-open-shop, unknown slot, insufficient funds or a full bag.
+		internal async Task HandleBuyItemFromShop(INetworkClient client, uint shopInstance, uint pos)
+		{
+			var character = client.Session.Character;
+			if (character == null)
+				return;
+
+			if (!_openShop.TryGetValue(client, out var shop) || shop.Instance != shopInstance)
+			{
+				Logger.LogWarning("BuyItem: no open shop (or stale instance 0x{Instance:X}) for {Character}.", shopInstance, character.Name);
+				return;
+			}
+
+			if (!shop.WaresByPos.TryGetValue(pos, out var ware))
+			{
+				Logger.LogWarning("BuyItem: shop \"{Vendor}\" has no ware at slot {Pos} for {Character}.", shop.VendorName, pos, character.Name);
+				return;
+			}
+
+			var price = VendorBuyPriceTin(ware.TailLevel, ware.Count);
+			if (character.Money < price)
+			{
+				Logger.LogInformation("BuyItem: {Character} can't afford ware {Template} at slot {Pos} ({Price} tin, has {Balance}).",
+					character.Name, ware.ItemTemplateId, pos, price, character.Money);
+				return;
+			}
+
+			// Grant first so a full bag (null slot) aborts the purchase before any money moves.
+			var slot = await GrantItemToBackpack(client, ware.ItemTemplateId, ware.Count);
+			if (slot == null)
+			{
+				Logger.LogWarning("BuyItem: couldn't grant ware {Template} to {Character} (bag full or item not buildable); purchase aborted.",
+					ware.ItemTemplateId, character.Name);
+				return;
+			}
+
+			character.Money -= price;
+			await Database.SaveCharacter(character);
+			await SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Spend);
+
+			Logger.LogInformation("Shop: {Character} bought ware {Template} x{Count} (slot {Pos}) from \"{Vendor}\" for {Price} tin into bag slot {BagSlot} (wallet {Balance}).",
+				character.Name, ware.ItemTemplateId, ware.Count, pos, shop.VendorName, price, slot, character.Money);
 		}
 	}
 }

@@ -26,5 +26,28 @@ namespace Faolan.Tests
 			var body = Faolan.GameServer.Shop.ShopReplayData.DispatchShopDataBody;
 			Assert.Equal("0000c75b00001e7e", Convert.ToHexStringLower(body.AsSpan(0, 8).ToArray()));
 		}
+
+		[Fact]
+		public void VendorBuyPrice_ExceedsSellPrice_SoWaresCantBeFlipped()
+		{
+			// A vendor must sell dearer than it buys back, or a ware could be bought and re-sold for profit.
+			// Same level signal both ways (sell off Items.Level, buy off the entry TailLevel).
+			const byte level = 40;
+			const uint count = 1;
+			Assert.True(GameServerListener.VendorBuyPriceTin(level, count) > GameServerListener.VendorPriceTin(level, count));
+		}
+
+		[Fact]
+		public void VendorBuyPrice_ScalesWithCount()
+		{
+			Assert.Equal(GameServerListener.VendorBuyPriceTin(10, 1) * 3, GameServerListener.VendorBuyPriceTin(10, 3));
+		}
+
+		[Fact]
+		public void VendorBuyPrice_NeverFree()
+		{
+			// Level-0 wares (the common case while Items.Level is mostly unmapped) still cost something.
+			Assert.True(GameServerListener.VendorBuyPriceTin(0, 1) >= GameServerListener.VendorBuyMarkup);
+		}
 	}
 }

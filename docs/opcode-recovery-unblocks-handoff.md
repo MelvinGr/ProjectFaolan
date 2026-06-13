@@ -30,8 +30,17 @@ proven **byte-exact against a capture** (golden test in `Faolan.Tests`) before i
 - **Bonus, unrelated to the table:** the personal BANK storage was decoded + delivered (BankIIR 0x0BA1C1CB,
   container kind 105, in-client verified) — `[[protocol_bank_storage]]`.
 
-Still open from this handoff: §2 vendor BUY (gate gone, not built), §4 spell/feat grants, §5 trade/quest-share,
-§6 mail, §7 unknown-(class,opcode) name logging.
+- **§2 vendor BUY — DONE (server-side; window render still client-gated).** `BuyItem (c2s 0x2033)` now resolves
+  the clicked slot against the session's open shop, debits the wallet (`DispatchUpdateCash 0x2005`) and grants the
+  ware live (`DispatchAddItem 0x2020` via `GrantItemToBackpack`). New session state tracks the open shop, recorded
+  when `DispatchShopData` is served; a `.shop [vendor]` GM command re-added as the test bootstrap (sets the state +
+  serves the window — note the window only POPS off the client's own NPC trade-initiation, the same
+  KnubotStartTrade gate the SELL side sits behind). Provisional `VendorBuyPriceTin` (buy markup over the sell
+  price) keeps wares from being flipped for free; real prices are RDB-template-gated. Golden/unit tests in
+  `ShopTests`. Grant aborts cleanly on a full bag *before* any money moves.
+
+Still open from this handoff: §4 spell/feat grants, §5 trade/quest-share, §6 mail, §7 unknown-(class,opcode) name
+logging.
 
 ---
 
@@ -147,6 +156,9 @@ the actual method name instead of a bare hex value — useful for triaging the n
    (`DispatchAddItemTests`), in-client verified, wired into `GrantItemToBackpack`.
 2. ✅ **DONE — loot grant** (TryLootAll → add-item, TryLootCash → wallet credit). NB the loot bag VISUAL is blocked
    by the mid-session-spawn issue, but the grant works.
-3. ⬜ Vendor BUY (BuyItem → DispatchItemBoughtBack/AddItem + cash) — gate is gone (DispatchAddItem); not built.
+3. ✅ **DONE — Vendor BUY** (BuyItem → DispatchAddItem + cash debit; `.shop` bootstrap + per-session open-shop
+   state). Window render is still KnubotStartTrade-gated (same as SELL), but the buy round-trip is complete and
+   golden/unit-tested. `DispatchItemBoughtBack (0x2036)` is the *buy-back* (repurchase a sold item) reply — a fresh
+   buy uses DispatchAddItem, so it wasn't needed here; left for if/when the buy-back tab is wired.
 4. ⬜ Mail/AH delivery (§9) reuses the same add-item path for attachments — AH window + bank now open in-client;
    AH search/sell + mail still to build.

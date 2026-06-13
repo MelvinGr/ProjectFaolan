@@ -170,6 +170,7 @@ namespace Faolan.GameServer
 				["tag"] = (client, arguments) => TagCommand(client, arguments),
 				["lua"] = (client, arguments) => LuaCommand(client, arguments),
 				["ah"] = (client, _) => OpenAuctionHouseCommand(client),
+			["shop"] = (client, arguments) => OpenShopCommand(client, arguments),
 				["guild"] = (client, arguments) => GuildCommand(client, arguments),
 				["money"] = (client, arguments) => MoneyCommand(client, arguments),
 				["buffs"] = (client, _) => BuffsCommand(client),
@@ -299,6 +300,35 @@ namespace Faolan.GameServer
 			await SendBank(client, bank);
 
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Opened the auction house (PoC) at your position; bank tab has {bank.Items.Count} item(s).");
+		}
+
+		// .shop [vendorName]  - serve a vendor window for testing the SELL/BUY round-trip (PoC bootstrap; the real
+		// trigger is the client's own NPC trade-initiation, which the shop window is gated on - a cold push sets up
+		// the server state but doesn't pop the window in-client). Records the open shop on the session so a BuyItem
+		// resolves; without an argument it picks the first imported shop. Buy a slot to exercise
+		// DispatchAddItem + the cash debit.
+		private async Task OpenShopCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var vendor = (arguments ?? "").Trim();
+
+			var shop = string.IsNullOrEmpty(vendor)
+				? await Database.GetFirstShop()
+				: await Database.GetShopByVendorName(vendor);
+			if (shop == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId,
+					string.IsNullOrEmpty(vendor) ? "No shops imported." : $"No shop for vendor \"{vendor}\".");
+				return;
+			}
+
+			// The window renders against the vendor NPC's handle; for the bootstrap we don't have the vendor's
+			// entity, so address it to the player's own world handle (the window is cold-push-gated anyway).
+			var entity = PlayerWorldEntity(client);
+			await SendShopData(client, shop, entity?.Handle ?? 0);
+
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				$"Served shop \"{shop.VendorName}\" ({shop.Items.Count} wares). Buy a slot to test the grant+debit (window render is client-gated).");
 		}
 
 		// .lua run <scriptId>  - run an RDB LuaArchive script against the player (the conversation/quest VM engine):

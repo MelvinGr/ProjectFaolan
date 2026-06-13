@@ -5,9 +5,11 @@ namespace Faolan.GameServer.Shop
 	// The captured DispatchShopData (0x2033) body from the necrol80 sell_items_to_trader session - the Old Town
 	// trader's full shop inventory: [shop ID32 0xC75B:0x1E7E][vendor NPC ID32][protobuf shop content]
 	// (6932 bytes). Reference data for the ShopContentCodec round-trip tests (decode the blob -> rows ->
-	// rebuild byte-exact). The cold-push .shop GM command was removed: an unsolicited DispatchShopData doesn't
-	// open the window - the vendor window is gated on the client's own NPC trade-initiation (KnubotStartTrade),
-	// which establishes the conversation retail's DispatchShopData rides. Wiring that real trigger is the open work.
+	// rebuild byte-exact). NB: the vendor window only POPS off the client's own NPC trade-initiation
+	// (KnubotStartTrade), which establishes the conversation retail's DispatchShopData rides - a cold push doesn't
+	// open it. The .shop GM command (re-added with the BUY work) serves this content from the DB and records the
+	// open-shop session state so the BUY round-trip is exercisable; wiring the real KnubotStartTrade trigger so the
+	// window actually pops is the remaining open work.
 	internal static class ShopReplayData
 	{
 		public static readonly byte[] DispatchShopDataBody = Convert.FromHexString(

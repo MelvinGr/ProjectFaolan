@@ -455,10 +455,9 @@ namespace Faolan.GameServer
 					var shopId = packet.Body.ReadUInt32();
 					var pos = packet.Body.ReadUInt32();
 
-					// Buying GRANTS an item - blocked on the live inventory-add path (the same item-grant wall as
-					// loot, see protocol_containeradditem); the shop content protobuf is also undecoded, so the
-					// position can't be priced/resolved yet. Logged until both land.
-					Logger.LogInformation("BuyItem from shop {Shop:X}: position {Pos} (item grant not implemented).", shopId, pos);
+					// Resolve the clicked slot against the open shop, debit the wallet and grant the item live
+					// (DispatchAddItem). The item-grant wall that gated this is gone (protocol_containeradditem).
+					await HandleBuyItemFromShop(client, shopId, pos);
 
 					break;
 				}

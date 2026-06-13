@@ -620,9 +620,11 @@ across capture sessions). Golden-tested (`MoneyUpdateTests`).
       (now low-risk, not separately exercised). Open caveat unchanged: we push an interim 0x2005 sync at login;
       retail carries the initial balance in the FullChar snapshot (field undecoded) — watch for double-count.
 - [x] **Vendor sell credit** (§9b sell side, 2026-06-12) — the first real money-usage path.
-- [ ] **Remaining usage paths**: vendor BUY debit (item-grant-gated, §9b), AH listing/buy + mail COD (§9a),
-      guild bank (`GuildTransferMoney`/`GuildWithdrawMoney`; `Guild.Cash` is persisted; no captures exercise
-      the bank UI, so the bodies are unknown).
+- [x] **Vendor BUY debit** (§9b buy side, 2026-06-13) — `BuyItem` → `GrantItemToBackpack` + a `DispatchUpdateCash`
+      spend; grant aborts before any money moves on a full bag.
+- [ ] **Remaining usage paths**: AH listing/buy + mail COD (§9a), guild bank
+      (`GuildTransferMoney`/`GuildWithdrawMoney`; `Guild.Cash` is persisted; no captures exercise the bank UI, so
+      the bodies are unknown).
 
 ### 9b. NPC vendor / shop buy-sell (AFTER 9a — simpler)
 Rides on **`GameCharAgent`/`GameCharInterface`** — the main GameServer connection, already fully wired; **no new
@@ -639,11 +641,12 @@ connection needed**, and likely simpler than the AH (no listings/search/mail).
       `0x2035 DispatchItemSoldToShop` [container][charId][slot] + the 0x2005 wallet credit. Sell handler removes
       the `CharacterInventory` row, credits `Character.Money`, supports `UndoLastSoldItem` (single-step restore).
       Golden tests `ShopTests`.
-- [ ] **Wire the real shop-OPEN trigger**: the cold-push `.shop` GM command was REMOVED — an unsolicited
-      `DispatchShopData` doesn't open the window. The vendor window is gated on the client's own NPC
-      trade-initiation (KnubotStartTrade), which establishes the conversation retail's `DispatchShopData` rides;
-      the reply must echo the inbound conversation (like the working `SellItem`→`0x2035` path does). `ShopContentCodec`
-      + `ShopReplayData` remain as the proven content builder + codec round-trip test data.
+- [ ] **Wire the real shop-OPEN trigger**: an unsolicited `DispatchShopData` doesn't POP the window. The vendor
+      window is gated on the client's own NPC trade-initiation (KnubotStartTrade), which establishes the
+      conversation retail's `DispatchShopData` rides; the reply must echo the inbound conversation (like the working
+      `SellItem`→`0x2035` path does). `SendShopData` (2026-06-13) serves the DB content + records the open-shop
+      session state, exposed via the `.shop [vendor]` GM bootstrap; it makes the BUY round-trip exercisable but
+      doesn't pop the window — wiring KnubotStartTrade is the remaining piece.
 - [x] **Shop-content protobuf DECODED + DB-backed shops (2026-06-12)**: the content is a plain
       `ProtoInventoryGame` (the bag message!) with container type 111; each ware is a standard
       `InventoryListEntry` whose ProtoAcgItem tail carries the FULL item identity (Data1-4 quad + template +
@@ -651,12 +654,14 @@ connection needed**, and likely simpler than the AH (no listings/search/mail).
       trader blob). Importer: `CaptureShopImporter` (6 vendors, keyed by NPC name) + shop wares as
       `ArchetypeHarvester`'s third source (+281 items, +324 buildable). `ShopContentCodec.Build` CONSTRUCTS the
       window byte-exact from `Shop`/`ShopItem`/`Items` rows, ready for whenever the open-trigger above is wired.
-- [ ] **BUY side**: positions now resolve to items via `ShopItem`; the live inventory-add wall is GONE
-      (`DispatchAddItem` 0x2020, see Inventory/loot above) — BUY = `BuyItem` → `GrantItemToBackpack` + a
-      `DispatchUpdateCash` debit. Still open: prices (stat 356 semantics unknown — the client may price from the
-      RDB item template) + the shop-open trigger.
-- [ ] **Real sell prices**: the RDB item templates carry item value (TEA key cracked, field not mapped);
-      provisional price = level×2×count (`VendorPriceTin`). Captured anchors: 19/23/92/392 tin.
+- [x] **BUY side implemented (2026-06-13)**: `BuyItem` (c2s 0x2033 = [shop ID32 type][shop instance][slot])
+      resolves the slot against the session's open shop (`_openShop`, recorded by `SendShopData`), debits the
+      wallet (`DispatchUpdateCash` spend) and grants the ware live (`DispatchAddItem` via `GrantItemToBackpack`).
+      The grant runs first so a full bag aborts the purchase before any money moves. `ShopTests` cover the buy
+      pricing invariants. Still client-gated on the shop-OPEN trigger above (the window doesn't pop yet).
+- [ ] **Real prices**: the RDB item templates carry item value (TEA key cracked, field not mapped); provisional
+      sell = level×2×count (`VendorPriceTin`), buy = TailLevel×2×count×4 (`VendorBuyPriceTin`, a markup so wares
+      can't be flipped for free). Captured sell anchors: 19/23/92/392 tin. Stat-356 semantics still unknown.
 
 ---
 
