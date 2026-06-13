@@ -1,0 +1,2429 @@
+=== "IIR" ===
+  @01f6b553  "IIR_c"
+  @01f9432f  "IIR_c"
+  @01f9433c  "IIR_t"
+  @01f9434d  "IIR_t"
+  @01f94366  "IIR_t"
+  @01f94383  "IIR"
+  @01f94390  "IIR_t"
+  @01f943a1  "IIR_t"
+  @01f943b3  "IIR_c"
+  @01f943c1  "IIR_c"
+  @01f943d3  "IIR_t"
+  @01f943e4  "IIR_t"
+  @01f943f4  "IIR_t"
+  @01f94404  "IIR_t"
+  @01f9441a  "IIR_t"
+  @01f9442e  "IIR_c"
+  @01f94438  "IIR_t"
+  @01f94449  "IIR"
+  @01f94459  "IIR"
+  @01f9446a  "IIR"
+  @01f94476  "IIR_c"
+  @01f94486  "IIR_c"
+  @01f94496  "IIR_t"
+  @01f944ab  "IIR_t"
+  @01f944c3  "IIR_t"
+  @01f944da  "IIR_t"
+  @01f944ee  "IIR_t"
+  @01f944fe  "IIR_t"
+  @01f9450d  "IIR_c"
+  @01f94529  "IIR_c"
+  @01f9453e  "IIR_c"
+  @01f94555  "IIR_c"
+  @01f94572  "IIR_c"
+  @01f94589  "IIR_c"
+  @01f945a3  "IIR_c"
+  @01f945bc  "IIR_c"
+  @01f945d4  "IIR_c"
+  @01f945f4  "IIR"
+  @01f94608  "IIR_c"
+  @01f94625  "IIR_c"
+  @01f9463b  "IIR_c"
+  @01f94653  "IIR"
+  @01f9466f  "IIR_c"
+  @01f9468f  "IIR_c"
+  @01f946af  "IIR_c"
+  @01f946c2  "IIR_c"
+  @01f946d7  "IIR_c"
+  @01f946ef  "IIR"
+  @01f946fa  "IIR_c"
+  @01f94712  "IIR_c"
+  @01f94728  "IIR_c"
+  @01f94740  "IIR_c"
+  @01f94757  "IIR_c"
+  @01f9476a  "IIR_t"
+  @01f94784  "IIR_c"
+  @01f947a1  "IIR_c"
+  @01f947b4  "IIR_c"
+  @01f947cc  "IIR_c"
+  @01f947e5  "IIR_c"
+  @01f947fb  "IIR_t"
+
+=== "ReadSubClass" ===
+  @01fa93ed  "ReadSubClass failed for IIR "
+  @01fa9458  "ReadSubClass for IIR %s. %s"
+  @01fa94f5  "ReadSubClass for IIR "
+  @01fa9962  "ReadSubClass(): ToolEvent_MessageReceived:.  m_nMessagePartNumber="
+  @01fbbaf5  "ReadSubClass(): Received command string : "
+  @01fc907c  "ReadSubClass() Wrong IIR_t version %d, (current is %d)...."
+  @01fca38c  "ReadSubClass() Wrong IIR_t version "
+  @01fca3f4  "ReadSubClass version mismatch"
+  @01fca470  "ReadSubClass version mismatch"
+  @01fca4a6  "ReadSubClass read an invalid type"
+  @01fca4de  "ReadSubClass tried to stream out an invalid type"
+  @01fdf614  "ReadSubClass() Wrong IIR_t version %d...."
+  @01fdf66d  "ReadSubClass, memory leak!"
+  @01fdfaaf  "ReadSubClass() reading...."
+  @01feb313  "ReadSubClass(): nAnswerCount = "
+  @01feb6d9  "ReadSubClass(): Got KnubotBaseIIR_c with invalid IIR version "
+  @01ff3f8d  "ReadSubClass read an invalid pos."
+  @01ff3fbd  "ReadSubClass read an invalid rot."
+  @020404cb  "ReadSubClass() Received a bad stream upon entering!."
+  @02042cad  "ReadSubClass :: Tried to stream multiple attacks on an already filled result ent"
+  @02089424  "ReadSubClass() Received a bad stream upon entering!."
+  @0208c587  "ReadSubClass() Received a bad stream upon entering!."
+
+=== "InfoItemRemote" ===
+  @01fa91c6  "InfoItemRemote::Register("
+  @01fa925d  "InfoItemRemote"
+  @01fa9288  "InfoItemRemote::Register("
+  @01fa92ee  "InfoItemRemote::Construct: Entry with hash "
+  @01fa9345  "InfoItemRemote::Construct: Could not create item with hash "
+  @01fa93d2  "InfoItemRemote::Construct: ReadSubClass failed for IIR "
+  @01fa9476  "InfoItemRemote::Construct: "
+  @01fa94da  "InfoItemRemote::Construct: ReadSubClass for IIR "
+  @01fa9556  "InfoItemRemote::Write: Write for item '"
+  @01fa95aa  "InfoItemRemote::Write() failed:."
+  @01fa964a  "InfoItemRemote/PollStatus"
+  @021beb7e  "InfoItemRemote@@"
+  @021c0783  "InfoItemRemote@@@detail@boost@@"
+  @021c12fe  "InfoItemRemote@@"
+
+=== "Construct" ===
+  @01eb8772  "Construct"
+  @01f7c6ec  "ConstructionGUI"
+      <- ptr@00466915  FUN_00466680 @00466680 size=1119
+  @01f94ac4  "ConstructionMenuIIR_c"
+      <- ptr@004e52c3  FUN_004e4c20 @004e4c20 size=1803
+      <- ptr@006d7155  FUN_006d7150 @006d7150 size=137
+  @01f94adc  "ConstructionOrderIIR_c"
+      <- ptr@004e52d5  FUN_004e4c20 @004e4c20 size=1803
+      <- ptr@006d8e66  FUN_006d8e60 @006d8e60 size=128
+  @01fa5e0c  "Constructed Raid with instance: "
+      <- ptr@00576742  FUN_005764e0 @005764e0 size=1139
+  @01fa6da9  "ConstructVehicle CreateVehicle() cannot return a 0 vehicle.!"
+  @01fa92fe  "Construct: Entry with hash "
+  @01fa9355  "Construct: Could not create item with hash "
+  @01fa93e2  "Construct: ReadSubClass failed for IIR "
+  @01fa9426  "Construct. RECEIVED IIR: "
+  @01fa9486  "Construct: "
+  @01fa94ea  "Construct: ReadSubClass for IIR "
+  @01fc06a4  "ConstructionMenuIIR_c::PollStatus[%d:%u], invalid id!."
+      <- ptr@006d8455  FUN_006d8440 @006d8440 size=131
+  @01fc071c  "ConstructionOrderIIR_c::PollStatus[%d:%u], invalid id!."
+      <- ptr@006d90b5  FUN_006d90a0 @006d90a0 size=131
+  @01fefa64  "Construct"
+  @01fefa74  "Construct < s_CallbackNameToName.size() && s_CallbackNameToName[e_OnConstruct].e"
+  @01fefab8  "Construct].empty()"
+  @0201c8cb  "Constructed()"
+  @02035990  "Constructor"
+  @0203da9e  "Constructor"
+  @020a0d04  "ConstructionMenuWindow"
+      <- ptr@01633fe1  FUN_01633fc0 @01633fc0 size=725
+  @020a0d1c  "ConstructionTitle"
+      <- ptr@016340bf  FUN_01633fc0 @01633fc0 size=725
+      <- ptr@016340f0  FUN_01633fc0 @01633fc0 size=725
+      <- ptr@016340fe  FUN_01633fc0 @01633fc0 size=725
+  @020a94f8  "Construction speed"
+      <- ptr@016b9c52  FUN_016b98c0 @016b98c0 size=1630
+  @020af04e  "ConstructionMenuGUI/ConstructionMenuView.xml"
+  @020af062  "ConstructionMenuView.xml"
+  @020af07c  "ConstructionMenuView data container not created!"
+      <- ptr@017254f1  FUN_01725420 @01725420 size=760
+  @020af0bc  "ConstructionHeader"
+      <- ptr@0172560b  FUN_01725420 @01725420 size=760
+  @020b2992  "ConstructionMenuGUI/BuildingView.xml"
+  @021c5d5c  "ConstructionMenuIIR_c@@"
+  @021c5d80  "ConstructionOrderIIR_c@@"
+  @021dd878  "ConstructorObject2@VASPoint@asc@@MM@@"
+  @021dd8b0  "ConstructorObject@VASPoint@asc@@MMVSFFOUnusedArgType@@V3@V3@V3@V3@V3@V3@V3@@@"
+  @021de396  "ConstructorObjectBase@@"
+  @021de3c0  "ConstructorObject4@VASRect@asc@@MMMM@@"
+  @021de3f8  "ConstructorObject@VASRect@asc@@MMMMVSFFOUnusedArgType@@V3@V3@V3@V3@V3@@@"
+  @021df7b0  "ConstructorObject0@VSFClipLoader@@@@"
+  @021df7e8  "ConstructorObject@VSFClipLoader@@VSFFOUnusedArgType@@V2@V2@V2@V2@V2@V2@V2@V2@V2@"
+  @021df92b  "Constructor@?7??InstallConstructor@ActionScriptClass@@IAEXXZ@"
+  @021df942  "Constructor@ActionScriptClass@@IAEXXZ@"
+  @021e1540  "ConstructorObject1@VASDistributedValue@asc@@ABVString@@@@"
+  @021e1590  "ConstructorObject@VASDistributedValue@asc@@ABVString@@VSFFOUnusedArgType@@V4@V4@"
+  @021e1888  "ConstructorObject0@VEscapeStackNodeCPP@asc@@@@"
+  @021e18c8  "ConstructorObject@VEscapeStackNodeCPP@asc@@VSFFOUnusedArgType@@V3@V3@V3@V3@V3@V3"
+  @021e1c38  "ConstructorObject2@VDialogBoxIF@@ABVString@@W4StandardButtons_e@DialogBox_c@@@@"
+  @021e1c98  "ConstructorObject@VDialogBoxIF@@ABVString@@W4StandardButtons_e@DialogBox_c@@VSFF"
+  @021e2180  "ConstructorObject1@VASWeakPtr@asc@@AAVGFxValue@@@@"
+  @021e21c8  "ConstructorObject@VASWeakPtr@asc@@AAVGFxValue@@VSFFOUnusedArgType@@V4@V4@V4@V4@V"
+  @021e25d0  "ConstructorObject1@VASFormat@asc@@ABVString@@@@"
+  @021e2610  "ConstructorObject@VASFormat@asc@@ABVString@@VSFFOUnusedArgType@@V4@V4@V4@V4@V4@V"
+  @021e2ab8  "ConstructorObject1@VASLDBFormat@asc@@ABVString@@@@"
+  @021e2b00  "ConstructorObject@VASLDBFormat@asc@@ABVString@@VSFFOUnusedArgType@@V4@V4@V4@V4@V"
+  @021e2e5c  "ConstructorObject0@VASInventoryItem@@@@"
+  @021e2e98  "ConstructorObject@VASInventoryItem@@VSFFOUnusedArgType@@V2@V2@V2@V2@V2@V2@V2@V2@"
+  @021e3200  "ConstructorObject1@VInventory@asc@@ABVID32@@@@"
+  @021e3240  "ConstructorObject@VInventory@asc@@ABVID32@@VSFFOUnusedArgType@@V4@V4@V4@V4@V4@V4"
+  @021e3a88  "ConstructorObject1@VASCharacter@asc@@ABVID32@@@@"
+  @021e3ad0  "ConstructorObject@VASCharacter@asc@@ABVID32@@VSFFOUnusedArgType@@V4@V4@V4@V4@V4@"
+  @021e3c84  "ConstructorObject0@VASBuffData@asc@@@@"
+  @021e3cc0  "ConstructorObject@VASBuffData@asc@@VSFFOUnusedArgType@@V3@V3@V3@V3@V3@V3@V3@V3@V"
+  @021e4614  "ConstructorObject1@VASDynel@asc@@ABVID32@@@@"
+
+=== "Serialize" ===
+  @020310c0  "Serialized; unknown version "
+  @020310e4  "Serialized; failed after loading monsterdata instance."
+  @02031120  "Serialized; failed after reading attractor "
+  @02031150  "Serialized; failed after reading skinned mesh "
+  @02031184  "Serialized; failed after reading morph value "
+
+=== "iir key" ===
+  @01fa9511  "iir key 0! Programmer error."
+
+=== "Rpc" ===
+  @01f7cf2f  "Rpc header: "
+  @01f83406  "RpcHeader.!..caller_id.. .(.2..ProtoEndpoint.#..endpoint_id.. .(.2..ProtoEndpoin"
+  @021be068  "RpcHeader@@"
+
+=== "RPC" ===
+  @01ed2550  "RPC_DELETE"
+  @01ed55e5  "RPC_CANCELLED"
+  @01ed791d  "RPC_PACKAGES_REGISTERED"
+  @01ed8ce8  "RPC_S_GRP_ELT_NOT_REMOVED"
+      <- ptr@01ba32ea
+  @01ed8d04  "RPC_S_GRP_ELT_NOT_ADDED"
+      <- ptr@01ba32e0
+  @01ed8d1c  "RPC_S_PRF_ELT_NOT_REMOVED"
+      <- ptr@01ba32d6
+  @01ed8d38  "RPC_S_PRF_ELT_NOT_ADDED"
+      <- ptr@01ba32cc
+  @01ed8d50  "RPC_S_PROFILE_NOT_ADDED"
+      <- ptr@01ba32c2
+  @01ed8d68  "RPC_S_INTERFACE_NOT_EXPORTED"
+      <- ptr@01ba32b8
+  @01ed8d88  "RPC_S_NOT_ALL_OBJS_EXPORTED"
+      <- ptr@01ba32ae
+  @01ed8da4  "RPC_S_ENTRY_TYPE_MISMATCH"
+      <- ptr@01ba32a4
+  @01ed9038  "RPC_X_PIPE_EMPTY"
+      <- ptr@01ba31aa
+  @01ed904c  "RPC_X_PIPE_DISCIPLINE_ERROR"
+      <- ptr@01ba31a0
+  @01ed9068  "RPC_X_PIPE_CLOSED"
+      <- ptr@01ba3196
+  @01ed907c  "RPC_S_INVALID_ASYNC_CALL"
+      <- ptr@01ba318c
+  @01ed9098  "RPC_S_INVALID_ASYNC_HANDLE"
+      <- ptr@01ba3182
+  @01ed90b4  "RPC_S_SEND_INCOMPLETE"
+      <- ptr@01ba3178
+  @01ed91e8  "RPC_S_INVALID_OBJECT"
+      <- ptr@01ba30f6
+  @01ed9214  "RPC_S_GROUP_MEMBER_NOT_FOUND"
+      <- ptr@01ba30e2
+  @01ed9234  "RPC_X_WRONG_PIPE_VERSION"
+      <- ptr@01ba30d8
+  @01ed9250  "RPC_X_WRONG_PIPE_ORDER"
+      <- ptr@01ba30ce
+  @01ed9268  "RPC_X_INVALID_PIPE_OBJECT"
+      <- ptr@01ba30c4
+  @01ed9284  "RPC_X_WRONG_STUB_VERSION"
+      <- ptr@01ba30ba
+  @01ed92a0  "RPC_X_WRONG_ES_VERSION"
+      <- ptr@01ba30b0
+  @01ed92b8  "RPC_X_INVALID_ES_ACTION"
+      <- ptr@01ba30a6
+  @01ed92d0  "RPC_S_NOT_CANCELLED"
+      <- ptr@01ba309c
+  @01ed92e4  "RPC_S_SEC_PKG_ERROR"
+      <- ptr@01ba3092
+  @01ed92f8  "RPC_S_UUID_LOCAL_ONLY"
+      <- ptr@01ba3088
+  @01ed9310  "RPC_S_NOT_RPC_ERROR"
+      <- ptr@01ba307e
+  @01ed931a  "RPC_ERROR"
+  @01ed9324  "RPC_S_NO_PRINC_NAME"
+      <- ptr@01ba3074
+  @01ed9338  "RPC_S_UNSUPPORTED_AUTHN_LEVEL"
+      <- ptr@01ba306a
+  @01ed9358  "RPC_S_COMM_FAILURE"
+      <- ptr@01ba3060
+  @01ed936c  "RPC_S_BINDING_INCOMPLETE"
+      <- ptr@01ba3056
+  @01ed9388  "RPC_S_CALL_CANCELLED"
+      <- ptr@01ba304c
+  @01ed93a0  "RPC_S_NO_INTERFACES"
+      <- ptr@01ba3042
+  @01ed9500  "RPC_S_NO_MORE_BINDINGS"
+      <- ptr@01ba2fd4
+  @01ed96b4  "RPC_S_CALL_IN_PROGRESS"
+      <- ptr@01ba2f3e
+  @01ed9794  "RPC_X_BAD_STUB_DATA"
+      <- ptr@01ba2eee
+  @01ed97a8  "RPC_X_BYTE_COUNT_TOO_SMALL"
+      <- ptr@01ba2ee4
+  @01ed97c4  "RPC_X_ENUM_VALUE_OUT_OF_RANGE"
+      <- ptr@01ba2eda
+  @01ed97e4  "RPC_X_NULL_REF_POINTER"
+      <- ptr@01ba2ed0
+  @01ed97fc  "RPC_X_SS_CANNOT_GET_CALL_HANDLE"
+      <- ptr@01ba2ec6
+  @01ed981c  "RPC_X_SS_HANDLES_MISMATCH"
+      <- ptr@01ba2ebc
+  @01ed9838  "RPC_X_SS_CONTEXT_DAMAGED"
+      <- ptr@01ba2eb2
+  @01ed9854  "RPC_X_SS_IN_NULL_CONTEXT"
+      <- ptr@01ba2ea8
+  @01ed9870  "RPC_X_SS_CHAR_TRANS_SHORT_FILE"
+      <- ptr@01ba2e9e
+  @01ed9890  "RPC_X_SS_CHAR_TRANS_OPEN_FAIL"
+      <- ptr@01ba2e94
+  @01ed98b0  "RPC_X_NO_MORE_ENTRIES"
+      <- ptr@01ba2e8a
+  @01ed98c8  "RPC_S_FP_OVERFLOW"
+      <- ptr@01ba2e80
+  @01ed98dc  "RPC_S_FP_UNDERFLOW"
+      <- ptr@01ba2e76
+  @01ed98f0  "RPC_S_FP_DIV_ZERO"
+      <- ptr@01ba2e6c
+  @01ed9904  "RPC_S_ADDRESS_ERROR"
+      <- ptr@01ba2e62
+  @01ed9918  "RPC_S_ZERO_DIVIDE"
+      <- ptr@01ba2e58
+  @01ed992c  "RPC_S_INTERNAL_ERROR"
+      <- ptr@01ba2e4e
+  @01ed9944  "RPC_S_NO_CONTEXT_AVAILABLE"
+      <- ptr@01ba2e44
+  @01ed9960  "RPC_S_CANNOT_SUPPORT"
+      <- ptr@01ba2e3a
+  @01ed9978  "RPC_S_INVALID_NAF_ID"
+      <- ptr@01ba2e30
+  @01ed9990  "RPC_S_NAME_SERVICE_UNAVAILABLE"
+      <- ptr@01ba2e26
+  @01ed99b0  "RPC_S_ENTRY_NOT_FOUND"
+      <- ptr@01ba2e1c
+
+=== "opcode" ===
+  @01f21f17  "opcode"
+
+=== "Opcode" ===
+  (none)
+
+=== "method" ===
+  @01ea4af8  "method is invalid."
+  @01eaf2cc  "method of %s class.."
+  @01eaf316  "method is null."
+  @01eaf40e  "method is null."
+  @01eb0247  "method %s is not a function."
+  @01eb0273  "method %s.%s is not a function."
+  @01eb0753  "method '%s' is not a function."
+  @01eb0783  "method '%s.%s' is not a function."
+  @01eb07ba  "method '%s' to invoke.."
+  @01eb07e6  "method '%s.%s' to invoke.."
+  @01eb0aca  "method '%s' is not found.."
+  @01eb0af6  "method '%s.%s' is not found.."
+  @01eb0b23  "method (%s) is not a function."
+  @01eb0b53  "method (%s.%s) is not a function."
+  @01eb0ba4  "method '%s'.."
+  @01eb0bd3  "method %s."
+  @01eb0bff  "method %s.%s."
+  @01eb0c1f  "method (%s) is null."
+  @01eb0c43  "method (%s.%s) is null."
+  @01eb0c7e  "method."
+  @01eb0cad  "method."
+  @01eb794f  "method.."
+  @01ee8ac5  "method failed because a DTD or schema was not specified in the document."
+  @01ee8b95  "method failed because the document does not contain exactly one root node."
+  @01ee93b0  "method of function from callback."
+  @01ee9a13  "method is invalid."
+  @01ee9d07  "method."
+  @01eeca09  "method SetCooperativeLevel being called."
+  @01eee511  "methods while in full-screen mode."
+  @01ef51da  "method was acceptable. (It is quite likely that the SOCKS5 server wanted a usern"
+  @01ef5286  "method was acceptable."
+  @01ef6e1e  "method"
+  @01ef6eb3  "method 0"
+  @01ef6ed5  "method"
+  @01ef6f81  "method 8 is supported by PNG"
+  @01ef7b57  "method in IHDR"
+  @01ef7b77  "method in IHDR"
+  @01ef7b9c  "method in IHDR"
+  @01ef7bbe  "method in IHDR"
+  @01ef8389  "method or flags in IDAT"
+  @01efa1b8  "method"
+  @01f0fc58  "method"
+      <- ptr@01cd9b80  FUN_01cd9b10 @01cd9b10 size=257
+      <- ptr@01cdb34f  FUN_01cdb200 @01cdb200 size=337
+  @01f0ff98  "method/C-call boundary"
+  @01f13b17  "method requires a singular field."
+  @01f13b93  "method requires a repeated field."
+  @01f15ceb  "method.. .(.2&.google.protobuf.MethodDescriptorProto.0..options.. .(.2..google.p"
+  @01f77ca5  "method. Hint: Did you try to access the display to early/late in the program?"
+  @01f7e230  "method out of range! Server/Client code possibly out of sync (or hack attempt).."
+  @01f834b6  "method_instance.. .(."
+  @01fc3121  "method/fql.query?format=json&query=SELECT+pid+FROM+photo+WHERE+object_id=""
+  @01fc3195  "method/photos.addTag?pid="
+  @01fc3201  "method/fql.query?format=json&query=SELECT+uid,name,is_app_user+FROM+user+WHERE+u"
+  @01fc32b1  "method/stream.publish?access_token="
+  @01fea09b  "method"
+  @01fea0d0  "method" parameter: "%s"!"
+  @02049b90  "method"
+  @02063764  "methods"
+      <- ptr@01324f20  FUN_01324ec0 @01324ec0 size=385
+  @0207ac47  "method was called."
+
+=== "Dispatch" ===
+  @01f7a23c  "Dispatcher.cpp"
+  @01f7a336  "Dispatcher"
+  @01f7cde0  "Dispatcher.cpp"
+      <- ptr@00467dc8  FUN_00467d90 @00467d90 size=237
+      <- ptr@00467e23  FUN_00467d90 @00467d90 size=237
+      <- ptr@00467f6e  FUN_00467f40 @00467f40 size=268
+      <- ptr@00467fd1  FUN_00467f40 @00467f40 size=268
+      <- ptr@0046937e  FUN_00469370 @00469370 size=119
+  @01f7ce3c  "Dispatcher_t::Dispatch() BinaryStream fail"
+      <- ptr@0046811a  FUN_00468050 @00468050 size=4772
+  @01f7ce4a  "Dispatch() BinaryStream fail"
+  @01f7ce68  "Dispatcher"
+      <- ptr@00468255  FUN_00468050 @00468050 size=4772
+      <- ptr@004682e5  FUN_00468050 @00468050 size=4772
+      <- ptr@00468bd1  FUN_00468050 @00468050 size=4772
+      <- ptr@00468cdd  FUN_00468050 @00468050 size=4772
+      <- ptr@00468e6f  FUN_00468050 @00468050 size=4772
+      <- ptr@00468f7c  FUN_00468050 @00468050 size=4772
+      <- ptr@00468ff8  FUN_00468050 @00468050 size=4772
+      <- ptr@00469105  FUN_00468050 @00468050 size=4772
+  @01f7cf04  "Dispatcher_t::Dispatch() BinaryStream fail Rpc header: "
+      <- ptr@00468609  FUN_00468050 @00468050 size=4772
+  @01f7cf12  "Dispatch() BinaryStream fail Rpc header: "
+  @01f7cf40  "Dispatcher_t::Dispatch possible hack attempt! Endpoint=%s nMethodInstance=%d:%s "
+      <- ptr@0046a6aa  FUN_0046a680 @0046a680 size=231
+  @01f7cf4e  "Dispatch possible hack attempt! Endpoint=%s nMethodInstance=%d:%s cCallerEID=%s "
+  @01f7cfd1  "Dispatcher"
+  @01f7cff0  "Dispatcher_t "
+      <- ptr@004689d4  FUN_00468050 @00468050 size=4772
+      <- ptr@00468d5b  FUN_00468050 @00468050 size=4772
+  @01f7d034  "Dispatcher call "
+      <- ptr@00468c5f  FUN_00468050 @00468050 size=4772
+  @01f7d0e8  "Dispatcher call "
+  @01f7e1ff  "Dispatch_t::DispatchMethod ""
+  @01f7e20b  "DispatchMethod ""
+  @01f7e293  "Dispatch_t::DispatchMethod("
+  @01f7e29f  "DispatchMethod("
+  @01f7e2bf  "Dispatch_t::DispatchOnFacebookTokenResult() not possible, stream bad after 'stor"
+  @01f7e2cb  "DispatchOnFacebookTokenResult() not possible, stream bad after 'storedToken'! Se"
+  @01f7e367  "Dispatch_t::DispatchOnFacebookTokenResult() not possible, stream bad after 'shou"
+  @01f7e373  "DispatchOnFacebookTokenResult() not possible, stream bad after 'shouldAskToSignI"
+  @01f7e41f  "Dispatch_t::DispatchOnUpdateFacebookFriends() not possible, stream bad after 'fb"
+  @01f7e42b  "DispatchOnUpdateFacebookFriends() not possible, stream bad after 'fbFriends'! Se"
+  @01f7e4c7  "Dispatch_t::DispatchOnFacebookFriendSignedUp() not possible, stream bad after 'f"
+  @01f7e4d3  "DispatchOnFacebookFriendSignedUp() not possible, stream bad after 'fbFriend'! Se"
+  @01f7e56f  "Dispatch_t::DispatchAuthenticateAck() not possible, stream bad after 'nStatus'! "
+  @01f7e57b  "DispatchAuthenticateAck() not possible, stream bad after 'nStatus'! Server/Clien"
+  @01f7e60f  "Dispatch_t::DispatchLoginConnectReady() not possible, stream bad after 'gameServ"
+  @01f7e61b  "DispatchLoginConnectReady() not possible, stream bad after 'gameServerAddr'! Ser"
+  @01f7e6b7  "Dispatch_t::DispatchLoginConnectReady() not possible, stream bad after 'nCookie'"
+  @01f7e6c3  "DispatchLoginConnectReady() not possible, stream bad after 'nCookie'! Server/Cli"
+  @01f7e757  "Dispatch_t::DispatchLoginConnectReady() not possible, stream bad after 'cClientC"
+  @01f7e763  "DispatchLoginConnectReady() not possible, stream bad after 'cClientCharacterID'!"
+  @01f7e7ff  "Dispatch_t::DispatchLoginConnectReady() not possible, stream bad after 'cPF'! Se"
+  @01f7e80b  "DispatchLoginConnectReady() not possible, stream bad after 'cPF'! Server/Client "
+  @01f7e89f  "Dispatch_t::DispatchCSServerConnectReady() not possible, stream bad after 'i_nAd"
+  @01f7e8ab  "DispatchCSServerConnectReady() not possible, stream bad after 'i_nAddress'! Serv"
+  @01f7e947  "Dispatch_t::DispatchCSServerConnectReady() not possible, stream bad after 'nCook"
+  @01f7e953  "DispatchCSServerConnectReady() not possible, stream bad after 'nCookie'! Server/"
+  @01f7e9e7  "Dispatch_t::DispatchCSServerConnectReady() not possible, stream bad after 'cClie"
+  @01f7e9f3  "DispatchCSServerConnectReady() not possible, stream bad after 'cClientCharacterI"
+  @01f7ea97  "Dispatch_t::DispatchChatServerConnectReady() not possible, stream bad after 'add"
+  @01f7eaa3  "DispatchChatServerConnectReady() not possible, stream bad after 'address'! Serve"
+  @01f7eb3f  "Dispatch_t::DispatchChatServerConnectReady() not possible, stream bad after 'coo"
+  @01f7eb4b  "DispatchChatServerConnectReady() not possible, stream bad after 'cookie'! Server"
+  @01f7ebe7  "Dispatch_t::DispatchChatServerConnectReady() not possible, stream bad after 'cha"
+  @01f7ebf3  "DispatchChatServerConnectReady() not possible, stream bad after 'characterID'! S"
+  @01f7ec8f  "Dispatch_t::DispatchUpdateClientPlayerData() not possible, stream bad after 'cli"
+  @01f7ec9b  "DispatchUpdateClientPlayerData() not possible, stream bad after 'clientPlayerDat"
+  @01f7ed3f  "Dispatch_t::DispatchUpdateClientPlayerData() not possible, stream bad after 'fid"
+  @01f7ed4b  "DispatchUpdateClientPlayerData() not possible, stream bad after 'fidData'! Serve"
+  @01f7ede7  "Dispatch_t::DispatchUpdateClientPlayerData() not possible, stream bad after 'ter"
+  @01f7edf3  "DispatchUpdateClientPlayerData() not possible, stream bad after 'territoryID'! S"
+  @01f7ee8f  "Dispatch_t::DispatchSetDimensionList() not possible, stream bad after 'cDimensio"
+  @01f7ee9b  "DispatchSetDimensionList() not possible, stream bad after 'cDimensionList'! Serv"
+  @01f7ef37  "Dispatch_t::DispatchSetStats() not possible, stream bad after 'cStatsStr'! Serve"
+  @01f7ef43  "DispatchSetStats() not possible, stream bad after 'cStatsStr'! Server/Client cod"
+  @01f7efcf  "Dispatch_t::DispatchSuggestNicknameResult() not possible, stream bad after 'cSug"
+  @01f7efdb  "DispatchSuggestNicknameResult() not possible, stream bad after 'cSuggestionName'"
+
+=== "Stub" ===
+  (none)
+
+=== "Proxy" ===
+  @01ef2198  "Proxy-authenticate:"
+      <- ptr@01bfdb17  FUN_01bfd410 @01bfd410 size=2872
+      <- ptr@01c06f3d  FUN_01c06a50 @01c06a50 size=2213
+  @01ef22e4  "Proxy-Connection:"
+      <- ptr@01bfd764  FUN_01bfd410 @01bfd410 size=2872
+      <- ptr@01bfd7aa  FUN_01bfd410 @01bfd410 size=2872
+      <- ptr@01c05f87  FUN_01c05540 @01c05540 size=5371
+      <- ptr@01c06b8c  FUN_01c06a50 @01c06a50 size=2213
+      <- ptr@01c06ffb  FUN_01c06a50 @01c06a50 size=2213
+  @01ef2e84  "Proxy-"
+      <- ptr@01c04627  FUN_01c045a0 @01c045a0 size=205
+      <- ptr@01c137f5  FUN_01c13510 @01c13510 size=1074
+      <- ptr@01c1384b  FUN_01c13510 @01c13510 size=1074
+  @01ef2f00  "Proxy-authorization:"
+      <- ptr@01c048ba  FUN_01c04860 @01c04860 size=282
+  @01ef3184  "Proxy-Connection: Keep-Alive.."
+      <- ptr@01c05f96  FUN_01c05540 @01c05540 size=5371
+      <- ptr@01c06b9f  FUN_01c06a50 @01c06a50 size=2213
+  @01ef33d0  "Proxy replied OK to CONNECT request."
+      <- ptr@01c072ca  FUN_01c06a50 @01c06a50 size=2213
+  @01ef3428  "Proxy CONNECT aborted due to timeout"
+      <- ptr@01c0723e  FUN_01c06a50 @01c06a50 size=2213
+  @01ef3450  "Proxy CONNECT aborted due to select/poll error"
+      <- ptr@01c07168  FUN_01c06a50 @01c06a50 size=2213
+  @01ef3520  "Proxy CONNECT aborted"
+      <- ptr@01c06dee  FUN_01c06a50 @01c06a50 size=2213
+  @01eff9f4  "Proxy-Authorization: Basic %s.."
+      <- ptr@01c741d7  FUN_01c740b4 @01c740b4 size=2903
+  @01f70e46  "ProxyModelType"
+  @01f70e6e  "ProxyModelInstance"
+  @01f70e9a  "ProxyGroupInstance"
+  @01f70ec6  "ProxySubgroupInstance"
+  @01f72752  "ProxyDifficultyLevel"
+  @01f79732  "Proxy().GetCallerEID().GetInst() == cPlayerID.GetInstance()"
+  @01f7ce2a  "Proxy"
+  @01f7d255  "Proxy"
+  @01f7d274  "Proxy_t::called with a too low id! min allowed "
+      <- ptr@0046c2ce  FUN_0046c250 @0046c250 size=448
+  @01f7d2b0  "Proxy instance %d"
+  @01f7d2e6  "ProxyInstance"
+  @01f7d2f4  "Proxy.cpp"
+      <- ptr@0046c3d6  FUN_0046c250 @0046c250 size=448
+      <- ptr@0046c8ce  FUN_0046c7a0 @0046c7a0 size=354
+  @01f7d324  "Proxy"
+      <- ptr@0046c958  FUN_0046c910 @0046c910 size=1534
+      <- ptr@0046c9f9  FUN_0046c910 @0046c910 size=1534
+      <- ptr@00cafd70  FUN_00cafc80 @00cafc80 size=2549
+      <- ptr@00cafdf5  FUN_00cafc80 @00cafc80 size=2549
+      <- ptr@00cafea8  FUN_00cafc80 @00cafc80 size=2549
+      <- ptr@00caff2d  FUN_00cafc80 @00cafc80 size=2549
+      <- ptr@00cb002b  FUN_00cafc80 @00cafc80 size=2549
+      <- ptr@00cb00b0  FUN_00cafc80 @00cafc80 size=2549
+      <- ptr@00cb02e6  FUN_00cafc80 @00cafc80 size=2549
+      <- ptr@00cb036b  FUN_00cafc80 @00cafc80 size=2549
+      <- ptr@00cb03f0  FUN_00cafc80 @00cafc80 size=2549
+      <- ptr@00cb0480  FUN_00cafc80 @00cafc80 size=2549
+      <- ptr@00cb055b  FUN_00cafc80 @00cafc80 size=2549
+      <- ptr@00cb05eb  FUN_00cafc80 @00cafc80 size=2549
+      <- ptr@01c0491c  FUN_01c04860 @01c04860 size=282
+      <- ptr@01c04928  FUN_01c04860 @01c04860 size=282
+  @01f7d331  "Proxy_t::SendMethodInvocation() RPC: "
+  @01f81743  "Proxy_t::called with a too low id! min allowed "
+  @01f8199b  "Proxy.cpp"
+  @01f819db  "Proxy_t::Authenticate(ID32::InstanceType nAccount, unsigned int nCookie, unsigne"
+  @01f81a6b  "Proxy_t::AuthenticateLoggedIn(ID32::InstanceType playerInstance, unsigned int co"
+  @01f81aeb  "Proxy_t::LoginFromCrash(uint32 player, uint32 cookie, uint32 character) streamed"
+  @01f81b5b  "Proxy_t::CreateCharacter(uint i_nDimID, const std::string& cRDBDSN, const uint16"
+  @01f81c53  "Proxy_t::CreateCharacterWithData(uint dim, StrStrMap& dataMap, const uint16 regi"
+  @01f81d4b  "Proxy_t::LoginCharacter(ID32::InstanceType nCharInstance, const StrStrMap& dataM"
+  @01f81e7b  "Proxy_t::RenameCharacter(ID32::InstanceType nCharInstance, String& cNewName) str"
+  @01f81ef3  "Proxy_t::RequestDeleteCharacter(ID32::InstanceType nCharacterInstance) streamed "
+  @01f81f63  "Proxy_t::VerifyLanguageSetting(const int nClientLanguage) streamed payload of si"
+  @01f81fc3  "Proxy_t::AddOfflineLevel(ID32::InstanceType nCharInstance) streamed payload of s"
+  @01f82023  "Proxy_t::UnlockCharacter(ID32::InstanceType charInstance) streamed payload of si"
+  @01f82083  "Proxy_t::SetHardcoreLevel(ID32::InstanceType charInstance, int nHardcoreLevel) s"
+  @01f820fb  "Proxy_t::GetDimensionList() streamed payload of size "
+  @01f82143  "Proxy_t::RequestSuggestNickname(int i_nRace, int i_nSex) streamed payload of siz"
+  @01f821a3  "Proxy_t::GetStartupData(const String& md5) streamed payload of size "
+  @01f821f3  "Proxy_t::LoadFacebookToken() streamed payload of size "
+  @01f8223b  "Proxy_t::SaveFacebookToken(uint64 facebookUserId, const String& tokenToStore) st"
+  @01f822b3  "Proxy_t::UpdateFacebookFriends(const std::vector<uint64>& fbFriendIds) streamed "
+  @01f82323  "Proxy_t::RecruitFacebookFriends(const FacebookNS::FacebookFriendsMap& fbFriends)"
+  @01f8239b  "Proxy_t::UpdateSubscriptionSettings(IOBuffer& data, const String& md5) streamed "
+  @01f8240b  "Proxy_t::UpdateCharacterSettings(const ID32& characterId, IOBuffer& data, const "
+  @01f82493  "Proxy_t::UpdateCharacterPreview(const ID32& characterId, IOBuffer& data) streame"
+  @01f82503  "Proxy_t::FinishGetStartupData(const CharacterCheckSumMap& characterMap) streamed"
+  @01f82573  "Proxy_t::ReceivedCharacterSettings() streamed payload of size "
+  @01f825c3  "Proxy_t::ClientReplyKeepCookie() streamed payload of size "
+  @01f8260d  "Proxy_t::called with a too low id! min allowed "
+  @01f82689  "Proxy.cpp"
+  @01f826a5  "Proxy_t::InitiateAuthentication(const std::string& username, const uint32 nGameI"
+  @01f82725  "Proxy_t::AnswerChallenge(const std::string& cAnswerChallenge) streamed payload o"
+  @01f8278d  "Proxy_t::ClientDisconnected(ID32::InstanceType nConnectionID) streamed payload o"
+  @01f827f1  "Proxy_t::called with a too low id! min allowed "
+  @01f82879  "Proxy.cpp"
+  @01f82891  "Proxy_t::PassBlob(BinaryStream& b) streamed payload of size "
+  @01f828d9  "Proxy_t::Ping(uint32 sequenceId) streamed payload of size "
+
+=== "endpoint" ===
+  @01f1420d  "endpoint): "
+  @01f83436  "endpoint_id.. .(.2..ProtoEndpoint.+..routing_destination.. .(.2..ProtoEndpoint.,"
+  @0208c998  "endpoint/auth&scope=scope_general,scope_billing"
+
+=== "FullPlayerCharacter" ===
+  @01f94370  "FullPlayerCharacterIIR"
+  @01fc8ff0  "FullPlayerCharacterIIR::Activate, no dynel for %u:%u."
+  @01fc902c  "FullPlayerCharacterIIR::Activate, Got stat %d,%d."
+  @01fc9064  "FullPlayerCharacterIIR::ReadSubClass() Wrong IIR_t version %d, (current is %d).."
+  @020473fc  "FullPlayerCharacterIIR"
+      <- ptr@00796508  FUN_00796500 @00796500 size=524
+      <- ptr@0116e9a9  FUN_0116e900 @0116e900 size=183
+  @021c9d28  "FullPlayerCharacterIIR@@"
+  @0221609c  "FullPlayerCharacterIIR@@"
+
+=== "CoreCharacter" ===
+  @01fa99c6  "CoreCharacter::Get(cPlayerID) returned NULL for cPlayerID=%d:%d."
+  @01fc198c  "CoreCharacter::GetQuestHolder() - created by npc ("
+      <- ptr@006eb9b8  FUN_006eb910 @006eb910 size=315
+      <- ptr@006ebaf8  FUN_006eba50 @006eba50 size=315
+  @01fc19c0  "CoreCharacter::GetActionHolder() - created by npc ("
+      <- ptr@006ebcdf  FUN_006ebc30 @006ebc30 size=320
+  @01fc19f4  "CoreCharacter\CoreCharacter.cpp"
+      <- ptr@006ebeb1  FUN_006ebea0 @006ebea0 size=47
+      <- ptr@006ebfd8  FUN_006ebf20 @006ebf20 size=328
+      <- ptr@006ecf63  FUN_006eceb0 @006eceb0 size=392
+      <- ptr@006efe20  FUN_006efd60 @006efd60 size=642
+      <- ptr@006f1a3e  FUN_006f1980 @006f1980 size=415
+      <- ptr@006f1b45  FUN_006f1b20 @006f1b20 size=114
+      <- ptr@006f1b69  FUN_006f1b20 @006f1b20 size=114
+      <- ptr@009c515d  FUN_009c5140 @009c5140 size=85
+  @01fc1a02  "CoreCharacter.cpp"
+  @01fc1a28  "CoreCharacter::GetTeamHolder() - called by npc. This will crash!"
+      <- ptr@006ebf7b  FUN_006ebf20 @006ebf20 size=328
+  @01fc1a95  "CoreCharacter::Action() Could not open SpellBook.."
+  @01fc1ac9  "CoreCharacter::Action() unhandled action "
+  @01fc1bb0  "CoreCharacter"
+      <- ptr@006ee9b3  FUN_006ee980 @006ee980 size=231
+      <- ptr@006eea13  FUN_006ee980 @006ee980 size=231
+      <- ptr@006eeab3  FUN_006eea70 @006eea70 size=715
+      <- ptr@006eeb13  FUN_006eea70 @006eea70 size=715
+      <- ptr@006eeb67  FUN_006eea70 @006eea70 size=715
+  @01fc1fb0  "CoreCharacter::SetupDefaultStats() for %d:%d(%s):  stats::e_Health =%d  stats::e"
+      <- ptr@006f3eda  FUN_006f3eb0 @006f3eb0 size=227
+  @01fc2f90  "CoreCharacter\Facebook\FacebookInterface.cpp"
+      <- ptr@0070c40b  FUN_0070c380 @0070c380 size=346
+  @01fc3d7c  "CoreCharacter\CoreSkillHolder.cpp"
+      <- ptr@00718620  FUN_007184d0 @007184d0 size=385
+  @01fc4520  "CoreCharacter\CommandHolder\CoreCommandHolder.cpp"
+      <- ptr@0072e71d  FUN_0072e630 @0072e630 size=797
+      <- ptr@0072feba  FUN_0072fdc0 @0072fdc0 size=2153
+      <- ptr@00730747  FUN_00730660 @00730660 size=573
+  @01fc585c  "CoreCharacter\Combat\CoreCombatManager.cpp"
+      <- ptr@00743927  FUN_00743890 @00743890 size=453
+      <- ptr@00743af7  FUN_00743a60 @00743a60 size=453
+      <- ptr@00744273  FUN_007441b0 @007441b0 size=557
+  @01fc5f3c  "CoreCharacter\InventorySystem\CoreItemHolder.cpp"
+      <- ptr@0074ad31  FUN_0074ad10 @0074ad10 size=371
+      <- ptr@0074cdf2  FUN_0074cd50 @0074cd50 size=500
+      <- ptr@0074e650  FUN_0074e580 @0074e580 size=343
+      <- ptr@0074e7aa  FUN_0074e6e0 @0074e6e0 size=337
+      <- ptr@0074e92a  FUN_0074e840 @0074e840 size=363
+  @01fc7750  "CoreCharacter\InventorySystem\InventoryGame.cpp"
+      <- ptr@0076efbe  FUN_0076eed0 @0076eed0 size=793
+      <- ptr@0076f108  FUN_0076eed0 @0076eed0 size=793
+      <- ptr@00770075  FUN_00770050 @00770050 size=196
+  @01fc83cc  "CoreCharacter\Magic\Spellbook.cpp"
+      <- ptr@0077b06c  FUN_0077af90 @0077af90 size=737
+  @01fc8478  "CoreCharacter\PlayfieldAccessHolder.cpp"
+      <- ptr@0077e420  FUN_0077e200 @0077e200 size=612
+  @01fc84ec  "CoreCharacter\CoreShortcutBarIF.cpp"
+      <- ptr@0078320f  FUN_00783200 @00783200 size=95
+  @01fc91ec  "CoreCharacter\IIR\areaformulaiir.cpp"
+      <- ptr@0079e513  FUN_0079e440 @0079e440 size=732
+  @01fca084  "CoreCharacter\IIR\characteractioniir.cpp"
+      <- ptr@007a8426  FUN_007a83a0 @007a83a0 size=168
+  @01fca214  "CoreCharacter\IIR\threatleveliir.cpp"
+      <- ptr@007a8f06  FUN_007a8ee0 @007a8ee0 size=225
+      <- ptr@007a8f5a  FUN_007a8ee0 @007a8ee0 size=225
+  @01fca2cc  "CoreCharacter\IIR\skilliir.cpp"
+      <- ptr@007a9b55  FUN_007a9a90 @007a9a90 size=336
+  @01fca740  "CoreCharacter\IIR\groundeffectiir.cpp"
+      <- ptr@007afd00  FUN_007afc30 @007afc30 size=612
+  @01fcb220  "CoreCharacter\lookat.cpp"
+      <- ptr@007c0295  FUN_007bffc0 @007bffc0 size=2523
+  @01fcc650  "CoreCharacter\command.cpp"
+      <- ptr@007ddd96  FUN_007ddd60 @007ddd60 size=314
+  @01fcc82f  "CoreCharacter/command.h"
+  @01fcdb7c  "CoreCharacter\InventorySystem\CoreItemInfoCreator.cpp"
+      <- ptr@005f0a0f  FUN_005f0800 @005f0800 size=666
+      <- ptr@0074bb45  FUN_0074bad0 @0074bad0 size=209
+      <- ptr@00769d47  FUN_00769220 @00769220 size=3551
+      <- ptr@00769daa  FUN_00769220 @00769220 size=3551
+      <- ptr@0076d3d7  FUN_0076d3c0 @0076d3c0 size=88
+      <- ptr@00807a1e  FUN_00807a10 @00807a10 size=43
+      <- ptr@00807a66  FUN_00807a50 @00807a50 size=121
+      <- ptr@01395431  FUN_01395420 @01395420 size=54
+      <- ptr@0145d011  FUN_0145cfc0 @0145cfc0 size=775
+      <- ptr@0145d17c  FUN_0145cfc0 @0145cfc0 size=775
+      <- ptr@0145d1d5  FUN_0145cfc0 @0145cfc0 size=775
+      <- ptr@01465947  FUN_01465930 @01465930 size=88
+      <- ptr@0149369f  FUN_01493690 @01493690 size=45
+      <- ptr@014954f9  FUN_014938b0 @014938b0 size=8017
+      <- ptr@01495557  FUN_014938b0 @014938b0 size=8017
+      <- ptr@014998a1  FUN_01499670 @01499670 size=1065
+      <- ptr@014d3ed8  FUN_014d33d0 @014d33d0 size=3216
+      <- ptr@014d3f39  FUN_014d33d0 @014d33d0 size=3216
+      <- ptr@014d5a62  FUN_014d5980 @014d5980 size=2506
+      <- ptr@0176f8d5  FUN_0176f830 @0176f830 size=575
+  @01fce144  "CoreCharacter\CoreQuestHolder.cpp"
+      <- ptr@0080ef95  FUN_0080ef00 @0080ef00 size=360
+      <- ptr@0080f466  FUN_0080f430 @0080f430 size=955
+      <- ptr@0080f48b  FUN_0080f430 @0080f430 size=955
+  @01fcedc0  "CoreCharacter\CoreCharacterSignals.cpp"
+      <- ptr@0081797c  FUN_008178d0 @008178d0 size=289
+  @01fcedce  "CoreCharacterSignals.cpp"
+  @01fcef50  "CoreCharacter\signalholder.cpp"
+      <- ptr@0081883f  FUN_00818760 @00818760 size=1300
+  @01fcef88  "CoreCharacter\journalholder.cpp"
+      <- ptr@00819ca6  FUN_00819c50 @00819c50 size=158
+  @01fcf05c  "CoreCharacter\Pets\petholder.cpp"
+      <- ptr@0081b1b1  FUN_0081b140 @0081b140 size=227
+      <- ptr@0081b68b  FUN_0081b670 @0081b670 size=340
+  @01fcf1f4  "CoreCharacter\CoreTradeHolder.cpp"
+      <- ptr@0081dec3  FUN_0081de90 @0081de90 size=93
+  @01fcfda0  "CoreCharacter\IIR\reactiveiir.cpp"
+      <- ptr@0082c6b0  FUN_0082c690 @0082c690 size=131
+  @01fd04ac  "CoreCharacter\CommandQueue\TargetAnimationCommand.cpp"
+      <- ptr@0082ee00  FUN_0082e9c0 @0082e9c0 size=1329
+  @01fd19f0  "CoreCharacter\Data\PvPConRating.cpp"
+      <- ptr@00837d19  FUN_00837a40 @00837a40 size=868
+  @01fd29d0  "CoreCharacter\Pets\basepet.cpp"
+      <- ptr@008472dc  FUN_008472b0 @008472b0 size=70
+  @020474af  "CoreCharacter/CoreCharacterSignals.h"
+  @020474bd  "CoreCharacterSignals.h"
+  @0204832f  "CoreCharacter/lookat.h"
+  @02088294  "CoreCharacter\ScriptCommands\LookAtScriptCommand.cpp"
+      <- ptr@01450e93  FUN_01450e60 @01450e60 size=209
+      <- ptr@01450eb6  FUN_01450e60 @01450e60 size=209
+      <- ptr@01450ed6  FUN_01450e60 @01450e60 size=209
+      <- ptr@01450ee8  FUN_01450e60 @01450e60 size=209
+      <- ptr@01450f0a  FUN_01450e60 @01450e60 size=209
+      <- ptr@01450ff4  FUN_01450f40 @01450f40 size=552
+      <- ptr@01451045  FUN_01450f40 @01450f40 size=552
+  @020882cc  "CoreCharacter\ScriptCommands\ShowSubtitleScriptCommand.cpp"
+      <- ptr@014511a3  FUN_01451170 @01451170 size=108
+      <- ptr@014511b8  FUN_01451170 @01451170 size=108
+      <- ptr@01451209  FUN_014511e0 @014511e0 size=181
+  @02088308  "CoreCharacter\ScriptCommands\ShowFIFOMessageScriptCommand.cpp"
+      <- ptr@014512d3  FUN_014512a0 @014512a0 size=108
+      <- ptr@014512e8  FUN_014512a0 @014512a0 size=108
+      <- ptr@0145132f  FUN_01451310 @01451310 size=143
+  @02088348  "CoreCharacter\ScriptCommands\controlcharacter.cpp"
+      <- ptr@014513c8  FUN_014513a0 @014513a0 size=159
+      <- ptr@014513eb  FUN_014513a0 @014513a0 size=159
+      <- ptr@01451413  FUN_014513a0 @014513a0 size=159
+      <- ptr@0145146d  FUN_01451440 @01451440 size=113
+  @020883a0  "CoreCharacter\ScriptCommands\TagCharacterForCinematicScriptCommand.cpp"
+      <- ptr@014514ea  FUN_014514c0 @014514c0 size=114
+      <- ptr@01451518  FUN_014514c0 @014514c0 size=114
+  @020883e8  "CoreCharacter\ScriptCommands\clientbccactionscriptcommand.cpp"
+      <- ptr@014515d3  FUN_014515a0 @014515a0 size=145
+      <- ptr@014515f6  FUN_014515a0 @014515a0 size=145
+      <- ptr@0145160f  FUN_014515a0 @014515a0 size=145
+      <- ptr@01451670  FUN_01451640 @01451640 size=522
+      <- ptr@01451804  FUN_01451640 @01451640 size=522
+      <- ptr@01451946  FUN_01451910 @01451910 size=109
+      <- ptr@014519a7  FUN_01451980 @01451980 size=88
+  @0208844c  "CoreCharacter\ScriptCommands\isaclientscriptcommand.cpp"
+      <- ptr@01451a10  FUN_014519e0 @014519e0 size=136
+      <- ptr@01451a2d  FUN_014519e0 @014519e0 size=136
+      <- ptr@01451a50  FUN_014519e0 @014519e0 size=136
+  @02088484  "CoreCharacter\ScriptCommands\bccemotescriptcommand.cpp"
+      <- ptr@01451b63  FUN_01451b30 @01451b30 size=305
+      <- ptr@01451b8e  FUN_01451b30 @01451b30 size=305
+      <- ptr@01451bae  FUN_01451b30 @01451b30 size=305
+      <- ptr@01451bde  FUN_01451b30 @01451b30 size=305
+      <- ptr@01451bfe  FUN_01451b30 @01451b30 size=305
+      <- ptr@01451c1e  FUN_01451b30 @01451b30 size=305
+      <- ptr@01451c32  FUN_01451b30 @01451b30 size=305
+      <- ptr@01451d80  FUN_01451c70 @01451c70 size=1157
+      <- ptr@01451f16  FUN_01451c70 @01451c70 size=1157
+      <- ptr@01451f5b  FUN_01451c70 @01451c70 size=1157
+      <- ptr@01451fb1  FUN_01451c70 @01451c70 size=1157
+      <- ptr@01452033  FUN_01451c70 @01451c70 size=1157
+      <- ptr@014520ba  FUN_01451c70 @01451c70 size=1157
+      <- ptr@01452268  FUN_01452240 @01452240 size=125
+  @020886f0  "CoreCharacter\ScriptCommands\statcheckintervalscriptcommand.cpp"
+      <- ptr@01452a93  FUN_01452a60 @01452a60 size=210
+      <- ptr@01452ab3  FUN_01452a60 @01452a60 size=210
+      <- ptr@01452ac8  FUN_01452a60 @01452a60 size=210
+      <- ptr@01452ae6  FUN_01452a60 @01452a60 size=210
+      <- ptr@01452b0b  FUN_01452a60 @01452a60 size=210
+      <- ptr@01452b57  FUN_01452b40 @01452b40 size=132
+      <- ptr@01452b6a  FUN_01452b40 @01452b40 size=132
+      <- ptr@01452b83  FUN_01452b40 @01452b40 size=132
+  @02088730  "CoreCharacter\ScriptCommands\statcheckscriptcommand.cpp"
+      <- ptr@01452c0f  FUN_01452be0 @01452be0 size=507
+      <- ptr@01452c33  FUN_01452be0 @01452be0 size=507
+      <- ptr@01452c56  FUN_01452be0 @01452be0 size=507
+      <- ptr@01452c79  FUN_01452be0 @01452be0 size=507
+      <- ptr@01452c9b  FUN_01452be0 @01452be0 size=507
+      <- ptr@01452cd2  FUN_01452be0 @01452be0 size=507
+      <- ptr@01452cf9  FUN_01452be0 @01452be0 size=507
+      <- ptr@01452d06  FUN_01452be0 @01452be0 size=507
+      <- ptr@01452d20  FUN_01452be0 @01452be0 size=507
+      <- ptr@01452d4a  FUN_01452be0 @01452be0 size=507
+      <- ptr@01452d80  FUN_01452be0 @01452be0 size=507
+      <- ptr@01452dae  FUN_01452be0 @01452be0 size=507
+      <- ptr@01452f7b  FUN_01452de0 @01452de0 size=1404
+      <- ptr@014530a9  FUN_01452de0 @01452de0 size=1404
+      <- ptr@01453338  FUN_01452de0 @01452de0 size=1404
+  @02088848  "CoreCharacter\ScriptCommands\TrackScriptCommand.cpp"
+      <- ptr@014534c3  FUN_01453490 @01453490 size=209
+      <- ptr@014534e6  FUN_01453490 @01453490 size=209
+      <- ptr@01453506  FUN_01453490 @01453490 size=209
+      <- ptr@01453518  FUN_01453490 @01453490 size=209
+      <- ptr@0145353a  FUN_01453490 @01453490 size=209
+      <- ptr@014535fe  FUN_01453570 @01453570 size=340
+      <- ptr@0145364f  FUN_01453570 @01453570 size=340
+  @02088a34  "CoreCharacter\ScriptCommands\GetStatScriptCommand.cpp"
+      <- ptr@01454513  FUN_014544e0 @014544e0 size=210
+      <- ptr@01454536  FUN_014544e0 @014544e0 size=210
+      <- ptr@01454548  FUN_014544e0 @014544e0 size=210
+      <- ptr@01454573  FUN_014544e0 @014544e0 size=210
+      <- ptr@0145459a  FUN_014544e0 @014544e0 size=210
+      <- ptr@014545e2  FUN_014545c0 @014545c0 size=115
+  @02088a6c  "CoreCharacter\ScriptCommands\IsInStateScriptCommand.cpp"
+      <- ptr@01454670  FUN_01454640 @01454640 size=165
+      <- ptr@0145468d  FUN_01454640 @01454640 size=165
+      <- ptr@014546b0  FUN_01454640 @01454640 size=165
+      <- ptr@014546cf  FUN_01454640 @01454640 size=165
+  @02088aa8  "CoreCharacter\ScriptCommands\IsMorphValueNameLegalScriptCommand.cpp"
+      <- ptr@01454823  FUN_014547f0 @014547f0 size=140
+      <- ptr@01454843  FUN_014547f0 @014547f0 size=140
+      <- ptr@01454858  FUN_014547f0 @014547f0 size=140
+      <- ptr@0145489e  FUN_01454880 @01454880 size=254
+  @02088aec  "CoreCharacter\ScriptCommands\IsNicknameLegalScriptCommand.cpp"
+      <- ptr@014549b0  FUN_01454980 @01454980 size=134
+      <- ptr@014549cd  FUN_01454980 @01454980 size=134
+      <- ptr@014549e2  FUN_01454980 @01454980 size=134
+      <- ptr@01454a2e  FUN_01454a10 @01454a10 size=166
+  @02088b2c  "CoreCharacter\ScriptCommands\PlayActionAnimScriptCommand.cpp"
+      <- ptr@01454af0  FUN_01454ac0 @01454ac0 size=140
+      <- ptr@01454b16  FUN_01454ac0 @01454ac0 size=140
+      <- ptr@01454b28  FUN_01454ac0 @01454ac0 size=140
+      <- ptr@01454b73  FUN_01454b50 @01454b50 size=438
+  @02088b6c  "CoreCharacter\ScriptCommands\SetMorphValueScriptCommand.cpp"
+      <- ptr@01454d43  FUN_01454d10 @01454d10 size=280
+      <- ptr@01454d66  FUN_01454d10 @01454d10 size=280
+      <- ptr@01454d78  FUN_01454d10 @01454d10 size=280
+      <- ptr@01454d96  FUN_01454d10 @01454d10 size=280
+      <- ptr@01454dc8  FUN_01454d10 @01454d10 size=280
+      <- ptr@01454dde  FUN_01454d10 @01454d10 size=280
+      <- ptr@01454e10  FUN_01454d10 @01454d10 size=280
+      <- ptr@01454e71  FUN_01454e30 @01454e30 size=891
+      <- ptr@01454eb4  FUN_01454e30 @01454e30 size=891
+      <- ptr@01454ec7  FUN_01454e30 @01454e30 size=891
+  @02088c18  "CoreCharacter\ScriptCommands\setstatscriptcommand.cpp"
+      <- ptr@014551f3  FUN_014551c0 @014551c0 size=208
+      <- ptr@01455216  FUN_014551c0 @014551c0 size=208
+      <- ptr@01455228  FUN_014551c0 @014551c0 size=208
+      <- ptr@01455246  FUN_014551c0 @014551c0 size=208
+      <- ptr@01455278  FUN_014551c0 @014551c0 size=208
+      <- ptr@014552d1  FUN_01455290 @01455290 size=564
+      <- ptr@0145531b  FUN_01455290 @01455290 size=564
+      <- ptr@0145534c  FUN_01455290 @01455290 size=564
+      <- ptr@014553c3  FUN_01455290 @01455290 size=564
+      <- ptr@014553e4  FUN_01455290 @01455290 size=564
+      <- ptr@014558d8  FUN_01455840 @01455840 size=1080
+      <- ptr@014559be  FUN_01455840 @01455840 size=1080
+      <- ptr@01455ab7  FUN_01455840 @01455840 size=1080
+      <- ptr@014560d2
+
+=== "Inventory" ===
+  @01f2552c  "Inventory"
+  @01f6c198  "InventoryTimeout"
+      <- ptr@01db445f  FUN_01db2740 @01db2740 size=217362
+  @01f6c1d8  "InventoryId"
+      <- ptr@01db4750  FUN_01db2740 @01db2740 size=217362
+  @01f6c4ce  "Inventory"
+  @01f72107  "Inventory"
+  @01f72122  "Inventory"
+  @01f72136  "Inventory"
+  @01f7b343  "InventoryView"
+  @01f7b442  "Inventory"
+  @01f83195  "InventoryGameEntry....item_id.. .(..5..stat_list.. .(.2".ProtoInventoryGameEntry"
+  @01f831d3  "InventoryGameEntry.StatValue. ..item_data.. .(.2..ProtoAcgItem.2..slot_map.. .(."
+  @01f8322b  "InventoryGameEntry.SlotMap....creator_name.. .(.....maxAvailableItems.. .(..(..S"
+  @01f832e0  "InventoryGame. ..inventory_id.. .(.2..ProtoID32....max_size.. .(.....disabled_sl"
+  @01f83356  "InventoryGame.InventoryListEntry.I..InventoryListEntry....pos.. .(..&..item.. .("
+  @01f83364  "InventoryListEntry.I..InventoryListEntry....pos.. .(..&..item.. .(.2..ProtoInven"
+  @01f8337a  "InventoryListEntry....pos.. .(..&..item.. .(.2..ProtoInventoryGameEntry">..Proto"
+  @01f833af  "InventoryGameEntry">..ProtoEndpoint....type.. .(.....instance.. .(.....token.. ."
+  @01f851bc  "InventoryItemToOrFromGuildBank"
+  @01f85388  "InventoryItemToGuildBank"
+  @01f853a8  "InventoryItemFromGuildBank"
+  @01f86721  "InventoryItemToOrFromGuildBank() not possible, stream bad after 'i_cSrcInv'! Ser"
+  @01f867d9  "InventoryItemToOrFromGuildBank() not possible, stream bad after 'i_nSrcPos'! Ser"
+  @01f86891  "InventoryItemToOrFromGuildBank() not possible, stream bad after 'i_cDstInv'! Ser"
+  @01f86949  "InventoryItemToOrFromGuildBank() not possible, stream bad after 'i_nDstPos'! Ser"
+  @01f86b76  "InventoryID'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f87d8e  "InventoryID'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f8848d  "InventoryID'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f88672  "InventoryID'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f888b9  "InventoryItemToGuildBank() not possible, stream bad after 'i_cInventoryID'! Serv"
+  @01f888f7  "InventoryID'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f88971  "InventoryItemToGuildBank() not possible, stream bad after 'i_nItemPos'! Server/C"
+  @01f88a21  "InventoryItemToGuildBank() not possible, stream bad after 'i_nDstPos'! Server/Cl"
+  @01f88ad1  "InventoryItemFromGuildBank() not possible, stream bad after 'i_cInventoryID'! Se"
+  @01f88b11  "InventoryID'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f88b89  "InventoryItemFromGuildBank() not possible, stream bad after 'i_nItemPos'! Server"
+      <- ptr@00ba15c0  FUN_00ba1420 @00ba1420 size=591
+      <- ptr@01bfae9f  FUN_01bfa980 @01bfa980 size=1639
+  @01f88c39  "InventoryItemFromGuildBank() not possible, stream bad after 'i_nDstPos'! Server/"
+  @01f944ba  "InventoryIIR_t"
+  @01f948e4  "InventoryItemIIR_t"
+  @01f9c8e9  "InventoryItem"
+  @01f9c909  "InventoryItemIfPossible"
+  @01f9df9b  "InventoryItem(const ID32& i_cInventory, int i_nSrcPos, int i_nSplitSize, int i_n"
+  @01f9dfb8  "Inventory, int i_nSrcPos, int i_nSplitSize, int i_nDstPos) streamed payload of s"
+  @01f9e09b  "InventoryItemIfPossible(const ID32& i_cSrcContainerID, uint8 i_nSrcPos, const ID"
+  @01f9e915  "InventoryID, int i_nPos) streamed payload of size "
+  @01fa0142  "InventoryType) streamed payload of size "
+  @01fa01c0  "InventoryType) streamed payload of size "
+  @01fc2615  "Inventory..-----------------------------------.."
+  @01fc2669  "Inventory..-----------------------------------.."
+  @01fc5ea8  "Inventory_DisabledBankSlots"
+      <- ptr@010cbc60  FUN_010cb540 @010cb540 size=10810
+      <- ptr@010cbc7e  FUN_010cb540 @010cb540 size=10810
+      <- ptr@01dea8f2
+  @01fc5f4a  "InventorySystem\CoreItemHolder.cpp"
+  @01fc5f9a  "Inventory"
+  @01fc62e9  "InventoryType"
+  @01fc64eb  "Inventory!"
+  @01fc6556  "Inventory!"
+  @01fc76b0  "InventoryGame_c::GetNextFreeInventorySlot(): no free slot found..HasFreeInventor"
+      <- ptr@0076e1f8  FUN_0076e180 @0076e180 size=215
+      <- ptr@00774701  FUN_007746e0 @007746e0 size=125
+  @01fc76cc  "InventorySlot(): no free slot found..HasFreeInventorySlot() must be called prior"
+  @01fc76f8  "InventorySlot() must be called prior to this one!."
+  @01fc775e  "InventorySystem\InventoryGame.cpp"
+  @01fc776e  "InventoryGame.cpp"
+  @01fc7780  "InventoryGame_c::GetInterpolatedItem(): failed getting GameItem for %d (%u/%u/%u"
+      <- ptr@0076e67b  FUN_0076e600 @0076e600 size=149
+
+=== "Container" ===
+  @01f7a0b7  "Containers/fcVector.h"
+  @01f9e0c5  "ContainerID, uint8 i_nSrcPos, const ID32& i_cDstContainerID, uint8 i_nDstPos) st"
+  @01f9e0f5  "ContainerID, uint8 i_nDstPos) streamed payload of size "
+  @01fa875f  "Containers/loosequadtree.h"
+  @01fc4f47  "Containers/fcProtectedVector.h"
+  @01fdd917  "Container_c::Enter starting script "
+  @01ff583e  "Container.cpp"
+  @01ff5876  "Container"
+  @02005a8e  "Container to ContentSlotView found.."
+  @02006967  "Container::GetAttrPoint() failed to parse '%s' as a Point.."
+  @020069b7  "Container::GetAttrIPoint() failed to parse '%s' as a IPoint.."
+  @020069ff  "Container::GetAttrRect() failed to parse '%s' as a Rect.."
+  @02006abb  "Container.cpp"
+  @02017587  "Containers/staticvector.h"
+  @0201f2f7  "Containers/fcInplaceVector.h"
+  @02056220  "Container"
+  @02057f85  "Containers"
+  @0205c64e  "Container"
+  @0205cddc  "Container UpdateItemData.."
+  @0205ce36  "Container SetSlotBackground.."
+  @0205d86b  "Container"
+  @0205d87c  "Container"
+  @0205eedc  "Container"
+  @0205f00d  "Container in DetachAllItems.."
+  @0205f05d  "Container from Mail View.."
+  @0205f155  "Container in Mail View.."
+  @0205f1fd  "ContainerReader in Mail View.."
+  @0205f449  "Container"
+  @020601b8  "ContainerHeader"
+  @020601cc  "ContainerDock"
+  @0206022c  "ContainerHeader"
+  @0206116c  "Container"
+  @02078228  "ContainerAddItemIIR.proto"
+      <- ptr@01371bb0  FUN_01371b80 @01371b80 size=369
+      <- ptr@01371e1b  FUN_01371dd0 @01371dd0 size=315
+  @02078244  "ContainerAddItemIIR.pb.cc"
+      <- ptr@01371be8  FUN_01371b80 @01371b80 size=369
+      <- ptr@01371de7  FUN_01371dd0 @01371dd0 size=315
+      <- ptr@01372681  FUN_01372650 @01372650 size=189
+      <- ptr@0137273e  FUN_01372710 @01372710 size=262
+      <- ptr@01373031  FUN_01373000 @01373000 size=189
+      <- ptr@013730ee  FUN_013730c0 @013730c0 size=241
+  @02078282  "ContainerAddItemIIR.proto..Util.proto"....ProtoMoveInventoryItemIIR.'..source_co"
+  @020940a5  "Container"
+  @020940e1  "Container"
+  @0209524c  "ContainerView"
+  @020959de  "Container"
+  @02095a0b  "Container"
+  @020971ba  "Container"
+  @020971e0  "Container"
+  @020996c4  "Container"
+  @0209990f  "Container"
+  @0209e976  "Container"
+  @0209f180  "Container"
+  @020a16ec  "Container"
+  @020a19f0  "Container"
+  @020a1a72  "ContainerView"
+  @020abfa1  "Container"
+  @020ad984  "ContainerView"
+  @020afee2  "Container"
+  @0219cbc6  "ContainerInstance@FMOD@@"
+  @0219cbf2  "Container@FMOD@@"
+  @0219ce42  "ContainerInstance@FMOD@@"
+  @0219ce72  "Container@FMOD@@"
+  @021bec67  "Container_c@@"
+  @021c5e6a  "Container@@"
+  @021ce384  "Container_c@@"
+  @021d3235  "Container_base0@std@@"
+
+=== "AcgItem" ===
+  @01f830c5  "AcgItem.!..key1.. .(.2..ProtoDecryptionKey.!..key2.. .(.2..ProtoDecryptionKey.!."
+  @01f8320a  "AcgItem.2..slot_map.. .(.2 .ProtoInventoryGameEntry.SlotMap....creator_name.. .("
+  @01f832cf  "AcgItem"....ProtoInventoryGame. ..inventory_id.. .(.2..ProtoID32....max_size.. ."
+  @01fbb897  "AcgItemData_t::GetInstance()->FanaticFlushCache()."
+  @01fdc028  "AcgItemData_t::GetInterpolatedItem: missing item data. Item: "
+      <- ptr@008c8139  FUN_008c7fa0 @008c7fa0 size=1501
+      <- ptr@008c892d  FUN_008c8580 @008c8580 size=1109
+  @01fdc070  "AcgItemData_t::GetInterpolatedItem: Data refers to nonexistent template "
+      <- ptr@008c8380  FUN_008c7fa0 @008c7fa0 size=1501
+      <- ptr@008c8864  FUN_008c8580 @008c8580 size=1109
+  @01fdc0c0  "AcgItemData_t::GetInterpolatedItem: Added item to the interpolated item cache. I"
+      <- ptr@008c84c6  FUN_008c7fa0 @008c7fa0 size=1501
+      <- ptr@008c878a  FUN_008c8580 @008c8580 size=1109
+  @01fdc12c  "AcgItemData_t cache statistics:"
+      <- ptr@008c8ad0  FUN_008c89e0 @008c89e0 size=666
+  @020b428a  "AcgItem.@..gem_slots.. .(.2-.ProtoCoreCharacterIIR.InventoryEntry.GemSlot.3..Gem"
+  @020b4301  "AcgItem"
+  @021bdf55  "AcgItem@@"
+  @021ce1f4  "AcgItemData_t@@"
+
+=== "DecryptionKey" ===
+  @01f83076  "DecryptionKey....key1.. .(.....key2.. .(.....key3.. .(.....key4.. .(."....ProtoA"
+  @01f830e2  "DecryptionKey.!..key2.. .(.2..ProtoDecryptionKey.!..key3.. .(.2..ProtoDecryption"
+  @01f83105  "DecryptionKey.!..key3.. .(.2..ProtoDecryptionKey....template1.. .(.....template2"
+  @01f83128  "DecryptionKey....template1.. .(.....template2.. .(.....template3.. .(.....level."
+  @01fa1000  "DecryptionKey_c key1, DecryptionKey_c key2) streamed payload of size "
+  @01fa1016  "DecryptionKey_c key2) streamed payload of size "
+  @02036b28  "DecryptionKey().IsNull()"
+  @021bdf31  "DecryptionKey@@"
+
+=== "Quest" ===
+  @01f25829  "QuestsCompleted"
+  @01f6cb6e  "QuestItem"
+  @01f6cffc  "QuestStat"
+      <- ptr@01dbc0bf  FUN_01db2740 @01db2740 size=217362
+  @01f6dfe8  "QuestIndex0"
+      <- ptr@01dc52f2  FUN_01db2740 @01db2740 size=217362
+  @01f6dff4  "QuestTimeout"
+      <- ptr@01dc5389  FUN_01db2740 @01db2740 size=217362
+  @01f6f488  "QuestBoothDifficulty"
+      <- ptr@01dcfdcc  FUN_01db2740 @01db2740 size=217362
+  @01f6f4a0  "QuestASMinimumRange"
+      <- ptr@01dcfe63  FUN_01db2740 @01db2740 size=217362
+  @01f6f4b4  "QuestASMaximumRange"
+      <- ptr@01dcfefa  FUN_01db2740 @01db2740 size=217362
+  @01f72010  "QuestTaskID"
+      <- ptr@01de2af4  FUN_01db2740 @01db2740 size=217362
+  @01f7201c  "QuestTaskKeepFlags"
+      <- ptr@01de2b8a  FUN_01db2740 @01db2740 size=217362
+  @01f72102  "QuestInventory"
+  @01f7a874  "QuestTracker"
+  @01f7b3ff  "QuestSharingWindow"
+  @01f7c52c  "QuestCooldowns"
+      <- ptr@00466738  FUN_00466680 @00466680 size=1119
+  @01f7c7a8  "Questmessageboxes"
+      <- ptr@00466a0e  FUN_00466680 @00466680 size=1119
+  @01f7c830  "QuestMissionNames"
+      <- ptr@00466aad  FUN_00466680 @00466680 size=1119
+  @01f851df  "QuestMarker"
+  @01f85700  "QuestAvailable"
+  @01f85710  "QuestShareGlobalFeedback"
+      <- ptr@004bb541  FUN_004babb0 @004babb0 size=5946
+  @01f8572c  "QuestShareIndividualFeedback"
+      <- ptr@004bb560  FUN_004babb0 @004babb0 size=5946
+  @01f8574c  "QuestShareRequest"
+      <- ptr@004bb57f  FUN_004babb0 @004babb0 size=5946
+  @01f8576a  "QuestList"
+  @01f8577e  "QuestList"
+  @01f86a00  "QuestMarker() not possible, stream bad after 'i_cNPC'! Server/Client code possib"
+  @01f86aa0  "QuestMarker() not possible, stream bad after 'i_eMarker'! Server/Client code pos"
+  @01f8c579  "QuestAvailable() not possible, stream bad after 'nextAwaitingQuest'! Server/Clie"
+  @01f8c5b6  "Quest'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f8c629  "QuestAvailable() not possible, stream bad after 'questName'! Server/Client code "
+  @01f8c6cd  "QuestShareGlobalFeedback() not possible, stream bad after 'i_nFeedbackType'! Ser"
+  @01f8c77d  "QuestShareGlobalFeedback() not possible, stream bad after 'i_nFeedbackValue'! Se"
+  @01f8c82d  "QuestShareIndividualFeedback() not possible, stream bad after 'i_nFeedbackType'!"
+  @01f8c8e5  "QuestShareIndividualFeedback() not possible, stream bad after 'i_cFeedbackValue'"
+  @01f8c99d  "QuestShareRequest() not possible, stream bad after 'i_cCharID'! Server/Client co"
+  @01f8ca45  "QuestShareRequest() not possible, stream bad after 'i_nStartTaskTemplate'! Serve"
+  @01f8caf5  "QuestShareRequest() not possible, stream bad after 'i_cQuestName'! Server/Client"
+  @01f8cb2c  "QuestName'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f8cba7  "QuestList() not possible, stream bad after 'cQuestData'! Server/Client code poss"
+  @01f8cbd4  "QuestData'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f8cc4f  "QuestList() not possible, stream bad after 'nQuestShareCode'! Server/Client code"
+  @01f8cc7c  "QuestShareCode'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f946e0  "QuestFullUpdateIIR"
+      <- ptr@004e4f51  FUN_004e4c20 @004e4c20 size=1803
+      <- ptr@00917d74  FUN_00917d70 @00917d70 size=68
+  @01f9474c  "QuestUpdateIIR_c"
+  @01f948a4  "QuestIIR_c"
+      <- ptr@004e50dd  FUN_004e4c20 @004e4c20 size=1803
+      <- ptr@007aa104  FUN_007aa100 @007aa100 size=69
+  @01f94944  "QuestGoalIIR_c"
+      <- ptr@004e517f  FUN_004e4c20 @004e4c20 size=1803
+      <- ptr@00919a64  FUN_00919a60 @00919a60 size=80
+  @01f94954  "QuestJournalIIR_c"
+      <- ptr@004e5191  FUN_004e4c20 @004e4c20 size=1803
+      <- ptr@00919f30  FUN_00919f20 @00919f20 size=280
+      <- ptr@0091a04f  FUN_0091a040 @0091a040 size=249
+      <- ptr@0091a14f  FUN_0091a140 @0091a140 size=257
+  @01f94968  "QuestRewardNotifyIIR_c"
+      <- ptr@004e51a3  FUN_004e4c20 @004e4c20 size=1803
+      <- ptr@0091ad36  FUN_0091ad30 @0091ad30 size=204
+  @01f94980  "QuestRewardSelectionIIR_c"
+      <- ptr@004e51b5  FUN_004e4c20 @004e4c20 size=1803
+      <- ptr@0091c864  FUN_0091c860 @0091c860 size=62
+      <- ptr@012c42d9  FUN_012c42a0 @012c42a0 size=296
+  @01f9499c  "QuestCooldownIIR"
+      <- ptr@004e51c7  FUN_004e4c20 @004e4c20 size=1803
+      <- ptr@0091cb14  FUN_0091cb10 @0091cb10 size=65
+      <- ptr@0091cb64  FUN_0091cb60 @0091cb60 size=68
+  @01f955bc  "Quests"
+      <- ptr@004f4001  FUN_004f3f40 @004f3f40 size=1614
+      <- ptr@01610cfb  FUN_01610480 @01610480 size=3490
+      <- ptr@01612b5f  FUN_01612b50 @01612b50 size=493
+      <- ptr@01612b94  FUN_01612b50 @01612b50 size=493
+      <- ptr@01612c84  FUN_01612b50 @01612b50 size=493
+  @01f9573c  "Questions"
+      <- ptr@004f41fc  FUN_004f3f40 @004f3f40 size=1614
+  @01f9592c  "QuestNames"
+      <- ptr@004f43e2  FUN_004f3f40 @004f3f40 size=1614
+  @01f95938  "QuestTaskNames"
+      <- ptr@004f43f4  FUN_004f3f40 @004f3f40 size=1614
+  @01f95948  "QuestTaskDescriptions"
+      <- ptr@004f4406  FUN_004f3f40 @004f3f40 size=1614
+  @01f95960  "QuestTaskSolved"
+      <- ptr@004f4418  FUN_004f3f40 @004f3f40 size=1614
+  @01f95970  "QuestGoalNames"
+      <- ptr@004f442a  FUN_004f3f40 @004f3f40 size=1614
+  @01f95980  "QuestCooldown"
+      <- ptr@004f443c  FUN_004f3f40 @004f3f40 size=1614
+  @01f95990  "QuestMissionTypes"
+      <- ptr@004f444e  FUN_004f3f40 @004f3f40 size=1614
+  @01f959a4  "QuestDescriptions"
+      <- ptr@004f4460  FUN_004f3f40 @004f3f40 size=1614
+  @01f9c92a  "QuestMarkerNPC"
+  @01f9ca0e  "QuestFromQuestgiver"
+
+=== "Spell" ===
+  @01f23cb4  "SpellEffect_DisplayLevel"
+      <- ptr@0042557a  FUN_00425530 @00425530 size=213
+      <- ptr@007e5c49  FUN_007e5c00 @007e5c00 size=2186
+  @01f23cd5  "SpellEffectDisplayLevel"
+  @01f252f8  "SpellGUICategory"
+      <- ptr@01df8022  FUN_01df7df0 @01df7df0 size=15246
+  @01f6c018  "SpellCategory"
+      <- ptr@01db33e1  FUN_01db2740 @01db2740 size=217362
+  @01f6c17c  "SpellStatModifierPercent"
+      <- ptr@01db43c8  FUN_01db2740 @01db2740 size=217362
+  @01f6c548  "SpellRadius"
+      <- ptr@01db6850  FUN_01db2740 @01db2740 size=217362
+  @01f6c5f4  "SpellRank"
+      <- ptr@01db6f64  FUN_01db2740 @01db2740 size=217362
+  @01f6c602  "SpellCategory"
+  @01f6c644  "SpellLine"
+      <- ptr@01db7257  FUN_01db2740 @01db2740 size=217362
+  @01f6c650  "SpellCriticalModifier"
+      <- ptr@01db72ee  FUN_01db2740 @01db2740 size=217362
+  @01f6c67f  "SpellWeave"
+  @01f6c778  "SpellCriticalChance"
+      <- ptr@01db7d88  FUN_01db2740 @01db2740 size=217362
+  @01f6cb1c  "SpellMaxStackCount"
+      <- ptr@01db9a68  FUN_01db2740 @01db2740 size=217362
+  @01f6ccbc  "SpellColumnRadius"
+      <- ptr@01dba9be  FUN_01db2740 @01db2740 size=217362
+  @01f6cef0  "SpellDisplayStackSize"
+      <- ptr@01dbb6b8  FUN_01db2740 @01db2740 size=217362
+  @01f6d3cc  "SpellParticleEffectSet"
+      <- ptr@01dbe41f  FUN_01db2740 @01db2740 size=217362
+  @01f6d508  "SpellUpgrades"
+      <- ptr@01dbef54  FUN_01db2740 @01db2740 size=217362
+  @01f6d710  "SpellWeaveTime"
+      <- ptr@01dc035b  FUN_01db2740 @01db2740 size=217362
+  @01f6d788  "SpellFatalityChance"
+      <- ptr@01dc06e5  FUN_01db2740 @01db2740 size=217362
+  @01f6d7f7  "SpellAttack"
+  @01f6dbdc  "SpellPenetration"
+      <- ptr@01dc3159  FUN_01db2740 @01db2740 size=217362
+  @01f6e1b0  "SpellDamageMultiplier"
+      <- ptr@01dc62df  FUN_01db2740 @01db2740 size=217362
+  @01f6e1c8  "SpellVulnerability"
+      <- ptr@01dc6376  FUN_01db2740 @01db2740 size=217362
+  @01f6eba8  "SpellFlags"
+      <- ptr@01dcbcf7  FUN_01db2740 @01db2740 size=217362
+  @01f6ebc4  "SpellType"
+      <- ptr@01dcbe23  FUN_01db2740 @01db2740 size=217362
+  @01f6ed9d  "SpellCostStat"
+  @01f6edb5  "SpellCostValue"
+  @01f6f4c8  "SpellInturruptionModifierPercentage"
+      <- ptr@01dcff91  FUN_01db2740 @01db2740 size=217362
+  @01f6f81c  "SpellMagicModifier"
+      <- ptr@01dd1d04  FUN_01db2740 @01db2740 size=217362
+  @01f6f830  "SpellResistModifier"
+      <- ptr@01dd1d9b  FUN_01db2740 @01db2740 size=217362
+  @01f70800  "SpellDamage"
+  @01f71e58  "SpellLine2"
+      <- ptr@01de1ccf  FUN_01db2740 @01db2740 size=217362
+  @01f71e64  "SpellLine3"
+      <- ptr@01de1d66  FUN_01db2740 @01db2740 size=217362
+  @01f71e70  "SpellLine4"
+      <- ptr@01de1dfd  FUN_01db2740 @01db2740 size=217362
+  @01f71e7c  "SpellLine5"
+      <- ptr@01de1e94  FUN_01db2740 @01db2740 size=217362
+  @01f71ed0  "SpellLine6"
+      <- ptr@01de2185  FUN_01db2740 @01db2740 size=217362
+  @01f71edc  "SpellLine7"
+      <- ptr@01de221c  FUN_01db2740 @01db2740 size=217362
+  @01f71ee8  "SpellLine8"
+      <- ptr@01de22b3  FUN_01db2740 @01db2740 size=217362
+  @01f7a6a6  "SpellFriendly"
+  @01f7a6be  "SpellHostile"
+  @01f7b46a  "Spells"
+  @01f7bd88  "SpellSfx"
+      <- ptr@01da9991  FUN_01da9040 @01da9040 size=3225
+  @01f7c7fc  "SpellLineNames"
+      <- ptr@00466a7a  FUN_00466680 @00466680 size=1119
+  @01f7c850  "SpellLines"
+      <- ptr@00466ad1  FUN_00466680 @00466680 size=1119
+  @01f85205  "Spell"
+  @01f85212  "Spell"
+  @01f85218  "SpellInterrupted"
+      <- ptr@004badfd  FUN_004babb0 @004babb0 size=5946
+      <- ptr@01395778  FUN_01395700 @01395700 size=216
+      <- ptr@013957ad  FUN_01395700 @01395700 size=216
+  @01f853f6  "SpellRecharge"
+  @01f85b63  "SpellData"
+  @01f85f9f  "Spells"
+  @01f85fab  "SpellResistance"
+  @01f85fc2  "SpellResistance"
+  @01f86d3a  "Spell() not possible, stream bad after 'i_nSpellID'! Server/Client code possibly"
+  @01f86d65  "SpellID'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f86ddb  "Spell() not possible, stream bad after 'i_nSpellID'! Server/Client code possibly"
+  @01f86e06  "SpellID'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f87a53  "SpellTemplate'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f87afe  "SpellOnResurrect'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f902c4  "SpellData() not possible, stream bad after 'i_cSpellBook'! Server/Client code po"
+  @01f902f3  "SpellBook'! Server/Client code possibly out of sync (or hack attempt).."
+
+=== "Ability" ===
+  @01f6e66c  "AbilityBccEvent"
+      <- ptr@01dc92a0  FUN_01db2740 @01db2740 size=217362
+  @01f72ad8  "Ability"
+  @01f857f6  "Ability"
+  @01f8580d  "Ability"
+  @01f85e1b  "AbilityEquip"
+  @01f85e2f  "AbilityUnequip"
+  @01f8d35f  "Ability() not possible, stream bad after 'i_nAbilityID'! Server/Client code poss"
+  @01f8d38c  "AbilityID'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f8d407  "Ability() not possible, stream bad after 'i_cItem'! Server/Client code possibly "
+  @01f8d4a7  "Ability() not possible, stream bad after 'i_nType'! Server/Client code possibly "
+  @01f8d547  "Ability() not possible, stream bad after 'i_nResourceID'! Server/Client code pos"
+  @01f8d5ef  "Ability() not possible, stream bad after 'i_bDoFeedback'! Server/Client code pos"
+  @01f8d69a  "Ability() not possible, stream bad after 'i_nAbilityID'! Server/Client code poss"
+  @01f8d6c7  "AbilityID'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f8d742  "Ability() not possible, stream bad after 'i_cItem'! Server/Client code possibly "
+  @01f91a6c  "AbilityEquip() not possible, stream bad after 'abilityPos'! Server/Client code p"
+  @01f91b14  "AbilityEquip() not possible, stream bad after 'templateID'! Server/Client code p"
+  @01f91bbc  "AbilityUnequip() not possible, stream bad after 'abilityPos'! Server/Client code"
+  @01f958e3  "AbilityNames"
+  @01f958f7  "AbilityDescriptions"
+  @01fa0d05  "AbilityEquip(uint32 abilityPos, uint32 templateID) streamed payload of size "
+  @01fa0d75  "AbilityUnequip(uint32 abilityPos) streamed payload of size "
+  @01fbc851  "AbilityCooldowns"
+  @01fc1307  "AbilityRunning"
+  @01fc3cfc  "AbilityModifier()illegal mode %i - assuming stats::eFull."
+  @01fc3d4c  "AbilityModifier() no ability defined for %i."
+  @01fc57a7  "AbilityModifierDexterity"
+  @01fc57cf  "AbilityModifierStrength"
+  @01fc6f5a  "Ability failed! (action = %d)."
+  @01fc6f9e  "Ability already have action : "
+  @01fc6fc6  "AbilityWithName"
+  @01fc6fd8  "AbilityNotAvailable"
+      <- ptr@0075d98b  FUN_0075d8b0 @0075d8b0 size=617
+  @01fccae4  "Ability "
+      <- ptr@007e3644  FUN_007e3220 @007e3220 size=1387
+  @01fccb02  "Ability"
+  @01fd9a0e  "Ability"
+  @01fda0c1  "Ability"
+  @01fda41f  "Ability"
+  @01fda444  "Ability"
+  @0203f046  "AbilityModifier"
+  @0203f061  "AbilityModifier"
+  @02041498  "Ability"
+  @020416b6  "AbilityModifier"
+  @0208d358  "Ability"
+      <- ptr@0149ff4c  FUN_0149e450 @0149e450 size=18839
+  @0209f0dc  "AbilityList"
+      <- ptr@0161d4b5  FUN_0161d2b0 @0161d2b0 size=4370
+  @0209f138  "AbilityListView"
+      <- ptr@0161d66f  FUN_0161d2b0 @0161d2b0 size=4370
+  @0209f39e  "AbilityList"
+  @0209f406  "AbilityListView"
+  @020b1c91  "AbilityItem.xml"
+  @020b1ca4  "AbilityIcon"
+      <- ptr@01749e9a  FUN_01749d70 @01749d70 size=1534
+  @020b1cb0  "AbilityName"
+      <- ptr@01749f2c  FUN_01749d70 @01749d70 size=1534
+  @020b1cbc  "AbilityInfo"
+      <- ptr@01749fb4  FUN_01749d70 @01749d70 size=1534
+  @021c296a  "AbilityCommand_c@@"
+  @021ccea1  "AbilityGameAction@@"
+  @021cd4df  "AbilityGameAction@@"
+  @021ff670  "AbilityGameAction@@"
+  @02229e04  "AbilityList_c@@"
+  @02233641  "AbilityList_c@@U?$SignalSignatureObj1@XHVAbilityList_c@@@@XH@@"
+  @0223366a  "AbilityList_c@@@@XH@@"
+  @0223369b  "AbilityList@@U?$SignalSignatureObj1@XHVAAAbilityList@@@@XH@@"
+  @022336c4  "AbilityList@@@@XH@@"
+
+=== "Playfield" ===
+  @01f6c6a0  "Playfield"
+  @01f6cab4  "PlayfieldInstance"
+  @01f6cacf  "PlayfieldInstance"
+  @01f6cc38  "PlayfieldAttackRules"
+  @01f6d2f3  "PlayfieldTimeStamp"
+  @01f6db18  "PlayfieldType"
+      <- ptr@01dc2917  FUN_01db2740 @01db2740 size=217362
+  @01f6e165  "Playfield"
+  @01f6e4df  "Playfield"
+  @01f6e54c  "Playfield"
+  @01f78360  "Playfield"
+      <- ptr@0043a4ad  FUN_0043a1a0 @0043a1a0 size=1971
+      <- ptr@0043c7e2  FUN_0043c000 @0043c000 size=2301
+      <- ptr@00596b52  FUN_00596800 @00596800 size=2404
+      <- ptr@00596f34  FUN_00596800 @00596800 size=2404
+      <- ptr@00597bdb  FUN_00597970 @00597970 size=1695
+      <- ptr@00597c8b  FUN_00597970 @00597970 size=1695
+      <- ptr@009b774b  FUN_009b76c0 @009b76c0 size=274
+      <- ptr@00a12dc2  FUN_00a12d90 @00a12d90 size=6535
+      <- ptr@00a12e2c  FUN_00a12d90 @00a12d90 size=6535
+      <- ptr@00a12f41  FUN_00a12d90 @00a12d90 size=6535
+      <- ptr@00a1301e  FUN_00a12d90 @00a12d90 size=6535
+      <- ptr@00a13165  FUN_00a12d90 @00a12d90 size=6535
+      <- ptr@00a13275  FUN_00a12d90 @00a12d90 size=6535
+      <- ptr@00a132db  FUN_00a12d90 @00a12d90 size=6535
+      <- ptr@00a133b9  FUN_00a12d90 @00a12d90 size=6535
+      <- ptr@00a135ff  FUN_00a12d90 @00a12d90 size=6535
+      <- ptr@00a136da  FUN_00a12d90 @00a12d90 size=6535
+      <- ptr@00a13860  FUN_00a12d90 @00a12d90 size=6535
+      <- ptr@00a139ad  FUN_00a12d90 @00a12d90 size=6535
+      <- ptr@00a13bde  FUN_00a12d90 @00a12d90 size=6535
+  @01f7b3c7  "PlayfieldAccessWindow"
+  @01f7c4f8  "PlayfieldInstanceNames"
+      <- ptr@00466714  FUN_00466680 @00466680 size=1119
+  @01f7c510  "PlayfieldWindowCategories"
+      <- ptr@00466726  FUN_00466680 @00466680 size=1119
+  @01f7c53c  "PlayfieldTeleportPopup"
+      <- ptr@0046674a  FUN_00466680 @00466680 size=1119
+  @01f7c554  "PlayfieldTeleportPopupGUI"
+      <- ptr@0046675c  FUN_00466680 @00466680 size=1119
+  @01f7c662  "PlayfieldDescriptions"
+  @01f7c67e  "PlayfieldTips"
+  @01f80967  "PlayfieldAccessPopup"
+  @01f815d8  "PlayfieldAccessPopup() not possible, stream bad after 'playfieldID'! Server/Clie"
+  @01f85bb3  "Playfield"
+  @01f85f34  "PlayfieldAccessDenied"
+      <- ptr@004bc0c2  FUN_004babb0 @004babb0 size=5946
+      <- ptr@0139a027  FUN_0139a010 @0139a010 size=227
+  @01f85f4c  "PlayfieldAccessGranted"
+      <- ptr@004bc0e1  FUN_004babb0 @004babb0 size=5946
+  @01f85f68  "PlayfieldAccessData"
+  @01f85f80  "PlayfieldLockoutData"
+  @01f86373  "PlayfieldInstanceID'! Server/Client code possibly out of sync (or hack attempt)."
+  @01f8da04  "PlayfieldModelID'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f8dcc1  "PlayfieldModelID'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f8dd6d  "PlayfieldModelID'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f8fd2e  "PlayfieldID'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f900e9  "PlayfieldID'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f904d0  "Playfield() not possible, stream bad after 'i_cInstanceList'! Server/Client code"
+  @01f92775  "PlayfieldAccessDenied() not possible, stream bad after 'playfieldId'! Server/Cli"
+  @01f9281d  "PlayfieldAccessGranted() not possible, stream bad after 'playfieldId'! Server/Cl"
+  @01f928c5  "PlayfieldAccessGranted() not possible, stream bad after 'hours'! Server/Client c"
+  @01f9296d  "PlayfieldAccessGranted() not possible, stream bad after 'allCharacters'! Server/"
+  @01f92a21  "PlayfieldAccessData() not possible, stream bad after 'playfieldId'! Server/Clien"
+  @01f92ad1  "PlayfieldAccessData() not possible, stream bad after 'accessInfo'! Server/Client"
+  @01f92b79  "PlayfieldLockoutData() not possible, stream bad after 'playfieldId'! Server/Clie"
+  @01f92c29  "PlayfieldLockoutData() not possible, stream bad after 'lockoutInfo'! Server/Clie"
+  @01f944f4  "PlayfieldFIIR_t"
+      <- ptr@004e4de9  FUN_004e4c20 @004e4c20 size=1803
+      <- ptr@013cff8a  FUN_013cff70 @013cff70 size=502
+  @01f94a38  "PlayfieldDebugManagerIIR_c"
+      <- ptr@004e5245  FUN_004e4c20 @004e4c20 size=1803
+      <- ptr@008f28b7  FUN_008f28b0 @008f28b0 size=70
+      <- ptr@00916ba1  FUN_00916b80 @00916b80 size=132
+      <- ptr@00916c31  FUN_00916c10 @00916c10 size=132
+      <- ptr@00916cc1  FUN_00916ca0 @00916ca0 size=132
+  @01f95a08  "Playfieldnames"
+      <- ptr@004f44cc  FUN_004f3f40 @004f3f40 size=1614
+  @01f9cef5  "Playfield"
+  @01f9cf17  "Playfield"
+  @01f9cf53  "PlayfieldInstanceList"
+  @01f9d226  "Playfield"
+  @01f9d277  "Playfield"
+  @01f9f835  "PlayfieldProxyModelType, uint i_nPlayfieldProxyModelInstance, uint i_nPosX, uint"
+  @01f9f856  "PlayfieldProxyModelInstance, uint i_nPosX, uint i_nPosY, uint i_nPosZ, uint i_nS"
+  @01f9fc1f  "PlayfieldProxy& i_cProxy) streamed payload of size "
+  @01f9fc97  "PlayfieldID) streamed payload of size "
+  @01f9fd00  "PlayfieldID) streamed payload of size "
+  @01fa06ef  "Playfield() streamed payload of size "
+  @01fa0745  "Playfield(uint32 i_nInstanceIndex) streamed payload of size "
+  @01fa0851  "PlayfieldInstanceList(ID32::InstanceType uCharInst, const PlayfieldInstanceList_"
+  @01fa088b  "PlayfieldInstanceList_t& cPlayfieldList) streamed payload of size "
+  @01fa08a5  "PlayfieldList) streamed payload of size "
+  @01fa0982  "PlayfieldProxy& i_cPlayfield) streamed payload of size "
+  @01fa0995  "Playfield) streamed payload of size "
+  @01fa09f4  "PlayfieldProxy& i_cPlayfield) streamed payload of size "
+
+=== "Dynel" ===
+  @01f6d36a  "DynelCreationFlags"
+  @01f6d892  "DynelFlags"
+  @01f6fc2c  "DynelID"
+  @01f9451a  "DynelFullUpdateIIR_c"
+  @01f94550  "DynelIIR_c"
+  @01f9467e  "DynelVisualChangeIIR_c"
+  @01f946a0  "DynelFullUpdateIIR_c"
+  @01f95a2a  "Dynels"
+  @01fa6bd2  "Dynel::PutInDir() Identity cannot be null!"
+  @01fa6c4e  "Dynel::Init : Dynel "
+  @01fa6c5c  "Dynel "
+  @01fa6c69  "Dynel"
+  @01fa6c72  "Dynel::~n3Dynel() "
+  @01fa6c7c  "Dynel() "
+  @01fa6c8a  "Dynel::dtor Destructing dynel "
+  @01fa6cb2  "Dynel::dtor Tried to remove dynel from dynel map, but it did not exist. Maybe it"
+  @01fa6da2  "Dynel::ConstructVehicle CreateVehicle() cannot return a 0 vehicle.!"
+  @01fa6dfe  "Dynel::Init: Dynel created with ID "
+  @01fa6e0b  "Dynel created with ID "
+  @01fa6e26  "Dynel::FirstTimeAddPlayfieldContext() id "
+  @01fa6e5e  "Dynel::AddToPlayfieldSpaces() id "
+  @01fa6e82  "Dynel::RemoveFromPlayfieldSpaces() id "
+  @01fa6ec2  "Dynel::GetPos() Cannot do this on dynel "
+  @01fa6eee  "Dynel::SetRelPos() Cannot do this on dynel %"
+  @01fa6f1e  "Dynel::GetRot() Cannot do this on dynel "
+  @01fa6f76  "Dynel::ParentDetach() Cannot detach dynel ("
+  @01fa6faa  "Dynel::OnPlayfieldChange() Can only handle vehicles of Dummyvehicle or CharVehic"
+  @01fa7036  "Dynel::Run() "
+  @01fa7046  "Dynel::Run: Character Starting to die on this Server Count("
+  @01fa7086  "Dynel::Run: Character Dieing on this Server Count("
+  @01fa71e6  "Dynel::DieDeep called multiple times on dynel %u %u."
+  @01fa7222  "Dynel::DieDeep called on Dynel %u %u not in tree, Releasing it ."
+  @01fa723b  "Dynel %u %u not in tree, Releasing it ."
+  @01fa7266  "Dynel::DieDeep called on dynel %u %u."
+  @01fa7292  "Dynel::StopDying() Cannot be called on a dynel not already dying."
+  @01fa7307  "DynelSignal object exist.."
+  @01fa7326  "DynelSignals == NULL"
+  @01fa7342  "DynelSignals cant be created in constructor, refactor c'tor code to allow for th"
+  @01fa7673  "Dynel( n3Dynel* pcDynel ): pcDynel must exist!."
+  @01fa767c  "Dynel* pcDynel ): pcDynel must exist!."
+  @01fa7685  "Dynel ): pcDynel must exist!."
+  @01fa7690  "Dynel must exist!."
+  @01fa76ba  "Dynel || 0 == pcDynel"
+  @01fa76ca  "Dynel"
+  @01fa76d7  "Dynel( n3Dynel* pcDynel ): Main dynel not known!."
+  @01fa76e0  "Dynel* pcDynel ): Main dynel not known!."
+  @01fa76e9  "Dynel ): Main dynel not known!."
+  @01fa7722  "Dynel || 0 != pcDynel"
+  @01fa7732  "Dynel"
+  @01fa774f  "Dynel() Dynamic cast failed or no n3EngineClient instance."
+  @01fa77b3  "Dynel() Dynel cannot be 0 here"
+  @01fa77bb  "Dynel cannot be 0 here"
+  @01fa77db  "Dynel"
+  @01fa7e8c  "Dynel != NULL"
+  @01fa7e9c  "Dynellist has been corrupted, please restart age of conan."
+      <- ptr@0059ce7d  FUN_0059cdb0 @0059cdb0 size=1708
+  @01fa7edc  "Dynel->GetRefCount() == 1"
+  @01fa7fe8  "Dynel: "
+      <- ptr@0059d0ac  FUN_0059cdb0 @0059cdb0 size=1708
+  @01fa8005  "Dynel"
+  @01fa80c1  "Dynel"
+  @01fa81a5  "Dynel() Cannot add 0 ptr dynel!"
+
+=== "Spawn" ===
+  @01f0d6c8  "Spawn Intensity"
+      <- ptr@01ccee92  FUN_01cceb49 @01cceb49 size=1514
+  @01f6d994  "SpawnAnimation"
+      <- ptr@01dc19cb  FUN_01db2740 @01db2740 size=217362
+  @01f6e852  "Spawnpoint"
+      <- ptr@00ada7c4  FUN_00ada740 @00ada740 size=182
+  @01f72768  "SpawnLuaScriptId"
+      <- ptr@01de5e79  FUN_01db2740 @01db2740 size=217362
+  @01f955b0  "SpawnPoints"
+      <- ptr@004f3fef  FUN_004f3f40 @004f3f40 size=1614
+  @01f9e30a  "SpawnPointID) streamed payload of size "
+  @01fb1a00  "Spawns an entrance to a ACG outfoor playfield"
+      <- ptr@0062eaf5  FUN_0062eae0 @0062eae0 size=39
+  @01fb1a30  "Spawns an acgentrance on a dynel..style is the id of the style (see CONANDEV_ACG"
+      <- ptr@0062eb28  FUN_0062eb10 @0062eb10 size=42
+  @01fb1d3c  "Spawns a Quest"
+      <- ptr@0062f075  FUN_0062f060 @0062f060 size=39
+  @01fb1d50  "Spawns a quest on your target..HASH is the HASH to spawn the mission from."
+      <- ptr@0062f0a5  FUN_0062f090 @0062f090 size=39
+  @01fb399c  "Spawns an object"
+      <- ptr@006377a5  FUN_00637790 @00637790 size=39
+  @01fb39b0  "Spawns a object into the world"
+      <- ptr@006377d5  FUN_006377c0 @006377c0 size=39
+  @01fb3ab1  "Spawn to my inventory"
+  @01fb3ad5  "Spawn to targets inventory"
+  @01fb85ad  "Spawn a pet with the specified hash, level and brains.capture                  :"
+  @01fb87c5  "Spawn a pet"
+  @01fd9d39  "SpawnMonster"
+  @01fd9d60  "SpawnMonsterACG"
+  @01fd9d70  "SpawnMonsterACG"
+      <- ptr@008bf844  FUN_008bdf40 @008bdf40 size=22988
+  @01fd9d95  "SpawnMonsterACG"
+  @01fd9dfd  "SpawnMonsterACGRot"
+  @01fd9e25  "SpawnItemOnCharacter"
+  @01fda7e1  "SpawnPetACG"
+  @01fdb19d  "SpawnQuest"
+  @01fdb609  "SpawnRemotePet"
+  @01fde4fe  "Spawnpoints"
+  @01fe2091  "Spawned""
+  @01fed1a8  "SpawnItem"
+      <- ptr@009c6075  FUN_009c5230 @009c5230 size=4659
+      <- ptr@009c753b  FUN_009c7510 @009c7510 size=81
+      <- ptr@009ca110  FUN_009ca0e0 @009ca0e0 size=86
+      <- ptr@009cb700
+  @01feebc8  "Spawn failed."
+      <- ptr@00a1117c  FUN_00a10f30 @00a10f30 size=720
+  @01feebd8  "Spawn failed, no cat mesh."
+      <- ptr@00a111d6  FUN_00a10f30 @00a10f30 size=720
+  @01feef28  "Spawn something in the playfield"
+      <- ptr@00a1399e  FUN_00a12d90 @00a12d90 size=6535
+  @01ff320f  "SpawnedOnServer"
+  @01ff3227  "SpawnedOnServer < s_CallbackNameToName.size() && s_CallbackNameToName[e_OnNPCSpa"
+  @01ff3274  "SpawnedOnServer].empty()"
+  @0200e768  "Spawn Force Emitter"
+      <- ptr@00d133e1  FUN_00d12a70 @00d12a70 size=18166
+  @0202f848  "SpawnBloodSplatter"
+      <- ptr@00fb6cc6  FUN_00fb6c60 @00fb6c60 size=122
+  @0202f894  "Spawn"
+      <- ptr@00fb8e4b  FUN_00fb8e10 @00fb8e10 size=195
+      <- ptr@01461125  FUN_01460f30 @01460f30 size=639
+      <- ptr@0146116f  FUN_01460f30 @01460f30 size=639
+  @0202fadc  "SpawnLightning"
+      <- ptr@00fb988e  FUN_00fb9860 @00fb9860 size=152
+  @0204a9b3  "SpawnedByHash_c::Evaluate() is being called with Executor ID %d:%d and Target ID"
+  @0204aa1b  "SpawnedByHash_c::Evaluate() Mode is %d and hash is %s(%d).."
+  @0204aa63  "SpawnedByHash_c::Evaluate() Invalid mode!."
+  @021c2a27  "SpawnpointsCommand_c@@"
+  @021c2b0f  "SpawnHASHCommand_c@@"
+  @021c2e97  "SpawnQuestCommand_c@@"
+  @021c2ec3  "SpawnACGOutdoorEntranceCommand_c@@"
+  @021cc7d4  "SpawnQuestGameAction@@"
+  @021cc8c0  "SpawnRemotePetGameAction@@"
+  @021cdb74  "SpawnItemOnCharacterGameAction@@"
+  @021d1a98  "SpawnClientNPCScriptCommand@@"
+  @021fa890  "SpawnBloodSplatter@@"
+  @021feaa7  "SpawnedByHash_c@@"
+  @02214fa6  "Spawner_n@@"
+  @02214fe5  "Spawner_n@@"
+  @0222a7a0  "SpawnedLootEntryItem@@"
+
+=== "Tradepost" ===
+  @01f6cfd0  "TradepostPrice"
+      <- ptr@01dbbefa  FUN_01db2740 @01db2740 size=217362
+  @01f6d048  "TradepostStartTime"
+      <- ptr@01dbc318  FUN_01db2740 @01db2740 size=217362
+  @01f95620  "Tradepost"
+      <- ptr@004f40a3  FUN_004f3f40 @004f3f40 size=1614
+      <- ptr@0074c008  FUN_0074bfd0 @0074bfd0 size=475
+      <- ptr@0074c093  FUN_0074bfd0 @0074bfd0 size=475
+      <- ptr@007c2743  FUN_007c26a0 @007c26a0 size=2571
+      <- ptr@007c27c9  FUN_007c26a0 @007c26a0 size=2571
+      <- ptr@007c3392  FUN_007c3350 @007c3350 size=874
+      <- ptr@007c340e  FUN_007c3350 @007c3350 size=874
+      <- ptr@007c373e  FUN_007c36f0 @007c36f0 size=913
+      <- ptr@007c37c4  FUN_007c36f0 @007c36f0 size=913
+      <- ptr@007c3c22  FUN_007c3be0 @007c3be0 size=605
+      <- ptr@007c3c9e  FUN_007c3be0 @007c3be0 size=605
+      <- ptr@007c3e74  FUN_007c3e40 @007c3e40 size=280
+      <- ptr@007c3ef0  FUN_007c3e40 @007c3e40 size=280
+      <- ptr@007c4923  FUN_007c48d0 @007c48d0 size=1900
+      <- ptr@007c499f  FUN_007c48d0 @007c48d0 size=1900
+      <- ptr@007c4aac  FUN_007c48d0 @007c48d0 size=1900
+      <- ptr@007c4b3d  FUN_007c48d0 @007c48d0 size=1900
+      <- ptr@007c4ba9  FUN_007c48d0 @007c48d0 size=1900
+      <- ptr@007c4c4a  FUN_007c48d0 @007c48d0 size=1900
+      <- ptr@007c4cb2  FUN_007c48d0 @007c48d0 size=1900
+  @01f9cfd4  "TradepostSearchResult"
+      <- ptr@004f58fa  FUN_004f4590 @004f4590 size=6223
+  @01fa0abe  "TradepostSearchResult(const ID32& i_cChar, const TradepostSearchResult_t& i_cTra"
+  @01fa0aef  "TradepostSearchResult_t& i_cTradepostResult) streamed payload of size "
+  @01fa0b0b  "TradepostResult) streamed payload of size "
+  @01fa786e  "TradepostInterface"
+  @01fcb3ec  "TradepostHolder::SendMail, player "
+  @01fcb544  "TradepostHolder::MarkMailRead, player "
+  @01fcb5dc  "TradepostHolder::GetMailItems, player "
+  @01fcb608  "TradepostHolder::GetMailItems, player"
+  @01fcb678  "TradepostHolder::DeleteMail, player "
+  @01fcb6b8  "TradepostHolder::CancelMail, player "
+  @01fcb774  "TradepostHolder::SellItem, player "
+  @01fcba00  "TradepostHolder::IsItemForSale, player "
+  @01fcba60  "TradepostHolder::IsItemInMailTransit, player "
+  @01fcba94  "TradepostHolder::CancelSellItem, player "
+  @01fcbb68  "TradepostHolder::ItemSearch, player "
+  @01fcbbe8  "TradepostHolder::BuyItem, player "
+  @01fcbc5c  "TradepostHolder::BuyItem, Player "
+  @01fda4c4  "Tradepost"
+  @02041518  "TradepostHolder::BuyItem, player "
+      <- ptr@01139b17  FUN_01139a90 @01139a90 size=1285
+  @0204153c  "TradepostHolder::BuyItem, Player "
+      <- ptr@01139c1d  FUN_01139a90 @01139a90 size=1285
+      <- ptr@01139d6d  FUN_01139a90 @01139a90 size=1285
+      <- ptr@01139e9d  FUN_01139a90 @01139a90 size=1285
+  @02041560  "TradepostHolder::GetMailItems, player"
+      <- ptr@0113a068  FUN_01139fa0 @01139fa0 size=983
+      <- ptr@0113a180  FUN_01139fa0 @01139fa0 size=983
+  @02041588  "TradepostHolder::GetMailItems, player "
+      <- ptr@0113a29c  FUN_01139fa0 @01139fa0 size=983
+  @0205fca9  "Tradepost failed. SearchItemCategory not found in the xml File.."
+  @02061484  "TradepostPrice"
+      <- ptr@012fe9a7  FUN_012fe930 @012fe930 size=265
+  @02061494  "TradepostFee"
+      <- ptr@012feb40  FUN_012fea40 @012fea40 size=491
+  @020614cc  "TradepostGUI_TimesOut"
+      <- ptr@012fedcd  FUN_012fed90 @012fed90 size=299
+  @02072944  "TradepostAgent"
+      <- ptr@0135668e  FUN_013565e0 @013565e0 size=395
+      <- ptr@01356eac  FUN_01356ce0 @01356ce0 size=583
+      <- ptr@0135705d  FUN_01356ff0 @01356ff0 size=271
+      <- ptr@013574c1  FUN_01357490 @01357490 size=108
+      <- ptr@0136bcd2  FUN_0136bca0 @0136bca0 size=1173
+  @02072954  "TradepostInterface"
+      <- ptr@01356702  FUN_013565e0 @013565e0 size=395
+      <- ptr@01356d4c  FUN_01356ce0 @01356ce0 size=583
+      <- ptr@0136c1f1  FUN_0136c1c0 @0136c1c0 size=108
+  @02072a1d  "Tradepost"
+  @02072a4c  "TradepostSearchResults"
+      <- ptr@01356e54  FUN_01356ce0 @01356ce0 size=583
+  @02072a64  "TradepostInterfaceDispatch_t::DispatchMethod ""
+      <- ptr@013571ce  FUN_01357130 @01357130 size=799
+  @02072a94  "TradepostInterfaceDispatch_t::DispatchMethod("
+      <- ptr@013573c1  FUN_01357130 @01357130 size=799
+  @02072ac8  "TradepostInterfaceDispatch_t::DispatchOpenTradepost() not possible, stream bad a"
+      <- ptr@013577a1  FUN_01357710 @01357710 size=393
+  @02072af2  "Tradepost() not possible, stream bad after 'cAccessPos'! Server/Client code poss"
+  @02072b68  "TradepostInterfaceDispatch_t::DispatchOpenTradepost() not possible, stream bad a"
+      <- ptr@01357856  FUN_01357710 @01357710 size=393
+  @02072b92  "Tradepost() not possible, stream bad after 'vMaxDistance'! Server/Client code po"
+  @02072c10  "TradepostInterfaceDispatch_t::DispatchMailMessage() not possible, stream bad aft"
+      <- ptr@0135793d  FUN_013578c0 @013578c0 size=299
+  @02072cb0  "TradepostInterfaceDispatch_t::DispatchSendMailResult() not possible, stream bad "
+      <- ptr@01357a9a  FUN_013579f0 @013579f0 size=499
+  @02072d50  "TradepostInterfaceDispatch_t::DispatchSendMailResult() not possible, stream bad "
+      <- ptr@01357b99  FUN_013579f0 @013579f0 size=499
+  @02072df8  "TradepostInterfaceDispatch_t::DispatchRetrieveMailResult() not possible, stream "
+      <- ptr@01357c85  FUN_01357bf0 @01357bf0 size=290
+  @02072ea0  "TradepostInterfaceDispatch_t::DispatchTradepostSearchResults() not possible, str"
+      <- ptr@01357da6  FUN_01357d20 @01357d20 size=337
+  @02072ec6  "TradepostSearchResults() not possible, stream bad after 'cSearchResults'! Server"
+  @02072f50  "TradepostInterfaceDispatch_t::DispatchDeleteCanceledMail() not possible, stream "
+      <- ptr@01357eeb  FUN_01357e80 @01357e80 size=246
+  @02072ff0  "TradepostInterfaceDispatch_t::DispatchDeleteCanceledMailItem() not possible, str"
+      <- ptr@01357ff1  FUN_01357f80 @01357f80 size=358
+  @02073098  "TradepostInterfaceDispatch_t::DispatchDeleteCanceledMailItem() not possible, str"
+      <- ptr@013580a5  FUN_01357f80 @01357f80 size=358
+  @02077630  "TradepostAgentProxy_t::called with a too low id! min allowed "
+      <- ptr@0136bdec  FUN_0136bca0 @0136bca0 size=1173
+  @020776e8  "TradepostSellItem"
+      <- ptr@0136bfe3  FUN_0136bca0 @0136bca0 size=1173
+  @020776fc  "TradepostChangeItemPrice"
+      <- ptr@0136c005  FUN_0136bca0 @0136bca0 size=1173
+  @02077718  "TradepostCancelSellItem"
+      <- ptr@0136c027  FUN_0136bca0 @0136bca0 size=1173
+  @02077730  "TradepostItemSearch"
+      <- ptr@0136c049  FUN_0136bca0 @0136bca0 size=1173
+  @02077744  "TradepostBuyItem"
+      <- ptr@0136c06b  FUN_0136bca0 @0136bca0 size=1173
+  @02077758  "TradepostOpen"
+      <- ptr@0136c08d  FUN_0136bca0 @0136bca0 size=1173
+  @02077768  "TradepostClose"
+      <- ptr@0136c0af  FUN_0136bca0 @0136bca0 size=1173
+  @02077778  "TradepostUpdateItemTimeouts"
+      <- ptr@0136c0d1  FUN_0136bca0 @0136bca0 size=1173
+  @02077794  "TradepostAgentProxy.cpp"
+      <- ptr@0136c28e  FUN_0136c230 @0136c230 size=441
+      <- ptr@0136c44e  FUN_0136c3f0 @0136c3f0 size=462
+      <- ptr@0136c62e  FUN_0136c5c0 @0136c5c0 size=799
+      <- ptr@0136c941  FUN_0136c8e0 @0136c8e0 size=465
+      <- ptr@0136cb21  FUN_0136cac0 @0136cac0 size=445
+      <- ptr@0136cce1  FUN_0136cc80 @0136cc80 size=465
+      <- ptr@0136cec1  FUN_0136ce60 @0136ce60 size=483
+      <- ptr@0136d0b1  FUN_0136d050 @0136d050 size=465
+      <- ptr@0136d291  FUN_0136d230 @0136d230 size=465
+      <- ptr@0136d471  FUN_0136d410 @0136d410 size=465
+      <- ptr@0136d652  FUN_0136d5f0 @0136d5f0 size=548
+      <- ptr@0136d882  FUN_0136d820 @0136d820 size=548
+      <- ptr@0136dab2  FUN_0136da50 @0136da50 size=530
+      <- ptr@0136dcd5  FUN_0136dc70 @0136dc70 size=461
+      <- ptr@0136dea1  FUN_0136de40 @0136de40 size=483
+      <- ptr@0136e092  FUN_0136e030 @0136e030 size=537
+      <- ptr@0136e2b1  FUN_0136e250 @0136e250 size=445
+      <- ptr@0136e471  FUN_0136e410 @0136e410 size=445
+      <- ptr@0136e632  FUN_0136e5d0 @0136e5d0 size=484
+      <- ptr@0136e822  FUN_0136e7c0 @0136e7c0 size=530
+  @020777ac  "TradepostAgentProxy_t::GetAllMails() streamed payload of size "
+      <- ptr@0136c2f1  FUN_0136c230 @0136c230 size=441
+
+=== "Shop" ===
+  @01f6e580  "ShopPrice"
+      <- ptr@01dc8802  FUN_01db2740 @01db2740 size=217362
+  @01f6e5d7  "ShopItems"
+  @01f6e5f0  "ShopRent"
+      <- ptr@01dc8d51  FUN_01db2740 @01db2740 size=217362
+  @01f6e608  "ShopFlags"
+      <- ptr@01dc8e7f  FUN_01db2740 @01db2740 size=217362
+  @01f6e614  "ShopLastUsed"
+      <- ptr@01dc8f16  FUN_01db2740 @01db2740 size=217362
+  @01f6e624  "ShopType"
+      <- ptr@01dc8fad  FUN_01db2740 @01db2740 size=217362
+  @01f6e8ec  "ShopCurrency"
+  @01f7b373  "Shop"
+  @01f7c7c0  "Shop"
+  @01f8556c  "ShopData"
+      <- ptr@004bb2b6  FUN_004babb0 @004babb0 size=5946
+  @01f8557d  "Shop"
+  @01f8558e  "Shop"
+  @01f8a59d  "ShopData() not possible, stream bad after 'i_cShopID'! Server/Client code possib"
+  @01f8a5cb  "ShopID'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f8a635  "ShopData() not possible, stream bad after 'i_cShopParentID'! Server/Client code "
+  @01f8a663  "ShopParentID'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f8a6d5  "ShopData() not possible, stream bad after 'i_cShopContent'! Server/Client code p"
+  @01f8a703  "ShopContent'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f8a77a  "Shop() not possible, stream bad after 'i_cShopID'! Server/Client code possibly o"
+  @01f8a7a4  "ShopID'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f8a81f  "Shop() not possible, stream bad after 'inventoryID'! Server/Client code possibly"
+  @01f8a8bf  "Shop() not possible, stream bad after 'inventoryPos'! Server/Client code possibl"
+  @01f9e833  "Shop(const ID32& i_cShopID) streamed payload of size "
+  @01f9e847  "ShopID) streamed payload of size "
+  @01f9e89d  "ShopID, int i_nPos) streamed payload of size "
+  @01f9e8fe  "ShopID, const ID32& i_cInventoryID, int i_nPos) streamed payload of size "
+  @01f9e97e  "ShopID) streamed payload of size "
+  @0203e521  "Shops"
+  @0203e557  "ShopWontServeCriminals"
+  @0204433f  "ShopContent'! Server/Client code possibly out of sync (or hack attempt).."
+  @0204d1a8  "ShopCommand_Description"
+  @0204d1c4  "ShopCommand_Name"
+  @0204d1ec  "ShopCommand_BuyAllCommand_Description"
+  @0204d218  "ShopCommand_BuyAllCommand_Name"
+  @0204d244  "ShopCommand_BuyTimes_UIntParameter_Description"
+  @0204d278  "ShopCommand_BuyTimes_UIntParameter_Name"
+  @0204d2b0  "ShopCommand_FakeBillingConnection_Description"
+  @0204d2e4  "ShopCommand_FakeBillingConnection_Name"
+  @0204d32c  "ShopCommand_FakeBillingConnection_boolParameter_Description"
+  @0204d36c  "ShopCommand_FakeBillingConnection_boolParameter_Name"
+  @0204d3bc  "ShopCommand_ReloadData_Description"
+  @0204d3e4  "ShopCommand_ReloadData_Name"
+  @02050af4  "Shop"
+      <- ptr@01201fc8  FUN_01201eb0 @01201eb0 size=579
+      <- ptr@01202013  FUN_01201eb0 @01201eb0 size=579
+      <- ptr@01524a00  FUN_015249d0 @015249d0 size=132
+  @0205977d  "ShopViewKorea"
+  @02059795  "ShopView"
+  @0205d24e  "ShopViewConfig"
+  @0208d976  "ShopBrowser.ItemShopBrowser"
+  @0208d986  "ShopBrowser"
+  @0208edcf  "ShopItemTooltip"
+  @02091e10  "Shop.swf"
+  @02091e3e  "Shop.ItemShop.SignalReceivedItems.Emit"
+  @02091e47  "Shop.SignalReceivedItems.Emit"
+  @02091e86  "Shop.ItemShop.SignalReceivedUpdatedItems.Emit"
+  @02091e8f  "Shop.SignalReceivedUpdatedItems.Emit"
+  @02091ed6  "Shop.ItemShop.SignalReceivedFavorites.Emit"
+  @02091edf  "Shop.SignalReceivedFavorites.Emit"
+  @02091f26  "Shop.ItemShop.SignalReceivedBalance.Emit"
+  @02091f2f  "Shop.SignalReceivedBalance.Emit"
+  @02091f6e  "Shop.ItemShop.SignalReceivedCoupons.Emit"
+  @02091f77  "Shop.SignalReceivedCoupons.Emit"
+
+=== "Diffie" ===
+  (none)
+
+=== "Hellman" ===
+  (none)
+
+=== "TEA" ===
+  @01e95806  "TEARING"
+  @01e95826  "TEARABLE_VERTICES"
+  @01e958eb  "TEARING"
+  @01e95907  "TEARABLE_VERTICES"
+  @01e9637e  "TEARABLE"
+  @01e96458  "TEARABLE"
+  @01e97563  "TEARABLE"
+  @01e9786d  "TEARABLE"
+  @01e97937  "TEARABLE"
+  @01e97aef  "TEARABLE"
+  @01e97bff  "TEARABLE"
+  @01ed1d0f  "TEATTRIBUTE"
+  @01edf5d9  "TEATTACHED"
+  @01ee071a  "TEABLE"
+  @01f79206  "TEAPP): Application actived.."
+  @01f7922e  "TEAPP): Application deactived.."
+  @020a9320  "TEAM"
+      <- ptr@016b79a3  FUN_016b74a0 @016b74a0 size=3086
+
+=== "Decrypt" ===
+  @01f83076  "DecryptionKey....key1.. .(.....key2.. .(.....key3.. .(.....key4.. .(."....ProtoA"
+  @01f830e2  "DecryptionKey.!..key2.. .(.2..ProtoDecryptionKey.!..key3.. .(.2..ProtoDecryption"
+  @01f83105  "DecryptionKey.!..key3.. .(.2..ProtoDecryptionKey....template1.. .(.....template2"
+  @01f83128  "DecryptionKey....template1.. .(.....template2.. .(.....template3.. .(.....level."
+  @01fa1000  "DecryptionKey_c key1, DecryptionKey_c key2) streamed payload of size "
+  @01fa1016  "DecryptionKey_c key2) streamed payload of size "
+  @02036b28  "DecryptionKey().IsNull()"
+  @021bdf31  "DecryptionKey@@"
+
+=== "Encrypt" ===
+  (none)
+
+=== "cipher" ===
+  @01ef5e97  "cipher"
+
+=== "Cipher" ===
+  (none)
+
+=== "password" ===
+  @01ef522e  "password, since none was supplied to the server on this connection.)"
+  @01fb30f7  "password for the server (only needed if you do not have SetStat gmflag)"
+  @01fb3140  "password"
+      <- ptr@0063431f  FUN_00633f20 @00633f20 size=1114
+      <- ptr@01919d6d  FUN_01919980 @01919980 size=1619
+      <- ptr@01c13163  FUN_01c12f20 @01c12f20 size=866
+      <- ptr@02194058
+  @0204ede8  "password "%s"."
+
+=== "login" ===
+  @01ef55a4  "login"
+      <- ptr@01c13137  FUN_01c12f20 @01c12f20 size=866
+  @01f22c76  "logindata and must exit"
+  @01f79ee2  "login as server lost.."
+  @01fb9479  "login hang."
+  @01fbbfa9  "login"
+  @02049c06  "login"
+  @0208c8e0  "login_window"
+      <- ptr@0148dee8  FUN_0148deb0 @0148deb0 size=138
+      <- ptr@0148df78  FUN_0148df40 @0148df40 size=151
+      <- ptr@0148e447  FUN_0148e410 @0148e410 size=140
+  @0208da94  "login_success.html&scope=read_stream,publish_stream,offline_access,user_photo_vi"
+
+=== "Login" ===
+  @01ef5cd4  "Login denied"
+      <- ptr@01c14a8d  FUN_01c148e0 @01c148e0 size=526
+  @01f7825c  "Login_UserName"
+  @01f783c0  "LoginName"
+      <- ptr@0043a598  FUN_0043a1a0 @0043a1a0 size=1971
+      <- ptr@0060fd79  FUN_0060f9c0 @0060f9c0 size=1210
+  @01f79b12  "Login."
+  @01f79c54  "Login timed out."
+      <- ptr@0044c713  FUN_0044c650 @0044c650 size=681
+  @01f7a5d2  "Login"
+  @01f7b2a0  "LoginBrowser"
+  @01f7d8e0  "Login/Queue"
+      <- ptr@0047c75d  FUN_0047c720 @0047c720 size=359
+      <- ptr@0047c805  FUN_0047c720 @0047c720 size=359
+  @01f7dfdc  "LoginConnectReady"
+      <- ptr@00483d68  FUN_00483c10 @00483c10 size=1144
+  @01f7e084  "LoginQueuePosition"
+      <- ptr@00483e60  FUN_00483c10 @00483c10 size=1144
+  @01f7e18c  "LoginProblem"
+      <- ptr@00483fb5  FUN_00483c10 @00483c10 size=1144
+      <- ptr@0049067a  FUN_00490560 @00490560 size=524
+  @01f7e623  "LoginConnectReady() not possible, stream bad after 'gameServerAddr'! Server/Clie"
+  @01f7e6cb  "LoginConnectReady() not possible, stream bad after 'nCookie'! Server/Client code"
+  @01f7e76b  "LoginConnectReady() not possible, stream bad after 'cClientCharacterID'! Server/"
+  @01f7e813  "LoginConnectReady() not possible, stream bad after 'cPF'! Server/Client code pos"
+  @01f7f13b  "LoginQueuePosition() not possible, stream bad after 'i_nDimensionID'! Server/Cli"
+  @01f7f1e3  "LoginQueuePosition() not possible, stream bad after 'i_nCharID'! Server/Client c"
+  @01f7f283  "LoginQueuePosition() not possible, stream bad after 'i_nQueuePosition'! Server/C"
+  @01f7fc4b  "LoginProblem() not possible, stream bad after 'eStatus'! Server/Client code poss"
+  @01f80585  "LoginProblem() not possible, stream bad after 'eLoginStatus'! Server/Client code"
+  @01f805b5  "LoginStatus'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f8179c  "LoginFromCrash"
+      <- ptr@00493e77  FUN_00493c40 @00493c40 size=1347
+  @01f817d4  "LoginCharacter"
+      <- ptr@00493edd  FUN_00493c40 @00493c40 size=1347
+  @01f81af4  "LoginFromCrash(uint32 player, uint32 cookie, uint32 character) streamed payload "
+  @01f81d54  "LoginCharacter(ID32::InstanceType nCharInstance, const StrStrMap& dataMap, const"
+  @01f8502c  "LoginPrefs.xml"
+  @01f85079  "LoginPrefsPath.empty() == false"
+  @01faea78  "Login_UserName"
+      <- ptr@0060fcc5  FUN_0060f9c0 @0060f9c0 size=1210
+      <- ptr@0060fd12  FUN_0060f9c0 @0060f9c0 size=1210
+  @01faf37c  "LoginProblems"
+      <- ptr@00625851  FUN_00625820 @00625820 size=153
+  @01fbc07e  "Login"
+  @01ff7348  "LoginPlayfield"
+      <- ptr@01dee3a1
+  @01ff7358  "LoginPosX"
+      <- ptr@01dee3d1
+  @01ff7364  "LoginPosZ"
+      <- ptr@01dee401
+  @01ff7370  "LoginPosY"
+      <- ptr@01dee431
+  @01ffe492  "LoginPrefsLoaded"
+  @01ffe4aa  "LoginPrefsPostUnload"
+  @0204823d  "Login"
+  @02048249  "Login_window"
+  @0204e228  "LoginProgressTitle"
+      <- ptr@011cf85c  FUN_011cf290 @011cf290 size=2795
+      <- ptr@011cf891  FUN_011cf290 @011cf290 size=2795
+  @0204e250  "Login"
+      <- ptr@011cfb88  FUN_011cf290 @011cf290 size=2795
+      <- ptr@011e3371  FUN_011e26f0 @011e26f0 size=3782
+  @0204e295  "Login_ManageAccount_URL"
+  @0204e2e8  "Login problem: "%s".."
+      <- ptr@011d1ffe  FUN_011d1fe0 @011d1fe0 size=590
+  @0204ea08  "Login_TerritoryAddress"
+      <- ptr@011e5509  FUN_011e5320 @011e5320 size=1128
+      <- ptr@011e5caf  FUN_011e5c50 @011e5c50 size=382
+      <- ptr@021a0708
+  @0204ea45  "LoginKorean.xml"
+  @0204ea6d  "Login.xml"
+  @0204ea90  "Login_UserName"
+      <- ptr@011e2c99  FUN_011e26f0 @011e26f0 size=3782
+      <- ptr@011e6668  FUN_011e64a0 @011e64a0 size=725
+  @0204eaa0  "Login_Password"
+      <- ptr@011e2daa  FUN_011e26f0 @011e26f0 size=3782
+      <- ptr@011e66d0  FUN_011e64a0 @011e64a0 size=725
+      <- ptr@011e6703  FUN_011e64a0 @011e64a0 size=725
+  @0204eb58  "LoginProblem_UnableToConnect"
+      <- ptr@011e38aa  FUN_011e3860 @011e3860 size=228
+      <- ptr@011e38df  FUN_011e3860 @011e3860 size=228
+      <- ptr@011e56d7  FUN_011e5320 @011e5320 size=1128
+      <- ptr@011e5716  FUN_011e5320 @011e5320 size=1128
+  @0204eb78  "LoginProblems_ConfirmExit"
+      <- ptr@011e3e7c  FUN_011e3e20 @011e3e20 size=713
+      <- ptr@011e3ec9  FUN_011e3e20 @011e3e20 size=713
+      <- ptr@01599145  FUN_01599120 @01599120 size=666
+      <- ptr@0159917a  FUN_01599120 @01599120 size=666
+  @0204eb94  "LoginProblem_DoYouReally"
+      <- ptr@011e3f15  FUN_011e3e20 @011e3e20 size=713
+      <- ptr@011e3f4a  FUN_011e3e20 @011e3e20 size=713
+      <- ptr@015991a8  FUN_01599120 @01599120 size=666
+      <- ptr@015991dd  FUN_01599120 @01599120 size=666
+  @0204ebd8  "LoginProblem_EnterUsernameAndPassword"
+      <- ptr@011e4995  FUN_011e4680 @011e4680 size=948
+  @0204ec00  "LoginProblem_ConnectUM"
+      <- ptr@011e47f0  FUN_011e4680 @011e4680 size=948
+      <- ptr@011e4b3e  FUN_011e4a40 @011e4a40 size=1257
+      <- ptr@011e4b73  FUN_011e4a40 @011e4a40 size=1257
+  @0204ec1c  "Login() found an existing territory connection (or attempt); disconnecting it.."
+  @0204ec74  "Login() found an existing universe connection (or attempt); disconnecting it.."
+  @0204ed02  "Login() found an existing territory connection (or attempt); disconnecting it.."
+  @0204ed62  "Login() found an existing universe connection (or attempt); disconnecting it.."
+  @0204edb4  "LoginProblem_LoggingIntoUM"
+      <- ptr@011e4f43  FUN_011e4f30 @011e4f30 size=996
+      <- ptr@011e4f78  FUN_011e4f30 @011e4f30 size=996
+  @0204edf8  "LoginProblem_ConnectingToTM"
+      <- ptr@011e5376  FUN_011e5320 @011e5320 size=1128
+      <- ptr@011e53c0  FUN_011e5320 @011e5320 size=1128
+  @0204ee44  "LoginProblem_LoggingIntoTM"
+      <- ptr@011e579f  FUN_011e5790 @011e5790 size=754
+      <- ptr@011e57d4  FUN_011e5790 @011e5790 size=754
+  @0204eebc  "LoginProblem_UMConnectionError"
+      <- ptr@011e5bc6  FUN_011e5a90 @011e5a90 size=447
+      <- ptr@011e5bfb  FUN_011e5a90 @011e5a90 size=447
+
+=== "key exchange" ===
+  (none)
+
+=== "SRP" ===
+  @00409392  "SRP...t..._^[..].."
+  @004394a1  "SRP...@.....~...~.r...3.f....._^[Y].."
+  @0045cb3b  "SRP..."
+  @0058ef99  "SRPQ.N."
+  @00698522  "SRP.v.."
+  @007b2cd6  "SRP.........<;.u._^[].."
+  @008a34c9  "SRPQ..."
+  @008a3659  "SRPQ.n."
+  @008a37e9  "SRPQ..."
+  @009fb2f9  "SRPQ.n."
+  @00a79a59  "SRPQ.>."
+  @00a891dc  "SRP.GLP.F....."
+  @00cb93e9  "SRPQ..."
+  @00cb9a87  "SRP.a....M..U..}.+.....]..u.;.}..u....]..u..E....u...+....E..}..u..E..p...;u.u.."
+  @00cd4e32  "SRP.F*."
+  @00cd4e7a  "SRP..)."
+  @00cd4f72  "SRP..)."
+  @00cd4fba  "SRP..(."
+  @00cd50b5  "SRP..'."
+  @00cd510a  "SRP.n'."
+  @00cebbde  "SRP.A....E.;...l."
+  @00cebc0f  "SRP.AH...E.;...0."
+  @00d24c82  "SRP.A.........."
+  @00d2d548  "SRPV......."
+  @00d2d5a2  "SRPV.e......_[..]..............."
+  @00e9bdf0  "SRP...."
+  @00e9ef43  "SRPQ.C"...."
+  @00efc1c3  "SRP.."
+  @00fcb0b9  "SRP.A|...D$49|$....."
+  @010c6294  "SRP...w"
+  @010d5723  "SRP.u.v"
+  @010de76a  "SRP...w"
+  @010de87c  "SRP...w"
+  @010ed1d7  "SRP.D$..P..L$...S.L$.._....D$.P.|$<.\$$.\$(..."
+  @011125f7  "SRP.ARs"
+  @01112687  "SRP..Qs"
+  @01129a39  "SRPQ.N."
+  @011f5556  "SRPj.....<.....P.S.....NX...P.QW..........."
+  @013daae9  "SRPQhx...h$...........j"
+  @0171502f  "SRP.......3..L$.Q....."
+  @01793b55  "SRP.......$..t..2.."
+  @0182c134  "SRPj.......N....Q...........j...........M...t..U..E.R.U.PRj..{.......j.........."
+  @0182c1c4  "SRPj.... ..._^3.[..].."
+  @01843c67  "SRP..;"
+  @01878518  "SRP.`...[.L$....D$..Q.."
+  @018fd179  "SRP.O[."
+  @019b9b3f  "SRP.Y...^][.."
+  @019e1591  "SRP..........u..D$ ..t...K,.....D.(_^[....."
+  @019f1614  "SRPQ........L$.f...t.f...u'.T$..B $.....$...f...f;.t..T$<.>..f.DW..D$4)\$8.\$..."
+  @01a76393  "SRP...CI...L$.^..."
+  @01a87286  "SRP.F...[W......_^.."
+  @01ac608f  "SRP........L$..WhQSR........}7"
+  @01ae4890  "SRP.x........u6..u..F...+N.t.....8 u..F..V.;V.u..+.....t..F.."
+  @01b414ba  "SRPj"
+  @01c237db  "SRP......F...."
+  @01c498d8  "SRP.`...........I.."
+  @01c5a154  "SRP.............L.."
+  @01c6d918  "SRP.`......."
+  @01c72856  "SRP..O..........E.."
+  @01c7398f  "SRP..>..........G.."
+
+=== "blowfish" ===
+  (none)
+
+=== "rdb" ===
+  @01fac46c  "rdbid"
+      <- ptr@005eea67  FUN_005ee4f0 @005ee4f0 size=1544
+      <- ptr@00714a73  FUN_00714a50 @00714a50 size=459
+      <- ptr@0085254c  FUN_00852470 @00852470 size=472
+      <- ptr@00852c93  FUN_00852910 @00852910 size=2015
+      <- ptr@0085a303  FUN_00859ff0 @00859ff0 size=2469
+      <- ptr@00fd0a2a  FUN_00fd0810 @00fd0810 size=2490
+      <- ptr@00fff7a6  FUN_00fff780 @00fff780 size=996
+      <- ptr@00fffbee  FUN_00fffbb0 @00fffbb0 size=236
+      <- ptr@0100111b  FUN_010005e0 @010005e0 size=3914
+      <- ptr@01001352  FUN_010005e0 @010005e0 size=3914
+      <- ptr@01197cc0  FUN_01178410 @01178410 size=132161
+  @01fac901  "rdbid"
+  @01faeae8  "rdb/Live"
+  @01fb27b6  "rdbid of the scriptgroup to start.scriptgroupparams: (Optional) A ';'-separated "
+  @01fb294d  "rdbid of the scriptgroup to start"
+  @01fb47a3  "rdb      : Reloads the RDB-data only..tradeskill: Reloads the TRADESKILL_TREE ta"
+  @01fb4b2c  "rdb"
+      <- ptr@0063ad57  FUN_0063a3d0 @0063a3d0 size=3482
+  @01fb6059  "rdbpath e.g. achardb/Live/test"
+  @01fb606a  "rdb/Live/test"
+  @01fbfd2d  "rdbcache"
+  @01fc37b7  "rdbpackage"
+  @01fc38cd  "rdbid parameter specified.."
+  @01fcada7  "rdbid>110326</rdbid><attractor>10</attractor></effect></effects></timeline></tim"
+  @01fcadb5  "rdbid><attractor>10</attractor></effect></effects></timeline></timelines></effec"
+  @01fd3678  "rdbid: %d"
+      <- ptr@008527bc  FUN_008527b0 @008527b0 size=31
+  @01fd3769  "rdbid>, using the <rdbid> value "
+  @01fd377c  "rdbid> value "
+  @01fd3797  "rdbid> tag when we already had an <name>, using the <rdbid> value "
+  @01fd37cc  "rdbid> value "
+  @01fe1c05  "rdbid=%d)(instance=%d) has executed %d script commands in this frame. The alerte"
+  @01fe1cc5  "rdbid=%d)(instance=%d) has executed more than %d scriptcommands in this frame an"
+  @01fea4ec  "rdbid=%d)!"
+  @01fea555  "rdbid=%d)!"
+  @01fef750  "rdb:%u:%u"
+      <- ptr@00a1712b  FUN_00a17090 @00a17090 size=236
+  @01ff9554  "rdb:%d:%d"
+      <- ptr@00aad1d8  FUN_00aad1b0 @00aad1b0 size=193
+      <- ptr@00aff989  FUN_00aff940 @00aff940 size=374
+  @01ffb4a4  "rdb_%d_%d"
+      <- ptr@00aff99c  FUN_00aff940 @00aff940 size=374
+  @01ffcdc4  "rdb:"
+      <- ptr@01deeb71
+  @01fff32a  "rdb/%u"
+  @02000b4d  "rdb loaded textures"
+  @02000fa0  "rdb://"
+      <- ptr@00bace31  FUN_00bace10 @00bace10 size=609
+  @02017f96  "rdbid=%d)"
+  @0201a249  "rdbwrappers\FileFormats/MeshLoader.cpp"
+  @0201a411  "rdbwrappers\decompress.cpp"
+  @0201a581  "rdbwrappers\PNGFormat.cpp"
+  @0201a769  "rdbwrappers\PNGTextureLoader.cpp"
+  @0201a7e1  "rdbwrappers\RDBCAT2Skeleton.cpp"
+  @0201a8d1  "rdbwrappers\RDBEnvArea.cpp"
+  @0201a951  "rdbwrappers\RDBEnvParams.cpp"
+  @0201a9c9  "rdbwrappers\RDBGroundHeightmap.cpp"
+  @0201aa39  "rdbwrappers\RDBMesh.cpp"
+  @0201ab71  "rdbwrappers\RDBModelIDX.cpp"
+  @0201adc1  "rdbwrappers\RDBParticleSystem.cpp"
+  @0201af31  "rdbwrappers\RDBPointLightSet.cpp"
+  @0201b081  "rdbwrappers\RDBRainSnowMask.cpp"
+  @0201b121  "rdbwrappers\RDBTexture.cpp"
+  @0201b311  "rdbwrappers\TextureLoader.cpp"
+  @0201db88  "rdbsource.cpp"
+      <- ptr@021f6d64
+  @0201dbf8  "rdbtexture.cpp"
+      <- ptr@021f6d4c
+  @02031b58  "rdb anim %u:%u."
+  @02031bfd  "rdb anim %u:%u."
+  @02031d22  "rdb anim %u:%u."
+  @02034574  "rdbname"
+      <- ptr@0103b463  FUN_0103b340 @0103b340 size=3235
+  @0203459d  "rdbname attribute"
+  @020351ac  "rdbObj->m_pRequest == NULL"
+      <- ptr@0104c964  FUN_0104c870 @0104c870 size=2015
+  @02035310  "rdbObj->GetIdentity() != ResourceID_t::zero()"
+      <- ptr@0104cfbe  FUN_0104c870 @0104c870 size=2015
+  @020355a0  "rdb/res/"
+      <- ptr@0104fcfe  FUN_0104fb40 @0104fb40 size=1178
+      <- ptr@0104fe38  FUN_0104fb40 @0104fb40 size=1178
+      <- ptr@0104ff5e  FUN_0104fb40 @0104fb40 size=1178
+  @02035b99  "rdbserver at '%s:%d' with the dataset %d(%s). The dataset id specified in the co"
+  @02036204  "rdbres"
+  @0203632d  "rdb server."
+  @02036bc0  "rdbdata"
+
+=== "RDB" ===
+  @0106fd95  "RDBH..8."
+  @010714d5  "RDB0t6SV.^."
+  @01073245  "RDB0.D$.t&.D$..D$..T$..D$.0.D$.R.T$..D$..D$..D$..T$0.B.j..L$.Q.L$8...L$0Q......|"
+  @01f7d8a1  "RDB.."
+  @01f81b97  "RDBDSN, const uint16 regionCode, const uint16 ageCode, const uint16 genderCode, "
+  @01f94425  "RDBCachesIIR_c"
+  @01fa20ce  "RDB_CameraPaths:"
+  @01fa6171  "RDBData: Unexpected version number %i.."
+  @01fa6208  "RDBData: Unexpected version number %i.."
+  @01fa8a9a  "RDBID:"
+  @01fa8ae7  "RDBID:"
+  @01fa8e77  "RDBAsyncLoader.h"
+  @01fa98d0  "RDBBuffer.cpp"
+      <- ptr@005bdc24  FUN_005bdc10 @005bdc10 size=71
+  @01fa9d6c  "RDBPlayfield"
+      <- ptr@005c328b  FUN_005c3220 @005c3220 size=596
+      <- ptr@005c330d  FUN_005c3220 @005c3220 size=596
+      <- ptr@005c3399  FUN_005c3220 @005c3220 size=596
+  @01fa9ebc  "RDBPlayfield.cpp"
+      <- ptr@005c3ac7  FUN_005c3480 @005c3480 size=4057
+      <- ptr@005c3cb7  FUN_005c3480 @005c3480 size=4057
+  @01faa01c  "RDBPlayfieldXml_t::LoadXml(): unable to read playfield "
+      <- ptr@005c4324  FUN_005c3480 @005c3480 size=4057
+  @01faa0f8  "RDBGenericXML"
+      <- ptr@005c5b18  FUN_005c5ad0 @005c5ad0 size=638
+      <- ptr@005c5bb4  FUN_005c5ad0 @005c5ad0 size=638
+      <- ptr@005c5c4f  FUN_005c5ad0 @005c5ad0 size=638
+      <- ptr@005c5cf1  FUN_005c5ad0 @005c5ad0 size=638
+  @01faa108  "RDBGenericXML::ReadData: Got an empty resource for "
+      <- ptr@005c5b53  FUN_005c5ad0 @005c5ad0 size=638
+  @01faa13c  "RDBGenericXML::ReadData: Can't parse XML resource "
+      <- ptr@005c5c8e  FUN_005c5ad0 @005c5ad0 size=638
+  @01faa170  "RDBGenericXML::ReadData: Can't find root node for resource "
+      <- ptr@005c5d2c  FUN_005c5ad0 @005c5ad0 size=638
+  @01faa74e  "RDBCollisionTagMap.h"
+  @01fac0e2  "RDB_Res_CombatCombo_Binary resource.."
+  @01fac292  "RDBResource:%d]."
+  @01fac2d7  "RDBResource:%d]."
+  @01facfd1  "RDB_Res_CombatCombo_Binary resource.."
+  @01fad1a1  "RDBResource:%d]."
+  @01fad1ee  "RDBResource:%d]."
+  @01fad516  "RDBResource:%d]."
+  @01fad557  "RDBResource:%d]."
+  @01fad5a2  "RDB_Res_BCCTree_Binary resource.."
+  @01fad6c9  "RDBResource:%d]."
+  @01fad973  "RDB_Res_BCCTree_Binary resource.."
+  @01fadb2f  "RDBResource:%d]."
+  @01fadb70  "RDBResource:%d]."
+  @01fadbda  "RDBResource:%d]."
+  @01fadef8  "RDB_Res_Movementset_Binary merged resource.."
+  @01fae1a2  "RDB.."
+  @01fae2fd  "RDBID: %d. Unable to find root node."
+  @01fae396  "RDBID: %s. CARS data loaded with no errors.."
+  @01fae411  "RDB_Res_CarsRuleData_Binary resource.."
+  @01fae4b8  "RDBID: "
+  @01fae4db  "RDBID: %d. Unable to find root node."
+  @01fae51b  "RDBID: %d. Unable to load data from RDB.."
+  @01fae53f  "RDB.."
+  @01faed39  "RDB language %s.."
+  @01faed71  "RDB language %s.."
+  @01fb453c  "RDB-data, CHARACTER_TEMPLATE, TEMPLATE_CLUSTER, CATEGORYTREE, TREASURE.quests   "
+  @01fb4646  "RDB-data, TEMPLATE_CLUSTER and CATEGORYTREE..knubot   : Reloads all knubot-relat"
+  @01fb47ba  "RDB-data only..tradeskill: Reloads the TRADESKILL_TREE table..anims     : Reload"
+  @01fb48bf  "RDB-data, CHARACTER_TEMPLATE, TEMPLATE_CLUSTER, CATEGORYTREE"
+  @01fb4b1d  "RDB-data only"
+  @01fb9668  "RDB..list                   : List all gametweaks.."
+  @01fb9749  "RDB"
+  @01fb9b21  "RDBID"
+  @01fbb7c1  "RDBCachesIIR"
+  @01fbb80d  "RDBCachesIIR_c::FlushRDBCaches(): Calling ItemData_t::GetInstance()->FanaticFlus"
+  @01fbb822  "RDBCaches(): Calling ItemData_t::GetInstance()->FanaticFlushCache()."
+  @01fbb86d  "RDBCachesIIR_c::FlushRDBCaches(): Calling AcgItemData_t::GetInstance()->FanaticF"
+  @01fbb882  "RDBCaches(): Calling AcgItemData_t::GetInstance()->FanaticFlushCache()."
+  @01fbb8d5  "RDBCachesIIR_c::FlushRDBCaches(): Calling SpellTemplate_t::FanaticFlushCache()."
+
+=== "le.idx" ===
+  @02036eb4  "le.idx"
+      <- ptr@0107249b  FUN_01072430 @01072430 size=1237
+      <- ptr@01073fca  FUN_01073ef0 @01073ef0 size=1062
+      <- ptr@010742bd  FUN_01073ef0 @01073ef0 size=1062
+  @020372c8  "le.idx"
+
+=== "scratch memories" ===
+  @0202c46f  "scratch memories. Waiting until one is freed.."
+
+=== "does not exist" ===
+  @01ec1751  "does not exist!"
+  @01ee90e5  "does not exist in auditioned wavebank."
+  @01ee9bd8  "does not exist or is unavailable."
+  @01ee9d85  "does not exist."
+  @01eed923  "does not exist."
+  @01ef00a8  "does not exist."
+  @01ef00fb  "does not exist."
+  @01ef13a2  "does not exist."
+  @01ef4be7  "does not exist"
+  @01fa4f12  "does not exist anymore! We have "
+  @01fcd8cd  "does not exist: "
+  @01fef654  "does not exist"
+  @02035638  "does not exist in any available RDB sources.."
+  @02035677  "does not exist in any available RDB sources.."
+  @020363d1  "does not exist on the RDB Server.."
+  @02036a04  "does not exist in any available RDB sources.."
+  @020380d0  "does not exist in any RDB sources.."
+  @020413fe  "does not exist in the FEAT table."
+  @02055b25  "does not exist in the stack!"
+  @02058449  "does not exist."
+  @020a9a8f  "does not exist!"
+
+=== "BKDR" ===
+  (none)
+
+=== "hash" ===
+  @01f0ce72  "hash.cpp"
+  @01f15e57  "hash.. .(.:.false.F..optimize_for.. .(.2).google.protobuf.FileOptions.OptimizeMo"
+  @01f83181  "hash.. .(."....ProtoInventoryGameEntry....item_id.. .(..5..stat_list.. .(.2".Pro"
+  @01f93596  "hash'! Server/Client code possibly out of sync (or hack attempt).."
+  @01f959ee  "hashes"
+  @01f963bf  "hash"
+  @01f99064  "hash"
+      <- ptr@00647036  FUN_00646e50 @00646e50 size=577
+      <- ptr@006483d6  FUN_006481f0 @006481f0 size=3259
+      <- ptr@009e2316  FUN_009e2250 @009e2250 size=711
+      <- ptr@00a13a1f  FUN_00a12d90 @00a12d90 size=6535
+      <- ptr@00c6ca3b  FUN_00c6ca10 @00c6ca10 size=88
+      <- ptr@00c6d663  FUN_00c6d650 @00c6d650 size=40
+      <- ptr@0117dfce  FUN_01178410 @01178410 size=132161
+      <- ptr@0118095e  FUN_01178410 @01178410 size=132161
+      <- ptr@011837c1  FUN_01178410 @01178410 size=132161
+      <- ptr@01187146  FUN_01178410 @01178410 size=132161
+      <- ptr@0118e6d4  FUN_01178410 @01178410 size=132161
+      <- ptr@01197ddd  FUN_01178410 @01178410 size=132161
+      <- ptr@01198251  FUN_01178410 @01178410 size=132161
+      <- ptr@0119836e  FUN_01178410 @01178410 size=132161
+      <- ptr@01f74b18
+  @01f996c1  "hash"
+  @01f99b71  "hash"
+  @01f9a193  "hash"
+  @01f9b8c3  "hash"
+  @01f9c509  "hash5"
+  @01f9c519  "hash4"
+  @01f9c529  "hash3"
+  @01f9c539  "hash2"
+  @01f9c549  "hash1"
+  @01fa91bd  "hash("
+  @01fa9314  "hash "
+  @01fa937b  "hash "
+  @01fab18e  "hash=[%s] level=%d seed=%d."
+  @01fab1ef  "hash=[%s] level=%d seed=%d."
+  @01fab539  "hash ""
+  @01fb1299  "hash> <level> .inflict <amount> ."
+  @01fb13f6  "hash and level"
+  @01fb60e7  "hash : solves goal with hash goalhash if in current phase<br>failgoal goalhash :"
+  @01fb60ff  "hash goalhash if in current phase<br>failgoal goalhash : fails task with goal wi"
+  @01fb6108  "hash if in current phase<br>failgoal goalhash : fails task with goal with goalha"
+  @01fb6131  "hash : fails task with goal with goalhash<br>solvetask taskhash: solve task with"
+  @01fb6156  "hash<br>solvetask taskhash: solve task with hash taskhash<br>failtask taskhash :"
+  @01fb616c  "hash: solve task with hash taskhash<br>failtask taskhash : fails task with hash "
+  @01fb6182  "hash taskhash<br>failtask taskhash : fails task with hash taskhash<br>nextphase "
+  @01fb618b  "hash<br>failtask taskhash : fails task with hash taskhash<br>nextphase taskhash "
+  @01fb61a0  "hash : fails task with hash taskhash<br>nextphase taskhash : solves all goals in"
+  @01fb61b7  "hash taskhash<br>nextphase taskhash : solves all goals in current phase of task "
+  @01fb61c0  "hash<br>nextphase taskhash : solves all goals in current phase of task with hash"
+  @01fb61d6  "hash : solves all goals in current phase of task with hash taskhash<br>increasec"
+  @01fb620c  "hash taskhash<br>increasecount goalhash : increases the repeat count of goal wit"
+  @01fb6215  "hash<br>increasecount goalhash : increases the repeat count of goal with hash go"
+  @01fb622f  "hash : increases the repeat count of goal with hash goalhash<br>cooldownincrease"
+  @01fb625e  "hash goalhash<br>cooldownincrease cooldown-name minutes-to-add : increases the t"
+  @01fb6267  "hash<br>cooldownincrease cooldown-name minutes-to-add : increases the time limit"
+  @01fb639b  "hash"
+  @01fb63d4  "hash"
+  @01fb6407  "hash"
+  @01fb6436  "hash"
+  @01fb6486  "hash"
+  @01fb64ca  "hash"
+  @01fb8205  "hash."
+  @01fb822f  "hash. .First param is either the hash or 'reset' to set back to normal..Monsterd"
+  @01fb8250  "hash or 'reset' to set back to normal..Monsterdata, headmesh and morphvalues are"
+  @01fb831b  "hash"
+  @01fb85cc  "hash, level and brains.capture                  : Capture the targeted NPCs and "
+  @01fb9f04  "hash"
+  @01fc25d8  "hash: %s.."
+  @01fcdd04  "hash "
+  @01fde424  "hash"
+  @01ff6ee2  "hash arg "
+  @01ff6f2b  "hash does not match ("
+  @0200aeda  "hashed to value "
+  @02011528  "hash_map<K, T> key"
+
+=== "version" ===
+  @01e8e984  "version not supported by DLL"
+  @01e8e9cc  "version of WinSock not supported"
+      <- ptr@0178f4a6  FUN_0178f470 @0178f470 size=290
+  @01e92393  "version of Protocol Buffers as your link-time library.  (Version verification fa"
+  @01e92444  "version ("
+  @01e92472  "version "
+  @01e924f4  "version of Protocol Buffers as your link-time library.  (Version verification fa"
+  @01e9258b  "version is "
+  @01e925ae  "version "
+  @01e9295c  "version number mismatch."
+  @01e95509  "version="1.4.0" xmlns="http://www.collada.org/2005/11/COLLADASchema">.."
+  @01e9555a  "version="1.0".encoding="utf-8"?>.."
+  @01e9a1c5  "version of NxuStream is no longer supported..."
+  @01e9a5d4  "version, the version format has changed from %d to %d"
+  @01e9a5e1  "version format has changed from %d to %d"
+  @01e9a643  "version of the SDK. Saved with SDK%d but running SDK%d"
+  @01ead576  "version 3-4.x expected."
+  @01ead615  "version = %d, File length = %d."
+  @01eb1181  "version"
+  @01eb7230  "version=""
+  @01ebc862  "versionMode"
+  @01ebc89a  "versionMode"
+  @01ebc8ad  "version"
+  @01ebcc50  "versionStatus"
+  @01ebffca  "version %d.%02d, density %dx%d  %d"
+  @01ec014c  "version %d, flags 0x%04x 0x%04x, transform %d"
+  @01ec0851  "version request"
+  @01ec0abf  "version: library is %d, caller expects %d"
+  @01ec39e8  "version"
+      <- ptr@01af22bd  FUN_01af2250 @01af2250 size=660
+  @01ecf317  "version"
+  @01ee9558  "version)."
+  @01ee9892  "version is not supported."
+  @01eea2dd  "version of the DXGI.DLL will provide run-time debug output with further informat"
+  @01eeab0d  "version"
+  @01eec9b0  "version hardware present or available."
+  @01eecec2  "version of DirectInput."
+  @01eecf96  "version or mismatched or incomplete driver components."
+  @01eed041  "version of DirectInput."
+  @01eed126  "version of Direct3D or D3DX."
+  @01eed9da  "version."
+  @01eedb8e  "version."
+  @01eee444  "version number of the file is invalid."
+  @01ef3fc5  "version to support telnet"
+  @01ef50bf  "version, version should be 4."
+  @01ef50c8  "version should be 4."
+  @01ef53eb  "version, version should be 5."
+  @01ef53f4  "version should be 5."
+  @01ef5479  "version in initial SOCKS5 response."
+  @01ef5c0b  "version failed"
+  @01ef663c  "version not supported"
+  @01ef6b81  "version 1.2.32 - September 18, 2008.   Copyright (c) 1998-2008 Glenn Randers-Peh"
+  @01ef6c48  "version 1.2.32 - September 18, 2008.."
+  @01ef6fb4  "version in application and library"
+  @01ef74e9  "version error"
+  @01ef7511  "version"
+  @01ef75c7  "version"
+  @01ef8214  "version error"
+  @01efc295  "version"
+  @01f17e1b  "version>1.0.0</version>"
+  @01f17e2a  "version>"
+  @01f17fa3  "version>1.0.0</version><retract><experience>"
+
+=== "datasize" ===
+  @01fa6984  "datasize left in stream="
+
+=== "blob" ===
+  @01fd608c  "blob, aborting the stream"
+
+=== "protobuf" ===
+  @01e922bf  "protobuf %s %s:%d] %s."
+  @01e925c6  "protobuf\stubs\common.cc"
+  @01f11c76  "protobuf\message.cc"
+  @01f120f2  "protobuf\descriptor.cc"
+  @01f138a0  "protobuf::Reflection::"
+  @01f13902  "protobuf\generated_message_reflection.cc"
+  @01f141ae  "protobuf\wire_format.cc"
+  @01f1434a  "protobuf\reflection_ops.cc"
+  @01f14582  "protobuf\message_lite.cc"
+  @01f14705  "protobuf/io/coded_stream.h."
+  @01f14732  "protobuf\io\coded_stream.cc"
+  @01f14879  "protobuf/io/coded_stream.h."
+  @01f148c2  "protobuf\text_format.cc"
+  @01f14bd6  "protobuf\io\zero_copy_stream_impl.cc"
+  @01f14e32  "protobuf\stubs\strutil.cc"
+  @01f14ee6  "protobuf\descriptor.pb.cc"
+  @01f15547  "protobuf/descriptor.proto"
+  @01f15571  "protobuf/descriptor.proto..google.protobuf"G..FileDescriptorSet.2..file.. .(.2$."
+  @01f15593  "protobuf"G..FileDescriptorSet.2..file.. .(.2$.google.protobuf.FileDescriptorProt"
+  @01f155c8  "protobuf.FileDescriptorProto"....FileDescriptorProto....name.. .(.....package.. "
+  @01f1564f  "protobuf.DescriptorProto.7..enum_type.. .(.2$.google.protobuf.EnumDescriptorProt"
+  @01f15684  "protobuf.EnumDescriptorProto.8..service.. .(.2'.google.protobuf.ServiceDescripto"
+  @01f156bb  "protobuf.ServiceDescriptorProto.8..extension.. .(.2%.google.protobuf.FieldDescri"
+  @01f156f7  "protobuf.FieldDescriptorProto.-..options.. .(.2..google.protobuf.FileOptions.9.."
+  @01f1572f  "protobuf.FileOptions.9..source_code_info.. .(.2..google.protobuf.SourceCodeInfo""
+  @01f15767  "protobuf.SourceCodeInfo"....DescriptorProto....name.. .(..4..field.. .(.2%.googl"
+  @01f157b9  "protobuf.FieldDescriptorProto.8..extension.. .(.2%.google.protobuf.FieldDescript"
+  @01f157f3  "protobuf.FieldDescriptorProto.5..nested_type.. .(.2 .google.protobuf.DescriptorP"
+  @01f1582f  "protobuf.DescriptorProto.7..enum_type.. .(.2$.google.protobuf.EnumDescriptorProt"
+  @01f15864  "protobuf.EnumDescriptorProto.H..extension_range.. .(.2/.google.protobuf.Descript"
+  @01f158a3  "protobuf.DescriptorProto.ExtensionRange.0..options.. .(.2..google.protobuf.Messa"
+  @01f158e5  "protobuf.MessageOptions.,..ExtensionRange....start.. .(.....end.. .(."....FieldD"
+  @01f1597a  "protobuf.FieldDescriptorProto.Label.8..type.. .(.2*.google.protobuf.FieldDescrip"
+  @01f159b5  "protobuf.FieldDescriptorProto.Type....type_name.. .(.....extendee.. .(.....defau"
+  @01f15a2e  "protobuf.FieldOptions"....Type....TYPE_DOUBLE......TYPE_FLOAT......TYPE_INT64..."
+  @01f15c00  "protobuf.EnumValueDescriptorProto.-..options.. .(.2..google.protobuf.EnumOptions"
+  @01f15c3c  "protobuf.EnumOptions"l..EnumValueDescriptorProto....name.. .(.....number.. .(..2"
+  @01f15ca5  "protobuf.EnumValueOptions"....ServiceDescriptorProto....name.. .(..6..method.. ."
+  @01f15d01  "protobuf.MethodDescriptorProto.0..options.. .(.2..google.protobuf.ServiceOptions"
+  @01f15d3a  "protobuf.ServiceOptions"...MethodDescriptorProto....name.. .(.....input_type.. ."
+  @01f15dbc  "protobuf.MethodOptions"....FileOptions....java_package.. .(.....java_outer_class"
+  @01f15e88  "protobuf.FileOptions.OptimizeMode:.SPEED."..cc_generic_services.. .(.:.false.$.."
+  @01f15f47  "protobuf.UninterpretedOption":..OptimizeMode....SPEED......CODE_SIZE......LITE_R"
+  @01f1603e  "protobuf.UninterpretedOption*.........."....FieldOptions.:..ctype.. .(.2#.google"
+  @01f1608f  "protobuf.FieldOptions.CType:.STRING....packed.. .(.....deprecated.. .(.:.false.."
+  @01f16124  "protobuf.UninterpretedOption"/..CType....STRING."
+  @01f161b4  "protobuf.UninterpretedOption*.........."b..EnumValueOptions.C..uninterpreted_opt"
+  @01f16218  "protobuf.UninterpretedOption*.........."`..ServiceOptions.C..uninterpreted_optio"
+  @01f1627a  "protobuf.UninterpretedOption*.........."_..MethodOptions.C..uninterpreted_option"
+  @01f162db  "protobuf.UninterpretedOption*.........."....UninterpretedOption.;..name.. .(.2-."
+  @01f16332  "protobuf.UninterpretedOption.NamePart....identifier_value.. .(.....positive_int_"
+  @01f16451  "protobuf.SourceCodeInfo.Location....Location....path.. .(.B.......span.. .(.B..."
+  @01f164b0  "protobufB.DescriptorProtosH."
+  @01f16662  "protobuf\io\tokenizer.cc"
+  @01f169ca  "protobuf\dynamic_message.cc"
+  @01f16b1a  "protobuf\stubs\substitute.cc"
+  @01f16bde  "protobuf\descriptor_database.cc"
+  @01f16dc2  "protobuf\io\zero_copy_stream_impl_lite.cc"
+  @01f1701e  "protobuf\extension_set.cc"
+  @01f172fe  "protobuf\extension_set_heavy.cc"
+
+=== "wire" ===
+  @01f1213c  "wire type for CPPTYPE_INT32: "
+  @01f12164  "wire type for CPPTYPE_INT64: "
+  @01f1218c  "wire type for CPPTYPE_UINT32: "
+  @01f121b4  "wire type for CPPTYPE_UINT64: "
+  @01f124ec  "wire type for CPPTYPE_MESSAGE: "
+  @01f141b7  "wire_format.cc"
+  @01f15fcd  "wire_format.. .(.:.false....no_standard_descriptor_accessor.. .(.:.false.C..unin"
+  @0201b541  "wire.h"
+
+=== "varint" ===
+  (none)
+

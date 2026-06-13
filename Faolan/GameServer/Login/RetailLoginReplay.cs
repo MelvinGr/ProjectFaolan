@@ -40,8 +40,8 @@ namespace Faolan.GameServer
 		private const uint StarterWristItem = 3361557; // Slave Manacles (wrist, 0x12)
 
 		// Rebuilds the (already instance-substituted) world-entry inventory snapshot (0x737A6DF9): patches the LIVE
-		// character's level/vitals into the tails and (default ON, see below) substitutes the player's DB containers
-		// for the captured ones - this snapshot is what drives the bag AND the equipment doll in-client.
+		// character's level/vitals into the tails and substitutes the player's DB containers for the captured ones
+		// (the correct BE32 blob-length framing, see below) - this snapshot drives the bag AND the equipment doll.
 		//
 		// HISTORY: container substitution used to stall world-load/chat ("any container mutation breaks chat",
 		// [[protocol_chat_connection_regression]]) - that bisect PRE-DATED the ContentMirror; the stall was the
@@ -94,17 +94,19 @@ namespace Faolan.GameServer
 			var rootBytes = parts.Root.ToArray();
 			var prefix = parts.Prefix;
 
-			// DB containers in the WORLD-ENTRY snapshot — now DEFAULT OFF (opt IN with FAOLAN_WORLDENTRY_DB_CONTAINERS=1).
-			// REGRESSION 2026-06-13: after this session's world-entry rework, the rebuilt root makes the client REJECT
-			// the player's own snapshot — AgeOfConan.log: "N3InfoItemRemote::Construct: ReadSubClass for IIR 1937403385
-			// (FullPlayerCharacterIIR) failed! Identity 50000:<charId>. Blob data may be inconsistant, data invalid".
-			// That invalid 0x737A6DF9 cascades: world entry never completes, character names don't render, and the
-			// client never connects to the CommunityServer (chat). The VERBATIM snapshot (this branch skipped) is valid
-			// and restores chat + names + name-on-healthbar (verified in-client 2026-06-13). The DB-container rebuild
-			// (AdjustSnapshotPrefixRootLength / FullCharSnapshotBuilder) needs to be re-proven byte-valid against a
-			// capture before it can be the default again — tracked in TODO.md. It DID render bag+doll on 2026-06-12,
-			// so the breakage is in a world-entry change since then, not the builder's original design.
-			if (Environment.GetEnvironmentVariable("FAOLAN_WORLDENTRY_DB_CONTAINERS") == "1" && equipment != null)
+			// Substitute the player's DB containers into the WORLD-ENTRY snapshot (the bag + equipment doll).
+			// In-client verified 2026-06-13: chat connects, names render, the bag shows the player's real DB items.
+			// FRAMING (recovered from AgeOfConan.exe via Ghidra, 2026-06-13 — see docs/db-container-handoff.md):
+			// n3InfoItemRemote::Construct reads the body as [u32 KEY=subop][u32 identity.type=50000][u32 instance]
+			// [u8 flag][u32 BE blobLen][protobuf blob = blobLen bytes][u32 BE version=0x18][tails subclass]. The
+			// "blob" = [field5 (the captured `28 81 06`, = our parts.Prefix[5..])] + [the FullCharacterIIR root =
+			// field 6 containers + f7/f8]. The client reads EXACTLY blobLen bytes then expects the 0x18 version — so
+			// blobLen MUST equal field5Len + rootLen. The old AdjustSnapshotPrefixRootLength treated the same bytes as
+			// a protobuf varint (the byte-misaligned model: `00 00 00 02`=ver, `ae 28`=varint 4483+rootLen, `81 06`=
+			// trailing) and on resize wrote the wrong field, leaving blobLen ~0x2xx regardless of the real root → the
+			// client over-read into the tails and rejected the FullChar ("Wrong IIR_t version"). SetSnapshotBlobLength
+			// writes the correct BE32 length; the captured prefix already carries the right [flag][len][field5] shape.
+			if (equipment != null)
 			{
 				try
 				{
@@ -125,9 +127,9 @@ namespace Faolan.GameServer
 					foreach (var container in FullCharSnapshotBuilder.BuildContainers(instance, equipped, bagFirst, inventoryRows ?? []))
 						typedRoot.Inventories.Add(container);
 					var newRoot = typedRoot.ToProtobufBytes();
-					prefix = AdjustSnapshotPrefixRootLength(parts.Prefix, newRoot.Length - rootBytes.Length);
-					Logger.LogInformation("World-entry DB containers: root {Old} -> {New} bytes ({Equipped} equipped + {Rows} rows).", rootBytes.Length, newRoot.Length, equipped.Count,
-						(inventoryRows ?? []).Length);
+					prefix = SetSnapshotBlobLength(parts.Prefix, newRoot.Length);
+					Logger.LogInformation("World-entry DB containers: root {Old} -> {New} bytes ({Equipped} equipped + {Rows} rows); blobLen={Blob}.", rootBytes.Length, newRoot.Length, equipped.Count,
+						(inventoryRows ?? []).Length, (parts.Prefix.Length - 5) + newRoot.Length);
 					rootBytes = newRoot;
 				}
 				catch (Exception ex)
@@ -170,11 +172,32 @@ namespace Faolan.GameServer
 			(0x0a, e => e.RingRight), (0x0b, e => e.Cloak), (0x0c, e => e.Shoulder), (0x0e, e => e.Boots), (0x0f, e => e.Hands), (0x10, e => e.Legs), (0x12, e => e.Wrist), (0x14, e => e.MainHandRight), (0x15, e => e.OffHandRight)
 		];
 
+		// Sets the snapshot's protobuf-blob length to match a regenerated root. The 8-byte prefix the client reads
+		// is [u8 flag][u32 BE blobLen][field5 = the rest], where the client (n3InfoItemRemote::Construct ->
+		// FUN_00cbfb80 in AgeOfConan.exe) reads EXACTLY blobLen bytes as the protobuf blob = field5 + the
+		// FullCharacterIIR root, then expects the 0x18 version. So blobLen = field5Len + rootLength, written as a
+		// 4-byte big-endian int at prefix offset 1. (This SUPERSEDES AdjustSnapshotPrefixRootLength, which adjusted
+		// a byte-misaligned protobuf-varint model and corrupted the real length on resize — see
+		// docs/db-container-handoff.md / [[protocol_containeradditem]].) field5Len = prefix.Length - 5 (the flag +
+		// the 4 length bytes); the captured field5 bytes at prefix[5..] are preserved unchanged.
+		internal static byte[] SetSnapshotBlobLength(byte[] prefix, int rootLength)
+		{
+			if (prefix.Length < 5 || rootLength < 0)
+				return prefix;
+
+			var field5Len = prefix.Length - 5;
+			var result = (byte[])prefix.Clone();
+			BinaryPrimitives.WriteUInt32BigEndian(result.AsSpan(1, 4), (uint)(field5Len + rootLength));
+			return result;
+		}
+
 		// Delta-adjusts the snapshot IIR prefix's embedded root-length varint by `delta`. The prefix is
 		// [4-byte base-class version][varint = const + rootLength][trailing varint(s)]; the client uses that
 		// varint to delimit the protobuf root from the following subclass (the tails). Reads the varint at
 		// offset 4, adds delta, and re-encodes in place (variable width), preserving the bytes around it.
 		// Returns the prefix unchanged when delta is 0 or the layout isn't the known 8-byte shape.
+		// DEPRECATED 2026-06-13: byte-misaligned model — the client reads a BE32 length, not this varint. Kept only
+		// for the existing SnapshotPrefixLengthTests until those are migrated to SetSnapshotBlobLength.
 		internal static byte[] AdjustSnapshotPrefixRootLength(byte[] prefix, int delta)
 		{
 			const int varintOffset = 4;

@@ -1,0 +1,822 @@
+# AoC client IIR decompiles (Ghidra, AgeOfConan.exe 2026-06-13)
+# Recovered the 0x737A6DF9 FullPlayerCharacterIIR framing — see docs/db-container-handoff.md.
+# Stripped binary; FUN_xxxx auto-named. Key map: Construct=005b9d30, ReadSubClass=00797440,
+#   ReadU32(BE)=0048f900, ReadBytes=00cba1b0, ReadByte=004e0340, parse-blob=00cbfb80.
+
+################################################################
+# FUNCTION FUN_0048f900 @ 0048f900  size=102
+################################################################
+
+uint FUN_0048f900(void)
+
+{
+  int in_EAX;
+  uint in_ECX;
+  uint local_8;
+  
+  local_8 = in_ECX;
+  if (*(char *)(in_EAX + 0x19) == '\0') {
+    if (*(uint *)(in_EAX + 0x10) < 4) {
+      *(undefined1 *)(in_EAX + 0x19) = 1;
+    }
+    else {
+      FUN_00cba1b0(&local_8,4);
+      if (*(int *)(in_EAX + 0x10) == 0) {
+        *(undefined1 *)(in_EAX + 0x18) = 1;
+      }
+    }
+  }
+  if (*(char *)(in_EAX + 0x1a) != '\0') {
+    return (local_8 & 0xff0000 | local_8 >> 0x10) >> 8 | (local_8 & 0xff00 | local_8 << 0x10) << 8;
+  }
+  return local_8;
+}
+
+
+
+################################################################
+# FUNCTION FUN_00797440 @ 00797440  size=556
+################################################################
+
+bool FUN_00797440(int param_1)
+
+{
+  int iVar1;
+  undefined4 *puVar2;
+  undefined8 *puVar3;
+  int in_ECX;
+  undefined8 uVar4;
+  undefined8 uVar5;
+  undefined1 local_29;
+  undefined1 local_28;
+  int local_24;
+  int local_20;
+  int local_1c;
+  undefined8 local_10;
+  
+  local_20 = in_ECX;
+  iVar1 = FUN_0048f900();
+  if (iVar1 == 0x18) {
+    FUN_0091f5c0(param_1);
+    FUN_00798c70(param_1,in_ECX + 0x20);
+    FUN_004d4c70(param_1,*(undefined4 *)(in_ECX + 0x40));
+    iVar1 = FUN_0048f900();
+    if (0 < iVar1) {
+      do {
+        local_1c = iVar1;
+        puVar2 = (undefined4 *)FUN_00c9cce0(0x54,4,0);
+        if (puVar2 != (undefined4 *)0x0) {
+          *puVar2 = PtrTarget_c::vftable;
+          puVar2[1] = 0;
+          puVar2[3] = 0;
+          puVar2[2] = 1000000000;
+          *puVar2 = MainQuest_c::vftable;
+          puVar2[4] = 0;
+          puVar2[5] = 0;
+          puVar2[6] = 0;
+          puVar2[7] = 0;
+          puVar2[8] = 0;
+          puVar2[9] = 0;
+          puVar2[0xb] = 0;
+          puVar2[0xc] = 0;
+          puVar2[0xd] = 0;
+          puVar2[0xe] = 0;
+          *(undefined2 *)(puVar2 + 0xf) = 0x100;
+          puVar2[0x10] = 0;
+          puVar2[0x11] = 0;
+          puVar2[0x12] = 1;
+          puVar2[0x13] = 0;
+        }
+        FUN_007999e0(&local_24);
+        FUN_00922210(local_24);
+        FUN_007977e0();
+        if (local_24 != 0) {
+          local_24 = 0;
+          FUN_004165d0();
+        }
+        local_1c = local_1c + -1;
+        iVar1 = local_1c;
+      } while (local_1c != 0);
+    }
+    iVar1 = local_20;
+    FUN_0077d220(local_20 + 0x44);
+    FUN_0077d5b0(iVar1 + 0x54);
+    iVar1 = local_20;
+    FUN_004d5900(param_1);
+    FUN_0139d450(param_1,*(undefined4 *)(iVar1 + 0x74));
+    FUN_0139d450(param_1,*(undefined4 *)(iVar1 + 0x78));
+    if (*(char *)(iVar1 + 0xe9) != '\0') {
+      FUN_0077af90(*(undefined4 *)(iVar1 + 0x7c));
+      iVar1 = local_20;
+    }
+    local_1c = FUN_0048f900();
+    if (local_1c != 0) {
+      local_20 = iVar1 + 0x80;
+      do {
+        if (*(char *)(param_1 + 0x19) == '\0') {
+          if (*(int *)(param_1 + 0x10) == 0) {
+            *(undefined1 *)(param_1 + 0x19) = 1;
+          }
+          else {
+            FUN_00cba1b0(&local_29,1);
+            if (*(int *)(param_1 + 0x10) == 0) {
+              *(undefined1 *)(param_1 + 0x18) = 1;
+            }
+          }
+        }
+        uVar4 = FUN_0048f720();
+        local_28 = local_29;
+        uVar5 = FUN_0048f720();
+        local_10 = uVar5;
+        puVar3 = (undefined8 *)FUN_00797960(local_20);
+        local_1c = local_1c + -1;
+        *puVar3 = uVar4;
+        puVar3[1] = local_10;
+      } while (local_1c != 0);
+    }
+    return *(char *)(param_1 + 0x19) != '\0';
+  }
+  FUN_004a8c10("GameCode",
+               "CoreFullPlayerCharacterIIR::ReadSubClass() Wrong IIR_t version %d, (current is %d)..\n\n"
+               ,iVar1,0x18);
+  return true;
+}
+
+
+
+################################################################
+# FUNCTION FUN_005b9d30 @ 005b9d30  size=1705
+################################################################
+
+void FUN_005b9d30(int param_1)
+
+{
+  undefined4 uVar1;
+  char cVar2;
+  int iVar3;
+  undefined4 uVar4;
+  int iVar5;
+  int *piVar6;
+  undefined4 *puVar7;
+  type_info *this;
+  char *pcVar8;
+  undefined4 ****ppppuVar9;
+  undefined4 extraout_ECX;
+  undefined4 extraout_ECX_00;
+  undefined4 extraout_ECX_01;
+  undefined4 extraout_ECX_02;
+  undefined4 extraout_ECX_03;
+  undefined4 extraout_ECX_04;
+  undefined4 extraout_ECX_05;
+  __type_info_node *p_Var10;
+  uint uStack_200;
+  int local_1e8;
+  undefined **local_1e4;
+  undefined **local_198 [19];
+  undefined4 local_14c;
+  int local_148;
+  int *local_144;
+  int local_140;
+  undefined4 ***local_13c [5];
+  uint local_128;
+  uint local_1c;
+  undefined1 *local_14;
+  void *local_10;
+  undefined1 *puStack_c;
+  undefined4 local_8;
+  
+  local_8 = 0xffffffff;
+  puStack_c = &LAB_01da8bb0;
+  local_10 = ExceptionList;
+  uStack_200 = DAT_021906e0 ^ (uint)&stack0xfffffffc;
+  local_14 = (undefined1 *)&uStack_200;
+  ExceptionList = &local_10;
+  local_1c = uStack_200;
+  iVar3 = FUN_0048f900();
+  local_140 = iVar3;
+  if (*(char *)(param_1 + 0x19) == '\0') {
+    FUN_005b9340(&DAT_029c7b18,iVar3,*(undefined4 *)(param_1 + 0x10));
+    if (DAT_0297d37c == 0) {
+      iVar5 = FUN_004175a0(0x10);
+      if (iVar5 == 0) {
+        DAT_0297d37c = 0;
+      }
+      else {
+        DAT_0297d37c = FUN_005b9250();
+      }
+    }
+    iVar5 = DAT_0297d37c;
+    local_148 = iVar3;
+    FUN_005bb600(&local_148);
+    if (local_144 != *(int **)(iVar5 + 4)) {
+      piVar6 = (int *)(*(code *)local_144[4])();
+      local_144 = piVar6;
+      if (piVar6 == (int *)0x0) {
+        FUN_004174e0(2,1);
+        FUN_0040f1c0(&local_1e8,
+                     "PROGRAMMING ERROR: n3InfoItemRemote::Construct: Could not create item with hash "
+                     ,extraout_ECX_00,iVar3,extraout_ECX_00,". Not good!\n");
+        uVar4 = FUN_00433c20();
+        FUN_0040f1c0(uVar4);
+        FUN_00416ae0(local_13c);
+        if (local_128 < 0x10) {
+          local_13c[0] = local_13c;
+        }
+        FUN_004a8c10("N3/N3InfoItemRemote",&DAT_01f22980,local_13c[0]);
+        FUN_004111d0(1,0);
+        FUN_00416c10();
+        goto LAB_005b9e64;
+      }
+      piVar6[3] = iVar3;
+      piVar6[5] = 0;
+      uVar4 = FUN_0048f900();
+      local_148 = FUN_0048f900();
+      local_14c = uVar4;
+      FUN_005b9130(&local_14c);
+      if ((*(char *)(param_1 + 0x19) == '\0') && (FUN_004e0340(), *(char *)(param_1 + 0x19) == '\0')
+         ) {
+        if ((char)local_148 == '\0') {
+          *(undefined1 *)(piVar6 + 6) = 0;
+LAB_005ba1df:
+          uVar4 = (**(code **)(*piVar6 + 0x1c))
+                            (0,&google::protobuf::Message::RTTI_Type_Descriptor,
+                             &ProtoEmptyMessage::RTTI_Type_Descriptor,0);
+          iVar3 = FUN_018493f7(uVar4);
+          if (iVar3 == 0) {
+            uVar4 = (**(code **)(*piVar6 + 0x1c))();
+            FUN_00cbfb80(uVar4);
+          }
+          local_8 = 0;
+          if ((DAT_021a2c29 != '\0') && (cVar2 = FUN_004a8c50(2,"N3/IIR"), cVar2 != '\0')) {
+            FUN_004174e0(2,1);
+            p_Var10 = (__type_info_node *)&DAT_0223bdf0;
+            this = (type_info *)___RTtypeid(piVar6,&DAT_0223bdf0,extraout_ECX_03,&DAT_01f23060);
+            pcVar8 = type_info::name(this,p_Var10);
+            uVar4 = FUN_0040f1c0(&local_1e8,"n3infoitemremote::Construct. RECEIVED IIR: ",
+                                 extraout_ECX_04,pcVar8);
+            uVar4 = FUN_0040f1c0(uVar4);
+            FUN_0040f1c0(uVar4);
+            FUN_00416ae0(local_13c);
+            ppppuVar9 = (undefined4 ****)local_13c[0];
+            if (local_128 < 0x10) {
+              ppppuVar9 = local_13c;
+            }
+            FUN_004a8b90(2,"N3/IIR",&DAT_01f22980,ppppuVar9);
+            FUN_004111d0(1,0);
+            FUN_00416c10();
+          }
+          iVar3 = (**(code **)(*piVar6 + 0x20))(param_1);
+          local_8 = 0xffffffff;
+          if (iVar3 == 0) goto LAB_005b9e64;
+          FUN_004174e0(2,1);
+          uVar4 = ((undefined4 *)piVar6[2])[1];
+          uVar1 = *(undefined4 *)piVar6[2];
+          puVar7 = (undefined4 *)FUN_005b9c80(local_140);
+          if (0xf < (uint)puVar7[5]) {
+            puVar7 = (undefined4 *)*puVar7;
+          }
+          FUN_0040f1c0(&local_1e8,"n3InfoItemRemote::Construct: ReadSubClass for IIR ",local_140,
+                       local_140,extraout_ECX_05,&DAT_01f7d030,extraout_ECX_05,puVar7,
+                       extraout_ECX_05,") failed! Identity ",extraout_ECX_05,uVar1,extraout_ECX_05,
+                       &DAT_01f22fe8,uVar4,". Blob data may be inconsistant, data invalid\n");
+          uVar4 = FUN_00433c20();
+          uVar4 = FUN_0040f1c0(uVar4);
+          uVar4 = FUN_0040f1c0(uVar4);
+          FUN_0040f1c0(uVar4);
+          uVar4 = FUN_00433c20();
+          FUN_0040f1c0(uVar4);
+          uVar4 = FUN_0040e9d0();
+          FUN_0040f1c0(uVar4);
+          FUN_00416ae0(local_13c);
+        }
+        else {
+          if ((char)local_148 == '\x01') {
+            *(undefined1 *)(piVar6 + 6) = 1;
+            goto LAB_005ba1df;
+          }
+          FUN_004174e0(2,1);
+          iVar3 = local_140;
+          puVar7 = (undefined4 *)FUN_005b9c80(local_140);
+          if (0xf < (uint)puVar7[5]) {
+            puVar7 = (undefined4 *)*puVar7;
+          }
+          FUN_0040f1c0(&local_1e8,"n3InfoItemRemote::Construct: ReadSubClass failed for IIR ",
+                       extraout_ECX_01,iVar3,extraout_ECX_01,&DAT_01f7d030,extraout_ECX_01,puVar7,
+                       extraout_ECX_01,")! isToBePassed on bool has value ");
+          uVar4 = FUN_00433c20();
+          uVar4 = FUN_0040f1c0(uVar4);
+          uVar4 = FUN_0040f1c0(uVar4);
+          uVar4 = FUN_0040f1c0(uVar4);
+          uVar4 = FUN_004068b0(uVar4,local_148,extraout_ECX_02,
+                               ". Blob data may be in wrong format!\n");
+          FUN_0040f1c0(uVar4);
+          FUN_00416ae0(local_13c);
+        }
+        if (local_128 < 0x10) {
+          local_13c[0] = local_13c;
+        }
+        FUN_004a8c10("N3/N3InfoItemRemote",&DAT_01f22980,local_13c[0]);
+        FUN_004111d0(1,0);
+        FUN_00416c10();
+      }
+      (**(code **)*piVar6)(1);
+      goto LAB_005b9e64;
+    }
+    FUN_004174e0(2,1);
+    FUN_0040f1c0(&local_1e8,"n3InfoItemRemote::Construct: Entry with hash ",extraout_ECX,iVar3,
+                 extraout_ECX," was not found!\n");
+    uVar4 = FUN_00433c20();
+    FUN_0040f1c0(uVar4);
+    FUN_00416ae0(local_13c);
+    if (local_128 < 0x10) {
+      local_13c[0] = local_13c;
+    }
+    FUN_004a8c10("N3/N3InfoItemRemote",&DAT_01f22980,local_13c[0]);
+    FUN_004111d0(1,0);
+    *(undefined ***)((int)&local_1e8 + *(int *)(local_1e8 + 4)) =
+         std::basic_ostringstream<char,std::char_traits<char>,std::allocator<char>_>::vftable;
+    local_1e4 = std::basic_stringbuf<char,std::char_traits<char>,std::allocator<char>_>::vftable;
+    FUN_00417440();
+    FUN_00410f00();
+    *(undefined ***)((int)&local_1e8 + *(int *)(local_1e8 + 4)) =
+         std::basic_ostream<char,std::char_traits<char>_>::vftable;
+  }
+  else {
+    FUN_004174e0(2,1);
+    FUN_0040f1c0(&local_1e8,"Figos ID ",0," sent a too short IIR UNKNOWN Key) !\n");
+    uVar4 = FUN_0040e9d0();
+    FUN_0040f1c0(uVar4);
+    FUN_00416ae0(local_13c);
+    if (local_128 < 0x10) {
+      local_13c[0] = local_13c;
+    }
+    FUN_004a8c10("N3/N3InfoItemRemote",&DAT_01f22980,local_13c[0]);
+    FUN_004111d0(1,0);
+    *(undefined ***)((int)&local_1e8 + *(int *)(local_1e8 + 4)) =
+         std::basic_ostringstream<char,std::char_traits<char>,std::allocator<char>_>::vftable;
+    local_1e4 = std::basic_stringbuf<char,std::char_traits<char>,std::allocator<char>_>::vftable;
+    FUN_00417440();
+    FUN_00410f00();
+    *(undefined ***)((int)&local_1e8 + *(int *)(local_1e8 + 4)) =
+         std::basic_ostream<char,std::char_traits<char>_>::vftable;
+  }
+  local_198[0] = std::ios_base::vftable;
+  FUN_0182cc13(local_198);
+LAB_005b9e64:
+  ExceptionList = local_10;
+  __security_check_cookie(local_1c ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
+################################################################
+# FUNCTION FUN_005b9130 @ 005b9130  size=82
+################################################################
+
+void FUN_005b9130(void)
+
+{
+  int *piVar1;
+  int iVar2;
+  int unaff_EDI;
+  undefined4 local_10;
+  int local_c;
+  
+  FUN_005bb130(&local_10);
+  iVar2 = *(int *)(unaff_EDI + 8);
+  *(undefined4 *)(unaff_EDI + 4) = local_10;
+  if (iVar2 != 0) {
+    piVar1 = (int *)(iVar2 + 0xc);
+    *piVar1 = *piVar1 + -1;
+    if (*piVar1 == 0) {
+      FUN_0045b5b0(iVar2);
+                    /* WARNING: Subroutine does not return */
+      FUN_004175c0(iVar2);
+    }
+  }
+  *(int *)(unaff_EDI + 8) = local_c;
+  *(int *)(local_c + 0xc) = *(int *)(local_c + 0xc) + 1;
+  piVar1 = (int *)(local_c + 0xc);
+  *piVar1 = *piVar1 + -1;
+  if (*piVar1 == 0) {
+    FUN_0045b5b0(local_c);
+                    /* WARNING: Subroutine does not return */
+    FUN_004175c0(local_c);
+  }
+  return;
+}
+
+
+
+################################################################
+# FUNCTION FUN_005b9340 @ 005b9340  size=169
+################################################################
+
+void FUN_005b9340(int param_1)
+
+{
+  uint uVar1;
+  int *piVar2;
+  undefined4 local_2c;
+  
+  uVar1 = DAT_021906e0 ^ (uint)&stack0xfffffffc;
+  if (*(char *)(param_1 + 8) != '\0') {
+    __time64((__time64_t *)0x0);
+    FUN_005bb440();
+    piVar2 = (int *)FUN_0050da00();
+    *piVar2 = *piVar2 + 1;
+    if (*(uint *)(param_1 + 4) <= (*(int *)(param_1 + 0x10) - *(int *)(param_1 + 0xc)) / 0x18 + 1U)
+    {
+      FUN_005bc8d0(*(int *)(param_1 + 0xc) + 0x18,local_2c);
+      *(int *)(param_1 + 0x10) = *(int *)(param_1 + 0x10) + -0x18;
+    }
+    FUN_0045eed0();
+  }
+  __security_check_cookie(uVar1 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
+################################################################
+# FUNCTION FUN_004e0340 @ 004e0340  size=78
+################################################################
+
+void FUN_004e0340(void)
+
+{
+  int in_EAX;
+  undefined4 in_ECX;
+  undefined1 *unaff_EDI;
+  undefined1 local_5;
+  
+  local_5 = (undefined1)((uint)in_ECX >> 0x18);
+  if (*(char *)(in_EAX + 0x19) != '\0') {
+    *unaff_EDI = local_5;
+    return;
+  }
+  if (*(int *)(in_EAX + 0x10) == 0) {
+    *(undefined1 *)(in_EAX + 0x19) = 1;
+  }
+  else {
+    FUN_00cba1b0(&local_5,1);
+    if (*(int *)(in_EAX + 0x10) == 0) {
+      *(undefined1 *)(in_EAX + 0x18) = 1;
+      *unaff_EDI = local_5;
+      return;
+    }
+  }
+  *unaff_EDI = local_5;
+  return;
+}
+
+
+
+################################################################
+# FUNCTION FUN_018493f7 @ 018493f7  size=273
+################################################################
+
+/* WARNING: Function: __SEH_prolog4 replaced with injection: SEH_prolog4 */
+/* WARNING: Function: __SEH_epilog4 replaced with injection: EH_epilog3 */
+
+int FUN_018493f7(int *param_1,int param_2,_s_RTTICompleteObjectLocator *param_3,int param_4,
+                int param_5)
+
+{
+  uint uVar1;
+  int iVar2;
+  int *piVar3;
+  _s_RTTICompleteObjectLocator *p_Var4;
+  int iVar5;
+  _s_RTTIBaseClassDescriptor *p_Var6;
+  TypeDescriptor *pTVar7;
+  uint uVar8;
+  PMD *in_stack_ffffffb8;
+  bad_cast local_38 [12];
+  uint local_2c;
+  uint local_28;
+  undefined4 local_24;
+  void *local_20;
+  undefined4 uStack_c;
+  undefined4 local_8;
+  
+  uStack_c = 0x1849403;
+  if (param_1 == (int *)0x0) {
+    return 0;
+  }
+  local_8 = 0;
+  local_20 = (void *)FUN_01849088();
+  pTVar7 = (TypeDescriptor *)((int)param_1 + (-(int)local_20 - param_2));
+  uVar1 = *(uint *)(*(int *)(*(int *)(*param_1 + -4) + 0x10) + 4);
+  if ((uVar1 & 1) == 0) {
+    iVar5 = *(int *)(*(int *)(*param_1 + -4) + 0x10);
+    iVar2 = *(int *)(iVar5 + 0xc);
+    uVar1 = *(uint *)(iVar5 + 8);
+    for (uVar8 = 0; local_28 = uVar8, uVar8 < uVar1; uVar8 = uVar8 + 1) {
+      p_Var6 = *(_s_RTTIBaseClassDescriptor **)(iVar2 + uVar8 * 4);
+      if ((*(int *)p_Var6 == param_4) ||
+         (iVar5 = _strcmp((char *)(*(int *)p_Var6 + 8),(char *)(param_4 + 8)), iVar5 == 0))
+      goto LAB_0184946f;
+    }
+    p_Var6 = (_s_RTTIBaseClassDescriptor *)0x0;
+  }
+  else if ((uVar1 & 2) == 0) {
+    p_Var6 = FindMITargetTypeInstance
+                       (local_20,param_3,pTVar7,param_4,(TypeDescriptor *)in_stack_ffffffb8);
+  }
+  else {
+    p_Var6 = FindVITargetTypeInstance
+                       (local_20,param_3,pTVar7,param_4,(TypeDescriptor *)in_stack_ffffffb8);
+  }
+  goto LAB_018494c1;
+  while ((p_Var4 = (_s_RTTICompleteObjectLocator *)*piVar3, p_Var4 != param_3 &&
+         (iVar5 = _strcmp((char *)(p_Var4 + 8),(char *)(param_3 + 8)), iVar5 != 0))) {
+LAB_0184946f:
+    uVar8 = uVar8 + 1;
+    local_2c = uVar8;
+    if ((uVar1 <= uVar8) ||
+       (piVar3 = *(int **)(iVar2 + uVar8 * 4), (*(byte *)(piVar3 + 5) & 4) != 0)) goto LAB_018494e3;
+  }
+LAB_018494c1:
+  if (p_Var6 == (_s_RTTIBaseClassDescriptor *)0x0) {
+LAB_018494e3:
+    iVar5 = 0;
+    local_24 = 0;
+    if (param_5 != 0) {
+      std::bad_cast::bad_cast(local_38,"Bad dynamic_cast!");
+                    /* WARNING: Subroutine does not return */
+      __CxxThrowException_8(local_38,&DAT_02154e34);
+    }
+  }
+  else {
+    iVar5 = PMDtoOffset(local_20,in_stack_ffffffb8);
+    iVar5 = iVar5 + (int)local_20;
+  }
+  return iVar5;
+}
+
+
+
+################################################################
+# FUNCTION FUN_005b9c80 @ 005b9c80  size=159
+################################################################
+
+/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */
+
+undefined * FUN_005b9c80(void)
+
+{
+  int iVar1;
+  int *piVar2;
+  undefined *puVar3;
+  
+  if ((_DAT_03b9dbf0 & 1) == 0) {
+    _DAT_03b9dbf0 = _DAT_03b9dbf0 | 1;
+    FUN_004111d0(0,0);
+    FUN_0040ec10("Unknown",7);
+    _atexit((_func_4879 *)&LAB_01e07040);
+  }
+  if (DAT_0297d380 == 0) {
+    iVar1 = FUN_004175a0(0x10);
+    if (iVar1 == 0) {
+      DAT_0297d380 = 0;
+    }
+    else {
+      DAT_0297d380 = FUN_005b9480();
+    }
+  }
+  iVar1 = DAT_0297d380;
+  piVar2 = (int *)FUN_00498020(&stack0x00000004);
+  if (*piVar2 == *(int *)(iVar1 + 4)) {
+    return &DAT_03b9dbd4;
+  }
+  puVar3 = (undefined *)FUN_004879d0();
+  return puVar3;
+}
+
+
+
+################################################################
+# FUNCTION FUN_005bb600 @ 005bb600  size=103
+################################################################
+
+void FUN_005bb600(uint *param_1)
+
+{
+  undefined4 *in_EAX;
+  int in_ECX;
+  undefined4 *puVar1;
+  undefined4 *puVar2;
+  undefined4 *puVar3;
+  
+  puVar3 = *(undefined4 **)(in_ECX + 4);
+  if (*(char *)((int)puVar3[1] + 0x15) == '\0') {
+    puVar1 = (undefined4 *)puVar3[1];
+    do {
+      if ((uint)puVar1[3] < *param_1) {
+        puVar2 = (undefined4 *)puVar1[2];
+      }
+      else {
+        puVar2 = (undefined4 *)*puVar1;
+        puVar3 = puVar1;
+      }
+      puVar1 = puVar2;
+    } while (*(char *)((int)puVar2 + 0x15) == '\0');
+  }
+  if ((puVar3 != *(undefined4 **)(in_ECX + 4)) && ((uint)puVar3[3] <= *param_1)) {
+    *in_EAX = puVar3;
+    return;
+  }
+  *in_EAX = *(undefined4 **)(in_ECX + 4);
+  return;
+}
+
+
+
+
+##### additional parse helpers #####
+# FUNCTION FUN_00cbfb80 @ 00cbfb80  size=95
+################################################################
+
+void FUN_00cbfb80(void)
+
+{
+  int in_EAX;
+  uint uVar1;
+  undefined4 uVar2;
+  
+  uVar1 = FUN_0048f900();
+  uVar2 = FUN_00c9cce0(uVar1,4,0);
+  if ((*(char *)(in_EAX + 0x19) == '\0') && (uVar1 != 0)) {
+    if (*(uint *)(in_EAX + 0x10) < uVar1) {
+      *(undefined1 *)(in_EAX + 0x19) = 1;
+    }
+    else {
+      FUN_00cba1b0(uVar2,uVar1);
+      if (*(int *)(in_EAX + 0x10) == 0) {
+        *(undefined1 *)(in_EAX + 0x18) = 1;
+      }
+    }
+  }
+  FUN_01d2def0(uVar2,uVar1);
+  FUN_00c9d060(uVar2,uVar2);
+  return;
+}
+
+
+
+################################################################
+# FUNCTION FUN_00cba1b0 @ 00cba1b0  size=256
+################################################################
+
+void FUN_00cba1b0(void *param_1,int *param_2)
+
+{
+  int *_Size;
+  int *piVar1;
+  int iVar2;
+  int iVar3;
+  int **ppiVar4;
+  int iVar5;
+  int *piVar6;
+  int *unaff_ESI;
+  int *local_14;
+  int *local_10;
+  int local_c;
+  int local_8;
+  
+  iVar5 = *unaff_ESI;
+  local_8 = 0;
+  piVar6 = param_2;
+  while ((iVar5 != 0 && (piVar6 != (int *)0x0))) {
+    if (*unaff_ESI == unaff_ESI[1]) {
+      iVar5 = unaff_ESI[3];
+    }
+    else {
+      iVar5 = 0x100;
+    }
+    local_10 = (int *)(iVar5 - unaff_ESI[2]);
+    ppiVar4 = &local_10;
+    if (piVar6 <= (int *)(iVar5 - unaff_ESI[2])) {
+      ppiVar4 = &param_2;
+    }
+    _Size = *ppiVar4;
+    if (param_1 != (void *)0x0) {
+      FID_conflict__memcpy(param_1,(void *)(unaff_ESI[2] + 8 + *unaff_ESI),(size_t)_Size);
+      param_1 = (void *)((int)param_1 + (int)_Size);
+    }
+    unaff_ESI[2] = unaff_ESI[2] + (int)_Size;
+    piVar1 = (int *)*unaff_ESI;
+    local_8 = local_8 + (int)_Size;
+    piVar6 = (int *)((int)piVar6 - (int)_Size);
+    if (piVar1 == (int *)unaff_ESI[1]) {
+      iVar5 = unaff_ESI[3];
+    }
+    else {
+      iVar5 = 0x100;
+    }
+    param_2 = piVar6;
+    if (unaff_ESI[2] == iVar5) {
+      iVar5 = *piVar1;
+      LOCK();
+      iVar2 = piVar1[1] + -1;
+      piVar1[1] = iVar2;
+      iVar3 = DAT_029c9d9c;
+      UNLOCK();
+      if (iVar2 == 0) {
+        local_10 = (int *)(DAT_029c9d9c + 0x80);
+        LOCK();
+        local_c = *local_10;
+        *local_10 = *local_10 + 1;
+        UNLOCK();
+        local_14 = piVar1;
+        FUN_00cba7d0(iVar3 + 0x180 + (local_c * 3 & 7U) * 0x14,&local_14,local_c);
+      }
+      if (unaff_ESI[1] == *unaff_ESI) {
+        unaff_ESI[1] = 0;
+      }
+      *unaff_ESI = iVar5;
+      unaff_ESI[2] = 0;
+    }
+    iVar5 = *unaff_ESI;
+  }
+  unaff_ESI[4] = unaff_ESI[4] - local_8;
+  return;
+}
+
+
+
+################################################################
+# FUNCTION FUN_004e0340 @ 004e0340  size=78
+################################################################
+
+void FUN_004e0340(void)
+
+{
+  int in_EAX;
+  undefined4 in_ECX;
+  undefined1 *unaff_EDI;
+  undefined1 local_5;
+  
+  local_5 = (undefined1)((uint)in_ECX >> 0x18);
+  if (*(char *)(in_EAX + 0x19) != '\0') {
+    *unaff_EDI = local_5;
+    return;
+  }
+  if (*(int *)(in_EAX + 0x10) == 0) {
+    *(undefined1 *)(in_EAX + 0x19) = 1;
+  }
+  else {
+    FUN_00cba1b0(&local_5,1);
+    if (*(int *)(in_EAX + 0x10) == 0) {
+      *(undefined1 *)(in_EAX + 0x18) = 1;
+      *unaff_EDI = local_5;
+      return;
+    }
+  }
+  *unaff_EDI = local_5;
+  return;
+}
+
+
+
+################################################################
+# FUNCTION FUN_005b9c80 @ 005b9c80  size=159
+################################################################
+
+/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */
+
+undefined * FUN_005b9c80(void)
+
+{
+  int iVar1;
+  int *piVar2;
+  undefined *puVar3;
+  
+  if ((_DAT_03b9dbf0 & 1) == 0) {
+    _DAT_03b9dbf0 = _DAT_03b9dbf0 | 1;
+    FUN_004111d0(0,0);
+    FUN_0040ec10("Unknown",7);
+    _atexit((_func_4879 *)&LAB_01e07040);
+  }
+  if (DAT_0297d380 == 0) {
+    iVar1 = FUN_004175a0(0x10);
+    if (iVar1 == 0) {
+      DAT_0297d380 = 0;
+    }
+    else {
+      DAT_0297d380 = FUN_005b9480();
+    }
+  }
+  iVar1 = DAT_0297d380;
+  piVar2 = (int *)FUN_00498020(&stack0x00000004);
+  if (*piVar2 == *(int *)(iVar1 + 4)) {
+    return &DAT_03b9dbd4;
+  }
+  puVar3 = (undefined *)FUN_004879d0();
+  return puVar3;
+}
+
+
+

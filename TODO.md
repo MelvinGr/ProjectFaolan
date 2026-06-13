@@ -68,15 +68,15 @@ prior diagnoses are in `docs/archive/todo-history.md`.
         the class by id (like Tradepost), reply `[0xC350][target][0]`. Flood 450→19 (retail=17), post-entry now a
         healthy idle. → `HandleGameCharAgentProject.cs`, memory `protocol_gameserver_rpc_multiplexing`.
 
-- [ ] **Re-enable DB-container world-entry inventory (re-prove the snapshot byte-valid)**: the equipment-doll + bag
-      DB-item delivery (`FAOLAN_WORLDENTRY_DB_CONTAINERS`, `FullCharSnapshotBuilder` + `AdjustSnapshotPrefixRootLength`
-      in `RetailLoginReplay.cs`) is now OPT-IN (=1) because its rebuilt `0x737A6DF9` root makes the client reject the
-      player's FullPlayerCharacterIIR (see chat fix above). It DID render bag+doll on 2026-06-12 (commit 20f2cc1), so
-      a world-entry change since then desynced the rebuilt root from the prefix/root-length the client expects. Diff
-      the rebuilt root vs the verbatim root for the SAME char, re-validate `AdjustSnapshotPrefixRootLength` against a
-      capture (memory `protocol_containeradditem`: the prefix carries a root-length varint @offset4 = const 4483 +
-      rootLen that MUST be delta-adjusted), and only flip the default back ON once a login is IIR-error-free in
-      `AgeOfConan.log`. Until then, equipment/bag show the verbatim capture's items, not the player's DB items.
+- [x] **DB-container world-entry inventory — FIXED via Ghidra (2026-06-13), DEFAULT ON, unconditional.** In-client
+      verified: chat connects, names render, bag shows the player's real DB items. Root cause: the `0x737A6DF9`
+      protobuf root is **length-prefixed by a 4-byte BIG-ENDIAN length** the server wrote wrong on resize (the old
+      `AdjustSnapshotPrefixRootLength` was a byte-misaligned varint model — `varint−rootLen=4483` was a coincidence of
+      two near-equal-length captures). Decompiled `AgeOfConan.exe`: `n3InfoItemRemote::Construct` → `FUN_00cbfb80`
+      reads `[u32 BE blobLen][blob]`, then `ReadSubClass` reads the `0x18` version; `blobLen = field5Len + rootLen`.
+      FIX = `GameServerListener.SetSnapshotBlobLength` (writes BE32 at prefix offset 1), called by
+      `BuildBeachInventoryPacket`. Framing in `docs/db-container-handoff.md`; decompiles in `docs/re/`; golden test
+      `Faolan.Tests/SnapshotBlobLengthTests.cs`. (`FAOLAN_WORLDENTRY_DB_CONTAINERS` env flag removed.)
 
       (historical detail kept for reference) The client never opened a TCP socket to **AgentServer (7012)** even
       though the PlayerAgent handoff for it is well-formed (frame 125 in `Captures/loopback2.pcapng`: discriminator
