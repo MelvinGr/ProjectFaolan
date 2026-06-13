@@ -485,16 +485,21 @@ namespace Faolan.GameServer
 				else if (TryRebuildNpcSpawnFromDb(client, npcByPosition, pkt, out var npcRebuilt, out var wasIdentical))
 				{
 					npcBuilt++;
-					// DB-built NPC bodies are now the DEFAULT on the wire - the verbatim burst body is dropped and each
-					// NPC renders from its NpcSpawns row (transform columns + re-encoded CharacterIIR). The burst handle
-					// is kept (TryRebuildNpcSpawnFromDb builds with it) so the spawn stays paired with the burst's
-					// 96C46740 MoveTask registration. wasIdentical still tracks how many rebuild byte-identical to the
-					// capture (the proven-exact subset) for the log; cross-session rows differ (the row's captured
-					// pre-IIR/scaffold blocks carry the source session's instance refs) - this is the from-DB render
-					// path that supersedes the verbatim burst.
-					pkt = npcRebuilt;
+					// Only put the DB rebuild on the wire when it is BYTE-IDENTICAL to the captured burst body. The
+					// matched NpcSpawns row is often from a DIFFERENT capture session than this map's burst, and its
+					// un-lifted pre-IIR/scaffold blocks then carry that session's instance refs; replaying such a body
+					// builds an entity the client can't fully realize (observed: "[Identity 50000:530647] pcDynel is
+					// NULL", divergent bodies on ~23/42 beach NPCs) and contributes to the world-entry crash. The burst
+					// is retail's own bytes and renders, so for any non-identical rebuild we KEEP the verbatim burst
+					// packet (CLAUDE.md: don't replace a verbatim payload unless it's proven byte-for-byte). Re-addressing
+					// the cross-session pre-IIR/scaffold blocks is the path to a true from-DB render; until then verbatim
+					// wins. The from-model interest spawn (EnsureZoneNpcs, for NPCs OUTSIDE the burst like Casilda) is a
+					// separate path and unaffected.
 					if (wasIdentical)
+					{
+						pkt = npcRebuilt;
 						npcIdentical++;
+					}
 				}
 				else if (TryRebuildWorldObjectFromDb(objectByPosition, pkt, out var objRebuilt, out var objIdentical))
 				{
