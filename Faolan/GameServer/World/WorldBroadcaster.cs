@@ -268,8 +268,17 @@ namespace Faolan.GameServer.World
 			var seenCells = new HashSet<(string, int, int, int)>();
 			foreach (var npc in npcs.OrderByDescending(n => burstHandles.Contains(n.CapturedHandle)))
 			{
-				const float cell = 8f; // re-captures cluster within a few units; 8 collapses them without merging distinct mobs
-				var dedupKey = (npc.Name ?? "", (int)(npc.PositionX / cell), (int)(npc.PositionY / cell), (int)(npc.PositionZ / cell));
+				// Faction mobs (Community > 0) are legitimately MANY of the same name spread across the map - dedup by
+				// (name, coarse cell): same-spot cross-session re-captures collapse, distinct mobs in different cells
+				// survive. Friendly/neutral named NPCs (Community 0: quest-givers like Casilda/Kalanthes + a few neutral
+				// critters) are UNIQUE - but their cross-session captures land at genuinely DIFFERENT spots (Casilda was
+				// captured at ~361 AND ~448, 87 units apart), so cell dedup keeps phantom duplicates that bloat the
+				// spawn set and confuse the client. Collapse those by NAME alone -> one instance (the burst-handle row
+				// wins, ordered first, so the kept entity coincides with the burst-rendered one).
+				const float cell = 8f;
+				var dedupKey = npc.Community == 0
+					? (npc.Name ?? "", 0, 0, 0)
+					: (npc.Name ?? "", (int)(npc.PositionX / cell), (int)(npc.PositionY / cell), (int)(npc.PositionZ / cell));
 				if (!seenCells.Add(dedupKey))
 					continue;
 
@@ -598,13 +607,8 @@ namespace Faolan.GameServer.World
 		}
 
 		// Sends the subject's FA015807 spawn to `recipient`, re-framed to the recipient and patched to the subject's
-		// CURRENT position (its captured spawn body holds its entry position, which may be stale). For an NPC the
-		// spawn is PAIRED with a stationary 96C46740 MoveTask: retail sends both per entity, and without the MoveTask
-		// the client never polls 0x2020 to finish registering the entity - it spawns the model but never gets a
-		// floating name tag / full nameplate (the "only Kalanthes has a name" symptom; he was one of the few burst
-		// NPCs that carried a MoveTask). Same sender as the spawn (WorldFraming.Sender, verified against the capture).
-		// Players forward their own Move; loot bags have their own lifecycle - neither gets a MoveTask here.
-		private async Task SendWorldSpawn(INetworkClient recipient, WorldEntity subject)
+		// CURRENT position (its captured spawn body holds its entry position, which may be stale).
+		private Task SendWorldSpawn(INetworkClient recipient, WorldEntity subject)
 		{
 			var body = (byte[])subject.SpawnBody.Clone();
 			if (body.Length >= SpawnPacketBuilder.PosZOffset + 4)
@@ -614,16 +618,10 @@ namespace Faolan.GameServer.World
 				BinaryPrimitives.WriteSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.PosZOffset, 4), subject.Position.Z);
 			}
 
-			await new PacketStream()
+			return new PacketStream()
 				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), 0x2000)
 				.WriteArray(body)
 				.SendAsync(recipient);
-
-			if (!subject.IsPlayer && !subject.IsLoot)
-				await new PacketStream()
-					.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), 0x2000)
-					.WriteArray(MoveTaskBuilder.BuildStationary(subject.Handle, subject.Position))
-					.SendAsync(recipient);
 		}
 
 		// The components of a player's Move, forwarded verbatim to other viewers (only the receiver differs).
