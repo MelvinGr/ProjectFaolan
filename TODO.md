@@ -52,14 +52,30 @@ prior diagnoses are in `docs/archive/todo-history.md`.
       profession comes from char-select, the player spawn, a feat/profession packet, or client-side derivation —
       finding it needs that angle (likely client RE), NOT more snapshot decode. → memory `snapshot_tails_construction_scope`
 - [ ] Login/movement still spawn at the correct position after the raw-body float-endianness fix. → `docs/archive/todo-history.md` §8
-- [ ] **Chat broken again** (Melvin, 2026-06-13): in-game chat not working after world entry. Server-log signal:
-      on the clean-server login the client connects to UniverseAgent/PlayerAgent/GameServer/CSPlayerAgent but
-      **AgentServer (7012) never gets a `Client connected`** — the chat connection isn't establishing (CSPlayerAgent
-      connects then immediately drops too). Chat connects AFTER load, so either the client is dropping the post-load
-      connections (in-game session unstable after entry) or the chat-server handoff isn't being driven. Needs the
-      exact symptom (no chat window? can't send? channels empty?) + a fresh loopback to see whether the client even
-      opens the 7012 socket. History: chat regressions were the dead CDN / snapshot gate (now lifted) — memory
-      `protocol_chat_connection_regression`, `protocol_agentserver_chat`.
+- [ ] **Chat broken again** (Melvin, 2026-06-13): in-game chat not working after world entry — the client never
+      opens a TCP socket to **AgentServer (7012)** even though the PlayerAgent handoff for it is well-formed
+      (frame 125 in `Captures/loopback2.pcapng`: discriminator `fae5989d02`=AgentServer, addr `127.0.0.1:7012`,
+      same format as the CsPlayerAgent handoff the client DOES act on). Confirmed by capture: client connects to
+      7010/7011/7014/7001 only, never 7012.
+      - [x] **Loading-screen hang FIXED (root cause #1, 2026-06-13)**: the client was stuck flooding
+            `RequestAggroStatus` (GameCharAgentProject `0x5B9756FC`, method 0x2000) ~450× for nearby NPCs and never
+            finishing load, because we never replied. We mis-dispatched it: `Handle0x2000` read the body's first two
+            u32s as `[pbLength][pbOpcode]`, and since the aggro body is `[0xC350][player][0xC350][target]` the
+            "pbOpcode" came out == the player instance → it hit the "client-instance ping" default and was dropped.
+            Fixed by routing class `0x5B9756FC` by id before the opcode switch (like Tradepost) and replying
+            `[0xC350][target][0x00000000]` (aggro=0). Verified: flood 450→19 (retail=17), and the post-entry stream
+            is now a healthy idle (periodic `0x2085→0x2082` + `0x2005` pings). → `HandleGameCharAgentProject.cs`,
+            memory `protocol_gameserver_rpc_multiplexing`.
+      - [ ] **Chat connection STILL not opened** after the aggro fix: client is fully in-world and idle but never
+            connects to 7012. In retail the chat + csplayer connections both open ~2s after world entry (~4ms
+            apart), so it's a post-world-entry trigger we're not satisfying. NOT the CSPlayerAgent dissect bug
+            (that's display-only, see Wireshark §). Remaining leads to chase: (a) does the client need the
+            CsPlayerAgent handshake to fully complete (retail finishes with a 4756-byte `0x2038` social/friends
+            dump on csplayer that we never send; ours stops after the `0x20D0/0x20C5` pair)? (b) is there a
+            per-session "social/community ready" flag in the world/snapshot data the client checks before opening
+            chat? Compare our post-entry GS stream to retail (`…kalantes_chat`) right around the chat-connect
+            moment. History: earlier chat regressions were the dead CDN / snapshot gate (now lifted) — memory
+            `protocol_chat_connection_regression`, `protocol_agentserver_chat`.
 
 **Combat** (loop both directions) → `docs/combat.md` (BCC ack protocol), `docs/archive/quests-and-combat.md`, memory `protocol_stats_and_combat`
 - [x] Normal-attack FSM re-test: the swing-1 BccAck now matches retail byte-for-byte (u32 argsLen fix, field3
@@ -389,6 +405,25 @@ tag system exists. → memory `lua_vm`, `protocol_conversation_routing`; `docs/a
       (0 `00 00 FF FF` markers), but the 9-byte `80 00 00 05` transition headers re-init the compression
       state at packet boundaries — on inflate failure, scan forward to the next transition marker and
       resume from its fresh zlib stream instead of failing terminally. Mark the gap with an expert info.
+
+- [ ] **Wireshark plugin: CSPlayerAgent (port 7001) RpcHeader mis-framed** (found 2026-06-13 chasing the chat
+      bug) — the plugin dissects our CSPlayerAgent server→client responses with the WRONG opcode. In
+      `Captures/loopback2.pcapng` frames 484/486/488 (src=7001) are our real `Authenticate` ack / `0x20D0` /
+      `0x20C5` responses (bodies `00000001`, `000003f1`, the `GroupFinder…` remoteformat — all correct), but the
+      plugin reports `op=0x0a0a`, `SenderClass=None`, and the REAL opcode + tail spill into `HeaderExtraHex`
+      (`0dc860d5bb10d5cb8b40`**`2000`** / `…`**`20d001`** / `…`**`20c501`**). So it over-/under-reads the RpcHeader
+      and then reads the opcode (and direction) from the wrong offset. The same family on RETAIL (port **7012** in
+      retail's layout — chat=7001/csplayer=7012 is swapped vs our chat=7012/csplayer=7001) dissects correctly as
+      `0x2000`. Likely cause: the dissector keys the header layout / service / direction off the retail PORT
+      numbers (or off the auto-followed handoff that assumed retail ports) instead of parsing the ProtoEndpoint
+      framing length-by-length; it miscounts when the response RECEIVER endpoint carries a multi-byte instance
+      varint (our reply swaps sender/receiver via `WriteHeader(packet.ReceiverBytes, packet.SenderBytes, …)`, so
+      the receiver = the client's `{0xBBD560C8, instance=0x0802E5D5}` with a 4-byte varint). Fix: derive
+      sender/receiver field lengths from the protobuf framing itself and assign service+direction from the
+      followed handoff's service discriminator (`fae5989d02`=AgentServer, `e0d4b4d705`=CsPlayerAgent,
+      `f9d8d9c50d`=GameServer), never from hardcoded retail ports. NOTE: this is a DISSECTOR display bug only —
+      the live client parses our CSPlayerAgent responses fine (it connects to 7001 and proceeds); it is NOT the
+      cause of the chat (7012) connection never opening (see §2). → `Faolan.Wireshark/`
 
 - [ ] **ConanMessageFramer: handle mid-chunk compression transitions** — found while building the
       Wireshark dissector: the 9-byte `80 00 00 05` transition header occurs at PACKET boundaries (not

@@ -101,7 +101,7 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CsPlayerAgentOpcodes.StartVoteRetreat: // register?
+				case CsPlayerAgentOpcodes.StartVoteRetreat:
 				{
 					var unk0 = packet.Body.ReadUInt32(); // 0x00, 0x00, 0xC3, 0x50
 					var nClientInst = packet.Body.ReadUInt32();

@@ -146,6 +146,20 @@ namespace Faolan.GameServer
 				return;
 			}
 
+			// GameCharAgentProject (0x5B9756FC, the "post-ready family") rides this same RPC layer and its method
+			// ids COLLIDE with ordinary 0x2000 opcodes, so route it by class id BEFORE the opcode switch (like
+			// Tradepost). The in-world RequestAggroStatus poll lives here and GATES the loading screen finishing:
+			// without the reply the client retries it forever and never opens the chat (CommunityServer) connection.
+			// Gated to existing-character world login - the create-editor / create-world flows have their own
+			// elaborate handshake on this class and must not be diverted. See HandleGameCharAgentProject.
+			if (packet.Receiver.Type == ConanEndpoints.GamePostReadyType
+				&& !client.Session.IsCreateEditorConnection && !client.Session.IsCreateWorldSession
+				&& client.Session.Character?.Name != null)
+			{
+				await HandleGameCharAgentProject(client, packet);
+				return;
+			}
+
 			if (opcode is not (GameServerOpcodes.Ping or GameServerOpcodes.LatencyCheck))
 				LogPacketReceived(packet, opcode);
 
