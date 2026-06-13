@@ -118,6 +118,11 @@ prior diagnoses are in `docs/archive/todo-history.md`.
       `feedback_combat_not_contentmirror`).
 - [ ] NPC **counter-attack** (the second ack retail sends for the mob's own behaviour, actor = target handle) —
       not yet reproduced; mob may not visibly fight back.
+- [ ] **Add `.kill` GM command + MCP `kill` tool** (Melvin, 2026-06-13): kill the currently SELECTED target
+      (the player's last LookAt/select handle, `Session.SelectedTarget` or equivalent), INCLUDING self if the
+      player has themselves selected. Reuse the combat death path (`ApplyNpcDamage`/`OnNpcKilled` for NPCs,
+      vitals->0 for the player). If no target is selected, send a system message ("no target selected") rather
+      than no-op. Expose via MCP (`kill` tool routing through `RunGmCommand`).
 - [ ] **BLOCKER (PINNED — needs client-side RE) — mid-session entity spawn doesn't render** (`.spawnnpc`,
       `.spawnbag`/kill loot bags, `.mount`, interest streaming). Full writeup: **`docs/mid-session-spawn-blocker.md`**
       / memory `protocol_midsession_spawn_blocked`. Decoded 2026-06-13 via loopback captures + the necrol80 mount
@@ -149,8 +154,12 @@ prior diagnoses are in `docs/archive/todo-history.md`.
       correct, client-initiated mount flow (and a clean test of whether a client-CAST spawn renders mid-session).
 
 **Teleport / maps**
-- [ ] `.teleport 2010|2040|3000|4010` — moves the player + buff but the **map doesn't change** (soft same-conn
-      map-change vs retail's reconnect). → fix the map render on teleport.
+- [ ] **`.teleport` is BROKEN (Melvin, 2026-06-13): it does NOT move the character.** Instead it makes the char
+      level 80 and grants a bunch of spells (almost certainly a captured leveled-char SNAPSHOT being replayed
+      instead of a map-change) — the character stays put. Find where `.teleport` (DoTeleport) replays a snapshot
+      and make it actually relocate the player (+ map change). Supersedes the "map doesn't change" note below.
+- [ ] `.teleport 2010|2040|3000|4010` — (historical) was meant to move the player + buff but the **map doesn't
+      change** (soft same-conn map-change vs retail's reconnect). → fix the map render on teleport.
 - [ ] Maps with a world burst (2000/2010/2040/3000/4000/4010) render; out-of-range maps 1000/11040 now import —
       verify they render or fall back cleanly. → `docs/archive/todo-history.md` §9
 - [ ] `.maps` / teleport labels show real RDB names (4010 = "Tortage Island", etc.).
@@ -333,6 +342,11 @@ First pass IMPLEMENTED 2026-06-12 (same day); what remains is the deeper model w
       casts register, CancelBuff removes (retail sends no removal IIR — just a FormatFeedback text; the client
       clears its own icon), tick expires entries with durations, `.buffs` GM command.
       - [ ] Durations + stat effects need the RDB spell definitions (§5); all entries are duration-less until then.
+- [ ] **"Shield of the Risen" should auto-apply on login / playfield change** (Melvin, 2026-06-13): this buff
+      (a starting/racial shield?) is present in retail on world entry; apply it via the buff model
+      (`ApplySpell`/`ActiveBuffs`) at login AND on every playfield/map change, the same hook the starting
+      abilities use (`GrantStartingAbilities`). Need the buff/spell id (find it in a login capture's ApplySpell /
+      the snapshot's active-buff list).
       - [ ] Mount buff and other direct ApplySpell sends bypass the registry (only the Handle0x2000 cast path
             registers).
 - [x] **Hotbar persistence (server side)** — `CharacterShortcuts` table; `AddShortcut` upserts,
@@ -435,6 +449,16 @@ tag system exists. → memory `lua_vm`, `protocol_conversation_routing`; `docs/a
       at all). Add a ChatLog table (timestamp, kind: channel/say/whisper/system, channel id, sender id+name,
       recipient for whispers, text) appended from the AgentServer paths, so history survives restarts and the
       Claude bridge can rewind from the DB instead of skipping backlog.
+- [ ] **`.<command>` should work in ANY chat channel, just like `say`** (Melvin, 2026-06-13): a `.foo` typed in
+      any channel (not just the local say channel) should run as a GM command — same `.`-prefix / account >=
+      GameMaster gate as the say path (`GameServerListener.cs:704` -> `HandleGmCommand`). **And do NOT echo the
+      command line to chat** when it's recognized as a command (today a `.cmd` in a channel broadcasts the literal
+      text). Wire the `.`-prefix GM dispatch into every channel-chat handler (`AgentServerListener` ChannelChat),
+      and suppress the relay/echo for command lines. Subsumes the Claude-channel-commands item below.
+- [ ] **Claude channel: reply in the SAME mode you were addressed in** (Melvin, 2026-06-13): when a player talks
+      to Claude on the Claude CHANNEL, Claude should reply on the channel (broadcast); when WHISPERED, reply as a
+      whisper. Today the faolan-chat reply tool defaults to whisper unless told otherwise — make the bridge pass
+      the input mode (channel vs whisper) through so the reply matches it automatically.
 - [ ] **Run `.commands` posted in the Claude channel as GM commands** (Melvin, 2026-06-13): a `.foo` message
       on the Claude channel should execute as a GM command (like normal chat), not just bridge to Claude.
       Normal chat already does this at `GameServerListener.cs:704` (`.` prefix, not `..`, account >= GameMaster
