@@ -366,20 +366,16 @@ namespace Faolan.GameServer
 				: $"Spawned {entity.Name} (handle 0x{entity.Handle:X8}, level {entity.Level}{(entity.Hostile ? ", hostile" : "")}).");
 		}
 
-		// .bank  - open the BANK tab of the trader/auctionhouse window. The bank is the SAME NPC as the auction
-		// house (`.ah`), just a different tab: this opens the trader window (DispatchOpenTradepost, like `.ah`) and
-		// then sends the bank-tab content - container kind 105, delivered via a BankIIR (decoded,
-		// protocol_bank_storage). Built from the character's Container=105 rows (seeds a couple of random items the
-		// first time so there's something to see). PoC: in retail the bank tab content is sent when the player
-		// clicks the tab on the already-open window.
+		// .bank  - send the BANK tab content of the trader/auctionhouse window. The bank is the SAME NPC as the
+		// auction house, just the FIRST (default) tab - but a DIFFERENT channel: the bank tab is a BankIIR
+		// (0x0BA1C1CB) on the WORLD conversation (NOT a tradepost/DispatchOpenTradepost packet, which is the AH
+		// tab). Decoded from the necrol80 trader-bank capture (protocol_bank_storage): the player interacts with the
+		// NPC and the server replies with 0x201c slot registrations + the BankIIR. Built from the character's
+		// Container=105 rows (seeds a couple of random items the first time). PoC: in retail the window is opened by
+		// the client's NPC interaction; a cold push may be interaction-gated like the old `.shop`.
 		private async Task BankCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
-
-			// The bank is a tab of the trader/AH window - open that window first (same as `.ah`).
-			var entity = PlayerWorldEntity(client);
-			if (entity != null)
-				await Tradepost.TradepostResponses.SendOpenTradepost(client, entity.Position);
 
 			var rows = await Database.GetCharacterInventory(characterId);
 			var bankRows = rows
