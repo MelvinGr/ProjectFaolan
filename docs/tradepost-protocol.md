@@ -136,8 +136,25 @@ only the tail differs):
 [item: ProtoAcgItem protobuf] # same item proto as the search rows
 [footer]
 ```
-So both the listing rows and the mail attachment carry the **same `ProtoAcgItem`** — one reusable builder serves
+So both the listing rows and the mail attachment carry the **same `ProtoInventoryGameEntry`** (item_id =
+itemInstanceId, stat_list = `{26: qty}`, item_data = the item's `ProtoAcgItem`) — one reusable builder serves
 search results, the AH window, and the mail item.
+
+**Status (2026-06-13):** the `Mail` + `MailAttachment` DB model and the **`DispatchMailMessage` builder are DONE +
+byte-exact** (`MailMessageCodec.Build`, `Faolan/Migrations/*AddMail`). Full wire grammar decoded from the get-mail
+capture (the 629 B base #1604/#1611 and the 754 B attachment #1607):
+```
+[mailId:u64]
+[recipientClass:u32][nameLen:u16][recipient ascii]        # recipientClass = 0x08006F31 (const)
+[senderClass:u32][nameLen:u16][sender ascii]              # sender NAME empty = system mail
+[xmlLen:u16][remoteformat XML]
+[footerWord:u32 = 0x0B][money:u64][ts1:u32][ts2:u32]
+[attachCount:u32]
+attachCount x { [itemInstanceId:u64][entryLen:u32][ProtoInventoryGameEntry][trailer: u32 0x72, u32 0x08006F31, u32 0] }
+```
+Golden tests `MailMessageCodecTests` (Build == captured 629 B and 754 B; `includeAttachments=false` reproduces the
+base from the attachment mail). Still to wire: SELL into the AH (create a listing + escrow) and BUY → mail
+delivery (debit buyer, create a system mail with the item escrowed, grant on retrieve).
 
 ## Implementation notes (for TODO §9a)
 

@@ -666,11 +666,13 @@ buy-delivery path (seller's item + buyer's payment move through mail).
   - [ ] **Bank deposit/withdraw must PERSIST**: moving items between the bank (container 105) and the bag must be
         written to `CharacterInventory` so the bank survives relog (the client move sends go through the inventory
         move handler - route bank-slot moves to/from container 105).
-- [~] **Step 3:** go DB-backed. `TradepostListing` table + DB-backed search DONE (2026-06-13, above). Still:
-      `Mail`/`MailAttachment` tables, SELL into the AH (create a listing from a bank item + escrow), money debit,
-      buy→mail grant. NB: tradepost sells from the **bank** (`nBankItemSlot`) — leans on bank/money support (the
-      bank itself is now decoded + delivered); `CSBuyItemReply` hints at a commerce/CS path. All on the existing
-      GameServer dispatcher (no new connection).
+- [~] **Step 3:** go DB-backed. `TradepostListing` table + DB-backed search DONE (2026-06-13, above);
+      `Mail`/`MailAttachment` tables + the `DispatchMailMessage` builder DONE (2026-06-14, `MailMessageCodec`,
+      byte-exact vs the captured 629 B/754 B bodies, `MailMessageCodecTests`, migration `AddMail`). Still:
+      SELL into the AH (create a listing from a bank item + escrow), money debit, buy→mail grant (create the
+      system mail + escrow the item, grant on retrieve via `GrantItemToBackpack`). NB: tradepost sells from the
+      **bank** (`nBankItemSlot`) — leans on bank/money support (the bank itself is now decoded + delivered);
+      `CSBuyItemReply` hints at a commerce/CS path. All on the existing GameServer dispatcher (no new connection).
 
 ### 9c. Money storage / usage (cross-cutting prerequisite)
 
