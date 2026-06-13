@@ -12,8 +12,9 @@ RpcHeader is a **method index** (0x2000 + position) into the recovered RPC table
 
 - client→server: `CSPlayerAgent.client_to_server` — alignment verified (0x201C = `AcceptGuildInvitation`
   fired exactly once on the accept; 0x201E/0x202F/0x2040/0x2041 all match their observed behavior).
-- server→client: `CSPlayerInterface.server_to_client` — the live build has unnamed extra methods, so
-  indices drift upward vs the recovered table. Download opcodes were therefore identified by content.
+- server→client: `CSPlayerInterface.server_to_client` — true table recovered from the dispatcher switch
+  (211 methods; the live build inserts mostly no-arg methods the string catalog missed). Full table:
+  `docs/aoc-rpc-method-opcodes.md`.
 
 One GameServer packet participates: sub-opcode `0x2550C99A GuildUpdateIIR_c` sets the in-world guild
 tag: `[ID32 char][u16 0][s16 guildName]`. Retail sends it once on guild join; an empty name clears it.

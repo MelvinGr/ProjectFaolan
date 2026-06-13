@@ -84,11 +84,13 @@ OFF by default — `PRAGMA foreign_keys=ON` before manual deletes or you orphan 
   16-bit opcode)** — the same opcode means different methods per class. Any GameServer opcode >= 0x2014
   is unambiguously GameCharAgent. Tradepost routes class-first (`TradepostProtocol.IsInbound`); add
   class guards surgically, don't rewrite the opcode switch.
-- 16-bit RPC opcodes are **method indices** (0x2000 + position) into the recovered client→server tables
-  (`docs/aoc-client-rpc-methods.json`); full per-class catalogs are in
-  `Faolan.Core/Network/Packets/Opcodes.cs`. Server→client tables DRIFT in the live build — name
-  downloads by decoded content, never by table index. 32-bit sub-opcodes inside 0x2000 are BKDR-31
-  hashes of the client's IIR type names (`docs/aoc-opcode-ids.md`).
+- 16-bit RPC opcodes are **method indices**: `wire = 0x2000 + registration index`, per interface, base
+  0x2000 for every interface except PlayerAgent/PlayerInterface (32-bit hash dispatch — login, still open).
+  Both directions are recovered from the client (`docs/aoc-rpc-method-opcodes.md`, scripts in
+  `Captures/ghidra/`): c2s order == `docs/aoc-client-rpc-methods.json`; the s2c "Dispatch" tables are the
+  per-class dispatcher switches (the old "drift" was just extra no-arg dispatch methods the string catalog
+  missed). Full per-class catalogs are in `Faolan.Core/Network/Packets/Opcodes.cs`. 32-bit sub-opcodes
+  inside 0x2000 are BKDR-31 hashes of the client's IIR type names (`docs/aoc-opcode-ids.md`).
 - Session-volatile values (entity handles, shop ids, conversation ids) must never be persistence keys;
   the stable key is the NPC/vendor NAME (conversations, shops) or the character id.
 

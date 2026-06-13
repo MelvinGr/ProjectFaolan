@@ -47,8 +47,12 @@ client-side proximity check, so the access position must be within 15 units of t
 | S→C | `0x2000` | **DispatchOpenTradepost** | 4 floats `[posX][posY][posZ][maxRadius=15.0]` (big-endian raw) |
 | S→C | `0x2005` | **DispatchTradepostSearchResults** | listing rows (below) |
 | S→C | `0x2002` | **DispatchMailMessage** | the mail (below) |
-| S→C | `0x2004` | ack | `01` |
-| S→C | `0x2001` | DispatchClose | empty |
+| S→C | `0x2003` | DispatchSendMailResult | `[bSuccess][cError]` |
+| S→C | `0x2004` | DispatchRetrieveMailResult (was nicknamed "ack") | `01` |
+| S→C | `0x2001` | DispatchClose | empty (no-arg; the catalog-missed insertion) |
+| S→C | `0x2006/0x2007` | DispatchDeleteCanceledMail / DispatchDeleteCanceledMailItem | — |
+
+(Full TradepostInterface table — 8 methods, recovered from the dispatcher switch — in `docs/aoc-rpc-method-opcodes.md`.)
 
 ## TradepostItemSearch query (C→S `0x200D`, byte-exact)
 

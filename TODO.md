@@ -454,11 +454,12 @@ tag system exists. → memory `lua_vm`, `protocol_conversation_routing`; `docs/a
 
 - [ ] **Real password validation** — login is DH + TEA-CBC; we accept any password (validation stubbed). Needs a
       client DH-key binary patch + C# port of the cipher. Fully understood, not implemented. → `docs/archive/login-decryption-plan.md`
-- [x] **Recover real opcode / RPC names** — DONE for the meaningful parts (2026-06-12): IIR sub-opcodes = BKDR-31
-      name hashes (`docs/aoc-opcode-ids.md`), and the 16-bit RPC opcodes = method index (0x2000 + position) into
-      the recovered per-class client→server tables — full catalogs in `Opcodes.cs`. Remaining gap: the
-      server→client interface tables drift (live build has unnamed extra methods) so downloads stay
-      content-named; closing that would need Ghidra on the dispatch tables. → README "Client reverse-engineering"
+- [x] **Recover real opcode / RPC names** — DONE: IIR sub-opcodes = BKDR-31 name hashes
+      (`docs/aoc-opcode-ids.md`); 16-bit RPC opcodes = `0x2000 + registration index` in BOTH directions
+      (`docs/aoc-rpc-method-opcodes.md`, scripts `Captures/ghidra/`). c2s catalogs in `Opcodes.cs`; the
+      server→client tables (once thought to "drift") are recovered from the per-class dispatcher switches — the
+      drift was just extra no-arg dispatch methods the string catalog missed. Only PlayerInterface/PlayerAgent
+      (32-bit hash dispatch, login) stays behavior-derived. → README "Client reverse-engineering"
 
 ---
 

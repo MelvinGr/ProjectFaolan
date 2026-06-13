@@ -554,10 +554,11 @@ and DH-login work). The full plan + findings: **`docs/archive/opcode-re-plan.md`
   `i_n`=int, `b`=bool, `i_v`=vector). This is "what every server<->client method is and how its body is laid out".
 - **Embedded protobuf descriptors**: exactly 16 IIR message types are protobuf (`Faolan.Core/Network/Protobuf/
   aoc-client-protos.proto` -> generated `AocProtocol.g.cs`); the rest (combat/quest/morph/move) are raw-stream.
-- **16-bit RpcHeader opcodes** (`0x2052`, `0x2008`, ...) are framework-assigned method indices, **not** hashes -
-  and they ARE mapped now (cracked 2026-06-12 during the guild work, no Ghidra needed): the opcode is simply
-  **`0x2000` + the method's position in the recovered RPC catalog** (`docs/aoc-client-rpc-methods.json`), i.e.
-  the client and server agree on the method order of each interface and dispatch by index. How it was verified:
+- **16-bit RpcHeader opcodes** (`0x2052`, `0x2008`, ...) are framework-assigned method indices, **not** hashes:
+  **`wire = 0x2000 + registration index`**, per interface, base `0x2000` for every interface except PlayerAgent/
+  PlayerInterface (login — 32-bit hash dispatch, still open). Both directions are fully recovered
+  (`docs/aoc-rpc-method-opcodes.md`); the client and server agree on the method order of each interface and
+  dispatch by index. How it was verified:
   - **Hypothesis from a known anchor**: in the guild invite-accept capture, the one packet the player sent on
     clicking "accept" was CsPlayerAgent `0x201C` - and `CSPlayerAgent.client_to_server[0x1C]` is
     `AcceptGuildInvitation`. Every other upload in that capture matched its table name's expected behavior too
@@ -574,17 +575,23 @@ and DH-login work). The full plan + findings: **`docs/archive/opcode-re-plan.md`
     different methods per class - the dispatch key is `(class id, opcode)`. The small tables top out early
     (TradepostAgent `0x2013`, project `0x200C`, GameAgent `0x200A`), so any GameServer opcode `>= 0x2014` is
     unambiguously GameCharAgent.
-  - **The drift caveat**: this only holds for **client->server** tables. The **server->client** interface tables
-    (CSPlayerInterface, GameInterface, TradepostInterface, PlayerAgent in both directions) have unnamed extra
-    methods in the live build, so observed indices drift upward vs the recovered names (e.g. the observed Pong is
-    `0x2009`, the table says `0x2003`) - downloads stay named by decoded content, never by table index.
+  - **The s2c side (Ghidra, 2026-06-13)**: the **server->client** "Dispatch" tables once looked like they
+    "drifted" upward vs the string-extracted catalog. RESOLVED by decompiling each
+    `<Class>InterfaceDispatch_t::DispatchMethod` (a `switch(index)`, case N -> handler N named by its own log
+    string): the live build inserts extra **mostly no-arg** dispatch methods that emit no `stream bad` string,
+    so the catalog missed them and every later method shifted. The dispatcher switch is the authoritative table.
+    True s2c sizes: GameCharInterface 181, CSPlayerInterface 211, GameInterface 16, GameCharInterfaceProject 16,
+    TradepostInterface 8, UniverseInterface 6. In-client anchors all match (DispatchUpdateCash `0x2005`,
+    DispatchShopData `0x2033`, DispatchAddSpecialAbility `0x2052`, DispatchPong `0x2082`). Full tables:
+    `docs/aoc-rpc-method-opcodes.md`; recovery scripts: `Captures/ghidra/`.
 
-  The complete per-class catalogs now live in `Faolan.Core/Network/Packets/Opcodes.cs` (`GameAgentOpcodes`,
+  The complete per-class catalogs live in `Faolan.Core/Network/Packets/Opcodes.cs` (`GameAgentOpcodes`,
   `GameCharAgentOpcodes` (169), `GameCharAgentProjectOpcodes`, the full 135-method `CsPlayerAgentOpcodes`,
-  `TradepostProtocol.AgentMethod`), each annotated with collisions and drift warnings.
+  `TradepostProtocol.AgentMethod`); s2c tables in `docs/aoc-rpc-method-opcodes.md`.
 - Tooling (reproducible from the exe): `Captures/extract_rpc_catalog.py`, `decode_opcode_ids.py`,
   `reverse_hash_ids.py`, `decode_scryscript.py`, `decode_tradepost.py` (auction-house/mail RPC),
-  `decode_guild.py` (the guild flow + the method-index verification).
+  `decode_guild.py` (the guild flow + the method-index verification), and `Captures/ghidra/` (the Ghidra
+  headless scripts that recovered the c2s registration order + the full s2c dispatcher tables).
 
 ## Roadmap / current focus
 
