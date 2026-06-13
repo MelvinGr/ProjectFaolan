@@ -477,7 +477,8 @@ tag system exists. → memory `lua_vm`, `protocol_conversation_routing`; `docs/a
       and the dead method deleted. 316 tests green.
 - [ ] Fold `Packets.cs` sender-bytes duplication into `World/WorldFraming` (verify which conversation senders are
       truly identical before merging). Small, safe.
-- [ ] Rename `Packets/FullCharSnapshot/BigboyTailsFile.cs` to something descriptive. Trivial.
+- [x] Rename `Packets/FullCharSnapshot/BigboyTailsFile.cs` → `SnapshotTails.cs` (class `SnapshotTails`) — DONE
+      2026-06-14. ("Bigboy" was a capture name, "File" a misnomer; it's the parsed 0x737A6DF9 tails region.)
 - [ ] **GameServer dispatch hardening (not a blanket rewrite).** The GameServer multiplexes ~4 RPC class-pairs
       over one connection; the `0x20xx` opcode is a per-class method selector that COLLIDES across classes, so the
       correct dispatch key is `(endpoint class id, method opcode)`. Decided AGAINST rewriting the whole opcode

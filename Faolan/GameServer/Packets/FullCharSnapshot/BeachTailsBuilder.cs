@@ -53,7 +53,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// client instance) in the assembled tails - the tails carry raw big-endian entity references.
 		public static byte[] Build(Character character, uint instance)
 		{
-			var tails = BigboyTailsFile.Deserialize(Template);
+			var tails = SnapshotTails.Deserialize(Template);
 
 			if (character != null)
 			{

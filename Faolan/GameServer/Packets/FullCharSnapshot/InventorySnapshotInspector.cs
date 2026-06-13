@@ -314,7 +314,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			using var rootStream = new MemoryStream(rootBytes, false);
 			var root = ProtoMessage.Parse(rootStream);
 
-			return new InventoryPacketParts(prefix, root, BigboyTailsFile.Deserialize(tails));
+			return new InventoryPacketParts(prefix, root, SnapshotTails.Deserialize(tails));
 		}
 
 		public static TailScanResult ReadTailRecords(FaolanStream tailsStream)
@@ -764,7 +764,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			}
 		}
 
-		public sealed record InventoryPacketParts(byte[] Prefix, ProtoMessage Root, BigboyTailsFile Tails);
+		public sealed record InventoryPacketParts(byte[] Prefix, ProtoMessage Root, SnapshotTails Tails);
 
 		public sealed record InventoryEntrySummary(ulong? Slot, ulong? ItemId, string[] Properties, uint? TemplateA, uint? TemplateB, uint? Archetype);
 

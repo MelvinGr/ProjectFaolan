@@ -63,7 +63,7 @@ namespace Faolan.Tests
 			Assert.Equal(9282, tails.Length);
 
 			// Round-trips through the structured model.
-			Assert.True(BigboyTailsFile.Deserialize(tails).ToArray().SequenceEqual(tails));
+			Assert.True(SnapshotTails.Deserialize(tails).ToArray().SequenceEqual(tails));
 		}
 
 		// The server-owned tails builder, given the captured beach character's level (1) and vitals, reproduces the
@@ -75,7 +75,7 @@ namespace Faolan.Tests
 
 			// Strie's captured beach values: level 1, and the vitals the template already carries (so patching them
 			// back to the same values is a no-op and the output must equal the capture).
-			var captured = BigboyTailsFile.Deserialize(tails);
+			var captured = SnapshotTails.Deserialize(tails);
 			var character = new Faolan.Core.Database.Tables.Character
 			{
 				Level = (ushort)captured.Level,
@@ -101,7 +101,7 @@ namespace Faolan.Tests
 		public void BeachSnapshot_PrefixPlusBuiltTails_ReassemblesConsistently()
 		{
 			var (_, root, tails) = SplitBeach();
-			var captured = BigboyTailsFile.Deserialize(tails);
+			var captured = SnapshotTails.Deserialize(tails);
 			var character = new Faolan.Core.Database.Tables.Character { Level = (ushort)captured.Level };
 			var builtTails = BeachTailsBuilder.Build(character);
 			var prefix = BeachSnapshotPrefix.Build(root.Length);

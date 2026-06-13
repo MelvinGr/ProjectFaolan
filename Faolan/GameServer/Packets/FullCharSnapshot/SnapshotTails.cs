@@ -7,7 +7,7 @@ using Faolan.Core.Data;
 
 namespace Faolan.GameServer.Packets.FullCharSnapshot
 {
-	public sealed class BigboyTailsFile
+	public sealed class SnapshotTails
 	{
 		[JsonIgnore]
 		public bool HasKnownRepeatedStatTable => PostAccessBlock?.LargestAdjacentRepeatedRun is not null;
@@ -84,7 +84,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			return writer.ToArray();
 		}
 
-		public static BigboyTailsFile Deserialize(byte[] data)
+		public static SnapshotTails Deserialize(byte[] data)
 		{
 			ArgumentNullException.ThrowIfNull(data);
 
@@ -114,7 +114,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			{
 				var unknownBeforeAccessWindowTable = data[knownHeaderLength..];
 
-				return new BigboyTailsFile
+				return new SnapshotTails
 				{
 					Header0 = header0,
 					Unknown0Marker = unknown0Marker,
@@ -163,7 +163,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			var unknownAfterAccessWindowTable = data[checked((int)accessReader.Position)..];
 			var postAccessBlock = TryReadPostAccessBlock(unknownAfterAccessWindowTable);
 
-			return new BigboyTailsFile
+			return new SnapshotTails
 			{
 				Header0 = header0,
 				Unknown0Marker = unknown0Marker,

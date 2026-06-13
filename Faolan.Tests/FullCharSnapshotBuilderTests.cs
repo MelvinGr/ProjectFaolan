@@ -166,7 +166,7 @@ namespace Faolan.Tests
 			Assert.Equal(original, parts.Tails.ToArray());
 
 			parts.Tails.Level = 42;
-			var patched = BigboyTailsFile.Deserialize(parts.Tails.ToArray());
+			var patched = SnapshotTails.Deserialize(parts.Tails.ToArray());
 			Assert.Equal(42u, patched.Level);
 			Assert.Equal(original.Length, parts.Tails.ToArray()
 				.Length); // fixed-width patch, no resize
@@ -178,7 +178,7 @@ namespace Faolan.Tests
 			{
 				parts.Tails.PostAccessBlock!.CurrentHp = 1234;
 				parts.Tails.PostAccessBlock.CurrentXp = 5678;
-				var statPatched = BigboyTailsFile.Deserialize(parts.Tails.ToArray());
+				var statPatched = SnapshotTails.Deserialize(parts.Tails.ToArray());
 				Assert.Equal(1234u, statPatched.PostAccessBlock!.CurrentHp);
 				Assert.Equal(5678u, statPatched.PostAccessBlock.CurrentXp);
 			}
