@@ -364,6 +364,12 @@ Item templates + dialogue text are cracked (TEA-ECB, memory `rdb_extraction`); t
       acceptable). Could still extend to a per-(class,ability) many-to-many if a subset-shared ability ever appears.
 - [ ] Spell / ability definitions (names + params) — also unblocks real spell-grant (no capture has it; needs a
       fresh caster capture OR RDB import). → `docs/archive/todo-history.md` §3 "spells blocked on data"
+      NOTE (2026-06-13): a LEVELED char's full spell book is NOT sent as discrete grants — captures have zero
+      `0x200A` DispatchLearnSpell and only the standard ~24 `0x2052` combat grants (even lvl-80 necrol80). The spell
+      book is baked into the `0x737A6DF9` FullChar snapshot, which balloons with level (~10 KB fresh beach char →
+      **~620 KB for lvl-80 necrol80** in `account-faolan-character-necrol80-login-mount_move_dismount`). So the
+      in-capture source of a leveled char's real spell identities is that snapshot blob — decoding its spell
+      section is the purist path (dense RE); the wiki scrape above is the pragmatic one for names/levels.
 - [ ] **IDEA — scrape the AoC fandom wiki for catalog data (names + levels).** `https://aoc.fandom.com/wiki`
       (`/wiki/Spells` has spell names + levels) is a ready-made source for the gaps captures can't fill: spell
       names/levels and (likely) item level-requirements (the `Items.Level`-is-0 gap that blocked level-appropriate
