@@ -39,7 +39,27 @@ prior diagnoses are in `docs/archive/todo-history.md`.
 - [ ] `.vitals` (no args → MaxStats), `.vitals 1000 800 500`, `.setstat 36 25` move the bars. (`.hurt`/`.heal` work.)
 - [ ] New character's sheet vitals reflect its **class** (mage = more mana, soldier = more health), not the
       level-1 rogue default. → `docs/player-stats.md`
+- [ ] **XP resets on relog** (Melvin, 2026-06-13): in-game XP is not persisted across logout — it reverts to 0 (or
+      the snapshot default) on the next login. `character.Experience` is patched into the snapshot tails
+      (`CurrentXp`, idx 80 ÷10) but is evidently never SAVED when it changes (kill/XP loop in §2). Persist
+      `Character.Experience` on gain (and on logout) so it survives relog. RELATED: the XP **max / to-next-level**
+      is still the captured template's (Strie's) value — wrong for the character's level — so even the bar is off.
+- [ ] **In-game CLASS is wrong — and it is NOT in the snapshot** (Melvin, 2026-06-13; VERIFIED). A created Dark
+      Templar shows the wrong class. Exhaustively ruled out: the class id is not a plain field in any world packet
+      (21 dumps / 5 classes, every sub-opcode+offset ×1/×2), not in the tails `Values` table (index 78 = ARCHETYPE
+      only: Mage=2/Rogue=3), and not in the access-window entries (those are playfield access). **Proven by
+      injection**: swapping in a different-class (Herald) tails did NOT change the displayed class. So the in-world
+      profession comes from char-select, the player spawn, a feat/profession packet, or client-side derivation —
+      finding it needs that angle (likely client RE), NOT more snapshot decode. → memory `snapshot_tails_construction_scope`
 - [ ] Login/movement still spawn at the correct position after the raw-body float-endianness fix. → `docs/archive/todo-history.md` §8
+- [ ] **Chat broken again** (Melvin, 2026-06-13): in-game chat not working after world entry. Server-log signal:
+      on the clean-server login the client connects to UniverseAgent/PlayerAgent/GameServer/CSPlayerAgent but
+      **AgentServer (7012) never gets a `Client connected`** — the chat connection isn't establishing (CSPlayerAgent
+      connects then immediately drops too). Chat connects AFTER load, so either the client is dropping the post-load
+      connections (in-game session unstable after entry) or the chat-server handoff isn't being driven. Needs the
+      exact symptom (no chat window? can't send? channels empty?) + a fresh loopback to see whether the client even
+      opens the 7012 socket. History: chat regressions were the dead CDN / snapshot gate (now lifted) — memory
+      `protocol_chat_connection_regression`, `protocol_agentserver_chat`.
 
 **Combat** (loop both directions) → `docs/combat.md` (BCC ack protocol), `docs/archive/quests-and-combat.md`, memory `protocol_stats_and_combat`
 - [x] Normal-attack FSM re-test: the swing-1 BccAck now matches retail byte-for-byte (u32 argsLen fix, field3
@@ -171,29 +191,23 @@ Full detail: `docs/archive/spawn-dissection-plan.md`.
         handle/name/typeId/mode/field3 if the click still closes the window). Residual: unique NPCs captured at
         spots >8 units apart (Casilda ~87u, one extra Kalanthes ~35u) still render as 2 — a NpcSpawns data-quality
         artifact, not a streaming bug.
-  - [~] **NPC spawn deep-dive (2026-06-13, session 2) — Casilda still invisible, root causes found, NOT solved.**
-        Loopback captures of our own world-entry (`Captures/loopback*.pcapng`, our output) diffed against the
-        retail `randochar-...-kalantes_chat` capture. KEY FINDINGS:
-    - **Burst-vs-interest DOUBLE-SPAWN is the real bug** (TODO #5): the `Known`-seeding in `BroadcastPlayerEntry`
-      does NOT take (the first interest pass shows `now knows 98` from 0), so the burst's ~41 NPCs are re-streamed
-      on the first move → ~138 spawns on the wire vs retail's ~43. This is benign for rendering (client dedups by
-      handle) but is the **packet flood behind the loader crashes**. FIX THIS FIRST.
-    - **The model is the UNION of all capture sessions** (491 NpcSpawns rows → 168 model → ~98 in range): we
-      accumulate every session's NPCs, so ~4× retail's count (35 crocs vs 7, 25 pillagers vs 11). The burst path
-      replays ONE session (~43, retail-shaped); the FA015807-individual path (flag `FAOLAN_NPC_INDIVIDUAL_SPAWN`,
-      default OFF) streams the whole union → crashes the loader. Needs cross-session mob dedup to be viable.
-    - **Casilda's spawn body is NOT the blocker**: her FA015807 IIR is byte-identical to the retail capture where
-      she renders (only transient `SpawnAnimation` differed: 1→0, now normalized via `NpcSpawnBuilder` freshSpawn).
-      She is sent (twice, the phantom 448 dup now deduped by name) and still does not draw. Her pre-IIR/IIR differ
-      from retail only in the cross-session ways Pillager (renders) also differs. The mesh/RDB errors in
-      `AgeOfConan.log` are RED HERRINGS — the same client renders fine on retail (content proxy running).
-    - **Nameplates**: only Kalanthes shows a (frame) name; mobs show neither floating tag nor frame name. Retail
-      floats name+healthbar over every NPC. Cause unknown; the `96C46740` MoveTask pairing did NOT fix it (and
-      crashed the loader via packet doubling — reverted). The `n3ToClientQuit … e_Impossible` client warning is
-      benign (our despawn body is byte-identical to retail's; sender-instance 0x58 vs 0x08 makes no difference).
-    - **NEXT**: (1) fix the double-spawn seeding (#5) to kill the flood; (2) then a focused IIR FIELD-level diff of
-      our Casilda vs retail (there was a ~1-byte/off-by-one shift in the IIR region worth chasing); (3) the
-      nameplate question. Handoff prompt: `docs/npc-spawn-handoff.md`.
+  - [x] **NPC spawn / loader crash — SOLVED in-client (2026-06-13, session 3).** A freshly-created character logs
+        in, the loading screen completes, and the beach renders with NPCs **including Casilda**. The crash chain was
+        three bugs, all fixed (`docs/archive/npc-spawn-handoff.md` for the full diagnosis):
+    - **The first-move spawn FLOOD** (the loader crash) was the entry `Known`-seeding being wiped: `BroadcastPlayerEntry`
+      ran a PLAYER-ONLY `ResolveMove` (`includeNonPlayers=false`) whose despawn-prune removed every NPC handle it had
+      just seeded, so the first move re-streamed the whole zone (~95). Fixed: the player-only pass no longer prunes
+      NPCs, entry seeds EVERY in-range NPC into `Known`, and model NPC handles align to the burst's wire handle BY
+      POSITION (not the session-volatile handle). First move now streams ~0.
+    - **The loading-screen crash** was a divergent burst: cross-session `NpcSpawns` rows carry foreign-session
+      instance refs, so a non-byte-identical DB rebuild builds an entity the client can't realize (`pcDynel is NULL`).
+      Fixed: the burst keeps the VERBATIM captured body unless the DB rebuild is byte-identical. (Also reverted the
+      session-2 `freshSpawn` re-encode of the burst, which had re-shaped it.)
+    - **Casilda renders** via the model/interest stream (she is outside the burst vantage); the `freshSpawn`
+      SpawnAnimation-normalize stays only on that from-model path.
+    - Residual (cosmetic, open): floating nameplates over mobs (only frame names show); unique NPCs captured >8u
+      apart still render as 2 (NpcSpawns data-quality, not a streaming bug). The `n3ToClientQuit … e_Impossible`
+      warning is benign.
 - [ ] Inventory add/remove client stall — semantic / client-side, not a packet defect.
 - [ ] MoveTask mode-00 "approach/face" param floats + a `PatrolPath` table to source waypoints.
 - [ ] Fold the pre-IIR / post-IIR scaffolds into rows.
@@ -265,14 +279,17 @@ Item templates + dialogue text are cracked (TEA-ECB, memory `rdb_extraction`); t
 `docs/archive/rdb-extraction-plan.md`.
 
 - [ ] NPC / creature definitions (real max HP, replacing the spawn-seeded value).
-- [ ] **(Re)import ALL class skills/abilities** (Melvin, 2026-06-13): on login `GrantStartingAbilities` grants
-      **0** abilities for most classes — `ClassAbilities` only has 3 rows (classes 18/29/44, one each), because
-      the full per-class kit comes from the `--archive` importer pass which was never run for all classes. Re-run
-      `Faolan.Importer --archive <Archive dir>` (ArchiveSqlImporter populates ClassAbilities) so every class gets
-      its starting + level abilities, then verify login grants them. **Also fix the class-id mapping**: Testertwo
-      is a **Barbarian** in-client but the server stores/logs it as **class 41 = Necromancer** — the class enum
-      mapping (or the create/import class assignment) is wrong, so even a full ability import would grant the wrong
-      class's kit. Confirm the AoC class-id↔name table against a capture before relying on the grant.
+- [x] **Starting abilities — extracted class-aware from the capture 0x2052 grants (2026-06-13).** The archive has
+      no starting kit, so `CaptureAbilityImporter` now reads the `0x2052` ability grants from the create-flow
+      captures and attributes each to that capture's class (parsed from its `ChangeClass` command, value/2). An
+      ability granted across ≥2 classes is GENERIC (`Ability.Class=0`, e.g. the 3 Normal Attacks + toggle-combat /
+      switch-weapon); single-class ones are class-specific (beach data: 269272 → Guardian). `GetStartingAbilities(level,
+      class)` grants generic + the character's class set; in-client a created char now has its attacks. (Fix that
+      unblocked it: `TsharkCaptureReader` was discarding the real opcode — every rebuilt packet read as 0x2000 — so
+      the importer saw zero grants.) The **class-id mapping was NOT a bug** — the enum is correct (Barbarian 0x12,
+      Necromancer 0x29, verified against `docs/guilds.md`); Testertwo was simply stored as Necromancer from its
+      import and was corrected in the DB. Class-specific coverage is bounded by the captured classes (incomplete is
+      acceptable). Could still extend to a per-(class,ability) many-to-many if a subset-shared ability ever appears.
 - [ ] Spell / ability definitions (names + params) — also unblocks real spell-grant (no capture has it; needs a
       fresh caster capture OR RDB import). → `docs/archive/todo-history.md` §3 "spells blocked on data"
 - [ ] Tortage cinematic / camera-path resources (ties into §1).

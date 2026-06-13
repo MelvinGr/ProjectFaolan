@@ -1,4 +1,12 @@
-# NPC spawn / Casilda render — handoff (2026-06-13)
+# NPC spawn / Casilda render — handoff (2026-06-13) — ✅ RESOLVED (archived)
+
+**RESOLVED 2026-06-13 (session 3):** beach NPCs render in-client including Casilda; the loader crash is fixed
+(three bugs — the first-move spawn-flood from the wiped entry Known-seeding, the divergent cross-session burst
+body `pcDynel is NULL`, and the session-2 `freshSpawn` re-encode of the burst — all fixed). See TODO §3 for the
+summary + commits. Residual cosmetic open items: floating nameplates over mobs; the in-game CLASS is wrong but
+is NOT in the snapshot (proven; TODO §2 + memory `snapshot_tails_construction_scope`). Kept below for history.
+
+---
 
 Paste-ready prompt for the next session, plus the state of play. Goal: **make beach (map 4010) NPCs
 render like retail** — specifically (a) Casilda (a chained quest-captive) is invisible, and (b) NPCs lack
