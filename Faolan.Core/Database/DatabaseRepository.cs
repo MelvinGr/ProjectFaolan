@@ -54,6 +54,7 @@ namespace Faolan.Core.Database
 
 		Task<Item> GetItem(uint id);
 		Task<Item[]> SearchItems(string nameSubstring, int limit = 25);
+		Task<Item[]> GetRandomBuildableItems(int count);
 		Task<NpcSpawn[]> SearchNpcSpawns(string nameSubstring, int limit = 50);
 		Task<LuaScript> GetLuaScript(uint scriptId);
 
@@ -624,6 +625,20 @@ namespace Faolan.Core.Database
 				.Where(i => i.Name != null && i.Name.ToLower().Contains(lowered))
 				.OrderBy(i => i.Name)
 				.Take(limit)
+				.ToArrayAsync();
+		}
+
+		// A random sample of snapshot-buildable items (Archetype != 0, so SnapshotItemBuilder can render them).
+		// Used to fill loot bags with a couple of test items (.spawnbag, NPC-kill drops). SQLite RANDOM() order;
+		// fewer than `count` come back only when the item table has fewer buildable rows.
+		public async Task<Item[]> GetRandomBuildableItems(int count)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.Items
+				.Where(i => i.Archetype != 0 && i.Name != null && i.Name != "")
+				.OrderBy(_ => EF.Functions.Random())
+				.Take(count)
 				.ToArrayAsync();
 		}
 

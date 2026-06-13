@@ -104,47 +104,5 @@ namespace Faolan.GameServer
 			Logger.LogInformation("Shop: {Character} undid the sale of item {ItemId} (slot {Slot}); {Price} tin debited (wallet {Balance}).",
 				character.Name, sale.ItemId, sale.Slot, sale.PriceTin, character.Money);
 		}
-
-		// .shop [vendor name]  - open a vendor's shop window. The content protobuf is DECODED (a plain
-		// ProtoInventoryGame with container type 111, ShopContentCodec) so the window is CONSTRUCTED from the
-		// imported Shop/ShopItem + Items rows; with no imported shops the captured trader blob is the fallback.
-		// The real trigger is the vendor NPC dialogue (KnubotStartTrade), still conversation-gated.
-		private async Task OpenShopCommand(INetworkClient client, string arguments)
-		{
-			var characterId = client.Session.Character.Id;
-			var vendor = (arguments ?? "").Trim();
-			var shop = vendor.Length > 0
-				? await Database.GetShopByVendorName(vendor)
-				: await Database.GetFirstShop();
-
-			byte[] body;
-			string label;
-			if (shop != null)
-			{
-				// Resolve each ware's identity from Items (harvested from the same captures by the importer).
-				var templates = shop
-					.Items
-					.Select(i => i.ItemTemplateId)
-					.Distinct()
-					.ToList();
-				var resolved = new Dictionary<uint, Core.Database.Tables.Item>();
-				foreach (var template in templates)
-					resolved[template] = await Database.GetItem(template);
-
-				body = ShopContentCodec.Build(shop.Id, 0, shop.MaxSize, shop.Items, t => resolved.GetValueOrDefault(t));
-				label = $"\"{shop.VendorName}\" ({shop.Items.Count} wares, DB-built)";
-			}
-			else
-			{
-				body = Shop.ShopReplayData.DispatchShopDataBody;
-				label = "the captured trader (PoC blob; run the importer to get DB-built shops)";
-			}
-
-			await new PacketStream()
-				.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameServerRespondOpcodes.ShopData)
-				.WriteArray(body)
-				.SendAsync(client);
-			await _agentServerDispatcher.SendSystemMessage(characterId, $"Opened {label}. Try selling junk from your bag.");
-		}
 	}
 }

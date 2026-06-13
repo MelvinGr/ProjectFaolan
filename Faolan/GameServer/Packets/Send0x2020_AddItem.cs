@@ -1,10 +1,12 @@
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Data;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.Core.Network.Protobuf;
+using Faolan.GameServer.Packets.FullCharSnapshot;
 using ProtoBuf;
 
 // ReSharper disable once CheckNamespace
@@ -55,6 +57,54 @@ namespace Faolan.GameServer
 			ps.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameServerRespondOpcodes.AddItem);
 			WriteAddItemBody(ps, containerType, charId, itemPos, SerializeInventoryEntry(entry), feedback);
 			await ps.SendAsync(client);
+		}
+
+		// Grants an item to the player's backpack: persists it to a free CharacterInventory bag cell (so it
+		// survives relog via the world-entry snapshot) AND pushes the live DispatchAddItem so it appears
+		// immediately. The entry is the proven snapshot entry (SnapshotItemBuilder.BuildListEntry().Item - the
+		// 3-stat form that renders in-client), and itemId/recordId use FullCharSnapshotBuilder's deterministic
+		// formula so the live add and the next login's snapshot agree on the entry's identity. Returns the bag
+		// slot it landed in, or null when the item isn't snapshot-buildable or the bag is full.
+		private async Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1)
+		{
+			var item = await Database.GetItem(itemTemplateId);
+			if (item is not { Archetype: not 0 })
+				return null;
+
+			var characterId = client.Session.Character.Id;
+			var slot = await FindFreeBagSlot(characterId);
+			if (slot == null)
+				return null;
+
+			await Database.SetCharacterInventorySlot(characterId, (int)FullCharSnapshotBuilder.BagKind, slot.Value, itemTemplateId, count);
+
+			var entry = SnapshotItemBuilder.BuildListEntry(
+				(ulong)slot.Value,
+				FullCharSnapshotBuilder.ItemId(characterId, FullCharSnapshotBuilder.BagKind, (ulong)slot.Value),
+				FullCharSnapshotBuilder.RecordId(characterId, FullCharSnapshotBuilder.BagKind, (ulong)slot.Value),
+				count, item, item.Archetype).Item;
+			await SendAddItem(client, InventoryContainerBackpack, (uint)slot.Value, entry);
+			return slot;
+		}
+
+		// The first free backpack cell (0..23), skipping persisted rows and the legacy starter-bag cell (pos 1)
+		// while the FirstPosBag item still renders there. Null = bag full.
+		private async Task<int?> FindFreeBagSlot(uint characterId)
+		{
+			var equipment = await Database.GetCharacterEquipment(characterId);
+			var rows = await Database.GetCharacterInventory(characterId);
+			var taken = rows
+				.Where(r => r.Container == (int)FullCharSnapshotBuilder.BagKind)
+				.Select(r => r.Slot)
+				.ToHashSet();
+			if (equipment?.FirstPosBag is { Archetype: not 0 })
+				taken.Add(1);
+
+			return Enumerable
+				.Range(0, 24)
+				.Where(s => !taken.Contains(s))
+				.Cast<int?>()
+				.FirstOrDefault();
 		}
 	}
 }

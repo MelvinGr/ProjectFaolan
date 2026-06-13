@@ -173,7 +173,7 @@ namespace Faolan.GameServer
 				["guild"] = (client, arguments) => GuildCommand(client, arguments),
 				["money"] = (client, arguments) => MoneyCommand(client, arguments),
 				["buffs"] = (client, _) => BuffsCommand(client),
-				["shop"] = (client, arguments) => OpenShopCommand(client, arguments)
+				["spawnbag"] = (client, arguments) => SpawnBagCommand(client, arguments)
 			};
 		}
 
@@ -365,6 +365,36 @@ namespace Faolan.GameServer
 				: $"Spawned {entity.Name} (handle 0x{entity.Handle:X8}, level {entity.Level}{(entity.Hostile ? ", hostile" : "")}).");
 		}
 
+		// .spawnbag  - drop a loot bag at your feet with a couple of random items + some coins (the same bag a kill
+		// can drop). Open it and "loot all" to grant the items live (DispatchAddItem) and the coins (TryLootCash).
+		private async Task SpawnBagCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+
+			var items = await Database.GetRandomBuildableItems(Random.Shared.Next(2, 4)); // 2-3 items
+			if (items.Length == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "No snapshot-buildable items in the DB to fill a bag with.");
+				return;
+			}
+
+			var templates = items
+				.Select(i => i.Id)
+				.ToList();
+			var cash = (uint)Random.Shared.Next(50, 500);
+
+			var bag = await _broadcaster.SpawnLootBagForPlayer(client, templates, cash);
+			if (bag == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Couldn't spawn a loot bag here (this map has no captured loot-bag template).");
+				return;
+			}
+
+			var names = string.Join(", ", items.Select(i => i.Name));
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				$"Dropped {bag.Name} (0x{bag.Handle:X8}) with {items.Length} items [{names}] + {cash} tin. Open it and loot all.");
+		}
+
 		// .despawnnpc <handle>  - despawn a non-player entity by its wire handle (hex with 0x prefix, or decimal)
 		// in the caller's zone: n3ToClientQuit to players in range + removal from the world model. The cleanup
 		// complement to .spawnnpc; handles come from list_zone_entities or the spawn message.
@@ -432,33 +462,17 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			// First free bag cell: skip slots taken by persisted rows and the captured starter-bag cell (pos 1)
-			// while the legacy FirstPosBag item still renders there.
-			var equipment = await Database.GetCharacterEquipment(characterId);
-			var rows = await Database.GetCharacterInventory(characterId);
-			var taken = rows
-				.Where(r => r.Container == (int)FullCharSnapshotBuilder.BagKind)
-				.Select(r => r.Slot)
-				.ToHashSet();
-			if (equipment?.FirstPosBag is { Archetype: not 0 })
-				taken.Add(1);
-			var slot = Enumerable
-				.Range(0, 24)
-				.Where(s => !taken.Contains(s))
-				.Cast<int?>()
-				.FirstOrDefault();
+			// Persist + deliver live via DispatchAddItem (0x2020) - it appears without a relog now that the live
+			// add path exists (the old "no live add packet exists" caveat is gone).
+			var slot = await GrantItemToBackpack(client, itemId, count);
 			if (slot == null)
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, "Bag is full (24 cells).");
 				return;
 			}
 
-			await Database.SetCharacterInventorySlot(characterId, (int)FullCharSnapshotBuilder.BagKind, slot.Value, itemId, count);
-
-			// No live delivery exists: the client ignores/rejects a second 0x737A6DF9 for an already-constructed
-			// identity (verified 2026-06-12), so the item rides the next login's world-entry snapshot.
 			await _agentServerDispatcher.SendSystemMessage(characterId,
-				$"Added {count}x '{item.Name}' (id {itemId}) to bag slot {slot}. It appears on the next login (no live add packet exists).");
+				$"Added {count}x '{item.Name}' (id {itemId}) to bag slot {slot} (live DispatchAddItem).");
 		}
 
 		// .quest add|remove <id> | .quest list  - manage the player's quest journal. `add` records the quest +

@@ -178,8 +178,16 @@ prior diagnoses are in `docs/archive/todo-history.md`.
 - [ ] From-scratch TAILS (BeachSnapshotPrefix/BeachTailsBuilder, golden-tested but no longer on the live path
       since the post-load cleanup 135b06f): future construct step - replace the captured tails in the
       world-entry snapshot, then re-verify level/vitals/progression UI on fresh AND captured chars.
-- [ ] Click a dropped loot bag → loot window opens, bag stays; close/expire → it fades. (Taking items into the bag
-      is client-side; no server add-item packet exists.)
+- [x] **`DispatchAddItem` (s2c 0x2020) builder — the live add packet EXISTS** (corrects the old "no server
+      add-item packet" belief, RPC-opcode recovery §1). Decoded from the strickenbla questcomplete capture,
+      byte-exact golden test `DispatchAddItemTests`; body = `[ID32 invType,charId][u32 pos][u32-len entry][u32
+      feedback]`, entry = the bare `ProtoInventoryGameEntry` (snapshot `.Item`). Wired into a shared
+      `GrantItemToBackpack` (persist + live add) reused by `.additem`, loot, and `.spawnbag`.
+- [ ] **IN-CLIENT verify the live add**: `.additem <id>` → the item appears in the bag WITHOUT a relog (no IIR
+      error, chat stays). Was believed impossible (snapshot-only); now has the real opcode + a proven body.
+- [ ] Click a dropped loot bag → loot window opens, bag stays; `loot all` grants its items (live `DispatchAddItem`)
+      + coins (`TryLootCash`); close/expire → it fades. Bags now carry random items (kill drop + `.spawnbag`); the
+      loot-WINDOW item list display (DispatchReplyLootForCharacter*) is still undecoded — grant works via loot-all.
 
 **Quests** → memory `protocol_quest_state`
 - [ ] `.quest add 13479 5 Scavenger Lackey` → journal entry; kill 5 → goal advances + completes; persists across
@@ -551,19 +559,23 @@ connection needed**, and likely simpler than the AH (no listings/search/mail).
       [u32 charId][u32 slot] (container 0x68 = the DB bag container 104, no mapping needed); reply =
       `0x2035 DispatchItemSoldToShop` [container][charId][slot] + the 0x2005 wallet credit. Sell handler removes
       the `CharacterInventory` row, credits `Character.Money`, supports `UndoLastSoldItem` (single-step restore).
-      `.shop` GM command opens the captured trader window (PoC blob replay, like `.ah`). Golden tests `ShopTests`.
-- [ ] **In-client verify `.shop`**: window opens; selling a bag item clears the slot + wallet updates; undo
-      restores. (The blob's embedded vendor handle is session-volatile — expected to open anyway, like `.ah`.)
+      Golden tests `ShopTests`.
+- [ ] **Wire the real shop-OPEN trigger**: the cold-push `.shop` GM command was REMOVED — an unsolicited
+      `DispatchShopData` doesn't open the window. The vendor window is gated on the client's own NPC
+      trade-initiation (KnubotStartTrade), which establishes the conversation retail's `DispatchShopData` rides;
+      the reply must echo the inbound conversation (like the working `SellItem`→`0x2035` path does). `ShopContentCodec`
+      + `ShopReplayData` remain as the proven content builder + codec round-trip test data.
 - [x] **Shop-content protobuf DECODED + DB-backed shops (2026-06-12)**: the content is a plain
       `ProtoInventoryGame` (the bag message!) with container type 111; each ware is a standard
       `InventoryListEntry` whose ProtoAcgItem tail carries the FULL item identity (Data1-4 quad + template +
       archetype). `ShopContentCodec` parses + builds **byte-exact** (round-trip golden test vs the captured
       trader blob). Importer: `CaptureShopImporter` (6 vendors, keyed by NPC name) + shop wares as
-      `ArchetypeHarvester`'s third source (+281 items, +324 buildable). `.shop [vendor]` now CONSTRUCTS the
-      window from `Shop`/`ShopItem`/`Items` rows (blob fallback only when no shops imported).
-- [ ] **BUY side**: positions now resolve to items via `ShopItem`; still blocked on the live inventory-add
-      path (the same item-grant wall as loot, `protocol_containeradditem`) and on prices (stat 356 semantics
-      unknown - not obviously a price; the client may price from the RDB item template).
+      `ArchetypeHarvester`'s third source (+281 items, +324 buildable). `ShopContentCodec.Build` CONSTRUCTS the
+      window byte-exact from `Shop`/`ShopItem`/`Items` rows, ready for whenever the open-trigger above is wired.
+- [ ] **BUY side**: positions now resolve to items via `ShopItem`; the live inventory-add wall is GONE
+      (`DispatchAddItem` 0x2020, see Inventory/loot above) — BUY = `BuyItem` → `GrantItemToBackpack` + a
+      `DispatchUpdateCash` debit. Still open: prices (stat 356 semantics unknown — the client may price from the
+      RDB item template) + the shop-open trigger.
 - [ ] **Real sell prices**: the RDB item templates carry item value (TEA key cracked, field not mapped);
       provisional price = level×2×count (`VendorPriceTin`). Captured anchors: 19/23/92/392 tin.
 

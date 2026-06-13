@@ -500,13 +500,22 @@ namespace Faolan.GameServer.World
 			return entity;
 		}
 
-		// A player clicked an item in the loot window (top-level 0x2043). The actual transfer - grant the item to the
-		// player's inventory (ContainerAddItem) + LootRemoveItems to clear it from the bag - is the in-client-gated
-		// piece not built yet (no live inventory-add path). Logged so the click is traceable.
-		public Task TakeLootItem(INetworkClient client, uint bagHandle)
+		// A player clicked "loot all" (top-level 0x2043): hand the caller the bag's item templates to grant (via
+		// DispatchAddItem) and clear them from the bag so each is granted exactly once. Empty when the bag is
+		// unknown / not a loot bag / already emptied. Coins are a separate path (TryLootCash -> TakeLootCash).
+		public IReadOnlyList<uint> TakeBagItems(INetworkClient client, uint bagHandle)
 		{
-			_logger.LogInformation("Loot: take-item on bag 0x{Handle:X8} (item grant not yet implemented).", bagHandle);
-			return Task.CompletedTask;
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null || !_sim
+				    .World
+				    .ZoneFor(player.MapId)
+				    .TryGet(bagHandle, out var bag) || !bag.IsLoot || bag.LootItems.Count == 0)
+				return Array.Empty<uint>();
+
+			var taken = bag.LootItems.ToArray();
+			bag.LootItems.Clear();
+			_logger.LogInformation("Loot: {Player} loots {Count} item(s) from bag 0x{Handle:X8}.", player.Name, taken.Length, bagHandle);
+			return taken;
 		}
 
 		// TryLootCash (0x2045): takes the bag's coins exactly once - returns the amount and zeroes it on the bag
@@ -538,27 +547,75 @@ namespace Faolan.GameServer.World
 			if (template == null)
 				return;
 
-			var handle = NextLootHandle();
-			if (!WorldObjectBuilder.TryBuild(template, handle, deadNpc.Position, new Quaternion(deadNpc.Rotation.X, deadNpc.Rotation.Y, deadNpc.Rotation.Z, 1f), out var body))
-				return;
+			var items = await RollLootItems(Random.Shared.Next(0, 3)); // 0-2 items on a kill
+			var cash = LootResolver.RollCash(Random.Shared.NextDouble(), deadNpc.Level);
+			var bag = await PlaceLootBag(template, deadNpc.MapId, deadNpc.Position, deadNpc.Rotation, cash, items);
+			if (bag != null)
+				_logger.LogInformation("Loot: dropped {Name} 0x{Handle:X8} at {Pos} on map {Map} ({Items} items, {Cash} tin; expires {Expiry}s).",
+					bag.Name, bag.Handle, deadNpc.Position, deadNpc.MapId, items.Count, cash, LootResolver.LootExpirySeconds);
+		}
 
-			var bag = WorldEntity.ForLoot(handle, deadNpc.MapId, deadNpc.Position, deadNpc.Rotation, template.Name ?? "Bag of loot", body, LootResolver.LootExpirySeconds);
-			bag.CashTin = LootResolver.RollCash(Random.Shared.NextDouble(), deadNpc.Level);
+		// Spawns a loot bag at the player's feet with a forced item/cash payload (the same bag a kill can drop) -
+		// the .spawnbag test bootstrap. Null when the player isn't in the world or the map has no captured loot-bag
+		// template to render from.
+		public async Task<WorldEntity> SpawnLootBagForPlayer(INetworkClient client, IReadOnlyList<uint> itemTemplates, uint cashTin)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null)
+				return null;
+
+			var template = await GetLootTemplate(player.MapId);
+			if (template == null)
+				return null;
+
+			var bag = await PlaceLootBag(template, player.MapId, player.Position, player.Rotation, cashTin, itemTemplates);
+			if (bag != null)
+				_logger.LogInformation("Loot: .spawnbag {Name} 0x{Handle:X8} for {Player} ({Items} items, {Cash} tin).",
+					bag.Name, bag.Handle, player.Name, itemTemplates.Count, cashTin);
+			return bag;
+		}
+
+		// Builds the loot-bag world object from the map template, stamps its cash + item payload, adds it to the
+		// zone, and renders it for nearby players. Returns the bag, or null if the body couldn't be built. Shared
+		// by the kill-drop (TrySpawnLoot) and the .spawnbag command.
+		private async Task<WorldEntity> PlaceLootBag(WorldObject template, uint mapId, Vector3 position, Vector3 rotation, uint cashTin, IReadOnlyList<uint> itemTemplates)
+		{
+			var handle = NextLootHandle();
+			if (!WorldObjectBuilder.TryBuild(template, handle, position, new Quaternion(rotation.X, rotation.Y, rotation.Z, 1f), out var body))
+				return null;
+
+			var bag = WorldEntity.ForLoot(handle, mapId, position, rotation, template.Name ?? "Bag of loot", body, LootResolver.LootExpirySeconds);
+			bag.CashTin = cashTin;
+			if (itemTemplates != null)
+				bag.LootItems.AddRange(itemTemplates);
 			_sim
 				.World
-				.ZoneFor(deadNpc.MapId)
+				.ZoneFor(mapId)
 				.Add(bag);
 
 			foreach (var viewer in _sim
 				         .World
-				         .ZoneFor(deadNpc.MapId)
+				         .ZoneFor(mapId)
 				         .PlayersInRange(bag.Position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client != null)
 					await SendWorldSpawn(viewer.Client, bag);
 			}
 
-			_logger.LogInformation("Loot: dropped {Name} 0x{Handle:X8} at {Pos} on map {Map} (expires in {Expiry}s).", bag.Name, handle, bag.Position, deadNpc.MapId, LootResolver.LootExpirySeconds);
+			return bag;
+		}
+
+		// A few random snapshot-buildable item templates (Archetype != 0) for a loot bag. Empty when count <= 0
+		// or the item table has no buildable rows.
+		private async Task<List<uint>> RollLootItems(int count)
+		{
+			if (count <= 0)
+				return new List<uint>();
+
+			var items = await _database.GetRandomBuildableItems(count);
+			return items
+				.Select(i => i.Id)
+				.ToList();
 		}
 
 		// Dispatches interest events. `move` (the mover's Move components) is required to forward Move events and is

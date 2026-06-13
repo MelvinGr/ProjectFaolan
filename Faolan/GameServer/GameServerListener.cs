@@ -474,7 +474,14 @@ namespace Faolan.GameServer
 				{
 					packet.Body.ReadUInt32(); // loot typetag (0xC87A)
 					var bagHandle = packet.Body.ReadUInt32();
-					await _broadcaster.TakeLootItem(client, bagHandle);
+
+					// Grant each item the bag carries into the backpack (persist + live DispatchAddItem). The bag
+					// hands them over once (TakeBagItems clears them); coins ride the separate TryLootCash click.
+					var items = _broadcaster.TakeBagItems(client, bagHandle);
+					foreach (var itemTemplateId in items)
+						await GrantItemToBackpack(client, itemTemplateId);
+					if (items.Count > 0)
+						Logger.LogInformation("Loot: granted {Count} item(s) from bag 0x{Bag:X8} to {Player}.", items.Count, bagHandle, client.Session.Character?.Name);
 
 					break;
 				}

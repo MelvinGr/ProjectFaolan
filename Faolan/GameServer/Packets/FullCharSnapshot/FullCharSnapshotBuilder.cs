@@ -87,8 +87,10 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			return containers;
 		}
 
-		// Unique within the character, stable across logins: epoch | kind | slot | instance-low.
-		private static ulong ItemId(uint instance, uint kind, ulong slot)
+		// Unique within the character, stable across logins: epoch | kind | slot | instance-low. Internal so the
+		// live DispatchAddItem grant path (GrantItemToBackpack) computes the same itemId/recordId the next login's
+		// snapshot will, keeping the live add and the snapshot in agreement on the entry's identity.
+		internal static ulong ItemId(uint instance, uint kind, ulong slot)
 		{
 			return ItemIdEpoch | ((kind & 0xFFUL) << 24) | ((slot & 0xFFUL) << 16) | (instance & 0xFFFF);
 		}
@@ -107,7 +109,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			};
 		}
 
-		private static ulong RecordId(uint instance, uint kind, ulong slot)
+		internal static ulong RecordId(uint instance, uint kind, ulong slot)
 		{
 			return ((kind & 0xFFUL) << 24) | ((slot & 0xFFUL) << 16) | (instance & 0xFFFF);
 		}

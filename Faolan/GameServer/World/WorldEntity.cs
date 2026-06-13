@@ -38,6 +38,10 @@ namespace Faolan.GameServer.World
 		// (TryLootCash is granted exactly once per bag).
 		public uint CashTin { get; set; }
 
+		// Item template ids carried by a loot bag, rolled when it drops; granted to the looter's backpack via
+		// DispatchAddItem (0x2020) on TryLootAll and removed as they're taken, so each item is granted exactly once.
+		public List<uint> LootItems { get; } = new List<uint>();
+
 		public bool IsPlayer { get; }
 
 		// The FA015807 spawn BODY (the bytes after the RPC header) that renders this entity on a client - for a player,
