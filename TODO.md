@@ -203,6 +203,12 @@ prior diagnoses are in `docs/archive/todo-history.md`.
 - [ ] Re-test a beach login: Casilda gives HER dialogue, Kalanthes his; advancing to an un-captured step now
       CLOSES the window cleanly (no chat-lock) instead of hanging. "No lines / wrong branch" on un-captured
       quest-states is a **content-coverage gap** (proper fix = RDB Lua/tag VM, deferred — see §6).
+- [ ] **Casilda's create-world dialogue isn't in the DB**: the dikketest create capture's conversation packets
+      aren't recoverable by the old analyzer (truncated/compressed — the TCP-reassembly gap), so in create-world
+      clicking Casilda falls through to the scripted Kalanthes intro. Fix: re-dump the create capture as
+      `*.tshark.json` (Wireshark plugin), extract Casilda's create-flow conversation keyed by her handle, reimport.
+- [ ] Decode the NPC spawn's stable conversation/dialogue id, so handle→conversation survives across sessions
+      (not just verbatim-replayed scenes).
 
 **Inventory / loot** → memory `protocol_containeradditem`
 - [x] Backpack shows the `CharacterInventory` items; equip/unequip + bag moves persist and survive relog; chat
@@ -368,6 +374,10 @@ First pass IMPLEMENTED 2026-06-12 (same day); what remains is the deeper model w
       DispatchForgetSpell`, `0x2053 DispatchRemoveSpecialAbility`, `0x2011 DispatchUntrainSingleFeat`,
       `0x209A/0x209B DispatchPassiveAbilityEquip/Unequip`. (`0x2052 DispatchAddSpecialAbility` already used by
       `GrantStartingAbilities`.) Each needs a byte-exact capture/golden test before shipping.
+  - [ ] **Grant actual SPELLS (vs abilities) is BLOCKED on data**: the spell-grant packet is in NO capture — even
+        a caster only ever receives the 8 starting abilities via `0x2052`; `SpellBookIIR 0x6BA10936` is just a stub
+        notification and `DispatchLearnSpell(i_nSpellID)` is never exercised. Needs a fresh capture of a caster
+        learning a spell (e.g. class 29's 165241) to pin the body. (The C++ `addSpell 0x09` is the dead old scheme.)
 - [ ] **Resolve method names in the "unknown (class, opcode)" log** (handoff §7): every inbound `(receiver class,
       opcode)` and outbound s2c opcode now maps to a real method name (`docs/aoc-rpc-method-opcodes.md`), so the
       `default`-branch logging can print the method name instead of bare hex — quick triage win for spotting

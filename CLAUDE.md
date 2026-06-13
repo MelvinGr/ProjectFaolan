@@ -4,8 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Project Faolan is an Age of Conan server protocol emulator (C#, .NET 10). **Packet captures are the
 primary truth source** — the code intentionally mirrors retail traffic byte-for-byte rather than
-abstracting it; if local behavior diverges from a retail capture, fix local to match. `README.md` is the
-deep-dive (architecture, protocol notes, RE methodology); `TODO.md` is the single tracker of open work.
+abstracting it; if local behavior diverges from a retail capture, fix local to match. This file plus `docs/`
+are the deep-dive (architecture, protocol notes, RE methodology); `README.md` is the regular repo readme
+(overview + build/run); `TODO.md` is the single tracker of open work.
 
 ## Commands
 
