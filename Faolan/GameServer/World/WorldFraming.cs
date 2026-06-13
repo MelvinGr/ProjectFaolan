@@ -10,6 +10,10 @@ namespace Faolan.GameServer.World
 	// WorldBroadcaster and by the listener's login/create-flow senders (which delegate here).
 	public static class WorldFraming
 	{
+		// Instance 0x58 from the Strie capture; retail's per-session value varies (hoxxling 0x08, randochar 0x0b).
+		// Tested 0x08 (2026-06-13) to clear the client's "n3ToClientQuit sent from 0 -> e_Impossible" warning - it did
+		// NOT clear it, so the warning is benign (our despawn body is byte-identical to retail's; it's the client's
+		// default IIR PollStatus log). Reverted to 0x58 (the proven value).
 		public static readonly byte[] Sender = [0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x58];
 
 		public static byte[] Receiver(INetworkClient client)

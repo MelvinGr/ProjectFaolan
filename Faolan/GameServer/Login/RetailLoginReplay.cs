@@ -453,11 +453,23 @@ namespace Faolan.GameServer
 			byte[] spawnTemplate = null;
 			byte[] moveTaskTemplate = null;
 
+			// FAOLAN_NPC_INDIVIDUAL_SPAWN: render NPCs as the burst does today (default), OR drop every NPC record
+			// from the burst (its FA015807 spawns + their 96C46740 MoveTasks) and let the interest system spawn each
+			// NPC individually at entry (BroadcastPlayerEntry). The burst-rendered NPCs use the burst's wire handles
+			// while the model uses the row handles, so they are NOT seeded into Known and the first move re-streams
+			// all of them -> mass double-spawn (the "nameplate flickers then clears" bug). Making interest the SOLE
+			// NPC path removes the duplication entirely. The player's own spawn, containers, world objects and the
+			// snapshot stay in the burst.
+			var npcIndividualSpawn = Environment.GetEnvironmentVariable("FAOLAN_NPC_INDIVIDUAL_SPAWN") == "1";
+
 			foreach (var packet in packets)
 			{
 				// Re-address the capture's instance to the logged-in character so the burst works for any character.
 				// The NPC handles in the burst are left as-is.
 				var pkt = RewriteBurstInstance(packet, capturedInstance, liveInstance);
+
+				if (npcIndividualSpawn && IsBurstNpcRecord(client, pkt))
+					continue; // NPC spawn/MoveTask - spawned individually via interest instead (no burst double-spawn)
 
 				if (IsInventorySnapshot(pkt))
 				{
@@ -582,6 +594,29 @@ namespace Faolan.GameServer
 		// packet's re-addressed header + framing, exactly like the player-spawn rebuild. `wasIdentical` reports
 		// whether the built body equals the burst's (true for same-source rows: the table reproduces the capture).
 		// Falls back (returns false) when there is no matching row or the build fails, so the NPC keeps its burst body.
+		// True if the burst packet is an NPC spawn (FA015807 whose handle is NOT the player's own) or an NPC MoveTask
+		// (96C46740). Used by the FAOLAN_NPC_INDIVIDUAL_SPAWN path to drop NPC records from the burst so the interest
+		// system is the sole NPC spawn path. The player's own FA015807 (handle == client instance) returns false.
+		private static bool IsBurstNpcRecord(INetworkClient client, byte[] packet)
+		{
+			if (packet.Length < 12)
+				return false;
+
+			var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
+			if (bodyStart + 16 > packet.Length)
+				return false;
+
+			var subOpcode = BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(bodyStart + 4, 4));
+			if (subOpcode == MoveTaskBuilder.SubOpcode)
+				return true; // 96C46740 NPC movement registration
+
+			if (subOpcode != 0xFA015807u)
+				return false;
+
+			var handle = BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(bodyStart + 12, 4));
+			return handle != client.Session.Account.ClientInstance; // an NPC spawn, not the player's own
+		}
+
 		private bool TryRebuildNpcSpawnFromDb(INetworkClient client, IReadOnlyDictionary<(int, int, int), NpcSpawn> npcByPosition, byte[] packet, out byte[] rebuilt, out bool wasIdentical)
 		{
 			rebuilt = null;
@@ -602,7 +637,7 @@ namespace Faolan.GameServer
 
 			var key = PositionKey(BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosXOffset, 4)), BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosYOffset, 4)),
 				BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosZOffset, 4)));
-			if (!npcByPosition.TryGetValue(key, out var row) || !NpcSpawnBuilder.TryBuild(row, handle, out var newBody))
+			if (!npcByPosition.TryGetValue(key, out var row) || !NpcSpawnBuilder.TryBuild(row, handle, out var newBody, freshSpawn: true))
 				return false;
 
 			// Keep the burst packet's header (already re-addressed to the live player); swap only the FA015807 body.

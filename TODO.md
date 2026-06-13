@@ -242,6 +242,14 @@ Item templates + dialogue text are cracked (TEA-ECB, memory `rdb_extraction`); t
 `docs/archive/rdb-extraction-plan.md`.
 
 - [ ] NPC / creature definitions (real max HP, replacing the spawn-seeded value).
+- [ ] **(Re)import ALL class skills/abilities** (Melvin, 2026-06-13): on login `GrantStartingAbilities` grants
+      **0** abilities for most classes — `ClassAbilities` only has 3 rows (classes 18/29/44, one each), because
+      the full per-class kit comes from the `--archive` importer pass which was never run for all classes. Re-run
+      `Faolan.Importer --archive <Archive dir>` (ArchiveSqlImporter populates ClassAbilities) so every class gets
+      its starting + level abilities, then verify login grants them. **Also fix the class-id mapping**: Testertwo
+      is a **Barbarian** in-client but the server stores/logs it as **class 41 = Necromancer** — the class enum
+      mapping (or the create/import class assignment) is wrong, so even a full ability import would grant the wrong
+      class's kit. Confirm the AoC class-id↔name table against a capture before relying on the grant.
 - [ ] Spell / ability definitions (names + params) — also unblocks real spell-grant (no capture has it; needs a
       fresh caster capture OR RDB import). → `docs/archive/todo-history.md` §3 "spells blocked on data"
 - [ ] Tortage cinematic / camera-path resources (ties into §1).

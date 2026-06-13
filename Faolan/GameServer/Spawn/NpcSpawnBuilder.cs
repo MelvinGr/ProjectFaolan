@@ -14,13 +14,21 @@ namespace Faolan.GameServer.Spawn
 	public static class NpcSpawnBuilder
 	{
 		// Produces the FA015807 body for `row`, addressed to `handle`. Returns false if the row has no usable
-		// captured body (no Data / no decodable CharacterIIR).
-		public static bool TryBuild(NpcSpawn row, uint handle, out byte[] body)
+		// captured body (no Data / no decodable CharacterIIR). With `freshSpawn`, the transient
+		// NpcStats.SpawnAnimation is zeroed: it is the animation that was PLAYING when the NPC was captured, not a
+		// config value (retail's standing spawn of e.g. Casilda has 0; her row was captured mid-animation as 1).
+		// Replaying a non-zero one drives the client into a spawn-anim state the freshly-spawned entity has no
+		// reason to be in - on Casilda that left her entity present but undrawn. Default off keeps the byte-exact
+		// reproduction the goldens assert; the world-entry/interest spawn paths pass true.
+		public static bool TryBuild(NpcSpawn row, uint handle, out byte[] body, bool freshSpawn = false)
 		{
 			body = null;
 			var template = ExtractBody(row?.Data);
 			if (template == null || !PlayerSpawnReader.TryReadCharacterMessage(template, out var read))
 				return false;
+
+			if (freshSpawn && read.Message.npc_stats != null)
+				read.Message.npc_stats.SpawnAnimation = 0;
 
 			var position = new Vector3(row.PositionX, row.PositionY, row.PositionZ);
 			var rotation = new Quaternion(row.RotationX, row.RotationY, row.RotationZ, row.RotationW);

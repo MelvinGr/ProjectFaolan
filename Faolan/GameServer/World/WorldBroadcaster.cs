@@ -123,11 +123,24 @@ namespace Faolan.GameServer.World
 			if (entity?.SpawnBody == null)
 				return;
 
+			var zone = _sim.World.ZoneFor(entity.MapId);
+
+			// FAOLAN_NPC_INDIVIDUAL_SPAWN: NPCs were dropped from the burst (ReplayMapWorldBurst), so the interest
+			// system is the SOLE NPC spawn path - stream every in-range NPC here at entry (includeNonPlayers), each
+			// as its own FA015807 + name registration via DispatchInterest. No burst NPCs means no Known-seeding and
+			// no double-spawn. Otherwise (default) the burst already rendered the entry NPCs: seed those into Known
+			// so the first move doesn't re-spawn them, and only stream players here.
+			if (Environment.GetEnvironmentVariable("FAOLAN_NPC_INDIVIDUAL_SPAWN") == "1")
+			{
+				var npcEvents = InterestManager.ResolveMove(zone, entity, WorldSimulation.PlayerInterestRange, includeNonPlayers: true);
+				await DispatchInterest(npcEvents, null);
+				return;
+			}
+
 			// The handles the world-burst replay already rendered (RecordSpawnedNpcName populated this during the
 			// replay, before this runs). Snapshot them so we can tell burst NPCs (already on screen) from the rest.
 			var burstHandles = new HashSet<uint>(client.Session.SpawnedNpcNamesByHandle.Keys);
 
-			var zone = _sim.World.ZoneFor(entity.MapId);
 			foreach (var npc in zone.EntitiesInRange(entity.Position, WorldSimulation.PlayerInterestRange, entity.Handle))
 			{
 				if (npc.IsPlayer || npc.IsLoot || npc.Name == null || !burstHandles.Contains(npc.Handle))
@@ -275,7 +288,7 @@ namespace Faolan.GameServer.World
 
 				// Keep the NPC's FA015807 spawn body so respawn can re-render it for nearby players (built byte-exact
 				// from the row by NpcSpawnBuilder, the same path the burst-replacement uses).
-				if (NpcSpawnBuilder.TryBuild(npc, npc.CapturedHandle, out var spawnBody))
+				if (NpcSpawnBuilder.TryBuild(npc, npc.CapturedHandle, out var spawnBody, freshSpawn: true))
 					entity.SpawnBody = spawnBody;
 
 				zone.Add(entity);
@@ -368,7 +381,7 @@ namespace Faolan.GameServer.World
 
 			var npc = await _database.GetNpcSpawnByName(npcName);
 			var handle = NextLootHandle(); // a fresh summoned-entity handle (high range, no player/NPC collision)
-			if (npc == null || !NpcSpawnBuilder.TryBuild(npc, handle, out var body))
+			if (npc == null || !NpcSpawnBuilder.TryBuild(npc, handle, out var body, freshSpawn: true))
 			{
 				_logger.LogInformation("Spawn: no spawnable '{Npc}' template found.", npcName);
 				return null;
@@ -585,8 +598,13 @@ namespace Faolan.GameServer.World
 		}
 
 		// Sends the subject's FA015807 spawn to `recipient`, re-framed to the recipient and patched to the subject's
-		// CURRENT position (its captured spawn body holds its entry position, which may be stale).
-		private Task SendWorldSpawn(INetworkClient recipient, WorldEntity subject)
+		// CURRENT position (its captured spawn body holds its entry position, which may be stale). For an NPC the
+		// spawn is PAIRED with a stationary 96C46740 MoveTask: retail sends both per entity, and without the MoveTask
+		// the client never polls 0x2020 to finish registering the entity - it spawns the model but never gets a
+		// floating name tag / full nameplate (the "only Kalanthes has a name" symptom; he was one of the few burst
+		// NPCs that carried a MoveTask). Same sender as the spawn (WorldFraming.Sender, verified against the capture).
+		// Players forward their own Move; loot bags have their own lifecycle - neither gets a MoveTask here.
+		private async Task SendWorldSpawn(INetworkClient recipient, WorldEntity subject)
 		{
 			var body = (byte[])subject.SpawnBody.Clone();
 			if (body.Length >= SpawnPacketBuilder.PosZOffset + 4)
@@ -596,10 +614,16 @@ namespace Faolan.GameServer.World
 				BinaryPrimitives.WriteSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.PosZOffset, 4), subject.Position.Z);
 			}
 
-			return new PacketStream()
+			await new PacketStream()
 				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), 0x2000)
 				.WriteArray(body)
 				.SendAsync(recipient);
+
+			if (!subject.IsPlayer && !subject.IsLoot)
+				await new PacketStream()
+					.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), 0x2000)
+					.WriteArray(MoveTaskBuilder.BuildStationary(subject.Handle, subject.Position))
+					.SendAsync(recipient);
 		}
 
 		// The components of a player's Move, forwarded verbatim to other viewers (only the receiver differs).
