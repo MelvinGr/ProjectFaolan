@@ -173,8 +173,7 @@ namespace Faolan.GameServer
 				["guild"] = (client, arguments) => GuildCommand(client, arguments),
 				["money"] = (client, arguments) => MoneyCommand(client, arguments),
 				["buffs"] = (client, _) => BuffsCommand(client),
-				["spawnbag"] = (client, arguments) => SpawnBagCommand(client, arguments),
-				["bank"] = (client, arguments) => BankCommand(client, arguments)
+				["spawnbag"] = (client, arguments) => SpawnBagCommand(client, arguments)
 			};
 		}
 
@@ -288,7 +287,18 @@ namespace Faolan.GameServer
 			}
 
 			await Tradepost.TradepostResponses.SendOpenTradepost(client, entity.Position);
-			await _agentServerDispatcher.SendSystemMessage(characterId, "Opened the auction house (PoC) at your position.");
+
+			// The window's first/default tab is the BANK (personal storage), a separate channel: container kind 105
+			// delivered via a BankIIR (decoded, protocol_bank_storage). Populate it from the character's
+			// Container=105 rows so the default tab isn't blank.
+			var rows = await Database.GetCharacterInventory(characterId);
+			var bankRows = rows
+				.Where(r => r.Container == (int)FullCharSnapshotBuilder.BankKind)
+				.ToList();
+			var bank = FullCharSnapshotBuilder.BuildContainer(FullCharSnapshotBuilder.BankKind, 50, 30, characterId, bankRows);
+			await SendBank(client, bank);
+
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Opened the auction house (PoC) at your position; bank tab has {bank.Items.Count} item(s).");
 		}
 
 		// .lua run <scriptId>  - run an RDB LuaArchive script against the player (the conversation/quest VM engine):
@@ -364,40 +374,6 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, entity == null
 				? $"No spawnable NPC named '{name}' (needs a captured NpcSpawns row with spawn data; any map)."
 				: $"Spawned {entity.Name} (handle 0x{entity.Handle:X8}, level {entity.Level}{(entity.Hostile ? ", hostile" : "")}).");
-		}
-
-		// .bank  - send the BANK tab content of the trader/auctionhouse window. The bank is the SAME NPC as the
-		// auction house, just the FIRST (default) tab - but a DIFFERENT channel: the bank tab is a BankIIR
-		// (0x0BA1C1CB) on the WORLD conversation (NOT a tradepost/DispatchOpenTradepost packet, which is the AH
-		// tab). Decoded from the necrol80 trader-bank capture (protocol_bank_storage): the player interacts with the
-		// NPC and the server replies with 0x201c slot registrations + the BankIIR. Built from the character's
-		// Container=105 rows (seeds a couple of random items the first time). PoC: in retail the window is opened by
-		// the client's NPC interaction; a cold push may be interaction-gated like the old `.shop`.
-		private async Task BankCommand(INetworkClient client, string arguments)
-		{
-			var characterId = client.Session.Character.Id;
-
-			var rows = await Database.GetCharacterInventory(characterId);
-			var bankRows = rows
-				.Where(r => r.Container == (int)FullCharSnapshotBuilder.BankKind)
-				.ToList();
-			if (bankRows.Count == 0)
-			{
-				// Seed a few random buildable items into the bank so it isn't empty.
-				var seed = await Database.GetRandomBuildableItems(3);
-				for (var i = 0; i < seed.Length; i++)
-					await Database.SetCharacterInventorySlot(characterId, (int)FullCharSnapshotBuilder.BankKind, i, seed[i].Id, 1);
-
-				rows = await Database.GetCharacterInventory(characterId);
-				bankRows = rows
-					.Where(r => r.Container == (int)FullCharSnapshotBuilder.BankKind)
-					.ToList();
-			}
-
-			var bank = FullCharSnapshotBuilder.BuildContainer(FullCharSnapshotBuilder.BankKind, 50, 30, characterId, bankRows);
-			await SendBank(client, bank);
-			await _agentServerDispatcher.SendSystemMessage(characterId,
-				$"Opened bank ({bank.Items.Count} items, container kind 105). PoC - the window may be NPC-interaction-gated like the old .shop.");
 		}
 
 		// .spawnbag  - drop a loot bag at your feet with a couple of random items + some coins (the same bag a kill

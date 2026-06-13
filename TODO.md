@@ -584,14 +584,25 @@ buy-delivery path (seller's item + buyer's payment move through mail).
         triggered by interacting with the auctioneer NPC, not by `TradepostOpen` (replying to Open is circular).
         PoC bootstrap = the **`.ah` GM command**, which sends `DispatchOpenTradepost` at the player's live position
         (so the within-15-radius check passes). 277 tests green.
-  - [ ] **In-client check (user side):** stand somewhere, type `.ah` → does the auction-house window open? Then
-        search → does the listing grid show the replayed row ("Jocko", item 0x755D)? Grab the client log on
-        failure (`stream bad`, `invalid ...`, `ResourceManager ... does not exist`). Candidates if it doesn't
-        open: the `BankIIR 0x0BA1C1CB` that accompanies `DispatchOpenTradepost`, or the interface instance
-        (0x08006F31) not matching this client. If it renders, framing/endpoints are confirmed live → Step 3.
+  - [x] **`.ah` opens the window IN-CLIENT (Melvin, 2026-06-13).** Framing/endpoints confirmed live. The window's
+        first/default tab is the **BANK** (personal storage) - DECODED + wired into `.ah` (memory
+        `protocol_bank_storage`, `docs`-less): container kind 105 delivered via a **BankIIR (0x0BA1C1CB)** on the
+        world conversation (separate channel from the tradepost AH/mail tabs), byte-exact `BankStorageTests`. The
+        bank tab renders and the player can move items in/out in-client.
+  - [ ] **AH SEARCH is static replay - make it DB-backed** (Melvin, 2026-06-13): the search returns a captured
+        single-row listing ("Jocko", item 0x755D). Query a `TradepostListing` table for rows matching the search
+        and build `DispatchTradepostSearchResults` from them (the byte-exact builder exists; swap the replay blob
+        for DB rows).
+  - [ ] **AH "offer for sale" should work** (Melvin, 2026-06-13): the c2s list-item request → create a
+        `TradepostListing` (seller/price/qty/itemId), remove the item from the bank (container 105) into escrow, and
+        the listing then shows in search. The tradepost sells from the BANK (`nBankItemSlot`).
+  - [ ] **Bank deposit/withdraw must PERSIST**: moving items between the bank (container 105) and the bag must be
+        written to `CharacterInventory` so the bank survives relog (the client move sends go through the inventory
+        move handler - route bank-slot moves to/from container 105).
 - [ ] **Step 3:** go DB-backed — `TradepostListing` + `Mail`/`MailAttachment` tables, search, money/escrow,
-      buy→mail grant. NB: tradepost sells from the **bank** (`nBankItemSlot`) — leans on bank/money support;
-      `CSBuyItemReply` hints at a commerce/CS path. All on the existing GameServer dispatcher (no new connection).
+      buy→mail grant. NB: tradepost sells from the **bank** (`nBankItemSlot`) — leans on bank/money support (the
+      bank itself is now decoded + delivered); `CSBuyItemReply` hints at a commerce/CS path. All on the existing
+      GameServer dispatcher (no new connection).
 
 ### 9c. Money storage / usage (cross-cutting prerequisite)
 
