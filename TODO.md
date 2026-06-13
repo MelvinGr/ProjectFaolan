@@ -300,6 +300,16 @@ tag system exists. → memory `lua_vm`, `protocol_conversation_routing`; `docs/a
       at all). Add a ChatLog table (timestamp, kind: channel/say/whisper/system, channel id, sender id+name,
       recipient for whispers, text) appended from the AgentServer paths, so history survives restarts and the
       Claude bridge can rewind from the DB instead of skipping backlog.
+- [ ] **Run `.commands` posted in the Claude channel as GM commands** (Melvin, 2026-06-13): a `.foo` message
+      on the Claude channel should execute as a GM command (like normal chat), not just bridge to Claude.
+      Normal chat already does this at `GameServerListener.cs:704` (`.` prefix, not `..`, account >= GameMaster
+      -> `HandleGmCommand`). The seam to reuse exists: `IGameServerDispatcher.RunGmCommand(characterId, text)`
+      (GameServerProvider.cs:25) resolves the player's GameServer session and invokes `HandleGmCommand`. Wire it
+      into the `ChannelChat` handler (`AgentServerListener.cs:143`): when `channelId == ClaudeChannel.ChannelId`
+      and the message is a `.command`, gate on `client.Session.Account.Type >= GameMaster` and call
+      `RunGmCommand(client.Session.Character.Id, message)` instead of (or before) the `_claudeChannel.Append`
+      bridge. Decide whether GM-command lines should still echo into the bridge log (probably skip, to avoid
+      Claude "replying" to a command).
 - [ ] **Add Claude to the friends list** (Melvin, 2026-06-13): see whether the synthetic Claude identity
       (ClaudeChannel.SenderId 0xC1A0DE05, the 0x0014-announced "Claude" sender) can appear on a player's
       in-game friends list - needs the friends-list protocol decoded first (add/remove/status packets are
