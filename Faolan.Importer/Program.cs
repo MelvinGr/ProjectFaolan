@@ -221,6 +221,9 @@ namespace Faolan.Importer
 			var rdbItems = args.Contains("--rdb-items"); // decrypt each keyed item's RDB template (needs --rdb)
 			var dumpTemplatesDir = GetOption(args, "--dump-templates"); // optional: write decrypted templates here
 			var dryRun = args.Contains("--dry-run");
+			// Re-seed ONLY the AH listings (TradepostListing) and skip every other capture import - avoids a full
+			// re-import churning unrelated tables (Items/NpcSpawns) from newer captures into the committed DB.
+			var listingsOnly = args.Contains("--listings-only");
 
 			Console.WriteLine($"Faolan.Importer: db={dbPath}  captures={capturesDir}  archive={archiveDir ?? "(none)"}  rdb={rdbDir ?? "(none)"}  dryRun={dryRun}");
 
@@ -333,6 +336,13 @@ namespace Faolan.Importer
 
 			if (doCaptures)
 			{
+				// AH listings (TradepostListing) - harvested from the captured DispatchTradepostSearchResults
+				// (0x2005) rows. Re-seedable on its own via --listings-only.
+				var (listSeen, listAdded, listUpdated) = await CaptureListingImporter.ImportAsync(db, captures.SelectMany(CaptureListingImporter.Extract));
+				Console.WriteLine($"AH listings (0x2005 search results): {listSeen} listings, {listAdded} new, {listUpdated} updated.");
+
+				if (!listingsOnly)
+				{
 				await CaptureItemImporter.ImportAsync(db, itemPackets);
 				await CaptureMapImporter.ImportAsync(db, itemPackets);
 				await CaptureSpellImporter.ImportAsync(db, itemPackets);
@@ -374,6 +384,7 @@ namespace Faolan.Importer
 				await ImportNpcSpawns(db, NpcSpawnExtractor.Merge(captures.SelectMany(NpcSpawnExtractor.Extract)));
 				await ImportWorldObjects(db, WorldObjectExtractor.Merge(captures.SelectMany(WorldObjectExtractor.Extract)));
 				await ImportMapWorldBursts(db, MapWorldBurstExtractor.Merge(captures.SelectMany(MapWorldBurstExtractor.Extract)));
+				}
 			}
 
 			if (rdbDir != null)

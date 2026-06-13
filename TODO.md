@@ -657,9 +657,13 @@ buy-delivery path (seller's item + buyer's payment move through mail).
         The full row grammar was nailed: `[saleId][handle][seller][price][qty][itemId][u64][u32][entryLen]
         [ProtoInventoryGameEntry]` — the entry is the SAME message the snapshot/shop/add-item use (item_id=saleId,
         stats {0,26:qty,258:price,265:ts}, item_data=the listed instance's ProtoAcgItem). The captured single-row
-        replay is the FALLBACK when no listing matches (so the grid still renders pre-import). Remaining: a
-        listings importer/seed (harvest captured search rows into `TradepostListing`) so search returns real data
-        without the fallback.
+        replay is the FALLBACK when no listing matches (so the grid still renders pre-import).
+  - [x] **AH listings importer DONE (2026-06-14).** `CaptureListingImporter` harvests the captured
+        `DispatchTradepostSearchResults` (0x2005) rows into `TradepostListing` (242 listings across 11 item ids
+        seeded into `faolan.db`), so search returns real data instead of the single-row fallback. Disambiguates
+        from the colliding `DispatchUpdateCash` 0x2005 by the TradepostInterface class id in the header. Round-trip
+        test `CaptureListingImporterTests` (Parse→ToListing→Build == captured bytes). Re-seedable alone via the
+        importer's `--listings-only` flag (avoids churning unrelated tables).
   - [ ] **AH "offer for sale" should work** (Melvin, 2026-06-13): the c2s list-item request → create a
         `TradepostListing` (seller/price/qty/itemId), remove the item from the bank (container 105) into escrow, and
         the listing then shows in search. The tradepost sells from the BANK (`nBankItemSlot`).

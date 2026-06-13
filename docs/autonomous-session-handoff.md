@@ -101,3 +101,7 @@ log below, then pick the next item. If you exhaust the safe list, stop and summa
 - 2026-06-14 — §9a **Mail model + DispatchMailMessage builder DONE**. Decoded the full mail wire grammar from the
   get-mail capture (629 B base / 754 B w/ attachment); added `Mail`+`MailAttachment` tables (migration `AddMail`),
   `MailMessageCodec` (Build/Parse, byte-exact), 4 golden tests in `MailMessageCodecTests`. 308 tests green.
+- 2026-06-14 — §9a **AH listings importer DONE**. `CaptureListingImporter` harvests the captured 0x2005 search-result
+  rows into `TradepostListing` (242 listings / 11 item ids seeded into faolan.db) so AH search returns real data;
+  round-trip test `CaptureListingImporterTests`; importer `--listings-only` flag re-seeds just these (kept the db
+  diff clean — a full re-import would churn Items/NpcSpawns from newer captures). 311 tests green.
