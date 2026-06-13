@@ -432,10 +432,16 @@ namespace Faolan.GameServer.Combat
 			if (npcEntity != null)
 			{
 				npcEntity.MarkDead();
-				await _broadcaster.BroadcastEntityDespawn(npcEntity);
-				_logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); despawned, respawns in {Delay}s.", npcEntity.Name, targetHandle, cause, npcEntity.RespawnDelaySeconds);
 				await AwardKillXp(killer, npcEntity.Level);
-				await _broadcaster.TrySpawnLoot(npcEntity);
+
+				// Maybe turn the corpse into a lootable bag IN PLACE (reusing the NPC's handle so the client, which
+				// already renders the corpse, accepts the update). Only despawn the corpse when nothing dropped.
+				var becameBag = await _broadcaster.TryDropCorpseLoot(npcEntity);
+				if (!becameBag)
+					await _broadcaster.BroadcastEntityDespawn(npcEntity);
+
+				_logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); {Outcome}, respawns in {Delay}s.",
+					npcEntity.Name, targetHandle, cause, becameBag ? "corpse became a loot bag" : "despawned", npcEntity.RespawnDelaySeconds);
 				await AdvanceKillQuests(killer, npcEntity.Name);
 				return;
 			}

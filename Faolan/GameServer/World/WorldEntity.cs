@@ -42,6 +42,12 @@ namespace Faolan.GameServer.World
 		// DispatchAddItem (0x2020) on TryLootAll and removed as they're taken, so each item is granted exactly once.
 		public List<uint> LootItems { get; } = new List<uint>();
 
+		// True when this entity can be looted: a standalone loot bag, OR a DEAD NPC whose corpse was turned into a
+		// lootable bag in place (the kill-drop path reuses the NPC's own handle so the client - which already
+		// renders the corpse - just updates it, rather than introducing a brand-new world object mid-session that
+		// the client won't render). Loot is cleared when the NPC respawns (TickRespawn).
+		public bool IsLootable => IsLoot || (IsDead && (LootItems.Count > 0 || CashTin > 0));
+
 		public bool IsPlayer { get; }
 
 		// The FA015807 spawn BODY (the bytes after the RPC header) that renders this entity on a client - for a player,
@@ -146,6 +152,9 @@ namespace Faolan.GameServer.World
 			Vitals.Health = Vitals.MaxHealth;
 			Position = SpawnPosition;
 			Rotation = SpawnRotation;
+			// Drop any unlooted corpse-bag contents - the entity is a live NPC again, not a bag.
+			CashTin = 0;
+			LootItems.Clear();
 			return true;
 		}
 

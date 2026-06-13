@@ -235,7 +235,7 @@ namespace Faolan.GameServer.World
 			if (player == null || !_sim
 				    .World
 				    .ZoneFor(player.MapId)
-				    .TryGet(bagHandle, out var bag) || !bag.IsLoot)
+				    .TryGet(bagHandle, out var bag) || !bag.IsLootable)
 				return;
 
 			await BroadcastEntityFade(bag);
@@ -367,7 +367,7 @@ namespace Faolan.GameServer.World
 			if (player == null || !_sim
 				    .World
 				    .ZoneFor(player.MapId)
-				    .TryGet(objectHandle, out var bag) || !bag.IsLoot)
+				    .TryGet(objectHandle, out var bag) || !bag.IsLootable)
 				return;
 
 			await new PacketStream()
@@ -512,7 +512,7 @@ namespace Faolan.GameServer.World
 			if (player == null || !_sim
 				    .World
 				    .ZoneFor(player.MapId)
-				    .TryGet(bagHandle, out var bag) || !bag.IsLoot || bag.LootItems.Count == 0)
+				    .TryGet(bagHandle, out var bag) || !bag.IsLootable || bag.LootItems.Count == 0)
 				return Array.Empty<uint>();
 
 			var taken = bag.LootItems.ToArray();
@@ -529,7 +529,7 @@ namespace Faolan.GameServer.World
 			if (player == null || !_sim
 				    .World
 				    .ZoneFor(player.MapId)
-				    .TryGet(bagHandle, out var bag) || !bag.IsLoot)
+				    .TryGet(bagHandle, out var bag) || !bag.IsLootable)
 				return 0;
 
 			var cash = bag.CashTin;
@@ -537,75 +537,87 @@ namespace Faolan.GameServer.World
 			return cash;
 		}
 
-		// On a kill, maybe drop a loot bag at the dead NPC's spot (LootResolver coin-flip). The bag is a world object
-		// (LootBagFullUpdateIIR_c 0xF096251E) built from a captured "Bag of loot" row for the map, placed at the death
-		// position with a fresh handle, added to the zone, and spawned for nearby players. It expires off the tick
-		// (WorldState.Tick -> LootExpired -> despawn + remove). Opening/looting the bag is a separate (gated) step.
-		public async Task TrySpawnLoot(WorldEntity deadNpc)
+		// On a kill, MAYBE turn the dead NPC's corpse into a lootable bag (LootResolver coin-flip + a map loot
+		// template). The bag REUSES the NPC's own handle: the client already renders the corpse, so the
+		// LootBagFullUpdateIIR (0xF096251E) is an UPDATE it accepts - introducing a brand-new world object
+		// mid-session does NOT render (the client only takes world objects at playfield-load; confirmed against
+		// captures where every loot bag is introduced in the world-entry burst, never mid-session). The entity
+		// stays dead in the model and respawns off the tick (which clears the loot). Returns true if the corpse
+		// became a bag, so the caller skips the despawn.
+		public async Task<bool> TryDropCorpseLoot(WorldEntity deadNpc)
 		{
 			if (!LootResolver.RollsDrop(Random.Shared.NextDouble()))
-				return;
-
-			var template = await GetLootTemplate(deadNpc.MapId);
-			if (template == null)
-				return;
+				return false;
 
 			var items = await RollLootItems(Random.Shared.Next(0, 3)); // 0-2 items on a kill
 			var cash = LootResolver.RollCash(Random.Shared.NextDouble(), deadNpc.Level);
-			var bag = await PlaceLootBag(template, deadNpc.MapId, deadNpc.Position, deadNpc.Rotation, cash, items);
-			if (bag != null)
-				_logger.LogInformation("Loot: dropped {Name} 0x{Handle:X8} at {Pos} on map {Map} ({Items} items, {Cash} tin; expires {Expiry}s).",
-					bag.Name, bag.Handle, deadNpc.Position, deadNpc.MapId, items.Count, cash, LootResolver.LootExpirySeconds);
+			if (!await MakeCorpseLootable(deadNpc, items, cash))
+				return false;
+
+			_logger.LogInformation("Loot: corpse of {Name} 0x{Handle:X8} became a loot bag ({Items} items, {Cash} tin) on map {Map}.",
+				deadNpc.Name, deadNpc.Handle, items.Count, cash, deadNpc.MapId);
+			return true;
 		}
 
-		// Spawns a loot bag at the player's feet with a forced item/cash payload (the same bag a kill can drop) -
-		// the .spawnbag test bootstrap. Null when the player isn't in the world or the map has no captured loot-bag
-		// template to render from.
+		// Test bootstrap (.spawnbag): spawn a throwaway NPC at the player, immediately mark it dead, and turn its
+		// corpse into a lootable bag - exercising the exact corpse-reuse path a real kill uses (a standalone
+		// mid-session loot object won't render; an update to an entity the client already spawned does). Returns
+		// the entity, or null if no NPC could be spawned or the map has no loot template.
 		public async Task<WorldEntity> SpawnLootBagForPlayer(INetworkClient client, IReadOnlyList<uint> itemTemplates, uint cashTin)
 		{
-			var player = _sim.PlayerWorldEntity(client);
-			if (player == null)
+			var npc = await SpawnNpcForPlayer(client, "Crocodile");
+			if (npc == null)
 				return null;
 
-			var template = await GetLootTemplate(player.MapId);
-			if (template == null)
+			npc.MarkDead();
+			if (!await MakeCorpseLootable(npc, itemTemplates, cashTin))
 				return null;
 
-			var bag = await PlaceLootBag(template, player.MapId, player.Position, player.Rotation, cashTin, itemTemplates);
-			if (bag != null)
-				_logger.LogInformation("Loot: .spawnbag {Name} 0x{Handle:X8} for {Player} ({Items} items, {Cash} tin).",
-					bag.Name, bag.Handle, player.Name, itemTemplates.Count, cashTin);
-			return bag;
+			_logger.LogInformation("Loot: .spawnbag corpse 0x{Handle:X8} for {Player} ({Items} items, {Cash} tin).",
+				npc.Handle, client.Session.Character?.Name, itemTemplates.Count, cashTin);
+			return npc;
 		}
 
-		// Builds the loot-bag world object from the map template, stamps its cash + item payload, adds it to the
-		// zone, and renders it for nearby players. Returns the bag, or null if the body couldn't be built. Shared
-		// by the kill-drop (TrySpawnLoot) and the .spawnbag command.
-		private async Task<WorldEntity> PlaceLootBag(WorldObject template, uint mapId, Vector3 position, Vector3 rotation, uint cashTin, IReadOnlyList<uint> itemTemplates)
+		// Turns an already-spawned, dead entity's corpse into a lootable bag IN PLACE: builds the
+		// LootBagFullUpdateIIR (0xF096251E) for the entity's OWN handle + position and sends it to nearby players,
+		// then attaches the loot payload. Reusing the handle is the whole point - the client renders the corpse,
+		// so this is an UPDATE it accepts. Returns false if the map has no loot-bag template or the body can't be
+		// built.
+		private async Task<bool> MakeCorpseLootable(WorldEntity corpse, IReadOnlyList<uint> items, uint cash)
 		{
-			var handle = NextLootHandle();
-			if (!WorldObjectBuilder.TryBuild(template, handle, position, new Quaternion(rotation.X, rotation.Y, rotation.Z, 1f), out var body))
-				return null;
+			var template = await GetLootTemplate(corpse.MapId);
+			if (template == null)
+				return false;
 
-			var bag = WorldEntity.ForLoot(handle, mapId, position, rotation, template.Name ?? "Bag of loot", body, LootResolver.LootExpirySeconds);
-			bag.CashTin = cashTin;
-			if (itemTemplates != null)
-				bag.LootItems.AddRange(itemTemplates);
-			_sim
-				.World
-				.ZoneFor(mapId)
-				.Add(bag);
+			if (!WorldObjectBuilder.TryBuild(template, corpse.Handle, corpse.Position, new Quaternion(corpse.Rotation.X, corpse.Rotation.Y, corpse.Rotation.Z, 1f), out var body))
+				return false;
+
+			corpse.CashTin = cash;
+			corpse.LootItems.Clear();
+			if (items != null)
+				corpse.LootItems.AddRange(items);
 
 			foreach (var viewer in _sim
 				         .World
-				         .ZoneFor(mapId)
-				         .PlayersInRange(bag.Position, WorldSimulation.PlayerInterestRange))
+				         .ZoneFor(corpse.MapId)
+				         .PlayersInRange(corpse.Position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client != null)
-					await SendWorldSpawn(viewer.Client, bag);
+					await SendLootBagUpdate(viewer.Client, body);
 			}
 
-			return bag;
+			return true;
+		}
+
+		// Sends a prebuilt LootBagFullUpdateIIR body (handle + transform already baked by WorldObjectBuilder) on
+		// the world conversation. Unlike SendWorldSpawn this does NOT re-patch the position - the body is already
+		// placed at the corpse's spot.
+		private Task SendLootBagUpdate(INetworkClient recipient, byte[] body)
+		{
+			return new PacketStream()
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), 0x2000)
+				.WriteArray(body)
+				.SendAsync(recipient);
 		}
 
 		// A few random snapshot-buildable item templates (Archetype != 0) for a loot bag. Empty when count <= 0
