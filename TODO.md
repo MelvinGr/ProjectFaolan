@@ -134,8 +134,17 @@ prior diagnoses are in `docs/archive/todo-history.md`.
       resurrection point; walk near an undiscovered point → "Resurrection point discovered".
 
 **Mounts**
-- [ ] `.mount` / `.mount 3BAD7D` — currently does nothing; report cast bar / horse spawn / ride. Likely needs the
-      mount-entity spawn.
+- [ ] `.mount` / `.mount 3BAD7D` — **does NOT work** (confirmed in-client 2026-06-13): the server-cast ApplySpell +
+      SpawnMountForPlayer push renders nothing (the mount-entity spawn is gated on the mid-session-spawn blocker,
+      `protocol_midsession_spawn_blocked`). In-game a mount is a learnable **spell/ability the PLAYER casts**, not a
+      server push.
+- [ ] **Import the mount spell/ability from the necrol80 capture so it can be GRANTED + cast.** The capture
+      `account-faolan-character-necrol80-login-mount_move_dismount` has the full mount summon (ApplySpell 0x6B87E316
+      / spell 0x3BAD7D, the F508F4C1 channel packets, and the "Fading Black Horse" FA015807 spawn at idx 1523). The
+      importer doesn't harvest the mount's grant identity (Data quad + slot), so `.grantspell` can't grant it (not
+      in the Abilities table; only the 26 captured combat 0x2052 grants are). Fix the importer to pull the mount
+      ability out of this capture, then `.grantspell <mountId>` puts it on the bar and the player casts it — the
+      correct, client-initiated mount flow (and a clean test of whether a client-CAST spawn renders mid-session).
 
 **Teleport / maps**
 - [ ] `.teleport 2010|2040|3000|4010` — moves the player + buff but the **map doesn't change** (soft same-conn
