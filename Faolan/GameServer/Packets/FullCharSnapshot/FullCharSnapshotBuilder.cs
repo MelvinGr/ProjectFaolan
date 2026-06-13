@@ -24,6 +24,10 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		public const uint QuestKind = 113;
 		public const uint ResourceKind = 112;
 
+		// The personal BANK container (opened at the trader/auctionhouse NPC). NOT one of the 4 login-snapshot
+		// containers - it is delivered on-demand via a BankIIR packet (see protocol_bank_storage / BankHandler).
+		public const uint BankKind = 105;
+
 		// The first bag cell of a fresh character's snapshot is pos 1 (Strie's captured starter bag).
 		private const uint BagFirstPos = 1;
 		private const ulong ItemIdEpoch = 0x20D82B63UL << 32;
@@ -85,6 +89,23 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			}
 
 			return containers;
+		}
+
+		// Builds a SINGLE inventory container (ProtoInventoryGame) of the given kind from CharacterInventory rows -
+		// used for the on-demand BANK delivery (kind 105), which isn't one of the 4 login-snapshot containers.
+		// Same item codec as the snapshot (SnapshotItemBuilder.BuildListEntry); only buildable rows (Archetype != 0).
+		public static ProtoInventoryGame BuildContainer(uint kind, uint capacity, uint disabledSlots, uint instance, IReadOnlyCollection<CharacterInventory> rows)
+		{
+			var container = NewContainer(kind, capacity, disabledSlots, instance);
+			foreach (var row in (rows ?? [])
+			         .Where(r => r.Item is { Archetype: not 0 })
+			         .OrderBy(r => r.Slot))
+			{
+				var slot = (ulong)row.Slot;
+				container.Items.Add(SnapshotItemBuilder.BuildListEntry(slot, ItemId(instance, kind, slot), RecordId(instance, kind, slot), row.Count, row.Item, row.Item.Archetype));
+			}
+
+			return container;
 		}
 
 		// Unique within the character, stable across logins: epoch | kind | slot | instance-low. Internal so the

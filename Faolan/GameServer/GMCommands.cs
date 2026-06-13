@@ -173,7 +173,8 @@ namespace Faolan.GameServer
 				["guild"] = (client, arguments) => GuildCommand(client, arguments),
 				["money"] = (client, arguments) => MoneyCommand(client, arguments),
 				["buffs"] = (client, _) => BuffsCommand(client),
-				["spawnbag"] = (client, arguments) => SpawnBagCommand(client, arguments)
+				["spawnbag"] = (client, arguments) => SpawnBagCommand(client, arguments),
+				["bank"] = (client, arguments) => BankCommand(client, arguments)
 			};
 		}
 
@@ -363,6 +364,44 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, entity == null
 				? $"No spawnable NPC named '{name}' (needs a captured NpcSpawns row with spawn data; any map)."
 				: $"Spawned {entity.Name} (handle 0x{entity.Handle:X8}, level {entity.Level}{(entity.Hostile ? ", hostile" : "")}).");
+		}
+
+		// .bank  - open the BANK tab of the trader/auctionhouse window. The bank is the SAME NPC as the auction
+		// house (`.ah`), just a different tab: this opens the trader window (DispatchOpenTradepost, like `.ah`) and
+		// then sends the bank-tab content - container kind 105, delivered via a BankIIR (decoded,
+		// protocol_bank_storage). Built from the character's Container=105 rows (seeds a couple of random items the
+		// first time so there's something to see). PoC: in retail the bank tab content is sent when the player
+		// clicks the tab on the already-open window.
+		private async Task BankCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+
+			// The bank is a tab of the trader/AH window - open that window first (same as `.ah`).
+			var entity = PlayerWorldEntity(client);
+			if (entity != null)
+				await Tradepost.TradepostResponses.SendOpenTradepost(client, entity.Position);
+
+			var rows = await Database.GetCharacterInventory(characterId);
+			var bankRows = rows
+				.Where(r => r.Container == (int)FullCharSnapshotBuilder.BankKind)
+				.ToList();
+			if (bankRows.Count == 0)
+			{
+				// Seed a few random buildable items into the bank so it isn't empty.
+				var seed = await Database.GetRandomBuildableItems(3);
+				for (var i = 0; i < seed.Length; i++)
+					await Database.SetCharacterInventorySlot(characterId, (int)FullCharSnapshotBuilder.BankKind, i, seed[i].Id, 1);
+
+				rows = await Database.GetCharacterInventory(characterId);
+				bankRows = rows
+					.Where(r => r.Container == (int)FullCharSnapshotBuilder.BankKind)
+					.ToList();
+			}
+
+			var bank = FullCharSnapshotBuilder.BuildContainer(FullCharSnapshotBuilder.BankKind, 50, 30, characterId, bankRows);
+			await SendBank(client, bank);
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				$"Opened bank ({bank.Items.Count} items, container kind 105). PoC - the window may be NPC-interaction-gated like the old .shop.");
 		}
 
 		// .spawnbag  - drop a loot bag at your feet with a couple of random items + some coins (the same bag a kill
