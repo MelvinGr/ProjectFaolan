@@ -94,16 +94,17 @@ namespace Faolan.GameServer
 			var rootBytes = parts.Root.ToArray();
 			var prefix = parts.Prefix;
 
-			// DB containers in the WORLD-ENTRY snapshot (default ON; opt out FAOLAN_WORLDENTRY_DB_CONTAINERS=0):
-			// the only delivery that demonstrably drives both the bag AND the equipment doll - in-client verified
-			// 2026-06-12 (bag items + worn gear render; world loads; chat connects). The historical "any container
-			// mutation stalls world-load/chat" bisect PRE-DATES the ContentMirror; with resources served locally
-			// the substitution is safe. The post-load second-snapshot delivery is a dead end (the client ignores
-			// or rejects a second 0x737A6DF9 for the same identity), so this is the inventory delivery.
-			// KNOWN LIMIT: an item whose bag/icon resources are missing locally (e.g. 13826 Combatant's Hauberk,
-			// only ever captured WORN, never in an inventory) makes the client render the WHOLE bag empty - keep
-			// such items out of CharacterInventory until the resource gap is solved (TODO).
-			if (Environment.GetEnvironmentVariable("FAOLAN_WORLDENTRY_DB_CONTAINERS") != "0" && equipment != null)
+			// DB containers in the WORLD-ENTRY snapshot — now DEFAULT OFF (opt IN with FAOLAN_WORLDENTRY_DB_CONTAINERS=1).
+			// REGRESSION 2026-06-13: after this session's world-entry rework, the rebuilt root makes the client REJECT
+			// the player's own snapshot — AgeOfConan.log: "N3InfoItemRemote::Construct: ReadSubClass for IIR 1937403385
+			// (FullPlayerCharacterIIR) failed! Identity 50000:<charId>. Blob data may be inconsistant, data invalid".
+			// That invalid 0x737A6DF9 cascades: world entry never completes, character names don't render, and the
+			// client never connects to the CommunityServer (chat). The VERBATIM snapshot (this branch skipped) is valid
+			// and restores chat + names + name-on-healthbar (verified in-client 2026-06-13). The DB-container rebuild
+			// (AdjustSnapshotPrefixRootLength / FullCharSnapshotBuilder) needs to be re-proven byte-valid against a
+			// capture before it can be the default again — tracked in TODO.md. It DID render bag+doll on 2026-06-12,
+			// so the breakage is in a world-entry change since then, not the builder's original design.
+			if (Environment.GetEnvironmentVariable("FAOLAN_WORLDENTRY_DB_CONTAINERS") == "1" && equipment != null)
 			{
 				try
 				{
