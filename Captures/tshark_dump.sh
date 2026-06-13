@@ -24,7 +24,10 @@ fi
 
 # tcp.analyze_sequence_numbers:FALSE - Wireshark otherwise hides retransmitted frames from
 # the plugin, stalling compressed streams at gaps that a late retransmission would fill.
-tshark -r "$capture" -o tcp.analyze_sequence_numbers:FALSE -T json \
+# -Y faolan drops the non-game frames (pure ACKs etc.) and -J trims the emitted protocol tree
+# to just what the filter reads, shrinking tshark's JSON ~3.7x (484MB -> 131MB on the longload
+# capture) - byte-identical dump, but far less for jq to parse.
+tshark -r "$capture" -o tcp.analyze_sequence_numbers:FALSE -Y faolan -J "frame ip tcp faolan" -T json \
     | jq -f "$filter" > "$output"
 
 echo "$(jq '.Packets | length' "$output") packets -> $output"

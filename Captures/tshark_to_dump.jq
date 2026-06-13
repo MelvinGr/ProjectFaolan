@@ -11,6 +11,11 @@
 # Flattens a packet subtree (fields live at several nesting depths) into one lookup dict.
 def flat: [.. | objects | to_entries[] | select(.value | type == "string")] | from_entries;
 
+# Strips the colons tshark renders into FT_BYTES fields ("00:0b:.." -> "000b.."). MUST be a literal
+# split+join, NOT gsub(":";"") - gsub runs an oniguruma regex per match, which on the big compressed
+# bodies (hundreds of KB of hex) dominates the whole run (~30x slower; measured 3018ms -> 220ms).
+def dehex: split(":") | join("");
+
 {
   Packets: [
     .[]
@@ -39,8 +44,8 @@ def flat: [.. | objects | to_entries[] | select(.value | type == "string")] | fr
         ReceiverClass: $f["faolan.pkt.receiver_class"],
         ReceiverInstance: $f["faolan.pkt.receiver_instance"],
         Crc32: $f["faolan.pkt.crc"],
-        HeaderExtraHex: ($f["faolan.pkt.header_extra"] // "" | gsub(":"; "")),
-        BodyHex: ($f["faolan.pkt.body"] // $f["faolan.chat.body"] // "" | gsub(":"; ""))
+        HeaderExtraHex: ($f["faolan.pkt.header_extra"] // "" | dehex),
+        BodyHex: ($f["faolan.pkt.body"] // $f["faolan.chat.body"] // "" | dehex)
       }
   ]
 }
