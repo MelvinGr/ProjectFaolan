@@ -4,7 +4,8 @@ The single tracker for what's left. Each area links to its deep-dive doc for the
 
 - **Deep-dive design / RE detail:** `docs/*.md` (linked per section below).
 - **Resolved history & detailed diagnoses:** `docs/archive/todo-history.md` (the old TODO, verbatim),
-  `docs/archive/chat-regression-handoff.md` (SOLVED), `docs/archive/backpack-inventory-handoff.md` (RESOLVED).
+  `docs/archive/chat-regression-handoff.md` + `docs/archive/chat-handoff.md` (both SOLVED),
+  `docs/archive/backpack-inventory-handoff.md` (RESOLVED). FullChar snapshot framing: `docs/db-container-handoff.md`.
 - **Test method for in-client items:** server from `Faolan/bin/Debug` (`dotnet Faolan.dll`, cwd = bin/Debug);
   drive the client with `Faolan.ClientLauncher --console --universeaddr 127.0.0.1:7010 -u faolan -p any -c <char>`.
   Grab `AgeOfConan.log` on any failure (look for `stream bad`, `Dispatcher call ... failed`, `invalid camera
@@ -59,9 +60,10 @@ prior diagnoses are in `docs/archive/todo-history.md`.
         REJECTS — `AgeOfConan.log`: "N3InfoItemRemote::Construct: ReadSubClass for IIR 1937403385
         (FullPlayerCharacterIIR) failed! … Blob data may be inconsistant, data invalid". The client can't construct
         the player's OWN character, so world entry never completes → names don't render → no CommunityServer (chat).
-        The hint was the client log past the RDB noise. Fixed by flipping the flag to opt-IN (default = the proven
-        VERBATIM snapshot, which is byte-valid). Verified: FullPlayerCharacterIIR error gone, client reaches
-        "Authenticating with CommunityServer", opens the 7012 socket, names render. See new DB-container TODO below.
+        The hint was the client log past the RDB noise. Interim fix (5c7f2a8) defaulted to the verbatim snapshot to
+        restore chat; the REAL fix (85c2886) is the BE32 root-length framing — DB containers are back on. Verified:
+        FullPlayerCharacterIIR error gone, client reaches "Authenticating with CommunityServer", names render. See the
+        DB-container item below.
       - **#1 (the loading hang), commit 5c99a6a**: client flooded `RequestAggroStatus` (GameCharAgentProject
         `0x5B9756FC` method 0x2000) ~450× because we mis-dispatched it (read `[pbLength][pbOpcode]` off a body that
         is `[0xC350][player][0xC350][target]`, so "pbOpcode" == player instance → dropped as a client-ping). Routed
@@ -87,12 +89,11 @@ prior diagnoses are in `docs/archive/todo-history.md`.
 - [x] Normal-attack FSM re-test: the swing-1 BccAck now matches retail byte-for-byte (u32 argsLen fix, field3
       phase splice, 0xCB constant). VERIFIED in-client 2026-06-12 (Broken Oar equipped): armed swings land,
       no random/self-target. NOTE the earlier "broken attacks" were UNARMED (see next item).
-- [x] **Equipment window + bag now show the player's DB items** (2026-06-12, commit 20f2cc1): the world-entry
-      snapshot carries DB containers (default ON, FAOLAN_WORLDENTRY_DB_CONTAINERS=0 opts out) - the old
-      chat-gate constraint was the dead retail CDN, lifted by the ContentMirror. In-client verified incl.
-      equip-from-bag + persistence. En route: Socket partial-write truncation fixed (24fbed6); post-load
-      second-snapshot delivery retired (client rejects/ignores re-constructs - FAOLAN_POSTLOAD_INVENTORY=1
-      re-enables for experiments).
+- [x] **Equipment window + bag show the player's DB items** (2026-06-12 `20f2cc1`, BE32-framing fix 2026-06-13
+      `85c2886`): the world-entry snapshot carries DB containers unconditionally - the old chat-gate constraint was
+      the dead retail CDN, lifted by the ContentMirror. In-client verified incl. equip-from-bag + persistence. En
+      route: Socket partial-write truncation fixed (24fbed6); the post-load second-snapshot delivery is dead (the
+      client rejects/ignores re-constructs for an already-built identity).
 - [ ] **Bag-poison items**: an item only ever captured WORN (never in an inventory container) renders the
       WHOLE bag empty when placed in CharacterInventory (repro: 13826 Combatant's Hauberk; client shows
       VisualMeshLoader 1010001 misses). Likely missing local bag/icon resources. Detect/exclude such items in

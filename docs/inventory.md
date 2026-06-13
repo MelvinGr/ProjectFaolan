@@ -1,23 +1,34 @@
 # Inventory: the FullChar snapshot, delivery model, and equip moves
 
-Status 2026-06-12: **solved end-to-end in-client** (bag renders, equipment doll renders, equip/unequip
+Status 2026-06-13: **solved end-to-end in-client** (bag renders, equipment doll renders, equip/unequip
 persists and survives relog). Commits `20f2cc1` (delivery), `226b16f` (equip/unequip protocol), `24fbed6`
-(the socket partial-write fix that masked everything), `135b06f` (dead-path cleanup).
+(the socket partial-write fix that masked everything), `135b06f` (dead-path cleanup),
+`85c2886` (the BE32 root-length framing recovered via Ghidra — the final fix).
 
 ## The snapshot (0x737A6DF9 FullPlayerCharacterIIR)
 
-Body = `[subop][0000C350][instance]` + **8-byte IIR prefix** + **protobuf root** + **tails**.
+The body is read by `n3InfoItemRemote::Construct` (decompiled from `AgeOfConan.exe` — `docs/re/`,
+`docs/db-container-handoff.md`), all **big-endian**:
 
-- Prefix = `[u32 base version = 2][varint = 4483 + rootLength][81 06]`. The varint is the client's root
-  delimiter: regenerate the root and the varint MUST track its length (`AdjustSnapshotPrefixRootLength`,
-  or `BeachSnapshotPrefix.Build` from scratch) or the client misframes the tails version
-  (`CoreFullPlayerCharacterIIR::ReadSubClass() Wrong IIR_t version ...`).
-- Root = `ProtoFullCharacterIIR` (recovered schema, byte-exact round-trip on 37/39 captured snapshots):
+```
+[u32 KEY = subop = 0x737A6DF9][u32 identity.type = 50000 (0xC350)][u32 identity.instance]
+[u8 flag][u32 BE blobLen][protobuf blob = blobLen bytes][u32 BE version = 0x18][tails]
+```
+
+- **The protobuf root is length-prefixed by a 4-byte BIG-ENDIAN length** (`FUN_00cbfb80` reads exactly
+  `blobLen` bytes, then `ReadSubClass` reads the `0x18` version). The "blob" = `field5` (the constant
+  `28 81 06` = protobuf field 5 varint 769) + the FullCharacterIIR root, so **`blobLen = field5Len + rootLen`**
+  (`field5Len = prefix.Length - 5`). Regenerate the root and that BE32 length MUST be rewritten
+  (`GameServerListener.SetSnapshotBlobLength`) or the client reads the version from the wrong place and rejects
+  the FullChar (`CoreFullPlayerCharacterIIR::ReadSubClass() Wrong IIR_t version ...`). The captured 8-byte
+  prefix `00 00 00 02 ae 28 81 06` is really `[00 = flag][00 00 02 ae = blobLen 686][28 81 06 = field5]`.
+  (The earlier `varint = 4483 + rootLength` / `AdjustSnapshotPrefixRootLength` model was byte-misaligned and is
+  retired; `4483` was a coincidence of two near-equal-length captures.)
+- Root = `ProtoFullCharacterIIR` (recovered schema, byte-exact round-trip on the captured snapshots):
   field 6 × N = the containers (Equipped 101 / Bag 104 / Resource 112 / Quest 113), then fields 7, 8.
 - Tails = the 9282-byte record/XML region starting `00 00 00 18` (subclass version 24). Carried from the
   capture with live level/vitals/XP patched (`BigboyTailsFile`); a from-scratch template build exists
-  (`BeachTailsBuilder` + `BeachSnapshotPrefix`, golden tests `BeachSnapshotConstructionTests`) for the
-  construct direction.
+  (`BeachTailsBuilder`, golden tests `BeachSnapshotConstructionTests`) for the construct direction.
 
 Containers are built wholesale from the DB (`FullCharSnapshotBuilder.BuildContainers`:
 `CharacterEquipment` + `CharacterInventory` rows; entry = `SnapshotItemBuilder.BuildListEntry`, identity =
@@ -27,8 +38,7 @@ Containers are built wholesale from the DB (`FullCharSnapshotBuilder.BuildContai
 
 1. **The world-entry snapshot is THE inventory delivery** - it feeds both the bag window and the equipment
    doll, and nothing re-feeds them later. `BuildBeachInventoryPacket` substitutes the player's DB containers
-   into the (instance-rewritten) captured snapshot, default ON (`FAOLAN_WORLDENTRY_DB_CONTAINERS=0` opts
-   out to verbatim captured containers).
+   into the (instance-rewritten) captured snapshot unconditionally (and rewrites the BE32 blob length).
 2. **The old "any container mutation stalls world-load/chat" rule is obsolete.** That bisect pre-dated the
    ContentMirror: the stall was the client thrashing on item resources it couldn't fetch from the dead
    retail CDN. With the mirror serving resources, substitution is in-client verified safe.
