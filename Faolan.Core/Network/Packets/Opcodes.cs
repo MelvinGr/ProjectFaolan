@@ -270,7 +270,11 @@
 			AckAuthentication = 0x2001,
 			ReadyForPlayScreen = 0x2024,
 			SpawnCheck = 0x2008,
-			LatencyCheckResponse = 0x2082
+			LatencyCheckResponse = 0x2082,
+			// GameCharInterface.DispatchAddItem (recovered name, exact): the incremental "an item appeared in your
+			// inventory" delivery - the live counterpart to the world-entry snapshot. Body decoded + golden-tested
+			// (DispatchAddItemTests); the keystone for live loot/buy/quest-reward/mail item grants.
+			AddItem = 0x2020
 		}
 
 		// --- Full client->server method catalogs for the GameServer connection's RPC classes, generated from

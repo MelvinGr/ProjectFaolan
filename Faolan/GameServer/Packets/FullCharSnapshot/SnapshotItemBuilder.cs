@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Packets;
@@ -19,6 +20,11 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 	// proven to re-serialize the wire byte-for-byte (AocProtocolDecodeTests).
 	public static class SnapshotItemBuilder
 	{
+		// One (stat id, value) record of a ProtoInventoryGameEntry.stat_list. The world-entry snapshot uses a
+		// fixed triple (BuildListEntry below); the incremental DispatchAddItem (0x2020) s2c carries a richer,
+		// per-instance set captured from retail, so BuildInventoryEntry takes the stat list as a parameter.
+		public readonly record struct ItemStat(uint Stat, uint Value);
+
 		public static ProtoField BuildEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, uint archetype, ulong flags = 1, ulong f7 = 1)
 		{
 			var entry = BuildListEntry(slot, itemId, recordId, count, item, archetype, flags, f7);
@@ -36,8 +42,29 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			};
 		}
 
-		// The typed form, used directly by FullCharSnapshotBuilder's generated containers.
+		// The typed form, used directly by FullCharSnapshotBuilder's generated containers. The world-entry snapshot
+		// entry carries the fixed (flags, recordId, count) stat triple.
 		public static ProtoInventoryGame.InventoryListEntry BuildListEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, uint archetype, ulong flags = 1, ulong f7 = 1)
+		{
+			return new ProtoInventoryGame.InventoryListEntry
+			{
+				Pos = (uint)slot,
+				Item = BuildInventoryEntry(itemId, item, archetype,
+					new[]
+					{
+						new ItemStat(0, (uint)flags),
+						new ItemStat(23, (uint)recordId),
+						new ItemStat(26, (uint)count)
+					},
+					f7)
+			};
+		}
+
+		// Builds the bare per-item entry (ProtoInventoryGameEntry, i.e. InventoryListEntry.item without the Pos
+		// wrapper) from a DB template + per-instance state and an explicit stat list. This is the form
+		// GameCharInterface.DispatchAddItem (s2c 0x2020) carries as i_cEntry - the live, mid-session counterpart
+		// to the world-entry snapshot; there the slot rides separately as i_nItemPos, so no Pos wrapper.
+		public static ProtoInventoryGameEntry BuildInventoryEntry(ulong itemId, Item item, uint archetype, IEnumerable<ItemStat> stats, ulong level = 1)
 		{
 			var key = new ProtoDecryptionKey
 			{
@@ -47,42 +74,25 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 				Key4 = item.Data4
 			};
 
-			return new ProtoInventoryGame.InventoryListEntry
+			var entry = new ProtoInventoryGameEntry
 			{
-				Pos = (uint)slot,
-				Item = new ProtoInventoryGameEntry
+				ItemId = itemId,
+				ItemData = new ProtoAcgItem
 				{
-					ItemId = itemId,
-					StatLists =
-					{
-						new ProtoInventoryGameEntry.StatValue
-						{
-							Stat = 0,
-							Value = (uint)flags
-						},
-						new ProtoInventoryGameEntry.StatValue
-						{
-							Stat = 23,
-							Value = (uint)recordId
-						},
-						new ProtoInventoryGameEntry.StatValue
-						{
-							Stat = 26,
-							Value = (uint)count
-						}
-					},
-					ItemData = new ProtoAcgItem
-					{
-						Key1 = key,
-						Key2 = key,
-						Key3 = key,
-						Template1 = item.Id,
-						Template2 = item.Id,
-						Level = (uint)f7,
-						Hash = archetype
-					}
+					Key1 = key,
+					Key2 = key,
+					Key3 = key,
+					Template1 = item.Id,
+					Template2 = item.Id,
+					Level = (uint)level,
+					Hash = archetype
 				}
 			};
+
+			foreach (var stat in stats)
+				entry.StatLists.Add(new ProtoInventoryGameEntry.StatValue { Stat = stat.Stat, Value = stat.Value });
+
+			return entry;
 		}
 
 		// Convenience overload: an item is buildable iff it has an archetype (DB column, harvested from captures).
