@@ -53,6 +53,13 @@ namespace Faolan.GameServer.World
 					if (inRange.Contains(knownHandle))
 						continue;
 
+					// A player-only pass (includeNonPlayers=false, e.g. world entry) computes inRange from PLAYERS
+					// only, so every NPC the mover knows would look "out of range" here and be wrongly despawned -
+					// wiping the entry seeding and re-streaming the entire zone on the first move (the loader flood).
+					// Only prune NPCs on passes that actually manage NPCs; players are always managed.
+					if (!includeNonPlayers && zone.TryGet(knownHandle, out var known) && !known.IsPlayer)
+						continue;
+
 					mover.Known.Remove(knownHandle);
 					if (zone.TryGet(knownHandle, out var gone))
 						events.Add(new InterestEvent(mover, gone, InterestEventType.Despawn));

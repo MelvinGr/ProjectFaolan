@@ -113,10 +113,12 @@ namespace Faolan.GameServer.World
 		// After world entry (spawn body now captured): spawn the player to nearby players and them to the player.
 		// NPC streaming is deliberately NOT run here - the world-burst replay already rendered the entry-point NPCs
 		// and piling more spawns onto the load can reshape the burst's TCP segmentation and stall the client. Instead
-		// we (a) seed the burst NPCs into the player's Known set so the first move doesn't re-spawn them, and (b)
-		// register every in-range model NPC's handle -> name for conversation routing (so e.g. Kalanthes, whose burst
-		// handle differs from his captured-conversation handle, still resolves to his dialogue). NPCs the burst did
-		// not cover stream in on the first move (BroadcastPlayerMove, includeNonPlayers).
+		// we seed EVERY in-range model NPC into the player's Known set (and register its handle -> name for
+		// conversation routing), so the first move re-spawns none of them. The burst already rendered the NPCs retail
+		// shows at this vantage; the remaining in-range model NPCs are cross-session capture dupes (the model is the
+		// union of all sessions, ~2-4x retail's count) that retail does NOT render here - leaving them Known-but-unsent
+		// keeps the entry view == the burst == retail and avoids the spawn flood that crashes the client on the first
+		// move. NPCs OUTSIDE entry range (e.g. Casilda) are not seeded, so they still stream in as the player moves.
 		public async Task BroadcastPlayerEntry(INetworkClient client)
 		{
 			var entity = _sim.PlayerWorldEntity(client);
@@ -137,25 +139,26 @@ namespace Faolan.GameServer.World
 				return;
 			}
 
-			// The handles the world-burst replay already rendered (RecordSpawnedNpcName populated this during the
-			// replay, before this runs). Snapshot them so we can tell burst NPCs (already on screen) from the rest.
-			var burstHandles = new HashSet<uint>(client.Session.SpawnedNpcNamesByHandle.Keys);
-
+			var seeded = 0;
 			foreach (var npc in zone.EntitiesInRange(entity.Position, WorldSimulation.PlayerInterestRange, entity.Handle))
 			{
-				if (npc.IsPlayer || npc.IsLoot || npc.Name == null || !burstHandles.Contains(npc.Handle))
+				if (npc.IsPlayer || npc.IsLoot || npc.Name == null)
 					continue;
 
-				// A burst-rendered NPC that is also in the model: mark it Known so the first move doesn't re-spawn it,
-				// and re-register its name from the model (authoritative) so the clicked-handle -> name -> conversation
-				// lookup resolves correctly even if the burst body's name read was off. NPCs the burst did NOT render
-				// are left out of Known so they stream in on the first move (and get named in DispatchInterest then).
+				// Mark it Known so the first move doesn't (re)spawn it, and register its handle -> name from the model
+				// (authoritative) so the clicked-handle -> name -> conversation lookup resolves. Burst NPCs share the
+				// burst wire handle (EnsureZoneNpcs aligns them by position), so this lines up with what the client
+				// rendered; non-burst in-range dupes are simply never sent.
 				entity.Known.Add(npc.Handle);
 				client.Session.SpawnedNpcNamesByHandle[npc.Handle] = npc.Name;
+				seeded++;
 			}
 
+			// Player-only interest (the burst already placed the NPCs; do NOT include non-players here or we re-stream
+			// the whole zone). The ResolveMove player-only pass preserves the NPC Known entries seeded above.
 			var events = InterestManager.ResolveMove(zone, entity, WorldSimulation.PlayerInterestRange);
 			await DispatchInterest(events, null);
+			_logger.LogInformation("World entry: {Name} seeded {Seeded} in-range NPC(s) into Known (suppresses first-move re-stream).", entity.Name, seeded);
 		}
 
 		// After a player's Move: update interest and broadcast the resulting spawns/moves to nearby players.
