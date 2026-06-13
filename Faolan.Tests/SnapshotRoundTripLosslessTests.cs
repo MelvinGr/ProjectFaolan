@@ -18,7 +18,7 @@ namespace Faolan.Tests
 	// edit must reproduce the captured root exactly; otherwise the rebuilt root would differ from a valid one before
 	// we even touch the containers, and the client rejects it ("ReadSubClass for IIR 1937403385
 	// (FullPlayerCharacterIIR) failed"). This proves the round-trip is NOT the source of the 2026-06-13 regression -
-	// it does not drop the per-container 0x18 subclass version byte (the suspect in docs/db-container-handoff.md).
+	// it does not drop the per-container 0x18 subclass version byte (the suspect in docs/archive/db-container-handoff.md).
 	public class SnapshotRoundTripLosslessTests
 	{
 		private const string CapturesDir = "/home/melvin/Development/C#/Project Faolan/Captures";

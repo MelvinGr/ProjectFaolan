@@ -5,7 +5,7 @@ server mis-dispatched it, hanging the loading screen (`5c99a6a`, route GameCharA
 class id and reply `[0xC350][target][0]`); (2) the DB-container world-entry `0x737A6DF9` snapshot rejected the
 player's own FullChar — the snapshot's protobuf root is length-prefixed by a 4-byte BE length the server wrote
 wrong on resize (interim verbatim default `5c7f2a8`, real fix `85c2886` = `SetSnapshotBlobLength`; framing in
-`docs/db-container-handoff.md`). Chat connects, names render, the bag shows the player's DB items. The
+`docs/archive/db-container-handoff.md`). Chat connects, names render, the bag shows the player's DB items. The
 investigation notes below are kept verbatim for the method (live-client log triage past the RDB/resource noise).
 
 ---

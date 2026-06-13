@@ -8,7 +8,7 @@ persists and survives relog). Commits `20f2cc1` (delivery), `226b16f` (equip/une
 ## The snapshot (0x737A6DF9 FullPlayerCharacterIIR)
 
 The body is read by `n3InfoItemRemote::Construct` (decompiled from `AgeOfConan.exe` — `docs/re/`,
-`docs/db-container-handoff.md`), all **big-endian**:
+`docs/archive/db-container-handoff.md`), all **big-endian**:
 
 ```
 [u32 KEY = subop = 0x737A6DF9][u32 identity.type = 50000 (0xC350)][u32 identity.instance]

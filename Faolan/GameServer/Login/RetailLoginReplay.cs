@@ -96,7 +96,7 @@ namespace Faolan.GameServer
 
 			// Substitute the player's DB containers into the WORLD-ENTRY snapshot (the bag + equipment doll).
 			// In-client verified 2026-06-13: chat connects, names render, the bag shows the player's real DB items.
-			// FRAMING (recovered from AgeOfConan.exe via Ghidra, 2026-06-13 — see docs/db-container-handoff.md):
+			// FRAMING (recovered from AgeOfConan.exe via Ghidra, 2026-06-13 — see docs/archive/db-container-handoff.md):
 			// n3InfoItemRemote::Construct reads the body as [u32 KEY=subop][u32 identity.type=50000][u32 instance]
 			// [u8 flag][u32 BE blobLen][protobuf blob = blobLen bytes][u32 BE version=0x18][tails subclass]. The
 			// "blob" = [field5 (the captured `28 81 06`, = our parts.Prefix[5..])] + [the FullCharacterIIR root =
@@ -178,7 +178,7 @@ namespace Faolan.GameServer
 		// FullCharacterIIR root, then expects the 0x18 version. So blobLen = field5Len + rootLength, written as a
 		// 4-byte big-endian int at prefix offset 1. (This SUPERSEDES AdjustSnapshotPrefixRootLength, which adjusted
 		// a byte-misaligned protobuf-varint model and corrupted the real length on resize — see
-		// docs/db-container-handoff.md / [[protocol_containeradditem]].) field5Len = prefix.Length - 5 (the flag +
+		// docs/archive/db-container-handoff.md / [[protocol_containeradditem]].) field5Len = prefix.Length - 5 (the flag +
 		// the 4 length bytes); the captured field5 bytes at prefix[5..] are preserved unchanged.
 		internal static byte[] SetSnapshotBlobLength(byte[] prefix, int rootLength)
 		{

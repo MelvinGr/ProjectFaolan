@@ -14,7 +14,7 @@ namespace Faolan.GameServer
 {
 	// GameCharInterface.DispatchAddItem (s2c 0x2020) - the incremental "an item appeared in your inventory"
 	// delivery. [[protocol_containeradditem]] had recorded "no server add-item packet; the snapshot is the only
-	// delivery"; the RPC-opcode recovery disproved that (docs/opcode-recovery-unblocks-handoff.md §1). This is
+	// delivery"; the RPC-opcode recovery disproved that (docs/archive/opcode-recovery-unblocks-handoff.md §1). This is
 	// the live, mid-session counterpart to the world-entry FullChar snapshot, and the keystone for granting
 	// loot / vendor-buy / quest-reward / mail items without a relog.
 	//

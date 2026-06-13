@@ -5,7 +5,7 @@ The single tracker for what's left. Each area links to its deep-dive doc for the
 - **Deep-dive design / RE detail:** `docs/*.md` (linked per section below).
 - **Resolved history & detailed diagnoses:** `docs/archive/todo-history.md` (the old TODO, verbatim),
   `docs/archive/chat-regression-handoff.md` + `docs/archive/chat-handoff.md` (both SOLVED),
-  `docs/archive/backpack-inventory-handoff.md` (RESOLVED). FullChar snapshot framing: `docs/db-container-handoff.md`.
+  `docs/archive/backpack-inventory-handoff.md` (RESOLVED). FullChar snapshot framing: `docs/archive/db-container-handoff.md`.
 - **Test method for in-client items:** server from `Faolan/bin/Debug` (`dotnet Faolan.dll`, cwd = bin/Debug);
   drive the client with `Faolan.ClientLauncher --console --universeaddr 127.0.0.1:7010 -u faolan -p any -c <char>`.
   Grab `AgeOfConan.log` on any failure (look for `stream bad`, `Dispatcher call ... failed`, `invalid camera
@@ -80,7 +80,7 @@ prior diagnoses are in `docs/archive/todo-history.md`.
       two near-equal-length captures). Decompiled `AgeOfConan.exe`: `n3InfoItemRemote::Construct` → `FUN_00cbfb80`
       reads `[u32 BE blobLen][blob]`, then `ReadSubClass` reads the `0x18` version; `blobLen = field5Len + rootLen`.
       FIX = `GameServerListener.SetSnapshotBlobLength` (writes BE32 at prefix offset 1), called by
-      `BuildBeachInventoryPacket`. Framing in `docs/db-container-handoff.md`; decompiles in `docs/re/`; golden test
+      `BuildBeachInventoryPacket`. Framing in `docs/archive/db-container-handoff.md`; decompiles in `docs/re/`; golden test
       `Faolan.Tests/SnapshotBlobLengthTests.cs`. (`FAOLAN_WORLDENTRY_DB_CONTAINERS` env flag removed.)
 
       (historical detail kept for reference) The client never opened a TCP socket to **AgentServer (7012)** even
@@ -441,6 +441,10 @@ tag system exists. → memory `lua_vm`, `protocol_conversation_routing`; `docs/a
       the safety net, then delete the embedded file. Catch: the burst weaves the live instance id into ~324
       packets via `AppendVarint` — needs a template-with-substitution capture, not a flat blob. Verifiable
       without the client (the byte-equality oracle).
+- [ ] Remove the dead `AdjustSnapshotPrefixRootLength` (the old byte-misaligned prefix-length model, superseded by
+      `SetSnapshotBlobLength` — see `docs/archive/db-container-handoff.md`). It survives only in
+      `BeachSnapshotPrefix.cs` / `RetailLoginReplay.cs` for `SnapshotPrefixLengthTests`; migrate that test to the
+      `SetSnapshotBlobLength` framing and delete the old method. Small, safe.
 - [ ] Fold `Packets.cs` sender-bytes duplication into `World/WorldFraming` (verify which conversation senders are
       truly identical before merging). Small, safe.
 - [ ] Rename `Packets/FullCharSnapshot/BigboyTailsFile.cs` to something descriptive. Trivial.
