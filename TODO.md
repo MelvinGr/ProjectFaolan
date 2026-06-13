@@ -171,6 +171,29 @@ Full detail: `docs/archive/spawn-dissection-plan.md`.
         handle/name/typeId/mode/field3 if the click still closes the window). Residual: unique NPCs captured at
         spots >8 units apart (Casilda ~87u, one extra Kalanthes ~35u) still render as 2 — a NpcSpawns data-quality
         artifact, not a streaming bug.
+  - [~] **NPC spawn deep-dive (2026-06-13, session 2) — Casilda still invisible, root causes found, NOT solved.**
+        Loopback captures of our own world-entry (`Captures/loopback*.pcapng`, our output) diffed against the
+        retail `randochar-...-kalantes_chat` capture. KEY FINDINGS:
+    - **Burst-vs-interest DOUBLE-SPAWN is the real bug** (TODO #5): the `Known`-seeding in `BroadcastPlayerEntry`
+      does NOT take (the first interest pass shows `now knows 98` from 0), so the burst's ~41 NPCs are re-streamed
+      on the first move → ~138 spawns on the wire vs retail's ~43. This is benign for rendering (client dedups by
+      handle) but is the **packet flood behind the loader crashes**. FIX THIS FIRST.
+    - **The model is the UNION of all capture sessions** (491 NpcSpawns rows → 168 model → ~98 in range): we
+      accumulate every session's NPCs, so ~4× retail's count (35 crocs vs 7, 25 pillagers vs 11). The burst path
+      replays ONE session (~43, retail-shaped); the FA015807-individual path (flag `FAOLAN_NPC_INDIVIDUAL_SPAWN`,
+      default OFF) streams the whole union → crashes the loader. Needs cross-session mob dedup to be viable.
+    - **Casilda's spawn body is NOT the blocker**: her FA015807 IIR is byte-identical to the retail capture where
+      she renders (only transient `SpawnAnimation` differed: 1→0, now normalized via `NpcSpawnBuilder` freshSpawn).
+      She is sent (twice, the phantom 448 dup now deduped by name) and still does not draw. Her pre-IIR/IIR differ
+      from retail only in the cross-session ways Pillager (renders) also differs. The mesh/RDB errors in
+      `AgeOfConan.log` are RED HERRINGS — the same client renders fine on retail (content proxy running).
+    - **Nameplates**: only Kalanthes shows a (frame) name; mobs show neither floating tag nor frame name. Retail
+      floats name+healthbar over every NPC. Cause unknown; the `96C46740` MoveTask pairing did NOT fix it (and
+      crashed the loader via packet doubling — reverted). The `n3ToClientQuit … e_Impossible` client warning is
+      benign (our despawn body is byte-identical to retail's; sender-instance 0x58 vs 0x08 makes no difference).
+    - **NEXT**: (1) fix the double-spawn seeding (#5) to kill the flood; (2) then a focused IIR FIELD-level diff of
+      our Casilda vs retail (there was a ~1-byte/off-by-one shift in the IIR region worth chasing); (3) the
+      nameplate question. Handoff prompt: `docs/npc-spawn-handoff.md`.
 - [ ] Inventory add/remove client stall — semantic / client-side, not a packet defect.
 - [ ] MoveTask mode-00 "approach/face" param floats + a `PatrolPath` table to source waypoints.
 - [ ] Fold the pre-IIR / post-IIR scaffolds into rows.
