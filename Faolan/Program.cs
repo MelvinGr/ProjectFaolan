@@ -45,6 +45,9 @@ namespace Faolan
 				: LogLevel.Information);
 			builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
 
+			builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
+			builder.Logging.AddFilter("ModelContextProtocol.Server.McpServer", LogLevel.Warning);
+
 			builder.Logging.AddSimpleConsole(options =>
 			{
 				options.IncludeScopes = true;
