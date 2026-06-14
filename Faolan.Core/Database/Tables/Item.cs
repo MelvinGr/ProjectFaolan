@@ -41,5 +41,11 @@ namespace Faolan.Core.Database.Tables
 		public uint Data2 { get; set; }
 		public uint Data3 { get; set; }
 		public uint Data4 { get; set; }
+
+		// The auction-house SEARCH CATEGORY id the client queries by (e.g. 30000/30030, NOT the template id) - the
+		// FIRST u32 of the decrypted RDB item-template body (template[12..16]). Decoded from the client RDB
+		// (RdbItemImporter), validated byte-for-byte against 170 captured AH listings. 0 when unknown (not RDB-imported).
+		// Used to file a player's listing under the right item-type search node (issue #181).
+		public uint SearchCategory { get; set; }
 	}
 }

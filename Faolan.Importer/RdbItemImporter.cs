@@ -80,7 +80,7 @@ namespace Faolan.Importer
 			if (dumpDir != null)
 				Directory.CreateDirectory(dumpDir);
 
-			int decrypted = 0, noEntry = 0, headerMismatch = 0, decryptFailed = 0, namesAdded = 0;
+			int decrypted = 0, noEntry = 0, headerMismatch = 0, decryptFailed = 0, namesAdded = 0, categoriesAdded = 0;
 			var firstSampleShown = false;
 
 			foreach (var item in items)
@@ -125,6 +125,16 @@ namespace Faolan.Importer
 
 				decrypted++;
 
+				// The AH search CATEGORY is the first u32 of the template body (right after the 12-byte RDB-Id header).
+				// Validated byte-for-byte against 170 captured AH listings (#181). Lets a player's listing be filed
+				// under the item-type search node the client queries by, for EVERY item - not just captured ones.
+				var category = BinaryPrimitives.ReadUInt32LittleEndian(template.AsSpan(12, 4));
+				if (category != item.SearchCategory)
+				{
+					item.SearchCategory = category;
+					categoriesAdded++;
+				}
+
 				// Fill the display name only when we don't already have one (captured names are authoritative).
 				if (string.IsNullOrWhiteSpace(item.Name))
 				{
@@ -147,10 +157,10 @@ namespace Faolan.Importer
 				}
 			}
 
-			if (namesAdded > 0)
+			if (namesAdded > 0 || categoriesAdded > 0)
 				await db.SaveChangesAsync();
 
-			return new Result(items.Count, decrypted, noEntry, headerMismatch, decryptFailed, namesAdded);
+			return new Result(items.Count, decrypted, noEntry, headerMismatch, decryptFailed, namesAdded, categoriesAdded);
 		}
 
 		private static bool IsPrintableAscii(ReadOnlySpan<byte> s)
@@ -164,6 +174,6 @@ namespace Faolan.Importer
 			return true;
 		}
 
-		public readonly record struct Result(int Keyed, int Decrypted, int NoEntry, int HeaderMismatch, int DecryptFailed, int NamesAdded);
+		public readonly record struct Result(int Keyed, int Decrypted, int NoEntry, int HeaderMismatch, int DecryptFailed, int NamesAdded, int CategoriesAdded);
 	}
 }

@@ -503,6 +503,13 @@ namespace Faolan.Core.Database
 		public async Task<uint?> GetItemSearchCategory(uint template)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
+
+			// Prefer the RDB-decoded category on the item template (covers EVERY item, not just captured ones).
+			var item = await ctx.Items.FirstOrDefaultAsync(i => i.Id == template);
+			if (item is { SearchCategory: > 0 })
+				return item.SearchCategory;
+
+			// Fallback: recover it from captured listings (the items seen in AH captures) for DBs without an RDB import.
 			var categories = await ctx
 				.TradepostListings
 				.Where(l => l.Template == template && l.ItemId != l.Template)
