@@ -245,13 +245,14 @@ prior diagnoses are in `docs/archive/todo-history.md`.
       requirements, kept them, and chat stayed connected throughout — i.e. the bag rendered, no IIR error, session
       intact. Overturns the long-standing "snapshot is the only delivery" belief. (Worn-only items in a bag still
       risk the relog bag-poison; level-appropriate selection is gated on RDB item levels not yet in the DB.)
-- [~] **Live item REMOVE — `DispatchRemoveItem` (s2c 0x201F)** — builder DONE 2026-06-14 (NEEDS IN-CLIENT). Decoded
+- [x] **Live item REMOVE — `DispatchRemoveItem` (s2c 0x201F)** — DONE + IN-CLIENT VERIFIED 2026-06-14. Decoded
       from the hoxxling/strickenbla gameplay captures: body = `[container ID32 = type+charId][u32 itemPos][u32
       amountToRemove]` (16 B; every captured remove is container 0x71/equipped, pos 0, amount 0). Byte-exact builder
       `WriteRemoveItemBody`/`SendRemoveItem` + `RemoveItemFromBackpack` (clears the persisted `CharacterInventory`
       cell AND pushes the live remove), golden test `DispatchRemoveItemTests`, wired to a `.removeitem <slot>` GM
-      command (the inverse of `.additem`). IN-CLIENT GATE: `.additem` then `.removeitem <slot>` → the item should
-      vanish from the bag without a relog. (Also surfaces the bag-poison cleanup need for worn-only items.)
+      command (the inverse of `.additem`). IN-CLIENT VERIFIED 2026-06-14: `.additem 13817` → Dusklight Tunic in bag
+      slot 0, `.removeitem 0` → item vanished without a relog, chat stayed connected. (Also surfaces the bag-poison
+      cleanup need for worn-only items.)
 - [ ] Click a dropped loot bag → loot window opens, bag stays; `loot all` grants its items (live `DispatchAddItem`)
       + coins (`TryLootCash`); close/expire → it fades. Bags now carry random items (kill drop + `.spawnbag`); the
       loot-WINDOW item list display (DispatchReplyLootForCharacter*) is still undecoded — grant works via loot-all.
@@ -560,24 +561,31 @@ tag system exists. → memory `lua_vm`, `protocol_conversation_routing`; `docs/a
       `RunGmCommand(client.Session.Character.Id, message)` instead of (or before) the `_claudeChannel.Append`
       bridge. Decide whether GM-command lines should still echo into the bridge log (probably skip, to avoid
       Claude "replying" to a command).
-- [ ] **Add Claude to the friends list** (Melvin, 2026-06-13): see whether the synthetic Claude identity
-      (ClaudeChannel.SenderId 0xC1A0DE05, the 0x0014-announced "Claude" sender) can appear on a player's
-      in-game friends list - needs the friends-list protocol decoded first (add/remove/status packets are
-      uncaptured; capture a retail friend-add to start). Whispers to Claude already route to the MCP bridge,
-      so a friends entry would mainly give presence/easy access.
+- [ ] **Friends list** (Melvin, 2026-06-14): decode + implement the in-game friends list — add/remove a friend,
+      online/offline presence, and the friends-window population on login. Protocol is uncaptured; capture a retail
+      friend add/remove + a friend coming online to recover the packets (likely an AgentServer/CSPlayerAgent family,
+      same neighbourhood as channel subs / whispers). Backing store = a `CharacterFriend` table (owner id, friend id,
+      added-at). Persistence + presence push mirror the chat/guild patterns already in place.
+  - [ ] **Add Claude as a 'virtual' friend** (sub-item): see whether the synthetic Claude identity
+        (`ClaudeChannel.SenderId` 0xC1A0DE05, the 0x0014-announced "Claude" sender) can be injected into a player's
+        friends list as an always-online entry — a virtual friend with no real character behind it. Whispers to
+        Claude already route to the MCP bridge, so a friends entry would mainly give presence + one-click access.
+        Gated on the friends-list protocol above; the open question is whether the client accepts a friend whose id
+        isn't a real character/account (may need a fabricated presence record).
 - [ ] **Player↔player trade, quest sharing, team quests** (opcode-recovery handoff §5 — full named families
       recovered, never implemented; gated on grouping/trading being picked up): trade `0x2068`–`0x2074`
       (RequestTrade / StartTrade / cash / add-remove item / accept), quest-share `0x2047`–`0x204C`
       (NextQuestAvailable / QuestShare* / UpdateTeamQuestList). Fully specified for whenever grouping lands; each
       builder needs a byte-exact capture/golden test.
-- [~] **On-screen feedback / notification overlay (`FormatFeedbackIIR` 0x8D5A8B6B)** — builder DONE 2026-06-14
-      (NEEDS IN-CLIENT). The top-of-screen FIFO banners + feedback lines (zone-name reveal, pickup notices, buff
+- [x] **On-screen feedback / notification overlay (`FormatFeedbackIIR` 0x8D5A8B6B)** — DONE + IN-CLIENT VERIFIED
+      2026-06-14. The top-of-screen FIFO banners + feedback lines (zone-name reveal, pickup notices, buff
       worn, attribute up) — NOT chat. Carried as an IIR on the world conversation (opcode 0x2000, WorldFraming);
       the FIFO banner uses the `showfifomessagefromserver(...)|<Template>` token family (`GenericDisplayAreaName`,
       `GenericSimpleDynelPickup`, ...). Grammar decoded + byte-exact `FormatFeedbackCodec` (golden test
       `FormatFeedbackCodecTests`), live `SendFeedback` + a `.feedback` GM command that pops the proven area-name
-      banner. → `docs/on-screen-feedback.md`. IN-CLIENT GATE: `.feedback` → a banner should appear at the top of the
-      screen. Follow-ups: arbitrary literal text (the templates reference a localized RDB string id), then route
+      banner. → `docs/on-screen-feedback.md`. IN-CLIENT VERIFIED 2026-06-14: `.feedback` → "Castle approach" banner
+      appeared at the top of the screen, separate from chat. Follow-ups: arbitrary literal text (the templates
+      reference a localized RDB string id), then route
       "Resurrection point discovered" etc. through it instead of chat (`WorldSimulation.SendSystemMessage`).
 - [ ] **World/system chat via `ChatTextIIR` (0xE0B51102)** (from `docs/chat.md`): a GameServer remoteformat-XML
       chat path seen once in captures, not implemented — the local-say `0x0022` path covers player say for now.

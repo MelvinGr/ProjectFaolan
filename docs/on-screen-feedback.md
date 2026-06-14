@@ -51,8 +51,9 @@ from the session** — not just a verbatim replay.
 - ✅ Decoded + byte-exact builder + golden test (`FormatFeedbackCodecTests`, round-trips the captured area-name
   banner and the LostGraceEffect line).
 - ✅ Live send wired: `SendFeedback(client, xml, ...)` (world framing + opcode 0x2000) and the `.feedback` GM
-  command, which replays the proven `GenericDisplayAreaName` banner addressed to the live session. **NEEDS an
-  in-client pass** to confirm it pops the banner.
+  command, which replays the proven `GenericDisplayAreaName` banner addressed to the live session. **IN-CLIENT
+  VERIFIED 2026-06-14**: `.feedback` on a live session (Darktemplarchar) popped the "Castle approach" banner at the
+  top of the screen, separate from chat.
 - ⬜ **Arbitrary literal text**: the FIFO templates reference a localized RDB string id (the area-name points at
   string 3474586), so showing custom text needs either a literal-text FIFO template or injecting an RDB string id.
   The plain-token lines (`AttributeChanged`, ...) are also token-driven. A literal-text path is the remaining
