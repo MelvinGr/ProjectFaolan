@@ -7,11 +7,13 @@ path, see `docs/client-autotest.md`). Addresses come from the Ghidra project (`/
 
 ## Build (pure LLVM — no mingw / Windows SDK)
 ```
-./build.sh        # -> faolan_hook.dll (32-bit)
+cmake -S Faolan.ClientHook -B Faolan.ClientHook/build
+cmake --build Faolan.ClientHook/build        # -> build/faolan_hook.dll (32-bit)
 ```
 `llvm-dlltool` makes the kernel32 import lib from `kernel32.def`; `clang --target=i686-pc-windows-msvc
--fasm-blocks` compiles (freestanding, no CRT, inline kernel32 prototypes); `lld-link` links. Melvin injects
-the DLL into the running client.
+-fasm-blocks` compiles (freestanding, no CRT, inline kernel32 prototypes); `lld-link` links. (The CMake
+project is `LANGUAGES NONE` + custom commands — there's no CRT/SDK for CMake's normal toolchain detection to
+link a test program against.) Melvin injects `build/faolan_hook.dll` into the running client.
 
 ## What it does (on `DLL_PROCESS_ATTACH`)
 1. **Enables the client's own debug logging** (the broad, bulletproof part — no code patching). Sets the two
