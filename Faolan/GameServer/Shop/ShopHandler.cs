@@ -95,7 +95,7 @@ namespace Faolan.GameServer
 			var price = VendorPriceTin(row.Item.Level, row.Count);
 			await Database.SetCharacterInventorySlot(character.Id, (int)container, (int)slot, null);
 			character.Money += price;
-			await Database.SaveCharacter(character);
+			await Database.SetCharacterMoney(character.Id, character.Money);
 			_lastShopSale[client] = new LastShopSale((int)container, (int)slot, row.ItemId ?? 0, row.Count, price);
 
 			var ps = new PacketStream();
@@ -122,7 +122,7 @@ namespace Faolan.GameServer
 			character.Money = character.Money >= sale.PriceTin
 				? character.Money - sale.PriceTin
 				: 0;
-			await Database.SaveCharacter(character);
+			await Database.SetCharacterMoney(character.Id, character.Money);
 			await SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Spend);
 
 			Logger.LogInformation("Shop: {Character} undid the sale of item {ItemId} (slot {Slot}); {Price} tin debited (wallet {Balance}).",
@@ -199,7 +199,7 @@ namespace Faolan.GameServer
 			}
 
 			character.Money -= price;
-			await Database.SaveCharacter(character);
+			await Database.SetCharacterMoney(character.Id, character.Money);
 			await SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Spend);
 
 			Logger.LogInformation("Shop: {Character} bought ware {Template} x{Count} (slot {Pos}) from \"{Vendor}\" for {Price} tin into bag slot {BagSlot} (wallet {Balance}).",

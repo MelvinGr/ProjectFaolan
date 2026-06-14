@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -86,7 +87,9 @@ namespace Faolan.Core.Database
 		Task SaveCharacter(Character character);
 		Task SaveCharacterEquipment(CharacterEquipment equipment);
 		Task SaveCharacterScaffold(Character character);
+		Task SaveCharacterTransform(uint characterId, Vector3 position, Vector3 rotation, uint mapId);
 		Task SetCharacterInventorySlot(uint characterId, int container, int slot, uint? itemId, uint count = 1);
+		Task SetCharacterMoney(uint characterId, ulong money);
 		Task SetCharacterProgress(uint characterId, uint experience, ushort level);
 		Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0, string goalTargetName = null);
 		Task<int> SetCreationSpawn(Character character);
@@ -945,20 +948,51 @@ namespace Faolan.Core.Database
 			await ctx.SaveChangesAsync();
 		}
 
+		// Targeted scalar flushes (Money / Transform / Progress). Each is a single bulk UPDATE (ExecuteUpdateAsync):
+		// no entity load, no change-tracker, no navigation walk - so unlike the full-graph SaveCharacter they can't be
+		// rolled back by a navigation conflict and don't rewrite the whole character graph. Use these for the hot-path
+		// mutations (wallet, position/map, XP) that change constantly; SaveCharacter is reserved for the create-flow
+		// graph-add (name + Body + MaxStats as one unit of work). Contexts are short-lived per-unit-of-work, so the
+		// caller's in-memory Character is the source of truth and ExecuteUpdate not syncing it is a non-issue.
+
+		// Persists the wallet the moment it changes (vendor/loot/.money/AH), so it survives relog without the
+		// full-graph SaveCharacter. Caller updates Character.Money in memory first and passes the new total.
+		public async Task SetCharacterMoney(uint characterId, ulong money)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await ctx.Characters
+				.Where(c => c.Id == characterId)
+				.ExecuteUpdateAsync(s => s.SetProperty(c => c.Money, money));
+		}
+
+		// Persists the character's authoritative live transform (the WorldEntity's position/rotation/map) on
+		// teleport / disconnect / autosave - movement isn't otherwise saved, so without this a relog loses where the
+		// player was.
+		public async Task SaveCharacterTransform(uint characterId, Vector3 position, Vector3 rotation, uint mapId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await ctx.Characters
+				.Where(c => c.Id == characterId)
+				.ExecuteUpdateAsync(s => s
+					.SetProperty(c => c.PositionX, position.X)
+					.SetProperty(c => c.PositionY, position.Y)
+					.SetProperty(c => c.PositionZ, position.Z)
+					.SetProperty(c => c.RotationX, rotation.X)
+					.SetProperty(c => c.RotationY, rotation.Y)
+					.SetProperty(c => c.RotationZ, rotation.Z)
+					.SetProperty(c => c.MapId, mapId));
+		}
+
 		// Persists a character's levelling progress (within-level Experience + Level) the moment it changes, so XP and
-		// levels survive relog without depending on the full-graph SaveCharacter at disconnect/autosave. Targeted
-		// column update on the tracked row (the pattern SetCharacterInventorySlot/SetCharacterQuest use) - no graph
-		// churn, no risk of a navigation conflict rolling the write back.
+		// levels survive relog without depending on the full-graph SaveCharacter at disconnect/autosave.
 		public async Task SetCharacterProgress(uint characterId, uint experience, ushort level)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var row = await ctx.Characters.FirstOrDefaultAsync(c => c.Id == characterId);
-			if (row == null)
-				return;
-
-			row.Experience = experience;
-			row.Level = level;
-			await ctx.SaveChangesAsync();
+			await ctx.Characters
+				.Where(c => c.Id == characterId)
+				.ExecuteUpdateAsync(s => s
+					.SetProperty(c => c.Experience, experience)
+					.SetProperty(c => c.Level, level));
 		}
 
 		// Upserts a character's quest state/progress.

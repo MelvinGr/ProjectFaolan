@@ -64,7 +64,7 @@ namespace Faolan.GameServer
 			client.Session.Character.MapId = map.Id;
 			client.Session.Character.Position = map.Position;
 			client.Session.Character.Rotation = map.Rotation;
-			await Database.SaveCharacter(client.Session.Character);
+			await Database.SaveCharacterTransform(client.Session.Character.Id, map.Position, map.Rotation, map.Id);
 
 			await SendWorldEntry(client);
 
@@ -226,7 +226,7 @@ namespace Faolan.GameServer
 				character.Money = add
 					? character.Money + amount
 					: amount;
-				await Database.SaveCharacter(character);
+				await Database.SetCharacterMoney(character.Id, character.Money);
 				await SendMoneyUpdate(client, character.Money, add
 					? MoneyUpdateReason.Gain
 					: MoneyUpdateReason.Spend);
@@ -642,7 +642,8 @@ namespace Faolan.GameServer
 			{
 				character.MapId = entity.MapId;
 				character.Position = entity.Position;
-				await Database.SaveCharacter(character);
+				character.Rotation = entity.Rotation;
+				await Database.SaveCharacterTransform(character.Id, entity.Position, entity.Rotation, entity.MapId);
 				return true;
 			}
 			catch (Exception ex)

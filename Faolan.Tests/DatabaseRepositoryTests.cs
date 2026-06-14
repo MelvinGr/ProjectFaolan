@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
@@ -55,6 +56,54 @@ namespace Faolan.Tests
 				Assert.NotNull(loaded!.MaxStats);
 				Assert.True(loaded.MaxStats!.Health > 0);
 				Assert.True(loaded.MaxStats.Stamina > 0);
+			}
+			finally
+			{
+				if (File.Exists(dbPath))
+					File.Delete(dbPath);
+			}
+		}
+
+		// The targeted scalar savers (ExecuteUpdate-backed: money / transform / progress) persist their columns the
+		// moment they change and leave the rest of the character graph (e.g. the MaxStats nav) untouched - the point
+		// of replacing the full-graph SaveCharacter on these hot paths.
+		[Fact]
+		public async Task ScalarSavers_PersistColumns_WithoutDisturbingTheGraph()
+		{
+			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-repo-{Guid.NewGuid():N}.db");
+			try
+			{
+				const uint accountId = 1;
+				const uint realmId = 1;
+
+				var (repo, factory) = NewRepo(dbPath);
+				await using (var ctx = await factory.CreateDbContextAsync())
+				{
+					await ctx.Database.EnsureCreatedAsync();
+					ctx.Accounts.Add(new Account { Id = accountId, UserName = "t", Password = "t", AuthChallenge = "", LastIpAddress = "" });
+					ctx.Realms.Add(new Realm { Id = realmId, Name = "Test", IpAddress = "127.0.0.1" });
+					ctx.Maps.Add(new Map { Id = 2040, Name = "Test Destination" }); // Character.MapId is a FK; the transform target must exist
+					await ctx.SaveChangesAsync();
+				}
+
+				var created = await repo.CreateCharacter(accountId, realmId); // seeds a MaxStats nav row
+				Assert.NotNull(created.MaxStats);
+
+				await repo.SetCharacterMoney(created.Id, 12345);
+				await repo.SaveCharacterTransform(created.Id, new Vector3(10, 20, 30), new Vector3(1, 2, 3), 2040);
+				await repo.SetCharacterProgress(created.Id, 4500, 17);
+
+				var loaded = await repo.GetCharacter(created.Id);
+				Assert.Equal(12345ul, loaded!.Money);
+				Assert.Equal(new Vector3(10, 20, 30), loaded.Position);
+				Assert.Equal(new Vector3(1, 2, 3), loaded.Rotation);
+				Assert.Equal(2040u, loaded.MapId);
+				Assert.Equal(4500u, loaded.Experience);
+				Assert.Equal((ushort)17, loaded.Level);
+
+				// The MaxStats navigation the full-graph save would have rewritten is still intact.
+				Assert.NotNull(loaded.MaxStats);
+				Assert.True(loaded.MaxStats!.Health > 0);
 			}
 			finally
 			{

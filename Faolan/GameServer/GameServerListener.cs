@@ -504,7 +504,7 @@ namespace Faolan.GameServer
 					if (cash > 0 && character != null)
 					{
 						character.Money += cash;
-						await Database.SaveCharacter(character);
+						await Database.SetCharacterMoney(character.Id, character.Money);
 						await SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Gain);
 						Logger.LogInformation("Loot: {Player} looted {Cash} tin from bag 0x{Bag:X8} (wallet {Balance}).", character.Name, cash, bagHandle, character.Money);
 					}
