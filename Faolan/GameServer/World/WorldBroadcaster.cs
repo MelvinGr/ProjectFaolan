@@ -436,6 +436,23 @@ namespace Faolan.GameServer.World
 				.SendAsync(client);
 		}
 
+		// Builds one quest's DETAIL block as it appears in the FullChar snapshot tails (docs/quest-log-handover.md):
+		// the QuestFullUpdate CONTENT, i.e. BuildQuestFullUpdate's output from `questId` onward (drop the 17-byte
+		// [subop][ack][player][0x00000000][0x01] prefix) and without the trailing 0x00 separator - the captured 13479
+		// block is 879 B = that 880-B content minus the last byte. `instance` is the live player's client instance
+		// (the block carries raw entity references, like the rest of the tails). Used by SnapshotQuestInjector.
+		public byte[] BuildSnapshotQuestBlock(uint instance, QuestDefinition def)
+		{
+			var refs = new[] { QuestTextSlot.Title, QuestTextSlot.Summary, QuestTextSlot.AreaTitle, QuestTextSlot.RegionName, QuestTextSlot.MapName }
+				.Select(s => Record(def, s))
+				.ToArray();
+			var full = WorldQuest.BuildQuestFullUpdate(
+				instance, def.QuestId, WorldQuest.FullUpdateStateActive, def.AreaId, refs,
+				def.GoalId, 0, def.MapId, def.MarkerX, def.MarkerY,
+				Record(def, QuestTextSlot.Objective), Record(def, QuestTextSlot.ObjectiveLocalized));
+			return full[WorldQuest.QuestFullUpdateContentOffset..^1]; // drop the 17-byte prefix + the trailing 0x00
+		}
+
 		// Sends the active-quest LIST (0x504B7924) that POPULATES the J-panel - WITHOUT it an accepted quest never
 		// appears in the log even though the client got its QuestFullUpdate detail (decoded from the grant capture;
 		// docs/quest-log-handover.md). trackedDef is the highlighted (just-accepted) quest; activeQuestIds are all the

@@ -89,6 +89,10 @@ namespace Faolan.GameServer.World
 		public const uint QuestFullUpdateSubOpcode = 0x63268258; // one quest's full detail
 		public const uint QuestLogListSubOpcode = 0x504B7924; // the active-quest LIST that POPULATES the J-panel
 		public const uint AreaTitleCategory = 50300; // category of the area journal-title remoteformat
+
+		// BuildQuestFullUpdate emits [subop 4][ack 4][player 4][u32 0 = 4][0x01 = 1] = 17 bytes before `questId`. The
+		// snapshot-tails per-quest block is exactly that content from `questId` onward (BuildSnapshotQuestBlock).
+		public const int QuestFullUpdateContentOffset = 17;
 		private const uint ChapterTag = 0x00000BD3; // per-quest grouping word, constant across Tortage quests
 		private const string RrlMagic = "RRL3"; // record-list magic that precedes the per-quest entries
 

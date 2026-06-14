@@ -66,7 +66,7 @@ namespace Faolan.GameServer
 		// IMPORTANT: built entirely with manual byte assembly + manual CRC and the ORIGINAL packet's header copied
 		// verbatim - NOT via PacketStream/WriteLengthHash. An earlier PacketStream-based rebuild stalled the client
 		// on the loading screen even though its output was byte-exact, whereas the manual byte path works.
-		private byte[] BuildBeachInventoryPacket(byte[] substitutedPacket, Character character, CharacterEquipment equipment = null, CharacterInventory[] inventoryRows = null)
+		private byte[] BuildBeachInventoryPacket(byte[] substitutedPacket, Character character, CharacterEquipment equipment = null, CharacterInventory[] inventoryRows = null, IReadOnlyList<(uint QuestId, byte[] Block)> extraQuestBlocks = null)
 		{
 			var conanPacket = new ConanPacket(substitutedPacket);
 			var body = new FaolanStream(conanPacket.Body.ReadArrayUInt32Length());
@@ -158,7 +158,18 @@ namespace Faolan.GameServer
 			contentStream.WriteUInt32(instance);
 			contentStream.WriteArray(prefix);
 			contentStream.WriteArray(rootBytes);
-			contentStream.WriteArray(parts.Tails.ToArray());
+			// Author the character's accepted quests (beyond the beach starter) into the tails so they show in the
+			// J-panel on login (SnapshotQuestInjector; FAOLAN_SNAPSHOT_QUESTS). A no-op when none / the flag is off.
+			var tailsBytes = parts.Tails.ToArray();
+			if (extraQuestBlocks is { Count: > 0 })
+			{
+				var before = tailsBytes.Length;
+				tailsBytes = SnapshotQuestInjector.Inject(tailsBytes, extraQuestBlocks);
+				if (tailsBytes.Length != before)
+					Logger.LogInformation("Snapshot quests: injected up to {N} block(s); tails {Before} -> {After} B.", extraQuestBlocks.Count, before, tailsBytes.Length);
+			}
+
+			contentStream.WriteArray(tailsBytes);
 			var bodyContent = contentStream.ToArray();
 
 			// Copy the original header (len4 + crc4 + headerLen4 + header bytes) verbatim, then append the rebuilt
@@ -176,6 +187,26 @@ namespace Faolan.GameServer
 			BinaryPrimitives.WriteUInt32BigEndian(rebuilt.AsSpan(4, 4), crc);
 
 			return rebuilt;
+		}
+
+		// Builds the per-quest snapshot detail blocks for the character's accepted quests beyond the beach starter
+		// (which the template already carries) - the input to SnapshotQuestInjector. Empty unless FAOLAN_SNAPSHOT_QUESTS
+		// is set. The blocks carry the live instance (the tails hold raw entity references). docs/quest-log-handover.md.
+		private async Task<IReadOnlyList<(uint QuestId, byte[] Block)>> BuildSnapshotQuestBlocks(INetworkClient client, uint liveInstance)
+		{
+			if (Environment.GetEnvironmentVariable("FAOLAN_SNAPSHOT_QUESTS") != "1" || client.Session?.Character == null)
+				return [];
+
+			var blocks = new List<(uint, byte[])>();
+			var quests = await Database.GetCharacterQuests(client.Session.Character.Id);
+			foreach (var quest in quests.Where(q => q.State == QuestState.Active && q.QuestId != WorldQuest.BeachStarterQuestId))
+			{
+				var def = await Database.GetQuestDefinition(quest.QuestId);
+				if (def != null)
+					blocks.Add((quest.QuestId, _broadcaster.BuildSnapshotQuestBlock(liveInstance, def)));
+			}
+
+			return blocks;
 		}
 
 		// Equipped-container slot id -> the CharacterEquipment nav (archive player_items slot bytes).
@@ -478,6 +509,11 @@ namespace Faolan.GameServer
 			// snapshot stay in the burst.
 			var npcIndividualSpawn = Environment.GetEnvironmentVariable("FAOLAN_NPC_INDIVIDUAL_SPAWN") == "1";
 
+			// FAOLAN_SNAPSHOT_QUESTS (opt-in): author the character's accepted quests into the login snapshot tails so
+			// they show in the J-panel on relog (the snapshot, not packets, delivers the login quest log). Default off
+			// - snapshot-tails surgery is in-client-gated; bisect the block length live. docs/quest-log-handover.md.
+			var snapshotQuestBlocks = await BuildSnapshotQuestBlocks(client, liveInstance);
+
 			foreach (var packet in packets)
 			{
 				// Re-address the capture's instance to the logged-in character so the burst works for any character.
@@ -491,7 +527,7 @@ namespace Faolan.GameServer
 				{
 					// The world-entry snapshot: tails patched to the live character, containers substituted with the
 					// player's DB items (BuildBeachInventoryPacket) - this is THE inventory delivery (bag + doll).
-					pkt = BuildBeachInventoryPacket(pkt, client.Session.Character, equipment, inventoryRows);
+					pkt = BuildBeachInventoryPacket(pkt, client.Session.Character, equipment, inventoryRows, snapshotQuestBlocks);
 				}
 				else if (TryRebuildPlayerSpawnFromDb(client, equipment, scaffoldCharacter, pkt, out var rebuilt))
 				{
