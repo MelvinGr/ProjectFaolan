@@ -133,10 +133,14 @@ namespace Faolan.Core.Database
 
 			// ItemType.Normal (104) is the default classification - existing item rows backfill to Normal when the
 			// column is added; the importer reclassifies quest/resource items by the container they were seen in.
+			// The enum has no 0 member, so the CLR default 0 is a safe sentinel: an Item left at Type==0 (e.g. a
+			// .additem-created row) gets the DB default Normal, never a literal 0. Declaring the sentinel explicitly
+			// confirms that intent to EF and silences the model-validation warning.
 			modelBuilder
 				.Entity<Item>()
 				.Property(i => i.Type)
-				.HasDefaultValue(ItemType.Normal);
+				.HasDefaultValue(ItemType.Normal)
+				.HasSentinel((ItemType)0);
 
 			// One-to-one Character <-> CharacterMaxStats, keyed by CharacterId; deletes cascade with the character.
 			modelBuilder
