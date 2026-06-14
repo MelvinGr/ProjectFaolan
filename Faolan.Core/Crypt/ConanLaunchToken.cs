@@ -49,7 +49,7 @@ namespace Faolan.Core.Crypt
 		/// <summary>The <c>-key</c> value for the current time.</summary>
 		public static string Now()
 		{
-			return ForUnixTime((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+			return ForUnixTime(Statics.NowUnixTimeSeconds);
 		}
 	}
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
@@ -24,20 +25,28 @@ namespace Faolan.Core
 		public static readonly string BuildString;
 		public static readonly string StartupBanner;
 
+		// Current UTC unix time as the 32-bit seconds value the wire/DB use (mail/listing timestamps, launch token).
+		public static uint NowUnixTimeSeconds => (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
 		static Statics()
 		{
-			var entryAssembly = Assembly.GetEntryAssembly()!;
+			// The build metadata rides on the ENTRY assembly (Faolan.dll). It is absent under a test host or when
+			// loaded as a library, so degrade gracefully (don't throw) - accessing any Statics member, e.g.
+			// NowUnixTimeSeconds, must never depend on the build info being present.
+			var entryAssembly = Assembly.GetEntryAssembly();
 
-			var assemblyMetadata = entryAssembly
+			var assemblyMetadata = entryAssembly?
 				.GetCustomAttributes<AssemblyMetadataAttribute>()
-				.ToDictionary(k => k.Key, v => v.Value);
+				.ToDictionary(k => k.Key, v => v.Value) ?? new Dictionary<string, string>();
 
-			BuildConfiguration = assemblyMetadata["BuildConfiguration"];
-			BuildDateTimeUtc = DateTime.Parse(assemblyMetadata["BuildDateTimeUtc"], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+			BuildConfiguration = assemblyMetadata.GetValueOrDefault("BuildConfiguration", "unknown");
+			BuildDateTimeUtc = assemblyMetadata.TryGetValue("BuildDateTimeUtc", out var buildDate)
+				? DateTime.Parse(buildDate, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)
+				: default;
 
 			// The SDK appends "+<commit-sha>" to the informational version (IncludeSourceRevisionInInformationalVersion),
 			// so the HEAD SHA rides along for free - no custom metadata needed.
-			var informationalVersion = entryAssembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
+			var informationalVersion = entryAssembly?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "";
 			var plusIndex = informationalVersion.IndexOf('+');
 			var gitSha = plusIndex >= 0 ? informationalVersion[(plusIndex + 1)..] : informationalVersion;
 

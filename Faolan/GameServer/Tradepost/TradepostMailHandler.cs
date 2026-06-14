@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Data;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
@@ -30,12 +31,9 @@ namespace Faolan.GameServer
 		// Mail wire/DB constants (MailConstants.EndpointClass / FooterUnread / AttachmentTrailerWord / ExpirySeconds) live in
 		// the shared Faolan.Core MailConstants so the server and the MCP economy tools agree on one source.
 
-		// Bank-slot stat ids + flag values the "listed" overlay rides on (0x201c stat updates on container 105,
-		// decoded from the sell/change/cancel captures). The client draws/clears the AH overlay from these.
-		private const uint BankStatFlags = 0;       // stat 0 = item flags
-		private const uint BankStatPrice = 258;     // stat 258 (0x102) = listing price
-		private const uint BankStatTimestamp = 265; // stat 265 (0x109) = listing timestamp (unix)
-		private static uint NowUnix() => (uint)System.DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+		// The bank "listed" overlay rides on the SAME item-stat ids as a listing entry (TradepostListingCodec.Stat*:
+		// 0=flags, 258=price, 265=timestamp), pushed as 0x201c stat updates on container 105. Only the flag VALUES
+		// below are bank-overlay-specific.
 
 		private const uint BankFlagListed = 0x401;      // flags value while listed for sale
 		private const uint BankFlagMailPending = 0x8001; // flags value while attached to an outgoing mail
@@ -142,7 +140,7 @@ namespace Faolan.GameServer
 				ItemId = row.Item.Id,        // filed under the item's template (best-effort search key)
 				InstanceField = 0,
 				ItemHandle = 0,
-				EntryFlags = 0x421,          // the flag word every captured listing carries
+				EntryFlags = TradepostListingCodec.DefaultEntryFlags,
 				Timestamp = 0,
 				Data1 = row.Item.Data1,
 				Data2 = row.Item.Data2,
@@ -157,9 +155,9 @@ namespace Faolan.GameServer
 			// The listed item STAYS in its bank slot - the client draws a "listed" overlay when the server pushes
 			// these three bank-slot stat updates (decoded from the capture, F376/F377): price, timestamp, and the
 			// listed flag. It only leaves the seller's bank when someone BUYS it (HandleTradepostBuy clears the cell).
-			await SendBankSlotStat(client, (uint)bankSlot, BankStatPrice, (uint)price);
-			await SendBankSlotStat(client, (uint)bankSlot, BankStatTimestamp, (uint)System.DateTimeOffset.UtcNow.ToUnixTimeSeconds());
-			await SendBankSlotStat(client, (uint)bankSlot, BankStatFlags, BankFlagListed);
+			await SendBankSlotStat(client, (uint)bankSlot, TradepostListingCodec.StatPrice, (uint)price);
+			await SendBankSlotStat(client, (uint)bankSlot, TradepostListingCodec.StatTimestamp, Statics.NowUnixTimeSeconds);
+			await SendBankSlotStat(client, (uint)bankSlot, TradepostListingCodec.StatFlags, BankFlagListed);
 
 			Logger.LogInformation("Tradepost SELL: {Char} listed \"{Item}\" x{Qty} (bank slot {Slot}, template {Template}) for {Price} tin -> sale 0x{Sale:X16}.",
 				character.Name, row.Item.Name, listing.Quantity, bankSlot, row.Item.Id, price, listing.SaleId);
@@ -185,7 +183,7 @@ namespace Faolan.GameServer
 
 			await Database.SetTradepostListingPrice(listing.SaleId, newPrice);
 			// Update the bank-slot overlay's price stat (capture F364).
-			await SendBankSlotStat(client, bankSlot, BankStatPrice, (uint)newPrice);
+			await SendBankSlotStat(client, bankSlot, TradepostListingCodec.StatPrice, (uint)newPrice);
 			Logger.LogInformation("Tradepost CHANGEPRICE: {Char} repriced listing 0x{Sale:X16} (bank slot {Slot}) {Old} -> {New} tin.",
 				character.Name, listing.SaleId, bankSlot, listing.Price, newPrice);
 		}
@@ -210,8 +208,8 @@ namespace Faolan.GameServer
 
 			await Database.DeleteTradepostListing(listing.SaleId);
 			// Clear the bank-slot overlay (capture F398): flag back to normal, price to 0.
-			await SendBankSlotStat(client, bankSlot, BankStatFlags, BankFlagNormal);
-			await SendBankSlotStat(client, bankSlot, BankStatPrice, 0);
+			await SendBankSlotStat(client, bankSlot, TradepostListingCodec.StatFlags, BankFlagNormal);
+			await SendBankSlotStat(client, bankSlot, TradepostListingCodec.StatPrice, 0);
 			Logger.LogInformation("Tradepost CANCELSELL: {Char} cancelled listing 0x{Sale:X16} (bank slot {Slot}); item stays in the bank.",
 				character.Name, listing.SaleId, bankSlot);
 		}
@@ -250,8 +248,8 @@ namespace Faolan.GameServer
 				BodyXml = bodyText,
 				FooterWord = MailConstants.FooterUnread,
 				Money = money,
-				Timestamp1 = NowUnix(),
-				Timestamp2 = NowUnix() + MailConstants.ExpirySeconds
+				Timestamp1 = Statics.NowUnixTimeSeconds,
+				Timestamp2 = Statics.NowUnixTimeSeconds + MailConstants.ExpirySeconds
 			};
 
 			// Attach the sender's bank item (if a slot was given and an item sits there). The item STAYS in the
@@ -284,7 +282,7 @@ namespace Faolan.GameServer
 
 			// Draw the mail-pending overlay on the kept bank item (capture F500: stat 0 = flags 0x8001).
 			if (row?.Item != null)
-				await SendBankSlotStat(client, (uint)bankSlot, BankStatFlags, BankFlagMailPending);
+				await SendBankSlotStat(client, (uint)bankSlot, TradepostListingCodec.StatFlags, BankFlagMailPending);
 
 			Logger.LogInformation("Tradepost mail: {Char} sent mail 0x{Mail:X16} to {Recipient} (\"{Body}\", money {Money}, attach {HasItem}).",
 				character.Name, mail.MailId, recipient.Name, bodyText, money, row?.Item != null);
@@ -304,7 +302,7 @@ namespace Faolan.GameServer
 			// - the item never left the bank, so cancelling just frees it.
 			var mail = await Database.GetMailByWireId(mailId);
 			if (mail != null && mail.SenderName == character.Name && (mail.Attachments?.Count ?? 0) > 0)
-				await SendBankSlotStat(client, mail.SenderBankSlot, BankStatFlags, BankFlagNormal);
+				await SendBankSlotStat(client, mail.SenderBankSlot, TradepostListingCodec.StatFlags, BankFlagNormal);
 
 			await Database.DeleteMail(mailId);
 			Logger.LogInformation("Tradepost mail: {Char} cancelled/deleted mail 0x{Mail:X16}.", character.Name, mailId);
@@ -469,7 +467,7 @@ namespace Faolan.GameServer
 		// delivers, only its name in the mail text degrades.
 		private async Task<Mail> BuildPurchaseMail(string buyer, TradepostListing listing)
 		{
-			var now = NowUnix();
+			var now = Statics.NowUnixTimeSeconds;
 
 			var mail = new Mail
 			{

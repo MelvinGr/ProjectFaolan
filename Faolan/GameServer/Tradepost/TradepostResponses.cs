@@ -24,8 +24,9 @@ namespace Faolan.GameServer.Tradepost
 
 		// The client's TradepostInterface object instance - constant 0x08006F31 across both captures (different
 		// chars/sessions), so it appears to be a deterministic client-side allocation. Used when the server opens
-		// the tradepost without an inbound packet to echo (the auctioneer-interact / GM trigger).
-		public const uint DefaultInterfaceInstance = 0x08006F31;
+		// the tradepost without an inbound packet to echo (the auctioneer-interact / GM trigger). It is the same
+		// TradepostInterface object id the mail endpoints carry (MailConstants.EndpointClass), so reuse that.
+		public const uint DefaultInterfaceInstance = MailConstants.EndpointClass;
 
 		private const float AccessRadius = 15.0f;
 

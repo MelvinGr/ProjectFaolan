@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Packets;
@@ -115,8 +116,8 @@ namespace Faolan.Mcp.Tools
 				BodyXml = body ?? "",
 				FooterWord = MailConstants.FooterUnread,
 				Money = moneyTin,
-				Timestamp1 = (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-				Timestamp2 = (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds() + MailConstants.ExpirySeconds
+				Timestamp1 = Statics.NowUnixTimeSeconds,
+				Timestamp2 = Statics.NowUnixTimeSeconds + MailConstants.ExpirySeconds
 			};
 
 			string itemNote = null;
@@ -175,8 +176,8 @@ namespace Faolan.Mcp.Tools
 				ItemId = itemId,
 				InstanceField = 0,
 				ItemHandle = 0,
-				EntryFlags = 0x421,
-				Timestamp = (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+				EntryFlags = TradepostListingCodec.DefaultEntryFlags,
+				Timestamp = Statics.NowUnixTimeSeconds,
 				Data1 = item.Data1,
 				Data2 = item.Data2,
 				Data3 = item.Data3,

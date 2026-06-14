@@ -22,10 +22,14 @@ namespace Faolan.Core.Network.Packets
 	public static class TradepostListingCodec
 	{
 		// Entry stat ids carried per listing (decoded from the capture; 0/265 semantics still loose - preserved).
+		// These same stat ids drive the bank "listed" overlay (TradepostMailHandler reuses them).
 		public const uint StatFlags = 0;
 		public const uint StatQuantity = 26;
 		public const uint StatPrice = 258;
 		public const uint StatTimestamp = 265;
+
+		// The flag word (stat 0) every captured listing carries; the default for a freshly-created listing.
+		public const uint DefaultEntryFlags = 0x421;
 
 		public sealed record ParsedRow(
 			ulong SaleId, uint Handle, string Seller, ulong Price, uint Quantity, uint ItemId,
