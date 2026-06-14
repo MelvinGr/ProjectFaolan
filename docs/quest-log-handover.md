@@ -118,6 +118,34 @@ a36d3b74 0000c350 0131720b 00000000 1f 08 05 10 02 18 00 22 0f "ApproachCasilda"
 
 ---
 
+## QuestFullUpdate wire grammar — decoded from the client (Ghidra, 2026-06-14)
+
+The per-quest "stat" fields + objective records that the captures alone couldn't pin are now decoded from
+`QuestFullUpdateIIR::ReadSubClass` in `AgeOfConan.exe` (`FUN_00917e20` → the field reader `FUN_0091df50`;
+reproduce with `Captures/ghidra/DumpQuestIir.java` + `DumpFns.java`). Read primitives: `FUN_0048f900` =
+read u32, `FUN_0048f720` = read u64, `FUN_0048f840` = read string (the `<remoteformat>`/`<localized>`
+slots), `FUN_00cc0540` = read a 4-u32 group. Wire order (after the `[subop][ack][player]` framing):
+
+```
+u32  version (== 1)
+u32 ×5    header scalars            (struct 0xc, 0x10, 0x114, 0x118, 0x14)
+string×5  the 5 remoteformat refs   (title 50301, summary 50302, area 50300, region/map 52000 ×2)
+u32 ×4    header scalars            (0xec, 0xcc, 0x2c, 0x11c)
+u64       header                    (0x20 — the field I'd mistaken for a per-objective "floating timestamp")
+u32       header scalar             (0x28)
+u32       COUNT-1  (capped at 100)
+  record ×COUNT-1 : 18 u32 (0x48 B) — read [0],[1], a u32 pair, a 4-u32 group, a u32 pair, a 4-u32 group, [0xe],[0xf]
+u32       COUNT-2  (capped at 100)
+  record ×COUNT-2 : 18 u32 (0x48 B) — same shape, read big-endian-swapped
+```
+
+So a quest carries **two** count-prefixed lists of fixed 18-u32 records (not one flat block) — which is why
+my earlier flat-u32 alignment saw a "moving timestamp" and varying field counts. **Remaining (mechanical):**
+map each of the 18 record fields to its meaning by correlating the offsets with the captured values, then
+model it + rebuild (extractor harvests both lists; `BuildQuestFullUpdate` emits header + 2 lists). Still no
+*self-delivered* multi-objective quest consumes this yet (Casilda's 13479 is single-objective; 10238 is
+snapshot-owned), so it's unblocked but unscheduled.
+
 ## Captures (decode source)
 
 Primary, rich in all five packet types:
