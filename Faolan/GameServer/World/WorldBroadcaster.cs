@@ -448,7 +448,7 @@ namespace Faolan.GameServer.World
 				.ToArray();
 			var full = WorldQuest.BuildQuestFullUpdate(
 				instance, def.QuestId, WorldQuest.FullUpdateStateActive, def.AreaId, refs,
-				def.GoalId, 0, def.MapId, def.MarkerX, def.MarkerY,
+				def.GoalId, WorldQuest.SnapshotQuestAcceptTime, def.MapId, def.MarkerX, def.MarkerY,
 				Record(def, QuestTextSlot.Objective), Record(def, QuestTextSlot.ObjectiveLocalized));
 			return full[WorldQuest.QuestFullUpdateContentOffset..^1]; // drop the 17-byte prefix + the trailing 0x00
 		}

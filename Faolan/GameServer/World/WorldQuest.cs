@@ -93,6 +93,12 @@ namespace Faolan.GameServer.World
 		// BuildQuestFullUpdate emits [subop 4][ack 4][player 4][u32 0 = 4][0x01 = 1] = 17 bytes before `questId`. The
 		// snapshot-tails per-quest block is exactly that content from `questId` onward (BuildSnapshotQuestBlock).
 		public const int QuestFullUpdateContentOffset = 17;
+
+		// The fixed u64 the QuestFullUpdate carries at its `acceptTime` slot inside the snapshot tails (NOT a live
+		// timestamp - it is the same constant in the live grant packet and the in-progress login snapshot; decoded as
+		// a structural header field, docs/quest-log-handover.md). Using it makes BuildSnapshotQuestBlock byte-identical
+		// to retail's embedded block.
+		public const ulong SnapshotQuestAcceptTime = 0x000111D354375554UL;
 		private const uint ChapterTag = 0x00000BD3; // per-quest grouping word, constant across Tortage quests
 		private const string RrlMagic = "RRL3"; // record-list magic that precedes the per-quest entries
 

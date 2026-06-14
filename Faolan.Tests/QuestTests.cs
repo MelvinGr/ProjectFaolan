@@ -144,7 +144,7 @@ namespace Faolan.Tests
 			// Full update - byte-exact against frame 687 when fed the captured accept timestamp.
 			var textRefs = new[] { Rec(QuestTextSlot.Title), Rec(QuestTextSlot.Summary), Rec(QuestTextSlot.AreaTitle), Rec(QuestTextSlot.RegionName), Rec(QuestTextSlot.MapName) };
 			var full = WorldQuest.BuildQuestFullUpdate(0x0131720B, def.QuestId, 3, def.AreaId, textRefs, def.GoalId,
-				0x000111D354375554UL, def.MapId, def.MarkerX, def.MarkerY, Rec(QuestTextSlot.Objective), Rec(QuestTextSlot.ObjectiveLocalized));
+				WorldQuest.SnapshotQuestAcceptTime, def.MapId, def.MarkerX, def.MarkerY, Rec(QuestTextSlot.Objective), Rec(QuestTextSlot.ObjectiveLocalized));
 			Assert.Equal(CaptureBody("63268258"), Convert.ToHexString(full).ToLowerInvariant());
 
 			// Quest-log LIST (the packet that POPULATES the J-panel) - byte-exact against frame 687. The captured
@@ -153,7 +153,8 @@ namespace Faolan.Tests
 				new uint[] { 0x34A7, 0x34FB, 0x34A8, 0x3077 }, Rec(QuestTextSlot.AreaTitle));
 			Assert.Equal(CaptureBody("504b7924"), Convert.ToHexString(logList).ToLowerInvariant());
 
-			// SNAPSHOT-TAILS per-quest block = the QuestFullUpdate content (questId onward) minus the trailing 0x00.
+			// SNAPSHOT-TAILS per-quest block = the QuestFullUpdate content (questId onward) minus the trailing 0x00 -
+			// EXACTLY what WorldBroadcaster.BuildSnapshotQuestBlock emits (same args incl. SnapshotQuestAcceptTime).
 			// Proven byte-identical to the SAME quest's block embedded in a real login snapshot (xxx-login's 13479
 			// tails block) EXCEPT the 3 explained spots: quest PROGRESS @577 (just-accepted 0x64 vs in-progress 0x50)
 			// and @585 (0 vs 7), and the player INSTANCE @606-609 - i.e. a freshly-accepted quest generates the exact
