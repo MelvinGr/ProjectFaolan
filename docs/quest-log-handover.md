@@ -13,44 +13,59 @@ behind it.
 
 ---
 
-## Progress (2026-06-14): grammar decoded + journal builders byte-exact
+## STATUS (end of 2026-06-14 session) — journal works in-client
 
-**Decode DONE.** `Captures/decode_quest.py` pulls every QuestJournal / QuestFullUpdate / QuestRewards
-body out of the three captures, tokenizes the framing, and **round-trips all 65 packets to the byte**
-(parse → re-serialize → assert == original). The grammar below is closed.
+The quest journal renders correctly in-client. Two delivery paths, both working:
 
-Key finding: every text slot is a `00 <u8 len> <ascii>` record holding a
-`<remoteformat id=.. category=.. key=..>` / `<localized ..>` token. **The `key` attribute is a
-DETERMINISTIC content hash** — byte-identical for a given `(id, category)` across characters, sessions
-and captures — so it is harvestable data, not a per-send nonce. category map: `50300` region/journal
-title · `50301` quest title · `50302` quest summary · `50303` list sub-line · `50304` objective text ·
-`52000` map/region name · `51000/51200/100` localized strings.
+1. **Snapshot-delivered** — the beach world-entry FullChar snapshot (`0x737A6DF9`) embeds quest **10238
+   "Shipwrecked"** (with its full multi-objective journal record) for every character. It is now also
+   **persisted** to `CharacterQuests` so the DB matches what the client shows
+   (`RetailLoginReplay.EnsureBeachStarterQuest`), and `RestorePlayerQuests` **skips** it so we don't
+   clobber the snapshot's richer entry. In-client confirmed: login works, journal shows Shipwrecked with
+   **both** objectives.
+2. **Server-constructed** — quests the player accepts via NPC dialogue are built from DB rows and sent as
+   QuestIIR/QuestFullUpdate/QuestJournal packets (see below). Single-objective; in-client check pending.
 
-**Build DONE (framing).** `WorldQuest.BuildQuestJournal` + `BuildQuestFullUpdate` (+ `RemoteFormat` /
-`Localized` record helpers), each **byte-exact golden-tested** against the Casilda quest 13479
-(`QuestTests.BuildQuestJournal_MatchesCasildaCapture` vs frame 9947;
-`BuildQuestFullUpdate_MatchesCasildaCapture` vs the fresh-offer frame 687). Builders take the text
-records + scalar fields as parameters; the framing/structure is server-owned. The structured-header
-constants (`0x50`/`0x64`/`0x7e2`/`0x0c`/`0x412`) are reproduced as a documented template and locked by
-the golden — not yet semantically pinned.
+### Decode (DONE, byte-exact)
+- `Captures/decode_quest.py` round-trips all 65 QuestJournal/QuestFullUpdate/QuestRewards bodies to the byte.
+- Every text slot is `00 <u8 len> <ascii>` holding a `<remoteformat id=.. category=.. key=..>` / `<localized>`
+  token. **`key` is a deterministic per-`(id,category)` content hash** (harvestable, not a nonce). Categories:
+  `50300` area/journal title · `50301` quest title · `50302` summary · `50303` list sub-line · `50304`
+  objective · `52000` map/region name · `51000/51200/100` localized.
+- **QuestFullUpdate wire grammar fully decoded from the client** (Ghidra, `QuestFullUpdateIIR::ReadSubClass`):
+  fixed header (u32×5, 5 strings, u32×4, a **u64**, u32) then **two count-prefixed lists of 18-u32 (0x48)
+  objective records** (2nd big-endian-swapped). See the "wire grammar" section below.
 
-**DB model + wiring DONE (commit 6c92837).** `QuestDefinition` + `QuestTextRef` tables (migration
-`AddQuestDefinitions`) hold each quest's areaId/goalId/map+x+y marker and its `(RefId, Category, Key)`
-text slots. `Faolan.Importer/QuestDefinitionExtractor` harvests them from the captured QuestFullUpdate +
-QuestJournal packets (merging the two for the full slot set) — **17 quests seeded** incl. Casilda 13479.
-`WorldBroadcaster.SendQuestFullUpdate` / `SendQuestJournal` build from a definition;
-`RestorePlayerQuests` (login) now sends journal content for every active quest that has a definition;
-`.quest journal [<id>]` GM command re-sends it for testing. Round-trip golden test
-(`QuestDefinitionExtractor_RoundTripsCasilda`): importer-harvested def → builders → frames 9947 + 687
-byte-for-byte.
+### Build + DB + wiring (DONE)
+- `WorldQuest.BuildQuestJournal`/`BuildQuestFullUpdate` (+ `RemoteFormat`/`Localized` helpers), byte-exact
+  golden-tested vs Casilda 13479 (single objective).
+- `QuestDefinition` + `QuestTextRef` tables (migration `AddQuestDefinitions`); `QuestDefinitionExtractor`
+  harvests **17 quests** from captures; round-trip golden test feeds a harvested def back through the
+  builders to frames 9947+687 byte-for-byte.
+- `WorldBroadcaster.SendQuestFullUpdate`/`SendQuestJournal`; `RestorePlayerQuests` (login restore);
+  `.quest journal [<id>]` GM command.
 
-**REMAINING for #91:** (a) `BuildQuestRewards` (the destiny-step driver — decoded/round-tripped, not yet
-built; separate concern, see below); (b) the **multi-quest journal trailing block** (the "tracked quest"
-pointer — `SendQuestJournal` currently ships the captured single-quest no-track block; the multi-quest
-variant needs more decode); (c) **accept/turn-in path** send (login restore works; mid-session accept is
-the pinned Lua/tag VM seam); (d) **in-client verify** the J-panel renders (the `key` hashes are the
-render-critical bit — wrong keys ⇒ blank text). RDB-harvest of definitions for quests not in a capture
-is future work; the importer currently seeds only capture-observed quests.
+### Accept-from-dialogue (DONE, generic — #37)
+- `ConversationNode.GrantQuestId` (migration `AddConversationGrantQuest`), harvested generically: a quest is
+  granted at the dialogue node where its full-update first appears after an option pick (15 grant nodes
+  across 9 NPCs). `ServeScreen` persists the quest active + pushes its journal content.
+- `HasQuest(id)` Lua predicate (active OR completed = "accepted") so dialogue gates on acceptance, not just
+  completion. Fixed Casilda's greeting state machine: OFFER = unconditional fallback, IN-PROGRESS =
+  `HasQuest and not HasCompletedQuest`, DONE = `HasCompletedQuest`.
+
+### REMAINING for #91
+- **Multi-objective server-constructed quests** — grammar decoded (Ghidra), build is mechanical (map the 18
+  record fields, model + emit the 2 lists). **No consumer yet** (self-delivered quests are single-objective;
+  10238 is snapshot-owned) → unblocked but unscheduled.
+- `BuildQuestRewards` (the destiny-step driver — decoded/round-tripped, not built; separate concern).
+- Multi-quest **journal trailing block** (the "tracked quest" pointer — `SendQuestJournal` ships the captured
+  single-quest no-track block).
+- RDB-harvest of definitions for quests not in a capture (importer seeds only capture-observed quests).
+- In-client verify the **server-constructed** accept→journal path end to end (snapshot path is verified).
+
+### Known mismatch (cosmetic)
+`QuestDefinitionExtractor` harvests only the FIRST objective (50304) per quest, so a self-delivered
+multi-objective quest would show one objective. Doesn't affect 10238 (snapshot-owned) or 13479 (single).
 
 ---
 
