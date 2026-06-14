@@ -6,9 +6,11 @@ using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Data;
 using Faolan.Core.Database;
+using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.AgentServer;
+using Faolan.Core.Network.GameServer;
 using Faolan.Core.Network.Packets.Opcodes;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -18,13 +20,34 @@ namespace Faolan.AgentServer
 	public partial class AgentServerListener : Server<AgentServerPacket, AgentServerPacketFactory, AgentServerMessageFramer>, IAgentServerProvider
 	{
 		private readonly IAgentServerDispatcher _dispatcher;
+		private readonly IGameServerDispatcher _gameServerDispatcher;
 		private readonly ClaudeChannel _claudeChannel;
 
-		public AgentServerListener(ILogger<AgentServerListener> logger, IConfiguration configuration, IDatabaseRepository database, IAgentServerDispatcher dispatcher, ClaudeChannel claudeChannel) : base(
+		public AgentServerListener(ILogger<AgentServerListener> logger, IConfiguration configuration, IDatabaseRepository database, IAgentServerDispatcher dispatcher, IGameServerDispatcher gameServerDispatcher, ClaudeChannel claudeChannel) : base(
 			configuration.AgentServerPort, logger, configuration, database, new AgentServerOutgoingPacketLogger(logger))
 		{
 			_dispatcher = dispatcher;
+			_gameServerDispatcher = gameServerDispatcher;
 			_claudeChannel = claudeChannel;
+		}
+
+		/// <summary>
+		///     If <paramref name="message" /> is a '.command' (single leading dot) from a GameMaster, run it as a GM
+		///     command on the player's world session (via the GameServer dispatcher) and return true so the caller
+		///     suppresses the chat broadcast/echo. Mirrors the '/say' GM gate in
+		///     <see cref="GameServer.GameServerListener" /> so commands work in every chat channel.
+		/// </summary>
+		private async Task<bool> TryRunChatGmCommand(INetworkClient client, string message)
+		{
+			var text = message?.TrimStart() ?? string.Empty;
+			if (text.Length <= 2 || text[0] != '.' || text[1] == '.')
+				return false;
+
+			if (client.Session.Character == null || client.Session.Account is not { } account || account.Type < AccountType.GameMaster)
+				return false;
+
+			await _gameServerDispatcher.RunGmCommand(client.Session.Character.Id, text);
+			return true;
 		}
 
 		public IReadOnlyList<SessionInfo> GetSessions()
@@ -135,6 +158,12 @@ namespace Faolan.AgentServer
 					var message = packet.Body.ReadString();
 
 					Logger.LogInformation("AgentServer channel chat from {Character} on channel {Type:X2}/{Id:X8}: {Message}", client.Session.Character?.Name ?? "?", channelType, channelId, message);
+
+					// A '.command' (not '..') from a GM runs as a GM command in ANY channel, just like in /say -
+					// routed to the player's world session via the GameServer dispatcher. The command line is NOT
+					// echoed to chat (and is kept out of the Claude bridge log below so Claude doesn't "reply" to it).
+					if (await TryRunChatGmCommand(client, message))
+						break;
 
 					await BroadcastChannelChat(client, channelType, channelId, message);
 
