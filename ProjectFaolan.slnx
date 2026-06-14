@@ -9,7 +9,6 @@
     <File Path="deleteBinObj.sh" />
     <File Path="Directory.Build.props" />
     <File Path="Dockerfile" />
-    <File Path="docs\spawn-dissection-plan.md" />
     <File Path="faolan.db" />
     <File Path="faolan.json" />
     <File Path="logo.ico" />

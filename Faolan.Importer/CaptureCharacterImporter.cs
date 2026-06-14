@@ -89,8 +89,9 @@ namespace Faolan.Importer
 					// Only PLAYER spawns parse with the scaffold codec (NPC FA015807 bodies have a different
 					// post-IIR layout). Editor-preview spawns (the fully-constant 228-byte pre-frame) carry a
 					// synthesized "Character<instance>" placeholder name - those are the creator's temp
-					// instances, never importable; real spawns include other PLAYERS visible in gameplay
-					// captures (useful geared test characters), which import fine.
+					// instances, never importable. Real spawns also include OTHER PLAYERS visible in gameplay
+					// captures; those are filtered out after pooling (only the capturing account's own played
+					// character is imported - see the own-character prune below).
 					if (!PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out _) || scaffold.PreFrame is { Length: 228 })
 						continue;
 					if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read) || string.IsNullOrEmpty(read.Message.Name) || IsCreatorTempName(read.Message.Name))
@@ -105,6 +106,24 @@ namespace Faolan.Importer
 						best[name] = (body, mapId, handle);
 				}
 			}
+
+			// Keep ONLY the capturing account's own PLAYED character(s); drop other players who merely appeared
+			// in a gameplay capture. The own character is identified by being in the account's character list
+			// (0x20EF carries only the capturing account's own characters) and/or by the server having sent it a
+			// personal FullChar snapshot (0x737A6DF9, only ever delivered for the local player). Other players
+			// have neither, so this excludes them. (Pooled across all captures first, so a char listed in one
+			// capture but spawned in another still matches.)
+			var otherPlayers = 0;
+			foreach (var name in best.Keys.ToList())
+			{
+				if (charList.ContainsKey(name) || snapshots.ContainsKey(best[name].Handle))
+					continue;
+
+				best.Remove(name);
+				otherPlayers++;
+			}
+			if (otherPlayers > 0)
+				Console.WriteLine($"Characters: skipped {otherPlayers} other player(s) visible in captures (not the played character).");
 
 			var accountId = AccountId != 0
 				? AccountId
