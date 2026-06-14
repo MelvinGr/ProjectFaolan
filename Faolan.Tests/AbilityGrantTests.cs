@@ -32,6 +32,27 @@ namespace Faolan.Tests
 			Assert.Equal(expectedHex, ToHex(body));
 		}
 
+		// The per-login SILENT re-grant clears the announce byte (the final 0x01 -> 0x00), so the client doesn't pop
+		// "You have learned a new ability" for the whole starting kit on every login. The captures show this is the
+		// ONLY byte that differs between a create-flow grant (announce) and a login re-grant for the same ability.
+		[Fact]
+		public void BuildAbilityGrantBody_Silent_ClearsTheAnnounceByte()
+		{
+			var ability = new Ability
+			{
+				Id = 769094u, Slot = 108u, Data0 = 1263352118u,
+				Data1 = 3236668225u, Data2 = 2153842419u, Data3 = 314062142u, Data4 = 3015939650u
+			};
+
+			var announced = ToHex(GameServerListener.BuildAbilityGrantBody(ability, announce: true));
+			var silent = ToHex(GameServerListener.BuildAbilityGrantBody(ability, announce: false));
+
+			Assert.EndsWith("0000000001", announced);
+			Assert.EndsWith("0000000000", silent);
+			// Only the final byte differs.
+			Assert.Equal(announced[..^2], silent[..^2]);
+		}
+
 		private static string ToHex(byte[] bytes)
 		{
 			var chars = new char[bytes.Length * 2];
