@@ -5,6 +5,8 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Protobuf;
+using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.GameServer.Tradepost;
 using Microsoft.Extensions.Logging;
 
@@ -137,9 +139,14 @@ namespace Faolan.GameServer
 			}
 		}
 
-		// GetMailItem: grant the escrowed attachment into the bag (via the proven GrantItemToBackpack render path),
-		// then drop it from the mail and re-send the now-itemless mail so the client clears the attachment. Aborts
-		// (item left in the mail) on a full bag / un-buildable item, so the player can retry.
+		// GetMailItem: grant the escrowed attachment into the bag, then drop it from the mail and re-send the
+		// now-itemless mail so the client clears the attachment. The item is RENDERED live from the attachment's
+		// stored INSTANCE identity (Data quad + template + level + hash) - the same fields the AH grid renders from -
+		// so it works even when the listed template isn't in our Items table (most AH listings reference retail
+		// templates we never harvested, and listing.ItemHash/archetype is 0). Persistence is conditional: only a real
+		// buildable Items row can be written to CharacterInventory (the ItemId FK requires it) and re-rendered by the
+		// world-entry snapshot, so an un-harvested item is a LIVE-ONLY delivery (kept this session, lost on relog).
+		// Aborts (item left in the mail) only on a full bag, so the player can retry.
 		private async Task TakeMailItem(INetworkClient client, ulong mailId, ulong itemInstanceId, uint inst)
 		{
 			var character = client.Session.Character;
@@ -153,20 +160,58 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			var slot = await GrantItemToBackpack(client, attachment.Template, attachment.Quantity);
+			var slot = await FindFreeBagSlot(character.Id);
 			if (slot == null)
 			{
-				Logger.LogWarning("Tradepost mail: couldn't grant item template {Template} from mail 0x{Mail:X16} to {Char} (bag full or not buildable); kept in mail.",
-					attachment.Template, mailId, character.Name);
+				Logger.LogWarning("Tradepost mail: {Char}'s bag is full; mail 0x{Mail:X16} item kept in mail.", character.Name, mailId);
 				return;
 			}
+
+			var entry = BuildMailItemEntry(attachment, character.Id, slot.Value);
+			await SendAddItem(client, InventoryContainerBackpack, (uint)slot.Value, entry);
+
+			var qty = attachment.Quantity == 0 ? 1u : attachment.Quantity;
+			var item = await Database.GetItem(attachment.Template);
+			if (item is { Archetype: not 0 })
+				await Database.SetCharacterInventorySlot(character.Id, (int)FullCharSnapshotBuilder.BagKind, slot.Value, attachment.Template, qty);
+			else
+				Logger.LogInformation("Tradepost mail: delivered template {Template} to {Char} LIVE-ONLY (not a buildable Items row; won't persist across relog).",
+					attachment.Template, character.Name);
 
 			await Database.RemoveMailAttachment(mailId, attachment.ItemInstanceId);
 			mail.Attachments.Remove(attachment);
 			await TradepostResponses.SendMailMessage(client, mail, includeAttachments: false, inst);
 
-			Logger.LogInformation("Tradepost mail: {Char} took item template {Template} from mail 0x{Mail:X16} into bag slot {Slot}.",
+			Logger.LogInformation("Tradepost mail: {Char} took item (template {Template}) from mail 0x{Mail:X16} into bag slot {Slot}.",
 				character.Name, attachment.Template, mailId, slot);
+		}
+
+		// Builds the live DispatchAddItem entry for a mail attachment from its stored instance identity (no Items
+		// lookup), mirroring SnapshotItemBuilder's bag entry: ProtoAcgItem{key=Data quad, template1/2=template,
+		// level, hash} + the bag stat triple (0=flags, 23=recordId, 26=count). The client resolves the visual from
+		// the template via its RDB, so this renders even for items we don't have as Items rows.
+		private static ProtoInventoryGameEntry BuildMailItemEntry(MailAttachment a, uint charId, int slot)
+		{
+			var key = new ProtoDecryptionKey { Key1 = a.Data1, Key2 = a.Data2, Key3 = a.Data3, Key4 = a.Data4 };
+			var qty = a.Quantity == 0 ? 1u : a.Quantity;
+			var entry = new ProtoInventoryGameEntry
+			{
+				ItemId = FullCharSnapshotBuilder.ItemId(charId, FullCharSnapshotBuilder.BagKind, (ulong)slot),
+				ItemData = new ProtoAcgItem
+				{
+					Key1 = key,
+					Key2 = key,
+					Key3 = key,
+					Template1 = a.Template,
+					Template2 = a.Template,
+					Level = a.ItemLevel,
+					Hash = a.ItemHash
+				}
+			};
+			entry.StatLists.Add(new ProtoInventoryGameEntry.StatValue { Stat = 0, Value = 1 });
+			entry.StatLists.Add(new ProtoInventoryGameEntry.StatValue { Stat = 23, Value = (uint)FullCharSnapshotBuilder.RecordId(charId, FullCharSnapshotBuilder.BagKind, (ulong)slot) });
+			entry.StatLists.Add(new ProtoInventoryGameEntry.StatValue { Stat = 26, Value = qty });
+			return entry;
 		}
 
 		// Builds the system mail for a completed AH purchase: recipient = the buyer, sender empty (system), the bought
