@@ -21,15 +21,20 @@ link a test program against.) Melvin injects `build/faolan_hook.dll` into the ru
    **`AgeOfConan.log`**: quest activates (`got quest [id]`), IIR version errors (`Wrong IIR_t version`),
    dispatch, inventory, combat, etc. This is the "test whatever we want" channel — the client's own
    instrumentation across every subsystem.
-2. **Installs inline hooks** (prologue-verified — each is skipped, not forced, if the target bytes don't match
-   the recovered Ghidra prologue, so a stale address can never corrupt the client):
-   - `QuestFullUpdateIIR::Activate` (`0x00918080`) → logs `quest_activate=<id>` (the activated quest id,
-     `*(*(this+0x2C)+0x0C)`).
-3. Writes `faolan_hook.log` (client CWD) with the exe base, pid, and what installed.
+2. **Hooks every interface dispatcher** → a full server→client PACKET FEED. Each
+   `*InterfaceDispatch_t::DispatchMethod(opcode, …)` (thiscall; opcode = first stack arg) logs `disp <iface>
+   <opcode>` to `faolan_hook.log`: **GameChar** (`0x004BC7B0` — snapshot/quest/inventory/combat),
+   **Tradepost** (`0x01357130` — AH/mail), **CSPlayer** (`0x0133A6A0` — guild/team), **Player** (`0x00484270`),
+   **Universe** (`0x00490970`), **Game** (`0x00491F30`), **GameCharProj** (`0x0115E430`). Shows exactly which
+   packets the client received and dispatched.
+3. **Field hook**: `QuestFullUpdateIIR::Activate` (`0x00918080`) → `quest_activate=<id>` (`*(*(this+0x2C)+0x0C)`).
+4. All inline hooks are **prologue-verified** — installed only if the target bytes match the Ghidra prologue
+   (`55 8B EC 83 E4 F8`), so a stale/wrong address is skipped, never patched (it can't corrupt the client).
+5. Writes `faolan_hook.log` (client CWD) with the exe base, pid, per-hook OK/SKIP, and the live hook output.
 
 ## Adding hooks (the framework)
-`install_hook(addr, expected_prologue, steal_len, detour, &trampoline)` is generic: add a `PROLOGUE_*` byte
-signature (read the real bytes at the VA: `file_off = VA - 0x400C00`), a `__declspec(naked)` detour that reads
-the field of interest and `jmp dword ptr [g_tramp_*]`, and one `install_hook(...)` line. Candidate targets
-already located: `QuestFullUpdateIIR::ReadSubClass` (`0x00917E20`), the logger `FUN_004a8b90` (`0x004A8B90`,
-`(level, channel, fmt, ...)`), `_dbShouldOutput` (`0x004B2CC0`).
+Add a row to `g_hooks[]`: `{ addr, PROLOGUE_STD (or a new signature read at `file_off = VA - 0x400C00`),
+steal_len, detour, &trampoline, name }`, plus a `__declspec(naked)` detour that reads the field of interest and
+`jmp dword ptr [g_tramp_*]`. (clang's `-fasm-blocks` won't expand `__asm{}` inside a macro, so detours are
+written out explicitly.) Other located candidates: `QuestFullUpdateIIR::ReadSubClass` (`0x00917E20`), the logger
+`FUN_004a8b90` (`0x004A8B90`, `(level, channel, fmt, …)`), `_dbShouldOutput` (`0x004B2CC0`).
