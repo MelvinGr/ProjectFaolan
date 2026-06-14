@@ -240,11 +240,39 @@ quest region is still TEMPLATE (`BeachTailsBuilder` only generates level/vitals;
 `RemoteFormat50301/50302/50300` are template). So **every** beach character inherits Strie's quest 10238,
 regardless of their own `CharacterQuests`.
 
-**Fix (open):** generate the snapshot's quest-journal region from the live character's `CharacterQuests`
-(empty → no quest), like containers are generated — clear `SnapshotTails.RemoteFormat50300/50301/50302`
-+ `PrimaryRemoteFormatId(Again)` and strip the objective records / quest count from
-`UnknownBeforeAccessWindowTable` when the character lacks the matching quest. Snapshot-tails surgery is
-in-client-gated (the chat/world-load history, `protocol_chat_connection_regression`), so prove it in-client.
+**Why this matters (confirmed in-client 2026-06-14):** a quest accepted from dialogue now grants + renders
+in the log AT ACCEPT TIME (the 0x504B7924 QuestLogList fix, commit `3c9ed1b`), but it VANISHES on relog —
+because login delivers the log via the snapshot, not separate packets (retail's in-progress login
+`xxx-login` sends ZERO quest packets), and our snapshot is the template (10238 only). Sending a QuestLogList
+on login restore was tried and reverted: retail doesn't, so neither do we — the quest belongs in the tails.
+
+### Snapshot quest-region grammar — DECODED (2026-06-14, `Captures/decode_snapshot_quests.py`)
+
+Each quest in the tails is ONE block, structurally identical to the `QuestFullUpdate` (0x63268258) body's
+content section (`WorldQuest.BuildQuestFullUpdate`). Per block:
+
+```
+[0x00000BD3 ChapterTag]          # grouping word; precedes the FIRST quest of a chapter run (not every quest)
+u32 questId · u32 1 · u32 questId · u32 state · u32 0 · u32 N · u32 0x412
+<title    00<len><remoteformat id=questId category=50301>>
+<summary             remoteformat id=questId category=50302>
+<area                remoteformat id=areaId  category=50300>
+<objective(s)        ... category=50304 ...>
+```
+
+Verified across snapshots: Strie login = 1 block (10238, state=1, N=4); `xxx-login` (in-progress Casilda)
+= 2 blocks (10238 state=1 N=4 **+** 13479 state=3 N=3). `state` here is the SAME per-quest field as the
+QuestFullUpdate @36 (13479=3, the value the grant fix authors); `0x412` and `0x0BD3` are markers the
+builder already emits. So **generating the region = emitting one QuestFullUpdate-content block per active
+quest** — we already build that shape.
+
+**Plan (build):** model the tails quest region in `SnapshotTails` as a LIST of per-quest blocks (today it is
+the single `RemoteFormat50301/50302/50300` fields + the opaque `UnknownBeforeAccessWindowTable`); generate
+the blocks from `CharacterQuests` × `QuestDefinition` (beach 10238 always present + each accepted quest),
+re-serialize the tails (fix the region length / any count). Decode-first done; the builder + a byte-exact
+golden test (rebuild `xxx-login`'s 2-block region) is next. Snapshot-tails surgery is in-client-gated
+(`protocol_chat_connection_regression`), so prove it in-client. Open: the exact `0x0BD3` placement rule and
+the `N` field's meaning (objective-related; 10238=4/13479=3) still need pinning before the golden closes.
 
 ## Related
 
