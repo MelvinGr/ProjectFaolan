@@ -39,8 +39,9 @@ namespace Faolan.GameServer
 		private const uint BankStatFlags = 0;       // stat 0 = item flags
 		private const uint BankStatPrice = 258;     // stat 258 (0x102) = listing price
 		private const uint BankStatTimestamp = 265; // stat 265 (0x109) = listing timestamp (unix)
-		private const uint BankFlagListed = 0x401;  // flags value while listed for sale
-		private const uint BankFlagNormal = 0x001;  // flags value once unlisted (capture's cancel value)
+		private const uint BankFlagListed = 0x401;      // flags value while listed for sale
+		private const uint BankFlagMailPending = 0x8001; // flags value while attached to an outgoing mail
+		private const uint BankFlagNormal = 0x001;      // flags value once unlisted / mail cancelled
 
 		// Pushes one bank-slot stat update (0x201c on container 105): [kind=105][charInstance][slot][statId][value],
 		// byte-exact to the capture (F376/F377/F364/F398). Rides the same GameCharAgent conversation as the bank
@@ -255,11 +256,14 @@ namespace Faolan.GameServer
 				Timestamp2 = 0
 			};
 
-			// Attach the sender's bank item (if a slot was given and an item sits there); it leaves the sender's bank.
+			// Attach the sender's bank item (if a slot was given and an item sits there). The item STAYS in the
+			// sender's bank with a "mail-pending" overlay (it does NOT leave on send) - it only leaves when the
+			// recipient TAKES it (GetMailItem), and the overlay clears if the sender cancels the mail.
 			var rows = await Database.GetCharacterInventory(character.Id);
 			var row = rows.FirstOrDefault(r => r.Container == (int)FullCharSnapshotBuilder.BankKind && r.Slot == bankSlot);
 			if (row?.Item != null)
 			{
+				mail.SenderBankSlot = (uint)bankSlot;
 				mail.Attachments.Add(new MailAttachment
 				{
 					ItemInstanceId = (ulong)System.Random.Shared.NextInt64(1, long.MaxValue),
@@ -275,13 +279,14 @@ namespace Faolan.GameServer
 					TrailerClass = MailEndpointClass,
 					TrailerTail = 0
 				});
-				await Database.SetCharacterInventorySlot(character.Id, (int)FullCharSnapshotBuilder.BankKind, bankSlot, null);
 			}
 
 			await Database.CreateMail(mail);
 			await TradepostResponses.SendMailSendResult(client, success: true, packet.Sender.Instance);
+
+			// Draw the mail-pending overlay on the kept bank item (capture F500: stat 0 = flags 0x8001).
 			if (row?.Item != null)
-				await ResendBank(client); // refresh the sender's bank tab (the attached item is gone)
+				await SendBankSlotStat(client, (uint)bankSlot, BankStatFlags, BankFlagMailPending);
 
 			Logger.LogInformation("Tradepost mail: {Char} sent mail 0x{Mail:X16} to {Recipient} (\"{Body}\", money {Money}, attach {HasItem}).",
 				character.Name, mail.MailId, recipient.Name, bodyText, money, row?.Item != null);
@@ -296,6 +301,13 @@ namespace Faolan.GameServer
 				return;
 
 			var mailId = packet.Body.ReadUInt64();
+
+			// If the sender (this player) attached a bank item, clear its mail-pending overlay (capture F404: flag -> 1)
+			// - the item never left the bank, so cancelling just frees it.
+			var mail = await Database.GetMailByWireId(mailId);
+			if (mail != null && mail.SenderName == character.Name && (mail.Attachments?.Count ?? 0) > 0)
+				await SendBankSlotStat(client, mail.SenderBankSlot, BankStatFlags, BankFlagNormal);
+
 			await Database.DeleteMail(mailId);
 			Logger.LogInformation("Tradepost mail: {Char} cancelled/deleted mail 0x{Mail:X16}.", character.Name, mailId);
 		}
@@ -406,6 +418,16 @@ namespace Faolan.GameServer
 			else
 				Logger.LogInformation("Tradepost mail: delivered template {Template} to {Char} LIVE-ONLY (no Items row; won't persist across relog).",
 					attachment.Template, character.Name);
+
+			// For a PLAYER mail, the attached item was still sitting in the SENDER's bank (with the mail-pending
+			// overlay) - now that the recipient has taken it, remove it from the sender's bank so it isn't duplicated.
+			// AH system mail has an empty sender (the listed item already left the seller's bank on buy), so skip it.
+			if (!string.IsNullOrEmpty(mail.SenderName))
+			{
+				var sender = await Database.GetCharacterByName(mail.SenderName);
+				if (sender != null)
+					await Database.SetCharacterInventorySlot(sender.Id, (int)FullCharSnapshotBuilder.BankKind, (int)mail.SenderBankSlot, null);
+			}
 
 			await Database.RemoveMailAttachment(mailId, attachment.ItemInstanceId);
 			mail.Attachments.Remove(attachment);

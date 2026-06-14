@@ -47,6 +47,11 @@ namespace Faolan.Core.Database.Tables
 		// DB-only: whether the recipient has read the mail (MarkMailRead). Not on this body.
 		public bool IsRead { get; set; }
 
+		// DB-only: for a PLAYER-composed mail with an attachment, the sender's origin BANK slot. The attached item
+		// stays in the sender's bank with a "mail-pending" overlay until the recipient takes it (then it leaves the
+		// sender's bank) or the sender cancels (overlay cleared). 0 / no attachment for AH system mail (escrowed).
+		public uint SenderBankSlot { get; set; }
+
 		public virtual ICollection<MailAttachment> Attachments { get; set; } = new List<MailAttachment>();
 	}
 }

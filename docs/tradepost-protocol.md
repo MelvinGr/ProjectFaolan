@@ -198,8 +198,11 @@ golden tests `TradepostSellBodyTests`). INTERIM: the listing's search `ItemId` i
 lack the retail item-type search id), so a normal item-type search won't necessarily surface a player listing yet.
 
 **`SendMail` (C→S `0x2002`) — player→player mail with a bank-item attachment (capture F499), WIRED
-(`HandleTradepostSendMail`): creates a Mail to the recipient with the sender's bank item escrowed, removes it from
-the sender's bank, replies `DispatchSendMailResult`; an unknown recipient is rejected (success=0). Grammar:**
+(`HandleTradepostSendMail`): creates a Mail to the recipient; the attached item STAYS in the sender's bank with a
+**mail-pending overlay** (`0x201c` stat 0 = flags **`0x8001`**, capture F500), it only leaves the sender's bank when
+the recipient TAKES it (and the overlay clears if the sender CancelMails it - F404 flag → `1`). Replies
+`DispatchSendMailResult`; an unknown recipient is rejected (success=0). The mail remembers the sender's origin bank
+slot (`Mail.SenderBankSlot`, migration `AddMailSenderBankSlot`). Grammar:**
 ```
 [u16+recipientName ascii][u16+bodyText ascii][money:u64][0x000007E2:u32][bankItemSlot:u32]
 ```
