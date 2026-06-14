@@ -42,9 +42,11 @@ character/playfield), `-clienthash`, `-key`, `-loginkey`, `-logindata`, `-statin
   (imports `FreeConsole`/`WriteConsoleW`, not `AllocConsole`) — so there's no console and the flag is a visible
   no-op. The client's console output also goes to `AgeOfConan.log` (which `--console` tails — see §2).
 - **`-openautomate`** = NVIDIA's benchmark framework (perf plugins; not functional testing).
-  **`-autotest`** = the client's built-in **XML ScriptCommand test engine** (control flow, GUI/chat/
-  distributed-value commands, reads `autotest.txt`) — powerful but the tests are RDB/script-authored, a much
-  bigger lift than the `-username`/`-password`/`-charname` auto-login.
+  **`autotest.txt`** (gated by `-nautotest`) = a LOGIN-AUTOMATION file (`Server`/`Login`/`Character` records,
+  parsed in the LauncherWindow) — same job as `-username`/`-password`/`-charname`, via a file, NOT a test
+  script (corrected 2026-06-15). The actual test-result channel is the `<testreportscriptcommand>` ScriptCommand
+  (RDB scriptgroups → the `Autotest` log line in `AgeOfConan.log`). Both decoded in **`docs/client-autotest.md`**
+  (with the harness sketch for hands-free in-client asserts).
 
 ---
 
