@@ -66,43 +66,52 @@ GrantQuestId) + `ConversationPacket` (Sequence, Data).
 
 ---
 
-## What is BROKEN (the core problem)
+## What WAS BROKEN (the core problem) — FIXED 2026-06-14, commit `50ad9cc`
 
 Diagnosed in-client + loopback (Casilda, fresh char, quest 13479 not accepted):
-1. **The greeting content is wrong** — the served unconditional/fallback variant (the randochar capture) is
-   NOT the true pre-quest first-meeting offer.
+1. **The greeting content is wrong** — the served unconditional/fallback variant was NOT the true pre-quest
+   first-meeting offer.
 2. **The option tree mixes quest states** — "wrong order", options are a mix of pre/post-accept screens.
 3. **Dead-ends** — "stuck without options" at the accept node.
 
-Root cause: **only the greeting is state-gated; the deeper nodes are state-blind.** `Merge` dedups children
-across captures by `(NpcName, TypeId, AnswerPath, ConditionScript)`, and the children have an **empty**
-condition — so a `"0>1"` screen captured post-accept and one captured pre-accept collapse into ONE node, and
-whichever scored higher wins regardless of the walking player's state. The result is a single Frankenstein
-tree. Plus the captures may not cleanly contain every state (the true pre-quest offer may be absent).
+Root cause: **the unconditional "offer" fallback was a Frankenstein merge.** Every capture with NO
+quest-state rule got an empty `ConditionScript`, so `Merge` (keyed on `(NpcName, TypeId, AnswerPath,
+ConditionScript)`) collapsed them all into ONE fallback tree. For Casilda that pulled in a 48-screen
+mid-game re-walk (`hoxxling-login-gameplay`, granting *follow-up* quests 13480/12373/12369 at inconsistent
+paths) and a loopback of OUR OWN server (`casilda_convo`) — both poisoning the fresh-char greeting.
 
----
+## The FIX that landed — whole-tree gating + authoritative classification
 
-## The FIX (per-quest-state dialogue trees)
+1. ✅ **Gate the WHOLE tree by state** — `ConversationConditions.Apply` already ran per-capture and tagged
+   ALL of a capture's screens (not just the greeting); the gap was unclassified captures defaulting to the
+   shared empty-condition fallback.
+2. ✅ **Authoritative classification for state-managed NPCs.** An NpcName listed in
+   `ConversationConditions.Rules` is now *managed*: its dialogue is drawn ONLY from classified captures; an
+   unlisted capture's nodes for that NPC are **dropped** (`Apply` returns nothing), so a mixed-state /
+   loopback capture can't pollute the per-state tree. Casilda's offer is now the three clean offer walks
+   (randochar / Strie / strickenbla), which agree (`"" → 0 → 0>0 → 0>0>0 → 0>0>0>0` grants 13479) and union
+   into one self-consistent tree; in-progress/done stay conditioned. `ConversationNodes` 166 → 139.
+   - New tool: **`dotnet run --project Faolan.Importer -- --dump-conversation-states`** prints per-(capture,
+     NPC) screen counts + mid-convo quest GRANTS — the read-only "classify captures by state" step. Use it
+     to author new gates (a grant at the shallowest path ⇒ that capture is the OFFER walk for that quest).
+   - The runtime needed no change: `PickConversationScreen` already serves the offer fallback when every
+     conditioned gate fails (a fresh char).
 
-1. **Gate the WHOLE tree by state, not just the greeting.** Tag every `ConversationNode` (not only the
-   greeting) with the quest-state condition of the capture it came from, and have `PickConversationScreen`
-   serve the variant matching the live player at EVERY path — so the player walks a single capture's
-   self-consistent subtree. Concretely: in the importer, propagate the per-`(capture, NPC)` condition
-   (`ConversationConditions`) onto ALL of that capture's screens for that NPC, not just the greeting, and add
-   the condition to keep them as separate rows through `Merge`. (Today `ConversationConditions.Apply` already
-   runs per-capture; extend it from greeting-only to whole-tree, and make `DeriveOfferConditions`-style
-   gating per node.)
-2. **Classify captures by state.** For each (capture, NPC), determine the quest state it represents
-   (pre-offer / offer / in-progress / complete) from the capture's quest packets (a QuestFullUpdate *grant*
-   during the convo ⇒ this capture is the OFFER state; an active QuestIIR at login with no grant ⇒
-   in-progress; HasCompletedQuest ⇒ done; none ⇒ pre-offer). Use that to author the per-node condition.
-3. **Fill state gaps with the RDB Lua VM.** Where no capture covers a state (likely the true pre-quest
-   offer), fall back to the RDB dialogue scripts + the Lua/tag VM (`memory lua_vm`: 1992 LuaArchive scripts +
-   MoonSharp + CharacterTag store already built) to drive branching instead of replay.
+## What REMAINS
 
-Verification is **in-client only** (capture-first). Acceptance: a fresh char talks to Casilda → sees the
-offer → can navigate to accept → quest 13479 grants → journal updates (the grant + journal plumbing already
-work); re-talk shows in-progress; complete → done greeting.
+1. **In-client navigation verification** (capture-first, the acceptance gate below). The DB tree is now
+   clean + self-consistent and 342/342 tests pass, but the offer→accept→journal walk has NOT yet been driven
+   in-client since the fix.
+2. **Fill state gaps with the RDB Lua VM.** Casilda's follow-up quests (13480, 12369 — dropped with the
+   hoxxling capture) and any state no capture covers need the RDB dialogue scripts + the Lua/tag VM
+   (`memory lua_vm`: 1992 LuaArchive scripts + MoonSharp + CharacterTag store already built) to drive
+   branching instead of replay.
+3. **Generalize to more NPCs.** Only Casilda is managed today; classify the other quest-giving NPCs (use
+   `--dump-conversation-states`) and add their offer/in-progress/done rules.
+
+Acceptance (in-client): a fresh char talks to Casilda → sees the offer → navigates `0,0,0,0` to accept →
+quest 13479 grants → journal updates (grant + journal plumbing already work); re-talk shows in-progress;
+complete → done greeting.
 
 ---
 
