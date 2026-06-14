@@ -27,7 +27,10 @@
         <ContainerImageTag>dev</ContainerImageTag>
     </PropertyGroup>-->
 
-    <Target Name="GenerateBuildInfo" BeforeTargets="BeforeCompile">
+    <!-- SourceRevisionId is the HEAD commit SHA, populated by the SDK's bundled git
+         source-control tasks (InitializeSourceControlInformation). Replaces GitVersion.MsBuild. -->
+    <Target Name="GenerateBuildInfo" BeforeTargets="BeforeCompile"
+        DependsOnTargets="InitializeSourceControlInformation">
         <ItemGroup>
             <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
                 <_Parameter1>BuildDateTimeUtc</_Parameter1>
@@ -37,6 +40,11 @@
             <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
                 <_Parameter1>BuildConfiguration</_Parameter1>
                 <_Parameter2>$(Configuration)</_Parameter2>
+            </AssemblyAttribute>
+
+            <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+                <_Parameter1>GitSha</_Parameter1>
+                <_Parameter2>$(SourceRevisionId)</_Parameter2>
             </AssemblyAttribute>
         </ItemGroup>
     </Target>

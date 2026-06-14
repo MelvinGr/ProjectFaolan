@@ -32,7 +32,7 @@ namespace Faolan.Core
 
 			BuildConfiguration = assemblyMetadata["BuildConfiguration"];
 			BuildDateTimeUtc = DateTime.Parse(assemblyMetadata["BuildDateTimeUtc"], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
-			BuildString = $"{BuildConfiguration} {GitVersionInformation.Sha} @ {BuildDateTimeUtc:G} UTC";
+			BuildString = $"{BuildConfiguration} {assemblyMetadata["GitSha"]} @ {BuildDateTimeUtc:G} UTC";
 
 			StartupBanner = "-------------------------------------------------------------------------------\n" + //
 			                "|  ####  ####   ###    # #### ### #####    ####   #    ###  #      #   #   #  |\n" + //
