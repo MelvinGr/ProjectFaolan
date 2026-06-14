@@ -34,12 +34,23 @@ records + scalar fields as parameters; the framing/structure is server-owned. Th
 constants (`0x50`/`0x64`/`0x7e2`/`0x0c`/`0x412`) are reproduced as a documented template and locked by
 the golden — not yet semantically pinned.
 
-**REMAINING for #91:** (a) a **quest-definition + content table** (questId → areaId, the
-`(id, category, key)` text refs, goalId, map+x+y marker) harvested by the importer from these captures
-+ RDB — *construct, don't replay*; (b) `BuildQuestRewards` (the destiny-step driver — decoded, not yet
-built; separate concern, see below); (c) **wire** `SendQuestJournal` / `SendQuestFullUpdate` into
-`WorldBroadcaster.RestorePlayerQuests` (login) + the accept/turn-in path; (d) in-client verify the
-J-panel renders (the `key` hashes are the render-critical bit — wrong keys ⇒ blank text).
+**DB model + wiring DONE (commit 6c92837).** `QuestDefinition` + `QuestTextRef` tables (migration
+`AddQuestDefinitions`) hold each quest's areaId/goalId/map+x+y marker and its `(RefId, Category, Key)`
+text slots. `Faolan.Importer/QuestDefinitionExtractor` harvests them from the captured QuestFullUpdate +
+QuestJournal packets (merging the two for the full slot set) — **17 quests seeded** incl. Casilda 13479.
+`WorldBroadcaster.SendQuestFullUpdate` / `SendQuestJournal` build from a definition;
+`RestorePlayerQuests` (login) now sends journal content for every active quest that has a definition;
+`.quest journal [<id>]` GM command re-sends it for testing. Round-trip golden test
+(`QuestDefinitionExtractor_RoundTripsCasilda`): importer-harvested def → builders → frames 9947 + 687
+byte-for-byte.
+
+**REMAINING for #91:** (a) `BuildQuestRewards` (the destiny-step driver — decoded/round-tripped, not yet
+built; separate concern, see below); (b) the **multi-quest journal trailing block** (the "tracked quest"
+pointer — `SendQuestJournal` currently ships the captured single-quest no-track block; the multi-quest
+variant needs more decode); (c) **accept/turn-in path** send (login restore works; mid-session accept is
+the pinned Lua/tag VM seam); (d) **in-client verify** the J-panel renders (the `key` hashes are the
+render-critical bit — wrong keys ⇒ blank text). RDB-harvest of definitions for quests not in a capture
+is future work; the importer currently seeds only capture-observed quests.
 
 ---
 
