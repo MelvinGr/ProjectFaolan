@@ -23,5 +23,12 @@ namespace Faolan.Core.Database.Tables
 		// screen. This is the STABLE branch key (the old Mode/Field3 were session-volatile counters).
 		public string AnswerPath { get; set; }
 		public uint TypeId { get; set; }
+
+		// A Lua CONDITION source (run against the live player via LuaScriptVm.RunCondition) that gates this screen
+		// variant - how the SAME (NpcName, TypeId, AnswerPath) serves different dialogue by quest/tag state (e.g.
+		// Casilda's pre- vs post-first-quest greeting). "" = unconditional (the fallback / current behaviour). The
+		// runtime picks the first variant whose condition passes for the player, else the "" one. Part of the
+		// tag/quest dialogue VM (issue #37 / §6); the importer tags each captured variant with the state it came from.
+		public string ConditionScript { get; set; } = "";
 	}
 }

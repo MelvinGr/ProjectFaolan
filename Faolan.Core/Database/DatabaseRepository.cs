@@ -46,6 +46,7 @@ namespace Faolan.Core.Database
 		Task<ClassAbility> GetClassAbility(uint @class, uint level);
 
 		Task<ConversationNode> GetConversationScreen(string npcName, uint typeId, string answerPath);
+		Task<List<ConversationNode>> GetConversationScreens(string npcName, uint typeId, string answerPath);
 		Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId);
 
 		Task<Guild> CreateGuild(string name, uint leaderCharacterId);
@@ -727,6 +728,25 @@ namespace Faolan.Core.Database
 				.ConversationNodes
 				.Include(n => n.Packets)
 				.FirstOrDefaultAsync(n => n.NpcName == npcName && n.TypeId == typeId && n.AnswerPath == answerPath);
+		}
+
+		// All quest/tag-conditioned variants of a screen (same NpcName/TypeId/AnswerPath, differing ConditionScript).
+		// The runtime evaluates each variant's condition against the live player and serves the matching one (the
+		// unconditional "" variant is the fallback). Ordered conditioned-first so the caller can take the first pass.
+		public async Task<List<ConversationNode>> GetConversationScreens(string npcName, uint typeId, string answerPath)
+		{
+			if (string.IsNullOrEmpty(npcName))
+				return new List<ConversationNode>();
+
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var nodes = await ctx
+				.ConversationNodes
+				.Include(n => n.Packets)
+				.Where(n => n.NpcName == npcName && n.TypeId == typeId && n.AnswerPath == answerPath)
+				.ToListAsync();
+
+			// Conditioned variants first, the unconditional fallback last.
+			return nodes.OrderBy(n => string.IsNullOrEmpty(n.ConditionScript)).ToList();
 		}
 
 		public async Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId)

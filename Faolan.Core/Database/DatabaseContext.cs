@@ -227,7 +227,8 @@ namespace Faolan.Core.Database
 				{
 					n.NpcName,
 					n.TypeId,
-					n.AnswerPath
+					n.AnswerPath,
+					n.ConditionScript // a screen can have quest/tag-conditioned variants under one (name,type,path)
 				})
 				.IsUnique();
 			modelBuilder

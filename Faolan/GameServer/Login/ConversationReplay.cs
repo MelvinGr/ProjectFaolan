@@ -95,7 +95,7 @@ namespace Faolan.GameServer
 			var childPath = path.Length == 0
 				? answerIndex.ToString()
 				: $"{path}>{answerIndex}";
-			var screen = await Database.GetConversationScreen(client.Session.ConversationNpcName, client.Session.ConversationTypeId, childPath);
+			var screen = await PickConversationScreen(client, client.Session.ConversationNpcName, client.Session.ConversationTypeId, childPath);
 			if (screen == null)
 			{
 				Logger.LogInformation("Conversation: no captured screen for npc={Name} path='{Path}' (un-walked branch); closing.", client.Session.ConversationNpcName, childPath);
@@ -125,12 +125,51 @@ namespace Faolan.GameServer
 			if (!client.Session.SpawnedNpcNamesByHandle.TryGetValue(clickedNpcHandle, out var npcName))
 				return false; // unknown NPC (not spawned this session) -> create-world scripted intro fallback
 
-			var greeting = await Database.GetConversationScreen(npcName, typeId, "");
+			var greeting = await PickConversationScreen(client, npcName, typeId, "");
 			if (greeting == null)
 				return false;
 
 			await ServeScreen(client, greeting, clickedNpcHandle);
 			return true;
+		}
+
+		// Picks the conversation-screen variant whose Lua CONDITION passes for the live player (quest/tag-gated
+		// dialogue, issue #37). Most screens have a single unconditional variant - fast path. When conditioned
+		// variants exist, evaluate each (conditioned-first) against the character's tags + completed quests via the
+		// LuaScriptVm, and serve the first that passes; the unconditional "" variant is the fallback. A condition
+		// script error is treated as "doesn't match" (permissive=false) so a bad gate can't hijack every player.
+		private async Task<ConversationNode> PickConversationScreen(INetworkClient client, string npcName, uint typeId, string answerPath)
+		{
+			var variants = await Database.GetConversationScreens(npcName, typeId, answerPath);
+			if (variants.Count == 0)
+				return null;
+			if (variants.Count == 1 || variants.All(v => string.IsNullOrEmpty(v.ConditionScript)))
+				return variants[0]; // GetConversationScreens orders the unconditional fallback last
+
+			var character = client.Session.Character;
+			var tags = character != null ? await Database.GetCharacterTags(character.Id) : System.Array.Empty<uint>();
+			var completed = character != null
+				? (await Database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Completed).Select(q => q.QuestId)
+				: System.Linq.Enumerable.Empty<uint>();
+			var player = new Scripting.GameLuaPlayer(tags, completed);
+
+			ConversationNode fallback = null;
+			foreach (var v in variants)
+			{
+				if (string.IsNullOrEmpty(v.ConditionScript))
+				{
+					fallback = v;
+					continue;
+				}
+
+				if (_luaVm.RunCondition(v.ConditionScript, player, permissive: false))
+				{
+					Logger.LogInformation("Conversation: npc={Name} path='{Path}' matched conditioned variant.", npcName, answerPath);
+					return v;
+				}
+			}
+
+			return fallback;
 		}
 
 		// Replaces every big-endian uint32 occurrence of oldVal with newVal after the 8-byte length+crc prefix.
