@@ -490,20 +490,20 @@ namespace Faolan.GameServer
 				else if (TryRebuildNpcSpawnFromDb(client, npcByPosition, pkt, out var npcRebuilt, out var wasIdentical))
 				{
 					npcBuilt++;
-					// Only put the DB rebuild on the wire when it is BYTE-IDENTICAL to the captured burst body. The
-					// matched NpcSpawns row is often from a DIFFERENT capture session than this map's burst, and its
-					// un-lifted pre-IIR/scaffold blocks then carry that session's instance refs; replaying such a body
-					// builds an entity the client can't fully realize (observed: "[Identity 50000:530647] pcDynel is
-					// NULL", divergent bodies on ~23/42 beach NPCs) and contributes to the world-entry crash. The burst
-					// is retail's own bytes and renders, so for any non-identical rebuild we KEEP the verbatim burst
-					// packet (CLAUDE.md: don't replace a verbatim payload unless it's proven byte-for-byte). Re-addressing
-					// the cross-session pre-IIR/scaffold blocks is the path to a true from-DB render; until then verbatim
-					// wins. The from-model interest spawn (EnsureZoneNpcs, for NPCs OUTSIDE the burst like Casilda) is a
-					// separate path and unaffected.
-					if (wasIdentical)
+					// The from-DB rebuild (DB-row identity/scaffold + the burst's EXACT transform spliced in, see
+					// TryRebuildNpcSpawnFromDb) now goes on the wire for EVERY matched NPC, not just byte-identical ones.
+					// #185 in-client verified 2026-06-14: the old "kept verbatim for non-identical / pcDynel-is-NULL"
+					// problem was a spawn<->MoveTask position inconsistency, NOT the scaffolds; with the transform
+					// matching the paired MoveTask, all 23 cross-session beach NPCs render from the DB. The from-model
+					// interest spawn (EnsureZoneNpcs, for NPCs OUTSIDE the burst) is a separate path. Known fidelity gaps:
+					// the row's IIR pose (Casilda renders un-chained, TODO #184) + a transient half-stream on moving NPCs.
+					// Put the from-DB rebuild on the wire (it carries the burst's exact transform, so it renders -
+					// #185 in-client verified). FAOLAN_NPC_VERBATIM=1 restores the old "byte-identical only" behaviour.
+					if (wasIdentical || Environment.GetEnvironmentVariable("FAOLAN_NPC_VERBATIM") != "1")
 					{
 						pkt = npcRebuilt;
-						npcIdentical++;
+						if (wasIdentical)
+							npcIdentical++;
 					}
 				}
 				else if (TryRebuildWorldObjectFromDb(objectByPosition, pkt, out var objRebuilt, out var objIdentical))
@@ -657,13 +657,24 @@ namespace Faolan.GameServer
 				return false;
 
 			// Keep the burst packet's header (already re-addressed to the live player); swap only the FA015807 body.
-			wasIdentical = packet.Length - bodyStart == newBody.Length && packet
-				.AsSpan(bodyStart)
-				.SequenceEqual(newBody);
-
 			rebuilt = new byte[bodyStart + newBody.Length];
 			Array.Copy(packet, 0, rebuilt, 0, bodyStart); // [len][crc][headerLen][header]
 			newBody.CopyTo(rebuilt, bodyStart);
+
+			// Splice the burst's EXACT transform group (body [20:66]) into the rebuild so the spawn position
+			// byte-matches its paired 96C46740 MoveTask (a waypoint list keyed on that exact position). #185:
+			// in-client verified 2026-06-14 that WITHOUT this the from-DB rebuild renders nowhere (the client silently
+			// drops a spawn whose position diverges from its MoveTask, even by sub-0.1 float precision); WITH it, all
+			// 23 cross-session beach NPCs render. This is what lets the from-DB body replace the verbatim burst packet:
+			// the identity/scaffold come from the DB row, the transform stays the burst's (correct — same NPC, same
+			// captured spot). FAOLAN_NPC_VERBATIM=1 restores the old verbatim-only behaviour. TODO #184: the row's IIR
+			// also carries the spawn animation, so e.g. Casilda renders un-chained; carry the burst pose for full fidelity.
+			if (Environment.GetEnvironmentVariable("FAOLAN_NPC_VERBATIM") != "1"
+			    && packet.Length >= bodyStart + 66 && rebuilt.Length >= bodyStart + 66)
+				Array.Copy(packet, bodyStart + 20, rebuilt, bodyStart + 20, 46);
+
+			// wasIdentical = the (transform-spliced) rebuilt body equals the burst body (now just a stat/diagnostic).
+			wasIdentical = packet.Length == rebuilt.Length && packet.AsSpan(bodyStart).SequenceEqual(rebuilt.AsSpan(bodyStart));
 
 			BinaryPrimitives.WriteUInt32BigEndian(rebuilt.AsSpan(0, 4), (uint)(rebuilt.Length - 4));
 			var crc = Crc32.Calculate(rebuilt[8..]);

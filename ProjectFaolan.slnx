@@ -15,7 +15,6 @@
     <File Path="logo.png" />
     <File Path="ProjectFaolan.sln.DotSettings" />
     <File Path="README.md" />
-    <File Path="TODO.md" />
   </Folder>
   <Project Path="Faolan.ClientLauncher/Faolan.ClientLauncher.csproj" />
   <Project Path="Faolan.ContentMirror/Faolan.ContentMirror.csproj" />
