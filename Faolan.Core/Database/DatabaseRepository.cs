@@ -477,15 +477,16 @@ namespace Faolan.Core.Database
 				.FirstOrDefaultAsync();
 		}
 
-		// Auction-house listings for a searched item template, cheapest first (the order the grid renders).
+		// Auction-house listings for a searched item template, cheapest first (the order the grid renders). Price is
+		// a ulong (tin), which SQLite can't ORDER BY in SQL, so fetch the (small) match set and sort client-side.
 		public async Task<List<TradepostListing>> GetTradepostListings(uint itemId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx
+			var rows = await ctx
 				.TradepostListings
 				.Where(l => l.ItemId == itemId)
-				.OrderBy(l => l.Price)
 				.ToListAsync();
+			return rows.OrderBy(l => l.Price).ToList();
 		}
 
 		// One listing by its unique sale id - the buy targets this (TradepostBuyItem [saleId]).

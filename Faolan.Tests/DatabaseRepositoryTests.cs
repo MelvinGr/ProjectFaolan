@@ -175,6 +175,37 @@ namespace Faolan.Tests
 			}
 		}
 
+		// Search returns the matching listings cheapest-first. Guards the SQLite "can't ORDER BY a ulong" trap: Price
+		// is a ulong, so the sort must run client-side - ordering in SQL throws and drops the client on every search.
+		[Fact]
+		public async Task GetTradepostListings_SortsByPrice_CheapestFirst()
+		{
+			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-repo-{Guid.NewGuid():N}.db");
+			try
+			{
+				var (repo, factory) = NewRepo(dbPath);
+				await using (var ctx = await factory.CreateDbContextAsync())
+				{
+					await ctx.Database.EnsureCreatedAsync();
+					ctx.TradepostListings.Add(new TradepostListing { SaleId = 1, ItemId = 0x7530, Price = 5000, SellerName = "b" });
+					ctx.TradepostListings.Add(new TradepostListing { SaleId = 2, ItemId = 0x7530, Price = 25, SellerName = "a" });
+					ctx.TradepostListings.Add(new TradepostListing { SaleId = 3, ItemId = 0x9999, Price = 1, SellerName = "c" }); // other item
+					await ctx.SaveChangesAsync();
+				}
+
+				var listings = await repo.GetTradepostListings(0x7530);
+
+				Assert.Equal(2, listings.Count); // only the matching item
+				Assert.Equal(25ul, listings[0].Price); // cheapest first
+				Assert.Equal(5000ul, listings[1].Price);
+			}
+			finally
+			{
+				if (File.Exists(dbPath))
+					File.Delete(dbPath);
+			}
+		}
+
 		[Fact]
 		public async Task EquipmentAndAccount_RoundTrip_AcrossShortLivedContexts()
 		{
