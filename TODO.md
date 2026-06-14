@@ -155,11 +155,15 @@ prior diagnoses are in `docs/archive/todo-history.md`.
       `protocol_stats_and_combat`, `feedback_combat_not_contentmirror`.
 - [ ] NPC **counter-attack** (the second ack retail sends for the mob's own behaviour, actor = target handle) —
       not yet reproduced; mob may not visibly fight back.
-- [ ] **Add `.kill` GM command + MCP `kill` tool** (Melvin, 2026-06-13): kill the currently SELECTED target
-      (the player's last LookAt/select handle, `Session.SelectedTarget` or equivalent), INCLUDING self if the
-      player has themselves selected. Reuse the combat death path (`ApplyNpcDamage`/`OnNpcKilled` for NPCs,
-      vitals->0 for the player). If no target is selected, send a system message ("no target selected") rather
-      than no-op. Expose via MCP (`kill` tool routing through `RunGmCommand`).
+- [x] **Add `.kill` GM command + MCP `kill` tool** (Melvin, 2026-06-13) — DONE 2026-06-14 (needs in-client).
+      Decoded the LookAtIIR/SelectDeselect body (0x0D155695) from the hoxxling gameplay capture (target handle =
+      u32 at body offset 13 after the `[c350][self]` + `c350` target tag; zeroed on deselect) and store it as
+      `Session.SelectedTargetHandle`. `.kill [<handle>|self]` kills the selected target (no arg), a given handle,
+      or self: an NPC runs the full combat death path (`CombatService.KillNpc` → `ApplyNpcDamage`/`OnNpcKilled`,
+      so despawn/corpse-loot + XP + kill-quest advance fire), self drops the player's vitals to 0 and the world
+      tick respawns at the nearest resurrection point. No selection + no arg → "No target selected." system
+      message. MCP `kill` tool routes through `RunGmCommand`. 323 tests green. IN-CLIENT GATE: select an NPC →
+      `.kill` (or MCP) → it dies/despawns + XP; `.kill self` → death + respawn.
 - [ ] **BLOCKER (PINNED — needs client-side RE) — mid-session entity spawn doesn't render** (`.spawnnpc`,
       `.spawnbag`/kill loot bags, `.mount`, interest streaming). Full writeup: **`docs/mid-session-spawn-blocker.md`**
       / memory `protocol_midsession_spawn_blocked`. Decoded 2026-06-13 via loopback captures + the necrol80 mount
@@ -558,26 +562,20 @@ tag system exists. → memory `lua_vm`, `protocol_conversation_routing`; `docs/a
       at all). Add a ChatLog table (timestamp, kind: channel/say/whisper/system, channel id, sender id+name,
       recipient for whispers, text) appended from the AgentServer paths, so history survives restarts and the
       Claude bridge can rewind from the DB instead of skipping backlog.
-- [ ] **`.<command>` should work in ANY chat channel, just like `say`** (Melvin, 2026-06-13): a `.foo` typed in
-      any channel (not just the local say channel) should run as a GM command — same `.`-prefix / account >=
-      GameMaster gate as the say path (`GameServerListener.cs:704` -> `HandleGmCommand`). **And do NOT echo the
-      command line to chat** when it's recognized as a command (today a `.cmd` in a channel broadcasts the literal
-      text). Wire the `.`-prefix GM dispatch into every channel-chat handler (`AgentServerListener` ChannelChat),
-      and suppress the relay/echo for command lines. Subsumes the Claude-channel-commands item below.
+- [x] **`.<command>` should work in ANY chat channel, just like `say`** (Melvin, 2026-06-13) — DONE 2026-06-14.
+      `AgentServerListener.ChannelChat` now runs a `.command` (single leading dot, not `..`) from a GameMaster
+      as a GM command via `IGameServerDispatcher.RunGmCommand` (wired the dispatcher into the listener), mirroring
+      the `/say` GM gate (`TryRunChatGmCommand`); the command line is NOT broadcast/echoed and is kept out of the
+      Claude bridge log. Covers EVERY channel incl. the Claude channel. **Subsumes the "Run `.commands` in the
+      Claude channel as GM commands" item below** (it ran before both the broadcast and the `_claudeChannel.Append`,
+      so a `.cmd` on the Claude channel executes and does not bridge to Claude).
 - [ ] **Claude channel: reply in the SAME mode you were addressed in** (Melvin, 2026-06-13): when a player talks
       to Claude on the Claude CHANNEL, Claude should reply on the channel (broadcast); when WHISPERED, reply as a
       whisper. Today the faolan-chat reply tool defaults to whisper unless told otherwise — make the bridge pass
       the input mode (channel vs whisper) through so the reply matches it automatically.
-- [ ] **Run `.commands` posted in the Claude channel as GM commands** (Melvin, 2026-06-13): a `.foo` message
-      on the Claude channel should execute as a GM command (like normal chat), not just bridge to Claude.
-      Normal chat already does this at `GameServerListener.cs:704` (`.` prefix, not `..`, account >= GameMaster
-      -> `HandleGmCommand`). The seam to reuse exists: `IGameServerDispatcher.RunGmCommand(characterId, text)`
-      (GameServerProvider.cs:25) resolves the player's GameServer session and invokes `HandleGmCommand`. Wire it
-      into the `ChannelChat` handler (`AgentServerListener.cs:143`): when `channelId == ClaudeChannel.ChannelId`
-      and the message is a `.command`, gate on `client.Session.Account.Type >= GameMaster` and call
-      `RunGmCommand(client.Session.Character.Id, message)` instead of (or before) the `_claudeChannel.Append`
-      bridge. Decide whether GM-command lines should still echo into the bridge log (probably skip, to avoid
-      Claude "replying" to a command).
+- [x] **Run `.commands` posted in the Claude channel as GM commands** (Melvin, 2026-06-13) — DONE 2026-06-14,
+      subsumed by the any-channel GM-command item above (a `.cmd` on the Claude channel now executes as a GM
+      command and is not bridged to Claude).
 - [ ] **Friends list** (Melvin, 2026-06-14): decode + implement the in-game friends list — add/remove a friend,
       online/offline presence, and the friends-window population on login. Protocol is uncaptured; capture a retail
       friend add/remove + a friend coming online to recover the packets (likely an AgentServer/CSPlayerAgent family,

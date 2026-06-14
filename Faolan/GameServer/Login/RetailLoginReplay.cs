@@ -667,17 +667,23 @@ namespace Faolan.GameServer
 			if (character == null)
 				return false;
 
-			// Position only for now. Rebuilding the rotation from the DB stalled the client on the loading screen
-			// (the player avatar spawn was rejected), and existing characters have unreliable rotation data anyway,
-			// so the captured rotation is kept verbatim until DB rotation is trustworthy and verified safe.
+			// The transform's rotation is a ProtoQuat (X/Y/Z/W); we author it from the character's DB facing
+			// (Character.RotationQuaternion - captured into the row by the importer, identity for fresh chars).
+			// An earlier attempt stalled the client because the DB carried a DEGENERATE quaternion (W defaulted to
+			// 0 -> a zero rotation the avatar can't realize); RotationW now defaults to 1, but as a belt-and-braces
+			// guard a near-zero-magnitude stored quaternion falls back to the captured rotation rather than risk it.
 			var body = packet[bodyStart..];
-			var keptRotation = new Quaternion(BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.RotXOffset, 4)), BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.RotYOffset, 4)),
+			var capturedRotation = new Quaternion(BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.RotXOffset, 4)), BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.RotYOffset, 4)),
 				BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.RotZOffset, 4)), BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.RotWOffset, 4)));
+			var dbRotation = character.RotationQuaternion;
+			var rotation = dbRotation.LengthSquared() > 0.0001f
+				? dbRotation
+				: capturedRotation;
 
 			// Rebuild the body from the DB: position (fixed-length) then the character message. If the character has
 			// fully-buildable worn gear, rebuild the whole CharacterIIR (name + the worn equipment as its
 			// InventoryEntries) from the DB via the typed message; otherwise fall back to the proven name-only splice.
-			var newBody = SpawnPacketBuilder.BuildSpawnBody(body, handle, character.Position, keptRotation);
+			var newBody = SpawnPacketBuilder.BuildSpawnBody(body, handle, character.Position, rotation);
 
 			if (PlayerSpawnReader.TryReadCharacterMessage(newBody, out var read))
 			{

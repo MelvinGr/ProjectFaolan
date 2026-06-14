@@ -94,6 +94,12 @@ namespace Faolan.Core.Network
 		uint Post205FF98E10B3Count { get; set; }
 		uint? LastGameServer2020RequestId { get; set; }
 		ulong GameServerInboundPacketSequence { get; set; }
+
+		// The wire handle of the entity the player currently has selected (last LookAtIIR/SelectDeselect), or 0 when
+		// nothing is selected (deselect sends a zeroed handle). Session-volatile, like every entity handle. Used by
+		// the .kill GM command to target whatever the player is looking at (the player's own ClientInstance when they
+		// select themselves).
+		uint SelectedTargetHandle { get; set; }
 	}
 
 	public sealed class NetworkClientSession : INetworkClientSession
@@ -140,5 +146,6 @@ namespace Faolan.Core.Network
 
 		public uint? LastGameServer2020RequestId { get; set; }
 		public ulong GameServerInboundPacketSequence { get; set; }
+		public uint SelectedTargetHandle { get; set; }
 	}
 }

@@ -67,6 +67,18 @@ namespace Faolan.Mcp.Tools
 				: $"Character {characterId} is not currently connected to any GameServer listener.";
 		}
 
+		[McpServerTool(Name = "kill"),
+		 Description(
+			 "Kill an entity in a connected character's zone (wrapper over the .kill GM command). Omit the handle to kill the character's currently selected target (their last in-game LookAt); pass a handle (from list_zone_entities) to kill a specific NPC; pass \"self\" to kill the player themselves (they respawn at the nearest resurrection point). An NPC runs the full death lifecycle (despawn/corpse-loot, XP, kill-quest advance).")]
+		public async Task<string> Kill([Description("Character id of a currently-connected player")] uint characterId,
+			[Description("Optional target: an entity wire handle (0x-hex or decimal), \"self\", or empty for the character's selected target")] string target = "")
+		{
+			var ok = await _dispatcher.RunGmCommand(characterId, $".kill {target}".TrimEnd());
+			return ok
+				? $"Ran kill ({(string.IsNullOrWhiteSpace(target) ? "selected target" : target)}) for character {characterId} (the in-game system-message reply states the outcome)."
+				: $"Character {characterId} is not currently connected to any GameServer listener.";
+		}
+
 		[McpServerTool(Name = "add_item"),
 		 Description(
 			 "Add an item by faolan.db item id to a connected character's bag - persisted AND delivered LIVE via the DispatchAddItem (0x2020) packet, so it appears in the bag without a relog. The item must be snapshot-buildable (Archetype != 0). Wrapper over the .additem GM command; find ids with search_items.")]

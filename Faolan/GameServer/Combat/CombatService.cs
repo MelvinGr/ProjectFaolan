@@ -368,6 +368,15 @@ namespace Faolan.GameServer.Combat
 		// (despawn + scheduled respawn). Vitals resolve from the WORLD MODEL when the target is a model NPC (the
 		// authoritative owner), else fall back to the per-session store (e.g. the built-NPC test). Shared by the melee
 		// and spell paths.
+		// .kill GM command: kill an NPC target outright by applying its full remaining health as damage, so it runs
+		// the normal death lifecycle (vitals push, despawn/corpse-loot, XP, kill-quest advance). No-op if the target
+		// isn't a live NPC in the killer's zone.
+		public Task KillNpc(INetworkClient client, uint targetHandle)
+		{
+			var target = ResolveNpcVitals(client, targetHandle, out _);
+			return ApplyNpcDamage(client, targetHandle, (int)target.Health, ".kill command");
+		}
+
 		private async Task ApplyNpcDamage(INetworkClient client, uint targetHandle, int damage, string cause)
 		{
 			var target = ResolveNpcVitals(client, targetHandle, out var npcEntity);

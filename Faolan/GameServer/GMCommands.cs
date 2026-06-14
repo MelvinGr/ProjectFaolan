@@ -164,6 +164,7 @@ namespace Faolan.GameServer
 				["mount"] = (client, arguments) => MountCommand(client, arguments),
 				["spawnnpc"] = (client, arguments) => SpawnNpcCommand(client, arguments),
 				["despawnnpc"] = (client, arguments) => DespawnNpcCommand(client, arguments),
+				["kill"] = (client, arguments) => KillCommand(client, arguments),
 				["additem"] = (client, arguments) => AddItemCommand(client, arguments),
 				["removeitem"] = (client, arguments) => RemoveItemCommand(client, arguments),
 				["feedback"] = (client, _) => FeedbackCommand(client),
@@ -481,6 +482,68 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, entity == null
 				? $"No despawnable entity 0x{handle:X8} in this zone (unknown handle, or a player)."
 				: $"Despawned {entity.Name} (0x{handle:X8}).");
+		}
+
+		// .kill [<handle> | self]  - kill the player's currently SELECTED target (last LookAt/SelectDeselect), or the
+		// given handle, or self. An NPC runs the full combat death lifecycle (vitals push, despawn/corpse-loot, XP,
+		// kill-quest advance); self drops the player's vitals to 0 and the world tick respawns them at the nearest
+		// resurrection point. No arg + nothing selected -> a system message rather than a no-op.
+		private async Task KillCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var selfHandle = client.Session.Account.ClientInstance;
+			var arg = (arguments ?? "").Trim();
+
+			uint targetHandle;
+			if (arg.Length == 0)
+				targetHandle = client.Session.SelectedTargetHandle;
+			else if (arg.Equals("self", StringComparison.OrdinalIgnoreCase) || arg.Equals("me", StringComparison.OrdinalIgnoreCase))
+				targetHandle = selfHandle;
+			else if (!TryParseHandle(arg, out targetHandle))
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .kill [&lt;handle&gt; | self]  (no arg = your selected target)");
+				return;
+			}
+
+			if (targetHandle == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "No target selected.");
+				return;
+			}
+
+			if (targetHandle == selfHandle)
+			{
+				var vitals = _combat.GetOrAddPlayerVitals(client);
+				vitals.Health = 0; // the world tick detects the death and respawns at the nearest resurrection point
+				await SendStatUpdate(client, vitals.ToVitalsBlock(), selfHandle);
+				await _agentServerDispatcher.SendSystemMessage(characterId, "You kill yourself.");
+				return;
+			}
+
+			await _combat.KillNpc(client, targetHandle);
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Killed target 0x{targetHandle:X8}.");
+		}
+
+		// Parses a wire handle from a GM-command argument: "0x"-prefixed hex or plain decimal. Returns false on a
+		// malformed/overflowing value.
+		private static bool TryParseHandle(string arg, out uint handle)
+		{
+			handle = 0;
+			try
+			{
+				handle = arg.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+					? Convert.ToUInt32(arg[2..], 16)
+					: uint.Parse(arg);
+				return true;
+			}
+			catch (FormatException)
+			{
+				return false;
+			}
+			catch (OverflowException)
+			{
+				return false;
+			}
 		}
 
 		// .additem <itemId> [count]  - add an item (by faolan.db Items id) to the calling character's bag: persist

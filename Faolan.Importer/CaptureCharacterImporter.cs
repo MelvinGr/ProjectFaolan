@@ -218,6 +218,32 @@ namespace Faolan.Importer
 				}
 			}
 
+			// The transform's Quat payload is a ProtoQuat: tagged fixed32 fields 0D <x> 15 <y> 1D <z> 25 <w>,
+			// floats little-endian (the position Vec3 encoding plus the field-4 W component). Captured here so the
+			// player spawn rotation is authored from the DB instead of kept verbatim from the burst.
+			if (scaffold.Quat is { Length: >= 20 })
+			{
+				for (var i = 0; i + 5 <= scaffold.Quat.Length; i += 5)
+				{
+					var value = BinaryPrimitives.ReadSingleLittleEndian(scaffold.Quat.AsSpan(i + 1, 4));
+					switch (scaffold.Quat[i])
+					{
+						case 0x0D:
+							character.RotationX = value;
+							break;
+						case 0x15:
+							character.RotationY = value;
+							break;
+						case 0x1D:
+							character.RotationZ = value;
+							break;
+						case 0x25:
+							character.RotationW = value;
+							break;
+					}
+				}
+			}
+
 			// Vitals from the IIR's max side (x100 wire scale); class is not in the spawn, so fall back to the
 			// class-default baseline only when the capture carries nothing.
 			character.MaxStats = stats.Health > 0

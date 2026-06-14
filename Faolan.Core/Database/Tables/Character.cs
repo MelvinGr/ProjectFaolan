@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Numerics;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
@@ -85,6 +86,27 @@ namespace Faolan.Core.Database.Tables
 		public byte GuildRank { get; set; }
 
 		public const byte GuildLeaderRank = 6;
+
+		// The spawn transform's facing is a full quaternion (ProtoQuat X/Y/Z/W), but Base3DEntity.Rotation is a
+		// Vector3 (X/Y/Z only - that is why NpcSpawn/WorldObject declare their own RotationW). The missing W
+		// component lives here so the player spawn rotation can be authored from the DB instead of kept verbatim.
+		// Defaults to the identity quaternion (W=1) so a character with no captured facing (X=Y=Z=0) still spawns
+		// with a valid, normalized rotation (0,0,0,1) rather than the degenerate (0,0,0,0) that fails to realize.
+		public float RotationW { get; set; } = 1f;
+
+		// The full spawn facing as a System.Numerics.Quaternion, combining Base3DEntity's X/Y/Z with RotationW.
+		[NotMapped]
+		public Quaternion RotationQuaternion
+		{
+			get => new Quaternion(RotationX, RotationY, RotationZ, RotationW);
+			set
+			{
+				RotationX = value.X;
+				RotationY = value.Y;
+				RotationZ = value.Z;
+				RotationW = value.W;
+			}
+		}
 
 		public override string ToString()
 		{

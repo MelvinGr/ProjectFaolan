@@ -461,9 +461,19 @@ namespace Faolan.GameServer
 
 				case GameServer0X2000Opcodes.SelectDeselect:
 				{
+					// LookAtIIR (0x0D155695): the client selects/deselects an entity. Body (after the 0x2000 framing):
+					//   [u32 0x0000C350 type][u32 selectorInstance=self] [u8 00 00 00 pad]
+					//   [u16 0xC350 targetTag][u32 targetHandle] [trailing counters]
+					// On deselect the target tag+handle are zeroed. Decoded from
+					// account-faolan-character-hoxxling-login-gameplay (frames 259 select / 362 deselect).
 					var data = packet.Body.ReadRemainingArray();
 
-					Logger.LogInformation($"SelectDeselect: {data.ToHex()}");
+					uint targetHandle = 0;
+					if (data.Length >= 17)
+						targetHandle = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(13, 4));
+					client.Session.SelectedTargetHandle = targetHandle;
+
+					Logger.LogInformation("SelectDeselect: target 0x{Target:X8} ({Data})", targetHandle, data.ToHex());
 
 					break;
 				}
