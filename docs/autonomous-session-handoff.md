@@ -118,3 +118,8 @@ log below, then pick the next item. If you exhaust the safe list, stop and summa
   DispatchAddItem). Decoded from gameplay captures, byte-exact `DispatchRemoveItemTests`, `RemoveItemFromBackpack`
   (clears the persisted cell + live remove) wired to a `.removeitem <slot>` GM cmd. NEEDS in-client check
   (`.additem` then `.removeitem`). Also added TODO §10 (AoC-specific systems) + the §2 directional-combat item. 318 green.
+- 2026-06-14 — §8 **on-screen feedback overlay DECODED** (`FormatFeedbackIIR` 0x8D5A8B6B = the top-of-screen FIFO
+  notification banners + feedback lines, NOT chat; `showfifomessagefromserver` token family). Byte-exact
+  `FormatFeedbackCodec` + golden test, live `SendFeedback` + `.feedback` GM command (pops the proven area-name
+  banner; live-addressable via ClientInstance). `docs/on-screen-feedback.md`, memory `protocol_onscreen_feedback`.
+  NEEDS in-client check (`.feedback` → banner). Follow-up: arbitrary literal text. 322 green.

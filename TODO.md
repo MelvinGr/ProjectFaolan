@@ -549,6 +549,15 @@ tag system exists. → memory `lua_vm`, `protocol_conversation_routing`; `docs/a
       (RequestTrade / StartTrade / cash / add-remove item / accept), quest-share `0x2047`–`0x204C`
       (NextQuestAvailable / QuestShare* / UpdateTeamQuestList). Fully specified for whenever grouping lands; each
       builder needs a byte-exact capture/golden test.
+- [~] **On-screen feedback / notification overlay (`FormatFeedbackIIR` 0x8D5A8B6B)** — builder DONE 2026-06-14
+      (NEEDS IN-CLIENT). The top-of-screen FIFO banners + feedback lines (zone-name reveal, pickup notices, buff
+      worn, attribute up) — NOT chat. Carried as an IIR on the world conversation (opcode 0x2000, WorldFraming);
+      the FIFO banner uses the `showfifomessagefromserver(...)|<Template>` token family (`GenericDisplayAreaName`,
+      `GenericSimpleDynelPickup`, ...). Grammar decoded + byte-exact `FormatFeedbackCodec` (golden test
+      `FormatFeedbackCodecTests`), live `SendFeedback` + a `.feedback` GM command that pops the proven area-name
+      banner. → `docs/on-screen-feedback.md`. IN-CLIENT GATE: `.feedback` → a banner should appear at the top of the
+      screen. Follow-ups: arbitrary literal text (the templates reference a localized RDB string id), then route
+      "Resurrection point discovered" etc. through it instead of chat (`WorldSimulation.SendSystemMessage`).
 - [ ] **World/system chat via `ChatTextIIR` (0xE0B51102)** (from `docs/chat.md`): a GameServer remoteformat-XML
       chat path seen once in captures, not implemented — the local-say `0x0022` path covers player say for now.
 - [ ] **Guild protocol gaps** (from `docs/guilds.md` "Open items" + `docs/capture-events.md`): no capture exercises

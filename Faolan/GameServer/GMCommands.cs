@@ -166,6 +166,7 @@ namespace Faolan.GameServer
 				["despawnnpc"] = (client, arguments) => DespawnNpcCommand(client, arguments),
 				["additem"] = (client, arguments) => AddItemCommand(client, arguments),
 				["removeitem"] = (client, arguments) => RemoveItemCommand(client, arguments),
+				["feedback"] = (client, _) => FeedbackCommand(client),
 				["world"] = (client, _) => SendWorldInfo(client),
 				["quest"] = (client, arguments) => QuestCommand(client, arguments),
 				["tag"] = (client, arguments) => TagCommand(client, arguments),
@@ -535,6 +536,17 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, removed
 				? $"Removed the item in bag slot {slot} (live DispatchRemoveItem)."
 				: $"No item in bag slot {slot}.");
+		}
+
+		// .feedback  - pops the on-screen FIFO notification banner (top of screen, NOT chat) via FormatFeedbackIIR
+		// (0x8D5A8B6B / showfifomessagefromserver). Replays the proven GenericDisplayAreaName banner addressed to the
+		// live session, to demonstrate the overlay channel. (Arbitrary literal text is a follow-up - needs a
+		// literal-text FIFO template or an RDB string id.)
+		private async Task FeedbackCommand(INetworkClient client)
+		{
+			await SendAreaNameBanner(client);
+			await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
+				"Sent an on-screen FIFO banner (FormatFeedbackIIR / showfifomessagefromserver).");
 		}
 
 		// .quest add|remove <id> | .quest list  - manage the player's quest journal. `add` records the quest +
