@@ -39,7 +39,14 @@ namespace Faolan.UniverseAgent
 
 					client.Session.Account = await Database.GetAccount(accountName);
 					if (client.Session.Account == null)
-						throw new Exception("client.Account == null");
+					{
+						// Unknown account (e.g. a client still configured for a retail account name we don't have) -
+						// reject gracefully so the client shows "invalid login" instead of the connection throwing
+						// and hanging on the auth screen. Don't leak which half was wrong: same reason as a bad password.
+						Logger.LogWarning("UniverseAgent login: unknown account '{Account}' - rejecting (invalid login).", accountName);
+						await SendInvalidLogin(client, InvalidLoginReasons.InvalidLogin);
+						break;
+					}
 
 					await InitAuth(client);
 					break;
