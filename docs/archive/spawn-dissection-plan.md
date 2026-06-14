@@ -298,6 +298,19 @@ post-IIR breaks humanoids, `memory npc_spawn_minimal_postiir_breaks_humanoids` �
 pre-IIR in-client.) Next: correlate the 53-u32 order with a captured NPC body (`Captures/dissect_npc_spawn.py`)
 to label the spatial fields, then a `NpcPreIirCodec` (Parse/Build) golden-tested like `PlayerSpawnScaffoldCodec`.
 
+PREMISE CORRECTION 2026-06-14 (#185): the long-standing claim that cross-session NPC rows fail to render
+because their **pre-IIR / post-IIR carry the wrong session's instance refs is WRONG.** Scanning 8 beach NPC
+bodies (`body = Data[12+headerLen:]`, pre-IIR `body[66:293]`, post-IIR `body[297+iirLen:]`): the pre-IIR
+contains **no entity handle** (not even its own; the only handle-range value is a CONSTANT `0x00050000` @ pre+43),
+and the post-IIR (41–83 B) is the minimal scaffold + float movement-waypoint triples (values ending `…3f` =
+float exponents), **also no handles**. So both blocks are session-INDEPENDENT (spatial + constants + the NPC's
+own waypoints) and fully regeneratable from columns. The real cross-session render blocker is therefore NOT
+these blocks — it is elsewhere (the CharacterIIR content, or a client-side gate), and
+[[npc_spawn_minimal_postiir_breaks_humanoids]] (minimal post-IIR breaks humanoids) is consistent with
+"humanoids need their captured post-IIR waypoints, don't strip them" rather than a ref problem. Re-scopes #185:
+build the pre-IIR codec + keep/regenerate the post-IIR waypoints; the cross-session mystery needs a fresh
+in-client bisect on the CharacterIIR, not the scaffolds.
+
 CONSTRUCTION PROGRESS (2026-06-10):
 - ✓ The machinery generalizes (commit 3897e05, `NpcSpawnConstructionTests`): `BuildSpawnBody` reconstructs an
   NPC body (animal + humanoid) byte-exact from its typed pos/rot, and `PlayerSpawnReader` decodes the NPC
