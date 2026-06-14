@@ -66,8 +66,19 @@ namespace Faolan.GameServer
 			var oldInstanceVarint = EncodeVarint(node.CapturedInstance);
 			var newInstanceVarint = EncodeVarint(liveInstance);
 
-			foreach (var p in node.Packets.OrderBy(p => p.Sequence))
+			// A captured screen that offers options (AnswerList 0xF164A4A5) sometimes ALSO carries a trailing
+			// CloseChatWindow (0xC4AF39EB) - the captured session closed the window right after. Replaying that close
+			// auto-shuts the dialogue the player should be picking from (observed: Casilda's greeting opens then
+			// instantly closes, can't accept). When the screen has a real AnswerList, drop the spurious close; a pure
+			// terminal screen (CloseChatWindow only) is kept.
+			var orderedPackets = node.Packets.OrderBy(p => p.Sequence).ToList();
+			var hasAnswerList = orderedPackets.Any(p => ConversationSubOpcode(p.Data) == KnubotAnswerListSubOpcode);
+
+			foreach (var p in orderedPackets)
 			{
+				if (hasAnswerList && ConversationSubOpcode(p.Data) == KnubotCloseChatWindowSubOpcode)
+					continue; // skip the spurious close so the option list stays interactive
+
 				var packet = (byte[])p.Data.Clone();
 				SubstituteUInt32(packet, node.CapturedNpcHandle, clickedNpcHandle);
 				SubstituteUInt32(packet, node.CapturedInstance, liveInstance);
@@ -201,6 +212,17 @@ namespace Faolan.GameServer
 			}
 
 			return fallback;
+		}
+
+		// The conversation IIR sub-opcode of a stored packet: full Conan packet is [len4][crc4][headerLen4][header]
+		// [body], and the body is [u32 len][u32 subOpcode]... so the sub-op is the u32 at 12 + headerLen + 4.
+		private static uint ConversationSubOpcode(byte[] packet)
+		{
+			if (packet == null || packet.Length < 12)
+				return 0;
+			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
+			var off = 12 + headerLen + 4;
+			return off + 4 <= packet.Length ? BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(off, 4)) : 0;
 		}
 
 		// Replaces every big-endian uint32 occurrence of oldVal with newVal after the 8-byte length+crc prefix.
