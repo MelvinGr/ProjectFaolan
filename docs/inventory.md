@@ -47,7 +47,10 @@ Containers are built wholesale from the DB (`FullCharSnapshotBuilder.BuildContai
    re-sending the whole snapshot is NOT how you deliver a mid-session item. **UPDATE 2026-06-13:** the real
    live-add IS a per-item packet — `DispatchAddItem` (s2c 0x2020), decoded + byte-exact + in-client verified
    (`GrantItemToBackpack`; `DispatchAddItemTests`). `.additem` / `add_item` now both persist the row AND push the
-   live add (no relog needed). Live item-REMOVE (0x201F) is not built yet.
+   live add (no relog needed). **Live item-REMOVE — `DispatchRemoveItem` (s2c 0x201F)** is now built too (2026-06-14):
+   byte-exact builder (`WriteRemoveItemBody`/`SendRemoveItem`, body `[container ID32][u32 pos][u32 amount]`,
+   `DispatchRemoveItemTests`), `RemoveItemFromBackpack` clears the persisted cell AND pushes the live remove, wired to
+   the `.removeitem <slot>` GM command (inverse of `.additem`). Needs an in-client confirmation pass.
 4. **Bag-poison items**: an item only ever captured WORN (never inside an inventory container) can render
    the WHOLE bag empty when placed in `CharacterInventory` (repro: 13826 Combatant's Hauberk; client logs
    VisualMeshLoader 1010001 misses). Likely missing local bag/icon resources. Keep such items out of bags
