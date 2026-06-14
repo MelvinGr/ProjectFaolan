@@ -760,6 +760,55 @@ connection needed**, and likely simpler than the AH (no listings/search/mail).
 
 ---
 
+## 10. AoC-specific systems not yet started
+
+Signature Age-of-Conan mechanics the emulator doesn't model at all yet (distinct from generic MMO features).
+Grouped by how they're reached: the combat-layer ones decode from the existing combat captures; several are already
+**named in the recovered opcode tables** (`Opcodes.cs`, `docs/aoc-rpc-method-opcodes.md`) and just need a capture +
+builder; the world/endgame ones are large features. Each new wire builder still needs a byte-exact golden test.
+
+### 10a. Combat-layer signatures (decode from the necrol80 / stricken998 combat captures)
+- [ ] **Directional combat + defensive shields ("Real Combat")** — see the dedicated item in §2 (Combat). The other
+      combat items here are its siblings.
+- [ ] **Combos** — the core of every class rotation: directional attack CHAINS that build to a finisher, with the
+      on-screen "next direction(s)" prompt. We grant the starting attack abilities (`0x2052`) but model no combo
+      step sequence / finisher. Decode the combo-step packet (which ability + which direction advances the chain,
+      and the finisher trigger) from the combat captures; pairs naturally with the directional-combat decode.
+- [ ] **Fatalities** — gory finishing-move animations (decapitation / dismemberment) on a killing blow, triggered
+      server-side at the kill. Find the fatality trigger/flag in a kill capture; hook it into the NPC kill path
+      (`CombatService` / `OnNpcKilled`).
+- [ ] **Spellweaving** (casters: Herald of Xotli / Demonologist / Necromancer / Tempest of Set …) — chaining spells
+      into an escalating "weave" with a backlash risk; a distinct caster resource system, not generic mana. Needs a
+      caster capture (blocked on the same missing data as real spell grants, §5) to decode the weave state packets.
+- [ ] **Mounted combat** — lance charges (trample / knockback) + mounted abilities from horseback. Doubly blocked:
+      mounts don't even render yet (mid-session-spawn blocker, §2/§3), then combat-from-mount on top. Do after the
+      mount spell-grant + render work (§2 Mounts).
+
+### 10b. Recovered-but-unimplemented (opcodes already named; each needs a capture + byte-exact builder)
+- [ ] **Offline Training System** (`GameCharAgentProject.StartOfflineTrainingSystem` 0x2007, `ResetOfflineTrainingSystem`
+      0x2008) — set training to gain limited XP while logged out.
+- [ ] **Apprentice / mentor sidekick** (`AcceptApprenticeTeacher` 0x2002, `DeclineApprenticeTeacher`,
+      `RequestApprenticeStudent`, `LeaveApprenticeMode`) — level-sync mentoring.
+- [ ] **Ranger tracking** (`EnableRangerTracking` 0x200A) and **vanity / social armor** (`ToggleVanityArmorFilter`
+      0x200B) — class + appearance toggles (the vanity tab overrides visible gear).
+- [ ] **Minigames & Massive PvP** (`RequestMassivePvPScoreData` 0x208D + the GameCharAgent minigame methods) —
+      instanced PvP minigames + open-world massive-PvP scoring. (`0x208D` is noted in §4b as "note only" today.)
+
+### 10c. World / endgame systems (large features, no opcode work started)
+- [ ] **Sieges / Battlekeeps / Guild cities** (Border Kingdoms) — guilds craft resources, build cities + keeps, and
+      fight massed siege battles (siege weapons, destructible walls). Guilds exist (renown) but none of the city /
+      siege layer. Depends on tradeskills (Architect) + a building/object-persistence model.
+- [ ] **Tradeskills** — gathering nodes (mining / harvesting / skinning / woodcutting / stonecutting) at world
+      resource spawns + crafting professions (Alchemy, Weaponsmith, Armorsmith, Gemcutting, **Architect** for city
+      parts). Zero today. Needs node spawns, a gather interaction, recipe data, and a craft UI/flow.
+- [ ] **Tortage day/night destiny phasing** — the starter zone's solo-"night" (destiny quest) vs group-"day"
+      instances the player phases between; an AoC-specific single-player layering of one zone. Ties into the §1
+      create-world / cutscene work (one capture is named `…login_move-from-night-to-day…`).
+- [ ] **Alternate Advancement (AA) / veteran / mastery** — the post-level-80 perk trees (feat-like endgame
+      progression). Not modeled.
+
+---
+
 ## Known non-blockers (no action unless curious)
 
 - `OverrideGameTweaks` (`0x2085...`) — client logs `stream bad after 'overrides'` and drops that one route every
