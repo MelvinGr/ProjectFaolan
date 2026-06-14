@@ -12,7 +12,9 @@ namespace Faolan.Importer
 	// Keyed by the capture's BASE filename (no .tshark.json) + NPC name. Captures/NPCs not listed stay unconditional.
 	public static class ConversationConditions
 	{
-		// Casilda's first quest is 13479 ("Scavenger Lackey"); her dialogue + her chained/unchained state flip on it.
+		// Casilda gives the "Casilda" quest, id 13479 (capture: …randochar-login-get-casilda-quest, QuestFullUpdate
+		// 0x63268258 id=13479 after the ApproachCasilda destiny step). Her dialogue + her chained/unchained state flip
+		// on it. (Separate from the "Shipwrecked" quest, given after the Kalanthes conversation — id not yet captured.)
 		private const int CasildaFirstQuest = 13479;
 
 		private static readonly List<(string CaptureBaseName, string NpcName, string Condition)> Rules =

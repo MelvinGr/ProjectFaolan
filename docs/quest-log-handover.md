@@ -62,15 +62,18 @@ Three download (`s→c`) record packets carry the journal content. All share the
 - `category=50301` = quest description; expect objective-text refs too. The leading
   `01 0000 27fe 01 0000 27fe 01 …` block is the structured header (ids + flags/counts) to decode.
 
-### QuestRewards `0xA36D3B74`  (turn-in reward list)
+### QuestRewards `0xA36D3B74`  (mis-named — it's the destiny/tutorial STEP driver)
 ```
-a36d3b74 0000c350 01316d8a 00000002 f708 0510 0718 0022 b901 3c72… (= "<r…")
-   <remoteformat token="playorskip(72)|onclientconnected(1)|NEW_character_creation Slave Galley
-    (server-side)" category="50023">
+a36d3b74 0000c350 0131720b 00000000 1f 08 05 10 02 18 00 22 0f "ApproachCasilda" 2a 00 32 04 08 00 10 00
+   …and: "WelcomeTutorial" / "CombatTutorial" / "StartFixed3d" / token="playorskip(72)|
+    onclientconnected(1)|NEW_character_creation Slave Galley (server-side)" category="50023"
 ```
-- Body is **protobuf-shaped** (`08/10/18/22` field tags) wrapping reward refs + a remoteformat. 50 of these
-  in the questcomplete capture. Likely item/xp/money reward descriptors — cross-check field ids against
-  `docs/aoc-client-protos.proto`.
+- Body is **protobuf-shaped** (`08/10/18/22/2a/32` field tags) wrapping a **named scripted-step token**, not
+  an item/xp/money reward as the opcode-catalog name implies. The tokens observed —
+  `WelcomeTutorial`, `CombatTutorial`, `ApproachCasilda`, `StartFixed3d`, `NEW_character_creation …` — are
+  **Tortage destiny/tutorial step markers** (see #149 day/night destiny phasing). `ApproachCasilda` fires
+  immediately before Casilda's quest grant. Decode the field tags against `docs/aoc-client-protos.proto`;
+  this packet drives the scripted intro sequence, the reward side is a separate concern.
 
 ---
 
@@ -80,10 +83,28 @@ Primary, rich in all five packet types:
 `Captures/account-stricken998-character-strickenbla-create-random-actions-combat-levelup-questcomplete.tshark.json`
 (4903 pkts; QuestIIR×6, QuestGoal×3, QuestFullUpdate×5, QuestJournal×3, QuestRewards×50).
 
+**Fresh-offer / grant flow** (the previously-missing capture):
+`Captures/account-stricken997-character-randochar-login-get-casilda-quest.tshark.json` — a brand-new char
+logs in and gets Casilda's quest. Shows the destiny-step driver in action:
+`WelcomeTutorial`/`CombatTutorial` → `ApproachCasilda` (QuestRewards `0xA36D3B74` tokens) → talk to Casilda →
+**QuestFullUpdate `0x63268258` with quest id 13479** (remoteformat id=13479 category=50301). This is the true
+fresh-offer Casilda dialogue + first-quest grant.
+
 Accept-side (one QuestFullUpdate at accept):
 `Captures/account-faolan-character-necrol80-login-changemap-accept_quest.tshark.json`.
 
-Quest used throughout: **13479 (`0x34A7`) "Scavenger Lackey"**, goal id `0x1670` (5744).
+**Quest naming (corrected 2026-06-14):** quest **13479 (`0x34A7`) is the "Casilda" quest** — the one Casilda
+gives — goal id `0x1670` (5744). It is *not* "Scavenger Lackey" (that name was wrong in earlier notes/issues;
+**"Scavenger Lackey" is a beach *mob* name**, FA015807 spawns at frames 49/54/355/392 of this capture). The
+"**Shipwrecked**" quest is given after the **Kalanthes** conversation; its quest id is not yet in a capture
+(the `…kalantes_chat` capture only reaches the `WelcomeTutorial`/`StartFixed3d` tutorial-token stage).
+
+**Quest-triggered spawn (→ M4, #184):** the named NPC **"Scavenger Tuut"** (FA015807, handle `0x00056DB0`)
+spawns on the beach **in the same dialogue turn as the quest-13479 grant** — frame 687 QuestFullUpdate
+(0x63268258) → frame 689 the Tuut spawn. So an active Casilda quest *adds* a per-player beach NPC. M4's
+conditional-spawn model (chained↔unchained Casilda) must also cover "spawn Tuut while 13479 is active". The
+simplest path is including it in the player's login world-burst gated on quest state (sidesteps the pinned
+mid-session-spawn blocker, `memory protocol_midsession_spawn_blocked`).
 
 The `.tshark.json` records expose `BodyHex` per packet; **`BodyHex` = `[len4][subOp4]…`** (sub-op at byte 4,
 not byte 0 — that tripped up the first dump). Filter on the sub-op hex.
