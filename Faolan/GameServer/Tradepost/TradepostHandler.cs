@@ -47,6 +47,11 @@ namespace Faolan.GameServer.Tradepost
 					await listener.HandleTradepostBuy(client, packet);
 					break;
 
+				case TradepostProtocol.AgentMethod.TradepostSellItem:
+					// SELL -> list a bank item for sale (creates a listing + escrows the item out of the bank).
+					await listener.HandleTradepostSell(client, packet);
+					break;
+
 				case TradepostProtocol.AgentMethod.Close:
 					logger.LogInformation("Tradepost: {Char} closed the auction house.", CharName(client));
 					break;

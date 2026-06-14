@@ -170,11 +170,28 @@ fragment is left empty (per-item RDB name key unsynthesizable — same client-RD
 the granted item uses the **Items-template** identity, not the listed instance's exact Data quad (like vendor BUY);
 the seller isn't credited (importer-seeded sellers aren't live characters).
 
-**Still to wire — SELL into the AH (`TradepostSellItem 0x200A`) is BLOCKED on a capture.** No capture contains the
-sell/list-an-item request (only BUY `0x200E` + the mail flow are on the wire), so the request body grammar is
-unknown — building it would be speculative and un-golden-testable, against the "decode first" rule. Capture a retail
-"list an item for sale" session (also `TradepostChangeItemPrice 0x200B`/`TradepostCancelSellItem 0x200C`) to decode
-the body, then create a `TradepostListing` from a bank item + escrow it.
+## SELL into the AH + player SendMail (decoded 2026-06-14 from `account-faolan-character-necrol80-sell_item_on_ah-send_mail_with_attachment`)
+
+**`TradepostSellItem` (C→S `0x200A`) — byte-exact (capture F375):**
+```
+[nBankItemSlot:u32][nPrice:u64]
+```
+F375 = slot 6 @ 1,000,000 tin. Lists one of the player's BANK items (container 105) for sale: the server creates a
+`TradepostListing` from the bank item's identity (Data quad + template + level + archetype, seller = char name, the
+given price/qty), escrows the item out of the bank, and refreshes the bank tab. There is NO direct tradepost reply
+(the client just re-polls). WIRED: `GameServerListener.HandleTradepostSell`, repo `CreateTradepostListing`,
+golden test `TradepostSellBodyTests`. INTERIM: the listing's search `ItemId` is filed under the item's TEMPLATE
+(we lack the retail item-type search id), so a normal item-type search won't necessarily find it; the listing is
+created + escrowed correctly. `TradepostChangeItemPrice 0x200B` / `TradepostCancelSellItem 0x200C` still uncaptured.
+
+**`SendMail` (C→S `0x2002`) — player→player mail with a bank-item attachment (capture F499), DECODED, not yet wired:**
+```
+[u16+recipientName ascii][u16+bodyText ascii][money:u64][0x000007E2:u32][bankItemSlot:u32]
+```
+F499 = to "DemoL80", body "Hello this is a test", money 0, attach bank slot 5 (the `0x7E2` word is the same category
+constant the AH search carries; preserved). Reply `DispatchSendMailResult` (S→C `0x2003`) = `[u8 success][u16+remoteformat XML]`
+(F500: success=1 + a result-message remoteformat). This is the player-composed mail path (distinct from the
+AH buy→system-mail already wired); to implement, create a `Mail` to the recipient with the bank item escrowed.
 
 ## Implementation notes (for TODO §9a)
 

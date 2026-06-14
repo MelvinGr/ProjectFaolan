@@ -74,6 +74,56 @@ namespace Faolan.GameServer
 				character.Name, saleId, listing.ItemId, listing.Price, mail.MailId, character.Money);
 		}
 
+		// TradepostSellItem (0x200A) [nBankItemSlot:u32][nPrice:u64]: list one of the player's BANK items (container
+		// 105) for sale. Decoded from the necrol80 sell_item_on_ah capture (F375 = slot 6 @ 1,000,000 tin). Creates a
+		// TradepostListing from the bank item's identity, escrows the item out of the bank, and refreshes the bank tab.
+		internal async Task HandleTradepostSell(INetworkClient client, ConanPacket packet)
+		{
+			var character = client.Session.Character;
+			if (character == null)
+				return;
+
+			var bankSlot = (int)packet.Body.ReadUInt32();
+			var price = packet.Body.ReadUInt64();
+
+			var rows = await Database.GetCharacterInventory(character.Id);
+			var row = rows.FirstOrDefault(r => r.Container == (int)FullCharSnapshotBuilder.BankKind && r.Slot == bankSlot);
+			if (row?.Item == null)
+			{
+				Logger.LogWarning("Tradepost SELL: {Char} has no bank item at slot {Slot}.", character.Name, bankSlot);
+				return;
+			}
+
+			var listing = new TradepostListing
+			{
+				SaleId = await AllocateSaleId(),
+				Handle = 0,
+				SellerName = character.Name,
+				Price = price,
+				Quantity = row.Count == 0 ? 1u : row.Count,
+				ItemId = row.Item.Id,        // filed under the item's template (best-effort search key)
+				InstanceField = 0,
+				ItemHandle = 0,
+				EntryFlags = 0x421,          // the flag word every captured listing carries
+				Timestamp = 0,
+				Data1 = row.Item.Data1,
+				Data2 = row.Item.Data2,
+				Data3 = row.Item.Data3,
+				Data4 = row.Item.Data4,
+				Template = row.Item.Id,
+				ItemLevel = row.Item.Level,
+				ItemHash = row.Item.Archetype
+			};
+			await Database.CreateTradepostListing(listing);
+
+			// Escrow: the listed item leaves the bank (until sold/cancelled). Refresh the bank tab so it disappears.
+			await Database.SetCharacterInventorySlot(character.Id, (int)FullCharSnapshotBuilder.BankKind, bankSlot, null);
+			await ResendBank(client);
+
+			Logger.LogInformation("Tradepost SELL: {Char} listed \"{Item}\" x{Qty} (bank slot {Slot}, template {Template}) for {Price} tin -> sale 0x{Sale:X16}.",
+				character.Name, row.Item.Name, listing.Quantity, bankSlot, row.Item.Id, price, listing.SaleId);
+		}
+
 		// The mailbox ops (GetAllMails / GetMailByID / GetItemData preview / GetMailItem take / MarkMailRead /
 		// DeleteMail). All address the buyer's own mail by the wire MailId; GetMailItem grants the escrowed item.
 		internal async Task HandleTradepostMailOp(INetworkClient client, ConanPacket packet, TradepostProtocol.AgentMethod method)
@@ -265,6 +315,19 @@ namespace Faolan.GameServer
 			{
 				var id = (ulong)System.Random.Shared.NextInt64(1, long.MaxValue);
 				if (await Database.GetMailByWireId(id) == null)
+					return id;
+			}
+
+			return (ulong)System.Random.Shared.NextInt64(1, long.MaxValue);
+		}
+
+		// A unique sale id for a new listing (session-volatile, like the mail id); retry on the rare collision.
+		private async Task<ulong> AllocateSaleId()
+		{
+			for (var attempt = 0; attempt < 8; attempt++)
+			{
+				var id = (ulong)System.Random.Shared.NextInt64(1, long.MaxValue);
+				if (await Database.GetTradepostListingBySaleId(id) == null)
 					return id;
 			}
 
