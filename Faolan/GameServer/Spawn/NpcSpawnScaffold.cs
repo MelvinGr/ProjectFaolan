@@ -41,12 +41,12 @@ namespace Faolan.GameServer.Spawn
 		// The minimal record body + the shared 0x3F1 terminators (everything after the 12-byte header). Constant
 		// across all 23 NPCs that carry the minimal form (verified single distinct value, dissect_npc_spawn.py).
 		private static readonly byte[] MinimalBody =
-		{
+		[
 			0x00, 0x00, 0x00, 0x03, 0xF1, // [u8 0][u32 0x3F1] - empty ID-list terminator
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xF1, // empty pair list, 0x3F1 terminator
 			0x00, 0x00, 0x03, 0xF1, // 0x3F1 marker
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xF1 // end pairs, final 0x3F1 marker
-		};
+		];
 
 		// Builds the minimal post-IIR scaffold for a freshly-spawned NPC: [u32 0][u32 len-36][u32 1] + the
 		// constant terminator body. Byte-identical to the 23 minimal-form NPCs in the beach burst.

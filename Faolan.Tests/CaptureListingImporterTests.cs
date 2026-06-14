@@ -53,7 +53,7 @@ namespace Faolan.Tests
 			var b = CaptureListingImporter.ToListing(TradepostListingCodec.Parse(Convert.FromHexString(CapturedBody)).Rows.Single());
 			b.Price = 42; // same saleId, later capture wins
 
-			var merged = CaptureListingImporter.Merge(new[] { a, b });
+			var merged = CaptureListingImporter.Merge([a, b]);
 
 			var single = Assert.Single(merged);
 			Assert.Equal(42ul, single.Price);

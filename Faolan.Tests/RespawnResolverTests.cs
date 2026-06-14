@@ -15,7 +15,7 @@ namespace Faolan.Tests
 		public void ClosestKnown_AlwaysKnownNeedsNoDiscovery()
 		{
 			var beach = Point(1, 5, 0, true);
-			var target = RespawnResolver.ClosestKnown(Vector3.Zero, new[] { beach }, null);
+			var target = RespawnResolver.ClosestKnown(Vector3.Zero, [beach], null);
 			Assert.Same(beach, target);
 		}
 
@@ -35,8 +35,8 @@ namespace Faolan.Tests
 		public void ClosestKnown_NullWhenNothingKnown()
 		{
 			var unknown = Point(1, 5, 0); // not always-known, not discovered
-			Assert.Null(RespawnResolver.ClosestKnown(Vector3.Zero, new[] { unknown }, new HashSet<uint>()));
-			Assert.Null(RespawnResolver.ClosestKnown(Vector3.Zero, Array.Empty<RespawnPoint>(), null));
+			Assert.Null(RespawnResolver.ClosestKnown(Vector3.Zero, [unknown], new HashSet<uint>()));
+			Assert.Null(RespawnResolver.ClosestKnown(Vector3.Zero, [], null));
 		}
 
 		[Fact]

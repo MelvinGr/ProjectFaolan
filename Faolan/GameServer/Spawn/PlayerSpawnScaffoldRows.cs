@@ -25,13 +25,13 @@ namespace Faolan.GameServer.Spawn
 		// race/class/head presets - mapping not yet cracked), so fresh characters keep Dikketest's proven set.
 		// The character's morph entries are generated from its CharacterBody (see CharacterMorphs), not stored here.
 		private static readonly ScaffoldEntry[] FreshWeightedAttributes =
-		{
+		[
 			new ScaffoldEntry(1, 0x00B0, 0x3F800000), new ScaffoldEntry(2, 0x0147, 0x3F800000), new ScaffoldEntry(3, 0x0154, 0x3F800000), new ScaffoldEntry(4, 0x0191, 0x3F800000), new ScaffoldEntry(5, 0x010B, 0x3F800000),
 			new ScaffoldEntry(6, 0x01DE, 0x3F800000)
-		};
+		];
 
 		// Dikketest's feat/ability ID list (all rank 0).
-		private static readonly uint[] FreshSkillIds = { 1800, 6000, 6100, 6200, 6300, 6600, 6800, 6900, 7100, 8100, 8305, 8400, 13600, 14600, 124400, 318400, 318800, 328700, 328900, 331300 };
+		private static readonly uint[] FreshSkillIds = [1800, 6000, 6100, 6200, 6300, 6600, 6800, 6900, 7100, 8100, 8305, 8400, 13600, 14600, 124400, 318400, 318800, 328700, 328900, 331300];
 
 		// Builds the weighted (1.0) appearance entries from the character's chosen editor resources, resolved
 		// against the imported client registry (MorphTarget; wire tag = registry id - 1). Wire order = editor

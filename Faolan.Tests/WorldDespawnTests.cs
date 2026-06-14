@@ -46,7 +46,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void TryExtractPlayfieldToken_ReturnsFalseWhenAbsent()
 		{
-			Assert.False(WorldDespawn.TryExtractPlayfieldToken(new byte[] { 0x01, 0x02, 0x03, 0x04 }, out var token));
+			Assert.False(WorldDespawn.TryExtractPlayfieldToken([0x01, 0x02, 0x03, 0x04], out var token));
 			Assert.Equal(0u, token);
 		}
 

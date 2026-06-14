@@ -49,13 +49,11 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			return new ProtoInventoryGame.InventoryListEntry
 			{
 				Pos = (uint)slot,
-				Item = BuildInventoryEntry(itemId, item, archetype,
-					new[]
-					{
+				Item = BuildInventoryEntry(itemId, item, archetype, [
 						new ItemStat(0, (uint)flags),
 						new ItemStat(23, (uint)recordId),
 						new ItemStat(26, (uint)count)
-					},
+					],
 					f7)
 			};
 		}

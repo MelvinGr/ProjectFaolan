@@ -12,7 +12,7 @@ namespace Faolan.Core.Crypt
 	public static class ConanLaunchToken
 	{
 		// k0..k3, the TEA key baked into the patcher (the magic constants in sub_439140).
-		private static readonly uint[] PatcherKey = { 0x5BCE568E, 0xFB2E8CBC, 0xA324E6D8, 0xF22BF865 };
+		private static readonly uint[] PatcherKey = [0x5BCE568E, 0xFB2E8CBC, 0xA324E6D8, 0xF22BF865];
 
 		/// <summary>The <c>-key</c> value for a given Unix timestamp (seconds).</summary>
 		public static string ForUnixTime(uint unixSeconds)

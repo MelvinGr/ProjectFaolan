@@ -63,7 +63,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Parse_RejectsNonSpawnBodies()
 		{
-			Assert.False(PlayerSpawnScaffoldCodec.TryParse(new byte[] { 1, 2, 3 }, out _, out _));
+			Assert.False(PlayerSpawnScaffoldCodec.TryParse([1, 2, 3], out _, out _));
 			Assert.False(PlayerSpawnScaffoldCodec.TryParse(new byte[64], out _, out _));
 		}
 

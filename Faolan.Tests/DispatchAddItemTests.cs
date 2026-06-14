@@ -64,14 +64,12 @@ namespace Faolan.Tests
 
 				// 1) The entry blob: same template the snapshot builds, but the live add's per-instance stat set.
 				var entry = SnapshotItemBuilder.BuildInventoryEntry(
-					ItemId, item, item.Archetype,
-					new[]
-					{
+					ItemId, item, item.Archetype, [
 						new SnapshotItemBuilder.ItemStat(0, 1),
 						new SnapshotItemBuilder.ItemStat(8, 0xffffffff),
 						new SnapshotItemBuilder.ItemStat(23, (uint)RecordId),
 						new SnapshotItemBuilder.ItemStat(46, 7)
-					});
+					]);
 				var entryBytes = GameServerListener.SerializeInventoryEntry(entry);
 				Assert.Equal(CapturedEntry, Convert.ToHexStringLower(entryBytes));
 

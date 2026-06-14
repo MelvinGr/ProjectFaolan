@@ -20,7 +20,7 @@ namespace Faolan.GameServer.Spawn
 	{
 		// In wire order: face by slot ascending, then body alphabetical.
 		private static readonly Slider[] Sliders =
-		{
+		[
 			new Slider("BrowLow", 0x00, 2, b => b.EyebrowScale, (b, v) => b.EyebrowScale = v), new Slider("CheekForward", 0x00, 4, b => b.CheekDepth, (b, v) => b.CheekDepth = v),
 			new Slider("CheekLow", 0x00, 6, b => b.CheekHeight, (b, v) => b.CheekHeight = v), new Slider("CheekWide", 0x00, 8, b => b.CheekWidth, (b, v) => b.CheekWidth = v),
 			new Slider("ChinShort", 0x00, 9, b => b.ChinLength, (b, v) => b.ChinLength = v), new Slider("ChinWide", 0x00, 12, b => b.ChinWidth, (b, v) => b.ChinWidth = v),
@@ -34,7 +34,7 @@ namespace Faolan.GameServer.Spawn
 			new Slider("arm", 0x01, 0, b => b.Arm, (b, v) => b.Arm = v), new Slider("arse", 0x01, 4, b => b.Arse, (b, v) => b.Arse = v), new Slider("bosom", 0x01, 2, b => b.Bosom, (b, v) => b.Bosom = v),
 			new Slider("chest", 0x01, 1, b => b.Chest, (b, v) => b.Chest = v), new Slider("ears", 0x00, 0xFF, b => b.Ears, (b, v) => b.Ears = v), new Slider("leg", 0x01, 6, b => b.Leg, (b, v) => b.Leg = v),
 			new Slider("stomach", 0x01, 3, b => b.Stomach, (b, v) => b.Stomach = v), new Slider("thigh", 0x01, 5, b => b.Thigh, (b, v) => b.Thigh = v)
-		};
+		];
 
 		// Generates the spawn-scaffold morph entries for the body's non-default sliders, indexed from
 		// startIndex, in the retail wire order. A null body (character never touched a slider) yields none -

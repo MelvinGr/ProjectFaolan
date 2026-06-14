@@ -33,9 +33,9 @@ namespace Faolan.GameServer.Tradepost
 		// This captured value (Tortage auctioneer + 15.0) is kept only as the golden-test oracle; live opens build
 		// the body from the player's position (BuildAccessPointBody) so the client's within-radius check passes.
 		private static readonly byte[] CapturedAccessPointBody =
-		{
+		[
 			0x44, 0x7D, 0x70, 0x0C, 0x42, 0xE6, 0x2E, 0x00, 0x44, 0x1A, 0x8D, 0xDB, 0x41, 0x70, 0x00, 0x00
-		};
+		];
 
 		// DispatchTradepostSearchResults body - PoC REPLAY of a captured single-row listing (necrol80 auctionhouse
 		// pkt#1028: seller "Jocko", item 0x755D, price 1,000,000, qty 1, + the item's ProtoAcgItem). [head:u32][row]*
@@ -75,12 +75,12 @@ namespace Faolan.GameServer.Tradepost
 
 		// DispatchSendMailResult (0x2003) [u8 success][u8 error] - the result of a send/mark/delete op.
 		public static Task SendMailResult(INetworkClient client, bool success, byte error = 0, uint interfaceInstance = DefaultInterfaceInstance) =>
-			Build(TradepostProtocol.InterfaceMethod.DispatchSendMailResult, new[] { success ? (byte)1 : (byte)0, error }, interfaceInstance)
+			Build(TradepostProtocol.InterfaceMethod.DispatchSendMailResult, [Convert.ToByte(success), error], interfaceInstance)
 				.SendAsync(client);
 
 		// DispatchRetrieveMailResult (0x2004) - a single 0x01 byte (the "mailbox retrieved" ack in the capture).
 		public static Task SendRetrieveMailResult(INetworkClient client, uint interfaceInstance = DefaultInterfaceInstance) =>
-			Build(TradepostProtocol.InterfaceMethod.DispatchRetrieveMailResult, new byte[] { 0x01 }, interfaceInstance)
+			Build(TradepostProtocol.InterfaceMethod.DispatchRetrieveMailResult, [0x01], interfaceInstance)
 				.SendAsync(client);
 
 		private static byte[] BuildAccessPointBody(Vector3 position, float radius)

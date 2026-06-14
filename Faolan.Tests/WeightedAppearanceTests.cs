@@ -17,25 +17,25 @@ namespace Faolan.Tests
 	public class WeightedAppearanceTests
 	{
 		private static readonly (string Ref, ushort Tag, byte Category)[] Registry =
-		{
+		[
 			("*beardmesh_3181870", 0x02BB, 4), ("*hairmesh_566206", 0x012C, 3), ("*texscript_1136960", 0x0193, 10), ("*texscript_183875", 0x01B3, 2), // face paint - never emitted in spawns
 			("*texscript_202393", 0x00E3, 8), ("*texscript_213934", 0x0112, 7), ("*texscript_3113027", 0x01CF, 6), ("*texscript_3770894", 0x0323, 9)
-		};
+		];
 
 		// faolanx's editor resource-ref stream (faolanx-charcreation.json, in send order) and his spawn's
 		// weighted entry tags (faolanx-charlogin, idx 1-7, all weight 1.0).
-		private static readonly string[] FaolanxRefs = { "*beardmesh_3181870", "*hairmesh_566206", "*texscript_1136960", "*texscript_183875", "*texscript_202393", "*texscript_213934", "*texscript_3113027", "*texscript_3770894" };
+		private static readonly string[] FaolanxRefs = ["*beardmesh_3181870", "*hairmesh_566206", "*texscript_1136960", "*texscript_183875", "*texscript_202393", "*texscript_213934", "*texscript_3113027", "*texscript_3770894"];
 
-		private static readonly ushort[] FaolanxWire = { 0x02BB, 0x012C, 0x0193, 0x00E3, 0x0112, 0x01CF, 0x0323 };
+		private static readonly ushort[] FaolanxWire = [0x02BB, 0x012C, 0x0193, 0x00E3, 0x0112, 0x01CF, 0x0323];
 
 		[Fact]
 		public void BuildWeightedEntries_SkipsUnresolvedAndReturnsNullWhenEmpty()
 		{
 			Assert.Null(PlayerSpawnScaffoldRows.BuildWeightedEntries(null, RegistryDict()));
 			Assert.Null(PlayerSpawnScaffoldRows.BuildWeightedEntries(Resources(FaolanxRefs), null));
-			Assert.Null(PlayerSpawnScaffoldRows.BuildWeightedEntries(Resources(new[] { "*texscript_999999" }), RegistryDict()));
+			Assert.Null(PlayerSpawnScaffoldRows.BuildWeightedEntries(Resources(["*texscript_999999"]), RegistryDict()));
 			// Only the never-emitted face-paint category resolves -> null (fall back to defaults).
-			Assert.Null(PlayerSpawnScaffoldRows.BuildWeightedEntries(Resources(new[] { "*texscript_183875" }), RegistryDict()));
+			Assert.Null(PlayerSpawnScaffoldRows.BuildWeightedEntries(Resources(["*texscript_183875"]), RegistryDict()));
 		}
 
 		[Fact]

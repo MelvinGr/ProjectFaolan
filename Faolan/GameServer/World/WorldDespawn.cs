@@ -18,8 +18,8 @@ namespace Faolan.GameServer.World
 
 		// The markers that bracket the playfield token inside the 0x737A6DF9 snapshot tail: ...000000BF <token> 0000040B
 		// (verified identical in the seeded beach burst (token 0x004FE428) and the hoxxling gameplay capture (0x01EA985C)).
-		private static readonly byte[] TokenPrefixMarker = { 0x00, 0x00, 0x00, 0xBF };
-		private static readonly byte[] TokenSuffixMarker = { 0x00, 0x00, 0x04, 0x0B };
+		private static readonly byte[] TokenPrefixMarker = [0x00, 0x00, 0x00, 0xBF];
+		private static readonly byte[] TokenSuffixMarker = [0x00, 0x00, 0x04, 0x0B];
 
 		// Builds the 17-byte IIR body (the bytes after the u32 length prefix) for removing `handle` in playfield `token`.
 		public static byte[] BuildBody(uint handle, uint token)

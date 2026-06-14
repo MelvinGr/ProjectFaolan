@@ -42,7 +42,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Build_MatchesCapturedRow()
 		{
-			var body = TradepostListingCodec.Build(0x7e2, new[] { JockoListing() });
+			var body = TradepostListingCodec.Build(0x7e2, [JockoListing()]);
 
 			Assert.Equal(CapturedBody, Convert.ToHexStringLower(body));
 		}
@@ -70,7 +70,7 @@ namespace Faolan.Tests
 		public void BuildThenParse_RoundTrips()
 		{
 			var listing = JockoListing();
-			var body = TradepostListingCodec.Build(0x7e2, new[] { listing });
+			var body = TradepostListingCodec.Build(0x7e2, [listing]);
 
 			var row = TradepostListingCodec.Parse(body).Rows.Single();
 

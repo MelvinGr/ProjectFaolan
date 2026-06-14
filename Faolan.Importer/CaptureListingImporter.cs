@@ -20,7 +20,7 @@ namespace Faolan.Importer
 	{
 		// TradepostInterface class id (the search-results sender) in little-endian wire order - the discriminator
 		// that tells a Tradepost 0x2005 apart from the colliding GameCharInterface DispatchUpdateCash (also 0x2005).
-		private static readonly byte[] TradepostInterfaceLe = { 0xB5, 0xD5, 0xC2, 0xF2 }; // 0xF2C2D5B5
+		private static readonly byte[] TradepostInterfaceLe = [0xB5, 0xD5, 0xC2, 0xF2]; // 0xF2C2D5B5
 
 		public static List<TradepostListing> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
