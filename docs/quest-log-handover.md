@@ -282,13 +282,23 @@ retail's objective tail is not required for the quest to show. Model the region 
 (today: single `RemoteFormat50301/50302/50300` + opaque `UnknownBeforeAccessWindowTable`) as a parsed
 detail-block list + index, regenerate from `CharacterQuests`×`QuestDefinition`.
 
-**Status: BUILD-READY, blocked on in-client.** Decode complete; the generate path reuses tested code. NOT yet
-implemented because snapshot-tails surgery is regression-prone and **in-client-gated**
-(`protocol_chat_connection_regression`) — it must be built behind a default-off flag and proven in-client
-(chat + world-load intact + the quest visible after relog), which needs a live client. Remaining unknowns
-before a byte-exact golden (not required for the generate path, but for fidelity): the index `marker` word
-(template `0x7E2` vs `xxx-login` `0x0BD3`), the `N` field (10238=4/13479=3), and the 51000-localized id
-derivation (objective `id=11561`).
+**Index framing — fully decoded + self-validated** (`decode_snapshot_quests.py`): the index after the detail
+blocks is `[0x000003F1][marker u32][questId u32 × N][N u32][0x000000F1][0x57365154]…`; `N` is the quest COUNT
+and equals the id-run length (template=1 → `[27FE][1]`; `xxx-login`=2 → `[27FE][34A7][2]`). Adding a quest =
+insert its detail block immediately before `0x000003F1`, append its id to the id-run, bump `N`.
+
+**Status: blocked on in-client (the byte-accounting last mile).** The build path is clear and reuses tested
+code, BUT the per-quest detail block must serialize to the EXACT length/framing the tails parser expects, and
+a 1-byte error mis-frames the rest of the tails (access-window table) → broken FullChar → chat/world-load
+regression (`protocol_chat_connection_regression`). Open accounting to pin (needs a live client to prove, so
+build behind a default-off flag and bisect in-client): the tails 13479 block is **879 B** vs
+`BuildQuestFullUpdate`'s content **880 B** — i.e. the block is QFU-content WITHOUT the trailing `0x00`
+separator (line 189); confirm whether consecutive blocks carry a separator, and that the objective-record
+section (which diverges from the live QFU at byte 577 — acceptTime/markers) parses identically in the tails
+reader. The `marker` word (`0x7E2` vs `0x0BD3`) and 51000-localized id (`id=11561`) only matter for byte
+fidelity, not for the quest to show. **Recommended:** implement `SnapshotQuestInjector.Inject(tails, blocks)`
+(byte surgery: insert blocks + extend index) + a `WorldBroadcaster` block builder (QFU-content minus the
+17-byte prefix), wire behind `FAOLAN_SNAPSHOT_QUESTS=1`, then bisect block length in-client.
 
 ## Related
 

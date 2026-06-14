@@ -75,6 +75,19 @@ def decode(path):
             ("50300", "50301", "50302", "50304", "51000", "52000")}
     print(f"  remoteformat categories: {cats}")
 
+    # The quest INDEX after the detail blocks: [1009=0x3f1][marker][questId x N][N][0xf1][0x57365154]...
+    # N is the quest COUNT (template=1, xxx-login=2) - it sits AFTER the id-run, before the 0xf1 sentinel.
+    mi = b.find(b"\x00\x00\x03\xf1")
+    if mi >= 0:
+        marker = u32(b, mi + 4)
+        # ids are real quest ids (>= 0x1000); the COUNT (small) sits right before the 0xf1/0x57365154 sentinel.
+        ids, o = [], mi + 8
+        while o + 4 <= len(b) and u32(b, o) >= 0x1000:
+            ids.append(u32(b, o)); o += 4
+        count = u32(b, o)
+        print(f"  index @{mi}: marker=0x{marker:x} ids={[hex(i) for i in ids]} count={count}"
+              + ("  [OK count==#ids]" if count == len(ids) else "  [!! count mismatch]"))
+
 
 if __name__ == "__main__":
     args = sys.argv[1:] or [
