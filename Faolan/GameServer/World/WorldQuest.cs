@@ -28,6 +28,15 @@ namespace Faolan.GameServer.World
 
 		// Quest state codes (from the capture; only "active/added" = 2 is confirmed).
 		public const uint StateActive = 2;
+
+		// The QuestFullUpdate (0x63268258) carries its OWN per-quest "state/category" field (the u32 after the second
+		// questId) - a DIFFERENT enum from the QuestIIR StateActive above. It is CONSTANT per quest across its whole
+		// lifecycle (every captured 13479 full-update uses 3, on grant and on every re-display: frames 687/8876/9947/
+		// 10129), so it is a quest property, not a dynamic state. Passing the QuestIIR value (2) here makes the client
+		// silently DROP the full-update (journal stays empty) - the bug behind the dialogue-grant not rendering.
+		// TODO: harvest this per quest into QuestDefinition; 3 is the captured value for Casilda's 13479 (and the only
+		// value observed for active quests so far - a different quest 0x..27 used 1).
+		public const uint FullUpdateStateActive = 3;
 		public const uint TypeTagAck = 0x0000C350;
 
 		// The Tortage beach world-entry snapshot (0x737A6DF9) embeds quest 10238 ("Shipwrecked") in its tails, with its
@@ -78,6 +87,8 @@ namespace Faolan.GameServer.World
 
 		public const uint QuestJournalSubOpcode = 0x79F8C7A1; // the J-panel quest list
 		public const uint QuestFullUpdateSubOpcode = 0x63268258; // one quest's full detail
+		public const uint QuestLogListSubOpcode = 0x504B7924; // the active-quest LIST that POPULATES the J-panel
+		public const uint AreaTitleCategory = 50300; // category of the area journal-title remoteformat
 		private const uint ChapterTag = 0x00000BD3; // per-quest grouping word, constant across Tortage quests
 		private const string RrlMagic = "RRL3"; // record-list magic that precedes the per-quest entries
 
@@ -187,6 +198,37 @@ namespace Faolan.GameServer.World
 			w.AddRange(objectiveText);
 			w.AddRange(objectiveLocalized);
 			w.Add(0x00);
+			return w.ToArray();
+		}
+
+		// The active-quest LIST (0x504B7924) that POPULATES the J-panel. WITHOUT this the client never shows an
+		// accepted quest in the log even though it received the per-quest QuestFullUpdate detail (the detail alone is
+		// not enough - decoded from randochar frame 687 / strickenbla frame 3086). Retail sends it at every grant,
+		// listing ALL the player's active quests (tracked quest first), plus the current area's journal-title slot.
+		// Wire (subopcode onward):
+		//   [subop][ack][u32 player] 01 [u32=1] [u32 areaId] [u32 trackedQuestId] [u32 count]
+		//   count × { u32 index(1-based); u32 questId }
+		//   <areaTitle text slot: 00 <len> <remoteformat areaId/50300>>
+		//   [u32=1] [10 zero bytes]
+		public static byte[] BuildQuestLogList(uint playerHandle, uint areaId, uint trackedQuestId, IReadOnlyList<uint> questIds, byte[] areaTitleRecord)
+		{
+			var w = new List<byte>(64 + questIds.Count * 8 + areaTitleRecord.Length);
+			WriteHeader(w, QuestLogListSubOpcode, playerHandle);
+			w.Add(0x01);
+			WriteU32(w, 1);
+			WriteU32(w, areaId);
+			WriteU32(w, trackedQuestId);
+			WriteU32(w, (uint)questIds.Count);
+			for (var i = 0; i < questIds.Count; i++)
+			{
+				WriteU32(w, (uint)(i + 1));
+				WriteU32(w, questIds[i]);
+			}
+
+			w.AddRange(areaTitleRecord);
+			WriteU32(w, 1);
+			for (var i = 0; i < 10; i++)
+				w.Add(0x00);
 			return w.ToArray();
 		}
 

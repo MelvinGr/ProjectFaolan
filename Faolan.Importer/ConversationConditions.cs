@@ -34,11 +34,12 @@ namespace Faolan.Importer
 		// served only when both fail.)
 		private static readonly List<(string CaptureBaseName, string NpcName, string Condition)> Rules =
 		[
-			// Casilda OFFER (fresh char, quest 13479 not yet accepted) - three clean offer walks that agree
-			// (greeting -> 0 -> 0>0 -> 0>0>0 -> 0>0>0>0 grants 13479); they union into one offer tree.
+			// Casilda OFFER (fresh char, quest 13479 not yet accepted) = the canonical fresh first-quest capture:
+			// greeting -> 0 -> 0>0 -> 0>0>0 -> 0>0>0>0 grants 13479, then the next pick CLOSES (6 screens, matches
+			// retail). The Strie/strickenbla walks are deliberately NOT unioned in here: they continue past the grant
+			// to a FOLLOW-UP quest 13480 (at 0>0>0>0>0), which made the accept grant two quests / fire two
+			// notifications. Keeping the offer to randochar alone reproduces retail's single-quest first-offer flow.
 			("account-stricken997-character-randochar-login-get-casilda-quest", "Casilda", ""),
-			("account-stricken997-character-Strie-login-randomActions", "Casilda", ""),
-			("account-stricken998-character-strickenbla-create-random-actions-combat-levelup-questcomplete", "Casilda", ""),
 			// Casilda AFTER accepting but BEFORE completing (in-progress greeting; this char already had the quest).
 			("account-stricken998-character-xxx-login", "Casilda", $"return player:HasQuest({CasildaFirstQuest}) and not player:HasCompletedQuest({CasildaFirstQuest})"),
 			// Casilda AFTER it is complete: the turn-in capture + the post-quest login (the unchained, different greeting).

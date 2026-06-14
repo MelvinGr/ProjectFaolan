@@ -74,10 +74,25 @@ namespace Faolan.GameServer
 			var orderedPackets = node.Packets.OrderBy(p => p.Sequence).ToList();
 			var hasAnswerList = orderedPackets.Any(p => ConversationSubOpcode(p.Data) == KnubotAnswerListSubOpcode);
 
+			// A grant node accepts a quest. Retail announces it INTERLEAVED inside the grant screen, in this order:
+			// AppendText -> QuestLogList (0x504B7924, the J-panel list) -> QuestFullUpdate (0x63268258, the detail) ->
+			// AnswerList, with NO QuestIIR and NO QuestJournal (capture randochar-login-get-casilda-quest frame 687-688).
+			// The QuestLogList is what POPULATES the log; sending only the full-update (the detail) leaves the log empty.
+			var grantDef = node.GrantQuestId != 0 ? await PrepareQuestGrant(client, node) : null;
+			var grantSent = false;
+
 			foreach (var p in orderedPackets)
 			{
-				if (hasAnswerList && ConversationSubOpcode(p.Data) == KnubotCloseChatWindowSubOpcode)
+				var subOp = ConversationSubOpcode(p.Data);
+				if (hasAnswerList && subOp == KnubotCloseChatWindowSubOpcode)
 					continue; // skip the spurious close so the option list stays interactive
+
+				// Deliver the quest packets immediately BEFORE the screen's AnswerList, mirroring retail's order.
+				if (grantDef != null && !grantSent && subOp == KnubotAnswerListSubOpcode)
+				{
+					await SendQuestGrantPackets(client, grantDef);
+					grantSent = true;
+				}
 
 				var packet = (byte[])p.Data.Clone();
 				SubstituteUInt32(packet, node.CapturedNpcHandle, clickedNpcHandle);
@@ -87,42 +102,50 @@ namespace Faolan.GameServer
 				await new PacketStream(packet).SendAsync(client);
 			}
 
+			if (grantDef != null && !grantSent) // no AnswerList on this screen - send after the (terminal) screen
+				await SendQuestGrantPackets(client, grantDef);
+
 			client.Session.ConversationNpcName = node.NpcName;
 			client.Session.ConversationTypeId = node.TypeId;
 			client.Session.ConversationAnswerPath = node.AnswerPath;
 			client.Session.ConversationNpcHandle = clickedNpcHandle;
 
 			Logger.LogInformation("Conversation screen (npc={Name}, typeId={TypeId}, path='{Path}') -> {Packets} packet(s) for NPC 0x{Npc:X}.", node.NpcName, node.TypeId, node.AnswerPath, node.Packets.Count, clickedNpcHandle);
-
-			if (node.GrantQuestId != 0)
-				await GrantQuestFromConversation(client, node.GrantQuestId);
 		}
 
-		// Reaching a conversation node that GRANTS a quest (harvested from the capture as ConversationNode.GrantQuestId)
-		// accepts it for the player: persist it active and push its journal content (QuestIIR + the J-panel record), so
-		// "talk to NPC -> accept -> it appears in the quest journal" works for any NPC. Guarded so re-serving the node
-		// (or already having the quest) doesn't duplicate or reset it.
-		private async Task GrantQuestFromConversation(INetworkClient client, uint questId)
+		// Reaching a conversation node that GRANTS a quest accepts it for the player: persist it ACTIVE and return its
+		// definition so ServeScreen can deliver the single QuestFullUpdate inline (the retail grant shape - see above).
+		// Returns null when the player already has the quest (re-serving the node must not re-grant) or it has no
+		// definition (state is still persisted; there is just nothing to render).
+		private async Task<QuestDefinition> PrepareQuestGrant(INetworkClient client, ConversationNode node)
 		{
 			var character = client.Session?.Character;
 			if (character == null)
-				return;
+				return null;
 
 			var existing = await Database.GetCharacterQuests(character.Id);
-			if (existing.Any(q => q.QuestId == questId))
-				return; // already accepted (active) or completed - don't re-grant
+			if (existing.Any(q => q.QuestId == node.GrantQuestId))
+				return null; // already accepted (active) or completed - don't re-grant
 
-			await Database.SetCharacterQuest(character.Id, questId, QuestState.Active);
-			await _broadcaster.SendQuestIir(client, questId, WorldQuest.StateActive);
+			await Database.SetCharacterQuest(character.Id, node.GrantQuestId, QuestState.Active);
+			Logger.LogInformation("Quest {QuestId} granted to {Name} from {Npc}'s dialogue.", node.GrantQuestId, character.Name, node.NpcName);
+			return await Database.GetQuestDefinition(node.GrantQuestId);
+		}
 
-			var def = await Database.GetQuestDefinition(questId);
-			if (def != null)
-			{
-				await _broadcaster.SendQuestFullUpdate(client, def);
-				await _broadcaster.SendQuestJournal(client, new[] { def });
-			}
+		// Sends the two retail grant packets in order: the QuestLogList (populates the J-panel - all active quests,
+		// just-granted tracked first) then the QuestFullUpdate (the quest's detail). Order + presence both matter: the
+		// list is what makes the quest appear in the log (decoded from the grant capture).
+		private async Task SendQuestGrantPackets(INetworkClient client, QuestDefinition grantDef)
+		{
+			var character = client.Session.Character;
+			var active = await Database.GetCharacterQuests(character.Id);
+			var ids = new List<uint> { grantDef.QuestId };
+			ids.AddRange(active
+				.Where(q => q.State == QuestState.Active && q.QuestId != grantDef.QuestId)
+				.Select(q => q.QuestId));
 
-			Logger.LogInformation("Quest {QuestId} granted to {Name} from {Npc}'s dialogue.", questId, character.Name, client.Session.ConversationNpcName);
+			await _broadcaster.SendQuestLogList(client, grantDef, ids);
+			await _broadcaster.SendQuestFullUpdate(client, grantDef);
 		}
 
 		// The player picked option `answerIndex` in the active conversation: navigate to the child screen at the

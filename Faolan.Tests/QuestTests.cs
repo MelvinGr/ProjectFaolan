@@ -139,6 +139,12 @@ namespace Faolan.Tests
 			var full = WorldQuest.BuildQuestFullUpdate(0x0131720B, def.QuestId, 3, def.AreaId, textRefs, def.GoalId,
 				0x000111D354375554UL, def.MapId, def.MarkerX, def.MarkerY, Rec(QuestTextSlot.Objective), Rec(QuestTextSlot.ObjectiveLocalized));
 			Assert.Equal(CaptureBody("63268258"), Convert.ToHexString(full).ToLowerInvariant());
+
+			// Quest-log LIST (the packet that POPULATES the J-panel) - byte-exact against frame 687. The captured
+			// randochar had four active quests (tracked 13479 first); the area-title slot is the 13479 def's AreaTitle.
+			var logList = WorldQuest.BuildQuestLogList(0x0131720B, def.AreaId, 0x34A7,
+				new uint[] { 0x34A7, 0x34FB, 0x34A8, 0x3077 }, Rec(QuestTextSlot.AreaTitle));
+			Assert.Equal(CaptureBody("504b7924"), Convert.ToHexString(logList).ToLowerInvariant());
 		}
 
 		// Pull the body (subopcode onward, dropping the 4-byte length prefix) of the named captured

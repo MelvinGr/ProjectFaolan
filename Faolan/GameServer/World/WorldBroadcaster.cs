@@ -420,7 +420,7 @@ namespace Faolan.GameServer.World
 
 		// Sends a QuestFullUpdate (one quest's full detail: description, summary, objective + map marker) built from
 		// its seeded definition. acceptTime is the per-character "accepted at" stamp (display/sort field).
-		public Task SendQuestFullUpdate(INetworkClient client, QuestDefinition def, uint state = WorldQuest.StateActive)
+		public Task SendQuestFullUpdate(INetworkClient client, QuestDefinition def, uint state = WorldQuest.FullUpdateStateActive)
 		{
 			var refs = new[] { QuestTextSlot.Title, QuestTextSlot.Summary, QuestTextSlot.AreaTitle, QuestTextSlot.RegionName, QuestTextSlot.MapName }
 				.Select(s => Record(def, s))
@@ -430,6 +430,20 @@ namespace Faolan.GameServer.World
 				def.GoalId, Statics.NowUnixTimeSeconds, def.MapId, def.MarkerX, def.MarkerY,
 				Record(def, QuestTextSlot.Objective), Record(def, QuestTextSlot.ObjectiveLocalized));
 
+			return new PacketStream()
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), 0x2000)
+				.WriteArrayUInt32Length(s => s.WriteArray(body))
+				.SendAsync(client);
+		}
+
+		// Sends the active-quest LIST (0x504B7924) that POPULATES the J-panel - WITHOUT it an accepted quest never
+		// appears in the log even though the client got its QuestFullUpdate detail (decoded from the grant capture;
+		// docs/quest-log-handover.md). trackedDef is the highlighted (just-accepted) quest; activeQuestIds are all the
+		// player's active quests with the tracked one FIRST. The area-title slot comes from the tracked quest's def.
+		public Task SendQuestLogList(INetworkClient client, QuestDefinition trackedDef, IReadOnlyList<uint> activeQuestIds)
+		{
+			var body = WorldQuest.BuildQuestLogList(client.Session.Account.ClientInstance, trackedDef.AreaId, trackedDef.QuestId,
+				activeQuestIds, Record(trackedDef, QuestTextSlot.AreaTitle));
 			return new PacketStream()
 				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), 0x2000)
 				.WriteArrayUInt32Length(s => s.WriteArray(body))
