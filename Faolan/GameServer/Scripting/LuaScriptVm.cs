@@ -130,6 +130,11 @@ namespace Faolan.GameServer.Scripting
 			return _p.HasCompletedQuest(questId);
 		}
 
+		public bool HasQuest(int questId)
+		{
+			return _p.HasQuest(questId);
+		}
+
 		public bool HasTag(int tagId)
 		{
 			return _p.HasTag(tagId);

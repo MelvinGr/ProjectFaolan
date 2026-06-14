@@ -17,21 +17,34 @@ namespace Faolan.Importer
 		// on it. (Separate from the "Shipwrecked" quest, given after the Kalanthes conversation — id not yet captured.)
 		private const int CasildaFirstQuest = 13479;
 
+		// Quest-state greetings. The OFFER (not-yet-accepted) greeting stays the UNCONDITIONAL fallback - a fresh char
+		// fails the two conditions below, so the runtime serves the fallback (offer). Accepting the quest at the NPC's
+		// grant node (ConversationNode.GrantQuestId, harvested generically) flips HasQuest, so she then shows in-progress:
+		//   IN PROGRESS (accepted, not done) = `HasQuest(X) and not HasCompletedQuest(X)`
+		//   DONE                             = `HasCompletedQuest(X)`
+		// (These two are mutually exclusive, so runtime order doesn't matter.)
 		private static readonly List<(string CaptureBaseName, string NpcName, string Condition)> Rules =
 		[
-			// Casilda BEFORE her first quest is complete (the chained, quest-giving greeting).
-			("account-stricken998-character-xxx-login", "Casilda", $"return not player:HasCompletedQuest({CasildaFirstQuest})"),
+			// Casilda AFTER accepting but BEFORE completing (in-progress greeting; this char already had the quest).
+			("account-stricken998-character-xxx-login", "Casilda", $"return player:HasQuest({CasildaFirstQuest}) and not player:HasCompletedQuest({CasildaFirstQuest})"),
 			// Casilda AFTER it is complete: the turn-in capture + the post-quest login (the unchained, different greeting).
 			("account-stricken998-character-xxx-compat_compeltefirstquest", "Casilda", $"return player:HasCompletedQuest({CasildaFirstQuest})"),
 			("account-stricken998-character-xxx-login-after_first_quest_kalanthes_chat", "Casilda", $"return player:HasCompletedQuest({CasildaFirstQuest})"),
 		];
 
-		// Tags each conversation entry from `captureBaseName` whose NPC matches a rule with that rule's condition; the
-		// rest pass through unconditional (""). Returns new entries (records are immutable).
+		// Tags each conversation entry from `captureBaseName` whose NPC matches a rule with that rule's condition. An
+		// entry that already has a condition (e.g. an auto-derived offer gate) is left as-is - the manual rules only
+		// fill the in-progress/completed states. Returns new entries (records are immutable).
 		public static IEnumerable<ConversationEntry> Apply(string captureBaseName, IEnumerable<ConversationEntry> entries)
 		{
 			foreach (var e in entries)
 			{
+				if (!string.IsNullOrEmpty(e.ConditionScript))
+				{
+					yield return e;
+					continue;
+				}
+
 				var rule = Rules.FirstOrDefault(r => r.CaptureBaseName == captureBaseName && r.NpcName == e.NpcName);
 				yield return rule.Condition != null
 					? e with { ConditionScript = rule.Condition }

@@ -30,5 +30,12 @@ namespace Faolan.Core.Database.Tables
 		// runtime picks the first variant whose condition passes for the player, else the "" one. Part of the
 		// tag/quest dialogue VM (issue #37 / §6); the importer tags each captured variant with the state it came from.
 		public string ConditionScript { get; set; } = "";
+
+		// The RDB quest id this screen GRANTS when reached (0 = none). Harvested from the captures: a QuestFullUpdate /
+		// QuestIIR-add for a quest arrived while this screen's responses were being collected (i.e. the player walked
+		// the accept branch). When the runtime serves this screen it persists the quest (active) for the player and
+		// sends its journal content - this is how "talk to NPC -> accept quest -> it appears in the J-panel" works,
+		// generically for any NPC (not just Casilda). See QuestDefinition / WorldBroadcaster.SendQuestFullUpdate.
+		public uint GrantQuestId { get; set; }
 	}
 }

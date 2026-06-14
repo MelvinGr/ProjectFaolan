@@ -74,6 +74,7 @@ namespace Faolan.Importer
 					NpcName = e.NpcName,
 					CapturedInstance = e.CapturedInstance,
 					ConditionScript = e.ConditionScript,
+					GrantQuestId = e.GrantQuestId,
 					Packets = e
 						.Packets
 						.Select((p, i) => new ConversationPacket

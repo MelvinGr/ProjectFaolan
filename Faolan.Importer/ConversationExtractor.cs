@@ -17,7 +17,7 @@ namespace Faolan.Importer
 	// runtime routes on; the handle/instance are session-volatile and only used to re-address the replay).
 	// (Mode/Field3 were the OLD key but both are session-volatile counters, not branch ids - the AnswerPath is the
 	// stable branch key; memory protocol_conversation_routing.)
-	public sealed record ConversationEntry(uint TypeId, string AnswerPath, uint CapturedNpcHandle, uint CapturedInstance, List<byte[]> Packets, string NpcName, string ConditionScript = "");
+	public sealed record ConversationEntry(uint TypeId, string AnswerPath, uint CapturedNpcHandle, uint CapturedInstance, List<byte[]> Packets, string NpcName, string ConditionScript = "", uint GrantQuestId = 0);
 
 	// Reconstructs each NPC's dialogue as a TREE of screens keyed by answer-index PATH, from the captured request/
 	// response flow. The grammar (memory protocol_conversation_routing): a conversation INSTANCE = TalkToNpc(f3=0)
@@ -32,6 +32,11 @@ namespace Faolan.Importer
 		private const uint KnubotAnswerSubOpcode = 0x4D7D9123;
 		private const uint Opcode2000 = 0x2000;
 		private const uint Opcode2015 = 0x2015;
+
+		// A quest GRANT signal seen mid-conversation: the full journal record (0x63268258) the retail server sends when
+		// the player accepts a quest. (QuestIIR-add 0x97E02314 also adds the quest but the full-update is the
+		// unambiguous "here is the new quest" marker; the runtime guards against re-granting, so this is safe.)
+		private const uint QuestFullUpdateSubOpcode = 0x63268258;
 
 		private const uint SpawnSubOpcode = 0xFA015807;
 		private const uint TalkToNpcActionType = 0x16;
@@ -50,11 +55,13 @@ namespace Faolan.Importer
 			uint typeId = 0, npc = 0, instance = 0;
 			var path = ""; // answer-index path of the CURRENT screen (the one whose responses we're collecting)
 			var screen = new List<byte[]>();
+			uint grant = 0; // a quest the server granted while collecting THIS screen's responses (0 = none)
+			var questsSeen = new HashSet<uint>(); // every quest whose full-update appeared earlier in THIS capture
 
 			void Flush()
 			{
 				if (active && screen.Count > 0)
-					entries.Add(new ConversationEntry(typeId, path, npc, instance, [..screen], namesByHandle.GetValueOrDefault(npc)));
+					entries.Add(new ConversationEntry(typeId, path, npc, instance, [..screen], namesByHandle.GetValueOrDefault(npc), GrantQuestId: grant));
 			}
 
 			foreach (var p in packets)
@@ -81,6 +88,7 @@ namespace Faolan.Importer
 					instance = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
 					path = "";
 					screen = [];
+					grant = 0;
 				}
 				else if (!p.IsDownload && p.Opcode == Opcode2000 && p.SubOpcode == KnubotAnswerSubOpcode && active)
 				{
@@ -96,6 +104,24 @@ namespace Faolan.Importer
 						? idx.ToString()
 						: $"{path}>{idx}";
 					screen = [];
+					grant = 0;
+				}
+				else if (p.IsDownload && p.Opcode == Opcode2000 && p.SubOpcode == QuestFullUpdateSubOpcode)
+				{
+					// A quest full-update. body @16 = [00000000][01][u32 questId]. It's a GRANT (vs a login restore or a
+					// re-display) only if: a conversation is active, the player has navigated past the greeting (path !=
+					// ""), and this is the quest's FIRST appearance in the capture (a restore re-sends a quest first seen
+					// at login). That pins the accept to the dialogue node the player walked. Always remember the quest so
+					// later re-sends aren't mistaken for grants.
+					var body = GetBody(p.Bytes);
+					if (body.Length >= 25)
+					{
+						var questId = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(21, 4));
+						if (active && path.Length != 0 && questsSeen.Add(questId))
+							grant = questId;
+						else
+							questsSeen.Add(questId);
+					}
 				}
 				else if (p.IsDownload && active &&
 				         (p.Opcode == Opcode2015 || (p.Opcode == Opcode2000 && ResponseSubOpcodes.Contains(p.SubOpcode))))
@@ -128,7 +154,15 @@ namespace Faolan.Importer
 					? 1_000_000
 					: 0) + e.Packets.Count;
 				if (!best.TryGetValue(key, out var cur) || score > cur.score)
-					best[key] = (score, e);
+				{
+					// Preserve a grant seen in any capture of this screen even if the highest-scoring replay didn't see it.
+					var grant = e.GrantQuestId != 0 ? e.GrantQuestId : cur.entry?.GrantQuestId ?? 0;
+					best[key] = (score, e with { GrantQuestId = grant });
+				}
+				else if (e.GrantQuestId != 0 && cur.entry.GrantQuestId == 0)
+				{
+					best[key] = (cur.score, cur.entry with { GrantQuestId = e.GrantQuestId });
+				}
 			}
 
 			return best

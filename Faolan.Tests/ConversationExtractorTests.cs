@@ -115,6 +115,45 @@ namespace Faolan.Tests
 			Assert.True(byPath.ContainsKey("0>0") && byPath.ContainsKey("0>1"));
 		}
 
+		// A quest is GRANTED at the dialogue node where its full-update FIRST appears after the player picked an option
+		// (path != ""). A full-update at the greeting (path "") or a re-send of an already-seen quest is NOT a grant
+		// (those are login restores / re-displays). This is how "talk to NPC -> accept -> quest in journal" is harvested.
+		[Fact]
+		public void Extract_HarvestsQuestGrantAtAcceptNode()
+		{
+			var packets = new List<CapturedPacket>
+			{
+				Spawn(0x9D42, "Casilda"),
+				Talk(42008, 1, 0, 0x9D42, 0x02000005), // greeting
+				Response(0x2000, 0xF164A4A5), // "" screen
+				QuestFullUpdate(13479), // at the greeting -> NOT a grant (and remembered)
+				Answer(0),
+				Response(0x2000, 0x4A3D899A), // "0" screen
+				QuestFullUpdate(13479), // already seen -> NOT a grant
+				Answer(0),
+				Response(0x2000, 0x4A3D899A), // "0>0" screen
+				QuestFullUpdate(13480) // first appearance, after a pick -> GRANT on "0>0"
+			};
+
+			var byPath = ConversationExtractor.Extract(packets).ToDictionary(e => e.AnswerPath);
+
+			Assert.Equal(0u, byPath[""].GrantQuestId);
+			Assert.Equal(0u, byPath["0"].GrantQuestId);
+			Assert.Equal(13480u, byPath["0>0"].GrantQuestId);
+		}
+
+		// A KnubotCloseChatWindow is the 0xC4AF39EB sub-op; a quest full-update is 0x63268258 with the quest id at
+		// body offset 21 ([len4][subop4][ack4][player4][00000000][01][u32 questId]).
+		private static CapturedPacket QuestFullUpdate(uint questId)
+		{
+			var body = new byte[25];
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)body.Length);
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), 0x63268258);
+			body[20] = 0x01;
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(21, 4), questId);
+			return new CapturedPacket(0, true, 0x2000, 0x63268258, Frame(body));
+		}
+
 		private static byte[] BuildInteractArgs(uint typeId, uint mode, uint field3, uint npc)
 		{
 			var b = new List<byte>();

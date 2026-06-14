@@ -107,6 +107,11 @@ namespace Faolan.Tests
 				return false;
 			}
 
+			public bool HasQuest(int questId)
+			{
+				return false;
+			}
+
 			public bool HasTag(int tagId)
 			{
 				return Tags.Contains(tagId);

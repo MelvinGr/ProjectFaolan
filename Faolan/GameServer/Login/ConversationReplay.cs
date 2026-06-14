@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
+using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
 // ReSharper disable once CheckNamespace
@@ -81,6 +82,36 @@ namespace Faolan.GameServer
 			client.Session.ConversationNpcHandle = clickedNpcHandle;
 
 			Logger.LogInformation("Conversation screen (npc={Name}, typeId={TypeId}, path='{Path}') -> {Packets} packet(s) for NPC 0x{Npc:X}.", node.NpcName, node.TypeId, node.AnswerPath, node.Packets.Count, clickedNpcHandle);
+
+			if (node.GrantQuestId != 0)
+				await GrantQuestFromConversation(client, node.GrantQuestId);
+		}
+
+		// Reaching a conversation node that GRANTS a quest (harvested from the capture as ConversationNode.GrantQuestId)
+		// accepts it for the player: persist it active and push its journal content (QuestIIR + the J-panel record), so
+		// "talk to NPC -> accept -> it appears in the quest journal" works for any NPC. Guarded so re-serving the node
+		// (or already having the quest) doesn't duplicate or reset it.
+		private async Task GrantQuestFromConversation(INetworkClient client, uint questId)
+		{
+			var character = client.Session?.Character;
+			if (character == null)
+				return;
+
+			var existing = await Database.GetCharacterQuests(character.Id);
+			if (existing.Any(q => q.QuestId == questId))
+				return; // already accepted (active) or completed - don't re-grant
+
+			await Database.SetCharacterQuest(character.Id, questId, QuestState.Active);
+			await _broadcaster.SendQuestIir(client, questId, WorldQuest.StateActive);
+
+			var def = await Database.GetQuestDefinition(questId);
+			if (def != null)
+			{
+				await _broadcaster.SendQuestFullUpdate(client, def);
+				await _broadcaster.SendQuestJournal(client, new[] { def });
+			}
+
+			Logger.LogInformation("Quest {QuestId} granted to {Name} from {Npc}'s dialogue.", questId, character.Name, client.Session.ConversationNpcName);
 		}
 
 		// The player picked option `answerIndex` in the active conversation: navigate to the child screen at the
@@ -148,10 +179,10 @@ namespace Faolan.GameServer
 
 			var character = client.Session.Character;
 			var tags = character != null ? await Database.GetCharacterTags(character.Id) : System.Array.Empty<uint>();
-			var completed = character != null
-				? (await Database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Completed).Select(q => q.QuestId)
-				: System.Linq.Enumerable.Empty<uint>();
-			var player = new Scripting.GameLuaPlayer(tags, completed);
+			var quests = character != null ? await Database.GetCharacterQuests(character.Id) : System.Array.Empty<CharacterQuest>();
+			var completed = quests.Where(q => q.State == QuestState.Completed).Select(q => q.QuestId);
+			var active = quests.Where(q => q.State == QuestState.Active).Select(q => q.QuestId);
+			var player = new Scripting.GameLuaPlayer(tags, completed, active);
 
 			ConversationNode fallback = null;
 			foreach (var v in variants)
