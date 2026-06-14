@@ -452,27 +452,7 @@ namespace Faolan.GameServer
 		{
 			var characterId = client.Session.Character.Id;
 			var arg = (arguments ?? "").Trim();
-			uint handle = 0;
-			var parsed = arg.Length > 0;
-			try
-			{
-				if (parsed)
-				{
-					handle = arg.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
-						? Convert.ToUInt32(arg[2..], 16)
-						: uint.Parse(arg);
-				}
-			}
-			catch (FormatException)
-			{
-				parsed = false;
-			}
-			catch (OverflowException)
-			{
-				parsed = false;
-			}
-
-			if (!parsed)
+			if (arg.Length == 0 || !TryParseHandle(arg, out var handle))
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .despawnnpc <handle> (0x-hex or decimal)");
 				return;
