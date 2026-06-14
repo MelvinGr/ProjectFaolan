@@ -129,6 +129,11 @@ namespace Faolan.GameServer
 				return;
 			}
 
+			// #181: file the listing under the item's AH search CATEGORY (the item-type-search id the client queries
+			// by, e.g. 30030) so a normal item-type search surfaces it, recovered from captured listings. Falls back
+			// to the template when the category is unknown (no regression vs the old template-filing).
+			var searchCategory = await Database.GetItemSearchCategory(row.Item.Id) ?? row.Item.Id;
+
 			var listing = new TradepostListing
 			{
 				SaleId = await AllocateSaleId(),
@@ -137,7 +142,7 @@ namespace Faolan.GameServer
 				BankSlot = (uint)bankSlot,
 				Price = price,
 				Quantity = row.Count == 0 ? 1u : row.Count,
-				ItemId = row.Item.Id,        // filed under the item's template (best-effort search key)
+				ItemId = searchCategory,     // #181: the item-type search category (was row.Item.Id, the template)
 				InstanceField = 0,
 				ItemHandle = 0,
 				EntryFlags = TradepostListingCodec.DefaultEntryFlags,

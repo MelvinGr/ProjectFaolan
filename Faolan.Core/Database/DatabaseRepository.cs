@@ -69,6 +69,7 @@ namespace Faolan.Core.Database
 		Task<Shop> GetFirstShop();
 
 		Task<List<TradepostListing>> GetTradepostListings(uint itemId);
+		Task<uint?> GetItemSearchCategory(uint template);
 		Task<TradepostListing> GetTradepostListingBySaleId(ulong saleId);
 		Task<TradepostListing> GetTradepostListingBySellerSlot(string sellerName, uint bankSlot);
 		Task CreateTradepostListing(TradepostListing listing);
@@ -492,6 +493,25 @@ namespace Faolan.Core.Database
 				.Where(l => l.ItemId == itemId)
 				.ToListAsync();
 			return rows.OrderBy(l => l.Price).ToList();
+		}
+
+		// The AH search CATEGORY (the item-type-search id the client queries by, e.g. 30000 / 30030 - NOT the item
+		// template) for an item template, recovered from CAPTURED listings, where ItemId is the real category and
+		// Template is the per-item id. The mapping is a clean function (each template -> one category; verified
+		// conflict-free across 171 captured templates); we take the most common to be safe. Returns null when no
+		// captured listing covers the template (caller then falls back to the template). Issue #181.
+		public async Task<uint?> GetItemSearchCategory(uint template)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var categories = await ctx
+				.TradepostListings
+				.Where(l => l.Template == template && l.ItemId != l.Template)
+				.Select(l => l.ItemId)
+				.ToListAsync();
+			if (categories.Count == 0)
+				return null;
+
+			return categories.GroupBy(c => c).OrderByDescending(g => g.Count()).First().Key;
 		}
 
 		// One listing by its unique sale id - the buy targets this (TradepostBuyItem [saleId]).
