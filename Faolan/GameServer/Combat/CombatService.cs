@@ -383,7 +383,9 @@ namespace Faolan.GameServer.Combat
 
 		// Awards the killer XP for a kill, advancing levels when the XP bar fills (LevelingResolver), and pushes a
 		// 0x96B8DC59 stat update so the XP bar (and, on a ding, level + new vitals) move. Experience is within-level
-		// progress; XP/level accrue on the persisted Character (saved by the usual disconnect/autosave/.save points).
+		// progress. The new XP/level are PERSISTED immediately (SetCharacterProgress) so they survive relog instead of
+		// waiting on the full-graph disconnect/autosave save (which the player can lose by crashing or which can roll
+		// back on a navigation conflict).
 		private async Task AwardKillXp(INetworkClient killer, uint npcLevel)
 		{
 			var character = killer?.Session?.Character;
@@ -400,10 +402,13 @@ namespace Faolan.GameServer.Combat
 			{
 				character.Level = (ushort)Math.Min(character.Level + levelsGained, LevelingResolver.MaxLevel);
 				character.RegenerateMaxStats();
+				await _database.SetCharacterProgress(character.Id, character.Experience, character.Level);
 				await PushLevelUp(killer, character);
 				_logger.LogInformation("Combat: {Name} gained {Xp} XP and reached level {Level}.", character.Name, xp, character.Level);
 				return;
 			}
+
+			await _database.SetCharacterProgress(character.Id, character.Experience, character.Level);
 
 			var block = new CharacterStatBlock()
 				.Set(LegacyCharacterStatId.Exp, character.Experience)

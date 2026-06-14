@@ -55,11 +55,16 @@ prior diagnoses are in `docs/archive/todo-history.md`.
   - [ ] Decode follow-up (`docs/player-stats.md` "Open follow-ups"): determine whether base attributes
         (str/dex/…) are sent on the wire at all, or derived client-side from class/level — drives whether the
         snapshot/vitals block needs them.
-- [ ] **XP resets on relog** (Melvin, 2026-06-13): in-game XP is not persisted across logout — it reverts to 0 (or
-      the snapshot default) on the next login. `character.Experience` is patched into the snapshot tails
-      (`CurrentXp`, idx 80 ÷10) but is evidently never SAVED when it changes (kill/XP loop in §2). Persist
-      `Character.Experience` on gain (and on logout) so it survives relog. RELATED: the XP **max / to-next-level**
-      is still the captured template's (Strie's) value — wrong for the character's level — so even the bar is off.
+- [x] **XP resets on relog** (Melvin, 2026-06-13) — FIXED 2026-06-14 (needs in-client). Root cause: `AwardKillXp`
+      only mutated the in-memory `Character.Experience`, relying on the full-graph `SaveCharacter` at
+      disconnect/autosave — which the player can lose by crashing and which can roll back on a navigation conflict.
+      FIX: persist Experience + Level the MOMENT they change via a new targeted `SetCharacterProgress(charId, exp,
+      level)` repo method (the same column-update pattern as `SetCharacterInventorySlot`/`SetCharacterQuest`, no graph
+      churn), called from `AwardKillXp` (both the ding and no-ding branches). The XP **max / to-next-level** half:
+      the snapshot tails carry the captured template's (Strie's) stale MaxExp in an undecoded slot, so `BuildVitals`
+      (the login vitals announce) now also pushes `Level`/`Exp`/`MaxExp` via the same 0x96B8DC59 the combat XP path
+      uses (`LevelingResolver.XpForNextLevel(level)`), overriding the stale max so the bar scales for the char's
+      level. IN-CLIENT GATE: kill mobs → relog → XP bar shows the same progress (not 0) and is scaled to the level.
 - [ ] **In-game CLASS is wrong — and it is NOT in the snapshot** (Melvin, 2026-06-13; VERIFIED). A created Dark
       Templar shows the wrong class. Exhaustively ruled out: the class id is not a plain field in any world packet
       (21 dumps / 5 classes, every sub-opcode+offset ×1/×2), not in the tails `Values` table (index 78 = ARCHETYPE

@@ -87,6 +87,7 @@ namespace Faolan.Core.Database
 		Task SaveCharacterEquipment(CharacterEquipment equipment);
 		Task SaveCharacterScaffold(Character character);
 		Task SetCharacterInventorySlot(uint characterId, int container, int slot, uint? itemId, uint count = 1);
+		Task SetCharacterProgress(uint characterId, uint experience, ushort level);
 		Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0, string goalTargetName = null);
 		Task<int> SetCreationSpawn(Character character);
 
@@ -941,6 +942,22 @@ namespace Faolan.Core.Database
 				row.Count = count;
 			}
 
+			await ctx.SaveChangesAsync();
+		}
+
+		// Persists a character's levelling progress (within-level Experience + Level) the moment it changes, so XP and
+		// levels survive relog without depending on the full-graph SaveCharacter at disconnect/autosave. Targeted
+		// column update on the tracked row (the pattern SetCharacterInventorySlot/SetCharacterQuest use) - no graph
+		// churn, no risk of a navigation conflict rolling the write back.
+		public async Task SetCharacterProgress(uint characterId, uint experience, ushort level)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var row = await ctx.Characters.FirstOrDefaultAsync(c => c.Id == characterId);
+			if (row == null)
+				return;
+
+			row.Experience = experience;
+			row.Level = level;
 			await ctx.SaveChangesAsync();
 		}
 

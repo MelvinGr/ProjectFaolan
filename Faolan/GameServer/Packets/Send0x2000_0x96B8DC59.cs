@@ -25,10 +25,16 @@ namespace Faolan.GameServer
 			var stats = character.MaxStats ?? CharacterMaxStats.CreateDefaults(character.Class, character.Level);
 			// Emit the full value under the CURRENT ids (0x001B/0x01F8/0x01FA) - the retail full-spawn announce sends
 			// current (== max at full health); the max ids ride the snapshot/tails. (in-client proof: CapturedCharacterStats.)
+			// Also carry Level + Exp/MaxExp so the XP bar reflects the character's REAL progress: the snapshot tails
+			// carry the captured template's stale to-next-level max, so overriding it here (the same Exp/MaxExp the
+			// combat XP path sends) scales the bar correctly for this character's level.
 			var block = new CharacterStatBlock()
 				.Set(LegacyCharacterStatId.HealthCurrent, stats.Health)
 				.Set(LegacyCharacterStatId.StaminaCurrent, stats.Stamina)
-				.Set(LegacyCharacterStatId.ManaCurrent, stats.Mana);
+				.Set(LegacyCharacterStatId.ManaCurrent, stats.Mana)
+				.Set(LegacyCharacterStatId.Level, character.Level)
+				.Set(LegacyCharacterStatId.Exp, character.Experience)
+				.Set(LegacyCharacterStatId.MaxExp, Combat.LevelingResolver.XpForNextLevel(character.Level));
 
 			return BuildStatUpdate(client, block);
 		}
