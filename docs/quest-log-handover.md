@@ -181,14 +181,27 @@ not byte 0 — that tripped up the first dump). Filter on the sub-op hex.
 - GM bootstrap: `.quest` in `Faolan/GameServer/GMCommands.cs`.
 - Tests: `Faolan.Tests` (`QuestTests`).
 
-## Non-issue to remember (don't chase it again)
+## CORRECTED: the phantom journal quest IS in the snapshot (2026-06-14)
 
-A fresh beach character's journal showing "1 quest" is **not** a server replay. Verified 2026-06-14: the beach
-(map 4010) world-entry FullChar snapshot (`0x737A6DF9`) carries **no** quest in any encoding (no `34A7`, no
-QuestIIR markers — only the `PFAccessWindow_` table + a few dialogue-format XML strings), the beach burst has
-no QuestIIR records, Casilda's conversation packets carry no quest grant, and `RestorePlayerQuests` reads 0
-rows. Such an entry is the **retail client's local journal cache** for that character slot — confirm with a
-brand-new character.
+The earlier "client local cache, not a server replay" claim was **WRONG** — a misdiagnosis. The beach
+(map 4010) world-entry FullChar snapshot (`0x737A6DF9`) **does** carry a quest: its TAILS embed
+**quest 10238 (`0x27FE`)**'s journal records — `<remoteformat category="50301">` (title),
+`50302` (summary), `50300` (area), `50304` (objective), `<localized category="51000">`. The earlier check
+only looked for `34A7` (Casilda's id) and dismissed these journal remoteformats as "dialogue strings".
+
+Source: the snapshot is replayed (largely verbatim) from character **Strie** (captured instance
+`35020543` / `0x02165EFF`), who had that quest. `RetailLoginReplay.BuildBeachInventoryPacket` substitutes
+the inventory containers but keeps `parts.Tails` verbatim (only Level/vitals patched), so Strie's journal
+rides along. The "from-scratch" path is no better: `BeachTailsTemplate.bin` IS Strie's tails, and the
+quest region is still TEMPLATE (`BeachTailsBuilder` only generates level/vitals; `UnknownBefore` +
+`RemoteFormat50301/50302/50300` are template). So **every** beach character inherits Strie's quest 10238,
+regardless of their own `CharacterQuests`.
+
+**Fix (open):** generate the snapshot's quest-journal region from the live character's `CharacterQuests`
+(empty → no quest), like containers are generated — clear `SnapshotTails.RemoteFormat50300/50301/50302`
++ `PrimaryRemoteFormatId(Again)` and strip the objective records / quest count from
+`UnknownBeforeAccessWindowTable` when the character lacks the matching quest. Snapshot-tails surgery is
+in-client-gated (the chat/world-load history, `protocol_chat_connection_regression`), so prove it in-client.
 
 ## Related
 
