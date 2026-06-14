@@ -498,6 +498,27 @@ tag system exists. → memory `lua_vm`, `protocol_conversation_routing`; `docs/a
       duplicates, left as-is. 316 tests green.
 - [x] Rename `Packets/FullCharSnapshot/BigboyTailsFile.cs` → `SnapshotTails.cs` (class `SnapshotTails`) — DONE
       2026-06-14. ("Bigboy" was a capture name, "File" a misnomer; it's the parsed 0x737A6DF9 tails region.)
+- [ ] **Consolidate the build-only wire builders into the `Parse`/`Build` codec pattern.** Six bodies already use
+      the codec shape (`IirRecordCodec`, `PlayerSpawnScaffoldCodec`, `ShopContentCodec`, `TradepostListingCodec`,
+      `MailMessageCodec`, `FormatFeedbackCodec` — all with Parse + a byte-exact golden test). The remaining wire
+      builders are **build-only** (no `Parse`), so they can't round-trip a capture and the construction is sometimes
+      entangled with domain logic. NB most already have golden BUILD tests, so this is a **consistency + round-trip**
+      refactor (uniform Parse/Build, decode-a-capture capability), NOT a correctness gap — lower priority than feature
+      work. Candidates, each → a `*Codec` (Parse + Build) with a round-trip/golden test:
+  - [ ] **Stat/vitals block** — `CharacterStatBlock` (build-only, the count-prefixed `[u32 statId][u32 value]`
+        records) + `VitalsPacket.BuildStatUpdate` (0x96B8DC59). Add `Parse` and a round-trip vs a captured vitals
+        packet; the block is shared by the 0x737A6DF9 snapshot and 0x96B8DC59, so one codec covers both.
+        (`CharacterStatBlockTests`/`CharacterStatsRoundTripTests` cover the build side.)
+  - [ ] **Combat packets** — extract from `CombatService` (where they're built inline, mixed with the damage/kill
+        logic): `DamageResultIIR` 0xFEC4158A, the BehaviorControlCenter ack, `EnergyIIR`. A `CombatPacketCodec` with
+        golden tests against the strickenbla combat capture. (Highest value here — decouples packets from logic.)
+  - [ ] **Despawn** — `WorldDespawn` (n3ToClientQuit 0x04B82B2D): add `Parse` (3271 captured records as the oracle;
+        `WorldDespawnTests` covers build).
+  - [ ] **Quest packets** — `WorldQuest` (QuestIIR 0x97E02314, QuestGoal 0x0774C8C1, QuestFullUpdate, QuestJournal):
+        formalize as codecs with Parse (`QuestTests` covers build).
+  - [ ] **Ability grant** — `Send0x2052_GrantAbilities` (the 16-byte constant pair + ability records) →
+        `AbilityGrantCodec` (`AbilityGrantTests` covers build).
+  - [ ] **Guild update** — `Send0x2000_GuildUpdate` (invite/accept/0x203F/tag) → a codec (`GuildPacketTests` covers build).
 - [ ] **GameServer dispatch hardening (not a blanket rewrite).** The GameServer multiplexes ~4 RPC class-pairs
       over one connection; the `0x20xx` opcode is a per-class method selector that COLLIDES across classes, so the
       correct dispatch key is `(endpoint class id, method opcode)`. Decided AGAINST rewriting the whole opcode
