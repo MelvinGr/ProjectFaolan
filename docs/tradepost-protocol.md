@@ -178,11 +178,24 @@ the seller isn't credited (importer-seeded sellers aren't live characters).
 ```
 F375 = slot 6 @ 1,000,000 tin. Lists one of the player's BANK items (container 105) for sale: the server creates a
 `TradepostListing` from the bank item's identity (Data quad + template + level + archetype, seller = char name, the
-given price/qty), escrows the item out of the bank, and refreshes the bank tab. There is NO direct tradepost reply
-(the client just re-polls). WIRED: `GameServerListener.HandleTradepostSell`, repo `CreateTradepostListing`,
-golden test `TradepostSellBodyTests`. INTERIM: the listing's search `ItemId` is filed under the item's TEMPLATE
-(we lack the retail item-type search id), so a normal item-type search won't necessarily find it; the listing is
-created + escrowed correctly. `TradepostChangeItemPrice 0x200B` / `TradepostCancelSellItem 0x200C` still uncaptured.
+given price/qty + the origin **bank slot**). The listed item **STAYS in its bank slot** (the client just draws a
+"listed" overlay - it is NOT escrowed out); it only leaves the seller's bank when someone BUYS it (the buy removes
+the seller's bank cell by `(SellerName, BankSlot)`). There is NO direct tradepost reply (the client re-polls).
+
+The seller addresses their own listing by the **origin bank slot** (NOT the saleId - that's for buying), so the
+listing carries a `BankSlot` (migration `AddTradepostListingBankSlot`).
+
+| dir | method | name | body | behaviour |
+|-----|--------|------|------|-----------|
+| C→S | `0x200A` | TradepostSellItem | `[nBankItemSlot:u32][nPrice:u64]` | list the bank item; it stays in the slot |
+| C→S | `0x200B` | TradepostChangeItemPrice | `[nBankItemSlot:u32][nNewPrice:u64]` | reprice the seller's listing (F363: slot 6 → 5,000,000) |
+| C→S | `0x200C` | TradepostCancelSellItem | `[nBankItemSlot:u32]` | delete the listing; item stays in the bank (F397: slot 6) |
+| C→S | `0x2009` | CancelMail | `[mailId:u64]` | recall/delete a mail (F403) |
+
+WIRED (`GameServerListener.HandleTradepostSell`/`HandleTradepostChangePrice`/`HandleTradepostCancelSell`/
+`HandleTradepostCancelMail`, repo `CreateTradepostListing`/`GetTradepostListingBySellerSlot`/`SetTradepostListingPrice`,
+golden tests `TradepostSellBodyTests`). INTERIM: the listing's search `ItemId` is filed under the item's TEMPLATE (we
+lack the retail item-type search id), so a normal item-type search won't necessarily surface a player listing yet.
 
 **`SendMail` (C→S `0x2002`) — player→player mail with a bank-item attachment (capture F499), DECODED, not yet wired:**
 ```

@@ -23,6 +23,11 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(64)]
 		public string SellerName { get; set; }
 
+		// The seller's origin BANK slot the item was listed from. The seller addresses their own listing by this
+		// slot (TradepostChangeItemPrice / TradepostCancelSellItem carry nBankItemSlot, not the saleId), and a cancel
+		// returns the escrowed item to it. 0 for importer-seeded listings (not player-managed). Keyed with SellerName.
+		public uint BankSlot { get; set; }
+
 		// Asking price in the wallet wire unit (tin). u64 on the wire; also mirrored into entry stat 258.
 		public ulong Price { get; set; }
 

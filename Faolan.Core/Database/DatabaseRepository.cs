@@ -68,7 +68,9 @@ namespace Faolan.Core.Database
 
 		Task<List<TradepostListing>> GetTradepostListings(uint itemId);
 		Task<TradepostListing> GetTradepostListingBySaleId(ulong saleId);
+		Task<TradepostListing> GetTradepostListingBySellerSlot(string sellerName, uint bankSlot);
 		Task CreateTradepostListing(TradepostListing listing);
+		Task SetTradepostListingPrice(ulong saleId, ulong price);
 		Task DeleteTradepostListing(ulong saleId);
 
 		Task<Mail> CreateMail(Mail mail);
@@ -497,12 +499,27 @@ namespace Faolan.Core.Database
 			return await ctx.TradepostListings.FirstOrDefaultAsync(l => l.SaleId == saleId);
 		}
 
+		// The seller's active listing for a given origin bank slot - how the seller's own change-price / cancel ops
+		// address their listing (they carry nBankItemSlot, not the saleId). Keyed by (seller, slot).
+		public async Task<TradepostListing> GetTradepostListingBySellerSlot(string sellerName, uint bankSlot)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.TradepostListings.FirstOrDefaultAsync(l => l.SellerName == sellerName && l.BankSlot == bankSlot);
+		}
+
 		// Creates a new listing - a player putting a bank item up for sale (TradepostSellItem).
 		public async Task CreateTradepostListing(TradepostListing listing)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			ctx.TradepostListings.Add(listing);
 			await ctx.SaveChangesAsync();
+		}
+
+		// Reprices a listing (TradepostChangeItemPrice).
+		public async Task SetTradepostListingPrice(ulong saleId, ulong price)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await ctx.TradepostListings.Where(l => l.SaleId == saleId).ExecuteUpdateAsync(s => s.SetProperty(l => l.Price, price));
 		}
 
 		// Removes a listing once it is bought (or cancelled). No-op if it is already gone.

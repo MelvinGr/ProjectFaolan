@@ -66,6 +66,12 @@ namespace Faolan.GameServer
 			await Database.CreateMail(mail);
 			await Database.DeleteTradepostListing(saleId);
 
+			// The listed item stayed in the SELLER's bank (with a "listed" overlay) until now - the sale removes it
+			// from their bank. Importer-seeded listings have no real seller character, so this is a no-op for them.
+			var seller = await Database.GetCharacterByName(listing.SellerName);
+			if (seller != null && seller.Id != character.Id)
+				await Database.SetCharacterInventorySlot(seller.Id, (int)FullCharSnapshotBuilder.BankKind, (int)listing.BankSlot, null);
+
 			// Push the mail (base, no attachment): it carries its own MailId, which the client then targets with the
 			// GetMail* ops to preview + take the item. Echo the inbound TradepostInterface instance.
 			await TradepostResponses.SendMailMessage(client, mail, includeAttachments: false, packet.Sender.Instance);
@@ -99,6 +105,7 @@ namespace Faolan.GameServer
 				SaleId = await AllocateSaleId(),
 				Handle = 0,
 				SellerName = character.Name,
+				BankSlot = (uint)bankSlot,
 				Price = price,
 				Quantity = row.Count == 0 ? 1u : row.Count,
 				ItemId = row.Item.Id,        // filed under the item's template (best-effort search key)
@@ -116,12 +123,69 @@ namespace Faolan.GameServer
 			};
 			await Database.CreateTradepostListing(listing);
 
-			// Escrow: the listed item leaves the bank (until sold/cancelled). Refresh the bank tab so it disappears.
-			await Database.SetCharacterInventorySlot(character.Id, (int)FullCharSnapshotBuilder.BankKind, bankSlot, null);
-			await ResendBank(client);
-
+			// The listed item STAYS in its bank slot (the client just shows a "listed" overlay); it only leaves the
+			// seller's bank when someone BUYS it (HandleTradepostBuy removes the seller's bank cell). So no escrow here.
 			Logger.LogInformation("Tradepost SELL: {Char} listed \"{Item}\" x{Qty} (bank slot {Slot}, template {Template}) for {Price} tin -> sale 0x{Sale:X16}.",
 				character.Name, row.Item.Name, listing.Quantity, bankSlot, row.Item.Id, price, listing.SaleId);
+		}
+
+		// TradepostChangeItemPrice (0x200B) [nBankItemSlot:u32][nNewPrice:u64]: reprice the seller's own listing,
+		// addressed by the origin bank slot (capture F363 = slot 6 -> 5,000,000 tin). No tradepost reply (re-poll).
+		internal async Task HandleTradepostChangePrice(INetworkClient client, ConanPacket packet)
+		{
+			var character = client.Session.Character;
+			if (character == null)
+				return;
+
+			var bankSlot = packet.Body.ReadUInt32();
+			var newPrice = packet.Body.ReadUInt64();
+
+			var listing = await Database.GetTradepostListingBySellerSlot(character.Name, bankSlot);
+			if (listing == null)
+			{
+				Logger.LogWarning("Tradepost CHANGEPRICE: {Char} has no listing for bank slot {Slot}.", character.Name, bankSlot);
+				return;
+			}
+
+			await Database.SetTradepostListingPrice(listing.SaleId, newPrice);
+			Logger.LogInformation("Tradepost CHANGEPRICE: {Char} repriced listing 0x{Sale:X16} (bank slot {Slot}) {Old} -> {New} tin.",
+				character.Name, listing.SaleId, bankSlot, listing.Price, newPrice);
+		}
+
+		// TradepostCancelSellItem (0x200C) [nBankItemSlot:u32]: pull the seller's own listing (capture F397 = slot 6).
+		// The item never left the bank (it just had the "listed" overlay), so cancelling only deletes the listing -
+		// the client clears the overlay itself.
+		internal async Task HandleTradepostCancelSell(INetworkClient client, ConanPacket packet)
+		{
+			var character = client.Session.Character;
+			if (character == null)
+				return;
+
+			var bankSlot = packet.Body.ReadUInt32();
+
+			var listing = await Database.GetTradepostListingBySellerSlot(character.Name, bankSlot);
+			if (listing == null)
+			{
+				Logger.LogWarning("Tradepost CANCELSELL: {Char} has no listing for bank slot {Slot}.", character.Name, bankSlot);
+				return;
+			}
+
+			await Database.DeleteTradepostListing(listing.SaleId);
+			Logger.LogInformation("Tradepost CANCELSELL: {Char} cancelled listing 0x{Sale:X16} (bank slot {Slot}); item stays in the bank.",
+				character.Name, listing.SaleId, bankSlot);
+		}
+
+		// CancelMail (0x2009) [mailId:u64]: recall/delete one of the player's mails (capture F403). We delete it; any
+		// escrowed attachment is dropped with it (the AH buy-delivery mail is the only attachment source today).
+		internal async Task HandleTradepostCancelMail(INetworkClient client, ConanPacket packet)
+		{
+			var character = client.Session.Character;
+			if (character == null)
+				return;
+
+			var mailId = packet.Body.ReadUInt64();
+			await Database.DeleteMail(mailId);
+			Logger.LogInformation("Tradepost mail: {Char} cancelled/deleted mail 0x{Mail:X16}.", character.Name, mailId);
 		}
 
 		// The mailbox ops (GetAllMails / GetMailByID / GetItemData preview / GetMailItem take / MarkMailRead /

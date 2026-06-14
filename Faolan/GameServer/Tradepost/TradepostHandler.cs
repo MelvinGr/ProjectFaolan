@@ -52,6 +52,21 @@ namespace Faolan.GameServer.Tradepost
 					await listener.HandleTradepostSell(client, packet);
 					break;
 
+				case TradepostProtocol.AgentMethod.TradepostChangeItemPrice:
+					// Reprice the seller's own listing (addressed by origin bank slot).
+					await listener.HandleTradepostChangePrice(client, packet);
+					break;
+
+				case TradepostProtocol.AgentMethod.TradepostCancelSellItem:
+					// Pull the seller's own listing and return the escrowed item to the bank.
+					await listener.HandleTradepostCancelSell(client, packet);
+					break;
+
+				case TradepostProtocol.AgentMethod.CancelMail:
+					// Recall/delete one of the player's mails.
+					await listener.HandleTradepostCancelMail(client, packet);
+					break;
+
 				case TradepostProtocol.AgentMethod.Close:
 					logger.LogInformation("Tradepost: {Char} closed the auction house.", CharName(client));
 					break;

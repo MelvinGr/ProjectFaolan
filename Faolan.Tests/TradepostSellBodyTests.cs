@@ -22,5 +22,39 @@ namespace Faolan.Tests
 			Assert.Equal(1_000_000ul, price);
 			Assert.Equal(body.Length, (int)s.Position); // the whole 12-byte body is consumed
 		}
+
+		// TradepostChangeItemPrice (0x200B), capture F363: same [slot:u32][price:u64] shape as SellItem.
+		[Fact]
+		public void ChangePriceBody_DecodesSlotAndNewPrice()
+		{
+			var body = Convert.FromHexString("0000000600000000004c4b40");
+			var s = new FaolanStream(body);
+
+			Assert.Equal(6u, s.ReadUInt32());
+			Assert.Equal(5_000_000ul, s.ReadUInt64());
+			Assert.Equal(body.Length, (int)s.Position);
+		}
+
+		// TradepostCancelSellItem (0x200C), capture F397: just the origin bank slot.
+		[Fact]
+		public void CancelSellBody_DecodesSlot()
+		{
+			var body = Convert.FromHexString("00000006");
+			var s = new FaolanStream(body);
+
+			Assert.Equal(6u, s.ReadUInt32());
+			Assert.Equal(body.Length, (int)s.Position);
+		}
+
+		// CancelMail (0x2009), capture F403: a u64 mail id.
+		[Fact]
+		public void CancelMailBody_DecodesMailId()
+		{
+			var body = Convert.FromHexString("20d82b5b17d2e9d4");
+			var s = new FaolanStream(body);
+
+			Assert.Equal(0x20d82b5b17d2e9d4ul, s.ReadUInt64());
+			Assert.Equal(body.Length, (int)s.Position);
+		}
 	}
 }
