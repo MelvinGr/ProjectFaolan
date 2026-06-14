@@ -287,18 +287,23 @@ blocks is `[0x000003F1][marker u32][questId u32 × N][N u32][0x000000F1][0x57365
 and equals the id-run length (template=1 → `[27FE][1]`; `xxx-login`=2 → `[27FE][34A7][2]`). Adding a quest =
 insert its detail block immediately before `0x000003F1`, append its id to the id-run, bump `N`.
 
-**Status: blocked on in-client (the byte-accounting last mile).** The build path is clear and reuses tested
-code, BUT the per-quest detail block must serialize to the EXACT length/framing the tails parser expects, and
-a 1-byte error mis-frames the rest of the tails (access-window table) → broken FullChar → chat/world-load
-regression (`protocol_chat_connection_regression`). Open accounting to pin (needs a live client to prove, so
-build behind a default-off flag and bisect in-client): the tails 13479 block is **879 B** vs
-`BuildQuestFullUpdate`'s content **880 B** — i.e. the block is QFU-content WITHOUT the trailing `0x00`
-separator (line 189); confirm whether consecutive blocks carry a separator, and that the objective-record
-section (which diverges from the live QFU at byte 577 — acceptTime/markers) parses identically in the tails
-reader. The `marker` word (`0x7E2` vs `0x0BD3`) and 51000-localized id (`id=11561`) only matter for byte
-fidelity, not for the quest to show. **Recommended:** implement `SnapshotQuestInjector.Inject(tails, blocks)`
-(byte surgery: insert blocks + extend index) + a `WorldBroadcaster` block builder (QFU-content minus the
-17-byte prefix), wire behind `FAOLAN_SNAPSHOT_QUESTS=1`, then bisect block length in-client.
+**Status: IMPLEMENTED behind a flag, byte-verified, awaiting only the in-client smoke test** (commit
+`3174ac1` + the cross-capture golden). `SnapshotQuestInjector.Inject` splices the block + extends the index;
+`WorldBroadcaster.BuildSnapshotQuestBlock` builds it (QFU-content minus the 17-byte prefix and the trailing
+`0x00` → 879 B); wired into the beach-login snapshot behind `FAOLAN_SNAPSHOT_QUESTS=1`.
+
+The block is **proven byte-identical to retail's real login-snapshot tails block** for the same quest
+(`QuestTests.QuestDefinitionExtractor_RoundTripsCasilda` now diffs the built 13479 block against
+`xxx-login`'s embedded 13479 block): the ONLY differences are the player INSTANCE (@606-609, re-addressed)
+and two quest-PROGRESS bytes (@577 `0x64` just-accepted vs `0x50` in-progress, @585 `0`/`7`) — i.e. a
+freshly-accepted quest generates the exact retail block. The 879-vs-880 question is settled (879 = no trailing
+separator; blocks are contiguous, the index sits immediately after the last block's 51000). `SnapshotQuest-
+InjectorTests` proves the index/splice surgery against the real `BeachTailsTemplate.bin`.
+
+So the byte-accounting is no longer guesswork. The remaining gate is purely the **in-client smoke test**:
+flag on, relog with an accepted quest → quest shows in the J-panel AND chat/world-load survive. If green,
+flip the default on. (Marker `0x7E2`/`0x0BD3` and 51000-id `11561` are template-carried, not regenerated, so
+they don't affect the injected quest.)
 
 ## Related
 

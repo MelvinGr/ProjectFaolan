@@ -145,6 +145,45 @@ namespace Faolan.Tests
 			var logList = WorldQuest.BuildQuestLogList(0x0131720B, def.AreaId, 0x34A7,
 				new uint[] { 0x34A7, 0x34FB, 0x34A8, 0x3077 }, Rec(QuestTextSlot.AreaTitle));
 			Assert.Equal(CaptureBody("504b7924"), Convert.ToHexString(logList).ToLowerInvariant());
+
+			// SNAPSHOT-TAILS per-quest block = the QuestFullUpdate content (questId onward) minus the trailing 0x00.
+			// Proven byte-identical to the SAME quest's block embedded in a real login snapshot (xxx-login's 13479
+			// tails block) EXCEPT the 3 explained spots: quest PROGRESS @577 (just-accepted 0x64 vs in-progress 0x50)
+			// and @585 (0 vs 7), and the player INSTANCE @606-609 - i.e. a freshly-accepted quest generates the exact
+			// retail block (decode_snapshot_quests.py). This is the byte-level basis for SnapshotQuestInjector.
+			var block = full[WorldQuest.QuestFullUpdateContentOffset..^1];
+			Assert.Equal(879, block.Length);
+			var tailsBlock = SnapshotQuestBlock(0x34A7); // the 13479 block from xxx-login's login snapshot (879 B)
+			for (var i = 0; i < 879; i++)
+			{
+				if (i is 577 or 585 || i is >= 606 and <= 609)
+					continue; // progress (577/585) + player instance (606-609): expected per-character differences
+				Assert.True(block[i] == tailsBlock[i], $"snapshot block byte @{i}: built=0x{block[i]:x2} capture=0x{tailsBlock[i]:x2}");
+			}
+		}
+
+		// The per-quest detail block (questId onward, 879 B) for `questId` from xxx-login's 0x737A6DF9 login snapshot.
+		private static byte[] SnapshotQuestBlock(uint questId)
+		{
+			var path = System.IO.Path.Combine(CapturesDir, "account-stricken998-character-xxx-login.tshark.json");
+			using var doc = System.Text.Json.JsonDocument.Parse(System.IO.File.ReadAllText(path));
+			foreach (var p in doc.RootElement.GetProperty("Packets").EnumerateArray())
+			{
+				var bh = p.GetProperty("BodyHex").GetString();
+				if (bh == null || bh.Length < 16 || bh.Substring(8, 8) != "737a6df9")
+					continue;
+				var body = Convert.FromHexString(bh);
+				// block header = [questId][1][questId]; find it and take 879 bytes.
+				System.Span<byte> needle = stackalloc byte[12];
+				System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(needle[..4], questId);
+				System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(needle.Slice(4, 4), 1);
+				System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(needle.Slice(8, 4), questId);
+				for (var i = 0; i + 879 <= body.Length; i++)
+					if (body.AsSpan(i, 12).SequenceEqual(needle))
+						return body[i..(i + 879)];
+			}
+
+			throw new Xunit.Sdk.XunitException($"no snapshot block for quest {questId}");
 		}
 
 		// Pull the body (subopcode onward, dropping the 4-byte length prefix) of the named captured
