@@ -301,6 +301,12 @@ namespace Faolan.GameServer
 			var bank = FullCharSnapshotBuilder.BuildContainer(FullCharSnapshotBuilder.BankKind, 50, 30, characterId, bankRows);
 			await SendBank(client, bank);
 
+			// KNOWN QUIRK (first open): the bank only renders into an already-initialised tradepost window. On the
+			// very first .ah the window is created fresh, so this BankIIR lands too early and the tab shows empty
+			// ("page 1/0" / "0/1"); closing and re-opening (a full open CYCLE) populates it. A delayed bank-only or
+			// full-reopen re-send did NOT reliably fix it in-client, so no workaround here - the real fix is the
+			// auctioneer-NPC open handshake (the window-ready signal), still to be decoded. The live deposit/withdraw
+			// refresh (UpdateBankAfterMove) works once the window is up.
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Opened the auction house (PoC) at your position; bank tab has {bank.Items.Count} item(s).");
 		}
 

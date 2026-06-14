@@ -1,10 +1,12 @@
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Data;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.Packets.FullCharSnapshot;
+using Faolan.GameServer.Packets.Protobuf;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 using ProtoBuf;
@@ -86,6 +88,63 @@ namespace Faolan.GameServer
 
 			Logger.LogInformation("Bank: sent {Count} items to {Character} (BankIIR, container kind {Kind}).",
 				bank.Items.Count, client.Session.Character?.Name, FullCharSnapshotBuilder.BankKind);
+		}
+
+		// Rebuilds the personal bank container (kind 105) from the character's freshly-persisted CharacterInventory
+		// rows and re-sends it. Reuses the same path as the .ah bank tab open.
+		private async Task ResendBank(INetworkClient client)
+		{
+			var characterId = client.Session.Character.Id;
+			var rows = await Database.GetCharacterInventory(characterId);
+			var bankRows = rows
+				.Where(r => r.Container == (int)FullCharSnapshotBuilder.BankKind)
+				.ToList();
+			var bank = FullCharSnapshotBuilder.BuildContainer(FullCharSnapshotBuilder.BankKind, BankMaxSize, BankDisabledSlots, characterId, bankRows);
+			await SendBank(client, bank);
+		}
+
+		// Live-renders a MoveItemInInventory that touches the personal bank (kind 105). PersistInventoryMove has
+		// already written the new slots; the client, however, gets NO response to a bank move, so a deposit looks
+		// like the item "disappeared" (it left the bag client-side but the bank tab never refreshed). The retail
+		// deposit/withdraw response isn't captured yet, so this is a PoC: re-send the whole bank (BankIIR) to refresh
+		// the bank tab, and on a withdraw (bank -> bag) also push the live DispatchAddItem (0x2020) so the item
+		// renders in the bag. NEEDS in-client verification (does an already-open bank window re-read the BankIIR?).
+		private async Task UpdateBankAfterMove(INetworkClient client, MoveItemInInventoryArgs move)
+		{
+			var character = client.Session.Character;
+			if (character == null || move?.SourceContainerId == null || move.DestinationContainerId == null)
+				return;
+
+			var sKind = (int)move.SourceContainerId.Type;
+			var dKind = (int)move.DestinationContainerId.Type;
+			const int bank = (int)FullCharSnapshotBuilder.BankKind;
+			const int bag = (int)FullCharSnapshotBuilder.BagKind;
+			if (sKind != bank && dKind != bank)
+				return; // not a bank move - nothing to refresh
+
+			// Refresh the bank tab from the just-persisted rows (covers deposit, withdraw, and in-bank rearrange).
+			await ResendBank(client);
+
+			// Withdraw (bank -> bag): the item now lives in the bag; push the live add so it renders there too.
+			if (sKind == bank && dKind == bag)
+			{
+				var dPos = (int)move.DestinationItemPos;
+				var rows = await Database.GetCharacterInventory(character.Id);
+				var row = rows.FirstOrDefault(r => r.Container == bag && r.Slot == dPos);
+				if (row?.ItemId == null)
+					return;
+
+				var item = await Database.GetItem(row.ItemId.Value);
+				if (item is not { Archetype: not 0 })
+					return;
+
+				var entry = SnapshotItemBuilder.BuildListEntry(
+					(ulong)dPos,
+					FullCharSnapshotBuilder.ItemId(character.Id, FullCharSnapshotBuilder.BagKind, (ulong)dPos),
+					FullCharSnapshotBuilder.RecordId(character.Id, FullCharSnapshotBuilder.BagKind, (ulong)dPos),
+					row.Count, item, item.Archetype).Item;
+				await SendAddItem(client, InventoryContainerBackpack, (uint)dPos, entry);
+			}
 		}
 	}
 }

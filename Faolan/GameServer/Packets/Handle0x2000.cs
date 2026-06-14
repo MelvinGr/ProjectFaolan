@@ -500,8 +500,12 @@ namespace Faolan.GameServer
 					Logger.LogInformation($"MoveItemInInventory: {move}");
 
 					// Persist the new slot positions so the player's bag arrangement survives logout (the world-entry
-					// snapshot rebuilds the bag from these CharacterInventory rows). No server->client packet follows.
+					// snapshot rebuilds the bag from these CharacterInventory rows).
 					await PersistInventoryMove(client, move);
+
+					// A move that touches the personal bank (kind 105) gets no client-side render otherwise (the bank
+					// tab isn't refreshed), so a deposit looks like the item vanished - push the live bank refresh.
+					await UpdateBankAfterMove(client, move);
 
 					break;
 				}
