@@ -39,8 +39,8 @@ namespace Faolan.GameServer
 		// (verified across the Strie / hoxxling / randochar captures - it is the canonical beach starting quest, not
 		// a per-character artifact). Since the snapshot is replayed and the client renders that quest, persist it so
 		// the DB matches what the journal shows (otherwise CharacterQuests is empty while the journal shows a quest -
-		// see snapshot_embeds_strie_quest). See EnsureBeachStarterQuest.
-		private const uint BeachStarterQuestId = 10238;
+		// see snapshot_embeds_strie_quest). See EnsureBeachStarterQuest / WorldQuest.BeachStarterQuestId.
+		private const uint BeachStarterQuestId = WorldQuest.BeachStarterQuestId;
 
 		// Default starter gear for beach characters (item ids that are fully buildable: p_items identity + harvested
 		// archetype), keyed by the CharacterEquipment slot they go in. Slot-appropriate so the client accepts them.

@@ -30,6 +30,13 @@ namespace Faolan.GameServer.World
 		public const uint StateActive = 2;
 		public const uint TypeTagAck = 0x0000C350;
 
+		// The Tortage beach world-entry snapshot (0x737A6DF9) embeds quest 10238 ("Shipwrecked") in its tails, with its
+		// FULL multi-objective journal record, for every character (snapshot_embeds_strie_quest). The snapshot is the
+		// authoritative delivery for it - the server must NOT re-send a (thinner, single-objective) QuestFullUpdate for
+		// it on login, or it clobbers the snapshot's richer entry. Persisted via EnsureBeachStarterQuest; skipped in
+		// RestorePlayerQuests.
+		public const uint BeachStarterQuestId = 10238;
+
 		// QuestGoal (33 B): [subop][ack][playerHandle][0x01][u32 questId][u32 goalId][u32 count][0][0].
 		public static byte[] BuildQuestGoal(uint playerHandle, uint questId, uint goalId, uint count)
 		{

@@ -393,7 +393,11 @@ namespace Faolan.GameServer.World
 			if (character == null)
 				return;
 
-			var active = (await _database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Active).ToList();
+			// Skip the beach starter quest: the world-entry snapshot already delivers its FULL journal entry (multiple
+			// objectives), so re-sending our thinner QuestFullUpdate would clobber it down to one objective.
+			var active = (await _database.GetCharacterQuests(character.Id))
+				.Where(q => q.State == QuestState.Active && q.QuestId != WorldQuest.BeachStarterQuestId)
+				.ToList();
 			var definitions = new List<(CharacterQuest Quest, QuestDefinition Def)>();
 			foreach (var quest in active)
 			{
