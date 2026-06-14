@@ -206,6 +206,58 @@ namespace Faolan.Tests
 			}
 		}
 
+		// Bank deposit/withdraw persistence (issue #124): a move into the personal bank (container 105) is written to
+		// CharacterInventory and the bank rebuilds from it (the bank is NOT in the login snapshot - it's delivered on
+		// demand via BuildContainer from the kind-105 rows), so it survives relog. This is the data-layer contract
+		// behind PersistInventoryMove + BankHandler; the move handler just routes the kind-105 source/dest through it.
+		[Fact]
+		public async Task BankDepositWithdraw_PersistsAndRebuilds()
+		{
+			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-repo-{Guid.NewGuid():N}.db");
+			try
+			{
+				const uint accountId = 1;
+				const uint realmId = 1;
+				const uint itemId = 354477; // an item with a real archetype (renders in the container)
+				const int bank = (int)Faolan.GameServer.Packets.FullCharSnapshot.FullCharSnapshotBuilder.BankKind; // 105
+				const int bag = (int)Faolan.GameServer.Packets.FullCharSnapshot.FullCharSnapshotBuilder.BagKind;    // 104
+
+				var (repo, factory) = NewRepo(dbPath);
+				await using (var ctx = await factory.CreateDbContextAsync())
+				{
+					await ctx.Database.EnsureCreatedAsync();
+					ctx.Accounts.Add(new Account { Id = accountId, UserName = "t", Password = "t", AuthChallenge = "", LastIpAddress = "" });
+					ctx.Realms.Add(new Realm { Id = realmId, Name = "Test", IpAddress = "127.0.0.1" });
+					ctx.Items.Add(new Item { Id = itemId, Name = "Ape King's Treasure", Archetype = 1497905484, Data1 = 1, Data2 = 2, Data3 = 3, Data4 = 4 });
+					await ctx.SaveChangesAsync();
+				}
+				var character = await repo.CreateCharacter(accountId, realmId);
+
+				// Deposit: item lands in bank slot 3 (what PersistInventoryMove writes for a bag->bank move).
+				await repo.SetCharacterInventorySlot(character.Id, bank, 3, itemId);
+
+				// Reload across a fresh context: the bank row persists, and the on-demand bank container rebuilds it.
+				var bankRows = (await repo.GetCharacterInventory(character.Id)).Where(r => r.Container == bank).ToList();
+				Assert.Single(bankRows);
+				var container = Faolan.GameServer.Packets.FullCharSnapshot.FullCharSnapshotBuilder.BuildContainer(
+					(uint)bank, 50, 30, character.Id, bankRows);
+				Assert.Contains(container.Items, e => e.Pos == 3);
+
+				// Withdraw: bank slot 3 -> bag slot 0 (the move clears the bank cell, writes the bag cell).
+				await repo.SetCharacterInventorySlot(character.Id, bank, 3, null);
+				await repo.SetCharacterInventorySlot(character.Id, bag, 0, itemId);
+
+				var rows = await repo.GetCharacterInventory(character.Id);
+				Assert.DoesNotContain(rows, r => r.Container == bank); // bank now empty
+				Assert.Contains(rows, r => r.Container == bag && r.Slot == 0 && r.ItemId == itemId);
+			}
+			finally
+			{
+				if (File.Exists(dbPath))
+					File.Delete(dbPath);
+			}
+		}
+
 		[Fact]
 		public async Task EquipmentAndAccount_RoundTrip_AcrossShortLivedContexts()
 		{
