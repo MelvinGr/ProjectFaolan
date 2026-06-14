@@ -73,6 +73,7 @@ namespace Faolan.Importer
 					CapturedNpcHandle = e.CapturedNpcHandle,
 					NpcName = e.NpcName,
 					CapturedInstance = e.CapturedInstance,
+					ConditionScript = e.ConditionScript,
 					Packets = e
 						.Packets
 						.Select((p, i) => new ConversationPacket
@@ -245,7 +246,7 @@ namespace Faolan.Importer
 				? ReadCaptures(capturesDir)
 				: [];
 			var itemPackets = captures
-				.SelectMany(c => c.Select(p => p.Bytes))
+				.SelectMany(c => c.Packets.Select(p => p.Bytes))
 				.ToList();
 			if (doCaptures)
 			{
@@ -253,7 +254,10 @@ namespace Faolan.Importer
 					itemPackets.Add(await File.ReadAllBytesAsync(bin));
 			}
 
-			var conversations = ConversationExtractor.Merge(captures.SelectMany(ConversationExtractor.Extract));
+			// Extract per capture so quest/tag dialogue conditions (ConversationConditions) can target a named capture
+			// (e.g. Casilda's pre- vs post-first-quest greeting); Merge then dedups by (name, type, path, condition).
+			var conversations = ConversationExtractor.Merge(
+				captures.SelectMany(c => ConversationConditions.Apply(c.Name, ConversationExtractor.Extract(c.Packets))));
 
 			if (doCaptures)
 				Console.WriteLine($"Read {captures.Count} captures, {itemPackets.Count} item-candidate packets; extracted {conversations.Count} conversation nodes.");
@@ -338,7 +342,7 @@ namespace Faolan.Importer
 			{
 				// AH listings (TradepostListing) - harvested from the captured DispatchTradepostSearchResults
 				// (0x2005) rows. Re-seedable on its own via --listings-only.
-				var (listSeen, listAdded, listUpdated) = await CaptureListingImporter.ImportAsync(db, captures.SelectMany(CaptureListingImporter.Extract));
+				var (listSeen, listAdded, listUpdated) = await CaptureListingImporter.ImportAsync(db, captures.SelectMany(c => CaptureListingImporter.Extract(c.Packets)));
 				Console.WriteLine($"AH listings (0x2005 search results): {listSeen} listings, {listAdded} new, {listUpdated} updated.");
 
 				if (!listingsOnly)
@@ -371,19 +375,19 @@ namespace Faolan.Importer
 				// After items (the equipment references them). Existing names are skipped, never overwritten.
 				if (!args.Contains("--skip-characters")) // TODO: CaptureCharacterImporter is not idempotent (UNIQUE CharacterBodies.CharacterId) on a populated DB
 				{
-					var (chSeen, chAdded, chSkipped) = await CaptureCharacterImporter.ImportAsync(db, captures);
+					var (chSeen, chAdded, chSkipped) = await CaptureCharacterImporter.ImportAsync(db, captures.Select(c => c.Packets).ToList());
 					Console.WriteLine($"Characters: {chSeen} captured, {chAdded} added, {chSkipped} already in DB.");
 				}
 
 				await ImportConversations(db, conversations);
 				// After characters exist: seed their observed live state (wallet balances, hotbar slots).
-				var (moneySeeded, shortcutsSeeded) = await CaptureCharacterStateImporter.ImportAsync(db, captures);
+				var (moneySeeded, shortcutsSeeded) = await CaptureCharacterStateImporter.ImportAsync(db, captures.Select(c => c.Packets).ToList());
 				Console.WriteLine($"Character state: {moneySeeded} wallets, {shortcutsSeeded} hotbar slots seeded from captures.");
-				var (shopsSeen, shopsAdded, shopsUpdated) = await CaptureShopImporter.ImportAsync(db, captures.SelectMany(CaptureShopImporter.Extract));
+				var (shopsSeen, shopsAdded, shopsUpdated) = await CaptureShopImporter.ImportAsync(db, captures.SelectMany(c => CaptureShopImporter.Extract(c.Packets)));
 				Console.WriteLine($"Shops (0x2033 vendor windows): {shopsSeen} vendors, {shopsAdded} new, {shopsUpdated} updated.");
-				await ImportNpcSpawns(db, NpcSpawnExtractor.Merge(captures.SelectMany(NpcSpawnExtractor.Extract)));
-				await ImportWorldObjects(db, WorldObjectExtractor.Merge(captures.SelectMany(WorldObjectExtractor.Extract)));
-				await ImportMapWorldBursts(db, MapWorldBurstExtractor.Merge(captures.SelectMany(MapWorldBurstExtractor.Extract)));
+				await ImportNpcSpawns(db, NpcSpawnExtractor.Merge(captures.SelectMany(c => NpcSpawnExtractor.Extract(c.Packets))));
+				await ImportWorldObjects(db, WorldObjectExtractor.Merge(captures.SelectMany(c => WorldObjectExtractor.Extract(c.Packets))));
+				await ImportMapWorldBursts(db, MapWorldBurstExtractor.Merge(captures.SelectMany(c => MapWorldBurstExtractor.Extract(c.Packets))));
 				}
 			}
 
@@ -460,9 +464,15 @@ namespace Faolan.Importer
 			}
 		}
 
-		private static List<List<CapturedPacket>> ReadCaptures(string capturesDir)
+		// A capture's packets plus its base filename (no extension) - the name lets per-capture rules (e.g.
+		// quest-state dialogue conditions, ConversationConditions) target a specific capture.
+		public sealed record NamedCapture(string Name, List<CapturedPacket> Packets);
+
+		private static string CaptureBaseName(string path, string suffix) => StripSuffix(Path.GetFileName(path), suffix);
+
+		private static List<NamedCapture> ReadCaptures(string capturesDir)
 		{
-			var captures = new List<List<CapturedPacket>>();
+			var captures = new List<NamedCapture>();
 
 			// tshark dumps (*.tshark.json) TCP-reassemble and keep the compressed downloads the analyzer drops (notably
 			// the conversation RESPONSE packets) - they are the trustworthy source. They are read ADDITIVELY alongside
@@ -472,7 +482,7 @@ namespace Faolan.Importer
 			var tsharkBases = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 			foreach (var ts in Directory.EnumerateFiles(capturesDir, "*.tshark.json"))
 			{
-				captures.Add(TsharkCaptureReader.Read(ts));
+				captures.Add(new NamedCapture(CaptureBaseName(ts, ".tshark.json"), TsharkCaptureReader.Read(ts)));
 				tsharkBases.Add(StripSuffix(ts, ".tshark.json"));
 			}
 
@@ -481,7 +491,7 @@ namespace Faolan.Importer
 				if (json.EndsWith(".tshark.json", StringComparison.OrdinalIgnoreCase))
 					continue; // already read above
 
-				captures.Add(ReadJsonCapture(json));
+				captures.Add(new NamedCapture(CaptureBaseName(json, ".json"), ReadJsonCapture(json)));
 			}
 
 			var analysis = new PacketAnalysisService();
@@ -493,7 +503,7 @@ namespace Faolan.Importer
 
 				try
 				{
-					captures.Add(ReadPcapCapture(analysis, pcap));
+					captures.Add(new NamedCapture(CaptureBaseName(pcap, ".pcapng"), ReadPcapCapture(analysis, pcap)));
 				}
 				catch (Exception ex)
 				{

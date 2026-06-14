@@ -17,7 +17,7 @@ namespace Faolan.Importer
 	// runtime routes on; the handle/instance are session-volatile and only used to re-address the replay).
 	// (Mode/Field3 were the OLD key but both are session-volatile counters, not branch ids - the AnswerPath is the
 	// stable branch key; memory protocol_conversation_routing.)
-	public sealed record ConversationEntry(uint TypeId, string AnswerPath, uint CapturedNpcHandle, uint CapturedInstance, List<byte[]> Packets, string NpcName);
+	public sealed record ConversationEntry(uint TypeId, string AnswerPath, uint CapturedNpcHandle, uint CapturedInstance, List<byte[]> Packets, string NpcName, string ConditionScript = "");
 
 	// Reconstructs each NPC's dialogue as a TREE of screens keyed by answer-index PATH, from the captured request/
 	// response flow. The grammar (memory protocol_conversation_routing): a conversation INSTANCE = TalkToNpc(f3=0)
@@ -115,13 +115,15 @@ namespace Faolan.Importer
 		// is a 4-byte varint (re-addresses to any normal character), then the most packets.
 		public static List<ConversationEntry> Merge(IEnumerable<ConversationEntry> all)
 		{
-			var best = new Dictionary<(string, uint, string), (int score, ConversationEntry entry)>();
+			var best = new Dictionary<(string, uint, string, string), (int score, ConversationEntry entry)>();
 			foreach (var e in all)
 			{
 				var identity = string.IsNullOrEmpty(e.NpcName)
 					? $"#{e.CapturedNpcHandle}"
 					: e.NpcName;
-				var key = (identity, e.TypeId, e.AnswerPath);
+				// The ConditionScript is part of the key so a NPC's quest/tag-conditioned variants (e.g. Casilda's
+				// pre- vs post-first-quest greeting) stay SEPARATE rows instead of merging into one mixed screen.
+				var key = (identity, e.TypeId, e.AnswerPath, e.ConditionScript);
 				var score = (VarintLength(e.CapturedInstance) == 4
 					? 1_000_000
 					: 0) + e.Packets.Count;
