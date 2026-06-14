@@ -124,54 +124,71 @@ namespace Faolan.Core.Database.Tables
 		public uint Stamina { get; set; }
 
 		// Approximate class/level defaults so a character has sensible vitals until a real stat system exists.
-		// Anchored on assassinl23 (Assassin, lvl 23: Health 1270, Mana 74, Stamina 1148) - a rogue archetype check.
-		// Values are intentionally rough; combat/levelling will replace these once those systems land.
+		// Which pools a class HAS is taken from the captured retail characters (memory class_resource_mana_stamina,
+		// authoritative): pure-physical classes (melee Soldiers + all Rogues) have Stamina only, pure casters
+		// (Mages + ranged Priests) have Mana only, and the three melee-hybrids (Dark Templar / Bear Shaman / Herald
+		// of Xotli) have both. The unused pool is zeroed so the client hides that bar. Magnitudes are intentionally
+		// rough; combat/levelling will replace these once those systems land.
 		public static CharacterMaxStats CreateDefaults(Class @class, ushort level)
 		{
 			var lvl = level == 0
 				? (ushort)1
 				: level;
-			var (healthPerLevel, manaBase, manaPerLevel) = Archetype(@class);
+			var (healthPerLevel, manaBase, manaPerLevel, usesStamina, usesMana) = Archetype(@class);
 
 			return new CharacterMaxStats
 			{
 				Health = (uint)(200 + lvl * healthPerLevel),
-				Stamina = (uint)(200 + lvl * (healthPerLevel - 6)),
-				Mana = (uint)(manaBase + lvl * manaPerLevel)
+				Stamina = usesStamina
+					? (uint)(200 + lvl * (healthPerLevel - 6))
+					: 0,
+				Mana = usesMana
+					? (uint)(manaBase + lvl * manaPerLevel)
+					: 0
 			};
 		}
 
-		// (healthPerLevel, manaBase, manaPerLevel) by AoC class archetype.
-		private static (int HealthPerLevel, int ManaBase, int ManaPerLevel) Archetype(Class @class)
+		// (healthPerLevel, manaBase, manaPerLevel, usesStamina, usesMana) by class. The stamina/mana flags match the
+		// captured retail CharacterMaxStats (see memory class_resource_mana_stamina).
+		private static (int HealthPerLevel, int ManaBase, int ManaPerLevel, bool UsesStamina, bool UsesMana) Archetype(Class @class)
 		{
 			switch (@class)
 			{
-				// Soldiers - high health, little mana.
+				// Melee Soldiers - high health, STAMINA ONLY.
 				case Class.Guardian:
 				case Class.Conqueror:
-				case Class.DarkTemplar:
-					return (60, 50, 1);
+					return (60, 0, 0, true, false);
 
-				// Rogues - medium health, little mana (Assassin lvl 23 -> ~1281 HP / ~73 mana).
+				// Dark Templar - Soldier hybrid, BOTH (unholy magic + melee).
+				case Class.DarkTemplar:
+					return (60, 50, 1, true, true);
+
+				// Rogues - medium health, STAMINA ONLY (captures show Assassin has no mana).
 				case Class.Barbarian:
 				case Class.Assassin:
 				case Class.Ranger:
-					return (47, 50, 1);
+					return (47, 0, 0, true, false);
 
-				// Priests - medium health, moderate mana.
+				// Ranged Priests - medium health, MANA ONLY.
 				case Class.PriestOfMitra:
 				case Class.TempestOfSet:
-				case Class.BearShaman:
-					return (45, 80, 30);
+					return (45, 80, 30, false, true);
 
-				// Mages - low health, high mana.
+				// Bear Shaman - Priest melee hybrid, BOTH.
+				case Class.BearShaman:
+					return (45, 80, 30, true, true);
+
+				// Herald of Xotli - Mage melee hybrid, BOTH.
 				case Class.HeraldOfXotli:
+					return (38, 100, 40, true, true);
+
+				// Pure Mages - low health, MANA ONLY.
 				case Class.Demonologist:
 				case Class.Necromancer:
-					return (38, 100, 40);
+					return (38, 100, 40, false, true);
 
 				default:
-					return (47, 50, 1);
+					return (47, 50, 1, true, true);
 			}
 		}
 	}

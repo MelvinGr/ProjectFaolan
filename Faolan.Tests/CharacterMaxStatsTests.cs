@@ -4,8 +4,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Class/level vitals defaults. Anchored on assassinl23 (Assassin lvl 23 -> sheet Health 1270, Mana 74,
-	// Stamina 1148); the rogue archetype should land close. See docs/player-stats.md.
+	// Class/level vitals defaults. Anchored on assassinl23 (Assassin lvl 23 -> captured Health 1270, Stamina 736,
+	// Mana 0 - Assassins are stamina-only per the captures, memory class_resource_mana_stamina). See
+	// docs/player-stats.md.
 	public class CharacterMaxStatsTests
 	{
 		[Fact]
@@ -33,10 +34,11 @@ namespace Faolan.Tests
 		{
 			var stats = CharacterMaxStats.CreateDefaults(Class.Assassin, 23);
 
-			// 200 + 23*47 = 1281 (sheet 1270), 200 + 23*41 = 1143 (sheet 1148), 50 + 23 = 73 (sheet 74)
+			// 200 + 23*47 = 1281 (captured 1270), 200 + 23*41 = 1143 (captured 736 - rough); Assassin is
+			// stamina-only so Mana = 0 (captured AssassinL23 Mana 0).
 			Assert.Equal(1281u, stats.Health);
 			Assert.Equal(1143u, stats.Stamina);
-			Assert.Equal(73u, stats.Mana);
+			Assert.Equal(0u, stats.Mana);
 		}
 
 		[Fact]
