@@ -56,5 +56,15 @@ namespace Faolan.Tests
 			Assert.Equal(0x20d82b5b17d2e9d4ul, s.ReadUInt64());
 			Assert.Equal(body.Length, (int)s.Position);
 		}
+
+		// The "listed" overlay rides on 0x201c bank-slot stat updates: [kind=105][charInst][slot][statId][value].
+		// Byte-exact vs the sell capture's F376 (slot 6, stat 258=price=1,000,000, char instance 0x0802e5d4).
+		[Fact]
+		public void BankSlotStatBody_MatchesCapturedOverlayUpdate()
+		{
+			var body = Faolan.GameServer.GameServerListener.BuildBankSlotStatBody(0x0802e5d4, slot: 6, statId: 258, value: 1_000_000);
+
+			Assert.Equal("000000690802e5d40000000600000102000f4240", Convert.ToHexStringLower(body));
+		}
 	}
 }

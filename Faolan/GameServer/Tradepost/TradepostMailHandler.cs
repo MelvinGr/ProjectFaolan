@@ -34,6 +34,38 @@ namespace Faolan.GameServer
 		private const uint MailFooterUnread = 0x0B; // footer word; flips to 0x09 once read (the client's read flag)
 		private const uint MailAttachmentTrailerWord = 0x72;
 
+		// Bank-slot stat ids + flag values the "listed" overlay rides on (0x201c stat updates on container 105,
+		// decoded from the sell/change/cancel captures). The client draws/clears the AH overlay from these.
+		private const uint BankStatFlags = 0;       // stat 0 = item flags
+		private const uint BankStatPrice = 258;     // stat 258 (0x102) = listing price
+		private const uint BankStatTimestamp = 265; // stat 265 (0x109) = listing timestamp (unix)
+		private const uint BankFlagListed = 0x401;  // flags value while listed for sale
+		private const uint BankFlagNormal = 0x001;  // flags value once unlisted (capture's cancel value)
+
+		// Pushes one bank-slot stat update (0x201c on container 105): [kind=105][charInstance][slot][statId][value],
+		// byte-exact to the capture (F376/F377/F364/F398). Rides the same GameCharAgent conversation as the bank
+		// slot registrations (BankHandler), so the client applies it to the live bank cell.
+		private Task SendBankSlotStat(INetworkClient client, uint slot, uint statId, uint value)
+		{
+			return new PacketStream()
+				.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), (ushort)0x201C)
+				.WriteArray(BuildBankSlotStatBody(client.Session.Character.Id, slot, statId, value))
+				.SendAsync(client);
+		}
+
+		// The 0x201c bank-slot stat-update body: [kind=105][charInstance][slot][statId][value] (all u32 BE). Locked
+		// byte-exact to the capture by TradepostBankStatTests.
+		internal static byte[] BuildBankSlotStatBody(uint charInstance, uint slot, uint statId, uint value)
+		{
+			return new FaolanStream()
+				.WriteUInt32(FullCharSnapshotBuilder.BankKind)
+				.WriteUInt32(charInstance)
+				.WriteUInt32(slot)
+				.WriteUInt32(statId)
+				.WriteUInt32(value)
+				.ToArray();
+		}
+
 		// TradepostBuyItem (0x200E) [saleId:u64][searchResultId:u64]: charge the buyer and deliver the listed item via
 		// a system mail. Refuses on unknown listing or insufficient funds (no money moves until the mail is created).
 		internal async Task HandleTradepostBuy(INetworkClient client, ConanPacket packet)
@@ -123,8 +155,13 @@ namespace Faolan.GameServer
 			};
 			await Database.CreateTradepostListing(listing);
 
-			// The listed item STAYS in its bank slot (the client just shows a "listed" overlay); it only leaves the
-			// seller's bank when someone BUYS it (HandleTradepostBuy removes the seller's bank cell). So no escrow here.
+			// The listed item STAYS in its bank slot - the client draws a "listed" overlay when the server pushes
+			// these three bank-slot stat updates (decoded from the capture, F376/F377): price, timestamp, and the
+			// listed flag. It only leaves the seller's bank when someone BUYS it (HandleTradepostBuy clears the cell).
+			await SendBankSlotStat(client, (uint)bankSlot, BankStatPrice, (uint)price);
+			await SendBankSlotStat(client, (uint)bankSlot, BankStatTimestamp, (uint)System.DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+			await SendBankSlotStat(client, (uint)bankSlot, BankStatFlags, BankFlagListed);
+
 			Logger.LogInformation("Tradepost SELL: {Char} listed \"{Item}\" x{Qty} (bank slot {Slot}, template {Template}) for {Price} tin -> sale 0x{Sale:X16}.",
 				character.Name, row.Item.Name, listing.Quantity, bankSlot, row.Item.Id, price, listing.SaleId);
 		}
@@ -148,6 +185,8 @@ namespace Faolan.GameServer
 			}
 
 			await Database.SetTradepostListingPrice(listing.SaleId, newPrice);
+			// Update the bank-slot overlay's price stat (capture F364).
+			await SendBankSlotStat(client, bankSlot, BankStatPrice, (uint)newPrice);
 			Logger.LogInformation("Tradepost CHANGEPRICE: {Char} repriced listing 0x{Sale:X16} (bank slot {Slot}) {Old} -> {New} tin.",
 				character.Name, listing.SaleId, bankSlot, listing.Price, newPrice);
 		}
@@ -171,6 +210,9 @@ namespace Faolan.GameServer
 			}
 
 			await Database.DeleteTradepostListing(listing.SaleId);
+			// Clear the bank-slot overlay (capture F398): flag back to normal, price to 0.
+			await SendBankSlotStat(client, bankSlot, BankStatFlags, BankFlagNormal);
+			await SendBankSlotStat(client, bankSlot, BankStatPrice, 0);
 			Logger.LogInformation("Tradepost CANCELSELL: {Char} cancelled listing 0x{Sale:X16} (bank slot {Slot}); item stays in the bank.",
 				character.Name, listing.SaleId, bankSlot);
 		}
