@@ -112,6 +112,10 @@ namespace Faolan.GameServer
 				// Then the post-ready world-state/quest record stream (verbatim from the Strie login capture).
 				await SendPostReadyBurst(client);
 
+				// Re-deliver any persisted bag items the world-entry snapshot dropped for lacking an archetype
+				// (AH-bought items - harvested template, no archetype) via the live add path, so they survive relog.
+				await RedeliverNonSnapshotBagItems(client);
+
 				// (The post-load second-snapshot delivery was removed 2026-06-12: the client ignores/rejects a
 				// second 0x737A6DF9 for an already-constructed identity. Inventory rides the WORLD-ENTRY snapshot,
 				// see BuildBeachInventoryPacket.)

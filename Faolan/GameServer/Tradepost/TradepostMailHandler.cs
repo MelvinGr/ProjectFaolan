@@ -172,10 +172,13 @@ namespace Faolan.GameServer
 
 			var qty = attachment.Quantity == 0 ? 1u : attachment.Quantity;
 			var item = await Database.GetItem(attachment.Template);
-			if (item is { Archetype: not 0 })
+			if (item != null)
+				// The listing importer harvests every listed item into Items (so the CharacterInventory.ItemId FK
+				// holds), letting the bought item persist. Archetype-0 items the world-entry snapshot drops are
+				// re-rendered on relog by RedeliverNonSnapshotBagItems via the live add path.
 				await Database.SetCharacterInventorySlot(character.Id, (int)FullCharSnapshotBuilder.BagKind, slot.Value, attachment.Template, qty);
 			else
-				Logger.LogInformation("Tradepost mail: delivered template {Template} to {Char} LIVE-ONLY (not a buildable Items row; won't persist across relog).",
+				Logger.LogInformation("Tradepost mail: delivered template {Template} to {Char} LIVE-ONLY (no Items row; won't persist across relog).",
 					attachment.Template, character.Name);
 
 			await Database.RemoveMailAttachment(mailId, attachment.ItemInstanceId);

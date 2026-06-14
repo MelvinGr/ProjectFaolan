@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Packets;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -105,6 +106,43 @@ namespace Faolan.Importer
 				.ToList();
 		}
 
+		// Ensures each listed item exists as an Items TEMPLATE so a bought item can persist (CharacterInventory.ItemId
+		// FK) and be re-rendered on relog. The AH listing carries the per-template identity quad + level (verified
+		// identical across a template's listings) but NO archetype (the search-results ProtoAcgItem.Hash is 0), so
+		// these are by-template / Hash-0 items: they render via the live add-item path (DispatchAddItem), not the
+		// archetype-gated world-entry snapshot. Skips templates we already have (real harvested items win). Returns
+		// the number of new Items rows seeded.
+		public static async Task<int> HarvestItems(IDatabaseContext db, IEnumerable<TradepostListing> listings)
+		{
+			var merged = Merge(listings);
+			var harvested = 0;
+			foreach (var tmpl in merged.Select(l => l.Template).Where(t => t != 0).Distinct())
+			{
+				if (await db.Items.AnyAsync(i => i.Id == tmpl))
+					continue;
+
+				var src = merged.First(l => l.Template == tmpl);
+				db.Items.Add(new Item
+				{
+					Id = tmpl,
+					Name = "",
+					Level = (byte)Math.Min(src.ItemLevel, byte.MaxValue),
+					Type = ItemType.Normal,
+					Archetype = src.ItemHash, // 0 for AH listings - rendered by-template via the live add, not the snapshot
+					Data0 = 0,
+					Data1 = src.Data1,
+					Data2 = src.Data2,
+					Data3 = src.Data3,
+					Data4 = src.Data4
+				});
+				harvested++;
+			}
+
+			if (harvested > 0)
+				await db.SaveChangesAsync();
+			return harvested;
+		}
+
 		public static async Task<(int Seen, int Added, int Updated)> ImportAsync(IDatabaseContext db, IEnumerable<TradepostListing> listings, ILogger logger = null)
 		{
 			var added = 0;
@@ -141,6 +179,12 @@ namespace Faolan.Importer
 			}
 
 			await db.SaveChangesAsync();
+
+			// Seed an Items template for every listed item so a bought item can persist + render on relog.
+			var harvested = await HarvestItems(db, merged);
+			logger?.LogInformation("Tradepost listings: {Seen} seen, {Added} added, {Updated} updated; {Harvested} item template(s) harvested.",
+				merged.Count, added, updated, harvested);
+
 			return (merged.Count, added, updated);
 		}
 

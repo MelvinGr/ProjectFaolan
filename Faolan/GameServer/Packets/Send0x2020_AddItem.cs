@@ -7,6 +7,7 @@ using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.Packets.FullCharSnapshot;
+using Microsoft.Extensions.Logging;
 using ProtoBuf;
 
 // ReSharper disable once CheckNamespace
@@ -85,6 +86,41 @@ namespace Faolan.GameServer
 				count, item, item.Archetype).Item;
 			await SendAddItem(client, InventoryContainerBackpack, (uint)slot.Value, entry);
 			return slot;
+		}
+
+		// Re-delivers, via the proven live DispatchAddItem (0x2020) path, the persisted BAG items the world-entry
+		// snapshot DROPPED because they carry no archetype (Archetype == 0 - e.g. an AH-bought item whose template
+		// we harvested from a listing, which has no archetype). The snapshot only renders Archetype != 0 rows
+		// (FullCharSnapshotBuilder), and embedding a half-identified item in the chat-critical 0x737A6DF9 root is
+		// risky, so these ride the mid-session add-item mechanism (which renders by template / Hash 0) once at login.
+		// Items WITH an archetype already rode the snapshot, so this only touches the dropped ones (no duplication).
+		private async Task RedeliverNonSnapshotBagItems(INetworkClient client)
+		{
+			var character = client.Session?.Character;
+			if (character == null)
+				return;
+
+			var rows = await Database.GetCharacterInventory(character.Id);
+			var pushed = 0;
+			foreach (var row in rows.Where(r => r.Container == (int)FullCharSnapshotBuilder.BagKind
+			                                    && r.ItemId != null && r.Item is { Archetype: 0 }))
+			{
+				var slot = (ulong)row.Slot;
+				var entry = SnapshotItemBuilder.BuildInventoryEntry(
+					FullCharSnapshotBuilder.ItemId(character.Id, FullCharSnapshotBuilder.BagKind, slot),
+					row.Item, 0,
+					[
+						new SnapshotItemBuilder.ItemStat(0, 1),
+						new SnapshotItemBuilder.ItemStat(23, (uint)FullCharSnapshotBuilder.RecordId(character.Id, FullCharSnapshotBuilder.BagKind, slot)),
+						new SnapshotItemBuilder.ItemStat(26, row.Count)
+					],
+					row.Item.Level);
+				await SendAddItem(client, InventoryContainerBackpack, (uint)row.Slot, entry);
+				pushed++;
+			}
+
+			if (pushed > 0)
+				Logger.LogInformation("Re-delivered {Count} archetype-less bag item(s) to '{Name}' via live add (not in the snapshot).", pushed, character.Name);
 		}
 
 		// The first free backpack cell (0..23), skipping persisted rows and the legacy starter-bag cell (pos 1)
