@@ -101,6 +101,13 @@ namespace Faolan.Tests
 				Convert.ToHexString(ScryScript.BuildStep(0x01316D8A, "IntroDone")).ToLowerInvariant());
 			Assert.Equal("a36d3b740000c35001316d8a000000001908051002180622094368616e67655365782a00320408001000",
 				Convert.ToHexString(ScryScript.BuildStep(0x01316D8A, "ChangeSex", flag: 6)).ToLowerInvariant());
+
+			// The PostReadyBurst login destiny steps (records 2 + 4), proving BuildStep reproduces them so the
+			// verbatim byte arrays there can be retired (construct, don't replay - #191).
+			Assert.Equal("a36d3b740000c35001316d8a000000001c080510021800220c5374617274466978656433642a00320408001000",
+				Convert.ToHexString(ScryScript.BuildStep(0x01316D8A, "StartFixed3d")).ToLowerInvariant());
+			Assert.Equal("a36d3b740000c35001316d8a000000001f080510021800220f57656c636f6d655475746f7269616c2a00320408001000",
+				Convert.ToHexString(ScryScript.BuildStep(0x01316D8A, "WelcomeTutorial")).ToLowerInvariant());
 		}
 
 		// End-to-end: the importer harvests the Casilda definition from the captures, and feeding it back

@@ -2,6 +2,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
 // ReSharper disable once CheckNamespace
@@ -39,12 +40,13 @@ namespace Faolan.GameServer
 				.WriteArray(0x01)
 				.SendAsync(client);
 
-			// record 2: 0x00002000, 49-byte body
+			// record 2: 0x00002000 - the StartFixed3d destiny step (ScryScriptIIR 0xA36D3B74), constructed (was verbatim;
+			// byte-identical, proven by QuestTests.BuildScryStep_MatchesCapture). The body is [u32 len][step bytes].
+			var startFixed3d = ScryScript.BuildStep(instance, "StartFixed3d");
 			await new PacketStream()
 				.WriteHeader(ExistingCharacterWorldEntryPromptSender, AppendVarint(ExistingCharacterWorldEntryPromptReceiverPrefix, instance), 0x00002000u)
-				.WriteArray(0x00, 0x00, 0x00, 0x2D, 0xA3, 0x6D, 0x3B, 0x74, 0x00, 0x00, 0xC3, 0x50)
-				.WriteUInt32(instance)
-				.WriteArray(0x00, 0x00, 0x00, 0x00, 0x1C, 0x08, 0x05, 0x10, 0x02, 0x18, 0x00, 0x22, 0x0C, 0x53, 0x74, 0x61, 0x72, 0x74, 0x46, 0x69, 0x78, 0x65, 0x64, 0x33, 0x64, 0x2A, 0x00, 0x32, 0x04, 0x08, 0x00, 0x10, 0x00)
+				.WriteUInt32((uint)startFixed3d.Length)
+				.WriteArray(startFixed3d)
 				.SendAsync(client);
 
 			// record 3: 0x00002000, 35-byte body - the GameCode script-message (script id 0x5F376, no name string,
@@ -60,13 +62,13 @@ namespace Faolan.GameServer
 					.WriteArray(0x00, 0x00, 0x00, 0x00, 0x0E, 0x08, 0x05, 0x10, 0x00, 0x18, 0xF6, 0xC6, 0x17, 0x32, 0x04, 0x08, 0x00, 0x10, 0x00)
 					.SendAsync(client);
 
-			// record 4: 0x00002000, 52-byte body
+			// record 4: 0x00002000 - the WelcomeTutorial destiny step (ScryScriptIIR 0xA36D3B74), constructed (was
+			// verbatim; byte-identical, proven by QuestTests.BuildScryStep_MatchesCapture).
+			var welcomeTutorial = ScryScript.BuildStep(instance, "WelcomeTutorial");
 			await new PacketStream()
 				.WriteHeader(ExistingCharacterWorldEntryPromptSender, AppendVarint(ExistingCharacterWorldEntryPromptReceiverPrefix, instance), 0x00002000u)
-				.WriteArray(0x00, 0x00, 0x00, 0x30, 0xA3, 0x6D, 0x3B, 0x74, 0x00, 0x00, 0xC3, 0x50)
-				.WriteUInt32(instance)
-				.WriteArray(0x00, 0x00, 0x00, 0x00, 0x1F, 0x08, 0x05, 0x10, 0x02, 0x18, 0x00, 0x22, 0x0F, 0x57, 0x65, 0x6C, 0x63, 0x6F, 0x6D, 0x65, 0x54, 0x75, 0x74, 0x6F, 0x72, 0x69, 0x61, 0x6C, 0x2A, 0x00, 0x32, 0x04, 0x08,
-					0x00, 0x10, 0x00)
+				.WriteUInt32((uint)welcomeTutorial.Length)
+				.WriteArray(welcomeTutorial)
 				.SendAsync(client);
 
 			// record 5: 0x00002000, 154-byte body
