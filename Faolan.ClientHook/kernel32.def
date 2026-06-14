@@ -1,0 +1,7 @@
+LIBRARY kernel32.dll
+EXPORTS
+CreateFileA@28
+WriteFile@20
+CloseHandle@4
+GetModuleHandleA@4
+GetCurrentProcessId@0
