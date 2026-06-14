@@ -43,13 +43,33 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		public TailsPostAccessBlock? PostAccessBlock { get; init; }
 		public uint Header0 { get; init; }
 		public uint Level { get; set; } // settable: world entry patches the LIVE character level in (the rest of the header stays captured)
-		public uint PrimaryRemoteFormatId { get; init; }
-		public uint PrimaryRemoteFormatIdAgain { get; init; }
-		public uint Unknown0Marker { get; init; }
+		// Settable: world entry reconciles the embedded quest journal to the LIVE character (the captured tails carry
+		// the source character's quests, e.g. Strie's quest 10238 on the beach - see SetQuestCount).
+		public uint PrimaryRemoteFormatId { get; set; }
+		public uint PrimaryRemoteFormatIdAgain { get; set; }
+		public uint Unknown0Marker { get; set; }
 		public uint Unknown3 { get; init; }
 		public uint Unknown6 { get; init; }
 		public uint Unknown7 { get; init; }
 		public uint Unknown8 { get; init; }
+
+		// The FullChar snapshot embeds the SOURCE character's quest journal (the captured tails carry e.g. Strie's
+		// beach quest 10238), so every character replaying that snapshot inherits it. The quest count is encoded as
+		// Unknown0Marker = 1009 * (count + 1) (verified: 0 quests = 1009/0x3F1, 1 = 2018/0x7E2, 2 = 3027/0xBD3) and
+		// PrimaryRemoteFormatId(Again) points at the primary quest. Reconcile the count to the LIVE character: setting
+		// it to 0 tells the client the player has no quests (the quest RECORD bytes in RemoteFormat50301/50302 +
+		// UnknownBefore stay, but the count gates the journal). This is length-preserving (two u32 fields), so it does
+		// not reshape the snapshot framing. The player's REAL quests are then driven by the QuestIIR/QuestFullUpdate
+		// packets on login (WorldBroadcaster.RestorePlayerQuests). See docs/quest-log-handover.md / snapshot_embeds_strie_quest.
+		public void SetQuestCount(uint count)
+		{
+			Unknown0Marker = 1009u * (count + 1u);
+			if (count == 0)
+			{
+				PrimaryRemoteFormatId = 0;
+				PrimaryRemoteFormatIdAgain = 0;
+			}
+		}
 
 		public byte[] ToArray()
 		{

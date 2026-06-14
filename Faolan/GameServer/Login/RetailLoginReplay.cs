@@ -53,7 +53,7 @@ namespace Faolan.GameServer
 		// IMPORTANT: built entirely with manual byte assembly + manual CRC and the ORIGINAL packet's header copied
 		// verbatim - NOT via PacketStream/WriteLengthHash. An earlier PacketStream-based rebuild stalled the client
 		// on the loading screen even though its output was byte-exact, whereas the manual byte path works.
-		private byte[] BuildBeachInventoryPacket(byte[] substitutedPacket, Character character, CharacterEquipment equipment = null, CharacterInventory[] inventoryRows = null)
+		private byte[] BuildBeachInventoryPacket(byte[] substitutedPacket, Character character, CharacterEquipment equipment = null, CharacterInventory[] inventoryRows = null, uint activeQuestCount = 0)
 		{
 			var conanPacket = new ConanPacket(substitutedPacket);
 			var body = new FaolanStream(conanPacket.Body.ReadArrayUInt32Length());
@@ -62,6 +62,11 @@ namespace Faolan.GameServer
 			var c350 = body.ReadUInt32();
 			var instance = body.ReadUInt32();
 			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(body);
+
+			// The captured tails embed the SOURCE character's quest journal (e.g. Strie's beach quest 10238); reconcile
+			// the embedded quest COUNT to the live character so they don't inherit it. The live character's actual
+			// quests are delivered by the QuestIIR/QuestFullUpdate packets (RestorePlayerQuests). See SnapshotTails.SetQuestCount.
+			parts.Tails.SetQuestCount(activeQuestCount);
 
 			// Patch the LIVE character's level + current vitals into the tails (the captured player's values
 			// otherwise ride along; tail stat edits are proven safe in-client - they do NOT affect the chat gate).
@@ -384,6 +389,12 @@ namespace Faolan.GameServer
 				? await Database.GetCharacterInventory(client.Session.Character.Id)
 				: [];
 
+			// The live character's active quest count, to reconcile the snapshot's embedded (source-character) quest
+			// journal so players don't inherit the captured character's quests (e.g. Strie's beach quest 10238).
+			var activeQuestCount = client.Session.Character != null
+				? (uint)(await Database.GetCharacterQuests(client.Session.Character.Id)).Count(q => q.State == QuestState.Active)
+				: 0u;
+
 			// The spawn-scaffold rows (entry table / feat-ID list / pre-IIR frame) drive the player spawn's
 			// scaffold frame; characters without rows are seeded with the fresh-character defaults once.
 			var scaffoldCharacter = await EnsureSpawnScaffoldRows(client.Session.Character);
@@ -449,7 +460,7 @@ namespace Faolan.GameServer
 				{
 					// The world-entry snapshot: tails patched to the live character, containers substituted with the
 					// player's DB items (BuildBeachInventoryPacket) - this is THE inventory delivery (bag + doll).
-					pkt = BuildBeachInventoryPacket(pkt, client.Session.Character, equipment, inventoryRows);
+					pkt = BuildBeachInventoryPacket(pkt, client.Session.Character, equipment, inventoryRows, activeQuestCount);
 				}
 				else if (TryRebuildPlayerSpawnFromDb(client, equipment, scaffoldCharacter, pkt, out var rebuilt))
 				{
