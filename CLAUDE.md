@@ -6,7 +6,10 @@ Project Faolan is an Age of Conan server protocol emulator (C#, .NET 10). **Pack
 primary truth source** — the code intentionally mirrors retail traffic byte-for-byte rather than
 abstracting it; if local behavior diverges from a retail capture, fix local to match. This file plus `docs/`
 are the deep-dive (architecture, protocol notes, RE methodology); `README.md` is the regular repo readme
-(overview + build/run); `TODO.md` is the single tracker of open work.
+(overview + build/run). Open work is tracked as **Gitea issues** (`melvin/projectfaolan` on
+`git.groenendaal.io`), grouped by `area:*` labels — NOT in a TODO file. Create/close issues there as work
+lands (see the agent memory `issue_tracking_in_gitea` for the API recipe). Inline `TODO §N` / `TODO.md`
+mentions still scattered through code comments and docs are historical pointers (left as-is, not a live file).
 
 ## Commands
 
@@ -117,7 +120,7 @@ are the standard test bootstrap for features whose retail trigger isn't wired ye
   byte-for-byte against a capture. Wrong-looking values are often capture-derived; check the comment
   and the referenced capture first.
 - Protocol knowledge lives in `docs/` (per-subsystem .md files + `docs/archive/` for resolved plans);
-  update the relevant doc and `TODO.md` when a subsystem's status changes.
+  update the relevant doc and the corresponding **Gitea issue** when a subsystem's status changes.
 
 Note: `AGENTS.md` predates parts of the current code; where it conflicts (lazy-loading proxies,
 test-project layout), this file and the code comments win.

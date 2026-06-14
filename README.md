@@ -7,7 +7,8 @@ to it and play.
 
 It is a **protocol-research and preservation project**, not a finished game server. Packet captures are the
 source of truth: where the emulator and a retail capture disagree, the emulator is wrong. Many subsystems are
-decoded and working; others are partially implemented or gated on further reverse-engineering (see `TODO.md`).
+decoded and working; others are partially implemented or gated on further reverse-engineering (tracked as
+Gitea issues on `melvin/projectfaolan`, grouped by `area:*` labels).
 
 > **Disclaimer.** This is an independent, non-commercial research project for interoperability and game
 > preservation. *Age of Conan* is a trademark of Funcom; this project is not affiliated with or endorsed by
@@ -85,7 +86,7 @@ dotnet run --project Faolan.Importer -- --skip-characters    # keep --skip-chara
 
 - **`CLAUDE.md`** — architecture, build/run commands, the wire-protocol essentials, and working conventions
   (the orientation guide for anyone, human or AI, working in the codebase).
-- **`TODO.md`** — the single tracker of open work, grouped by subsystem.
+- **Gitea issues** (`melvin/projectfaolan`) — the tracker of open work, grouped by `area:*` labels.
 - **`docs/`** — per-subsystem deep-dives (protocol decoding, reverse-engineering methodology, capture workflow);
   `docs/archive/` holds resolved plans and handoffs.
 - **`Faolan.Wireshark/README.md`** — building and using the dissector plugin.
