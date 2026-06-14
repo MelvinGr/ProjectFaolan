@@ -311,6 +311,23 @@ these blocks — it is elsewhere (the CharacterIIR content, or a client-side gat
 build the pre-IIR codec + keep/regenerate the post-IIR waypoints; the cross-session mystery needs a fresh
 in-client bisect on the CharacterIIR, not the scaffolds.
 
+IN-CLIENT BISECT 2026-06-14 (#185, driven via Faolan.ClientLauncher + server-side diff logging). Forcing the
+23 diverged beach NPC rebuilds onto the wire (`FAOLAN_FORCE_NPC_REBUILD=1`): **no crash, no `pcDynel is NULL`**
+(the old world-entry crash is GONE) — the client just **silently doesn't render** them (= the "missing NPCs").
+So diverged bodies are silently dropped, not fatal. Diffing each rebuild vs its burst body (skipping len+crc):
+two patterns, both at the **transform/pre-IIR boundary** (`bodyStart=35`, firstBodyDiff ~rel-body 3 or 61),
+never the identity/IIR:
+- **Pattern A** — different total lengths (1089/1076, 1844/1855): the row's IIR/scaffold is a DIFFERENT SIZE
+  than the burst (a different capture session's runtime state — more/fewer post-IIR waypoint records).
+- **Pattern B** — equal lengths, ~10–15% of body bytes differ starting ~rel-body 61: SAME NPC, the per-instance
+  transform floats + pre-IIR/post-IIR scaffold values diverge (the row's exact float pos/state ≠ the burst's;
+  position-match rounds to 0.1 so sub-precision differences survive).
+Conclusion: it is the same NPC with a different session's per-instance transform+scaffold state, and the client
+silently rejects a body whose state doesn't match what it expects. Next: build the pre-IIR codec so the
+transform+scaffold are GENERATED from the row's columns (not the cross-session `Data` blob) → the rebuild's
+state becomes self-consistent with its transform, which is the candidate fix for the silent-drop. The
+`FAOLAN_FORCE_NPC_REBUILD` lever + diff logging were experiments (reverted); re-add when building the codec.
+
 CONSTRUCTION PROGRESS (2026-06-10):
 - ✓ The machinery generalizes (commit 3897e05, `NpcSpawnConstructionTests`): `BuildSpawnBody` reconstructs an
   NPC body (animal + humanoid) byte-exact from its typed pos/rot, and `PlayerSpawnReader` decodes the NPC
