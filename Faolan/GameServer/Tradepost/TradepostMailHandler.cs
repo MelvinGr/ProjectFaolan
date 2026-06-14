@@ -27,19 +27,14 @@ namespace Faolan.GameServer
 	// Data quad isn't preserved into the bag yet - an interim, like vendor BUY).
 	public partial class GameServerListener
 	{
-		// The recipient/sender endpoint class + per-attachment trailer constants the mail body carries (from the
-		// capture; see Mail/MailAttachment). 0x08006F31 is the TradepostInterface object id, reused as the mail
-		// endpoint class and the attachment trailer class.
-		private const uint MailEndpointClass = 0x08006F31;
-		private const uint MailFooterUnread = 0x0B; // footer word; flips to 0x09 once read (the client's read flag)
-		private const uint MailAttachmentTrailerWord = 0x72;
+		// Mail wire/DB constants (MailConstants.EndpointClass / FooterUnread / AttachmentTrailerWord / ExpirySeconds) live in
+		// the shared Faolan.Core MailConstants so the server and the MCP economy tools agree on one source.
 
 		// Bank-slot stat ids + flag values the "listed" overlay rides on (0x201c stat updates on container 105,
 		// decoded from the sell/change/cancel captures). The client draws/clears the AH overlay from these.
 		private const uint BankStatFlags = 0;       // stat 0 = item flags
 		private const uint BankStatPrice = 258;     // stat 258 (0x102) = listing price
 		private const uint BankStatTimestamp = 265; // stat 265 (0x109) = listing timestamp (unix)
-		private const uint MailExpirySeconds = 2_592_000; // ~30 days (the captured mail's ts2 - ts1 gap)
 		private static uint NowUnix() => (uint)System.DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
 		private const uint BankFlagListed = 0x401;      // flags value while listed for sale
@@ -248,15 +243,15 @@ namespace Faolan.GameServer
 			var mail = new Mail
 			{
 				MailId = await AllocateMailId(),
-				RecipientClass = MailEndpointClass,
+				RecipientClass = MailConstants.EndpointClass,
 				RecipientName = recipient.Name,
-				SenderClass = MailEndpointClass,
+				SenderClass = MailConstants.EndpointClass,
 				SenderName = character.Name, // a player mail, NOT a system mail (sender name is set)
 				BodyXml = bodyText,
-				FooterWord = MailFooterUnread,
+				FooterWord = MailConstants.FooterUnread,
 				Money = money,
 				Timestamp1 = NowUnix(),
-				Timestamp2 = NowUnix() + MailExpirySeconds
+				Timestamp2 = NowUnix() + MailConstants.ExpirySeconds
 			};
 
 			// Attach the sender's bank item (if a slot was given and an item sits there). The item STAYS in the
@@ -278,8 +273,8 @@ namespace Faolan.GameServer
 					Template = row.Item.Id,
 					ItemLevel = row.Item.Level,
 					ItemHash = row.Item.Archetype,
-					TrailerWord = MailAttachmentTrailerWord,
-					TrailerClass = MailEndpointClass,
+					TrailerWord = MailConstants.AttachmentTrailerWord,
+					TrailerClass = MailConstants.EndpointClass,
 					TrailerTail = 0
 				});
 			}
@@ -479,16 +474,16 @@ namespace Faolan.GameServer
 			var mail = new Mail
 			{
 				MailId = await AllocateMailId(),
-				RecipientClass = MailEndpointClass,
+				RecipientClass = MailConstants.EndpointClass,
 				RecipientName = buyer,
-				SenderClass = MailEndpointClass,
+				SenderClass = MailConstants.EndpointClass,
 				SenderName = "",
 				BodyXml = TradepostMailBody.BuildItemBought(
 					buyer, listing.SaleId, itemNameEscaped: "", listing.SellerName, listing.Price.ToString()),
-				FooterWord = MailFooterUnread,
+				FooterWord = MailConstants.FooterUnread,
 				Money = 0,
 				Timestamp1 = now,
-				Timestamp2 = now + MailExpirySeconds
+				Timestamp2 = now + MailConstants.ExpirySeconds
 			};
 
 			mail.Attachments.Add(new MailAttachment
@@ -502,8 +497,8 @@ namespace Faolan.GameServer
 				Template = listing.Template,
 				ItemLevel = listing.ItemLevel,
 				ItemHash = listing.ItemHash,
-				TrailerWord = MailAttachmentTrailerWord,
-				TrailerClass = MailEndpointClass,
+				TrailerWord = MailConstants.AttachmentTrailerWord,
+				TrailerClass = MailConstants.EndpointClass,
 				TrailerTail = 0
 			});
 

@@ -64,6 +64,7 @@ namespace Faolan.Mcp
 				.WithTools<SessionTools>()
 				.WithTools<GameServerTools>()
 				.WithTools<CharacterTools>()
+				.WithTools<EconomyTools>()
 				.WithTools<ClaudeChannelTools>();
 
 			_app = builder.Build();
