@@ -123,12 +123,13 @@ namespace Faolan.GameServer
 							}
 							else
 							{
+								// The DB Character stores a quaternion; the move wire carries a Vector3 (Euler) rotation.
 								sessionCharacter.Position = movePosition;
-								sessionCharacter.Rotation = moveRotation;
+								sessionCharacter.Rotation = moveRotation.ToQuaternion();
 							}
 
 							var livePosition = moveEntity?.Position ?? sessionCharacter.Position;
-							var liveRotation = moveEntity?.Rotation ?? sessionCharacter.Rotation;
+							var liveRotation = moveEntity?.Rotation ?? sessionCharacter.Rotation.ToVector3();
 
 							// send to all (nearby) clients? (single client for now -> the session conversation;
 							// retail's move broadcast uses sender 0d13ce71b110 58 + receiver = the moving entity's

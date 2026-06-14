@@ -668,14 +668,14 @@ namespace Faolan.GameServer
 				return false;
 
 			// The transform's rotation is a ProtoQuat (X/Y/Z/W); we author it from the character's DB facing
-			// (Character.RotationQuaternion - captured into the row by the importer, identity for fresh chars).
+			// (Character.Rotation, a quaternion - captured into the row by the importer, identity for fresh chars).
 			// An earlier attempt stalled the client because the DB carried a DEGENERATE quaternion (W defaulted to
 			// 0 -> a zero rotation the avatar can't realize); RotationW now defaults to 1, but as a belt-and-braces
 			// guard a near-zero-magnitude stored quaternion falls back to the captured rotation rather than risk it.
 			var body = packet[bodyStart..];
 			var capturedRotation = new Quaternion(BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.RotXOffset, 4)), BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.RotYOffset, 4)),
 				BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.RotZOffset, 4)), BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.RotWOffset, 4)));
-			var dbRotation = character.RotationQuaternion;
+			var dbRotation = character.Rotation;
 			var rotation = dbRotation.LengthSquared() > 0.0001f
 				? dbRotation
 				: capturedRotation;

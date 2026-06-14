@@ -93,6 +93,10 @@ namespace Faolan.Tests
 				Assert.Equal(322.5f, character.PositionX); // the Tortage beach intro spawn (ProtoVec3 fields)
 				Assert.Equal(145.3113250732f, character.PositionY, 0.001f);
 				Assert.Equal(704.9000244141f, character.PositionZ, 0.001f);
+				// The facing is decoded from the spawn's ProtoQuat (X/Y/Z/W); a captured quaternion is unit-length,
+				// which confirms all four components (incl. the new RotationW) were read - not the W=1 fresh default.
+				Assert.Equal(1f, character.Rotation.LengthSquared(), 0.001f);
+				Assert.NotEqual(1f, character.RotationW); // a real captured W, not the identity fallback
 				Assert.NotNull(character.MaxStats);
 				Assert.Equal(14, character.Attributes.Count); // 6 weighted + 7 morphs + closer
 				Assert.Equal(20, character.Skills.Count);

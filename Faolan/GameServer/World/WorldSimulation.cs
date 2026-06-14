@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.AgentServer;
 using Faolan.GameServer.Combat;
@@ -118,7 +119,8 @@ namespace Faolan.GameServer.World
 
 			var handle = client.Session.Account.ClientInstance;
 			var entity = Players.GetOrAdd(client, _ => new WorldEntity(handle, character.MapId, true, character.Name ?? $"Character{handle}", client) { Vitals = EntityVitals.FromCharacter(character) });
-			var zone = World.Place(entity, character.MapId, character.Position, character.Rotation);
+			// The DB rotation is a quaternion; the live sim/movement layer is Vector3 (Euler degrees) - bridge it.
+			var zone = World.Place(entity, character.MapId, character.Position, character.Rotation.ToVector3());
 			var nearby = zone
 				.PlayersInRange(character.Position, PlayerInterestRange, handle)
 				.Count();

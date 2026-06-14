@@ -87,7 +87,7 @@ namespace Faolan.Core.Database
 		Task SaveCharacter(Character character);
 		Task SaveCharacterEquipment(CharacterEquipment equipment);
 		Task SaveCharacterScaffold(Character character);
-		Task SaveCharacterTransform(uint characterId, Vector3 position, Vector3 rotation, uint mapId);
+		Task SaveCharacterTransform(uint characterId, Vector3 position, Quaternion rotation, uint mapId);
 		Task SetCharacterInventorySlot(uint characterId, int container, int slot, uint? itemId, uint count = 1);
 		Task SetCharacterMoney(uint characterId, ulong money);
 		Task SetCharacterProgress(uint characterId, uint experience, ushort level);
@@ -968,7 +968,7 @@ namespace Faolan.Core.Database
 		// Persists the character's authoritative live transform (the WorldEntity's position/rotation/map) on
 		// teleport / disconnect / autosave - movement isn't otherwise saved, so without this a relog loses where the
 		// player was.
-		public async Task SaveCharacterTransform(uint characterId, Vector3 position, Vector3 rotation, uint mapId)
+		public async Task SaveCharacterTransform(uint characterId, Vector3 position, Quaternion rotation, uint mapId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			await ctx.Characters
@@ -980,6 +980,7 @@ namespace Faolan.Core.Database
 					.SetProperty(c => c.RotationX, rotation.X)
 					.SetProperty(c => c.RotationY, rotation.Y)
 					.SetProperty(c => c.RotationZ, rotation.Z)
+					.SetProperty(c => c.RotationW, rotation.W)
 					.SetProperty(c => c.MapId, mapId));
 		}
 
@@ -1090,7 +1091,9 @@ namespace Faolan.Core.Database
 		// satisfy the foreign key.
 		private static Task EnsureMapExists(DatabaseContext ctx, uint mapId, string name)
 		{
-			return ctx.Database.ExecuteSqlRawAsync("INSERT OR IGNORE INTO Maps (Id, Name, PositionX, PositionY, PositionZ, RotationX, RotationY, RotationZ) VALUES ({0}, {1}, 0, 0, 0, 0, 0, 0)", mapId, name);
+			// RotationW must be listed: it is NOT NULL (the rotation quaternion's W) with no SQL default, so omitting
+			// it makes the OR IGNORE silently drop the row, leaving the Character->Map FK to fail. W=1 = identity.
+			return ctx.Database.ExecuteSqlRawAsync("INSERT OR IGNORE INTO Maps (Id, Name, PositionX, PositionY, PositionZ, RotationX, RotationY, RotationZ, RotationW) VALUES ({0}, {1}, 0, 0, 0, 0, 0, 0, 1)", mapId, name);
 		}
 
 		private static Task<CharacterEquipment> LoadTrackedEquipment(DatabaseContext ctx, uint id)

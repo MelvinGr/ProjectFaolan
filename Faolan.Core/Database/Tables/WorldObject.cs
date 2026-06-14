@@ -10,16 +10,11 @@ namespace Faolan.Core.Database.Tables
 	// SubOpcode (the object CLASS), the transform (position + rotation), and the object message's id + name
 	// (docs/archive/spawn-dissection-plan.md Phase 6). These share the FA015807 transform grammar but have NO pre-IIR
 	// block - the object message's length prefix follows the transform directly.
-	public class WorldObject : BaseEntity
+	// Transform (PositionX/Y/Z + the RotationX/Y/Z/W quaternion + the Position/Rotation accessors) is inherited
+	// from Base3DEntity, shared with the player Character and the NPC spawns.
+	public class WorldObject : Base3DEntity
 	{
 		public byte[] Data { get; set; }
-		public float PositionX { get; set; }
-		public float PositionY { get; set; }
-		public float PositionZ { get; set; }
-		public float RotationW { get; set; }
-		public float RotationX { get; set; }
-		public float RotationY { get; set; }
-		public float RotationZ { get; set; }
 		public string Name { get; set; }
 		public uint CapturedHandle { get; set; }
 		public uint MapId { get; set; }

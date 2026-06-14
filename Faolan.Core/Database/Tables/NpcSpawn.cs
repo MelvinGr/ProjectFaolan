@@ -8,17 +8,12 @@ namespace Faolan.Core.Database.Tables
 	// transform (position + rotation) and the NPC identity/appearance (TemplateId/Race/Sex/Level/...). They make
 	// the identity first-class so the server can build the spawn from data; `Data` shrinks once the pre-IIR
 	// float block + post-IIR scaffold are also lifted into scaffold rows (the same blocks the player spawn keeps).
-	public class NpcSpawn : BaseEntity
+	// Transform (PositionX/Y/Z + the RotationX/Y/Z/W quaternion + the Position/Rotation accessors) is inherited
+	// from Base3DEntity, shared with the player Character and the world objects.
+	public class NpcSpawn : Base3DEntity
 	{
 		public bool HasEquipment { get; set; }
 		public byte[] Data { get; set; }
-		public float PositionX { get; set; }
-		public float PositionY { get; set; }
-		public float PositionZ { get; set; }
-		public float RotationW { get; set; }
-		public float RotationX { get; set; }
-		public float RotationY { get; set; }
-		public float RotationZ { get; set; }
 		public string Name { get; set; }
 		public uint CapturedHandle { get; set; }
 

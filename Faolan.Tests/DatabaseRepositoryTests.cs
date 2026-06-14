@@ -90,13 +90,13 @@ namespace Faolan.Tests
 				Assert.NotNull(created.MaxStats);
 
 				await repo.SetCharacterMoney(created.Id, 12345);
-				await repo.SaveCharacterTransform(created.Id, new Vector3(10, 20, 30), new Vector3(1, 2, 3), 2040);
+				await repo.SaveCharacterTransform(created.Id, new Vector3(10, 20, 30), new Quaternion(0.1f, 0.2f, 0.3f, 0.4f), 2040);
 				await repo.SetCharacterProgress(created.Id, 4500, 17);
 
 				var loaded = await repo.GetCharacter(created.Id);
 				Assert.Equal(12345ul, loaded!.Money);
 				Assert.Equal(new Vector3(10, 20, 30), loaded.Position);
-				Assert.Equal(new Vector3(1, 2, 3), loaded.Rotation);
+				Assert.Equal(new Quaternion(0.1f, 0.2f, 0.3f, 0.4f), loaded.Rotation);
 				Assert.Equal(2040u, loaded.MapId);
 				Assert.Equal(4500u, loaded.Experience);
 				Assert.Equal((ushort)17, loaded.Level);

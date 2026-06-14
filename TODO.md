@@ -351,9 +351,17 @@ Full detail: `docs/archive/spawn-dissection-plan.md`.
 - [ ] Appearance: generate the morph entries from `CharacterBody` (the editor sliders → float-valued scaffold
       entries) instead of the Dikketest defaults. → `docs/archive/player-spawn-generation-plan.md` (COMPLETE; this is the
       one optional remainder)
-- [ ] **Player-spawn ROTATION is still verbatim** — `TryRebuildPlayerSpawnFromDb` keeps the captured rotation
-      bytes because a DB-driven rotation rebuild stalled the client. Decode the rotation encoding (quaternion vs
-      packed Euler) and author it from a stored facing so the spawn carries no captured bytes.
+- [~] **Player-spawn ROTATION — now DB-authored (2026-06-14), needs in-client.** The encoding was never the
+      blocker: the spawn rotation is a typed `ProtoQuat` (X/Y/Z/W, LE fixed32) that `SpawnPacketBuilder.BuildSpawnBody`
+      already authors from a `Quaternion`. The gap was STORAGE — `Base3DEntity` only had a 3-component `Rotation`
+      (no W), so the player rotation couldn't be persisted and was kept verbatim. FIX: `Base3DEntity.Rotation` is now
+      a full quaternion (`RotationW` added, default identity W=1; NpcSpawn/WorldObject fold into Base3DEntity);
+      `CaptureCharacterImporter` decodes the spawn's `Quat` payload into the row; `TryRebuildPlayerSpawnFromDb`
+      authors from `character.Rotation` (degenerate-quaternion guard falls back to captured). Migration
+      `AddRotationWQuaternion`. The earlier client stall was a DEGENERATE (0,0,0,0) quaternion (no W); existing rows
+      now default to the valid identity. IN-CLIENT GATE: log in → avatar spawns correctly facing the stored
+      direction, no loading-screen stall. (Live sim/movement stays Vector3-Euler; bridged via the existing
+      `QuaternionExtensions` `.ToVector3()`/`.ToQuaternion()` at the DB↔sim seam.)
 
 ### "All packets from scratch" — the endgame inventory
 The goal (`world_packets_construct_not_replay`) is that NO packet ships captured bytes; everything is built from
