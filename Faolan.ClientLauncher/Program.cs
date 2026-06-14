@@ -354,7 +354,14 @@ namespace Faolan.ClientLauncher
 				if (streamOutput)
 				{
 					Console.WriteLine($"tailing {logPath} (Ctrl+C to stop) ...");
-					WaitForClientExit(proc, true, logPath, logStart);
+					var pos = logStart;
+					while (!proc.HasExited)
+					{
+						pos = DumpNewLogContent(logPath, pos);
+						Thread.Sleep(200);
+					}
+
+					DumpNewLogContent(logPath, pos);
 				}
 				else if (originalUniverseAddr is not null && detach)
 				{
@@ -363,7 +370,7 @@ namespace Faolan.ClientLauncher
 					WaitForClientStartup();
 				}
 				else if (originalUniverseAddr is not null)
-					WaitForClientExit(proc, false, logPath, logStart);
+					proc.WaitForExit();
 			}
 			finally
 			{
@@ -558,42 +565,6 @@ namespace Faolan.ClientLauncher
 			{
 				return 0;
 			}
-		}
-
-		// Hold the foreground until the actual AgeOfConan client has exited. `proc` is only the proton/wine
-		// wrapper, which can linger after (or exit independently of) the real client grandchild, so we track
-		// the client itself via /proc (ClientIsRunning) rather than the wrapper's exit. Tails AgeOfConan.log
-		// meanwhile when streamOutput is set.
-		private static void WaitForClientExit(Process proc, bool streamOutput, string logPath, long logStart)
-		{
-			var pos = logStart;
-
-			void Tick()
-			{
-				if (streamOutput)
-					pos = DumpNewLogContent(logPath, pos);
-
-				Thread.Sleep(200);
-			}
-
-			// Proton cold start: the real client appears in /proc a little after the wrapper starts. Wait for
-			// it to show up first (bounded) so we don't immediately treat "not yet started" as "exited". Bail
-			// if the wrapper dies without ever spawning a client (a launch failure).
-			var deadline = Environment.TickCount64 + 60_000;
-			while (Environment.TickCount64 < deadline && !ClientIsRunning())
-			{
-				if (proc.HasExited)
-					break;
-
-				Tick();
-			}
-
-			// Then hold until the client process is gone.
-			while (ClientIsRunning())
-				Tick();
-
-			if (streamOutput)
-				DumpNewLogContent(logPath, pos);
 		}
 
 		// For --detach: wait until the client process is up (it reads LocalConfig at startup) plus a grace window,
