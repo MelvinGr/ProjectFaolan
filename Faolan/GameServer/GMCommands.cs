@@ -290,24 +290,22 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			await Tradepost.TradepostResponses.SendOpenTradepost(client, entity.Position);
-
 			// The window's first/default tab is the BANK (personal storage), a separate channel: container kind 105
-			// delivered via a BankIIR (decoded, protocol_bank_storage). Populate it from the character's
-			// Container=105 rows so the default tab isn't blank.
+			// delivered via a BankIIR (decoded, protocol_bank_storage). Populate it from the character's Container=105 rows.
 			var rows = await Database.GetCharacterInventory(characterId);
 			var bankRows = rows
 				.Where(r => r.Container == (int)FullCharSnapshotBuilder.BankKind)
 				.ToList();
 			var bank = FullCharSnapshotBuilder.BuildContainer(FullCharSnapshotBuilder.BankKind, 50, 30, characterId, bankRows);
-			await SendBank(client, bank);
 
-			// KNOWN QUIRK (first open): the bank only renders into an already-initialised tradepost window. On the
-			// very first .ah the window is created fresh, so this BankIIR lands too early and the tab shows empty
-			// ("page 1/0" / "0/1"); closing and re-opening (a full open CYCLE) populates it. A delayed bank-only or
-			// full-reopen re-send did NOT reliably fix it in-client, so no workaround here - the real fix is the
-			// auctioneer-NPC open handshake (the window-ready signal), still to be decoded. The live deposit/withdraw
-			// refresh (UpdateBankAfterMove) works once the window is up.
+			// ORDER MATTERS (fixes the old "first open shows an empty bank" quirk): retail sends the bank content
+			// (the 0x201c slot registrations + the BankIIR) BEFORE DispatchOpenTradepost, so the window OPENS already
+			// populated - account-faolan-...-Has-inventory-at-trader-bank F6208-6210 = [bank slot regs][BankIIR]
+			// [DispOpenTradepost]. We previously sent the open FIRST, so the BankIIR landed before the window existed
+			// and the first open rendered empty (you had to close + reopen). Now: bank first, open last.
+			await SendBank(client, bank);
+			await Tradepost.TradepostResponses.SendOpenTradepost(client, entity.Position);
+
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Opened the auction house (PoC) at your position; bank tab has {bank.Items.Count} item(s).");
 		}
 

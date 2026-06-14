@@ -93,12 +93,15 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 		// Builds a SINGLE inventory container (ProtoInventoryGame) of the given kind from CharacterInventory rows -
 		// used for the on-demand BANK delivery (kind 105), which isn't one of the 4 login-snapshot containers.
-		// Same item codec as the snapshot (SnapshotItemBuilder.BuildListEntry); only buildable rows (Archetype != 0).
+		// Same item codec as the snapshot (SnapshotItemBuilder.BuildListEntry). Includes archetype-0 items too (they
+		// render by template / Hash 0, like the live add) so an AH-bought item deposited to the bank still shows on
+		// reopen - unlike the chat-critical world-entry snapshot, the BankIIR is its own channel, so a half-identified
+		// item here can't break world entry. Rows without a resolved Item (no DB identity at all) are still skipped.
 		public static ProtoInventoryGame BuildContainer(uint kind, uint capacity, uint disabledSlots, uint instance, IReadOnlyCollection<CharacterInventory> rows)
 		{
 			var container = NewContainer(kind, capacity, disabledSlots, instance);
 			foreach (var row in (rows ?? [])
-			         .Where(r => r.Item is { Archetype: not 0 })
+			         .Where(r => r.Item != null)
 			         .OrderBy(r => r.Slot))
 			{
 				var slot = (ulong)row.Slot;
