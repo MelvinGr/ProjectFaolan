@@ -13,6 +13,36 @@ behind it.
 
 ---
 
+## Progress (2026-06-14): grammar decoded + journal builders byte-exact
+
+**Decode DONE.** `Captures/decode_quest.py` pulls every QuestJournal / QuestFullUpdate / QuestRewards
+body out of the three captures, tokenizes the framing, and **round-trips all 65 packets to the byte**
+(parse → re-serialize → assert == original). The grammar below is closed.
+
+Key finding: every text slot is a `00 <u8 len> <ascii>` record holding a
+`<remoteformat id=.. category=.. key=..>` / `<localized ..>` token. **The `key` attribute is a
+DETERMINISTIC content hash** — byte-identical for a given `(id, category)` across characters, sessions
+and captures — so it is harvestable data, not a per-send nonce. category map: `50300` region/journal
+title · `50301` quest title · `50302` quest summary · `50303` list sub-line · `50304` objective text ·
+`52000` map/region name · `51000/51200/100` localized strings.
+
+**Build DONE (framing).** `WorldQuest.BuildQuestJournal` + `BuildQuestFullUpdate` (+ `RemoteFormat` /
+`Localized` record helpers), each **byte-exact golden-tested** against the Casilda quest 13479
+(`QuestTests.BuildQuestJournal_MatchesCasildaCapture` vs frame 9947;
+`BuildQuestFullUpdate_MatchesCasildaCapture` vs the fresh-offer frame 687). Builders take the text
+records + scalar fields as parameters; the framing/structure is server-owned. The structured-header
+constants (`0x50`/`0x64`/`0x7e2`/`0x0c`/`0x412`) are reproduced as a documented template and locked by
+the golden — not yet semantically pinned.
+
+**REMAINING for #91:** (a) a **quest-definition + content table** (questId → areaId, the
+`(id, category, key)` text refs, goalId, map+x+y marker) harvested by the importer from these captures
++ RDB — *construct, don't replay*; (b) `BuildQuestRewards` (the destiny-step driver — decoded, not yet
+built; separate concern, see below); (c) **wire** `SendQuestJournal` / `SendQuestFullUpdate` into
+`WorldBroadcaster.RestorePlayerQuests` (login) + the accept/turn-in path; (d) in-client verify the
+J-panel renders (the `key` hashes are the render-critical bit — wrong keys ⇒ blank text).
+
+---
+
 ## What is already DONE (state layer)
 
 `Faolan/GameServer/World/WorldQuest.cs` — byte-exact builders, golden-tested vs capture (`QuestTests`):
