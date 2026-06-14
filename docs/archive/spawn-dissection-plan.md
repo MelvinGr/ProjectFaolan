@@ -328,6 +328,16 @@ transform+scaffold are GENERATED from the row's columns (not the cross-session `
 state becomes self-consistent with its transform, which is the candidate fix for the silent-drop. The
 `FAOLAN_FORCE_NPC_REBUILD` lever + diff logging were experiments (reverted); re-add when building the codec.
 
+MOVETASK CARRIES POSITIONS (2026-06-14, supports the #185 hypothesis + #190). Each burst FA015807 spawn is
+paired with a `96C46740` MoveTaskIIR_c, and that MoveTask body is **full of position floats** — a waypoint /
+patrol path (e.g. a len-214 beach MoveTask has waypoints at 677.7, 352.1, 741.3, 645.1, 999.1, …; the first
+float ~offset 3 is the start position). So when a forced from-DB rebuild changes the spawn's exact position
+(row float ≠ burst float, same rounded 0.1), the spawn is now **inconsistent with its paired MoveTask's
+waypoints** (the MoveTask is sent verbatim from the burst). That is the leading explanation for the silent
+drop, and is exactly what `FAOLAN_NPC_BURST_XFORM` (splice the burst transform into the rebuild) tests —
+**pending the visual check (Gitea #185).** Next decode target either way: `MoveTaskIIR_c::ReadSubClass` (the
+waypoint-list grammar) for #190 + to rebuild the MoveTask consistently with a from-DB spawn.
+
 CONSTRUCTION PROGRESS (2026-06-10):
 - ✓ The machinery generalizes (commit 3897e05, `NpcSpawnConstructionTests`): `BuildSpawnBody` reconstructs an
   NPC body (animal + humanoid) byte-exact from its typed pos/rot, and `PlayerSpawnReader` decodes the NPC
