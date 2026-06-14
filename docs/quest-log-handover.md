@@ -266,13 +266,29 @@ QuestFullUpdate @36 (13479=3, the value the grant fix authors); `0x412` and `0x0
 builder already emits. So **generating the region = emitting one QuestFullUpdate-content block per active
 quest** — we already build that shape.
 
-**Plan (build):** model the tails quest region in `SnapshotTails` as a LIST of per-quest blocks (today it is
-the single `RemoteFormat50301/50302/50300` fields + the opaque `UnknownBeforeAccessWindowTable`); generate
-the blocks from `CharacterQuests` × `QuestDefinition` (beach 10238 always present + each accepted quest),
-re-serialize the tails (fix the region length / any count). Decode-first done; the builder + a byte-exact
-golden test (rebuild `xxx-login`'s 2-block region) is next. Snapshot-tails surgery is in-client-gated
-(`protocol_chat_connection_regression`), so prove it in-client. Open: the exact `0x0BD3` placement rule and
-the `N` field's meaning (objective-related; 10238=4/13479=3) still need pinning before the golden closes.
+**Region location (decoded 2026-06-14).** The quest region is at the START of the tails. Template
+(`BeachTailsTemplate.bin`, 1 quest): header `[0x18][0x7E2]` → detail block @8 (10238) → … 50304 objective +
+51000 localized @1109 → **index `[1009][marker][questId…]` @~1168** → `PFAccessWindow_` @1307. The 2-quest
+`xxx-login` is the same shape with a second detail block + the second id appended to the index. The detail
+block is byte-identical to the `QuestFullUpdate` body from `questId` onward (verified: 577 bytes match
+`BuildQuestFullUpdate`'s output, diverging only in the objective-record tail — acceptTime/markers).
+
+**Build path (preferred — GENERATE, don't splice).** Because the detail block == `QuestFullUpdate` content,
+generate it with the EXISTING `WorldQuest.BuildQuestFullUpdate(def, …)` and drop its 21-byte
+`[subop][ack][player][0][01]` prefix — no captured-byte splice, re-addressing is free (built with the live
+instance). Then: insert the generated block after the existing detail block(s) and append the quest id to
+the index id-run. The QFU content already renders in-client (the grant path proved it), so an exact match of
+retail's objective tail is not required for the quest to show. Model the region in `SnapshotTails`
+(today: single `RemoteFormat50301/50302/50300` + opaque `UnknownBeforeAccessWindowTable`) as a parsed
+detail-block list + index, regenerate from `CharacterQuests`×`QuestDefinition`.
+
+**Status: BUILD-READY, blocked on in-client.** Decode complete; the generate path reuses tested code. NOT yet
+implemented because snapshot-tails surgery is regression-prone and **in-client-gated**
+(`protocol_chat_connection_regression`) — it must be built behind a default-off flag and proven in-client
+(chat + world-load intact + the quest visible after relog), which needs a live client. Remaining unknowns
+before a byte-exact golden (not required for the generate path, but for fidelity): the index `marker` word
+(template `0x7E2` vs `xxx-login` `0x0BD3`), the `N` field (10238=4/13479=3), and the 51000-localized id
+derivation (objective `id=11561`).
 
 ## Related
 
