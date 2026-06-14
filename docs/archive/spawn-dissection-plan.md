@@ -282,6 +282,22 @@ the dissected POST-IIR scaffold. So it is NOT encrypted/opaque; it is another sp
 region (extended transform/bounds + state entries) that yields to the same pair-list decode as
 `PlayerSpawnScaffoldCodec` — a dedicated effort, not a blocker (NpcSpawnBuilder ships it raw from `Data` today).
 
+PRE-IIR LAYOUT DECODED FROM THE CLIENT (Ghidra, 2026-06-14, Gitea #185). `SimpleCharFullUpdateIIR_t::ReadSubClass`
+= `FUN_01121c00` (anchor "...Received a bad stream..."), reproduce with `Captures/ghidra/DumpSpawnIir.java` +
+`DumpFns.java`. Read primitives: `FUN_0048f900` = read u32 (byte-swapped when the big-endian flag is set),
+`FUN_004e0390` = read 1 byte, `FUN_01122b10` = read a **0x3F1-keyed scaffold** (`word = u32; count = word/0x3F1 -
+1; if word % 0x3F1 == 0 read `count` records`), `FUN_0145ac80` = read the embedded CharacterIIR (+ tail). The
+pre-IIR is therefore **NOT** a uniform sparse scaffold — it is a **FIXED field sequence**: after the version
+byte (==5), the reader does **53 u32 + 6 single-byte reads + exactly ONE embedded 0x3F1 scaffold** (≈222 B,
+== the ~227-byte region). For a freshly-spawned NPC that scaffold is EMPTY — its count word is the literal
+`00 00 03 F1` (value 0x3F1 → count 0), which is exactly the "`03 f1` marker @112-113" earlier mis-read as a
+scaffold key. So the lift is: model the fixed field sequence as a struct (most fields zero / per-instance
+spatial), emit the empty 0x3F1 scaffold word, and the block regenerates from columns — no raw `Data` blob, no
+cross-session stale refs. (Caveat: cross-session humanoid render still has a separate unknown — minimal
+post-IIR breaks humanoids, `memory npc_spawn_minimal_postiir_breaks_humanoids` — so prove the regenerated
+pre-IIR in-client.) Next: correlate the 53-u32 order with a captured NPC body (`Captures/dissect_npc_spawn.py`)
+to label the spatial fields, then a `NpcPreIirCodec` (Parse/Build) golden-tested like `PlayerSpawnScaffoldCodec`.
+
 CONSTRUCTION PROGRESS (2026-06-10):
 - ✓ The machinery generalizes (commit 3897e05, `NpcSpawnConstructionTests`): `BuildSpawnBody` reconstructs an
   NPC body (animal + humanoid) byte-exact from its typed pos/rot, and `PlayerSpawnReader` decodes the NPC
