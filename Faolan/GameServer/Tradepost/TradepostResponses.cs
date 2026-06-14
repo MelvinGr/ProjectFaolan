@@ -78,6 +78,20 @@ namespace Faolan.GameServer.Tradepost
 			Build(TradepostProtocol.InterfaceMethod.DispatchSendMailResult, [Convert.ToByte(success), error], interfaceInstance)
 				.SendAsync(client);
 
+		// The captured DispatchSendMailResult message for a player SendMail (F500): a generic result remoteformat.
+		private const string SendMailResultXml =
+			"<remoteformat id=\"0\" category=\"0\" key=\"C4O?^XE&#39;^VC4O?^XE&#39;^V\" knubot=\"0\"  ></remoteformat>";
+
+		// DispatchSendMailResult for a player SendMail (0x2002 -> 0x2003): [u8 success][u16 len + remoteformat XML]
+		// (byte-shape from the sell capture F500). success=0 lets the client show "couldn't send" (e.g. bad recipient).
+		public static Task SendMailSendResult(INetworkClient client, bool success, uint interfaceInstance = DefaultInterfaceInstance)
+		{
+			var s = new FaolanStream();
+			s.WriteByte(Convert.ToByte(success));
+			s.WriteArrayUInt16Length(System.Text.Encoding.ASCII.GetBytes(SendMailResultXml));
+			return Build(TradepostProtocol.InterfaceMethod.DispatchSendMailResult, s.ToArray(), interfaceInstance).SendAsync(client);
+		}
+
 		// DispatchRetrieveMailResult (0x2004) - a single 0x01 byte (the "mailbox retrieved" ack in the capture).
 		public static Task SendRetrieveMailResult(INetworkClient client, uint interfaceInstance = DefaultInterfaceInstance) =>
 			Build(TradepostProtocol.InterfaceMethod.DispatchRetrieveMailResult, [0x01], interfaceInstance)

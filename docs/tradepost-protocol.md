@@ -197,7 +197,9 @@ WIRED (`GameServerListener.HandleTradepostSell`/`HandleTradepostChangePrice`/`Ha
 golden tests `TradepostSellBodyTests`). INTERIM: the listing's search `ItemId` is filed under the item's TEMPLATE (we
 lack the retail item-type search id), so a normal item-type search won't necessarily surface a player listing yet.
 
-**`SendMail` (C→S `0x2002`) — player→player mail with a bank-item attachment (capture F499), DECODED, not yet wired:**
+**`SendMail` (C→S `0x2002`) — player→player mail with a bank-item attachment (capture F499), WIRED
+(`HandleTradepostSendMail`): creates a Mail to the recipient with the sender's bank item escrowed, removes it from
+the sender's bank, replies `DispatchSendMailResult`; an unknown recipient is rejected (success=0). Grammar:**
 ```
 [u16+recipientName ascii][u16+bodyText ascii][money:u64][0x000007E2:u32][bankItemSlot:u32]
 ```

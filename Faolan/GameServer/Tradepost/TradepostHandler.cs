@@ -62,6 +62,11 @@ namespace Faolan.GameServer.Tradepost
 					await listener.HandleTradepostCancelSell(client, packet);
 					break;
 
+				case TradepostProtocol.AgentMethod.SendMail:
+					// Player-composed mail (optionally with a bank-item attachment) to another character.
+					await listener.HandleTradepostSendMail(client, packet);
+					break;
+
 				case TradepostProtocol.AgentMethod.CancelMail:
 					// Recall/delete one of the player's mails.
 					await listener.HandleTradepostCancelMail(client, packet);

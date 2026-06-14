@@ -217,6 +217,76 @@ namespace Faolan.GameServer
 				character.Name, listing.SaleId, bankSlot);
 		}
 
+		// SendMail (0x2002) [u16+recipient][u16+body][money:u64][0x7E2:u32][bankItemSlot:u32]: a player-composed mail,
+		// optionally with a bank item attached (capture F499 = to "DemoL80", "Hello this is a test", slot 5, no COD).
+		// Creates a Mail to the recipient with the sender's bank item escrowed, removes it from the sender's bank, and
+		// replies DispatchSendMailResult. Rejects (success=0) an unknown recipient so the client shows "couldn't send".
+		internal async Task HandleTradepostSendMail(INetworkClient client, ConanPacket packet)
+		{
+			var character = client.Session.Character;
+			if (character == null)
+				return;
+
+			var recipientName = System.Text.Encoding.ASCII.GetString(packet.Body.ReadArrayUInt16Length());
+			var bodyText = System.Text.Encoding.ASCII.GetString(packet.Body.ReadArrayUInt16Length());
+			var money = packet.Body.ReadUInt64();
+			packet.Body.ReadUInt32();                         // 0x7E2 category constant (preserved)
+			var bankSlot = (int)packet.Body.ReadUInt32();
+
+			var recipient = await Database.GetCharacterByName(recipientName);
+			if (recipient == null)
+			{
+				Logger.LogInformation("Tradepost mail: {Char} -> unknown recipient '{Recipient}'; rejected.", character.Name, recipientName);
+				await TradepostResponses.SendMailSendResult(client, success: false, packet.Sender.Instance);
+				return;
+			}
+
+			var mail = new Mail
+			{
+				MailId = await AllocateMailId(),
+				RecipientClass = MailEndpointClass,
+				RecipientName = recipient.Name,
+				SenderClass = MailEndpointClass,
+				SenderName = character.Name, // a player mail, NOT a system mail (sender name is set)
+				BodyXml = bodyText,
+				FooterWord = MailFooterUnread,
+				Money = money,
+				Timestamp1 = 0,
+				Timestamp2 = 0
+			};
+
+			// Attach the sender's bank item (if a slot was given and an item sits there); it leaves the sender's bank.
+			var rows = await Database.GetCharacterInventory(character.Id);
+			var row = rows.FirstOrDefault(r => r.Container == (int)FullCharSnapshotBuilder.BankKind && r.Slot == bankSlot);
+			if (row?.Item != null)
+			{
+				mail.Attachments.Add(new MailAttachment
+				{
+					ItemInstanceId = (ulong)System.Random.Shared.NextInt64(1, long.MaxValue),
+					Quantity = row.Count == 0 ? 1u : row.Count,
+					Data1 = row.Item.Data1,
+					Data2 = row.Item.Data2,
+					Data3 = row.Item.Data3,
+					Data4 = row.Item.Data4,
+					Template = row.Item.Id,
+					ItemLevel = row.Item.Level,
+					ItemHash = row.Item.Archetype,
+					TrailerWord = MailAttachmentTrailerWord,
+					TrailerClass = MailEndpointClass,
+					TrailerTail = 0
+				});
+				await Database.SetCharacterInventorySlot(character.Id, (int)FullCharSnapshotBuilder.BankKind, bankSlot, null);
+			}
+
+			await Database.CreateMail(mail);
+			await TradepostResponses.SendMailSendResult(client, success: true, packet.Sender.Instance);
+			if (row?.Item != null)
+				await ResendBank(client); // refresh the sender's bank tab (the attached item is gone)
+
+			Logger.LogInformation("Tradepost mail: {Char} sent mail 0x{Mail:X16} to {Recipient} (\"{Body}\", money {Money}, attach {HasItem}).",
+				character.Name, mail.MailId, recipient.Name, bodyText, money, row?.Item != null);
+		}
+
 		// CancelMail (0x2009) [mailId:u64]: recall/delete one of the player's mails (capture F403). We delete it; any
 		// escrowed attachment is dropped with it (the AH buy-delivery mail is the only attachment source today).
 		internal async Task HandleTradepostCancelMail(INetworkClient client, ConanPacket packet)
