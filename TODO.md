@@ -121,6 +121,21 @@ prior diagnoses are in `docs/archive/todo-history.md`.
       reaction to self. Should resolve to "no target -> swing whiffs" (animation only, no self hit-react), or to
       arc target-selection (see cone/AoE item above). Server attack FSM, NOT ContentMirror (memory
       `feedback_combat_not_contentmirror`).
+- [ ] **Directional combat + defensive shields ("Real Combat")** (Melvin, 2026-06-14) — AoC's signature melee is
+      DIRECTIONAL: every swing/combo step comes from a direction (live = 3: left / right / overhead-top), and the
+      target (NPC or PvP player) shows blue **shield segments** distributed across those directions — a finite guard
+      pool that REDUCES damage from the covered arcs. The defender AI dynamically shifts shields toward where it's
+      being hit, so the attacker must keep re-aiming swings at the weakest (fewest-shield) arc as it moves. NONE of
+      this is modeled today: combat resolves only `SpellTarget.TargetHandle` + provisional damage (which is also why
+      "melee is cone/AoE" and "no-target hits self" above). Three decodes, none done — all pure-decode from the
+      existing combat captures (necrol80 / stricken998 armed+unarmed), no live client needed for the decode:
+      1. the **attack-direction field** in the swing/behavior packet (the `BehaviorControlCenterIIR` args we echo —
+         `v4` is damage, the rest undecoded; the direction is likely in there);
+      2. the target's **shield/guard distribution** + how it's broadcast to the client (the blue arcs) — find the
+         packet that sets/updates per-direction guard on a target;
+      3. the **shield-shifting AI** (redistribute the guard toward incoming hits) once 1+2 are decoded.
+      Combat damage then = base × the mitigation of the arc the swing came from. → `docs/combat.md`, memory
+      `protocol_stats_and_combat`, `feedback_combat_not_contentmirror`.
 - [ ] NPC **counter-attack** (the second ack retail sends for the mob's own behaviour, actor = target handle) —
       not yet reproduced; mob may not visibly fight back.
 - [ ] **Add `.kill` GM command + MCP `kill` tool** (Melvin, 2026-06-13): kill the currently SELECTED target
