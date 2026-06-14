@@ -245,12 +245,13 @@ prior diagnoses are in `docs/archive/todo-history.md`.
       requirements, kept them, and chat stayed connected throughout — i.e. the bag rendered, no IIR error, session
       intact. Overturns the long-standing "snapshot is the only delivery" belief. (Worn-only items in a bag still
       risk the relog bag-poison; level-appropriate selection is gated on RDB item levels not yet in the DB.)
-- [ ] **Live item REMOVE — `DispatchRemoveItem` (s2c 0x201F)**: build the counterpart to `DispatchAddItem`, so an
-      item can be pulled from a connected player's bag mid-session (there is currently NO way to undo an `.additem`
-      live). Opcode is in the recovered s2c table (`GameCharInterfaceDispatchOpcodes` / `docs/aoc-rpc-method-opcodes.md`);
-      body fields `i_cInventoryID, i_nItemPos, i_nAmountToRemove`. Decode against a capture, golden-test like
-      `DispatchAddItemTests`, then wire a `.removeitem`/`remove_item` MCP path that clears the `CharacterInventory`
-      row AND pushes the live remove. Also surfaces the bag-poison cleanup need (worn-only items in a bag).
+- [~] **Live item REMOVE — `DispatchRemoveItem` (s2c 0x201F)** — builder DONE 2026-06-14 (NEEDS IN-CLIENT). Decoded
+      from the hoxxling/strickenbla gameplay captures: body = `[container ID32 = type+charId][u32 itemPos][u32
+      amountToRemove]` (16 B; every captured remove is container 0x71/equipped, pos 0, amount 0). Byte-exact builder
+      `WriteRemoveItemBody`/`SendRemoveItem` + `RemoveItemFromBackpack` (clears the persisted `CharacterInventory`
+      cell AND pushes the live remove), golden test `DispatchRemoveItemTests`, wired to a `.removeitem <slot>` GM
+      command (the inverse of `.additem`). IN-CLIENT GATE: `.additem` then `.removeitem <slot>` → the item should
+      vanish from the bag without a relog. (Also surfaces the bag-poison cleanup need for worn-only items.)
 - [ ] Click a dropped loot bag → loot window opens, bag stays; `loot all` grants its items (live `DispatchAddItem`)
       + coins (`TryLootCash`); close/expire → it fades. Bags now carry random items (kill drop + `.spawnbag`); the
       loot-WINDOW item list display (DispatchReplyLootForCharacter*) is still undecoded — grant works via loot-all.

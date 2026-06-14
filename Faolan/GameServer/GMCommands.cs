@@ -165,6 +165,7 @@ namespace Faolan.GameServer
 				["spawnnpc"] = (client, arguments) => SpawnNpcCommand(client, arguments),
 				["despawnnpc"] = (client, arguments) => DespawnNpcCommand(client, arguments),
 				["additem"] = (client, arguments) => AddItemCommand(client, arguments),
+				["removeitem"] = (client, arguments) => RemoveItemCommand(client, arguments),
 				["world"] = (client, _) => SendWorldInfo(client),
 				["quest"] = (client, arguments) => QuestCommand(client, arguments),
 				["tag"] = (client, arguments) => TagCommand(client, arguments),
@@ -514,6 +515,26 @@ namespace Faolan.GameServer
 
 			await _agentServerDispatcher.SendSystemMessage(characterId,
 				$"Added {count}x '{item.Name}' (id {itemId}) to bag slot {slot} (live DispatchAddItem).");
+		}
+
+		// .removeitem <slot>  - the inverse of .additem: clear the calling character's bag cell `slot` (persisted
+		// CharacterInventory row) and push the live DispatchRemoveItem (0x201F) so it disappears without a relog.
+		private async Task RemoveItemCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var parts = (arguments ?? "")
+				.Trim()
+				.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+			if (parts.Length != 1 || !int.TryParse(parts[0], out var slot) || slot < 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .removeitem &lt;bagSlot&gt;");
+				return;
+			}
+
+			var removed = await RemoveItemFromBackpack(client, slot);
+			await _agentServerDispatcher.SendSystemMessage(characterId, removed
+				? $"Removed the item in bag slot {slot} (live DispatchRemoveItem)."
+				: $"No item in bag slot {slot}.");
 		}
 
 		// .quest add|remove <id> | .quest list  - manage the player's quest journal. `add` records the quest +

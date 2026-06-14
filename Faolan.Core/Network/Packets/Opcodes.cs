@@ -271,6 +271,10 @@
 			ReadyForPlayScreen = 0x2024,
 			SpawnCheck = 0x2008,
 			LatencyCheckResponse = 0x2082,
+			// GameCharInterface.DispatchRemoveItem (recovered name, exact): the live "an item left your inventory"
+			// counterpart to DispatchAddItem. Body = [container ID32][u32 itemPos][u32 amountToRemove]; decoded +
+			// golden-tested (DispatchRemoveItemTests). Lets an item be pulled from a connected bag mid-session.
+			RemoveItem = 0x201F,
 			// GameCharInterface.DispatchAddItem (recovered name, exact): the incremental "an item appeared in your
 			// inventory" delivery - the live counterpart to the world-entry snapshot. Body decoded + golden-tested
 			// (DispatchAddItemTests); the keystone for live loot/buy/quest-reward/mail item grants.

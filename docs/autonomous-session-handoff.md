@@ -114,3 +114,7 @@ log below, then pick the next item. If you exhaust the safe list, stop and summa
 - 2026-06-14 — §7 **rename `BigboyTailsFile` → `SnapshotTails`** (file + class, 5 files; no behavior change). 316 green.
 - 2026-06-14 — §7 **fold `Packets.cs` sender duplication**: only `ExistingCharacterWorldEntryPromptSender` was
   byte-identical to `WorldFraming.Sender` (now aliases it); the other senders differ (class/sub-id) and stay. 316 green.
+- 2026-06-14 — §2 **`DispatchRemoveItem` (s2c 0x201F) builder DONE** (live item REMOVE, the counterpart to
+  DispatchAddItem). Decoded from gameplay captures, byte-exact `DispatchRemoveItemTests`, `RemoveItemFromBackpack`
+  (clears the persisted cell + live remove) wired to a `.removeitem <slot>` GM cmd. NEEDS in-client check
+  (`.additem` then `.removeitem`). Also added TODO §10 (AoC-specific systems) + the §2 directional-combat item. 318 green.
