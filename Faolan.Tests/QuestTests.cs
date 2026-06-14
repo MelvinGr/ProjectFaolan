@@ -92,6 +92,17 @@ namespace Faolan.Tests
 			Assert.Equal(CaptureBody("63268258"), Convert.ToHexString(body).ToLowerInvariant());
 		}
 
+		// ScryScript (0xA36D3B74) destiny/tutorial step driver, built from scratch (#191). Golden vs the
+		// strickenbla capture: "IntroDone" (mode 2, flag 0) frame 2237 and "ChangeSex" (flag 6) frame 2333.
+		[Fact]
+		public void BuildScryStep_MatchesCapture()
+		{
+			Assert.Equal("a36d3b740000c35001316d8a00000000190805100218002209496e74726f446f6e652a00320408001000",
+				Convert.ToHexString(ScryScript.BuildStep(0x01316D8A, "IntroDone")).ToLowerInvariant());
+			Assert.Equal("a36d3b740000c35001316d8a000000001908051002180622094368616e67655365782a00320408001000",
+				Convert.ToHexString(ScryScript.BuildStep(0x01316D8A, "ChangeSex", flag: 6)).ToLowerInvariant());
+		}
+
 		// End-to-end: the importer harvests the Casilda definition from the captures, and feeding it back
 		// through the builders reproduces the captured packets byte-for-byte (proves QuestDefinitionExtractor's
 		// refs + objective marker, and the QuestTextRef -> record mapping).
