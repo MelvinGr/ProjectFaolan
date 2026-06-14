@@ -6,6 +6,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 	///     - 64-bit big-endian: (statId &lt;&lt; 32) | rawValue
 	///     - compact 7-byte big-endian: 3-byte statId + 4-byte rawValue
 	/// </summary>
+	///  TODO: Rename legacy?
 	public enum LegacyCharacterStatId : uint
 	{
 		// Vitals are sent as a (current, max) pair per stat in the 0x96B8DC59 update. Verified across 90 capture
@@ -37,12 +38,6 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		Dexterity = 0x032E
 	}
 
-	public enum LegacyCharacterStatEncoding
-	{
-		TaggedUInt64,
-		PackedStatId24AndUInt32Value
-	}
-
 	public sealed class LegacyCharacterStatEntry
 	{
 		public decimal ScaledValue =>
@@ -53,7 +48,6 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 				_   => RawValue
 			};
 
-		public required LegacyCharacterStatEncoding Encoding { get; init; }
 		public required LegacyCharacterStatId StatId { get; init; }
 
 		public required uint RawValue { get; init; }
