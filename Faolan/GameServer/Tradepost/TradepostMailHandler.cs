@@ -39,6 +39,9 @@ namespace Faolan.GameServer
 		private const uint BankStatFlags = 0;       // stat 0 = item flags
 		private const uint BankStatPrice = 258;     // stat 258 (0x102) = listing price
 		private const uint BankStatTimestamp = 265; // stat 265 (0x109) = listing timestamp (unix)
+		private const uint MailExpirySeconds = 2_592_000; // ~30 days (the captured mail's ts2 - ts1 gap)
+		private static uint NowUnix() => (uint)System.DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
 		private const uint BankFlagListed = 0x401;      // flags value while listed for sale
 		private const uint BankFlagMailPending = 0x8001; // flags value while attached to an outgoing mail
 		private const uint BankFlagNormal = 0x001;      // flags value once unlisted / mail cancelled
@@ -252,8 +255,8 @@ namespace Faolan.GameServer
 				BodyXml = bodyText,
 				FooterWord = MailFooterUnread,
 				Money = money,
-				Timestamp1 = 0,
-				Timestamp2 = 0
+				Timestamp1 = NowUnix(),
+				Timestamp2 = NowUnix() + MailExpirySeconds
 			};
 
 			// Attach the sender's bank item (if a slot was given and an item sits there). The item STAYS in the
@@ -471,6 +474,8 @@ namespace Faolan.GameServer
 		// delivers, only its name in the mail text degrades.
 		private async Task<Mail> BuildPurchaseMail(string buyer, TradepostListing listing)
 		{
+			var now = NowUnix();
+
 			var mail = new Mail
 			{
 				MailId = await AllocateMailId(),
@@ -482,8 +487,8 @@ namespace Faolan.GameServer
 					buyer, listing.SaleId, itemNameEscaped: "", listing.SellerName, listing.Price.ToString()),
 				FooterWord = MailFooterUnread,
 				Money = 0,
-				Timestamp1 = 0,
-				Timestamp2 = 0
+				Timestamp1 = now,
+				Timestamp2 = now + MailExpirySeconds
 			};
 
 			mail.Attachments.Add(new MailAttachment
