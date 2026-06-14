@@ -153,8 +153,28 @@ capture (the 629 B base #1604/#1611 and the 754 B attachment #1607):
 attachCount x { [itemInstanceId:u64][entryLen:u32][ProtoInventoryGameEntry][trailer: u32 0x72, u32 0x08006F31, u32 0] }
 ```
 Golden tests `MailMessageCodecTests` (Build == captured 629 B and 754 B; `includeAttachments=false` reproduces the
-base from the attachment mail). Still to wire: SELL into the AH (create a listing + escrow) and BUY → mail
-delivery (debit buyer, create a system mail with the item escrowed, grant on retrieve).
+base from the attachment mail).
+
+**Status (2026-06-14): BUY → mail delivery + the mailbox ops are WIRED** (`Faolan/GameServer/Tradepost/TradepostMailHandler.cs`,
+`TradepostResponses.SendMailMessage/SendMailResult/SendRetrieveMailResult`). `TradepostBuyItem(0x200E)` debits the
+buyer (`DispatchUpdateCash`), creates a **system mail** (recipient = buyer, sender empty) with the listed item
+escrowed as a `MailAttachment`, deletes the listing, and pushes the base `DispatchMailMessage`. The mailbox ops then
+work off the DB-backed mail: `GetAllMails` (poll → each mail base + `DispatchRetrieveMailResult`), `GetMailByID`
+(base), `GetItemData 0x2007` (preview = mail WITH attachment), `GetMailItem 0x2006` (TAKE = grant the item to the
+bag via the proven `GrantItemToBackpack`/`DispatchAddItem 0x2020` render path, then re-send the now-itemless mail),
+`MarkMailRead` (footer 0x0b→0x09), `DeleteMail`. Repo methods + `TradepostMailBody` (the `TradePostGUI_MailItemBought`
+remoteformat XML, **byte-exact for the captured inputs** — `TradepostMailBodyTests`); the mail-flow ordering matches
+the capture (BuyItem F502 → mail poll/preview/take F509–F557). IN-CLIENT GATE: buy a listing → coins deducted, a
+mail arrives, opening it shows the item, "take" puts it in the bag. KNOWN INTERIMS: the mail-body **item-name**
+fragment is left empty (per-item RDB name key unsynthesizable — same client-RDB-by-id limit as conversation text);
+the granted item uses the **Items-template** identity, not the listed instance's exact Data quad (like vendor BUY);
+the seller isn't credited (importer-seeded sellers aren't live characters).
+
+**Still to wire — SELL into the AH (`TradepostSellItem 0x200A`) is BLOCKED on a capture.** No capture contains the
+sell/list-an-item request (only BUY `0x200E` + the mail flow are on the wire), so the request body grammar is
+unknown — building it would be speculative and un-golden-testable, against the "decode first" rule. Capture a retail
+"list an item for sale" session (also `TradepostChangeItemPrice 0x200B`/`TradepostCancelSellItem 0x200C`) to decode
+the body, then create a `TradepostListing` from a bank item + escrow it.
 
 ## Implementation notes (for TODO §9a)
 

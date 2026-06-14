@@ -67,6 +67,22 @@ namespace Faolan.GameServer.Tradepost
 			Build(TradepostProtocol.InterfaceMethod.DispatchSearchResults, SearchResultsReplayBody, inbound.Sender.Instance)
 				.SendAsync(client);
 
+		// Push a mail (DispatchMailMessage 0x2002), built byte-exact from the Mail row by MailMessageCodec. The base
+		// form (includeAttachments=false) is the mailbox-poll/preview; with attachments it carries the bought item.
+		public static Task SendMailMessage(INetworkClient client, Faolan.Core.Database.Tables.Mail mail, bool includeAttachments, uint interfaceInstance = DefaultInterfaceInstance) =>
+			Build(TradepostProtocol.InterfaceMethod.DispatchMailMessage, MailMessageCodec.Build(mail, includeAttachments), interfaceInstance)
+				.SendAsync(client);
+
+		// DispatchSendMailResult (0x2003) [u8 success][u8 error] - the result of a send/mark/delete op.
+		public static Task SendMailResult(INetworkClient client, bool success, byte error = 0, uint interfaceInstance = DefaultInterfaceInstance) =>
+			Build(TradepostProtocol.InterfaceMethod.DispatchSendMailResult, new[] { success ? (byte)1 : (byte)0, error }, interfaceInstance)
+				.SendAsync(client);
+
+		// DispatchRetrieveMailResult (0x2004) - a single 0x01 byte (the "mailbox retrieved" ack in the capture).
+		public static Task SendRetrieveMailResult(INetworkClient client, uint interfaceInstance = DefaultInterfaceInstance) =>
+			Build(TradepostProtocol.InterfaceMethod.DispatchRetrieveMailResult, new byte[] { 0x01 }, interfaceInstance)
+				.SendAsync(client);
+
 		private static byte[] BuildAccessPointBody(Vector3 position, float radius)
 		{
 			var s = new FaolanStream(new byte[16], writable: true);

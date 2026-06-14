@@ -67,6 +67,15 @@ namespace Faolan.Core.Database
 		Task<Shop> GetFirstShop();
 
 		Task<List<TradepostListing>> GetTradepostListings(uint itemId);
+		Task<TradepostListing> GetTradepostListingBySaleId(ulong saleId);
+		Task DeleteTradepostListing(ulong saleId);
+
+		Task<Mail> CreateMail(Mail mail);
+		Task<List<Mail>> GetMailsForRecipient(string recipientName);
+		Task<Mail> GetMailByWireId(ulong mailId);
+		Task SetMailRead(ulong mailId, bool read);
+		Task RemoveMailAttachment(ulong mailId, ulong itemInstanceId);
+		Task DeleteMail(ulong mailId);
 
 		Task<MapWorldBurst> GetMapWorldBurst(uint mapId);
 		Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names);
@@ -477,6 +486,83 @@ namespace Faolan.Core.Database
 				.Where(l => l.ItemId == itemId)
 				.OrderBy(l => l.Price)
 				.ToListAsync();
+		}
+
+		// One listing by its unique sale id - the buy targets this (TradepostBuyItem [saleId]).
+		public async Task<TradepostListing> GetTradepostListingBySaleId(ulong saleId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.TradepostListings.FirstOrDefaultAsync(l => l.SaleId == saleId);
+		}
+
+		// Removes a listing once it is bought (or cancelled). No-op if it is already gone.
+		public async Task DeleteTradepostListing(ulong saleId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await ctx.TradepostListings.Where(l => l.SaleId == saleId).ExecuteDeleteAsync();
+		}
+
+		// --- mail ------------------------------------------------------------------------------------------
+
+		// Persists a new mail (with its attachments) - the buy->mail delivery creates a system mail to the buyer
+		// with the bought item escrowed as an attachment. Returns the saved row (Attachments populated).
+		public async Task<Mail> CreateMail(Mail mail)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			ctx.Mails.Add(mail);
+			await ctx.SaveChangesAsync();
+			return mail;
+		}
+
+		// All mail addressed to a character (newest first), attachments eager-loaded so the codec can build the
+		// item preview/grant without a second round-trip. Recipient NAME is the stable key (the wire id is volatile).
+		public async Task<List<Mail>> GetMailsForRecipient(string recipientName)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.Mails
+				.Include(m => m.Attachments)
+				.Where(m => m.RecipientName == recipientName)
+				.OrderByDescending(m => m.Id)
+				.ToListAsync();
+		}
+
+		// One mail by its wire MailId (the GetMailByID / GetMailItem target), attachments eager-loaded.
+		public async Task<Mail> GetMailByWireId(ulong mailId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.Mails
+				.Include(m => m.Attachments)
+				.FirstOrDefaultAsync(m => m.MailId == mailId);
+		}
+
+		// Marks a mail read/unread (the footer word flips 0x0b unread -> 0x09 read on the wire).
+		public async Task SetMailRead(ulong mailId, bool read)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await ctx.Mails
+				.Where(m => m.MailId == mailId)
+				.ExecuteUpdateAsync(s => s.SetProperty(m => m.IsRead, read));
+		}
+
+		// Removes one escrowed attachment from a mail once the recipient has taken it into the bag (GetMailItem).
+		public async Task RemoveMailAttachment(ulong mailId, ulong itemInstanceId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var mail = await ctx.Mails.FirstOrDefaultAsync(m => m.MailId == mailId);
+			if (mail == null)
+				return;
+			await ctx.MailAttachments
+				.Where(a => a.MailId == mail.Id && a.ItemInstanceId == itemInstanceId)
+				.ExecuteDeleteAsync();
+		}
+
+		// Deletes a mail (cascades to its attachments via the FK).
+		public async Task DeleteMail(ulong mailId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await ctx.Mails.Where(m => m.MailId == mailId).ExecuteDeleteAsync();
 		}
 
 		// --- equipment -------------------------------------------------------------------------------------

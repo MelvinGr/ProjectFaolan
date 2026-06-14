@@ -14,7 +14,7 @@ namespace Faolan.GameServer.Tradepost
 	// are the next increment.
 	public static class TradepostHandler
 	{
-		public static async Task Handle(INetworkClient client, ConanPacket packet, ILogger logger, IDatabaseRepository database)
+		public static async Task Handle(GameServerListener listener, INetworkClient client, ConanPacket packet, ILogger logger, IDatabaseRepository database)
 		{
 			var method = (TradepostProtocol.AgentMethod)packet.Opcode;
 			switch (method)
@@ -43,25 +43,23 @@ namespace Faolan.GameServer.Tradepost
 				}
 
 				case TradepostProtocol.AgentMethod.BuyItem:
-				{
-					var (saleId, resultId) = ReadBuy(packet.Body);
-					logger.LogInformation("Tradepost: {Char} bought listing saleId=0x{Sale:X16} (resultId=0x{Result:X16}).",
-						CharName(client), saleId, resultId);
+					// BUY -> debit the buyer + deliver the item via a system mail (mutates state, so the listener owns it).
+					await listener.HandleTradepostBuy(client, packet);
 					break;
-				}
 
 				case TradepostProtocol.AgentMethod.Close:
 					logger.LogInformation("Tradepost: {Char} closed the auction house.", CharName(client));
 					break;
 
+				// Mailbox retrieval ops: poll / preview / take the bought item / mark-read / delete (listener-owned,
+				// they read + grant from the DB-backed mail).
+				case TradepostProtocol.AgentMethod.GetAllMails:
 				case TradepostProtocol.AgentMethod.GetMailByID:
-				case TradepostProtocol.AgentMethod.GetMailItems:
 				case TradepostProtocol.AgentMethod.GetItemData:
 				case TradepostProtocol.AgentMethod.GetMailItem:
 				case TradepostProtocol.AgentMethod.MarkMailRead:
-				case TradepostProtocol.AgentMethod.GetAllMails:
-					logger.LogInformation("Tradepost/mail: {Char} {Method} (bodylen={Len}).",
-						CharName(client), method, packet.Body?.Length ?? 0);
+				case TradepostProtocol.AgentMethod.DeleteMail:
+					await listener.HandleTradepostMailOp(client, packet, method);
 					break;
 
 				default:
@@ -91,12 +89,6 @@ namespace Faolan.GameServer.Tradepost
 			{
 				return new SearchQuery("", 0x7e2, 0, 0);
 			}
-		}
-
-		private static (ulong saleId, ulong resultId) ReadBuy(FaolanStream body)
-		{
-			if (body == null || body.Length < 16) return (0, 0);
-			return (body.ReadUInt64(), body.ReadUInt64());
 		}
 
 		private static string CharName(INetworkClient client) =>

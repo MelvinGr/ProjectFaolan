@@ -112,6 +112,69 @@ namespace Faolan.Tests
 			}
 		}
 
+		// The auction-house BUY -> mail data path: a listing is resolvable by saleId and removed on buy; the system
+		// mail (with the escrowed item) round-trips by recipient and wire id, the read flag flips, an attachment can be
+		// taken (removed) leaving the mail, and delete cascades the remaining attachments. Backs TODO §9a Step 3.
+		[Fact]
+		public async Task TradepostBuyMail_DataPath_RoundTrips()
+		{
+			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-repo-{Guid.NewGuid():N}.db");
+			try
+			{
+				var (repo, factory) = NewRepo(dbPath);
+				await using (var ctx = await factory.CreateDbContextAsync())
+				{
+					await ctx.Database.EnsureCreatedAsync();
+					ctx.TradepostListings.Add(new TradepostListing
+					{
+						SaleId = 0x20d82b62d02b198b, Handle = 1, SellerName = "Ponakin", Price = 25, Quantity = 1,
+						ItemId = 0x7530, Template = 0x3E0A97, ItemLevel = 5
+					});
+					await ctx.SaveChangesAsync();
+				}
+
+				// Resolve + remove the listing (the buy).
+				var listing = await repo.GetTradepostListingBySaleId(0x20d82b62d02b198b);
+				Assert.NotNull(listing);
+				Assert.Equal("Ponakin", listing!.SellerName);
+				await repo.DeleteTradepostListing(0x20d82b62d02b198b);
+				Assert.Null(await repo.GetTradepostListingBySaleId(0x20d82b62d02b198b));
+
+				// Create the system mail with the bought item escrowed.
+				var mail = new Mail
+				{
+					MailId = 0x20d82b631c0c578f, RecipientClass = 0x08006F31, RecipientName = "AssassinL23",
+					SenderClass = 0x08006F31, SenderName = "", BodyXml = "<remoteformat />", FooterWord = 0x0B
+				};
+				mail.Attachments.Add(new MailAttachment { ItemInstanceId = 0x20d82b62d02b198b, Quantity = 1, Template = 0x3E0A97 });
+				await repo.CreateMail(mail);
+
+				// Retrieve by recipient + by wire id (attachments eager-loaded).
+				var inbox = await repo.GetMailsForRecipient("AssassinL23");
+				Assert.Single(inbox);
+				var byId = await repo.GetMailByWireId(0x20d82b631c0c578f);
+				Assert.NotNull(byId);
+				Assert.Single(byId!.Attachments);
+				Assert.False(byId.IsRead);
+
+				// Mark read (footer flips on the wire), then take the attachment (it leaves the mail).
+				await repo.SetMailRead(0x20d82b631c0c578f, true);
+				await repo.RemoveMailAttachment(0x20d82b631c0c578f, 0x20d82b62d02b198b);
+				var afterTake = await repo.GetMailByWireId(0x20d82b631c0c578f);
+				Assert.True(afterTake!.IsRead);
+				Assert.Empty(afterTake.Attachments);
+
+				// Delete the mail.
+				await repo.DeleteMail(0x20d82b631c0c578f);
+				Assert.Null(await repo.GetMailByWireId(0x20d82b631c0c578f));
+			}
+			finally
+			{
+				if (File.Exists(dbPath))
+					File.Delete(dbPath);
+			}
+		}
+
 		[Fact]
 		public async Task EquipmentAndAccount_RoundTrip_AcrossShortLivedContexts()
 		{

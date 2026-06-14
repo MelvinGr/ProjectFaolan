@@ -747,19 +747,36 @@ buy-delivery path (seller's item + buyer's payment move through mail).
         from the colliding `DispatchUpdateCash` 0x2005 by the TradepostInterface class id in the header. Round-trip
         test `CaptureListingImporterTests` (Parse→ToListing→Build == captured bytes). Re-seedable alone via the
         importer's `--listings-only` flag (avoids churning unrelated tables).
-  - [ ] **AH "offer for sale" should work** (Melvin, 2026-06-13): the c2s list-item request → create a
-        `TradepostListing` (seller/price/qty/itemId), remove the item from the bank (container 105) into escrow, and
-        the listing then shows in search. The tradepost sells from the BANK (`nBankItemSlot`).
+  - [x] **BUY → mail delivery DONE (2026-06-14, needs in-client).** `TradepostBuyItem 0x200E` → debit the buyer
+        (`DispatchUpdateCash`), create a SYSTEM mail (recipient = buyer, sender empty) with the listed item escrowed
+        as a `MailAttachment`, delete the listing, push `DispatchMailMessage`. The mailbox ops are wired off the
+        DB-backed mail: `GetAllMails`/`GetMailByID` (base + `DispatchRetrieveMailResult`), `GetItemData 0x2007`
+        (preview WITH attachment), `GetMailItem 0x2006` (TAKE = grant to the bag via the proven `GrantItemToBackpack`/
+        `DispatchAddItem 0x2020` path, then re-send the itemless mail), `MarkMailRead` (footer 0x0b→0x09), `DeleteMail`.
+        New: repo mail/listing methods, `TradepostMailHandler` (listener partial), `TradepostResponses.SendMailMessage/
+        SendMailResult/SendRetrieveMailResult`, `TradepostMailBody` (the `TradePostGUI_MailItemBought` XML, byte-exact
+        for the captured inputs — `TradepostMailBodyTests`), `DatabaseRepositoryTests.TradepostBuyMail_DataPath_RoundTrips`.
+        INTERIMS: the mail-body item-NAME is empty (per-item RDB name key unsynthesizable); the granted item uses the
+        Items-template identity, not the listed instance's Data quad (like vendor BUY); the seller isn't credited
+        (importer-seeded sellers aren't live characters). IN-CLIENT GATE: buy a listing → coins deducted, a mail
+        arrives, opening it shows the item, "take" puts it in the bag. → `docs/tradepost-protocol.md`.
+  - [ ] **AH "offer for sale" — BLOCKED on a capture** (Melvin, 2026-06-13): the c2s list-item request
+        (`TradepostSellItem 0x200A`) is in NO capture (only BUY `0x200E` + the mail flow are on the wire), so its
+        body grammar is unknown — building it would be speculative and un-golden-testable (violates "decode first").
+        Capture a retail "list an item for sale" session (+ `TradepostChangeItemPrice 0x200B` / `TradepostCancelSellItem
+        0x200C`), decode the body, then create a `TradepostListing` from a bank item (container 105, `nBankItemSlot`)
+        and escrow it; the listing then shows in search.
   - [ ] **Bank deposit/withdraw must PERSIST**: moving items between the bank (container 105) and the bag must be
         written to `CharacterInventory` so the bank survives relog (the client move sends go through the inventory
         move handler - route bank-slot moves to/from container 105).
-- [~] **Step 3:** go DB-backed. `TradepostListing` table + DB-backed search DONE (2026-06-13, above);
+- [~] **Step 3:** go DB-backed. `TradepostListing` table + DB-backed search DONE (2026-06-13);
       `Mail`/`MailAttachment` tables + the `DispatchMailMessage` builder DONE (2026-06-14, `MailMessageCodec`,
-      byte-exact vs the captured 629 B/754 B bodies, `MailMessageCodecTests`, migration `AddMail`). Still:
-      SELL into the AH (create a listing from a bank item + escrow), money debit, buy→mail grant (create the
-      system mail + escrow the item, grant on retrieve via `GrantItemToBackpack`). NB: tradepost sells from the
-      **bank** (`nBankItemSlot`) — leans on bank/money support (the bank itself is now decoded + delivered);
-      `CSBuyItemReply` hints at a commerce/CS path. All on the existing GameServer dispatcher (no new connection).
+      byte-exact vs the captured 629 B/754 B bodies, `MailMessageCodecTests`, migration `AddMail`); **BUY → mail
+      grant + the mailbox ops DONE (2026-06-14, needs in-client — see the bullet above).** REMAINING: SELL into the
+      AH (create a listing from a bank item + escrow) — BLOCKED on a capture of the sell request (above); seller
+      credit; the listed-instance Data quad on the granted item; the mail-body item-name (RDB-gated). Tradepost
+      sells from the **bank** (`nBankItemSlot`) — leans on bank/money support (both decoded). All on the existing
+      GameServer dispatcher (no new connection).
 
 ### 9c. Money storage / usage (cross-cutting prerequisite)
 
