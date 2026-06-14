@@ -36,6 +36,7 @@ namespace Faolan.Core.Database
 		Task<Character> GetCharacterForAccount(uint accountId, uint clientInstance);
 		Task<CharacterInventory[]> GetCharacterInventory(uint characterId);
 		Task<CharacterQuest[]> GetCharacterQuests(uint characterId);
+		Task<QuestDefinition> GetQuestDefinition(uint questId);
 		Task<Character[]> GetCharactersByAccount(uint id, bool skipUninitialized = true);
 		Task<Character> GetCharacterScaffold(uint characterId);
 		Task<CharacterShortcut[]> GetCharacterShortcuts(uint characterId);
@@ -662,6 +663,16 @@ namespace Faolan.Core.Database
 				.CharacterQuests
 				.Where(q => q.CharacterId == characterId)
 				.ToArrayAsync();
+		}
+
+		// The shared journal-content definition for a quest (text refs + objective marker), or null if not seeded.
+		public async Task<QuestDefinition> GetQuestDefinition(uint questId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.QuestDefinitions
+				.Include(q => q.TextRefs)
+				.FirstOrDefaultAsync(q => q.QuestId == questId);
 		}
 
 		public async Task<Character[]> GetCharactersByAccount(uint id, bool skipUninitialized = true)

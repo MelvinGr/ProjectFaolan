@@ -88,6 +88,40 @@ namespace Faolan.Importer
 			await db.SaveChangesAsync();
 		}
 
+		// Quest journal-content definitions (QuestDefinition + QuestTextRef) are fully derived from the captures, so
+		// refresh each harvested quest wholesale (replace its text refs); leave un-harvested quests untouched.
+		private static async Task ImportQuestDefinitions(DatabaseContext db, List<QuestDefinition> definitions)
+		{
+			var added = 0;
+			var updated = 0;
+			foreach (var def in definitions)
+			{
+				var existing = await db
+					.QuestDefinitions
+					.Include(q => q.TextRefs)
+					.FirstOrDefaultAsync(q => q.QuestId == def.QuestId);
+
+				if (existing == null)
+				{
+					db.QuestDefinitions.Add(def);
+					added++;
+					continue;
+				}
+
+				existing.AreaId = def.AreaId;
+				existing.GoalId = def.GoalId;
+				existing.MapId = def.MapId;
+				existing.MarkerX = def.MarkerX;
+				existing.MarkerY = def.MarkerY;
+				db.QuestTextRefs.RemoveRange(existing.TextRefs);
+				existing.TextRefs = def.TextRefs;
+				updated++;
+			}
+
+			await db.SaveChangesAsync();
+			Console.WriteLine($"Quest definitions (journal content): {definitions.Count} harvested, {added} new, {updated} updated.");
+		}
+
 		// Upsert per map: replace that map's burst (instance + structured IIR records); leave other maps untouched.
 		private static async Task ImportMapWorldBursts(DatabaseContext db, List<MapWorldBurstEntry> bursts)
 		{
@@ -388,6 +422,7 @@ namespace Faolan.Importer
 				await ImportNpcSpawns(db, NpcSpawnExtractor.Merge(captures.SelectMany(c => NpcSpawnExtractor.Extract(c.Packets))));
 				await ImportWorldObjects(db, WorldObjectExtractor.Merge(captures.SelectMany(c => WorldObjectExtractor.Extract(c.Packets))));
 				await ImportMapWorldBursts(db, MapWorldBurstExtractor.Merge(captures.SelectMany(c => MapWorldBurstExtractor.Extract(c.Packets))));
+				await ImportQuestDefinitions(db, QuestDefinitionExtractor.Extract(captures.SelectMany(c => c.Packets).ToList()));
 				}
 			}
 

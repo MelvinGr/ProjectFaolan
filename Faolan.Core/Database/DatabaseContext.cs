@@ -41,6 +41,8 @@ namespace Faolan.Core.Database
 		DbSet<NpcSpawn> NpcSpawns { get; }
 		DbSet<Realm> Realms { get; }
 		DbSet<RespawnPoint> RespawnPoints { get; }
+		DbSet<QuestDefinition> QuestDefinitions { get; }
+		DbSet<QuestTextRef> QuestTextRefs { get; }
 		DbSet<Shop> Shops { get; }
 		DbSet<ShopItem> ShopItems { get; }
 		DbSet<Spell> Spells { get; }
@@ -82,6 +84,8 @@ namespace Faolan.Core.Database
 		public DbSet<MapWorldBurstEntity> MapWorldBurstEntities { get; set; }
 		public DbSet<MorphTarget> MorphTargets { get; set; }
 		public DbSet<NpcSpawn> NpcSpawns { get; set; }
+		public DbSet<QuestDefinition> QuestDefinitions { get; set; }
+		public DbSet<QuestTextRef> QuestTextRefs { get; set; }
 		public DbSet<Realm> Realms { get; set; }
 		public DbSet<RespawnPoint> RespawnPoints { get; set; }
 		public DbSet<Shop> Shops { get; set; }

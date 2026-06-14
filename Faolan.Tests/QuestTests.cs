@@ -1,6 +1,8 @@
 using System;
+using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.GameServer.World;
+using Faolan.Importer;
 using Xunit;
 
 namespace Faolan.Tests
@@ -88,6 +90,44 @@ namespace Faolan.Tests
 				goalId: 0x1670, acceptTime: 0x000111D354375554UL, mapId: 4010, markerX: 0x147, markerY: 0x2A6,
 				objectiveText: objectiveText, objectiveLocalized: objectiveLocalized);
 			Assert.Equal(CaptureBody("63268258"), Convert.ToHexString(body).ToLowerInvariant());
+		}
+
+		// End-to-end: the importer harvests the Casilda definition from the captures, and feeding it back
+		// through the builders reproduces the captured packets byte-for-byte (proves QuestDefinitionExtractor's
+		// refs + objective marker, and the QuestTextRef -> record mapping).
+		[Fact]
+		public void QuestDefinitionExtractor_RoundTripsCasilda()
+		{
+			var packets = TsharkCaptureReader.Read(System.IO.Path.Combine(CapturesDir,
+				"account-stricken998-character-strickenbla-create-random-actions-combat-levelup-questcomplete.tshark.json"));
+			var def = QuestDefinitionExtractor.Extract(packets).Single(d => d.QuestId == 0x34A7);
+
+			Assert.Equal(1054u, def.AreaId);
+			Assert.Equal(0x1670u, def.GoalId);
+			Assert.Equal(4010u, def.MapId);
+			Assert.Equal(0x147u, def.MarkerX);
+			Assert.Equal(0x2A6u, def.MarkerY);
+
+			byte[] Rec(QuestTextSlot slot)
+			{
+				var r = def.TextRefs.Single(t => t.Slot == slot);
+				return r.IsLocalized
+					? WorldQuest.Localized((int)r.RefId, (int)r.Category, r.Flags ?? "", r.KeyText)
+					: WorldQuest.RemoteFormat((int)r.RefId, (int)r.Category, r.KeyText);
+			}
+
+			// Journal list (no timestamp) - byte-exact against frame 9947.
+			var areaHeader = new[] { Rec(QuestTextSlot.AreaTitle), Rec(QuestTextSlot.MapName), Rec(QuestTextSlot.RegionName) };
+			var entries = new[] { new WorldQuest.JournalEntry(0x34A7, Rec(QuestTextSlot.Title), Rec(QuestTextSlot.ListSubLine)) };
+			var trailing = Convert.FromHexString("00000000000003f100000000000003f100000000");
+			var journal = WorldQuest.BuildQuestJournal(0x01316D8A, def.AreaId, areaHeader, entries, trailing);
+			Assert.Equal(CaptureBody("79f8c7a1"), Convert.ToHexString(journal).ToLowerInvariant());
+
+			// Full update - byte-exact against frame 687 when fed the captured accept timestamp.
+			var textRefs = new[] { Rec(QuestTextSlot.Title), Rec(QuestTextSlot.Summary), Rec(QuestTextSlot.AreaTitle), Rec(QuestTextSlot.RegionName), Rec(QuestTextSlot.MapName) };
+			var full = WorldQuest.BuildQuestFullUpdate(0x0131720B, def.QuestId, 3, def.AreaId, textRefs, def.GoalId,
+				0x000111D354375554UL, def.MapId, def.MarkerX, def.MarkerY, Rec(QuestTextSlot.Objective), Rec(QuestTextSlot.ObjectiveLocalized));
+			Assert.Equal(CaptureBody("63268258"), Convert.ToHexString(full).ToLowerInvariant());
 		}
 
 		// Pull the body (subopcode onward, dropping the 4-byte length prefix) of the named captured

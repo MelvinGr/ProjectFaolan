@@ -6,6 +6,7 @@ using System.Linq;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
@@ -392,15 +393,74 @@ namespace Faolan.GameServer.World
 			if (character == null)
 				return;
 
-			foreach (var quest in await _database.GetCharacterQuests(character.Id))
+			var active = (await _database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Active).ToList();
+			var definitions = new List<(CharacterQuest Quest, QuestDefinition Def)>();
+			foreach (var quest in active)
 			{
-				if (quest.State != QuestState.Active)
-					continue;
-
 				await SendQuestIir(client, quest.QuestId, WorldQuest.StateActive);
 				if (quest.GoalRequired > 0)
 					await SendQuestGoal(client, quest.QuestId, 0, quest.GoalProgress);
+
+				var def = await _database.GetQuestDefinition(quest.QuestId);
+				if (def != null)
+				{
+					await SendQuestFullUpdate(client, def);
+					definitions.Add((quest, def));
+				}
 			}
+
+			// One journal-list packet covers every quest that has a seeded definition (the J-panel title lines).
+			if (definitions.Count > 0)
+				await SendQuestJournal(client, definitions.Select(d => d.Def).ToList());
+		}
+
+		// Sends a QuestFullUpdate (one quest's full detail: description, summary, objective + map marker) built from
+		// its seeded definition. acceptTime is the per-character "accepted at" stamp (display/sort field).
+		public Task SendQuestFullUpdate(INetworkClient client, QuestDefinition def, uint state = WorldQuest.StateActive)
+		{
+			var refs = new[] { QuestTextSlot.Title, QuestTextSlot.Summary, QuestTextSlot.AreaTitle, QuestTextSlot.RegionName, QuestTextSlot.MapName }
+				.Select(s => Record(def, s))
+				.ToArray();
+			var body = WorldQuest.BuildQuestFullUpdate(
+				client.Session.Account.ClientInstance, def.QuestId, state, def.AreaId, refs,
+				def.GoalId, Statics.NowUnixTimeSeconds, def.MapId, def.MarkerX, def.MarkerY,
+				Record(def, QuestTextSlot.Objective), Record(def, QuestTextSlot.ObjectiveLocalized));
+
+			return new PacketStream()
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), 0x2000)
+				.WriteArrayUInt32Length(s => s.WriteArray(body))
+				.SendAsync(client);
+		}
+
+		// Sends the QuestJournal list (one title line per quest). The shared area header (region/map names) is taken
+		// from the first definition. The trailing "tracked quest" pointer is the captured no-track block; pinning the
+		// multi-quest tracked variant needs more decode (docs/quest-log-handover.md).
+		public Task SendQuestJournal(INetworkClient client, IReadOnlyList<QuestDefinition> definitions)
+		{
+			var first = definitions[0];
+			var areaHeader = new[] { Record(first, QuestTextSlot.AreaTitle), Record(first, QuestTextSlot.MapName), Record(first, QuestTextSlot.RegionName) };
+			var entries = definitions
+				.Select(d => new WorldQuest.JournalEntry(d.QuestId, Record(d, QuestTextSlot.Title), Record(d, QuestTextSlot.ListSubLine)))
+				.ToList();
+			var trailing = Convert.FromHexString("00000000000003f100000000000003f100000000");
+
+			var body = WorldQuest.BuildQuestJournal(client.Session.Account.ClientInstance, first.AreaId, areaHeader, entries, trailing);
+			return new PacketStream()
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), 0x2000)
+				.WriteArrayUInt32Length(s => s.WriteArray(body))
+				.SendAsync(client);
+		}
+
+		// A QuestTextRef -> on-wire text record (remoteformat/localized). Missing slots fall back to an empty
+		// remoteformat so the framing stays valid (the client just renders nothing for that slot).
+		private static byte[] Record(QuestDefinition def, QuestTextSlot slot)
+		{
+			var r = def.TextRefs.FirstOrDefault(t => t.Slot == slot);
+			if (r == null)
+				return WorldQuest.RemoteFormat(0, 0, "");
+			return r.IsLocalized
+				? WorldQuest.Localized((int)r.RefId, (int)r.Category, r.Flags ?? "", r.KeyText ?? "")
+				: WorldQuest.RemoteFormat((int)r.RefId, (int)r.Category, r.KeyText ?? "");
 		}
 
 		// Sends a QuestGoal (objective progress) to the player.

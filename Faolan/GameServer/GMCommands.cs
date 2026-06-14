@@ -624,9 +624,43 @@ namespace Faolan.GameServer
 				return;
 			}
 
+			// .quest journal [<id>] - (re)send the seeded journal CONTENT (title/description/objective) for one quest
+			// or every active quest with a definition. The J-panel renders this; QuestIIR/.quest add only drive state.
+			if (sub == "journal")
+			{
+				var defs = new List<QuestDefinition>();
+				if (parts.Length > 1 && uint.TryParse(parts[1], out var only))
+				{
+					var def = await Database.GetQuestDefinition(only);
+					if (def != null)
+						defs.Add(def);
+				}
+				else
+				{
+					foreach (var q in (await Database.GetCharacterQuests(characterId)).Where(q => q.State == QuestState.Active))
+					{
+						var def = await Database.GetQuestDefinition(q.QuestId);
+						if (def != null)
+							defs.Add(def);
+					}
+				}
+
+				if (defs.Count == 0)
+				{
+					await _agentServerDispatcher.SendSystemMessage(characterId, "No seeded quest definition for the requested quest(s).");
+					return;
+				}
+
+				foreach (var def in defs)
+					await _broadcaster.SendQuestFullUpdate(client, def);
+				await _broadcaster.SendQuestJournal(client, defs);
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"Sent journal content for {defs.Count} quest(s): {string.Join(", ", defs.Select(d => d.QuestId))}.");
+				return;
+			}
+
 			if (parts.Length < 2 || !uint.TryParse(parts[1], out var questId))
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .quest add|remove <questId> | .quest list");
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .quest add|remove|complete <questId> | .quest journal [<id>] | .quest list");
 				return;
 			}
 
