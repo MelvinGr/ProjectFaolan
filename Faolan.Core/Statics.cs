@@ -26,13 +26,22 @@ namespace Faolan.Core
 
 		static Statics()
 		{
-			var assemblyMetadata = Assembly.GetEntryAssembly()!
+			var entryAssembly = Assembly.GetEntryAssembly()!;
+
+			var assemblyMetadata = entryAssembly
 				.GetCustomAttributes<AssemblyMetadataAttribute>()
 				.ToDictionary(k => k.Key, v => v.Value);
 
 			BuildConfiguration = assemblyMetadata["BuildConfiguration"];
 			BuildDateTimeUtc = DateTime.Parse(assemblyMetadata["BuildDateTimeUtc"], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
-			BuildString = $"{BuildConfiguration} {assemblyMetadata["GitSha"]} @ {BuildDateTimeUtc:G} UTC";
+
+			// The SDK appends "+<commit-sha>" to the informational version (IncludeSourceRevisionInInformationalVersion),
+			// so the HEAD SHA rides along for free - no custom metadata needed.
+			var informationalVersion = entryAssembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
+			var plusIndex = informationalVersion.IndexOf('+');
+			var gitSha = plusIndex >= 0 ? informationalVersion[(plusIndex + 1)..] : informationalVersion;
+
+			BuildString = $"{BuildConfiguration} {gitSha} @ {BuildDateTimeUtc:G} UTC";
 
 			StartupBanner = "-------------------------------------------------------------------------------\n" + //
 			                "|  ####  ####   ###    # #### ### #####    ####   #    ###  #      #   #   #  |\n" + //

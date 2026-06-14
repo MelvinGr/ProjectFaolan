@@ -27,10 +27,9 @@
         <ContainerImageTag>dev</ContainerImageTag>
     </PropertyGroup>-->
 
-    <!-- SourceRevisionId is the HEAD commit SHA, populated by the SDK's bundled git
-         source-control tasks (InitializeSourceControlInformation). Replaces GitVersion.MsBuild. -->
-    <Target Name="GenerateBuildInfo" BeforeTargets="BeforeCompile"
-        DependsOnTargets="InitializeSourceControlInformation">
+    <!-- The HEAD commit SHA is appended to AssemblyInformationalVersion automatically by the SDK's
+         bundled git source-control tasks (replaces GitVersion.MsBuild); Statics reads it from there. -->
+    <Target Name="GenerateBuildInfo" BeforeTargets="BeforeCompile">
         <ItemGroup>
             <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
                 <_Parameter1>BuildDateTimeUtc</_Parameter1>
@@ -40,11 +39,6 @@
             <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
                 <_Parameter1>BuildConfiguration</_Parameter1>
                 <_Parameter2>$(Configuration)</_Parameter2>
-            </AssemblyAttribute>
-
-            <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
-                <_Parameter1>GitSha</_Parameter1>
-                <_Parameter2>$(SourceRevisionId)</_Parameter2>
             </AssemblyAttribute>
         </ItemGroup>
     </Target>
