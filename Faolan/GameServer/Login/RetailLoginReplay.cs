@@ -42,6 +42,12 @@ namespace Faolan.GameServer
 		// see snapshot_embeds_strie_quest). See EnsureBeachStarterQuest / WorldQuest.BeachStarterQuestId.
 		private const uint BeachStarterQuestId = WorldQuest.BeachStarterQuestId;
 
+		// #184: Casilda is CHAINED (arms-up) until the player accepts her quest 13479, then UNCHAINED. The captured
+		// beach burst has her chained; the position-matched NpcSpawns row is the unchained capture. So pre-quest we
+		// keep her body VERBATIM (the burst's chained pose) and post-accept we serve the from-DB unchained rebuild.
+		private const uint CasildaQuestId = 13479;
+		private const string CasildaName = "Casilda";
+
 		// Default starter gear for beach characters (item ids that are fully buildable: p_items identity + harvested
 		// archetype), keyed by the CharacterEquipment slot they go in. Slot-appropriate so the client accepts them.
 		private const uint StarterWristItem = 3361557; // Slave Manacles (wrist, 0x12)
@@ -415,6 +421,11 @@ namespace Faolan.GameServer
 				? await Database.GetCharacterInventory(client.Session.Character.Id)
 				: [];
 
+			// #184: keep Casilda's chained pose (the verbatim burst body) until the player accepts her quest 13479
+			// (HasQuest = active OR completed, like the dialogue gate); after that she renders un-chained from the DB.
+			var keepCasildaChained = client.Session.Character != null
+				&& !(await Database.GetCharacterQuests(client.Session.Character.Id)).Any(q => q.QuestId == CasildaQuestId);
+
 			// The spawn-scaffold rows (entry table / feat-ID list / pre-IIR frame) drive the player spawn's
 			// scaffold frame; characters without rows are seeded with the fresh-character defaults once.
 			var scaffoldCharacter = await EnsureSpawnScaffoldRows(client.Session.Character);
@@ -487,7 +498,7 @@ namespace Faolan.GameServer
 					pkt = rebuilt;
 					_broadcaster.CaptureOwnSpawnBody(client, pkt); // stash the player's FA015807 body so other players can be sent it
 				}
-				else if (TryRebuildNpcSpawnFromDb(client, npcByPosition, pkt, out var npcRebuilt, out var wasIdentical))
+				else if (TryRebuildNpcSpawnFromDb(client, npcByPosition, pkt, keepCasildaChained, out var npcRebuilt, out var wasIdentical))
 				{
 					npcBuilt++;
 					// The from-DB rebuild (DB-row identity/scaffold + the burst's EXACT transform spliced in, see
@@ -627,7 +638,7 @@ namespace Faolan.GameServer
 			return handle != client.Session.Account.ClientInstance; // an NPC spawn, not the player's own
 		}
 
-		private bool TryRebuildNpcSpawnFromDb(INetworkClient client, IReadOnlyDictionary<(int, int, int), NpcSpawn> npcByPosition, byte[] packet, out byte[] rebuilt, out bool wasIdentical)
+		private bool TryRebuildNpcSpawnFromDb(INetworkClient client, IReadOnlyDictionary<(int, int, int), NpcSpawn> npcByPosition, byte[] packet, bool keepCasildaChained, out byte[] rebuilt, out bool wasIdentical)
 		{
 			rebuilt = null;
 			wasIdentical = false;
@@ -654,6 +665,10 @@ namespace Faolan.GameServer
 			// spawn (EnsureZoneNpcs -> SendWorldSpawn), which is where Casilda actually streams in (she is outside
 			// the burst), so reverting here keeps the Casilda fix while restoring the working loading screen.
 			if (!npcByPosition.TryGetValue(key, out var row) || !NpcSpawnBuilder.TryBuild(row, handle, out var newBody))
+				return false;
+
+			// #184: pre-quest, keep Casilda VERBATIM (the burst's chained pose) instead of the unchained DB rebuild.
+			if (keepCasildaChained && string.Equals(row.Name, CasildaName, StringComparison.Ordinal))
 				return false;
 
 			// Keep the burst packet's header (already re-addressed to the live player); swap only the FA015807 body.
