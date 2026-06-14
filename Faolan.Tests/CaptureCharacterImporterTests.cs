@@ -44,8 +44,18 @@ namespace Faolan.Tests
 				});
 				await db.SaveChangesAsync();
 
-				// One capture: a MapChange to 4000, then the golden dikketest spawn (a real captured body).
-				var capture = new[] { new CapturedPacket(0, true, 0x2000, 0x5D85BFC7, MapChangePacket(4000)), new CapturedPacket(1, true, 0x2000, 0xFA015807, WrapBody(Golden.Bytes("SpawnDikketestLogin"))) };
+				const uint dikketestHandle = 0x01316D2B; // the spawn handle = on-wire instance = the imported char id
+
+				// One capture: a MapChange to 4000, the golden dikketest spawn (a real captured body), then a
+				// personal FullChar snapshot for the same instance. The snapshot is the "this is the capturing
+				// account's own played character" signal the importer's own-character prune requires (0x737A6DF9 is
+				// only ever sent for the local player); without it the spawn is dropped as an other-player sighting.
+				var capture = new[]
+				{
+					new CapturedPacket(0, true, 0x2000, 0x5D85BFC7, MapChangePacket(4000)),
+					new CapturedPacket(1, true, 0x2000, 0xFA015807, WrapBody(Golden.Bytes("SpawnDikketestLogin"))),
+					new CapturedPacket(2, true, 0x2000, 0x737A6DF9, SnapshotPacket(dikketestHandle))
+				};
 
 				CaptureCharacterImporter.AccountId = 7;
 				(int, int, int) result;
@@ -105,6 +115,18 @@ namespace Faolan.Tests
 			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)body.Length - 4);
 			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), 0x5D85BFC7);
 			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(34, 4), mapId);
+			return WrapBody(body);
+		}
+
+		// A minimal personal FullChar snapshot (0x737A6DF9) addressed to `instance` - enough for the importer to key
+		// it (subop at offset 4, instance at offset 12) and recognize the spawn as the local player. The inventory
+		// body is empty/garbage, which ImportCarriedInventory parses to "no carried items" without throwing.
+		private static byte[] SnapshotPacket(uint instance)
+		{
+			var body = new byte[40];
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)body.Length - 4);
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), 0x737A6DF9);
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(12, 4), instance);
 			return WrapBody(body);
 		}
 
