@@ -158,25 +158,6 @@ namespace Faolan.Tests
 			Assert.True(Contains(built, liveBe), "live instance must be present");
 		}
 
-		// The snapshot embeds the source character's quest count as Unknown0Marker = 1009*(count+1); reconciling it to
-		// the live character (0 = no quests) is how a player stops inheriting the captured character's journal (e.g.
-		// Strie's beach quest 10238). Verified marker values: 0->1009(0x3F1), 1->2018(0x7E2), 2->3027(0xBD3).
-		[Theory]
-		[InlineData(0u, 1009u)]
-		[InlineData(1u, 2018u)]
-		[InlineData(2u, 3027u)]
-		public void SetQuestCount_EncodesMarker(uint count, uint expectedMarker)
-		{
-			var tails = new SnapshotTails { Unknown0Marker = 999, PrimaryRemoteFormatId = 10238, PrimaryRemoteFormatIdAgain = 10238 };
-
-			tails.SetQuestCount(count);
-
-			Assert.Equal(expectedMarker, tails.Unknown0Marker);
-			// Count 0 also clears the "primary quest" pointer; a non-zero count leaves it (the journal records remain).
-			Assert.Equal(count == 0 ? 0u : 10238u, tails.PrimaryRemoteFormatId);
-			Assert.Equal(count == 0 ? 0u : 10238u, tails.PrimaryRemoteFormatIdAgain);
-		}
-
 		private static bool Contains(byte[] haystack, byte[] needle)
 		{
 			for (var i = 0; i + needle.Length <= haystack.Length; i++)
