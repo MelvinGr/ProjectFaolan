@@ -655,8 +655,16 @@ namespace Faolan.GameServer
 					await Database.RemoveCharacterQuest(characterId, questId);
 					await _agentServerDispatcher.SendSystemMessage(characterId, $"Quest {questId} removed.");
 					break;
+				case "complete":
+					// Mark a quest complete (test bootstrap for quest-gated dialogue, #37): persists State=Completed so
+					// HasCompletedQuest(id) flips, which the conversation VM reads (e.g. Casilda's post-quest greeting).
+					// (The wire "quest complete" journal update isn't decoded - only the persisted state, which the VM
+					// reads, is needed for the dialogue flip; the kill-quest path persists the same way via CombatService.)
+					await Database.SetCharacterQuest(characterId, questId, QuestState.Completed, 0, 0);
+					await _agentServerDispatcher.SendSystemMessage(characterId, $"Quest {questId} marked complete (HasCompletedQuest flips; talk to the quest NPC to see post-quest dialogue).");
+					break;
 				default:
-					await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .quest add|remove <questId> | .quest list");
+					await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .quest add|remove|complete <questId> | .quest list");
 					break;
 			}
 		}
