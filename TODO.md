@@ -31,15 +31,27 @@ These are implemented + unit-tested; they just need a live-client pass. Detailed
 prior diagnoses are in `docs/archive/todo-history.md`.
 
 **Vitals / stats / movement**
-- [ ] **Health regen not visibly working in-client** (Melvin, 2026-06-13): the tick HAS a regen pass
-      (`WorldSimulation.RegenerateConnectedPlayers`, 1 Hz, ~5% hp / 10% stamina / 5% mana per sec, `PushVitals`),
-      but HP doesn't visibly come back after taking damage. Check that combat damage and the regen pass mutate the
-      SAME `WorldEntity.Vitals` instance (a split instance would regen a different copy than combat damaged), that
-      the 0x96B8DC59 vitals push updates the HUD bar, and tune the provisional rates. Ties into the combat-vitals
-      wiring (kill/XP/death loop).
+- [x] **Health regen not visibly working in-client** (Melvin, 2026-06-13) — FIXED + IN-CLIENT VERIFIED 2026-06-14.
+      Root cause was NOT regen (the tick + shared `WorldEntity.Vitals` instance were fine): the vitals **stat ids
+      were inverted** — current health rode `0x0001`, which the client renders as MAX. So regen grew the player's
+      MAX bar instead of refilling current. Fix: corrected `LegacyCharacterStatId` (current = {0x001B,0x01F8,0x01FA},
+      max = {0x0001,0x01F9,0x01FB}, proven by live `.setstat` probes) + `Send0x2000_0x96B8DC59`. Verified: `.hurt`
+      then regen refills the CURRENT bar with max stable. → memory `protocol_stats_and_combat`.
+- [ ] **Server-side MAX-STAT aggregation from gear/attributes** (Melvin, 2026-06-14): the client adds equipped-item
+      HP/stat bonuses on top of the base max we send (a ring's +HP made base 320 show as max **648**), but the
+      server only knows the base — so regen caps current at the base (bar tops at 320/648, never fills). Parse item
+      stat attributes (RDB/p_items) → aggregate into the character's derived MaxHealth/MaxStamina/MaxMana (+ the
+      Str/Dex/… attributes), so MaxStats reflect worn gear and the bar can fill. Bigger feature (item-stats →
+      derived-stats system); ties into the class-vitals item below and the unconfirmed attribute ids in
+      `protocol_stats_and_combat`.
 - [ ] `.vitals` (no args → MaxStats), `.vitals 1000 800 500`, `.setstat 36 25` move the bars. (`.hurt`/`.heal` work.)
-- [ ] New character's sheet vitals reflect its **class** (mage = more mana, soldier = more health), not the
-      level-1 rogue default. → `docs/player-stats.md`
+- [~] New character's sheet vitals reflect its **class** (mage = more mana, soldier = more health), not the
+      level-1 rogue default. → `docs/player-stats.md`. PARTIAL 2026-06-14: `CharacterMaxStats.CreateDefaults` now
+      zeroes the unused pool per class (capture-derived table, memory `class_resource_mana_stamina`: physical
+      classes = stamina-only, casters = mana-only, the 3 melee-hybrids = both). Still rough magnitudes; and chars
+      with IMPORTED stats (e.g. Darktemplarchar) bypass CreateDefaults. OPEN: the mana bar can still be missing
+      in-client for a both-pools class — login `BuildVitals` sends only the CURRENT ids, so the client may lack a
+      mana MAX to render the bar (needs the max ids and/or the snapshot tails to carry mana max).
   - [ ] Decode follow-up (`docs/player-stats.md` "Open follow-ups"): determine whether base attributes
         (str/dex/…) are sent on the wire at all, or derived client-side from class/level — drives whether the
         snapshot/vitals block needs them.
