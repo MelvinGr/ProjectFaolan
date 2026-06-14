@@ -131,10 +131,11 @@ namespace Faolan.Tests
 		{
 			var v = EntityVitals.FromMax(63, 63, 63);
 
-			// Full entity (current == max == 63 -> raw 6300 = 0x189C). Emits the current AND max id per vital:
-			// count(06) + HealthCurrent(0001) + HealthMax(001B) + StaminaCurrent(01F9) + StaminaMax(01F8)
-			//           + ManaCurrent(01FB) + ManaMax(01FA), each = 0x189C.
-			Assert.Equal("06000000010000189c0000001b0000189c000001f90000189c000001f80000189c000001fb0000189c000001fa0000189c", ToHex(v
+			// Full entity (current == max == 63 -> raw 6300 = 0x189C). Emits the current AND max id per vital, in
+			// .Set order (current then max per vital; ids in-client verified, see LegacyCharacterStatId):
+			// count(06) + HealthCurrent(001B) + HealthMax(0001) + StaminaCurrent(01F8) + StaminaMax(01F9)
+			//           + ManaCurrent(01FA) + ManaMax(01FB), each = 0x189C.
+			Assert.Equal("060000001b0000189c000000010000189c000001f80000189c000001f90000189c000001fa0000189c000001fb0000189c", ToHex(v
 				.ToVitalsBlock()
 				.ToArray()));
 		}

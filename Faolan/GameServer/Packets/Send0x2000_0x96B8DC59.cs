@@ -23,10 +23,12 @@ namespace Faolan.GameServer
 		{
 			var character = client.Session.Character;
 			var stats = character.MaxStats ?? CharacterMaxStats.CreateDefaults(character.Class, character.Level);
+			// Emit the full value under the CURRENT ids (0x001B/0x01F8/0x01FA) - the retail full-spawn announce sends
+			// current (== max at full health); the max ids ride the snapshot/tails. (in-client proof: CapturedCharacterStats.)
 			var block = new CharacterStatBlock()
-				.Set(LegacyCharacterStatId.HealthMax, stats.Health)
-				.Set(LegacyCharacterStatId.StaminaMax, stats.Stamina)
-				.Set(LegacyCharacterStatId.ManaMax, stats.Mana);
+				.Set(LegacyCharacterStatId.HealthCurrent, stats.Health)
+				.Set(LegacyCharacterStatId.StaminaCurrent, stats.Stamina)
+				.Set(LegacyCharacterStatId.ManaCurrent, stats.Mana);
 
 			return BuildStatUpdate(client, block);
 		}
@@ -50,12 +52,12 @@ namespace Faolan.GameServer
 		// CharacterStatBlock applies the ×100 vitals scale.
 		private static Task SendVitals(INetworkClient client, uint health, uint stamina, uint mana)
 		{
-			// Values are the character's MAX stats, so emit them under the max ids (matches the retail spawn
-			// pattern, which sends max-only and lets the client show full bars).
+			// Emit the values under the CURRENT ids (0x001B/0x01F8/0x01FA) - matches the retail full-spawn announce,
+			// which sends current (== max at full health) and lets the client show full bars; max rides the snapshot.
 			var stats = new CharacterStatBlock()
-				.Set(LegacyCharacterStatId.HealthMax, health)
-				.Set(LegacyCharacterStatId.StaminaMax, stamina)
-				.Set(LegacyCharacterStatId.ManaMax, mana);
+				.Set(LegacyCharacterStatId.HealthCurrent, health)
+				.Set(LegacyCharacterStatId.StaminaCurrent, stamina)
+				.Set(LegacyCharacterStatId.ManaCurrent, mana);
 
 			return SendStatUpdate(client, stats);
 		}

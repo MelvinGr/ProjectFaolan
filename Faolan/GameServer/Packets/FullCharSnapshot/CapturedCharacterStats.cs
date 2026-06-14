@@ -9,22 +9,24 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 	///  TODO: Rename legacy?
 	public enum LegacyCharacterStatId : uint
 	{
-		// Vitals are sent as a (current, max) pair per stat in the 0x96B8DC59 update. Verified across 90 capture
-		// records (the invariant current &lt;= max holds 100%, see docs/player-stats.md): the LARGER-valued id of
-		// each pair is the max. The pair ids are adjacent for stamina/mana but NOT for health (current = 0x0001).
-		// NOTE: this corrects the previous labels, which had current/max swapped on all three vitals.
-		HealthCurrent = 0x0001,
-		HealthMax = 0x001B,
+		// Vitals are sent as a (current, max) pair per stat in the 0x96B8DC59 update. The current/max id assignment
+		// is **proven in-client** (2026-06-14, live .setstat probes on Darktemplarchar): setting 0x0001 moved the
+		// player's MAX health bar, 0x001B moved CURRENT; 0x01F8 moved stamina CURRENT, 0x01FA moved mana CURRENT.
+		// So current = {0x001B health, 0x01F8 stamina, 0x01FA mana}; max = {0x0001, 0x01F9, 0x01FB}. (The old
+		// "larger id = max" heuristic was backwards - a full-health capture has current == max, so the announce
+		// packet that uses 0x001B/0x01F8/0x01FA was the CURRENT ids all along; see CharacterStatBlockTests.)
+		HealthCurrent = 0x001B,
+		HealthMax = 0x0001,
 		PvpExp = 0x0033,
 		Exp = 0x0034,
 		Level = 0x0036,
 		PvpLevel = 0x0046,
 		MaxExp = 0x015E,
 		PvpMaxExp = 0x0161,
-		StaminaMax = 0x01F8,
-		StaminaCurrent = 0x01F9,
-		ManaMax = 0x01FA,
-		ManaCurrent = 0x01FB,
+		StaminaCurrent = 0x01F8,
+		StaminaMax = 0x01F9,
+		ManaCurrent = 0x01FA,
+		ManaMax = 0x01FB,
 		KillingBlows = 0x0290,
 		Death = 0x0292,
 		AnnihilationWin = 0x029A,

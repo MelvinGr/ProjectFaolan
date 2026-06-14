@@ -11,23 +11,24 @@ namespace Faolan.Tests
 		[Fact]
 		public void Build_VitalsBlock_MatchesCapturedBytes()
 		{
-			// Captured packet sends the MAX ids (0x1B/0x1F8/0x1FA) - an entity announcing its full vitals on spawn.
+			// Captured packet sends the CURRENT ids (0x1B/0x1F8/0x1FA) - an entity announcing its full vitals on
+			// spawn (current == max at full health; ids in-client verified, see LegacyCharacterStatId).
 			var block = new CharacterStatBlock()
-				.Set(LegacyCharacterStatId.HealthMax, 63)
-				.Set(LegacyCharacterStatId.StaminaMax, 63)
-				.Set(LegacyCharacterStatId.ManaMax, 63);
+				.Set(LegacyCharacterStatId.HealthCurrent, 63)
+				.Set(LegacyCharacterStatId.StaminaCurrent, 63)
+				.Set(LegacyCharacterStatId.ManaCurrent, 63);
 
 			Assert.Equal(3, block.Count);
 
-			// count(03) + HealthMax(001B)=189C + StaminaMax(01F8)=189C + ManaMax(01FA)=189C
+			// count(03) + HealthCurrent(001B)=189C + StaminaCurrent(01F8)=189C + ManaCurrent(01FA)=189C
 			Assert.Equal("030000001b0000189c000001f80000189c000001fa0000189c", ToHex(block.ToArray()));
 		}
 
 		[Fact]
 		public void Set_AppliesVitalsScale()
 		{
-			// HealthMax is a ×100 vital: display 63 -> raw 6300 (0x189C).
-			var block = new CharacterStatBlock().Set(LegacyCharacterStatId.HealthMax, 63);
+			// HealthCurrent (0x001B) is a ×100 vital: display 63 -> raw 6300 (0x189C).
+			var block = new CharacterStatBlock().Set(LegacyCharacterStatId.HealthCurrent, 63);
 			Assert.Equal("010000001b0000189c", ToHex(block.ToArray()));
 		}
 
