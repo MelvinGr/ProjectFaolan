@@ -297,6 +297,28 @@ namespace Faolan.Importer
 			if (doCaptures)
 				Console.WriteLine($"Read {captures.Count} captures, {itemPackets.Count} item-candidate packets; extracted {conversations.Count} conversation nodes.");
 
+			// --dump-conversation-states: read-only classification of each capture's per-NPC dialogue (issue #37). Prints
+			// the screens + mid-conversation quest GRANTS per (capture, NPC) so the quest STATE a capture represents can
+			// be inferred (a grant ⇒ that capture is the OFFER walk for that quest). Used to author per-capture gates.
+			if (args.Contains("--dump-conversation-states"))
+			{
+				foreach (var c in captures)
+				{
+					foreach (var g in ConversationExtractor.Extract(c.Packets)
+						         .Where(e => !string.IsNullOrEmpty(e.NpcName))
+						         .GroupBy(e => e.NpcName)
+						         .OrderBy(g => g.Key))
+					{
+						var grants = g.Where(e => e.GrantQuestId != 0)
+							.OrderBy(e => e.AnswerPath)
+							.Select(e => $"'{e.AnswerPath}'->{e.GrantQuestId}");
+						Console.WriteLine($"{c.Name} | {g.Key} | screens={g.Count()} | grants=[{string.Join(", ", grants)}]");
+					}
+				}
+
+				return 0;
+			}
+
 			if (dryRun)
 			{
 				Console.WriteLine("[dry-run] no changes written.");
