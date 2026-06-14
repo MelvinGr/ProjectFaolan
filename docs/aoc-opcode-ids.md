@@ -6,6 +6,13 @@ identifier in `AgeOfConan.exe` and matching. `[?]` = no exe string hashes to it 
 a collision picked wrong); 16-bit RpcHeader opcodes are method indices, not hashes — **RESOLVED 2026-06-12**
 (see Stage 3b below).
 
+**Update 2026-06-14 (#192):** `0x33A56FB0 = DoorFullUpdateIIR_c` (the last unidentified beach-burst type —
+the map's doors); `0x00000000` is a null/terminator, not a type. The remaining GameServer `[?]` rows below
+in the `0x013xxxxx` family plus `0x02165EFF` / `0x08006F31` / `0x0802E5D4` are **NOT IIR type hashes** — they
+are per-character **instance ids** (ProtoEndpoint.instance), which the analyzer surfaces as a "sub-opcode"
+because in-world the client streams 0x2000 packets keyed by its own instance (e.g. `0x01316E71` = hoxxling,
+`0x02165EFF` = Strie). No name hashes to them because they aren't names.
+
 
 ## ProtoEndpoint.type ids (object-class / interface names)
 
