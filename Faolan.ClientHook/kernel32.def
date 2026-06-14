@@ -5,3 +5,5 @@ WriteFile@20
 CloseHandle@4
 GetModuleHandleA@4
 GetCurrentProcessId@0
+VirtualProtect@16
+VirtualAlloc@16
