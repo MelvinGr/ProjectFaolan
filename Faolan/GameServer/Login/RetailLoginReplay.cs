@@ -35,6 +35,13 @@ namespace Faolan.GameServer
 		private const uint SpawnCheckStatusTwoHandle = 0x00081906;
 		private const uint StarterFirstBagItem = 3774542; // Royal Signet (first bag slot)
 
+		// The Tortage beach world-entry snapshot (0x737A6DF9) embeds quest 10238 in its tails for EVERY character
+		// (verified across the Strie / hoxxling / randochar captures - it is the canonical beach starting quest, not
+		// a per-character artifact). Since the snapshot is replayed and the client renders that quest, persist it so
+		// the DB matches what the journal shows (otherwise CharacterQuests is empty while the journal shows a quest -
+		// see snapshot_embeds_strie_quest). See EnsureBeachStarterQuest.
+		private const uint BeachStarterQuestId = 10238;
+
 		// Default starter gear for beach characters (item ids that are fully buildable: p_items identity + harvested
 		// archetype), keyed by the CharacterEquipment slot they go in. Slot-appropriate so the client accepts them.
 		private const uint StarterWristItem = 3361557; // Slave Manacles (wrist, 0x12)
@@ -225,6 +232,29 @@ namespace Faolan.GameServer
 			}
 		}
 
+		// Persists the beach starting quest (10238) the world-entry snapshot already shows, so the journal matches the
+		// DB. Seeded ONCE: only when the character has NO row for it at all (so a later complete/abandon isn't undone by
+		// re-seeding an Active row on every login). Best-effort - a failure just leaves the journal/DB out of sync.
+		private async Task EnsureBeachStarterQuest(Character character)
+		{
+			if (character == null)
+				return;
+
+			try
+			{
+				var quests = await Database.GetCharacterQuests(character.Id);
+				if (quests.Any(q => q.QuestId == BeachStarterQuestId))
+					return; // already has it (active or completed) - leave the player's state alone
+
+				await Database.SetCharacterQuest(character.Id, BeachStarterQuestId, QuestState.Active);
+				Logger.LogInformation("Seeded beach starting quest {QuestId} for {Name}.", BeachStarterQuestId, character.Name);
+			}
+			catch (Exception ex)
+			{
+				Logger.LogWarning(ex, "Failed to seed beach starting quest for {CharacterId}.", character.Id);
+			}
+		}
+
 		// Loads the character's spawn-scaffold rows, seeding the fresh-character defaults once for characters that
 		// have none (like EnsureBeachStarterEquipment seeds starter gear). Returns null on failure - the spawn
 		// then keeps the captured scaffold frame.
@@ -380,6 +410,7 @@ namespace Faolan.GameServer
 			// (it can't resolve arbitrary items' RDB resources) so it never dials the chat server. See
 			// BuildBeachInventoryPacket / [[protocol_chat_connection_regression]].
 			var equipment = await EnsureBeachStarterEquipment(client.Session.Character);
+			await EnsureBeachStarterQuest(client.Session.Character);
 			var inventoryRows = client.Session.Character != null
 				? await Database.GetCharacterInventory(client.Session.Character.Id)
 				: [];
