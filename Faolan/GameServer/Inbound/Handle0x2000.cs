@@ -204,7 +204,7 @@ namespace Faolan.GameServer
 					var answerIndex = rawPayload.Length >= 4
 						? BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(rawPayload.Length - 4, 4))
 						: 0u;
-					await AdvanceConversation(client, answerIndex);
+					await _conversation.AdvanceConversation(client, answerIndex);
 
 					break;
 				}
@@ -347,7 +347,7 @@ namespace Faolan.GameServer
 
 								// Real branching dialogue: replay the captured conversation node for whichever NPC/node
 								// the client asked for, re-addressed to the clicked NPC.
-								if (await TryReplayConversation(client, (uint)args.TypeId, (uint)args.Field3, npcHandle))
+								if (await _conversation.TryReplayConversation(client, (uint)args.TypeId, (uint)args.Field3, npcHandle))
 									break;
 
 								// Last-resort fallback ONLY when the DB has no node for this NPC: the single hardcoded
@@ -362,7 +362,7 @@ namespace Faolan.GameServer
 								{
 									var routedName = client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var rn) ? rn : "<unmapped handle>";
 									Logger.LogInformation("TalkToNpc: no conversation node for npcHandle=0x{Npc:X} (name={Name}, typeId={TypeId}, mode={Mode}, field3={Field3}); closing the window.", npcHandle, routedName, args.TypeId, args.Mode, args.Field3);
-									await SendConversationClose(client);
+									await _conversation.SendConversationClose(client);
 								}
 
 								break;

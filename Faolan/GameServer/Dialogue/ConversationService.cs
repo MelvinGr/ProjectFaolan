@@ -3,19 +3,61 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.GameServer.Scripting;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
-// ReSharper disable once CheckNamespace
-namespace Faolan.GameServer
+namespace Faolan.GameServer.Dialogue
 {
-	public partial class GameServerListener
+	// The NPC dialogue runtime: routes a TalkToNpc / KnubotAnswer to the captured conversation node for the
+	// requested (NPC, typeId, answer-path), re-addresses its packets to the live player + clicked NPC, advances
+	// the tree, and grants quests reached in a branch. Extracted from GameServerListener as a composed
+	// collaborator; quest-journal pushes go through the WorldBroadcaster, branch conditions through the Lua VM.
+	public sealed class ConversationService
 	{
+		private readonly IDatabaseRepository _database;
+		private readonly ILogger _logger;
+		private readonly WorldBroadcaster _broadcaster;
+		private readonly LuaScriptVm _luaVm;
+
+		public ConversationService(IDatabaseRepository database, ILogger logger, WorldBroadcaster broadcaster, LuaScriptVm luaVm)
+		{
+			_database = database;
+			_logger = logger;
+			_broadcaster = broadcaster;
+			_luaVm = luaVm;
+		}
+
+		// Byte-array find/replace from offset 8 (skips the length+crc prefix). Copied from RetailLoginReplay's
+		// private helper - a small self-contained util; duplicating it keeps this service free of the listener.
+		private static void ReplaceAll(byte[] buffer, byte[] find, byte[] repl)
+		{
+			for (var i = 8; i + find.Length <= buffer.Length; i++)
+			{
+				var match = true;
+				for (var j = 0; j < find.Length; j++)
+				{
+					if (buffer[i + j] != find[j])
+					{
+						match = false;
+						break;
+					}
+				}
+
+				if (match)
+				{
+					repl.CopyTo(buffer, i);
+					i += find.Length - 1;
+				}
+			}
+		}
+
 		// The instance baked into the captured KnubotCloseChatWindow body (hoxxling's clientInstance), re-addressed
 		// to the live player on send.
 		private const uint CloseChatWindowCapturedInstance = 0x01316E71;
@@ -45,7 +87,7 @@ namespace Faolan.GameServer
 		// waiting for a reply that won't come - the "advance a step with no captured branch -> chat locks, can't ESC"
 		// bug. (Conversation replay is coverage-bound: (Mode, Field3) is quest-state-dependent and the captures cover
 		// only some states per NPC, so an un-captured branch is expected; closing the window is the right answer.)
-		internal Task SendConversationClose(INetworkClient client)
+		public Task SendConversationClose(INetworkClient client)
 		{
 			client.Session.ConversationAnswerPath = null; // end any active conversation
 			client.Session.ConversationNpcName = null;
@@ -112,7 +154,7 @@ namespace Faolan.GameServer
 			client.Session.ConversationAnswerPath = node.AnswerPath;
 			client.Session.ConversationNpcHandle = clickedNpcHandle;
 
-			Logger.LogInformation("Conversation screen (npc={Name}, typeId={TypeId}, path='{Path}') -> {Packets} packet(s) for NPC 0x{Npc:X}.", node.NpcName, node.TypeId, node.AnswerPath, node.Packets.Count, clickedNpcHandle);
+			_logger.LogInformation("Conversation screen (npc={Name}, typeId={TypeId}, path='{Path}') -> {Packets} packet(s) for NPC 0x{Npc:X}.", node.NpcName, node.TypeId, node.AnswerPath, node.Packets.Count, clickedNpcHandle);
 		}
 
 		// Reaching a conversation node that GRANTS a quest accepts it for the player: persist it ACTIVE and return its
@@ -125,13 +167,13 @@ namespace Faolan.GameServer
 			if (character == null)
 				return null;
 
-			var existing = await Database.GetCharacterQuests(character.Id);
+			var existing = await _database.GetCharacterQuests(character.Id);
 			if (existing.Any(q => q.QuestId == node.GrantQuestId))
 				return null; // already accepted (active) or completed - don't re-grant
 
-			await Database.SetCharacterQuest(character.Id, node.GrantQuestId, QuestState.Active);
-			Logger.LogInformation("Quest {QuestId} granted to {Name} from {Npc}'s dialogue.", node.GrantQuestId, character.Name, node.NpcName);
-			return await Database.GetQuestDefinition(node.GrantQuestId);
+			await _database.SetCharacterQuest(character.Id, node.GrantQuestId, QuestState.Active);
+			_logger.LogInformation("Quest {QuestId} granted to {Name} from {Npc}'s dialogue.", node.GrantQuestId, character.Name, node.NpcName);
+			return await _database.GetQuestDefinition(node.GrantQuestId);
 		}
 
 		// Sends the two retail grant packets in order: the QuestLogList (populates the J-panel - all active quests,
@@ -140,7 +182,7 @@ namespace Faolan.GameServer
 		private async Task SendQuestGrantPackets(INetworkClient client, QuestDefinition grantDef)
 		{
 			var character = client.Session.Character;
-			var active = await Database.GetCharacterQuests(character.Id);
+			var active = await _database.GetCharacterQuests(character.Id);
 			var ids = new List<uint> { grantDef.QuestId };
 			ids.AddRange(active
 				.Where(q => q.State == QuestState.Active && q.QuestId != grantDef.QuestId)
@@ -153,7 +195,7 @@ namespace Faolan.GameServer
 		// The player picked option `answerIndex` in the active conversation: navigate to the child screen at the
 		// extended answer-path and serve it. An un-walked branch (no captured screen) closes the window gracefully so
 		// the client never hangs. No-op when no conversation is active.
-		internal async Task AdvanceConversation(INetworkClient client, uint answerIndex)
+		public async Task AdvanceConversation(INetworkClient client, uint answerIndex)
 		{
 			var path = client.Session.ConversationAnswerPath;
 			if (path == null)
@@ -165,7 +207,7 @@ namespace Faolan.GameServer
 			var screen = await PickConversationScreen(client, client.Session.ConversationNpcName, client.Session.ConversationTypeId, childPath);
 			if (screen == null)
 			{
-				Logger.LogInformation("Conversation: no captured screen for npc={Name} path='{Path}' (un-walked branch); closing.", client.Session.ConversationNpcName, childPath);
+				_logger.LogInformation("Conversation: no captured screen for npc={Name} path='{Path}' (un-walked branch); closing.", client.Session.ConversationNpcName, childPath);
 				await SendConversationClose(client);
 				return;
 			}
@@ -178,7 +220,7 @@ namespace Faolan.GameServer
 		// Runs for world-burst (beach) AND create-world sessions; the create-world scripted intro stays the fallback
 		// for NPCs with no captured dialogue. The nodes live in the DB (ConversationNode/ConversationPacket), imported
 		// from captures by Faolan.Importer. (Option picks after the greeting are KnubotAnswers -> AdvanceConversation.)
-		private async Task<bool> TryReplayConversation(INetworkClient client, uint typeId, uint field3, uint clickedNpcHandle)
+		public async Task<bool> TryReplayConversation(INetworkClient client, uint typeId, uint field3, uint clickedNpcHandle)
 		{
 			if (!client.Session.UsedWorldBurstReplay && !client.Session.IsCreateWorldSession)
 				return false;
@@ -207,15 +249,15 @@ namespace Faolan.GameServer
 		// script error is treated as "doesn't match" (permissive=false) so a bad gate can't hijack every player.
 		private async Task<ConversationNode> PickConversationScreen(INetworkClient client, string npcName, uint typeId, string answerPath)
 		{
-			var variants = await Database.GetConversationScreens(npcName, typeId, answerPath);
+			var variants = await _database.GetConversationScreens(npcName, typeId, answerPath);
 			if (variants.Count == 0)
 				return null;
 			if (variants.Count == 1 || variants.All(v => string.IsNullOrEmpty(v.ConditionScript)))
 				return variants[0]; // GetConversationScreens orders the unconditional fallback last
 
 			var character = client.Session.Character;
-			var tags = character != null ? await Database.GetCharacterTags(character.Id) : System.Array.Empty<uint>();
-			var quests = character != null ? await Database.GetCharacterQuests(character.Id) : System.Array.Empty<CharacterQuest>();
+			var tags = character != null ? await _database.GetCharacterTags(character.Id) : System.Array.Empty<uint>();
+			var quests = character != null ? await _database.GetCharacterQuests(character.Id) : System.Array.Empty<CharacterQuest>();
 			var completed = quests.Where(q => q.State == QuestState.Completed).Select(q => q.QuestId);
 			var active = quests.Where(q => q.State == QuestState.Active).Select(q => q.QuestId);
 			var player = new Scripting.GameLuaPlayer(tags, completed, active);
@@ -231,7 +273,7 @@ namespace Faolan.GameServer
 
 				if (_luaVm.RunCondition(v.ConditionScript, player, permissive: false))
 				{
-					Logger.LogInformation("Conversation: npc={Name} path='{Path}' matched conditioned variant.", npcName, answerPath);
+					_logger.LogInformation("Conversation: npc={Name} path='{Path}' matched conditioned variant.", npcName, answerPath);
 					return v;
 				}
 			}

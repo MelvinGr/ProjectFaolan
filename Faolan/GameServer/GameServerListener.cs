@@ -56,6 +56,10 @@ namespace Faolan.GameServer
 		// port + the loot/quest opcode handlers to it. See World/WorldBroadcaster.cs.
 		private readonly WorldBroadcaster _broadcaster;
 
+		// NPC dialogue runtime (TalkToNpc/KnubotAnswer -> captured conversation nodes + quest grants). Composed
+		// collaborator; uses the broadcaster for quest pushes + the Lua VM for branch conditions. See Dialogue/ConversationService.cs.
+		private readonly Dialogue.ConversationService _conversation;
+
 		// The live world simulation: owns the world model, the connected players' authoritative entities, and the
 		// 10 Hz tick (NPC respawn/AI, vitals regen, player death/respawn, resurrection discovery). The listener is its
 		// IWorldOutbound port. Built in the ctor (after the dispatchers are assigned). See World/WorldSimulation.cs.
@@ -75,6 +79,7 @@ namespace Faolan.GameServer
 			_simulation = new WorldSimulation(this, database, agentServerDispatcher, logger);
 			_broadcaster = new WorldBroadcaster(_simulation, database, logger);
 			_combat = new CombatService(_simulation, _broadcaster, database, agentServerDispatcher, logger);
+			_conversation = new Dialogue.ConversationService(database, logger, _broadcaster, _luaVm);
 			_equipment = new Inventory.EquipmentService(database, logger);
 			_shop = new Economy.Shop.ShopService(database, logger, SendMoneyUpdate, GrantItemToBackpack);
 			_bank = new Economy.Bank.BankService(database, logger, (client, container, pos, entry) => SendAddItem(client, container, pos, entry));
