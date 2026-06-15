@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using Faolan.Core.Data;
 using Faolan.Core.Network.Packets.Opcodes;
 
 namespace Faolan.GameServer.World
@@ -27,13 +28,13 @@ namespace Faolan.GameServer.World
 		// Builds the 17-byte IIR body (the bytes after the u32 length prefix) for removing `handle` in playfield `token`.
 		public static byte[] BuildBody(uint handle, uint token)
 		{
-			var body = new byte[BodyLength];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), SubOpcode);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), TypeTagAck);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), handle);
-			body[12] = RecordMarker;
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(13, 4), token);
-			return body;
+			return new FaolanStream()
+				.WriteUInt32(SubOpcode)
+				.WriteUInt32(TypeTagAck)
+				.WriteUInt32(handle)
+				.WriteByte(RecordMarker)
+				.WriteUInt32(token)
+				.ToArray();
 		}
 
 		// The inverse of BuildBody: parses a 17-byte n3ToClientQuit body into its (handle, token). Returns false when

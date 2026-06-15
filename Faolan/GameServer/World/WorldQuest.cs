@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
+using Faolan.Core.Data;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Packets.Opcodes;
 
@@ -50,16 +51,17 @@ namespace Faolan.GameServer.World
 		// QuestGoal (33 B): [subop][ack][playerHandle][0x01][u32 questId][u32 goalId][u32 count][0][0].
 		public static byte[] BuildQuestGoal(uint playerHandle, uint questId, uint goalId, uint count)
 		{
-			var b = new byte[33];
-			BinaryPrimitives.WriteUInt32BigEndian(b.AsSpan(0, 4), QuestGoalSubOpcode);
-			BinaryPrimitives.WriteUInt32BigEndian(b.AsSpan(4, 4), TypeTagAck);
-			BinaryPrimitives.WriteUInt32BigEndian(b.AsSpan(8, 4), playerHandle);
-			b[12] = 0x01;
-			BinaryPrimitives.WriteUInt32BigEndian(b.AsSpan(13, 4), questId);
-			BinaryPrimitives.WriteUInt32BigEndian(b.AsSpan(17, 4), goalId);
-			BinaryPrimitives.WriteUInt32BigEndian(b.AsSpan(21, 4), count);
-			// b[25..33] = 0
-			return b;
+			return new FaolanStream()
+				.WriteUInt32(QuestGoalSubOpcode)
+				.WriteUInt32(TypeTagAck)
+				.WriteUInt32(playerHandle)
+				.WriteByte(0x01)
+				.WriteUInt32(questId)
+				.WriteUInt32(goalId)
+				.WriteUInt32(count)
+				.WriteUInt32(0) // trailing [0][0]
+				.WriteUInt32(0)
+				.ToArray();
 		}
 
 		// The inverse of BuildQuestGoal: recovers (playerHandle, questId, goalId, count) from a 33-byte QuestGoal body.
@@ -93,16 +95,16 @@ namespace Faolan.GameServer.World
 		// QuestIIR (29 B): [subop][ack][playerHandle][0][0x01 marker][u32 state][u32 questId][0].
 		public static byte[] BuildQuestIir(uint playerHandle, uint questId, uint state)
 		{
-			var b = new byte[29];
-			BinaryPrimitives.WriteUInt32BigEndian(b.AsSpan(0, 4), QuestIirSubOpcode);
-			BinaryPrimitives.WriteUInt32BigEndian(b.AsSpan(4, 4), TypeTagAck);
-			BinaryPrimitives.WriteUInt32BigEndian(b.AsSpan(8, 4), playerHandle);
-			// b[12..16] = 0
-			b[16] = 0x01;
-			BinaryPrimitives.WriteUInt32BigEndian(b.AsSpan(17, 4), state);
-			BinaryPrimitives.WriteUInt32BigEndian(b.AsSpan(21, 4), questId);
-			// b[25..29] = 0
-			return b;
+			return new FaolanStream()
+				.WriteUInt32(QuestIirSubOpcode)
+				.WriteUInt32(TypeTagAck)
+				.WriteUInt32(playerHandle)
+				.WriteUInt32(0) // [12..16] = 0
+				.WriteByte(0x01)
+				.WriteUInt32(state)
+				.WriteUInt32(questId)
+				.WriteUInt32(0) // [25..29] = 0
+				.ToArray();
 		}
 
 		// The inverse of BuildQuestIir: recovers (playerHandle, state, questId) from a 29-byte QuestIIR body. Validates
