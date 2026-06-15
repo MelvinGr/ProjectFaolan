@@ -1,0 +1,398 @@
+==== FUN @0x4e0390 -> FUN_004e0390 size=78 ====
+
+void FUN_004e0390(void)
+
+{
+  int in_EAX;
+  undefined4 in_ECX;
+  undefined1 *unaff_EDI;
+  undefined1 local_5;
+  
+  local_5 = (undefined1)((uint)in_ECX >> 0x18);
+  if (*(char *)(in_EAX + 0x19) != '\0') {
+    *unaff_EDI = local_5;
+    return;
+  }
+  if (*(int *)(in_EAX + 0x10) == 0) {
+    *(undefined1 *)(in_EAX + 0x19) = 1;
+  }
+  else {
+    FUN_00cba1b0(&local_5,1);
+    if (*(int *)(in_EAX + 0x10) == 0) {
+      *(undefined1 *)(in_EAX + 0x18) = 1;
+      *unaff_EDI = local_5;
+      return;
+    }
+  }
+  *unaff_EDI = local_5;
+  return;
+}
+
+
+
+==== FUN @0x1122b10 -> FUN_01122b10 size=240 ====
+
+void FUN_01122b10(int param_1)
+
+{
+  uint uVar1;
+  uint uVar2;
+  undefined4 uVar3;
+  undefined4 local_68;
+  uint local_64;
+  undefined1 local_60 [84];
+  uint local_c;
+  
+  local_c = DAT_021906e0 ^ (uint)&stack0xfffffffc;
+  uVar2 = FUN_0048f900();
+  uVar1 = uVar2 / 0x3f1 - 1;
+  if ((uVar2 % 0x3f1 == 0) && (uVar1 < 0xf4241)) {
+    local_64 = 0;
+    if (uVar2 / 0x3f1 != 1) {
+      local_64 = 0;
+      do {
+        local_68 = FUN_0048f900();
+        FUN_0113f1b0();
+        FUN_0113f650(local_60);
+        if (*(char *)(param_1 + 0x19) != '\0') {
+          FUN_01122c90(local_60);
+          __security_check_cookie(local_c ^ (uint)&stack0xfffffffc);
+          return;
+        }
+        uVar3 = FUN_01122d70(&local_68);
+        FUN_01122d00(uVar3);
+        FUN_01122c90(local_60);
+        local_64 = local_64 + 1;
+      } while (local_64 < uVar1);
+      __security_check_cookie(local_c ^ (uint)&stack0xfffffffc);
+      return;
+    }
+  }
+  else {
+    *(undefined1 *)(param_1 + 0x19) = 1;
+  }
+  __security_check_cookie(local_c ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
+==== FUN @0x48f900 -> FUN_0048f900 size=102 ====
+
+uint FUN_0048f900(void)
+
+{
+  int in_EAX;
+  uint in_ECX;
+  uint local_8;
+  
+  local_8 = in_ECX;
+  if (*(char *)(in_EAX + 0x19) == '\0') {
+    if (*(uint *)(in_EAX + 0x10) < 4) {
+      *(undefined1 *)(in_EAX + 0x19) = 1;
+    }
+    else {
+      FUN_00cba1b0(&local_8,4);
+      if (*(int *)(in_EAX + 0x10) == 0) {
+        *(undefined1 *)(in_EAX + 0x18) = 1;
+      }
+    }
+  }
+  if (*(char *)(in_EAX + 0x1a) != '\0') {
+    return (local_8 & 0xff0000 | local_8 >> 0x10) >> 8 | (local_8 & 0xff00 | local_8 << 0x10) << 8;
+  }
+  return local_8;
+}
+
+
+
+==== FUN @0x145ac80 -> FUN_0145ac80 size=1659 ====
+
+/* WARNING: Type propagation algorithm not settling */
+
+void FUN_0145ac80(int param_1)
+
+{
+  uint *puVar1;
+  code *pcVar2;
+  undefined4 uVar3;
+  undefined4 uVar4;
+  undefined4 *******pppppppuVar5;
+  int iVar6;
+  uint uVar7;
+  uint uVar8;
+  uint *puVar9;
+  int in_ECX;
+  uint auStack_dc [3];
+  char cStack_cd;
+  int local_cc;
+  uint uStack_c8;
+  int iStack_c4;
+  int local_c0;
+  undefined **ppuStack_bc;
+  undefined **appuStack_70 [18];
+  undefined4 *******apppppppuStack_28 [5];
+  uint uStack_14;
+  uint local_c;
+  
+  local_c = DAT_021906e0 ^ (uint)auStack_dc;
+  local_cc = in_ECX;
+  if (*(char *)(param_1 + 0x19) != '\0') {
+    FUN_004174e0(2,1);
+    uVar3 = FUN_0040f1c0(&local_c0,"!a_cBlob.HasFailed()");
+    uVar3 = FUN_00435610(uVar3);
+    uVar4 = FUN_004ad010(apppppppuStack_28,
+                         "CoreCharacterFullUpdateIIR::ReadSubClass() Received a bad stream upon entering!\n"
+                        );
+    uVar3 = FUN_00435670(uVar3,uVar4);
+    FUN_00435610(uVar3);
+    FUN_004111d0(1,0);
+    FUN_00416ae0(apppppppuStack_28);
+    pppppppuVar5 = apppppppuStack_28[0];
+    if (uStack_14 < 0x10) {
+      pppppppuVar5 = apppppppuStack_28;
+    }
+    iVar6 = FUN_004a6a30(pppppppuVar5,"CoreCharacter\\IIR\\CoreCharacterFullUpdateIIR.cpp",0x3f0,
+                         0x10);
+    FUN_004111d0(1,0);
+    if (iVar6 == 2) {
+      pcVar2 = (code *)swi(3);
+      (*pcVar2)();
+      return;
+    }
+    *(undefined ***)((int)&local_c0 + *(int *)(local_c0 + 4)) =
+         std::basic_ostringstream<char,std::char_traits<char>,std::allocator<char>_>::vftable;
+    ppuStack_bc = std::basic_stringbuf<char,std::char_traits<char>,std::allocator<char>_>::vftable;
+    FUN_00417440();
+    FUN_00410f00();
+    *(undefined ***)((int)&local_c0 + *(int *)(local_c0 + 4)) =
+         std::basic_ostream<char,std::char_traits<char>_>::vftable;
+    appuStack_70[0] = std::ios_base::vftable;
+    FUN_0182cc13(appuStack_70);
+    iVar6 = local_cc;
+    if (*(char *)(param_1 + 0x19) != '\0') goto LAB_0145addb;
+  }
+  iVar6 = local_cc;
+  if (*(int *)(param_1 + 0x10) == 0) {
+    *(undefined1 *)(param_1 + 0x19) = 1;
+  }
+  else {
+    FUN_00cba1b0(&cStack_cd,1);
+    if (*(int *)(param_1 + 0x10) == 0) {
+      *(undefined1 *)(param_1 + 0x18) = 1;
+    }
+  }
+LAB_0145addb:
+  if (cStack_cd != 'A') {
+    FUN_004174e0(2,1);
+    uVar3 = FUN_0040f1c0(&local_c0,"g_nCoreVersion == nVersion");
+    uVar3 = FUN_00435610(uVar3);
+    uVar4 = FUN_004ad010(apppppppuStack_28,
+                         "ShowMessageOnly Wrong client version of SimpleCharFullupdateIIR! (clientversion: %d, serverversion: %d)\n Client and server code is out of sync!\n"
+                         ,0x41,cStack_cd);
+    uVar3 = FUN_00435670(uVar3,uVar4);
+    FUN_00435610(uVar3);
+    FUN_004111d0(1,0);
+    FUN_00416ae0(apppppppuStack_28);
+    if (uStack_14 < 0x10) {
+      apppppppuStack_28[0] = apppppppuStack_28;
+    }
+    iVar6 = FUN_004a6a30(apppppppuStack_28[0],"CoreCharacter\\IIR\\CoreCharacterFullUpdateIIR.cpp",
+                         0x3fa,0x10);
+    FUN_004111d0(1,0);
+    if (iVar6 != 2) {
+      *(undefined ***)((int)&local_c0 + *(int *)(local_c0 + 4)) =
+           std::basic_ostringstream<char,std::char_traits<char>,std::allocator<char>_>::vftable;
+      ppuStack_bc = std::basic_stringbuf<char,std::char_traits<char>,std::allocator<char>_>::vftable
+      ;
+      FUN_00417440();
+      FUN_00410f00();
+      *(undefined ***)((int)&local_c0 + *(int *)(local_c0 + 4)) =
+           std::basic_ostream<char,std::char_traits<char>_>::vftable;
+      appuStack_70[0] = std::ios_base::vftable;
+      FUN_0182cc13(appuStack_70);
+      __security_check_cookie(local_c ^ (uint)auStack_dc);
+      return;
+    }
+    pcVar2 = (code *)swi(3);
+    (*pcVar2)();
+    return;
+  }
+  uVar3 = FUN_0048f900();
+  *(undefined4 *)(iVar6 + 0x5c) = uVar3;
+  FUN_00cbfb80(iVar6 + 0x60);
+  uVar7 = FUN_0048f900();
+  if (0 < (int)uVar7) {
+    do {
+      auStack_dc[1] = uVar7;
+      uVar7 = FUN_0048f900();
+      puVar9 = *(uint **)(iVar6 + 0x140);
+      auStack_dc[0] = uVar7;
+      if (auStack_dc < puVar9) {
+        puVar1 = *(uint **)(iVar6 + 0x13c);
+        if (auStack_dc < puVar1) goto LAB_0145af8b;
+        if (puVar9 == *(uint **)(iVar6 + 0x144)) {
+          FUN_005ec310();
+        }
+        if (*(undefined4 **)(iVar6 + 0x140) != (undefined4 *)0x0) {
+          **(undefined4 **)(iVar6 + 0x140) =
+               *(undefined4 *)(*(int *)(iVar6 + 0x13c) + ((int)auStack_dc - (int)puVar1 >> 2) * 4);
+        }
+      }
+      else {
+LAB_0145af8b:
+        if (puVar9 == *(uint **)(iVar6 + 0x144)) {
+          FUN_005ec310();
+        }
+        if (*(uint **)(iVar6 + 0x140) != (uint *)0x0) {
+          **(uint **)(iVar6 + 0x140) = uVar7;
+        }
+      }
+      *(int *)(iVar6 + 0x140) = *(int *)(iVar6 + 0x140) + 4;
+      uVar7 = auStack_dc[1] + -1;
+    } while (auStack_dc[1] + -1 != 0);
+    auStack_dc[1] = 0;
+  }
+  FUN_00cbf5d0();
+  if ((*(char *)(param_1 + 0x19) != '\0') &&
+     (iVar6 = FUN_004a6a30("!a_cBlob.HasFailed()",
+                           "CoreCharacter\\IIR\\CoreCharacterFullUpdateIIR.cpp",0x413,0x10),
+     iVar6 == 2)) {
+    pcVar2 = (code *)swi(3);
+    (*pcVar2)();
+    return;
+  }
+  iVar6 = local_cc;
+  FUN_0145b8a0(param_1,*(undefined4 *)(local_cc + 0x120));
+  FUN_010087b0(param_1);
+  FUN_0079cfd0();
+  FUN_0145ba10(param_1,iVar6 + 0x14c);
+  uVar8 = FUN_0048f900();
+  uVar7 = auStack_dc[0];
+  if (0 < (int)uVar8) {
+    do {
+      auStack_dc[2] = uVar8;
+      if (*(char *)(param_1 + 0x19) == '\0') {
+        if (*(uint *)(param_1 + 0x10) < 4) {
+          *(undefined1 *)(param_1 + 0x19) = 1;
+        }
+        else {
+          FUN_00cba1b0(auStack_dc + 1,4);
+          if (*(int *)(param_1 + 0x10) == 0) {
+            *(undefined1 *)(param_1 + 0x18) = 1;
+          }
+        }
+      }
+      if (*(char *)(param_1 + 0x1a) != '\0') {
+        auStack_dc[1] =
+             (auStack_dc[1] & 0xff0000 | auStack_dc[1] >> 0x10) >> 8 |
+             (auStack_dc[1] << 0x10 | auStack_dc[1] & 0xff00) << 8;
+      }
+      uStack_c8 = auStack_dc[1];
+      if (*(char *)(param_1 + 0x19) == '\0') {
+        if (*(uint *)(param_1 + 0x10) < 4) {
+          *(undefined1 *)(param_1 + 0x19) = 1;
+        }
+        else {
+          FUN_00cba1b0(auStack_dc,4);
+          uVar7 = auStack_dc[0];
+          if (*(int *)(param_1 + 0x10) == 0) {
+            *(undefined1 *)(param_1 + 0x18) = 1;
+          }
+        }
+      }
+      if (*(char *)(param_1 + 0x1a) != '\0') {
+        uVar7 = (uVar7 & 0xff00 | uVar7 << 0x10) << 8 | (uVar7 & 0xff0000 | uVar7 >> 0x10) >> 8;
+        auStack_dc[0] = uVar7;
+      }
+      puVar9 = (uint *)FUN_004d6c70();
+      *puVar9 = uVar7;
+      uVar8 = auStack_dc[2] + -1;
+    } while (auStack_dc[2] + -1 != 0);
+    auStack_dc[2] = 0;
+    iVar6 = local_cc;
+  }
+  if (*(char *)(param_1 + 0x19) == '\0') {
+    if (*(uint *)(param_1 + 0x10) < 4) {
+      *(undefined1 *)(param_1 + 0x19) = 1;
+    }
+    else {
+      FUN_00cba1b0(auStack_dc + 2,4);
+      if (*(int *)(param_1 + 0x10) == 0) {
+        *(undefined1 *)(param_1 + 0x18) = 1;
+      }
+    }
+  }
+  uVar7 = auStack_dc[2];
+  if (*(char *)(param_1 + 0x1a) != '\0') {
+    uVar7 = (auStack_dc[2] & 0xff0000 | auStack_dc[2] >> 0x10) >> 8 |
+            (auStack_dc[2] << 0x10 | auStack_dc[2] & 0xff00) << 8;
+  }
+  if (0 < (int)uVar7) {
+    iStack_c4 = iVar6 + 0x16c;
+    uVar8 = auStack_dc[0];
+    auStack_dc[2] = uVar7;
+    do {
+      if (*(char *)(param_1 + 0x19) == '\0') {
+        if (*(uint *)(param_1 + 0x10) < 4) {
+          *(undefined1 *)(param_1 + 0x19) = 1;
+        }
+        else {
+          FUN_00cba1b0(auStack_dc + 1,4);
+          if (*(int *)(param_1 + 0x10) == 0) {
+            *(undefined1 *)(param_1 + 0x18) = 1;
+          }
+        }
+      }
+      if (*(char *)(param_1 + 0x1a) != '\0') {
+        auStack_dc[1] =
+             (auStack_dc[1] & 0xff0000 | auStack_dc[1] >> 0x10) >> 8 |
+             (auStack_dc[1] << 0x10 | auStack_dc[1] & 0xff00) << 8;
+      }
+      uStack_c8 = auStack_dc[1];
+      if (*(char *)(param_1 + 0x19) == '\0') {
+        if (*(uint *)(param_1 + 0x10) < 4) {
+          *(undefined1 *)(param_1 + 0x19) = 1;
+        }
+        else {
+          FUN_00cba1b0(auStack_dc,4);
+          uVar8 = auStack_dc[0];
+          if (*(int *)(param_1 + 0x10) == 0) {
+            *(undefined1 *)(param_1 + 0x18) = 1;
+          }
+        }
+      }
+      if (*(char *)(param_1 + 0x1a) != '\0') {
+        uVar8 = (uVar8 & 0xff00 | uVar8 << 0x10) << 8 | (uVar8 & 0xff0000 | uVar8 >> 0x10) >> 8;
+        auStack_dc[0] = uVar8;
+      }
+      puVar9 = (uint *)FUN_004d6c70();
+      auStack_dc[2] = auStack_dc[2] - 1;
+      *puVar9 = uVar8;
+    } while (auStack_dc[2] != 0);
+    auStack_dc[2] = 0;
+    iVar6 = local_cc;
+  }
+  if ((DAT_02d25da8 - DAT_02d25da4 >> 2 != *(int *)(iVar6 + 0xc0)) &&
+     (iVar6 = FUN_004a6a30("g_Int32StatsOrder.size() == m_CoreCharacterMessage.generic_stats_size()"
+                           ,"CoreCharacter\\IIR\\CoreCharacterFullUpdateIIR.cpp",0x435,0x10),
+     iVar6 == 2)) {
+    pcVar2 = (code *)swi(3);
+    (*pcVar2)();
+    return;
+  }
+  FUN_004d5900(param_1);
+  if ((*(char *)(param_1 + 0x19) != '\0') &&
+     (iVar6 = FUN_004a6a30("!a_cBlob.HasFailed()",
+                           "CoreCharacter\\IIR\\CoreCharacterFullUpdateIIR.cpp",0x43e,0x10),
+     iVar6 == 2)) {
+    pcVar2 = (code *)swi(3);
+    (*pcVar2)();
+    return;
+  }
+  __security_check_cookie(local_c ^ (uint)auStack_dc);
+  return;
+}
+
+
+

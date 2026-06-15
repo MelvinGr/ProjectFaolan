@@ -1,0 +1,295 @@
+################## anchor "SimpleCharFullUpdateIIR_t::ReadSubClass() Received a bad stream" -> 020404b0
+==== ref @01121c58 in FUN_01121c00 @01121c00 size=1483 ====
+
+void FUN_01121c00(int param_1)
+
+{
+  code *pcVar1;
+  undefined4 uVar2;
+  undefined4 uVar3;
+  undefined4 ****ppppuVar4;
+  int iVar5;
+  int in_ECX;
+  undefined1 auStack_cc [7];
+  char cStack_c5;
+  undefined4 uStack_c4;
+  int local_c0;
+  undefined **ppuStack_bc;
+  undefined **appuStack_70 [18];
+  undefined4 ***apppuStack_28 [5];
+  uint uStack_14;
+  uint local_c;
+  
+  local_c = DAT_021906e0 ^ (uint)auStack_cc;
+  if (*(char *)(param_1 + 0x19) != '\0') {
+    FUN_004174e0(2,1);
+    uVar2 = FUN_0040f1c0(&local_c0,"!a_cBlob.HasFailed()");
+    uVar2 = FUN_00435610(uVar2);
+    uVar3 = FUN_004ad010(apppuStack_28,
+                         "SimpleCharFullUpdateIIR_t::ReadSubClass() Received a bad stream upon entering!\n"
+                        );
+    uVar2 = FUN_00435670(uVar2,uVar3);
+    FUN_00435610(uVar2);
+    FUN_004111d0(1,0);
+    FUN_00416ae0(apppuStack_28);
+    ppppuVar4 = (undefined4 ****)apppuStack_28[0];
+    if (uStack_14 < 0x10) {
+      ppppuVar4 = apppuStack_28;
+    }
+    iVar5 = FUN_004a6a30(ppppuVar4,"simplecharfullupdateiir.cpp",0x17c,0x10);
+    cStack_c5 = iVar5 == 2;
+    FUN_004111d0(1,0);
+    if (cStack_c5 != '\0') {
+      pcVar1 = (code *)swi(3);
+      (*pcVar1)();
+      return;
+    }
+    *(undefined ***)((int)&local_c0 + *(int *)(local_c0 + 4)) =
+         std::basic_ostringstream<char,std::char_traits<char>,std::allocator<char>_>::vftable;
+    ppuStack_bc = std::basic_stringbuf<char,std::char_traits<char>,std::allocator<char>_>::vftable;
+    FUN_00417440();
+    FUN_00410f00();
+    *(undefined ***)((int)&local_c0 + *(int *)(local_c0 + 4)) =
+         std::basic_ostream<char,std::char_traits<char>_>::vftable;
+    appuStack_70[0] = std::ios_base::vftable;
+    FUN_0182cc13(appuStack_70);
+    if (*(char *)(param_1 + 0x19) != '\0') goto LAB_01121d58;
+  }
+  if (*(int *)(param_1 + 0x10) == 0) {
+    *(undefined1 *)(param_1 + 0x19) = 1;
+  }
+  else {
+    FUN_00cba1b0(&cStack_c5,1);
+    if (*(int *)(param_1 + 0x10) == 0) {
+      *(undefined1 *)(param_1 + 0x18) = 1;
+    }
+  }
+LAB_01121d58:
+  if (cStack_c5 == '\x05') {
+    FUN_004e0390();
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x184) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x188) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x18c) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 400) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x194) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x198) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x19c) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x1a8) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x1b0) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x1c0) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x1c8) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x1d0) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x1d8) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x1e0) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x1e8) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x1f0) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x1b8) = uVar2;
+    FUN_004e0390();
+    FUN_004e0390();
+    FUN_004e0390();
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x1fc) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x200) = uVar2;
+    uStack_c4 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x204) = uStack_c4;
+    uStack_c4 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x208) = uStack_c4;
+    FUN_004e0390();
+    FUN_004e0390();
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x210) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x214) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x218) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x21c) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x220) = uVar2;
+    FUN_01122b10(param_1);
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x1a0) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x1a4) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x1ac) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x1b4) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x1c4) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x1cc) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x1d4) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x1dc) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x1e4) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x1ec) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 500) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x1bc) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x224) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x230) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x228) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x234) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x238) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x23c) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x240) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x244) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x248) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x24c) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x254) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 600) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x25c) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x260) = uVar2;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x264) = uVar2;
+    FUN_0145ac80(param_1);
+    __security_check_cookie(local_c ^ (uint)auStack_cc);
+    return;
+  }
+  FUN_004174e0(2,1);
+  uVar2 = FUN_0040f1c0(&local_c0,"g_nVersion == nVersion");
+  uVar2 = FUN_00435610(uVar2);
+  uVar3 = FUN_004ad010(apppuStack_28,
+                       "ShowMessageOnly Wrong client version of SimpleCharFullupdateIIR! (clientversion: %d, serverversion: %d)\n Client and server code is out of sync!\n"
+                       ,5,cStack_c5);
+  uVar2 = FUN_00435670(uVar2,uVar3);
+  FUN_00435610(uVar2);
+  FUN_004111d0(1,0);
+  FUN_00416ae0(apppuStack_28);
+  if (uStack_14 < 0x10) {
+    apppuStack_28[0] = apppuStack_28;
+  }
+  iVar5 = FUN_004a6a30(apppuStack_28[0],"simplecharfullupdateiir.cpp",0x182,0x10);
+  FUN_004111d0(1,0);
+  if (iVar5 == 2) {
+    pcVar1 = (code *)swi(3);
+    (*pcVar1)();
+    return;
+  }
+  *(undefined ***)((int)&local_c0 + *(int *)(local_c0 + 4)) =
+       std::basic_ostringstream<char,std::char_traits<char>,std::allocator<char>_>::vftable;
+  ppuStack_bc = std::basic_stringbuf<char,std::char_traits<char>,std::allocator<char>_>::vftable;
+  FUN_00417440();
+  FUN_00410f00();
+  *(undefined ***)((int)&local_c0 + *(int *)(local_c0 + 4)) =
+       std::basic_ostream<char,std::char_traits<char>_>::vftable;
+  appuStack_70[0] = std::ios_base::vftable;
+  FUN_0182cc13(appuStack_70);
+  __security_check_cookie(local_c ^ (uint)auStack_cc);
+  return;
+}
+
+
+
+################## anchor "Wrong client version of SimpleCharFullupdateIIR" -> 02040510
+################## anchor "simplecharfullupdateiir.cpp" -> 02040490
+==== ref @01121438 in FUN_01121350 @01121350 size=415 ====
+
+void FUN_01121350(void)
+
+{
+  code *pcVar1;
+  int iVar2;
+  undefined4 uVar3;
+  undefined4 uVar4;
+  undefined4 *in_EDX;
+  int local_cc;
+  undefined **local_c8;
+  undefined **local_7c [18];
+  undefined **local_34 [3];
+  char *local_28;
+  undefined4 ***local_24 [5];
+  uint local_10;
+  uint local_8;
+  
+  local_8 = DAT_021906e0 ^ (uint)&stack0xfffffffc;
+  FUN_01458700();
+  *in_EDX = SimpleCharFullUpdateIIR_t::vftable;
+  in_EDX[7] = SimpleCharFullUpdateIIR_t::vftable;
+  in_EDX[0x9c] = 0;
+  iVar2 = FUN_004175a0(100);
+  if (iVar2 == 0) {
+    local_28 = (char *)0x0;
+    std::exception::exception((exception *)local_34,&local_28);
+    local_34[0] = std::bad_alloc::vftable;
+                    /* WARNING: Subroutine does not return */
+    __CxxThrowException_8(local_34,&DAT_02154e6c);
+  }
+  in_EDX[0x9b] = iVar2;
+  *(int *)iVar2 = iVar2;
+  *(undefined4 *)(in_EDX[0x9b] + 4) = in_EDX[0x9b];
+  *(undefined4 *)(in_EDX[0x9b] + 8) = in_EDX[0x9b];
+  *(undefined1 *)(in_EDX[0x9b] + 0x60) = 1;
+  *(undefined1 *)(in_EDX[0x9b] + 0x61) = 1;
+  FUN_004174e0(2,1);
+  uVar3 = FUN_0040f1c0(&local_cc,&DAT_01fc3da0);
+  uVar3 = FUN_00435610(uVar3);
+  uVar4 = FUN_004ad010(local_24,
+                       "SimpleCharFullUpdateIIR_t::SimpleCharFullUpdateIIR_t this constructor is not to be used on the client!\n"
+                      );
+  uVar3 = FUN_00435670(uVar3,uVar4);
+  FUN_00435610(uVar3);
+  FUN_004111d0(1,0);
+  FUN_00416ae0(local_24);
+  if (local_10 < 0x10) {
+    local_24[0] = local_24;
+  }
+  iVar2 = FUN_004a6a30(local_24[0],"simplecharfullupdateiir.cpp",0xa8,0x10);
+  FUN_004111d0(1,0);
+  if (iVar2 == 2) {
+    pcVar1 = (code *)swi(3);
+    (*pcVar1)();
+    return;
+  }
+  *(undefined ***)((int)&local_cc + *(int *)(local_cc + 4)) =
+       std::basic_ostringstream<char,std::char_traits<char>,std::allocator<char>_>::vftable;
+  local_c8 = std::basic_stringbuf<char,std::char_traits<char>,std::allocator<char>_>::vftable;
+  FUN_00417440();
+  FUN_00410f00();
+  *(undefined ***)((int)&local_cc + *(int *)(local_cc + 4)) =
+       std::basic_ostream<char,std::char_traits<char>_>::vftable;
+  local_7c[0] = std::ios_base::vftable;
+  FUN_0182cc13(local_7c);
+  __security_check_cookie(local_8 ^ (uint)&stack0xfffffffc);
+  return;
+}
+
+
+
