@@ -1,5 +1,6 @@
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Packets.Opcodes;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer
@@ -18,7 +19,7 @@ namespace Faolan.GameServer
 		{
 			var ps = new PacketStream();
 			ps
-				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x00002000)
+				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameServerRespondOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(IirMessageTypes.GameTime);
@@ -47,7 +48,7 @@ namespace Faolan.GameServer
 
 			var ps = new PacketStream();
 			ps
-				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), 0x00002000)
+				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameServerRespondOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(IirMessageTypes.MapChange);

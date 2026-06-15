@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Packets.Opcodes;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
@@ -63,7 +64,7 @@ namespace Faolan.GameServer
 		{
 			var instance = client.Session.Account.ClientInstance;
 			return new PacketStream()
-				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), 0x2000)
+				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerRespondOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(0xA36D3B74u);
@@ -92,7 +93,7 @@ namespace Faolan.GameServer
 		private Task SendCreateEditor2000(INetworkClient client, uint subOpcode, byte[] tail, uint instance)
 		{
 			return new PacketStream()
-				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), 0x2000)
+				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerRespondOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(subOpcode);
@@ -121,7 +122,7 @@ namespace Faolan.GameServer
 				: 0xBCF5C28Fu;
 
 			return new PacketStream()
-				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), 0x2000)
+				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerRespondOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(0xBADF5A4Bu);
@@ -144,7 +145,7 @@ namespace Faolan.GameServer
 			var instance = client.Session.Account.ClientInstance;
 
 			await new PacketStream()
-				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), 0x2000)
+				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerRespondOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(0xADCE0CDAu);
@@ -196,7 +197,7 @@ namespace Faolan.GameServer
 			var address = $"{realm.IpAddress}:{realm.Port}";
 
 			await new PacketStream()
-				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), 0x2002)
+				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerRespondOpcodes.WorldHandoff)
 				.WriteByte(0x00)
 				.WriteStringByteLength(address)
 				.SendAsync(client);

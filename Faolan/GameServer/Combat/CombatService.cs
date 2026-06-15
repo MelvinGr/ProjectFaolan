@@ -9,6 +9,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.AgentServer;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
@@ -111,7 +112,7 @@ namespace Faolan.GameServer.Combat
 
 			// 1) BehaviorControlCenterIIR ack - releases the swing.
 			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), 0x2000)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerRespondOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(0x642CD3D6u)
 					.WriteUInt32(0x0000C350u)
@@ -262,7 +263,7 @@ namespace Faolan.GameServer.Combat
 		private static Task SendWorldPacket(INetworkClient client, byte[] body)
 		{
 			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), 0x2000)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerRespondOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s => s.WriteArray(body))
 				.SendAsync(client);
 		}

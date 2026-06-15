@@ -25,7 +25,7 @@ namespace Faolan.GameServer.World
 
 			var ps = new PacketStream();
 			ps
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), 0x00002000)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerRespondOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(GameServer0X2000RespondsOpcodes.StatUpdateIIR);

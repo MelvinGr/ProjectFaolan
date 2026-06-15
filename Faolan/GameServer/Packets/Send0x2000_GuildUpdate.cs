@@ -22,7 +22,7 @@ namespace Faolan.GameServer
 		{
 			var ps = new PacketStream();
 			ps
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), 0x00002000)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerRespondOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s => WriteGuildTagBody(s, characterId, guildName));
 			return ps
 				.WriteLengthHash()

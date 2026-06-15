@@ -278,7 +278,24 @@
 			// GameCharInterface.DispatchAddItem (recovered name, exact): the incremental "an item appeared in your
 			// inventory" delivery - the live counterpart to the world-entry snapshot. Body decoded + golden-tested
 			// (DispatchAddItemTests); the keystone for live loot/buy/quest-reward/mail item grants.
-			AddItem = 0x2020
+			AddItem = 0x2020,
+
+			// The IIR carrier: the generic 0x2000 wrapper whose real method is a sub-opcode in the body (GameAgent.
+			// PassBlob c2s). Almost every world/create/login s2c record is sent under this opcode.
+			IirCarrier = 0x2000,
+			// The world-address handoff advert ([0x00][byteLen][host:port]) on the create enter-world + teleport
+			// paths; the client reconnects to the advertised GameServer. Same value as BindLocation (overloaded).
+			WorldHandoff = 0x2002,
+			// Recovered s2c method opcodes sent verbatim by the create/world bursts (per-class dispatch names from
+			// docs/aoc-rpc-method-opcodes.md; the conversation class disambiguates the overloaded value).
+			SetItemStat = 0x201C, // GameCharInterface.DispatchSetItemStat (the 0x201c spawn/world handshake record)
+			SetDialogueCamera = 0x2015, // GameCharInterface.DispatchSetDialogueCamera (NPC dialogue framing)
+			AddSpecialAbility = 0x2052, // GameCharInterface.DispatchAddSpecialAbility (the ability grant)
+			ReceivedStockPhraseText = 0x205D, // GameCharInterface.DispatchReceivedStockPhraseText
+			ShortcutBarReply = 0x2076, // GameCharInterface.DispatchShortcutBarReply
+			GuildRankingsUpdate = 0x2038, // CSPlayerInterface.DispatchGuildRankingsUpdate (guild list)
+			MassivePvpInfoRequestReturn = 0x20A5, // CSPlayerInterface.DispatchMassivePvpInfoRequestReturn
+			GameInterfaceNoArg2004 = 0x2004 // GameInterface no-arg dispatch (method index 4); no recovered name
 		}
 
 		// --- Full client->server method catalogs for the GameServer connection's RPC classes, generated from

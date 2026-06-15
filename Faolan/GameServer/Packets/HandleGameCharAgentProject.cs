@@ -2,6 +2,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Packets.Opcodes;
 using Microsoft.Extensions.Logging;
 
 // ReSharper disable once CheckNamespace
@@ -43,7 +44,7 @@ namespace Faolan.GameServer
 			var instance = client.Session.Account.ClientInstance;
 
 			await new PacketStream()
-				.WriteHeader(ExistingCharacterPostReadyReportServerIdSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameServerIdType, instance), 0x00002000u)
+				.WriteHeader(ExistingCharacterPostReadyReportServerIdSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameServerIdType, instance), GameServerRespondOpcodes.IirCarrier)
 				.WriteUInt32(targetType)
 				.WriteUInt32(targetInstance)
 				.WriteUInt32(0x00000000) // aggro status: 0 = no aggro (no live aggro model yet)

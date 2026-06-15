@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Data;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.GameServer.Packets.Protobuf;
@@ -82,7 +83,7 @@ namespace Faolan.GameServer
 
 			var record = BuildBankIirRecord(charInstance, SerializeContainer(bank));
 			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), 0x2000)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerRespondOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(record)
 				.SendAsync(client);
 

@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Packets.Opcodes;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer
@@ -28,7 +29,7 @@ namespace Faolan.GameServer
 		private static Task Send0X201CEntry(INetworkClient client, byte[] sender, byte[] receiver, uint prefix, uint state, uint ticket)
 		{
 			return new PacketStream()
-				.WriteHeader(sender, receiver, 0x0000201C)
+				.WriteHeader(sender, receiver, GameServerRespondOpcodes.SetItemStat)
 				.WriteUInt32(prefix)
 				.WriteUInt32(client.Session.Account.ClientInstance)
 				.WriteUInt32(state)

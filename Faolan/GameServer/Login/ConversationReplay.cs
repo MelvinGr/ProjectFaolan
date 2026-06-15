@@ -7,6 +7,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
@@ -53,7 +54,7 @@ namespace Faolan.GameServer
 			SubstituteUInt32(body, CloseChatWindowCapturedInstance, id);
 
 			return new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameWorldType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GamePlayerType, id), 0x2000u)
+				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameWorldType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GamePlayerType, id), GameServerRespondOpcodes.IirCarrier)
 				.WriteArray(body)
 				.SendAsync(client);
 		}

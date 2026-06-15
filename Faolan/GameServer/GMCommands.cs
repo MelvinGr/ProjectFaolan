@@ -8,6 +8,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.GameServer.Scripting;
 using Faolan.GameServer.World;
@@ -99,7 +100,7 @@ namespace Faolan.GameServer
 			var instance = client.Session.Account.ClientInstance;
 			foreach (var body in new[] { BuildTeleportBeginBody(instance, destMapId), BuildTeleportDestBody(instance, destMapId, position) })
 				await new PacketStream()
-					.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), 0x00002000)
+					.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerRespondOpcodes.IirCarrier)
 					.WriteArrayUInt32Length(s => s.WriteArray(body))
 					.SendAsync(client);
 		}
