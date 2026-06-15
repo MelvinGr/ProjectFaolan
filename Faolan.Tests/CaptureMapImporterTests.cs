@@ -9,8 +9,9 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// A real captured MapChange (0x2000 / 0x5D85BFC7, King Conan's Castle = map 2040) must be parsed and inserted
-	// with its spawn position; an already-present map must be left untouched.
+	// A real captured MapChange (0x2000 / 0x5D85BFC7, King Conan's Castle = map 2040) must be parsed and the map id
+	// inserted (a Map carries no position - the coordinate space - so only id+name are stored); an already-present
+	// map must be left untouched.
 	public class CaptureMapImporterTests
 	{
 		// The 146-byte MapChange packet from account-faolan-character-necrol80-login-kingconanscastle (map 2040).
@@ -32,10 +33,7 @@ namespace Faolan.Tests
 					db.Maps.Add(new Map
 					{
 						Id = 4010,
-						Name = "Tortage Beach",
-						PositionX = 1,
-						PositionY = 2,
-						PositionZ = 3
+						Name = "Tortage Beach"
 					});
 					await db.SaveChangesAsync();
 
@@ -48,14 +46,10 @@ namespace Faolan.Tests
 					var map = await db.Maps.FindAsync(2040u);
 					Assert.NotNull(map);
 					Assert.Equal(string.Empty, map!.Name); // capture-discovered, no name
-					Assert.Equal(249.83f, map.PositionX, 0.5f);
-					Assert.Equal(31.97f, map.PositionY, 0.5f);
-					Assert.Equal(106.55f, map.PositionZ, 0.5f);
 
 					// The pre-existing map was not overwritten.
 					var beach = await db.Maps.FindAsync(4010u);
 					Assert.Equal("Tortage Beach", beach!.Name);
-					Assert.Equal(1f, beach.PositionX);
 				}
 			}
 			finally

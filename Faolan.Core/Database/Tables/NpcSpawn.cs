@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace Faolan.Core.Database.Tables
 {
 	// A captured NPC entity spawn (FA015807) on a map. Keyed for dedup by (MapId, Position) - the stable spawn
@@ -35,5 +37,8 @@ namespace Faolan.Core.Database.Tables
 		// Identity/appearance, lifted from the CharacterIIR (ProtoCoreCharacterIIR). TemplateId (NpcStats.f4) is
 		// the stable per-type identity; MonsterScale carries the per-instance size jitter.
 		public uint TemplateId { get; set; }
+
+		[ForeignKey(nameof(MapId))]
+		public virtual Map Map { get; set; }
 	}
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
@@ -57,15 +58,28 @@ namespace Faolan.GameServer
 		// advertises our own GameServer, the client reconnects, and the existing-character Hello path runs
 		// SendWorldEntry for the (now persisted) target map - identical to logging in on that map, which works.
 		// .teleport <mapId | name>  - resolves the argument to a map (numeric id, or a case-insensitive name match
-		// so `.teleport Khemi` works) then hands off to DoTeleport. Gives a usage/echo message instead of throwing on
-		// a missing/garbled argument (the old `uint.Parse(arguments)` surfaced a raw FormatException to the player).
+		// so `.teleport Khemi` works) then hands off to DoTeleport. Also accepts `.teleport <x> <y> <z>` (three numeric
+		// tokens) to move to a position on the CURRENT map. Gives a usage/echo message instead of throwing on a
+		// missing/garbled argument (the old `uint.Parse(arguments)` surfaced a raw FormatException to the player).
 		private async Task TeleportCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
 			var arg = (arguments ?? string.Empty).Trim();
 			if (arg.Length == 0)
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .teleport &lt;mapId | name&gt;  (see .maps)");
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .teleport &lt;mapId | name&gt;  or  .teleport &lt;x&gt; &lt;y&gt; &lt;z&gt;  (current map; see .maps)");
+				return;
+			}
+
+			// .teleport <x> <y> <z>  - three numeric tokens = a position on the CURRENT map (no map change).
+			// Invariant culture so a comma-decimal locale doesn't reject the dotted coordinates.
+			var tokens = arg.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
+			if (tokens.Length == 3
+				&& float.TryParse(tokens[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var px)
+				&& float.TryParse(tokens[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var py)
+				&& float.TryParse(tokens[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var pz))
+			{
+				await DoTeleport(characterId, client.Session.Character.MapId, new Vector3(px, py, pz));
 				return;
 			}
 
@@ -88,6 +102,18 @@ namespace Faolan.GameServer
 			await DoTeleport(characterId, match.Id);
 		}
 
+		// .position  - print the caller's current map + live position (the in-world entity transform when
+		// connected, else the persisted Character position). Formatted so the x y z can be pasted into .teleport.
+		private Task PositionCommand(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			var entity = _simulation.PlayerWorldEntity(client);
+			var mapId = entity?.MapId ?? character.MapId;
+			var pos = entity?.Position ?? character.Position;
+			return _agentServerDispatcher.SendSystemMessage(character.Id,
+				$"Map {mapId} - position {pos.X.ToString("0.###", CultureInfo.InvariantCulture)} {pos.Y.ToString("0.###", CultureInfo.InvariantCulture)} {pos.Z.ToString("0.###", CultureInfo.InvariantCulture)}");
+		}
+
 		// toPosition: an explicit destination within the map (e.g. a bind/recall point); null = the map's spawn point.
 		private async Task DoTeleport(uint characterId, uint mapId, Vector3? toPosition = null)
 		{
@@ -102,14 +128,31 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			// Destination: an explicit point (bind/recall) or the map's spawn point (importer-added maps carry the
-			// real captured spawn; older seeded maps carry a placeholder). Persist BEFORE the handoff so the
-			// reconnect's world entry (existing-character Hello -> SendWorldEntry, which loads Character.MapId) lands
-			// on the new map at the right spot.
-			var position = toPosition ?? map.Position;
-			var rotation = toPosition.HasValue
-				? Quaternion.Identity
-				: map.Rotation;
+			// Destination: an explicit point (bind/recall/coords) or the map's default spawn (the AlwaysKnown starter,
+			// else any respawn point - GetDefaultSpawn). A map with no points defined can't resolve a spawn, so refuse
+			// rather than dump the player at the origin. Persist BEFORE the handoff so the reconnect's world entry
+			// (existing-character Hello -> SendWorldEntry, which loads Character.MapId) lands at the right spot.
+			Vector3 position;
+			Quaternion rotation;
+			if (toPosition.HasValue)
+			{
+				position = toPosition.Value;
+				rotation = Quaternion.Identity;
+			}
+			else
+			{
+				var spawn = await Database.GetDefaultSpawn(map.Id);
+				if (spawn == null)
+				{
+					await _agentServerDispatcher.SendSystemMessage(characterId,
+						$"<span style=\"color: red;\">No spawn point defined for map {(string.IsNullOrEmpty(map.Name) ? map.Id.ToString() : $"{map.Name} ({map.Id})")}. Give explicit coordinates: .teleport &lt;x&gt; &lt;y&gt; &lt;z&gt;.</span>");
+					return;
+				}
+
+				position = spawn.Position;
+				rotation = spawn.Rotation;
+			}
+
 			client.Session.Character.MapId = map.Id;
 			client.Session.Character.Position = position;
 			client.Session.Character.Rotation = rotation;
@@ -165,8 +208,8 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(character.Id, $"Bind point set: {point.Name} ({point.MapId}).");
 		}
 
-		// .totem / .recall  - use the Totem of Origin: recall to the bound location (the persisted bind point). The
-		// real trigger is using the totem ITEM (use_totem_of_origin capture); this GM command is the test bootstrap.
+		// .recall  - use the Totem of Origin: recall to the bound location (the persisted bind point). The real
+		// trigger is using the totem ITEM (use_totem_of_origin capture); this GM command is the test bootstrap.
 		private async Task RecallToBindCommand(INetworkClient client)
 		{
 			var character = client.Session.Character;
@@ -309,8 +352,8 @@ namespace Faolan.GameServer
 				["spelllist"] = (client, _) => SendGrantableAbilityList(client.Session.Character.Id),
 				["grantspell"] = (client, arguments) => GrantSpellCommand(client, arguments),
 				["teleport"] = (client, arguments) => TeleportCommand(client, arguments),
+				["position"] = (client, _) => PositionCommand(client),
 				["bind"] = (client, _) => BindCommand(client),
-				["totem"] = (client, _) => RecallToBindCommand(client),
 				["recall"] = (client, _) => RecallToBindCommand(client),
 				["spelltest"] = (client, arguments) => ApplySpellTest(client.Session.Character.Id, uint.Parse(arguments)),
 				["vitals"] = (client, arguments) => SetVitalsCommand(client, arguments),

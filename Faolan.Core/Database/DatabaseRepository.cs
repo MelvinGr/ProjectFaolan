@@ -92,6 +92,10 @@ namespace Faolan.Core.Database
 		Task<Realm[]> GetRealms();
 		Task<RespawnPoint[]> GetRespawnPoints(uint mapId);
 
+		// The default spawn for a map: the AlwaysKnown starter point, else the first respawn point on the map, else
+		// null (the map has no points at all - callers decide whether to refuse). Replaces the old Map.Position.
+		Task<RespawnPoint> GetDefaultSpawn(uint mapId);
+
 		Task<Spell> GetSpell(uint id);
 		Task<Spell[]> GetSpells();
 		Task<Ability[]> GetStartingAbilities(uint level, uint @class);
@@ -951,6 +955,15 @@ namespace Faolan.Core.Database
 				.ToArrayAsync();
 		}
 
+		public async Task<RespawnPoint> GetDefaultSpawn(uint mapId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var points = ctx.RespawnPoints.Where(r => r.MapId == mapId);
+			// AlwaysKnown starter wins; otherwise any point on the map; null if the map defines none.
+			return await points.FirstOrDefaultAsync(r => r.AlwaysKnown)
+				?? await points.FirstOrDefaultAsync();
+		}
+
 		public async Task<Spell> GetSpell(uint id)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -1284,9 +1297,8 @@ namespace Faolan.Core.Database
 		// satisfy the foreign key.
 		private static Task EnsureMapExists(DatabaseContext ctx, uint mapId, string name)
 		{
-			// RotationW must be listed: it is NOT NULL (the rotation quaternion's W) with no SQL default, so omitting
-			// it makes the OR IGNORE silently drop the row, leaving the Character->Map FK to fail. W=1 = identity.
-			return ctx.Database.ExecuteSqlRawAsync("INSERT OR IGNORE INTO Maps (Id, Name, PositionX, PositionY, PositionZ, RotationX, RotationY, RotationZ, RotationW) VALUES ({0}, {1}, 0, 0, 0, 0, 0, 0, 1)", mapId, name);
+			// A Map is just Id + Name now (no position/rotation - those moved to the per-map RespawnPoints).
+			return ctx.Database.ExecuteSqlRawAsync("INSERT OR IGNORE INTO Maps (Id, Name) VALUES ({0}, {1})", mapId, name);
 		}
 
 		private static Task<CharacterEquipment> LoadTrackedEquipment(DatabaseContext ctx, uint id)

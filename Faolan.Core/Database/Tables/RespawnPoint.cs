@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace Faolan.Core.Database.Tables
 {
 	// A resurrection point on a map - where a dead player can revive. Players must DISCOVER a point (walk near it)
@@ -10,5 +12,8 @@ namespace Faolan.Core.Database.Tables
 
 		public string Name { get; set; }
 		public uint MapId { get; set; }
+
+		[ForeignKey(nameof(MapId))]
+		public virtual Map Map { get; set; }
 	}
 }

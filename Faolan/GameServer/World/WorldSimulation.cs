@@ -323,14 +323,17 @@ namespace Faolan.GameServer.World
 			}
 			else
 			{
-				var map = await _database.GetMap(character.MapId);
-				if (map != null)
+				// No point the player KNOWS - fall back to the map's default spawn (AlwaysKnown starter, else any
+				// point on the map; the points are already loaded above). If the map defines none, respawn in place.
+				var fallback = points.FirstOrDefault(p => p.AlwaysKnown) ?? points.FirstOrDefault();
+				if (fallback != null)
 				{
-					character.Position = map.Position;
-					character.Rotation = map.Rotation;
+					character.Position = fallback.Position;
+					character.Rotation = fallback.Rotation;
+					_logger.LogInformation("Combat: {Player} respawned at the default spawn '{Point}' (map {Map}; no known resurrection point).", character.Name, fallback.Name, character.MapId);
 				}
-
-				_logger.LogInformation("Combat: {Player} respawned at the map {Map} spawn point (no known resurrection point).", character.Name, character.MapId);
+				else
+					_logger.LogInformation("Combat: {Player} respawned in place (map {Map} has no resurrection point).", character.Name, character.MapId);
 			}
 
 			await _output.ReenterWorld(client);

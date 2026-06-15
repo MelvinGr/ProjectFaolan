@@ -1,4 +1,6 @@
-﻿namespace Faolan.Core.Network.Packets
+﻿using System;
+
+namespace Faolan.Core.Network.Packets
 {
 	namespace Opcodes
 	{
@@ -249,6 +251,7 @@
 		//   AckAuthenticate 0x2001 = GameInterface/UniverseInterface.DispatchAckAuthenticate
 		// Keep the values; do NOT rename (they drive capture-replayed sends). 0x2020 s2c = DispatchAddItem (note for
 		// the inventory-delivery work - there IS a per-item add packet, separate from the snapshot).
+		[Obsolete("Use GameCharAgentOpcodes/GameCharAgentProjectOpcodes/GameAgentOpcodes")]
 		public enum GameServerRespondOpcodes : ushort
 		{
 			// Reply to GameCharAgent.RequestBindLocation: [u32 playfieldId] = the character's bind/home playfield

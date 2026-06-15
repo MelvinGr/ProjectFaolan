@@ -37,7 +37,9 @@ namespace Faolan.Importer
 			var existingSet = existing.ToHashSet();
 
 			var inserted = 0;
-			foreach (var (id, pos) in found)
+			// A Map carries no position (it's the coordinate space); the MapChange spawn position scanned into `found`
+			// is only used to discover which map ids exist. The per-map default spawn lives in RespawnPoints now.
+			foreach (var id in found.Keys)
 			{
 				if (existingSet.Contains(id))
 					continue;
@@ -45,10 +47,7 @@ namespace Faolan.Importer
 				db.Maps.Add(new Map
 				{
 					Id = id,
-					Name = string.Empty,
-					PositionX = pos.X,
-					PositionY = pos.Y,
-					PositionZ = pos.Z
+					Name = string.Empty
 				});
 				inserted++;
 			}

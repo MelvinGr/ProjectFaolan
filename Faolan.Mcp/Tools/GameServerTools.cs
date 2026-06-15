@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Globalization;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Faolan.Core.Network.GameServer;
@@ -152,12 +153,32 @@ namespace Faolan.Mcp.Tools
 				: $"Character {characterId} is not currently connected to any GameServer listener.";
 		}
 
-		[McpServerTool(Name = "teleport_character"), Description("Teleport a connected character to a map by id (convenience wrapper over the .teleport GM command).")]
-		public async Task<string> TeleportCharacter([Description("Character id of a currently-connected player")] uint characterId, [Description("Destination map id (see list_maps)")] uint mapId)
+		[McpServerTool(Name = "teleport_character"),
+		 Description("Teleport a connected character (convenience wrapper over the .teleport GM command). Either give a destination map id, OR give x/y/z to move to a position on the character's CURRENT map (no map change). Map id takes priority if both are supplied.")]
+		public async Task<string> TeleportCharacter([Description("Character id of a currently-connected player")] uint characterId,
+			[Description("Destination map id (see list_maps); omit to teleport by position instead")] uint? mapId = null,
+			[Description("X coordinate on the current map (requires y and z; ignored if mapId is given)")] float? x = null,
+			[Description("Y coordinate on the current map (requires x and z; ignored if mapId is given)")] float? y = null,
+			[Description("Z coordinate on the current map (requires x and y; ignored if mapId is given)")] float? z = null)
 		{
-			var ok = await _dispatcher.RunGmCommand(characterId, $".teleport {mapId}");
+			string command, success;
+			if (mapId is uint map)
+			{
+				command = $".teleport {map}";
+				success = $"Teleported character {characterId} to map {map}.";
+			}
+			else if (x is float px && y is float py && z is float pz)
+			{
+				var i = CultureInfo.InvariantCulture;
+				command = $".teleport {px.ToString(i)} {py.ToString(i)} {pz.ToString(i)}";
+				success = $"Teleported character {characterId} to ({px.ToString(i)}, {py.ToString(i)}, {pz.ToString(i)}) on its current map.";
+			}
+			else
+				return "Supply either a mapId, or all three of x/y/z to teleport by position.";
+
+			var ok = await _dispatcher.RunGmCommand(characterId, command);
 			return ok
-				? $"Teleported character {characterId} to map {mapId}."
+				? success
 				: $"Character {characterId} is not currently connected to any GameServer listener.";
 		}
 	}
