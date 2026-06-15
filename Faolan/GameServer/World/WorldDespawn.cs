@@ -21,16 +21,39 @@ namespace Faolan.GameServer.World
 		private static readonly byte[] TokenPrefixMarker = [0x00, 0x00, 0x00, 0xBF];
 		private static readonly byte[] TokenSuffixMarker = [0x00, 0x00, 0x04, 0x0B];
 
+		public const int BodyLength = 17; // [subop][typeTag][handle][marker][token] = 4+4+4+1+4
+
 		// Builds the 17-byte IIR body (the bytes after the u32 length prefix) for removing `handle` in playfield `token`.
 		public static byte[] BuildBody(uint handle, uint token)
 		{
-			var body = new byte[17];
+			var body = new byte[BodyLength];
 			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), SubOpcode);
 			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), TypeTagAck);
 			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), handle);
 			body[12] = RecordMarker;
 			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(13, 4), token);
 			return body;
+		}
+
+		// The inverse of BuildBody: parses a 17-byte n3ToClientQuit body into its (handle, token). Returns false when
+		// the length, sub-opcode, ack TypeTag, or record marker don't match the decoded grammar (so a mis-routed body
+		// is rejected rather than yielding garbage). Proven against the captured records by WorldDespawnTests round-trip.
+		public static bool TryParseBody(ReadOnlySpan<byte> body, out uint handle, out uint token)
+		{
+			handle = 0;
+			token = 0;
+			if (body.Length != BodyLength)
+				return false;
+			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != SubOpcode)
+				return false;
+			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != TypeTagAck)
+				return false;
+			if (body[12] != RecordMarker)
+				return false;
+
+			handle = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(8, 4));
+			token = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(13, 4));
+			return true;
 		}
 
 		// Finds the playfield token in a 0x737A6DF9 snapshot body: the 4 bytes framed by 000000BF ... 0000040B

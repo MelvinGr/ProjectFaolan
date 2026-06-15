@@ -27,6 +27,59 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void TryParseBody_RoundTripsBuildBody()
+		{
+			// Build -> Parse must recover the exact (handle, token); the captured hoxxling record is the oracle.
+			var body = WorldDespawn.BuildBody(0x00017E29, 0x01EA985C);
+
+			Assert.True(WorldDespawn.TryParseBody(body, out var handle, out var token));
+			Assert.Equal(0x00017E29u, handle);
+			Assert.Equal(0x01EA985Cu, token);
+		}
+
+		[Fact]
+		public void TryParseBody_ParsesCapturedRecord()
+		{
+			// The literal 17-byte body from the hoxxling gameplay capture (same bytes the build test asserts).
+			var captured = new byte[]
+			{
+				0x04, 0xB8, 0x2B, 0x2D, // subop
+				0x00, 0x00, 0xC3, 0x50, // typeTag/ack
+				0x00, 0x01, 0x7E, 0x29, // handle
+				0x01, // marker
+				0x01, 0xEA, 0x98, 0x5C // playfield token
+			};
+
+			Assert.True(WorldDespawn.TryParseBody(captured, out var handle, out var token));
+			Assert.Equal(0x00017E29u, handle);
+			Assert.Equal(0x01EA985Cu, token);
+		}
+
+		[Theory]
+		[InlineData(16)] // too short
+		[InlineData(18)] // too long
+		public void TryParseBody_RejectsWrongLength(int length)
+		{
+			Assert.False(WorldDespawn.TryParseBody(new byte[length], out _, out _));
+		}
+
+		[Fact]
+		public void TryParseBody_RejectsWrongSubOpcode()
+		{
+			var body = WorldDespawn.BuildBody(0x00017E29, 0x01EA985C);
+			body[0] ^= 0xFF; // corrupt the sub-opcode
+			Assert.False(WorldDespawn.TryParseBody(body, out _, out _));
+		}
+
+		[Fact]
+		public void TryParseBody_RejectsWrongMarker()
+		{
+			var body = WorldDespawn.BuildBody(0x00017E29, 0x01EA985C);
+			body[12] = 0x02; // marker is 0x01 in 3271/3271 records
+			Assert.False(WorldDespawn.TryParseBody(body, out _, out _));
+		}
+
+		[Fact]
 		public void TryExtractPlayfieldToken_FindsTokenBetweenMarkers()
 		{
 			// ...000000BF <token> 0000040B - the framing seen in the beach burst (token 0x004FE428).
