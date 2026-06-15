@@ -47,6 +47,10 @@ namespace Faolan.GameServer
 		// outbound ops are injected as seams (shared with other subsystems). See Economy/Shop/ShopService.cs.
 		private readonly Economy.Shop.ShopService _shop;
 
+		// Personal bank storage (kind 105) delivered on-demand. The withdraw item-grant op is an injected seam.
+		// See Economy/Bank/BankService.cs.
+		private readonly Economy.Bank.BankService _bank;
+
 		// Builds + sends the world-event packets (spawns/moves/despawns, NPC respawn/loot/mount renders, loot-window
 		// and quest-journal packets). Reads the world model via the simulation; the listener delegates its IWorldOutbound
 		// port + the loot/quest opcode handlers to it. See World/WorldBroadcaster.cs.
@@ -73,6 +77,7 @@ namespace Faolan.GameServer
 			_combat = new CombatService(_simulation, _broadcaster, database, agentServerDispatcher, logger);
 			_equipment = new Inventory.EquipmentService(database, logger);
 			_shop = new Economy.Shop.ShopService(database, logger, SendMoneyUpdate, GrantItemToBackpack);
+			_bank = new Economy.Bank.BankService(database, logger, (client, container, pos, entry) => SendAddItem(client, container, pos, entry));
 
 			InitGmCommands();
 		}

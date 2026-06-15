@@ -360,7 +360,7 @@ namespace Faolan.GameServer
 			// populated - account-faolan-...-Has-inventory-at-trader-bank F6208-6210 = [bank slot regs][BankIIR]
 			// [DispOpenTradepost]. We previously sent the open FIRST, so the BankIIR landed before the window existed
 			// and the first open rendered empty (you had to close + reopen). Now: bank first, open last.
-			await SendBank(client, bank);
+			await _bank.SendBank(client, bank);
 			await Economy.Tradepost.TradepostResponses.SendOpenTradepost(client, entity.Position);
 
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Opened the auction house (PoC) at your position; bank tab has {bank.Items.Count} item(s).");

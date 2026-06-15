@@ -1,3 +1,4 @@
+using Faolan.GameServer.Economy.Bank;
 using System;
 using Faolan.Core.Data;
 using Faolan.GameServer;
@@ -50,7 +51,7 @@ namespace Faolan.Tests
 			// The blob (the ProtoInventoryGame) starts after recLen(4)+subop(4)+type(4)+instance(4)+flag(1)+blobLen(4)=21.
 			var blob = captured[21..];
 
-			var record = GameServerListener.BuildBankIirRecord(CharInstance, blob);
+			var record = BankService.BuildBankIirRecord(CharInstance, blob);
 
 			// Re-add the 0x2000 packet length prefix the send path writes (WriteArrayUInt32Length).
 			var s = new FaolanStream();

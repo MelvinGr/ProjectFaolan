@@ -515,7 +515,7 @@ namespace Faolan.GameServer
 
 					// A move that touches the personal bank (kind 105) gets no client-side render otherwise (the bank
 					// tab isn't refreshed), so a deposit looks like the item vanished - push the live bank refresh.
-					await UpdateBankAfterMove(client, move);
+					await _bank.UpdateBankAfterMove(client, move);
 
 					break;
 				}

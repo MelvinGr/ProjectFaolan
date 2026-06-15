@@ -1,8 +1,11 @@
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Data;
+using Faolan.Core.Database;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.Core.Network.Protobuf;
@@ -12,8 +15,7 @@ using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 using ProtoBuf;
 
-// ReSharper disable once CheckNamespace
-namespace Faolan.GameServer
+namespace Faolan.GameServer.Economy.Bank
 {
 	// Personal BANK storage (the separate storage opened at the trader/auctionhouse NPC). Decoded from
 	// account-faolan-character-necrol80-login-Has-inventory-at-trader-bank (memory protocol_bank_storage): the bank
@@ -24,8 +26,22 @@ namespace Faolan.GameServer
 	//        [u32 subop=0BA1C1CB][u32 type=0000C350][u32 charInstance][u8 flag=01][u32 BE blobLen][ProtoInventoryGame]
 	//      (on the GameAgent->GameInterface world conversation). The container's items are standard
 	//      InventoryListEntry entries - the same codec SnapshotItemBuilder already produces for the backpack.
-	public partial class GameServerListener
+	// Extracted from GameServerListener as a composed collaborator; the live item-grant outbound op (for a
+	// withdraw) is injected as a delegate seam (the same one ShopService uses).
+	public sealed class BankService
 	{
+		private readonly IDatabaseRepository _database;
+		private readonly ILogger _logger;
+		private readonly Func<INetworkClient, uint, uint, ProtoInventoryGameEntry, Task> _sendAddItem;
+
+		public BankService(IDatabaseRepository database, ILogger logger,
+			Func<INetworkClient, uint, uint, ProtoInventoryGameEntry, Task> sendAddItem)
+		{
+			_database = database;
+			_logger = logger;
+			_sendAddItem = sendAddItem;
+		}
+
 		private const uint BankIirSubOpcode = (uint)GameServer0X2000RespondsOpcodes.BankIIR; // BankIIR_t
 		private const uint BankMaxSize = 50; // captured bank capacity
 		private const uint BankDisabledSlots = 30; // captured disabled-slot count (unpurchased bank space)
@@ -33,7 +49,7 @@ namespace Faolan.GameServer
 
 		// The BankIIR record (everything after the 0x2000 packet's u32 length prefix). Golden-tested byte-exact
 		// against the captured bank (BankStorageTests).
-		internal static byte[] BuildBankIirRecord(uint charInstance, byte[] containerBlob)
+		public static byte[] BuildBankIirRecord(uint charInstance, byte[] containerBlob)
 		{
 			return new FaolanStream()
 				.WriteUInt32(BankIirSubOpcode)
@@ -47,7 +63,7 @@ namespace Faolan.GameServer
 
 		// One 0x201c bank-slot registration body (20 bytes): [u32 kind=105][u32 charInstance][u32 slot][u32 0x17]
 		// [u16 0x0f][u16 recordId]. Sent once per occupied bank slot before the BankIIR content.
-		internal static void WriteBankSlotRegistration(FaolanStream s, uint charInstance, uint slot, ushort recordId)
+		public static void WriteBankSlotRegistration(FaolanStream s, uint charInstance, uint slot, ushort recordId)
 		{
 			s
 				.WriteUInt32(FullCharSnapshotBuilder.BankKind)
@@ -68,7 +84,7 @@ namespace Faolan.GameServer
 		// Sends the bank: a 0x201c slot registration per occupied cell, then the BankIIR content. The container is
 		// built from the character's CharacterInventory rows in the bank container (kind 105) via the proven
 		// snapshot item codec.
-		private async Task SendBank(INetworkClient client, ProtoInventoryGame bank)
+		public async Task SendBank(INetworkClient client, ProtoInventoryGame bank)
 		{
 			var charInstance = client.Session.Character.Id;
 
@@ -76,7 +92,7 @@ namespace Faolan.GameServer
 			foreach (var entry in bank.Items)
 			{
 				var ps = new PacketStream();
-				ps.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), BankRegisterOpcode);
+				ps.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x58), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, client.Session.Account.ClientInstance), BankRegisterOpcode);
 				WriteBankSlotRegistration(ps, charInstance, entry.Pos, recordId++);
 				await ps.SendAsync(client);
 			}
@@ -87,16 +103,16 @@ namespace Faolan.GameServer
 				.WriteArrayUInt32Length(record)
 				.SendAsync(client);
 
-			Logger.LogInformation("Bank: sent {Count} items to {Character} (BankIIR, container kind {Kind}).",
+			_logger.LogInformation("Bank: sent {Count} items to {Character} (BankIIR, container kind {Kind}).",
 				bank.Items.Count, client.Session.Character?.Name, FullCharSnapshotBuilder.BankKind);
 		}
 
 		// Rebuilds the personal bank container (kind 105) from the character's freshly-persisted CharacterInventory
 		// rows and re-sends it. Reuses the same path as the .ah bank tab open.
-		private async Task ResendBank(INetworkClient client)
+		public async Task ResendBank(INetworkClient client)
 		{
 			var characterId = client.Session.Character.Id;
-			var rows = await Database.GetCharacterInventory(characterId);
+			var rows = await _database.GetCharacterInventory(characterId);
 			var bankRows = rows
 				.Where(r => r.Container == (int)FullCharSnapshotBuilder.BankKind)
 				.ToList();
@@ -110,7 +126,7 @@ namespace Faolan.GameServer
 		// deposit/withdraw response isn't captured yet, so this is a PoC: re-send the whole bank (BankIIR) to refresh
 		// the bank tab, and on a withdraw (bank -> bag) also push the live DispatchAddItem (0x2020) so the item
 		// renders in the bag. NEEDS in-client verification (does an already-open bank window re-read the BankIIR?).
-		private async Task UpdateBankAfterMove(INetworkClient client, MoveItemInInventoryArgs move)
+		public async Task UpdateBankAfterMove(INetworkClient client, MoveItemInInventoryArgs move)
 		{
 			var character = client.Session.Character;
 			if (character == null || move?.SourceContainerId == null || move.DestinationContainerId == null)
@@ -130,12 +146,12 @@ namespace Faolan.GameServer
 			if (sKind == bank && dKind == bag)
 			{
 				var dPos = (int)move.DestinationItemPos;
-				var rows = await Database.GetCharacterInventory(character.Id);
+				var rows = await _database.GetCharacterInventory(character.Id);
 				var row = rows.FirstOrDefault(r => r.Container == bag && r.Slot == dPos);
 				if (row?.ItemId == null)
 					return;
 
-				var item = await Database.GetItem(row.ItemId.Value);
+				var item = await _database.GetItem(row.ItemId.Value);
 				if (item is not { Archetype: not 0 })
 					return;
 
@@ -144,7 +160,7 @@ namespace Faolan.GameServer
 					FullCharSnapshotBuilder.ItemId(character.Id, FullCharSnapshotBuilder.BagKind, (ulong)dPos),
 					FullCharSnapshotBuilder.RecordId(character.Id, FullCharSnapshotBuilder.BagKind, (ulong)dPos),
 					row.Count, item, item.Archetype).Item;
-				await SendAddItem(client, InventoryContainerBackpack, (uint)dPos, entry);
+				await _sendAddItem(client, 0x68u, (uint)dPos, entry);
 			}
 		}
 	}
