@@ -266,6 +266,16 @@ QuestFullUpdate @36 (13479=3, the value the grant fix authors); `0x412` and `0x0
 builder already emits. So **generating the region = emitting one QuestFullUpdate-content block per active
 quest** — we already build that shape.
 
+**Client-reader cross-check (2026-06-15, Ghidra — `docs/fullplayer-snapshot-reader.md`).** The
+`FullPlayerCharacterIIR` reader's quest list is `MainQuest_c` (`FUN_00922210`), a **plain `u32 count`** then
+that many records of `[u32×5][objCount][(u32,u32)×objCount][u32×3]` — **all numeric, NO embedded strings**.
+The `<remoteformat>` XML the byte-level decode above lumps into each "block" therefore belongs to the
+**adjacent `Quest_c` journal list** (List A in the reader doc — `FUN_0091df50`, whose records carry the
+localized title/summary/area/objective `std::string` members), not to the numeric `MainQuest_c` — i.e. the
+heuristic block boundary here does not align with the client's record boundary. Reconcile before modeling the
+region in `SnapshotTails` (the injector's byte-splice still works regardless; this matters for from-scratch
+generation, #186).
+
 **Region location (decoded 2026-06-14).** The quest region is at the START of the tails. Template
 (`BeachTailsTemplate.bin`, 1 quest): header `[0x18][0x7E2]` → detail block @8 (10238) → … 50304 objective +
 51000 localized @1109 → **index `[1009][marker][questId…]` @~1168** → `PFAccessWindow_` @1307. The 2-quest
