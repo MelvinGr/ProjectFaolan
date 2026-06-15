@@ -16,6 +16,11 @@ namespace Faolan.Core.Network
 		bool HasPendingCreateEditorReadyFollowUp { get; set; }
 		bool HasPendingPost205FFollowUp { get; set; }
 
+		// True on the OLD connection while a teleport/changemap handoff is in flight: DoTeleport has already
+		// persisted the authoritative destination position, so this connection's disconnect must NOT save its
+		// stale pre-teleport live position back over it (it would clobber the bind/destination). See #28.
+		bool IsTeleportingOut { get; set; }
+
 		// True on the character-creator (editor) GameServer connection: set in the Hello handler when a
 		// not-yet-named character connects.
 		bool IsCreateEditorConnection { get; set; }
@@ -102,6 +107,7 @@ namespace Faolan.Core.Network
 		public bool HasFlushedCreateEditorPostReady { get; set; }
 		public bool HasPendingCreateEditorReadyFollowUp { get; set; }
 		public bool HasPendingPost205FFollowUp { get; set; }
+		public bool IsTeleportingOut { get; set; }
 		public bool IsCreateEditorConnection { get; set; }
 		public bool IsCreateWorldSession { get; set; }
 		public bool PostMorphBurstSent { get; set; }

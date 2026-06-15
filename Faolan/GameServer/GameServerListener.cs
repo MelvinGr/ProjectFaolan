@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -29,7 +30,19 @@ namespace Faolan.GameServer
 		// when the name is committed and removed (consumed) on the world Hello, which is how that connection is
 		// recognised as the create-world entry (and given the intro/cutscene) rather than a normal login. Static
 		// because the editor and world connections are different sessions but hit the same listener instance.
-		private static readonly HashSet<uint> PendingCreateWorldEntry = [];
+		// ConcurrentDictionary-as-set: these statics are mutated from different connection threads (add on one
+		// connection's handler, remove on the reconnect's), and other clients can teleport/log in concurrently, so a
+		// plain HashSet would race and corrupt. The byte value is unused.
+		private static readonly ConcurrentDictionary<uint, byte> PendingCreateWorldEntry = new();
+
+		// Client instances awaiting a TELEPORT/changemap re-entry: added in DoTeleport before the 0x2002 handoff and
+		// consumed on the reconnect Hello. A direct GameServer->GameServer changemap reconnect carries NO 0x205F (the
+		// retail changemap capture confirms it - the flag is normally armed by the client's 0x205F at full login), so
+		// we arm HasPendingPost205FFollowUp ourselves here. Without it the world burst lands but 0x2024 ReadyForPlay-
+		// Screen never fires and the client sits on the loading screen forever (the totem-recall hang, Gitea #28).
+		// Static for the same reason as PendingCreateWorldEntry: the old + reconnect connections are different sessions
+		// on the one listener instance. ConcurrentDictionary-as-set (see PendingCreateWorldEntry) for thread safety.
+		private static readonly ConcurrentDictionary<uint, byte> PendingTeleportReentry = new();
 
 		// Combat domain logic: melee/spell damage, NPC kill lifecycle, XP/leveling, kill-quest tracking + the combat
 		// wire packets. The opcode dispatch (Handle0x2000) and GM .hurt/.heal call into it. See Combat/CombatService.cs.
@@ -178,7 +191,13 @@ namespace Faolan.GameServer
 				_simulation.RemovePlayer(client, out _);
 				// Persist the player's final live state - movement isn't otherwise saved, so without this a logout
 				// loses where they were. Fire-and-forget: the connection is going away so we can't await; logged.
-				_ = SavePlayerState(client, entity);
+				// EXCEPT on a teleport-out: DoTeleport already saved the destination, and this connection's entity
+				// still holds the stale pre-teleport position which would clobber it (#28).
+				if (!client.Session.IsTeleportingOut)
+					_ = SavePlayerState(client, entity);
+				else
+					Logger.LogInformation("Teleport-out: skipping stale-position save for {Name} (0x{Handle:X8}); destination already persisted.", entity.Name, entity.Handle);
+				client.Session.IsTeleportingOut = false; // one-shot: only suppress this teleport's disconnect save
 				Logger.LogInformation("World: player {Name} (0x{Handle:X8}) left map {Map}.", entity.Name, entity.Handle, entity.MapId);
 			}
 
@@ -277,7 +296,7 @@ namespace Faolan.GameServer
 					// normal login of the same character does not re-trigger the intro. This connection needs the
 					// full retail creation world entry (the verbatim burst with its own 0x200B/0x200C/0x2001
 					// auth + the intro/cutscene), so skip the helper auth for it.
-					var isCreateWorldEntry = !isNewCharacter && PendingCreateWorldEntry.Remove(clientInstance);
+					var isCreateWorldEntry = !isNewCharacter && PendingCreateWorldEntry.TryRemove(clientInstance, out _);
 					client.Session.IsCreateWorldSession = isCreateWorldEntry;
 					client.Session.IsCreateEditorConnection = isNewCharacter;
 
@@ -338,6 +357,16 @@ namespace Faolan.GameServer
 						// Abilities (0x2052) are granted AFTER 0x2024 ReadyForPlayScreen (in FlushPendingPost205FFollowUp),
 						// matching the retail login order (handshake -> 0x2024 -> 0x2052). Granting them eagerly here -
 						// before the client polled/was ready - is a divergence from the Strie login dump.
+
+						// Teleport/changemap re-entry: a full login arms the post-0x205F follow-up off the client's 0x205F,
+						// but a direct GameServer->GameServer changemap reconnect sends no 0x205F (retail confirms). Arm it
+						// here so the next 0x2020 poll flushes 0x2024 ReadyForPlayScreen (+ abilities) and the loading screen
+						// dismisses; otherwise the burst lands but the client loads forever (#28 / totem recall).
+						if (PendingTeleportReentry.TryRemove(clientInstance, out _))
+						{
+							client.Session.HasPendingPost205FFollowUp = true;
+							Logger.LogInformation("Teleport re-entry (clientInstance={ClientInstance:X8}): armed the post-0x205F follow-up so 0x2024 ReadyForPlayScreen flushes on the next 0x2020 (no client 0x205F on a changemap reconnect).", clientInstance);
+						}
 					}
 
 					break;

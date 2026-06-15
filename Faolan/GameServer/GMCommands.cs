@@ -125,6 +125,16 @@ namespace Faolan.GameServer
 			// 0x5A32F0D7 (destination map + spawn position) - THEN the 0x2002 handoff advert, after which the
 			// client reconnects and does a fresh world entry on the new map. All three ride the handoff
 			// conversation (0xb171ce13 -> 0x6c67c147 = SendWorldHandoff's sender/receiver).
+			// Mark this client as a teleport re-entry so the reconnect Hello arms the post-0x205F follow-up (the
+			// changemap reconnect carries no 0x205F, so 0x2024 ReadyForPlayScreen would otherwise never fire and the
+			// loading screen would hang - #28). Consumed in the GameServer Hello existing-character branch.
+			PendingTeleportReentry.TryAdd(client.Session.Account.ClientInstance, 0);
+
+			// We've just persisted the destination position above; stop THIS (old) connection's imminent disconnect
+			// from saving its stale pre-teleport live position back over it (ClientDisconnected does a fire-and-forget
+			// SavePlayerState that would otherwise clobber the bind/destination - #28).
+			client.Session.IsTeleportingOut = true;
+
 			await SendChangeMapPrep(client, map.Id, position);
 			await SendWorldHandoff(client);
 		}

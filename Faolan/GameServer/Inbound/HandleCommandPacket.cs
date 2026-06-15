@@ -226,7 +226,7 @@ namespace Faolan.GameServer
 						// The character is now named; its NEXT GameServer connection (opened after the 0x2002
 						// enter-world handoff) is the create-world entry and must get the intro/cutscene. Mark it
 						// pending so the world Hello recognises that connection (and not later normal logins).
-						PendingCreateWorldEntry.Add(client.Session.Character.Id);
+						PendingCreateWorldEntry.TryAdd(client.Session.Character.Id, 0);
 						Logger.LogInformation("Create-editor: character {CharacterId:X8} named '{Name}'; marked pending create-world entry.", client.Session.Character.Id, valueString);
 					}
 
