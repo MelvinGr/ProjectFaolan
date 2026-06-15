@@ -80,6 +80,33 @@ The animation/result params (`typeId`/`swingCounter`/`f5`/`f11`/`f12`/`resultTyp
 semantically decoded - capture-typical defaults for the live send; **needs in-client verification** that the
 swing actually animates.
 
+## NPC chase / aggro movement (#190, 2026-06-15)
+
+A hostile NPC with a player inside `NpcAggroRange` (20u) chases it: `WorldState.Tick` steps the NPC toward
+the target (horizontal, `NpcMoveSpeed` 12u/s, keeping terrain Y) and `WorldBroadcaster.BroadcastNpcMove`
+sends a per-tick **MoveTask transform** (`MoveTaskCodec.BuildBody`, the 61-byte `0x02` "orient" form:
+origin->this-tick position, facing travel direction) so nearby viewers watch it move. In melee range
+(`NpcMeleeRange` 3u) it swings (the attack-animation ack above). **Leash:** past `NpcLeashRange` (40u) from
+spawn it disengages, walks home (ignoring re-aggro, `WorldEntity.Returning`), and heals on arrival; losing
+the target out in the field also sends it home. WORKS in-client (it moves + leashes + stops on de-aggro).
+
+**Open polish (walk gait + slight snap).** The 61-byte form has no speed field, so the client uses a default
+interpolation (a small teleport/snap) and a **walk** gait. Findings from the MoveTask grammar:
+- The task-type byte **@30** (offset incl. the 4-byte length prefix) is the form discriminator: `0x06`
+  stationary (`BuildStationary`), `0x02` orient (the 61-byte form we send), `0x04` patrol/segment-list
+  (`BuildPatrol`, carries a speed but its anchor loops), `0x08` **follow-entity**.
+- `0x08` follow (the chasing mobs send it with id = the player handle) is **target/facing metadata, NOT a
+  mover** - wiring it as the chase driver made NPCs face+attack in place without moving. The actual
+  locomotion rides the position-transform packets sent alongside it.
+- ⚠️ `MoveTaskBuilder` bodies (`BuildStationary`/`BuildPatrol`/...) carry their **own** 4-byte length prefix,
+  so they must be framed RAW after the RPC header - wrapping them in a `WriteArrayUInt32Length` length prefix
+  double-prefixes and the client drops the packet.
+- **Next candidate** for run gait + no snap: the `0x05` "pace" form (len 69) `[05][const 12][f32][vec3][vec3]`
+  - a speed float + two positions (a linear move WITH speed). Drive the per-tick step from it instead of the
+  61-byte form. Full MoveTask grammar: `docs/archive/spawn-dissection-plan.md`.
+
+Separately, NPC swings render **empty-handed** (no weapon drawn) - a combat-stance / weapon-draw gap, #218.
+
 ## Known gaps (TODO.md §Combat)
 - HP/stamina auto-regen not implemented. NPC death animation: corpse now lingers then becomes a loot bag
   (above, #204); a decoded death-state IIR is still open.
