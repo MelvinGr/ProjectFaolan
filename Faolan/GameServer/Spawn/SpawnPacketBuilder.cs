@@ -19,10 +19,6 @@ namespace Faolan.GameServer.Spawn
 	// + CRC are (re)computed by the caller / PacketStream.
 	public static class SpawnPacketBuilder
 	{
-		// The CharacterStats IIR component (sex/side/race/class/health/... = ProtoCoreCharacterIIR.CharacterStats) is
-		// a 0x22 length-delimited field immediately after the name. Strie layout: 0x22 @315, 67-byte payload @317.
-		public const int CharacterStatsTagOffset = 315;
-
 		// Offsets within the FA015807 body, valid for the Strie-shaped beach layout (the burst's player spawn and
 		// the SpawnStrieTemplate test golden; other characters' spawns shift with name/equipment length - use
 		// PlayerSpawnReader / PlayerSpawnScaffoldCodec for those).

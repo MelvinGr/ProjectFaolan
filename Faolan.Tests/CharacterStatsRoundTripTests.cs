@@ -16,8 +16,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void TemplateCharacterStats_DecodesExpectedIdentity()
 		{
-			var payload = TemplateCharacterStatsPayload(out _);
-			var stats = payload.FromProtobuf<ProtoCoreCharacterIIR.CharacterStats>();
+			var stats = TemplateCharacterStats();
 
 			// Strie: sex code 3, race 1 (cross-checked against the other captures' player spawns, which are sex 2 /
 			// race 3). Life (field 6) = 9000.
@@ -27,23 +26,25 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void TemplateCharacterStats_ReEncodesByteIdentical()
+		public void TemplateCharacterMessage_ReEncodesByteIdentical()
 		{
-			var payload = TemplateCharacterStatsPayload(out _);
-			var stats = payload.FromProtobuf<ProtoCoreCharacterIIR.CharacterStats>();
+			var template = Golden.Bytes("SpawnStrieTemplate");
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(template, out var read));
 
-			var reEncoded = stats.ToProtobufBytes();
-
-			Assert.Equal(Convert.ToHexString(payload), Convert.ToHexString(reEncoded));
+			// Re-encoding the typed ProtoCoreCharacterIIR (which contains CharacterStats) reproduces the captured
+			// message slice byte-for-byte - the build-side oracle, located structurally (no fixed Strie offset).
+			var captured = template.AsSpan(read.Offset, read.Length).ToArray();
+			Assert.Equal(Convert.ToHexString(captured), Convert.ToHexString(read.Message.ToProtobufBytes()));
 		}
 
-		private static ReadOnlySpan<byte> TemplateCharacterStatsPayload(out byte[] template)
+		// Locates the ProtoCoreCharacterIIR structurally (PlayerSpawnReader, not a fixed byte offset) and returns its
+		// typed CharacterStats sub-message.
+		private static ProtoCoreCharacterIIR.CharacterStats TemplateCharacterStats()
 		{
-			template = Golden.Bytes("SpawnStrieTemplate");
-			var p = SpawnPacketBuilder.CharacterStatsTagOffset;
-			Assert.Equal(0x22, template[p]); // 0x22 length-delimited field tag
-			int len = template[p + 1]; // 67 < 128, single-byte length
-			return template.AsSpan(p + 2, len);
+			var template = Golden.Bytes("SpawnStrieTemplate");
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(template, out var read));
+			Assert.NotNull(read.Message.Stats);
+			return read.Message.Stats;
 		}
 	}
 }
