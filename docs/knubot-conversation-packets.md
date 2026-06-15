@@ -1,7 +1,7 @@
 # Knubot conversation packets — wire grammar (Gitea #188)
 
 Decoded from `AgeOfConan.exe` (Ghidra, 2026-06-14; reproduce with `Captures/ghidra/DumpIirReaders.java`).
-These are the NPC-dialogue packets `ConversationReplay.ServeScreen` currently **replays verbatim** from the
+These are the NPC-dialogue packets `ConversationService.ServeScreen` currently **replays verbatim** from the
 captured `ConversationPacket` rows (~409 rows). Decoding them is the step toward constructing dialogue from
 RDB text + the Lua/tag VM (#188), retiring the replay.
 
@@ -23,7 +23,7 @@ Every Knubot packet begins with this base (the subclasses call it first).
 | **OpenChatWindow** | `0x045B0B0F` | `FUN_009a5490` | window framing (small) |
 | **AppendText** | `0x4A3D899A` | `FUN_009a4ce0` | one `<remoteformat>` string = the NPC's line |
 | **AnswerList** | `0xF164A4A5` | `FUN_009a3a10` | a sub-object, then `u32 answerCount` (asserted `>0`, `<=1000`), then `answerCount × <remoteformat>` strings = the player's options |
-| **CloseChatWindow** | `0xC4AF39EB` | — | AnswerList with `answerCount = 0` (the captured constant in `ConversationReplay`) |
+| **CloseChatWindow** | `0xC4AF39EB` | — | AnswerList with `answerCount = 0` (the captured constant in `ConversationService`) |
 
 A dialogue SCREEN on the wire = `OpenChatWindow` (opens) → `AppendText` (NPC text) → `AnswerList` (the
 option list). Each text/option slot is a `<remoteformat id=.. category=.. key=..>` token the client resolves
@@ -36,4 +36,4 @@ records with the right `(id, category, key)` refs.
   already give the screens; `memory rdb_extraction` for the RDB side).
 - Build `KnubotOpenChatWindow`/`AppendText`/`AnswerList` from those refs (byte-exact golden tests vs the
   captured `ConversationPacket` bodies), then drive them from the Lua/tag VM (conditions + grants already
-  landed, #37) instead of replaying. Retire `ConversationReplay.ServeScreen`'s verbatim path.
+  landed, #37) instead of replaying. Retire `ConversationService.ServeScreen`'s verbatim path.

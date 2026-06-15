@@ -36,7 +36,7 @@ The Knubot packet grammar is decoded (Ghidra): `docs/knubot-conversation-packets
 
 ## What is already BUILT (and works)
 
-Runtime (`Faolan/GameServer/Login/ConversationReplay.cs`, partial `GameServerListener`):
+Runtime (`Faolan/GameServer/Dialogue/ConversationService.cs`, the `ConversationService` collaborator):
 - **Replay** — `TryReplayConversation` (greeting on `TalkToNpc` field3=0) → `ServeScreen` (re-addresses the
   captured `ConversationPacket` bytes to the live player/NPC and sends them) → `AdvanceConversation`
   (`KnubotAnswer` index extends the answer-path, serves the child). Un-walked branch → `SendConversationClose`.
@@ -116,7 +116,7 @@ complete → done greeting.
 ---
 
 ## Wiring points
-- Runtime: `Faolan/GameServer/Login/ConversationReplay.cs` (`PickConversationScreen` = the variant selector;
+- Runtime: `Faolan/GameServer/Dialogue/ConversationService.cs` (`PickConversationScreen` = the variant selector;
   extend it to gate every path).
 - Importer: `Faolan.Importer/ConversationExtractor.cs` (`Extract`/`Merge`) + `ConversationConditions.cs`
   (whole-tree state conditions) + `Program.cs` (the conversation assembly pipeline).

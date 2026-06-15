@@ -13,7 +13,7 @@
 - `GameServerListener` depends on `IAgentServerDispatcher` (`Faolan.Core/Network/AgentServer/AgentServerDispatcher.cs`) to send chat/system messages through the separate AgentServer channel.
 
 ## Packet/code patterns to follow
-- Most listeners are split across partial classes (`Packets.cs`, `GMCommands.cs`, retail burst files, etc.). Before changing behavior, inspect all partials for that listener.
+- Most listeners are split across partial classes (organized under `Inbound/`, `Outbound/`, `Gm/`, retail burst files, etc.). Before changing behavior, inspect all partials for that listener. Domain logic increasingly lives in composed collaborator services (`CombatService`, `ShopService`, `ConversationService`, …) rather than the partial — see CLAUDE.md.
 - Network services inherit `Server<TPacket,...>` (`Faolan.Core/Network/Server.cs`); connection/session state lives on `INetworkClient.Session` (`Faolan.Core/Network/NetworkClientSession.cs`).
 - Build packets with `PacketStream` / `FaolanStream`, not raw byte math where helpers exist. Important quirks: integers are big-endian, but `WriteFloat` is intentionally little-endian (`Faolan.Core/Data/FaolanStream.cs`).
 - `PacketStream.WriteHeader(...)` plus `SendAsync(...)` computes length + CRC automatically. If you bypass `PacketStream`, you must already have a full wire packet.

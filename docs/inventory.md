@@ -74,7 +74,7 @@ Capture: `account-stricken998-character-combat_armed-and-unarmed` (2026-06-12). 
   args) with the tail's zero padding replaced by the identity block: `[Item.Data1..4 quad] x2 +
   [B2 90 80 5C 29 E6 27 CA] x2` on equip, the null filler x6 on unequip - plus a 0x201C record
   (`prefix 0x65, state = destSlot` on equip; `0x68, 0` on unequip).
-- Persistence: `EquipmentPersistence.cs` (equip writes the slot + consumes the bag row; unequip parks the
+- Persistence: `Inventory/EquipmentService.cs` (equip writes the slot + consumes the bag row; unequip parks the
   item at the exact bag cell).
 
 Slot ids (equipped container `pos` = `CharacterEquipment` slot): chest 5, main hand 6, ring 9, legs 16,

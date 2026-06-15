@@ -1,7 +1,7 @@
 # Tradepost (auction house) + mail protocol
 
 > **STATUS (2026-06-12): ⛔ PINNED — awaiting an in-client render check.** The protocol below is decoded
-> byte-exact and the open + search replies are wired + golden-tested (`Faolan/GameServer/Tradepost/`,
+> byte-exact and the open + search replies are wired + golden-tested (`Faolan/GameServer/Economy/Tradepost/`,
 > `TradepostResponseTests`). What's unverified is whether the client actually renders the AH window/listings —
 > test with the `.ah` GM command (sends `DispatchOpenTradepost` at the player's position). Once it renders,
 > proceed to Step 3 (DB-backed listings + the `Mail`/`MailAttachment` model + buy→mail). See `TODO.md` §9a.
@@ -155,7 +155,7 @@ attachCount x { [itemInstanceId:u64][entryLen:u32][ProtoInventoryGameEntry][trai
 Golden tests `MailMessageCodecTests` (Build == captured 629 B and 754 B; `includeAttachments=false` reproduces the
 base from the attachment mail).
 
-**Status (2026-06-14): BUY → mail delivery + the mailbox ops are WIRED** (`Faolan/GameServer/Tradepost/TradepostMailHandler.cs`,
+**Status (2026-06-14): BUY → mail delivery + the mailbox ops are WIRED** (`Faolan/GameServer/Economy/Tradepost/TradepostService.cs`,
 `TradepostResponses.SendMailMessage/SendMailResult/SendRetrieveMailResult`). `TradepostBuyItem(0x200E)` debits the
 buyer (`DispatchUpdateCash`), creates a **system mail** (recipient = buyer, sender empty) with the listed item
 escrowed as a `MailAttachment`, deletes the listing, and pushes the base `DispatchMailMessage`. The mailbox ops then

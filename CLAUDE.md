@@ -70,14 +70,22 @@ compressed GameServer downloads; use `-o tcp.analyze_sequence_numbers:FALSE` on 
 **Listeners** are partial classes split across many files — inspect all partials before changing
 behavior. `GameServerListener`'s partials are organized by role: `Inbound/` (opcode handlers, `Handle*`),
 `Outbound/` (packet builders, **behavior-named** e.g. `VitalsUpdateBuilder`/`GuildTagBuilder` — never
-opcode-named), `Gm/`, and the subsystem folders (`Login/`, `CreateFlow/`, `Combat/`, `World/`, `Spawn/`,
-`Scripting/`, `Economy/`...). NB a partial-class file keeps `namespace Faolan.GameServer` regardless of its
-folder (the `// CheckNamespace` suppression), so its folder is organizational only; the composed
-collaborators (`CombatService`, `WorldBroadcaster`, `WorldSimulation`...) are proper folder-namespaced
-classes — prefer that pattern over growing the partial. Listeners inherit `Server<TPacket,...>`
-(`Faolan.Core/Network/Server.cs`); per-connection state lives on `INetworkClient.Session`. Cross-listener
-actions go through dispatcher seams (`IAgentServerDispatcher` for chat/system messages,
-`IGameServerDispatcher` for world actions), never direct references.
+opcode-named), `Gm/`, and the per-flow folders (`Login/`, `CreateFlow/`...). NB a partial-class file keeps
+`namespace Faolan.GameServer` regardless of its folder (the `// CheckNamespace` suppression), so its folder
+is organizational only.
+
+**Prefer composed collaborators over growing the partial.** Domain logic is pulled OUT of the listener into
+folder-namespaced service classes that take their deps by ctor and the client per call:
+`CombatService` (Combat/), `WorldBroadcaster` + `WorldSimulation` (World/), `EquipmentService` (Inventory/),
+`ConversationService` (Dialogue/), and `ShopService`/`BankService`/`TradepostService` (Economy/). The
+listener holds them as `_combat`/`_shop`/... fields and forwards. When a service needs a cross-cutting
+OUTBOUND op that lives on the listener (e.g. the wallet update or the live item-grant, shared by several
+subsystems), inject it as a **delegate seam** (`Func<…>`) from the listener ctor rather than passing the
+listener — keeps the service free of the god-class. (See Gitea #200 for the remaining extraction backlog.)
+
+Listeners inherit `Server<TPacket,...>` (`Faolan.Core/Network/Server.cs`); per-connection state lives on
+`INetworkClient.Session`. Cross-listener actions go through dispatcher seams (`IAgentServerDispatcher` for
+chat/system messages, `IGameServerDispatcher` for world actions), never direct references.
 
 **Database:** SQLite via EF Core, pooled `DbContextFactory`, short-lived per-unit-of-work contexts —
 lazy loading is deliberately NOT used; load navigations explicitly with `Include`. All access goes

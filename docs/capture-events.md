@@ -67,7 +67,7 @@ human-readable `remoteformat`/`localized` XML + object/NPC name strings (with th
 `...create-random-actions-combat-levelup-questcomplete.json`
 - **Quest dialogue tree** (the beach Casilda/combat NPC): `4A3D899A` 12493→12490→20018→20019→20020→19919→
   26909→12492→12494 with `F164A4A5` remoteformats 7615/12621/12622/12623/13444/12548/7617. (This is the tree
-  `ConversationReplay` already serves.)
+  `ConversationService` already serves.)
 - **Quest rewards / turn-in**: `0xA36D3B74` "QuestRewards".
 - **Combat**: `0x6B87E316` ApplySpell casts + `4517AA81` Move; damage/health updates are in entity-state packets
   (candidate `205a`/`04B82B2D`/`D751EBB4` - unconfirmed). Level-up not isolated to a single sub-op yet.
