@@ -130,6 +130,9 @@ authored/decoded grammar in the codebase. **Open:** map this block to its exact 
 top-level sequence (it is one of List B/C / the `MainQuest_c` neighborhood — List B's `FUN_00922c90` record
 shape does not match these bytes, so the order/identity needs another tracing pass).
 
+Validated by the dissector `Captures/decode_questc.py` (parses version + List A + each `Quest_c` and asserts
+it consumes exactly to the objective-block boundary `@609`; `listKey == questId`).
+
 So the human-readable journal text is entirely the **5 header strings**; the numeric objective records are
 unused for the beach starter (its objectives render from the strings). **Generation:** emit `listKey` +
 `[ver=1, questId, state, 0, N, 0x412]` + the 5 `<remoteformat>` strings + `[1, areaId, questId, 0]` +
