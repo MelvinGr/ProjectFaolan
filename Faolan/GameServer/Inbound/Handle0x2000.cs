@@ -287,17 +287,9 @@ namespace Faolan.GameServer
 								await _combat.SpendCasterMana(client, spellId);
 
 								// An offensive cast at another entity applies damage + pushes the target's vitals; a
-								// self/no-target cast is treated as a buff (no damage) until spell data distinguishes them.
+								// self/no-target cast is a buff (no damage), already registered by ApplySpell (#69).
 								if (targetHandle != 0 && targetHandle != casterHandle)
 									await _combat.ResolveOffensiveCast(client, casterHandle, targetHandle, spellId);
-								else
-								{
-									// Track the buff server-side (the client tracks its own icon/duration from the
-									// ApplySpell data; this registry is what CancelBuff removes from).
-									var casterEntity = _simulation.PlayerWorldEntity(client);
-									if (casterEntity != null)
-										casterEntity.ActiveBuffs[spellId] = new World.ActiveBuff(spellId, casterHandle, DateTimeOffset.UtcNow, null);
-								}
 
 								break;
 							}

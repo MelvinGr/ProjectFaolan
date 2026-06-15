@@ -406,7 +406,7 @@ namespace Faolan.GameServer
 		// send time (Burst + SendBurst in PacketBurstHelper) with the same instance written into the header and
 		// body, so auth replies and burst packets stay on one conversation.
 
-		private static Task ApplySpell(INetworkClient client, uint applyTo, uint applyFrom, uint spellId, byte[] data = null)
+		private async Task ApplySpell(INetworkClient client, uint applyTo, uint applyFrom, uint spellId, byte[] data = null)
 		{
 			// Use as 'dummy' data (comes from Scythe Shield Rank 3 (3 hours, 20 min, 28ish sec))
 			var spellData = new byte[]
@@ -420,7 +420,7 @@ namespace Faolan.GameServer
 
 			data ??= spellData;
 
-			return new PacketStream()
+			await new PacketStream()
 				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameServerRespondOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000RespondsOpcodes.ApplySpell)
@@ -432,6 +432,17 @@ namespace Faolan.GameServer
 					.WriteUInt32(applyFrom) // apply from ?
 					.WriteArray(data))
 				.SendAsync(client);
+
+			// Register a SELF-buff (applyTo == applyFrom) so the server tracks it (.buffs / CancelBuff / tick
+			// expiry). Centralized here so EVERY ApplySpell send path registers - the mount buff, .spelltest, the
+			// summon cast and the BCC cast path - not just the inbound cast handler (#69). Offensive casts
+			// (applyTo != applyFrom) are damage, not buffs, and are handled by ResolveOffensiveCast.
+			if (applyTo == applyFrom)
+			{
+				var entity = _simulation.PlayerWorldEntity(client);
+				if (entity != null && entity.Handle == applyTo)
+					entity.ActiveBuffs[spellId] = new World.ActiveBuff(spellId, applyFrom, DateTimeOffset.UtcNow, null);
+			}
 		}
 
 		private static Task ReportDimensionId(INetworkClient client, uint realmId, byte[] sender = null, byte[] receiver = null)
