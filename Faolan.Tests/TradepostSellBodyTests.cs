@@ -1,3 +1,4 @@
+using Faolan.GameServer.Economy.Tradepost;
 using System;
 using Faolan.Core.Data;
 using Xunit;
@@ -62,7 +63,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void BankSlotStatBody_MatchesCapturedOverlayUpdate()
 		{
-			var body = Faolan.GameServer.GameServerListener.BuildBankSlotStatBody(0x0802e5d4, slot: 6, statId: 258, value: 1_000_000);
+			var body = Faolan.GameServer.Economy.Tradepost.TradepostService.BuildBankSlotStatBody(0x0802e5d4, slot: 6, statId: 258, value: 1_000_000);
 
 			Assert.Equal("000000690802e5d40000000600000102000f4240", Convert.ToHexStringLower(body));
 		}

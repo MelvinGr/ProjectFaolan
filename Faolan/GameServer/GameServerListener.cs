@@ -51,6 +51,9 @@ namespace Faolan.GameServer
 		// See Economy/Bank/BankService.cs.
 		private readonly Economy.Bank.BankService _bank;
 
+		// Auction-house buy->mail + mailbox ops + sell/list flow. Wallet/item-grant injected as seams. See Economy/Tradepost/TradepostService.cs.
+		private readonly Economy.Tradepost.TradepostService _tradepost;
+
 		// Builds + sends the world-event packets (spawns/moves/despawns, NPC respawn/loot/mount renders, loot-window
 		// and quest-journal packets). Reads the world model via the simulation; the listener delegates its IWorldOutbound
 		// port + the loot/quest opcode handlers to it. See World/WorldBroadcaster.cs.
@@ -83,6 +86,7 @@ namespace Faolan.GameServer
 			_equipment = new Inventory.EquipmentService(database, logger);
 			_shop = new Economy.Shop.ShopService(database, logger, SendMoneyUpdate, GrantItemToBackpack);
 			_bank = new Economy.Bank.BankService(database, logger, (client, container, pos, entry) => SendAddItem(client, container, pos, entry));
+			_tradepost = new Economy.Tradepost.TradepostService(database, logger, SendMoneyUpdate, (c, ct, p, e) => SendAddItem(c, ct, p, e), GrantItemToBackpack);
 
 			InitGmCommands();
 		}
@@ -161,7 +165,7 @@ namespace Faolan.GameServer
 			// ordinary opcodes, so route them by RPC class id before the opcode switch (docs/tradepost-protocol.md).
 			if (Economy.Tradepost.TradepostProtocol.IsInbound(packet))
 			{
-				await Economy.Tradepost.TradepostHandler.Handle(this, client, packet, Logger, Database);
+				await Economy.Tradepost.TradepostHandler.Handle(_tradepost, client, packet, Logger, Database);
 				return;
 			}
 

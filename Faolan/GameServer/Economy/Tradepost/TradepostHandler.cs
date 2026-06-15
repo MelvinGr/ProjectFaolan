@@ -14,7 +14,7 @@ namespace Faolan.GameServer.Economy.Tradepost
 	// are the next increment.
 	public static class TradepostHandler
 	{
-		public static async Task Handle(GameServerListener listener, INetworkClient client, ConanPacket packet, ILogger logger, IDatabaseRepository database)
+		public static async Task Handle(TradepostService tradepost, INetworkClient client, ConanPacket packet, ILogger logger, IDatabaseRepository database)
 		{
 			var method = (TradepostProtocol.AgentMethod)packet.Opcode;
 			switch (method)
@@ -44,32 +44,32 @@ namespace Faolan.GameServer.Economy.Tradepost
 
 				case TradepostProtocol.AgentMethod.BuyItem:
 					// BUY -> debit the buyer + deliver the item via a system mail (mutates state, so the listener owns it).
-					await listener.HandleTradepostBuy(client, packet);
+					await tradepost.HandleTradepostBuy(client, packet);
 					break;
 
 				case TradepostProtocol.AgentMethod.TradepostSellItem:
 					// SELL -> list a bank item for sale (creates a listing + escrows the item out of the bank).
-					await listener.HandleTradepostSell(client, packet);
+					await tradepost.HandleTradepostSell(client, packet);
 					break;
 
 				case TradepostProtocol.AgentMethod.TradepostChangeItemPrice:
 					// Reprice the seller's own listing (addressed by origin bank slot).
-					await listener.HandleTradepostChangePrice(client, packet);
+					await tradepost.HandleTradepostChangePrice(client, packet);
 					break;
 
 				case TradepostProtocol.AgentMethod.TradepostCancelSellItem:
 					// Pull the seller's own listing and return the escrowed item to the bank.
-					await listener.HandleTradepostCancelSell(client, packet);
+					await tradepost.HandleTradepostCancelSell(client, packet);
 					break;
 
 				case TradepostProtocol.AgentMethod.SendMail:
 					// Player-composed mail (optionally with a bank-item attachment) to another character.
-					await listener.HandleTradepostSendMail(client, packet);
+					await tradepost.HandleTradepostSendMail(client, packet);
 					break;
 
 				case TradepostProtocol.AgentMethod.CancelMail:
 					// Recall/delete one of the player's mails.
-					await listener.HandleTradepostCancelMail(client, packet);
+					await tradepost.HandleTradepostCancelMail(client, packet);
 					break;
 
 				case TradepostProtocol.AgentMethod.Close:
@@ -84,7 +84,7 @@ namespace Faolan.GameServer.Economy.Tradepost
 				case TradepostProtocol.AgentMethod.GetMailItem:
 				case TradepostProtocol.AgentMethod.MarkMailRead:
 				case TradepostProtocol.AgentMethod.DeleteMail:
-					await listener.HandleTradepostMailOp(client, packet, method);
+					await tradepost.HandleTradepostMailOp(client, packet, method);
 					break;
 
 				default:
