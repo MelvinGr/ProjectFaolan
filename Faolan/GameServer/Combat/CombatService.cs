@@ -145,20 +145,7 @@ namespace Faolan.GameServer.Combat
 			if (hasEnemyTarget)
 			{
 				// 2) DamageResultIIR - the hit / floating number.
-				await new PacketStream()
-					.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), 0x2000)
-					.WriteArrayUInt32Length(s => s
-						.WriteUInt32(0xFEC4158Au)
-						.WriteUInt32(0x0000C350u)
-						.WriteUInt32(instance)
-						.WriteByte(0x00)
-						.WriteUInt32(0x0000C350u)
-						.WriteUInt32(targetHandle)
-						.WriteUInt32(damage)
-						.WriteUInt32(2)
-						.WriteUInt32(0)
-						.WriteUInt32(0))
-					.SendAsync(client);
+				await SendWorldPacket(client, CombatPacketCodec.BuildDamageResultBody(instance, targetHandle, damage));
 
 				// Apply to the target's live vitals (world-authoritative), push its health bar, and run the kill
 				// lifecycle (despawn + scheduled respawn) on death.
@@ -167,15 +154,7 @@ namespace Faolan.GameServer.Combat
 
 			// 3) EnergyIIR - the player's stamina after the swing.
 			var player = GetOrAddPlayerVitals(client);
-			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), 0x2000)
-				.WriteArrayUInt32Length(s => s
-					.WriteUInt32(0x40749B8Au)
-					.WriteUInt32(0x0000C350u)
-					.WriteUInt32(instance)
-					.WriteByte(0x01)
-					.WriteUInt32(player.Stamina))
-				.SendAsync(client);
+			await SendWorldPacket(client, CombatPacketCodec.BuildEnergyBody(instance, player.Stamina));
 		}
 
 		// The 8-byte filler retail writes where an item identity quad would otherwise go in a behavior ack
@@ -291,33 +270,12 @@ namespace Faolan.GameServer.Combat
 		// stamina update (the retail post-ack trio of the armed swing path).
 		private async Task SendSwingDamage(INetworkClient client, uint instance, uint targetHandle, uint damage)
 		{
-			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), 0x2000)
-				.WriteArrayUInt32Length(s => s
-					.WriteUInt32(0xFEC4158Au)
-					.WriteUInt32(0x0000C350u)
-					.WriteUInt32(instance)
-					.WriteByte(0x00)
-					.WriteUInt32(0x0000C350u)
-					.WriteUInt32(targetHandle)
-					.WriteUInt32(damage)
-					.WriteUInt32(2)
-					.WriteUInt32(0)
-					.WriteUInt32(0))
-				.SendAsync(client);
+			await SendWorldPacket(client, CombatPacketCodec.BuildDamageResultBody(instance, targetHandle, damage));
 
 			await ApplyNpcDamage(client, targetHandle, (int)damage, $"melee from 0x{instance:X8}");
 
 			var player = GetOrAddPlayerVitals(client);
-			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), 0x2000)
-				.WriteArrayUInt32Length(s => s
-					.WriteUInt32(0x40749B8Au)
-					.WriteUInt32(0x0000C350u)
-					.WriteUInt32(instance)
-					.WriteByte(0x01)
-					.WriteUInt32(player.Stamina))
-				.SendAsync(client);
+			await SendWorldPacket(client, CombatPacketCodec.BuildEnergyBody(instance, player.Stamina));
 		}
 
 		// Spends the caster's mana for a cast and pushes the caster's own 0x96B8DC59 update so the mana bar drops -
