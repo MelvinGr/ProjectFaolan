@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
+using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets.Opcodes;
 
@@ -20,7 +21,7 @@ namespace Faolan.GameServer.World
 	public static class ScryScript
 	{
 		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.ScryScriptIIR;
-		public const uint TypeTagAck = 0x0000C350;
+		public const uint TypeTagAck = EntityClass.Character;
 
 		// A named scripted step (mode 2 = the simple step-token form: "IntroDone", "ChangeSex", ...).
 		public static byte[] BuildStep(uint playerHandle, string stepToken, uint mode = 2, uint flag = 0, string resources = "")

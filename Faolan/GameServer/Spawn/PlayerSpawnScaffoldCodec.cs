@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using Faolan.Core.Network;
 using Faolan.Core.Network.Packets.Opcodes;
 
 namespace Faolan.GameServer.Spawn
@@ -36,7 +37,7 @@ namespace Faolan.GameServer.Spawn
 		public List<ScaffoldIdEntry> IdList { get; } = new List<ScaffoldIdEntry>();
 		public List<ScaffoldPair> EndPairs { get; } = new List<ScaffoldPair>();
 		public List<ScaffoldPair> EndPairs2 { get; } = new List<ScaffoldPair>();
-		public uint Ack { get; set; } = 0xC350;
+		public uint Ack { get; set; } = EntityClass.Character;
 
 		public uint EntryTableX { get; set; } // per-char u32 after the entry count (Strie 0xB7, necrol80 0x2B6, editor 0x3F1)
 		public uint FieldA { get; set; }
@@ -257,7 +258,7 @@ namespace Faolan.GameServer.Spawn
 
 			for (var n = key / Marker - 1; n > 0; n--)
 			{
-				if (BinaryPrimitives.ReadUInt32BigEndian(b.AsSpan(i + 32, 4)) != 0xC350)
+				if (BinaryPrimitives.ReadUInt32BigEndian(b.AsSpan(i + 32, 4)) != EntityClass.Character)
 					throw new FormatException("buff record shape mismatch");
 
 				s.BuffRecords.Add(b

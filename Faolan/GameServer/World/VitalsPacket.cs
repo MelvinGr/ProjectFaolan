@@ -15,7 +15,7 @@ namespace Faolan.GameServer.World
 	// build it without depending on the listener type.
 	public static class VitalsPacket
 	{
-		private const uint VitalsMarker = 0x0000C350;
+		private const uint VitalsMarker = EntityClass.Character;
 
 		// Builds a 0x96B8DC59 stat block for an entity (defaults to the session's own client instance). Returns the
 		// wire bytes.

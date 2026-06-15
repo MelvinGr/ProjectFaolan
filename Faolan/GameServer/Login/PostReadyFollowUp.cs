@@ -424,11 +424,11 @@ namespace Faolan.GameServer
 				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameServerRespondOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000RespondsOpcodes.ApplySpell)
-					.WriteUInt32(0x0000C350)
+					.WriteUInt32(EntityClass.Character)
 					.WriteUInt32(applyTo) //Apply to ?
 					.WriteUInt16(0x0000)
 					.WriteUInt32(spellId) // SpellID
-					.WriteUInt32(0x0000C350)
+					.WriteUInt32(EntityClass.Character)
 					.WriteUInt32(applyFrom) // apply from ?
 					.WriteArray(data))
 				.SendAsync(client);
@@ -474,7 +474,7 @@ namespace Faolan.GameServer
 				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, client.Session.Account.ClientInstance), GameServerRespondOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(opcode)
-					.WriteUInt32(0x0000C350)
+					.WriteUInt32(EntityClass.Character)
 					.WriteUInt32(client.Session.Account.ClientInstance)
 					.WriteArray(SubstitutePostReadyInstance(tail, client.Session.Account.ClientInstance)))
 				.SendAsync(client);
@@ -501,7 +501,7 @@ namespace Faolan.GameServer
 				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, client.Session.Account.ClientInstance), GameServerRespondOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000RespondsOpcodes.StatIIR)
-					.WriteUInt32(0x0000C350)
+					.WriteUInt32(EntityClass.Character)
 					.WriteUInt32(client.Session.Account.ClientInstance)
 					.WriteByte(0x01)
 					.WriteUInt32(0x00000013)
@@ -513,7 +513,7 @@ namespace Faolan.GameServer
 		{
 			return new PacketStream()
 				.WriteHeader(ExistingCharacterReadyForPlayScreenSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, client.Session.Account.ClientInstance), GameServerRespondOpcodes.SpawnCheck)
-				.WriteUInt32(0x0000C350)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(client.Session.Account.ClientInstance)
 				.WriteByte(0)
 				.SendAsync(client);

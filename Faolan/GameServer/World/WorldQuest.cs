@@ -1,3 +1,4 @@
+using Faolan.Core.Network;
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
@@ -39,7 +40,7 @@ namespace Faolan.GameServer.World
 		// TODO: harvest this per quest into QuestDefinition; 3 is the captured value for Casilda's 13479 (and the only
 		// value observed for active quests so far - a different quest 0x..27 used 1).
 		public const uint FullUpdateStateActive = 3;
-		public const uint TypeTagAck = 0x0000C350;
+		public const uint TypeTagAck = EntityClass.Character;
 
 		// The Tortage beach world-entry snapshot (0x737A6DF9) embeds quest 10238 ("Shipwrecked") in its tails, with its
 		// FULL multi-objective journal record, for every character (snapshot_embeds_strie_quest). The snapshot is the

@@ -1,3 +1,4 @@
+using Faolan.Core.Network;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
@@ -17,7 +18,7 @@ namespace Faolan.GameServer.Spawn
 	{
 		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.MoveTaskIIR;
 		private const int BodyLength = 31;
-		private const uint Ack = 0x0000C350;
+		private const uint Ack = EntityClass.Character;
 
 		// Builds the canonical single-segment PATROL MoveTask (task type 0x04, the waypoint-list form). This is
 		// what a moving NPC needs: a current position plus a list of waypoints it walks between at `speed`. The

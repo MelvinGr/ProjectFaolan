@@ -36,7 +36,7 @@ namespace Faolan.CSPlayerAgent
 			_clientForCharacter = clientForCharacter;
 		}
 
-		private const uint CharacterWireType = 0x0000C350;
+		private const uint CharacterWireType = EntityClass.Character;
 
 		// A guild invite offered to a character, awaiting AcceptGuildInvitation/DeclineGuildInvitation. Keyed by
 		// the invitee's character id; entries are dropped on accept/decline (retail also expires them - cooldown

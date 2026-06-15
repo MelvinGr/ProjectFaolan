@@ -1,3 +1,4 @@
+using Faolan.Core.Network;
 using Faolan.Core.Data;
 
 namespace Faolan.Core.Network.Packets
@@ -28,7 +29,7 @@ namespace Faolan.Core.Network.Packets
 	public static class FormatFeedbackCodec
 	{
 		public const uint SubOpcode = 0x8D5A8B6B;
-		private const uint IirMarker = 0x0000C350;
+		private const uint IirMarker = EntityClass.Character;
 		private const byte LeadFlag = 0x01;
 
 		// typeFlags value of the GenericDisplayAreaName / FIFO-banner messages (the top-of-screen overlay).

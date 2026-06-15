@@ -1,4 +1,5 @@
 using Faolan.Core.Data;
+using Faolan.Core.Network;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer
@@ -14,8 +15,8 @@ namespace Faolan.GameServer
 	// RetailCreateEditor*Burst Iir() helper already does.
 	public static class CreateEditorRecordBuilder
 	{
-		// The wire type tag every per-character editor record carries (the GameClient/character class id, 0xC350).
-		public const uint CharacterWireType = 0x0000C350;
+		// The entity-class tag every per-character editor record carries (EntityClass.Character = 0xC350).
+		public const uint CharacterWireType = EntityClass.Character;
 
 		// StatIIR (0xF98E10B3): a single stat set on an entity. 17 bytes:
 		//   [u32 type][u32 handle][u8 flag][u32 statId][u32 value]
@@ -63,7 +64,7 @@ namespace Faolan.GameServer
 				.WriteUInt32(charInstance)
 				.WriteUInt32(0u)
 				.WriteUInt32(count)
-				.WriteUInt32(0x00009C50u) // the 0xC350 char wire type
+				.WriteUInt32(0x00009C50u) // 0x9C50 = 40016 (distinct from EntityClass.Character 0xC350; semantics TBD)
 				.WriteUInt32(playfieldToken)
 				.WriteUInt32(0u).WriteUInt32(0u) // [54:62] zeros
 				.WriteByte((byte)0x18)

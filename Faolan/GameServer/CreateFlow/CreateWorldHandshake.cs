@@ -68,7 +68,7 @@ namespace Faolan.GameServer
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(GameServer0X2000RespondsOpcodes.ScryScriptIIR);
-					s.WriteUInt32(0x0000C350u);
+					s.WriteUInt32(EntityClass.Character);
 					s.WriteUInt32(instance);
 					s.WriteByte(0x00);
 					s.WriteArrayUInt32Length(pb =>
@@ -97,7 +97,7 @@ namespace Faolan.GameServer
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(subOpcode);
-					s.WriteUInt32(0x0000C350u);
+					s.WriteUInt32(EntityClass.Character);
 					s.WriteUInt32(instance);
 					s.WriteArray(tail);
 				})
@@ -126,7 +126,7 @@ namespace Faolan.GameServer
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(GameServer0X2000RespondsOpcodes.SetMorphValueIIR);
-					s.WriteUInt32(0x0000C350u);
+					s.WriteUInt32(EntityClass.Character);
 					s.WriteUInt32(instance);
 					s.WriteUInt16((ushort)0);
 					s.WriteStringByteLength(morphValue);
@@ -149,7 +149,7 @@ namespace Faolan.GameServer
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(GameServer0X2000RespondsOpcodes.SetNameIIR);
-					s.WriteUInt32(0x0000C350u);
+					s.WriteUInt32(EntityClass.Character);
 					s.WriteUInt32(instance);
 					s.WriteUInt32(0u);
 					s.WriteByte(0x03);

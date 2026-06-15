@@ -1,3 +1,4 @@
+using Faolan.Core.Network;
 using System;
 using System.Buffers.Binary;
 using Faolan.Core.Data;
@@ -16,7 +17,7 @@ namespace Faolan.GameServer.Combat
 	{
 		public const uint DamageResultSubOpcode = (uint)GameServer0X2000RespondsOpcodes.DamageResultIIR;
 		public const uint EnergySubOpcode = (uint)GameServer0X2000RespondsOpcodes.EnergyIIR;
-		private const uint WireType = 0x0000C350; // the C350 type word shared by the IIR record family
+		private const uint WireType = EntityClass.Character; // the C350 type word shared by the IIR record family
 
 		public const int DamageResultBodyLength = 37;
 		public const int EnergyBodyLength = 17;

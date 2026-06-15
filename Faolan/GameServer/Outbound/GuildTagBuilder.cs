@@ -11,7 +11,7 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-		private const uint CharacterWireType = 0x0000C350;
+		private const uint CharacterWireType = EntityClass.Character;
 
 		// 0x2550C99A GuildUpdateIIR_c - sets the entity's in-world guild tag (the guild name under the player
 		// name). Retail sends exactly one when the player joins a guild, and the wire layout is

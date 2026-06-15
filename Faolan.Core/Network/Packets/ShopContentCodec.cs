@@ -1,3 +1,4 @@
+using Faolan.Core.Network;
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
@@ -20,7 +21,7 @@ namespace Faolan.Core.Network.Packets
 	public static class ShopContentCodec
 	{
 		public const uint ShopEntryFlags = 0x200000;
-		private const uint CharacterWireType = 0x0000C350;
+		private const uint CharacterWireType = EntityClass.Character;
 
 		public sealed record ShopEntry(uint Pos, uint Template, uint Count, uint Stat356, uint TailLevel, uint Archetype, uint Data1, uint Data2, uint Data3, uint Data4);
 

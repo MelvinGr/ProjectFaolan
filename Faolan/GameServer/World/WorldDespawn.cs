@@ -1,3 +1,4 @@
+using Faolan.Core.Network;
 using System;
 using System.Buffers.Binary;
 using Faolan.Core.Data;
@@ -15,7 +16,7 @@ namespace Faolan.GameServer.World
 	public static class WorldDespawn
 	{
 		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.N3ToClientQuitIIR; // n3ToClientQuitIIR_t
-		public const uint TypeTagAck = 0x0000C350; // the ack TypeTag shared by the IIR record family
+		public const uint TypeTagAck = EntityClass.Character; // the ack TypeTag shared by the IIR record family
 		private const byte RecordMarker = 0x01; // constant in 3271/3271 records (record-count / type marker)
 
 		// The markers that bracket the playfield token inside the 0x737A6DF9 snapshot tail: ...000000BF <token> 0000040B

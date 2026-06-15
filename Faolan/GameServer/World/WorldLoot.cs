@@ -1,3 +1,4 @@
+using Faolan.Core.Network;
 using System.Text;
 using Faolan.Core.Data;
 using Faolan.Core.Network.Packets.Opcodes;
@@ -10,7 +11,7 @@ namespace Faolan.GameServer.World
 	public static class WorldLoot
 	{
 		public const float DefaultFadeSeconds = 3.0f;
-		public const uint EntityTypeTag = 0x0000C350; // the entity-frame typetag carried inside NewCurrentLooter
+		public const uint EntityTypeTag = EntityClass.Character; // the entity-frame typetag carried inside NewCurrentLooter
 		public const uint FadeSubOpcode = (uint)GameServer0X2000RespondsOpcodes.N3ToClientFadeIIR; // n3ToClientFadeIIR_t - graceful fade-out despawn
 		public const uint LootTypeTag = 0x0000C87A; // the loot-bag class typetag
 		public const uint NewCurrentLooterSubOpcode = (uint)GameServer0X2000RespondsOpcodes.NewCurrentLooterIIR; // NewCurrentLooterIIR_c
