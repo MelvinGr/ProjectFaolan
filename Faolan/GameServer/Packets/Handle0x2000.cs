@@ -53,8 +53,7 @@ namespace Faolan.GameServer
 
 						if (client.Session.HasPendingPost205FFollowUp)
 						{
-							client.Session.Post205FF98E10B3Count++;
-							Logger.LogInformation("Queued new-character 0xF98E10B3 #{Count} while post-0x205F handoff is still pending.", client.Session.Post205FF98E10B3Count);
+							Logger.LogInformation("Queued new-character 0xF98E10B3 while post-0x205F handoff is still pending.");
 						}
 						else
 							Logger.LogInformation("Ignoring standalone new-character 0xF98E10B3 because the post-0x205F handoff has already been flushed.");

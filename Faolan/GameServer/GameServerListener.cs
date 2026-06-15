@@ -136,7 +136,6 @@ namespace Faolan.GameServer
 		protected override async Task ReceivedPacket(INetworkClient client, ConanPacket packet)
 		{
 			var opcode = (GameServerOpcodes)packet.Opcode;
-			client.Session.GameServerInboundPacketSequence++;
 
 			// Tradepost (auction house) + mail ride the GameServer RPC layer; their 0x20xx methods COLLIDE with
 			// ordinary opcodes, so route them by RPC class id before the opcode switch (docs/tradepost-protocol.md).
@@ -250,14 +249,10 @@ namespace Faolan.GameServer
 					client.Session.HasPendingCreateEditorReadyFollowUp = false;
 					client.Session.HasFlushedCreateWorldEntryBurst = false;
 					client.Session.HasFlushedCreateEditorPostReady = false;
-					client.Session.Post205F2020Count = 0;
-					client.Session.Post205FF98E10B3Count = 0;
-					client.Session.Post205F02165EFFCount = 0;
 					client.Session.CreateEditorTempInstanceCount = 0;
 					client.Session.CreateEditorObservedRequestIds.Clear();
 					client.Session.CreateEditorReadyRequestIds.Clear();
 					client.Session.MorphAckCounter = 0;
-					client.Session.CharacterEditorInteractive = false;
 					client.Session.MorphActivitySequence = 0;
 					client.Session.PostMorphBurstSent = false;
 					client.Session.AwaitingEnterWorld = false;
@@ -334,9 +329,6 @@ namespace Faolan.GameServer
 
 						client.Session.HasPendingPost205FFollowUp = true;
 						client.Session.CreateEditorTempInstanceCount = 0;
-						client.Session.Post205F2020Count = 0;
-						client.Session.Post205FF98E10B3Count = 0;
-						client.Session.Post205F02165EFFCount = 0;
 						Logger.LogInformation("0x205F decoded: unk0={Unk0:X}, characterId={CharacterId:X8}. Armed the retail create-editor post-0x205F follow-up.", unk0, characterId);
 						break;
 					}
@@ -356,9 +348,6 @@ namespace Faolan.GameServer
 					}
 
 					client.Session.HasPendingPost205FFollowUp = true;
-					client.Session.Post205F2020Count = 0;
-					client.Session.Post205FF98E10B3Count = 0;
-					client.Session.Post205F02165EFFCount = 0;
 					Logger.LogInformation("0x205F decoded: unk0={Unk0:X}, characterId={CharacterId:X8}, expectedCharacterId={ExpectedCharacterId:X8}. Marked post-0x205F follow-up as pending.", unk0, characterId, characterId);
 
 					break;
@@ -398,11 +387,9 @@ namespace Faolan.GameServer
 						if (client.Session.UsedWorldBurstReplay || client.Session.IsCreateWorldSession)
 							await SendSpawnCheckResponse(client, requestId);
 
-						if (client.Session.Character?.Name == null && client.Session.HasPendingPost205FFollowUp)
-							client.Session.Post205F2020Count++;
 						Logger.LogInformation("0x2020 summary: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X8}", ack0, requestId, ack1, characterId);
-						Logger.LogInformation("0x2020 decoded: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X}, pendingPost205F={PendingPost205F}, newCharacter2020Count={NewCharacter2020Count}",
-							ack0, requestId, ack1, characterId, client.Session.HasPendingPost205FFollowUp, client.Session.Post205F2020Count);
+						Logger.LogInformation("0x2020 decoded: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X}, pendingPost205F={PendingPost205F}",
+							ack0, requestId, ack1, characterId, client.Session.HasPendingPost205FFollowUp);
 						await FlushPendingPost205FFollowUp(client);
 						packet.Body.Position = 0;
 					}

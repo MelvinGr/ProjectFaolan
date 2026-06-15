@@ -273,7 +273,6 @@ namespace Faolan.GameServer
 						break;
 					}
 
-					client.Session.CharacterEditorInteractive = true;
 					Logger.LogInformation("Character-editor: IntroDone - editor is interactive; the editor connection is now silent until enter-world.");
 					break;
 				}

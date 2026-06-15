@@ -73,7 +73,7 @@ namespace Faolan.GameServer
 
 			if (client.Session.Character?.Name == null)
 			{
-				Logger.LogInformation($"New-character post-0x205F follow-up remains pending on 0x2020 #{client.Session.Post205F2020Count}; waiting for the retail create handoff instead of flushing early.");
+				Logger.LogInformation("New-character post-0x205F follow-up remains pending on 0x2020; waiting for the retail create handoff instead of flushing early.");
 				return;
 			}
 

@@ -11,12 +11,6 @@ namespace Faolan.Core.Network
 		// 0x206E enter-world signal, which we answer with the 0x2002 world-address handoff.
 		bool AwaitingEnterWorld { get; set; }
 
-		// Set once the character-creation editor enters its interactive phase (the "IntroDone" script
-		// callback). The retail capture proves the server sends NOTHING on the editor connection from
-		// IntroDone onward - the client self-advances through customization, naming and enter-world. So
-		// once this is set the server must stay silent on the editor connection (no instance-ping acks,
-		// no morph acks); any stray downstream packet corrupts the client editor and stalls naming.
-		bool CharacterEditorInteractive { get; set; }
 		bool HasFlushedCreateWorldEntryBurst { get; set; }
 		bool HasFlushedCreateEditorPostReady { get; set; }
 		bool HasPendingCreateEditorReadyFollowUp { get; set; }
@@ -89,11 +83,7 @@ namespace Faolan.Core.Network
 		// for morphs that were changed, so the exact set/last one varies). MorphActivitySequence is bumped on
 		// Finish and every morph; the trio is sent once activity goes quiet. PostMorphBurstSent guards it.
 		uint MorphActivitySequence { get; set; }
-		uint Post205F02165EFFCount { get; set; }
-		uint Post205F2020Count { get; set; }
-		uint Post205FF98E10B3Count { get; set; }
 		uint? LastGameServer2020RequestId { get; set; }
-		ulong GameServerInboundPacketSequence { get; set; }
 
 		// The wire handle of the entity the player currently has selected (last LookAtIIR/SelectDeselect), or 0 when
 		// nothing is selected (deselect sends a zeroed handle). Session-volatile, like every entity handle. Used by
@@ -108,7 +98,6 @@ namespace Faolan.Core.Network
 
 		public Account Account { get; set; }
 		public bool AwaitingEnterWorld { get; set; }
-		public bool CharacterEditorInteractive { get; set; }
 		public bool HasFlushedCreateWorldEntryBurst { get; set; }
 		public bool HasFlushedCreateEditorPostReady { get; set; }
 		public bool HasPendingCreateEditorReadyFollowUp { get; set; }
@@ -140,12 +129,8 @@ namespace Faolan.Core.Network
 		public uint CreateEditorTempInstanceCount { get; set; }
 		public uint MorphAckCounter { get; set; }
 		public uint MorphActivitySequence { get; set; }
-		public uint Post205F02165EFFCount { get; set; }
-		public uint Post205F2020Count { get; set; }
-		public uint Post205FF98E10B3Count { get; set; }
 
 		public uint? LastGameServer2020RequestId { get; set; }
-		public ulong GameServerInboundPacketSequence { get; set; }
 		public uint SelectedTargetHandle { get; set; }
 	}
 }
