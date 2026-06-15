@@ -358,6 +358,7 @@ namespace Faolan.GameServer
 				["spelltest"] = (client, arguments) => ApplySpellTest(client.Session.Character.Id, uint.Parse(arguments)),
 				["vitals"] = (client, arguments) => SetVitalsCommand(client, arguments),
 				["setstat"] = (client, arguments) => SetStatCommand(client, arguments),
+				["level"] = (client, arguments) => SetLevelCommand(client, arguments),
 				["hurt"] = (client, arguments) => AdjustOwnHealthCommand(client, arguments, false),
 				["heal"] = (client, arguments) => AdjustOwnHealthCommand(client, arguments, true),
 				["mount"] = (client, arguments) => MountCommand(client, arguments),
@@ -1022,6 +1023,29 @@ namespace Faolan.GameServer
 				: health;
 
 			return SendVitals(client, health, stamina, mana);
+		}
+
+		// .level <n>  - set the player's character level, regenerate its MaxStats from the new class/level, persist,
+		// and push the Level stat + refreshed vitals so the change shows without a relog (the persisted level also
+		// rides the next login snapshot). Test-bootstrap convenience for level-gated features (e.g. #206 Totem of
+		// Origin's min-20). Mirrors .setstat/.vitals; the stat's wire scale is applied at send.
+		private async Task SetLevelCommand(INetworkClient client, string arguments)
+		{
+			var character = client.Session.Character;
+			var parts = (arguments ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+			if (parts.Length == 0 || !ushort.TryParse(parts[0], out var level) || level == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(character.Id, "Usage: .level <n>  (1..65535)");
+				return;
+			}
+
+			character.Level = level;
+			character.RegenerateMaxStats();
+			await Database.SaveCharacter(character);
+
+			await SendStatUpdate(client, new CharacterStatBlock().Set(LegacyCharacterStatId.Level, level));
+			await SendVitals(client);
+			await _agentServerDispatcher.SendSystemMessage(character.Id, $"Level set to {level} (relog to refresh the full character sheet).");
 		}
 
 		// .tag add <id> | .tag list  - manage the player's quest-state tags (the flags RDB Lua scripts read/write).
