@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Packets.Opcodes;
 
 namespace Faolan.GameServer.World
 {
@@ -23,8 +24,8 @@ namespace Faolan.GameServer.World
 	// is the pinned RDB Lua quest VM.
 	public static class WorldQuest
 	{
-		public const uint QuestGoalSubOpcode = 0x0774C8C1; // QuestGoalIIR_c - objective progress
-		public const uint QuestIirSubOpcode = 0x97E02314; // QuestIIR_c - add/update/remove a quest in the journal
+		public const uint QuestGoalSubOpcode = (uint)GameServer0X2000RespondsOpcodes.QuestGoalIIR; // QuestGoalIIR_c - objective progress
+		public const uint QuestIirSubOpcode = (uint)GameServer0X2000RespondsOpcodes.QuestIIR; // QuestIIR_c - add/update/remove a quest in the journal
 
 		// Quest state codes (from the capture; only "active/added" = 2 is confirmed).
 		public const uint StateActive = 2;
@@ -139,9 +140,9 @@ namespace Faolan.GameServer.World
 		// Builders emit from the subopcode onward; the 4-byte length prefix is added by the send layer
 		// (matching BuildQuestIir/BuildQuestGoal).
 
-		public const uint QuestJournalSubOpcode = 0x79F8C7A1; // the J-panel quest list
-		public const uint QuestFullUpdateSubOpcode = 0x63268258; // one quest's full detail
-		public const uint QuestLogListSubOpcode = 0x504B7924; // the active-quest LIST that POPULATES the J-panel
+		public const uint QuestJournalSubOpcode = (uint)GameServer0X2000RespondsOpcodes.QuestJournalIIR; // the J-panel quest list
+		public const uint QuestFullUpdateSubOpcode = (uint)GameServer0X2000RespondsOpcodes.QuestFullUpdateIIR; // one quest's full detail
+		public const uint QuestLogListSubOpcode = (uint)GameServer0X2000RespondsOpcodes.QuestLogListIIR; // the active-quest LIST that POPULATES the J-panel
 		public const uint AreaTitleCategory = 50300; // category of the area journal-title remoteformat
 
 		// BuildQuestFullUpdate emits [subop 4][ack 4][player 4][u32 0 = 4][0x01 = 1] = 17 bytes before `questId`. The

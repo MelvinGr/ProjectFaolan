@@ -26,7 +26,7 @@ namespace Faolan.GameServer
 	//      InventoryListEntry entries - the same codec SnapshotItemBuilder already produces for the backpack.
 	public partial class GameServerListener
 	{
-		private const uint BankIirSubOpcode = 0x0BA1C1CB; // BankIIR_t
+		private const uint BankIirSubOpcode = (uint)GameServer0X2000RespondsOpcodes.BankIIR; // BankIIR_t
 		private const uint BankMaxSize = 50; // captured bank capacity
 		private const uint BankDisabledSlots = 30; // captured disabled-slot count (unpurchased bank space)
 		private const ushort BankRegisterOpcode = 0x201C;

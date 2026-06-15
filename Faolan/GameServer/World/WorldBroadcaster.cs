@@ -28,7 +28,7 @@ namespace Faolan.GameServer.World
 	public sealed class WorldBroadcaster
 	{
 		// LootBagFullUpdateIIR_c - the world-object sub-opcode a loot bag spawns as.
-		private const uint LootBagSubOpcode = 0xF096251E;
+		private const uint LootBagSubOpcode = (uint)GameServer0X2000RespondsOpcodes.LootBagFullUpdateIIR;
 
 		// Maps whose NPCs have been loaded into the world model (once per map, on first entry).
 		private readonly ConcurrentDictionary<uint, byte> _npcLoadedZones = new ConcurrentDictionary<uint, byte>();

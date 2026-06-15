@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using Faolan.Core.Data;
+using Faolan.Core.Network.Packets.Opcodes;
 
 namespace Faolan.GameServer.Combat
 {
@@ -13,8 +14,8 @@ namespace Faolan.GameServer.Combat
 	//   EnergyIIR       0x40749B8A: [subop][0000C350][actor:4][01][stamina:4]                                     (17 b)
 	public static class CombatPacketCodec
 	{
-		public const uint DamageResultSubOpcode = 0xFEC4158A;
-		public const uint EnergySubOpcode = 0x40749B8A;
+		public const uint DamageResultSubOpcode = (uint)GameServer0X2000RespondsOpcodes.DamageResultIIR;
+		public const uint EnergySubOpcode = (uint)GameServer0X2000RespondsOpcodes.EnergyIIR;
 		private const uint WireType = 0x0000C350; // the C350 type word shared by the IIR record family
 
 		public const int DamageResultBodyLength = 37;

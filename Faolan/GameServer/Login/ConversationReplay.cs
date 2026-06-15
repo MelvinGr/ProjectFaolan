@@ -21,8 +21,8 @@ namespace Faolan.GameServer
 		private const uint CloseChatWindowCapturedInstance = 0x01316E71;
 
 		// The Knubot packets that END a conversation stage: an answer list (the next options) or a close-window.
-		private const uint KnubotAnswerListSubOpcode = 0xF164A4A5;
-		private const uint KnubotCloseChatWindowSubOpcode = 0xC4AF39EB;
+		private const uint KnubotAnswerListSubOpcode = (uint)GameServer0X2000RespondsOpcodes.KnubotAnswerListIIR;
+		private const uint KnubotCloseChatWindowSubOpcode = (uint)GameServer0X2000RespondsOpcodes.KnubotCloseChatWindowIIR;
 
 		// A KnubotCloseChatWindow (0xC4AF39EB) body, captured verbatim. It closes the NPC chat window with an EMPTY
 		// answer list (the remoteformat is id="0" with no options) - retail's "this NPC has nothing (more) to say"

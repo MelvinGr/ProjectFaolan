@@ -114,7 +114,7 @@ namespace Faolan.GameServer.Combat
 			await new PacketStream()
 				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerRespondOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s => s
-					.WriteUInt32(0x642CD3D6u)
+					.WriteUInt32(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR)
 					.WriteUInt32(0x0000C350u)
 					.WriteUInt32(instance)
 					.WriteUInt16(next)
@@ -180,7 +180,7 @@ namespace Faolan.GameServer.Combat
 
 			using var s = new FaolanStream();
 			s
-				.WriteUInt32(0x642CD3D6u)
+				.WriteUInt32(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR)
 				.WriteUInt32(0x0000C350u)
 				.WriteUInt32(instance)
 				.WriteUInt16((ushort)(seq + 1))

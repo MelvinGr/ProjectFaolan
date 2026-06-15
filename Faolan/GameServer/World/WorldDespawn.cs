@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using Faolan.Core.Network.Packets.Opcodes;
 
 namespace Faolan.GameServer.World
 {
@@ -12,7 +13,7 @@ namespace Faolan.GameServer.World
 	// actually send (TryExtractPlayfieldToken), so the despawn token matches what the client learned, by construction.
 	public static class WorldDespawn
 	{
-		public const uint SubOpcode = 0x04B82B2D; // n3ToClientQuitIIR_t
+		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.N3ToClientQuitIIR; // n3ToClientQuitIIR_t
 		public const uint TypeTagAck = 0x0000C350; // the ack TypeTag shared by the IIR record family
 		private const byte RecordMarker = 0x01; // constant in 3271/3271 records (record-count / type marker)
 

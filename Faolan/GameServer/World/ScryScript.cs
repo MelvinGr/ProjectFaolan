@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
 using Faolan.Core.Network.Conan;
+using Faolan.Core.Network.Packets.Opcodes;
 
 namespace Faolan.GameServer.World
 {
@@ -18,7 +19,7 @@ namespace Faolan.GameServer.World
 	//   f6 = sub-message {f1=0, f2=0}.
 	public static class ScryScript
 	{
-		public const uint SubOpcode = 0xA36D3B74;
+		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.ScryScriptIIR;
 		public const uint TypeTagAck = 0x0000C350;
 
 		// A named scripted step (mode 2 = the simple step-token form: "IntroDone", "ChangeSex", ...).

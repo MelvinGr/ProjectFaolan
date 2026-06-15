@@ -593,6 +593,7 @@
 			QuestGoalIIR = 0x0774C8C1, // QuestGoalIIR_c  (x27)
 			QuestIIR = 0x97E02314, // QuestIIR_c  (x34) - "DeleteQuest"
 			QuestJournalIIR = 0x79F8C7A1, // QuestJournalIIR_c  (x17)
+			QuestLogListIIR = 0x504B7924, // the active-quest LIST that populates the J-panel (WorldQuest.BuildQuestLogList)
 			RegenIIR = 0x28D0AC99, // RegenIIR_c  (x554)
 			ScryScriptIIR = 0xA36D3B74, // ScryScriptIIR_c  (x390) - cutscene/scry scripts + char-editor callbacks (IntroDone, TheNameIs, ...)
 			SetMorphValueIIR = 0xBADF5A4B, // SetMorphValueIIR_c  (x101) - character-creator morph ack

@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Text;
+using Faolan.Core.Network.Packets.Opcodes;
 
 namespace Faolan.GameServer.World
 {
@@ -11,10 +12,10 @@ namespace Faolan.GameServer.World
 	{
 		public const float DefaultFadeSeconds = 3.0f;
 		public const uint EntityTypeTag = 0x0000C350; // the entity-frame typetag carried inside NewCurrentLooter
-		public const uint FadeSubOpcode = 0x66180B20; // n3ToClientFadeIIR_t - graceful fade-out despawn
+		public const uint FadeSubOpcode = (uint)GameServer0X2000RespondsOpcodes.N3ToClientFadeIIR; // n3ToClientFadeIIR_t - graceful fade-out despawn
 		public const uint LootTypeTag = 0x0000C87A; // the loot-bag class typetag
-		public const uint NewCurrentLooterSubOpcode = 0xD06568C8; // NewCurrentLooterIIR_c
-		public const uint VisualChangeSubOpcode = 0xE7F4F8F8; // SimpleDynelVisualChangeIIR_c - "Open" opens the loot window
+		public const uint NewCurrentLooterSubOpcode = (uint)GameServer0X2000RespondsOpcodes.NewCurrentLooterIIR; // NewCurrentLooterIIR_c
+		public const uint VisualChangeSubOpcode = (uint)GameServer0X2000RespondsOpcodes.SimpleDynelVisualChangeIIR; // SimpleDynelVisualChangeIIR_c - "Open" opens the loot window
 
 		// The graceful fade-out despawn (the loot-consumed / loot-expired variant of n3ToClientQuit). 17 B:
 		// [subop][typetag][handle][0x00 marker][float fadeSeconds, big-endian]. Marker 0x00 + a FLOAT distinguishes it

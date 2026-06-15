@@ -39,7 +39,7 @@ namespace Faolan.GameServer
 			aBuffer = new PacketStream();
 			aBuffer.WriteHeader(Sender2, Receiver2, GameServerRespondOpcodes.IirCarrier);
 			aBuffer.WriteUInt32(0x00000089);
-			aBuffer.WriteUInt32(0xf508f4c1);
+			aBuffer.WriteUInt32(GameServer0X2000RespondsOpcodes.GameActionListIIR);
 			aBuffer.WriteUInt32(0x0000c350);
 			aBuffer.WriteUInt32(client.Session.Account.ClientInstance);
 			aBuffer.WriteArray(blobData81);

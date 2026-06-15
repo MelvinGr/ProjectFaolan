@@ -67,7 +67,7 @@ namespace Faolan.GameServer
 				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerRespondOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s =>
 				{
-					s.WriteUInt32(0xA36D3B74u);
+					s.WriteUInt32(GameServer0X2000RespondsOpcodes.ScryScriptIIR);
 					s.WriteUInt32(0x0000C350u);
 					s.WriteUInt32(instance);
 					s.WriteByte(0x00);
@@ -125,7 +125,7 @@ namespace Faolan.GameServer
 				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerRespondOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s =>
 				{
-					s.WriteUInt32(0xBADF5A4Bu);
+					s.WriteUInt32(GameServer0X2000RespondsOpcodes.SetMorphValueIIR);
 					s.WriteUInt32(0x0000C350u);
 					s.WriteUInt32(instance);
 					s.WriteUInt16((ushort)0);
@@ -148,7 +148,7 @@ namespace Faolan.GameServer
 				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerRespondOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s =>
 				{
-					s.WriteUInt32(0xADCE0CDAu);
+					s.WriteUInt32(GameServer0X2000RespondsOpcodes.SetNameIIR);
 					s.WriteUInt32(0x0000C350u);
 					s.WriteUInt32(instance);
 					s.WriteUInt32(0u);
