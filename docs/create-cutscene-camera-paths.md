@@ -43,27 +43,30 @@ camera-path/playfield theory is resolved and is no longer the blocker.**
 
 ## Remaining gap: actor animation (client-script / content, not server packets)
 
-What still doesn't play is the scripted **actor animation** (galley sinking, the player avatar's
-knockout). Because the drowning cutscene is client-autonomous, there is no server directive to add — the
-client-side galley script (RDB script id 105937) spawns and drives its own actors. Two leads, both needing
-the live client to confirm:
+What still doesn't play (per the **last known** in-client create run — see caveat below) is the scripted
+**actor animation** (galley sinking, the player avatar's knockout). Because the drowning cutscene is
+client-autonomous, there is no server directive to add — the client-side galley script (RDB script id
+105937) spawns and drives its own actors. Lead:
 
-1. **Missing client RDB content.** The failed-login client log (2026-06-14) shows
-   `Resource 1010004:<id> does not exist in any available RDB sources` — the same resource **type 1010004**
-   the cutscene manifest references (`1010004:793713;1010004:793714;…` at editor #170). If the cutscene's
-   actor/texture resources aren't in the client install (and aren't served by the ContentMirror), the
-   actors can't render/animate even though the camera (separate resource) works.
-2. **Cinematic actor-tagging.** `TagCharacterForCinematicScriptCommand` (`FUN_014514c0`) parses an
-   `"object"` reference identifying which character the cinematic controls. This is the server-driven path
-   used by the **Kalanthes** beach cutscene (`ThisIsKalanthes`/`Kneel`), not the autonomous drowning one.
+- **Cinematic actor-tagging.** `TagCharacterForCinematicScriptCommand` (`FUN_014514c0`) parses an
+  `"object"` reference identifying which character the cinematic controls. This is the server-driven path
+  used by the **Kalanthes** beach cutscene (`ThisIsKalanthes`/`Kneel`), not the autonomous drowning one.
+
+> **Caveat — no recent create run.** The latest `AgeOfConan.log` (2026-06-14 22:51) is a **failed login**
+> (`Authentication Failure (14)` 4 s after boot), not a create-flow run, so it does NOT show the current
+> cutscene state. Its `1010004:<id> does not exist` lines are **boot-time texture loads**, unrelated to the
+> cutscene manifest — do not treat them as evidence of a content gap. The actor-animation conclusion above
+> comes from earlier in-client sessions (memory `createworld_cutscene_diagnosis`); re-confirm it with a fresh
+> create run before acting on it.
 
 ## Pinned next step (needs the live client)
 
-Capture **our** server's create flow and diff the **editor** stream packet-by-packet against the retail
-editor stream (stricken998 `create-no-worldenter` :7030) to find any runtime divergence (timing of the
-deadlock-breaker post-ready flush vs. the playfield-4000 load; a missing prerequisite spawn). The static
-data says our packets are correct, so the remaining isolation is a live-run diff. Also confirm the client
-install actually has the `1010004:*` / `1010003:*` cutscene resources (else it's a ContentMirror/CDN gap).
+First, **do a fresh create run** and grab `AgeOfConan.log` — we don't currently have a recent one, so the
+actual current symptom is unconfirmed. Then capture **our** server's create flow and diff the **editor**
+stream packet-by-packet against the retail editor stream (stricken998 `create-no-worldenter` :7030) for any
+runtime divergence (timing of the deadlock-breaker post-ready flush vs. the playfield-4000 load; a missing
+prerequisite spawn). The static data says our packets are correct, so the remaining isolation is a live-run
+diff.
 
 Reproduce the RE: `Captures/ghidra/DumpCutscene.java` (strings + xrefs), `DecompileFns.java`
 (`FNS=00515420,005230b0,014514c0`), `FindStr.java` (`NEEDLE=…`) against `/tmp/ghidra-aoc` (see
