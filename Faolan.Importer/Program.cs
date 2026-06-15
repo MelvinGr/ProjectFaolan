@@ -416,6 +416,24 @@ namespace Faolan.Importer
 				{
 				await CaptureItemImporter.ImportAsync(db, itemPackets);
 				await CaptureMapImporter.ImportAsync(db, itemPackets);
+
+				// Backfill: strip level-tooling suffixes from existing map names (#31) so .maps/teleport show the
+				// clean RDB name even without re-running --rdb-maps. Idempotent; only touches names with a marker.
+				var renamedMaps = 0;
+				foreach (var map in await db.Maps.ToListAsync())
+				{
+					var clean = RdbMapImporter.SanitizeMapName(map.Name);
+					if (clean != map.Name)
+					{
+						map.Name = clean;
+						renamedMaps++;
+					}
+				}
+				if (renamedMaps > 0)
+				{
+					await db.SaveChangesAsync();
+					Console.WriteLine($"Maps: sanitized {renamedMaps} tooling-suffixed names (#31).");
+				}
 				await CaptureSpellImporter.ImportAsync(db, itemPackets);
 				// The starting ability kit = what every new character gets during creation, so detect it from the
 				// CREATE-flow captures only (filenames contain "creat"); the rest are higher-level/class abilities.

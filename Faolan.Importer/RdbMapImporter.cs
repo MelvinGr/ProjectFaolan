@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -51,7 +52,7 @@ namespace Faolan.Importer
 
 				found++;
 				var id = uint.Parse(m.Groups[2].Value);
-				var name = DecodeXmlEntities(m.Groups[1].Value);
+				var name = SanitizeMapName(DecodeXmlEntities(m.Groups[1].Value));
 
 				if (maps.TryGetValue(id, out var map))
 				{
@@ -76,6 +77,32 @@ namespace Faolan.Importer
 
 			await db.SaveChangesAsync();
 			return new Result(found, gated, created, renamed);
+		}
+
+		// A handful of RDB playfield names carry internal level-tooling suffixes appended to the player-facing name
+		// (e.g. "Khopshef Province Heigh_Tiles_Statels", "Wild Lands of Zelata_statel_height_painting",
+		// "Old Tarantia Statels and Hmap"). Cut the name at the first such marker so .maps/teleport labels show the
+		// clean name (#31). The markers are level-editor artifacts (statel = static element, hmap = height map),
+		// never part of a real map name, so this can't truncate a legitimate one.
+		private static readonly string[] ToolingMarkers =
+		{
+			" Heigh_Tiles", "_statel", " Statels", "_height", "_painting", " and Hmap", " Hmap"
+		};
+
+		public static string SanitizeMapName(string name)
+		{
+			if (string.IsNullOrEmpty(name))
+				return name;
+
+			var cut = name.Length;
+			foreach (var marker in ToolingMarkers)
+			{
+				var i = name.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+				if (i >= 0 && i < cut)
+					cut = i;
+			}
+
+			return cut < name.Length ? name[..cut].TrimEnd() : name;
 		}
 
 		// The playfield XML uses standard XML entities in names (e.g. Conall&apos;s Valley).
