@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using Faolan.Core.Data;
 
 namespace Faolan.GameServer.Spawn
 {
@@ -52,12 +53,12 @@ namespace Faolan.GameServer.Spawn
 		// constant terminator body. Byte-identical to the 23 minimal-form NPCs in the beach burst.
 		public static byte[] BuildMinimalPostIir()
 		{
-			var post = new byte[MinimalPostIirLength];
-			BinaryPrimitives.WriteUInt32BigEndian(post.AsSpan(0, 4), HeaderWord0);
-			BinaryPrimitives.WriteUInt32BigEndian(post.AsSpan(4, 4), (uint)(MinimalPostIirLength - RecordLenBias));
-			BinaryPrimitives.WriteUInt32BigEndian(post.AsSpan(8, 4), MinimalRecordCount);
-			MinimalBody.CopyTo(post, 12);
-			return post;
+			return new FaolanStream()
+				.WriteUInt32(HeaderWord0)
+				.WriteUInt32((uint)(MinimalPostIirLength - RecordLenBias))
+				.WriteUInt32(MinimalRecordCount)
+				.WriteArray(MinimalBody)
+				.ToArray();
 		}
 
 		// Replaces an FA015807 body's post-IIR scaffold with the minimal session-independent form, adjusting the

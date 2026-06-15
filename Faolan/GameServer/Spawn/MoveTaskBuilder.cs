@@ -1,7 +1,7 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Numerics;
+using Faolan.Core.Data;
 using Faolan.Core.Network.Packets.Opcodes;
 
 namespace Faolan.GameServer.Spawn
@@ -39,64 +39,41 @@ namespace Faolan.GameServer.Spawn
 				throw new ArgumentOutOfRangeException(nameof(waypoints), "waypoint count exceeds one byte");
 
 			var total = 16 + 2 + 12 + 10 + 1 + 12 * waypoints.Count + 17 + 12 + 2;
-			var body = new byte[total];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)(total - 4));
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), SubOpcode);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), Ack);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(12, 4), handle);
-			// body[16..18] stay 0x00 0x00 (the prefix)
-			WriteVec3(body, 18, currentPosition);
-
-			var p = 30;
-			// segment-list + move-block header (04 01 00 02 01 01 00 00 00 00)
-			body[p++] = 0x04;
-			body[p++] = 0x01;
-			body[p++] = 0x00;
-			body[p++] = 0x02;
-			body[p++] = 0x01;
-			body[p++] = 0x01;
-			body[p++] = 0x00;
-			body[p++] = 0x00;
-			body[p++] = 0x00;
-			body[p++] = 0x00;
-			body[p++] = (byte)waypoints.Count;
+			var stream = new FaolanStream()
+				.WriteUInt32((uint)(total - 4))
+				.WriteUInt32(SubOpcode)
+				.WriteUInt32(Ack)
+				.WriteUInt32(handle)
+				.WriteUInt16((ushort)0) // prefix 00 00
+				.WriteVector3BigEndian(currentPosition)
+				// segment-list + move-block header (04 01 00 02 01 01 00 00 00 00)
+				.WriteArray(0x04, 0x01, 0x00, 0x02, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00)
+				.WriteByte((byte)waypoints.Count);
 			foreach (var wp in waypoints)
-			{
-				WriteVec3(body, p, wp);
-				p += 12;
-			}
+				stream.WriteVector3BigEndian(wp);
 
-			// block trailer: flag 00, speed, 12 pad bytes
-			body[p++] = 0x00;
-			BinaryPrimitives.WriteSingleBigEndian(body.AsSpan(p, 4), speed);
-			p += 4 + 12;
-			WriteVec3(body, p, currentPosition); // anchor
-			p += 12;
-			body[p++] = 0x00;
-			body[p] = 0x01; // terminator
-			return body;
+			return stream
+				// block trailer: flag 00, speed, 12 pad bytes
+				.WriteByte(0x00)
+				.WriteFloatBigEndian(speed)
+				.WriteArray(new byte[12])
+				.WriteVector3BigEndian(currentPosition) // anchor
+				.WriteByte(0x00)
+				.WriteByte(0x01) // terminator
+				.ToArray();
 		}
 
 		public static byte[] BuildStationary(uint handle, Vector3 position)
 		{
-			var body = new byte[BodyLength];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), BodyLength - 4);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), SubOpcode);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), Ack);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(12, 4), handle);
-			// body[16..18] stay 0x00 0x00 (the prefix)
-			BinaryPrimitives.WriteSingleBigEndian(body.AsSpan(18, 4), position.X);
-			BinaryPrimitives.WriteSingleBigEndian(body.AsSpan(22, 4), position.Y);
-			BinaryPrimitives.WriteSingleBigEndian(body.AsSpan(26, 4), position.Z);
-			body[30] = 0x06; // stationary terminator (vs 0x04 = a movement segment follows)
-			return body;
-		}
-
-		private static void WriteVec3(byte[] body, int offset, Vector3 v)
-		{
-			BinaryPrimitives.WriteSingleBigEndian(body.AsSpan(offset, 4), v.X);
-			BinaryPrimitives.WriteSingleBigEndian(body.AsSpan(offset + 4, 4), v.Y);
-			BinaryPrimitives.WriteSingleBigEndian(body.AsSpan(offset + 8, 4), v.Z);
+			return new FaolanStream()
+				.WriteUInt32((uint)(BodyLength - 4))
+				.WriteUInt32(SubOpcode)
+				.WriteUInt32(Ack)
+				.WriteUInt32(handle)
+				.WriteUInt16((ushort)0) // prefix 00 00
+				.WriteVector3BigEndian(position)
+				.WriteByte(0x06) // stationary terminator (vs 0x04 = a movement segment follows)
+				.ToArray();
 		}
 	}
 }

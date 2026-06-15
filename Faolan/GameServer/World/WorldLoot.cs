@@ -1,6 +1,5 @@
-using System;
-using System.Buffers.Binary;
 using System.Text;
+using Faolan.Core.Data;
 using Faolan.Core.Network.Packets.Opcodes;
 
 namespace Faolan.GameServer.World
@@ -22,27 +21,27 @@ namespace Faolan.GameServer.World
 		// from n3ToClientQuit's 0x01 marker + u32 playfield token.
 		public static byte[] BuildFadeBody(uint typeTag, uint handle, float fadeSeconds)
 		{
-			var body = new byte[17];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), FadeSubOpcode);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), typeTag);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), handle);
-			body[12] = 0x00;
-			BinaryPrimitives.WriteSingleBigEndian(body.AsSpan(13, 4), fadeSeconds);
-			return body;
+			return new FaolanStream()
+				.WriteUInt32(FadeSubOpcode)
+				.WriteUInt32(typeTag)
+				.WriteUInt32(handle)
+				.WriteByte(0x00)
+				.WriteFloatBigEndian(fadeSeconds)
+				.ToArray();
 		}
 
 		// "bag -> current looter = this player" (also used for NewAllowedLooter, same shape). 21 B:
 		// [subop][lootTypetag][bagHandle][0x00][entityTypetag][playerHandle].
 		public static byte[] BuildNewCurrentLooterBody(uint bagHandle, uint playerHandle)
 		{
-			var body = new byte[21];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), NewCurrentLooterSubOpcode);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), LootTypeTag);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), bagHandle);
-			body[12] = 0x00;
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(13, 4), EntityTypeTag);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(17, 4), playerHandle);
-			return body;
+			return new FaolanStream()
+				.WriteUInt32(NewCurrentLooterSubOpcode)
+				.WriteUInt32(LootTypeTag)
+				.WriteUInt32(bagHandle)
+				.WriteByte(0x00)
+				.WriteUInt32(EntityTypeTag)
+				.WriteUInt32(playerHandle)
+				.ToArray();
 		}
 
 		// Opens the loot WINDOW on the object (SimpleDynelVisualChange carrying the state string "Open"). 19 + len B:
@@ -50,15 +49,15 @@ namespace Faolan.GameServer.World
 		public static byte[] BuildOpenWindowBody(uint typeTag, uint handle, string state = "Open")
 		{
 			var text = Encoding.ASCII.GetBytes(state);
-			var body = new byte[19 + text.Length];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), VisualChangeSubOpcode);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), typeTag);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), handle);
-			// body[12..16] stays 0x00000000
-			body[16] = 0x00;
-			BinaryPrimitives.WriteUInt16BigEndian(body.AsSpan(17, 2), (ushort)text.Length);
-			text.CopyTo(body, 19);
-			return body;
+			return new FaolanStream()
+				.WriteUInt32(VisualChangeSubOpcode)
+				.WriteUInt32(typeTag)
+				.WriteUInt32(handle)
+				.WriteUInt32(0) // [12..16] = 0
+				.WriteByte(0x00) // [16]
+				.WriteUInt16((ushort)text.Length)
+				.WriteArray(text)
+				.ToArray();
 		}
 	}
 }
