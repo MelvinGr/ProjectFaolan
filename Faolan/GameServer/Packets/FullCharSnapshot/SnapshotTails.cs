@@ -21,10 +21,15 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// first Quest_c record's header + its 5 <remoteformat> strings.
 		public QuestcRegion Quests { get; init; } = new();
 
+		// The @609 per-goal objective-detail region (chapterTag + per-goal records), modeled from the recovered
+		// grammar (QuestObjectiveRegion, docs/fullplayer-snapshot-reader.md) instead of riding in the opaque blob.
+		// Null when the tails carry no such region (no chapterTag at the boundary) - then it stays in UnknownBefore.
+		public QuestObjectiveRegion? QuestObjectives { get; init; }
+
 		public byte[] UnknownAfterAccessWindowTable { get; init; }
 
-		// Everything between the Quest_c region and the access-window table (objective-detail blocks + the quest
-		// index); still opaque (decoded by Captures/decode_snapshot_quests.py, authored by BuildQuestFullUpdate).
+		// Everything between the @609 objective region and the access-window table (the quest INDEX + any tail);
+		// still opaque (decoded by Captures/decode_snapshot_quests.py).
 		public byte[] UnknownBeforeAccessWindowTable { get; init; }
 
 		public int KnownHeaderLength { get; init; }
@@ -50,6 +55,9 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 			writer.WriteArray(Quests.ToArray());
 
+			if (QuestObjectives is not null)
+				writer.WriteArray(QuestObjectives.ToArray());
+
 			writer.WriteArray(UnknownBeforeAccessWindowTable);
 
 			foreach (var entry in AccessWindowEntries)
@@ -71,15 +79,21 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			// typed region and take the boundary where it ends as the start of the remaining opaque blob.
 			var quests = QuestcRegion.Parse(data, out var knownHeaderLength);
 
+			// Then the @609 per-goal objective-detail region (when present - it opens with the 0x0BD3 chapterTag).
+			// Modeled typed; on anything unexpected fall back to leaving it in the opaque UnknownBefore blob so a
+			// tails shape we don't fully recognise is never corrupted.
+			var questObjectives = TryParseQuestObjectives(data, knownHeaderLength, out var afterObjectives);
+
 			var accessWindowNameOffset = IndexOfAscii(data, "PFAccessWindow_");
 
 			if (accessWindowNameOffset < 0)
 			{
-				var unknownBeforeAccessWindowTable = data[knownHeaderLength..];
+				var unknownBeforeAccessWindowTable = data[afterObjectives..];
 
 				return new SnapshotTails
 				{
 					Quests = quests,
+					QuestObjectives = questObjectives,
 					KnownHeaderLength = knownHeaderLength,
 					UnknownBeforeAccessWindowTable = unknownBeforeAccessWindowTable,
 					AccessWindowEntries = [],
@@ -98,10 +112,10 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			// u16 internalNameLength
 			var accessWindowTableStart = accessWindowNameOffset - 15;
 
-			if (accessWindowTableStart < knownHeaderLength)
-				accessWindowTableStart = knownHeaderLength;
+			if (accessWindowTableStart < afterObjectives)
+				accessWindowTableStart = afterObjectives;
 
-			var unknownBeforeAccessWindowTable0 = data[knownHeaderLength..accessWindowTableStart];
+			var unknownBeforeAccessWindowTable0 = data[afterObjectives..accessWindowTableStart];
 
 			using var accessReader = new FaolanStream(data, false) { Position = checked((uint)accessWindowTableStart) };
 
@@ -116,6 +130,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			return new SnapshotTails
 			{
 				Quests = quests,
+				QuestObjectives = questObjectives,
 				KnownHeaderLength = knownHeaderLength,
 				UnknownBeforeAccessWindowTable = unknownBeforeAccessWindowTable0,
 				AccessWindowEntries = accessWindowEntries,
@@ -123,6 +138,28 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 				PostAccessBlock = postAccessBlock,
 				OriginalData = data
 			};
+		}
+
+		// Parses the @609 per-goal objective-detail region when the boundary opens with the 0x0BD3 chapterTag;
+		// reports the offset just past it (= the start of the quest index / remaining opaque blob). Returns null and
+		// leaves `afterObjectives == boundary` for any tails without that region or that fail to parse cleanly.
+		private static QuestObjectiveRegion? TryParseQuestObjectives(byte[] data, int boundary, out int afterObjectives)
+		{
+			afterObjectives = boundary;
+			if (boundary + 4 > data.Length || BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(boundary, 4)) != QuestObjectiveRegion.ChapterTag)
+				return null;
+
+			try
+			{
+				var region = QuestObjectiveRegion.Parse(data, boundary, out var consumed);
+				afterObjectives = boundary + consumed;
+				return region;
+			}
+			catch (Exception)
+			{
+				afterObjectives = boundary;
+				return null;
+			}
 		}
 
 		private static List<uint> CopyRange(List<uint> values, int startIndex, int length)
