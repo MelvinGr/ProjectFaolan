@@ -56,6 +56,38 @@ namespace Faolan.GameServer
 		// enter-world flow already sends (SendWorldHandoff), proving our single-host server CAN do it: it
 		// advertises our own GameServer, the client reconnects, and the existing-character Hello path runs
 		// SendWorldEntry for the (now persisted) target map - identical to logging in on that map, which works.
+		// .teleport <mapId | name>  - resolves the argument to a map (numeric id, or a case-insensitive name match
+		// so `.teleport Khemi` works) then hands off to DoTeleport. Gives a usage/echo message instead of throwing on
+		// a missing/garbled argument (the old `uint.Parse(arguments)` surfaced a raw FormatException to the player).
+		private async Task TeleportCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var arg = (arguments ?? string.Empty).Trim();
+			if (arg.Length == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .teleport &lt;mapId | name&gt;  (see .maps)");
+				return;
+			}
+
+			if (uint.TryParse(arg, out var mapId))
+			{
+				await DoTeleport(characterId, mapId);
+				return;
+			}
+
+			// Name match: exact (case-insensitive) wins; otherwise the first map whose name contains the argument.
+			var maps = await Database.GetMaps();
+			var match = maps.FirstOrDefault(m => string.Equals(m.Name, arg, StringComparison.OrdinalIgnoreCase))
+				?? maps.FirstOrDefault(m => m.Name != null && m.Name.Contains(arg, StringComparison.OrdinalIgnoreCase));
+			if (match == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"<span style=\"color: red;\">No map matching '{arg}'. Try .maps.</span>");
+				return;
+			}
+
+			await DoTeleport(characterId, match.Id);
+		}
+
 		private async Task DoTeleport(uint characterId, uint mapId)
 		{
 			var client = ClientForCharacter(characterId);
@@ -212,7 +244,7 @@ namespace Faolan.GameServer
 				["spells"] = (client, _) => SendListAllSpells(client.Session.Character.Id),
 				["spelllist"] = (client, _) => SendGrantableAbilityList(client.Session.Character.Id),
 				["grantspell"] = (client, arguments) => GrantSpellCommand(client, arguments),
-				["teleport"] = (client, arguments) => DoTeleport(client.Session.Character.Id, uint.Parse(arguments)),
+				["teleport"] = (client, arguments) => TeleportCommand(client, arguments),
 				["spelltest"] = (client, arguments) => ApplySpellTest(client.Session.Character.Id, uint.Parse(arguments)),
 				["vitals"] = (client, arguments) => SetVitalsCommand(client, arguments),
 				["setstat"] = (client, arguments) => SetStatCommand(client, arguments),
