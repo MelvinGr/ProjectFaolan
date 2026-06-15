@@ -81,6 +81,13 @@ is clearest in the `0x96B8DC59` entity-vitals packet (`...<entityHandle><0000000
 > Tracked in `TODO.md` §2 (the single tracker). The notes below are the technical context.
 
 - ✅ ~~Locate real Max-Health / Max-Mana / Max-Stamina ids~~ — DONE (current/max pair table above).
-- Determine whether attributes are sent at all, or derived client-side.
+- ✅ ~~Determine whether attributes are sent at all, or derived client-side~~ — **DONE (2026-06-15, #6):
+  client-derived.** The sheet attribute values (necrol80: Str 20 / Con 56 / Int 39 / Wis 26 / Dex 79, and ×10)
+  appear **nowhere** as the value following their stat id (`0x0324`/`0x0326`/`0x0328`/`0x032A`/`0x032E`) across
+  any necrol80 capture — the only clean value the wire carries for those ids is a base `10` (= 1.0 at ×10). So the
+  displayed attributes are computed client-side (base + gear + buffs), NOT transmitted as plain stat records.
+  (Corroborating from the binary: the on-wire stat set is bounded by `g_Int32StatsOrder`, asserted
+  `== generic_stats_size()` in `CoreCharacterFullUpdateIIR::ReadSubClass`; the array is built indirectly via
+  vector growth, so enumerating its full id list needs the registration-call route, not a direct-write xref.)
 - Combat (HP changes mid-fight) should reuse this block — see the combat work in [[archive_cpp_reference]] and
   `docs/capture-events.md`.
