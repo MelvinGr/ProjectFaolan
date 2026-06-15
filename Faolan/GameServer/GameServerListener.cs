@@ -397,14 +397,13 @@ namespace Faolan.GameServer
 
 				case GameServerOpcodes.SetSprintInputState: // GameCharAgentProject - the sprint key (x2092 in captures)
 				{
-					// Historical behavior (predates the method-name mapping, when this was guessed to be a
-					// map-change request): reply with ReportDimensionId. Retail does NOT answer sprint inputs;
-					// kept until a live client run confirms removing it is safe.
+					// Sprint is a fire-and-forget input-state update; retail sends NO reply. Verified against the
+					// gameplay captures: 208/786/267 SetSprintInputState uploads vs only a baseline of
+					// ReportDimensionId downloads (login + real dimension changes), with no 1:1 correlation - so the
+					// old "answer each sprint with ReportDimensionId" was a spurious packet retail never sends (#72).
+					// Just record the state; no response.
 					if (packet.Body != null)
 						LogPacketBodyDebug("GameServer 0x200C body", packet.Body.ToArray());
-
-					if (client.Session.Character != null)
-						await ReportDimensionId(client, client.Session.Character.RealmId);
 
 					break;
 				}
