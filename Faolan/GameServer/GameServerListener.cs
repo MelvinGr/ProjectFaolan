@@ -777,13 +777,18 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerOpcodes.UpdateShortcut: // body = [u32 slot][u32 a][u32 b] - a/b semantics undecoded
+				case GameServerOpcodes.UpdateShortcut: // body = [u32 slot][u32 flag][u32 container]
 				{
+					// Partial decode (#71, necrol80 randomActions/changemap captures): the slot is in the bar-PAGE
+					// range (0x4E20.., not the 0x64.. item range), `b` is always 0x68 = the backpack container kind,
+					// and `a` is a 0/1 flag. Reads as a bar-page item-slot toggle referencing container 0x68. Not
+					// persisted: the meaningful deliverable (hotbar RESTORE at login) is gated on decoding the
+					// FullChar snapshot field that carries the bar, so per-mutation persistence is moot until then.
 					var slot = packet.Body.ReadUInt32();
-					var a = packet.Body.ReadUInt32();
-					var bField = packet.Body.ReadUInt32();
+					var flag = packet.Body.ReadUInt32();
+					var container = packet.Body.ReadUInt32();
 
-					Logger.LogInformation("UpdateShortcut slot 0x{Slot:X4} a={A} b=0x{B:X} (semantics undecoded; not persisted).", slot, a, bField);
+					Logger.LogInformation("UpdateShortcut bar-page slot 0x{Slot:X4} flag={Flag} container=0x{Container:X} (#71; restore is snapshot-gated).", slot, flag, container);
 
 					break;
 				}

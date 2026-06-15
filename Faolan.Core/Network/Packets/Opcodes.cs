@@ -224,7 +224,7 @@
 			MoveTradeItemInternal = 0x206A, // (was "request change map(?)" - the old guess predates the table)
 			RequestShortcutBar = 0x206D, // sent at login
 			AddShortcut = 0x206E, // drag an item/ability onto the hotbar; body = [u32 type][u32 slot][u32 targetId][u32 0]
-			UpdateShortcut = 0x206F, // body = [u32 slot][u32 a][u32 b] (semantics not decoded; observed a=0/1, b=0x68)
+			UpdateShortcut = 0x206F, // body = [u32 barPageSlot][u32 flag(0/1)][u32 container=0x68 backpack] (#71)
 			RemoveShortcut = 0x2071, // body = [u32 slot]
 			GetInstanceListForCurrentPlayfield = 0x207B, // the 'Select instance' button
 			SetHideInspectOption = 0x207E,
