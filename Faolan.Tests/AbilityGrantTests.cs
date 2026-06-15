@@ -53,6 +53,42 @@ namespace Faolan.Tests
 			Assert.Equal(announced[..^2], silent[..^2]);
 		}
 
+		// Build -> Parse must recover the exact Ability fields and announce flag (the body duplicates Id and Data1..4,
+		// so the parser has structural invariants to check). Same capture rows as the build test.
+		[Theory,
+		 InlineData(769094u, 108u, 1263352118u, 3236668225u, 2153842419u, 314062142u, 3015939650u, true),
+		 InlineData(769099u, 112u, 1227967307u, 3443694845u, 1660108369u, 1296666148u, 2957995211u, false)]
+		public void TryParseAbilityGrantBody_RoundTripsBuild(uint id, uint slot, uint data0, uint data1, uint data2, uint data3, uint data4, bool announce)
+		{
+			var original = new Ability { Id = id, Slot = slot, Data0 = data0, Data1 = data1, Data2 = data2, Data3 = data3, Data4 = data4 };
+			var body = GameServerListener.BuildAbilityGrantBody(original, announce);
+
+			Assert.True(GameServerListener.TryParseAbilityGrantBody(body, out var parsed, out var parsedAnnounce));
+			Assert.Equal(announce, parsedAnnounce);
+			Assert.Equal(original.Id, parsed.Id);
+			Assert.Equal(original.Slot, parsed.Slot);
+			Assert.Equal(original.Data0, parsed.Data0);
+			Assert.Equal(original.Data1, parsed.Data1);
+			Assert.Equal(original.Data2, parsed.Data2);
+			Assert.Equal(original.Data3, parsed.Data3);
+			Assert.Equal(original.Data4, parsed.Data4);
+		}
+
+		[Fact]
+		public void TryParseAbilityGrantBody_RejectsMalformed()
+		{
+			var ability = new Ability { Id = 769094u, Slot = 108u, Data0 = 1u, Data1 = 2u, Data2 = 3u, Data3 = 4u, Data4 = 5u };
+			var body = GameServerListener.BuildAbilityGrantBody(ability);
+
+			Assert.False(GameServerListener.TryParseAbilityGrantBody(new byte[80], out _, out _)); // wrong length
+			var corruptId = (byte[])body.Clone();
+			corruptId[8] ^= 0xFF; // break the duplicated Id (field index 2)
+			Assert.False(GameServerListener.TryParseAbilityGrantBody(corruptId, out _, out _));
+			var corruptConst = (byte[])body.Clone();
+			corruptConst[14 * 4] ^= 0xFF; // break the B290805C constant
+			Assert.False(GameServerListener.TryParseAbilityGrantBody(corruptConst, out _, out _));
+		}
+
 		private static string ToHex(byte[] bytes)
 		{
 			var chars = new char[bytes.Length * 2];

@@ -80,5 +80,50 @@ namespace Faolan.GameServer
 				.WriteByte(Convert.ToByte(announce))
 				.ToArray();
 		}
+
+		internal const int AbilityGrantBodyLength = 81; // 20 u32 fields + the announce byte
+
+		// The inverse of BuildAbilityGrantBody: recovers the Ability (Slot/Id/Data0..4) and the announce flag from a
+		// 0x2052 body. Validates the fixed words (the duplicated Id, the 0/1 constants, the B290805C/29E627CA pair, the
+		// duplicated Data1..4) so a mis-shaped body is rejected rather than yielding garbage. Proven by AbilityGrantTests
+		// round-trip against the strickenbla capture. Build- and parse-side share one grammar (TODO §refactor / #92).
+		internal static bool TryParseAbilityGrantBody(ReadOnlySpan<byte> body, out Ability ability, out bool announce)
+		{
+			ability = new Ability();
+			announce = false;
+			if (body.Length != AbilityGrantBodyLength)
+				return false;
+
+			Span<uint> f = stackalloc uint[20];
+			for (var i = 0; i < 20; i++)
+				f[i] = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(body.Slice(i * 4, 4));
+
+			var slot = f[0];
+			var id = f[1];
+			var data0 = f[5];
+			var data1 = f[6];
+			var data2 = f[7];
+			var data3 = f[8];
+			var data4 = f[9];
+
+			// Structural invariants: the duplicated Id, the 0/1 constants, the repeated Data1..4 and the constant pair.
+			if (f[2] != id || f[3] != 0x00000000 || f[4] != 0x00000001)
+				return false;
+			if (f[10] != data1 || f[11] != data2 || f[12] != data3 || f[13] != data4)
+				return false;
+			if (f[14] != AbilityGrantConstantA || f[15] != AbilityGrantConstantB ||
+			    f[16] != AbilityGrantConstantA || f[17] != AbilityGrantConstantB)
+				return false;
+			if (f[18] != 0x00000001 || f[19] != 0x00000000)
+				return false;
+
+			var announceByte = body[80];
+			if (announceByte > 1)
+				return false;
+
+			ability = new Ability { Slot = slot, Id = id, Data0 = data0, Data1 = data1, Data2 = data2, Data3 = data3, Data4 = data4 };
+			announce = announceByte == 1;
+			return true;
+		}
 	}
 }
