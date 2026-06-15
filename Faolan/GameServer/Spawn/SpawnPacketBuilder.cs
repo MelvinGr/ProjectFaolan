@@ -1,7 +1,6 @@
 using System;
 using System.Buffers.Binary;
 using System.Numerics;
-using System.Text;
 using Faolan.Core.Data;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Protobuf;
@@ -43,7 +42,6 @@ namespace Faolan.GameServer.Spawn
 		public const int RotXOffset = 41; // quaternion floats little-endian
 		public const int RotYOffset = 46;
 		public const int RotZOffset = 51;
-		private const byte BaseNameLength = 5; // "Strie" - the captured base body's name
 		private const int TransformEndOffset = RotWOffset + 4; // first byte after the constructed transform (60)
 
 		// Builds a complete FA015807 body from a base template + a typed transform + a CharacterIIR: the transform
@@ -125,38 +123,6 @@ namespace Faolan.GameServer.Spawn
 			AddBigEndian(result, iirOffset - 4, delta); // the CharacterIIR's own length prefix
 			if (iirOffset == NameTagOffset) // Strie-shaped player layout: also the @133 value island (player only)
 				AddBigEndian(result, NameOuterLengthOffset, delta);
-			return result;
-		}
-
-		// Returns a copy of a Strie-shaped spawn body with the name replaced. Delta-adjusts the CharacterIIR
-		// length prefix (@304), the @133 value (see NameOuterLengthOffset) and the body length. If the body does
-		// not look like the Strie-shaped layout (the name marker is not where expected) or the name is unusable,
-		// returns the body unchanged. Fallback path only - the main path replaces the whole CharacterIIR via
-		// SetCharacterMessage.
-		public static byte[] SetSpawnName(byte[] body, string name)
-		{
-			var nameBytes = Encoding.UTF8.GetBytes(name ?? string.Empty);
-			if (nameBytes.Length is 0 or > 127)
-				return body;
-
-			// Guard: only operate on the known layout (0x0A tag + the base body's "Strie" name length).
-			if (body.Length <= NameTagOffset + 1 || body[NameTagOffset] != 0x0A || body[NameTagOffset + 1] != BaseNameLength)
-				return body;
-
-			var oldLen = body[NameTagOffset + 1];
-			var delta = nameBytes.Length - oldLen;
-
-			var result = new byte[body.Length + delta];
-			Array.Copy(body, 0, result, 0, NameTagOffset + 1); // through the 0x0A tag
-			result[NameTagOffset + 1] = (byte)nameBytes.Length; // new 1-byte length
-			nameBytes.CopyTo(result, NameTagOffset + 2);
-			var afterSrc = NameTagOffset + 2 + oldLen;
-			Array.Copy(body, afterSrc, result, NameTagOffset + 2 + nameBytes.Length, body.Length - afterSrc);
-
-			// Both adjusted fields sit before the name, so their offsets are unchanged; only the values change.
-			AddBigEndian(result, 0, delta); // body length field
-			AddBigEndian(result, NameOuterLengthOffset, delta); // @133 value island (legacy adjust, tolerated)
-			AddBigEndian(result, NameInnerLengthOffset, delta); // @304 CharacterIIR length prefix
 			return result;
 		}
 

@@ -840,8 +840,11 @@ namespace Faolan.GameServer
 				// body doesn't parse or the character has no rows.
 				newBody = RebuildScaffoldFromRows(newBody, scaffoldCharacter);
 			}
-			else
-				newBody = SpawnPacketBuilder.SetSpawnName(newBody, character.Name);
+			// else: no decodable ProtoCoreCharacterIIR in the body (a malformed / non-standard spawn). There is no
+			// structural way to rename it, and the old fixed-Strie-offset SetSpawnName fallback could only have fired
+			// on a body whose name signature TryReadCharacterMessage (which scans every 0x0A) would already have
+			// found - so it was dead in practice (#201). Ship the body with its captured identity rather than
+			// raw-patch a malformed one.
 
 			rebuilt = new byte[bodyStart + newBody.Length];
 			Array.Copy(packet, 0, rebuilt, 0, bodyStart); // [len][crc][headerLen][header]

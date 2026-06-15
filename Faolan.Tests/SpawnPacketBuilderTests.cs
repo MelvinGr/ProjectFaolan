@@ -1,7 +1,6 @@
 using System;
 using System.Buffers.Binary;
 using System.Numerics;
-using System.Text;
 using Faolan.GameServer.Spawn;
 using Faolan.Tests.Support;
 using Xunit;
@@ -39,56 +38,6 @@ namespace Faolan.Tests
 			var built = SpawnPacketBuilder.BuildSpawnBody(template, handle, position, rotation);
 
 			Assert.Equal(template, built);
-		}
-
-		// Different-length rename grows/shrinks the body and adds the same delta to both enclosing length
-		// prefixes and the body length field.
-		[Theory, InlineData("Bob", -2), InlineData("Conanofcimmeria", 10)]
-		public void SetSpawnName_DifferentLength_AdjustsEnclosingLengths(string name, int expectedDelta)
-		{
-			var template = Golden.Bytes("SpawnStrieTemplate");
-			var renamed = SpawnPacketBuilder.SetSpawnName(template, name);
-
-			Assert.Equal(template.Length + expectedDelta, renamed.Length);
-			AssertBeDelta(template, renamed, 0, expectedDelta);
-			AssertBeDelta(template, renamed, SpawnPacketBuilder.NameOuterLengthOffset, expectedDelta);
-			AssertBeDelta(template, renamed, SpawnPacketBuilder.NameInnerLengthOffset, expectedDelta);
-			Assert.Equal(name, Encoding.ASCII.GetString(renamed, SpawnPacketBuilder.NameTagOffset + 2, name.Length));
-			Assert.Equal((byte)name.Length, renamed[SpawnPacketBuilder.NameTagOffset + 1]);
-		}
-
-		// Same-length rename ("Strie" -> "Conan", both 5) is byte-identical except the 5 name bytes (no length math).
-		[Fact]
-		public void SetSpawnName_SameLength_OnlyChangesNameBytes()
-		{
-			var template = Golden.Bytes("SpawnStrieTemplate");
-			var renamed = SpawnPacketBuilder.SetSpawnName(template, "Conan");
-
-			Assert.Equal(template.Length, renamed.Length);
-			var diffs = 0;
-			for (var i = 0; i < template.Length; i++)
-			{
-				if (template[i] != renamed[i])
-					diffs++;
-			}
-
-			Assert.Equal(5, diffs);
-			Assert.Equal("Conan", Encoding.ASCII.GetString(renamed, SpawnPacketBuilder.NameTagOffset + 2, 5));
-		}
-
-		// No-op when the name is unchanged ("Strie" -> "Strie"): byte-identical.
-		[Fact]
-		public void SetSpawnName_UnchangedName_IsByteIdentical()
-		{
-			var template = Golden.Bytes("SpawnStrieTemplate");
-			Assert.Equal(template, SpawnPacketBuilder.SetSpawnName(template, "Strie"));
-		}
-
-		private static void AssertBeDelta(byte[] before, byte[] after, int offset, int delta)
-		{
-			var b = BinaryPrimitives.ReadUInt32BigEndian(before.AsSpan(offset, 4));
-			var a = BinaryPrimitives.ReadUInt32BigEndian(after.AsSpan(offset, 4));
-			Assert.Equal((uint)(b + delta), a);
 		}
 
 		private static float ReadLE(byte[] b, int offset)
