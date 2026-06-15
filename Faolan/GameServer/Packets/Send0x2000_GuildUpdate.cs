@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using Faolan.Core.Data;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
@@ -22,17 +23,44 @@ namespace Faolan.GameServer
 			var ps = new PacketStream();
 			ps
 				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), 0x00002000)
-				.WriteArrayUInt32Length(s =>
-				{
-					s.WriteUInt32(GameServer0X2000RespondsOpcodes.GuildUpdateIIR);
-					s.WriteUInt32(CharacterWireType);
-					s.WriteUInt32(characterId);
-					s.WriteUInt16(0);
-					s.WriteString(guildName);
-				});
+				.WriteArrayUInt32Length(s => WriteGuildTagBody(s, characterId, guildName));
 			return ps
 				.WriteLengthHash()
 				.ToArray();
+		}
+
+		// The IIR body (the bytes WriteArrayUInt32Length wraps): [subop 2550C99A][0000C350][char][u16 0][string name].
+		// Factored out so it can be built and round-tripped without a live client (GuildPacketTests).
+		internal static void WriteGuildTagBody(FaolanStream s, uint characterId, string guildName)
+		{
+			s.WriteUInt32(GameServer0X2000RespondsOpcodes.GuildUpdateIIR);
+			s.WriteUInt32(CharacterWireType);
+			s.WriteUInt32(characterId);
+			s.WriteUInt16(0);
+			s.WriteString(guildName);
+		}
+
+		// The inverse of WriteGuildTagBody: recovers (characterId, guildName) from a GuildUpdateIIR body. Validates the
+		// sub-opcode + C350 wire type and the string length prefix. Proven by the GuildPacketTests round-trip.
+		internal static bool TryParseGuildTagBody(System.ReadOnlySpan<byte> body, out uint characterId, out string guildName)
+		{
+			characterId = 0;
+			guildName = string.Empty;
+			if (body.Length < 16) // subop(4) + type(4) + char(4) + u16 0(2) + u16 str-len(2)
+				return false;
+			if (System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000RespondsOpcodes.GuildUpdateIIR)
+				return false;
+			if (System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != CharacterWireType)
+				return false;
+
+			characterId = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(body.Slice(8, 4));
+			// body[12..14] is the constant u16 0; the WriteString length prefix follows at [14..16], then the name.
+			int len = System.Buffers.Binary.BinaryPrimitives.ReadUInt16BigEndian(body.Slice(14, 2));
+			if (body.Length != 16 + len)
+				return false;
+
+			guildName = System.Text.Encoding.UTF8.GetString(body.Slice(16, len));
+			return true;
 		}
 
 		// IGameServerProvider seam: pushes the guild tag onto the character's live world connection, if it is

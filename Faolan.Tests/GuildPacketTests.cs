@@ -3,6 +3,7 @@ using Faolan.Core.Data;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.CSPlayerAgent;
+using Faolan.GameServer;
 using Xunit;
 
 namespace Faolan.Tests
@@ -54,6 +55,43 @@ namespace Faolan.Tests
 			CsPlayerAgentListener.WriteGuildMemberRecord(s, hoxxling, true, 0xFAA, 0);
 
 			Assert.Equal(CapturedMemberRecord, Convert.ToHexStringLower(s.ToArray()));
+		}
+
+		// The in-world guild-tag IIR body (GuildUpdateIIR 0x2550C99A): [subop][0000C350][char][u16 0][string name].
+		[Theory]
+		[InlineData(0x01316E71u, "Sepulchra Invictus")]
+		[InlineData(0x00090000u, "")] // empty name clears the tag
+		public void GuildTagBody_RoundTrips(uint characterId, string guildName)
+		{
+			var s = new FaolanStream();
+			GameServerListener.WriteGuildTagBody(s, characterId, guildName);
+			var body = s.ToArray();
+
+			Assert.True(GameServerListener.TryParseGuildTagBody(body, out var parsedId, out var parsedName));
+			Assert.Equal(characterId, parsedId);
+			Assert.Equal(guildName, parsedName);
+		}
+
+		[Fact]
+		public void GuildTagBody_Matches_ExpectedLayout()
+		{
+			var s = new FaolanStream();
+			GameServerListener.WriteGuildTagBody(s, 0x01316E71, "Sepulchra Invictus");
+
+			// subop 2550C99A + type 0000C350 + char 01316E71 + u16 0 + len 0012 + "Sepulchra Invictus"
+			Assert.Equal(
+				"2550c99a0000c35001316e7100000012" + Convert.ToHexStringLower(System.Text.Encoding.UTF8.GetBytes("Sepulchra Invictus")),
+				Convert.ToHexStringLower(s.ToArray()));
+		}
+
+		[Fact]
+		public void TryParseGuildTagBody_RejectsWrongSubOpcode()
+		{
+			var s = new FaolanStream();
+			GameServerListener.WriteGuildTagBody(s, 0x01316E71, "X");
+			var body = s.ToArray();
+			body[0] ^= 0xFF;
+			Assert.False(GameServerListener.TryParseGuildTagBody(body, out _, out _));
 		}
 	}
 }
