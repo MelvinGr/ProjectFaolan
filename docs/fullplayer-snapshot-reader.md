@@ -155,8 +155,15 @@ the former opaque `Header0`/`Unknown*`/`RemoteFormat*` fields. The live snapshot
 tests pass, incl. `BeachSnapshotConstructionTests`). Generating DIFFERENT quests from a character's
 `CharacterQuests` is the next step (gated by an in-client chat-connect smoke test).
 
+**Generation (DONE, byte-exact).** `QuestcRecord.BuildSingle(QuestDefinition, state, n, fieldEc, fieldF0,
+fieldF8)` assembles a record from a DB `QuestDefinition` (its 5 header text refs + `AreaId`) plus the few
+per-quest scalars not yet harvested into the definition (`N`, the `@0xf0`/`@0xf8` words). `QuestcGenerationTests`
+proves building the beach starter (10238) from `faolan.db` reproduces the template's `@0–609` byte-exact - the
+journal text is fully DB-sourced. Remaining for arbitrary quests: harvest `N`/`@0xf0`/`@0xf8` into
+`QuestDefinition`, and regenerate the `@609` objective block + index (already authored by `BuildQuestFullUpdate`).
+
 So the human-readable journal text is entirely the **5 header strings**; the numeric objective records are
-unused for the beach starter (its objectives render from the strings). **Generation:** emit `listKey` +
+unused for the beach starter (its objectives render from the strings). The raw wire emit is: `listKey` +
 `[ver=1, questId, state, 0, N, 0x412]` + the 5 `<remoteformat>` strings + `[1, areaId, questId, 0]` +
 `u64 0` + `0` + four `0` empty-list counts — i.e. a fresh single-quest `Quest_c` is fully authored from
 `(questId, state, areaId, N, the 5 text tokens)`. The wire grammar is fully pinned and ground-truth-verified.

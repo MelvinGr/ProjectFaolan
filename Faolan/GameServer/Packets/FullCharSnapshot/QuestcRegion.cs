@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Faolan.Core.Data;
+using Faolan.Core.Database.Tables;
 
 namespace Faolan.GameServer.Packets.FullCharSnapshot
 {
@@ -64,6 +66,12 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 				record.Write(w);
 			return w.ToArray();
 		}
+
+		// The <remoteformat> token text the client resolves by (id, category) against its RDB; `key` is the
+		// pre-escaped deterministic content hash from QuestTextRef.KeyText. Matches WorldQuest.RemoteFormat's
+		// exact spelling (incl. the trailing knubot="0" and two spaces) so it reproduces the captured bytes.
+		public static string RemoteFormat(uint id, uint category, string key) =>
+			$"<remoteformat id=\"{id}\" category=\"{category}\" key=\"{key}\" knubot=\"0\"  ></remoteformat>";
 	}
 
 	public sealed class QuestcRecord
@@ -93,6 +101,44 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		public List<uint[]> Obj4 { get; init; } = [];
 
 		private const int ObjRecWords = 16;
+
+		// Build a single quest-journal record from a QuestDefinition (its 5 header text refs + areaId) plus the
+		// per-quest scalars that are NOT yet harvested into QuestDefinition (the goal/line count `n` and the two
+		// undecoded words FieldF0/FieldF8 - carried from the capture per quest). The numeric objective lists are
+		// left empty (the objective TEXT rides in the strings; see docs/fullplayer-snapshot-reader.md). This is
+		// the construct-don't-replay generator for the quest region (#186), proven byte-exact for 10238 by
+		// QuestcGenerationTests.
+		public static QuestcRecord BuildSingle(QuestDefinition def, uint state, uint n, uint fieldEc, uint fieldF0, ulong fieldF8)
+		{
+			ArgumentNullException.ThrowIfNull(def);
+
+			string Slot(QuestTextSlot slot)
+			{
+				var t = def.TextRefs.FirstOrDefault(x => x.Slot == slot)
+					?? throw new InvalidOperationException($"Quest {def.QuestId}: missing text ref slot {slot}");
+				return QuestcRegion.RemoteFormat(t.RefId, t.Category, t.KeyText);
+			}
+
+			return new QuestcRecord
+			{
+				QuestId = def.QuestId,
+				State = state,
+				Zero = 0,
+				N = n,
+				Title = Slot(QuestTextSlot.Title),
+				Summary = Slot(QuestTextSlot.Summary),
+				Area = Slot(QuestTextSlot.AreaTitle),
+				Region1 = Slot(QuestTextSlot.RegionName),
+				Region2 = Slot(QuestTextSlot.MapName),
+				FieldEc = fieldEc,
+				AreaId = def.AreaId,
+				Field11c = 0,
+				Accept = 0,
+				Field28 = 0,
+				FieldF0 = fieldF0,
+				FieldF8 = fieldF8,
+			};
+		}
 
 		public static QuestcRecord Read(FaolanStream r)
 		{
