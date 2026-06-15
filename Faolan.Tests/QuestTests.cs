@@ -45,6 +45,38 @@ namespace Faolan.Tests
 				.ToLowerInvariant());
 		}
 
+		[Fact]
+		public void TryParseQuestGoal_RoundTripsBuild()
+		{
+			var body = WorldQuest.BuildQuestGoal(0x01316E71, 0x34A7, 0x1670, 1);
+
+			Assert.True(WorldQuest.TryParseQuestGoal(body, out var player, out var quest, out var goal, out var count));
+			Assert.Equal(0x01316E71u, player);
+			Assert.Equal(0x34A7u, quest);
+			Assert.Equal(0x1670u, goal);
+			Assert.Equal(1u, count);
+
+			Assert.False(WorldQuest.TryParseQuestGoal(new byte[32], out _, out _, out _, out _)); // wrong length
+			var corrupt = (byte[])body.Clone();
+			corrupt[12] = 0x00; // marker must be 0x01
+			Assert.False(WorldQuest.TryParseQuestGoal(corrupt, out _, out _, out _, out _));
+		}
+
+		[Fact]
+		public void TryParseQuestIir_RoundTripsBuild()
+		{
+			var body = WorldQuest.BuildQuestIir(0x01316E71, 0x34A7, WorldQuest.StateActive);
+
+			Assert.True(WorldQuest.TryParseQuestIir(body, out var player, out var quest, out var state));
+			Assert.Equal(0x01316E71u, player);
+			Assert.Equal(0x34A7u, quest);
+			Assert.Equal(WorldQuest.StateActive, state);
+
+			var corrupt = (byte[])body.Clone();
+			corrupt[0] ^= 0xFF; // sub-opcode
+			Assert.False(WorldQuest.TryParseQuestIir(corrupt, out _, out _, out _));
+		}
+
 		// Journal CONTENT packets (Captures/decode_quest.py). The Casilda quest 0x34A7 = 13479,
 		// goal 0x1670 = 5744, area 1054, map 4010. Keys are the deterministic content hashes harvested
 		// from the captures (identical across characters/sessions).

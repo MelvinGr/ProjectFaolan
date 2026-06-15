@@ -61,6 +61,34 @@ namespace Faolan.GameServer.World
 			return b;
 		}
 
+		// The inverse of BuildQuestGoal: recovers (playerHandle, questId, goalId, count) from a 33-byte QuestGoal body.
+		// Validates the sub-opcode, ack TypeTag, the 0x01 marker and the trailing zero words. Proven by the QuestTests
+		// round-trip (#87 quest-packets codec consolidation).
+		public static bool TryParseQuestGoal(ReadOnlySpan<byte> body, out uint playerHandle, out uint questId, out uint goalId, out uint count)
+		{
+			playerHandle = 0;
+			questId = 0;
+			goalId = 0;
+			count = 0;
+			if (body.Length != 33)
+				return false;
+			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != QuestGoalSubOpcode)
+				return false;
+			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != TypeTagAck)
+				return false;
+			if (body[12] != 0x01)
+				return false;
+			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(25, 4)) != 0 ||
+			    BinaryPrimitives.ReadUInt32BigEndian(body.Slice(29, 4)) != 0)
+				return false;
+
+			playerHandle = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(8, 4));
+			questId = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(13, 4));
+			goalId = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(17, 4));
+			count = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(21, 4));
+			return true;
+		}
+
 		// QuestIIR (29 B): [subop][ack][playerHandle][0][0x01 marker][u32 state][u32 questId][0].
 		public static byte[] BuildQuestIir(uint playerHandle, uint questId, uint state)
 		{
@@ -74,6 +102,32 @@ namespace Faolan.GameServer.World
 			BinaryPrimitives.WriteUInt32BigEndian(b.AsSpan(21, 4), questId);
 			// b[25..29] = 0
 			return b;
+		}
+
+		// The inverse of BuildQuestIir: recovers (playerHandle, state, questId) from a 29-byte QuestIIR body. Validates
+		// the sub-opcode, ack TypeTag, the zeroed word at [12..16], the 0x01 marker and the trailing zero word.
+		public static bool TryParseQuestIir(ReadOnlySpan<byte> body, out uint playerHandle, out uint questId, out uint state)
+		{
+			playerHandle = 0;
+			questId = 0;
+			state = 0;
+			if (body.Length != 29)
+				return false;
+			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != QuestIirSubOpcode)
+				return false;
+			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != TypeTagAck)
+				return false;
+			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(12, 4)) != 0)
+				return false;
+			if (body[16] != 0x01)
+				return false;
+			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(25, 4)) != 0)
+				return false;
+
+			playerHandle = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(8, 4));
+			state = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(17, 4));
+			questId = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(21, 4));
+			return true;
 		}
 
 		// --- Journal CONTENT packets (Captures/decode_quest.py, byte-exact golden tests) ----------
