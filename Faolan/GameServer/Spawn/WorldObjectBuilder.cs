@@ -28,13 +28,13 @@ namespace Faolan.GameServer.Spawn
 
 			body = SpawnPacketBuilder.BuildSpawnBody(template, handle, position, rotation);
 
-			// For a dynel whose identity has been lifted into columns (#187), CONSTRUCT the ProtoSimpleDynelIIR
-			// message from those columns and splice it over the carried-from-Data identity. The body is the IIR
-			// carrier [u32 len][u32 subOpcode][record], so the codec operates on `body[8..]` (the record); the kd-tree
-			// tail + transform stay template-carried (interim). Byte-identical when the columns match the capture;
-			// non-dynel classes / un-lifted rows fall through with the spliced-from-Data identity unchanged.
-			if (row.SubOpcode == SimpleDynelMessageCodec.SubOpcode && body.Length > 8 &&
-			    SimpleDynelMessageCodec.TryReplaceIdentityFromColumns(body.AsSpan(8), row, out var newRecord))
+			// For an object whose identity has been lifted into columns (#187), CONSTRUCT the ProtoSimpleDynelIIR
+			// message from those columns and splice it over the carried-from-Data identity. EVERY world-object class
+			// (SimpleDynel/ClimbingDynel/ZoneLabel/Destructible/LootBag) carries the same identity message as its
+			// first blob, so this is gated on the lifted columns (DisplayName != null, set by the self-validating
+			// importer), not on the class. The body is the IIR carrier [u32 len][u32 subOpcode][record], so the codec
+			// operates on `body[8..]`; the per-class tail + transform stay template-carried (interim). Byte-identical.
+			if (body.Length > 8 && SimpleDynelMessageCodec.TryReplaceIdentityFromColumns(body.AsSpan(8), row, out var newRecord))
 			{
 				var combined = new byte[8 + newRecord.Length];
 				body.AsSpan(0, 8).CopyTo(combined);

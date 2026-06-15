@@ -506,14 +506,19 @@ namespace Faolan.Importer
 			row.RotationZ = e.RotZ;
 			row.RotationW = e.RotW;
 
-			// Lift the SimpleDynel identity into typed columns (#187): parse the ProtoSimpleDynelIIR out of the
-			// captured body so the builder can CONSTRUCT it from the DB rather than slice it from Data. Body is the
-			// IIR carrier [u32 len][u32 subOpcode][record]; the codec reads the record (body[8..]).
-			if (e.SubOpcode == SimpleDynelMessageCodec.SubOpcode)
+			// Lift the object's ProtoSimpleDynelIIR identity into typed columns (#187) so the builder can CONSTRUCT
+			// it from the DB rather than slice it from Data. EVERY world-object class carries this identity as its
+			// first blob, so this isn't class-gated - instead it SELF-VALIDATES: keep the columns only if the
+			// column-rebuild reproduces the original record byte-exact; otherwise clear DisplayName so the builder
+			// falls back to the Data slice (zero risk for any class/shape we don't fully model). Body is the IIR
+			// carrier [u32 len][u32 subOpcode][record]; the codec reads the record (body[8..]).
+			var objBody = WorldObjectBuilder.ExtractBody(e.Data);
+			if (objBody is { Length: > 8 } && SimpleDynelMessageCodec.TryParse(objBody.AsSpan(8), out var message, out _, out _))
 			{
-				var objBody = WorldObjectBuilder.ExtractBody(e.Data);
-				if (objBody is { Length: > 8 } && SimpleDynelMessageCodec.TryParse(objBody.AsSpan(8), out var message, out _, out _))
-					SimpleDynelMessageCodec.ApplyColumns(row, message);
+				SimpleDynelMessageCodec.ApplyColumns(row, message);
+				if (!SimpleDynelMessageCodec.TryReplaceIdentityFromColumns(objBody.AsSpan(8), row, out var rebuilt) ||
+				    !rebuilt.AsSpan().SequenceEqual(objBody.AsSpan(8)))
+					row.DisplayName = null; // un-faithful lift -> fall back to the verbatim slice
 			}
 
 			return row;

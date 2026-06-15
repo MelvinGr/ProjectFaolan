@@ -21,8 +21,9 @@ namespace Faolan.Tests
 			using var con = new SqliteConnection($"Data Source={db};Mode=ReadOnly");
 			con.Open();
 			using var cmd = con.CreateCommand();
-			cmd.CommandText = "SELECT Name,DisplayName,CarsGroup,IsClosed,QuestItemEffect,TemplateItemId,Kdtree,Data " +
-			                  "FROM WorldObjects WHERE SubOpcode=1722735952 AND DisplayName IS NOT NULL";
+			// All world-object classes (not just dynels) - they share the ProtoSimpleDynelIIR identity message.
+			cmd.CommandText = "SELECT Name,DisplayName,CarsGroup,IsClosed,QuestItemEffect,TemplateItemId,Kdtree,WaypointType,Data " +
+			                  "FROM WorldObjects WHERE DisplayName IS NOT NULL";
 			using var r = cmd.ExecuteReader();
 			int total = 0, ok = 0, parseFail = 0, mismatch = 0;
 			while (r.Read())
@@ -37,9 +38,10 @@ namespace Faolan.Tests
 					IsClosed = r.GetBoolean(3),
 					QuestItemEffect = r.IsDBNull(4) ? null : (uint)r.GetInt64(4),
 					TemplateItemId = r.IsDBNull(5) ? null : (uint)r.GetInt64(5),
-					Kdtree = (uint)r.GetInt64(6)
+					Kdtree = (uint)r.GetInt64(6),
+					WaypointType = r.IsDBNull(7) ? null : (uint)r.GetInt64(7)
 				};
-				var data = (byte[])r[7];
+				var data = (byte[])r[8];
 				var body = WorldObjectBuilder.ExtractBody(data);
 				if (body == null || body.Length <= 8 || !SimpleDynelMessageCodec.TryParse(body.AsSpan(8), out _, out var start, out var consumed))
 				{
@@ -55,9 +57,9 @@ namespace Faolan.Tests
 					mismatch++;
 			}
 
-			Console.WriteLine($"dynels={total} ok={ok} parseFail={parseFail} mismatch={mismatch}");
+			Console.WriteLine($"objects={total} ok={ok} parseFail={parseFail} mismatch={mismatch}");
 			Assert.Equal(0, mismatch);
-			Assert.True(ok > 400, $"expected >400 byte-exact rebuilds, got {ok}");
+			Assert.True(ok > 700, $"expected >700 byte-exact rebuilds across all object classes, got {ok}");
 		}
 
 		private static string FindRepoRoot()

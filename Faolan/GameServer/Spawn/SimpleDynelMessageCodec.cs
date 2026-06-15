@@ -94,6 +94,8 @@ namespace Faolan.GameServer.Spawn
 			};
 			if (row.QuestItemEffect.HasValue)
 				message.QuestItemEffect = row.QuestItemEffect.Value;
+			if (row.WaypointType.HasValue)
+				message.WaypointType = row.WaypointType.Value;
 			if (row.TemplateItemId.HasValue)
 				message.TemplateItemId = row.TemplateItemId.Value;
 			return message;
@@ -109,6 +111,7 @@ namespace Faolan.GameServer.Spawn
 			row.CarsGroup = message.CarsGroup;
 			row.IsClosed = message.IsClosed;
 			row.QuestItemEffect = message.ShouldSerializeQuestItemEffect() ? message.QuestItemEffect : null;
+			row.WaypointType = message.ShouldSerializeWaypointType() ? message.WaypointType : null;
 			row.TemplateItemId = message.ShouldSerializeTemplateItemId() ? message.TemplateItemId : null;
 		}
 

@@ -32,6 +32,7 @@ namespace Faolan.Core.Database.Tables
 		public uint CarsGroup { get; set; }            // proto field 5
 		public bool IsClosed { get; set; }             // proto field 12
 		public uint? QuestItemEffect { get; set; }     // proto field 6 (present on ~23%)
+		public uint? WaypointType { get; set; }        // proto field 7 (present on zone-label objects)
 		public uint? TemplateItemId { get; set; }      // proto field 8 (present on ~25%)
 	}
 }
