@@ -94,6 +94,33 @@ def is_ascii_run(v):
     return sum(1 for c in bs if 32 <= c < 127) >= 3 and v != 0
 
 
+def decode_text(path, limit=8):
+    """Reassemble the 53 u32 slots in STRUCT-OFFSET order (not wire order) and read them little-endian:
+    that recovers the contiguous char buffer the client scatters into struct fields 0x184..0x264. The
+    content is the NPC's RDB script-binding diagnostic string (ScriptGroup/Script/Command + font markup)."""
+    import re
+    u32_offsets = [off for kind, off in WIRE_SEQ if kind == 'u32']
+    n = 0
+    for rec in fa_records(json.load(open(path))['Packets']):
+        ws = words(rec)
+        if not ws:
+            continue
+        u32s = [(off, struct.pack('>I', v)) for _, kind, off, v in ws if kind == 'u32']
+        if len(u32s) != 53:
+            continue
+        buf = bytearray(0xE8)
+        for off, raw in u32s:
+            buf[off - 0x184: off - 0x184 + 4] = raw[::-1]  # client byteswaps (endian flag set) -> wire is LE
+        txt = buf.decode('latin1')
+        frags = [f for f in re.split(r'[^ -~]+', txt) if len(f) >= 6]
+        if frags:
+            hnd = struct.unpack('>I', rec[4:8])[0]
+            print(f'{hnd:08x}: ' + ' | '.join(frags)[:160])
+            n += 1
+        if n >= limit:
+            return
+
+
 def main(path):
     recs = [r for r in fa_records(json.load(open(path))['Packets'])]
     parsed = [w for w in (words(r) for r in recs) if w]
@@ -123,6 +150,12 @@ def main(path):
 
 
 if __name__ == '__main__':
-    paths = sys.argv[1:] or [sorted(glob.glob('Captures/*hoxxling-login.tshark.json'))[0]]
+    args = sys.argv[1:]
+    text_mode = '--text' in args
+    paths = [a for a in args if a != '--text'] or [sorted(glob.glob('Captures/*hoxxling-login.tshark.json'))[0]]
     for p in paths:
-        main(p)
+        if text_mode:
+            print(f'== {p.split("/")[-1]} — struct-order char-buffer text ==')
+            decode_text(p)
+        else:
+            main(p)

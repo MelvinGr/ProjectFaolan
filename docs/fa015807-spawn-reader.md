@@ -81,15 +81,34 @@ classifies each word over a beach burst: the great majority are `ascii/charbuf` 
 others — 36/36 blocks distinct because the per-NPC text differs), with only a few genuine scalars
 (`w21`@0x1fc, the const-zero `w22`@0x200 / `w45`@0x224, the numeric `w50`@0x23c).
 
+## What the char buffer actually contains — decoded (2026-06-15)
+The bytes are contiguous **on the wire** but the client scatters consecutive 4-byte chunks into
+**non-contiguous** struct fields (`0x184, 0x188, … 0x1a8, 0x1b0, …`), so reading them in wire order gives
+scrambled text. Reassembling the 53 u32s **in struct-offset order** and taking each word **little-endian**
+(the stream's endian flag is set, so `ReadU32` byteswaps — i.e. the wire is LE) recovers clean, contiguous
+text (`analyze_fa015807_scaffold.py --text`):
+
+```
+ScriptFormula defined at ScriptCommands/ShowFIFOMessageFromServerScriptCommand.cpp(19) in ScriptGroup
+'PvPMonthlyFestivalArenaOfDeath_Solo' (id=5000419) Script 'eventcomplete' (id=6) Command
+'showfifomessagefromserver' … <font color="green"> … Command 'if' (id=54)
+```
+
+So the dominant content of the pre-IIR scaffold is the NPC's **RDB script-engine binding / diagnostic
+string** — ScriptGroup / Script / Command names + ids + the `<font color=…>` feedback markup, null-padded
+into the fixed-width buffer. It is per-instance text the client reads into a struct char buffer (and
+evidently keeps for script/debug, not geometry). Source: the RDB script layer (`[[lua_vm]]` /
+`[[protocol_onscreen_feedback]]`), keyed per NPC type.
+
 ## What this means for construction (#185/#54)
-The **wire grammar is now fully pinned** — fixed-width, no variable-length elements when the sublist count is
-0 (every beach NPC). What remains is purely **sourcing the content**, not more decoding:
-1. The dominant region is a per-instance **char buffer holding RDB script/feedback text** (the FormatFeedback
-   / event-script strings — `[[lua_vm]]` / `[[protocol_onscreen_feedback]]`), keyed per NPC type. To author
-   from scratch the server writes that fixed-width buffer (RDB text, padded) rather than slicing it from a
-   captured row.
-2. The few genuine scalars (`w21`, `w50`, the const-zeros) are small numeric fields — author as constants /
-   simple per-NPC values.
+The **wire grammar is fully pinned AND the content is identified** — no decoding remains for the beach case
+(sublist count 0). What's left is sourcing + the in-client flip:
+1. **The char buffer = the NPC's script-binding string** (above). Two construction routes, both in-client
+   gated: (a) author the buffer from the NPC's RDB script binding, or (b) since it reads like an engine
+   *diagnostic* the client only stores, test whether a **null/empty** buffer still renders (would make
+   construction trivial — but `[[npc_spawn_minimal_postiir_breaks_humanoids]]` is the cautionary precedent).
+2. The few genuine scalars (`w21`@0x1fc, the const-zero `w22`@0x200 / `w45`@0x224, numeric `w50`@0x23c) are
+   small per-NPC numeric fields — author as constants / simple values.
 3. The per-spawn sub-list (`@1122b10`) entry sub-object grammar is still unobserved (`count==0` on beach NPCs).
 
 Net: there is **no remaining read-grammar unknown** for the beach case; byte-exact construction is now a
