@@ -18,11 +18,22 @@ namespace Faolan.CSPlayerAgent
 		// guild tag (0x2550C99A) onto a character's live GameServer connection on join/leave.
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 
+		// Composed collaborator: owns the guild RPC handlers, wire builders, and pending-invite / reply-endpoint
+		// state. The cross-connection lookup (ClientForCharacter, on the Server base) is injected as a delegate seam.
+		private readonly GuildService _guild;
+
 		public CsPlayerAgentListener(ILogger<CsPlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database, IGameServerDispatcher gameServerDispatcher) : base(configuration.CsPlayerAgentPort, logger,
 			configuration, database,
 			new ConanOutgoingPacketLogger(logger, "CsPlayerAgent", typeof(CsPlayerAgentResponseOpcodes)))
 		{
 			_gameServerDispatcher = gameServerDispatcher;
+			_guild = new GuildService(database, logger, gameServerDispatcher, ClientForCharacter);
+		}
+
+		protected override void ClientDisconnected(INetworkClient client)
+		{
+			_guild.OnClientDisconnected(client);
+			base.ClientDisconnected(client);
 		}
 
 		protected override async Task ReceivedPacket(INetworkClient client, ConanPacket packet)
@@ -73,7 +84,7 @@ namespace Faolan.CSPlayerAgent
 
 					// Remember this connection's reply endpoints so guild events (invites, member-joined) can be
 					// pushed to it later without an incoming packet to echo.
-					_replyEndpoints[client] = (packet.ReceiverBytes, packet.SenderBytes);
+					_guild.RememberReplyEndpoints(client, packet.ReceiverBytes, packet.SenderBytes);
 
 					await new PacketStream()
 						.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CsPlayerAgentResponseOpcodes.Authenticate)
@@ -82,7 +93,7 @@ namespace Faolan.CSPlayerAgent
 
 					// Guilded character: retail pushes the 0x203F full guild update right after the
 					// Authenticate ack (claim_login_reward dump), before the 0x20D0/0x20C5 pair.
-					await SendGuildStateOnLogin(client, packet);
+					await _guild.SendGuildStateOnLogin(client, packet);
 
 					await new PacketStream()
 						.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CsPlayerAgentResponseOpcodes.Ox20D0, [0x01])
@@ -140,14 +151,14 @@ namespace Faolan.CSPlayerAgent
 
 				case CsPlayerAgentOpcodes.ClientRequestGuildInfo:
 				{
-					await HandleClientRequestGuildInfo(client, packet);
+					await _guild.HandleClientRequestGuildInfo(client, packet);
 
 					break;
 				}
 
 				case CsPlayerAgentOpcodes.AcceptGuildInvitation:
 				{
-					await HandleAcceptGuildInvitation(client, packet);
+					await _guild.HandleAcceptGuildInvitation(client, packet);
 
 					break;
 				}
@@ -155,43 +166,44 @@ namespace Faolan.CSPlayerAgent
 				case CsPlayerAgentOpcodes.DeclineGuildInvitation:
 				{
 					var characterId = client.Session.Character?.Id ?? 0;
-					if (_pendingGuildInvites.TryRemove(characterId, out var declined))
-						Logger.LogInformation("Guild invite to \"{Guild}\" declined by {CharacterId:X8}.", declined.GuildName, characterId);
+					var declinedGuild = _guild.DeclineGuildInvitation(characterId);
+					if (declinedGuild != null)
+						Logger.LogInformation("Guild invite to \"{Guild}\" declined by {CharacterId:X8}.", declinedGuild, characterId);
 
 					break;
 				}
 
 				case CsPlayerAgentOpcodes.CreateGuild:
 				{
-					await HandleCreateGuild(client, packet);
+					await _guild.HandleCreateGuild(client, packet);
 
 					break;
 				}
 
 				case CsPlayerAgentOpcodes.GuildInviteByName:
 				{
-					await HandleGuildInviteByName(client, packet);
+					await _guild.HandleGuildInviteByName(client, packet);
 
 					break;
 				}
 
 				case CsPlayerAgentOpcodes.GuildInvite:
 				{
-					await HandleGuildInvite(client, packet);
+					await _guild.HandleGuildInvite(client, packet);
 
 					break;
 				}
 
 				case CsPlayerAgentOpcodes.GuildLeave:
 				{
-					await HandleGuildLeave(client);
+					await _guild.HandleGuildLeave(client);
 
 					break;
 				}
 
 				case CsPlayerAgentOpcodes.GuildMessageOfTheDay:
 				{
-					await HandleGuildMessageOfTheDay(client, packet);
+					await _guild.HandleGuildMessageOfTheDay(client, packet);
 
 					break;
 				}
@@ -208,7 +220,7 @@ namespace Faolan.CSPlayerAgent
 				case CsPlayerAgentOpcodes.GuildRequestMemberList:
 				{
 					// Retail answers the member-list request with a fresh 0x203F full update plus the 0x20A5 summary.
-					await SendGuildStateOnLogin(client, packet);
+					await _guild.SendGuildStateOnLogin(client, packet);
 					await SendQuickGuildSummary(client, packet);
 
 					break;

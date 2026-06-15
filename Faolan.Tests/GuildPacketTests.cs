@@ -34,7 +34,7 @@ namespace Faolan.Tests
 			};
 
 			var s = new FaolanStream();
-			CsPlayerAgentListener.WriteGuildInviteBody(s, guild, 0x01316E71, "Kyloth");
+			GuildService.WriteGuildInviteBody(s, guild, 0x01316E71, "Kyloth");
 
 			Assert.Equal(CapturedInviteBody, Convert.ToHexStringLower(s.ToArray()));
 		}
@@ -52,7 +52,7 @@ namespace Faolan.Tests
 			};
 
 			var s = new FaolanStream();
-			CsPlayerAgentListener.WriteGuildMemberRecord(s, hoxxling, true, 0xFAA, 0);
+			GuildService.WriteGuildMemberRecord(s, hoxxling, true, 0xFAA, 0);
 
 			Assert.Equal(CapturedMemberRecord, Convert.ToHexStringLower(s.ToArray()));
 		}
