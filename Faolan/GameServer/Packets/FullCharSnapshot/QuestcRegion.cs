@@ -1,0 +1,191 @@
+using System;
+using System.Collections.Generic;
+using Faolan.Core.Data;
+
+namespace Faolan.GameServer.Packets.FullCharSnapshot
+{
+	// The Quest_c (List A) region at the START of the 0x737A6DF9 FullChar snapshot tails - the quest JOURNAL.
+	// Grammar recovered from the client reader FullPlayerCharacterIIR::ReadSubClass (FUN_0148c210 -> base
+	// FUN_00797440 -> List A driver FUN_0091f5c0 -> per-record FUN_0091df50) and validated byte-exact against
+	// BeachTailsTemplate.bin (docs/fullplayer-snapshot-reader.md, Captures/decode_questc.py).
+	//
+	// Wire: u32 version(0x18) ; u32 listA_count = (records+1)*0x3F1 ; then per record:
+	//   u32 listKey(=questId) ; u32 ver(=1) ; u32 questId ; u32 state ; u32 0 ; u32 N ; u32 0x412 ;
+	//   string x5 ([u16 len][utf8] <remoteformat>) ; u32 ; u32 areaId ; u32 questId ; u32 ;
+	//   u64 ; u32 ; objlist1 ; objlist2 ; u32 ; u64 ; objlist3 ; objlist4
+	// where each objlist = u32 count then count x ObjRec(16 u32). The four objlists are EMPTY for the beach
+	// starter (so ObjRec is carried verbatim as raw u32s and is not yet field-validated).
+	//
+	// This is a standalone codec proven by a byte-exact round-trip golden test (QuestcRegionTests); it is the
+	// construct-don't-replay foundation for retiring BeachTailsTemplate.bin's quest region (Gitea #186). It is
+	// NOT yet wired into SnapshotTails / the live snapshot path.
+	public sealed class QuestcRegion
+	{
+		public const uint Version = 0x18;
+		public const uint Frame = 0x3F1; // 1009 - the list-count framing multiplier
+		public const uint RecordVersion = 1;
+		public const uint Marker = 0x412;
+
+		public List<QuestcRecord> Records { get; init; } = [];
+
+		public static QuestcRegion Parse(byte[] data)
+		{
+			ArgumentNullException.ThrowIfNull(data);
+			using var r = new FaolanStream(data, false);
+
+			var version = r.ReadUInt32();
+			if (version != Version)
+				throw new InvalidOperationException($"Quest_c region: version 0x{version:X} != 0x{Version:X}");
+
+			var count = r.ReadUInt32();
+			if (count == 0 || count % Frame != 0)
+				throw new InvalidOperationException($"Quest_c region: listA count 0x{count:X} is not a positive multiple of 0x{Frame:X}");
+			var records = count / Frame - 1;
+
+			var region = new QuestcRegion();
+			for (var i = 0; i < records; i++)
+				region.Records.Add(QuestcRecord.Read(r));
+			return region;
+		}
+
+		public byte[] ToArray()
+		{
+			using var w = new FaolanStream();
+			w.WriteUInt32(Version);
+			w.WriteUInt32(((uint)Records.Count + 1) * Frame);
+			foreach (var record in Records)
+				record.Write(w);
+			return w.ToArray();
+		}
+	}
+
+	public sealed class QuestcRecord
+	{
+		public uint QuestId { get; init; }
+		public uint State { get; init; }
+		public uint Zero { get; init; }
+		public uint N { get; init; }
+		public string Title { get; init; } = "";     // <remoteformat category=50301>
+		public string Summary { get; init; } = "";   // <remoteformat category=50302>
+		public string Area { get; init; } = "";      // <remoteformat category=50300>
+		public string Region1 { get; init; } = "";   // <remoteformat category=52000>
+		public string Region2 { get; init; } = "";   // <remoteformat category=52000>
+		public uint FieldEc { get; init; }           // @+0xec (=1 in template)
+		public uint AreaId { get; init; }            // @+0xcc (matches the Area string's id)
+		public uint Field11c { get; init; }          // @+0x11c (=0)
+		public ulong Accept { get; init; }           // @+0x20 u64 (likely acceptTime; =0)
+		public uint Field28 { get; init; }           // @+0x28 (=0)
+		public uint FieldF0 { get; init; }           // @+0xf0 (=0x96)
+		public ulong FieldF8 { get; init; }          // @+0xf8 u64 (=15)
+
+		// The four objective lists. Each entry is one ObjRec carried as 16 raw u32s (unvalidated; empty for
+		// the beach starter, so this is exercised only by round-trip of progressed captures).
+		public List<uint[]> Obj1 { get; init; } = [];
+		public List<uint[]> Obj2 { get; init; } = [];
+		public List<uint[]> Obj3 { get; init; } = [];
+		public List<uint[]> Obj4 { get; init; } = [];
+
+		private const int ObjRecWords = 16;
+
+		public static QuestcRecord Read(FaolanStream r)
+		{
+			var listKey = r.ReadUInt32();
+			var ver = r.ReadUInt32();
+			if (ver != QuestcRegion.RecordVersion)
+				throw new InvalidOperationException($"Quest_c record: ver 0x{ver:X} != 1");
+			var questId = r.ReadUInt32();
+			if (listKey != questId)
+				throw new InvalidOperationException($"Quest_c record: listKey {listKey} != questId {questId}");
+			var state = r.ReadUInt32();
+			var zero = r.ReadUInt32();
+			var n = r.ReadUInt32();
+			var marker = r.ReadUInt32();
+			if (marker != QuestcRegion.Marker)
+				throw new InvalidOperationException($"Quest_c record: marker 0x{marker:X} != 0x{QuestcRegion.Marker:X}");
+
+			var title = r.ReadString();
+			var summary = r.ReadString();
+			var area = r.ReadString();
+			var region1 = r.ReadString();
+			var region2 = r.ReadString();
+
+			var fieldEc = r.ReadUInt32();
+			var areaId = r.ReadUInt32();
+			var questId2 = r.ReadUInt32();
+			if (questId2 != questId)
+				throw new InvalidOperationException($"Quest_c record: trailing questId {questId2} != {questId}");
+			var field11c = r.ReadUInt32();
+			var accept = r.ReadUInt64();
+			var field28 = r.ReadUInt32();
+
+			var obj1 = ReadObjList(r);
+			var obj2 = ReadObjList(r);
+			var fieldF0 = r.ReadUInt32();
+			var fieldF8 = r.ReadUInt64();
+			var obj3 = ReadObjList(r);
+			var obj4 = ReadObjList(r);
+
+			return new QuestcRecord
+			{
+				QuestId = questId, State = state, Zero = zero, N = n,
+				Title = title, Summary = summary, Area = area, Region1 = region1, Region2 = region2,
+				FieldEc = fieldEc, AreaId = areaId, Field11c = field11c, Accept = accept, Field28 = field28,
+				FieldF0 = fieldF0, FieldF8 = fieldF8,
+				Obj1 = obj1, Obj2 = obj2, Obj3 = obj3, Obj4 = obj4,
+			};
+		}
+
+		public void Write(FaolanStream w)
+		{
+			w.WriteUInt32(QuestId);                 // listKey
+			w.WriteUInt32(QuestcRegion.RecordVersion);
+			w.WriteUInt32(QuestId);
+			w.WriteUInt32(State);
+			w.WriteUInt32(Zero);
+			w.WriteUInt32(N);
+			w.WriteUInt32(QuestcRegion.Marker);
+
+			w.WriteString(Title);
+			w.WriteString(Summary);
+			w.WriteString(Area);
+			w.WriteString(Region1);
+			w.WriteString(Region2);
+
+			w.WriteUInt32(FieldEc);
+			w.WriteUInt32(AreaId);
+			w.WriteUInt32(QuestId);
+			w.WriteUInt32(Field11c);
+			w.WriteUInt64(Accept);
+			w.WriteUInt32(Field28);
+
+			WriteObjList(w, Obj1);
+			WriteObjList(w, Obj2);
+			w.WriteUInt32(FieldF0);
+			w.WriteUInt64(FieldF8);
+			WriteObjList(w, Obj3);
+			WriteObjList(w, Obj4);
+		}
+
+		private static List<uint[]> ReadObjList(FaolanStream r)
+		{
+			var count = r.ReadUInt32();
+			var list = new List<uint[]>((int)count);
+			for (var i = 0; i < count; i++)
+			{
+				var rec = new uint[ObjRecWords];
+				for (var j = 0; j < ObjRecWords; j++)
+					rec[j] = r.ReadUInt32();
+				list.Add(rec);
+			}
+			return list;
+		}
+
+		private static void WriteObjList(FaolanStream w, List<uint[]> list)
+		{
+			w.WriteUInt32((uint)list.Count);
+			foreach (var rec in list)
+				foreach (var word in rec)
+					w.WriteUInt32(word);
+		}
+	}
+}
