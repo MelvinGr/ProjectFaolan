@@ -1,3 +1,5 @@
+using System;
+
 namespace Faolan.Core.Database.Tables
 {
 	// A captured static world object on a map - the decor/props (66AEDD50), interactive containers (F096251E),
@@ -14,6 +16,12 @@ namespace Faolan.Core.Database.Tables
 	// from Base3DEntity, shared with the player Character and the NPC spawns.
 	public class WorldObject : Base3DEntity
 	{
+		// LEGACY verbatim captured packet. The world-entry render no longer replays it - it CONSTRUCTS the object
+		// from the typed columns (identity) + KdTreeTail (geometry) + the burst's live placement (#187,
+		// TryBuildOntoLivePlacement). Retained ONLY as: (a) the import source-of-truth the columns are derived from
+		// (per "captures are the primary truth source"), and (b) the runtime loot-bag-template / un-lifted fallback.
+		// Do NOT use for new render paths - build from the columns + KdTreeTail instead.
+		[Obsolete("Legacy verbatim packet; the render builds from the typed columns + KdTreeTail (#187). Kept only as the import source + runtime loot-bag/fallback.")]
 		public byte[] Data { get; set; }
 		public string Name { get; set; }
 		public uint CapturedHandle { get; set; }
