@@ -20,10 +20,14 @@ namespace Faolan.Importer
 	{
 		private const uint MarkerItem = 1000000;
 
-		// String fields inside a template are encoded `tag 0x21 (u32) + length (u32) + <length> ASCII bytes`. The
-		// first such string is the display name; internal asset names (mesh refs like `NPC_..._(W0129)`) contain
-		// underscores, so we skip those and take the first underscore-free string. Items whose display name is a
-		// localized-string id (not inline) yield none - we leave their captured name untouched.
+		// String fields inside a template are encoded `tag 0x21 (u32) + length (u16) + flags (u16) + <length> ASCII
+		// bytes`. The length is a u16, NOT a u32 - the next u16 is a flags word that is nonzero whenever the string
+		// carries backslash-escaped chars (e.g. an apostrophe `\'`). Reading the length as a u32 folds that flags word
+		// into the high bytes, so names like "Aspirant's Cap" came out as a bogus 1.5M length and got skipped (#202) -
+		// the ~900 names that worked all happened to have flags == 0. The first such string is the display name;
+		// internal asset names (mesh refs like `NPC_..._(W0129)`) contain underscores, so we skip those and take the
+		// first underscore-free string. NPC/TEST/internal items carry only an asset name and have no display name - we
+		// leave their captured (empty) name untouched.
 		private const uint StringTag = 0x21;
 		private static readonly uint[] ItemTemplateTypes = [1000020, 1000620];
 
@@ -37,13 +41,14 @@ namespace Faolan.Importer
 			{
 				if (BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(i, 4)) == StringTag)
 				{
-					var len = (int)BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(i + 4, 4));
+					// length is a u16; body[i+6..i+8] is a flags word (escaping marker) we don't need.
+					var len = BinaryPrimitives.ReadUInt16LittleEndian(body.Slice(i + 4, 2));
 					if (len >= 1 && len <= 1024 && i + 8 + len <= body.Length)
 					{
 						var s = body.Slice(i + 8, len);
 						if (IsPrintableAscii(s))
 						{
-							var text = Encoding.ASCII.GetString(s);
+							var text = Unescape(Encoding.ASCII.GetString(s));
 							if (!text.Contains('_'))
 								return text;
 
@@ -161,6 +166,14 @@ namespace Faolan.Importer
 				await db.SaveChangesAsync();
 
 			return new Result(items.Count, decrypted, noEntry, headerMismatch, decryptFailed, namesAdded, categoriesAdded);
+		}
+
+		// Template strings backslash-escape apostrophes/quotes (e.g. "Aspirant\'s Cap"); undo that for the stored name.
+		private static string Unescape(string s)
+		{
+			return s.Contains('\\')
+				? s.Replace("\\'", "'").Replace("\\\"", "\"").Replace("\\\\", "\\")
+				: s;
 		}
 
 		private static bool IsPrintableAscii(ReadOnlySpan<byte> s)
