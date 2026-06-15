@@ -69,7 +69,7 @@ namespace Faolan.AgentServer
 				.SendAsync(target);
 			await target.SendAsync(BuildWhisper(ClaudeChannel.SenderId, message));
 
-			_claudeChannel.Append(ClaudeChannel.SenderId, ClaudeChannel.SenderName, $"(whisper to {targetCharacterId:X8}) {message}", fromClaude: true);
+			_claudeChannel.Append(ClaudeChannel.SenderId, ClaudeChannel.SenderName, $"(whisper to {targetCharacterId:X8}) {message}", fromClaude: true, viaWhisper: true);
 			return true;
 		}
 

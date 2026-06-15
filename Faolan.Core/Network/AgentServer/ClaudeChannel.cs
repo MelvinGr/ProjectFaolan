@@ -5,8 +5,14 @@ using System.Threading;
 
 namespace Faolan.Core.Network.AgentServer
 {
-	/// <summary>One message on the Claude chat channel. <see cref="Sequence" /> is monotonic, for cursor-style polling.</summary>
-	public sealed record ClaudeChannelMessage(ulong Sequence, DateTime TimestampUtc, uint SenderId, string SenderName, string Message, bool FromClaude);
+	/// <summary>
+	///     One message on the Claude chat channel. <see cref="Sequence" /> is monotonic, for cursor-style polling.
+	///     <see cref="ViaWhisper" /> records the inbound MODE: true if a player whispered Claude privately, false if
+	///     they posted on the channel - the bridge surfaces it so Claude replies in the SAME mode it was addressed in
+	///     (whisper-back vs channel-broadcast). For Claude's own posts (<see cref="FromClaude" />), it mirrors how the
+	///     reply was sent.
+	/// </summary>
+	public sealed record ClaudeChannelMessage(ulong Sequence, DateTime TimestampUtc, uint SenderId, string SenderName, string Message, bool FromClaude, bool ViaWhisper = false);
 
 	/// <summary>
 	///     The "Claude" chat channel: a server-defined channel every client is subscribed to on AgentServer login,
@@ -36,11 +42,11 @@ namespace Faolan.Core.Network.AgentServer
 		private readonly Queue<ClaudeChannelMessage> _messages = new Queue<ClaudeChannelMessage>();
 		private ulong _nextSequence = 1;
 
-		public ClaudeChannelMessage Append(uint senderId, string senderName, string message, bool fromClaude)
+		public ClaudeChannelMessage Append(uint senderId, string senderName, string message, bool fromClaude, bool viaWhisper = false)
 		{
 			lock (_lock)
 			{
-				var entry = new ClaudeChannelMessage(_nextSequence++, DateTime.UtcNow, senderId, senderName, message, fromClaude);
+				var entry = new ClaudeChannelMessage(_nextSequence++, DateTime.UtcNow, senderId, senderName, message, fromClaude, viaWhisper);
 				_messages.Enqueue(entry);
 				while (_messages.Count > MaxMessages)
 					_messages.Dequeue();

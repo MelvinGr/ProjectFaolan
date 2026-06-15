@@ -102,3 +102,10 @@ claude --dangerously-load-development-channels server:faolan-chat
 (Custom channels are not on the research-preview allowlist, hence the development flag. The bridge tolerates
 game-server restarts and skips the pre-launch backlog. SDK note: the experimental capability value must be a
 JsonElement - a boxed Dictionary breaks the SDK's source-generated initialize serialization.)
+
+**Reply in the addressed mode (#97):** each message carries the inbound MODE structurally — `ClaudeChannelMessage.ViaWhisper`
+is set at ingestion (true for a `/tell Claude`, false for a channel post; `AgentServerListener` `Whisper` vs channel-chat
+cases), *not* encoded as a `"(whisper) "` text prefix. The bridge surfaces it on the channel event as
+`mode="whisper|channel"`, and the server instructions tell Claude to answer in kind: whisper back (`whisper_to` =
+`sender_id`) for a whisper, broadcast (omit `whisper_to`) for a channel post. So a private tell stays private and a
+public post stays public, automatically. Covered by `ClaudeChannelTests`.

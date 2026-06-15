@@ -175,7 +175,7 @@ namespace Faolan.AgentServer
 						var senderName = client.Session.Character?.Name?.Length > 0
 							? client.Session.Character.Name
 							: $"Character{senderId}";
-						_claudeChannel.Append(senderId, senderName, message, fromClaude: false);
+						_claudeChannel.Append(senderId, senderName, message, fromClaude: false, viaWhisper: false);
 					}
 
 					break;
@@ -197,10 +197,12 @@ namespace Faolan.AgentServer
 					Logger.LogInformation("AgentServer whisper {Sender} -> {Target:X8}: {Message}", senderName, targetCharacterId, message);
 
 					// A tell to Claude's synthetic identity goes into the MCP bridge log as a private message
-					// (the client learns Claude's id from the channel posts' 0x0014, so /tell Claude works).
+					// (the client learns Claude's id from the channel posts' 0x0014, so /tell Claude works). The
+					// whisper MODE is carried structurally (viaWhisper) so the bridge can have Claude reply privately,
+					// matching how it was addressed - NOT as a "(whisper) " text prefix the bridge would have to parse.
 					if (Configuration.McpEnabled && targetCharacterId == ClaudeChannel.SenderId)
 					{
-						_claudeChannel.Append(senderId, senderName, $"(whisper) {message}", fromClaude: false);
+						_claudeChannel.Append(senderId, senderName, message, fromClaude: false, viaWhisper: true);
 						break;
 					}
 
