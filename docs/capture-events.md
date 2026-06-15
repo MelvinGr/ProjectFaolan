@@ -75,6 +75,9 @@ human-readable `remoteformat`/`localized` XML + object/NPC name strings (with th
 ### hoxxling — create (all sliders), long load, chat before exit
 `...create-modified_all_sliders-very_long_loading_screen-chat_message_before_exit.json`
 - Full create-editor stream: `A36D3B74` script callbacks (77), `2005/2009/2085/2082` editor setup, `96C46740`.
+  The editor `0x2000` IIR carrier stream is decoded in `docs/create-editor-bursts.md` (dissector
+  `Captures/decode_create_editor.py`): it multiplexes by endpoint-class pair, and the entity full-updates
+  reuse the login/world-entry spawn grammar.
 - **Chat before exit**: a chat send (`642CD3D6`/text) near the end; chat broadcast is `0x203f` (see guild).
 
 ## Open questions (for later dissection)

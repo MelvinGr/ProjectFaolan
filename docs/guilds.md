@@ -66,13 +66,14 @@ misalign the roster that follows. Cosmetic-only until decoded.
 
 - DB: `Guild` table + `Character.GuildId`/`GuildRank` (migration `AddGuilds`). Members are characters
   with `GuildId` set; deleting a guild releases members (`SetNull`).
-- `Faolan/CSPlayerAgent/GuildPackets.cs` — wire builders (member record + invite body byte-exact
-  against the capture: `GuildPacketTests`).
-- `Faolan/CSPlayerAgent/GuildHandlers.cs` — CreateGuild, GuildInvite(ByName), Accept/Decline,
-  GuildLeave, GuildMessageOfTheDay, ClientRequestGuildInfo, member-list refresh. Pending invites are
-  in-memory; cross-client pushes use reply endpoints captured at Authenticate.
-- In-world tag: `SendGuildTag` through the `IGameServerProvider` seam (live join/leave) and on the
-  existing-character login path.
+- `Faolan/CSPlayerAgent/GuildService.cs` — the guild collaborator extracted from the listener: wire
+  builders (member record + invite body byte-exact against the capture: `GuildPacketTests`) plus the
+  RPC handlers (CreateGuild, GuildInvite(ByName), Accept/Decline, GuildLeave, GuildMessageOfTheDay,
+  ClientRequestGuildInfo, member-list refresh). Pending invites are in-memory; cross-client pushes use
+  reply endpoints captured at Authenticate (the listener forwards them via `_guild`).
+- In-world tag: `SendGuildTag` through the `IGameServerDispatcher` seam (live join/leave) and on the
+  existing-character login path. The cross-connection member lookup is the `ClientForCharacter` Func
+  seam injected into `GuildService`.
 - GM bootstrap: `.guild create <name>` (the capture-true CreateGuild RPC needs a registrar NPC window).
 
 ## Open items
