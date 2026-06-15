@@ -59,9 +59,14 @@ human-readable `remoteformat`/`localized` XML + object/NPC name strings (with th
 ### assassinl23 — resurect
 `...randomActions-resurect.json`
 - `0x642CD3D6` dominates (3632) - the death/resurrect interactions + the resurrect confirm are Interact actions.
-- `FA015807` "Inexperienced Nemedian" (the mob). Death→resurrect likely: a health-to-0 state update, a resurrect
-  prompt (remoteformat), then a MapChange/teleport to a resurrection point. Specific resurrect opcode not yet
-  isolated - candidate: an Interact accept + a 737A6DF9/state refresh after.
+- `FA015807` "Inexperienced Nemedian" (the mob).
+- **DECODED 2026-06-15:** death → server sends `DispatchValidResurrectionSpots` (s2c `0x2024`, GameCharInterface):
+  `[deathPos 3 floats][u32 0x7E2][ spot: pos 3 floats + 0xC7A0 + mapId + 0 0 0 + spawnPointId + 0x0A ]* [0x00]`
+  (idx616/idx4050, 57 B, both deaths identical bar the death pos). The client shows the release screen, the player
+  picks → `RespawnMe` (c2s `0x2024`) = `[u32 spawnPointId]` (the chosen spot echoed back). NOTE: the same `0x2024` is
+  sent at LOGIN (the misnamed `SendReadyForPlayScreen`) to set the spawn anchor - it only renders the release UI when
+  the client is in the dead state (which needs a real combat killing-blow, not a raw health=0 push). Builder +
+  golden test shipped (commits 6d7df27/e6961d1); see Gitea #214/#215.
 
 ### strickenbla — create, combat, levelup, questcomplete
 `...create-random-actions-combat-levelup-questcomplete.json`
