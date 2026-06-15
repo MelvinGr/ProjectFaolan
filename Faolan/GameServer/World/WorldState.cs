@@ -77,9 +77,14 @@ namespace Faolan.GameServer.World
 					if (entity.IsPlayer)
 						continue;
 
-					// A dead NPC counts down to respawn; a living one runs its AI (aggro nearest player + attack).
+					// A dead NPC first lingers as the dying creature (death animation), then its corpse becomes a
+					// lootable bag, then it respawns. The corpse-linger and respawn timers run independently off the
+					// same death; the linger (~3s) elapses well before the respawn (~15s) so the bag is lootable in
+					// between.
 					if (entity.IsDead)
 					{
+						if (entity.TickCorpseLinger(deltaSeconds))
+							(effects ??= new List<WorldTickEffect>()).Add(new WorldTickEffect(entity, WorldTickEffectType.NpcCorpseLootable));
 						if (entity.TickRespawn(deltaSeconds))
 							(effects ??= new List<WorldTickEffect>()).Add(new WorldTickEffect(entity, WorldTickEffectType.NpcRespawned));
 						continue;

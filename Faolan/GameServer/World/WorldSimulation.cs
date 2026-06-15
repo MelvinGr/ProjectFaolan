@@ -27,6 +27,10 @@ namespace Faolan.GameServer.World
 		// Re-render a respawned NPC for the players in range (its stored FA015807 spawn body).
 		Task BroadcastNpcRespawn(WorldEntity npc);
 
+		// Convert a dead NPC's corpse to a lootable bag in place (after its death-animation linger), or despawn it if
+		// no loot bag can be built for the map.
+		Task ConvertCorpseToLoot(WorldEntity npc);
+
 		// Push a 0x96B8DC59 vitals update for the player (regen tick, NPC-attack damage).
 		Task PushVitals(INetworkClient client, EntityVitals vitals);
 
@@ -358,6 +362,9 @@ namespace Faolan.GameServer.World
 						{
 							case WorldTickEffectType.NpcRespawned:
 								await _output.BroadcastNpcRespawn(effect.Entity);
+								break;
+							case WorldTickEffectType.NpcCorpseLootable:
+								await _output.ConvertCorpseToLoot(effect.Entity);
 								break;
 							case WorldTickEffectType.LootExpired:
 								await _output.BroadcastEntityFade(effect.Entity); // graceful fade-out (n3ToClientFade)

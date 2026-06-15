@@ -643,19 +643,30 @@ namespace Faolan.GameServer.World
 		// captures where every loot bag is introduced in the world-entry burst, never mid-session). The entity
 		// stays dead in the model and respawns off the tick (which clears the loot). Returns true if the corpse
 		// became a bag, so the caller skips the despawn.
-		public async Task<bool> TryDropCorpseLoot(WorldEntity deadNpc)
+		// A dead NPC's death-animation linger elapsed (driven by the world tick): turn its corpse into a lootable bag
+		// IN PLACE. Every kill leaves a lootable corpse - the drop ROLL decides only whether it carries items/cash, not
+		// whether it's lootable (retail leaves a lootable corpse on every kill; empty corpses are fine). Falls back to a
+		// plain despawn only when no loot-bag world object can be built for the map.
+		public async Task ConvertCorpseToLoot(WorldEntity deadNpc)
 		{
-			if (!LootResolver.RollsDrop(Random.Shared.NextDouble()))
-				return false;
+			if (!deadNpc.IsDead)
+				return; // revived (or never died) before the linger fired - nothing to convert
 
-			var items = await RollLootItems(Random.Shared.Next(0, 3)); // 0-2 items on a kill
-			var cash = LootResolver.RollCash(Random.Shared.NextDouble(), deadNpc.Level);
+			var dropsContents = LootResolver.RollsDrop(Random.Shared.NextDouble());
+			var items = await RollLootItems(dropsContents ? Random.Shared.Next(0, 3) : 0); // 0-2 items, or none
+			var cash = dropsContents ? LootResolver.RollCash(Random.Shared.NextDouble(), deadNpc.Level) : 0u;
+
 			if (!await MakeCorpseLootable(deadNpc, items, cash))
-				return false;
+			{
+				// No loot template for this map: we can't render a bag, so just despawn the corpse.
+				await BroadcastEntityDespawn(deadNpc);
+				_logger.LogInformation("Loot: corpse of {Name} 0x{Handle:X8} despawned (no loot bag template for map {Map}).",
+					deadNpc.Name, deadNpc.Handle, deadNpc.MapId);
+				return;
+			}
 
 			_logger.LogInformation("Loot: corpse of {Name} 0x{Handle:X8} became a loot bag ({Items} items, {Cash} tin) on map {Map}.",
 				deadNpc.Name, deadNpc.Handle, items.Count, cash, deadNpc.MapId);
-			return true;
 		}
 
 		// Test bootstrap (.spawnbag): spawn a throwaway NPC at the player, immediately mark it dead, and turn its

@@ -15,8 +15,20 @@ namespace Faolan.GameServer.World
 		// Default time a killed NPC stays dead before the tick respawns it.
 		public const double DefaultRespawnDelaySeconds = 15.0;
 
+		// How long a fresh corpse stays as the dying creature (so the client plays its death animation off the
+		// health=0 vitals it just received) before the corpse is converted to a lootable bag in place. Must be well
+		// under RespawnDelaySeconds so the lootable window opens before the NPC revives.
+		public const double CorpseLingerSeconds = 3.0;
+
 		// Time (seconds) until this NPC may swing again; counts down while it has a target in range.
 		private double _attackCooldownRemaining;
+
+		// Remaining time (seconds) the dying corpse is still the creature model (death animation) before it becomes a
+		// loot bag; counts down while dead-and-not-yet-converted.
+		private double _corpseLingerRemaining;
+
+		// Set once the corpse has been turned into a lootable bag this death, so the conversion fires exactly once.
+		private bool _corpseConverted;
 
 		// Remaining time (seconds) until a loot bag expires.
 		private double _expiryRemaining;
@@ -108,10 +120,14 @@ namespace Faolan.GameServer.World
 			_attackCooldownRemaining = interval;
 		}
 
-		// Marks the entity dead (call once its vitals reach 0) and starts the respawn countdown. Idempotent per death.
+		// Marks the entity dead (call once its vitals reach 0) and starts the corpse-linger + respawn countdowns. The
+		// corpse stays as the dying creature for CorpseLingerSeconds (death animation), then the tick converts it to a
+		// lootable bag; the respawn timer revives it later. Idempotent per death.
 		public void MarkDead()
 		{
 			_respawnRemaining = RespawnDelaySeconds;
+			_corpseLingerRemaining = CorpseLingerSeconds;
+			_corpseConverted = false;
 		}
 
 		// Advances the attack cooldown by dt; returns true (and re-arms for `interval`) when a swing is ready. Used by
@@ -123,6 +139,21 @@ namespace Faolan.GameServer.World
 				return false;
 
 			_attackCooldownRemaining = interval;
+			return true;
+		}
+
+		// Counts down a fresh corpse's death-animation linger by dt; returns true the single tick it elapses, so the
+		// caller converts the corpse to a lootable bag in place. Fires exactly once per death and only while dead.
+		public bool TickCorpseLinger(double dt)
+		{
+			if (_corpseConverted || !IsDead)
+				return false;
+
+			_corpseLingerRemaining -= dt;
+			if (_corpseLingerRemaining > 0)
+				return false;
+
+			_corpseConverted = true;
 			return true;
 		}
 
@@ -155,6 +186,7 @@ namespace Faolan.GameServer.World
 			// Drop any unlooted corpse-bag contents - the entity is a live NPC again, not a bag.
 			CashTin = 0;
 			LootItems.Clear();
+			_corpseConverted = false;
 			return true;
 		}
 

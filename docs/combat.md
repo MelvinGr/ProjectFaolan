@@ -34,9 +34,28 @@ aggro/death/XP/loot) lives in TODO.md §Combat and `docs/archive/quests-and-comb
 The `B2 90 80 5C 29 E6 27 CA` 8-byte sequence is the standard null-identity filler wherever an item
 identity quad would go (behavior acks, the 0xF result block, 0x2052 grants).
 
+## NPC death lifecycle (corpse linger -> loot bag -> respawn)
+
+A killed NPC no longer instant-pops. The killing blow pushes the `health=0` vitals (`ApplyNpcDamage`), then
+`CombatService.OnNpcKilled` only `MarkDead`s the world entity (+ XP + kill quests) - it does NOT despawn or
+swap the corpse. The world tick (`WorldState.Tick`) drives two independent timers off the death:
+1. **corpse linger** (`WorldEntity.CorpseLingerSeconds`, ~3s): the corpse stays the dying creature so the
+   client plays its death animation off the health=0 it just got. When it elapses the tick emits
+   `NpcCorpseLootable` -> `WorldBroadcaster.ConvertCorpseToLoot` turns the corpse into a lootable bag IN PLACE
+   (reusing the handle - `MakeCorpseLootable`). Every kill leaves a lootable corpse; the drop ROLL only decides
+   whether it carries items/cash (empty corpses are fine, matching retail). Falls back to a plain despawn only
+   when the map has no loot-bag template.
+2. **respawn** (`RespawnDelaySeconds`, ~15s): revives the NPC at its spawn point and re-renders it
+   (`NpcRespawned`), clearing any unlooted corpse contents.
+
+Open: the death animation currently relies on the client reacting to the `health=0` StatUpdate during the
+linger - a dedicated death-state/anim IIR is not decoded (see #204; candidates noted there).
+
 ## Known gaps (TODO.md §Combat)
 
 - Melee is cone/AoE in retail (every target in the arc takes damage); we resolve only the selected target.
+  Directional combat + defensive shields is #20 (decode #1 = the swing tail direction-ability id, done).
 - NPC counter-attack ANIMATION ack (retail's second BccAck with actor = target handle) - undecoded; the
   world model deals NPC damage on the tick instead.
-- HP/stamina auto-regen not implemented; NPC death animation before despawn + loot-bag spawn reliability.
+- HP/stamina auto-regen not implemented. NPC death animation: corpse now lingers then becomes a loot bag
+  (above, #204); a decoded death-state IIR is still open.

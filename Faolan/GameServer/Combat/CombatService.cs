@@ -414,17 +414,15 @@ namespace Faolan.GameServer.Combat
 		{
 			if (npcEntity != null)
 			{
+				// MarkDead starts the corpse-linger + respawn timers. The killing blow already pushed health=0 vitals
+				// (ApplyNpcDamage), so the client plays the death animation on the still-rendered creature; the world
+				// tick then converts the lingering corpse to a lootable bag (NpcCorpseLootable) and respawns it later.
+				// Don't despawn/convert here - that instant-popped the corpse before the death animation could play.
 				npcEntity.MarkDead();
 				await AwardKillXp(killer, npcEntity.Level);
 
-				// Maybe turn the corpse into a lootable bag IN PLACE (reusing the NPC's handle so the client, which
-				// already renders the corpse, accepts the update). Only despawn the corpse when nothing dropped.
-				var becameBag = await _broadcaster.TryDropCorpseLoot(npcEntity);
-				if (!becameBag)
-					await _broadcaster.BroadcastEntityDespawn(npcEntity);
-
-				_logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); {Outcome}, respawns in {Delay}s.",
-					npcEntity.Name, targetHandle, cause, becameBag ? "corpse became a loot bag" : "despawned", npcEntity.RespawnDelaySeconds);
+				_logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); corpse lingers {Linger}s then becomes lootable, respawns in {Delay}s.",
+					npcEntity.Name, targetHandle, cause, WorldEntity.CorpseLingerSeconds, npcEntity.RespawnDelaySeconds);
 				await AdvanceKillQuests(killer, npcEntity.Name);
 				return;
 			}

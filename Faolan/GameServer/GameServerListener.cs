@@ -104,6 +104,11 @@ namespace Faolan.GameServer
 			return _broadcaster.BroadcastNpcRespawn(npc);
 		}
 
+		Task IWorldOutbound.ConvertCorpseToLoot(WorldEntity npc)
+		{
+			return _broadcaster.ConvertCorpseToLoot(npc);
+		}
+
 		Task IWorldOutbound.PushVitals(INetworkClient client, EntityVitals vitals)
 		{
 			return SendStatUpdate(client, vitals.ToVitalsBlock(), client.Session.Account.ClientInstance);
