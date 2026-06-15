@@ -8,7 +8,7 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-		private static readonly byte[] RetailCreateEditorPostReadyAckSender = [0x0D, 0xFC, 0x56, 0x97, 0x5B, 0x10, 0x59];
+		private static readonly byte[] RetailCreateEditorPostReadyAckSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GamePostReadyType, 0x59);
 
 		private static uint GetRetailCreateEditorPostReadyAckStatus(uint requestId)
 		{

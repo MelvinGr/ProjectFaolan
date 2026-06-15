@@ -51,24 +51,24 @@ namespace Faolan.GameServer
 
 		private static readonly byte[] ExistingCharacterPostReadyReportServerIdReceiverPrefix = [0x0D, 0x48, 0x76, 0x37, 0x28, 0x10];
 
-		private static readonly byte[] ExistingCharacterPostReadyReportServerIdSender = [0x0D, 0xFC, 0x56, 0x97, 0x5B, 0x10, 0x58];
+		private static readonly byte[] ExistingCharacterPostReadyReportServerIdSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GamePostReadyType, 0x58);
 		private static readonly byte[] ExistingCharacterReadyForPlayScreenReceiverPrefix = [0x0D, 0x91, 0xF7, 0x87, 0x8B, 0x10];
 
 		// Existing-character post-ready conversations: retail uses sub-id 0x58 + the session character instance
 		// on every family (Strie login capture, idx 294+). Receivers are prefix-only here; the instance varint
 		// is appended at send time via AppendVarint(prefix, ClientInstance).
-		private static readonly byte[] ExistingCharacterReadyForPlayScreenSender = [0x0D, 0x5D, 0xB9, 0xEC, 0xA9, 0x10, 0x58];
+		private static readonly byte[] ExistingCharacterReadyForPlayScreenSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameSpawnCallerType, 0x58);
 		private static readonly byte[] ExistingCharacterWorldEntryPromptReceiverPrefix = [0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10];
 		// The world-entry prompt rides the world-system conversation (0x13CE71B1/0x58) - byte-identical to
 		// WorldFraming.Sender, so fold to that single source of truth rather than re-spelling the literal.
 		private static readonly byte[] ExistingCharacterWorldEntryPromptSender = World.WorldFraming.Sender;
 		private static readonly byte[] NewCharacterReadyForPlayScreenReceiver = [0x0D, 0x91, 0xF7, 0x87, 0x8B, 0x10, 0xC2, 0xDD, 0xD8, 0x10];
 
-		private static readonly byte[] NewCharacterReadyForPlayScreenSender = [0x0D, 0x5D, 0xB9, 0xEC, 0xA9, 0x10, 0x59];
+		private static readonly byte[] NewCharacterReadyForPlayScreenSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameSpawnCallerType, 0x59);
 		private static readonly byte[] Receiver2 = [0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0x84, 0x80, 0x80, 0x08];
 		private static readonly byte[] Receiver3 = [0x0d, 0x48, 0x76, 0x37, 0x28, 0x10, 0x84, 0x80, 0x80, 0x08];
-		private static readonly byte[] RetailCreatePost205FSender = [0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x59];
-		private static readonly byte[] Sender2 = [0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x14];
+		private static readonly byte[] RetailCreatePost205FSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameWorldType, 0x59);
+		private static readonly byte[] Sender2 = ConanEndpoints.EndpointBytes(ConanEndpoints.GameWorldType, 0x14);
 
 		private async Task FlushPendingPost205FFollowUp(INetworkClient client)
 		{
