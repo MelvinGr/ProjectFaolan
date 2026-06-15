@@ -73,6 +73,12 @@ namespace Faolan.GameServer.Combat
 		// the sequence incremented; its 81-byte result tail is the capture's layout with the live actor=player and
 		// the computed damage in the damage slot (the v1/v3/v5 metadata constants are templated - their semantics
 		// aren't decoded yet, only that v4 == the swing damage).
+		//
+		// The result-block ack is the TARGETED-hit variant: its actor=player slot makes the client play a hit-react
+		// (the blood/impact animation) on whoever the block names - the player. An air swing (no target selected)
+		// must therefore get the PLAIN echo-ack with no result block, exactly like the unarmed air swing, or the
+		// player visibly bleeds when swinging at nothing (#19). The "no damage" half was already guarded; this also
+		// drops the self hit-react.
 		public async Task SendNormalAttackResponse(INetworkClient client, byte[] rawPayload, uint targetHandle, uint mode = 0)
 		{
 			// rawPayload = [bodyLen u32][subop u32][c350 u32][instance u32][seq u16][behaviorId u32][argsLen u32][args][reqTail]
@@ -87,7 +93,6 @@ namespace Faolan.GameServer.Combat
 			if (26 + argsLen > rawPayload.Length)
 				return;
 
-			var argBytes = rawPayload[26..(26 + argsLen)];
 			var reqTail = rawPayload[(26 + argsLen)..];
 			var abilityId = reqTail.Length >= 4
 				? (uint)((reqTail[^4] << 24) | (reqTail[^3] << 16) | (reqTail[^2] << 8) | reqTail[^1])
@@ -97,17 +102,24 @@ namespace Faolan.GameServer.Combat
 			// capture proves the phase value IS the request's own Mode (field 2) - the earlier "monotonic server
 			// counter" read was an artifact of Mode itself incrementing per action. Echo the Mode when the caller
 			// has it; fall back to the legacy session counter for callers that don't parse the args.
-			var echoedArgs = InsertBehaviorPhaseField(argBytes, mode != 0
+			var phase = mode != 0
 				? mode
-				: (uint)(++client.Session.NormalAttackAckPhase));
+				: (uint)(++client.Session.NormalAttackAckPhase);
 
-			// Only deal damage to a real enemy: an attack with no target selected (or one that resolves to the
-			// player's own handle) must NOT hit the player - that was the "attack hits myself" bug.
+			// Only hit a real enemy: an attack with no target selected (or one that resolves to the player's own
+			// handle) must NOT hit the player - that was the "attack hits myself" bug. An air swing gets the plain
+			// echo-ack (no result block) so the client plays no hit-react on the player (#19), matching the unarmed
+			// air-swing path - then we're done (retail's air swing is the bare ack).
 			var hasEnemyTarget = targetHandle != 0 && targetHandle != instance;
+			if (!hasEnemyTarget)
+			{
+				await SendWorldPacket(client, BuildBehaviorEchoAckBody(rawPayload, instance, phase));
+				return;
+			}
+
+			var echoedArgs = InsertBehaviorPhaseField(rawPayload[26..(26 + argsLen)], phase);
 			var level = client.Session.Character?.Level ?? 1;
-			var damage = hasEnemyTarget
-				? (uint)CombatResolver.ResolveSpellDamage(abilityId, level)
-				: 0u;
+			var damage = (uint)CombatResolver.ResolveSpellDamage(abilityId, level);
 			var next = (ushort)(seq + 1);
 
 			// 1) BehaviorControlCenterIIR ack - releases the swing.
@@ -144,15 +156,12 @@ namespace Faolan.GameServer.Combat
 					.WriteUInt32(0))
 				.SendAsync(client);
 
-			if (hasEnemyTarget)
-			{
-				// 2) DamageResultIIR - the hit / floating number.
-				await SendWorldPacket(client, CombatPacketCodec.BuildDamageResultBody(instance, targetHandle, damage));
+			// 2) DamageResultIIR - the hit / floating number.
+			await SendWorldPacket(client, CombatPacketCodec.BuildDamageResultBody(instance, targetHandle, damage));
 
-				// Apply to the target's live vitals (world-authoritative), push its health bar, and run the kill
-				// lifecycle (despawn + scheduled respawn) on death.
-				await ApplyNpcDamage(client, targetHandle, (int)damage, $"melee from 0x{instance:X8}");
-			}
+			// Apply to the target's live vitals (world-authoritative), push its health bar, and run the kill
+			// lifecycle (despawn + scheduled respawn) on death.
+			await ApplyNpcDamage(client, targetHandle, (int)damage, $"melee from 0x{instance:X8}");
 
 			// 3) EnergyIIR - the player's stamina after the swing.
 			var player = GetOrAddPlayerVitals(client);
