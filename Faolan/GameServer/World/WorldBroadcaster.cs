@@ -22,7 +22,7 @@ namespace Faolan.GameServer.World
 	// renders, loot-window and quest-journal packets (docs/archive/server-architecture-roadmap.md). Extracted out of the
 	// GameServer listener so packet CONSTRUCTION for world events is its own collaborator; it reads the world model via
 	// the WorldSimulation, loads templates from the DB, and frames every packet on the world conversation (WorldFraming:
-	// sender = world-system 0x58, receiver = the recipient's GamePlayerType endpoint). The FA015807 body carries the
+	// sender = world-system 0x58, receiver = the recipient's GameInterfaceType endpoint). The FA015807 body carries the
 	// SUBJECT's handle (unchanged), so the recipient renders the subject as a separate entity. NEEDS IN-CLIENT
 	// VERIFICATION with two connected players. Single-player is a no-op (no interest events).
 	public sealed class WorldBroadcaster

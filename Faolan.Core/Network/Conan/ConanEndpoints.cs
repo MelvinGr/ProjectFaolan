@@ -23,14 +23,14 @@ namespace Faolan.Core.Network.Conan
 		// see docs/archive/opcode-re-plan.md + docs/aoc-opcode-ids.md. The C# constant names are kept for compatibility, but
 		// the REAL client class name is noted per line (our originals were guesses). "Agent" = client->server proxy
 		// side, "Interface" = server->client dispatch side.
-		public const uint GamePlayerType = 0x6C67C147; // = hash("GameInterface")
-		public const uint GamePostReadyType = 0x5B9756FC; // = hash("GameCharAgentProject")     (post-ready family)
-		public const uint GameServerIdType = 0x28377648; // = hash("GameCharInterfaceProject")  (report-server-id family)
-		public const uint GameSpawnCallerType = 0xA9ECB95D; // = hash("GameCharAgent")      (0x201C spawn-handshake caller)
-		public const uint GameSpawnEndpointType = 0x8B87F791; // = hash("GameCharInterface")  (0x201C spawn-handshake endpoint)
-		public const uint GameWorldType = 0xB171CE13; // = hash("GameAgent")
-		public const uint CsPlayerAgentType = 0x6DD55614; // = hash("CSPlayerAgent")     (CsPlayerAgent reply endpoint)
-		public const uint CsPlayerInterfaceType = 0xBBD560C8; // = hash("CSPlayerInterface") (CsPlayerAgent reply caller)
+		public const uint GameInterfaceType = 0x6C67C147; // = hash("GameInterface")
+		public const uint GameCharAgentProjectType = 0x5B9756FC; // = hash("GameCharAgentProject")     (post-ready family)
+		public const uint GameCharInterfaceProjectType = 0x28377648; // = hash("GameCharInterfaceProject")  (report-server-id family)
+		public const uint GameCharAgentType = 0xA9ECB95D; // = hash("GameCharAgent")      (0x201C spawn-handshake caller)
+		public const uint GameCharInterfaceType = 0x8B87F791; // = hash("GameCharInterface")  (0x201C spawn-handshake endpoint)
+		public const uint GameAgentType = 0xB171CE13; // = hash("GameAgent")
+		public const uint CSPlayerAgentType = 0x6DD55614; // = hash("CSPlayerAgent")     (CsPlayerAgent reply endpoint)
+		public const uint CSPlayerInterfaceType = 0xBBD560C8; // = hash("CSPlayerInterface") (CsPlayerAgent reply caller)
 
 		public static ProtoEndpoint Endpoint(uint type, uint instance)
 		{

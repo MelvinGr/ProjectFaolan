@@ -151,7 +151,7 @@ namespace Faolan.GameServer
 			// without the reply the client retries it forever and never opens the chat (CommunityServer) connection.
 			// Gated to existing-character world login - the create-editor / create-world flows have their own
 			// elaborate handshake on this class and must not be diverted. See HandleGameCharAgentProject.
-			if (packet.Receiver.Type == ConanEndpoints.GamePostReadyType
+			if (packet.Receiver.Type == ConanEndpoints.GameCharAgentProjectType
 				&& !client.Session.IsCreateEditorConnection && !client.Session.IsCreateWorldSession
 				&& client.Session.Character?.Name != null)
 			{
@@ -823,12 +823,12 @@ namespace Faolan.GameServer
 			return _simulation.PlayerWorldEntity(client);
 		}
 
-		// The create-editor 0x2000 receiver: the player object (GamePlayerType) addressed to this session's
+		// The create-editor 0x2000 receiver: the player object (GameInterfaceType) addressed to this session's
 		// client instance. Built as a typed ProtoEndpoint so the type+instance can't drift (the old hardcoded
 		// receiver baked in 0x021662C8; see ConanEndpoints / ProtoEndpointGoldenTests).
 		private static byte[] CreateEditorReceiver(INetworkClient client)
 		{
-			return ConanEndpoints.EndpointBytes(ConanEndpoints.GamePlayerType, client.Session.Account.ClientInstance);
+			return ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, client.Session.Account.ClientInstance);
 		}
 
 		// The post-creation WORLD connection: the second (world) connection opened after the 0x2002 enter-world

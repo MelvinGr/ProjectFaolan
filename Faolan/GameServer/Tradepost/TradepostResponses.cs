@@ -17,9 +17,8 @@ namespace Faolan.GameServer.Tradepost
 	// server-initiated open).
 	public static class TradepostResponses
 	{
-		// Server source endpoint for tradepost dispatches: GameCharAgent (hash "GameCharAgent") sub-id 0x59,
-		// constant across both captures (same bytes as NewCharacterReadyForPlayScreenSender).
-		private const uint GameCharAgentType = ConanEndpoints.GameSpawnCallerType; // 0xA9ECB95D
+		// Server source endpoint for tradepost dispatches: GameCharAgent sub-id 0x59, constant across both
+		// captures (same bytes as NewCharacterReadyForPlayScreenSender).
 		private const uint GameCharAgentInstance = 0x59;
 
 		// The client's TradepostInterface object instance - constant 0x08006F31 across both captures (different
@@ -110,7 +109,7 @@ namespace Faolan.GameServer.Tradepost
 
 		private static PacketStream Build(TradepostProtocol.InterfaceMethod method, byte[] body, uint interfaceInstance)
 		{
-			var sender = new ProtoEndpoint { Type = GameCharAgentType, Instance = GameCharAgentInstance };
+			var sender = new ProtoEndpoint { Type = ConanEndpoints.GameCharAgentType, Instance = GameCharAgentInstance };
 			var receiver = new ProtoEndpoint { Type = TradepostProtocol.InterfaceType, Instance = interfaceInstance };
 
 			var stream = new PacketStream();

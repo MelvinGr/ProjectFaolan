@@ -8,10 +8,10 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-		private static readonly byte[] LatencyResponseSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameSpawnCallerType, 0x08);
+		private static readonly byte[] LatencyResponseSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x08);
 
 		// The 0x201C handshake uses a different conversation family, but the same sub-id 0x58 + instance tail.
-		private static readonly byte[] LoginWorld201CSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameSpawnCallerType, 0x58);
+		private static readonly byte[] LoginWorld201CSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x58);
 		// The create-flow packets are written explicitly (PacketStream.WriteHeader + WriteArray + WriteUInt32) in
 		// their Retail*Burst sender methods. The client instance is the character's real id: it is written into the
 		// body with WriteUInt32(id) and woven into the sender/receiver conversation id by building each endpoint
@@ -29,11 +29,11 @@ namespace Faolan.GameServer
 		// from gameplay dumps (Pong 0x2009 and LatencyCheckResponse 0x2082 both consistently use 0x08). Same
 		// endpoint TYPEs as the world conversation: Pong from GameAgent (0x13CE71B1), latency from GameCharAgent
 		// (0xA9ECB95D).
-		private static readonly byte[] PingResponseSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameWorldType, 0x08);
+		private static readonly byte[] PingResponseSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08);
 
 		private static byte[] LoginWorld201CReceiver(INetworkClient client)
 		{
-			return ConanEndpoints.EndpointBytes(ConanEndpoints.GameSpawnEndpointType, client.Session.Account.ClientInstance);
+			return ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, client.Session.Account.ClientInstance);
 		}
 
 		private static byte[] LoginWorldReceiver(INetworkClient client)

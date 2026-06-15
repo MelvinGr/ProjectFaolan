@@ -1184,9 +1184,9 @@
 			{
 				return receiverClass switch
 				{
-					Conan.ConanEndpoints.GameWorldType => Name<GameAgentOpcodes>(opcode),                 // GameAgent
-					Conan.ConanEndpoints.GameSpawnCallerType => Name<GameCharAgentOpcodes>(opcode),        // GameCharAgent
-					Conan.ConanEndpoints.GamePostReadyType => Name<GameCharAgentProjectOpcodes>(opcode),   // GameCharAgentProject
+					Conan.ConanEndpoints.GameAgentType => Name<GameAgentOpcodes>(opcode),                 // GameAgent
+					Conan.ConanEndpoints.GameCharAgentType => Name<GameCharAgentOpcodes>(opcode),        // GameCharAgent
+					Conan.ConanEndpoints.GameCharAgentProjectType => Name<GameCharAgentProjectOpcodes>(opcode),   // GameCharAgentProject
 					_ => "Unknown"
 				};
 			}

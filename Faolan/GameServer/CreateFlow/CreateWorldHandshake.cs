@@ -23,7 +23,7 @@ namespace Faolan.GameServer
 		// Server->client conversation family for the creator 0x2000 traffic. Sender is the game-server
 		// conversation id; receiver is built per session by CreateEditorReceiver(client) (the per-client
 		// family ending in the character-instance varint).
-		private static readonly byte[] CreateEditorMorphAckSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameWorldType, 0x0C);
+		private static readonly byte[] CreateEditorMorphAckSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x0C);
 
 		// Sends the post-morph trio once the morph stream goes quiet. After Finish the editor streams its
 		// SetMorphValue callbacks, but ONLY for morphs that were changed - so the set (and which one is last)

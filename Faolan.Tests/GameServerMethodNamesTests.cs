@@ -11,18 +11,18 @@ namespace Faolan.Tests
 	{
 		[Theory]
 		// Same opcode 0x2002, three different classes -> three different recovered names.
-		[InlineData(ConanEndpoints.GameWorldType, (ushort)0x2002, "ChatVicinity")]          // GameAgent
-		[InlineData(ConanEndpoints.GameSpawnCallerType, (ushort)0x2002, "RequestBindLocation")] // GameCharAgent
-		[InlineData(ConanEndpoints.GamePostReadyType, (ushort)0x2002, "AcceptApprenticeTeacher")] // GameCharAgentProject
-		[InlineData(ConanEndpoints.GameSpawnCallerType, (ushort)0x2000, "RequestAggroStatus")]
-		[InlineData(ConanEndpoints.GameWorldType, (ushort)0x2003, "Authenticate2")]
+		[InlineData(ConanEndpoints.GameAgentType, (ushort)0x2002, "ChatVicinity")]          // GameAgent
+		[InlineData(ConanEndpoints.GameCharAgentType, (ushort)0x2002, "RequestBindLocation")] // GameCharAgent
+		[InlineData(ConanEndpoints.GameCharAgentProjectType, (ushort)0x2002, "AcceptApprenticeTeacher")] // GameCharAgentProject
+		[InlineData(ConanEndpoints.GameCharAgentType, (ushort)0x2000, "RequestAggroStatus")]
+		[InlineData(ConanEndpoints.GameAgentType, (ushort)0x2003, "Authenticate2")]
 		public void Resolve_NamesTheMethodPerClass(uint receiverClass, ushort opcode, string expected)
 		{
 			Assert.Equal(expected, GameServerMethodNames.Resolve(receiverClass, opcode));
 		}
 
 		[Theory]
-		[InlineData(ConanEndpoints.GameSpawnCallerType, (ushort)0x2FFF)] // opcode out of the catalog
+		[InlineData(ConanEndpoints.GameCharAgentType, (ushort)0x2FFF)] // opcode out of the catalog
 		[InlineData(0xDEADBEEF, (ushort)0x2000)]                        // class not multiplexed here
 		public void Resolve_UnknownPairs_ReturnUnknown(uint receiverClass, ushort opcode)
 		{

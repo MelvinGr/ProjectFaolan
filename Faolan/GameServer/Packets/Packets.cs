@@ -49,22 +49,22 @@ namespace Faolan.GameServer
 			0x32, 0x04, 0x08, 0x00, 0x10, 0x00
 		];
 
-		private static readonly byte[] ExistingCharacterPostReadyReportServerIdSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GamePostReadyType, 0x58);
+		private static readonly byte[] ExistingCharacterPostReadyReportServerIdSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentProjectType, 0x58);
 
 		// Existing-character post-ready conversations: retail uses sub-id 0x58 + the session character instance on
 		// every family (Strie login capture, idx 294+). The receiver is built per send as
 		// ConanEndpoints.EndpointBytes(<family type>, ClientInstance).
-		private static readonly byte[] ExistingCharacterReadyForPlayScreenSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameSpawnCallerType, 0x58);
+		private static readonly byte[] ExistingCharacterReadyForPlayScreenSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x58);
 		// The world-entry prompt rides the world-system conversation (0x13CE71B1/0x58) - byte-identical to
 		// WorldFraming.Sender, so fold to that single source of truth rather than re-spelling the literal.
 		private static readonly byte[] ExistingCharacterWorldEntryPromptSender = World.WorldFraming.Sender;
 		private static readonly byte[] NewCharacterReadyForPlayScreenReceiver = [0x0D, 0x91, 0xF7, 0x87, 0x8B, 0x10, 0xC2, 0xDD, 0xD8, 0x10];
 
-		private static readonly byte[] NewCharacterReadyForPlayScreenSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameSpawnCallerType, 0x59);
+		private static readonly byte[] NewCharacterReadyForPlayScreenSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59);
 		private static readonly byte[] Receiver2 = [0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0x84, 0x80, 0x80, 0x08];
 		private static readonly byte[] Receiver3 = [0x0d, 0x48, 0x76, 0x37, 0x28, 0x10, 0x84, 0x80, 0x80, 0x08];
-		private static readonly byte[] RetailCreatePost205FSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameWorldType, 0x59);
-		private static readonly byte[] Sender2 = ConanEndpoints.EndpointBytes(ConanEndpoints.GameWorldType, 0x14);
+		private static readonly byte[] RetailCreatePost205FSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59);
+		private static readonly byte[] Sender2 = ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x14);
 
 		private async Task FlushPendingPost205FFollowUp(INetworkClient client)
 		{
@@ -140,7 +140,7 @@ namespace Faolan.GameServer
 				Logger.LogInformation("Sending deferred new-character AccessWindow/SetDayTime after the post-0x205F follow-up.");
 
 				await new PacketStream() // AccessWindow packet
-					.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameWorldType, 0x0E), [0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, 0xF4, 0xF0, 0xC1, 0x09], GameServerRespondOpcodes.IirCarrier)
+					.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x0E), [0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, 0xF4, 0xF0, 0xC1, 0x09], GameServerRespondOpcodes.IirCarrier)
 					.WriteArray(0x00, 0x00, 0x1F, 0x93, 0x73, 0x7A, 0x6D, 0xF9, 0x00, 0x00, 0xC3, 0x50)
 					.WriteUInt32(client.Session.Account.ClientInstance)
 					.WriteArray(0x00, 0x00, 0x00, 0x00, 0x49, 0x20, 0x81, 0x80, 0x30, 0x28, 0x81, 0x83, 0x06, 0x32, 0x0E, 0x0A, 0x07, 0x08, 0x65, 0x10, 0xF4, 0xF0, 0xC1, 0x09, 0x10, 0x84, 0x08, 0x18, 0x00, 0x32, 0x0D, 0x0A, 0x07,
@@ -460,7 +460,7 @@ namespace Faolan.GameServer
 		private static Task SendExistingCharacterPostReadyDataPacket(INetworkClient client, uint opcode, byte[] tail)
 		{
 			return new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GamePlayerType, client.Session.Account.ClientInstance), GameServerRespondOpcodes.IirCarrier)
+				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, client.Session.Account.ClientInstance), GameServerRespondOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(opcode)
 					.WriteUInt32(0x0000C350)
@@ -475,7 +475,7 @@ namespace Faolan.GameServer
 			await SendExistingCharacterPostReadyDataPacket(client, 0x864CFEF8, ExistingCharacterPostReady864CfeF8Tail);
 
 			await new PacketStream()
-				.WriteHeader(ExistingCharacterPostReadyReportServerIdSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameServerIdType, client.Session.Account.ClientInstance), GameServerRespondOpcodes.ReportServerId)
+				.WriteHeader(ExistingCharacterPostReadyReportServerIdSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceProjectType, client.Session.Account.ClientInstance), GameServerRespondOpcodes.ReportServerId)
 				.WriteByte(0x01)
 				.SendAsync(client);
 
@@ -487,7 +487,7 @@ namespace Faolan.GameServer
 		private static Task SendPost205FOxf98E10B3Prompt(INetworkClient client)
 		{
 			return new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GamePlayerType, client.Session.Account.ClientInstance), GameServerRespondOpcodes.IirCarrier)
+				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, client.Session.Account.ClientInstance), GameServerRespondOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000RespondsOpcodes.StatIIR)
 					.WriteUInt32(0x0000C350)
@@ -501,7 +501,7 @@ namespace Faolan.GameServer
 		private static Task SendPost205FSpawnCheck(INetworkClient client)
 		{
 			return new PacketStream()
-				.WriteHeader(ExistingCharacterReadyForPlayScreenSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameSpawnEndpointType, client.Session.Account.ClientInstance), GameServerRespondOpcodes.SpawnCheck)
+				.WriteHeader(ExistingCharacterReadyForPlayScreenSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, client.Session.Account.ClientInstance), GameServerRespondOpcodes.SpawnCheck)
 				.WriteUInt32(0x0000C350)
 				.WriteUInt32(client.Session.Account.ClientInstance)
 				.WriteByte(0)
@@ -515,7 +515,7 @@ namespace Faolan.GameServer
 				: ExistingCharacterReadyForPlayScreenSender;
 			var receiver = client.Session.Character?.Name == null
 				? NewCharacterReadyForPlayScreenReceiver
-				: ConanEndpoints.EndpointBytes(ConanEndpoints.GameSpawnEndpointType, client.Session.Account.ClientInstance);
+				: ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, client.Session.Account.ClientInstance);
 
 			if (client.Session.Character?.Name == null)
 			{

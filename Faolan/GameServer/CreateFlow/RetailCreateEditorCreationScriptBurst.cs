@@ -26,7 +26,7 @@ namespace Faolan.GameServer
 		{
 			var id = client.Session.Account.ClientInstance;
 			var sender = new byte[] { 0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x59 };
-			var receiver = ConanEndpoints.EndpointBytes(ConanEndpoints.GamePlayerType, id);
+			var receiver = ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id);
 
 			// One IIR packet: 0x2000 envelope -> [u32 length][u32 IIR-id][body]. The length is recomputed, so editing
 			// a body never desyncs it.

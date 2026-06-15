@@ -9,8 +9,8 @@ namespace Faolan.Core.Network.Packets
 	// (`AttributeChanged`/`Increased`, `LostGraceEffect`, ...) render the smaller feedback lines.
 	//
 	// Carried as an IIR on the WORLD conversation (opcode 0x2000; sender = WorldFraming.Sender 0xB171CE13/0x58,
-	// receiver = the player's GameInterface = GamePlayerType + ClientInstance). The IIR body's `instance` equals
-	// that receiver instance (verified in the Strie capture: all 1249 GamePlayerType packets AND the feedback share
+	// receiver = the player's GameInterface = GameInterfaceType + ClientInstance). The IIR body's `instance` equals
+	// that receiver instance (verified in the Strie capture: all 1249 GameInterfaceType packets AND the feedback share
 	// 0x02165EFF), so a live send is fully addressable from the session, not just a replay.
 	//
 	// Wire grammar (big-endian, decoded 2026-06-14 from the gameplay/Has-inventory captures, golden-tested in
