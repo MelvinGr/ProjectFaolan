@@ -165,6 +165,19 @@ namespace Faolan.GameServer
 
 				case GameServer0X2000Opcodes.ReadyForPlayScreen: //peer0_160
 				{
+					// 0x2024 also = GameCharAgent.RespawnMe: when the player is DEAD this is their pick on the release
+					// screen (DispatchValidResurrectionSpots), body = [u32 spawnPointId]. Route to respawn, not the
+					// login ReadyForPlayScreen path (they share the opcode).
+					if (_simulation.IsAwaitingRespawn(client))
+					{
+						var spawnPointId = packet.Body != null && packet.Body.Length - packet.Body.Position >= sizeof(uint)
+							? packet.Body.ReadUInt32()
+							: 0;
+						Logger.LogInformation("RespawnMe (0x2024): {Char} chose resurrection spot {SpawnPointId}.", client.Session.Character?.Name, spawnPointId);
+						await _simulation.RespawnAtChosenPoint(client, spawnPointId);
+						break;
+					}
+
 					if (client.Session.Character?.Name == null)
 					{
 						if (IsRetailCreateEditorFlow(client))

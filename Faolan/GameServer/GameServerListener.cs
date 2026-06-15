@@ -137,6 +137,11 @@ namespace Faolan.GameServer
 			return SendWorldEntry(client);
 		}
 
+		Task IWorldOutbound.SendResurrectionScreen(INetworkClient client, System.Numerics.Vector3 deathPosition, System.Collections.Generic.IReadOnlyList<Core.Database.Tables.RespawnPoint> spots)
+		{
+			return SendValidResurrectionSpots(client, deathPosition, spots);
+		}
+
 		// --- IEconomyOutbound: the wallet + item-grant ops the economy/inventory services reach back to (forwarding
 		// to the private Outbound builders, which the listener also calls directly from loot/GM paths) ---------------
 		Task IEconomyOutbound.SendMoneyUpdate(INetworkClient client, ulong balanceTin, MoneyUpdateReason reason)

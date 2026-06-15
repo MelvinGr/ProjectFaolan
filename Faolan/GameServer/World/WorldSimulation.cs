@@ -36,6 +36,10 @@ namespace Faolan.GameServer.World
 
 		// Re-run the world-entry render path for the player (used to respawn them at a resurrection point).
 		Task ReenterWorld(INetworkClient client);
+
+		// Push the death/release screen: DispatchValidResurrectionSpots with the death position + the spots the
+		// player may resurrect at. The client replies with RespawnMe(spawnPointId) (handled inbound).
+		Task SendResurrectionScreen(INetworkClient client, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots);
 	}
 
 	// The live in-memory world (docs/archive/server-architecture-roadmap.md): owns the world model + the connected players'
@@ -299,6 +303,40 @@ namespace Faolan.GameServer.World
 			return true;
 		}
 
+		// True while the player is dead and awaiting resurrection (used to route the c2s 0x2024 to RespawnMe rather
+		// than the login ReadyForPlayScreen - they share the opcode).
+		public bool IsAwaitingRespawn(INetworkClient client) =>
+			Players.TryGetValue(client, out var entity) && entity.Vitals?.IsDead == true;
+
+		// The player clicked a spot on the release screen: RespawnMe(spawnPointId) (c2s 0x2024). spawnPointId is the
+		// RespawnPoint.Id we sent in DispatchValidResurrectionSpots, echoed back. Revive at that point; if the id
+		// doesn't resolve, fall back to the closest-known logic (RespawnPlayer). No-op if the player isn't dead.
+		public async Task<bool> RespawnAtChosenPoint(INetworkClient client, uint spawnPointId)
+		{
+			if (!Players.TryGetValue(client, out var entity) || client.Session?.Character == null)
+				return false;
+			var vitals = entity.Vitals;
+			if (vitals == null || !vitals.IsDead)
+				return false;
+
+			var point = await _database.GetRespawnPoint(spawnPointId);
+			if (point == null)
+			{
+				await TryRespawnNow(client); // unknown id - closest-known fallback
+				return true;
+			}
+
+			_playerRespawnRemaining.TryRemove(client, out _);
+			var character = client.Session.Character;
+			vitals.ReviveToFull();
+			character.Position = point.Position;
+			character.Rotation = point.Rotation;
+			character.MapId = point.MapId;
+			_logger.LogInformation("Combat: {Player} resurrected at chosen point '{Point}' (map {Map}).", character.Name, point.Name, point.MapId);
+			await _output.ReenterWorld(client);
+			return true;
+		}
+
 		// Revives a dead player: full vitals, moved to the CLOSEST resurrection point they know (the always-known
 		// starter + any discovered; RespawnResolver), and re-entered (the proven world-entry render path, same as a
 		// teleport) so they reappear alive away from whatever killed them. Falls back to the map's spawn point if the
@@ -337,6 +375,23 @@ namespace Faolan.GameServer.World
 			}
 
 			await _output.ReenterWorld(client);
+		}
+
+		// On death: show the client the release screen (DispatchValidResurrectionSpots) so the player can pick where to
+		// resurrect, instead of silently sitting at 0 HP until the auto-timer fires. We send the single closest known
+		// point (the captures only ever carried one spot; the multi-spot framing isn't pinned). The client replies with
+		// RespawnMe(spawnPointId), handled inbound. If the map has no point, skip (the auto-timer still revives).
+		private async Task SendDeathScreen(INetworkClient client, Character character, Vector3 deathPosition)
+		{
+			var points = await GetRespawnPointsCached(character.MapId);
+			if (points.Length == 0)
+				return;
+
+			var discovered = await GetDiscoveredRespawnCached(character.Id);
+			var spot = RespawnResolver.ClosestKnown(deathPosition, points, discovered)
+				?? points.FirstOrDefault(p => p.AlwaysKnown)
+				?? points[0];
+			await _output.SendResurrectionScreen(client, deathPosition, new[] { spot });
 		}
 
 		// The server game loop (docs/archive/server-architecture-roadmap.md): a 10 Hz base tick that advances continuous systems
@@ -442,6 +497,7 @@ namespace Faolan.GameServer.World
 				{
 					_playerRespawnRemaining[client] = PlayerRespawnDelaySeconds;
 					_logger.LogInformation("Combat: {Player} died; respawning in {Delay}s.", character.Name, PlayerRespawnDelaySeconds);
+					await SendDeathScreen(client, character, pair.Value.Position);
 					continue;
 				}
 
