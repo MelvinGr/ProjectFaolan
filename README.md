@@ -76,8 +76,7 @@ dotnet run --project Faolan.Importer -- --skip-characters    # keep --skip-chara
 | `Faolan.Mcp/` | In-process MCP server exposing DB queries + live-session inspection to Claude. |
 | `Faolan.ClientLauncher/` | Launches the retail client unattended (patcher stand-in). |
 | `Faolan.ContentMirror/` | Store-and-forward proxy for the client's content CDN (fixes the loading hang). |
-| `Faolan.Wireshark/` | A Wireshark/tshark C plugin that fully dissects the Conan protocol. |
-| `Faolan.PacketAnalyzer/` | Older pcap→JSON dump tool (superseded by the Wireshark plugin). |
+| `Faolan.Wireshark/` | A Wireshark/tshark C plugin that fully dissects the Conan protocol (the canonical capture tool). |
 | `Faolan.DatabaseEditor/` | Desktop editor for `faolan.db`. |
 | `Faolan.Tests/` | The unit/golden test suite. |
 | `Captures/` | Reference packet traces + Python dissectors used for protocol comparison. |

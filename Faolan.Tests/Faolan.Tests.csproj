@@ -4,7 +4,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Faolan.PacketAnalyzer\Faolan.PacketAnalyzer.csproj"/>
         <ProjectReference Include="..\Faolan\Faolan.csproj"/>
         <ProjectReference Include="..\Faolan.Importer\Faolan.Importer.csproj"/>
     </ItemGroup>

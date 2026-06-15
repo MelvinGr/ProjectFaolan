@@ -5,9 +5,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <!-- Faolan: the importers (CaptureItemImporter) + EF model. PacketAnalyzer: the pcap read/reassembly/
-             inflation pipeline (PacketAnalysisService). -->
+        <!-- Faolan: the importers (CaptureItemImporter) + EF model. Captures are read from the tshark dumps
+             (TsharkCaptureReader); the C# PacketAnalyzer pipeline was retired (#82). -->
         <ProjectReference Include="..\Faolan\Faolan.csproj"/>
-        <ProjectReference Include="..\Faolan.PacketAnalyzer\Faolan.PacketAnalyzer.csproj"/>
     </ItemGroup>
 </Project>

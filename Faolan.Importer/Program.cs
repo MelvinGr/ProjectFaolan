@@ -2,13 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.GameServer.Spawn;
-using Faolan.PacketAnalyzer;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer
@@ -36,13 +34,6 @@ namespace Faolan.Importer
 			(1000090, "ResurrectionPointsExport"), (1010001, "3DModel"), (1010004, "Texture/FCTX"), (1010035, "TextScript"), (1010201, "MonsterData"), (1010223, "LuaArchive"), (1010700, "CharacterCreator"), (1020003, "Lip"),
 			(1030002, "TextStrings"), (1070003, "PlayfieldDescription")
 		];
-
-		private static uint GetNestedValue(JsonElement packet, string property)
-		{
-			return packet.TryGetProperty(property, out var obj) && obj.ValueKind == JsonValueKind.Object && obj.TryGetProperty("Value", out var v) && v.TryGetUInt32(out var value)
-				? value
-				: 0;
-		}
 
 		private static string? GetOption(string[] args, string name)
 		{
@@ -438,22 +429,12 @@ namespace Faolan.Importer
 				// The starting ability kit = what every new character gets during creation, so detect it from the
 				// CREATE-flow captures only (filenames contain "creat"); the rest are higher-level/class abilities.
 				// Keep ONE packet list per capture (CaptureAbilityImporter attributes each capture's grants to the
-				// class chosen by its ChangeClass command). Prefer the tshark dump (it keeps the compressed 0x2052
-				// downloads the analyzer drops); fall back to the analyzer JSON for captures without a tshark dump.
+				// class chosen by its ChangeClass command). The tshark dump is the source (it keeps the compressed
+				// 0x2052 downloads); the C# analyzer was retired (#82).
 				var createCaptures = new List<IReadOnlyList<byte[]>>();
-				var createTsharkBases = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 				foreach (var f in Directory.EnumerateFiles(capturesDir, "*.tshark.json")
 					         .Where(f => Path.GetFileName(f).Contains("creat", StringComparison.OrdinalIgnoreCase)))
-				{
 					createCaptures.Add(TsharkCaptureReader.Read(f).Select(p => p.Bytes).ToList());
-					createTsharkBases.Add(StripSuffix(f, ".tshark.json"));
-				}
-
-				foreach (var f in Directory.EnumerateFiles(capturesDir, "*.json")
-					         .Where(f => !f.EndsWith(".tshark.json", StringComparison.OrdinalIgnoreCase)
-					                     && Path.GetFileName(f).Contains("creat", StringComparison.OrdinalIgnoreCase)
-					                     && !createTsharkBases.Contains(StripSuffix(f, ".json"))))
-					createCaptures.Add(ReadJsonCapture(f).Select(p => p.Bytes).ToList());
 
 				var (abSeen, abNew, abUpd) = await CaptureAbilityImporter.ImportAsync(db, itemPackets, createCaptures);
 				Console.WriteLine($"Abilities (0x2052 grants): {abSeen} seen, {abNew} new, {abUpd} updated.");
@@ -565,42 +546,12 @@ namespace Faolan.Importer
 		{
 			var captures = new List<NamedCapture>();
 
-			// tshark dumps (*.tshark.json) TCP-reassemble and keep the compressed downloads the analyzer drops (notably
-			// the conversation RESPONSE packets) - they are the trustworthy source. They are read ADDITIVELY alongside
-			// the analyzer dumps (not as a replacement): each extractor's Merge dedups overlaps, so adding the tshark
-			// stream only FILLS IN the packets the analyzer lost, never removes what the analyzer captured. A capture
-			// with a tshark dump thus keeps its analyzer-derived rows AND gains the reassembled ones.
-			var tsharkBases = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+			// tshark dumps (*.tshark.json) TCP-reassemble and keep the compressed downloads (notably the conversation
+			// RESPONSE packets) - they are the trustworthy, canonical source. The C# PacketAnalyzer (which dropped
+			// ~2/3 of compressed downloads) and its analyzer-JSON / direct-pcap read paths were retired (#82); every
+			// capture is now dumped with Captures/tshark_dump.sh.
 			foreach (var ts in Directory.EnumerateFiles(capturesDir, "*.tshark.json"))
-			{
 				captures.Add(new NamedCapture(CaptureBaseName(ts, ".tshark.json"), TsharkCaptureReader.Read(ts)));
-				tsharkBases.Add(StripSuffix(ts, ".tshark.json"));
-			}
-
-			foreach (var json in Directory.EnumerateFiles(capturesDir, "*.json"))
-			{
-				if (json.EndsWith(".tshark.json", StringComparison.OrdinalIgnoreCase))
-					continue; // already read above
-
-				captures.Add(new NamedCapture(CaptureBaseName(json, ".json"), ReadJsonCapture(json)));
-			}
-
-			var analysis = new PacketAnalysisService();
-			foreach (var pcap in Directory.EnumerateFiles(capturesDir, "*.pcapng"))
-			{
-				var baseName = StripSuffix(pcap, ".pcapng");
-				if (tsharkBases.Contains(baseName) || File.Exists(Path.ChangeExtension(pcap, ".json")))
-					continue; // covered by a tshark dump or its analyzer dump
-
-				try
-				{
-					captures.Add(new NamedCapture(CaptureBaseName(pcap, ".pcapng"), ReadPcapCapture(analysis, pcap)));
-				}
-				catch (Exception ex)
-				{
-					Console.Error.WriteLine($"  skip {Path.GetFileName(pcap)}: {ex.Message}");
-				}
-			}
 
 			return captures;
 		}
@@ -611,73 +562,6 @@ namespace Faolan.Importer
 			return path.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)
 				? path[..^suffix.Length]
 				: path;
-		}
-
-		private static List<CapturedPacket> ReadJsonCapture(string jsonPath)
-		{
-			var list = new List<CapturedPacket>();
-
-			JsonDocument doc;
-			try
-			{
-				doc = JsonDocument.Parse(File.ReadAllText(jsonPath));
-			}
-			catch
-			{
-				return list;
-			}
-
-			using (doc)
-			{
-				if (!doc.RootElement.TryGetProperty("Packets", out var packets) || packets.ValueKind != JsonValueKind.Array)
-					return list;
-
-				foreach (var p in packets.EnumerateArray())
-				{
-					if (p.TryGetProperty("ProtocolName", out var proto) && proto.GetString() != "GameServer")
-						continue;
-					if (!p.TryGetProperty("RawBytesBase64", out var raw) || raw.ValueKind != JsonValueKind.String)
-						continue;
-
-					byte[] bytes;
-					try
-					{
-						bytes = Convert.FromBase64String(raw.GetString()!);
-					}
-					catch
-					{
-						continue;
-					}
-
-					var ticks = p.TryGetProperty("TimestampTicks", out var t) && t.TryGetInt64(out var tv)
-						? tv
-						: 0L;
-					var isDownload = p.TryGetProperty("IsDownload", out var d) && d.ValueKind == JsonValueKind.True;
-					var opcode = GetNestedValue(p, "Opcode");
-					var subOpcode = GetNestedValue(p, "SubOpcode");
-
-					list.Add(new CapturedPacket(ticks, isDownload, opcode, subOpcode, bytes));
-				}
-			}
-
-			list.Sort((a, b) => a.Ticks.CompareTo(b.Ticks));
-			return list;
-		}
-
-		private static List<CapturedPacket> ReadPcapCapture(PacketAnalysisService analysis, string pcap)
-		{
-			var list = new List<CapturedPacket>();
-			var tick = 0L;
-			foreach (var p in analysis.AnalyzeCapture(pcap)
-				         .Packets)
-			{
-				if (p.ProtocolName != "GameServer")
-					continue;
-
-				list.Add(new CapturedPacket(tick++, p.IsDownload, p.OpcodeValue, p.SubOpcodeValue ?? 0, p.Bytes));
-			}
-
-			return list; // analyzer order is chronological
 		}
 
 		private static async Task<Dictionary<string, int>> Snapshot(DatabaseContext db)

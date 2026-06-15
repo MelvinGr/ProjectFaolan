@@ -33,15 +33,13 @@ dotnet run --project Faolan.ClientLauncher -- --console --universeaddr 127.0.0.1
 # Rebuild DB content from captures (idempotent EXCEPT characters - keep --skip-characters on a populated DB)
 dotnet run --project Faolan.Importer -- --skip-characters    # [--captures dir] [--rdb dir] [--archive dir]
 
-# Dump a pcap to the JSON the dissectors read
-dotnet run --project Faolan.PacketAnalyzer -- --dump Captures/<capture>.pcapng
-
 # Wireshark plugin: full Conan+chat dissection (auto-follows the session from port 7010);
 # build+install once, then open captures in Wireshark (filter: faolan) or dump to JSON.
+# (The old C# Faolan.PacketAnalyzer + its --dump CLI were retired in #82 - tshark is the only source now.)
 cmake -S Faolan.Wireshark -B Faolan.Wireshark/build && cmake --build Faolan.Wireshark/build -j \
   && cmake --build Faolan.Wireshark/build --target install-faolan-plugin
-Captures/tshark_dump.sh Captures/<capture>.pcapng   # analyzer-style JSON, one record per packet;
-# more complete than the PacketAnalyzer dump (TCP-reassembled, includes compressed DL packets).
+Captures/tshark_dump.sh Captures/<capture>.pcapng   # the canonical *.tshark.json the importer reads:
+# TCP-reassembled, one record per packet, includes the compressed DL packets.
 # Lossy captures in the Wireshark GUI: set TCP pref analyze_sequence_numbers off (the script does).
 
 # EF migrations (context lives in Faolan.Core, migrations in Faolan/Migrations)
@@ -60,12 +58,12 @@ service as a hosted service: `UniverseAgentListener`, `PlayerAgentListener`, `Cs
 serves both the create-editor and world connections).
 
 **Projects:** `Faolan/` server host · `Faolan.Core/` shared networking/DB/protobuf/crypto ·
-`Faolan.Importer/` pcap+RDB -> DB CLI · `Faolan.PacketAnalyzer/` pcap -> JSON ·
-`Faolan.ClientLauncher/` unattended retail client · `Faolan.Tests/` the test suite ·
-`Faolan.Wireshark/` full Conan-protocol dissector plugin - framing + zlib + RpcHeader endpoints + raw
-opcodes + handoff auto-follow (ground truth; the analyzer has no TCP reassembly and drops ~2/3 of
-compressed GameServer downloads; use `-o tcp.analyze_sequence_numbers:FALSE` on lossy captures) ·
-`Captures/` reference traces + Python dissectors.
+`Faolan.Importer/` tshark-dump+RDB -> DB CLI · `Faolan.ClientLauncher/` unattended retail client ·
+`Faolan.Tests/` the test suite · `Faolan.Wireshark/` full Conan-protocol dissector plugin - framing + zlib +
+RpcHeader endpoints + raw opcodes + handoff auto-follow (ground truth, TCP-reassembled; use
+`-o tcp.analyze_sequence_numbers:FALSE` on lossy captures) · `Captures/` reference traces + Python dissectors.
+(The old C# `Faolan.PacketAnalyzer` GUI/CLI was retired in #82 - it had no TCP reassembly and dropped ~2/3 of
+the compressed GameServer downloads; the Wireshark plugin + `Captures/tshark_dump.sh` fully replace it.)
 
 **Listeners** are partial classes split across many files — inspect all partials before changing
 behavior. `GameServerListener`'s partials are organized by role: `Inbound/` (opcode handlers, `Handle*`),
