@@ -132,6 +132,11 @@ namespace Faolan.GameServer
 			return SendStatUpdate(client, vitals.ToVitalsBlock(), client.Session.Account.ClientInstance);
 		}
 
+		Task IWorldOutbound.SendNpcAttackAnimation(INetworkClient client, uint npcHandle, uint damage, uint swingCounter)
+		{
+			return _combat.SendNpcAttackAnimation(client, npcHandle, damage, swingCounter);
+		}
+
 		Task IWorldOutbound.ReenterWorld(INetworkClient client)
 		{
 			return SendWorldEntry(client);

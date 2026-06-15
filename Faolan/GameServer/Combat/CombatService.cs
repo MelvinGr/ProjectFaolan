@@ -171,6 +171,23 @@ namespace Faolan.GameServer.Combat
 			await SendWorldPacket(client, CombatPacketCodec.BuildEnergyBody(instance, player.Stamina));
 		}
 
+		// Sends the NPC counter-attack ANIMATION ack to the player it hit: a BehaviorControlCenterIIR with actor = the
+		// NPC handle (the decoded "second BccAck", docs/combat.md), so the client plays the NPC's swing + the player's
+		// hit-react. Visual only - the authoritative HP move rides the world-tick StatUpdate, so the damage here is just
+		// the floating combat number. The animation/result params are capture-typical (not semantically decoded); the
+		// swingCounter increments per NPC swing to mirror the per-actor counter the capture carries.
+		public Task SendNpcAttackAnimation(INetworkClient client, uint npcHandle, uint damage, uint swingCounter)
+		{
+			var playerHandle = client.Session.Account.ClientInstance;
+			// TypeId is a large per-swing behavior-instance id in the capture; we don't synthesize a real one, so reuse
+			// the granted Normal Attack ability id as a stable, plausible value (the client treats it as an opaque id).
+			var body = CombatPacketCodec.BuildNpcAttackAnimationAckBody(
+				npcHandle, playerHandle, damage,
+				typeId: 769094, swingCounter: swingCounter, f5: 24, f11: 64, f12: 56,
+				resultType: 0xCB, resultK1: 1, resultK2: 2);
+			return SendWorldPacket(client, body);
+		}
+
 		// The 8-byte filler retail writes where an item identity quad would otherwise go in a behavior ack
 		// (B2 90 80 5C 29 E6 27 CA - the same null-identity padding as the 0xF result block and the 0x2052 grant).
 		internal static readonly byte[] NullIdentityFiller = [0xB2, 0x90, 0x80, 0x5C, 0x29, 0xE6, 0x27, 0xCA];

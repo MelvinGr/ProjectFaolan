@@ -34,6 +34,11 @@ namespace Faolan.GameServer.World
 		// Push a 0x96B8DC59 vitals update for the player (regen tick, NPC-attack damage).
 		Task PushVitals(INetworkClient client, EntityVitals vitals);
 
+		// Send the NPC's attack-animation ack to the player it hit (the decoded "second BccAck" - BehaviorControlCenterIIR
+		// with actor = NPC handle), so the client plays the NPC's swing + the player's hit-react. Visual only - the HP
+		// move rides PushVitals.
+		Task SendNpcAttackAnimation(INetworkClient client, uint npcHandle, uint damage, uint swingCounter);
+
 		// Re-run the world-entry render path for the player (used to respawn them at a resurrection point).
 		Task ReenterWorld(INetworkClient client);
 
@@ -53,11 +58,11 @@ namespace Faolan.GameServer.World
 		// How far a player perceives other players (world-entity interest radius; wider than say range).
 		public const float PlayerInterestRange = 150f;
 
-		// NPC auto-attack damage. The hostile-NPC swing is delivered as model-only damage via the 0x96B8DC59 vitals
-		// packet; the attack ANIMATION ack is still undecoded (see protocol_stats_and_combat), so the hit is invisible.
-		// CAVEAT (why this was gated off): on a zone with many hostiles (Tortage Beach has ~400) a player who keeps
-		// dying can hit a death-loop (re-enters the world every ~10s, never finishes loading). Re-enabled to exercise
-		// real combat death (and the death/release screen #214); the proper fix is decoding the attack-animation ack.
+		// NPC auto-attack. The hostile-NPC swing now plays the decoded attack-ANIMATION ack (the "second BccAck" with
+		// actor = NPC handle - ApplyNpcAttack -> IWorldOutbound.SendNpcAttackAnimation, docs/combat.md) and then the
+		// 0x96B8DC59 vitals move for the HP drop. CAVEAT (why this was once gated off): on a zone with many hostiles
+		// (Tortage Beach has ~400) a player who keeps dying can hit a death-loop (re-enters the world every ~10s, never
+		// finishes loading). Kept on to exercise real combat death + the death/release screen (#214).
 		private const bool NpcAutoAttackEnabled = true;
 
 		// Base game-loop cadence: 10 Hz. Continuous systems run every base tick with the real elapsed dt so they stay
@@ -198,6 +203,9 @@ namespace Faolan.GameServer.World
 				return;
 
 			var damage = (int)CombatResolver.ResolveNpcAttackDamage(npc.Level);
+			// Play the NPC's swing animation (the decoded attack-animation ack) BEFORE the HP move lands, so the
+			// hit reads as "swing -> damage". Visual only; the authoritative health change is the PushVitals below.
+			await _output.SendNpcAttackAnimation(client, npc.Handle, (uint)damage, ++npc.AttackSwingCounter);
 			vitals.ApplyHealthDelta(-damage);
 			await _output.PushVitals(client, vitals);
 

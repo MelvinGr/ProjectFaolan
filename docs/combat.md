@@ -63,9 +63,23 @@ per-direction shield mitigation is #20 (decode #1 = the swing tail direction-abi
 TARGET-centered rather than a true player-facing cone because the rotation->forward convention isn't decoded;
 radius + cap are provisional, tuned in-client.
 
-## Known gaps (TODO.md §Combat)
+## NPC counter-attack animation ack (decoded 2026-06-15)
 
-- NPC counter-attack ANIMATION ack (retail's second BccAck with actor = target handle) - undecoded; the
-  world model deals NPC damage on the tick instead.
+When an NPC swings at the player, retail sends a second `BehaviorControlCenterIIR` (0x642CD3D6) whose
+top-level **actor = the NPC handle** (the player's own attack ack puts the player there). It is structurally
+the targeted-hit attack ack with the roles SWAPPED: `args.SpellTarget.handle` and the result-block target
+both name the **player** the NPC hit, and the args carry **no Mode field** (the player-only field-2 - the
+clean NPC-vs-player tell). `seq` is the constant `0x0004` (server-initiated, not echoing a client seq).
+Sending it plays the NPC's swing + the player's hit-react; the authoritative HP move still rides the
+world-tick `StatUpdate` (the ack's damage is just the floating number, so the two don't double-apply).
+
+Decode: `Captures/decode_combat_npc_ack.py` (98/98 frames of the strickenbla capture). Builder
+`CombatPacketCodec.BuildNpcAttackAnimationAckBody`, byte-exact against frame 6472 in
+`CombatPacketCodecTests`. Wired into `WorldSimulation.ApplyNpcAttack` via `IWorldOutbound.SendNpcAttackAnimation`.
+The animation/result params (`typeId`/`swingCounter`/`f5`/`f11`/`f12`/`resultType`/`resultK*`) are not
+semantically decoded - capture-typical defaults for the live send; **needs in-client verification** that the
+swing actually animates.
+
+## Known gaps (TODO.md §Combat)
 - HP/stamina auto-regen not implemented. NPC death animation: corpse now lingers then becomes a loot bag
   (above, #204); a decoded death-state IIR is still open.
