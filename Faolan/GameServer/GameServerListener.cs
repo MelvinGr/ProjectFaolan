@@ -43,6 +43,10 @@ namespace Faolan.GameServer
 		// handlers call into it. Composed collaborator, like CombatService. See Inventory/EquipmentService.cs.
 		private readonly Inventory.EquipmentService _equipment;
 
+		// NPC vendor / shop sell-buy-undo flow (owns the open-shop/last-sale state). The wallet-update + item-grant
+		// outbound ops are injected as seams (shared with other subsystems). See Economy/Shop/ShopService.cs.
+		private readonly Economy.Shop.ShopService _shop;
+
 		// Builds + sends the world-event packets (spawns/moves/despawns, NPC respawn/loot/mount renders, loot-window
 		// and quest-journal packets). Reads the world model via the simulation; the listener delegates its IWorldOutbound
 		// port + the loot/quest opcode handlers to it. See World/WorldBroadcaster.cs.
@@ -68,6 +72,7 @@ namespace Faolan.GameServer
 			_broadcaster = new WorldBroadcaster(_simulation, database, logger);
 			_combat = new CombatService(_simulation, _broadcaster, database, agentServerDispatcher, logger);
 			_equipment = new Inventory.EquipmentService(database, logger);
+			_shop = new Economy.Shop.ShopService(database, logger, SendMoneyUpdate, GrantItemToBackpack);
 
 			InitGmCommands();
 		}
@@ -429,14 +434,14 @@ namespace Faolan.GameServer
 
 				case GameServerOpcodes.SellToShop:
 				{
-					await HandleSellItemToShop(client, packet);
+					await _shop.HandleSellItemToShop(client, packet);
 
 					break;
 				}
 
 				case GameServerOpcodes.UndoLastSoldItem:
 				{
-					await HandleUndoLastSoldItem(client);
+					await _shop.HandleUndoLastSoldItem(client);
 
 					break;
 				}
@@ -449,7 +454,7 @@ namespace Faolan.GameServer
 
 					// Resolve the clicked slot against the open shop, debit the wallet and grant the item live
 					// (DispatchAddItem). The item-grant wall that gated this is gone (protocol_containeradditem).
-					await HandleBuyItemFromShop(client, shopId, pos);
+					await _shop.HandleBuyItemFromShop(client, shopId, pos);
 
 					break;
 				}

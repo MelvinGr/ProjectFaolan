@@ -389,7 +389,7 @@ namespace Faolan.GameServer
 			// The window renders against the vendor NPC's handle; for the bootstrap we don't have the vendor's
 			// entity, so address it to the player's own world handle (the window is cold-push-gated anyway).
 			var entity = PlayerWorldEntity(client);
-			await SendShopData(client, shop, entity?.Handle ?? 0);
+			await _shop.SendShopData(client, shop, entity?.Handle ?? 0);
 
 			await _agentServerDispatcher.SendSystemMessage(characterId,
 				$"Served shop \"{shop.VendorName}\" ({shop.Items.Count} wares). Buy a slot to test the grant+debit (window render is client-gated).");

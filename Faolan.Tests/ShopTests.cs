@@ -1,3 +1,4 @@
+using Faolan.GameServer.Economy.Shop;
 using System;
 using Faolan.Core.Data;
 using Faolan.GameServer;
@@ -13,7 +14,7 @@ namespace Faolan.Tests
 		{
 			// Retail's DispatchItemSoldToShop after SellItem(container 0x68, slot 5): 0000006808006f3100000005.
 			var s = new FaolanStream();
-			GameServerListener.WriteItemSoldBody(s, 0x68, 0x08006F31, 5);
+			ShopService.WriteItemSoldBody(s, 0x68, 0x08006F31, 5);
 
 			Assert.Equal("0000006808006f3100000005", Convert.ToHexStringLower(s.ToArray()));
 		}
@@ -34,20 +35,20 @@ namespace Faolan.Tests
 			// Same level signal both ways (sell off Items.Level, buy off the entry TailLevel).
 			const byte level = 40;
 			const uint count = 1;
-			Assert.True(GameServerListener.VendorBuyPriceTin(level, count) > GameServerListener.VendorPriceTin(level, count));
+			Assert.True(ShopService.VendorBuyPriceTin(level, count) > ShopService.VendorPriceTin(level, count));
 		}
 
 		[Fact]
 		public void VendorBuyPrice_ScalesWithCount()
 		{
-			Assert.Equal(GameServerListener.VendorBuyPriceTin(10, 1) * 3, GameServerListener.VendorBuyPriceTin(10, 3));
+			Assert.Equal(ShopService.VendorBuyPriceTin(10, 1) * 3, ShopService.VendorBuyPriceTin(10, 3));
 		}
 
 		[Fact]
 		public void VendorBuyPrice_NeverFree()
 		{
 			// Level-0 wares (the common case while Items.Level is mostly unmapped) still cost something.
-			Assert.True(GameServerListener.VendorBuyPriceTin(0, 1) >= GameServerListener.VendorBuyMarkup);
+			Assert.True(ShopService.VendorBuyPriceTin(0, 1) >= ShopService.VendorBuyMarkup);
 		}
 	}
 }
