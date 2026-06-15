@@ -125,14 +125,36 @@ namespace Faolan.GameServer.World
 			var facing = npc.MoveOrigin.FaceTowards(npc.Position);
 			var body = MoveTaskCodec.BuildBody(npc.Handle, npc.MoveOrigin, npc.Position, facing);
 
-			foreach (var viewer in _sim
-				         .World
-				         .ZoneFor(npc.MapId)
-				         .PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
-			{
+			foreach (var viewer in NpcMoveViewers(npc))
+				await SendWorldIir(viewer, body);
+		}
+
+		// Tell viewers this NPC should follow the target: the client then drives the chase movement locally (smooth,
+		// run gait, no server-side per-tick snapping). The body is a MoveTaskBuilder form (own length prefix), so it is
+		// sent RAW (SendWorldRawIir), not through SendWorldIir's length wrapper.
+		public async Task BroadcastNpcFollow(WorldEntity npc, uint targetHandle)
+		{
+			var body = Spawn.MoveTaskBuilder.BuildFollow(npc.Handle, npc.Position, targetHandle);
+			foreach (var viewer in NpcMoveViewers(npc))
+				await SendWorldRawIir(viewer, body);
+		}
+
+		// Cancel a follow: plant the NPC where it stands (the stationary MoveTask), so the client stops chasing the
+		// player after the NPC disengages. Also a MoveTaskBuilder (own length prefix) -> raw send.
+		public async Task BroadcastNpcStop(WorldEntity npc)
+		{
+			var body = Spawn.MoveTaskBuilder.BuildStationary(npc.Handle, npc.Position);
+			foreach (var viewer in NpcMoveViewers(npc))
+				await SendWorldRawIir(viewer, body);
+		}
+
+		// The connected players in range of `npc` that already see it (know its handle) - the recipients of any of its
+		// movement packets. A viewer who hasn't been spawned the NPC must not get a move for an unknown entity.
+		private IEnumerable<INetworkClient> NpcMoveViewers(WorldEntity npc)
+		{
+			foreach (var viewer in _sim.World.ZoneFor(npc.MapId).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
-					await SendWorldIir(viewer.Client, body);
-			}
+					yield return viewer.Client;
 		}
 
 		// On disconnect/logout: despawn the leaving player for everyone who could see it (n3ToClientQuit), before it is
@@ -861,13 +883,22 @@ namespace Faolan.GameServer.World
 				.SendAsync(recipient);
 		}
 
-		// Frames a raw 0x2000 IIR body on the world conversation to one recipient (the generic single-recipient send the
-		// dedicated builders share - e.g. the NPC MoveTask chase step).
+		// Frames an INNER 0x2000 IIR body (no length prefix of its own) to one recipient - the length wrapper adds it.
 		private Task SendWorldIir(INetworkClient recipient, byte[] body)
 		{
 			return new PacketStream()
 				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameServerRespondOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s => s.WriteArray(body))
+				.SendAsync(recipient);
+		}
+
+		// Sends a body that ALREADY carries its own 4-byte length prefix (the MoveTaskBuilder forms) - written raw after
+		// the RPC header, with NO length wrapper (wrapping would double-prefix it and the client drops the packet).
+		private Task SendWorldRawIir(INetworkClient recipient, byte[] body)
+		{
+			return new PacketStream()
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameServerRespondOpcodes.IirCarrier)
+				.WriteArray(body)
 				.SendAsync(recipient);
 		}
 

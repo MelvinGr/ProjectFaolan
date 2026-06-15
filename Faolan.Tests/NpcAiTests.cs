@@ -22,8 +22,8 @@ namespace Faolan.Tests
 			zone.Add(near);
 
 			var effects = world.Tick(WorldState.NpcAttackInterval);
-			Assert.Same(near, Assert.Single(effects)
-				.Target);
+			var attack = Assert.Single(effects, e => e.Type == WorldTickEffectType.NpcAttack);
+			Assert.Same(near, attack.Target);
 		}
 
 		[Fact]
@@ -101,17 +101,17 @@ namespace Faolan.Tests
 			zone.Add(npc);
 			zone.Add(player);
 
-			// First contact swings immediately (cooldown starts at 0), targeting the player.
+			// First contact swings immediately (cooldown starts at 0), targeting the player (alongside the one-time
+			// follow effect for the engagement).
 			var first = world.Tick(0.1);
-			var attack = Assert.Single(first);
-			Assert.Equal(WorldTickEffectType.NpcAttack, attack.Type);
+			var attack = Assert.Single(first, e => e.Type == WorldTickEffectType.NpcAttack);
 			Assert.Same(npc, attack.Entity);
 			Assert.Same(player, attack.Target);
 
 			// Within the interval, no further swing.
-			Assert.Empty(world.Tick(WorldState.NpcAttackInterval / 2));
+			Assert.DoesNotContain(world.Tick(WorldState.NpcAttackInterval / 2), e => e.Type == WorldTickEffectType.NpcAttack);
 			// Once the interval elapses, it swings again.
-			Assert.Single(world.Tick(WorldState.NpcAttackInterval));
+			Assert.Contains(world.Tick(WorldState.NpcAttackInterval), e => e.Type == WorldTickEffectType.NpcAttack);
 		}
 
 		[Fact]
@@ -124,14 +124,17 @@ namespace Faolan.Tests
 			zone.Add(npc);
 			zone.Add(player);
 
-			var move = Assert.Single(world.Tick(0.5));
-			Assert.Equal(WorldTickEffectType.NpcMove, move.Type);
-			Assert.Same(npc, move.Entity);
-			Assert.Same(player, move.Target);
+			// First chase tick tells the client to follow the player (client-driven movement); the model also steps.
+			var follow = Assert.Single(world.Tick(0.5));
+			Assert.Equal(WorldTickEffectType.NpcFollow, follow.Type);
+			Assert.Same(npc, follow.Entity);
+			Assert.Same(player, follow.Target);
+			Assert.True(npc.Position.X > 0 && npc.Position.X < 10, "model stepped toward the player");
 
-			// It stepped toward the player (closer than it started, not past them) and recorded its origin.
-			Assert.True(npc.Position.X > 0 && npc.Position.X < 10);
-			Assert.Equal(0f, npc.MoveOrigin.X);
+			// Already following: subsequent chase ticks step the model silently (no repeated follow/move effect).
+			var startX = npc.Position.X;
+			Assert.Empty(world.Tick(0.5));
+			Assert.True(npc.Position.X > startX, "model kept closing the gap");
 		}
 
 		[Fact]

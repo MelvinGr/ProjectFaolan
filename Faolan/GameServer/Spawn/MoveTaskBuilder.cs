@@ -64,6 +64,32 @@ namespace Faolan.GameServer.Spawn
 				.ToArray();
 		}
 
+		// Builds the FOLLOW MoveTask (task type 0x08, the 49-byte "anchor-id" form): the server tells the client this
+		// entity should follow another entity, and the CLIENT then drives the movement locally - smooth, with the right
+		// run gait, no server-side per-tick position snapping. Decoded from the strickenbla capture (frame 6472): the
+		// chasing mobs send this with the id = the PLAYER's handle. Grammar:
+		//   [00 00][curPos vec3 BE][08][00 00 c3 50][targetHandle u32][01][8x 00][00]
+		// Like the other MoveTaskBuilder forms, the returned body INCLUDES the 4-byte length prefix (send it raw after
+		// the RPC header, NOT through a WriteArrayUInt32Length wrapper, or it double-prefixes).
+		public static byte[] BuildFollow(uint handle, Vector3 currentPosition, uint targetHandle)
+		{
+			const int total = 49;
+			return new FaolanStream()
+				.WriteUInt32(total - 4)
+				.WriteUInt32(SubOpcode)
+				.WriteUInt32(Ack)
+				.WriteUInt32(handle)
+				.WriteUInt16((ushort)0) // prefix 00 00
+				.WriteVector3BigEndian(currentPosition)
+				.WriteByte(0x08) // task type: follow-entity
+				.WriteUInt32(Ack) // target type word (0xC350)
+				.WriteUInt32(targetHandle)
+				.WriteByte(0x01)
+				.WriteArray(new byte[8])
+				.WriteByte(0x00)
+				.ToArray();
+		}
+
 		public static byte[] BuildStationary(uint handle, Vector3 position)
 		{
 			return new FaolanStream()

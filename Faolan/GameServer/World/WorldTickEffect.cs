@@ -9,9 +9,11 @@ namespace Faolan.GameServer.World
 		NpcCorpseLootable, // a dead NPC's death-animation linger elapsed; convert its corpse to a lootable bag in place
 		LootExpired, // a loot bag's lifetime elapsed (despawn it for nearby players, then remove it from the zone)
 		NpcAttack, // an aggroed NPC (Entity) swings at a player (Target); the listener applies damage + pushes vitals
-		NpcMove // an aggroed NPC (Entity) stepped toward its target player (Target); broadcast its MoveTask transform
+		NpcMove, // an NPC (Entity) stepped toward its destination (returning home); broadcast its MoveTask transform
+		NpcFollow, // an NPC (Entity) started chasing a player (Target); tell the client to follow it (client drives the move)
+		NpcStop // an NPC (Entity) disengaged; tell the client to stop following (plant it where it stands)
 	}
 
-	// `Target` is the attacked/chased player for NpcAttack/NpcMove; null otherwise.
+	// `Target` is the attacked/followed player for NpcAttack/NpcFollow; null otherwise.
 	public readonly record struct WorldTickEffect(WorldEntity Entity, WorldTickEffectType Type, WorldEntity Target = null);
 }
