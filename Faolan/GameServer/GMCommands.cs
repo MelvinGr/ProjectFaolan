@@ -37,15 +37,21 @@ namespace Faolan.GameServer
 			return ApplySpell(client, client.Session.Character.Id, client.Session.Character.Id, id);
 		}
 
-		// .teleport <mapId>  - move the character to a map and rebuild the world there.
+		// .teleport <mapId>  - move the character to another playfield via the retail HANDOFF + RECONNECT.
 		//
-		// Re-runs the proven world-entry render path for the target map - the same world-burst replay (or
-		// hand-built fallback) that login uses, which is the only sequence confirmed to build the playfield and
-		// render NPCs. NOTE: a retail teleport actually hands the client off to a (possibly different) world
-		// server - the old server sends teleport-prep packets (0x10D27BC0 / 0x5A32F0D7 / vitals) and a 0x2002
-		// world-address advert, then the client reconnects and does a full world entry (capture
-		// account-faolan-...-changemap, idx 6091-6103, ports 7027 -> 7030). Our single-host server can't do that
-		// handoff, so we soft-change the map on the current connection instead.
+		// Retail never changes playfield in place: it sends a 0x2002 world-address advert on the current
+		// connection, the client opens a FRESH connection and does a full world entry there (changemap capture
+		// account-faolan-...-changemap: :7027 -> :7030, frame 4214 advertises gs013-nj4...:7030). This matters
+		// because the client only loads a playfield's resources (camera paths, geometry, NPCs) during a fresh
+		// world entry - confirmed via Ghidra: camera paths are an RDB resource (e_RDB_CameraPaths, type 1000047)
+		// keyed by playfield id, loaded by CameraPathMap_c::LoadPlayfieldPaths only on the n3Camera init a fresh
+		// entry runs (see docs/create-cutscene-camera-paths.md). A soft in-place MapChange on the live connection
+		// does NOT trigger that reload, so the old playfield's resources stay loaded - that was the teleport bug.
+		//
+		// The handoff is the SAME packet (same 0xb171ce13 -> 0x6c67c147 conversation, byte-identical) the create
+		// enter-world flow already sends (SendWorldHandoff), proving our single-host server CAN do it: it
+		// advertises our own GameServer, the client reconnects, and the existing-character Hello path runs
+		// SendWorldEntry for the (now persisted) target map - identical to logging in on that map, which works.
 		private async Task DoTeleport(uint characterId, uint mapId)
 		{
 			var client = ClientForCharacter(characterId);
@@ -60,18 +66,22 @@ namespace Faolan.GameServer
 			}
 
 			// Move the character to the map's spawn point (importer-added maps carry the real captured spawn;
-			// older seeded maps carry a placeholder) and persist so a relog lands on the new map.
+			// older seeded maps carry a placeholder) and persist BEFORE the handoff so the reconnect's world entry
+			// (existing-character Hello -> SendWorldEntry, which loads Character.MapId) lands on the new map.
 			client.Session.Character.MapId = map.Id;
 			client.Session.Character.Position = map.Position;
 			client.Session.Character.Rotation = map.Rotation;
 			await Database.SaveCharacterTransform(client.Session.Character.Id, map.Position, map.Rotation, map.Id);
 
-			await SendWorldEntry(client);
-
 			var mapLabel = string.IsNullOrEmpty(map.Name)
 				? map.Id.ToString()
 				: $"{map.Name} ({map.Id})";
-			await _agentServerDispatcher.SendSystemMessage(characterId, $"Teleported to {mapLabel}.");
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Teleporting to {mapLabel}...");
+
+			// Hand the client off to a fresh world entry on the new map (the client reconnects to the advertised
+			// GameServer and reloads the playfield), instead of a soft in-place MapChange that left the old
+			// playfield loaded.
+			await SendWorldHandoff(client);
 		}
 
 		// Writes each connected player's live WorldEntity transform onto their Character and persists it. Returns the
