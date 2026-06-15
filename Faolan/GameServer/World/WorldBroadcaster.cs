@@ -118,9 +118,12 @@ namespace Faolan.GameServer.World
 		// get it (else they'd get a move for an unknown entity).
 		public async Task BroadcastNpcMove(WorldEntity npc)
 		{
-			// Path = origin -> this tick's position (the capture's approach form starts the waypoint list with the
-			// current position, then the destination - frame 6470), walked at NpcMoveSpeed.
-			var body = Spawn.MoveTaskBuilder.BuildPatrol(npc.Handle, npc.MoveOrigin, new[] { npc.MoveOrigin, npc.Position }, WorldState.NpcMoveSpeed);
+			// Send the 61-byte transform form (origin -> this tick's position, facing travel direction). NB the patrol
+			// form (BuildPatrol) was tried here but its anchor makes the client walk to the waypoint then BACK to the
+			// anchor, netting ZERO movement (the NPC jitters in place) - so we keep the plain transform. The walk-vs-run
+			// gait + the residual snap are the remaining #190 polish (needs the parametric "approach" MoveTask form).
+			var facing = npc.MoveOrigin.FaceTowards(npc.Position);
+			var body = MoveTaskCodec.BuildBody(npc.Handle, npc.MoveOrigin, npc.Position, facing);
 
 			foreach (var viewer in _sim
 				         .World
