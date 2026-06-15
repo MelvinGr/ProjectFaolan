@@ -67,11 +67,17 @@ opcodes + handoff auto-follow (ground truth; the analyzer has no TCP reassembly 
 compressed GameServer downloads; use `-o tcp.analyze_sequence_numbers:FALSE` on lossy captures) ·
 `Captures/` reference traces + Python dissectors.
 
-**Listeners** are partial classes split across many files (`Packets.cs`, `GMCommands.cs`,
-`GuildHandlers.cs`, burst files...) — inspect all partials before changing behavior. They inherit
-`Server<TPacket,...>` (`Faolan.Core/Network/Server.cs`); per-connection state lives on
-`INetworkClient.Session`. Cross-listener actions go through dispatcher seams (`IAgentServerDispatcher`
-for chat/system messages, `IGameServerDispatcher` for world actions), never direct references.
+**Listeners** are partial classes split across many files — inspect all partials before changing
+behavior. `GameServerListener`'s partials are organized by role: `Inbound/` (opcode handlers, `Handle*`),
+`Outbound/` (packet builders, **behavior-named** e.g. `VitalsUpdateBuilder`/`GuildTagBuilder` — never
+opcode-named), `Gm/`, and the subsystem folders (`Login/`, `CreateFlow/`, `Combat/`, `World/`, `Spawn/`,
+`Scripting/`, `Economy/`...). NB a partial-class file keeps `namespace Faolan.GameServer` regardless of its
+folder (the `// CheckNamespace` suppression), so its folder is organizational only; the composed
+collaborators (`CombatService`, `WorldBroadcaster`, `WorldSimulation`...) are proper folder-namespaced
+classes — prefer that pattern over growing the partial. Listeners inherit `Server<TPacket,...>`
+(`Faolan.Core/Network/Server.cs`); per-connection state lives on `INetworkClient.Session`. Cross-listener
+actions go through dispatcher seams (`IAgentServerDispatcher` for chat/system messages,
+`IGameServerDispatcher` for world actions), never direct references.
 
 **Database:** SQLite via EF Core, pooled `DbContextFactory`, short-lived per-unit-of-work contexts —
 lazy loading is deliberately NOT used; load navigations explicitly with `Include`. All access goes
