@@ -135,6 +135,26 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void LeashedNpc_StopsChasingAndReturnsHome()
+		{
+			var world = new WorldState();
+			var zone = world.ZoneFor(4010);
+			var npc = Npc(1, 0, 0); // spawns (and homes) at the origin
+			npc.Position = new Vector3(WorldState.NpcLeashRange + 5f, 0, 0); // already chased out past the leash
+			zone.Add(npc);
+			zone.Add(Player(2, WorldState.NpcLeashRange + 6f, 0)); // a player right next to it, well within aggro range
+
+			// First tick past the leash flips it to returning; it then ignores the adjacent player and heads home.
+			world.Tick(0.5);
+			Assert.True(npc.Returning, "NPC should leash after straying past NpcLeashRange");
+
+			for (var i = 0; i < 400 && npc.Returning; i++)
+				world.Tick(0.5);
+			Assert.False(npc.Returning);
+			Assert.True(npc.Position.X < WorldState.NpcMeleeRange + 0.001f, "NPC returned home, not parked by the player");
+		}
+
+		[Fact]
 		public void Chase_ArrivesInMeleeRangeThenAttacks()
 		{
 			var world = new WorldState();

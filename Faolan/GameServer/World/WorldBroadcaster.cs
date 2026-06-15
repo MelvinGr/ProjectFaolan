@@ -110,12 +110,12 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// An aggroed NPC stepped toward its target on the tick: send its MoveTask transform (origin -> current position,
-		// facing the target) to every player in range that already sees it, so they watch it walk up. Only viewers who
-		// know the handle get it (a viewer who hasn't been spawned the NPC would get a move for an unknown entity).
-		public async Task BroadcastNpcMove(WorldEntity npc, WorldEntity target)
+		// An NPC stepped on the tick (chasing a target, or returning home): send its MoveTask transform (origin ->
+		// current position, facing its direction of travel) to every player in range that already sees it, so they
+		// watch it move. Only viewers who know the handle get it (else they'd get a move for an unknown entity).
+		public async Task BroadcastNpcMove(WorldEntity npc)
 		{
-			var facing = npc.Position.FaceTowards(target.Position);
+			var facing = npc.MoveOrigin.FaceTowards(npc.Position); // face the way it is moving
 			var body = MoveTaskCodec.BuildBody(npc.Handle, npc.MoveOrigin, npc.Position, facing);
 
 			foreach (var viewer in _sim

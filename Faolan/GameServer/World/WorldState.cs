@@ -20,8 +20,13 @@ namespace Faolan.GameServer.World
 		// How close (horizontal) an aggroed NPC must be to its target to swing; beyond this it chases.
 		public const float NpcMeleeRange = 3f;
 
-		// How fast a chasing NPC closes on its target (world units per second).
-		public const float NpcMoveSpeed = 6f;
+		// How fast a chasing NPC closes on its target (world units per second). A run-pace value so it keeps up with a
+		// fleeing player (a slower value rubber-bands) and the client reads the faster movement as a run, not a walk.
+		public const float NpcMoveSpeed = 12f;
+
+		// How far (horizontal) an NPC will chase from its spawn before giving up and returning home (so a player can't
+		// drag a mob across the whole zone). Once it disengages it keeps returning until home, ignoring re-aggro.
+		public const float NpcLeashRange = 40f;
 		private readonly ConcurrentDictionary<uint, Zone> _zones = new ConcurrentDictionary<uint, Zone>();
 
 		// Server-global monotonic allocator for playfield-instance tokens, mirroring retail's behaviour (a steadily
@@ -103,12 +108,36 @@ namespace Faolan.GameServer.World
 					var target = entity.Hostile
 						? NearestPlayerInRange(zone, entity, NpcAggroRange)
 						: null;
+
+					var homeDx = entity.SpawnPosition.X - entity.Position.X;
+					var homeDz = entity.SpawnPosition.Z - entity.Position.Z;
+					var homeDist = MathF.Sqrt(homeDx * homeDx + homeDz * homeDz);
+
+					// Leash: once led too far from spawn, disengage and keep returning home until arrived (ignoring
+					// re-aggro) so a player hovering at the edge can't ping-pong it. A returning NPC walks back, then
+					// heals to full on arrival.
+					if (homeDist > NpcLeashRange)
+						entity.Returning = true;
+
+					if (entity.Returning)
+					{
+						entity.ArmAttackCooldown(NpcAttackInterval);
+						if (homeDist > NpcMeleeRange)
+						{
+							StepToward(entity, homeDx, homeDz, homeDist, deltaSeconds);
+							(effects ??= new List<WorldTickEffect>()).Add(new WorldTickEffect(entity, WorldTickEffectType.NpcMove));
+							continue;
+						}
+
+						entity.Returning = false;
+						entity.Vitals.ReviveToFull(); // home again
+						continue;
+					}
+
 					if (target == null)
 					{
 						entity.ArmAttackCooldown(NpcAttackInterval); // re-aggro shouldn't swing instantly
-						// Leash: a damaged NPC with no one in range has disengaged - heal back to full (so it can't be
-						// whittled down from out of range / across separate pulls). Mobs don't move yet, so "return home"
-						// is just the HP reset.
+						// Disengaged with no one in range: heal back to full so it can't be whittled from out of range.
 						if (entity.Vitals.Health < entity.Vitals.MaxHealth)
 							entity.Vitals.ReviveToFull();
 						continue;
@@ -116,15 +145,13 @@ namespace Faolan.GameServer.World
 
 					// Chase: if the target is beyond melee range, step toward it (horizontal plane; keep terrain Y) and
 					// broadcast the move instead of swinging this tick. The client interpolates origin->position, so a
-					// 10 Hz step reads as the NPC walking up to the player; it swings once it arrives in melee range.
+					// 10 Hz step reads as the NPC running up to the player; it swings once it arrives in melee range.
 					var dx = target.Position.X - entity.Position.X;
 					var dz = target.Position.Z - entity.Position.Z;
 					var horizontal = MathF.Sqrt(dx * dx + dz * dz);
 					if (horizontal > NpcMeleeRange)
 					{
-						var step = MathF.Min((float)(NpcMoveSpeed * deltaSeconds), horizontal - NpcMeleeRange);
-						entity.MoveOrigin = entity.Position;
-						entity.Position = new Vector3(entity.Position.X + dx / horizontal * step, entity.Position.Y, entity.Position.Z + dz / horizontal * step);
+						StepToward(entity, dx, dz, horizontal, deltaSeconds, leaveMelee: true);
 						entity.ArmAttackCooldown(NpcAttackInterval); // wind up a swing for when it arrives
 						(effects ??= new List<WorldTickEffect>()).Add(new WorldTickEffect(entity, WorldTickEffectType.NpcMove, target));
 						continue;
@@ -147,6 +174,19 @@ namespace Faolan.GameServer.World
 		public bool TryGetZone(uint mapId, out Zone zone)
 		{
 			return _zones.TryGetValue(mapId, out zone);
+		}
+
+		// Advances `entity` one tick's worth toward (dx, dz) - a horizontal step at NpcMoveSpeed (keeping terrain Y),
+		// recording the origin so the broadcast can send origin->position for the client to interpolate. `leaveMelee`
+		// stops one melee-range short (chasing a target) vs landing on the point (returning home).
+		private static void StepToward(WorldEntity entity, float dx, float dz, float distance, double deltaSeconds, bool leaveMelee = false)
+		{
+			var travel = MathF.Min((float)(NpcMoveSpeed * deltaSeconds), leaveMelee ? distance - NpcMeleeRange : distance);
+			entity.MoveOrigin = entity.Position;
+			entity.Position = new Vector3(
+				entity.Position.X + dx / distance * travel,
+				entity.Position.Y,
+				entity.Position.Z + dz / distance * travel);
 		}
 
 		// The closest player within `range` of the NPC (its aggro target), or null if none.

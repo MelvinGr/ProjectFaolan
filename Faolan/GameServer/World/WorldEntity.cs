@@ -82,6 +82,10 @@ namespace Faolan.GameServer.World
 		// client interpolates the step (set just before Position is advanced toward the target).
 		public Vector3 MoveOrigin { get; set; }
 
+		// True while a leashed NPC is walking back to its spawn point - it ignores re-aggro until home (so a player
+		// camping the leash edge can't ping-pong it).
+		public bool Returning { get; set; }
+
 		// Active buffs/effects on this entity, keyed by buff (spell) id - reapplying refreshes the entry.
 		// Server-side bookkeeping only for now: the client tracks icon + duration itself from the ApplySpell
 		// data, and retail sends NO removal IIR on CancelBuff (just a FormatFeedback text), so removal here is
