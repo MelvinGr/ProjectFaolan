@@ -67,6 +67,23 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void Build_WithMintHandles_GivesEachRowAUniqueHandle()
+		{
+			// #212: multiple listings of one item all carry the same stored handle (or 0 for fresh sells); the
+			// client collapses rows sharing a handle, so the live search path mints a unique handle per row.
+			var listings = Enumerable.Range(0, 5)
+				.Select(_ => JockoListing()) // all identical => identical stored Handle/ItemHandle
+				.ToList();
+
+			var body = TradepostListingCodec.Build(0x7e2, listings, i => (0x0c000000u + (uint)i, 0x15000000u + (uint)i));
+			var rows = TradepostListingCodec.Parse(body).Rows;
+
+			Assert.Equal(5, rows.Count);
+			Assert.Equal(5, rows.Select(r => r.Handle).Distinct().Count());
+			Assert.Equal(5, rows.Select(r => r.ItemHandle).Distinct().Count());
+		}
+
+		[Fact]
 		public void BuildThenParse_RoundTrips()
 		{
 			var listing = JockoListing();

@@ -58,8 +58,18 @@ namespace Faolan.GameServer.Economy.Tradepost
 		// TradepostListingCodec, cheapest first). `head` echoes the query's category. Echoes the inbound
 		// TradepostInterface instance so the client matches the reply to its window.
 		public static Task SendSearchResults(INetworkClient client, ConanPacket inbound, uint head, IReadOnlyCollection<TradepostListing> listings) =>
-			Build(TradepostProtocol.InterfaceMethod.DispatchSearchResults, TradepostListingCodec.Build(head, listings), inbound.Sender.Instance)
+			Build(TradepostProtocol.InterfaceMethod.DispatchSearchResults, TradepostListingCodec.Build(head, listings, MintRowHandles), inbound.Sender.Instance)
 				.SendAsync(client);
+
+		// Unique per-row display handles for the search grid (#212). The client keys the grid by the per-row dynel
+		// handle, so all listings of an item must NOT share one handle or they collapse to a single visible row.
+		// Index-based within the response guarantees uniqueness; the buy path keys on SaleId, so these are throwaway
+		// display ids. High bases keep them clear of the small world-entity handle range.
+		private const uint RowHandleBase = 0x0C000000;
+		private const uint RowItemHandleBase = 0x15000000;
+
+		private static (uint Handle, uint ItemHandle) MintRowHandles(int index) =>
+			(RowHandleBase + (uint)index, RowItemHandleBase + (uint)index);
 
 		// Fallback when no DB listing matches the query: replay the captured single-row listing so the grid still
 		// renders something for the PoC (item-agnostic). Drops out naturally once listings are imported/seeded.

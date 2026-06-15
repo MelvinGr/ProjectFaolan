@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -68,11 +69,18 @@ namespace Faolan.Core.Network.Packets
 		// Builds the full body from DB listing rows. `head` echoes the search query's category (constant 0x7E2 in
 		// the captures); listings are emitted in the order given (the client renders them as-is - sort by price
 		// ascending at the call site to match retail).
-		public static byte[] Build(uint head, IEnumerable<TradepostListing> listings)
+		//
+		// `mintHandles` optionally overrides the per-row display handles (Handle + ItemHandle) by row index. The
+		// client keys the search grid by the per-row dynel handle, so rows that share one handle COLLAPSE to a single
+		// visible row (#212) - and stored listings all carry the same seeded handle (or 0 for freshly-sold ones).
+		// Live search supplies a minter that gives each row a UNIQUE handle; the buy path keys on SaleId, not the
+		// handle, so these are pure session-volatile display ids. Left null for the byte-exact golden replay tests.
+		public static byte[] Build(uint head, IEnumerable<TradepostListing> listings, Func<int, (uint Handle, uint ItemHandle)>? mintHandles = null)
 		{
 			var s = new FaolanStream();
 			s.WriteUInt32(head);
 
+			var index = 0;
 			foreach (var listing in listings)
 			{
 				var entry = BuildEntry(listing);
@@ -83,16 +91,20 @@ namespace Faolan.Core.Network.Packets
 					entryBytes = ms.ToArray();
 				}
 
+				var (handle, itemHandle) = mintHandles?.Invoke(index) ?? (listing.Handle, listing.ItemHandle);
+
 				s
 					.WriteUInt64(listing.SaleId)
-					.WriteUInt32(listing.Handle)
+					.WriteUInt32(handle)
 					.WriteArrayUInt16Length(Encoding.ASCII.GetBytes(listing.SellerName ?? ""))
 					.WriteUInt64(listing.Price)
 					.WriteUInt32(listing.Quantity)
 					.WriteUInt32(listing.ItemId)
 					.WriteUInt64(listing.InstanceField)
-					.WriteUInt32(listing.ItemHandle)
+					.WriteUInt32(itemHandle)
 					.WriteArrayUInt32Length(entryBytes);
+
+				index++;
 			}
 
 			return s.ToArray();
