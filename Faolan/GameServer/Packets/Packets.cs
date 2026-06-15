@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
 using Microsoft.Extensions.Logging;
@@ -599,7 +600,7 @@ namespace Faolan.GameServer
 		private static byte[] SubstitutePostReadyInstance(byte[] tail, uint instance)
 		{
 			var placeholder = new byte[] { 0xF4, 0xF0, 0xC1, 0x09 };
-			var inst = EncodeVarint(instance);
+			var inst = Varint.Encode(instance);
 			if (inst.Length != placeholder.Length)
 				return tail;
 

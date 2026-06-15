@@ -246,39 +246,12 @@ namespace Faolan.Core.Network.Packets
 
 		private static ulong ReadVarint(MemoryStream stream)
 		{
-			ulong result = 0;
-			var shift = 0;
-
-			while (true)
-			{
-				var value = stream.ReadByte();
-
-				if (value < 0)
-					throw new InvalidOperationException("Unexpected end of protobuf varint.");
-
-				var b = (byte)value;
-
-				result |= (ulong)(b & 0x7F) << shift;
-
-				if ((b & 0x80) == 0)
-					return result;
-
-				shift += 7;
-
-				if (shift > 63)
-					throw new InvalidOperationException("Invalid protobuf varint.");
-			}
+			return Conan.Varint.Read(stream);
 		}
 
 		private static void WriteVarint(List<byte> bytes, ulong value)
 		{
-			while (value >= 0x80)
-			{
-				bytes.Add((byte)((value & 0x7F) | 0x80));
-				value >>= 7;
-			}
-
-			bytes.Add((byte)value);
+			Conan.Varint.Write(bytes, value);
 		}
 	}
 }

@@ -7,6 +7,7 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.AgentServer;
+using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.GameServer.World;
@@ -476,16 +477,7 @@ namespace Faolan.GameServer.Combat
 		private static byte[] EncodeBehaviorPhase(uint value)
 		{
 			var bytes = new List<byte> { 0x18 };
-			do
-			{
-				var b = (byte)(value & 0x7f);
-				value >>= 7;
-				if (value != 0)
-					b |= 0x80;
-				bytes.Add(b);
-			}
-			while (value != 0);
-
+			Varint.Write(bytes, value);
 			return bytes.ToArray();
 		}
 

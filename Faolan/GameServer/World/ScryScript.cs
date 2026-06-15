@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
+using Faolan.Core.Network.Conan;
 
 namespace Faolan.GameServer.World
 {
@@ -46,8 +47,8 @@ namespace Faolan.GameServer.World
 
 		private static void WriteVarintField(List<byte> w, int field, ulong value)
 		{
-			WriteVarint(w, (ulong)(field << 3)); // wire type 0 (varint)
-			WriteVarint(w, value);
+			Varint.Write(w,(ulong)(field << 3)); // wire type 0 (varint)
+			Varint.Write(w,value);
 		}
 
 		private static void WriteStringField(List<byte> w, int field, string value)
@@ -57,21 +58,9 @@ namespace Faolan.GameServer.World
 
 		private static void WriteBytesField(List<byte> w, int field, byte[] value)
 		{
-			WriteVarint(w, (ulong)((field << 3) | 2)); // wire type 2 (length-delimited)
-			WriteVarint(w, (ulong)value.Length);
+			Varint.Write(w,(ulong)((field << 3) | 2)); // wire type 2 (length-delimited)
+			Varint.Write(w,(ulong)value.Length);
 			w.AddRange(value);
-		}
-
-		private static void WriteVarint(List<byte> w, ulong v)
-		{
-			do
-			{
-				var b = (byte)(v & 0x7F);
-				v >>= 7;
-				if (v != 0)
-					b |= 0x80;
-				w.Add(b);
-			} while (v != 0);
 		}
 
 		private static void WriteU32(List<byte> w, uint v)

@@ -35,27 +35,11 @@ namespace Faolan.GameServer
 		// producing the full conversation id that addresses the given client instance.
 		private static byte[] AppendVarint(byte[] prefix, uint value)
 		{
-			var varint = EncodeVarint(value);
+			var varint = Varint.Encode(value);
 			var result = new byte[prefix.Length + varint.Length];
 			Array.Copy(prefix, result, prefix.Length);
 			Array.Copy(varint, 0, result, prefix.Length, varint.Length);
 			return result;
-		}
-
-		private static byte[] EncodeVarint(uint value)
-		{
-			var bytes = new List<byte>(5);
-			do
-			{
-				var b = (byte)(value & 0x7F);
-				value >>= 7;
-				if (value != 0)
-					b |= 0x80;
-				bytes.Add(b);
-			}
-			while (value != 0);
-
-			return bytes.ToArray();
 		}
 
 		private static byte[] LoginWorld201CReceiver(INetworkClient client)

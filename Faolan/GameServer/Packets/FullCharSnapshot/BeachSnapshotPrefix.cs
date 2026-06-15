@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Faolan.Core.Network.Conan;
 
 namespace Faolan.GameServer.Packets.FullCharSnapshot
 {
@@ -26,24 +27,9 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		{
 			var prefix = new List<byte>(8);
 			prefix.AddRange(BaseVersion);
-			prefix.AddRange(EncodeVarint(RootLengthConstant + (ulong)rootLength));
+			Varint.Write(prefix, RootLengthConstant + (ulong)rootLength);
 			prefix.AddRange(Trailing);
 			return [.. prefix];
-		}
-
-		private static IEnumerable<byte> EncodeVarint(ulong v)
-		{
-			var bytes = new List<byte>();
-			do
-			{
-				var b = (byte)(v & 0x7F);
-				v >>= 7;
-				if (v != 0)
-					b |= 0x80;
-				bytes.Add(b);
-			} while (v != 0);
-
-			return bytes;
 		}
 	}
 }

@@ -1079,7 +1079,7 @@ namespace Faolan.GameServer
 			if (oldInstance == newInstance)
 				return packet;
 
-			var oldVarint = EncodeVarint(oldInstance);
+			var oldVarint = Varint.Encode(oldInstance);
 			var newVarint = EncodeVarintPadded(newInstance, oldVarint.Length);
 			if (newVarint == null)
 				return packet; // live id needs more varint bytes than the captured id; can't substitute in place

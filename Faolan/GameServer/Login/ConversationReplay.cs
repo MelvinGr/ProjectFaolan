@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
@@ -63,8 +64,8 @@ namespace Faolan.GameServer
 		private async Task ServeScreen(INetworkClient client, ConversationNode node, uint clickedNpcHandle)
 		{
 			var liveInstance = client.Session.Account.ClientInstance;
-			var oldInstanceVarint = EncodeVarint(node.CapturedInstance);
-			var newInstanceVarint = EncodeVarint(liveInstance);
+			var oldInstanceVarint = Varint.Encode(node.CapturedInstance);
+			var newInstanceVarint = Varint.Encode(liveInstance);
 
 			// A captured screen that offers options (AnswerList 0xF164A4A5) sometimes ALSO carries a trailing
 			// CloseChatWindow (0xC4AF39EB) - the captured session closed the window right after. Replaying that close

@@ -154,6 +154,18 @@ namespace Faolan.Core.Data
 			return this;
 		}
 
+		// A base-128 varint (protobuf LEB128) - the canonical Conan wire varint (Network.Conan.Varint).
+		public FaolanStream WriteVarint(ulong value)
+		{
+			while (value >= 0x80)
+			{
+				WriteByte((byte)((value & 0x7F) | 0x80));
+				value >>= 7;
+			}
+
+			return WriteByte((byte)value);
+		}
+
 		public FaolanStream WriteArrayByteLength(FaolanStream stream)
 		{
 			return WriteArrayByteLength(stream.ToArray());
