@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.IO;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Protobuf;
 using ProtoBuf;
 
@@ -74,6 +75,59 @@ namespace Faolan.GameServer.Spawn
 			BinaryPrimitives.WriteUInt32BigEndian(outBytes.AsSpan(0, 4), (uint)protobuf.Length);
 			protobuf.CopyTo(outBytes, 4);
 			return outBytes;
+		}
+
+		// SimpleDynelFullUpdateIIR sub-opcode (the object class that carries a ProtoSimpleDynelIIR identity).
+		public const uint SubOpcode = 0x66AEDD50;
+
+		// Builds the typed identity message from a WorldObject row's columns (the DB-source path). Kdtree is always 0
+		// on world dynels; the two nullable columns are emitted only when present, reproducing the captured field-set.
+		public static ProtoSimpleDynelIIR ToMessage(WorldObject row)
+		{
+			var message = new ProtoSimpleDynelIIR
+			{
+				Kdtree = row.Kdtree,
+				Name = row.Name,
+				DisplayName = row.DisplayName,
+				CarsGroup = row.CarsGroup,
+				IsClosed = row.IsClosed
+			};
+			if (row.QuestItemEffect.HasValue)
+				message.QuestItemEffect = row.QuestItemEffect.Value;
+			if (row.TemplateItemId.HasValue)
+				message.TemplateItemId = row.TemplateItemId.Value;
+			return message;
+		}
+
+		// Copies a parsed identity message into a WorldObject row's columns (the importer path). The nullable columns
+		// stay null when the field is absent, so ToMessage round-trips back to the same wire bytes.
+		public static void ApplyColumns(WorldObject row, ProtoSimpleDynelIIR message)
+		{
+			row.Kdtree = message.Kdtree;
+			row.Name = message.Name;
+			row.DisplayName = message.DisplayName;
+			row.CarsGroup = message.CarsGroup;
+			row.IsClosed = message.IsClosed;
+			row.QuestItemEffect = message.ShouldSerializeQuestItemEffect() ? message.QuestItemEffect : null;
+			row.TemplateItemId = message.ShouldSerializeTemplateItemId() ? message.TemplateItemId : null;
+		}
+
+		// Replaces the identity message inside a built dynel body with one constructed from the WorldObject's columns,
+		// keeping the header + transform + kd-tree tail. Byte-identical to the original when the columns match the
+		// captured message (proven for every captured field-shape). Returns false (and leaves `result` null) if the
+		// body can't be framed as a dynel or the row has no lifted identity (DisplayName null = not a dynel row).
+		public static bool TryReplaceIdentityFromColumns(ReadOnlySpan<byte> body, WorldObject row, out byte[] result)
+		{
+			result = null;
+			if (row?.DisplayName == null || !TryParse(body, out _, out var start, out var consumed))
+				return false;
+
+			var rebuilt = BuildMessage(ToMessage(row));
+			result = new byte[start + rebuilt.Length + (body.Length - start - consumed)];
+			body[..start].CopyTo(result);
+			rebuilt.CopyTo(result.AsSpan(start));
+			body[(start + consumed)..].CopyTo(result.AsSpan(start + rebuilt.Length));
+			return true;
 		}
 
 		private static bool TryReadVarint(ReadOnlySpan<byte> b, ref int i, out ulong value)

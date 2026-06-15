@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
+using Faolan.GameServer.Spawn;
 using Faolan.PacketAnalyzer;
 using Microsoft.EntityFrameworkCore;
 
@@ -504,6 +505,17 @@ namespace Faolan.Importer
 			row.RotationY = e.RotY;
 			row.RotationZ = e.RotZ;
 			row.RotationW = e.RotW;
+
+			// Lift the SimpleDynel identity into typed columns (#187): parse the ProtoSimpleDynelIIR out of the
+			// captured body so the builder can CONSTRUCT it from the DB rather than slice it from Data. Body is the
+			// IIR carrier [u32 len][u32 subOpcode][record]; the codec reads the record (body[8..]).
+			if (e.SubOpcode == SimpleDynelMessageCodec.SubOpcode)
+			{
+				var objBody = WorldObjectBuilder.ExtractBody(e.Data);
+				if (objBody is { Length: > 8 } && SimpleDynelMessageCodec.TryParse(objBody.AsSpan(8), out var message, out _, out _))
+					SimpleDynelMessageCodec.ApplyColumns(row, message);
+			}
+
 			return row;
 		}
 

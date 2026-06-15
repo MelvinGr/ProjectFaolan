@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Database.Tables;
 using Faolan.GameServer.Spawn;
 using Xunit;
 
@@ -62,6 +63,26 @@ namespace Faolan.Tests
 			record.AsSpan(start + consumed).CopyTo(spliced.AsSpan(start + rebuilt.Length)); // kd-tree tail
 
 			Assert.Equal(Convert.ToHexString(record), Convert.ToHexString(spliced));
+		}
+
+		[Fact]
+		public void FromColumns_ReproducesRecordByteExact()
+		{
+			// The DB-source path: lift the identity into WorldObject columns (importer), then rebuild the message
+			// from those columns (builder). Columns -> message -> splice must reproduce the captured record exactly.
+			var record = Convert.FromHexString(RecordHex);
+			Assert.True(SimpleDynelMessageCodec.TryParse(record, out var msg, out _, out _));
+
+			var row = new WorldObject { SubOpcode = SimpleDynelMessageCodec.SubOpcode };
+			SimpleDynelMessageCodec.ApplyColumns(row, msg);            // importer side
+			Assert.Equal("Acheronian Ruins", row.Name);
+			Assert.Equal(1u, row.CarsGroup);
+			Assert.True(row.IsClosed);
+			Assert.Null(row.QuestItemEffect);                          // absent on this dynel
+			Assert.Null(row.TemplateItemId);
+
+			Assert.True(SimpleDynelMessageCodec.TryReplaceIdentityFromColumns(record, row, out var rebuilt)); // builder side
+			Assert.Equal(Convert.ToHexString(record), Convert.ToHexString(rebuilt));
 		}
 	}
 }

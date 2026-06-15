@@ -27,6 +27,22 @@ namespace Faolan.GameServer.Spawn
 				return false;
 
 			body = SpawnPacketBuilder.BuildSpawnBody(template, handle, position, rotation);
+
+			// For a dynel whose identity has been lifted into columns (#187), CONSTRUCT the ProtoSimpleDynelIIR
+			// message from those columns and splice it over the carried-from-Data identity. The body is the IIR
+			// carrier [u32 len][u32 subOpcode][record], so the codec operates on `body[8..]` (the record); the kd-tree
+			// tail + transform stay template-carried (interim). Byte-identical when the columns match the capture;
+			// non-dynel classes / un-lifted rows fall through with the spliced-from-Data identity unchanged.
+			if (row.SubOpcode == SimpleDynelMessageCodec.SubOpcode && body.Length > 8 &&
+			    SimpleDynelMessageCodec.TryReplaceIdentityFromColumns(body.AsSpan(8), row, out var newRecord))
+			{
+				var combined = new byte[8 + newRecord.Length];
+				body.AsSpan(0, 8).CopyTo(combined);
+				newRecord.CopyTo(combined.AsSpan(8));
+				BinaryPrimitives.WriteUInt32BigEndian(combined.AsSpan(0, 4), (uint)(4 + newRecord.Length)); // carrier len = [subOpcode] + record
+				body = combined;
+			}
+
 			return true;
 		}
 
@@ -54,7 +70,8 @@ namespace Faolan.GameServer.Spawn
 
 		// The captured `Data` is the full Conan packet ([u32 len][u32 crc][u32 headerLen][header][body]); the
 		// object body starts after the 12-byte prefix + the header. Returns null if the framing is malformed.
-		private static byte[] ExtractBody(byte[] data)
+		// Public so the importer can lift the dynel identity columns from the same body the builder consumes.
+		public static byte[] ExtractBody(byte[] data)
 		{
 			if (data == null || data.Length < 12)
 				return null;
