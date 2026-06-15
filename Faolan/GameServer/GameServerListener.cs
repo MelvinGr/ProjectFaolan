@@ -39,6 +39,10 @@ namespace Faolan.GameServer
 		// The RDB Lua VM (conversation/quest scripting); stateless + reusable.
 		private readonly LuaScriptVm _luaVm = new LuaScriptVm();
 
+		// Persists equip/unequip/inventory-move/drop/split actions to the DB (no packet sends). The Inbound
+		// handlers call into it. Composed collaborator, like CombatService. See Inventory/EquipmentService.cs.
+		private readonly Inventory.EquipmentService _equipment;
+
 		// Builds + sends the world-event packets (spawns/moves/despawns, NPC respawn/loot/mount renders, loot-window
 		// and quest-journal packets). Reads the world model via the simulation; the listener delegates its IWorldOutbound
 		// port + the loot/quest opcode handlers to it. See World/WorldBroadcaster.cs.
@@ -63,6 +67,7 @@ namespace Faolan.GameServer
 			_simulation = new WorldSimulation(this, database, agentServerDispatcher, logger);
 			_broadcaster = new WorldBroadcaster(_simulation, database, logger);
 			_combat = new CombatService(_simulation, _broadcaster, database, agentServerDispatcher, logger);
+			_equipment = new Inventory.EquipmentService(database, logger);
 
 			InitGmCommands();
 		}
@@ -673,7 +678,7 @@ namespace Faolan.GameServer
 					// 0x00, 0x00, 0x00, 0x04  // target Slot
 
 					// Persist the split so both stacks survive logout (bag container; the packet carries no kind).
-					await PersistSplitStack(client, (int)sourceSlot, (int)targetSlot, targetStackSize);
+					await _equipment.PersistSplitStack(client, (int)sourceSlot, (int)targetSlot, targetStackSize);
 
 					break;
 				}

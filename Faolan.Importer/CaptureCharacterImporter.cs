@@ -9,6 +9,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Protobuf;
+using Faolan.GameServer.Inventory;
 using Faolan.GameServer;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.GameServer.Spawn;
@@ -285,7 +286,7 @@ namespace Faolan.Importer
 				if (item == null)
 					continue;
 
-				if (GameServerListener.SetEquipmentSlot(equipment, (CharacterEquipmentSlot)entry.Pos, item))
+				if (EquipmentService.SetEquipmentSlot(equipment, (CharacterEquipmentSlot)entry.Pos, item))
 					worn++;
 			}
 

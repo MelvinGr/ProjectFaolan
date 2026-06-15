@@ -1,3 +1,4 @@
+using Faolan.GameServer.Inventory;
 using System;
 using System.IO;
 using System.Threading.Tasks;
@@ -74,7 +75,7 @@ namespace Faolan.Tests
 					var equipment = await db.CharacterEquipment.FirstOrDefaultAsync(e => e.CharacterId == characterId);
 					var item = await db.Items.FirstOrDefaultAsync(i => i.Id == royalSignet);
 
-					Assert.True(GameServerListener.SetEquipmentSlot(equipment!, CharacterEquipmentSlot.LeftRing, item));
+					Assert.True(EquipmentService.SetEquipmentSlot(equipment!, CharacterEquipmentSlot.LeftRing, item));
 					if (equipment!.FirstPosBag != null && equipment.FirstPosBag.Id == item!.Id)
 						equipment.FirstPosBag = null;
 

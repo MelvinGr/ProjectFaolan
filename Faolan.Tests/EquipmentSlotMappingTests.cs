@@ -1,3 +1,4 @@
+using Faolan.GameServer.Inventory;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.GameServer;
@@ -27,19 +28,19 @@ namespace Faolan.Tests
 				Name = "Ring"
 			};
 
-			GameServerListener.SetEquipmentSlot(e, CharacterEquipmentSlot.LeftRing, ring);
+			EquipmentService.SetEquipmentSlot(e, CharacterEquipmentSlot.LeftRing, ring);
 
-			Assert.Equal(ring.Id, GameServerListener.GetEquipmentSlot(e, CharacterEquipmentSlot.LeftRing)!.Id);
-			Assert.Null(GameServerListener.GetEquipmentSlot(e, CharacterEquipmentSlot.RightRing));
-			Assert.Null(GameServerListener.GetEquipmentSlot(e, CharacterEquipmentSlot.Chest));
-			Assert.Null(GameServerListener.GetEquipmentSlot(e, CharacterEquipmentSlot.Wrist));
+			Assert.Equal(ring.Id, EquipmentService.GetEquipmentSlot(e, CharacterEquipmentSlot.LeftRing)!.Id);
+			Assert.Null(EquipmentService.GetEquipmentSlot(e, CharacterEquipmentSlot.RightRing));
+			Assert.Null(EquipmentService.GetEquipmentSlot(e, CharacterEquipmentSlot.Chest));
+			Assert.Null(EquipmentService.GetEquipmentSlot(e, CharacterEquipmentSlot.Wrist));
 		}
 
 		[Fact]
 		public void SetSlot_ReturnsFalse_ForUnmappedSlot()
 		{
 			var e = new CharacterEquipment();
-			Assert.False(GameServerListener.SetEquipmentSlot(e, CharacterEquipmentSlot.VanityHead, new Item { Id = 1 }));
+			Assert.False(EquipmentService.SetEquipmentSlot(e, CharacterEquipmentSlot.VanityHead, new Item { Id = 1 }));
 		}
 
 		[Fact]
@@ -54,8 +55,8 @@ namespace Faolan.Tests
 					Name = slot.ToString()
 				};
 
-				Assert.True(GameServerListener.SetEquipmentSlot(e, slot, item));
-				var read = GameServerListener.GetEquipmentSlot(e, slot);
+				Assert.True(EquipmentService.SetEquipmentSlot(e, slot, item));
+				var read = EquipmentService.GetEquipmentSlot(e, slot);
 
 				Assert.NotNull(read);
 				Assert.Equal(item.Id, read!.Id);
