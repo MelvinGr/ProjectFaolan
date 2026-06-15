@@ -5,7 +5,7 @@
 # Faolan.PacketAnalyzer dumps drop. See Faolan.Wireshark/README.md.
 #
 # Requires the plugin to be installed (cmake --build Faolan.Wireshark/build --target
-# install-faolan-plugin) and jq.
+# install-faolan-plugin) and python3.
 set -euo pipefail
 
 if [[ $# -lt 1 ]]; then
@@ -15,7 +15,7 @@ fi
 
 capture=$1
 output=${2:-${capture%.pcapng}.tshark.json}
-filter="$(dirname "$0")/tshark_to_dump.jq"
+reshaper="$(dirname "$0")/tshark_to_dump.py"
 
 if ! tshark -G plugins | grep -q faolan; then
     echo "error: the Faolan Wireshark plugin is not installed (see Faolan.Wireshark/README.md)" >&2
@@ -25,9 +25,10 @@ fi
 # tcp.analyze_sequence_numbers:FALSE - Wireshark otherwise hides retransmitted frames from
 # the plugin, stalling compressed streams at gaps that a late retransmission would fill.
 # -Y faolan drops the non-game frames (pure ACKs etc.) and -J trims the emitted protocol tree
-# to just what the filter reads, shrinking tshark's JSON ~3.7x (484MB -> 131MB on the longload
-# capture) - byte-identical dump, but far less for jq to parse.
+# to just what the reshaper reads, shrinking tshark's JSON ~3.7x (484MB -> 131MB on the longload
+# capture). The reshape pass is python3 (tshark_to_dump.py) - same dump as the old jq filter, but
+# ~10x faster on large captures and no jq dependency (#106).
 tshark -r "$capture" -o tcp.analyze_sequence_numbers:FALSE -Y faolan -J "frame ip tcp faolan" -T json \
-    | jq -f "$filter" > "$output"
+    | python3 "$reshaper" > "$output"
 
-echo "$(jq '.Packets | length' "$output") packets -> $output"
+echo "$(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1]))["Packets"]))' "$output") packets -> $output"

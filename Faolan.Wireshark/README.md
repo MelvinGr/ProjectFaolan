@@ -93,7 +93,7 @@ tshark -r capture.pcapng -o tcp.analyze_sequence_numbers:FALSE \
   -T fields -e frame.number -e faolan.pkt.opcode
 ```
 
-## JSON export (analyzer-style dumps via jq)
+## JSON export (analyzer-style dumps)
 
 `Captures/tshark_dump.sh` converts a capture into an analyzer-style dump - one record per
 Faolan/chat packet with frame/time/endpoints/direction/opcode/classes/body:
@@ -103,16 +103,17 @@ Captures/tshark_dump.sh <capture.pcapng> [output.json]   # default output: <capt
 ```
 
 Under the hood: `tshark -T json` emits the full dissection tree (one object per frame; each
-"Conan packet N" subtree is self-contained) and `Captures/tshark_to_dump.jq` re-groups it:
+"Conan packet N" subtree is self-contained) and `Captures/tshark_to_dump.py` re-groups it:
 
 ```zsh
 tshark -r capture.pcapng -o tcp.analyze_sequence_numbers:FALSE -T json \
-  | jq -f Captures/tshark_to_dump.jq > capture.tshark.json
+  | Captures/tshark_to_dump.py > capture.tshark.json
 ```
 
-Not schema-identical to the `Faolan.PacketAnalyzer` dumps, but carries the same essentials and
-additionally includes the compressed-stream packets the analyzer drops. (~27s for the largest
-12.8k-packet reference capture.)
+The reshape pass is python3 (was a jq filter; #106) - same dump, but ~10x faster on large
+captures (131 MB tshark JSON: ~11.7 s jq -> ~1.1 s) and no jq dependency. Not schema-identical
+to the `Faolan.PacketAnalyzer` dumps, but carries the same essentials and additionally includes
+the compressed-stream packets the analyzer drops.
 
 ## Validation
 
