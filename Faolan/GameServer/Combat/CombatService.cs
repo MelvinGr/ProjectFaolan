@@ -163,6 +163,9 @@ namespace Faolan.GameServer.Combat
 			// lifecycle (despawn + scheduled respawn) on death.
 			await ApplyNpcDamage(client, targetHandle, (int)damage, $"melee from 0x{instance:X8}");
 
+			// Cleave: the swing also hits the hostile NPCs clustered around the target (#18).
+			await ApplyMeleeCleave(client, instance, targetHandle, damage);
+
 			// 3) EnergyIIR - the player's stamina after the swing.
 			var player = GetOrAddPlayerVitals(client);
 			await SendWorldPacket(client, CombatPacketCodec.BuildEnergyBody(instance, player.Stamina));
@@ -285,8 +288,29 @@ namespace Faolan.GameServer.Combat
 
 			await ApplyNpcDamage(client, targetHandle, (int)damage, $"melee from 0x{instance:X8}");
 
+			// Cleave: the swing also hits the hostile NPCs clustered around the target (#18).
+			await ApplyMeleeCleave(client, instance, targetHandle, damage);
+
 			var player = GetOrAddPlayerVitals(client);
 			await SendWorldPacket(client, CombatPacketCodec.BuildEnergyBody(instance, player.Stamina));
+		}
+
+		// Melee cleave (#18): an AoC swing hits an arc, not just the selected target. After the primary hit, splash the
+		// same damage to the hostile, living NPCs clustered around the target (CombatTargeting.CleaveTargets - a
+		// target-centered cleave, robust without a decoded player-facing vector; the directional arc + per-direction
+		// mitigation is the separate #20). Each secondary gets its own DamageResultIIR floating number and runs the
+		// full damage/kill lifecycle (vitals push, corpse-loot, XP, kill-quest advance) via ApplyNpcDamage.
+		private async Task ApplyMeleeCleave(INetworkClient client, uint instance, uint primaryHandle, uint damage)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null || !_sim.World.TryGetZone(player.MapId, out var zone) || !zone.TryGet(primaryHandle, out var primary))
+				return;
+
+			foreach (var secondary in CombatTargeting.CleaveTargets(zone, primary, CombatTargeting.DefaultCleaveRadius, CombatTargeting.DefaultMaxCleaveTargets))
+			{
+				await SendWorldPacket(client, CombatPacketCodec.BuildDamageResultBody(instance, secondary.Handle, damage));
+				await ApplyNpcDamage(client, secondary.Handle, (int)damage, $"melee cleave from 0x{instance:X8}");
+			}
 		}
 
 		// Spends the caster's mana for a cast and pushes the caster's own 0x96B8DC59 update so the mana bar drops -

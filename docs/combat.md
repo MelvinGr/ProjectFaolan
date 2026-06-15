@@ -51,10 +51,20 @@ swap the corpse. The world tick (`WorldState.Tick`) drives two independent timer
 Open: the death animation currently relies on the client reacting to the `health=0` StatUpdate during the
 linger - a dedicated death-state/anim IIR is not decoded (see #204; candidates noted there).
 
+## Melee cleave (#18)
+
+A swing damages an ARC in retail, not just the selected target. `CombatService.ApplyMeleeCleave` (called
+after the primary hit on both the armed and unarmed paths) splashes the same damage to the hostile, living
+NPCs clustered around the target - `CombatTargeting.CleaveTargets` selects them (target-centered: other
+entities within `DefaultCleaveRadius` of the primary, excluding the primary/players/non-hostile/dead, nearest
+first, capped at `DefaultMaxCleaveTargets`). Each secondary gets its own `DamageResultIIR` + the full
+damage/kill lifecycle. This is the flat "everyone in the cluster takes the swing" half; the directional arc +
+per-direction shield mitigation is #20 (decode #1 = the swing tail direction-ability id, done). The cleave is
+TARGET-centered rather than a true player-facing cone because the rotation->forward convention isn't decoded;
+radius + cap are provisional, tuned in-client.
+
 ## Known gaps (TODO.md §Combat)
 
-- Melee is cone/AoE in retail (every target in the arc takes damage); we resolve only the selected target.
-  Directional combat + defensive shields is #20 (decode #1 = the swing tail direction-ability id, done).
 - NPC counter-attack ANIMATION ack (retail's second BccAck with actor = target handle) - undecoded; the
   world model deals NPC damage on the tick instead.
 - HP/stamina auto-regen not implemented. NPC death animation: corpse now lingers then becomes a loot bag
