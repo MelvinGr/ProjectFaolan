@@ -267,3 +267,8 @@ Faolan/faolan.db
 # Python bytecode caches (Captures/*.py tooling)
 __pycache__/
 *.pyc
+
+# Faolan.ClientHook CMake artifacts (build/ and *.obj are already ignored above;
+# the root-level faolan_hook.dll copy + the kernel32 import lib are not)
+Faolan.ClientHook/*.dll
+Faolan.ClientHook/*.lib
