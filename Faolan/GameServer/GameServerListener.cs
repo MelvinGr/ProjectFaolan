@@ -44,6 +44,10 @@ namespace Faolan.GameServer
 		// handlers call into it. Composed collaborator, like CombatService. See Inventory/EquipmentService.cs.
 		private readonly Inventory.EquipmentService _equipment;
 
+		// Dispatches a player using (right-clicking) a bag item by its kind (Totem of Origin -> recall, future
+		// consumables...). The RightClickItem Inbound handler delegates to it. See Inventory/ItemUseService.cs.
+		private readonly Inventory.ItemUseService _itemUse;
+
 		// NPC vendor / shop sell-buy-undo flow (owns the open-shop/last-sale state). The wallet-update + item-grant
 		// outbound ops are injected as seams (shared with other subsystems). See Economy/Shop/ShopService.cs.
 		private readonly Economy.Shop.ShopService _shop;
@@ -85,6 +89,7 @@ namespace Faolan.GameServer
 			_combat = new CombatService(_simulation, _broadcaster, database, agentServerDispatcher, logger);
 			_conversation = new Dialogue.ConversationService(database, logger, _broadcaster, _luaVm);
 			_equipment = new Inventory.EquipmentService(database, logger);
+			_itemUse = new Inventory.ItemUseService(database, RecallToBindCommand, logger);
 			_shop = new Economy.Shop.ShopService(database, logger, this);
 			_bank = new Economy.Bank.BankService(database, logger, this);
 			_tradepost = new Economy.Tradepost.TradepostService(database, logger, this);
