@@ -289,11 +289,16 @@ vs the partial snapshot.
   (`Data1..4`), looks up RDB `1000020`/`1000620` id=Item.Id, decrypts, validates the RDB-Id header.
   **Result on our DB: 387/388 keyed items decrypt + validate** (the 1 "miss" is a DB id that collides with a
   *plain* TESTITEM entry, correctly rejected). 
-- **Template string fields** are `tag 0x21 (u32) + len (u32) + ASCII`. The first underscore-free such string is the
-  display name (internal mesh/asset names contain `_`; names-by-localized-id have none inline). The importer fills
-  `Item.Name` only when empty (captured names stay authoritative): **143 names recovered** (e.g. "Dusklight Tunic",
-  "Misery of Dagon"), 26 items still nameless (their names are localized-string ids, resolvable via TextStrings
-  `1030002` TDC2 if ever needed).
+- **Template string fields** are `tag 0x21 (u32) + len (u16) + flags (u16) + ASCII`. The length is a **u16**, not a
+  u32 — the next u16 is a flags word that is **nonzero whenever the string is backslash-escaped** (e.g. an
+  apostrophe `\'`). Reading the length as a u32 folds that flags word into the high bytes (e.g. `0x0018000f` ≈ 1.5M),
+  which a sane length guard then rejects — that was the #202 bug: names with `flags == 0` worked, escaped names were
+  dropped. Read len as u16, skip the flags word, unescape `\'`/`\"`/`\\`. The first underscore-free such string is the
+  display name (internal mesh/asset names contain `_`). The importer fills `Item.Name` only when empty (captured names
+  stay authoritative). The earlier "localized-string id" theory for the blanks was **wrong**: those names are inline,
+  just mis-framed — fixing the length read recovered **225 more** ("Aspirant's Cap", "The Conqueror's Crown", …; commit
+  `06fda38`). The genuinely-blank remainder (~839) are NPC/TEST/internal items whose only string is an asset-mesh ref —
+  they have no player-facing name. Guarded by `RdbItemNameTests`.
 ### Template body format (characterized 2026-06-08)
 The decrypted template body (after the 12-byte RDB-Id header) is a **fixed-layout struct**, NOT a generic TLV.
 Evidence: aligning two unrelated items by their constant values, the constants land at **identical byte offsets**
@@ -301,8 +306,9 @@ Evidence: aligning two unrelated items by their constant values, the constants l
 stat *slots* whose ids are the same for all items, with the per-item *values* in interleaved fixed fields. There
 is also a **packed field** (e.g. `@40 = 0x0X000001`, X differs per item) that is not a plain u32, which is why a
 naive `[id u32][value u32]` walk only consumes the body exactly for 160/387 (and mis-fires when a value == 33,
-the string marker). **Strings** are `0x21 (u32) + len (u32) + ASCII`, unaligned (no realign after), holding the
-name (done) and usually a description.
+the string marker). **Strings** are `0x21 (u32) + len (u16) + flags (u16) + ASCII`, unaligned (no realign after),
+holding the name (done) and usually a description. (The `len` is a u16 + a u16 escaping-flags word — see the #202
+note above; do not read it as a u32.)
 - **Conclusion:** correct stat extraction needs the struct's **field map** (offsets → meaning). RE pass 2 traced
   the parser chain (anchors below), which revealed *why* this is non-trivial:
   - Factory: `0x10603b0(creatorFn, type)` registers a creator per RDB type; type `1000020`/`1000620`/`1040005`/
