@@ -126,9 +126,26 @@ detail block**, NOT inside `Quest_c`:
 This is exactly the shape `Captures/decode_snapshot_quests.py` parses and `WorldQuest.BuildQuestFullUpdate`
 already emits byte-exactly (the handover notes it is "byte-identical to the QuestFullUpdate body from questId
 onward"). So the objective TEXT is delivered by this block, keyed by questId, and is already an
-authored/decoded grammar in the codebase. **Open:** map this block to its exact client reader in the
-top-level sequence (it is one of List B/C / the `MainQuest_c` neighborhood — List B's `FUN_00922c90` record
-shape does not match these bytes, so the order/identity needs another tracing pass).
+authored/decoded grammar in the codebase.
+
+**Reader resolution (2026-06-16) — partial.** Ruled out, by byte layout against the template:
+- **`QuestFullUpdateIIR::ReadSubClass`** (`FUN_00917e20`) = `u32 ver==1` + `u32` + **the same `FUN_0091df50`
+  (Quest_c)** + a trailing flag byte. So a QuestFullUpdate body IS a `Quest_c` — but `@609` is not a Quest_c
+  header (no `ver==1 · questId · … · 0x412`), so `@609` is **not** embedded QuestFullUpdate content.
+- **List B** (`FUN_00798c70` → `FUN_00922c90`) = `u32 + 3×ReadString + ACGHash(FUN_005d7190, reads 1 u32) +
+  u32 + u32 count + nested 0x3F1 string-lists`. Parsing `@613` this way mis-frames immediately (the 2nd
+  ReadString's `[u16 len]` lands on `0x0009` and swallows the instance bytes). So `@609` is **not** a
+  `FUN_00922c90` record either.
+- Not `MainQuest_c` (`FUN_00922210`, all-numeric, no strings) and not `Quest_c`.
+
+So there is a real discrepancy: the static top-level call order makes List B the next reader after List A, yet
+`@609`'s bytes fit none of the list record grammars. The likely causes are (a) one or more of List B/C / the
+MainQuest list are **empty/near-empty** here and consume only a few bytes, shifting the true start of the
+objective block past `@609`; or (b) the template carries a spliced/captured objective region the live writer
+emits via a path not in this static chain. **Resolving it cleanly needs a DYNAMIC trace** (breakpoint
+`FUN_0048f900`/the list drivers on a live snapshot load) — static decompilation has been exhausted. **Not
+blocking:** the `@609` byte grammar is already decoded (`decode_snapshot_quests.py`) and authored
+(`WorldQuest.BuildQuestFullUpdate`), so generation does not wait on this label.
 
 Validated by the dissector `Captures/decode_questc.py` (parses version + List A + each `Quest_c` and asserts
 it consumes exactly to the objective-block boundary `@609`; `listKey == questId`).
