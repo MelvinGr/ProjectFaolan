@@ -70,47 +70,47 @@ Then back in `FullPlayerCharacterIIR::ReadSubClass` (`FUN_0148c210`):
 
 12. **Trailing pair-list** — **plain** `u32 count`, then `count` × `[u32,u32]` (wide reads via `FUN_0048f720`).
 
-## `Quest_c` per-record grammar (`FUN_0091df50`)
+## `Quest_c` per-record grammar (`FUN_0091df50`) — VALIDATED against `BeachTailsTemplate.bin`
 
-One `Quest_c` record (offsets are into the 0x120-byte object; reads in wire order):
+The outer List A loop (`FUN_0091f5c0`) reads **`u32 listKey` = the questId** before each record, then calls
+`FUN_0091df50`. ReadString (`FUN_0048f840`) wire format = **`[u16 len][len bytes]`**. Field labels below are
+confirmed by parsing the template's only `Quest_c` (quest **10238**), which consumes exactly to the next
+region:
 
 ```
-u32   ver            == 1        (else stream-error flag set, bail)
-u32   @0x0c          (quest id — matches the "questId" word in decode_snapshot_quests.py)
-u32   @0x10
-u32   @0x114
-u32   @0x118
-u32   @0x14
-string @0x?? × 5     (FUN_0048f840 ReadString) — the <remoteformat> XML: title/summary/area/region…
-u32   @0xec
-u32   @0xcc
-u32   @0x2c
-u32   @0x11c
-u64   @0x20          (FUN_0048f720 — likely acceptTime)
-u32   @0x28
-objective-list 1 → vec @0x10c   # u32 count (capped 100), then count × ObjRec
-objective-list 2 → vec @0x110   # same framing
-u32   @0xf0
-u64   @0xf8
-objective-list 3 → vec @0x100   # u32 count (capped 100), then count × ObjRec
-objective-list 4 → vec @0x104   # u32 count (capped 100), then count × ObjRec
-                                # (post-read: sort + ref-count fixups, no further stream reads)
+u32   listKey        # = questId (the List A map key; read by the outer loop, not the record reader)
+--- Quest_c record (FUN_0091df50): ---
+u32   ver     == 1   # @0x?? guard (else stream-error, bail)
+u32   questId        # @0x0c  (10238)
+u32   state          # @0x10  (1 = active; same field as QuestFullUpdate state)
+u32   reserved == 0  # @0x114
+u32   N              # @0x118 (4 — journal goal/line count)
+u32   marker == 0x412# @0x14  (constant; also emitted by WorldQuest.BuildQuestFullUpdate)
+string × 5           # [u16 len][bytes] <remoteformat> tokens:
+                     #   50301 title, 50302 summary, 50300 area(id=241), 52000 region(id=4), 52000 region(id=4010)
+u32   @0xec   (=1)
+u32   areaId  @0xcc  (=241 — matches the 50300 string's id)
+u32   questId @0x2c  (=10238 again)
+u32   @0x11c  (=0)
+u64   @0x20          (FUN_0048f720; =0 here — likely acceptTime)
+u32   @0x28   (=0)
+obj-list 1 → vec @0x10c   # u32 count (capped 100) — EMPTY (0) for 10238
+obj-list 2 → vec @0x110   # u32 count (capped 100) — EMPTY (0)
+u32   @0xf0   (=0x96=150)
+u64   @0xf8          (=15 here)
+obj-list 3 → vec @0x100   # u32 count (capped 100) — EMPTY (0)
+obj-list 4 → vec @0x104   # u32 count (capped 100) — EMPTY (0)
+                          # (post-read: sort + ref-count fixups; no further stream reads)
 ```
 
-**`ObjRec`** (one objective; 0x48-byte / 18-word heap node, built per entry):
-```
-u32, u32                    # ids/handles
-u32, u32                    # ids/handles
-Read4×U32 (FUN_00cc0540)     # 16-byte numeric text/format ref #1
-u32, u32                    # ids/flags
-Read4×U32 (FUN_00cc0540)     # 16-byte numeric text/format ref #2
-u32, u32                    # ids/flags
-```
+Each populated **`ObjRec`** (0x48-byte heap node; not exercised by the beach starter) reads 16 `u32`:
+`u32 ×2 · u32 ×2 · Read4×U32 (text ref #1) · u32 ×2 · Read4×U32 (text ref #2) · u32 ×2`.
 
-So a `Quest_c` = header (6 `u32` + 5 strings + 4 `u32` + `u64` + `u32`) + 4 capped-100 objective lists. The
-human-readable text is entirely in the 5 header strings; objective records are numeric (the two `Read4×U32`
-refs resolve client-side, like the `<remoteformat>`/`<localized>` id+category tokens). **TODO:** label the
-individual `u32` fields against the captured bytes (state/goal/areaId) — the wire SHAPE is now pinned.
+So the human-readable journal text is entirely the **5 header strings**; the numeric objective records are
+unused for the beach starter (its objectives render from the strings). **Generation:** emit `listKey` +
+`[ver=1, questId, state, 0, N, 0x412]` + the 5 `<remoteformat>` strings + `[1, areaId, questId, 0]` +
+`u64 0` + `0` + four `0` empty-list counts — i.e. a fresh single-quest `Quest_c` is fully authored from
+`(questId, state, areaId, N, the 5 text tokens)`. The wire grammar is fully pinned and ground-truth-verified.
 
 ## What this means for `BeachTailsTemplate.bin`
 
@@ -121,8 +121,8 @@ access-window table our heuristic finds by the `PFAccessWindow_` ASCII is one of
 the spawn/loot/movetask readers already regenerated.
 
 Remaining to author a fully-synthetic fresh-beach tails (and so delete the `.bin`):
-- **`Quest_c` wire SHAPE now pinned** (above). Left: label the individual `u32` fields (state/goal/areaId)
-  against the captured bytes — mechanical, cross-ref `Captures/decode_snapshot_quests.py`.
+- **`Quest_c` (List A) DONE** — wire grammar pinned + field-labeled + ground-truth-validated against the
+  template (above); a fresh single-quest record is authorable from `(questId, state, areaId, N, 5 text tokens)`.
 - Pin List B (`FUN_00922c90`) short reads + the `PFAccessWindow_` name source (List B is the prime suspect for
   the access-window entries our heuristic finds by ASCII).
 - Then model regions 2–12 in `SnapshotTails` (today: typed header + opaque `UnknownBefore` + parsed
