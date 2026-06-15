@@ -62,9 +62,16 @@ create-specific to decode, only builder wiring to do:
   `pos=(262.931, 6.014, 280.970)`, `rot=(0, 0.98769, 0, 0.15643)` (≈18° about Y). The editor always spawns
   the avatar on the same pedestal; only `playfield_instance` (session) and the embedded looks differ.
 
-### Partially decoded (header level)
-- **PlayfieldFIIR** (`0x5D85BFC7`, "MapChange"), 103 bytes — map/playfield setup; raw-body big-endian floats.
-- **GameTimeIIR** (`0x4F57DC08`, "SetDayTime"), 29 bytes — day-time value block.
+### Fully decoded + constructive builders (added 2026-06-15)
+`CreateEditorRecordBuilder.BuildPlayfieldFiir` / `BuildGameTimeIir`, locked by `CreateEditorRecordTests`.
+- **PlayfieldFIIR** (`0x5D85BFC7`, "MapChange"), 103 bytes:
+  `[9-byte prefix][Vec3 reference pos (BE floats)][0x62][0x0000C79C][u32 mapId][0][u32 charInstance][0]
+   [u32 count][0x00009C50][u32 playfieldToken][8 zeros][0x18][0x00000001][u32 playfieldToken][0x0000CB20]
+   [f32 nearClip=15.0][f32 farClip][0][0xFFFFFFFFFFFFFFFF][0x00000007][u32 flags]`.
+  The position is the map's reference point; the playfield token (live, per-session) is carried twice. `count`,
+  `farClip` and `flags` are passed through (not yet semantically pinned). Byte-exact for maps 4000 + 4010.
+- **GameTimeIIR** (`0x4F57DC08`, "SetDayTime"), 29 bytes:
+  `[u32 0][u32 0][u64 dayTime][u8 flag][u64 timestamp][f32 rate=1.0]`. Byte-exact.
 - **SetMorphValueIIR** (`0xBADF5A4B`), 36–37 bytes — `[type][handle]… "hairmesh_207920" … <float weight>`; the
   morph wiring itself is already covered by [[character_appearance_morphs_unused]].
 - **ScryScriptIIR** (`0xA36D3B74`) — the cutscene/editor callback scripts; see `docs/create-cutscene-camera-paths.md`.

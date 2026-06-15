@@ -43,5 +43,57 @@ namespace Faolan.GameServer
 				.WriteUInt32(value)
 				.ToArray();
 		}
+
+		// PlayfieldFIIR (0x5D85BFC7, "MapChange"): announces the playfield the client is entering - its reference
+		// position (a Vec3, raw-body big-endian floats), the map id, the entering character instance, and the live
+		// per-session playfield token (carried TWICE). 103 bytes; framing decoded from the create captures
+		// (docs/create-editor-bursts.md). `count` (3/6), `nearClip`=15.0 + `farClip` (~12-14), and the trailing
+		// `flags` are not yet semantically pinned, so they're passed through. Constructing this drives the map change
+		// from the Map row + the session token instead of replaying the captured MapChange.
+		public static byte[] BuildPlayfieldFiir(float posX, float posY, float posZ, uint mapId, uint charInstance,
+			uint count, uint playfieldToken, float nearClip, float farClip, uint flags)
+		{
+			return new FaolanStream()
+				.WriteUInt32(0u).WriteUInt32(0u).WriteByte((byte)0x00) // [0:9] prefix
+				.WriteFloatBigEndian(posX).WriteFloatBigEndian(posY).WriteFloatBigEndian(posZ) // [9:21] reference position
+				.WriteByte((byte)0x62)
+				.WriteUInt32(0x0000C79Cu)
+				.WriteUInt32(mapId)
+				.WriteUInt32(0u)
+				.WriteUInt32(charInstance)
+				.WriteUInt32(0u)
+				.WriteUInt32(count)
+				.WriteUInt32(0x00009C50u) // the 0xC350 char wire type
+				.WriteUInt32(playfieldToken)
+				.WriteUInt32(0u).WriteUInt32(0u) // [54:62] zeros
+				.WriteByte((byte)0x18)
+				.WriteUInt32(0x00000001u)
+				.WriteUInt32(playfieldToken) // token again
+				.WriteUInt32(0x0000CB20u)
+				.WriteFloatBigEndian(nearClip)
+				.WriteFloatBigEndian(farClip)
+				.WriteUInt32(0u)
+				.WriteUInt32(0xFFFFFFFFu).WriteUInt32(0xFFFFFFFFu)
+				.WriteUInt32(0x00000007u)
+				.WriteUInt32(flags)
+				.ToArray();
+		}
+
+		// GameTimeIIR (0x4F57DC08, "SetDayTime"): the in-game day-time + a wall-clock timestamp + the time rate.
+		// 29 bytes: [u32 0][u32 0][u64 dayTime][u8 flag][u64 timestamp][f32 rate]. Decoded from the create captures
+		// (docs/create-editor-bursts.md); dayTime's low 32 bits are the fractional half (0 / 0x80000000), flag is a
+		// small phase byte (00/01/02), and the rate is the day-cycle speed (1.0 in every capture). Raw-body float =
+		// big-endian. Constructing it lets the server drive the sky/lighting time instead of replaying the capture.
+		public static byte[] BuildGameTimeIir(ulong dayTime, byte flag, ulong timestamp, float rate = 1.0f)
+		{
+			return new FaolanStream()
+				.WriteUInt32(0u)
+				.WriteUInt32(0u)
+				.WriteUInt64(dayTime)
+				.WriteByte(flag)
+				.WriteUInt64(timestamp)
+				.WriteFloatBigEndian(rate)
+				.ToArray();
+		}
 	}
 }
