@@ -189,6 +189,12 @@ namespace Faolan.GameServer.Economy.Tradepost
 			await SendBankSlotStat(client, (uint)bankSlot, TradepostListingCodec.StatTimestamp, Statics.NowUnixTimeSeconds);
 			await SendBankSlotStat(client, (uint)bankSlot, TradepostListingCodec.StatFlags, BankFlagListed);
 
+			// Retail pushes a 0x2005 wallet refresh after a listing - but the balance is UNCHANGED: there is NO
+			// listing deposit / postage fee. Verified across the sell / send-mail / change-price / cancel captures
+			// (necrol80 stays at 1,365,148 tin throughout), #182. Push the current balance (reason 0, as captured) so
+			// the HUD stays in sync; no debit.
+			await _outbound.SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Spend);
+
 			_logger.LogInformation("Tradepost SELL: {Char} listed \"{Item}\" x{Qty} (bank slot {Slot}, template {Template}) for {Price} tin -> sale 0x{Sale:X16}.",
 				character.Name, row.Item.Name, listing.Quantity, bankSlot, row.Item.Id, price, listing.SaleId);
 		}
@@ -313,6 +319,11 @@ namespace Faolan.GameServer.Economy.Tradepost
 			// Draw the mail-pending overlay on the kept bank item (capture F500: stat 0 = flags 0x8001).
 			if (row?.Item != null)
 				await SendBankSlotStat(client, (uint)bankSlot, TradepostListingCodec.StatFlags, BankFlagMailPending);
+
+			// Retail pushes a 0x2005 wallet refresh after SendMail too - again with NO postage fee (the captured
+			// balance is unchanged across the send-mail-with-attachment capture), #182. Push the current balance so
+			// the HUD stays in sync (reflects any attached money debit elsewhere; the item attachment itself is free).
+			await _outbound.SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Spend);
 
 			_logger.LogInformation("Tradepost mail: {Char} sent mail 0x{Mail:X16} to {Recipient} (\"{Body}\", money {Money}, attach {HasItem}).",
 				character.Name, mail.MailId, recipient.Name, bodyText, money, row?.Item != null);
