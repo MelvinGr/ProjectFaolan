@@ -31,7 +31,7 @@ namespace Faolan.GameServer
 				.WriteArray(0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x03)
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerRespondOpcodes.AckAuthentication)
+				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerRespondOpcodes.AckAuthenticate)
 				.WriteArray(0x00, 0x00, 0x00, 0x01)
 				.SendAsync(client);
 			await new PacketStream()

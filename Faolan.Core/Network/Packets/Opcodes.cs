@@ -236,8 +236,8 @@
 		// identities are now recovered from AgeOfConan.exe (docs/aoc-rpc-method-opcodes.md, Captures/ghidra/):
 		// the live build inserted extra (mostly no-arg) dispatch methods, which is why the values don't line up
 		// with the string-extracted catalog order. Ground-truth identities for the nicknames below:
-		//   MoneyUpdate 0x2005   = GameCharInterface.DispatchUpdateCash          (exact match)
-		//   BindLocation 0x2002  = GameCharInterface.DispatchUpdateBindLocation  (exact match)
+		//   UpdateCash 0x2005   = GameCharInterface.DispatchUpdateCash          (exact match)
+		//   UpdateBindLocation 0x2002  = GameCharInterface.DispatchUpdateBindLocation  (exact match)
 		//   ShopData 0x2033      = GameCharInterface.DispatchShopData            (exact match)
 		//   ItemSoldToShop 0x2035= GameCharInterface.DispatchItemSoldToShop      (exact match)
 		//   LatencyCheckResponse 0x2082 = GameCharInterface.DispatchPong         (the REAL per-char pong)
@@ -246,14 +246,14 @@
 		//   SpawnCheck 0x2008    = GameCharInterface.DispatchSetQuestMarker      (per-char, not GameInterface)
 		//   ReadyForPlayScreen 0x2024 = GameCharInterface.DispatchValidResurrectionSpots
 		//   ReportDimensionId 0x200b = GameInterface.DispatchReportDimesionID; ReportServerId 0x200c = ...DispatchReportServerID
-		//   AckAuthentication 0x2001 = GameInterface/UniverseInterface.DispatchAckAuthenticate
+		//   AckAuthenticate 0x2001 = GameInterface/UniverseInterface.DispatchAckAuthenticate
 		// Keep the values; do NOT rename (they drive capture-replayed sends). 0x2020 s2c = DispatchAddItem (note for
 		// the inventory-delivery work - there IS a per-item add packet, separate from the snapshot).
 		public enum GameServerRespondOpcodes : ushort
 		{
 			// Reply to GameCharAgent.RequestBindLocation: [u32 playfieldId] = the character's bind/home playfield
 			// (the Totem of Origin destination). Verified 1:1 request/reply across 13 captures.
-			BindLocation = 0x2002,
+			UpdateBindLocation = 0x2002,
 			// Vendor window content: [shop ID32 (type 0xC75B)][vendor NPC ID32][protobuf shop content]
 			// (= GameCharInterface.DispatchShopData by content; the value collides with the c2s BuyItem).
 			ShopData = 0x2033,
@@ -263,11 +263,11 @@
 			// Decoded from the sell/loot captures: values grow +2 per beach coin loot, jump on quest rewards,
 			// DECREASE on a purchase with reason 0, and persist across sessions. The same opcode value carries
 			// the TradepostInterface search results (different class/size); the money body is always 12 bytes.
-			MoneyUpdate = 0x2005,
+			UpdateCash = 0x2005,
 			Pong = 0x2009,
 			ReportDimensionId = 0x200b,
 			ReportServerId = 0x200c,
-			AckAuthentication = 0x2001,
+			AckAuthenticate = 0x2001,
 			ReadyForPlayScreen = 0x2024,
 			SpawnCheck = 0x2008,
 			LatencyCheckResponse = 0x2082,
@@ -284,7 +284,7 @@
 			// PassBlob c2s). Almost every world/create/login s2c record is sent under this opcode.
 			IirCarrier = 0x2000,
 			// The world-address handoff advert ([0x00][byteLen][host:port]) on the create enter-world + teleport
-			// paths; the client reconnects to the advertised GameServer. Same value as BindLocation (overloaded).
+			// paths; the client reconnects to the advertised GameServer. Same value as UpdateBindLocation (overloaded).
 			WorldHandoff = 0x2002,
 			// Recovered s2c method opcodes sent verbatim by the create/world bursts (per-class dispatch names from
 			// docs/aoc-rpc-method-opcodes.md; the conversation class disambiguates the overloaded value).

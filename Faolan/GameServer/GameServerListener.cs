@@ -241,7 +241,7 @@ namespace Faolan.GameServer
 
 						await ReportDimensionId(client, client.Session.Character.RealmId, authSender, authReceiver); // 1
 						await ReportServerId(client, 1, authSender, authReceiver); // 0x00000006
-						await AckAuthentication(client, 1, authSender, authReceiver);
+						await AckAuthenticate(client, 1, authSender, authReceiver);
 					}
 
 					client.Session.LastGameServer2020RequestId = null;
@@ -692,7 +692,7 @@ namespace Faolan.GameServer
 						// No bind/totem model yet: a character's bind playfield is its current map. TODO: persist a
 						// real bind location once binding (inn/wayfarer) and the totem teleport are implemented.
 						await new PacketStream()
-							.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, GameServerRespondOpcodes.BindLocation)
+							.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, GameServerRespondOpcodes.UpdateBindLocation)
 							.WriteUInt32(client.Session.Character?.MapId ?? Core.Database.Tables.Map.TortageBeachId)
 							.SendAsync(client);
 						Logger.LogDebug("RequestBindLocation({RequesterId:X8}) -> bind playfield {MapId}.", requesterId, client.Session.Character?.MapId ?? 0);

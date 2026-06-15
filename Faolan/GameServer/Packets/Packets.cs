@@ -390,13 +390,13 @@ namespace Faolan.GameServer
 			Logger.LogInformation("Cleared pending post-0x205F follow-up flag.");
 		}
 
-		private static Task AckAuthentication(INetworkClient client, uint value, byte[] sender = null, byte[] receiver = null)
+		private static Task AckAuthenticate(INetworkClient client, uint value, byte[] sender = null, byte[] receiver = null)
 		{
 			var sender0 = sender ?? LoginWorldSender;
 			var receiver0 = receiver ?? LoginWorldReceiver(client);
 
 			return new PacketStream()
-				.WriteHeader(sender0, receiver0, GameServerRespondOpcodes.AckAuthentication)
+				.WriteHeader(sender0, receiver0, GameServerRespondOpcodes.AckAuthenticate)
 				.WriteUInt32(value)
 				.SendAsync(client);
 		}
