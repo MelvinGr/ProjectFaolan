@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -264,7 +265,23 @@ namespace Faolan.GameServer
 
 							case ActionType.RightClickItem:
 							{
-								Logger.LogInformation($"RightClickItem: {args}");
+								Logger.LogInformation("RightClickItem: container={Container} slot={Slot} {Args}", from, target, args);
+
+								// Every behavior gets an echo-ack (docs/combat.md rule 1), then we act on the item. The
+								// right-clicked item is identified by its inventory location - from = container (0x68 =
+								// backpack), target = slot - decoded from the use_totem_of_origin capture. Using a Totem
+								// of Origin recalls the player to their bind point (#206/#64); the recall's handoff is the
+								// capture's "long loading screen". Other usable items aren't wired yet.
+								await _combat.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
+
+								var character = client.Session.Character;
+								if (character != null)
+								{
+									var used = (await Database.GetCharacterInventory(character.Id))
+										.FirstOrDefault(i => i.Container == (int)from && i.Slot == (int)target);
+									if (used?.Item?.Name?.Contains("Totem of Origin", StringComparison.OrdinalIgnoreCase) == true)
+										await RecallToBindCommand(client);
+								}
 
 								break;
 							}

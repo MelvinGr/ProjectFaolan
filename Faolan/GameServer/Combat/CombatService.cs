@@ -271,6 +271,22 @@ namespace Faolan.GameServer.Combat
 			await SendWorldPacket(client, BuildEquipMoveAckBody(rawPayload, client.Session.Account.ClientInstance, mode, movedItem));
 		}
 
+		// The generic "every behavior gets an echo-ack" reply (docs/combat.md rule 1) for an Interact request with no
+		// special result block - the air-swing path uses it, and so does a plain item-use (RightClickItem, e.g. the
+		// Totem of Origin #206). Phase = the request's Mode, or the legacy session counter when the caller didn't
+		// parse the args. No-op for a malformed (too-short) payload.
+		public Task SendBehaviorEchoAck(INetworkClient client, byte[] rawPayload, uint mode)
+		{
+			if (rawPayload.Length < 26)
+				return Task.CompletedTask;
+
+			var instance = client.Session.Account.ClientInstance;
+			var phase = mode != 0
+				? mode
+				: (uint)(++client.Session.NormalAttackAckPhase);
+			return SendWorldPacket(client, BuildBehaviorEchoAckBody(rawPayload, instance, phase));
+		}
+
 		// Frames a raw 0x2000 body on the world conversation.
 		private static Task SendWorldPacket(INetworkClient client, byte[] body)
 		{
