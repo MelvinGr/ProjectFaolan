@@ -14,7 +14,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void CapturedTraderBlob_RoundTrips_ByteExact()
 		{
-			var captured = Faolan.GameServer.Shop.ShopReplayData.DispatchShopDataBody;
+			var captured = Faolan.GameServer.Economy.Shop.ShopReplayData.DispatchShopDataBody;
 			var parsed = ShopContentCodec.Parse(captured);
 
 			Assert.Equal(0x1E7Eu, parsed.ShopInstance);

@@ -139,9 +139,9 @@ namespace Faolan.GameServer
 
 			// Tradepost (auction house) + mail ride the GameServer RPC layer; their 0x20xx methods COLLIDE with
 			// ordinary opcodes, so route them by RPC class id before the opcode switch (docs/tradepost-protocol.md).
-			if (Tradepost.TradepostProtocol.IsInbound(packet))
+			if (Economy.Tradepost.TradepostProtocol.IsInbound(packet))
 			{
-				await Tradepost.TradepostHandler.Handle(this, client, packet, Logger, Database);
+				await Economy.Tradepost.TradepostHandler.Handle(this, client, packet, Logger, Database);
 				return;
 			}
 

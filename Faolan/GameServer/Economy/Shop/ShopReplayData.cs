@@ -1,6 +1,6 @@
 using System;
 
-namespace Faolan.GameServer.Shop
+namespace Faolan.GameServer.Economy.Shop
 {
 	// The captured DispatchShopData (0x2033) body from the necrol80 sell_items_to_trader session - the Old Town
 	// trader's full shop inventory: [shop ID32 0xC75B:0x1E7E][vendor NPC ID32][protobuf shop content]

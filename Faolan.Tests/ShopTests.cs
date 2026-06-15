@@ -23,7 +23,7 @@ namespace Faolan.Tests
 		{
 			// The PoC blob must start with the captured shop ID32 (0xC75B:0x1E7E) - guards against the blob
 			// being regenerated from the wrong capture/offset.
-			var body = Faolan.GameServer.Shop.ShopReplayData.DispatchShopDataBody;
+			var body = Faolan.GameServer.Economy.Shop.ShopReplayData.DispatchShopDataBody;
 			Assert.Equal("0000c75b00001e7e", Convert.ToHexStringLower(body.AsSpan(0, 8).ToArray()));
 		}
 

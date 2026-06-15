@@ -1,4 +1,4 @@
-using Faolan.GameServer.Tradepost;
+using Faolan.GameServer.Economy.Tradepost;
 using Xunit;
 
 namespace Faolan.Tests

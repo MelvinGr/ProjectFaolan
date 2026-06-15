@@ -1,6 +1,6 @@
 using Faolan.Core.Network.Conan;
 
-namespace Faolan.GameServer.Tradepost
+namespace Faolan.GameServer.Economy.Tradepost
 {
 	// Auction house ("Tradepost") + mail wire protocol. Full grammar in docs/tradepost-protocol.md, decoded from
 	// the necrol80/assassinl23 captures via Captures/decode_tradepost.py. Carried on the GameServer RPC layer (NOT a

@@ -8,7 +8,7 @@ using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.Packets.FullCharSnapshot;
-using Faolan.GameServer.Tradepost;
+using Faolan.GameServer.Economy.Tradepost;
 using Microsoft.Extensions.Logging;
 
 // ReSharper disable once CheckNamespace

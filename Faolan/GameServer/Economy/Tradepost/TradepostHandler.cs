@@ -6,7 +6,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Microsoft.Extensions.Logging;
 
-namespace Faolan.GameServer.Tradepost
+namespace Faolan.GameServer.Economy.Tradepost
 {
 	// Entry point for inbound Tradepost (auction house) + mail RPC. First increment (Step 2b): decode and LOG each
 	// method against the live session, so an in-client AH interaction confirms our captured grammar
