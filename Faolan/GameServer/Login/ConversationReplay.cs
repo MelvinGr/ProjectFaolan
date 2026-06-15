@@ -53,7 +53,7 @@ namespace Faolan.GameServer
 			SubstituteUInt32(body, CloseChatWindowCapturedInstance, id);
 
 			return new PacketStream()
-				.WriteHeader([0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x08], AppendVarint([0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10], id), 0x2000u)
+				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameWorldType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GamePlayerType, id), 0x2000u)
 				.WriteArray(body)
 				.SendAsync(client);
 		}

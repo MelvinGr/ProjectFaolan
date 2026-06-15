@@ -29,6 +29,8 @@ namespace Faolan.Core.Network.Conan
 		public const uint GameSpawnCallerType = 0xA9ECB95D; // = hash("GameCharAgent")      (0x201C spawn-handshake caller)
 		public const uint GameSpawnEndpointType = 0x8B87F791; // = hash("GameCharInterface")  (0x201C spawn-handshake endpoint)
 		public const uint GameWorldType = 0xB171CE13; // = hash("GameAgent")
+		public const uint CsPlayerAgentType = 0x6DD55614; // = hash("CSPlayerAgent")     (CsPlayerAgent reply endpoint)
+		public const uint CsPlayerInterfaceType = 0xBBD560C8; // = hash("CSPlayerInterface") (CsPlayerAgent reply caller)
 
 		public static ProtoEndpoint Endpoint(uint type, uint instance)
 		{

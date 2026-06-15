@@ -43,7 +43,7 @@ namespace Faolan.GameServer
 			var instance = client.Session.Account.ClientInstance;
 
 			await new PacketStream()
-				.WriteHeader(ExistingCharacterPostReadyReportServerIdSender, AppendVarint(ExistingCharacterPostReadyReportServerIdReceiverPrefix, instance), 0x00002000u)
+				.WriteHeader(ExistingCharacterPostReadyReportServerIdSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameServerIdType, instance), 0x00002000u)
 				.WriteUInt32(targetType)
 				.WriteUInt32(targetInstance)
 				.WriteUInt32(0x00000000) // aggro status: 0 = no aggro (no live aggro model yet)

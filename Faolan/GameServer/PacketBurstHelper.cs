@@ -12,10 +12,10 @@ namespace Faolan.GameServer
 
 		// The 0x201C handshake uses a different conversation family, but the same sub-id 0x58 + instance tail.
 		private static readonly byte[] LoginWorld201CSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameSpawnCallerType, 0x58);
-		// The create-flow packets are written explicitly (PacketStream.WriteHeader + WriteArray + WriteUInt32)
-		// in their Retail*Burst sender methods. The client instance is the character's real id: it is written
-		// into the body with WriteUInt32(id) and appended to the relevant conversation-id (sender/receiver) as
-		// a protobuf varint via AppendVarint.
+		// The create-flow packets are written explicitly (PacketStream.WriteHeader + WriteArray + WriteUInt32) in
+		// their Retail*Burst sender methods. The client instance is the character's real id: it is written into the
+		// body with WriteUInt32(id) and woven into the sender/receiver conversation id by building each endpoint
+		// through ConanEndpoints.EndpointBytes(type, id).
 
 		// The retail login world-entry rides ONE conversation for everything (auth, MapChange, world objects,
 		// player and NPC spawns, time): family prefix + sub-id 0x58 on the sender, and the receiver family
@@ -30,17 +30,6 @@ namespace Faolan.GameServer
 		// endpoint TYPEs as the world conversation: Pong from GameAgent (0x13CE71B1), latency from GameCharAgent
 		// (0xA9ECB95D).
 		private static readonly byte[] PingResponseSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameWorldType, 0x08);
-
-		// Appends a uint32, protobuf-varint encoded, to a conversation-id prefix (the receiver/sender family),
-		// producing the full conversation id that addresses the given client instance.
-		private static byte[] AppendVarint(byte[] prefix, uint value)
-		{
-			var varint = Varint.Encode(value);
-			var result = new byte[prefix.Length + varint.Length];
-			Array.Copy(prefix, result, prefix.Length);
-			Array.Copy(varint, 0, result, prefix.Length, varint.Length);
-			return result;
-		}
 
 		private static byte[] LoginWorld201CReceiver(INetworkClient client)
 		{
