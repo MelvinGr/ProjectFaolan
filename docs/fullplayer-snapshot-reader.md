@@ -23,8 +23,12 @@ and the memory `snapshot_tails_construction_scope`.
 
 - `FUN_0048f900` = **ReadU32** (big-endian; byte-swaps when the stream's BE flag `+0x1a` is set — same as
   every other IIR reader). All counts/ids below are ReadU32.
-- `FUN_0048f840` = secondary fixed read (u16/byte-ish; used 3× inside the 112-byte record, not yet pinned).
-- `FUN_0048f720` = wide read (returns `undefined8`) used by the trailing pair-list.
+- `FUN_0048f840` = **ReadString** — a length-prefixed `std::string` (MSVC SSO: builds the string, stores
+  `len`/`cap`, memcpy-inline when `len < 0x10` else heap pointer). This is the **only string reader** in the
+  tails; the `<remoteformat>` XML tokens are read here.
+- `FUN_0048f720` = **ReadU64** (wide read, returns `undefined8`).
+- `FUN_00cc0540` = **Read4×U32** — a fixed 16-byte (4× ReadU32, BE-swapped) record; used as the per-objective
+  numeric reference pair inside the `Quest_c` objective sublists.
 - `FUN_00cba1b0` = the raw `memcpy`-from-stream primitive the inline ReadU32 expansions call.
 
 ## The `0x3F1` list-framing invariant
@@ -40,12 +44,9 @@ count (no `0x3F1`): the quest list and the outer trailing pair-list.
 
 1. `u32 version` — must == `0x18` (else `"...Wrong IIR_t version"`). This is `SnapshotTails.Header0`.
 2. **List A — the quest journal** — `FUN_0091f5c0`: `0x3F1`-framed; `N-1` records of **`Quest_c`** (0x120-byte
-   objects; the constructor `FUN_0091cf10` sets `Quest_c::vftable`). The reader `FUN_0091df50` (5523 B):
-   `u32 ver==1`, then ~scalar fields (ids/flags/state; a `u64` @+0x20 = likely acceptTime), then a count
-   **capped at 100** (objectives), then several `std::string`/vector members (the `0xf` SSO-capacity inits at
-   +0x11/+0x18/+0x39 and four `0x10`-byte heap allocs at +0x40…+0x44) holding the localized
-   **title/summary/area/objective** text. **This is where the journal `<remoteformat>` XML lives** — it is the
-   rich counterpart to the numeric `MainQuest_c` list (region 5). **TODO: finish field-mapping `FUN_0091df50`.**
+   objects; the constructor `FUN_0091cf10` sets `Quest_c::vftable`), read by `FUN_0091df50` — see the per-record
+   grammar below. **This is where the journal `<remoteformat>` XML lives** (the 5 header strings); it is the
+   rich counterpart to the numeric `MainQuest_c` list (region 5).
 3. **List B** — `FUN_00798c70` → `FUN_00922c90`: `0x3F1`-framed; `N-1` records of **112 bytes (stride 0x70)**.
    Each record (`FUN_00922c90`): `u32` + 3× `FUN_0048f840` + `u32` (→ +0x1b) + `u32 innerCount` + that many
    `[u32,u32]` pairs (built via `FUN_004d55b0`/`FUN_0079b760`). **TODO: pin the 3 short reads + name it.**
@@ -69,6 +70,48 @@ Then back in `FullPlayerCharacterIIR::ReadSubClass` (`FUN_0148c210`):
 
 12. **Trailing pair-list** — **plain** `u32 count`, then `count` × `[u32,u32]` (wide reads via `FUN_0048f720`).
 
+## `Quest_c` per-record grammar (`FUN_0091df50`)
+
+One `Quest_c` record (offsets are into the 0x120-byte object; reads in wire order):
+
+```
+u32   ver            == 1        (else stream-error flag set, bail)
+u32   @0x0c          (quest id — matches the "questId" word in decode_snapshot_quests.py)
+u32   @0x10
+u32   @0x114
+u32   @0x118
+u32   @0x14
+string @0x?? × 5     (FUN_0048f840 ReadString) — the <remoteformat> XML: title/summary/area/region…
+u32   @0xec
+u32   @0xcc
+u32   @0x2c
+u32   @0x11c
+u64   @0x20          (FUN_0048f720 — likely acceptTime)
+u32   @0x28
+objective-list 1 → vec @0x10c   # u32 count (capped 100), then count × ObjRec
+objective-list 2 → vec @0x110   # same framing
+u32   @0xf0
+u64   @0xf8
+objective-list 3 → vec @0x100   # u32 count (capped 100), then count × ObjRec
+objective-list 4 → vec @0x104   # u32 count (capped 100), then count × ObjRec
+                                # (post-read: sort + ref-count fixups, no further stream reads)
+```
+
+**`ObjRec`** (one objective; 0x48-byte / 18-word heap node, built per entry):
+```
+u32, u32                    # ids/handles
+u32, u32                    # ids/handles
+Read4×U32 (FUN_00cc0540)     # 16-byte numeric text/format ref #1
+u32, u32                    # ids/flags
+Read4×U32 (FUN_00cc0540)     # 16-byte numeric text/format ref #2
+u32, u32                    # ids/flags
+```
+
+So a `Quest_c` = header (6 `u32` + 5 strings + 4 `u32` + `u64` + `u32`) + 4 capped-100 objective lists. The
+human-readable text is entirely in the 5 header strings; objective records are numeric (the two `Read4×U32`
+refs resolve client-side, like the `<remoteformat>`/`<localized>` id+category tokens). **TODO:** label the
+individual `u32` fields against the captured bytes (state/goal/areaId) — the wire SHAPE is now pinned.
+
 ## What this means for `BeachTailsTemplate.bin`
 
 The opaque `UnknownBeforeAccessWindowTable` is really **Lists A–F + the quest list** (regions 2–8); the
@@ -78,10 +121,10 @@ access-window table our heuristic finds by the `PFAccessWindow_` ASCII is one of
 the spawn/loot/movetask readers already regenerated.
 
 Remaining to author a fully-synthetic fresh-beach tails (and so delete the `.bin`):
-- **Finish field-mapping `FUN_0091df50`** (List A = the `Quest_c` journal records, 5523 B) — the largest
-  region; map its scalar fields + the objective sub-list + the string members. Highest-value next step for
-  `.bin` removal. (Unrelated to the wrong displayed class — see #8 above.)
-- Pin List B (`FUN_00922c90`) short reads + where the `PFAccessWindow_`/`<remoteformat>` strings are read.
+- **`Quest_c` wire SHAPE now pinned** (above). Left: label the individual `u32` fields (state/goal/areaId)
+  against the captured bytes — mechanical, cross-ref `Captures/decode_snapshot_quests.py`.
+- Pin List B (`FUN_00922c90`) short reads + the `PFAccessWindow_` name source (List B is the prime suspect for
+  the access-window entries our heuristic finds by ASCII).
 - Then model regions 2–12 in `SnapshotTails` (today: typed header + opaque `UnknownBefore` + parsed
   access-window + typed `PostAccessBlock`) as the real list sequence and regenerate from server state.
 
