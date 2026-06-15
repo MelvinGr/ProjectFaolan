@@ -16,6 +16,12 @@ namespace Faolan.GameServer.World
 
 		// How close a player must be for a hostile NPC to aggro + attack (world units).
 		public const float NpcAggroRange = 20f;
+
+		// How close (horizontal) an aggroed NPC must be to its target to swing; beyond this it chases.
+		public const float NpcMeleeRange = 3f;
+
+		// How fast a chasing NPC closes on its target (world units per second).
+		public const float NpcMoveSpeed = 6f;
 		private readonly ConcurrentDictionary<uint, Zone> _zones = new ConcurrentDictionary<uint, Zone>();
 
 		// Server-global monotonic allocator for playfield-instance tokens, mirroring retail's behaviour (a steadily
@@ -58,8 +64,8 @@ namespace Faolan.GameServer.World
 		// Advances the world model by `deltaSeconds` (docs/archive/server-architecture-roadmap.md) and returns the wire-visible
 		// effects for the caller to broadcast: dead NPCs whose respawn delay elapsed (revived here - vitals + transform
 		// reset), loot bags whose lifetime expired (despawned + removed), and aggroed NPCs swinging at a nearby player.
-		// Player transforms are driven by Move packets, not the tick; NPC movement joins here once the MoveTask grammar
-		// lands. The model stays network-free - it reports effects and the listener turns them into packets.
+		// Player transforms are driven by Move packets, not the tick; aggroed NPCs chase here (NpcMove effects, broadcast
+		// as MoveTask). The model stays network-free - it reports effects and the listener turns them into packets.
 		public IReadOnlyList<WorldTickEffect> Tick(double deltaSeconds)
 		{
 			List<WorldTickEffect> effects = null;
@@ -105,6 +111,22 @@ namespace Faolan.GameServer.World
 						// is just the HP reset.
 						if (entity.Vitals.Health < entity.Vitals.MaxHealth)
 							entity.Vitals.ReviveToFull();
+						continue;
+					}
+
+					// Chase: if the target is beyond melee range, step toward it (horizontal plane; keep terrain Y) and
+					// broadcast the move instead of swinging this tick. The client interpolates origin->position, so a
+					// 10 Hz step reads as the NPC walking up to the player; it swings once it arrives in melee range.
+					var dx = target.Position.X - entity.Position.X;
+					var dz = target.Position.Z - entity.Position.Z;
+					var horizontal = MathF.Sqrt(dx * dx + dz * dz);
+					if (horizontal > NpcMeleeRange)
+					{
+						var step = MathF.Min((float)(NpcMoveSpeed * deltaSeconds), horizontal - NpcMeleeRange);
+						entity.MoveOrigin = entity.Position;
+						entity.Position = new Vector3(entity.Position.X + dx / horizontal * step, entity.Position.Y, entity.Position.Z + dz / horizontal * step);
+						entity.ArmAttackCooldown(NpcAttackInterval); // wind up a swing for when it arrives
+						(effects ??= new List<WorldTickEffect>()).Add(new WorldTickEffect(entity, WorldTickEffectType.NpcMove, target));
 						continue;
 					}
 

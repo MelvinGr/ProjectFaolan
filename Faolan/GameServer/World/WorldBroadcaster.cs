@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
@@ -106,6 +107,24 @@ namespace Faolan.GameServer.World
 			{
 				if (viewer.Client != null)
 					await SendWorldSpawn(viewer.Client, npc);
+			}
+		}
+
+		// An aggroed NPC stepped toward its target on the tick: send its MoveTask transform (origin -> current position,
+		// facing the target) to every player in range that already sees it, so they watch it walk up. Only viewers who
+		// know the handle get it (a viewer who hasn't been spawned the NPC would get a move for an unknown entity).
+		public async Task BroadcastNpcMove(WorldEntity npc, WorldEntity target)
+		{
+			var facing = npc.Position.FaceTowards(target.Position);
+			var body = MoveTaskCodec.BuildBody(npc.Handle, npc.MoveOrigin, npc.Position, facing);
+
+			foreach (var viewer in _sim
+				         .World
+				         .ZoneFor(npc.MapId)
+				         .PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
+			{
+				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
+					await SendWorldIir(viewer.Client, body);
 			}
 		}
 
@@ -832,6 +851,16 @@ namespace Faolan.GameServer.World
 					.WriteVector3BigEndian(move.Position)
 					.WriteVector3BigEndian(move.Rotation)
 					.WriteArray(move.Tail))
+				.SendAsync(recipient);
+		}
+
+		// Frames a raw 0x2000 IIR body on the world conversation to one recipient (the generic single-recipient send the
+		// dedicated builders share - e.g. the NPC MoveTask chase step).
+		private Task SendWorldIir(INetworkClient recipient, byte[] body)
+		{
+			return new PacketStream()
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameServerRespondOpcodes.IirCarrier)
+				.WriteArrayUInt32Length(s => s.WriteArray(body))
 				.SendAsync(recipient);
 		}
 

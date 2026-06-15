@@ -92,12 +92,12 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void PlayerInRange_AttacksOnCadence()
+		public void PlayerInMeleeRange_AttacksOnCadence()
 		{
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
 			var npc = Npc(1, 0, 0);
-			var player = Player(2, 5, 0); // within NpcAggroRange (20)
+			var player = Player(2, 2, 0); // within NpcMeleeRange (3)
 			zone.Add(npc);
 			zone.Add(player);
 
@@ -112,6 +112,44 @@ namespace Faolan.Tests
 			Assert.Empty(world.Tick(WorldState.NpcAttackInterval / 2));
 			// Once the interval elapses, it swings again.
 			Assert.Single(world.Tick(WorldState.NpcAttackInterval));
+		}
+
+		[Fact]
+		public void PlayerBeyondMeleeRange_ChasesTowardPlayer()
+		{
+			var world = new WorldState();
+			var zone = world.ZoneFor(4010);
+			var npc = Npc(1, 0, 0);
+			var player = Player(2, 10, 0); // aggro range (20) but beyond melee (3)
+			zone.Add(npc);
+			zone.Add(player);
+
+			var move = Assert.Single(world.Tick(0.5));
+			Assert.Equal(WorldTickEffectType.NpcMove, move.Type);
+			Assert.Same(npc, move.Entity);
+			Assert.Same(player, move.Target);
+
+			// It stepped toward the player (closer than it started, not past them) and recorded its origin.
+			Assert.True(npc.Position.X > 0 && npc.Position.X < 10);
+			Assert.Equal(0f, npc.MoveOrigin.X);
+		}
+
+		[Fact]
+		public void Chase_ArrivesInMeleeRangeThenAttacks()
+		{
+			var world = new WorldState();
+			var zone = world.ZoneFor(4010);
+			var npc = Npc(1, 0, 0);
+			zone.Add(npc);
+			zone.Add(Player(2, 8, 0));
+
+			// Several seconds of chasing closes the gap; eventually a swing lands once inside melee range.
+			var sawAttack = false;
+			for (var i = 0; i < 40 && !sawAttack; i++)
+				foreach (var e in world.Tick(0.5))
+					sawAttack |= e.Type == WorldTickEffectType.NpcAttack;
+
+			Assert.True(sawAttack);
 		}
 
 		[Fact]

@@ -78,6 +78,10 @@ namespace Faolan.GameServer.World
 		// field (mirrors the small incrementing value the capture carries; not a persistence key).
 		public uint AttackSwingCounter { get; set; }
 
+		// The position this NPC stepped FROM on its last chase tick - the MoveTask broadcast sends from->to so the
+		// client interpolates the step (set just before Position is advanced toward the target).
+		public Vector3 MoveOrigin { get; set; }
+
 		// Active buffs/effects on this entity, keyed by buff (spell) id - reapplying refreshes the entry.
 		// Server-side bookkeeping only for now: the client tracks icon + duration itself from the ApplySpell
 		// data, and retail sends NO removal IIR on CancelBuff (just a FormatFeedback text), so removal here is

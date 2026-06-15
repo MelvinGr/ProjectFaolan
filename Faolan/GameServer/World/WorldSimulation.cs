@@ -39,6 +39,10 @@ namespace Faolan.GameServer.World
 		// move rides PushVitals.
 		Task SendNpcAttackAnimation(INetworkClient client, uint npcHandle, uint damage, uint swingCounter);
 
+		// Broadcast an aggroed NPC's chase step (its MoveTask transform) to the players who can see it, so they watch it
+		// walk toward its target.
+		Task BroadcastNpcMove(WorldEntity npc, WorldEntity target);
+
 		// Re-run the world-entry render path for the player (used to respawn them at a resurrection point).
 		Task ReenterWorld(INetworkClient client);
 
@@ -435,10 +439,14 @@ namespace Faolan.GameServer.World
 								World.Remove(effect.Entity);
 								break;
 							case WorldTickEffectType.NpcAttack:
-								// Gated off until the attack animation is decoded - see NpcAutoAttackEnabled. Invisible
-								// model damage was killing players in a respawn/world-re-entry death-loop.
+								// Gated by NpcAutoAttackEnabled (the once-feared respawn/world-re-entry death-loop on a
+								// dense zone); the swing now plays the decoded attack-animation ack (see ApplyNpcAttack).
 								if (NpcAutoAttackEnabled)
 									await ApplyNpcAttack(effect.Entity, effect.Target);
+								break;
+							case WorldTickEffectType.NpcMove:
+								if (NpcAutoAttackEnabled)
+									await _output.BroadcastNpcMove(effect.Entity, effect.Target);
 								break;
 						}
 					}

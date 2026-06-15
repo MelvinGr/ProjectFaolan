@@ -3,15 +3,36 @@ using System.Numerics;
 
 namespace Faolan.Core.Extensions
 {
-	public static class QuaternionExtensions
+	public static class MathExtensions
 	{
-		extension(Vector3 degrees)
+		extension(MathF)
+		{
+			public static float DegreesToRadians(float degrees)
+			{
+				return degrees * (MathF.PI / 180f);
+			}
+		}
+
+		extension(Vector3 vector3)
 		{
 			public Quaternion ToQuaternion()
 			{
-				var radians = degrees * (MathF.PI / 180.0f);
-
+				var radians = vector3 * (MathF.PI / 180.0f);
 				return Quaternion.CreateFromYawPitchRoll(radians.Y, radians.X, radians.Z);
+			}
+
+			// A yaw-only facing quaternion (rotation about the Y/up axis) that points `from` at `target` - the
+			// (0, qy, 0, qw) shape the capture's MoveTask facings all use. Returns identity (facing +Z) when the two
+			// points coincide. Yaw measured from +Z toward +X (atan2(dx, dz)), matching the captured Y-axis quaternions.
+			public Quaternion FaceTowards(Vector3 target)
+			{
+				var dx = target.X - vector3.X;
+				var dz = target.Z - vector3.Z;
+				if (dx == 0f && dz == 0f)
+					return Quaternion.Identity;
+
+				var yaw = MathF.Atan2(dx, dz);
+				return new Quaternion(0f, MathF.Sin(yaw / 2f), 0f, MathF.Cos(yaw / 2f));
 			}
 		}
 
@@ -44,17 +65,6 @@ namespace Faolan.Core.Extensions
 			public static Quaternion CreateFromYawPitchRollDegrees(float yawDegrees, float pitchDegrees, float rollDegrees)
 			{
 				return Quaternion.CreateFromYawPitchRoll(MathF.DegreesToRadians(yawDegrees), MathF.DegreesToRadians(pitchDegrees), MathF.DegreesToRadians(rollDegrees));
-			}
-		}
-	}
-
-	public static class MathExtensions
-	{
-		extension(MathF)
-		{
-			public static float DegreesToRadians(float degrees)
-			{
-				return degrees * (MathF.PI / 180f);
 			}
 		}
 	}
