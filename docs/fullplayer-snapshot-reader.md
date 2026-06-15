@@ -150,8 +150,10 @@ blocking:** the `@609` byte grammar is already decoded (`decode_snapshot_quests.
 Validated by the dissector `Captures/decode_questc.py` (parses version + List A + each `Quest_c` and asserts
 it consumes exactly to the objective-block boundary `@609`; `listKey == questId`). A C# codec
 `QuestcRegion`/`QuestcRecord` (Parse/ToArray + typed fields) round-trips the template's `@0–609` **byte-exact**
-(`QuestcRegionTests`) — the construct-don't-replay foundation for retiring the quest region of the `.bin`
-(standalone; not yet wired into `SnapshotTails`/the live path).
+(`QuestcRegionTests`) and is **wired into `SnapshotTails`** — it now models the tails' front region instead of
+the former opaque `Header0`/`Unknown*`/`RemoteFormat*` fields. The live snapshot is byte-identical (all 400
+tests pass, incl. `BeachSnapshotConstructionTests`). Generating DIFFERENT quests from a character's
+`CharacterQuests` is the next step (gated by an in-client chat-connect smoke test).
 
 So the human-readable journal text is entirely the **5 header strings**; the numeric objective records are
 unused for the beach starter (its objectives render from the strings). **Generation:** emit `listKey` +

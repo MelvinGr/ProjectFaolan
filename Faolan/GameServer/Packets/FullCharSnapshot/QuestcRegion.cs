@@ -16,9 +16,11 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 	// where each objlist = u32 count then count x ObjRec(16 u32). The four objlists are EMPTY for the beach
 	// starter (so ObjRec is carried verbatim as raw u32s and is not yet field-validated).
 	//
-	// This is a standalone codec proven by a byte-exact round-trip golden test (QuestcRegionTests); it is the
-	// construct-don't-replay foundation for retiring BeachTailsTemplate.bin's quest region (Gitea #186). It is
-	// NOT yet wired into SnapshotTails / the live snapshot path.
+	// Proven by a byte-exact round-trip golden test (QuestcRegionTests); the construct-don't-replay foundation
+	// for retiring BeachTailsTemplate.bin's quest region (Gitea #186). WIRED into SnapshotTails (it models the
+	// tails' front region instead of the former opaque header+string fields) - the live snapshot is byte-
+	// identical (BeachSnapshotConstructionTests). Generating DIFFERENT quests from a character's CharacterQuests
+	// is the next step and is gated by an in-client chat-connect smoke test.
 	public sealed class QuestcRegion
 	{
 		public const uint Version = 0x18;
@@ -28,7 +30,11 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 		public List<QuestcRecord> Records { get; init; } = [];
 
-		public static QuestcRegion Parse(byte[] data)
+		public static QuestcRegion Parse(byte[] data) => Parse(data, out _);
+
+		// Parses the Quest_c region from the FRONT of `data` (which may be the whole tails) and reports how many
+		// bytes it consumed - the boundary where the next region (objective blocks / index) begins.
+		public static QuestcRegion Parse(byte[] data, out int consumed)
 		{
 			ArgumentNullException.ThrowIfNull(data);
 			using var r = new FaolanStream(data, false);
@@ -45,6 +51,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			var region = new QuestcRegion();
 			for (var i = 0; i < records; i++)
 				region.Records.Add(QuestcRecord.Read(r));
+			consumed = checked((int)r.Position);
 			return region;
 		}
 
@@ -62,7 +69,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 	public sealed class QuestcRecord
 	{
 		public uint QuestId { get; init; }
-		public uint State { get; init; }
+		public uint State { get; set; } // settable: world entry historically patches the lead quest's @20 word
 		public uint Zero { get; init; }
 		public uint N { get; init; }
 		public string Title { get; init; } = "";     // <remoteformat category=50301>

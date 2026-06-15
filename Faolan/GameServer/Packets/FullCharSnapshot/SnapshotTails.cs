@@ -15,61 +15,40 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		[JsonIgnore]
 		public byte[] OriginalData { get; private init; } = [];
 
+		// The quest JOURNAL region at the START of the tails (version + 0x3F1-framed Quest_c list), modeled from
+		// the recovered FullPlayerCharacterIIR grammar (docs/fullplayer-snapshot-reader.md) instead of an opaque
+		// header+string blob. Replaces the former Header0/Unknown*/RemoteFormat* fields, which were really the
+		// first Quest_c record's header + its 5 <remoteformat> strings.
+		public QuestcRegion Quests { get; init; } = new();
+
 		public byte[] UnknownAfterAccessWindowTable { get; init; }
 
+		// Everything between the Quest_c region and the access-window table (objective-detail blocks + the quest
+		// index); still opaque (decoded by Captures/decode_snapshot_quests.py, authored by BuildQuestFullUpdate).
 		public byte[] UnknownBeforeAccessWindowTable { get; init; }
 
 		public int KnownHeaderLength { get; init; }
 
-		public int Unknown0
-		{
-			get
-			{
-				if (Unknown0Marker % 1009 != 0)
-					return -1;
-
-				return checked((int)(Unknown0Marker / 1009 - 1));
-			}
-		}
-
 		public List<PfAccessWindowEntry> AccessWindowEntries { get; init; }
-		public string RemoteFormat50300 { get; init; }
-
-		public string RemoteFormat50301 { get; init; }
-		public string RemoteFormat50302 { get; init; }
-		public string RemoteFormat52000A { get; init; }
-		public string RemoteFormat52000B { get; init; }
 
 		public TailsPostAccessBlock? PostAccessBlock { get; init; }
-		public uint Header0 { get; init; }
-		public uint Level { get; set; } // settable: world entry patches the LIVE character level in (the rest of the header stays captured)
-		public uint PrimaryRemoteFormatId { get; init; }
-		public uint PrimaryRemoteFormatIdAgain { get; init; }
-		public uint Unknown0Marker { get; init; }
-		public uint Unknown3 { get; init; }
-		public uint Unknown6 { get; init; }
-		public uint Unknown7 { get; init; }
-		public uint Unknown8 { get; init; }
+
+		// Back-compat shim: the lead quest's STATE word (@20). World entry historically patched the live
+		// character "level" here - the field is actually the first Quest_c record's state (for a fresh beach
+		// char level == state == 1, so the write was a no-op). Kept so BeachTailsBuilder/RetailLoginReplay
+		// continue to compile and produce identical bytes.
+		[JsonIgnore]
+		public uint Level
+		{
+			get => Quests.Records.Count > 0 ? Quests.Records[0].State : 0;
+			set { if (Quests.Records.Count > 0) Quests.Records[0].State = value; }
+		}
 
 		public byte[] ToArray()
 		{
 			using var writer = new FaolanStream();
 
-			writer.WriteUInt32(Header0);
-			writer.WriteUInt32(Unknown0Marker);
-			writer.WriteUInt32(PrimaryRemoteFormatId);
-			writer.WriteUInt32(Unknown3);
-			writer.WriteUInt32(PrimaryRemoteFormatIdAgain);
-			writer.WriteUInt32(Level);
-			writer.WriteUInt32(Unknown6);
-			writer.WriteUInt32(Unknown7);
-			writer.WriteUInt32(Unknown8);
-
-			writer.WriteString(RemoteFormat50301);
-			writer.WriteString(RemoteFormat50302);
-			writer.WriteString(RemoteFormat50300);
-			writer.WriteString(RemoteFormat52000A);
-			writer.WriteString(RemoteFormat52000B);
+			writer.WriteArray(Quests.ToArray());
 
 			writer.WriteArray(UnknownBeforeAccessWindowTable);
 
@@ -88,25 +67,9 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		{
 			ArgumentNullException.ThrowIfNull(data);
 
-			using var reader = new FaolanStream(data, false);
-
-			var header0 = reader.ReadUInt32();
-			var unknown0Marker = reader.ReadUInt32();
-			var primaryRemoteFormatId = reader.ReadUInt32();
-			var unknown3 = reader.ReadUInt32();
-			var primaryRemoteFormatIdAgain = reader.ReadUInt32();
-			var level = reader.ReadUInt32();
-			var unknown6 = reader.ReadUInt32();
-			var unknown7 = reader.ReadUInt32();
-			var unknown8 = reader.ReadUInt32();
-
-			var remoteFormat50301 = reader.ReadString();
-			var remoteFormat50302 = reader.ReadString();
-			var remoteFormat50300 = reader.ReadString();
-			var remoteFormat52000A = reader.ReadString();
-			var remoteFormat52000B = reader.ReadString();
-
-			var knownHeaderLength = checked((int)reader.Position);
+			// The tails open with the Quest_c journal region (version + 0x3F1-framed Quest_c list); parse it as a
+			// typed region and take the boundary where it ends as the start of the remaining opaque blob.
+			var quests = QuestcRegion.Parse(data, out var knownHeaderLength);
 
 			var accessWindowNameOffset = IndexOfAscii(data, "PFAccessWindow_");
 
@@ -116,20 +79,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 				return new SnapshotTails
 				{
-					Header0 = header0,
-					Unknown0Marker = unknown0Marker,
-					PrimaryRemoteFormatId = primaryRemoteFormatId,
-					Unknown3 = unknown3,
-					PrimaryRemoteFormatIdAgain = primaryRemoteFormatIdAgain,
-					Level = level,
-					Unknown6 = unknown6,
-					Unknown7 = unknown7,
-					Unknown8 = unknown8,
-					RemoteFormat50301 = remoteFormat50301,
-					RemoteFormat50302 = remoteFormat50302,
-					RemoteFormat50300 = remoteFormat50300,
-					RemoteFormat52000A = remoteFormat52000A,
-					RemoteFormat52000B = remoteFormat52000B,
+					Quests = quests,
 					KnownHeaderLength = knownHeaderLength,
 					UnknownBeforeAccessWindowTable = unknownBeforeAccessWindowTable,
 					AccessWindowEntries = [],
@@ -165,20 +115,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 			return new SnapshotTails
 			{
-				Header0 = header0,
-				Unknown0Marker = unknown0Marker,
-				PrimaryRemoteFormatId = primaryRemoteFormatId,
-				Unknown3 = unknown3,
-				PrimaryRemoteFormatIdAgain = primaryRemoteFormatIdAgain,
-				Level = level,
-				Unknown6 = unknown6,
-				Unknown7 = unknown7,
-				Unknown8 = unknown8,
-				RemoteFormat50301 = remoteFormat50301,
-				RemoteFormat50302 = remoteFormat50302,
-				RemoteFormat50300 = remoteFormat50300,
-				RemoteFormat52000A = remoteFormat52000A,
-				RemoteFormat52000B = remoteFormat52000B,
+				Quests = quests,
 				KnownHeaderLength = knownHeaderLength,
 				UnknownBeforeAccessWindowTable = unknownBeforeAccessWindowTable0,
 				AccessWindowEntries = accessWindowEntries,
