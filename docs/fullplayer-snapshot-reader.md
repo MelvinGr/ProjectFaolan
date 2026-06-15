@@ -7,6 +7,34 @@ region of `BeachTailsTemplate.bin`) with a real, generated grammar so the `.bin`
 character's **class/progression** authored instead of inherited from Strie. See `docs/quest-log-handover.md`
 and the memory `snapshot_tails_construction_scope`.
 
+## Status & handover (2026-06-16)
+
+The whole `UnknownBefore` blob is mapped, and the **quest-journal region is decoded, modeled, and
+generatable from the DB**. Commits this session (branch `development`, all green — 401 tests): the Ghidra
+reader decode, the `Quest_c`/`MainQuest_c`/`StatList_t`/`SpellBook_t` grammar, the `decode_questc.py`
+dissector, the `QuestcRegion`/`QuestcRecord` codec, its integration into `SnapshotTails` (byte-identical),
+and `QuestcRecord.BuildSingle` generation from `QuestDefinition` (byte-exact for the beach starter 10238).
+
+DONE:
+- Top-level `FullPlayerCharacterIIR::ReadSubClass` grammar (every region named — see below).
+- `Quest_c` (List A) **fully field-labeled + validated** against `BeachTailsTemplate.bin`.
+- `QuestcRegion` codec round-trips the template `@0–609` byte-exact (`QuestcRegionTests`) and now models
+  that region inside `SnapshotTails` (replaced the opaque `Header0`/`Unknown*`/`RemoteFormat*` fields).
+- **Generation**: `QuestcRecord.BuildSingle(QuestDefinition, …)` reproduces 10238's region byte-exact from
+  `faolan.db` (`QuestcGenerationTests`) — the journal text is fully DB-sourced.
+
+REMAINING to retire the `.bin`'s quest region for ARBITRARY characters (in priority order):
+1. **Harvest the 3 undecoded per-quest scalars** (`N`, `@0xf0`, `@0xf8`) into `QuestDefinition`
+   (importer + a migration). Today `BuildSingle` takes them as parameters; the beach values are
+   `N=4, @0xf0=0x96, @0xf8=15`. LOW/MED.
+2. **Regenerate the `@609` objective-detail block + the quest index** from the character's quests (the
+   builders exist: `WorldQuest.BuildQuestFullUpdate` + the `decode_snapshot_quests.py` index grammar).
+3. **Wire into `BeachTailsBuilder`** behind a flag (default off) → in-client **chat-connect** smoke test
+   (the first step that changes the emitted bytes; chat connecting = the client accepted the load).
+Then the **access-window table** and **stats** regions are the last template-sourced pieces. Unresolved
+side-thread: the exact client reader that consumes `@609` (List B byte-layout doesn't match; needs a
+dynamic trace — NOT blocking, the bytes are already authored).
+
 ## Class id → reader
 
 `0x737A6DF9` == BKDR-31(`FullPlayerCharacterIIR`) (confirmed; `docs/aoc-opcode-ids.md` row 33).

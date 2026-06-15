@@ -13,6 +13,17 @@ behind it.
 
 ---
 
+## UPDATE (2026-06-16) — the snapshot quest region is now DECODED + GENERATABLE
+
+The snapshot tails' quest region (the part that carries 10238 verbatim from Strie's template) is no longer
+opaque. The client reader `FullPlayerCharacterIIR::ReadSubClass` was decoded (Ghidra), the `Quest_c` (List A)
+journal grammar field-labeled + validated, and a C# codec (`QuestcRegion`/`QuestcRecord`) now models it inside
+`SnapshotTails` (byte-identical) AND **generates** it from a DB `QuestDefinition` — `QuestcRecord.BuildSingle`
+reproduces 10238's region byte-exact from `faolan.db`. So the journal can be authored from `CharacterQuests`
+instead of carried in the template. Full grammar + remaining steps: **`docs/fullplayer-snapshot-reader.md`**
+(Gitea #186). Remaining for arbitrary chars: harvest 3 scalars into `QuestDefinition`, regenerate the `@609`
+objective block + index, wire into `BeachTailsBuilder` + chat-connect smoke test.
+
 ## STATUS (end of 2026-06-14 session) — journal works in-client
 
 The quest journal renders correctly in-client. Two delivery paths, both working:
