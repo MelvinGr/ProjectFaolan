@@ -101,6 +101,25 @@ namespace Faolan.GameServer.Spawn
 			return message;
 		}
 
+		// Lifts the identity columns from a row's OWN stored Data (the importer + backfill path). Self-validating:
+		// populates the typed columns only if the column-rebuild reproduces the record byte-exact, else leaves
+		// DisplayName null so the builder falls back to the verbatim slice (zero risk for any shape not fully
+		// modelled). Idempotent - safe to re-run over already-lifted rows. Returns true if the row was lifted.
+		public static bool TryLiftColumns(WorldObject row)
+		{
+			row.DisplayName = null;
+			var body = WorldObjectBuilder.ExtractBody(row?.Data);
+			if (body is not { Length: > 8 } || !TryParse(body.AsSpan(8), out var message, out _, out _))
+				return false;
+
+			ApplyColumns(row, message);
+			if (TryReplaceIdentityFromColumns(body.AsSpan(8), row, out var rebuilt) && rebuilt.AsSpan().SequenceEqual(body.AsSpan(8)))
+				return true;
+
+			row.DisplayName = null; // un-faithful lift -> fall back to the verbatim slice
+			return false;
+		}
+
 		// Copies a parsed identity message into a WorldObject row's columns (the importer path). The nullable columns
 		// stay null when the field is absent, so ToMessage round-trips back to the same wire bytes.
 		public static void ApplyColumns(WorldObject row, ProtoSimpleDynelIIR message)

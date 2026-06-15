@@ -246,6 +246,15 @@ namespace Faolan.Importer
 					PopulateObject(existing, e);
 			}
 
+			// Backfill the identity columns (#187) over EVERY world object - including rows imported in a prior run
+			// whose objects aren't in this run's capture extraction (so PopulateObject never re-touched them). The
+			// lift reads each row's own stored Data and is self-validating, so this only fills gaps, never corrupts.
+			var lifted = 0;
+			foreach (var row in await db.WorldObjects.ToListAsync())
+				if (SimpleDynelMessageCodec.TryLiftColumns(row))
+					lifted++;
+			Console.WriteLine($"World objects: identity columns lifted on {lifted} rows (#187).");
+
 			await db.SaveChangesAsync();
 		}
 
@@ -506,20 +515,9 @@ namespace Faolan.Importer
 			row.RotationZ = e.RotZ;
 			row.RotationW = e.RotW;
 
-			// Lift the object's ProtoSimpleDynelIIR identity into typed columns (#187) so the builder can CONSTRUCT
-			// it from the DB rather than slice it from Data. EVERY world-object class carries this identity as its
-			// first blob, so this isn't class-gated - instead it SELF-VALIDATES: keep the columns only if the
-			// column-rebuild reproduces the original record byte-exact; otherwise clear DisplayName so the builder
-			// falls back to the Data slice (zero risk for any class/shape we don't fully model). Body is the IIR
-			// carrier [u32 len][u32 subOpcode][record]; the codec reads the record (body[8..]).
-			var objBody = WorldObjectBuilder.ExtractBody(e.Data);
-			if (objBody is { Length: > 8 } && SimpleDynelMessageCodec.TryParse(objBody.AsSpan(8), out var message, out _, out _))
-			{
-				SimpleDynelMessageCodec.ApplyColumns(row, message);
-				if (!SimpleDynelMessageCodec.TryReplaceIdentityFromColumns(objBody.AsSpan(8), row, out var rebuilt) ||
-				    !rebuilt.AsSpan().SequenceEqual(objBody.AsSpan(8)))
-					row.DisplayName = null; // un-faithful lift -> fall back to the verbatim slice
-			}
+			// Lift the object's ProtoSimpleDynelIIR identity into typed columns (#187) from its stored Data so the
+			// builder can CONSTRUCT it rather than slice it. Class-agnostic + self-validating (see TryLiftColumns).
+			SimpleDynelMessageCodec.TryLiftColumns(row);
 
 			return row;
 		}

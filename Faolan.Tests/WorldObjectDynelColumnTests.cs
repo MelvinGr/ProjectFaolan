@@ -59,7 +59,7 @@ namespace Faolan.Tests
 
 			Console.WriteLine($"objects={total} ok={ok} parseFail={parseFail} mismatch={mismatch}");
 			Assert.Equal(0, mismatch);
-			Assert.True(ok > 700, $"expected >700 byte-exact rebuilds across all object classes, got {ok}");
+			Assert.True(ok > 900, $"expected >900 byte-exact rebuilds across all object classes, got {ok}");
 		}
 
 		private static string FindRepoRoot()
