@@ -142,16 +142,6 @@ namespace Faolan.GameServer
 			return _broadcaster.BroadcastNpcMove(npc);
 		}
 
-		Task IWorldOutbound.BroadcastNpcFollow(WorldEntity npc, uint targetHandle)
-		{
-			return _broadcaster.BroadcastNpcFollow(npc, targetHandle);
-		}
-
-		Task IWorldOutbound.BroadcastNpcStop(WorldEntity npc)
-		{
-			return _broadcaster.BroadcastNpcStop(npc);
-		}
-
 		Task IWorldOutbound.ReenterWorld(INetworkClient client)
 		{
 			return SendWorldEntry(client);

@@ -48,23 +48,6 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void BuildFollow_MatchesCapturedFrame6472()
-		{
-			// The follow MoveTask (task type 0x08) a chasing mob sends with id = the player handle, byte-exact against
-			// the strickenbla capture frame 6472 (NPC 0x2c56 at (308.83,145.99,652.67) following player 0x01316d8a).
-			var curPos = new Vector3(
-				BitConverter.Int32BitsToSingle(unchecked((int)0x439A6A7Du)),
-				BitConverter.Int32BitsToSingle(unchecked((int)0x4311FE8Du)),
-				BitConverter.Int32BitsToSingle(unchecked((int)0x44232AD0u)));
-
-			var built = MoveTaskBuilder.BuildFollow(0x00002C56u, curPos, 0x01316D8Au);
-
-			Assert.Equal(
-				"0000002d96c467400000c35000002c560000439a6a7d4311fe8d44232ad0080000c35001316d8a01000000000000000000",
-				Convert.ToHexStringLower(built));
-		}
-
-		[Fact]
 		public void BuildStationary_FromCapturedHandleAndPosition_IsByteIdentical()
 		{
 			var captured = Golden.Bytes("MoveTaskStationary");

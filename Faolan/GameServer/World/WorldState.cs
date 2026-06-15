@@ -113,15 +113,14 @@ namespace Faolan.GameServer.World
 					var homeDz = entity.SpawnPosition.Z - entity.Position.Z;
 					var homeDist = MathF.Sqrt(homeDx * homeDx + homeDz * homeDz);
 
-					// Leash: once led too far from spawn (or the target slips away while we're out in the field), disengage
-					// and return home, walking back until arrived and ignoring re-aggro so a player at the edge can't
-					// ping-pong it.
-					if (homeDist > NpcLeashRange || (target == null && homeDist > NpcMeleeRange))
+					// Leash: once led too far from spawn, disengage and keep returning home until arrived (ignoring
+					// re-aggro) so a player hovering at the edge can't ping-pong it. A returning NPC walks back, then
+					// heals to full on arrival.
+					if (homeDist > NpcLeashRange)
 						entity.Returning = true;
 
 					if (entity.Returning)
 					{
-						StopFollowing(entity, ref effects); // a follow would drag it back to the player - cancel it
 						entity.ArmAttackCooldown(NpcAttackInterval);
 						if (homeDist > NpcMeleeRange)
 						{
@@ -137,7 +136,6 @@ namespace Faolan.GameServer.World
 
 					if (target == null)
 					{
-						StopFollowing(entity, ref effects);
 						entity.ArmAttackCooldown(NpcAttackInterval); // re-aggro shouldn't swing instantly
 						// Disengaged with no one in range: heal back to full so it can't be whittled from out of range.
 						if (entity.Vitals.Health < entity.Vitals.MaxHealth)
@@ -145,15 +143,9 @@ namespace Faolan.GameServer.World
 						continue;
 					}
 
-					// Engaged: tell the client to FOLLOW the target (once per engagement) - the client drives the actual
-					// chase movement (smooth, run gait). We still step the model toward the target for our own melee/leash
-					// logic, but we do NOT broadcast per-tick transforms (that fought the client follow and snapped).
-					if (entity.FollowTarget != target.Handle)
-					{
-						entity.FollowTarget = target.Handle;
-						(effects ??= new List<WorldTickEffect>()).Add(new WorldTickEffect(entity, WorldTickEffectType.NpcFollow, target));
-					}
-
+					// Chase: if the target is beyond melee range, step toward it (horizontal plane; keep terrain Y) and
+					// broadcast the move instead of swinging this tick. The client interpolates origin->position, so a
+					// 10 Hz step reads as the NPC running up to the player; it swings once it arrives in melee range.
 					var dx = target.Position.X - entity.Position.X;
 					var dz = target.Position.Z - entity.Position.Z;
 					var horizontal = MathF.Sqrt(dx * dx + dz * dz);
@@ -161,6 +153,7 @@ namespace Faolan.GameServer.World
 					{
 						StepToward(entity, dx, dz, horizontal, deltaSeconds, leaveMelee: true);
 						entity.ArmAttackCooldown(NpcAttackInterval); // wind up a swing for when it arrives
+						(effects ??= new List<WorldTickEffect>()).Add(new WorldTickEffect(entity, WorldTickEffectType.NpcMove, target));
 						continue;
 					}
 
@@ -181,17 +174,6 @@ namespace Faolan.GameServer.World
 		public bool TryGetZone(uint mapId, out Zone zone)
 		{
 			return _zones.TryGetValue(mapId, out zone);
-		}
-
-		// Cancels a NPC's client-side follow when it disengages: emits an NpcStop (a stationary MoveTask planting it
-		// where it stands) so the client doesn't keep dragging it after the player. No-op if it wasn't following.
-		private static void StopFollowing(WorldEntity entity, ref List<WorldTickEffect> effects)
-		{
-			if (entity.FollowTarget == 0)
-				return;
-
-			entity.FollowTarget = 0;
-			(effects ??= new List<WorldTickEffect>()).Add(new WorldTickEffect(entity, WorldTickEffectType.NpcStop));
 		}
 
 		// Advances `entity` one tick's worth toward (dx, dz) - a horizontal step at NpcMoveSpeed (keeping terrain Y),

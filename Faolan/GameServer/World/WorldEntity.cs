@@ -86,10 +86,6 @@ namespace Faolan.GameServer.World
 		// camping the leash edge can't ping-pong it).
 		public bool Returning { get; set; }
 
-		// The handle this NPC has told the client to FOLLOW (client-driven chase movement), or 0 when not following.
-		// Tracked so the follow MoveTask is sent once per engagement (on change), not every tick.
-		public uint FollowTarget { get; set; }
-
 		// Active buffs/effects on this entity, keyed by buff (spell) id - reapplying refreshes the entry.
 		// Server-side bookkeeping only for now: the client tracks icon + duration itself from the ApplySpell
 		// data, and retail sends NO removal IIR on CancelBuff (just a FormatFeedback text), so removal here is

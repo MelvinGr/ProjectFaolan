@@ -39,15 +39,9 @@ namespace Faolan.GameServer.World
 		// move rides PushVitals.
 		Task SendNpcAttackAnimation(INetworkClient client, uint npcHandle, uint damage, uint swingCounter);
 
-		// Broadcast an NPC's tick step (its MoveTask transform) to the players who can see it - used for the walk back
-		// home - so they watch it move.
+		// Broadcast an NPC's tick step (its MoveTask transform) to the players who can see it - chasing a target or
+		// returning home - so they watch it move.
 		Task BroadcastNpcMove(WorldEntity npc);
-
-		// Tell the players who see this NPC that it should FOLLOW the target (client-driven chase movement).
-		Task BroadcastNpcFollow(WorldEntity npc, uint targetHandle);
-
-		// Tell the players who see this NPC to stop it where it stands (cancels a follow when it disengages).
-		Task BroadcastNpcStop(WorldEntity npc);
 
 		// Re-run the world-entry render path for the player (used to respawn them at a resurrection point).
 		Task ReenterWorld(INetworkClient client);
@@ -453,14 +447,6 @@ namespace Faolan.GameServer.World
 							case WorldTickEffectType.NpcMove:
 								if (NpcAutoAttackEnabled)
 									await _output.BroadcastNpcMove(effect.Entity);
-								break;
-							case WorldTickEffectType.NpcFollow:
-								if (NpcAutoAttackEnabled)
-									await _output.BroadcastNpcFollow(effect.Entity, effect.Target.Handle);
-								break;
-							case WorldTickEffectType.NpcStop:
-								if (NpcAutoAttackEnabled)
-									await _output.BroadcastNpcStop(effect.Entity);
 								break;
 						}
 					}
