@@ -574,12 +574,12 @@ namespace Faolan.GameServer
 
 		// Resolves the resurrection anchor advertised on the login 0x2024: the closest known / AlwaysKnown RespawnPoint on
 		// the character's map (mirrors SendDeathScreen's resolution). Falls back to the universal Tortage Beach default
-		// (Map.DefaultResurrection) when the map defines no respawn point.
+		// (Map.NewPlayerSpawnSpawnPoint) when the map defines no respawn point.
 		private async Task<RespawnPoint> ResolveLoginResurrectionSpot(Character character)
 		{
 			var points = await Database.GetRespawnPoints(character.MapId);
 			if (points.Length == 0)
-				return Map.DefaultResurrection();
+				return Map.NewPlayerSpawnSpawnPoint;
 
 			var discovered = new HashSet<uint>(await Database.GetDiscoveredRespawnPointIds(character.Id));
 			return RespawnResolver.ClosestKnown(character.Position, points, discovered)

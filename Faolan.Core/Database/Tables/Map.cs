@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Numerics;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -13,27 +15,27 @@ namespace Faolan.Core.Database.Tables
 		// seeded, so it is the safe default wherever a character needs a map (creation, import, world entry).
 		public const uint TortageBeachId = 0x00000FAA;
 
-		// The universal default resurrection anchor: Tortage Beach's ResurrectionAIPoint1, captured verbatim from the
-		// Strie 4010 login (idx 236). It is advertised on the login 0x2024 ReadyForPlayScreen (= DispatchValidResurrectionSpots)
-		// when a map defines no real RespawnPoint, and by the new-character create flow. NB the spawnId 784236 is retail's
-		// id, NOT a row in our DB - this is a placeholder anchor only; maps with their own RespawnPoints advertise the real
+		// The default resurrection anchor advertised on the login 0x2024 (= DispatchValidResurrectionSpots) when a map
+		// defines no real RespawnPoint. A TRANSIENT carrier (never persisted; Id 0 = no DB point, not a real spawn id)
+		// positioned at the Tortage Beach new-player spawn. Maps with their own RespawnPoints advertise their real
 		// RespawnPoint.Id instead (the id RespawnMe echoes back).
-		public const uint TortageBeachResurrectionSpawnId = 0x000BF76C;
-
-		// TODO: THIS SHOULD BE THE NEW PLYER SPAWN POINT (NO ID, NOT A DB OBJECT), NOT Tortage Beach's ResurrectionAIPoint1
-		public static RespawnPoint DefaultResurrection()
+		public static readonly RespawnPoint NewPlayerSpawnSpawnPoint = new RespawnPoint
 		{
-			return new RespawnPoint
-			{
-				Id = TortageBeachResurrectionSpawnId,
-				MapId = TortageBeachId,
-				PositionX = 336.309f,
-				PositionY = 148.967f,
-				PositionZ = 660.968f,
-				AlwaysKnown = true,
-				Name = "Tortage Beach"
-			};
-		}
+			Id = 0,
+			MapId = TortageBeachId,
+
+			// The Tortage Beach new-player intro spawn (map 4010), bit-exact (exact IEEE-754 bits) from the create
+			// world-entry MapChange / 2nd 0x2024 ReadyForPlayScreen (dikketest & randochar create dumps). Single source of
+			// truth for the freshly-created character's start location - reused by SetCreationSpawn (DatabaseRepository) and
+			// as the default resurrection anchor (DefaultResurrection).
+			Position = new Vector3(
+				BitConverter.Int32BitsToSingle(0x43A14000),  // 322.5
+				BitConverter.Int32BitsToSingle(0x43114FB3),  // ~145.311
+				BitConverter.Int32BitsToSingle(0x4430399A)), // ~704.9
+
+			AlwaysKnown = true,
+			Name = "Tortage Beach"
+		};
 
 		public virtual ICollection<WorldObject> Objects { get; set; }
 		public virtual ICollection<RespawnPoint> RespawnPoints { get; set; }

@@ -128,22 +128,11 @@ namespace Faolan.Core.Database
 		// burst replay pads varints (EncodeVarintPadded), so any id below 2^28 substitutes length-preserving
 		// into the captured packets.
 
-		// Slave Galley (character-creation) map. 0xFAA/4010 is the map the retail create capture's world
-		// entry uses (account-stricken998-character-strickenen-create-random-actions) and it exists in the
-		// seeded Maps table; 0xFA0/4000 does NOT exist and caused a Map foreign-key failure on save.
-		private const uint CreationMapId = Map.TortageBeachId;
-
 		// Character ids ARE the on-wire client instance and the burst replay substitutes them into captured 4-byte
 		// protobuf-varint slots, so they must encode to <= 4 varint bytes (id <= 0x0FFFFFFF). Allocate from this base
 		// continuing the existing 0x013xxxxx rows; a 5-byte id (> 0x0FFFFFFF) crashes the client (see DatabaseContext).
 		private const uint FirstCharacterId = 0x02000000;
 		private const uint MaxCharacterId = 0x0FFFFFFF;
-
-		// Tortage Beach intro spawn, taken verbatim (exact IEEE-754 bits) from the dikketest world-entry
-		// MapChange so a newly created character loads at the correct intro location instead of (0,0,0).
-		private static readonly float CreationSpawnX = BitConverter.Int32BitsToSingle(0x43A14000); // 322.5
-		private static readonly float CreationSpawnY = BitConverter.Int32BitsToSingle(0x43114FB3); // ~145.31
-		private static readonly float CreationSpawnZ = BitConverter.Int32BitsToSingle(0x4430399A); // ~704.90
 
 		private readonly IDbContextFactory<DatabaseContext> _contextFactory;
 
@@ -182,7 +171,7 @@ namespace Faolan.Core.Database
 			// Captures are authoritative: the create world-entry uses map 0xFAA. Make sure the row exists
 			// so the character->Map foreign key can never fail, inserting a best-effort row if the seeded
 			// Maps table is missing it.
-			await EnsureMapExists(ctx, CreationMapId, "Tortage Beach");
+			await EnsureMapExists(ctx, Map.TortageBeachId, "Tortage Beach");
 
 			// Only reuse an IN-RANGE unnamed row; an out-of-range leftover (>0x0FFFFFFF, e.g. created when a high-id
 			// captured char poisoned the sequence) would yield a 5-byte instance the burst substitution can't pad, so
@@ -223,7 +212,8 @@ namespace Faolan.Core.Database
 						.ToString("N"),
 					Level = 1,
 					CreationDate = DateTime.UtcNow,
-					MapId = CreationMapId
+					MapId = Map.TortageBeachId,
+					Position = Map.NewPlayerSpawnSpawnPoint.Position
 				};
 
 				// Seed default vitals (cascade-inserts with the character). Class isn't chosen yet at row
@@ -232,15 +222,6 @@ namespace Faolan.Core.Database
 
 				ApplyCreationSpawn(character);
 				ctx.Characters.Add(character);
-				await ctx.SaveChangesAsync();
-			}
-			else if (character.MapId != CreationMapId || character.PositionX != CreationSpawnX)
-			{
-				// Older pending rows may predate the creation-map/spawn default (or carry a non-existent
-				// map); align them to the Tortage Beach map + intro spawn so world entry loads at the right
-				// place and won't fail the Map foreign key.
-				character.MapId = CreationMapId;
-				ApplyCreationSpawn(character);
 				await ctx.SaveChangesAsync();
 			}
 
@@ -1232,7 +1213,7 @@ namespace Faolan.Core.Database
 
 		public Task<int> SetCreationSpawn(Character character)
 		{
-			character.MapId = CreationMapId;
+			character.MapId = Map.TortageBeachId;
 			ApplyCreationSpawn(character);
 			return SaveCharacterReturningRows(character);
 		}
@@ -1287,9 +1268,7 @@ namespace Faolan.Core.Database
 
 		private static void ApplyCreationSpawn(Character character)
 		{
-			character.PositionX = CreationSpawnX;
-			character.PositionY = CreationSpawnY;
-			character.PositionZ = CreationSpawnZ;
+			character.Position = Map.NewPlayerSpawnSpawnPoint.Position;
 		}
 
 		// Inserts a Map row only if its id is absent (INSERT OR IGNORE keeps an existing seeded row, e.g.
