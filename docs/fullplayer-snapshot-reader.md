@@ -27,13 +27,15 @@ REMAINING to retire the `.bin`'s quest region for ARBITRARY characters (in prior
 1. **Harvest the 3 undecoded per-quest scalars** (`N`, `@0xf0`, `@0xf8`) into `QuestDefinition`
    (importer + a migration). Today `BuildSingle` takes them as parameters; the beach values are
    `N=4, @0xf0=0x96, @0xf8=15`. LOW/MED.
-2. **Regenerate the `@609` objective-detail block + the quest index** from the character's quests (the
-   builders exist: `WorldQuest.BuildQuestFullUpdate` + the `decode_snapshot_quests.py` index grammar).
+2. **Build the `@609` per-goal objective-detail block + the quest index.** The `@609` grammar is now
+   DECODED (`Captures/decode_snapshot_609.py`, `Snapshot609AnalysisTests`) — see the `@609` section below —
+   but it is a per-GOAL block (the beach starter has 2 goals: 1448 + 3490, each with its own marker), NOT a
+   `BuildQuestFullUpdate` block (that earlier claim was DISPROVEN 2026-06-16: 559 B vs 869 B, different
+   header). So a builder + a **per-goal `QuestDefinition` model** (goals/markers/sub-text-refs) is the real
+   remaining work here; the index grammar exists (`decode_snapshot_quests.py` / `SnapshotQuestInjector`).
 3. **Wire into `BeachTailsBuilder`** behind a flag (default off) → in-client **chat-connect** smoke test
    (the first step that changes the emitted bytes; chat connecting = the client accepted the load).
-Then the **access-window table** and **stats** regions are the last template-sourced pieces. Unresolved
-side-thread: the exact client reader that consumes `@609` (List B byte-layout doesn't match; needs a
-dynamic trace — NOT blocking, the bytes are already authored).
+Then the **access-window table** and **stats** regions are the last template-sourced pieces.
 
 ## Class id → reader
 
@@ -137,43 +139,46 @@ obj-list 4 → vec @0x104   # u32 count (capped 100) — EMPTY (0)
 Each populated **`ObjRec`** (0x48-byte heap node; not exercised by the beach starter) reads 16 `u32`:
 `u32 ×2 · u32 ×2 · Read4×U32 (text ref #1) · u32 ×2 · Read4×U32 (text ref #2) · u32 ×2`.
 
-### The `@609` region (after `Quest_c`) — objective detail block
+### The `@609` region (after `Quest_c`) — per-goal objective-detail block (DECODED 2026-06-16)
 
 In the template, `Quest_c` ends at byte `@609` (its 4 numeric objective lists are **empty** for quest 10238 —
-counts at `@581/@585/@601/@605` are all 0). The bytes from `@609` are a **QuestFullUpdate-style objective
-detail block**, NOT inside `Quest_c`:
+counts at `@581/@585/@601/@605` are all 0). The bytes from `@609` up to the quest index (`@1168`) are a
+**per-GOAL objective-detail block** — its OWN grammar, fully decoded + validated by
+`Captures/decode_snapshot_609.py` (parses to the index boundary exactly) and locked by
+`Faolan.Tests/Snapshot609AnalysisTests`:
 
 ```
-@609 0x0bd3   marker      @613 1          @617 9        @621 0x02165eff (instance)
-@625 10238 (questId)      @629 1448       @633 1        @637 1448       @641 1
-@645..669 zeros           @673 180        @677 4010(map)  @681 416  @685 701
-@697 0x64 → @699 [u16 len=100] "<remoteformat id=\"1448\" category=\"50304\" …>"  (objective text)
-… then id=180 cat=51200, id=3490 cat=50304, <localized id=9500 cat=51000> …
+@609  u32 0x00000BD3            chapterTag (opens the region, per-chapter grouping word)
+--- per goal (the beach starter 10238 has TWO: goalId 1448 then 3490) ---
+u32 1 ; u32 k                   # goal separator ([1][9] goal 1, [1][12] goal 2)
+u32 instance                    # the live player's client instance (re-addressed like the rest of the tails)
+u32 questId ; u32 goalId ; u32 n ; u32 goalId(rep) ; u32 1
+u32 ×7 0                        # reserved/padding
+u32 subId ; u32 mapId ; u32 markerX ; u32 markerY   # goal 1 marker == QuestDefinition (416,701); goal 2 (521,757)
+u32 0 ; u32 0
+u32 objLen ; <remoteformat category="50304" …>      # objective text, u32-length-prefixed inline (NOT 00-len)
+<00 u8len text record>          # a cat-51200 <remoteformat> (goal 1) or a cat-51000 <localized> (goal 2)
 ```
 
-This is exactly the shape `Captures/decode_snapshot_quests.py` parses and `WorldQuest.BuildQuestFullUpdate`
-already emits byte-exactly (the handover notes it is "byte-identical to the QuestFullUpdate body from questId
-onward"). So the objective TEXT is delivered by this block, keyed by questId, and is already an
-authored/decoded grammar in the codebase.
+The objective TEXT is fully **DB-sourced** (every `key=` matches `QuestTextRefs` for quest 10238), but the
+STRUCTURE is per-goal and the starter carries **two** goals each with its own world marker — richer than
+`QuestDefinition` today (one `GoalId`, one marker). So generating this region needs a **per-goal definition
+model** (Gitea #186, remaining item 2).
 
-**Reader resolution (2026-06-16) — partial.** Ruled out, by byte layout against the template:
-- **`QuestFullUpdateIIR::ReadSubClass`** (`FUN_00917e20`) = `u32 ver==1` + `u32` + **the same `FUN_0091df50`
-  (Quest_c)** + a trailing flag byte. So a QuestFullUpdate body IS a `Quest_c` — but `@609` is not a Quest_c
-  header (no `ver==1 · questId · … · 0x412`), so `@609` is **not** embedded QuestFullUpdate content.
-- **List B** (`FUN_00798c70` → `FUN_00922c90`) = `u32 + 3×ReadString + ACGHash(FUN_005d7190, reads 1 u32) +
-  u32 + u32 count + nested 0x3F1 string-lists`. Parsing `@613` this way mis-frames immediately (the 2nd
-  ReadString's `[u16 len]` lands on `0x0009` and swallows the instance bytes). So `@609` is **not** a
-  `FUN_00922c90` record either.
-- Not `MainQuest_c` (`FUN_00922210`, all-numeric, no strings) and not `Quest_c`.
+**CORRECTION (2026-06-16):** the earlier claim that `@609` is "a QuestFullUpdate block authored by
+`WorldQuest.BuildQuestFullUpdate`" is **WRONG** for the beach starter. Empirically (`Snapshot609AnalysisTests`):
+`BuildQuestFullUpdate`'s content for 10238 is **869 B** and starts `[questId][1][questId][3][0][3][0x412]`,
+whereas the template's `@609` region is **559 B** starting `[0x0BD3][1][9][instance][questId][goalId]`. They
+differ at byte 2 — different grammars. `BuildSnapshotQuestBlock`/`SnapshotQuestInjector` (the
+`FAOLAN_SNAPSHOT_QUESTS` path) were validated against a *different* capture's 13479 block, not this region, so
+they do **not** reproduce the beach `@609`. Generation of the beach region is therefore **not** authored yet.
 
-So there is a real discrepancy: the static top-level call order makes List B the next reader after List A, yet
-`@609`'s bytes fit none of the list record grammars. The likely causes are (a) one or more of List B/C / the
-MainQuest list are **empty/near-empty** here and consume only a few bytes, shifting the true start of the
-objective block past `@609`; or (b) the template carries a spliced/captured objective region the live writer
-emits via a path not in this static chain. **Resolving it cleanly needs a DYNAMIC trace** (breakpoint
-`FUN_0048f900`/the list drivers on a live snapshot load) — static decompilation has been exhausted. **Not
-blocking:** the `@609` byte grammar is already decoded (`decode_snapshot_quests.py`) and authored
-(`WorldQuest.BuildQuestFullUpdate`), so generation does not wait on this label.
+**Reader (Ghidra) still partial.** Ruled out by byte layout: `QuestFullUpdateIIR::ReadSubClass` (= a `Quest_c`,
+no `ver==1·questId·…·0x412` header here), List B (`FUN_00922c90`, mis-frames on the 2nd ReadString),
+`MainQuest_c` (all-numeric), `Quest_c`. The static top-level order makes List B next after List A yet `@609`
+fits none — likely List B/C / MainQuest are empty here and consume only a few bytes, shifting the true block
+start; pinning the exact reader needs a **dynamic trace**. NOT blocking the *generator* now that the wire
+grammar above is decoded — the blocker is the per-goal `QuestDefinition` model, not the byte layout.
 
 Validated by the dissector `Captures/decode_questc.py` (parses version + List A + each `Quest_c` and asserts
 it consumes exactly to the objective-block boundary `@609`; `listKey == questId`). A C# codec
