@@ -88,7 +88,8 @@ namespace Faolan.GameServer
 			await DoTeleport(characterId, match.Id);
 		}
 
-		private async Task DoTeleport(uint characterId, uint mapId)
+		// toPosition: an explicit destination within the map (e.g. a bind/recall point); null = the map's spawn point.
+		private async Task DoTeleport(uint characterId, uint mapId, Vector3? toPosition = null)
 		{
 			var client = ClientForCharacter(characterId);
 			if (client?.Session.Character == null)
@@ -101,13 +102,18 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			// Move the character to the map's spawn point (importer-added maps carry the real captured spawn;
-			// older seeded maps carry a placeholder) and persist BEFORE the handoff so the reconnect's world entry
-			// (existing-character Hello -> SendWorldEntry, which loads Character.MapId) lands on the new map.
+			// Destination: an explicit point (bind/recall) or the map's spawn point (importer-added maps carry the
+			// real captured spawn; older seeded maps carry a placeholder). Persist BEFORE the handoff so the
+			// reconnect's world entry (existing-character Hello -> SendWorldEntry, which loads Character.MapId) lands
+			// on the new map at the right spot.
+			var position = toPosition ?? map.Position;
+			var rotation = toPosition.HasValue
+				? Quaternion.Identity
+				: map.Rotation;
 			client.Session.Character.MapId = map.Id;
-			client.Session.Character.Position = map.Position;
-			client.Session.Character.Rotation = map.Rotation;
-			await Database.SaveCharacterTransform(client.Session.Character.Id, map.Position, map.Rotation, map.Id);
+			client.Session.Character.Position = position;
+			client.Session.Character.Rotation = rotation;
+			await Database.SaveCharacterTransform(client.Session.Character.Id, position, rotation, map.Id);
 
 			var mapLabel = string.IsNullOrEmpty(map.Name)
 				? map.Id.ToString()
@@ -119,8 +125,56 @@ namespace Faolan.GameServer
 			// 0x5A32F0D7 (destination map + spawn position) - THEN the 0x2002 handoff advert, after which the
 			// client reconnects and does a fresh world entry on the new map. All three ride the handoff
 			// conversation (0xb171ce13 -> 0x6c67c147 = SendWorldHandoff's sender/receiver).
-			await SendChangeMapPrep(client, map.Id, map.Position);
+			await SendChangeMapPrep(client, map.Id, position);
 			await SendWorldHandoff(client);
+		}
+
+		// .bind  - bind the Totem of Origin to a resurrection point. You can only bind to a point you've already
+		// DISCOVERED (or the always-known starter) on this map - the real trigger is a wayfarer NPC binding you to one
+		// (no capture yet), so this GM bootstrap binds to the nearest KNOWN point, mirroring the death-respawn rule
+		// (RespawnResolver.ClosestKnown). The chosen point's map+position is materialized into the bind columns.
+		private async Task BindCommand(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			var entity = _simulation.PlayerWorldEntity(client);
+			var mapId = entity?.MapId ?? character.MapId;
+			var position = entity?.Position ?? character.Position;
+
+			var points = await Database.GetRespawnPoints(mapId);
+			var discovered = new HashSet<uint>(await Database.GetDiscoveredRespawnPointIds(character.Id));
+			var point = RespawnResolver.ClosestKnown(position, points, discovered);
+			if (point == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(character.Id, "<span style=\"color: red;\">No discovered resurrection point on this map - find one first.</span>");
+				return;
+			}
+
+			character.BindRespawnPointId = point.Id;
+			await Database.SaveCharacterBind(character.Id, point.Id);
+
+			await _agentServerDispatcher.SendSystemMessage(character.Id, $"Bind point set: {point.Name} ({point.MapId}).");
+		}
+
+		// .totem / .recall  - use the Totem of Origin: recall to the bound location (the persisted bind point). The
+		// real trigger is using the totem ITEM (use_totem_of_origin capture); this GM command is the test bootstrap.
+		private async Task RecallToBindCommand(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			if (character.BindRespawnPointId is not uint pointId)
+			{
+				await _agentServerDispatcher.SendSystemMessage(character.Id, "You have no bind point. Use .bind to set one.");
+				return;
+			}
+
+			var point = await Database.GetRespawnPoint(pointId);
+			if (point == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(character.Id, "<span style=\"color: red;\">Your bind point no longer exists. Re-bind with .bind.</span>");
+				return;
+			}
+
+			await _agentServerDispatcher.SendSystemMessage(character.Id, "The Totem of Origin pulls you home...");
+			await DoTeleport(character.Id, point.MapId, point.Position);
 		}
 
 		// The change-map destination-announce IIR bodies, captured from the changemap dumps (frames 4200/4212)
@@ -245,6 +299,9 @@ namespace Faolan.GameServer
 				["spelllist"] = (client, _) => SendGrantableAbilityList(client.Session.Character.Id),
 				["grantspell"] = (client, arguments) => GrantSpellCommand(client, arguments),
 				["teleport"] = (client, arguments) => TeleportCommand(client, arguments),
+				["bind"] = (client, _) => BindCommand(client),
+				["totem"] = (client, _) => RecallToBindCommand(client),
+				["recall"] = (client, _) => RecallToBindCommand(client),
 				["spelltest"] = (client, arguments) => ApplySpellTest(client.Session.Character.Id, uint.Parse(arguments)),
 				["vitals"] = (client, arguments) => SetVitalsCommand(client, arguments),
 				["setstat"] = (client, arguments) => SetStatCommand(client, arguments),

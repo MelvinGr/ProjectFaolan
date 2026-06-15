@@ -83,15 +83,19 @@ namespace Faolan.Tests
 					ctx.Accounts.Add(new Account { Id = accountId, UserName = "t", Password = "t", AuthChallenge = "", LastIpAddress = "" });
 					ctx.Realms.Add(new Realm { Id = realmId, Name = "Test", IpAddress = "127.0.0.1" });
 					ctx.Maps.Add(new Map { Id = 2040, Name = "Test Destination" }); // Character.MapId is a FK; the transform target must exist
+					ctx.RespawnPoints.Add(new RespawnPoint { Id = 7, MapId = 2040, Name = "Test Bind", AlwaysKnown = true }); // Character.BindRespawnPointId FK target
 					await ctx.SaveChangesAsync();
 				}
 
 				var created = await repo.CreateCharacter(accountId, realmId); // seeds a MaxStats nav row
 				Assert.NotNull(created.MaxStats);
 
+				Assert.False(created.HasBind); // a fresh character is unbound (BindMapId 0)
+
 				await repo.SetCharacterMoney(created.Id, 12345);
 				await repo.SaveCharacterTransform(created.Id, new Vector3(10, 20, 30), new Quaternion(0.1f, 0.2f, 0.3f, 0.4f), 2040);
 				await repo.SetCharacterProgress(created.Id, 4500, 17);
+				await repo.SaveCharacterBind(created.Id, 7); // bind to the seeded RespawnPoint
 
 				var loaded = await repo.GetCharacter(created.Id);
 				Assert.Equal(12345ul, loaded!.Money);
@@ -100,6 +104,9 @@ namespace Faolan.Tests
 				Assert.Equal(2040u, loaded.MapId);
 				Assert.Equal(4500u, loaded.Experience);
 				Assert.Equal((ushort)17, loaded.Level);
+				Assert.True(loaded.HasBind);
+				Assert.Equal(7u, loaded.BindRespawnPointId);
+				Assert.Equal(2040u, (await repo.GetRespawnPoint(7))!.MapId);
 
 				// The MaxStats navigation the full-graph save would have rewritten is still intact.
 				Assert.NotNull(loaded.MaxStats);

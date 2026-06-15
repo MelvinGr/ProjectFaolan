@@ -735,13 +735,18 @@ namespace Faolan.GameServer
 						packet.Body.ReadUInt32(); // ID32 type (0x0000C350)
 						var requesterId = packet.Body.ReadUInt32();
 
-						// No bind/totem model yet: a character's bind playfield is its current map. TODO: persist a
-						// real bind location once binding (inn/wayfarer) and the totem teleport are implemented.
+						// The bind playfield is the map of the character's persisted bind RespawnPoint (set by .bind / a
+						// wayfarer); an unbound character (or one whose point vanished) falls back to its current map.
+						// This is the Totem of Origin destination (#64).
+						var character = client.Session.Character;
+						var bindMapId = character?.MapId ?? Core.Database.Tables.Map.TortageBeachId;
+						if (character?.BindRespawnPointId is uint bindPointId)
+							bindMapId = (await Database.GetRespawnPoint(bindPointId))?.MapId ?? bindMapId;
 						await new PacketStream()
 							.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, GameServerRespondOpcodes.UpdateBindLocation)
-							.WriteUInt32(client.Session.Character?.MapId ?? Core.Database.Tables.Map.TortageBeachId)
+							.WriteUInt32(bindMapId)
 							.SendAsync(client);
-						Logger.LogDebug("RequestBindLocation({RequesterId:X8}) -> bind playfield {MapId}.", requesterId, client.Session.Character?.MapId ?? 0);
+						Logger.LogDebug("RequestBindLocation({RequesterId:X8}) -> bind playfield {MapId}.", requesterId, bindMapId);
 
 						break;
 					}

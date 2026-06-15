@@ -87,6 +87,20 @@ namespace Faolan.Core.Database.Tables
 
 		public const byte GuildLeaderRank = 6;
 
+		// Bind / recall point: the resurrection point the Totem of Origin (and, later, death-recall) returns the
+		// character to. A reference to a RespawnPoint the player has DISCOVERED (CharacterRespawnPoint) - set by a
+		// wayfarer NPC (today: the .bind GM command). It answers the client's RequestBindLocation poll (the Totem
+		// destination playfield) and resolves to the point's map+position on recall. Null = UNBOUND (falls back to the
+		// character's current map). See issue #64.
+		public uint? BindRespawnPointId { get; set; }
+
+		[ForeignKey(nameof(BindRespawnPointId))]
+		public virtual RespawnPoint BindRespawnPoint { get; set; }
+
+		// True once a bind point has been set (an unbound character recalls to / reports its current map).
+		[NotMapped]
+		public bool HasBind => BindRespawnPointId.HasValue;
+
 		public override string ToString()
 		{
 			return $"{base.ToString()}: {Name}";

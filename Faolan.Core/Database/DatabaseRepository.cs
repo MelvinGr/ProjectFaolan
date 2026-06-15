@@ -103,6 +103,10 @@ namespace Faolan.Core.Database
 		Task SaveCharacterEquipment(CharacterEquipment equipment);
 		Task SaveCharacterScaffold(Character character);
 		Task SaveCharacterTransform(uint characterId, Vector3 position, Quaternion rotation, uint mapId);
+
+		Task SaveCharacterBind(uint characterId, uint respawnPointId);
+
+		Task<RespawnPoint> GetRespawnPoint(uint id);
 		Task SetCharacterInventorySlot(uint characterId, int container, int slot, uint? itemId, uint count = 1);
 		Task SetCharacterMoney(uint characterId, ulong money);
 		Task SetCharacterProgress(uint characterId, uint experience, ushort level);
@@ -1153,6 +1157,24 @@ namespace Faolan.Core.Database
 					.SetProperty(c => c.RotationZ, rotation.Z)
 					.SetProperty(c => c.RotationW, rotation.W)
 					.SetProperty(c => c.MapId, mapId));
+		}
+
+		// Persists a character's bind / recall point (the discovered RespawnPoint the Totem of Origin returns to) the
+		// moment it's set, so it survives relog independently of the full-graph save. See issue #64.
+		public async Task SaveCharacterBind(uint characterId, uint respawnPointId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await ctx.Characters
+				.Where(c => c.Id == characterId)
+				.ExecuteUpdateAsync(s => s
+					.SetProperty(c => c.BindRespawnPointId, respawnPointId));
+		}
+
+		// A single resurrection point by id (resolves a character's bind point to its map+position on recall).
+		public async Task<RespawnPoint> GetRespawnPoint(uint id)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.RespawnPoints.FirstOrDefaultAsync(p => p.Id == id);
 		}
 
 		// Persists a character's levelling progress (within-level Experience + Level) the moment it changes, so XP and
