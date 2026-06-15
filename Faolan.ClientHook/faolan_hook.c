@@ -1,18 +1,15 @@
 // Faolan client hook DLL (32-bit, injected into AgeOfConan.exe under Wine/Proton).
-// In-client verification without human eyes. Three mechanisms:
+// In-client verification without human eyes. Two mechanisms:
 //
-//  1) ENABLE THE CLIENT'S OWN DEBUG LOGGING (broad, bulletproof — no code patching). The client has extensive
-//     internal logging (LogBase/_dbShouldOutput) gated off by default: the gate is
-//     `DAT_021a2c29 != 0 && (DAT_029864f8 == 0 || _dbShouldOutput(channel))`. We set DAT_021a2c29=1 and
-//     DAT_029864f8=0 (the OR short-circuits, bypassing the per-channel check), so the client writes its full
-//     debug trace to AgeOfConan.log — quest activates ("got quest [id]"), IIR version errors, etc.
-//
-//  2) DISPATCHER HOOKS — a full per-interface server->client PACKET FEED. Every `*InterfaceDispatch_t::
+//  1) DISPATCHER HOOKS — a full per-interface server->client PACKET FEED. Every `*InterfaceDispatch_t::
 //     DispatchMethod(opcode, ...)` (thiscall; opcode = first stack arg) is hooked; we log `disp <iface> <op>`.
 //     Covers GameChar (snapshot/quest/inventory/combat), Tradepost (AH/mail), CSPlayer (guild/team),
 //     Player/Universe/Game (login flow). This is "see exactly which packets the client received + dispatched".
 //
-//  3) FIELD HOOKS — e.g. QuestFullUpdateIIR::Activate logs the activated quest id.
+//  2) FIELD HOOKS — e.g. QuestFullUpdateIIR::Activate logs the activated quest id.
+//
+// (A former mechanism — toggling the DAT_021a2c29 / DAT_029864f8 log gate to enable the client's own internal
+// debug trace — was REMOVED: it produces no extra output on this build. See docs/client-debug-logging.md.)
 //
 // Inline hooks are PROLOGUE-VERIFIED: a hook is installed only if the target's current bytes match the
 // prologue recovered from Ghidra, so a stale/wrong address is skipped (never patched) — it can't corrupt the
@@ -79,16 +76,7 @@ static void *mem_alloc_rwx(DWORD n) { return VirtualAlloc(0, n, MEM_COMMIT | MEM
 static int bytes_match(const BYTE *a, const BYTE *b, unsigned n) { for (unsigned i = 0; i < n; i++) if (a[i] != b[i]) return 0; return 1; }
 static void mem_copy(BYTE *d, const BYTE *s, unsigned n) { for (unsigned i = 0; i < n; i++) d[i] = s[i]; }
 
-// ---------------------------------------------------------------------------- 1) enable debug logging
-
-static void enable_debug_logging(void) {
-    DWORD old;
-    if (VirtualProtect((LPVOID)0x021A2C29, 1, PAGE_READWRITE, &old)) { *(volatile BYTE *)0x021A2C29 = 1; VirtualProtect((LPVOID)0x021A2C29, 1, old, &old); }
-    if (VirtualProtect((LPVOID)0x029864F8, 4, PAGE_READWRITE, &old)) { *(volatile DWORD *)0x029864F8 = 0; VirtualProtect((LPVOID)0x029864F8, 4, old, &old); }
-    logs("enabled client debug logging (DAT_021a2c29=1, DAT_029864f8=0) -> AgeOfConan.log\n");
-}
-
-// ---------------------------------------------------------------------------- 2) inline-hook framework
+// ---------------------------------------------------------------------------- inline-hook framework
 
 // 5-byte rel32 jmp at `target` -> `detour`, installed ONLY if the first `steal` bytes equal `expected`. The
 // stolen (relocatable, position-independent) bytes go into a fresh RWX trampoline ending in a jmp back to
@@ -268,8 +256,6 @@ static void on_attach(void) {
     logs("faolan_hook loaded\n");
     log_kv("exe_base", (DWORD)GetModuleHandleA(0));
     log_kv("pid", GetCurrentProcessId());
-
-    enable_debug_logging();
 
     unsigned ok = 0, total = (unsigned)(sizeof(g_hooks) / sizeof(g_hooks[0]));
     for (unsigned i = 0; i < total; i++) {

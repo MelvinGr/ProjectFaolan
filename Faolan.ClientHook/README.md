@@ -15,22 +15,23 @@ cmake --build Faolan.ClientHook/build        # -> build/faolan_hook.dll (32-bit)
 project is `LANGUAGES NONE` + custom commands — there's no CRT/SDK for CMake's normal toolchain detection to
 link a test program against.) Melvin injects `build/faolan_hook.dll` into the running client.
 
+> **Removed:** an earlier mechanism toggled the client's debug-log gate globals (`DAT_021a2c29=1` +
+> `DAT_029864f8=0`) to surface the client's own internal trace in `AgeOfConan.log`. It was dropped — it
+> produces **no extra output on this build** (the master flag is already on, the client clears the
+> channel-filter itself by world-entry, and the verbose log sites don't fire). Full investigation:
+> `docs/client-debug-logging.md`.
+
 ## What it does (on `DLL_PROCESS_ATTACH`)
-1. **Enables the client's own debug logging** (the broad, bulletproof part — no code patching). Sets the two
-   gate globals `DAT_021a2c29=1` + `DAT_029864f8=0` so the client writes its full internal debug trace to
-   **`AgeOfConan.log`**: quest activates (`got quest [id]`), IIR version errors (`Wrong IIR_t version`),
-   dispatch, inventory, combat, etc. This is the "test whatever we want" channel — the client's own
-   instrumentation across every subsystem.
-2. **Hooks every interface dispatcher** → a full server→client PACKET FEED. Each
+1. **Hooks every interface dispatcher** → a full server→client PACKET FEED. Each
    `*InterfaceDispatch_t::DispatchMethod(opcode, …)` (thiscall; opcode = first stack arg) logs `disp <iface>
    <opcode>` to `faolan_hook.log`: **GameChar** (`0x004BC7B0` — snapshot/quest/inventory/combat),
    **Tradepost** (`0x01357130` — AH/mail), **CSPlayer** (`0x0133A6A0` — guild/team), **Player** (`0x00484270`),
    **Universe** (`0x00490970`), **Game** (`0x00491F30`), **GameCharProj** (`0x0115E430`). Shows exactly which
    packets the client received and dispatched.
-3. **Field hook**: `QuestFullUpdateIIR::Activate` (`0x00918080`) → `quest_activate=<id>` (`*(*(this+0x2C)+0x0C)`).
-4. All inline hooks are **prologue-verified** — installed only if the target bytes match the Ghidra prologue
+2. **Field hook**: `QuestFullUpdateIIR::Activate` (`0x00918080`) → `quest_activate=<id>` (`*(*(this+0x2C)+0x0C)`).
+3. All inline hooks are **prologue-verified** — installed only if the target bytes match the Ghidra prologue
    (`55 8B EC 83 E4 F8`), so a stale/wrong address is skipped, never patched (it can't corrupt the client).
-5. Writes `faolan_hook.log` (client CWD) with the exe base, pid, per-hook OK/SKIP, and the live hook output.
+4. Writes `faolan_hook.log` (client CWD) with the exe base, pid, per-hook OK/SKIP, and the live hook output.
 
 ## Adding hooks (the framework)
 Add a row to `g_hooks[]`: `{ addr, PROLOGUE_STD (or a new signature read at `file_off = VA - 0x400C00`),
