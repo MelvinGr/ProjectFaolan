@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Microsoft.Extensions.Logging;
 
@@ -42,15 +43,17 @@ namespace Faolan.GameServer.Inventory
 				return;
 			}
 
-			// Totem of Origin -> recall to the bound resurrection point (#206). Identified by name (the only recall
-			// item; matches the "Totem of Origins" template and any tier variant).
-			if (item.Name?.Contains("Totem of Origin", StringComparison.OrdinalIgnoreCase) == true)
+			// Dispatch on the item's use CATEGORY (ItemUseClassifier maps the stable template id), not its name.
+			switch (ItemUseClassifier.Classify(item))
 			{
-				await _recallToBind(client);
-				return;
-			}
+				case ItemUseType.TotemRecall:
+					await _recallToBind(client); // Totem of Origin -> recall to the bound resurrection point (#206)
+					break;
 
-			_logger.LogInformation("UseInventoryItem: no use wired for '{Item}' (container {Container} slot {Slot}).", item.Name, container, slot);
+				default:
+					_logger.LogInformation("UseInventoryItem: no use wired for '{Item}' (id {Id}).", item.Name, item.Id);
+					break;
+			}
 		}
 	}
 }
