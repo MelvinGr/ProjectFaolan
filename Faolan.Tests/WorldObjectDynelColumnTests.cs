@@ -22,10 +22,10 @@ namespace Faolan.Tests
 			con.Open();
 			using var cmd = con.CreateCommand();
 			// All world-object classes (not just dynels) - they share the ProtoSimpleDynelIIR identity message.
-			cmd.CommandText = "SELECT Name,DisplayName,CarsGroup,IsClosed,QuestItemEffect,TemplateItemId,Kdtree,WaypointType,Data " +
+			cmd.CommandText = "SELECT Name,DisplayName,CarsGroup,IsClosed,QuestItemEffect,TemplateItemId,Kdtree,WaypointType,KdTreeTail,Data " +
 			                  "FROM WorldObjects WHERE DisplayName IS NOT NULL";
 			using var r = cmd.ExecuteReader();
-			int total = 0, ok = 0, parseFail = 0, mismatch = 0;
+			int total = 0, ok = 0, parseFail = 0, mismatch = 0, builtFromDb = 0;
 			while (r.Read())
 			{
 				total++;
@@ -39,9 +39,10 @@ namespace Faolan.Tests
 					QuestItemEffect = r.IsDBNull(4) ? null : (uint)r.GetInt64(4),
 					TemplateItemId = r.IsDBNull(5) ? null : (uint)r.GetInt64(5),
 					Kdtree = (uint)r.GetInt64(6),
-					WaypointType = r.IsDBNull(7) ? null : (uint)r.GetInt64(7)
+					WaypointType = r.IsDBNull(7) ? null : (uint)r.GetInt64(7),
+					KdTreeTail = r.IsDBNull(8) ? null : (byte[])r[8]
 				};
-				var data = (byte[])r[8];
+				var data = (byte[])r[9];
 				var body = WorldObjectBuilder.ExtractBody(data);
 				if (body == null || body.Length <= 8 || !SimpleDynelMessageCodec.TryParse(body.AsSpan(8), out _, out var start, out var consumed))
 				{
@@ -55,11 +56,20 @@ namespace Faolan.Tests
 					ok++;
 				else
 					mismatch++;
+
+				// The world-entry path: building the object onto its OWN body using columns + KdTreeTail (no Data
+				// slice) must reproduce the captured body byte-for-byte. This is what drops the Data dependency (#187).
+				Assert.True(WorldObjectBuilder.TryBuildOntoLivePlacement(row, body, out var fromDb));
+				if (Convert.ToHexString(body) == Convert.ToHexString(fromDb))
+					builtFromDb++;
+				else
+					mismatch++;
 			}
 
-			Console.WriteLine($"objects={total} ok={ok} parseFail={parseFail} mismatch={mismatch}");
+			Console.WriteLine($"objects={total} ok={ok} builtFromDb={builtFromDb} parseFail={parseFail} mismatch={mismatch}");
 			Assert.Equal(0, mismatch);
 			Assert.True(ok > 900, $"expected >900 byte-exact rebuilds across all object classes, got {ok}");
+			Assert.Equal(ok, builtFromDb); // every lifted object also builds from the DB (columns + tail) byte-exact
 		}
 
 		private static string FindRepoRoot()

@@ -34,5 +34,12 @@ namespace Faolan.Core.Database.Tables
 		public uint? QuestItemEffect { get; set; }     // proto field 6 (present on ~23%)
 		public uint? WaypointType { get; set; }        // proto field 7 (present on zone-label objects)
 		public uint? TemplateItemId { get; set; }      // proto field 8 (present on ~25%)
+
+		// The bytes AFTER the identity message: the kd-tree / collision / bounds geometry (FUN_0080c620), per-object
+		// but session-INDEPENDENT (static decor geometry). Stored so the world-entry build constructs the whole
+		// object from the DB - identity (columns above) + this tail - instead of slicing it from the raw Data packet
+		// (#187). Null on un-lifted rows (those still use Data). The transform (pos/rot) is rebuilt from Base3DEntity's
+		// columns and the live playfield comes from the burst, so with this the row's Data is no longer read at render.
+		public byte[] KdTreeTail { get; set; }
 	}
 }

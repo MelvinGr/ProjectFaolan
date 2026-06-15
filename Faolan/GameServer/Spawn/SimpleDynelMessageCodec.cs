@@ -108,13 +108,18 @@ namespace Faolan.GameServer.Spawn
 		public static bool TryLiftColumns(WorldObject row)
 		{
 			row.DisplayName = null;
+			row.KdTreeTail = null;
 			var body = WorldObjectBuilder.ExtractBody(row?.Data);
-			if (body is not { Length: > 8 } || !TryParse(body.AsSpan(8), out var message, out _, out _))
+			if (body is not { Length: > 8 } || !TryParse(body.AsSpan(8), out var message, out var messageStart, out var consumed))
 				return false;
 
 			ApplyColumns(row, message);
 			if (TryReplaceIdentityFromColumns(body.AsSpan(8), row, out var rebuilt) && rebuilt.AsSpan().SequenceEqual(body.AsSpan(8)))
+			{
+				// Store the geometry tail (everything after the identity message) so the build needs no Data slice.
+				row.KdTreeTail = body.AsSpan(8)[(messageStart + consumed)..].ToArray();
 				return true;
+			}
 
 			row.DisplayName = null; // un-faithful lift -> fall back to the verbatim slice
 			return false;

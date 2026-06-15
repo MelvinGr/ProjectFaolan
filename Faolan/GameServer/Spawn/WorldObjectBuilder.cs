@@ -55,16 +55,30 @@ namespace Faolan.GameServer.Spawn
 		public static bool TryBuildOntoLivePlacement(WorldObject row, ReadOnlySpan<byte> liveBody, out byte[] body)
 		{
 			body = null;
+			if (!TryMessageOffset(liveBody, out var liveOffset))
+				return false;
+
+			// Lifted row (#187): CONSTRUCT the identity from columns + append the stored geometry tail - no Data
+			// slice read at all. Byte-identical to the verbatim splice (the columns reproduce the captured identity,
+			// the tail is stored verbatim), so the world-entry object is now fully DB-driven.
+			if (row?.DisplayName != null && row.KdTreeTail != null)
+			{
+				var identity = SimpleDynelMessageCodec.BuildMessage(SimpleDynelMessageCodec.ToMessage(row));
+				body = new byte[liveOffset + identity.Length + row.KdTreeTail.Length];
+				liveBody[..liveOffset].CopyTo(body);
+				identity.CopyTo(body.AsSpan(liveOffset));
+				row.KdTreeTail.CopyTo(body.AsSpan(liveOffset + identity.Length));
+				return true;
+			}
+
+			// Fallback (un-lifted row): splice the row's identity + tail verbatim from its captured Data.
 			var template = ExtractBody(row?.Data);
-			if (template == null || !TryMessageOffset(liveBody, out var liveOffset) || !TryMessageOffset(template, out var rowOffset))
+			if (template == null || !TryMessageOffset(template, out var rowOffset))
 				return false;
 
 			body = new byte[liveOffset + (template.Length - rowOffset)];
-			liveBody[..liveOffset]
-				.CopyTo(body);
-			template
-				.AsSpan(rowOffset)
-				.CopyTo(body.AsSpan(liveOffset));
+			liveBody[..liveOffset].CopyTo(body);
+			template.AsSpan(rowOffset).CopyTo(body.AsSpan(liveOffset));
 			return true;
 		}
 
