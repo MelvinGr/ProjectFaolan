@@ -1,3 +1,5 @@
+using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using Faolan.Core.Data;
 
@@ -17,6 +19,39 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		private readonly List<(uint StatId, uint RawValue)> _records = [];
 
 		public int Count => _records.Count;
+
+		/// <summary>The parsed/built records at wire scale, in order ([statId], [rawValue]).</summary>
+		public IReadOnlyList<(uint StatId, uint RawValue)> Records => _records;
+
+		/// <summary>
+		///     The inverse of <see cref="WriteTo" />: parses <c>[count:1][N×(statId:u32, value:u32)]</c> (big-endian)
+		///     from the front of <paramref name="data" />, returning the block and the number of bytes consumed. The
+		///     same codec covers both the <c>0x737A6DF9</c> snapshot and the <c>0x96B8DC59</c> vitals packet. Returns
+		///     false (and <paramref name="consumed" /> = 0) when the buffer is too short for the declared count.
+		/// </summary>
+		public static bool TryParse(ReadOnlySpan<byte> data, out CharacterStatBlock block, out int consumed)
+		{
+			block = new CharacterStatBlock();
+			consumed = 0;
+			if (data.Length < 1)
+				return false;
+
+			int count = data[0];
+			var needed = 1 + count * 8;
+			if (data.Length < needed)
+				return false;
+
+			for (var i = 0; i < count; i++)
+			{
+				var off = 1 + i * 8;
+				var statId = BinaryPrimitives.ReadUInt32BigEndian(data.Slice(off, 4));
+				var rawValue = BinaryPrimitives.ReadUInt32BigEndian(data.Slice(off + 4, 4));
+				block._records.Add((statId, rawValue));
+			}
+
+			consumed = needed;
+			return true;
+		}
 
 		/// <summary>Adds a record using the player-facing value; the wire scale for the stat is applied.</summary>
 		public CharacterStatBlock Set(LegacyCharacterStatId statId, uint displayValue)

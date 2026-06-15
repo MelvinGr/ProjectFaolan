@@ -1,3 +1,5 @@
+using System;
+using System.Buffers.Binary;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
@@ -35,6 +37,27 @@ namespace Faolan.GameServer.World
 			return ps
 				.WriteLengthHash()
 				.ToArray();
+		}
+
+		// The inverse of BuildStatUpdate at the IIR-body level: parses the inner 0x96B8DC59 record
+		//   [subop 96B8DC59][0000C350][entityHandle:4][00000000:4][CharacterStatBlock]
+		// (the bytes WriteArrayUInt32Length wraps, i.e. after the u32 length prefix). Returns the entity handle and the
+		// shared stat block. Validates the sub-opcode + marker so a mis-routed body is rejected. Proven by the
+		// VitalsPacket round-trip in CharacterStatBlockTests.
+		public static bool TryParseStatUpdateBody(ReadOnlySpan<byte> body, out uint entityHandle, out CharacterStatBlock stats)
+		{
+			entityHandle = 0;
+			stats = new CharacterStatBlock();
+			if (body.Length < 16)
+				return false;
+			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000RespondsOpcodes.StatUpdateIIR)
+				return false;
+			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != VitalsMarker)
+				return false;
+
+			entityHandle = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(8, 4));
+			// body[12..16] is the constant 0x00000000 padding word; the stat block follows.
+			return CharacterStatBlock.TryParse(body.Slice(16), out stats, out _);
 		}
 	}
 }
