@@ -179,11 +179,13 @@ namespace Faolan.GameServer.Combat
 		public Task SendNpcAttackAnimation(INetworkClient client, uint npcHandle, uint damage, uint swingCounter)
 		{
 			var playerHandle = client.Session.Account.ClientInstance;
-			// TypeId is a large per-swing behavior-instance id in the capture; we don't synthesize a real one, so reuse
-			// the granted Normal Attack ability id as a stable, plausible value (the client treats it as an opaque id).
+			// args.f1 is the NormalAttack BEHAVIOR TypeId the client resolves to pick the swing animation - NOT an
+			// ability id. The capture's beach mobs use ~0xBEEC (48876) across several NPCs (per-NPC jitter of a few);
+			// 0xBEEC is the representative value. (The earlier 769094 was the Normal Attack ABILITY id - wrong field,
+			// which played the player's hit-react + audio but left the NPC body un-animated.)
 			var body = CombatPacketCodec.BuildNpcAttackAnimationAckBody(
 				npcHandle, playerHandle, damage,
-				typeId: 769094, swingCounter: swingCounter, f5: 24, f11: 64, f12: 56,
+				typeId: 0xBEEC, swingCounter: swingCounter, f5: 24, f11: 64, f12: 56,
 				resultType: 0xCB, resultK1: 1, resultK2: 2);
 			return SendWorldPacket(client, body);
 		}
