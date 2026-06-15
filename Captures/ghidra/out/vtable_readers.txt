@@ -1,0 +1,221 @@
+KNOWN vtable SimpleCharFullUpdateIIR_t::vftable -> 020405b0
+ReadSubClass slot index = 8 (ptr 0x1121c00)
+
+################## SimpleDynelFullUpdateIIR_c::vftable -> 01fc9514
+  slot[8] -> 0x7a2510 in FUN_007a2510 @007a2510 size=51
+
+bool FUN_007a2510(int param_1)
+
+{
+  int in_ECX;
+  
+  FUN_00cbfb80(in_ECX + 0x5c);
+  FUN_0080c620(param_1,in_ECX + 0x9c);
+  return *(char *)(param_1 + 0x19) != '\0';
+}
+
+
+
+################## LootBagFullUpdateIIR_c::vftable -> 01fc9664
+  slot[8] -> 0x7a3db0 in FUN_007a3db0 @007a3db0 size=65
+
+bool FUN_007a3db0(int param_1)
+
+{
+  int in_ECX;
+  
+  FUN_00cbfb80(in_ECX + 0x5c);
+  FUN_0080c620(param_1,in_ECX + 0x9c);
+  FUN_00cbfb80(in_ECX + 0x16c);
+  return *(char *)(param_1 + 0x19) != '\0';
+}
+
+
+
+################## MoveTaskIIR_c::vftable -> 01ff4124
+  slot[8] -> 0xa340e0 in FUN_00a340e0 @00a340e0 size=367
+
+void FUN_00a340e0(int param_1)
+
+{
+  char cVar1;
+  undefined4 uVar2;
+  int *piVar3;
+  undefined4 *puVar4;
+  int in_ECX;
+  undefined1 *puVar5;
+  undefined1 auStack_dc [3];
+  char local_d9;
+  undefined4 local_d8;
+  undefined1 auStack_d4 [200];
+  uint local_c;
+  
+  local_c = DAT_021906e0 ^ (uint)auStack_dc;
+  if (*(char *)(param_1 + 0x19) == '\0') {
+    if (*(int *)(param_1 + 0x10) == 0) {
+      *(undefined1 *)(param_1 + 0x19) = 1;
+    }
+    else {
+      FUN_00cba1b0(&local_d9,1);
+      if (*(int *)(param_1 + 0x10) == 0) {
+        *(undefined1 *)(param_1 + 0x18) = 1;
+      }
+    }
+  }
+  *(bool *)(in_ECX + 0x3c) = local_d9 != '\0';
+  uVar2 = FUN_0048f900();
+  *(undefined4 *)(in_ECX + 0x30) = uVar2;
+  local_d8 = FUN_0048f900();
+  *(undefined4 *)(in_ECX + 0x34) = local_d8;
+  local_d8 = FUN_0048f900();
+  *(undefined4 *)(in_ECX + 0x38) = local_d8;
+  piVar3 = (int *)FUN_00a46800();
+  if (piVar3 != (int *)0x0) {
+    cVar1 = (**(code **)(*piVar3 + 0x28))();
+    if (cVar1 != '\0') {
+      *(int **)(in_ECX + 0x2c) = piVar3;
+      __security_check_cookie(local_c ^ (uint)auStack_dc);
+      return;
+    }
+    (**(code **)*piVar3)(1);
+  }
+  if (DAT_021a2c29 != '\0') {
+    if (DAT_029864f8 != 0) {
+      cVar1 = FUN_004b2cc0(&DAT_02984ac0,3,"GameCode/Movement");
+      if (cVar1 == '\0') goto LAB_00a3422c;
+    }
+    puVar5 = auStack_d4;
+    FUN_0040c520("Ignoring invalid move task.");
+    puVar4 = (undefined4 *)FUN_004157a0(puVar5);
+    if (0xf < (uint)puVar4[5]) {
+      puVar4 = (undefined4 *)*puVar4;
+    }
+    FUN_004a8b90(3,"GameCode/Movement",&DAT_01f22980,puVar4);
+    FUN_004111d0(1,0);
+    FUN_004071f0();
+  }
+LAB_00a3422c:
+  *(undefined4 *)(in_ECX + 0x2c) = 0;
+  __security_check_cookie(local_c ^ (uint)auStack_dc);
+  return;
+}
+
+
+
+################## GameActionListIIR_t::vftable -> 01fd5d10
+  slot[8] -> 0x8679f0 in FUN_008679f0 @008679f0 size=97
+
+bool FUN_008679f0(int param_1)
+
+{
+  int iVar1;
+  undefined4 uVar2;
+  int in_ECX;
+  
+  iVar1 = param_1;
+  FUN_00870500(in_ECX + 0x2c);
+  if (*(char *)(iVar1 + 0x19) == '\0') {
+    if (*(int *)(iVar1 + 0x10) == 0) {
+      *(undefined1 *)(iVar1 + 0x19) = 1;
+    }
+    else {
+      FUN_00cba1b0((int)&param_1 + 3,1);
+      if (*(int *)(iVar1 + 0x10) == 0) {
+        *(undefined1 *)(iVar1 + 0x18) = 1;
+      }
+    }
+  }
+  *(bool *)(in_ECX + 0x3c) = param_1._3_1_ != '\0';
+  uVar2 = FUN_0048f900();
+  *(undefined4 *)(in_ECX + 0x40) = uVar2;
+  return *(char *)(iVar1 + 0x19) != '\0';
+}
+
+
+
+################## BehaviorControlCenterIIR_c::vftable -> 01fabbec
+  slot[8] -> 0x5e24e0 in FUN_005e24e0 @005e24e0 size=326
+
+undefined4 FUN_005e24e0(int param_1)
+
+{
+  char cVar1;
+  undefined4 uVar2;
+  int iVar3;
+  int in_ECX;
+  byte local_d;
+  int local_c;
+  
+  if (*(char *)(param_1 + 0x19) == '\0') {
+    if (*(int *)(param_1 + 0x10) == 0) {
+      *(undefined1 *)(param_1 + 0x19) = 1;
+    }
+    else {
+      FUN_00cba1b0(&local_d,1);
+      if (*(int *)(param_1 + 0x10) == 0) {
+        *(undefined1 *)(param_1 + 0x18) = 1;
+      }
+    }
+  }
+  *(uint *)(in_ECX + 0x1c) = (uint)local_d;
+  switch((uint)local_d) {
+  case 2:
+  case 3:
+  case 4:
+  case 5:
+  case 7:
+  case 10:
+  case 0xf:
+  case 0x10:
+  case 0x12:
+    local_c = FUN_0048f900();
+    if (local_c == 0) {
+      return 1;
+    }
+    iVar3 = FUN_007dcd60(local_c);
+    *(int *)(in_ECX + 0x20) = iVar3;
+    break;
+  case 6:
+  case 8:
+  case 9:
+  case 0xd:
+  case 0x11:
+    *(undefined4 *)(in_ECX + 0x20) = 0;
+    return 0;
+  case 0xb:
+  case 0xc:
+    *(undefined4 *)(in_ECX + 0x20) = 0;
+    uVar2 = FUN_0048f900();
+    *(undefined4 *)(in_ECX + 0x28) = uVar2;
+    return 0;
+  case 0xe:
+    iVar3 = FUN_0048f900();
+    *(int *)(in_ECX + 0x24) = iVar3;
+    if (iVar3 == 0) {
+      return 1;
+    }
+    local_c = FUN_0048f900();
+    if (local_c == 0) {
+      return 1;
+    }
+    iVar3 = FUN_007dcd60(local_c);
+    *(int *)(in_ECX + 0x20) = iVar3;
+    break;
+  default:
+    goto switchD_005e2536_default;
+  }
+  if (iVar3 != 0) {
+    FUN_007dd1f0(param_1);
+    (**(code **)(**(int **)(in_ECX + 0x20) + 0x80))(param_1);
+    return 0;
+  }
+  if ((DAT_021a2c29 != '\0') &&
+     ((DAT_029864f8 == 0 || (cVar1 = FUN_004b2cc0(&DAT_02984ac0,4,"Control"), cVar1 != '\0')))) {
+    FUN_005e2730("BccIIR::[Command==NULL] CommandManager:%d\n");
+  }
+switchD_005e2536_default:
+  return 1;
+}
+
+
+
