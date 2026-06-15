@@ -110,13 +110,17 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// An NPC stepped on the tick (chasing a target, or returning home): send its MoveTask transform (origin ->
-		// current position, facing its direction of travel) to every player in range that already sees it, so they
-		// watch it move. Only viewers who know the handle get it (else they'd get a move for an unknown entity).
+		// An NPC stepped on the tick (chasing a target, or returning home): send its MoveTask to every player in range
+		// that already sees it, so they watch it move. Uses the PATROL form (origin -> this tick's position as a single
+		// waypoint, at NpcMoveSpeed) rather than the speed-less 61-byte form: the wire SPEED is what makes the client (a)
+		// interpolate the segment over speed*dt instead of snapping/teleporting and (b) pick a run gait over a walk.
+		// The NPC faces its travel direction implicitly (it walks toward the waypoint). Only viewers who know the handle
+		// get it (else they'd get a move for an unknown entity).
 		public async Task BroadcastNpcMove(WorldEntity npc)
 		{
-			var facing = npc.MoveOrigin.FaceTowards(npc.Position); // face the way it is moving
-			var body = MoveTaskCodec.BuildBody(npc.Handle, npc.MoveOrigin, npc.Position, facing);
+			// Path = origin -> this tick's position (the capture's approach form starts the waypoint list with the
+			// current position, then the destination - frame 6470), walked at NpcMoveSpeed.
+			var body = Spawn.MoveTaskBuilder.BuildPatrol(npc.Handle, npc.MoveOrigin, new[] { npc.MoveOrigin, npc.Position }, WorldState.NpcMoveSpeed);
 
 			foreach (var viewer in _sim
 				         .World
