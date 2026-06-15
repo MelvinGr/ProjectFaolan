@@ -1,4 +1,3 @@
-using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -27,19 +26,18 @@ namespace Faolan.GameServer.Economy.Bank
 	//      (on the GameAgent->GameInterface world conversation). The container's items are standard
 	//      InventoryListEntry entries - the same codec SnapshotItemBuilder already produces for the backpack.
 	// Extracted from GameServerListener as a composed collaborator; the live item-grant outbound op (for a
-	// withdraw) is injected as a delegate seam (the same one ShopService uses).
+	// withdraw) is reached through the shared IEconomyOutbound port (the listener implements it).
 	public sealed class BankService
 	{
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
-		private readonly Func<INetworkClient, uint, uint, ProtoInventoryGameEntry, Task> _sendAddItem;
+		private readonly IEconomyOutbound _outbound;
 
-		public BankService(IDatabaseRepository database, ILogger logger,
-			Func<INetworkClient, uint, uint, ProtoInventoryGameEntry, Task> sendAddItem)
+		public BankService(IDatabaseRepository database, ILogger logger, IEconomyOutbound outbound)
 		{
 			_database = database;
 			_logger = logger;
-			_sendAddItem = sendAddItem;
+			_outbound = outbound;
 		}
 
 		private const uint BankIirSubOpcode = (uint)GameServer0X2000RespondsOpcodes.BankIIR; // BankIIR_t
@@ -160,7 +158,7 @@ namespace Faolan.GameServer.Economy.Bank
 					FullCharSnapshotBuilder.ItemId(character.Id, FullCharSnapshotBuilder.BagKind, (ulong)dPos),
 					FullCharSnapshotBuilder.RecordId(character.Id, FullCharSnapshotBuilder.BagKind, (ulong)dPos),
 					row.Count, item, item.Archetype).Item;
-				await _sendAddItem(client, 0x68u, (uint)dPos, entry);
+				await _outbound.SendAddItem(client, 0x68u, (uint)dPos, entry);
 			}
 		}
 	}

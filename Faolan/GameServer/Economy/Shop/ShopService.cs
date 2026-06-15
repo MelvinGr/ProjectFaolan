@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,22 +25,19 @@ namespace Faolan.GameServer.Economy.Shop
 	// The wire container 0x68 (104) IS the DB CharacterInventory.Container bag value - no mapping needed.
 	// Extracted out of GameServerListener as a composed collaborator: it owns the open-shop/last-sale session
 	// state and the sell/buy/undo logic. The two cross-cutting OUTBOUND ops it needs - the wallet update and the
-	// live item grant - are injected as delegate seams (they're shared by many subsystems and stay on the listener).
+	// live item grant - are reached through the IEconomyOutbound port (the listener implements it; the ops stay
+	// on the listener because they're shared by many subsystems).
 	public sealed class ShopService
 	{
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
-		private readonly Func<INetworkClient, ulong, MoneyUpdateReason, Task> _sendMoneyUpdate;
-		private readonly Func<INetworkClient, uint, uint, Task<int?>> _grantItemToBackpack;
+		private readonly IEconomyOutbound _outbound;
 
-		public ShopService(IDatabaseRepository database, ILogger logger,
-			Func<INetworkClient, ulong, MoneyUpdateReason, Task> sendMoneyUpdate,
-			Func<INetworkClient, uint, uint, Task<int?>> grantItemToBackpack)
+		public ShopService(IDatabaseRepository database, ILogger logger, IEconomyOutbound outbound)
 		{
 			_database = database;
 			_logger = logger;
-			_sendMoneyUpdate = sendMoneyUpdate;
-			_grantItemToBackpack = grantItemToBackpack;
+			_outbound = outbound;
 		}
 
 		// The last sale per connection, so UndoLastSoldItem can restore it (retail's undo is single-step too).
@@ -122,7 +118,7 @@ namespace Faolan.GameServer.Economy.Shop
 			ps.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, GameServerRespondOpcodes.ItemSoldToShop);
 			WriteItemSoldBody(ps, container, sellerId, slot);
 			await ps.SendAsync(client);
-			await _sendMoneyUpdate(client, character.Money, MoneyUpdateReason.Gain);
+			await _outbound.SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Gain);
 
 			_logger.LogInformation("Shop: {Character} sold \"{Item}\" x{Count} (container {Container} slot {Slot}) for {Price} tin (wallet {Balance}).",
 				character.Name, row.Item.Name, row.Count, container, slot, price, character.Money);
@@ -143,7 +139,7 @@ namespace Faolan.GameServer.Economy.Shop
 				? character.Money - sale.PriceTin
 				: 0;
 			await _database.SetCharacterMoney(character.Id, character.Money);
-			await _sendMoneyUpdate(client, character.Money, MoneyUpdateReason.Spend);
+			await _outbound.SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Spend);
 
 			_logger.LogInformation("Shop: {Character} undid the sale of item {ItemId} (slot {Slot}); {Price} tin debited (wallet {Balance}).",
 				character.Name, sale.ItemId, sale.Slot, sale.PriceTin, character.Money);
@@ -210,7 +206,7 @@ namespace Faolan.GameServer.Economy.Shop
 			}
 
 			// Grant first so a full bag (null slot) aborts the purchase before any money moves.
-			var slot = await _grantItemToBackpack(client, ware.ItemTemplateId, ware.Count);
+			var slot = await _outbound.GrantItemToBackpack(client, ware.ItemTemplateId, ware.Count);
 			if (slot == null)
 			{
 				_logger.LogWarning("BuyItem: couldn't grant ware {Template} to {Character} (bag full or item not buildable); purchase aborted.",
@@ -220,7 +216,7 @@ namespace Faolan.GameServer.Economy.Shop
 
 			character.Money -= price;
 			await _database.SetCharacterMoney(character.Id, character.Money);
-			await _sendMoneyUpdate(client, character.Money, MoneyUpdateReason.Spend);
+			await _outbound.SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Spend);
 
 			_logger.LogInformation("Shop: {Character} bought ware {Template} x{Count} (slot {Pos}) from \"{Vendor}\" for {Price} tin into bag slot {BagSlot} (wallet {Balance}).",
 				character.Name, ware.ItemTemplateId, ware.Count, pos, shop.VendorName, price, slot, character.Money);

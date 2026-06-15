@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Protobuf;
 using Faolan.Core.Network.AgentServer;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.GameServer;
@@ -18,7 +19,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
-	public partial class GameServerListener : Server<ConanPacket, ConanPacketFactory, ConanMessageFramer>, IWorldOutbound
+	public partial class GameServerListener : Server<ConanPacket, ConanPacketFactory, ConanMessageFramer>, IWorldOutbound, IEconomyOutbound
 	{
 		// Periodic world-state autosave cadence (crash safety; logout/teleport/.save are the event-driven saves).
 		private const int AutoSaveIntervalMinutes = 5;
@@ -84,9 +85,9 @@ namespace Faolan.GameServer
 			_combat = new CombatService(_simulation, _broadcaster, database, agentServerDispatcher, logger);
 			_conversation = new Dialogue.ConversationService(database, logger, _broadcaster, _luaVm);
 			_equipment = new Inventory.EquipmentService(database, logger);
-			_shop = new Economy.Shop.ShopService(database, logger, SendMoneyUpdate, GrantItemToBackpack);
-			_bank = new Economy.Bank.BankService(database, logger, (client, container, pos, entry) => SendAddItem(client, container, pos, entry));
-			_tradepost = new Economy.Tradepost.TradepostService(database, logger, SendMoneyUpdate, (c, ct, p, e) => SendAddItem(c, ct, p, e), GrantItemToBackpack);
+			_shop = new Economy.Shop.ShopService(database, logger, this);
+			_bank = new Economy.Bank.BankService(database, logger, this);
+			_tradepost = new Economy.Tradepost.TradepostService(database, logger, this);
 
 			InitGmCommands();
 		}
@@ -111,6 +112,23 @@ namespace Faolan.GameServer
 		Task IWorldOutbound.ReenterWorld(INetworkClient client)
 		{
 			return SendWorldEntry(client);
+		}
+
+		// --- IEconomyOutbound: the wallet + item-grant ops the economy/inventory services reach back to (forwarding
+		// to the private Outbound builders, which the listener also calls directly from loot/GM paths) ---------------
+		Task IEconomyOutbound.SendMoneyUpdate(INetworkClient client, ulong balanceTin, MoneyUpdateReason reason)
+		{
+			return SendMoneyUpdate(client, balanceTin, reason);
+		}
+
+		Task IEconomyOutbound.SendAddItem(INetworkClient client, uint containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback)
+		{
+			return SendAddItem(client, containerType, itemPos, entry, feedback);
+		}
+
+		Task<int?> IEconomyOutbound.GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count)
+		{
+			return GrantItemToBackpack(client, itemTemplateId, count);
 		}
 
 		public override Task StartAsync(CancellationToken cancellationToken)

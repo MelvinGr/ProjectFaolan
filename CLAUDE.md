@@ -80,8 +80,13 @@ folder-namespaced service classes that take their deps by ctor and the client pe
 `ConversationService` (Dialogue/), and `ShopService`/`BankService`/`TradepostService` (Economy/). The
 listener holds them as `_combat`/`_shop`/... fields and forwards. When a service needs a cross-cutting
 OUTBOUND op that lives on the listener (e.g. the wallet update or the live item-grant, shared by several
-subsystems), inject it as a **delegate seam** (`Func<…>`) from the listener ctor rather than passing the
-listener — keeps the service free of the god-class. (See Gitea #200 for the remaining extraction backlog.)
+subsystems), reach it through a **narrow port the listener implements** rather than passing the whole
+listener — keeps the service free of the god-class while making its dependency surface explicit. A single
+shared op can be a `Func<…>` delegate seam (e.g. `ClientForCharacter` into `GuildService`); once several
+services share the same cluster of ops, collapse them into one named interface the listener implements
+(`IEconomyOutbound` = wallet + item-grant for Shop/Bank/Tradepost; `IWorldOutbound` = the simulation tick's
+wire side). Do NOT pass the listener itself — that re-introduces the circular dependency the extraction
+removed. (See Gitea #200 for the remaining extraction backlog.)
 
 Listeners inherit `Server<TPacket,...>` (`Faolan.Core/Network/Server.cs`); per-connection state lives on
 `INetworkClient.Session`. Cross-listener actions go through dispatcher seams (`IAgentServerDispatcher` for

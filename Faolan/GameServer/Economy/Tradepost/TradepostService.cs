@@ -1,4 +1,3 @@
-using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core;
@@ -19,7 +18,8 @@ namespace Faolan.GameServer.Economy.Tradepost
 	// buy_from_autionhouse_get_mail capture (docs/tradepost-protocol.md "Buy -> mail delivery"). These ride the same
 	// TradepostAgent the search/open path does, but they MUTATE state (money, listings, mail, the bag). Extracted
 	// from GameServerListener as a composed collaborator; the wallet update, the live item-grant and the
-	// GrantItemToBackpack mail-take are injected as delegate seams (shared by ShopService/BankService too).
+	// GrantItemToBackpack mail-take are reached through the shared IEconomyOutbound port (the listener implements
+	// it; the same surface ShopService/BankService use).
 	//
 	// Flow (capture-grounded): TradepostBuyItem [saleId] -> debit the buyer (DispatchUpdateCash) + create a SYSTEM
 	// mail to the buyer with the bought item escrowed as an attachment + remove the listing; the client then polls the
@@ -32,20 +32,13 @@ namespace Faolan.GameServer.Economy.Tradepost
 	{
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
-		private readonly Func<INetworkClient, ulong, MoneyUpdateReason, Task> _sendMoneyUpdate;
-		private readonly Func<INetworkClient, uint, uint, ProtoInventoryGameEntry, Task> _sendAddItem;
-		private readonly Func<INetworkClient, uint, uint, Task<int?>> _grantItemToBackpack;
+		private readonly IEconomyOutbound _outbound;
 
-		public TradepostService(IDatabaseRepository database, ILogger logger,
-			Func<INetworkClient, ulong, MoneyUpdateReason, Task> sendMoneyUpdate,
-			Func<INetworkClient, uint, uint, ProtoInventoryGameEntry, Task> sendAddItem,
-			Func<INetworkClient, uint, uint, Task<int?>> grantItemToBackpack)
+		public TradepostService(IDatabaseRepository database, ILogger logger, IEconomyOutbound outbound)
 		{
 			_database = database;
 			_logger = logger;
-			_sendMoneyUpdate = sendMoneyUpdate;
-			_sendAddItem = sendAddItem;
-			_grantItemToBackpack = grantItemToBackpack;
+			_outbound = outbound;
 		}
 
 		// The first free backpack cell (0..23), skipping persisted rows + the legacy starter-bag cell while it renders.
@@ -121,7 +114,7 @@ namespace Faolan.GameServer.Economy.Tradepost
 
 			character.Money -= listing.Price;
 			await _database.SetCharacterMoney(character.Id, character.Money);
-			await _sendMoneyUpdate(client, character.Money, MoneyUpdateReason.Spend);
+			await _outbound.SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Spend);
 
 			var mail = await BuildPurchaseMail(character.Name, listing);
 			await _database.CreateMail(mail);
@@ -439,7 +432,7 @@ namespace Faolan.GameServer.Economy.Tradepost
 			}
 
 			var entry = BuildMailItemEntry(attachment, character.Id, slot.Value);
-			await _sendAddItem(client, 0x68u, (uint)slot.Value, entry);
+			await _outbound.SendAddItem(client, 0x68u, (uint)slot.Value, entry);
 
 			var qty = attachment.Quantity == 0 ? 1u : attachment.Quantity;
 			var item = await _database.GetItem(attachment.Template);
