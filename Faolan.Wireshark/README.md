@@ -17,7 +17,11 @@ Wireshark without the JSON dump + Python dissector pipeline.
   plugin handles it at any packet boundary.)*
 - **RpcHeader dissection**: sender/receiver `ProtoEndpoint`s (class id resolved to the 14
   recovered client class names - BKDR-31 hashes, see `docs/aoc-opcode-ids.md` - plus the
-  instance), the 16-bit method opcode (shown raw), trailing header bytes, body.
+  instance), the 16-bit method opcode (shown raw), trailing header bytes, body. The two
+  endpoints are dispatched by their protobuf tag (sender = field 1 / `0x0A`, receiver =
+  field 2 / `0x12`) in **either order** - server->client replies swap them (receiver-first),
+  so a fixed sender-then-receiver assumption misframed those (the old CSPlayerAgent
+  `op=0x0a0a` bug, #108).
 - **CRC verification**: the packet crc is a plain CRC-32 (zlib `crc32()`) over everything
   after the 8-byte length+crc prefix; mismatches get expert warnings.
 - **Auto-follow**: service handoffs advertise the next service's address (ASCII `host:port`

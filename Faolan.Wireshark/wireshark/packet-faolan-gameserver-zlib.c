@@ -358,18 +358,29 @@ static void dissect_conan_packet(
     uint32_t pos = hdr_len_offset + 4;
     uint32_t sender_class = 0;
     uint32_t receiver_class = 0;
+    bool have_sender = false;
+    bool have_receiver = false;
 
-    if (pos < hdr_end && tvb_get_uint8(tvb, pos) == 0x0A) {
-        const uint32_t consumed = dissect_proto_endpoint(tvb, pinfo, pkt_tree, pos, hdr_end, true, &sender_class);
-        if (consumed == 0) {
-            expert_add_info(pinfo, pkt_item, &ei_faolan_pkt_malformed);
-            return;
+    /* The RpcHeader carries sender_id (protobuf field 1, tag 0x0A) and endpoint_id (field 2, tag 0x12),
+       but the two can appear in EITHER order: client->server requests write sender-then-receiver, while
+       our server->client replies swap the endpoints (WriteHeader(ReceiverBytes, SenderBytes, ...)) so the
+       receiver (0x12) is emitted first. Dispatch each endpoint by its own tag instead of assuming a fixed
+       order - otherwise a receiver-first reply skips the sender (class "None") and reads the opcode from
+       the sender's 0x0A tag+len bytes (the CSPlayerAgent op=0x0a0a misframe, #108). */
+    while (pos < hdr_end) {
+        const uint8_t tag = tvb_get_uint8(tvb, pos);
+        uint32_t consumed = 0;
+
+        if (tag == 0x0A && !have_sender) {
+            consumed = dissect_proto_endpoint(tvb, pinfo, pkt_tree, pos, hdr_end, true, &sender_class);
+            have_sender = true;
+        } else if (tag == 0x12 && !have_receiver) {
+            consumed = dissect_proto_endpoint(tvb, pinfo, pkt_tree, pos, hdr_end, false, &receiver_class);
+            have_receiver = true;
+        } else {
+            break;
         }
-        pos += consumed;
-    }
 
-    if (pos < hdr_end && tvb_get_uint8(tvb, pos) == 0x12) {
-        const uint32_t consumed = dissect_proto_endpoint(tvb, pinfo, pkt_tree, pos, hdr_end, false, &receiver_class);
         if (consumed == 0) {
             expert_add_info(pinfo, pkt_item, &ei_faolan_pkt_malformed);
             return;
