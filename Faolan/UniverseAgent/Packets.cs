@@ -40,7 +40,7 @@ namespace Faolan.UniverseAgent
 		private static Task SendInvalidLogin(INetworkClient client, InvalidLoginReasons reason)
 		{
 			return new PacketStream()
-				.WriteHeader(Sender, client.Session.ClientConversation, 0x00002001)
+				.WriteHeader(Sender, client.Session.ClientConversation, UniverseAgentResponseOpcodes.DispatchAckAuthenticate)
 				.WriteArray(0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 				.WriteByte(reason)
 				.SendAsync(client);

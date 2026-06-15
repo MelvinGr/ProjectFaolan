@@ -673,6 +673,7 @@
 		public enum PlayerAgentResponseOpcodes : ushort
 		{
 			Ox20B9 = 0x20b9,
+			Ox209C = 0x209c,
 			InitAuth = 0x2091,
 			SmallCharList = 0x20a5,
 			SendCharacterList = 0x20ef,
