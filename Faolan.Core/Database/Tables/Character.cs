@@ -37,6 +37,15 @@ namespace Faolan.Core.Database.Tables
 		public virtual ICollection<CharacterScaffoldPair> ScaffoldPairs { get; set; }
 		public virtual ICollection<CharacterSkill> Skills { get; set; }
 
+		// Per-character progression/state collections (inverse sides of the matching child tables, all cascade-delete
+		// with the character). Quests/Tags are the quest-state machine, RespawnPoints the resurrection points the
+		// character has discovered, Shortcuts the hotbar, Spells the learned spell set re-granted on login.
+		public virtual ICollection<CharacterQuest> Quests { get; set; }
+		public virtual ICollection<CharacterTag> Tags { get; set; }
+		public virtual ICollection<CharacterRespawnPoint> RespawnPoints { get; set; }
+		public virtual ICollection<CharacterShortcut> Shortcuts { get; set; }
+		public virtual ICollection<CharacterSpell> Spells { get; set; }
+
 		[ForeignKey(nameof(MapId))]
 		public virtual Map Map { get; set; }
 

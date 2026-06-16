@@ -198,14 +198,34 @@ namespace Faolan.Core.Database
 			modelBuilder
 				.Entity<CharacterShortcut>()
 				.HasOne(s => s.Character)
-				.WithMany()
+				.WithMany(c => c.Shortcuts)
+				.OnDelete(DeleteBehavior.Cascade);
+
+			// Quest state, quest/dialogue tags and discovered respawn points all delete with the character.
+			modelBuilder
+				.Entity<Character>()
+				.HasMany(c => c.Quests)
+				.WithOne(q => q.Character)
+				.HasForeignKey(q => q.CharacterId)
+				.OnDelete(DeleteBehavior.Cascade);
+			modelBuilder
+				.Entity<Character>()
+				.HasMany(c => c.Tags)
+				.WithOne(t => t.Character)
+				.HasForeignKey(t => t.CharacterId)
+				.OnDelete(DeleteBehavior.Cascade);
+			modelBuilder
+				.Entity<Character>()
+				.HasMany(c => c.RespawnPoints)
+				.WithOne(r => r.Character)
+				.HasForeignKey(r => r.CharacterId)
 				.OnDelete(DeleteBehavior.Cascade);
 
 			// Learned spells delete with the character; a character knows a given spell at most once.
 			modelBuilder
 				.Entity<CharacterSpell>()
 				.HasOne(s => s.Character)
-				.WithMany()
+				.WithMany(c => c.Spells)
 				.OnDelete(DeleteBehavior.Cascade);
 			modelBuilder
 				.Entity<CharacterSpell>()
