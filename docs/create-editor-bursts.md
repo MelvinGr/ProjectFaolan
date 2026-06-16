@@ -117,11 +117,18 @@ create-specific to decode, only builder wiring to do:
    - `StatUpdateIIR` (0x96B8DC59) — `(statId,value)` batch.
    - `SetMorphValueIIR` (0xBADF5A4B) — hair/texture resource morph.
    - `BehaviorControlCenterIIR` (0x642CD3D6) **short form** — behavior register (6 records).
+   - `BehaviorControlCenterIIR` (0x642CD3D6) **116-byte long form** (×3, #223) — the 28-byte short-form head plus
+     an 88-byte tail that binds the behavior to an **equipped item**: `[u32 index][u32 someId][u32 itemHandle×2]
+     [u32 0][u32 1][char[4] tag][byte[16] transform×2][8 ownerStamp×2][12 zero]`. The item handle, the 4-char
+     entity tag (`OPC1`/`M9W9`/`CUP5`) and the 16-byte transform (the item's pose as four big-endian u32) all
+     match the paired `DispatchAddItem` equipment piece earlier in the same burst; `ownerStamp`
+     (`B290805C 29E627CA`) is the fixed creator/timestamp pair that recurs burst-wide. Decoded by
+     `decode_create_iir_records.py`, built by `CreateEditorRecordBuilder.BuildBehaviorControlCenterIirLong`.
    - (`StatIIR`/`EnergyIIR`/`PlayfieldFIIR`/`GameTimeIIR` already had builders.)
 
    **Still verbatim** (handle-addressed via `IirId`, i.e. the only session-variable field is already
-   parameterized; the rest is fixed scripted/state content that needs deeper RE):
-   `BehaviorControlCenterIIR` **116-byte form** (×3, an 88-byte behavior-state tail with transforms + entity
-   tags), `RegenIIR` (×1, opaque), and `ScryScriptIIR` (the cutscene callback scripts — overlap the in-client
-   cutscene work). Plus the non-IIR `ApplySpell`, `RetailNpcConversationBurst`, and the 1.1 MB intro-cutscene
-   `RetailCreateWorldEntryBurst` (render/pacing-sensitive, needs in-client validation).
+   parameterized; the rest is fixed scripted/state content that needs deeper RE — #223):
+   `RegenIIR` (×1, opaque 13-byte payload — one record, can't triangulate the grammar from this capture alone),
+   and `ScryScriptIIR` (the cutscene callback scripts — overlap the in-client cutscene work). Plus the non-IIR
+   `ApplySpell`, `RetailNpcConversationBurst`, and the 1.1 MB intro-cutscene `RetailCreateWorldEntryBurst`
+   (render/pacing-sensitive, needs in-client validation).

@@ -77,6 +77,24 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void BehaviorControlCenterIirLong_MatchesCapturedBytes()
+		{
+			// The three 116-byte item-bound BehaviorControlCenterIIR records of the WorldPrep stream
+			// (handle 0x02000001, slot 9, behaviorId 42011, field5 8): each binds the behavior to one of the
+			// burst's equipment pieces (OPC1/M9W9/CUP5 + its handle + 16-byte transform). decode_create_iir_records.py
+			// validated all 3 against WorldPrepBurst.bin.
+			Assert.Equal(
+				"0000c350020000010004000000090000000a089bc8021801280830000000000000000010" +
+				"0004f2500004f25000000000000000014f504331" +
+				"037ac2fe60e046bf84923d28bad0f252037ac2fe60e046bf84923d28bad0f252" +
+				"b290805c29e627cab290805c29e627ca000000000000000000000000",
+				Convert.ToHexString(CreateEditorRecordBuilder.BuildBehaviorControlCenterIirLong(
+					0x02000001, 9, 42011, 1, 8, 0, 0, 0x10, 0x0004F250, "OPC1",
+					[0x03, 0x7A, 0xC2, 0xFE, 0x60, 0xE0, 0x46, 0xBF, 0x84, 0x92, 0x3D, 0x28, 0xBA, 0xD0, 0xF2, 0x52]))
+					.ToLowerInvariant());
+		}
+
+		[Fact]
 		public void CharacterActionIir_MatchesCapturedBytes()
 		{
 			// First + last CharacterActionIIR of the WorldPrep stream (handle 0x02000001): grants action ids

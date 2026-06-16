@@ -115,8 +115,8 @@ namespace Faolan.GameServer
 		// BehaviorControlCenterIIR (0x642CD3D6), short form (28 bytes): registers one behavior on an entity.
 		//   [u32 type][u32 handle][u16 0x0004][u32 slot][u32 msgLen][protobuf]
 		// protobuf = `08 <behaviorId> 18 <phase> 28 <field5> 30 <field6>` (all varints), msgLen = its length.
-		// (A longer 116-byte form carries an extra behavior-state tail with transforms + entity tags - not built
-		// here; those records stay verbatim, handle-addressed.) Decoded by Captures/decode_create_iir_records.py.
+		// (A longer 116-byte form carries an extra item-bound behavior-state tail - see
+		// BuildBehaviorControlCenterIirLong below.) Decoded by Captures/decode_create_iir_records.py.
 		public static byte[] BuildBehaviorControlCenterIir(uint handle, uint slot, uint behaviorId, uint phase,
 			uint field5, uint field6, uint type = CharacterWireType)
 		{
@@ -132,6 +132,47 @@ namespace Faolan.GameServer
 				.WriteUInt16((ushort)0x0004)
 				.WriteUInt32(slot)
 				.WriteArrayUInt32Length(protobuf)
+				.ToArray();
+		}
+
+		// BehaviorControlCenterIIR (0x642CD3D6), LONG form (116 bytes): the same 28-byte head as the short form
+		// above, plus an 88-byte behavior-state tail that binds the behavior to an EQUIPPED ITEM (the three records
+		// in WorldPrep each pair with one of the burst's DispatchAddItem equipment pieces - the item's handle, its
+		// 4-char entity tag and its transform all match):
+		//   <head: short-form bytes, slot 9, msgLen 10, protobuf 08 <behaviorId> 18 <phase> 28 <field5> 30 <field6>>
+		//   [u32 index][u32 someId][u32 itemHandle][u32 itemHandle][u32 0][u32 1][char[4] tag]
+		//   [byte[16] transform][byte[16] transform][8-byte ownerStamp][8-byte ownerStamp][12 zero bytes]
+		// The item handle + 4-char tag are repeated; the 16-byte transform is the item's pose packed as four
+		// big-endian u32 (the same x/y/z + rotation values the paired DispatchAddItem carries as fixed32 protobuf
+		// fields), also repeated; `ownerStamp` (0xB290805C 0x29E627CA) is the fixed creator/timestamp pair that
+		// recurs across the whole WorldPrep burst (semantics unpinned). Decoded from WorldPrepBurst.bin by
+		// Captures/decode_create_iir_records.py and locked byte-exact by CreateEditorRecordTests.
+		private static readonly byte[] BehaviorOwnerStamp = [0xB2, 0x90, 0x80, 0x5C, 0x29, 0xE6, 0x27, 0xCA];
+
+		public static byte[] BuildBehaviorControlCenterIirLong(uint handle, uint slot, uint behaviorId, uint phase,
+			uint field5, uint field6, uint index, uint someId, uint itemHandle, string tag, byte[] transform,
+			uint type = CharacterWireType)
+		{
+			var tagBytes = System.Text.Encoding.ASCII.GetBytes(tag);
+			if (tagBytes.Length != 4)
+				throw new System.ArgumentException("behavior entity tag must be 4 ASCII chars", nameof(tag));
+			if (transform.Length != 16)
+				throw new System.ArgumentException("behavior transform must be 16 bytes", nameof(transform));
+
+			return new FaolanStream()
+				.WriteArray(BuildBehaviorControlCenterIir(handle, slot, behaviorId, phase, field5, field6, type))
+				.WriteUInt32(index)
+				.WriteUInt32(someId)
+				.WriteUInt32(itemHandle)
+				.WriteUInt32(itemHandle)
+				.WriteUInt32(0u)
+				.WriteUInt32(1u)
+				.WriteArray(tagBytes)
+				.WriteArray(transform)
+				.WriteArray(transform)
+				.WriteArray(BehaviorOwnerStamp)
+				.WriteArray(BehaviorOwnerStamp)
+				.WriteArray(new byte[12])
 				.ToArray();
 		}
 
