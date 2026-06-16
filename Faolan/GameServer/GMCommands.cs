@@ -1063,12 +1063,17 @@ namespace Faolan.GameServer
 				return;
 			}
 
+			var previousLevel = character.Level;
 			character.Level = level;
 			character.RegenerateMaxStats();
 			await Database.SaveCharacter(character);
 
 			await SendStatUpdate(client, new CharacterStatBlock().Set(LegacyCharacterStatId.Level, level));
 			await SendVitals(client);
+			// On an increase, emit the retail level-up attribute feedback (one AttributeChanged line per primary) so
+			// the change shows the same as an XP-driven ding (#209); the vitals push above already raised the maxima.
+			if (level > previousLevel)
+				await SendLevelUpFeedback(client, level, (uint)(level - previousLevel));
 			await _agentServerDispatcher.SendSystemMessage(character.Id, $"Level set to {level} (relog to refresh the full character sheet).");
 		}
 

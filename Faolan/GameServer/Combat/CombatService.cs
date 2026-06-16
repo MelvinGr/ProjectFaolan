@@ -440,7 +440,7 @@ namespace Faolan.GameServer.Combat
 				character.Level = (ushort)Math.Min(character.Level + levelsGained, LevelingResolver.MaxLevel);
 				character.RegenerateMaxStats();
 				await _database.SetCharacterProgress(character.Id, character.Experience, character.Level);
-				await PushLevelUp(killer, character);
+				await PushLevelUp(killer, character, levelsGained);
 				_logger.LogInformation("Combat: {Name} gained {Xp} XP and reached level {Level}.", character.Name, xp, character.Level);
 				return;
 			}
@@ -490,10 +490,15 @@ namespace Faolan.GameServer.Combat
 			_combat.Remove(targetHandle);
 		}
 
-		// On level-up: raise the player's live vitals to the new max and refill them (a ding heals), then push the new
-		// Level + Exp/MaxExp + full vitals in one 0x96B8DC59 update.
-		private async Task PushLevelUp(INetworkClient killer, Character character)
+		// On level-up: emit the retail attribute-increase feedback (one AttributeChanged on-screen line per primary
+		// that rose - the VISIBLE half of a ding, #209), then raise the player's live vitals to the new max and refill
+		// them (a ding heals) and push the new Level + Exp/MaxExp + full vitals in one 0x96B8DC59 update.
+		private async Task PushLevelUp(INetworkClient killer, Character character, uint levelsGained)
 		{
+			var instance = killer.Session.Account.ClientInstance;
+			foreach (var (attributeId, amount) in AttributeGrowth.ForLevelGain(character.Class, character.Level, levelsGained))
+				await SendWorldFeedback(killer, AttributeChangedFeedback.Build(instance, attributeId, amount));
+
 			var vitals = GetOrAddPlayerVitals(killer);
 			var max = character.MaxStats ?? CharacterMaxStats.CreateDefaults(character.Class, character.Level);
 			vitals.MaxHealth = max.Health;
@@ -509,6 +514,16 @@ namespace Faolan.GameServer.Combat
 				.Set(LegacyCharacterStatId.Exp, character.Experience)
 				.Set(LegacyCharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
 			await SendStatUpdate(killer, block, killer.Session.Account.ClientInstance);
+		}
+
+		// Frames a FormatFeedbackIIR body (which already carries its own u32 length prefix) raw on the world
+		// conversation - unlike SendWorldPacket, which length-wraps a bare body.
+		private static Task SendWorldFeedback(INetworkClient client, byte[] feedbackBody)
+		{
+			return new PacketStream()
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteArray(feedbackBody)
+				.SendAsync(client);
 		}
 
 		// The NPC's authoritative live vitals: the world-model entity's if it is a tracked NPC (also returned, so the
