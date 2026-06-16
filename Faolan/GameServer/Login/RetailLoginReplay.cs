@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Crypt;
 using Faolan.Core.Data;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
@@ -33,7 +34,6 @@ namespace Faolan.GameServer
 		// 0x00081906 in the capture); every other polled entity gets status 0x00. This is an NPC handle from the
 		// burst, NOT the player (the client never polls its own handle), so it is unchanged across characters.
 		private const uint SpawnCheckStatusTwoHandle = 0x00081906;
-		private const uint StarterFirstBagItem = 3774542; // Royal Signet (first bag slot)
 
 		// The Tortage beach world-entry snapshot (0x737A6DF9) embeds quest 10238 in its tails for EVERY character
 		// (verified across the Strie / hoxxling / randochar captures - it is the canonical beach starting quest, not
@@ -50,7 +50,32 @@ namespace Faolan.GameServer
 
 		// Default starter gear for beach characters (item ids that are fully buildable: p_items identity + harvested
 		// archetype), keyed by the CharacterEquipment slot they go in. Slot-appropriate so the client accepts them.
-		private const uint StarterWristItem = 3361557; // Slave Manacles (wrist, 0x12)
+		// Harvested from the create-flow captures (#220): every fresh beach character wears the Slave Manacles, and
+		// the rest of the slave outfit is sex-specific - males are bare-chested with a loincloth, females wear a gown
+		// + bottom (the exact garment COLOUR is randomised per character in retail, so one representative set is used
+		// per sex). Character.Sex 0 = male, 1 = female (the create-flow captures confirm this against the worn gear).
+		private const uint StarterWristItem = 3361557; // Slave Manacles (wrist, 0x12) - universal
+
+		// Male (Sex 0): loincloth in the legs slot, no chest item.
+		private const uint StarterMaleLegsItem = 3805575; // Red Loincloth
+
+		// Female (Sex 1): a gown (chest) + matching bottom (legs).
+		private const uint StarterFemaleChestItem = 324139; // Silver Gown
+		private const uint StarterFemaleLegsItem = 324171; // Silver Bottom
+
+		// Per-class starting WEAPON (the main-hand-left slot, 0x06), harvested from the *create* captures (#220):
+		// Tortage hands each recruit an improvised weapon, and it is CLASS-specific (per-archetype is disproven - the
+		// two Soldier classes in the captures, Conqueror and Guardian, do NOT share a weapon). Coverage is only the
+		// classes the create dumps actually contain, like the ability kit's partial coverage; the rest start unarmed
+		// until more create captures land. Necromancer is confirmed by two independent create dumps (randochar +
+		// faolanx); Assassin by one (Strie). Barbarian + Guardian create dumps show NO starting weapon. (The Fleshy
+		// Club / Broken Oar seen elsewhere are NOT create-flow starters - they came from a level-2 char and a login
+		// capture respectively, so they are deliberately excluded.)
+		private static readonly Dictionary<Class, uint> StarterClassWeapon = new()
+		{
+			[Class.Necromancer] = 3395744, // Broken Bottle
+			[Class.Assassin] = 3735601     // Marlin Spike
+		};
 
 		// Rebuilds the (already instance-substituted) world-entry inventory snapshot (0x737A6DF9): patches the LIVE
 		// character's level/vitals into the tails and substitutes the player's DB containers for the captured ones
@@ -262,13 +287,20 @@ namespace Faolan.GameServer
 
 				// Seed the default starter gear ONLY for a brand-new equipment row. Re-filling emptied slots on every
 				// login would undo the player's own unequips (which persistence writes back), so an existing row is
-				// left exactly as the player left it.
+				// left exactly as the player left it. Sex-specific slave outfit (#220): both sexes wear the manacles;
+				// males add a loincloth (legs), females a gown (chest) + bottom (legs). See the Starter* constants.
+				var female = character.Sex == Sex.Female;
 				equipment = new CharacterEquipment
 				{
 					Id = character.Id,
 					CharacterId = character.Id,
 					Wrist = await Database.GetItem(StarterWristItem),
-					FirstPosBag = await Database.GetItem(StarterFirstBagItem)
+					Chest = female ? await Database.GetItem(StarterFemaleChestItem) : null,
+					Legs = await Database.GetItem(female ? StarterFemaleLegsItem : StarterMaleLegsItem),
+					// Class-specific improvised weapon (main-hand-left); only the classes the create dumps cover.
+					MainHandLeft = StarterClassWeapon.TryGetValue(character.Class, out var weaponId)
+						? await Database.GetItem(weaponId)
+						: null
 				};
 				await Database.SaveCharacterEquipment(equipment);
 
