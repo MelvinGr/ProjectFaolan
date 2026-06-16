@@ -159,6 +159,28 @@ The sibling ops the RE listed — `DispatchForgetSpell 0x200B`, `RemoveSpecialAb
 0x2011`, `PassiveAbilityEquip/Unequip` — have **zero** packets on this class in any capture, so no byte-exact
 oracle; deferred under #73.
 
+## Buffs: ApplySpell self-buffs, the mount buff, the login shield (#26 / #221)
+Buffs ride **`0x6B87E316` ApplySpell (MagicBuff)**, the same op as a combat cast. A **self-buff** is
+`applyTo == applyFrom == the entity's own handle`:
+`[subop][0000C350][applyTo][u16 seq][spellId u32][0000C350][applyFrom][data]`. `PostReadyFollowUp.ApplySpell`
+builds it and registers `applyTo == applyFrom` casts in `WorldEntity.ActiveBuffs` (so `.buffs` / `CancelBuff`
+`0x201E` / the expiry tick track them). The **wire spell id is `(baseId << 8) | rank`** — apply uses rank `00`,
+remove uses rank `01`; the payload embeds the same `baseId` at offset **[22..26]**.
+
+**Mount buff — fully captured** (`account-faolan-character-necrol80-login-mount_move_dismount`, the only 2
+ApplySpell packets in it): mount up = self ApplySpell **`0x31EB1500`** + a **54-byte** payload
+(`…0031eb15…` at [22..26]); dismount = **`0x31EB1501`** (base|rank 01) with an **empty** payload. So the mount
+**buff** apply/remove is a real oracle now — distinct from the demol80 `0x3BAD7D` summon. The mount **entity
+spawn** is still gated on the mid-session-spawn blocker (#26), so the buff renders but the horse model does not.
+
+**Persistent login shield (#221).** `GrantStartingBuffs` re-applies a shield self-buff to **every** character
+(class-agnostic) in `FlushPendingPost205FFollowUp`, right after the ability/spell re-grants. That flush is also
+re-armed on teleport/changemap re-entry, so the buff is re-asserted on **each playfield change** as well.
+**INTERIM content:** spell `0x02387E00` (Scythe Shield — the buff our existing ApplySpell payload already encodes;
+base `0x02387E`, apply rank `00`). The wire grammar is validated against the captured mount buff above, so the
+shape is sound, but **"Shield of the Risen" is in no capture** — its exact id/payload is unknown. **In-client
+verification pending** (needs-testing on #221): confirm a server-pushed self-buff renders the intended shield.
+
 ## Starting gear (#220)
 A brand-new beach character is seeded its slave outfit in `RetailLoginReplay.EnsureBeachStarterEquipment`, all
 harvested from the `*create*` captures (one row, only if absent — an existing equipment row is left as the player
