@@ -77,18 +77,17 @@ create-specific to decode, only builder wiring to do:
 - **ScryScriptIIR** (`0xA36D3B74`) — the cutscene/editor callback scripts; see `docs/create-cutscene-camera-paths.md`.
 
 ## 4. What's left (the #189 backlog)
-1. ~~Construct `SimpleCharFullUpdate` (editor avatar)~~ **DONE** — `CreateEditorAvatarBuilder.BuildBody`
-   reconstructs the avatar record (pedestal pose `262.931, 6.014, 280.970`) through `SpawnPacketBuilder`:
-   the transform is rebuilt from the typed `ProtoVec3`/`ProtoQuat`, and the two live-session values — the
-   entity **handle** and the **playfield instance** (the `18 <varint>` token the MapChange advertises) — are
-   threaded/spliced through. The **identity/appearance** is reconstructed by decoding the template's
-   `ProtoCoreCharacterIIR` and re-encoding it (a byte-identical round-trip — no protobuf drift) — the seam where
-   the create flow's live chosen looks will be substituted via the `BuildBody(handle, playfield, looks)` overload.
-   Byte-exact for the captured handle/playfield (`CreateEditorAvatarTests`, golden `SpawnEditorAvatar.bin`), and
-   the constructed record reproduces `InitialBurst.bin` in the live burst path (`BurstGoldenTests`).
-   (Note: this targets the `0x0009FF92` "Stygian Female" scene-pedestal avatar; the live player-preview
-   record — `Character…`, handle = char id — is already covered by `PlayerSpawnScaffoldCodec` /
-   `SpawnEditorPreview.bin`.)
+1. ~~Construct `SimpleCharFullUpdate` (editor scene characters)~~ **DONE** — `CreateEditorCharBuilder.Reconstruct`
+   rebuilds every scene-pedestal `SimpleChar` (the "Stygian Female" avatar + the four example models: Saddur /
+   Male+Female Template / Stygian Slaver) through `SpawnPacketBuilder`: the **transform** from the typed
+   `ProtoVec3`/`ProtoQuat` pose, the **identity/appearance** by decoding + re-encoding the `ProtoCoreCharacterIIR`
+   (a byte-identical round-trip — no protobuf drift), with the **playfield instance** (the `18 <varint>` token)
+   threaded in. The still-un-lifted pre-IIR scaffold block is carried verbatim from the record (DB-sourcing these
+   from the `NpcSpawns` rows is blocked on that lift, #185/#54 — the captured rows are from a different session,
+   so their pre-IIR blocks don't match). Self-reconstruction is byte-exact (`CreateEditorSceneCharTests`); the
+   full burst still equals `InitialBurst.bin` (`BurstGoldenTests`). The live `Character…` preview stays on
+   `IirId` (it carries the live client instance as its handle; also already covered by `PlayerSpawnScaffoldCodec`
+   / `SpawnEditorPreview.bin`) — the seam for the eventual live chosen-looks preview.
 2. ~~Construct the editor-scene `SimpleDynel` props~~ **DONE** — the 18 props are `WorldObjects` rows on map
    4000 in `faolan.db` (same localized ids + keys). `SendRetailCreateEditorInitialBurst` now takes the
    `IDatabaseRepository` and SOURCES each scene dynel from its row (`BuildSceneDynel`): matched by identity
@@ -105,8 +104,8 @@ create-specific to decode, only builder wiring to do:
    map id + the session playfield token (carried twice); SetDayTime from the captured day-time/timestamp/rate.
    Wiring `InitialBurst.bin` surfaced an un-pinned u32 at PlayfieldFIIR `[58:62]` (0 in the test capture,
    `0x01000000` here) — added as the `field58` pass-through param. Locked by `BurstGoldenTests`.
-4. **Remaining** — the verbatim records still in `RetailCreateEditorInitialBurst` (the 5 other scene
-   `SimpleChar` props: Saddur / Male+Female Template / Stygian Slaver / the live `Character…` preview) and the
-   other create bursts (`CreationScriptBurst`, `WorldPrepBurst`, `RetailCreateWorldEntryBurst`,
-   `RetailNpcConversationBurst`) stay as the interim until each is constructed and proven byte-exact, per the
-   project's decode-then-golden discipline.
+4. **Remaining** — every record in `RetailCreateEditorInitialBurst` is now constructed except the live
+   `Character…` preview (`IirId`, intentionally verbatim — see item 1). What's left is the OTHER create bursts:
+   `CreationScriptBurst`, `WorldPrepBurst`, the 1.1 MB `RetailCreateWorldEntryBurst`, and
+   `RetailNpcConversationBurst` — they stay verbatim until each is decoded/constructed and proven byte-exact,
+   per the project's decode-then-golden discipline.
