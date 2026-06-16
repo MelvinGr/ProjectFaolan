@@ -456,19 +456,39 @@ namespace Faolan.GameServer.World
 			_logger.LogInformation("Loot: {Name} opened the loot window on {Bag} 0x{Handle:X8}.", player.Name, bag.Name, bag.Handle);
 		}
 
-		// Completes a "loot all": the retail loot-all finish, decoded from the hoxxling gameplay capture (frame 4470).
-		// Retail sends NO inventory-add for normal loot - the client moves the items from the bag to the backpack
-		// LOCALLY; the server just signals the removal and tears the emptied bag down. Sequence (all to the looter):
-		//   LootRemoveItems (the "items taken" signal) -> DispatchCloseLootBag (0x2038, close the window) ->
-		//   NewCurrentLooter/NewAllowedLooter reset -> n3ToClientFade -> UpdateSimpleDynel, then drop the bag.
-		// Cash is auto-looted on open (separate TryLootCash), so the bag holds no coins by the time this runs.
-		public async Task FinishLootAll(INetworkClient client, uint bagHandle)
+		// Take ONE item from a bag by its display index - TryLootItem (0x2046), the single drag-out. Returns the item
+		// template id removed (or null if the bag/index is invalid); remaining items shift down to match the client's
+		// re-indexed view. (Loot-all uses TakeBagItems, which clears them all at once.)
+		public uint? TakeBagItem(INetworkClient client, uint bagHandle, int index)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null || !_sim.World.ZoneFor(player.MapId).TryGet(bagHandle, out var bag) || !bag.IsLootable)
+				return null;
+			if (index < 0 || index >= bag.LootItems.Count)
+				return null;
+
+			var item = bag.LootItems[index];
+			bag.LootItems.RemoveAt(index);
+			_logger.LogInformation("Loot: {Player} loots item #{Index} (0x{Item:X}) from bag 0x{Handle:X8} ({Left} left).", player.Name, index, item, bagHandle, bag.LootItems.Count);
+			return item;
+		}
+
+		// Called after items are taken from a bag (loot-all OR a single drag): confirm the take to the client with
+		// LootRemoveItems, and tear the bag down ONLY once it is FULLY emptied (no items AND no coins). A partial loot
+		// leaves the bag in the world with its remaining contents; it still fades on its own expiry (TickExpiry).
+		// Retail loot-all finish decoded from the hoxxling gameplay capture (frame 4470): LootRemoveItems ->
+		// DispatchCloseLootBag (0x2038) -> NewCurrentLooter/NewAllowedLooter reset -> n3ToClientFade -> UpdateSimpleDynel.
+		public async Task AfterLootTake(INetworkClient client, uint bagHandle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null || !_sim.World.ZoneFor(player.MapId).TryGet(bagHandle, out var bag))
 				return;
 
 			await SendWorldIir(client, WorldLoot.BuildLootRemoveItemsBody(bag.Handle));
+
+			if (bag.LootItems.Count > 0 || bag.CashTin > 0)
+				return; // items/coins remain - keep the bag open in the world
+
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x58),
 					ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, client.Session.Account.ClientInstance),
@@ -482,7 +502,7 @@ namespace Faolan.GameServer.World
 			await SendWorldIir(client, WorldLoot.BuildBagConsumedVisualBody(bag.Handle));
 
 			_sim.World.ZoneFor(bag.MapId).Remove(bag.Handle);
-			_logger.LogInformation("Loot: {Name} looted all from {Bag} 0x{Handle:X8} (bag consumed).", player.Name, bag.Name, bag.Handle);
+			_logger.LogInformation("Loot: bag 0x{Handle:X8} fully looted; consumed + faded.", bag.Handle);
 		}
 
 		// On world entry: re-send the player's persisted active quests so their journal is restored.
@@ -837,9 +857,10 @@ namespace Faolan.GameServer.World
 				slot++;
 			}
 
-			// Size the container to what we actually put in it: keeping the template's MaxSize capped the window to the
-			// captured bag's item count (e.g. a 2-slot template hid the 3rd rolled item).
-			contents.Inventory.MaxSize = slot;
+			// Fixed loot-bag capacity (the captured "Chest" bag carried MaxSize=10 regardless of item count, items at
+			// Pos 0..n-1). Sizing it to the exact item count truncated the window by one slot (the off-by-one that hid
+			// the last item + shifted the drag index); use the captured capacity, widened if a bag ever holds more.
+			contents.Inventory.MaxSize = Math.Max(10u, slot);
 
 			var newContents = LootBagMessageCodec.BuildContents(contents);
 			var newRecordLen = contentsStart + newContents.Length;

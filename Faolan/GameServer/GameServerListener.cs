@@ -559,10 +559,25 @@ namespace Faolan.GameServer
 					if (items.Count > 0)
 						Logger.LogInformation("Loot: granted {Count} item(s) from bag 0x{Bag:X8} to {Player}.", items.Count, bagHandle, client.Session.Character?.Name);
 
-					// Tear the emptied bag down the retail way: LootRemoveItems (clears the bag's item list) +
-					// DispatchCloseLootBag + looter-reset + n3ToClientFade, so the looted bag empties and fades away
-					// instead of lingering with its items still shown.
-					await _broadcaster.FinishLootAll(client, bagHandle);
+					// Confirm the take + (since loot-all empties it) consume/fade the bag.
+					await _broadcaster.AfterLootTake(client, bagHandle);
+
+					break;
+				}
+
+				case GameServerOpcodes.TryLootItem: // single drag of one item out of the loot window
+				{
+					packet.Body.ReadUInt32();                  // loot typetag (0xC87A)
+					var bagHandle = packet.Body.ReadUInt32();
+					var itemIndex = packet.Body.ReadUInt32();  // which item (display index) the player dragged
+
+					var item = _broadcaster.TakeBagItem(client, bagHandle, (int)itemIndex);
+					if (item != null)
+						await GrantItemToBackpack(client, item.Value);
+
+					// Confirm the take; AfterLootTake only consumes/fades the bag once it is fully emptied, so a
+					// partial drag leaves it open with the remaining items.
+					await _broadcaster.AfterLootTake(client, bagHandle);
 
 					break;
 				}

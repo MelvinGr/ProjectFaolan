@@ -219,6 +219,7 @@ namespace Faolan.Core.Network.Packets
 			TryLootAll = 0x2043, // loot-window take; body = [loot typetag][bag handle]
 			CloseLootBag = 0x2044, // client closes the loot window; body = [loot typetag][bag handle]
 			TryLootCash = 0x2045, // loot the bag's coins; body = [loot typetag][bag handle]; fires on every loot (1:1 with TryLootAll)
+			TryLootItem = 0x2046, // single drag-out; body = [loot typetag][bag handle][u32 itemIndex][0000c350][playerHandle][0000000a]
 			PerformSpecialAction = 0x205A,
 			DoSkillSellback = 0x205C,
 			PlayStockphraseAsSubtitle = 0x205E,
