@@ -454,19 +454,6 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerOpcodes.SetSprintInputState: // GameCharAgentProject - the sprint key (x2092 in captures)
-				{
-					// Sprint is a fire-and-forget input-state update; retail sends NO reply. Verified against the
-					// gameplay captures: 208/786/267 SetSprintInputState uploads vs only a baseline of
-					// ReportDimensionId downloads (login + real dimension changes), with no 1:1 correlation - so the
-					// old "answer each sprint with ReportDimensionId" was a spurious packet retail never sends (#72).
-					// Just record the state; no response.
-					if (packet.Body != null)
-						LogPacketBodyDebug("GameServer 0x200C body", packet.Body.ToArray());
-
-					break;
-				}
-
 				case GameServerOpcodes.UpdateQuestMarkerNPC:
 				{
 					if (packet.Body?.Length >= sizeof(uint) * 4)

@@ -29,8 +29,14 @@ namespace Faolan.GameServer
 			var opcode = (ushort)packet.Opcode;
 			if (opcode != 0x2000)
 			{
-				// Other GameCharAgentProject methods (e.g. SetSprintInputState 0x200C) are not loading gates and
-				// retail's replies aren't decoded yet - log and no-op rather than misparse them as a 0x2000 ping.
+				// Other GameCharAgentProject methods are not loading gates and retail's replies aren't decoded yet -
+				// log and no-op rather than misparse them as a 0x2000 ping. The dominant one is SetSprintInputState
+				// (0x200C, the sprint key - x2092 in captures): a fire-and-forget input-state update that retail does
+				// NOT reply to (verified - sprint uploads vastly outnumber ReportDimensionId downloads with no 1:1
+				// correlation; the old "answer each sprint with a ReportDimensionId" was a spurious packet, #72). This
+				// is the SOLE sprint path: every SetSprintInputState rides this class (receiver 0x5B9756FC), so it is
+				// routed here by class id and never reaches the opcode switch (where 0x200C collides with other
+				// methods) - so there is no separate sprint case there.
 				Logger.LogDebug("GameCharAgentProject opcode 0x{Opcode:X4} (unhandled, no reply).", opcode);
 				return;
 			}
