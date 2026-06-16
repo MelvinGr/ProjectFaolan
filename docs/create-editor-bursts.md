@@ -106,6 +106,12 @@ create-specific to decode, only builder wiring to do:
    `0x01000000` here) — added as the `field58` pass-through param. Locked by `BurstGoldenTests`.
 4. **Remaining** — every record in `RetailCreateEditorInitialBurst` is now constructed except the live
    `Character…` preview (`IirId`, intentionally verbatim — see item 1). What's left is the OTHER create bursts:
-   `CreationScriptBurst`, `WorldPrepBurst`, the 1.1 MB `RetailCreateWorldEntryBurst`, and
-   `RetailNpcConversationBurst` — they stay verbatim until each is decoded/constructed and proven byte-exact,
-   per the project's decode-then-golden discipline.
+   - **`WorldPrepBurst`**: `CharacterActionIIR` (0x6B6FD368) DECODED + built — `BuildCharacterActionIir` grants
+     one action/ability id (`[type][handle][0][0x1D][16x00][u32 actionId][8x00]`, 41 bytes); the burst's 26
+     records are wired to it (`Captures/decode_character_action.py`, `CreateEditorRecordTests`, golden-locked).
+     Still verbatim there: `ComboBookIIR`×12, `BehaviorControlCenterIIR`×5, `RegenIIR`×1.
+   - **`CreationScriptBurst`**: `StatIIR`/`EnergyIIR` have builders; `StatUpdateIIR`, `SetMorphValueIIR`,
+     `BehaviorControlCenterIIR`, `ScryScriptIIR`, `ApplySpell` still need builders.
+   - **`RetailNpcConversationBurst`** and the 1.1 MB **`RetailCreateWorldEntryBurst`** (the intro cutscene —
+     render/pacing-sensitive, needs in-client validation) are untouched.
+   Each stays verbatim until decoded/constructed and proven byte-exact, per the decode-then-golden discipline.

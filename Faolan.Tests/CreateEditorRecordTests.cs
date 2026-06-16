@@ -35,6 +35,19 @@ namespace Faolan.Tests
 			Assert.Equal("0000c350021662c80100000000", Convert.ToHexString(bytes).ToLowerInvariant());
 		}
 
+		[Fact]
+		public void CharacterActionIir_MatchesCapturedBytes()
+		{
+			// First + last CharacterActionIIR of the WorldPrep stream (handle 0x02000001): grants action ids
+			// 0x012C and 0x050E24 (decode_character_action.py validated all 26 records).
+			Assert.Equal(
+				"0000c35002000001000000001d000000000000000000000000000000000000012c0000000000000000",
+				Convert.ToHexString(CreateEditorRecordBuilder.BuildCharacterActionIir(0x02000001, 0x0000012C)).ToLowerInvariant());
+			Assert.Equal(
+				"0000c35002000001000000001d0000000000000000000000000000000000050e240000000000000000",
+				Convert.ToHexString(CreateEditorRecordBuilder.BuildCharacterActionIir(0x02000001, 0x00050E24)).ToLowerInvariant());
+		}
+
 		[Theory]
 		// fa0 (Stygian Galley) and faa (Tortage Island) MapChange records from the create captures.
 		[InlineData(260f, 0f, 290f, 0x00000FA0u, 0x00000000u, 3u, 0x01EA984Eu, 15f, 13.949005126953125f, 0x00000080u,

@@ -45,6 +45,24 @@ namespace Faolan.GameServer
 				.ToArray();
 		}
 
+		// CharacterActionIIR (0x6B6FD368): grants one action/ability id to an entity. 41 bytes:
+		//   [u32 type][u32 handle][u32 0][u8 0x1D][16x 0x00][u32 actionId][8x 0x00]
+		// The create-editor WorldPrep burst streams one per granted id (the same ability/feat id space as the
+		// player-spawn scaffold's id list - e.g. 0x050E24). Decoded by Captures/decode_character_action.py and
+		// validated byte-exact against every record in the WorldPrep capture (CreateEditorRecordTests).
+		public static byte[] BuildCharacterActionIir(uint handle, uint actionId, uint type = CharacterWireType)
+		{
+			return new FaolanStream()
+				.WriteUInt32(type)
+				.WriteUInt32(handle)
+				.WriteUInt32(0u)
+				.WriteByte((byte)0x1D)
+				.WriteArray(new byte[16])
+				.WriteUInt32(actionId)
+				.WriteArray(new byte[8])
+				.ToArray();
+		}
+
 		// PlayfieldFIIR (0x5D85BFC7, "MapChange"): announces the playfield the client is entering - its reference
 		// position (a Vec3, raw-body big-endian floats), the map id, the entering character instance, and the live
 		// per-session playfield token (carried TWICE). 103 bytes; framing decoded from the create captures
