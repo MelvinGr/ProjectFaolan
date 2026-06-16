@@ -74,6 +74,33 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			return bytes;
 		}
 
+		// GENERATES the quest PORTION of the tails (@0..1292 = Quest_c journal + @609 objective region + index) from a
+		// quest's DB definition + its seeded snapshot-generation fields, with the player's live `instance` (#186). The
+		// three regions are byte-exact for the beach starter (QuestcGenerationTests). Used by the gated production path
+		// (RetailLoginReplay, FAOLAN_GENERATE_BEACH_QUEST_TAILS) to splice the GENERATED quest region over the captured
+		// tails - byte-identical for a fresh beach char, so it's the first construct-from-DB step in the real snapshot.
+		public const int QuestPortionLength = 1292;
+
+		public static byte[] BuildBeachQuestPortion(QuestDefinition def, uint state, uint instance)
+		{
+			ArgumentNullException.ThrowIfNull(def);
+
+			var quests = new QuestcRegion
+			{
+				Records = { QuestcRecord.BuildSingle(def, state, def.SnapshotN, def.SnapshotFieldEc, def.SnapshotFieldF0, def.SnapshotFieldF8) }
+			};
+			var objectives = QuestObjectiveRegion.Build(def, instance);
+			var goalSteps = (def.IndexGoalSteps ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(uint.Parse).ToArray();
+			var index = QuestIndexRegion.Build(
+				[def.QuestId], goalSteps, def.IndexMarker, def.IndexTableField1, def.IndexTableField2, def.IndexTableField3,
+				def.QuestId, def.IndexTrailerWord);
+
+			byte[] portion = [.. quests.ToArray(), .. objectives.ToArray(), .. index.ToArray()];
+			if (portion.Length != QuestPortionLength)
+				throw new InvalidOperationException($"generated quest portion is {portion.Length} B, expected {QuestPortionLength}");
+			return portion;
+		}
+
 		// Replaces every big-endian uint32 occurrence of `find` with `replace` (the tails are raw records, not
 		// protobuf, so entity references appear as raw 4-byte big-endian values).
 		private static void ReplaceRawUInt32(byte[] data, uint find, uint replace)

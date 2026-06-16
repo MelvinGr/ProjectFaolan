@@ -84,6 +84,20 @@ namespace Faolan.Tests
 			Assert.Equal(template[..1292], built);
 		}
 
+		// The production helper (gated FAOLAN_GENERATE_BEACH_QUEST_TAILS path) builds the quest portion byte-identical
+		// to the beach template's @0..1292 - so flipping the flag splices identical bytes for a fresh beach char. #186.
+		[Fact]
+		public async Task BuildBeachQuestPortion_MatchesTemplate_ByteExact()
+		{
+			var def = await LoadDefinition(BeachStarterQuestId);
+			Assert.NotNull(def);
+
+			var portion = BeachTailsBuilder.BuildBeachQuestPortion(def, state: BeachState, instance: 0x02165EFF);
+
+			Assert.Equal(BeachTailsBuilder.QuestPortionLength, portion.Length);
+			Assert.Equal(File.ReadAllBytes(TemplatePath)[..1292], portion);
+		}
+
 		private static async Task<QuestDefinition> LoadDefinition(uint questId)
 		{
 			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={DbPath}").Options;

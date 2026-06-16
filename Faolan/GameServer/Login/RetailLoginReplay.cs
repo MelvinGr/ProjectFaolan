@@ -66,7 +66,7 @@ namespace Faolan.GameServer
 		// IMPORTANT: built entirely with manual byte assembly + manual CRC and the ORIGINAL packet's header copied
 		// verbatim - NOT via PacketStream/WriteLengthHash. An earlier PacketStream-based rebuild stalled the client
 		// on the loading screen even though its output was byte-exact, whereas the manual byte path works.
-		private byte[] BuildBeachInventoryPacket(byte[] substitutedPacket, Character character, CharacterEquipment equipment = null, CharacterInventory[] inventoryRows = null, IReadOnlyList<(uint QuestId, byte[] Block)> extraQuestBlocks = null)
+		private byte[] BuildBeachInventoryPacket(byte[] substitutedPacket, Character character, CharacterEquipment equipment = null, CharacterInventory[] inventoryRows = null, IReadOnlyList<(uint QuestId, byte[] Block)> extraQuestBlocks = null, byte[] generatedQuestPortion = null)
 		{
 			var conanPacket = new ConanPacket(substitutedPacket);
 			var body = new FaolanStream(conanPacket.Body.ReadArrayUInt32Length());
@@ -161,6 +161,18 @@ namespace Faolan.GameServer
 			// Author the character's accepted quests (beyond the beach starter) into the tails so they show in the
 			// J-panel on login (SnapshotQuestInjector; FAOLAN_SNAPSHOT_QUESTS). A no-op when none / the flag is off.
 			var tailsBytes = parts.Tails.ToArray();
+
+			// FAOLAN_GENERATE_BEACH_QUEST_TAILS (opt-in): splice the DB-GENERATED quest portion (Quest_c + @609 +
+			// index, built from the character's beach quest definition) over the captured tails' @0..1292 region. For a
+			// fresh beach char this is byte-identical to the captured region, so it's a safe first construct-from-DB
+			// step in the REAL login snapshot (#186) - flip the flag and confirm chat connects in-client.
+			if (generatedQuestPortion is { Length: BeachTailsBuilder.QuestPortionLength } && tailsBytes.Length >= BeachTailsBuilder.QuestPortionLength)
+			{
+				var identical = tailsBytes.AsSpan(0, BeachTailsBuilder.QuestPortionLength).SequenceEqual(generatedQuestPortion);
+				Array.Copy(generatedQuestPortion, 0, tailsBytes, 0, BeachTailsBuilder.QuestPortionLength);
+				Logger.LogInformation("Snapshot quests: spliced DB-generated quest portion ({Len} B; identical-to-captured={Same}).", BeachTailsBuilder.QuestPortionLength, identical);
+			}
+
 			if (extraQuestBlocks is { Count: > 0 })
 			{
 				var before = tailsBytes.Length;
@@ -514,6 +526,25 @@ namespace Faolan.GameServer
 			// - snapshot-tails surgery is in-client-gated; bisect the block length live. docs/quest-log-handover.md.
 			var snapshotQuestBlocks = await BuildSnapshotQuestBlocks(client, liveInstance);
 
+			// FAOLAN_GENERATE_BEACH_QUEST_TAILS (opt-in, default off): generate the snapshot's quest portion (Quest_c +
+			// @609 + index) from the beach starter's DB definition instead of carrying the captured one - the first
+			// from-DB construct in the REAL login snapshot (#186). Byte-identical for a fresh beach char, so safe to
+			// flip; the in-client chat-connect smoke test confirms the client accepts it. state 1 = active on login.
+			byte[] generatedBeachQuestPortion = null;
+			if (Environment.GetEnvironmentVariable("FAOLAN_GENERATE_BEACH_QUEST_TAILS") == "1")
+			{
+				try
+				{
+					var beachDef = await Database.GetQuestDefinition(WorldQuest.BeachStarterQuestId);
+					if (beachDef is { Goals.Count: > 0 } && !string.IsNullOrEmpty(beachDef.IndexGoalSteps))
+						generatedBeachQuestPortion = BeachTailsBuilder.BuildBeachQuestPortion(beachDef, state: 1, liveInstance);
+				}
+				catch (Exception ex)
+				{
+					Logger.LogWarning(ex, "Generated beach quest portion failed; keeping the captured quest region.");
+				}
+			}
+
 			foreach (var packet in packets)
 			{
 				// Re-address the capture's instance to the logged-in character so the burst works for any character.
@@ -527,7 +558,7 @@ namespace Faolan.GameServer
 				{
 					// The world-entry snapshot: tails patched to the live character, containers substituted with the
 					// player's DB items (BuildBeachInventoryPacket) - this is THE inventory delivery (bag + doll).
-					pkt = BuildBeachInventoryPacket(pkt, client.Session.Character, equipment, inventoryRows, snapshotQuestBlocks);
+					pkt = BuildBeachInventoryPacket(pkt, client.Session.Character, equipment, inventoryRows, snapshotQuestBlocks, generatedBeachQuestPortion);
 				}
 				else if (TryRebuildPlayerSpawnFromDb(client, equipment, scaffoldCharacter, pkt, out var rebuilt))
 				{
