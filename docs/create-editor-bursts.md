@@ -105,13 +105,20 @@ create-specific to decode, only builder wiring to do:
    Wiring `InitialBurst.bin` surfaced an un-pinned u32 at PlayfieldFIIR `[58:62]` (0 in the test capture,
    `0x01000000` here) — added as the `field58` pass-through param. Locked by `BurstGoldenTests`.
 4. **Remaining** — every record in `RetailCreateEditorInitialBurst` is now constructed except the live
-   `Character…` preview (`IirId`, intentionally verbatim — see item 1). What's left is the OTHER create bursts:
-   - **`WorldPrepBurst`**: `CharacterActionIIR` (0x6B6FD368) DECODED + built — `BuildCharacterActionIir` grants
-     one action/ability id (`[type][handle][0][0x1D][16x00][u32 actionId][8x00]`, 41 bytes); the burst's 26
-     records are wired to it (`Captures/decode_character_action.py`, `CreateEditorRecordTests`, golden-locked).
-     Still verbatim there: `ComboBookIIR`×12, `BehaviorControlCenterIIR`×5, `RegenIIR`×1.
-   - **`CreationScriptBurst`**: `StatIIR`/`EnergyIIR` have builders; `StatUpdateIIR`, `SetMorphValueIIR`,
-     `BehaviorControlCenterIIR`, `ScryScriptIIR`, `ApplySpell` still need builders.
-   - **`RetailNpcConversationBurst`** and the 1.1 MB **`RetailCreateWorldEntryBurst`** (the intro cutscene —
-     render/pacing-sensitive, needs in-client validation) are untouched.
-   Each stays verbatim until decoded/constructed and proven byte-exact, per the decode-then-golden discipline.
+   `Character…` preview (`IirId`, intentionally verbatim — see item 1). Across `WorldPrepBurst` +
+   `CreationScriptBurst`, **every `*IIR` record type with structured per-record variation is now decoded + built
+   + wired** (dissectors `Captures/decode_character_action.py` + `decode_create_iir_records.py`, builders in
+   `CreateEditorRecordBuilder`, locked by `CreateEditorRecordTests` + the burst goldens):
+   - `CharacterActionIIR` (0x6B6FD368) — action/ability grant (26 records).
+   - `ComboBookIIR` (0xA8BBEB7F) — combo-book grant (12 records).
+   - `StatUpdateIIR` (0x96B8DC59) — `(statId,value)` batch.
+   - `SetMorphValueIIR` (0xBADF5A4B) — hair/texture resource morph.
+   - `BehaviorControlCenterIIR` (0x642CD3D6) **short form** — behavior register (6 records).
+   - (`StatIIR`/`EnergyIIR`/`PlayfieldFIIR`/`GameTimeIIR` already had builders.)
+
+   **Still verbatim** (handle-addressed via `IirId`, i.e. the only session-variable field is already
+   parameterized; the rest is fixed scripted/state content that needs deeper RE):
+   `BehaviorControlCenterIIR` **116-byte form** (×3, an 88-byte behavior-state tail with transforms + entity
+   tags), `RegenIIR` (×1, opaque), and `ScryScriptIIR` (the cutscene callback scripts — overlap the in-client
+   cutscene work). Plus the non-IIR `ApplySpell`, `RetailNpcConversationBurst`, and the 1.1 MB intro-cutscene
+   `RetailCreateWorldEntryBurst` (render/pacing-sensitive, needs in-client validation).
