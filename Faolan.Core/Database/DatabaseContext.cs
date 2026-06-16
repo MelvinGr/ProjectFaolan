@@ -42,6 +42,8 @@ namespace Faolan.Core.Database
 		DbSet<NpcSpawn> NpcSpawns { get; }
 		DbSet<Realm> Realms { get; }
 		DbSet<RespawnPoint> RespawnPoints { get; }
+		DbSet<PatrolPath> PatrolPaths { get; }
+		DbSet<PatrolWaypoint> PatrolWaypoints { get; }
 		DbSet<QuestDefinition> QuestDefinitions { get; }
 		DbSet<QuestTextRef> QuestTextRefs { get; }
 		DbSet<QuestGoalDefinition> QuestGoalDefinitions { get; }
@@ -87,6 +89,8 @@ namespace Faolan.Core.Database
 		public DbSet<MapWorldBurstEntity> MapWorldBurstEntities { get; set; }
 		public DbSet<MorphTarget> MorphTargets { get; set; }
 		public DbSet<NpcSpawn> NpcSpawns { get; set; }
+		public DbSet<PatrolPath> PatrolPaths { get; set; }
+		public DbSet<PatrolWaypoint> PatrolWaypoints { get; set; }
 		public DbSet<QuestDefinition> QuestDefinitions { get; set; }
 		public DbSet<QuestTextRef> QuestTextRefs { get; set; }
 		public DbSet<QuestGoalDefinition> QuestGoalDefinitions { get; set; }
@@ -300,6 +304,25 @@ namespace Faolan.Core.Database
 					n.PositionZ
 				})
 				.IsUnique();
+
+			// One patrol route per (map, spawn point) - keyed like the NpcSpawn it belongs to, so the live MoveTask
+			// builder joins them by position (#53). Its waypoints cascade-delete with the route.
+			modelBuilder
+				.Entity<PatrolPath>()
+				.HasIndex(p => new
+				{
+					p.MapId,
+					p.PositionX,
+					p.PositionY,
+					p.PositionZ
+				})
+				.IsUnique();
+			modelBuilder
+				.Entity<PatrolPath>()
+				.HasMany(p => p.Waypoints)
+				.WithOne(w => w.PatrolPath)
+				.HasForeignKey(w => w.PatrolPathId)
+				.OnDelete(DeleteBehavior.Cascade);
 
 			// A captured world object is deduped by its (map, spawn point, identity): two distinct props can occupy the
 			// EXACT same coordinates (#222), so the display_name identity is part of the key - position alone would

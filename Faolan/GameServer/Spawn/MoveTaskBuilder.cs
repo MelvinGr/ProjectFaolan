@@ -1,8 +1,10 @@
 using Faolan.Core.Network;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using Faolan.Core.Data;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Packets.Opcodes;
 
 namespace Faolan.GameServer.Spawn
@@ -62,6 +64,20 @@ namespace Faolan.GameServer.Spawn
 				.WriteByte(0x00)
 				.WriteByte(0x01) // terminator
 				.ToArray();
+		}
+
+		// Builds the patrol MoveTask for `handle` from a DB-sourced PatrolPath row (#53): the row's Position is the
+		// current/anchor point, its ordered Waypoints the path, and Speed the walk speed. Byte-identical to the
+		// captured patrol the row was extracted from (PatrolPath rows only store the canonical single-segment form -
+		// PatrolPathExtractor). Same output as the explicit BuildPatrol overload, sourced from data instead of args.
+		public static byte[] BuildPatrol(uint handle, PatrolPath path)
+		{
+			ArgumentNullException.ThrowIfNull(path);
+			var waypoints = path.Waypoints
+				.OrderBy(w => w.Ordinal)
+				.Select(w => new Vector3(w.X, w.Y, w.Z))
+				.ToList();
+			return BuildPatrol(handle, path.Position, waypoints, path.Speed);
 		}
 
 		public static byte[] BuildStationary(uint handle, Vector3 position)

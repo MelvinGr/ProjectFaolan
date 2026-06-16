@@ -245,6 +245,41 @@ namespace Faolan.Importer
 			await db.SaveChangesAsync();
 		}
 
+		// NPC patrol routes (the canonical MoveTask waypoint form), deduped by (map, position) like the NPC spawns.
+		// Replaces the route's waypoints wholesale on re-import so an updated capture re-seeds cleanly.
+		private static async Task ImportPatrolPaths(DatabaseContext db, List<PatrolPathEntry> paths)
+		{
+			foreach (var e in paths)
+			{
+				var existing = await db.PatrolPaths
+					.Include(p => p.Waypoints)
+					.FirstOrDefaultAsync(p => p.MapId == e.MapId && p.PositionX == e.Position.X && p.PositionY == e.Position.Y && p.PositionZ == e.Position.Z);
+
+				if (existing == null)
+				{
+					existing = new PatrolPath { MapId = e.MapId, Position = e.Position };
+					db.PatrolPaths.Add(existing);
+				}
+				else
+				{
+					db.PatrolWaypoints.RemoveRange(existing.Waypoints);
+					existing.Waypoints.Clear();
+				}
+
+				existing.Speed = e.Speed;
+				for (var i = 0; i < e.Waypoints.Count; i++)
+					existing.Waypoints.Add(new PatrolWaypoint
+					{
+						Ordinal = i,
+						X = e.Waypoints[i].X,
+						Y = e.Waypoints[i].Y,
+						Z = e.Waypoints[i].Z
+					});
+			}
+
+			await db.SaveChangesAsync();
+		}
+
 		// --rdb: read the client RDB index and inventory the resource types. The server references text by id (the
 		// client renders it from its own RDB), so we DON'T bulk-store strings; this inventory is the foundation for
 		// locating + importing the structured data the server actually needs (item-template identity, NPC stats).
@@ -513,6 +548,7 @@ namespace Faolan.Importer
 				var (shopsSeen, shopsAdded, shopsUpdated) = await CaptureShopImporter.ImportAsync(db, captures.SelectMany(c => CaptureShopImporter.Extract(c.Packets)));
 				Console.WriteLine($"Shops (0x2033 vendor windows): {shopsSeen} vendors, {shopsAdded} new, {shopsUpdated} updated.");
 				await ImportNpcSpawns(db, NpcSpawnExtractor.Merge(captures.SelectMany(c => NpcSpawnExtractor.Extract(c.Packets))));
+				await ImportPatrolPaths(db, PatrolPathExtractor.Merge(captures.SelectMany(c => PatrolPathExtractor.Extract(c.Packets))));
 				await ImportWorldObjects(db, WorldObjectExtractor.Merge(captures.SelectMany(c => WorldObjectExtractor.Extract(c.Packets))));
 				await ImportMapWorldBursts(db, MapWorldBurstExtractor.Merge(captures.SelectMany(c => MapWorldBurstExtractor.Extract(c.Packets))));
 				await ImportQuestDefinitions(db, QuestDefinitionExtractor.Extract(captures.SelectMany(c => c.Packets).ToList()));
@@ -638,6 +674,7 @@ namespace Faolan.Importer
 				["Maps"] = await db.Maps.CountAsync(),
 				["MapWorldBursts"] = await db.MapWorldBursts.CountAsync(),
 				["NpcSpawns"] = await db.NpcSpawns.CountAsync(),
+				["PatrolPaths"] = await db.PatrolPaths.CountAsync(),
 				["WorldObjects"] = await db.WorldObjects.CountAsync(),
 				["ConversationNodes"] = await db.ConversationNodes.CountAsync(),
 				["ConversationPackets"] = await db.ConversationPackets.CountAsync()
