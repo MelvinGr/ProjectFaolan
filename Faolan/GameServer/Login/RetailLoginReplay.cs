@@ -160,10 +160,20 @@ namespace Faolan.GameServer
 						? (equipment.FirstPosBag, equipment.FirstPosBag.Archetype)
 						: null;
 
-					var typedRoot = ((ReadOnlySpan<byte>)rootBytes).FromProtobuf<ProtoFullCharacterIIR>();
-					typedRoot.Inventories.Clear();
-					foreach (var container in FullCharSnapshotBuilder.BuildContainers(instance, equipped, bagFirst, inventoryRows ?? []))
-						typedRoot.Inventories.Add(container);
+					// AUTHOR the root (#57) instead of mutating the captured one: f4/f5 come from the server's
+					// account-entitlement policy (FullExpansion/SubscriptionFlags), f6 from the DB containers, f7
+					// false. f1 character_tag and f8 has_spellbook are still carried from the captured root (the
+					// CharacterTag->numeric-id mapping and the spell-nav load are follow-ups); for the in-client-
+					// proven faolan beach snapshot the policy flags equal the captured values, so this stays
+					// byte-identical there. BuildRoot is proven to reproduce any captured root (FullCharIirRoundTripTests).
+					var captured = ((ReadOnlySpan<byte>)rootBytes).FromProtobuf<ProtoFullCharacterIIR>();
+					var typedRoot = FullCharSnapshotBuilder.BuildRoot(
+						captured.CharacterTags,
+						FullCharSnapshotBuilder.FullExpansionFlags,
+						FullCharSnapshotBuilder.FullSubscriptionFlags,
+						captured.ShouldSerializeHasNewClaimItems() ? captured.HasNewClaimItems : false,
+						captured.ShouldSerializeHasSpellbook() ? captured.HasSpellbook : null,
+						FullCharSnapshotBuilder.BuildContainers(instance, equipped, bagFirst, inventoryRows ?? []));
 					var newRoot = typedRoot.ToProtobufBytes();
 					prefix = SetSnapshotBlobLength(parts.Prefix, newRoot.Length);
 					Logger.LogInformation("World-entry DB containers: root {Old} -> {New} bytes ({Equipped} equipped + {Rows} rows); blobLen={Blob}.", rootBytes.Length, newRoot.Length, equipped.Count,

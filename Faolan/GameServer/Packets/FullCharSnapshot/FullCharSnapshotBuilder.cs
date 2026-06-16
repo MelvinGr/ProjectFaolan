@@ -32,6 +32,41 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		private const uint BagFirstPos = 1;
 		private const ulong ItemIdEpoch = 0x20D82B63UL << 32;
 
+		// The server's account-entitlement policy: every account gets the full expansion + subscription set. These
+		// are the root's f4/f5 (account bitfields the client reads to gate expansion content, NOT per-character
+		// state); the captured faolan snapshots carry exactly these, so authoring them reproduces those roots
+		// byte-identically (other captured accounts e.g. Strie carry fewer - presence is per-account).
+		public const uint FullExpansionFlags = 0x000C0001;
+		public const uint FullSubscriptionFlags = 0x00018181;
+
+		// Authors the whole ProtoFullCharacterIIR root from typed inputs instead of carrying the captured root
+		// (#57): f1 character_tag (numeric tag ids - empty on a fresh beach char), f4 expansion_flags, f5
+		// subscription_flags, f6 the DB containers, f7 has_new_claim_items, f8 has_spellbook. f2/f3
+		// (free_feat_respecs / feat_resets) are absent on every captured snapshot, so they stay unset. The flags
+		// are nullable so an absent field stays absent (presence is per-account): a null arg emits nothing, a
+		// value emits the field (false/0 included). Reproduces any captured root byte-identically when fed that
+		// root's own field values (FullCharIirRoundTripTests) - the construction oracle.
+		public static ProtoFullCharacterIIR BuildRoot(IEnumerable<uint> characterTags, uint? expansionFlags, uint? subscriptionFlags, bool? hasNewClaimItems, bool? hasSpellbook,
+			IEnumerable<ProtoInventoryGame> containers)
+		{
+			var root = new ProtoFullCharacterIIR();
+
+			if (characterTags?.ToArray() is { Length: > 0 } tags)
+				root.CharacterTags = tags;
+			if (expansionFlags is { } ef)
+				root.ExpansionFlags = ef;
+			if (subscriptionFlags is { } sf)
+				root.SubscriptionFlags = sf;
+			foreach (var container in containers ?? [])
+				root.Inventories.Add(container);
+			if (hasNewClaimItems is { } nc)
+				root.HasNewClaimItems = nc;
+			if (hasSpellbook is { } hs)
+				root.HasSpellbook = hs;
+
+			return root;
+		}
+
 		public static List<ProtoInventoryGame> BuildContainers(uint instance, IReadOnlyDictionary<ulong, (Item Item, uint Archetype)> equipped, (Item Item, uint Archetype)? bagFirst,
 			IReadOnlyCollection<CharacterInventory> inventoryRows = null)
 		{
