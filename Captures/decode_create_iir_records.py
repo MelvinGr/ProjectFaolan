@@ -9,9 +9,13 @@ the WorldPrep + CreationScript golden bursts. Each is the IIR-carrier body (afte
                    head = [u32 type][u32 handle][u16 0x0004][u32 slot][u32 msgLen][protobuf]
                    tail = [u32 index][u32 someId][u32 itemHandle][u32 itemHandle][u32 0][u32 1][char[4] tag]
                           [byte[16] transform][byte[16] transform][8 ownerStamp][8 ownerStamp][12 zero]
+  RegenIIR         0x28D0AC99  [u32 type][u32 handle][u8 flag][u32 v1][u32 v2][u32 v3]                  (21)
+                   (RegenIIR_c::ReadSubClass = 3x big-endian ReadU32; flag is the base IIR's, 0 in every capture)
 
-Usage: python3 Captures/decode_create_iir_records.py
+Usage: python3 Captures/decode_create_iir_records.py   (RegenIIR is validated against ALL *.tshark.json, 590 records)
 """
+import glob
+import json
 import struct
 import sys
 
@@ -87,6 +91,38 @@ def behavior_long(b):
     return handle, index, some_id, ih1, tag.decode("ascii"), tr1.hex()
 
 
+def regen(b):
+    # RegenIIR_c::ReadSubClass reads three big-endian u32; the lone flag byte is the base IIR's.
+    assert len(b) == 21
+    type_, handle = struct.unpack(">II", b[0:8])
+    flag = b[8]
+    v1, v2, v3 = struct.unpack(">III", b[9:21])
+    assert type_ == CHAR_TYPE and flag == 0
+    return handle, v1, v2, v3
+
+
+def regen_from_all_captures():
+    # RegenIIR is x1 in the create burst but recurs hundreds of times across the login/gameplay captures - harvest
+    # every *.tshark.json (IIR carrier body = [u32 len][u32 iirType][record]) to triangulate the fixed grammar.
+    ok = total = 0
+    for cap in sorted(glob.glob("Captures/*.tshark.json")):
+        try:
+            d = json.load(open(cap))
+        except Exception:  # noqa
+            continue
+        for p in d.get("Packets", []):
+            body = p.get("BodyHex") or ""
+            if p.get("Opcode") != "0x2000" or len(body) < 16 or body[8:16].lower() != "28d0ac99":
+                continue
+            total += 1
+            try:
+                regen(bytes.fromhex(body[16:]))
+                ok += 1
+            except Exception as e:  # noqa
+                print(f"  RegenIIR NON-CONFORMING: {body[16:]} ({e})")
+    print(f"RegenIIR(all captures): {ok}/{total} conform")
+
+
 def main():
     wp = open("Faolan.Tests/Golden/WorldPrepBurst.bin", "rb").read()
     cs = open("Faolan.Tests/Golden/CreationScriptBurst.bin", "rb").read()
@@ -108,6 +144,7 @@ def main():
                 applicable += 1
                 print(f"  {name} NON-CONFORMING: {b.hex()} ({e})")
         print(f"{name}: {ok}/{applicable} conform")
+    regen_from_all_captures()
 
 
 if __name__ == "__main__":

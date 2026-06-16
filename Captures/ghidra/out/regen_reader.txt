@@ -1,0 +1,40 @@
+SYM ADVAPI32.DLL::RegEnumKeyA @EXTERNAL:00000187
+SYM RegenIIR_c::vftable_meta_ptr @01fc91a0
+SYM RegenIIR_c::vftable @01fc91a4
+SYM RegenIIR_c::RTTI_Complete_Object_Locator @020d2850
+SYM RegenIIR_c::RTTI_Class_Hierarchy_Descriptor @020d2864
+SYM RegenIIR_c::RTTI_Base_Class_Array @020d2874
+SYM RegenIIR_c::RTTI_Base_Class_Descriptor_at_(0,-1,0,64) @020d2884
+SYM RegenIIR_c::RTTI_Type_Descriptor @021c9da0
+
+################## RegenIIR_c::vftable_meta_ptr -> vtable 01fc91a0 slot[8] -> 0x79dbe0 in FUN_0079dbe0 @0079dbe0
+
+int FUN_0079dbe0(void)
+
+{
+  int in_ECX;
+  
+  return in_ECX + 0x1c;
+}
+
+
+
+################## RegenIIR_c::vftable -> vtable 01fc91a4 slot[8] -> 0x79dea0 in FUN_0079dea0 @0079dea0
+
+bool FUN_0079dea0(int param_1)
+
+{
+  undefined4 uVar1;
+  int in_ECX;
+  
+  uVar1 = FUN_0048f900();
+  *(undefined4 *)(in_ECX + 0x2c) = uVar1;
+  uVar1 = FUN_0048f900();
+  *(undefined4 *)(in_ECX + 0x30) = uVar1;
+  uVar1 = FUN_0048f900();
+  *(undefined4 *)(in_ECX + 0x34) = uVar1;
+  return *(char *)(param_1 + 0x19) != '\0';
+}
+
+
+

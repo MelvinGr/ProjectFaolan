@@ -124,11 +124,17 @@ create-specific to decode, only builder wiring to do:
      match the paired `DispatchAddItem` equipment piece earlier in the same burst; `ownerStamp`
      (`B290805C 29E627CA`) is the fixed creator/timestamp pair that recurs burst-wide. Decoded by
      `decode_create_iir_records.py`, built by `CreateEditorRecordBuilder.BuildBehaviorControlCenterIirLong`.
+   - `RegenIIR` (0x28D0AC99, #223) — `[u32 type][u32 handle][u8 flag][u32 v1][u32 v2][u32 v3]` (21 bytes). The
+     grammar was pinned by harvesting **590 records across all `*.tshark.json`** captures (it's ×1 in the create
+     burst but recurs throughout login/gameplay) and confirmed in the client: `RegenIIR_c::ReadSubClass`
+     (Ghidra `FUN_0079dea0`, vtable slot 8) reads exactly three big-endian u32 into +0x2c/+0x30/+0x34 — the three
+     resource/regen pools; the lone `flag` byte is the base IIR's (0 in every capture). Decoded by
+     `decode_create_iir_records.py` + `Captures/ghidra/DumpRegenReader.java`, built by
+     `CreateEditorRecordBuilder.BuildRegenIir`.
    - (`StatIIR`/`EnergyIIR`/`PlayfieldFIIR`/`GameTimeIIR` already had builders.)
 
    **Still verbatim** (handle-addressed via `IirId`, i.e. the only session-variable field is already
    parameterized; the rest is fixed scripted/state content that needs deeper RE — #223):
-   `RegenIIR` (×1, opaque 13-byte payload — one record, can't triangulate the grammar from this capture alone),
-   and `ScryScriptIIR` (the cutscene callback scripts — overlap the in-client cutscene work). Plus the non-IIR
+   `ScryScriptIIR` (the cutscene callback scripts — overlap the in-client cutscene work). Plus the non-IIR
    `ApplySpell`, `RetailNpcConversationBurst`, and the 1.1 MB intro-cutscene `RetailCreateWorldEntryBurst`
    (render/pacing-sensitive, needs in-client validation).

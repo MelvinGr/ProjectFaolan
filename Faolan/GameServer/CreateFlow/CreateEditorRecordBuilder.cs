@@ -176,6 +176,25 @@ namespace Faolan.GameServer
 				.ToArray();
 		}
 
+		// RegenIIR (0x28D0AC99): an entity regen record - three resource/regen values. 21 bytes:
+		//   [u32 type][u32 handle][u8 flag][u32 v1][u32 v2][u32 v3]
+		// RegenIIR_c::ReadSubClass (Ghidra FUN_0079dea0) reads exactly three big-endian u32 (via the ReadU32 helper
+		// FUN_0048f900) into fields +0x2c/+0x30/+0x34 - the three consecutive resource pools (the health/stamina/mana
+		// regen family); the single `flag` byte belongs to the base IIR and is 0 in every capture. Decoded by
+		// Captures/decode_create_iir_records.py + Captures/ghidra/DumpRegenReader.java and validated byte-exact
+		// against 590 records across the login/gameplay/create captures (all type 0xC350, flag 0, three clean u32).
+		public static byte[] BuildRegenIir(uint handle, uint v1, uint v2, uint v3, byte flag = 0, uint type = CharacterWireType)
+		{
+			return new FaolanStream()
+				.WriteUInt32(type)
+				.WriteUInt32(handle)
+				.WriteByte(flag)
+				.WriteUInt32(v1)
+				.WriteUInt32(v2)
+				.WriteUInt32(v3)
+				.ToArray();
+		}
+
 		// PlayfieldFIIR (0x5D85BFC7, "MapChange"): announces the playfield the client is entering - its reference
 		// position (a Vec3, raw-body big-endian floats), the map id, the entering character instance, and the live
 		// per-session playfield token (carried TWICE). 103 bytes; framing decoded from the create captures

@@ -95,6 +95,18 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void RegenIir_MatchesCapturedBytes()
+		{
+			// The WorldPrep RegenIIR (handle 0x02000001, flag 0, v1=0x7EE v2=0 v3=0x415) plus a second record from
+			// the demol80 capture (v1=0x4F81). RegenIIR_c::ReadSubClass = 3x big-endian u32; decode_create_iir_records.py
+			// validated all 590 records across the captures.
+			Assert.Equal("0000c3500200000100000007ee0000000000000415",
+				Convert.ToHexString(CreateEditorRecordBuilder.BuildRegenIir(0x02000001, 0x000007EE, 0, 0x00000415)).ToLowerInvariant());
+			Assert.Equal("0000c350110099bd0000004f810000000000000000",
+				Convert.ToHexString(CreateEditorRecordBuilder.BuildRegenIir(0x110099BD, 0x00004F81, 0, 0)).ToLowerInvariant());
+		}
+
+		[Fact]
 		public void CharacterActionIir_MatchesCapturedBytes()
 		{
 			// First + last CharacterActionIIR of the WorldPrep stream (handle 0x02000001): grants action ids

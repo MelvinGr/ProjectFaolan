@@ -235,7 +235,7 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00050E24u));
 			await IirId(GameServer0X2000RespondsOpcodes.EnergyIIR, [0x00, 0x00, 0xC3, 0x50], 0x01, 0x00, 0x00, 0x00, 0x08);
-			await IirId(GameServer0X2000RespondsOpcodes.RegenIIR, [0x00, 0x00, 0xC3, 0x50], 0x00, 0x00, 0x00, 0x07, 0xEE, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x15);
+			await Iir(GameServer0X2000RespondsOpcodes.RegenIIR, CreateEditorRecordBuilder.BuildRegenIir(id, 0x000007EE, 0, 0x00000415));
 		}
 	}
 }
