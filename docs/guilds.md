@@ -85,3 +85,30 @@ misalign the roster that follows. Cosmetic-only until decoded.
 - 0x203A "counters update" (52 b, frequent): small u32 counters, semantics unknown.
 - Renown block internal framing; renown history (0x2039) / rankings (0x2038) are replayed blobs.
 - Other players' guild tags ride in their spawn data (cross-player visibility is future work anyway).
+
+## Ghidra: guild s2c reader topology (2026-06-16, #219)
+
+Hunt for the 277-byte renown-block reader. The s2c (CSPlayerInterface) dispatch indices DRIFT vs the
+recovered name table, so the wire-opcode→handler mapping must be confirmed per-function by its assert
+string, not by `0x2000 + index`. Confirmed so far (decompiles via `Captures/ghidra/DecompileFns.java`):
+
+- `FUN_013428d0` = `DispatchGuildUpdate`     (reads one leading member + member list)
+- `FUN_01344670` = `DispatchGuildMemberList` (member list only)
+- `FUN_013463d0` = `DispatchGMReplyGuildInfoFromChar` (asserts `i_cGuild` + `i_cMembers`)
+- `FUN_0134ed30` = guild **member-list reader**: `[u32 word]`, `count = word / 0x3F1` with the **0x3F1
+  list-framing invariant** (validates `word == count*0x3F1`, caps `count-1 < 0x7531`), then loops
+  `count-1` × the member reader. Same 0x3F1 invariant as the FA015807/GameActionList lists.
+- `FUN_00566740` = **GuildMember_c reader**, streaming version 3 (asserts "GuildMember_c streaming
+  version mismatch! Got N wanted 3"). In-memory record size 0x88 (136 b). Case-3 field reads (confirms
+  the wire member grammar): ReadString(name), ReadByte, ReadByte(bool online), ReadU32, ReadByte,
+  ReadU32, ReadU64(time), then **6× ReadU64** — i.e. the member record's 48-byte tail = 6 u64 renown/pvp
+  counters (not opaque).
+- Stream primitives (shared, from `ghidra_vtable_xref_readers`): `FUN_0048f900` ReadU32(BE),
+  `FUN_004e0390` ReadByte, `FUN_0048f840` ReadString, `FUN_0048f720` ReadU64.
+
+STILL OPEN — the **Guild_c header+renown reader** (govForm/guildId/cash/name/desc/motd + the 277-byte
+renown block) is NOT yet isolated: it is not `FUN_005656a0`/`FUN_00565900` (those are ctors), and the
+traced dispatchers only surface the member-list read. Next step: find the function that reads a u64
+(cash) + 3 strings (ReadString ×3) — that is the Guild_c deserializer, and the renown block is read at
+its tail. The renown-block scaffold (`[u8 ver][u32 hdr][13× u32 stat ids 0x4FFB0..0x50334][220-byte
+counter region]`) is documented in `Captures/decode_guild_renown.py`.
