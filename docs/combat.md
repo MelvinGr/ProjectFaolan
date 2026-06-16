@@ -117,7 +117,7 @@ and `AttributeChangedFeedback` (decode `Captures/decode_levelup_feedback.py`, go
 Wired into both paths: GM `.level` (`SetLevelCommand`) and `CombatService.PushLevelUp`. Which attributes rise / by
 how much is provisional (`Combat.AttributeGrowth`, flat +1/primary) — no per-class growth tables exist in captures.
 
-## Live spell / ability grants (#73)
+## Live spell / ability grants (#73, #74)
 Two distinct mid-session grant packets, both on the GameCharInterface conversation (same class pair), each
 byte-exact:
 - **`0x2052 DispatchAddSpecialAbility`** — grants a catalog **ability** (the melee/utility kit). Body = the 81-byte
@@ -127,9 +127,32 @@ byte-exact:
   invariant across all 68 captured packets. `SendLearnSpell`/`BuildLearnSpellBody` (decode
   `Captures/decode_learn_spell.py`, golden `LearnSpellTests`). GM: `.learnspell <id>`.
 
+**Spell granting / persistence (#74).** Spells are learned per-character: the captures show a caster's whole
+learned set is re-sent on every world entry (NecroL80 always relearns her 5, DemoL80 his 9), so it is modelled like
+the ability re-grant. The set lives in the per-character `CharacterSpell` table (CharacterId, SpellId);
+`GrantStartingSpells` replays it on login (after `GrantStartingAbilities`, via `SendLearnSpell`), `.learnspell`
+persists into it, and `CaptureSpellImporter.ImportLearnedSpellsAsync` seeds captured characters from the grants in
+the pcaps (attributed via the grant's RpcHeader **receiver instance** = the character id; the GameCharAgent→
+GameCharInterface class pair disambiguates the 0x200A opcode collisions). Level-up auto-grant is NOT implemented —
+captures don't say which spell is learned at which level. **In-client verification pending** (needs-testing on #74).
+
 The sibling ops the RE listed — `DispatchForgetSpell 0x200B`, `RemoveSpecialAbility 0x2053`, `UntrainSingleFeat
 0x2011`, `PassiveAbilityEquip/Unequip` — have **zero** packets on this class in any capture, so no byte-exact
 oracle; deferred under #73.
+
+## Starting gear (#220)
+A brand-new beach character is seeded its slave outfit in `RetailLoginReplay.EnsureBeachStarterEquipment`, all
+harvested from the `*create*` captures (one row, only if absent — an existing equipment row is left as the player
+left it):
+- **Wrist:** Slave Manacles (3361557, universal).
+- **Clothing by sex** (`Character.Sex`: 0 = male, 1 = female): male = bare chest + loincloth (legs); female = gown
+  (chest) + matching bottom (legs). Garment colour is randomised per character in retail, so one representative set
+  is used per sex.
+- **Weapon by class** (main-hand-**left** slot 0x06, `StarterClassWeapon`): Necromancer → Broken Bottle (2 create
+  dumps), Assassin → Marlin Spike. **Per-class, NOT per-archetype** (Conqueror + Guardian are both Soldiers and do
+  not share a weapon). Coverage is only the classes the create dumps contain; the rest start unarmed. The Fleshy
+  Club (a level-2 char) and Broken Oar (a login capture) are NOT create-flow starters and are excluded. In-client
+  verification pending (needs-testing on #220).
 
 ## Known gaps (TODO.md §Combat)
 - HP/stamina auto-regen not implemented. NPC death animation: corpse now lingers then becomes a loot bag
