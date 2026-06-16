@@ -756,6 +756,11 @@ namespace Faolan.GameServer.World
 			if (!WorldObjectBuilder.TryBuild(template, corpse.Handle, corpse.Position, new Quaternion(corpse.Rotation.X, corpse.Rotation.Y, corpse.Rotation.Z, 1f), out var body))
 				return false;
 
+			// Re-stamp the live playfield token (same reason as SendWorldSpawn): the loot-bag template carries its
+			// capture session's token, but the client only registers/polls an object whose playfield instance matches
+			// the playfield it loaded. Without this a mid-session loot bag never renders (the blocker that gated loot).
+			SpawnPlayfieldRewriter.TryRewrite(body, _sim.World.ZoneFor(corpse.MapId).PlayfieldToken);
+
 			corpse.CashTin = cash;
 			corpse.LootItems.Clear();
 			if (items != null)
@@ -910,6 +915,15 @@ namespace Faolan.GameServer.World
 				BinaryPrimitives.WriteSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.PosYOffset, 4), subject.Position.Y);
 				BinaryPrimitives.WriteSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.PosZOffset, 4), subject.Position.Z);
 			}
+
+			// Re-stamp the playfield-instance token to THIS session's live value. The spawn body carries the token from
+			// whatever capture session the row was built in (e.g. a Crocodile row captured on the beach carries
+			// 0x01EA985C), but the client only registers - and then polls (0x2020) - a spawn whose playfield instance
+			// matches the playfield it actually loaded at world entry (docs/mid-session-spawn-blocker.md part 3: the
+			// client looks the spawn's playfield up in its loaded-playfield map; a miss is dropped before it ever polls).
+			// The login burst renders only because it was replayed from the same session whose token IS the live one;
+			// mid-session/interest spawns reuse arbitrary rows, so without this they carry a stale token and never render.
+			SpawnPlayfieldRewriter.TryRewrite(body, _sim.World.ZoneFor(subject.MapId).PlayfieldToken);
 
 			return new PacketStream()
 				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameServerCarrierOpcodes.IirCarrier)
