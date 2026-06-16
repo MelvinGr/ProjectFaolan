@@ -124,9 +124,27 @@ kills it before it ever reaches the spawn apply / playfield-add. This re-centers
 conversation/object-registration theory (memory `protocol_midsession_spawn_blocked`), now with the exact client
 function (`n3InfoItemRemote::PollStatus` `FUN_005bae50`) that performs the drop.
 
-**NEXT:** decompile how `n3InfoItemRemote` resolves its proxy (the id→object registry it consults, `FUN_005bb1c0`/
-`FUN_005bb1f0` are the resolve+null-check) and find what REGISTERS an object into it at world-entry that a
-mid-session push lacks. That registry — NOT the playfield map — is the real gate.
+**Proxy mechanism (part 5):** `n3InfoItemRemote` is a WEAK REFERENCE — `FUN_005bb1c0`/`FUN_005bb1f0` resolve
+`*(holder+8)` where `holder = proxy[1]` (a `Ptr_c` control block), returning is/isn't-null. So a mid-session IIR's
+`remote` is bound to a holder during dispatch; if the referenced owner (the sender CONVERSATION / world endpoint
+`0x13CE71B1:0x58`) was never registered in the client, the holder's object is 0 → PollStatus e_Impossible → drop.
+Corroborated by the despawn `n3ToClientQuitIIR::Activate` (`FUN_005cbf80`): a null target logs "Trying to quit a
+dynel (…) that no longer (or ever) exist", and an accepted one additionally gates on the playfield instance
+(`*(playfield+0x94) == IIR field +0x2c`). So EVERY mid-session world IIR (spawn + despawn) fails the same way:
+its remote/owner reference doesn't resolve.
+
+**CONVERGED ROOT (parts 4–5):** the selective mid-session drop is a **remote-reference resolution failure** at
+`n3InfoItemRemote::PollStatus` — the world conversation our packets ride (`0x13CE71B1:0x58`) is NOT in the
+client's object registry mid-session, so every IIR's remote binds to a null holder and is killed before apply.
+This is the original conversation-registration theory, now pinned to the exact client functions. The playfield-map
+gate (parts 2–3) is the downstream render path, not the blocker.
+
+**NEXT (the fix):** find what REGISTERS the world conversation / sender endpoint into the client's remote-object
+registry at world-entry — the handshake retail runs that binds `0x13CE71B1:<sub-id>` to a live holder — and send
+it before mid-session pushes. Two routes: (a) Ghidra — trace the IIR DISPATCH that binds an incoming IIR's
+`remote` (proxy[1]) to a holder from the packet's sender endpoint (the conversation table insert); (b) offline —
+diff retail's world-entry handshake packets vs ours for a registration we skip. Either way, confirming a fix needs
+an in-client render (PollStatus runs only in the live client).
 
 ### The playfield-instance map lookup (part 3) — the downstream RENDER path (kept for reference)
 
