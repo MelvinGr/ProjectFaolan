@@ -139,12 +139,26 @@ client's object registry mid-session, so every IIR's remote binds to a null hold
 This is the original conversation-registration theory, now pinned to the exact client functions. The playfield-map
 gate (parts 2–3) is the downstream render path, not the blocker.
 
-**NEXT (the fix):** find what REGISTERS the world conversation / sender endpoint into the client's remote-object
-registry at world-entry — the handshake retail runs that binds `0x13CE71B1:<sub-id>` to a live holder — and send
-it before mid-session pushes. Two routes: (a) Ghidra — trace the IIR DISPATCH that binds an incoming IIR's
-`remote` (proxy[1]) to a holder from the packet's sender endpoint (the conversation table insert); (b) offline —
-diff retail's world-entry handshake packets vs ours for a registration we skip. Either way, confirming a fix needs
-an in-client render (PollStatus runs only in the live client).
+**OFFLINE CHECK (part 6) — retail uses ONE conversation for both phases.** In the retail mount capture
+(`mount_move_dismount`), EVERY `FA015807` spawn — the world-entry burst (frames 49–89, handles `0x0802e5d4` +
+`0x000285xx`) AND the mid-session ones (frames 1277–1459, the mount/interest `0x000286xx` range) — rides the SAME
+sender **`0xb171ce13:0x57`**. So retail does NOT switch to a different play-mode conversation; the same world
+conversation carries load and play, and the client resolves it in BOTH. This RULES OUT "send mid-session on a new
+sub-id." The difference is purely that retail's SERVER keeps `0x13CE71B1:0x57` (and its entities) registered as a
+live resolvable remote object for the whole session, so the client's `PollStatus` resolves a non-null holder even
+for an unsolicited mid-session push; Faolan replays the burst (accepted while the client is in load/construction
+mode) but never performs that server-side registration.
+
+**CONCLUSION / fix framing:** this is NOT "port `PollStatus`" (that's the client's receive-side accept check, which
+a server never runs) and NOT "switch conversations." It's that the real n3 server registers the world
+conversation + its objects as live remote objects and keeps them alive; Faolan, being a byte-replay bridge with no
+stateful conversation/object model (see `server_architecture_roadmap` — "protocol done, simulation layer
+missing"), never sends the registration the client needs to later resolve the remote. **Open question:** is that
+registration a single replayable handshake packet, or does it require the stateful conversation model (a slice of
+the missing simulation layer)? **NEXT (offline):** diff retail's world-entry handshake (around the load→play
+`CharInPlayIIR`/`ReadyForPlayScreen` transition) vs ours for a conversation/object-registration step we skip; if
+it's a discrete packet it's replayable, otherwise it's a simulation-layer build. Confirming any fix needs an
+in-client render (`PollStatus` runs only in the live client).
 
 ### The playfield-instance map lookup (part 3) — the downstream RENDER path (kept for reference)
 
