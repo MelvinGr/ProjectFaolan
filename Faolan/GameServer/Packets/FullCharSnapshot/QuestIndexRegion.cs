@@ -79,9 +79,11 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 		// GENERATES the index region from the indexed quest ids + the per-quest goal-step ids (+ the W6QT table's
 		// three lead words and the trailer word), synthesizing the constants (tag/sentinel/magic, the 1..n goal
-		// indices, the trailer's [1][0][0]). The quest ids / count / sentinel follow from the character's quest list;
-		// the goal-step ids + trailer word are per-quest data (seeded like the per-goal model). #186.
-		public static QuestIndexRegion Build(IReadOnlyList<uint> questIds, IReadOnlyList<uint> goalSteps, uint marker,
+		// indices, the trailer's [1][0][0]). The MARKER is DERIVED from the quest count: it is the `0x3F1` list-framing
+		// word `0x3F1 * (count + 1)` (decoded across captures: 1 quest -> 0x7E2, 2 quests -> 0xBD3 - the same
+		// record-count invariant the client asserts), NOT a per-quest constant. The quest ids / count / sentinel follow
+		// from the character's quest list; the goal-step ids + trailer word are per-quest data (seeded). #186.
+		public static QuestIndexRegion Build(IReadOnlyList<uint> questIds, IReadOnlyList<uint> goalSteps,
 			uint tableField1, uint tableField2, uint tableField3, uint trailerQuestId, uint trailerWord)
 		{
 			ArgumentNullException.ThrowIfNull(questIds);
@@ -91,7 +93,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 				.ToArray();
 			return new QuestIndexRegion
 			{
-				Marker = marker, QuestIds = [.. questIds],
+				Marker = IndexTag * (uint)(questIds.Count + 1), QuestIds = [.. questIds],
 				TableField1 = tableField1, TableField2 = tableField2, TableField3 = tableField3,
 				GoalIds = [.. goalSteps], Trailer = trailer
 			};

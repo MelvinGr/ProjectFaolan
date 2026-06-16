@@ -41,6 +41,27 @@ REMAINING (to fully retire the `.bin` / captured-tails dependency — NOT decode
 3. **Stat skeleton** — `TailsStatBlock` relocated; wire it + the patches into the assembly.
 Then the **access-window table** and **stats** regions are the last template-sourced pieces.
 
+## Multi-quest layout (2026-06-16) — toward authoring the player's full quest log
+
+Decoded the 2-quest snapshot (`xxx-login`: 10238 + 13479) vs the 1-quest (`Strie`: 10238) to author the
+player's accepted quests on login from `CharacterQuests` (replacing the snapshot's single beach quest). Findings:
+- **Index marker is DERIVED from the count**: `marker = 0x3F1 * (questCount + 1)` (1 quest → `0x7E2`, 2 quests →
+  `0xBD3`). It is NOT a per-quest constant; baked into `QuestIndexRegion.Build` (the `IndexMarker` DB column is now
+  unused). Index = `[0x3F1][marker][questId × N][N][0xF1]` + the W6QT goal-id table with ALL quests' goal steps.
+- Quest journal = N concatenated `Quest_c` records (one per quest); the index lists all N ids.
+
+REMAINING to author multi-quest (the gating work, decode-first):
+1. **Decode the 2-quest `@609` objective region** — the single-quest `decode_snapshot_609.py` assumes the beach
+   offset and the chapterTag at @609; the 2-quest region differs (starts `0x220a2020` at @609 in `xxx-login`), so the
+   per-quest goal-block ordering + chapterTag placement for >1 quest is not yet decoded. Decode it from `xxx-login`.
+2. **Harvest 13479's snapshot scalars + goals** (`SnapshotN`/`FieldEc`/`FieldF0`/`FieldF8`, per-goal markers,
+   `GoalSteps`, trailer word) into `QuestDefinition`/`QuestGoalDefinition` (seeded only for 10238 today).
+3. **Extend `BeachTailsBuilder.BuildBeachQuestPortion` → `BuildQuestPortion(IReadOnlyList<(def,state)>)`** — emit N
+   `Quest_c` records + the N-quest objective region + the N-id index; validate byte-exact against `xxx-login`'s
+   2-quest region (golden test) before wiring.
+4. **Wire from `CharacterQuests`** via `SnapshotTails.Parse`→replace the 3 quest regions→`ToArray()` (variable
+   length; the access-window/stat regions follow) — drops the fixed `@0..1292` splice. Then in-client smoke test.
+
 ## Class id → reader
 
 `0x737A6DF9` == BKDR-31(`FullPlayerCharacterIIR`) (confirmed; `docs/aoc-opcode-ids.md` row 33).

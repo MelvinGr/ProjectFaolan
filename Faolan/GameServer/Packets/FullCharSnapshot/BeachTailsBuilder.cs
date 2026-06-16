@@ -92,7 +92,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			var objectives = QuestObjectiveRegion.Build(def, instance);
 			var goalSteps = (def.IndexGoalSteps ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(uint.Parse).ToArray();
 			var index = QuestIndexRegion.Build(
-				[def.QuestId], goalSteps, def.IndexMarker, def.IndexTableField1, def.IndexTableField2, def.IndexTableField3,
+				[def.QuestId], goalSteps, def.IndexTableField1, def.IndexTableField2, def.IndexTableField3,
 				def.QuestId, def.IndexTrailerWord);
 
 			byte[] portion = [.. quests.ToArray(), .. objectives.ToArray(), .. index.ToArray()];

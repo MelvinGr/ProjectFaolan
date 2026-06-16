@@ -75,7 +75,7 @@ namespace Faolan.Tests
 			var goalSteps = def.IndexGoalSteps.Split(',').Select(uint.Parse).ToArray();
 			var index = QuestIndexRegion.Build(
 				questIds: [def.QuestId], goalSteps: goalSteps,
-				marker: def.IndexMarker, tableField1: def.IndexTableField1, tableField2: def.IndexTableField2, tableField3: def.IndexTableField3,
+				tableField1: def.IndexTableField1, tableField2: def.IndexTableField2, tableField3: def.IndexTableField3,
 				trailerQuestId: def.QuestId, trailerWord: def.IndexTrailerWord);
 
 			byte[] built = [.. quests.ToArray(), .. objectives.ToArray(), .. index.ToArray()];
