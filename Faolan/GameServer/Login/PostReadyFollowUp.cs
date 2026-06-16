@@ -110,6 +110,8 @@ namespace Faolan.GameServer
 				await SendReadyForPlayScreen(client);
 				// Retail grants the starting abilities (0x2052) right after 0x2024, not during world entry.
 				await GrantStartingAbilities(client);
+				// ...and re-grants the character's learned SPELLS (DispatchLearnSpell 0x200A) the same way (#74).
+				await GrantStartingSpells(client);
 				// Then the post-ready world-state/quest record stream (verbatim from the Strie login capture).
 				await SendPostReadyBurst(client);
 

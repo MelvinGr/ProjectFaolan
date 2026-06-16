@@ -40,6 +40,25 @@ namespace Faolan.GameServer
 			Logger.LogInformation("GrantStartingAbilities: re-granted {Count} abilities (silent) to '{Name}' (class={Class}, level={Level}).", abilities.Length, character.Name, character.Class, character.Level);
 		}
 
+		// Re-grants the character's learned spells on login - the spell counterpart to GrantStartingAbilities (#74).
+		// Retail re-sends a caster's whole learned set via DispatchLearnSpell on every world entry (invariant across
+		// every login capture: NecroL80 always relearns her 5, DemoL80 his 9); the client silently no-ops spells it
+		// already knows, so this is safe to replay each login. The set is the character's CharacterSpells rows (seeded
+		// for captured characters by CaptureSpellImporter, grown live by .learnspell). Sent after GrantStartingAbilities.
+		private async Task GrantStartingSpells(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			if (character == null)
+				return;
+
+			var spells = await Database.GetCharacterSpells(character.Id);
+			foreach (var spell in spells)
+				await SendLearnSpell(client, spell.SpellId);
+
+			if (spells.Length > 0)
+				Logger.LogInformation("GrantStartingSpells: re-granted {Count} learned spells to '{Name}' (class={Class}).", spells.Length, character.Name, character.Class);
+		}
+
 		// Sends a live spell grant (DispatchLearnSpell, s2c 0x200A) - the retail "learn a spell" packet (#73). Grants a
 		// spell mid-session (level-up / quest-reward / GM) without rebuilding the FullChar snapshot. Rides the same
 		// GameCharInterface conversation as the 0x2052 ability grant; the body is a single u32 spell id (decoded in

@@ -503,6 +503,9 @@ namespace Faolan.Importer
 				// After characters exist: seed their observed live state (wallet balances, hotbar slots).
 				var (moneySeeded, shortcutsSeeded) = await CaptureCharacterStateImporter.ImportAsync(db, captures.Select(c => c.Packets).ToList());
 				Console.WriteLine($"Character state: {moneySeeded} wallets, {shortcutsSeeded} hotbar slots seeded from captures.");
+				// ...and their learned SPELL sets from the DispatchLearnSpell grants (re-granted on login, #74).
+				var (spellChars, spellRows) = await CaptureSpellImporter.ImportLearnedSpellsAsync(db, itemPackets);
+				Console.WriteLine($"Learned spells (0x200A grants): {spellChars} characters seeded, {spellRows} new rows.");
 				var (shopsSeen, shopsAdded, shopsUpdated) = await CaptureShopImporter.ImportAsync(db, captures.SelectMany(c => CaptureShopImporter.Extract(c.Packets)));
 				Console.WriteLine($"Shops (0x2033 vendor windows): {shopsSeen} vendors, {shopsAdded} new, {shopsUpdated} updated.");
 				await ImportNpcSpawns(db, NpcSpawnExtractor.Merge(captures.SelectMany(c => NpcSpawnExtractor.Extract(c.Packets))));

@@ -1096,7 +1096,9 @@ namespace Faolan.GameServer
 			}
 
 			await SendLearnSpell(client, spellId);
-			await _agentServerDispatcher.SendSystemMessage(character.Id, $"Learned spell 0x{spellId:X}.");
+			// Persist so the spell rides GrantStartingSpells on the next login (#74), like a real learn.
+			var added = await Database.AddCharacterSpell(character.Id, spellId);
+			await _agentServerDispatcher.SendSystemMessage(character.Id, $"Learned spell 0x{spellId:X}.{(added ? "" : " (already known)")}");
 		}
 
 		// .tag add <id> | .tag list  - manage the player's quest-state tags (the flags RDB Lua scripts read/write).

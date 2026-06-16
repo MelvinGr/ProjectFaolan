@@ -36,6 +36,8 @@ namespace Faolan.Core.Database
 		Task<Character> GetCharacterForAccount(uint accountId, uint clientInstance);
 		Task<CharacterInventory[]> GetCharacterInventory(uint characterId);
 		Task<CharacterQuest[]> GetCharacterQuests(uint characterId);
+		Task<CharacterSpell[]> GetCharacterSpells(uint characterId);
+		Task<bool> AddCharacterSpell(uint characterId, uint spellId);
 		Task<QuestDefinition> GetQuestDefinition(uint questId);
 		Task<Character[]> GetCharactersByAccount(uint id, bool skipUninitialized = true);
 		Task<Character> GetCharacterScaffold(uint characterId);
@@ -679,6 +681,34 @@ namespace Faolan.Core.Database
 				.CharacterQuests
 				.Where(q => q.CharacterId == characterId)
 				.ToArrayAsync();
+		}
+
+		// The spells a character has learned; GrantStartingSpells replays these as DispatchLearnSpell grants on login.
+		public async Task<CharacterSpell[]> GetCharacterSpells(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.CharacterSpells
+				.Where(s => s.CharacterId == characterId)
+				.OrderBy(s => s.Id)
+				.ToArrayAsync();
+		}
+
+		// Records that a character has learned a spell (idempotent: returns false when already known). The grant
+		// PACKET (DispatchLearnSpell) is sent separately; this is the persistence so the spell survives relog.
+		public async Task<bool> AddCharacterSpell(uint characterId, uint spellId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			if (await ctx.CharacterSpells.AnyAsync(s => s.CharacterId == characterId && s.SpellId == spellId))
+				return false;
+
+			ctx.CharacterSpells.Add(new CharacterSpell
+			{
+				CharacterId = characterId,
+				SpellId = spellId
+			});
+			await ctx.SaveChangesAsync();
+			return true;
 		}
 
 		// The shared journal-content definition for a quest (text refs + objective marker), or null if not seeded.

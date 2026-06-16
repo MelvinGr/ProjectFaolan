@@ -25,6 +25,7 @@ namespace Faolan.Core.Database
 		DbSet<CharacterShortcut> CharacterShortcuts { get; }
 		DbSet<CharacterSkill> CharacterSkills { get; }
 		DbSet<CharacterSpawnFrame> CharacterSpawnFrames { get; }
+		DbSet<CharacterSpell> CharacterSpells { get; }
 		DbSet<CharacterTag> CharacterTags { get; }
 		DbSet<ClassAbility> ClassAbilities { get; }
 		DbSet<ConversationNode> ConversationNodes { get; }
@@ -71,6 +72,7 @@ namespace Faolan.Core.Database
 		public DbSet<CharacterShortcut> CharacterShortcuts { get; set; }
 		public DbSet<CharacterSkill> CharacterSkills { get; set; }
 		public DbSet<CharacterSpawnFrame> CharacterSpawnFrames { get; set; }
+		public DbSet<CharacterSpell> CharacterSpells { get; set; }
 		public DbSet<CharacterTag> CharacterTags { get; set; }
 		public DbSet<ClassAbility> ClassAbilities { get; set; }
 		public DbSet<ConversationNode> ConversationNodes { get; set; }
@@ -198,6 +200,21 @@ namespace Faolan.Core.Database
 				.HasOne(s => s.Character)
 				.WithMany()
 				.OnDelete(DeleteBehavior.Cascade);
+
+			// Learned spells delete with the character; a character knows a given spell at most once.
+			modelBuilder
+				.Entity<CharacterSpell>()
+				.HasOne(s => s.Character)
+				.WithMany()
+				.OnDelete(DeleteBehavior.Cascade);
+			modelBuilder
+				.Entity<CharacterSpell>()
+				.HasIndex(s => new
+				{
+					s.CharacterId,
+					s.SpellId
+				})
+				.IsUnique();
 
 			// Guild membership: deleting a guild releases its members back to guildless instead of deleting them.
 			modelBuilder
