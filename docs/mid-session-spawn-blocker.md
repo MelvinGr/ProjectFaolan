@@ -71,5 +71,28 @@ Until then, mid-session spawning is impossible, which gates **loot bags, `.spawn
 interest-streaming**. (The `DispatchAddItem` live inventory add is unaffected — it's a HUD/inventory update on the
 GameCharAgent conversation, not a world-entity spawn, and is in-client verified.)
 
+## Ghidra progress (2026-06-16) — the client-side "register handle" chain mapped
+
+The step that must run for the client to start polling `0x2020` for a handle is the dynel's insertion into the
+**playfield spaces** (the spatial/interest grid). Located it client-side (analyzed project `/tmp/ghidra-aoc/proj`;
+run headless scripts from a path WITHOUT spaces — the repo's `Captures/ghidra` dir fails Ghidra's bundle loader
+because of the `#`/space, so copy the `.java` to e.g. `/tmp/aocscripts` and run there):
+
+- **`n3Dynel::AddToPlayfieldSpaces` = `FUN_00590b70`** — logs `"n3Dynel::AddToPlayfieldSpaces() id "` (gated on the
+  dead debug flag `DAT_021a2c29`, see `client_debug_logging_dead_end`), real work in `FUN_00591570`. This is the
+  "register the handle so the client polls it" step.
+- Callers: **`n3Playfield::RelocateDynel` = `FUN_0059da00`** (asserts the dynel is non-null, not dying @+0x17, and
+  ALREADY in the tree @+0x42 — from `n3playfield.cpp`) and **`AddChildDynel`-path `FUN_0059cdb0`**.
+- Callers of `AddChildDynel` (`FUN_0059cdb0`): `FUN_0083ae30`, and the game-code dynel-manager funcs
+  `FUN_01458d40` / `FUN_01460f30` / `FUN_014613b0` (the `0x0145xxxx`/`0x0146xxxx` region).
+
+`0xFA015807` is NOT an immediate anywhere (the spawn IIR dispatches through the BKDR-31 name-hash table, like every
+IIR — `opcode_re_feasibility`), so the network→dynel handler is reached via the dispatch table, not a constant
+compare. **NEXT:** trace DOWN from the FA015807 dispatch handler to `AddChildDynel`/`RelocateDynel` and find the
+branch that is taken during world-load but skipped after `CharInPlayIIR` — i.e. the dynel-manager func
+(`FUN_0145xxxx`) that the burst path enters but the mid-session push does not. Compare the burst-spawn call path vs
+the mid-session push at that branch. (Any candidate fix still needs an in-client render to confirm — packet/golden
+tests can't see the client's poll loop.)
+
 Memory: `protocol_midsession_spawn_blocked`. Related: `protocol_201c_spawn_subprotocol` (the poll loop),
 `npc_model_streaming` (its "interest streaming renders" claim is DISPROVEN — those NPCs were the burst).
