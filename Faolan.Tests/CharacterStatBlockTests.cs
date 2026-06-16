@@ -109,6 +109,19 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void BuildStatBlockBody_NpcCombatMode_MatchesCapturedFrame()
+		{
+			// strickenbla combat capture frame 6424: the combat-mode (weapon-draw) update on beach mob 0x00002C56 the
+			// tick before its first swing - stat 0x14 (CombatMode) = 4. The full IIR body (after the u32 length prefix)
+			// is [96b8dc59][0000c350][handle][00000000][count=1][statId 0x14][value 4]. Decodes the empty-handed-swing
+			// fix (#218); see WorldBroadcaster.BroadcastNpcCombatMode.
+			var stats = new CharacterStatBlock().Set(LegacyCharacterStatId.CombatMode, 4);
+			var body = VitalsPacket.BuildStatBlockBody(0x00002C56u, stats);
+
+			Assert.Equal("96b8dc590000c35000002c5600000000010000001400000004", ToHex(body));
+		}
+
+		[Fact]
 		public void VitalsPacket_StatUpdateBody_RejectsWrongSubOpcode()
 		{
 			var body = new byte[17];

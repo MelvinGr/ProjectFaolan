@@ -43,6 +43,10 @@ namespace Faolan.GameServer.World
 		// returning home - so they watch it move.
 		Task BroadcastNpcMove(WorldEntity npc);
 
+		// Broadcast an NPC's combat-mode change (engaged -> draw weapon, disengaged -> sheathe) to the players who can
+		// see it, as the captured stat-20 update. Without it the NPC swings empty-handed (#218).
+		Task BroadcastNpcCombatMode(WorldEntity npc, bool inCombat);
+
 		// Re-run the world-entry render path for the player (used to respawn them at a resurrection point).
 		Task ReenterWorld(INetworkClient client);
 
@@ -447,6 +451,13 @@ namespace Faolan.GameServer.World
 							case WorldTickEffectType.NpcMove:
 								if (NpcAutoAttackEnabled)
 									await _output.BroadcastNpcMove(effect.Entity);
+								break;
+							case WorldTickEffectType.NpcEnterCombat:
+							case WorldTickEffectType.NpcExitCombat:
+								// Draw (enter) or sheathe (exit) the NPC's weapon for nearby viewers - #218. Gated with the
+								// rest of the combat sim since combat mode only has meaning alongside the auto-attack swing.
+								if (NpcAutoAttackEnabled)
+									await _output.BroadcastNpcCombatMode(effect.Entity, effect.Type == WorldTickEffectType.NpcEnterCombat);
 								break;
 						}
 					}

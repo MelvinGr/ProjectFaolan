@@ -142,6 +142,11 @@ namespace Faolan.GameServer
 			return _broadcaster.BroadcastNpcMove(npc);
 		}
 
+		Task IWorldOutbound.BroadcastNpcCombatMode(WorldEntity npc, bool inCombat)
+		{
+			return _broadcaster.BroadcastNpcCombatMode(npc, inCombat);
+		}
+
 		Task IWorldOutbound.ReenterWorld(INetworkClient client)
 		{
 			return SendWorldEntry(client);

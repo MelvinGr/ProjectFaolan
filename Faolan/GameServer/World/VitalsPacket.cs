@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using Faolan.Core.Data;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
@@ -37,6 +38,21 @@ namespace Faolan.GameServer.World
 			return ps
 				.WriteLengthHash()
 				.ToArray();
+		}
+
+		// The bare 0x96B8DC59 IIR body (no RPC header / length prefix) for an entity's stat change - the bytes
+		// SendWorldIir frames per recipient when BROADCASTING a stat to nearby viewers (e.g. an NPC's combat-mode draw,
+		// #218). Same content BuildStatUpdate wraps for a single recipient.
+		public static byte[] BuildStatBlockBody(uint entityHandle, CharacterStatBlock stats)
+		{
+			using var s = new FaolanStream();
+			s
+				.WriteUInt32(GameServer0X2000RespondsOpcodes.StatUpdateIIR)
+				.WriteUInt32(VitalsMarker)
+				.WriteUInt32(entityHandle)
+				.WriteUInt32(0x00000000);
+			stats.WriteTo(s);
+			return s.ToArray();
 		}
 
 		// The inverse of BuildStatUpdate at the IIR-body level: parses the inner 0x96B8DC59 record

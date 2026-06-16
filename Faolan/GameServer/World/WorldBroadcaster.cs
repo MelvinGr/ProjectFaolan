@@ -14,6 +14,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.Combat;
+using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.GameServer.Spawn;
 using Microsoft.Extensions.Logging;
 
@@ -124,6 +125,33 @@ namespace Faolan.GameServer.World
 			// gait + the residual snap are the remaining #190 polish (needs the parametric "approach" MoveTask form).
 			var facing = npc.MoveOrigin.FaceTowards(npc.Position);
 			var body = MoveTaskCodec.BuildBody(npc.Handle, npc.MoveOrigin, npc.Position, facing);
+
+			foreach (var viewer in _sim
+				         .World
+				         .ZoneFor(npc.MapId)
+				         .PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
+			{
+				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
+					await SendWorldIir(viewer.Client, body);
+			}
+		}
+
+		// The combat-mode stat value the captured beach melee mobs send at aggro (strickenbla capture, #218): the tick
+		// before each mob's first swing it pushes `CombatMode = 4`, which is what draws its weapon. (The player uses 1
+		// and one non-swinging entity used 1 - the field is a stance/mode code that isn't fully decoded, but 4 is the
+		// value every actual melee swinger sends.)
+		private const uint NpcCombatModeValue = 4;
+
+		// An NPC engaged or disengaged combat: push the combat-mode stat (stat 20) to every viewer in range that sees it,
+		// so the client DRAWS (enter) or SHEATHES (exit) the NPC's weapon. Without it the NPC swings empty-handed (#218) -
+		// the swing animation plays but no weapon is in hand because the client never put the NPC into combat stance.
+		// Enter sends the captured melee-mob value (4); exit sends 0 (the idle default - a spawn carries no stat-20 record
+		// at all, so 0 sheathes; the sheathe value isn't separately captured). Only viewers who already know the handle
+		// get it (mirrors BroadcastNpcMove).
+		public async Task BroadcastNpcCombatMode(WorldEntity npc, bool inCombat)
+		{
+			var stats = new CharacterStatBlock().Set(LegacyCharacterStatId.CombatMode, inCombat ? NpcCombatModeValue : 0u);
+			var body = VitalsPacket.BuildStatBlockBody(npc.Handle, stats);
 
 			foreach (var viewer in _sim
 				         .World

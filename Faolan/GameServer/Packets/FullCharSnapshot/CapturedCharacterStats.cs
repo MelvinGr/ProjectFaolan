@@ -17,6 +17,14 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// packet that uses 0x001B/0x01F8/0x01FA was the CURRENT ids all along; see CharacterStatBlockTests.)
 		HealthCurrent = 0x001B,
 		HealthMax = 0x0001,
+
+		// Combat-mode / weapon-stance flag: pushed in a 0x96B8DC59 update the tick an entity enters combat, telling
+		// the client to DRAW the entity's weapon (out of combat the weapon is sheathed). Decoded from the strickenbla
+		// combat capture (#218): every beach melee mob gets `CombatMode = 4` the moment before its first swing, and the
+		// player gets `CombatMode = 1` when it enters combat - so without it an NPC swings EMPTY-HANDED (the swing plays
+		// but no weapon is drawn). The value is a stance/mode code not fully decoded (melee mobs = 4, player = 1); idle
+		// entities carry no record at all, so 0 = sheathed.
+		CombatMode = 0x0014,
 		PvpExp = 0x0033,
 		Exp = 0x0034,
 		Level = 0x0036,

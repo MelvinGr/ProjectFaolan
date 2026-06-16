@@ -74,6 +74,20 @@ namespace Faolan.GameServer.World
 		public IReadOnlyList<WorldTickEffect> Tick(double deltaSeconds)
 		{
 			List<WorldTickEffect> effects = null;
+
+			// Flips an NPC's combat-engaged state and, on the transition, queues the combat-mode effect the broadcaster
+			// turns into the stat-20 weapon draw/sheathe (#218). No-op when already in that state, so it fires once per
+			// engage/disengage.
+			void SetCombat(WorldEntity e, bool inCombat)
+			{
+				if (e.InCombat == inCombat)
+					return;
+
+				e.InCombat = inCombat;
+				(effects ??= new List<WorldTickEffect>()).Add(new WorldTickEffect(e,
+					inCombat ? WorldTickEffectType.NpcEnterCombat : WorldTickEffectType.NpcExitCombat));
+			}
+
 			foreach (var zone in _zones.Values)
 			{
 				foreach (var entity in zone.Entities)
@@ -121,6 +135,7 @@ namespace Faolan.GameServer.World
 
 					if (entity.Returning)
 					{
+						SetCombat(entity, false); // disengaged: sheathe the weapon while walking home
 						entity.ArmAttackCooldown(NpcAttackInterval);
 						if (homeDist > NpcMeleeRange)
 						{
@@ -136,12 +151,18 @@ namespace Faolan.GameServer.World
 
 					if (target == null)
 					{
+						SetCombat(entity, false); // no target in range: disengage and sheathe
 						entity.ArmAttackCooldown(NpcAttackInterval); // re-aggro shouldn't swing instantly
 						// Disengaged with no one in range: heal back to full so it can't be whittled from out of range.
 						if (entity.Vitals.Health < entity.Vitals.MaxHealth)
 							entity.Vitals.ReviveToFull();
 						continue;
 					}
+
+					// Engaged: a target is in aggro range and we're not leashing home. Draw the weapon on the transition
+					// (the captured combat-mode stat) BEFORE the chase/swing, mirroring retail - the stat-20 update lands
+					// the tick the mob acquires its target, while it's still closing the distance (#218).
+					SetCombat(entity, true);
 
 					// Chase: if the target is beyond melee range, step toward it (horizontal plane; keep terrain Y) and
 					// broadcast the move instead of swinging this tick. The client interpolates origin->position, so a

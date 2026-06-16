@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Numerics;
+using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
 using Xunit;
 
@@ -103,6 +104,34 @@ namespace Faolan.Tests
 			// re-fetching the same map returns the same zone, not a fresh token
 			Assert.Equal(first, world.ZoneFor(2040)
 				.PlayfieldToken);
+		}
+
+		[Fact]
+		public void Tick_NpcEngagesAndDisengages_EmitsCombatModeEffects()
+		{
+			// A hostile NPC with a player in aggro range engages: the tick flips InCombat and emits NpcEnterCombat so the
+			// broadcaster can draw the NPC's weapon (#218). When the player leaves range it disengages: InCombat clears
+			// and NpcExitCombat is emitted (sheathe). The transition fires once, not every tick.
+			var world = new WorldState();
+			var npc = WorldEntity.ForNpc(10, 2040, new Vector3(0, 0, 0), Vector3.Zero, "Mob", EntityVitals.FromMax(100, 0, 100));
+			npc.Hostile = true;
+			var player = Player(1, 5, 0); // within aggro range (20)
+			world.Place(npc, 2040, new Vector3(0, 0, 0), Vector3.Zero);
+			world.Place(player, 2040, player.Position, Vector3.Zero);
+
+			var first = world.Tick(0.1);
+			Assert.Contains(first, e => e.Type == WorldTickEffectType.NpcEnterCombat && e.Entity == npc);
+			Assert.True(npc.InCombat);
+
+			// Already engaged: a second tick must NOT re-emit enter-combat.
+			var second = world.Tick(0.1);
+			Assert.DoesNotContain(second, e => e.Type == WorldTickEffectType.NpcEnterCombat);
+
+			// Player walks far away -> NPC disengages and sheathes.
+			player.Position = new Vector3(500, 0, 0);
+			var third = world.Tick(0.1);
+			Assert.Contains(third, e => e.Type == WorldTickEffectType.NpcExitCombat && e.Entity == npc);
+			Assert.False(npc.InCombat);
 		}
 
 		private static WorldEntity Npc(uint handle, float x, float z)

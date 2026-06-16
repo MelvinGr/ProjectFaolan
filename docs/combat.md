@@ -105,7 +105,26 @@ interpolation (a small teleport/snap) and a **walk** gait. Findings from the Mov
   - a speed float + two positions (a linear move WITH speed). Drive the per-tick step from it instead of the
   61-byte form. Full MoveTask grammar: `docs/archive/spawn-dissection-plan.md`.
 
-Separately, NPC swings render **empty-handed** (no weapon drawn) - a combat-stance / weapon-draw gap, #218.
+## NPC weapon-draw / combat stance (#218, decoded 2026-06-16)
+
+NPC swings rendered **empty-handed** (the swing plays but no weapon is in hand) because the client never put the
+NPC into **combat stance** - entities sheathe their weapon out of combat and DRAW it on entering combat, and we
+never sent the draw. There is **no dedicated weapon-draw IIR**: the trigger is a **stat** in the ordinary
+`0x96B8DC59` vitals update - **stat `0x14` (CombatMode) = 4**. In the strickenbla capture every beach melee mob
+gets `CombatMode = 4` the tick BEFORE its first swing (handle 0x2C56 frame 6424 → swings 6472; 0x2C59 7341→7424;
+0x2CCE 9441→9462; 0x2C47 11118→11138; 0x2C48 12141→12187 - perfect correlation), and the player gets
+`CombatMode = 1` when it enters combat. The value is a stance/mode code (melee mobs = 4, player = 1, one
+non-swinging entity = 1) not fully decoded, but **4 is what every actual melee swinger sends**; idle entities
+carry no stat-20 record at all, so **0 = sheathed**.
+
+Implemented as a world-sim state transition: `WorldEntity.InCombat` flips in `WorldState.Tick` when a hostile NPC
+acquires/loses a target (emitting `NpcEnterCombat`/`NpcExitCombat` effects), and `WorldBroadcaster.BroadcastNpcCombatMode`
+pushes the stat (4 on enter, 0 on exit) to every viewer in range that already sees the NPC (mirrors `BroadcastNpcMove`).
+Reset on death/respawn so a respawned mob re-draws cleanly. Builder `VitalsPacket.BuildStatBlockBody`, byte-exact
+against frame 6424 (`CharacterStatBlockTests.BuildStatBlockBody_NpcCombatMode_MatchesCapturedFrame`); transition
+logic covered by `WorldStateTests.Tick_NpcEngagesAndDisengages_EmitsCombatModeEffects`. The exit value (0) is an
+inference (the capture's mobs died rather than leashing, so a sheathe was never captured). **Needs in-client
+verification** that the NPC now swings with its weapon drawn.
 
 ## Level-up feedback (#209)
 On a ding (XP-driven or the GM `.level` set) retail sends, in order: a burst of **`AttributeChanged`/`Increased`**

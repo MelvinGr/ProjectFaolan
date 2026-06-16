@@ -86,6 +86,11 @@ namespace Faolan.GameServer.World
 		// camping the leash edge can't ping-pong it).
 		public bool Returning { get; set; }
 
+		// True while this NPC is engaged in combat (a target in aggro range, not leashing home). Drives the combat-mode
+		// stat broadcast that makes the client DRAW the NPC's weapon - without it the NPC swings empty-handed (#218).
+		// The tick flips this and emits an NpcEnterCombat/NpcExitCombat effect on the transition; reset on death/respawn.
+		public bool InCombat { get; set; }
+
 		// Active buffs/effects on this entity, keyed by buff (spell) id - reapplying refreshes the entry.
 		// Server-side bookkeeping only for now: the client tracks icon + duration itself from the ApplySpell
 		// data, and retail sends NO removal IIR on CancelBuff (just a FormatFeedback text), so removal here is
@@ -140,6 +145,7 @@ namespace Faolan.GameServer.World
 			_respawnRemaining = RespawnDelaySeconds;
 			_corpseLingerRemaining = CorpseLingerSeconds;
 			_corpseConverted = false;
+			InCombat = false; // combat ends on death; a respawn re-engages from a clean (sheathed) state
 		}
 
 		// Advances the attack cooldown by dt; returns true (and re-arms for `interval`) when a swing is ready. Used by
@@ -199,6 +205,8 @@ namespace Faolan.GameServer.World
 			CashTin = 0;
 			LootItems.Clear();
 			_corpseConverted = false;
+			InCombat = false; // the fresh NPC starts idle (sheathed); re-aggro re-draws via the combat-mode broadcast
+			Returning = false;
 			return true;
 		}
 
