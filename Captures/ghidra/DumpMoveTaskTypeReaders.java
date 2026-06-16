@@ -8,7 +8,7 @@ import ghidra.program.model.symbol.*;
 import java.io.PrintWriter;
 
 public class DumpMoveTaskTypeReaders extends GhidraScript {
-    static final String[] TARGETS = { "ListMoveTask::vftable", "PathMoveTask::vftable", "RotateMoveTask::vftable" };
+    static final String[] TARGETS = { "WaitMoveTask::vftable","RotateMoveTask::vftable","JumpMoveTask::vftable","SetPosMoveTask::vftable","GroundAlignMoveTask::vftable" };
     Address vtableAddr(String full) {
         for (Symbol s : currentProgram.getSymbolTable().getAllSymbols(false))
             if (s.getName(true).equals(full)) return s.getAddress();
