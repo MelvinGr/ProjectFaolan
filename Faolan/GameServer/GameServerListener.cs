@@ -551,10 +551,18 @@ namespace Faolan.GameServer
 					// Grant each item the bag carries into the backpack (persist + live DispatchAddItem). The bag
 					// hands them over once (TakeBagItems clears them); coins ride the separate TryLootCash click.
 					var items = _broadcaster.TakeBagItems(client, bagHandle);
+					// GRANT each item to the backpack (persist + live DispatchAddItem): our client does NOT local-add
+					// from the bag (verified - persist-only left the items un-takeable), so the server push is what
+					// actually delivers them.
 					foreach (var itemTemplateId in items)
 						await GrantItemToBackpack(client, itemTemplateId);
 					if (items.Count > 0)
 						Logger.LogInformation("Loot: granted {Count} item(s) from bag 0x{Bag:X8} to {Player}.", items.Count, bagHandle, client.Session.Character?.Name);
+
+					// Tear the emptied bag down the retail way: LootRemoveItems (clears the bag's item list) +
+					// DispatchCloseLootBag + looter-reset + n3ToClientFade, so the looted bag empties and fades away
+					// instead of lingering with its items still shown.
+					await _broadcaster.FinishLootAll(client, bagHandle);
 
 					break;
 				}

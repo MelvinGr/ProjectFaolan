@@ -66,7 +66,11 @@ namespace Faolan.GameServer
 		// 3-stat form that renders in-client), and itemId/recordId use FullCharSnapshotBuilder's deterministic
 		// formula so the live add and the next login's snapshot agree on the entry's identity. Returns the bag
 		// slot it landed in, or null when the item isn't snapshot-buildable or the bag is full.
-		private async Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1)
+		// `pushLiveAdd`: send the live DispatchAddItem so the item appears immediately. LOOT passes false: retail sends
+		// NO inventory-add for normal loot - the client moves the looted item from the bag to the backpack LOCALLY
+		// (confirmed by LootRemoveItems), so a server push would double it. Loot still PERSISTS here (DB write) so the
+		// item survives relog via the world-entry snapshot.
+		private async Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, bool pushLiveAdd = true)
 		{
 			var item = await Database.GetItem(itemTemplateId);
 			if (item is not { Archetype: not 0 })
@@ -78,6 +82,9 @@ namespace Faolan.GameServer
 				return null;
 
 			await Database.SetCharacterInventorySlot(characterId, (int)FullCharSnapshotBuilder.BagKind, slot.Value, itemTemplateId, count);
+
+			if (!pushLiveAdd)
+				return slot;
 
 			var entry = SnapshotItemBuilder.BuildListEntry(
 				(ulong)slot.Value,

@@ -456,6 +456,35 @@ namespace Faolan.GameServer.World
 			_logger.LogInformation("Loot: {Name} opened the loot window on {Bag} 0x{Handle:X8}.", player.Name, bag.Name, bag.Handle);
 		}
 
+		// Completes a "loot all": the retail loot-all finish, decoded from the hoxxling gameplay capture (frame 4470).
+		// Retail sends NO inventory-add for normal loot - the client moves the items from the bag to the backpack
+		// LOCALLY; the server just signals the removal and tears the emptied bag down. Sequence (all to the looter):
+		//   LootRemoveItems (the "items taken" signal) -> DispatchCloseLootBag (0x2038, close the window) ->
+		//   NewCurrentLooter/NewAllowedLooter reset -> n3ToClientFade -> UpdateSimpleDynel, then drop the bag.
+		// Cash is auto-looted on open (separate TryLootCash), so the bag holds no coins by the time this runs.
+		public async Task FinishLootAll(INetworkClient client, uint bagHandle)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null || !_sim.World.ZoneFor(player.MapId).TryGet(bagHandle, out var bag))
+				return;
+
+			await SendWorldIir(client, WorldLoot.BuildLootRemoveItemsBody(bag.Handle));
+			await new PacketStream()
+				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x58),
+					ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, client.Session.Account.ClientInstance),
+					GameCharInterfaceDispatchOpcodes.DispatchCloseLootBag)
+				.WriteUInt32(WorldLoot.LootTypeTag)
+				.WriteUInt32(bag.Handle)
+				.SendAsync(client);
+			await SendWorldIir(client, WorldLoot.BuildLooterResetBody(WorldLoot.NewCurrentLooterSubOpcode, bag.Handle));
+			await SendWorldIir(client, WorldLoot.BuildLooterResetBody(WorldLoot.NewAllowedLooterSubOpcode, bag.Handle));
+			await SendWorldIir(client, WorldLoot.BuildFadeBody(WorldLoot.LootTypeTag, bag.Handle, WorldLoot.DefaultFadeSeconds));
+			await SendWorldIir(client, WorldLoot.BuildBagConsumedVisualBody(bag.Handle));
+
+			_sim.World.ZoneFor(bag.MapId).Remove(bag.Handle);
+			_logger.LogInformation("Loot: {Name} looted all from {Bag} 0x{Handle:X8} (bag consumed).", player.Name, bag.Name, bag.Handle);
+		}
+
 		// On world entry: re-send the player's persisted active quests so their journal is restored.
 		public async Task RestorePlayerQuests(INetworkClient client)
 		{
@@ -761,6 +790,7 @@ namespace Faolan.GameServer.World
 			if (!WorldObjectBuilder.TryBuild(template, handle, player.Position, rotation, out var body))
 				return null;
 			SpawnPlayfieldRewriter.TryRewrite(body, _sim.World.ZoneFor(player.MapId).PlayfieldToken);
+			body = await SpliceLootContents(body, handle, cashTin, itemTemplates); // show OUR items/cash in the window
 
 			var bag = WorldEntity.ForLoot(handle, player.MapId, player.Position, player.Rotation, template.Name ?? "Loot", body, LootBagExpirySeconds);
 			bag.CashTin = cashTin;
@@ -780,6 +810,44 @@ namespace Faolan.GameServer.World
 			_logger.LogInformation("Loot: .spawnbag bag 0x{Handle:X8} for {Player} ({Items} items, {Cash} tin).",
 				handle, client.Session.Character?.Name, itemTemplates.Count, cashTin);
 			return bag;
+		}
+
+		// Splices the bag's ACTUAL contents (cash + rolled items) into a loot-bag body built from the captured
+		// template, so the client shows them in the loot window. The client reads the item list from the
+		// LootBagFullUpdateIIR body it already has - there is NO separate contents packet (hoxxling gameplay capture:
+		// only DispatchOpenLootBag 0x2037 + the loot-ack 0x2038, no DispatchReplyLootForCharacter). Keeps the
+		// template's inventory ENVELOPE (id/size) and swaps only the items + cash, via the proven LootBagMessageCodec.
+		// Per-item ids are synthetic (display only - the grant is server-side from WorldEntity.LootItems). Returns the
+		// body unchanged if the contents blob can't be located (the window then just shows empty, as before).
+		private async Task<byte[]> SpliceLootContents(byte[] body, uint handle, uint cash, IReadOnlyList<uint> itemTemplateIds)
+		{
+			if (body.Length <= 8 || !LootBagMessageCodec.TryParse(body.AsSpan(8), out var contents, out var contentsStart))
+				return body;
+
+			contents.Cash = cash;
+			contents.Inventory.Items.Clear();
+			uint slot = 0;
+			foreach (var templateId in itemTemplateIds ?? Array.Empty<uint>())
+			{
+				var item = await _database.GetItem(templateId);
+				if (item == null || item.Archetype == 0)
+					continue;
+				var guid = ((ulong)handle << 16) | slot; // synthetic per-instance id (display only)
+				contents.Inventory.Items.Add(SnapshotItemBuilder.BuildListEntry(slot, guid, guid, 1, item, item.Archetype));
+				slot++;
+			}
+
+			// Size the container to what we actually put in it: keeping the template's MaxSize capped the window to the
+			// captured bag's item count (e.g. a 2-slot template hid the 3rd rolled item).
+			contents.Inventory.MaxSize = slot;
+
+			var newContents = LootBagMessageCodec.BuildContents(contents);
+			var newRecordLen = contentsStart + newContents.Length;
+			var result = new byte[8 + newRecordLen];
+			body.AsSpan(0, 8 + contentsStart).CopyTo(result);      // [u32 len][u32 subOpcode][identity + kd-tree]
+			newContents.CopyTo(result.AsSpan(8 + contentsStart));  // the new [u32 len][ProtoLootBagIIR] tail
+			BinaryPrimitives.WriteUInt32BigEndian(result.AsSpan(0, 4), (uint)(4 + newRecordLen)); // carrier len = subOpcode + record
+			return result;
 		}
 
 		// Turns an already-spawned, dead entity's corpse into a lootable bag IN PLACE: builds the

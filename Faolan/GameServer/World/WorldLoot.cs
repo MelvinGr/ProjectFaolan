@@ -31,6 +31,60 @@ namespace Faolan.GameServer.World
 				.ToArray();
 		}
 
+		public const uint LootRemoveItemsSubOpcode = (uint)GameServer0X2000RespondsOpcodes.LootRemoveItemsIIR; // 0x70010162
+		public const uint NewAllowedLooterSubOpcode = (uint)GameServer0X2000RespondsOpcodes.NewAllowedLooterIIR; // 0x1E2E0139
+		public const uint BagConsumedVisualSubOpcode = (uint)GameServer0X2000RespondsOpcodes.UpdateSimpleDynelIIR; // 0x30536411
+
+		// LootRemoveItemsIIR (0x70010162): the "items taken" signal the client acts on to move the looted items from
+		// the bag into the backpack LOCALLY (retail sends NO inventory-add for normal loot - the item grant we saw in
+		// captures is the quest-only path; see protocol_loot_interaction). The tail is CONSTANT across every captured
+		// item-removal (hoxxling gameplay, 21 instances) - only the bag handle varies. 25 B:
+		// [subop][lootTypetag][bagHandle][00000000][00000007][0xE2][00000000].
+		public static byte[] BuildLootRemoveItemsBody(uint bagHandle)
+		{
+			return new FaolanStream()
+				.WriteUInt32(LootRemoveItemsSubOpcode)
+				.WriteUInt32(LootTypeTag)
+				.WriteUInt32(bagHandle)
+				.WriteUInt32(0)
+				.WriteUInt32(7)
+				.WriteByte(0xE2)
+				.WriteUInt32(0)
+				.ToArray();
+		}
+
+		// NewCurrentLooter / NewAllowedLooter RESET (looter -> none) once the bag is emptied. 21 B:
+		// [subop][lootTypetag][bagHandle][00000000][00000000][00]. Distinct from BuildNewCurrentLooterBody (which
+		// ASSIGNS a looter with [0x00][entityTypetag][playerHandle]); the reset clears it with two zero words.
+		public static byte[] BuildLooterResetBody(uint subOpcode, uint bagHandle)
+		{
+			return new FaolanStream()
+				.WriteUInt32(subOpcode)
+				.WriteUInt32(LootTypeTag)
+				.WriteUInt32(bagHandle)
+				.WriteUInt32(0)
+				.WriteUInt32(0)
+				.WriteByte(0x00)
+				.ToArray();
+		}
+
+		// UpdateSimpleDynelIIR (0x30536411): the bag's visual update as it's consumed (sent right before the fade).
+		// 24 B: [subop][lootTypetag][bagHandle][00000000][00000000][01][00 01 01].
+		public static byte[] BuildBagConsumedVisualBody(uint bagHandle)
+		{
+			return new FaolanStream()
+				.WriteUInt32(BagConsumedVisualSubOpcode)
+				.WriteUInt32(LootTypeTag)
+				.WriteUInt32(bagHandle)
+				.WriteUInt32(0)
+				.WriteUInt32(0)
+				.WriteByte(0x01)
+				.WriteByte(0x00)
+				.WriteByte(0x01)
+				.WriteByte(0x01)
+				.ToArray();
+		}
+
 		// "bag -> current looter = this player" (also used for NewAllowedLooter, same shape). 21 B:
 		// [subop][lootTypetag][bagHandle][0x00][entityTypetag][playerHandle].
 		public static byte[] BuildNewCurrentLooterBody(uint bagHandle, uint playerHandle)
