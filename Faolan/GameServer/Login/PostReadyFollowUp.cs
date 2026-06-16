@@ -112,6 +112,9 @@ namespace Faolan.GameServer
 				await GrantStartingAbilities(client);
 				// ...and re-grants the character's learned SPELLS (DispatchLearnSpell 0x200A) the same way (#74).
 				await GrantStartingSpells(client);
+				// ...and re-applies the persistent shield self-buff every character carries (#221). This flush is also
+				// re-armed on teleport/changemap re-entry, so the buff is re-asserted on each playfield change too.
+				await GrantStartingBuffs(client);
 				// Then the post-ready world-state/quest record stream (verbatim from the Strie login capture).
 				await SendPostReadyBurst(client);
 

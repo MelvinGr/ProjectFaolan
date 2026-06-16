@@ -59,6 +59,33 @@ namespace Faolan.GameServer
 				Logger.LogInformation("GrantStartingSpells: re-granted {Count} learned spells to '{Name}' (class={Class}).", spells.Length, character.Name, character.Class);
 		}
 
+		// The persistent self-buff every character carries in-world (the protective "shield" buff, #221). Re-applied on
+		// each login AND playfield change: it lives in FlushPendingPost205FFollowUp next to the ability/spell re-grants,
+		// and the teleport/changemap re-entry re-arms that flush, so zoning re-asserts it too. Class-agnostic - every
+		// character gets it. Applied via the proven ApplySpell (MagicBuff 0x6B87E316) self-buff path, so it also lands in
+		// ActiveBuffs (.buffs / CancelBuff / expiry).
+		//
+		// INTERIM spell id + payload: the exact "Shield of the Risen" id/payload is in no capture (#221), so this uses
+		// the shield our ApplySpell payload already encodes (Scythe Shield - the payload's embedded spell base 0x02387E
+		// matches this id's base; the apply rank byte is 0x00, mirroring the captured mount buff's 0x31EB1500/...01
+		// apply/remove pair). The wire GRAMMAR is the fully-captured mount buff
+		// (account-faolan-character-necrol80-login-mount_move_dismount: ApplySpell 0x31EB1500 + 54-byte payload), so the
+		// shape is sound; whether THIS buff renders the intended shield in-client is the open item (needs-testing on #221).
+		private const uint ShieldBuffSpellId = 0x02387E00;
+
+		private async Task GrantStartingBuffs(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			if (character == null)
+				return;
+
+			// Self-buff: applyTo == applyFrom == the player's own handle (== ClientInstance == Character.Id), which is
+			// also what ApplySpell keys the ActiveBuffs registration on.
+			var self = client.Session.Account.ClientInstance;
+			await ApplySpell(client, self, self, ShieldBuffSpellId);
+			Logger.LogInformation("GrantStartingBuffs: applied the shield self-buff 0x{Spell:X8} to '{Name}'.", ShieldBuffSpellId, character.Name);
+		}
+
 		// Sends a live spell grant (DispatchLearnSpell, s2c 0x200A) - the retail "learn a spell" packet (#73). Grants a
 		// spell mid-session (level-up / quest-reward / GM) without rebuilding the FullChar snapshot. Rides the same
 		// GameCharInterface conversation as the 0x2052 ability grant; the body is a single u32 spell id (decoded in
