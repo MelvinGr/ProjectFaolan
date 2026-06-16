@@ -22,16 +22,29 @@ WHAT THIS PASS ESTABLISHED (2026-06-16, #219):
               0x50208 0x50209 0x5026C 0x5026D 0x502D0 0x50334
            (the +0x64 / +0x01 stepping is the classic AoC stat-id block; these are constant across
             guilds -> the structural scaffold a fresh-guild block must reproduce). Ends at @57.
-  - @57..276 (220 bytes) is the COUNTER REGION. It does NOT parse as a parallel [13 x u32 value]
-    array (reading u32s from @58 yields 0xF3000000.. which misaligns), so it has its own internal
-    framing (typed/variable records) that is NOT recoverable from the bytes alone. The clean decode
-    needs the client's guild IIR reader (Ghidra), the same approach as the other ReadSubClass readers
-    (see ghidra_vtable_xref_readers). Until then the block stays template-carried in GuildService.
+  - @57..276 (220 bytes) is the COUNTER REGION (see the FRAMING CRACKED note below).
 
-CONCLUSION: a fresh-guild GENERATOR is still blocked on the counter-region framing. But the block is
-proven length-stable (always 277 bytes) and counter-only-variable, so carrying the captured template
-verbatim is safe for the roster that follows it. This script documents the scaffold for the eventual
-Ghidra pass.
+FRAMING CRACKED via Ghidra (2026-06-16, #219). The block is NOT an IIR ReadSubClass (the named
+GuildUpdateIIR_c is an unrelated {bool,string} object). The 0x203F packet is the RPC method
+CSPlayerInterface case 0x3F = DispatchGuildUpdate (FUN_013428d0), which reads three args:
+i_pcGuild + i_pcMember + i_cMemberList. The renown block is the TAIL of i_pcGuild, read by
+CoreGuild_c::Read (FUN_00565900, streaming version == 3, then a switch on govForm 0..3). Reader chain
+recovered by Captures/ghidra/DumpGuildDispatch.java + DumpFnList.java. The block grammar:
+  @0   u8  flag (ReadByte; 0x01 here)
+  @1   0x3F1-FRAMED u32 LIST (FUN_004d4c70): word = (count+1)*0x3F1, then count x u32.
+       0x0000372E == 14*0x3F1 -> count 13 -> the 13 stat-ids @5..57. (This is why reading @58 as a
+       raw array misaligned: the leading region is a 0x3F1 list, the SAME primitive as the spawn
+       reader's sub-list, not a flat array.)
+  @57..276  a govForm-dependent run of ReadU64 (FUN_0048f720) / ReadU32 (FUN_0048f900) / ReadByte
+       fields - the renown/feat/city counters. Most are u64 stored big-endian [hi u32][lo u32], which
+       is the value/zero alternation seen below (e.g. @269..276 = u64 975,000,000; @169..176 a
+       count(3)+u64 30,000,000). The @133 u32 that ticks across snapshots is one such counter.
+
+CONCLUSION: the framing is no longer a black box - a fresh-guild GENERATOR is now a field-mapping job
+(walk CoreGuild_c::Read case-by-case and emit the same ReadU64/ReadU32/ReadByte order with the live
+guild's counters, zeroed for a brand-new guild). Carrying the captured template verbatim remains safe
+(length-stable 277 bytes, counter-only-variable) until the generator lands. The @81 0xFC4 (==4*0x3F1)
+is coincidental, not a nested list (it sits mid-u64-field).
 """
 import json, struct, sys
 
@@ -51,8 +64,23 @@ TEMPLATE_HEX = (
 )
 
 
+F3F1 = 0x3F1
+
+
 def stat_ids(blk):
     return [struct.unpack('>I', blk[5 + 4 * i:9 + 4 * i])[0] for i in range(13)]
+
+
+def parse_framing(blk):
+    """Validate the cracked grammar: u8 flag, then the 0x3F1-framed u32 list (the 13 stat-ids)."""
+    o = 0
+    flag = blk[o]; o += 1
+    word = struct.unpack('>I', blk[o:o + 4])[0]; o += 4
+    assert word % F3F1 == 0, f"list word 0x{word:x} not a 0x3F1 multiple"
+    count = word // F3F1 - 1
+    ids = [struct.unpack('>I', blk[o + 4 * i:o + 4 * i + 4])[0] for i in range(count)]
+    o += 4 * count
+    return flag, word, count, ids, o
 
 
 def extract_blocks(path):
@@ -77,10 +105,11 @@ def main(path):
     blocks = extract_blocks(path)
     print(f"found {len(blocks)} renown blocks")
     for frame, blk in blocks:
-        print(f"  frame {frame}: len={len(blk)} ver={blk[0]:#x} hdr@1={struct.unpack('>I', blk[1:5])[0]:#x}"
-              f" counter@133={struct.unpack('>I', blk[133:137])[0]:#x}")
-        assert stat_ids(blk) == [0x4FFB0, 0x4FFB1, 0x50014, 0x50078, 0x500DC, 0x50140, 0x501A4,
-                                 0x50208, 0x50209, 0x5026C, 0x5026D, 0x502D0, 0x50334], "stat-id scaffold drift"
+        flag, word, count, ids, counter_off = parse_framing(blk)
+        print(f"  frame {frame}: len={len(blk)} flag={flag:#x} listword={word:#x}=({word // F3F1})*0x3F1"
+              f" -> {count} stat-ids, counter region @{counter_off}, counter@133={struct.unpack('>I', blk[133:137])[0]:#x}")
+        assert ids == [0x4FFB0, 0x4FFB1, 0x50014, 0x50078, 0x500DC, 0x50140, 0x501A4,
+                       0x50208, 0x50209, 0x5026C, 0x5026D, 0x502D0, 0x50334], "stat-id scaffold drift"
     if len(blocks) >= 2:
         a, b = blocks[0][1], blocks[1][1]
         diffs = [i for i in range(277) if a[i] != b[i]]

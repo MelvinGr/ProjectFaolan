@@ -70,14 +70,17 @@ namespace Faolan.CSPlayerAgent
 			return _pendingGuildInvites.TryRemove(characterId, out var declined) ? declined.GuildName : null;
 		}
 
-		// The 277-byte renown/feat/city-stats block of the 0x203F full update, verbatim from the capture. Decode
-		// pass (Captures/decode_guild_renown.py, #219): the block is a STATIC scaffold + a few live counters - it
-		// is byte-identical across snapshots except a u32 renown total at block offset 133 (0x01327BAD->0x01327FFE)
-		// and is always 277 bytes, so carrying it verbatim never misaligns the roster that follows. Leading
-		// structure is decoded: [u8 0x01 ver][u32 0x372E header][13x u32 ascending stat-slot ids 0x4FFB0..0x50334].
-		// The 220-byte counter region after the ids has its own (typed/variable) framing that needs the client's
-		// guild IIR reader (Ghidra) to generate a fresh-guild block - still blocked. Cosmetic-only until then: the
-		// renown tab shows the captured guild's numbers.
+		// The 277-byte renown/feat/city-stats block of the 0x203F full update, verbatim from the capture. It is
+		// byte-identical across snapshots except a u32 renown total at block offset 133 (0x01327BAD->0x01327FFE)
+		// and is always 277 bytes, so carrying it verbatim never misaligns the roster that follows.
+		// FRAMING CRACKED (Ghidra, #219 - Captures/decode_guild_renown.py + DumpGuildDispatch.java): the block is
+		// NOT an IIR ReadSubClass; it is the tail of the i_pcGuild arg read by CSPlayerInterface::DispatchGuildUpdate
+		// -> CoreGuild_c::Read (streaming version 3, govForm switch). Grammar:
+		//   [u8 flag=0x01][0x3F1-framed u32 list: word=(count+1)*0x3F1=0x372E -> 13 stat-ids 0x4FFB0..0x50334]
+		//   [@57.. govForm-dependent run of ReadU64/ReadU32/ReadByte renown/feat/city counters].
+		// So a fresh-guild GENERATOR is now a field-mapping job (emit CoreGuild_c::Read's field order, counters
+		// zeroed), not a black box - but still TODO. Cosmetic-only until then: the renown tab shows the captured
+		// guild's numbers.
 		private static readonly byte[] GuildRenownBlockTemplate =
 		[
 			0x01, 0x00, 0x00, 0x37, 0x2E, 0x00, 0x04, 0xFF, 0xB0, 0x00, 0x04, 0xFF, 0xB1, 0x00, 0x05, 0x00, 0x14, 0x00, 0x05, 0x00, 0x78, 0x00, 0x05, 0x00, 0xDC, 0x00, 0x05, 0x01, 0x40, 0x00, 0x05, 0x01, 0xA4, 0x00, 0x05,
