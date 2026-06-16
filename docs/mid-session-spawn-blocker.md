@@ -128,12 +128,25 @@ loaded playfield's `+0x94`. The doc-verified "loot bag carried 0x01EA985C" is ne
 `pf->GetInstance() == 0x01EA985C` for the live session — i.e. the token we splice via `SpawnPlayfieldRewriter`
 must equal the registered playfield instance, not a captured/stale one.
 
-**NEXT (fix direction):** (a) find how `+0x94` is SET (from the MapChange `5D85BFC7` body / the world-entry
-handshake) so we can compute the client's live registered playfield instance server-side and stamp mid-session
-spawns with it; (b) in-client, log `GetPlayfield` hits/misses (the "Cant add same playfield twice" + the
-add-to-playfield path) to confirm whether our mid-session token actually misses the map. Also still worth pinning:
-the CharInPlayIIR *Activate* slot (the `+0x94` resolution there shows the same "cant resolve simplechar" failure
-family). Helper scripts: `Captures/ghidra/DumpVtableX.java`, `ReadSlotFn.java`. (Any candidate fix still needs an
+**Where `+0x94` comes from (client):** the `n3Playfield` ctor (`FUN_0059a1a0`, writes `[ESI+0x94]` at `0059a242`)
+copies it from its **descriptor field 8** (`param_2[0x25] = param_1[8]`), set at playfield CONSTRUCTION during
+world-load — i.e. `+0x94` is whatever instance the world-load/MapChange path stamps into the playfield, NOT
+necessarily the snapshot's playfield token. (Tracing descriptor[8] to its exact wire field is the remaining client
+step; it's a deep thiscall ctor chain — `FUN_008e0df0` Playfield ctor.)
+
+**The server-side suspect (offline-checkable lead):** our mid-session spawns get their `18 <varint>` token from
+`Zone.PlayfieldToken` (`WorldBroadcaster.cs:862`), which is set by `CapturePlayfieldToken` extracting the token
+from the **0x737A6DF9 snapshot body** (`WorldDespawn.TryExtractPlayfieldToken`), with a minted `0x00A00000+`
+fallback (`WorldState._nextPlayfieldToken`). If the value the client registers as `pf->GetInstance()` (+0x94, from
+the world-load descriptor) is NOT the same as the snapshot-extracted token we stamp into spawns, every mid-session
+spawn misses the playfield map → dropped. The burst renders because its spawns carry the captured token verbatim
+(which, in the captured session, matched the real playfield instance).
+
+**NEXT (fix direction):** (a) confirm the equality — in-client, log the registered `GetPlayfield(+0x94)` instance
+vs the token we stamp; OR finish tracing client descriptor[8] → its wire field and compare to what our world-entry
+sends; (b) if they differ, stamp mid-session spawns with the world-load-registered instance instead of the
+snapshot token. Also still open: the CharInPlayIIR *Activate* slot (same `+0x94` "cant resolve simplechar"
+family). Helper scripts: `Captures/ghidra/{DumpVtableX,ReadSlotFn,Xrefs}.java`. (Any candidate fix still needs an
 in-client render to confirm — packet/golden tests can't see the client's poll loop.)
 
 Memory: `protocol_midsession_spawn_blocked`. Related: `protocol_201c_spawn_subprotocol` (the poll loop),
