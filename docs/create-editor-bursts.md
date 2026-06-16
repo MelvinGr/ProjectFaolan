@@ -98,10 +98,11 @@ create-specific to decode, only builder wiring to do:
    record's handle + the create session's playfield token (the new playfield-instance overload —
    `TryRewritePlayfieldInstance` — rewrites the rows' stored token, which is from a different session), and
    emitted ONLY when byte-identical to the verbatim record (the `RetailLoginReplay` zero-render-risk gate); no DB
-   / no row / any drift falls back to verbatim. `CreateEditorSceneDynelTests` proves **17/18 reconstruct
-   byte-for-byte** and that the **full DB-driven burst equals `InitialBurst.bin`**. The 18th (localized
-   `3072626`, handle `0x0002A7FE`) has no DB row — it shares an exact position with `347659` and the importer's
-   position-keyed `WorldObject` dedup dropped it (Gitea #222) — so it stays the one verbatim scene record.
+   / no row / any drift falls back to verbatim. `CreateEditorSceneDynelTests` proves **all 18 reconstruct
+   byte-for-byte** and that the **full DB-driven burst equals `InitialBurst.bin`**. (Until Gitea #222 the 18th —
+   localized `3072626`, handle `0x0002A7FE` — had no DB row: it shares an exact position with `347659` and the
+   importer's position-keyed `WorldObject` dedup dropped it. Fixed by keying world objects by (position,
+   `display_name` identity) in the dedup + replay + coverage; `3072626` now has its own row.)
 3. ~~Decode + build `PlayfieldFIIR`/`GameTimeIIR`~~ **DONE & WIRED** — both are now constructed in the burst
    via `CreateEditorRecordBuilder.BuildPlayfieldFiir`/`BuildGameTimeIir`. MapChange is built from the editor
    map id + the session playfield token (carried twice); SetDayTime from the captured day-time/timestamp/rate.
