@@ -193,12 +193,13 @@ namespace Faolan.GameServer.World
 
 			var zone = _sim.World.ZoneFor(entity.MapId);
 
-			// FAOLAN_NPC_INDIVIDUAL_SPAWN: NPCs were dropped from the burst (ReplayMapWorldBurst), so the interest
-			// system is the SOLE NPC spawn path - stream every in-range NPC here at entry (includeNonPlayers), each
-			// as its own FA015807 + name registration via DispatchInterest. No burst NPCs means no Known-seeding and
-			// no double-spawn. Otherwise (default) the burst already rendered the entry NPCs: seed those into Known
-			// so the first move doesn't re-spawn them, and only stream players here.
-			if (Environment.GetEnvironmentVariable("FAOLAN_NPC_INDIVIDUAL_SPAWN") == "1")
+			// Interest is the SOLE NPC spawn path (DEFAULT since #23 made mid-session/interest spawns render; in-client
+			// verified 2026-06-16): NPCs were dropped from the burst (ReplayMapWorldBurst), so stream every in-range NPC
+			// here at entry (includeNonPlayers), each as its own FA015807 + name registration via DispatchInterest. No
+			// burst NPCs means no Known-seeding and no double-spawn. Set FAOLAN_NPC_INDIVIDUAL_SPAWN=0 to fall back to
+			// the old burst path (seed entry NPCs into Known, stream only players here). KNOWN: streams the cross-session
+			// model union (~4x retail density) - cross-session mob dedup / interest tuning is a follow-up.
+			if (Environment.GetEnvironmentVariable("FAOLAN_NPC_INDIVIDUAL_SPAWN") != "0")
 			{
 				var npcEvents = InterestManager.ResolveMove(zone, entity, WorldSimulation.PlayerInterestRange, includeNonPlayers: true);
 				await DispatchInterest(npcEvents, null);

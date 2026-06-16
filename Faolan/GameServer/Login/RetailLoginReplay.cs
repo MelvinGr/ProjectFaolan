@@ -556,7 +556,7 @@ namespace Faolan.GameServer
 			// all of them -> mass double-spawn (the "nameplate flickers then clears" bug). Making interest the SOLE
 			// NPC path removes the duplication entirely. The player's own spawn, containers, world objects and the
 			// snapshot stay in the burst.
-			var npcIndividualSpawn = Environment.GetEnvironmentVariable("FAOLAN_NPC_INDIVIDUAL_SPAWN") == "1";
+			var npcIndividualSpawn = Environment.GetEnvironmentVariable("FAOLAN_NPC_INDIVIDUAL_SPAWN") != "0"; // DEFAULT on (#23 made interest spawns render); =0 restores the burst NPC path
 
 			// FAOLAN_SNAPSHOT_QUESTS (opt-in): author the character's accepted quests into the login snapshot tails so
 			// they show in the J-panel on relog (the snapshot, not packets, delivers the login quest log). Default off
@@ -568,7 +568,7 @@ namespace Faolan.GameServer
 			// from-DB construct in the REAL login snapshot (#186). Byte-identical for a fresh beach char, so safe to
 			// flip; the in-client chat-connect smoke test confirms the client accepts it. state 1 = active on login.
 			byte[] generatedBeachQuestPortion = null;
-			if (Environment.GetEnvironmentVariable("FAOLAN_GENERATE_BEACH_QUEST_TAILS") == "1")
+			if (Environment.GetEnvironmentVariable("FAOLAN_GENERATE_BEACH_QUEST_TAILS") != "0") // DEFAULT on (in-client verified 2026-06-16; =0 keeps the captured region)
 			{
 				try
 				{
