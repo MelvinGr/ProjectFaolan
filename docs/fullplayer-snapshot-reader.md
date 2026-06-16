@@ -7,34 +7,38 @@ region of `BeachTailsTemplate.bin`) with a real, generated grammar so the `.bin`
 character's **class/progression** authored instead of inherited from Strie. See `docs/quest-log-handover.md`
 and the memory `snapshot_tails_construction_scope`.
 
-## Status & handover (2026-06-16)
+## Status & handover (2026-06-16, updated)
 
-The whole `UnknownBefore` blob is mapped, and the **quest-journal region is decoded, modeled, and
-generatable from the DB**. Commits this session (branch `development`, all green — 401 tests): the Ghidra
-reader decode, the `Quest_c`/`MainQuest_c`/`StatList_t`/`SpellBook_t` grammar, the `decode_questc.py`
-dissector, the `QuestcRegion`/`QuestcRecord` codec, its integration into `SnapshotTails` (byte-identical),
-and `QuestcRecord.BuildSingle` generation from `QuestDefinition` (byte-exact for the beach starter 10238).
+The whole tails' QUEST PORTION (`@0..1292`) is now **decoded, typed, and generated from the DB with zero
+literals**, and the generation is **wired into the production login snapshot behind a flag**. The stat block
+is decoded; only the access-window table + stat skeleton remain as fixed relocatable data. Branch
+`development`, all green (420 tests).
 
-DONE:
-- Top-level `FullPlayerCharacterIIR::ReadSubClass` grammar (every region named — see below).
-- `Quest_c` (List A) **fully field-labeled + validated** against `BeachTailsTemplate.bin`.
-- `QuestcRegion` codec round-trips the template `@0–609` byte-exact (`QuestcRegionTests`) and now models
-  that region inside `SnapshotTails` (replaced the opaque `Header0`/`Unknown*`/`RemoteFormat*` fields).
-- **Generation**: `QuestcRecord.BuildSingle(QuestDefinition, …)` reproduces 10238's region byte-exact from
-  `faolan.db` (`QuestcGenerationTests`) — the journal text is fully DB-sourced.
+DONE this session (the whole quest region authors from server state):
+- **Quest_c (`@0..609`)** — `QuestcRegion`/`QuestcRecord` codec (byte-exact round-trip), wired into
+  `SnapshotTails`, and `QuestcRecord.BuildSingle` GENERATES it from `faolan.db` (`QuestcGenerationTests`).
+- **`@609` objective region** — DECODED as a per-GOAL block (NOT a `BuildQuestFullUpdate` block — that was
+  DISPROVEN: 559 B vs 869 B). Codec `QuestObjectiveRegion`/`QuestObjectiveGoal` (round-trip), wired into
+  `SnapshotTails`, and `QuestObjectiveGoal.BuildSingle` GENERATES it from the per-goal DB model.
+- **Quest INDEX (`@1168`)** — codec `QuestIndexRegion` (the `0x3F1` index + the `0x57365154` "W6QT" goal-id
+  table), wired into `SnapshotTails`, with a `Build` generator.
+- **Per-goal `QuestDefinition` model** — `QuestGoalDefinition` table + the snapshot-generation columns
+  (`SnapshotN/FieldEc/FieldF0/FieldF8`, `IndexMarker/TableField*/TrailerWord/GoalSteps`) + migration; seeded
+  for the beach starter (importer `SeedBeachQuestGoals`). `BuildWholeQuestPortion_ReproducesBeachTails`
+  proves `@0..1292` regenerates byte-exact with NO literals (only the per-character quest state).
+- **Production wiring (gated)** — `RetailLoginReplay.BuildBeachInventoryPacket` splices the DB-generated quest
+  portion over the captured tails' `@0..1292` behind **`FAOLAN_GENERATE_BEACH_QUEST_TAILS`** (default off);
+  byte-identical for a fresh beach char (`BuildBeachQuestPortion_MatchesTemplate`). NB `BeachTailsBuilder`
+  itself is TEST-ONLY — production uses the captured world-burst tails, so this gated splice is the real path.
+- **Stat block decoded** — `decode_statblock.py`: only 25 of 338 values vary across fresh chars (class/map/XP
+  + one session slot); the other 313 are a fixed skeleton, relocated to `TailsStatBlock`.
 
-REMAINING to retire the `.bin`'s quest region for ARBITRARY characters (in priority order):
-1. **Harvest the 3 undecoded per-quest scalars** (`N`, `@0xf0`, `@0xf8`) into `QuestDefinition`
-   (importer + a migration). Today `BuildSingle` takes them as parameters; the beach values are
-   `N=4, @0xf0=0x96, @0xf8=15`. LOW/MED.
-2. **Build the `@609` per-goal objective-detail block + the quest index.** The `@609` grammar is now
-   DECODED (`Captures/decode_snapshot_609.py`, `Snapshot609AnalysisTests`) — see the `@609` section below —
-   but it is a per-GOAL block (the beach starter has 2 goals: 1448 + 3490, each with its own marker), NOT a
-   `BuildQuestFullUpdate` block (that earlier claim was DISPROVEN 2026-06-16: 559 B vs 869 B, different
-   header). So a builder + a **per-goal `QuestDefinition` model** (goals/markers/sub-text-refs) is the real
-   remaining work here; the index grammar exists (`decode_snapshot_quests.py` / `SnapshotQuestInjector`).
-3. **Wire into `BeachTailsBuilder`** behind a flag (default off) → in-client **chat-connect** smoke test
-   (the first step that changes the emitted bytes; chat connecting = the client accepted the load).
+REMAINING (to fully retire the `.bin` / captured-tails dependency — NOT decode):
+1. **In-client chat-connect smoke test** of the gated path (`FAOLAN_GENERATE_BEACH_QUEST_TAILS=1`) — the first
+   byte-changing step; needs Melvin at the client.
+2. **Access-window table** (`[1292,7917)`, 172 `PFAccessWindow_` entries) — relocate as authored data / source
+   from playfield (#81); the last template-sourced region.
+3. **Stat skeleton** — `TailsStatBlock` relocated; wire it + the patches into the assembly.
 Then the **access-window table** and **stats** regions are the last template-sourced pieces.
 
 ## Class id → reader
