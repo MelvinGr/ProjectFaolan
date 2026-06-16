@@ -521,6 +521,12 @@ namespace Faolan.GameServer
 					// Remove the dropped item from the persisted bag so it doesn't reappear on relog.
 					await _equipment.PersistDropItem(client, move);
 
+					// Push the LIVE remove so the open bag updates without a relog (#230): the DropItem opcode has no
+					// implicit client-side removal, so without this the dropped item stays visible until next login.
+					// Same DispatchRemoveItem (0x201F) the .removeitem GM path / RemoveItemFromBackpack use.
+					if (move?.SourceContainerId is { Type: InventoryContainerBackpack })
+						await SendRemoveItem(client, InventoryContainerBackpack, move.SourceItemPos);
+
 					break;
 				}
 
