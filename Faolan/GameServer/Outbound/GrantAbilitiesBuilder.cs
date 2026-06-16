@@ -4,6 +4,7 @@ using Faolan.Core.Data;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Packets.Opcodes;
 using Microsoft.Extensions.Logging;
 
 // ReSharper disable once CheckNamespace
@@ -37,6 +38,29 @@ namespace Faolan.GameServer
 				await SendAbilityGrant(client, ability, announce: false);
 
 			Logger.LogInformation("GrantStartingAbilities: re-granted {Count} abilities (silent) to '{Name}' (class={Class}, level={Level}).", abilities.Length, character.Name, character.Class, character.Level);
+		}
+
+		// Sends a live spell grant (DispatchLearnSpell, s2c 0x200A) - the retail "learn a spell" packet (#73). Grants a
+		// spell mid-session (level-up / quest-reward / GM) without rebuilding the FullChar snapshot. Rides the same
+		// GameCharInterface conversation as the 0x2052 ability grant; the body is a single u32 spell id (decoded in
+		// Captures/decode_learn_spell.py, byte-exact in LearnSpellTests). The client pops the "learned a new spell"
+		// toast itself. (The sibling DispatchForgetSpell 0x200B / RemoveSpecialAbility 0x2053 / UntrainSingleFeat
+		// 0x2011 have no capture oracle yet, so they are not built - see #73.)
+		private Task SendLearnSpell(INetworkClient client, uint spellId)
+		{
+			return new PacketStream()
+				.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchLearnSpell)
+				.WriteArray(BuildLearnSpellBody(spellId))
+				.SendAsync(client);
+		}
+
+		// The DispatchLearnSpell 0x200A body: just the big-endian u32 spell id (`i_nSpellID`). Proven byte-exact
+		// against the captured grants in LearnSpellTests.
+		internal static byte[] BuildLearnSpellBody(uint spellId)
+		{
+			return new FaolanStream()
+				.WriteUInt32(spellId)
+				.ToArray();
 		}
 
 		// Builds a single 0x2052 ability-grant packet from an Ability row. `announce` controls whether the client pops

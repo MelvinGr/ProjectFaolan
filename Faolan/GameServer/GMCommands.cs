@@ -308,10 +308,10 @@ namespace Faolan.GameServer
 			return saved;
 		}
 
-		// .grantspell <id>  - grant an ability from the catalog to the player via the 0x2052 ability-grant (the only
-		// proven grant packet - real spell grants aren't decoded, and the Spell table has no grant identity quad).
-		// Makes the ability appear so it can be dragged to the hotbar and cast, which is how the spell/mana drain is
-		// tested. The grant is transient (not persisted) - it is re-sent only by login's GrantStartingAbilities.
+		// .grantspell <id>  - grant an ability from the catalog to the player via the 0x2052 ability-grant. Makes the
+		// ability appear so it can be dragged to the hotbar and cast, which is how the spell/mana drain is tested. The
+		// grant is transient (not persisted) - it is re-sent only by login's GrantStartingAbilities. (The real spell
+		// grant DispatchLearnSpell 0x200A is now decoded too - see .learnspell / #73.)
 		private async Task GrantSpellCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -383,6 +383,7 @@ namespace Faolan.GameServer
 				["vitals"] = (client, arguments) => SetVitalsCommand(client, arguments),
 				["setstat"] = (client, arguments) => SetStatCommand(client, arguments),
 				["level"] = (client, arguments) => SetLevelCommand(client, arguments),
+				["learnspell"] = (client, arguments) => LearnSpellCommand(client, arguments),
 				["hurt"] = (client, arguments) => AdjustOwnHealthCommand(client, arguments, false),
 				["heal"] = (client, arguments) => AdjustOwnHealthCommand(client, arguments, true),
 				["mount"] = (client, arguments) => MountCommand(client, arguments),
@@ -1075,6 +1076,27 @@ namespace Faolan.GameServer
 			if (level > previousLevel)
 				await SendLevelUpFeedback(client, level, (uint)(level - previousLevel));
 			await _agentServerDispatcher.SendSystemMessage(character.Id, $"Level set to {level} (relog to refresh the full character sheet).");
+		}
+
+		// .learnspell <id>  - live-grant a real spell to the player via DispatchLearnSpell (0x200A), the decoded
+		// spell-grant path (#73), without a relog. Distinct from .grantspell, which grants a catalog ABILITY via the
+		// 0x2052 ability-grant. <id> is the spell id (hex with 0x or decimal); e.g. ".learnspell 0x3006ff" - any
+		// captured DispatchLearnSpell id (see Captures/decode_learn_spell.py).
+		private async Task LearnSpellCommand(INetworkClient client, string arguments)
+		{
+			var character = client.Session.Character;
+			var arg = (arguments ?? "").Trim();
+			var ok = arg.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+				? uint.TryParse(arg.AsSpan(2), System.Globalization.NumberStyles.HexNumber, null, out var spellId)
+				: uint.TryParse(arg, out spellId);
+			if (!ok || spellId == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(character.Id, "Usage: .learnspell <id>  (hex 0x.. or decimal)");
+				return;
+			}
+
+			await SendLearnSpell(client, spellId);
+			await _agentServerDispatcher.SendSystemMessage(character.Id, $"Learned spell 0x{spellId:X}.");
 		}
 
 		// .tag add <id> | .tag list  - manage the player's quest-state tags (the flags RDB Lua scripts read/write).
