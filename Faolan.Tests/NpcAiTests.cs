@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Numerics;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
@@ -21,8 +22,9 @@ namespace Faolan.Tests
 			zone.Add(far);
 			zone.Add(near);
 
+			// The engage tick also carries the combat-mode (weapon-draw, #218) effect, so select the attack itself.
 			var effects = world.Tick(WorldState.NpcAttackInterval);
-			Assert.Same(near, Assert.Single(effects)
+			Assert.Same(near, effects.Single(e => e.Type == WorldTickEffectType.NpcAttack)
 				.Target);
 		}
 
@@ -101,10 +103,10 @@ namespace Faolan.Tests
 			zone.Add(npc);
 			zone.Add(player);
 
-			// First contact swings immediately (cooldown starts at 0), targeting the player.
+			// First contact swings immediately (cooldown starts at 0), targeting the player. The same engage tick also
+			// emits the combat-mode (weapon-draw, #218) effect, so pick the attack out of the pair.
 			var first = world.Tick(0.1);
-			var attack = Assert.Single(first);
-			Assert.Equal(WorldTickEffectType.NpcAttack, attack.Type);
+			var attack = first.Single(e => e.Type == WorldTickEffectType.NpcAttack);
 			Assert.Same(npc, attack.Entity);
 			Assert.Same(player, attack.Target);
 
@@ -124,8 +126,8 @@ namespace Faolan.Tests
 			zone.Add(npc);
 			zone.Add(player);
 
-			var move = Assert.Single(world.Tick(0.5));
-			Assert.Equal(WorldTickEffectType.NpcMove, move.Type);
+			// The engage tick also carries the combat-mode (weapon-draw, #218) effect alongside the chase step.
+			var move = world.Tick(0.5).Single(e => e.Type == WorldTickEffectType.NpcMove);
 			Assert.Same(npc, move.Entity);
 			Assert.Same(player, move.Target);
 
