@@ -26,6 +26,49 @@ namespace Faolan.Core.Database.Tables
 		public uint MarkerY { get; set; }
 
 		public virtual ICollection<QuestTextRef> TextRefs { get; set; } = new List<QuestTextRef>();
+
+		// The per-GOAL objective detail (the @609 region of the FullChar snapshot tails) - one row per goal of the
+		// quest. A quest can have several goals each with its own world marker + objective text (the beach starter has
+		// two: 1448 + 3490). Distinct from TextRefs (the journal header); these drive QuestObjectiveRegion generation
+		// so the snapshot's objective region builds from the DB instead of BeachTailsTemplate.bin (#186).
+		public virtual ICollection<QuestGoalDefinition> Goals { get; set; } = new List<QuestGoalDefinition>();
+	}
+
+	// One goal of a quest as it appears in the snapshot's @609 objective-detail region (decoded:
+	// Captures/decode_snapshot_609.py, codec QuestObjectiveRegion). Construct, don't replay: the numeric fields +
+	// the two text refs (objective cat 50304, trailing cat 51200 remoteformat / 51000 localized) regenerate the
+	// per-goal record byte-exact via QuestObjectiveGoal.BuildSingle.
+	public class QuestGoalDefinition : BaseEntity
+	{
+		[ForeignKey(nameof(QuestDefinitionId))]
+		public virtual QuestDefinition Quest { get; set; }
+
+		public uint QuestDefinitionId { get; set; }
+
+		public uint GoalId { get; set; }
+		public uint Sequence { get; set; } // the per-goal ordinal `N` (1, 2, ...)
+		public uint Separator { get; set; } // the [1][k] separator's k word (9, 12 in the beach capture)
+		public uint SubId { get; set; }      // the trailing record's id echoed in the header (= TrailingRefId)
+		public uint MapId { get; set; }
+		public uint MarkerX { get; set; }
+		public uint MarkerY { get; set; }
+
+		// Two of the "reserved" header words: 0 for most goals; the beach goal 2 carries a number + a 4-char tag
+		// (70099 / 0x36314C56 = "61LV") here. Undecoded, carried per goal.
+		public uint Extra5 { get; set; }
+		public uint Extra6 { get; set; }
+
+		// The objective text (always a <remoteformat category=50304>).
+		public uint ObjectiveRefId { get; set; }
+		public uint ObjectiveCategory { get; set; }
+		public string ObjectiveKey { get; set; }
+
+		// The trailing text record: a <remoteformat category=51200> or a <localized category=51000 flags=..>.
+		public uint TrailingRefId { get; set; }
+		public uint TrailingCategory { get; set; }
+		public string TrailingKey { get; set; }
+		public bool TrailingLocalized { get; set; }
+		public string TrailingFlags { get; set; }
 	}
 
 	// One text slot of a quest definition: a <remoteformat>/<localized> reference the client resolves by

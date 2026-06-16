@@ -688,6 +688,7 @@ namespace Faolan.Core.Database
 			return await ctx
 				.QuestDefinitions
 				.Include(q => q.TextRefs)
+				.Include(q => q.Goals)
 				.FirstOrDefaultAsync(q => q.QuestId == questId);
 		}
 

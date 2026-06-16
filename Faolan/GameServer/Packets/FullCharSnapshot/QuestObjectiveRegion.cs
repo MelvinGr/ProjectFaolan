@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 using Faolan.Core.Data;
+using Faolan.Core.Database.Tables;
 
 namespace Faolan.GameServer.Packets.FullCharSnapshot
 {
@@ -56,6 +59,33 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 				goal.Write(w);
 			return w.ToArray();
 		}
+
+		// GENERATES the objective region from a quest's per-goal definitions (construct, don't replay - #186): each
+		// QuestGoalDefinition's numeric fields + its objective/trailing text refs build a record via BuildSingle, so
+		// the region comes from the DB instead of BeachTailsTemplate.bin. `instance` is the live player's client
+		// instance (the records carry raw entity references, re-addressed like the rest of the tails).
+		public static QuestObjectiveRegion Build(QuestDefinition def, uint instance)
+		{
+			ArgumentNullException.ThrowIfNull(def);
+			var region = new QuestObjectiveRegion();
+			foreach (var g in def.Goals.OrderBy(g => g.Sequence))
+			{
+				var objective = QuestcRegion.RemoteFormat(g.ObjectiveRefId, g.ObjectiveCategory, g.ObjectiveKey);
+				var trailing = g.TrailingLocalized
+					? Localized(g.TrailingRefId, g.TrailingCategory, g.TrailingFlags ?? "", g.TrailingKey)
+					: QuestcRegion.RemoteFormat(g.TrailingRefId, g.TrailingCategory, g.TrailingKey);
+				region.Goals.Add(QuestObjectiveGoal.BuildSingle(instance, def.QuestId, g.GoalId, g.Sequence, g.Separator,
+					g.SubId, g.MapId, g.MarkerX, g.MarkerY,
+					Encoding.ASCII.GetBytes(objective), Encoding.ASCII.GetBytes(trailing), g.Extra5, g.Extra6));
+			}
+
+			return region;
+		}
+
+		// The <localized> text-record spelling (mirrors QuestcRegion.RemoteFormat); the trailing record of a goal is
+		// either a <remoteformat> (cat 51200) or this <localized> form (cat 51000), with the exact trailing " >".
+		public static string Localized(uint id, uint category, string flags, string key) =>
+			$"<localized id=\"{id}\" category=\"{category}\" flags=\"{flags}\" key=\"{key}\" >";
 
 		private static uint PeekUInt32(byte[] data, uint position) =>
 			System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(checked((int)position), 4));

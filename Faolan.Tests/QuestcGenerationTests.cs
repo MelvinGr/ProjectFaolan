@@ -40,6 +40,22 @@ namespace Faolan.Tests
 			Assert.Equal(template[..RegionEnd], built);
 		}
 
+		// The @609 objective region GENERATES from the DB per-goal model (QuestGoalDefinition rows seeded for the beach
+		// starter), reproducing the template's @609..1168 bytes exactly - so the whole quest region is now DB-sourced.
+		[Fact]
+		public async Task BuildObjectiveRegion_FromDbGoals_ReproducesBeachRegion_ByteExact()
+		{
+			var def = await LoadDefinition(BeachStarterQuestId);
+			Assert.NotNull(def);
+			Assert.Equal(2, def.Goals.Count); // the two seeded beach goals (1448 + 3490)
+
+			const uint templateInstance = 0x02165EFF;
+			var built = QuestObjectiveRegion.Build(def, templateInstance).ToArray();
+
+			var template = File.ReadAllBytes(TemplatePath);
+			Assert.Equal(template[RegionEnd..1168], built);
+		}
+
 		private static async Task<QuestDefinition> LoadDefinition(uint questId)
 		{
 			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={DbPath}").Options;

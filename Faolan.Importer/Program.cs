@@ -113,6 +113,41 @@ namespace Faolan.Importer
 
 			await db.SaveChangesAsync();
 			Console.WriteLine($"Quest definitions (journal content): {definitions.Count} harvested, {added} new, {updated} updated.");
+
+			await SeedBeachQuestGoals(db);
+		}
+
+		// The beach starter (quest 10238) per-goal objective detail (the snapshot's @609 region). This data lives ONLY
+		// in the FullChar snapshot (BeachTailsTemplate.bin), not the QuestFullUpdate/Journal packets the extractor reads,
+		// so it is seeded here from the decoded values (Captures/decode_snapshot_609.py / QuestObjectiveRegion). Two
+		// goals (1448, 3490), each with its own world marker + objective text. Lets QuestObjectiveRegion.Build generate
+		// the objective region from the DB instead of the .bin (#186). Idempotent: skipped if the goals already exist.
+		private static async Task SeedBeachQuestGoals(DatabaseContext db)
+		{
+			const uint beachQuestId = 10238;
+			var quest = await db.QuestDefinitions.Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == beachQuestId);
+			if (quest == null || quest.Goals.Count > 0)
+				return;
+
+			quest.Goals.Add(new QuestGoalDefinition
+			{
+				GoalId = 1448, Sequence = 1, Separator = 9, SubId = 180, MapId = 4010, MarkerX = 416, MarkerY = 701,
+				Extra5 = 0, Extra6 = 0,
+				ObjectiveRefId = 1448, ObjectiveCategory = 50304, ObjectiveKey = "pARATX1!DX]&#92;So+0*A9B",
+				TrailingRefId = 180, TrailingCategory = 51200, TrailingKey = "b2Y2],LfVfAVps*9JX*G",
+				TrailingLocalized = false, TrailingFlags = ""
+			});
+			quest.Goals.Add(new QuestGoalDefinition
+			{
+				GoalId = 3490, Sequence = 2, Separator = 12, SubId = 0, MapId = 4010, MarkerX = 521, MarkerY = 757,
+				Extra5 = 70099, Extra6 = 0x36314C56,
+				ObjectiveRefId = 3490, ObjectiveCategory = 50304, ObjectiveKey = "cA!(EbPpfzUK&#92;WPN@!H!",
+				TrailingRefId = 9500, TrailingCategory = 51000, TrailingKey = "]+/sUK&#39;G3mO)clF`)9Jh",
+				TrailingLocalized = true, TrailingFlags = "m"
+			});
+
+			await db.SaveChangesAsync();
+			Console.WriteLine("Seeded beach quest 10238 goal-detail (2 goals) for the @609 objective region.");
 		}
 
 		// Upsert per map: replace that map's burst (instance + structured IIR records); leave other maps untouched.
