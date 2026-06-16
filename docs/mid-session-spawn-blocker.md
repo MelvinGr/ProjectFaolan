@@ -88,11 +88,34 @@ because of the `#`/space, so copy the `.java` to e.g. `/tmp/aocscripts` and run 
 
 `0xFA015807` is NOT an immediate anywhere (the spawn IIR dispatches through the BKDR-31 name-hash table, like every
 IIR — `opcode_re_feasibility`), so the network→dynel handler is reached via the dispatch table, not a constant
-compare. **NEXT:** trace DOWN from the FA015807 dispatch handler to `AddChildDynel`/`RelocateDynel` and find the
-branch that is taken during world-load but skipped after `CharInPlayIIR` — i.e. the dynel-manager func
-(`FUN_0145xxxx`) that the burst path enters but the mid-session push does not. Compare the burst-spawn call path vs
-the mid-session push at that branch. (Any candidate fix still needs an in-client render to confirm — packet/golden
-tests can't see the client's poll loop.)
+compare.
+
+### Ghidra deepening (2026-06-16, part 2) — the two resolution gates
+
+Both ends of the render path gate on RESOLVING a mid-session object reference to a live client object, which is
+exactly the doc's "client treats our sender as 0 / `e_Impossible`" symptom:
+
+- **The dynel-add gate** — `AddChildDynel` (`FUN_0059cdb0`) is reached from the CoreCharacter playfield-add
+  `FUN_01458d40`, which FIRST resolves the spawn's parent **playfield** (`FUN_005a2470` → compare to the sentinel
+  global `DAT_029c7ae0` → `FUN_005950e0`); if the playfield doesn't resolve (`local_360 == 0`) it jumps to
+  `LAB_0145ac67` and NEVER calls AddToPlayfieldSpaces — so the entity is never registered for the `0x2020` poll.
+  i.e. a spawn whose playfield reference doesn't resolve to the client's CURRENT live playfield object is silently
+  dropped.
+- **The in-play transition** — `CharInPlayIIR` is an EMPTY-message IIR (ctor `FUN_0075a800`/`FUN_0075a890`,
+  registered in the IIR registry `FUN_004e4c20`). Its slot-8 ReadSubClass (`FUN_0075a920`, log category
+  "GameCode/Inplay") RESOLVES the target SimpleChar from the IIR reference (`*(int*)(param_1+8)+8`, cached at
+  `+4`) and logs **"Read InPlay from Client"** / **"cant resolve simplechar"**. The "cant resolve simplechar"
+  branch is the same failure family: the in-play machinery can't bind the IIR to the live char.
+
+**Working theory:** the load-time burst's spawns resolve their playfield/owner because they're processed while the
+playfield/object-set is being constructed and "current"; a mid-session push carries the right playfield TOKEN
+(0x01EA985C verified) but the client can't resolve that token to the live `Playfield` OBJECT after `CharInPlay`,
+so `FUN_01458d40` early-outs before AddToPlayfieldSpaces. **NEXT:** (a) decompile `FUN_005950e0`/`FUN_005a2470`
+to see how a playfield token → live `Playfield*` is resolved and what populates that map at load vs play; (b) find
+the CharInPlayIIR *Activate* slot (not slot-8 ReadSubClass) to see the state it flips. Helper scripts added:
+`Captures/ghidra/DumpVtableX.java` (dump a named `*::vftable`'s slots), `ReadSlotFn.java` (decompile the fn at a
+vtable+offset). (Any candidate fix still needs an in-client render to confirm — packet/golden tests can't see the
+client's poll loop.)
 
 Memory: `protocol_midsession_spawn_blocked`. Related: `protocol_201c_spawn_subprotocol` (the poll loop),
 `npc_model_streaming` (its "interest streaming renders" claim is DISPROVEN — those NPCs were the burst).
