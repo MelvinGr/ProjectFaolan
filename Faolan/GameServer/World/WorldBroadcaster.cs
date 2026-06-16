@@ -32,6 +32,9 @@ namespace Faolan.GameServer.World
 		// LootBagFullUpdateIIR_c - the world-object sub-opcode a loot bag spawns as.
 		private const uint LootBagSubOpcode = (uint)GameServer0X2000RespondsOpcodes.LootBagFullUpdateIIR;
 
+		// How long a dropped loot bag lingers before the tick fades + removes it (the IsLoot expiry).
+		private const double LootBagExpirySeconds = 120.0;
+
 		// Maps whose NPCs have been loaded into the world model (once per map, on first entry).
 		private readonly ConcurrentDictionary<uint, byte> _npcLoadedZones = new ConcurrentDictionary<uint, byte>();
 
@@ -723,23 +726,48 @@ namespace Faolan.GameServer.World
 				deadNpc.Name, deadNpc.Handle, items.Count, cash, deadNpc.MapId);
 		}
 
-		// Test bootstrap (.spawnbag): spawn a throwaway NPC at the player, immediately mark it dead, and turn its
-		// corpse into a lootable bag - exercising the exact corpse-reuse path a real kill uses (a standalone
-		// mid-session loot object won't render; an update to an entity the client already spawned does). Returns
-		// the entity, or null if no NPC could be spawned or the map has no loot template.
+		// .spawnbag: drop a standalone loot bag at the player. Now that mid-session spawns carry the live playfield
+		// token and render (#23), a brand-new loot object renders on its own - so this no longer needs the old
+		// dead-NPC-corpse-reuse workaround (that bag was a Crocodile that respawned back to life after ~15s and was
+		// never IsLoot, so it couldn't be opened). The bag is a real IsLoot world object: no vitals, no respawn, it
+		// just lingers until its expiry. Returns the bag, or null if the map has no loot template.
 		public async Task<WorldEntity> SpawnLootBagForPlayer(INetworkClient client, IReadOnlyList<uint> itemTemplates, uint cashTin)
 		{
-			var npc = await SpawnNpcForPlayer(client, "Crocodile");
-			if (npc == null)
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null)
 				return null;
 
-			npc.MarkDead();
-			if (!await MakeCorpseLootable(npc, itemTemplates, cashTin))
+			var template = await GetLootTemplate(player.MapId);
+			if (template == null)
 				return null;
 
-			_logger.LogInformation("Loot: .spawnbag corpse 0x{Handle:X8} for {Player} ({Items} items, {Cash} tin).",
-				npc.Handle, client.Session.Character?.Name, itemTemplates.Count, cashTin);
-			return npc;
+			var handle = NextLootHandle();
+			// Identity (unit) rotation: a bag has no facing, and a NON-unit quaternion scales the model - stuffing the
+			// player's Euler-degree rotation into a quaternion (w=1) gave a magnitude-~180 quaternion that rendered the
+			// bag hugely oversized/distorted.
+			var rotation = Quaternion.Identity;
+			if (!WorldObjectBuilder.TryBuild(template, handle, player.Position, rotation, out var body))
+				return null;
+			SpawnPlayfieldRewriter.TryRewrite(body, _sim.World.ZoneFor(player.MapId).PlayfieldToken);
+
+			var bag = WorldEntity.ForLoot(handle, player.MapId, player.Position, player.Rotation, template.Name ?? "Loot", body, LootBagExpirySeconds);
+			bag.CashTin = cashTin;
+			if (itemTemplates != null)
+				bag.LootItems.AddRange(itemTemplates);
+			_sim.World.ZoneFor(player.MapId).Add(bag);
+
+			foreach (var viewer in _sim
+				         .World
+				         .ZoneFor(player.MapId)
+				         .PlayersInRange(player.Position, WorldSimulation.PlayerInterestRange))
+			{
+				if (viewer.Client != null)
+					await SendLootBagUpdate(viewer.Client, body);
+			}
+
+			_logger.LogInformation("Loot: .spawnbag bag 0x{Handle:X8} for {Player} ({Items} items, {Cash} tin).",
+				handle, client.Session.Character?.Name, itemTemplates.Count, cashTin);
+			return bag;
 		}
 
 		// Turns an already-spawned, dead entity's corpse into a lootable bag IN PLACE: builds the
