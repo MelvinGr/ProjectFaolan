@@ -112,13 +112,6 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		{
 			ArgumentNullException.ThrowIfNull(def);
 
-			string Slot(QuestTextSlot slot)
-			{
-				var t = def.TextRefs.FirstOrDefault(x => x.Slot == slot)
-					?? throw new InvalidOperationException($"Quest {def.QuestId}: missing text ref slot {slot}");
-				return QuestcRegion.RemoteFormat(t.RefId, t.Category, t.KeyText);
-			}
-
 			return new QuestcRecord
 			{
 				QuestId = def.QuestId,
@@ -138,6 +131,13 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 				FieldF0 = fieldF0,
 				FieldF8 = fieldF8,
 			};
+
+			string Slot(QuestTextSlot slot)
+			{
+				var t = def.TextRefs.FirstOrDefault(x => x.Slot == slot)
+				        ?? throw new InvalidOperationException($"Quest {def.QuestId}: missing text ref slot {slot}");
+				return QuestcRegion.RemoteFormat(t.RefId, t.Category, t.KeyText);
+			}
 		}
 
 		public static QuestcRecord Read(FaolanStream r)

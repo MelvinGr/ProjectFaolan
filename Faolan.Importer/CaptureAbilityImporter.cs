@@ -68,15 +68,6 @@ namespace Faolan.Importer
 			if (grants.Count == 0)
 				return (0, 0, 0);
 
-			// An ability granted under >= 2 distinct classes (or under none we could attribute) is GENERIC (Class 0);
-			// one seen under exactly one class is specific to it.
-			uint ClassFor(uint id)
-			{
-				return idToClasses.TryGetValue(id, out var classes) && classes.Count == 1
-					? classes.Single()
-					: 0u;
-			}
-
 			var ids = grants.Keys.ToList();
 			var existing = await db
 				.Abilities
@@ -119,6 +110,15 @@ namespace Faolan.Importer
 			logger?.LogInformation("CaptureAbilityImporter: {Seen} ability grants seen ({Starters} starting: {Generic} generic + {Specific} class-specific), {Inserted} new, {Updated} updated.",
 				grants.Count, starters.Count, generic, starters.Count - generic, inserted, updated);
 			return (grants.Count, inserted, updated);
+
+			// An ability granted under >= 2 distinct classes (or under none we could attribute) is GENERIC (Class 0);
+			// one seen under exactly one class is specific to it.
+			uint ClassFor(uint id)
+			{
+				return idToClasses.TryGetValue(id, out var classes) && classes.Count == 1
+					? classes.Single()
+					: 0u;
+			}
 		}
 
 		// 0x2052 body (no length prefix): [slot][id][id][0][1][data0][data1..4][data1..4][constA][constB]x2[1][0][u8].

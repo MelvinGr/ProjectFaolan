@@ -22,28 +22,6 @@ namespace Faolan.GameServer
 			var sender = new byte[] { 0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x0C };
 			var receiver = ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id);
 
-			Task Iir(GameServer0X2000RespondsOpcodes iir, params byte[] body)
-			{
-				return new PacketStream()
-					.WriteHeader(sender, receiver, GameServerCarrierOpcodes.IirCarrier)
-					.WriteArrayUInt32Length(s => s
-						.WriteUInt32(iir)
-						.WriteArray(body))
-					.SendAsync(client);
-			}
-
-			Task IirId(GameServer0X2000RespondsOpcodes iir, byte[] prefix, params byte[] suffix)
-			{
-				return new PacketStream()
-					.WriteHeader(sender, receiver, GameServerCarrierOpcodes.IirCarrier)
-					.WriteArrayUInt32Length(s => s
-						.WriteUInt32(iir)
-						.WriteArray(prefix)
-						.WriteUInt32(id)
-						.WriteArray(suffix))
-					.SendAsync(client);
-			}
-
 			await Iir(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR, CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00039232u, 7, 41413, 1, 24, 0));
 			await Iir(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR, CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00039233u, 7, 41413, 1, 24, 0));
 			await new PacketStream()
@@ -236,6 +214,29 @@ namespace Faolan.GameServer
 			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00050E24u));
 			await IirId(GameServer0X2000RespondsOpcodes.EnergyIIR, [0x00, 0x00, 0xC3, 0x50], 0x01, 0x00, 0x00, 0x00, 0x08);
 			await Iir(GameServer0X2000RespondsOpcodes.RegenIIR, CreateEditorRecordBuilder.BuildRegenIir(id, 0x000007EE, 0, 0x00000415));
+			return;
+
+			Task Iir(GameServer0X2000RespondsOpcodes iir, params byte[] body)
+			{
+				return new PacketStream()
+					.WriteHeader(sender, receiver, GameServerCarrierOpcodes.IirCarrier)
+					.WriteArrayUInt32Length(s => s
+						.WriteUInt32(iir)
+						.WriteArray(body))
+					.SendAsync(client);
+			}
+
+			Task IirId(GameServer0X2000RespondsOpcodes iir, byte[] prefix, params byte[] suffix)
+			{
+				return new PacketStream()
+					.WriteHeader(sender, receiver, GameServerCarrierOpcodes.IirCarrier)
+					.WriteArrayUInt32Length(s => s
+						.WriteUInt32(iir)
+						.WriteArray(prefix)
+						.WriteUInt32(id)
+						.WriteArray(suffix))
+					.SendAsync(client);
+			}
 		}
 	}
 }

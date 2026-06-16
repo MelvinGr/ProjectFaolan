@@ -57,7 +57,7 @@ namespace Faolan.Tests
 		public void Inject_AddsBlockAndExtendsIndex()
 		{
 			var block = Enumerable.Range(0, 879).Select(i => (byte)(i & 0xFF)).ToArray(); // a stand-in 13479 detail block
-			var outp = SnapshotQuestInjector.Inject(Template, new (uint, byte[])[] { (13479u, block) });
+			var outp = SnapshotQuestInjector.Inject(Template, [(13479u, block)]);
 
 			var (ids, count, off) = ParseIndex(outp);
 			Assert.Equal(new uint[] { 10238, 13479 }, ids); // beach quest first, new quest appended
@@ -79,7 +79,7 @@ namespace Faolan.Tests
 		{
 			Assert.Same(Template, SnapshotQuestInjector.Inject(Template, []));
 			// 10238 is already listed -> nothing added, returns the input unchanged.
-			Assert.Same(Template, SnapshotQuestInjector.Inject(Template, new (uint, byte[])[] { (10238u, new byte[10]) }));
+			Assert.Same(Template, SnapshotQuestInjector.Inject(Template, [(10238u, new byte[10])]));
 		}
 	}
 }

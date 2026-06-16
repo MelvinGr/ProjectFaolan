@@ -267,10 +267,10 @@ namespace Faolan.Core.Network.Packets
 		{
 			// The generic IIR carrier (s2c 0x2000): the real method is a sub-opcode in the body. = GameInterface
 			// DispatchPassBlob. Almost every world/create/login s2c record is sent under this opcode.
-			IirCarrier = (ushort)GameInterfaceDispatchOpcodes.DispatchPassBlob,
+			IirCarrier = GameInterfaceDispatchOpcodes.DispatchPassBlob,
 			// Enter-world/teleport world-address advert ([0x00][byteLen][host:port]); the client reconnects to the
 			// advertised GameServer. = GameInterface DispatchRedirectToServer.
-			WorldHandoff = (ushort)GameInterfaceDispatchOpcodes.DispatchRedirectToServer
+			WorldHandoff = GameInterfaceDispatchOpcodes.DispatchRedirectToServer
 		}
 
 		// --- Full client->server method catalogs for the GameServer connection's RPC classes, generated from

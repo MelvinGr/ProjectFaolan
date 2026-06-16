@@ -32,44 +32,6 @@ namespace Faolan.GameServer
 			// verbatim record is sent. Proven for 17/18 props by CreateEditorSceneDynelTests; #189 item 2.
 			var dynelRows = await LoadEditorSceneDynels(database);
 
-			Task Iir(GameServer0X2000RespondsOpcodes iir, params byte[] body)
-			{
-				return new PacketStream()
-					.WriteHeader(sender, receiver, GameServerCarrierOpcodes.IirCarrier)
-					.WriteArrayUInt32Length(s => s
-						.WriteUInt32(iir)
-						.WriteArray(body))
-					.SendAsync(client);
-			}
-
-			// Emits a SimpleDynel scene-prop record, substituting the DB-sourced build for the verbatim bytes when
-			// the row reproduces it exactly (see LoadEditorSceneDynels / the comment above).
-			Task IirDynel(params byte[] verbatim)
-			{
-				return Iir(GameServer0X2000RespondsOpcodes.SimpleDynelFullUpdateIIR, BuildSceneDynel(dynelRows, verbatim));
-			}
-
-			// Emits a SimpleChar scene-pedestal record, RECONSTRUCTED from its own bytes (transform + identity
-			// rebuilt, pre-IIR scaffold carried, session playfield threaded - CreateEditorCharBuilder). The live
-			// "Character..." preview stays on IirId (it carries the live client instance as its handle).
-			Task IirChar(params byte[] verbatim)
-			{
-				return Iir(GameServer0X2000RespondsOpcodes.SimpleCharFullUpdateIIR,
-					CreateEditorCharBuilder.Reconstruct(verbatim, CreateEditorCharBuilder.EditorPlayfieldInstance));
-			}
-
-			Task IirId(GameServer0X2000RespondsOpcodes iir, byte[] prefix, params byte[] suffix)
-			{
-				return new PacketStream()
-					.WriteHeader(sender, receiver, GameServerCarrierOpcodes.IirCarrier)
-					.WriteArrayUInt32Length(s => s
-						.WriteUInt32(iir)
-						.WriteArray(prefix)
-						.WriteUInt32(id)
-						.WriteArray(suffix))
-					.SendAsync(client);
-			}
-
 			// MapChange: CONSTRUCTED from the editor map's reference point + the session playfield token (#189
 			// item 3). mapId + playfieldToken are the meaningful values; the reference position, clip planes and
 			// trailing flags are this map's constants (not yet semantically pinned - carried as builder args).
@@ -580,6 +542,45 @@ namespace Faolan.GameServer
 			await IirId(GameServer0X2000RespondsOpcodes.StatIIR, [0x00, 0x00, 0xC3, 0x50], 0x01, 0x00, 0x0F, 0x42, 0x8A, 0x00, 0x00, 0x00, 0x00);
 			await IirId(GameServer0X2000RespondsOpcodes.StatIIR, [0x00, 0x00, 0xC3, 0x50], 0x01, 0x00, 0x0F, 0x42, 0x8B, 0x00, 0x00, 0x00, 0x00);
 			await IirId(GameServer0X2000RespondsOpcodes.StatIIR, [0x00, 0x00, 0xC3, 0x50], 0x01, 0x00, 0x0F, 0x42, 0x8C, 0x00, 0x00, 0x00, 0x00);
+			return;
+
+			Task Iir(GameServer0X2000RespondsOpcodes iir, params byte[] body)
+			{
+				return new PacketStream()
+					.WriteHeader(sender, receiver, GameServerCarrierOpcodes.IirCarrier)
+					.WriteArrayUInt32Length(s => s
+						.WriteUInt32(iir)
+						.WriteArray(body))
+					.SendAsync(client);
+			}
+
+			// Emits a SimpleDynel scene-prop record, substituting the DB-sourced build for the verbatim bytes when
+			// the row reproduces it exactly (see LoadEditorSceneDynels / the comment above).
+			Task IirDynel(params byte[] verbatim)
+			{
+				return Iir(GameServer0X2000RespondsOpcodes.SimpleDynelFullUpdateIIR, BuildSceneDynel(dynelRows, verbatim));
+			}
+
+			// Emits a SimpleChar scene-pedestal record, RECONSTRUCTED from its own bytes (transform + identity
+			// rebuilt, pre-IIR scaffold carried, session playfield threaded - CreateEditorCharBuilder). The live
+			// "Character..." preview stays on IirId (it carries the live client instance as its handle).
+			Task IirChar(params byte[] verbatim)
+			{
+				return Iir(GameServer0X2000RespondsOpcodes.SimpleCharFullUpdateIIR,
+					CreateEditorCharBuilder.Reconstruct(verbatim, CreateEditorCharBuilder.EditorPlayfieldInstance));
+			}
+
+			Task IirId(GameServer0X2000RespondsOpcodes iir, byte[] prefix, params byte[] suffix)
+			{
+				return new PacketStream()
+					.WriteHeader(sender, receiver, GameServerCarrierOpcodes.IirCarrier)
+					.WriteArrayUInt32Length(s => s
+						.WriteUInt32(iir)
+						.WriteArray(prefix)
+						.WriteUInt32(id)
+						.WriteArray(suffix))
+					.SendAsync(client);
+			}
 		}
 
 		// The editor map's scene-prop WorldObjects, keyed by identity (display_name). Null when no DB is available

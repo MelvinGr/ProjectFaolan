@@ -405,7 +405,7 @@ namespace Faolan.GameServer.World
 			var spot = RespawnResolver.ClosestKnown(deathPosition, points, discovered)
 				?? points.FirstOrDefault(p => p.AlwaysKnown)
 				?? points[0];
-			await _output.SendResurrectionScreen(client, deathPosition, new[] { spot });
+			await _output.SendResurrectionScreen(client, deathPosition, [spot]);
 		}
 
 		// The server game loop (docs/archive/server-architecture-roadmap.md): a 10 Hz base tick that advances continuous systems

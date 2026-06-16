@@ -56,7 +56,7 @@ namespace Faolan.GameServer
 				.WriteUInt32(type)
 				.WriteUInt32(handle)
 				.WriteUInt32(0u)
-				.WriteByte((byte)0x1D)
+				.WriteByte(0x1D)
 				.WriteArray(new byte[16])
 				.WriteUInt32(actionId)
 				.WriteArray(new byte[8])
@@ -104,7 +104,7 @@ namespace Faolan.GameServer
 				.WriteUInt32(handle)
 				.WriteUInt16((ushort)0x0000)
 				.WriteByte((byte)(1 + nameBytes.Length))
-				.WriteByte((byte)0x2A)
+				.WriteByte(0x2A)
 				.WriteArray(nameBytes)
 				.WriteFloatBigEndian(weight)
 				.WriteByte(p)
@@ -121,10 +121,10 @@ namespace Faolan.GameServer
 			uint field5, uint field6, uint type = CharacterWireType)
 		{
 			var protobuf = new FaolanStream()
-				.WriteByte((byte)0x08).WriteVarint(behaviorId)
-				.WriteByte((byte)0x18).WriteVarint(phase)
-				.WriteByte((byte)0x28).WriteVarint(field5)
-				.WriteByte((byte)0x30).WriteVarint(field6)
+				.WriteByte(0x08).WriteVarint(behaviorId)
+				.WriteByte(0x18).WriteVarint(phase)
+				.WriteByte(0x28).WriteVarint(field5)
+				.WriteByte(0x30).WriteVarint(field6)
 				.ToArray();
 			return new FaolanStream()
 				.WriteUInt32(type)
@@ -206,9 +206,9 @@ namespace Faolan.GameServer
 			uint count, uint playfieldToken, float nearClip, float farClip, uint flags, uint field58 = 0u)
 		{
 			return new FaolanStream()
-				.WriteUInt32(0u).WriteUInt32(0u).WriteByte((byte)0x00) // [0:9] prefix
+				.WriteUInt32(0u).WriteUInt32(0u).WriteByte(0x00) // [0:9] prefix
 				.WriteFloatBigEndian(posX).WriteFloatBigEndian(posY).WriteFloatBigEndian(posZ) // [9:21] reference position
-				.WriteByte((byte)0x62)
+				.WriteByte(0x62)
 				.WriteUInt32(0x0000C79Cu)
 				.WriteUInt32(mapId)
 				.WriteUInt32(0u)
@@ -218,7 +218,7 @@ namespace Faolan.GameServer
 				.WriteUInt32(0x00009C50u) // 0x9C50 = 40016 (distinct from EntityClass.Character 0xC350; semantics TBD)
 				.WriteUInt32(playfieldToken)
 				.WriteUInt32(0u).WriteUInt32(field58) // [54:62]: a zero u32 then the un-pinned field58
-				.WriteByte((byte)0x18)
+				.WriteByte(0x18)
 				.WriteUInt32(0x00000001u)
 				.WriteUInt32(playfieldToken) // token again
 				.WriteUInt32(0x0000CB20u)

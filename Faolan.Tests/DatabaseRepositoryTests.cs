@@ -247,7 +247,7 @@ namespace Faolan.Tests
 				var bankRows = (await repo.GetCharacterInventory(character.Id)).Where(r => r.Container == bank).ToList();
 				Assert.Single(bankRows);
 				var container = Faolan.GameServer.Packets.FullCharSnapshot.FullCharSnapshotBuilder.BuildContainer(
-					(uint)bank, 50, 30, character.Id, bankRows);
+					bank, 50, 30, character.Id, bankRows);
 				Assert.Contains(container.Items, e => e.Pos == 3);
 
 				// Withdraw: bank slot 3 -> bag slot 0 (the move clears the bank cell, writes the bag cell).

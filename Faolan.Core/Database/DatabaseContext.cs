@@ -152,7 +152,7 @@ namespace Faolan.Core.Database
 				.Entity<Item>()
 				.Property(i => i.Type)
 				.HasDefaultValue(ItemType.Normal)
-				.HasSentinel((ItemType)0);
+				.HasSentinel(0);
 
 			// One-to-one Character <-> CharacterMaxStats, keyed by CharacterId; deletes cascade with the character.
 			modelBuilder

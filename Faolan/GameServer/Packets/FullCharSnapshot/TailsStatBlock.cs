@@ -57,7 +57,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			Marker0 = Marker,
 			Marker1 = Marker,
 			BlockType = BlockType,
-			Values = new List<uint>(Skeleton),
+			Values = [..Skeleton],
 			Trailer = [0x00],
 			// Non-null so HasKnownRepeatedStatTable is true and the caller's vitals patches (which write the +148
 			// copy too) fire; the run mirrors RepeatedBlockStartIndex/Offset on TailsPostAccessBlock.

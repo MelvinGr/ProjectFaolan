@@ -53,7 +53,7 @@ namespace Faolan.GameServer.Economy.Bank
 				.WriteUInt32(BankIirSubOpcode)
 				.WriteUInt32(0x0000C350u)
 				.WriteUInt32(charInstance)
-				.WriteByte((byte)0x01)
+				.WriteByte(0x01)
 				.WriteUInt32((uint)containerBlob.Length)
 				.WriteArray(containerBlob)
 				.ToArray();

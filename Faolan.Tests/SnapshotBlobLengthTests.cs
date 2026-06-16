@@ -83,7 +83,6 @@ namespace Faolan.Tests
 		{
 			var (prefix, verbatimRootLen, tails, instance, verbatimRoot) = SplitFull("strie-login-inventory.bin");
 
-			Item Mk(uint id, uint d1, uint d2, uint d3, uint d4, uint arch) => new Item { Id = id, Data1 = d1, Data2 = d2, Data3 = d3, Data4 = d4, Archetype = arch };
 			var equipped = new Dictionary<ulong, (Item, uint)>
 			{
 				{ 0x12, (Mk(3361557, 3714105241, 1980330998, 2034888138, 2381170642, 1129664565), 1129664565) },
@@ -121,6 +120,9 @@ namespace Faolan.Tests
 			var reparsed = InventorySnapshotInspector.ParseInventoryPacketBody(s2);
 			Assert.True(reparsed.Tails.ToArray().SequenceEqual(tails), "tails must survive intact after the regenerated root");
 			Assert.True(reparsed.Root.ToArray().SequenceEqual(genRoot), "the regenerated root must re-split byte-identically");
+			return;
+
+			Item Mk(uint id, uint d1, uint d2, uint d3, uint d4, uint arch) => new Item { Id = id, Data1 = d1, Data2 = d2, Data3 = d3, Data4 = d4, Archetype = arch };
 		}
 
 		// Variant of Split that also returns the instance id and the verbatim root bytes (for the reassembly test).

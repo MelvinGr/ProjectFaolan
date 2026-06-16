@@ -80,16 +80,6 @@ namespace Faolan.Tests
 			var payload = new List<byte>();
 			payload.AddRange(new byte[24]);
 
-			void Record(string name, uint category, float weight, uint id)
-			{
-				payload.AddRange(BitConverter.GetBytes((uint)name.Length));
-				payload.AddRange(Encoding.ASCII.GetBytes(name));
-				payload.AddRange(BitConverter.GetBytes(category));
-				payload.AddRange(BitConverter.GetBytes(0u));
-				payload.AddRange(BitConverter.GetBytes(weight));
-				payload.AddRange(BitConverter.GetBytes(id));
-			}
-
 			Record("02_BrowLow", 0, 1f, 3);
 			Record("*texscript_1108153", 6, 1f, 0x148);
 			payload.AddRange(BitConverter.GetBytes(5u));
@@ -102,6 +92,17 @@ namespace Faolan.Tests
 			Assert.Equal("02_BrowLow", targets[0].Name);
 			Assert.Equal(0x147u, targets[1].Id);
 			Assert.Equal(6, targets[1].Category);
+			return;
+
+			void Record(string name, uint category, float weight, uint id)
+			{
+				payload.AddRange(BitConverter.GetBytes((uint)name.Length));
+				payload.AddRange(Encoding.ASCII.GetBytes(name));
+				payload.AddRange(BitConverter.GetBytes(category));
+				payload.AddRange(BitConverter.GetBytes(0u));
+				payload.AddRange(BitConverter.GetBytes(weight));
+				payload.AddRange(BitConverter.GetBytes(id));
+			}
 		}
 
 		private static Dictionary<string, MorphTarget> RegistryDict()

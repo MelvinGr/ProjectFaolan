@@ -127,14 +127,6 @@ namespace Faolan.Tests
 		[Fact]
 		public void TwoBeachCharacters_TailsDifferOnlyAtInstanceAndStats()
 		{
-			byte[] Tails(string file)
-			{
-				var packet = new ConanPacket(File.ReadAllBytes(Path.Combine(Path.GetDirectoryName(Cap)!, file)));
-				var s = new FaolanStream(packet.Body.ReadArrayUInt32Length());
-				s.ReadUInt32(); s.ReadUInt32(); s.ReadUInt32();
-				return InventorySnapshotInspector.ParseInventoryPacketBody(s).Tails.UnknownBeforeAccessWindowTable ?? [];
-			}
-
 			// strie-login-inventory.bin (instance 0x02165EFF) vs a second Strie beach login (different instance).
 			var a = Tails("strie-login-inventory.bin");
 			var b = Tails("account-stricken997-character-Strie-login-randomActions-bigboy.bin");
@@ -142,6 +134,15 @@ namespace Faolan.Tests
 			// These two are the SAME session capture pair -> identical; the cross-character proof lives in the
 			// committed finding. Here we assert the builder substitutes the instance everywhere.
 			Assert.True(a.SequenceEqual(b));
+			return;
+
+			byte[] Tails(string file)
+			{
+				var packet = new ConanPacket(File.ReadAllBytes(Path.Combine(Path.GetDirectoryName(Cap)!, file)));
+				var s = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+				s.ReadUInt32(); s.ReadUInt32(); s.ReadUInt32();
+				return InventorySnapshotInspector.ParseInventoryPacketBody(s).Tails.UnknownBeforeAccessWindowTable ?? [];
+			}
 		}
 
 		// BeachTailsBuilder must replace EVERY instance reference (UnknownBefore carries it at multiple offsets), so

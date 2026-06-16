@@ -254,8 +254,8 @@ namespace Faolan.GameServer
 				.WriteUInt32(0x10D27BC0u)   // IIR sub-opcode (begin teleport)
 				.WriteUInt32(0x0000C350u)   // receiver class tag (character)
 				.WriteUInt32(clientInstance)
-				.WriteByte((byte)0x01)
-				.WriteByte((byte)0x62)
+				.WriteByte(0x01)
+				.WriteByte(0x62)
 				.WriteUInt32(0x0000C79Cu)   // constant
 				.WriteUInt32(destMapId)
 				.WriteArray(new byte[26])   // trailing pad
@@ -278,19 +278,19 @@ namespace Faolan.GameServer
 				.WriteUInt32(clientInstance)
 				.WriteArray(new byte[25])
 				.WriteFloatBigEndian(1.0f)
-				.WriteByte((byte)0x62)
+				.WriteByte(0x62)
 				.WriteUInt32(0x0000C79Cu)   // constant
 				.WriteUInt32(destMapId)
 				.WriteArray(new byte[15])
-				.WriteByte((byte)0x01)
+				.WriteByte(0x01)
 				.WriteUInt32(0x00009C50u)   // constant
 				.WriteUInt32(destPlayfieldToken)
 				.WriteArray(new byte[12])
-				.WriteByte((byte)0x14)
+				.WriteByte(0x14)
 				.WriteUInt32(0x00018704u)   // constant
 				.WriteVector3BigEndian(position)
 				.WriteUInt32(destDescriptor)
-				.WriteByte((byte)0x00)
+				.WriteByte(0x00)
 				.ToArray();
 		}
 

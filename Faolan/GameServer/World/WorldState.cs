@@ -73,29 +73,16 @@ namespace Faolan.GameServer.World
 		// as MoveTask). The model stays network-free - it reports effects and the listener turns them into packets.
 		public IReadOnlyList<WorldTickEffect> Tick(double deltaSeconds)
 		{
-			List<WorldTickEffect> effects = null;
+			List<WorldTickEffect> effects = [];
 
-			// Flips an NPC's combat-engaged state and, on the transition, queues the combat-mode effect the broadcaster
-			// turns into the stat-20 weapon draw/sheathe (#218). No-op when already in that state, so it fires once per
-			// engage/disengage.
-			void SetCombat(WorldEntity e, bool inCombat)
-			{
-				if (e.InCombat == inCombat)
-					return;
-
-				e.InCombat = inCombat;
-				(effects ??= new List<WorldTickEffect>()).Add(new WorldTickEffect(e,
-					inCombat ? WorldTickEffectType.NpcEnterCombat : WorldTickEffectType.NpcExitCombat));
-			}
-
-			foreach (var zone in _zones.Values)
+			foreach (var zone in _zones.Values) // Parralell?
 			{
 				foreach (var entity in zone.Entities)
 				{
 					if (entity.IsLoot)
 					{
 						if (entity.TickExpiry(deltaSeconds))
-							(effects ??= new List<WorldTickEffect>()).Add(new WorldTickEffect(entity, WorldTickEffectType.LootExpired));
+							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.LootExpired));
 						continue;
 					}
 
@@ -109,9 +96,9 @@ namespace Faolan.GameServer.World
 					if (entity.IsDead)
 					{
 						if (entity.TickCorpseLinger(deltaSeconds))
-							(effects ??= new List<WorldTickEffect>()).Add(new WorldTickEffect(entity, WorldTickEffectType.NpcCorpseLootable));
+							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcCorpseLootable));
 						if (entity.TickRespawn(deltaSeconds))
-							(effects ??= new List<WorldTickEffect>()).Add(new WorldTickEffect(entity, WorldTickEffectType.NpcRespawned));
+							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcRespawned));
 						continue;
 					}
 
@@ -140,7 +127,7 @@ namespace Faolan.GameServer.World
 						if (homeDist > NpcMeleeRange)
 						{
 							StepToward(entity, homeDx, homeDz, homeDist, deltaSeconds);
-							(effects ??= new List<WorldTickEffect>()).Add(new WorldTickEffect(entity, WorldTickEffectType.NpcMove));
+							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcMove));
 							continue;
 						}
 
@@ -174,16 +161,29 @@ namespace Faolan.GameServer.World
 					{
 						StepToward(entity, dx, dz, horizontal, deltaSeconds, leaveMelee: true);
 						entity.ArmAttackCooldown(NpcAttackInterval); // wind up a swing for when it arrives
-						(effects ??= new List<WorldTickEffect>()).Add(new WorldTickEffect(entity, WorldTickEffectType.NpcMove, target));
+						effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcMove, target));
 						continue;
 					}
 
 					if (entity.TickAttackReady(deltaSeconds, NpcAttackInterval))
-						(effects ??= new List<WorldTickEffect>()).Add(new WorldTickEffect(entity, WorldTickEffectType.NpcAttack, target));
+						effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcAttack, target));
 				}
 			}
 
-			return effects ?? (IReadOnlyList<WorldTickEffect>)Array.Empty<WorldTickEffect>();
+			return effects;
+
+			// Flips an NPC's combat-engaged state and, on the transition, queues the combat-mode effect the broadcaster
+			// turns into the stat-20 weapon draw/sheathe (#218). No-op when already in that state, so it fires once per
+			// engage/disengage.
+			void SetCombat(WorldEntity e, bool inCombat)
+			{
+				if (e.InCombat == inCombat)
+					return;
+
+				e.InCombat = inCombat;
+				effects.Add(new WorldTickEffect(e,
+					inCombat ? WorldTickEffectType.NpcEnterCombat : WorldTickEffectType.NpcExitCombat));
+			}
 		}
 
 		public Zone ZoneFor(uint mapId)

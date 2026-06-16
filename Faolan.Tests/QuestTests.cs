@@ -175,14 +175,6 @@ namespace Faolan.Tests
 			Assert.Equal(0x147u, def.MarkerX);
 			Assert.Equal(0x2A6u, def.MarkerY);
 
-			byte[] Rec(QuestTextSlot slot)
-			{
-				var r = def.TextRefs.Single(t => t.Slot == slot);
-				return r.IsLocalized
-					? WorldQuest.Localized((int)r.RefId, (int)r.Category, r.Flags ?? "", r.KeyText)
-					: WorldQuest.RemoteFormat((int)r.RefId, (int)r.Category, r.KeyText);
-			}
-
 			// Journal list (no timestamp) - byte-exact against frame 9947.
 			var areaHeader = new[] { Rec(QuestTextSlot.AreaTitle), Rec(QuestTextSlot.MapName), Rec(QuestTextSlot.RegionName) };
 			var entries = new[] { new WorldQuest.JournalEntry(0x34A7, Rec(QuestTextSlot.Title), Rec(QuestTextSlot.ListSubLine)) };
@@ -198,8 +190,7 @@ namespace Faolan.Tests
 
 			// Quest-log LIST (the packet that POPULATES the J-panel) - byte-exact against frame 687. The captured
 			// randochar had four active quests (tracked 13479 first); the area-title slot is the 13479 def's AreaTitle.
-			var logList = WorldQuest.BuildQuestLogList(0x0131720B, def.AreaId, 0x34A7,
-				new uint[] { 0x34A7, 0x34FB, 0x34A8, 0x3077 }, Rec(QuestTextSlot.AreaTitle));
+			var logList = WorldQuest.BuildQuestLogList(0x0131720B, def.AreaId, 0x34A7, [0x34A7, 0x34FB, 0x34A8, 0x3077], Rec(QuestTextSlot.AreaTitle));
 			Assert.Equal(CaptureBody("504b7924"), Convert.ToHexString(logList).ToLowerInvariant());
 
 			// SNAPSHOT-TAILS per-quest block = the QuestFullUpdate content (questId onward) minus the trailing 0x00 -
@@ -216,6 +207,16 @@ namespace Faolan.Tests
 				if (i is 577 or 585 || i is >= 606 and <= 609)
 					continue; // progress (577/585) + player instance (606-609): expected per-character differences
 				Assert.True(block[i] == tailsBlock[i], $"snapshot block byte @{i}: built=0x{block[i]:x2} capture=0x{tailsBlock[i]:x2}");
+			}
+
+			return;
+
+			byte[] Rec(QuestTextSlot slot)
+			{
+				var r = def.TextRefs.Single(t => t.Slot == slot);
+				return r.IsLocalized
+					? WorldQuest.Localized((int)r.RefId, (int)r.Category, r.Flags ?? "", r.KeyText)
+					: WorldQuest.RemoteFormat((int)r.RefId, (int)r.Category, r.KeyText);
 			}
 		}
 

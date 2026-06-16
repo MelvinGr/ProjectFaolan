@@ -58,12 +58,6 @@ namespace Faolan.Importer
 			uint grant = 0; // a quest the server granted while collecting THIS screen's responses (0 = none)
 			var questsSeen = new HashSet<uint>(); // every quest whose full-update appeared earlier in THIS capture
 
-			void Flush()
-			{
-				if (active && screen.Count > 0)
-					entries.Add(new ConversationEntry(typeId, path, npc, instance, [..screen], namesByHandle.GetValueOrDefault(npc), GrantQuestId: grant));
-			}
-
 			foreach (var p in packets)
 			{
 				if (!p.IsDownload && p.Opcode == Opcode2000 && p.SubOpcode == InteractSubOpcode)
@@ -132,6 +126,12 @@ namespace Faolan.Importer
 
 			Flush();
 			return entries;
+
+			void Flush()
+			{
+				if (active && screen.Count > 0)
+					entries.Add(new ConversationEntry(typeId, path, npc, instance, [..screen], namesByHandle.GetValueOrDefault(npc), GrantQuestId: grant));
+			}
 		}
 
 		// Merges screens from many captures/instances, deduped by (NpcName, TypeId, AnswerPath) - the stable branch

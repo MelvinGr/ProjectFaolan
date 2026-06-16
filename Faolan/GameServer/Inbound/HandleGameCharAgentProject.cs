@@ -26,7 +26,7 @@ namespace Faolan.GameServer
 		// We have no live aggro model yet, so reply 0 (no aggro) for every target - enough to unblock the load.
 		private async Task HandleGameCharAgentProject(INetworkClient client, ConanPacket packet)
 		{
-			var opcode = (ushort)packet.Opcode;
+			var opcode = packet.Opcode;
 			if (opcode != 0x2000)
 			{
 				// Other GameCharAgentProject methods are not loading gates and retail's replies aren't decoded yet -

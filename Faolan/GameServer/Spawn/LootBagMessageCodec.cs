@@ -35,7 +35,7 @@ namespace Faolan.GameServer.Spawn
 			for (var k = 0; k + 4 <= record.Length; k++)
 			{
 				var len = BinaryPrimitives.ReadUInt32BigEndian(record.Slice(k, 4));
-				if (len == 0 || k + 4 + (long)len != record.Length)
+				if (len == 0 || k + 4 + len != record.Length)
 					continue;
 
 				contents = Serializer.Deserialize<ProtoLootBagIIR>(record.Slice(k + 4, (int)len).ToArray().AsMemory());

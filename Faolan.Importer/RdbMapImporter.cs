@@ -85,9 +85,9 @@ namespace Faolan.Importer
 		// clean name (#31). The markers are level-editor artifacts (statel = static element, hmap = height map),
 		// never part of a real map name, so this can't truncate a legitimate one.
 		private static readonly string[] ToolingMarkers =
-		{
+		[
 			" Heigh_Tiles", "_statel", " Statels", "_height", "_painting", " and Hmap", " Hmap"
-		};
+		];
 
 		public static string SanitizeMapName(string name)
 		{

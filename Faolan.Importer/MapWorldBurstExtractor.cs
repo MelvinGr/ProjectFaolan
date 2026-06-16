@@ -46,28 +46,6 @@ namespace Faolan.Importer
 			uint capturedInstance = 0;
 			var sawPoll = false; // per-window: has the client's first 0x2020 poll passed? (ends the pre-poll burst)
 
-			void Flush()
-			{
-				// Reject a window captured mid-session (gameplay churn, not a clean world build) - see the
-				// N3ToClientQuit remark. A rejected map with no clean window elsewhere falls back to the beach burst.
-				if (current is { Count: > 0 } && currentMap != 0 && CountSubOpcode(current, N3ToClientQuitSubOpcode) <= MaxEntityQuitsInWorldBuild)
-					bursts.Add(new MapWorldBurstEntry(currentMap, capturedInstance, current));
-				current = null;
-				currentMap = 0;
-				capturedInstance = 0;
-				sawPoll = false;
-			}
-
-			void BackfillInstance(byte[] full)
-			{
-				if (capturedInstance != 0)
-					return;
-
-				var inst = ExtractReceiverInstance(full);
-				if (inst != 0)
-					capturedInstance = inst;
-			}
-
 			foreach (var p in packets)
 			{
 				var body = GetBody(p.Bytes);
@@ -120,6 +98,28 @@ namespace Faolan.Importer
 
 			Flush();
 			return bursts;
+
+			void Flush()
+			{
+				// Reject a window captured mid-session (gameplay churn, not a clean world build) - see the
+				// N3ToClientQuit remark. A rejected map with no clean window elsewhere falls back to the beach burst.
+				if (current is { Count: > 0 } && currentMap != 0 && CountSubOpcode(current, N3ToClientQuitSubOpcode) <= MaxEntityQuitsInWorldBuild)
+					bursts.Add(new MapWorldBurstEntry(currentMap, capturedInstance, current));
+				current = null;
+				currentMap = 0;
+				capturedInstance = 0;
+				sawPoll = false;
+			}
+
+			void BackfillInstance(byte[] full)
+			{
+				if (capturedInstance != 0)
+					return;
+
+				var inst = ExtractReceiverInstance(full);
+				if (inst != 0)
+					capturedInstance = inst;
+			}
 		}
 
 		// One burst per map: the longest (most complete) that also has a known captured instance.

@@ -573,7 +573,7 @@ namespace Faolan.GameServer
 
 			var ps = new PacketStream();
 			ps.WriteHeader(sender, receiver, GameCharInterfaceDispatchOpcodes.DispatchValidResurrectionSpots);
-			WriteValidResurrectionSpotsBody(ps, character.Position, new[] { spot });
+			WriteValidResurrectionSpotsBody(ps, character.Position, [spot]);
 			await ps.SendAsync(client);
 		}
 

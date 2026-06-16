@@ -28,31 +28,6 @@ namespace Faolan.GameServer
 			var sender = new byte[] { 0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x59 };
 			var receiver = ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id);
 
-			// One IIR packet: 0x2000 envelope -> [u32 length][u32 IIR-id][body]. The length is recomputed, so editing
-			// a body never desyncs it.
-			Task Iir(GameServer0X2000RespondsOpcodes iir, params byte[] body)
-			{
-				return new PacketStream()
-					.WriteHeader(sender, receiver, GameServerCarrierOpcodes.IirCarrier)
-					.WriteArrayUInt32Length(s => s
-						.WriteUInt32(iir)
-						.WriteArray(body))
-					.SendAsync(client);
-			}
-
-			// Same, for the packets that carry the client instance mid-body: [prefix][instance][suffix].
-			Task IirId(GameServer0X2000RespondsOpcodes iir, byte[] prefix, params byte[] suffix)
-			{
-				return new PacketStream()
-					.WriteHeader(sender, receiver, GameServerCarrierOpcodes.IirCarrier)
-					.WriteArrayUInt32Length(s => s
-						.WriteUInt32(iir)
-						.WriteArray(prefix)
-						.WriteUInt32(id)
-						.WriteArray(suffix))
-					.SendAsync(client);
-			}
-
 			byte[] C350 = [0x00, 0x00, 0xC3, 0x50];
 
 			// Initial vitals + behavior/action setup for the editor entities (handles 0x0009FF92..96).
@@ -139,6 +114,32 @@ namespace Faolan.GameServer
 			await Iir(GameServer0X2000RespondsOpcodes.SetMorphValueIIR, CreateEditorRecordBuilder.BuildSetMorphValueIir(id, "texscript_183875", 1.0f, 0x01, 0x00000001u));
 			await Iir(GameServer0X2000RespondsOpcodes.SetMorphValueIIR, CreateEditorRecordBuilder.BuildSetMorphValueIir(0x0009FF95u, "texscript_183875", 1.0f, 0x01, 0x00000002u));
 			await Iir(GameServer0X2000RespondsOpcodes.SetMorphValueIIR, CreateEditorRecordBuilder.BuildSetMorphValueIir(0x0009FF94u, "texscript_183875", 1.0f, 0x01, 0x00000002u));
+			return;
+
+			// One IIR packet: 0x2000 envelope -> [u32 length][u32 IIR-id][body]. The length is recomputed, so editing
+			// a body never desyncs it.
+			Task Iir(GameServer0X2000RespondsOpcodes iir, params byte[] body)
+			{
+				return new PacketStream()
+					.WriteHeader(sender, receiver, GameServerCarrierOpcodes.IirCarrier)
+					.WriteArrayUInt32Length(s => s
+						.WriteUInt32(iir)
+						.WriteArray(body))
+					.SendAsync(client);
+			}
+
+			// Same, for the packets that carry the client instance mid-body: [prefix][instance][suffix].
+			Task IirId(GameServer0X2000RespondsOpcodes iir, byte[] prefix, params byte[] suffix)
+			{
+				return new PacketStream()
+					.WriteHeader(sender, receiver, GameServerCarrierOpcodes.IirCarrier)
+					.WriteArrayUInt32Length(s => s
+						.WriteUInt32(iir)
+						.WriteArray(prefix)
+						.WriteUInt32(id)
+						.WriteArray(suffix))
+					.SendAsync(client);
+			}
 		}
 	}
 }
