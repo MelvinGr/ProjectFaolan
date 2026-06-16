@@ -393,6 +393,7 @@ namespace Faolan.GameServer
 				["additem"] = (client, arguments) => AddItemCommand(client, arguments),
 				["removeitem"] = (client, arguments) => RemoveItemCommand(client, arguments),
 				["feedback"] = (client, _) => FeedbackCommand(client),
+				["syschat"] = (client, _) => SysChatCommand(client),
 				["world"] = (client, _) => SendWorldInfo(client),
 				["quest"] = (client, arguments) => QuestCommand(client, arguments),
 				["tag"] = (client, arguments) => TagCommand(client, arguments),
@@ -819,6 +820,16 @@ namespace Faolan.GameServer
 			await SendAreaNameBanner(client);
 			await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
 				"Sent an on-screen FIFO banner (FormatFeedbackIIR / showfifomessagefromserver).");
+		}
+
+		// .syschat - push a world/system chat line into the chat window via ChatTextIIR (#103). Sends the captured
+		// localized CriteriaYou line (arbitrary literal text needs a literal-text remoteformat template, like the
+		// FIFO banner). The test bootstrap for the ChatTextIIR path.
+		private async Task SysChatCommand(INetworkClient client)
+		{
+			await SendSampleWorldChat(client);
+			await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
+				"Sent a world/system chat line (ChatTextIIR 0xE0B51102).");
 		}
 
 		// .quest add|remove <id> | .quest list  - manage the player's quest journal. `add` records the quest +
