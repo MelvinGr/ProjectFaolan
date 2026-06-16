@@ -176,15 +176,9 @@ namespace Faolan.GameServer.World
 			return DispatchInterest(events, null);
 		}
 
-		// After world entry (spawn body now captured): spawn the player to nearby players and them to the player.
-		// NPC streaming is deliberately NOT run here - the world-burst replay already rendered the entry-point NPCs
-		// and piling more spawns onto the load can reshape the burst's TCP segmentation and stall the client. Instead
-		// we seed EVERY in-range model NPC into the player's Known set (and register its handle -> name for
-		// conversation routing), so the first move re-spawns none of them. The burst already rendered the NPCs retail
-		// shows at this vantage; the remaining in-range model NPCs are cross-session capture dupes (the model is the
-		// union of all sessions, ~2-4x retail's count) that retail does NOT render here - leaving them Known-but-unsent
-		// keeps the entry view == the burst == retail and avoids the spawn flood that crashes the client on the first
-		// move. NPCs OUTSIDE entry range (e.g. Casilda) are not seeded, so they still stream in as the player moves.
+		// After world entry (spawn body now captured): stream the in-range NPCs to the player via interest (the burst
+		// no longer carries NPCs) and spawn the player to nearby players. Interest is the sole NPC spawn path now that
+		// #23 made mid-session/interest spawns render in-client.
 		public async Task BroadcastPlayerEntry(INetworkClient client)
 		{
 			var entity = _sim.PlayerWorldEntity(client);
@@ -193,39 +187,13 @@ namespace Faolan.GameServer.World
 
 			var zone = _sim.World.ZoneFor(entity.MapId);
 
-			// Interest is the SOLE NPC spawn path (DEFAULT since #23 made mid-session/interest spawns render; in-client
-			// verified 2026-06-16): NPCs were dropped from the burst (ReplayMapWorldBurst), so stream every in-range NPC
-			// here at entry (includeNonPlayers), each as its own FA015807 + name registration via DispatchInterest. No
-			// burst NPCs means no Known-seeding and no double-spawn. Set FAOLAN_NPC_INDIVIDUAL_SPAWN=0 to fall back to
-			// the old burst path (seed entry NPCs into Known, stream only players here). KNOWN: streams the cross-session
-			// model union (~4x retail density) - cross-session mob dedup / interest tuning is a follow-up.
-			if (Environment.GetEnvironmentVariable("FAOLAN_NPC_INDIVIDUAL_SPAWN") != "0")
-			{
-				var npcEvents = InterestManager.ResolveMove(zone, entity, WorldSimulation.PlayerInterestRange, includeNonPlayers: true);
-				await DispatchInterest(npcEvents, null);
-				return;
-			}
-
-			var seeded = 0;
-			foreach (var npc in zone.EntitiesInRange(entity.Position, WorldSimulation.PlayerInterestRange, entity.Handle))
-			{
-				if (npc.IsPlayer || npc.IsLoot || npc.Name == null)
-					continue;
-
-				// Mark it Known so the first move doesn't (re)spawn it, and register its handle -> name from the model
-				// (authoritative) so the clicked-handle -> name -> conversation lookup resolves. Burst NPCs share the
-				// burst wire handle (EnsureZoneNpcs aligns them by position), so this lines up with what the client
-				// rendered; non-burst in-range dupes are simply never sent.
-				entity.Known.Add(npc.Handle);
-				client.Session.SpawnedNpcNamesByHandle[npc.Handle] = npc.Name;
-				seeded++;
-			}
-
-			// Player-only interest (the burst already placed the NPCs; do NOT include non-players here or we re-stream
-			// the whole zone). The ResolveMove player-only pass preserves the NPC Known entries seeded above.
-			var events = InterestManager.ResolveMove(zone, entity, WorldSimulation.PlayerInterestRange);
-			await DispatchInterest(events, null);
-			_logger.LogInformation("World entry: {Name} seeded {Seeded} in-range NPC(s) into Known (suppresses first-move re-stream).", entity.Name, seeded);
+			// Interest is the SOLE NPC spawn path (since #23 made mid-session/interest spawns render; in-client verified
+			// 2026-06-16): NPCs are dropped from the world-entry burst (ReplayMapWorldBurst), so stream every in-range
+			// NPC here at entry (includeNonPlayers), each as its own FA015807 + name registration via DispatchInterest.
+			// No burst NPCs means no Known-seeding and no double-spawn. KNOWN: streams the cross-session model union
+			// (~4x retail density) - cross-session mob dedup / interest tuning is a follow-up.
+			var npcEvents = InterestManager.ResolveMove(zone, entity, WorldSimulation.PlayerInterestRange, includeNonPlayers: true);
+			await DispatchInterest(npcEvents, null);
 		}
 
 		// After a player's Move: update interest and broadcast the resulting spawns/moves to nearby players.
@@ -554,23 +522,6 @@ namespace Faolan.GameServer.World
 				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s => s.WriteArray(body))
 				.SendAsync(client);
-		}
-
-		// Builds one quest's DETAIL block as it appears in the FullChar snapshot tails (docs/quest-log-handover.md):
-		// the QuestFullUpdate CONTENT, i.e. BuildQuestFullUpdate's output from `questId` onward (drop the 17-byte
-		// [subop][ack][player][0x00000000][0x01] prefix) and without the trailing 0x00 separator - the captured 13479
-		// block is 879 B = that 880-B content minus the last byte. `instance` is the live player's client instance
-		// (the block carries raw entity references, like the rest of the tails). Used by SnapshotQuestInjector.
-		public byte[] BuildSnapshotQuestBlock(uint instance, QuestDefinition def)
-		{
-			var refs = new[] { QuestTextSlot.Title, QuestTextSlot.Summary, QuestTextSlot.AreaTitle, QuestTextSlot.RegionName, QuestTextSlot.MapName }
-				.Select(s => Record(def, s))
-				.ToArray();
-			var full = WorldQuest.BuildQuestFullUpdate(
-				instance, def.QuestId, WorldQuest.FullUpdateStateActive, def.AreaId, refs,
-				def.GoalId, WorldQuest.SnapshotQuestAcceptTime, def.MapId, def.MarkerX, def.MarkerY,
-				Record(def, QuestTextSlot.Objective), Record(def, QuestTextSlot.ObjectiveLocalized));
-			return full[WorldQuest.QuestFullUpdateContentOffset..^1]; // drop the 17-byte prefix + the trailing 0x00
 		}
 
 		// Sends the active-quest LIST (0x504B7924) that POPULATES the J-panel - WITHOUT it an accepted quest never

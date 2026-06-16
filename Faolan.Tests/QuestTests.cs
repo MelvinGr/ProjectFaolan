@@ -193,12 +193,12 @@ namespace Faolan.Tests
 			var logList = WorldQuest.BuildQuestLogList(0x0131720B, def.AreaId, 0x34A7, [0x34A7, 0x34FB, 0x34A8, 0x3077], Rec(QuestTextSlot.AreaTitle));
 			Assert.Equal(CaptureBody("504b7924"), Convert.ToHexString(logList).ToLowerInvariant());
 
-			// SNAPSHOT-TAILS per-quest block = the QuestFullUpdate content (questId onward) minus the trailing 0x00 -
-			// EXACTLY what WorldBroadcaster.BuildSnapshotQuestBlock emits (same args incl. SnapshotQuestAcceptTime).
+			// SNAPSHOT-TAILS per-quest block = the QuestFullUpdate content (questId onward) minus the trailing 0x00.
 			// Proven byte-identical to the SAME quest's block embedded in a real login snapshot (xxx-login's 13479
 			// tails block) EXCEPT the 3 explained spots: quest PROGRESS @577 (just-accepted 0x64 vs in-progress 0x50)
 			// and @585 (0 vs 7), and the player INSTANCE @606-609 - i.e. a freshly-accepted quest generates the exact
-			// retail block (decode_snapshot_quests.py). This is the byte-level basis for SnapshotQuestInjector.
+			// retail block (decode_snapshot_quests.py). Validates BuildQuestFullUpdate's content shape (the basis the
+			// from-DB quest-region generation builds on).
 			var block = full[WorldQuest.QuestFullUpdateContentOffset..^1];
 			Assert.Equal(879, block.Length);
 			var tailsBlock = SnapshotQuestBlock(0x34A7); // the 13479 block from xxx-login's login snapshot (879 B)
