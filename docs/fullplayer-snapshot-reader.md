@@ -51,9 +51,16 @@ player's accepted quests on login from `CharacterQuests` (replacing the snapshot
 - Quest journal = N concatenated `Quest_c` records (one per quest); the index lists all N ids.
 
 REMAINING to author multi-quest (the gating work, decode-first):
-1. **Decode the 2-quest `@609` objective region** — the single-quest `decode_snapshot_609.py` assumes the beach
-   offset and the chapterTag at @609; the 2-quest region differs (starts `0x220a2020` at @609 in `xxx-login`), so the
-   per-quest goal-block ordering + chapterTag placement for >1 quest is not yet decoded. Decode it from `xxx-login`.
+1. **Decode the 2-quest `Quest_c` List A + `@609` objective region.** Pinpointed 2026-06-16: running the production
+   `SnapshotTails`/`QuestcRegion.Parse` on the `xxx-login` 2-quest tails THROWS `Quest_c record: listKey 3027 !=
+   questId 9` (3027 = `0xBD3` = the objective region's chapterTag). So after the two `Quest_c` records the parser runs
+   into the `@609` objective region and reads its `0xBD3`/`[1][9]` as a third record's listKey - i.e. `QuestcRegion`'s
+   List A model (validated only on the 1-quest beach, whose record's 4 objective sub-lists are EMPTY and consume
+   exactly to @609) does NOT handle the 2-quest case. Likely the 13479 record (state=3 in-progress) has NON-empty
+   objective sub-lists that consume extra bytes, so the parser misaligns. Decode the 13479 `Quest_c` record's
+   sub-lists + the 2-quest objective region from `xxx-login` (manual byte walk / dynamic Ghidra trace), then fix
+   `QuestcRegion`/`QuestObjectiveRegion` to round-trip the `xxx-login` tails byte-exact - the prerequisite to
+   generating multiple quests.
 2. **Harvest 13479's snapshot scalars + goals** (`SnapshotN`/`FieldEc`/`FieldF0`/`FieldF8`, per-goal markers,
    `GoalSteps`, trailer word) into `QuestDefinition`/`QuestGoalDefinition` (seeded only for 10238 today).
 3. **Extend `BeachTailsBuilder.BuildBeachQuestPortion` → `BuildQuestPortion(IReadOnlyList<(def,state)>)`** — emit N
