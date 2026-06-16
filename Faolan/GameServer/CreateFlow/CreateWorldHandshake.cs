@@ -64,7 +64,7 @@ namespace Faolan.GameServer
 		{
 			var instance = client.Session.Account.ClientInstance;
 			return new PacketStream()
-				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerCarrierOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(GameServer0X2000RespondsOpcodes.ScryScriptIIR);
@@ -93,7 +93,7 @@ namespace Faolan.GameServer
 		private Task SendCreateEditor2000(INetworkClient client, uint subOpcode, byte[] tail, uint instance)
 		{
 			return new PacketStream()
-				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerCarrierOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(subOpcode);
@@ -122,7 +122,7 @@ namespace Faolan.GameServer
 				: 0xBCF5C28Fu;
 
 			return new PacketStream()
-				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerCarrierOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(GameServer0X2000RespondsOpcodes.SetMorphValueIIR);
@@ -145,7 +145,7 @@ namespace Faolan.GameServer
 			var instance = client.Session.Account.ClientInstance;
 
 			await new PacketStream()
-				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
+				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerCarrierOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s =>
 				{
 					s.WriteUInt32(GameServer0X2000RespondsOpcodes.SetNameIIR);
@@ -197,7 +197,7 @@ namespace Faolan.GameServer
 			var address = $"{realm.IpAddress}:{realm.Port}";
 
 			await new PacketStream()
-				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameInterfaceDispatchOpcodes.DispatchRedirectToServer)
+				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerCarrierOpcodes.WorldHandoff)
 				.WriteByte(0x00)
 				.WriteStringByteLength(address)
 				.SendAsync(client);

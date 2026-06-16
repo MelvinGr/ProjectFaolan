@@ -25,7 +25,7 @@ namespace Faolan.GameServer
 			Task Iir(GameServer0X2000RespondsOpcodes iir, params byte[] body)
 			{
 				return new PacketStream()
-					.WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchPassBlob)
+					.WriteHeader(sender, receiver, GameServerCarrierOpcodes.IirCarrier)
 					.WriteArrayUInt32Length(s => s
 						.WriteUInt32(iir)
 						.WriteArray(body))
@@ -35,7 +35,7 @@ namespace Faolan.GameServer
 			Task IirId(GameServer0X2000RespondsOpcodes iir, byte[] prefix, params byte[] suffix)
 			{
 				return new PacketStream()
-					.WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchPassBlob)
+					.WriteHeader(sender, receiver, GameServerCarrierOpcodes.IirCarrier)
 					.WriteArrayUInt32Length(s => s
 						.WriteUInt32(iir)
 						.WriteArray(prefix)

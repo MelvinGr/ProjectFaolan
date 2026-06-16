@@ -236,9 +236,8 @@ namespace Faolan.Core.Network.Packets
 		// The behavior-nickname GameServerRespondOpcodes enum was RETIRED (2026-06-16): every s2c send now uses the
 		// recovered per-class dispatch enum below (values are byte-identical, so the wire is unchanged and the
 		// capture-replay golden tests hold). The nickname -> recovered-name map, for reference:
-		//   IirCarrier 0x2000        -> GameInterfaceDispatchOpcodes.DispatchPassBlob (the generic IIR carrier; the
-		//                               real method is a sub-opcode in the body)
-		//   WorldHandoff 0x2002      -> GameInterfaceDispatchOpcodes.DispatchRedirectToServer (enter-world/teleport advert)
+		//   IirCarrier 0x2000        -> GameServerCarrierOpcodes.IirCarrier (= GameInterface DispatchPassBlob)
+		//   WorldHandoff 0x2002      -> GameServerCarrierOpcodes.WorldHandoff (= GameInterface DispatchRedirectToServer)
 		//   UpdateBindLocation 0x2002-> GameCharInterfaceDispatchOpcodes.DispatchUpdateBindLocation
 		//   AckAuthenticate 0x2001   -> GameInterfaceDispatchOpcodes.DispatchAckAuthenticate
 		//   GameInterfaceNoArg2004   -> GameInterfaceDispatchOpcodes.Reserved0x2004 (no recovered name)
@@ -260,6 +259,19 @@ namespace Faolan.Core.Network.Packets
 		//   ShortcutBarReply 0x2076  -> GameCharInterfaceDispatchOpcodes.DispatchShortcutBarReply
 		//   LatencyCheckResponse 0x2082 -> GameCharInterfaceDispatchOpcodes.DispatchPong (the per-char pong)
 		//   MassivePvpInfoRequestReturn 0x20A5 -> CSPlayerInterfaceDispatchOpcodes.DispatchMassivePvpInfoRequestReturn
+
+		// The two CARRIER opcodes kept as readable nicknames (they aren't a single dispatch method, so the recovered
+		// DispatchPassBlob / DispatchRedirectToServer names obscure intent at the ~600 call sites that use them). The
+		// values equal their GameInterface dispatch counterparts, so the wire is identical.
+		public enum GameServerCarrierOpcodes : ushort
+		{
+			// The generic IIR carrier (s2c 0x2000): the real method is a sub-opcode in the body. = GameInterface
+			// DispatchPassBlob. Almost every world/create/login s2c record is sent under this opcode.
+			IirCarrier = (ushort)GameInterfaceDispatchOpcodes.DispatchPassBlob,
+			// Enter-world/teleport world-address advert ([0x00][byteLen][host:port]); the client reconnects to the
+			// advertised GameServer. = GameInterface DispatchRedirectToServer.
+			WorldHandoff = (ushort)GameInterfaceDispatchOpcodes.DispatchRedirectToServer
+		}
 
 		// --- Full client->server method catalogs for the GameServer connection's RPC classes, generated from
 		// --- docs/aoc-client-rpc-methods.json (opcode = 0x2000 + table position). Most are not handled yet;
