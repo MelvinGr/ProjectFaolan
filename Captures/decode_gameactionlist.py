@@ -71,11 +71,30 @@ def main():
     print(f"GameActionListIIR instances: {total}")
     print(f"fixed header [00][7E2][dyn][field3][4][u64=1] holds: {ok}/{total}")
     print(f"action-tail length histogram: {tails.most_common(10)}")
-    print("sample tails (len, hex):")
-    for ln, hx in sorted(set(samples))[:8]:
-        print(f"  {ln:3d}  {hx}")
     assert ok == total, "header grammar did not hold for every instance!"
     print("OK: header validated for every captured GameActionList.")
+
+    # The action tail = [u32 0][u32 1][u32 actionType][type-specific body]. The body is per-ACTION and multi-form:
+    #   type 9 (animation/emote): a [u16 len][ascii anim name] form ("idle2_emote", "movement_*_idle"), plus several
+    #     numeric sub-forms (4 B id, 13/41/91 B position/timer blobs) and an empty form;
+    #   type 0 (spawn/PF/scene): 9/28/33/42/47/48/53/76 B numeric blobs.
+    # Only the animation-string form has a clean grammar; the numeric bodies are action-specific (dispatched per
+    # action by the client's GameActionList action reader, FUN_008cb620) and NOT decodable to byte-exact codecs from
+    # captures alone. GameActionListCodec carries the tail verbatim; this taxonomy is the decode ceiling here (#190).
+    import collections as _c
+    cat = _c.Counter()
+    for fn, fr, b in instances():
+        _, _, o = parse_header(b)
+        t = b[o:]
+        if len(t) < 12:
+            continue
+        at = u32(t, 8); rest = t[12:]
+        if at == 9 and len(rest) >= 2 and 0 < u16(rest, 0) <= 60 and 2 + u16(rest, 0) <= len(rest) \
+           and all(32 <= c < 127 for c in rest[2:2 + u16(rest, 0)]):
+            cat["type9:anim-string"] += 1
+        else:
+            cat[f"type{at}:numeric({len(rest)}B)"] += 1
+    print("action-body taxonomy:", cat.most_common(10))
 
 
 if __name__ == "__main__":
