@@ -23,8 +23,11 @@ namespace Faolan.GameServer.World
 		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.ScryScriptIIR;
 		public const uint TypeTagAck = EntityClass.Character;
 
-		// A named scripted step (mode 2 = the simple step-token form: "IntroDone", "ChangeSex", ...).
-		public static byte[] BuildStep(uint playerHandle, string stepToken, uint mode = 2, uint flag = 0, string resources = "")
+		// A named scripted step. mode 2 = the simple step-token form ("IntroDone", "ChangeSex", "StartFixed3d", ...);
+		// mode 7 = the rich creation step ("NEW_character_creation ..." carried as an f4 <remoteformat> token, an f5
+		// resource-preload list "id:value;...", and a non-zero f6 pair). f6Field1/f6Field2 are the trailing sub-message
+		// pair (both 0 for the simple steps).
+		public static byte[] BuildStep(uint playerHandle, string stepToken, uint mode = 2, uint flag = 0, string resources = "", ulong f6Field1 = 0, ulong f6Field2 = 0)
 		{
 			var pb = new List<byte>();
 			WriteVarintField(pb, 1, 5); // version
@@ -33,8 +36,8 @@ namespace Faolan.GameServer.World
 			WriteStringField(pb, 4, stepToken);
 			WriteStringField(pb, 5, resources);
 			var f6 = new List<byte>();
-			WriteVarintField(f6, 1, 0);
-			WriteVarintField(f6, 2, 0);
+			WriteVarintField(f6, 1, f6Field1);
+			WriteVarintField(f6, 2, f6Field2);
 			WriteBytesField(pb, 6, f6.ToArray());
 
 			var body = new List<byte>(16 + pb.Count);
