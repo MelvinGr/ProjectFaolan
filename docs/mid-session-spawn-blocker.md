@@ -1,6 +1,22 @@
 # Mid-session entity spawn doesn't render — blocker (2026-06-13)
 
-> **CONVERGED CONCLUSION (2026-06-16, after the Ghidra + offline-capture deep-dive in parts 2–7 below).**
+> **SOLVED IN-CLIENT (2026-06-16).** The root cause is **part 3** below: our mid-session spawns carried the
+> playfield-instance token from whatever capture session the row/template was built in (a beach Crocodile row carries
+> `0x01EA985C`), NOT this session's live token (`0x004FE428`). The client looks a spawn's playfield up in its
+> loaded-playfield map and silently drops a miss before it ever polls (`0x2020`) the handle. The login burst rendered
+> only because it was replayed from the same session whose token IS the live one. Fix: `SendWorldSpawn` +
+> `MakeCorpseLootable` now re-stamp the token to the live `Zone.PlayfieldToken` via `SpawnPlayfieldRewriter`
+> (commit `0827af5`). **Verified in-client:** a `.spawnnpc Crocodile` drew the first mid-session `0x2020` poll +
+> `0x2008` SpawnCheck in the project's history and rendered. This fixes `.spawnnpc`, mount, interest-streaming,
+> NPC respawn, and loot bags.
+>
+> The "stateful conversation / `n3InfoItemRemote::PollStatus` keepalive" conclusion below (parts 4–7) was
+> **DISPROVEN in-client this session:** streaming a continuous `BehaviorControlCenterIIR` (`0x642CD3D6`) heartbeat on
+> the world conversation (matching retail's ~1206-packet steady stream that parts 4–7 never noticed) — 1834 packets,
+> conversation provably alive — did NOT make the client poll a mid-session spawn. So conversation liveness is not the
+> gate; the playfield-token match is. (Parts 1–7 kept below as the investigation record; part 3 was right.)
+
+> **CONVERGED CONCLUSION (2026-06-16, after the Ghidra + offline-capture deep-dive in parts 2–7 below) — SUPERSEDED, see the SOLVED banner above.**
 > The selective mid-session drop is a **remote-reference resolution failure** in the client: `n3InfoItemRemote::
 > PollStatus` (`FUN_005bae50`) returns `e_Impossible` when an incoming IIR's *remote* reference (a weak-ref proxy
 > to the sender world conversation / owner object) resolves to a null holder — so the IIR is discarded before it
