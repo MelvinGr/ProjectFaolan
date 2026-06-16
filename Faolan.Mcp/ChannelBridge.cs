@@ -40,6 +40,14 @@ namespace Faolan.Mcp
 			? ms
 			: 1500);
 
+		// On its first read after (re)connecting the bridge skips pre-existing posts as "backlog", but only those
+		// OLDER than this window - posts newer than it are delivered, so a bridge that comes up just after a player
+		// speaks still surfaces that post instead of dropping it forever (#205). The bridge is respawned on every
+		// /mcp reconnect / session restart, so a fresh process must catch the immediately-preceding chatter.
+		private static readonly TimeSpan BacklogGrace = TimeSpan.FromMilliseconds(double.TryParse(Environment.GetEnvironmentVariable("FAOLAN_CHANNEL_BACKLOG_GRACE_MS"), out var graceMs)
+			? graceMs
+			: 120_000);
+
 		private static McpClient _gameServer;
 
 		public static async Task Main()
@@ -125,15 +133,7 @@ namespace Faolan.Mcp
 					var read = ParseChannelRead(ResultText(await client.CallToolAsync("read_claude_channel",
 						new Dictionary<string, object> { ["afterSequence"] = cursor ?? 0 }, cancellationToken: cancellationToken)));
 
-					if (cursor == null)
-					{
-						// First successful read: skip the pre-bridge backlog, only forward what comes after.
-						cursor = read.Latest;
-						await Console.Error.WriteLineAsync($"[faolan-chat] connected; skipping backlog through sequence {cursor}");
-						continue;
-					}
-
-					if (read.Latest < cursor.Value)
+					if (read.Latest < (cursor ?? 0))
 					{
 						// The game server restarted: its channel log is in-memory, so sequences reset below our
 						// cursor and new posts became invisible to the old afterSequence filter. Rewind so
@@ -143,8 +143,18 @@ namespace Faolan.Mcp
 						continue;
 					}
 
-					cursor = Math.Max(cursor.Value, read.Latest);
-					foreach (var message in read.Messages.Where(m => !m.FromClaude))
+					if (cursor == null)
+					{
+						// First successful read after (re)connecting. Don't replay the whole in-memory backlog, but
+						// DO deliver anything posted within the grace window: a fresh bridge process (every /mcp
+						// reconnect / session restart spawns one) whose first read lands just AFTER a player spoke
+						// would otherwise skip that post as "backlog" and never surface it (#205). The floor is the
+						// newest post older than the window; newer posts (Sequence > floor) fall through and forward.
+						cursor = InitialCursor(read.Messages.Select(m => (m.Sequence, m.TimestampUtc)), DateTime.UtcNow, BacklogGrace);
+						await Console.Error.WriteLineAsync($"[faolan-chat] connected; backlog floor sequence {cursor}, forwarding posts newer than {BacklogGrace.TotalSeconds:0}s");
+					}
+
+					foreach (var message in read.Messages.Where(m => !m.FromClaude && m.Sequence > cursor.Value))
 					{
 						await server.SendNotificationAsync(ChannelNotificationMethod, new ChannelEvent
 						{
@@ -160,6 +170,8 @@ namespace Faolan.Mcp
 							}
 						}, cancellationToken: cancellationToken);
 					}
+
+					cursor = Math.Max(cursor.Value, read.Latest);
 				}
 				catch (OperationCanceledException)
 				{
@@ -172,6 +184,20 @@ namespace Faolan.Mcp
 					_gameServer = null;
 				}
 			}
+		}
+
+		// The backlog floor for the bridge's first successful read: the newest message OLDER than the grace
+		// window (relative to <paramref name="nowUtc" />). Messages newer than the window have Sequence greater
+		// than this floor, so the poll loop forwards them rather than skipping them as backlog (#205). Returns 0
+		// when every message is within the window (forward them all) or the log is empty.
+		public static ulong InitialCursor(IEnumerable<(ulong Sequence, DateTime TimestampUtc)> messages, DateTime nowUtc, TimeSpan grace)
+		{
+			var cutoff = nowUtc - grace;
+			return messages
+				.Where(m => m.TimestampUtc < cutoff)
+				.Select(m => m.Sequence)
+				.DefaultIfEmpty(0UL)
+				.Max();
 		}
 
 		private static async Task<McpClient> GameServer(CancellationToken cancellationToken)
@@ -217,6 +243,7 @@ namespace Faolan.Mcp
 		private sealed class ChannelMessage
 		{
 			public ulong Sequence { get; set; }
+			public DateTime TimestampUtc { get; set; }
 			public uint SenderId { get; set; }
 			public string SenderName { get; set; }
 			public string Message { get; set; }
