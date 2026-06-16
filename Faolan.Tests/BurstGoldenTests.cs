@@ -27,7 +27,9 @@ namespace Faolan.Tests
 		[Fact]
 		public Task InitialBurst_IsByteStable()
 		{
-			return AssertBurstStable("InitialBurst", GameServerListener.SendRetailCreateEditorInitialBurst);
+			// No DB passed: the dynel scene props fall back to their verbatim bytes, so the golden still locks the
+			// exact wire output. The DB-sourced substitution path is proven separately by CreateEditorSceneDynelTests.
+			return AssertBurstStable("InitialBurst", c => GameServerListener.SendRetailCreateEditorInitialBurst(c));
 		}
 
 		[Fact]

@@ -89,16 +89,17 @@ create-specific to decode, only builder wiring to do:
    (Note: this targets the `0x0009FF92` "Stygian Female" scene-pedestal avatar; the live player-preview
    record — `Character…`, handle = char id — is already covered by `PlayerSpawnScaffoldCodec` /
    `SpawnEditorPreview.bin`.)
-2. **Construction PROVEN from DB rows** (wiring pending) — the 18 editor-scene `SimpleDynel` props are already
-   `WorldObjects` rows on map 4000 in `faolan.db` (same localized ids + keys). `WorldObjectBuilder.TryBuild(row,
-   handle, playfieldInstance, ...)` rebuilds them: transform + identity from the row's columns, with the new
-   playfield-instance overload threading the create session's token (the committed rows were captured in a
-   different session, so the stored token must be rewritten — `WorldObjectBuilder.TryRewritePlayfieldInstance`).
-   `CreateEditorSceneDynelTests` matches each burst record to its row by `display_name` and proves **17/18
-   reconstruct byte-for-byte**. The 18th (localized `3072626`) has no DB row: it shares an exact position with
-   `347659` and the importer's position-keyed `WorldObject` dedup dropped it (Gitea #222). Remaining: wire
-   the burst to emit the DB-built records (needs `Database` access in `SendRetailCreateEditorInitialBurst` + the
-   byte-identical-gate-else-verbatim pattern, like `RetailLoginReplay`), keeping `3072626` verbatim.
+2. ~~Construct the editor-scene `SimpleDynel` props~~ **DONE** — the 18 props are `WorldObjects` rows on map
+   4000 in `faolan.db` (same localized ids + keys). `SendRetailCreateEditorInitialBurst` now takes the
+   `IDatabaseRepository` and SOURCES each scene dynel from its row (`BuildSceneDynel`): matched by identity
+   (`display_name`), re-addressed via `WorldObjectBuilder.TryBuild(row, handle, playfieldInstance, ...)` to the
+   record's handle + the create session's playfield token (the new playfield-instance overload —
+   `TryRewritePlayfieldInstance` — rewrites the rows' stored token, which is from a different session), and
+   emitted ONLY when byte-identical to the verbatim record (the `RetailLoginReplay` zero-render-risk gate); no DB
+   / no row / any drift falls back to verbatim. `CreateEditorSceneDynelTests` proves **17/18 reconstruct
+   byte-for-byte** and that the **full DB-driven burst equals `InitialBurst.bin`**. The 18th (localized
+   `3072626`, handle `0x0002A7FE`) has no DB row — it shares an exact position with `347659` and the importer's
+   position-keyed `WorldObject` dedup dropped it (Gitea #222) — so it stays the one verbatim scene record.
 3. Decode `PlayfieldFIIR`/`GameTimeIIR` bodies fully (small, low risk) and build them.
 4. The verbatim `RetailCreateEditorInitialBurst`/`CreationScriptBurst`/etc. stay as the interim until each
    record type above is constructed and proven byte-exact, per the project's decode-then-golden discipline.

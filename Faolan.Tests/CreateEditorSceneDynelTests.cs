@@ -4,8 +4,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.GameServer;
 using Faolan.GameServer.Spawn;
 using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
@@ -59,6 +62,32 @@ namespace Faolan.Tests
 
 			Assert.Equal(17, rebuilt);
 			Assert.Equal(1, missing);
+		}
+
+		// End-to-end: running the actual initial burst WITH a DB (the committed faolan.db) emits exactly the golden
+		// bytes - i.e. the live BuildSceneDynel substitution (identity match -> DB build -> byte-identical gate)
+		// reproduces InitialBurst.bin, with the lone DB-less prop (3072626) falling back to verbatim. This locks the
+		// wired DB-sourced path, not just WorldObjectBuilder in isolation.
+		[Fact]
+		public async Task InitialBurst_WithDb_IsByteIdenticalToGolden()
+		{
+			var options = new DbContextOptionsBuilder<DatabaseContext>()
+				.UseSqlite($"Data Source={FaolanDbPath()};Mode=ReadOnly")
+				.Options;
+			var repo = new DatabaseRepository(new SingleOptionsContextFactory(options));
+			var client = new RecordingNetworkClient(0x02000001); // the instance the golden was recorded with
+
+			await GameServerListener.SendRetailCreateEditorInitialBurst(client, repo);
+
+			var bytes = client.Sent.SelectMany(p => p).ToArray();
+			Assert.Equal(Convert.ToHexString(Golden.Bytes("InitialBurst")), Convert.ToHexString(bytes));
+		}
+
+		private sealed class SingleOptionsContextFactory(DbContextOptions<DatabaseContext> options)
+			: IDbContextFactory<DatabaseContext>
+		{
+			public DatabaseContext CreateDbContext() => new(options);
+			public Task<DatabaseContext> CreateDbContextAsync(CancellationToken ct = default) => Task.FromResult(new DatabaseContext(options));
 		}
 
 		// The SimpleDynel record body in the burst: [u32 0x0000C878][u32 handle][u32 0] 2C 0A 0F 0D <posX> ... ;
