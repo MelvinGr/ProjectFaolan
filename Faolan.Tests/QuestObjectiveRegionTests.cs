@@ -29,6 +29,27 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void BuildSingle_RegeneratesTheRegion_ByteExact()
+		{
+			// Generation (construct, don't replay, #186): build the two beach goals from their MEANINGFUL fields
+			// (goalId/n/k/subId/map/marker) - synthesizing the constants - plus their objective/trailing text records
+			// (the DB-sourced data, taken here from the parsed region), and prove the assembled region reproduces the
+			// template's @609 bytes exactly. Confirms a compact per-goal definition regenerates the full record.
+			var parsed = QuestObjectiveRegion.Parse(File.ReadAllBytes(TemplatePath), RegionStart);
+			const uint instance = 0x02165EFF; // the template's baked-in instance (re-addressed live)
+
+			var g1 = QuestObjectiveGoal.BuildSingle(instance, questId: 10238, goalId: 1448, n: 1, k: 9, subId: 180,
+				mapId: 4010, markerX: 416, markerY: 701, objective: parsed.Goals[0].Objective, textRecord: parsed.Goals[0].TextRecord);
+			var g2 = QuestObjectiveGoal.BuildSingle(instance, questId: 10238, goalId: 3490, n: 2, k: 12, subId: 0,
+				mapId: 4010, markerX: 521, markerY: 757, objective: parsed.Goals[1].Objective, textRecord: parsed.Goals[1].TextRecord,
+				extra5: 70099, extra6: 0x36314C56);
+
+			var region = new QuestObjectiveRegion { Goals = { g1, g2 } };
+
+			Assert.Equal(Region, region.ToArray());
+		}
+
+		[Fact]
 		public void Parse_DecodesTheTwoBeachGoals()
 		{
 			var region = QuestObjectiveRegion.Parse(File.ReadAllBytes(TemplatePath), RegionStart);

@@ -83,6 +83,28 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 		private const int ReservedWords = 7;
 
+		// Builds one goal record from its MEANINGFUL fields, synthesizing the constants (Lead/One = 1, GoalIdRepeat =
+		// GoalId, the 7 reserved words + Zero1/Zero2 = 0). So a compact per-goal definition (goalId, n, k, subId, map,
+		// marker + the objective/trailing text records) regenerates the full @609 record - the construct-don't-replay
+		// generator for the objective region (#186), mirroring QuestcRecord.BuildSingle for the journal region. The
+		// objective/trailing text come from the quest's per-goal text refs (the same RemoteFormat/Localized records the
+		// journal uses); `instance` is re-addressed to the live player like the rest of the tails.
+		// extra5/extra6 are the last two of the 7 "reserved" words: 0 for the first goal, but the second goal carries
+		// a number + a 4-char tag there (70099 / 0x36314C56 = "61LV"; still undecoded - carried per goal like
+		// QuestcRecord's undecoded scalars). The first five reserved words are always 0.
+		public static QuestObjectiveGoal BuildSingle(uint instance, uint questId, uint goalId, uint n, uint k, uint subId, uint mapId, uint markerX, uint markerY, byte[] objective, byte[] textRecord, uint extra5 = 0, uint extra6 = 0)
+		{
+			ArgumentNullException.ThrowIfNull(objective);
+			ArgumentNullException.ThrowIfNull(textRecord);
+			return new QuestObjectiveGoal
+			{
+				Lead = 1, K = k, Instance = instance, QuestId = questId, GoalId = goalId, N = n,
+				GoalIdRepeat = goalId, One = 1, Reserved = [0, 0, 0, 0, 0, extra5, extra6],
+				SubId = subId, MapId = mapId, MarkerX = markerX, MarkerY = markerY, Zero1 = 0, Zero2 = 0,
+				Objective = objective, TextRecord = textRecord
+			};
+		}
+
 		public static QuestObjectiveGoal Read(FaolanStream r)
 		{
 			var lead = r.ReadUInt32();
