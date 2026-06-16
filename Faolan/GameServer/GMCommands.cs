@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
+using Faolan.Core.Data;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
@@ -244,30 +245,53 @@ namespace Faolan.GameServer
 					.SendAsync(client);
 		}
 
-		// 0x10D27BC0 "begin teleport to map N": [subop][ack][clientInst@8][01][62][0000c79c][destMap@18][zeros].
-		// Template = the changemap capture (frame 4200) IIR body; only the session values are substituted.
+		// 0x10D27BC0 "begin teleport to map N". Constructed field-by-field (was a spliced hex template); byte-exact
+		// against the changemap captures, frames 4200 (map 2010) and 4417 (map 2000) - TeleportHandoffTests.
+		//   [u32 subop][u32 0xC350 receiver-class][u32 clientInstance][01][62][u32 0xC79C][u32 destMap][26x 00]
 		internal static byte[] BuildTeleportBeginBody(uint clientInstance, uint destMapId)
 		{
-			var body = Convert.FromHexString(
-				"10d27bc00000c35008006f3101620000c79c000007da0000000000000000000000000000000000000000000000000000");
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), clientInstance);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(18, 4), destMapId);
-			return body;
+			return new FaolanStream()
+				.WriteUInt32(0x10D27BC0u)   // IIR sub-opcode (begin teleport)
+				.WriteUInt32(0x0000C350u)   // receiver class tag (character)
+				.WriteUInt32(clientInstance)
+				.WriteByte((byte)0x01)
+				.WriteByte((byte)0x62)
+				.WriteUInt32(0x0000C79Cu)   // constant
+				.WriteUInt32(destMapId)
+				.WriteArray(new byte[26])   // trailing pad
+				.ToArray();
 		}
 
-		// 0x5A32F0D7 destination announce: destination map (@46) + spawn position (@91/95/99, big-endian floats).
-		// Template = the changemap capture (frame 4212) IIR body; the constants + the undecoded instance word
-		// (0x00503570) are kept verbatim. In-client verification pending.
-		internal static byte[] BuildTeleportDestBody(uint clientInstance, uint destMapId, Vector3 position)
+		// 0x5A32F0D7 destination announce. Constructed field-by-field (was a spliced hex template); byte-exact against
+		// the changemap captures, frames 4212 (map 2010) and 4420 (map 2000) - TeleportHandoffTests.
+		//   [u32 subop][u32 0xC350][u32 clientInstance][25x 00][f32 1.0][62][u32 0xC79C][u32 destMap][15x 00][01]
+		//   [u32 0x9C50][u32 destPlayfieldToken][12x 00][14][u32 0x00018704][pos x/y/z f32 BE][u32 destDescriptor][00]
+		// Two fields vary with the destination and are NOT yet derivable from the map id: destPlayfieldToken (@70)
+		// and destDescriptor (@103) - 0x503570/0x14 for map 2010, 0x503610/0xBE for map 2000. Both default to the
+		// map-2010 capture values (the GM-teleport path is in-client unverified - see #219).
+		internal static byte[] BuildTeleportDestBody(uint clientInstance, uint destMapId, Vector3 position,
+			uint destPlayfieldToken = 0x00503570u, uint destDescriptor = 0x00000014u)
 		{
-			var body = Convert.FromHexString(
-				"5a32f0d70000c35008006f31000000000000000000000000000000000000000000000000003f800000620000c79c000007da0000000000000000000000000000000100009c500050357000000000000000000000000014000187044468000042e80000445980000000001400");
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), clientInstance);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(46, 4), destMapId);
-			BinaryPrimitives.WriteSingleBigEndian(body.AsSpan(91, 4), position.X);
-			BinaryPrimitives.WriteSingleBigEndian(body.AsSpan(95, 4), position.Y);
-			BinaryPrimitives.WriteSingleBigEndian(body.AsSpan(99, 4), position.Z);
-			return body;
+			return new FaolanStream()
+				.WriteUInt32(0x5A32F0D7u)   // IIR sub-opcode (destination announce)
+				.WriteUInt32(0x0000C350u)   // receiver class tag (character)
+				.WriteUInt32(clientInstance)
+				.WriteArray(new byte[25])
+				.WriteFloatBigEndian(1.0f)
+				.WriteByte((byte)0x62)
+				.WriteUInt32(0x0000C79Cu)   // constant
+				.WriteUInt32(destMapId)
+				.WriteArray(new byte[15])
+				.WriteByte((byte)0x01)
+				.WriteUInt32(0x00009C50u)   // constant
+				.WriteUInt32(destPlayfieldToken)
+				.WriteArray(new byte[12])
+				.WriteByte((byte)0x14)
+				.WriteUInt32(0x00018704u)   // constant
+				.WriteVector3BigEndian(position)
+				.WriteUInt32(destDescriptor)
+				.WriteByte((byte)0x00)
+				.ToArray();
 		}
 
 		// Writes each connected player's live WorldEntity transform onto their Character and persists it. Returns the

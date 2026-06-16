@@ -70,10 +70,14 @@ namespace Faolan.CSPlayerAgent
 			return _pendingGuildInvites.TryRemove(characterId, out var declined) ? declined.GuildName : null;
 		}
 
-		// The 277-byte renown/feat/city-stats block of the 0x203F full update, verbatim from the capture (it was
-		// the same length in all three retail snapshots, only a few counters ticked). Its internal framing is not
-		// decoded yet, so a synthesized block could misalign the roster that follows it; the retail bytes are
-		// known-parseable. Cosmetic-only: the renown tab shows the captured guild's numbers until it is decoded.
+		// The 277-byte renown/feat/city-stats block of the 0x203F full update, verbatim from the capture. Decode
+		// pass (Captures/decode_guild_renown.py, #219): the block is a STATIC scaffold + a few live counters - it
+		// is byte-identical across snapshots except a u32 renown total at block offset 133 (0x01327BAD->0x01327FFE)
+		// and is always 277 bytes, so carrying it verbatim never misaligns the roster that follows. Leading
+		// structure is decoded: [u8 0x01 ver][u32 0x372E header][13x u32 ascending stat-slot ids 0x4FFB0..0x50334].
+		// The 220-byte counter region after the ids has its own (typed/variable) framing that needs the client's
+		// guild IIR reader (Ghidra) to generate a fresh-guild block - still blocked. Cosmetic-only until then: the
+		// renown tab shows the captured guild's numbers.
 		private static readonly byte[] GuildRenownBlockTemplate =
 		[
 			0x01, 0x00, 0x00, 0x37, 0x2E, 0x00, 0x04, 0xFF, 0xB0, 0x00, 0x04, 0xFF, 0xB1, 0x00, 0x05, 0x00, 0x14, 0x00, 0x05, 0x00, 0x78, 0x00, 0x05, 0x00, 0xDC, 0x00, 0x05, 0x01, 0x40, 0x00, 0x05, 0x01, 0xA4, 0x00, 0x05,
