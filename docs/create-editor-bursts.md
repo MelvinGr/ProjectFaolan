@@ -77,9 +77,18 @@ create-specific to decode, only builder wiring to do:
 - **ScryScriptIIR** (`0xA36D3B74`) — the cutscene/editor callback scripts; see `docs/create-cutscene-camera-paths.md`.
 
 ## 4. What's left (the #189 backlog)
-1. Construct `SimpleCharFullUpdate` (editor avatar) from the character's chosen looks via `NpcSpawnBuilder`
-   instead of replaying the captured blob — the big remaining win; gated on threading the editor pose +
-   playfield instance through.
+1. ~~Construct `SimpleCharFullUpdate` (editor avatar)~~ **DONE** — `CreateEditorAvatarBuilder.BuildBody`
+   reconstructs the avatar record (pedestal pose `262.931, 6.014, 280.970`) through `SpawnPacketBuilder`:
+   the transform is rebuilt from the typed `ProtoVec3`/`ProtoQuat`, and the two live-session values — the
+   entity **handle** and the **playfield instance** (the `18 <varint>` token the MapChange advertises) — are
+   threaded/spliced through. The **identity/appearance** is reconstructed by decoding the template's
+   `ProtoCoreCharacterIIR` and re-encoding it (a byte-identical round-trip — no protobuf drift) — the seam where
+   the create flow's live chosen looks will be substituted via the `BuildBody(handle, playfield, looks)` overload.
+   Byte-exact for the captured handle/playfield (`CreateEditorAvatarTests`, golden `SpawnEditorAvatar.bin`), and
+   the constructed record reproduces `InitialBurst.bin` in the live burst path (`BurstGoldenTests`).
+   (Note: this targets the `0x0009FF92` "Stygian Female" scene-pedestal avatar; the live player-preview
+   record — `Character…`, handle = char id — is already covered by `PlayerSpawnScaffoldCodec` /
+   `SpawnEditorPreview.bin`.)
 2. Construct the editor-scene `SimpleDynel` props from `ProtoSimpleDynelIIR` rows.
 3. Decode `PlayfieldFIIR`/`GameTimeIIR` bodies fully (small, low risk) and build them.
 4. The verbatim `RetailCreateEditorInitialBurst`/`CreationScriptBurst`/etc. stay as the interim until each
