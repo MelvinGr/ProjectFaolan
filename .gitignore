@@ -272,3 +272,6 @@ __pycache__/
 # the root-level faolan_hook.dll copy + the kernel32 import lib are not)
 Faolan.ClientHook/*.dll
 Faolan.ClientHook/*.lib
+
+# Test golden-mismatch diff artifacts (written by AssertBurstStable on failure)
+*.bin.actual
