@@ -77,6 +77,26 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			};
 		}
 
+		// GENERATES the index region from the indexed quest ids + the per-quest goal-step ids (+ the W6QT table's
+		// three lead words and the trailer word), synthesizing the constants (tag/sentinel/magic, the 1..n goal
+		// indices, the trailer's [1][0][0]). The quest ids / count / sentinel follow from the character's quest list;
+		// the goal-step ids + trailer word are per-quest data (seeded like the per-goal model). #186.
+		public static QuestIndexRegion Build(IReadOnlyList<uint> questIds, IReadOnlyList<uint> goalSteps, uint marker,
+			uint tableField1, uint tableField2, uint tableField3, uint trailerQuestId, uint trailerWord)
+		{
+			ArgumentNullException.ThrowIfNull(questIds);
+			ArgumentNullException.ThrowIfNull(goalSteps);
+			var trailer = new FaolanStream()
+				.WriteUInt32(trailerQuestId).WriteUInt32(1).WriteUInt32(0).WriteUInt32(0).WriteUInt32(trailerWord)
+				.ToArray();
+			return new QuestIndexRegion
+			{
+				Marker = marker, QuestIds = [.. questIds],
+				TableField1 = tableField1, TableField2 = tableField2, TableField3 = tableField3,
+				GoalIds = [.. goalSteps], Trailer = trailer
+			};
+		}
+
 		public byte[] ToArray()
 		{
 			using var w = new FaolanStream();

@@ -56,6 +56,34 @@ namespace Faolan.Tests
 			Assert.Equal(template[RegionEnd..1168], built);
 		}
 
+		// The WHOLE quest portion of the tails (@0..1292 = Quest_c + @609 + index) regenerates byte-exact from the DB
+		// (the journal + per-goal model) plus the decoded per-quest scalars/index data - proving the .bin's entire
+		// quest region can be authored from server state (#186). The not-yet-DB values (the Quest_c scalars, the
+		// index goal-steps + trailer) are passed as the decoded literals here, the deferred seed.
+		[Fact]
+		public async Task BuildWholeQuestPortion_ReproducesBeachTails_ByteExact()
+		{
+			var def = await LoadDefinition(BeachStarterQuestId);
+			Assert.NotNull(def);
+			const uint instance = 0x02165EFF;
+
+			var quests = new QuestcRegion
+			{
+				Records = { QuestcRecord.BuildSingle(def, BeachState, BeachN, BeachFieldEc, BeachFieldF0, BeachFieldF8) }
+			};
+			var objectives = QuestObjectiveRegion.Build(def, instance);
+			var index = QuestIndexRegion.Build(
+				questIds: [10238],
+				goalSteps: [10238, 12369, 12373, 10320, 12371, 10286, 10287, 10915],
+				marker: 0x7E2, tableField1: 1, tableField2: 7, tableField3: 0,
+				trailerQuestId: 10238, trailerWord: 0x000156E7);
+
+			byte[] built = [.. quests.ToArray(), .. objectives.ToArray(), .. index.ToArray()];
+
+			var template = File.ReadAllBytes(TemplatePath);
+			Assert.Equal(template[..1292], built);
+		}
+
 		private static async Task<QuestDefinition> LoadDefinition(uint questId)
 		{
 			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={DbPath}").Options;
