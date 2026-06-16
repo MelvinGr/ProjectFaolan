@@ -317,14 +317,14 @@ namespace Faolan.GameServer
 			var characterId = client.Session.Character.Id;
 			if (!uint.TryParse((arguments ?? "").Trim(), out var id))
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .grantability &lt;abilityId&gt;  (see .spelllist)");
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .grantability &lt;abilityId&gt;  (see .abilitylist)");
 				return;
 			}
 
 			var ability = await Database.GetAbility(id);
 			if (ability == null)
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, $"<span style=\"color: red;\">No grantable ability with id {id} (see .spelllist).</span>");
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"<span style=\"color: red;\">No grantable ability with id {id} (see .abilitylist).</span>");
 				return;
 			}
 
@@ -373,7 +373,7 @@ namespace Faolan.GameServer
 				["help"] = (client, _) => SendGmHelpText(client.Session.Character.Id),
 				["maps"] = (client, _) => SendListAllMaps(client.Session.Character.Id),
 				["spells"] = (client, _) => SendListAllSpells(client.Session.Character.Id),
-				["spelllist"] = (client, _) => SendGrantableAbilityList(client.Session.Character.Id),
+				["abilitylist"] = (client, _) => SendGrantableAbilityList(client.Session.Character.Id),
 				["grantability"] = (client, arguments) => GrantAbilityCommand(client, arguments),
 				["teleport"] = (client, arguments) => TeleportCommand(client, arguments),
 				["position"] = (client, _) => PositionCommand(client),
@@ -967,7 +967,7 @@ namespace Faolan.GameServer
 			return _agentServerDispatcher.SendSystemMessage(characterId, $"Available Commands:<br />{_gmCommandsDict.Keys.JoinAsString("<br />")}");
 		}
 
-		// .spelllist  - list the grantable ability catalog (id / name / slot) for use with .grantability. These are
+		// .abilitylist  - list the grantable ability catalog (id / name / slot) for use with .grantability. These are
 		// what can actually be handed out via the proven 0x2052 grant; the Spell table (.spells) has no grant
 		// identity quad, so its rows can be cast but not granted. A trailing * marks the universal starting kit.
 		private async Task SendGrantableAbilityList(uint characterId)
