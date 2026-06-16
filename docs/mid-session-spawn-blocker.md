@@ -160,6 +160,30 @@ the missing simulation layer)? **NEXT (offline):** diff retail's world-entry han
 it's a discrete packet it's replayable, otherwise it's a simulation-layer build. Confirming any fix needs an
 in-client render (`PollStatus` runs only in the live client).
 
+### HANDSHAKE DIFF (part 7) — no discrete missing registration packet
+
+Mapped retail's full world-entry handshake (`mount_move_dismount`, frames 4–49) and matched it against what our
+server sends:
+- The **world conversation** (`0xb171ce13:0x57` → `0x6C67C147:char`) is established by `0x200b` / `0x200c` /
+  `0x2001` immediately after the client's `0x2003`, THEN the burst (`5D85BFC7` MapChange → dynels → `FA015807`).
+  Our server already replicates this exact sequence.
+- The only novel pre-burst packet, frame 41's **`0x1a07` from class `0x1d359116:0x57`**, is NOT a world-conversation
+  registration: its bodies decode to the **multi-agent address handoff** (ASCII `gs013-nj4.ageofconan.com:7028`) +
+  per-char init stats + global game config (`AAPointsPerLevel`, `AlternateAdvancement_*`). Our own opcode enum
+  even labels `0x1A07` as `Send{CsPlayerAgent,AgentServer,GameServer}` — the agent-address advert, which we already
+  perform (the client connects to our agents). So it's a red herring for the remote-resolution gate.
+
+**So the handshake diff finds NO discrete packet we omit** — corroborating the earlier byte-level loopback
+comparison ("our world-entry handshake is structurally identical to retail's"). Combined with part 6 (retail uses
+ONE conversation for both phases), the answer to the open question lands on **stateful, not a single packet**: the
+real n3 server keeps the world conversation + its entities alive as resolvable remote objects across the load→play
+transition, and Faolan's byte-replay bridge has no such model, so once the client leaves construction mode the
+remote can't resolve. The fix is therefore a **slice of the missing simulation/conversation layer**
+(`server_architecture_roadmap`), not a replayable handshake. This is the end of the productive offline trail for
+#23; the next move is either (1) build a minimal live remote-object/conversation registration on the world
+connection and test in-client whether `PollStatus` then resolves a mid-session spawn, or (2) deeper Ghidra on the
+n3 dispatch to learn exactly when/how the construction-mode leniency ends (what `CharInPlayIIR`'s Activate flips).
+
 ### The playfield-instance map lookup (part 3) — the downstream RENDER path (kept for reference)
 
 `DAT_029c7ae0` is a **global `std::map<uint, Playfield*>`** (red-black tree). The full chain:
