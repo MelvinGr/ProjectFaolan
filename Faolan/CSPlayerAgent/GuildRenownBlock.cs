@@ -1,0 +1,178 @@
+using System;
+using System.Buffers.Binary;
+using Faolan.Core.Data;
+
+namespace Faolan.CSPlayerAgent
+{
+	// Typed, byte-exact codec for the 277-byte renown/feat/city-stats block at the tail of the 0x203F
+	// GuildFullUpdate (Gitea #219). The block is the tail of the i_pcGuild argument read by
+	// CSPlayerInterface::DispatchGuildUpdate -> CoreGuild_c::Read (FUN_00565900, streaming version 3) for the
+	// govForm==1 form (case 1 falling through case 3 - the form our created guilds use). Grammar recovered from
+	// Ghidra + validated against both 0x203F snapshots in the guild_invite capture (Captures/decode_guild_renown.py,
+	// parses to exactly 277 bytes; the ONLY byte that differs between snapshots is RenownCounters[1], the renown
+	// total that ticked). The two embedded count-framed lists use the shared 0x3F1 invariant (word=(count+1)*0x3F1).
+	//
+	// Field SEMANTICS are only partly known (the stat-id list + RenownCounters are proven; the rest are the
+	// captured guild's feat/city/cap values), so neutral structural names are used. Caps like 0x01C9C380
+	// (30,000,000) and 0x3A1D51C0 (975,000,000) live in Group4/Counters64D and are NOT per-guild renown.
+	public sealed class GuildRenownBlock
+	{
+		public const int Length = 277;
+
+		// 0x3F1 list-framing invariant: the first word of a count-framed u32 list is (count+1)*0x3F1.
+		private const uint ListMultiplier = 0x3F1;
+
+		// The 13 guild stat-slot ids (the first 0x3F1 list). Constant across guilds - the structural scaffold a
+		// fresh-guild block reproduces (ascending, the classic AoC stat-id stepping).
+		public static readonly uint[] StatSlotIds =
+		[
+			0x4FFB0, 0x4FFB1, 0x50014, 0x50078, 0x500DC, 0x50140, 0x501A4,
+			0x50208, 0x50209, 0x5026C, 0x5026D, 0x502D0, 0x50334,
+		];
+
+		public byte Flag { get; set; } = 0x01;
+		public uint[] StatIds { get; set; } = (uint[])StatSlotIds.Clone();
+		public byte BoolA { get; set; } = 1;
+		public byte BoolB { get; set; }
+		public uint[] Group1 { get; set; } = new uint[3];
+		public byte BoolC { get; set; }
+		public byte BoolD { get; set; }
+		public uint[] Group2 { get; set; } = new uint[2];
+		// The second 0x3F1 list (count 3 in the capture) - feat/city stat ids.
+		public uint[] List2 { get; set; } = new uint[3];
+		public uint[] Group3 { get; set; } = new uint[6];
+		// u64a: the renown counters. RenownCounters[1] is the accumulating renown total (the only field that
+		// changed between the two captured snapshots). Zeroed for a fresh guild.
+		public ulong[] RenownCounters { get; set; } = new ulong[6];
+		public uint[] Group4 { get; set; } = new uint[2];
+		public ulong[] Counters64B { get; set; } = new ulong[8];
+		public ulong[] Counters64C { get; set; } = new ulong[3];
+		public uint Group5 { get; set; }
+		public ulong Counters64D { get; set; }
+
+		// Decodes a 277-byte block. Throws on a malformed 0x3F1 list word or wrong length (the block is fixed-size
+		// for govForm 1; a different govForm would have a different layout/length and is out of scope).
+		public static GuildRenownBlock Decode(ReadOnlySpan<byte> block)
+		{
+			if (block.Length < Length)
+				throw new ArgumentException($"renown block must be {Length} bytes, got {block.Length}");
+
+			var o = 0;
+			var b = new GuildRenownBlock { Flag = block[o++] };
+			b.StatIds = ReadList(block, ref o);
+			b.BoolA = block[o++];
+			b.BoolB = block[o++];
+			b.Group1 = ReadU32s(block, ref o, 3);
+			b.BoolC = block[o++];
+			b.BoolD = block[o++];
+			b.Group2 = ReadU32s(block, ref o, 2);
+			b.List2 = ReadList(block, ref o);
+			b.Group3 = ReadU32s(block, ref o, 6);
+			b.RenownCounters = ReadU64s(block, ref o, 6);
+			b.Group4 = ReadU32s(block, ref o, 2);
+			b.Counters64B = ReadU64s(block, ref o, 8);
+			b.Counters64C = ReadU64s(block, ref o, 3);
+			b.Group5 = ReadU32(block, ref o);
+			b.Counters64D = ReadU64(block, ref o);
+
+			if (o != Length)
+				throw new InvalidOperationException($"renown block decoded {o} bytes, expected {Length}");
+			return b;
+		}
+
+		// Serializes to the 277-byte wire block (byte-identical to the captured block when round-tripped).
+		public byte[] Encode()
+		{
+			var s = new FaolanStream().WriteByte(Flag);
+			WriteList(s, StatIds);
+			s.WriteByte(BoolA).WriteByte(BoolB);
+			foreach (var v in Group1) s.WriteUInt32(v);
+			s.WriteByte(BoolC).WriteByte(BoolD);
+			foreach (var v in Group2) s.WriteUInt32(v);
+			WriteList(s, List2);
+			foreach (var v in Group3) s.WriteUInt32(v);
+			foreach (var v in RenownCounters) s.WriteUInt64(v);
+			foreach (var v in Group4) s.WriteUInt32(v);
+			foreach (var v in Counters64B) s.WriteUInt64(v);
+			foreach (var v in Counters64C) s.WriteUInt64(v);
+			s.WriteUInt32(Group5).WriteUInt64(Counters64D);
+			return s.ToArray();
+		}
+
+		// The captured "Sepulchra Invictus" block as structured fields (replaces the old hand-transcribed verbatim
+		// blob, which had dropped 3 bytes -> 274 not 277, misaligning the roster). Encode() reproduces the capture
+		// byte-for-byte (GuildRenownBlockTests). Used as the cosmetic placeholder until a guild's own renown is
+		// wired; the large values (caps 0x01C9C380 / 0x3A1D51C0, the feat/city stats) are this guild's, not generic.
+		public static GuildRenownBlock CapturedPlaceholder()
+		{
+			return new GuildRenownBlock
+			{
+				Flag = 0x01,
+				BoolA = 1,
+				Group1 = [1523, 12, 2070],
+				List2 = [0x410, 0x816, 0xBEA],
+				Group3 = [57, 0, 84, 84, 0, 0],
+				RenownCounters = [111747, 20085677, 1225359, 45185, 13896395, 1058420],
+				Group4 = [3, 30000000],
+				Counters64B = [0, 0, 0, 0, 0, 17, 0, 0],
+				Counters64C = [25111741, 42286280, 26217713],
+				Counters64D = 975000000,
+			};
+		}
+
+		// A fresh-guild block: the placeholder scaffold (stat-ids, caps) with the accumulating renown counters
+		// zeroed - what a brand-new guild must show. RenownCounters + Counters64C are the proven renown groups
+		// (RenownCounters[1] is the total that ticked between snapshots; Counters64C are the large renown
+		// sub-totals); the rest (caps, feat/city slots) are kept since their per-guild-vs-constant split needs the
+		// stat-id meanings (a follow-up). Cosmetic and in-client unverified - see #219.
+		public static GuildRenownBlock ForFreshGuild()
+		{
+			var b = CapturedPlaceholder();
+			Array.Clear(b.RenownCounters);
+			Array.Clear(b.Counters64C);
+			return b;
+		}
+
+		private static uint[] ReadList(ReadOnlySpan<byte> b, ref int o)
+		{
+			var word = ReadU32(b, ref o);
+			if (word % ListMultiplier != 0)
+				throw new InvalidOperationException($"0x3F1 list word {word:X} not a multiple of {ListMultiplier:X}");
+			return ReadU32s(b, ref o, (int)(word / ListMultiplier) - 1);
+		}
+
+		private static void WriteList(FaolanStream s, uint[] items)
+		{
+			s.WriteUInt32((uint)(items.Length + 1) * ListMultiplier);
+			foreach (var v in items) s.WriteUInt32(v);
+		}
+
+		private static uint[] ReadU32s(ReadOnlySpan<byte> b, ref int o, int n)
+		{
+			var r = new uint[n];
+			for (var i = 0; i < n; i++) r[i] = ReadU32(b, ref o);
+			return r;
+		}
+
+		private static ulong[] ReadU64s(ReadOnlySpan<byte> b, ref int o, int n)
+		{
+			var r = new ulong[n];
+			for (var i = 0; i < n; i++) r[i] = ReadU64(b, ref o);
+			return r;
+		}
+
+		private static uint ReadU32(ReadOnlySpan<byte> b, ref int o)
+		{
+			var v = BinaryPrimitives.ReadUInt32BigEndian(b.Slice(o, 4));
+			o += 4;
+			return v;
+		}
+
+		private static ulong ReadU64(ReadOnlySpan<byte> b, ref int o)
+		{
+			var v = BinaryPrimitives.ReadUInt64BigEndian(b.Slice(o, 8));
+			o += 8;
+			return v;
+		}
+	}
+}
