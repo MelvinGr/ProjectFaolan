@@ -1,5 +1,22 @@
 # Mid-session entity spawn doesn't render — blocker (2026-06-13)
 
+> **CONVERGED CONCLUSION (2026-06-16, after the Ghidra + offline-capture deep-dive in parts 2–7 below).**
+> The selective mid-session drop is a **remote-reference resolution failure** in the client: `n3InfoItemRemote::
+> PollStatus` (`FUN_005bae50`) returns `e_Impossible` when an incoming IIR's *remote* reference (a weak-ref proxy
+> to the sender world conversation / owner object) resolves to a null holder — so the IIR is discarded before it
+> is ever applied. The login burst renders only because the client accepts it in load/construction mode (PollStatus
+> not enforced). Established offline: retail uses the SAME world conversation (`0x13CE71B1:0x57`) for BOTH the burst
+> and mid-session spawns (part 6), and the world-entry handshake has NO discrete registration packet we omit
+> (part 7). So the fix is **NOT** "port PollStatus" (that's the client's receive-side accept check), **NOT** a new
+> play-mode conversation, and **NOT** a missing handshake packet. It is the **stateful server-side
+> conversation/object model** the real n3 server maintains (keeping the world conversation + its entities alive as
+> resolvable remote objects across the load→play transition) — a slice of the missing simulation layer
+> (`server_architecture_roadmap`), which Faolan's byte-replay bridge lacks. **Next, both client-gated to verify:**
+> (1) build a minimal live remote-object/conversation registration on the world connection and check in-client
+> whether PollStatus then resolves a mid-session spawn; (2) Ghidra: what `CharInPlayIIR`'s Activate flips to end
+> construction-mode leniency. Key client functions are listed in parts 4–7. (The playfield-instance map gate in
+> parts 2–3 is the downstream RENDER path, hit equally by burst + mid-session — NOT the selective blocker.)
+
 **Symptom.** Nothing spawned mid-session renders in-client: `.spawnnpc` (NPC), `.spawnbag` / kill-drop loot
 bags, `.mount` (the horse), interest-streamed NPCs. Only the login **world burst** renders entities. The server
 spawns them correctly (they appear in the world model, the packet goes out) — the client just never draws them.
