@@ -239,7 +239,7 @@ namespace Faolan.GameServer
 			var instance = client.Session.Account.ClientInstance;
 			foreach (var body in new[] { BuildTeleportBeginBody(instance, destMapId), BuildTeleportDestBody(instance, destMapId, position) })
 				await new PacketStream()
-					.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerRespondOpcodes.IirCarrier)
+					.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 					.WriteArrayUInt32Length(s => s.WriteArray(body))
 					.SendAsync(client);
 		}

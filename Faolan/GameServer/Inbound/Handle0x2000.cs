@@ -135,7 +135,7 @@ namespace Faolan.GameServer
 							// instance, confirmed across Strie/dikketest/demol80 captures). Interest-managed broadcast to
 							// nearby players is the next step.
 							await new PacketStream()
-								.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameServerRespondOpcodes.IirCarrier)
+								.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 								.WriteArrayUInt32Length(s => s
 									.WriteUInt32(pbOpcode)
 									.WriteUInt32(dataobjdec)

@@ -37,7 +37,7 @@ namespace Faolan.GameServer
 		private async Task SendMoneyUpdate(INetworkClient client, ulong balanceTin, MoneyUpdateReason reason)
 		{
 			var ps = new PacketStream();
-			ps.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameServerRespondOpcodes.UpdateCash);
+			ps.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchUpdateCash);
 			WriteMoneyUpdateBody(ps, balanceTin, reason);
 			await ps.SendAsync(client);
 

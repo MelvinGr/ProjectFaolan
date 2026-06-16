@@ -605,7 +605,7 @@ namespace Faolan.GameServer
 				: 0x00);
 
 			return new PacketStream()
-				.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameServerRespondOpcodes.SpawnCheck)
+				.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteUInt32(0x0000C350)
 				.WriteUInt32(handle)
 				.WriteByte(status)

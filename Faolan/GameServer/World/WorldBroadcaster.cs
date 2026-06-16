@@ -87,7 +87,7 @@ namespace Faolan.GameServer.World
 					continue;
 
 				await new PacketStream()
-					.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(viewer.Client), GameServerRespondOpcodes.IirCarrier)
+					.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(viewer.Client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 					.WriteArrayUInt32Length(s => s.WriteArray(body))
 					.SendAsync(viewer.Client);
 			}
@@ -402,11 +402,11 @@ namespace Faolan.GameServer.World
 				return;
 
 			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerRespondOpcodes.IirCarrier)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(WorldLoot.BuildNewCurrentLooterBody(bag.Handle, player.Handle)))
 				.SendAsync(client);
 			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerRespondOpcodes.IirCarrier)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(WorldLoot.BuildOpenWindowBody(WorldLoot.LootTypeTag, bag.Handle)))
 				.SendAsync(client);
 
@@ -458,7 +458,7 @@ namespace Faolan.GameServer.World
 				Record(def, QuestTextSlot.Objective), Record(def, QuestTextSlot.ObjectiveLocalized));
 
 			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerRespondOpcodes.IirCarrier)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(body))
 				.SendAsync(client);
 		}
@@ -489,7 +489,7 @@ namespace Faolan.GameServer.World
 			var body = WorldQuest.BuildQuestLogList(client.Session.Account.ClientInstance, trackedDef.AreaId, trackedDef.QuestId,
 				activeQuestIds, Record(trackedDef, QuestTextSlot.AreaTitle));
 			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerRespondOpcodes.IirCarrier)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(body))
 				.SendAsync(client);
 		}
@@ -508,7 +508,7 @@ namespace Faolan.GameServer.World
 
 			var body = WorldQuest.BuildQuestJournal(client.Session.Account.ClientInstance, first.AreaId, areaHeader, entries, trailing);
 			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerRespondOpcodes.IirCarrier)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(body))
 				.SendAsync(client);
 		}
@@ -529,7 +529,7 @@ namespace Faolan.GameServer.World
 		public Task SendQuestGoal(INetworkClient client, uint questId, uint goalId, uint count)
 		{
 			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerRespondOpcodes.IirCarrier)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(WorldQuest.BuildQuestGoal(client.Session.Account.ClientInstance, questId, goalId, count)))
 				.SendAsync(client);
 		}
@@ -538,7 +538,7 @@ namespace Faolan.GameServer.World
 		public Task SendQuestIir(INetworkClient client, uint questId, uint state)
 		{
 			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerRespondOpcodes.IirCarrier)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(WorldQuest.BuildQuestIir(client.Session.Account.ClientInstance, questId, state)))
 				.SendAsync(client);
 		}
@@ -751,7 +751,7 @@ namespace Faolan.GameServer.World
 		private Task SendLootBagUpdate(INetworkClient recipient, byte[] body)
 		{
 			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameServerRespondOpcodes.IirCarrier)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(body)
 				.SendAsync(recipient);
 		}
@@ -839,7 +839,7 @@ namespace Faolan.GameServer.World
 			}
 
 			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameServerRespondOpcodes.IirCarrier)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(WorldDespawn.BuildBody(subjectHandle, token)))
 				.SendAsync(recipient);
 		}
@@ -849,7 +849,7 @@ namespace Faolan.GameServer.World
 		private Task SendWorldMove(INetworkClient recipient, MoveForward move)
 		{
 			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameServerRespondOpcodes.IirCarrier)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(move.Subop)
 					.WriteUInt32(move.DataObject)
@@ -866,7 +866,7 @@ namespace Faolan.GameServer.World
 		private Task SendWorldIir(INetworkClient recipient, byte[] body)
 		{
 			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameServerRespondOpcodes.IirCarrier)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s.WriteArray(body))
 				.SendAsync(recipient);
 		}
@@ -884,7 +884,7 @@ namespace Faolan.GameServer.World
 			}
 
 			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameServerRespondOpcodes.IirCarrier)
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArray(body)
 				.SendAsync(recipient);
 		}

@@ -33,7 +33,7 @@ namespace Faolan.GameServer
 			Task Iir(GameServer0X2000RespondsOpcodes iir, params byte[] body)
 			{
 				return new PacketStream()
-					.WriteHeader(sender, receiver, GameServerRespondOpcodes.IirCarrier)
+					.WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchPassBlob)
 					.WriteArrayUInt32Length(s => s
 						.WriteUInt32(iir)
 						.WriteArray(body))
@@ -44,7 +44,7 @@ namespace Faolan.GameServer
 			Task IirId(GameServer0X2000RespondsOpcodes iir, byte[] prefix, params byte[] suffix)
 			{
 				return new PacketStream()
-					.WriteHeader(sender, receiver, GameServerRespondOpcodes.IirCarrier)
+					.WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchPassBlob)
 					.WriteArrayUInt32Length(s => s
 						.WriteUInt32(iir)
 						.WriteArray(prefix)
@@ -77,7 +77,7 @@ namespace Faolan.GameServer
 
 			// MagicBuff carries the instance twice (caster + target).
 			await new PacketStream()
-				.WriteHeader(sender, receiver, GameServerRespondOpcodes.IirCarrier)
+				.WriteHeader(sender, receiver, GameInterfaceDispatchOpcodes.DispatchPassBlob)
 				.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000RespondsOpcodes.ApplySpell)
 					.WriteArray(0x00, 0x00, 0xC3, 0x50)

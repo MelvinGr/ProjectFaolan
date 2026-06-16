@@ -93,7 +93,7 @@ namespace Faolan.GameServer
 		private Task _autoSaveTask = Task.CompletedTask;
 
 		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, ushort port, IAgentServerDispatcher agentServerDispatcher, IGameServerDispatcher gameServerDispatcher) : base(port,
-			logger, configuration, database, new ConanOutgoingPacketLogger(logger, "GameServer", typeof(GameServerRespondOpcodes), typeof(GameServer0X2000RespondsOpcodes)))
+			logger, configuration, database, new ConanOutgoingPacketLogger(logger, "GameServer", typeof(GameCharInterfaceDispatchOpcodes), typeof(GameServer0X2000RespondsOpcodes)))
 		{
 			_agentServerDispatcher = agentServerDispatcher;
 			_gameServerDispatcher = gameServerDispatcher;
@@ -639,7 +639,7 @@ namespace Faolan.GameServer
 					var tick = unchecked((uint)(Environment.TickCount64 * 1000L));
 
 					await new PacketStream()
-						.WriteHeader(LatencyResponseSender, LoginWorld201CReceiver(client), GameServerRespondOpcodes.LatencyCheckResponse, [0x01])
+						.WriteHeader(LatencyResponseSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchPong, [0x01])
 						.WriteUInt32(counter)
 						.WriteUInt32(0x00000012)
 						.WriteUInt32(tick)
@@ -719,7 +719,7 @@ namespace Faolan.GameServer
 					// float is a varying server-load/fps metric (~80-83 in dumps) - we have no equivalent, so a
 					// fixed plausible value (0x42B32A07 = ~89.6) is sent. The client just treats it as a readout.
 					await new PacketStream()
-						.WriteHeader(PingResponseSender, LoginWorldReceiver(client), GameServerRespondOpcodes.Pong)
+						.WriteHeader(PingResponseSender, LoginWorldReceiver(client), GameInterfaceDispatchOpcodes.DispatchGameServerStats)
 						.WriteUInt32(0x42B32A07)
 						.WriteUInt32(0)
 						.WriteUInt32(0)
@@ -738,7 +738,7 @@ namespace Faolan.GameServer
 					var nClientInst = packet.Data.ReadUInt32();
 
 					new PacketStream()
-					    .WriteHeader(Sender9, Receiver9, null, GameServerRespondOpcodes.SpawnCheck)
+					    .WriteHeader(Sender9, Receiver9, null, GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 					    .WriteUInt32(part1)
 					    .WriteUInt32(spawnId)
 					    .WriteByte(0)
@@ -792,7 +792,7 @@ namespace Faolan.GameServer
 						if (character?.BindRespawnPointId is uint bindPointId)
 							bindMapId = (await Database.GetRespawnPoint(bindPointId))?.MapId ?? bindMapId;
 						await new PacketStream()
-							.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, GameServerRespondOpcodes.UpdateBindLocation)
+							.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, GameCharInterfaceDispatchOpcodes.DispatchUpdateBindLocation)
 							.WriteUInt32(bindMapId)
 							.SendAsync(client);
 						Logger.LogDebug("RequestBindLocation({RequesterId:X8}) -> bind playfield {MapId}.", requesterId, bindMapId);

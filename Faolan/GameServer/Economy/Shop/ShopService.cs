@@ -115,7 +115,7 @@ namespace Faolan.GameServer.Economy.Shop
 			_lastShopSale[client] = new LastShopSale((int)container, (int)slot, row.ItemId ?? 0, row.Count, price);
 
 			var ps = new PacketStream();
-			ps.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, GameServerRespondOpcodes.ItemSoldToShop);
+			ps.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, GameCharInterfaceDispatchOpcodes.DispatchItemSoldToShop);
 			WriteItemSoldBody(ps, container, sellerId, slot);
 			await ps.SendAsync(client);
 			await _outbound.SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Gain);
@@ -168,7 +168,7 @@ namespace Faolan.GameServer.Economy.Shop
 			_openShop[client] = new OpenShop(instance, shop.VendorName, waresByPos);
 
 			var ps = new PacketStream();
-			ps.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x58), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, client.Session.Account.ClientInstance), GameServerRespondOpcodes.ShopData);
+			ps.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x58), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, client.Session.Account.ClientInstance), GameCharInterfaceDispatchOpcodes.DispatchShopData);
 			ps.WriteArray(body);
 			await ps.SendAsync(client);
 

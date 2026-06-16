@@ -55,7 +55,7 @@ namespace Faolan.GameServer
 			var charId = client.Session.Character.Id;
 
 			var ps = new PacketStream();
-			ps.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameServerRespondOpcodes.AddItem);
+			ps.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchAddItem);
 			WriteAddItemBody(ps, containerType, charId, itemPos, SerializeInventoryEntry(entry), feedback);
 			await ps.SendAsync(client);
 		}

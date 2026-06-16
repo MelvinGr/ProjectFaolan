@@ -233,73 +233,33 @@ namespace Faolan.Core.Network.Packets
 			LatencyCheck = 0x2085 // GameCharAgent.Ping (client 0x2085 -> server 0x2082)
 		}
 
-		// Server->client opcodes on the GameServer connection. These VALUES are capture-replayed (retail
-		// byte-for-byte) and in-client verified; the names below are behavior nicknames. The true s2c method
-		// identities are now recovered from AgeOfConan.exe (docs/aoc-rpc-method-opcodes.md, Captures/ghidra/):
-		// the live build inserted extra (mostly no-arg) dispatch methods, which is why the values don't line up
-		// with the string-extracted catalog order. Ground-truth identities for the nicknames below:
-		//   UpdateCash 0x2005   = GameCharInterface.DispatchUpdateCash          (exact match)
-		//   UpdateBindLocation 0x2002  = GameCharInterface.DispatchUpdateBindLocation  (exact match)
-		//   ShopData 0x2033      = GameCharInterface.DispatchShopData            (exact match)
-		//   ItemSoldToShop 0x2035= GameCharInterface.DispatchItemSoldToShop      (exact match)
-		//   LatencyCheckResponse 0x2082 = GameCharInterface.DispatchPong         (the REAL per-char pong)
-		//   Pong 0x2009          = GameInterface.DispatchGameServerStats (reply to c2s GameAgent.UpdateGameServerStats
-		//                          0x2005; the "ping/pong" pair is really the game-server-stats keepalive)
-		//   SpawnCheck 0x2008    = GameCharInterface.DispatchSetQuestMarker      (per-char, not GameInterface)
-		//   ReadyForPlayScreen 0x2024 = GameCharInterface.DispatchValidResurrectionSpots
-		//   ReportDimensionId 0x200b = GameInterface.DispatchReportDimesionID; ReportServerId 0x200c = ...DispatchReportServerID
-		//   AckAuthenticate 0x2001 = GameInterface/UniverseInterface.DispatchAckAuthenticate
-		// Keep the values; do NOT rename (they drive capture-replayed sends). 0x2020 s2c = DispatchAddItem (note for
-		// the inventory-delivery work - there IS a per-item add packet, separate from the snapshot).
-		[Obsolete("Use GameCharAgentOpcodes/GameCharAgentProjectOpcodes/GameAgentOpcodes")]
-		public enum GameServerRespondOpcodes : ushort
-		{
-			// Reply to GameCharAgent.RequestBindLocation: [u32 playfieldId] = the character's bind/home playfield
-			// (the Totem of Origin destination). Verified 1:1 request/reply across 13 captures.
-			UpdateBindLocation = 0x2002,
-			// Vendor window content: [shop ID32 (type 0xC75B)][vendor NPC ID32][protobuf shop content]
-			// (= GameCharInterface.DispatchShopData by content; the value collides with the c2s BuyItem).
-			ShopData = 0x2033,
-			// Confirms a SellItem: [u32 container][u32 charId][u32 slot] - the client clears the bag slot.
-			ItemSoldToShop = 0x2035,
-			// Wallet update: [u64 balanceTin][u32 reason] (reason 3 = gain, 0 = spend/sync, 2 seen once).
-			// Decoded from the sell/loot captures: values grow +2 per beach coin loot, jump on quest rewards,
-			// DECREASE on a purchase with reason 0, and persist across sessions. The same opcode value carries
-			// the TradepostInterface search results (different class/size); the money body is always 12 bytes.
-			UpdateCash = 0x2005,
-			Pong = 0x2009,
-			ReportDimensionId = 0x200b,
-			ReportServerId = 0x200c,
-			AckAuthenticate = 0x2001,
-			ReadyForPlayScreen = 0x2024,
-			SpawnCheck = 0x2008,
-			LatencyCheckResponse = 0x2082,
-			// GameCharInterface.DispatchRemoveItem (recovered name, exact): the live "an item left your inventory"
-			// counterpart to DispatchAddItem. Body = [container ID32][u32 itemPos][u32 amountToRemove]; decoded +
-			// golden-tested (DispatchRemoveItemTests). Lets an item be pulled from a connected bag mid-session.
-			RemoveItem = 0x201F,
-			// GameCharInterface.DispatchAddItem (recovered name, exact): the incremental "an item appeared in your
-			// inventory" delivery - the live counterpart to the world-entry snapshot. Body decoded + golden-tested
-			// (DispatchAddItemTests); the keystone for live loot/buy/quest-reward/mail item grants.
-			AddItem = 0x2020,
-
-			// The IIR carrier: the generic 0x2000 wrapper whose real method is a sub-opcode in the body (GameAgent.
-			// PassBlob c2s). Almost every world/create/login s2c record is sent under this opcode.
-			IirCarrier = 0x2000,
-			// The world-address handoff advert ([0x00][byteLen][host:port]) on the create enter-world + teleport
-			// paths; the client reconnects to the advertised GameServer. Same value as UpdateBindLocation (overloaded).
-			WorldHandoff = 0x2002,
-			// Recovered s2c method opcodes sent verbatim by the create/world bursts (per-class dispatch names from
-			// docs/aoc-rpc-method-opcodes.md; the conversation class disambiguates the overloaded value).
-			SetItemStat = 0x201C, // GameCharInterface.DispatchSetItemStat (the 0x201c spawn/world handshake record)
-			SetDialogueCamera = 0x2015, // GameCharInterface.DispatchSetDialogueCamera (NPC dialogue framing)
-			AddSpecialAbility = 0x2052, // GameCharInterface.DispatchAddSpecialAbility (the ability grant)
-			ReceivedStockPhraseText = 0x205D, // GameCharInterface.DispatchReceivedStockPhraseText
-			ShortcutBarReply = 0x2076, // GameCharInterface.DispatchShortcutBarReply
-			GuildRankingsUpdate = 0x2038, // CSPlayerInterface.DispatchGuildRankingsUpdate (guild list)
-			MassivePvpInfoRequestReturn = 0x20A5, // CSPlayerInterface.DispatchMassivePvpInfoRequestReturn
-			GameInterfaceNoArg2004 = 0x2004 // GameInterface no-arg dispatch (method index 4); no recovered name
-		}
+		// The behavior-nickname GameServerRespondOpcodes enum was RETIRED (2026-06-16): every s2c send now uses the
+		// recovered per-class dispatch enum below (values are byte-identical, so the wire is unchanged and the
+		// capture-replay golden tests hold). The nickname -> recovered-name map, for reference:
+		//   IirCarrier 0x2000        -> GameInterfaceDispatchOpcodes.DispatchPassBlob (the generic IIR carrier; the
+		//                               real method is a sub-opcode in the body)
+		//   WorldHandoff 0x2002      -> GameInterfaceDispatchOpcodes.DispatchRedirectToServer (enter-world/teleport advert)
+		//   UpdateBindLocation 0x2002-> GameCharInterfaceDispatchOpcodes.DispatchUpdateBindLocation
+		//   AckAuthenticate 0x2001   -> GameInterfaceDispatchOpcodes.DispatchAckAuthenticate
+		//   GameInterfaceNoArg2004   -> GameInterfaceDispatchOpcodes.Reserved0x2004 (no recovered name)
+		//   UpdateCash 0x2005        -> GameCharInterfaceDispatchOpcodes.DispatchUpdateCash
+		//   SpawnCheck 0x2008        -> GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker (per-char)
+		//   Pong 0x2009              -> GameInterfaceDispatchOpcodes.DispatchGameServerStats (the stats keepalive)
+		//   ReportDimensionId 0x200b -> GameInterfaceDispatchOpcodes.DispatchReportDimesionID
+		//   ReportServerId 0x200c    -> GameInterfaceDispatchOpcodes.DispatchReportServerID
+		//   SetDialogueCamera 0x2015 -> GameCharInterfaceDispatchOpcodes.DispatchSetDialogueCamera
+		//   SetItemStat 0x201C       -> GameCharInterfaceDispatchOpcodes.DispatchSetItemStat
+		//   RemoveItem 0x201F        -> GameCharInterfaceDispatchOpcodes.DispatchRemoveItem
+		//   AddItem 0x2020           -> GameCharInterfaceDispatchOpcodes.DispatchAddItem
+		//   ReadyForPlayScreen 0x2024-> GameCharInterfaceDispatchOpcodes.DispatchValidResurrectionSpots
+		//   ShopData 0x2033          -> GameCharInterfaceDispatchOpcodes.DispatchShopData
+		//   ItemSoldToShop 0x2035    -> GameCharInterfaceDispatchOpcodes.DispatchItemSoldToShop
+		//   GuildRankingsUpdate 0x2038 -> CSPlayerInterfaceDispatchOpcodes.DispatchGuildRankingsUpdate
+		//   AddSpecialAbility 0x2052 -> GameCharInterfaceDispatchOpcodes.DispatchAddSpecialAbility
+		//   ReceivedStockPhraseText 0x205D -> GameCharInterfaceDispatchOpcodes.DispatchReceivedStockPhraseText
+		//   ShortcutBarReply 0x2076  -> GameCharInterfaceDispatchOpcodes.DispatchShortcutBarReply
+		//   LatencyCheckResponse 0x2082 -> GameCharInterfaceDispatchOpcodes.DispatchPong (the per-char pong)
+		//   MassivePvpInfoRequestReturn 0x20A5 -> CSPlayerInterfaceDispatchOpcodes.DispatchMassivePvpInfoRequestReturn
 
 		// --- Full client->server method catalogs for the GameServer connection's RPC classes, generated from
 		// --- docs/aoc-client-rpc-methods.json (opcode = 0x2000 + table position). Most are not handled yet;

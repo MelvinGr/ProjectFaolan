@@ -34,7 +34,7 @@ namespace Faolan.GameServer
 			var charId = client.Session.Character.Id;
 
 			var ps = new PacketStream();
-			ps.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameServerRespondOpcodes.RemoveItem);
+			ps.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchRemoveItem);
 			WriteRemoveItemBody(ps, containerType, charId, itemPos, amountToRemove);
 			await ps.SendAsync(client);
 		}
