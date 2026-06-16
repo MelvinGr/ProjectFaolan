@@ -61,6 +61,26 @@ REMAINING to author multi-quest (the gating work, decode-first):
    sub-lists + the 2-quest objective region from `xxx-login` (manual byte walk / dynamic Ghidra trace), then fix
    `QuestcRegion`/`QuestObjectiveRegion` to round-trip the `xxx-login` tails byte-exact - the prerequisite to
    generating multiple quests.
+
+   **2-quest layout fully mapped from the bytes (2026-06-16, `xxx-login` snapshot body offsets):**
+   ```
+   @456  version 0x18
+   @460  List A count 0xBD3 (= 0x3F1*3 -> records = 2)
+   @464  10238 Quest_c record   (601 B, obj-lists EMPTY - byte-identical to the beach record)
+   @1065 10238 objective region (0xBD3 chapterTag, 559 B - the beach "@609" block, 2 goals)
+   @1624 13479 block            (879 B, QuestFullUpdate-content shape - objectives INLINE, NO 0xBD3)
+   @2503 index (0x3F1 tag, marker 0xBD3, ids [27FE,34A7] count 2, W6QT table @2527)
+   ```
+   So `QuestcRegion.Parse` (loops `records=2`, reading `QuestcRecord` back-to-back) reads record 1 (10238, to
+   @1065) then tries record 2 AT @1065 - the 10238 OBJECTIVE region (0xBD3), whose `[1][9]` reads as ver=1/questId=9
+   -> the `listKey 3027(0xBD3) != questId 9` throw. KEY: the objective region is INTERLEAVED between the two
+   Quest_c records, and the two quests are structurally DIFFERENT (10238 = split record + separate 0xBD3 objregion
+   like the beach; 13479 = a single inline 879 B block). This is the exact ambiguity flagged above: whether the
+   client's List A reads 2 records with List B/C/MainQuest consuming 10238's objregion, or List A interleaves
+   record+objregion per quest. Disambiguating needs a **dynamic Ghidra trace** of `FUN_0091f5c0` (List A) +
+   `FUN_00798c70`/`FUN_004d4c70`/`FUN_00922210` (Lists B/C/MainQuest) on the 2-quest tails to see which reader
+   consumes @1065..1624. Then model the quest region as the real per-quest (record [+ objregion]) sequence in
+   `SnapshotTails`/`QuestcRegion` and regenerate from `CharacterQuests`.
 2. **Harvest 13479's snapshot scalars + goals** (`SnapshotN`/`FieldEc`/`FieldF0`/`FieldF8`, per-goal markers,
    `GoalSteps`, trailer word) into `QuestDefinition`/`QuestGoalDefinition` (seeded only for 10238 today).
 3. **Extend `BeachTailsBuilder.BuildBeachQuestPortion` → `BuildQuestPortion(IReadOnlyList<(def,state)>)`** — emit N
