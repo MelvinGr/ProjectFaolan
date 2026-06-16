@@ -48,11 +48,12 @@ namespace Faolan.GameServer
 		// PlayfieldFIIR (0x5D85BFC7, "MapChange"): announces the playfield the client is entering - its reference
 		// position (a Vec3, raw-body big-endian floats), the map id, the entering character instance, and the live
 		// per-session playfield token (carried TWICE). 103 bytes; framing decoded from the create captures
-		// (docs/create-editor-bursts.md). `count` (3/6), `nearClip`=15.0 + `farClip` (~12-14), and the trailing
-		// `flags` are not yet semantically pinned, so they're passed through. Constructing this drives the map change
-		// from the Map row + the session token instead of replaying the captured MapChange.
+		// (docs/create-editor-bursts.md). `count` (3/6), `nearClip`=15.0 + `farClip` (~12-14), the trailing `flags`
+		// and `field58` (a u32 at [58:62] - 0 in some captures, 0x01000000 in others) are not yet semantically
+		// pinned, so they're passed through. Constructing this drives the map change from the Map row + the session
+		// token instead of replaying the captured MapChange.
 		public static byte[] BuildPlayfieldFiir(float posX, float posY, float posZ, uint mapId, uint charInstance,
-			uint count, uint playfieldToken, float nearClip, float farClip, uint flags)
+			uint count, uint playfieldToken, float nearClip, float farClip, uint flags, uint field58 = 0u)
 		{
 			return new FaolanStream()
 				.WriteUInt32(0u).WriteUInt32(0u).WriteByte((byte)0x00) // [0:9] prefix
@@ -66,7 +67,7 @@ namespace Faolan.GameServer
 				.WriteUInt32(count)
 				.WriteUInt32(0x00009C50u) // 0x9C50 = 40016 (distinct from EntityClass.Character 0xC350; semantics TBD)
 				.WriteUInt32(playfieldToken)
-				.WriteUInt32(0u).WriteUInt32(0u) // [54:62] zeros
+				.WriteUInt32(0u).WriteUInt32(field58) // [54:62]: a zero u32 then the un-pinned field58
 				.WriteByte((byte)0x18)
 				.WriteUInt32(0x00000001u)
 				.WriteUInt32(playfieldToken) // token again

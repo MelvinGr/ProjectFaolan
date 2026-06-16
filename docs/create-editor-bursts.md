@@ -100,6 +100,13 @@ create-specific to decode, only builder wiring to do:
    byte-for-byte** and that the **full DB-driven burst equals `InitialBurst.bin`**. The 18th (localized
    `3072626`, handle `0x0002A7FE`) has no DB row — it shares an exact position with `347659` and the importer's
    position-keyed `WorldObject` dedup dropped it (Gitea #222) — so it stays the one verbatim scene record.
-3. Decode `PlayfieldFIIR`/`GameTimeIIR` bodies fully (small, low risk) and build them.
-4. The verbatim `RetailCreateEditorInitialBurst`/`CreationScriptBurst`/etc. stay as the interim until each
-   record type above is constructed and proven byte-exact, per the project's decode-then-golden discipline.
+3. ~~Decode + build `PlayfieldFIIR`/`GameTimeIIR`~~ **DONE & WIRED** — both are now constructed in the burst
+   via `CreateEditorRecordBuilder.BuildPlayfieldFiir`/`BuildGameTimeIir`. MapChange is built from the editor
+   map id + the session playfield token (carried twice); SetDayTime from the captured day-time/timestamp/rate.
+   Wiring `InitialBurst.bin` surfaced an un-pinned u32 at PlayfieldFIIR `[58:62]` (0 in the test capture,
+   `0x01000000` here) — added as the `field58` pass-through param. Locked by `BurstGoldenTests`.
+4. **Remaining** — the verbatim records still in `RetailCreateEditorInitialBurst` (the 5 other scene
+   `SimpleChar` props: Saddur / Male+Female Template / Stygian Slaver / the live `Character…` preview) and the
+   other create bursts (`CreationScriptBurst`, `WorldPrepBurst`, `RetailCreateWorldEntryBurst`,
+   `RetailNpcConversationBurst`) stay as the interim until each is constructed and proven byte-exact, per the
+   project's decode-then-golden discipline.
