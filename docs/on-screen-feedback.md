@@ -25,6 +25,16 @@ Plain tokens (no `showfifomessagefromserver` wrapper) render the smaller feedbac
 `Increased` (stat up), `LostGraceEffect` / `AttackedByNPCLostGraceEffect` (buff worn off),
 `CantCrouchInThisPlayfield`, `FeatUntrainNotEnoughMoney`, `NotCancelable`, ...
 
+**The `AttributeChanged`/`Increased` line is the level-up feedback** (#209): there is **no** "You reached level N"
+banner in any capture — when a character dings (or a quest awards attribute points) retail sends one
+`AttributeChanged` message **per primary attribute that rose** (the 5 category-615 ids 804/806/808/810/814), then
+a `0x96B8DC59` vitals push with the new maxima. Built by `AttributeChangedFeedback` (`Faolan.Core`, reuses
+`FormatFeedbackCodec`), decoded in `Captures/decode_levelup_feedback.py`, byte-exact in
+`AttributeChangedFeedbackTests`. typeFlags = `0x40000006`, footer = `0` (invariant across all 33 captured
+messages). The three `key="..."` are per-burst nonces the client does not validate (reuse is in-client proven).
+Wired into both ding paths: GM `.level` and the XP-driven `CombatService.PushLevelUp`. The growth amounts are
+provisional (`Combat.AttributeGrowth`) pending real per-class tables.
+
 This is the same `FormatFeedback` retail sends as the (textual) reply to `CancelBuff` — it is the general
 "show feedback text" channel, distinct from the AgentServer chat/system-message path.
 
@@ -54,6 +64,8 @@ from the session** — not just a verbatim replay.
   command, which replays the proven `GenericDisplayAreaName` banner addressed to the live session. **IN-CLIENT
   VERIFIED 2026-06-14**: `.feedback` on a live session (Darktemplarchar) popped the "Castle approach" banner at the
   top of the screen, separate from chat.
+- ✅ **`AttributeChanged` level-up feedback** (#209): byte-exact builder `AttributeChangedFeedback` + golden test +
+  decode script, wired into the GM `.level` and combat ding paths. Awaits in-client verification (`needs-testing`).
 - ⬜ **Arbitrary literal text**: the FIFO templates reference a localized RDB string id (the area-name points at
   string 3474586), so showing custom text needs either a literal-text FIFO template or injecting an RDB string id.
   The plain-token lines (`AttributeChanged`, ...) are also token-driven. A literal-text path is the remaining

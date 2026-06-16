@@ -107,6 +107,30 @@ interpolation (a small teleport/snap) and a **walk** gait. Findings from the Mov
 
 Separately, NPC swings render **empty-handed** (no weapon drawn) - a combat-stance / weapon-draw gap, #218.
 
+## Level-up feedback (#209)
+On a ding (XP-driven or the GM `.level` set) retail sends, in order: a burst of **`AttributeChanged`/`Increased`**
+on-screen feedback lines — **one per primary attribute that rose** (the 5 category-615 ids 804/806/808/810/814) —
+then a `0x96B8DC59` vitals push with the new Health/Stamina/Mana maxima. There is **no** "You reached level N"
+banner in any capture, and the Level number is never pushed as a standalone `0x36` stat (the client tracks it from
+the snapshot/quest stream). The attribute lines are `FormatFeedbackIIR` payloads — see `docs/on-screen-feedback.md`
+and `AttributeChangedFeedback` (decode `Captures/decode_levelup_feedback.py`, golden `AttributeChangedFeedbackTests`).
+Wired into both paths: GM `.level` (`SetLevelCommand`) and `CombatService.PushLevelUp`. Which attributes rise / by
+how much is provisional (`Combat.AttributeGrowth`, flat +1/primary) — no per-class growth tables exist in captures.
+
+## Live spell / ability grants (#73)
+Two distinct mid-session grant packets, both on the GameCharInterface conversation (same class pair), each
+byte-exact:
+- **`0x2052 DispatchAddSpecialAbility`** — grants a catalog **ability** (the melee/utility kit). Body = the 81-byte
+  ability struct. `SendAbilityGrant`/`BuildAbilityGrantBody`, used by login `GrantStartingAbilities`. GM:
+  `.grantability <id>` (catalog via `.abilitylist`).
+- **`0x200A DispatchLearnSpell`** — grants a real **spell**. Body = a bare big-endian `u32` spell id (`i_nSpellID`),
+  invariant across all 68 captured packets. `SendLearnSpell`/`BuildLearnSpellBody` (decode
+  `Captures/decode_learn_spell.py`, golden `LearnSpellTests`). GM: `.learnspell <id>`.
+
+The sibling ops the RE listed — `DispatchForgetSpell 0x200B`, `RemoveSpecialAbility 0x2053`, `UntrainSingleFeat
+0x2011`, `PassiveAbilityEquip/Unequip` — have **zero** packets on this class in any capture, so no byte-exact
+oracle; deferred under #73.
+
 ## Known gaps (TODO.md §Combat)
 - HP/stamina auto-regen not implemented. NPC death animation: corpse now lingers then becomes a loot bag
   (above, #204); a decoded death-state IIR is still open.
