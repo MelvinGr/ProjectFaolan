@@ -26,6 +26,10 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// Null when the tails carry no such region (no chapterTag at the boundary) - then it stays in UnknownBefore.
 		public QuestObjectiveRegion? QuestObjectives { get; init; }
 
+		// The quest INDEX region (the [0x3F1] index + the "W6QT" goal-id table) between the @609 objective region and
+		// the access-window table; modeled by QuestIndexRegion. Null when not present (then it rides UnknownBefore).
+		public QuestIndexRegion? QuestIndex { get; init; }
+
 		public byte[] UnknownAfterAccessWindowTable { get; init; }
 
 		// Everything between the @609 objective region and the access-window table (the quest INDEX + any tail);
@@ -58,6 +62,9 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			if (QuestObjectives is not null)
 				writer.WriteArray(QuestObjectives.ToArray());
 
+			if (QuestIndex is not null)
+				writer.WriteArray(QuestIndex.ToArray());
+
 			writer.WriteArray(UnknownBeforeAccessWindowTable);
 
 			foreach (var entry in AccessWindowEntries)
@@ -88,12 +95,14 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 			if (accessWindowNameOffset < 0)
 			{
-				var unknownBeforeAccessWindowTable = data[afterObjectives..];
+				var questIndexNoAw = TryParseQuestIndex(data, afterObjectives, data.Length, out var afterIndexNoAw);
+				var unknownBeforeAccessWindowTable = data[afterIndexNoAw..];
 
 				return new SnapshotTails
 				{
 					Quests = quests,
 					QuestObjectives = questObjectives,
+					QuestIndex = questIndexNoAw,
 					KnownHeaderLength = knownHeaderLength,
 					UnknownBeforeAccessWindowTable = unknownBeforeAccessWindowTable,
 					AccessWindowEntries = [],
@@ -115,7 +124,10 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			if (accessWindowTableStart < afterObjectives)
 				accessWindowTableStart = afterObjectives;
 
-			var unknownBeforeAccessWindowTable0 = data[afterObjectives..accessWindowTableStart];
+			// The quest index sits between the @609 region and the access-window table; model it typed (its trailer
+			// runs to the table start). On anything unexpected it stays in the opaque UnknownBefore blob.
+			var questIndex = TryParseQuestIndex(data, afterObjectives, accessWindowTableStart, out var afterIndex);
+			var unknownBeforeAccessWindowTable0 = data[afterIndex..accessWindowTableStart];
 
 			using var accessReader = new FaolanStream(data, false) { Position = checked((uint)accessWindowTableStart) };
 
@@ -131,6 +143,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			{
 				Quests = quests,
 				QuestObjectives = questObjectives,
+				QuestIndex = questIndex,
 				KnownHeaderLength = knownHeaderLength,
 				UnknownBeforeAccessWindowTable = unknownBeforeAccessWindowTable0,
 				AccessWindowEntries = accessWindowEntries,
@@ -158,6 +171,29 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			catch (Exception)
 			{
 				afterObjectives = boundary;
+				return null;
+			}
+		}
+
+		// Parses the quest index region when the boundary opens with the 0x3F1 index tag; its trailer runs to
+		// `endOffset` (the access-window table start). Returns null (and leaves `afterIndex == offset`) for tails
+		// without it or that fail to parse cleanly, so an unrecognised shape stays in the opaque blob.
+		private static QuestIndexRegion? TryParseQuestIndex(byte[] data, int offset, int endOffset, out int afterIndex)
+		{
+			afterIndex = offset;
+			if (offset + 4 > data.Length || endOffset < offset
+				|| BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(offset, 4)) != QuestIndexRegion.IndexTag)
+				return null;
+
+			try
+			{
+				var region = QuestIndexRegion.Parse(data, offset, endOffset);
+				afterIndex = endOffset; // the region consumes to the boundary (its trailer is the remainder)
+				return region;
+			}
+			catch (Exception)
+			{
+				afterIndex = offset;
 				return null;
 			}
 		}
