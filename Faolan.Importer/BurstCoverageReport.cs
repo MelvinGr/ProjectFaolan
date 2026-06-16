@@ -44,9 +44,12 @@ namespace Faolan.Importer
 			var npcsByMap = (await db.NpcSpawns.ToListAsync())
 				.GroupBy(n => n.MapId)
 				.ToDictionary(g => g.Key, g => Index(g, n => (n.PositionX, n.PositionY, n.PositionZ)));
+			// World objects are keyed by (position, identity): two props can share an exact position (#222), so the
+			// identity (display_name, read from the row's own Data) disambiguates them - matching what the importer
+			// dedup and the live world-entry replay do.
 			var objectsByMap = (await db.WorldObjects.ToListAsync())
 				.GroupBy(o => o.MapId)
-				.ToDictionary(g => g.Key, g => Index(g, o => (o.PositionX, o.PositionY, o.PositionZ)));
+				.ToDictionary(g => g.Key, g => IndexObjects(g));
 
 			Console.WriteLine();
 			Console.WriteLine("Burst reconstruction coverage (construct-don't-replay gate)");
@@ -62,7 +65,7 @@ namespace Faolan.Importer
 				npcsByMap.TryGetValue(burst.MapId, out var npcs);
 				objectsByMap.TryGetValue(burst.MapId, out var objects);
 				npcs ??= new Dictionary<(int, int, int), NpcSpawn>();
-				objects ??= new Dictionary<(int, int, int), WorldObject>();
+				objects ??= new Dictionary<(int, int, int, string), WorldObject>();
 
 				var built = 0;
 				var residual = new SortedDictionary<string, int>(StringComparer.Ordinal);
@@ -119,10 +122,23 @@ namespace Faolan.Importer
 			return map;
 		}
 
+		// As Index, but keys world objects by (position, identity) so two props at one position both keep a slot (#222).
+		private static Dictionary<(int, int, int, string), WorldObject> IndexObjects(IEnumerable<WorldObject> rows)
+		{
+			var map = new Dictionary<(int, int, int, string), WorldObject>();
+			foreach (var row in rows)
+			{
+				var (x, y, z) = PositionKey(row.PositionX, row.PositionY, row.PositionZ);
+				map.TryAdd((x, y, z, WorldObjectBuilder.ReadIdentity(row)), row);
+			}
+
+			return map;
+		}
+
 		// True if this record is already reproducible without the burst: a server-generated global/player record, or a
 		// world entity whose table row (matched by spawn position) rebuilds byte-identical via the same builder the
 		// replay uses. Otherwise it is still burst-only; `residualFamily` names why so the report can tally it.
-		private static bool IsConstructable(MapWorldBurstEntity e, uint playerInstance, IReadOnlyDictionary<(int, int, int), NpcSpawn> npcs, IReadOnlyDictionary<(int, int, int), WorldObject> objects, out string residualFamily)
+		private static bool IsConstructable(MapWorldBurstEntity e, uint playerInstance, IReadOnlyDictionary<(int, int, int), NpcSpawn> npcs, IReadOnlyDictionary<(int, int, int, string), WorldObject> objects, out string residualFamily)
 		{
 			residualFamily = null;
 
@@ -171,7 +187,8 @@ namespace Faolan.Importer
 						return false;
 					}
 
-					if (!objects.TryGetValue(objKey, out var objRow))
+					var (ox, oy, oz) = objKey;
+					if (!objects.TryGetValue((ox, oy, oz, WorldObjectBuilder.ReadIdentity(objBodyArr)), out var objRow))
 					{
 						residualFamily = "world object (no WorldObjects row)";
 						return false;

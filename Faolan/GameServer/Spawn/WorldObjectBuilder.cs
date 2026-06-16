@@ -92,6 +92,34 @@ namespace Faolan.GameServer.Spawn
 			return true;
 		}
 
+		// Identity discriminator for deduping/matching world objects: the SimpleDynel `display_name` (a stable
+		// localized id), or "" for object classes that carry no such id. Two distinct props can sit at the EXACT
+		// same coordinates (e.g. the map-4000 editor scene has localized 347659 and 3072626 at one spot, #222), so
+		// position alone is not a unique key - the dedup and the burst/world-entry matching both key by (position,
+		// identity). Reads from a carrier body ([u32 len][u32 subOpcode][record]); the record's identity message is
+		// the same ProtoSimpleDynelIIR the lift codec parses. "" when the class has no display_name or the body is
+		// malformed (such objects don't collide, so position alone keeps disambiguating them).
+		public static string ReadIdentity(ReadOnlySpan<byte> carrierBody)
+		{
+			if (carrierBody.Length <= 8)
+				return string.Empty;
+
+			var subOpcode = BinaryPrimitives.ReadUInt32BigEndian(carrierBody.Slice(4, 4));
+			return subOpcode == SimpleDynelMessageCodec.SubOpcode && SimpleDynelMessageCodec.TryParse(carrierBody.Slice(8), out var message, out _, out _)
+				? message.DisplayName ?? string.Empty
+				: string.Empty;
+		}
+
+		// As ReadIdentity(body), reading the identity from a stored row's OWN captured Data. Used to key the table
+		// rows the same way the burst bodies are keyed, so the two sides always agree regardless of lift status.
+		public static string ReadIdentity(WorldObject row)
+		{
+			var body = ExtractBody(row?.Data);
+			return body == null
+				? string.Empty
+				: ReadIdentity(body);
+		}
+
 		// The captured `Data` is the full Conan packet ([u32 len][u32 crc][u32 headerLen][header][body]); the
 		// object body starts after the 12-byte prefix + the header. Returns null if the framing is malformed.
 		// Public so the importer can lift the dynel identity columns from the same body the builder consumes.

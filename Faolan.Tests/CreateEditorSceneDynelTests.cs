@@ -29,11 +29,6 @@ namespace Faolan.Tests
 		// token in (the rows' stored token differs); everything else reconstructs byte-exact.
 		private const uint CreateSessionPlayfield = 0x00502276;
 
-		// The one burst prop with no DB row: localized 3072626 shares an exact position with localized 347659, and
-		// the importer's position-keyed WorldObject dedup dropped it. Documented exception until the importer keys
-		// objects by identity (tracked separately); it stays a verbatim record when the rest are DB-driven.
-		private const uint MissingObjectHandle = 0x0002A7FE;
-
 		[Fact]
 		public void EveryBurstDynel_RebuildsFromDbRow_ByteExact()
 		{
@@ -42,16 +37,12 @@ namespace Faolan.Tests
 			Assert.Equal(18, records.Count);
 
 			var rebuilt = 0;
-			var missing = 0;
 			foreach (var (handle, body) in records)
 			{
 				var identity = ExtractDisplayName(body);
-				if (!rowsByIdentity.TryGetValue(identity, out var row))
-				{
-					Assert.Equal(MissingObjectHandle, handle); // the only record allowed to lack a DB row
-					missing++;
-					continue;
-				}
+				// Every prop now has a DB row: the importer keys WorldObjects by (position, identity), so localized
+				// 3072626 and 347659 - which share an exact spot - both survive the dedup (#222).
+				Assert.True(rowsByIdentity.TryGetValue(identity, out var row), $"no DB row for handle 0x{handle:X8} (identity '{identity}')");
 
 				Assert.True(WorldObjectBuilder.TryBuild(row, handle, CreateSessionPlayfield, out var built), $"build failed for handle 0x{handle:X8}");
 				// WorldObjectBuilder returns the full carrier payload [u32 len][u32 subOpcode][record]; the burst's
@@ -60,14 +51,13 @@ namespace Faolan.Tests
 				rebuilt++;
 			}
 
-			Assert.Equal(17, rebuilt);
-			Assert.Equal(1, missing);
+			Assert.Equal(18, rebuilt);
 		}
 
 		// End-to-end: running the actual initial burst WITH a DB (the committed faolan.db) emits exactly the golden
 		// bytes - i.e. the live BuildSceneDynel substitution (identity match -> DB build -> byte-identical gate)
-		// reproduces InitialBurst.bin, with the lone DB-less prop (3072626) falling back to verbatim. This locks the
-		// wired DB-sourced path, not just WorldObjectBuilder in isolation.
+		// reproduces InitialBurst.bin. Every prop is now DB-sourced (#222), so this locks the wired DB path, not just
+		// WorldObjectBuilder in isolation.
 		[Fact]
 		public async Task InitialBurst_WithDb_IsByteIdenticalToGolden()
 		{

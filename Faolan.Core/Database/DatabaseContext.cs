@@ -301,7 +301,10 @@ namespace Faolan.Core.Database
 				})
 				.IsUnique();
 
-			// A captured world object is deduped by its (map, spawn point), like the NPC spawns.
+			// A captured world object is deduped by its (map, spawn point, identity): two distinct props can occupy the
+			// EXACT same coordinates (#222), so the display_name identity is part of the key - position alone would
+			// reject the second prop. (Identity-less classes have a null DisplayName; SQLite treats NULLs as distinct,
+			// so they fall back to position-only dedup, which the importer's in-memory Merge already enforces.)
 			modelBuilder
 				.Entity<WorldObject>()
 				.HasIndex(o => new
@@ -309,7 +312,8 @@ namespace Faolan.Core.Database
 					o.MapId,
 					o.PositionX,
 					o.PositionY,
-					o.PositionZ
+					o.PositionZ,
+					o.DisplayName
 				})
 				.IsUnique();
 

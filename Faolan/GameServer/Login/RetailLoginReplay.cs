@@ -522,9 +522,14 @@ namespace Faolan.GameServer
 			// keyed by position, rebuilt via WorldObjectBuilder with the burst's handle, put on the wire only when
 			// byte-identical to the re-addressed burst body (zero render risk).
 			var worldObjectRows = await Database.GetWorldObjects(burst.MapId);
-			var objectByPosition = new Dictionary<(int, int, int), WorldObject>();
+			// Keyed by (position, identity): two props can share an exact position (#222), so the display_name identity
+			// (read from the row's own Data) disambiguates them - position alone would drop one and mis-match the other.
+			var objectByPosition = new Dictionary<(int, int, int, string), WorldObject>();
 			foreach (var o in worldObjectRows)
-				objectByPosition.TryAdd(PositionKey(o.PositionX, o.PositionY, o.PositionZ), o);
+			{
+				var (ox, oy, oz) = PositionKey(o.PositionX, o.PositionY, o.PositionZ);
+				objectByPosition.TryAdd((ox, oy, oz, WorldObjectBuilder.ReadIdentity(o)), o);
+			}
 			var objectBuilt = 0;
 			var objectIdentical = 0;
 
@@ -925,7 +930,7 @@ namespace Faolan.GameServer
 
 		// As TryRebuildNpcSpawnFromDb, for the static world objects (66AEDD50/F096251E/33A56FB0). Matched by
 		// position, rebuilt with the burst's handle via WorldObjectBuilder; `wasIdentical` is the safety signal.
-		private bool TryRebuildWorldObjectFromDb(IReadOnlyDictionary<(int, int, int), WorldObject> objectByPosition, byte[] packet, out byte[] rebuilt, out bool wasIdentical)
+		private bool TryRebuildWorldObjectFromDb(IReadOnlyDictionary<(int, int, int, string), WorldObject> objectByPosition, byte[] packet, out byte[] rebuilt, out bool wasIdentical)
 		{
 			rebuilt = null;
 			wasIdentical = false;
@@ -942,8 +947,9 @@ namespace Faolan.GameServer
 			if (subOpcode is not (0x66AEDD50u or 0xF096251Eu or 0x33A56FB0u or 0x6BD56736u or 0x1FD6412Bu))
 				return false; // decor/container/zone + destructible (6BD56736) + climbing dynel (1FD6412B)
 
-			var key = PositionKey(BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosXOffset, 4)), BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosYOffset, 4)),
+			var (px, py, pz) = PositionKey(BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosXOffset, 4)), BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosYOffset, 4)),
 				BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosZOffset, 4)));
+			var key = (px, py, pz, WorldObjectBuilder.ReadIdentity(body));
 			// Splice the DB object identity onto the LIVE placement (handle/transform/playfield from the burst body),
 			// so the per-session playfield + handle stay correct and only the object definition comes from the table.
 			if (!objectByPosition.TryGetValue(key, out var row) || !WorldObjectBuilder.TryBuildOntoLivePlacement(row, body, out var newBody))

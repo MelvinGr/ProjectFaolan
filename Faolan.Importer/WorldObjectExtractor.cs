@@ -15,6 +15,9 @@ namespace Faolan.Importer
 		public float RotZ { get; init; }
 		public string Name { get; init; } = string.Empty;
 		public uint ObjectId { get; init; }
+
+		// The display_name identity (localized id) that disambiguates two props sharing an exact position (#222).
+		public string DisplayName { get; init; } = string.Empty;
 	}
 
 	// Extracts the static world objects per map from a capture: tracks the current map (MapChange 5D85BFC7), then
@@ -66,19 +69,21 @@ namespace Faolan.Importer
 					RotZ = ReadLE(body, SpawnPacketBuilder.RotZOffset),
 					RotW = ReadLE(body, SpawnPacketBuilder.RotWOffset),
 					ObjectId = objectId,
-					Name = name
+					Name = name,
+					DisplayName = WorldObjectBuilder.ReadIdentity(body)
 				});
 			}
 
 			return entries;
 		}
 
-		// Dedup by (map, spawn point); keep the first seen.
+		// Dedup by (map, spawn point, identity); keep the first seen. Identity (the display_name) is part of the key
+		// because two distinct props can occupy the EXACT same coordinates (#222) - position alone would drop one.
 		public static List<WorldObjectEntry> Merge(IEnumerable<WorldObjectEntry> all)
 		{
-			var seen = new Dictionary<(uint, float, float, float), WorldObjectEntry>();
+			var seen = new Dictionary<(uint, float, float, float, string), WorldObjectEntry>();
 			foreach (var e in all)
-				seen.TryAdd((e.MapId, e.X, e.Y, e.Z), e);
+				seen.TryAdd((e.MapId, e.X, e.Y, e.Z, e.DisplayName), e);
 
 			return seen.Values.ToList();
 		}

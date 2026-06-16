@@ -278,7 +278,11 @@ namespace Faolan.Importer
 		{
 			foreach (var e in objects)
 			{
-				var existing = await db.WorldObjects.FirstOrDefaultAsync(o => o.MapId == e.MapId && o.PositionX == e.X && o.PositionY == e.Y && o.PositionZ == e.Z);
+				// Match by (position, identity): two props can share an exact position (#222), so disambiguate the
+				// existing row by its display_name identity (read from its own stored Data, the same way the entry's
+				// DisplayName was read) - position alone would update the wrong row and still drop one of the pair.
+				var candidates = await db.WorldObjects.Where(o => o.MapId == e.MapId && o.PositionX == e.X && o.PositionY == e.Y && o.PositionZ == e.Z).ToListAsync();
+				var existing = candidates.FirstOrDefault(o => WorldObjectBuilder.ReadIdentity(o) == e.DisplayName);
 				if (existing == null)
 					db.WorldObjects.Add(PopulateObject(new WorldObject
 					{
