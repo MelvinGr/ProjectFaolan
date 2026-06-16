@@ -7,6 +7,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.GameServer.Dialogue;
 using Faolan.GameServer.Packets.Protobuf;
 using Microsoft.Extensions.Logging;
 
@@ -222,6 +223,15 @@ namespace Faolan.GameServer
 					break;
 				}
 
+				case GameServer0X2000Opcodes.KnubotCloseChatWindow:
+					// The player closed the NPC chat window (ESC/X). The client signals this with its OWN
+					// KnubotCloseChatWindow (the client double-sends it); retail just accepts it. We must tear down the
+					// conversation session state so the dialogue stays closed - leaving it set let the next interaction
+					// re-enter a stale conversation, and the unknown-opcode default path also spammed a system message
+					// on every close (#217). No reply: the window is already closed on the client.
+					ConversationService.EndConversation(client);
+					break;
+
 				case GameServer0X2000Opcodes.Interact:
 				{
 					// Important capture observation:
@@ -361,6 +371,14 @@ namespace Faolan.GameServer
 								// Real branching dialogue: replay the captured conversation node for whichever NPC/node
 								// the client asked for, re-addressed to the clicked NPC.
 								if (await _conversation.TryReplayConversation(client, (uint)args.TypeId, (uint)args.Field3, npcHandle))
+									break;
+
+								// Only a GREETING click (Field3 == 0) may OPEN a dialogue. The client fires a second
+								// TalkToNpc with Field3 != 0 the same instant it opens one (retail answers it with a bare
+								// ack); if that duplicate isn't absorbed above (no active conversation - e.g. right after a
+								// close) it must NOT re-open the intro/greeting, or the dialogue "triggers a second time"
+								// (#217). A non-greeting click with nothing to absorb is a no-op.
+								if (args.Field3 != 0)
 									break;
 
 								// Last-resort fallback ONLY when the DB has no node for this NPC: the single hardcoded

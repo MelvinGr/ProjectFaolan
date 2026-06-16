@@ -501,6 +501,7 @@ namespace Faolan.Core.Network.Packets
 			StatIIR = 0xf98e10b3, // = StatIIR_t
 			SelectDeselect = 0x0D155695, // = LookAtIIR_t
 			KnubotAnswer = 0x4D7D9123, // = KnubotAnswerIIR_c: the player picked a dialogue option (NPC chat); advances the conversation one stage
+			KnubotCloseChatWindow = 0xC4AF39EB, // = KnubotCloseChatWindowIIR_c: the player closed the NPC chat window (ESC/X). The client double-sends it; the server just tears down its conversation state (#217). Same IIR type the server sends to close the window s2c.
 			DropItem = 0x72491DE9, // = DeleteItemIIR_t: client-side inventory action; no matching bag-content response packet is decoded yet
 			MoveItemInInventory = 0x2A8A1B49, // = MoveInventoryItemIIR_t: client-side slot move action
 			DeleteQuest = 0x97E02314, // = QuestIIR_c

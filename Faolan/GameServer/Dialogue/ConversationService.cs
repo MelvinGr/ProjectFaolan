@@ -87,10 +87,20 @@ namespace Faolan.GameServer.Dialogue
 		// waiting for a reply that won't come - the "advance a step with no captured branch -> chat locks, can't ESC"
 		// bug. (Conversation replay is coverage-bound: (Mode, Field3) is quest-state-dependent and the captures cover
 		// only some states per NPC, so an un-captured branch is expected; closing the window is the right answer.)
+		// Clears the session's conversation state - the player is no longer in a dialogue. Sends nothing; use this
+		// when the CLIENT ended the conversation (it sent KnubotCloseChatWindow), so we just tear down our state and
+		// don't echo a close back. Leaving state set is what let a stale conversation be re-entered (#217).
+		public static void EndConversation(INetworkClient client)
+		{
+			client.Session.ConversationAnswerPath = null;
+			client.Session.ConversationNpcName = null;
+			client.Session.ConversationTypeId = 0;
+			client.Session.ConversationNpcHandle = 0;
+		}
+
 		public Task SendConversationClose(INetworkClient client)
 		{
-			client.Session.ConversationAnswerPath = null; // end any active conversation
-			client.Session.ConversationNpcName = null;
+			EndConversation(client); // end any active conversation
 			var id = client.Session.Account.ClientInstance;
 			var body = (byte[])KnubotCloseChatWindowBody.Clone();
 			SubstituteUInt32(body, CloseChatWindowCapturedInstance, id);
