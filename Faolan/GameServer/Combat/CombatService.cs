@@ -144,8 +144,10 @@ namespace Faolan.GameServer.Combat
 					.WriteUInt32(0) // entry (6 u32)
 					.WriteUInt32(1)
 					.WriteUInt32(0x0000C350u)
-					.WriteUInt32(instance)
-					.WriteUInt32(0) // result: count, c350, actor=player, 0
+					.WriteUInt32(targetHandle)
+					.WriteUInt32(0) // result: count, c350, VICTIM=target, 0 - the entity that plays the hit-react/blood.
+					// Was `instance` (the player), which played the blood/impact on SELF when hitting an NPC (#228);
+					// the proven NPC->player ack (BuildNpcAttackAnimationAckBody) names the victim handle in this slot.
 					.WriteByte(0x06)
 					.WriteUInt32(0x000000CBu) // result constant (was 0xCD; the capture's BccAck result block uses 0xCB)
 					.WriteUInt32(0)
