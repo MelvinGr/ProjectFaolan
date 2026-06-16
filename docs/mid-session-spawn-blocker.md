@@ -107,7 +107,28 @@ exactly the doc's "client treats our sender as 0 / `e_Impossible`" symptom:
   `+4`) and logs **"Read InPlay from Client"** / **"cant resolve simplechar"**. The "cant resolve simplechar"
   branch is the same failure family: the in-play machinery can't bind the IIR to the live char.
 
-### THE GATE, pinned (2026-06-16, part 3) — a playfield-instance map lookup
+### COURSE-CORRECTION (2026-06-16, part 4) — the playfield gate is the RENDER path, not the selective blocker
+
+The sole FA015807 apply is `FUN_011215e0` (resolves the SimpleChar via RTTI, pumps ~120 stats, then calls the
+playfield-add `FUN_01458d40` **unconditionally**). So the burst AND mid-session spawns hit the SAME playfield-map
+gate — which means that gate (part 3) is the RENDER mechanism but CANNOT be what selectively blocks mid-session
+(the burst renders through it). **The selective drop is UPSTREAM, before the IIR is applied:**
+
+`FUN_005bae50` = **`n3InfoItemRemote::PollStatus`** (log category "n3InfoItemRemote/PollStatus", emits "is
+returning e_Impossible"). It resolves the IIR's **target reference** (`param_1+8`, an `n3InfoItemRemote` = a REMOTE
+OBJECT PROXY) against the client's object set; if the reference resolves to NULL it logs "...is NULL..." and
+returns **e_Impossible** — the IIR never applies. This IS the long-noted "n3ToClientQuit sent from 0 →
+e_Impossible" rejection (n3ToClientQuit::Activate = `FUN_005cbf80`). So the root cause is a **remote-reference
+resolution failure**: our mid-session packet's target/sender proxy id isn't in the client's registry, so PollStatus
+kills it before it ever reaches the spawn apply / playfield-add. This re-centers on the original
+conversation/object-registration theory (memory `protocol_midsession_spawn_blocked`), now with the exact client
+function (`n3InfoItemRemote::PollStatus` `FUN_005bae50`) that performs the drop.
+
+**NEXT:** decompile how `n3InfoItemRemote` resolves its proxy (the id→object registry it consults, `FUN_005bb1c0`/
+`FUN_005bb1f0` are the resolve+null-check) and find what REGISTERS an object into it at world-entry that a
+mid-session push lacks. That registry — NOT the playfield map — is the real gate.
+
+### The playfield-instance map lookup (part 3) — the downstream RENDER path (kept for reference)
 
 `DAT_029c7ae0` is a **global `std::map<uint, Playfield*>`** (red-black tree). The full chain:
 
