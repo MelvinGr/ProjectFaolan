@@ -1,9 +1,12 @@
 # Character-create editor bursts (issue #189)
 
 RE notes for the **create-editor download stream** — the burst the GameServer streams to the client
-while it is in the character-creation editor (between the client's `0x205F` "ready" pokes). Today this is
-replayed verbatim from `Faolan/GameServer/CreateFlow/RetailCreateEditor*Burst.cs`; the goal of #189 is to
-construct it from scratch like the login path. This doc is the decode that makes that possible.
+while it is in the character-creation editor (between the client's `0x205F` "ready" pokes). The goal of #189
+is to construct it from scratch like the login path instead of replaying `RetailCreateEditor*Burst.cs`
+verbatim. **Status: `InitialBurst` is fully constructed, and all structured `*IIR` types in
+`WorldPrepBurst`/`CreationScriptBurst` are decoded + built + wired** (see §4); the remaining verbatim bursts
+(conversation, the 1.1 MB intro-cutscene world-entry) and a few handle-only records are tracked in §4 + #223.
+This doc is the decode that makes the construction possible.
 
 Dissector: `Captures/decode_create_editor.py` (validated across all seven `*create*.tshark.json` captures).
 
