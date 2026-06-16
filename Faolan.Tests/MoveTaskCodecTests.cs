@@ -29,6 +29,28 @@ namespace Faolan.Tests
 				Convert.ToHexStringLower(body));
 		}
 
+		// mode-00: a bare position update [from][00][01], byte-exact against a captured player position tick (#53).
+		[Fact]
+		public void BarePositionBody_MatchesCapture()
+		{
+			var from = new Vector3(Bits(0x43930FE8), Bits(0x431124A6), Bits(0x443591DC));
+
+			var body = MoveTaskCodec.BuildBarePositionBody(0x01316E71, from);
+
+			Assert.Equal("96c467400000c35001316e71000043930fe8431124a6443591dc0001", Convert.ToHexStringLower(body));
+		}
+
+		// mode-08: approach/face a target entity [from][08][c350][targetHandle][01][9 zeros], byte-exact vs capture (#53).
+		[Fact]
+		public void ApproachTargetBody_MatchesCapture()
+		{
+			var from = new Vector3(Bits(0x43A51ACD), Bits(0x43115C2A), Bits(0x442A2D1A));
+
+			var body = MoveTaskCodec.BuildApproachTargetBody(0x00017F80, from, targetHandle: 0x01316E71);
+
+			Assert.Equal("96c467400000c35000017f80000043a51acd43115c2a442a2d1a080000c35001316e7101000000000000000000", Convert.ToHexStringLower(body));
+		}
+
 		[Fact]
 		public void FaceTowards_YawsAboutY_TowardTarget()
 		{
