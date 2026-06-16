@@ -112,8 +112,31 @@ The **wire grammar is fully pinned AND the content is identified** — no decodi
 3. The per-spawn sub-list (`@1122b10`) entry sub-object grammar is still unobserved (`count==0` on beach NPCs).
 
 Net: there is **no remaining read-grammar unknown** for the beach case; byte-exact construction is now a
-content-sourcing job (RDB script text + a handful of scalars). The flip to wire it live is still in-client
-gated — a synthesized block is the same thing the client has been observed to reject — see
-`[[protocol_midsession_spawn_blocked]]` and `[[npc_spawn_minimal_postiir_breaks_humanoids]]`. The same reader
-primitives + `0x3F1` framing drive the dynel/loot readers (#187, done) — see
-`Captures/ghidra/DumpIirReaders.java`.
+content-sourcing job (RDB script text + a handful of scalars). The same reader primitives + `0x3F1` framing
+drive the dynel/loot readers (#187, done) — see `Captures/ghidra/DumpIirReaders.java`.
+
+## Typed scaffold codec — landed (2026-06-16, byte-exact)
+`NpcSpawnPreIir` + `NpcSpawnPreIirCodec` (`Faolan/GameServer/Spawn/NpcSpawnPreIir.cs`) decode the 223-byte
+count==0 scaffold into a typed, mutable struct (`Version`, 6 `Flags`, 53 `Words`, the raw `Sublist`) and
+re-encode it **byte-exact**, anchored by `PlayerSpawnReader` (the embedded CoreCharacter `0x41` is a fixed
+9-byte header before the protobuf name; the scaffold is the fixed 223 bytes before it). The post-IIR header
+is likewise typed (`NpcSpawnPostIir`, in `NpcSpawnScaffold.cs`): `[u32 word0][u32 firstRecordLen][u32
+recordCount]` + raw records (the records are tick-derived session runtime state, kept raw). Round-trip gates:
+`NpcSpawnPreIirTests` (8 tests, both goldens). This makes the from-DB path own the grammar in code instead of
+slicing the captured `Data` blob — the foundation for sourcing the scaffold from DB / zeroing the buffer.
+
+## Two findings that revise the plan above (2026-06-16)
+1. **The "synthesized block is rejected" gate is STALE.** That belief came from the mid-session-spawn failure,
+   which #23 cracked (2026-06-16) as the **playfield token**, not block synthesis — synthesized spawns now
+   render once `SpawnPlayfieldRewriter` re-stamps the live token (`[[protocol_midsession_spawn_blocked]]`). So
+   the in-client flip for a constructed scaffold is no longer presumed-blocked; it is **testable**, and the
+   `npc_spawn_minimal_postiir_breaks_humanoids` result (which predates the token fix) is worth re-running.
+2. **The two rendering beach NPCs carry an EMPTY script buffer.** Decoding the `SpawnNpcCrocodile` and
+   `SpawnNpcCasilda` goldens (both confirmed to render in-client), `DecodeScriptText` recovers **nothing** —
+   their 53 scaffold words are small scalars, floats (e.g. `0x41fadfbc`≈31.4 @0x238), and a few large
+   session-volatile-looking values (`0x82a367d0`/`0x82a365b0`/`0x82a36800`, a consecutive-allocation pattern),
+   NOT text. The `showfifomessagefromserver` string in the analysis sample was a **script-bound** PvP-festival
+   NPC, not a typical mob. So the struct region is a **union**: script-bound NPCs put their diagnostic string
+   there; ordinary mobs put runtime scalars/handles there. This is direct evidence for construction **route b**
+   (an empty/scalar buffer is a valid rendering form), and it nuances the earlier "purely diagnostic text, no
+   instance handles" conclusion — the large values bear watching as possible session refs on the in-client flip.
