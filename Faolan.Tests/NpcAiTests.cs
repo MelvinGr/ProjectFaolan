@@ -83,6 +83,19 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void InvisiblePlayer_DrawsNoAggro()
+		{
+			var world = new WorldState();
+			var zone = world.ZoneFor(4010);
+			zone.Add(Npc(1, 0, 0));
+			var player = Player(2, 3, 0); // right next to a hostile NPC
+			player.Invisible = true; // .invisible
+			zone.Add(player);
+
+			Assert.Empty(world.Tick(WorldState.NpcAttackInterval)); // no aggro -> no attack/combat effects
+		}
+
+		[Fact]
 		public void NoPlayerInRange_NoAttack()
 		{
 			var world = new WorldState();

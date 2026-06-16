@@ -210,6 +210,9 @@ namespace Faolan.GameServer.World
 			if (vitals.IsDead)
 				return;
 
+			if (target.GodMode) // .godmode: the player takes no damage (the NPC still aggros + chases, just can't land a hit)
+				return;
+
 			var damage = (int)CombatResolver.ResolveNpcAttackDamage(npc.Level);
 			// Play the NPC's swing animation (the decoded attack-animation ack) BEFORE the HP move lands, so the
 			// hit reads as "swing -> damage". Visual only; the authoritative health change is the PushVitals below.

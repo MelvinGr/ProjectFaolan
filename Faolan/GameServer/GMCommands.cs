@@ -183,6 +183,42 @@ namespace Faolan.GameServer
 			await SendWorldHandoff(client);
 		}
 
+		// .godmode  - toggle invincibility on yourself: hostile NPC swings land their animation but deal no damage
+		// (the flag lives on the player's live WorldEntity, so it clears on relog). Self-target only.
+		private async Task ToggleGodModeCommand(INetworkClient client)
+		{
+			var characterId = client.Session.Character.Id;
+			var entity = _simulation.PlayerWorldEntity(client);
+			if (entity == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "You're not in the world yet.");
+				return;
+			}
+
+			entity.GodMode = !entity.GodMode;
+			await _agentServerDispatcher.SendSystemMessage(characterId, entity.GodMode
+				? "God mode <span style=\"color: lime;\">ON</span> - you take no damage."
+				: "God mode <span style=\"color: red;\">OFF</span>.");
+		}
+
+		// .invisible  - toggle aggro invisibility on yourself: hostile NPCs won't target/aggro you (skipped in the
+		// sim's NearestPlayerInRange). Self-target only; clears on relog (lives on the live WorldEntity).
+		private async Task ToggleInvisibleCommand(INetworkClient client)
+		{
+			var characterId = client.Session.Character.Id;
+			var entity = _simulation.PlayerWorldEntity(client);
+			if (entity == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "You're not in the world yet.");
+				return;
+			}
+
+			entity.Invisible = !entity.Invisible;
+			await _agentServerDispatcher.SendSystemMessage(characterId, entity.Invisible
+				? "Invisible <span style=\"color: lime;\">ON</span> - NPCs won't aggro you."
+				: "Invisible <span style=\"color: red;\">OFF</span>.");
+		}
+
 		// .bind  - bind the Totem of Origin to a resurrection point. You can only bind to a point you've already
 		// DISCOVERED (or the always-known starter) on this map - the real trigger is a wayfarer NPC binding you to one
 		// (no capture yet), so this GM bootstrap binds to the nearest KNOWN point, mirroring the death-respawn rule
@@ -386,6 +422,8 @@ namespace Faolan.GameServer
 				["learnspell"] = (client, arguments) => LearnSpellCommand(client, arguments),
 				["hurt"] = (client, arguments) => AdjustOwnHealthCommand(client, arguments, false),
 				["heal"] = (client, arguments) => AdjustOwnHealthCommand(client, arguments, true),
+				["godmode"] = (client, _) => ToggleGodModeCommand(client),
+				["invisible"] = (client, _) => ToggleInvisibleCommand(client),
 				["mount"] = (client, arguments) => MountCommand(client, arguments),
 				["spawnnpc"] = (client, arguments) => SpawnNpcCommand(client, arguments),
 				["despawnnpc"] = (client, arguments) => DespawnNpcCommand(client, arguments),

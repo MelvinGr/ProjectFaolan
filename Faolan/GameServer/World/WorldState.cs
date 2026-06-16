@@ -217,6 +217,8 @@ namespace Faolan.GameServer.World
 			var nearestDist = float.MaxValue;
 			foreach (var player in zone.PlayersInRange(npc.Position, range))
 			{
+				if (player.Invisible) // .invisible: a hidden player draws no aggro
+					continue;
 				var dist = Vector3.Distance(player.Position, npc.Position);
 				if (dist < nearestDist)
 				{

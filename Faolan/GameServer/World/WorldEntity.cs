@@ -40,6 +40,12 @@ namespace Faolan.GameServer.World
 		// with a conversation) are not. Set at zone load. Players are never hostile here.
 		public bool Hostile { get; set; }
 
+		// GM toggles on a PLAYER entity (.godmode / .invisible). GodMode: the player takes no damage from NPC swings.
+		// Invisible: hostile NPCs don't aggro the player (skipped in target selection). Default off; cleared on relog
+		// since the entity is recreated at world entry.
+		public bool GodMode { get; set; }
+		public bool Invisible { get; set; }
+
 		// Dead = has vitals and they hit zero. A dead entity is excluded from combat and counts down to respawn.
 		public bool IsDead => Vitals?.IsDead == true;
 
