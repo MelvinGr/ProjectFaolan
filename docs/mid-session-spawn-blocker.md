@@ -107,15 +107,34 @@ exactly the doc's "client treats our sender as 0 / `e_Impossible`" symptom:
   `+4`) and logs **"Read InPlay from Client"** / **"cant resolve simplechar"**. The "cant resolve simplechar"
   branch is the same failure family: the in-play machinery can't bind the IIR to the live char.
 
-**Working theory:** the load-time burst's spawns resolve their playfield/owner because they're processed while the
-playfield/object-set is being constructed and "current"; a mid-session push carries the right playfield TOKEN
-(0x01EA985C verified) but the client can't resolve that token to the live `Playfield` OBJECT after `CharInPlay`,
-so `FUN_01458d40` early-outs before AddToPlayfieldSpaces. **NEXT:** (a) decompile `FUN_005950e0`/`FUN_005a2470`
-to see how a playfield token → live `Playfield*` is resolved and what populates that map at load vs play; (b) find
-the CharInPlayIIR *Activate* slot (not slot-8 ReadSubClass) to see the state it flips. Helper scripts added:
-`Captures/ghidra/DumpVtableX.java` (dump a named `*::vftable`'s slots), `ReadSlotFn.java` (decompile the fn at a
-vtable+offset). (Any candidate fix still needs an in-client render to confirm — packet/golden tests can't see the
-client's poll loop.)
+### THE GATE, pinned (2026-06-16, part 3) — a playfield-instance map lookup
+
+`DAT_029c7ae0` is a **global `std::map<uint, Playfield*>`** (red-black tree). The full chain:
+
+1. **Register (at load):** when a playfield activates (`FUN_005a1390`, a virtual `Playfield::OnLoad`-ish slot) it
+   calls `n3Playfield::AddPlayfield` (`FUN_0059bdc0`, n3playfield.cpp:0x318), which inserts the playfield into the
+   map **keyed by `pf->GetInstance()` = the playfield-instance at object offset `+0x94`** (asserts "Cant add same
+   playfield twice" / "GetPlayfield(pf->GetInstance()) == NULL"). The map's `operator[]` is `FUN_005a2330`.
+2. **Resolve (on every spawn):** `FUN_01458d40` (the CoreCharacter add-to-playfield) looks the spawn's target
+   playfield up in that map (`FUN_005a2470`, lookup at `01458da1`; value extracted by `FUN_005950e0`). The compare
+   key is the `+0x94` instance. If it isn't found (`== DAT_029c7ae0` sentinel → `local_360 == 0`) it jumps to
+   `LAB_0145ac67` and **never calls `AddToPlayfieldSpaces`** → the entity is never registered for the `0x2020`
+   poll → never renders.
+
+**So the gate is exactly: `spawn.targetPlayfieldInstance` must equal a LOADED playfield's `GetInstance()` (+0x94).**
+The login burst renders because its spawns' playfield-instance matches the playfield the client registered at
+MapChange/world-entry; a mid-session push is dropped if its playfield-instance doesn't match the client's CURRENTLY
+loaded playfield's `+0x94`. The doc-verified "loot bag carried 0x01EA985C" is necessary but only sufficient *iff*
+`pf->GetInstance() == 0x01EA985C` for the live session — i.e. the token we splice via `SpawnPlayfieldRewriter`
+must equal the registered playfield instance, not a captured/stale one.
+
+**NEXT (fix direction):** (a) find how `+0x94` is SET (from the MapChange `5D85BFC7` body / the world-entry
+handshake) so we can compute the client's live registered playfield instance server-side and stamp mid-session
+spawns with it; (b) in-client, log `GetPlayfield` hits/misses (the "Cant add same playfield twice" + the
+add-to-playfield path) to confirm whether our mid-session token actually misses the map. Also still worth pinning:
+the CharInPlayIIR *Activate* slot (the `+0x94` resolution there shows the same "cant resolve simplechar" failure
+family). Helper scripts: `Captures/ghidra/DumpVtableX.java`, `ReadSlotFn.java`. (Any candidate fix still needs an
+in-client render to confirm — packet/golden tests can't see the client's poll loop.)
 
 Memory: `protocol_midsession_spawn_blocked`. Related: `protocol_201c_spawn_subprotocol` (the poll loop),
 `npc_model_streaming` (its "interest streaming renders" claim is DISPROVEN — those NPCs were the burst).
