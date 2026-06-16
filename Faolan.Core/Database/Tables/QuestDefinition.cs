@@ -25,6 +25,25 @@ namespace Faolan.Core.Database.Tables
 		public uint MarkerX { get; set; }
 		public uint MarkerY { get; set; }
 
+		// --- Snapshot-tails GENERATION data (#186): values that live ONLY in the FullChar snapshot's quest region
+		// (BeachTailsTemplate.bin), not the QuestFullUpdate/Journal packets, so they are seeded (not harvested). They
+		// let the snapshot's Quest_c record + quest index generate from the DB with no literals.
+
+		// Quest_c (journal) record scalars (still semantically undecoded; carried per quest). Beach 10238 = 4/1/0x96/15.
+		public uint SnapshotN { get; set; }
+		public uint SnapshotFieldEc { get; set; }
+		public uint SnapshotFieldF0 { get; set; }
+		public ulong SnapshotFieldF8 { get; set; }
+
+		// Quest index region: the W6QT goal-id table's marker + three lead words + trailer word, and the goal-step ids
+		// (CSV, the client's 1..n goal index). Beach 10238: marker 0x7E2, fields 1/7/0, trailer 0x156E7, 8 steps.
+		public uint IndexMarker { get; set; }
+		public uint IndexTableField1 { get; set; }
+		public uint IndexTableField2 { get; set; }
+		public uint IndexTableField3 { get; set; }
+		public uint IndexTrailerWord { get; set; }
+		public string IndexGoalSteps { get; set; }
+
 		public virtual ICollection<QuestTextRef> TextRefs { get; set; } = new List<QuestTextRef>();
 
 		// The per-GOAL objective detail (the @609 region of the FullChar snapshot tails) - one row per goal of the

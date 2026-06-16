@@ -126,8 +126,27 @@ namespace Faolan.Importer
 		{
 			const uint beachQuestId = 10238;
 			var quest = await db.QuestDefinitions.Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == beachQuestId);
-			if (quest == null || quest.Goals.Count > 0)
+			if (quest == null)
 				return;
+
+			// The Quest_c scalars + the index region's W6QT/table/trailer/goal-steps (snapshot-only; decoded from the
+			// template @0..1292, Captures/decode_snapshot_609.py). Idempotent - set every run.
+			quest.SnapshotN = 4;
+			quest.SnapshotFieldEc = 1;
+			quest.SnapshotFieldF0 = 0x96;
+			quest.SnapshotFieldF8 = 15;
+			quest.IndexMarker = 0x7E2;
+			quest.IndexTableField1 = 1;
+			quest.IndexTableField2 = 7;
+			quest.IndexTableField3 = 0;
+			quest.IndexTrailerWord = 0x000156E7;
+			quest.IndexGoalSteps = "10238,12369,12373,10320,12371,10286,10287,10915";
+
+			if (quest.Goals.Count > 0)
+			{
+				await db.SaveChangesAsync();
+				return;
+			}
 
 			quest.Goals.Add(new QuestGoalDefinition
 			{

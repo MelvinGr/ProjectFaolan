@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
@@ -19,10 +20,9 @@ namespace Faolan.Tests
 		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan/GameServer/Packets/FullCharSnapshot/BeachTailsTemplate.bin";
 		private const int RegionEnd = 609;
 
-		// The beach starter's per-quest scalars not (yet) harvested into QuestDefinition - carried from the
-		// capture (docs/fullplayer-snapshot-reader.md). state=1 active; N=4; FieldEc=1; FieldF0=0x96; FieldF8=15.
-		private const uint BeachState = 1, BeachN = 4, BeachFieldEc = 1, BeachFieldF0 = 0x96;
-		private const ulong BeachFieldF8 = 15;
+		// The per-character quest STATE (1 = active); the only quest-portion value that isn't quest-definition data
+		// (it comes from CharacterQuest live). Everything else now rides in QuestDefinition (seeded for 10238).
+		private const uint BeachState = 1;
 		private const uint BeachStarterQuestId = 10238;
 
 		[Fact]
@@ -31,7 +31,8 @@ namespace Faolan.Tests
 			var def = await LoadDefinition(BeachStarterQuestId);
 			Assert.NotNull(def);
 
-			var record = QuestcRecord.BuildSingle(def, BeachState, BeachN, BeachFieldEc, BeachFieldF0, BeachFieldF8);
+			// All scalars sourced from the DB (SnapshotN/FieldEc/FieldF0/FieldF8) - no literals but the per-char state.
+			var record = QuestcRecord.BuildSingle(def, BeachState, def.SnapshotN, def.SnapshotFieldEc, def.SnapshotFieldF0, def.SnapshotFieldF8);
 			var region = new QuestcRegion { Records = { record } };
 			var built = region.ToArray();
 
@@ -57,9 +58,8 @@ namespace Faolan.Tests
 		}
 
 		// The WHOLE quest portion of the tails (@0..1292 = Quest_c + @609 + index) regenerates byte-exact from the DB
-		// (the journal + per-goal model) plus the decoded per-quest scalars/index data - proving the .bin's entire
-		// quest region can be authored from server state (#186). The not-yet-DB values (the Quest_c scalars, the
-		// index goal-steps + trailer) are passed as the decoded literals here, the deferred seed.
+		// (the journal + per-goal model) plus the per-quest scalars/index data NOW SOURCED FROM THE DB - proving the
+		// .bin's entire quest region authors from server state with ZERO literals (only the per-character state). #186.
 		[Fact]
 		public async Task BuildWholeQuestPortion_ReproducesBeachTails_ByteExact()
 		{
@@ -69,14 +69,14 @@ namespace Faolan.Tests
 
 			var quests = new QuestcRegion
 			{
-				Records = { QuestcRecord.BuildSingle(def, BeachState, BeachN, BeachFieldEc, BeachFieldF0, BeachFieldF8) }
+				Records = { QuestcRecord.BuildSingle(def, BeachState, def.SnapshotN, def.SnapshotFieldEc, def.SnapshotFieldF0, def.SnapshotFieldF8) }
 			};
 			var objectives = QuestObjectiveRegion.Build(def, instance);
+			var goalSteps = def.IndexGoalSteps.Split(',').Select(uint.Parse).ToArray();
 			var index = QuestIndexRegion.Build(
-				questIds: [10238],
-				goalSteps: [10238, 12369, 12373, 10320, 12371, 10286, 10287, 10915],
-				marker: 0x7E2, tableField1: 1, tableField2: 7, tableField3: 0,
-				trailerQuestId: 10238, trailerWord: 0x000156E7);
+				questIds: [def.QuestId], goalSteps: goalSteps,
+				marker: def.IndexMarker, tableField1: def.IndexTableField1, tableField2: def.IndexTableField2, tableField3: def.IndexTableField3,
+				trailerQuestId: def.QuestId, trailerWord: def.IndexTrailerWord);
 
 			byte[] built = [.. quests.ToArray(), .. objectives.ToArray(), .. index.ToArray()];
 
