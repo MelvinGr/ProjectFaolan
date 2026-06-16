@@ -11,6 +11,7 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.Combat;
@@ -432,13 +433,24 @@ namespace Faolan.GameServer.World
 				    .TryGet(objectHandle, out var bag) || !bag.IsLootable)
 				return;
 
+			// NewCurrentLooter rides the WORLD conversation (GameAgent -> GameInterface), as in retail (mount/gameplay
+			// capture frame 1477).
 			await new PacketStream()
 				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s => s.WriteArray(WorldLoot.BuildNewCurrentLooterBody(bag.Handle, player.Handle)))
 				.SendAsync(client);
+
+			// The actual window-open is DispatchOpenLootBag (0x2037) on the GameCharAgent -> GameCharInterface
+			// conversation (the same class-pair as the 0x201C spawn handshake / SpawnCheck), body [loot typetag][bag
+			// handle] - NOT a SimpleDynelVisualChange on the world conversation (that only played the open animation, no
+			// window). Decoded from the hoxxling gameplay capture (f1477): after this the client itself sends
+			// TryLootCash (0x2045) then TryLootAll (0x2043), which we already handle.
 			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArrayUInt32Length(s => s.WriteArray(WorldLoot.BuildOpenWindowBody(WorldLoot.LootTypeTag, bag.Handle)))
+				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x58),
+					ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, client.Session.Account.ClientInstance),
+					GameCharInterfaceDispatchOpcodes.DispatchOpenLootBag)
+				.WriteUInt32(WorldLoot.LootTypeTag)
+				.WriteUInt32(bag.Handle)
 				.SendAsync(client);
 
 			_logger.LogInformation("Loot: {Name} opened the loot window on {Bag} 0x{Handle:X8}.", player.Name, bag.Name, bag.Handle);
