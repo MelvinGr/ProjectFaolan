@@ -112,6 +112,29 @@ namespace Faolan.GameServer
 				.ToArray();
 		}
 
+		// BehaviorControlCenterIIR (0x642CD3D6), short form (28 bytes): registers one behavior on an entity.
+		//   [u32 type][u32 handle][u16 0x0004][u32 slot][u32 msgLen][protobuf]
+		// protobuf = `08 <behaviorId> 18 <phase> 28 <field5> 30 <field6>` (all varints), msgLen = its length.
+		// (A longer 116-byte form carries an extra behavior-state tail with transforms + entity tags - not built
+		// here; those records stay verbatim, handle-addressed.) Decoded by Captures/decode_create_iir_records.py.
+		public static byte[] BuildBehaviorControlCenterIir(uint handle, uint slot, uint behaviorId, uint phase,
+			uint field5, uint field6, uint type = CharacterWireType)
+		{
+			var protobuf = new FaolanStream()
+				.WriteByte((byte)0x08).WriteVarint(behaviorId)
+				.WriteByte((byte)0x18).WriteVarint(phase)
+				.WriteByte((byte)0x28).WriteVarint(field5)
+				.WriteByte((byte)0x30).WriteVarint(field6)
+				.ToArray();
+			return new FaolanStream()
+				.WriteUInt32(type)
+				.WriteUInt32(handle)
+				.WriteUInt16((ushort)0x0004)
+				.WriteUInt32(slot)
+				.WriteArrayUInt32Length(protobuf)
+				.ToArray();
+		}
+
 		// PlayfieldFIIR (0x5D85BFC7, "MapChange"): announces the playfield the client is entering - its reference
 		// position (a Vec3, raw-body big-endian floats), the map id, the entering character instance, and the live
 		// per-session playfield token (carried TWICE). 103 bytes; framing decoded from the create captures

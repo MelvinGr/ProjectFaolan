@@ -58,14 +58,11 @@ namespace Faolan.GameServer
 			// Initial vitals + behavior/action setup for the editor entities (handles 0x0009FF92..96).
 			await Iir(GameServer0X2000RespondsOpcodes.StatUpdateIIR, CreateEditorRecordBuilder.BuildStatUpdateIir(0x0009FF92u, [(0x1Bu, 0x189Cu), (0x1F8u, 0x189Cu), (0x1FAu, 0x189Cu)]));
 			await Iir(GameServer0X2000RespondsOpcodes.StatUpdateIIR, CreateEditorRecordBuilder.BuildStatUpdateIir(0x0009FF93u, [(0x1Bu, 0x189Cu), (0x1F8u, 0x189Cu), (0x1FAu, 0x189Cu)]));
-			await Iir(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x94, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xD3, 0x9E, 0x05, 0x18, 0x01, 0x28,
-				0x18, 0x30, 0x00);
+			await Iir(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR, CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x0009FF94u, 5, 85843, 1, 24, 0));
 			await Iir(GameServer0X2000RespondsOpcodes.StatUpdateIIR, CreateEditorRecordBuilder.BuildStatUpdateIir(0x0009FF94u, [(0x1Bu, 0x189Cu), (0x1F8u, 0x189Cu), (0x1FAu, 0x189Cu)]));
-			await Iir(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x95, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x01, 0x28,
-				0x18, 0x30, 0x00);
+			await Iir(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR, CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x0009FF95u, 7, 41413, 1, 24, 0));
 			await Iir(GameServer0X2000RespondsOpcodes.StatUpdateIIR, CreateEditorRecordBuilder.BuildStatUpdateIir(0x0009FF95u, [(0x1Bu, 0x189Cu), (0x1F8u, 0x189Cu), (0x1FAu, 0x189Cu)]));
-			await Iir(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x96, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x01, 0x28,
-				0x18, 0x30, 0x00);
+			await Iir(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR, CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x0009FF96u, 7, 41413, 1, 24, 0));
 			await Iir(GameServer0X2000RespondsOpcodes.StatUpdateIIR, CreateEditorRecordBuilder.BuildStatUpdateIir(0x0009FF96u, [(0x1Bu, 0x189Cu), (0x1F8u, 0x189Cu), (0x1FAu, 0x189Cu)]));
 
 			await IirId(GameServer0X2000RespondsOpcodes.StatIIR, C350, 0x00, 0x00, 0x00, 0x03, 0x60, 0x00, 0x00, 0x00, 0x02);
@@ -138,8 +135,7 @@ namespace Faolan.GameServer
 			// SetMorphValue setup (hair meshes, then a texscript) on the editor entities.
 			await Iir(GameServer0X2000RespondsOpcodes.SetMorphValueIIR, CreateEditorRecordBuilder.BuildSetMorphValueIir(0x0009FF94u, "hairmesh_207920", 1.0f, 0x00, 0x00000001u));
 			await Iir(GameServer0X2000RespondsOpcodes.SetMorphValueIIR, CreateEditorRecordBuilder.BuildSetMorphValueIir(0x0009FF95u, "hairmesh_203666", 1.0f, 0x00, 0x00000001u));
-			await Iir(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x94, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xD3, 0x9E, 0x05, 0x18, 0x02, 0x28,
-				0x18, 0x30, 0x00);
+			await Iir(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR, CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x0009FF94u, 5, 85843, 2, 24, 0));
 			await Iir(GameServer0X2000RespondsOpcodes.SetMorphValueIIR, CreateEditorRecordBuilder.BuildSetMorphValueIir(id, "texscript_183875", 1.0f, 0x01, 0x00000001u));
 			await Iir(GameServer0X2000RespondsOpcodes.SetMorphValueIIR, CreateEditorRecordBuilder.BuildSetMorphValueIir(0x0009FF95u, "texscript_183875", 1.0f, 0x01, 0x00000002u));
 			await Iir(GameServer0X2000RespondsOpcodes.SetMorphValueIIR, CreateEditorRecordBuilder.BuildSetMorphValueIir(0x0009FF94u, "texscript_183875", 1.0f, 0x01, 0x00000002u));

@@ -66,6 +66,17 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void BehaviorControlCenterIir_MatchesCapturedBytes()
+		{
+			// WorldPrep behavior (handle 0x00039232, slot 7, behaviorId 41413, phase 1) and a CreationScript one
+			// (handle 0x0009FF94, slot 5, behaviorId 85843, phase 2).
+			Assert.Equal("0000c350000392320004000000070000000a08c5c302180128183000",
+				Convert.ToHexString(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00039232, 7, 41413, 1, 24, 0)).ToLowerInvariant());
+			Assert.Equal("0000c3500009ff940004000000050000000a08d39e05180228183000",
+				Convert.ToHexString(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x0009FF94, 5, 85843, 2, 24, 0)).ToLowerInvariant());
+		}
+
+		[Fact]
 		public void CharacterActionIir_MatchesCapturedBytes()
 		{
 			// First + last CharacterActionIIR of the WorldPrep stream (handle 0x02000001): grants action ids
