@@ -63,6 +63,55 @@ namespace Faolan.GameServer
 				.ToArray();
 		}
 
+		// ComboBookIIR (0xA8BBEB7F): grants one combo/ability to the entity's combo book. 14 bytes:
+		//   [u32 type][u32 handle][u16 0x0001][u32 comboId]
+		// The WorldPrep burst streams one per combo id. Decoded by Captures/decode_create_iir_records.py.
+		public static byte[] BuildComboBookIir(uint handle, uint comboId, uint type = CharacterWireType)
+		{
+			return new FaolanStream()
+				.WriteUInt32(type)
+				.WriteUInt32(handle)
+				.WriteUInt16((ushort)0x0001)
+				.WriteUInt32(comboId)
+				.ToArray();
+		}
+
+		// StatUpdateIIR (0x96B8DC59): a batch of stat (statId, value) pairs set on an entity:
+		//   [u32 type][u32 handle][u32 0][u8 count][ count x ([u32 statId][u32 value]) ]
+		// The editor/world-prep streams it to seed a character's stat block (max health/mana/... + a few flags).
+		public static byte[] BuildStatUpdateIir(uint handle, (uint StatId, uint Value)[] stats, uint type = CharacterWireType)
+		{
+			var s = new FaolanStream()
+				.WriteUInt32(type)
+				.WriteUInt32(handle)
+				.WriteUInt32(0u)
+				.WriteByte((byte)stats.Length);
+			foreach (var (statId, value) in stats)
+				s.WriteUInt32(statId).WriteUInt32(value);
+			return s.ToArray();
+		}
+
+		// SetMorphValueIIR (0xBADF5A4B): sets one morph/resource value on an entity. Variable length:
+		//   [u32 type][u32 handle][u16 0][u8 blobLen][0x2A][name utf8][f32 weight BE][u8 p][u32 q]
+		// `blobLen` = 1 + name.Length (it counts the 0x2A tag + the name). The editor streams the chosen
+		// hair/texture resource refs ("hairmesh_207920", "texscript_183875") this way; `weight` is 1.0 in every
+		// capture and the small p/q trailing pair carries morph flags/index. Raw-body float = big-endian.
+		public static byte[] BuildSetMorphValueIir(uint handle, string name, float weight, byte p, uint q, uint type = CharacterWireType)
+		{
+			var nameBytes = System.Text.Encoding.UTF8.GetBytes(name);
+			return new FaolanStream()
+				.WriteUInt32(type)
+				.WriteUInt32(handle)
+				.WriteUInt16((ushort)0x0000)
+				.WriteByte((byte)(1 + nameBytes.Length))
+				.WriteByte((byte)0x2A)
+				.WriteArray(nameBytes)
+				.WriteFloatBigEndian(weight)
+				.WriteByte(p)
+				.WriteUInt32(q)
+				.ToArray();
+		}
+
 		// PlayfieldFIIR (0x5D85BFC7, "MapChange"): announces the playfield the client is entering - its reference
 		// position (a Vec3, raw-body big-endian floats), the map id, the entering character instance, and the live
 		// per-session playfield token (carried TWICE). 103 bytes; framing decoded from the create captures
