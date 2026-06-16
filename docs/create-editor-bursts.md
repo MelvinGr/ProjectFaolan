@@ -89,7 +89,16 @@ create-specific to decode, only builder wiring to do:
    (Note: this targets the `0x0009FF92` "Stygian Female" scene-pedestal avatar; the live player-preview
    record — `Character…`, handle = char id — is already covered by `PlayerSpawnScaffoldCodec` /
    `SpawnEditorPreview.bin`.)
-2. Construct the editor-scene `SimpleDynel` props from `ProtoSimpleDynelIIR` rows.
+2. **Construction PROVEN from DB rows** (wiring pending) — the 18 editor-scene `SimpleDynel` props are already
+   `WorldObjects` rows on map 4000 in `faolan.db` (same localized ids + keys). `WorldObjectBuilder.TryBuild(row,
+   handle, playfieldInstance, ...)` rebuilds them: transform + identity from the row's columns, with the new
+   playfield-instance overload threading the create session's token (the committed rows were captured in a
+   different session, so the stored token must be rewritten — `WorldObjectBuilder.TryRewritePlayfieldInstance`).
+   `CreateEditorSceneDynelTests` matches each burst record to its row by `display_name` and proves **17/18
+   reconstruct byte-for-byte**. The 18th (localized `3072626`) has no DB row: it shares an exact position with
+   `347659` and the importer's position-keyed `WorldObject` dedup dropped it (Gitea #222). Remaining: wire
+   the burst to emit the DB-built records (needs `Database` access in `SendRetailCreateEditorInitialBurst` + the
+   byte-identical-gate-else-verbatim pattern, like `RetailLoginReplay`), keeping `3072626` verbatim.
 3. Decode `PlayfieldFIIR`/`GameTimeIIR` bodies fully (small, low risk) and build them.
 4. The verbatim `RetailCreateEditorInitialBurst`/`CreationScriptBurst`/etc. stay as the interim until each
    record type above is constructed and proven byte-exact, per the project's decode-then-golden discipline.
