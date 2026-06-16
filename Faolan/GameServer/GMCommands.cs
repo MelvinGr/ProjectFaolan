@@ -308,16 +308,16 @@ namespace Faolan.GameServer
 			return saved;
 		}
 
-		// .grantspell <id>  - grant an ability from the catalog to the player via the 0x2052 ability-grant. Makes the
+		// .grantability <id>  - grant an ability from the catalog to the player via the 0x2052 ability-grant. Makes the
 		// ability appear so it can be dragged to the hotbar and cast, which is how the spell/mana drain is tested. The
 		// grant is transient (not persisted) - it is re-sent only by login's GrantStartingAbilities. (The real spell
-		// grant DispatchLearnSpell 0x200A is now decoded too - see .learnspell / #73.)
-		private async Task GrantSpellCommand(INetworkClient client, string arguments)
+		// grant DispatchLearnSpell 0x200A is a separate command - see .learnspell / #73.)
+		private async Task GrantAbilityCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
 			if (!uint.TryParse((arguments ?? "").Trim(), out var id))
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .grantspell &lt;abilityId&gt;  (see .spelllist)");
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .grantability &lt;abilityId&gt;  (see .spelllist)");
 				return;
 			}
 
@@ -374,7 +374,7 @@ namespace Faolan.GameServer
 				["maps"] = (client, _) => SendListAllMaps(client.Session.Character.Id),
 				["spells"] = (client, _) => SendListAllSpells(client.Session.Character.Id),
 				["spelllist"] = (client, _) => SendGrantableAbilityList(client.Session.Character.Id),
-				["grantspell"] = (client, arguments) => GrantSpellCommand(client, arguments),
+				["grantability"] = (client, arguments) => GrantAbilityCommand(client, arguments),
 				["teleport"] = (client, arguments) => TeleportCommand(client, arguments),
 				["position"] = (client, _) => PositionCommand(client),
 				["bind"] = (client, _) => BindCommand(client),
@@ -967,7 +967,7 @@ namespace Faolan.GameServer
 			return _agentServerDispatcher.SendSystemMessage(characterId, $"Available Commands:<br />{_gmCommandsDict.Keys.JoinAsString("<br />")}");
 		}
 
-		// .spelllist  - list the grantable ability catalog (id / name / slot) for use with .grantspell. These are
+		// .spelllist  - list the grantable ability catalog (id / name / slot) for use with .grantability. These are
 		// what can actually be handed out via the proven 0x2052 grant; the Spell table (.spells) has no grant
 		// identity quad, so its rows can be cast but not granted. A trailing * marks the universal starting kit.
 		private async Task SendGrantableAbilityList(uint characterId)
@@ -982,7 +982,7 @@ namespace Faolan.GameServer
 			var lines = abilities
 				.Select(a => $"{a.Id}: {(string.IsNullOrEmpty(a.Name) ? "(unnamed)" : a.Name)} [slot {a.Slot}]{(a.IsStartingAbility ? " *" : "")}")
 				.JoinAsString("<br />");
-			await _agentServerDispatcher.SendSystemMessage(characterId, $"Grantable abilities (.grantspell &lt;id&gt;):<br />{lines}");
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Grantable abilities (.grantability &lt;id&gt;):<br />{lines}");
 		}
 
 		private async Task SendListAllMaps(uint characterId)
@@ -1079,7 +1079,7 @@ namespace Faolan.GameServer
 		}
 
 		// .learnspell <id>  - live-grant a real spell to the player via DispatchLearnSpell (0x200A), the decoded
-		// spell-grant path (#73), without a relog. Distinct from .grantspell, which grants a catalog ABILITY via the
+		// spell-grant path (#73), without a relog. Distinct from .grantability, which grants a catalog ABILITY via the
 		// 0x2052 ability-grant. <id> is the spell id (hex with 0x or decimal); e.g. ".learnspell 0x3006ff" - any
 		// captured DispatchLearnSpell id (see Captures/decode_learn_spell.py).
 		private async Task LearnSpellCommand(INetworkClient client, string arguments)

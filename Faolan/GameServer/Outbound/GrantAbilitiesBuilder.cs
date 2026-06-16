@@ -64,7 +64,7 @@ namespace Faolan.GameServer
 		}
 
 		// Builds a single 0x2052 ability-grant packet from an Ability row. `announce` controls whether the client pops
-		// the "You have learned a new ability" toast: true on a genuine first learn (create flow / .grantspell / future
+		// the "You have learned a new ability" toast: true on a genuine first learn (create flow / .grantability / future
 		// level-up), false for the silent per-login re-grant.
 		private Task SendAbilityGrant(INetworkClient client, Ability ability, bool announce = true)
 		{
