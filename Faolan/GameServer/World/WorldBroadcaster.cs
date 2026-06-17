@@ -834,13 +834,17 @@ namespace Faolan.GameServer.World
 			if (template == null)
 				return false;
 
-			if (!WorldObjectBuilder.TryBuild(template, corpse.Handle, corpse.Position, new Quaternion(corpse.Rotation.X, corpse.Rotation.Y, corpse.Rotation.Z, 1f), out var body))
+			// Identity rotation: the corpse's Euler-degree rotation stuffed into a quaternion (w=1) gives a
+			// magnitude-~180 quaternion that SCALES/DISTORTS the bag model (the deformed loot bag) - the same fix
+			// SpawnLootBagForPlayer already carries. A loot bag has no facing.
+			if (!WorldObjectBuilder.TryBuild(template, corpse.Handle, corpse.Position, Quaternion.Identity, out var body))
 				return false;
 
 			// Re-stamp the live playfield token (same reason as SendWorldSpawn): the loot-bag template carries its
 			// capture session's token, but the client only registers/polls an object whose playfield instance matches
 			// the playfield it loaded. Without this a mid-session loot bag never renders (the blocker that gated loot).
 			SpawnPlayfieldRewriter.TryRewrite(body, _sim.World.ZoneFor(corpse.MapId).PlayfieldToken);
+			body = await SpliceLootContents(body, corpse.Handle, cash, items); // show the corpse's items/cash in the window
 
 			corpse.CashTin = cash;
 			corpse.LootItems.Clear();
@@ -852,8 +856,13 @@ namespace Faolan.GameServer.World
 				         .ZoneFor(corpse.MapId)
 				         .PlayersInRange(corpse.Position, WorldSimulation.PlayerInterestRange))
 			{
-				if (viewer.Client != null)
-					await SendLootBagUpdate(viewer.Client, body);
+				if (viewer.Client == null)
+					continue;
+				// Despawn the standing NPC dynel FIRST, then spawn the bag on the same handle. A LootBagFullUpdate on a
+				// still-rendered character dynel does NOT swap the model (the NPC stayed standing on the corpse), so
+				// remove the dynel then re-add it as the bag.
+				await SendWorldDespawn(viewer.Client, viewer.MapId, corpse.Handle);
+				await SendLootBagUpdate(viewer.Client, body);
 			}
 
 			return true;
