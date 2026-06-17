@@ -1,12 +1,16 @@
 # Knubot conversation packets — wire grammar (Gitea #188)
 
 Decoded from `AgeOfConan.exe` (Ghidra, 2026-06-14; reproduce with `Captures/ghidra/DumpIirReaders.java`).
-These are the NPC-dialogue packets `ConversationService.ServeScreen` still **replays verbatim** from the
-captured `ConversationPacket` rows (~409 rows). The **construct path is now wired** (#188): `KnubotCodec`
-(`Faolan/GameServer/Dialogue/KnubotCodec.cs`) builds `OpenChatWindow`/`AppendText` byte-exact from live
-endpoints, reachable via `WorldBroadcaster.SendKnubotOpenChatWindow`/`SendKnubotAppendText` and the `.npcsay`
-GM bootstrap (golden-tested in `KnubotCodecTests`). Remaining: source the remoteformat from RDB text + the
-Lua/tag VM and retire `ServeScreen`'s replay screen-by-screen.
+These are the NPC-dialogue packets served by `ConversationService.ServeScreen`. The **spoken line
+(`KnubotAppendText`) and the window-open (`KnubotOpenChatWindow`) are now CONSTRUCTED** via `KnubotCodec`
+(`Faolan/GameServer/Dialogue/KnubotCodec.cs`): `TryConstructKnubotRecord` lifts the remoteformat XML / value
+from the captured record and rebuilds it re-addressed to the live player + clicked NPC, framed on the
+conversation endpoint (`GameAgent:0x08`) like `SendConversationClose`. Proven byte-identical to the old
+handle-substitution (`ConversationConstructTests`/`KnubotCodecTests`). The remaining sub-opcodes
+(`AnswerList` 0xF164A4A5, `CloseChatWindow` 0xC4AF39EB, the quest packets) still **replay verbatim** from the
+captured `ConversationPacket` rows (~409 rows) with handle substitution. Remaining: source the remoteformat
+from RDB text + the Lua/tag VM (vs the captured line) and construct the answer-list/close too, retiring the
+replay entirely.
 
 Read primitives (shared with the rest of the protocol): `FUN_0048f900` = read u32 (byte-swapped when the
 big-endian flag is set), `FUN_0048f840` / `FUN_006200a0` = read a length-prefixed string (the
