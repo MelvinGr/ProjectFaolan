@@ -73,17 +73,24 @@ The `else` branch is the **patrol waypoint list** (the count-prefixed 3-float po
 trailer (whether `FUN_00a31ec0` consumes bytes past the 3 floats) and the `flags & 1` packed branch are the
 remaining byte-alignment to pin against the captured bodies.
 
-Mode-1/5/6/7 leaf **type names** recovered from their ctors (`DumpMoveTaskLeafReaders.java`): 1 = PathMoveTask,
-5 = BallisticMoveTask, 6 = AnimatedMoveTask, 7 = FormationMoveTask (5/6/7 readers not yet field-mapped).
+All mode-1/5/6/7 leaves are now field-mapped (`DumpMoveTaskLeafReaders.java` + `DumpMoveTaskTail.java`):
+
+| mode | type | wire fields (after the mode byte) |
+|---|---|---|
+| 5 | BallisticMoveTask | base header + `[float x7][u8 flag]` (`FUN_00a49540`) |
+| 6 | AnimatedMoveTask   | nothing — `FUN_00a4a2b0` returns 1 |
+| 7 | FormationMoveTask  | `[float x6]`, no header (`FUN_00a4a9d0`) |
+
+The PathMoveTask finalizer `FUN_00a3e400` = `[u8 bool][7 u32]` (a fixed 29 B; its sibling `FUN_00a3e510` only
+validates the spline and reads nothing), so both PathMoveTask branches end with it.
 
 ## Status (#53)
 
-- **Built byte-exact** (`MoveTaskCodec`, golden tests): mode 0 bare-position, mode 2 stationary (Rotate
-  to-pos+quat, the 61-B form), mode 8 approach-target.
-- **Decoded (2026-06-17), not yet built**: the recursive structure is fully pinned — the `ListMoveTask` header
-  (`FUN_00a48820` Wait-base + the min byte + `u8 count`) makes the recursive parse consume every mode-4 body to
-  its leaves; `PathMoveTask` is decoded down to its `[u32 count][3-float waypoints]` list. Scripts:
-  `Captures/ghidra/DumpMoveTaskList.java` + `DumpMoveTaskLeafReaders.java`.
-- **Remaining**: pin PathMoveTask's per-waypoint trailer + its `flags&1` packed branch, field-map the
-  Ballistic/Animated/Formation leaves, then a recursive `MoveTaskCodec` over the leaf builders + a `PatrolPath`
-  DB table that groups ordered waypoints per path (today's `PatrolPaths` table is flat, ungrouped).
+- **Decode COMPLETE (2026-06-17)**: the full recursive grammar is pinned — `Captures/decode_movetask.py`
+  round-trips **6225/6225 captured MoveTask records (100%)** byte-exact. Scripts: `DumpMoveTaskList.java`,
+  `DumpMoveTaskLeafReaders.java`, `DumpPathHelpers.java`, `DumpMoveTaskTail.java`.
+- **Built byte-exact** (`MoveTaskCodec`, golden tests): mode 0 bare-position, mode 1 PathMoveTask
+  (`BuildPathBody` — the multi-waypoint path), mode 2 stationary (Rotate, the 61-B form), mode 8 approach-target.
+- **Remaining**: recursive `MoveTaskCodec` builders for the other leaves (Ballistic/Animated/Formation/List) as
+  they're needed, wiring `BuildPathBody` into the broadcaster, and a `PatrolPath` DB table that groups ordered
+  waypoints per path (today's `PatrolPaths` table is flat, ungrouped).
