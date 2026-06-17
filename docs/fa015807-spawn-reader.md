@@ -104,6 +104,24 @@ into the fixed-width buffer. It is per-instance text the client reads into a str
 evidently keeps for script/debug, not geometry). Source: the RDB script layer (`[[lua_vm]]` /
 `[[protocol_onscreen_feedback]]`), keyed per NPC type.
 
+## The "missing hair" gap — the POST-IIR float-stat table (offline analysis 2026-06-17)
+
+The minimal post-IIR (`NpcSpawnScaffold.WithMinimalPostIir`, behind `FAOLAN_MINIMAL_SCAFFOLD`) renders humanoids
+with their body intact + chat connected, but **drops hair** — and the offline analysis pins why. Splitting the
+beach burst by post-IIR size (excluding the PLAYER's own record — hoxxling is a player, 635 B post):
+- **Animals** (Panther/Scorpion/Flesheater/Guard Dog) → post-IIR = **41 B (minimal)**: header `[0][len-36][cnt]`
+  + empty `0x3F1` terminators, **no stat records**. The minimal form IS their real form, so they're unaffected.
+- **Humanoids** (Harbor Guard, Boozed Bully, Slave of Acheron, …) → post-IIR = **83–573 B**: the same header
+  then a **float-stat table** — a run of `[u32 statId][f32 value]…` records (stat ids `0x144`/`0xB7`/`0x124` +
+  the `0x01..0x24` slider range, values 0–1) before the `0x3F1` terminators.
+
+So the post-IIR carries the NPC's per-spawn **float-stat / appearance table**, which humanoids have and animals
+don't; `WithMinimalPostIir` emits the empty (animal) form for everyone, so humanoids fall back to default looks →
+no hair. **The fix is to author this stat table (from the NPC's stats/looks) instead of the empty minimal form**
+— or carry just the post-IIR stat table from `Data` while keeping the rest session-independent. (NB: the exact
+record stride/`0x3F1` framing of the table needs one more alignment pass before generating — the records are not
+a clean 16-byte fixed width in the multi-stat tables.) Animals need nothing extra; the minimal form is correct.
+
 ## What this means for construction (#185/#54)
 The **wire grammar is fully pinned AND the content is identified** — no decoding remains for the beach case
 (sublist count 0). What's left is sourcing + the in-client flip:
