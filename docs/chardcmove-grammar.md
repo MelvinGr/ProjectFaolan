@@ -83,6 +83,10 @@ The 7 floats are `position(x,y,z)` + a 4-float facing/orientation, e.g. hoxxling
 
 ## Status
 
-Decoded + dissected (this doc + `decode_chardcmove.py`). **Construct/implement** (a C# codec + a
-byte-exact golden test, driven by the simulation tick) is the implement-second step under #190 —
-CharDCMove/Stop are what the per-zone world model would emit to broadcast entity movement.
+Decoded + dissected (this doc + `decode_chardcmove.py`). **Construct DONE:** `CharDCMoveCodec`,
+`StopCodec` and `SetPosCodec` (`Faolan/GameServer/World/DeadReckoningCodecs.cs`) build/parse byte-exact,
+golden-tested in `DeadReckoningCodecTests`. **Wired (#190):** the sim emits a `StopIIR` (`StopCodec`)
+when an NPC arrives home and stops moving (`WorldTickEffectType.NpcStopped` → `BroadcastNpcStop`); the
+per-tick move still uses `MoveTaskCodec` (swapping it for `CharDCMove` is optional polish). All
+self-contained records are sent via `WorldBroadcaster.SendWorldRecord` (NOT `SendWorldIir`, which would
+double-prefix the codec's own length). Needs in-client verification.

@@ -93,6 +93,12 @@ origin->this-tick position, facing travel direction) so nearby viewers watch it 
 spawn it disengages, walks home (ignoring re-aggro, `WorldEntity.Returning`), and heals on arrival; losing
 the target out in the field also sends it home. WORKS in-client (it moves + leashes + stops on de-aggro).
 
+On arrival home the NPC now also emits a **StopIIR** (`StopCodec` → `BroadcastNpcStop`, the `NpcStopped`
+tick effect) to formally close the move stream (#190), and on engage the broadcaster pushes the NPC's
+**aggro** — a `HateListUpdate` + `ThreatLevel` (`HateListCodec`/`ThreatLevelCodec` → `BroadcastNpcAggro`,
+#216) — alongside the combat-mode weapon-draw. Both are gated by `NpcAutoAttackEnabled` and await in-client
+verification.
+
 **Open polish (walk gait + slight snap).** The 61-byte form has no speed field, so the client uses a default
 interpolation (a small teleport/snap) and a **walk** gait. Findings from the MoveTask grammar:
 - The task-type byte **@30** (offset incl. the 4-byte length prefix) is the form discriminator: `0x06`

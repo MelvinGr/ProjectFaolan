@@ -1,9 +1,12 @@
 # Knubot conversation packets — wire grammar (Gitea #188)
 
 Decoded from `AgeOfConan.exe` (Ghidra, 2026-06-14; reproduce with `Captures/ghidra/DumpIirReaders.java`).
-These are the NPC-dialogue packets `ConversationService.ServeScreen` currently **replays verbatim** from the
-captured `ConversationPacket` rows (~409 rows). Decoding them is the step toward constructing dialogue from
-RDB text + the Lua/tag VM (#188), retiring the replay.
+These are the NPC-dialogue packets `ConversationService.ServeScreen` still **replays verbatim** from the
+captured `ConversationPacket` rows (~409 rows). The **construct path is now wired** (#188): `KnubotCodec`
+(`Faolan/GameServer/Dialogue/KnubotCodec.cs`) builds `OpenChatWindow`/`AppendText` byte-exact from live
+endpoints, reachable via `WorldBroadcaster.SendKnubotOpenChatWindow`/`SendKnubotAppendText` and the `.npcsay`
+GM bootstrap (golden-tested in `KnubotCodecTests`). Remaining: source the remoteformat from RDB text + the
+Lua/tag VM and retire `ServeScreen`'s replay screen-by-screen.
 
 Read primitives (shared with the rest of the protocol): `FUN_0048f900` = read u32 (byte-swapped when the
 big-endian flag is set), `FUN_0048f840` / `FUN_006200a0` = read a length-prefixed string (the
