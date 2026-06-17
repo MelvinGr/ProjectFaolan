@@ -85,7 +85,7 @@ namespace Faolan.Importer
 			if (dumpDir != null)
 				Directory.CreateDirectory(dumpDir);
 
-			int decrypted = 0, noEntry = 0, headerMismatch = 0, decryptFailed = 0, namesAdded = 0, categoriesAdded = 0;
+			int decrypted = 0, noEntry = 0, headerMismatch = 0, decryptFailed = 0, namesAdded = 0, categoriesAdded = 0, valuesAdded = 0;
 			var firstSampleShown = false;
 
 			foreach (var item in items)
@@ -140,6 +140,16 @@ namespace Faolan.Importer
 					categoriesAdded++;
 				}
 
+				// The item base VALUE = property-table field 74 (validated: vendor sell = round(value/10) per unit
+				// against the captured sell anchors, #137). The property table is the run of [fieldId][value] u32 pairs
+				// with strictly-decreasing fieldId after the body header (same parse as Captures/decode_item_template.py).
+				// Some templates' tables don't carry field 74 (left at 0 -> the shop falls back to the level price).
+				if (TryReadPropertyField(template.AsSpan(12), 74, out var value) && value != item.Value)
+				{
+					item.Value = value;
+					valuesAdded++;
+				}
+
 				// Fill the display name only when we don't already have one (captured names are authoritative).
 				if (string.IsNullOrWhiteSpace(item.Name))
 				{
@@ -162,10 +172,10 @@ namespace Faolan.Importer
 				}
 			}
 
-			if (namesAdded > 0 || categoriesAdded > 0)
+			if (namesAdded > 0 || categoriesAdded > 0 || valuesAdded > 0)
 				await db.SaveChangesAsync();
 
-			return new Result(items.Count, decrypted, noEntry, headerMismatch, decryptFailed, namesAdded, categoriesAdded);
+			return new Result(items.Count, decrypted, noEntry, headerMismatch, decryptFailed, namesAdded, categoriesAdded, valuesAdded);
 		}
 
 		// Template strings backslash-escape apostrophes/quotes (e.g. "Aspirant\'s Cap"); undo that for the stored name.
@@ -187,6 +197,53 @@ namespace Faolan.Importer
 			return true;
 		}
 
-		public readonly record struct Result(int Keyed, int Decrypted, int NoEntry, int HeaderMismatch, int DecryptFailed, int NamesAdded, int CategoriesAdded);
+		public readonly record struct Result(int Keyed, int Decrypted, int NoEntry, int HeaderMismatch, int DecryptFailed, int NamesAdded, int CategoriesAdded, int ValuesAdded);
+
+		// Reads the value of property-table field `fieldId` from a decrypted template body (the span AFTER the
+		// 12-byte RDB-Id header). The property table is the longest run of [fieldId u32][value u32] LE pairs with
+		// strictly-decreasing fieldId in (0, 2000] - the same grammar Captures/decode_item_template.py validated.
+		// Returns false when no such run contains the field (some template kinds don't carry it).
+		private static bool TryReadPropertyField(ReadOnlySpan<byte> body, uint fieldId, out uint value)
+		{
+			value = 0;
+			var words = body.Length / 4;
+			var bestLen = 0;
+			var bestValue = 0u;
+			var bestFound = false;
+			for (var start = 0; start + 1 < words; start++)
+			{
+				uint last = 0;
+				var haveLast = false;
+				var len = 0;
+				var found = false;
+				var fv = 0u;
+				for (var j = start; j + 1 < words; j++)
+				{
+					var fid = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(j * 4, 4));
+					if (fid == 0 || fid > 2000 || (haveLast && fid >= last))
+						break;
+					var val = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice((j + 1) * 4, 4));
+					if (fid == fieldId)
+					{
+						found = true;
+						fv = val;
+					}
+					last = fid;
+					haveLast = true;
+					len++;
+					j++; // consumed the value word too
+				}
+				if (len > bestLen)
+				{
+					bestLen = len;
+					bestFound = found;
+					bestValue = fv;
+				}
+			}
+
+			if (bestFound)
+				value = bestValue;
+			return bestFound;
+		}
 	}
 }

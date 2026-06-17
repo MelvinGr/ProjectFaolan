@@ -333,7 +333,7 @@ namespace Faolan.Importer
 		private static async Task ImportRdbItems(DatabaseContext db, string rdbDir, string dumpDir)
 		{
 			var r = await RdbItemImporter.ImportAsync(db, rdbDir, dumpDir);
-			Console.WriteLine($"RDB items: {r.Decrypted}/{r.Keyed} keyed items decrypted+validated; {r.NamesAdded} names filled; {r.CategoriesAdded} search-categories filled" + $"  (noEntry={r.NoEntry}, headerMismatch={r.HeaderMismatch}, decryptFailed={r.DecryptFailed})" +
+			Console.WriteLine($"RDB items: {r.Decrypted}/{r.Keyed} keyed items decrypted+validated; {r.NamesAdded} names filled; {r.CategoriesAdded} search-categories filled; {r.ValuesAdded} values filled" + $"  (noEntry={r.NoEntry}, headerMismatch={r.HeaderMismatch}, decryptFailed={r.DecryptFailed})" +
 			                  (dumpDir != null
 				                  ? $"  -> templates dumped to {dumpDir}"
 				                  : ""));

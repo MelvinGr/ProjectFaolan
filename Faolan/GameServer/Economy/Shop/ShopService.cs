@@ -56,23 +56,32 @@ namespace Faolan.GameServer.Economy.Shop
 		// back). Uniqueness only needs to hold within a session; a process-wide counter is plenty.
 		private static int _shopInstanceSeq;
 
-		// Provisional vendor SELL price in tin, the wallet wire unit (the RDB item templates carry the real value -
-		// TEA-cracked but the value field is not mapped yet; the captured sales went for 19/23/92/392 tin);
-		// until then, scale with item level so better junk pays more.
-		public static uint VendorPriceTin(byte itemLevel, uint count)
+		// The per-unit base value in tin (the wallet wire unit) = round(Item.Value / 10), where Item.Value is the
+		// RDB item-template's field 74. Proven by the captured sales (190->19, 920->92, 560->56 tin; #137). When the
+		// value is unknown (Item.Value==0: not RDB-imported, or a template kind without field 74) it falls back to
+		// the provisional level*2 so better junk still pays more.
+		private static uint BaseValueTin(uint value, int levelFallback)
 		{
-			return (uint)System.Math.Max(1, itemLevel * 2) * System.Math.Max(1u, count);
+			return value > 0
+				? System.Math.Max(1u, (value + 5) / 10)
+				: (uint)System.Math.Max(1, levelFallback * 2);
 		}
 
-		// Provisional vendor BUY price in tin. Real prices are RDB-template-gated (undecoded, like the sell value),
-		// so until then a vendor sells dearer than it buys: a flat markup over VendorPriceTin keeps buy > sell so
-		// the wares can't be flipped for free. The shop-entry's TailLevel is the closest level signal we carry
-		// (Items.Level is mostly 0), so price off that.
+		// Vendor SELL price in tin (what the player gets selling to the vendor) = round(value/10) per unit. Pass the
+		// item's Value (RDB field 74) and its Level (the fallback when Value is unknown).
+		public static uint VendorPriceTin(uint value, byte itemLevel, uint count)
+		{
+			return BaseValueTin(value, itemLevel) * System.Math.Max(1u, count);
+		}
+
+		// Vendor BUY price in tin (what the player pays): a flat markup over the SAME item's sell value so wares
+		// can't be flipped for free (buy > sell). Now grounded in the real value when known; the markup itself has
+		// no captured anchor and stays the open part (#137). TailLevel is the fallback level for value-less wares.
 		public const uint VendorBuyMarkup = 4;
 
-		public static uint VendorBuyPriceTin(uint tailLevel, uint count)
+		public static uint VendorBuyPriceTin(uint value, uint tailLevel, uint count)
 		{
-			return (uint)System.Math.Max(1, (int)tailLevel * 2) * System.Math.Max(1u, count) * VendorBuyMarkup;
+			return BaseValueTin(value, (int)tailLevel) * System.Math.Max(1u, count) * VendorBuyMarkup;
 		}
 
 		// DL 0x2035 - tells the client the bag slot was sold (it clears the slot itself).
@@ -108,7 +117,7 @@ namespace Faolan.GameServer.Economy.Shop
 				return;
 			}
 
-			var price = VendorPriceTin(row.Item.Level, row.Count);
+			var price = VendorPriceTin(row.Item.Value, row.Item.Level, row.Count);
 			await _database.SetCharacterInventorySlot(character.Id, (int)container, (int)slot, null);
 			character.Money += price;
 			await _database.SetCharacterMoney(character.Id, character.Money);
@@ -197,7 +206,8 @@ namespace Faolan.GameServer.Economy.Shop
 				return;
 			}
 
-			var price = VendorBuyPriceTin(ware.TailLevel, ware.Count);
+			var wareItem = await _database.GetItem(ware.ItemTemplateId);
+			var price = VendorBuyPriceTin(wareItem?.Value ?? 0, ware.TailLevel, ware.Count);
 			if (character.Money < price)
 			{
 				_logger.LogInformation("BuyItem: {Character} can't afford ware {Template} at slot {Pos} ({Price} tin, has {Balance}).",

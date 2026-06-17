@@ -47,5 +47,12 @@ namespace Faolan.Core.Database.Tables
 		// (RdbItemImporter), validated byte-for-byte against 170 captured AH listings. 0 when unknown (not RDB-imported).
 		// Used to file a player's listing under the right item-type search node (issue #181).
 		public uint SearchCategory { get; set; }
+
+		// The item's base VALUE = RDB item-template property field 74 (the property table is [fieldId][value] pairs
+		// after the body header; RdbItemImporter). The vendor SELL price is round(Value / 10) per unit, validated
+		// against the captured sell anchors (e.g. 190->19, 920->92, 560->56 tin; #137). 0 when unknown (not
+		// RDB-imported, or a template whose property table doesn't carry field 74) - callers fall back to the
+		// provisional level-based price.
+		public uint Value { get; set; }
 	}
 }

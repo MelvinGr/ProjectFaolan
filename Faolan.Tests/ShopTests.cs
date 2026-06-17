@@ -28,27 +28,54 @@ namespace Faolan.Tests
 			Assert.Equal("0000c75b00001e7e", Convert.ToHexStringLower(body.AsSpan(0, 8).ToArray()));
 		}
 
+		// The real per-unit sell price = round(Item.Value / 10), proven against every sale in the
+		// sell_items_to_trader capture (slot->Item.Value->tin). #137.
+		[Theory]
+		[InlineData(190u, 19u)]   // tmpl 3886819
+		[InlineData(230u, 23u)]   // tmpl 3887406
+		[InlineData(920u, 92u)]   // tmpl 3887364
+		[InlineData(560u, 56u)]   // tmpl 3917245 (sold x7 = 392 tin)
+		[InlineData(206u, 21u)]   // tmpl 3724525 (round half up: 20.6 -> 21)
+		[InlineData(637u, 64u)]   // tmpl 3719048 (63.7 -> 64)
+		public void VendorSellPrice_IsRoundedValueOverTen(uint value, uint expectedPerUnit)
+		{
+			Assert.Equal(expectedPerUnit, ShopService.VendorPriceTin(value, itemLevel: 0, count: 1));
+		}
+
+		[Fact]
+		public void VendorSellPrice_ScalesWithCount_AndMatchesTheStackSale()
+		{
+			// tmpl 3917245: value 560 -> 56/unit, the captured stack of 7 sold for 392 tin.
+			Assert.Equal(392u, ShopService.VendorPriceTin(560, itemLevel: 0, count: 7));
+		}
+
+		[Fact]
+		public void VendorSellPrice_FallsBackToLevel_WhenValueUnknown()
+		{
+			// Value 0 (not RDB-imported) -> provisional level*2.
+			Assert.Equal(80u, ShopService.VendorPriceTin(value: 0, itemLevel: 40, count: 1));
+		}
+
 		[Fact]
 		public void VendorBuyPrice_ExceedsSellPrice_SoWaresCantBeFlipped()
 		{
 			// A vendor must sell dearer than it buys back, or a ware could be bought and re-sold for profit.
-			// Same level signal both ways (sell off Items.Level, buy off the entry TailLevel).
-			const byte level = 40;
+			const uint value = 920;
 			const uint count = 1;
-			Assert.True(ShopService.VendorBuyPriceTin(level, count) > ShopService.VendorPriceTin(level, count));
+			Assert.True(ShopService.VendorBuyPriceTin(value, tailLevel: 0, count) > ShopService.VendorPriceTin(value, itemLevel: 0, count));
 		}
 
 		[Fact]
 		public void VendorBuyPrice_ScalesWithCount()
 		{
-			Assert.Equal(ShopService.VendorBuyPriceTin(10, 1) * 3, ShopService.VendorBuyPriceTin(10, 3));
+			Assert.Equal(ShopService.VendorBuyPriceTin(200, 10, 1) * 3, ShopService.VendorBuyPriceTin(200, 10, 3));
 		}
 
 		[Fact]
 		public void VendorBuyPrice_NeverFree()
 		{
-			// Level-0 wares (the common case while Items.Level is mostly unmapped) still cost something.
-			Assert.True(ShopService.VendorBuyPriceTin(0, 1) >= ShopService.VendorBuyMarkup);
+			// Value-less, level-0 wares still cost something.
+			Assert.True(ShopService.VendorBuyPriceTin(0, 0, 1) >= ShopService.VendorBuyMarkup);
 		}
 	}
 }
