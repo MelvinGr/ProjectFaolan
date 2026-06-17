@@ -18,25 +18,18 @@ public class DumpVtableReaders extends GhidraScript {
     static final long KNOWN_READER = 0x01121c00L;            // SimpleCharFullUpdateIIR_t::ReadSubClass (FUN_01121c00)
     static final String KNOWN_VTABLE = "SimpleCharFullUpdateIIR_t::vftable";
     static final String[] TARGETS = {
-        "ConstructionMenuIIR_c::vftable",
-        "ConstructionOrderIIR_c::vftable",
-        "TradeskillReplyIIR_c::vftable",
-        "TradeskillRequestIIR_c::vftable",
-        "MassivePvPDamageLocationIIR_c::vftable",
-        "MassivePvpScoreIIR_c::vftable",
-        "PVPDropItemIIR_t::vftable",
-        "FanaticIIR_t::vftable",
-        "FanaticCommandIIR_t::vftable",
-        "ToolMessageIIR_t::vftable",
-        "ToolMessageInternalIIR_t::vftable",
-        "ScryLuaIIR::vftable",
-        "n3PlayfieldFullUpdateIIR_t::vftable",
-        "n3ToServerUnBlockIIR_t::vftable",
-        "GameCodeDynelFullUpdateIIR::vftable",
-        "CoreFullPlayerCharacterIIR::vftable",
-        "FloatStatIIR::vftable",
-        "Int32StatIIR::vftable",
-        "StringStatIIR::vftable",
+        "FlushRDBCachesIIR_c::vftable",
+        "GMStatIIR_c::vftable",
+        "HiveDebugIIR_c::vftable",
+        "IIRDebugView::vftable",
+        "IIRStatListViewItem::vftable",
+        "NPCDebugManagerIIR_c::vftable",
+        "PlayfieldDebugManagerIIR_c::vftable",
+        "RequestDebugInfoIIR_c::vftable",
+        "ServerPosDebugInfoIIR_c::vftable",
+        "ProtoCoreCharacterIIR::vftable",
+        "ProtoFullCharacterIIR::vftable",
+        "ProtoSimpleDynelIIR::vftable",
     };
 
     Address vtableAddr(String full) {

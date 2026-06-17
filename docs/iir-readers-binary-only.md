@@ -113,9 +113,44 @@ Primitives: `FUN_0048f900` = `ReadU32` (BE); `FUN_00cba1b0(&x,N)` = `ReadN` (N=1
 > readers behind the count-prefixed stat blocks in [player-stats.md](player-stats.md): each is
 > `[u32 statId][value]` where value is a u32 (float/int) or a length-prefixed string.
 
+## Batch 6 — debug/editor classes + the `Proto*` protobuf types (catalog closeout)
+
+### Debug / editor / GM readers
+
+These are dev/GM tooling, not normal gameplay traffic — recovered for completeness.
+
+| sub | type | reader | body |
+|---|---|---|---|
+| `0x45ECFD79` | `FlushRDBCachesIIR_c` | `661890` | `[u32]` |
+| `0xBF12AA7C` | `GMStatIIR_c` | `8d4750` | `[u32×2]` (GM stat set: id + value) |
+| `0xAFE243E6` | `ServerPosDebugInfoIIR_c` | `a33da0` | `[u32×9]` (debug position/orientation dump) |
+| `0x52076086` | `IIRDebugView` | `adf280` | empty stub — a UI/debug-view class, no wire body |
+| `0xAC1383D3` | `HiveDebugIIR_c` | `6d63f0` | large debug reader (body not expanded) |
+| `0x9F2C283B` | `NPCDebugManagerIIR_c` | `794db0` | large debug reader |
+| `0xEE7F5776` | `PlayfieldDebugManagerIIR_c` | `8f2b20` | large debug reader |
+| `0x09F159E4` | `RequestDebugInfoIIR_c` | `6dcc40` | large debug reader |
+| `0x9D5F1DDC` | `IIRStatListViewItem` | `c07c90` | UI list-view item (editor stat inspector) |
+
+### `Proto*` types are protobuf, not IIR stream readers
+
+The 17 `Proto*` catalog entries (and their nested submessages) are **protobuf message types**, fully
+specified by the recovered client schema at
+[`Faolan.Core/Network/Protobuf/aoc-client-protos.proto`](../Faolan.Core/Network/Protobuf/aoc-client-protos.proto)
+— so they are "decoded" by the schema, not by a hand-rolled `ReadSubClass`. (Their vtable slot 8 is the
+generated protobuf serialize/parse virtual, not the IIR stream reader.) Covered there:
+
+`ProtoMoveInventoryItemIIR`, `ProtoDeleteItemIIR`, `ProtoFullCharacterIIR`, `ProtoSimpleDynelIIR`,
+`ProtoLootBagIIR` (+ `SpecialLootOwnerEntry`), `ProtoGameCodeDynelIIR` (+ `RunningEffects`),
+`ProtoScryScriptIIR` (+ `Variable`), `ProtoCoreCharacterIIR` (+ `CharacterStats` / `PlayerStats` /
+`NpcStats` / `InventoryEntry` / `InventoryEntry.GemSlot` / `CharacterBcc`).
+
 ## Status
 
 Readers recovered (this doc). These are **not implemented or byte-validated** — the retail captures
 never exercise them, so they're low priority for the emulator until a feature needs one (groups,
 feats/skills, master-looter, PvP threat meter, quest rewards). When that happens, the grammar above
 is the starting point; capture or in-client validation is still required before shipping a builder.
+
+**Catalog closeout:** with this batch every one of the 141 IIR classes is accounted for — on-wire
+types byte-exact decoded, binary-only readers recovered, debug/editor readers recovered, and the
+`Proto*` types covered by the protobuf schema. Nothing in the client's IIR catalog is now unmapped.
