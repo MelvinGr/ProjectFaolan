@@ -23,6 +23,8 @@ public class DumpVtableReaders extends GhidraScript {
         "MoveTaskIIR_c::vftable",
         "GameActionListIIR_t::vftable",
         "BehaviorControlCenterIIR_c::vftable",
+        "CharDCMoveIIR_t::vftable",
+        "StopIIR_c::vftable",
     };
 
     Address vtableAddr(String full) {
