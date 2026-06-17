@@ -24,3 +24,23 @@ are already built byte-exact by `CombatService`/`CombatPacketCodec` (`BehaviorAc
 
 Grammar SHAPE decoded (type switch + commandId + per-command reader). A fully constructive codec needs the
 per-Command readers (vtable slot 0x80 of each Command type) enumerated - the residue; the combat path is done.
+
+## Registration form (the create-burst / world-entry BccIIR) — #234
+
+Distinct from the combat BccAck above: the create-world cutscene and world-entry bursts REGISTER behaviors on
+scene entities with a fixed-shape record (decoded by `Captures/decode_behaviorcc.py`, built by
+`CreateEditorRecordBuilder.BuildBehaviorControlCenterIir`):
+
+```
+[u32 C350][u32 handle][u16 form][u32 slot][u32 msgLen][protobuf][optional tail]
+  form     = 0x0004 (common) | 0x0007 (rarer subtype: adds protobuf field 4, a varint)
+  protobuf = base varints  f1=behaviorId  f3=phase  f5=field5  f6=field6
+             + OPTIONAL     f2, f11, f12        (wire order: 1,[2],3,5,6,[11],[12])
+  tail     = 0 | 20-byte "bound" [u32 boundA][u32 boundB][12x 00] | 88-byte item-bound long form
+```
+
+Form census across the hoxxling create-world cutscene (90 records): 41x {1,3,5,6,12} no-tail, 34x {1,3,5,6}
+no-tail, 7x {1,3,5,6,12}+bound20, 4x {1,3,5,6,11,12}+bound20, 1x {1,3,5,6}+bound20, 1x {1,2,3,5,6,12}+bound20,
+1x {1,3,5,6}+long88, 1x form=0x0007. `BuildBehaviorControlCenterIir` constructs the form-0x0004 records
+(base + optional 2/11/12 + 20-byte bound tail); `BuildBehaviorControlCenterIirLong` the 88-byte item-bound form.
+The 0x0007 subtype (field-4 variant) is the only registration shape still un-built (1 record, left verbatim).

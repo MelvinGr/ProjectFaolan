@@ -112,27 +112,36 @@ namespace Faolan.GameServer
 				.ToArray();
 		}
 
-		// BehaviorControlCenterIIR (0x642CD3D6), short form (28 bytes): registers one behavior on an entity.
-		//   [u32 type][u32 handle][u16 0x0004][u32 slot][u32 msgLen][protobuf]
-		// protobuf = `08 <behaviorId> 18 <phase> 28 <field5> 30 <field6>` (all varints), msgLen = its length.
-		// (A longer 116-byte form carries an extra item-bound behavior-state tail - see
-		// BuildBehaviorControlCenterIirLong below.) Decoded by Captures/decode_create_iir_records.py.
+		// BehaviorControlCenterIIR (0x642CD3D6), registration form: registers one behavior on an entity.
+		//   [u32 type][u32 handle][u16 0x0004][u32 slot][u32 msgLen][protobuf][optional 20-byte bound tail]
+		// protobuf = base varint fields `08 <behaviorId> [10 <field2>] 18 <phase> 28 <field5> 30 <field6>
+		// [58 <field11>] [60 <field12>]`, msgLen = its length. The optional fields (2/11/12) and the 20-byte
+		// "bound" tail (`[u32 boundA][u32 boundB][12x 00]`) were decoded from the create-world cutscene burst
+		// (Captures/decode_behaviorcc.py, #234): of its 90 records the field set is {1,3,5,6} with optional
+		// {2,11,12} and a 0- or 20-byte tail. (A separate 88-byte item-bound long form has its own builder,
+		// BuildBehaviorControlCenterIirLong below.) Decoded by Captures/decode_create_iir_records.py + decode_behaviorcc.py.
 		public static byte[] BuildBehaviorControlCenterIir(uint handle, uint slot, uint behaviorId, uint phase,
-			uint field5, uint field6, uint type = CharacterWireType)
+			uint field5, uint field6, uint type = CharacterWireType,
+			uint? field2 = null, uint? field11 = null, uint? field12 = null,
+			uint? boundA = null, uint? boundB = null)
 		{
-			var protobuf = new FaolanStream()
-				.WriteByte(0x08).WriteVarint(behaviorId)
-				.WriteByte(0x18).WriteVarint(phase)
+			var pb = new FaolanStream().WriteByte(0x08).WriteVarint(behaviorId);
+			if (field2 is uint f2) pb.WriteByte(0x10).WriteVarint(f2);
+			pb.WriteByte(0x18).WriteVarint(phase)
 				.WriteByte(0x28).WriteVarint(field5)
-				.WriteByte(0x30).WriteVarint(field6)
-				.ToArray();
-			return new FaolanStream()
+				.WriteByte(0x30).WriteVarint(field6);
+			if (field11 is uint f11) pb.WriteByte(0x58).WriteVarint(f11);
+			if (field12 is uint f12) pb.WriteByte(0x60).WriteVarint(f12);
+
+			var s = new FaolanStream()
 				.WriteUInt32(type)
 				.WriteUInt32(handle)
 				.WriteUInt16((ushort)0x0004)
 				.WriteUInt32(slot)
-				.WriteArrayUInt32Length(protobuf)
-				.ToArray();
+				.WriteArrayUInt32Length(pb.ToArray());
+			if (boundA is uint a)
+				s.WriteUInt32(a).WriteUInt32(boundB ?? 0u).WriteArray(new byte[12]);
+			return s.ToArray();
 		}
 
 		// BehaviorControlCenterIIR (0x642CD3D6), LONG form (116 bytes): the same 28-byte head as the short form

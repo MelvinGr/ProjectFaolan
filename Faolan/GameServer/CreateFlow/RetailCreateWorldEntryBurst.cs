@@ -1350,48 +1350,39 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x3D, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x01, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E3D, 7, 41413, 1, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x3E, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x01, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E3E, 7, 41413, 1, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x3C, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x01, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E3C, 7, 41413, 1, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x5B, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0x95, 0xA7, 0x0D, 0x18, 0x01, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E5B, 7, 218005, 1, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x57, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xD8, 0x84, 0x01, 0x18, 0x01, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E57, 7, 16984, 1, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x58, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xD8, 0x84, 0x01, 0x18, 0x01, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E58, 7, 16984, 1, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x59, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0x95, 0xA7, 0x0D, 0x18, 0x01, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E59, 7, 218005, 1, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x32, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x01, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E32, 7, 41413, 1, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x33, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x01, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E33, 7, 41413, 1, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -1407,13 +1398,11 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x3F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x01, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E3F, 7, 41413, 1, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x54, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xD8, 0x84, 0x01, 0x18, 0x01, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E54, 7, 16984, 1, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -1427,8 +1416,7 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x53, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xD8, 0x84, 0x01, 0x18, 0x01, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E53, 7, 16984, 1, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -1454,23 +1442,19 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x5A, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0x95, 0xA7, 0x0D, 0x18, 0x01, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E5A, 7, 218005, 1, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x4D, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xD8, 0x84, 0x01, 0x18, 0x01, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E4D, 7, 16984, 1, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x4E, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xD8, 0x84, 0x01, 0x18, 0x01, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E4E, 7, 16984, 1, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x4F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xD8, 0x84, 0x01, 0x18, 0x01, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E4F, 7, 16984, 1, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -1509,38 +1493,31 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x28, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x01, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E28, 7, 41413, 1, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2E, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x01, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2E, 7, 41413, 1, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2B, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x01, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2B, 7, 41413, 1, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2C, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x01, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2C, 7, 41413, 1, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2A, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x01, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2A, 7, 41413, 1, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x01, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 7, 41413, 1, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x29, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x01, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E29, 7, 41413, 1, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -1577,8 +1554,7 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x37, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x33, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xA9, 0xC8, 0x02, 0x18, 0x02, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0x90, 0x03, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E33, 1, 42025, 2, 24, 0, field12: 400, boundA: 9, boundB: 1)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -1588,18 +1564,15 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x37, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x28, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xA9, 0xC8, 0x02, 0x18, 0x02, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0xD4, 0x02, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E28, 1, 42025, 2, 24, 0, field12: 340, boundA: 9, boundB: 1)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x37, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2C, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xA9, 0xC8, 0x02, 0x18, 0x02, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0xD4, 0x02, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2C, 1, 42025, 2, 24, 0, field12: 340, boundA: 9, boundB: 1)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x37, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xA9, 0xC8, 0x02, 0x18, 0x02, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0x90, 0x03, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 1, 42025, 2, 24, 0, field12: 400, boundA: 9, boundB: 1)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -1667,8 +1640,7 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x28, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xBC, 0xC9, 0x02, 0x18, 0x03, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0x88, 0x18)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E28, 5, 42172, 3, 24, 0, field12: 3080)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -1678,8 +1650,7 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2C, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xB7, 0xC9, 0x02, 0x18, 0x03, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0xB4, 0x06)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2C, 5, 42167, 3, 24, 0, field12: 820)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -1827,8 +1798,7 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x33, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xBC, 0xC9, 0x02, 0x18, 0x03, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0xDC, 0x1A)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E33, 5, 42172, 3, 24, 0, field12: 3420)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -1980,13 +1950,11 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2C, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xB7, 0xC9, 0x02, 0x18, 0x04, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0xB4, 0x06)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2C, 5, 42167, 4, 24, 0, field12: 820)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xBA, 0xC9, 0x02, 0x18, 0x03, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0xB0, 0x04)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 5, 42170, 3, 24, 0, field12: 560)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -2104,8 +2072,7 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x28, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xBA, 0xC9, 0x02, 0x18, 0x04, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0x90, 0x03)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E28, 5, 42170, 4, 24, 0, field12: 400)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -2142,8 +2109,7 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xBA, 0xC9, 0x02, 0x18, 0x04, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0xB0, 0x04)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 5, 42170, 4, 24, 0, field12: 560)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -2254,8 +2220,7 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x28, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xB7, 0xC9, 0x02, 0x18, 0x05, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0xB4, 0x06)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E28, 5, 42167, 5, 24, 0, field12: 820)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -2338,13 +2303,11 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x33, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xB7, 0xC9, 0x02, 0x18, 0x04, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0xAC, 0x05)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E33, 5, 42167, 4, 24, 0, field12: 684)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2C, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xBB, 0xC9, 0x02, 0x18, 0x05, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0xEC, 0x04)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2C, 5, 42171, 5, 24, 0, field12: 620)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -2506,8 +2469,7 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xBB, 0xC9, 0x02, 0x18, 0x05, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0xF0, 0x01)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 5, 42171, 5, 24, 0, field12: 240)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -2516,13 +2478,11 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x38, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0E, 0x08, 0xBF, 0xC9, 0x02, 0x18, 0x06, 0x28,
-					0x18, 0x30, 0x00, 0x58, 0x04, 0x60, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 1, 42175, 6, 24, 0, field11: 4, field12: 4, boundA: 1, boundB: 9)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x07, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 7, 41413, 7, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -2577,8 +2537,7 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2C, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xBC, 0xC9, 0x02, 0x18, 0x06, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0x88, 0x18)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2C, 5, 42172, 6, 24, 0, field12: 3080)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -2811,8 +2770,7 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x33, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xBB, 0xC9, 0x02, 0x18, 0x05, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0xF0, 0x01)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E33, 5, 42171, 5, 24, 0, field12: 240)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -2836,8 +2794,7 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x28, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xBB, 0xC9, 0x02, 0x18, 0x06, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0xEC, 0x04)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E28, 5, 42171, 6, 24, 0, field12: 620)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -2920,8 +2877,7 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x28, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xB7, 0xC9, 0x02, 0x18, 0x07, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0xB4, 0x06)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E28, 5, 42167, 7, 24, 0, field12: 820)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -2936,13 +2892,11 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x22, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0C, 0x08, 0x87, 0xC5, 0x0B, 0x18, 0x08, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0x0A)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 5, 189063, 8, 24, 0, field12: 10)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x09, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 7, 41413, 9, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -3019,8 +2973,7 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xFA, 0xC8, 0x02, 0x18, 0x0A, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0xBF, 0x07)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 5, 42106, 10, 24, 0, field12: 959)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -3046,8 +2999,7 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x33, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xBB, 0xC9, 0x02, 0x18, 0x06, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0xF0, 0x01)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E33, 5, 42171, 6, 24, 0, field12: 240)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -3162,8 +3114,7 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xFA, 0xC8, 0x02, 0x18, 0x0B, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0xBF, 0x07)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 5, 42106, 11, 24, 0, field12: 959)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -3194,8 +3145,7 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x33, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xB7, 0xC9, 0x02, 0x18, 0x07, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0xAC, 0x05)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E33, 5, 42167, 7, 24, 0, field12: 684)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -3269,8 +3219,7 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x0C, 0x28,
-					0x18, 0x30, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 7, 41413, 12, 24, 0)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -3339,13 +3288,11 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2C, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xB7, 0xC9, 0x02, 0x18, 0x07, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0xB4, 0x06)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2C, 5, 42167, 7, 24, 0, field12: 820)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x37, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xA9, 0xC8, 0x02, 0x18, 0x0D, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0x90, 0x03, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 1, 42025, 13, 24, 0, field12: 400, boundA: 9, boundB: 1)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -3528,8 +3475,7 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2C, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xBC, 0xC9, 0x02, 0x18, 0x08, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0x88, 0x18)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2C, 5, 42172, 8, 24, 0, field12: 3080)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -3543,8 +3489,7 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x33, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xBC, 0xC9, 0x02, 0x18, 0x08, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0xDC, 0x1A)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E33, 5, 42172, 8, 24, 0, field12: 3420)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -3693,8 +3638,7 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x28, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xB7, 0xC9, 0x02, 0x18, 0x08, 0x28,
-					0x18, 0x30, 0x00, 0x60, 0xB4, 0x06)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E28, 5, 42167, 8, 24, 0, field12: 820)))
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -4614,8 +4558,7 @@ namespace Faolan.GameServer
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x34, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0xD0, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xBA, 0xEE, 0x09, 0x18, 0x01,
-							0x28, 0x18, 0x30, 0x00, 0x00, 0x00, 0x00, 0x50, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017ED0, 1, 161594, 1, 24, 0, boundA: 80, boundB: 1)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -4711,13 +4654,11 @@ namespace Faolan.GameServer
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x38, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0E, 0x08, 0xBF, 0xC9, 0x02, 0x18, 0x0E,
-							0x28, 0x18, 0x30, 0x00, 0x58, 0x04, 0x60, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 1, 42175, 14, 24, 0, field11: 4, field12: 4, boundA: 1, boundB: 9)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x0F,
-							0x28, 0x18, 0x30, 0x00)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 7, 41413, 15, 24, 0)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -5189,8 +5130,7 @@ namespace Faolan.GameServer
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x10,
-							0x28, 0x18, 0x30, 0x00)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 7, 41413, 16, 24, 0)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -5214,8 +5154,7 @@ namespace Faolan.GameServer
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x37, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xA9, 0xC8, 0x02, 0x18, 0x11,
-							0x28, 0x18, 0x30, 0x00, 0x60, 0x90, 0x03, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 1, 42025, 17, 24, 0, field12: 400, boundA: 9, boundB: 1)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -5353,8 +5292,7 @@ namespace Faolan.GameServer
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x28, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xBC, 0xC9, 0x02, 0x18, 0x09,
-							0x28, 0x18, 0x30, 0x00, 0x60, 0x88, 0x18)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E28, 5, 42172, 9, 24, 0, field12: 3080)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchPong, [0x01])
@@ -5366,8 +5304,7 @@ namespace Faolan.GameServer
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x33, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xBC, 0xC9, 0x02, 0x18, 0x09,
-							0x28, 0x18, 0x30, 0x00, 0x60, 0xDC, 0x1A)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E33, 5, 42172, 9, 24, 0, field12: 3420)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchPong, [0x01])
@@ -5422,8 +5359,7 @@ namespace Faolan.GameServer
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x03, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x01,
-							0x28, 0x18, 0x30, 0x00)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E03, 7, 41413, 1, 24, 0)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -5490,8 +5426,7 @@ namespace Faolan.GameServer
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2C, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xBA, 0xC9, 0x02, 0x18, 0x09,
-							0x28, 0x18, 0x30, 0x00, 0x60, 0x90, 0x03)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2C, 5, 42170, 9, 24, 0, field12: 400)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchPong, [0x01])
@@ -5738,8 +5673,7 @@ namespace Faolan.GameServer
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2C, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xB7, 0xC9, 0x02, 0x18, 0x0A,
-							0x28, 0x18, 0x30, 0x00, 0x60, 0xB4, 0x06)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2C, 5, 42167, 10, 24, 0, field12: 820)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -5906,13 +5840,11 @@ namespace Faolan.GameServer
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x38, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0E, 0x08, 0xBF, 0xC9, 0x02, 0x18, 0x12,
-							0x28, 0x18, 0x30, 0x00, 0x58, 0x04, 0x60, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 1, 42175, 18, 24, 0, field11: 4, field12: 4, boundA: 1, boundB: 9)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x13,
-							0x28, 0x18, 0x30, 0x00)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 7, 41413, 19, 24, 0)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -5937,8 +5869,7 @@ namespace Faolan.GameServer
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xFA, 0xC8, 0x02, 0x18, 0x14,
-							0x28, 0x18, 0x30, 0x00, 0x60, 0xBF, 0x07)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 5, 42106, 20, 24, 0, field12: 959)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchPong, [0x01])
@@ -5998,8 +5929,7 @@ namespace Faolan.GameServer
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2C, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xBA, 0xC9, 0x02, 0x18, 0x0B,
-							0x28, 0x18, 0x30, 0x00, 0x60, 0x90, 0x03)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2C, 5, 42170, 11, 24, 0, field12: 400)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -6035,13 +5965,11 @@ namespace Faolan.GameServer
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x28, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xBA, 0xC9, 0x02, 0x18, 0x0A,
-							0x28, 0x18, 0x30, 0x00, 0x60, 0x90, 0x03)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E28, 5, 42170, 10, 24, 0, field12: 400)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xFA, 0xC8, 0x02, 0x18, 0x15,
-							0x28, 0x18, 0x30, 0x00, 0x60, 0xBF, 0x07)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 5, 42106, 21, 24, 0, field12: 959)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchReceivedStockPhraseText)
@@ -6094,8 +6022,7 @@ namespace Faolan.GameServer
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x33, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xB7, 0xC9, 0x02, 0x18, 0x0A,
-							0x28, 0x18, 0x30, 0x00, 0x60, 0xAC, 0x05)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E33, 5, 42167, 10, 24, 0, field12: 684)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -6199,13 +6126,11 @@ namespace Faolan.GameServer
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x22, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0C, 0x08, 0x87, 0xC5, 0x0B, 0x18, 0x16,
-							0x28, 0x18, 0x30, 0x00, 0x60, 0x0A)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 5, 189063, 22, 24, 0, field12: 10)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x17,
-							0x28, 0x18, 0x30, 0x00)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 7, 41413, 23, 24, 0)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -6217,13 +6142,11 @@ namespace Faolan.GameServer
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0x9D, 0xC9, 0x02, 0x18, 0x18,
-							0x28, 0x18, 0x30, 0x00, 0x60, 0x8F, 0x06)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 5, 42141, 24, 24, 0, field12: 783)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x28, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xBA, 0xC9, 0x02, 0x18, 0x0B,
-							0x28, 0x18, 0x30, 0x00, 0x60, 0x90, 0x03)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E28, 5, 42170, 11, 24, 0, field12: 400)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -6420,8 +6343,7 @@ namespace Faolan.GameServer
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0x9D, 0xC9, 0x02, 0x18, 0x19,
-							0x28, 0x18, 0x30, 0x00, 0x60, 0x8F, 0x06)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 5, 42141, 25, 24, 0, field12: 783)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchPong, [0x01])
@@ -6433,18 +6355,15 @@ namespace Faolan.GameServer
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x28, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xBB, 0xC9, 0x02, 0x18, 0x0C,
-							0x28, 0x18, 0x30, 0x00, 0x60, 0xEC, 0x04)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E28, 5, 42171, 12, 24, 0, field12: 620)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2C, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xBA, 0xC9, 0x02, 0x18, 0x0C,
-							0x28, 0x18, 0x30, 0x00, 0x60, 0x90, 0x03)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2C, 5, 42170, 12, 24, 0, field12: 400)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x03, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x02,
-							0x28, 0x18, 0x30, 0x00)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E03, 7, 41413, 2, 24, 0)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -6492,13 +6411,11 @@ namespace Faolan.GameServer
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x33, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xB7, 0xC9, 0x02, 0x18, 0x0B,
-							0x28, 0x18, 0x30, 0x00, 0x60, 0xAC, 0x05)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E33, 5, 42167, 11, 24, 0, field12: 684)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x1A,
-							0x28, 0x18, 0x30, 0x00)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 7, 41413, 26, 24, 0)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -6613,8 +6530,7 @@ namespace Faolan.GameServer
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x37, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xA9, 0xC8, 0x02, 0x18, 0x1B,
-							0x28, 0x18, 0x30, 0x00, 0x60, 0x90, 0x03, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 1, 42025, 27, 24, 0, field12: 400, boundA: 9, boundB: 1)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
@@ -6712,13 +6628,11 @@ namespace Faolan.GameServer
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x38, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0E, 0x08, 0xBF, 0xC9, 0x02, 0x18, 0x1C,
-							0x28, 0x18, 0x30, 0x00, 0x58, 0x04, 0x60, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 1, 42175, 28, 24, 0, field11: 4, field12: 4, boundA: 1, boundB: 9)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x20, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x2F, 0x00, 0x04, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x0A, 0x08, 0xC5, 0xC3, 0x02, 0x18, 0x1D,
-							0x28, 0x18, 0x30, 0x00)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E2F, 7, 41413, 29, 24, 0)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -6755,8 +6669,7 @@ namespace Faolan.GameServer
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArray(0x00, 0x00, 0x00, 0x23, 0x64, 0x2C, 0xD3, 0xD6, 0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x28, 0x00, 0x04, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x0D, 0x08, 0xBB, 0xC9, 0x02, 0x18, 0x0D,
-							0x28, 0x18, 0x30, 0x00, 0x60, 0xEC, 0x04)
+						.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR).WriteArray(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00017E28, 5, 42171, 13, 24, 0, field12: 620)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
