@@ -431,7 +431,11 @@ namespace Faolan.GameServer
 		// Replays a map's captured world burst (from the DB), re-addressed from the burst's captured instance to the
 		// logged-in character. Works for ANY map that has a stored burst (beach included - its burst is the proven
 		// blob, seeded into the DB by Faolan.Importer).
-		private async Task ReplayMapWorldBurst(INetworkClient client, MapWorldBurst burst)
+		// `mapId` is the player's ACTUAL destination map; `burst` may be a fallback from another map (the beach) when the
+		// destination has no captured burst of its own. NPC/object rows + the playfield token are sourced by `mapId`,
+		// NOT burst.MapId, so a fallback renders the destination map's contents (empty if it has no rows), never the
+		// fallback map's (#210). On a same-map entry mapId == burst.MapId, so this is a no-op there.
+		private async Task ReplayMapWorldBurst(INetworkClient client, MapWorldBurst burst, uint mapId)
 		{
 			// Rebuild the exact original packet bytes from the structured IIR records (IirRecordCodec is round-trip
 			// lossless), then drive the same proven byte-preserving replay (instance rewrite + inventory/spawn rebuild).
@@ -459,7 +463,7 @@ namespace Faolan.GameServer
 			// regenerated snapshot), so n3ToClientQuit removals carry the value the client learned here (WorldDespawn).
 			var fullChar = records.FirstOrDefault(e => e.IirType == IirMessageTypes.FullChar);
 			if (fullChar?.Body != null)
-				_broadcaster.CapturePlayfieldToken(burst.MapId, fullChar.Body);
+				_broadcaster.CapturePlayfieldToken(mapId, fullChar.Body);
 
 			client.Session.UsedWorldBurstReplay = true;
 
@@ -490,7 +494,7 @@ namespace Faolan.GameServer
 			// the burst's own handle so it stays paired with the burst's 96C46740 registration. Same-source rows
 			// rebuild byte-identical; cross-session rows are a genuine reconstruction of the same NPC at the same
 			// spot. The player's own spawn and non-NPC records are untouched.
-			var npcRows = await Database.GetNpcSpawns(burst.MapId);
+			var npcRows = await Database.GetNpcSpawns(mapId);
 			var npcByPosition = new Dictionary<(int, int, int), NpcSpawn>();
 			foreach (var n in npcRows)
 				npcByPosition.TryAdd(PositionKey(n.PositionX, n.PositionY, n.PositionZ), n);
@@ -500,7 +504,7 @@ namespace Faolan.GameServer
 			// Static world objects (decor/containers/zones) sourced from the WorldObjects table the same way -
 			// keyed by position, rebuilt via WorldObjectBuilder with the burst's handle, put on the wire only when
 			// byte-identical to the re-addressed burst body (zero render risk).
-			var worldObjectRows = await Database.GetWorldObjects(burst.MapId);
+			var worldObjectRows = await Database.GetWorldObjects(mapId);
 			// Keyed by (position, identity): two props can share an exact position (#222), so the display_name identity
 			// (read from the row's own Data) disambiguates them - position alone would drop one and mis-match the other.
 			var objectByPosition = new Dictionary<(int, int, int, string), WorldObject>();
@@ -673,7 +677,7 @@ namespace Faolan.GameServer
 			// (docs/archive/server-architecture-roadmap.md).
 			await _broadcaster.EnsureZoneNpcs(mapId);
 			_simulation.RegisterPlayerInWorld(client);
-			await ReplayMapWorldBurst(client, worldBurst);
+			await ReplayMapWorldBurst(client, worldBurst, mapId);
 
 			// Now that the spawn body is captured, run interest: spawn this player to nearby players and them to it.
 			await _broadcaster.BroadcastPlayerEntry(client);
