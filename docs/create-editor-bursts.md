@@ -134,8 +134,13 @@ create-specific to decode, only builder wiring to do:
      `CreateEditorRecordBuilder.BuildRegenIir`.
    - (`StatIIR`/`EnergyIIR`/`PlayfieldFIIR`/`GameTimeIIR` already had builders.)
 
-   **Still verbatim** (handle-addressed via `IirId`, i.e. the only session-variable field is already
-   parameterized; the rest is fixed scripted/state content that needs deeper RE — #223):
-   `ScryScriptIIR` (the cutscene callback scripts — overlap the in-client cutscene work). Plus the non-IIR
-   `ApplySpell`, `RetailNpcConversationBurst`, and the 1.1 MB intro-cutscene `RetailCreateWorldEntryBurst`
-   (render/pacing-sensitive, needs in-client validation).
+   **`ScryScriptIIR` now CONSTRUCTED (#223):** the two CreationScript records (the "Slave Galley" PreloadAssets
+   step + "PlayOrSkip") are built by `ScryScript.BuildStep`, and the post-morph `StartScriptGroupOnClient`
+   callback by `ScryScript.BuildStartScriptGroup` (the NicknameOk/CharCreationFinished callbacks were already
+   built by `SendA36DCallback`). All byte-exact (`ScryScriptCreateBurstTests`). With `BehaviorControlCenterIIR`
+   long form + `RegenIIR` (already done), **no `*IIR` record type in the create-editor bursts is verbatim**.
+
+   **Still verbatim** (non-IIR / deferred): `ApplySpell`, `RetailNpcConversationBurst` (the Knubot dialogue
+   blobs — the #188 conversation-VM track), and the ScryScript inside the 1.1 MB intro-cutscene
+   `RetailCreateWorldEntryBurst` (render/pacing-sensitive, decoded together with the cutscene — needs in-client
+   validation).
