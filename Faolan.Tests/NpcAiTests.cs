@@ -170,6 +170,42 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void EnterCombat_EffectCarriesAggroTarget()
+		{
+			var world = new WorldState();
+			var zone = world.ZoneFor(4010);
+			var npc = Npc(1, 0, 0);
+			var player = Player(2, 3, 0);
+			zone.Add(npc);
+			zone.Add(player);
+
+			// The engage tick emits NpcEnterCombat carrying the aggroed target (so the broadcaster can push HateList/
+			// ThreatLevel, #216).
+			var enter = world.Tick(WorldState.NpcAttackInterval).Single(e => e.Type == WorldTickEffectType.NpcEnterCombat);
+			Assert.Same(player, enter.Target);
+		}
+
+		[Fact]
+		public void ArrivesHome_EmitsNpcStopped()
+		{
+			var world = new WorldState();
+			var zone = world.ZoneFor(4010);
+			var npc = Npc(1, 0, 0);
+			npc.Position = new Vector3(WorldState.NpcLeashRange + 5f, 0, 0); // chased out past the leash
+			zone.Add(npc);
+			zone.Add(Player(2, WorldState.NpcLeashRange + 6f, 0));
+
+			world.Tick(0.5); // flips to returning
+			var stopped = false;
+			for (var i = 0; i < 400 && !stopped; i++)
+				foreach (var e in world.Tick(0.5))
+					stopped |= e.Type == WorldTickEffectType.NpcStopped && e.Entity == npc;
+
+			Assert.True(stopped, "an NPC arriving home should emit NpcStopped (#190)");
+			Assert.False(npc.Returning);
+		}
+
+		[Fact]
 		public void Chase_ArrivesInMeleeRangeThenAttacks()
 		{
 			var world = new WorldState();

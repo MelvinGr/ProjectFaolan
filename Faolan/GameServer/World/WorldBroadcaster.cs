@@ -167,6 +167,47 @@ namespace Faolan.GameServer.World
 			}
 		}
 
+		// An NPC engaged a target: push its aggro to every viewer in range that sees it - a HateListUpdate (the NPC now
+		// hates the target) plus a ThreatLevel, so the threat/aggro is visible the tick combat starts (#216). Additive
+		// to the combat-mode weapon-draw; gated with the rest of the combat sim by the caller.
+		public async Task BroadcastNpcAggro(WorldEntity npc, WorldEntity target)
+		{
+			if (target == null)
+				return;
+
+			var hate = HateListCodec.Build(npc.Handle, target.Handle);
+			var threat = ThreatLevelCodec.Build(npc.Handle, threat: 1, flag: 1);
+
+			foreach (var viewer in _sim
+				         .World
+				         .ZoneFor(npc.MapId)
+				         .PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
+			{
+				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
+				{
+					await SendWorldIir(viewer.Client, hate);
+					await SendWorldIir(viewer.Client, threat);
+				}
+			}
+		}
+
+		// An NPC arrived home and stopped moving: send a StopIIR (final position + facing) to every viewer that sees it,
+		// closing the MoveTask stream it was emitting while it chased/returned (#190). Faces the direction it travelled.
+		public async Task BroadcastNpcStop(WorldEntity npc)
+		{
+			var facing = npc.MoveOrigin.FaceTowards(npc.Position);
+			var body = StopCodec.Build(npc.Handle, npc.Position, facing.X, facing.Y, facing.Z, facing.W);
+
+			foreach (var viewer in _sim
+				         .World
+				         .ZoneFor(npc.MapId)
+				         .PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
+			{
+				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
+					await SendWorldIir(viewer.Client, body);
+			}
+		}
+
 		// On disconnect/logout: despawn the leaving player for everyone who could see it (n3ToClientQuit), before it is
 		// removed from the zone. Returns the dispatch task so the caller can fire-and-forget (the connection is going
 		// away). Single-player is a no-op (no viewers).

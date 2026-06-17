@@ -152,6 +152,16 @@ namespace Faolan.GameServer
 			return _broadcaster.BroadcastNpcCombatMode(npc, inCombat);
 		}
 
+		Task IWorldOutbound.BroadcastNpcAggro(WorldEntity npc, WorldEntity target)
+		{
+			return _broadcaster.BroadcastNpcAggro(npc, target);
+		}
+
+		Task IWorldOutbound.BroadcastNpcStop(WorldEntity npc)
+		{
+			return _broadcaster.BroadcastNpcStop(npc);
+		}
+
 		Task IWorldOutbound.ReenterWorld(INetworkClient client)
 		{
 			return SendWorldEntry(client);

@@ -51,6 +51,14 @@ namespace Faolan.GameServer.World
 		// see it, as the captured stat-20 update. Without it the NPC swings empty-handed (#218).
 		Task BroadcastNpcCombatMode(WorldEntity npc, bool inCombat);
 
+		// Broadcast an NPC's aggro on a target (HateListUpdate + ThreatLevel) to nearby viewers, so the threat/aggro is
+		// visible the tick it engages (#216).
+		Task BroadcastNpcAggro(WorldEntity npc, WorldEntity target);
+
+		// Broadcast an NPC's StopIIR (final position + facing) when it arrives home and stops moving, closing the move
+		// it was streaming (#190).
+		Task BroadcastNpcStop(WorldEntity npc);
+
 		// Re-run the world-entry render path for the player (used to respawn them at a resurrection point).
 		Task ReenterWorld(INetworkClient client);
 
@@ -499,7 +507,17 @@ namespace Faolan.GameServer.World
 								// Draw (enter) or sheathe (exit) the NPC's weapon for nearby viewers - #218. Gated with the
 								// rest of the combat sim since combat mode only has meaning alongside the auto-attack swing.
 								if (NpcAutoAttackEnabled)
+								{
 									await _output.BroadcastNpcCombatMode(effect.Entity, effect.Type == WorldTickEffectType.NpcEnterCombat);
+									// On engage, also push the aggro so the threat/hate is visible (#216).
+									if (effect.Type == WorldTickEffectType.NpcEnterCombat && effect.Target != null)
+										await _output.BroadcastNpcAggro(effect.Entity, effect.Target);
+								}
+								break;
+							case WorldTickEffectType.NpcStopped:
+								// The NPC arrived home and stopped; close its move with a StopIIR (#190).
+								if (NpcAutoAttackEnabled)
+									await _output.BroadcastNpcStop(effect.Entity);
 								break;
 						}
 					}

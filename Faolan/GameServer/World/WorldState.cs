@@ -133,6 +133,7 @@ namespace Faolan.GameServer.World
 
 						entity.Returning = false;
 						entity.Vitals.ReviveToFull(); // home again
+						effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcStopped)); // arrived: stop moving (#190)
 						continue;
 					}
 
@@ -148,8 +149,9 @@ namespace Faolan.GameServer.World
 
 					// Engaged: a target is in aggro range and we're not leashing home. Draw the weapon on the transition
 					// (the captured combat-mode stat) BEFORE the chase/swing, mirroring retail - the stat-20 update lands
-					// the tick the mob acquires its target, while it's still closing the distance (#218).
-					SetCombat(entity, true);
+					// the tick the mob acquires its target, while it's still closing the distance (#218). The target rides
+					// the effect so the broadcaster can also push the aggro (HateList/ThreatLevel, #216).
+					SetCombat(entity, true, target);
 
 					// Chase: if the target is beyond melee range, step toward it (horizontal plane; keep terrain Y) and
 					// broadcast the move instead of swinging this tick. The client interpolates origin->position, so a
@@ -176,14 +178,14 @@ namespace Faolan.GameServer.World
 			// Flips an NPC's combat-engaged state and, on the transition, queues the combat-mode effect the broadcaster
 			// turns into the stat-20 weapon draw/sheathe (#218). No-op when already in that state, so it fires once per
 			// engage/disengage.
-			void SetCombat(WorldEntity e, bool inCombat)
+			void SetCombat(WorldEntity e, bool inCombat, WorldEntity target = null)
 			{
 				if (e.InCombat == inCombat)
 					return;
 
 				e.InCombat = inCombat;
 				effects.Add(new WorldTickEffect(e,
-					inCombat ? WorldTickEffectType.NpcEnterCombat : WorldTickEffectType.NpcExitCombat));
+					inCombat ? WorldTickEffectType.NpcEnterCombat : WorldTickEffectType.NpcExitCombat, target));
 			}
 		}
 
