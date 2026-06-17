@@ -33,9 +33,14 @@ namespace Faolan.Core.Database.Tables
 
 		public uint Quantity { get; set; }
 
-		// The item template id the listing is filed/searched under (the row's itemId field; differs from the
-		// instance's Template below).
+		// The catalog item (template id) the listing is filed/searched under (the row's itemId field). FK to Items:
+		// the filed item MUST exist - this guards against the 30000-placeholder import bug (#212) where every listing
+		// shared one bogus ItemId and the client collapsed them to a single "Torn Rags" row. NB this is the SEARCH
+		// key, still distinct from the listed instance's own Template/Data1..4 below (which is the specific item sold).
 		public uint ItemId { get; set; }
+
+		// Navigation to the filed catalog item (FK ItemId -> Items.Id, Restrict). Load with Include when needed.
+		public Item Item { get; set; }
 
 		// --- undecoded-but-preserved framing scalars (verbatim, like ShopItem.Stat356) ----------------------
 		// Row field after itemId: a u64 (0 in the capture - buyout / reserved) and a u32 (an item-handle-like value).

@@ -156,6 +156,16 @@ namespace Faolan.Core.Database
 				.HasDefaultValue(ItemType.Normal)
 				.HasSentinel(0);
 
+			// Every Tradepost (AH) listing is filed under a real catalog Item (FK ItemId -> Items.Id). Restrict: an
+			// item referenced by a listing can't be deleted out from under it. Guards the #212 placeholder-ItemId import
+			// bug (listings with a bogus ItemId=30000 that the client collapsed into one "Torn Rags" row).
+			modelBuilder
+				.Entity<TradepostListing>()
+				.HasOne(t => t.Item)
+				.WithMany()
+				.HasForeignKey(t => t.ItemId)
+				.OnDelete(DeleteBehavior.Restrict);
+
 			// One-to-one Character <-> CharacterMaxStats, keyed by CharacterId; deletes cascade with the character.
 			modelBuilder
 				.Entity<Character>()
