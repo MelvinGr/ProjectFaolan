@@ -35,11 +35,20 @@ Reader `FUN_005d1ae0` = 7 leading words, the PlayfieldProxy, 2 words, a sub-read
 
 ### The destination-derived fields (formerly "undecoded")
 
-`destPlayfieldToken` (`0x00503570` for map 2010, `0x00503610` for map 2000) is the **destination zone's
-playfield token** — the same per-zone token the simulation already mints as `Zone.PlayfieldToken`, not an
-opaque constant. `destDescriptor` (`0x14` / `0xBE`) is a per-zone descriptor word. Both default to the
-map-2010 capture values in `TeleportCodec.BuildDestination`; a real cross-map teleport should pass the
-destination zone's actual token (see #211 for the loading-screen handoff).
+`destPlayfieldToken` (`0x00503570` for map 2010 in the capture) is the **destination playfield-INSTANCE
+token** — and it is **not a per-map constant**: it differs between captures of the same map (the changemap
+capture's map-2010 token `0x00503570` vs our DB burst's `0x0050360F`), because the retail server mints a token
+per playfield instance. So the dest-announce only matches the destination world-entry if **both come from the
+same burst**. The live change-map path now sources it via
+`WorldBroadcaster.ResolveMapPlayfieldToken(destMapId)`, which extracts the token from the destination map's
+stored burst FullChar snapshot (the same `WorldDespawn.TryExtractPlayfieldToken` the world-entry's
+`CapturePlayfieldToken` uses) and caches it on the zone — so the announce and the reconnect's world-entry stamp
+the **same** token (relevant to the #211 loading-screen hang). `TeleportCodec.BuildDestination` keeps the
+capture default only for the golden test / a burst-less map.
+
+`destDescriptor` (`0x14` for map 2010, `0xBE` for map 2000) is a per-zone descriptor word that does **not**
+correlate with the map's NPC / world-object / burst-record counts, so it is not yet derivable from the data;
+it stays a parameter with the capture default until another data point pins it.
 
 ## Status
 

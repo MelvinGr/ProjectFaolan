@@ -272,7 +272,10 @@ namespace Faolan.GameServer
 		private async Task SendChangeMapPrep(INetworkClient client, uint destMapId, Vector3 position)
 		{
 			var instance = client.Session.Account.ClientInstance;
-			foreach (var body in new[] { TeleportCodec.BuildBegin(instance, destMapId), TeleportCodec.BuildDestination(instance, destMapId, position) })
+			// Source the destination playfield token from the destination map's burst so the announce matches the token
+			// the reconnect's world-entry will stamp (#219 / #211) - it is per-playfield-instance, not a constant.
+			var destToken = await _broadcaster.ResolveMapPlayfieldToken(destMapId);
+			foreach (var body in new[] { TeleportCodec.BuildBegin(instance, destMapId), TeleportCodec.BuildDestination(instance, destMapId, position, destPlayfieldToken: destToken) })
 				await new PacketStream()
 					.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerCarrierOpcodes.IirCarrier)
 					.WriteArrayUInt32Length(s => s.WriteArray(body))

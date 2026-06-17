@@ -44,8 +44,11 @@ namespace Faolan.GameServer.World
 		//   [u32 subop][u32 0xC350][u32 clientInstance][u8 env=00][24x 00][f32 1.0][u8 'b'][u32 0xC79C][u32 destMap]
 		//   [15x 00][01][u32 0x9C50][u32 destPlayfieldToken][12x 00][14][u32 0x00018704][pos x/y/z f32 BE]
 		//   [u32 destDescriptor][00]
-		// destPlayfieldToken + destDescriptor are destination-derived (the destination zone's playfield token + a
-		// per-zone descriptor) and default to the map-2010 capture values.
+		// destPlayfieldToken is the destination zone's per-instance playfield token - the LIVE change-map path sources
+		// it from the destination map's burst (WorldBroadcaster.ResolveMapPlayfieldToken) so it matches the token the
+		// reconnect's world-entry stamps (#211); it is NOT a per-map constant (the captured 0x00503570 was that
+		// session's instance). destDescriptor (0x14 / 0xBE) is a per-zone descriptor not yet derivable from the data.
+		// Both default to the map-2010 capture values for the golden test / a burst-less map.
 		public static byte[] BuildDestination(uint clientInstance, uint destMapId, Vector3 position,
 			uint destPlayfieldToken = 0x00503570u, uint destDescriptor = 0x00000014u)
 		{

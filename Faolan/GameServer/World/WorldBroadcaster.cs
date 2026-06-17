@@ -317,6 +317,23 @@ namespace Faolan.GameServer.World
 			_logger.LogInformation("World: map {Map} playfield token = 0x{Token:X8} (from burst; overrides minted fallback).", mapId, token);
 		}
 
+		// Resolves the playfield token a map's world-entry will stamp (extracted from its stored burst's FullChar
+		// snapshot, the same source CapturePlayfieldToken uses on entry). A cross-map teleport's destination announce
+		// must carry THIS token, not a captured constant: the token is per-playfield-INSTANCE (it differs between the
+		// changemap capture and our burst), so the dest-announce only matches the destination world-entry if both come
+		// from the same burst (#219 / #211). Caches it on the destination zone and returns it; falls back to the zone's
+		// current (possibly minted) token when the map has no burst.
+		public async Task<uint> ResolveMapPlayfieldToken(uint mapId)
+		{
+			var zone = _sim.World.ZoneFor(mapId);
+			var burst = await _database.GetMapWorldBurst(mapId);
+			var fullCharBody = burst?.Entities?
+				.FirstOrDefault(e => e.IirType == IirMessageTypes.FullChar)?.Body;
+			if (fullCharBody != null && WorldDespawn.TryExtractPlayfieldToken(fullCharBody, out var token))
+				zone.PlayfieldToken = token;
+			return zone.PlayfieldToken;
+		}
+
 		// A player closed the loot window (top-level 0x2044): consume the bag - fade it out for nearby players and drop
 		// it from the model.
 		public async Task CloseLootBag(INetworkClient client, uint bagHandle)
