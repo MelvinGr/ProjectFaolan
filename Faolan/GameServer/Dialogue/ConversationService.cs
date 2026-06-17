@@ -107,15 +107,53 @@ namespace Faolan.GameServer.Dialogue
 			return false;
 		}
 
-		// Frames a constructed Knubot record on the CONVERSATION conversation (sender GameAgent:0x08, receiver the
-		// player's GameInterface) and sends it - the same proven framing SendConversationClose uses.
-		private static Task SendConstructedKnubot(INetworkClient client, uint liveInstance, byte[] record)
+		// Frames a constructed Knubot record exactly as retail does (verified against the captures): the conversation
+		// runs sender `GameAgent:<conversationAgentInstance>` -> receiver `GameInterface:<playerHandle>` on opcode
+		// 0x2000. Retail VARIES the GameAgent instance per conversation (0x07..0x5a observed; 0x08 the most common),
+		// and the client addresses its KnubotAnswer back to whatever instance sent the screen - so we PRESERVE the
+		// captured packet's sender instance rather than hardcoding one, matching the replay path byte-for-byte.
+		private static Task SendConstructedKnubot(INetworkClient client, uint senderInstance, uint liveInstance, byte[] record)
 		{
 			return new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08),
+				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, senderInstance),
 					ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, liveInstance), GameServerCarrierOpcodes.IirCarrier)
 				.WriteArray(record)
 				.SendAsync(client);
+		}
+
+		// Reads the GameAgent sender instance out of a captured packet's RPC header. Header layout (PacketStream):
+		// [u32 len][u32 crc][u32 headerLen][0x0a][byteLen][sender endpoint][0x12]... where a ProtoEndpoint is
+		// [0x0D <type LE32> 0x10 <instance varint>]. Falls back to 0x08 (the common value / SendConversationClose's)
+		// if the header is shaped unexpectedly.
+		internal static uint ReadSenderInstance(byte[] packet)
+		{
+			const uint Fallback = 0x08;
+			if (packet == null || packet.Length < 14 || packet[12] != 0x0a)
+				return Fallback;
+
+			var senderLen = packet[13];
+			var i = 14;
+			var end = i + senderLen;
+			if (end > packet.Length || packet[i] != 0x0d)
+				return Fallback;
+
+			i += 1 + 4;                    // skip 0x0D + the fixed32 type
+			if (i >= end || packet[i] != 0x10)
+				return Fallback;
+			i++;                           // skip the 0x10 instance tag
+
+			uint value = 0;
+			var shift = 0;
+			while (i < end)
+			{
+				var bb = packet[i++];
+				value |= (uint)(bb & 0x7f) << shift;
+				if ((bb & 0x80) == 0)
+					return value;
+				shift += 7;
+			}
+
+			return Fallback;
 		}
 
 		// A KnubotCloseChatWindow (0xC4AF39EB) body, captured verbatim. It closes the NPC chat window with an EMPTY
@@ -204,7 +242,7 @@ namespace Faolan.GameServer.Dialogue
 				// CloseChatWindow, ...) verbatim with handle substitution until they too are constructed.
 				if (TryConstructKnubotRecord(p.Data, liveInstance, clickedNpcHandle, out var constructed))
 				{
-					await SendConstructedKnubot(client, liveInstance, constructed);
+					await SendConstructedKnubot(client, ReadSenderInstance(p.Data), liveInstance, constructed);
 					continue;
 				}
 

@@ -67,6 +67,28 @@ namespace Faolan.Tests
 			Assert.Equal(Convert.ToHexStringLower(expected), Convert.ToHexStringLower(rebuilt));
 		}
 
+		// Retail varies the GameAgent sender instance per conversation (0x07..0x5a in the captures); we preserve the
+		// captured packet's instance so the constructed framing matches retail byte-for-byte. ReadSenderInstance must
+		// recover exactly what the real endpoint encoder (ConanEndpoints) wrote.
+		[Theory]
+		[InlineData(0x08u)]
+		[InlineData(0x0Eu)]
+		[InlineData(0x5Au)]
+		[InlineData(0x01316E71u)] // a multi-byte varint instance, for good measure
+		public void ReadSenderInstance_RecoversTheEncodedGameAgentInstance(uint instance)
+		{
+			var sender = Faolan.Core.Network.Conan.ConanEndpoints.EndpointBytes(
+				Faolan.Core.Network.Conan.ConanEndpoints.GameAgentType, instance);
+
+			// assemble a header the way PacketStream.WriteHeader does: [8 len+crc][u32 headerLen][0x0a][byteLen][sender]...
+			var packet = new byte[14 + sender.Length + 1];
+			packet[12] = 0x0a;
+			packet[13] = (byte)sender.Length;
+			Buffer.BlockCopy(sender, 0, packet, 14, sender.Length);
+
+			Assert.Equal(instance, ConversationService.ReadSenderInstance(packet));
+		}
+
 		[Fact]
 		public void TryConstructKnubotRecord_ReturnsFalseForAnswerList()
 		{
