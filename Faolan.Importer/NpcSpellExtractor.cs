@@ -59,6 +59,8 @@ namespace Faolan.Importer
 				var payload = end > PayloadOffset
 					? body[PayloadOffset..end]
 					: [];
+				if (payload.Length == 0) // the rank-1 EMPTY twin is the buff-end/terminator, not a standalone cast (#232)
+					continue;
 				entries.Add(new NpcSpellEntry(name, spellId, payload));
 			}
 
