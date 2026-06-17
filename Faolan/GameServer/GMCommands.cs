@@ -367,6 +367,7 @@ namespace Faolan.GameServer
 				["mount"] = (client, arguments) => MountCommand(client, arguments),
 				["spawnnpc"] = (client, arguments) => SpawnNpcCommand(client, arguments),
 				["despawnnpc"] = (client, arguments) => DespawnNpcCommand(client, arguments),
+				["delete"] = (client, arguments) => DeleteCommand(client, arguments),
 				["kill"] = (client, arguments) => KillCommand(client, arguments),
 				["additem"] = (client, arguments) => AddItemCommand(client, arguments),
 				["removeitem"] = (client, arguments) => RemoveItemCommand(client, arguments),
@@ -665,6 +666,41 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, entity == null
 				? $"No despawnable entity 0x{handle:X8} in this zone (unknown handle, or a player)."
 				: $"Despawned {entity.Name} (0x{handle:X8}).");
+		}
+
+		// .delete [<handle>]  - PERMANENTLY remove the player's currently SELECTED target (or the given handle): despawn
+		// it live for nearby players AND delete its NpcSpawn row(s) so it never renders again. The tool for scrubbing
+		// captured import artifacts (phantom players that happened to be in the pcap when the world was captured). A
+		// faction mob (hostile) deletes only the rows at the target's spot (don't wipe every same-name mob); a neutral
+		// named entity deletes every same-name row on the map (its cross-session captures collapse to one render).
+		// Unlike .despawnnpc (live-only, comes back on relog), .delete is durable.
+		private async Task DeleteCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var arg = (arguments ?? "").Trim();
+			var handle = arg.Length == 0
+				? client.Session.SelectedTargetHandle
+				: TryParseHandle(arg, out var parsed)
+					? parsed
+					: 0;
+			if (handle == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .delete [&lt;handle&gt;]  (no arg = your selected target). Removes it live AND deletes its spawn row.");
+				return;
+			}
+
+			var entity = await _broadcaster.DespawnEntityForPlayer(client, handle);
+			if (entity == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"No deletable entity 0x{handle:X8} in this zone (target an NPC first; players can't be deleted).");
+				return;
+			}
+
+			var deleted = await Database.DeleteNpcSpawns(entity.MapId, entity.Name,
+				entity.Hostile ? entity.SpawnPosition.X : null,
+				entity.Hostile ? entity.SpawnPosition.Y : null,
+				entity.Hostile ? entity.SpawnPosition.Z : null, 10f);
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Deleted {entity.Name} (0x{handle:X8}) - removed live + {deleted} spawn row(s) (gone on relog too).");
 		}
 
 		// .kill [<handle> | self]  - kill the player's currently SELECTED target (last LookAt/SelectDeselect), or the

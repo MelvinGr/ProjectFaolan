@@ -90,6 +90,7 @@ namespace Faolan.Core.Database
 		Task<NpcSpawn> GetNpcSpawnByName(string name);
 		Task<List<NpcSpell>> GetNpcSpellsByName(string name);
 		Task<NpcSpawn[]> GetNpcSpawns(uint mapId);
+		Task<int> DeleteNpcSpawns(uint mapId, string name, float? x, float? y, float? z, float radius);
 
 		Task<Realm> GetRealm(uint id);
 		Task<Realm[]> GetRealms();
@@ -929,6 +930,25 @@ namespace Faolan.Core.Database
 				.NpcSpawns
 				.Where(n => n.Name != null && n.Name.ToLower() == lowered && n.Data != null)
 				.FirstOrDefaultAsync();
+		}
+
+		// Deletes the persisted NpcSpawn rows for a named entity on a map - the .delete GM command, for scrubbing
+		// captured import artifacts (phantom players that happened to be near the capturing client in the pcap). With a
+		// position, scopes to rows within `radius` of it (so deleting one faction mob doesn't wipe every same-name mob on
+		// the map); without (x null), deletes EVERY same-name row on the map (a unique neutral named entity, whose
+		// cross-session captures collapse to a single render). Returns the row count removed.
+		public async Task<int> DeleteNpcSpawns(uint mapId, string name, float? x, float? y, float? z, float radius)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var lowered = (name ?? "").ToLowerInvariant();
+			var query = ctx
+				.NpcSpawns
+				.Where(n => n.MapId == mapId && n.Name != null && n.Name.ToLower() == lowered);
+			if (x is { } px && y is { } py && z is { } pz)
+				query = query.Where(n => n.PositionX >= px - radius && n.PositionX <= px + radius
+					&& n.PositionY >= py - radius && n.PositionY <= py + radius
+					&& n.PositionZ >= pz - radius && n.PositionZ <= pz + radius);
+			return await query.ExecuteDeleteAsync();
 		}
 
 		// The spells a caster NPC casts (keyed by its stable name), for the sim's NPC spell-casting (#232).
