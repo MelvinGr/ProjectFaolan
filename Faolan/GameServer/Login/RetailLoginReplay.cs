@@ -389,15 +389,10 @@ namespace Faolan.GameServer
 			if (!NpcSpawnBuilder.TryBuild(templateRow, builtHandle, out var spawnBody))
 				return;
 
-			// Opt-in (FAOLAN_MINIMAL_SCAFFOLD=1): swap the carried pre-IIR + post-IIR for the minimal session-
-			// independent form. The in-client experiment for the cross-session render fix - if the built NPC still
-			// renders with the minimal scaffolds, they are client-acceptable and the cross-session row's stale
-			// runtime-state scaffolds were the rejection cause (see NpcSpawnScaffold / [[world-packets-construct-not-replay]]).
-			if (Environment.GetEnvironmentVariable("FAOLAN_MINIMAL_SCAFFOLD") == "1")
-			{
-				spawnBody = NpcSpawnScaffold.WithMinimalScaffolds(spawnBody);
-				Logger.LogInformation("Built NPC: swapped in the minimal session-independent pre+post-IIR scaffolds (body now {Len}B).", spawnBody.Length);
-			}
+			// Swap the carried pre-IIR + post-IIR for the minimal session-independent form (now the live default for
+			// from-DB spawns, #185 verified in-client). TryBuild above was called without freshSpawn, so apply it here
+			// explicitly for this from-scratch built NPC (see NpcSpawnScaffold / [[world-packets-construct-not-replay]]).
+			spawnBody = NpcSpawnScaffold.WithMinimalScaffolds(spawnBody);
 
 			// Validate the minimal STATIONARY MoveTask (MoveTaskBuilder): if she now spawns by the player and STAYS
 			// (no drag to a patrol route), the built stationary MoveTask is accepted - the full burst-free primitive
@@ -586,13 +581,10 @@ namespace Faolan.GameServer
 					// interest spawn (EnsureZoneNpcs, for NPCs OUTSIDE the burst) is a separate path. Known fidelity gaps:
 					// the row's IIR pose (Casilda renders un-chained, TODO #184) + a transient half-stream on moving NPCs.
 					// Put the from-DB rebuild on the wire (it carries the burst's exact transform, so it renders -
-					// #185 in-client verified). FAOLAN_NPC_VERBATIM=1 restores the old "byte-identical only" behaviour.
-					if (wasIdentical || Environment.GetEnvironmentVariable("FAOLAN_NPC_VERBATIM") != "1")
-					{
-						pkt = npcRebuilt;
-						if (wasIdentical)
-							npcIdentical++;
-					}
+					// #185 in-client verified). Always - construct-don't-replay is the only NPC path now.
+					pkt = npcRebuilt;
+					if (wasIdentical)
+						npcIdentical++;
 				}
 				else if (TryRebuildWorldObjectFromDb(objectByPosition, pkt, out var objRebuilt, out var objIdentical))
 				{
@@ -759,10 +751,9 @@ namespace Faolan.GameServer
 			// drops a spawn whose position diverges from its MoveTask, even by sub-0.1 float precision); WITH it, all
 			// 23 cross-session beach NPCs render. This is what lets the from-DB body replace the verbatim burst packet:
 			// the identity/scaffold come from the DB row, the transform stays the burst's (correct — same NPC, same
-			// captured spot). FAOLAN_NPC_VERBATIM=1 restores the old verbatim-only behaviour. TODO #184: the row's IIR
-			// also carries the spawn animation, so e.g. Casilda renders un-chained; carry the burst pose for full fidelity.
-			if (Environment.GetEnvironmentVariable("FAOLAN_NPC_VERBATIM") != "1"
-			    && packet.Length >= bodyStart + 66 && rebuilt.Length >= bodyStart + 66)
+			// captured spot). TODO #184: the row's IIR also carries the spawn animation, so e.g. Casilda renders
+			// un-chained; carry the burst pose for full fidelity.
+			if (packet.Length >= bodyStart + 66 && rebuilt.Length >= bodyStart + 66)
 				Array.Copy(packet, bodyStart + 20, rebuilt, bodyStart + 20, 46);
 
 			// wasIdentical = the (transform-spliced) rebuilt body equals the burst body (now just a stat/diagnostic).
