@@ -185,8 +185,8 @@ namespace Faolan.GameServer.World
 			{
 				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
 				{
-					await SendWorldIir(viewer.Client, hate);
-					await SendWorldIir(viewer.Client, threat);
+					await SendWorldRecord(viewer.Client, hate);
+					await SendWorldRecord(viewer.Client, threat);
 				}
 			}
 		}
@@ -196,7 +196,7 @@ namespace Faolan.GameServer.World
 		public async Task BroadcastNpcStop(WorldEntity npc)
 		{
 			var facing = npc.MoveOrigin.FaceTowards(npc.Position);
-			var body = StopCodec.Build(npc.Handle, npc.Position, facing.X, facing.Y, facing.Z, facing.W);
+			var record = StopCodec.Build(npc.Handle, npc.Position, facing.X, facing.Y, facing.Z, facing.W);
 
 			foreach (var viewer in _sim
 				         .World
@@ -204,7 +204,7 @@ namespace Faolan.GameServer.World
 				         .PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
-					await SendWorldIir(viewer.Client, body);
+					await SendWorldRecord(viewer.Client, record);
 			}
 		}
 
@@ -1043,6 +1043,17 @@ namespace Faolan.GameServer.World
 			return new PacketStream()
 				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameServerCarrierOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s => s.WriteArray(body))
+				.SendAsync(recipient);
+		}
+
+		// Sends a SELF-CONTAINED IIR record (one whose builder already prepends the [u32 len] prefix, e.g. the
+		// ChatText/Knubot/dead-reckoning codecs) - written verbatim, NOT re-wrapped with another length (which would
+		// double-prefix it). Mirrors ChatTextSender. Use SendWorldIir for bare bodies (MoveTask/loot/vitals).
+		private Task SendWorldRecord(INetworkClient recipient, byte[] record)
+		{
+			return new PacketStream()
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameServerCarrierOpcodes.IirCarrier)
+				.WriteArray(record)
 				.SendAsync(recipient);
 		}
 
