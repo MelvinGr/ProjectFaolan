@@ -11,11 +11,22 @@ Usage:
 
 Defaults: logs.txt in repo root, the Strie login capture.
 """
-import sys, re, json, base64
+import sys, re, json, struct
 from collections import Counter
 
 DEFAULT_LOG = 'logs.txt'
-DEFAULT_DUMP = 'Captures/account-stricken997-character-Strie-login.json'
+DEFAULT_DUMP = 'Captures/account-stricken997-character-Strie-login.tshark.json'
+
+# GameServer RPC endpoint class ids (ConanEndpoints.cs). The .tshark.json dump tags every Conan packet
+# Protocol="Conan", so the GameServer conversation is selected by these classes, not the old ProtocolName.
+GAMESERVER_CLASSES = {f'0x{c:08x}' for c in (
+    0x6C67C147,  # GameInterface
+    0xB171CE13,  # GameAgent
+    0x5B9756FC,  # GameCharAgentProject
+    0x28377648,  # GameCharInterfaceProject
+    0xA9ECB95D,  # GameCharAgent
+    0x8B87F791,  # GameCharInterface
+)}
 
 
 def _read_varint(b, i):
@@ -26,6 +37,40 @@ def _read_varint(b, i):
         if not x & 0x80:
             return r, i
         s += 7
+
+
+def _write_varint(v):
+    out = bytearray()
+    while True:
+        b = v & 0x7f; v >>= 7
+        out.append(b | (0x80 if v else 0))
+        if not v:
+            return bytes(out)
+
+
+def _endpoint_blob(cls_hex, inst_hex):
+    """Rebuild the on-wire ProtoEndpoint blob [0x0d <classId LE32> (0x10 <instance varint>)?] so the dump side
+    yields the same (sender, receiver, ...) hex tuple shape the raw-frame log side produces."""
+    blob = bytes([0x0d]) + struct.pack('<I', int(cls_hex, 16))
+    if inst_hex is not None:
+        blob += bytes([0x10]) + _write_varint(int(inst_hex, 16))
+    return blob
+
+
+def _is_gameserver(pk):
+    return ((pk.get('SenderClass') or '').lower() in GAMESERVER_CLASSES
+            or (pk.get('ReceiverClass') or '').lower() in GAMESERVER_CLASSES)
+
+
+def dump_tuple(pk):
+    """(sender, receiver, opcode, headerData, body) from a de-framed .tshark.json record — same shape as parse()."""
+    if not pk.get('Opcode'):
+        return None
+    sender = _endpoint_blob(pk['SenderClass'], pk.get('SenderInstance'))
+    receiver = _endpoint_blob(pk['ReceiverClass'], pk.get('ReceiverInstance'))
+    opcode = int(pk['Opcode'], 16)
+    hd = bytes.fromhex((pk.get('HeaderExtraHex') or '').replace(' ', ''))
+    return sender.hex(), receiver.hex(), opcode, hd.hex(), bytes.fromhex(pk.get('BodyHex') or '')
 
 
 def parse(b):
@@ -58,13 +103,13 @@ def from_log(path, proto='GameServer', direction='<='):
     return out
 
 
-def from_dump(path, proto='GameServer', download=True):
+def from_dump(path, download=True):
     d = json.load(open(path))
     out = []
     for pk in d['Packets']:
-        if pk['ProtocolName'] != proto or pk['IsDownload'] != download:
+        if not _is_gameserver(pk) or bool(pk['IsDownload']) != download:
             continue
-        p = parse(base64.b64decode(pk['RawBytesBase64']))
+        p = dump_tuple(pk)
         if p:
             out.append(p)
     return out
@@ -75,11 +120,11 @@ def collapsed_timeline(dump_path):
     d = json.load(open(dump_path))
     ev = []
     for pk in d['Packets']:
-        if pk['ProtocolName'] != 'GameServer':
+        if not _is_gameserver(pk):
             continue
-        p = parse(base64.b64decode(pk['RawBytesBase64']))
+        p = dump_tuple(pk)
         if p:
-            ev.append((pk['TimestampTicks'], 'DOWN' if pk['IsDownload'] else 'UP', p[2]))
+            ev.append((pk['Frame'], 'DOWN' if pk['IsDownload'] else 'UP', p[2]))
     ev.sort()
     out = []; prev = None; cnt = 0
     for _, dr, op in ev:

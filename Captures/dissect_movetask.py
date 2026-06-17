@@ -58,7 +58,7 @@ spec = importlib.util.spec_from_file_location('c', ROOT / 'Captures/compare_log_
 cdt = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cdt)
 
-DEFAULT_CAP = 'Captures/account-stricken997-character-Strie-login.json'
+DEFAULT_CAP = 'Captures/account-stricken997-character-Strie-login.tshark.json'
 SUBOP = '96c46740'
 FIXED = {0x06: 1, 0x00: 2, 0x02: 31, 0x05: 39, 0x07: 25, 0x08: 19, 0x01: 60}
 
@@ -252,7 +252,7 @@ def cmd_one(cap, handle_hex):
 
 def cmd_coverage():
     uniq = {}
-    for cap in sorted(glob.glob(str(ROOT / 'Captures/*.json'))):
+    for cap in sorted(glob.glob(str(ROOT / 'Captures/*.tshark.json'))):
         try:
             rows = move_tasks(cap)
         except Exception:

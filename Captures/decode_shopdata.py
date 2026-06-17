@@ -25,7 +25,7 @@ what an `Items` row needs (ArchetypeHarvester's third source) and what SnapshotI
 the window from the DB. Shop ids are session-volatile; the stable shop key is the vendor NPC NAME (resolved
 from the same capture's FA015807 spawns, like conversations).
 """
-import json, base64, struct, sys, sqlite3, os
+import json, struct, sys, sqlite3, os
 from collections import OrderedDict
 
 SHOP_TYPE = 0x0000C75B
@@ -94,9 +94,10 @@ def spawn_names(packets):
     """handle -> name from the capture's FA015807 spawns (cheap scan: [sub][C350][handle] ... name)."""
     names = {}
     for p in packets:
-        raw = base64.b64decode(p['RawBytesBase64'])
+        if not p['IsDownload']: continue
+        raw = bytes.fromhex(p.get('BodyHex') or '')
         idx = raw.find(bytes.fromhex('fa015807'))
-        if idx < 0 or not p['IsDownload']: continue
+        if idx < 0: continue
         handle = struct.unpack('>I', raw[idx + 8:idx + 12])[0]
         # the entity name is the first length-prefixed ASCII string in the body
         for j in range(idx + 12, min(idx + 160, len(raw) - 2)):
@@ -111,7 +112,7 @@ def spawn_names(packets):
 
 def main(path):
     d = json.load(open(path))
-    pkts = sorted(d['Packets'], key=lambda p: p['TimestampTicks'])
+    pkts = sorted(d['Packets'], key=lambda p: p['Frame'])
     names = spawn_names(pkts)
     db = None
     dbpath = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'faolan.db')
@@ -119,11 +120,9 @@ def main(path):
         db = sqlite3.connect(dbpath)
     seen = OrderedDict()
     for p in pkts:
-        if p['ProtocolName'] != 'GameServer' or not p['IsDownload'] or p['Opcode']['Value'] != 0x2033: continue
-        raw = base64.b64decode(p['RawBytesBase64'])
-        if len(raw) < 60: continue
-        hdrlen = struct.unpack('>I', raw[8:12])[0]
-        body = raw[12 + hdrlen:]
+        if not p['IsDownload'] or (p.get('Opcode') or '').lower() != '0x2033': continue
+        body = bytes.fromhex(p.get('BodyHex') or '')
+        if len(body) < 48: continue
         try:
             shop = parse_shop(body)
         except Exception as e:
@@ -146,4 +145,4 @@ def main(path):
 
 if __name__ == '__main__':
     main(sys.argv[1] if len(sys.argv) > 1 else
-         'account-faolan-character-necrol80-login-sell_items_to_trader-intract-with-auctionhouse.json')
+         'Captures/account-faolan-character-necrol80-login-sell_items_to_trader-intract-with-auctionhouse.tshark.json')

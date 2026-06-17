@@ -8,12 +8,13 @@ each endpoint = ProtoEndpoint { 0x0d fixed32 classId (LITTLE-endian on wire), 0x
 
 Tradepost classes: TradepostAgent 0x3D744981 (client->server), TradepostInterface 0xF2C2D5B5 (server->client).
 """
-import json, base64, sys, struct
+import json, sys, struct
 
 AGENT = 0x3D744981   # TradepostAgent  (client -> server)
 IFACE = 0xF2C2D5B5   # TradepostInterface (server -> client)
-AGENT_LE = struct.pack('<I', AGENT)
-IFACE_LE = struct.pack('<I', IFACE)
+# The .tshark.json dump already exposes the RPC endpoint class ids + opcode + de-framed body, so the packet
+# is selected by its SenderClass/ReceiverClass instead of scanning the raw frame for the little-endian tag.
+TP_CLASSES = {f'0x{AGENT:08x}', f'0x{IFACE:08x}'}
 
 def read_varint(b, i):
     shift = 0; val = 0
@@ -38,27 +39,6 @@ def parse_endpoint(b):
             ln, i = read_varint(b, i); i += ln
         else: break
     return cls, inst
-
-def parse_rpc(raw):
-    """-> dict(callId, receiver=(cls,inst), sender=(cls,inst), method, body)."""
-    if len(raw) < 12: return None
-    total = struct.unpack('>I', raw[0:4])[0]
-    callId = struct.unpack('>I', raw[4:8])[0]
-    inner = struct.unpack('>I', raw[8:12])[0]
-    p = raw[12:12+inner]
-    i = 0; recv = send = None
-    while i < len(p):
-        tag = p[i]
-        if tag in (0x0a, 0x12):  # field1/field2, wiretype 2
-            i += 1; ln, i = read_varint(p, i)
-            ep = parse_endpoint(p[i:i+ln]); i += ln
-            if tag == 0x0a: recv = ep
-            else: send = ep
-        else:
-            break
-    method = struct.unpack('>H', p[i:i+2])[0] if i+2 <= len(p) else None
-    body = raw[12+inner:]   # payload follows the RpcHeader+method region
-    return dict(callId=callId, recv=recv, send=send, method=method, body=body)
 
 # Method map (recovered 2026-06-12 by behaviour across the sell + buy/mail captures).
 # These 0x20xx are per-class method selectors, not GameServer transport opcodes.
@@ -133,21 +113,18 @@ def parse_mail(b):
     return (f'mailId={mailId} recipient="{recip[1]}"(cls={recip[0]}) sender="{sender[1]}"(cls={sender[0]}) '
             f'body~={b[i:i+48].decode("latin1","replace")!r}')
 
-def is_tradepost(raw):
-    return AGENT_LE in raw or IFACE_LE in raw
-
 def main(path):
     d = json.load(open(path))
     P = d['Packets']
     rows = []
     for idx, pk in enumerate(P):
-        if pk['ProtocolName'] != 'GameServer': continue
-        raw = base64.b64decode(pk['RawBytesBase64'])
-        if not is_tradepost(raw): continue
-        r = parse_rpc(raw)
-        if not r: continue
-        r['idx'] = idx; r['dl'] = pk['IsDownload']
-        rows.append(r)
+        sc = (pk.get('SenderClass') or '').lower()
+        rc = (pk.get('ReceiverClass') or '').lower()
+        if sc not in TP_CLASSES and rc not in TP_CLASSES: continue
+        if not pk.get('Opcode'): continue
+        rows.append(dict(idx=idx, dl=pk['IsDownload'],
+                         method=int(pk['Opcode'], 16),
+                         body=bytes.fromhex(pk.get('BodyHex') or '')))
     print(f'{len(rows)} tradepost RPC packets\n')
     def nm(cls):
         return {AGENT:'TPAgent', IFACE:'TPIface'}.get(cls, f'0x{cls:08X}' if cls else '-')
@@ -167,5 +144,5 @@ def main(path):
 if __name__ == '__main__':
     import os
     default = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                           'account-faolan-character-necrol80-login-sell_items_to_trader-intract-with-auctionhouse.json')
+                           'account-faolan-character-necrol80-login-sell_items_to_trader-intract-with-auctionhouse.tshark.json')
     main(sys.argv[1] if len(sys.argv) > 1 else default)

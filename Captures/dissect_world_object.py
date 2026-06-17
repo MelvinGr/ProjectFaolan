@@ -27,7 +27,7 @@ spec = importlib.util.spec_from_file_location('c', ROOT / 'Captures/compare_log_
 cdt = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cdt)
 
-CAP = 'Captures/account-stricken997-character-Strie-login.json'
+CAP = 'Captures/account-stricken997-character-Strie-login.tshark.json'
 SUBOPS = ('66aedd50', 'f096251e', '33a56fb0')
 
 
@@ -198,7 +198,7 @@ def cmd_coverage():
     import glob
     total = ok = 0
     states = {}
-    for cap in sorted(glob.glob(str(ROOT / 'Captures/*.json'))):
+    for cap in sorted(glob.glob(str(ROOT / 'Captures/*.tshark.json'))):
         try:
             rows = [p[4] for p in cdt.from_dump(cap)
                     if p[2] == 0x2000 and len(p[4]) >= 20 and p[4][4:8].hex() in SUBOPS]

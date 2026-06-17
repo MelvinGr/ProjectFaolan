@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
 """Generate constructive PacketStream C# for the hoxxling create-world burst (:7012 S->C),
-grouped into the 6 chunks, substituting the captured char instance with `id`."""
-import json, base64, struct, sys
+grouped into the 6 chunks, substituting the captured char instance with `id`.
 
-CAP='Captures/account-faolan-character-hoxxling-create-modified_all_sliders-very_long_loading_screen-chat_message_before_exit.json'
+Reads the canonical Captures/*.tshark.json dump (already de-framed: endpoint class ids + opcode + body are
+fields), reconstructing each ProtoEndpoint header blob from its class id + instance.
+
+NOTE: the committed Faolan/GameServer/CreateFlow/RetailCreateWorldEntryBurst.cs has since been hand-refactored
+(ConanEndpoints.EndpointBytes + named opcodes), so this generator's raw-byte output is SUPERSEDED — re-running
+it would revert those edits. It writes to an explicit output path (default /tmp) so it never clobbers the
+refactored file; pass the .cs path as argv[1] only if you really intend to regenerate the verbatim form."""
+import json, struct, sys, os
+
+CAP='Captures/account-faolan-character-hoxxling-create-modified_all_sliders-very_long_loading_screen-chat_message_before_exit.tshark.json'
+OUT=sys.argv[1] if len(sys.argv)>1 else '/tmp/RetailCreateWorldEntryBurst.cs'
 INST=0x01316E71
 
 def varint(v):
@@ -18,14 +27,24 @@ INST_RAW=struct.pack('>I',INST)
 
 def u32(b,o): return struct.unpack('>I',b[o:o+4])[0]
 
-def tok(raw):
-    if bytes.fromhex('A36D3B74') not in raw: return None
-    j=raw.find(bytes.fromhex('A36D3B74'))
-    while j<len(raw)-1:
-        if raw[j]==0x22:
-            ln=raw[j+1]
-            if 0<ln<40 and j+2+ln<=len(raw):
-                s=raw[j+2:j+2+ln]
+def endpoint_blob(cls_hex, inst_hex):
+    """Rebuild the on-wire ProtoEndpoint header blob [0x0d <classId LE32> (0x10 <instance varint>)?] from the
+    dump's parsed class id + instance (the .tshark.json de-frames the header into these fields)."""
+    blob=bytes([0x0d])+struct.pack('<I',int(cls_hex,16))
+    if inst_hex is not None:
+        blob+=bytes([0x10])+varint(int(inst_hex,16))
+    return blob
+
+def body_of(p): return bytes.fromhex(p.get('BodyHex') or '')
+
+def tok(body):
+    if bytes.fromhex('A36D3B74') not in body: return None
+    j=body.find(bytes.fromhex('A36D3B74'))
+    while j<len(body)-1:
+        if body[j]==0x22:
+            ln=body[j+1]
+            if 0<ln<40 and j+2+ln<=len(body):
+                s=body[j+2:j+2+ln]
                 if all(32<=c<127 for c in s): return s.decode()
         j+=1
     return None
@@ -38,27 +57,21 @@ triggers={'ClientLoadingDone','StartScript','Move','IntroDone'}
 chunks=[[]]
 seen_hello=False
 for p in w:
-    raw=base64.b64decode(p['RawBytesBase64'])
-    cs=p['Source']['Port']!=7012
+    cs=p['Source']['Port']!=7012   # client->server (upload to the :7012 world server)
     if cs:
-        if p['Opcode']['Value']==0x2003: seen_hello=True; continue
-        if seen_hello and tok(raw) in triggers: chunks.append([])
+        if (p.get('Opcode') or '').lower()=='0x2003': seen_hello=True; continue
+        if seen_hello and tok(body_of(p)) in triggers: chunks.append([])
     elif seen_hello:
-        chunks[len(chunks)-1].append(raw)
+        chunks[len(chunks)-1].append(p)
 
 def hexlist(bs): return ", ".join(f"0x{b:02X}" for b in bs)
 
-def emit_packet(raw):
-    # parse [len][crc][headerLen][header][body]
-    hl=u32(raw,8); hstart=12; hend=12+hl
-    assert raw[hstart]==0x0a, "no 0x0a"
-    slen=raw[hstart+1]; sender=raw[hstart+2:hstart+2+slen]
-    p=hstart+2+slen
-    assert raw[p]==0x12, "no 0x12"
-    rlen=raw[p+1]; receiver=raw[p+2:p+2+rlen]; p=p+2+rlen
-    opcode=struct.unpack('>H',raw[p:p+2])[0]; p+=2
-    headerdata=raw[p:hend]
-    body=raw[hend:]
+def emit_packet(p):
+    sender=endpoint_blob(p['SenderClass'], p.get('SenderInstance'))
+    receiver=endpoint_blob(p['ReceiverClass'], p.get('ReceiverInstance'))
+    opcode=int(p['Opcode'],16)
+    headerdata=bytes.fromhex((p.get('HeaderExtraHex') or '').replace(' ',''))
+    body=body_of(p)
     # receiver: if ends with INST_VAR use AppendVarint
     if receiver.endswith(INST_VAR):
         recv=f"AppendVarint([{hexlist(receiver[:-len(INST_VAR)])}], id)"
@@ -80,34 +93,14 @@ def emit_packet(raw):
         else: chain+=f".WriteArray({hexlist(val)})"
     return chain+".SendAsync(client)"
 
-# self-test: regenerate with id=INST and compare to original bytes (ignoring crc/len which WriteHeader recomputes)
-def rebuild_bytes(raw):
-    # emulate: same as original since id==INST; just return body/header structure check
-    return True
-
-
-# byte-identity self-test: rebuild header+body with id=INST and compare original[8:]
-def rebuild(raw):
-    hl=u32(raw,8); hstart=12; hend=12+hl
-    slen=raw[hstart+1]; sender=raw[hstart+2:hstart+2+slen]; p=hstart+2+slen
-    rlen=raw[p+1]; receiver=raw[p+2:p+2+rlen]; p=p+2+rlen
-    opcode=raw[p:p+2]; p+=2; headerdata=raw[p:hend]; body=raw[hend:]
-    hdr=bytes([0x0a,len(sender)])+sender+bytes([0x12,len(receiver)])+receiver+opcode+headerdata
-    out=struct.pack('>I',len(hdr))+hdr+body
-    return out
-bad=0
-for ci,chunk in enumerate(chunks):
-    for raw in chunk:
-        if rebuild(raw)!=raw[8:]:
-            bad+=1
-            if bad<=3: print("MISMATCH chunk",ci, raw[:40].hex())
-print("self-test mismatches:", bad)
-
+# (The old byte-identity self-test compared a rebuilt raw frame against the original RawBytesBase64; the
+# .tshark.json dump is already de-framed, so there is no raw frame to round-trip — the header blobs are
+# reconstructed from the parsed class+instance fields above.)
 
 def pkt_lines(chunk, indent):
     lines=[]
-    for raw in chunk:
-        lines.append(indent+"await "+emit_packet(raw)+";")
+    for p in chunk:
+        lines.append(indent+"await "+emit_packet(p)+";")
     return lines
 
 L=[]
@@ -152,7 +145,7 @@ L.append("\t\t\t}")
 L.append("\t\t}")
 L.append("\t}")
 L.append("}")
-open('Faolan/GameServer/CreateFlow/RetailCreateWorldEntryBurst.cs','w').write("\n".join(L)+"\n")
+open(OUT,'w').write("\n".join(L)+"\n")
 print("chunks:", [len(c) for c in chunks], "total", sum(len(c) for c in chunks))
-print("wrote RetailCreateWorldEntryBurst.cs lines:", len(L))
+print(f"wrote {OUT} lines: {len(L)}")
 

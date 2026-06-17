@@ -6,9 +6,9 @@ The body is `ProtoScryScriptIIR` (Faolan.Core/Network/Protobuf/aoc-client-protos
 control message. The create-world intro (TODO #7) is a sequence of these: PreloadAssets (carries the RDB resource
 manifest the client must load!) -> PlayOrSkip -> StartScriptGroupOnClient -> ScriptMessage(ThisIsKalanthes/...).
 
-Usage: decode_scryscript.py <capture.json>   (defaults to the dikketest create-world capture)
+Usage: decode_scryscript.py <capture.tshark.json>   (defaults to the dikketest create-world capture)
 """
-import json, struct, base64, sys, os
+import json, struct, sys, os
 
 TYPE = {0: "StartScriptGroupOnClient", 1: "StartScriptGroupOnClientWait", 2: "ScriptMessage",
         3: "StopScriptGroupOnClient", 4: "RestartScriptGroupOnClient", 5: "ScriptCompleted",
@@ -16,7 +16,7 @@ TYPE = {0: "StartScriptGroupOnClient", 1: "StartScriptGroupOnClientWait", 2: "Sc
 
 CAP = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
-    "account-stricken998-character-dikketest-create-random-actions.json")
+    "account-stricken998-character-dikketest-create-random-actions.tshark.json")
 
 def rv(b, p):
     s = 0; v = 0
@@ -62,27 +62,14 @@ def decode_scry(b):
             return d
     return None
 
-def hsplit(raw):
-    b = base64.b64decode(raw)
-    if len(b) < 14 or b[12] != 0x0a:
-        return None
-    o = 12; sl = b[o + 1]; o += 2 + sl
-    if b[o] != 0x12:
-        return None
-    rl = b[o + 1]; o += 2 + rl
-    return struct.unpack(">H", b[o:o + 2])[0], b[o + 2:]
-
 d = json.load(open(CAP))
 print(f"ScryScript (0xA36D3B74) sequence in {os.path.basename(CAP)}:\n")
 i = 0
 for p in d["Packets"]:
-    if not p.get("IsDownload"):
+    if not p.get("IsDownload") or (p.get("Opcode") or "").lower() != "0x2000":
         continue
-    r = hsplit(p["RawBytesBase64"])
-    if not r:
-        continue
-    op, body = r
-    if op != 0x2000 or len(body) < 8 or struct.unpack(">I", body[4:8])[0] != 0xA36D3B74:
+    body = bytes.fromhex(p.get("BodyHex") or "")
+    if len(body) < 8 or struct.unpack(">I", body[4:8])[0] != 0xA36D3B74:
         continue
     dd = decode_scry(body[8:])
     i += 1

@@ -5,7 +5,7 @@ Stage 2 cracked the client's id hash: h = h*31 + c over the ASCII class name (Ja
   - ProtoEndpoint.type ids   = hash(interface/agent class name), e.g. hash("GameCharInterface")=0x8B87F791
   - 32-bit sub-opcodes (in 0x2000) = hash(IIR message-type name), e.g. hash("StatUpdateIIR_c")=0x96B8DC59
 
-This scans every Captures/*.json across ALL servers (Universe/Player/CSPlayer/Game), collects the distinct
+This scans every Captures/*.tshark.json across ALL servers (Universe/Player/CSPlayer/Game), collects the distinct
 endpoint type ids and 32-bit sub-opcodes, and resolves each to a name by hashing every identifier in the client
 exe and matching. (16-bit RpcHeader opcodes like 0x2052 are per-interface method indices, NOT hashes -> Stage 3b.)
 
@@ -49,45 +49,36 @@ def resolve(idv, want_iir):
     return best, sorted(cands, key=lambda n: -rank(n, want_iir))
 
 # --- parse captures ---
-def parse(raw):
-    import base64
-    b = base64.b64decode(raw)
-    if len(b) < 14 or b[12] != 0x0a:
-        return None
-    off = 12
-    sl = b[off + 1]; sender = b[off + 2:off + 2 + sl]; off += 2 + sl
-    if off + 2 > len(b) or b[off] != 0x12:
-        return None
-    rl = b[off + 1]; recv = b[off + 2:off + 2 + rl]; off += 2 + rl
-    if off + 2 > len(b):
-        return None
-    op = struct.unpack(">H", b[off:off + 2])[0]; off += 2
-    return sender, recv, op, b[off:]
+# The .tshark.json dump (Captures/tshark_dump.sh) already de-frames every packet: the RPC endpoint class ids,
+# the 16-bit opcode and the body come straight from the record. All Conan-protocol services collapse to
+# Protocol="Conan" (only chat keeps "AgentServer"), so the per-service breakdown is bucketed by the
+# server-side endpoint CLASS id (the stable interface discriminator — ports are dynamically advertised).
+def hexint(s):
+    return int(s, 16) if s else None
 
-def endpoint_type(blob):
-    # [0x0d <type LE32> 0x10 <instance varint>]
-    if len(blob) >= 5 and blob[0] == 0x0d:
-        return struct.unpack("<I", blob[1:5])[0]
-    return None
+def service_label(p):
+    if p.get("Protocol") == "AgentServer":
+        return "AgentServer"
+    cls = p.get("SenderClass") if p.get("IsDownload") else p.get("ReceiverClass")
+    return cls or p.get("Protocol") or "?"
 
 endpoint_ids = collections.Counter()
 subops = collections.Counter()          # 32-bit subopcode -> count
 subops_by_proto = collections.defaultdict(collections.Counter)
 op16_by_proto = collections.defaultdict(collections.Counter)
 
-for fn in sorted(glob.glob(os.path.join(CAPDIR, "*.json"))):
+for fn in sorted(glob.glob(os.path.join(CAPDIR, "*.tshark.json"))):
     try:
         d = json.load(open(fn))
     except Exception:
         continue
     for p in d.get("Packets", []):
-        r = parse(p["RawBytesBase64"])
-        if not r:
+        op = hexint(p.get("Opcode"))
+        if op is None:
             continue
-        sender, recv, op, body = r
-        proto = p.get("ProtocolName", "?")
-        for blob in (sender, recv):
-            t = endpoint_type(blob)
+        body = bytes.fromhex(p.get("BodyHex") or "")
+        proto = service_label(p)
+        for t in (hexint(p.get("SenderClass")), hexint(p.get("ReceiverClass"))):
             if t is not None:
                 endpoint_ids[t] += 1
         op16_by_proto[proto][op] += 1
@@ -123,7 +114,7 @@ for idv, cnt in sorted(subops.items(), key=lambda kv: -kv[1]):
     protos = ",".join(sorted({pr for pr, c in subops_by_proto.items() if idv in c}))
     out.append(f"| 0x{idv:08X} | {cnt} | {best or '[?]'} | {protos} |")
 
-out.append("\n## 16-bit RpcHeader opcodes per server (method indices - Stage 3b, NOT hashes)\n")
+out.append("\n## 16-bit RpcHeader opcodes per endpoint class (method indices - Stage 3b, NOT hashes)\n")
 for proto in sorted(op16_by_proto):
     ops = op16_by_proto[proto]
     listing = " ".join(f"0x{o:04X}({c})" for o, c in sorted(ops.items(), key=lambda kv: -kv[1]))

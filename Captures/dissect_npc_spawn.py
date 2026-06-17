@@ -26,7 +26,7 @@ NPC body layout (offsets body-relative; the beach NPCs all share iirOff=297):
 Usage:
   python3 Captures/dissect_npc_spawn.py                 # table of every NPC spawn in the Strie login burst
   python3 Captures/dissect_npc_spawn.py one <handle-hex> # full field dump of one NPC (e.g. 818f7)
-  python3 Captures/dissect_npc_spawn.py <capture.json>   # table for another capture
+  python3 Captures/dissect_npc_spawn.py <capture.tshark.json>   # table for another capture
 """
 import importlib.util
 import struct
@@ -41,7 +41,7 @@ ss = importlib.util.spec_from_file_location('s', ROOT / 'Captures/parse_spawn_sc
 ps = importlib.util.module_from_spec(ss)
 ss.loader.exec_module(ps)
 
-DEFAULT_CAP = 'Captures/account-stricken997-character-Strie-login.json'
+DEFAULT_CAP = 'Captures/account-stricken997-character-Strie-login.tshark.json'
 INSTANCE_RANGE_START = 0x02000000  # >= this handle is the player's own spawn, not an NPC
 
 # CharacterStats (IIR f4) field names, from ProtoCoreCharacterIIR.CharacterStats in AocProtocol.g.cs.

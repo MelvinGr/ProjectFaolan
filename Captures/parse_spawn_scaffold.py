@@ -354,7 +354,7 @@ def cmd_template():
 
 
 def cmd_all(player_only=False):
-    caps = sorted((ROOT / 'Captures').glob('*.json'))
+    caps = sorted((ROOT / 'Captures').glob('*.tshark.json'))
     total = ok = 0
     fails = {}
     for cap in caps:
@@ -393,7 +393,7 @@ def cmd_pre():
     ref = None
     rows = []
     caps = [(Path('TEMPLATE'), [template_bytes()])]
-    caps += [(cap, spawns_in_capture(cap, player_only=True)) for cap in sorted((ROOT / 'Captures').glob('*.json'))]
+    caps += [(cap, spawns_in_capture(cap, player_only=True)) for cap in sorted((ROOT / 'Captures').glob('*.tshark.json'))]
     for cap, bodies in caps:
         for idx, body in enumerate(bodies):
             try:
@@ -431,7 +431,7 @@ def cmd_prediff():
     """Group player-spawn pre-IIR regions by length and show, per group, every distinct byte column."""
     groups = {}
     caps = [(Path('TEMPLATE'), [template_bytes()])]
-    caps += [(cap, spawns_in_capture(cap, player_only=True)) for cap in sorted((ROOT / 'Captures').glob('*.json'))]
+    caps += [(cap, spawns_in_capture(cap, player_only=True)) for cap in sorted((ROOT / 'Captures').glob('*.tshark.json'))]
     for cap, bodies in caps:
         for idx, body in enumerate(bodies):
             try:

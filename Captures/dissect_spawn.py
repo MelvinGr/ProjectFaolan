@@ -19,7 +19,7 @@ Usage:
 """
 import sys, struct, importlib.util
 
-CAP = 'Captures/account-stricken997-character-Strie-login.json'
+CAP = 'Captures/account-stricken997-character-Strie-login.tshark.json'
 spec = importlib.util.spec_from_file_location('c', 'Captures/compare_log_to_dump.py')
 cdt = importlib.util.module_from_spec(spec); spec.loader.exec_module(cdt)
 

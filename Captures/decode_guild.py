@@ -46,11 +46,15 @@ GuildFullUpdate 0x203F body:
       for a fresh guild)
   [self member record][u32 selfContribution?][member records ... to end of packet, no count]
 """
-import json, base64, struct, sys
+import json, struct, sys
 from collections import Counter
 
 GUILD_TYPE = 0x0000DEB7
 CHAR_TYPE = 0x0000C350
+
+# CsPlayerAgent (guilds/teams) RPC endpoint class ids — the new .tshark.json dumps tag every Conan packet
+# Protocol="Conan", so the guild conversation is selected by its class pair, not the old ProtocolName field.
+CS_CLASSES = {'0xbbd560c8', '0x6dd55614'}
 
 C2S = {0x201C: 'AcceptGuildInvitation', 0x201D: 'DeclineGuildInvitation',
        0x201E: 'ClientRequestGuildInfo', 0x201F: 'ClientRequestGuildName',
@@ -91,20 +95,6 @@ class R:
         return len(self.b) - self.off
 
 
-def body_of(raw):
-    """[len u32][callId u32][hdrlen u32][RpcHeader protobuf][method u16][flags?][body] -> (method, body).
-
-    hdrlen covers the protobuf endpoints + method + optional trailing flag byte(s), so the method
-    is found by walking the protobuf fields, not by offset arithmetic from hdrlen."""
-    hdrlen = struct.unpack('>I', raw[8:12])[0]
-    i = 12
-    while raw[i] in (0x0A, 0x12):  # field 1/2, wiretype 2 (the two ProtoEndpoints)
-        n = raw[i + 1]
-        i += 2 + n
-    method = struct.unpack('>H', raw[i:i + 2])[0]
-    return method, raw[12 + hdrlen:]
-
-
 def parse_member(r):
     head = (r.u8(), r.u8())
     assert head == (3, 3), f'member head {head} at {r.off - 2:#x}'
@@ -139,18 +129,18 @@ def parse_full_update(body):
 
 def main(path):
     d = json.load(open(path))
-    pkts = [p for p in d['Packets'] if p['ProtocolName'] == 'CsPlayerAgent']
-    pkts.sort(key=lambda p: p['TimestampTicks'])
-    t0 = pkts[0]['TimestampTicks'] if pkts else 0
+    pkts = [p for p in d['Packets']
+            if (p.get('SenderClass') or '').lower() in CS_CLASSES
+            or (p.get('ReceiverClass') or '').lower() in CS_CLASSES]
+    pkts.sort(key=lambda p: p['Frame'])
     counts = Counter()
     for p in pkts:
-        raw = base64.b64decode(p['RawBytesBase64'])
         dl = p['IsDownload']
-        method, body = body_of(raw)
+        method = int(p['Opcode'], 16)
+        body = bytes.fromhex(p.get('BodyHex') or '')
         name = (S2C if dl else C2S).get(method, '?')
         counts[(dl, method, name)] += 1
-        dt = (p['TimestampTicks'] - t0) / 1e7
-        line = f"{dt:8.2f}s {'DL' if dl else 'UL'} {method:#06x} {name:24s}"
+        line = f"#{p['Frame']:6d} {'DL' if dl else 'UL'} {method:#06x} {name:24s}"
         try:
             if dl and method == 0x202A:
                 r = R(body)
@@ -184,4 +174,4 @@ def main(path):
 
 if __name__ == '__main__':
     main(sys.argv[1] if len(sys.argv) > 1 else
-         'account-faolan-character-hoxxling-login-guild_invite_accepted-random-gameplay-other_playersvisible.json')
+         'Captures/account-faolan-character-hoxxling-login-guild_invite_accepted-random-gameplay-other_playersvisible.tshark.json')

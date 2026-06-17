@@ -8,7 +8,7 @@ word in every capture body (both endiannesses) and reports the ones that resolve
 
 Usage: reverse_hash_ids.py <AgeOfConan.exe> <Captures-dir> [out.md]
 """
-import re, json, sys, glob, os, struct, base64, subprocess, collections
+import re, json, sys, glob, os, struct, subprocess, collections
 
 EXE = sys.argv[1] if len(sys.argv) > 1 else "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/AgeOfConan.exe"
 CAPDIR = sys.argv[2] if len(sys.argv) > 2 else os.path.dirname(os.path.abspath(__file__))
@@ -46,35 +46,29 @@ def best_name(idv):
         return s
     return max(cands, key=score)
 
-# scan capture bodies
-def header_split(raw):
-    b = base64.b64decode(raw)
-    if len(b) < 14 or b[12] != 0x0a:
-        return None
-    o = 12; sl = b[o + 1]; o += 2 + sl
-    if o + 2 > len(b) or b[o] != 0x12:
-        return None
-    rl = b[o + 1]; o += 2 + rl
-    if o + 2 > len(b):
-        return None
-    op = struct.unpack(">H", b[o:o + 2])[0]
-    return op, b[o + 2:]
+# scan capture bodies — the .tshark.json dump already de-frames each packet (opcode + body are fields), and
+# all Conan services collapse to Protocol="Conan", so the context label is the server-side endpoint class id.
+def service_label(p):
+    if p.get("Protocol") == "AgentServer":
+        return "AgentServer"
+    cls = p.get("SenderClass") if p.get("IsDownload") else p.get("ReceiverClass")
+    return cls or p.get("Protocol") or "?"
 
 hits = collections.Counter()
 hit_ctx = collections.defaultdict(set)   # name -> {(proto, opcode)}
 hit_name = {}
 
-for fn in sorted(glob.glob(os.path.join(CAPDIR, "*.json"))):
+for fn in sorted(glob.glob(os.path.join(CAPDIR, "*.tshark.json"))):
     try:
         d = json.load(open(fn))
     except Exception:
         continue
     for p in d.get("Packets", []):
-        r = header_split(p["RawBytesBase64"])
-        if not r:
+        op = int(p["Opcode"], 16) if p.get("Opcode") else None
+        if op is None:
             continue
-        op, body = r
-        proto = p.get("ProtocolName", "?")
+        body = bytes.fromhex(p.get("BodyHex") or "")
+        proto = service_label(p)
         for i in range(0, len(body) - 3):
             for endian in ("<I", ">I"):
                 v = struct.unpack_from(endian, body, i)[0]
