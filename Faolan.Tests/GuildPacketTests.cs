@@ -9,7 +9,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Golden-byte tests for the guild wire builders against the retail bytes from the hoxxling
-	// guild_invite_accepted capture (see Captures/decode_guild.py for the decoded grammar).
+	// guild_invite_accepted capture (see Captures/scripts/decode_guild.py for the decoded grammar).
 	public class GuildPacketTests
 	{
 		// The 0x202A invite body Kyloth's invite produced for Hoxxling: guild ID32 (0xDEB7:0x7585B)

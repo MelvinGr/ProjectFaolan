@@ -10,7 +10,7 @@ namespace Faolan.GameServer
 	{
 		// Step 3 of the create->world handshake: the world-prep / scene burst the creator sends after
 		// CharCreationFinished, before the client will send 0x206E (enter world). Verbatim from
-		// Captures/account-stricken998-character-dikketest-create-random-actions.json (creator gs013:7016,
+		// Captures/Dikketest_rogue-barbarian_create_random-actions.json (creator gs013:7016,
 		// idx 364-438, excluding the 0x2082/0x2009 keepalive replies which are answered naturally), with the
 		// client instance retargeted from dikketest's 0x01316D2B to the local temp instance 0x021662C8
 		// (receiver varint AB DA C5 09 -> C8 C5 D9 10, body instance 01 31 6D 2B -> 02 16 62 C8). Each packet

@@ -11,7 +11,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Locks the decoded grammar of the 0x737A6DF9 tails' @609 OBJECTIVE-DETAIL region (between the Quest_c
-	// journal region @0..609 and the quest index @1168). Decode + dissector: Captures/decode_snapshot_609.py;
+	// journal region @0..609 and the quest index @1168). Decode + dissector: Captures/scripts/decode_snapshot_609.py;
 	// docs/fullplayer-snapshot-reader.md.
 	//
 	// KEY CORRECTION (2026-06-16): @609 is NOT a "QuestFullUpdate block authored by BuildQuestFullUpdate" (the

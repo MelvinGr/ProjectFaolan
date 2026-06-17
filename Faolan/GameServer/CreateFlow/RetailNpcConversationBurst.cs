@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 namespace Faolan.GameServer
 {
 	// The NPC intro-conversation reply, reconstructed from
-	// Captures/account-stricken998-character-dikketest-create-random-actions.json (world conn 37.18.193.22:7012).
+	// Captures/Dikketest_rogue-barbarian_create_random-actions.json (world conn 37.18.193.22:7012).
 	//
 	// In that capture the conversation is NOT automatic: the player walks up to the beach NPC and clicks it,
 	// sending an Interact (0x642CD3D6, actionType 0x16 = talk-to-NPC). The server then replies with this batch

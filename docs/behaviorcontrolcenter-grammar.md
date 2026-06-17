@@ -28,7 +28,7 @@ per-Command readers (vtable slot 0x80 of each Command type) enumerated - the res
 ## Registration form (the create-burst / world-entry BccIIR) — #234
 
 Distinct from the combat BccAck above: the create-world cutscene and world-entry bursts REGISTER behaviors on
-scene entities with a fixed-shape record (decoded by `Captures/decode_behaviorcc.py`, built by
+scene entities with a fixed-shape record (decoded by `Captures/scripts/decode_behaviorcc.py`, built by
 `CreateEditorRecordBuilder.BuildBehaviorControlCenterIir`):
 
 ```

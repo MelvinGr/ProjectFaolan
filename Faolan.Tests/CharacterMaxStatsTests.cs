@@ -34,10 +34,11 @@ namespace Faolan.Tests
 		{
 			var stats = CharacterMaxStats.CreateDefaults(Class.Assassin, 23);
 
-			// 200 + 23*47 = 1281 (captured 1270), 200 + 23*41 = 1143 (captured 736 - rough); Assassin is
-			// stamina-only so Mana = 0 (captured AssassinL23 Mana 0).
-			Assert.Equal(1281u, stats.Health);
-			Assert.Equal(1143u, stats.Stamina);
+			// L1-anchored (Strie 98 HP / 236 Stam) + growth fitted to the L23 capture (AssassinL23 1270 HP / 736 Stam):
+			// 98 + 22*53 = 1264 (captured 1270), 236 + 22*23 = 742 (captured 736). Assassin is stamina-only so
+			// Mana = 0 (captured AssassinL23 Mana 0).
+			Assert.Equal(1264u, stats.Health);
+			Assert.Equal(742u, stats.Stamina);
 			Assert.Equal(0u, stats.Mana);
 		}
 

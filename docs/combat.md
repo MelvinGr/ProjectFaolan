@@ -2,7 +2,7 @@
 
 Status 2026-06-12: armed and unarmed swings work in-client; equip-state decides which protocol the client
 speaks. Commits `226b16f`, `a115c40`. Golden tests: `BehaviorAckTests` (byte-exact against
-`Captures/account-stricken998-character-combat_armed-and-unarmed.pcapng`). Wider combat-loop status (NPC
+`Captures/Stihetfv_soldier-conqueror_login_combat_armed-and-unarmed.pcapng`). Wider combat-loop status (NPC
 aggro/death/XP/loot) lives in TODO.md §Combat and `docs/archive/quests-and-combat.md`.
 
 ## The Interact request (0x642CD3D6 upload)
@@ -85,7 +85,7 @@ clean NPC-vs-player tell). `seq` is the constant `0x0004` (server-initiated, not
 Sending it plays the NPC's swing + the player's hit-react; the authoritative HP move still rides the
 world-tick `StatUpdate` (the ack's damage is just the floating number, so the two don't double-apply).
 
-Decode: `Captures/decode_combat_npc_ack.py` (98/98 frames of the strickenbla capture). Builder
+Decode: `Captures/scripts/decode_combat_npc_ack.py` (98/98 frames of the strickenbla capture). Builder
 `CombatPacketCodec.BuildNpcAttackAnimationAckBody`, byte-exact against frame 6472 in
 `CombatPacketCodecTests`. Wired into `WorldSimulation.ApplyNpcAttack` via `IWorldOutbound.SendNpcAttackAnimation`.
 The animation/result params (`typeId`/`swingCounter`/`f5`/`f11`/`f12`/`resultType`/`resultK*`) are not
@@ -151,7 +151,7 @@ on-screen feedback lines — **one per primary attribute that rose** (the 5 cate
 then a `0x96B8DC59` vitals push with the new Health/Stamina/Mana maxima. There is **no** "You reached level N"
 banner in any capture, and the Level number is never pushed as a standalone `0x36` stat (the client tracks it from
 the snapshot/quest stream). The attribute lines are `FormatFeedbackIIR` payloads — see `docs/on-screen-feedback.md`
-and `AttributeChangedFeedback` (decode `Captures/decode_levelup_feedback.py`, golden `AttributeChangedFeedbackTests`).
+and `AttributeChangedFeedback` (decode `Captures/scripts/decode_levelup_feedback.py`, golden `AttributeChangedFeedbackTests`).
 Wired into both paths: GM `.level` (`SetLevelCommand`) and `CombatService.PushLevelUp`. Which attributes rise / by
 how much is provisional (`Combat.AttributeGrowth`, flat +1/primary) — no per-class growth tables exist in captures.
 
@@ -163,7 +163,7 @@ byte-exact:
   `.grantability <id>` (catalog via `.abilitylist`).
 - **`0x200A DispatchLearnSpell`** — grants a real **spell**. Body = a bare big-endian `u32` spell id (`i_nSpellID`),
   invariant across all 68 captured packets. `SendLearnSpell`/`BuildLearnSpellBody` (decode
-  `Captures/decode_learn_spell.py`, golden `LearnSpellTests`). GM: `.learnspell <id>`.
+  `Captures/scripts/decode_learn_spell.py`, golden `LearnSpellTests`). GM: `.learnspell <id>`.
 
 **Spell granting / persistence (#74).** Spells are learned per-character: the captures show a caster's whole
 learned set is re-sent on every world entry (NecroL80 always relearns her 5, DemoL80 his 9), so it is modelled like
@@ -186,7 +186,7 @@ builds it and registers `applyTo == applyFrom` casts in `WorldEntity.ActiveBuffs
 `0x201E` / the expiry tick track them). The **wire spell id is `(baseId << 8) | rank`** — apply uses rank `00`,
 remove uses rank `01`; the payload embeds the same `baseId` at offset **[22..26]**.
 
-**Mount buff — fully captured** (`account-faolan-character-necrol80-login-mount_move_dismount`, the only 2
+**Mount buff — fully captured** (`NecroL80_mage-necromancer_login_mount_move_dismount`, the only 2
 ApplySpell packets in it): mount up = self ApplySpell **`0x31EB1500`** + a **54-byte** payload
 (`…0031eb15…` at [22..26]); dismount = **`0x31EB1501`** (base|rank 01) with an **empty** payload. So the mount
 **buff** apply/remove is a real oracle now — distinct from the demol80 `0x3BAD7D` summon. The mount **entity

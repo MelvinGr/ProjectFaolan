@@ -2,7 +2,7 @@
 
 Wire grammars for a batch of combat / world-entity / movement-adjacent `IIR` records, recovered
 from `AgeOfConan.exe` via the vtable-xref method (`Captures/ghidra/DumpVtableReaders.java`, slot 8 →
-each class's `ReadSubClass`). Validator: `Captures/decode_combat_world_iir.py` — every reader below
+each class's `ReadSubClass`). Validator: `Captures/scripts/decode_combat_world_iir.py` — every reader below
 consumes **exactly to the declared packet length** for every captured instance.
 
 ## Shared framing + primitives

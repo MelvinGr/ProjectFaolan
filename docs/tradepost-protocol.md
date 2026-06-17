@@ -6,7 +6,7 @@
 > test with the `.ah` GM command (sends `DispatchOpenTradepost` at the player's position). Once it renders,
 > proceed to Step 3 (DB-backed listings + the `Mail`/`MailAttachment` model + buy→mail). See `TODO.md` §9a.
 
-Decoded 2026-06-12 from two captures via `Captures/decode_tradepost.py`:
+Decoded 2026-06-12 from two captures via `Captures/scripts/decode_tradepost.py`:
 - `account-faolan-character-necrol80-...-sell_items_to_trader-intract-with-auctionhouse` (browse/search)
 - `account-faolan-character-assassinl23-...-buy_from_autionhouse_get_mail-...` (buy + mail delivery)
 
@@ -170,7 +170,7 @@ fragment is left empty (per-item RDB name key unsynthesizable — same client-RD
 the granted item uses the **Items-template** identity, not the listed instance's exact Data quad (like vendor BUY);
 the seller isn't credited (importer-seeded sellers aren't live characters).
 
-## SELL into the AH + player SendMail (decoded 2026-06-14 from `account-faolan-character-necrol80-sell_item_on_ah-send_mail_with_attachment`)
+## SELL into the AH + player SendMail (decoded 2026-06-14 from `NecroL80_mage-necromancer_login_sell_item_on_ah-send_mail_with_attachment`)
 
 **`TradepostSellItem` (C→S `0x200A`) — byte-exact (capture F375):**
 ```

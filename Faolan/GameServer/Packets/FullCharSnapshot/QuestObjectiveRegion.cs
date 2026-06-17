@@ -9,7 +9,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 {
 	// The @609 OBJECTIVE-DETAIL region of the 0x737A6DF9 FullChar snapshot tails - the bytes between the Quest_c
 	// journal region (@0..609, see QuestcRegion) and the quest INDEX (the 0x000003F1 tag). Grammar decoded +
-	// validated 2026-06-16 (Captures/decode_snapshot_609.py, docs/fullplayer-snapshot-reader.md): a per-GOAL
+	// validated 2026-06-16 (Captures/scripts/decode_snapshot_609.py, docs/fullplayer-snapshot-reader.md): a per-GOAL
 	// objective-detail list, NOT a BuildQuestFullUpdate block (that earlier claim was disproven - 559 B vs 869 B).
 	//
 	// Wire: u32 chapterTag(0x0BD3) ; then per goal:

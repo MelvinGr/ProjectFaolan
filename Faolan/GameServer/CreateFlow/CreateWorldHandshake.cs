@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 namespace Faolan.GameServer
 {
 	// The post-customization handshake on the character-creator connection, reconstructed byte-for-byte
-	// from Captures/account-stricken998-character-dikketest-create-random-actions.json (creator = gs013:7016).
+	// from Captures/Dikketest_rogue-barbarian_create_random-actions.json (creator = gs013:7016).
 	//
 	// After Finish + the SetMorphValue stream, the server drives the client to naming and enter-world:
 	//   1. each non-empty SetMorphValue is acked with a 0xBADF5A4B packet that ECHOES the morph value

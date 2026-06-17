@@ -53,7 +53,7 @@ The 32-bit and endpoint ids are the hash track (Stage 2/3a). The 16-bit opcodes 
 ## Stages
 
 ### Stage 1 — Name & signature catalog ✅ DONE (2026-06-09)
-Extracted by `Captures/extract_rpc_catalog.py <AgeOfConan.exe>` → **`docs/aoc-client-rpc-methods.md`** (+ `.json`).
+Extracted by `Captures/scripts/extract_rpc_catalog.py <AgeOfConan.exe>` → **`docs/aoc-client-rpc-methods.md`** (+ `.json`).
 **14 interfaces, 376 client→server (proxy) + 401 server→client (dispatch) methods.** The interfaces map 1:1 onto
 our services: `UniverseAgent/Interface`, `PlayerAgent/Interface`, `CSPlayerAgent/Interface`, `GameCharAgent/
 Interface` (the main game protocol, 169 c2s / 157 s2c), `GameAgent/Interface`, **`TradepostAgent/Interface`**
@@ -80,7 +80,7 @@ exact. No disassembly needed. Examples:
   Interact→`BehaviorControlCenterIIR_c`, Move→`CharDCMoveIIR_t`.
 
 ### Stage 3 — Build the id↔name tables
-- **3a (32-bit + endpoint ids):** ✅ DONE — `Captures/decode_opcode_ids.py <exe> <Captures>` →
+- **3a (32-bit + endpoint ids):** ✅ DONE — `Captures/scripts/decode_opcode_ids.py <exe> <Captures>` →
   **`docs/aoc-opcode-ids.md`**. Scans every capture across **all servers**, resolves all 14 endpoint type ids and
   ~72 IIR sub-opcodes by hashing every exe identifier. Cross-validated against independently-known opcodes
   (`SetMorphValueIIR_c`=morph ack, `SetNameIIR_t`=name commit, `n3TeleportIIR_t`=teleport, the `Knubot*IIR`
@@ -122,13 +122,13 @@ and tied to an open TODO. Ranked by value.
 
 1. **Exact wire layout of every raw dispatch method (highest value).** ✅ DONE (2026-06-09). `stream bad after
    '<field>'` is the client's own parser emitting each field *in read order*; the catalog
-   (`docs/aoc-client-rpc-methods.md`, via `Captures/extract_rpc_catalog.py`) already lists every method's field
+   (`docs/aoc-client-rpc-methods.md`, via `Captures/scripts/extract_rpc_catalog.py`) already lists every method's field
    names in order + the typed client→server signatures, and now a **Hungarian-prefix → wire-type legend** (`i_c`=
    ID32 handle, `i_n`=int, `b`=bool, `i_v`=vector, plural/`...List`/`...Data`=collection), verified against the
    proxy sigs. Confirmed examples: `DispatchSetItemStat(i_cInventoryID, i_nItemPos, i_nStat, i_nValue)`,
    `DispatchLearnSpell(i_nSpellID)`. Remaining: collection fields still need their nested element encoding (item 2).
 2. **Reverse-hash decoder for name-hashed ids inside packet BODIES** — ✅ CLOSED: NO PRODUCTIVE TARGET REMAINS
-   (probed 2026-06-09). `Captures/reverse_hash_ids.py` BKDR-31-matches 32-bit body words against every exe
+   (probed 2026-06-09). `Captures/scripts/reverse_hash_ids.py` BKDR-31-matches 32-bit body words against every exe
    identifier, but a **blind** scan is too noisy: the hash over ~60k tokens collides with random 4-byte windows
    (lengths/floats/strings), so the non-opcode hits are mostly junk (`wTrL`, `PjES`, `ShadowMapType`). It only pays
    off **targeted at a field already located by packet structure** — and when we targeted BOTH named leads, **both
@@ -166,7 +166,7 @@ and tied to an open TODO. Ranked by value.
      messages: `PlayOrSkip` / `ThisIsKalanthes` ride this; `ProtoScryScriptIIR` is already a typed C# class).
    The other 13 descriptors are sub-structures nested inside other messages (e.g. CoreCharacter/FullCharacter inside
    the char snapshot), not standalone wire ids.
-   - **Applied to TODO #7 (2026-06-09):** `Captures/decode_scryscript.py` decodes the full create-world intro scry
+   - **Applied to TODO #7 (2026-06-09):** `Captures/scripts/decode_scryscript.py` decodes the full create-world intro scry
      sequence (PreloadAssets+manifest → PlayOrSkip → StartScriptGroup → ThisIsKalanthes → WelcomeTutorial).
      Cross-checking our server showed we ALREADY replay the Slave Galley `PreloadAssets` + manifest verbatim, and
      the client's failing resource ids are playfield *child* lookups (local RDB), not server-sent — which
@@ -195,7 +195,7 @@ and tied to an open TODO. Ranked by value.
    protobuf, per #3), so building it needs packet-structure RE from captures, and the full slot→column map needs
    the RDB face-morph table (we only see the 7 morphs the test users happened to change).
 6. **Cutscene / ScryScript decode** (TODO #7) — ✅ SCRY FULLY DECODED + server-side replay VERIFIED (2026-06-09);
-   the bug is NOT here. `Captures/decode_scryscript.py` decodes the full 12-step retail cutscene; splitting it by
+   the bug is NOT here. `Captures/scripts/decode_scryscript.py` decodes the full 12-step retail cutscene; splitting it by
    source port shows #1–#5 (galley) on the **creator** conn (:7016) and #6–#12 (beach `PlayOrSkipQuestion`,
    `ThisIsKalanthes`, `WelcomeTutorial`) on the **world** conn (:7012). Our server replays BOTH on the matching
    connections (`RetailCreateEditorCreationScriptBurst` creator + `RetailCreateWorldEntryBurst` world), with the

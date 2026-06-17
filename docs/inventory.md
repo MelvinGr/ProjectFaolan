@@ -61,7 +61,7 @@ Containers are built wholesale from the DB (`FullCharSnapshotBuilder.BuildContai
 
 ## Equip/unequip moves (Interact 0x09) - decoded from capture
 
-Capture: `account-stricken998-character-combat_armed-and-unarmed` (2026-06-12). Golden tests:
+Capture: `Stihetfv_soldier-conqueror_login_combat_armed-and-unarmed` (2026-06-12). Golden tests:
 `BehaviorAckTests`.
 
 - Request args protobuf: `{TypeId, Mode, Category:10, Field6:0}`. **Mode is the client's monotonic

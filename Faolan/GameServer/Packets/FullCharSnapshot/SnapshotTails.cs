@@ -33,7 +33,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		public byte[] UnknownAfterAccessWindowTable { get; init; }
 
 		// Everything between the @609 objective region and the access-window table (the quest INDEX + any tail);
-		// still opaque (decoded by Captures/decode_snapshot_quests.py).
+		// still opaque (decoded by Captures/scripts/decode_snapshot_quests.py).
 		public byte[] UnknownBeforeAccessWindowTable { get; init; }
 
 		public int KnownHeaderLength { get; init; }
@@ -916,8 +916,14 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			Unknown59 = 59,
 			Unknown60 = 60,
 			Unknown61 = 61,
-			Unknown62 = 62,
+
+			// Index 62 is a SECONDARY mana value (~6 lower than displayed): retail Necro [62]=24000 vs displayed
+			// 24600, Bear Shaman [62]=16500 vs displayed 17100. NOT the displayed max — see CurrentMana below.
+			ManaSecondary = 62,
 			Unknown63 = 63,
+			// The displayed MAX mana (×100). Verified against retail LOGIN snapshots: Necro [64]=24600 (=246 mana,
+			// matches the client sheet), Bear Shaman [64]=17100 (=171). Index 60 carries the same value; [62] is a
+			// ~6-lower secondary. (The earlier "[64]=2276 / use 62" note came from an UNSETTLED create snapshot.)
 			CurrentMana = 64,
 			Unknown65 = 65,
 			Unknown66 = 66,

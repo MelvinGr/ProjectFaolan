@@ -20,7 +20,7 @@ flat "header + verbatim tail" the capture-only model first suggested). Gitea #19
 
 Each action carries a DIFFERENT set of properties (an animation action has a string name property; a
 positional action has numeric properties), so the element length varies (4–91 B) — it's a property bag, not a
-fixed record. The capture taxonomy (`Captures/decode_gameactionlist.py`) reflects this: the clean
+fixed record. The capture taxonomy (`Captures/scripts/decode_gameactionlist.py`) reflects this: the clean
 `[u16 len][anim name]` form is one string-valued property; the rest are numeric property sets.
 
 ## Status (#190)

@@ -10,7 +10,7 @@ verbatim bursts are the Knubot conversation (#188) and the intro-cutscene world-
 despawn + regen + BehaviorCC records — 146 in all — are already constructed; the FA015807 spawns + MoveTask/AI
 choreography remain, gated on #185/#190). This doc is the decode that makes the construction possible.
 
-Dissector: `Captures/decode_create_editor.py` (validated across all seven `*create*.tshark.json` captures).
+Dissector: `Captures/scripts/decode_create_editor.py` (validated across all seven `*create*.tshark.json` captures).
 
 ## 1. `0x2000` is multiplexed — split by endpoint-class pair first
 
@@ -113,7 +113,7 @@ create-specific to decode, only builder wiring to do:
 4. **Remaining** — every record in `RetailCreateEditorInitialBurst` is now constructed except the live
    `Character…` preview (`IirId`, intentionally verbatim — see item 1). Across `WorldPrepBurst` +
    `CreationScriptBurst`, **every `*IIR` record type with structured per-record variation is now decoded + built
-   + wired** (dissectors `Captures/decode_character_action.py` + `decode_create_iir_records.py`, builders in
+   + wired** (dissectors `Captures/scripts/decode_character_action.py` + `decode_create_iir_records.py`, builders in
    `CreateEditorRecordBuilder`, locked by `CreateEditorRecordTests` + the burst goldens):
    - `CharacterActionIIR` (0x6B6FD368) — action/ability grant (26 records).
    - `ComboBookIIR` (0xA8BBEB7F) — combo-book grant (12 records).

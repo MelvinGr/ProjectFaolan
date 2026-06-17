@@ -19,7 +19,7 @@ HP change rides a separate vitals `StatUpdate` (`0x96B8DC59`), as combat already
 
 ## Field map (54-byte payload)
 Recovered by the reader grammar + an empirical diff of same-spell instances (per-cast fields) vs different
-spells (spell params) — `Captures/decode_applyspell.py`:
+spells (spell params) — `Captures/scripts/decode_applyspell.py`:
 
 | Offset | Field | Notes |
 |---|---|---|

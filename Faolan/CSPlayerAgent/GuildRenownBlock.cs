@@ -9,7 +9,7 @@ namespace Faolan.CSPlayerAgent
 	// CSPlayerInterface::DispatchGuildUpdate -> CoreGuild_c::Read (FUN_00565900, streaming version 3) for the
 	// govForm==1 form (case 1 falling through case 3 - the form our created guilds use). The FULL reader walk
 	// (version, guildId, govForm, cash, 3 strings, then this block) consumes the whole i_pcGuild arg and lands
-	// EXACTLY on the following member record (Captures/decode_guild_renown.py --walk, validated against both
+	// EXACTLY on the following member record (Captures/scripts/decode_guild_renown.py --walk, validated against both
 	// 0x203F snapshots in the guild_invite capture); the ONLY byte that differs between snapshots is
 	// RenownCounters[1] (param_1[0x40]), the renown total that ticked. The two embedded count-framed lists use the
 	// shared 0x3F1 invariant (word=(count+1)*0x3F1).

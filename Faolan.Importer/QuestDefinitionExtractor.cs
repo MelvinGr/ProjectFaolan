@@ -9,7 +9,7 @@ using Faolan.Core.Database.Tables;
 namespace Faolan.Importer
 {
 	// Harvests quest journal-content definitions (QuestDefinition + QuestTextRef rows) from captured QuestFullUpdate
-	// (0x63268258) and QuestJournal (0x79f8c7a1) packets. Grammar + round-trip proof: Captures/decode_quest.py;
+	// (0x63268258) and QuestJournal (0x79f8c7a1) packets. Grammar + round-trip proof: Captures/scripts/decode_quest.py;
 	// builders: WorldQuest.BuildQuestJournal/BuildQuestFullUpdate (byte-exact golden tests). Construct, don't replay:
 	// we keep ids + the deterministic per-(id,category) content keys, never literal text. A quest's full slot set
 	// needs both packets - the full-update carries title/summary/objective/headers, the journal carries the list

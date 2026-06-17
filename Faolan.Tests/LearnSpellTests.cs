@@ -6,7 +6,7 @@ namespace Faolan.Tests
 {
 	// Byte-exact construct of the DispatchLearnSpell (s2c 0x200A) body - the live spell-grant packet (#73). Oracle:
 	// the captured grants on the GameCharInterface conversation, whose body is a single big-endian u32 spell id
-	// (invariant across all 68 packets; see Captures/decode_learn_spell.py).
+	// (invariant across all 68 packets; see Captures/scripts/decode_learn_spell.py).
 	public class LearnSpellTests
 	{
 		[Theory]

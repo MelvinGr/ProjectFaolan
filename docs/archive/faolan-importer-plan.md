@@ -7,7 +7,7 @@ into the database** — item templates, NPCs, conversations, maps, spells, and (
 canonical, testable C# pipeline that replaces today's scattered, ad-hoc extraction:
 
 - the `ArchetypeHarvestRegenerator` **test** that writes `captured-items.tsv`,
-- the Python scripts `Captures/extract_conversations.py`, `dissect_spawn.py`, `compare_log_to_dump.py`,
+- the Python scripts `Captures/scripts/extract_conversations.py`, `dissect_spawn.py`, `compare_log_to_dump.py`,
 - the manual "run the server to seed" dance.
 
 "Captures are leading" is the project's core principle; this tool makes the captures a first-class data source.
@@ -147,7 +147,7 @@ docs/archive/player-spawn-generation-plan.md). The server embeds no spawn/burst 
   talk; `Merge` dedups across captures preferring a 4-byte-varint instance then most packets). The tool full-
   replaces the conversation tables each run (verified: **12 nodes / 96 packets**, matching the old `.bin`).
   `ConversationReplay` now reads from the DB via `IDatabaseRepository.GetConversationNode`. **Retired**
-  `conversations-strie.bin` (+ its embed) and `Captures/extract_conversations.py`. Tests:
+  `conversations-strie.bin` (+ its embed) and `Captures/scripts/extract_conversations.py`. Tests:
   `ConversationExtractorTests` (extract windowing + merge); server starts clean.
 - **Phase 3 — DONE (2026-06-07).** `CaptureMapImporter` reads `MapChange` (0x2000 / 0x5D85BFC7) packets - mapId
   @ inner[30], spawn position @ inner[13] (3 BE floats) - and INSERTS maps not already in the DB (existing

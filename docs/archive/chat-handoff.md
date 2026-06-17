@@ -50,7 +50,7 @@ So the chat (AgentServer) connection is never established. Chat connects only AF
    (`Captures/tshark_dump.sh`), check for any 7012 traffic. If the client never opens 7012, the trigger to connect
    is missing/late; if it opens then drops, the AgentServer handshake is failing.
 4. **Compare to a retail chat connection.** Retail dumps have full 7012 traffic
-   (`account-stricken997-character-randochar-login-kalantes_chat.tshark.json` etc.): `0x003c` channel subs, `0x0014`
+   (`Ranochar_mage-necromancer_login_kalantes_chat.tshark.json` etc.): `0x003c` channel subs, `0x0014`
    sender info, `0x0023` system msg — sent DURING entry (before the first move). Diff our AgentServer handshake
    against retail's to see what the client waits for. The full post-ready record stream after CoreClaim (records in
    `PostReadyBurst.cs`) may be incomplete/misframed so the client never signals "ready for chat".

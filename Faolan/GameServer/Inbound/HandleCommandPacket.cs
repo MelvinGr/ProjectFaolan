@@ -80,7 +80,7 @@ namespace Faolan.GameServer
 		//
 		// These callbacks are how the editor reports the player's choices (sex/race/head/size/class/
 		// voice/name) and lifecycle events (IntroDone, ClientLoadingDone, Move). The retail capture
-		// account-stricken998-character-strickenen-create-random-actions.json proves the server sends
+		// Stricken_soldier-guardian_create_random-actions.json proves the server sends
 		// NO responses to any of these (ChangeSex/Finish/SetMorphValue/TheNameIs all stream client->server
 		// with zero downstream replies); the client self-advances. So this handler is parse-only.
 		//

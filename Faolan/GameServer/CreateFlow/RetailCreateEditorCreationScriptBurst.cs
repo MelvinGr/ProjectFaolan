@@ -9,7 +9,7 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-		// The create-world ScryScript step content (decoded by Captures/decode_scryscript.py, #223): the PlayOrSkip(72)
+		// The create-world ScryScript step content (decoded by Captures/scripts/decode_scryscript.py, #223): the PlayOrSkip(72)
 		// remoteformat token for the "Slave Galley" creation step (f4) and the RDB resource manifest the client preloads
 		// (f5, "rdbId:value;..."). Carried as named strings now (was a verbatim hex blob); ScryScript.BuildStep frames them.
 		internal const string CreateWorldScriptToken =
@@ -89,7 +89,7 @@ namespace Faolan.GameServer
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x03, 0x01, 0x00, 0x00, 0x02, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x5F, 0x59, 0xEA, 0x5C, 0x54);
 
 			// ScryScriptIIR: the create-world "PlayOrSkip(72) Slave Galley" remoteformat + its RDB resource manifest,
-			// then the "PlayOrSkip" ScriptMessage (decoded by Captures/decode_scryscript.py).
+			// then the "PlayOrSkip" ScriptMessage (decoded by Captures/scripts/decode_scryscript.py).
 			await IirRecord(ScryScript.BuildStep(id, CreateWorldScriptToken, mode: 7, resources: CreateWorldResourceManifest, f6Field1: 6177372, f6Field2: 9422303));
 			await IirRecord(ScryScript.BuildStep(id, "PlayOrSkip"));
 

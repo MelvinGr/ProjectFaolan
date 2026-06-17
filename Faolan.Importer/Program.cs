@@ -119,7 +119,7 @@ namespace Faolan.Importer
 
 		// The beach starter (quest 10238) per-goal objective detail (the snapshot's @609 region). This data lives ONLY
 		// in the FullChar snapshot (BeachTailsTemplate.bin), not the QuestFullUpdate/Journal packets the extractor reads,
-		// so it is seeded here from the decoded values (Captures/decode_snapshot_609.py / QuestObjectiveRegion). Two
+		// so it is seeded here from the decoded values (Captures/scripts/decode_snapshot_609.py / QuestObjectiveRegion). Two
 		// goals (1448, 3490), each with its own world marker + objective text. Lets QuestObjectiveRegion.Build generate
 		// the objective region from the DB instead of the .bin (#186). Idempotent: skipped if the goals already exist.
 		private static async Task SeedBeachQuestGoals(DatabaseContext db)
@@ -130,7 +130,7 @@ namespace Faolan.Importer
 				return;
 
 			// The Quest_c scalars + the index region's W6QT/table/trailer/goal-steps (snapshot-only; decoded from the
-			// template @0..1292, Captures/decode_snapshot_609.py). Idempotent - set every run.
+			// template @0..1292, Captures/scripts/decode_snapshot_609.py). Idempotent - set every run.
 			quest.SnapshotN = 4;
 			quest.SnapshotFieldEc = 1;
 			quest.SnapshotFieldF0 = 0x96;

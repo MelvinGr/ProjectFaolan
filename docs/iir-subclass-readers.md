@@ -43,7 +43,7 @@ ReadSubClass:
   BLOB  -> ProtoSimpleDynelIIR protobuf      (FUN_00cbfb80; name/display_name/template_item_id/flags)
   KDTREE                                       (FUN_0080c620)
 ```
-**Validated** by `Captures/decode_iir_subclass_readers.py` against **all** captured dynel records (every
+**Validated** by `Captures/scripts/decode_iir_subclass_readers.py` against **all** captured dynel records (every
 login capture, 100%): the `[u32 blobLen]` frames a protobuf that starts with field 1 (`0x08`, kdtree) and
 carries the name field. The protobuf is the already-recovered `ProtoSimpleDynelIIR` — so the dynel is
 constructible from DB rows + that proto, no bespoke decoder.

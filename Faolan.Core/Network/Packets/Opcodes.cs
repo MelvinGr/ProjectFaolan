@@ -26,7 +26,7 @@ namespace Faolan.Core.Network.Packets
 		// Client->server methods - the COMPLETE recovered CSPlayerAgent.client_to_server table. The 16-bit opcode
 		// is a METHOD INDEX (0x2000 + position) into docs/aoc-client-rpc-methods.json; alignment verified against
 		// the hoxxling guild capture (0x2000 Authenticate, 0x201C AcceptGuildInvitation fired exactly once on the
-		// accept, 0x201E/0x202F/0x2040/0x2041/0x2077 all behave as named). See Captures/decode_guild.py.
+		// accept, 0x201E/0x202F/0x2040/0x2041/0x2077 all behave as named). See Captures/scripts/decode_guild.py.
 		public enum CsPlayerAgentOpcodes : ushort
 		{
 			Authenticate = 0x2000,

@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Core.Database.Tables
 {
 	// An NPC vendor's shop window, imported from captured DispatchShopData (0x2033) packets
-	// (Captures/decode_shopdata.py for the wire grammar). Keyed by the vendor NPC NAME - shop ids and NPC
+	// (Captures/scripts/decode_shopdata.py for the wire grammar). Keyed by the vendor NPC NAME - shop ids and NPC
 	// handles are session-volatile, names are stable (same convention as conversations).
 	[Index(nameof(VendorName), IsUnique = true)]
 	public class Shop : BaseEntity

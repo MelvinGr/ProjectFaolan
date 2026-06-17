@@ -5,7 +5,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 {
 	// The fresh-character STAT-block skeleton (the SnapshotTails PostAccessBlock), relocated out of
 	// BeachTailsTemplate.bin so the stat region can be authored without the .bin (#186). Decoded by
-	// Captures/decode_statblock.py: of the 338 values, only ~14 distinct slots are character/map-derived (class
+	// Captures/scripts/decode_statblock.py: of the 338 values, only ~14 distinct slots are character/map-derived (class
 	// HP/Mana/Stamina + archetype, XP, the playfield token + position, one session slot) - the other 313 are this
 	// FIXED baseline, identical for every fresh character. CreateFreshBlock() returns a PostAccessBlock seeded with
 	// the skeleton; the caller patches the character-derived slots via the existing setters (CurrentHp/Mana/Stamina/

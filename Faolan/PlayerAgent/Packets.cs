@@ -179,7 +179,7 @@ namespace Faolan.PlayerAgent
 
 		// The small character list (id + auth challenge per named character). Sent in response to
 		// RequestSmallCharList and again after a delete so the client refreshes. Entry layout is exactly
-		// Id + AuthChallenge (length-prefixed string), verified against retail (faolanx-charlogin: all bytes
+		// Id + AuthChallenge (length-prefixed string), verified against retail (Faolanx_mage-necromancer_login: all bytes
 		// consumed, no per-entry trailer - an extra field shifts every following entry and the client loops
 		// once there is more than one character).
 		private async Task SendSmallCharList(INetworkClient client)

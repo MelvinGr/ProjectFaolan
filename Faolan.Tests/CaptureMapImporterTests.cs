@@ -14,7 +14,7 @@ namespace Faolan.Tests
 	// map must be left untouched.
 	public class CaptureMapImporterTests
 	{
-		// The 146-byte MapChange packet from account-faolan-character-necrol80-login-kingconanscastle (map 2040).
+		// The 146-byte MapChange packet from NecroL80_mage-necromancer_login_kingconanscastle (map 2040).
 		private const string MapChangeHex =
 			"0000008e426be154000000170a070d13ce71b11056120a0d47c1676c10d4cb8b4020000000006b5d85bfc70000000000000000004379d4bc41ffc29042d51810620000c79c000007f8000000026c3f3611000000000000000100009c500050357800000000010000001800000001005035780000cb204170000040df091200000003ffffffffffffffff0000000000000000";
 

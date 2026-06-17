@@ -1,8 +1,8 @@
 # Guilds
 
-Decoded 2026-06-12 from `Captures/account-faolan-character-hoxxling-login-guild_invite_accepted-…json`
+Decoded 2026-06-12 from `Captures/Hoxxling_mage-heraldofxotli_login-guild_invite_accepted-…json`
 (a live retail invite→accept) and `…-claim_login_reward.json` (a later login while guilded).
-Dissector + validation: `Captures/decode_guild.py`.
+Dissector + validation: `Captures/scripts/decode_guild.py`.
 
 ## Where guilds live on the wire
 
@@ -63,7 +63,7 @@ byte is the **CoreGuild_c streaming version (==3)**, NOT the government form (an
 **government form is the byte after guildId (==1)**, which selects the reader's case 1 → fall-through case 3
 layout. The 277-byte block is now a **typed codec** (`GuildRenownBlock`, byte-exact, `GuildRenownBlockTests`),
 built per-guild from `Guild.Renown` (`GuildRenownBlock.ForRenown`) — no longer a verbatim blob. The full reader
-walk (`Captures/decode_guild_renown.py --walk`) deserializes the whole arg and lands byte-exact on the next
+walk (`Captures/scripts/decode_guild_renown.py --walk`) deserializes the whole arg and lands byte-exact on the next
 member record, proving the field grammar; only `RenownCounters[1]` (param_1[0x40]) varies between snapshots (the
 live renown total), so the other feat/city/cap fields stay constant pending their (binary-stripped) semantics.
 
@@ -116,7 +116,7 @@ not a ctor as earlier supposed). It reads: streaming version (==3), guildId, gov
 the form; **case 1 falls through into case 3**, reading cash (ReadU64), two enum/bytes around a u32, the three
 strings (name/desc/motd), then the renown block = `ReadByte(flag)` + `ReadList`(13 stat ids @param+0x39) +
 2 bytes + 3×u32 + 2 bytes + 2×u32 + `ReadList`(3 ids @param+0x1c) + 6×u32 + **6×u64 (RenownCounters, @param+0x3e..**
-where `[0x40]` is the live renown total) + 2×u32 + 8×u64 + 3×u64 + u32 + u64. `Captures/decode_guild_renown.py
+where `[0x40]` is the live renown total) + 2×u32 + 8×u64 + 3×u64 + u32 + u64. `Captures/scripts/decode_guild_renown.py
 --walk` replays this exact sequence and lands byte-exact on the following member record (helpers: FUN_0048f900
 ReadU32, FUN_0048f720 ReadU64, FUN_0048f6d0/FUN_004e0390 ReadByte, FUN_0048f840 ReadString, FUN_004d4c70
 ReadList). The C# field↔offset map is in `GuildRenownBlock`. Remaining: the per-guild meaning of the feat/city/

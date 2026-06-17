@@ -39,12 +39,12 @@ namespace Faolan.Importer
 			// retail). The Strie/strickenbla walks are deliberately NOT unioned in here: they continue past the grant
 			// to a FOLLOW-UP quest 13480 (at 0>0>0>0>0), which made the accept grant two quests / fire two
 			// notifications. Keeping the offer to randochar alone reproduces retail's single-quest first-offer flow.
-			("account-stricken997-character-randochar-login-get-casilda-quest", "Casilda", ""),
+			("Ranochar_mage-necromancer_login_get-casilda-quest", "Casilda", ""),
 			// Casilda AFTER accepting but BEFORE completing (in-progress greeting; this char already had the quest).
-			("account-stricken998-character-xxx-login", "Casilda", $"return player:HasQuest({CasildaFirstQuest}) and not player:HasCompletedQuest({CasildaFirstQuest})"),
+			("Stihetfv_soldier-conqueror_login", "Casilda", $"return player:HasQuest({CasildaFirstQuest}) and not player:HasCompletedQuest({CasildaFirstQuest})"),
 			// Casilda AFTER it is complete: the turn-in capture + the post-quest login (the unchained, different greeting).
-			("account-stricken998-character-xxx-compat_compeltefirstquest", "Casilda", $"return player:HasCompletedQuest({CasildaFirstQuest})"),
-			("account-stricken998-character-xxx-login-after_first_quest_kalanthes_chat", "Casilda", $"return player:HasCompletedQuest({CasildaFirstQuest})"),
+			("Stihetfv_soldier-conqueror_login_compat_compeltefirstquest", "Casilda", $"return player:HasCompletedQuest({CasildaFirstQuest})"),
+			("Stihetfv_soldier-conqueror_login_after_first_quest_kalanthes_chat", "Casilda", $"return player:HasCompletedQuest({CasildaFirstQuest})"),
 		];
 
 		// An NPC is "state-managed" once it appears in any rule: its dialogue then comes ONLY from classified captures.

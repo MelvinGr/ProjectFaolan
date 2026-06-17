@@ -7,7 +7,7 @@ namespace Faolan.GameServer.Spawn
 	// The NPC SimpleCharFullUpdate (FA015807) post-IIR scaffold - the stream that follows the embedded
 	// ProtoCoreCharacterIIR. Unlike the player's post-IIR (PlayerSpawnScaffoldCodec, keyed on the 0x3F1
 	// buff-table multiple), the NPC post-IIR is its own grammar (dissected 2026-06-12, workbench
-	// Captures/dissect_npc_spawn.py over the Strie beach burst, 42 NPCs):
+	// Captures/scripts/dissect_npc_spawn.py over the Strie beach burst, 42 NPCs):
 	//
 	//   header:  [u32 0][u32 firstRecordLen = len(post) - 36][u32 recordCount]
 	//            - word0 is 0 on ALL 42 (the player has 2 here).
@@ -66,7 +66,7 @@ namespace Faolan.GameServer.Spawn
 
 		// Replaces an FA015807 body's PRE-IIR scaffold (the 223-byte block between the transform and the embedded
 		// CoreCharacterIIR) with the from-scratch minimal form (NpcSpawnPreIir.BuildMinimal: all runtime words 0
-		// except the category word). The cross-capture sweep (Captures/classify_fa015807_fields.py) proved the
+		// except the category word). The cross-capture sweep (Captures/scripts/classify_fa015807_fields.py) proved the
 		// captured scaffold carries only per-instance runtime state (handles/timers), 0 on a fresh spawn - so a
 		// cross-session row's captured scaffold holds another session's runtime state, and the minimal form is the
 		// correct fresh-spawn value (Gitea #185). Length-preserving (FixedLength == FixedLength), so the body-length

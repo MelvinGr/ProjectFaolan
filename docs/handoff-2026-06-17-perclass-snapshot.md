@@ -14,52 +14,83 @@ or class-derived stats**, so every fresh character inherits Strie's Rogue identi
   adjacent create-flow data issues; **#186** (retire `BeachTailsTemplate.bin`) is the same "construct the
   snapshot per-character instead of shipping Strie's" work.
 
-## Ground truth (retail, read off the client 2026-06-17)
-Fresh Necromancer on the beach: **HP 89, Mana 246, Stamina 0**.
+## Ground truth (retail L1, read off the client 2026-06-17) — see the 4-way table in the CORRECTION below
+- Necromancer (Mage): **HP 89, Mana 246, Stamina 0**
+- Guardian (Soldier): **HP 130, Mana 0, Stamina 179**
+- Assassin (Rogue): **HP 98, Mana 0, Stamina 236** (+ AssassinL23 L23: HP 1270, Stam 736)
+- Bear Shaman (Priest-hybrid): **HP 108, Mana 171, Stamina 178**
 
-## Captures committed (0a0df6e) — the decode data
-- `Captures/account-stricken997-character-necro-create.tshark.json` — Necro create → beach world-entry. TWO
-  `0x737A6DF9` snapshots: create-editor (pkt#60, 8082 B) and **world-entry (pkt#329, 8497 B)** — use the
-  world-entry one.
-- `Captures/account-stricken997-character-necro-login-magic-combat-ice-strike.tshark.json` — a Necro casting.
-- Baseline to diff against: `account-stricken997-character-Strie-create` (Strie = Assassin/Rogue, **same create
-  flow**) — a clean Rogue-vs-Mage diff with appearance/name/instance as the only other variables.
+## Captures — the decode data
+Captures are named `<realname>_<archetype>-<class>_<create|login>_<desc>` (the real in-game name, from the
+create flow's `TheNameIs`). Per-archetype create+login pairs (use the **login** snapshot for vitals):
+- `Stickienecro_mage-necromancer_*` (Necromancer), `Fwfnwfjwk_soldier-guardian_*` (Guardian),
+  `Efjwlnfj_priest-bearshaman_*` (Bear Shaman), `Strie_rogue-assassin_*` (Assassin).
+- Snapshot pkt indices: necro create pkt#528 (unsettled), necro login (magic-combat) pkt#47, Strie login
+  pkt#52, guardian login pkt#45, bearshaman login pkt#50. Screenshots: `~/Pictures/Screenshots/stats/`.
+- Decode scripts now live in `Captures/scripts/` (run from the repo root).
 
 ## What's PROVEN
 - The `0x737A6DF9` body is `[u32 len][737a6df9][c350][instance][front protobuf root ~4..498][PFAccessWindow_
   table ~498..7066 (game-static, identical for everyone)][tails]`.
 - **Tails STAT BLOCK** is at the END of the tails — signature `00 00 03 F1  00 00 03 F1  00 00 46 F2`, then
   338×u32 + a 1-byte trailer; indices **35..182 are copied to 183..330** (a +148 repeat). `SetValue` writes both
-  copies.
-- **HP IS in the stat block:** retail Necro HP 89 → slots **[23] and [54]** (×100 = 8900, repeat at [202]). The
-  existing `TailsPostAccessBlock.CurrentHp` setter already targets these.
-- **Mana is NOT in the stat block** — 246 / 24600 appear nowhere. The client **computes displayed mana from
-  ATTRIBUTES**, a separate region not yet located.
-- `Captures/decode_statblock.py`'s `[64]=mana` and `[78]=archetype` labels are **WRONG/unreliable**: the retail
-  Necro (a Mage) has `[78]=3` (not the claimed "Mage=2") and `[64]=2276` (not 24600). Re-decode against the
-  retail values, don't trust that map.
-- The **CLASS label is not a stat slot** — it's in the **front protobuf root** (`ProtoFullCharacterIIR`, bytes
-  ~4..498) or its sub-messages. It is not a plain ASCII string, so it needs protobuf **parsing**, not a byte-scan.
+  copies. (NB: a fresh Mage snapshot has a 6-word-longer block, 344, because of its quest-index region — not a
+  class difference.)
+
+### CORRECTION 2026-06-17c — verified across FOUR archetypes' retail LOGIN snapshots + character-sheet screenshots (`python3 Captures/scripts/decode_statblock.py --necro-vs-strie`). The ONLY class-derived slots are vitals; everything else is session/map/quest. **The earlier "class is in the front root", "mana is not in the stat block", and (my own interim) "use index 62 for mana" claims were ALL WRONG.**
+
+> **Use the LOGIN snapshot, never the create one.** At create the vitals are unsettled — the Guardian's create
+> world-entry snapshot showed HP 100.3 / Stam 11.45, but its login snapshot (and the sheet) show HP 130 / Stam 178.5.
+
+**Retail L1 ground truth (sheet + login stat block, ×100 in the block):**
+
+| Class (archetype) | HP `[23]` | Mana `[60]`=`[64]` | Stamina `[68]` |
+|---|---|---|---|
+| Guardian (Soldier)        | 130 | — (0) | 179 |
+| Assassin/Strie (Rogue)    | 98  | — (0) | 236 |
+| Necromancer (Mage)        | 89  | 246   | — (0) |
+| Bear Shaman (Priest-hybrid, BOTH) | 108 | 171 | 178 |
+
+(Also captured: **AssassinL23 = Assassin L23 → HP 1270, Stam 736** — the only multi-level point; gives Rogue growth ≈ 53 HP / 23 Stam per level.)
+
+- **CLASS LABEL / weapon proficiency (#239) is NOT in this snapshot at all.** Proven three ways: (a) the two
+  create-editor snapshots (Necro vs Assassin, both 8082 B, byte-aligned) differ in only **24 bytes — all instance
+  ids**; (b) all four archetypes' stat blocks differ **only in vitals magnitudes** (+ session + a Soldier-only
+  slot) — no class enum; (c) the front protobuf root is **`ProtoFullCharacterIIR`** = inventory + account flags
+  only, no class field. ⇒ #239's class source is a **separate packet** (CoreCharacterIIR / self-spawn /
+  stat-update), **still to be located** — that is the real #239 hunt, NOT the FullChar snapshot.
+- **Displayed-vitals slot map** (each ×100, + a +148 repeat copy that `SetValue` keeps in sync):
+  - HP = `[23]` (=`[54]`, rep `[202]`); a lower secondary HP at `[21]` (=`[56]`, rep `[204]`).
+  - **MANA = `[60]` = `[64]`** (rep `[208]`/`[212]`) — the value matching the sheet; `[62]` (rep `[210]`) is a
+    ~6-lower secondary, **NOT** the displayed value. So **`CurrentMana = 64` is CORRECT** (an interim change to 62,
+    based on an unsettled create snapshot, was reverted).
+  - STAMINA = `[68]` (rep `[216]`); a lower secondary at `[66]` (rep `[214]`).
+  - `[78]` is **not** archetype (every class = 3). `[92]`/`[240]` is a Soldier-only value (Guardian 12060, others 1000).
 
 ## What FAILED (reverted — don't repeat)
-Patching the tails stat-block archetype/vitals per-class in `BuildBeachInventoryPacket`. A diagnostic confirmed
-the patch path runs (`HasKnownRepeatedStatTable=True`, class read correctly), and `WritePostAccessBlock` writes
-`block.Values` — yet in-client the sheet was unchanged AND **equipped gear vanished** (the client rejected the
-inconsistent snapshot). So editing the tails stat block in isolation is a dead end; the class/mana sources are
-elsewhere.
+Patching the tails stat-block archetype/vitals per-class in `BuildBeachInventoryPacket` — in-client the sheet was
+unchanged AND **equipped gear vanished** (the client rejected the inconsistent snapshot). The setter indices are
+now confirmed correct (mana 64, stam 68, hp 23/54), so the likely remaining cause is **inconsistency**: the setters
+only touch the *displayed* slot and leave the *secondary* slots (`[21]`/`[62]`/`[66]`) at the Strie template's
+Rogue values — e.g. a Necro would carry Strie's `[66]`/`[68]` stamina. The robust fix is to GENERATE the whole
+per-class block (BuildFromScratch), not patch individual slots on Strie's template.
+
+## DONE this session (2026-06-17c)
+- Reverted the bad mana-index change; `CurrentMana = 64` confirmed against 4 archetypes.
+- Recalibrated `CharacterMaxStats.CreateDefaults` to the retail L1 anchors above (was ~2× off — e.g. Guardian 260→130).
+  Rogue per-level growth fitted to the Strie(L1)+AssassinL23(L23) pair. Classes without a captured sheet
+  (Dark Templar, ranged Priests, Herald of Xotli) keep clearly-flagged ESTIMATES. `CharacterMaxStatsTests` updated.
 
 ## NEXT STEPS (fresh session)
-1. **Find the class field.** Parse the front protobuf root of the Necro vs Strie world-entry snapshots
-   (`ProtoFullCharacterIIR`), diff the fields, isolate the one that differs by class (Mage vs Rogue). Map it to
-   the `Class`/`ArchType` enum. (Strie=Assassin/Rogue is the baseline; a Soldier + Priest create dump would also
-   give the remaining values.)
-2. **Find the attribute region** that yields the displayed mana (246) / the class HP/mana/stamina maxima, so #4's
-   numbers can be generated.
-3. **Generate both per-character** in the snapshot build — this is also the substance of retiring
-   `BeachTailsTemplate.bin` (#186): `BeachTailsBuilder.BuildFromScratch` already reproduces the tails byte-exact
-   but isn't wired into the login path, and even wired it would still ship Strie's class/stats until (1)+(2) land.
-4. **Verify in-client** (the only real proof): a fresh Necromancer must show class=Necromancer, mana ≈ 246, and
-   equip a dagger/staff. Watch for the "gear vanished" failure mode = an inconsistent snapshot.
+1. **#239 class label — hunt the SEPARATE packet** (NOT the FullChar snapshot — proven). Diff the per-archetype
+   LOGIN captures for the player's own CoreCharacterIIR / self-spawn / stat-update; find the class/profession field.
+2. **#4 vitals — generate the per-class block** from `CharacterMaxStats` (set BOTH the displayed AND secondary
+   slots so the snapshot is internally consistent) and wire `BeachTailsBuilder.BuildFromScratch` into the login
+   path (also retires `BeachTailsTemplate.bin`, #186). The setter indices are correct; the gap is the secondaries.
+3. **Verify in-client** (the only real proof): a fresh Necromancer shows mana ≈ 246; Guardian HP 130 / Stam 179;
+   Bear Shaman 108/171/178. Watch for the "gear vanished" failure = an inconsistent snapshot.
+4. **More captures wanted** to fill the estimated classes: a Soldier-hybrid (Dark Templar), a ranged Priest
+   (Priest of Mitra / Tempest of Set), and a Mage-hybrid (Herald of Xotli) — login + sheet.
 
 ## Pointers
 - Build/run: `dotnet Faolan/bin/Debug/Faolan.dll` from the **repo root** (not `bin/Debug`).

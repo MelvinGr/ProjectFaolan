@@ -17,7 +17,7 @@ namespace Faolan.CSPlayerAgent
 {
 	// Guild RPC handlers + wire builders + flow state for the CsPlayerAgent connection (create / invite / accept /
 	// decline / leave / MOTD / info). Formats decoded from the hoxxling guild_invite_accepted capture (see
-	// Captures/decode_guild.py). Extracted from CsPlayerAgentListener as a composed collaborator: it owns the
+	// Captures/scripts/decode_guild.py). Extracted from CsPlayerAgentListener as a composed collaborator: it owns the
 	// pending-invite + per-client reply-endpoint state and routes guild events to other connected members. The
 	// cross-connection client lookup (ClientForCharacter, on the Server base) is injected as a delegate seam; the
 	// in-world guild-tag push rides the existing IGameServerDispatcher.

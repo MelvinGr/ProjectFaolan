@@ -134,7 +134,7 @@ namespace Faolan.GameServer.World
 			return true;
 		}
 
-		// --- Journal CONTENT packets (Captures/decode_quest.py, byte-exact golden tests) ----------
+		// --- Journal CONTENT packets (Captures/scripts/decode_quest.py, byte-exact golden tests) ----------
 		//
 		// These carry the J-panel text the player reads. Text is NEVER literal: every slot is a
 		// <remoteformat .../> or <localized .../> token packed as  00 <u8 len> <ascii>.  The client

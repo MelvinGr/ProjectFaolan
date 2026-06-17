@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Core.Database.Tables
 {
 	// A player guild. Wire identity is ID32 [type 0x0000DEB7][instance = Id]; members are Characters with
-	// GuildId set (rank lives on the Character). Protocol: Captures/decode_guild.py / the hoxxling
+	// GuildId set (rank lives on the Character). Protocol: Captures/scripts/decode_guild.py / the hoxxling
 	// guild_invite_accepted capture.
 	[Index(nameof(Name), IsUnique = true)]
 	public class Guild : BaseEntity

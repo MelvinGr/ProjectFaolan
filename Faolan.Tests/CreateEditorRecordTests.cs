@@ -5,7 +5,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Locks the fixed-grammar character-create EDITOR IIR records to the captured bytes (issue #189,
-	// decoded by Captures/decode_create_editor.py, see docs/create-editor-bursts.md). These records are
+	// decoded by Captures/scripts/decode_create_editor.py, see docs/create-editor-bursts.md). These records are
 	// streamed verbatim today by RetailCreateEditorInitialBurst; the byte-exact builders are the first step
 	// of replacing that replay with construction. Capture: account-stricken998-character-create-no-worldenter
 	// (editor avatar handle 0x021662C8).

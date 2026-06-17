@@ -14,7 +14,7 @@ namespace Faolan.Tests
 	// catalog it in Spells if absent.
 	public class CaptureSpellImporterTests
 	{
-		// ApplySpell packet from account-faolan-character-necrol80-login-kingconanscastle (spell id 0x3dfa48).
+		// ApplySpell packet from NecroL80_mage-necromancer_login_kingconanscastle (spell id 0x3dfa48).
 		private const string ApplySpellHex =
 			"000000731bd646d2000000170a070d13ce71b11056120a0d47c1676c10d4cb8b402000000000506b87e3160000c3500802e5d400003dfa48000000c3500802e5d400000000000000000000000100010000000100000000003dfa480000005000000000000000000000000000000050000000001534b945";
 

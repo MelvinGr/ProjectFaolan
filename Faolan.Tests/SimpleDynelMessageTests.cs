@@ -8,8 +8,8 @@ namespace Faolan.Tests
 	// Locks the typed SimpleDynel identity codec to the captured wire bytes (#187 / #57): the
 	// SimpleDynelFullUpdateIIR (0x66AEDD50) message is lifted out of the opaque Data slice into a typed
 	// ProtoSimpleDynelIIR and rebuilt BYTE-EXACT. Record captured from
-	// account-faolan-character-hoxxling-login (the "Acheronian Ruins" world dynel). Reader decoded by
-	// vtable-xref - docs/iir-subclass-readers.md; framing validated by Captures/decode_iir_subclass_readers.py.
+	// Hoxxling_mage-heraldofxotli_login (the "Acheronian Ruins" world dynel). Reader decoded by
+	// vtable-xref - docs/iir-subclass-readers.md; framing validated by Captures/scripts/decode_iir_subclass_readers.py.
 	public class SimpleDynelMessageTests
 	{
 		// The full SimpleDynel IIR record (the bytes after the 0x2000 carrier's [u32 len][u32 iirType] prefix):

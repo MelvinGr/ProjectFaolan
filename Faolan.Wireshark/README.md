@@ -103,11 +103,11 @@ Captures/tshark_dump.sh <capture.pcapng> [output.json]   # default output: <capt
 ```
 
 Under the hood: `tshark -T json` emits the full dissection tree (one object per frame; each
-"Conan packet N" subtree is self-contained) and `Captures/tshark_to_dump.py` re-groups it:
+"Conan packet N" subtree is self-contained) and `Captures/scripts/tshark_to_dump.py` re-groups it:
 
 ```zsh
 tshark -r capture.pcapng -o tcp.analyze_sequence_numbers:FALSE -T json \
-  | Captures/tshark_to_dump.py > capture.tshark.json
+  | Captures/scripts/tshark_to_dump.py > capture.tshark.json
 ```
 
 The reshape pass is python3 (was a jq filter; #106) - same dump, but ~10x faster on large
@@ -119,13 +119,13 @@ the compressed-stream packets the analyzer drops.
 
 Byte-exact parity with the `Faolan.PacketAnalyzer` JSON dumps (per-opcode packet counts) on:
 
-- `account-stricken997-character-Strie-login.pcapng` (305/305, + post-capture-hole recovery
+- `Strie_rogue-assassin_login.pcapng` (305/305, + post-capture-hole recovery
   the analyzer can't do)
-- `account-faolan-character-hoxxling-login-guild_invite_accepted-...pcapng` (6520/6520,
+- `Hoxxling_mage-heraldofxotli_login-guild_invite_accepted-...pcapng` (6520/6520,
   incl. both GameServer connections of the zone change; chat opcode counts 94/94 + one
   body-less `[op][len 0]` packet per session the C# stack drops as invalid)
 - `account-faolan-character-necrol80-login-sell_items_to_trader-...pcapng` (3765/3765)
-- `account-stricken997-character-Strie-create.pcapng` (673/673)
+- `Strie_rogue-assassin_create.pcapng` (673/673)
 
 ## Layout
 

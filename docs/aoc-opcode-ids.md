@@ -574,7 +574,7 @@ CSPlayerInterface **211 (+33)**. Full tables: **`docs/aoc-rpc-method-opcodes.md`
 =0x2052, DispatchPong=0x2082. NOTE corrections to old content-guesses: GameServer s2c `0x2009`=DispatchChangeItem
 StackSize (not "Pong" — real per-char Pong is `0x2082`), `0x2008`=DispatchSetQuestMarker, and `0x2020`=
 **DispatchAddItem** exists. PlayerInterface s2c is still open (its dispatcher isn't a flat switch). Methodology:
-README "Client reverse-engineering"; verification corpus: `Captures/decode_guild.py` + `Captures/ghidra/`.
+README "Client reverse-engineering"; verification corpus: `Captures/scripts/decode_guild.py` + `Captures/ghidra/`.
 
 The raw per-server counts below are kept as the original observation record:
 

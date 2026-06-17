@@ -5,7 +5,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Golden tests for the whisper/tell packet (0x001E), byte-exact against the capture
-	// account-faolan-character-hoxxling-login_move-from-night-to-day_send-and-receive-whisper
+	// Hoxxling_mage-heraldofxotli_login_move-from-night-to-day_send-and-receive-whisper
 	// (2026-06-12, Hoxxling <-> Settuc 0x01313438). The same wire shape carries both directions:
 	// [u16 0x001E][u16 bodyLen][u32 peerCharId][u16 len][text][00][01][00].
 	public class WhisperTests

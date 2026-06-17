@@ -69,7 +69,7 @@ namespace Faolan.GameServer
 		// the shield our ApplySpell payload already encodes (Scythe Shield - the payload's embedded spell base 0x02387E
 		// matches this id's base; the apply rank byte is 0x00, mirroring the captured mount buff's 0x31EB1500/...01
 		// apply/remove pair). The wire GRAMMAR is the fully-captured mount buff
-		// (account-faolan-character-necrol80-login-mount_move_dismount: ApplySpell 0x31EB1500 + 54-byte payload), so the
+		// (NecroL80_mage-necromancer_login_mount_move_dismount: ApplySpell 0x31EB1500 + 54-byte payload), so the
 		// shape is sound; whether THIS buff renders the intended shield in-client is the open item (needs-testing on #221).
 		private const uint ShieldBuffSpellId = 0x02387E00;
 
@@ -89,7 +89,7 @@ namespace Faolan.GameServer
 		// Sends a live spell grant (DispatchLearnSpell, s2c 0x200A) - the retail "learn a spell" packet (#73). Grants a
 		// spell mid-session (level-up / quest-reward / GM) without rebuilding the FullChar snapshot. Rides the same
 		// GameCharInterface conversation as the 0x2052 ability grant; the body is a single u32 spell id (decoded in
-		// Captures/decode_learn_spell.py, byte-exact in LearnSpellTests). The client pops the "learned a new spell"
+		// Captures/scripts/decode_learn_spell.py, byte-exact in LearnSpellTests). The client pops the "learned a new spell"
 		// toast itself. (The sibling DispatchForgetSpell 0x200B / RemoveSpecialAbility 0x2053 / UntrainSingleFeat
 		// 0x2011 have no capture oracle yet, so they are not built - see #73.)
 		private Task SendLearnSpell(INetworkClient client, uint spellId)

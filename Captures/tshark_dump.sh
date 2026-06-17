@@ -15,7 +15,7 @@ fi
 
 capture=$1
 output=${2:-${capture%.pcapng}.tshark.json}
-reshaper="$(dirname "$0")/tshark_to_dump.py"
+reshaper="$(dirname "$0")/scripts/tshark_to_dump.py"
 
 if ! tshark -G plugins | grep -q faolan; then
     echo "error: the Faolan Wireshark plugin is not installed (see Faolan.Wireshark/README.md)" >&2

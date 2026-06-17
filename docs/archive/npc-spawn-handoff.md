@@ -40,7 +40,7 @@ frame name).
 - Run: `cd Faolan/bin/Debug && dotnet Faolan.dll`. Drive client: see CLAUDE.md. Client log:
   `/var/games/debian-installation/steamapps/common/Age of Conan/AgeOfConan.log`.
 - Loopback captures of OUR output: `Captures/loopback*.pcapng` (+ `.tshark.json`). Retail reference:
-  `Captures/account-stricken997-character-randochar-login-kalantes_chat.*` (Casilda renders chained there).
+  `Captures/Ranochar_mage-necromancer_login_kalantes_chat.*` (Casilda renders chained there).
 
 ## What we proved this session (don't re-derive)
 1. **Casilda's spawn bytes are not the problem.** Her FA015807 IIR is byte-identical to the retail capture

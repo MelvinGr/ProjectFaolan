@@ -70,7 +70,7 @@ restarts. In-client render of the channel is not yet verified (needs a live clie
 
 ## Whispers / tells (0x001E) - decoded + implemented 2026-06-12
 
-Capture `account-faolan-character-hoxxling-login_move-from-night-to-day_send-and-receive-whisper`: the tell is
+Capture `Hoxxling_mage-heraldofxotli_login_move-from-night-to-day_send-and-receive-whisper`: the tell is
 op **0x001E both directions**, same body shape: `[u32 peerCharId][string][00 01 00]` (peer = the TARGET in the
 client's request, the SENDER on delivery). Delivery is preceded by a `0x0014` sender info, like channel chat;
 retail echoes nothing back to the sender (the client renders its own outgoing tell locally). Golden tests:

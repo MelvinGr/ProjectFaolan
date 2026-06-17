@@ -7,7 +7,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Golden-byte test for the BankIIR (0x0BA1C1CB) framing that delivers the personal bank container (kind 105),
-	// decoded from account-faolan-character-necrol80-login-Has-inventory-at-trader-bank (memory protocol_bank_storage).
+	// decoded from NecroL80_mage-necromancer_login_Has-inventory-at-trader-bank (memory protocol_bank_storage).
 	// Proves BuildBankIirRecord reproduces the captured on-wire bank record byte-for-byte given the captured
 	// ProtoInventoryGame blob: [subop 0BA1C1CB][type C350][charInstance][flag 01][u32 BE blobLen][blob], with the
 	// 0x2000 packet length prefix (WriteArrayUInt32Length).

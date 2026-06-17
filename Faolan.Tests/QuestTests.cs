@@ -77,7 +77,7 @@ namespace Faolan.Tests
 			Assert.False(WorldQuest.TryParseQuestIir(corrupt, out _, out _, out _));
 		}
 
-		// Journal CONTENT packets (Captures/decode_quest.py). The Casilda quest 0x34A7 = 13479,
+		// Journal CONTENT packets (Captures/scripts/decode_quest.py). The Casilda quest 0x34A7 = 13479,
 		// goal 0x1670 = 5744, area 1054, map 4010. Keys are the deterministic content hashes harvested
 		// from the captures (identical across characters/sessions).
 		[Fact]
@@ -166,7 +166,7 @@ namespace Faolan.Tests
 		public void QuestDefinitionExtractor_RoundTripsCasilda()
 		{
 			var packets = TsharkCaptureReader.Read(System.IO.Path.Combine(CapturesDir,
-				"account-stricken998-character-strickenbla-create-random-actions-combat-levelup-questcomplete.tshark.json"));
+				"Blablabla_soldier-guardian_create_random-actions-combat-levelup-questcomplete.tshark.json"));
 			var def = QuestDefinitionExtractor.Extract(packets).Single(d => d.QuestId == 0x34A7);
 
 			Assert.Equal(1054u, def.AreaId);
@@ -223,7 +223,7 @@ namespace Faolan.Tests
 		// The per-quest detail block (questId onward, 879 B) for `questId` from xxx-login's 0x737A6DF9 login snapshot.
 		private static byte[] SnapshotQuestBlock(uint questId)
 		{
-			var path = System.IO.Path.Combine(CapturesDir, "account-stricken998-character-xxx-login.tshark.json");
+			var path = System.IO.Path.Combine(CapturesDir, "Stihetfv_soldier-conqueror_login.tshark.json");
 			using var doc = System.Text.Json.JsonDocument.Parse(System.IO.File.ReadAllText(path));
 			foreach (var p in doc.RootElement.GetProperty("Packets").EnumerateArray())
 			{
@@ -250,8 +250,8 @@ namespace Faolan.Tests
 		{
 			foreach (var (file, frame) in new[]
 			{
-				("account-stricken997-character-randochar-login-get-casilda-quest.tshark.json", 687),
-				("account-stricken998-character-strickenbla-create-random-actions-combat-levelup-questcomplete.tshark.json", 9947)
+				("Ranochar_mage-necromancer_login_get-casilda-quest.tshark.json", 687),
+				("Blablabla_soldier-guardian_create_random-actions-combat-levelup-questcomplete.tshark.json", 9947)
 			})
 			{
 				var path = System.IO.Path.Combine(CapturesDir, file);

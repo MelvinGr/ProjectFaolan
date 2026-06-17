@@ -44,7 +44,7 @@ namespace Faolan.Tests
 		// is those exact retail bytes. This locks the burst so the step-by-step construction (#234 steps 4-6) can be
 		// proven to not drift a single wire byte.
 		//
-		// PROVEN equal to retail (Captures/decode_createworld_burst.py --verify-golden): the 604 emitted packets are
+		// PROVEN equal to retail (Captures/scripts/decode_createworld_burst.py --verify-golden): the 604 emitted packets are
 		// byte-identical (opcode + body) to the create capture's :7012 s2c stream [4:608]; the 4 leading packets the
 		// burst omits (0x2000/0x20D0/0x20C5/0x2038) are the pre-Hello auth/redirect handshake, sent by the auth path
 		// (ReportDimensionId/ReportServerId/AckAuthenticate), not the cutscene burst.

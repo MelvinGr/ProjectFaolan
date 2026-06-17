@@ -2,7 +2,7 @@
 
 Cross-referencing the character-sheet **screenshots** (`Captures/screenshots/assassinl23/`) with the capture
 packets. Reference character: **AssassinL23, Stygian Assassin, level 23** (screenshot 2026-06-07 17:17), decoded
-against `account-faolan-character-assassinl23-login-randomActions-changemap.json`. Generated 2026-06-08.
+against `AssassinL23_rogue-assassin_login_randomActions-changemap.json`. Generated 2026-06-08.
 
 ## Where the data is
 

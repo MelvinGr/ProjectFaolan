@@ -1099,7 +1099,7 @@ namespace Faolan.GameServer
 		// .learnspell <id>  - live-grant a real spell to the player via DispatchLearnSpell (0x200A), the decoded
 		// spell-grant path (#73), without a relog. Distinct from .grantability, which grants a catalog ABILITY via the
 		// 0x2052 ability-grant. <id> is the spell id (hex with 0x or decimal); e.g. ".learnspell 0x3006ff" - any
-		// captured DispatchLearnSpell id (see Captures/decode_learn_spell.py).
+		// captured DispatchLearnSpell id (see Captures/scripts/decode_learn_spell.py).
 		private async Task LearnSpellCommand(INetworkClient client, string arguments)
 		{
 			var character = client.Session.Character;

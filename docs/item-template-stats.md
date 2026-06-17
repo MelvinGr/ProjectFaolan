@@ -11,7 +11,7 @@ Data1..4 quad; `RdbItemImporter`). Dump the decrypted templates with:
 dotnet run --project Faolan.Importer -- --skip-characters --rdb <RDB dir> --rdb-items --dump-templates <dir>
 ```
 
-Each file `<type>_<id>.bin` = `[12-byte RDB-Id header][body]`. Dissector: `Captures/decode_item_template.py`.
+Each file `<type>_<id>.bin` = `[12-byte RDB-Id header][body]`. Dissector: `Captures/scripts/decode_item_template.py`.
 
 ## Body grammar
 

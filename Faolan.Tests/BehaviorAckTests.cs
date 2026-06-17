@@ -6,7 +6,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Golden tests for the BehaviorControlCenter echo-acks, byte-exact against the armed+unarmed combat capture
-	// (Captures/account-stricken998-character-combat_armed-and-unarmed.pcapng, 2026-06-12). Each case is a real
+	// (Captures/Stihetfv_soldier-conqueror_login_combat_armed-and-unarmed.pcapng, 2026-06-12). Each case is a real
 	// client request (UP) paired with retail's reply (DOWN); request/reply hex includes the leading u32 body length
 	// (the builders take the length-prefixed request and return the reply content without its length prefix).
 	public class BehaviorAckTests

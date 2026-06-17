@@ -90,7 +90,7 @@ namespace Faolan.Core.Database.Tables
 		public ulong Money { get; set; }
 
 		// Guild membership; null = guildless. Rank 0 = fresh member (retail's invite-accept record), higher =
-		// promoted; the guild creator gets GuildLeaderRank. See Captures/decode_guild.py for the wire records.
+		// promoted; the guild creator gets GuildLeaderRank. See Captures/scripts/decode_guild.py for the wire records.
 		public uint? GuildId { get; set; }
 		public byte GuildRank { get; set; }
 
@@ -147,72 +147,76 @@ namespace Faolan.Core.Database.Tables
 		public uint Mana { get; set; }
 		public uint Stamina { get; set; }
 
-		// Approximate class/level defaults so a character has sensible vitals until a real stat system exists.
-		// Which pools a class HAS is taken from the captured retail characters (memory class_resource_mana_stamina,
-		// authoritative): pure-physical classes (melee Soldiers + all Rogues) have Stamina only, pure casters
-		// (Mages + ranged Priests) have Mana only, and the three melee-hybrids (Dark Templar / Bear Shaman / Herald
-		// of Xotli) have both. The unused pool is zeroed so the client hides that bar. Magnitudes are intentionally
-		// rough; combat/levelling will replace these once those systems land.
+		// Class/level vitals. The LEVEL-1 values are anchored to the retail character sheet (read off the live
+		// client 2026-06-17, cross-checked against the world-entry FullChar snapshot stat block - see
+		// docs/handoff-2026-06-17-perclass-snapshot.md): Guardian 130/0/179, Assassin 98/0/236, Necromancer
+		// 89/246/0, Bear Shaman 108/171/178 (HP/Mana/Stamina). The classes WITHOUT a captured sheet yet
+		// (Dark Templar, ranged Priests, Herald of Xotli) keep ESTIMATES, flagged below. Which pools a class HAS
+		// matches memory class_resource_mana_stamina (a 0 anchor zeroes the pool so the client hides that bar).
+		// PER-LEVEL growth is still rough (no multi-level captures yet); only L1 is authoritative.
 		public static CharacterMaxStats CreateDefaults(Class @class, ushort level)
 		{
 			var lvl = level == 0
 				? (ushort)1
 				: level;
-			var (healthPerLevel, manaBase, manaPerLevel, usesStamina, usesMana) = Archetype(@class);
+			var extra = lvl - 1;
+			var (hpL1, hpGrow, manaL1, manaGrow, staminaL1, staminaGrow) = Archetype(@class);
 
 			return new CharacterMaxStats
 			{
-				Health = (uint)(200 + lvl * healthPerLevel),
-				Stamina = usesStamina
-					? (uint)(200 + lvl * (healthPerLevel - 6))
-					: 0,
-				Mana = usesMana
-					? (uint)(manaBase + lvl * manaPerLevel)
-					: 0
+				Health = (uint)(hpL1 + extra * hpGrow),
+				Mana = manaL1 == 0
+					? 0
+					: (uint)(manaL1 + extra * manaGrow),
+				Stamina = staminaL1 == 0
+					? 0
+					: (uint)(staminaL1 + extra * staminaGrow)
 			};
 		}
 
-		// (healthPerLevel, manaBase, manaPerLevel, usesStamina, usesMana) by class. The stamina/mana flags match the
-		// captured retail CharacterMaxStats (see memory class_resource_mana_stamina).
-		private static (int HealthPerLevel, int ManaBase, int ManaPerLevel, bool UsesStamina, bool UsesMana) Archetype(Class @class)
+		// L1-anchored vitals by class: (hpL1, hpGrow, manaL1, manaGrow, staminaL1, staminaGrow). A 0 for manaL1 /
+		// staminaL1 means the class does not have that pool. The L1 values for Soldier/Rogue/Mage/Bear-Shaman are
+		// from retail captures; the rest are estimates (marked). Growth is a placeholder until levelling lands.
+		private static (int HpL1, int HpGrow, int ManaL1, int ManaGrow, int StaminaL1, int StaminaGrow) Archetype(Class @class)
 		{
 			switch (@class)
 			{
-				// Melee Soldiers - high health, STAMINA ONLY.
+				// Melee Soldiers - STAMINA ONLY. Retail L1: Guardian HP 130, Stamina 179.
 				case Class.Guardian:
 				case Class.Conqueror:
-					return (60, 0, 0, true, false);
+					return (130, 60, 0, 0, 179, 54);
 
-				// Dark Templar - Soldier hybrid, BOTH (unholy magic + melee).
+				// Dark Templar - Soldier hybrid, BOTH (ESTIMATE: no sheet captured yet).
 				case Class.DarkTemplar:
-					return (60, 50, 1, true, true);
+					return (120, 60, 120, 30, 170, 54);
 
-				// Rogues - medium health, STAMINA ONLY (captures show Assassin has no mana).
+				// Rogues - STAMINA ONLY. TWO captured points (Assassin): L1 HP 98 / Stam 236 (Strie), L23 HP 1270 /
+				// Stam 736 (AssassinL23) -> growth ~53.3 HP, ~22.7 Stam per level.
 				case Class.Barbarian:
 				case Class.Assassin:
 				case Class.Ranger:
-					return (47, 0, 0, true, false);
+					return (98, 53, 0, 0, 236, 23);
 
-				// Ranged Priests - medium health, MANA ONLY.
+				// Ranged Priests - MANA ONLY (ESTIMATE: no sheet captured yet).
 				case Class.PriestOfMitra:
 				case Class.TempestOfSet:
-					return (45, 80, 30, false, true);
+					return (95, 45, 200, 30, 0, 0);
 
-				// Bear Shaman - Priest melee hybrid, BOTH.
+				// Bear Shaman - Priest melee hybrid, BOTH. Retail L1: HP 108, Mana 171, Stamina 178.
 				case Class.BearShaman:
-					return (45, 80, 30, true, true);
+					return (108, 45, 171, 30, 178, 39);
 
-				// Herald of Xotli - Mage melee hybrid, BOTH.
+				// Herald of Xotli - Mage melee hybrid, BOTH (ESTIMATE: no sheet captured yet).
 				case Class.HeraldOfXotli:
-					return (38, 100, 40, true, true);
+					return (95, 38, 200, 40, 150, 32);
 
-				// Pure Mages - low health, MANA ONLY.
+				// Pure Mages - MANA ONLY. Retail L1 (Necromancer): HP 89, Mana 246.
 				case Class.Demonologist:
 				case Class.Necromancer:
-					return (38, 100, 40, false, true);
+					return (89, 38, 246, 40, 0, 0);
 
 				default:
-					return (47, 50, 1, true, true);
+					return (98, 47, 150, 30, 150, 41);
 			}
 		}
 	}

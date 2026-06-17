@@ -9,7 +9,7 @@ Goal (chosen 2026-06-10, finished the same day over two sessions): generate the 
 > `PlayerSpawnTemplate` C# constant, are both gone; Strie's captured bytes survive only as a test oracle
 > (`Faolan.Tests/Golden/SpawnStrieTemplate.bin`).
 > Verified: the wire grammar parses + regenerates **all captured player-own spawns byte-exact (37/37, incl. captures added after the codec was written)**
-> (`Captures/parse_spawn_scaffold.py`); the rows→bytes oracle is locked by
+> (`Captures/scripts/parse_spawn_scaffold.py`); the rows→bytes oracle is locked by
 > `PlayerSpawnScaffoldCodecTests`/`PlayerSpawnScaffoldRowsTests`; `tools/client-smoke-test.sh` 16/16 with the
 > generated scaffold confirmed on the wire (session-pcap parse); 142 unit tests.
 
@@ -59,7 +59,7 @@ captured spawn extracts to the same rows as its unbuffed form (locked by
 
 ## Wire grammar (validated: regenerates all 37 captured player spawns byte-exact)
 
-Workbench: `Captures/parse_spawn_scaffold.py` (`template` / `players` / `all` / `one` / `dumpb` / `pre` /
+Workbench: `Captures/scripts/parse_spawn_scaffold.py` (`template` / `players` / `all` / `one` / `dumpb` / `pre` /
 `prediff` commands). C# port: `PlayerSpawnScaffoldCodec`.
 
 - `[u32 bodyLen=len-4][u32 FA015807][u32 ack=C350][u32 handle][u32 fieldA]`

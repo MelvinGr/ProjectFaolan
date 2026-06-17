@@ -7,7 +7,7 @@ the simulation/movement layer (Gitea #190 / #53).
 
 Recovered from `AgeOfConan.exe` via the vtable-xref method (`Captures/ghidra/DumpVtableReaders.java`,
 slot 8 → `CharDCMoveIIR_t::ReadSubClass = FUN_007adae0`, which delegates to the inner reader
-**`FUN_007ad6b0`**). Dissector + validator: `Captures/decode_chardcmove.py`
+**`FUN_007ad6b0`**). Dissector + validator: `Captures/scripts/decode_chardcmove.py`
 (byte-exact to the declared length for all 13,289 samples).
 
 ## Carrier framing (the 0x2000 IIR envelope)

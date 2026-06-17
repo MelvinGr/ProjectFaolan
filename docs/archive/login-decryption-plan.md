@@ -198,5 +198,5 @@ offset 12.)
 - Our login handler: `Faolan/UniverseAgent/UniverseAgentListener.cs`, `Faolan/UniverseAgent/Packets.cs`.
 - DB: `Faolan.Core/Database/Tables/Account.cs` (`AuthChallenge`, `Password`),
   `Faolan.Core/Database/DatabaseRepository.cs` (`CheckLogin`, `GetAccount`).
-- Captures: `Captures/account-faolan-character-demol80-login-randomActions.json` (and other `*-login-*`).
+- Captures: `Captures/DemoL80_mage-demonologist_login_randomActions.json` (and other `*-login-*`).
 - Client binaries: `<AoC>/AgeOfConan.exe` (key string @ 0x1bf6c18), `AgeOfConanDX10.exe`.

@@ -212,7 +212,7 @@ Each populated **`ObjRec`** (0x48-byte heap node; not exercised by the beach sta
 In the template, `Quest_c` ends at byte `@609` (its 4 numeric objective lists are **empty** for quest 10238 —
 counts at `@581/@585/@601/@605` are all 0). The bytes from `@609` up to the quest index (`@1168`) are a
 **per-GOAL objective-detail block** — its OWN grammar, fully decoded + validated by
-`Captures/decode_snapshot_609.py` (parses to the index boundary exactly) and locked by
+`Captures/scripts/decode_snapshot_609.py` (parses to the index boundary exactly) and locked by
 `Faolan.Tests/Snapshot609AnalysisTests`:
 
 ```
@@ -248,7 +248,7 @@ fits none — likely List B/C / MainQuest are empty here and consume only a few 
 start; pinning the exact reader needs a **dynamic trace**. NOT blocking the *generator* now that the wire
 grammar above is decoded — the blocker is the per-goal `QuestDefinition` model, not the byte layout.
 
-Validated by the dissector `Captures/decode_questc.py` (parses version + List A + each `Quest_c` and asserts
+Validated by the dissector `Captures/scripts/decode_questc.py` (parses version + List A + each `Quest_c` and asserts
 it consumes exactly to the objective-block boundary `@609`; `listKey == questId`). A C# codec
 `QuestcRegion`/`QuestcRecord` (Parse/ToArray + typed fields) round-trips the template's `@0–609` **byte-exact**
 (`QuestcRegionTests`) and is **wired into `SnapshotTails`** — it now models the tails' front region instead of

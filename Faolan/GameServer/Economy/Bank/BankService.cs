@@ -17,7 +17,7 @@ using ProtoBuf;
 namespace Faolan.GameServer.Economy.Bank
 {
 	// Personal BANK storage (the separate storage opened at the trader/auctionhouse NPC). Decoded from
-	// account-faolan-character-necrol80-login-Has-inventory-at-trader-bank (memory protocol_bank_storage): the bank
+	// NecroL80_mage-necromancer_login_Has-inventory-at-trader-bank (memory protocol_bank_storage): the bank
 	// is just another inventory container - kind 105 (0x69) - delivered ON-DEMAND (NOT in the login FullChar
 	// snapshot) when the bank is opened. The wire delivery mirrors the world-entry container handshake:
 	//   1. 0x201c x N  - register each bank slot (on the GameCharAgent conversation, like the inventory/money path)

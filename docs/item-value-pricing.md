@@ -6,7 +6,7 @@ every item is priced — not just captured wares, and not from the (mostly-0) `I
 
 ## Confirmed: sell price = value-per-item × count
 
-Ground truth from `Captures/account-faolan-character-necrol80-login-sell_items_to_trader-intract-with-auctionhouse`:
+Ground truth from `Captures/NecroL80_mage-necromancer_login_sell_items_to_trader-intract-with-auctionhouse`:
 
 - The wallet update is `0x2005` but that opcode is **multiplexed** — filter by **`SenderClass 0xa9ecb95d`**
   (GameCharAgent `UpdateCash`), whose body is exactly 12 bytes `[u64 balanceTin][u32 reason]`. The other
@@ -38,7 +38,7 @@ Slot 9 (count 7, total 392 → 56/item) is the proof that price scales with coun
 
 The earlier "no multiplier matches" search failed because it scanned **raw offsets**. The body is an RDB
 **property table** — a run of `[fieldId u32][value u32]` LE pairs with strictly-decreasing fieldId after the
-header (same grammar as `Captures/decode_item_template.py`). The value is **field 74**, and the
+header (same grammar as `Captures/scripts/decode_item_template.py`). The value is **field 74**, and the
 **vendor sell-per-unit = round(value / 10)** (integer `(value+5)/10`):
 
 | template | field 74 | sell/item |

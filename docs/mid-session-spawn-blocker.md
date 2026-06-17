@@ -56,7 +56,7 @@ server: SpawnCheck reply         <-  0x2008  body = [0000c350][u32 H][flag]
 client: NOW renders H
 ```
 
-Proven in `Captures/account-faolan-character-necrol80-login-mount_move_dismount.tshark.json`: the mount
+Proven in `Captures/NecroL80_mage-necromancer_login_mount_move_dismount.tshark.json`: the mount
 (`FA015807`, handle `0x000286dd`) is pushed at packet idx 1523, the client polls `0x2020` for `0x000286dd` at idx
 1545, the server answers `0x2008` at idx 1553, and it renders. Retail's client polls **69×** across the session
 (world-entry + mid-session, for the mount and for interest NPCs as the player moves).

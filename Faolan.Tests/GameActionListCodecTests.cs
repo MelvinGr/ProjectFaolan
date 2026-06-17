@@ -6,7 +6,7 @@ namespace Faolan.Tests
 {
 	// Byte-exact construct + round-trip for GameActionListIIR (0xF508F4C1) vs captured instances (#190). Proves the
 	// decoded fixed header is built for a live frame/dynel handle and the (still-opaque) action tail rides verbatim -
-	// the construct-don't-replay step for this movement/AI record. Grammar: Captures/decode_gameactionlist.py.
+	// the construct-don't-replay step for this movement/AI record. Grammar: Captures/scripts/decode_gameactionlist.py.
 	public class GameActionListCodecTests
 	{
 		// strickenbla / necrol80 capture bodies (subop onward, i.e. BodyHex minus the 4-byte length).

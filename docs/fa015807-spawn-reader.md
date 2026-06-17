@@ -6,7 +6,7 @@ token; it is now the SOLE NPC-spawn path (every FA015807 is dropped from the log
 there is no verbatim-burst fallback anymore — #185).
 
 > **RESOLVED (2026-06-17): the scaffolds are RUNTIME state, not config — generate the minimal form from scratch.**
-> A cross-capture sweep (`Captures/classify_fa015807_fields.py` for the pre-IIR, `classify_fa015807_postiir.py` for
+> A cross-capture sweep (`Captures/scripts/classify_fa015807_fields.py` for the pre-IIR, `classify_fa015807_postiir.py` for
 > the post-IIR; **5026 / 5151 scaffolds across all 45 captures**) overturned the "per-NPC RDB-config" theory below.
 > The scaffolds carry **no per-NPC config and no session-volatile reference**; **every** non-zero word is
 > per-instance runtime state (target/owner handles, timers, action counters) that is **0 on an idle fresh spawn**.
@@ -19,7 +19,7 @@ there is no verbatim-burst fallback anymore — #185).
 
 Decompiled from `AgeOfConan.exe` (Ghidra) — reproduce with `Captures/ghidra/DumpSpawnIir.java` +
 `DumpFns.java` (both committed). Grammar **validated against 4558 captured FA015807 records** (zero
-framing failures) by `Captures/decode_fa015807_reader.py`.
+framing failures) by `Captures/scripts/decode_fa015807_reader.py`.
 
 ## Reader primitives (`DumpFns.java`)
 
@@ -61,7 +61,7 @@ the embedded CoreCharacter.
 
 ## Validation
 
-`python3 Captures/decode_fa015807_reader.py` walks the fixed scaffold for every captured FA015807 record and
+`python3 Captures/scripts/decode_fa015807_reader.py` walks the fixed scaffold for every captured FA015807 record and
 checks three predictions: leading version `0x05`, the sub-list's first word is a multiple of `0x3F1`, and the
 embedded CoreCharacter version `0x41` lands at the exact predicted offset. Across all login + create captures:
 
