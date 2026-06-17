@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 
 namespace Faolan.GameServer.Spawn
 {
@@ -30,8 +31,38 @@ namespace Faolan.GameServer.Spawn
 			new ScaffoldEntry(6, 0x01DE, 0x3F800000)
 		];
 
-		// Dikketest's feat/ability ID list (all rank 0).
-		private static readonly uint[] FreshSkillIds = [1800, 6000, 6100, 6200, 6300, 6600, 6800, 6900, 7100, 8100, 8305, 8400, 13600, 14600, 124400, 318400, 318800, 328700, 328900, 331300];
+		// Per-class fresh feat/ability ID list (all rank 0). The FIRST id is the PROFESSION feat and equals
+		// (class enum) * 100 (1800=Barbarian, 2000=Guardian, 2900=BearShaman, 3400=Assassin, 4100=Necromancer,
+		// 2200=Conqueror, 4300=HeraldOfXotli, 4400=Demonologist...). The AoC client DERIVES the displayed
+		// profession from this feat tree, so a fresh character MUST carry its own class's profession feat or the
+		// sheet (and weapon proficiency) defaults to whatever the profession feat resolves to - #239, where every
+		// fresh char inherited Dikketest's Barbarian feat 1800 and showed as a Barbarian. Confirmed across 8
+		// classes' retail self-spawns (Captures/scripts: profession feat = class*100, always first/ascending).
+		// The four captured-at-L1 archetypes use their exact retail fresh list; the rest fall back to the
+		// profession feat + the base feats common to every captured fresh list (display is correct for all 12).
+		private static readonly uint[] CommonFreshSkillIds = [6900, 8100, 8305, 8400, 13600, 14600, 328900, 331300];
+
+		private static readonly Dictionary<Class, uint[]> FreshSkillIdsByClass = new()
+		{
+			[Class.Barbarian] = [1800, 6000, 6100, 6200, 6300, 6600, 6800, 6900, 7100, 8100, 8305, 8400, 13600, 14600, 124400, 318400, 318800, 328700, 328900, 331300],
+			[Class.Guardian] = [2000, 6000, 6200, 6500, 6700, 6800, 6900, 7100, 7500, 8100, 8305, 8400, 13600, 14600, 24700, 328700, 328900, 331300],
+			[Class.BearShaman] = [2900, 6300, 6600, 6700, 6800, 6900, 7100, 8100, 8305, 8400, 13600, 14600, 244300, 328700, 328900, 331300],
+			[Class.Assassin] = [3400, 6400, 6700, 6900, 8100, 8305, 8400, 13600, 14600, 160000, 318000, 328700, 328900, 331300],
+			[Class.Necromancer] = [4100, 6400, 6700, 6800, 6900, 7800, 8100, 8305, 8400, 8900, 13600, 14600, 85200, 328900, 331300],
+		};
+
+		// The fresh feat list for a class: the captured retail list when we have one, else the profession feat
+		// (class*100) prepended to the common base feats. Always ascending (the wire/codec require it).
+		public static uint[] FreshSkillIdsFor(Class @class)
+		{
+			if (FreshSkillIdsByClass.TryGetValue(@class, out var ids))
+				return ids;
+
+			return new[] { (uint)@class * 100 }
+				.Concat(CommonFreshSkillIds)
+				.OrderBy(id => id)
+				.ToArray();
+		}
 
 		// Builds the weighted (1.0) appearance entries from the character's chosen editor resources, resolved
 		// against the imported client registry (MorphTarget; wire tag = registry id - 1). Wire order = editor
@@ -90,7 +121,7 @@ namespace Faolan.GameServer.Spawn
 					Value = e.Value
 				})
 				.ToList();
-			character.Skills = FreshSkillIds
+			character.Skills = FreshSkillIdsFor(character.Class)
 				.Select(id => new CharacterSkill
 				{
 					CharacterId = character.Id,

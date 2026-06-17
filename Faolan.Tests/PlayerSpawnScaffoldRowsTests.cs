@@ -47,6 +47,10 @@ namespace Faolan.Tests
 			var character = new Character
 			{
 				Id = 0x02000005,
+				// Dikketest is a Barbarian; his captured fresh feat list is the per-class Barbarian list (the
+				// profession feat 1800 = Class.Barbarian * 100), so the fresh rows must be generated for that class
+				// to reproduce his spawn byte-for-byte (#239 - the feat tree is the client's class source).
+				Class = Faolan.Core.Enums.Class.Barbarian,
 				Body = new CharacterBody()
 			};
 			foreach (var (morph, raw) in new (string, uint)[] { ("arm", 59), ("arse", 14), ("bosom", 30), ("chest", 59), ("leg", 59), ("stomach", 14), ("thigh", 59) })
@@ -71,6 +75,30 @@ namespace Faolan.Tests
 			var closer = character.Attributes.Single(a => a.Sequence == 6);
 			Assert.Equal(7u, closer.StatId);
 			Assert.Equal(0x56B6, closer.Tag);
+		}
+
+		// #239: the AoC client derives the displayed profession from the character's feat tree, whose first
+		// (profession) feat = class enum * 100. A fresh character must carry ITS class's profession feat, not the
+		// Barbarian default (1800) that every fresh char used to inherit from Dikketest. Verified against retail
+		// self-spawns for 8 classes.
+		[Theory]
+		[InlineData(Faolan.Core.Enums.Class.Necromancer, 4100u)]
+		[InlineData(Faolan.Core.Enums.Class.Guardian, 2000u)]
+		[InlineData(Faolan.Core.Enums.Class.BearShaman, 2900u)]
+		[InlineData(Faolan.Core.Enums.Class.Assassin, 3400u)]
+		[InlineData(Faolan.Core.Enums.Class.Barbarian, 1800u)]
+		[InlineData(Faolan.Core.Enums.Class.Conqueror, 2200u)] // fallback (no L1 capture) - profession feat still correct
+		[InlineData(Faolan.Core.Enums.Class.HeraldOfXotli, 4300u)]
+		[InlineData(Faolan.Core.Enums.Class.Demonologist, 4400u)]
+		[InlineData(Faolan.Core.Enums.Class.DarkTemplar, 3100u)]
+		public void FreshRows_CarryTheClassProfessionFeat(Faolan.Core.Enums.Class @class, uint professionFeat)
+		{
+			var character = new Character { Id = 0x02000007, Class = @class };
+			Assert.True(PlayerSpawnScaffoldRows.EnsureFreshRows(character));
+
+			var feats = character.Skills.Select(s => s.SkillId).OrderBy(id => id).ToArray();
+			Assert.Equal(professionFeat, feats.First()); // profession feat = class * 100, and it sorts first
+			Assert.Equal((uint)@class * 100, feats.First());
 		}
 
 		[Fact]
