@@ -287,3 +287,15 @@ Remaining to author a fully-synthetic fresh-beach tails (and so delete the `.bin
 
 Dumps: `/tmp/ghidra-aoc/fullchar_reader.txt`, `/tmp/ghidra-aoc/fullchar_records.txt` (regenerate with the two
 scripts above).
+
+## Per-character CLASS + stats are NOT regenerated yet (2026-06-17, #239/#4/#186)
+The beach snapshot is the captured **Strie** packet (an Assassin = **Rogue**); the login path patches level /
+current vitals / quest / containers but **not the class or class-derived stats**, so every character ships
+Strie's Rogue identity (sheet shows "Barbarian", Rogue weapon proficiency, wrong mana). Key decode facts (full
+writeup + retail Necro captures in **`docs/handoff-2026-06-17-perclass-snapshot.md`**):
+- HP **is** in the tails stat block (`[23]/[54]` ×100; retail Necro HP 89 = 8900).
+- **Mana is NOT** in the stat block — the client computes it from an **attribute** region (separate, TBD).
+- The **class label is in the FRONT protobuf root** (`ProtoFullCharacterIIR`), not the tails — find it by
+  parsing + diffing the Necro (Mage) vs Strie (Rogue) world-entry snapshots.
+- A tails-stat-block patch was tried and **reverted** (it didn't change the sheet and made the client drop
+  equipped gear). `decode_statblock.py`'s `[64]=mana` / `[78]=archetype` labels are wrong — corrected in that file.

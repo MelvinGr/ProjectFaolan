@@ -10,8 +10,18 @@ FINDING (diff across 10 fresh L1 character login snapshots - Strie/combat/xxx/ca
 **25 of 338** indices vary; the other 313 are a FIXED fresh-character SKELETON. The 25 categorize as:
 
   CLASS/ARCHETYPE (from CharacterMaxStats):
-    [78] archetype (Rogue=3, Mage=2)
+    [78] archetype (Rogue=3, Mage=2)   <-- WRONG, see correction below
     [21]/[56] HP base ; [23]/[54] current HP ; [64] current mana ; [66] stamina base ; [68] current stamina
+
+  *** CORRECTION 2026-06-17 (retail Necromancer ground truth: HP 89, Mana 246, Stam 0; see
+      docs/handoff-2026-06-17-perclass-snapshot.md) ***
+  - HP IS here: HP 89 -> [23]/[54] x100 = 8900 (repeat [202]). Confirmed.
+  - MANA is NOT in the stat block (246/24600 appear NOWHERE) -> the client computes displayed mana from
+    ATTRIBUTES, a separate region. [64]="current mana" is WRONG.
+  - [78] is NOT a reliable archetype: the retail Necro (a Mage) has [78]=3, not the "Mage=2" claimed above.
+  - The CLASS label is not a stat slot at all; it lives in the FRONT protobuf root (ProtoFullCharacterIIR).
+  The "10 snapshots" the original diff used were apparently all Rogue/Mage with coincidental values; re-decode
+  the class/mana against the committed retail Necro captures before trusting this map.
   XP:        [80]
   MAP (playfield token + position floats - already handled by TryReplacePlayfieldToken / char position):
     [17] playfield token ; [104] (~1.5e9 id) ; [134]/[136] (floats, 0 / 0xF0010000)
