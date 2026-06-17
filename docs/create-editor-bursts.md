@@ -4,9 +4,11 @@ RE notes for the **create-editor download stream** — the burst the GameServer 
 while it is in the character-creation editor (between the client's `0x205F` "ready" pokes). The goal of #189
 is to construct it from scratch like the login path instead of replaying `RetailCreateEditor*Burst.cs`
 verbatim. **Status: `InitialBurst` is fully constructed, and all structured `*IIR` types in
-`WorldPrepBurst`/`CreationScriptBurst` are decoded + built + wired** (see §4); the remaining verbatim bursts
-(conversation, the 1.1 MB intro-cutscene world-entry) and a few handle-only records are tracked in §4 + #223.
-This doc is the decode that makes the construction possible.
+`WorldPrepBurst`/`CreationScriptBurst` are decoded + built + wired** (see §4; #223 closed). The remaining
+verbatim bursts are the Knubot conversation (#188) and the intro-cutscene world-entry
+`RetailCreateWorldEntryBurst`, whose construction is now tracked separately under **#234** (its ScryScript +
+despawn + regen + BehaviorCC records — 146 in all — are already constructed; the FA015807 spawns + MoveTask/AI
+choreography remain, gated on #185/#190). This doc is the decode that makes the construction possible.
 
 Dissector: `Captures/decode_create_editor.py` (validated across all seven `*create*.tshark.json` captures).
 
@@ -140,7 +142,7 @@ create-specific to decode, only builder wiring to do:
    built by `SendA36DCallback`). All byte-exact (`ScryScriptCreateBurstTests`). With `BehaviorControlCenterIIR`
    long form + `RegenIIR` (already done), **no `*IIR` record type in the create-editor bursts is verbatim**.
 
-   **Still verbatim** (non-IIR / deferred): `ApplySpell`, `RetailNpcConversationBurst` (the Knubot dialogue
-   blobs — the #188 conversation-VM track), and the ScryScript inside the 1.1 MB intro-cutscene
-   `RetailCreateWorldEntryBurst` (render/pacing-sensitive, decoded together with the cutscene — needs in-client
-   validation).
+   **Still verbatim** (non-IIR / deferred): `ApplySpell` and `RetailNpcConversationBurst` (the Knubot dialogue
+   blobs — the #188 conversation-VM track). The intro-cutscene `RetailCreateWorldEntryBurst` is now constructed
+   record-by-record under **#234** (ScryScript + despawn + regen + BehaviorCC done; FA015807 spawns + MoveTask/AI
+   remain, gated on #185/#190) — end-to-end in-client validation still pends the cutscene arming (#1).
