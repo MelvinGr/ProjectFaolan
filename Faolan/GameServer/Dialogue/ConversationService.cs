@@ -58,10 +58,6 @@ namespace Faolan.GameServer.Dialogue
 			}
 		}
 
-		// The instance baked into the captured KnubotCloseChatWindow body (hoxxling's clientInstance), re-addressed
-		// to the live player on send.
-		private const uint CloseChatWindowCapturedInstance = 0x01316E71;
-
 		// The Knubot packets that END a conversation stage: an answer list (the next options) or a close-window.
 		private const uint KnubotAnswerListSubOpcode = (uint)GameServer0X2000RespondsOpcodes.KnubotAnswerListIIR;
 		private const uint KnubotCloseChatWindowSubOpcode = (uint)GameServer0X2000RespondsOpcodes.KnubotCloseChatWindowIIR;
@@ -101,6 +97,14 @@ namespace Faolan.GameServer.Dialogue
 			{
 				var p = KnubotCodec.ParseOpenChatWindow(carrier);
 				record = KnubotCodec.BuildOpenChatWindow(liveInstance, clickedNpcHandle, p.Value, p.Env);
+				return true;
+			}
+
+			// AnswerList + CloseChatWindow share the string-list grammar; rebuild re-addressed to the live endpoints.
+			if (sub == KnubotAnswerListSubOpcode || sub == KnubotCloseChatWindowSubOpcode)
+			{
+				var p = KnubotCodec.ParseStringList(carrier);
+				record = KnubotCodec.BuildStringList(sub, liveInstance, clickedNpcHandle, p.Strings, p.Env);
 				return true;
 			}
 
@@ -192,13 +196,13 @@ namespace Faolan.GameServer.Dialogue
 		{
 			EndConversation(client); // end any active conversation
 			var id = client.Session.Account.ClientInstance;
-			var body = (byte[])KnubotCloseChatWindowBody.Clone();
-			SubstituteUInt32(body, CloseChatWindowCapturedInstance, id);
 
-			return new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(body)
-				.SendAsync(client);
+			// CONSTRUCT the close via KnubotCodec from the captured empty-remoteformat reply, re-addressed to the live
+			// player (the captured NPC + string are reused verbatim) - byte-identical to the old substitution, on the
+			// same sender (GameAgent:0x08) SendConversationClose has always used.
+			var captured = KnubotCodec.ParseStringList(KnubotCloseChatWindowBody);
+			var record = KnubotCodec.BuildCloseChatWindow(id, captured.NpcHandle, captured.Strings, captured.Env);
+			return SendConstructedKnubot(client, 0x08, id, record);
 		}
 
 		// Serves one dialogue SCREEN: re-addresses its captured response packets to the live player + clicked NPC and

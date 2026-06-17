@@ -43,5 +43,33 @@ namespace Faolan.Tests
 			var rebuilt = KnubotCodec.BuildAppendText(0x110099BDu, 0x00042194u, Faolan.GameServer.Dialogue.KnubotSampleLine.RemoteFormatXml);
 			Assert.Equal(KnubotCodecTestData.AppendTextBody, Convert.ToHexStringLower(rebuilt));
 		}
+
+		// AnswerList + CloseChatWindow share the [u32 count][ count x string ] grammar.
+		[Fact]
+		public void AnswerList_BuildsByteExact()
+		{
+			var captured = Convert.FromHexString(KnubotCodecTestData.AnswerListBody);
+			var p = KnubotCodec.ParseStringList(captured);
+			Assert.Equal(0x0802E5D4u, p.PlayerInstance);
+			Assert.Equal(0x00031815u, p.NpcHandle);
+			Assert.Single(p.Strings);
+			Assert.Equal(KnubotCodecTestData.AnswerListBody,
+				Convert.ToHexStringLower(KnubotCodec.BuildAnswerList(p.PlayerInstance, p.NpcHandle, p.Strings, p.Env)));
+		}
+
+		// the captured s2c CloseChatWindow (an answer-list of one empty remoteformat id="0")
+		private const string CloseChatWindowBody =
+			"0000007cc4af39eb0000c35001316e710000010000c35000017e0300000001005f3c72656d6f7465666f726d61742069643d2230222063617465676f72793d2231303022206b65793d222e667a5475457969753742262339323b5a595a4d6f71312d22206b6e75626f743d22302220203e3c2f72656d6f7465666f726d61743e";
+
+		[Fact]
+		public void CloseChatWindow_BuildsByteExact()
+		{
+			var captured = Convert.FromHexString(CloseChatWindowBody);
+			var p = KnubotCodec.ParseStringList(captured);
+			Assert.Single(p.Strings);
+			Assert.StartsWith("<remoteformat id=\"0\"", System.Text.Encoding.ASCII.GetString(p.Strings[0]));
+			Assert.Equal(CloseChatWindowBody,
+				Convert.ToHexStringLower(KnubotCodec.BuildCloseChatWindow(p.PlayerInstance, p.NpcHandle, p.Strings, p.Env)));
+		}
 	}
 }

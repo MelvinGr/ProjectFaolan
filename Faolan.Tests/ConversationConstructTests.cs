@@ -49,6 +49,42 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void Construct_AnswerList_IsByteIdenticalToSubstitution()
+		{
+			var captured = Convert.FromHexString(KnubotCodecTestData.AnswerListBody);
+			const uint capturedInst = 0x0802E5D4, capturedNpc = 0x00031815;
+
+			var p = KnubotCodec.ParseStringList(captured);
+			var construct = KnubotCodec.BuildAnswerList(LiveInstance, ClickedNpc, p.Strings, p.Env);
+			var substitute = SubstituteU32(SubstituteU32(captured, capturedInst, LiveInstance), capturedNpc, ClickedNpc);
+
+			Assert.Equal(Convert.ToHexStringLower(substitute), Convert.ToHexStringLower(construct));
+		}
+
+		[Fact]
+		public void TryConstructKnubotRecord_RebuildsAnswerListAndCloseChatWindow()
+		{
+			foreach (var recordHex in new[] { KnubotCodecTestData.AnswerListBody })
+			{
+				var record = Convert.FromHexString(recordHex);
+				var packet = WrapInPacket(record);
+				Assert.True(ConversationService.TryConstructKnubotRecord(packet, LiveInstance, ClickedNpc, out var rebuilt));
+				var p = KnubotCodec.ParseStringList(record);
+				var expected = KnubotCodec.BuildAnswerList(LiveInstance, ClickedNpc, p.Strings, p.Env);
+				Assert.Equal(Convert.ToHexStringLower(expected), Convert.ToHexStringLower(rebuilt));
+			}
+		}
+
+		private static byte[] WrapInPacket(byte[] record)
+		{
+			var header = new byte[12];
+			var packet = new byte[12 + header.Length + record.Length];
+			BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(8, 4), (uint)header.Length);
+			Buffer.BlockCopy(record, 0, packet, 12 + header.Length, record.Length);
+			return packet;
+		}
+
+		[Fact]
 		public void TryConstructKnubotRecord_LiftsAndRebuildsFromAFullPacket()
 		{
 			var record = Convert.FromHexString(KnubotCodecTestData.AppendTextBody);
@@ -90,15 +126,11 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void TryConstructKnubotRecord_ReturnsFalseForAnswerList()
+		public void TryConstructKnubotRecord_ReturnsFalseForUnhandledSubOpcode()
 		{
-			// an AnswerList record (sub 0xF164A4A5) must stay on the substitution-replay path
-			var record = Convert.FromHexString("0000000cf164a4a50000c350110099bd00");
-			var header = new byte[12];
-			var packet = new byte[12 + header.Length + record.Length];
-			BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(8, 4), (uint)header.Length);
-			Buffer.BlockCopy(record, 0, packet, 12 + header.Length, record.Length);
-
+			// a non-constructed sub-opcode (here a quest MainQuestUpdate 0x504B7924) must stay on the substitution path
+			var record = Convert.FromHexString("0000000c504b79240000c350110099bd00");
+			var packet = WrapInPacket(record);
 			Assert.False(ConversationService.TryConstructKnubotRecord(packet, LiveInstance, ClickedNpc, out _));
 		}
 	}

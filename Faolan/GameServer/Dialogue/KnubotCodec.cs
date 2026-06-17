@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Faolan.Core.Data;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets.Opcodes;
@@ -69,6 +70,38 @@ namespace Faolan.GameServer.Dialogue
 			s.ReadUInt32(); s.ReadUInt32();
 			var player = ReadHeader(s, out var env, out var npc);
 			return new OpenChatWindow(player, npc, env, s.ReadByte());
+		}
+
+		// KnubotAnswerListIIR_c (0xF164A4A5) + KnubotCloseChatWindowIIR_c (0xC4AF39EB) share one grammar (verified
+		// 197/197 + 48/48): the KnubotBase header then `[u32 count][ count x ([u16 len][remoteformat string]) ]`. The
+		// answer list is the screen's option buttons; the close-window is the same shape with a single empty
+		// remoteformat (id="0"), retail's "nothing (more) to say" reply.
+		public static byte[] BuildAnswerList(uint playerInstance, uint npcHandle, IReadOnlyList<byte[]> options, byte env = 0x00)
+			=> BuildStringList((uint)GameServer0X2000RespondsOpcodes.KnubotAnswerListIIR, playerInstance, npcHandle, options, env);
+
+		public static byte[] BuildCloseChatWindow(uint playerInstance, uint npcHandle, IReadOnlyList<byte[]> options, byte env = 0x00)
+			=> BuildStringList((uint)GameServer0X2000RespondsOpcodes.KnubotCloseChatWindowIIR, playerInstance, npcHandle, options, env);
+
+		public static byte[] BuildStringList(uint subOpcode, uint playerInstance, uint npcHandle, IReadOnlyList<byte[]> strings, byte env = 0x00)
+		{
+			var c = Header(subOpcode, playerInstance, npcHandle, env).WriteUInt32((uint)strings.Count);
+			foreach (var str in strings)
+				c.WriteUInt16((ushort)str.Length).WriteArray(str);
+			return CharDCMoveCodec.WithLength(c.ToArray());
+		}
+
+		public sealed record StringList(uint PlayerInstance, uint NpcHandle, byte Env, IReadOnlyList<byte[]> Strings);
+
+		public static StringList ParseStringList(byte[] body)
+		{
+			var s = new FaolanStream(body);
+			s.ReadUInt32(); s.ReadUInt32();                     // len, subop
+			var player = ReadHeader(s, out var env, out var npc);
+			var count = s.ReadUInt32();
+			var strings = new List<byte[]>((int)count);
+			for (var i = 0; i < count; i++)
+				strings.Add(s.ReadArrayUInt16Length());
+			return new StringList(player, npc, env, strings);
 		}
 
 		// Reads the carrier marker + player instance, then the KnubotBase header (env, version, marker, npc handle).
