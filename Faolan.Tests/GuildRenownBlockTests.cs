@@ -50,5 +50,25 @@ namespace Faolan.Tests
 			Assert.Equal(GuildRenownBlock.StatSlotIds, fresh.StatIds); // scaffold preserved
 			Assert.Equal(GuildRenownBlock.Length, fresh.Encode().Length); // still 277 bytes -> roster stays aligned
 		}
+
+		// The live path builds the block from Guild.Renown: the total lands in RenownCounters[1] (the proven slot),
+		// everything else stays the zeroed fresh-guild scaffold, and the block stays 277 bytes so the roster aligns.
+		[Fact]
+		public void ForRenown_SplicesTheTotalIntoTheProvenSlotAndStaysAligned()
+		{
+			var block = GuildRenownBlock.ForRenown(54321);
+
+			Assert.Equal(54321ul, block.RenownCounters[1]);
+			Assert.Equal(0ul, block.RenownCounters[0]); // only the total slot is set
+			Assert.All(block.Counters64C, c => Assert.Equal(0ul, c));
+			Assert.Equal(GuildRenownBlock.Length, block.Encode().Length);
+		}
+
+		// A guild with no accumulated renown is byte-identical to the fresh-guild scaffold.
+		[Fact]
+		public void ForRenown_ZeroEqualsFreshGuild()
+		{
+			Assert.Equal(GuildRenownBlock.ForFreshGuild().Encode(), GuildRenownBlock.ForRenown(0).Encode());
+		}
 	}
 }

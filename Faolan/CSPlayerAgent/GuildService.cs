@@ -70,17 +70,6 @@ namespace Faolan.CSPlayerAgent
 			return _pendingGuildInvites.TryRemove(characterId, out var declined) ? declined.GuildName : null;
 		}
 
-		// The 277-byte renown/feat/city-stats block of the 0x203F full update, now CONSTRUCTED from typed fields
-		// (GuildRenownBlock) instead of carried as a verbatim blob. FRAMING CRACKED (Ghidra, #219 -
-		// Captures/decode_guild_renown.py + DumpGuildDispatch.java): the block is NOT an IIR ReadSubClass; it is the
-		// tail of the i_pcGuild arg read by CSPlayerInterface::DispatchGuildUpdate -> CoreGuild_c::Read (streaming
-		// version 3, govForm 1). Grammar: [u8 flag][0x3F1-framed u32 list = 13 stat-ids][run of ReadU64/ReadU32/
-		// ReadByte counters] (GuildRenownBlock decodes/encodes it byte-exact - GuildRenownBlockTests). The old
-		// hand-transcribed blob had dropped 3 bytes (274 not 277), which would misalign the roster that follows;
-		// the constructed block is the correct 277 bytes. Still the captured guild's numbers cosmetically (a real
-		// per-guild generator is a follow-up; GuildRenownBlock.ForFreshGuild zeroes the renown for that).
-		internal static readonly byte[] GuildRenownBlockTemplate = GuildRenownBlock.CapturedPlaceholder().Encode();
-
 		// True when the character is connected to a world GameServer right now (drives the member record's
 		// online flag; the member list has no other liveness source).
 		private bool IsCharacterOnline(uint characterId)
@@ -129,6 +118,8 @@ namespace Faolan.CSPlayerAgent
 		// again on join/member-list requests:
 		//   [govForm u8][guildId u32][01][cash u64][03][u32 0][00][name s16][description s16][motd s16]
 		//   [renown block][self member record][selfContribution u32][other member records ... to packet end]
+		// The renown block is built per-guild from Guild.Renown (GuildRenownBlock.ForRenown), now that the 277-byte
+		// block is a typed codec (#219) - our created guilds no longer carry the captured guild's feat/city numbers.
 		private async Task SendGuildFullUpdate(INetworkClient client, ProtoMessage sender, ProtoMessage receiver, Guild guild, Character self)
 		{
 			var ps = new PacketStream();
@@ -144,7 +135,7 @@ namespace Faolan.CSPlayerAgent
 				.WriteString(guild.Name)
 				.WriteString(guild.Description ?? "")
 				.WriteString(guild.MessageOfTheDay ?? "")
-				.WriteArray(GuildRenownBlockTemplate);
+				.WriteArray(GuildRenownBlock.ForRenown(guild.Renown).Encode());
 
 			WriteGuildMemberRecord(ps, self);
 			ps.WriteUInt32(0); // self contribution counter (grows with renown gain in the capture)

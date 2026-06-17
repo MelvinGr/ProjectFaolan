@@ -133,6 +133,17 @@ namespace Faolan.CSPlayerAgent
 			return b;
 		}
 
+		// A guild's block built from its stored renown total: the fresh-guild scaffold with the accumulated total
+		// spliced into RenownCounters[1] (the proven renown-total slot - the only field that ticked between the two
+		// captured snapshots). The other (still-opaque) feat/city slots stay zeroed until their stat-id meanings are
+		// decoded, so this is the accurate block for our created guilds (none carry another guild's feat/city stats).
+		public static GuildRenownBlock ForRenown(uint renown)
+		{
+			var b = ForFreshGuild();
+			b.RenownCounters[1] = renown;
+			return b;
+		}
+
 		private static uint[] ReadList(ReadOnlySpan<byte> b, ref int o)
 		{
 			var word = ReadU32(b, ref o);
