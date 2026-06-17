@@ -1,8 +1,14 @@
 # IIR `ReadSubClass` readers via vtable-xref (Gitea #187 / #53 / #190)
 
-Decode of the remaining verbatim IIR record bodies — the world dynels + loot bags (#187), the movement/AI
-records (#53 MoveTask, #190 GameActionList / BehaviorControlCenter). Companion to the FA015807 decode
-(`docs/fa015807-spawn-reader.md`); same stream primitives.
+Decode of the world dynels + loot bags (#187), the movement/AI records (#53 MoveTask, #190 GameActionList /
+BehaviorControlCenter). Companion to the FA015807 decode (`docs/fa015807-spawn-reader.md`); same stream
+primitives.
+
+> **Catalog closeout (#233, 2026-06-17):** the vtable-xref method here was later run across the **entire**
+> 141-class IIR catalog. Every on-the-wire type is now byte-exact decoded and every binary-only/debug reader
+> recovered — see `docs/chardcmove-grammar.md`, `docs/iir-readers-combat-world.md`,
+> `docs/iir-readers-conversation-misc.md`, `docs/iir-readers-binary-only.md`. This doc remains the deep-dive
+> for the dynel/loot/movetask/gameactionlist/behaviorcontrol readers specifically.
 
 ## The vtable-xref method (because the string anchor fails here)
 

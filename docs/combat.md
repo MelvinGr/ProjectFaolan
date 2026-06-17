@@ -49,7 +49,10 @@ swap the corpse. The world tick (`WorldState.Tick`) drives two independent timer
    (`NpcRespawned`), clearing any unlooted corpse contents.
 
 Open: the death animation currently relies on the client reacting to the `health=0` StatUpdate during the
-linger - a dedicated death-state/anim IIR is not decoded (see #204; candidates noted there).
+linger. The death/corpse IIR readers are now decoded — `SimpleCharKilledByUpdateIIR_t` (0xB066AFC2, the
+"killed by" record = killer handle + flags) and `TombStoneFullUpdateIIR_c` (0x0D80E7C9, the corpse) — see
+`docs/iir-readers-conversation-misc.md` / `docs/iir-readers-combat-world.md`. What remains for #204 is
+wiring a death-animation/state trigger from these, not a decode gap.
 
 ## Melee cleave (#18)
 
