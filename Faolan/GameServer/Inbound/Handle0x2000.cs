@@ -470,6 +470,14 @@ namespace Faolan.GameServer
 							default:
 							{
 								Logger.LogInformation($"UNKNOWN-{actionType.ToHex()}: {args}");
+
+								// Robustness (#236 channeled cast 0x15, #238 dodge hop): an un-decoded behavior must
+								// STILL get the generic behavior echo-ack (docs/combat.md rule 1), or the client stays
+								// stuck in the action's start state forever (cast bar never finishes / dodge never lands
+								// back to idle) and the player soft-locks until relog. Acking with the request's Mode
+								// returns control even when we don't yet model the action's effect.
+								await _combat.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
+
 								break;
 							}
 						}
