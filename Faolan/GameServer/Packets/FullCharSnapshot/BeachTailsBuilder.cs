@@ -27,6 +27,11 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 		private static readonly byte[] Template = LoadTemplate();
 
+		// The game-static PFAccessWindow_ playfield catalog (the tails region @1292..7917) - the one tails region that
+		// is reference data, not generated. Carved out of the template so the tails can be assembled with NO captured
+		// tails (BuildFromScratch). Identical for every character.
+		private static readonly byte[] AccessWindowTable = LoadAsset("AccessWindowTable.bin");
+
 		// True when the server-owned template is available (it always is once embedded); guards the caller's fallback.
 		public static bool IsAvailable => Template.Length > 0;
 
@@ -101,6 +106,41 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			return portion;
 		}
 
+		// Builds the WHOLE beach 0x737A6DF9 tails FROM SCRATCH - no captured-tails template (#186). Assembles the three
+		// regions, each independently proven byte-exact: the generated quest portion (BuildBeachQuestPortion, @0..1292),
+		// the game-static access-window catalog (the embedded AccessWindowTable asset, @1292..7917), and the code stat
+		// skeleton (TailsStatBlock.CreateFreshBlock, @7917..end) with the live character's vitals/XP patched in. Then
+		// re-addresses the template instance + stamps the playfield token, exactly as Build does. For the captured beach
+		// character + instance this reproduces BeachTailsTemplate.bin byte-for-byte (BeachTailsFromScratchTests), so the
+		// template .bin is no longer needed to author a beach entry.
+		public static byte[] BuildFromScratch(QuestDefinition beachDef, Character character, uint instance, uint? playfieldToken = null)
+		{
+			ArgumentNullException.ThrowIfNull(beachDef);
+
+			var quest = BuildBeachQuestPortion(beachDef, state: 1, instance);
+
+			var block = TailsStatBlock.CreateFreshBlock();
+			if (character?.MaxStats != null)
+			{
+				block.CurrentXp = character.Experience;
+				block.CurrentHp = character.MaxStats.Health;
+				block.CurrentMana = character.MaxStats.Mana;
+				block.CurrentStamina = character.MaxStats.Stamina;
+			}
+			var statBytes = TailsStatBlock.Serialize(block);
+
+			byte[] tails = [.. quest, .. AccessWindowTable, .. statBytes];
+
+			// The quest portion already carries `instance`; the static access-window + stat regions carry the template's
+			// (Strie's) instance, so re-address those occurrences. (No-op on the quest portion - it has no TemplateInstance.)
+			if (instance != TemplateInstance)
+				ReplaceRawUInt32(tails, TemplateInstance, instance);
+			if (playfieldToken.HasValue)
+				WorldDespawn.TryReplacePlayfieldToken(tails, playfieldToken.Value);
+
+			return tails;
+		}
+
 		// Replaces every big-endian uint32 occurrence of `find` with `replace` (the tails are raw records, not
 		// protobuf, so entity references appear as raw 4-byte big-endian values).
 		private static void ReplaceRawUInt32(byte[] data, uint find, uint replace)
@@ -117,10 +157,12 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			}
 		}
 
-		private static byte[] LoadTemplate()
+		private static byte[] LoadTemplate() => LoadAsset("BeachTailsTemplate.bin");
+
+		private static byte[] LoadAsset(string fileName)
 		{
 			var assembly = Assembly.GetExecutingAssembly();
-			var name = assembly.GetManifestResourceNames().FirstOrDefault(n => n.EndsWith("BeachTailsTemplate.bin", StringComparison.Ordinal));
+			var name = assembly.GetManifestResourceNames().FirstOrDefault(n => n.EndsWith(fileName, StringComparison.Ordinal));
 			if (name == null)
 				return [];
 

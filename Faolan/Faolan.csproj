@@ -17,6 +17,10 @@
         <!-- Server-owned beach 0x737A6DF9 tails template (content-fixed regions); BeachTailsBuilder assembles it
              with the live character's generated fields instead of carrying the captured burst tails. -->
         <EmbeddedResource Include="GameServer\Packets\FullCharSnapshot\BeachTailsTemplate.bin"/>
+        <!-- The game-static PFAccessWindow_ playfield catalog (172 entries, identical for every character) - the one
+             region of the tails that is reference data, not generated. Carved out so BuildFromScratch builds the tails
+             with NO captured-tails template (generated quest + this asset + the code stat skeleton). #186. -->
+        <EmbeddedResource Include="GameServer\Packets\FullCharSnapshot\AccessWindowTable.bin"/>
     </ItemGroup>
 
     <ItemGroup>

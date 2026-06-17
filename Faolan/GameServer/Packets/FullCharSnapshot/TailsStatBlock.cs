@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Faolan.Core.Data;
 
 namespace Faolan.GameServer.Packets.FullCharSnapshot
 {
@@ -51,6 +52,20 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			0x0, 0x292, 0x0, 0x566, 0x0, 0x290, 0x0, 0x3F1, 0x1, 0x1000000, 0x0, 0x0,
 			0x0, 0x0
 		];
+
+		// Serializes a stat block to its wire bytes: [u32 Marker0][u32 Marker1][u32 BlockType][u32 x Values][Trailer]
+		// (mirrors SnapshotTails.WritePostAccessBlock). 12 + Values.Count*4 + Trailer bytes - 1365 for the fresh block.
+		public static byte[] Serialize(TailsPostAccessBlock block)
+		{
+			var w = new FaolanStream();
+			w.WriteUInt32(block.Marker0);
+			w.WriteUInt32(block.Marker1);
+			w.WriteUInt32(block.BlockType);
+			foreach (var value in block.Values)
+				w.WriteUInt32(value);
+			w.WriteArray(block.Trailer);
+			return w.ToArray();
+		}
 
 		public static TailsPostAccessBlock CreateFreshBlock() => new()
 		{
