@@ -132,8 +132,8 @@ pushes the stat (4 on enter, 0 on exit) to every viewer in range that already se
 Reset on death/respawn so a respawned mob re-draws cleanly. Builder `VitalsPacket.BuildStatBlockBody`, byte-exact
 against frame 6424 (`CharacterStatBlockTests.BuildStatBlockBody_NpcCombatMode_MatchesCapturedFrame`); transition
 logic covered by `WorldStateTests.Tick_NpcEngagesAndDisengages_EmitsCombatModeEffects`. The exit value (0) is an
-inference (the capture's mobs died rather than leashing, so a sheathe was never captured). **Needs in-client
-verification** that the NPC now swings with its weapon drawn.
+inference (the capture's mobs died rather than leashing, so a sheathe was never captured). **VERIFIED in-client
+— the NPC swings with its weapon drawn (#218 CLOSED).**
 
 ## Level-up feedback (#209)
 On a ding (XP-driven or the GM `.level` set) retail sends, in order: a burst of **`AttributeChanged`/`Increased`**
