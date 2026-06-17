@@ -20,11 +20,14 @@ namespace Faolan.GameServer.Spawn
 	//
 	// A FRESHLY-SPAWNED NPC (no accrued movement/buff state) has the MINIMAL form: a single constant 41-byte
 	// block (23/42 NPCs carry exactly this, byte-identical - see MinimalPostIir). That is what a from-scratch
-	// construction emits; the variable runtime-state forms are session state the server re-derives at the tick,
-	// not template data, so they are NOT reproduced at spawn. NOTE: the wire-flip to emit this generated post-IIR
-	// in place of the row's captured one is IN-CLIENT-GATED (a cross-session NPC body is proven rejected by the
-	// client - see [[world-packets-construct-not-replay]]); this codec is the regeneration foundation, validated
-	// byte-exact here, ready for that in-client step.
+	// construction emits. CAVEAT (offline analysis 2026-06-17, docs/fa015807-spawn-reader.md): the minimal form is
+	// correct for ANIMALS (they carry exactly it), but HUMANOIDS carry a LARGER post-IIR holding a float-stat /
+	// APPEARANCE table - emitting the minimal form for them drops that table, which is the in-client "missing hair"
+	// regression ([[npc_spawn_minimal_postiir_breaks_humanoids]] UPDATE 2026-06-16). So the variable forms are NOT
+	// purely droppable runtime state; the humanoid appearance table must be authored too. NOTE: the wire-flip to emit
+	// a generated post-IIR is IN-CLIENT-GATED (and as of post-#23 the minimal form renders + chat connects - the
+	// cross-session-rejection theory is superseded); this codec is the regeneration foundation, validated byte-exact
+	// here, ready for that in-client step.
 	public static class NpcSpawnScaffold
 	{
 		// word0 is constant 0 across the corpus (the player spawn has 2 in this slot).
