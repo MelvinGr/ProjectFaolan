@@ -1,9 +1,13 @@
 # FA015807 NPC-spawn reader — `SimpleCharFullUpdateIIR_t::ReadSubClass` (Gitea #185 / #54)
 
 RE of the **NPC-spawn pre-IIR scaffold** — the "last un-lifted part" of the from-DB NPC spawn. `NpcSpawnBuilder`
-builds the FA015807 (SimpleCharFullUpdate) body byte-exact from DB columns *when they match the capture*, but
-the pre-IIR float block + post-IIR scaffold still come verbatim from the row's captured `Data` blob, so
-cross-session rows fall back to verbatim burst. This doc decodes the reader so those blocks can be generated.
+builds the FA015807 (SimpleCharFullUpdate) body byte-exact from the row, re-addressing the live handle/position +
+token; it is now the SOLE NPC-spawn path (every FA015807 is dropped from the login burst and interest-spawned, so
+there is no verbatim-burst fallback anymore — #185). The pre-IIR float block + post-IIR scaffold still ride the
+row's captured `Data` blob: the decode (this doc) confirms they carry NO session-volatile data (the char buffer is
+the NPC's RDB script-binding string; the only stale ref is the transform's playfield token), so carrying them is
+correct. Generating them WITHOUT `Data` is per-NPC RDB-derived (221/222 scaffold bytes vary across 5151 records),
+so it needs RDB extraction of the per-NPC script bindings + config — the remaining lift.
 
 Decompiled from `AgeOfConan.exe` (Ghidra) — reproduce with `Captures/ghidra/DumpSpawnIir.java` +
 `DumpFns.java` (both committed). Grammar **validated against 4558 captured FA015807 records** (zero
