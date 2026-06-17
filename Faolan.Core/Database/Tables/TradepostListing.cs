@@ -40,7 +40,9 @@ namespace Faolan.Core.Database.Tables
 		public uint ItemId { get; set; }
 
 		// Navigation to the filed catalog item (FK ItemId -> Items.Id, Restrict). Load with Include when needed.
-		public Item Item { get; set; }
+		// virtual so the lazy-loading-proxy DbContext used in tests (EquipmentPersistenceTests etc.) can build its
+		// model - UseLazyLoadingProxies requires every navigation to be virtual (the live app doesn't enable proxies).
+		public virtual Item Item { get; set; }
 
 		// --- undecoded-but-preserved framing scalars (verbatim, like ShopItem.Stat356) ----------------------
 		// Row field after itemId: a u64 (0 in the capture - buyout / reserved) and a u32 (an item-handle-like value).

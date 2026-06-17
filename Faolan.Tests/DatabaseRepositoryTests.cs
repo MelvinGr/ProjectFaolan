@@ -132,6 +132,8 @@ namespace Faolan.Tests
 				await using (var ctx = await factory.CreateDbContextAsync())
 				{
 					await ctx.Database.EnsureCreatedAsync();
+					// The listing's ItemId is FK-restricted to Items.Id (#212), so the referenced catalog item must exist.
+					ctx.Items.Add(new Item { Id = 0x7530, Name = "TestWare" });
 					ctx.TradepostListings.Add(new TradepostListing
 					{
 						SaleId = 0x20d82b62d02b198b, Handle = 1, SellerName = "Ponakin", Price = 25, Quantity = 1,
@@ -194,6 +196,9 @@ namespace Faolan.Tests
 				await using (var ctx = await factory.CreateDbContextAsync())
 				{
 					await ctx.Database.EnsureCreatedAsync();
+					// ItemId is FK-restricted to Items.Id (#212), so seed the referenced catalog items first.
+					ctx.Items.Add(new Item { Id = 0x7530, Name = "WareA" });
+					ctx.Items.Add(new Item { Id = 0x9999, Name = "WareB" });
 					ctx.TradepostListings.Add(new TradepostListing { SaleId = 1, ItemId = 0x7530, Price = 5000, SellerName = "b" });
 					ctx.TradepostListings.Add(new TradepostListing { SaleId = 2, ItemId = 0x7530, Price = 25, SellerName = "a" });
 					ctx.TradepostListings.Add(new TradepostListing { SaleId = 3, ItemId = 0x9999, Price = 1, SellerName = "c" }); // other item

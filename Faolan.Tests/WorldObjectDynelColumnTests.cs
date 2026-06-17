@@ -68,7 +68,10 @@ namespace Faolan.Tests
 
 			Console.WriteLine($"objects={total} ok={ok} builtFromDb={builtFromDb} parseFail={parseFail} mismatch={mismatch}");
 			Assert.Equal(0, mismatch);
-			Assert.True(ok > 900, $"expected >900 byte-exact rebuilds across all object classes, got {ok}");
+			// faolan.db was pruned to the Tortage maps (galley/beach/city, a75d4ea), dropping the dynel population
+			// from ~965 to ~285. The real gate is "every populated dynel still rebuilds byte-exact" (mismatch==0
+			// above); keep a meaningful lower bound for the pruned world rather than the stale pre-prune count.
+			Assert.True(ok > 250, $"expected >250 byte-exact rebuilds across all object classes, got {ok}");
 			Assert.Equal(ok, builtFromDb); // every lifted object also builds from the DB (columns + tail) byte-exact
 		}
 
