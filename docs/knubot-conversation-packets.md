@@ -1,16 +1,21 @@
 # Knubot conversation packets — wire grammar (Gitea #188)
 
 Decoded from `AgeOfConan.exe` (Ghidra, 2026-06-14; reproduce with `Captures/ghidra/DumpIirReaders.java`).
-These are the NPC-dialogue packets served by `ConversationService.ServeScreen`. The **spoken line
-(`KnubotAppendText`) and the window-open (`KnubotOpenChatWindow`) are now CONSTRUCTED** via `KnubotCodec`
-(`Faolan/GameServer/Dialogue/KnubotCodec.cs`): `TryConstructKnubotRecord` lifts the remoteformat XML / value
-from the captured record and rebuilds it re-addressed to the live player + clicked NPC, framed on the
-conversation endpoint (`GameAgent:0x08`) like `SendConversationClose`. Proven byte-identical to the old
-handle-substitution (`ConversationConstructTests`/`KnubotCodecTests`). The remaining sub-opcodes
-(`AnswerList` 0xF164A4A5, `CloseChatWindow` 0xC4AF39EB, the quest packets) still **replay verbatim** from the
-captured `ConversationPacket` rows (~409 rows) with handle substitution. Remaining: source the remoteformat
-from RDB text + the Lua/tag VM (vs the captured line) and construct the answer-list/close too, retiring the
-replay entirely.
+These are the NPC-dialogue packets served by `ConversationService.ServeScreen`. The **whole Knubot s2c set is
+now CONSTRUCTED** via `KnubotCodec` (`Faolan/GameServer/Dialogue/KnubotCodec.cs`) — `KnubotAppendText` (the
+spoken line), `KnubotOpenChatWindow`, `KnubotAnswerList` (the option buttons) and `KnubotCloseChatWindow`:
+`TryConstructKnubotRecord` lifts the remoteformat XML / options out of the captured record and rebuilds them
+re-addressed to the live player + clicked NPC, framed on the conversation endpoint (`GameAgent:<captured
+instance>`) like `SendConversationClose`. The quest-grant packets in the flow are built by the `WorldQuest`
+builders. So `ServeScreen` no longer replays any packet — substitution-replay survives only as a fallback for
+an unexpected sub-opcode. Proven byte-identical to the old handle-substitution
+(`ConversationConstructTests`/`KnubotCodecTests`). Remaining: source the remoteformat from RDB text + the
+Lua/tag VM (vs the captured line) so the NPC greets with the live player's name, retiring the captured-XML
+dependency entirely.
+
+`AnswerList` (0xF164A4A5) and `CloseChatWindow` (0xC4AF39EB) **share one grammar** (validated 197/197 +
+48/48): the KnubotBase header then `[u32 count][ count x ([u16 len][remoteformat string]) ]`. CloseChatWindow
+is that shape with a single empty `id="0"` remoteformat (retail's "nothing (more) to say").
 
 **Carrier framing (confirmed against the captures):** every Knubot s2c packet is opcode `0x2000`, sender
 `GameAgent` (`0xB171CE13`) : `<conversationAgentInstance>`, receiver `GameInterface` (`0x6C67C147`) :
