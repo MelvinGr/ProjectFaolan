@@ -82,6 +82,10 @@ namespace Faolan.GameServer.World
 		// How long this entity stays dead before the tick respawns it.
 		public double RespawnDelaySeconds { get; set; } = DefaultRespawnDelaySeconds;
 
+		// A summoned/test NPC (e.g. .spawnnpc) that should NOT revive when killed: once dead it lingers as a lootable
+		// corpse for RespawnDelaySeconds, then the tick fades + removes it instead of respawning it.
+		public bool NoRespawn { get; set; }
+
 		// Live vitals (NPCs are seeded at load; null for entities the combat/world layer doesn't track here yet).
 		// The world is the authoritative owner - combat applies damage to this, and the tick respawns off it.
 		public EntityVitals Vitals { get; set; }
@@ -220,6 +224,17 @@ namespace Faolan.GameServer.World
 			InCombat = false; // the fresh NPC starts idle (sheathed); re-aggro re-draws via the combat-mode broadcast
 			Returning = false;
 			return true;
+		}
+
+		// A summoned NoRespawn NPC: once dead, run its respawn timer DOWN as a despawn timer instead of reviving -
+		// returns true the tick it elapses so the caller fades + removes the corpse. Never revives the entity.
+		public bool TickPostDeathDespawn(double dt)
+		{
+			if (!IsDead)
+				return false;
+
+			_respawnRemaining -= dt;
+			return _respawnRemaining <= 0;
 		}
 
 		// A transient loot bag dropped on a kill (a world object, not a player/NPC): no vitals, no respawn; it sits at

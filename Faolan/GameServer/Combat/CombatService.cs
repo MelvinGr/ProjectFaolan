@@ -493,8 +493,9 @@ namespace Faolan.GameServer.Combat
 				npcEntity.MarkDead();
 				await AwardKillXp(killer, npcEntity.Level);
 
-				_logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); corpse lingers {Linger}s then becomes lootable, respawns in {Delay}s.",
-					npcEntity.Name, targetHandle, cause, WorldEntity.CorpseLingerSeconds, npcEntity.RespawnDelaySeconds);
+				_logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); corpse lingers {Linger}s then becomes lootable, {Fate}.",
+					npcEntity.Name, targetHandle, cause, WorldEntity.CorpseLingerSeconds,
+					npcEntity.NoRespawn ? $"then fades (no respawn)" : $"respawns in {npcEntity.RespawnDelaySeconds}s");
 				await AdvanceKillQuests(killer, npcEntity.Name);
 				return;
 			}

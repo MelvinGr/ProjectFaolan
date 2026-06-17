@@ -714,6 +714,13 @@ namespace Faolan.GameServer.World
 			entity.Level = npc.Level;
 			entity.Hostile = killable && npc.Community > 0;
 			entity.SpawnBody = body;
+			entity.NoRespawn = true; // summoned test NPCs don't revive - they fade out after death (GM .spawnnpc QoL)
+
+			// Load this NPC type's caster spells (same as the zone-load path) so a summoned caster actually casts
+			// (#232) instead of only meleeing - the sim's cast branch lights up when entity.Spells is non-empty.
+			if (entity.Name is { Length: > 0 } spellName)
+				foreach (var s in await _database.GetNpcSpellsByName(spellName))
+					entity.Spells.Add(new NpcSpellCast(s.SpellId, s.Payload));
 			_sim
 				.World
 				.ZoneFor(player.MapId)
