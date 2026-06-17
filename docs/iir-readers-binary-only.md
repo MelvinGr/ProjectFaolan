@@ -74,6 +74,45 @@ Primitives: `FUN_0048f900` = `ReadU32` (BE); `FUN_00cba1b0(&x,N)` = `ReadN` (N=1
 | `0x6AC7B325` | `LootDeleteItemsIIR` | `7a5c90` | `FUN_004d4ef0` + `[string]` |
 | `0x51BEF2CB` | `LootUpdateAllowedLootersIIR` | `7a4c70` | `FUN_007a4df0` (looter-list reader) |
 
+## Batch 5 — remaining wire types (PvP / construction / tradeskill / tool / stat-template)
+
+### Fixed-size
+
+| sub | type | reader | body |
+|---|---|---|---|
+| `0x7057225B` | `PVPDropItemIIR_t` | `8d6690` | `[u32×6]` |
+| `0x1C4528A7` | `FanaticIIR_t` | `663400` | `[u32×3]` (2nd/3rd default to a stored pair if both 0) |
+| `0x09012E82` | `FloatStatIIR` | `4e6da0` | `[u32 statId][u32 value]` — the float-typed stat record |
+| `0xA2F53610` | `Int32StatIIR` | `4e6f10` | `[u32 statId][u32 value]` — the int-typed stat record |
+
+### String-bearing / variable
+
+| sub | type | reader | structure |
+|---|---|---|---|
+| `0xC415E6ED` | `StringStatIIR` | `4e70f0` | `[u32 statId][string]` — the string-typed stat record |
+| `0x3188C31B` | `ToolMessageInternalIIR_t` | `5be880` | `[u32][u32][string]` |
+| `0x8AD083D9` | `ConstructionOrderIIR_c` | `6d9030` | `[string][u32][string][u8 bool]` |
+| `0x5D7884EE` | `n3PlayfieldFullUpdateIIR_t` | `13d0a20` | `[u32×3]` + PlayfieldProxy stream + `[u32]` + sub `FUN_00cbf5d0` |
+
+### Empty / no-op (delivered out-of-band)
+
+| sub | type | reader | note |
+|---|---|---|---|
+| `0x16294E79` | `GameCodeDynelFullUpdateIIR` | `005b9230` | `return 0` — content via the `ProtoGameCodeDynel` protobuf |
+| `0x156687CC` | `MassivePvPDamageLocationIIR_c` | `005b9230` | `return 0` |
+| `0x87A3B396` | `n3ToServerUnBlockIIR_t` | `13ce1a0` | `return 0` |
+
+### Sub-reader-delegated / large bodies (reader located, body not expanded)
+
+`MassivePvpScoreIIR_c` (`6d5590`→`6d5800`), `ConstructionMenuIIR_c` (`6d7ae0`, 2.4 KB),
+`TradeskillReplyIIR_c` (`7aab30`), `TradeskillRequestIIR_c` (`7aa600`), `FanaticCommandIIR_t`
+(`663860`), `ToolMessageIIR_t` (`5be2f0`), `ScryLuaIIR` (`9c26a0` — the Scry/Lua tutorial driver),
+`CoreFullPlayerCharacterIIR` (`797440` — a player full-update kin to `FullPlayerCharacterIIR`).
+
+> The `*StatIIR` trio (`FloatStatIIR`/`Int32StatIIR`/`StringStatIIR`) are the per-type stat-record
+> readers behind the count-prefixed stat blocks in [player-stats.md](player-stats.md): each is
+> `[u32 statId][value]` where value is a u32 (float/int) or a length-prefixed string.
+
 ## Status
 
 Readers recovered (this doc). These are **not implemented or byte-validated** — the retail captures
