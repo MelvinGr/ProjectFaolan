@@ -12,9 +12,11 @@ player's bag, docs/aoc-client-protos.proto):
   f4 items[]             = InventoryListEntry { pos, item }
     item = ProtoInventoryGameEntry {
       item_id = 0                                  (shop wares have no instance GUID)
-      stat_list = [(0, 0x200000), (26, count), (356, perSlotValue)]
+      stat_list = [(0, 0x200000), (26, count), (356, 0x394E0034)]
                                                    (the bag uses (0,1),(23,recordId),(26,count) - stat 356
-                                                    replaces the record id for shop slots; semantics unknown)
+                                                    replaces the record id for shop slots; it is a CONSTANT
+                                                    0x394E0034 across all wares, NOT a price - the item value is
+                                                    RDB template field 74, sell=round(value/10), see #137)
       item_data = ProtoAcgItem { key1=key2=key3 = the Data1..4 identity quad (the item's TEA key!),
                                  template1=template2 = the RDB item template id,
                                  level (1 or 40 observed), hash = the 4-char archetype code }

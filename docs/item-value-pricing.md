@@ -34,25 +34,34 @@ Combined oracle (`...sell_items_to_trader...`), **value-per-item = delta / count
 
 Slot 9 (count 7, total 392 → 56/item) is the proof that price scales with count.
 
-## The blocker: value is not a directly-stored template field
+## SOLVED 2026-06-17: value = property-table field 74
 
-Searched each of the 7 decrypted templates (`/tmp/itpl/1000020_<template>.bin`, body = bytes **after** the
-12-byte RDB-Id header) for its value-per-item as LE u32 **and** as protobuf varint, anywhere, at multipliers
-x1 / x4 / x5 / x10 / x20 / x25 / x50 / x100: **no multiplier matches all 7** (only 3 of 7 even contain the raw
-value as a u32, at inconsistent positions). So the sell value is not a trivially-stored field at a fixed
-offset or simple scale.
+The earlier "no multiplier matches" search failed because it scanned **raw offsets**. The body is an RDB
+**property table** — a run of `[fieldId u32][value u32]` LE pairs with strictly-decreasing fieldId after the
+header (same grammar as `Captures/decode_item_template.py`). The value is **field 74**, and the
+**vendor sell-per-unit = round(value / 10)** (integer `(value+5)/10`):
 
-`Items.SearchCategory` is already mapped (= `template[12..16]`, the first u32 of the body; validated 242/242
-against captured AH listings). The value lives in one of the still-**unreversed binary fields** of the item
-template (`RdbItemImporter` notes "reversing those fields into stat columns is the next step"; today it maps
-only `SearchCategory` + the `0x21`-tagged name strings).
+| template | field 74 | sell/item |
+|---|---|---|
+| 3886819 | 190 | 19 |
+| 3887406 | 230 | 23 |
+| 3887364 | 920 | 92 |
+| 3917245 | 560 | 56 (×7 = 392) |
+| 3724525 | 206 | 21 |
+| 3719048 | 637 | 64 |
+| 3514741 | **0** | — (no field 74 value → **unsellable**, the Totem of Origins) |
 
-## Remaining work
-1. Reverse the item-template tagged-field grammar enough to locate the value field — solve it against the
-   oracle table above (parse the 7 templates' fields, find the field whose value, or a clean function of it,
-   reproduces {19, 23, 92, 56, 47, 21, 64}).
-2. Add `Item.Value`, populate it in `RdbItemImporter`, and replace `ShopService.VendorPriceTin` /
-   `VendorBuyPriceTin` with `value × count` (vendor buy = a markup over that). Golden-test against the anchors.
+`Items.SearchCategory` (= `template[12..16]`) was already mapped; field 74 is the second mapped property.
+
+## Implemented
+- `Item.Value` column (migration `AddItemValue`); `RdbItemImporter.TryReadPropertyField` extracts field 74
+  (~1677/1970 keyed items populated).
+- `ShopService`: `VendorPriceTin(value, count) = round(value/10)×count`; `VendorBuyPriceTin = ×4 markup`;
+  **value 0 ⇒ unsellable** (`HandleSellItemToShop` refuses). Golden tests = the anchors above (`ShopTests`).
+- `stat 356` (in the shop window) is a CONSTANT `0x394E0034`, **not** a price.
+
+## Remaining (open)
+The BUY markup (×4) has no captured anchor — it's a stand-in over the now-real sell value.
 
 ## Reproduce
 - RDB install: `/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB/` (see the

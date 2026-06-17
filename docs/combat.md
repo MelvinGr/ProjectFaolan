@@ -101,9 +101,10 @@ verification.
 
 **Open polish (walk gait + slight snap).** The 61-byte form has no speed field, so the client uses a default
 interpolation (a small teleport/snap) and a **walk** gait. Findings from the MoveTask grammar:
-- The task-type byte **@30** (offset incl. the 4-byte length prefix) is the form discriminator: `0x06`
-  stationary (`BuildStationary`), `0x02` orient (the 61-byte form we send), `0x04` patrol/segment-list
-  (`BuildPatrol`, carries a speed but its anchor loops), `0x08` **follow-entity**.
+- The task-type byte **@30** (offset incl. the 4-byte length prefix) is the form discriminator: `0x02` orient
+  (the 61-byte form we send), `0x04` patrol/segment-list, `0x08` **follow-entity**. NB the FULL recursive grammar
+  + authoritative per-mode type names are now decoded (100%, #53) in `docs/movetask-grammar.md` (0x04 is the
+  recursive `ListMoveTask`, 0x06 = `AnimatedMoveTask`); the labels here are combat-side shorthand.
 - `0x08` follow (the chasing mobs send it with id = the player handle) is **target/facing metadata, NOT a
   mover** - wiring it as the chase driver made NPCs face+attack in place without moving. The actual
   locomotion rides the position-transform packets sent alongside it.

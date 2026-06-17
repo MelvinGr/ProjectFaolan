@@ -7,10 +7,11 @@ using Faolan.Core.Network.Packets.Opcodes;
 namespace Faolan.GameServer.World
 {
 	// The MoveTask transform packet (MoveTaskIIR 0x96C46740) - how the server tells clients where an entity is and which
-	// way it faces. Decoded from the strickenbla capture (the 61-byte "at-position-facing" form, the simplest + by far
-	// the most common shape; the larger 96..370-byte forms carry multi-waypoint paths and aren't built yet). Even the
-	// player uses this form. The two positions are a FROM/TO segment - in the capture's stationary updates from==to; for
-	// a moving NPC we send from = the previous position, to = the stepped position so the client interpolates the step.
+	// way it faces. The full recursive grammar is decoded (100% round-trip, docs/movetask-grammar.md); this codec builds
+	// the forms we emit: the 61-byte "at-position-facing" form (the simplest + by far the most common, used by the player
+	// too), the bare-position + approach-target forms, and the multi-waypoint PathMoveTask (BuildPathBody). The 61-byte
+	// form's two positions are a FROM/TO segment - in the capture's stationary updates from==to; for a moving NPC we send
+	// from = the previous position, to = the stepped position so the client interpolates the step.
 	//
 	// Wire body (the inner 0x2000 IIR record, after the u32 totalLen WriteArrayUInt32Length wraps), all big-endian:
 	//   [subop 0x96C46740][0x0000C350][handle][u16 0][from: 3 floats][u8 0x02][to: 3 floats][quat: 4 floats][u16 0]
