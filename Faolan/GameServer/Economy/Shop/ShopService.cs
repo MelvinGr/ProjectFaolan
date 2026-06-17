@@ -56,32 +56,32 @@ namespace Faolan.GameServer.Economy.Shop
 		// back). Uniqueness only needs to hold within a session; a process-wide counter is plenty.
 		private static int _shopInstanceSeq;
 
-		// The per-unit base value in tin (the wallet wire unit) = round(Item.Value / 10), where Item.Value is the
-		// RDB item-template's field 74. Proven by the captured sales (190->19, 920->92, 560->56 tin; #137). When the
-		// value is unknown (Item.Value==0: not RDB-imported, or a template kind without field 74) it falls back to
-		// the provisional level*2 so better junk still pays more.
-		private static uint BaseValueTin(uint value, int levelFallback)
+		// The per-unit value in tin (the wallet wire unit) = round(Item.Value / 10), where Item.Value is the RDB
+		// item-template's field 74. Proven by the captured sales (190->19, 920->92, 560->56 tin; #137). Value 0 is a
+		// genuinely valueless item (the template carries field 74 == 0, e.g. the unsellable Totem of Origins) -> 0,
+		// NOT a price; SELL treats that as unsellable and BUY adds its markup on top.
+		private static uint PerUnitValueTin(uint value)
 		{
-			return value > 0
-				? System.Math.Max(1u, (value + 5) / 10)
-				: (uint)System.Math.Max(1, levelFallback * 2);
+			return value > 0 ? System.Math.Max(1u, (value + 5) / 10) : 0;
 		}
 
-		// Vendor SELL price in tin (what the player gets selling to the vendor) = round(value/10) per unit. Pass the
-		// item's Value (RDB field 74) and its Level (the fallback when Value is unknown).
-		public static uint VendorPriceTin(uint value, byte itemLevel, uint count)
+		// Vendor SELL price in tin (what the player gets selling to the vendor) = round(value/10) per unit. Returns 0
+		// for a valueless item (Item.Value == 0) - HandleSellItemToShop refuses to sell those (they are no-value /
+		// no-sell, like the Totem of Origins), rather than inventing a level-based price.
+		public static uint VendorPriceTin(uint value, uint count)
 		{
-			return BaseValueTin(value, itemLevel) * System.Math.Max(1u, count);
+			return PerUnitValueTin(value) * System.Math.Max(1u, count);
 		}
 
 		// Vendor BUY price in tin (what the player pays): a flat markup over the SAME item's sell value so wares
-		// can't be flipped for free (buy > sell). Now grounded in the real value when known; the markup itself has
-		// no captured anchor and stays the open part (#137). TailLevel is the fallback level for value-less wares.
+		// can't be flipped for free (buy > sell). Grounded in the real value when known; the markup itself has no
+		// captured anchor and stays the open part (#137). A value-less ware still costs at least the markup (min 1
+		// per-unit) so the shop never gives it away free.
 		public const uint VendorBuyMarkup = 4;
 
-		public static uint VendorBuyPriceTin(uint value, uint tailLevel, uint count)
+		public static uint VendorBuyPriceTin(uint value, uint count)
 		{
-			return BaseValueTin(value, (int)tailLevel) * System.Math.Max(1u, count) * VendorBuyMarkup;
+			return System.Math.Max(1u, PerUnitValueTin(value)) * System.Math.Max(1u, count) * VendorBuyMarkup;
 		}
 
 		// DL 0x2035 - tells the client the bag slot was sold (it clears the slot itself).
@@ -117,7 +117,15 @@ namespace Faolan.GameServer.Economy.Shop
 				return;
 			}
 
-			var price = VendorPriceTin(row.Item.Value, row.Item.Level, row.Count);
+			var price = VendorPriceTin(row.Item.Value, row.Count);
+			if (price == 0)
+			{
+				// A valueless item (RDB value 0, e.g. the Totem of Origins) is no-sell - refuse rather than invent
+				// a price. The client keeps the item in the slot since we send no DispatchItemSoldToShop.
+				_logger.LogInformation("SellItem: {Item} (template {Template}) is valueless / not sellable for {Character}.", row.Item.Name, row.Item.Id, character.Name);
+				return;
+			}
+
 			await _database.SetCharacterInventorySlot(character.Id, (int)container, (int)slot, null);
 			character.Money += price;
 			await _database.SetCharacterMoney(character.Id, character.Money);
@@ -207,7 +215,7 @@ namespace Faolan.GameServer.Economy.Shop
 			}
 
 			var wareItem = await _database.GetItem(ware.ItemTemplateId);
-			var price = VendorBuyPriceTin(wareItem?.Value ?? 0, ware.TailLevel, ware.Count);
+			var price = VendorBuyPriceTin(wareItem?.Value ?? 0, ware.Count);
 			if (character.Money < price)
 			{
 				_logger.LogInformation("BuyItem: {Character} can't afford ware {Template} at slot {Pos} ({Price} tin, has {Balance}).",

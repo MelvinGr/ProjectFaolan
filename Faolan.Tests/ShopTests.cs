@@ -39,21 +39,22 @@ namespace Faolan.Tests
 		[InlineData(637u, 64u)]   // tmpl 3719048 (63.7 -> 64)
 		public void VendorSellPrice_IsRoundedValueOverTen(uint value, uint expectedPerUnit)
 		{
-			Assert.Equal(expectedPerUnit, ShopService.VendorPriceTin(value, itemLevel: 0, count: 1));
+			Assert.Equal(expectedPerUnit, ShopService.VendorPriceTin(value, count: 1));
 		}
 
 		[Fact]
 		public void VendorSellPrice_ScalesWithCount_AndMatchesTheStackSale()
 		{
 			// tmpl 3917245: value 560 -> 56/unit, the captured stack of 7 sold for 392 tin.
-			Assert.Equal(392u, ShopService.VendorPriceTin(560, itemLevel: 0, count: 7));
+			Assert.Equal(392u, ShopService.VendorPriceTin(560, count: 7));
 		}
 
 		[Fact]
-		public void VendorSellPrice_FallsBackToLevel_WhenValueUnknown()
+		public void VendorSellPrice_ZeroValueIsUnsellable()
 		{
-			// Value 0 (not RDB-imported) -> provisional level*2.
-			Assert.Equal(80u, ShopService.VendorPriceTin(value: 0, itemLevel: 40, count: 1));
+			// A valueless item (RDB value 0, e.g. the Totem of Origins) yields no price -> the sell handler refuses.
+			Assert.Equal(0u, ShopService.VendorPriceTin(value: 0, count: 1));
+			Assert.Equal(0u, ShopService.VendorPriceTin(value: 0, count: 5));
 		}
 
 		[Fact]
@@ -62,20 +63,20 @@ namespace Faolan.Tests
 			// A vendor must sell dearer than it buys back, or a ware could be bought and re-sold for profit.
 			const uint value = 920;
 			const uint count = 1;
-			Assert.True(ShopService.VendorBuyPriceTin(value, tailLevel: 0, count) > ShopService.VendorPriceTin(value, itemLevel: 0, count));
+			Assert.True(ShopService.VendorBuyPriceTin(value, count) > ShopService.VendorPriceTin(value, count));
 		}
 
 		[Fact]
 		public void VendorBuyPrice_ScalesWithCount()
 		{
-			Assert.Equal(ShopService.VendorBuyPriceTin(200, 10, 1) * 3, ShopService.VendorBuyPriceTin(200, 10, 3));
+			Assert.Equal(ShopService.VendorBuyPriceTin(200, 1) * 3, ShopService.VendorBuyPriceTin(200, 3));
 		}
 
 		[Fact]
 		public void VendorBuyPrice_NeverFree()
 		{
-			// Value-less, level-0 wares still cost something.
-			Assert.True(ShopService.VendorBuyPriceTin(0, 0, 1) >= ShopService.VendorBuyMarkup);
+			// Even a value-less ware still costs the markup (the shop never gives it away).
+			Assert.True(ShopService.VendorBuyPriceTin(0, 1) >= ShopService.VendorBuyMarkup);
 		}
 	}
 }
