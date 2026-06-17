@@ -52,15 +52,20 @@ At login while guilded, the server pushes `0x203F` immediately after the Authent
 ## 0x203F GuildFullUpdate body
 
 ```
-[govForm u8 =3][guildId u32][01][cash u64][03][u32 0][00]
+[version u8 =3][guildId u32][govForm u8 =1][cash u64][b u8][u32 0][b u8]
 [name s16][description s16][motd s16]
 [277-byte renown/feat/city-stats block]
 [self member record][selfContribution u32][other member records … to packet end, no count]
 ```
 
-The 277-byte block (renown total, 13 feat/unlock ids, city counters) has undecoded internal framing;
-we emit the captured bytes verbatim (`GuildRenownBlockTemplate`) because a synthesized block could
-misalign the roster that follows. Cosmetic-only until decoded.
+The whole body is the `i_pcGuild` argument deserialized by `CoreGuild_c::Read` (FUN_00565900). NOTE the first
+byte is the **CoreGuild_c streaming version (==3)**, NOT the government form (an earlier note mislabeled it); the
+**government form is the byte after guildId (==1)**, which selects the reader's case 1 → fall-through case 3
+layout. The 277-byte block is now a **typed codec** (`GuildRenownBlock`, byte-exact, `GuildRenownBlockTests`),
+built per-guild from `Guild.Renown` (`GuildRenownBlock.ForRenown`) — no longer a verbatim blob. The full reader
+walk (`Captures/decode_guild_renown.py --walk`) deserializes the whole arg and lands byte-exact on the next
+member record, proving the field grammar; only `RenownCounters[1]` (param_1[0x40]) varies between snapshots (the
+live renown total), so the other feat/city/cap fields stay constant pending their (binary-stripped) semantics.
 
 ## Server implementation (Faolan)
 
@@ -106,9 +111,13 @@ string, not by `0x2000 + index`. Confirmed so far (decompiles via `Captures/ghid
 - Stream primitives (shared, from `ghidra_vtable_xref_readers`): `FUN_0048f900` ReadU32(BE),
   `FUN_004e0390` ReadByte, `FUN_0048f840` ReadString, `FUN_0048f720` ReadU64.
 
-STILL OPEN — the **Guild_c header+renown reader** (govForm/guildId/cash/name/desc/motd + the 277-byte
-renown block) is NOT yet isolated: it is not `FUN_005656a0`/`FUN_00565900` (those are ctors), and the
-traced dispatchers only surface the member-list read. Next step: find the function that reads a u64
-(cash) + 3 strings (ReadString ×3) — that is the Guild_c deserializer, and the renown block is read at
-its tail. The renown-block scaffold (`[u8 ver][u32 hdr][13× u32 stat ids 0x4FFB0..0x50334][220-byte
-counter region]`) is documented in `Captures/decode_guild_renown.py`.
+RESOLVED (2026-06-17, #219) — the **Guild_c header+renown reader IS `FUN_00565900`** (`CoreGuild_c::Read`,
+not a ctor as earlier supposed). It reads: streaming version (==3), guildId, government form, then switches on
+the form; **case 1 falls through into case 3**, reading cash (ReadU64), two enum/bytes around a u32, the three
+strings (name/desc/motd), then the renown block = `ReadByte(flag)` + `ReadList`(13 stat ids @param+0x39) +
+2 bytes + 3×u32 + 2 bytes + 2×u32 + `ReadList`(3 ids @param+0x1c) + 6×u32 + **6×u64 (RenownCounters, @param+0x3e..**
+where `[0x40]` is the live renown total) + 2×u32 + 8×u64 + 3×u64 + u32 + u64. `Captures/decode_guild_renown.py
+--walk` replays this exact sequence and lands byte-exact on the following member record (helpers: FUN_0048f900
+ReadU32, FUN_0048f720 ReadU64, FUN_0048f6d0/FUN_004e0390 ReadByte, FUN_0048f840 ReadString, FUN_004d4c70
+ReadList). The C# field↔offset map is in `GuildRenownBlock`. Remaining: the per-guild meaning of the feat/city/
+cap fields is not recoverable from the stripped binary (no symbol names; only RenownCounters[1] varies in capture).

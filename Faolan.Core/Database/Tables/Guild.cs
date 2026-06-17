@@ -27,9 +27,12 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(4096)]
 		public string MessageOfTheDay { get; set; } = "";
 
-		// Retail "Sepulchra Invictus" carried governmentForm 3 in every 0x203F snapshot; the client UI maps the
-		// value to a government label. Keep retail's default until the forms are mapped.
-		public byte GovernmentForm { get; set; } = 3;
+		// The guild government form. NOTE: this is NOT the 0x203F's first byte (that is the CoreGuild_c streaming
+		// version, fixed at 3 - see GuildService). The actual government-form byte sits after guildId and is fixed
+		// at 1 on the wire today, because GuildRenownBlock only encodes that form's body layout (the captured
+		// "Sepulchra Invictus" guild was form 1). This column is retained for a future real government-form feature
+		// and is not yet emitted. The client UI maps the value to a government label (#219, docs/guilds.md).
+		public byte GovernmentForm { get; set; } = 1;
 
 		// Guild bank, in tin (u64 on the wire; the wallet wire unit).
 		public ulong Cash { get; set; }

@@ -113,10 +113,18 @@ namespace Faolan.CSPlayerAgent
 				: 0, lastSeen);
 		}
 
+		// CoreGuild_c::Read (the client deserializer, FUN_00565900) asserts streaming version == 3; the byte after
+		// guildId is the GOVERNMENT FORM, whose value selects the body layout. Form 1 (which falls through into the
+		// form-3 field block in the reader) is the layout GuildRenownBlock encodes, so both are fixed here. The old
+		// code wrote guild.GovernmentForm into the version slot - harmless only because it defaulted to 3, but a
+		// non-3 value would have tripped the client's "streaming version mismatch" assert (#219, docs/guilds.md).
+		private const byte CoreGuildStreamVersion = 0x03; // first body byte - CoreGuild_c streaming version (must be 3)
+		private const byte GuildGovernmentForm = 0x01;    // byte after guildId - the form selecting the case 1->3 layout
+
 		// 0x203F full guild update - the packet that makes the client consider itself a guild member (guild
 		// window, guild chat tab, MOTD popup). Retail pushes it right after the Authenticate ack on login and
-		// again on join/member-list requests:
-		//   [govForm u8][guildId u32][01][cash u64][03][u32 0][00][name s16][description s16][motd s16]
+		// again on join/member-list requests. The whole body is CoreGuild_c::Read's i_pcGuild argument:
+		//   [version u8=3][guildId u32][govForm u8=1][cash u64][b u8][u32 0][b u8][name s16][description s16][motd s16]
 		//   [renown block][self member record][selfContribution u32][other member records ... to packet end]
 		// The renown block is built per-guild from Guild.Renown (GuildRenownBlock.ForRenown), now that the 277-byte
 		// block is a typed codec (#219) - our created guilds no longer carry the captured guild's feat/city numbers.
@@ -125,9 +133,9 @@ namespace Faolan.CSPlayerAgent
 			var ps = new PacketStream();
 			ps
 				.WriteHeader(sender, receiver, CsPlayerAgentResponseOpcodes.GuildFullUpdate)
-				.WriteByte(guild.GovernmentForm)
+				.WriteByte(CoreGuildStreamVersion)
 				.WriteUInt32(guild.Id)
-				.WriteByte(0x01)
+				.WriteByte(GuildGovernmentForm)
 				.WriteUInt64(guild.Cash)
 				.WriteByte(0x03)
 				.WriteUInt32(0)
