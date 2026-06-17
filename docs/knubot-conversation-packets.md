@@ -12,6 +12,14 @@ captured `ConversationPacket` rows (~409 rows) with handle substitution. Remaini
 from RDB text + the Lua/tag VM (vs the captured line) and construct the answer-list/close too, retiring the
 replay entirely.
 
+**Carrier framing (confirmed against the captures):** every Knubot s2c packet is opcode `0x2000`, sender
+`GameAgent` (`0xB171CE13`) : `<conversationAgentInstance>`, receiver `GameInterface` (`0x6C67C147`) :
+`<playerHandle>`. Retail **varies the GameAgent sender instance per conversation** — `0x07, 0x08, 0x0a, 0x0b,
+0x0e, 0x10, 0x11, 0x54..0x5a` observed (`0x08`/`0x0e` most common) — and the client addresses its `KnubotAnswer`
+(c2s: `GameInterface:<player>` → `GameAgent:<thatInstance>`) back to whichever instance sent the screen. So the
+construct path **preserves the captured sender instance** (`ConversationService.ReadSenderInstance`) rather than
+fixing one, matching retail/replay byte-for-byte.
+
 Read primitives (shared with the rest of the protocol): `FUN_0048f900` = read u32 (byte-swapped when the
 big-endian flag is set), `FUN_0048f840` / `FUN_006200a0` = read a length-prefixed string (the
 `<remoteformat>` text token), `FUN_00cba1b0(&x, n)` = read n raw bytes.
