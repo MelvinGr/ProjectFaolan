@@ -246,11 +246,20 @@ namespace Faolan.Importer
 		}
 
 		// Caster NPCs' spells (#232), upserted by (NPC name, spell id). The effect payload is refreshed on re-import.
+		// PLAYER characters are materialized as NPC spawns too (captured other-players), so their OWN casts would be
+		// mis-attributed as NPC spells - skip any name that is a known character.
 		private static async Task<int> ImportNpcSpells(DatabaseContext db, List<NpcSpellEntry> spells)
 		{
+			var playerNames = (await db.Characters.Select(c => c.Name).ToListAsync())
+				.Where(n => !string.IsNullOrEmpty(n))
+				.Select(n => n.ToLowerInvariant())
+				.ToHashSet();
+
 			var inserted = 0;
 			foreach (var e in spells)
 			{
+				if (playerNames.Contains(e.Name.ToLowerInvariant()))
+					continue;
 				var existing = await db.NpcSpells.FirstOrDefaultAsync(s => s.NpcName == e.Name && s.SpellId == e.SpellId);
 				if (existing == null)
 				{
