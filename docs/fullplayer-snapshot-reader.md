@@ -7,12 +7,22 @@ region of `BeachTailsTemplate.bin`) with a real, generated grammar so the `.bin`
 character's **class/progression** authored instead of inherited from Strie. See `docs/quest-log-handover.md`
 and the memory `snapshot_tails_construction_scope`.
 
-## Status & handover (2026-06-16, updated)
+## Status & handover (2026-06-17, updated)
 
-The whole tails' QUEST PORTION (`@0..1292`) is now **decoded, typed, and generated from the DB with zero
-literals**, and the generation is **wired into the production login snapshot behind a flag**. The stat block
-is decoded; only the access-window table + stat skeleton remain as fixed relocatable data. Branch
-`development`, all green (420 tests).
+**The WHOLE tails now build from scratch — no captured-tails template.** `BeachTailsBuilder.BuildFromScratch`
+assembles the three regions and reproduces `BeachTailsTemplate.bin` byte-for-byte (`BeachTailsFromScratchTests`):
+- **quest portion** `@0..1292` — DB-generated (`BuildBeachQuestPortion`), wired into the production login
+  snapshot (in-client verified 2026-06-16).
+- **access-window table** `@1292..7917` — carved out into its own game-static asset `AccessWindowTable.bin`
+  (the 172-entry `PFAccessWindow_` playfield catalog, identical for every character — reference data, not
+  generated).
+- **stat block** `@7917..end` — the code skeleton `TailsStatBlock.CreateFreshBlock` (313 fixed slots + ~14
+  character/map-derived, patched) serialized by `TailsStatBlock.Serialize`.
+
+So the captured Strie tails are no longer needed to *author* a beach entry's tails. `BeachTailsTemplate.bin`
+now serves only as the golden test oracle; the remaining step is wiring `BuildFromScratch` into the burst-less
+world entry (#210) + an in-client chat-connect smoke test, after which the production FullChar tails are fully
+generated. Branch `development`, all green (506 tests).
 
 DONE this session (the whole quest region authors from server state):
 - **Quest_c (`@0..609`)** — `QuestcRegion`/`QuestcRecord` codec (byte-exact round-trip), wired into
