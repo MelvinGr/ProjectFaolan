@@ -1,0 +1,83 @@
+using System;
+using System.Buffers.Binary;
+using Faolan.GameServer.Dialogue;
+using Xunit;
+
+namespace Faolan.Tests
+{
+	// #188: ConversationService.ServeScreen now CONSTRUCTS the spoken line (KnubotAppendText) and window-open
+	// (KnubotOpenChatWindow) through KnubotCodec instead of replaying the captured packet with byte-substitution.
+	// These tests prove the swap is behavior-preserving: the constructed record is BYTE-IDENTICAL to what the old
+	// handle-substitution produced, and TryConstructKnubotRecord lifts/rebuilds the record out of a full packet.
+	public class ConversationConstructTests
+	{
+		private const uint CapturedInstance = 0x110099BD;
+		private const uint CapturedNpc = 0x00042194;
+		private const uint LiveInstance = 0x02000123;
+		private const uint ClickedNpc = 0x00090000;
+
+		// Replaces every big-endian u32 occurrence of oldVal with newVal - the record-level equivalent of
+		// ConversationService.SubstituteUInt32 (which scans from offset 8 of a FULL packet; a bare record's handles
+		// sit past that, so scanning the whole record matches).
+		private static byte[] SubstituteU32(byte[] data, uint oldVal, uint newVal)
+		{
+			var outp = (byte[])data.Clone();
+			Span<byte> needle = stackalloc byte[4];
+			BinaryPrimitives.WriteUInt32BigEndian(needle, oldVal);
+			for (var i = 0; i + 4 <= outp.Length; i++)
+				if (outp.AsSpan(i, 4).SequenceEqual(needle))
+				{
+					BinaryPrimitives.WriteUInt32BigEndian(outp.AsSpan(i, 4), newVal);
+					i += 3;
+				}
+			return outp;
+		}
+
+		[Fact]
+		public void Construct_AppendText_IsByteIdenticalToSubstitution()
+		{
+			var captured = Convert.FromHexString(KnubotCodecTestData.AppendTextBody);
+
+			// construct: parse the captured record, rebuild with the live endpoints
+			var p = KnubotCodec.ParseAppendText(captured);
+			var construct = KnubotCodec.BuildAppendText(LiveInstance, ClickedNpc, p.Xml, p.Field, p.Trailing, p.Env);
+
+			// replay: substitute the two handles in the captured record
+			var substitute = SubstituteU32(SubstituteU32(captured, CapturedInstance, LiveInstance), CapturedNpc, ClickedNpc);
+
+			Assert.Equal(Convert.ToHexStringLower(substitute), Convert.ToHexStringLower(construct));
+		}
+
+		[Fact]
+		public void TryConstructKnubotRecord_LiftsAndRebuildsFromAFullPacket()
+		{
+			var record = Convert.FromHexString(KnubotCodecTestData.AppendTextBody);
+
+			// wrap the record in a full conversation packet: [8 len+crc][u32 headerLen][header][record]
+			var header = new byte[20];
+			var packet = new byte[12 + header.Length + record.Length];
+			BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(8, 4), (uint)header.Length);
+			Buffer.BlockCopy(header, 0, packet, 12, header.Length);
+			Buffer.BlockCopy(record, 0, packet, 12 + header.Length, record.Length);
+
+			Assert.True(ConversationService.TryConstructKnubotRecord(packet, LiveInstance, ClickedNpc, out var rebuilt));
+
+			var expected = KnubotCodec.BuildAppendText(LiveInstance, ClickedNpc,
+				KnubotCodec.ParseAppendText(record).Xml, 1, 1, 0);
+			Assert.Equal(Convert.ToHexStringLower(expected), Convert.ToHexStringLower(rebuilt));
+		}
+
+		[Fact]
+		public void TryConstructKnubotRecord_ReturnsFalseForAnswerList()
+		{
+			// an AnswerList record (sub 0xF164A4A5) must stay on the substitution-replay path
+			var record = Convert.FromHexString("0000000cf164a4a50000c350110099bd00");
+			var header = new byte[12];
+			var packet = new byte[12 + header.Length + record.Length];
+			BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(8, 4), (uint)header.Length);
+			Buffer.BlockCopy(record, 0, packet, 12 + header.Length, record.Length);
+
+			Assert.False(ConversationService.TryConstructKnubotRecord(packet, LiveInstance, ClickedNpc, out _));
+		}
+	}
+}

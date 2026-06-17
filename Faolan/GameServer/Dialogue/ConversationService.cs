@@ -66,6 +66,58 @@ namespace Faolan.GameServer.Dialogue
 		private const uint KnubotAnswerListSubOpcode = (uint)GameServer0X2000RespondsOpcodes.KnubotAnswerListIIR;
 		private const uint KnubotCloseChatWindowSubOpcode = (uint)GameServer0X2000RespondsOpcodes.KnubotCloseChatWindowIIR;
 
+		// The Knubot packets we CONSTRUCT from the typed codec (KnubotCodec) instead of replaying+substituting (#188):
+		// the spoken line and the window-open. Their content (XML / value) is lifted from the captured record and
+		// rebuilt with the LIVE player/NPC endpoints - byte-identical to the substitution path (ConversationConstruct
+		// tests) but routed through the typed codec, the first step toward sourcing the line from RDB/Lua.
+		private const uint KnubotAppendTextSubOpcode = (uint)GameServer0X2000RespondsOpcodes.KnubotAppendTextIIR;
+		private const uint KnubotOpenChatWindowSubOpcode = (uint)GameServer0X2000RespondsOpcodes.KnubotOpenChatWindowIIR;
+
+		// Lifts the IIR carrier payload (the [u32 len][record]) out of a captured full conversation packet and, if it
+		// is an AppendText or OpenChatWindow, rebuilds it through KnubotCodec re-addressed to the live player + clicked
+		// NPC. Returns false for every other sub-opcode (those stay on the substitution-replay path).
+		internal static bool TryConstructKnubotRecord(byte[] capturedPacket, uint liveInstance, uint clickedNpcHandle, out byte[] record)
+		{
+			record = null;
+			if (capturedPacket == null || capturedPacket.Length < 12)
+				return false;
+
+			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(capturedPacket.AsSpan(8, 4));
+			var start = 12 + headerLen;
+			if (start + 8 > capturedPacket.Length)
+				return false;
+
+			var carrier = capturedPacket.AsSpan(start).ToArray(); // [u32 len][sub][...]
+			var sub = BinaryPrimitives.ReadUInt32BigEndian(carrier.AsSpan(4, 4));
+
+			if (sub == KnubotAppendTextSubOpcode)
+			{
+				var p = KnubotCodec.ParseAppendText(carrier);
+				record = KnubotCodec.BuildAppendText(liveInstance, clickedNpcHandle, p.Xml, p.Field, p.Trailing, p.Env);
+				return true;
+			}
+
+			if (sub == KnubotOpenChatWindowSubOpcode)
+			{
+				var p = KnubotCodec.ParseOpenChatWindow(carrier);
+				record = KnubotCodec.BuildOpenChatWindow(liveInstance, clickedNpcHandle, p.Value, p.Env);
+				return true;
+			}
+
+			return false;
+		}
+
+		// Frames a constructed Knubot record on the CONVERSATION conversation (sender GameAgent:0x08, receiver the
+		// player's GameInterface) and sends it - the same proven framing SendConversationClose uses.
+		private static Task SendConstructedKnubot(INetworkClient client, uint liveInstance, byte[] record)
+		{
+			return new PacketStream()
+				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08),
+					ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, liveInstance), GameServerCarrierOpcodes.IirCarrier)
+				.WriteArray(record)
+				.SendAsync(client);
+		}
+
 		// A KnubotCloseChatWindow (0xC4AF39EB) body, captured verbatim. It closes the NPC chat window with an EMPTY
 		// answer list (the remoteformat is id="0" with no options) - retail's "this NPC has nothing (more) to say"
 		// reply. The remoteformat (incl. its key) is byte-identical across every capture, so it is a reusable
@@ -146,6 +198,14 @@ namespace Faolan.GameServer.Dialogue
 				{
 					await SendQuestGrantPackets(client, grantDef);
 					grantSent = true;
+				}
+
+				// CONSTRUCT the spoken line / window-open through the typed codec (#188); replay the rest (AnswerList,
+				// CloseChatWindow, ...) verbatim with handle substitution until they too are constructed.
+				if (TryConstructKnubotRecord(p.Data, liveInstance, clickedNpcHandle, out var constructed))
+				{
+					await SendConstructedKnubot(client, liveInstance, constructed);
+					continue;
 				}
 
 				var packet = (byte[])p.Data.Clone();
