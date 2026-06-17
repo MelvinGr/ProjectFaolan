@@ -36,6 +36,48 @@ namespace Faolan.Tests
 			Assert.True(template.SequenceEqual(built), "from-scratch tails must equal BeachTailsTemplate.bin byte-for-byte");
 		}
 
+		// The captured-byte tests above only exercise the Strie baseline. The production flip (authoring the tails
+		// instead of replaying the captured burst) relies on BuildFromScratch staying STRUCTURALLY valid for any
+		// character - a different class/level patches different vitals into the stat block, and the snapshot framing
+		// (the in-client hang risk) must survive that. This proves: the assembly re-parses, the three regions keep
+		// their boundaries (quest portion = 1292, access-window catalog parses), the live vitals/XP land in the
+		// right PostAccessBlock slots, and the round-trip is lossless - for a character that is NOT the capture.
+		[Fact]
+		public async Task BuildFromScratch_StaysValidForANonBaselineCharacter()
+		{
+			var def = await LoadDefinition(BeachStarterQuestId);
+			Assert.NotNull(def);
+
+			var character = new Character
+			{
+				Level = 7,
+				Experience = 98760,
+				MaxStats = new CharacterMaxStats { Health = 4321, Mana = 765, Stamina = 543 }
+			};
+			const uint live = 0x0802ABCD;
+
+			var built = BeachTailsBuilder.BuildFromScratch(def, character, live);
+
+			// Re-parses without throwing, and is byte-lossless through the typed model.
+			var tails = SnapshotTails.Deserialize(built);
+			Assert.True(built.SequenceEqual(tails.ToArray()), "non-baseline from-scratch tails must round-trip losslessly");
+
+			// Region boundaries intact: the quest portion is the fixed beach length, the static access-window catalog parsed.
+			Assert.Equal(BeachTailsBuilder.QuestPortionLength, tails.KnownHeaderLength + QuestRegionTrailerLength(tails));
+			Assert.NotEmpty(tails.AccessWindowEntries);
+
+			// The live character's vitals/XP landed in the decoded stat slots (the part the production flip changes).
+			Assert.NotNull(tails.PostAccessBlock);
+			Assert.Equal(4321u, tails.PostAccessBlock!.CurrentHp);
+			Assert.Equal(765u, tails.PostAccessBlock.CurrentMana);
+			Assert.Equal(543u, tails.PostAccessBlock.CurrentStamina);
+			Assert.Equal(98760u, tails.PostAccessBlock.CurrentXp);
+		}
+
+		// The quest portion = the Quest_c journal (KnownHeaderLength) + the @609 objective region + the index region.
+		private static int QuestRegionTrailerLength(SnapshotTails tails) =>
+			(tails.QuestObjectives?.ToArray().Length ?? 0) + (tails.QuestIndex?.ToArray().Length ?? 0);
+
 		[Fact]
 		public async Task BuildFromScratch_ReAddressesInstance()
 		{
