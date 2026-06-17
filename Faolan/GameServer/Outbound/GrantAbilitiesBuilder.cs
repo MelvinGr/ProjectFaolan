@@ -65,13 +65,22 @@ namespace Faolan.GameServer
 		// character gets it. Applied via the proven ApplySpell (MagicBuff 0x6B87E316) self-buff path, so it also lands in
 		// ActiveBuffs (.buffs / CancelBuff / expiry).
 		//
-		// INTERIM spell id + payload: the exact "Shield of the Risen" id/payload is in no capture (#221), so this uses
-		// the shield our ApplySpell payload already encodes (Scythe Shield - the payload's embedded spell base 0x02387E
-		// matches this id's base; the apply rank byte is 0x00, mirroring the captured mount buff's 0x31EB1500/...01
-		// apply/remove pair). The wire GRAMMAR is the fully-captured mount buff
-		// (NecroL80_mage-necromancer_login_mount_move_dismount: ApplySpell 0x31EB1500 + 54-byte payload), so the
-		// shape is sound; whether THIS buff renders the intended shield in-client is the open item (needs-testing on #221).
-		private const uint ShieldBuffSpellId = 0x02387E00;
+		// CAPTURE-PROVEN spell id + payload (#221): the starting self-buff is wire id 0x000B9000 - base 0x0B90 (2960),
+		// apply rank 0x00 ((base<<8)|rank). It is applied to EVERY freshly-created character on the beach in all 11
+		// create captures (Captures/*_create.tshark.json - Necro/Guardian/Assassin/Barbarian/BearShaman/Herald, etc.),
+		// so it is class-agnostic, exactly as this re-apply assumes. (Earlier this was an INTERIM guess - Scythe Shield
+		// 0x02387E00 - on the false premise the id was in no capture; it is in every create capture.)
+		private const uint ShieldBuffSpellId = 0x000B9000;
+
+		// The captured MagicBuff effect payload for 0x000B9000 (the 54 bytes after applyFrom in the create-capture
+		// ApplySpell, e.g. Stickienecro_mage-necromancer_create pkt#284). Only the trailing u32 (@50) is a per-cast
+		// counter/timestamp - kept as captured; the client doesn't validate it for a self-buff.
+		private static readonly byte[] ShieldBuffPayload =
+		[
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x27, 0x10, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0B, 0x90, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x08, 0xA8, 0x15, 0xAD
+		];
 
 		private async Task GrantStartingBuffs(INetworkClient client)
 		{
@@ -80,9 +89,10 @@ namespace Faolan.GameServer
 				return;
 
 			// Self-buff: applyTo == applyFrom == the player's own handle (== ClientInstance == Character.Id), which is
-			// also what ApplySpell keys the ActiveBuffs registration on.
+			// also what ApplySpell keys the ActiveBuffs registration on. Use the captured payload so the wire matches
+			// the retail starting buff byte-for-byte (modulo the per-cast trailing counter).
 			var self = client.Session.Account.ClientInstance;
-			await ApplySpell(client, self, self, ShieldBuffSpellId);
+			await ApplySpell(client, self, self, ShieldBuffSpellId, ShieldBuffPayload);
 			Logger.LogInformation("GrantStartingBuffs: applied the shield self-buff 0x{Spell:X8} to '{Name}'.", ShieldBuffSpellId, character.Name);
 		}
 
