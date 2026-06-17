@@ -33,5 +33,14 @@ namespace Faolan.Tests
 			var body = ScryScript.BuildStep(Handle, "PlayOrSkip");
 			Assert.Equal(Expected(Rec2Suffix), Convert.ToHexStringLower(body));
 		}
+
+		// The post-morph StartScriptGroupOnClient callback (no token form, #223) from CreateWorldHandshake.
+		[Fact]
+		public void StartScriptGroup_BuildsTheCapturedRecord()
+		{
+			// captured suffix [flag=00][u32 pbLen=0E][08 05 10 00 18 EC 97 02 32 04 08 00 10 00]
+			var body = ScryScript.BuildStartScriptGroup(Handle, 35820);
+			Assert.Equal(Expected("000000000e0805100018ec9702320408001000"), Convert.ToHexStringLower(body));
+		}
 	}
 }

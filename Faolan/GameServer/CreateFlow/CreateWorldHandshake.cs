@@ -1,3 +1,4 @@
+using Faolan.GameServer.World;
 using System;
 using System.Threading.Tasks;
 using Faolan.Core.Network;
@@ -104,6 +105,16 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 		}
 
+		// Sends a fully-built create-editor IIR record (one that already begins with its sub-opcode, e.g.
+		// ScryScript.BuildStartScriptGroup) on the same conversation framing as SendCreateEditor2000.
+		private Task SendCreateEditor2000Record(INetworkClient client, byte[] record)
+		{
+			return new PacketStream()
+				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteArrayUInt32Length(s => s.WriteArray(record))
+				.SendAsync(client);
+		}
+
 		// Sends the 0xBADF5A4B ack for one SetMorphValue. The wire layout (after the 0x2000 wrapper) is:
 		//   subOpcode(0xBADF5A4B) ack(0xC350) clientInstance uint16(0) [byteLen morphValue] float byte(0) counter
 		// The float is a server-side default that is not present in the client's message: textures
@@ -180,7 +191,7 @@ namespace Faolan.GameServer
 			var instance = client.Session.Account.ClientInstance;
 
 			await SendCreateEditor2000(client, 0xF98E10B3u, [0x01, 0x00, 0x00, 0x05, 0x78, 0x00, 0x00, 0x00, 0x00], instance);
-			await SendCreateEditor2000(client, 0xA36D3B74u, [0x00, 0x00, 0x00, 0x00, 0x0E, 0x08, 0x05, 0x10, 0x00, 0x18, 0xEC, 0x97, 0x02, 0x32, 0x04, 0x08, 0x00, 0x10, 0x00], instance);
+			await SendCreateEditor2000Record(client, ScryScript.BuildStartScriptGroup(instance, 35820)); // StartScriptGroupOnClient (#223)
 			await SendCreateEditor2000(client, 0x96B8DC59u,
 				[0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x2A, 0xF8, 0x00, 0x00, 0x01, 0xF9, 0x00, 0x00, 0x43, 0x30, 0x00, 0x00, 0x01, 0xFB, 0x00, 0x00, 0x00, 0x00], instance);
 		}

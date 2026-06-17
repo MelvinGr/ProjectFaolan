@@ -50,6 +50,30 @@ namespace Faolan.GameServer.World
 			return body.ToArray();
 		}
 
+		// The no-token form: a StartScriptGroupOnClient (type 0) callback that runs a script group by id, with no
+		// step-token/resources (f4/f5 omitted) - the post-morph "nudge" the create-world handshake sends. protobuf
+		// = {f1=5 version, f2=0 type, f3=scriptGroupId, f6={0,0}}.
+		public static byte[] BuildStartScriptGroup(uint playerHandle, uint scriptGroupId)
+		{
+			var pb = new List<byte>();
+			WriteVarintField(pb, 1, 5);              // version
+			WriteVarintField(pb, 2, 0);              // type = StartScriptGroupOnClient
+			WriteVarintField(pb, 3, scriptGroupId);
+			var f6 = new List<byte>();
+			WriteVarintField(f6, 1, 0);
+			WriteVarintField(f6, 2, 0);
+			WriteBytesField(pb, 6, f6.ToArray());
+
+			var body = new List<byte>(16 + pb.Count);
+			WriteU32(body, SubOpcode);
+			WriteU32(body, TypeTagAck);
+			WriteU32(body, playerHandle);
+			body.Add(0x00);
+			WriteU32(body, (uint)pb.Count);
+			body.AddRange(pb);
+			return body.ToArray();
+		}
+
 		private static void WriteVarintField(List<byte> w, int field, ulong value)
 		{
 			Varint.Write(w,(ulong)(field << 3)); // wire type 0 (varint)
