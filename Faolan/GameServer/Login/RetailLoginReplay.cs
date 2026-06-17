@@ -359,50 +359,6 @@ namespace Faolan.GameServer
 			}
 		}
 
-		// Builds one NpcSpawn row from scratch (spawn + stationary MoveTask) with a fresh server handle and appends
-		// it to the burst. Opt-in (FAOLAN_BUILT_NPC_TEST=1); a no-op without the templates or a usable row.
-		private void InjectBuiltTestNpc(INetworkClient client, NpcSpawn[] npcRows, byte[] spawnTemplate, byte[] moveTaskTemplate, List<byte[]> toSend)
-		{
-			if (Environment.GetEnvironmentVariable("FAOLAN_BUILT_NPC_TEST") != "1" || spawnTemplate == null || moveTaskTemplate == null)
-				return;
-
-			const uint builtHandle = 0x00090001; // above the burst's 0x000818xx handles and below the instance range
-			var playerPos = client.Session.Character.Position;
-			var pos = new Vector3(playerPos.X + 4f, playerPos.Y, playerPos.Z + 4f);
-
-			// VALIDATE NpcSpawnBuilder: build the spawn FROM the template's own (known-good) bytes via the builder
-			// (transform rebuilt to `pos`, CharacterIIR re-encoded), and pair it with the proven cloned MoveTask.
-			// If this renders + polls, NpcSpawnBuilder produces client-acceptable output and the only open issue is
-			// cross-session DB row data (the earlier built Crocodile came from a different session's capture).
-			var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(spawnTemplate.AsSpan(8, 4));
-			var templateRow = new NpcSpawn
-			{
-				Data = spawnTemplate,
-				PositionX = pos.X,
-				PositionY = pos.Y,
-				PositionZ = pos.Z,
-				RotationX = BinaryPrimitives.ReadSingleLittleEndian(spawnTemplate.AsSpan(bodyStart + SpawnPacketBuilder.RotXOffset, 4)),
-				RotationY = BinaryPrimitives.ReadSingleLittleEndian(spawnTemplate.AsSpan(bodyStart + SpawnPacketBuilder.RotYOffset, 4)),
-				RotationZ = BinaryPrimitives.ReadSingleLittleEndian(spawnTemplate.AsSpan(bodyStart + SpawnPacketBuilder.RotZOffset, 4)),
-				RotationW = BinaryPrimitives.ReadSingleLittleEndian(spawnTemplate.AsSpan(bodyStart + SpawnPacketBuilder.RotWOffset, 4))
-			};
-			if (!NpcSpawnBuilder.TryBuild(templateRow, builtHandle, out var spawnBody))
-				return;
-
-			// Swap the carried pre-IIR + post-IIR for the minimal session-independent form (now the live default for
-			// from-DB spawns, #185 verified in-client). TryBuild above was called without freshSpawn, so apply it here
-			// explicitly for this from-scratch built NPC (see NpcSpawnScaffold / [[world-packets-construct-not-replay]]).
-			spawnBody = NpcSpawnScaffold.WithMinimalScaffolds(spawnBody);
-
-			// Validate the minimal STATIONARY MoveTask (MoveTaskBuilder): if she now spawns by the player and STAYS
-			// (no drag to a patrol route), the built stationary MoveTask is accepted - the full burst-free primitive
-			// set (built spawn + built stationary MoveTask) is proven in-client.
-			var moveBody = MoveTaskBuilder.BuildStationary(builtHandle, pos);
-			toSend.Add(FrameLikeTemplate(spawnTemplate, spawnBody));
-			toSend.Add(FrameLikeTemplate(moveTaskTemplate, moveBody));
-			Logger.LogInformation("Injected BUILT spawn + BUILT stationary MoveTask at handle 0x{Handle:X} pos ({X},{Y},{Z}).", builtHandle, pos.X, pos.Y, pos.Z);
-		}
-
 		// Regenerates the spawn body's scaffold frame from the character's DB rows via the byte-exact codec
 		// (PlayerSpawnScaffoldCodec round-trips every captured player spawn). Returns the body unchanged when it
 		// doesn't parse or the character has no rows.
@@ -522,11 +478,6 @@ namespace Faolan.GameServer
 			// map/instance - it is never stored in the burst - so emit it first.
 			toSend.Add(BuildMapChange(client));
 
-			// Templates for the additive built-NPC test (FAOLAN_BUILT_NPC_TEST): the first live-addressed NPC
-			// spawn + MoveTask packets, reused as framing headers for a from-scratch built entity.
-			byte[] spawnTemplate = null;
-			byte[] moveTaskTemplate = null;
-
 			// Interest is the SOLE NPC spawn path: every NPC record (FA015807 spawns + their 96C46740 MoveTasks) is
 			// dropped from the burst below and the interest system spawns each NPC individually at entry
 			// (BroadcastPlayerEntry). This removes the burst-vs-model handle duplication (the old "nameplate flickers
@@ -599,16 +550,8 @@ namespace Faolan.GameServer
 				// Record each spawned NPC's handle -> name so a clicked handle can be routed to its conversation by
 				// the stable name (handles are session-volatile). Reads the final bytes the client receives.
 				RecordSpawnedNpcName(client, pkt);
-
-				CaptureInjectionTemplate(client, pkt, ref spawnTemplate, ref moveTaskTemplate);
 				toSend.Add(pkt);
 			}
-
-			// ADDITIVE built-NPC test (opt-in via FAOLAN_BUILT_NPC_TEST=1): inject one fully-constructed entity -
-			// an NpcSpawn built from scratch (NpcSpawnBuilder) + a built stationary MoveTask (MoveTaskBuilder),
-			// with a fresh server handle - alongside the verbatim burst. If it renders, the burst-free path is
-			// validated end-to-end in-client; if not, the burst NPCs are unaffected. Off by default (no impact).
-			InjectBuiltTestNpc(client, npcRows, spawnTemplate, moveTaskTemplate, toSend);
 
 			if (npcByPosition.Count > 0)
 				Logger.LogInformation("NPC spawns for map {Map}: {Matched} burst NPCs matched a row; {Identical} put on the wire as byte-identical DB rebuilds, the other {Verbatim} kept VERBATIM (cross-session rebuild diverged); {Rows} rows available.", burst.MapId,
@@ -956,39 +899,6 @@ namespace Faolan.GameServer
 			return v != 0
 				? null // value didn't fit in byteLength 7-bit groups
 				: bytes;
-		}
-
-		// Captures the first live-addressed NPC spawn (FA015807, non-player handle) and MoveTask (96C46740) packets
-		// as framing templates for the additive built-NPC test (their header carries the live receiver/instance).
-		private static void CaptureInjectionTemplate(INetworkClient client, byte[] packet, ref byte[] spawnTemplate, ref byte[] moveTaskTemplate)
-		{
-			if (packet.Length < 12)
-				return;
-
-			var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
-			if (bodyStart + 16 > packet.Length)
-				return;
-
-			var subOpcode = BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(bodyStart + 4, 4));
-			var handle = BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(bodyStart + 12, 4));
-			if (spawnTemplate == null && subOpcode == 0xFA015807u && handle != client.Session.Account.ClientInstance)
-				spawnTemplate = packet;
-			else if (moveTaskTemplate == null && subOpcode == MoveTaskBuilder.SubOpcode)
-				moveTaskTemplate = packet;
-		}
-
-		// Frames a built body as a full Conan packet by reusing a template packet's header (its live receiver/
-		// instance), then setting the packet length and recomputing the CRC over everything after it.
-		private static byte[] FrameLikeTemplate(byte[] template, byte[] body)
-		{
-			var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(8, 4));
-			var packet = new byte[bodyStart + body.Length];
-			Array.Copy(template, 0, packet, 0, bodyStart); // [len][crc][headerLen][header]
-			body.CopyTo(packet, bodyStart);
-
-			BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(0, 4), (uint)(packet.Length - 4));
-			BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(4, 4), Crc32.Calculate(packet[8..]));
-			return packet;
 		}
 
 		// True if the packet is the 0x2000 inventory snapshot (sub-opcode 0x737A6DF9).
