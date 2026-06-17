@@ -15,6 +15,7 @@ using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.Combat;
+using Faolan.GameServer.Dialogue;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.GameServer.Spawn;
 using Microsoft.Extensions.Logging;
@@ -165,6 +166,22 @@ namespace Faolan.GameServer.World
 				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
 					await SendWorldIir(viewer.Client, body);
 			}
+		}
+
+		// #188 construct path: open the Knubot chat window for the player against an NPC (KnubotOpenChatWindow), built
+		// from the live endpoints rather than replaying a captured packet. Self-contained record (SendWorldRecord).
+		public Task SendKnubotOpenChatWindow(INetworkClient client, uint npcHandle)
+		{
+			var record = KnubotCodec.BuildOpenChatWindow(client.Session.Account.ClientInstance, npcHandle);
+			return SendWorldRecord(client, record);
+		}
+
+		// #188 construct path: send an NPC dialogue line (KnubotAppendText) built from remoteformat XML + the live
+		// player/NPC endpoints - the dialogue VM's CONSTRUCT side, vs ConversationService's ConversationPacket replay.
+		public Task SendKnubotAppendText(INetworkClient client, uint npcHandle, byte[] xml)
+		{
+			var record = KnubotCodec.BuildAppendText(client.Session.Account.ClientInstance, npcHandle, xml);
+			return SendWorldRecord(client, record);
 		}
 
 		// An NPC engaged a target: push its aggro to every viewer in range that sees it - a HateListUpdate (the NPC now

@@ -432,6 +432,7 @@ namespace Faolan.GameServer
 				["removeitem"] = (client, arguments) => RemoveItemCommand(client, arguments),
 				["feedback"] = (client, _) => FeedbackCommand(client),
 				["syschat"] = (client, _) => SysChatCommand(client),
+				["npcsay"] = (client, _) => NpcSayCommand(client),
 				["world"] = (client, _) => SendWorldInfo(client),
 				["quest"] = (client, arguments) => QuestCommand(client, arguments),
 				["tag"] = (client, arguments) => TagCommand(client, arguments),
@@ -868,6 +869,22 @@ namespace Faolan.GameServer
 			await SendSampleWorldChat(client);
 			await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
 				"Sent a world/system chat line (ChatTextIIR 0xE0B51102).");
+		}
+
+		// .npcsay - CONSTRUCT a Knubot dialogue line (KnubotAppendTextIIR) from the live endpoints and push it to the
+		// player, addressed to its current conversation NPC (or itself as a fallback handle): opens the chat window then
+		// appends the captured greeting, rebuilt byte-for-byte by KnubotCodec. The test bootstrap for the #188 construct
+		// path (vs ConversationService's verbatim ConversationPacket replay). NEEDS IN-CLIENT VERIFICATION.
+		private async Task NpcSayCommand(INetworkClient client)
+		{
+			var npcHandle = client.Session.ConversationNpcHandle != 0
+				? client.Session.ConversationNpcHandle
+				: client.Session.Account.ClientInstance;
+
+			await _broadcaster.SendKnubotOpenChatWindow(client, npcHandle);
+			await _broadcaster.SendKnubotAppendText(client, npcHandle, Dialogue.KnubotSampleLine.RemoteFormatXml);
+			await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
+				"Sent a constructed Knubot dialogue line (KnubotAppendTextIIR 0x4A3D899A).");
 		}
 
 		// .quest add|remove <id> | .quest list  - manage the player's quest journal. `add` records the quest +
