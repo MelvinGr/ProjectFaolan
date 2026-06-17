@@ -18,26 +18,15 @@ public class DumpVtableReaders extends GhidraScript {
     static final long KNOWN_READER = 0x01121c00L;            // SimpleCharFullUpdateIIR_t::ReadSubClass (FUN_01121c00)
     static final String KNOWN_VTABLE = "SimpleCharFullUpdateIIR_t::vftable";
     static final String[] TARGETS = {
-        "KnubotAppendTextIIR_c::vftable",
-        "KnubotAnswerIIR_c::vftable",
-        "KnubotOpenChatWindowIIR_c::vftable",
-        "KnubotAnswerListIIR_c::vftable",
-        "StatDamageIIR_t::vftable",
-        "ThreatLevelIIR_c::vftable",
-        "CombatShieldIIR_c::vftable",
-        "CharInPlayIIR_t::vftable",
-        "DoorFullUpdateIIR_c::vftable",
-        "DestructibleFullUpdateIIR_c::vftable",
-        "ClimbingDynelFullUpdateIIR_c::vftable",
-        "HateListUpdateIIR::vftable",
-        "LockedToChangedIIR_t::vftable",
-        "SetPosIIR_c::vftable",
-        "IntendedTeleportIIR_c::vftable",
-        "AreaFormulaIIR_t::vftable",
-        "ChainKillIIR_t::vftable",
-        "CombatReactiveIIR_c::vftable",
-        "TombStoneFullUpdateIIR_c::vftable",
-        "UpdateInventoryIIR_t::vftable",
+        "MoveInventoryItemIIR_t::vftable",
+        "PetIIR_c::vftable",
+        "SpellBookIIR_t::vftable",
+        "TemplateActionIIR_t::vftable",
+        "FeedbackIIR_t::vftable",
+        "CrimeIIR_c::vftable",
+        "SimpleCharKilledByUpdateIIR_t::vftable",
+        "KnubotFinishTradeIIR_c::vftable",
+        "KnubotStartTradeIIR_c::vftable",
     };
 
     Address vtableAddr(String full) {
