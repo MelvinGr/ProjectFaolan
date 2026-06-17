@@ -245,6 +245,28 @@ namespace Faolan.Importer
 			await db.SaveChangesAsync();
 		}
 
+		// Caster NPCs' spells (#232), upserted by (NPC name, spell id). The effect payload is refreshed on re-import.
+		private static async Task<int> ImportNpcSpells(DatabaseContext db, List<NpcSpellEntry> spells)
+		{
+			var inserted = 0;
+			foreach (var e in spells)
+			{
+				var existing = await db.NpcSpells.FirstOrDefaultAsync(s => s.NpcName == e.Name && s.SpellId == e.SpellId);
+				if (existing == null)
+				{
+					db.NpcSpells.Add(new NpcSpell { NpcName = e.Name, SpellId = e.SpellId, Payload = e.Payload });
+					inserted++;
+				}
+				else
+				{
+					existing.Payload = e.Payload;
+				}
+			}
+
+			await db.SaveChangesAsync();
+			return inserted;
+		}
+
 		// NPC patrol routes (the canonical MoveTask waypoint form), deduped by (map, position) like the NPC spawns.
 		// Replaces the route's waypoints wholesale on re-import so an updated capture re-seeds cleanly.
 		private static async Task ImportPatrolPaths(DatabaseContext db, List<PatrolPathEntry> paths)
@@ -548,6 +570,9 @@ namespace Faolan.Importer
 				var (shopsSeen, shopsAdded, shopsUpdated) = await CaptureShopImporter.ImportAsync(db, captures.SelectMany(c => CaptureShopImporter.Extract(c.Packets)));
 				Console.WriteLine($"Shops (0x2033 vendor windows): {shopsSeen} vendors, {shopsAdded} new, {shopsUpdated} updated.");
 				await ImportNpcSpawns(db, NpcSpawnExtractor.Merge(captures.SelectMany(c => NpcSpawnExtractor.Extract(c.Packets))));
+				var npcSpells = NpcSpellExtractor.Merge(captures.SelectMany(c => NpcSpellExtractor.Extract(c.Packets)));
+				var npcSpellsAdded = await ImportNpcSpells(db, npcSpells);
+				Console.WriteLine($"NPC spells (#232): {npcSpells.Count} (name,spell) pairs, {npcSpellsAdded} new.");
 				await ImportPatrolPaths(db, PatrolPathExtractor.Merge(captures.SelectMany(c => PatrolPathExtractor.Extract(c.Packets))));
 				await ImportWorldObjects(db, WorldObjectExtractor.Merge(captures.SelectMany(c => WorldObjectExtractor.Extract(c.Packets))));
 				await ImportMapWorldBursts(db, MapWorldBurstExtractor.Merge(captures.SelectMany(c => MapWorldBurstExtractor.Extract(c.Packets))));

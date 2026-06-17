@@ -305,6 +305,7 @@ namespace Faolan.GameServer.World
 			// Burst-position rows are ordered FIRST so they win their cell - the kept entity is then the exact one the
 			// burst rendered, and it inherits the burst's wire handle below so the two never stack.
 			var seenCells = new HashSet<(string, int, int, int)>();
+			var spellsByName = new Dictionary<string, List<Core.Database.Tables.NpcSpell>>(); // cached: one query per distinct caster name (#232)
 			foreach (var npc in npcs.OrderByDescending(n => burstHandleByPosition.ContainsKey(PositionKey(n.PositionX, n.PositionY, n.PositionZ))))
 			{
 				// Faction mobs (Community > 0) are legitimately MANY of the same name spread across the map - dedup by
@@ -344,6 +345,16 @@ namespace Faolan.GameServer.World
 				// it for nearby players - built from the row by NpcSpawnBuilder, the same path the burst-replacement uses.
 				if (NpcSpawnBuilder.TryBuild(npc, handle, out var spawnBody, freshSpawn: true))
 					entity.SpawnBody = spawnBody;
+
+				// Caster NPCs (#232): load the spells this NPC type casts (by name, cached per distinct name). Empty
+				// until the importer populates NpcSpell, at which point the sim's cast branch (IsCaster) lights up.
+				if (npc.Name is { Length: > 0 } spellName)
+				{
+					if (!spellsByName.TryGetValue(spellName, out var spells))
+						spellsByName[spellName] = spells = await _database.GetNpcSpellsByName(spellName);
+					foreach (var s in spells)
+						entity.Spells.Add(new NpcSpellCast(s.SpellId, s.Payload));
+				}
 
 				zone.Add(entity);
 			}

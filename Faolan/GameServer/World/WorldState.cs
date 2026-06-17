@@ -166,7 +166,8 @@ namespace Faolan.GameServer.World
 					}
 
 					if (entity.TickAttackReady(deltaSeconds, NpcAttackInterval))
-						effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcAttack, target));
+						// A caster NPC casts a spell on the same cadence; everyone else swings (#232).
+						effects.Add(new WorldTickEffect(entity, entity.IsCaster ? WorldTickEffectType.NpcCast : WorldTickEffectType.NpcAttack, target));
 				}
 			}
 

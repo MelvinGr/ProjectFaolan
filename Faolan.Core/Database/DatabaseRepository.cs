@@ -88,6 +88,7 @@ namespace Faolan.Core.Database
 		Task<MapWorldBurst> GetMapWorldBurst(uint mapId);
 		Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names);
 		Task<NpcSpawn> GetNpcSpawnByName(string name);
+		Task<List<NpcSpell>> GetNpcSpellsByName(string name);
 		Task<NpcSpawn[]> GetNpcSpawns(uint mapId);
 
 		Task<Realm> GetRealm(uint id);
@@ -928,6 +929,19 @@ namespace Faolan.Core.Database
 				.NpcSpawns
 				.Where(n => n.Name != null && n.Name.ToLower() == lowered && n.Data != null)
 				.FirstOrDefaultAsync();
+		}
+
+		// The spells a caster NPC casts (keyed by its stable name), for the sim's NPC spell-casting (#232).
+		public async Task<List<NpcSpell>> GetNpcSpellsByName(string name)
+		{
+			if (string.IsNullOrEmpty(name))
+				return [];
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var lowered = name.ToLowerInvariant();
+			return await ctx
+				.NpcSpells
+				.Where(s => s.NpcName != null && s.NpcName.ToLower() == lowered)
+				.ToListAsync();
 		}
 
 		// The captured NPC entity spawns for a map (FA015807 bodies in Data + the lifted identity/transform

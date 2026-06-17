@@ -137,6 +137,11 @@ namespace Faolan.GameServer
 			return _combat.SendNpcAttackAnimation(client, npcHandle, damage, swingCounter);
 		}
 
+		Task IWorldOutbound.SendNpcSpellCast(INetworkClient client, uint npcHandle, World.NpcSpellCast spell)
+		{
+			return _combat.SendNpcSpellCast(client, npcHandle, spell);
+		}
+
 		Task IWorldOutbound.BroadcastNpcMove(WorldEntity npc)
 		{
 			return _broadcaster.BroadcastNpcMove(npc);

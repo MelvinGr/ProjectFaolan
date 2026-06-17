@@ -39,6 +39,10 @@ namespace Faolan.GameServer.World
 		// move rides PushVitals.
 		Task SendNpcAttackAnimation(INetworkClient client, uint npcHandle, uint damage, uint swingCounter);
 
+		// Send a caster NPC's spell cast at the player: the ApplySpell (0x6B87E316) from the NPC handle (#232). The
+		// damage/effect is the captured payload; visual + the HP move rides the caller's PushVitals (like the swing).
+		Task SendNpcSpellCast(INetworkClient client, uint npcHandle, NpcSpellCast spell);
+
 		// Broadcast an NPC's tick step (its MoveTask transform) to the players who can see it - chasing a target or
 		// returning home - so they watch it move.
 		Task BroadcastNpcMove(WorldEntity npc);
@@ -224,6 +228,35 @@ namespace Faolan.GameServer.World
 
 			if (vitals.IsDead)
 				_logger.LogInformation("Combat: {Player} was killed by {Npc}.", character.Name, npc.Name);
+		}
+
+		// A caster NPC's tick action (#232): cast a spell at the target player (ApplySpell from the NPC handle) and
+		// apply its damage, mirroring ApplyNpcAttack. The spell + effect payload come from the NPC's NpcSpell rows
+		// (entity.Spells, loaded at zone load); a caster cycles through its spells. Damage is the provisional
+		// melee-scaled value for now - the captured payload's magnitude isn't decoded, same interim as buffs.
+		private async Task ApplyNpcCast(WorldEntity npc, WorldEntity target)
+		{
+			var client = target?.Client;
+			var character = client?.Session?.Character;
+			if (character == null || npc.Spells.Count == 0)
+				return;
+
+			var vitals = target.Vitals ??= EntityVitals.FromCharacter(character);
+			if (vitals.IsDead)
+				return;
+
+			var spell = npc.Spells[(int)(npc.AttackSwingCounter++ % (uint)npc.Spells.Count)];
+			var damage = (int)CombatResolver.ResolveNpcAttackDamage(npc.Level);
+			await _output.SendNpcSpellCast(client, npc.Handle, spell);
+
+			if (target.GodMode) // .godmode: the NPC still casts, but the spell deals no damage
+				return;
+
+			vitals.ApplyHealthDelta(-damage);
+			await _output.PushVitals(client, vitals);
+
+			if (vitals.IsDead)
+				_logger.LogInformation("Combat: {Player} was killed by {Npc}'s spell.", character.Name, npc.Name);
 		}
 
 		// Discovers any resurrection point a living player has walked near (so they can respawn there later). Run at the
@@ -452,6 +485,10 @@ namespace Faolan.GameServer.World
 								// dense zone); the swing now plays the decoded attack-animation ack (see ApplyNpcAttack).
 								if (NpcAutoAttackEnabled)
 									await ApplyNpcAttack(effect.Entity, effect.Target);
+								break;
+							case WorldTickEffectType.NpcCast:
+								if (NpcAutoAttackEnabled)
+									await ApplyNpcCast(effect.Entity, effect.Target);
 								break;
 							case WorldTickEffectType.NpcMove:
 								if (NpcAutoAttackEnabled)

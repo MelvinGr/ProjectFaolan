@@ -40,6 +40,7 @@ namespace Faolan.Core.Database
 		DbSet<MapWorldBurstEntity> MapWorldBurstEntities { get; }
 		DbSet<MorphTarget> MorphTargets { get; }
 		DbSet<NpcSpawn> NpcSpawns { get; }
+		DbSet<NpcSpell> NpcSpells { get; }
 		DbSet<Realm> Realms { get; }
 		DbSet<RespawnPoint> RespawnPoints { get; }
 		DbSet<PatrolPath> PatrolPaths { get; }
@@ -89,6 +90,7 @@ namespace Faolan.Core.Database
 		public DbSet<MapWorldBurstEntity> MapWorldBurstEntities { get; set; }
 		public DbSet<MorphTarget> MorphTargets { get; set; }
 		public DbSet<NpcSpawn> NpcSpawns { get; set; }
+		public DbSet<NpcSpell> NpcSpells { get; set; }
 		public DbSet<PatrolPath> PatrolPaths { get; set; }
 		public DbSet<PatrolWaypoint> PatrolWaypoints { get; set; }
 		public DbSet<QuestDefinition> QuestDefinitions { get; set; }

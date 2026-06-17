@@ -40,6 +40,12 @@ namespace Faolan.GameServer.World
 		// with a conversation) are not. Set at zone load. Players are never hostile here.
 		public bool Hostile { get; set; }
 
+		// Spells this CASTER NPC can cast at its target (#232), loaded from NpcSpell rows (by name) at zone load.
+		// Empty for non-caster NPCs and players; IsCaster gates the sim's cast branch.
+		public List<NpcSpellCast> Spells { get; } = [];
+
+		public bool IsCaster => Spells.Count > 0;
+
 		// GM toggles on a PLAYER entity (.godmode / .invisible). GodMode: the player takes no damage from NPC swings.
 		// Invisible: hostile NPCs don't aggro the player (skipped in target selection). Default off; cleared on relog
 		// since the entity is recreated at world entry.
@@ -245,4 +251,8 @@ namespace Faolan.GameServer.World
 			};
 		}
 	}
+
+	// A spell a caster NPC casts at its target (#232): the full wire spell id + the captured ApplySpell effect
+	// payload (interim verbatim). Sourced from the NpcSpell table by NPC name.
+	public readonly record struct NpcSpellCast(uint SpellId, byte[] Payload);
 }

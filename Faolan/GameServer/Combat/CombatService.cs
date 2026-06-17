@@ -192,6 +192,17 @@ namespace Faolan.GameServer.Combat
 			return SendWorldPacket(client, body);
 		}
 
+		// Sends a caster NPC's spell cast to the player it targets (#232): the ApplySpell (0x6B87E316) framed from the
+		// NPC handle (applyFrom = npc, applyTo = player), built from the NPC's NpcSpell row by NpcSpellCastBuilder -
+		// the construct-from-data counterpart of the melee SendNpcAttackAnimation. The HP move rides the caller's
+		// PushVitals; this is the cast packet/effect.
+		public Task SendNpcSpellCast(INetworkClient client, uint npcHandle, World.NpcSpellCast spell)
+		{
+			var playerHandle = client.Session.Account.ClientInstance;
+			var body = NpcSpellCastBuilder.Build(playerHandle, npcHandle, spell.SpellId, spell.Payload);
+			return SendWorldPacket(client, body);
+		}
+
 		// The 8-byte filler retail writes where an item identity quad would otherwise go in a behavior ack
 		// (B2 90 80 5C 29 E6 27 CA - the same null-identity padding as the 0xF result block and the 0x2052 grant).
 		internal static readonly byte[] NullIdentityFiller = [0xB2, 0x90, 0x80, 0x5C, 0x29, 0xE6, 0x27, 0xCA];

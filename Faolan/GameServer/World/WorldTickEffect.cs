@@ -11,7 +11,8 @@ namespace Faolan.GameServer.World
 		NpcAttack, // an aggroed NPC (Entity) swings at a player (Target); the listener applies damage + pushes vitals
 		NpcMove, // an aggroed NPC (Entity) stepped toward its target player (Target); broadcast its MoveTask transform
 		NpcEnterCombat, // an NPC (Entity) just engaged a target; broadcast the combat-mode stat so viewers draw its weapon (#218)
-		NpcExitCombat // an NPC (Entity) disengaged (leashed / lost its target); broadcast the combat-mode stat so it sheathes
+		NpcExitCombat, // an NPC (Entity) disengaged (leashed / lost its target); broadcast the combat-mode stat so it sheathes
+		NpcCast // a CASTER NPC (Entity) casts a spell at a player (Target); the listener sends ApplySpell + applies damage (#232)
 	}
 
 	// `Target` is the attacked/chased player for NpcAttack/NpcMove; null otherwise.
