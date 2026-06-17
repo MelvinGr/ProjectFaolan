@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using Faolan.GameServer;
+using Faolan.GameServer.World;
 using Xunit;
 
 namespace Faolan.Tests
@@ -14,7 +15,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildTeleportBeginBody_MatchesCapture()
 		{
-			var body = GameServerListener.BuildTeleportBeginBody(0x08006F31, 2010);
+			var body = TeleportCodec.BuildBegin(0x08006F31, 2010);
 			Assert.Equal(
 				"10d27bc00000c35008006f3101620000c79c000007da0000000000000000000000000000000000000000000000000000",
 				Convert.ToHexStringLower(body));
@@ -23,7 +24,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildTeleportDestBody_MatchesCapture()
 		{
-			var body = GameServerListener.BuildTeleportDestBody(0x08006F31, 2010, new Vector3(928f, 116f, 870f));
+			var body = TeleportCodec.BuildDestination(0x08006F31, 2010, new Vector3(928f, 116f, 870f));
 			Assert.Equal(
 				"5a32f0d70000c35008006f31000000000000000000000000000000000000000000000000003f800000620000c79c000007da0000000000000000000000000000000100009c500050357000000000000000000000000014000187044468000042e80000445980000000001400",
 				Convert.ToHexStringLower(body));
@@ -33,7 +34,7 @@ namespace Faolan.Tests
 		public void BuildTeleportBeginBody_MatchesSecondCapture()
 		{
 			// Frame 4417: same session, destination map 2000 (0x07D0).
-			var body = GameServerListener.BuildTeleportBeginBody(0x08006F31, 2000);
+			var body = TeleportCodec.BuildBegin(0x08006F31, 2000);
 			Assert.Equal(
 				"10d27bc00000c35008006f3101620000c79c000007d00000000000000000000000000000000000000000000000000000",
 				Convert.ToHexStringLower(body));
@@ -44,7 +45,7 @@ namespace Faolan.Tests
 		{
 			// Frame 4420: map 2000, pos 927/115/858, with that destination's playfield token (0x00503610) and
 			// descriptor (0xBE) - the two destination-derived fields that differ from the map-2010 capture.
-			var body = GameServerListener.BuildTeleportDestBody(0x08006F31, 2000, new Vector3(927f, 115f, 858f),
+			var body = TeleportCodec.BuildDestination(0x08006F31, 2000, new Vector3(927f, 115f, 858f),
 				0x00503610u, 0x000000BEu);
 			Assert.Equal(
 				"5a32f0d70000c35008006f31000000000000000000000000000000000000000000000000003f800000620000c79c000007d00000000000000000000000000000000100009c500050361000000000000000000000000014000187044467c00042e6000044568000000000be00",
@@ -54,7 +55,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildTeleportBeginBody_SubstitutesInstanceAndMap()
 		{
-			var body = GameServerListener.BuildTeleportBeginBody(0x0200ABCD, 0x0FAA);
+			var body = TeleportCodec.BuildBegin(0x0200ABCD, 0x0FAA);
 			// clientInstance @8, destMap @18 (both big-endian u32)
 			Assert.Equal(0x0200ABCDu, System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(8, 4)));
 			Assert.Equal(0x0FAAu, System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(18, 4)));
@@ -63,7 +64,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildTeleportDestBody_SubstitutesMapAndPosition()
 		{
-			var body = GameServerListener.BuildTeleportDestBody(0x0200ABCD, 0x0FAA, new Vector3(322.5f, 145.31f, 704.9f));
+			var body = TeleportCodec.BuildDestination(0x0200ABCD, 0x0FAA, new Vector3(322.5f, 145.31f, 704.9f));
 			Assert.Equal(0x0FAAu, System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(46, 4)));
 			Assert.Equal(322.5f, System.Buffers.Binary.BinaryPrimitives.ReadSingleBigEndian(body.AsSpan(91, 4)));
 			Assert.Equal(145.31f, System.Buffers.Binary.BinaryPrimitives.ReadSingleBigEndian(body.AsSpan(95, 4)));

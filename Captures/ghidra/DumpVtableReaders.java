@@ -18,6 +18,8 @@ public class DumpVtableReaders extends GhidraScript {
     static final long KNOWN_READER = 0x01121c00L;            // SimpleCharFullUpdateIIR_t::ReadSubClass (FUN_01121c00)
     static final String KNOWN_VTABLE = "SimpleCharFullUpdateIIR_t::vftable";
     static final String[] TARGETS = {
+        "n3TeleportIIR_t::vftable",
+        "IntendedTeleportIIR_c::vftable",
         "FlushRDBCachesIIR_c::vftable",
         "GMStatIIR_c::vftable",
         "HiveDebugIIR_c::vftable",

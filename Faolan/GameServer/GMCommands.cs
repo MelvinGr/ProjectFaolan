@@ -267,67 +267,16 @@ namespace Faolan.GameServer
 			await DoTeleport(character.Id, point.MapId, point.Position);
 		}
 
-		// The change-map destination-announce IIR bodies, captured from the changemap dumps (frames 4200/4212)
-		// with the session values substituted: client instance (@8), destination map (@18 / @46), and the spawn
-		// position (@91/95/99, big-endian floats). The remaining bytes - constants plus one undecoded instance
-		// word (0x00503570 in the capture) - are kept verbatim; in-client verification pending.
+		// The change-map prep IIR bodies (begin + destination announce) the retail teleport sends before the 0x2002
+		// handoff, built by the named TeleportCodec (#219, World/TeleportCodec.cs). In-client verification pending.
 		private async Task SendChangeMapPrep(INetworkClient client, uint destMapId, Vector3 position)
 		{
 			var instance = client.Session.Account.ClientInstance;
-			foreach (var body in new[] { BuildTeleportBeginBody(instance, destMapId), BuildTeleportDestBody(instance, destMapId, position) })
+			foreach (var body in new[] { TeleportCodec.BuildBegin(instance, destMapId), TeleportCodec.BuildDestination(instance, destMapId, position) })
 				await new PacketStream()
 					.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerCarrierOpcodes.IirCarrier)
 					.WriteArrayUInt32Length(s => s.WriteArray(body))
 					.SendAsync(client);
-		}
-
-		// 0x10D27BC0 "begin teleport to map N". Constructed field-by-field (was a spliced hex template); byte-exact
-		// against the changemap captures, frames 4200 (map 2010) and 4417 (map 2000) - TeleportHandoffTests.
-		//   [u32 subop][u32 0xC350 receiver-class][u32 clientInstance][01][62][u32 0xC79C][u32 destMap][26x 00]
-		internal static byte[] BuildTeleportBeginBody(uint clientInstance, uint destMapId)
-		{
-			return new FaolanStream()
-				.WriteUInt32(0x10D27BC0u)   // IIR sub-opcode (begin teleport)
-				.WriteUInt32(0x0000C350u)   // receiver class tag (character)
-				.WriteUInt32(clientInstance)
-				.WriteByte(0x01)
-				.WriteByte(0x62)
-				.WriteUInt32(0x0000C79Cu)   // constant
-				.WriteUInt32(destMapId)
-				.WriteArray(new byte[26])   // trailing pad
-				.ToArray();
-		}
-
-		// 0x5A32F0D7 destination announce. Constructed field-by-field (was a spliced hex template); byte-exact against
-		// the changemap captures, frames 4212 (map 2010) and 4420 (map 2000) - TeleportHandoffTests.
-		//   [u32 subop][u32 0xC350][u32 clientInstance][25x 00][f32 1.0][62][u32 0xC79C][u32 destMap][15x 00][01]
-		//   [u32 0x9C50][u32 destPlayfieldToken][12x 00][14][u32 0x00018704][pos x/y/z f32 BE][u32 destDescriptor][00]
-		// Two fields vary with the destination and are NOT yet derivable from the map id: destPlayfieldToken (@70)
-		// and destDescriptor (@103) - 0x503570/0x14 for map 2010, 0x503610/0xBE for map 2000. Both default to the
-		// map-2010 capture values (the GM-teleport path is in-client unverified - see #219).
-		internal static byte[] BuildTeleportDestBody(uint clientInstance, uint destMapId, Vector3 position,
-			uint destPlayfieldToken = 0x00503570u, uint destDescriptor = 0x00000014u)
-		{
-			return new FaolanStream()
-				.WriteUInt32(0x5A32F0D7u)   // IIR sub-opcode (destination announce)
-				.WriteUInt32(0x0000C350u)   // receiver class tag (character)
-				.WriteUInt32(clientInstance)
-				.WriteArray(new byte[25])
-				.WriteFloatBigEndian(1.0f)
-				.WriteByte(0x62)
-				.WriteUInt32(0x0000C79Cu)   // constant
-				.WriteUInt32(destMapId)
-				.WriteArray(new byte[15])
-				.WriteByte(0x01)
-				.WriteUInt32(0x00009C50u)   // constant
-				.WriteUInt32(destPlayfieldToken)
-				.WriteArray(new byte[12])
-				.WriteByte(0x14)
-				.WriteUInt32(0x00018704u)   // constant
-				.WriteVector3BigEndian(position)
-				.WriteUInt32(destDescriptor)
-				.WriteByte(0x00)
-				.ToArray();
 		}
 
 		// Writes each connected player's live WorldEntity transform onto their Character and persists it. Returns the
