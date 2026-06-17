@@ -79,6 +79,10 @@ namespace Faolan.GameServer
 		// collaborator; uses the broadcaster for quest pushes + the Lua VM for branch conditions. See Dialogue/ConversationService.cs.
 		private readonly Dialogue.ConversationService _conversation;
 
+		// Loot-window flow (loot-all/single-drag/cash/close): orchestrates the broadcaster's bag state + the
+		// item-grant/wallet ports. The loot Inbound cases delegate to it. See World/LootService.cs.
+		private readonly LootService _loot;
+
 		// The live world simulation: owns the world model, the connected players' authoritative entities, and the
 		// 10 Hz tick (NPC respawn/AI, vitals regen, player death/respawn, resurrection discovery). The listener is its
 		// IWorldOutbound port. Built in the ctor (after the dispatchers are assigned). See World/WorldSimulation.cs.
@@ -102,6 +106,7 @@ namespace Faolan.GameServer
 			_broadcaster = new WorldBroadcaster(_simulation, database, logger);
 			_combat = new CombatService(_simulation, _broadcaster, database, agentServerDispatcher, logger);
 			_conversation = new Dialogue.ConversationService(database, logger, _broadcaster, _luaVm);
+			_loot = new LootService(_broadcaster, this, database, logger);
 			_equipment = new Inventory.EquipmentService(database, logger);
 			_itemUse = new Inventory.ItemUseService(database, RecallToBindCommand, logger);
 			_shop = new Economy.Shop.ShopService(database, logger, this);
@@ -585,68 +590,28 @@ namespace Faolan.GameServer
 
 				case GameServerOpcodes.TryLootAll: // the loot-all click on an open loot window; body = [typetag][bag handle]
 				{
-					packet.Body.ReadUInt32(); // loot typetag (0xC87A)
-					var bagHandle = packet.Body.ReadUInt32();
-
-					// Grant each item the bag carries into the backpack (persist + live DispatchAddItem). The bag
-					// hands them over once (TakeBagItems clears them); coins ride the separate TryLootCash click.
-					var items = _broadcaster.TakeBagItems(client, bagHandle);
-					// GRANT each item to the backpack (persist + live DispatchAddItem): our client does NOT local-add
-					// from the bag (verified - persist-only left the items un-takeable), so the server push is what
-					// actually delivers them.
-					foreach (var itemTemplateId in items)
-						await GrantItemToBackpack(client, itemTemplateId);
-					if (items.Count > 0)
-						Logger.LogInformation("Loot: granted {Count} item(s) from bag 0x{Bag:X8} to {Player}.", items.Count, bagHandle, client.Session.Character?.Name);
-
-					// Confirm the take + (since loot-all empties it) consume/fade the bag.
-					await _broadcaster.AfterLootTake(client, bagHandle);
+					await _loot.HandleLootAll(client, packet);
 
 					break;
 				}
 
 				case GameServerOpcodes.TryLootItem: // single drag of one item out of the loot window
 				{
-					packet.Body.ReadUInt32();                  // loot typetag (0xC87A)
-					var bagHandle = packet.Body.ReadUInt32();
-					var itemIndex = packet.Body.ReadUInt32();  // which item (display index) the player dragged
-
-					var item = _broadcaster.TakeBagItem(client, bagHandle, (int)itemIndex);
-					if (item != null)
-						await GrantItemToBackpack(client, item.Value);
-
-					// Confirm the take; AfterLootTake only consumes/fades the bag once it is fully emptied, so a
-					// partial drag leaves it open with the remaining items.
-					await _broadcaster.AfterLootTake(client, bagHandle);
+					await _loot.HandleLootItem(client, packet);
 
 					break;
 				}
 
 				case GameServerOpcodes.CloseLootBag: // client closed the loot window; body = [typetag][bag handle]
 				{
-					packet.Body.ReadUInt32(); // loot typetag (0xC87A)
-					var bagHandle = packet.Body.ReadUInt32();
-					await _broadcaster.CloseLootBag(client, bagHandle);
+					await _loot.HandleCloseLootBag(client, packet);
 
 					break;
 				}
 
 				case GameServerOpcodes.TryLootCash: // loot the bag's coins; fires on every loot alongside TryLootAll
 				{
-					packet.Body.ReadUInt32(); // loot typetag (0xC87A)
-					var bagHandle = packet.Body.ReadUInt32();
-
-					var character = client.Session.Character;
-					var cash = _broadcaster.TakeLootCash(client, bagHandle);
-					if (cash > 0 && character != null)
-					{
-						character.Money += cash;
-						await Database.SetCharacterMoney(character.Id, character.Money);
-						await SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Gain);
-						Logger.LogInformation("Loot: {Player} looted {Cash} tin from bag 0x{Bag:X8} (wallet {Balance}).", character.Name, cash, bagHandle, character.Money);
-					}
-					else
-						Logger.LogDebug("TryLootCash for bag 0x{Bag:X8}: no coins to grant.", bagHandle);
+					await _loot.HandleLootCash(client, packet);
 
 					break;
 				}
