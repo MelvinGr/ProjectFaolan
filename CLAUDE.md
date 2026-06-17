@@ -74,8 +74,9 @@ is organizational only.
 
 **Prefer composed collaborators over growing the partial.** Domain logic is pulled OUT of the listener into
 folder-namespaced service classes that take their deps by ctor and the client per call:
-`CombatService` (Combat/), `WorldBroadcaster` + `WorldSimulation` (World/), `EquipmentService` (Inventory/),
-`ConversationService` (Dialogue/), and `ShopService`/`BankService`/`TradepostService` (Economy/). The
+`CombatService` (Combat/), `WorldBroadcaster` + `WorldSimulation` + `PlayerPersistenceService` (World/),
+`EquipmentService` (Inventory/), `ConversationService` (Dialogue/), and
+`ShopService`/`BankService`/`TradepostService` (Economy/). The
 listener holds them as `_combat`/`_shop`/... fields and forwards. When a service needs a cross-cutting
 OUTBOUND op that lives on the listener (e.g. the wallet update or the live item-grant, shared by several
 subsystems), reach it through a **narrow port the listener implements** rather than passing the whole

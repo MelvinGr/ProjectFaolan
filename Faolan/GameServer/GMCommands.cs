@@ -284,18 +284,6 @@ namespace Faolan.GameServer
 
 		// Writes each connected player's live WorldEntity transform onto their Character and persists it. Returns the
 		// number of players saved.
-		private async Task<int> FlushWorldState()
-		{
-			var saved = 0;
-			foreach (var pair in _simulation.Players)
-			{
-				if (await SavePlayerState(pair.Key, pair.Value))
-					saved++;
-			}
-
-			return saved;
-		}
-
 		// .grantability <id>  - grant an ability from the catalog to the player via the 0x2052 ability-grant. Makes the
 		// ability appear so it can be dragged to the hotbar and cast, which is how the spell/mana drain is tested. The
 		// grant is transient (not persisted) - it is re-sent only by login's GrantStartingAbilities. (The real spell
@@ -952,32 +940,8 @@ namespace Faolan.GameServer
 		// more live state - vitals, buffs, … - as those become persisted.)
 		private async Task SaveChanges(uint characterId)
 		{
-			var saved = await FlushWorldState();
+			var saved = await _persistence.FlushAllAsync();
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Flushed {saved} player(s)' live world state to the database.");
-		}
-
-		// Flushes one player's authoritative live transform (the WorldEntity) onto their persisted Character and
-		// saves it. Used by the autosave loop, .save, and disconnect. Errors are logged (callers may not await).
-		private async Task<bool> SavePlayerState(INetworkClient client, WorldEntity entity)
-		{
-			var character = client.Session?.Character;
-			if (character == null)
-				return false;
-
-			try
-			{
-				// entity is the live WorldEntity (Vector3 Euler rotation); the DB Character stores a quaternion.
-				character.MapId = entity.MapId;
-				character.Position = entity.Position;
-				character.Rotation = entity.Rotation.ToQuaternion();
-				await Database.SaveCharacterTransform(character.Id, entity.Position, entity.Rotation.ToQuaternion(), entity.MapId);
-				return true;
-			}
-			catch (Exception ex)
-			{
-				Logger.LogWarning(ex, "Failed to flush world state for {Name} (0x{Handle:X8}).", entity.Name, entity.Handle);
-				return false;
-			}
 		}
 
 		private Task SendGmHelpText(uint characterId)

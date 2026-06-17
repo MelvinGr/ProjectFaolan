@@ -22,8 +22,6 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener : Server<ConanPacket, ConanPacketFactory, ConanMessageFramer>, IWorldOutbound, IEconomyOutbound
 	{
-		// Periodic world-state autosave cadence (crash safety; logout/teleport/.save are the event-driven saves).
-		private const int AutoSaveIntervalMinutes = 5;
 
 		// Character ids that have just been named in the create-editor and are about to open their FIRST world
 		// connection (the second GameServer connection, after the 0x2002 enter-world handoff). The id is added
@@ -86,11 +84,13 @@ namespace Faolan.GameServer
 		// IWorldOutbound port. Built in the ctor (after the dispatchers are assigned). See World/WorldSimulation.cs.
 		private readonly WorldSimulation _simulation;
 
-		// Background loops (the autosave loop is owned here; the simulation owns its own tick) and their lifetime token.
-		// Held (not fire-and-forget) so StopAsync can signal them and await a clean shutdown, and so any unobserved
-		// fault surfaces instead of being swallowed.
+		// Player-state persistence (autosave loop + logout/teleport/.save flushes), composed off the listener (#200).
+		private readonly PlayerPersistenceService _persistence;
+
+		// Background loops (persistence + simulation each own their own loop) and their shared lifetime token. Held
+		// (not fire-and-forget) so StopAsync can signal them and await a clean shutdown, and so any unobserved fault
+		// surfaces instead of being swallowed.
 		private CancellationTokenSource _loopCts;
-		private Task _autoSaveTask = Task.CompletedTask;
 
 		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, ushort port, IAgentServerDispatcher agentServerDispatcher, IGameServerDispatcher gameServerDispatcher) : base(port,
 			logger, configuration, database, new ConanOutgoingPacketLogger(logger, "GameServer", typeof(GameCharInterfaceDispatchOpcodes), typeof(GameServer0X2000RespondsOpcodes)))
@@ -98,6 +98,7 @@ namespace Faolan.GameServer
 			_agentServerDispatcher = agentServerDispatcher;
 			_gameServerDispatcher = gameServerDispatcher;
 			_simulation = new WorldSimulation(this, database, agentServerDispatcher, logger);
+			_persistence = new PlayerPersistenceService(database, logger, _simulation);
 			_broadcaster = new WorldBroadcaster(_simulation, database, logger);
 			_combat = new CombatService(_simulation, _broadcaster, database, agentServerDispatcher, logger);
 			_conversation = new Dialogue.ConversationService(database, logger, _broadcaster, _luaVm);
@@ -195,7 +196,7 @@ namespace Faolan.GameServer
 			// Own lifetime token (linked to startup) so StopAsync can cancel the loops independently of any single
 			// connection. Tasks are stored so they can be awaited on shutdown.
 			_loopCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-			_autoSaveTask = AutoSaveLoop(_loopCts.Token); // periodic crash-safety flush of the live world state
+			_persistence.Start(_loopCts.Token); // periodic crash-safety flush of the live world state
 			_simulation.Start(_loopCts.Token); // the simulation tick (regen, NPC AI, death/respawn, discovery)
 			return base.StartAsync(cancellationToken);
 		}
@@ -209,7 +210,7 @@ namespace Faolan.GameServer
 			// shutdown token either way.
 			if (_loopCts != null)
 				await _loopCts.CancelAsync();
-			await Task.WhenAll(_simulation.StopAsync(), _autoSaveTask);
+			await Task.WhenAll(_simulation.StopAsync(), _persistence.StopAsync());
 			_loopCts?.Dispose();
 
 			await base.StopAsync(cancellationToken);
@@ -229,7 +230,7 @@ namespace Faolan.GameServer
 				// EXCEPT on a teleport-out: DoTeleport already saved the destination, and this connection's entity
 				// still holds the stale pre-teleport position which would clobber it (#28).
 				if (!client.Session.IsTeleportingOut)
-					_ = SavePlayerState(client, entity);
+					_ = _persistence.SavePlayerState(client, entity);
 				else
 					Logger.LogInformation("Teleport-out: skipping stale-position save for {Name} (0x{Handle:X8}); destination already persisted.", entity.Name, entity.Handle);
 				client.Session.IsTeleportingOut = false; // one-shot: only suppress this teleport's disconnect save
@@ -952,28 +953,6 @@ namespace Faolan.GameServer
 		// Periodically flushes the live world state to the DB so a crash loses at most one interval. Persistence is
 		// otherwise event-driven (disconnect, teleport, .save) and needs no game loop; this is just a cheap timer
 		// (docs/archive/server-architecture-roadmap.md). The simulation tick, when it lands, can absorb this.
-		private async Task AutoSaveLoop(CancellationToken cancellationToken)
-		{
-			using var timer = new PeriodicTimer(TimeSpan.FromMinutes(AutoSaveIntervalMinutes));
-			try
-			{
-				while (await timer.WaitForNextTickAsync(cancellationToken))
-				{
-					var saved = await FlushWorldState();
-					if (saved > 0)
-						Logger.LogInformation("Autosave: flushed {Count} player(s)' live world state.", saved);
-				}
-			}
-			catch (OperationCanceledException)
-			{
-				// server shutting down
-			}
-			catch (Exception ex)
-			{
-				Logger.LogError(ex, "Autosave loop failed.");
-			}
-		}
-
 		// The player's live world entity for this connection (the authoritative transform + vitals), or null if not yet
 		// in the world. Thin delegate to the simulation, which owns the player registry; kept so the other listener
 		// partials (broadcast, combat, GM) read it unchanged.
