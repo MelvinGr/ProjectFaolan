@@ -46,10 +46,19 @@ swap the corpse. The world tick (`WorldState.Tick`) drives two independent timer
    whether it carries items/cash (empty corpses are fine, matching retail). Falls back to a plain despawn only
    when the map has no loot-bag template.
 2. **respawn** (`RespawnDelaySeconds`, ~15s): revives the NPC at its spawn point and re-renders it
-   (`NpcRespawned`), clearing any unlooted corpse contents.
+   (`NpcRespawned`), clearing any unlooted corpse contents. **EXCEPT** summoned `.spawnnpc` NPCs
+   (`WorldEntity.NoRespawn`, set in `SpawnNpcForPlayer`): once dead they don't revive — the post-death timer runs
+   as a despawn (`TickPostDeathDespawn` → `LootExpired` fade+remove) so a test mob fades out instead of coming
+   back (commit `df8f90d`, a GM QoL Melvin asked for).
+
+`.delete <handle|selected>` (GM): the DURABLE removal — despawns the selected entity live AND deletes its
+`NpcSpawns` row(s) (`IDatabaseRepository.DeleteNpcSpawns`) so it never re-renders, unlike `.despawnnpc` (live-only,
+comes back on relog). The tool for scrubbing captured import artifacts (phantom players baked into the pcap). A
+neutral named entity deletes every same-name row on the map; a faction mob only the rows at its spot (commit `576c007`).
 
 Open: the death animation currently relies on the client reacting to the `health=0` StatUpdate during the
-linger. The death/corpse IIR readers are now decoded — `SimpleCharKilledByUpdateIIR_t` (0xB066AFC2, the
+linger. **In-client 2026-06-17 this does NOT play (#204): NPCs despawn with no death animation** — the
+health=0 StatUpdate alone doesn't drive the client's death anim; it needs an explicit trigger. The death/corpse IIR readers are now decoded — `SimpleCharKilledByUpdateIIR_t` (0xB066AFC2, the
 "killed by" record = killer handle + flags) and `TombStoneFullUpdateIIR_c` (0x0D80E7C9, the corpse) — see
 `docs/iir-readers-conversation-misc.md` / `docs/iir-readers-combat-world.md`. What remains for #204 is
 wiring a death-animation/state trigger from these, not a decode gap.

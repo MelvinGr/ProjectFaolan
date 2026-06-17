@@ -22,8 +22,9 @@ dotnet test Faolan.Tests
 dotnet test Faolan.Tests --filter GuildPacketTests          # single class
 dotnet test Faolan.Tests --filter "FullyQualifiedName~Shop" # by substring
 
-# Run the server (cwd MUST be bin/Debug - faolan.json is loaded via ../../../)
-cd Faolan/bin/Debug && dotnet Faolan.dll
+# Run the server (cwd MUST be the repo root: Program.cs loads faolan.json + faolan.db from the CWD,
+# and both live at the repo root). Running from bin/Debug fails with "faolan.json not found".
+dotnet Faolan/bin/Debug/Faolan.dll
 
 # Drive the retail client unattended against the local server (auto-login -> world)
 dotnet run --project Faolan.ClientLauncher -- --console --universeaddr 127.0.0.1:7010 -u faolan -p any -c <char>

@@ -47,3 +47,13 @@ mount buff `…01 empty=dismount`). So a caster's real cast = the rank-0 apply; 
   strength in a spell unit, not direct HP.
 - Importing only the rank-0 (non-empty) row per spell is the clean form (the rank-1 is a terminator, not a
   standalone cast).
+
+## In-client VERIFIED (2026-06-17, #232 done)
+A spawned caster casts at the player in-client. Repro: `.spawnnpc Poacher Marksman` (a row with a 54-byte
+`NpcSpell.Payload`), engage it → it follows and applies its debuff via `MagicBuffIIR (0x6B87E316)`, applyFrom =
+the NPC handle, spell `0x316DCB` ("Ripper Volley") — it casts instead of meleeing.
+**Fix that enabled the test (commit `df8f90d`):** `WorldBroadcaster.SpawnNpcForPlayer` (the `.spawnnpc` path) was
+a minimal spawn that NEVER loaded `entity.Spells` — only the zone-load path did — so a summoned caster could never
+cast regardless of data. It now loads the NPC's `NpcSpells` rows like the zone path, so `IsCaster` lights up.
+Caveat: the applied debuff doesn't expire (no duration honored — #67; "Ripper Volley" shows a 6s tooltip but
+sticks). NpcSpells data is still sparse (~14 named casters); `.spawnnpc` mobs also get no loot table.

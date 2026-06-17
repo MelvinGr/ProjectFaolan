@@ -129,23 +129,26 @@ So the "missing hair" regression was the **#23 playfield token** (a stale token 
 now fixed by `SpawnPlayfieldRewriter` — not the post-IIR content. The minimal post-IIR is correct for animals
 **and** humanoids. (`[[npc_spawn_minimal_postiir_breaks_humanoids]]` is corrected accordingly.)
 
-## Resolution — from-scratch minimal scaffold, landed (2026-06-17, #185 → needs-testing)
+## Resolution — from-scratch minimal scaffold, DEFAULT (2026-06-17, #185 done)
 The wire grammar was already pinned; the sweep settled the **construction** question (there is nothing to source).
 Implemented:
 1. **pre-IIR** — `NpcSpawnPreIir.BuildMinimal(category = 0x6f)`: version `0x05`, all 6 flags 0, all 53 words 0
    except `word17` = the modal category enum. Byte-exact to a real captured minimal NPC.
 2. **post-IIR** — the existing `NpcSpawnScaffold.BuildMinimalPostIir()` (recordCount==1) is a captured-valid form.
 3. **lift** — `NpcSpawnScaffold.WithMinimalScaffolds(body)` rewrites a captured/cross-session body to the fresh
-   form (transform + IIR identity kept, both scaffolds reset), wired into `NpcSpawnBuilder.TryBuild` for
-   `freshSpawn` builds behind env `FAOLAN_MINIMAL_SCAFFOLD=1` (default OFF; byte-exact reproduction goldens
-   unchanged).
+   form (transform + IIR identity kept, both scaffolds reset), applied in `NpcSpawnBuilder.TryBuild` on every
+   `freshSpawn` build. **This is now unconditional/default** (the `FAOLAN_MINIMAL_SCAFFOLD` opt-in is gone); the
+   byte-exact reproduction goldens are unaffected because they build with `freshSpawn=false`.
 4. **golden** — `SpawnNpcMinimalPanther.bin` (Kier-Dheed's Panther, fully minimal in both halves) proves
    `BuildMinimal` (pre) + `BuildMinimalPostIir` (post) + `WithMinimalScaffolds` byte-exact (`NpcSpawnPreIirTests`,
    526 tests green).
 
-**Remaining (the in-client flip only):** run `Faolan.ClientLauncher` with `FAOLAN_MINIMAL_SCAFFOLD=1`, confirm
-world-entry / interest / `.spawnnpc` NPCs still render with the minimal scaffolds; if so, make it the default and
-close #185. The per-spawn sub-list (`@1122b10`) entry sub-object grammar stays unobserved (`count==0` everywhere)
+**In-client flip DONE (2026-06-17, #185 verified):** logged onto the beach with the minimal scaffolds active —
+world-entry / interest / `.spawnnpc` NPCs render the same ("ncs seem the same"), chat connects (the real load
+confirmation), zero stream errors. So the minimal scaffold was made the **default** (commit `48be35a`) and the
+`FAOLAN_MINIMAL_SCAFFOLD` / `FAOLAN_NPC_VERBATIM` env toggles + the dead `FAOLAN_BUILT_NPC_TEST` injector were
+removed — construct-don't-replay is now the only NPC spawn path. The per-spawn sub-list (`@1122b10`) entry
+sub-object grammar stays unobserved (`count==0` everywhere)
 but is irrelevant to the minimal build. The same reader primitives + `0x3F1` framing drove the dynel/loot readers
 (#187, done) — see `Captures/ghidra/DumpIirReaders.java`.
 

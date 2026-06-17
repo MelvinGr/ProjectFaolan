@@ -197,6 +197,14 @@ WIRED (`GameServerListener.HandleTradepostSell`/`HandleTradepostChangePrice`/`Ha
 golden tests `TradepostSellBodyTests`). INTERIM: the listing's search `ItemId` is filed under the item's TEMPLATE (we
 lack the retail item-type search id), so a normal item-type search won't necessarily surface a player listing yet.
 
+**`ItemId` must reference a real `Item` (FK, 2026-06-17, #212).** `TradepostListing.ItemId` now has a FK to
+`Items.Id` (`OnDelete Restrict`) so a listing can't be filed under a non-existent item. This fixed an import bug
+where 242 of 243 captured listings carried a placeholder `ItemId=30000` (sharing one `ItemHandle`), which the
+client collapsed into a single "Torn Rags" row in every category — those broken listings were deleted and the FK
+added (commit `2887e17`). NOTE the instance identity (`Template`/`Data1..4`) still lives on the row and is distinct
+from the `ItemId` search key. (Open: the in-client "Torn Rags in every category" browse persisted after the DB fix —
+likely a client AH cache or a non-listings category-browse path, not the listing data.)
+
 **`SendMail` (C→S `0x2002`) — player→player mail with a bank-item attachment (capture F499), WIRED
 (`HandleTradepostSendMail`): creates a Mail to the recipient; the attached item STAYS in the sender's bank with a
 **mail-pending overlay** (`0x201c` stat 0 = flags **`0x8001`**, capture F500), it only leaves the sender's bank when
