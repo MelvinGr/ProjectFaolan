@@ -10,7 +10,8 @@ Usage: decode_createworld_burst.py [capture.tshark.json]
 """
 import json, struct, sys, os, collections
 
-CAP = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
+_args = [a for a in sys.argv[1:] if not a.startswith("-")]
+CAP = _args[0] if _args else os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     "account-faolan-character-hoxxling-create-modified_all_sliders-very_long_loading_screen-chat_message_before_exit.tshark.json")
 
@@ -46,7 +47,48 @@ CATALOG = {
 }
 
 
+def capture_s2c(path):
+    """The create-world :7012 server->client stream as ordered (opcode, body_hex) — the retail ground truth."""
+    dls = [p for p in json.load(open(path))["Packets"] if p["Source"]["Port"] == 7012 and p["IsDownload"]]
+    return [(int(p["Opcode"], 16), (p.get("BodyHex") or "").lower()) for p in dls if p.get("Opcode")]
+
+
+def parse_golden_frames(blob):
+    """Parse the RecordingNetworkClient golden .bin (concatenated PacketStream frames) -> [(opcode, body_hex)].
+    Frame = [u32 len][u32 crc][u32 hdrLen][0x0a slen sender][0x12 rlen recv][u16 opcode][hdrData][body]."""
+    out = []
+    i = 0
+    while i < len(blob):
+        length = struct.unpack(">I", blob[i:i + 4])[0]
+        frame = blob[i:i + 4 + length]
+        i += 4 + length
+        hl = struct.unpack(">I", frame[8:12])[0]
+        hend = 12 + hl
+        p = 12
+        assert frame[p] == 0x0A; p += 2 + frame[p + 1]   # sender ProtoEndpoint
+        assert frame[p] == 0x12; p += 2 + frame[p + 1]   # receiver ProtoEndpoint
+        op = struct.unpack(">H", frame[p:p + 2])[0]; p += 2
+        out.append((op, frame[hend:].hex()))
+    return out
+
+
+def verify_golden():
+    """Assert the committed golden burst .bin is byte-identical to the capture's :7012 s2c stream (#234 harness)."""
+    bin_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                            "Faolan.Tests", "Golden", "CreateWorldEntryBurst.bin")
+    burst = parse_golden_frames(open(bin_path, "rb").read())
+    cap = capture_s2c(CAP)
+    start = next((s for s in range(len(cap)) if cap[s:s + len(burst)] == burst), None)
+    assert start is not None, "golden .bin is NOT a contiguous run of the capture's s2c stream"
+    lead = [hex(o) for o, _ in cap[:start]]
+    print(f"VERIFIED: golden .bin ({len(burst)} pkts) == capture s2c[{start}:{start + len(burst)}] byte-for-byte; "
+          f"{start} leading handshake pkts omitted by the burst: {lead}")
+
+
 def main():
+    if "--verify-golden" in sys.argv:
+        verify_golden()
+        return
     dls = [p for p in json.load(open(CAP))["Packets"] if p["Source"]["Port"] == 7012 and p["IsDownload"]]
     tally = collections.Counter()
     by_status = collections.Counter()

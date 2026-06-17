@@ -19,7 +19,7 @@ namespace Faolan.GameServer
 		// (ClientLoadingDone, StartScript, StartScript, Move, IntroDone).
 		// Chunk S->C packet counts: [324, 12, 39, 65, 100, 64].
 
-		private async Task SendCreateWorldSceneBurst(INetworkClient client)
+		internal static async Task SendCreateWorldSceneBurst(INetworkClient client)
 		{
 			var id = client.Session.Account.ClientInstance;
 			await new PacketStream()
@@ -4176,7 +4176,7 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 		}
 
-		private async Task SendNextCreateWorldChunk(INetworkClient client)
+		internal static async Task SendNextCreateWorldChunk(INetworkClient client)
 		{
 			var id = client.Session.Account.ClientInstance;
 			// One chunk per client cutscene trigger, in order: ClientLoadingDone, StartScript,
