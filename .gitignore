@@ -275,3 +275,6 @@ Faolan.ClientHook/*.lib
 
 # Test golden-mismatch diff artifacts (written by AssertBurstStable on failure)
 *.bin.actual
+
+# CI runner registration token (docker-compose.yml reads it from here) - never commit
+.env

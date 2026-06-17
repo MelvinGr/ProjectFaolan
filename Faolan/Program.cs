@@ -37,7 +37,7 @@ namespace Faolan
 				builder.Environment.EnvironmentName = "Development";
 
 			builder.Configuration.SetBasePath(Directory.GetCurrentDirectory());
-			builder.Configuration.AddJsonFile(Path.GetFullPath("../../../faolan.json"));
+			builder.Configuration.AddJsonFile(Path.GetFullPath("faolan.json"));
 			builder.Configuration.AddCommandLine(args);
 
 			builder.Logging.SetMinimumLevel(Statics.IsDebug
@@ -54,7 +54,10 @@ namespace Faolan
 				options.SingleLine = true;
 			});
 
-			builder.Logging.AddProvider(new FileLoggerProvider("/home/melvin/Development/C#/Project Faolan/logs.txt"));
+			// Mirror the console log to a file. FAOLAN_LOG_FILE overrides the location (e.g. a mounted volume in a
+			// container); default is logs.txt in the working directory.
+			builder.Logging.AddProvider(new FileLoggerProvider(
+				Environment.GetEnvironmentVariable("FAOLAN_LOG_FILE") ?? Path.GetFullPath("logs.txt")));
 
 			builder.Services.AddLogging();
 

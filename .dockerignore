@@ -1,7 +1,7 @@
 **/.classpath
 **/.dockerignore
 **/.env
-#**/.git
+**/.git
 **/.gitignore
 **/.project
 **/.settings
@@ -25,3 +25,18 @@
 LICENSE
 README.md
 Faolan.Files
+
+# Projects + assets not in the server's build graph (the Dockerfile copies only Faolan, Faolan.Core, Faolan.Mcp).
+# Keeps the build context small (Captures alone is hundreds of MB of pcaps/JSON). faolan.json + faolan.db at the
+# repo root are NOT matched here and ARE shipped into the image.
+Faolan.Tests
+Faolan.Importer
+Faolan.ClientLauncher
+Faolan.Wireshark
+Captures
+Archive
+docs
+**/*.pcapng
+**/*.tshark.json
+**/*.md
+logs.txt

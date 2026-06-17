@@ -10,7 +10,6 @@
   "McpPort": 7099,
 
   "DatabasePath": "faolan.db",
-  "DatabasePathDev": "../../../faolan.db",
 
   "WelcomeString": "Welcome to Project Faolan!"
 }

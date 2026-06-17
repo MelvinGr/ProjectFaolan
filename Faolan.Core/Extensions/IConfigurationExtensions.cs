@@ -11,10 +11,7 @@ namespace Faolan.Core.Extensions
 	{
 		extension(IConfiguration config)
 		{
-			public string DatabasePath =>
-				Path.GetFullPath(config[Statics.IsDebug
-					? "DatabasePathDev"
-					: "DatabasePath"]);
+			public string DatabasePath => Path.GetFullPath(config["DatabasePath"]);
 
 			public string ServerIpAddress => config["ServerIpAddress"];
 

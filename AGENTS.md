@@ -9,7 +9,7 @@
 ## Runtime/data boundaries
 - Ports and paths come from `faolan.json`; access them through `Faolan.Core/Extensions/IConfigurationExtensions.cs`, not ad hoc string reads.
 - DB access is centralized through `IDatabaseRepository` / `DatabaseRepository` (`Faolan.Core/Database/DatabaseRepository.cs`) over SQLite + EF Core. `DatabaseMigrator` runs automatically on startup.
-- `DatabasePath` switches between `DatabasePathDev` and `DatabasePath` depending on `Statics.IsDebug`; both `Faolan/Program.cs` and `Faolan.DatabaseEditor/Program.cs` load `../../../faolan.json`, so current working directory matters.
+- Current working directory matters, it should be the solution root
 - `GameServerListener` depends on `IAgentServerDispatcher` (`Faolan.Core/Network/AgentServer/AgentServerDispatcher.cs`) to send chat/system messages through the separate AgentServer channel.
 
 ## Packet/code patterns to follow
