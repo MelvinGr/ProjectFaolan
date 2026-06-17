@@ -268,21 +268,45 @@ namespace Faolan.GameServer
 			if (opcode is not (GameServerOpcodes.Ping or GameServerOpcodes.LatencyCheck))
 				LogPacketReceived(packet, opcode);
 
-			switch (opcode)
+			// Class-first routing for the sub-0x2014 opcodes that COLLIDE between GameAgent (the connection class:
+			// auth/chat/ping/PassBlob) and GameCharAgent (per-character). These two are the only opcodes that arrive
+			// on BOTH classes (confirmed across every capture), so resolve them by receiver class HERE - the same
+			// pattern as the Tradepost / GameCharAgentProject routes above - and the opcode switch below then only
+			// ever sees the GameAgent form:
+			//   0x2002  GameAgent.ChatVicinity          vs  GameCharAgent.RequestBindLocation
+			//   0x2003  GameAgent.Authenticate2 (Hello) vs  GameCharAgent.SetTutorialStats
+			// (Everything else in the switch is either GameAgent-only - 0x2000/0x2005 - or unambiguously GameCharAgent
+			// at opcode >= 0x2014; 0x200B/0x200C are GameCharAgentProject-only and routed out above.)
+			if (packet.Receiver.Type == ConanEndpoints.GameCharAgentType)
 			{
-				case GameServerOpcodes.Hello:
+				switch (opcode)
 				{
-					// 0x2003 is overloaded BY CLASS: the >= 12-byte body is GameAgent.Authenticate2 (the
-					// connection Hello: clientInstance + accountId + version), while the 4-byte body is
-					// GameCharAgent.SetTutorialStats (a u32, usually 0 - the Tortage tutorial stat tracking;
-					// x80 in captures). Retail sends no per-packet reply, so just note it and move on -
-					// parsing it as a Hello would read past the end of the body and drop the client.
-					if (packet.Body.Length - packet.Body.Position < 12)
+					case GameServerOpcodes.ChatCommand: // 0x2002 = GameCharAgent.RequestBindLocation
+						await HandleRequestBindLocation(client, packet);
+						return;
+
+					case GameServerOpcodes.Hello: // 0x2003 = GameCharAgent.SetTutorialStats (Tortage tutorial tracking)
 					{
 						var tutorialStat = packet.Body.Length - packet.Body.Position >= sizeof(uint)
 							? packet.Body.ReadUInt32()
 							: 0;
 						Logger.LogDebug("GameCharAgent.SetTutorialStats(0x{Value:X8}); no reply.", tutorialStat);
+						return;
+					}
+				}
+			}
+
+			switch (opcode)
+			{
+				case GameServerOpcodes.Hello:
+				{
+					// 0x2003 = GameAgent.Authenticate2 (the connection Hello: clientInstance + accountId + version).
+					// The GameCharAgent.SetTutorialStats collision on this opcode is resolved by the class-first route
+					// above, so here the body is always the >= 12-byte Authenticate2. Guard defensively anyway: a short
+					// body would over-read and drop the client.
+					if (packet.Body.Length - packet.Body.Position < 12)
+					{
+						Logger.LogWarning("GameAgent.Authenticate2 (0x2003) with a short {Bytes}-byte body; ignoring.", packet.Body.Length - packet.Body.Position);
 						break;
 					}
 
@@ -805,31 +829,8 @@ namespace Faolan.GameServer
 
 				case GameServerOpcodes.ChatCommand:
 				{
-					// 0x2002 collides by class: GameAgent.ChatVicinity (typed chat, the string body below) vs
-					// GameCharAgent.RequestBindLocation (body = exactly the player's ID32, sent repeatedly - the
-					// client resolving its bind/home playfield, i.e. the Totem of Origin destination). Retail
-					// answers each with a 4-byte 0x2002 [u32 playfieldId] (verified 1:1 across 13 captures).
-					if (packet.Body?.Length == sizeof(uint) * 2)
-					{
-						packet.Body.ReadUInt32(); // ID32 type (0x0000C350)
-						var requesterId = packet.Body.ReadUInt32();
-
-						// The bind playfield is the map of the character's persisted bind RespawnPoint (set by .bind / a
-						// wayfarer); an unbound character (or one whose point vanished) falls back to its current map.
-						// This is the Totem of Origin destination (#64).
-						var character = client.Session.Character;
-						var bindMapId = character?.MapId ?? Core.Database.Tables.Map.TortageBeachId;
-						if (character?.BindRespawnPointId is uint bindPointId)
-							bindMapId = (await Database.GetRespawnPoint(bindPointId))?.MapId ?? bindMapId;
-						await new PacketStream()
-							.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, GameCharInterfaceDispatchOpcodes.DispatchUpdateBindLocation)
-							.WriteUInt32(bindMapId)
-							.SendAsync(client);
-						Logger.LogDebug("RequestBindLocation({RequesterId:X8}) -> bind playfield {MapId}.", requesterId, bindMapId);
-
-						break;
-					}
-
+					// 0x2002 = GameAgent.ChatVicinity (typed chat, carries GM commands). The GameCharAgent.RequestBindLocation
+					// collision on this opcode is resolved by the class-first route above (HandleRequestBindLocation).
 					LogPacketBodyDebug("GameServer ChatCommand body", packet.Body?.ToArray());
 
 					var unk0 = packet.Body.ReadUInt32();
@@ -923,6 +924,29 @@ namespace Faolan.GameServer
 					break;
 				}
 			}
+		}
+
+		// GameCharAgent.RequestBindLocation (0x2002 on the GameCharAgent class): the client repeatedly polls its
+		// bind/home playfield (the Totem of Origin destination, #64); body = the player's ID32. Retail answers each
+		// with a 4-byte 0x2002 [u32 playfieldId] (verified 1:1 across 13 captures). Routed here by receiver class so
+		// it never collides with GameAgent.ChatVicinity, which shares opcode 0x2002.
+		private async Task HandleRequestBindLocation(INetworkClient client, ConanPacket packet)
+		{
+			packet.Body.ReadUInt32(); // ID32 type (0x0000C350)
+			var requesterId = packet.Body.ReadUInt32();
+
+			// The bind playfield is the map of the character's persisted bind RespawnPoint (set by .bind / a
+			// wayfarer); an unbound character (or one whose point vanished) falls back to its current map.
+			var character = client.Session.Character;
+			var bindMapId = character?.MapId ?? Core.Database.Tables.Map.TortageBeachId;
+			if (character?.BindRespawnPointId is uint bindPointId)
+				bindMapId = (await Database.GetRespawnPoint(bindPointId))?.MapId ?? bindMapId;
+
+			await new PacketStream()
+				.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, GameCharInterfaceDispatchOpcodes.DispatchUpdateBindLocation)
+				.WriteUInt32(bindMapId)
+				.SendAsync(client);
+			Logger.LogDebug("RequestBindLocation({RequesterId:X8}) -> bind playfield {MapId}.", requesterId, bindMapId);
 		}
 
 		// Periodically flushes the live world state to the DB so a crash loses at most one interval. Persistence is
