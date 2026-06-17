@@ -64,6 +64,33 @@ namespace Faolan.GameServer.Spawn
 				.ToArray();
 		}
 
+		// Replaces an FA015807 body's PRE-IIR scaffold (the 223-byte block between the transform and the embedded
+		// CoreCharacterIIR) with the from-scratch minimal form (NpcSpawnPreIir.BuildMinimal: all runtime words 0
+		// except the category word). The cross-capture sweep (Captures/classify_fa015807_fields.py) proved the
+		// captured scaffold carries only per-instance runtime state (handles/timers), 0 on a fresh spawn - so a
+		// cross-session row's captured scaffold holds another session's runtime state, and the minimal form is the
+		// correct fresh-spawn value (Gitea #185). Length-preserving (FixedLength == FixedLength), so the body-length
+		// header is unchanged. No-op (returns the body unchanged) for a count>0 captured scaffold (unobserved) or
+		// when no CharacterIIR is found.
+		public static byte[] WithMinimalPreIir(byte[] body)
+		{
+			if (!NpcSpawnPreIirCodec.TryDecode(body, out _, out var offset))
+				return body;
+
+			var result = (byte[])body.Clone();
+			NpcSpawnPreIirCodec.Encode(NpcSpawnPreIir.BuildMinimal()).CopyTo(result, offset);
+			return result;
+		}
+
+		// Applies both minimal scaffolds (pre-IIR then post-IIR), turning a captured (or cross-session) NPC body
+		// into a from-scratch fresh-spawn body: the transform + CharacterIIR (identity/appearance) are kept, the
+		// surrounding runtime-state scaffolds are reset to their idle-fresh form. This is the wire side of the
+		// #185 "lift the scaffolds" work; the live flip is gated until verified in-client (NpcSpawnBuilder).
+		public static byte[] WithMinimalScaffolds(byte[] body)
+		{
+			return WithMinimalPostIir(WithMinimalPreIir(body));
+		}
+
 		// Replaces an FA015807 body's post-IIR scaffold with the minimal session-independent form, adjusting the
 		// inner body-length field (@0, which tracks total body size 1:1 - same convention as
 		// SpawnPacketBuilder.SetCharacterMessage). A cross-session NpcSpawn row's captured post-IIR carries another

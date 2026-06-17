@@ -3,11 +3,19 @@
 RE of the **NPC-spawn pre-IIR scaffold** — the "last un-lifted part" of the from-DB NPC spawn. `NpcSpawnBuilder`
 builds the FA015807 (SimpleCharFullUpdate) body byte-exact from the row, re-addressing the live handle/position +
 token; it is now the SOLE NPC-spawn path (every FA015807 is dropped from the login burst and interest-spawned, so
-there is no verbatim-burst fallback anymore — #185). The pre-IIR float block + post-IIR scaffold still ride the
-row's captured `Data` blob: the decode (this doc) confirms they carry NO session-volatile data (the char buffer is
-the NPC's RDB script-binding string; the only stale ref is the transform's playfield token), so carrying them is
-correct. Generating them WITHOUT `Data` is per-NPC RDB-derived (221/222 scaffold bytes vary across 5151 records),
-so it needs RDB extraction of the per-NPC script bindings + config — the remaining lift.
+there is no verbatim-burst fallback anymore — #185).
+
+> **RESOLVED (2026-06-17): the scaffolds are RUNTIME state, not config — generate the minimal form from scratch.**
+> A cross-capture sweep (`Captures/classify_fa015807_fields.py` for the pre-IIR, `classify_fa015807_postiir.py` for
+> the post-IIR; **5026 / 5151 scaffolds across all 45 captures**) overturned the "per-NPC RDB-config" theory below.
+> The scaffolds carry **no per-NPC config and no session-volatile reference**; **every** non-zero word is
+> per-instance runtime state (target/owner handles, timers, action counters) that is **0 on an idle fresh spawn**.
+> Per-NPC verdict for Crocodile / Citizen / Nemedian / Black Dragon Guard: **0 words** const-per-type, **0**
+> const-per-session — all per-instance. The most-minimal real captured NPCs carry exactly **one** non-zero pre-IIR
+> word (`word17`@0x1fc, a 5-state enum `{3,0x6f,0x78,0xc9,0x12c}`, modal `0x6f`, NOT identity-bound) + the
+> recordCount==1 minimal post-IIR. So the from-scratch fresh scaffold is a fixed constant, needs **no RDB
+> extraction, no DB columns, no re-addressing** — see "Resolution" at the bottom. The earlier sections are kept
+> for the wire-grammar RE (still correct) but their *construction* conclusions are superseded.
 
 Decompiled from `AgeOfConan.exe` (Ghidra) — reproduce with `Captures/ghidra/DumpSpawnIir.java` +
 `DumpFns.java` (both committed). Grammar **validated against 4558 captured FA015807 records** (zero
@@ -104,38 +112,42 @@ into the fixed-width buffer. It is per-instance text the client reads into a str
 evidently keeps for script/debug, not geometry). Source: the RDB script layer (`[[lua_vm]]` /
 `[[protocol_onscreen_feedback]]`), keyed per NPC type.
 
-## The "missing hair" gap — the POST-IIR float-stat table (offline analysis 2026-06-17)
+## The POST-IIR is runtime state, NOT appearance — "missing hair" was the playfield token (corrected 2026-06-17)
 
-The minimal post-IIR (`NpcSpawnScaffold.WithMinimalPostIir`, behind `FAOLAN_MINIMAL_SCAFFOLD`) renders humanoids
-with their body intact + chat connected, but **drops hair** — and the offline analysis pins why. Splitting the
-beach burst by post-IIR size (excluding the PLAYER's own record — hoxxling is a player, 635 B post):
-- **Animals** (Panther/Scorpion/Flesheater/Guard Dog) → post-IIR = **41 B (minimal)**: header `[0][len-36][cnt]`
-  + empty `0x3F1` terminators, **no stat records**. The minimal form IS their real form, so they're unaffected.
-- **Humanoids** (Harbor Guard, Boozed Bully, Slave of Acheron, …) → post-IIR = **83–573 B**: the same header
-  then a **float-stat table** — a run of `[u32 statId][f32 value]…` records (stat ids `0x144`/`0xB7`/`0x124` +
-  the `0x01..0x24` slider range, values 0–1) before the `0x3F1` terminators.
+An earlier offline pass guessed the larger humanoid post-IIR was a **float-stat / appearance table** and that the
+minimal form "drops hair". **The cross-capture sweep (`classify_fa015807_postiir.py`, 5151 records) disproves it:**
+- **Appearance lives in the IIR** (`CharacterStats.head_mesh` / `looks_package`), which the DB build already
+  sources — NOT in the post-IIR.
+- **19 humanoid NPC types** (Kalanthes, Guard, Nobleman, Black Dragon Guard, Poacher, Bat Pict Mauler, …) emit
+  the **41-byte minimal post-IIR themselves** in some captures. A type that renders correctly with the minimal
+  post-IIR proves the larger form is not required for its looks.
+- The minimal form has just **3 variants differing only in `recordCount` ∈ {1,2,3}** over a constant `0x3F1`
+  body; `word0 == 0` on 5148/5151. The larger forms concatenate per-instance **runtime records** (movement
+  waypoints / buff-timer pairs), session state the simulation re-derives — not template/appearance data.
 
-So the post-IIR carries the NPC's per-spawn **float-stat / appearance table**, which humanoids have and animals
-don't; `WithMinimalPostIir` emits the empty (animal) form for everyone, so humanoids fall back to default looks →
-no hair. **The fix is to author this stat table (from the NPC's stats/looks) instead of the empty minimal form**
-— or carry just the post-IIR stat table from `Data` while keeping the rest session-independent. (NB: the exact
-record stride/`0x3F1` framing of the table needs one more alignment pass before generating — the records are not
-a clean 16-byte fixed width in the multi-stat tables.) Animals need nothing extra; the minimal form is correct.
+So the "missing hair" regression was the **#23 playfield token** (a stale token made the client drop the spawn),
+now fixed by `SpawnPlayfieldRewriter` — not the post-IIR content. The minimal post-IIR is correct for animals
+**and** humanoids. (`[[npc_spawn_minimal_postiir_breaks_humanoids]]` is corrected accordingly.)
 
-## What this means for construction (#185/#54)
-The **wire grammar is fully pinned AND the content is identified** — no decoding remains for the beach case
-(sublist count 0). What's left is sourcing + the in-client flip:
-1. **The char buffer = the NPC's script-binding string** (above). Two construction routes, both in-client
-   gated: (a) author the buffer from the NPC's RDB script binding, or (b) since it reads like an engine
-   *diagnostic* the client only stores, test whether a **null/empty** buffer still renders (would make
-   construction trivial — but `[[npc_spawn_minimal_postiir_breaks_humanoids]]` is the cautionary precedent).
-2. The few genuine scalars (`w21`@0x1fc, the const-zero `w22`@0x200 / `w45`@0x224, numeric `w50`@0x23c) are
-   small per-NPC numeric fields — author as constants / simple values.
-3. The per-spawn sub-list (`@1122b10`) entry sub-object grammar is still unobserved (`count==0` on beach NPCs).
+## Resolution — from-scratch minimal scaffold, landed (2026-06-17, #185 → needs-testing)
+The wire grammar was already pinned; the sweep settled the **construction** question (there is nothing to source).
+Implemented:
+1. **pre-IIR** — `NpcSpawnPreIir.BuildMinimal(category = 0x6f)`: version `0x05`, all 6 flags 0, all 53 words 0
+   except `word17` = the modal category enum. Byte-exact to a real captured minimal NPC.
+2. **post-IIR** — the existing `NpcSpawnScaffold.BuildMinimalPostIir()` (recordCount==1) is a captured-valid form.
+3. **lift** — `NpcSpawnScaffold.WithMinimalScaffolds(body)` rewrites a captured/cross-session body to the fresh
+   form (transform + IIR identity kept, both scaffolds reset), wired into `NpcSpawnBuilder.TryBuild` for
+   `freshSpawn` builds behind env `FAOLAN_MINIMAL_SCAFFOLD=1` (default OFF; byte-exact reproduction goldens
+   unchanged).
+4. **golden** — `SpawnNpcMinimalPanther.bin` (Kier-Dheed's Panther, fully minimal in both halves) proves
+   `BuildMinimal` (pre) + `BuildMinimalPostIir` (post) + `WithMinimalScaffolds` byte-exact (`NpcSpawnPreIirTests`,
+   526 tests green).
 
-Net: there is **no remaining read-grammar unknown** for the beach case; byte-exact construction is now a
-content-sourcing job (RDB script text + a handful of scalars). The same reader primitives + `0x3F1` framing
-drive the dynel/loot readers (#187, done) — see `Captures/ghidra/DumpIirReaders.java`.
+**Remaining (the in-client flip only):** run `Faolan.ClientLauncher` with `FAOLAN_MINIMAL_SCAFFOLD=1`, confirm
+world-entry / interest / `.spawnnpc` NPCs still render with the minimal scaffolds; if so, make it the default and
+close #185. The per-spawn sub-list (`@1122b10`) entry sub-object grammar stays unobserved (`count==0` everywhere)
+but is irrelevant to the minimal build. The same reader primitives + `0x3F1` framing drove the dynel/loot readers
+(#187, done) — see `Captures/ghidra/DumpIirReaders.java`.
 
 ## Typed scaffold codec — landed (2026-06-16, byte-exact)
 `NpcSpawnPreIir` + `NpcSpawnPreIirCodec` (`Faolan/GameServer/Spawn/NpcSpawnPreIir.cs`) decode the 223-byte
@@ -162,3 +174,5 @@ slicing the captured `Data` blob — the foundation for sourcing the scaffold fr
    there; ordinary mobs put runtime scalars/handles there. This is direct evidence for construction **route b**
    (an empty/scalar buffer is a valid rendering form), and it nuances the earlier "purely diagnostic text, no
    instance handles" conclusion — the large values bear watching as possible session refs on the in-client flip.
+   **(Confirmed by the 2026-06-17 sweep: those large values ARE per-instance runtime handles/timers; they are 0
+   on a fresh spawn, so the minimal build drops them — see "Resolution" above.)**

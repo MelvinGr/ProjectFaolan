@@ -60,6 +60,17 @@ namespace Faolan.GameServer.Spawn
 		// Entry == (isByte, isSublist).
 		internal static readonly (bool IsByte, bool IsSublist)[] Layout = BuildLayout();
 
+		// The wire index of the one word that is reliably non-zero on a freshly-spawned NPC. The cross-capture
+		// sweep (Captures/classify_fa015807_fields.py over 5026 scaffolds) showed every other word is per-instance
+		// runtime state (target/owner handles, timers, action counters) that is 0 on an idle fresh spawn, and that
+		// the most-minimal captured scaffolds carry exactly ONE non-zero word here. Its struct offset is 0x1fc.
+		public const int CategoryWordIndex = 17;
+
+		// The modal value of the category word across the corpus (111 = 0x6f, ~49% of all NPCs; it is a 5-state
+		// per-instance enum {3, 0x6f, 0x78, 0xc9, 0x12c}, NOT identity-bound). The from-scratch minimal scaffold
+		// defaults to it - byte-identical to the most-minimal captured NPCs (e.g. Kier-Dheed's Panther).
+		public const uint DefaultCategory = 0x6f;
+
 		// version byte (0x05; client rejects any other value).
 		public byte Version { get; set; } = ExpectedVersion;
 
@@ -73,6 +84,19 @@ namespace Faolan.GameServer.Spawn
 
 		// The per-spawn sublist, raw. count==0 (the only observed form) is the bare 0x3F1 framing word.
 		public byte[] Sublist { get; set; } = [0x00, 0x00, 0x03, 0xF1];
+
+		// The from-scratch pre-IIR scaffold for a freshly-spawned NPC: version 0x05, all flags 0, all 53 words 0
+		// except the category word (defaulted to 0x6f), and the empty 0x3F1 sublist. This is the "last un-lifted
+		// part" of the from-DB NPC spawn (Gitea #185), sourced from NOTHING - the sweep proved the scaffold carries
+		// no per-NPC config and no session-volatile reference, only per-instance runtime state that is 0 on a fresh
+		// spawn (so there is nothing to lift from the captured Data blob, nor to re-address). Encode() of this is
+		// byte-identical to the most-minimal captured NPC scaffolds (NpcSpawnPreIirTests.PreIir_BuildMinimal_*).
+		public static NpcSpawnPreIir BuildMinimal(uint category = DefaultCategory)
+		{
+			var scaffold = new NpcSpawnPreIir();
+			scaffold.Words[CategoryWordIndex] = category;
+			return scaffold;
+		}
 
 		// Reassembles the 53 u32 in C++ struct-offset order, little-endian (the stream byteswaps on read, so the
 		// wire is LE), into the contiguous inline char buffer, and returns its printable runs joined by ' | '.

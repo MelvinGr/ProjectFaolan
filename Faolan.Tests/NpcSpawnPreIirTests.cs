@@ -60,5 +60,55 @@ namespace Faolan.Tests
 			Assert.Equal(0u, post.Word0); // word0 == 0 across the NPC corpus (the player spawn has 2)
 			Assert.Equal(captured, post.Encode());
 		}
+
+		// The from-scratch FRESH-SPAWN scaffold, built from NOTHING (no captured Data, no DB columns, no session
+		// re-addressing), reproduces a real captured minimal NPC byte-for-byte. SpawnNpcMinimalPanther is
+		// Kier-Dheed's Panther: its pre-IIR has all 53 words 0 except the category word (0x6f) and all flags 0, and
+		// its post-IIR is the recordCount==1 minimal form. This is the proof that the cross-capture sweep's
+		// conclusion holds in code - the "last un-lifted part" of the NPC spawn (Gitea #185) is a constant, so the
+		// remaining work is only the in-client flip (re-run once the world-entry path emits these).
+		[Fact]
+		public void PreIir_BuildMinimal_MatchesCapturedMinimalNpc()
+		{
+			var body = Golden.Bytes("SpawnNpcMinimalPanther");
+			Assert.True(NpcSpawnPreIirCodec.TryDecode(body, out _, out var offset));
+
+			var captured = body[offset..(offset + NpcSpawnPreIir.FixedLength)];
+			Assert.Equal(captured, NpcSpawnPreIirCodec.Encode(NpcSpawnPreIir.BuildMinimal()));
+		}
+
+		[Fact]
+		public void PostIir_BuildMinimal_MatchesCapturedMinimalNpc()
+		{
+			var body = Golden.Bytes("SpawnNpcMinimalPanther");
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var read));
+			var captured = body[(read.Offset + read.Length)..];
+
+			Assert.Equal(captured, NpcSpawnScaffold.BuildMinimalPostIir());
+		}
+
+		// WithMinimalScaffolds is the wire-side "lift": it rewrites a captured NPC body's runtime-state pre-IIR +
+		// post-IIR scaffolds to their from-scratch minimal form while keeping the transform and the CharacterIIR
+		// (identity/appearance) intact. Crocodile carries 11 non-zero pre-IIR words (per-instance runtime state);
+		// after the swap its scaffolds equal the from-scratch builders and its name (IIR) is unchanged (Gitea #185).
+		[Theory, InlineData("SpawnNpcCrocodile"), InlineData("SpawnNpcCasilda")]
+		public void WithMinimalScaffolds_ResetsScaffolds_KeepsIdentity(string golden)
+		{
+			var original = Golden.Bytes(golden);
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(original, out var before));
+
+			var minimal = NpcSpawnScaffold.WithMinimalScaffolds(original);
+
+			// pre-IIR is now the from-scratch minimal scaffold.
+			Assert.True(NpcSpawnPreIirCodec.TryDecode(minimal, out _, out var preOffset));
+			Assert.Equal(
+				NpcSpawnPreIirCodec.Encode(NpcSpawnPreIir.BuildMinimal()),
+				minimal[preOffset..(preOffset + NpcSpawnPreIir.FixedLength)]);
+
+			// post-IIR is now the from-scratch minimal scaffold, and the identity (name) survived the rewrite.
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(minimal, out var after));
+			Assert.Equal(before.Message.Name, after.Message.Name);
+			Assert.Equal(NpcSpawnScaffold.BuildMinimalPostIir(), minimal[(after.Offset + after.Length)..]);
+		}
 	}
 }
