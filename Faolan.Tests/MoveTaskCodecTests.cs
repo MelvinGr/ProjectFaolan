@@ -51,6 +51,39 @@ namespace Faolan.Tests
 			Assert.Equal("96c467400000c35000017f80000043a51acd43115c2a442a2d1a080000c35001316e7101000000000000000000", Convert.ToHexStringLower(body));
 		}
 
+		// mode-01 PathMoveTask: the multi-waypoint patrol path, byte-exact against a captured 2-waypoint path
+		// (handle 0x00017e45, hoxxling login-gameplay): header flags=01, F=00, [u32 2][wp0=from][wp1], then the
+		// 29-byte trailer [00][f32 pathLength][12x00][from]. pathLength is the captured from->last-wp distance (#53).
+		[Fact]
+		public void PathBody_MatchesCapturedTwoWaypointPath()
+		{
+			var from = new Vector3(Bits(0x4414B655), Bits(0x4330D189), Bits(0x443640ED));
+			var wp1 = new Vector3(Bits(0x44144BE7), Bits(0x43313D4F), Bits(0x4433EBE7));
+			var pathLength = Bits(0x4117C22D); // = dist(from, wp1), retail's exact float
+
+			var body = MoveTaskCodec.BuildPathBody(0x00017E45, from, [from, wp1], pathLength);
+
+			Assert.Equal(
+				"96c467400000c35000017e4500004414b6554330d189443640ed010100000000024414b6554330d189443640ed44144be743313d4f4433ebe700"
+				+ "4117c22d0000000000000000000000004414b6554330d189443640ed",
+				Convert.ToHexStringLower(body));
+		}
+
+		// The live overload computes the trailer path-length as the from->last-waypoint distance.
+		[Fact]
+		public void PathBody_LiveOverload_ComputesPathLengthAndStaysWellFormed()
+		{
+			var from = new Vector3(10, 0, 0);
+			var wps = new[] { from, new Vector3(13, 0, 4) }; // dist(from, last) = 5
+
+			var body = MoveTaskCodec.BuildPathBody(0x00017E45, from, wps);
+
+			// trailer = [byte][f32 pathLength][12x00][from(12)] = 29 B; the float is at len-28. Assert it's the distance.
+			var pathLen = BitConverter.Int32BitsToSingle(
+				System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(body.AsSpan(body.Length - 28, 4)));
+			Assert.Equal(5f, pathLen, 3);
+		}
+
 		[Fact]
 		public void FaceTowards_YawsAboutY_TowardTarget()
 		{

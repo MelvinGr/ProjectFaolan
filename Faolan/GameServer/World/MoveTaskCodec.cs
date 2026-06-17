@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Numerics;
 using Faolan.Core.Data;
 using Faolan.Core.Network;
@@ -23,6 +24,7 @@ namespace Faolan.GameServer.World
 		// captures, #53): 0x00 = a bare position, 0x02 = the stationary from/to/facing below, 0x04 = a multi-waypoint
 		// path (the PatrolPath source, still variable-length), 0x08 = approach/face a target entity.
 		public const byte ModeBarePosition = 0x00;
+		public const byte ModePath = 0x01;
 		public const byte ModeStationary = 0x02;
 		public const byte ModeApproachTarget = 0x08;
 
@@ -58,6 +60,43 @@ namespace Faolan.GameServer.World
 				.WriteUInt64(0)
 				.WriteByte(0x00)
 				.ToArray();
+		}
+
+		// mode-01 PathMoveTask: the multi-waypoint patrol path - decoded from the captures + the client reader
+		// FUN_00a483b0 (docs/movetask-grammar.md, #53). Canonical shape (92/92 captured else-branch records): the
+		// WaitMoveTask base header with flags=0x01 (bit0 set -> no duration/remaining floats) + the PathMoveTask
+		// F-flags=0x00 (no optional floats), then [u32 count][count x position] and a fixed 29-byte trailer
+		//   [0x00][f32 pathLength][12x 00][from x/y/z].
+		// `pathLength` is the from -> last-waypoint distance (ratio 1.000 across the captures); it is a PARAMETER
+		// because the retail value differs from a recomputed float by ~1 ULP - the overload computes it for a live
+		// path (the client uses it for interpolation timing, where the last-ULP difference is irrelevant).
+		public static byte[] BuildPathBody(uint handle, Vector3 from, IReadOnlyList<Vector3> waypoints, float pathLength)
+		{
+			var s = new FaolanStream()
+				.WriteUInt32(MoveTaskSubOpcode)
+				.WriteUInt32(WireType)
+				.WriteUInt32(handle)
+				.WriteUInt16(0)
+				.WriteFloatBigEndian(from.X).WriteFloatBigEndian(from.Y).WriteFloatBigEndian(from.Z)
+				.WriteByte(ModePath)
+				.WriteByte(0x01)                     // WaitMoveTask base header flags (bit0 -> no dur/rem floats)
+				.WriteByte(0x00)                     // PathMoveTask F-flags (no optional floats; waypoint-list branch)
+				.WriteUInt32((uint)waypoints.Count);
+			foreach (var w in waypoints)
+				s.WriteFloatBigEndian(w.X).WriteFloatBigEndian(w.Y).WriteFloatBigEndian(w.Z);
+			return s
+				.WriteByte(0x00)                     // trailer byte
+				.WriteFloatBigEndian(pathLength)
+				.WriteUInt64(0).WriteUInt32(0)       // 12 zero bytes
+				.WriteFloatBigEndian(from.X).WriteFloatBigEndian(from.Y).WriteFloatBigEndian(from.Z)
+				.ToArray();
+		}
+
+		// Live overload: the trailer path-length is the from -> last-waypoint distance.
+		public static byte[] BuildPathBody(uint handle, Vector3 from, IReadOnlyList<Vector3> waypoints)
+		{
+			var pathLength = waypoints.Count > 0 ? Vector3.Distance(from, waypoints[^1]) : 0f;
+			return BuildPathBody(handle, from, waypoints, pathLength);
 		}
 
 		// Builds the 61-byte-frame MoveTask body for `handle` moving from `from` to `to`, facing `facing`. from==to is a
