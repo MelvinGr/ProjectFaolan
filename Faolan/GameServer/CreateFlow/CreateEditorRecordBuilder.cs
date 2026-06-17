@@ -120,15 +120,18 @@ namespace Faolan.GameServer
 		// (Captures/decode_behaviorcc.py, #234): of its 90 records the field set is {1,3,5,6} with optional
 		// {2,11,12} and a 0- or 20-byte tail. (A separate 88-byte item-bound long form has its own builder,
 		// BuildBehaviorControlCenterIirLong below.) Decoded by Captures/decode_create_iir_records.py + decode_behaviorcc.py.
+		// `form` is 0x0004 for the common registration; the rarer 0x0007 subtype adds protobuf field 4 (a varint,
+		// between phase and field5). Protobuf wire order: f1=behaviorId, [f2], f3=phase, [f4], f5, f6, [f11], [f12].
 		public static byte[] BuildBehaviorControlCenterIir(uint handle, uint slot, uint behaviorId, uint phase,
 			uint field5, uint field6, uint type = CharacterWireType,
-			uint? field2 = null, uint? field11 = null, uint? field12 = null,
-			uint? boundA = null, uint? boundB = null)
+			uint? field2 = null, uint? field4 = null, uint? field11 = null, uint? field12 = null,
+			uint? boundA = null, uint? boundB = null, ushort form = 0x0004)
 		{
 			var pb = new FaolanStream().WriteByte(0x08).WriteVarint(behaviorId);
 			if (field2 is uint f2) pb.WriteByte(0x10).WriteVarint(f2);
-			pb.WriteByte(0x18).WriteVarint(phase)
-				.WriteByte(0x28).WriteVarint(field5)
+			pb.WriteByte(0x18).WriteVarint(phase);
+			if (field4 is uint f4) pb.WriteByte(0x20).WriteVarint(f4);
+			pb.WriteByte(0x28).WriteVarint(field5)
 				.WriteByte(0x30).WriteVarint(field6);
 			if (field11 is uint f11) pb.WriteByte(0x58).WriteVarint(f11);
 			if (field12 is uint f12) pb.WriteByte(0x60).WriteVarint(f12);
@@ -136,7 +139,7 @@ namespace Faolan.GameServer
 			var s = new FaolanStream()
 				.WriteUInt32(type)
 				.WriteUInt32(handle)
-				.WriteUInt16((ushort)0x0004)
+				.WriteUInt16(form)
 				.WriteUInt32(slot)
 				.WriteArrayUInt32Length(pb.ToArray());
 			if (boundA is uint a)
@@ -158,9 +161,11 @@ namespace Faolan.GameServer
 		// Captures/decode_create_iir_records.py and locked byte-exact by CreateEditorRecordTests.
 		private static readonly byte[] BehaviorOwnerStamp = [0xB2, 0x90, 0x80, 0x5C, 0x29, 0xE6, 0x27, 0xCA];
 
+		// The trailing 3 u32 (`trailingA/B/C`) are 0 in the WorldPrep equipment records but carry a small state pair
+		// (e.g. 0,1,1) in the create-world cutscene's mount/companion long form - so they're parameterized (default 0).
 		public static byte[] BuildBehaviorControlCenterIirLong(uint handle, uint slot, uint behaviorId, uint phase,
 			uint field5, uint field6, uint index, uint someId, uint itemHandle, string tag, byte[] transform,
-			uint type = CharacterWireType)
+			uint type = CharacterWireType, uint trailingA = 0, uint trailingB = 0, uint trailingC = 0)
 		{
 			var tagBytes = System.Text.Encoding.ASCII.GetBytes(tag);
 			if (tagBytes.Length != 4)
@@ -181,7 +186,9 @@ namespace Faolan.GameServer
 				.WriteArray(transform)
 				.WriteArray(BehaviorOwnerStamp)
 				.WriteArray(BehaviorOwnerStamp)
-				.WriteArray(new byte[12])
+				.WriteUInt32(trailingA)
+				.WriteUInt32(trailingB)
+				.WriteUInt32(trailingC)
 				.ToArray();
 		}
 

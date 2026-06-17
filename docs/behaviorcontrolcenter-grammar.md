@@ -41,6 +41,7 @@ scene entities with a fixed-shape record (decoded by `Captures/decode_behaviorcc
 
 Form census across the hoxxling create-world cutscene (90 records): 41x {1,3,5,6,12} no-tail, 34x {1,3,5,6}
 no-tail, 7x {1,3,5,6,12}+bound20, 4x {1,3,5,6,11,12}+bound20, 1x {1,3,5,6}+bound20, 1x {1,2,3,5,6,12}+bound20,
-1x {1,3,5,6}+long88, 1x form=0x0007. `BuildBehaviorControlCenterIir` constructs the form-0x0004 records
-(base + optional 2/11/12 + 20-byte bound tail); `BuildBehaviorControlCenterIirLong` the 88-byte item-bound form.
-The 0x0007 subtype (field-4 variant) is the only registration shape still un-built (1 record, left verbatim).
+1x {1,3,5,6}+long88, 1x form=0x0007. `BuildBehaviorControlCenterIir` constructs every form-0x0004 record (base + optional 2/4/11/12 + 20-byte bound
+tail) AND the 0x0007 subtype (via `form: 0x0007` + `field4`); `BuildBehaviorControlCenterIirLong` builds the
+88-byte item-bound form (its trailing 3 u32 parameterized for the cutscene's non-zero state). All 90 cutscene
+records are now constructed byte-exact (the #234 golden harness locks them).
