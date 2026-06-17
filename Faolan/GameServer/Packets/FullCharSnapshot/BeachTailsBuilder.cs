@@ -81,9 +81,9 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 		// GENERATES the quest PORTION of the tails (@0..1292 = Quest_c journal + @609 objective region + index) from a
 		// quest's DB definition + its seeded snapshot-generation fields, with the player's live `instance` (#186). The
-		// three regions are byte-exact for the beach starter (QuestcGenerationTests). Used by the gated production path
-		// (RetailLoginReplay, FAOLAN_GENERATE_BEACH_QUEST_TAILS) to splice the GENERATED quest region over the captured
-		// tails - byte-identical for a fresh beach char, so it's the first construct-from-DB step in the real snapshot.
+		// three regions are byte-exact for the beach starter (QuestcGenerationTests). Used by the LIVE production path
+		// (RetailLoginReplay, unconditional with a graceful fallback) to splice the GENERATED quest region over the
+		// captured tails - byte-identical for a fresh beach char (in-client verified), the first construct-from-DB step.
 		public const int QuestPortionLength = 1292;
 
 		public static byte[] BuildBeachQuestPortion(QuestDefinition def, uint state, uint instance)

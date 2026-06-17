@@ -2,10 +2,12 @@
 
 Recovered from `AgeOfConan.exe` via the vtable-xref method (`Captures/ghidra/DumpFullCharReader.java` +
 `DumpFullCharRecords.java`, slot 8 = `ReadSubClass`; see the agent memory `ghidra_vtable_xref_readers`).
-Goal: replace the opaque `SnapshotTails.UnknownBeforeAccessWindowTable` blob (the last template-sourced
-region of `BeachTailsTemplate.bin`) with a real, generated grammar so the `.bin` can be retired and the
-character's **class/progression** authored instead of inherited from Strie. See `docs/quest-log-handover.md`
-and the memory `snapshot_tails_construction_scope`.
+Goal (ACHIEVED for the tails, see Status): replace the captured `BeachTailsTemplate.bin` tails with a real,
+generated grammar so the `.bin` can be retired and the character's **class/progression** authored instead of
+inherited from Strie. `BeachTailsBuilder.BuildFromScratch` now reproduces the whole tails byte-for-byte from
+generated quest + a game-static access-window asset + the code stat skeleton; what remains is wiring it into
+the production world-entry + the in-client chat-connect check. See `docs/quest-log-handover.md` and the memory
+`snapshot_tails_construction_scope`.
 
 ## Status & handover (2026-06-17, updated)
 
@@ -36,20 +38,24 @@ DONE this session (the whole quest region authors from server state):
   (`SnapshotN/FieldEc/FieldF0/FieldF8`, `IndexMarker/TableField*/TrailerWord/GoalSteps`) + migration; seeded
   for the beach starter (importer `SeedBeachQuestGoals`). `BuildWholeQuestPortion_ReproducesBeachTails`
   proves `@0..1292` regenerates byte-exact with NO literals (only the per-character quest state).
-- **Production wiring (gated)** — `RetailLoginReplay.BuildBeachInventoryPacket` splices the DB-generated quest
-  portion over the captured tails' `@0..1292` behind **`FAOLAN_GENERATE_BEACH_QUEST_TAILS`** (default off);
-  byte-identical for a fresh beach char (`BuildBeachQuestPortion_MatchesTemplate`). NB `BeachTailsBuilder`
-  itself is TEST-ONLY — production uses the captured world-burst tails, so this gated splice is the real path.
+- **Production wiring (live, in-client verified 2026-06-16)** — `RetailLoginReplay` generates the quest portion
+  (`BeachTailsBuilder.BuildBeachQuestPortion`) and splices it over the captured tails' `@0..1292` unconditionally
+  (with a graceful fallback to the captured region on any failure); byte-identical for a fresh beach char. NB
+  `BeachTailsBuilder.Build`/`BuildFromScratch` are TEST-ONLY — production still uses the captured world-burst
+  tails for everything OUTSIDE the quest portion (the snapshot frame + stats), so retiring the burst entirely is
+  the #210 integration.
 - **Stat block decoded** — `decode_statblock.py`: only 25 of 338 values vary across fresh chars (class/map/XP
   + one session slot); the other 313 are a fixed skeleton, relocated to `TailsStatBlock`.
 
-REMAINING (to fully retire the `.bin` / captured-tails dependency — NOT decode):
-1. **In-client chat-connect smoke test** of the gated path (`FAOLAN_GENERATE_BEACH_QUEST_TAILS=1`) — the first
-   byte-changing step; needs Melvin at the client.
-2. **Access-window table** (`[1292,7917)`, 172 `PFAccessWindow_` entries) — relocate as authored data / source
-   from playfield (#81); the last template-sourced region.
-3. **Stat skeleton** — `TailsStatBlock` relocated; wire it + the patches into the assembly.
-Then the **access-window table** and **stats** regions are the last template-sourced pieces.
+DONE (2026-06-17): the **access-window table** (`[1292,7917)`, 172 `PFAccessWindow_` entries) was carved into
+its own game-static asset `AccessWindowTable.bin`, and the **stat skeleton** + its patches are assembled by
+`BeachTailsBuilder.BuildFromScratch` (serialized via `TailsStatBlock.Serialize`). Together with the generated
+quest portion, `BuildFromScratch` reproduces `BeachTailsTemplate.bin` byte-for-byte (`BeachTailsFromScratchTests`).
+
+REMAINING (to fully retire the `.bin` from production — integration, NOT decode):
+1. Wire `BuildFromScratch` into the burst-less world entry (#210) so the player's own FullChar tails are
+   generated, not the burst's captured ones.
+2. **In-client chat-connect smoke test** — the acceptance gate for any byte-changing snapshot step.
 
 ## Multi-quest layout (2026-06-16) — toward authoring the player's full quest log
 
