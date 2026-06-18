@@ -91,7 +91,8 @@ namespace Faolan.GameServer
 		// IMPORTANT: built entirely with manual byte assembly + manual CRC and the ORIGINAL packet's header copied
 		// verbatim - NOT via PacketStream/WriteLengthHash. An earlier PacketStream-based rebuild stalled the client
 		// on the loading screen even though its output was byte-exact, whereas the manual byte path works.
-		private byte[] BuildBeachInventoryPacket(byte[] substitutedPacket, Character character, CharacterEquipment equipment = null, CharacterInventory[] inventoryRows = null, byte[] generatedQuestPortion = null)
+		private byte[] BuildBeachInventoryPacket(byte[] substitutedPacket, Character character, CharacterEquipment equipment = null, CharacterInventory[] inventoryRows = null, byte[] generatedQuestPortion = null,
+			uint[] characterTags = null)
 		{
 			var conanPacket = new ConanPacket(substitutedPacket);
 			var body = new FaolanStream(conanPacket.Body.ReadArrayUInt32Length());
@@ -160,19 +161,21 @@ namespace Faolan.GameServer
 						? (equipment.FirstPosBag, equipment.FirstPosBag.Archetype)
 						: null;
 
-					// AUTHOR the root (#57) instead of mutating the captured one: f4/f5 come from the server's
-					// account-entitlement policy (FullExpansion/SubscriptionFlags), f6 from the DB containers, f7
-					// false. f1 character_tag and f8 has_spellbook are still carried from the captured root (the
-					// CharacterTag->numeric-id mapping and the spell-nav load are follow-ups); for the in-client-
-					// proven faolan beach snapshot the policy flags equal the captured values, so this stays
-					// byte-identical there. BuildRoot is proven to reproduce any captured root (FullCharIirRoundTripTests).
-					var captured = ((ReadOnlySpan<byte>)rootBytes).FromProtobuf<ProtoFullCharacterIIR>();
+					// AUTHOR the root (#57) fully from typed inputs instead of mutating the captured one: f1
+					// character_tag = the character's DB quest-state tags (empty on a fresh beach char), f4/f5 from the
+					// server's account-entitlement policy (FullExpansion/SubscriptionFlags), f6 from the DB containers,
+					// f7 false, f8 has_spellbook = true. f8 is a CONSTANT, not spell-derived: it decodes to 1 on EVERY
+					// captured login (necro/herald/demo casters, but ALSO pure soldiers guardian+conqueror and rogue
+					// assassins, and the freshest captured chars) - the "from the Spells nav" follow-up was disproven by
+					// the capture sweep. The captured root is no longer read. A fresh beach char has no tags (f1 absent),
+					// so the in-client-proven beach snapshot stays byte-identical. BuildRoot is proven to reproduce any
+					// captured root (FullCharIirRoundTripTests).
 					var typedRoot = FullCharSnapshotBuilder.BuildRoot(
-						captured.CharacterTags,
+						characterTags,
 						FullCharSnapshotBuilder.FullExpansionFlags,
 						FullCharSnapshotBuilder.FullSubscriptionFlags,
-						captured.ShouldSerializeHasNewClaimItems() ? captured.HasNewClaimItems : false,
-						captured.ShouldSerializeHasSpellbook() ? captured.HasSpellbook : null,
+						false,
+						true,
 						FullCharSnapshotBuilder.BuildContainers(instance, equipped, bagFirst, inventoryRows ?? []));
 					var newRoot = typedRoot.ToProtobufBytes();
 					prefix = SetSnapshotBlobLength(parts.Prefix, newRoot.Length);
@@ -430,6 +433,14 @@ namespace Faolan.GameServer
 				? await Database.GetCharacterInventory(client.Session.Character.Id)
 				: [];
 
+			// The snapshot root's per-character f1 character_tag (#57) = the character's quest-state tag ids
+			// (CharacterTag rows; empty on a fresh beach char). Authored from the DB instead of carried from the
+			// captured root; emitted ascending to match the wire. (f8 has_spellbook is NOT per-character: it is 1 on
+			// EVERY captured login regardless of class/level - see BuildBeachInventoryPacket.)
+			var characterTags = client.Session.Character != null
+				? (await Database.GetCharacterTags(client.Session.Character.Id)).OrderBy(t => t).ToArray()
+				: [];
+
 			// #184: keep Casilda's chained pose (the verbatim burst body) until the player accepts her quest 13479
 			// (HasQuest = active OR completed, like the dialogue gate); after that she renders un-chained from the DB.
 			var keepCasildaChained = client.Session.Character != null
@@ -514,7 +525,7 @@ namespace Faolan.GameServer
 				{
 					// The world-entry snapshot: tails patched to the live character, containers substituted with the
 					// player's DB items (BuildBeachInventoryPacket) - this is THE inventory delivery (bag + doll).
-					pkt = BuildBeachInventoryPacket(pkt, client.Session.Character, equipment, inventoryRows, generatedBeachQuestPortion);
+					pkt = BuildBeachInventoryPacket(pkt, client.Session.Character, equipment, inventoryRows, generatedBeachQuestPortion, characterTags);
 				}
 				else if (TryRebuildPlayerSpawnFromDb(client, equipment, scaffoldCharacter, pkt, out var rebuilt))
 				{
