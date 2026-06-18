@@ -20,6 +20,7 @@ namespace Faolan.Tests
 	{
 		private const string SnapshotCap = "/home/melvin/Development/C#/Project Faolan/Captures/strie-login-inventory.bin";
 		private const string PlayerSpawnCap = "/home/melvin/Development/C#/Project Faolan/Captures/strie-login-playerspawn.bin";
+		private const string WorldObjectCap = "/home/melvin/Development/C#/Project Faolan/Captures/strie-login-worldobject.bin";
 		private const uint StriePlayerInstance = 0x02165EFF;
 
 		private static (byte[] Root, byte[] Tails) SplitBeachSnapshot()
@@ -71,6 +72,21 @@ namespace Faolan.Tests
 
 			Assert.Equal(captured.Length, built.Length);
 			Assert.True(captured.SequenceEqual(built), "from-scratch player-spawn packet must be byte-identical to the capture");
+		}
+
+		// A world-object record (66AEDD50, handle != the player) frames with the SAME shared header as the snapshot /
+		// player spawn - confirming the keystone covers every world-entry record class, not just the player's own.
+		[Fact]
+		public void FrameWorldEntryRecord_ReproducesCapturedWorldObjectPacket()
+		{
+			var captured = File.ReadAllBytes(WorldObjectCap);
+			var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(captured.AsSpan(8, 4));
+			var objectBody = captured[bodyStart..];
+
+			var built = GameServerListener.FrameWorldEntryRecord(BeachClient(), objectBody);
+
+			Assert.Equal(captured.Length, built.Length);
+			Assert.True(captured.SequenceEqual(built), "from-scratch world-object packet must be byte-identical to the capture");
 		}
 
 		private static RecordingNetworkClient BeachClient() => new(StriePlayerInstance);
