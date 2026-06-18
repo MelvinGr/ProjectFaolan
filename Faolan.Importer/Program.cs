@@ -245,6 +245,57 @@ namespace Faolan.Importer
 			await db.SaveChangesAsync();
 		}
 
+		// Derives the Npc TYPE table (#244) from the existing NpcSpawns and backfills the FKs. One Npc per distinct
+		// TemplateId; Name/Community come from a representative spawn (constant per type). Rebuilt from scratch each
+		// run (clears Npcs first), so it's idempotent. Spawns with TemplateId 0 (un-lifted) get no type. Spells link
+		// by NpcName -> Npc.Name (the existing name key), keeping NpcName as the live join until the contract step.
+		private static async Task BuildNpcTypes(DatabaseContext db)
+		{
+			// Reset NpcId backrefs + the table so a re-run is a clean rebuild (SetNull FK lets us clear Npcs).
+			await db.Database.ExecuteSqlRawAsync("UPDATE NpcSpawns SET NpcId = NULL");
+			await db.Database.ExecuteSqlRawAsync("UPDATE NpcSpells SET NpcId = NULL");
+			await db.Database.ExecuteSqlRawAsync("DELETE FROM Npcs");
+
+			var spawns = await db.NpcSpawns.ToListAsync();
+			var byTemplate = spawns
+				.Where(s => s.TemplateId != 0)
+				.GroupBy(s => s.TemplateId);
+
+			var typeByTemplate = new Dictionary<uint, Npc>();
+			var typeByName = new Dictionary<string, Npc>(StringComparer.OrdinalIgnoreCase);
+			foreach (var g in byTemplate)
+			{
+				var rep = g.FirstOrDefault(s => !string.IsNullOrEmpty(s.Name)) ?? g.First();
+				var npc = new Npc { TemplateId = g.Key, Name = rep.Name, Community = rep.Community };
+				db.Npcs.Add(npc);
+				typeByTemplate[g.Key] = npc;
+				if (!string.IsNullOrEmpty(npc.Name))
+					typeByName.TryAdd(npc.Name, npc);
+			}
+
+			await db.SaveChangesAsync(); // assigns Npc.Id
+
+			foreach (var s in spawns)
+				if (s.TemplateId != 0 && typeByTemplate.TryGetValue(s.TemplateId, out var npc))
+					s.NpcId = npc.Id;
+
+			var spells = await db.NpcSpells.ToListAsync();
+			var linkedSpells = 0;
+			foreach (var sp in spells)
+				if (sp.NpcName != null && typeByName.TryGetValue(sp.NpcName, out var npc))
+				{
+					sp.NpcId = npc.Id;
+					linkedSpells++;
+				}
+
+			await db.SaveChangesAsync();
+
+			var spawnsLinked = spawns.Count(s => s.NpcId != null);
+			Console.WriteLine($"Built {typeByTemplate.Count} NPC type(s) from {spawns.Count} spawn(s); " +
+				$"linked {spawnsLinked} spawn(s) and {linkedSpells}/{spells.Count} spell(s). " +
+				$"{spawns.Count - spawnsLinked} spawn(s) had no TemplateId.");
+		}
+
 		// Caster NPCs' spells (#232), upserted by (NPC name, spell id). The effect payload is refreshed on re-import.
 		// PLAYER characters are materialized as NPC spawns too (captured other-players), so their OWN casts would be
 		// mis-attributed as NPC spells - skip any name that is a known character.
@@ -461,6 +512,16 @@ namespace Faolan.Importer
 			if (args.Contains("--burst-coverage"))
 			{
 				await BurstCoverageReport.RunAsync(db);
+				return 0;
+			}
+
+			// --build-npc-types: derive the Npc TYPE table (#244) from the EXISTING NpcSpawns - one Npc per distinct
+			// TemplateId (Name/Community from a representative spawn) - and backfill the FKs (NpcSpawn.NpcId + the
+			// spells' NpcId by NpcName). No capture re-import: the type identity already lives in the spawn columns, so
+			// this runs against the committed (pruned) DB. Idempotent: rebuilt from scratch each run.
+			if (args.Contains("--build-npc-types"))
+			{
+				await BuildNpcTypes(db);
 				return 0;
 			}
 

@@ -55,5 +55,13 @@ namespace Faolan.Core.Database.Tables
 
 		[ForeignKey(nameof(MapId))]
 		public virtual Map Map { get; set; }
+
+		// The NPC TYPE this placement is an instance of (#244). Nullable during the expand phase: populated by
+		// deriving the type set from the spawns' TemplateId; the duplicated type columns above (Name/Community/...)
+		// are retired onto Npc in a later contract step. Joined by TemplateId, not Id.
+		public uint? NpcId { get; set; }
+
+		[ForeignKey(nameof(NpcId))]
+		public virtual Npc Npc { get; set; }
 	}
 }

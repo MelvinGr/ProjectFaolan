@@ -39,6 +39,7 @@ namespace Faolan.Core.Database
 		DbSet<MapWorldBurst> MapWorldBursts { get; }
 		DbSet<MapWorldBurstEntity> MapWorldBurstEntities { get; }
 		DbSet<MorphTarget> MorphTargets { get; }
+		DbSet<Npc> Npcs { get; }
 		DbSet<NpcSpawn> NpcSpawns { get; }
 		DbSet<NpcSpawnMorph> NpcSpawnMorphs { get; }
 		DbSet<NpcSpawnEquipment> NpcSpawnEquipment { get; }
@@ -91,6 +92,7 @@ namespace Faolan.Core.Database
 		public DbSet<MapWorldBurst> MapWorldBursts { get; set; }
 		public DbSet<MapWorldBurstEntity> MapWorldBurstEntities { get; set; }
 		public DbSet<MorphTarget> MorphTargets { get; set; }
+		public DbSet<Npc> Npcs { get; set; }
 		public DbSet<NpcSpawn> NpcSpawns { get; set; }
 		public DbSet<NpcSpawnMorph> NpcSpawnMorphs { get; set; }
 		public DbSet<NpcSpawnEquipment> NpcSpawnEquipment { get; set; }
@@ -336,6 +338,28 @@ namespace Faolan.Core.Database
 				.WithOne(e => e.NpcSpawn)
 				.HasForeignKey(e => e.NpcSpawnId)
 				.OnDelete(DeleteBehavior.Cascade);
+
+			// The NPC TYPE table (#244): one row per TemplateId, deduping the type identity duplicated across every
+			// placement. A spawn (instance) and a spell point at their type by the Npc PK (NpcId); SetNull keeps the
+			// instance/spell if the type is ever removed (the type is reference data, not a cascade parent).
+			modelBuilder
+				.Entity<Npc>()
+				.HasIndex(n => n.TemplateId)
+				.IsUnique();
+
+			modelBuilder
+				.Entity<Npc>()
+				.HasMany(n => n.Spawns)
+				.WithOne(s => s.Npc)
+				.HasForeignKey(s => s.NpcId)
+				.OnDelete(DeleteBehavior.SetNull);
+
+			modelBuilder
+				.Entity<Npc>()
+				.HasMany(n => n.Spells)
+				.WithOne(s => s.Npc)
+				.HasForeignKey(s => s.NpcId)
+				.OnDelete(DeleteBehavior.SetNull);
 
 			// One patrol route per (map, spawn point) - keyed like the NpcSpawn it belongs to, so the live MoveTask
 			// builder joins them by position (#53). Its waypoints cascade-delete with the route.

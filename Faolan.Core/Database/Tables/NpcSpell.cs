@@ -12,8 +12,17 @@ namespace Faolan.Core.Database.Tables
 	// path uses.
 	public class NpcSpell : BaseEntity
 	{
-		// The casting NPC's name (matched against the live WorldEntity / NpcSpawn name).
+		// The casting NPC's name (matched against the live WorldEntity / NpcSpawn name). Retained during the #244
+		// expand phase as the live join key; superseded by the NpcId FK below once the loader reads spells via the type.
 		public string NpcName { get; set; }
+
+		// The NPC TYPE that casts this spell (#244) - replaces the fragile NpcName string key. Nullable while the
+		// expand phase backfills it (by matching NpcName -> Npc.Name); the loader still joins by name until the
+		// contract step flips it to the FK.
+		public uint? NpcId { get; set; }
+
+		[System.ComponentModel.DataAnnotations.Schema.ForeignKey(nameof(NpcId))]
+		public virtual Npc Npc { get; set; }
 
 		// The full wire spell id the NPC casts: (rdbBase << 8) | rank. The client resolves the visual/effect from it.
 		public uint SpellId { get; set; }
