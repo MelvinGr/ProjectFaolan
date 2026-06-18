@@ -42,12 +42,6 @@ namespace Faolan.GameServer
 		// see snapshot_embeds_strie_quest). See EnsureBeachStarterQuest / WorldQuest.BeachStarterQuestId.
 		private const uint BeachStarterQuestId = WorldQuest.BeachStarterQuestId;
 
-		// #184: Casilda is CHAINED (arms-up) until the player accepts her quest 13479, then UNCHAINED. The captured
-		// beach burst has her chained; the position-matched NpcSpawns row is the unchained capture. So pre-quest we
-		// keep her body VERBATIM (the burst's chained pose) and post-accept we serve the from-DB unchained rebuild.
-		private const uint CasildaQuestId = 13479;
-		private const string CasildaName = "Casilda";
-
 		// Default starter gear for beach characters (item ids that are fully buildable: p_items identity + harvested
 		// archetype), keyed by the CharacterEquipment slot they go in. Slot-appropriate so the client accepts them.
 		// Harvested from the create-flow captures (#220): every fresh beach character wears the Slave Manacles, and
@@ -441,27 +435,13 @@ namespace Faolan.GameServer
 				? (await Database.GetCharacterTags(client.Session.Character.Id)).OrderBy(t => t).ToArray()
 				: [];
 
-			// #184: keep Casilda's chained pose (the verbatim burst body) until the player accepts her quest 13479
-			// (HasQuest = active OR completed, like the dialogue gate); after that she renders un-chained from the DB.
-			var keepCasildaChained = client.Session.Character != null
-				&& !(await Database.GetCharacterQuests(client.Session.Character.Id)).Any(q => q.QuestId == CasildaQuestId);
-
 			// The spawn-scaffold rows (entry table / feat-ID list / pre-IIR frame) drive the player spawn's
 			// scaffold frame; characters without rows are seeded with the fresh-character defaults once.
 			var scaffoldCharacter = await EnsureSpawnScaffoldRows(client.Session.Character);
 
-			// NPC spawns sourced from the NpcSpawns table so each NPC's FA015807 body is BUILT from its row
-			// (transform columns + IIR) via NpcSpawnBuilder rather than taken verbatim from the burst. Keyed by the
-			// stable spawn POSITION (the dedup key) - NOT the handle, which is session-volatile - and rebuilt with
-			// the burst's own handle so it stays paired with the burst's 96C46740 registration. Same-source rows
-			// rebuild byte-identical; cross-session rows are a genuine reconstruction of the same NPC at the same
-			// spot. The player's own spawn and non-NPC records are untouched.
-			var npcRows = await Database.GetNpcSpawns(mapId);
-			var npcByPosition = new Dictionary<(int, int, int), NpcSpawn>();
-			foreach (var n in npcRows)
-				npcByPosition.TryAdd(PositionKey(n.PositionX, n.PositionY, n.PositionZ), n);
-			var npcBuilt = 0;
-			var npcIdentical = 0;
+			// NPC spawns are NOT rebuilt in the burst: every FA015807 NPC record + its 96C46740 MoveTask is dropped
+			// from the burst (IsBurstNpcRecord -> continue) and each NPC is spawned individually via interest
+			// (WorldBroadcaster.EnsureZoneNpcs -> NpcSpawnBuilder, the from-DB construct-don't-replay path; #185).
 
 			// Static world objects (decor/containers/zones) sourced from the WorldObjects table the same way -
 			// keyed by position, rebuilt via WorldObjectBuilder with the burst's handle, put on the wire only when
@@ -532,22 +512,6 @@ namespace Faolan.GameServer
 					pkt = rebuilt;
 					_broadcaster.CaptureOwnSpawnBody(client, pkt); // stash the player's FA015807 body so other players can be sent it
 				}
-				else if (TryRebuildNpcSpawnFromDb(client, npcByPosition, pkt, keepCasildaChained, out var npcRebuilt, out var wasIdentical))
-				{
-					npcBuilt++;
-					// The from-DB rebuild (DB-row identity/scaffold + the burst's EXACT transform spliced in, see
-					// TryRebuildNpcSpawnFromDb) now goes on the wire for EVERY matched NPC, not just byte-identical ones.
-					// #185 in-client verified 2026-06-14: the old "kept verbatim for non-identical / pcDynel-is-NULL"
-					// problem was a spawn<->MoveTask position inconsistency, NOT the scaffolds; with the transform
-					// matching the paired MoveTask, all 23 cross-session beach NPCs render from the DB. The from-model
-					// interest spawn (EnsureZoneNpcs, for NPCs OUTSIDE the burst) is a separate path. Known fidelity gaps:
-					// the row's IIR pose (Casilda renders un-chained, TODO #184) + a transient half-stream on moving NPCs.
-					// Put the from-DB rebuild on the wire (it carries the burst's exact transform, so it renders -
-					// #185 in-client verified). Always - construct-don't-replay is the only NPC path now.
-					pkt = npcRebuilt;
-					if (wasIdentical)
-						npcIdentical++;
-				}
 				else if (TryRebuildWorldObjectFromDb(objectByPosition, pkt, out var objRebuilt, out var objIdentical))
 				{
 					objectBuilt++;
@@ -564,9 +528,6 @@ namespace Faolan.GameServer
 				toSend.Add(pkt);
 			}
 
-			if (npcByPosition.Count > 0)
-				Logger.LogInformation("NPC spawns for map {Map}: {Matched} burst NPCs matched a row; {Identical} put on the wire as byte-identical DB rebuilds, the other {Verbatim} kept VERBATIM (cross-session rebuild diverged); {Rows} rows available.", burst.MapId,
-					npcBuilt, npcIdentical, npcBuilt - npcIdentical, npcByPosition.Count);
 			if (objectByPosition.Count > 0)
 				Logger.LogInformation("World objects for map {Map}: {Identical}/{Built} table-built objects put on the wire byte-identical, {Rows} rows available.", burst.MapId, objectIdentical, objectBuilt,
 					objectByPosition.Count);
@@ -659,64 +620,6 @@ namespace Faolan.GameServer
 
 			var handle = BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(bodyStart + 12, 4));
 			return handle != client.Session.Account.ClientInstance; // an NPC spawn, not the player's own
-		}
-
-		private bool TryRebuildNpcSpawnFromDb(INetworkClient client, IReadOnlyDictionary<(int, int, int), NpcSpawn> npcByPosition, byte[] packet, bool keepCasildaChained, out byte[] rebuilt, out bool wasIdentical)
-		{
-			rebuilt = null;
-			wasIdentical = false;
-			if (packet.Length < 12)
-				return false;
-
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
-			var bodyStart = 12 + headerLen;
-			if (bodyStart + SpawnPacketBuilder.PosZOffset + 4 > packet.Length)
-				return false;
-
-			var body = packet.AsSpan(bodyStart);
-			var subOpcode = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4));
-			var handle = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(12, 4));
-			if (subOpcode != 0xFA015807u || handle == client.Session.Account.ClientInstance)
-				return false; // not a spawn, or the player's own (handled by TryRebuildPlayerSpawnFromDb)
-
-			var key = PositionKey(BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosXOffset, 4)), BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosYOffset, 4)),
-				BinaryPrimitives.ReadSingleLittleEndian(body.Slice(SpawnPacketBuilder.PosZOffset, 4)));
-			// NO freshSpawn here: the loading-screen burst MUST stay byte-exact to the capture (the proven path that
-			// loads without crashing). freshSpawn re-encodes the body (drops the transient NpcStats.SpawnAnimation),
-			// which shifts the IIR/body lengths for every NPC captured mid-animation - that re-shaped the burst and
-			// crashed the client on the loading screen. SpawnAnimation normalization belongs ONLY on the from-model
-			// spawn (EnsureZoneNpcs -> SendWorldSpawn), which is where Casilda actually streams in (she is outside
-			// the burst), so reverting here keeps the Casilda fix while restoring the working loading screen.
-			if (!npcByPosition.TryGetValue(key, out var row) || !NpcSpawnBuilder.TryBuild(row, handle, out var newBody))
-				return false;
-
-			// #184: pre-quest, keep Casilda VERBATIM (the burst's chained pose) instead of the unchained DB rebuild.
-			if (keepCasildaChained && string.Equals(row.Name, CasildaName, StringComparison.Ordinal))
-				return false;
-
-			// Keep the burst packet's header (already re-addressed to the live player); swap only the FA015807 body.
-			rebuilt = new byte[bodyStart + newBody.Length];
-			Array.Copy(packet, 0, rebuilt, 0, bodyStart); // [len][crc][headerLen][header]
-			newBody.CopyTo(rebuilt, bodyStart);
-
-			// Splice the burst's EXACT transform group (body [20:66]) into the rebuild so the spawn position
-			// byte-matches its paired 96C46740 MoveTask (a waypoint list keyed on that exact position). #185:
-			// in-client verified 2026-06-14 that WITHOUT this the from-DB rebuild renders nowhere (the client silently
-			// drops a spawn whose position diverges from its MoveTask, even by sub-0.1 float precision); WITH it, all
-			// 23 cross-session beach NPCs render. This is what lets the from-DB body replace the verbatim burst packet:
-			// the identity/scaffold come from the DB row, the transform stays the burst's (correct — same NPC, same
-			// captured spot). TODO #184: the row's IIR also carries the spawn animation, so e.g. Casilda renders
-			// un-chained; carry the burst pose for full fidelity.
-			if (packet.Length >= bodyStart + 66 && rebuilt.Length >= bodyStart + 66)
-				Array.Copy(packet, bodyStart + 20, rebuilt, bodyStart + 20, 46);
-
-			// wasIdentical = the (transform-spliced) rebuilt body equals the burst body (now just a stat/diagnostic).
-			wasIdentical = packet.Length == rebuilt.Length && packet.AsSpan(bodyStart).SequenceEqual(rebuilt.AsSpan(bodyStart));
-
-			BinaryPrimitives.WriteUInt32BigEndian(rebuilt.AsSpan(0, 4), (uint)(rebuilt.Length - 4));
-			var crc = Crc32.Calculate(rebuilt[8..]);
-			BinaryPrimitives.WriteUInt32BigEndian(rebuilt.AsSpan(4, 4), crc);
-			return true;
 		}
 
 		// If the burst packet is the player's own entity Spawn (FA015807 whose handle is the client instance),
