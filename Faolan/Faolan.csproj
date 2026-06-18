@@ -21,6 +21,11 @@
              region of the tails that is reference data, not generated. Carved out so BuildFromScratch builds the tails
              with NO captured-tails template (generated quest + this asset + the code stat skeleton). #186. -->
         <EmbeddedResource Include="GameServer\Packets\FullCharSnapshot\AccessWindowTable.bin"/>
+        <!-- Server-owned player CharacterIIR template (Strie's 469B message); the burst-less world entry (#210)
+             overrides its identity/looks/equipment per character via PlayerSpawnMessage and feeds it to
+             PlayerSpawnBuilder, so the player spawn needs no captured burst. The one templated piece - the rest of
+             the player body (scaffold/transform) is generated. -->
+        <EmbeddedResource Include="GameServer\Spawn\PlayerCharacterIirTemplate.bin"/>
     </ItemGroup>
 
     <ItemGroup>
