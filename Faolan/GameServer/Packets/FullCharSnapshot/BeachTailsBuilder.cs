@@ -123,9 +123,11 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			if (character?.MaxStats != null)
 			{
 				block.CurrentXp = character.Experience;
-				block.CurrentHp = character.MaxStats.Health;
-				block.CurrentMana = character.MaxStats.Mana;
-				block.CurrentStamina = character.MaxStats.Stamina;
+				// Author the WHOLE per-class stat block (displayed + base/secondary slots) so it is internally
+				// consistent (#4/#186), not just the displayed maxima. For the captured beach char (Strie, Assassin
+				// 98/0/236, base 90/0/230) this reproduces the template's slots exactly, so the golden stays byte-exact.
+				var v = character.MaxStats.SnapshotVitals(character.Class);
+				block.ApplyClassVitals(v.Hp, v.HpBase, v.Mana, v.ManaBase, v.Stamina, v.StaminaBase);
 			}
 			var statBytes = TailsStatBlock.Serialize(block);
 

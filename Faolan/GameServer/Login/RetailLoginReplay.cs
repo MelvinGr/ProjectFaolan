@@ -86,7 +86,7 @@ namespace Faolan.GameServer
 		// verbatim - NOT via PacketStream/WriteLengthHash. An earlier PacketStream-based rebuild stalled the client
 		// on the loading screen even though its output was byte-exact, whereas the manual byte path works.
 		private byte[] BuildBeachInventoryPacket(byte[] substitutedPacket, Character character, CharacterEquipment equipment = null, CharacterInventory[] inventoryRows = null, byte[] generatedQuestPortion = null,
-			uint[] characterTags = null)
+			uint[] characterTags = null, QuestDefinition beachDefForScratch = null)
 		{
 			var conanPacket = new ConanPacket(substitutedPacket);
 			var body = new FaolanStream(conanPacket.Body.ReadArrayUInt32Length());
@@ -110,9 +110,12 @@ namespace Faolan.GameServer
 						parts.Tails.PostAccessBlock.CurrentXp = character.Experience;
 						if (character.MaxStats != null)
 						{
-							parts.Tails.PostAccessBlock.CurrentHp = character.MaxStats.Health;
-							parts.Tails.PostAccessBlock.CurrentMana = character.MaxStats.Mana;
-							parts.Tails.PostAccessBlock.CurrentStamina = character.MaxStats.Stamina;
+							// Author the WHOLE per-class vitals block (displayed + base/secondary slots) so it is
+							// internally consistent (#4) - not just the displayed maxima, which left a Necromancer's
+							// [60] mana copy at the captured Strie 0. (For the beach this captured block is replaced
+							// wholesale by BuildFromScratch below; this still applies on every other map.)
+							var v = character.MaxStats.SnapshotVitals(character.Class);
+							parts.Tails.PostAccessBlock.ApplyClassVitals(v.Hp, v.HpBase, v.Mana, v.ManaBase, v.Stamina, v.StaminaBase);
 						}
 					}
 				}
@@ -190,16 +193,45 @@ namespace Faolan.GameServer
 			contentStream.WriteUInt32(instance);
 			contentStream.WriteArray(prefix);
 			contentStream.WriteArray(rootBytes);
-			var tailsBytes = parts.Tails.ToArray();
+			byte[] tailsBytes;
 
-			// Splice the DB-GENERATED quest portion (Quest_c + @609 + index, built from the character's beach quest
-			// definition) over the captured tails' @0..1292 region - the construct-from-DB login quest log (#186).
-			// Byte-identical to the captured region for a fresh beach char; in-client verified (chat connects).
-			if (generatedQuestPortion is { Length: BeachTailsBuilder.QuestPortionLength } && tailsBytes.Length >= BeachTailsBuilder.QuestPortionLength)
+			// On the beach, AUTHOR the whole tails from scratch (#186): generated quest portion + the game-static
+			// access-window catalog + the per-class stat block, with NO captured-tails dependency. Verified safe: the
+			// captured beach burst tails contain BeachTailsTemplate.bin as a contiguous substring, and BuildFromScratch
+			// reproduces that template byte-for-byte for the baseline char - so for a fresh char the ONLY change vs the
+			// proven captured path is the intended per-class stat block (the in-client gate). Falls back to the captured
+			// tails on any failure.
+			byte[] fromScratch = null;
+			if (beachDefForScratch != null)
 			{
-				var identical = tailsBytes.AsSpan(0, BeachTailsBuilder.QuestPortionLength).SequenceEqual(generatedQuestPortion);
-				Array.Copy(generatedQuestPortion, 0, tailsBytes, 0, BeachTailsBuilder.QuestPortionLength);
-				Logger.LogInformation("Snapshot quests: spliced DB-generated quest portion ({Len} B; identical-to-captured={Same}).", BeachTailsBuilder.QuestPortionLength, identical);
+				try
+				{
+					fromScratch = BeachTailsBuilder.BuildFromScratch(beachDefForScratch, character, instance);
+					Logger.LogInformation("Snapshot tails: authored beach tails from scratch ({Len} B; per-class stat block, no captured-tails template).", fromScratch.Length);
+				}
+				catch (Exception ex)
+				{
+					Logger.LogWarning(ex, "From-scratch beach tails failed; falling back to the captured tails + quest splice.");
+				}
+			}
+
+			if (fromScratch != null)
+			{
+				tailsBytes = fromScratch;
+			}
+			else
+			{
+				tailsBytes = parts.Tails.ToArray();
+
+				// Splice the DB-GENERATED quest portion (Quest_c + @609 + index, built from the character's beach quest
+				// definition) over the captured tails' @0..1292 region - the construct-from-DB login quest log (#186).
+				// Byte-identical to the captured region for a fresh beach char; in-client verified (chat connects).
+				if (generatedQuestPortion is { Length: BeachTailsBuilder.QuestPortionLength } && tailsBytes.Length >= BeachTailsBuilder.QuestPortionLength)
+				{
+					var identical = tailsBytes.AsSpan(0, BeachTailsBuilder.QuestPortionLength).SequenceEqual(generatedQuestPortion);
+					Array.Copy(generatedQuestPortion, 0, tailsBytes, 0, BeachTailsBuilder.QuestPortionLength);
+					Logger.LogInformation("Snapshot quests: spliced DB-generated quest portion ({Len} B; identical-to-captured={Same}).", BeachTailsBuilder.QuestPortionLength, identical);
+				}
 			}
 
 			contentStream.WriteArray(tailsBytes);
@@ -479,12 +511,20 @@ namespace Faolan.GameServer
 			// instead of carrying the captured one - the construct-from-DB login quest log (#186). Byte-identical for a
 			// fresh beach char (in-client verified 2026-06-16). state 1 = active on login.
 			byte[] generatedBeachQuestPortion = null;
+			QuestDefinition beachDefForScratch = null;
 			{
 				try
 				{
 					var beachDef = await Database.GetQuestDefinition(WorldQuest.BeachStarterQuestId);
 					if (beachDef is { Goals.Count: > 0 } && !string.IsNullOrEmpty(beachDef.IndexGoalSteps))
+					{
 						generatedBeachQuestPortion = BeachTailsBuilder.BuildBeachQuestPortion(beachDef, state: 1, liveInstance);
+						// On the beach itself, author the WHOLE tails from scratch (no captured-tails dependency, #186) -
+						// the quest portion + the game-static access-window catalog + the per-class stat block (#4). For
+						// any other map the captured burst tails stay the source (they carry that map's own regions).
+						if (mapId == DefaultWorldMapId)
+							beachDefForScratch = beachDef;
+					}
 				}
 				catch (Exception ex)
 				{
@@ -505,7 +545,7 @@ namespace Faolan.GameServer
 				{
 					// The world-entry snapshot: tails patched to the live character, containers substituted with the
 					// player's DB items (BuildBeachInventoryPacket) - this is THE inventory delivery (bag + doll).
-					pkt = BuildBeachInventoryPacket(pkt, client.Session.Character, equipment, inventoryRows, generatedBeachQuestPortion, characterTags);
+					pkt = BuildBeachInventoryPacket(pkt, client.Session.Character, equipment, inventoryRows, generatedBeachQuestPortion, characterTags, beachDefForScratch);
 				}
 				else if (TryRebuildPlayerSpawnFromDb(client, equipment, scaffoldCharacter, pkt, out var rebuilt))
 				{

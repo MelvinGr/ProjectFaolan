@@ -853,6 +853,33 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			set => SetValue(CharacterValueIndex.CurrentStamina, value * 100);
 		}
 
+		// Authors the WHOLE per-class vitals block (#4/#186): for HP/Mana/Stamina it sets the DISPLAYED max AND the
+		// lower base/secondary the client reads into a parallel slot, each ×100, keeping the +148 repeated copies in
+		// sync. The old per-stat setters (CurrentHp/Mana/Stamina) touched only the displayed slot, leaving the base
+		// slots - and the second mana copy [60] - at the captured Strie (Rogue) template's values; that internal
+		// inconsistency is the suspected cause of #4 (a Necromancer showed ~0 mana because [60] stayed 0 while [64]
+		// held 24600) and the in-client "gear vanished" snapshot reject. Verified slot map across four archetypes'
+		// retail LOGIN snapshots (decode_statblock.py): HP displayed [23]/[54], base [21]/[56]; mana displayed
+		// [60]=[64], secondary [62]; stamina displayed [68], secondary [66]. Pass CharacterMaxStats.SnapshotVitals().
+		public void ApplyClassVitals(uint hp, uint hpBase, uint mana, uint manaBase, uint stamina, uint staminaBase)
+		{
+			// HP: [21]/[23] are pre-repeated-block standalone slots (like CurrentHpExtra, no +148 copy); [54]/[56] live
+			// inside the repeated block, so SetValue also writes their [202]/[204] copies.
+			Values[21] = hpBase * 100;
+			Values[(int)CharacterValueIndex.CurrentHpExtra] = hp * 100; // [23]
+			SetValue(CharacterValueIndex.CurrentHp, hp * 100);          // [54] (+[202])
+			SetValue((CharacterValueIndex)56, hpBase * 100);            // [56] (+[204])
+
+			// Mana: the displayed max lives in BOTH [60] and [64]; [62] is the ~6-lower secondary.
+			SetValue((CharacterValueIndex)60, mana * 100);              // [60] (+[208])
+			SetValue(CharacterValueIndex.ManaSecondary, manaBase * 100); // [62] (+[210])
+			SetValue(CharacterValueIndex.CurrentMana, mana * 100);       // [64] (+[212])
+
+			// Stamina: displayed [68], secondary [66].
+			SetValue((CharacterValueIndex)66, staminaBase * 100);       // [66] (+[214])
+			SetValue(CharacterValueIndex.CurrentStamina, stamina * 100); // [68] (+[216])
+		}
+
 		public uint CurrentXp
 		{
 			get => GetValue(CharacterValueIndex.CurrentXp) / 10;

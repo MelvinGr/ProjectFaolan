@@ -160,7 +160,7 @@ namespace Faolan.Core.Database.Tables
 				? (ushort)1
 				: level;
 			var extra = lvl - 1;
-			var (hpL1, hpGrow, manaL1, manaGrow, staminaL1, staminaGrow) = Archetype(@class);
+			var (hpL1, hpGrow, manaL1, manaGrow, staminaL1, staminaGrow, _) = Archetype(@class);
 
 			return new CharacterMaxStats
 			{
@@ -174,49 +174,68 @@ namespace Faolan.Core.Database.Tables
 			};
 		}
 
-		// L1-anchored vitals by class: (hpL1, hpGrow, manaL1, manaGrow, staminaL1, staminaGrow). A 0 for manaL1 /
-		// staminaL1 means the class does not have that pool. The L1 values for Soldier/Rogue/Mage/Bear-Shaman are
-		// from retail captures; the rest are estimates (marked). Growth is a placeholder until levelling lands.
-		private static (int HpL1, int HpGrow, int ManaL1, int ManaGrow, int StaminaL1, int StaminaGrow) Archetype(Class @class)
+		// The FullChar snapshot stat block (TailsPostAccessBlock) carries, besides the DISPLAYED max for each pool, a
+		// slightly-lower "base/secondary" value the client reads into a parallel slot. From the four archetypes' retail
+		// LOGIN snapshots (decode_statblock.py over Necro/Guardian/Assassin/Bear-Shaman): mana base = displayed-6,
+		// stamina base = displayed-6, HP base = displayed - a per-class L1 delta (Necro 9, Guardian 10, Assassin/
+		// BearShaman 8). Authoring the WHOLE per-class block (both the displayed AND base slots) keeps it internally
+		// consistent - patching only the displayed slot and leaving the base at the Strie template's Rogue value was the
+		// suspected #4 (wrong mana) / "gear vanished" inconsistency (docs/handoff-2026-06-17-perclass-snapshot.md).
+		// Returned in display units (the block scales ×100 at write time). #186/#4.
+		public (uint Hp, uint HpBase, uint Mana, uint ManaBase, uint Stamina, uint StaminaBase) SnapshotVitals(Class @class)
+		{
+			var a = Archetype(@class);
+			var hpDelta = (uint)(a.HpL1 - a.HpBaseL1);
+			var hpBase = Health > hpDelta ? Health - hpDelta : Health;
+			var manaBase = Mana > 6 ? Mana - 6 : 0;       // 0-pool classes stay 0; mana base is 6 below the displayed max
+			var staminaBase = Stamina > 6 ? Stamina - 6 : 0;
+			return (Health, hpBase, Mana, manaBase, Stamina, staminaBase);
+		}
+
+		// L1-anchored vitals by class: (hpL1, hpGrow, manaL1, manaGrow, staminaL1, staminaGrow, hpBaseL1). A 0 for
+		// manaL1 / staminaL1 means the class does not have that pool. The L1 values for Soldier/Rogue/Mage/Bear-Shaman
+		// (incl. hpBaseL1 = the snapshot's lower HP-base slot) are from retail captures; the rest are estimates (marked).
+		// Growth is a placeholder until levelling lands.
+		private static (int HpL1, int HpGrow, int ManaL1, int ManaGrow, int StaminaL1, int StaminaGrow, int HpBaseL1) Archetype(Class @class)
 		{
 			switch (@class)
 			{
-				// Melee Soldiers - STAMINA ONLY. Retail L1: Guardian HP 130, Stamina 179.
+				// Melee Soldiers - STAMINA ONLY. Retail L1: Guardian HP 130 (base 120), Stamina 179.
 				case Class.Guardian:
 				case Class.Conqueror:
-					return (130, 60, 0, 0, 179, 54);
+					return (130, 60, 0, 0, 179, 54, 120);
 
 				// Dark Templar - Soldier hybrid, BOTH (ESTIMATE: no sheet captured yet).
 				case Class.DarkTemplar:
-					return (120, 60, 120, 30, 170, 54);
+					return (120, 60, 120, 30, 170, 54, 112);
 
-				// Rogues - STAMINA ONLY. TWO captured points (Assassin): L1 HP 98 / Stam 236 (Strie), L23 HP 1270 /
-				// Stam 736 (AssassinL23) -> growth ~53.3 HP, ~22.7 Stam per level.
+				// Rogues - STAMINA ONLY. TWO captured points (Assassin): L1 HP 98 (base 90) / Stam 236 (Strie), L23 HP
+				// 1270 / Stam 736 (AssassinL23) -> growth ~53.3 HP, ~22.7 Stam per level.
 				case Class.Barbarian:
 				case Class.Assassin:
 				case Class.Ranger:
-					return (98, 53, 0, 0, 236, 23);
+					return (98, 53, 0, 0, 236, 23, 90);
 
 				// Ranged Priests - MANA ONLY (ESTIMATE: no sheet captured yet).
 				case Class.PriestOfMitra:
 				case Class.TempestOfSet:
-					return (95, 45, 200, 30, 0, 0);
+					return (95, 45, 200, 30, 0, 0, 87);
 
-				// Bear Shaman - Priest melee hybrid, BOTH. Retail L1: HP 108, Mana 171, Stamina 178.
+				// Bear Shaman - Priest melee hybrid, BOTH. Retail L1: HP 108 (base 100), Mana 171, Stamina 178.
 				case Class.BearShaman:
-					return (108, 45, 171, 30, 178, 39);
+					return (108, 45, 171, 30, 178, 39, 100);
 
 				// Herald of Xotli - Mage melee hybrid, BOTH (ESTIMATE: no sheet captured yet).
 				case Class.HeraldOfXotli:
-					return (95, 38, 200, 40, 150, 32);
+					return (95, 38, 200, 40, 150, 32, 87);
 
-				// Pure Mages - MANA ONLY. Retail L1 (Necromancer): HP 89, Mana 246.
+				// Pure Mages - MANA ONLY. Retail L1 (Necromancer): HP 89 (base 80), Mana 246.
 				case Class.Demonologist:
 				case Class.Necromancer:
-					return (89, 38, 246, 40, 0, 0);
+					return (89, 38, 246, 40, 0, 0, 80);
 
 				default:
-					return (98, 47, 150, 30, 150, 41);
+					return (98, 47, 150, 30, 150, 41, 90);
 			}
 		}
 	}

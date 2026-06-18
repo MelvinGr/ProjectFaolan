@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -34,6 +35,30 @@ namespace Faolan.Tests
 			var template = File.ReadAllBytes(TemplatePath);
 			Assert.Equal(template.Length, built.Length);
 			Assert.True(template.SequenceEqual(built), "from-scratch tails must equal BeachTailsTemplate.bin byte-for-byte");
+		}
+
+		// The template IS Strie (an Assassin/Rogue: HP 98 base 90, Mana 0, Stamina 236 base 230). When the WHOLE
+		// per-class stat block is authored (#4) for an Assassin at L1 it must reproduce that block exactly - i.e. the
+		// production beach flip stays BYTE-IDENTICAL to the proven captured path for the baseline class, and the
+		// per-class authoring only diverges for a DIFFERENT class (Necro etc., the intended #4 change). Guards against
+		// the SnapshotVitals/ApplyClassVitals slot map drifting away from the captured Rogue values.
+		[Fact]
+		public async Task BuildFromScratch_AuthorsAssassinBlock_StillReproducesTheTemplate()
+		{
+			var def = await LoadDefinition(BeachStarterQuestId);
+			Assert.NotNull(def);
+
+			var strie = new Character
+			{
+				Level = 1,
+				Experience = 10, // the template's captured XP slot [80]=100 (=×10); matching it isolates the VITALS authoring
+				Class = Class.Assassin,
+				MaxStats = CharacterMaxStats.CreateDefaults(Class.Assassin, 1)
+			};
+			var built = BeachTailsBuilder.BuildFromScratch(def, strie, TemplateInstance);
+
+			var template = File.ReadAllBytes(TemplatePath);
+			Assert.True(template.SequenceEqual(built), "authoring the per-class block for an Assassin L1 must still equal the captured Strie template byte-for-byte");
 		}
 
 		// The captured-byte tests above only exercise the Strie baseline. The production flip (authoring the tails
