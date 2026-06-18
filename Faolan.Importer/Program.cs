@@ -228,7 +228,7 @@ namespace Faolan.Importer
 		{
 			foreach (var e in spawns)
 			{
-				var existing = await db.NpcSpawns.FirstOrDefaultAsync(n => n.MapId == e.MapId && n.PositionX == e.X && n.PositionY == e.Y && n.PositionZ == e.Z);
+				var existing = await db.NpcSpawns.Include(n => n.Morphs).FirstOrDefaultAsync(n => n.MapId == e.MapId && n.PositionX == e.X && n.PositionY == e.Y && n.PositionZ == e.Z);
 
 				if (existing == null)
 					db.NpcSpawns.Add(Populate(new NpcSpawn
@@ -630,6 +630,17 @@ namespace Faolan.Importer
 			row.HasEquipment = e.HasEquipment;
 			row.Health = e.Health;
 			row.Community = e.Community;
+
+			// Replace the appearance/morph table (#185) - decoded from the post-IIR, ordered. Empty for animals.
+			row.Morphs.Clear();
+			for (var i = 0; i < e.Morphs.Count; i++)
+				row.Morphs.Add(new NpcSpawnMorph
+				{
+					Ordinal = i,
+					MorphId = e.Morphs[i].MorphId,
+					Value = e.Morphs[i].Value,
+					Text = e.Morphs[i].Text ?? ""
+				});
 			return row;
 		}
 

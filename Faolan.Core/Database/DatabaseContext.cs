@@ -40,6 +40,7 @@ namespace Faolan.Core.Database
 		DbSet<MapWorldBurstEntity> MapWorldBurstEntities { get; }
 		DbSet<MorphTarget> MorphTargets { get; }
 		DbSet<NpcSpawn> NpcSpawns { get; }
+		DbSet<NpcSpawnMorph> NpcSpawnMorphs { get; }
 		DbSet<NpcSpell> NpcSpells { get; }
 		DbSet<Realm> Realms { get; }
 		DbSet<RespawnPoint> RespawnPoints { get; }
@@ -90,6 +91,7 @@ namespace Faolan.Core.Database
 		public DbSet<MapWorldBurstEntity> MapWorldBurstEntities { get; set; }
 		public DbSet<MorphTarget> MorphTargets { get; set; }
 		public DbSet<NpcSpawn> NpcSpawns { get; set; }
+		public DbSet<NpcSpawnMorph> NpcSpawnMorphs { get; set; }
 		public DbSet<NpcSpell> NpcSpells { get; set; }
 		public DbSet<PatrolPath> PatrolPaths { get; set; }
 		public DbSet<PatrolWaypoint> PatrolWaypoints { get; set; }
@@ -316,6 +318,14 @@ namespace Faolan.Core.Database
 					n.PositionZ
 				})
 				.IsUnique();
+
+			// A humanoid NPC's appearance/morph table (#185), ordered, cascade-deletes with its NpcSpawn.
+			modelBuilder
+				.Entity<NpcSpawn>()
+				.HasMany(n => n.Morphs)
+				.WithOne(m => m.NpcSpawn)
+				.HasForeignKey(m => m.NpcSpawnId)
+				.OnDelete(DeleteBehavior.Cascade);
 
 			// One patrol route per (map, spawn point) - keyed like the NpcSpawn it belongs to, so the live MoveTask
 			// builder joins them by position (#53). Its waypoints cascade-delete with the route.

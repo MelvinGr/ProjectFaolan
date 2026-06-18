@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Faolan.Core.Database.Tables
@@ -37,6 +38,11 @@ namespace Faolan.Core.Database.Tables
 		// Identity/appearance, lifted from the CharacterIIR (ProtoCoreCharacterIIR). TemplateId (NpcStats.f4) is
 		// the stable per-type identity; MonsterScale carries the per-instance size jitter.
 		public uint TemplateId { get; set; }
+
+		// The humanoid appearance / morph table lifted from the captured post-IIR (#185) - empty for animals, which
+		// carry no such table. When present, NpcSpawnBuilder generates the post-IIR from these rows instead of
+		// keeping the captured blob's (the from-DB lift of the bald-fix's verbatim post-IIR, #243).
+		public virtual ICollection<NpcSpawnMorph> Morphs { get; set; } = new List<NpcSpawnMorph>();
 
 		[ForeignKey(nameof(MapId))]
 		public virtual Map Map { get; set; }

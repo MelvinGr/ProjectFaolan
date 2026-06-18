@@ -27,6 +27,10 @@ namespace Faolan.Importer
 		public uint Race { get; init; }
 		public uint Sex { get; init; }
 		public uint TemplateId { get; init; }
+
+		// The humanoid appearance/morph table lifted from the post-IIR (#185), empty for animals. Lets the spawn's
+		// post-IIR generate from rows instead of the Data blob.
+		public IReadOnlyList<NpcAppearanceMorph> Morphs { get; init; } = [];
 	}
 
 	// Extracts NPC entity spawns (FA015807) per map from a capture: tracks the current map (MapChange 5D85BFC7),
@@ -81,6 +85,11 @@ namespace Faolan.Importer
 					? identity.Name
 					: ExtractName(body);
 
+				// Humanoid appearance/morph table (#185) - decoded from the post-IIR; empty for animals.
+				var morphs = NpcSpawnAppearanceCodec.TryDecodeAppearance(body, out var decoded)
+					? decoded
+					: [];
+
 				entries.Add(identity with
 				{
 					MapId = currentMap,
@@ -93,7 +102,8 @@ namespace Faolan.Importer
 					RotX = ReadLE(body, SpawnPacketBuilder.RotXOffset),
 					RotY = ReadLE(body, SpawnPacketBuilder.RotYOffset),
 					RotZ = ReadLE(body, SpawnPacketBuilder.RotZOffset),
-					RotW = ReadLE(body, SpawnPacketBuilder.RotWOffset)
+					RotW = ReadLE(body, SpawnPacketBuilder.RotWOffset),
+					Morphs = morphs
 				});
 			}
 

@@ -971,6 +971,7 @@ namespace Faolan.Core.Database
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx
 				.NpcSpawns
+				.Include(n => n.Morphs)
 				.Where(n => n.MapId == mapId && n.Data != null)
 				.ToArrayAsync();
 		}

@@ -41,6 +41,30 @@ namespace Faolan.Tests
 			}
 		}
 
+		// The from-DB lift (#185): on a fresh spawn, a humanoid's post-IIR APPEARANCE table is regenerated from the
+		// row's NpcSpawnMorph rows (not carried from Data). Fed the rows decoded from the capture, the rebuilt
+		// post-IIR reproduces the captured appearance table byte-for-byte - and is NOT the bald minimal form.
+		[Fact]
+		public void TryBuild_FreshSpawn_HumanoidWithDbMorphs_RegeneratesCapturedAppearance()
+		{
+			var capturedBody = Golden.Bytes("SpawnNpcCasilda");
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(capturedBody, out var cap));
+			var capturedPostIir = capturedBody[(cap.Offset + cap.Length)..];
+
+			var row = RowFromCapturedBody(capturedBody);
+			Assert.True(NpcSpawnAppearanceCodec.TryDecodeAppearance(capturedBody, out var morphs));
+			for (var i = 0; i < morphs.Count; i++)
+				row.Morphs.Add(new NpcSpawnMorph { Ordinal = i, MorphId = morphs[i].MorphId, Value = morphs[i].Value, Text = morphs[i].Text });
+
+			var handle = BinaryPrimitives.ReadUInt32BigEndian(capturedBody.AsSpan(SpawnPacketBuilder.HandleOffset, 4));
+			Assert.True(NpcSpawnBuilder.TryBuild(row, handle, out var body, freshSpawn: true));
+
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var read));
+			var builtPostIir = body[(read.Offset + read.Length)..];
+			Assert.Equal(capturedPostIir, builtPostIir);
+			Assert.NotEqual(NpcSpawnScaffold.BuildMinimalPostIir(), builtPostIir);
+		}
+
 		private static float ReadLE(byte[] b, int offset)
 		{
 			return BinaryPrimitives.ReadSingleLittleEndian(b.AsSpan(offset, 4));
