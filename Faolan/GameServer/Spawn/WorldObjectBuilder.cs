@@ -1,7 +1,10 @@
 using System;
 using System.Buffers.Binary;
 using System.Numerics;
+using Faolan.Core.Data;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Extensions;
+using Faolan.Core.Network.Protobuf;
 
 namespace Faolan.GameServer.Spawn
 {
@@ -55,6 +58,54 @@ namespace Faolan.GameServer.Spawn
 
 			return true;
 		}
+
+		// Builds a world-object body FROM SCRATCH (#249) - no captured `Data`: the header (subOpcode + typeTag +
+		// handle, fieldA=0) + the transform (pos/rot + the live playfield token as the 0x18 4-byte varint) + the
+		// identity message generated from the row's columns (SimpleDynelMessageCodec) + the row's KdTreeTail (the
+		// static geometry). Byte-identical to a captured body when fed that object's columns + KdTreeTail + transform
+		// (WorldObjectBuilderTests). This is how a loot bag is spawned with NO captured world-object row in the world
+		// (the loot system's bag definition is a baked constant - LootBagTemplate). Returns false if the row has no
+		// lifted columns (DisplayName) or no KdTreeTail.
+		public static bool BuildFromScratch(WorldObject row, uint handle, Vector3 position, Quaternion rotation, uint typeTag, uint playfieldToken, out byte[] body)
+		{
+			body = null;
+			if (row?.DisplayName == null || row.KdTreeTail == null)
+				return false;
+
+			var head = new FaolanStream()
+				.WriteUInt32(0) // body length placeholder @0 (set below)
+				.WriteUInt32(row.SubOpcode)
+				.WriteUInt32(typeTag)
+				.WriteUInt32(handle)
+				.WriteUInt32(0) // fieldA
+				.WriteByte(0x2C)
+				.WriteByte(0x0A)
+				.WriteArrayByteLength(new ProtoVec3 { X = position.X, Y = position.Y, Z = position.Z }.ToProtobufBytes())
+				.WriteByte(0x12)
+				.WriteArrayByteLength(new ProtoQuat { X = rotation.X, Y = rotation.Y, Z = rotation.Z, W = rotation.W }.ToProtobufBytes())
+				.WriteByte(0x18)
+				.WriteArray(EncodePlayfieldVarint(playfieldToken))
+				.ToArray();
+
+			var identity = SimpleDynelMessageCodec.BuildMessage(SimpleDynelMessageCodec.ToMessage(row)); // [u32 len][record]
+
+			body = new byte[head.Length + identity.Length + row.KdTreeTail.Length];
+			head.CopyTo(body, 0);
+			identity.CopyTo(body, head.Length);
+			row.KdTreeTail.CopyTo(body, head.Length + identity.Length);
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)(body.Length - 4));
+			return true;
+		}
+
+		// The playfield token in the transform is a 4-byte LEB128 varint (the fixed width SpawnPlayfieldRewriter
+		// assumes); tokens are < 2^28 so 4 bytes always suffice.
+		private static byte[] EncodePlayfieldVarint(uint token) =>
+		[
+			(byte)((token & 0x7F) | 0x80),
+			(byte)(((token >> 7) & 0x7F) | 0x80),
+			(byte)(((token >> 14) & 0x7F) | 0x80),
+			(byte)((token >> 21) & 0x7F)
+		];
 
 		// Builds a body by splicing the DB row's object IDENTITY (the length-delimited message + the raw tail,
 		// everything after the transform) onto the LIVE placement (`liveBody`'s header + transform + playfield).

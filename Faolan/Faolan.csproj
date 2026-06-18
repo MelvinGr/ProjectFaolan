@@ -26,6 +26,10 @@
              PlayerSpawnBuilder, so the player spawn needs no captured burst. The one templated piece - the rest of
              the player body (scaffold/transform) is generated. -->
         <EmbeddedResource Include="GameServer\Spawn\PlayerCharacterIirTemplate.bin"/>
+        <!-- #249: the generic loot-bag geometry tail (kd-tree), the one reference-data piece of a loot bag. The bag
+             body is otherwise built from scratch (header/transform + identity from columns); this static geometry is
+             baked once so loot bags need NO captured world-object row (GetLootTemplate is map-independent). -->
+        <EmbeddedResource Include="GameServer\Economy\LootBagKdTreeTail.bin"/>
     </ItemGroup>
 
     <ItemGroup>

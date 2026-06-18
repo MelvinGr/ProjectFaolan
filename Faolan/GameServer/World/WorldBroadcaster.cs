@@ -16,6 +16,7 @@ using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.Dialogue;
+using Faolan.GameServer.Economy;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.GameServer.Spawn;
 using Microsoft.Extensions.Logging;
@@ -41,7 +42,6 @@ namespace Faolan.GameServer.World
 		private readonly ConcurrentDictionary<uint, byte> _npcLoadedZones = new ConcurrentDictionary<uint, byte>();
 
 		// Cached loot-bag template (a captured "Bag of loot" world object) per map; null values cache loot-less maps.
-		private readonly ConcurrentDictionary<uint, WorldObject> _lootTemplateByMap = new ConcurrentDictionary<uint, WorldObject>();
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
 
@@ -851,7 +851,7 @@ namespace Faolan.GameServer.World
 			if (player == null)
 				return null;
 
-			var template = await GetLootTemplate(player.MapId);
+			var template = GetLootTemplate();
 			if (template == null)
 				return null;
 
@@ -860,9 +860,10 @@ namespace Faolan.GameServer.World
 			// player's Euler-degree rotation into a quaternion (w=1) gave a magnitude-~180 quaternion that rendered the
 			// bag hugely oversized/distorted.
 			var rotation = Quaternion.Identity;
-			if (!WorldObjectBuilder.TryBuild(template, handle, player.Position, rotation, out var body))
+			// Built FROM SCRATCH (#249): header/transform + identity-from-columns + KdTreeTail, stamped with the live
+			// playfield token directly - no captured Data, no SpawnPlayfieldRewriter pass.
+			if (!WorldObjectBuilder.BuildFromScratch(template, handle, player.Position, rotation, LootBagTemplate.TypeTag, _sim.World.ZoneFor(player.MapId).PlayfieldToken, out var body))
 				return null;
-			SpawnPlayfieldRewriter.TryRewrite(body, _sim.World.ZoneFor(player.MapId).PlayfieldToken);
 			body = await SpliceLootContents(body, handle, cashTin, itemTemplates); // show OUR items/cash in the window
 
 			var bag = WorldEntity.ForLoot(handle, player.MapId, player.Position, player.Rotation, template.Name ?? "Loot", body, LootBagExpirySeconds);
@@ -931,20 +932,17 @@ namespace Faolan.GameServer.World
 		// built.
 		private async Task<bool> MakeCorpseLootable(WorldEntity corpse, IReadOnlyList<uint> items, uint cash)
 		{
-			var template = await GetLootTemplate(corpse.MapId);
+			var template = GetLootTemplate();
 			if (template == null)
 				return false;
 
 			// Identity rotation: the corpse's Euler-degree rotation stuffed into a quaternion (w=1) gives a
-			// magnitude-~180 quaternion that SCALES/DISTORTS the bag model (the deformed loot bag) - the same fix
-			// SpawnLootBagForPlayer already carries. A loot bag has no facing.
-			if (!WorldObjectBuilder.TryBuild(template, corpse.Handle, corpse.Position, Quaternion.Identity, out var body))
+			// magnitude-~180 quaternion that SCALES/DISTORTS the bag model (the deformed loot bag). A loot bag has no
+			// facing. Built FROM SCRATCH (#249) on the corpse's handle + the live playfield token (the client only
+			// registers an object whose playfield instance matches the playfield it loaded).
+			if (!WorldObjectBuilder.BuildFromScratch(template, corpse.Handle, corpse.Position, Quaternion.Identity, LootBagTemplate.TypeTag, _sim.World.ZoneFor(corpse.MapId).PlayfieldToken, out var body))
 				return false;
 
-			// Re-stamp the live playfield token (same reason as SendWorldSpawn): the loot-bag template carries its
-			// capture session's token, but the client only registers/polls an object whose playfield instance matches
-			// the playfield it loaded. Without this a mid-session loot bag never renders (the blocker that gated loot).
-			SpawnPlayfieldRewriter.TryRewrite(body, _sim.World.ZoneFor(corpse.MapId).PlayfieldToken);
 			body = await SpliceLootContents(body, corpse.Handle, cash, items); // show the corpse's items/cash in the window
 
 			corpse.CashTin = cash;
@@ -1025,26 +1023,12 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// The captured loot-bag template (LootBagFullUpdateIIR_c) for a map, cached on first use. Null if the map has
-		// no captured loot bag to template from.
-		private async Task<WorldObject> GetLootTemplate(uint mapId)
+		// The loot-bag definition (#249): the baked canonical "Bag of loot" (columns + embedded KdTreeTail), built FROM
+		// SCRATCH by WorldObjectBuilder.BuildFromScratch - map-independent, needs NO captured loot-bag WorldObject in
+		// the world (deleting static world bags no longer breaks kill-loot). Null only if the geometry asset is missing.
+		private WorldObject GetLootTemplate()
 		{
-			if (_lootTemplateByMap.TryGetValue(mapId, out var cached))
-				return cached;
-
-			var objects = await _database.GetWorldObjects(mapId);
-			WorldObject template = null;
-			foreach (var o in objects)
-			{
-				if (o.SubOpcode == LootBagSubOpcode && o.Name != null && o.Name.Contains("loot", StringComparison.OrdinalIgnoreCase))
-				{
-					template = o;
-					break;
-				}
-			}
-
-			_lootTemplateByMap[mapId] = template; // cache misses too (null) so we don't re-query a loot-less map
-			return template;
+			return LootBagTemplate.IsAvailable ? LootBagTemplate.Create() : null;
 		}
 
 		private uint NextLootHandle()
