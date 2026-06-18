@@ -64,9 +64,13 @@ namespace Faolan.GameServer.World
 			_logger = logger;
 		}
 
-		// Despawn a world-owned entity (a killed NPC, an expired loot bag) for every player currently in range. These
-		// are seen by everyone in the zone (burst / direct spawn), not tracked in per-player Known sets, so this is
-		// range-based rather than ResolveRemove. Uses the same n3ToClientQuit packet as player despawns.
+		// Despawn a world-owned entity (a killed NPC, an expired loot bag) for every nearby player THAT ACTUALLY HAS IT
+		// in their Known set. The Known guard is the #245 invariant: an n3ToClientQuit for a handle the recipient was
+		// never sent crashes the client (`pcDynel is NULL`) - a still-loading player in range of an entity it never
+		// received must not get a despawn for it. Interest is the sole NPC spawn path now, so Known is the authoritative
+		// "was this entity sent to this client" record; the interest path (ResolveMove) already only despawns Known
+		// handles, but this range-based world-tick path did not. Removes the handle as it despawns. Uses the same
+		// n3ToClientQuit packet as player despawns.
 		public async Task BroadcastEntityDespawn(WorldEntity entity)
 		{
 			foreach (var viewer in _sim
@@ -74,7 +78,7 @@ namespace Faolan.GameServer.World
 				         .ZoneFor(entity.MapId)
 				         .PlayersInRange(entity.Position, WorldSimulation.PlayerInterestRange))
 			{
-				if (viewer.Client != null)
+				if (viewer.Client != null && viewer.Known.Remove(entity.Handle))
 					await SendWorldDespawn(viewer.Client, viewer.MapId, entity.Handle);
 			}
 		}
@@ -756,7 +760,9 @@ namespace Faolan.GameServer.World
 				         .ZoneFor(player.MapId)
 				         .PlayersInRange(entity.Position, WorldSimulation.PlayerInterestRange))
 			{
-				if (viewer.Client != null)
+				// #245 invariant: only despawn for a viewer that actually has this handle (a despawn for a handle the
+				// recipient was never sent crashes it). Removes it from Known as it goes.
+				if (viewer.Client != null && viewer.Known.Remove(entityHandle))
 					await SendWorldDespawn(viewer.Client, player.MapId, entityHandle);
 			}
 
@@ -953,8 +959,11 @@ namespace Faolan.GameServer.World
 					continue;
 				// Despawn the standing NPC dynel FIRST, then spawn the bag on the same handle. A LootBagFullUpdate on a
 				// still-rendered character dynel does NOT swap the model (the NPC stayed standing on the corpse), so
-				// remove the dynel then re-add it as the bag.
-				await SendWorldDespawn(viewer.Client, viewer.MapId, corpse.Handle);
+				// remove the dynel then re-add it as the bag. #245 invariant: only despawn for a viewer that actually
+				// HAS the NPC dynel (an n3ToClientQuit for an unknown handle crashes it); a viewer that never saw the
+				// NPC has nothing to swap, so the bag update below just spawns it fresh.
+				if (viewer.Known.Remove(corpse.Handle))
+					await SendWorldDespawn(viewer.Client, viewer.MapId, corpse.Handle);
 				await SendLootBagUpdate(viewer.Client, body);
 			}
 
