@@ -110,5 +110,40 @@ namespace Faolan.Tests
 			Assert.Equal(before.Message.Name, after.Message.Name);
 			Assert.Equal(NpcSpawnScaffold.BuildMinimalPostIir(), minimal[(after.Offset + after.Length)..]);
 		}
+
+		// WithFreshScaffolds is the live-path scaffold pass. For a HUMANOID it always resets the pre-IIR but KEEPS
+		// the captured post-IIR - the appearance / morph table ("*key=val" texscript string + [morphId][float]
+		// pairs). Collapsing it to the minimal form drops that table and the client renders the NPC bald (#243).
+		[Fact]
+		public void WithFreshScaffolds_Humanoid_ResetsPreIir_KeepsAppearancePostIir()
+		{
+			var original = Golden.Bytes("SpawnNpcCasilda");
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(original, out var before));
+			var capturedPostIir = original[(before.Offset + before.Length)..];
+
+			var fresh = NpcSpawnScaffold.WithFreshScaffolds(original, humanoid: true);
+
+			// pre-IIR is the from-scratch minimal scaffold (length-preserving, so the IIR doesn't shift)...
+			Assert.True(NpcSpawnPreIirCodec.TryDecode(fresh, out _, out var preOffset));
+			Assert.Equal(
+				NpcSpawnPreIirCodec.Encode(NpcSpawnPreIir.BuildMinimal()),
+				fresh[preOffset..(preOffset + NpcSpawnPreIir.FixedLength)]);
+
+			// ...but the captured post-IIR (Casilda's morph/appearance table) is preserved verbatim, NOT minimized.
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(fresh, out var after));
+			Assert.Equal(capturedPostIir, fresh[(after.Offset + after.Length)..]);
+			Assert.NotEqual(NpcSpawnScaffold.BuildMinimalPostIir(), fresh[(after.Offset + after.Length)..]);
+		}
+
+		// An animal carries no appearance table, so WithFreshScaffolds resets BOTH scaffolds - byte-identical to
+		// WithMinimalScaffolds (the validated #185 path).
+		[Fact]
+		public void WithFreshScaffolds_Animal_ResetsBothScaffolds()
+		{
+			var original = Golden.Bytes("SpawnNpcCrocodile");
+			Assert.Equal(
+				NpcSpawnScaffold.WithMinimalScaffolds(original),
+				NpcSpawnScaffold.WithFreshScaffolds(original, humanoid: false));
+		}
 	}
 }

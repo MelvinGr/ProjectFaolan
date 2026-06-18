@@ -18,16 +18,17 @@ namespace Faolan.GameServer.Spawn
 	//   body:    per-record groups (movement anchors as big-endian vec3 float triples, buff/timer pairs), all
 	//            terminated by the shared 0x3F1-marked empty pair lists.
 	//
-	// A FRESHLY-SPAWNED NPC (no accrued movement/buff state) has the MINIMAL form: a single constant 41-byte
+	// A FRESHLY-SPAWNED ANIMAL (no accrued movement/buff state) has the MINIMAL form: a single constant 41-byte
 	// block (23/42 NPCs carry exactly this, byte-identical - see MinimalPostIir). That is what a from-scratch
-	// construction emits. CAVEAT (offline analysis 2026-06-17, docs/fa015807-spawn-reader.md): the minimal form is
-	// correct for ANIMALS (they carry exactly it), but HUMANOIDS carry a LARGER post-IIR holding a float-stat /
-	// APPEARANCE table - emitting the minimal form for them drops that table, which is the in-client "missing hair"
-	// regression ([[npc_spawn_minimal_postiir_breaks_humanoids]] UPDATE 2026-06-16). So the variable forms are NOT
-	// purely droppable runtime state; the humanoid appearance table must be authored too. NOTE: the wire-flip to emit
-	// a generated post-IIR is IN-CLIENT-GATED (and as of post-#23 the minimal form renders + chat connects - the
-	// cross-session-rejection theory is superseded); this codec is the regeneration foundation, validated byte-exact
-	// here, ready for that in-client step.
+	// construction emits for animals. HUMANOIDS, however, carry a LARGER post-IIR holding their APPEARANCE / morph
+	// table - the "*key=val" texscript string (e.g. "*ii=-1;*bl=-1") followed by [u32 morphId][float32] pairs,
+	// decoded on Casilda (Gitea #243). Emitting the minimal form for a humanoid DROPS that table and the client
+	// renders the NPC BALD - the "missing hair" regression ([[npc_spawn_minimal_postiir_breaks_humanoids]]). So the
+	// humanoid post-IIR is NOT purely droppable runtime state, and the live path keeps it verbatim for humanoids
+	// (WithFreshScaffolds, gated on worn equipment); only animals get the minimal post-IIR reset. (This corrects the
+	// earlier conclusion in docs/fa015807-spawn-reader.md lines 115-130, which mis-classified the morph table as
+	// runtime state from the population sweep.) The minimal codecs below remain the validated animal/from-scratch
+	// foundation, byte-exact here.
 	public static class NpcSpawnScaffold
 	{
 		// word0 is constant 0 across the corpus (the player spawn has 2 in this slot).
@@ -89,6 +90,18 @@ namespace Faolan.GameServer.Spawn
 		public static byte[] WithMinimalScaffolds(byte[] body)
 		{
 			return WithMinimalPostIir(WithMinimalPreIir(body));
+		}
+
+		// The fresh-spawn scaffold pass used by the live spawn path. Like WithMinimalScaffolds, but a HUMANOID
+		// keeps its captured post-IIR instead of collapsing to the 41-byte minimal form: a humanoid's post-IIR
+		// carries that NPC's APPEARANCE / morph table (the "*key=val" texscript string + [morphId][float] pairs -
+		// decoded on Casilda, Gitea #243), and the minimal form drops it, so the client renders the NPC bald. An
+		// animal carries no such table (it ships exactly the minimal form), so it still gets the validated #185
+		// minimal post-IIR reset. The pre-IIR (transform/bounds runtime block) is always reset to minimal for both.
+		public static byte[] WithFreshScaffolds(byte[] body, bool humanoid)
+		{
+			body = WithMinimalPreIir(body);
+			return humanoid ? body : WithMinimalPostIir(body);
 		}
 
 		// Replaces an FA015807 body's post-IIR scaffold with the minimal session-independent form, adjusting the

@@ -34,12 +34,14 @@ namespace Faolan.GameServer.Spawn
 			var rotation = new Quaternion(row.RotationX, row.RotationY, row.RotationZ, row.RotationW);
 			body = SpawnPacketBuilder.BuildSpawn(template, handle, position, rotation, read.Message);
 
-			// On a fresh spawn, reset the pre-IIR + post-IIR scaffolds to their from-scratch minimal form instead of
-			// carrying the row's captured runtime-state scaffolds. The cross-capture sweep proved those scaffolds hold
-			// only per-instance runtime state (0 on a fresh spawn), and #185 was verified in-client 2026-06-17 (minimal
-			// scaffolds render + chat connects, no stream errors) - so this is now unconditional, the final from-DB lift.
+			// On a fresh spawn, reset the runtime-state scaffolds to their from-scratch minimal form instead of
+			// carrying the row's captured (cross-session) scaffolds. The pre-IIR (transform/bounds) always resets;
+			// the post-IIR resets only for ANIMALS. A HUMANOID's post-IIR carries its APPEARANCE / morph table
+			// (decoded on Casilda - "*key=val" texscript string + [morphId][float] pairs, Gitea #243), and the
+			// minimal form drops it, rendering the NPC BALD; so humanoids keep their captured post-IIR. (Humanoid =
+			// carries worn equipment - the same signal NpcSpawnConstructionTests keys on.)
 			if (freshSpawn)
-				body = NpcSpawnScaffold.WithMinimalScaffolds(body);
+				body = NpcSpawnScaffold.WithFreshScaffolds(body, humanoid: read.Message.InventoryEntries.Count > 0);
 
 			return true;
 		}
