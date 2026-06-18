@@ -7,11 +7,13 @@ using Faolan.Core.Database.Tables;
 namespace Faolan.GameServer.Spawn
 {
 	// Bridges a stored NpcSpawn row to a wire FA015807 (SimpleCharFullUpdate) body, addressed to a live session
-	// handle. The transform (position/rotation) is driven by the row's structured columns; the CharacterIIR
-	// (identity/appearance/equipment) and the still-raw pre-IIR float block + post-IIR scaffold come from the
-	// row's captured `Data` (docs/archive/spawn-dissection-plan.md Phase 4 - those two blocks are the last un-lifted part).
+	// handle. The transform (position/rotation) is driven by the row's structured columns; the pre-IIR float block
+	// + post-IIR scaffold are GENERATED from scratch (NpcSpawnScaffold), equipment from NpcSpawnEquipment rows and
+	// morphs from NpcSpawnMorph rows. The row's captured `Data` is no longer replayed - it is decoded only to source
+	// the CharacterIIR stat CORE (CharacterStats / NpcStats / Bcc) that isn't yet in typed storage; lifting that core
+	// (mostly TYPE-level, 27 templates) is deferred to the Npc-type split (#244), where `Data` retires.
 	// Byte-identical to the captured body when the row's columns match the capture (NpcSpawnBuilderTests); this is
-	// the unit the world-entry path will call per map instead of replaying the MapWorldBurst blob.
+	// the unit the world-entry/interest path calls per NPC instead of replaying the MapWorldBurst blob.
 	public static class NpcSpawnBuilder
 	{
 		// Produces the FA015807 body for `row`, addressed to `handle`. Returns false if the row has no usable

@@ -6,13 +6,17 @@ namespace Faolan.Core.Database.Tables
 	// A captured NPC entity spawn (FA015807) on a map. Keyed for dedup by (MapId, Position) - the stable spawn
 	// point; the entity handle is session-scoped. Imported from captures by Faolan.Importer (NpcSpawnExtractor).
 	//
-	// `Data` is the still-raw captured FA015807 body (interim, like the world burst). The structured columns
-	// below are LIFTED from its ProtoCoreCharacterIIR by the dissection (docs/archive/spawn-dissection-plan.md Phase 4):
-	// transform (position + rotation) and the NPC identity/appearance (TemplateId/Race/Sex/Level/...). They make
-	// the identity first-class so the server can build the spawn from data; `Data` shrinks once the pre-IIR
-	// float block + post-IIR scaffold are also lifted into scaffold rows (the same blocks the player spawn keeps).
-	// Transform (PositionX/Y/Z + the RotationX/Y/Z/W quaternion + the Position/Rotation accessors) is inherited
-	// from Base3DEntity, shared with the player Character and the world objects.
+	// `Data` is the captured FA015807 body. It is NO LONGER REPLAYED verbatim: NpcSpawnBuilder DECODES it and
+	// reconstructs the spawn field-by-field (#185) - the transform comes from the columns below, the scaffolds
+	// (pre-IIR/post-IIR) are generated from scratch, equipment from NpcSpawnEquipment, morphs from NpcSpawnMorph.
+	// So `Data` now serves only as the SOURCE for the CharacterIIR stat core (CharacterStats / NpcStats / Bcc)
+	// that hasn't been lifted into typed storage yet. A roster measurement (#185, 2026-06-18) showed that core is
+	// fully-typed protobuf with ~23 CharacterStats + ~9 NpcStats fields that vary, mostly TYPE-level (only 27
+	// distinct TemplateIds) - so its lift belongs with the Npc-type/NpcSpawn-instance split (#244), where the stat
+	// block is stored once per type as typed rows. `Data` is retired there, not here.
+	// The structured columns below are LIFTED from the ProtoCoreCharacterIIR: NPC identity/appearance
+	// (TemplateId/Race/Sex/Level/HeadMesh/...). Transform (PositionX/Y/Z + RotationX/Y/Z/W + the Position/Rotation
+	// accessors) is inherited from Base3DEntity, shared with the player Character and the world objects.
 	public class NpcSpawn : Base3DEntity
 	{
 		public bool HasEquipment { get; set; }
