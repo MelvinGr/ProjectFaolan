@@ -425,9 +425,15 @@ namespace Faolan.GameServer.World
 				if (NpcSpawnBuilder.TryBuild(npc, handle, out var spawnBody, freshSpawn: true))
 					entity.SpawnBody = spawnBody;
 
-				// Caster NPCs (#232): load the spells this NPC type casts (by name, cached per distinct name). Empty
-				// until the importer populates NpcSpell, at which point the sim's cast branch (IsCaster) lights up.
-				if (npc.Name is { Length: > 0 } spellName)
+				// Caster NPCs (#232): the spells this NPC casts. Prefer the #244 type FK (npc.Npc.Spells, loaded with
+				// the spawn) which replaces the fragile name-string join; fall back to the by-name lookup for a spawn
+				// not yet linked to a type (NpcId null - e.g. a row with no TemplateId). Empty for non-casters.
+				if (npc.Npc?.Spells is { Count: > 0 } typeSpells)
+				{
+					foreach (var s in typeSpells)
+						entity.Spells.Add(new NpcSpellCast(s.SpellId, s.Payload));
+				}
+				else if (npc.NpcId == null && npc.Name is { Length: > 0 } spellName)
 				{
 					if (!spellsByName.TryGetValue(spellName, out var spells))
 						spellsByName[spellName] = spells = await _database.GetNpcSpellsByName(spellName);

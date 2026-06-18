@@ -973,6 +973,7 @@ namespace Faolan.Core.Database
 				.NpcSpawns
 				.Include(n => n.Morphs)
 				.Include(n => n.Equipment)
+				.Include(n => n.Npc).ThenInclude(t => t.Spells) // #244: the NPC type + its FK'd spells (replaces the name-string spell join)
 				.Where(n => n.MapId == mapId && n.Data != null)
 				.ToArrayAsync();
 		}
