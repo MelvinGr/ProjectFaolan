@@ -1,13 +1,16 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Reflection;
+using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Protobuf;
+using Microsoft.Extensions.Logging;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.GameServer.Spawn;
 
@@ -27,6 +30,95 @@ namespace Faolan.GameServer
 		// The beach playfield id MapChange/BuildMapChange emits (0x004FE428); the spawn transform + world objects scope
 		// to it. Threaded as one value so the snapshot/spawn/objects agree (per-map sourcing is a follow-up).
 		private const uint BeachPlayfieldId = 0x004FE428;
+
+		// Opt-in flag for the burst-less world entry (#210). Default off: the path is built + unit-tested but NOT yet
+		// verified in-client, and is beach-shaped (the tails + playfield are beach values). Flip to test a beach login.
+		private static readonly bool BurstlessEntryEnabled =
+			string.Equals(Environment.GetEnvironmentVariable("FAOLAN_BURSTLESS_ENTRY"), "1", StringComparison.Ordinal);
+
+		// Builds + sends the entire world entry from generated/structured pieces - no captured burst (#210). Mirrors
+		// SendWorldEntry's world-model setup + record order (MapChange, objects, player spawn, snapshot, vitals,
+		// gametime), then runs interest for the NPCs. Beach-shaped (BeachTailsBuilder + BeachPlayfieldId); a non-beach
+		// map would get beach tails, so the flag is for a beach login until per-map sourcing lands.
+		private async Task SendBurstlessWorldEntry(INetworkClient client, uint mapId)
+		{
+			var character = client.Session.Character;
+			var equipment = await EnsureBeachStarterEquipment(character);
+			await EnsureBeachStarterQuest(character);
+			var inventoryRows = character != null
+				? await Database.GetCharacterInventory(character.Id)
+				: [];
+			var characterTags = character != null
+				? (await Database.GetCharacterTags(character.Id)).OrderBy(t => t).ToArray()
+				: [];
+			var scaffoldCharacter = await EnsureSpawnScaffoldRows(character);
+			var worldObjectRows = await Database.GetWorldObjects(mapId);
+
+			QuestDefinition beachDef = null;
+			try
+			{
+				beachDef = await Database.GetQuestDefinition(BeachStarterQuestId);
+			}
+			catch (Exception ex)
+			{
+				Logger.LogWarning(ex, "Burst-less entry: beach quest definition load failed.");
+			}
+
+			if (beachDef is not { Goals.Count: > 0 })
+			{
+				Logger.LogError("Burst-less world entry (map={Map}): no beach quest definition; falling back to the burst path.", mapId);
+				var fallback = await Database.GetMapWorldBurst(mapId) ?? await Database.GetMapWorldBurst(DefaultWorldMapId);
+				if (fallback != null)
+				{
+					await _broadcaster.EnsureZoneNpcs(mapId);
+					_simulation.RegisterPlayerInWorld(client);
+					await ReplayMapWorldBurst(client, fallback, mapId);
+					await _broadcaster.BroadcastPlayerEntry(client);
+					await _broadcaster.RestorePlayerQuests(client);
+				}
+
+				return;
+			}
+
+			// Populate the shared world model BEFORE building so the player entity exists for CaptureOwnSpawnBody.
+			await _broadcaster.EnsureZoneNpcs(mapId);
+			_simulation.RegisterPlayerInWorld(client);
+
+			var toSend = new List<byte[]>(worldObjectRows.Length + 5)
+			{
+				BuildMapChange(client)
+			};
+			toSend.AddRange(BuildBurstlessWorldObjects(client, worldObjectRows, BeachPlayfieldId));
+
+			var playerSpawn = BuildBurstlessPlayerSpawn(client, equipment, scaffoldCharacter, BeachPlayfieldId);
+			if (playerSpawn != null)
+			{
+				toSend.Add(playerSpawn);
+				_broadcaster.CaptureOwnSpawnBody(client, playerSpawn); // so other players can be sent this player's spawn
+			}
+			else
+			{
+				Logger.LogWarning("Burst-less entry (map={Map}, '{Name}'): player spawn not built (no scaffold rows?); avatar may not render.", mapId, character?.Name);
+			}
+
+			var snapshot = BuildBurstlessSnapshot(client, equipment, inventoryRows, characterTags, beachDef);
+			toSend.Add(snapshot);
+			// Record this playfield's despawn token from the snapshot we actually send (WorldDespawn), as the burst path does.
+			var snapBodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(snapshot.AsSpan(8, 4));
+			_broadcaster.CapturePlayfieldToken(mapId, snapshot.AsSpan(snapBodyStart));
+
+			toSend.Add(BuildVitals(client));
+			toSend.Add(BuildGameTime(client));
+
+			foreach (var bytes in toSend)
+				await client.SendAsync(bytes);
+
+			Logger.LogInformation("Burst-less world entry (map={Map}, '{Name}'): sent {Count} constructed packets (no burst).", mapId, character?.Name, toSend.Count);
+
+			// Interest spawns the NPCs + this player to nearby players; restore the quest journal.
+			await _broadcaster.BroadcastPlayerEntry(client);
+			await _broadcaster.RestorePlayerQuests(client);
+		}
 
 		// Server-owned player CharacterIIR template (Strie's 469B message); PlayerSpawnMessage overrides its
 		// identity/looks/equipment per character. The one templated piece of the otherwise-generated player body.
