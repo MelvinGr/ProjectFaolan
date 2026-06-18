@@ -559,6 +559,8 @@ namespace Faolan.Importer
 
 				await ImportNpcSpawns(db, burst);
 
+				await BuildNpcTypes(db); // #244: rebuild the Npc type table + FKs for the reseeded spawns
+
 				var byMap = burst.GroupBy(e => e.MapId).OrderBy(g => g.Key).Select(g => $"{g.Key}={g.Count()}");
 				Console.WriteLine($"Reseed NPCs: removed {removed} spawns; imported {burst.Count} login-burst spawns ({string.Join(", ", byMap)}); " +
 					$"morphs={await db.NpcSpawnMorphs.CountAsync()}, equipment={await db.NpcSpawnEquipment.CountAsync()}.");
@@ -683,6 +685,7 @@ namespace Faolan.Importer
 				var npcSpells = NpcSpellExtractor.Merge(captures.SelectMany(c => NpcSpellExtractor.Extract(c.Packets)));
 				var npcSpellsAdded = await ImportNpcSpells(db, npcSpells);
 				Console.WriteLine($"NPC spells (#232): {npcSpells.Count} (name,spell) pairs, {npcSpellsAdded} new.");
+				await BuildNpcTypes(db); // #244: rebuild the Npc type table + FKs from the freshly imported spawns/spells
 				await ImportPatrolPaths(db, PatrolPathExtractor.Merge(captures.SelectMany(c => PatrolPathExtractor.Extract(c.Packets))));
 				await ImportWorldObjects(db, WorldObjectExtractor.Merge(captures.SelectMany(c => WorldObjectExtractor.Extract(c.Packets))));
 				await ImportMapWorldBursts(db, MapWorldBurstExtractor.Merge(captures.SelectMany(c => MapWorldBurstExtractor.Extract(c.Packets))));
