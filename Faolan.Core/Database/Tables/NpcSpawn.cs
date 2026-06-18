@@ -44,6 +44,11 @@ namespace Faolan.Core.Database.Tables
 		// keeping the captured blob's (the from-DB lift of the bald-fix's verbatim post-IIR, #243).
 		public virtual ICollection<NpcSpawnMorph> Morphs { get; set; } = new List<NpcSpawnMorph>();
 
+		// The worn equipment (CharacterIIR f23) lifted from the captured spawn (#185) - empty for unarmed NPCs.
+		// When present, NpcSpawnBuilder rebuilds the spawn's inventory_entry list from these rows instead of the
+		// captured Data blob's (the NPC counterpart of the player's DB-sourced equipment, PlayerSpawnEquipment).
+		public virtual ICollection<NpcSpawnEquipment> Equipment { get; set; } = new List<NpcSpawnEquipment>();
+
 		[ForeignKey(nameof(MapId))]
 		public virtual Map Map { get; set; }
 	}

@@ -31,6 +31,16 @@ namespace Faolan.GameServer.Spawn
 			if (freshSpawn && read.Message.npc_stats != null)
 				read.Message.npc_stats.SpawnAnimation = 0;
 
+			// Worn equipment from DB rows (#185): rebuild the CharacterIIR f23 list from NpcSpawnEquipment instead of
+			// the captured Data blob's. Only when the row has lifted equipment - else the parsed (Data) list stands,
+			// so a row predating the lift is unchanged. Byte-identical to the capture when the rows came from it.
+			if (row?.Equipment is { Count: > 0 })
+			{
+				read.Message.InventoryEntries.Clear();
+				foreach (var entry in NpcSpawnEquipmentBuilder.BuildEntries(row.Equipment))
+					read.Message.InventoryEntries.Add(entry);
+			}
+
 			var position = new Vector3(row.PositionX, row.PositionY, row.PositionZ);
 			var rotation = new Quaternion(row.RotationX, row.RotationY, row.RotationZ, row.RotationW);
 			body = SpawnPacketBuilder.BuildSpawn(template, handle, position, rotation, read.Message);

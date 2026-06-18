@@ -41,6 +41,7 @@ namespace Faolan.Core.Database
 		DbSet<MorphTarget> MorphTargets { get; }
 		DbSet<NpcSpawn> NpcSpawns { get; }
 		DbSet<NpcSpawnMorph> NpcSpawnMorphs { get; }
+		DbSet<NpcSpawnEquipment> NpcSpawnEquipment { get; }
 		DbSet<NpcSpell> NpcSpells { get; }
 		DbSet<Realm> Realms { get; }
 		DbSet<RespawnPoint> RespawnPoints { get; }
@@ -92,6 +93,7 @@ namespace Faolan.Core.Database
 		public DbSet<MorphTarget> MorphTargets { get; set; }
 		public DbSet<NpcSpawn> NpcSpawns { get; set; }
 		public DbSet<NpcSpawnMorph> NpcSpawnMorphs { get; set; }
+		public DbSet<NpcSpawnEquipment> NpcSpawnEquipment { get; set; }
 		public DbSet<NpcSpell> NpcSpells { get; set; }
 		public DbSet<PatrolPath> PatrolPaths { get; set; }
 		public DbSet<PatrolWaypoint> PatrolWaypoints { get; set; }
@@ -325,6 +327,14 @@ namespace Faolan.Core.Database
 				.HasMany(n => n.Morphs)
 				.WithOne(m => m.NpcSpawn)
 				.HasForeignKey(m => m.NpcSpawnId)
+				.OnDelete(DeleteBehavior.Cascade);
+
+			// An NPC's worn equipment (CharacterIIR f23, #185), cascade-deletes with its NpcSpawn.
+			modelBuilder
+				.Entity<NpcSpawn>()
+				.HasMany(n => n.Equipment)
+				.WithOne(e => e.NpcSpawn)
+				.HasForeignKey(e => e.NpcSpawnId)
 				.OnDelete(DeleteBehavior.Cascade);
 
 			// One patrol route per (map, spawn point) - keyed like the NpcSpawn it belongs to, so the live MoveTask

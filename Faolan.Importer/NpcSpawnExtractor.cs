@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Faolan.Core.Database.Tables;
 using Faolan.GameServer.Spawn;
 
 namespace Faolan.Importer
@@ -31,6 +32,10 @@ namespace Faolan.Importer
 		// The humanoid appearance/morph table lifted from the post-IIR (#185), empty for animals. Lets the spawn's
 		// post-IIR generate from rows instead of the Data blob.
 		public IReadOnlyList<NpcAppearanceMorph> Morphs { get; init; } = [];
+
+		// The worn equipment lifted from the CharacterIIR f23 (#185), empty for unarmed NPCs and for any NPC whose
+		// items don't match the reproducible ProtoAcgItem shape (then equipment stays sourced from the Data blob).
+		public IReadOnlyList<NpcSpawnEquipment> Equipment { get; init; } = [];
 	}
 
 	// Extracts NPC entity spawns (FA015807) per map from a capture: tracks the current map (MapChange 5D85BFC7),
@@ -179,8 +184,24 @@ namespace Faolan.Importer
 			var msg = read.Message;
 			var stats = msg.Stats;
 			var wireHealth = stats == null ? 0 : stats.Health != 0 ? stats.Health : stats.Life;
+
+			// Lift worn equipment (#185) - but only when EVERY item matches the reproducible ProtoAcgItem shape, so
+			// the builder reproduces the f23 list byte-for-byte; otherwise leave equipment to the Data blob (no rows).
+			var equipment = new List<NpcSpawnEquipment>();
+			foreach (var entry in msg.InventoryEntries)
+			{
+				if (!NpcSpawnEquipmentBuilder.TryLift(entry, out var equipRow))
+				{
+					equipment.Clear();
+					break;
+				}
+
+				equipment.Add(equipRow);
+			}
+
 			return empty with
 			{
+				Equipment = equipment,
 				Name = msg.Name ?? string.Empty,
 				TemplateId = msg.npc_stats?.TemplateId ?? 0,
 				// NpcStats f4 (fixed32) = the stable per-type identity

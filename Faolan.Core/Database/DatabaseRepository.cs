@@ -972,6 +972,7 @@ namespace Faolan.Core.Database
 			return await ctx
 				.NpcSpawns
 				.Include(n => n.Morphs)
+				.Include(n => n.Equipment)
 				.Where(n => n.MapId == mapId && n.Data != null)
 				.ToArrayAsync();
 		}

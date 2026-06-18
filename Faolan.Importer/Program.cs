@@ -228,7 +228,7 @@ namespace Faolan.Importer
 		{
 			foreach (var e in spawns)
 			{
-				var existing = await db.NpcSpawns.Include(n => n.Morphs).FirstOrDefaultAsync(n => n.MapId == e.MapId && n.PositionX == e.X && n.PositionY == e.Y && n.PositionZ == e.Z);
+				var existing = await db.NpcSpawns.Include(n => n.Morphs).Include(n => n.Equipment).FirstOrDefaultAsync(n => n.MapId == e.MapId && n.PositionX == e.X && n.PositionY == e.Y && n.PositionZ == e.Z);
 
 				if (existing == null)
 					db.NpcSpawns.Add(Populate(new NpcSpawn
@@ -640,6 +640,18 @@ namespace Faolan.Importer
 					MorphId = e.Morphs[i].MorphId,
 					Value = e.Morphs[i].Value,
 					Text = e.Morphs[i].Text ?? ""
+				});
+
+			// Replace the worn-equipment table (#185) - lifted from the CharacterIIR f23. Empty for unarmed NPCs.
+			row.Equipment.Clear();
+			foreach (var eq in e.Equipment)
+				row.Equipment.Add(new NpcSpawnEquipment
+				{
+					Pos = eq.Pos,
+					Key1 = eq.Key1, Key2 = eq.Key2, Key3 = eq.Key3, Key4 = eq.Key4,
+					Template = eq.Template,
+					Level = eq.Level,
+					Hash = eq.Hash
 				});
 			return row;
 		}

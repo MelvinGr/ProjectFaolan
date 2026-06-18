@@ -65,6 +65,27 @@ namespace Faolan.Tests
 			Assert.NotEqual(NpcSpawnScaffold.BuildMinimalPostIir(), builtPostIir);
 		}
 
+		// The from-DB lift (#185): worn equipment is rebuilt from the row's NpcSpawnEquipment rows, not the Data
+		// blob's f23. Fed the rows lifted from Casilda's capture, the rebuilt body reproduces it byte-for-byte.
+		[Fact]
+		public void TryBuild_WithDbEquipment_ReproducesCapturedBody()
+		{
+			var capturedBody = Golden.Bytes("SpawnNpcCasilda");
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(capturedBody, out var read));
+
+			var row = RowFromCapturedBody(capturedBody);
+			foreach (var entry in read.Message.InventoryEntries)
+			{
+				Assert.True(NpcSpawnEquipmentBuilder.TryLift(entry, out var equip));
+				row.Equipment.Add(equip);
+			}
+			Assert.NotEmpty(row.Equipment);
+
+			var handle = BinaryPrimitives.ReadUInt32BigEndian(capturedBody.AsSpan(SpawnPacketBuilder.HandleOffset, 4));
+			Assert.True(NpcSpawnBuilder.TryBuild(row, handle, out var body));
+			Assert.Equal(capturedBody, body);
+		}
+
 		private static float ReadLE(byte[] b, int offset)
 		{
 			return BinaryPrimitives.ReadSingleLittleEndian(b.AsSpan(offset, 4));
