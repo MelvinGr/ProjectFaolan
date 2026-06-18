@@ -31,10 +31,12 @@ namespace Faolan.GameServer
 		// to it. Threaded as one value so the snapshot/spawn/objects agree (per-map sourcing is a follow-up).
 		private const uint BeachPlayfieldId = 0x004FE428;
 
-		// Opt-in flag for the burst-less world entry (#210). Default off: the path is built + unit-tested but NOT yet
-		// verified in-client, and is beach-shaped (the tails + playfield are beach values). Flip to test a beach login.
+		// The burst-less world entry (#210) is now the DEFAULT path (in-client verified on the beach 2026-06-18). Set
+		// FAOLAN_BURSTLESS_ENTRY=0 to fall back to the captured-burst replay. Beach-shaped for now (tails/playfield are
+		// beach values; per-map sourcing is a follow-up). NB an interest despawn-churn bug (#245) crashes the loader on
+		// high-density zones; FAOLAN_BURSTLESS_ENTRY=0 (the burst fallback) is the escape hatch until it lands.
 		private static readonly bool BurstlessEntryEnabled =
-			string.Equals(Environment.GetEnvironmentVariable("FAOLAN_BURSTLESS_ENTRY"), "1", StringComparison.Ordinal);
+			!string.Equals(Environment.GetEnvironmentVariable("FAOLAN_BURSTLESS_ENTRY"), "0", StringComparison.Ordinal);
 
 		// Builds + sends the entire world entry from generated/structured pieces - no captured burst (#210). Mirrors
 		// SendWorldEntry's world-model setup + record order (MapChange, objects, player spawn, snapshot, vitals,

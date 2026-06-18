@@ -611,8 +611,8 @@ namespace Faolan.GameServer
 			var mapId = client.Session.Character.MapId;
 
 			// Burst-less entry (#210): build the whole world entry from generated/structured pieces - no captured
-			// burst. Opt-in (FAOLAN_BURSTLESS_ENTRY) and beach-shaped for now (the tails/playfield are beach values);
-			// the prep for dropping the beach fallback once verified in-client.
+			// burst. DEFAULT path (in-client verified on the beach); FAOLAN_BURSTLESS_ENTRY=0 falls back to the replay.
+			// Beach-shaped for now (tails/playfield are beach values).
 			if (BurstlessEntryEnabled)
 			{
 				await SendBurstlessWorldEntry(client, mapId);
