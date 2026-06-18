@@ -74,11 +74,11 @@ namespace Faolan.Mcp.Tools
 				: Serialize(spawns.Select(n => new
 				{
 					n.Id,
-					n.Name,
+					Name = n.Npc?.Name, // #244: name/community live on the Npc type
 					n.MapId,
 					n.Level,
 					n.Health,
-					n.Community,
+					Community = n.Npc?.Community ?? 0,
 					Position = new { X = n.PositionX, Y = n.PositionY, Z = n.PositionZ },
 					Spawnable = n.Data != null
 				}));

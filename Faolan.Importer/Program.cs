@@ -226,74 +226,75 @@ namespace Faolan.Importer
 		// Upsert by (map, spawn point); never wipe.
 		private static async Task ImportNpcSpawns(DatabaseContext db, List<NpcSpawnEntry> spawns)
 		{
+			// #244: ensure the Npc TYPE rows exist first, so each spawn links to its type (the type identity lives on
+			// Npc now, not duplicated on the spawn).
+			var typeByTemplate = await UpsertNpcTypes(db, spawns);
+
 			foreach (var e in spawns)
 			{
 				var existing = await db.NpcSpawns.Include(n => n.Morphs).Include(n => n.Equipment).FirstOrDefaultAsync(n => n.MapId == e.MapId && n.PositionX == e.X && n.PositionY == e.Y && n.PositionZ == e.Z);
 
+				var row = existing ?? new NpcSpawn
+				{
+					MapId = e.MapId,
+					PositionX = e.X,
+					PositionY = e.Y,
+					PositionZ = e.Z
+				};
+				Populate(row, e);
+				row.NpcId = e.TemplateId != 0 && typeByTemplate.TryGetValue(e.TemplateId, out var npc) ? npc.Id : null;
 				if (existing == null)
-					db.NpcSpawns.Add(Populate(new NpcSpawn
-					{
-						MapId = e.MapId,
-						PositionX = e.X,
-						PositionY = e.Y,
-						PositionZ = e.Z
-					}, e));
-				else
-					Populate(existing, e);
+					db.NpcSpawns.Add(row);
 			}
 
 			await db.SaveChangesAsync();
 		}
 
-		// Derives the Npc TYPE table (#244) from the existing NpcSpawns and backfills the FKs. One Npc per distinct
-		// TemplateId; Name/Community come from a representative spawn (constant per type). Rebuilt from scratch each
-		// run (clears Npcs first), so it's idempotent. Spawns with TemplateId 0 (un-lifted) get no type. Spells link
-		// by NpcName -> Npc.Name (the existing name key), keeping NpcName as the live join until the contract step.
-		private static async Task BuildNpcTypes(DatabaseContext db)
+		// Upserts the Npc TYPE rows (#244) for the just-imported spawns and links each spawn to its type. Keyed by
+		// TemplateId; Name/Community come from the spawn entry (constant per type). Upsert (not delete+recreate) keeps
+		// Npc.Id stable across re-imports so existing NpcSpell FKs survive. Spawns with TemplateId 0 (phantom capture
+		// artifacts) get no type. Returns a TemplateId -> Npc cache for the caller.
+		private static async Task<Dictionary<uint, Npc>> UpsertNpcTypes(DatabaseContext db, List<NpcSpawnEntry> entries)
 		{
-			// Reset NpcId backrefs + the table so a re-run is a clean rebuild (SetNull FK lets us clear Npcs).
-			await db.Database.ExecuteSqlRawAsync("UPDATE NpcSpawns SET NpcId = NULL");
-			await db.Database.ExecuteSqlRawAsync("UPDATE NpcSpells SET NpcId = NULL");
-			await db.Database.ExecuteSqlRawAsync("DELETE FROM Npcs");
-
-			var spawns = await db.NpcSpawns.ToListAsync();
-			var byTemplate = spawns
-				.Where(s => s.TemplateId != 0)
-				.GroupBy(s => s.TemplateId);
-
-			var typeByTemplate = new Dictionary<uint, Npc>();
-			var typeByName = new Dictionary<string, Npc>(StringComparer.OrdinalIgnoreCase);
-			foreach (var g in byTemplate)
+			var byTemplate = await db.Npcs.ToDictionaryAsync(n => n.TemplateId);
+			foreach (var e in entries)
 			{
-				var rep = g.FirstOrDefault(s => !string.IsNullOrEmpty(s.Name)) ?? g.First();
-				var npc = new Npc { TemplateId = g.Key, Name = rep.Name, Community = rep.Community };
-				db.Npcs.Add(npc);
-				typeByTemplate[g.Key] = npc;
-				if (!string.IsNullOrEmpty(npc.Name))
-					typeByName.TryAdd(npc.Name, npc);
+				if (e.TemplateId == 0)
+					continue;
+				if (byTemplate.TryGetValue(e.TemplateId, out var npc))
+				{
+					if (!string.IsNullOrEmpty(e.Name)) npc.Name = e.Name;
+					npc.Community = e.Community;
+				}
+				else
+				{
+					npc = new Npc { TemplateId = e.TemplateId, Name = e.Name, Community = e.Community };
+					db.Npcs.Add(npc);
+					byTemplate[e.TemplateId] = npc;
+				}
 			}
+			await db.SaveChangesAsync(); // assigns Ids to new types
+			return byTemplate;
+		}
 
-			await db.SaveChangesAsync(); // assigns Npc.Id
+		// Links each NpcSpell to its NPC type by name (#244) - replaces the fragile NpcName string key with the FK while
+		// keeping NpcName as the live fallback. Returns the count linked.
+		private static async Task<int> LinkSpellsToTypes(DatabaseContext db)
+		{
+			var typeByName = new Dictionary<string, Npc>(StringComparer.OrdinalIgnoreCase);
+			foreach (var n in await db.Npcs.ToListAsync())
+				if (!string.IsNullOrEmpty(n.Name))
+					typeByName.TryAdd(n.Name, n);
 
-			foreach (var s in spawns)
-				if (s.TemplateId != 0 && typeByTemplate.TryGetValue(s.TemplateId, out var npc))
-					s.NpcId = npc.Id;
-
-			var spells = await db.NpcSpells.ToListAsync();
-			var linkedSpells = 0;
-			foreach (var sp in spells)
+			var linked = 0;
+			foreach (var sp in await db.NpcSpells.ToListAsync())
 				if (sp.NpcName != null && typeByName.TryGetValue(sp.NpcName, out var npc))
 				{
 					sp.NpcId = npc.Id;
-					linkedSpells++;
+					linked++;
 				}
-
 			await db.SaveChangesAsync();
-
-			var spawnsLinked = spawns.Count(s => s.NpcId != null);
-			Console.WriteLine($"Built {typeByTemplate.Count} NPC type(s) from {spawns.Count} spawn(s); " +
-				$"linked {spawnsLinked} spawn(s) and {linkedSpells}/{spells.Count} spell(s). " +
-				$"{spawns.Count - spawnsLinked} spawn(s) had no TemplateId.");
+			return linked;
 		}
 
 		// Caster NPCs' spells (#232), upserted by (NPC name, spell id). The effect payload is refreshed on re-import.
@@ -515,16 +516,6 @@ namespace Faolan.Importer
 				return 0;
 			}
 
-			// --build-npc-types: derive the Npc TYPE table (#244) from the EXISTING NpcSpawns - one Npc per distinct
-			// TemplateId (Name/Community from a representative spawn) - and backfill the FKs (NpcSpawn.NpcId + the
-			// spells' NpcId by NpcName). No capture re-import: the type identity already lives in the spawn columns, so
-			// this runs against the committed (pruned) DB. Idempotent: rebuilt from scratch each run.
-			if (args.Contains("--build-npc-types"))
-			{
-				await BuildNpcTypes(db);
-				return 0;
-			}
-
 			// --reseed-npcs: wipe the NPC spawn tables and re-import ONLY each map's LOGIN-BURST NPCs (the pre-poll
 			// world-build window), restricted to the Tortage intro + beach (4000/4010). This drops the cross-session
 			// mid-session-spawn duplicates that otherwise accrete (419 beach spawns -> the ~42 retail-shaped set; see
@@ -559,7 +550,7 @@ namespace Faolan.Importer
 
 				await ImportNpcSpawns(db, burst);
 
-				await BuildNpcTypes(db); // #244: rebuild the Npc type table + FKs for the reseeded spawns
+				await LinkSpellsToTypes(db); // #244: link the reseeded NPCs' spells to their types (types upserted in ImportNpcSpawns)
 
 				var byMap = burst.GroupBy(e => e.MapId).OrderBy(g => g.Key).Select(g => $"{g.Key}={g.Count()}");
 				Console.WriteLine($"Reseed NPCs: removed {removed} spawns; imported {burst.Count} login-burst spawns ({string.Join(", ", byMap)}); " +
@@ -685,7 +676,7 @@ namespace Faolan.Importer
 				var npcSpells = NpcSpellExtractor.Merge(captures.SelectMany(c => NpcSpellExtractor.Extract(c.Packets)));
 				var npcSpellsAdded = await ImportNpcSpells(db, npcSpells);
 				Console.WriteLine($"NPC spells (#232): {npcSpells.Count} (name,spell) pairs, {npcSpellsAdded} new.");
-				await BuildNpcTypes(db); // #244: rebuild the Npc type table + FKs from the freshly imported spawns/spells
+				await LinkSpellsToTypes(db); // #244: link spells to their types (types upserted in ImportNpcSpawns)
 				await ImportPatrolPaths(db, PatrolPathExtractor.Merge(captures.SelectMany(c => PatrolPathExtractor.Extract(c.Packets))));
 				await ImportWorldObjects(db, WorldObjectExtractor.Merge(captures.SelectMany(c => WorldObjectExtractor.Extract(c.Packets))));
 				await ImportMapWorldBursts(db, MapWorldBurstExtractor.Merge(captures.SelectMany(c => MapWorldBurstExtractor.Extract(c.Packets))));
@@ -717,14 +708,12 @@ namespace Faolan.Importer
 		// dedup key, set on insert only.
 		private static NpcSpawn Populate(NpcSpawn row, NpcSpawnEntry e)
 		{
-			row.Name = e.Name;
 			row.CapturedHandle = e.Handle;
 			row.Data = e.Data;
 			row.RotationX = e.RotX;
 			row.RotationY = e.RotY;
 			row.RotationZ = e.RotZ;
 			row.RotationW = e.RotW;
-			row.TemplateId = e.TemplateId;
 			row.Race = e.Race;
 			row.Sex = e.Sex;
 			row.Level = e.Level;
@@ -733,7 +722,6 @@ namespace Faolan.Importer
 			row.HeadMesh = e.HeadMesh;
 			row.HasEquipment = e.HasEquipment;
 			row.Health = e.Health;
-			row.Community = e.Community;
 
 			// Replace the appearance/morph table (#185) - decoded from the post-IIR, ordered. Empty for animals.
 			row.Morphs.Clear();

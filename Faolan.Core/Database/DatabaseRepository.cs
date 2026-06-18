@@ -862,8 +862,9 @@ namespace Faolan.Core.Database
 			var lowered = nameSubstring.ToLowerInvariant();
 			return await ctx
 				.NpcSpawns
-				.Where(n => n.Name != null && n.Name.ToLower().Contains(lowered))
-				.OrderBy(n => n.Name)
+				.Include(n => n.Npc)
+				.Where(n => n.Npc != null && n.Npc.Name != null && n.Npc.Name.ToLower().Contains(lowered)) // #244: name lives on the type
+				.OrderBy(n => n.Npc.Name)
 				.ThenBy(n => n.MapId)
 				.Take(limit)
 				.ToArrayAsync();
@@ -928,7 +929,10 @@ namespace Faolan.Core.Database
 			var lowered = name.ToLowerInvariant();
 			return await ctx
 				.NpcSpawns
-				.Where(n => n.Name != null && n.Name.ToLower() == lowered && n.Data != null)
+				.Include(n => n.Npc).ThenInclude(t => t.Spells)
+				.Include(n => n.Morphs)
+				.Include(n => n.Equipment)
+				.Where(n => n.Npc != null && n.Npc.Name != null && n.Npc.Name.ToLower() == lowered && n.Data != null) // #244: name lives on the type
 				.FirstOrDefaultAsync();
 		}
 
@@ -943,7 +947,7 @@ namespace Faolan.Core.Database
 			var lowered = (name ?? "").ToLowerInvariant();
 			var query = ctx
 				.NpcSpawns
-				.Where(n => n.MapId == mapId && n.Name != null && n.Name.ToLower() == lowered);
+				.Where(n => n.MapId == mapId && n.Npc != null && n.Npc.Name != null && n.Npc.Name.ToLower() == lowered); // #244: name lives on the type
 			if (x is { } px && y is { } py && z is { } pz)
 				query = query.Where(n => n.PositionX >= px - radius && n.PositionX <= px + radius
 					&& n.PositionY >= py - radius && n.PositionY <= py + radius

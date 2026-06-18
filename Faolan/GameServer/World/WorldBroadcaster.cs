@@ -384,9 +384,15 @@ namespace Faolan.GameServer.World
 			// Burst-position rows are ordered FIRST so they win their cell - the kept entity is then the exact one the
 			// burst rendered, and it inherits the burst's wire handle below so the two never stack.
 			var seenCells = new HashSet<(string, int, int, int)>();
-			var spellsByName = new Dictionary<string, List<Core.Database.Tables.NpcSpell>>(); // cached: one query per distinct caster name (#232)
 			foreach (var npc in npcs.OrderByDescending(n => burstHandleByPosition.ContainsKey(PositionKey(n.PositionX, n.PositionY, n.PositionZ))))
 			{
+				// The type identity (name/community) lives on the Npc type now (#244); a spawn with no type is a phantom
+				// capture artifact (no real creature) - skip it.
+				if (npc.Npc == null)
+					continue;
+				var npcName = npc.Npc.Name;
+				var community = npc.Npc.Community;
+
 				// Faction mobs (Community > 0) are legitimately MANY of the same name spread across the map - dedup by
 				// (name, coarse cell): same-spot cross-session re-captures collapse, distinct mobs in different cells
 				// survive. Friendly/neutral named NPCs (Community 0: quest-givers like Casilda/Kalanthes + a few neutral
@@ -395,9 +401,9 @@ namespace Faolan.GameServer.World
 				// spawn set and confuse the client. Collapse those by NAME alone -> one instance (the burst-handle row
 				// wins, ordered first, so the kept entity coincides with the burst-rendered one).
 				const float cell = 8f;
-				var dedupKey = npc.Community == 0
-					? (npc.Name ?? "", 0, 0, 0)
-					: (npc.Name ?? "", (int)(npc.PositionX / cell), (int)(npc.PositionY / cell), (int)(npc.PositionZ / cell));
+				var dedupKey = community == 0
+					? (npcName ?? "", 0, 0, 0)
+					: (npcName ?? "", (int)(npc.PositionX / cell), (int)(npc.PositionY / cell), (int)(npc.PositionZ / cell));
 				if (!seenCells.Add(dedupKey))
 					continue;
 
@@ -413,33 +419,23 @@ namespace Faolan.GameServer.World
 				var handle = burstHandleByPosition.TryGetValue(PositionKey(npc.PositionX, npc.PositionY, npc.PositionZ), out var bh)
 					? bh
 					: npc.CapturedHandle;
-				var entity = WorldEntity.ForNpc(handle, mapId, new Vector3(npc.PositionX, npc.PositionY, npc.PositionZ), new Vector3(npc.RotationX, npc.RotationY, npc.RotationZ), npc.Name ?? "NPC", vitals);
+				var entity = WorldEntity.ForNpc(handle, mapId, new Vector3(npc.PositionX, npc.PositionY, npc.PositionZ), new Vector3(npc.RotationX, npc.RotationY, npc.RotationZ), npcName ?? "NPC", vitals);
 				entity.Level = npc.Level;
-				// Hostile = a faction creature (NpcSpawn.Community > 0, lifted from NpcStats.community by the importer).
+				// Hostile = a faction creature (Npc.Community > 0, lifted from NpcStats.community by the importer).
 				// community 0 is the neutral/friendly community (quest-givers like Casilda/Kalanthes AND neutral critters
 				// like Scorpion/Guard Dog); faction mobs (poachers 59, scavengers 60, picts 317, crocs 374, ...) are > 0.
-				entity.Hostile = npc.Community > 0;
+				entity.Hostile = community > 0;
 
 				// Keep the NPC's FA015807 spawn body (addressed to the chosen handle) so interest/respawn can re-render
 				// it for nearby players - built from the row by NpcSpawnBuilder, the same path the burst-replacement uses.
 				if (NpcSpawnBuilder.TryBuild(npc, handle, out var spawnBody, freshSpawn: true))
 					entity.SpawnBody = spawnBody;
 
-				// Caster NPCs (#232): the spells this NPC casts. Prefer the #244 type FK (npc.Npc.Spells, loaded with
-				// the spawn) which replaces the fragile name-string join; fall back to the by-name lookup for a spawn
-				// not yet linked to a type (NpcId null - e.g. a row with no TemplateId). Empty for non-casters.
-				if (npc.Npc?.Spells is { Count: > 0 } typeSpells)
-				{
+				// Caster NPCs (#232): the spells this NPC type casts, read from the #244 type FK (npc.Npc.Spells, loaded
+				// with the spawn) - this replaces the fragile NpcName string join. Empty for non-casters.
+				if (npc.Npc.Spells is { Count: > 0 } typeSpells)
 					foreach (var s in typeSpells)
 						entity.Spells.Add(new NpcSpellCast(s.SpellId, s.Payload));
-				}
-				else if (npc.NpcId == null && npc.Name is { Length: > 0 } spellName)
-				{
-					if (!spellsByName.TryGetValue(spellName, out var spells))
-						spellsByName[spellName] = spells = await _database.GetNpcSpellsByName(spellName);
-					foreach (var s in spells)
-						entity.Spells.Add(new NpcSpellCast(s.SpellId, s.Payload));
-				}
 
 				zone.Add(entity);
 			}
@@ -720,9 +716,9 @@ namespace Faolan.GameServer.World
 				vitals = EntityVitals.FromMax(maxHealth, 0, maxHealth);
 			}
 
-			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npc.Name ?? npcName, vitals);
+			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npc.Npc?.Name ?? npcName, vitals);
 			entity.Level = npc.Level;
-			entity.Hostile = killable && npc.Community > 0;
+			entity.Hostile = killable && npc.Npc?.Community > 0;
 			entity.SpawnBody = body;
 			entity.NoRespawn = true; // summoned test NPCs don't revive - they fade out after death (GM .spawnnpc QoL)
 

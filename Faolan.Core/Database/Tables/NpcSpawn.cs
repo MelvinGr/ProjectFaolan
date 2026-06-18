@@ -21,12 +21,7 @@ namespace Faolan.Core.Database.Tables
 	{
 		public bool HasEquipment { get; set; }
 		public byte[] Data { get; set; }
-		public string Name { get; set; }
 		public uint CapturedHandle { get; set; }
-
-		// Faction/community lifted from NpcStats.community: 0 = neutral/friendly, > 0 = a hostile faction. Drives NPC
-		// aggro hostility (server-architecture-roadmap).
-		public uint Community { get; set; }
 		public uint HeadMesh { get; set; }
 
 		// Real per-NPC max health (player-facing) lifted from the spawn's CharacterStats.health - the combat HP vs the
@@ -38,10 +33,6 @@ namespace Faolan.Core.Database.Tables
 		public uint MonsterScale { get; set; }
 		public uint Race { get; set; }
 		public uint Sex { get; set; }
-
-		// Identity/appearance, lifted from the CharacterIIR (ProtoCoreCharacterIIR). TemplateId (NpcStats.f4) is
-		// the stable per-type identity; MonsterScale carries the per-instance size jitter.
-		public uint TemplateId { get; set; }
 
 		// The humanoid appearance / morph table lifted from the captured post-IIR (#185) - empty for animals, which
 		// carry no such table. When present, NpcSpawnBuilder generates the post-IIR from these rows instead of
@@ -56,9 +47,9 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(MapId))]
 		public virtual Map Map { get; set; }
 
-		// The NPC TYPE this placement is an instance of (#244). Nullable during the expand phase: populated by
-		// deriving the type set from the spawns' TemplateId; the duplicated type columns above (Name/Community/...)
-		// are retired onto Npc in a later contract step. Joined by TemplateId, not Id.
+		// The NPC TYPE this placement is an instance of (#244): the type identity (TemplateId, Name, Community) lives
+		// on Npc now, reached via the Npc navigation. Nullable only for phantom rows with no resolvable type (none
+		// remain after the phantom-player scrub); a real spawn always has one.
 		public uint? NpcId { get; set; }
 
 		[ForeignKey(nameof(NpcId))]
