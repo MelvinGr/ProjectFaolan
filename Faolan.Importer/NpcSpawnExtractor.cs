@@ -48,8 +48,12 @@ namespace Faolan.Importer
 		private const uint InstanceRangeStart = 0x02000000; // player/own-entity handles live in the instance range
 		private const uint MapChangeSubOpcode = 0x5D85BFC7;
 		private const uint Opcode2000 = 0x2000;
+		private const uint Opcode2020 = 0x2020; // client spawn poll - ends the pre-poll login burst window
 		private const uint SpawnSubOpcode = 0xFA015807;
 
+		// Every FA015807 spawn in the capture (login burst AND mid-session interest/respawn spawns), all maps. This
+		// accretes the cross-session UNION - the same physical NPC at slightly different spots across sessions - so
+		// the live world over-populates (~4x retail). Use ExtractLoginBurst for the clean retail-shaped set.
 		public static List<NpcSpawnEntry> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
 			var entries = new List<NpcSpawnEntry>();
@@ -74,45 +78,94 @@ namespace Faolan.Importer
 
 				if (subop != SpawnSubOpcode || currentMap == 0)
 					continue;
-				if (body.Length < SpawnPacketBuilder.RotWOffset + 4)
-					continue; // too short to hold the transform (position + rotation)
 
-				var handle = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
-				if (handle >= InstanceRangeStart)
-					continue; // the player's own spawn
-
-				var x = ReadLE(body, SpawnPacketBuilder.PosXOffset);
-				var y = ReadLE(body, SpawnPacketBuilder.PosYOffset);
-				var z = ReadLE(body, SpawnPacketBuilder.PosZOffset);
-
-				var identity = LiftIdentity(body);
-				var name = !string.IsNullOrEmpty(identity.Name)
-					? identity.Name
-					: ExtractName(body);
-
-				// Humanoid appearance/morph table (#185) - decoded from the post-IIR; empty for animals.
-				var morphs = NpcSpawnAppearanceCodec.TryDecodeAppearance(body, out var decoded)
-					? decoded
-					: [];
-
-				entries.Add(identity with
-				{
-					MapId = currentMap,
-					Name = name,
-					Handle = handle,
-					X = x,
-					Y = y,
-					Z = z,
-					Data = p.Bytes,
-					RotX = ReadLE(body, SpawnPacketBuilder.RotXOffset),
-					RotY = ReadLE(body, SpawnPacketBuilder.RotYOffset),
-					RotZ = ReadLE(body, SpawnPacketBuilder.RotZOffset),
-					RotW = ReadLE(body, SpawnPacketBuilder.RotWOffset),
-					Morphs = morphs
-				});
+				if (TryBuildEntry(body, p.Bytes, currentMap, out var entry))
+					entries.Add(entry);
 			}
 
 			return entries;
+		}
+
+		// Only the NPCs of a map's LOGIN WORLD BUILD: the FA015807 spawns in the pre-poll burst window (a MapChange
+		// up to the client's first 0x2020 spawn poll - the same window MapWorldBurstExtractor delimits). This is the
+		// retail-shaped set as it arrives on world entry; it EXCLUDES the mid-session interest/respawn spawns that
+		// otherwise accrete duplicates (Gitea #185 / #244). `allowedMaps` (null = all) restricts which maps to lift.
+		public static List<NpcSpawnEntry> ExtractLoginBurst(IReadOnlyList<CapturedPacket> packets, ISet<uint> allowedMaps = null)
+		{
+			var entries = new List<NpcSpawnEntry>();
+			uint currentMap = 0;
+			var sawPoll = false; // the first 0x2020 poll ends the pre-poll spawn burst
+
+			foreach (var p in packets)
+			{
+				var body = GetBody(p.Bytes);
+				var subop = body.Length >= 8 ? BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)) : 0;
+
+				if (p.Opcode == Opcode2000 && p.IsDownload && subop == MapChangeSubOpcode && body.Length >= 38)
+				{
+					currentMap = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(34, 4));
+					sawPoll = false;
+					continue;
+				}
+
+				if (currentMap == 0)
+					continue;
+				if (p.Opcode == Opcode2020) // client spawn poll - ends the pre-poll burst window
+				{
+					sawPoll = true;
+					continue;
+				}
+
+				if (sawPoll || p.Opcode != Opcode2000 || !p.IsDownload || subop != SpawnSubOpcode)
+					continue;
+				if (allowedMaps != null && !allowedMaps.Contains(currentMap))
+					continue;
+
+				if (TryBuildEntry(body, p.Bytes, currentMap, out var entry))
+					entries.Add(entry);
+			}
+
+			return entries;
+		}
+
+		// Builds one NPC spawn entry from an FA015807 body (transform + lifted identity/appearance/equipment). Returns
+		// false for a body too short to hold the transform, or the player's own spawn (handle in the instance range).
+		private static bool TryBuildEntry(byte[] body, byte[] fullBytes, uint currentMap, out NpcSpawnEntry entry)
+		{
+			entry = null;
+			if (body.Length < SpawnPacketBuilder.RotWOffset + 4)
+				return false; // too short to hold the transform (position + rotation)
+
+			var handle = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
+			if (handle >= InstanceRangeStart)
+				return false; // the player's own spawn
+
+			var identity = LiftIdentity(body);
+			var name = !string.IsNullOrEmpty(identity.Name)
+				? identity.Name
+				: ExtractName(body);
+
+			// Humanoid appearance/morph table (#185) - decoded from the post-IIR; empty for animals.
+			var morphs = NpcSpawnAppearanceCodec.TryDecodeAppearance(body, out var decoded)
+				? decoded
+				: [];
+
+			entry = identity with
+			{
+				MapId = currentMap,
+				Name = name,
+				Handle = handle,
+				X = ReadLE(body, SpawnPacketBuilder.PosXOffset),
+				Y = ReadLE(body, SpawnPacketBuilder.PosYOffset),
+				Z = ReadLE(body, SpawnPacketBuilder.PosZOffset),
+				Data = fullBytes,
+				RotX = ReadLE(body, SpawnPacketBuilder.RotXOffset),
+				RotY = ReadLE(body, SpawnPacketBuilder.RotYOffset),
+				RotZ = ReadLE(body, SpawnPacketBuilder.RotZOffset),
+				RotW = ReadLE(body, SpawnPacketBuilder.RotWOffset),
+				Morphs = morphs
+			};
+			return true;
 		}
 
 		// Dedup by (map, spawn point); keep the first seen.

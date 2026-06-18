@@ -464,6 +464,46 @@ namespace Faolan.Importer
 				return 0;
 			}
 
+			// --reseed-npcs: wipe the NPC spawn tables and re-import ONLY each map's LOGIN-BURST NPCs (the pre-poll
+			// world-build window), restricted to the Tortage intro + beach (4000/4010). This drops the cross-session
+			// mid-session-spawn duplicates that otherwise accrete (419 beach spawns -> the ~42 retail-shaped set; see
+			// #185/#244). Isolated: touches only NpcSpawns + its cascaded morph/equipment rows; no other table, so the
+			// Tortage prune stays intact. NpcSpells (type-level, name-keyed) is left as-is.
+			if (args.Contains("--reseed-npcs"))
+			{
+				var allowedMaps = new HashSet<uint> { 4000u, 4010u };
+
+				// ONE capture file per map: the login burst is deterministic per map, but positions carry tiny
+				// per-session float jitter, so UNIONING bursts across captures would not dedup (it ballooned to 236).
+				// Instead pick, per map, the single capture whose login burst has the most NPCs (the most complete
+				// world build) and take only that capture's burst - the clean retail-shaped ~42-NPC beach set.
+				var perCapture = captures
+					.Select(c => NpcSpawnExtractor.ExtractLoginBurst(c.Packets, allowedMaps))
+					.ToList();
+				var burst = new List<NpcSpawnEntry>();
+				foreach (var map in allowedMaps)
+				{
+					var best = perCapture
+						.Select(b => b.Where(e => e.MapId == map).ToList())
+						.OrderByDescending(list => list.Count)
+						.FirstOrDefault();
+					if (best is { Count: > 0 })
+						burst.AddRange(NpcSpawnExtractor.Merge(best)); // dedup any exact-position repeat within the one burst
+				}
+
+				var removed = await db.NpcSpawns.CountAsync();
+				await db.Database.ExecuteSqlRawAsync("DELETE FROM NpcSpawnMorphs");
+				await db.Database.ExecuteSqlRawAsync("DELETE FROM NpcSpawnEquipment");
+				await db.Database.ExecuteSqlRawAsync("DELETE FROM NpcSpawns");
+
+				await ImportNpcSpawns(db, burst);
+
+				var byMap = burst.GroupBy(e => e.MapId).OrderBy(g => g.Key).Select(g => $"{g.Key}={g.Count()}");
+				Console.WriteLine($"Reseed NPCs: removed {removed} spawns; imported {burst.Count} login-burst spawns ({string.Join(", ", byMap)}); " +
+					$"morphs={await db.NpcSpawnMorphs.CountAsync()}, equipment={await db.NpcSpawnEquipment.CountAsync()}.");
+				return 0;
+			}
+
 			// --rdb-maps: import map names + ids from the client RDB PLAYFIELDDESCRIPTIONDATA (type 1070003). Isolated
 			// (no capture import) so it only touches the Maps table.
 			if (args.Contains("--rdb-maps"))
