@@ -23,22 +23,18 @@ namespace Faolan.Tests
 		private const uint TemplateInstance = 0x02165EFF;
 
 		[Fact]
-		public async Task BuildFromScratch_EmbedsTheEmptyQuestPortion_NonQuestTailUnchanged()
+		public async Task BuildFromScratch_ReproducesTheTemplate_ByteForByte()
 		{
 			var def = await LoadDefinition(BeachStarterQuestId);
 			Assert.NotNull(def);
 
-			// #254: the journal is no longer baked into the snapshot - the quest portion is the EMPTY form and the
-			// journal is delivered live (RestorePlayerQuests). character = null -> the stat skeleton stays at its
-			// (Strie) baseline, instance = the template's. So the tails = [empty quest portion][the template's
-			// non-quest tail (access-window catalog + stat block), byte-for-byte unchanged].
+			// character = null -> the stat skeleton stays at its (Strie) baseline, instance = the template's, so no
+			// re-addressing: the assembly must equal the captured tails exactly.
 			var built = BeachTailsBuilder.BuildFromScratch(def, character: null, TemplateInstance);
-			var empty = BeachTailsBuilder.BuildEmptyQuestPortion();
-			var template = File.ReadAllBytes(TemplatePath);
 
-			Assert.True(built.AsSpan(0, empty.Length).SequenceEqual(empty), "snapshot quest portion must be the empty form (no embedded journal)");
-			Assert.True(built.AsSpan(empty.Length).SequenceEqual(template.AsSpan(BeachTailsBuilder.QuestPortionLength)),
-				"the non-quest tail (access-window catalog + stat block) must stay byte-for-byte the template's");
+			var template = File.ReadAllBytes(TemplatePath);
+			Assert.Equal(template.Length, built.Length);
+			Assert.True(template.SequenceEqual(built), "from-scratch tails must equal BeachTailsTemplate.bin byte-for-byte");
 		}
 
 		// The template IS Strie (an Assassin/Rogue: HP 98 base 90, Mana 0, Stamina 236 base 230). When the WHOLE
@@ -61,12 +57,8 @@ namespace Faolan.Tests
 			};
 			var built = BeachTailsBuilder.BuildFromScratch(def, strie, TemplateInstance);
 
-			// The non-quest tail (the authored per-class stat block + access-window) must still equal the captured
-			// Strie template byte-for-byte for the baseline Assassin (the quest portion is the empty form now, #254).
-			var empty = BeachTailsBuilder.BuildEmptyQuestPortion();
 			var template = File.ReadAllBytes(TemplatePath);
-			Assert.True(built.AsSpan(empty.Length).SequenceEqual(template.AsSpan(BeachTailsBuilder.QuestPortionLength)),
-				"the authored non-quest tail for an Assassin L1 must equal the captured Strie template byte-for-byte");
+			Assert.True(template.SequenceEqual(built), "authoring the per-class block for an Assassin L1 must still equal the captured Strie template byte-for-byte");
 		}
 
 		// The captured-byte tests above only exercise the Strie baseline. The production flip (authoring the tails
@@ -95,8 +87,8 @@ namespace Faolan.Tests
 			var tails = SnapshotTails.Deserialize(built);
 			Assert.True(built.SequenceEqual(tails.ToArray()), "non-baseline from-scratch tails must round-trip losslessly");
 
-			// Region boundaries intact: the quest portion is now the EMPTY form (#254), the static access-window catalog parsed.
-			Assert.Equal(BeachTailsBuilder.BuildEmptyQuestPortion().Length, tails.KnownHeaderLength + QuestRegionTrailerLength(tails));
+			// Region boundaries intact: the quest portion is the fixed beach length, the static access-window catalog parsed.
+			Assert.Equal(BeachTailsBuilder.QuestPortionLength, tails.KnownHeaderLength + QuestRegionTrailerLength(tails));
 			Assert.NotEmpty(tails.AccessWindowEntries);
 
 			// The live character's vitals/XP landed in the decoded stat slots (the part the production flip changes).
@@ -112,16 +104,17 @@ namespace Faolan.Tests
 			(tails.QuestObjectives?.ToArray().Length ?? 0) + (tails.QuestIndex?.ToArray().Length ?? 0);
 
 		[Fact]
-		public async Task BuildFromScratch_CarriesNoPerPlayerInstance_WithEmptyQuest()
+		public async Task BuildFromScratch_ReAddressesInstance()
 		{
 			var def = await LoadDefinition(BeachStarterQuestId);
 			const uint live = 0x0802ABCD;
 			var built = BeachTailsBuilder.BuildFromScratch(def, character: null, live);
 
-			// #254: the ONLY per-player instance ref in the tails was the quest objective region - now the empty form,
-			// with the journal (and its live instance) delivered via RestorePlayerQuests. So the tails carry neither
-			// the template instance nor the live one; the snapshot is addressed via the RPC header, not a raw tail ref.
-			Assert.False(Contains(built, new byte[] { 0x02, 0x16, 0x5E, 0xFF }), "template instance must not appear (was quest-objective only)");
+			// the template instance must be gone, the live one present (raw big-endian)
+			var needleOld = new byte[] { 0x02, 0x16, 0x5E, 0xFF };
+			var needleNew = new byte[] { 0x08, 0x02, 0xAB, 0xCD };
+			Assert.False(Contains(built, needleOld), "template instance should be re-addressed away");
+			Assert.True(Contains(built, needleNew), "live instance should be present");
 		}
 
 		private static bool Contains(byte[] hay, byte[] needle)

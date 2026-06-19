@@ -106,19 +106,6 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			return portion;
 		}
 
-		// #254: a zero-quest quest portion - the same three count-prefixed regions as the beach portion, with empty
-		// lists, so the snapshot carries NO journal entries. The journal is then delivered live (RestorePlayerQuests).
-		// Self-delimiting per the decoded grammar (QuestcRegion count=(0+1)*0x3F1, empty objective region = chapter
-		// tag only, empty index = empty quest list + zeroed table/trailer). NOT yet byte-verified against a no-quest
-		// capture - the in-client load (chat-connect) is the proof.
-		public static byte[] BuildEmptyQuestPortion()
-		{
-			var quests = new QuestcRegion();                          // 0 records
-			var objectives = new QuestObjectiveRegion();              // 0 goals -> chapter tag only
-			var index = QuestIndexRegion.Build([], [], 0, 0, 0, 0, 0); // empty quest list + zeroed table/trailer
-			return [.. quests.ToArray(), .. objectives.ToArray(), .. index.ToArray()];
-		}
-
 		// Builds the WHOLE beach 0x737A6DF9 tails FROM SCRATCH - no captured-tails template (#186). Assembles the three
 		// regions, each independently proven byte-exact: the generated quest portion (BuildBeachQuestPortion, @0..1292),
 		// the game-static access-window catalog (the embedded AccessWindowTable asset, @1292..7917), and the code stat
@@ -128,11 +115,9 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// template .bin is no longer needed to author a beach entry.
 		public static byte[] BuildFromScratch(QuestDefinition beachDef, Character character, uint instance, uint? playfieldToken = null)
 		{
-			// #254: the quest journal is NO LONGER baked into the snapshot. It is delivered LIVE from the player's
-			// CharacterQuests (RestorePlayerQuests -> QuestIIR/QuestFullUpdate/QuestJournal) so the journal reflects
-			// the actual player, not the captured beach char's "2/30 done" state. The snapshot carries an EMPTY quest
-			// region (beachDef kept in the signature for callers but no longer embedded).
-			var quest = BuildEmptyQuestPortion();
+			ArgumentNullException.ThrowIfNull(beachDef);
+
+			var quest = BuildBeachQuestPortion(beachDef, state: 1, instance);
 
 			var block = TailsStatBlock.CreateFreshBlock();
 			if (character?.MaxStats != null)
