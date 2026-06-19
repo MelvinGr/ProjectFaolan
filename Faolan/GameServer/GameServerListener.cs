@@ -13,6 +13,7 @@ using Faolan.Core.Network.GameServer;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.Combat;
+using Faolan.GameServer.Outbound;
 using Faolan.GameServer.Scripting;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Configuration;
@@ -547,9 +548,17 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServerOpcodes.RequestShortcutBar: // client asks for its saved hotbar at login; no reply yet (hotbar persistence not implemented)
+				case GameServerOpcodes.RequestShortcutBar: // client asks for its saved hotbar at login; reply with the restored bar (#71)
 				{
-					Logger.LogInformation("RequestShortcutBar (hotbar persistence not implemented; no reply).");
+					if (client.Session.Character != null)
+					{
+						var shortcuts = await Database.GetCharacterShortcuts(client.Session.Character.Id);
+						var ps = new PacketStream();
+						ps.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, GameCharInterfaceDispatchOpcodes.DispatchShortcutBarReply);
+						ps.WriteArray(ShortcutBarBuilder.BuildBody(shortcuts));
+						await ps.SendAsync(client);
+						Logger.LogInformation("ShortcutBarReply: restored {Count} hotbar shortcut(s) (#71).", shortcuts.Length);
+					}
 
 					break;
 				}
@@ -838,13 +847,14 @@ namespace Faolan.GameServer
 					// Partial decode (#71, necrol80 randomActions/changemap captures): the slot is in the bar-PAGE
 					// range (0x4E20.., not the 0x64.. item range), `b` is always 0x68 = the backpack container kind,
 					// and `a` is a 0/1 flag. Reads as a bar-page item-slot toggle referencing container 0x68. Not
-					// persisted: the meaningful deliverable (hotbar RESTORE at login) is gated on decoding the
-					// FullChar snapshot field that carries the bar, so per-mutation persistence is moot until then.
+					// persisted: the bar's restorable contents ride AddShortcut (persisted into CharacterShortcut);
+					// the login RESTORE is now built from those rows as ShortcutBarReply 0x2076 (see RequestShortcutBar).
+					// This op's exact semantics are still fuzzy, so it stays log-only.
 					var slot = packet.Body.ReadUInt32();
 					var flag = packet.Body.ReadUInt32();
 					var container = packet.Body.ReadUInt32();
 
-					Logger.LogInformation("UpdateShortcut bar-page slot 0x{Slot:X4} flag={Flag} container=0x{Container:X} (#71; restore is snapshot-gated).", slot, flag, container);
+					Logger.LogInformation("UpdateShortcut bar-page slot 0x{Slot:X4} flag={Flag} container=0x{Container:X} (#71; log-only).", slot, flag, container);
 
 					break;
 				}
@@ -871,9 +881,8 @@ namespace Faolan.GameServer
 					var sourceId = packet.Body.ReadUInt32(); // ability id or item ref
 					var unk = packet.Body.ReadUInt32();
 
-					// Persist the slot (upsert - re-dragging overwrites). The login RESTORE is undecoded
-					// (RequestShortcutBar gets no direct retail reply; likely rides the FullChar snapshot), so
-					// for now this is bookkeeping for when that lands.
+					// Persist the slot (upsert - re-dragging overwrites). The login RESTORE is now built from these
+					// rows as ShortcutBarReply 0x2076 (#71, see RequestShortcutBar) - DECODED, no longer snapshot-gated.
 					if (client.Session.Character != null)
 						await Database.SetCharacterShortcut(client.Session.Character.Id, slotId, type, sourceId);
 
