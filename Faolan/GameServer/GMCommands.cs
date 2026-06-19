@@ -383,6 +383,7 @@ namespace Faolan.GameServer
 				["guild"] = (client, arguments) => GuildCommand(client, arguments),
 				["money"] = (client, arguments) => MoneyCommand(client, arguments),
 				["buffs"] = (client, _) => BuffsCommand(client),
+				["cancelbuff"] = (client, arguments) => CancelBuffCommand(client, arguments),
 				["spawnbag"] = (client, arguments) => SpawnBagCommand(client, arguments)
 			};
 		}
@@ -405,6 +406,62 @@ namespace Faolan.GameServer
 				.OrderBy(b => b.AppliedAt)
 				.Select(b => $"0x{b.BuffId:X8} (for {(now - b.AppliedAt).TotalSeconds:F0}s{(b.DurationSeconds is double d ? $", expires after {d:F0}s" : "")})");
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Active buffs: {string.Join(", ", lines)}");
+		}
+
+		// .cancelbuff <id> | .cancelbuff all  - cancel a server-tracked buff on the player. <id> accepts hex
+		// (0x000B9000 / 000B9000 / B9000) or decimal. Mirrors the inbound CancelBuff (0x201E) right-click path:
+		// removes the entry from the ActiveBuffs registry, which stops tick stat-effects / re-assertion and
+		// makes .buffs accurate. NB the CLIENT-side icon removal is DUMP-GATED: retail's server->client buff-
+		// removal/dispel IIR isn't decoded yet (no capture), so the icon clears on relog for now - the server
+		// cancel is real, only the live visual push is pending a buff-cancel capture (#221-adjacent).
+		private async Task CancelBuffCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var entity = PlayerWorldEntity(client);
+			if (entity == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Not in the world.");
+				return;
+			}
+
+			var arg = (arguments ?? "").Trim();
+			if (arg.Length == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .cancelbuff &lt;id&gt; | .cancelbuff all");
+				return;
+			}
+
+			if (string.Equals(arg, "all", StringComparison.OrdinalIgnoreCase))
+			{
+				var ids = entity.ActiveBuffs.Keys.ToArray();
+				foreach (var id in ids)
+					entity.ActiveBuffs.TryRemove(id, out _);
+				Logger.LogInformation("CancelBuff (.cancelbuff all): removed {Count} buff(s) from {CharId:X8}.", ids.Length, characterId);
+				await _agentServerDispatcher.SendSystemMessage(characterId,
+					ids.Length > 0
+						? $"Cancelled {ids.Length} buff(s) server-side (relog to clear the icons - the client-removal packet isn't decoded yet)."
+						: "No server-tracked buffs to cancel.");
+				return;
+			}
+
+			var hex = arg.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? arg[2..] : arg;
+			if (!uint.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out var buffId)
+			    && !uint.TryParse(arg, out buffId))
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"Unrecognised buff id '{arg}'. Use hex (0x000B9000) or decimal; see .buffs.");
+				return;
+			}
+
+			if (entity.ActiveBuffs.TryRemove(buffId, out _))
+			{
+				Logger.LogInformation("CancelBuff (.cancelbuff): buff 0x{Buff:X8} removed from {CharId:X8}.", buffId, characterId);
+				await _agentServerDispatcher.SendSystemMessage(characterId,
+					$"Cancelled buff 0x{buffId:X8} server-side (relog to clear the icon - the client-removal packet isn't decoded yet).");
+			}
+			else
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"Buff 0x{buffId:X8} is not tracked (see .buffs).");
+			}
 		}
 
 		// .money            - show the wallet balance.
