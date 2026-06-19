@@ -30,11 +30,6 @@ namespace Faolan.GameServer
 		// one. (There is no hand-built login/teleport path anymore.)
 		private const uint DefaultWorldMapId = Map.TortageBeachId;
 
-		// The one beach NPC whose SpawnCheck answer carries status 0x02 (it is Casilda / the intro NPC, handle
-		// 0x00081906 in the capture); every other polled entity gets status 0x00. This is an NPC handle from the
-		// burst, NOT the player (the client never polls its own handle), so it is unchanged across characters.
-		private const uint SpawnCheckStatusTwoHandle = 0x00081906;
-
 		// The Tortage beach world-entry snapshot (0x737A6DF9) embeds quest 10238 in its tails for EVERY character
 		// (verified across the Strie / hoxxling / randochar captures - it is the canonical beach starting quest, not
 		// a per-character artifact). Since the snapshot is replayed and the client renders that quest, persist it so
@@ -586,13 +581,16 @@ namespace Faolan.GameServer
 
 		// Answers a client 0x2020 spawn poll with a 0x2008 SpawnCheck on the 201C conversation: body is
 		// 0x0000C350 + the polled entity handle + a status byte (0x02 for the player's own avatar, else 0x00).
-		private Task SendSpawnCheckResponse(INetworkClient client, uint handle)
+		private async Task SendSpawnCheckResponse(INetworkClient client, uint handle)
 		{
-			var status = (byte)(handle == SpawnCheckStatusTwoHandle
-				? 0x02
-				: 0x00);
+			// The 0x2020 poll reply (0x2008) doubles as the NPC quest marker. Compute it from the player's quest
+			// state for the polled handle (#241) instead of the old hardcoded 0x02-for-Casilda, which forced '!' on
+			// EVERY poll and overrode the state-driven marker (so it never cleared after accept). Non-giver /
+			// not-in-view -> 0x00 (still confirms the spawn). Capture-matched: poll reply was 0x02 before accept,
+			// 0x00 after (Ranochar frames 125 -> 698).
+			var status = await _broadcaster.QuestMarkerStateForHandle(client, handle);
 
-			return new PacketStream()
+			await new PacketStream()
 				.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteUInt32(0x0000C350)
 				.WriteUInt32(handle)

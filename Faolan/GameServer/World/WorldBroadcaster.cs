@@ -305,21 +305,42 @@ namespace Faolan.GameServer.World
 		// quest - e.g. Casilda shows '!' before, nothing while held, '?' once the kill goal is done (return to turn in).
 		private async Task SendQuestMarkerIfGiver(INetworkClient client, WorldEntity npc)
 		{
-			var character = client.Session.Character;
-			if (npc.Name == null || character == null)
+			if (npc.Name == null || client.Session.Character == null)
 				return;
-
 			_questGivers ??= await _database.GetQuestGiverMap();
-			if (!_questGivers.TryGetValue(npc.Name, out var questId))
+			if (!_questGivers.ContainsKey(npc.Name))
 				return; // not a quest-giver -> no marker
+			await SendQuestMarker(client, npc.Handle, await ComputeGiverMarkerState(client, npc.Name));
+		}
 
+		// The quest-marker state byte (#241) for a viewer + giver NPC name, from the player's CharacterQuests:
+		// no quest held -> '!' (0x02); goals complete -> '?' (0x04); active/in-progress -> cleared (0x00). Returns
+		// 0x00 for a non-giver. Shared by the interest-spawn push AND the 0x2020-poll reply so they never disagree.
+		private async Task<byte> ComputeGiverMarkerState(INetworkClient client, string npcName)
+		{
+			var character = client.Session.Character;
+			if (npcName == null || character == null)
+				return QuestMarkerNone;
+			_questGivers ??= await _database.GetQuestGiverMap();
+			if (!_questGivers.TryGetValue(npcName, out var questId))
+				return QuestMarkerNone;
 			var held = Array.Find(await _database.GetCharacterQuests(character.Id), q => q.QuestId == questId);
-			var state = held == null
-				? QuestMarkerAvailable                                  // can accept -> !
+			return held == null
+				? QuestMarkerAvailable
 				: held.State == QuestState.Completed
-					? QuestMarkerTurnIn                                // goals done -> ?
-					: QuestMarkerNone;                                 // active/in-progress -> cleared
-			await SendQuestMarker(client, npc.Handle, state);
+					? QuestMarkerTurnIn
+					: QuestMarkerNone;
+		}
+
+		// The quest-marker state byte for a handle the client polled via 0x2020 (resolves the entity in the player's
+		// zone). 0x00 when it isn't a quest-giver in view. Lets the poll reply (SendSpawnCheckResponse) carry the
+		// correct, state-driven marker instead of a hardcoded value.
+		public async Task<byte> QuestMarkerStateForHandle(INetworkClient client, uint handle)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player != null && _sim.World.ZoneFor(player.MapId).TryGet(handle, out var npc) && !npc.IsPlayer)
+				return await ComputeGiverMarkerState(client, npc.Name);
+			return QuestMarkerNone;
 		}
 
 		// #241: re-send a quest-giver's marker to one viewer after their quest state changed (accept/complete) while
