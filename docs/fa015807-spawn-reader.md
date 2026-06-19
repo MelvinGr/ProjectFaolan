@@ -202,3 +202,15 @@ construct-don't-replay goal is already met (`Data` is decoded + reconstructed fi
 so `Data` stays as the decoded source-of-truth interim. Revisiting the column drop needs **clean single-NPC
 captures per type** (like the two goldens) — a capture-collection effort, not a code change. The from-scratch
 builder + storage were implemented and reverted (proven on goldens; see #185).
+
+## Player spawn entry-table CLOSER is per-class (#250, 2026-06-19)
+
+The fresh-character player-spawn scaffold's entry-table **closer** record (the final `[u16 tag][u32 value]`
+entry) is **per-class**, not a constant. Stamping one class's closer on another **crashes the client's
+CoreCharacter construction on relog** (in-client: a Necromancer carrying the Barbarian closer `0x56B6/0x12C`
+crashes the loading screen; its own `0x4301/0x190` loads). Fix (`PlayerSpawnScaffoldRows.FreshCloser(Class)`,
+commit 303fd9c): **value = archetype × 100** (Soldier 100 / Priest 200 / Rogue 300 / Mage 400, solid across
+the 8 captured classes); **tag** per-class & race-independent — 5 confirmed from create dumps (Barb `0x56B6`,
+Guardian `0x4ED4`, BearShaman `0x46F2`, HeraldOfXotli `0x46F2`, Necromancer `0x4301`); the other 7 classes
+reuse a same-archetype tag (FIXME: capture their create spawns to confirm). The skill IdList (incl. Necro's
+feat `85200`) was already faithful to the dumps and is NOT the crash cause.
