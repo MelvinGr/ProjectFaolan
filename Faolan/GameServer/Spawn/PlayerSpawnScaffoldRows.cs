@@ -15,12 +15,40 @@ namespace Faolan.GameServer.Spawn
 	// genuinely fresh scaffold). See docs/archive/player-spawn-generation-plan.md "VALIDATED GRAMMAR".
 	public static class PlayerSpawnScaffoldRows
 	{
-		private const uint FreshCloserValue = 0x0000012C;
+		// The closing [u16 tag][u32 value] entry-table record (the final entry-table entry). It is PER-CLASS, not a
+		// single constant - #250: stamping one class's closer on another crashes the client's character construction
+		// (in-client: a Necromancer carrying the Barbarian closer 0x56B6/0x12C crashes the loading screen; its own
+		// 0x4301/0x190 loads). The VALUE is the archetype index x 100 (Soldier=100, Priest=200, Rogue=300, Mage=400),
+		// solid across all eight captured classes. The TAG is class-specific (race-independent: a race-1 and a
+		// Stygian Necromancer both load with 0x4301); the five values below are read off each class's create capture
+		// (Captures/*_create). Classes with no create capture yet reuse a same-archetype tag as a best-effort - those
+		// are FIXME until their create spawn is captured (Captures/scripts can re-extract the closer per class).
+		private static (ushort Tag, uint Value) FreshCloser(Class @class)
+		{
+			var value = @class switch
+			{
+				Class.Guardian or Class.Conqueror or Class.DarkTemplar => 100u,          // Soldier
+				Class.PriestOfMitra or Class.TempestOfSet or Class.BearShaman => 200u,   // Priest
+				Class.Barbarian or Class.Assassin or Class.Ranger => 300u,               // Rogue
+				_ => 400u                                                                // Mage
+			};
 
-		// The closing [u16 tag][u32 value] entry-table record. Also per-character on the wire (Dikketest
-		// 0x56B6/0x12C, strickenbla 0x4ED4/0x64, Hoxxling 0x46F2/0x190; semantics unknown) - fresh characters
-		// keep Dikketest's proven values.
-		private const ushort FreshCloserTag = 0x56B6;
+			var tag = @class switch
+			{
+				Class.Barbarian => (ushort)0x56B6,
+				Class.Guardian => (ushort)0x4ED4,
+				Class.BearShaman => (ushort)0x46F2,
+				Class.HeraldOfXotli => (ushort)0x46F2,
+				Class.Necromancer => (ushort)0x4301,
+				// No create capture yet - reuse a captured class of the same archetype (FIXME: capture to confirm).
+				Class.Conqueror or Class.DarkTemplar => (ushort)0x4ED4,    // Guardian (soldier)
+				Class.Assassin or Class.Ranger => (ushort)0x56B6,          // Barbarian (rogue)
+				Class.PriestOfMitra or Class.TempestOfSet => (ushort)0x46F2, // BearShaman (priest)
+				_ => (ushort)0x4301                                        // Demonologist -> Necromancer (mage)
+			};
+
+			return (tag, value);
+		}
 
 		// Dikketest's 6 weighted attributes (weight 1.0). The tags are per-character (likely the chosen
 		// race/class/head presets - mapping not yet cracked), so fresh characters keep Dikketest's proven set.
@@ -109,7 +137,8 @@ namespace Faolan.GameServer.Spawn
 			// Indices and Sequence both follow that wire order.
 			var entries = new List<ScaffoldEntry>(weightedAppearance ?? FreshWeightedAttributes);
 			entries.AddRange(CharacterMorphs.BuildEntries(character.Body, (uint)entries.Count + 1));
-			entries.Add(new ScaffoldEntry((uint)entries.Count + 1, FreshCloserTag, FreshCloserValue));
+			var closer = FreshCloser(character.Class);
+			entries.Add(new ScaffoldEntry((uint)entries.Count + 1, closer.Tag, closer.Value));
 
 			character.Attributes = entries
 				.Select((e, sequence) => new CharacterAttribute

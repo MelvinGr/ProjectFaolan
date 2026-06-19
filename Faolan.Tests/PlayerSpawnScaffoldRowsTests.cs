@@ -68,13 +68,15 @@ namespace Faolan.Tests
 		[Fact]
 		public void FreshRows_WithoutBody_HaveNoMorphEntries()
 		{
-			var character = new Character { Id = 0x02000006 };
+			// Class drives the per-class closer (#250): a Barbarian's closer is 0x56B6 / value 300 (rogue = archetype 3).
+			var character = new Character { Id = 0x02000006, Class = Faolan.Core.Enums.Class.Barbarian };
 			Assert.True(PlayerSpawnScaffoldRows.EnsureFreshRows(character));
 
 			Assert.Equal(7, character.Attributes.Count);
 			var closer = character.Attributes.Single(a => a.Sequence == 6);
 			Assert.Equal(7u, closer.StatId);
 			Assert.Equal(0x56B6, closer.Tag);
+			Assert.Equal(300u, closer.Value);
 		}
 
 		// #239: the AoC client derives the displayed profession from the character's feat tree, whose first
