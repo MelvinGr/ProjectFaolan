@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using Faolan.Core.Database.Tables;
 
@@ -72,11 +71,6 @@ namespace Faolan.Core.Network
 		uint ConversationTypeId { get; set; }
 		string ConversationAnswerPath { get; set; }
 		uint ConversationNpcHandle { get; set; }
-		// #217 post-close guard: the NPC handle whose dialogue just closed + when. The client fires a spurious
-		// greeting TalkToNpc the instant a dialogue closes; absorbing greetings for this handle for a brief window
-		// stops the conversation re-triggering, while a deliberate re-click later still opens it.
-		uint ConversationJustClosedHandle { get; set; }
-		DateTimeOffset ConversationClosedAt { get; set; }
 		List<uint> CreateEditorObservedRequestIds { get; }
 		List<uint> CreateEditorReadyRequestIds { get; }
 
@@ -136,8 +130,6 @@ namespace Faolan.Core.Network
 		public uint ConversationTypeId { get; set; }
 		public string ConversationAnswerPath { get; set; }
 		public uint ConversationNpcHandle { get; set; }
-		public uint ConversationJustClosedHandle { get; set; }
-		public DateTimeOffset ConversationClosedAt { get; set; }
 		public List<uint> CreateEditorObservedRequestIds { get; } = [];
 		public List<uint> CreateEditorReadyRequestIds { get; } = [];
 		public string PendingCharacterName { get; set; }

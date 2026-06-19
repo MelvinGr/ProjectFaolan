@@ -186,15 +186,6 @@ namespace Faolan.GameServer.Dialogue
 		// don't echo a close back. Leaving state set is what let a stale conversation be re-entered (#217).
 		public static void EndConversation(INetworkClient client)
 		{
-			// #217: arm the post-close guard for the NPC whose dialogue just ended (captured before we clear it), so
-			// the spurious greeting the client fires the instant a dialogue closes is absorbed (TryReplayConversation)
-			// instead of re-opening the conversation. A deliberate re-click after the brief window still opens it.
-			if (client.Session.ConversationNpcHandle != 0)
-			{
-				client.Session.ConversationJustClosedHandle = client.Session.ConversationNpcHandle;
-				client.Session.ConversationClosedAt = DateTimeOffset.UtcNow;
-			}
-
 			client.Session.ConversationAnswerPath = null;
 			client.Session.ConversationNpcName = null;
 			client.Session.ConversationTypeId = 0;
@@ -382,17 +373,6 @@ namespace Faolan.GameServer.Dialogue
 			// conversation is already active is absorbed (return true, no reply) so it doesn't reset or close it.
 			if (field3 != 0)
 				return client.Session.ConversationAnswerPath != null;
-
-			// #217: the client fires a BURST of greetings the instant a dialogue closes (observed: Mode 1 then Mode 2
-			// back-to-back). Absorb EVERY greeting for the just-closed NPC within a brief window so none re-trigger -
-			// NOT just the first (a single-consume guard let the second greeting re-open). A deliberate re-click after
-			// the window opens normally.
-			if (clickedNpcHandle != 0 && clickedNpcHandle == client.Session.ConversationJustClosedHandle
-			    && DateTimeOffset.UtcNow - client.Session.ConversationClosedAt < TimeSpan.FromSeconds(2.0))
-			{
-				_logger.LogInformation("Conversation: absorbed a post-close greeting for NPC 0x{Npc:X} (#217 re-trigger guard).", clickedNpcHandle);
-				return true;
-			}
 
 			if (!client.Session.SpawnedNpcNamesByHandle.TryGetValue(clickedNpcHandle, out var npcName))
 				return false; // unknown NPC (not spawned this session) -> create-world scripted intro fallback
