@@ -383,14 +383,14 @@ namespace Faolan.GameServer.Dialogue
 			if (field3 != 0)
 				return client.Session.ConversationAnswerPath != null;
 
-			// #217: the client fires a spurious greeting the instant a dialogue closes. Absorb a greeting for the
-			// just-closed NPC within a brief window so it doesn't re-trigger; a deliberate re-click later (past the
-			// window) opens normally. Consume the guard so only the one spurious greeting is swallowed.
+			// #217: the client fires a BURST of greetings the instant a dialogue closes (observed: Mode 1 then Mode 2
+			// back-to-back). Absorb EVERY greeting for the just-closed NPC within a brief window so none re-trigger -
+			// NOT just the first (a single-consume guard let the second greeting re-open). A deliberate re-click after
+			// the window opens normally.
 			if (clickedNpcHandle != 0 && clickedNpcHandle == client.Session.ConversationJustClosedHandle
-			    && DateTimeOffset.UtcNow - client.Session.ConversationClosedAt < TimeSpan.FromSeconds(1.5))
+			    && DateTimeOffset.UtcNow - client.Session.ConversationClosedAt < TimeSpan.FromSeconds(2.0))
 			{
-				client.Session.ConversationJustClosedHandle = 0;
-				_logger.LogInformation("Conversation: absorbed the post-close greeting for NPC 0x{Npc:X} (#217 re-trigger guard).", clickedNpcHandle);
+				_logger.LogInformation("Conversation: absorbed a post-close greeting for NPC 0x{Npc:X} (#217 re-trigger guard).", clickedNpcHandle);
 				return true;
 			}
 
