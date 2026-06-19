@@ -102,7 +102,8 @@ namespace Faolan.GameServer
 				Logger.LogWarning("Burst-less entry (map={Map}, '{Name}'): player spawn not built (no scaffold rows?); avatar may not render.", mapId, character?.Name);
 			}
 
-			var snapshot = BuildBurstlessSnapshot(client, equipment, inventoryRows, characterTags, beachDef);
+			var (snapshotQuests, primaryQuest) = await LoadSnapshotQuests(character, beachDef);
+			var snapshot = BuildBurstlessSnapshot(client, equipment, inventoryRows, characterTags, snapshotQuests, primaryQuest);
 			toSend.Add(snapshot);
 			// Record this playfield's despawn token from the snapshot we actually send (WorldDespawn), as the burst path does.
 			var snapBodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(snapshot.AsSpan(8, 4));
@@ -151,11 +152,31 @@ namespace Faolan.GameServer
 		}
 
 		// The complete burst-less 0x737A6DF9 snapshot packet (DB containers + from-scratch tails).
-		private byte[] BuildBurstlessSnapshot(INetworkClient client, CharacterEquipment equipment, CharacterInventory[] inventoryRows, uint[] characterTags, QuestDefinition beachDef)
+		// #255: the player's snapshot-eligible held quests + the primary (tracked) quest. The beach starter is the
+		// primary (always held + always seeded). Each other held quest is included ONLY if its definition has the
+		// snapshot Quest_c scalars seeded (SnapshotState != 0) AND all 5 header text refs - otherwise BuildSingle
+		// would throw and break world entry. Quests without snapshot data fall to the live RestorePlayerQuests path.
+		private async Task<(List<QuestDefinition> Quests, QuestDefinition Primary)> LoadSnapshotQuests(Character character, QuestDefinition beachDef)
+		{
+			var quests = new List<QuestDefinition> { beachDef };
+			if (character != null)
+				foreach (var cq in await Database.GetCharacterQuests(character.Id))
+				{
+					if (cq.QuestId == BeachStarterQuestId)
+						continue;
+					var def = await Database.GetQuestDefinition(cq.QuestId);
+					if (BeachTailsBuilder.IsSnapshotEligible(def))
+						quests.Add(def);
+				}
+
+			return (quests, beachDef);
+		}
+
+		private byte[] BuildBurstlessSnapshot(INetworkClient client, CharacterEquipment equipment, CharacterInventory[] inventoryRows, uint[] characterTags, IReadOnlyList<QuestDefinition> snapshotQuests, QuestDefinition primaryQuest)
 		{
 			var instance = client.Session.Account.ClientInstance;
 			var root = BuildBurstlessSnapshotRoot(instance, equipment, inventoryRows, characterTags);
-			var tails = BeachTailsBuilder.BuildFromScratch(beachDef, client.Session.Character, instance);
+			var tails = BeachTailsBuilder.BuildFromScratch(snapshotQuests, primaryQuest, client.Session.Character, instance);
 			return BuildWorldEntrySnapshot(client, root, tails);
 		}
 
