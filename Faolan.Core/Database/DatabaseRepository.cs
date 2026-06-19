@@ -36,6 +36,7 @@ namespace Faolan.Core.Database
 		Task<Character> GetCharacterForAccount(uint accountId, uint clientInstance);
 		Task<CharacterInventory[]> GetCharacterInventory(uint characterId);
 		Task<CharacterQuest[]> GetCharacterQuests(uint characterId);
+		Task<Dictionary<string, uint>> GetQuestGiverMap();
 		Task<CharacterSpell[]> GetCharacterSpells(uint characterId);
 		Task<bool> AddCharacterSpell(uint characterId, uint spellId);
 		Task<QuestDefinition> GetQuestDefinition(uint questId);
@@ -683,6 +684,22 @@ namespace Faolan.Core.Database
 				.CharacterQuests
 				.Where(q => q.CharacterId == characterId)
 				.ToArrayAsync();
+		}
+
+		// Quest-giver NPC name -> the quest id it grants (from ConversationNodes.GrantQuestId). Drives the per-NPC
+		// quest marker (!/?) - which NPC offers/turns-in which quest (#241). One quest per name (the lowest id if an
+		// NPC grants several); cached by the caller.
+		public async Task<Dictionary<string, uint>> GetQuestGiverMap()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var grants = await ctx.ConversationNodes
+				.Where(n => n.GrantQuestId != 0 && n.NpcName != null)
+				.Select(n => new { n.NpcName, n.GrantQuestId })
+				.Distinct()
+				.ToListAsync();
+			return grants
+				.GroupBy(g => g.NpcName)
+				.ToDictionary(g => g.Key, g => g.Min(x => x.GrantQuestId));
 		}
 
 		// The spells a character has learned; GrantStartingSpells replays these as DispatchLearnSpell grants on login.

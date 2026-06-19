@@ -293,6 +293,45 @@ namespace Faolan.GameServer.World
 			await DispatchInterest(events, new MoveForward(moveSubop, dataObject, dataClientInstance, movingType, position, rotation, tail));
 		}
 
+		// DispatchSetQuestMarker (0x2008) state byte (decoded #241): 0x02 = '!' (quest available), 0x04 = '?' (ready
+		// to turn in), 0x00 = none.
+		private const byte QuestMarkerNone = 0x00, QuestMarkerAvailable = 0x02, QuestMarkerTurnIn = 0x04;
+
+		// Quest-giver NPC name -> granted quest id, cached once (small set).
+		private Dictionary<string, uint> _questGivers;
+
+		// #241: drive a quest-giver NPC's marker from the viewer's quest state when it enters view. Recomputed each
+		// time the NPC is streamed in, so the '!' transitions to '?' (and clears) as the player accepts/completes the
+		// quest - e.g. Casilda shows '!' before, nothing while held, '?' once the kill goal is done (return to turn in).
+		private async Task SendQuestMarkerIfGiver(INetworkClient client, WorldEntity npc)
+		{
+			var character = client.Session.Character;
+			if (npc.Name == null || character == null)
+				return;
+
+			_questGivers ??= await _database.GetQuestGiverMap();
+			if (!_questGivers.TryGetValue(npc.Name, out var questId))
+				return; // not a quest-giver -> no marker
+
+			var held = Array.Find(await _database.GetCharacterQuests(character.Id), q => q.QuestId == questId);
+			var state = held == null
+				? QuestMarkerAvailable                                  // can accept -> !
+				: held.State == QuestState.Completed
+					? QuestMarkerTurnIn                                // goals done -> ?
+					: QuestMarkerNone;                                 // active/in-progress -> cleared
+			await SendQuestMarker(client, npc.Handle, state);
+		}
+
+		// DispatchSetQuestMarker body: [u32 0xC350][u32 npcHandle][u8 state], on the GameCharInterface dispatch
+		// (same framing as the static create-editor marker burst).
+		private static Task SendQuestMarker(INetworkClient client, uint npcHandle, byte state) =>
+			new PacketStream()
+				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, client.Session.Account.ClientInstance), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
+				.WriteUInt32(0x0000C350)
+				.WriteUInt32(npcHandle)
+				.WriteByte(state)
+				.SendAsync(client);
+
 		// Stashes the player's own FA015807 body (the bytes after the RPC header) on their world entity, so the
 		// broadcaster can re-frame it to spawn this player on other clients.
 		public void CaptureOwnSpawnBody(INetworkClient client, byte[] spawnPacket)
@@ -983,6 +1022,11 @@ namespace Faolan.GameServer.World
 						if (!ev.Subject.IsPlayer && !ev.Subject.IsLoot && ev.Subject.Name != null)
 							recipient.Session.SpawnedNpcNamesByHandle[ev.Subject.Handle] = ev.Subject.Name;
 						await SendWorldSpawn(recipient, ev.Subject);
+						// #241: when a quest-giver NPC enters view, set its marker from THIS viewer's quest state
+						// (! available / ? ready-to-turn-in / none active). Recomputed per entry, so it transitions as
+						// the player accepts/completes (e.g. Casilda shows ! then ? after the quest is done).
+						if (!ev.Subject.IsPlayer && !ev.Subject.IsLoot)
+							await SendQuestMarkerIfGiver(recipient, ev.Subject);
 						break;
 					case InterestEventType.Move when move.HasValue:
 						await SendWorldMove(recipient, move.Value);
