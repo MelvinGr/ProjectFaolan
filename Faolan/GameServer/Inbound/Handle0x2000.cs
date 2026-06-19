@@ -511,6 +511,9 @@ namespace Faolan.GameServer
 					if (data.Length >= 17)
 						targetHandle = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(13, 4));
 					client.Session.SelectedTargetHandle = targetHandle;
+					// #217: a (re-)select is genuine intent to interact - lift the post-close greeting suppression so a
+					// deliberate re-talk opens (the reflexive post-close greeting carries no SelectDeselect).
+					client.Session.ConversationEndedNpcHandle = 0;
 
 					Logger.LogInformation("SelectDeselect: target 0x{Target:X8} ({Data})", targetHandle, data.ToHex());
 

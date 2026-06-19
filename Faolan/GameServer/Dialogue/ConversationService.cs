@@ -186,6 +186,12 @@ namespace Faolan.GameServer.Dialogue
 		// don't echo a close back. Leaving state set is what let a stale conversation be re-entered (#217).
 		public static void EndConversation(INetworkClient client)
 		{
+			// #217: remember which NPC we just closed so the reflexive post-close greeting (the client re-fires one
+			// with no new SelectDeselect) is absorbed rather than re-opening the dialogue. Cleared when the player
+			// re-selects an NPC (SelectDeselect) = genuine intent to talk again.
+			if (client.Session.ConversationNpcHandle != 0)
+				client.Session.ConversationEndedNpcHandle = client.Session.ConversationNpcHandle;
+
 			client.Session.ConversationAnswerPath = null;
 			client.Session.ConversationNpcName = null;
 			client.Session.ConversationTypeId = 0;
@@ -383,6 +389,16 @@ namespace Faolan.GameServer.Dialogue
 			// conversation is already active is absorbed (return true, no reply) so it doesn't reset or close it.
 			if (field3 != 0)
 				return client.Session.ConversationAnswerPath != null;
+
+			// #217: absorb the reflexive greeting the client re-fires right after we close (it keeps the NPC
+			// targeted and re-talks with no new SelectDeselect). Stays suppressed until the player re-selects the
+			// NPC, so a deliberate re-talk still opens. This is what makes "unknown path -> just exit" actually stay
+			// exited instead of instantly re-triggering.
+			if (clickedNpcHandle != 0 && clickedNpcHandle == client.Session.ConversationEndedNpcHandle)
+			{
+				_logger.LogInformation("Conversation: suppressed the reflexive post-close greeting for NPC 0x{Npc:X} (#217; re-select to talk again).", clickedNpcHandle);
+				return true;
+			}
 
 			if (!client.Session.SpawnedNpcNamesByHandle.TryGetValue(clickedNpcHandle, out var npcName))
 				return false; // unknown NPC (not spawned this session) -> create-world scripted intro fallback

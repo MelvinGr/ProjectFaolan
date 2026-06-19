@@ -75,6 +75,11 @@ namespace Faolan.Core.Network
 		// e.g. 0x0a). The close must be sent from this SAME instance or the client won't match it to the dialogue
 		// and re-fires the greeting (#217). Captured from the served screens; 0 = none (fall back to 0x08).
 		uint ConversationAgentInstance { get; set; }
+		// #217: the NPC whose conversation was just closed. The client keeps the NPC targeted and reflexively
+		// re-fires the greeting TalkToNpc the instant we close (with NO new SelectDeselect) - which would re-open
+		// the dialogue. Suppress greetings for this handle until the player re-selects the NPC (a SelectDeselect
+		// clears it = fresh intent to talk). 0 = nothing suppressed.
+		uint ConversationEndedNpcHandle { get; set; }
 		List<uint> CreateEditorObservedRequestIds { get; }
 		List<uint> CreateEditorReadyRequestIds { get; }
 
@@ -135,6 +140,7 @@ namespace Faolan.Core.Network
 		public string ConversationAnswerPath { get; set; }
 		public uint ConversationNpcHandle { get; set; }
 		public uint ConversationAgentInstance { get; set; }
+		public uint ConversationEndedNpcHandle { get; set; }
 		public List<uint> CreateEditorObservedRequestIds { get; } = [];
 		public List<uint> CreateEditorReadyRequestIds { get; } = [];
 		public string PendingCharacterName { get; set; }
