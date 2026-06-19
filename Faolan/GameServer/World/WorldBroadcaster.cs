@@ -115,7 +115,10 @@ namespace Faolan.GameServer.World
 				         .ZoneFor(npc.MapId)
 				         .PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
-				if (viewer.Client != null)
+				// Re-add to Known: the corpse despawn (ConvertCorpseToLoot, #246) removed the handle, so the player
+				// no longer has it. Known.Add gates the spawn to viewers who actually need it + restores the #245
+				// invariant (Known == "was sent"), so later move/combat broadcasts (which check Known) reach it.
+				if (viewer.Client != null && viewer.Known.Add(npc.Handle))
 					await SendWorldSpawn(viewer.Client, npc);
 			}
 		}
@@ -827,17 +830,21 @@ namespace Faolan.GameServer.World
 			var items = await RollLootItems(dropsContents ? Random.Shared.Next(0, 3) : 0); // 0-2 items, or none
 			var cash = dropsContents ? LootResolver.RollCash(Random.Shared.NextDouble(), deadNpc.Level) : 0u;
 
-			if (!await MakeCorpseLootable(deadNpc, items, cash))
+			// DECOUPLED loot (#246): the bag is a SEPARATE IsLoot entity (its OWN handle) at the death spot, NOT the
+			// NPC's handle reused. Reusing it pinned the NPC's respawn to where it died (the client can't move a bag
+			// handle via the respawn's CharFullUpdate) and made the loot vanish when the NPC respawned. Spawn the bag,
+			// then despawn the corpse so the NPC handle respawns clean at its spawn point (BroadcastNpcRespawn re-adds
+			// it to Known); the bag lives/loots/expires on its own (tick-managed via TickExpiry). Empty corpses just
+			// despawn (matching retail - not every kill leaves a bag).
+			if (items.Count > 0 || cash > 0)
 			{
-				// No loot template for this map: we can't render a bag, so just despawn the corpse.
-				await BroadcastEntityDespawn(deadNpc);
-				_logger.LogInformation("Loot: corpse of {Name} 0x{Handle:X8} despawned (no loot bag template for map {Map}).",
-					deadNpc.Name, deadNpc.Handle, deadNpc.MapId);
-				return;
+				var bag = await SpawnLootBagAt(deadNpc.MapId, deadNpc.Position, deadNpc.Rotation, items, cash);
+				_logger.LogInformation("Loot: {Name} 0x{Handle:X8} dropped bag 0x{Bag:X8} ({Items} items, {Cash} tin) on map {Map}.",
+					deadNpc.Name, deadNpc.Handle, bag?.Handle ?? 0, items.Count, cash, deadNpc.MapId);
 			}
 
-			_logger.LogInformation("Loot: corpse of {Name} 0x{Handle:X8} became a loot bag ({Items} items, {Cash} tin) on map {Map}.",
-				deadNpc.Name, deadNpc.Handle, items.Count, cash, deadNpc.MapId);
+			await BroadcastEntityDespawn(deadNpc); // remove the corpse render; the NPC revives via TickRespawn (or is removed if NoRespawn)
+			return;
 		}
 
 		// .spawnbag: drop a standalone loot bag at the player. Now that mid-session spawns carry the live playfield
@@ -851,38 +858,47 @@ namespace Faolan.GameServer.World
 			if (player == null)
 				return null;
 
+			var bag = await SpawnLootBagAt(player.MapId, player.Position, player.Rotation, itemTemplates, cashTin);
+			if (bag != null)
+				_logger.LogInformation("Loot: .spawnbag bag 0x{Handle:X8} for {Player} ({Items} items, {Cash} tin).",
+					bag.Handle, client.Session.Character?.Name, itemTemplates.Count, cashTin);
+			return bag;
+		}
+
+		// Spawns a standalone IsLoot bag (its OWN handle) at a position, rendered for everyone in range - the decoupled
+		// loot model: the bag is a real world object (no vitals, no respawn; tick-expired via TickExpiry), independent
+		// of whatever dropped it. Used by .spawnbag AND by NPC death drops (#246) so the dead NPC's handle is free to
+		// respawn at its spawn point and the bag survives that respawn. Returns the bag, or null if the map has no
+		// loot template.
+		private async Task<WorldEntity> SpawnLootBagAt(uint mapId, Vector3 position, Vector3 rotation, IReadOnlyList<uint> itemTemplates, uint cashTin)
+		{
 			var template = GetLootTemplate();
 			if (template == null)
 				return null;
 
 			var handle = NextLootHandle();
-			// Identity (unit) rotation: a bag has no facing, and a NON-unit quaternion scales the model - stuffing the
-			// player's Euler-degree rotation into a quaternion (w=1) gave a magnitude-~180 quaternion that rendered the
-			// bag hugely oversized/distorted.
-			var rotation = Quaternion.Identity;
-			// Built FROM SCRATCH (#249): header/transform + identity-from-columns + KdTreeTail, stamped with the live
-			// playfield token directly - no captured Data, no SpawnPlayfieldRewriter pass.
-			if (!WorldObjectBuilder.BuildFromScratch(template, handle, player.Position, rotation, LootBagTemplate.TypeTag, _sim.World.ZoneFor(player.MapId).PlayfieldToken, out var body))
+			// Identity (unit) rotation in the wire transform: a bag has no facing, and a non-unit quaternion scales the
+			// model. Built FROM SCRATCH (#249): header/transform + identity-from-columns + KdTreeTail, stamped with the
+			// live playfield token directly - no captured Data, no SpawnPlayfieldRewriter pass.
+			if (!WorldObjectBuilder.BuildFromScratch(template, handle, position, Quaternion.Identity, LootBagTemplate.TypeTag, _sim.World.ZoneFor(mapId).PlayfieldToken, out var body))
 				return null;
 			body = await SpliceLootContents(body, handle, cashTin, itemTemplates); // show OUR items/cash in the window
 
-			var bag = WorldEntity.ForLoot(handle, player.MapId, player.Position, player.Rotation, template.Name ?? "Loot", body, LootBagExpirySeconds);
+			var bag = WorldEntity.ForLoot(handle, mapId, position, rotation, template.Name ?? "Loot", body, LootBagExpirySeconds);
 			bag.CashTin = cashTin;
 			if (itemTemplates != null)
 				bag.LootItems.AddRange(itemTemplates);
-			_sim.World.ZoneFor(player.MapId).Add(bag);
+			_sim.World.ZoneFor(mapId).Add(bag);
 
 			foreach (var viewer in _sim
 				         .World
-				         .ZoneFor(player.MapId)
-				         .PlayersInRange(player.Position, WorldSimulation.PlayerInterestRange))
+				         .ZoneFor(mapId)
+				         .PlayersInRange(position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client != null)
 					await SendLootBagUpdate(viewer.Client, body);
 			}
 
-			_logger.LogInformation("Loot: .spawnbag bag 0x{Handle:X8} for {Player} ({Items} items, {Cash} tin).",
-				handle, client.Session.Character?.Name, itemTemplates.Count, cashTin);
 			return bag;
 		}
 
@@ -923,51 +939,6 @@ namespace Faolan.GameServer.World
 			newContents.CopyTo(result.AsSpan(8 + contentsStart));  // the new [u32 len][ProtoLootBagIIR] tail
 			BinaryPrimitives.WriteUInt32BigEndian(result.AsSpan(0, 4), (uint)(4 + newRecordLen)); // carrier len = subOpcode + record
 			return result;
-		}
-
-		// Turns an already-spawned, dead entity's corpse into a lootable bag IN PLACE: builds the
-		// LootBagFullUpdateIIR (0xF096251E) for the entity's OWN handle + position and sends it to nearby players,
-		// then attaches the loot payload. Reusing the handle is the whole point - the client renders the corpse,
-		// so this is an UPDATE it accepts. Returns false if the map has no loot-bag template or the body can't be
-		// built.
-		private async Task<bool> MakeCorpseLootable(WorldEntity corpse, IReadOnlyList<uint> items, uint cash)
-		{
-			var template = GetLootTemplate();
-			if (template == null)
-				return false;
-
-			// Identity rotation: the corpse's Euler-degree rotation stuffed into a quaternion (w=1) gives a
-			// magnitude-~180 quaternion that SCALES/DISTORTS the bag model (the deformed loot bag). A loot bag has no
-			// facing. Built FROM SCRATCH (#249) on the corpse's handle + the live playfield token (the client only
-			// registers an object whose playfield instance matches the playfield it loaded).
-			if (!WorldObjectBuilder.BuildFromScratch(template, corpse.Handle, corpse.Position, Quaternion.Identity, LootBagTemplate.TypeTag, _sim.World.ZoneFor(corpse.MapId).PlayfieldToken, out var body))
-				return false;
-
-			body = await SpliceLootContents(body, corpse.Handle, cash, items); // show the corpse's items/cash in the window
-
-			corpse.CashTin = cash;
-			corpse.LootItems.Clear();
-			if (items != null)
-				corpse.LootItems.AddRange(items);
-
-			foreach (var viewer in _sim
-				         .World
-				         .ZoneFor(corpse.MapId)
-				         .PlayersInRange(corpse.Position, WorldSimulation.PlayerInterestRange))
-			{
-				if (viewer.Client == null)
-					continue;
-				// Despawn the standing NPC dynel FIRST, then spawn the bag on the same handle. A LootBagFullUpdate on a
-				// still-rendered character dynel does NOT swap the model (the NPC stayed standing on the corpse), so
-				// remove the dynel then re-add it as the bag. #245 invariant: only despawn for a viewer that actually
-				// HAS the NPC dynel (an n3ToClientQuit for an unknown handle crashes it); a viewer that never saw the
-				// NPC has nothing to swap, so the bag update below just spawns it fresh.
-				if (viewer.Known.Remove(corpse.Handle))
-					await SendWorldDespawn(viewer.Client, viewer.MapId, corpse.Handle);
-				await SendLootBagUpdate(viewer.Client, body);
-			}
-
-			return true;
 		}
 
 		// Sends a prebuilt LootBagFullUpdateIIR body (handle + transform already baked by WorldObjectBuilder) on
