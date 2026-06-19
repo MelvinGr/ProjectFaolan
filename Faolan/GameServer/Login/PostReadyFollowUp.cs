@@ -116,7 +116,10 @@ namespace Faolan.GameServer
 				// login (#237). Only abilities/buffs are post-ready.
 				// ...re-applies the persistent shield self-buff every character carries (#221). This flush is also
 				// re-armed on teleport/changemap re-entry, so the buff is re-asserted on each playfield change too.
-				await GrantStartingBuffs(client);
+				// DISABLED 2026-06-19: the capture-proven id 0x000B9000 renders in-client as the "Exhausted" DEBUFF
+				// and, because we re-apply it persistently with no working expiry, it never clears (#221). Left off
+				// until the expected duration/clear-point is pinned; flip back on once #221's expiry is sorted.
+				// await GrantStartingBuffs(client);
 				// Then the post-ready world-state/quest record stream (verbatim from the Strie login capture).
 				await SendPostReadyBurst(client);
 
