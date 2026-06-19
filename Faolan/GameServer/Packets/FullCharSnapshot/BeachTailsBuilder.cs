@@ -112,21 +112,6 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// other held quests just add their journal record + their questId to the index list (decoded from the
 		// compeltefirstquest 2-quest snapshot: beach + Casilda). Quests are ordered primary-first then by id (the
 		// captured order). Reproduces that capture's 2247-byte quest region byte-exact (BuildQuestPortionTests).
-		private static readonly QuestTextSlot[] HeaderSlots =
-			[QuestTextSlot.Title, QuestTextSlot.Summary, QuestTextSlot.AreaTitle, QuestTextSlot.RegionName, QuestTextSlot.MapName];
-
-		// A quest can ride the snapshot journal region (BuildQuestPortion) only if its Quest_c scalars are seeded
-		// (SnapshotState != 0) AND all 5 header text refs are present - else BuildSingle throws. Quests failing this
-		// fall to the live RestorePlayerQuests path instead. Shared by the snapshot builder + the live restore so the
-		// two never deliver the same quest twice (#255).
-		public static bool IsSnapshotEligible(QuestDefinition def)
-		{
-			if (def is not { SnapshotState: not 0 })
-				return false;
-			var slots = def.TextRefs.Select(t => t.Slot).ToHashSet();
-			return HeaderSlots.All(slots.Contains);
-		}
-
 		public static byte[] BuildQuestPortion(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, uint instance)
 		{
 			ArgumentNullException.ThrowIfNull(quests);
@@ -154,24 +139,11 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// re-addresses the template instance + stamps the playfield token, exactly as Build does. For the captured beach
 		// character + instance this reproduces BeachTailsTemplate.bin byte-for-byte (BeachTailsFromScratchTests), so the
 		// template .bin is no longer needed to author a beach entry.
-		// Beach-only convenience (the single-quest fresh path + the golden tests): delegates to the multi-quest form
-		// with just the beach quest. BuildQuestPortion([beach], beach) == BuildBeachQuestPortion(beach, state 1) so
-		// this stays byte-identical to the captured beach tails.
 		public static byte[] BuildFromScratch(QuestDefinition beachDef, Character character, uint instance, uint? playfieldToken = null)
 		{
 			ArgumentNullException.ThrowIfNull(beachDef);
-			return BuildFromScratch([beachDef], beachDef, character, instance, playfieldToken);
-		}
 
-		// As above but for the player's full set of snapshot-eligible held quests (#255): the journal region carries
-		// every held quest's record (primary owns the objective region + index). For a beach-only char this equals
-		// the beach-only overload. `primary` is the tracked quest (the beach quest when held).
-		public static byte[] BuildFromScratch(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, Character character, uint instance, uint? playfieldToken = null)
-		{
-			ArgumentNullException.ThrowIfNull(quests);
-			ArgumentNullException.ThrowIfNull(primary);
-
-			var quest = BuildQuestPortion(quests, primary, instance);
+			var quest = BuildBeachQuestPortion(beachDef, state: 1, instance);
 
 			var block = TailsStatBlock.CreateFreshBlock();
 			if (character?.MaxStats != null)
