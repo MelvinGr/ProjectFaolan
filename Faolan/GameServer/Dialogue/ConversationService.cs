@@ -192,16 +192,23 @@ namespace Faolan.GameServer.Dialogue
 			client.Session.ConversationNpcHandle = 0;
 		}
 
-		public Task SendConversationClose(INetworkClient client)
+		public Task SendConversationClose(INetworkClient client, uint npcHandle = 0)
 		{
+			// #217: the close's KnubotBase header carries the NPC handle the client uses to tear down THAT dialogue
+			// and RELEASE its dialogue camera. We used to re-address only the player instance and keep the captured
+			// (stale) NPC handle, so the client never matched the live dialogue: the camera stayed locked (soft-lock,
+			// relog to recover) and the client re-fired TalkToNpc (the conversation re-opened). Retail's close carries
+			// the LIVE NPC handle (e.g. 0x6A0A Kalanthes). Use the active dialogue's NPC (captured BEFORE EndConversation
+			// clears it), or the caller's clicked NPC for the no-node-on-click close.
+			if (npcHandle == 0)
+				npcHandle = client.Session.ConversationNpcHandle;
 			EndConversation(client); // end any active conversation
 			var id = client.Session.Account.ClientInstance;
 
 			// CONSTRUCT the close via KnubotCodec from the captured empty-remoteformat reply, re-addressed to the live
-			// player (the captured NPC + string are reused verbatim) - byte-identical to the old substitution, on the
-			// same sender (GameAgent:0x08) SendConversationClose has always used.
+			// player AND the live NPC (the captured string is reused verbatim), on the same sender (GameAgent:0x08).
 			var captured = KnubotCodec.ParseStringList(KnubotCloseChatWindowBody);
-			var record = KnubotCodec.BuildCloseChatWindow(id, captured.NpcHandle, captured.Strings, captured.Env);
+			var record = KnubotCodec.BuildCloseChatWindow(id, npcHandle != 0 ? npcHandle : captured.NpcHandle, captured.Strings, captured.Env);
 			return SendConstructedKnubot(client, 0x08, id, record);
 		}
 

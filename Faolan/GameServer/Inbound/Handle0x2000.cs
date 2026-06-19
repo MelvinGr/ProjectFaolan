@@ -393,7 +393,7 @@ namespace Faolan.GameServer
 								{
 									var routedName = client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var rn) ? rn : "<unmapped handle>";
 									Logger.LogInformation("TalkToNpc: no conversation node for npcHandle=0x{Npc:X} (name={Name}, typeId={TypeId}, mode={Mode}, field3={Field3}); closing the window.", npcHandle, routedName, args.TypeId, args.Mode, args.Field3);
-									await _conversation.SendConversationClose(client);
+									await _conversation.SendConversationClose(client, npcHandle); // #217: close the CLICKED NPC's window (re-address the camera release)
 								}
 
 								break;
