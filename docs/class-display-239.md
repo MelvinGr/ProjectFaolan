@@ -136,3 +136,18 @@ loader; post-ready is fine (matches the manual `.setstat 43 <class>` that flippe
 Marked INTERIM / NOT RETAIL-ACCURATE in the code: retail does not send stat 0x43 at all (the client computes
 it from char data we haven't decoded). When that computed source is found, replace the force-fed stat with
 the real data. Until then this gives the correct class display for all classes (id space = char-list Class).
+
+## VALIDATED against a retail properly-classed char (2026-06-19)
+
+Read a live retail **Cimmerian Conqueror lvl 2** in-world (winedbg froze at getPlayer, then a direct
+/proc/<pid>/mem read; the player's StatHolder is the *richest* array — 218 stats with distinct hp/mana,
+vs ~144 for NPC entities). Its stats confirm the mechanism AND the id space:
+
+- `stat 0x36 (level)` = 2, `stat 0x1b (HP)` = 22900, `stat 0x1f8 (mana)` = 21700, `stat 0x1fa (stam)` = 0.
+- **`stat 0x43 (CLASS)` = 22 = our `Class.Conqueror` (0x16).** With Necromancer=41 also matching, the
+  stat-0x43 class id space **equals our `Class` enum** — so the fix (`stat 0x43 = Character.Class`) is
+  correct for every class, not just Necro. (A nearby level-80 NPC had class 24 — NPCs share the same
+  StatHolder layout, so identify the player by the richest array / distinct hp≠mana.)
+- Bonus for #4: this Conqueror uses MANA (0x1f8=217), not stamina (0x1fa=0) — real per-class resource data.
+  StatHolder layout (`StatHolder_t::GetStat` = FUN_006faa30): sorted `[u32 id][u32 value]` at holder+0x28,
+  count +0x2c — reusable for stat decoding. (rdump.py over /tmp/frida-239/ reads any guest address.)
