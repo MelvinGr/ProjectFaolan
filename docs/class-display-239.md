@@ -151,3 +151,29 @@ vs ~144 for NPC entities). Its stats confirm the mechanism AND the id space:
 - Bonus for #4: this Conqueror uses MANA (0x1f8=217), not stamina (0x1fa=0) — real per-class resource data.
   StatHolder layout (`StatHolder_t::GetStat` = FUN_006faa30): sorted `[u32 id][u32 value]` at holder+0x28,
   count +0x2c — reusable for stat decoding. (rdump.py over /tmp/frida-239/ reads any guest address.)
+
+## RETAIL SOURCE FOUND (2026-06-19, dynamic backtrace on retail Conqueror)
+
+Set a conditional winedbg breakpoint on `SimpleChar_t::SetStat` (FUN_010fd220) with `key==0x43` and relogged
+a retail char — it fired exactly once during char-load. Backtrace:
+
+```
+0  FUN_010fd220   SimpleChar_t::SetStat(this, 0x43, classValue)
+1  FUN_005bffe0   (stat-apply dispatcher/visitor)
+2  FUN_0083ae30   GameCodeDynelFullUpdateIIR::Activate   <-- the player FULL-UPDATE spawn handler
+3  FUN_01121560 -> FUN_0083ae30
+...
+```
+
+(Frame 2 contains the literal string `GameCodeDynel\GameCodeDynelFullUpdateIIR.cpp`.)
+
+**So retail sets the class from the player's FULL-UPDATE SPAWN**: when the client Activates the
+GameCodeDynelFullUpdate (the player spawn), it applies the entity's stat data, including
+`SetStat(0x43 = class)`. The class is spawn-embedded, NOT a separate packet and NOT computed from the feat
+tree. Our FA015807 self-spawn omits it (its CoreCharacter has no class field/stat — CharacterStats f4 carries
+race/sex/vitals only, and we send no generic_stats), so the client never sets stat 0x43 → Barbarian.
+
+**Implication for the fix:** the interim `PostReadyFollowUp` `SetStat(0x43)` is *functionally* correct (same
+stat, right value) but happens post-ready rather than during spawn-Activate. The fully retail-accurate fix is
+to embed stat 0x43 in the player spawn's stat data so Activate sets it (exact carrier field — generic_stats
+vs an extra stat block — is the remaining decode). Until then the interim is fine and validated.
