@@ -125,3 +125,14 @@ some other path/timing we haven't observed. **The remaining work is purely the D
 on the player's stat-0x43 storage during a *retail* relog (using the now-proven winedbg + memdump workflow,
 `/tmp/frida-239/`) will show exactly which message/timing sets it — then mirror that on Faolan. The
 *mechanism* (class = player stat 0x43, fallback 0x1f) is settled; only the wire delivery is open.
+
+## RESOLVED (interim) — 2026-06-19, commit 399fa15
+
+Fix attempt 2 WORKS: send `stat 0x43 = Character.Class` in `PostReadyFollowUp` (after the 0x2024
+ReadyForPlayScreen), NOT in the mid-load vitals. Verified in-client: a fresh Necromancer now shows
+**Necromancer** (was Barbarian), no crash. The timing is the whole trick — mid-load stat 0x43 crashes the
+loader; post-ready is fine (matches the manual `.setstat 43 <class>` that flipped the sheet live).
+
+Marked INTERIM / NOT RETAIL-ACCURATE in the code: retail does not send stat 0x43 at all (the client computes
+it from char data we haven't decoded). When that computed source is found, replace the force-fed stat with
+the real data. Until then this gives the correct class display for all classes (id space = char-list Class).

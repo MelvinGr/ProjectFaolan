@@ -61,13 +61,13 @@ namespace Faolan.GameServer.Spawn
 
 		// Per-class fresh feat/ability ID list (all rank 0). The FIRST id is the PROFESSION feat and equals
 		// (class enum) * 100 (1800=Barbarian, 2000=Guardian, 2900=BearShaman, 3400=Assassin, 4100=Necromancer,
-		// 2200=Conqueror, 4300=HeraldOfXotli, 4400=Demonologist...). The AoC client DERIVES the displayed
-		// profession from this feat tree, so a fresh character MUST carry its own class's profession feat or the
-		// sheet (and weapon proficiency) defaults to whatever the profession feat resolves to - #239, where every
-		// fresh char inherited Dikketest's Barbarian feat 1800 and showed as a Barbarian. Confirmed across 8
-		// classes' retail self-spawns (Captures/scripts: profession feat = class*100, always first/ascending).
-		// The four captured-at-L1 archetypes use their exact retail fresh list; the rest fall back to the
-		// profession feat + the base feats common to every captured fresh list (display is correct for all 12).
+		// 2200=Conqueror, 4300=HeraldOfXotli, 4400=Demonologist...), matching the retail self-spawns (Captures/
+		// scripts: profession feat = class*100, always first/ascending). The four captured-at-L1 archetypes use
+		// their exact retail fresh list; the rest fall back to the profession feat + the base feats common to every
+		// captured fresh list. NOTE: the in-world *displayed class* is NOT derived from this feat tree - it reads
+		// player stat 0x43 (see PostReadyFollowUp / docs/class-display-239.md, #239). The earlier "client derives the
+		// profession from the feat tree" claim was DISPROVEN in-client (a spawn carrying feat 4100 still showed
+		// Barbarian); this list still matters for the actual feat/AA content, just not the class label.
 		private static readonly uint[] CommonFreshSkillIds = [6900, 8100, 8305, 8400, 13600, 14600, 328900, 331300];
 
 		private static readonly Dictionary<Class, uint[]> FreshSkillIdsByClass = new()
