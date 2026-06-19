@@ -111,9 +111,10 @@ namespace Faolan.GameServer
 				await SendReadyForPlayScreen(client);
 				// Retail grants the starting abilities (0x2052) right after 0x2024, not during world entry.
 				await GrantStartingAbilities(client);
-				// ...and re-grants the character's learned SPELLS (DispatchLearnSpell 0x200A) the same way (#74).
-				await GrantStartingSpells(client);
-				// ...and re-applies the persistent shield self-buff every character carries (#221). This flush is also
+				// NB the learned SPELLS (DispatchLearnSpell 0x200A) are NOT re-granted here anymore: they are sent
+				// pre-snapshot in SendWorldEntry so the client absorbs them silently instead of re-toasting every
+				// login (#237). Only abilities/buffs are post-ready.
+				// ...re-applies the persistent shield self-buff every character carries (#221). This flush is also
 				// re-armed on teleport/changemap re-entry, so the buff is re-asserted on each playfield change too.
 				await GrantStartingBuffs(client);
 				// Then the post-ready world-state/quest record stream (verbatim from the Strie login capture).

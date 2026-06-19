@@ -608,6 +608,14 @@ namespace Faolan.GameServer
 		{
 			await Send0X201C(client);
 
+			// #237: re-grant the character's learned SPELLS (DispatchLearnSpell 0x200A) BEFORE the world snapshot, so
+			// the client absorbs them as part of the initial load and stays SILENT - retail sends them pre-entry
+			// (NecroL80 login: grants at frame 59, the 0x737A6DF9 snapshot at frame 152). Granting them post-ready
+			// (the old PostReadyFollowUp call) made the client treat each as a fresh learn and re-toast "You have
+			// learned a new spell" on EVERY login. Done here, the shared world-entry path, so it's silent on login AND
+			// on changemap/teleport re-entry. (Abilities 0x2052 stay post-0x2024 - they don't toast.)
+			await GrantStartingSpells(client);
+
 			var mapId = client.Session.Character.MapId;
 
 			// Burst-less entry (#210): build the whole world entry from generated/structured pieces - no captured
