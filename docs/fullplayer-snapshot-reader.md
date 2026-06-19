@@ -26,7 +26,27 @@ now serves only as the golden test oracle; the remaining step is wiring `BuildFr
 world entry (#210) + an in-client chat-connect smoke test, after which the production FullChar tails are fully
 generated. Branch `development`, all green (506 tests).
 
-DONE this session (the whole quest region authors from server state):
+**UPDATE 2026-06-19 — MULTI-QUEST journal generates byte-exact + WIRED LIVE (#255 closed, verified in-client; commit 431673c).**
+The quest region now carries the player's full set of held quests (from `CharacterQuests`), not just the beach quest —
+so the login journal shows the real quests, not the captured beach char's phantom 2/30 (#254). Multi-quest wire order
+(decoded byte-exact from the Strie/Stihetfv 2-quest `[beach+13479]` login snapshot, 2247 B):
+`[QuestcRegion version 0x18][count=(N+1)*0x3F1]`, then **PER QUEST**: its `Quest_c` record IMMEDIATELY followed by its
+OWN `@609` objective region — whose lead word is `(goals+1)*0x3F1` (NOT a constant `0xBD3`; beach 2 goals = `0xBD3`,
+Casilda 1 goal = `0x7E2`; the old `QuestObjectiveRegion.ChapterTag` const is now `Frame`, computed). Then the quest
+**index** = shared header `[0x3F1][marker=(N+1)*0x3F1][all questIds][count][sentinel 0xF1]` + **one block per quest**
+`[magic][tf1..3][goalCount][(step,1..n) pairs][trailer questId,1,0,0,linkWord]`, where `magic` is the quest's goal-table
+NAME word (beach `0x57365154` "W6QT", Casilda `0x52524C33" "RRL3") and the block trailers **CHAIN**: `linkWord` = the
+NEXT held quest's `AreaId`, the LAST block = the primary's `IndexTrailerWord`. **All record/objective/index scalars are
+PER-QUEST CONSTANTS** (byte-identical across a quest's active AND completed login captures — NOT progress-bearing; the
+beach record is the same fresh 601 B early or late). Builder: `BeachTailsBuilder.BuildQuestPortion(quests, primary,
+instance)` + a `BuildFromScratch(quests, primary, ...)` overload (beach-only delegates → byte-identical). New
+`QuestDefinition` cols: `SnapshotState`, `SnapshotField28`, `IndexMagic` (+migrations). A held quest joins the snapshot
+only if `BeachTailsBuilder.IsSnapshotEligible` (scalars + 5 header text refs seeded); others fall to the live
+`RestorePlayerQuests` path (no double-delivery). Golden: `BuildQuestPortionTests` reproduces the 2-quest region
+byte-for-byte. NB the 3 earlier in-client crashes were WRONG ASSEMBLY ORDER (records-then-objective + single-block
+index), NOT a progress/obj-list issue — the obj-lists are empty and the records are constants.
+
+DONE 2026-06-16 (the single-quest beach region authors from server state):
 - **Quest_c (`@0..609`)** — `QuestcRegion`/`QuestcRecord` codec (byte-exact round-trip), wired into
   `SnapshotTails`, and `QuestcRecord.BuildSingle` GENERATES it from `faolan.db` (`QuestcGenerationTests`).
 - **`@609` objective region** — DECODED as a per-GOAL block (NOT a `BuildQuestFullUpdate` block — that was
