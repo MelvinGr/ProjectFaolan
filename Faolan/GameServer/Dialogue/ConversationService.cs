@@ -286,15 +286,16 @@ namespace Faolan.GameServer.Dialogue
 			var def = await _database.GetQuestDefinition(node.GrantQuestId);
 
 			// Seed the quest's first objective so kills can advance it (#47): GoalRequired = the goal record's decoded
-			// count (QuestGoalDefinition.RequiredCount, the word after goalIdRepeat - values 1/3/4/8/12/64 on the wire).
-			// GoalTargetName (which NPC's death counts) is NOT carried in the goal record, only in the RDB-resolved
-			// objective text, so it stays unset until sourced per quest - until then CombatService.AdvanceKillQuests
-			// won't match a kill (it keys on GoalTargetName), but the objective count is now persisted.
+			// count (QuestGoalDefinition.RequiredCount), GoalTargetName = the seeded kill target (QuestGoalDefinition.
+			// TargetName - server-side, sourced per quest since it's not on the wire). With both set,
+			// CombatService.AdvanceKillQuests matches a kill of that NPC and advances/completes the quest (e.g. Casilda's
+			// 13479 = kill 1 "Scavenger Tuut"). A talk/collect goal leaves TargetName null - no kill matching, count 0.
 			var firstGoal = def?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
 			var goalRequired = firstGoal is { RequiredCount: > 0 } ? firstGoal.RequiredCount : 0u;
+			var goalTargetName = firstGoal?.TargetName;
 
-			await _database.SetCharacterQuest(character.Id, node.GrantQuestId, QuestState.Active, goalRequired: goalRequired);
-			_logger.LogInformation("Quest {QuestId} granted to {Name} from {Npc}'s dialogue (goalRequired={Req}).", node.GrantQuestId, character.Name, node.NpcName, goalRequired);
+			await _database.SetCharacterQuest(character.Id, node.GrantQuestId, QuestState.Active, goalRequired: goalRequired, goalTargetName: goalTargetName);
+			_logger.LogInformation("Quest {QuestId} granted to {Name} from {Npc}'s dialogue (goalRequired={Req}, target={Target}).", node.GrantQuestId, character.Name, node.NpcName, goalRequired, goalTargetName ?? "-");
 			return def;
 		}
 

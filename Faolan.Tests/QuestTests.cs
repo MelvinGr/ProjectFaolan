@@ -19,6 +19,15 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void AdvancesOnKill_SingleKillObjective_TheCasildaShape()
+		{
+			// Casilda's quest 13479 seeds RequiredCount=1, GoalTargetName="Scavenger Tuut" (#47): one kill of Tuut
+			// must advance (0<1) and the next state is complete (1>=1, so a second kill no longer advances).
+			Assert.True(QuestProgress.AdvancesOnKill(KillQuest("Scavenger Tuut", 0, 1), "Scavenger Tuut"));
+			Assert.False(QuestProgress.AdvancesOnKill(KillQuest("Scavenger Tuut", 1, 1), "Scavenger Tuut"));
+		}
+
+		[Fact]
 		public void AdvancesOnKill_RejectsNonMatching()
 		{
 			Assert.False(QuestProgress.AdvancesOnKill(KillQuest("Scavenger Lackey", 0, 5), "Wolf")); // wrong target

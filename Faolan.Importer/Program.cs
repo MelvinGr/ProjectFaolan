@@ -115,6 +115,32 @@ namespace Faolan.Importer
 			Console.WriteLine($"Quest definitions (journal content): {definitions.Count} harvested, {added} new, {updated} updated.");
 
 			await SeedBeachQuestGoals(db);
+			await SeedKillQuestTargets(db);
+		}
+
+		// Kill-quest objectives recovered by capture correlation + domain knowledge (#47): the goal record carries the
+		// RequiredCount but NOT the target NPC (that's in the RDB-resolved objective text), so the target is seeded
+		// here. CombatService.AdvanceKillQuests matches a kill on the exact NPC name. Idempotent: only adds a goal if
+		// the quest exists and has none yet.
+		//   - Casilda's quest 13479 = kill 1 "Scavenger Tuut" (the NPC hit at the QuestGoal-complete frame in
+		//     Blablabla_..._questcomplete; "Tuut is the NPC you kill for the Casilda quest").
+		private static async Task SeedKillQuestTargets(DatabaseContext db)
+		{
+			await SeedKillGoal(db, questId: 13479, goalId: 5744, target: "Scavenger Tuut", required: 1);
+		}
+
+		private static async Task SeedKillGoal(DatabaseContext db, uint questId, uint goalId, string target, uint required)
+		{
+			var quest = await db.QuestDefinitions.Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == questId);
+			if (quest == null || quest.Goals.Count > 0)
+				return;
+
+			quest.Goals.Add(new QuestGoalDefinition
+			{
+				GoalId = goalId, Sequence = 1, RequiredCount = required, TargetName = target
+			});
+			await db.SaveChangesAsync();
+			Console.WriteLine($"Seeded kill-quest target: quest {questId} = kill {required} {target}.");
 		}
 
 		// The beach starter (quest 10238) per-goal objective detail (the snapshot's @609 region). This data lives ONLY

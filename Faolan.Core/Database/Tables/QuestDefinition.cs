@@ -72,6 +72,13 @@ namespace Faolan.Core.Database.Tables
 		// set, treated as 1 by QuestObjectiveRegion.Build (preserves byte-exact for rows seeded before this field).
 		public uint RequiredCount { get; set; }
 
+		// The NPC whose death advances this goal (a kill objective). SERVER-SIDE ONLY - NOT on the wire: the goal
+		// record carries the count but not the target (it's in the RDB-resolved objective text). Sourced per quest by
+		// capture correlation (the NPC hit at the QuestGoal-complete frame) + domain knowledge (#47, e.g. Casilda's
+		// quest 13479 = kill "Scavenger Tuut"). CombatService.AdvanceKillQuests matches a kill on this exact name.
+		// Null/empty = not a kill goal (talk/collect/reach) or target not yet sourced.
+		public string TargetName { get; set; }
+
 		public uint Separator { get; set; } // the [1][k] separator's k word (9, 12 in the beach capture)
 		public uint SubId { get; set; }      // the trailing record's id echoed in the header (= TrailingRefId)
 		public uint MapId { get; set; }
