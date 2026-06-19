@@ -491,6 +491,13 @@ namespace Faolan.GameServer.Combat
 				// tick then converts the lingering corpse to a lootable bag (NpcCorpseLootable) and respawns it later.
 				// Don't despawn/convert here - that instant-popped the corpse before the death animation could play.
 				npcEntity.MarkDead();
+
+				// #204: the health=0 StatUpdate alone does NOT play the death animation (in-client verified) - the
+				// client needs the explicit SimpleCharKilledByUpdateIIR (0xB066AFC2) kill record (docs/combat.md,
+				// decoded from AssassinL23_..._resurect). Send it right after the killing-blow vitals so the lingering
+				// corpse plays its death anim. Killer = the player who landed the blow.
+				await SendWorldPacket(killer, WorldDeath.BuildKilledBy(targetHandle, killer.Session.Account.ClientInstance));
+
 				await AwardKillXp(killer, npcEntity.Level);
 
 				_logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); corpse lingers {Linger}s then becomes lootable, {Fate}.",

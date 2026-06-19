@@ -65,6 +65,10 @@ namespace Faolan.GameServer.World
 		// Push the death/release screen: DispatchValidResurrectionSpots with the death position + the spots the
 		// player may resurrect at. The client replies with RespawnMe(spawnPointId) (handled inbound).
 		Task SendResurrectionScreen(INetworkClient client, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots);
+
+		// The explicit death trigger (SimpleCharKilledByUpdateIIR 0xB066AFC2) the client needs to enter the dead
+		// (release-screen) state - a health=0 StatUpdate alone doesn't (#214). Sent before SendResurrectionScreen.
+		Task SendDeathTrigger(INetworkClient client, uint dyingHandle, uint killerEndpoint);
 	}
 
 	// The live in-memory world (docs/archive/server-architecture-roadmap.md): owns the world model + the connected players'
@@ -451,6 +455,10 @@ namespace Faolan.GameServer.World
 			var spot = RespawnResolver.ClosestKnown(deathPosition, points, discovered)
 				?? points.FirstOrDefault(p => p.AlwaysKnown)
 				?? points[0];
+			// #214: drive the client into the dead state FIRST (the explicit kill record) - the health=0 StatUpdate
+			// alone leaves it alive, so the 0x2024 reads as the login spawn-anchor and no release screen shows. Then
+			// the resurrection screen. Killer unknown here (0) - the trigger's presence is what flips the dead state.
+			await _output.SendDeathTrigger(client, client.Session.Account.ClientInstance, 0);
 			await _output.SendResurrectionScreen(client, deathPosition, [spot]);
 		}
 

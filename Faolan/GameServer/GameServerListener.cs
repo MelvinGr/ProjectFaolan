@@ -179,6 +179,14 @@ namespace Faolan.GameServer
 			return SendValidResurrectionSpots(client, deathPosition, spots);
 		}
 
+		Task IWorldOutbound.SendDeathTrigger(INetworkClient client, uint dyingHandle, uint killerEndpoint)
+		{
+			return new PacketStream()
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteArrayUInt32Length(s => s.WriteArray(WorldDeath.BuildKilledBy(dyingHandle, killerEndpoint)))
+				.SendAsync(client);
+		}
+
 		// --- IEconomyOutbound: the wallet + item-grant ops the economy/inventory services reach back to (forwarding
 		// to the private Outbound builders, which the listener also calls directly from loot/GM paths) ---------------
 		Task IEconomyOutbound.SendMoneyUpdate(INetworkClient client, ulong balanceTin, MoneyUpdateReason reason)
