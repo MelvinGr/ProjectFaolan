@@ -284,6 +284,12 @@ namespace Faolan.GameServer.Dialogue
 			if (grantDef != null && !grantSent) // no AnswerList on this screen - send after the (terminal) screen
 				await SendQuestGrantPackets(client, grantDef);
 
+			// #241: accepting the quest changed the player's quest state, so the giver's '!' must update in-place
+			// (retail clears it to 0x00 the instant you accept - capture frame 698) rather than persisting until the
+			// NPC re-streams. The clicked NPC IS the giver and is in view.
+			if (grantDef != null)
+				await _broadcaster.RefreshQuestGiverMarker(client, clickedNpcHandle);
+
 			// A pure terminal screen (a CloseChatWindow with NO AnswerList) ENDS the dialogue: the window is now shut
 			// on the client. Recording it as the active position left the session "inside" a finished conversation,
 			// so the greeting the client fires right after re-opened it (#217). End instead - this arms the post-close

@@ -322,6 +322,18 @@ namespace Faolan.GameServer.World
 			await SendQuestMarker(client, npc.Handle, state);
 		}
 
+		// #241: re-send a quest-giver's marker to one viewer after their quest state changed (accept/complete) while
+		// the giver is ALREADY in view. Retail updates it in-place, not only on stream-in (capture frame 698: Casilda
+		// -> 0x00 the instant the quest is accepted). Resolves the entity in the player's zone, then recomputes.
+		public async Task RefreshQuestGiverMarker(INetworkClient client, uint npcHandle)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null)
+				return;
+			if (_sim.World.ZoneFor(player.MapId).TryGet(npcHandle, out var npc) && !npc.IsPlayer)
+				await SendQuestMarkerIfGiver(client, npc);
+		}
+
 		// DispatchSetQuestMarker body: [u32 0xC350][u32 npcHandle][u8 state], on the GameCharInterface dispatch
 		// (same framing as the static create-editor marker burst).
 		private static Task SendQuestMarker(INetworkClient client, uint npcHandle, byte state) =>
