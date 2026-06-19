@@ -190,6 +190,7 @@ namespace Faolan.GameServer.Dialogue
 			client.Session.ConversationNpcName = null;
 			client.Session.ConversationTypeId = 0;
 			client.Session.ConversationNpcHandle = 0;
+			client.Session.ConversationAgentInstance = 0;
 		}
 
 		public Task SendConversationClose(INetworkClient client, uint npcHandle = 0)
@@ -202,6 +203,9 @@ namespace Faolan.GameServer.Dialogue
 			// clears it), or the caller's clicked NPC for the no-node-on-click close.
 			if (npcHandle == 0)
 				npcHandle = client.Session.ConversationNpcHandle;
+			// The close must ride the SAME GameAgent instance the conversation's screens used (#217); 0x08 is the
+			// fallback when there was no active conversation. Captured BEFORE EndConversation clears it.
+			var agentInstance = client.Session.ConversationAgentInstance != 0 ? client.Session.ConversationAgentInstance : 0x08;
 			EndConversation(client); // end any active conversation
 			var id = client.Session.Account.ClientInstance;
 
@@ -209,7 +213,7 @@ namespace Faolan.GameServer.Dialogue
 			// player AND the live NPC (the captured string is reused verbatim), on the same sender (GameAgent:0x08).
 			var captured = KnubotCodec.ParseStringList(KnubotCloseChatWindowBody);
 			var record = KnubotCodec.BuildCloseChatWindow(id, npcHandle != 0 ? npcHandle : captured.NpcHandle, captured.Strings, captured.Env);
-			return SendConstructedKnubot(client, 0x08, id, record);
+			return SendConstructedKnubot(client, agentInstance, id, record);
 		}
 
 		// Serves one dialogue SCREEN: re-addresses its captured response packets to the live player + clicked NPC and
@@ -228,6 +232,12 @@ namespace Faolan.GameServer.Dialogue
 			// terminal screen (CloseChatWindow only) is kept.
 			var orderedPackets = node.Packets.OrderBy(p => p.Sequence).ToList();
 			var hasAnswerList = orderedPackets.Any(p => ConversationSubOpcode(p.Data) == KnubotAnswerListSubOpcode);
+
+			// Remember the GameAgent instance this conversation's packets are sent from (retail varies it per
+			// conversation). SendConversationClose must reuse it - a close from a different instance (e.g. the old
+			// hardcoded 0x08) doesn't match the dialogue and the client re-fires the greeting (#217).
+			if (orderedPackets.Count > 0)
+				client.Session.ConversationAgentInstance = ReadSenderInstance(orderedPackets[0].Data);
 
 			// A grant node accepts a quest. Retail announces it INTERLEAVED inside the grant screen, in this order:
 			// AppendText -> QuestLogList (0x504B7924, the J-panel list) -> QuestFullUpdate (0x63268258, the detail) ->

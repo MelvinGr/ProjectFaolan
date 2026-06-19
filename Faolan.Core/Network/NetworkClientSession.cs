@@ -71,6 +71,10 @@ namespace Faolan.Core.Network
 		uint ConversationTypeId { get; set; }
 		string ConversationAnswerPath { get; set; }
 		uint ConversationNpcHandle { get; set; }
+		// The GameAgent sender instance the active conversation's packets use (retail varies it per conversation,
+		// e.g. 0x0a). The close must be sent from this SAME instance or the client won't match it to the dialogue
+		// and re-fires the greeting (#217). Captured from the served screens; 0 = none (fall back to 0x08).
+		uint ConversationAgentInstance { get; set; }
 		List<uint> CreateEditorObservedRequestIds { get; }
 		List<uint> CreateEditorReadyRequestIds { get; }
 
@@ -130,6 +134,7 @@ namespace Faolan.Core.Network
 		public uint ConversationTypeId { get; set; }
 		public string ConversationAnswerPath { get; set; }
 		public uint ConversationNpcHandle { get; set; }
+		public uint ConversationAgentInstance { get; set; }
 		public List<uint> CreateEditorObservedRequestIds { get; } = [];
 		public List<uint> CreateEditorReadyRequestIds { get; } = [];
 		public string PendingCharacterName { get; set; }
