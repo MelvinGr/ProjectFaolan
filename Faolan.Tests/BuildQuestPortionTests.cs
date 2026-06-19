@@ -49,6 +49,27 @@ namespace Faolan.Tests
 			Assert.True(slice.SequenceEqual(built), $"13479 record must match the capture; first diff @{diff} of {built.Length}");
 		}
 
+		// The whole 2-quest region (beach + Casilda) must reproduce the captured login snapshot's quest region
+		// byte-for-byte - the proof that the multi-quest assembly (record order, the objective region between the
+		// primary record and the others, the multi-quest index) is correct + client-valid.
+		[Fact]
+		public async Task BuildQuestPortion_ReproducesTheTwoQuestCapture_ByteForByte()
+		{
+			var beach = await LoadDefinition(10238);
+			var casilda = await LoadDefinition(13479);
+			Assert.NotNull(beach);
+			Assert.NotNull(casilda);
+
+			var built = BeachTailsBuilder.BuildQuestPortion([beach, casilda], primary: beach, CaptureInstance);
+			var golden = File.ReadAllBytes(GoldenPath);
+
+			var diff = -1;
+			for (var i = 0; i < Math.Min(golden.Length, built.Length); i++)
+				if (golden[i] != built[i]) { diff = i; break; }
+			Assert.True(golden.SequenceEqual(built),
+				$"2-quest region must equal the capture; lengths golden={golden.Length} built={built.Length}; first diff @{diff}");
+		}
+
 		private static int IndexOf(byte[] hay, byte[] needle)
 		{
 			for (var i = 0; i + needle.Length <= hay.Length; i++)

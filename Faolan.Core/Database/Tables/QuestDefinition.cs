@@ -43,6 +43,9 @@ namespace Faolan.Core.Database.Tables
 
 		// Quest index region: the W6QT goal-id table's marker + three lead words + trailer word, and the goal-step ids
 		// (CSV, the client's 1..n goal index). Beach 10238: marker 0x7E2, fields 1/7/0, trailer 0x156E7, 8 steps.
+		// IndexMagic = the per-quest goal-table NAME word (beach = 0x57365154 "W6QT"; Casilda 13479 = 0x52524C33
+		// "RRL3"); in a multi-quest index each held quest contributes its own block keyed by this (#255).
+		public uint IndexMagic { get; set; }
 		public uint IndexMarker { get; set; }
 		public uint IndexTableField1 { get; set; }
 		public uint IndexTableField2 { get; set; }

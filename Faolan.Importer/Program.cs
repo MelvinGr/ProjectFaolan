@@ -126,7 +126,7 @@ namespace Faolan.Importer
 		// Idempotent - set every run. (13479's header text refs + AreaId are already harvested by the extractor.)
 		private static async Task SeedCasildaQuestSnapshot(DatabaseContext db)
 		{
-			var quest = await db.QuestDefinitions.FirstOrDefaultAsync(q => q.QuestId == 13479);
+			var quest = await db.QuestDefinitions.Include(q => q.Goals).Include(q => q.TextRefs).FirstOrDefaultAsync(q => q.QuestId == 13479);
 			if (quest == null)
 				return;
 			quest.SnapshotState = 3;
@@ -135,8 +135,41 @@ namespace Faolan.Importer
 			quest.SnapshotFieldF0 = 80;
 			quest.SnapshotFieldF8 = 7;
 			quest.SnapshotField28 = 80;
+			// 13479's quest-index block (#255): its own "RRL3" goal-table magic, table fields 1/3/0, and its 4 goal
+			// steps. In a multi-quest index this block follows the beach quest's; the chain link is by areaId.
+			quest.IndexMagic = 0x52524C33;
+			quest.IndexTableField1 = 1;
+			quest.IndexTableField2 = 3;
+			quest.IndexTableField3 = 0;
+			quest.IndexGoalSteps = "13479,13563,13480,12407";
+
+			// 13479's snapshot @609 objective goal (decoded from the Strie/Stihetfv login snapshots, #255): goal 5744,
+			// 1 step, separator 12, no subId, map 4010 marker (327,678), the two undecoded reserved words 70099/0x542D5354,
+			// and the objective (cat 50304) + trailing LOCALIZED (cat 51000, flags "m") text - keys taken from the
+			// already-harvested TextRefs so they stay byte-exact. Lets QuestObjectiveRegion.Build emit 13479's region.
+			var goal = quest.Goals.FirstOrDefault(g => g.GoalId == 5744);
+			if (goal != null)
+			{
+				goal.Sequence = 1;
+				goal.Separator = 12;
+				goal.SubId = 0;
+				goal.MapId = 4010;
+				goal.MarkerX = 327;
+				goal.MarkerY = 678;
+				goal.Extra5 = 70099;
+				goal.Extra6 = 0x542D5354;
+				goal.ObjectiveRefId = 5744;
+				goal.ObjectiveCategory = 50304;
+				goal.ObjectiveKey = quest.TextRefs.FirstOrDefault(t => t.Slot == QuestTextSlot.Objective)?.KeyText;
+				goal.TrailingRefId = 11561;
+				goal.TrailingCategory = 51000;
+				goal.TrailingKey = quest.TextRefs.FirstOrDefault(t => t.Slot == QuestTextSlot.ObjectiveLocalized)?.KeyText;
+				goal.TrailingLocalized = true;
+				goal.TrailingFlags = "m";
+			}
+
 			await db.SaveChangesAsync();
-			Console.WriteLine("Seeded Casilda quest 13479 snapshot Quest_c scalars (#255).");
+			Console.WriteLine("Seeded Casilda quest 13479 snapshot Quest_c scalars + @609 objective goal (#255).");
 		}
 
 		// Kill-quest objectives recovered by capture correlation + domain knowledge (#47): the goal record carries the
@@ -184,6 +217,7 @@ namespace Faolan.Importer
 			quest.SnapshotFieldF8 = 15;
 			quest.SnapshotState = 1;   // Quest_c State word @20 (per-quest constant; beach = 1). #255
 			quest.SnapshotField28 = 0; // Quest_c Field28 @28 (beach = 0). #255
+			quest.IndexMagic = 0x57365154; // "W6QT" goal-table name word. #255
 			quest.IndexMarker = 0x7E2;
 			quest.IndexTableField1 = 1;
 			quest.IndexTableField2 = 7;

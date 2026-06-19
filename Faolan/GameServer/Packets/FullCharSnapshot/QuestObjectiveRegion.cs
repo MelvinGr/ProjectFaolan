@@ -24,7 +24,10 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 	// foundation, mirroring QuestcRegion's role for @0..609.
 	public sealed class QuestObjectiveRegion
 	{
-		public const uint ChapterTag = 0x00000BD3;
+		// The region's lead word is the goal-list FRAMING count = (goals + 1) * 0x3F1 (the same 0x3F1 list-framing
+		// multiplier as QuestcRegion/QuestIndexRegion). The beach quest's 2 goals make it 0xBD3, which was previously
+		// hardcoded as "ChapterTag"; a 1-goal quest (e.g. Casilda 13479) is 0x7E2. #255.
+		public const uint Frame = 0x000003F1;
 		public const uint IndexTag = 0x000003F1; // opens the quest index that terminates this region
 		public const uint GoalLead = 1;          // every goal record opens with this word
 
@@ -40,8 +43,8 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			using var r = new FaolanStream(data, false) { Position = checked((uint)offset) };
 
 			var tag = r.ReadUInt32();
-			if (tag != ChapterTag)
-				throw new InvalidOperationException($"@609 region: chapterTag 0x{tag:X} != 0x{ChapterTag:X}");
+			if (tag == 0 || tag % Frame != 0)
+				throw new InvalidOperationException($"@609 region: lead word 0x{tag:X} is not a multiple of 0x{Frame:X}");
 
 			var region = new QuestObjectiveRegion();
 			while (r.Position + 4 <= r.Length && PeekUInt32(data, r.Position) == GoalLead)
@@ -54,7 +57,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		public byte[] ToArray()
 		{
 			using var w = new FaolanStream();
-			w.WriteUInt32(ChapterTag);
+			w.WriteUInt32(((uint)Goals.Count + 1) * Frame);
 			foreach (var goal in Goals)
 				goal.Write(w);
 			return w.ToArray();

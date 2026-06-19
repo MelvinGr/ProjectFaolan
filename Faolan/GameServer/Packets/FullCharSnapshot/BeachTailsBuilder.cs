@@ -112,24 +112,77 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// other held quests just add their journal record + their questId to the index list (decoded from the
 		// compeltefirstquest 2-quest snapshot: beach + Casilda). Quests are ordered primary-first then by id (the
 		// captured order). Reproduces that capture's 2247-byte quest region byte-exact (BuildQuestPortionTests).
+		private static readonly QuestTextSlot[] HeaderSlots =
+			[QuestTextSlot.Title, QuestTextSlot.Summary, QuestTextSlot.AreaTitle, QuestTextSlot.RegionName, QuestTextSlot.MapName];
+
+		// A quest can ride the snapshot journal region (BuildQuestPortion) only if its Quest_c scalars are seeded
+		// (SnapshotState != 0) AND all 5 header text refs are present - else BuildSingle throws. Quests failing this
+		// fall to the live RestorePlayerQuests path instead, so the two never deliver the same quest twice (#255).
+		public static bool IsSnapshotEligible(QuestDefinition def)
+		{
+			if (def is not { SnapshotState: not 0 })
+				return false;
+			var slots = def.TextRefs.Select(t => t.Slot).ToHashSet();
+			return HeaderSlots.All(slots.Contains);
+		}
+
 		public static byte[] BuildQuestPortion(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, uint instance)
 		{
 			ArgumentNullException.ThrowIfNull(quests);
 			ArgumentNullException.ThrowIfNull(primary);
 
+			// Wire order (decoded from the compeltefirstquest/Strie 2-quest region, byte-exact): the Quest_c list
+			// header (version + count), then for EACH held quest its journal record IMMEDIATELY followed by its own
+			// objective (@609) region, then the quest index. (The objective region's lead word is per-quest
+			// (goals+1)*0x3F1.) The index is owned by the primary (tracked) quest - its goal-steps/table/trailer - but
+			// lists every held quest's id. Primary ordered first.
 			var ordered = quests.OrderByDescending(q => q.QuestId == primary.QuestId).ThenBy(q => q.QuestId).ToList();
-			var qc = new QuestcRegion();
+
+			using var w = new Faolan.Core.Data.FaolanStream();
+			w.WriteUInt32(QuestcRegion.Version);
+			w.WriteUInt32(((uint)ordered.Count + 1) * QuestcRegion.Frame);
 			foreach (var q in ordered)
-				qc.Records.Add(QuestcRecord.BuildSingle(q, q.SnapshotState, q.SnapshotN, q.SnapshotFieldEc, q.SnapshotFieldF0, q.SnapshotFieldF8, q.SnapshotField28));
+			{
+				Record(q).Write(w);
+				w.WriteArray(QuestObjectiveRegion.Build(q, instance).ToArray());
+			}
 
-			var objectives = QuestObjectiveRegion.Build(primary, instance);
-			var goalSteps = (primary.IndexGoalSteps ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(uint.Parse).ToArray();
-			var index = QuestIndexRegion.Build(
-				[.. ordered.Select(q => q.QuestId)], goalSteps,
-				primary.IndexTableField1, primary.IndexTableField2, primary.IndexTableField3,
-				primary.QuestId, primary.IndexTrailerWord);
+			// Quest index: a shared header (tag, marker, ALL held questIds, count, sentinel) then ONE per-quest block
+			// (the quest's goal-id table: its magic name + tf1-3 + goal-steps + a trailer). The block trailers CHAIN -
+			// each links to the NEXT held quest's areaId; the last block carries the terminal word (the primary's
+			// IndexTrailerWord). Decoded byte-exact from the 2-quest capture (#255).
+			w.WriteUInt32(QuestIndexRegion.IndexTag);
+			w.WriteUInt32(((uint)ordered.Count + 1) * QuestcRegion.Frame);
+			foreach (var q in ordered)
+				w.WriteUInt32(q.QuestId);
+			w.WriteUInt32((uint)ordered.Count);
+			w.WriteUInt32(QuestIndexRegion.Sentinel);
+			for (var i = 0; i < ordered.Count; i++)
+			{
+				var q = ordered[i];
+				w.WriteUInt32(q.IndexMagic);
+				w.WriteUInt32(q.IndexTableField1);
+				w.WriteUInt32(q.IndexTableField2);
+				w.WriteUInt32(q.IndexTableField3);
+				var steps = (q.IndexGoalSteps ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(uint.Parse).ToArray();
+				w.WriteUInt32((uint)steps.Length);
+				for (var s = 0; s < steps.Length; s++)
+				{
+					w.WriteUInt32(steps[s]);
+					w.WriteUInt32((uint)(s + 1));
+				}
 
-			return [.. qc.ToArray(), .. objectives.ToArray(), .. index.ToArray()];
+				w.WriteUInt32(q.QuestId);
+				w.WriteUInt32(1);
+				w.WriteUInt32(0);
+				w.WriteUInt32(0);
+				w.WriteUInt32(i + 1 < ordered.Count ? ordered[i + 1].AreaId : primary.IndexTrailerWord);
+			}
+
+			return w.ToArray();
+
+			static QuestcRecord Record(QuestDefinition q) =>
+				QuestcRecord.BuildSingle(q, q.SnapshotState, q.SnapshotN, q.SnapshotFieldEc, q.SnapshotFieldF0, q.SnapshotFieldF8, q.SnapshotField28);
 		}
 
 		// Builds the WHOLE beach 0x737A6DF9 tails FROM SCRATCH - no captured-tails template (#186). Assembles the three
@@ -139,11 +192,23 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// re-addresses the template instance + stamps the playfield token, exactly as Build does. For the captured beach
 		// character + instance this reproduces BeachTailsTemplate.bin byte-for-byte (BeachTailsFromScratchTests), so the
 		// template .bin is no longer needed to author a beach entry.
+		// Beach-only convenience (golden tests + the single-quest path): delegates to the multi-quest form with just
+		// the beach quest. BuildQuestPortion([beach], beach) == BuildBeachQuestPortion, so byte-identical.
 		public static byte[] BuildFromScratch(QuestDefinition beachDef, Character character, uint instance, uint? playfieldToken = null)
 		{
 			ArgumentNullException.ThrowIfNull(beachDef);
+			return BuildFromScratch([beachDef], beachDef, character, instance, playfieldToken);
+		}
 
-			var quest = BuildBeachQuestPortion(beachDef, state: 1, instance);
+		// The player's full set of snapshot-eligible held quests (#255): the journal region carries every held
+		// quest's record + objective region (primary owns the index's terminal). For a beach-only char this equals
+		// the beach-only overload. `primary` is the tracked quest (the beach quest when held).
+		public static byte[] BuildFromScratch(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, Character character, uint instance, uint? playfieldToken = null)
+		{
+			ArgumentNullException.ThrowIfNull(quests);
+			ArgumentNullException.ThrowIfNull(primary);
+
+			var quest = BuildQuestPortion(quests, primary, instance);
 
 			var block = TailsStatBlock.CreateFreshBlock();
 			if (character?.MaxStats != null)

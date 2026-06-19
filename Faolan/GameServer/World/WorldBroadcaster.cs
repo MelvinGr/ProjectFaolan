@@ -648,19 +648,23 @@ namespace Faolan.GameServer.World
 			if (character == null)
 				return;
 
-			// Skip the beach starter quest: the world-entry snapshot already delivers its FULL journal entry (multiple
-			// objectives), so re-sending our thinner QuestFullUpdate would clobber it down to one objective.
+			// Restore the LIVE journal only for active quests NOT carried by the world-entry snapshot. A
+			// snapshot-eligible quest (Quest_c scalars + header text refs seeded - beach starter, Casilda 13479, ...)
+			// already rides the snapshot's multi-quest region (#255), so re-sending it live would double-deliver.
 			var active = (await _database.GetCharacterQuests(character.Id))
-				.Where(q => q.State == QuestState.Active && q.QuestId != WorldQuest.BeachStarterQuestId)
+				.Where(q => q.State == QuestState.Active)
 				.ToList();
 			var definitions = new List<(CharacterQuest Quest, QuestDefinition Def)>();
 			foreach (var quest in active)
 			{
+				var def = await _database.GetQuestDefinition(quest.QuestId);
+				if (BeachTailsBuilder.IsSnapshotEligible(def))
+					continue; // delivered in the snapshot's quest region
+
 				await SendQuestIir(client, quest.QuestId, WorldQuest.StateActive);
 				if (quest.GoalRequired > 0)
 					await SendQuestGoal(client, quest.QuestId, 0, quest.GoalProgress);
 
-				var def = await _database.GetQuestDefinition(quest.QuestId);
 				if (def != null)
 				{
 					await SendQuestFullUpdate(client, def);

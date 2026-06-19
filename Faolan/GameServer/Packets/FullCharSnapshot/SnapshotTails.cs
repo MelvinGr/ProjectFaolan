@@ -159,7 +159,11 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		private static QuestObjectiveRegion? TryParseQuestObjectives(byte[] data, int boundary, out int afterObjectives)
 		{
 			afterObjectives = boundary;
-			if (boundary + 4 > data.Length || BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(boundary, 4)) != QuestObjectiveRegion.ChapterTag)
+			if (boundary + 4 > data.Length)
+				return null;
+			// The objective region opens with the goal-list framing word (goals+1)*0x3F1 (#255); the beach's is 0xBD3.
+			var lead = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(boundary, 4));
+			if (lead == 0 || lead % QuestObjectiveRegion.Frame != 0)
 				return null;
 
 			try
