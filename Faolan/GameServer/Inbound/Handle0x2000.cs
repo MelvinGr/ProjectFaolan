@@ -389,7 +389,7 @@ namespace Faolan.GameServer
 								// Beach login with no captured node for this (Mode, Field3): close the chat window so the
 								// client doesn't hang waiting for a reply (the "advance a step -> chat locks, can't ESC"
 								// bug). Conversation replay is coverage-bound, so an un-captured branch is expected.
-								else if (client.Session.UsedWorldBurstReplay)
+								else if (client.Session.WorldEntered)
 								{
 									var routedName = client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var rn) ? rn : "<unmapped handle>";
 									Logger.LogInformation("TalkToNpc: no conversation node for npcHandle=0x{Npc:X} (name={Name}, typeId={TypeId}, mode={Mode}, field3={Field3}); closing the window.", npcHandle, routedName, args.TypeId, args.Mode, args.Field3);

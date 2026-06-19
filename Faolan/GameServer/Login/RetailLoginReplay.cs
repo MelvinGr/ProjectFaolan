@@ -445,7 +445,7 @@ namespace Faolan.GameServer
 			if (fullChar?.Body != null)
 				_broadcaster.CapturePlayfieldToken(mapId, fullChar.Body);
 
-			client.Session.UsedWorldBurstReplay = true;
+			client.Session.WorldEntered = true;
 
 			// Load the character's CharacterEquipment (seeding default starter gear once for new beach characters).
 			// This drives the player's WORN gear into their entity SPAWN (TryRebuildPlayerSpawnFromDb), which is the
@@ -618,37 +618,12 @@ namespace Faolan.GameServer
 
 			var mapId = client.Session.Character.MapId;
 
-			// Burst-less entry (#210): build the whole world entry from generated/structured pieces - no captured
-			// burst. DEFAULT path (in-client verified on the beach); FAOLAN_BURSTLESS_ENTRY=0 falls back to the replay.
-			// Beach-shaped for now (tails/playfield are beach values).
-			if (BurstlessEntryEnabled)
-			{
-				await SendBurstlessWorldEntry(client, mapId);
-				return;
-			}
-
-			var worldBurst = await Database.GetMapWorldBurst(mapId) ?? await Database.GetMapWorldBurst(DefaultWorldMapId);
-			if (worldBurst == null)
-			{
-				Logger.LogError("World entry (map={Map}, '{Name}'): no world burst available (not even the beach); the world cannot be built.", mapId, client.Session.Character?.Name);
-				return;
-			}
-
-			Logger.LogInformation("World entry (map={Map}, '{Name}'): replaying {Count} IIR records from the DB ({Source}).", mapId, client.Session.Character?.Name, worldBurst.Entities.Count, worldBurst.MapId == mapId
-				? "own map"
-				: $"beach fallback (map {worldBurst.MapId})");
-			// Populate the shared world model: the map's NPCs (once) + this player. Registered BEFORE the burst so
-			// the player's own spawn body can be captured into the entity during the replay
-			// (docs/archive/server-architecture-roadmap.md).
-			await _broadcaster.EnsureZoneNpcs(mapId);
-			_simulation.RegisterPlayerInWorld(client);
-			await ReplayMapWorldBurst(client, worldBurst, mapId);
-
-			// Now that the spawn body is captured, run interest: spawn this player to nearby players and them to it.
-			await _broadcaster.BroadcastPlayerEntry(client);
-
-			// Restore the player's persisted quest journal.
-			await _broadcaster.RestorePlayerQuests(client);
+			// Burst-less entry (#210) is the ONLY world-entry path: the whole world entry is built from
+			// generated/structured pieces - no captured burst. (The FAOLAN_BURSTLESS_ENTRY env toggle + its
+			// captured-burst replay fallback were removed once burstless became the verified default; the
+			// captured-burst replay now survives only as SendBurstlessWorldEntry's internal safety net for a map
+			// with no quest definition.)
+			await SendBurstlessWorldEntry(client, mapId);
 		}
 
 		// If the (already re-addressed) burst packet is an NPC entity Spawn (FA015807 whose handle is NOT the

@@ -31,13 +31,6 @@ namespace Faolan.GameServer
 		// to it. Threaded as one value so the snapshot/spawn/objects agree (per-map sourcing is a follow-up).
 		private const uint BeachPlayfieldId = 0x004FE428;
 
-		// The burst-less world entry (#210) is now the DEFAULT path (in-client verified on the beach 2026-06-18). Set
-		// FAOLAN_BURSTLESS_ENTRY=0 to fall back to the captured-burst replay. Beach-shaped for now (tails/playfield are
-		// beach values; per-map sourcing is a follow-up). NB an interest despawn-churn bug (#245) crashes the loader on
-		// high-density zones; FAOLAN_BURSTLESS_ENTRY=0 (the burst fallback) is the escape hatch until it lands.
-		private static readonly bool BurstlessEntryEnabled =
-			!string.Equals(Environment.GetEnvironmentVariable("FAOLAN_BURSTLESS_ENTRY"), "0", StringComparison.Ordinal);
-
 		// Builds + sends the entire world entry from generated/structured pieces - no captured burst (#210). Mirrors
 		// SendWorldEntry's world-model setup + record order (MapChange, objects, player spawn, snapshot, vitals,
 		// gametime), then runs interest for the NPCs. Beach-shaped (BeachTailsBuilder + BeachPlayfieldId); a non-beach
@@ -85,6 +78,12 @@ namespace Faolan.GameServer
 			// Populate the shared world model BEFORE building so the player entity exists for CaptureOwnSpawnBody.
 			await _broadcaster.EnsureZoneNpcs(mapId);
 			_simulation.RegisterPlayerInWorld(client);
+
+			// Mark this connection as having entered the world. The conversation system (ConversationService), the
+			// 0x2020 -> 0x2008 spawn-check (GameServerListener), and the dialogue-close fallback (Handle0x2000) are
+			// all gated on this - without it NPC dialogue silently never opens. The internal burst fallback below
+			// sets it via ReplayMapWorldBurst.
+			client.Session.WorldEntered = true;
 
 			var toSend = new List<byte[]>(worldObjectRows.Length + 5)
 			{

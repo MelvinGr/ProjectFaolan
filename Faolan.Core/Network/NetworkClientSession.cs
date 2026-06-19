@@ -31,10 +31,11 @@ namespace Faolan.Core.Network
 		bool IsCreateWorldSession { get; set; }
 		bool PostMorphBurstSent { get; set; }
 
-		// True once the verbatim world-burst replay has been sent for this connection (existing-character login on
-		// the Tortage beach). Gates the 0x2020 -> 0x2008 SpawnCheck responder so it only fires for replay sessions,
-		// not the create-world flow (which has its own 0x2020 handling).
-		bool UsedWorldBurstReplay { get; set; }
+		// True once this connection has completed world entry (the burst-less world entry, the only entry path).
+		// Gates the in-world behaviours that must not fire on a connection that hasn't entered the world: the
+		// 0x2020 -> 0x2008 SpawnCheck responder, the NPC conversation system, and the dialogue-close fallback.
+		// (The create-world flow uses IsCreateWorldSession alongside this.)
+		bool WorldEntered { get; set; }
 
 		// The client's conversation id for this connection (the value bytes of the incoming packet's sender
 		// field), captured per packet. Auth-handoff responses (UniverseAgent/PlayerAgent) echo this back as the
@@ -111,7 +112,7 @@ namespace Faolan.Core.Network
 		public bool IsCreateEditorConnection { get; set; }
 		public bool IsCreateWorldSession { get; set; }
 		public bool PostMorphBurstSent { get; set; }
-		public bool UsedWorldBurstReplay { get; set; }
+		public bool WorldEntered { get; set; }
 		public byte[] ClientConversation { get; set; }
 
 		public Character Character

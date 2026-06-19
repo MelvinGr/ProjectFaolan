@@ -525,7 +525,7 @@ namespace Faolan.GameServer
 						// entry need it: the create-world flow's old hand-built batch answered the wrong, hardcoded
 						// capture handles (0x818xx) on Strie's instance, so its entities (incl. Kalanthes) were never
 						// confirmed and the intro cinematic ("invalid camera path Kalanthes") failed.
-						if (client.Session.UsedWorldBurstReplay || client.Session.IsCreateWorldSession)
+						if (client.Session.WorldEntered || client.Session.IsCreateWorldSession)
 							await SendSpawnCheckResponse(client, requestId);
 
 						Logger.LogInformation("0x2020 summary: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X8}", ack0, requestId, ack1, characterId);
