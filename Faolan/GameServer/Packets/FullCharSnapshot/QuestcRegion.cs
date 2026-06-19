@@ -108,7 +108,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// left empty (the objective TEXT rides in the strings; see docs/fullplayer-snapshot-reader.md). This is
 		// the construct-don't-replay generator for the quest region (#186), proven byte-exact for 10238 by
 		// QuestcGenerationTests.
-		public static QuestcRecord BuildSingle(QuestDefinition def, uint state, uint n, uint fieldEc, uint fieldF0, ulong fieldF8)
+		public static QuestcRecord BuildSingle(QuestDefinition def, uint state, uint n, uint fieldEc, uint fieldF0, ulong fieldF8, uint field28 = 0)
 		{
 			ArgumentNullException.ThrowIfNull(def);
 
@@ -127,7 +127,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 				AreaId = def.AreaId,
 				Field11c = 0,
 				Accept = 0,
-				Field28 = 0,
+				Field28 = field28,
 				FieldF0 = fieldF0,
 				FieldF8 = fieldF8,
 			};

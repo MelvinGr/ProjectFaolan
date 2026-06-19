@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -104,6 +105,31 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			if (portion.Length != QuestPortionLength)
 				throw new InvalidOperationException($"generated quest portion is {portion.Length} B, expected {QuestPortionLength}");
 			return portion;
+		}
+
+		// #255: the multi-quest journal portion from the player's held quests. One QuestcRecord per quest (journal
+		// entries), but the objective (@609) region + the quest index belong to the PRIMARY (tracked) quest only -
+		// other held quests just add their journal record + their questId to the index list (decoded from the
+		// compeltefirstquest 2-quest snapshot: beach + Casilda). Quests are ordered primary-first then by id (the
+		// captured order). Reproduces that capture's 2247-byte quest region byte-exact (BuildQuestPortionTests).
+		public static byte[] BuildQuestPortion(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, uint instance)
+		{
+			ArgumentNullException.ThrowIfNull(quests);
+			ArgumentNullException.ThrowIfNull(primary);
+
+			var ordered = quests.OrderByDescending(q => q.QuestId == primary.QuestId).ThenBy(q => q.QuestId).ToList();
+			var qc = new QuestcRegion();
+			foreach (var q in ordered)
+				qc.Records.Add(QuestcRecord.BuildSingle(q, q.SnapshotState, q.SnapshotN, q.SnapshotFieldEc, q.SnapshotFieldF0, q.SnapshotFieldF8, q.SnapshotField28));
+
+			var objectives = QuestObjectiveRegion.Build(primary, instance);
+			var goalSteps = (primary.IndexGoalSteps ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(uint.Parse).ToArray();
+			var index = QuestIndexRegion.Build(
+				[.. ordered.Select(q => q.QuestId)], goalSteps,
+				primary.IndexTableField1, primary.IndexTableField2, primary.IndexTableField3,
+				primary.QuestId, primary.IndexTrailerWord);
+
+			return [.. qc.ToArray(), .. objectives.ToArray(), .. index.ToArray()];
 		}
 
 		// Builds the WHOLE beach 0x737A6DF9 tails FROM SCRATCH - no captured-tails template (#186). Assembles the three

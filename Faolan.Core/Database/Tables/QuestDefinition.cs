@@ -35,6 +35,12 @@ namespace Faolan.Core.Database.Tables
 		public uint SnapshotFieldF0 { get; set; }
 		public ulong SnapshotFieldF8 { get; set; }
 
+		// The Quest_c record's State word (@20) and Field28 (@28) - per-quest CONSTANTS (verified byte-identical across
+		// a quest's active + completed login captures, #255). Beach 10238 = state 1 / field28 0; Casilda 13479 = state 3
+		// / field28 80. Drive the multi-quest journal region (BuildQuestPortion) so every held quest's record generates.
+		public uint SnapshotState { get; set; }
+		public uint SnapshotField28 { get; set; }
+
 		// Quest index region: the W6QT goal-id table's marker + three lead words + trailer word, and the goal-step ids
 		// (CSV, the client's 1..n goal index). Beach 10238: marker 0x7E2, fields 1/7/0, trailer 0x156E7, 8 steps.
 		public uint IndexMarker { get; set; }

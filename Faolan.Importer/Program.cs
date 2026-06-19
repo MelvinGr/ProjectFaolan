@@ -116,6 +116,27 @@ namespace Faolan.Importer
 
 			await SeedBeachQuestGoals(db);
 			await SeedKillQuestTargets(db);
+			await SeedCasildaQuestSnapshot(db);
+		}
+
+		// Casilda's quest 13479 snapshot Quest_c scalars (#255): the journal-record fields that live ONLY in the
+		// FullChar snapshot, not the QuestFullUpdate/Journal packets the extractor reads. Decoded from the
+		// compeltefirstquest/Stihetfv/Strie login snapshots (byte-identical across that quest's active + completed
+		// states, so per-quest constants). Lets the multi-quest BuildQuestPortion generate 13479's record from the DB.
+		// Idempotent - set every run. (13479's header text refs + AreaId are already harvested by the extractor.)
+		private static async Task SeedCasildaQuestSnapshot(DatabaseContext db)
+		{
+			var quest = await db.QuestDefinitions.FirstOrDefaultAsync(q => q.QuestId == 13479);
+			if (quest == null)
+				return;
+			quest.SnapshotState = 3;
+			quest.SnapshotN = 3;
+			quest.SnapshotFieldEc = 1;
+			quest.SnapshotFieldF0 = 80;
+			quest.SnapshotFieldF8 = 7;
+			quest.SnapshotField28 = 80;
+			await db.SaveChangesAsync();
+			Console.WriteLine("Seeded Casilda quest 13479 snapshot Quest_c scalars (#255).");
 		}
 
 		// Kill-quest objectives recovered by capture correlation + domain knowledge (#47): the goal record carries the
@@ -161,6 +182,8 @@ namespace Faolan.Importer
 			quest.SnapshotFieldEc = 1;
 			quest.SnapshotFieldF0 = 0x96;
 			quest.SnapshotFieldF8 = 15;
+			quest.SnapshotState = 1;   // Quest_c State word @20 (per-quest constant; beach = 1). #255
+			quest.SnapshotField28 = 0; // Quest_c Field28 @28 (beach = 0). #255
 			quest.IndexMarker = 0x7E2;
 			quest.IndexTableField1 = 1;
 			quest.IndexTableField2 = 7;
