@@ -148,7 +148,9 @@ vs ~144 for NPC entities). Its stats confirm the mechanism AND the id space:
   stat-0x43 class id space **equals our `Class` enum** — so the fix (`stat 0x43 = Character.Class`) is
   correct for every class, not just Necro. (A nearby level-80 NPC had class 24 — NPCs share the same
   StatHolder layout, so identify the player by the richest array / distinct hp≠mana.)
-- Bonus for #4: this Conqueror uses MANA (0x1f8=217), not stamina (0x1fa=0) — real per-class resource data.
+- ⚠️ SUSPECT (do NOT act on): the read labelled `0x1f8=217` as MANA / `0x1fa=0` as stamina. This CONTRADICTS the
+  authoritative captured `CharacterMaxStats` (Conqueror = stamina only, mana 0); the label was almost certainly a
+  stat-id misread (0x1f8 is stamina). The captures win — don't make Conqueror a mana user on this line.
   StatHolder layout (`StatHolder_t::GetStat` = FUN_006faa30): sorted `[u32 id][u32 value]` at holder+0x28,
   count +0x2c — reusable for stat decoding. (rdump.py over /tmp/frida-239/ reads any guest address.)
 

@@ -37,16 +37,18 @@ identity quad would go (behavior acks, the 0xF result block, 0x2052 grants).
 ## NPC death lifecycle (corpse linger -> loot bag -> respawn)
 
 A killed NPC no longer instant-pops. The killing blow pushes the `health=0` vitals (`ApplyNpcDamage`), then
-`CombatService.OnNpcKilled` only `MarkDead`s the world entity (+ XP + kill quests) - it does NOT despawn or
-swap the corpse. The world tick (`WorldState.Tick`) drives two independent timers off the death:
+`CombatService.OnNpcKilled` `MarkDead`s the world entity (+ XP + kill quests) and sends the explicit death
+trigger `SimpleCharKilledByUpdateIIR` (0xB066AFC2) so the client plays the death anim (#204, see above). The
+world tick (`WorldState.Tick`) drives two independent timers off the death:
 1. **corpse linger** (`WorldEntity.CorpseLingerSeconds`, ~3s): the corpse stays the dying creature so the
-   client plays its death animation off the health=0 it just got. When it elapses the tick emits
-   `NpcCorpseLootable` -> `WorldBroadcaster.ConvertCorpseToLoot` turns the corpse into a lootable bag IN PLACE
-   (reusing the handle - `MakeCorpseLootable`). Every kill leaves a lootable corpse; the drop ROLL only decides
-   whether it carries items/cash (empty corpses are fine, matching retail). Falls back to a plain despawn only
-   when the map has no loot-bag template.
+   client plays its death animation. When it elapses the tick emits `NpcCorpseLootable` ->
+   `WorldBroadcaster.ConvertCorpseToLoot`, which (decoupled, #246) rolls the drop, spawns a **SEPARATE** loot bag
+   (its own handle, via `SpawnLootBagAt` - the same standalone-bag path as `.spawnbag`) at the death spot, then
+   despawns the corpse. The bag lives/loots/expires independently (a `ForLoot` entity, tick-expired) and SURVIVES
+   the NPC's respawn. (Old `MakeCorpseLootable` reused the NPC handle in place - removed; it pinned the respawn to
+   the death spot, #246.) Empty drops just despawn the corpse.
 2. **respawn** (`RespawnDelaySeconds`, ~15s): revives the NPC at its spawn point and re-renders it
-   (`NpcRespawned`), clearing any unlooted corpse contents. **EXCEPT** summoned `.spawnnpc` NPCs
+   (`NpcRespawned`, which re-adds the handle to the viewers' Known set, #246/#245). **EXCEPT** summoned `.spawnnpc` NPCs
    (`WorldEntity.NoRespawn`, set in `SpawnNpcForPlayer`): once dead they don't revive — the post-death timer runs
    as a despawn (`TickPostDeathDespawn` → `LootExpired` fade+remove) so a test mob fades out instead of coming
    back (commit `df8f90d`, a GM QoL Melvin asked for).
@@ -56,12 +58,15 @@ swap the corpse. The world tick (`WorldState.Tick`) drives two independent timer
 comes back on relog). The tool for scrubbing captured import artifacts (phantom players baked into the pcap). A
 neutral named entity deletes every same-name row on the map; a faction mob only the rows at its spot (commit `576c007`).
 
-Open: the death animation currently relies on the client reacting to the `health=0` StatUpdate during the
-linger. **In-client 2026-06-17 this does NOT play (#204): NPCs despawn with no death animation** — the
-health=0 StatUpdate alone doesn't drive the client's death anim; it needs an explicit trigger. The death/corpse IIR readers are now decoded — `SimpleCharKilledByUpdateIIR_t` (0xB066AFC2, the
-"killed by" record = killer handle + flags) and `TombStoneFullUpdateIIR_c` (0x0D80E7C9, the corpse) — see
-`docs/iir-readers-conversation-misc.md` / `docs/iir-readers-combat-world.md`. What remains for #204 is
-wiring a death-animation/state trigger from these, not a decode gap.
+Death trigger (#204 NPC death anim + #214 player release screen) — **WIRED 2026-06-19 (commit f5bcb5e).** A
+`health=0` StatUpdate alone does NOT drive the client's death state (verified in-client 2026-06-17: NPCs despawned
+with no anim; the player release screen never showed). The explicit trigger is `SimpleCharKilledByUpdateIIR_t`
+(**0xB066AFC2**) — decoded from `AssassinL23_..._resurect` as the packet right before the death `0x2024`. Record:
+`[subop][0000C350][dyingHandle][00][01][0000C350][killerEndpoint]`, built by `WorldDeath.BuildKilledBy`
+(byte-exact golden). `CombatService.OnNpcKilled` sends it for the dying NPC (after the killing-blow vitals);
+`WorldSimulation.SendDeathScreen` sends it for the player BEFORE `DispatchValidResurrectionSpots`. needs-testing.
+(The corpse object `TombStoneFullUpdateIIR_c` 0x0D80E7C9 is decoded but not used — the corpse lingers as the dying
+creature, then a separate loot bag spawns, #246.)
 
 ## Melee cleave (#18)
 
