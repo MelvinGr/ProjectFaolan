@@ -186,6 +186,15 @@ namespace Faolan.GameServer.Dialogue
 		// don't echo a close back. Leaving state set is what let a stale conversation be re-entered (#217).
 		public static void EndConversation(INetworkClient client)
 		{
+			// #217: arm the post-close guard for the NPC whose dialogue just ended (captured before we clear it), so
+			// the spurious greeting the client fires the instant a dialogue closes is absorbed (TryReplayConversation)
+			// instead of re-opening the conversation. A deliberate re-click after the brief window still opens it.
+			if (client.Session.ConversationNpcHandle != 0)
+			{
+				client.Session.ConversationJustClosedHandle = client.Session.ConversationNpcHandle;
+				client.Session.ConversationClosedAt = DateTimeOffset.UtcNow;
+			}
+
 			client.Session.ConversationAnswerPath = null;
 			client.Session.ConversationNpcName = null;
 			client.Session.ConversationTypeId = 0;
@@ -267,6 +276,19 @@ namespace Faolan.GameServer.Dialogue
 
 			if (grantDef != null && !grantSent) // no AnswerList on this screen - send after the (terminal) screen
 				await SendQuestGrantPackets(client, grantDef);
+
+			// A pure terminal screen (a CloseChatWindow with NO AnswerList) ENDS the dialogue: the window is now shut
+			// on the client. Recording it as the active position left the session "inside" a finished conversation,
+			// so the greeting the client fires right after re-opened it (#217). End instead - this arms the post-close
+			// guard (EndConversation) so that follow-up greeting is absorbed.
+			var isTerminalClose = !hasAnswerList && orderedPackets.Any(p => ConversationSubOpcode(p.Data) == KnubotCloseChatWindowSubOpcode);
+			if (isTerminalClose)
+			{
+				client.Session.ConversationNpcHandle = clickedNpcHandle; // ensure the guard arms for THIS npc
+				EndConversation(client);
+				_logger.LogInformation("Conversation ended (npc={Name}, typeId={TypeId}, path='{Path}') for NPC 0x{Npc:X}.", node.NpcName, node.TypeId, node.AnswerPath, clickedNpcHandle);
+				return;
+			}
 
 			client.Session.ConversationNpcName = node.NpcName;
 			client.Session.ConversationTypeId = node.TypeId;
@@ -360,6 +382,17 @@ namespace Faolan.GameServer.Dialogue
 			// conversation is already active is absorbed (return true, no reply) so it doesn't reset or close it.
 			if (field3 != 0)
 				return client.Session.ConversationAnswerPath != null;
+
+			// #217: the client fires a spurious greeting the instant a dialogue closes. Absorb a greeting for the
+			// just-closed NPC within a brief window so it doesn't re-trigger; a deliberate re-click later (past the
+			// window) opens normally. Consume the guard so only the one spurious greeting is swallowed.
+			if (clickedNpcHandle != 0 && clickedNpcHandle == client.Session.ConversationJustClosedHandle
+			    && DateTimeOffset.UtcNow - client.Session.ConversationClosedAt < TimeSpan.FromSeconds(1.5))
+			{
+				client.Session.ConversationJustClosedHandle = 0;
+				_logger.LogInformation("Conversation: absorbed the post-close greeting for NPC 0x{Npc:X} (#217 re-trigger guard).", clickedNpcHandle);
+				return true;
+			}
 
 			if (!client.Session.SpawnedNpcNamesByHandle.TryGetValue(clickedNpcHandle, out var npcName))
 				return false; // unknown NPC (not spawned this session) -> create-world scripted intro fallback
