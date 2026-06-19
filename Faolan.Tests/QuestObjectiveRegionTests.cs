@@ -63,11 +63,31 @@ namespace Faolan.Tests
 			Assert.Contains("category=\"50304\"", System.Text.Encoding.Latin1.GetString(g1.Objective));
 			Assert.All(g1.Reserved, w => Assert.Equal(0u, w));
 
+			Assert.Equal(1u, g1.RequiredCount); // beach objectives are "do 1" (the on-wire count, #47)
+
 			var g2 = region.Goals[1];
 			Assert.Equal(10238u, g2.QuestId);
 			Assert.Equal(3490u, g2.GoalId);
 			Assert.Equal((521u, 757u), (g2.MarkerX, g2.MarkerY));
+			Assert.Equal(1u, g2.RequiredCount);
 			Assert.Contains("<localized", System.Text.Encoding.Latin1.GetString(g2.TextRecord));
+		}
+
+		[Fact]
+		public void RequiredCount_GreaterThanOne_RoundTripsThroughTheWire()
+		{
+			// The goal record's count field (the word after goalIdRepeat) is NOT a constant 1: values 1/3/4/8/12/64 are
+			// seen across captures (e.g. Hoxxling quest 14012 = 3, quest 13778 goal 6658 = 64), so it is the objective's
+			// required amount (#47). Prove a count > 1 survives BuildSingle -> Write -> Read.
+            var obj = System.Text.Encoding.ASCII.GetBytes("<remoteformat id=\"6491\" category=\"50304\" key=\"x\" >");
+            var txt = System.Text.Encoding.ASCII.GetBytes("<remoteformat id=\"1\" category=\"51200\" key=\"y\" >");
+			var goal = QuestObjectiveGoal.BuildSingle(instance: 0x1234, questId: 14012, goalId: 6491, n: 1, k: 12,
+				subId: 0, mapId: 4010, markerX: 0, markerY: 0, objective: obj, textRecord: txt, requiredCount: 3);
+			Assert.Equal(3u, goal.RequiredCount);
+
+			var region = new QuestObjectiveRegion { Goals = { goal } };
+			var reparsed = QuestObjectiveRegion.Parse(region.ToArray(), 0);
+			Assert.Equal(3u, reparsed.Goals[0].RequiredCount);
 		}
 	}
 }

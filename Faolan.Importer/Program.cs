@@ -150,7 +150,7 @@ namespace Faolan.Importer
 
 			quest.Goals.Add(new QuestGoalDefinition
 			{
-				GoalId = 1448, Sequence = 1, Separator = 9, SubId = 180, MapId = 4010, MarkerX = 416, MarkerY = 701,
+				GoalId = 1448, Sequence = 1, RequiredCount = 1, Separator = 9, SubId = 180, MapId = 4010, MarkerX = 416, MarkerY = 701,
 				Extra5 = 0, Extra6 = 0,
 				ObjectiveRefId = 1448, ObjectiveCategory = 50304, ObjectiveKey = "pARATX1!DX]&#92;So+0*A9B",
 				TrailingRefId = 180, TrailingCategory = 51200, TrailingKey = "b2Y2],LfVfAVps*9JX*G",
@@ -158,7 +158,7 @@ namespace Faolan.Importer
 			});
 			quest.Goals.Add(new QuestGoalDefinition
 			{
-				GoalId = 3490, Sequence = 2, Separator = 12, SubId = 0, MapId = 4010, MarkerX = 521, MarkerY = 757,
+				GoalId = 3490, Sequence = 2, RequiredCount = 1, Separator = 12, SubId = 0, MapId = 4010, MarkerX = 521, MarkerY = 757,
 				Extra5 = 70099, Extra6 = 0x36314C56,
 				ObjectiveRefId = 3490, ObjectiveCategory = 50304, ObjectiveKey = "cA!(EbPpfzUK&#92;WPN@!H!",
 				TrailingRefId = 9500, TrailingCategory = 51000, TrailingKey = "]+/sUK&#39;G3mO)clF`)9Jh",

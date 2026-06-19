@@ -66,6 +66,12 @@ namespace Faolan.Core.Database.Tables
 
 		public uint GoalId { get; set; }
 		public uint Sequence { get; set; } // the per-goal ordinal `N` (1, 2, ...)
+
+		// The goal's required amount - how many kills/collects/etc. complete it. Decoded from the QuestFullUpdate /
+		// snapshot @609 goal record (the word after goalIdRepeat; values 1/3/4/8/12/64 seen on the wire, #47). 0 = not
+		// set, treated as 1 by QuestObjectiveRegion.Build (preserves byte-exact for rows seeded before this field).
+		public uint RequiredCount { get; set; }
+
 		public uint Separator { get; set; } // the [1][k] separator's k word (9, 12 in the beach capture)
 		public uint SubId { get; set; }      // the trailing record's id echoed in the header (= TrailingRefId)
 		public uint MapId { get; set; }

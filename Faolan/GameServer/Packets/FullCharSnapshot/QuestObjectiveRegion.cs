@@ -13,7 +13,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 	// objective-detail list, NOT a BuildQuestFullUpdate block (that earlier claim was disproven - 559 B vs 869 B).
 	//
 	// Wire: u32 chapterTag(0x0BD3) ; then per goal:
-	//   u32 1 ; u32 k ; u32 instance ; u32 questId ; u32 goalId ; u32 n ; u32 goalIdRep ; u32 1 ;
+	//   u32 1 ; u32 k ; u32 instance ; u32 questId ; u32 goalId ; u32 n ; u32 goalIdRep ; u32 requiredCount ;
 	//   u32 x7 reserved ; u32 subId ; u32 mapId ; u32 markerX ; u32 markerY ; u32 0 ; u32 0 ;
 	//   [u32 len][objective <remoteformat 50304> ascii] ; [00][u8 len][text record <remoteformat 51200>/<localized 51000> ascii]
 	// Goals run until the next u32 is the index tag (goals open with [1], the index with 0x000003F1).
@@ -76,7 +76,8 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 					: QuestcRegion.RemoteFormat(g.TrailingRefId, g.TrailingCategory, g.TrailingKey);
 				region.Goals.Add(QuestObjectiveGoal.BuildSingle(instance, def.QuestId, g.GoalId, g.Sequence, g.Separator,
 					g.SubId, g.MapId, g.MarkerX, g.MarkerY,
-					Encoding.ASCII.GetBytes(objective), Encoding.ASCII.GetBytes(trailing), g.Extra5, g.Extra6));
+					Encoding.ASCII.GetBytes(objective), Encoding.ASCII.GetBytes(trailing), g.Extra5, g.Extra6,
+					requiredCount: g.RequiredCount == 0 ? 1 : g.RequiredCount));
 			}
 
 			return region;
@@ -100,7 +101,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		public uint GoalId { get; init; }
 		public uint N { get; init; }
 		public uint GoalIdRepeat { get; init; }
-		public uint One { get; init; }         // [1]
+		public uint RequiredCount { get; init; } // the goal's required amount (kills/collects/etc.); 1/3/4/8/12/64 seen on the wire (decode 2026-06-19, #47)
 		public uint[] Reserved { get; init; } = new uint[ReservedWords]; // 7 words, all 0 in the template
 		public uint SubId { get; init; }       // a secondary text id (= the trailing record's id)
 		public uint MapId { get; init; }
@@ -122,14 +123,14 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// extra5/extra6 are the last two of the 7 "reserved" words: 0 for the first goal, but the second goal carries
 		// a number + a 4-char tag there (70099 / 0x36314C56 = "61LV"; still undecoded - carried per goal like
 		// QuestcRecord's undecoded scalars). The first five reserved words are always 0.
-		public static QuestObjectiveGoal BuildSingle(uint instance, uint questId, uint goalId, uint n, uint k, uint subId, uint mapId, uint markerX, uint markerY, byte[] objective, byte[] textRecord, uint extra5 = 0, uint extra6 = 0)
+		public static QuestObjectiveGoal BuildSingle(uint instance, uint questId, uint goalId, uint n, uint k, uint subId, uint mapId, uint markerX, uint markerY, byte[] objective, byte[] textRecord, uint extra5 = 0, uint extra6 = 0, uint requiredCount = 1)
 		{
 			ArgumentNullException.ThrowIfNull(objective);
 			ArgumentNullException.ThrowIfNull(textRecord);
 			return new QuestObjectiveGoal
 			{
 				Lead = 1, K = k, Instance = instance, QuestId = questId, GoalId = goalId, N = n,
-				GoalIdRepeat = goalId, One = 1, Reserved = [0, 0, 0, 0, 0, extra5, extra6],
+				GoalIdRepeat = goalId, RequiredCount = requiredCount, Reserved = [0, 0, 0, 0, 0, extra5, extra6],
 				SubId = subId, MapId = mapId, MarkerX = markerX, MarkerY = markerY, Zero1 = 0, Zero2 = 0,
 				Objective = objective, TextRecord = textRecord
 			};
@@ -144,7 +145,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			var goalId = r.ReadUInt32();
 			var n = r.ReadUInt32();
 			var goalIdRepeat = r.ReadUInt32();
-			var one = r.ReadUInt32();
+			var requiredCount = r.ReadUInt32();
 			var reserved = new uint[ReservedWords];
 			for (var i = 0; i < ReservedWords; i++)
 				reserved[i] = r.ReadUInt32();
@@ -164,7 +165,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			return new QuestObjectiveGoal
 			{
 				Lead = lead, K = k, Instance = instance, QuestId = questId, GoalId = goalId, N = n,
-				GoalIdRepeat = goalIdRepeat, One = one, Reserved = reserved, SubId = subId, MapId = mapId,
+				GoalIdRepeat = goalIdRepeat, RequiredCount = requiredCount, Reserved = reserved, SubId = subId, MapId = mapId,
 				MarkerX = markerX, MarkerY = markerY, Zero1 = zero1, Zero2 = zero2,
 				Objective = objective, TextRecord = text
 			};
@@ -179,7 +180,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			w.WriteUInt32(GoalId);
 			w.WriteUInt32(N);
 			w.WriteUInt32(GoalIdRepeat);
-			w.WriteUInt32(One);
+			w.WriteUInt32(RequiredCount);
 			foreach (var word in Reserved)
 				w.WriteUInt32(word);
 			w.WriteUInt32(SubId);

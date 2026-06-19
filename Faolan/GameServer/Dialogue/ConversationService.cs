@@ -283,9 +283,19 @@ namespace Faolan.GameServer.Dialogue
 			if (existing.Any(q => q.QuestId == node.GrantQuestId))
 				return null; // already accepted (active) or completed - don't re-grant
 
-			await _database.SetCharacterQuest(character.Id, node.GrantQuestId, QuestState.Active);
-			_logger.LogInformation("Quest {QuestId} granted to {Name} from {Npc}'s dialogue.", node.GrantQuestId, character.Name, node.NpcName);
-			return await _database.GetQuestDefinition(node.GrantQuestId);
+			var def = await _database.GetQuestDefinition(node.GrantQuestId);
+
+			// Seed the quest's first objective so kills can advance it (#47): GoalRequired = the goal record's decoded
+			// count (QuestGoalDefinition.RequiredCount, the word after goalIdRepeat - values 1/3/4/8/12/64 on the wire).
+			// GoalTargetName (which NPC's death counts) is NOT carried in the goal record, only in the RDB-resolved
+			// objective text, so it stays unset until sourced per quest - until then CombatService.AdvanceKillQuests
+			// won't match a kill (it keys on GoalTargetName), but the objective count is now persisted.
+			var firstGoal = def?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
+			var goalRequired = firstGoal is { RequiredCount: > 0 } ? firstGoal.RequiredCount : 0u;
+
+			await _database.SetCharacterQuest(character.Id, node.GrantQuestId, QuestState.Active, goalRequired: goalRequired);
+			_logger.LogInformation("Quest {QuestId} granted to {Name} from {Npc}'s dialogue (goalRequired={Req}).", node.GrantQuestId, character.Name, node.NpcName, goalRequired);
+			return def;
 		}
 
 		// Sends the two retail grant packets in order: the QuestLogList (populates the J-panel - all active quests,
