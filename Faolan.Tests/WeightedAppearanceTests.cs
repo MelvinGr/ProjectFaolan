@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.GameServer.Spawn;
 using Faolan.Importer;
 using Xunit;
@@ -42,7 +43,7 @@ namespace Faolan.Tests
 		public void EnsureFreshRows_UsesTheResolvedWeightedEntries()
 		{
 			var weighted = PlayerSpawnScaffoldRows.BuildWeightedEntries(Resources(FaolanxRefs), RegistryDict());
-			var character = new Character { Id = 0x02000007 };
+			var character = new Character { Id = 0x02000007, Class = Class.Necromancer }; // Faolanx is a mage-necromancer
 
 			Assert.True(PlayerSpawnScaffoldRows.EnsureFreshRows(character, weighted));
 
@@ -56,7 +57,7 @@ namespace Faolan.Tests
 				.Take(7)
 				.Select(a => a.Tag));
 			Assert.Equal(8u, rows[7].StatId);
-			Assert.Equal(0x56B6, rows[7].Tag);
+			Assert.Equal(0x4301, rows[7].Tag); // Necromancer's per-class closer (#250); was the old hardcoded 0x56B6
 		}
 
 		[Fact]
