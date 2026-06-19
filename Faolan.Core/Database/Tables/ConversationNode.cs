@@ -13,6 +13,11 @@ namespace Faolan.Core.Database.Tables
 		// The NPC's name, resolved at import from the captured FA015807 spawn with this handle. NPC dynel handles are
 		// session-volatile (the world burst we replay and the conversation came from different captures), so routing
 		// by handle fails; the name is the stable identity the runtime matches the clicked NPC against.
+		// (#39 reviewed 2026-06-19: NpcStats.template_id from the spawn is the more *canonical* id, but it's redundant
+		// here - name AND template_id are both derived from the same spawn parse on both the import and live sides, so
+		// neither is more durable; every conversational NPC has a unique name; and the lookup is name-keyed end-to-end
+		// with both sides matching the same ReadSpawnName output. Switch to template_id only if same-named conversational
+		// NPCs ever appear - until then name is correct and the simpler key.)
 		public string NpcName { get; set; }
 		public uint CapturedInstance { get; set; }
 
