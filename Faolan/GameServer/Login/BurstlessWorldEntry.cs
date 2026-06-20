@@ -1,10 +1,8 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Numerics;
-using System.Reflection;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
@@ -20,7 +18,7 @@ namespace Faolan.GameServer
 	// Builds the world-entry packets entirely from generated/structured pieces - NO captured burst (#210). Each
 	// record is assembled from a row/the character + wrapped in the shared world-entry header (FrameWorldEntryRecord):
 	//   - player spawn  -> PlayerSpawnBuilder.BuildFromScratch (scaffold + transform from DB) with the CharacterIIR
-	//                      overridden onto the one server-owned template (PlayerCharacterIirTemplate) per character,
+	//                      built from code (PlayerCharacterIir.BuildBaseMessage) + overridden per character,
 	//   - snapshot      -> BuildWorldEntrySnapshot (root from BuildRoot/BuildContainers, tails from BuildFromScratch),
 	//   - world objects -> WorldObjectBuilder.TryBuild(row) framed per object.
 	// Used by the FAOLAN_BURSTLESS_ENTRY path in RetailLoginReplay; the globals (MapChange/Vitals/GameTime) + the
@@ -121,22 +119,13 @@ namespace Faolan.GameServer
 			await _broadcaster.RestorePlayerQuests(client);
 		}
 
-		// Server-owned player CharacterIIR template (Strie's 469B message); PlayerSpawnMessage overrides its
-		// identity/looks/equipment per character. The one templated piece of the otherwise-generated player body.
-		private static readonly byte[] PlayerCharacterIirTemplate = LoadEmbeddedAsset("PlayerCharacterIirTemplate.bin");
-
-		// True when the embedded CharacterIIR template is present (always, once embedded) - guards the player spawn.
-		// (The tails no longer need an asset - BeachTailsBuilder builds them entirely from code/DB, #258.)
-		private static bool BurstlessAvailable => PlayerCharacterIirTemplate.Length > 0;
-
 		// The complete burst-less player FA015807 spawn packet, or null when the character has no scaffold rows yet.
 		private byte[] BuildBurstlessPlayerSpawn(INetworkClient client, CharacterEquipment equipment, Character scaffoldCharacter, uint playfield)
 		{
-			if (!BurstlessAvailable)
-				return null;
-
 			var character = client.Session.Character;
-			var message = ((ReadOnlySpan<byte>)PlayerCharacterIirTemplate).FromProtobuf<ProtoCoreCharacterIIR>();
+			// The base CharacterIIR is built from code (PlayerCharacterIir, formerly PlayerCharacterIirTemplate.bin, #258);
+			// PlayerSpawnMessage overrides name/identity/looks/worn gear per character.
+			var message = PlayerCharacterIir.BuildBaseMessage();
 			PlayerSpawnMessage.ApplyCharacter(message, character, equipment);
 
 			// A near-zero stored quaternion (the degenerate W=0 default) can't be realised by the avatar; fall back to
@@ -215,22 +204,6 @@ namespace Faolan.GameServer
 				if (WorldObjectBuilder.TryBuild(row, row.CapturedHandle, playfieldInstance, out var body))
 					yield return FrameWorldEntryRecord(client, body);
 			}
-		}
-
-		private static byte[] LoadEmbeddedAsset(string fileName)
-		{
-			var assembly = Assembly.GetExecutingAssembly();
-			var name = assembly.GetManifestResourceNames().FirstOrDefault(n => n.EndsWith(fileName, StringComparison.Ordinal));
-			if (name == null)
-				return [];
-
-			using var stream = assembly.GetManifestResourceStream(name);
-			if (stream == null)
-				return [];
-
-			using var ms = new MemoryStream();
-			stream.CopyTo(ms);
-			return ms.ToArray();
 		}
 	}
 }
