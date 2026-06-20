@@ -53,7 +53,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent  # repo root (this file is at Captures/scripts/)
 spec = importlib.util.spec_from_file_location('c', ROOT / 'Captures/scripts/compare_log_to_dump.py')
 cdt = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cdt)
