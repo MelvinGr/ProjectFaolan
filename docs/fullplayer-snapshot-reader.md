@@ -169,8 +169,16 @@ count (no `0x3F1`): the quest list and the outer trailing pair-list.
    Each record (`FUN_00922c90`): `u32` + 3× `ReadString` + `FUN_005d7190` (**ACGHash reader** — reads a hash
    key, asserts `"Read invalid hash from stream"`) + `u32` (→ +0x1b) + `u32 innerCount` + per-entry inner reads
    that include a **nested `0x3F1`-framed string list** (`FUN_004d55b0`) and `FUN_0079b760`/`FUN_00922eb0`.
-   Genuinely complex (nested string-lists + hashes); **not yet byte-validated** against the template — its
-   exact record framing is the remaining unknown. (See the `@609` note below.)
+   Genuinely complex (nested string-lists + hashes). **EMPIRICALLY EMPTY (#258, 2026-06-21):** the
+   per-record grammar — `u32 field0` + 3× `ReadString` + `u32 ACGHash` + `u32` + `u32 innerCount` +
+   `innerCount ×{ u32 a, u32 b, nested 0x3F1 string-list }` — was probed by `Captures/scripts/decode_listb.py`
+   against BOTH a fresh char (beach template / Faolanx) AND a developed char (NecroL80, 9 quests + a changemap).
+   It matches NOTHING: there is no `0x3F1`-framed region anywhere in either tails whose first record reads 3
+   printable strings. So List B carries **no records in practice** (it's a count-only empty list, like Lists
+   C–F here) and **needs no authoring** — the from-scratch builder already reproduces both tails byte-exact
+   without modeling it. The grammar above stays documented should a capture ever populate it. (This resolves
+   the long-standing "List B is the remaining unknown / mis-frames at `@609`" note: `@609` is the per-goal
+   objective region, NOT List B — `decode_listb.py` reads garbage strings there.)
 4. **List C** — `FUN_004d4c70`: `0x3F1`-framed; `N-1` plain `u32` values.
 5. **`MainQuest_c` list** — **plain** `u32 count`, then `count` × `MainQuest_c` (`FUN_00922210`). Each:
    `[u32 @0x14][u32 @0x18][u32 @0x30][u32 @0x34][u32 @0x44][u32 objCount][ (u32,u32) × objCount ][u32 @0x48]
@@ -316,13 +324,26 @@ access-window table our heuristic finds by the `PFAccessWindow_` ASCII is one of
 `StatList_t`s (region 9–10). Every region is a `0x3F1`/plain-count list — **fully tractable**, same shape as
 the spawn/loot/movetask readers already regenerated.
 
+**EMPIRICAL DECOMPOSITION (#258, 2026-06-21).** `SnapshotTails.Deserialize` on the beach template now leaves
+**ZERO opaque bytes** — `UnknownBefore = 0`, every byte falls into a typed region and `ToArray()` round-trips
+byte-exact: `Quests 609 + QuestObjectives 559 + QuestIndex 124 + AccessWindowEntries (86 entries, 6625 B) +
+PostAccessBlock (338 vals, 1365 B) = 9282`. So the beach tails are **fully decoded**; List B and the other
+"middle" lists are empty (count-only). The `PFAccessWindow_` strings our heuristic walks are NOT List B — they
+are a flat playfield-entry table (`u32 playfieldId, u8 section, u32 kind, u32, string name, …, childMode`) that
+`SnapshotTails` ALREADY parses into typed `PfAccessWindowEntry` records. It is **game-static**: beach and the
+developed NecroL80 snapshot both carry the SAME **172** `PFAccessWindow_` name strings — i.e. it is reference
+data, identical for every character, not per-character progression.
+
 Remaining to author a fully-synthetic fresh-beach tails (and so delete the `.bin`):
 - **`Quest_c` (List A) DONE** — wire grammar pinned + field-labeled + ground-truth-validated against the
   template (above); a fresh single-quest record is authorable from `(questId, state, areaId, N, 5 text tokens)`.
-- Pin List B (`FUN_00922c90`) short reads + the `PFAccessWindow_` name source (List B is the prime suspect for
-  the access-window entries our heuristic finds by ASCII).
-- Then model regions 2–12 in `SnapshotTails` (today: typed header + opaque `UnknownBefore` + parsed
-  access-window + typed `PostAccessBlock`) as the real list sequence and regenerate from server state.
+- **List B et al. — NO WORK NEEDED:** empirically empty (above); the from-scratch builder already omits them
+  and stays byte-exact.
+- **Access-window table — decoded, not generated:** the only thing still shipped verbatim
+  (`AccessWindowTable.bin`). Since it is game-static (172-entry catalog) and already round-trips through the
+  typed `PfAccessWindowEntry` model, "retiring the `.bin`" is a mechanical refactor (emit the 86 typed entries
+  from a code/DB catalog) for the #193 construct-don't-replay purity goal — NOT a decode. No per-character
+  generation is required (it's identical for every char).
 
 Dumps: `/tmp/ghidra-aoc/fullchar_reader.txt`, `/tmp/ghidra-aoc/fullchar_records.txt` (regenerate with the two
 scripts above).
