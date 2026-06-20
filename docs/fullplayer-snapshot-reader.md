@@ -191,6 +191,25 @@ Then back in `FullPlayerCharacterIIR::ReadSubClass` (`FUN_0148c210`):
 
 12. **Trailing pair-list** — **plain** `u32 count`, then `count` × `[u32,u32]` (wide reads via `FUN_0048f720`).
 
+## The per-character KNOWN-SPELL/FEAT list (decoded 2026-06-20, #74) — relog persistence + bar placement
+
+NOT the stride-0x14 `SpellBook_t` above (region 11). The list that actually carries a character's **learned
+spells** (and the feats/abilities the action bar binds to) is a separate `0x3F1`-framed list of **12-byte
+records**:
+```
+[u32 id  big-endian] [u32 0xFFFFFFFF] [u8 0x00 ×3] [u8 type]      # type 2 = spell, 5 = feat/ability
+```
+Count `c = (recordCount + 1) * 0x3F1`. A *developed* char carries the class's whole available set (NecroL80 necro
+= 108 records, RDB-catalog-derived, data-blocked); a **fresh** char carries only its learned spells (Faolanx
+necro = 2 records = its 2 create-spells `0x42CA77`/`0x125D9B`, count `0x0BD3`).
+
+In our beach tails (`BeachTailsTemplate.bin`) this list is **empty** at offset **`0x2425`** (count `0x03F1`),
+because the captured Strie was a fresh char with no spells — identified by the preceding landmark
+`00 00 00 00  00 00 02 90  00 00 00 00`. **This is why seeded spells vanish on relog and type-4 attacks don't
+place on the bar**: our snapshot never lists the character's own spells. The fix (insert the char's
+`CharacterSpells` as type-2 records into this region) is the focused follow-up in
+`docs/handoff-2026-06-20-snapshot-known-spell-list.md` (#74).
+
 ## `Quest_c` per-record grammar (`FUN_0091df50`) — VALIDATED against `BeachTailsTemplate.bin`
 
 The outer List A loop (`FUN_0091f5c0`) reads **`u32 listKey` = the questId** before each record, then calls
