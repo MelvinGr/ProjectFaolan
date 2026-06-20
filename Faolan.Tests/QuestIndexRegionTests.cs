@@ -8,7 +8,7 @@ namespace Faolan.Tests
 	// @609 objective region and the access-window table. docs/fullplayer-snapshot-reader.md, #186.
 	public class QuestIndexRegionTests
 	{
-		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan/GameServer/Packets/FullCharSnapshot/BeachTailsTemplate.bin";
+		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan.Tests/Assets/BeachTailsTemplate.bin";
 		private const int RegionStart = 1168, RegionEnd = 1292; // index region / access-window table boundaries
 
 		[Fact]

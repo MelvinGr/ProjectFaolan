@@ -11,7 +11,7 @@ namespace Faolan.Tests
 	// so retiring the .bin changed nothing on the wire.
 	public class AccessWindowCatalogTests
 	{
-		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan/GameServer/Packets/FullCharSnapshot/BeachTailsTemplate.bin";
+		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan.Tests/Assets/BeachTailsTemplate.bin";
 
 		[Fact]
 		public void Catalog_SerializesByteExactToTheCapturedRegion()

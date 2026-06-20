@@ -22,7 +22,7 @@ namespace Faolan.Tests
 	public class Snapshot609AnalysisTests
 	{
 		private const string DbPath = "/home/melvin/Development/C#/Project Faolan/faolan.db";
-		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan/GameServer/Packets/FullCharSnapshot/BeachTailsTemplate.bin";
+		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan.Tests/Assets/BeachTailsTemplate.bin";
 		private const int RegionStart = 609, IndexTag = 1168; // empirical boundaries (Quest_c end / quest index)
 
 		private static byte[] Template => File.ReadAllBytes(TemplatePath);

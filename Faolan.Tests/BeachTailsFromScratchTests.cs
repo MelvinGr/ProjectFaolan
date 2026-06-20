@@ -18,7 +18,7 @@ namespace Faolan.Tests
 	public class BeachTailsFromScratchTests
 	{
 		private const string DbPath = "/home/melvin/Development/C#/Project Faolan/faolan.db";
-		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan/GameServer/Packets/FullCharSnapshot/BeachTailsTemplate.bin";
+		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan.Tests/Assets/BeachTailsTemplate.bin";
 		private const uint BeachStarterQuestId = 10238;
 		private const uint TemplateInstance = 0x02165EFF;
 

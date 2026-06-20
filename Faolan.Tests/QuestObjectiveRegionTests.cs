@@ -12,7 +12,7 @@ namespace Faolan.Tests
 	// QuestcRegion for the @0..609 journal region.
 	public class QuestObjectiveRegionTests
 	{
-		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan/GameServer/Packets/FullCharSnapshot/BeachTailsTemplate.bin";
+		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan.Tests/Assets/BeachTailsTemplate.bin";
 		private const int RegionStart = 609, IndexTag = 1168; // Quest_c end / quest index (empirical)
 
 		private static byte[] Region => File.ReadAllBytes(TemplatePath)[RegionStart..IndexTag];

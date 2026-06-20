@@ -9,7 +9,7 @@ namespace Faolan.Tests
 	// byte-exact - so the stat region can be authored without BeachTailsTemplate.bin (#186, decode_statblock.py).
 	public class TailsStatBlockTests
 	{
-		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan/GameServer/Packets/FullCharSnapshot/BeachTailsTemplate.bin";
+		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan.Tests/Assets/BeachTailsTemplate.bin";
 
 		[Fact]
 		public void CreateFreshBlock_MatchesTheTemplateStatBlock()

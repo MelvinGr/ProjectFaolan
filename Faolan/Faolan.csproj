@@ -14,9 +14,6 @@
     </ItemGroup>
 
     <ItemGroup>
-        <!-- Server-owned beach 0x737A6DF9 tails template (content-fixed regions); BeachTailsBuilder assembles it
-             with the live character's generated fields instead of carrying the captured burst tails. -->
-        <EmbeddedResource Include="GameServer\Packets\FullCharSnapshot\BeachTailsTemplate.bin"/>
         <!-- Server-owned player CharacterIIR template (Strie's 469B message); the burst-less world entry (#210)
              overrides its identity/looks/equipment per character via PlayerSpawnMessage and feeds it to
              PlayerSpawnBuilder, so the player spawn needs no captured burst. The one templated piece - the rest of

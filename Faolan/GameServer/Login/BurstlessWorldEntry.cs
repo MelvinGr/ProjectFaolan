@@ -126,7 +126,8 @@ namespace Faolan.GameServer
 		private static readonly byte[] PlayerCharacterIirTemplate = LoadEmbeddedAsset("PlayerCharacterIirTemplate.bin");
 
 		// True when the embedded CharacterIIR template is present (always, once embedded) - guards the player spawn.
-		private static bool BurstlessAvailable => PlayerCharacterIirTemplate.Length > 0 && BeachTailsBuilder.IsAvailable;
+		// (The tails no longer need an asset - BeachTailsBuilder builds them entirely from code/DB, #258.)
+		private static bool BurstlessAvailable => PlayerCharacterIirTemplate.Length > 0;
 
 		// The complete burst-less player FA015807 spawn packet, or null when the character has no scaffold rows yet.
 		private byte[] BuildBurstlessPlayerSpawn(INetworkClient client, CharacterEquipment equipment, Character scaffoldCharacter, uint playfield)

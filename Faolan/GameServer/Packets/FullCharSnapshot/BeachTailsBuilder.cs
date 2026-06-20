@@ -1,85 +1,29 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Reflection;
 using Faolan.Core.Database.Tables;
 using Faolan.GameServer.World;
 
 namespace Faolan.GameServer.Packets.FullCharSnapshot
 {
-	// Builds the beach 0x737A6DF9 snapshot TAILS from a SERVER-OWNED template asset (BeachTailsTemplate.bin, the
-	// content-fixed regions: the PFAccessWindow_ table, the fresh-character record skeleton, the format scaffolding)
-	// plus the live character's GENERATED fields (level, vitals/XP). This decouples the snapshot tails from the
-	// captured world-burst packet - the server now owns and assembles them - and is the first step of constructing
-	// the snapshot from the ground up (the prefix is built by BeachSnapshotPrefix, the root by FullCharSnapshotBuilder).
-	//
-	// What is GENERATED today: Level, current HP/Mana/Stamina, current XP (the per-character stat fields the client
-	// renders). What is still TEMPLATE (content-fixed or not-yet-decoded, see [[snapshot_tails_construction_scope]]):
-	// the access-window table, the per-character name-format XML, and the UnknownBefore progression record block.
-	// For a fresh beach character these are the same fixed shape, so the template is correct; growing them into
-	// generated output is the remaining decode work.
+	// Builds the beach 0x737A6DF9 snapshot TAILS entirely FROM SCRATCH (BuildFromScratch) - no captured-tails
+	// template: the generated quest portion + the game-static PFAccessWindow_ catalog (AccessWindowCatalog typed
+	// entries) + the code stat skeleton (TailsStatBlock) with the live character's vitals/XP + learned spells patched
+	// in. The prefix is built by BeachSnapshotPrefix, the root by FullCharSnapshotBuilder. The former captured
+	// BeachTailsTemplate.bin asset is retired from the runtime (#258) - it survives only as the byte-exact golden
+	// oracle in Faolan.Tests (BeachTailsFromScratchTests proves BuildFromScratch reproduces it for the captured char).
 	public static class BeachTailsBuilder
 	{
-		// The captured instance baked into the template (Strie's); substituted for the live character's instance so
-		// the per-session entity references in the tails address the logged-in player (as the burst path re-addresses).
+		// The captured instance baked into the static regions (Strie's); substituted for the live character's instance
+		// so the per-session entity references in the tails address the logged-in player (as the burst path re-addresses).
 		private const uint TemplateInstance = 0x02165EFF;
-
-		private static readonly byte[] Template = LoadTemplate();
 
 		// The game-static PFAccessWindow_ playfield catalog (the tails region @1292..7917) - the one tails region that
 		// is reference data, not generated. Emitted from the TYPED AccessWindowCatalog (the 86 PfAccessWindowEntry
 		// records, formerly the AccessWindowTable.bin blob, #258) so no captured byte-blob is shipped; byte-identical
 		// to the captured region (BeachTailsFromScratchTests). Identical for every character.
 		private static readonly byte[] AccessWindowTable = SnapshotTails.SerializeAccessWindowEntries(AccessWindowCatalog.Entries);
-
-		// True when the server-owned template is available (it always is once embedded); guards the caller's fallback.
-		public static bool IsAvailable => Template.Length > 0;
-
-		// Assembles the beach tails for a character: the template with the live level + vitals patched in. Byte-
-		// identical to the captured beach tails when given the captured character's values (BeachSnapshotConstruction
-		// / golden test).
-		public static byte[] Build(Character character)
-		{
-			return Build(character, TemplateInstance);
-		}
-
-		// As Build(character, instance), and additionally stamps `playfieldToken` over the template's baked-in
-		// (beach-capture) token - the marker-framed per-playfield id the client learns from this snapshot and the
-		// despawn protocol scopes on (WorldDespawn). Required when the tails are assembled for any map other than
-		// the template's own playfield.
-		public static byte[] Build(Character character, uint instance, uint playfieldToken)
-		{
-			var bytes = Build(character, instance);
-			WorldDespawn.TryReplacePlayfieldToken(bytes, playfieldToken);
-			return bytes;
-		}
-
-		// As Build(character), but re-addresses the template's captured instance to `instance` (the live character's
-		// client instance) in the assembled tails - the tails carry raw big-endian entity references.
-		public static byte[] Build(Character character, uint instance)
-		{
-			var tails = SnapshotTails.Deserialize(Template);
-
-			if (character != null)
-			{
-				tails.Level = character.Level;
-				if (tails.HasKnownRepeatedStatTable && character.MaxStats != null)
-				{
-					tails.PostAccessBlock!.CurrentXp = character.Experience;
-					tails.PostAccessBlock.CurrentHp = character.MaxStats.Health;
-					tails.PostAccessBlock.CurrentMana = character.MaxStats.Mana;
-					tails.PostAccessBlock.CurrentStamina = character.MaxStats.Stamina;
-				}
-			}
-
-			var bytes = tails.ToArray();
-			if (instance != TemplateInstance)
-				ReplaceRawUInt32(bytes, TemplateInstance, instance);
-
-			return bytes;
-		}
 
 		// GENERATES the quest PORTION of the tails (@0..1292 = Quest_c journal + @609 objective region + index) from a
 		// quest's DB definition + its seeded snapshot-generation fields, with the player's live `instance` (#186). The
@@ -190,7 +134,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// regions, each independently proven byte-exact: the generated quest portion (BuildBeachQuestPortion, @0..1292),
 		// the game-static access-window catalog (AccessWindowCatalog typed entries, @1292..7917), and the code stat
 		// skeleton (TailsStatBlock.CreateFreshBlock, @7917..end) with the live character's vitals/XP patched in. Then
-		// re-addresses the template instance + stamps the playfield token, exactly as Build does. For the captured beach
+		// re-addresses the template instance + stamps the playfield token. For the captured beach
 		// character + instance this reproduces BeachTailsTemplate.bin byte-for-byte (BeachTailsFromScratchTests), so the
 		// template .bin is no longer needed to author a beach entry.
 		// Beach-only convenience (golden tests + the single-quest path): delegates to the multi-quest form with just
@@ -260,24 +204,6 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 					i += 3;
 				}
 			}
-		}
-
-		private static byte[] LoadTemplate() => LoadAsset("BeachTailsTemplate.bin");
-
-		private static byte[] LoadAsset(string fileName)
-		{
-			var assembly = Assembly.GetExecutingAssembly();
-			var name = assembly.GetManifestResourceNames().FirstOrDefault(n => n.EndsWith(fileName, StringComparison.Ordinal));
-			if (name == null)
-				return [];
-
-			using var stream = assembly.GetManifestResourceStream(name);
-			if (stream == null)
-				return [];
-
-			using var ms = new MemoryStream();
-			stream.CopyTo(ms);
-			return ms.ToArray();
 		}
 	}
 }

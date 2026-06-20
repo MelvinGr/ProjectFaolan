@@ -17,7 +17,7 @@ namespace Faolan.Tests
 	public class QuestcGenerationTests
 	{
 		private const string DbPath = "/home/melvin/Development/C#/Project Faolan/faolan.db";
-		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan/GameServer/Packets/FullCharSnapshot/BeachTailsTemplate.bin";
+		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan.Tests/Assets/BeachTailsTemplate.bin";
 		private const int RegionEnd = 609;
 
 		// The per-character quest STATE (1 = active); the only quest-portion value that isn't quest-definition data
