@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Faolan.Core.Data;
 
@@ -65,6 +66,50 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 				w.WriteUInt32(value);
 			w.WriteArray(block.Trailer);
 			return w.ToArray();
+		}
+
+		// The known-spell list lives INSIDE this stat block as a 0x3F1-framed list of 12-byte records (KnownSpellList),
+		// identified by the 16-byte landmark [0x566][0][0x290][0] immediately followed by a count word that is a positive
+		// multiple of 0x3F1. The fresh skeleton carries it empty (count 0x3F1, 0 records). InjectKnownSpells rewrites the
+		// count and splices the character's learned-spell records in after it, growing Values. The landmark word [0x566]
+		// also precedes an UNRELATED list (count 0x534, not a 0x3F1 multiple), so the multiple-of-0x3F1 count is the
+		// discriminator. Splices into the Values list (the count index is past the repeated stat block 35..330, so the
+		// +148 copies are untouched). See docs/handoff-2026-06-20-snapshot-known-spell-list.md.
+		public static int FindKnownSpellCountIndex(IReadOnlyList<uint> values)
+		{
+			for (var i = 4; i < values.Count; i++)
+			{
+				if (values[i] != 0 && values[i] % KnownSpellList.Frame == 0
+				    && values[i - 4] == 0x566 && values[i - 3] == 0 && values[i - 2] == 0x290 && values[i - 1] == 0)
+					return i;
+			}
+
+			return -1;
+		}
+
+		// Splices the character's known-spell records into the stat block's known-list. No-op for an empty list (so the
+		// fresh skeleton stays byte-identical to the beach template). Each record is 3 big-endian u32s
+		// (id, 0xFFFFFFFF, type); the count word becomes (records + 1) * 0x3F1.
+		public static void InjectKnownSpells(TailsPostAccessBlock block, KnownSpellList known)
+		{
+			if (known is not { Records.Count: > 0 })
+				return;
+
+			var idx = FindKnownSpellCountIndex(block.Values);
+			if (idx < 0)
+				throw new InvalidOperationException("Could not locate the known-spell list count word in the stat block.");
+
+			block.Values[idx] = ((uint)known.Records.Count + 1) * KnownSpellList.Frame;
+
+			var insert = new List<uint>(known.Records.Count * 3);
+			foreach (var record in known.Records)
+			{
+				insert.Add(record.Id);
+				insert.Add(KnownSpellList.Unbound);
+				insert.Add(record.Type);
+			}
+
+			block.Values.InsertRange(idx + 1, insert);
 		}
 
 		public static TailsPostAccessBlock CreateFreshBlock() => new()

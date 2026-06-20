@@ -53,15 +53,7 @@ namespace Faolan.GameServer
 
 			var spells = await Database.GetCharacterSpells(character.Id);
 			foreach (var spell in spells)
-			{
 				await SendLearnSpell(client, spell.SpellId);
-				// Also queue a POST-ready re-announce. The pre-snapshot send here is silent (#237) and only sticks for
-				// spells the client already knows from the FullChar snapshot - but our GENERATED snapshot doesn't carry
-				// the known-spell region, so on a normal relog the spells would otherwise vanish from the book+bar.
-				// PostReadyFollowUp drains this. INTERIM: it re-toasts each login; the real fix is to put the learned
-				// spells into the snapshot's known-spell region (#237/#186).
-				client.Session.PendingSpellLearns.Add(spell.SpellId);
-			}
 
 			if (spells.Length > 0)
 				Logger.LogInformation("GrantStartingSpells: re-granted {Count} learned spells to '{Name}' (class={Class}).", spells.Length, character.Name, character.Class);
@@ -111,8 +103,10 @@ namespace Faolan.GameServer
 
 				// Grant the ability NOW (pre-snapshot) so the client knows it when it restores the freshly-seeded bar
 				// mid-load and can place it - otherwise the post-0x2024 GrantStartingAbilities arrives AFTER the bar
-				// restore and the slot renders empty (the spells work because they're likewise granted pre-snapshot).
-				// Silent: the post-ready GrantStartingAbilities re-grants the whole kit anyway.
+				// restore and the slot renders empty. Abilities are NOT carried in the snapshot known-list (the Faolanx
+				// fresh-necro capture's list is spells only, type 2 - no type-5 ability records), so unlike the SPELLS
+				// (which the known-list now lists, #74) the abilities still need this pre-snapshot grant for bar
+				// placement. Silent: the post-ready GrantStartingAbilities re-grants the whole kit anyway.
 				await SendAbilityGrant(client, ability, announce: false);
 			}
 

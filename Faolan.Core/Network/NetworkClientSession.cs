@@ -54,12 +54,6 @@ namespace Faolan.Core.Network
 		// client rendered from the spawn, instead of a flat placeholder. Populated alongside SpawnedNpcNamesByHandle.
 		Dictionary<uint, uint> SpawnedNpcMaxHealthByHandle { get; }
 
-		// Spell ids freshly granted by the first-entry loadout seed (EnsureStartingLoadout, #74) that must be
-		// announced POST-ready so the client registers them in the spellbook. The pre-snapshot GrantStartingSpells
-		// path (#237) is silent and only re-asserts already-known spells, so a brand-new learn needs the post-0x2024
-		// DispatchLearnSpell (the same path .learnspell uses). PostReadyFollowUp drains this; empty on a normal login.
-		List<uint> PendingSpellLearns { get; }
-
 		// Index of the next post-creation world cutscene chunk to send. Advanced once per client script
 		// trigger (ClientLoadingDone, StartScript, Move, IntroDone) so each chunk is sent in order.
 		int CreateWorldChunkIndex { get; set; }
@@ -138,7 +132,6 @@ namespace Faolan.Core.Network
 
 		public Dictionary<uint, string> SpawnedNpcNamesByHandle { get; } = new Dictionary<uint, string>();
 		public Dictionary<uint, uint> SpawnedNpcMaxHealthByHandle { get; } = new Dictionary<uint, uint>();
-		public List<uint> PendingSpellLearns { get; } = [];
 
 		public int CreateWorldChunkIndex { get; set; }
 		public int NormalAttackAckPhase { get; set; }

@@ -194,16 +194,18 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// template .bin is no longer needed to author a beach entry.
 		// Beach-only convenience (golden tests + the single-quest path): delegates to the multi-quest form with just
 		// the beach quest. BuildQuestPortion([beach], beach) == BuildBeachQuestPortion, so byte-identical.
-		public static byte[] BuildFromScratch(QuestDefinition beachDef, Character character, uint instance, uint? playfieldToken = null)
+		public static byte[] BuildFromScratch(QuestDefinition beachDef, Character character, uint instance, uint? playfieldToken = null, IReadOnlyList<uint> knownSpellIds = null)
 		{
 			ArgumentNullException.ThrowIfNull(beachDef);
-			return BuildFromScratch([beachDef], beachDef, character, instance, playfieldToken);
+			return BuildFromScratch([beachDef], beachDef, character, instance, playfieldToken, knownSpellIds);
 		}
 
 		// The player's full set of snapshot-eligible held quests (#255): the journal region carries every held
 		// quest's record + objective region (primary owns the index's terminal). For a beach-only char this equals
-		// the beach-only overload. `primary` is the tracked quest (the beach quest when held).
-		public static byte[] BuildFromScratch(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, Character character, uint instance, uint? playfieldToken = null)
+		// the beach-only overload. `primary` is the tracked quest (the beach quest when held). `knownSpellIds` are the
+		// character's learned spells - spliced into the stat block's known-list so they persist across relog + place on
+		// the action bar (#74/#71); null/empty leaves the list empty (byte-identical to the captured beach tails).
+		public static byte[] BuildFromScratch(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, Character character, uint instance, uint? playfieldToken = null, IReadOnlyList<uint> knownSpellIds = null)
 		{
 			ArgumentNullException.ThrowIfNull(quests);
 			ArgumentNullException.ThrowIfNull(primary);
@@ -225,6 +227,10 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 				if (character.IsDead)
 					block.CurrentHp = 0;
 			}
+
+			// #74/#71: splice the character's learned spells into the stat block's known-list (no-op when empty).
+			TailsStatBlock.InjectKnownSpells(block, KnownSpellList.FromSpellIds(knownSpellIds));
+
 			var statBytes = TailsStatBlock.Serialize(block);
 
 			byte[] tails = [.. quest, .. AccessWindowTable, .. statBytes];

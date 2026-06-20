@@ -96,7 +96,13 @@ namespace Faolan.GameServer
 			}
 
 			var (snapshotQuests, primaryQuest) = await LoadSnapshotQuests(character, beachDef);
-			var snapshot = BuildBurstlessSnapshot(client, equipment, inventoryRows, characterTags, snapshotQuests, primaryQuest);
+			// #74/#71: the character's learned spells ride the snapshot's known-list so they survive relog + place on the
+			// action bar (instead of the per-login DispatchLearnSpell band-aid). Loaded after EnsureStartingLoadout has
+			// seeded a fresh character's class spells.
+			var knownSpellIds = character != null
+				? (await Database.GetCharacterSpells(character.Id)).Select(s => s.SpellId).ToArray()
+				: [];
+			var snapshot = BuildBurstlessSnapshot(client, equipment, inventoryRows, characterTags, snapshotQuests, primaryQuest, knownSpellIds);
 			toSend.Add(snapshot);
 			// Record this playfield's despawn token from the snapshot we actually send (WorldDespawn), as the burst path does.
 			var snapBodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(snapshot.AsSpan(8, 4));
@@ -165,11 +171,11 @@ namespace Faolan.GameServer
 			return (quests, beachDef);
 		}
 
-		private byte[] BuildBurstlessSnapshot(INetworkClient client, CharacterEquipment equipment, CharacterInventory[] inventoryRows, uint[] characterTags, System.Collections.Generic.IReadOnlyList<QuestDefinition> snapshotQuests, QuestDefinition primaryQuest)
+		private byte[] BuildBurstlessSnapshot(INetworkClient client, CharacterEquipment equipment, CharacterInventory[] inventoryRows, uint[] characterTags, System.Collections.Generic.IReadOnlyList<QuestDefinition> snapshotQuests, QuestDefinition primaryQuest, IReadOnlyList<uint> knownSpellIds)
 		{
 			var instance = client.Session.Account.ClientInstance;
 			var root = BuildBurstlessSnapshotRoot(instance, equipment, inventoryRows, characterTags);
-			var tails = BeachTailsBuilder.BuildFromScratch(snapshotQuests, primaryQuest, client.Session.Character, instance);
+			var tails = BeachTailsBuilder.BuildFromScratch(snapshotQuests, primaryQuest, client.Session.Character, instance, null, knownSpellIds);
 			return BuildWorldEntrySnapshot(client, root, tails);
 		}
 

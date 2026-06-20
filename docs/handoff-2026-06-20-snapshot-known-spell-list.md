@@ -1,5 +1,16 @@
 # Handoff — insert the per-character KNOWN-SPELL list into the FullChar snapshot (#74 / #71)
 
+> **RESOLVED 2026-06-20.** Implemented + verified in-client. The learned-spell records are now spliced into the
+> from-scratch tails' stat-block known-list (`KnownSpellList` + `TailsStatBlock.InjectKnownSpells`, wired through
+> `BeachTailsBuilder.BuildFromScratch` ← `BurstlessWorldEntry`). Byte-exact against the captured Faolanx 2-record
+> list and the empty beach template (`KnownSpellListTests`, 568 tests green). In-client: a necro with its 2 create-
+> spells enters the world (chat connects, no crash) on both the band-aid build and the cleaned build, confirming the
+> known-list — not the grant band-aid — delivers the spells. The interim band-aids were removed
+> (`PendingSpellLearns` re-announce + session field + drain). **DIVERGENCE from step "Once it works":** the
+> `EnsureStartingLoadout` pre-snapshot ability grant was KEPT — abilities are NOT in the known-list (Faolanx's list
+> is spells only, type 2; no type-5 ability records), so they still need the pre-snapshot grant for bar placement.
+> Original plan retained below for reference.
+
 **Goal:** make a character's learned spells (and the abilities behind type-4 bar entries) *persist across
 relog* and *place on the action bar*, the retail way — by carrying them in the `0x737A6DF9` FullChar
 world-entry snapshot's **known-list**, instead of the grant-packet band-aids.
