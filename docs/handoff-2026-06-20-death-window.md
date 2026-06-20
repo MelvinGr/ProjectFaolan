@@ -1,5 +1,79 @@
 # Handoff 2026-06-20 — Death/release window (#214): packets correct, gate is the dead-state flag
 
+## UPDATE 2026-06-20 (session 3, in-client) — death flow WORKS; the one remaining blocker is the WAVE-respawn path on the resurrect click
+
+**Read this section first — it's the current state. The older sections below are the (correct) trail that led here.**
+
+### What works in-client now (verified by Melvin)
+- **Death → release window + movement lock + camera pan + dead pose.** The full Dead substate is entered.
+- The window's **location title** resolves, and the **server-side respawn** (revive + move) is correct.
+
+### The fixes that got us here (all committed)
+1. **`CharacterStats.bcc_state = 29`** in the player FA015807 self-spawn = THE dead-state gate for a
+   login-while-dead char (commit eec6c33). Health=0 and the forced death anim (`anim_forced_id=41877`) are
+   COSMETIC (HP bar / lying pose) — they were red herrings. (PlayerSpawnMessage.ApplyCharacter.)
+2. **In-session death BccIIR** (`WorldDeath.BuildDeathBcc`, behaviorId 41877) sent at the end of the death
+   sequence (`SendDeathScreen`) — this is what makes an IN-SESSION death (not just login-while-dead) enter the
+   Dead substate; **it restored the death CAMERA PAN in-client** (commit 767e76a). bcc_state toggles via the
+   BccIIR channel (`0x642CD3D6`), NOT the FA015807 (the spawn only carries the *initial* state).
+3. **Lightweight in-place revive** (`WorldDeath.BuildRevive` BccIIR bcc_state 29→1 + vitals) replaces the heavy
+   `ReenterWorld` in BOTH `RespawnAtChosenPoint` and `RespawnPlayer` (commits 767e76a). Decoded from the retail
+   beach death+resurrect capture (`Stihetfv_soldier-conqueror_login-die-resurect-beach`, #1382 revive / #1292
+   death / #1387 IntendedTeleport). Retail does NOT world-re-enter for a near revive.
+4. **`Character.IsDead` cleared before the revive** (commit 76c0800) — `RespawnAtChosenPoint` forgot to, so the
+   re-entry rebuilt the dead spawn. (Now moot since we don't re-enter, but correct.)
+5. **`RespawnPoint.Id` = the RDB `Guid`** (commit 4110fec) so the `0x2024` `spawnPointId` is the client id the
+   release screen needs for the title + `RespawnMe` echo (beach AlwaysKnown = 784236/0xBF76C). Importer
+   `RdbRespawnImporter` captures `<resurrectionpoint Guid=…>`; migration `RespawnPointClientId`; db reseeded.
+
+### THE BLOCKER — the client takes the WAVE-respawn path on the resurrect click
+On the resurrect click the client sends **`SignUpForWaveRespawn (0x2025)` + `RequestWaveRespawnTimerUpdate
+(0x2028)`** (a repeating ~15s countdown) instead of instant **`RespawnMe (0x2024)`**. We don't handle the wave
+opcodes → countdown + nothing happens. **Retail's beach capture uses pure instant `RespawnMe`, zero wave
+packets** — so this is wrong, not a retail behavior. It is NOT stale session state (happens on a fresh client
+restart AND for in-session death, not just login-while-dead).
+
+**Client decision fully traced (Ghidra):**
+- Button handler **`FUN_01268d20`**: goes WAVE (`FUN_012696c0`) if resurrect-window flag **`+0x477 != 0`**
+  (primary); else if `+0x476` then stat `0x546`>0 else stat `0x545`>0 → WAVE; else INSTANT (`FUN_006ede20`,
+  which calls the RespawnMe proxy `0x4fa9f0`).
+- Window setup **`FUN_012673b0`** (ResurrectView_c ctor, loads `ResurrectView.xml`, has a `WaveRespawnBar`
+  widget) sets the flags:
+  - `+0x477 = 1` if `GetStat(0x360) & 0x8000` **OR** a resurrection-destination object `window[0x70]` (via
+    `FUN_00591c00`) has field `+0x74 == 0xC7A3`.
+  - `+0x476 = 1` if `SimpleChar[0x81] == 50000 (0xC350, = the entity class, ~always true)` AND current-playfield
+    checks (`FUN_00592aa0`).
+- Stat leaf `FUN_006f9700` is a per-character stat-map lookup → **returns 0 for an absent stat**. Stats
+  `0x360`/`0x545`/`0x546` are **absent in our snapshot AND the FA015807 generic_stats** (checked) → 0.
+- Our `0x2024` release-screen body is **byte-identical to retail's instant one** (spot const `0xC7A0`, not the
+  `0xC7A3` the wave gate wants); the wave stats are absent. **By this static read it should be INSTANT — yet
+  in-client it's WAVE.** So either one offset above is misread, or the trigger is live playfield/destination
+  state not in any packet we send differently from retail. Leading suspect: the **playfield** (the `+0x476`
+  playfield checks / how the client models our beach playfield instance vs a real Tortage one).
+
+**To resolve A (true instant):** read the live window `+0x476`/`+0x477` (and `window[0x70]+0x74`) on a dead
+client when the button is clicked — breakpoint `0x1268e53` (CMP `[ESI+0x477]`) in `FUN_01268d20`, ESI = the
+window. ⚠️ gdb on this Wine client is FLAKY: it stops on Wine **SIGUSR1/SIGUSR2** and freezes the client even
+with `handle … nostop noprint pass`; kill gdb + `kill -CONT` the client to recover. Client addrs (no ASLR):
+button handler `0x1268d20`, window setup `0x12673b0`, wave path `0x12696c0`, instant path `0x6ede20`, stat leaf
+`0x6f9700`, playfield getters `0x591c00`/`0x592aa0`, SimpleChar getter via `DAT_0297d374->[0x10]`.
+
+**Fallback B (pragmatic, not yet done):** handle the wave opcodes server-side — route `SignUpForWaveRespawn
+(0x2025)` (body `[u32 spawnPointId][u32 0]`) to the same lightweight revive, and answer
+`RequestWaveRespawnTimerUpdate (0x2028)` (reply `DispatchReplyWaveRespawnTimerUpdate 0x207C`, format
+undecoded — no wave capture) with timer 0 to kill the countdown. Makes the button work regardless of path.
+(Melvin wants A — true no-wave — so B is a last resort.)
+
+### Retail revive sequence (decoded, for completing the in-place revive properly later)
+After `RespawnMe`, retail (beach #1382-1387) sends, on the player handle, with sender GameAgent 0x59:
+`0x642CD3D6` revive BccIIR (bcc_state 29→1) → `0x96B8DC59` vitals (full HP) → `0x10D27BC0` IntendedTeleport to
+the res point → NPC interest re-stream. Distance-based: a FAR res point gives a loading screen (world re-entry);
+a NEAR one (beach) is this lightweight in-place form. We send the BccIIR + vitals; the IntendedTeleport
+(`0x10D27BC0`, body has the playfield token field we'd need) is NOT yet built — we revive in place at the death
+spot (fine for the adjacent beach point).
+
+---
+
 ## UPDATE 2026-06-20 (in-client, end-to-end) — window + respawn round-trip WORK; revive-completion is the last gap
 
 Live in-client progress (Melvin, on the local server):
