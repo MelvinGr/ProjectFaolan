@@ -1,5 +1,27 @@
 # Handoff 2026-06-20 — Death/release window (#214): packets correct, gate is the dead-state flag
 
+## UPDATE 2026-06-20 (later) — STEP 1 SOLVED: the dead-state field is current-health = 0
+The diff (handoff step 1) is **done**. The dead-state field in the `0x737A6DF9` world-entry snapshot is the
+**tails stat block's current-health stat**: `statId 0x001B` (`LegacyCharacterStatId.HealthCurrent`) **= 0**
+(the `HealthMax`-side slots stay full). Proof + refined mechanism:
+- `Captures/scripts/decode_death_snapshot.py`: across **37 alive** login snapshots `HealthCurrent` is always
+  full HP; **only** the `login-while-dead` capture has it `= 0`. Locked by `Faolan.Tests/DeathSnapshotTests`.
+- Slot map (positional `TailsPostAccessBlock.Values`, the stat block read as `[statId,value]` pairs): the
+  current-health VALUE lands at `[23]` (`CurrentHpExtra`), with repeated-block copies at `[54]`/`[202]`; the
+  base/max side is `[21]`/`[56]`/`[204]`. Dead capture: `[23]=[54]=[202]=0`, `[21]=[56]=[204]=19600` (max 196).
+- This maps 1:1 onto `TailsPostAccessBlock.CurrentHp` (which already writes `[23]`/`[54]`+`[202]`). So a dead
+  login snapshot = the normal one with `CurrentHp` patched to **0** (leave the base/max slots full).
+- **Refined mechanism (the crux for step 3):** the client's local-player dead-flag (`DAT_0297d374->[0x10]()`)
+  is **latched when the SimpleChar is CONSTRUCTED from the snapshot** (health 0 at birth ⇒ flag true). It is
+  **NOT** recomputed from a mid-session `HealthCurrent=0` StatUpdate — we already push exactly that in-session
+  (`WorldSimulation.ApplyNpcAttack`→`PushVitals`) and the flag stays false (matches `WorldDeath.cs:8`). So the
+  login path works via the construction-time latch; the **in-session path needs the state-transition packet
+  that re-latches it** (still the gdb-trace work below — find the setter behind `vtable+0x10`).
+
+Remaining: **step 2** (emit `CurrentHp=0` at login for a dead char — needs a persisted dead-state, a schema
+decision) and **step 3** (the in-session re-latch packet). Step 2 is now a small wiring change in
+`RetailLoginReplay` (where it already patches vitals); both still gate on an in-client retail test.
+
 ## TL;DR
 The in-client **release/resurrect window still doesn't show on our server**, but a full live-debugging +
 capture session proved **our death-packet layer is byte-correct** and pinpointed the real gate. The window is
