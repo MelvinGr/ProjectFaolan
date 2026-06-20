@@ -62,6 +62,29 @@ calls are flaky on Wine; prefer raw reads). Retail testing: throwaway Funcom acc
 
 ---
 
+## UPDATE 2026-06-20 (session 8, LIVE gdb retail-vs-ours) — green-names is a CACHED nameplate colour-index bug, NOT the registry/wave root (corrects session 7)
+
+Ran the nameplate colour path live on the client (our server then RETAIL, no ASLR). Decisive:
+- **Registry lookup WORKS** — the hostile NPC resolves to its OWN registry node (key matches), not the player's.
+  So green-names is NOT a `DAT_029c7a8c` registry miss and does NOT share a root with the wave bug. **Session 7's
+  "shared registry root" is SUPERSEDED.**
+- disposition (`FUN_011c28c0` param_10/EBX) = **6 = hostile_npc on BOTH** retail and ours (correct). disp 6 ∈ [6,9]
+  ⇒ colour via `FUN_011bf370(idx)` (0=friendly +0xab4 / 1=hostile +0xabc / 2=neutral +0xab8), not `FUN_011bf1b0`.
+  Palette correct on ours (friendly 0x5b933d / neutral 0xffff00 / hostile 0xb41d1d).
+- **RETAIL: idx=1 (hostile red) in ALL states (alive AND dead). OURS: idx=0 (friendly green).** Death-state is NOT
+  the variable. Bug is real, server-data-driven.
+- **Ruled out by the live diff:** registry miss; faction data we send (NpcStats.community matches); player handle
+  (= char id on BOTH — our ids start at 0x02000000 by design, `DatabaseRepository.FirstCharacterId`; Testie's
+  handle 0x02000000 is correct, NOT degenerate); death state; the param_2 buffer (matches; its +0x08 is a stray
+  stack return-addr into FUN_011c0940 = noise).
+- **Localized:** the colour index = `iVar3[0x1c]` (param_11 to FUN_011c28c0, pushed first at
+  `FUN_011c3b90:0x011c3e6e` from `[ESI+0x1c]`, ESI=[ESP+0xc]=iVar3). iVar3 = `FUN_011c74c0(*(np+0xa18))`, itself a
+  lower_bound CACHE lookup returning node+0x14 (a cached per-nameplate state object). iVar3[0x1c] = 0 (friendly)
+  on ours, 1 (hostile) on retail.
+- **NEXT STEP:** hardware watchpoint on `iVar3+0x1c` (break bf370 call `0x011c2b51`, recover iVar3, watch +0x1c)
+  to catch the writer + the divergent input it reads — that input is the data gap. Gdb recipe + the bf370/disp
+  breakpoints + the broken/correct reference buffers are in agent memory `npc_green_names_not_missing_faction_data`.
+
 ## UPDATE 2026-06-20 (session 7) — green-names and wave-respawn share ONE root (client code, decisive) + DAT_029c7a8c re-characterized
 
 Followed the disposition path in the client all the way down. **The nameplate-colour path and the wave-respawn
