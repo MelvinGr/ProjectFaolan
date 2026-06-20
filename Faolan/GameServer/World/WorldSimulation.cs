@@ -249,6 +249,7 @@ namespace Faolan.GameServer.World
 			if (target.GodMode) // .godmode: the NPC swings and aggros normally, but the hit deals no damage
 				return;
 
+			target.LastAttackerHandle = npc.Handle; // attribute the death to this mob, not self (instant respawn, #214)
 			vitals.ApplyHealthDelta(-damage);
 			await _output.PushVitals(client, vitals);
 
@@ -278,6 +279,7 @@ namespace Faolan.GameServer.World
 			if (target.GodMode) // .godmode: the NPC still casts, but the spell deals no damage
 				return;
 
+			target.LastAttackerHandle = npc.Handle; // attribute the death to this mob, not self (instant respawn, #214)
 			vitals.ApplyHealthDelta(-damage);
 			await _output.PushVitals(client, vitals);
 
@@ -457,7 +459,29 @@ namespace Faolan.GameServer.World
 		// resurrect, instead of silently sitting at 0 HP until the auto-timer fires. We send the single closest known
 		// point (the captures only ever carried one spot; the multi-spot framing isn't pinned). The client replies with
 		// RespawnMe(spawnPointId), handled inbound. If the map has no point, skip (the auto-timer still revives).
-		private async Task SendDeathScreen(INetworkClient client, Character character, Vector3 deathPosition)
+		// Resolves the killer to put in the death's SimpleCharKilledBy record. The resurrect window (#214) goes into
+		// WAVE-respawn mode iff the killer resolves to the LOCAL player (the client's ResurrectView ctor looks the
+		// killer up and, finding a local non-proxy entity, sets its wave flag); a real mob killer makes it INSTANT
+		// like retail. So NEVER attribute a death to the player itself: prefer the last mob that hit them, else the
+		// nearest live hostile NPC (covers .kill / environmental deaths so they still go instant), else fall back to
+		// self only when no hostile is anywhere near (rare; would wave, but there's no other valid endpoint).
+		private uint ResolveKiller(WorldEntity player, Vector3 deathPosition, uint mapId, uint selfHandle)
+		{
+			if (!World.TryGetZone(mapId, out var zone))
+				return selfHandle;
+
+			if (player != null && player.LastAttackerHandle != 0 && player.LastAttackerHandle != selfHandle
+			    && zone.TryGet(player.LastAttackerHandle, out var attacker) && attacker.Hostile && !attacker.IsDead)
+				return player.LastAttackerHandle;
+
+			var nearest = zone.EntitiesInRange(deathPosition, PlayerInterestRange, selfHandle)
+				.Where(e => e.Hostile && !e.IsDead && e.Vitals != null)
+				.OrderBy(e => Vector3.Distance(e.Position, deathPosition))
+				.FirstOrDefault();
+			return nearest?.Handle ?? selfHandle;
+		}
+
+		private async Task SendDeathScreen(INetworkClient client, Character character, WorldEntity playerEntity, Vector3 deathPosition)
 		{
 			var points = await GetRespawnPointsCached(character.MapId);
 			if (points.Length == 0)
@@ -470,18 +494,20 @@ namespace Faolan.GameServer.World
 			// #214: replay the retail BEACH player-death sequence (Stihetfv_..._login-die-resurect-beach pkt#1179) in
 			// order: death-pose MoveTask (type 0x06) -> SimpleCharKilledBy -> 0x2024 release screen -> death BccIIR.
 			// The death-pose MoveTask drops the avatar into the dead pose; the BccIIR (bcc_state 29) enters the Dead
-			// substate (window + camera pan). Every captured kill record carries a NON-ZERO killer, so attribute a
-			// self-inflicted death to the player itself (valid endpoint).
+			// substate (window + camera pan). The kill record's KILLER must NOT be the player itself or the client's
+			// ResurrectView ctor goes into WAVE-respawn mode (#214, proven by live gdb: the ctor looks the killer up
+			// in its entity registry and, finding a local non-proxy entity = the player, sets +0x476 -> wave). Resolve
+			// it to the actual mob (ResolveKiller) so the client takes the instant RespawnMe (0x2024) path like retail.
 			//
 			// NB: we deliberately do NOT send the self-applied death-effect ApplySpell(0x0009F000) here. It came from
 			// the AssassinL23 (map 2010) capture, but the retail BEACH death does NOT send it (proven by gdb 2026-06-20):
-			// that spell's client RDB effect sets stat 0x546 (the wave-respawn timer) = 15, which drives the
-			// ResurrectView ctor into WAVE-respawn mode (15s countdown via SignUpForWaveRespawn 0x2025) instead of the
-			// instant RespawnMe (0x2024) retail beach uses. The dead state is fully driven by the BccIIR below, so the
-			// effect is redundant; dropping it makes the client take the instant-respawn path like retail beach.
+			// that spell's client RDB effect sets stat 0x546 (the wave-respawn timer) = 15, ANOTHER wave trigger. The
+			// dead state is fully driven by the BccIIR below, so the effect is redundant; dropping it + the mob-killer
+			// above are the two fixes that make the client take the instant-respawn path like retail beach.
 			var handle = client.Session.Account.ClientInstance;
+			var killer = ResolveKiller(playerEntity, deathPosition, character.MapId, handle);
 			await _output.SendDeathPose(client, handle, deathPosition);
-			await _output.SendDeathTrigger(client, handle, handle);
+			await _output.SendDeathTrigger(client, handle, killer);
 			await _output.SendResurrectionScreen(client, deathPosition, [spot]);
 			// The BccIIR that transitions the live SimpleChar into the dead state (bcc_state 29) - retail sends it after
 			// the release screen. This is what shows the release window for an IN-SESSION death (the login spawn's
@@ -625,7 +651,7 @@ namespace Faolan.GameServer.World
 					// carries current-health = 0 and the client shows the release window at world entry.
 					character.IsDead = true;
 					await _database.SaveCharacterDeadState(character.Id, true);
-					await SendDeathScreen(client, character, pair.Value.Position);
+					await SendDeathScreen(client, character, pair.Value, pair.Value.Position);
 				}
 			}
 		}

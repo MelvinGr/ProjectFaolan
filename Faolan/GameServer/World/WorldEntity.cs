@@ -94,6 +94,11 @@ namespace Faolan.GameServer.World
 		// field (mirrors the small incrementing value the capture carries; not a persistence key).
 		public uint AttackSwingCounter { get; set; }
 
+		// For a PLAYER: the handle of the NPC that last damaged them - used as the killer in the death's
+		// SimpleCharKilledBy record. The resurrect window goes WAVE iff the killer resolves to the LOCAL player; a
+		// real mob killer makes it INSTANT like retail (#214). Set by ApplyNpcAttack/ApplyNpcCast when a hit lands.
+		public uint LastAttackerHandle { get; set; }
+
 		// The position this NPC stepped FROM on its last chase tick - the MoveTask broadcast sends from->to so the
 		// client interpolates the step (set just before Position is advanced toward the target).
 		public Vector3 MoveOrigin { get; set; }
