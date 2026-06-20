@@ -62,6 +62,39 @@ calls are flaky on Wine; prefer raw reads). Retail testing: throwaway Funcom acc
 
 ---
 
+## UPDATE 2026-06-20 (session 7) — green-names and wave-respawn share ONE root (client code, decisive) + DAT_029c7a8c re-characterized
+
+Followed the disposition path in the client all the way down. **The nameplate-colour path and the wave-respawn
+path read the SAME global** — so #256 (green names) and the #214 wave bug are the same world-model gap; one fix
+covers both.
+
+**Name-colour chain (Ghidra):** palette loaded by `FUN_011bd980` into the overhead obj (friendly_npc +0xab4,
+neutral_npc +0xab8, hostile_npc +0xabc, hostile_minion +0xac0, low_lvl +0xac4). Colour selector
+`FUN_011bf1b0(disposition)` maps a **disposition enum**: 5→friendly_npc, 6→hostile_npc, 7/8/9→hostile_minion,
+10→low_lvl (also 1 self / 2 team / 3 raid / 4 guild / 0xb friendly_player / 0xc hostile_player). The nameplate
+updater `FUN_011c3b90`→`FUN_011c28c0`→`FUN_011bf1b0` resolves the entity via `FUN_00592aa0`/`FUN_005937f0`
+over `DAT_029c7a8c` (`payload = node+0x14`) and reads `method_0x60` (= `SimpleChar+0x1e8`) on the result —
+**identical to the wave `+0x476` decision** (`FUN_012673b0`).
+
+**DAT_029c7a8c re-characterized (corrects the CURRENT-STATE block's "position→zone spatial index"):**
+`DAT_029c7a8c` is the red-black-tree **NIL SENTINEL** (single writer = its init `FUN_01de8890`; every other ref
+is a `== sentinel` miss-check). The real registry is an **ordered map keyed by a 2-word (class, handle) key**
+(node `+0xc`=class, `+0x10`=handle, `+0x14`=payload). `FUN_005937f0` = raw lower_bound walk; `FUN_00592aa0` =
+lower_bound with an at-or-before guard. So the lookups are **(class,handle) registry queries, NOT position→zone
+spatial queries** — the "missing beach zone-region spatial data" framing is imprecise. The real symptom (both
+bugs): the lower_bound resolves to the **player's own node** (`+0xc=0xC350`, `+0x10=0x02000000`) because the
+entry retail has at-or-before the search key is **absent from our registry**. What retail registers there that
+we don't is the open question (likely tied to how/whether our local player + world entities are entered into
+this registry — same area as the controlled-player / over-dense interest set).
+
+**Decisive next step (same for BOTH #214 and #256, live gdb):** at a nameplate update (bp `FUN_011c3b90`) and at
+the resurrect-window ctor (`FUN_012673b0`), on retail vs ours, read the lower_bound search key (the 2-word key
+in EAX/EDI), and dump the registry node it resolves to (`+0xc`/`+0x10`/`+0x14`) — find the entry retail has that
+ours lacks. Then register it at world-entry. Tooling added this session: `Captures/ghidra/FindFieldAccess.java`
+(find `[reg+OFF]` accesses).
+
+---
+
 ## UPDATE 2026-06-20 (session 6) — FACTION/GREEN-NAMES thread (Melvin picked this over the wave deep-fix) → Gitea #256
 
 Pulled the related "hostile NPCs render GREEN not RED" thread. **The handoff's premise — "our NPC spawns lack
