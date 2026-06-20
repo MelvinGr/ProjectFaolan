@@ -9,19 +9,16 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The archive SQL importer parses p_abilities + const_abilitys (MySQL dump rows, quoted + unquoted + NULL) and
-	// upserts Abilities + ClassAbilities.
+	// The archive SQL importer parses p_abilities (MySQL dump rows, quoted + unquoted + NULL) and upserts Abilities.
 	public class ArchiveSqlImporterTests
 	{
 		private const string Sql = """
 		                           INSERT INTO `p_abilities` VALUES('Normal Attack Left', '769094', '1', '1263352118', '3236668225', '2153842419', '314062142', '3015939650');
 		                           INSERT INTO `p_abilities` VALUES('Normal Attack Front', '769099', '1', '1227967307', '3443694845', '1660108369', '1296666148', '2957995211');
-		                           INSERT INTO `const_abilitys` VALUES (29, 1, '769094_1-769099_1', NULL, '165241', NULL);
-		                           INSERT INTO `const_abilitys` VALUES (18, 1, '769094_1-769099_1', NULL, NULL, NULL);
 		                           """;
 
 		[Fact]
-		public async Task Import_UpsertsAbilitiesAndClassAbilities()
+		public async Task Import_UpsertsAbilities()
 		{
 			var dir = Path.Combine(Path.GetTempPath(), $"faolan-arch-{Guid.NewGuid():N}");
 			Directory.CreateDirectory(dir);
@@ -44,11 +41,6 @@ namespace Faolan.Tests
 					Assert.Equal("Normal Attack Left", ability!.Name);
 					Assert.Equal(1263352118u, ability.Data0);
 					Assert.Equal(3015939650u, ability.Data4);
-
-					Assert.Equal(2, await db.ClassAbilities.CountAsync());
-					var priest = db.ClassAbilities.Single(c => c.Class == 29 && c.Level == 1);
-					Assert.Equal("769094_1-769099_1", priest.Abilities);
-					Assert.Equal("165241", priest.Spells);
 				}
 
 				// Idempotent: re-running upserts the same rows, no duplicates.
@@ -56,7 +48,6 @@ namespace Faolan.Tests
 				{
 					await ArchiveSqlImporter.ImportAsync(db, dir);
 					Assert.Equal(2, await db.Abilities.CountAsync());
-					Assert.Equal(2, await db.ClassAbilities.CountAsync());
 				}
 			}
 			finally

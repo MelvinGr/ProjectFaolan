@@ -693,8 +693,8 @@ namespace Faolan.Importer
 
 			if (archiveDir != null)
 			{
-				var (abilities, classAbilities) = await ArchiveSqlImporter.ImportAsync(db, archiveDir);
-				Console.WriteLine($"Archive: {abilities} abilities, {classAbilities} class-ability rows.");
+				var abilities = await ArchiveSqlImporter.ImportAsync(db, archiveDir);
+				Console.WriteLine($"Archive: {abilities} abilities.");
 			}
 
 			if (doCaptures)
@@ -739,6 +739,9 @@ namespace Faolan.Importer
 
 				var (abSeen, abNew, abUpd) = await CaptureAbilityImporter.ImportAsync(db, itemPackets, createCaptures);
 				Console.WriteLine($"Abilities (0x2052 grants): {abSeen} seen, {abNew} new, {abUpd} updated.");
+				// Per-class STARTING spells (#74): harvest each create capture's 0x200A grants, class-attributed.
+				var (startSpells, startSpellsNew) = await CaptureSpellImporter.ImportClassStartingSpellsAsync(db, createCaptures);
+				Console.WriteLine($"Class starting spells (create 0x200A grants): {startSpells} harvested, {startSpellsNew} new.");
 				// After items (the equipment references them). Existing names are skipped, never overwritten.
 				if (!args.Contains("--skip-characters")) // TODO: CaptureCharacterImporter is not idempotent (UNIQUE CharacterBodies.CharacterId) on a populated DB
 				{
@@ -902,7 +905,6 @@ namespace Faolan.Importer
 				["Items(buildable)"] = await db.Items.CountAsync(i => i.Archetype != 0),
 				["Spells"] = await db.Spells.CountAsync(),
 				["Abilities"] = await db.Abilities.CountAsync(),
-				["ClassAbilities"] = await db.ClassAbilities.CountAsync(),
 				["Maps"] = await db.Maps.CountAsync(),
 				["MapWorldBursts"] = await db.MapWorldBursts.CountAsync(),
 				["NpcSpawns"] = await db.NpcSpawns.CountAsync(),

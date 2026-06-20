@@ -53,10 +53,74 @@ namespace Faolan.GameServer
 
 			var spells = await Database.GetCharacterSpells(character.Id);
 			foreach (var spell in spells)
+			{
 				await SendLearnSpell(client, spell.SpellId);
+				// Also queue a POST-ready re-announce. The pre-snapshot send here is silent (#237) and only sticks for
+				// spells the client already knows from the FullChar snapshot - but our GENERATED snapshot doesn't carry
+				// the known-spell region, so on a normal relog the spells would otherwise vanish from the book+bar.
+				// PostReadyFollowUp drains this. INTERIM: it re-toasts each login; the real fix is to put the learned
+				// spells into the snapshot's known-spell region (#237/#186).
+				client.Session.PendingSpellLearns.Add(spell.SpellId);
+			}
 
 			if (spells.Length > 0)
 				Logger.LogInformation("GrantStartingSpells: re-granted {Count} learned spells to '{Name}' (class={Class}).", spells.Length, character.Name, character.Class);
+		}
+
+		// Seeds a fresh character's starting loadout the first time it enters the world with an empty action bar
+		// (#74/#71): the class's level-1 SPELLS (persisted to CharacterSpells so GrantStartingSpells sends them this
+		// session AND re-grants them every login) and the default action-bar layout (CharacterShortcuts). Mirrors what
+		// the retail create flow places on the beach - harvested per class from the create captures (Necromancer
+		// 0x125D9B/0x42CA77, Herald 0x3006FF; physical classes get no L1 spells). Idempotent: gated on an empty
+		// CharacterShortcuts set, so a player's customised bar is never overwritten. Runs at the start of world entry,
+		// before GrantStartingSpells (which then sends the spells this session). The bar restores via ShortcutBarReply.
+		private async Task EnsureStartingLoadout(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			if (character == null)
+				return;
+
+			var existingShortcuts = await Database.GetCharacterShortcuts(character.Id);
+			if (existingShortcuts.Length > 0)
+				return; // already seeded, or the player has placed/customised the bar - leave it alone
+
+			const uint shortcutTypeAbility = 4;
+			const uint shortcutTypeSpell = 2;
+			const uint specialBarBase = 0x4E20;
+
+			// Persist the class's starting spells. GrantStartingSpells (called right after this in SendWorldEntry) then
+			// reads CharacterSpells, sends them, and queues the post-ready re-announce - so the freshly-seeded spells
+			// ride the same path as an existing character's learned set, on this login and every relog.
+			var spells = await Database.GetStartingSpells(character.Level, (uint)character.Class);
+			foreach (var spellId in spells)
+				await Database.AddCharacterSpell(character.Id, spellId);
+
+			// Default bar (Strie/Faolanx create captures): the 3 Normal Attacks on the primary bar (slots 0,1,2), the
+			// other starting abilities (toggle-combat / switch-weapon / utility) on the special bar (0x4E20+), then the
+			// class spells after the attacks on the primary bar.
+			var abilities = await Database.GetStartingAbilities(character.Level, (uint)character.Class);
+			uint primarySlot = 0;
+			uint specialSlot = specialBarBase;
+			foreach (var ability in abilities)
+			{
+				var isNormalAttack = ability.Id is >= 0xBBC40 and <= 0xBBC60;
+				if (isNormalAttack)
+					await Database.SetCharacterShortcut(character.Id, primarySlot++, shortcutTypeAbility, ability.Id);
+				else
+					await Database.SetCharacterShortcut(character.Id, specialSlot++, shortcutTypeAbility, ability.Id);
+
+				// Grant the ability NOW (pre-snapshot) so the client knows it when it restores the freshly-seeded bar
+				// mid-load and can place it - otherwise the post-0x2024 GrantStartingAbilities arrives AFTER the bar
+				// restore and the slot renders empty (the spells work because they're likewise granted pre-snapshot).
+				// Silent: the post-ready GrantStartingAbilities re-grants the whole kit anyway.
+				await SendAbilityGrant(client, ability, announce: false);
+			}
+
+			foreach (var spellId in spells)
+				await Database.SetCharacterShortcut(character.Id, primarySlot++, shortcutTypeSpell, spellId);
+
+			Logger.LogInformation("EnsureStartingLoadout: seeded default bar for '{Name}' (class={Class}): {A} abilities + {S} spells (#74/#71).",
+				character.Name, character.Class, abilities.Length, spells.Length);
 		}
 
 		// The persistent self-buff every character carries in-world (the protective "shield" buff, #221). Re-applied on

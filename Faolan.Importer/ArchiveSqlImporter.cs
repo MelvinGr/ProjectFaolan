@@ -9,10 +9,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer
 {
-	// One-time(ish) import of the OLD C++ server's ability/spell DEFINITIONS from the archive SQL (Archive/, e.g.
+	// One-time(ish) import of the OLD C++ server's ability DEFINITIONS from the archive SQL (Archive/, e.g.
 	// the extracted aocdatabase.sql) - data that is NOT in the captures: `p_abilities` (ability templates + identity
-	// quad) -> Abilities, and `const_abilitys` (class/level -> ability+spell id lists) -> ClassAbilities. Run with
-	// `--archive <dir-containing-aocdatabase.sql>`. Upserts (no deletes), so it is safe to re-run.
+	// quad) -> Abilities. Run with `--archive <dir-containing-aocdatabase.sql>`. Upserts (no deletes), so it is safe
+	// to re-run. (The old `const_abilitys` class/level lists were dropped - they were the legacy C++ scheme with ids
+	// that don't match retail; per-class STARTING spells now come from the create captures - see CaptureSpellImporter.)
 	public static class ArchiveSqlImporter
 	{
 		// The ability "slot" (0x2052 grant leading word) lives in the OLD archive sqlite `abilities` table, not in
@@ -27,7 +28,7 @@ namespace Faolan.Importer
 			[3675584] = 259 // switch weapon
 		};
 
-		public static async Task<(int Abilities, int ClassAbilities)> ImportAsync(IDatabaseContext db, string sqlDir)
+		public static async Task<int> ImportAsync(IDatabaseContext db, string sqlDir)
 		{
 			var sql = await File.ReadAllTextAsync(Path.Combine(sqlDir, "aocdatabase.sql"));
 
@@ -54,36 +55,8 @@ namespace Faolan.Importer
 					a.Slot = slot;
 			}
 
-			// const_abilitys: class, level, abilitys, abilitysNew, spells, spellsNew
-			var existingClass = await db.ClassAbilities.ToDictionaryAsync(c => (c.Class, c.Level));
-			foreach (var r in ParseInserts(sql, "const_abilitys"))
-			{
-				var key = (U(r[0]), U(r[1]));
-				if (!existingClass.TryGetValue(key, out var c))
-				{
-					c = new ClassAbility
-					{
-						Class = key.Item1,
-						Level = key.Item2
-					};
-					db.ClassAbilities.Add(c);
-					existingClass[key] = c;
-				}
-
-				c.Abilities = r[2] ?? string.Empty;
-				c.AbilitiesNew = r.Length > 3
-					? r[3] ?? string.Empty
-					: string.Empty;
-				c.Spells = r.Length > 4
-					? r[4] ?? string.Empty
-					: string.Empty;
-				c.SpellsNew = r.Length > 5
-					? r[5] ?? string.Empty
-					: string.Empty;
-			}
-
 			await db.SaveChangesAsync();
-			return (existingAbilities.Count, existingClass.Count);
+			return existingAbilities.Count;
 		}
 
 		// Tolerant parser for MySQL `INSERT INTO `table` ... VALUES (..),(..);` dumps (single- or multi-row),

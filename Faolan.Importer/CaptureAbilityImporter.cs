@@ -156,7 +156,7 @@ namespace Faolan.Importer
 		// 0xA36D3B74, body = [ack u32][instance u32][reserved u8][pbLen u32][protobuf: f3 varint=value, f4 string=token]).
 		// The editor sends class as 2x the real id (see HandleCommandPacket), so the class = value/2. Returns null when
 		// the capture carries no ChangeClass (e.g. a login capture) so its grants stay generic by default.
-		private static uint? DetectClass(IReadOnlyList<byte[]> capture)
+		internal static uint? DetectClass(IReadOnlyList<byte[]> capture)
 		{
 			foreach (var packetBytes in capture)
 			{

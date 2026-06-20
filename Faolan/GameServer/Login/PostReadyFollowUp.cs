@@ -113,7 +113,12 @@ namespace Faolan.GameServer
 				await GrantStartingAbilities(client);
 				// NB the learned SPELLS (DispatchLearnSpell 0x200A) are NOT re-granted here anymore: they are sent
 				// pre-snapshot in SendWorldEntry so the client absorbs them silently instead of re-toasting every
-				// login (#237). Only abilities/buffs are post-ready.
+				// login (#237). Only abilities/buffs are post-ready. EXCEPTION: spells the first-entry loadout seed
+				// just granted (EnsureStartingLoadout, #74) - a brand-new learn the pre-snapshot path can't register -
+				// are announced here once, post-0x2024 (the path .learnspell uses). Empty on a normal login.
+				foreach (var spellId in client.Session.PendingSpellLearns)
+					await SendLearnSpell(client, spellId);
+				client.Session.PendingSpellLearns.Clear();
 				// ...re-applies the persistent shield self-buff every character carries (#221). This flush is also
 				// re-armed on teleport/changemap re-entry, so the buff is re-asserted on each playfield change too.
 				// DISABLED 2026-06-19: the capture-proven id 0x000B9000 renders in-client as the "Exhausted" DEBUFF

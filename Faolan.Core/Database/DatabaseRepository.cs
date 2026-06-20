@@ -47,8 +47,6 @@ namespace Faolan.Core.Database
 		Task RemoveCharacterShortcut(uint characterId, uint slot);
 		Task SetCharacterShortcut(uint characterId, uint slot, uint shortcutType, uint targetId);
 
-		Task<ClassAbility> GetClassAbility(uint @class, uint level);
-
 		Task<ConversationNode> GetConversationScreen(string npcName, uint typeId, string answerPath);
 		Task<List<ConversationNode>> GetConversationScreens(string npcName, uint typeId, string answerPath);
 		Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId);
@@ -104,6 +102,8 @@ namespace Faolan.Core.Database
 		Task<Spell> GetSpell(uint id);
 		Task<Spell[]> GetSpells();
 		Task<Ability[]> GetStartingAbilities(uint level, uint @class);
+
+		Task<uint[]> GetStartingSpells(uint level, uint @class);
 		Task<WorldObject[]> GetWorldObjects(uint mapId);
 		Task<T> Query<T>(Func<IDatabaseContext, Task<T>> work);
 		Task RemoveCharacterQuest(uint characterId, uint questId);
@@ -780,18 +780,6 @@ namespace Faolan.Core.Database
 				.ToArrayAsync();
 		}
 
-		// The class/level row that lists which abilities (and spells) a character of this class+level should have.
-		// Falls back to the highest captured level at or below the requested one so any level still resolves a grant.
-		public async Task<ClassAbility> GetClassAbility(uint @class, uint level)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx
-				.ClassAbilities
-				.Where(c => c.Class == @class && c.Level <= level)
-				.OrderByDescending(c => c.Level)
-				.FirstOrDefaultAsync();
-		}
-
 		// One screen in an NPC's dialogue tree, keyed by the stable (NpcName, TypeId, AnswerPath). The runtime serves
 		// the "" screen on the greeting click and the "path>idx" child screen on each KnubotAnswer (the answer index
 		// is the real branch selector; the old Mode/Field3 were session-volatile counters). Null = no captured screen
@@ -1066,6 +1054,21 @@ namespace Faolan.Core.Database
 				.Abilities
 				.Where(a => a.IsStartingAbility && a.Level <= level && (a.Class == 0 || a.Class == @class))
 				.OrderBy(a => a.Slot)
+				.ToArrayAsync();
+		}
+
+		// Starting SPELLS for a character (#74): the generic set (Class == 0) plus the spells specific to the
+		// character's own class, up to its level. Harvested from the create-flow captures (ClassStartingSpell);
+		// coverage is whatever the captures supplied (casters we have a beach capture for - physical classes have
+		// none at L1, which is correct). The spell analogue of GetStartingAbilities.
+		public async Task<uint[]> GetStartingSpells(uint level, uint @class)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.ClassStartingSpells
+				.Where(s => s.Level <= level && (s.Class == 0 || s.Class == @class))
+				.OrderBy(s => s.Id)
+				.Select(s => s.SpellId)
 				.ToArrayAsync();
 		}
 

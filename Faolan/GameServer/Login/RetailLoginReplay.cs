@@ -224,6 +224,10 @@ namespace Faolan.GameServer
 		{
 			await Send0X201C(client);
 
+			// First-entry seeding (#74/#71): a freshly-created character with an empty action bar gets its class's
+			// starting spells (persisted) + the default bar layout, so the spell grant below sends them this session.
+			await EnsureStartingLoadout(client);
+
 			// #237: re-grant the character's learned SPELLS (DispatchLearnSpell 0x200A) BEFORE the world snapshot, so
 			// the client absorbs them as part of the initial load and stays SILENT - retail sends them pre-entry
 			// (NecroL80 login: grants at frame 59, the 0x737A6DF9 snapshot at frame 152). Granting them post-ready

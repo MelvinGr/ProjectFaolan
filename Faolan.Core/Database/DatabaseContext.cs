@@ -27,7 +27,7 @@ namespace Faolan.Core.Database
 		DbSet<CharacterSpawnFrame> CharacterSpawnFrames { get; }
 		DbSet<CharacterSpell> CharacterSpells { get; }
 		DbSet<CharacterTag> CharacterTags { get; }
-		DbSet<ClassAbility> ClassAbilities { get; }
+		DbSet<ClassStartingSpell> ClassStartingSpells { get; }
 		DbSet<ConversationNode> ConversationNodes { get; }
 		DbSet<ConversationPacket> ConversationPackets { get; }
 		DbSet<Guild> Guilds { get; }
@@ -80,7 +80,7 @@ namespace Faolan.Core.Database
 		public DbSet<CharacterSpawnFrame> CharacterSpawnFrames { get; set; }
 		public DbSet<CharacterSpell> CharacterSpells { get; set; }
 		public DbSet<CharacterTag> CharacterTags { get; set; }
-		public DbSet<ClassAbility> ClassAbilities { get; set; }
+		public DbSet<ClassStartingSpell> ClassStartingSpells { get; set; }
 		public DbSet<ConversationNode> ConversationNodes { get; set; }
 		public DbSet<ConversationPacket> ConversationPackets { get; set; }
 		public DbSet<Guild> Guilds { get; set; }
@@ -309,14 +309,23 @@ namespace Faolan.Core.Database
 				.WithOne(p => p.Node)
 				.OnDelete(DeleteBehavior.Cascade);
 
+			// A class's starting spell is unique per (Class, SpellId) - re-importing the same create capture upserts.
 			modelBuilder
-				.Entity<ClassAbility>()
-				.HasIndex(c => new
+				.Entity<ClassStartingSpell>()
+				.HasIndex(s => new
 				{
-					c.Class,
-					c.Level
+					s.Class,
+					s.SpellId
 				})
 				.IsUnique();
+			// SpellId references the Spell catalog (the importer catalogs every starting spell id). Restrict so a
+			// spell can't be deleted out from under a class loadout.
+			modelBuilder
+				.Entity<ClassStartingSpell>()
+				.HasOne(s => s.Spell)
+				.WithMany()
+				.HasForeignKey(s => s.SpellId)
+				.OnDelete(DeleteBehavior.Restrict);
 
 			// A captured NPC spawn is deduped by its (map, spawn point); the entity handle is session-scoped.
 			modelBuilder
