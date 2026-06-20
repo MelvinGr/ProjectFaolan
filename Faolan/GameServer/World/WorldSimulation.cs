@@ -82,6 +82,16 @@ namespace Faolan.GameServer.World
 		// substate (bcc_state 29→1) - closes the release window + revives IN PLACE, NOT a world re-entry (#214).
 		Task SendRevive(INetworkClient client, uint handle, uint respawnPointId);
 
+		// The same-map revive teleport (IntendedTeleport 0x10D27BC0) relocating the revived player to the chosen res
+		// point with NO loading screen. playfieldToken MUST be the client's LIVE token (Zone.PlayfieldToken) so the
+		// client recognizes the same playfield and just repositions (#214).
+		Task SendReviveTeleport(INetworkClient client, uint handle, uint mapId, uint playfieldToken);
+
+		// The actual position move to the res point: the revive n3Teleport (0x5A32F0D7) carrying the destination
+		// position. The IntendedTeleport above only confirms the playfield (no move); retail follows it with THIS to
+		// relocate the player (#214, decoded from the beach resurrect sequence IntendedTeleport -> n3Teleport).
+		Task SendReviveDestination(INetworkClient client, uint handle, uint mapId, Vector3 position, float facingX, float facingZ);
+
 		// The in-session DEATH action (BccIIR 0x642CD3D6, behaviorId 41877) that transitions the live SimpleChar INTO
 		// the dead state (bcc_state 29) so the release window shows - the in-session analogue of the login spawn's
 		// bcc_state=29. Sent at the end of the death sequence (#214).
@@ -418,7 +428,8 @@ namespace Faolan.GameServer.World
 			// (0x10D27BC0) is the follow-up (the beach point is adjacent to the death spot). docs/handoff-2026-06-20-death-window.md.
 			await _output.SendRevive(client, entity.Handle, spawnPointId);
 			await _output.PushVitals(client, vitals);
-			_logger.LogInformation("Combat: {Player} resurrected in place (spot {Spot}).", character.Name, point?.Name ?? $"0x{spawnPointId:X}");
+			_logger.LogInformation("Combat: {Player} resurrected (chosen spot {Spot}).", character.Name, point?.Name ?? $"0x{spawnPointId:X}");
+			await RelocateToRespawnPoint(client, entity, character, point);
 			return true;
 		}
 
@@ -452,7 +463,33 @@ namespace Faolan.GameServer.World
 			var handle = entity?.Handle ?? client.Session.Account.ClientInstance;
 			await _output.SendRevive(client, handle, target?.Id ?? 0);
 			await _output.PushVitals(client, vitals);
-			_logger.LogInformation("Combat: {Player} resurrected in place (point '{Point}', map {Map}).", character.Name, target?.Name ?? "none", character.MapId);
+			_logger.LogInformation("Combat: {Player} resurrected (point '{Point}', map {Map}).", character.Name, target?.Name ?? "none", character.MapId);
+			await RelocateToRespawnPoint(client, entity, character, target);
+		}
+
+		// Move a just-revived player to their resurrection point on the SAME map with NO loading screen: update the
+		// authoritative server position, send the IntendedTeleport (the LIVE playfield token so the client recognizes
+		// the same playfield and doesn't reload), then the CharDCMove teleport that actually JUMPS the avatar there
+		// (the IntendedTeleport alone only confirms the playfield - the move is the CharDCMove) (#214). No-op if the
+		// point or entity is missing (revive in place).
+		private async Task RelocateToRespawnPoint(INetworkClient client, WorldEntity entity, Character character, RespawnPoint point)
+		{
+			if (entity == null || point == null)
+				return;
+
+			var dest = new Vector3(point.PositionX, point.PositionY, point.PositionZ);
+			entity.Position = dest;
+			character.Position = dest;
+
+			var liveToken = World.ZoneFor(character.MapId).PlayfieldToken;
+			await _output.SendReviveTeleport(client, entity.Handle, character.MapId, liveToken);
+
+			var rot = new Quaternion(point.RotationX, point.RotationY, point.RotationZ, point.RotationW);
+			var fwd = Vector3.Transform(Vector3.UnitZ, rot);
+			var hlen = MathF.Sqrt(fwd.X * fwd.X + fwd.Z * fwd.Z);
+			var (facingX, facingZ) = hlen > 1e-4f ? (fwd.X / hlen, fwd.Z / hlen) : (1f, 0f);
+			await _output.SendReviveDestination(client, entity.Handle, character.MapId, dest, facingX, facingZ);
+			_logger.LogInformation("Combat: {Player} relocated to '{Spot}' {Dest} (token 0x{Token:X}).", character.Name, point.Name, dest, liveToken);
 		}
 
 		// On death: show the client the release screen (DispatchValidResurrectionSpots) so the player can pick where to

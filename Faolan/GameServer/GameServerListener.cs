@@ -218,6 +218,26 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 		}
 
+		Task IWorldOutbound.SendReviveTeleport(INetworkClient client, uint handle, uint mapId, uint playfieldToken)
+		{
+			// IntendedTeleport (0x10D27BC0) relocating the revived player to the chosen res point on the SAME map (no
+			// loading screen). The caller passes the LIVE playfield token so the client repositions in place (#214).
+			return new PacketStream()
+				.WriteHeader(PlayerDeathSender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteArrayUInt32Length(s => s.WriteArray(World.TeleportCodec.BuildReviveTeleport(handle, mapId, handle, playfieldToken)))
+				.SendAsync(client);
+		}
+
+		Task IWorldOutbound.SendReviveDestination(INetworkClient client, uint handle, uint mapId, System.Numerics.Vector3 position, float facingX, float facingZ)
+		{
+			// The revive n3Teleport (0x5A32F0D7) that relocates the player to the res point - retail sends it right
+			// after the revive IntendedTeleport (#214). Carries the destination position; same-map so no loading screen.
+			return new PacketStream()
+				.WriteHeader(PlayerDeathSender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteArrayUInt32Length(s => s.WriteArray(World.TeleportCodec.BuildReviveDestination(handle, mapId, handle, position, facingX, facingZ)))
+				.SendAsync(client);
+		}
+
 		Task IWorldOutbound.SendDeathBcc(INetworkClient client, uint dyingHandle)
 		{
 			return new PacketStream()
