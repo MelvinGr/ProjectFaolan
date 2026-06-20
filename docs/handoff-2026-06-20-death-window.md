@@ -1,5 +1,42 @@
 # Handoff 2026-06-20 — Death/release window (#214): packets correct, gate is the dead-state flag
 
+## UPDATE 2026-06-20 (step 3 IMPLEMENTED) — step 2 zeroed health in the WRONG packet; fixed the FA015807 self-spawn
+
+**The construction-latch theory was right; step 2 just patched the wrong object.** The local
+**SimpleChar** (whose dead-flag gates the window, `DAT_0297d374->[0x10]`) is built by
+**`SimpleCharFullUpdateIIR` = the player's own FA015807 self-spawn**, NOT the `0x737A6DF9`
+FullPlayerChar snapshot. Step 2 zeroed `HealthCurrent` only in the snapshot (a different object) →
+the SimpleChar was still constructed full-health → flag false → avatar stood, no window. That fully
+explains the step-2 in-client failure WITHOUT abandoning the latch theory.
+
+**Decoded proof (same character alive vs dead).** The retail `login-while-dead` capture's player
+self-spawn is **Stihetfv** (handle `0x021663dd`, FA015807 pkt **#50**), and we also have Stihetfv's
+**alive** login (`Stihetfv_soldier-conqueror_login.tshark.json` #44) — same char, clean diff. Both
+get a self-FA015807 (the local player gets BOTH a self-FA015807 and the `0x737A6DF9` snapshot). The
+embedded `ProtoCoreCharacterIIR.CharacterStats` differs in exactly:
+- **`health` (f7) = 0 dead / 16800 alive** ← the latch field
+- **`life` (f6) stays full** (dead 19600) — only CURRENT health drops, max is untouched
+- **`can_fall` (f20) = 0 dead / 1 alive** (a corpse is ragdoll, not gravity-stepped)
+- (f7 bcc differs + f12/f13 offensive/defensive targets present when dead — combat residue, ignored)
+
+**Fix (commit 443213b, needs in-client test).** `PlayerSpawnMessage.ApplyCharacter` now sets
+`Stats.Health = 0` and `CanFall = false` for a dead character (life/max unchanged; alive path
+byte-unchanged). This is the SOLE world-entry player-spawn path (`SendBurstlessWorldEntry` →
+`BuildBurstlessPlayerSpawn`). Test `ApplyCharacter_DeadCharacter_ZeroesCurrentHealthKeepsLifeFull`
+(PlayerSpawnGenerationTests) locks it. Step 2's snapshot `HealthCurrent=0` STAYS (retail-dead carries
+both); they reinforce, not conflict.
+
+**TEST (needs Melvin — visual, the launcher can't see a painted window):** rebuild + restart the
+server, flag a char dead (`Character.IsDead=true`, e.g. die in-session or set it in the DB while the
+server is stopped), log in → the release/resurrect window should paint at world entry. If it shows,
+the latch theory is confirmed at the correct packet and the in-session death (which already sends the
+death sequence) should re-latch via the same health=0 the kill record carries. If it STILL doesn't
+show, the next lever is the gdb session #2 lead below (the C++ Dead substate transition) — but health
+is now zeroed on the constructing packet, so the construction-latch is finally being exercised
+correctly.
+
+---
+
 ## UPDATE 2026-06-20 (live gdb session #2) — the feed path is COMPLETE; the handoff's gate theory is WRONG
 
 A second live gdb session (client on our LOCAL server, char `Testie` flagged dead) overturned the central
