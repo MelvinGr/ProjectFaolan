@@ -70,7 +70,15 @@ namespace Faolan.Tests
 			Assert.Equal(expectedHealth, message.Stats.Health);
 			Assert.Equal(196u * 100, message.Stats.Life); // life (max) is full regardless of dead state
 			if (isDead)
+			{
 				Assert.False(message.CanFall);            // a dead corpse reports can_fall=0 (alive keeps the template value)
+				Assert.Equal(41877u, message.Bcc.AnimForcedId); // forced death animation - the actual Dead-substate signal
+				Assert.True(message.Bcc.AnimForcedBlend);
+			}
+			else
+			{
+				Assert.Equal(0u, message.Bcc.AnimForcedId); // alive: no forced animation (template carries none)
+			}
 		}
 
 		[Fact]

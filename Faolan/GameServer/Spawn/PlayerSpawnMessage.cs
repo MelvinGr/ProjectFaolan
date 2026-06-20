@@ -76,6 +76,25 @@ namespace Faolan.GameServer.Spawn
 				foreach (var entry in wornEquipment)
 					message.InventoryEntries.Add(entry);
 			}
+
+			// THE dead-state signal: a FORCED death animation in the BCC (animation controller). Health=0 alone only
+			// blanks the HP bar (the avatar stays up, no release window - verified in-client #214); the client enters
+			// the Dead substate / paints the resurrect window off the forced animation, NOT health. Across all 33
+			// captured ALIVE player spawns the BCC carries NO anim_forced_* fields; the ONLY spawn that sets them is
+			// the retail login-while-dead capture (Stihetfv FA015807 #50): anim_forced_id=41877, timer=1.0, blend=1.
+			// Force it for a dead login (left unset when alive). The id is the conqueror capture's value - if the dead
+			// POSE renders wrong on another class/skeleton but the WINDOW shows, the mechanism is confirmed and the id
+			// just needs a per-skeleton lookup. docs/handoff-2026-06-20-death-window.md.
+			if (character.IsDead && message.Bcc != null)
+			{
+				message.Bcc.AnimForcedId = DeathForcedAnimId;
+				message.Bcc.AnimForcedTimer = 1.0f;
+				message.Bcc.AnimForcedBlend = true;
+			}
 		}
+
+		// The forced "death" animation id retail sets in a dead player's BCC (Stihetfv login-while-dead FA015807).
+		// Capture-derived (conqueror); may be per-skeleton - see the call site.
+		private const uint DeathForcedAnimId = 41877;
 	}
 }
