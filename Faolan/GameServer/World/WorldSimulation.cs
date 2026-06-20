@@ -77,6 +77,15 @@ namespace Faolan.GameServer.World
 		// The death-pose MoveTask (0x96C46740 movement-type 0x06) retail forces onto the dying player just before the
 		// kill record (#214); puts the avatar into the dead/incapacitated state at the death position.
 		Task SendDeathPose(INetworkClient client, uint dyingHandle, Vector3 deathPosition);
+
+		// The revive action (BccIIR 0x642CD3D6) retail sends on RespawnMe to transition the player out of the Dead
+		// substate (bcc_state 29→1) - closes the release window + revives IN PLACE, NOT a world re-entry (#214).
+		Task SendRevive(INetworkClient client, uint handle, uint respawnPointId);
+
+		// The in-session DEATH action (BccIIR 0x642CD3D6, behaviorId 41877) that transitions the live SimpleChar INTO
+		// the dead state (bcc_state 29) so the release window shows - the in-session analogue of the login spawn's
+		// bcc_state=29. Sent at the end of the death sequence (#214).
+		Task SendDeathBcc(INetworkClient client, uint dyingHandle);
 	}
 
 	// The live in-memory world (docs/archive/server-architecture-roadmap.md): owns the world model + the connected players'
@@ -388,81 +397,60 @@ namespace Faolan.GameServer.World
 			if (vitals == null || !vitals.IsDead)
 				return false;
 
-			var point = await _database.GetRespawnPoint(spawnPointId);
-			if (point == null)
-			{
-				await TryRespawnNow(client); // unknown id - closest-known fallback
-				return true;
-			}
-
 			_playerRespawnRemaining.TryRemove(client, out _);
 			var character = client.Session.Character;
-			vitals.ReviveToFull();
+			var point = await _database.GetRespawnPoint(spawnPointId); // for logging/future teleport; revive works without it
 
-			// Clear the persisted dead state BEFORE the re-enter (#214): the re-entry rebuilds the player FA015807
-			// via ApplyCharacter, which keys bcc_state=29 / health=0 / the death pose off Character.IsDead. Leaving
-			// it set re-sends the DEAD spawn, so the client never leaves the Dead substate (window stays, avatar
-			// stays dead-looking while the sim has them alive). RespawnPlayer already does this; this path forgot.
+			vitals.ReviveToFull();
 			if (character.IsDead)
 			{
 				character.IsDead = false;
 				await _database.SaveCharacterDeadState(character.Id, false);
 			}
 
-			character.Position = point.Position;
-			character.Rotation = point.Rotation;
-			character.MapId = point.MapId;
-			_logger.LogInformation("Combat: {Player} resurrected at chosen point '{Point}' (map {Map}).", character.Name, point.Name, point.MapId);
-			await _output.ReenterWorld(client);
+			// Retail's RespawnMe revive (decoded from the beach death+resurrect capture, Stihetfv #1382-1387) is a
+			// LIGHTWEIGHT IN-PLACE sequence on the existing SimpleChar, NOT a world re-entry: a BccIIR (0x642CD3D6)
+			// flips bcc_state 29→1 (closes the release window), then a vitals update restores HP. Our old ReenterWorld
+			// re-ran the whole world entry, which (a) rebuilt the dead spawn when IsDead lingered and (b) corrupted the
+			// client into the sticky wave-respawn UI. We revive in place; honoring a FAR res point via IntendedTeleport
+			// (0x10D27BC0) is the follow-up (the beach point is adjacent to the death spot). docs/handoff-2026-06-20-death-window.md.
+			await _output.SendRevive(client, entity.Handle, spawnPointId);
+			await _output.PushVitals(client, vitals);
+			_logger.LogInformation("Combat: {Player} resurrected in place (spot {Spot}).", character.Name, point?.Name ?? $"0x{spawnPointId:X}");
 			return true;
 		}
 
-		// Revives a dead player: full vitals, moved to the CLOSEST resurrection point they know (the always-known
-		// starter + any discovered; RespawnResolver), and re-entered (the proven world-entry render path, same as a
-		// teleport) so they reappear alive away from whatever killed them. Falls back to the map's spawn point if the
-		// map has no points.
+		// Revives a dead player via the LIGHTWEIGHT in-place revive (the retail RespawnMe sequence, #214): BccIIR
+		// bcc_state 29→1 (closes the release window) + a vitals restore - NOT a world re-entry. The old re-entry path
+		// re-rendered the whole world (and, while IsDead lingered, rebuilt the DEAD spawn / corrupted the client into
+		// the sticky wave-respawn UI). The resolved point's id parameterizes the BccIIR; we revive in place (honoring
+		// a far point's relocation via IntendedTeleport 0x10D27BC0 is the follow-up). Used by the click (TryRespawnNow)
+		// and the tick fallback.
 		private async Task RespawnPlayer(INetworkClient client, EntityVitals vitals)
 		{
 			var character = client.Session.Character;
+			var entity = PlayerWorldEntity(client);
 			vitals.ReviveToFull();
 
-			// Clear the persisted dead state (#214) BEFORE the re-enter below, so the world-entry snapshot the revive
-			// sends carries full current-health (alive), not the dead current-health = 0.
 			if (character.IsDead)
 			{
 				character.IsDead = false;
 				await _database.SaveCharacterDeadState(character.Id, false);
 			}
 
-			var deathPos = PlayerWorldEntity(client)
-				?.Position ?? character.Position;
+			// The point the player would respawn at (closest known, else the map's AlwaysKnown/first) - used as the
+			// BccIIR revive id. Revive in place (no teleport yet), so the character position is left at the death spot.
+			var deathPos = entity?.Position ?? character.Position;
 			var points = await GetRespawnPointsCached(character.MapId);
 			var target = points.Length > 0
 				? RespawnResolver.ClosestKnown(deathPos, points, await GetDiscoveredRespawnCached(character.Id))
+				  ?? points.FirstOrDefault(p => p.AlwaysKnown) ?? points.FirstOrDefault()
 				: null;
 
-			if (target != null)
-			{
-				character.Position = target.Position;
-				character.Rotation = target.Rotation;
-				_logger.LogInformation("Combat: {Player} respawned at '{Point}' (map {Map}).", character.Name, target.Name, character.MapId);
-			}
-			else
-			{
-				// No point the player KNOWS - fall back to the map's default spawn (AlwaysKnown starter, else any
-				// point on the map; the points are already loaded above). If the map defines none, respawn in place.
-				var fallback = points.FirstOrDefault(p => p.AlwaysKnown) ?? points.FirstOrDefault();
-				if (fallback != null)
-				{
-					character.Position = fallback.Position;
-					character.Rotation = fallback.Rotation;
-					_logger.LogInformation("Combat: {Player} respawned at the default spawn '{Point}' (map {Map}; no known resurrection point).", character.Name, fallback.Name, character.MapId);
-				}
-				else
-					_logger.LogInformation("Combat: {Player} respawned in place (map {Map} has no resurrection point).", character.Name, character.MapId);
-			}
-
-			await _output.ReenterWorld(client);
+			var handle = entity?.Handle ?? client.Session.Account.ClientInstance;
+			await _output.SendRevive(client, handle, target?.Id ?? 0);
+			await _output.PushVitals(client, vitals);
+			_logger.LogInformation("Combat: {Player} resurrected in place (point '{Point}', map {Map}).", character.Name, target?.Name ?? "none", character.MapId);
 		}
 
 		// On death: show the client the release screen (DispatchValidResurrectionSpots) so the player can pick where to
@@ -489,6 +477,10 @@ namespace Faolan.GameServer.World
 			await _output.SendDeathTrigger(client, handle, handle);
 			await _output.SendResurrectionScreen(client, deathPosition, [spot]);
 			await _output.SendDeathEffect(client, handle);
+			// The BccIIR that transitions the live SimpleChar into the dead state (bcc_state 29) - retail sends it last
+			// (#1292, after the death effect). This is what shows the release window for an IN-SESSION death (the login
+			// spawn's bcc_state=29 only covers login-while-dead).
+			await _output.SendDeathBcc(client, handle);
 		}
 
 		// The server game loop (docs/archive/server-architecture-roadmap.md): a 10 Hz base tick that advances continuous systems

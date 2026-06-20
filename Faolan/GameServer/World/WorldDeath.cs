@@ -63,6 +63,50 @@ namespace Faolan.GameServer.World
 		private const uint MoveTaskSubOpcode = 0x96C46740;
 		private const byte DeadMovementType = 0x06;
 
+		// The revive action retail sends on RespawnMe — a BehaviorControlCenterIIR (0x642CD3D6) on the player that
+		// transitions bcc_state 29→1 (alive), which CLOSES the release window and revives in place. Decoded from the
+		// retail beach death+resurrect (Stihetfv #1382, identical form in AssassinL23 #4840): a form-0x0004 BccIIR record
+		// with a fixed protobuf (behaviorId 41368) and an 8-byte tail [u32 3][u32 respawnPointId]. Capture-derived
+		// verbatim except the player handle + the chosen resurrection-point id. Retail follows it with a vitals
+		// restore (we ride PushVitals) and an IntendedTeleport to the point (deferred - the beach point is adjacent so
+		// we revive in place). docs/handoff-2026-06-20-death-window.md.
+		private const uint BccIirSubOpcode = 0x642CD3D6;
+
+		private static readonly byte[] ReviveBccProtobuf =
+			[0x08, 0x98, 0xC3, 0x02, 0x18, 0x04, 0x28, 0x08, 0x30, 0x00, 0x60, 0x64];
+
+		// The in-session DEATH action retail sends to put the player into the dead state (bcc_state 29) - the inverse
+		// of BuildRevive. Decoded from the retail beach death (Stihetfv #1292, right after the death-effect ApplySpell):
+		// a form-0x0004 BccIIR, protobuf behaviorId 41877 (the death animation), no tail. Capture-derived verbatim
+		// except the player handle. Needed because a login-while-dead char gets bcc_state=29 from its spawn, but an
+		// IN-SESSION death has no spawn re-send - this BccIIR is how the dead state transitions on the live SimpleChar.
+		private static readonly byte[] DeathBccProtobuf =
+			[0x08, 0x95, 0xC7, 0x02, 0x18, 0x03, 0x28, 0x08, 0x30, 0x00, 0x60, 0xF0, 0x01];
+
+		public static byte[] BuildDeathBcc(uint handle) =>
+			new FaolanStream()
+				.WriteUInt32(BccIirSubOpcode)
+				.WriteUInt32(0x0000C350)
+				.WriteUInt32(handle)
+				.WriteUInt16(0x0004)         // form
+				.WriteUInt32(0x0000001F)     // slot
+				.WriteUInt32((uint)DeathBccProtobuf.Length)
+				.WriteArray(DeathBccProtobuf)
+				.ToArray();
+
+		public static byte[] BuildRevive(uint handle, uint respawnPointId) =>
+			new FaolanStream()
+				.WriteUInt32(BccIirSubOpcode)
+				.WriteUInt32(0x0000C350)
+				.WriteUInt32(handle)
+				.WriteUInt16(0x0004)         // form
+				.WriteUInt32(0x00000025)     // slot
+				.WriteUInt32((uint)ReviveBccProtobuf.Length)
+				.WriteArray(ReviveBccProtobuf)
+				.WriteUInt32(0x00000003)     // tail prefix
+				.WriteUInt32(respawnPointId) // the chosen resurrection-point id
+				.ToArray();
+
 		public static byte[] BuildDeathPose(uint dyingHandle, Vector3 position) =>
 			new FaolanStream()
 				.WriteUInt32(MoveTaskSubOpcode)

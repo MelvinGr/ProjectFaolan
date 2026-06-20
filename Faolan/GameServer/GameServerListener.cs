@@ -209,6 +209,23 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 		}
 
+		Task IWorldOutbound.SendRevive(INetworkClient client, uint handle, uint respawnPointId)
+		{
+			// Same GameAgent 0x59 sender / receiver framing as the death sequence (retail beach #1382 uses it).
+			return new PacketStream()
+				.WriteHeader(PlayerDeathSender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteArrayUInt32Length(s => s.WriteArray(WorldDeath.BuildRevive(handle, respawnPointId)))
+				.SendAsync(client);
+		}
+
+		Task IWorldOutbound.SendDeathBcc(INetworkClient client, uint dyingHandle)
+		{
+			return new PacketStream()
+				.WriteHeader(PlayerDeathSender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteArrayUInt32Length(s => s.WriteArray(WorldDeath.BuildDeathBcc(dyingHandle)))
+				.SendAsync(client);
+		}
+
 		// --- IEconomyOutbound: the wallet + item-grant ops the economy/inventory services reach back to (forwarding
 		// to the private Outbound builders, which the listener also calls directly from loot/GM paths) ---------------
 		Task IEconomyOutbound.SendMoneyUpdate(INetworkClient client, ulong balanceTin, MoneyUpdateReason reason)
