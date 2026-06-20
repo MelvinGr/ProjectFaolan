@@ -1,6 +1,26 @@
 # Handoff 2026-06-20 — Death/release window (#214): packets correct, gate is the dead-state flag
 
-## UPDATE 2026-06-20 (later) — STEP 1 SOLVED: the dead-state field is current-health = 0
+## UPDATE 2026-06-20 (in-client test) — health=0 is NOT the gate; the construction-latch theory is DISPROVEN
+Step 2 was tested in-client (char flagged dead in the DB, relogged). Result: **the 0 HP bar shows correctly
+but the release window does NOT, and the avatar stands** — even though the server ALSO fired the full death
+sequence (death-pose MoveTask + SimpleCharKilledBy + `0x2024` spots + death effect, confirmed in the log) AND
+the snapshot carried `HealthCurrent=0` AND the in-session vitals were 0. So **health=0 at SimpleChar
+construction does NOT latch the client dead-flag** — the earlier "construction-latch from health" theory is
+wrong. The window is gated on a field we are STILL not setting (confirms the original `vtable+0x10` gdb
+finding; neither the snapshot health nor any death packet flips it).
+
+New clue from the retail `login-while-dead` capture: the dead player (handle `0x021663dd`) has its FA015807
+spawn (#50) but **NO MoveTask at all** (every `96C46740` in the capture is an NPC's). So the dead pose/state is
+carried **inside the player's own FA015807 spawn or its `CharacterIIR`**, not a separate packet — that (or a
+non-health state field in the snapshot) is the real gate. Pinning it needs the **step-3 gdb trace** of what
+`method_0x10` reads on the live retail client.
+
+Step-2 code is KEPT as scaffolding (Melvin, 2026-06-20: "keep it, set chars alive") but is INERT until the real
+field is found: `Character.IsDead` persistence, the snapshot `CurrentHp=0` patch, `BuildVitals`/`EntityVitals`
+dead handling, and the `WorldSimulation` set/clear all remain. NB while a char is `IsDead` the world model
+treats it dead (NPCs won't attack, no regen) — so only flag a char dead for a death test.
+
+## UPDATE 2026-06-20 (later) — STEP 1 found the (insufficient) field: current-health = 0
 The diff (handoff step 1) is **done**. The dead-state field in the `0x737A6DF9` world-entry snapshot is the
 **tails stat block's current-health stat**: `statId 0x001B` (`LegacyCharacterStatId.HealthCurrent`) **= 0**
 (the `HealthMax`-side slots stay full). Proof + refined mechanism:
