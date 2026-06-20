@@ -638,6 +638,16 @@ namespace Faolan.GameServer
 						break;
 					}
 
+					// After we relocate the player on resurrect (IntendedTeleport + n3Teleport, #214), the client echoes
+					// the teleport records back; benign acks, no reply needed - log quietly instead of spamming a system
+					// message into chat.
+					if ((uint)pbOpcode == (uint)GameServer0X2000RespondsOpcodes.N3TeleportIIR
+					    || (uint)pbOpcode == (uint)GameServer0X2000RespondsOpcodes.IntendedTeleportIIR)
+					{
+						Logger.LogDebug("GameServer 0x2000 client teleport-ack {SubOpcodeHex} ({RawLength} bytes).", pbOpcode.ToHex(), rawPayload.Length);
+						break;
+					}
+
 					Logger.LogWarning("Unhandled GameServer 0x2000 subopcode {SubOpcodeHex} ({RawLength} bytes).", pbOpcode.ToHex(), rawPayload.Length);
 					if (Logger.IsEnabled(LogLevel.Debug))
 						Logger.LogDebug("Unhandled GameServer 0x2000 subopcode {SubOpcodeHex} raw payload: {RawPayload}", pbOpcode.ToHex(), rawPayload.ToHex());
