@@ -111,6 +111,12 @@ namespace Faolan.GameServer
 							// wholesale by BuildFromScratch below; this still applies on every other map.)
 							var v = character.MaxStats.SnapshotVitals(character.Class);
 							parts.Tails.PostAccessBlock.ApplyClassVitals(v.Hp, v.HpBase, v.Mana, v.ManaBase, v.Stamina, v.StaminaBase);
+
+							// #214: a dead character logs in dead - zero the current-health slots (HealthCurrent stat
+							// 0x1B) while leaving the max/base side full. The client reads current-health = 0 at
+							// SimpleChar construction and shows the release/resurrect window (decode_death_snapshot.py).
+							if (character.IsDead)
+								parts.Tails.PostAccessBlock.CurrentHp = 0;
 						}
 					}
 				}

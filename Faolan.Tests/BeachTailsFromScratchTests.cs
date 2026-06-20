@@ -99,6 +99,31 @@ namespace Faolan.Tests
 			Assert.Equal(98760u, tails.PostAccessBlock.CurrentXp);
 		}
 
+		// #214 step 2: a DEAD character's from-scratch tails carry current-health = 0 (the release-window gate)
+		// while the max/base HP side stays full - the same shape the retail login-while-dead snapshot has. An alive
+		// character with identical stats keeps full current health, so the only difference is the dead flag.
+		[Fact]
+		public async Task BuildFromScratch_DeadCharacter_ZeroesCurrentHealthKeepsMax()
+		{
+			var def = await LoadDefinition(BeachStarterQuestId);
+			Assert.NotNull(def);
+
+			CharacterMaxStats Stats() => new() { Health = 4321, Mana = 765, Stamina = 543 };
+			var alive = new Character { Level = 7, Experience = 98760, MaxStats = Stats(), IsDead = false };
+			var dead = new Character { Level = 7, Experience = 98760, MaxStats = Stats(), IsDead = true };
+			const uint live = 0x0802ABCD;
+
+			var aliveTails = SnapshotTails.Deserialize(BeachTailsBuilder.BuildFromScratch(def, alive, live));
+			var deadTails = SnapshotTails.Deserialize(BeachTailsBuilder.BuildFromScratch(def, dead, live));
+
+			Assert.Equal(4321u, aliveTails.PostAccessBlock!.CurrentHp); // alive: full current health
+			Assert.Equal(0u, deadTails.PostAccessBlock!.CurrentHp);     // dead: current health = 0 (the gate)
+
+			// Max/base HP side is untouched by death - the slot [21] base stays full in both.
+			Assert.Equal(aliveTails.PostAccessBlock.Values[21], deadTails.PostAccessBlock.Values[21]);
+			Assert.True(deadTails.PostAccessBlock.Values[21] > 0u, "dead snapshot keeps the max-health side populated");
+		}
+
 		// The quest portion = the Quest_c journal (KnownHeaderLength) + the @609 objective region + the index region.
 		private static int QuestRegionTrailerLength(SnapshotTails tails) =>
 			(tails.QuestObjectives?.ToArray().Length ?? 0) + (tails.QuestIndex?.ToArray().Length ?? 0);

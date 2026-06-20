@@ -115,6 +115,8 @@ namespace Faolan.Core.Database
 
 		Task SaveCharacterBind(uint characterId, uint respawnPointId);
 
+		Task SaveCharacterDeadState(uint characterId, bool isDead);
+
 		Task<RespawnPoint> GetRespawnPoint(uint id);
 		Task SetCharacterInventorySlot(uint characterId, int container, int slot, uint? itemId, uint count = 1);
 		Task SetCharacterMoney(uint characterId, ulong money);
@@ -1251,6 +1253,18 @@ namespace Faolan.Core.Database
 				.Where(c => c.Id == characterId)
 				.ExecuteUpdateAsync(s => s
 					.SetProperty(c => c.BindRespawnPointId, respawnPointId));
+		}
+
+		// Persists a character's DEAD state (#214) the moment it changes - on death (true) and respawn (false) - so a
+		// player who logs out dead returns dead and the login snapshot carries current-health = 0. Independent of the
+		// full-graph save, like SaveCharacterBind/SetCharacterProgress.
+		public async Task SaveCharacterDeadState(uint characterId, bool isDead)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await ctx.Characters
+				.Where(c => c.Id == characterId)
+				.ExecuteUpdateAsync(s => s
+					.SetProperty(c => c.IsDead, isDead));
 		}
 
 		// A single resurrection point by id (resolves a character's bind point to its map+position on recall).

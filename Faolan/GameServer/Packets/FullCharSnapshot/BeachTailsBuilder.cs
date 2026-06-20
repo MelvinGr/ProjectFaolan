@@ -219,6 +219,11 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 				// 98/0/236, base 90/0/230) this reproduces the template's slots exactly, so the golden stays byte-exact.
 				var v = character.MaxStats.SnapshotVitals(character.Class);
 				block.ApplyClassVitals(v.Hp, v.HpBase, v.Mana, v.ManaBase, v.Stamina, v.StaminaBase);
+
+				// #214: a dead character logs in dead - zero current-health (HealthCurrent stat 0x1B) while leaving
+				// the max/base side full, so the client shows the release window at world entry (decode_death_snapshot.py).
+				if (character.IsDead)
+					block.CurrentHp = 0;
 			}
 			var statBytes = TailsStatBlock.Serialize(block);
 

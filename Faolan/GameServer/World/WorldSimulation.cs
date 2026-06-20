@@ -415,6 +415,14 @@ namespace Faolan.GameServer.World
 			var character = client.Session.Character;
 			vitals.ReviveToFull();
 
+			// Clear the persisted dead state (#214) BEFORE the re-enter below, so the world-entry snapshot the revive
+			// sends carries full current-health (alive), not the dead current-health = 0.
+			if (character.IsDead)
+			{
+				character.IsDead = false;
+				await _database.SaveCharacterDeadState(character.Id, false);
+			}
+
 			var deathPos = PlayerWorldEntity(client)
 				?.Position ?? character.Position;
 			var points = await GetRespawnPointsCached(character.MapId);
@@ -604,6 +612,10 @@ namespace Faolan.GameServer.World
 				if (_playerRespawnRemaining.TryAdd(client, 0))
 				{
 					_logger.LogInformation("Combat: {Player} died; awaiting release (RespawnMe).", character.Name);
+					// Persist the dead state (#214) so a logout-while-dead returns dead - the login snapshot then
+					// carries current-health = 0 and the client shows the release window at world entry.
+					character.IsDead = true;
+					await _database.SaveCharacterDeadState(character.Id, true);
 					await SendDeathScreen(client, character, pair.Value.Position);
 				}
 			}
