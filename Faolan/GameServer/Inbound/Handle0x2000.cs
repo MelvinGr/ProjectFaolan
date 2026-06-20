@@ -269,18 +269,19 @@ namespace Faolan.GameServer
 						{
 							case ActionType.SummonMount:
 							{
-								// Fading black horse
-								// from = 0x3E34F1
-								// unk2 = 0x00, 0x00, 0x02, 0x26, 0x01
+								// The client-initiated mount summon (#27): `from` is the mount/feat id on the bar
+								// (0x3E34F1 = "Fading Black Horse", 0x3E34F2 = "Swift Fading Black Horse"; unk2's
+								// 4th byte is the mount variant index, target = 0). The server answers exactly like
+								// the `.mount` GM command: cast the summon spell (ApplySpell 0x6B87E316) so the
+								// channelled summon plays, then spawn the mount creature at the player so it renders
+								// (the FA015807 mount NPC, harvested by CaptureMountImporter). This is the proper
+								// client-cast mount flow - and the clean mid-session client-CAST-spawn render test.
+								var mount = World.MountCatalog.ForId(from) ?? World.MountCatalog.Default;
+								Logger.LogInformation("SummonMount: from=0x{From:X} -> {Mount} (spell 0x{Spell:X}). {Args}", from, mount.CreatureName, mount.SummonSpellId, args);
 
-								// Swift fading black horse
-								// from = 0x3E34F2
-								// unk2 = 0x00, 0x00, 0x02, 0x27, 0x01
-
-								// for both:
-								// target = 0
-
-								Logger.LogInformation($"SummonMount: {args}");
+								var self = client.Session.Account.ClientInstance;
+								await ApplySpell(client, self, self, mount.SummonSpellId);
+								await _broadcaster.SpawnMountForPlayer(client, mount.CreatureName);
 
 								break;
 							}

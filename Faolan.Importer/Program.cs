@@ -641,6 +641,16 @@ namespace Faolan.Importer
 				return 0;
 			}
 
+			// --reseed-mounts: harvest the summonable mount creatures (#27) from the captures into the dedicated
+			// never-loaded Mounts map (CaptureMountImporter), so a client-cast SummonMount renders the mount. Isolated:
+			// touches only the Mounts map + its NpcSpawns; leaves the Tortage world set intact.
+			if (args.Contains("--reseed-mounts"))
+			{
+				var (seen, seeded) = await CaptureMountImporter.ImportAsync(db, captures.Select(c => c.Packets));
+				Console.WriteLine($"Reseed mounts: {seen} mount creature(s) found, {seeded} seeded under map 0x{CaptureMountImporter.MountMapId:X}.");
+				return 0;
+			}
+
 			// --rdb-maps: import map names + ids from the client RDB PLAYFIELDDESCRIPTIONDATA (type 1070003). Isolated
 			// (no capture import) so it only touches the Maps table.
 			if (args.Contains("--rdb-maps"))

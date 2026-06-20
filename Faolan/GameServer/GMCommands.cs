@@ -397,6 +397,7 @@ namespace Faolan.GameServer
 				["godmode"] = (client, _) => ToggleGodModeCommand(client),
 				["invisible"] = (client, _) => ToggleInvisibleCommand(client),
 				["mount"] = (client, arguments) => MountCommand(client, arguments),
+				["grantmount"] = (client, arguments) => GrantMountCommand(client, arguments),
 				["spawnnpc"] = (client, arguments) => SpawnNpcCommand(client, arguments),
 				["despawnnpc"] = (client, arguments) => DespawnNpcCommand(client, arguments),
 				["delete"] = (client, arguments) => DeleteCommand(client, arguments),
@@ -670,23 +671,43 @@ namespace Faolan.GameServer
 				$"Lua {scriptId}: ran={ok}, +tags [{string.Join(",", player.AddedTags)}], spawned {player.SpawnedItems.Count}, solvedGoals [{string.Join(",", player.SolvedGoals)}], cast [{string.Join(",", player.CastSpells)}].");
 		}
 
-		// .mount [spellIdHex]  - cast the mount-summon spell on the player. Default 0x3BAD7D, the mount spell
-		// observed in demol80's "very_long_loading" capture: a channeled ApplySpell 0x6B87E316 (spell 0x3BAD7D,
-		// repeated ~11x with 0xF508F4C1) immediately precedes the "Fading Black Horse" entity registering
-		// (0x96C46740) and the player switching to MountedRun (MovingType 0x010A). This broadcasts the cast; full
-		// mounting: broadcasts the summon cast AND spawns the mount entity at the player (it appears). The player
-		// actually RIDING (the MountedRun movement transition) is the client's part and in-client-gated.
+		// .mount [mountIdHex]  - server-force a mount summon, the same path the client-cast SummonMount now drives
+		// (#27): cast the summon spell (channeled ApplySpell 0x6B87E316 / 0xF508F4C1) AND spawn the mount creature at
+		// the player so it appears. <mountId> selects the catalog mount (default 0x3E34F1 "Fading Black Horse"); the
+		// player actually RIDING (the MountedRun movement transition) is the client's part and in-client-gated.
 		private async Task MountCommand(INetworkClient client, string arguments)
 		{
-			var spellId = string.IsNullOrWhiteSpace(arguments)
-				? 0x3BAD7Du
-				: Convert.ToUInt32(arguments
-					.Trim()
-					.Replace("0x", "", StringComparison.OrdinalIgnoreCase), 16);
+			var mount = Faolan.GameServer.World.MountCatalog.Default;
+			if (!string.IsNullOrWhiteSpace(arguments)
+				&& uint.TryParse(arguments.Trim().Replace("0x", "", StringComparison.OrdinalIgnoreCase),
+					System.Globalization.NumberStyles.HexNumber, null, out var id))
+				mount = Faolan.GameServer.World.MountCatalog.ForId(id) ?? mount;
 
 			var self = client.Session.Account.ClientInstance;
-			await ApplySpell(client, self, self, spellId); // the channeled summon cast (broadcast)
-			await _broadcaster.SpawnMountForPlayer(client, "Fading Black Horse"); // the decoded mount for the default summon 0x3BAD7D
+			await ApplySpell(client, self, self, mount.SummonSpellId); // the channeled summon cast (broadcast)
+			await _broadcaster.SpawnMountForPlayer(client, mount.CreatureName);
+		}
+
+		// .grantmount [mountIdHex]  - put a catalog mount on the player's action bar so they can SUMMON it themselves
+		// (#27), the client-initiated flow. Persists a CharacterShortcut (mount shortcut type 0x69, decoded from the
+		// UpdateShortcut 0x206E the client sends after mounting) on the special bar so it survives relog and restores
+		// via ShortcutBarReply; then the player clicks it and the SummonMount handler casts + spawns the mount. Default
+		// 0x3E34F1 ("Fading Black Horse").
+		private const uint MountShortcutType = 0x69; // UpdateShortcut 0x206E type word for a mount bar entry (capture-decoded)
+		private const uint MountShortcutSlot = 0x4E2C; // a free special-bar slot (the 0x4E20+ special bar EnsureStartingLoadout uses)
+
+		private async Task GrantMountCommand(INetworkClient client, string arguments)
+		{
+			var character = client.Session.Character;
+			var mount = Faolan.GameServer.World.MountCatalog.Default;
+			if (!string.IsNullOrWhiteSpace(arguments)
+				&& uint.TryParse(arguments.Trim().Replace("0x", "", StringComparison.OrdinalIgnoreCase),
+					System.Globalization.NumberStyles.HexNumber, null, out var id))
+				mount = Faolan.GameServer.World.MountCatalog.ForId(id) ?? mount;
+
+			await Database.SetCharacterShortcut(character.Id, MountShortcutSlot, MountShortcutType, mount.Id);
+			await _agentServerDispatcher.SendSystemMessage(character.Id,
+				$"Granted mount '{mount.CreatureName}' (0x{mount.Id:X}) to the action bar. Relog or it appears on the bar; click it to summon.");
 		}
 
 		// .spawnnpc <npc name>  - spawn a captured NPC (any NpcSpawns row with spawn Data, matched by name,
