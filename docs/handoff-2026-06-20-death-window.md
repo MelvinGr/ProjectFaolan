@@ -1,5 +1,36 @@
 # Handoff 2026-06-20 — Death/release window (#214): packets correct, gate is the dead-state flag
 
+## UPDATE 2026-06-20 (SOLVED: the window shows) — the gate was `CharacterStats.bcc_state`, NOT health
+
+**The release/resurrect window now paints in-client and the player is movement-locked** (verified by
+Melvin). The gate was NEVER health. Walking the same-character (Stihetfv) dead-vs-alive player
+FA015807 self-spawn (`SimpleCharFullUpdateIIR`) field-by-field, three things differ that matter, in
+ascending order of importance:
+
+1. `CharacterStats.health`(f7) = 0 (life/max full) — **cosmetic**: blanks the HP bar only.
+2. `CharacterBcc.anim_forced_id` = 41877 (timer 1.0, blend 1) — **cosmetic**: the lying-down death
+   POSE. With only 1+2 the avatar lay on the floor but **could still walk** and **no window**.
+3. **`CharacterStats.bcc_state`(f22) = 29** (alive = 1) — **THE gate**. The behavior/state-controller
+   state enum. Setting it locks the player into the Dead substate → movement locked → resurrect window
+   paints. Across all 15 captured ALIVE player spawns `bcc_state==1`; the ONLY 29 is the dead capture.
+
+All three are now set for a dead character in `PlayerSpawnMessage.ApplyCharacter` (commits 443213b /
+4ae5b34 / eec6c33; alive path byte-unchanged; `PlayerSpawnGenerationTests` locks it). So the whole
+multi-session "construction-latch from health" thread was a red herring — the dead STATE is an explicit
+enum field in the spawn, not an inferred consequence of health=0.
+
+**Two follow-ups remain (the window works, but):**
+- **Empty location title.** The `0x2024` spot body carries no name string; the client resolves the
+  title from the **`spawnPointId`** (a client-RDB respawn-point id). Retail sends real ids — beach
+  (map 4010) = **0xBF76C (784236)**, AssassinL23's map 2010 = 0xF5C46 (1006150). Our `RespawnPoint.Id`
+  must BE that client id or the title is blank (and `RespawnMe` can't resolve it).
+- **Resurrect button does nothing.** The client echoes the chosen `spawnPointId` back in `RespawnMe`
+  (c2s 0x2024); our handler looks it up in `RespawnPoint`. If our id ≠ the client id (above), the
+  lookup fails → no revive. Fix = seed the real client respawn-point ids; then verify the
+  `WorldSimulation.RespawnPlayer` revive path. (Retail 0x2024 bodies decoded above; per-spot grammar
+  in `ResurrectionSpotsBuilder`.)
+
+
 ## UPDATE 2026-06-20 (step 3 IMPLEMENTED) — step 2 zeroed health in the WRONG packet; fixed the FA015807 self-spawn
 
 **The construction-latch theory was right; step 2 just patched the wrong object.** The local
