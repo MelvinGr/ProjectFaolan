@@ -62,6 +62,34 @@ calls are flaky on Wine; prefer raw reads). Retail testing: throwaway Funcom acc
 
 ---
 
+## UPDATE 2026-06-20 (session 6) — FACTION/GREEN-NAMES thread (Melvin picked this over the wave deep-fix) → Gitea #256
+
+Pulled the related "hostile NPCs render GREEN not RED" thread. **The handoff's premise — "our NPC spawns lack
+hostile-faction data" — is WRONG.** Full investigation is on **Gitea #256**; key facts:
+
+- **We send NPC faction data byte-identically to retail.** The hostile discriminator is `NpcStats.community`
+  (ProtoCoreCharacterIIR f5/f6): retail hostiles carry community 59/60/317/374, friendlies have it absent. Our
+  DB `NpcSpawns.Data` blobs carry the SAME values (verified Scavenger Tuut=60, Crocodile=374, …), and
+  `NpcSpawnBuilder.TryBuild` only zeroes `SpawnAnimation` — it preserves the whole `NpcStats`/IIR proto. The
+  beach (map 4010) DB has every hostile with the right community. `NpcStats.faction_id` (f13) is ABSENT in BOTH
+  retail and ours. The PLAYER self-spawn carries NO `NpcStats` at all (true for retail too). Retail sends NO
+  `DispatchApplyFactionRank`(0x204F)/`Points`(0x2050) at login (12 captures) — so basic mob colour is not from
+  server-sent reputation points either.
+- **Client mechanism (Ghidra, no ASLR):** palette from `Gui/Default/Views/PortraitGUI/OverheadConfig.xml`
+  loaded by `FUN_011bd980` → overhead-nameplate obj: `color_friendly_npc`+0xab4 / `color_neutral_npc`(#FFFF00)
+  +0xab8 / `color_hostile_npc`(#B41D1D)+0xabc / `color_hostile_minion_npc`+0xac0 / `color_low_lvl_npc`+0xac4.
+  Disposition computed from `data/FactionRelations.xml` (static client data, present on BOTH). Relevant fns:
+  `TargetIsFriendly` `FUN_01141480` (accumulates a disposition rank into obj+0xb4 = 2/10/0x12/0x13; uses
+  `GetTeamHolder`/faction); strings `IsFriendlyToFaction`, `CoreCharacter::GetTeamHolder() - called by npc.`
+- **Conclusion:** every NPC-side input matches retail, so the divergence is on the **local-player side** — the
+  player's faction/team (`GetTeamHolder` input), supplied via the `0x737A6DF9` snapshot OR established by the
+  controlled-player setup. **Same world-model gap as the wave-respawn root cause above** (our local player is
+  built via the generic FA015807 stream path; the client's spatial/team model of our local player is
+  incomplete). **Decisive next step:** live gdb (retail vs ours, same hostile NPC) — read the disposition rank
+  (nameplate obj+0xb4) + the local player's team-holder/faction; find which input is null/wrong on ours.
+
+---
+
 The chronological trail (sessions 1–5, including corrected theories) follows. **The section directly below
 leads with the `+0x1e8` construction-path theory that the retail read above DISPROVED — it is SUPERSEDED;
 keep it only for the reasoning trail.**
