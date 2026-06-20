@@ -61,17 +61,10 @@ namespace Faolan.GameServer
 
 			if (beachDef is not { Goals.Count: > 0 })
 			{
-				Logger.LogError("Burst-less world entry (map={Map}): no beach quest definition; falling back to the burst path.", mapId);
-				var fallback = await Database.GetMapWorldBurst(mapId) ?? await Database.GetMapWorldBurst(DefaultWorldMapId);
-				if (fallback != null)
-				{
-					await _broadcaster.EnsureZoneNpcs(mapId);
-					_simulation.RegisterPlayerInWorld(client);
-					await ReplayMapWorldBurst(client, fallback, mapId);
-					await _broadcaster.BroadcastPlayerEntry(client);
-					await _broadcaster.RestorePlayerQuests(client);
-				}
-
+				// The beach starter quest is always seeded (importer SeedBeachQuestGoals), so this is a broken-DB case.
+				// The legacy captured-burst replay fallback was removed with the rest of the snapshot-splice path;
+				// burst-less entry needs the beach quest definition to author the snapshot, so abort the world entry.
+				Logger.LogError("Burst-less world entry (map={Map}): no beach quest definition; cannot build the world entry.", mapId);
 				return;
 			}
 
