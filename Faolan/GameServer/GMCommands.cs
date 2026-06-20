@@ -1197,7 +1197,13 @@ namespace Faolan.GameServer
 			character.RegenerateMaxStats();
 			await Database.SaveCharacter(character);
 
-			await SendStatUpdate(client, new CharacterStatBlock().Set(LegacyCharacterStatId.Level, level));
+			// Push Level AND a refreshed XP bar (Exp/MaxExp) so a GM `.level` ding shows exactly like an XP-driven ding
+			// (#209): the kill path (CombatService.PushLevelUp) sets the same three stats, so both level-up paths emit an
+			// identical Level + AttributeChanged-burst + vitals max push.
+			await SendStatUpdate(client, new CharacterStatBlock()
+				.Set(LegacyCharacterStatId.Level, level)
+				.Set(LegacyCharacterStatId.Exp, character.Experience)
+				.Set(LegacyCharacterStatId.MaxExp, Faolan.GameServer.Combat.LevelingResolver.XpForNextLevel(level)));
 			await SendVitals(client);
 			// On an increase, emit the retail level-up attribute feedback (one AttributeChanged line per primary) so
 			// the change shows the same as an XP-driven ding (#209); the vitals push above already raised the maxima.
