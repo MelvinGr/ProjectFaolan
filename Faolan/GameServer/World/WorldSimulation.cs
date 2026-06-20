@@ -467,19 +467,25 @@ namespace Faolan.GameServer.World
 			var spot = RespawnResolver.ClosestKnown(deathPosition, points, discovered)
 				?? points.FirstOrDefault(p => p.AlwaysKnown)
 				?? points[0];
-			// #214: replay the full retail player-death sequence (AssassinL23_..._resurect pkt#4048-4051) in order:
-			//   death-pose MoveTask (type 0x06) -> SimpleCharKilledBy -> 0x2024 release screen -> death-state ApplySpell.
-			// SimpleCharKilledBy + 0x2024 + the effect alone left the avatar standing and the release UI shut; the
-			// death-pose MoveTask is the piece that drops the avatar into the dead state. Every captured kill record
-			// carries a NON-ZERO killer, so attribute a self-inflicted death to the player itself (valid endpoint).
+			// #214: replay the retail BEACH player-death sequence (Stihetfv_..._login-die-resurect-beach pkt#1179) in
+			// order: death-pose MoveTask (type 0x06) -> SimpleCharKilledBy -> 0x2024 release screen -> death BccIIR.
+			// The death-pose MoveTask drops the avatar into the dead pose; the BccIIR (bcc_state 29) enters the Dead
+			// substate (window + camera pan). Every captured kill record carries a NON-ZERO killer, so attribute a
+			// self-inflicted death to the player itself (valid endpoint).
+			//
+			// NB: we deliberately do NOT send the self-applied death-effect ApplySpell(0x0009F000) here. It came from
+			// the AssassinL23 (map 2010) capture, but the retail BEACH death does NOT send it (proven by gdb 2026-06-20):
+			// that spell's client RDB effect sets stat 0x546 (the wave-respawn timer) = 15, which drives the
+			// ResurrectView ctor into WAVE-respawn mode (15s countdown via SignUpForWaveRespawn 0x2025) instead of the
+			// instant RespawnMe (0x2024) retail beach uses. The dead state is fully driven by the BccIIR below, so the
+			// effect is redundant; dropping it makes the client take the instant-respawn path like retail beach.
 			var handle = client.Session.Account.ClientInstance;
 			await _output.SendDeathPose(client, handle, deathPosition);
 			await _output.SendDeathTrigger(client, handle, handle);
 			await _output.SendResurrectionScreen(client, deathPosition, [spot]);
-			await _output.SendDeathEffect(client, handle);
-			// The BccIIR that transitions the live SimpleChar into the dead state (bcc_state 29) - retail sends it last
-			// (#1292, after the death effect). This is what shows the release window for an IN-SESSION death (the login
-			// spawn's bcc_state=29 only covers login-while-dead).
+			// The BccIIR that transitions the live SimpleChar into the dead state (bcc_state 29) - retail sends it after
+			// the release screen. This is what shows the release window for an IN-SESSION death (the login spawn's
+			// bcc_state=29 only covers login-while-dead).
 			await _output.SendDeathBcc(client, handle);
 		}
 

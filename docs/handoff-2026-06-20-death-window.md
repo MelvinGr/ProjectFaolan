@@ -1,4 +1,245 @@
-# Handoff 2026-06-20 — Death/release window (#214): packets correct, gate is the dead-state flag
+# Handoff 2026-06-20 — Death/release window (#214)
+
+## ★ CURRENT STATE — READ THIS FIRST (FINAL, retail-confirmed 2026-06-20) ★
+
+**The in-session death flow works end-to-end** (release window, movement lock, camera pan, dead pose, title,
+server-side revive) — see the session-1/2/3 sections far below. **The one open item is the WAVE-vs-INSTANT
+respawn:** on the resurrect click our client takes the wave-respawn path (15 s countdown via
+`SignUpForWaveRespawn 0x2025`) instead of retail's instant `RespawnMe 0x2024`.
+
+**ROOT CAUSE (proven by side-by-side live gdb on OUR server vs RETAIL Funcom, both dead on the beach):**
+the death/`0x2024`/stat/BccIIR layers are all byte-correct and IDENTICAL to retail — they are NOT the problem.
+The sole difference is the client flag **`ResurrectView+0x476`**: retail `0` (→ instant), ours `1` (→ wave).
+That flag is set in the window ctor from a **spatial zone lookup** (`FUN_00592aa0` over the global index
+`DAT_029c7a8c`, a position→entity/zone tree): retail's lookup at the death spot returns a **zone-region marker**
+(`+0x14 = 0x4d8`); **ours has no zone marker there, so it falls through to the nearest ENTITY — the player's own
+SimpleChar** (`+0x14` = the player, `+0xc=0xC350`/`+0x10=0x02000000` = its class+handle) → the resurrect logic
+misfires → `+0x476=1` → wave. ⇒ **Our world-entry is missing the beach's playfield zone-region data in the
+client's spatial index.** This is the "no real playfield model" world-model gap, not a death-packet/stat issue.
+
+**Comparison table (live gdb):**
+
+| field | retail (instant) | ours (wave) | verdict |
+|---|---|---|---|
+| `window+0x476` | **0** | **1** | ← the ONLY discriminator |
+| `window+0x477` | 0 | 0 | same |
+| `GetStat(0x546)` | 15 | 15 | red herring (same on both) |
+| `GetStat(0x545)` | 0 | 0 | same |
+| `sc+0x1e8` (is-proxy) | 0 | 0 | red herring (0 is normal for a local player) |
+| `0x2024` body / spot const `0xC7A0` | identical | identical | red herring |
+
+**Red herrings ruled out (do NOT re-chase):** stat `0x546` (=15 on BOTH), `sc+0x1e8` (=0 on BOTH, normal for a
+local player), the `0xC7A3` wave-zone constant (our `destObj+0x74=0xC79C`, the normal beach region), and the
+self death-effect `ApplySpell(0x0009F000)` (absent from retail beach anyway — we removed it; correct but not the
+cause).
+
+**RELATED (Melvin): hostile NPCs render GREEN, not RED.** Name colour = faction/disposition → our NPC spawns
+lack hostile-faction data. Same root *area* (incomplete world-entry data: zone-regions + faction), not literally
+the same field. The faction thread may be the easier one to pull and could reveal what else world-entry omits.
+
+**State of the code / tree (uncommitted):**
+- `Faolan/GameServer/World/WorldSimulation.cs` — removed the extraneous death-effect `ApplySpell` from
+  `SendDeathScreen` (matches the retail beach capture; not the wave cause). 14/14 death tests pass.
+- This handoff — the full trail + the retail-confirmed conclusion.
+
+**Next steps (pick one):**
+1. **True fix (deep):** decode what populates `DAT_029c7a8c` with zone-region markers (Ghidra: it's a member
+   structure — find the inserter via `this`, not the global; the readers are `FUN_00592aa0`/`005937f0`/
+   `00590e40`/`00568a20`), find which world-entry packet/IIR carries the playfield zone-regions on retail, and
+   send it (or stop our over-dense burst from masking it). Same area as `npc_model_streaming` (~4× density).
+2. **Faction/green-names thread:** find how the client computes NPC name colour and the faction field it reads
+   from the spawn; fixing it may clarify the broader world-entry data gap.
+3. **Fallback B (small, contained):** handle `SignUpForWaveRespawn (0x2025)` server-side → fire the instant
+   revive immediately so the button works regardless of `+0x476`. Ships the death feature now.
+
+**Reproduce (live gdb; client has NO ASLR, Ghidra addr == runtime):** PE pid = the `pgrep -f AgeOfConan.exe`
+whose `/proc/<pid>/maps` has `00400000 ... AgeOfConan.exe`. `sc = *(*(uint*)0x0297d374 + 0xA4)`. ResurrectView
+window: scan rw mappings for vtable `0x020589a4`, read `+0x476`/`+0x477`. The `+0x476` decision is
+`FUN_012673b0` `0x1267bd4`–`0x1267c20` (breakpoint `0x1267bf2` to read the region lookup result). Stat getter
+`FUN_006f18e0`=`0x6f18e0` (`call (long double)(...)(statId,0)` with `$ecx=sc`, `set unwindonsignal on` — inferior
+calls are flaky on Wine; prefer raw reads). Retail testing: throwaway Funcom acct, no anti-cheat
+(`gdb_live_client_debugging`).
+
+---
+
+The chronological trail (sessions 1–5, including corrected theories) follows. **The section directly below
+leads with the `+0x1e8` construction-path theory that the retail read above DISPROVED — it is SUPERSEDED;
+keep it only for the reasoning trail.**
+
+## UPDATE 2026-06-20 (session 5, live gdb) — [SUPERSEDED by the CURRENT STATE block above: `+0x1e8` is a red herring; the real discriminator is `+0x476` from a missing zone marker]
+
+**This section's `+0x1e8` conclusion was overturned by the retail ground-truth read (see the top block).** Kept
+for the reasoning trail. Confirmed by live gdb on our own client + Ghidra. The death/`0x2024` packets are
+byte-correct and are NOT the problem.
+
+### The full causal chain (each link verified)
+1. **The resurrect window decides wave vs instant from the window's `+0x477`/`+0x476` flags** (ResurrectView_c
+   ctor `FUN_012673b0`, button handler `FUN_01268d20`). Live on our dead client: `+0x477=0`, `+0x476=1`.
+2. **`+0x477=0`** ⇒ not the `GetStat(0x360)&0x8000` term and not the `destObj+0x74==0xC7A3` term (we read
+   `destObj+0x74 = 0xC79C`, the normal beach region — so the session-3 "`0xC7A3` vs our `0xC7A0`" idea was a
+   red herring; those are unrelated values).
+3. **`+0x476=1`** routes the gate to `GetStat(0x546)` (the wave-respawn timer). We read it live = **15** → wave
+   bar with a 15 s countdown. BUT our server **never sends stat `0x546`** (confirmed: grepped our own
+   loopback capture, zero `0x546` in any encoding). The client *derives* `0x546=15` because `+0x476=1`.
+4. **`+0x476=1` because of a flag on the local player's own SimpleChar.** The ctor's `+0x476` block
+   (disasm `0x1267bd4`–`0x1267c20`): it spatially looks up the player's grid node, takes `node+0x14` = the
+   **player SimpleChar** (RTTI `.?AVSimpleChar_t@@`, class `0xC350`, handle `0x02000000`), and sets `+0x476=1`
+   iff `SimpleChar->method_0x60() == 0` **OR** `FUN_006dd5b0` finds `SimpleChar+0x380` non-empty.
+   Live: `SimpleChar+0x380` list is empty (both words 0), so the sole trigger is **`method_0x60()==0`**.
+5. **`method_0x60` (`FUN_006ea600`) just returns the byte `SimpleChar+0x1e8`.** Live: **`SimpleChar+0x1e8 = 0`**.
+   So `+0x1e8==0` ⇒ `+0x476=1` ⇒ gate reads `0x546` ⇒ client invents the 15 s wave timer ⇒ WAVE.
+   For retail-beach to go INSTANT, retail's local player must have **`+0x1e8 != 0`** (and the list empty).
+6. **`+0x1e8` is set ONCE, at SimpleChar construction** (only byte-writers of `+0x1e8` are the ctor and one
+   scene-spawn helper). The CoreCharacter ctor `FUN_006eace0` does `*(SimpleChar+0x1e8) = (param_1 == 0)`.
+   So `+0x1e8 = 1` **iff the SimpleChar is constructed with arg 0**, else `0`.
+7. **Construction-path split (the actual bug surface):** the `SimpleChar_t` ctor `FUN_010fb9e0` has these
+   creators:
+   - **`FUN_0148c370` = the networked-entity / FA015807-stream reader** — constructs with `&local` (always
+     non-null) ⇒ **`+0x1e8 = 0`** (wave).
+   - **`FUN_0116e9c0` / `FUN_01121570` = the local-controlled-player factory entries** (referenced as DATA in
+     a factory/vtable table at `0x020405d8` / from `FUN_0043ea20`) — these can pass arg 0 ⇒ **`+0x1e8 = 1`**
+     (instant).
+   ⇒ **Retail builds the local player via the controlled-player factory (`+0x1e8=1`); our world-entry makes the
+   client build the local player via the generic FA015807-stream path (`+0x1e8=0`).** The remaining work is in
+   the **control-handoff / entity-factory layer**: get the client to construct OUR local player as the
+   controlled entity (so the FA015807 self-spawn *updates* a pre-created local player instead of *constructing*
+   it). This is core world-entry protocol, not a death-path tweak.
+
+### RETAIL GROUND TRUTH (decisive) — the SOLE discriminator is `+0x476`; `0x546` and `+0x1e8` are BOTH red herrings
+Read live via gdb on the retail client (Funcom, throwaway acct), dead on the beach, vs our server:
+
+| field | retail (instant) | ours (wave) |
+|---|---|---|
+| `window+0x476` | **0** | **1** |
+| `window+0x477` | 0 | 0 |
+| `GetStat(0x546)` | **15** | 15 |
+| `GetStat(0x545)` | 0 | 0 |
+| `sc+0x1e8` (is-proxy) | 0 | 0 |
+
+⇒ `0x546=15` and `sc+0x1e8=0` are **identical on both** — neither is the bug. The **only** difference is
+`window+0x476`: retail `0` (button reads `0x545=0` → instant), ours `1` (reads `0x546=15` → wave).
+
+**Where `+0x476` diverges (breakpoint on the ctor block `0x1267bd4`–`0x1267c20`, both clients):** the block does a
+spatial region lookup `FUN_00592aa0(playerPos)` (a position→region tree at global `DAT_029c7a8c`), takes
+`region+0x14`, and sets `+0x476=1` iff `region+0x14`'s `method_0x60()==0` (or its `+0x380` list non-empty).
+- **Retail:** lookup returns a region whose `region+0x14 = 0x4d8` (a small non-pointer field of a real zone
+  node) → the test does NOT set `+0x476` → **instant**.
+- **Ours:** the SAME lookup returns a node whose `region+0x14 = the player's own SimpleChar pointer`
+  (`region+0xc=0xC350`, `+0x10=0x02000000` = the player's class+handle) → `method_0x60(player)==0`
+  (`sc+0x1e8=0`, normal) → `+0x476=1` → **wave**.
+
+⇒ **ROOT CAUSE (retail-confirmed): the `DAT_029c7a8c` position→entity spatial index lacks the beach's zone-region
+markers on our server, so the lookup at the player's spot falls through to the nearest ENTITY (the player
+itself) instead of a zone node — `region+0x14` = the player SimpleChar → `+0x476=1` → wave.** (`DAT_029c7a8c`
+is a spatial entity/zone index read by `FUN_00592aa0`/`005937f0`/`00590e40`… — NOT a faction table.) Retail's
+index has the zone marker (`+0x14=0x4d8`); ours doesn't. The death/`0x2024`/stat layers are all correct; this is
+a world-model / playfield-zone-data gap at world-entry.
+
+**RELATED OBSERVATION (Melvin, same session): our hostile NPCs render with GREEN names instead of RED.** Name
+colour = faction/disposition (red=hostile, green=friendly/same-team), so our NPC spawns aren't carrying
+hostile-faction data → default friendly. Same *root area* as the wave bug — **incomplete world-entry playfield
+data** (zone-region markers + entity faction) — though not literally the same field (the spatial index isn't a
+faction table). Worth tracking together as the "world-entry playfield/faction data" gap; cracking the faction
+field may be the easier of the two and could illuminate what else world-entry omits. **Next step:** find what inserts into `DAT_029c7a8c`
+(Ghidra: writers/inserters of that global), determine why our world-entry creates a player-keyed region node at
+the beach (likely the over-dense world/region burst, cf. `npc_model_streaming` ~4× density), and stop it /
+make the beach resolve to a normal zone node like retail. Everything below (incl. the `+0x1e8` construction-path
+theory) is superseded by this.
+
+### CORRECTION (same session, after the live ctor trace) — `+0x1e8` is a RED HERRING; the lever is stat `0x546`
+A logging breakpoint on the `SimpleChar_t` ctor (`0x10fb9e0`) over a full fresh world-entry captured **32**
+constructions (all via the FA015807 reader `0x148c370`). Exactly **one** got `+0x1e8=0` — the **first**, which a
+live read confirmed IS the local player (`sc=0x2b880ed0`); the other **31** (streamed NPCs/remote) got
+`+0x1e8=1`. So **`+0x1e8` is just the "is-proxy" flag: `0` = local controlled player (normal!), `1` = remote
+proxy.** A local player is ALWAYS `+0x1e8=0`, so `method_0x60()==0` and `+0x476=1` are **normal for any local
+player on retail too** — NOT our bug. (The session-5 "construction path" theory above is therefore wrong;
+kept only as the trail.)
+
+⇒ Since `+0x476=1` is normal, the wave/instant decision for a local player **always** comes down to
+`GetStat(0x546)` (the zone wave-respawn timer): `0` ⇒ instant, `>0` ⇒ wave. **Our client reads `0x546=15`;
+retail beach reads `0`.** We send NO `0x546` on the wire (re-scanned our own loopback capture in 4b/3b/2b/
+protobuf forms — zero hits). So the client **derives** the 15-second timer from its **current playfield/zone
+state**: our world-entry places the client in a zone it classifies as a wave-respawn (battlekeep-style) zone;
+retail's beach is a normal instant-respawn zone. **The real fix is in the world-entry/playfield setup (MapChange
+/ playfield-instance type), making the client's beach a normal zone — same area as the per-session-replay-bridge
+playfield gap.**
+
+**Decisive next step (ends the speculation):** retail ground-truth read (the `gdb_live_client_debugging` setup —
+throwaway Funcom account, no anti-cheat). Connect the client to retail, die on the beach, and gdb-read the local
+player's `GetStat(0x546)` (expect `0`), `window+0x476/+0x477`, and the current playfield object. Then find where
+the client derives `0x546` from the playfield (an RDB wave-timer lookup keyed by the playfield id/type) and what
+playfield state our world-entry sends differently from retail's. Until then, the construction-path/`+0x1e8`
+angle is closed.
+
+### What was tried and DID NOT fix it (don't repeat)
+- Removing the self-applied death-effect `ApplySpell(0x0009F000)` from `SendDeathScreen` (it's absent from the
+  retail BEACH death anyway, `Stihetfv_..._beach`). Correct to drop, but it is NOT the wave cause — the death
+  effect doesn't set `0x546`; the wave is the construction flag above. (Change kept; it makes us match the
+  beach capture.)
+- Re-testing on a clean client session. It still waves — so the wave is NOT stale session state (overturns the
+  session-3-era "wave = dirty session" note).
+
+### Reproduce / continue (live gdb recipe — client has NO ASLR, Ghidra addr == runtime)
+- Find PE pid: the `pgrep -f AgeOfConan.exe` whose `/proc/<pid>/maps` has `00400000 ... AgeOfConan.exe`.
+- Local SimpleChar: `sc = *(*(uint*)0x0297d374 + 0xA4)`. Read `sc+0x1e8` (the flag), `sc+0x380` (list).
+- ResurrectView window: scan rw mappings for the vtable ptr `0x020589a4`; read `window+0x476`/`+0x477`.
+- `method_0x60`=`0x6ea600` (returns `+0x1e8`); ctor `0x6eace0` (`+0x1e8 = param_1==0`); `SimpleChar_t` ctor
+  `0x10fb9e0`; creators `0x148c370` (stream ⇒ +0x1e8=0) / `0x116e9c0` / `0x1121570`; the `+0x476` decision is
+  `FUN_012673b0` `0x1267bd4`–`0x1267c20`. Inferior `call`s into client getters are flaky on Wine
+  (`set unwindonsignal on`); prefer raw memory reads.
+- **Next concrete step:** breakpoint the SimpleChar ctor (`0x6eace0`) at next login, log `param_1` + the caller
+  return address for the construction whose handle becomes `0x02000000` (the local player) — confirms it comes
+  via `FUN_0148c370` and identifies what would route it through `FUN_0116e9c0(0)` instead. Then find the
+  server message/sequence that triggers the controlled-player factory and ensure world-entry sends it.
+
+
+
+## UPDATE 2026-06-20 (session 4, static) — our `0x2024` is BYTE-IDENTICAL to retail-instant; the wave gate is purely client-side. There is NO server-side wire fix for path A.
+
+**Read this first — it corrects session 3's framing.** A full static pass (Ghidra decompile of the
+button handler / window ctor + byte-diff of our `0x2024` against the retail BEACH death capture) proves:
+
+1. **Our release screen is byte-for-byte retail.** The retail beach capture
+   `Stihetfv_..._login-die-resurect-beach` has an **in-session death** on the SAME map (4010), SAME char,
+   whose `0x2024` release screen (frame 1179) is:
+   `deathPos · 0x7E2 · spotPos · 0xC7A0 · map 0xFAA(4010) · 0·0·0 · spawnPointId 0xBF76C · 0x0A · 0x00`
+   — i.e. EXACTLY `WriteValidResurrectionSpotsBody` with one spot. Retail then replies pure instant
+   **`RespawnMe (0x2024)` `000bf76c`** (frame 1267), **zero `0x2025`/`0x2028` wave packets.** We send the
+   same single closest-known spot (`WorldSimulation.SendDeathScreen` → `[spot]`). So nothing we put on the
+   wire differs from retail-instant.
+
+2. **The handoff (session 3) conflated two different values.** It claimed the wave gate wants `0xC7A3`
+   while our spot const is `0xC7A0`, implying a packet fix. WRONG — those are unrelated and merely adjacent.
+   The decompiled wave gate (`FUN_012673b0`, ResurrectView_c ctor) reads a **client-side** object's field,
+   NOT our packet's `0xC7A0` spot const. Decompiled chain (window = `param_1`, `piVar8` = the local
+   SimpleChar = `(*DAT_0297d374)[0x10]()`):
+   - `+0x476`/`+0x477` are zeroed at ctor start.
+   - The wave block only runs **inside `if (iStack_e0 != 0)`**, where `iStack_e0` resolves from the
+     SimpleChar's **resurrection-destination** fields `piVar8[0x1b]`(+0x6c, a handle) / `piVar8[0x1c]`(+0x70,
+     the object). **If the SimpleChar has no resurrection-destination set, the whole wave gate is skipped.**
+   - Inside it: `+0x477 = 1` iff `GetStat(0x360) & 0x8000` **OR** `FUN_00591c00()` (returns
+     `SimpleChar->+0x70`) has `+0x74 == 0xC7A3`.
+   - Button handler `FUN_01268d20`: `+0x477 != 0` ⇒ WAVE (`FUN_012696c0`); else the `+0x476`/stat-0x545/0x546
+     path (all those stats absent ⇒ 0) ⇒ INSTANT (`FUN_006ede20` → RespawnMe proxy `0x4fa9f0`).
+
+3. **Stats `0x360`/`0x545`/`0x546` are absent in BOTH retail and our snapshot** (absent ⇒ leaf returns 0),
+   so they can't make US wave when retail doesn't. The ONLY discriminator left is term 2:
+   `SimpleChar->resurrectionDestination(+0x70)->+0x74 == 0xC7A3` — and whether the destination
+   (`piVar8[0x1b]`) is even set. `0xC7A3` is **present in retail too** (beach frames 56/58, inside NPC
+   `FA015807` spawns; it's a zone/region-type value in the 0xC79x–0xC7Ax family, cf. the revive
+   `IntendedTeleport`'s `0xC79C` at frame 1277) — so its mere presence isn't the discriminator either.
+
+**Conclusion:** the packets are already correct; the wave-vs-instant decision lives entirely in the
+client's local SimpleChar state (does it have a resurrection-destination whose region-type is `0xC7A3`?).
+This **supports the earlier "wave = client session/playfield state, not a packet flag" finding** over
+session 3's "reproduces on a fresh restart." There is no server wire change that distinguishes us from
+retail-instant — so path A can only be resolved by a **live gdb read on a dead client at the button
+click**, reading (with `piVar8 = (*DAT_0297d374)[0x10]()`): `[piVar8+0x6c]` (dest handle), `[piVar8+0x70]`
+(dest obj), `[[piVar8+0x70]+0x74]` (== 0xC7A3?), and the window's `+0x476`/`+0x477`. Breakpoints:
+window ctor `0x12673b0`, button handler CMP `[ESI+0x477]` at `0x1268e53`, wave path `0x12696c0`, instant
+path `0x6ede20`. If clean retest already goes instant (very possible, given byte-identity), there's
+nothing to fix. Else: either find/clear whatever sets the SimpleChar's resurrection-destination region to
+`0xC7A3` on our beach, or take fallback B (handle the wave opcodes server-side).
 
 ## UPDATE 2026-06-20 (session 3, in-client) — death flow WORKS; the one remaining blocker is the WAVE-respawn path on the resurrect click
 
