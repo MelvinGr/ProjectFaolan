@@ -28,17 +28,29 @@ namespace Faolan.GameServer.Spawn
 				message.Stats.Level = character.Level;
 
 				// Vitals (cur==max) from the persisted MaxStats, on the ×100 wire scale (Strie's life 9000 = 90).
+				// A DEAD character logs in with CURRENT health = 0 (life/max stays full): this FA015807 is the
+				// SimpleCharFullUpdateIIR that CONSTRUCTS the local SimpleChar whose dead-flag gates the
+				// release/resurrect window (DAT_0297d374->[0x10]). The flag is latched at construction from a 0
+				// current-health, NOT from the 0x737A6DF9 snapshot (a different object) - which is why zeroing only
+				// the snapshot's HealthCurrent (#214 step 2) left the avatar standing. Verified against the retail
+				// login-while-dead capture (Stihetfv FA015807 #50): CharacterStats.health(f7)=0, life(f6)=19600 full,
+				// and can_fall(f20)=0 (alive=1). docs/handoff-2026-06-20-death-window.md.
 				var maxStats = character.MaxStats;
 				if (maxStats != null)
 				{
 					message.Stats.Life = maxStats.Health * 100;
-					message.Stats.Health = maxStats.Health * 100;
+					message.Stats.Health = character.IsDead ? 0 : maxStats.Health * 100;
 					message.Stats.MaxStamina = maxStats.Stamina * 100;
 					message.Stats.Stamina = maxStats.Stamina * 100;
 					message.Stats.MaxMana = maxStats.Mana * 100;
 					message.Stats.Mana = maxStats.Mana * 100;
 				}
 				// Remaining CharacterStats fields (looks_package, side, ...) stay captured.
+
+				// Retail's dead SimpleChar also reports can_fall=0 (alive=1) - a corpse is ragdoll/incapacitated, not
+				// gravity-stepped. Match it for a dead login (kept captured when alive).
+				if (character.IsDead)
+					message.CanFall = false;
 			}
 
 			// The rendered looks from the editor choices (CharacterBody). The editor reports head mesh /
