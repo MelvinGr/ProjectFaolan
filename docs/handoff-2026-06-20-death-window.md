@@ -62,6 +62,21 @@ calls are flaky on Wine; prefer raw reads). Retail testing: throwaway Funcom acc
 
 ---
 
+## UPDATE 2026-06-20 (session 9, LIVE gdb on our client) — CONFIRMED in-client: iVar3[0x1c] is the sole colour driver; our server never sets it hostile
+
+- Mob idx=0 (green) while the player is ALIVE too → NOT a death-state issue (retail = idx 1 red in both states).
+- Hardware watchpoint on the mob's `iVar3+0x1c`: **zero writes even after attacking** → the index is never
+  recomputed on ours; it sits at the cache-creation default 0.
+- **Poke test (decisive): `set *(int*)(iVar3+0x1c)=1` → the mob name turns RED in-client and stays.** So
+  `iVar3[0x1c]` is the SOLE name-colour driver and our server never causes the client to compute hostile (1);
+  it stays at the default 0=friendly. disp (param_10)=6=hostile is correct on both; the finer index is the bug.
+- `iVar3` = cache node from `FUN_011c74c0` (callers 011c3510/3b90/42f0/2c00); creation zeroes fields (idx=0), so a
+  separate disposition computation sets idx=1 on retail and never runs / yields 0 on ours.
+- **Remaining (one experiment):** on RETAIL, break the FUN_011c74c0 cache-miss (creation) path, grab the new
+  node, watch node+0x30 (=payload+0x1c), continue → the 0→1 write fires → backtrace = the writer + the
+  server-supplied input it reads = the data gap. Recipe + breakpoints in agent memory
+  `npc_green_names_not_missing_faction_data`.
+
 ## UPDATE 2026-06-20 (session 8, LIVE gdb retail-vs-ours) — green-names is a CACHED nameplate colour-index bug, NOT the registry/wave root (corrects session 7)
 
 Ran the nameplate colour path live on the client (our server then RETAIL, no ASLR). Decisive:
