@@ -22,8 +22,10 @@ namespace Faolan.GameServer
 		//   req  C->S: recv=GameCharAgentProject, send=GameCharInterfaceProject/<player>, op 0x2000,
 		//              body [u32 0xC350][u32 charInstance][u32 0xC350][u32 targetInstance]   (two ProtoID32s)
 		//   resp S->C: send=GameCharAgentProject/<zone handle 0x58>, recv=GameCharInterfaceProject/<player>, op 0x2000,
-		//              body [u32 0xC350][u32 targetInstance][u32 aggroStatus]   (0 = not aggroed)
-		// We have no live aggro model yet, so reply 0 (no aggro) for every target - enough to unblock the load.
+		//              body [u32 0xC350][u32 targetInstance][u32 cCategory]
+		// The 3rd field is the target's overhead NAME-COLOUR category (0 friendly / 1 hostile / 2 neutral), the SOLE
+		// driver of the red/green/yellow name (proven by live gdb, #256) - not a live-aggro flag. We answer every
+		// poll (still unblocks the load) and now set 1 for hostile NPCs so their names render red like retail.
 		private async Task HandleGameCharAgentProject(INetworkClient client, ConanPacket packet)
 		{
 			var opcode = packet.Opcode;
@@ -49,14 +51,31 @@ namespace Faolan.GameServer
 
 			var instance = client.Session.Account.ClientInstance;
 
+			// The reply's third field (cCategory) is the client's overhead NAME-COLOUR category for this target,
+			// NOT a live-aggro toggle: 0 = friendly (green), 1 = hostile (red), 2 = neutral (yellow). Proven by live
+			// gdb (#256): DispatchUpdateAggroStatus -> FUN_0115eb10 emits the disposition signal that writes the
+			// nameplate colour index (color_friendly_npc/color_hostile_npc/color_neutral_npc); retail's cCategory is
+			// exactly 0/1/2. We always sent 0, so every NPC rendered green - including hostile mobs. Send 1 for a
+			// hostile NPC so its name renders red like retail. (The NpcStats.community we put in the spawn is correct
+			// but the client ignores it for the name colour - this RPC is the sole driver.)
+			uint category = 0;
+			var mapId = client.Session.Character?.MapId;
+			if (mapId.HasValue
+			    && _simulation.World.TryGetZone(mapId.Value, out var zone)
+			    && zone.TryGet(targetInstance, out var target)
+			    && target.Hostile)
+			{
+				category = 1;
+			}
+
 			await new PacketStream()
 				.WriteHeader(ExistingCharacterPostReadyReportServerIdSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceProjectType, instance), GameServerCarrierOpcodes.IirCarrier)
 				.WriteUInt32(targetType)
 				.WriteUInt32(targetInstance)
-				.WriteUInt32(0x00000000) // aggro status: 0 = no aggro (no live aggro model yet)
+				.WriteUInt32(category) // cCategory: 0 = friendly, 1 = hostile, 2 = neutral
 				.SendAsync(client);
 
-			Logger.LogDebug("RequestAggroStatus(target=0x{Target:X8}) -> aggroStatus=0.", targetInstance);
+			Logger.LogDebug("RequestAggroStatus(target=0x{Target:X8}) -> cCategory={Category}.", targetInstance, category);
 		}
 	}
 }
