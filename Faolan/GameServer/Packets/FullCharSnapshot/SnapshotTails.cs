@@ -78,6 +78,17 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			return writer.ToArray();
 		}
 
+		// Serializes a sequence of access-window entries to their wire bytes (the inverse of the parse loop in
+		// Deserialize). Used by the from-scratch tails builder to emit the game-static PFAccessWindow_ catalog
+		// (AccessWindowCatalog) instead of a captured byte blob; byte-identical to the captured region (#258).
+		public static byte[] SerializeAccessWindowEntries(IEnumerable<PfAccessWindowEntry> entries)
+		{
+			using var writer = new FaolanStream();
+			foreach (var entry in entries)
+				WriteAccessWindowEntry(writer, entry);
+			return writer.ToArray();
+		}
+
 		public static SnapshotTails Deserialize(byte[] data)
 		{
 			ArgumentNullException.ThrowIfNull(data);

@@ -29,9 +29,10 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		private static readonly byte[] Template = LoadTemplate();
 
 		// The game-static PFAccessWindow_ playfield catalog (the tails region @1292..7917) - the one tails region that
-		// is reference data, not generated. Carved out of the template so the tails can be assembled with NO captured
-		// tails (BuildFromScratch). Identical for every character.
-		private static readonly byte[] AccessWindowTable = LoadAsset("AccessWindowTable.bin");
+		// is reference data, not generated. Emitted from the TYPED AccessWindowCatalog (the 86 PfAccessWindowEntry
+		// records, formerly the AccessWindowTable.bin blob, #258) so no captured byte-blob is shipped; byte-identical
+		// to the captured region (BeachTailsFromScratchTests). Identical for every character.
+		private static readonly byte[] AccessWindowTable = SnapshotTails.SerializeAccessWindowEntries(AccessWindowCatalog.Entries);
 
 		// True when the server-owned template is available (it always is once embedded); guards the caller's fallback.
 		public static bool IsAvailable => Template.Length > 0;
@@ -187,7 +188,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 		// Builds the WHOLE beach 0x737A6DF9 tails FROM SCRATCH - no captured-tails template (#186). Assembles the three
 		// regions, each independently proven byte-exact: the generated quest portion (BuildBeachQuestPortion, @0..1292),
-		// the game-static access-window catalog (the embedded AccessWindowTable asset, @1292..7917), and the code stat
+		// the game-static access-window catalog (AccessWindowCatalog typed entries, @1292..7917), and the code stat
 		// skeleton (TailsStatBlock.CreateFreshBlock, @7917..end) with the live character's vitals/XP patched in. Then
 		// re-addresses the template instance + stamps the playfield token, exactly as Build does. For the captured beach
 		// character + instance this reproduces BeachTailsTemplate.bin byte-for-byte (BeachTailsFromScratchTests), so the
