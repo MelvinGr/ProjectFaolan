@@ -116,12 +116,20 @@ namespace Faolan.Importer
 		{
 			var merged = Merge(listings);
 			var harvested = 0;
-			foreach (var tmpl in merged.Select(l => l.Template).Where(t => t != 0).Distinct())
+
+			// Seed a row for every id the listings reference: the instance Template (the buy/render identity) AND the
+			// search-key ItemId (the FK target, #257). They're usually equal but can differ; both must exist as Items
+			// rows. For each id, pick a representative listing - one whose Template matches if any (carries the real
+			// instance identity), else one whose ItemId matches (a catalog placeholder).
+			var neededIds = merged.Select(l => l.Template).Where(t => t != 0)
+				.Concat(merged.Select(l => l.ItemId).Where(i => i != 0))
+				.Distinct();
+			foreach (var tmpl in neededIds)
 			{
 				if (await db.Items.AnyAsync(i => i.Id == tmpl))
 					continue;
 
-				var src = merged.First(l => l.Template == tmpl);
+				var src = merged.FirstOrDefault(l => l.Template == tmpl) ?? merged.First(l => l.ItemId == tmpl);
 				db.Items.Add(new Item
 				{
 					Id = tmpl,
@@ -148,6 +156,14 @@ namespace Faolan.Importer
 			var added = 0;
 			var updated = 0;
 			var merged = Merge(listings);
+
+			// Seed the item TEMPLATES first (#257): TradepostListing.ItemId is an FK into Items (OnDelete Restrict), so
+			// the listing save below throws "FOREIGN KEY constraint failed" if the filed catalog item has no Items row
+			// yet. HarvestItems used to run AFTER the save (too late) and only seeded by Template - a different field
+			// from the FK target ItemId - so a listing whose ItemId lacked a row crashed the whole importer. Now it runs
+			// here, before the save, and seeds rows for BOTH the search-key ItemId and the instance Template.
+			var harvested = await HarvestItems(db, merged);
+
 			foreach (var e in merged)
 			{
 				var existing = await db.TradepostListings.FirstOrDefaultAsync(l => l.SaleId == e.SaleId);
@@ -180,8 +196,6 @@ namespace Faolan.Importer
 
 			await db.SaveChangesAsync();
 
-			// Seed an Items template for every listed item so a bought item can persist + render on relog.
-			var harvested = await HarvestItems(db, merged);
 			logger?.LogInformation("Tradepost listings: {Seen} seen, {Added} added, {Updated} updated; {Harvested} item template(s) harvested.",
 				merged.Count, added, updated, harvested);
 

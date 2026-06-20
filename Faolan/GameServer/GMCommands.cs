@@ -68,7 +68,7 @@ namespace Faolan.GameServer
 			var arg = (arguments ?? string.Empty).Trim();
 			if (arg.Length == 0)
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .teleport &lt;mapId | name&gt;  or  .teleport &lt;x&gt; &lt;y&gt; &lt;z&gt;  (current map; see .maps)");
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .teleport &lt;mapId | name&gt;  or  .teleport &lt;x&gt; &lt;y&gt; &lt;z&gt;  (current map)  or  .teleport &lt;mapId | name&gt; &lt;x&gt; &lt;y&gt; &lt;z&gt;  (see .maps)");
 				return;
 			}
 
@@ -84,16 +84,33 @@ namespace Faolan.GameServer
 				return;
 			}
 
+			// .teleport <mapId | name> <x> <y> <z>  - jump to a precise spot on a NAMED (or numeric) map in one command
+			// (#247). The map is the first token, the trailing three are the coordinates; the map name itself may contain
+			// spaces, so everything before the last three tokens is the map argument.
+			if (tokens.Length == 4
+				&& float.TryParse(tokens[^3], NumberStyles.Float, CultureInfo.InvariantCulture, out var mpx)
+				&& float.TryParse(tokens[^2], NumberStyles.Float, CultureInfo.InvariantCulture, out var mpy)
+				&& float.TryParse(tokens[^1], NumberStyles.Float, CultureInfo.InvariantCulture, out var mpz))
+			{
+				var mapArg = string.Join(' ', tokens[..^3]);
+				var resolved = await ResolveMap(mapArg);
+				if (resolved == null)
+				{
+					await _agentServerDispatcher.SendSystemMessage(characterId, $"<span style=\"color: red;\">No map matching '{mapArg}'. Try .maps.</span>");
+					return;
+				}
+
+				await DoTeleport(characterId, resolved.Id, new Vector3(mpx, mpy, mpz));
+				return;
+			}
+
 			if (uint.TryParse(arg, out var mapId))
 			{
 				await DoTeleport(characterId, mapId);
 				return;
 			}
 
-			// Name match: exact (case-insensitive) wins; otherwise the first map whose name contains the argument.
-			var maps = await Database.GetMaps();
-			var match = maps.FirstOrDefault(m => string.Equals(m.Name, arg, StringComparison.OrdinalIgnoreCase))
-				?? maps.FirstOrDefault(m => m.Name != null && m.Name.Contains(arg, StringComparison.OrdinalIgnoreCase));
+			var match = await ResolveMap(arg);
 			if (match == null)
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, $"<span style=\"color: red;\">No map matching '{arg}'. Try .maps.</span>");
@@ -101,6 +118,21 @@ namespace Faolan.GameServer
 			}
 
 			await DoTeleport(characterId, match.Id);
+		}
+
+		// Resolves a map argument (numeric id, exact case-insensitive name, or first name-contains match) to its Map row,
+		// or null if nothing matches. Shared by the `.teleport <name>` and `.teleport <name> x y z` forms (#247).
+		private async Task<Map> ResolveMap(string arg)
+		{
+			if (uint.TryParse(arg, out var id))
+			{
+				var maps = await Database.GetMaps();
+				return maps.FirstOrDefault(m => m.Id == id);
+			}
+
+			var all = await Database.GetMaps();
+			return all.FirstOrDefault(m => string.Equals(m.Name, arg, StringComparison.OrdinalIgnoreCase))
+				?? all.FirstOrDefault(m => m.Name != null && m.Name.Contains(arg, StringComparison.OrdinalIgnoreCase));
 		}
 
 		// .position  - print the caller's current map + live position (the in-world entity transform when

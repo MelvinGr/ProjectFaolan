@@ -222,6 +222,10 @@ namespace Faolan.GameServer.World
 			Vitals.Health = Vitals.MaxHealth;
 			Position = SpawnPosition;
 			Rotation = SpawnRotation;
+			// Reset the move anchor too (#246): a chase/return leaves MoveOrigin at wherever the NPC last stepped
+			// (the spot it died), so without this the first post-respawn MoveTask streams origin=death -> spawn and
+			// the client renders the revived NPC back at its death location before walking home. Anchor it at spawn.
+			MoveOrigin = SpawnPosition;
 			// Drop any unlooted corpse-bag contents - the entity is a live NPC again, not a bag.
 			CashTin = 0;
 			LootItems.Clear();
