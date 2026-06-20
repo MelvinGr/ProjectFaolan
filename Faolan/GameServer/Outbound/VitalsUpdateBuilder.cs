@@ -28,8 +28,12 @@ namespace Faolan.GameServer
 			// Also carry Level + Exp/MaxExp so the XP bar reflects the character's REAL progress: the snapshot tails
 			// carry the captured template's stale to-next-level max, so overriding it here (the same Exp/MaxExp the
 			// combat XP path sends) scales the bar correctly for this character's level.
+			// #214: a dead character must NOT get its current health refilled here - the world-entry snapshot just set
+			// HealthCurrent = 0 to latch the client's dead state, and this post-snapshot vitals update would otherwise
+			// refill the bar (and un-latch the release window). Send 0 current health while dead.
+			var currentHealth = character.IsDead ? 0u : stats.Health;
 			var block = new CharacterStatBlock()
-				.Set(LegacyCharacterStatId.HealthCurrent, stats.Health)
+				.Set(LegacyCharacterStatId.HealthCurrent, currentHealth)
 				.Set(LegacyCharacterStatId.StaminaCurrent, stats.Stamina)
 				.Set(LegacyCharacterStatId.ManaCurrent, stats.Mana)
 				.Set(LegacyCharacterStatId.Level, character.Level)

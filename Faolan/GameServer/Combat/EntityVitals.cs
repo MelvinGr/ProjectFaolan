@@ -106,7 +106,12 @@ namespace Faolan.GameServer.Combat
 		public static EntityVitals FromCharacter(Character character)
 		{
 			var max = character.MaxStats ?? CharacterMaxStats.CreateDefaults(character.Class, character.Level);
-			return FromMax(max.Health, max.Mana, max.Stamina);
+			var vitals = FromMax(max.Health, max.Mana, max.Stamina);
+			// #214: a character that logged out dead is still dead - seed current health at 0 (max stays full) so the
+			// world model agrees with the dead login snapshot and RespawnMe/TryRespawnNow (which gate on IsDead) work.
+			if (character.IsDead)
+				vitals.Health = 0;
+			return vitals;
 		}
 
 		/// <summary>Creates a full-health entity (current == max) from max values.</summary>
