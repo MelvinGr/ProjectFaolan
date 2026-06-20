@@ -69,6 +69,14 @@ namespace Faolan.GameServer.World
 		// The explicit death trigger (SimpleCharKilledByUpdateIIR 0xB066AFC2) the client needs to enter the dead
 		// (release-screen) state - a health=0 StatUpdate alone doesn't (#214). Sent before SendResurrectionScreen.
 		Task SendDeathTrigger(INetworkClient client, uint dyingHandle, uint killerEndpoint);
+
+		// The self-applied death-state effect (ApplySpell 0x6B87E316, spell 0x0009F000) retail sends right after the
+		// release screen (#214). Without it the SimpleCharKilledBy + 0x2024 still left the client alive in-client.
+		Task SendDeathEffect(INetworkClient client, uint dyingHandle);
+
+		// The death-pose MoveTask (0x96C46740 movement-type 0x06) retail forces onto the dying player just before the
+		// kill record (#214); puts the avatar into the dead/incapacitated state at the death position.
+		Task SendDeathPose(INetworkClient client, uint dyingHandle, Vector3 deathPosition);
 	}
 
 	// The live in-memory world (docs/archive/server-architecture-roadmap.md): owns the world model + the connected players'
@@ -93,9 +101,6 @@ namespace Faolan.GameServer.World
 		// smooth; slower rate-based systems run via a TickAccumulator at their own interval. The loop measures
 		// wall-clock dt, not the nominal period, so a late tick doesn't desync the rates.
 		private const double BaseTickSeconds = 0.1;
-
-		// How long a killed player lies dead before respawning at the closest known resurrection point.
-		private const double PlayerRespawnDelaySeconds = 10.0;
 
 		// Vitals regen cadence (rate-based; dt-scaled by the real elapsed time when it fires).
 		private const double RegenIntervalSeconds = 1.0;
@@ -455,11 +460,16 @@ namespace Faolan.GameServer.World
 			var spot = RespawnResolver.ClosestKnown(deathPosition, points, discovered)
 				?? points.FirstOrDefault(p => p.AlwaysKnown)
 				?? points[0];
-			// #214: drive the client into the dead state FIRST (the explicit kill record) - the health=0 StatUpdate
-			// alone leaves it alive, so the 0x2024 reads as the login spawn-anchor and no release screen shows. Then
-			// the resurrection screen. Killer unknown here (0) - the trigger's presence is what flips the dead state.
-			await _output.SendDeathTrigger(client, client.Session.Account.ClientInstance, 0);
+			// #214: replay the full retail player-death sequence (AssassinL23_..._resurect pkt#4048-4051) in order:
+			//   death-pose MoveTask (type 0x06) -> SimpleCharKilledBy -> 0x2024 release screen -> death-state ApplySpell.
+			// SimpleCharKilledBy + 0x2024 + the effect alone left the avatar standing and the release UI shut; the
+			// death-pose MoveTask is the piece that drops the avatar into the dead state. Every captured kill record
+			// carries a NON-ZERO killer, so attribute a self-inflicted death to the player itself (valid endpoint).
+			var handle = client.Session.Account.ClientInstance;
+			await _output.SendDeathPose(client, handle, deathPosition);
+			await _output.SendDeathTrigger(client, handle, handle);
 			await _output.SendResurrectionScreen(client, deathPosition, [spot]);
+			await _output.SendDeathEffect(client, handle);
 		}
 
 		// The server game loop (docs/archive/server-architecture-roadmap.md): a 10 Hz base tick that advances continuous systems
@@ -530,8 +540,8 @@ namespace Faolan.GameServer.World
 						}
 					}
 
-					// Player death/respawn timers run every tick (continuous), scaled by real dt.
-					await TickPlayerDeaths(dt);
+					// Player death: push the release screen once; respawn is click-driven (RespawnMe), not timed.
+					await TickPlayerDeaths();
 					TickBuffExpiry();
 
 					// Rate-based systems: fire on their own cadence, scaled by the time actually elapsed since last fire.
@@ -570,7 +580,11 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		private async Task TickPlayerDeaths(double dt)
+		// A dead player gets the release screen ONCE and then waits for their RespawnMe (c2s 0x2024) click. Retail
+		// respawn is purely click-driven (AssassinL23_..._resurect: the player sat dead ~757 packets before sending
+		// RespawnMe), so there is NO auto-revive timer - the old 10s timer yanked the player back before the release
+		// screen could be used (#214). Respawn is driven inbound by RespawnAtChosenPoint / TryRespawnNow.
+		private async Task TickPlayerDeaths()
 		{
 			foreach (var pair in Players)
 			{
@@ -586,23 +600,12 @@ namespace Faolan.GameServer.World
 					continue;
 				}
 
-				if (!_playerRespawnRemaining.TryGetValue(client, out var remaining))
+				// Presence in the dict = release screen already sent; send it exactly once, then wait for RespawnMe.
+				if (_playerRespawnRemaining.TryAdd(client, 0))
 				{
-					_playerRespawnRemaining[client] = PlayerRespawnDelaySeconds;
-					_logger.LogInformation("Combat: {Player} died; respawning in {Delay}s.", character.Name, PlayerRespawnDelaySeconds);
+					_logger.LogInformation("Combat: {Player} died; awaiting release (RespawnMe).", character.Name);
 					await SendDeathScreen(client, character, pair.Value.Position);
-					continue;
 				}
-
-				remaining -= dt;
-				if (remaining > 0)
-				{
-					_playerRespawnRemaining[client] = remaining;
-					continue;
-				}
-
-				_playerRespawnRemaining.TryRemove(client, out _);
-				await RespawnPlayer(client, vitals);
 			}
 		}
 

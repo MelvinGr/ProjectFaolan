@@ -179,11 +179,33 @@ namespace Faolan.GameServer
 			return SendValidResurrectionSpots(client, deathPosition, spots);
 		}
 
+		// The player-death-screen packets (death-pose MoveTask, SimpleCharKilledBy, death-state ApplySpell) come from
+		// GameAgent at instance 0x59 in the capture (AssassinL23_..._resurect), NOT the 0x58 of WorldFraming.Sender that
+		// normal world/NPC-combat broadcasts use. The client appears to gate the player's own dead-state transition on
+		// the 0x59 endpoint - sending the full sequence from 0x58 left the avatar alive with the release UI shut (#214).
+		private static readonly byte[] PlayerDeathSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59);
+
 		Task IWorldOutbound.SendDeathTrigger(INetworkClient client, uint dyingHandle, uint killerEndpoint)
 		{
 			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteHeader(PlayerDeathSender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s => s.WriteArray(WorldDeath.BuildKilledBy(dyingHandle, killerEndpoint)))
+				.SendAsync(client);
+		}
+
+		Task IWorldOutbound.SendDeathEffect(INetworkClient client, uint dyingHandle)
+		{
+			return new PacketStream()
+				.WriteHeader(PlayerDeathSender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteArrayUInt32Length(s => s.WriteArray(WorldDeath.BuildDeathEffect(dyingHandle)))
+				.SendAsync(client);
+		}
+
+		Task IWorldOutbound.SendDeathPose(INetworkClient client, uint dyingHandle, System.Numerics.Vector3 deathPosition)
+		{
+			return new PacketStream()
+				.WriteHeader(PlayerDeathSender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteArrayUInt32Length(s => s.WriteArray(WorldDeath.BuildDeathPose(dyingHandle, deathPosition)))
 				.SendAsync(client);
 		}
 
