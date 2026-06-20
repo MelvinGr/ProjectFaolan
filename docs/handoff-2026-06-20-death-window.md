@@ -18,9 +18,20 @@ The diff (handoff step 1) is **done**. The dead-state field in the `0x737A6DF9` 
   login path works via the construction-time latch; the **in-session path needs the state-transition packet
   that re-latches it** (still the gdb-trace work below — find the setter behind `vtable+0x10`).
 
-Remaining: **step 2** (emit `CurrentHp=0` at login for a dead char — needs a persisted dead-state, a schema
-decision) and **step 3** (the in-session re-latch packet). Step 2 is now a small wiring change in
-`RetailLoginReplay` (where it already patches vitals); both still gate on an in-client retail test.
+**Step 2 IMPLEMENTED (commit 1623285) — needs in-client retail test.** A dead character now logs in dead:
+- `Character.IsDead` (+ migration `CharacterIsDead`) + `IDatabaseRepository.SaveCharacterDeadState` persist it
+  independently of the full-graph save (like the bind point / XP progress).
+- `WorldSimulation` sets it on death (`TickPlayerDeaths`, alongside the release screen) and clears it on
+  respawn (`RespawnPlayer`, before the revive re-enter so that snapshot is alive).
+- Both login tails paths zero `CurrentHp` for a dead char: `RetailLoginReplay` (captured tails) and
+  `BeachTailsBuilder.BuildFromScratch` (beach). Max/base HP stays full. Alive path byte-identical (IsDead
+  defaults false — the beach goldens still pass); `BuildFromScratch_DeadCharacter_ZeroesCurrentHealthKeepsMax`
+  proves the dead shape. 566/566 tests pass; migration auto-applies at server startup.
+- **TEST:** rebuild + restart the server (the migration applies on startup), then in-client: die, log out, log
+  back in → the release/resurrect window should show at world entry. If it does, the construction-latch theory
+  is confirmed and step 3 = replicate that latch mid-session.
+
+Remaining: **step 3** (the in-session re-latch packet — gdb-trace the setter behind `vtable+0x10`).
 
 ## TL;DR
 The in-client **release/resurrect window still doesn't show on our server**, but a full live-debugging +
