@@ -21,7 +21,9 @@ namespace Faolan.Importer
 		public const string DefaultCdnBase = "http://aoc-eu-gameupdate.live.ageofconan.com";
 		private const uint ResurrectionPointsType = 1000090;
 
-		private static readonly Regex PointRx = new Regex("<resurrectionpoint\\b[^>]*?\\bname=\"([^\"]*)\"[^>]*?\\bdiscoverable=\"([^\"]*)\"[^>]*?>\\s*<position\\s+x=\"([-0-9.]+)\"\\s+y=\"([-0-9.]+)\"\\s+z=\"([-0-9.]+)\"",
+		// Group 1 = Guid (the client resurrection-point id = the spawnPointId the 0x2024 release screen sends and the
+		// client echoes in RespawnMe; #214), 2 = name, 3 = discoverable, 4/5/6 = position. Guid precedes name in the XML.
+		private static readonly Regex PointRx = new Regex("<resurrectionpoint\\b[^>]*?\\bGuid=\"([0-9]+)\"[^>]*?\\bname=\"([^\"]*)\"[^>]*?\\bdiscoverable=\"([^\"]*)\"[^>]*?>\\s*<position\\s+x=\"([-0-9.]+)\"\\s+y=\"([-0-9.]+)\"\\s+z=\"([-0-9.]+)\"",
 			RegexOptions.Compiled | RegexOptions.Singleline);
 
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string cdnBase, string storeDir = null)
@@ -61,16 +63,18 @@ namespace Faolan.Importer
 				var found = 0;
 				foreach (Match m in PointRx.Matches(xml))
 				{
-					var name = m.Groups[1].Value;
+					var guid = uint.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture);
+					var name = m.Groups[2].Value;
 					var alwaysKnown = m
-						.Groups[2]
+						.Groups[3]
 						.Value
 						.Equals("false", StringComparison.OrdinalIgnoreCase);
-					var x = float.Parse(m.Groups[3].Value, CultureInfo.InvariantCulture);
-					var y = float.Parse(m.Groups[4].Value, CultureInfo.InvariantCulture);
-					var z = float.Parse(m.Groups[5].Value, CultureInfo.InvariantCulture);
+					var x = float.Parse(m.Groups[4].Value, CultureInfo.InvariantCulture);
+					var y = float.Parse(m.Groups[5].Value, CultureInfo.InvariantCulture);
+					var z = float.Parse(m.Groups[6].Value, CultureInfo.InvariantCulture);
 					db.RespawnPoints.Add(new RespawnPoint
 					{
+						Id = guid, // the client RDB Guid - the spawnPointId the release screen needs (#214)
 						MapId = e.Id,
 						Name = name,
 						AlwaysKnown = alwaysKnown,

@@ -151,6 +151,13 @@ namespace Faolan.Core.Database
 				.Property(c => c.Id)
 				.ValueGeneratedNever();
 
+			// RespawnPoint.Id is the client RDB resurrection-point Guid (the spawnPointId the 0x2024 release screen
+			// sends + the client echoes in RespawnMe), so it must be the real RDB value, not EF-generated (#214).
+			modelBuilder
+				.Entity<RespawnPoint>()
+				.Property(r => r.Id)
+				.ValueGeneratedNever();
+
 			// ItemType.Normal (104) is the default classification - existing item rows backfill to Normal when the
 			// column is added; the importer reclassifies quest/resource items by the container they were seen in.
 			// The enum has no 0 member, so the CLR default 0 is a safe sentinel: an Item left at Type==0 (e.g. a
