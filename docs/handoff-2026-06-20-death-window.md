@@ -1,5 +1,44 @@
 # Handoff 2026-06-20 — Death/release window (#214): packets correct, gate is the dead-state flag
 
+## UPDATE 2026-06-20 (in-client, end-to-end) — window + respawn round-trip WORK; revive-completion is the last gap
+
+Live in-client progress (Melvin, on the local server):
+- **Window + movement lock: WORKING** (bcc_state=29, commit eec6c33).
+- **Location title: WORKING** — `RespawnPoint.Id` is now the RDB `Guid` (commit 4110fec); beach AlwaysKnown
+  = 784236 (0xBF76C), byte-matching retail's `0x2024`.
+- **Resurrect click → server revive: WORKING** — on a CLEAN relog the client sends instant
+  `RespawnMe (0x2024)` `[u32 spawnPointId]`; the server resolves the spot, revives, moves to the res
+  point, logs "respawned." Verified by gdb (the resurrect button at ResurrectView `FUN_01268380+0xebd`
+  calls the RespawnMe proxy `0x4fa9f0`).
+
+**The "wave respawn" (0x2025/0x2028 + repeating 15s countdown) was STALE SESSION STATE, not a packet
+flag.** After an unclean relog the client was stuck in a leftover wave-respawn UI; a fresh client login
+makes it use instant `RespawnMe (0x2024)` like retail. So there is nothing to fix on the wave path — just
+don't carry over a dirty session. (We still don't handle 0x2025/0x2028; we don't need to for normal death.)
+
+**THE REMAINING GAP — revive completion.** After `RespawnMe` our server calls the full
+`ReenterWorld` (54-packet burst-less world entry). The client — already in-world showing the release
+window — does NOT apply that as a Dead→Alive transition: the window stays open, the avatar isn't cleanly
+revived (HP ticking from mobs, stray XP). **Retail does NOT re-enter the world.** Decoded from
+`AssassinL23_...resurect` right after the `RespawnMe` (pkt #4807), the retail revive is a lightweight
+in-place sequence on the EXISTING entity:
+- **#4840 `0x642CD3D6` BehaviorControlCenterIIR (BccIIR)** on the player handle — the "resurrect confirm"
+  behavior action; almost certainly the bcc_state 29→1 transition that CLOSES the window (grammar in
+  `docs/behaviorcontrolcenter-grammar.md`).
+- **#4845 `0x96B8DC59` vitals** — restore current health to full.
+- entity despawns (`0x04B82B2D`) for the old area, then **#4904 `0x10D27BC0` IntendedTeleportIIR** —
+  teleport to the res point, then re-stream nearby NPCs (interest).
+
+**Next step (deferred — Melvin 2026-06-20: "we'll figure that out later"):** the choice is DISTANCE-based.
+On retail a res point FAR from the death spot gives a loading screen (= a real world re-entry, our current
+path); a NEARBY res point (our beach case: death ~<331,146,707>, res point <336,148,660>, ~47 units) does
+the lightweight IN-PLACE revive (no loading screen) — BccIIR alive + vitals-to-full + IntendedTeleport +
+interest refresh — which is what closes the window cleanly. So `RespawnAtChosenPoint` should pick: near ⇒
+lightweight in-place revive (decode #4840 `0x642CD3D6` for the exact bcc_state 29→1 alive form, the inverse
+of the dead spawn we already build); far ⇒ keep `ReenterWorld` (with the loading screen). The bcc_state
+mechanism we already own is the key to the in-place form.
+
+
 ## UPDATE 2026-06-20 (SOLVED: the window shows) — the gate was `CharacterStats.bcc_state`, NOT health
 
 **The release/resurrect window now paints in-client and the player is movement-locked** (verified by
