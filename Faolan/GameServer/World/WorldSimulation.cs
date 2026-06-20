@@ -398,6 +398,17 @@ namespace Faolan.GameServer.World
 			_playerRespawnRemaining.TryRemove(client, out _);
 			var character = client.Session.Character;
 			vitals.ReviveToFull();
+
+			// Clear the persisted dead state BEFORE the re-enter (#214): the re-entry rebuilds the player FA015807
+			// via ApplyCharacter, which keys bcc_state=29 / health=0 / the death pose off Character.IsDead. Leaving
+			// it set re-sends the DEAD spawn, so the client never leaves the Dead substate (window stays, avatar
+			// stays dead-looking while the sim has them alive). RespawnPlayer already does this; this path forgot.
+			if (character.IsDead)
+			{
+				character.IsDead = false;
+				await _database.SaveCharacterDeadState(character.Id, false);
+			}
+
 			character.Position = point.Position;
 			character.Rotation = point.Rotation;
 			character.MapId = point.MapId;
