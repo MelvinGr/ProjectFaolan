@@ -62,6 +62,24 @@ calls are flaky on Wine; prefer raw reads). Retail testing: throwaway Funcom acc
 
 ---
 
+## UPDATE 2026-06-20 (session 10, RETAIL live gdb) — ROOT CAUSE: a GameCharInterface RPC drives the hostile name colour; our server doesn't send it
+
+Poked a retail mob's idx to 0 → retail IMMEDIATELY recomputed it to 1 (ours leaves a poke untouched). So
+retail recomputes the colour index; ours never does. The 0→1 write backtrace:
+- write at `0x011c01b0` `MOV [EDI+0x30],ESI` (EDI+0x30 = iVar3+0x1c = the index; ESI = value) in `FUN_011c0150`.
+- value arrives via a SIGNAL/observer cascade: `FUN_00547da0` (signal-emit, iterates a slot list calling each
+  observer vtable+8 = SlotFull/SignalSignatureObj/AggressionIndicator pattern) → `FUN_011ca740` (vtable forward
+  +0x20) → `FUN_011c0150` (stores idx).
+- the signal fires from **`FUN_0148dad0` = the GameCharInterface RPC dispatch** (strings
+  `"GameCharInterface_t::SendMessageToEndpoint"` / `"GameCharInterface"`), under the dispatch loop (0x0046xxxx).
+
+**ROOT CAUSE:** a GameCharInterface disposition/aggression RPC (server→client) makes the client compute the
+hostile colour index; **retail sends it, our server doesn't** → index stays at the friendly default 0 → green
+names. The NpcStats.community we send is correct but irrelevant to the name colour. Tied to the AggressionIndicator
+system (AggressionIndicator_c / AI_HostileActionPerformed / agro_overhead_indicator.tga). NEXT: identify the exact
+GameCharInterface method/opcode (diff GameCharInterface RPCs retail-vs-ours, or re-trace one frame above
+FUN_0148dad0 to read the dispatched method), then implement it server-side.
+
 ## UPDATE 2026-06-20 (session 9, LIVE gdb on our client) — CONFIRMED in-client: iVar3[0x1c] is the sole colour driver; our server never sets it hostile
 
 - Mob idx=0 (green) while the player is ALIVE too → NOT a death-state issue (retail = idx 1 red in both states).
