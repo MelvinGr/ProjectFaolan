@@ -47,6 +47,15 @@ namespace Faolan.GameServer.Spawn
 				}
 				// Remaining CharacterStats fields (looks_package, side, ...) stay captured.
 
+				// THE Dead-substate gate: CharacterStats.bcc_state (the behavior/state-controller state enum).
+				// Across all 15 captured ALIVE player spawns bcc_state==1; the ONLY spawn that carries DeadBccState
+				// (29) is the retail login-while-dead capture. Health=0 and the forced death animation are both
+				// COSMETIC (HP bar / lying-down pose - the avatar could still walk in-client #214); bcc_state is what
+				// locks the controller into the Dead substate and lets the resurrect window paint. Set it for a dead
+				// login (kept captured == alive 1 otherwise). docs/handoff-2026-06-20-death-window.md.
+				if (character.IsDead)
+					message.Stats.BccState = DeadBccState;
+
 				// Retail's dead SimpleChar also reports can_fall=0 (alive=1) - a corpse is ragdoll/incapacitated, not
 				// gravity-stepped. Match it for a dead login (kept captured when alive).
 				if (character.IsDead)
@@ -96,5 +105,8 @@ namespace Faolan.GameServer.Spawn
 		// The forced "death" animation id retail sets in a dead player's BCC (Stihetfv login-while-dead FA015807).
 		// Capture-derived (conqueror); may be per-skeleton - see the call site.
 		private const uint DeathForcedAnimId = 41877;
+
+		// CharacterStats.bcc_state value for a dead character (alive==1). The behavior-controller Dead state enum.
+		private const uint DeadBccState = 29;
 	}
 }
