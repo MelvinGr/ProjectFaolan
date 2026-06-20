@@ -620,8 +620,14 @@ namespace Faolan.GameServer
 					if (client.Session.Character != null)
 					{
 						var shortcuts = await Database.GetCharacterShortcuts(client.Session.Character.Id);
+						// Send from the GameCharAgent world conversation (LoginWorld201CSender 0x58 / the client
+						// instance), exactly like the ability/spell/item grants - NOT echoed from the request bytes.
+						// The 0x206D request's receiver carries no instance, so echoing it produced a sender with an
+						// empty instance and the client silently dropped the whole reply (#71: bar stayed empty in
+						// every slot in-client, though the body was byte-exact). Retail sends 0x2076 from this same
+						// GameCharAgent endpoint as the 0x2052 grants (confirmed: login capture pkt 182 vs 237).
 						var ps = new PacketStream();
-						ps.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, GameCharInterfaceDispatchOpcodes.DispatchShortcutBarReply);
+						ps.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchShortcutBarReply);
 						ps.WriteArray(ShortcutBarBuilder.BuildBody(shortcuts));
 						await ps.SendAsync(client);
 						Logger.LogInformation("ShortcutBarReply: restored {Count} hotbar shortcut(s) (#71).", shortcuts.Length);
