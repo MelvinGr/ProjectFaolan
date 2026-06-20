@@ -1,11 +1,32 @@
-# Handoff 2026-06-20 — Death/release window (#214)
+# Handoff 2026-06-20 — Death/release window (#214) — ✅ RESOLVED (ARCHIVED)
 
-## ★ CURRENT STATE — READ THIS FIRST (FINAL, retail-confirmed 2026-06-20) ★
+## ★ RESOLVED 2026-06-20 — #214 CLOSED, full flow verified in-client. ★
+
+The complete death/resurrect flow now works in-client: release/resurrect window → **instant** respawn (no wave)
+→ revive with **no loading screen** → **relocate to the chosen resurrection point**. The sessions below are the
+investigation trail (kept for context; several intermediate theories were superseded — read them as history, not
+current state). **The fixes that shipped:**
+- **Window** = `CharacterStats.bcc_state=29` in the player FA015807 (commit eec6c33) + in-session death BccIIR.
+- **Instant (no wave)** = the `ResurrectView+0x476` flag went wave because we set the kill record's killer to the
+  player's own handle (resolves to the local player). Fixed by attributing the death to the actual mob
+  (`WorldEntity.LastAttackerHandle` + `ResolveKiller`, commit 8a570b5). (The `+0x476` lever was confirmed by a
+  live poke; the deep "missing zone-region in DAT_029c7a8c" theory in the trail below is SUPERSEDED.)
+- **Relocate, no loading screen** = the retail revive sequence is `BccIIR → Vitals → IntendedTeleport(0x10D27BC0)
+  → n3Teleport(0x5A32F0D7) → CharDCMove`; the relocator is the **n3Teleport** (revive form, distinct from the
+  changemap one), sent with the **LIVE** `Zone.PlayfieldToken` so the client doesn't reload
+  (`TeleportCodec.BuildReviveDestination` + `WorldSimulation.RelocateToRespawnPoint`, commit 763aeb0).
+- Suppressed the chat-spam "Unknown 0x2000 Opcode" for the client's teleport echoes (commit 88949f9).
+
+Live state lives in the agent memory `protocol_death_resurrect`; everything below is the (resolved) trail.
+
+---
+
+### (historical) original CURRENT-STATE block — the wave was the last open item, now FIXED
 
 **The in-session death flow works end-to-end** (release window, movement lock, camera pan, dead pose, title,
-server-side revive) — see the session-1/2/3 sections far below. **The one open item is the WAVE-vs-INSTANT
-respawn:** on the resurrect click our client takes the wave-respawn path (15 s countdown via
-`SignUpForWaveRespawn 0x2025`) instead of retail's instant `RespawnMe 0x2024`.
+server-side revive). **The one open item [WAS] the WAVE-vs-INSTANT respawn:** on the resurrect click our client
+took the wave-respawn path (15 s countdown via `SignUpForWaveRespawn 0x2025`) instead of retail's instant
+`RespawnMe 0x2024`. (FIXED — see the RESOLVED block above.)
 
 **ROOT CAUSE (proven by side-by-side live gdb on OUR server vs RETAIL Funcom, both dead on the beach):**
 the death/`0x2024`/stat/BccIIR layers are all byte-correct and IDENTICAL to retail — they are NOT the problem.

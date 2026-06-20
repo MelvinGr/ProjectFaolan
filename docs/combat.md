@@ -64,7 +64,15 @@ with no anim; the player release screen never showed). The explicit trigger is `
 (**0xB066AFC2**) — decoded from `AssassinL23_..._resurect` as the packet right before the death `0x2024`. Record:
 `[subop][0000C350][dyingHandle][00][01][0000C350][killerEndpoint]`, built by `WorldDeath.BuildKilledBy`
 (byte-exact golden). `CombatService.OnNpcKilled` sends it for the dying NPC (after the killing-blow vitals);
-`WorldSimulation.SendDeathScreen` sends it for the player BEFORE `DispatchValidResurrectionSpots`. needs-testing.
+`WorldSimulation.SendDeathScreen` sends it for the player BEFORE `DispatchValidResurrectionSpots`.
+
+**Player death/resurrect — COMPLETE + verified in-client, #214 CLOSED 2026-06-20.** Full flow: release window
+(`CharacterStats.bcc_state=29`) → **instant** respawn (the `killerEndpoint` MUST be the actual mob, not the
+player's own handle, or the client's ResurrectView goes into the 15s wave-respawn path — `ResolveKiller` +
+`WorldEntity.LastAttackerHandle`, commit 8a570b5) → revive (BccIIR 29→1 + vitals) → **relocate to the res point
+with no loading screen** via the revive `IntendedTeleport`(0x10D27BC0)+`n3Teleport`(0x5A32F0D7) carrying the
+position + the LIVE `Zone.PlayfieldToken` (`TeleportCodec.BuildReviveDestination`, `RelocateToRespawnPoint`,
+commit 763aeb0). Trail: agent memory `protocol_death_resurrect` / `docs/archive/handoff-2026-06-20-death-window.md`.
 (The corpse object `TombStoneFullUpdateIIR_c` 0x0D80E7C9 is decoded but not used — the corpse lingers as the dying
 creature, then a separate loot bag spawns, #246.)
 
