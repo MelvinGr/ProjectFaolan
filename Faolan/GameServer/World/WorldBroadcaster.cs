@@ -595,23 +595,23 @@ namespace Faolan.GameServer.World
 			_logger.LogInformation("Loot: {Name} opened the loot window on {Bag} 0x{Handle:X8}.", player.Name, bag.Name, bag.Handle);
 		}
 
-		// Take ONE item from a bag by its display POSITION - TryLootItem (0x2046), the single drag-out. The client
-		// COMPACTS its loot window after each removal (the survivors shift down to fill the gap), then addresses the
-		// next drag by the NEW position - verified live (a 3-item bag dragged srcPos 1,1,0) and in the retail drag
-		// capture (bag 0x22ec dragged srcPos 1 then 0). So the server must compact too: RemoveAt(index) keeps our
-		// LootItems index aligned with the client's re-numbered view. Returns the template id removed, or null if the
-		// bag/index is invalid. (Loot-all uses TakeBagItems, which empties the bag at once.)
+		// Take ONE item from a bag by its display POSITION - TryLootItem (0x2046), the single drag-out. The client does
+		// NOT compact its loot window after a removal: it removes the looted slot, leaves a GAP, and keeps every survivor
+		// at its ORIGINAL Pos - proven live (a 3-item bag dragged srcPos 1, then 2, then 0: the 2 could only arrive if
+		// the survivors kept their original positions). So the take must be position-STABLE: null the slot (template 0 =
+		// looted) in place rather than RemoveAt - shifting desynced the next drag's Pos and dropped the take. Returns the
+		// template id removed, or null if the bag/Pos is invalid or already looted. (Loot-all uses TakeBagItems.)
 		public uint? TakeBagItem(INetworkClient client, uint bagHandle, int index)
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null || !_sim.World.ZoneFor(player.MapId).TryGet(bagHandle, out var bag) || !bag.IsLootable)
 				return null;
-			if (index < 0 || index >= bag.LootItems.Count)
+			if (index < 0 || index >= bag.LootItems.Count || bag.LootItems[index] == 0)
 				return null;
 
 			var item = bag.LootItems[index];
-			bag.LootItems.RemoveAt(index); // compact to match the client's re-numbered window
-			_logger.LogInformation("Loot: {Player} loots item #{Index} (0x{Item:X}) from bag 0x{Handle:X8} ({Left} left).", player.Name, index, item, bagHandle, bag.LootItems.Count);
+			bag.LootItems[index] = 0; // looted-slot sentinel: survivors keep their stable Pos for the client's next drag
+			_logger.LogInformation("Loot: {Player} loots item #{Index} (0x{Item:X}) from bag 0x{Handle:X8} ({Left} left).", player.Name, index, item, bagHandle, bag.LootItems.Count(i => i != 0));
 			return item;
 		}
 
@@ -632,8 +632,8 @@ namespace Faolan.GameServer.World
 			// the full object stacked a second window). Loot-all passes removedPos 0 (matches the captured loot-all ACK).
 			await SendWorldIir(client, WorldLoot.BuildLootRemoveItemsBody(bag.Handle, removedPos));
 
-			if (bag.LootItems.Count > 0 || bag.CashTin > 0)
-				return; // items/coins remain - keep the bag open; the client drives the close (0x2044) when done
+			if (bag.LootItems.Any(i => i != 0) || bag.CashTin > 0)
+				return; // items/coins remain (0 = a drag-looted slot) - keep the bag open; client drives close (0x2044)
 
 			// Fully emptied -> the captured completion sequence: DispatchCloseLootBag -> looter resets -> fade ->
 			// consumed visual. (LootRemoveItems with remaining=0 was already sent above.)
@@ -873,10 +873,11 @@ namespace Faolan.GameServer.World
 			if (player == null || !_sim
 				    .World
 				    .ZoneFor(player.MapId)
-				    .TryGet(bagHandle, out var bag) || !bag.IsLootable || bag.LootItems.Count == 0)
+				    .TryGet(bagHandle, out var bag) || !bag.IsLootable || !bag.LootItems.Any(i => i != 0))
 				return Array.Empty<uint>();
 
-			var taken = bag.LootItems.ToArray();
+			// Grant the still-present items (skip already-drag-looted slots, now 0); loot-all empties + closes the bag.
+			var taken = bag.LootItems.Where(i => i != 0).ToArray();
 			bag.LootItems.Clear();
 			_logger.LogInformation("Loot: {Player} loots {Count} item(s) from bag 0x{Handle:X8}.", player.Name, taken.Length, bagHandle);
 			return taken;
