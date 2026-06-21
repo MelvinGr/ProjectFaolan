@@ -595,20 +595,23 @@ namespace Faolan.GameServer.World
 			_logger.LogInformation("Loot: {Name} opened the loot window on {Bag} 0x{Handle:X8}.", player.Name, bag.Name, bag.Handle);
 		}
 
-		// Take ONE item from a bag by its display index - TryLootItem (0x2046), the single drag-out. Returns the item
-		// template id removed (or null if the bag/index is invalid); remaining items shift down to match the client's
-		// re-indexed view. (Loot-all uses TakeBagItems, which clears them all at once.)
+		// Take ONE item from a bag by its display POSITION - TryLootItem (0x2046), the single drag-out. The client
+		// addresses the item by its ORIGINAL display Pos and NEVER renumbers the remaining slots (verified live: after a
+		// take, later drags still carry the un-shifted Pos), so the take MUST be position-stable: we null the slot
+		// (template 0 = looted) in place rather than RemoveAt - shifting the list desynced every later Pos and made
+		// drags hit the wrong (or out-of-range) entry. Returns the template id removed, or null if the bag/Pos is
+		// invalid or the slot was already looted. (Loot-all uses TakeBagItems, which empties the bag at once.)
 		public uint? TakeBagItem(INetworkClient client, uint bagHandle, int index)
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null || !_sim.World.ZoneFor(player.MapId).TryGet(bagHandle, out var bag) || !bag.IsLootable)
 				return null;
-			if (index < 0 || index >= bag.LootItems.Count)
+			if (index < 0 || index >= bag.LootItems.Count || bag.LootItems[index] == 0)
 				return null;
 
 			var item = bag.LootItems[index];
-			bag.LootItems.RemoveAt(index);
-			_logger.LogInformation("Loot: {Player} loots item #{Index} (0x{Item:X}) from bag 0x{Handle:X8} ({Left} left).", player.Name, index, item, bagHandle, bag.LootItems.Count);
+			bag.LootItems[index] = 0; // looted-slot sentinel: keep the other slots at their stable Pos for the client
+			_logger.LogInformation("Loot: {Player} loots item #{Index} (0x{Item:X}) from bag 0x{Handle:X8} ({Left} left).", player.Name, index, item, bagHandle, bag.LootItems.Count(i => i != 0));
 			return item;
 		}
 
@@ -625,8 +628,8 @@ namespace Faolan.GameServer.World
 
 			await SendWorldIir(client, WorldLoot.BuildLootRemoveItemsBody(bag.Handle));
 
-			if (bag.LootItems.Count > 0 || bag.CashTin > 0)
-				return; // items/coins remain - keep the bag open in the world
+			if (bag.LootItems.Any(i => i != 0) || bag.CashTin > 0)
+				return; // items/coins remain (0 = a drag-looted slot) - keep the bag open in the world
 
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x58),
@@ -864,10 +867,12 @@ namespace Faolan.GameServer.World
 			if (player == null || !_sim
 				    .World
 				    .ZoneFor(player.MapId)
-				    .TryGet(bagHandle, out var bag) || !bag.IsLootable || bag.LootItems.Count == 0)
+				    .TryGet(bagHandle, out var bag) || !bag.IsLootable || !bag.LootItems.Any(i => i != 0))
 				return Array.Empty<uint>();
 
-			var taken = bag.LootItems.ToArray();
+			// Grant only the still-present items (skip already-drag-looted slots, now 0), then empty the bag - loot-all
+			// takes everything and the bag closes, so the stable-Pos sentinel no longer matters.
+			var taken = bag.LootItems.Where(i => i != 0).ToArray();
 			bag.LootItems.Clear();
 			_logger.LogInformation("Loot: {Player} loots {Count} item(s) from bag 0x{Handle:X8}.", player.Name, taken.Length, bagHandle);
 			return taken;
@@ -1028,6 +1033,13 @@ namespace Faolan.GameServer.World
 			bag.LootSourceName = lootSourceName; // the corpse's NPC name, for LootFromNpc quest-goal matching (#261)
 			bag.LootItems.AddRange(loot.Select(l => l.TemplateId)); // exactly the displayed set, same order as the window
 			_sim.World.ZoneFor(mapId).Add(bag);
+
+			// Log the contents by display Pos so an in-client single-drag test can confirm the client's source-Pos maps
+			// to the item the player actually clicked (TryLootItem 0x2046 is not in any capture - the Pos mapping is
+			// verified live, not from a golden).
+			if (loot.Count > 0)
+				_logger.LogInformation("Loot: bag 0x{Handle:X8} contents by Pos: {Items}", handle,
+					string.Join(", ", loot.Select((l, i) => $"#{i}=0x{l.TemplateId:X}({l.Item.Name})")));
 
 			foreach (var viewer in _sim
 				         .World
