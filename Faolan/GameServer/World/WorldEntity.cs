@@ -160,7 +160,11 @@ namespace Faolan.GameServer.World
 		// client walks the route), so the server just issues the captured route once per spawn/respawn.
 		public IReadOnlyList<Vector3> PatrolWaypoints { get; set; } = [];
 		public float PatrolSpeed { get; set; }
-		public bool Patrols => PatrolWaypoints.Count > 0;
+
+		// The captured MoveTask record re-addressed to THIS entity (handle + from = its spawn), ready to send verbatim.
+		// Replaying the captured form preserves its real speed/flags so the client walks (not run-crawls) the route.
+		public byte[] PatrolBody { get; set; }
+		public bool Patrols => PatrolBody != null;
 
 		// Seconds until the patrol route is re-issued (retail re-paths a one-shot patrol so it keeps looping). Set to
 		// the cycle length (path traversal time + dwell) when the route is issued; the tick counts it down.

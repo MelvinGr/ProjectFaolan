@@ -7,7 +7,7 @@ using Faolan.GameServer.World;
 
 namespace Faolan.Importer
 {
-	public sealed record PatrolPathEntry(uint MapId, Vector3 Position, float Speed, IReadOnlyList<Vector3> Waypoints, uint Handle = 0);
+	public sealed record PatrolPathEntry(uint MapId, Vector3 Position, float Speed, IReadOnlyList<Vector3> Waypoints, uint Handle = 0, byte[] Body = null);
 
 	// Extracts NPC patrol routes from a capture's MoveTask packets (MoveTaskIIR 0x96C46740): tracks the current
 	// map (MapChange 5D85BFC7), then for each MoveTask whose body is the CANONICAL single-segment waypoint patrol
@@ -112,7 +112,9 @@ namespace Faolan.Importer
 				if (!byHandle.TryGetValue(task.Handle, out var existing) || waypoints.Count > existing.Waypoints.Count)
 				{
 					var from = new Vector3(Bits(task.FromX), Bits(task.FromY), Bits(task.FromZ));
-					byHandle[task.Handle] = new PatrolPathEntry(currentMap, from, 0f, waypoints, task.Handle);
+					// Keep the captured record (from the subop onward) so the runtime can REPLAY it re-addressed - the
+					// exact form (speed/flags/list) is what makes the client walk it, not a rebuilt mode-1 path.
+					byHandle[task.Handle] = new PatrolPathEntry(currentMap, from, 0f, waypoints, task.Handle, body[4..]);
 				}
 			}
 

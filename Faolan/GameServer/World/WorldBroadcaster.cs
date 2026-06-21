@@ -536,13 +536,16 @@ namespace Faolan.GameServer.World
 				var entity = WorldEntity.ForNpc(handle, mapId, new Vector3(npc.PositionX, npc.PositionY, npc.PositionZ), new Vector3(npc.RotationX, npc.RotationY, npc.RotationZ), npcName ?? "NPC", vitals);
 				entity.Level = npc.Level;
 
-				// #266 patrol: attach this NPC's captured route (linked by exact spawn position) so it walks it. The cycle
-				// timer (path traversal time + dwell) drives the periodic re-issue that keeps it looping; the client
-				// walks the route once per issue, so re-issuing ~when it finishes makes a continuous patrol.
-				if (patrolByPosition.TryGetValue(PositionKey(npc.PositionX, npc.PositionY, npc.PositionZ), out var patrol) && patrol.Waypoints.Count > 0)
+				// #266 patrol: attach this NPC's captured route (linked by exact spawn position). REPLAY the captured
+				// MoveTask re-addressed to this entity (handle + from = its spawn) - the original form carries the real
+				// speed/flags, so the client walks the route at the right pace (a rebuilt mode-1 path lost the speed and
+				// run-crawled). The cycle timer (path time + dwell) re-issues it so it keeps looping.
+				if (patrolByPosition.TryGetValue(PositionKey(npc.PositionX, npc.PositionY, npc.PositionZ), out var patrol)
+				    && patrol.Body is { Length: > 0 } && patrol.Waypoints.Count > 0)
 				{
 					entity.PatrolWaypoints = patrol.Waypoints.OrderBy(w => w.Ordinal).Select(w => new Vector3(w.X, w.Y, w.Z)).ToList();
 					entity.PatrolSpeed = patrol.Speed;
+					entity.PatrolBody = ReaddressPatrol(patrol.Body, handle, entity.Position);
 					entity.PatrolCycleSeconds = MoveTaskCodec.TotalPathLength(entity.Position, entity.PatrolWaypoints) / PatrolWalkSpeed + PatrolDwellSeconds;
 					entity.ArmPatrolCycle();
 				}
@@ -1163,10 +1166,22 @@ namespace Faolan.GameServer.World
 		{
 			if (!npc.Patrols)
 				return Task.CompletedTask;
-			// mode-1 PathMoveTask (BuildPathBody) - the dominant captured patrol form; the path length is derived from
-			// the waypoints. BuildPathBody emits a bare 0x2000 body (no length prefix), so it rides SendWorldIir.
-			var body = MoveTaskCodec.BuildPathBody(npc.Handle, npc.Position, npc.PatrolWaypoints);
-			return SendWorldIir(recipient, body);
+			// Replay the captured MoveTask record (already re-addressed to this NPC's handle + spawn position). Encode
+			// emits a bare 0x2000 body (no length prefix), so it rides SendWorldIir.
+			return SendWorldIir(recipient, npc.PatrolBody);
+		}
+
+		// Re-address a captured MoveTask record to a live NPC: swap in its wire handle and set the from-position to its
+		// spawn (the render-gate requires the MoveTask's from to match the spawn the client was just sent). The captured
+		// form (speed/flags/list structure) is preserved verbatim - that is what makes the client walk the route.
+		private static byte[] ReaddressPatrol(byte[] capturedBody, uint handle, Vector3 from)
+		{
+			var task = MoveTaskComposite.Parse(capturedBody);
+			task.Handle = handle;
+			task.FromX = BitConverter.SingleToUInt32Bits(from.X);
+			task.FromY = BitConverter.SingleToUInt32Bits(from.Y);
+			task.FromZ = BitConverter.SingleToUInt32Bits(from.Z);
+			return task.Encode();
 		}
 
 		// Sends a prebuilt LootBagFullUpdateIIR body (handle + transform already baked by WorldObjectBuilder) on

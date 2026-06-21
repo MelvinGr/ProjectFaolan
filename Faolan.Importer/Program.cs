@@ -359,7 +359,7 @@ namespace Faolan.Importer
 				{
 					spawns.Add(e);
 					if (routes.TryGetValue(e.Handle, out var r) && r.Waypoints.Count > 0)
-						patrols.Add(new PatrolPathEntry(e.MapId, new Vector3(e.X, e.Y, e.Z), r.Speed, r.Waypoints));
+						patrols.Add(new PatrolPathEntry(e.MapId, new Vector3(e.X, e.Y, e.Z), r.Speed, r.Waypoints, 0, r.Body));
 				}
 			}
 
@@ -534,6 +534,7 @@ namespace Faolan.Importer
 				}
 
 				existing.Speed = e.Speed;
+				existing.Body = e.Body; // the captured MoveTask record, replayed re-addressed at runtime (#266)
 				for (var i = 0; i < e.Waypoints.Count; i++)
 					existing.Waypoints.Add(new PatrolWaypoint
 					{

@@ -18,6 +18,12 @@ namespace Faolan.Core.Database.Tables
 		// Walk speed - the patrol move-block trailer's big-endian float.
 		public float Speed { get; set; }
 
+		// The captured MoveTask record (bytes from the subop onward - the shape MoveTaskComposite.Parse accepts) so the
+		// runtime can REPLAY the exact captured patrol re-addressed to the live NPC (handle + from) instead of rebuilding
+		// a stripped mode-1 path. Replaying preserves the original form's speed/flags/list structure, which is what makes
+		// the client WALK the route at the right pace and loop it (#266). Null for a legacy row with no stored body.
+		public byte[] Body { get; set; }
+
 		public virtual ICollection<PatrolWaypoint> Waypoints { get; set; } = new List<PatrolWaypoint>();
 
 		[ForeignKey(nameof(MapId))]
