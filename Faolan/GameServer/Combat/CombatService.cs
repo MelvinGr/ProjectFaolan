@@ -399,7 +399,15 @@ namespace Faolan.GameServer.Combat
 				await _broadcaster.SendQuestGoal(killer, quest.QuestId, 0, progress);
 
 				if (completed)
+				{
+					// The goal push alone moves the objective counter but does NOT update the journal entry / mark the
+					// quest done in-client (#47). Retail follows the QuestGoal with QuestIIR state 2 (active/update) then
+					// state 4 (completed) - the journal driver (Stihetfv compeltefirstquest, 13479 idx858/860). Without
+					// these the kill registered server-side but the client journal never advanced.
+					await _broadcaster.SendQuestIir(killer, quest.QuestId, WorldQuest.StateActive);
+					await _broadcaster.SendQuestIir(killer, quest.QuestId, WorldQuest.StateCompleted);
 					await _agents.SendSystemMessage(character.Id, $"Quest {quest.QuestId} complete!");
+				}
 				else
 					await _agents.SendSystemMessage(character.Id, $"{npcName} slain ({progress}/{quest.GoalRequired}).");
 			}

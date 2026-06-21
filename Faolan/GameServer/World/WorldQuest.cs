@@ -29,8 +29,10 @@ namespace Faolan.GameServer.World
 		public const uint QuestGoalSubOpcode = (uint)GameServer0X2000RespondsOpcodes.QuestGoalIIR; // QuestGoalIIR_c - objective progress
 		public const uint QuestIirSubOpcode = (uint)GameServer0X2000RespondsOpcodes.QuestIIR; // QuestIIR_c - add/update/remove a quest in the journal
 
-		// Quest state codes (from the capture; only "active/added" = 2 is confirmed).
+		// Quest state codes (from the capture). On completion retail sends QuestIIR twice for the quest: state 2
+		// (active/update) then state 4 (completed) - see the Stihetfv compeltefirstquest capture (13479 idx858/860).
 		public const uint StateActive = 2;
+		public const uint StateCompleted = 4;
 
 		// The QuestFullUpdate (0x63268258) carries its OWN per-quest "state/category" field (the u32 after the second
 		// questId) - a DIFFERENT enum from the QuestIIR StateActive above. It is CONSTANT per quest across its whole
