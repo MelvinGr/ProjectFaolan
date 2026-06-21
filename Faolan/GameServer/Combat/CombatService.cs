@@ -462,6 +462,9 @@ namespace Faolan.GameServer.Combat
 				// tick then converts the lingering corpse to a lootable bag (NpcCorpseLootable) and respawns it later.
 				// Don't despawn/convert here - that instant-popped the corpse before the death animation could play.
 				npcEntity.MarkDead();
+				// Record the killer so the corpse's loot bag is owned by them (the allowed looter), not whoever is in
+				// range - retail's NewAllowedLooterIIR is a loot-PERMISSION grant (#263).
+				npcEntity.LastAttackerHandle = killer.Session.Account.ClientInstance;
 
 				// #204: the health=0 StatUpdate alone does NOT play the death animation (in-client verified) - the
 				// client needs the explicit SimpleCharKilledByUpdateIIR (0xB066AFC2) kill record (docs/combat.md,

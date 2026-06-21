@@ -928,9 +928,9 @@ namespace Faolan.GameServer.World
 			// despawn (matching retail - not every kill leaves a bag).
 			if (items.Count > 0 || cash > 0)
 			{
-				var bag = await SpawnLootBagAt(deadNpc.MapId, deadNpc.Position, deadNpc.Rotation, items, cash);
-				_logger.LogInformation("Loot: {Name} 0x{Handle:X8} dropped bag 0x{Bag:X8} ({Items} items, {Cash} tin) on map {Map}.",
-					deadNpc.Name, deadNpc.Handle, bag?.Handle ?? 0, items.Count, cash, deadNpc.MapId);
+				var bag = await SpawnLootBagAt(deadNpc.MapId, deadNpc.Position, deadNpc.Rotation, items, cash, deadNpc.LastAttackerHandle);
+				_logger.LogInformation("Loot: {Name} 0x{Handle:X8} dropped bag 0x{Bag:X8} ({Items} items, {Cash} tin, looter 0x{Looter:X8}) on map {Map}.",
+					deadNpc.Name, deadNpc.Handle, bag?.Handle ?? 0, items.Count, cash, deadNpc.LastAttackerHandle, deadNpc.MapId);
 			}
 
 			await BroadcastEntityDespawn(deadNpc); // remove the corpse render; the NPC revives via TickRespawn (or is removed if NoRespawn)
@@ -948,7 +948,7 @@ namespace Faolan.GameServer.World
 			if (player == null)
 				return null;
 
-			var bag = await SpawnLootBagAt(player.MapId, player.Position, player.Rotation, itemTemplates, cashTin);
+			var bag = await SpawnLootBagAt(player.MapId, player.Position, player.Rotation, itemTemplates, cashTin, player.Handle);
 			if (bag != null)
 				_logger.LogInformation("Loot: .spawnbag bag 0x{Handle:X8} for {Player} ({Items} items, {Cash} tin).",
 					bag.Handle, client.Session.Character?.Name, itemTemplates.Count, cashTin);
@@ -960,7 +960,7 @@ namespace Faolan.GameServer.World
 		// of whatever dropped it. Used by .spawnbag AND by NPC death drops (#246) so the dead NPC's handle is free to
 		// respawn at its spawn point and the bag survives that respawn. Returns the bag, or null if the map has no
 		// loot template.
-		private async Task<WorldEntity> SpawnLootBagAt(uint mapId, Vector3 position, Vector3 rotation, IReadOnlyList<uint> itemTemplates, uint cashTin)
+		private async Task<WorldEntity> SpawnLootBagAt(uint mapId, Vector3 position, Vector3 rotation, IReadOnlyList<uint> itemTemplates, uint cashTin, uint allowedLooterHandle)
 		{
 			var template = GetLootTemplate();
 			if (template == null)
@@ -976,6 +976,7 @@ namespace Faolan.GameServer.World
 
 			var bag = WorldEntity.ForLoot(handle, mapId, position, rotation, template.Name ?? "Loot", body, LootBagExpirySeconds);
 			bag.CashTin = cashTin;
+			bag.AllowedLooterHandle = allowedLooterHandle;
 			if (itemTemplates != null)
 				bag.LootItems.AddRange(itemTemplates);
 			_sim.World.ZoneFor(mapId).Add(bag);
@@ -992,9 +993,11 @@ namespace Faolan.GameServer.World
 				// #263: the LootBagFullUpdateIIR alone only renders a NEW world object on a playfield (re)load - the
 				// client otherwise treats it as an update to an object it doesn't have yet (verified: our bags only
 				// appeared after a relog). Retail follows the FullUpdate with a NewAllowedLooterIIR at the bag's
-				// mid-session spawn (capture fr1358), which is what makes the client INSTANTIATE + render it live. Name
-				// the viewer as the allowed looter (each in-range player may loot it).
-				await SendWorldIir(viewer.Client, WorldLoot.BuildNewAllowedLooterBody(handle, viewer.Handle));
+				// mid-session spawn (capture fr1358), which is what makes the client INSTANTIATE + render it live. This
+				// packet is a loot-PERMISSION grant, so it names the bag's OWNER (the killer / spawning player), not the
+				// recipient - a drop belongs to whoever earned it. Fall back to the viewer when there's no owner (e.g. a
+				// legacy .spawnbag) so the bag still renders.
+				await SendWorldIir(viewer.Client, WorldLoot.BuildNewAllowedLooterBody(handle, allowedLooterHandle != 0 ? allowedLooterHandle : viewer.Handle));
 			}
 
 			return bag;

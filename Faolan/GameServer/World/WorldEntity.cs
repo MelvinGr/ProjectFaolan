@@ -99,6 +99,12 @@ namespace Faolan.GameServer.World
 		// real mob killer makes it INSTANT like retail (#214). Set by ApplyNpcAttack/ApplyNpcCast when a hit lands.
 		public uint LastAttackerHandle { get; set; }
 
+		// For a LOOT BAG: the player handle allowed to loot it (the killer, or the .spawnbag player). Sent as the
+		// NewAllowedLooterIIR's looter at spawn (#263) - retail's loot-permission grant, so a drop belongs to whoever
+		// earned it rather than everyone in range. 0 = unowned (anyone). Loot-permission ENFORCEMENT (gating the take
+		// on this) is a later step (#101 shared-zone loot); today's Tortage is single-player-instanced so it's moot.
+		public uint AllowedLooterHandle { get; set; }
+
 		// The position this NPC stepped FROM on its last chase tick - the MoveTask broadcast sends from->to so the
 		// client interpolates the step (set just before Position is advanced toward the target).
 		public Vector3 MoveOrigin { get; set; }
