@@ -325,29 +325,33 @@ namespace Faolan.Importer
 			await db.SaveChangesAsync();
 		}
 
-		// The clean NPC spawn set the DB should hold (#266): faction mobs ONLY where a map's authoritative login burst
-		// (one session = retail's actual world build) placed them, PLUS the named/unique NPCs (Community 0: Casilda,
-		// vendors, neutral critters) the burst doesn't cover because they live outside the captured path. Without this
-		// the DB accretes the cross-session UNION - the same wandering mob logged at dozens of spots (the beach: 696
-		// rows for ~42 real NPCs), which renders as ~50 duplicate crocodiles in-client. Maps with NO captured login
-		// burst keep the union (no authoritative set to trust). Named NPCs are deduped by (map, name); exact-position
-		// overlaps by Merge. Mirrors the runtime WorldBroadcaster.EnsureZoneNpcs burst-as-truth gate.
+		// The clean NPC spawn set the DB should hold (#266). The raw captures over-count NPCs two ways: (1) the same mob
+		// is re-streamed at new positions as the player crosses its interest range (a 4-scavenger camp logged as 19
+		// FA015807 packets but only 4 HANDLES), and (2) the cross-session UNION stacks every session's sighting of a
+		// wandering mob. Fix both by working in DISTINCT-BY-HANDLE per-capture sets (one entry per real mob/session),
+		// then taking each NPC TYPE from a SINGLE authoritative session: the login-burst types from the richest pre-poll
+		// capture (retail's entry-area build), every other type (camps/areas the login window didn't reach - Scavenger
+		// Tuut/Lackeys, Casilda, vendors) from the capture that saw the most distinct-handle instances of it.
 		private static List<NpcSpawnEntry> BuildBurstTruthSpawns(IReadOnlyList<NamedCapture> captures)
 		{
-			var union = NpcSpawnExtractor.Merge(captures.SelectMany(c => NpcSpawnExtractor.Extract(c.Packets)));
+			// Per capture, ONE entry per distinct mob: dedup the FA015807 spawns by HANDLE. A mob is re-streamed at a
+			// new position every time the player re-enters its interest range, but it is the SAME mob (same handle) - the
+			// old position-dedup (Merge) kept each re-stream of a MOVING mob as a phantom copy (a 4-scavenger camp logged
+			// as 19). Handle is the per-session mob identity. Keep the first sighting (most pristine position).
+			var perCaptureAll = captures.Select(c => DistinctByHandle(NpcSpawnExtractor.Extract(c.Packets))).ToList();
+			var perCaptureBurst = captures.Select(c => DistinctByHandle(NpcSpawnExtractor.ExtractLoginBurst(c.Packets))).ToList();
+			var allMaps = perCaptureAll.SelectMany(l => l.Select(e => e.MapId)).Distinct().ToList();
 
-			// Best (most complete) login burst per map. Positions carry per-session float jitter, so DON'T union bursts
-			// across captures (that wouldn't dedup) - pick the single richest capture's burst per map and take only it.
-			var perCaptureBurst = captures.Select(c => NpcSpawnExtractor.ExtractLoginBurst(c.Packets)).ToList();
+			// Authoritative login burst per map: the single richest pre-poll capture (no kills yet -> complete & pristine).
 			var burst = new List<NpcSpawnEntry>();
-			foreach (var map in union.Select(e => e.MapId).Distinct())
+			foreach (var map in allMaps)
 			{
 				var best = perCaptureBurst
 					.Select(b => b.Where(e => e.MapId == map).ToList())
 					.OrderByDescending(l => l.Count)
 					.FirstOrDefault();
 				if (best is { Count: > 0 })
-					burst.AddRange(NpcSpawnExtractor.Merge(best));
+					burst.AddRange(best);
 			}
 
 			var burstMaps = burst.Select(e => e.MapId).ToHashSet();
@@ -355,55 +359,40 @@ namespace Faolan.Importer
 				.GroupBy(e => e.MapId)
 				.ToDictionary(g => g.Key, g => g.Select(e => e.Name ?? "").ToHashSet());
 
-			// Per-capture spawn set (deduped within each capture), for filling camps the burst missed from ONE session.
-			var perCaptureSpawns = captures
-				.Select(c => NpcSpawnExtractor.Merge(NpcSpawnExtractor.Extract(c.Packets)))
-				.ToList();
-
-			// Per-NPC-TYPE rule: trust the burst for any type it PLACED (a Crocodile in the burst -> the burst's ~7,
-			// not the union's ~50 cross-session copies). A type the burst NEVER saw is a camp/area the capture didn't
-			// walk through (Scavenger Tuut + Lackeys down the beach, the #261 quest camp) - it must still exist, so fill
-			// it from a SINGLE session, not the union: named/unique NPCs (Community 0: Casilda) once per name; faction
-			// mobs from the one capture that saw the most of that type. Cross-session position-cell dedup does NOT work
-			// for these - they WANDER, so the same mob is logged at many spots every session and would never collapse;
-			// the richest single capture is the retail-shaped count (the same single-session logic the burst uses).
+			// Unified per-TYPE rule: a type the login burst PLACED is taken from the burst (retail entry-area count);
+			// any OTHER type (a camp/area the login window didn't reach - Scavenger Tuut/Lackeys, Casilda, vendors) is
+			// filled from the single capture that saw the most DISTINCT-HANDLE instances of it - the most complete view
+			// of that camp in one session (movers included, re-streams already collapsed by handle). This is the same
+			// single-session logic the burst uses; for a unique NPC it naturally yields one instance.
 			var result = new List<NpcSpawnEntry>(burst);
-			var keptNamed = new HashSet<(uint, string)>();
-			var filledCamps = new HashSet<(uint, string)>();
-			foreach (var e in union)
+			var nonBurstTypes = perCaptureAll
+				.SelectMany(l => l)
+				.Select(e => (e.MapId, Name: e.Name ?? ""))
+				.Where(t => !(burstMaps.Contains(t.MapId) && burstNamesByMap[t.MapId].Contains(t.Name)))
+				.Distinct();
+			foreach (var (map, name) in nonBurstTypes)
 			{
-				if (!burstMaps.Contains(e.MapId))
-				{
-					result.Add(e); // no authoritative burst for this map - keep the union as-is
-					continue;
-				}
-				if (burstNamesByMap.TryGetValue(e.MapId, out var names) && names.Contains(e.Name ?? ""))
-					continue; // the burst placed this type -> trust the burst's count, drop the union copies
-
-				if (e.Community == 0)
-				{
-					if (keptNamed.Add((e.MapId, e.Name ?? "")))
-						result.Add(e); // a named/unique NPC the burst missed - one instance
-				}
-				else if (filledCamps.Add((e.MapId, e.Name ?? "")))
-				{
-					// A faction camp the burst missed: take this type's spawns from the single session that saw the
-					// FEWEST of them. These camps are mid-session (post-poll), so a session that FARMED them logged
-					// every respawn as a new spawn (the Scavenger Lackey union ranged 3..19 across captures - the 19 is
-					// a farming session). The smallest non-zero count is the un-farmed population (~the route's distinct
-					// mobs, one sighting each), the retail-shaped count. (The login burst uses the LARGEST pre-poll
-					// capture instead - that window has no kills yet, so largest = most complete & still pristine.)
-					var leastFarmed = perCaptureSpawns
-						.Select(cap => cap.Where(s => s.MapId == e.MapId && s.Name == e.Name).ToList())
-						.Where(l => l.Count > 0)
-						.OrderBy(l => l.Count)
-						.FirstOrDefault();
-					if (leastFarmed is { Count: > 0 })
-						result.AddRange(leastFarmed);
-				}
+				var best = perCaptureAll
+					.Select(cap => cap.Where(s => s.MapId == map && (s.Name ?? "") == name).ToList())
+					.OrderByDescending(l => l.Count)
+					.First();
+				result.AddRange(best);
 			}
 
-			return NpcSpawnExtractor.Merge(result);
+			return NpcSpawnExtractor.Merge(result); // final safety dedup of any exact-position overlap
+		}
+
+		// One entry per distinct mob in a capture: dedup FA015807 spawns by their wire HANDLE, keeping the first
+		// sighting. Within a session a handle uniquely identifies a mob; the same mob is re-streamed at new positions
+		// as it (or the player) moves, but those are not extra mobs (#266).
+		private static List<NpcSpawnEntry> DistinctByHandle(IEnumerable<NpcSpawnEntry> entries)
+		{
+			var seen = new HashSet<uint>();
+			var result = new List<NpcSpawnEntry>();
+			foreach (var e in entries)
+				if (seen.Add(e.Handle))
+					result.Add(e);
+			return result;
 		}
 
 		// Upsert by (map, spawn point); never wipe.
