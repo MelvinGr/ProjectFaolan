@@ -44,6 +44,20 @@ packet are identical.
   still fails at the player's position, the cause is NOT the death-spot Z — re-investigate the corpse
   `BroadcastEntityDespawn` (fired right after the bag spawn) interfering, or a body/token issue.
 
+## Problems 2 & 3 — RESOLVED + verified in-client 2026-06-21 (#226 CLOSED)
+
+The single-drag was decoded from a drag-only capture (`Captures/loot-drag-1538.tshark.json`; the older gameplay
+captures only loot-ALL). Findings + fixes (commits 220aa99, f82fbf2, 4bc1eeb), see [[loot_single_drag_226]]:
+- `TryLootItem 0x2046` body = `[typetag][bag][u32 srcPos][0000c350][playerHandle][u32 destSlot]`.
+- `LootRemoveItems` trailing u32 = the **looted display Pos** (the srcPos), echoed so the client removes THAT slot
+  — not a remaining-count, not a constant 0.
+- The client does **NOT compact** the window: it leaves a GAP and keeps survivors at their original Pos, so the
+  server keeps stable positions too (null the looted slot, never `RemoveAt`).
+- The N-1 display (Problem 3) was the `Archetype==0` skip; resolving buildable loot once makes display Pos ==
+  `LootItems` index. (Do NOT re-send the full LootBagFullUpdateIIR mid-window — it stacks a second window.)
+
+Original investigation notes below (superseded):
+
 ## Problem 2 — dragging an item moves the WRONG one (NEW, high priority) — FIXED in code, awaiting in-client test
 
 Dragging a specific item out of the bag grants/removes a DIFFERENT item than the one clicked. **Root cause:**
