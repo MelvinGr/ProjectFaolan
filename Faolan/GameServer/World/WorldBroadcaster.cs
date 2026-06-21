@@ -45,8 +45,9 @@ namespace Faolan.GameServer.World
 		private const float PatrolWalkSpeed = 6f;
 		private const double PatrolDwellSeconds = 2.0;
 
-		// Maps whose NPCs have been loaded into the world model (once per map, on first entry).
-		private readonly ConcurrentDictionary<uint, byte> _npcLoadedZones = new ConcurrentDictionary<uint, byte>();
+		// (mapId, instanceId) zones whose NPCs have been loaded into the world model (once per instance, on first entry
+		// to that copy - each instance gets its own NPC population) (#268).
+		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), byte> _npcLoadedZones = new();
 
 		// Cached loot-bag template (a captured "Bag of loot" world object) per map; null values cache loot-less maps.
 		private readonly IDatabaseRepository _database;
@@ -82,11 +83,11 @@ namespace Faolan.GameServer.World
 		{
 			foreach (var viewer in _sim
 				         .World
-				         .ZoneFor(entity.MapId)
+				         .ZoneForEntity(entity)
 				         .PlayersInRange(entity.Position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client != null && viewer.Known.Remove(entity.Handle))
-					await SendWorldDespawn(viewer.Client, viewer.MapId, entity.Handle);
+					await SendWorldDespawn(viewer.Client, _sim.World.ZoneForEntity(viewer).PlayfieldToken, entity.Handle);
 			}
 		}
 
@@ -97,7 +98,7 @@ namespace Faolan.GameServer.World
 			var body = WorldLoot.BuildFadeBody(WorldLoot.LootTypeTag, entity.Handle, WorldLoot.DefaultFadeSeconds);
 			foreach (var viewer in _sim
 				         .World
-				         .ZoneFor(entity.MapId)
+				         .ZoneForEntity(entity)
 				         .PlayersInRange(entity.Position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client == null)
@@ -119,7 +120,7 @@ namespace Faolan.GameServer.World
 
 			foreach (var viewer in _sim
 				         .World
-				         .ZoneFor(npc.MapId)
+				         .ZoneForEntity(npc)
 				         .PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
 				// Re-add to Known: the corpse despawn (ConvertCorpseToLoot, #246) removed the handle, so the player
@@ -151,7 +152,7 @@ namespace Faolan.GameServer.World
 
 			foreach (var viewer in _sim
 				         .World
-				         .ZoneFor(npc.MapId)
+				         .ZoneForEntity(npc)
 				         .PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
@@ -165,7 +166,7 @@ namespace Faolan.GameServer.World
 		{
 			foreach (var viewer in _sim
 				         .World
-				         .ZoneFor(npc.MapId)
+				         .ZoneForEntity(npc)
 				         .PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
@@ -192,7 +193,7 @@ namespace Faolan.GameServer.World
 
 			foreach (var viewer in _sim
 				         .World
-				         .ZoneFor(npc.MapId)
+				         .ZoneForEntity(npc)
 				         .PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
@@ -229,7 +230,7 @@ namespace Faolan.GameServer.World
 
 			foreach (var viewer in _sim
 				         .World
-				         .ZoneFor(npc.MapId)
+				         .ZoneForEntity(npc)
 				         .PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
@@ -249,7 +250,7 @@ namespace Faolan.GameServer.World
 
 			foreach (var viewer in _sim
 				         .World
-				         .ZoneFor(npc.MapId)
+				         .ZoneForEntity(npc)
 				         .PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
@@ -262,7 +263,7 @@ namespace Faolan.GameServer.World
 		// away). Single-player is a no-op (no viewers).
 		public Task BroadcastPlayerDespawn(WorldEntity leaver)
 		{
-			var events = InterestManager.ResolveRemove(_sim.World.ZoneFor(leaver.MapId), leaver);
+			var events = InterestManager.ResolveRemove(_sim.World.ZoneForEntity(leaver), leaver);
 			return DispatchInterest(events, null);
 		}
 
@@ -275,7 +276,7 @@ namespace Faolan.GameServer.World
 			if (entity?.SpawnBody == null)
 				return;
 
-			var zone = _sim.World.ZoneFor(entity.MapId);
+			var zone = _sim.World.ZoneForEntity(entity);
 
 			// Interest is the SOLE NPC spawn path (since #23 made mid-session/interest spawns render; in-client verified
 			// 2026-06-16): NPCs are dropped from the world-entry burst (ReplayMapWorldBurst), so stream every in-range
@@ -301,7 +302,7 @@ namespace Faolan.GameServer.World
 			// includeNonPlayers: stream the zone's NPCs to this player as they move (the burst only rendered the NPCs
 			// near the entry point; this fills in the rest of the map - e.g. Casilda, who is outside the captured
 			// burst). Burst NPCs are already in the player's Known set (seeded at entry) so they are not re-spawned.
-			var events = InterestManager.ResolveMove(_sim.World.ZoneFor(entity.MapId), entity, WorldSimulation.PlayerInterestRange, includeNonPlayers: true);
+			var events = InterestManager.ResolveMove(_sim.World.ZoneForEntity(entity), entity, WorldSimulation.PlayerInterestRange, includeNonPlayers: true);
 			var spawns = 0;
 			var despawns = 0;
 			foreach (var ev in events)
@@ -366,7 +367,7 @@ namespace Faolan.GameServer.World
 		public async Task<byte> QuestMarkerStateForHandle(INetworkClient client, uint handle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
-			if (player != null && _sim.World.ZoneFor(player.MapId).TryGet(handle, out var npc) && !npc.IsPlayer)
+			if (player != null && _sim.World.ZoneForEntity(player).TryGet(handle, out var npc) && !npc.IsPlayer)
 				return await ComputeGiverMarkerState(client, npc.Name);
 			return QuestMarkerNone;
 		}
@@ -379,7 +380,7 @@ namespace Faolan.GameServer.World
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null)
 				return;
-			if (_sim.World.ZoneFor(player.MapId).TryGet(npcHandle, out var npc) && !npc.IsPlayer)
+			if (_sim.World.ZoneForEntity(player).TryGet(npcHandle, out var npc) && !npc.IsPlayer)
 				await SendQuestMarkerIfGiver(client, npc);
 		}
 
@@ -411,17 +412,17 @@ namespace Faolan.GameServer.World
 		// OVERRIDES the token WorldState minted at zone creation - for a replayed playfield the burst's value is the
 		// authoritative one (the client learned it from the burst, not from us). Idempotent: the token is constant per
 		// playfield, so a re-entry re-extracts the same value; logged only when it actually changes.
-		public void CapturePlayfieldToken(uint mapId, ReadOnlySpan<byte> snapshotBody)
+		public void CapturePlayfieldToken(uint mapId, uint instanceId, ReadOnlySpan<byte> snapshotBody)
 		{
 			if (!WorldDespawn.TryExtractPlayfieldToken(snapshotBody, out var token))
 				return;
 
-			var zone = _sim.World.ZoneFor(mapId);
+			var zone = _sim.World.ZoneFor(mapId, instanceId);
 			if (zone.PlayfieldToken == token)
 				return;
 
 			zone.PlayfieldToken = token;
-			_logger.LogInformation("World: map {Map} playfield token = 0x{Token:X8} (from burst; overrides minted fallback).", mapId, token);
+			_logger.LogInformation("World: map {Map} instance 0x{Instance:X8} playfield token = 0x{Token:X8} (from burst; overrides minted fallback).", mapId, instanceId, token);
 		}
 
 		// Resolves the playfield token a map's world-entry will stamp (extracted from its stored burst's FullChar
@@ -448,7 +449,7 @@ namespace Faolan.GameServer.World
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null || !_sim
 				    .World
-				    .ZoneFor(player.MapId)
+				    .ZoneForEntity(player)
 				    .TryGet(bagHandle, out var bag) || !bag.IsLootable)
 				return;
 
@@ -461,13 +462,13 @@ namespace Faolan.GameServer.World
 		// authoritative shared view of the map's NPCs - the model fix at the heart of the roadmap (NPCs are otherwise
 		// only per-player burst replays the server doesn't track). The tick/AI/combat will drive these; clients still
 		// render them from the burst for now, so this is model bookkeeping (no wire change).
-		public async Task EnsureZoneNpcs(uint mapId)
+		public async Task EnsureZoneNpcs(uint mapId, uint instanceId)
 		{
-			if (!_npcLoadedZones.TryAdd(mapId, 0))
+			if (!_npcLoadedZones.TryAdd((mapId, instanceId), 0))
 				return;
 
 			var npcs = await _database.GetNpcSpawns(mapId);
-			var zone = _sim.World.ZoneFor(mapId);
+			var zone = _sim.World.ZoneFor(mapId, instanceId);
 
 			// #266 patrol: captured routes keyed at their paired spawn's position (the importer correlated route->spawn
 			// by handle), so link each route to its NPC by exact position below. The NPC then walks it client-side via a
@@ -534,6 +535,7 @@ namespace Faolan.GameServer.World
 					? bh
 					: npc.CapturedHandle;
 				var entity = WorldEntity.ForNpc(handle, mapId, new Vector3(npc.PositionX, npc.PositionY, npc.PositionZ), new Vector3(npc.RotationX, npc.RotationY, npc.RotationZ), npcName ?? "NPC", vitals);
+				entity.InstanceId = instanceId; // this NPC belongs to THIS copy of the map (#268)
 				entity.Level = npc.Level;
 
 				// #266 patrol: attach this NPC's captured route (linked by exact spawn position). REPLAY the captured
@@ -568,7 +570,7 @@ namespace Faolan.GameServer.World
 				zone.Add(entity);
 			}
 
-			_logger.LogInformation("World: loaded {Count} NPC(s) into map {Map}'s zone ({Raw} rows, {Collapsed} cross-session re-captures collapsed; {BurstAligned} aligned to burst handles).", zone.Count, mapId, npcs.Length, npcs.Length - seenCells.Count, burstHandleByPosition.Count);
+			_logger.LogInformation("World: loaded {Count} NPC(s) into map {Map} instance 0x{Instance:X8} ({Raw} rows, {Collapsed} cross-session re-captures collapsed; {BurstAligned} aligned to burst handles).", zone.Count, mapId, instanceId, npcs.Length, npcs.Length - seenCells.Count, burstHandleByPosition.Count);
 		}
 
 		// Maps each FA015807 NPC the burst renders to (rounded position) -> the wire handle it renders under, by
@@ -618,7 +620,7 @@ namespace Faolan.GameServer.World
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null || !_sim
 				    .World
-				    .ZoneFor(player.MapId)
+				    .ZoneForEntity(player)
 				    .TryGet(objectHandle, out var bag) || !bag.IsLootable)
 				return;
 
@@ -654,7 +656,7 @@ namespace Faolan.GameServer.World
 		public uint? TakeBagItem(INetworkClient client, uint bagHandle, int index)
 		{
 			var player = _sim.PlayerWorldEntity(client);
-			if (player == null || !_sim.World.ZoneFor(player.MapId).TryGet(bagHandle, out var bag) || !bag.IsLootable)
+			if (player == null || !_sim.World.ZoneForEntity(player).TryGet(bagHandle, out var bag) || !bag.IsLootable)
 				return null;
 			if (index < 0 || index >= bag.LootItems.Count || bag.LootItems[index] == 0)
 				return null;
@@ -673,7 +675,7 @@ namespace Faolan.GameServer.World
 		public async Task AfterLootTake(INetworkClient client, uint bagHandle, uint removedPos = 0)
 		{
 			var player = _sim.PlayerWorldEntity(client);
-			if (player == null || !_sim.World.ZoneFor(player.MapId).TryGet(bagHandle, out var bag))
+			if (player == null || !_sim.World.ZoneForEntity(player).TryGet(bagHandle, out var bag))
 				return;
 
 			// Per-take ACK: tell the client which display slot to remove from the open window - the looted item's Pos
@@ -699,7 +701,7 @@ namespace Faolan.GameServer.World
 			await SendWorldIir(client, WorldLoot.BuildFadeBody(WorldLoot.LootTypeTag, bag.Handle, WorldLoot.DefaultFadeSeconds));
 			await SendWorldIir(client, WorldLoot.BuildBagConsumedVisualBody(bag.Handle));
 
-			_sim.World.ZoneFor(bag.MapId).Remove(bag.Handle);
+			_sim.World.ZoneForEntity(bag).Remove(bag.Handle);
 			_logger.LogInformation("Loot: bag 0x{Handle:X8} fully looted; consumed + faded.", bag.Handle);
 		}
 
@@ -870,12 +872,12 @@ namespace Faolan.GameServer.World
 					entity.Spells.Add(new NpcSpellCast(s.SpellId, s.Payload));
 			_sim
 				.World
-				.ZoneFor(player.MapId)
+				.ZoneForEntity(player)
 				.Add(entity);
 
 			foreach (var viewer in _sim
 				         .World
-				         .ZoneFor(player.MapId)
+				         .ZoneForEntity(player)
 				         .PlayersInRange(player.Position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client != null)
@@ -894,19 +896,19 @@ namespace Faolan.GameServer.World
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null || !_sim
 				    .World
-				    .ZoneFor(player.MapId)
+				    .ZoneForEntity(player)
 				    .TryGet(entityHandle, out var entity) || entity.IsPlayer)
 				return null;
 
 			foreach (var viewer in _sim
 				         .World
-				         .ZoneFor(player.MapId)
+				         .ZoneForEntity(player)
 				         .PlayersInRange(entity.Position, WorldSimulation.PlayerInterestRange))
 			{
 				// #245 invariant: only despawn for a viewer that actually has this handle (a despawn for a handle the
 				// recipient was never sent crashes it). Removes it from Known as it goes.
 				if (viewer.Client != null && viewer.Known.Remove(entityHandle))
-					await SendWorldDespawn(viewer.Client, player.MapId, entityHandle);
+					await SendWorldDespawn(viewer.Client, _sim.World.ZoneForEntity(viewer).PlayfieldToken, entityHandle);
 			}
 
 			_sim.World.Remove(entity);
@@ -921,7 +923,7 @@ namespace Faolan.GameServer.World
 		public WorldEntity SetNpcFollow(INetworkClient client, uint npcHandle, bool follow)
 		{
 			var player = _sim.PlayerWorldEntity(client);
-			if (player == null || !_sim.World.ZoneFor(player.MapId).TryGet(npcHandle, out var npc) || npc.IsPlayer)
+			if (player == null || !_sim.World.ZoneForEntity(player).TryGet(npcHandle, out var npc) || npc.IsPlayer)
 				return null;
 
 			npc.FollowTargetHandle = follow ? player.Handle : 0;
@@ -952,10 +954,10 @@ namespace Faolan.GameServer.World
 		public async Task<bool> DespawnWorldObjectForPlayer(INetworkClient client, uint handle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
-			if (player == null || _sim.World.ZoneFor(player.MapId).PlayfieldToken == 0)
+			if (player == null || _sim.World.ZoneForEntity(player).PlayfieldToken == 0)
 				return false;
 
-			await SendWorldDespawn(client, player.MapId, handle);
+			await SendWorldDespawn(client, _sim.World.ZoneForEntity(player).PlayfieldToken, handle);
 			_logger.LogInformation("Despawn: world object 0x{Handle:X8} for {Player}.", handle, player.Name);
 			return true;
 		}
@@ -968,7 +970,7 @@ namespace Faolan.GameServer.World
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null || !_sim
 				    .World
-				    .ZoneFor(player.MapId)
+				    .ZoneForEntity(player)
 				    .TryGet(bagHandle, out var bag) || !bag.IsLootable || !bag.LootItems.Any(i => i != 0))
 				return Array.Empty<uint>();
 
@@ -985,7 +987,7 @@ namespace Faolan.GameServer.World
 		public string BagSourceName(INetworkClient client, uint bagHandle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
-			if (player != null && _sim.World.ZoneFor(player.MapId).TryGet(bagHandle, out var bag) && bag.IsLootable)
+			if (player != null && _sim.World.ZoneForEntity(player).TryGet(bagHandle, out var bag) && bag.IsLootable)
 				return bag.LootSourceName; // the dead NPC's name (e.g. "Scavenger Tuut"), NOT the bag's "Bag of loot"
 			return null;
 		}
@@ -997,7 +999,7 @@ namespace Faolan.GameServer.World
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null || !_sim
 				    .World
-				    .ZoneFor(player.MapId)
+				    .ZoneForEntity(player)
 				    .TryGet(bagHandle, out var bag) || !bag.IsLootable)
 				return 0;
 
@@ -1048,13 +1050,13 @@ namespace Faolan.GameServer.World
 				var dropPos = deadNpc.Position;
 				var dropRot = deadNpc.Rotation;
 				if (deadNpc.LastAttackerHandle != 0 &&
-				    _sim.World.ZoneFor(deadNpc.MapId).TryGet(deadNpc.LastAttackerHandle, out var killer) && killer.IsPlayer)
+				    _sim.World.ZoneForEntity(deadNpc).TryGet(deadNpc.LastAttackerHandle, out var killer) && killer.IsPlayer)
 				{
 					dropPos = killer.Position;
 					dropRot = killer.Rotation;
 				}
 
-				var bag = await SpawnLootBagAt(deadNpc.MapId, dropPos, dropRot, items, cash, deadNpc.LastAttackerHandle, deadNpc.Name);
+				var bag = await SpawnLootBagAt(deadNpc.MapId, deadNpc.InstanceId, dropPos, dropRot, items, cash, deadNpc.LastAttackerHandle, deadNpc.Name);
 				_logger.LogInformation("Loot: {Name} 0x{Handle:X8} dropped bag 0x{Bag:X8} ({Items} items, {Cash} tin, looter 0x{Looter:X8}, quest={Quest}) on map {Map} at {Drop} (death spot {Death}).",
 					deadNpc.Name, deadNpc.Handle, bag?.Handle ?? 0, items.Count, cash, deadNpc.LastAttackerHandle, questDrop, deadNpc.MapId, dropPos, deadNpc.Position);
 			}
@@ -1094,7 +1096,7 @@ namespace Faolan.GameServer.World
 			if (player == null)
 				return null;
 
-			var bag = await SpawnLootBagAt(player.MapId, player.Position, player.Rotation, itemTemplates, cashTin, player.Handle);
+			var bag = await SpawnLootBagAt(player.MapId, player.InstanceId, player.Position, player.Rotation, itemTemplates, cashTin, player.Handle);
 			if (bag != null)
 				_logger.LogInformation("Loot: .spawnbag bag 0x{Handle:X8} for {Player} ({Items} items, {Cash} tin).",
 					bag.Handle, client.Session.Character?.Name, itemTemplates.Count, cashTin);
@@ -1106,7 +1108,7 @@ namespace Faolan.GameServer.World
 		// of whatever dropped it. Used by .spawnbag AND by NPC death drops (#246) so the dead NPC's handle is free to
 		// respawn at its spawn point and the bag survives that respawn. Returns the bag, or null if the map has no
 		// loot template.
-		private async Task<WorldEntity> SpawnLootBagAt(uint mapId, Vector3 position, Vector3 rotation, IReadOnlyList<uint> itemTemplates, uint cashTin, uint allowedLooterHandle, string lootSourceName = null)
+		private async Task<WorldEntity> SpawnLootBagAt(uint mapId, uint instanceId, Vector3 position, Vector3 rotation, IReadOnlyList<uint> itemTemplates, uint cashTin, uint allowedLooterHandle, string lootSourceName = null)
 		{
 			var template = GetLootTemplate();
 			if (template == null)
@@ -1124,16 +1126,17 @@ namespace Faolan.GameServer.World
 			// Identity (unit) rotation in the wire transform: a bag has no facing, and a non-unit quaternion scales the
 			// model. Built FROM SCRATCH (#249): header/transform + identity-from-columns + KdTreeTail, stamped with the
 			// live playfield token directly - no captured Data, no SpawnPlayfieldRewriter pass.
-			if (!WorldObjectBuilder.BuildFromScratch(template, handle, position, Quaternion.Identity, LootBagTemplate.TypeTag, _sim.World.ZoneFor(mapId).PlayfieldToken, out var body))
+			if (!WorldObjectBuilder.BuildFromScratch(template, handle, position, Quaternion.Identity, LootBagTemplate.TypeTag, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken, out var body))
 				return null;
 			body = SpliceLootContents(body, handle, cashTin, [.. loot.Select((l, i) => ((uint)i, l.Item))]); // OUR items/cash, Pos 0..n-1
 
 			var bag = WorldEntity.ForLoot(handle, mapId, position, rotation, template.Name ?? "Loot", body, LootBagExpirySeconds);
+			bag.InstanceId = instanceId; // the bag lives in the same map COPY as whatever dropped it (#268)
 			bag.CashTin = cashTin;
 			bag.AllowedLooterHandle = allowedLooterHandle;
 			bag.LootSourceName = lootSourceName; // the corpse's NPC name, for LootFromNpc quest-goal matching (#261)
 			bag.LootItems.AddRange(loot.Select(l => l.TemplateId)); // exactly the displayed set, same order as the window
-			_sim.World.ZoneFor(mapId).Add(bag);
+			_sim.World.ZoneFor(mapId, instanceId).Add(bag);
 
 			// Log the contents by display Pos so an in-client single-drag test can confirm the client's source-Pos maps
 			// to the item the player actually clicked (TryLootItem 0x2046 is not in any capture - the Pos mapping is
@@ -1144,7 +1147,7 @@ namespace Faolan.GameServer.World
 
 			foreach (var viewer in _sim
 				         .World
-				         .ZoneFor(mapId)
+				         .ZoneFor(mapId, instanceId)
 				         .PlayersInRange(position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client == null)
@@ -1303,7 +1306,7 @@ namespace Faolan.GameServer.World
 						await SendWorldMove(recipient, move.Value);
 						break;
 					case InterestEventType.Despawn:
-						await SendWorldDespawn(recipient, ev.Recipient.MapId, ev.Subject.Handle);
+						await SendWorldDespawn(recipient, _sim.World.ZoneForEntity(ev.Recipient).PlayfieldToken, ev.Subject.Handle);
 						break;
 				}
 			}
@@ -1323,15 +1326,15 @@ namespace Faolan.GameServer.World
 		}
 
 		// Removes the subject from `recipient`'s view - the n3ToClientQuit despawn (WorldDespawn). Stamped with the
-		// recipient zone's playfield token: the burst's value for a replayed playfield (what the client learned at
-		// entry), else WorldState's minted fallback. The token-is-0 guard is just defensive (ZoneFor always mints one).
-		private Task SendWorldDespawn(INetworkClient recipient, uint recipientMapId, uint subjectHandle)
+		// recipient's INSTANCE playfield token (#268; ZoneForEntity(recipient).PlayfieldToken at the call site): the
+		// burst's value for a replayed playfield (what the client learned at entry), else WorldState's minted fallback.
+		// The token-is-0 guard is just defensive (ZoneFor always mints one).
+		private Task SendWorldDespawn(INetworkClient recipient, uint playfieldToken, uint subjectHandle)
 		{
-			var token = _sim.World.ZoneFor(recipientMapId)
-				.PlayfieldToken;
+			var token = playfieldToken;
 			if (token == 0)
 			{
-				_logger.LogDebug("World: skip despawn {Subject:X8} for a viewer on map {Map} (playfield token unknown).", subjectHandle, recipientMapId);
+				_logger.LogDebug("World: skip despawn {Subject:X8} for a viewer (playfield token unknown).", subjectHandle);
 				return Task.CompletedTask;
 			}
 
@@ -1398,7 +1401,7 @@ namespace Faolan.GameServer.World
 			// client looks the spawn's playfield up in its loaded-playfield map; a miss is dropped before it ever polls).
 			// The login burst renders only because it was replayed from the same session whose token IS the live one;
 			// mid-session/interest spawns reuse arbitrary rows, so without this they carry a stale token and never render.
-			SpawnPlayfieldRewriter.TryRewrite(body, _sim.World.ZoneFor(subject.MapId).PlayfieldToken);
+			SpawnPlayfieldRewriter.TryRewrite(body, _sim.World.ZoneForEntity(subject).PlayfieldToken);
 
 			await new PacketStream()
 				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameServerCarrierOpcodes.IirCarrier)

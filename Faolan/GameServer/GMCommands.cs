@@ -1182,7 +1182,7 @@ namespace Faolan.GameServer
 			if (entity == null)
 				return _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, "World: you are not registered in the world model yet.");
 
-			var zone = _simulation.World.ZoneFor(entity.MapId);
+			var zone = _simulation.World.ZoneForEntity(entity);
 			var players = zone.Entities.Count(e => e.IsPlayer);
 			var npcs = zone.Entities.Count(e => !e.IsPlayer);
 			var nearby = zone

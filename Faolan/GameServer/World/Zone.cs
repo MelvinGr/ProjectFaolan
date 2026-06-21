@@ -19,6 +19,14 @@ namespace Faolan.GameServer.World
 
 		public uint MapId { get; }
 
+		// Which copy (instance) of MapId this zone is (#268). Together with MapId it is the zone's identity key in
+		// WorldState. 0 = the default shared instance (the historical single-zone-per-map behaviour); a Solo/Group
+		// map mints a non-zero id per copy. Distinct from PlayfieldToken (the WIRE token below): the InstanceId is
+		// the stable routing key, the PlayfieldToken is the value the client learned from the burst (which, until
+		// per-instance burst stamping lands - #268 step 4 - is shared across a Solo map's copies, harmlessly, since a
+		// client only ever sees its own instance).
+		public uint InstanceId { get; set; }
+
 		// The per-playfield-instance token stamped into every despawn so the client scopes the removal to this playfield
 		// (see WorldDespawn). Minted by WorldState on zone creation as a fallback; for a REPLAYED playfield the burst's
 		// own token (the value woven into the 0x737A6DF9 snapshot tail, the one the client actually learned) overrides

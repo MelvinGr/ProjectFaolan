@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Threading;
+using Faolan.Core.Database.Tables;
 
 namespace Faolan.GameServer.World
 {
@@ -32,7 +33,14 @@ namespace Faolan.GameServer.World
 		// follower ~one step behind; its MoveTasks track the player ~6-7u apart). A follower never leashes/aggros.
 		public const float FollowStopRange = 4f;
 
-		private readonly ConcurrentDictionary<uint, Zone> _zones = new ConcurrentDictionary<uint, Zone>();
+		// The live zones keyed by (mapId, instanceId) (#268). A map can have several copies (instances): the default
+		// shared instance plus any per-character Solo / per-party Group copies. Instance DefaultInstance (0) is the
+		// shared copy every Shared map uses - so ZoneFor(mapId) / the historical single-zone-per-map paths all resolve
+		// to it and behave exactly as before instancing existed.
+		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), Zone> _zones = new();
+
+		// The shared instance id every Shared map (and every pre-instancing call site) uses - one zone per map.
+		public const uint DefaultInstance = 0;
 
 		// Server-global monotonic allocator for playfield-instance tokens, mirroring retail's behaviour (a steadily
 		// increasing per-instance id stamped into despawns; see protocol_despawn_n3toclientquit). Every Zone gets a
@@ -49,26 +57,49 @@ namespace Faolan.GameServer.World
 			return Interlocked.Increment(ref _nextPlayfieldToken);
 		}
 
-		// Adds the entity to `mapId`'s zone with the given transform, removing it from its previous zone if its map
-		// changed. Returns the zone it now lives in so the caller can run interest queries against it.
+		// Adds the entity to the default shared instance of `mapId` (pre-instancing callers / tests). See the
+		// instance-aware overload.
 		public Zone Place(WorldEntity entity, uint mapId, Vector3 position, Vector3 rotation)
 		{
-			if (entity.MapId != mapId && _zones.TryGetValue(entity.MapId, out var oldZone))
+			return Place(entity, mapId, DefaultInstance, position, rotation);
+		}
+
+		// Adds the entity to the (mapId, instanceId) zone with the given transform, removing it from its previous zone
+		// if its map OR instance changed (#268). Returns the zone it now lives in so the caller can run interest
+		// queries against it. The entity's MapId/InstanceId are updated to match - so every later ZoneForEntity lands
+		// in this same copy.
+		public Zone Place(WorldEntity entity, uint mapId, uint instanceId, Vector3 position, Vector3 rotation)
+		{
+			if ((entity.MapId != mapId || entity.InstanceId != instanceId)
+			    && _zones.TryGetValue((entity.MapId, entity.InstanceId), out var oldZone))
 				oldZone.Remove(entity.Handle);
 
 			entity.MapId = mapId;
+			entity.InstanceId = instanceId;
 			entity.Position = position;
 			entity.Rotation = rotation;
-			var zone = ZoneFor(mapId);
+			var zone = ZoneFor(mapId, instanceId);
 			zone.Add(entity);
 			return zone;
 		}
 
-		// Removes the entity from its current map's zone (disconnect / despawn).
+		// Removes the entity from its current zone (disconnect / despawn).
 		public void Remove(WorldEntity entity)
 		{
-			if (_zones.TryGetValue(entity.MapId, out var zone))
+			if (_zones.TryGetValue((entity.MapId, entity.InstanceId), out var zone))
 				zone.Remove(entity.Handle);
+		}
+
+		// Picks (or creates) the instance a player entering `mapId` should join, given the map's instancing mode and
+		// the player's EXISTING world entity (null on a fresh login) (#268). Same-map re-entry (respawn/teleport back)
+		// keeps the player's current copy; a fresh entry mints a private copy for a Solo map and joins the shared copy
+		// otherwise. Group is treated as Shared until party routing exists. The result is fed to Place.
+		public uint ResolveEntryInstance(WorldEntity existing, uint mapId, MapInstanceMode mode)
+		{
+			if (existing != null && existing.MapId == mapId && existing.InstanceId != DefaultInstance)
+				return existing.InstanceId; // already in a private copy of this same map - stay in it
+
+			return mode == MapInstanceMode.Solo ? NextPlayfieldToken() : DefaultInstance;
 		}
 
 		// Advances the world model by `deltaSeconds` (docs/archive/server-architecture-roadmap.md) and returns the wire-visible
@@ -256,15 +287,39 @@ namespace Faolan.GameServer.World
 			}
 		}
 
+		// The default shared instance of a map (pre-instancing callers, tests, the burst-token resolve path).
 		public Zone ZoneFor(uint mapId)
 		{
-			return _zones.GetOrAdd(mapId, m => new Zone(m) { PlayfieldToken = NextPlayfieldToken() });
+			return ZoneFor(mapId, DefaultInstance);
 		}
 
-		// Read-only zone lookup that does NOT mint a zone for an untracked map (for observers like the MCP tools).
+		// The (mapId, instanceId) zone, minting it (with a fallback wire token) if it doesn't exist yet (#268).
+		public Zone ZoneFor(uint mapId, uint instanceId)
+		{
+			return _zones.GetOrAdd((mapId, instanceId),
+				key => new Zone(key.MapId) { InstanceId = key.InstanceId, PlayfieldToken = NextPlayfieldToken() });
+		}
+
+		// The zone the entity currently lives in - its (MapId, InstanceId) copy. The routing primitive every
+		// broadcast/interest query uses so it reaches only the player's own instance (#268).
+		public Zone ZoneForEntity(WorldEntity entity)
+		{
+			return ZoneFor(entity.MapId, entity.InstanceId);
+		}
+
+		// Read-only lookup of the default shared instance; does NOT mint a zone for an untracked map.
 		public bool TryGetZone(uint mapId, out Zone zone)
 		{
-			return _zones.TryGetValue(mapId, out zone);
+			return _zones.TryGetValue((mapId, DefaultInstance), out zone);
+		}
+
+		// Every live instance of a map (all copies), for observers (MCP) that want the whole map regardless of which
+		// copy an entity is in.
+		public IEnumerable<Zone> ZonesForMap(uint mapId)
+		{
+			foreach (var kvp in _zones)
+				if (kvp.Key.MapId == mapId)
+					yield return kvp.Value;
 		}
 
 		// Advances `entity` one tick's worth toward (dx, dz) - a horizontal step at NpcMoveSpeed (keeping terrain Y),

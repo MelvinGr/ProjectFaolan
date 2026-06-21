@@ -530,7 +530,7 @@ namespace Faolan.GameServer.Combat
 			var player = _sim.PlayerWorldEntity(client);
 			if (player != null && _sim
 				    .World
-				    .ZoneFor(player.MapId)
+				    .ZoneForEntity(player)
 				    .TryGet(targetHandle, out npcEntity) && !npcEntity.IsPlayer && npcEntity.Vitals != null)
 				return npcEntity.Vitals;
 

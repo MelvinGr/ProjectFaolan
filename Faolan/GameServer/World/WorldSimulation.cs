@@ -174,20 +174,24 @@ namespace Faolan.GameServer.World
 		// transform + vitals from the persisted Character. After this the WorldEntity is the source of truth for live
 		// position/vitals; the Character is only re-read on a fresh entry/teleport. Idempotent (GetOrAdd keeps the
 		// existing entity, so vitals aren't reset across re-entry/teleport/respawn).
-		public void RegisterPlayerInWorld(INetworkClient client)
+		public void RegisterPlayerInWorld(INetworkClient client, MapInstanceMode instanceMode = MapInstanceMode.Shared)
 		{
 			var character = client.Session?.Character;
 			if (character == null)
 				return;
 
 			var handle = client.Session.Account.ClientInstance;
+			// The player's pre-existing entity (null on a fresh login) decides whether this is a re-entry that should
+			// keep its current instance vs. a fresh placement that picks one from the map's mode (#268).
+			Players.TryGetValue(client, out var existing);
 			var entity = Players.GetOrAdd(client, _ => new WorldEntity(handle, character.MapId, true, character.Name ?? $"Character{handle}", client) { Vitals = EntityVitals.FromCharacter(character) });
+			var instanceId = World.ResolveEntryInstance(existing, character.MapId, instanceMode);
 			// The DB rotation is a quaternion; the live sim/movement layer is Vector3 (Euler degrees) - bridge it.
-			var zone = World.Place(entity, character.MapId, character.Position, character.Rotation.ToVector3());
+			var zone = World.Place(entity, character.MapId, instanceId, character.Position, character.Rotation.ToVector3());
 			var nearby = zone
 				.PlayersInRange(character.Position, PlayerInterestRange, handle)
 				.Count();
-			_logger.LogInformation("World: player {Name} (0x{Handle:X8}) entered map {Map} at {Pos}; {Nearby} other player(s) in range.", entity.Name, handle, character.MapId, character.Position, nearby);
+			_logger.LogInformation("World: player {Name} (0x{Handle:X8}) entered map {Map} instance 0x{Instance:X8} at {Pos}; {Nearby} other player(s) in range.", entity.Name, handle, character.MapId, instanceId, character.Position, nearby);
 		}
 
 		// Removes the player from the world model on disconnect. The caller broadcasts the despawn FIRST (while the
@@ -219,7 +223,7 @@ namespace Faolan.GameServer.World
 
 			ids.Add(entity.Handle);
 			foreach (var near in World
-				         .ZoneFor(entity.MapId)
+				         .ZoneForEntity(entity)
 				         .PlayersInRange(entity.Position, SayRangeUnits, entity.Handle))
 				ids.Add(near.Handle);
 
@@ -485,7 +489,7 @@ namespace Faolan.GameServer.World
 			entity.Position = dest;
 			character.Position = dest;
 
-			var liveToken = World.ZoneFor(character.MapId).PlayfieldToken;
+			var liveToken = World.ZoneForEntity(entity).PlayfieldToken;
 			await _output.SendReviveTeleport(client, entity.Handle, character.MapId, liveToken);
 
 			var rot = new Quaternion(point.RotationX, point.RotationY, point.RotationZ, point.RotationW);

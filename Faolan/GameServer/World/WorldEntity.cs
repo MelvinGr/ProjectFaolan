@@ -148,6 +148,11 @@ namespace Faolan.GameServer.World
 
 		// Live transform + map. Mutable: updated by Move (players) and the AI tick (NPCs, later).
 		public uint MapId { get; set; }
+
+		// Which instance (copy) of MapId this entity lives in (#268). Equals its Zone's PlayfieldToken - the retail
+		// playfield-instance id. 0 until placed; WorldState.Place sets it from the resolved/created instance so every
+		// later ZoneFor(entity) lands in the same copy. Two entities only see each other if MapId AND InstanceId match.
+		public uint InstanceId { get; set; }
 		public Vector3 Position { get; set; }
 		public Vector3 Rotation { get; set; }
 

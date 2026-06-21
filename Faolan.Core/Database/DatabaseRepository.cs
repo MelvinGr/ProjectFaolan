@@ -1396,8 +1396,12 @@ namespace Faolan.Core.Database
 		// satisfy the foreign key.
 		private static Task EnsureMapExists(DatabaseContext ctx, uint mapId, string name)
 		{
-			// A Map is just Id + Name now (no position/rotation - those moved to the per-map RespawnPoints).
-			return ctx.Database.ExecuteSqlRawAsync("INSERT OR IGNORE INTO Maps (Id, Name) VALUES ({0}, {1})", mapId, name);
+			// A Map is Id + Name + the instancing columns (#268). The instancing columns are NOT NULL and - under the
+			// EnsureCreated schema (tests) - carry no SQL default, so they MUST be listed here: an INSERT OR IGNORE that
+			// omitted them would be silently dropped (NOT NULL violation -> ignored), leaving no Map row and failing the
+			// character->Map foreign key. 0/0 = the Shared, uncapped default (this best-effort fallback beach row).
+			return ctx.Database.ExecuteSqlRawAsync(
+				"INSERT OR IGNORE INTO Maps (Id, Name, InstanceMode, PopulationCap) VALUES ({0}, {1}, 0, 0)", mapId, name);
 		}
 
 		private static Task<CharacterEquipment> LoadTrackedEquipment(DatabaseContext ctx, uint id)

@@ -59,10 +59,10 @@ namespace Faolan.GameServer
 			// hostile NPC so its name renders red like retail. (The NpcStats.community we put in the spawn is correct
 			// but the client ignores it for the name colour - this RPC is the sole driver.)
 			uint category = 0;
-			var mapId = client.Session.Character?.MapId;
-			if (mapId.HasValue
-			    && _simulation.World.TryGetZone(mapId.Value, out var zone)
-			    && zone.TryGet(targetInstance, out var target)
+			// Resolve the target in the player's OWN instance (copy) of the map (#268), not the default shared zone.
+			var player = _simulation.PlayerWorldEntity(client);
+			if (player != null
+			    && _simulation.World.ZoneForEntity(player).TryGet(targetInstance, out var target)
 			    && target.Hostile)
 			{
 				category = 1;

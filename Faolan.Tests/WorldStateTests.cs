@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Numerics;
+using Faolan.Core.Database.Tables;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
 using Xunit;
@@ -132,6 +133,62 @@ namespace Faolan.Tests
 			var third = world.Tick(0.1);
 			Assert.Contains(third, e => e.Type == WorldTickEffectType.NpcExitCombat && e.Entity == npc);
 			Assert.False(npc.InCombat);
+		}
+
+		[Fact]
+		public void Shared_PlacesEveryoneInOneCopy(/* #268 */)
+		{
+			var world = new WorldState();
+			var a = world.ResolveEntryInstance(null, 4010, MapInstanceMode.Shared);
+			var b = world.ResolveEntryInstance(null, 4010, MapInstanceMode.Shared);
+			Assert.Equal(WorldState.DefaultInstance, a);
+			Assert.Equal(WorldState.DefaultInstance, b); // a Shared map always resolves to the one shared copy
+
+			var p1 = Player(1, 0, 0);
+			var p2 = Player(2, 1, 0);
+			world.Place(p1, 4010, a, p1.Position, Vector3.Zero);
+			world.Place(p2, 4010, b, p2.Position, Vector3.Zero);
+
+			Assert.Same(world.ZoneForEntity(p1), world.ZoneForEntity(p2)); // same zone object
+			Assert.Equal(2, world.ZoneForEntity(p1).Count);
+			// and they see each other via interest
+			var events = InterestManager.ResolveMove(world.ZoneForEntity(p1), p1, 50f);
+			Assert.Contains(events, e => e.Subject.Handle == 2);
+		}
+
+		[Fact]
+		public void Solo_GivesEachPlayerAPrivateCopy_NoCrossVisibility(/* #268 */)
+		{
+			var world = new WorldState();
+			var i1 = world.ResolveEntryInstance(null, 4010, MapInstanceMode.Solo);
+			var i2 = world.ResolveEntryInstance(null, 4010, MapInstanceMode.Solo);
+			Assert.NotEqual(WorldState.DefaultInstance, i1);
+			Assert.NotEqual(i1, i2); // a fresh private copy per entry
+
+			var p1 = Player(1, 0, 0);
+			var p2 = Player(2, 0, 0); // SAME position as p1
+			world.Place(p1, 4010, i1, p1.Position, Vector3.Zero);
+			world.Place(p2, 4010, i2, p2.Position, Vector3.Zero);
+
+			Assert.NotSame(world.ZoneForEntity(p1), world.ZoneForEntity(p2));
+			Assert.Equal(1, world.ZoneForEntity(p1).Count); // alone in their own copy
+			// p1 does NOT see p2 despite the identical position - different instances.
+			var events = InterestManager.ResolveMove(world.ZoneForEntity(p1), p1, 50f);
+			Assert.DoesNotContain(events, e => e.Subject.Handle == 2);
+		}
+
+		[Fact]
+		public void ResolveEntryInstance_KeepsCopyOnReentry_NewCopyOnMapChange(/* #268 */)
+		{
+			var world = new WorldState();
+			var solo = world.ResolveEntryInstance(null, 4010, MapInstanceMode.Solo);
+			var p = Player(1, 0, 0);
+			world.Place(p, 4010, solo, p.Position, Vector3.Zero);
+
+			// Same-map re-entry (respawn/teleport back) keeps the player's existing copy.
+			Assert.Equal(solo, world.ResolveEntryInstance(p, 4010, MapInstanceMode.Solo));
+			// A different map mints a fresh copy (the old instance id doesn't carry across maps).
+			Assert.NotEqual(solo, world.ResolveEntryInstance(p, 5000, MapInstanceMode.Solo));
 		}
 
 		private static WorldEntity Npc(uint handle, float x, float z)

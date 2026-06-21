@@ -11,6 +11,7 @@ using Faolan.Core.Network.Protobuf;
 using Microsoft.Extensions.Logging;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.GameServer.Spawn;
+using Faolan.GameServer.World;
 
 // ReSharper disable once CheckNamespace
 namespace Faolan.GameServer
@@ -67,8 +68,12 @@ namespace Faolan.GameServer
 			}
 
 			// Populate the shared world model BEFORE building so the player entity exists for CaptureOwnSpawnBody.
-			await _broadcaster.EnsureZoneNpcs(mapId);
-			_simulation.RegisterPlayerInWorld(client);
+			// Resolve which COPY (instance) of this map the player joins from its instancing mode (#268): register the
+			// player first (which picks/keeps their instance), then populate THAT instance's NPCs.
+			var map = await Database.GetMap(mapId);
+			_simulation.RegisterPlayerInWorld(client, map?.InstanceMode ?? MapInstanceMode.Shared);
+			var instanceId = _simulation.PlayerWorldEntity(client)?.InstanceId ?? WorldState.DefaultInstance;
+			await _broadcaster.EnsureZoneNpcs(mapId, instanceId);
 
 			// Mark this connection as having entered the world. The conversation system (ConversationService), the
 			// 0x2020 -> 0x2008 spawn-check (GameServerListener), and the dialogue-close fallback (Handle0x2000) are
@@ -104,7 +109,7 @@ namespace Faolan.GameServer
 			toSend.Add(snapshot);
 			// Record this playfield's despawn token from the snapshot we actually send (WorldDespawn), as the burst path does.
 			var snapBodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(snapshot.AsSpan(8, 4));
-			_broadcaster.CapturePlayfieldToken(mapId, snapshot.AsSpan(snapBodyStart));
+			_broadcaster.CapturePlayfieldToken(mapId, instanceId, snapshot.AsSpan(snapBodyStart));
 
 			toSend.Add(BuildVitals(client));
 			toSend.Add(BuildGameTime(client));

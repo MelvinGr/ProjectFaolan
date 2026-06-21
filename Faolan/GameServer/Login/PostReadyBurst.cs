@@ -75,6 +75,7 @@ namespace Faolan.GameServer
 			// is NOT the item-shop window - that one is opened client-side and persists even with the whole post-ready
 			// burst removed, so it can't be suppressed from here.)
 			if (false)
+			{
 				await new PacketStream()
 					.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
 					.WriteArray(0x00, 0x00, 0x00, 0x1F, 0xA3, 0x6D, 0x3B, 0x74, 0x00, 0x00, 0xC3, 0x50)
@@ -82,14 +83,15 @@ namespace Faolan.GameServer
 					.WriteArray(0x00, 0x00, 0x00, 0x00, 0x0E, 0x08, 0x05, 0x10, 0x00, 0x18, 0xF6, 0xC6, 0x17, 0x32, 0x04, 0x08, 0x00, 0x10, 0x00)
 					.SendAsync(client);
 
-			// record 4: 0x00002000 - the WelcomeTutorial destiny step (ScryScriptIIR 0xA36D3B74), constructed (was
-			// verbatim; byte-identical, proven by QuestTests.BuildScryStep_MatchesCapture).
-			var welcomeTutorial = ScryScript.BuildStep(instance, "WelcomeTutorial");
-			await new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
-				.WriteUInt32((uint)welcomeTutorial.Length)
-				.WriteArray(welcomeTutorial)
-				.SendAsync(client);
+				// record 4: 0x00002000 - the WelcomeTutorial destiny step (ScryScriptIIR 0xA36D3B74), constructed (was
+				// verbatim; byte-identical, proven by QuestTests.BuildScryStep_MatchesCapture).
+				var welcomeTutorial = ScryScript.BuildStep(instance, "WelcomeTutorial");
+				await new PacketStream()
+					.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
+					.WriteUInt32((uint)welcomeTutorial.Length)
+					.WriteArray(welcomeTutorial)
+					.SendAsync(client);
+			}
 
 			// record 4b (BEACH ONLY, #267): ApproachCasilda - the destiny step that follows WelcomeTutorial on retail
 			// beach logins, steering the player toward the chained Casilda. Same intro flow as the 385910 script group

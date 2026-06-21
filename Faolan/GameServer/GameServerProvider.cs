@@ -38,11 +38,10 @@ namespace Faolan.GameServer
 
 		public IReadOnlyList<ZoneEntityInfo> GetZoneEntities(uint mapId)
 		{
-			if (!_simulation.World.TryGetZone(mapId, out var zone))
-				return [];
-
-			return zone
-				.Entities
+			// Observer view: union every live instance (copy) of the map (#268), so the MCP tool sees all entities
+			// regardless of which copy they're in.
+			return _simulation.World.ZonesForMap(mapId)
+				.SelectMany(z => z.Entities)
 				.Select(e => new ZoneEntityInfo(e.Handle, e.Name, e.IsPlayer
 						? "player"
 						: e.IsLoot
