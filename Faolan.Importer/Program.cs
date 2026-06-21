@@ -333,6 +333,14 @@ namespace Faolan.Importer
 		// then taking each NPC TYPE from a SINGLE authoritative session: the login-burst types from the richest pre-poll
 		// capture (retail's entry-area build), every other type (camps/areas the login window didn't reach - Scavenger
 		// Tuut/Lackeys, Casilda, vendors) from the capture that saw the most distinct-handle instances of it.
+		// Home positions for unique quest NPCs captured at multiple spots (they move during their quest), so the
+		// burst-truth dedup doesn't strand them at a wander/first-sighting position (#266). NpcSpawnBuilder drives the
+		// render transform from these columns, so pinning the position here is sufficient.
+		private static readonly Dictionary<string, Vector3> UniqueNpcHomes = new()
+		{
+			["Casilda"] = new Vector3(361.64300537109375f, 153.34036254882813f, 717.66802978515625f), // her caged quest spot
+		};
+
 		private static (List<NpcSpawnEntry> Spawns, List<PatrolPathEntry> Patrols) BuildBurstTruthSpawns(IReadOnlyList<NamedCapture> captures)
 		{
 			// Per capture, ONE entry per distinct mob: dedup the FA015807 spawns by HANDLE. A mob is re-streamed at a
@@ -355,8 +363,12 @@ namespace Faolan.Importer
 			// patrol MoveTask from the NPC's live spawn point (the captured waypoints are absolute world coords).
 			void Take(List<NpcSpawnEntry> chosen, Dictionary<uint, PatrolPathEntry> routes)
 			{
-				foreach (var e in chosen)
+				foreach (var e0 in chosen)
 				{
+					// Pin a known unique quest-NPC to its home: the dedup's "first sighting" pick strands a wandering
+					// quest NPC at a walk position (Casilda was captured at 6 spots caged->escort; she ended up ~24u from
+					// her cage). Override to her caged quest spot so a reseed keeps her there (#266).
+					var e = UniqueNpcHomes.TryGetValue(e0.Name ?? "", out var home) ? e0 with { X = home.X, Y = home.Y, Z = home.Z } : e0;
 					spawns.Add(e);
 					if (routes.TryGetValue(e.Handle, out var r) && r.Waypoints.Count > 0)
 						patrols.Add(new PatrolPathEntry(e.MapId, new Vector3(e.X, e.Y, e.Z), r.Speed, r.Waypoints, 0, r.Body));
