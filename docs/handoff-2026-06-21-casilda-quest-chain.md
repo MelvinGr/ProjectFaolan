@@ -82,11 +82,17 @@ supersede 13479→13563, not leave 13479 for a turn-in. Rework it as part of sta
   confirm whether a quest-specific feedback record also rides each completion.
 - `QuestFullUpdate` field layout for the superseding quest (area/marker/goal text refs) — extend
   `WorldQuest.BuildQuestFullUpdate` if the chain stages need fields the current builder doesn't carry.
-- Escort completion trigger (arrival at the city) — needs a destination/zone check; may need another capture.
+- Escort completion trigger (arrival at the city) — needs a destination/zone check; the committed capture has
+  the escort GRANT (12407 active) but not its completion, so stage 4's *arrival* may need a short follow-up
+  capture. Stages 1–3 are fully captured.
 
 ## References
 
-- Capture: `Captures/Blablatest_mage-necromancer-create_casilda_quest_first_stage.tshark.json`
+- Capture (committed, both `.pcapng` + `.tshark.json`):
+  `Captures/Blablatest_mage-necromancer-create_casilda_quest_first_stage.*` — covers stages 1–3 end to end
+  (kill → loot key → free Casilda) plus the **grant** of stage 4 (escort, 12407 goes active at fr1605). The
+  only piece NOT in this capture is the escort *arrival* completion (12407 → next); a short follow-up capture
+  of reaching the city would close that. Stages 1–3 need no further capture.
 - Screenshots: `/home/melvin/Pictures/Screenshots/{kiled_tuut,free_casilda}.png`
 - Related: `docs/knubot-conversation-packets.md`; memories [[casilda_quest_chain_261]],
   [[quest_kill_goal_47]], [[protocol_quest_state]], [[protocol_loot_interaction]].
