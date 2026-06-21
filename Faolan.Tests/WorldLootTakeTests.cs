@@ -19,6 +19,17 @@ namespace Faolan.Tests
 				Convert.ToHexStringLower(WorldLoot.BuildLootRemoveItemsBody(Bag)));
 		}
 
+		// Per-drag ACK with items remaining: loot-drag-1538 frame 3266 (bag 0x22ec, dragged one item, 1 item left)
+		// sends trailing u32 = 1 (the remaining-item count); the emptying drag (fr3277) sends 0. The 0x000007e2
+		// landmark is constant.
+		[Fact]
+		public void LootRemoveItems_RemainingCount_MatchesDragCapture()
+		{
+			Assert.Equal(
+				"700101620000c87a000022ec0000000000000007e200000001",
+				Convert.ToHexStringLower(WorldLoot.BuildLootRemoveItemsBody(0x000022ec, itemsRemaining: 1)));
+		}
+
 		[Fact]
 		public void NewCurrentLooterReset_MatchesCapture()
 		{

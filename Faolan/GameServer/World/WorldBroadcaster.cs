@@ -626,21 +626,18 @@ namespace Faolan.GameServer.World
 			if (player == null || !_sim.World.ZoneFor(player.MapId).TryGet(bagHandle, out var bag))
 				return;
 
-			if (bag.LootItems.Any(i => i != 0) || bag.CashTin > 0)
-			{
-				// PARTIAL take (a single drag left items/coins): keep the bag in the world and REDRAW the open window
-				// with its remaining contents. We can't use LootRemoveItems to remove one slot - it carries a COUNT
-				// (count x 0x3F1 landmark), not the dragged item's Pos, so it removed the FIRST slot regardless of what
-				// was dragged (#226-2). Re-sending the LootBagFullUpdateIIR with the remaining items at their ORIGINAL
-				// Pos (gaps for looted slots) redraws the window correctly and keeps every remaining item's Pos stable
-				// for the next drag. The bag does NOT despawn until it is fully emptied (or its expiry elapses).
-				await RerenderLootBag(client, bag);
-				return;
-			}
+			// Per-take ACK: confirm the drag and report how many items REMAIN (the trailing u32, decoded from the
+			// drag-only capture loot-drag-1538). The client removes the item IT dragged from the open window itself; this
+			// just tells it whether the bag still has contents. A partial take therefore leaves the bag open with its
+			// other items at their stable Pos - NO re-render (re-sending the full object stacked a second window).
+			var remaining = (uint)bag.LootItems.Count(i => i != 0);
+			await SendWorldIir(client, WorldLoot.BuildLootRemoveItemsBody(bag.Handle, remaining));
 
-			// Fully emptied -> the captured loot-all completion sequence (hoxxling gameplay fr4470): LootRemoveItems ->
-			// DispatchCloseLootBag -> looter resets -> fade -> consumed visual.
-			await SendWorldIir(client, WorldLoot.BuildLootRemoveItemsBody(bag.Handle));
+			if (remaining > 0 || bag.CashTin > 0)
+				return; // items/coins remain - keep the bag open; the client drives the close (0x2044) when done
+
+			// Fully emptied -> the captured completion sequence: DispatchCloseLootBag -> looter resets -> fade ->
+			// consumed visual. (LootRemoveItems with remaining=0 was already sent above.)
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x58),
 					ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, client.Session.Account.ClientInstance),
@@ -1110,33 +1107,6 @@ namespace Faolan.GameServer.World
 			newContents.CopyTo(result.AsSpan(8 + contentsStart));  // the new [u32 len][ProtoLootBagIIR] tail
 			BinaryPrimitives.WriteUInt32BigEndian(result.AsSpan(0, 4), (uint)(4 + newRecordLen)); // carrier len = subOpcode + record
 			return result;
-		}
-
-		// Redraws an OPEN loot window after a partial single-drag: rebuilds the bag's LootBagFullUpdateIIR from its
-		// remaining contents (the non-zero LootItems at their ORIGINAL Pos, plus any cash left) and re-sends it to the
-		// looter. Re-sending the full update for the bag's existing handle is an UPDATE - it refreshes the displayed
-		// item list without re-instantiating the object. Keeping each remaining item at its stable Pos means the next
-		// drag's source-Pos still maps to the right entry. Also restamps bag.SpawnBody so a relog/re-stream is correct.
-		private async Task RerenderLootBag(INetworkClient client, WorldEntity bag)
-		{
-			var template = GetLootTemplate();
-			if (template == null || !WorldObjectBuilder.BuildFromScratch(template, bag.Handle, bag.Position, Quaternion.Identity, LootBagTemplate.TypeTag, _sim.World.ZoneFor(bag.MapId).PlayfieldToken, out var body))
-				return;
-
-			var entries = new List<(uint Pos, Item Item)>();
-			for (var i = 0; i < bag.LootItems.Count; i++)
-			{
-				if (bag.LootItems[i] == 0)
-					continue; // a drag-looted slot - leave the gap so the surviving items keep their Pos
-				var item = await _database.GetItem(bag.LootItems[i]);
-				if (item != null)
-					entries.Add(((uint)i, item));
-			}
-
-			body = SpliceLootContents(body, bag.Handle, bag.CashTin, entries);
-			bag.SpawnBody = body;
-			await SendLootBagUpdate(client, body);
-			_logger.LogInformation("Loot: redrew bag 0x{Handle:X8} ({Left} item(s), {Cash} tin left).", bag.Handle, entries.Count, bag.CashTin);
 		}
 
 		// Sends a prebuilt LootBagFullUpdateIIR body (handle + transform already baked by WorldObjectBuilder) on
