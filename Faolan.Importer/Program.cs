@@ -355,8 +355,15 @@ namespace Faolan.Importer
 				.GroupBy(e => e.MapId)
 				.ToDictionary(g => g.Key, g => g.Select(e => e.Name ?? "").ToHashSet());
 
+			// Per-NPC-TYPE rule: trust the burst for any type it PLACED (a Crocodile in the burst -> the burst's ~7,
+			// not the union's ~50 cross-session copies). But a type the burst NEVER saw is a camp/area the capture
+			// didn't walk through (Scavenger Tuut + Lackeys down the beach, the #261 quest camp) - it must still exist,
+			// so keep it from the union: named/unique NPCs (Community 0: Casilda) once per name, faction mobs deduped
+			// by a coarse position cell to collapse the cross-session wandering duplicates while keeping the camp.
+			const float cell = 8f;
 			var result = new List<NpcSpawnEntry>(burst);
 			var keptNamed = new HashSet<(uint, string)>();
+			var seenFactionCell = new HashSet<(uint, string, int, int, int)>();
 			foreach (var e in union)
 			{
 				if (!burstMaps.Contains(e.MapId))
@@ -364,13 +371,18 @@ namespace Faolan.Importer
 					result.Add(e); // no authoritative burst for this map - keep the union as-is
 					continue;
 				}
+				if (burstNamesByMap.TryGetValue(e.MapId, out var names) && names.Contains(e.Name ?? ""))
+					continue; // the burst placed this type -> trust the burst's count, drop the union copies
 
-				// Burst map: add only the named/unique NPCs (Community 0) the burst didn't already place, one per
-				// (map, name) - this is how Casilda et al (down the beach, outside the login-build window) survive.
-				if (e.Community == 0
-				    && !(burstNamesByMap.TryGetValue(e.MapId, out var names) && names.Contains(e.Name ?? ""))
-				    && keptNamed.Add((e.MapId, e.Name ?? "")))
-					result.Add(e);
+				if (e.Community == 0)
+				{
+					if (keptNamed.Add((e.MapId, e.Name ?? "")))
+						result.Add(e); // a named/unique NPC the burst missed - one instance
+				}
+				else if (seenFactionCell.Add((e.MapId, e.Name ?? "", (int)(e.X / cell), (int)(e.Y / cell), (int)(e.Z / cell))))
+				{
+					result.Add(e); // a faction camp the burst missed - keep, deduped by coarse cell
+				}
 			}
 
 			return NpcSpawnExtractor.Merge(result);
