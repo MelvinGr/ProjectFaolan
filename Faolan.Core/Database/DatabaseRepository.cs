@@ -89,6 +89,7 @@ namespace Faolan.Core.Database
 		Task<NpcSpawn> GetNpcSpawnByName(string name);
 		Task<List<NpcSpell>> GetNpcSpellsByName(string name);
 		Task<NpcSpawn[]> GetNpcSpawns(uint mapId);
+		Task<PatrolPath[]> GetPatrolPaths(uint mapId);
 		Task<int> DeleteNpcSpawns(uint mapId, string name, float? x, float? y, float? z, float radius);
 
 		Task<Realm> GetRealm(uint id);
@@ -986,6 +987,19 @@ namespace Faolan.Core.Database
 				.Include(n => n.Equipment)
 				.Include(n => n.Npc).ThenInclude(t => t.Spells) // #244: the NPC type + its FK'd spells (replaces the name-string spell join)
 				.Where(n => n.MapId == mapId && n.Data != null)
+				.ToArrayAsync();
+		}
+
+		// A map's captured patrol routes (#266 patrol), each with its ordered waypoints. Keyed at the paired NPC's
+		// spawn position (the importer correlates route->spawn by handle and stores the route at the spawn point), so
+		// the world model links a route to its NPC by exact position.
+		public async Task<PatrolPath[]> GetPatrolPaths(uint mapId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.PatrolPaths
+				.Include(p => p.Waypoints)
+				.Where(p => p.MapId == mapId)
 				.ToArrayAsync();
 		}
 

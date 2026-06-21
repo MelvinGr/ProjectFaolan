@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
@@ -332,54 +333,65 @@ namespace Faolan.Importer
 		// then taking each NPC TYPE from a SINGLE authoritative session: the login-burst types from the richest pre-poll
 		// capture (retail's entry-area build), every other type (camps/areas the login window didn't reach - Scavenger
 		// Tuut/Lackeys, Casilda, vendors) from the capture that saw the most distinct-handle instances of it.
-		private static List<NpcSpawnEntry> BuildBurstTruthSpawns(IReadOnlyList<NamedCapture> captures)
+		private static (List<NpcSpawnEntry> Spawns, List<PatrolPathEntry> Patrols) BuildBurstTruthSpawns(IReadOnlyList<NamedCapture> captures)
 		{
 			// Per capture, ONE entry per distinct mob: dedup the FA015807 spawns by HANDLE. A mob is re-streamed at a
 			// new position every time the player re-enters its interest range, but it is the SAME mob (same handle) - the
 			// old position-dedup (Merge) kept each re-stream of a MOVING mob as a phantom copy (a 4-scavenger camp logged
-			// as 19). Handle is the per-session mob identity. Keep the first sighting (most pristine position).
-			var perCaptureAll = captures.Select(c => DistinctByHandle(NpcSpawnExtractor.Extract(c.Packets))).ToList();
-			var perCaptureBurst = captures.Select(c => DistinctByHandle(NpcSpawnExtractor.ExtractLoginBurst(c.Packets))).ToList();
-			var allMaps = perCaptureAll.SelectMany(l => l.Select(e => e.MapId)).Distinct().ToList();
+			// as 19). Handle is the per-session mob identity. Each capture also yields its MoveTask patrol routes keyed by
+			// handle, so a kept spawn can be paired with ITS OWN route (by handle, within the same session - position
+			// doesn't correlate, since the first sighting and the MoveTask anchor are captured at different moments).
+			var perCap = captures.Select(c => (
+				All: DistinctByHandle(NpcSpawnExtractor.Extract(c.Packets)),
+				Burst: DistinctByHandle(NpcSpawnExtractor.ExtractLoginBurst(c.Packets)),
+				Routes: PatrolPathExtractor.ExtractByHandle(c.Packets))).ToList();
+			var allMaps = perCap.SelectMany(p => p.All.Select(e => e.MapId)).Distinct().ToList();
 
-			// Authoritative login burst per map: the single richest pre-poll capture (no kills yet -> complete & pristine).
-			var burst = new List<NpcSpawnEntry>();
-			foreach (var map in allMaps)
+			var spawns = new List<NpcSpawnEntry>();
+			var patrols = new List<PatrolPathEntry>();
+
+			// Add a chosen capture's spawn subset, pairing each spawn with its OWN patrol route (by handle, same
+			// capture) keyed at the SPAWN's position - so the runtime links route->NPC by exact position and drives the
+			// patrol MoveTask from the NPC's live spawn point (the captured waypoints are absolute world coords).
+			void Take(List<NpcSpawnEntry> chosen, Dictionary<uint, PatrolPathEntry> routes)
 			{
-				var best = perCaptureBurst
-					.Select(b => b.Where(e => e.MapId == map).ToList())
-					.OrderByDescending(l => l.Count)
-					.FirstOrDefault();
-				if (best is { Count: > 0 })
-					burst.AddRange(best);
+				foreach (var e in chosen)
+				{
+					spawns.Add(e);
+					if (routes.TryGetValue(e.Handle, out var r) && r.Waypoints.Count > 0)
+						patrols.Add(new PatrolPathEntry(e.MapId, new Vector3(e.X, e.Y, e.Z), r.Speed, r.Waypoints));
+				}
 			}
 
-			var burstMaps = burst.Select(e => e.MapId).ToHashSet();
-			var burstNamesByMap = burst
-				.GroupBy(e => e.MapId)
-				.ToDictionary(g => g.Key, g => g.Select(e => e.Name ?? "").ToHashSet());
+			// Authoritative login burst per map: the single richest pre-poll capture (no kills yet -> complete & pristine).
+			var burstNamesByMap = new Dictionary<uint, HashSet<string>>();
+			foreach (var map in allMaps)
+			{
+				var best = perCap.OrderByDescending(p => p.Burst.Count(e => e.MapId == map)).First();
+				var burstSpawns = best.Burst.Where(e => e.MapId == map).ToList();
+				if (burstSpawns.Count == 0)
+					continue;
+				Take(burstSpawns, best.Routes);
+				burstNamesByMap[map] = burstSpawns.Select(e => e.Name ?? "").ToHashSet();
+			}
 
 			// Unified per-TYPE rule: a type the login burst PLACED is taken from the burst (retail entry-area count);
 			// any OTHER type (a camp/area the login window didn't reach - Scavenger Tuut/Lackeys, Casilda, vendors) is
 			// filled from the single capture that saw the most DISTINCT-HANDLE instances of it - the most complete view
 			// of that camp in one session (movers included, re-streams already collapsed by handle). This is the same
 			// single-session logic the burst uses; for a unique NPC it naturally yields one instance.
-			var result = new List<NpcSpawnEntry>(burst);
-			var nonBurstTypes = perCaptureAll
-				.SelectMany(l => l)
+			var nonBurstTypes = perCap
+				.SelectMany(p => p.All)
 				.Select(e => (e.MapId, Name: e.Name ?? ""))
-				.Where(t => !(burstMaps.Contains(t.MapId) && burstNamesByMap[t.MapId].Contains(t.Name)))
+				.Where(t => !(burstNamesByMap.TryGetValue(t.MapId, out var ns) && ns.Contains(t.Name)))
 				.Distinct();
 			foreach (var (map, name) in nonBurstTypes)
 			{
-				var best = perCaptureAll
-					.Select(cap => cap.Where(s => s.MapId == map && (s.Name ?? "") == name).ToList())
-					.OrderByDescending(l => l.Count)
-					.First();
-				result.AddRange(best);
+				var best = perCap.OrderByDescending(p => p.All.Count(e => e.MapId == map && (e.Name ?? "") == name)).First();
+				Take(best.All.Where(e => e.MapId == map && (e.Name ?? "") == name).ToList(), best.Routes);
 			}
 
-			return NpcSpawnExtractor.Merge(result); // final safety dedup of any exact-position overlap
+			return (NpcSpawnExtractor.Merge(spawns), patrols); // final safety dedup of any exact-position overlap
 		}
 
 		// One entry per distinct mob in a capture: dedup FA015807 spawns by their wire HANDLE, keeping the first
@@ -696,20 +708,24 @@ namespace Faolan.Importer
 			// (type-level, name-keyed) is left as-is. Same helper the normal import uses, so a full re-import stays clean.
 			if (args.Contains("--reseed-npcs"))
 			{
-				var spawns = BuildBurstTruthSpawns(captures);
+				var (spawns, patrols) = BuildBurstTruthSpawns(captures);
 
 				var removed = await db.NpcSpawns.CountAsync();
 				await db.Database.ExecuteSqlRawAsync("DELETE FROM NpcSpawnMorphs");
 				await db.Database.ExecuteSqlRawAsync("DELETE FROM NpcSpawnEquipment");
 				await db.Database.ExecuteSqlRawAsync("DELETE FROM NpcSpawns");
+				// Patrol routes are correlated to the reseeded spawns (keyed at their positions), so rebuild them too.
+				await db.Database.ExecuteSqlRawAsync("DELETE FROM PatrolWaypoints");
+				await db.Database.ExecuteSqlRawAsync("DELETE FROM PatrolPaths");
 
 				await ImportNpcSpawns(db, spawns);
+				await ImportPatrolPaths(db, patrols);
 
 				await LinkSpellsToTypes(db); // #244: link the reseeded NPCs' spells to their types (types upserted in ImportNpcSpawns)
 
 				var byMap = spawns.GroupBy(e => e.MapId).OrderBy(g => g.Key).Select(g => $"{g.Key}={g.Count()}");
 				Console.WriteLine($"Reseed NPCs: removed {removed} spawns; imported {spawns.Count} burst-truth spawns ({string.Join(", ", byMap)}); " +
-					$"morphs={await db.NpcSpawnMorphs.CountAsync()}, equipment={await db.NpcSpawnEquipment.CountAsync()}.");
+					$"{patrols.Count} patrol routes; morphs={await db.NpcSpawnMorphs.CountAsync()}, equipment={await db.NpcSpawnEquipment.CountAsync()}.");
 				return 0;
 			}
 
@@ -840,12 +856,14 @@ namespace Faolan.Importer
 				Console.WriteLine($"Learned spells (0x200A grants): {spellChars} characters seeded, {spellRows} new rows.");
 				var (shopsSeen, shopsAdded, shopsUpdated) = await CaptureShopImporter.ImportAsync(db, captures.SelectMany(c => CaptureShopImporter.Extract(c.Packets)));
 				Console.WriteLine($"Shops (0x2033 vendor windows): {shopsSeen} vendors, {shopsAdded} new, {shopsUpdated} updated.");
-				await ImportNpcSpawns(db, BuildBurstTruthSpawns(captures)); // #266: burst faction set + named NPCs, not the bloated union
+				var (burstTruthSpawns, burstTruthPatrols) = BuildBurstTruthSpawns(captures); // #266: burst faction set + named NPCs, not the bloated union
+				await ImportNpcSpawns(db, burstTruthSpawns);
 				var npcSpells = NpcSpellExtractor.Merge(captures.SelectMany(c => NpcSpellExtractor.Extract(c.Packets)));
 				var npcSpellsAdded = await ImportNpcSpells(db, npcSpells);
 				Console.WriteLine($"NPC spells (#232): {npcSpells.Count} (name,spell) pairs, {npcSpellsAdded} new.");
 				await LinkSpellsToTypes(db); // #244: link spells to their types (types upserted in ImportNpcSpawns)
-				await ImportPatrolPaths(db, PatrolPathExtractor.Merge(captures.SelectMany(c => PatrolPathExtractor.Extract(c.Packets))));
+				// Patrol routes correlated by handle to the kept spawns, keyed at the spawn positions (#266 patrol).
+				await ImportPatrolPaths(db, burstTruthPatrols);
 				await ImportWorldObjects(db, WorldObjectExtractor.Merge(captures.SelectMany(c => WorldObjectExtractor.Extract(c.Packets))));
 				await ImportMapWorldBursts(db, MapWorldBurstExtractor.Merge(captures.SelectMany(c => MapWorldBurstExtractor.Extract(c.Packets))));
 				await ImportQuestDefinitions(db, QuestDefinitionExtractor.Extract(captures.SelectMany(c => c.Packets).ToList()));

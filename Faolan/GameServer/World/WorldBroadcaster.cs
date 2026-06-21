@@ -119,7 +119,11 @@ namespace Faolan.GameServer.World
 				// no longer has it. Known.Add gates the spawn to viewers who actually need it + restores the #245
 				// invariant (Known == "was sent"), so later move/combat broadcasts (which check Known) reach it.
 				if (viewer.Client != null && viewer.Known.Add(npc.Handle))
+				{
 					await SendWorldSpawn(viewer.Client, npc);
+					if (npc.Patrols) // #266: resume its patrol after respawn
+						await SendPatrol(viewer.Client, npc);
+				}
 			}
 		}
 
@@ -444,6 +448,13 @@ namespace Faolan.GameServer.World
 			var npcs = await _database.GetNpcSpawns(mapId);
 			var zone = _sim.World.ZoneFor(mapId);
 
+			// #266 patrol: captured routes keyed at their paired spawn's position (the importer correlated route->spawn
+			// by handle), so link each route to its NPC by exact position below. The NPC then walks it client-side via a
+			// patrol MoveTask issued at spawn (retail style).
+			var patrolByPosition = (await _database.GetPatrolPaths(mapId))
+				.GroupBy(p => PositionKey(p.PositionX, p.PositionY, p.PositionZ))
+				.ToDictionary(g => g.Key, g => g.First());
+
 			// The handle the map's world-burst renders each NPC under, keyed by the NPC's POSITION. Burst NPCs MUST
 			// carry their burst handle in the model so the per-player Known-set seeding lines up (entry seeds these)
 			// and the first move never re-streams them. Matching by HANDLE is wrong: the burst is ONE capture session
@@ -503,6 +514,13 @@ namespace Faolan.GameServer.World
 					: npc.CapturedHandle;
 				var entity = WorldEntity.ForNpc(handle, mapId, new Vector3(npc.PositionX, npc.PositionY, npc.PositionZ), new Vector3(npc.RotationX, npc.RotationY, npc.RotationZ), npcName ?? "NPC", vitals);
 				entity.Level = npc.Level;
+
+				// #266 patrol: attach this NPC's captured route (linked by exact spawn position) so it walks it.
+				if (patrolByPosition.TryGetValue(PositionKey(npc.PositionX, npc.PositionY, npc.PositionZ), out var patrol) && patrol.Waypoints.Count > 0)
+				{
+					entity.PatrolWaypoints = patrol.Waypoints.OrderBy(w => w.Ordinal).Select(w => new Vector3(w.X, w.Y, w.Z)).ToList();
+					entity.PatrolSpeed = patrol.Speed;
+				}
 				// Hostile = a faction creature (Npc.Community > 0, lifted from NpcStats.community by the importer).
 				// community 0 is the neutral/friendly community (quest-givers like Casilda/Kalanthes AND neutral critters
 				// like Scorpion/Guard Dog); faction mobs (poachers 59, scavengers 60, picts 317, crocs 374, ...) are > 0.
@@ -1111,6 +1129,19 @@ namespace Faolan.GameServer.World
 			return result;
 		}
 
+		// #266 patrol: issue the NPC's captured patrol route as a MoveTask so the CLIENT walks it (retail drives idle
+		// patrol client-side - the server sends the route once per spawn/respawn, not a per-tick step). The anchor /
+		// current position is the NPC's live spawn position (the render-gate requires the MoveTask position to match
+		// the spawn it was just sent); the waypoints are the absolute captured world coords. BuildPatrol emits a
+		// self-contained record (it prepends its own [u32 len]), so it rides SendWorldRecord, not SendWorldIir.
+		private Task SendPatrol(INetworkClient recipient, WorldEntity npc)
+		{
+			if (!npc.Patrols)
+				return Task.CompletedTask;
+			var body = MoveTaskBuilder.BuildPatrol(npc.Handle, npc.Position, npc.PatrolWaypoints, npc.PatrolSpeed);
+			return SendWorldRecord(recipient, body);
+		}
+
 		// Sends a prebuilt LootBagFullUpdateIIR body (handle + transform already baked by WorldObjectBuilder) on
 		// the world conversation. Unlike SendWorldSpawn this does NOT re-patch the position - the body is already
 		// placed at the corpse's spot.
@@ -1176,6 +1207,9 @@ namespace Faolan.GameServer.World
 						// the player accepts/completes (e.g. Casilda shows ! then ? after the quest is done).
 						if (!ev.Subject.IsPlayer && !ev.Subject.IsLoot)
 							await SendQuestMarkerIfGiver(recipient, ev.Subject);
+						// #266: a patrolling NPC walks its captured route - issue the patrol MoveTask now it's in view.
+						if (ev.Subject.Patrols)
+							await SendPatrol(recipient, ev.Subject);
 						break;
 					case InterestEventType.Move when move.HasValue:
 						await SendWorldMove(recipient, move.Value);

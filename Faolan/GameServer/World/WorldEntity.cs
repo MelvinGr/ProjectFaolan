@@ -155,6 +155,13 @@ namespace Faolan.GameServer.World
 		public Vector3 SpawnPosition { get; set; }
 		public Vector3 SpawnRotation { get; set; }
 
+		// #266 patrol: the captured waypoint route (absolute world coords) this NPC walks + its walk speed; empty for a
+		// stationary NPC. Sent as a patrol MoveTask after the NPC spawns - retail drives idle patrol client-side (the
+		// client walks the route), so the server just issues the captured route once per spawn/respawn.
+		public IReadOnlyList<Vector3> PatrolWaypoints { get; set; } = [];
+		public float PatrolSpeed { get; set; }
+		public bool Patrols => PatrolWaypoints.Count > 0;
+
 		public WorldEntity(uint handle, uint mapId, bool isPlayer, string name, INetworkClient client)
 		{
 			Handle = handle;

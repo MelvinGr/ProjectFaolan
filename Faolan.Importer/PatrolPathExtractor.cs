@@ -6,7 +6,7 @@ using System.Numerics;
 
 namespace Faolan.Importer
 {
-	public sealed record PatrolPathEntry(uint MapId, Vector3 Position, float Speed, IReadOnlyList<Vector3> Waypoints);
+	public sealed record PatrolPathEntry(uint MapId, Vector3 Position, float Speed, IReadOnlyList<Vector3> Waypoints, uint Handle = 0);
 
 	// Extracts NPC patrol routes from a capture's MoveTask packets (MoveTaskIIR 0x96C46740): tracks the current
 	// map (MapChange 5D85BFC7), then for each MoveTask whose body is the CANONICAL single-segment waypoint patrol
@@ -56,11 +56,23 @@ namespace Faolan.Importer
 				if (subop != MoveTaskSubOpcode || currentMap == 0)
 					continue;
 
-				if (TryParseCanonicalPatrol(body, out var position, out var speed, out var waypoints))
-					entries.Add(new PatrolPathEntry(currentMap, position, speed, waypoints));
+				if (TryParseCanonicalPatrol(body, out var position, out var speed, out var waypoints, out var handle))
+					entries.Add(new PatrolPathEntry(currentMap, position, speed, waypoints, handle));
 			}
 
 			return entries;
+		}
+
+		// One patrol route per NPC HANDLE in a capture (the last seen for that handle). Lets the importer correlate a
+		// route to its spawn by handle (the same-session mob identity) rather than by position - the spawn's first
+		// sighting and its MoveTask anchor are captured at different moments, so position doesn't match (#266).
+		public static Dictionary<uint, PatrolPathEntry> ExtractByHandle(IReadOnlyList<CapturedPacket> packets)
+		{
+			var byHandle = new Dictionary<uint, PatrolPathEntry>();
+			foreach (var e in Extract(packets))
+				if (e.Handle != 0)
+					byHandle[e.Handle] = e; // last MoveTask for the handle wins (its established patrol)
+			return byHandle;
 		}
 
 		// Dedup by (map, spawn point); keep the first seen - like NpcSpawnExtractor.Merge.
@@ -77,17 +89,18 @@ namespace Faolan.Importer
 		// BuildPatrol reproduces byte-for-byte. Every check is exact, so a row built from these fields round-trips
 		// to the captured bytes; any deviation (multi-segment, parametric, trailing data) returns false and is left
 		// as the verbatim MoveTask remainder.
-		private static bool TryParseCanonicalPatrol(byte[] b, out Vector3 position, out float speed, out IReadOnlyList<Vector3> waypoints)
+		private static bool TryParseCanonicalPatrol(byte[] b, out Vector3 position, out float speed, out IReadOnlyList<Vector3> waypoints, out uint handle)
 		{
 			position = default;
 			speed = 0;
 			waypoints = [];
+			handle = 0;
 
 			// header(16) + prefix(2) + curPos(12) + canonicalHeader(10) + count(1)
 			if (b.Length < 41)
 				return false;
 
-			var handle = BinaryPrimitives.ReadUInt32BigEndian(b.AsSpan(12, 4));
+			handle = BinaryPrimitives.ReadUInt32BigEndian(b.AsSpan(12, 4));
 			if (handle >= InstanceRangeStart)
 				return false; // a player MoveTask, not an NPC patrol
 
