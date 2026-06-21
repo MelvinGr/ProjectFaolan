@@ -17,7 +17,11 @@ namespace Faolan.Importer
 	// runtime routes on; the handle/instance are session-volatile and only used to re-address the replay).
 	// (Mode/Field3 were the OLD key but both are session-volatile counters, not branch ids - the AnswerPath is the
 	// stable branch key; memory protocol_conversation_routing.)
-	public sealed record ConversationEntry(uint TypeId, string AnswerPath, uint CapturedNpcHandle, uint CapturedInstance, List<byte[]> Packets, string NpcName, string ConditionScript = "", uint GrantQuestId = 0);
+	// QuestContextId: the quest that was ACTIVE (last QuestFullUpdate) when the player opened this conversation - the
+	// player's quest state AT THE GREETING. Lets a single capture that talks to one NPC at MULTIPLE chain stages (e.g.
+	// Casilda: offer pre-quest, then "free me" once you have the key) be split per-state, since the answer path alone
+	// ("" greeting both times) can't distinguish them (#264). 0 = no quest active at the greeting.
+	public sealed record ConversationEntry(uint TypeId, string AnswerPath, uint CapturedNpcHandle, uint CapturedInstance, List<byte[]> Packets, string NpcName, string ConditionScript = "", uint GrantQuestId = 0, uint QuestContextId = 0);
 
 	// Reconstructs each NPC's dialogue as a TREE of screens keyed by answer-index PATH, from the captured request/
 	// response flow. The grammar (memory protocol_conversation_routing): a conversation INSTANCE = TalkToNpc(f3=0)
@@ -57,6 +61,8 @@ namespace Faolan.Importer
 			var screen = new List<byte[]>();
 			uint grant = 0; // a quest the server granted while collecting THIS screen's responses (0 = none)
 			var questsSeen = new HashSet<uint>(); // every quest whose full-update appeared earlier in THIS capture
+			uint currentQuest = 0; // the last quest whose full-update appeared (the active quest at any point in the capture)
+			uint instanceContext = 0; // currentQuest AT the active instance's greeting - the player's state when they talked
 
 			foreach (var p in packets)
 			{
@@ -83,6 +89,7 @@ namespace Faolan.Importer
 					path = "";
 					screen = [];
 					grant = 0;
+					instanceContext = currentQuest; // the quest active WHEN the player opened this conversation (#264)
 				}
 				else if (!p.IsDownload && p.Opcode == Opcode2000 && p.SubOpcode == KnubotAnswerSubOpcode && active)
 				{
@@ -111,6 +118,7 @@ namespace Faolan.Importer
 					if (body.Length >= 25)
 					{
 						var questId = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(21, 4));
+						currentQuest = questId; // track the active quest for the per-greeting QuestContextId (#264)
 						if (active && path.Length != 0 && questsSeen.Add(questId))
 							grant = questId;
 						else
@@ -130,7 +138,7 @@ namespace Faolan.Importer
 			void Flush()
 			{
 				if (active && screen.Count > 0)
-					entries.Add(new ConversationEntry(typeId, path, npc, instance, [..screen], namesByHandle.GetValueOrDefault(npc), GrantQuestId: grant));
+					entries.Add(new ConversationEntry(typeId, path, npc, instance, [..screen], namesByHandle.GetValueOrDefault(npc), GrantQuestId: grant, QuestContextId: instanceContext));
 			}
 		}
 

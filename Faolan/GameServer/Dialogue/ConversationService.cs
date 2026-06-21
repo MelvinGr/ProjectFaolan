@@ -411,20 +411,24 @@ namespace Faolan.GameServer.Dialogue
 			if (!client.Session.SpawnedNpcNamesByHandle.TryGetValue(clickedNpcHandle, out var npcName))
 				return false; // unknown NPC (not spawned this session) -> create-world scripted intro fallback
 
-			// Quest chain (#261): talking to an NPC completes a TalkToNpc goal targeting it (e.g. freeing Casilda,
-			// 13480 -> superseded to the escort stage 12407). Run BEFORE serving the greeting so its conditioned variant
-			// (PickConversationScreen) reflects the new quest state - the freed/escort dialogue instead of the captive's.
-			await _questProgression.AdvanceTalkGoals(client, npcName);
-
 			// Turn-in (#47): a CHAINLESS quest whose objective is already done completes when talking to its giver - the
-			// reply is the reward greeting and the journal moves to Completed. (Chained stages supersede above instead.)
+			// reply is the reward greeting and the journal moves to Completed. (Chained stages supersede below instead.)
 			await TryTurnInQuests(client, npcName);
 
+			// Pick the greeting in the player's CURRENT (pre-completion) quest state so a talk-stage shows its OWN
+			// dialogue: e.g. Casilda's "I'll protect you now" one-off is gated on HasQuest(13480), so it must be picked
+			// while 13480 is still active (#264).
 			var greeting = await PickConversationScreen(client, npcName, typeId, "");
 			if (greeting == null)
 				return false;
 
 			await ServeScreen(client, greeting, clickedNpcHandle);
+
+			// Quest chain (#261/#264): NOW complete the TalkToNpc goal (e.g. freeing Casilda, 13480 -> escort 12407),
+			// AFTER serving the greeting - so the freeing dialogue shows once, then the stage completes; the next talk
+			// sees the post-freeing (completed) state and gets the post-quest greeting. Matches retail (capture: open ->
+			// supersede -> options).
+			await _questProgression.AdvanceTalkGoals(client, npcName);
 			return true;
 		}
 
