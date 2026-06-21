@@ -106,12 +106,22 @@ namespace Faolan.Importer
 
 				var waypoints = new List<Vector3>();
 				CollectPathWaypoints(task.Task, waypoints);
-				if (waypoints.Count == 0)
-					continue; // no path leaf (a wait/rotate/approach task carries no patrol route)
+				if (waypoints.Count < 2)
+					continue; // no real path (a wait/rotate/approach task, or a single point)
+
+				// Reject a ONE-WAY path: a captured MoveTask is often the mob CHASING the capturing player (a straight
+				// line to where the player stood - e.g. Scavenger Tuut, a stationary camp boss, ran a 2-point line). An
+				// idle PATROL loops back toward its start, so its net displacement is small vs the distance walked; a
+				// chase's displacement ~= its length. Keep only loop-shaped paths (#266).
+				var from = new Vector3(Bits(task.FromX), Bits(task.FromY), Bits(task.FromZ));
+				var length = Vector3.Distance(from, waypoints[0]);
+				for (var i = 1; i < waypoints.Count; i++)
+					length += Vector3.Distance(waypoints[i - 1], waypoints[i]);
+				if (length < 1f || Vector3.Distance(from, waypoints[^1]) / length > 0.6f)
+					continue; // one-way (chase/approach), not an idle patrol loop
 
 				if (!byHandle.TryGetValue(task.Handle, out var existing) || waypoints.Count > existing.Waypoints.Count)
 				{
-					var from = new Vector3(Bits(task.FromX), Bits(task.FromY), Bits(task.FromZ));
 					// Keep the captured record (from the subop onward) so the runtime can REPLAY it re-addressed - the
 					// exact form (speed/flags/list) is what makes the client walk it, not a rebuilt mode-1 path.
 					byHandle[task.Handle] = new PatrolPathEntry(currentMap, from, 0f, waypoints, task.Handle, body[4..]);
