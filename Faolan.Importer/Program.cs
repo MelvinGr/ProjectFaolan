@@ -739,6 +739,22 @@ namespace Faolan.Importer
 				return 0;
 			}
 
+			// --dump-worldobj <name>: read-only - build a named world object via WorldObjectBuilder (the burstless
+			// world-entry path) and print its hex, to diff against the captured packet (why a decor doesn't render).
+			if (args.Contains("--dump-worldobj"))
+			{
+				var target = GetOption(args, "--dump-worldobj") ?? "hangingwoman";
+				foreach (var row in await db.WorldObjects.Where(o => o.Name.Contains(target)).ToListAsync())
+				{
+					var baseOk = WorldObjectBuilder.TryBuild(row, row.CapturedHandle, out var baseBody);
+					var rewriteOk = baseOk && SpawnPlayfieldRewriter.TryRewrite(baseBody, 0x01EA985Cu);
+					Console.WriteLine($"map {row.MapId} {row.Name} handle 0x{row.CapturedHandle:X} baseBuild={baseOk} rewrite={rewriteOk} datalen={row.Data?.Length} kd={row.KdTreeTail?.Length}");
+					if (baseOk)
+						Console.WriteLine("  BUILT: " + Convert.ToHexString(baseBody).ToLowerInvariant());
+				}
+				return 0;
+			}
+
 			// --reseed-npcs: wipe the NPC spawn tables and re-import the BURST-TRUTH set (#266) - each map's authoritative
 			// login burst (faction mobs at retail density) PLUS the named/unique NPCs the burst misses (Casilda et al,
 			// outside the captured path). Drops the cross-session mid-session-spawn duplicates that otherwise accrete
