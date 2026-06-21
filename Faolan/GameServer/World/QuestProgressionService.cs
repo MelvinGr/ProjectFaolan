@@ -87,6 +87,12 @@ namespace Faolan.GameServer.World
 					await ObjectiveCompleteAwaitTurnIn(client, character, quest, def, required); // legacy #47 (chainless kill)
 				else
 					await CompleteFinal(client, character, quest, def, required); // chainless loot/talk -> just complete
+
+				// #262: talking to Casilda is what FREES her - on that talk-goal completion she becomes the player's
+				// escort companion and follows them (the world tick steps her along, retail-style). Keyed by NAME
+				// (handles are session-volatile); the player's world-entity handle is its ClientInstance.
+				if (triggerType == QuestGoalType.TalkToNpc && string.Equals(targetName, "Casilda", StringComparison.OrdinalIgnoreCase))
+					_outbound.SetNpcFollowByName(character.MapId, "Casilda", client.Session.Account.ClientInstance, follow: true);
 			}
 		}
 

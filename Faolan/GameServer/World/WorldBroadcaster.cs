@@ -914,6 +914,37 @@ namespace Faolan.GameServer.World
 			return entity;
 		}
 
+		// #262 companion-follow: make the NPC `npcHandle` follow `client`'s player (or stop, when follow=false). The
+		// world tick (WorldState) then steps it toward the player and broadcasts a MoveTask each step. Returns the NPC,
+		// or null if the handle isn't a non-player entity in the caller's zone. Used by the .npcfollow GM command and by
+		// the Casilda rescue trigger.
+		public WorldEntity SetNpcFollow(INetworkClient client, uint npcHandle, bool follow)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null || !_sim.World.ZoneFor(player.MapId).TryGet(npcHandle, out var npc) || npc.IsPlayer)
+				return null;
+
+			npc.FollowTargetHandle = follow ? player.Handle : 0;
+			_logger.LogInformation("Follow: {Name} 0x{Handle:X8} {State} {Player}.", npc.Name, npcHandle, follow ? "now follows" : "stopped following", player.Name);
+			return npc;
+		}
+
+		// Make the named NPC in `mapId`'s zone follow (or stop following) the given player handle - the quest-driven
+		// entry point (e.g. Casilda after her rescue stage), keyed by NAME since handles are session-volatile. No-op
+		// (returns false) if no such NPC is loaded in the zone.
+		public bool SetNpcFollowByName(uint mapId, string npcName, uint playerHandle, bool follow)
+		{
+			if (!_sim.World.TryGetZone(mapId, out var zone))
+				return false;
+			var npc = zone.Entities.FirstOrDefault(e => !e.IsPlayer && e.Name == npcName);
+			if (npc == null)
+				return false;
+
+			npc.FollowTargetHandle = follow ? playerHandle : 0;
+			_logger.LogInformation("Follow: {Name} {State} player 0x{Player:X8} (by name).", npcName, follow ? "now follows" : "stopped following", playerHandle);
+			return true;
+		}
+
 		// Despawn a STATIC world-object handle for the caller (e.g. the Casilda chain decor): world objects are
 		// delivered in the world burst with a fixed CapturedHandle and are NOT tracked in the world model, so the
 		// world-model path above can't reach them. This sends the same n3ToClientQuit (with the live playfield token)

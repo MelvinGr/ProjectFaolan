@@ -28,6 +28,10 @@ namespace Faolan.GameServer.World
 		// drag a mob across the whole zone). Once it disengages it keeps returning until home, ignoring re-aggro.
 		public const float NpcLeashRange = 40f;
 
+		// #262 companion-follow: how far behind the leading player a follower trails before it steps up (retail keeps the
+		// follower ~one step behind; its MoveTasks track the player ~6-7u apart). A follower never leashes/aggros.
+		public const float FollowStopRange = 4f;
+
 		private readonly ConcurrentDictionary<uint, Zone> _zones = new ConcurrentDictionary<uint, Zone>();
 
 		// Server-global monotonic allocator for playfield-instance tokens, mirroring retail's behaviour (a steadily
@@ -110,6 +114,48 @@ namespace Faolan.GameServer.World
 						continue;
 					}
 
+					// #262 companion-follow: a "released" NPC (e.g. Casilda after her rescue) follows its leading player -
+					// step toward them and broadcast a MoveTask each step (UNGATED; not combat), the server-driven
+					// incremental follow retail uses. Takes priority over patrol/aggro/leash. Clears when the leader
+					// leaves the zone or logs out.
+					if (entity.Following)
+					{
+						if (!zone.TryGet(entity.FollowTargetHandle, out var leader) || !leader.IsPlayer)
+						{
+							entity.FollowTargetHandle = 0;
+							if (entity.FollowMoving)
+							{
+								entity.FollowMoving = false;
+								effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcStopped));
+							}
+							continue;
+						}
+
+						var fdx = leader.Position.X - entity.Position.X;
+						var fdz = leader.Position.Z - entity.Position.Z;
+						var fdist = MathF.Sqrt(fdx * fdx + fdz * fdz);
+						if (fdist > FollowStopRange)
+						{
+							StepToward(entity, fdx, fdz, fdist, deltaSeconds, stopShort: FollowStopRange);
+							entity.FollowMoving = true;
+							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcFollow, leader));
+						}
+						else if (entity.FollowMoving)
+						{
+							entity.FollowMoving = false;
+							// Caught up: close the move FACING THE LEADER. The stop's facing is MoveOrigin->Position, but the
+							// last approach step is often tiny (she stops just outside FollowStopRange), so that direction is
+							// degenerate and she'd settle on the default heading (looks like turning back toward her spawn).
+							// Mirror MoveOrigin across her position so MoveOrigin->Position points straight at the leader.
+							entity.MoveOrigin = new Vector3(
+								2f * entity.Position.X - leader.Position.X,
+								entity.Position.Y,
+								2f * entity.Position.Z - leader.Position.Z);
+							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcStopped));
+						}
+						continue;
+					}
+
 					if (entity.Vitals == null)
 						continue;
 
@@ -182,7 +228,7 @@ namespace Faolan.GameServer.World
 					var horizontal = MathF.Sqrt(dx * dx + dz * dz);
 					if (horizontal > NpcMeleeRange)
 					{
-						StepToward(entity, dx, dz, horizontal, deltaSeconds, leaveMelee: true);
+						StepToward(entity, dx, dz, horizontal, deltaSeconds, stopShort: NpcMeleeRange);
 						entity.ArmAttackCooldown(NpcAttackInterval); // wind up a swing for when it arrives
 						effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcMove, target));
 						continue;
@@ -222,11 +268,12 @@ namespace Faolan.GameServer.World
 		}
 
 		// Advances `entity` one tick's worth toward (dx, dz) - a horizontal step at NpcMoveSpeed (keeping terrain Y),
-		// recording the origin so the broadcast can send origin->position for the client to interpolate. `leaveMelee`
-		// stops one melee-range short (chasing a target) vs landing on the point (returning home).
-		private static void StepToward(WorldEntity entity, float dx, float dz, float distance, double deltaSeconds, bool leaveMelee = false)
+		// recording the origin so the broadcast can send origin->position for the client to interpolate. `stopShort`
+		// leaves that many units short of the point (melee range when chasing, follow range when following); 0 lands on
+		// it (returning home).
+		private static void StepToward(WorldEntity entity, float dx, float dz, float distance, double deltaSeconds, float stopShort = 0f)
 		{
-			var travel = MathF.Min((float)(NpcMoveSpeed * deltaSeconds), leaveMelee ? distance - NpcMeleeRange : distance);
+			var travel = MathF.Min((float)(NpcMoveSpeed * deltaSeconds), distance - stopShort);
 			entity.MoveOrigin = entity.Position;
 			entity.Position = new Vector3(
 				entity.Position.X + dx / distance * travel,

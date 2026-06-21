@@ -603,6 +603,9 @@ namespace Faolan.GameServer.World
 							case WorldTickEffectType.NpcPatrol:
 								await _output.BroadcastNpcPatrol(effect.Entity); // idle patrol - not gated on the combat sim
 								break;
+							case WorldTickEffectType.NpcFollow:
+								await _output.BroadcastNpcMove(effect.Entity); // companion-follow step - ungated (not combat), #262
+								break;
 							case WorldTickEffectType.NpcMove:
 								if (NpcAutoAttackEnabled)
 									await _output.BroadcastNpcMove(effect.Entity);

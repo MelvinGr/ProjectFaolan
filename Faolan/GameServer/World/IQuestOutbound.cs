@@ -19,5 +19,9 @@ namespace Faolan.GameServer.World
 
 		// QuestFullUpdate (0x63268258): one quest's full detail - the supersession packet that swaps the displayed quest.
 		Task SendQuestFullUpdate(INetworkClient client, QuestDefinition def, uint state = WorldQuest.FullUpdateStateActive);
+
+		// #262: make the named NPC in `mapId`'s zone follow (or stop following) the given player - the quest-driven
+		// companion trigger (Casilda after her rescue). No-op if no such NPC is loaded; returns true if applied.
+		bool SetNpcFollowByName(uint mapId, string npcName, uint playerHandle, bool follow);
 	}
 }

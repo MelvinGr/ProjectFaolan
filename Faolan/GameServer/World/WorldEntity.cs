@@ -171,6 +171,16 @@ namespace Faolan.GameServer.World
 		private double _patrolReissueRemaining;
 		public double PatrolCycleSeconds { get; set; }
 
+		// #262 companion-follow: the handle of the PLAYER this NPC follows (0 = not following). Set when the player
+		// "releases" the NPC (e.g. Casilda after her rescue stage); the world tick steps the NPC toward that player and
+		// broadcasts a MoveTask each step - the same server-driven incremental-step follow retail uses (decoded from the
+		// Hoxxling gameplay capture: a stream of 0x96C46740 from->to ~6-7u steps tracking the player). Cleared when the
+		// leader leaves the zone / logs out. FollowMoving tracks whether she stepped last tick so a single Stop closes
+		// the move when she catches up (avoids spamming a stop every idle tick).
+		public uint FollowTargetHandle { get; set; }
+		public bool Following => FollowTargetHandle != 0;
+		public bool FollowMoving { get; set; }
+
 		// Arms the patrol re-issue timer for the next cycle.
 		public void ArmPatrolCycle() => _patrolReissueRemaining = PatrolCycleSeconds;
 

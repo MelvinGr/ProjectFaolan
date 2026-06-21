@@ -117,6 +117,12 @@ namespace Faolan.GameServer
 			// Interest spawns the NPCs + this player to nearby players; restore the quest journal.
 			await _broadcaster.BroadcastPlayerEntry(client);
 			await _broadcaster.RestorePlayerQuests(client);
+
+			// #262: if the player logs in mid-escort (Casilda freed, escort stage active), resume her follow now - the
+			// live talk-trigger only fires on the talk itself, so without this a relog leaves her standing at the cage.
+			if (character != null && Array.Exists(await Database.GetCharacterQuests(character.Id),
+				    q => q.QuestId == World.WorldQuest.CasildaEscortQuestId && q.State == QuestState.Active))
+				_broadcaster.SetNpcFollowByName(mapId, "Casilda", client.Session.Account.ClientInstance, follow: true);
 		}
 
 		// The complete burst-less player FA015807 spawn packet, or null when the character has no scaffold rows yet.

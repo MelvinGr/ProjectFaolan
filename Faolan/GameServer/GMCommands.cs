@@ -401,6 +401,7 @@ namespace Faolan.GameServer
 				["spawnnpc"] = (client, arguments) => SpawnNpcCommand(client, arguments),
 				["despawnnpc"] = (client, arguments) => DespawnNpcCommand(client, arguments),
 				["despawnobj"] = (client, arguments) => DespawnWorldObjectCommand(client, arguments),
+				["npcfollow"] = (client, arguments) => NpcFollowCommand(client, arguments),
 				["delete"] = (client, arguments) => DeleteCommand(client, arguments),
 				["kill"] = (client, arguments) => KillCommand(client, arguments),
 				["additem"] = (client, arguments) => AddItemCommand(client, arguments),
@@ -797,6 +798,29 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, sent
 				? $"Despawned world object 0x{handle:X8} (live only - returns on relog)."
 				: $"Can't despawn 0x{handle:X8} - your zone has no playfield token yet.");
+		}
+
+		// .npcfollow <handle> [stop]  - make a non-player entity follow you (companion-follow, #262), or 'stop' to
+		// release it. The world tick steps it toward you and streams MoveTasks (the same server-driven follow retail
+		// uses for Casilda after her rescue). Test bootstrap for the quest-driven trigger.
+		private async Task NpcFollowCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var parts = (arguments ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+			var stop = parts.Length > 0 && parts[^1].Equals("stop", StringComparison.OrdinalIgnoreCase);
+			// Handle = first non-"stop" arg, else the currently SELECTED target (click Casilda, then .npcfollow).
+			var handleArg = parts.FirstOrDefault(p => !p.Equals("stop", StringComparison.OrdinalIgnoreCase));
+			var handle = handleArg != null && TryParseHandle(handleArg, out var parsed) ? parsed : client.Session.SelectedTargetHandle;
+			if (handle == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .npcfollow [&lt;handle&gt;] [stop]  (no handle = your selected target)");
+				return;
+			}
+
+			var npc = _broadcaster.SetNpcFollow(client, handle, !stop);
+			await _agentServerDispatcher.SendSystemMessage(characterId, npc == null
+				? $"No followable entity 0x{handle:X8} in this zone."
+				: stop ? $"{npc.Name} (0x{handle:X8}) stopped following." : $"{npc.Name} (0x{handle:X8}) now follows you.");
 		}
 
 		// .delete [<handle>]  - PERMANENTLY remove the player's currently SELECTED target (or the given handle): despawn
