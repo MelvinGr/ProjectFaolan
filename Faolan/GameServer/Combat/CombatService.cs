@@ -28,19 +28,19 @@ namespace Faolan.GameServer.Combat
 		// Fallback vitals store for NPCs NOT in the world model (e.g. the built-NPC test) - model NPCs and players
 		// keep their vitals on their WorldEntity (the single source of truth). In-memory, never persisted.
 		private readonly CombatState _combat = new CombatState();
-		private readonly IAgentServerDispatcher _agents;
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
-		private readonly WorldBroadcaster _broadcaster;
+		private readonly QuestProgressionService _questProgression;
 
 		private readonly WorldSimulation _sim;
 
-		public CombatService(WorldSimulation sim, WorldBroadcaster broadcaster, IDatabaseRepository database, IAgentServerDispatcher agents, ILogger logger)
+		// Quest kill-goals route through the QuestProgressionService (#261), which owns the broadcaster + system-message
+		// seams; combat packets frame themselves directly (SendWorldPacket), so this service no longer needs either.
+		public CombatService(WorldSimulation sim, IDatabaseRepository database, QuestProgressionService questProgression, ILogger logger)
 		{
 			_sim = sim;
-			_broadcaster = broadcaster;
 			_database = database;
-			_agents = agents;
+			_questProgression = questProgression;
 			_logger = logger;
 		}
 
@@ -376,37 +376,6 @@ namespace Faolan.GameServer.Combat
 			await SendStatUpdate(client, player.ToVitalsBlock(), client.Session.Account.ClientInstance);
 		}
 
-		// Advances the killer's quest kill-objectives for an NPC of `npcName`: any active quest whose GoalTargetName
-		// matches gets GoalProgress++ (persisted) and a QuestGoal push; reaching GoalRequired completes it (state +
-		// system message). The objective DEFINITIONS (target/count) are set when the quest is added (the pinned RDB
-		// Lua VM would set them); this is the auto-tracking engine on top.
-		private async Task AdvanceKillQuests(INetworkClient killer, string npcName)
-		{
-			var character = killer?.Session?.Character;
-			if (character == null || string.IsNullOrEmpty(npcName))
-				return;
-
-			foreach (var quest in await _database.GetCharacterQuests(character.Id))
-			{
-				if (!QuestProgress.AdvancesOnKill(quest, npcName))
-					continue;
-
-				var progress = quest.GoalProgress + 1;
-				var objectiveDone = quest.GoalRequired > 0 && progress >= quest.GoalRequired;
-				// The kill only advances the OBJECTIVE - the quest stays Active and is marked Completed when the player
-				// TURNS IT IN at the giver (ConversationService.TryTurnInQuests, #47), not on the kill. Push the goal
-				// counter so the journal/OSD objective ticks; the '?' turn-in marker then appears on the giver.
-				await _database.SetCharacterQuest(character.Id, quest.QuestId, QuestState.Active, progress, quest.GoalRequired, quest.GoalTargetName);
-				await _broadcaster.SendQuestGoal(killer, quest.QuestId, 0, progress);
-				// Refresh the journal entry so the HUD objective ticks (the QuestGoal counter alone doesn't redraw it):
-				// QuestIIR state 2 = active/update, NOT completed - the quest is only marked Completed on turn-in (#47).
-				await _broadcaster.SendQuestIir(killer, quest.QuestId, WorldQuest.StateActive);
-				await _agents.SendSystemMessage(character.Id, objectiveDone
-					? $"{npcName} slain - objective complete ({progress}/{quest.GoalRequired}). Return to the quest giver."
-					: $"{npcName} slain ({progress}/{quest.GoalRequired}).");
-			}
-		}
-
 		// Applies `damage` to an NPC and pushes its 0x96B8DC59 health update; on death, runs the kill lifecycle
 		// (despawn + scheduled respawn). Vitals resolve from the WORLD MODEL when the target is a model NPC (the
 		// authoritative owner), else fall back to the per-session store (e.g. the built-NPC test). Shared by the melee
@@ -505,7 +474,9 @@ namespace Faolan.GameServer.Combat
 				_logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); corpse lingers {Linger}s then becomes lootable, {Fate}.",
 					npcEntity.Name, targetHandle, cause, WorldEntity.CorpseLingerSeconds,
 					npcEntity.NoRespawn ? $"then fades (no respawn)" : $"respawns in {npcEntity.RespawnDelaySeconds}s");
-				await AdvanceKillQuests(killer, npcEntity.Name);
+				// Quest chain (#261): a kill advances/completes any matching kill goal. A chained stage (e.g. Casilda's
+				// 13479) completes + supersedes to the next stage; a chainless kill quest keeps the legacy turn-in path.
+				await _questProgression.AdvanceKillGoals(killer, npcEntity.Name);
 				return;
 			}
 

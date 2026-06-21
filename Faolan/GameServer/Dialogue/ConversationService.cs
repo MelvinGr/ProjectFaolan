@@ -24,13 +24,15 @@ namespace Faolan.GameServer.Dialogue
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
 		private readonly WorldBroadcaster _broadcaster;
+		private readonly QuestProgressionService _questProgression;
 		private readonly LuaScriptVm _luaVm;
 
-		public ConversationService(IDatabaseRepository database, ILogger logger, WorldBroadcaster broadcaster, LuaScriptVm luaVm)
+		public ConversationService(IDatabaseRepository database, ILogger logger, WorldBroadcaster broadcaster, QuestProgressionService questProgression, LuaScriptVm luaVm)
 		{
 			_database = database;
 			_logger = logger;
 			_broadcaster = broadcaster;
+			_questProgression = questProgression;
 			_luaVm = luaVm;
 		}
 
@@ -409,8 +411,13 @@ namespace Faolan.GameServer.Dialogue
 			if (!client.Session.SpawnedNpcNamesByHandle.TryGetValue(clickedNpcHandle, out var npcName))
 				return false; // unknown NPC (not spawned this session) -> create-world scripted intro fallback
 
-			// Turn-in (#47): talking to a quest GIVER whose quest's objective is already done completes it now (not on
-			// the kill) - so the giver's reply is the completion/reward greeting and the journal moves to Completed.
+			// Quest chain (#261): talking to an NPC completes a TalkToNpc goal targeting it (e.g. freeing Casilda,
+			// 13480 -> superseded to the escort stage 12407). Run BEFORE serving the greeting so its conditioned variant
+			// (PickConversationScreen) reflects the new quest state - the freed/escort dialogue instead of the captive's.
+			await _questProgression.AdvanceTalkGoals(client, npcName);
+
+			// Turn-in (#47): a CHAINLESS quest whose objective is already done completes when talking to its giver - the
+			// reply is the reward greeting and the journal moves to Completed. (Chained stages supersede above instead.)
 			await TryTurnInQuests(client, npcName);
 
 			var greeting = await PickConversationScreen(client, npcName, typeId, "");

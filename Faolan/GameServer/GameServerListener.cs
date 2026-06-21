@@ -76,6 +76,9 @@ namespace Faolan.GameServer
 		// port + the loot/quest opcode handlers to it. See World/WorldBroadcaster.cs.
 		private readonly WorldBroadcaster _broadcaster;
 
+		// The multi-stage quest-chain supersession engine (#261), shared by the kill/loot/talk triggers.
+		private readonly World.QuestProgressionService _questProgression;
+
 		// NPC dialogue runtime (TalkToNpc/KnubotAnswer -> captured conversation nodes + quest grants). Composed
 		// collaborator; uses the broadcaster for quest pushes + the Lua VM for branch conditions. See Dialogue/ConversationService.cs.
 		private readonly Dialogue.ConversationService _conversation;
@@ -105,9 +108,10 @@ namespace Faolan.GameServer
 			_simulation = new WorldSimulation(this, database, agentServerDispatcher, logger);
 			_persistence = new PlayerPersistenceService(database, logger, _simulation);
 			_broadcaster = new WorldBroadcaster(_simulation, database, logger);
-			_combat = new CombatService(_simulation, _broadcaster, database, agentServerDispatcher, logger);
-			_conversation = new Dialogue.ConversationService(database, logger, _broadcaster, _luaVm);
-			_loot = new LootService(_broadcaster, this, database, logger);
+			_questProgression = new World.QuestProgressionService(database, _broadcaster, agentServerDispatcher, logger);
+			_combat = new CombatService(_simulation, database, _questProgression, logger);
+			_conversation = new Dialogue.ConversationService(database, logger, _broadcaster, _questProgression, _luaVm);
+			_loot = new LootService(_broadcaster, this, database, _questProgression, logger);
 			_equipment = new Inventory.EquipmentService(database, logger);
 			_itemUse = new Inventory.ItemUseService(database, RecallToBindCommand, logger);
 			_shop = new Economy.Shop.ShopService(database, logger, this);

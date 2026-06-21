@@ -23,13 +23,15 @@ namespace Faolan.GameServer.World
 		private readonly WorldBroadcaster _broadcaster;
 		private readonly IEconomyOutbound _outbound;
 		private readonly IDatabaseRepository _database;
+		private readonly QuestProgressionService _questProgression;
 		private readonly ILogger _logger;
 
-		public LootService(WorldBroadcaster broadcaster, IEconomyOutbound outbound, IDatabaseRepository database, ILogger logger)
+		public LootService(WorldBroadcaster broadcaster, IEconomyOutbound outbound, IDatabaseRepository database, QuestProgressionService questProgression, ILogger logger)
 		{
 			_broadcaster = broadcaster;
 			_outbound = outbound;
 			_database = database;
+			_questProgression = questProgression;
 			_logger = logger;
 		}
 
@@ -40,11 +42,18 @@ namespace Faolan.GameServer.World
 			packet.Body.ReadUInt32(); // loot typetag (0xC87A)
 			var bagHandle = packet.Body.ReadUInt32();
 
+			// Capture the bag's source NPC name BEFORE taking (loot-all empties + consumes it) for the loot-quest goal.
+			var sourceNpc = _broadcaster.BagSourceName(client, bagHandle);
+
 			var items = _broadcaster.TakeBagItems(client, bagHandle);
 			foreach (var itemTemplateId in items)
 				await _outbound.GrantItemToBackpack(client, itemTemplateId);
 			if (items.Count > 0)
 				_logger.LogInformation("Loot: granted {Count} item(s) from bag 0x{Bag:X8} to {Player}.", items.Count, bagHandle, client.Session.Character?.Name);
+
+			// Quest chain (#261): looting an NPC's corpse bag completes a LootFromNpc goal targeting it (the scavenger's
+			// key from Tuut's bag). Faithful even though the key item itself is RDB content - the bag's source IS the key.
+			await _questProgression.AdvanceLootGoals(client, sourceNpc);
 
 			// Confirm the take + (since loot-all empties it) consume/fade the bag.
 			await _broadcaster.AfterLootTake(client, bagHandle);
@@ -57,9 +66,13 @@ namespace Faolan.GameServer.World
 			var bagHandle = packet.Body.ReadUInt32();
 			var itemIndex = packet.Body.ReadUInt32(); // which item (display index) the player dragged
 
+			var sourceNpc = _broadcaster.BagSourceName(client, bagHandle);
 			var item = _broadcaster.TakeBagItem(client, bagHandle, (int)itemIndex);
 			if (item != null)
+			{
 				await _outbound.GrantItemToBackpack(client, item.Value);
+				await _questProgression.AdvanceLootGoals(client, sourceNpc); // #261 loot-from-NPC goal (the key)
+			}
 
 			// Confirm the take; AfterLootTake only consumes/fades the bag once it is fully emptied, so a partial
 			// drag leaves it open with the remaining items.

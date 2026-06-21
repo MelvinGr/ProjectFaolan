@@ -115,7 +115,7 @@ namespace Faolan.Importer
 			Console.WriteLine($"Quest definitions (journal content): {definitions.Count} harvested, {added} new, {updated} updated.");
 
 			await SeedBeachQuestGoals(db);
-			await SeedKillQuestTargets(db);
+			await SeedCasildaChain(db);
 			await SeedCasildaQuestSnapshot(db);
 		}
 
@@ -144,7 +144,7 @@ namespace Faolan.Importer
 			quest.IndexGoalSteps = "13479,13563,13480,12407";
 
 			// 13479's snapshot @609 objective goal (decoded from the Strie/Stihetfv login snapshots, #255): goal 5744,
-			// 1 step, separator 12, no subId, map 4010 marker (327,678), the two undecoded reserved words 70099/0x542D5354,
+			// 1 step, separator 12, no subId, map 4010 marker (327,678), the two undecoded reserved words 70099/0x54375554,
 			// and the objective (cat 50304) + trailing LOCALIZED (cat 51000, flags "m") text - keys taken from the
 			// already-harvested TextRefs so they stay byte-exact. Lets QuestObjectiveRegion.Build emit 13479's region.
 			var goal = quest.Goals.FirstOrDefault(g => g.GoalId == 5744);
@@ -157,7 +157,7 @@ namespace Faolan.Importer
 				goal.MarkerX = 327;
 				goal.MarkerY = 678;
 				goal.Extra5 = 70099;
-				goal.Extra6 = 0x542D5354;
+				goal.Extra6 = 0x54375554; // capture value (QuestPortion2QuestGolden.bin @1823); was a 0x542D5354 typo
 				goal.ObjectiveRefId = 5744;
 				goal.ObjectiveCategory = 50304;
 				goal.ObjectiveKey = quest.TextRefs.FirstOrDefault(t => t.Slot == QuestTextSlot.Objective)?.KeyText;
@@ -172,29 +172,48 @@ namespace Faolan.Importer
 			Console.WriteLine("Seeded Casilda quest 13479 snapshot Quest_c scalars + @609 objective goal (#255).");
 		}
 
-		// Kill-quest objectives recovered by capture correlation + domain knowledge (#47): the goal record carries the
-		// RequiredCount but NOT the target NPC (that's in the RDB-resolved objective text), so the target is seeded
-		// here. CombatService.AdvanceKillQuests matches a kill on the exact NPC name. Idempotent: only adds a goal if
-		// the quest exists and has none yet.
-		//   - Casilda's quest 13479 = kill 1 "Scavenger Tuut" (the NPC hit at the QuestGoal-complete frame in
-		//     Blablabla_..._questcomplete; "Tuut is the NPC you kill for the Casilda quest").
-		private static async Task SeedKillQuestTargets(DatabaseContext db)
+		// The Tortage intro quest CHAIN (Gitea #261): quest 13479 is NOT a lone kill - it is a four-stage supersession
+		// chain, each stage its own quest id. Decoded from Blablatest_..._casilda_quest_first_stage (the QuestGoal +
+		// QuestIIR 2->4 + QuestFullUpdate(next) sequence at fr1356/1446/1605). The goal record carries the RequiredCount
+		// but NOT the target NPC or the goal TYPE (both are in the RDB-resolved text / domain knowledge), so they are
+		// seeded here. The runtime QuestProgressionService matches each stage's trigger:
+		//   13479 - KILL "Scavenger Tuut"        (goal 5744) -> 13563
+		//   13563 - LOOT Tuut's corpse bag       (goal 5867) -> 13480   (the scavenger's key)
+		//   13480 - TALK "Casilda"               (goal 5745) -> 12407   (free Casilda)
+		//   12407 - ESCORT "Casilda" to the city (goal 3544) -> end     (escort not yet wired - Gitea sub-ticket)
+		// Idempotent: set every run (find-or-add the stage's goal by GoalId so 13479's pre-seeded @609 goal is updated
+		// in place, not duplicated, and the NextQuestId link is always refreshed).
+		private static async Task SeedCasildaChain(DatabaseContext db)
 		{
-			await SeedKillGoal(db, questId: 13479, goalId: 5744, target: "Scavenger Tuut", required: 1);
+			await SeedChainStage(db, questId: 13479, nextQuestId: 13563, goalType: QuestGoalType.Kill, target: "Scavenger Tuut", goalId: 5744);
+			await SeedChainStage(db, questId: 13563, nextQuestId: 13480, goalType: QuestGoalType.LootFromNpc, target: "Scavenger Tuut", goalId: 5867);
+			await SeedChainStage(db, questId: 13480, nextQuestId: 12407, goalType: QuestGoalType.TalkToNpc, target: "Casilda", goalId: 5745);
+			await SeedChainStage(db, questId: 12407, nextQuestId: 0, goalType: QuestGoalType.Escort, target: "Casilda", goalId: 3544);
 		}
 
-		private static async Task SeedKillGoal(DatabaseContext db, uint questId, uint goalId, string target, uint required)
+		private static async Task SeedChainStage(DatabaseContext db, uint questId, uint nextQuestId, QuestGoalType goalType, string target, uint goalId, uint required = 1)
 		{
 			var quest = await db.QuestDefinitions.Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == questId);
-			if (quest == null || quest.Goals.Count > 0)
+			if (quest == null)
 				return;
 
-			quest.Goals.Add(new QuestGoalDefinition
+			quest.NextQuestId = nextQuestId;
+
+			var goal = quest.Goals.FirstOrDefault(g => g.GoalId == goalId) ?? quest.Goals.FirstOrDefault();
+			if (goal == null)
 			{
-				GoalId = goalId, Sequence = 1, RequiredCount = required, TargetName = target
-			});
+				goal = new QuestGoalDefinition { GoalId = goalId, Sequence = 1 };
+				quest.Goals.Add(goal);
+			}
+
+			goal.GoalType = goalType;
+			goal.TargetName = target;
+			goal.RequiredCount = required;
+			if (goal.Sequence == 0)
+				goal.Sequence = 1;
+
 			await db.SaveChangesAsync();
-			Console.WriteLine($"Seeded kill-quest target: quest {questId} = kill {required} {target}.");
+			Console.WriteLine($"Seeded chain stage: quest {questId} = {goalType} '{target}' (goal {goalId}, required {required}) -> {nextQuestId}.");
 		}
 
 		// The beach starter (quest 10238) per-goal objective detail (the snapshot's @609 region). This data lives ONLY

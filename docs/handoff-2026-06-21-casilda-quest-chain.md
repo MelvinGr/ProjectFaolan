@@ -1,5 +1,32 @@
 # Handoff — Casilda / Tortage intro quest chain (Gitea epic #261)
 
+## STATUS 2026-06-21 (chain engine + stages 1-3 wired)
+
+Build-plan steps 1-4 are DONE (server builds, 576 tests pass, faolan.db re-seeded):
+
+- **Chain model** — `QuestDefinition.NextQuestId` (supersession link) + `QuestGoalDefinition.GoalType`
+  (`QuestGoalType` Kill/LootFromNpc/TalkToNpc/Escort), migration `QuestChainSupersession`.
+- **Supersession engine** — `Faolan/GameServer/World/QuestProgressionService.cs`: on a stage's goal completion it
+  emits the captured sequence (QuestGoal + QuestIIR 2->4 + QuestFullUpdate(next)) and flips state (complete N,
+  grant N+1 Active with its goal seeded). Reaches the three quest packets through the new narrow `IQuestOutbound`
+  port (WorldBroadcaster implements it). Pure match predicate `QuestProgress.Advances` is unit-tested.
+- **Triggers wired** — stage 1 KILL (`CombatService` -> `AdvanceKillGoals`, replaces the #47 turn-in for chained
+  quests, kept for chainless ones), stage 2 LOOT (`LootService` -> `AdvanceLootGoals`, matched on the corpse bag's
+  SOURCE NPC name since the key item is RDB content), stage 3 TALK (`ConversationService` -> `AdvanceTalkGoals`).
+- **Importer** — `SeedCasildaChain` seeds the four stages' NextQuestId links + goal types/targets. (Also fixed a
+  pre-existing `Extra6` typo 0x542D5354 -> 0x54375554 in `SeedCasildaQuestSnapshot` that a re-import surfaced.)
+
+**NOT done / remaining:**
+- **Stage 4 ESCORT (12407)** — follower AI + arrival completion. Own Gitea sub-ticket; needs a movement burst +
+  a short follow-up capture of reaching the city (this capture has the escort GRANT but not its completion).
+- **In-client verification is BLOCKED on spawns**: Casilda + Scavenger Tuut are NOT in the `NpcSpawns` table
+  (they're scripted in the create-world Tortage intro, #234/#185), so the chain can't be driven end-to-end in the
+  open world yet. The engine + wire are byte-exact/unit-tested and ready; flagging the epic `needs-testing` once
+  the intro NPCs spawn. Step 6 (per-stage toasts) is client-rendered from QuestIIR(4) so likely already covered.
+
+---
+
+
 Decoded 2026-06-21 from `Captures/Blablatest_mage-necromancer-create_casilda_quest_first_stage.tshark.json`
 (+ screenshots `/home/melvin/Pictures/Screenshots/{kiled_tuut,free_casilda}.png`, video
 `Screencast_20260621_112521.webm`). This supersedes the single-stage assumptions in #47 (closed) and the

@@ -30,7 +30,7 @@ namespace Faolan.GameServer.World
 	// sender = world-system 0x58, receiver = the recipient's GameInterfaceType endpoint). The FA015807 body carries the
 	// SUBJECT's handle (unchanged), so the recipient renders the subject as a separate entity. NEEDS IN-CLIENT
 	// VERIFICATION with two connected players. Single-player is a no-op (no interest events).
-	public sealed class WorldBroadcaster
+	public sealed class WorldBroadcaster : IQuestOutbound
 	{
 		// LootBagFullUpdateIIR_c - the world-object sub-opcode a loot bag spawns as.
 		private const uint LootBagSubOpcode = (uint)GameServer0X2000RespondsOpcodes.LootBagFullUpdateIIR;
@@ -871,6 +871,17 @@ namespace Faolan.GameServer.World
 			bag.LootItems.Clear();
 			_logger.LogInformation("Loot: {Player} loots {Count} item(s) from bag 0x{Handle:X8}.", player.Name, taken.Length, bagHandle);
 			return taken;
+		}
+
+		// The SOURCE NPC name of a loot bag (a corpse bag REUSES the dead NPC's WorldEntity + handle, so its Name is the
+		// NPC's, e.g. "Scavenger Tuut") - the match key for a LootFromNpc quest goal (#261), since the quest item itself
+		// is RDB content we don't materialise. Null for a non-bag handle or a bag with no source name (.spawnbag).
+		public string BagSourceName(INetworkClient client, uint bagHandle)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player != null && _sim.World.ZoneFor(player.MapId).TryGet(bagHandle, out var bag) && bag.IsLootable)
+				return bag.Name;
+			return null;
 		}
 
 		// TryLootCash (0x2045): takes the bag's coins exactly once - returns the amount and zeroes it on the bag

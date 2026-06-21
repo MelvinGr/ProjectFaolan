@@ -290,6 +290,42 @@ namespace Faolan.Tests
 			throw new System.IO.DirectoryNotFoundException("Captures/ not found above " + AppContext.BaseDirectory);
 		}
 
+		// --- Multi-stage chain supersession predicate (#261) ----------------------------------------------------------
+
+		[Fact]
+		public void Advances_MatchesGoalTypeAndTarget()
+		{
+			// The Casilda chain's three captured trigger stages: each matches only its own goal TYPE + target.
+			Assert.True(QuestProgress.Advances(Live(0, 1), Goal(QuestGoalType.Kill, "Scavenger Tuut"), QuestGoalType.Kill, "Scavenger Tuut"));
+			Assert.True(QuestProgress.Advances(Live(0, 1), Goal(QuestGoalType.LootFromNpc, "Scavenger Tuut"), QuestGoalType.LootFromNpc, "scavenger tuut")); // case-insensitive
+			Assert.True(QuestProgress.Advances(Live(0, 1), Goal(QuestGoalType.TalkToNpc, "Casilda"), QuestGoalType.TalkToNpc, "Casilda"));
+		}
+
+		[Fact]
+		public void Advances_RejectsWrongTypeTargetOrState()
+		{
+			var lootGoal = Goal(QuestGoalType.LootFromNpc, "Scavenger Tuut");
+			Assert.False(QuestProgress.Advances(Live(0, 1), lootGoal, QuestGoalType.Kill, "Scavenger Tuut"));          // a kill must not fire a loot goal
+			Assert.False(QuestProgress.Advances(Live(0, 1), lootGoal, QuestGoalType.LootFromNpc, "Casilda"));          // wrong target NPC
+			Assert.False(QuestProgress.Advances(Live(1, 1), lootGoal, QuestGoalType.LootFromNpc, "Scavenger Tuut"));   // objective already complete
+			Assert.False(QuestProgress.Advances(Live(0, 1, QuestState.Completed), lootGoal, QuestGoalType.LootFromNpc, "Scavenger Tuut")); // not active
+			Assert.False(QuestProgress.Advances(Live(0, 1), null, QuestGoalType.LootFromNpc, "Scavenger Tuut"));       // no goal definition
+			Assert.False(QuestProgress.Advances(Live(0, 1), Goal(QuestGoalType.LootFromNpc, null), QuestGoalType.LootFromNpc, "Scavenger Tuut")); // unsourced target
+		}
+
+		[Fact]
+		public void Advances_TreatsZeroRequiredAsOne()
+		{
+			// A goal seeded with RequiredCount 0 still completes on the first trigger (the predicate clamps to >= 1).
+			Assert.True(QuestProgress.Advances(Live(0, 0), Goal(QuestGoalType.TalkToNpc, "Casilda"), QuestGoalType.TalkToNpc, "Casilda"));
+		}
+
+		private static CharacterQuest Live(uint progress, uint required, QuestState state = QuestState.Active) =>
+			new() { QuestId = 1, State = state, GoalProgress = progress, GoalRequired = required };
+
+		private static QuestGoalDefinition Goal(QuestGoalType type, string target) =>
+			new() { GoalType = type, TargetName = target, Sequence = 1 };
+
 		private static CharacterQuest KillQuest(string target, uint progress, uint required, QuestState state = QuestState.Active)
 		{
 			return new CharacterQuest

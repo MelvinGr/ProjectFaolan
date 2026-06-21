@@ -14,6 +14,12 @@ namespace Faolan.Core.Database.Tables
 		// The RDB quest id (e.g. 13479) - the stable lookup key; the synthetic Id is the row PK.
 		public uint QuestId { get; set; }
 
+		// The next stage in a multi-stage quest CHAIN (Gitea #261): completing this quest's goal SUPERSEDES it with
+		// NextQuestId (QuestProgressionService sends QuestGoal + QuestIIR 2->4 + QuestFullUpdate(next) and sets the next
+		// quest Active). 0 = no successor (a standalone quest, or the last stage of a chain). The Tortage intro chain is
+		// 13479 (kill Tuut) -> 13563 (loot key) -> 13480 (free/talk Casilda) -> 12407 (escort) -> 0.
+		public uint NextQuestId { get; set; }
+
 		// The quest's region/area id (e.g. 1054), carried raw in both the journal and full-update packets.
 		public uint AreaId { get; set; }
 
@@ -76,16 +82,27 @@ namespace Faolan.Core.Database.Tables
 		public uint GoalId { get; set; }
 		public uint Sequence { get; set; } // the per-goal ordinal `N` (1, 2, ...)
 
+		// What server-side ACTION advances/completes this goal (Gitea #261). The wire output of a completion is
+		// identical for every type (QuestProgressionService); the type only selects which trigger matches:
+		//   Kill       - a kill of the NPC named TargetName (CombatService.AdvanceKillQuests).
+		//   LootFromNpc- looting the corpse bag of the NPC named TargetName (LootService); the actual key item is a
+		//                quest-specific RDB item we don't materialise, so the bag's SOURCE NPC name is the match key.
+		//   TalkToNpc  - opening the greeting of the NPC named TargetName (ConversationService).
+		//   Escort     - escorting the NPC named TargetName to a destination (not yet wired; Gitea sub-ticket).
+		// Default Kill keeps the existing single-goal rows (seeded before this field) as kill goals.
+		public QuestGoalType GoalType { get; set; } = QuestGoalType.Kill;
+
 		// The goal's required amount - how many kills/collects/etc. complete it. Decoded from the QuestFullUpdate /
 		// snapshot @609 goal record (the word after goalIdRepeat; values 1/3/4/8/12/64 seen on the wire, #47). 0 = not
 		// set, treated as 1 by QuestObjectiveRegion.Build (preserves byte-exact for rows seeded before this field).
 		public uint RequiredCount { get; set; }
 
-		// The NPC whose death advances this goal (a kill objective). SERVER-SIDE ONLY - NOT on the wire: the goal
-		// record carries the count but not the target (it's in the RDB-resolved objective text). Sourced per quest by
-		// capture correlation (the NPC hit at the QuestGoal-complete frame) + domain knowledge (#47, e.g. Casilda's
-		// quest 13479 = kill "Scavenger Tuut"). CombatService.AdvanceKillQuests matches a kill on this exact name.
-		// Null/empty = not a kill goal (talk/collect/reach) or target not yet sourced.
+		// The NPC this goal is ABOUT, interpreted per GoalType: the NPC to kill (Kill), whose corpse bag to loot
+		// (LootFromNpc), or to talk to (TalkToNpc / Escort). SERVER-SIDE ONLY - NOT on the wire: the goal record carries
+		// the count but not the target (it's in the RDB-resolved objective text). Sourced per quest by capture
+		// correlation (the NPC at the QuestGoal-complete frame) + domain knowledge (#47/#261, e.g. Casilda's chain
+		// 13479 = kill "Scavenger Tuut", 13563 = loot "Scavenger Tuut"'s bag, 13480 = talk "Casilda").
+		// Null/empty = target not yet sourced.
 		public string TargetName { get; set; }
 
 		public uint Separator { get; set; } // the [1][k] separator's k word (9, 12 in the beach capture)
@@ -135,6 +152,15 @@ namespace Faolan.Core.Database.Tables
 
 		// <localized flags="...">; null/empty for remoteformat slots.
 		public string Flags { get; set; }
+	}
+
+	// The server-side trigger that advances a quest goal (Gitea #261). Persisted as an int; ordering is stable.
+	public enum QuestGoalType
+	{
+		Kill = 0,        // kill the TargetName NPC
+		LootFromNpc = 1, // loot the TargetName NPC's corpse bag (the quest item is RDB content; the bag source is the key)
+		TalkToNpc = 2,   // talk to (open the greeting of) the TargetName NPC
+		Escort = 3       // escort the TargetName NPC to a destination (not yet wired)
 	}
 
 	public enum QuestTextSlot
