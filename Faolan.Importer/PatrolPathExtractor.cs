@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using Faolan.GameServer.World;
 
 namespace Faolan.Importer
 {
@@ -63,17 +64,74 @@ namespace Faolan.Importer
 			return entries;
 		}
 
-		// One patrol route per NPC HANDLE in a capture (the last seen for that handle). Lets the importer correlate a
-		// route to its spawn by handle (the same-session mob identity) rather than by position - the spawn's first
-		// sighting and its MoveTask anchor are captured at different moments, so position doesn't match (#266).
+		// One patrol route per NPC HANDLE in a capture, decoded from EVERY MoveTask form (#266 patrol). The canonical
+		// single-segment Extract above only catches a sliver; the real patrol is the mode-1 PathMoveTask waypoint list,
+		// usually nested inside a mode-4 ListMoveTask. The full recursive grammar is decoded (MoveTaskComposite,
+		// round-trips all 6225 captured records), so parse the whole tree and gather every PathMoveTask's waypoints.
+		// Keyed by handle (the same-session mob identity) so the importer correlates a route to its spawn by handle -
+		// position doesn't match, the first sighting and the MoveTask anchor are captured at different moments. Keeps
+		// the RICHEST route per handle (the most complete path seen that session).
 		public static Dictionary<uint, PatrolPathEntry> ExtractByHandle(IReadOnlyList<CapturedPacket> packets)
 		{
 			var byHandle = new Dictionary<uint, PatrolPathEntry>();
-			foreach (var e in Extract(packets))
-				if (e.Handle != 0)
-					byHandle[e.Handle] = e; // last MoveTask for the handle wins (its established patrol)
+			uint currentMap = 0;
+
+			foreach (var p in packets)
+			{
+				if (p.Opcode != Opcode2000)
+					continue;
+
+				var body = GetBody(p.Bytes);
+				if (body.Length < 8)
+					continue;
+
+				var subop = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4));
+				if (subop == MapChangeSubOpcode)
+				{
+					if (body.Length >= 38)
+						currentMap = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(34, 4));
+					continue;
+				}
+
+				if (subop != MoveTaskSubOpcode || currentMap == 0)
+					continue;
+
+				MoveTaskComposite task;
+				// Parse expects the record starting at the subop; GetBody includes the leading [u32 len], so skip it.
+				try { task = MoveTaskComposite.Parse(body[4..]); }
+				catch { continue; } // a form the grammar can't parse (should not happen - 6225/6225) - skip defensively
+
+				if (task.Handle == 0 || task.Handle >= InstanceRangeStart)
+					continue; // a player's MoveTask, not an NPC patrol
+
+				var waypoints = new List<Vector3>();
+				CollectPathWaypoints(task.Task, waypoints);
+				if (waypoints.Count == 0)
+					continue; // no path leaf (a wait/rotate/approach task carries no patrol route)
+
+				if (!byHandle.TryGetValue(task.Handle, out var existing) || waypoints.Count > existing.Waypoints.Count)
+				{
+					var from = new Vector3(Bits(task.FromX), Bits(task.FromY), Bits(task.FromZ));
+					byHandle[task.Handle] = new PatrolPathEntry(currentMap, from, 0f, waypoints, task.Handle);
+				}
+			}
+
 			return byHandle;
 		}
+
+		// Gathers every PathMoveTask (mode 1) waypoint in a move-task tree (recursing into mode-4 ListMoveTask). The
+		// node stores 3 raw big-endian float-bit u32 per waypoint (kept as bits for exact round-trip).
+		private static void CollectPathWaypoints(MoveTaskNode node, List<Vector3> waypoints)
+		{
+			if (node.Mode == 1)
+				for (var i = 0; i + 2 < node.Waypoints.Count; i += 3)
+					waypoints.Add(new Vector3(Bits(node.Waypoints[i]), Bits(node.Waypoints[i + 1]), Bits(node.Waypoints[i + 2])));
+
+			foreach (var child in node.Children)
+				CollectPathWaypoints(child, waypoints);
+		}
+
+		private static float Bits(uint raw) => BitConverter.UInt32BitsToSingle(raw);
 
 		// Dedup by (map, spawn point); keep the first seen - like NpcSpawnExtractor.Merge.
 		public static List<PatrolPathEntry> Merge(IEnumerable<PatrolPathEntry> all)

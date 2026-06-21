@@ -1138,8 +1138,10 @@ namespace Faolan.GameServer.World
 		{
 			if (!npc.Patrols)
 				return Task.CompletedTask;
-			var body = MoveTaskBuilder.BuildPatrol(npc.Handle, npc.Position, npc.PatrolWaypoints, npc.PatrolSpeed);
-			return SendWorldRecord(recipient, body);
+			// mode-1 PathMoveTask (BuildPathBody) - the dominant captured patrol form; the path length is derived from
+			// the waypoints. BuildPathBody emits a bare 0x2000 body (no length prefix), so it rides SendWorldIir.
+			var body = MoveTaskCodec.BuildPathBody(npc.Handle, npc.Position, npc.PatrolWaypoints);
+			return SendWorldIir(recipient, body);
 		}
 
 		// Sends a prebuilt LootBagFullUpdateIIR body (handle + transform already baked by WorldObjectBuilder) on
