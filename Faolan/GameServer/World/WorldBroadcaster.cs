@@ -461,6 +461,15 @@ namespace Faolan.GameServer.World
 			// mobs of the same name (Pillagers spread across the beach) fall in different cells and all survive.
 			// Burst-position rows are ordered FIRST so they win their cell - the kept entity is then the exact one the
 			// burst rendered, and it inherits the burst's wire handle below so the two never stack.
+			// Burst-as-truth (#266): the world-burst is ONE capture session, i.e. retail's ACTUAL spawn set for the
+			// captured area. NpcSpawns is the UNION of every capture, so a wandering faction mob (a Crocodile logged at
+			// 50 different spots across sessions) survives cell-dedup as ~50 phantom copies (the beach loaded 165 where
+			// the burst has 42). When the map has an authoritative burst, take the FACTION mobs ONLY from it; named/
+			// unique NPCs (Community 0: Casilda, Kalanthes, neutral critters) are kept regardless since the burst only
+			// covers the captured path and the uniques must still exist outside it. Maps with no burst keep the old
+			// dedup (no authoritative set to trust).
+			var hasBurst = burstHandleByPosition.Count > 0;
+
 			var seenCells = new HashSet<(string, int, int, int)>();
 			foreach (var npc in npcs.OrderByDescending(n => burstHandleByPosition.ContainsKey(PositionKey(n.PositionX, n.PositionY, n.PositionZ))))
 			{
@@ -470,6 +479,12 @@ namespace Faolan.GameServer.World
 					continue;
 				var npcName = npc.Npc.Name;
 				var community = npc.Npc.Community;
+
+				// Burst-as-truth gate: drop faction mobs the authoritative burst did NOT place (the cross-session
+				// re-capture density). Named/unique NPCs and burst-placed mobs pass through to the dedup below.
+				var inBurst = burstHandleByPosition.ContainsKey(PositionKey(npc.PositionX, npc.PositionY, npc.PositionZ));
+				if (hasBurst && community > 0 && !inBurst)
+					continue;
 
 				// Faction mobs (Community > 0) are legitimately MANY of the same name spread across the map - dedup by
 				// (name, coarse cell): same-spot cross-session re-captures collapse, distinct mobs in different cells
