@@ -325,9 +325,12 @@ namespace Faolan.GameServer.World
 			if (!_questGivers.TryGetValue(npcName, out var questId))
 				return QuestMarkerNone;
 			var held = Array.Find(await _database.GetCharacterQuests(character.Id), q => q.QuestId == questId);
+			// '!' when the quest isn't held yet; '?' once its objective is done but it's still ACTIVE (awaiting turn-in
+			// at the giver - the quest is only marked Completed on turn-in, not on the kill, #47/#241); no marker while
+			// in progress or after it's been turned in (Completed).
 			return held == null
 				? QuestMarkerAvailable
-				: held.State == QuestState.Completed
+				: held.State == QuestState.Active && held.GoalRequired > 0 && held.GoalProgress >= held.GoalRequired
 					? QuestMarkerTurnIn
 					: QuestMarkerNone;
 		}

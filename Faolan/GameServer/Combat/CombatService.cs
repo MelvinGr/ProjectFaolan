@@ -392,24 +392,18 @@ namespace Faolan.GameServer.Combat
 					continue;
 
 				var progress = quest.GoalProgress + 1;
-				var completed = progress >= quest.GoalRequired;
-				await _database.SetCharacterQuest(character.Id, quest.QuestId, completed
-					? QuestState.Completed
-					: QuestState.Active, progress, quest.GoalRequired, quest.GoalTargetName);
+				var objectiveDone = quest.GoalRequired > 0 && progress >= quest.GoalRequired;
+				// The kill only advances the OBJECTIVE - the quest stays Active and is marked Completed when the player
+				// TURNS IT IN at the giver (ConversationService.TryTurnInQuests, #47), not on the kill. Push the goal
+				// counter so the journal/OSD objective ticks; the '?' turn-in marker then appears on the giver.
+				await _database.SetCharacterQuest(character.Id, quest.QuestId, QuestState.Active, progress, quest.GoalRequired, quest.GoalTargetName);
 				await _broadcaster.SendQuestGoal(killer, quest.QuestId, 0, progress);
-
-				if (completed)
-				{
-					// The goal push alone moves the objective counter but does NOT update the journal entry / mark the
-					// quest done in-client (#47). Retail follows the QuestGoal with QuestIIR state 2 (active/update) then
-					// state 4 (completed) - the journal driver (Stihetfv compeltefirstquest, 13479 idx858/860). Without
-					// these the kill registered server-side but the client journal never advanced.
-					await _broadcaster.SendQuestIir(killer, quest.QuestId, WorldQuest.StateActive);
-					await _broadcaster.SendQuestIir(killer, quest.QuestId, WorldQuest.StateCompleted);
-					await _agents.SendSystemMessage(character.Id, $"Quest {quest.QuestId} complete!");
-				}
-				else
-					await _agents.SendSystemMessage(character.Id, $"{npcName} slain ({progress}/{quest.GoalRequired}).");
+				// Refresh the journal entry so the HUD objective ticks (the QuestGoal counter alone doesn't redraw it):
+				// QuestIIR state 2 = active/update, NOT completed - the quest is only marked Completed on turn-in (#47).
+				await _broadcaster.SendQuestIir(killer, quest.QuestId, WorldQuest.StateActive);
+				await _agents.SendSystemMessage(character.Id, objectiveDone
+					? $"{npcName} slain - objective complete ({progress}/{quest.GoalRequired}). Return to the quest giver."
+					: $"{npcName} slain ({progress}/{quest.GoalRequired}).");
 			}
 		}
 

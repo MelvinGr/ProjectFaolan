@@ -409,12 +409,40 @@ namespace Faolan.GameServer.Dialogue
 			if (!client.Session.SpawnedNpcNamesByHandle.TryGetValue(clickedNpcHandle, out var npcName))
 				return false; // unknown NPC (not spawned this session) -> create-world scripted intro fallback
 
+			// Turn-in (#47): talking to a quest GIVER whose quest's objective is already done completes it now (not on
+			// the kill) - so the giver's reply is the completion/reward greeting and the journal moves to Completed.
+			await TryTurnInQuests(client, npcName);
+
 			var greeting = await PickConversationScreen(client, npcName, typeId, "");
 			if (greeting == null)
 				return false;
 
 			await ServeScreen(client, greeting, clickedNpcHandle);
 			return true;
+		}
+
+		// Completes any quest GIVEN by `npcName` whose objective is done (Active + GoalProgress >= GoalRequired): marks
+		// it Completed and sends QuestIIR state 2 -> 4 so the client journal moves it to the completed tab (#47). The
+		// kill only advances the objective; the quest is marked Completed here, on TURN-IN at the giver. Called as the
+		// player opens the giver's greeting, so the greeting condition (HasCompletedQuest) then serves the reward line.
+		private async Task TryTurnInQuests(INetworkClient client, string npcName)
+		{
+			var character = client.Session.Character;
+			if (character == null || npcName == null)
+				return;
+
+			var givers = await _database.GetQuestGiverMap(); // NpcName -> the quest id it grants
+			if (!givers.TryGetValue(npcName, out var givenQuestId))
+				return;
+
+			var held = (await _database.GetCharacterQuests(character.Id)).FirstOrDefault(q => q.QuestId == givenQuestId);
+			if (held == null || held.State != QuestState.Active || held.GoalRequired == 0 || held.GoalProgress < held.GoalRequired)
+				return;
+
+			await _database.SetCharacterQuest(character.Id, held.QuestId, QuestState.Completed, held.GoalProgress, held.GoalRequired, held.GoalTargetName);
+			await _broadcaster.SendQuestIir(client, held.QuestId, WorldQuest.StateActive);
+			await _broadcaster.SendQuestIir(client, held.QuestId, WorldQuest.StateCompleted);
+			_logger.LogInformation("Quest {Quest} turned in to {Npc} by {Char} (objective {Progress}/{Required}).", held.QuestId, npcName, character.Name, held.GoalProgress, held.GoalRequired);
 		}
 
 		// Picks the conversation-screen variant whose Lua CONDITION passes for the live player (quest/tag-gated
