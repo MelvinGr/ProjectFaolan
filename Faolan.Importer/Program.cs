@@ -325,6 +325,57 @@ namespace Faolan.Importer
 			await db.SaveChangesAsync();
 		}
 
+		// The clean NPC spawn set the DB should hold (#266): faction mobs ONLY where a map's authoritative login burst
+		// (one session = retail's actual world build) placed them, PLUS the named/unique NPCs (Community 0: Casilda,
+		// vendors, neutral critters) the burst doesn't cover because they live outside the captured path. Without this
+		// the DB accretes the cross-session UNION - the same wandering mob logged at dozens of spots (the beach: 696
+		// rows for ~42 real NPCs), which renders as ~50 duplicate crocodiles in-client. Maps with NO captured login
+		// burst keep the union (no authoritative set to trust). Named NPCs are deduped by (map, name); exact-position
+		// overlaps by Merge. Mirrors the runtime WorldBroadcaster.EnsureZoneNpcs burst-as-truth gate.
+		private static List<NpcSpawnEntry> BuildBurstTruthSpawns(IReadOnlyList<NamedCapture> captures)
+		{
+			var union = NpcSpawnExtractor.Merge(captures.SelectMany(c => NpcSpawnExtractor.Extract(c.Packets)));
+
+			// Best (most complete) login burst per map. Positions carry per-session float jitter, so DON'T union bursts
+			// across captures (that wouldn't dedup) - pick the single richest capture's burst per map and take only it.
+			var perCaptureBurst = captures.Select(c => NpcSpawnExtractor.ExtractLoginBurst(c.Packets)).ToList();
+			var burst = new List<NpcSpawnEntry>();
+			foreach (var map in union.Select(e => e.MapId).Distinct())
+			{
+				var best = perCaptureBurst
+					.Select(b => b.Where(e => e.MapId == map).ToList())
+					.OrderByDescending(l => l.Count)
+					.FirstOrDefault();
+				if (best is { Count: > 0 })
+					burst.AddRange(NpcSpawnExtractor.Merge(best));
+			}
+
+			var burstMaps = burst.Select(e => e.MapId).ToHashSet();
+			var burstNamesByMap = burst
+				.GroupBy(e => e.MapId)
+				.ToDictionary(g => g.Key, g => g.Select(e => e.Name ?? "").ToHashSet());
+
+			var result = new List<NpcSpawnEntry>(burst);
+			var keptNamed = new HashSet<(uint, string)>();
+			foreach (var e in union)
+			{
+				if (!burstMaps.Contains(e.MapId))
+				{
+					result.Add(e); // no authoritative burst for this map - keep the union as-is
+					continue;
+				}
+
+				// Burst map: add only the named/unique NPCs (Community 0) the burst didn't already place, one per
+				// (map, name) - this is how Casilda et al (down the beach, outside the login-build window) survive.
+				if (e.Community == 0
+				    && !(burstNamesByMap.TryGetValue(e.MapId, out var names) && names.Contains(e.Name ?? ""))
+				    && keptNamed.Add((e.MapId, e.Name ?? "")))
+					result.Add(e);
+			}
+
+			return NpcSpawnExtractor.Merge(result);
+		}
+
 		// Upsert by (map, spawn point); never wipe.
 		private static async Task ImportNpcSpawns(DatabaseContext db, List<NpcSpawnEntry> spawns)
 		{
@@ -618,44 +669,27 @@ namespace Faolan.Importer
 				return 0;
 			}
 
-			// --reseed-npcs: wipe the NPC spawn tables and re-import ONLY each map's LOGIN-BURST NPCs (the pre-poll
-			// world-build window), restricted to the Tortage intro + beach (4000/4010). This drops the cross-session
-			// mid-session-spawn duplicates that otherwise accrete (419 beach spawns -> the ~42 retail-shaped set; see
-			// #185/#244). Isolated: touches only NpcSpawns + its cascaded morph/equipment rows; no other table, so the
-			// Tortage prune stays intact. NpcSpells (type-level, name-keyed) is left as-is.
+			// --reseed-npcs: wipe the NPC spawn tables and re-import the BURST-TRUTH set (#266) - each map's authoritative
+			// login burst (faction mobs at retail density) PLUS the named/unique NPCs the burst misses (Casilda et al,
+			// outside the captured path). Drops the cross-session mid-session-spawn duplicates that otherwise accrete
+			// (the beach: 696 rows -> the ~42-NPC burst set + a handful of named NPCs). Isolated: touches only NpcSpawns
+			// + its cascaded morph/equipment rows; no other table, so the Tortage prune stays intact. NpcSpells
+			// (type-level, name-keyed) is left as-is. Same helper the normal import uses, so a full re-import stays clean.
 			if (args.Contains("--reseed-npcs"))
 			{
-				var allowedMaps = new HashSet<uint> { 4000u, 4010u };
-
-				// ONE capture file per map: the login burst is deterministic per map, but positions carry tiny
-				// per-session float jitter, so UNIONING bursts across captures would not dedup (it ballooned to 236).
-				// Instead pick, per map, the single capture whose login burst has the most NPCs (the most complete
-				// world build) and take only that capture's burst - the clean retail-shaped ~42-NPC beach set.
-				var perCapture = captures
-					.Select(c => NpcSpawnExtractor.ExtractLoginBurst(c.Packets, allowedMaps))
-					.ToList();
-				var burst = new List<NpcSpawnEntry>();
-				foreach (var map in allowedMaps)
-				{
-					var best = perCapture
-						.Select(b => b.Where(e => e.MapId == map).ToList())
-						.OrderByDescending(list => list.Count)
-						.FirstOrDefault();
-					if (best is { Count: > 0 })
-						burst.AddRange(NpcSpawnExtractor.Merge(best)); // dedup any exact-position repeat within the one burst
-				}
+				var spawns = BuildBurstTruthSpawns(captures);
 
 				var removed = await db.NpcSpawns.CountAsync();
 				await db.Database.ExecuteSqlRawAsync("DELETE FROM NpcSpawnMorphs");
 				await db.Database.ExecuteSqlRawAsync("DELETE FROM NpcSpawnEquipment");
 				await db.Database.ExecuteSqlRawAsync("DELETE FROM NpcSpawns");
 
-				await ImportNpcSpawns(db, burst);
+				await ImportNpcSpawns(db, spawns);
 
 				await LinkSpellsToTypes(db); // #244: link the reseeded NPCs' spells to their types (types upserted in ImportNpcSpawns)
 
-				var byMap = burst.GroupBy(e => e.MapId).OrderBy(g => g.Key).Select(g => $"{g.Key}={g.Count()}");
-				Console.WriteLine($"Reseed NPCs: removed {removed} spawns; imported {burst.Count} login-burst spawns ({string.Join(", ", byMap)}); " +
+				var byMap = spawns.GroupBy(e => e.MapId).OrderBy(g => g.Key).Select(g => $"{g.Key}={g.Count()}");
+				Console.WriteLine($"Reseed NPCs: removed {removed} spawns; imported {spawns.Count} burst-truth spawns ({string.Join(", ", byMap)}); " +
 					$"morphs={await db.NpcSpawnMorphs.CountAsync()}, equipment={await db.NpcSpawnEquipment.CountAsync()}.");
 				return 0;
 			}
@@ -787,7 +821,7 @@ namespace Faolan.Importer
 				Console.WriteLine($"Learned spells (0x200A grants): {spellChars} characters seeded, {spellRows} new rows.");
 				var (shopsSeen, shopsAdded, shopsUpdated) = await CaptureShopImporter.ImportAsync(db, captures.SelectMany(c => CaptureShopImporter.Extract(c.Packets)));
 				Console.WriteLine($"Shops (0x2033 vendor windows): {shopsSeen} vendors, {shopsAdded} new, {shopsUpdated} updated.");
-				await ImportNpcSpawns(db, NpcSpawnExtractor.Merge(captures.SelectMany(c => NpcSpawnExtractor.Extract(c.Packets))));
+				await ImportNpcSpawns(db, BuildBurstTruthSpawns(captures)); // #266: burst faction set + named NPCs, not the bloated union
 				var npcSpells = NpcSpellExtractor.Merge(captures.SelectMany(c => NpcSpellExtractor.Extract(c.Packets)));
 				var npcSpellsAdded = await ImportNpcSpells(db, npcSpells);
 				Console.WriteLine($"NPC spells (#232): {npcSpells.Count} (name,spell) pairs, {npcSpellsAdded} new.");
