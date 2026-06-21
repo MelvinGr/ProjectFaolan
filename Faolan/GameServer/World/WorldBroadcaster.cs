@@ -620,20 +620,19 @@ namespace Faolan.GameServer.World
 		// leaves the bag in the world with its remaining contents; it still fades on its own expiry (TickExpiry).
 		// Retail loot-all finish decoded from the hoxxling gameplay capture (frame 4470): LootRemoveItems ->
 		// DispatchCloseLootBag (0x2038) -> NewCurrentLooter/NewAllowedLooter reset -> n3ToClientFade -> UpdateSimpleDynel.
-		public async Task AfterLootTake(INetworkClient client, uint bagHandle)
+		public async Task AfterLootTake(INetworkClient client, uint bagHandle, uint removedPos = 0)
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null || !_sim.World.ZoneFor(player.MapId).TryGet(bagHandle, out var bag))
 				return;
 
-			// Per-take ACK: confirm the drag and report how many items REMAIN (the trailing u32, decoded from the
-			// drag-only capture loot-drag-1538). The client removes the item IT dragged from the open window itself; this
-			// just tells it whether the bag still has contents. A partial take therefore leaves the bag open with its
-			// other items at their stable Pos - NO re-render (re-sending the full object stacked a second window).
-			var remaining = (uint)bag.LootItems.Count;
-			await SendWorldIir(client, WorldLoot.BuildLootRemoveItemsBody(bag.Handle, remaining));
+			// Per-take ACK: tell the client which display slot to remove from the open window - the looted item's Pos
+			// (the srcPos it dragged), echoed in the trailing u32 (decoded from loot-drag-1538). The client removes that
+			// slot and compacts; a partial take leaves the bag open with its remaining items - NO re-render (re-sending
+			// the full object stacked a second window). Loot-all passes removedPos 0 (matches the captured loot-all ACK).
+			await SendWorldIir(client, WorldLoot.BuildLootRemoveItemsBody(bag.Handle, removedPos));
 
-			if (remaining > 0 || bag.CashTin > 0)
+			if (bag.LootItems.Count > 0 || bag.CashTin > 0)
 				return; // items/coins remain - keep the bag open; the client drives the close (0x2044) when done
 
 			// Fully emptied -> the captured completion sequence: DispatchCloseLootBag -> looter resets -> fade ->

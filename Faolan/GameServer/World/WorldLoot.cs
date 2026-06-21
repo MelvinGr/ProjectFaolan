@@ -35,16 +35,15 @@ namespace Faolan.GameServer.World
 		public const uint NewAllowedLooterSubOpcode = (uint)GameServer0X2000RespondsOpcodes.NewAllowedLooterIIR; // 0x1E2E0139
 		public const uint BagConsumedVisualSubOpcode = (uint)GameServer0X2000RespondsOpcodes.UpdateSimpleDynelIIR; // 0x30536411
 
-		// LootRemoveItemsIIR (0x70010162): the per-take ACK the client acts on to move the looted item from the open bag
-		// window into the backpack. The client removes the item IT dragged (it tracks the source Pos it sent in
-		// TryLootItem 0x2046), so this packet does NOT name the item - it only confirms the take and reports how many
-		// items REMAIN in the bag (the trailing u32). 25 B:
-		// [subop][lootTypetag][bagHandle][00000000][000007e2 landmark][u32 itemsRemaining].
-		// Decoded from loot-drag-1538 (a drag-only capture): a single drag that left 1 item sent trailing=1, the drag
-		// that emptied the bag sent trailing=0, and every loot-all sent trailing=0. The OLD constant trailing=0 told the
-		// client the bag was emptied on EVERY take, so a partial drag wrongly cleared a slot (#226-2: "first slot
-		// disappears"). The 0x000007E2 landmark is a fixed constant here (not a per-bag count).
-		public static byte[] BuildLootRemoveItemsBody(uint bagHandle, uint itemsRemaining = 0)
+		// LootRemoveItemsIIR (0x70010162): the per-take ACK that tells the client which display slot to remove from the
+		// open bag window. The trailing u32 is the looted item's display Pos (the srcPos the client sent in TryLootItem
+		// 0x2046); the client removes that slot and compacts the window. 25 B:
+		// [subop][lootTypetag][bagHandle][00000000][000007e2 landmark][u32 removedPos].
+		// Decoded from loot-drag-1538 (a drag-only capture): drag srcPos=1 -> trailing=1, drag srcPos=0 -> trailing=0,
+		// single-item bags (srcPos 0) -> 0, loot-all -> 0. The OLD constant trailing=0 removed slot 0 on every take
+		// (#226-2: "first slot disappears"); a remaining-COUNT value (e.g. 2) named no real slot, so the dragged item
+		// was left in the bag. The 0x000007E2 landmark is a fixed constant here.
+		public static byte[] BuildLootRemoveItemsBody(uint bagHandle, uint removedPos = 0)
 		{
 			return new FaolanStream()
 				.WriteUInt32(LootRemoveItemsSubOpcode)
@@ -53,7 +52,7 @@ namespace Faolan.GameServer.World
 				.WriteUInt32(0)
 				.WriteUInt32(7)
 				.WriteByte(0xE2)
-				.WriteUInt32(itemsRemaining)
+				.WriteUInt32(removedPos)
 				.ToArray();
 		}
 

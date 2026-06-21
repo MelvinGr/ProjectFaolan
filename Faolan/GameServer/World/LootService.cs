@@ -74,9 +74,9 @@ namespace Faolan.GameServer.World
 				await _questProgression.AdvanceLootGoals(client, sourceNpc); // #261 loot-from-NPC goal (the key)
 			}
 
-			// Confirm the take; AfterLootTake only consumes/fades the bag once it is fully emptied, so a partial
-			// drag leaves it open with the remaining items.
-			await _broadcaster.AfterLootTake(client, bagHandle);
+			// Confirm the take: tell the client to remove the dragged slot (itemIndex) from the open window. AfterLootTake
+			// only consumes/fades the bag once it is fully emptied, so a partial drag leaves it open with the rest.
+			await _broadcaster.AfterLootTake(client, bagHandle, itemIndex);
 		}
 
 		// CloseLootBag: the client closed the loot window without taking everything.
