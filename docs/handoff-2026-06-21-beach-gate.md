@@ -61,6 +61,75 @@ playfield trigger that teleports/blocks). Less likely given the intro is already
 - Don't confuse with combat/leash (`WorldState.Tick` `NpcLeashRange`) — that's NPC movement, unrelated.
 - In-client verification needs the real client (the launcher can't see render/movement gating); use a fresh char.
 
+## Session findings 2026-06-21 (retail-dump comparison — CONCLUSIVE)
+
+Two distinct issues confirmed (not one): (1) Casilda's chains don't render (she hangs from thin air);
+(2) the invisible wall confines correctly while chained but doesn't lift when she's freed.
+
+**The wall is NOT a despawnable object — proven against every casilda/create/quest capture.**
+- The chain (`004709_Global__decor_chain_hangingwoman`, IIR `0x66AEDD50`) and the **Acheronian Gate** are
+  sent as a **consecutive handle pair (N, N+1)**, every session, with **session-volatile handles** — our DB's
+  `0x15DD8/0x15DD9` is just one import snapshot, and those exact values appear in NO capture.
+- **Neither is ever despawned** — not at quest start, not at first-quest-complete (`…compeltefirstquest`),
+  not post-quest (`…after_first_quest_kalanthes`, where they're *re-sent* in the 5-dynel login burst). They're
+  permanent decor. (Verified with the correct despawn-handle offset: `n3ToClientQuit` handle = body[12:16],
+  not [8:12]=the 0xC350 ack.)
+- The ONLY despawns in the whole flow are NPCs (`0xFA015807` — captor mobs killed + interest churn) and loot
+  containers (`0xF096251E`). Zero `0x66AEDD50` despawns anywhere.
+- ⟹ The wall is **client-side destiny/playfield collision**, lifted by destiny/quest STATE (Scry-driven:
+  `StartFixed3d → ApproachCasilda → LeaveCasilda → …`). `LeaveCasilda` is the prime "you may now leave" step.
+  Removing the chain/gate is the WRONG lever. The `.despawnobj <handle>` GM command added this session
+  (WorldBroadcaster.DespawnWorldObjectForPlayer + GMCommands) is a useful generic tool but is NOT the wall fix.
+
+**Issue 1 (chains missing) — server side fully CLEARED, so it's client mesh:**
+- The chain row (20) is sent (passes the `Data != null` filter in GetWorldObjects), built byte-exact (lifted
+  columns, WorldObjectBuilderTests), stamped with `BeachPlayfieldId` (the same token the player spawn uses, and
+  the player renders), and has NO handle collision (Casilda `0x29735`, chain `0x15DD8`, no NPC↔object overlap).
+- ⟹ Remaining cause = the `hangingwoman` mesh (resource `347243` / localized `347573`) not instantiating
+  client-side (also why `.despawnobj 0x15DD8` was a no-op — the dynel was never live). NEXT: in-client, check
+  whether the OTHER beach world objects render (chests/`Gloves of the Oxmal` `0xF096251E`, Acheronian Gate). If
+  none render → the whole burstless world-object path isn't instantiating; if only the chain is missing → it's
+  the specific decor mesh (RDB/ContentMirror resource `347243`).
+
+**Still blocked for issue 2 precision:** no capture shows a player crossing the boundary as the wall drops, so
+the exact Scry step (likely `LeaveCasilda`) that lifts it is inferred, not proven. A retail capture of walking
+out past the freed Casilda would pin it.
+
+## Session 2 (2026-06-21 eve): chains + pose — exhausted server side; CLIENT-CONTENT blocked
+
+Two symptoms chased in-client with a real client (Testietwo, beach):
+1. **Casilda's chains don't render** (she floats / stands with no manacles).
+2. Her **pose** was wrong (an old hack forced Bcc idle 156196).
+
+**Chains = client-side render issue; every server lever exhausted (all verified in-client, all negative):**
+- The chain decor record (`004709_Global__decor_chain_hangingwoman`, IIR `0x66AEDD50`) is **byte-identical** to
+  retail: identity, position (362.4,155.4,718.0), rotation all match a capture AND match the `MapWorldBurstEntities`
+  entity (handle 0x24124) that **rendered under the old replay path** — only the stored playfield-token bytes differ,
+  and those are rewritten to the live token (0x004FE428) at runtime anyway.
+- It IS sent (logged: `63 sent, 0 skipped`), with the correct live playfield token (other world objects render with
+  it — the lootable `0xF096251E` crate does), the mesh `347243` IS in the local RDB (types 1000028+1010034, LOCAL),
+  and there's no handle collision.
+- Tried, all no effect in-client: sending the `StartScriptGroupOnClient(385910)` destiny step on login; the
+  `SimpleDynelVisualChangeIIR (0xE7F4F8F8)` retail sends to the decor handle; and sending the chain under the exact
+  burst handle `0x24124` that rendered under replay.
+- KEY CLUE (Melvin): under the OLD verbatim-replay world entry the chains + pose were correct; the replay→construct
+  migration lost them. NPCs were also dropped from the burst into `NpcSpawns` ([[npc_model_streaming]]) and Casilda's
+  `NpcSpawns` capture is the STANDING one (idle 42024). ⟹ Whatever made the chain render lived in the broader scene
+  context the replay provided, not in the chain packet itself — not reconstructable piecemeal from here. The chains
+  are a client-content / beach-scene problem (the decor likely only instantiates as part of the full create-world
+  scene load), NOT a protocol gap. **Don't re-chase the chain packet — it's byte-perfect.**
+
+**Pose (decided): leave her STANDING, no override.** Dumps show retail spawns her standing (idle 42024 everywhere);
+the chained look is the destiny scene (decor + a captive BehaviorCC `161594`, decoded byte-exact: 0x642CD3D6 slot 1,
+phase 1, field5 24, bound 0x50/0x01). Both 161594 and the old 156196 only look right WITH the chains, so with the
+chains absent she's left standing (retail-exact spawn, no forced anim). Restore 161594 once the chains render.
+
+**Kept this session (retail-accurate):** removed the non-retail 156196 idle override (NpcSpawnBuilder); added the
+beach-gated `StartScriptGroup(385910)` + `ApproachCasilda` login Scry steps (PostReadyBurst — genuinely sent on retail
+beach login, harmless even though they didn't fix the chains); added a generic `.despawnobj <handle>` GM command
+(WorldBroadcaster.DespawnWorldObjectForPlayer). Dropped the dead experiments (BehaviorCC pose send, visual-change,
+burst-handle).
+
 ## Related
 Gitea #267 (this), #266 (Casilda done — position + hanging pose), #261 (the Casilda quest chain), #234 (create
 cutscene Scry layer — the construct-the-Scry-burst precedent), #210 (burstless world entry).

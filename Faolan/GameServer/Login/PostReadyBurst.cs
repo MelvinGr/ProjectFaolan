@@ -51,6 +51,24 @@ namespace Faolan.GameServer
 				.WriteArray(startFixed3d)
 				.SendAsync(client);
 
+			// record 2b (BEACH ONLY, #267): the destiny SCRIPT GROUP that builds the chained-Casilda tableau - it
+			// renders the `hangingwoman` chains and sets up the intro confinement ("invisible wall"). Retail sends
+			// StartScriptGroupOnClient(385910) on EVERY Tortage-beach LOGIN, between StartFixed3d and WelcomeTutorial
+			// (decode_scryscript.py on Ranochar/Stihetfv beach logins). We omitted it, which is why our beach chains
+			// don't instantiate (the dynel is byte-exact + its mesh 347243 is in the RDB, but nothing runs the scene
+			// script) and why the gate never resolves. Gated to the beach so a non-Tortage login isn't steered into
+			// the intro destiny flow.
+			var onBeach = client.Session.Character?.MapId == Faolan.Core.Database.Tables.Map.TortageBeachId;
+			if (onBeach)
+			{
+				var startCasildaScene = ScryScript.BuildStartScriptGroup(instance, 385910);
+				await new PacketStream()
+					.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
+					.WriteUInt32((uint)startCasildaScene.Length)
+					.WriteArray(startCasildaScene)
+					.SendAsync(client);
+			}
+
 			// record 3: 0x00002000, 35-byte body - the GameCode script-message (script id 0x5F376, no name string,
 			// unlike record 2 StartFixed3d / record 4 WelcomeTutorial) that triggers the on-screen TUTORIAL overlay.
 			// DISABLED (if(false)) so the tutorial no longer pops on world entry; re-enable to restore it. (Note: this
@@ -72,6 +90,20 @@ namespace Faolan.GameServer
 				.WriteUInt32((uint)welcomeTutorial.Length)
 				.WriteArray(welcomeTutorial)
 				.SendAsync(client);
+
+			// record 4b (BEACH ONLY, #267): ApproachCasilda - the destiny step that follows WelcomeTutorial on retail
+			// beach logins, steering the player toward the chained Casilda. Same intro flow as the 385910 script group
+			// above. (The fuller retail beach-login sequence also has CombatTutorial before StartFixed3d; left out for
+			// now - add if the chains/gate need it.)
+			if (onBeach)
+			{
+				var approachCasilda = ScryScript.BuildStep(instance, "ApproachCasilda");
+				await new PacketStream()
+					.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
+					.WriteUInt32((uint)approachCasilda.Length)
+					.WriteArray(approachCasilda)
+					.SendAsync(client);
+			}
 
 			// record 5: 0x00002000, 154-byte body
 			await new PacketStream()

@@ -203,6 +203,8 @@ namespace Faolan.GameServer
 			{
 				if (WorldObjectBuilder.TryBuild(row, row.CapturedHandle, playfieldInstance, out var body))
 					yield return FrameWorldEntryRecord(client, body);
+				else
+					Logger.LogWarning("World-object: SKIPPED '{Name}' (id {Id}) - TryBuild failed.", row.Name, row.Id);
 			}
 		}
 	}

@@ -914,6 +914,21 @@ namespace Faolan.GameServer.World
 			return entity;
 		}
 
+		// Despawn a STATIC world-object handle for the caller (e.g. the Casilda chain decor): world objects are
+		// delivered in the world burst with a fixed CapturedHandle and are NOT tracked in the world model, so the
+		// world-model path above can't reach them. This sends the same n3ToClientQuit (with the live playfield token)
+		// straight to the caller. Returns false only if the caller isn't in a known zone (no playfield token yet).
+		public async Task<bool> DespawnWorldObjectForPlayer(INetworkClient client, uint handle)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null || _sim.World.ZoneFor(player.MapId).PlayfieldToken == 0)
+				return false;
+
+			await SendWorldDespawn(client, player.MapId, handle);
+			_logger.LogInformation("Despawn: world object 0x{Handle:X8} for {Player}.", handle, player.Name);
+			return true;
+		}
+
 		// A player clicked "loot all" (top-level 0x2043): hand the caller the bag's item templates to grant (via
 		// DispatchAddItem) and clear them from the bag so each is granted exactly once. Empty when the bag is
 		// unknown / not a loot bag / already emptied. Coins are a separate path (TryLootCash -> TakeLootCash).
@@ -1335,7 +1350,7 @@ namespace Faolan.GameServer.World
 
 		// Sends the subject's FA015807 spawn to `recipient`, re-framed to the recipient and patched to the subject's
 		// CURRENT position (its captured spawn body holds its entry position, which may be stale).
-		private Task SendWorldSpawn(INetworkClient recipient, WorldEntity subject)
+		private async Task SendWorldSpawn(INetworkClient recipient, WorldEntity subject)
 		{
 			var body = (byte[])subject.SpawnBody.Clone();
 			if (body.Length >= SpawnPacketBuilder.PosZOffset + 4)
@@ -1354,7 +1369,7 @@ namespace Faolan.GameServer.World
 			// mid-session/interest spawns reuse arbitrary rows, so without this they carry a stale token and never render.
 			SpawnPlayfieldRewriter.TryRewrite(body, _sim.World.ZoneFor(subject.MapId).PlayfieldToken);
 
-			return new PacketStream()
+			await new PacketStream()
 				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameServerCarrierOpcodes.IirCarrier)
 				.WriteArray(body)
 				.SendAsync(recipient);

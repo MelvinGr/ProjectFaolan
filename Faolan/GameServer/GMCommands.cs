@@ -400,6 +400,7 @@ namespace Faolan.GameServer
 				["grantmount"] = (client, arguments) => GrantMountCommand(client, arguments),
 				["spawnnpc"] = (client, arguments) => SpawnNpcCommand(client, arguments),
 				["despawnnpc"] = (client, arguments) => DespawnNpcCommand(client, arguments),
+				["despawnobj"] = (client, arguments) => DespawnWorldObjectCommand(client, arguments),
 				["delete"] = (client, arguments) => DeleteCommand(client, arguments),
 				["kill"] = (client, arguments) => KillCommand(client, arguments),
 				["additem"] = (client, arguments) => AddItemCommand(client, arguments),
@@ -776,6 +777,26 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, entity == null
 				? $"No despawnable entity 0x{handle:X8} in this zone (unknown handle, or a player)."
 				: $"Despawned {entity.Name} (0x{handle:X8}).");
+		}
+
+		// .despawnobj <handle>  - despawn a STATIC world object by its wire handle (the Casilda chain decor is
+		// 0x00015DD8). Unlike .despawnnpc, world objects aren't in the live world model, so this sends n3ToClientQuit
+		// straight to the caller with the live playfield token. Live-only: the object returns on relog (the world
+		// burst re-sends it). Used to "free" Casilda from the chains when the intro chain completes (#266/#267).
+		private async Task DespawnWorldObjectCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var arg = (arguments ?? "").Trim();
+			if (arg.Length == 0 || !TryParseHandle(arg, out var handle))
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .despawnobj <handle> (0x-hex or decimal; the Casilda chain is 0x15DD8)");
+				return;
+			}
+
+			var sent = await _broadcaster.DespawnWorldObjectForPlayer(client, handle);
+			await _agentServerDispatcher.SendSystemMessage(characterId, sent
+				? $"Despawned world object 0x{handle:X8} (live only - returns on relog)."
+				: $"Can't despawn 0x{handle:X8} - your zone has no playfield token yet.");
 		}
 
 		// .delete [<handle>]  - PERMANENTLY remove the player's currently SELECTED target (or the given handle): despawn
