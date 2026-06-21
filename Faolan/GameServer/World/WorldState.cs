@@ -27,6 +27,7 @@ namespace Faolan.GameServer.World
 		// How far (horizontal) an NPC will chase from its spawn before giving up and returning home (so a player can't
 		// drag a mob across the whole zone). Once it disengages it keeps returning until home, ignoring re-aggro.
 		public const float NpcLeashRange = 40f;
+
 		private readonly ConcurrentDictionary<uint, Zone> _zones = new ConcurrentDictionary<uint, Zone>();
 
 		// Server-global monotonic allocator for playfield-instance tokens, mirroring retail's behaviour (a steadily

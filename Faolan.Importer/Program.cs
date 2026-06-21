@@ -581,6 +581,12 @@ namespace Faolan.Importer
 		{
 			foreach (var e in objects)
 			{
+				// Skip captured "Bag of loot" world objects: these are TRANSIENT dropped loot bags the capturing player
+				// happened to be near, not map decor - importing them bakes permanent un-fading bags into the world
+				// (#266). Real treasure chests (Chest/Treasure Chest/...) are kept.
+				if (e.DisplayName == "Bag of loot")
+					continue;
+
 				// Match by (position, identity): two props can share an exact position (#222), so disambiguate the
 				// existing row by its display_name identity (read from its own stored Data, the same way the entry's
 				// DisplayName was read) - position alone would update the wrong row and still drop one of the pair.
