@@ -25,7 +25,7 @@ correctness/cosmetic bugs. Verified state 2026-06-21 after #263 (mid-session ren
   `IEconomyOutbound.GrantItemToBackpack` (live `DispatchAddItem` 0x2020). `AfterLootTake` sends `LootRemoveItems`
   + tears the bag down only when fully empty.
 
-## Problem 1 — corpse bag shows only its spawn EFFECT, not the mesh (Gitea #265)
+## Problem 1 — corpse bag shows only its spawn EFFECT, not the mesh (Gitea #265) — FIX APPLIED, awaiting in-client test
 
 A kill drop (at `deadNpc.Position`) shows only the spawn particle, not the bag model — looks like nothing
 dropped (it IS there: log `dropped bag ... quest=True`, and it's lootable). `.spawnbag` at the player's feet
@@ -33,44 +33,48 @@ renders the FULL mesh. The ONLY difference between the two paths is the POSITION
 (player feet vs the NPC's death position); body builder, template, transform, token, and the NewAllowedLooter
 packet are identical.
 
-- **Most likely:** the NPC's death-spot Z is off the client's ground (the mob chased the player, so its server
-  position is where it walked to — see [[npc_spawn_movetask_position]] / #190 position sync), so the mesh clips
-  into/under terrain while the particle renders above. Or the corpse `BroadcastEntityDespawn` (fired right after
-  the bag spawn in `ConvertCorpseToLoot`) interferes.
-- **Next:** log the bag's emitted position vs the player's; compare Tuut's death Z to ground; try snapping the
-  bag to the player's Z or a ground-cast Z. `WorldBroadcaster.SpawnLootBagAt` line builds with
-  `position`/`Quaternion.Identity` — try `deadNpc.SpawnPosition` (the spawn point, known-good ground) instead of
-  the live death position as a quick test.
+- **Most likely cause:** the NPC's death-spot Z is off the client's ground (the mob chased the player, so its
+  server position is where it walked to — see [[npc_spawn_movetask_position]] / #190 position sync), so the mesh
+  clips into/under terrain while the particle renders above.
+- **Fix applied:** `WorldBroadcaster.ConvertCorpseToLoot` now resolves the killer (`LastAttackerHandle`) in the
+  zone and drops the bag at the KILLER's live position/rotation when it's a player — the proven-good `.spawnbag`
+  ground — instead of `deadNpc.Position`. Falls back to the death spot when the attacker can't be resolved. The
+  log line now prints both the drop position and the death spot so the in-client test can confirm the cause.
+- **Verify in-client:** kill a mob that chased you, confirm the bag MESH (not just the particle) renders. If it
+  still fails at the player's position, the cause is NOT the death-spot Z — re-investigate the corpse
+  `BroadcastEntityDespawn` (fired right after the bag spawn) interfering, or a body/token issue.
 
-## Problem 2 — dragging an item moves the WRONG one (NEW, high priority)
+## Problem 2 — dragging an item moves the WRONG one (NEW, high priority) — FIXED in code, awaiting in-client test
 
-Dragging a specific item out of the bag grants/removes a DIFFERENT item than the one clicked. **Root cause
-(strong):** an index-space mismatch. `WorldBroadcaster.SpliceLootContents` builds the DISPLAY list skipping
-`Archetype == 0` items (`if (item == null || item.Archetype == 0) continue;`) and assigns display `slot`
-0..n-1 over only the kept items. But `LootService.HandleLootItem` → `WorldBroadcaster.TakeBagItem(bagHandle,
-index)` indexes into the FULL `bag.LootItems` list (which still contains the skipped items). So the client's
-display index ≠ the server's `LootItems` index whenever any rolled item has `Archetype == 0`, and the drag
-removes/grants the wrong entry.
+Dragging a specific item out of the bag grants/removes a DIFFERENT item than the one clicked. **Root cause:**
+an index-space mismatch. `SpliceLootContents` built the DISPLAY list skipping `Archetype == 0` items and
+assigned display `slot` 0..n-1 over only the kept items, but `TakeBagItem(bagHandle, index)` indexed into the
+FULL `bag.LootItems` list (which still held the skipped items). So the display index ≠ the `LootItems` index
+whenever a rolled item had `Archetype == 0`, and the drag removed/granted the wrong entry.
 
-- **Fix:** make the display index and the take index share ONE ordering. Either (a) drop `Archetype == 0` items
-  from `bag.LootItems` at spawn (so `LootItems` == the displayed set), or (b) have `TakeBagItem` map the display
-  index through the SAME archetype-filter `SpliceLootContents` uses. (a) is simpler and also fixes Problem 3's
-  count. Confirm the client's drag opcode carries the display Pos (it does — `HandleLootItem` reads `itemIndex`).
-- Also re-check the drag opcode id: `GameServerListener` dispatches `HandleLootItem` (single drag); #226 calls it
-  `TryLootItem 0x2046`, the inline comments say 0x2044 — verify against the dispatch switch.
+- **Fix applied (approach a):** new `WorldBroadcaster.ResolveBuildableLoot` resolves the rolled templates to the
+  buildable set (in the item table AND `Archetype != 0`) ONCE in `SpawnLootBagAt`; that single filtered list
+  seeds BOTH `bag.LootItems` AND the spliced display (`SpliceLootContents` is now synchronous and takes the
+  pre-resolved `(TemplateId, Item)` list). So the display Pos == the `LootItems` index by construction — the
+  single-drag take can't desync. This also fixes Problem 3's off-by-one count (a skipped item no longer hides a
+  displayed slot).
+- **Opcode verified:** the single-drag is `TryLootItem = 0x2046` (`Opcodes.cs`), dispatched via
+  `GameServerOpcodes.TryLootItem` → `LootService.HandleLootItem`, which reads the display `itemIndex`. The
+  WorldBroadcaster comment was already correct (0x2046); no stale 0x2044 remained in the loot path.
+- **Verify in-client:** drop a multi-item bag (`.spawnbag` or a kill) where at least one rolled template is
+  Archetype-0, drag a specific item, confirm THAT item lands in the backpack and the window re-indexes correctly.
 
-## Problem 3 — bag window doesn't display ALL items (Gitea #226)
+## Problem 3 — bag window doesn't display ALL items (Gitea #226) — likely fixed by Problem 2, verify in-client
 
 A bag with N items shows N-1 in the window (the client still GRANTS all N — cosmetic). Contents are spliced
-into the LootBagFullUpdateIIR via `SpliceLootContents` (`LootBagMessageCodec` + `SnapshotItemBuilder`). Tried
-`MaxSize` = item count (truncated by one) then the captured fixed `MaxSize=10` (items at Pos 0..n-1, the decoded
-`Chest [N7FU]` bag). Likely related to Problem 2's archetype skip (a skipped item = one fewer shown) OR an entry
-byte the client rejects.
+into the LootBagFullUpdateIIR via `SpliceLootContents`. The strong hypothesis was Problem 2's archetype skip (a
+skipped item = one fewer shown). The Problem 2 fix removes Archetype-0 templates from BOTH lists at spawn, so a
+bag now displays exactly the items it holds — this should resolve the count.
 
-- **Next:** decode a real captured loot-bag item entry (the 113-byte ProtoInventoryGameEntry) from
-  `Hoxxling_..._login_gameplay` and diff it byte-for-byte against our spliced entry (`SnapshotItemBuilder.
-  BuildListEntry`) to find the missing/extra stat. Fixing Problem 2 (a: drop archetype-0 from `LootItems`) may
-  resolve the count too.
+- **Verify in-client:** drop a bag with several buildable items, confirm the window shows ALL of them.
+- **If it still shows N-1 with all-buildable items:** the cause is NOT the archetype skip — decode a real
+  captured loot-bag item entry (the 113-byte ProtoInventoryGameEntry) from `Hoxxling_..._login_gameplay` and
+  diff it byte-for-byte against our spliced entry (`SnapshotItemBuilder.BuildListEntry`) for a missing/extra stat.
 
 ## Key files
 

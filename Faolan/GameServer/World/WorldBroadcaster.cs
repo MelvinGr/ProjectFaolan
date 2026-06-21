@@ -933,9 +933,24 @@ namespace Faolan.GameServer.World
 			// completes the LootFromNpc goal, which matches on the bag's source NPC, not its contents).
 			if (questDrop || items.Count > 0 || cash > 0)
 			{
-				var bag = await SpawnLootBagAt(deadNpc.MapId, deadNpc.Position, deadNpc.Rotation, items, cash, deadNpc.LastAttackerHandle, deadNpc.Name);
-				_logger.LogInformation("Loot: {Name} 0x{Handle:X8} dropped bag 0x{Bag:X8} ({Items} items, {Cash} tin, looter 0x{Looter:X8}, quest={Quest}) on map {Map}.",
-					deadNpc.Name, deadNpc.Handle, bag?.Handle ?? 0, items.Count, cash, deadNpc.LastAttackerHandle, questDrop, deadNpc.MapId);
+				// #265: drop the bag at the KILLER's live position when we can resolve it, NOT the NPC's death spot. A mob
+				// that chased the player dies wherever it walked to, and that server position can be off the client's
+				// ground (the MoveTask Z drift, [[npc_spawn_movetask_position]]/#190) - the bag's mesh then clips into
+				// terrain and only its spawn particle renders. The killer is provably on valid ground (they're standing
+				// there, rendering), and that is exactly the proven-good `.spawnbag` path. Fall back to the death spot
+				// when the attacker can't be resolved (expired session, environmental death).
+				var dropPos = deadNpc.Position;
+				var dropRot = deadNpc.Rotation;
+				if (deadNpc.LastAttackerHandle != 0 &&
+				    _sim.World.ZoneFor(deadNpc.MapId).TryGet(deadNpc.LastAttackerHandle, out var killer) && killer.IsPlayer)
+				{
+					dropPos = killer.Position;
+					dropRot = killer.Rotation;
+				}
+
+				var bag = await SpawnLootBagAt(deadNpc.MapId, dropPos, dropRot, items, cash, deadNpc.LastAttackerHandle, deadNpc.Name);
+				_logger.LogInformation("Loot: {Name} 0x{Handle:X8} dropped bag 0x{Bag:X8} ({Items} items, {Cash} tin, looter 0x{Looter:X8}, quest={Quest}) on map {Map} at {Drop} (death spot {Death}).",
+					deadNpc.Name, deadNpc.Handle, bag?.Handle ?? 0, items.Count, cash, deadNpc.LastAttackerHandle, questDrop, deadNpc.MapId, dropPos, deadNpc.Position);
 			}
 
 			await BroadcastEntityDespawn(deadNpc); // remove the corpse render; the NPC revives via TickRespawn (or is removed if NoRespawn)
@@ -992,19 +1007,26 @@ namespace Faolan.GameServer.World
 				return null;
 
 			var handle = NextLootHandle();
+
+			// Resolve the rolled templates to the items the loot window can actually DISPLAY (Archetype != 0, present in
+			// the item table) ONCE, here - so the bag's LootItems and the spliced display list share ONE ordering. A
+			// non-buildable template dropped only at splice-time (the old behaviour) shifted every later display slot,
+			// so a single-drag (TakeBagItem indexes LootItems by the client's display Pos) removed/granted the WRONG
+			// item and the window showed one fewer than it held (#226 / handoff Problems 2+3).
+			var loot = await ResolveBuildableLoot(itemTemplates);
+
 			// Identity (unit) rotation in the wire transform: a bag has no facing, and a non-unit quaternion scales the
 			// model. Built FROM SCRATCH (#249): header/transform + identity-from-columns + KdTreeTail, stamped with the
 			// live playfield token directly - no captured Data, no SpawnPlayfieldRewriter pass.
 			if (!WorldObjectBuilder.BuildFromScratch(template, handle, position, Quaternion.Identity, LootBagTemplate.TypeTag, _sim.World.ZoneFor(mapId).PlayfieldToken, out var body))
 				return null;
-			body = await SpliceLootContents(body, handle, cashTin, itemTemplates); // show OUR items/cash in the window
+			body = SpliceLootContents(body, handle, cashTin, loot); // show OUR items/cash in the window
 
 			var bag = WorldEntity.ForLoot(handle, mapId, position, rotation, template.Name ?? "Loot", body, LootBagExpirySeconds);
 			bag.CashTin = cashTin;
 			bag.AllowedLooterHandle = allowedLooterHandle;
 			bag.LootSourceName = lootSourceName; // the corpse's NPC name, for LootFromNpc quest-goal matching (#261)
-			if (itemTemplates != null)
-				bag.LootItems.AddRange(itemTemplates);
+			bag.LootItems.AddRange(loot.Select(l => l.TemplateId)); // exactly the displayed set, same order as the window
 			_sim.World.ZoneFor(mapId).Add(bag);
 
 			foreach (var viewer in _sim
@@ -1035,8 +1057,10 @@ namespace Faolan.GameServer.World
 		// only DispatchOpenLootBag 0x2037 + the loot-ack 0x2038, no DispatchReplyLootForCharacter). Keeps the
 		// template's inventory ENVELOPE (id/size) and swaps only the items + cash, via the proven LootBagMessageCodec.
 		// Per-item ids are synthetic (display only - the grant is server-side from WorldEntity.LootItems). Returns the
-		// body unchanged if the contents blob can't be located (the window then just shows empty, as before).
-		private async Task<byte[]> SpliceLootContents(byte[] body, uint handle, uint cash, IReadOnlyList<uint> itemTemplateIds)
+		// body unchanged if the contents blob can't be located (the window then just shows empty, as before). Takes the
+		// already-resolved buildable loot (ResolveBuildableLoot) so the display Pos here == the LootItems index the
+		// single-drag take uses; the caller keeps the two lists in lockstep.
+		private static byte[] SpliceLootContents(byte[] body, uint handle, uint cash, IReadOnlyList<(uint TemplateId, Item Item)> loot)
 		{
 			if (body.Length <= 8 || !LootBagMessageCodec.TryParse(body.AsSpan(8), out var contents, out var contentsStart))
 				return body;
@@ -1044,11 +1068,8 @@ namespace Faolan.GameServer.World
 			contents.Cash = cash;
 			contents.Inventory.Items.Clear();
 			uint slot = 0;
-			foreach (var templateId in itemTemplateIds ?? Array.Empty<uint>())
+			foreach (var (_, item) in loot)
 			{
-				var item = await _database.GetItem(templateId);
-				if (item == null || item.Archetype == 0)
-					continue;
 				var guid = ((ulong)handle << 16) | slot; // synthetic per-instance id (display only)
 				contents.Inventory.Items.Add(SnapshotItemBuilder.BuildListEntry(slot, guid, guid, 1, item, item.Archetype));
 				slot++;
@@ -1077,6 +1098,24 @@ namespace Faolan.GameServer.World
 				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(recipient), GameServerCarrierOpcodes.IirCarrier)
 				.WriteArray(body)
 				.SendAsync(recipient);
+		}
+
+		// Resolves the rolled item templates to the ones the loot window can DISPLAY (in the item table AND
+		// Archetype != 0 - a 0-archetype template has no inventory entry the client can render). Filtering here, before
+		// the bag is built, keeps the bag's LootItems and the spliced display list in ONE shared order so the single-drag
+		// take index matches the client's display Pos (#226). Preserves the rolled order; drops unknown/non-buildable.
+		private async Task<List<(uint TemplateId, Item Item)>> ResolveBuildableLoot(IReadOnlyList<uint> itemTemplateIds)
+		{
+			var resolved = new List<(uint, Item)>();
+			foreach (var templateId in itemTemplateIds ?? Array.Empty<uint>())
+			{
+				var item = await _database.GetItem(templateId);
+				if (item == null || item.Archetype == 0)
+					continue;
+				resolved.Add((templateId, item));
+			}
+
+			return resolved;
 		}
 
 		// A few random snapshot-buildable item templates (Archetype != 0) for a loot bag. Empty when count <= 0
