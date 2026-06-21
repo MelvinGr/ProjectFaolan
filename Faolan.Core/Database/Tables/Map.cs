@@ -5,6 +5,22 @@ using System.Numerics;
 
 namespace Faolan.Core.Database.Tables
 {
+	// How the live world creates copies (instances) of a map (#268). Retail's playfield-instance token is the
+	// instance id; this column tells the assignment policy how many copies to mint and how to route players to them.
+	public enum MapInstanceMode
+	{
+		// One shared instance for everyone (capped by PopulationCap; 0 = uncapped). The default open-world behaviour
+		// and the historical model (a single global Zone per map).
+		Shared = 0,
+
+		// One instance per character - a solo/destiny playfield (e.g. the Tortage beach). No one else is ever placed
+		// in your copy.
+		Solo = 1,
+
+		// One instance per party (dungeons): party members route to the same copy, a new party mints a new one.
+		Group = 2,
+	}
+
 	//[Index(nameof(Name), IsUnique = true)]
 	// A map has no position/rotation of its own (it IS the coordinate space), so it inherits BaseEntity, not
 	// Base3DEntity. The "default spawn" for a map is derived from its respawn points (the AlwaysKnown starter, else
@@ -43,5 +59,13 @@ namespace Faolan.Core.Database.Tables
 
 		[MaxLength(128)]
 		public string Name { get; set; }
+
+		// How the live world instances this map (#268). Defaults to Shared so every existing map keeps its single
+		// global zone; the assignment policy only mints per-character/per-party copies for maps flagged otherwise.
+		public MapInstanceMode InstanceMode { get; set; } = MapInstanceMode.Shared;
+
+		// Max players per Shared instance before the policy spins up another copy. 0 = uncapped (and ignored for
+		// Solo/Group, which are sized by character/party).
+		public int PopulationCap { get; set; }
 	}
 }
