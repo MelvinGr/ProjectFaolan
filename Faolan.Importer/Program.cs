@@ -355,15 +355,21 @@ namespace Faolan.Importer
 				.GroupBy(e => e.MapId)
 				.ToDictionary(g => g.Key, g => g.Select(e => e.Name ?? "").ToHashSet());
 
+			// Per-capture spawn set (deduped within each capture), for filling camps the burst missed from ONE session.
+			var perCaptureSpawns = captures
+				.Select(c => NpcSpawnExtractor.Merge(NpcSpawnExtractor.Extract(c.Packets)))
+				.ToList();
+
 			// Per-NPC-TYPE rule: trust the burst for any type it PLACED (a Crocodile in the burst -> the burst's ~7,
-			// not the union's ~50 cross-session copies). But a type the burst NEVER saw is a camp/area the capture
-			// didn't walk through (Scavenger Tuut + Lackeys down the beach, the #261 quest camp) - it must still exist,
-			// so keep it from the union: named/unique NPCs (Community 0: Casilda) once per name, faction mobs deduped
-			// by a coarse position cell to collapse the cross-session wandering duplicates while keeping the camp.
-			const float cell = 8f;
+			// not the union's ~50 cross-session copies). A type the burst NEVER saw is a camp/area the capture didn't
+			// walk through (Scavenger Tuut + Lackeys down the beach, the #261 quest camp) - it must still exist, so fill
+			// it from a SINGLE session, not the union: named/unique NPCs (Community 0: Casilda) once per name; faction
+			// mobs from the one capture that saw the most of that type. Cross-session position-cell dedup does NOT work
+			// for these - they WANDER, so the same mob is logged at many spots every session and would never collapse;
+			// the richest single capture is the retail-shaped count (the same single-session logic the burst uses).
 			var result = new List<NpcSpawnEntry>(burst);
 			var keptNamed = new HashSet<(uint, string)>();
-			var seenFactionCell = new HashSet<(uint, string, int, int, int)>();
+			var filledCamps = new HashSet<(uint, string)>();
 			foreach (var e in union)
 			{
 				if (!burstMaps.Contains(e.MapId))
@@ -379,9 +385,21 @@ namespace Faolan.Importer
 					if (keptNamed.Add((e.MapId, e.Name ?? "")))
 						result.Add(e); // a named/unique NPC the burst missed - one instance
 				}
-				else if (seenFactionCell.Add((e.MapId, e.Name ?? "", (int)(e.X / cell), (int)(e.Y / cell), (int)(e.Z / cell))))
+				else if (filledCamps.Add((e.MapId, e.Name ?? "")))
 				{
-					result.Add(e); // a faction camp the burst missed - keep, deduped by coarse cell
+					// A faction camp the burst missed: take this type's spawns from the single session that saw the
+					// FEWEST of them. These camps are mid-session (post-poll), so a session that FARMED them logged
+					// every respawn as a new spawn (the Scavenger Lackey union ranged 3..19 across captures - the 19 is
+					// a farming session). The smallest non-zero count is the un-farmed population (~the route's distinct
+					// mobs, one sighting each), the retail-shaped count. (The login burst uses the LARGEST pre-poll
+					// capture instead - that window has no kills yet, so largest = most complete & still pristine.)
+					var leastFarmed = perCaptureSpawns
+						.Select(cap => cap.Where(s => s.MapId == e.MapId && s.Name == e.Name).ToList())
+						.Where(l => l.Count > 0)
+						.OrderBy(l => l.Count)
+						.FirstOrDefault();
+					if (leastFarmed is { Count: > 0 })
+						result.AddRange(leastFarmed);
 				}
 			}
 
