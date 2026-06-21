@@ -151,6 +151,13 @@ namespace Faolan.GameServer.World
 						// Disengaged with no one in range: heal back to full so it can't be whittled from out of range.
 						if (entity.Vitals.Health < entity.Vitals.MaxHealth)
 							entity.Vitals.ReviveToFull();
+						// #266: idle + at home -> keep its captured patrol going. The client walks the route; when a cycle
+						// elapses (path traversal + dwell) re-issue it so it loops (retail re-paths idle patrols).
+						if (entity.Patrols && entity.TickPatrolCycle(deltaSeconds))
+						{
+							entity.ArmPatrolCycle();
+							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcPatrol));
+						}
 						continue;
 					}
 

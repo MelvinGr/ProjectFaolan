@@ -47,6 +47,10 @@ namespace Faolan.GameServer.World
 		// returning home - so they watch it move.
 		Task BroadcastNpcMove(WorldEntity npc);
 
+		// (Re-)issue a patrolling NPC's captured route to the players who can see it, so it keeps walking its loop
+		// (retail re-paths idle patrols; #266).
+		Task BroadcastNpcPatrol(WorldEntity npc);
+
 		// Broadcast an NPC's combat-mode change (engaged -> draw weapon, disengaged -> sheathe) to the players who can
 		// see it, as the captured stat-20 update. Without it the NPC swings empty-handed (#218).
 		Task BroadcastNpcCombatMode(WorldEntity npc, bool inCombat);
@@ -595,6 +599,9 @@ namespace Faolan.GameServer.World
 							case WorldTickEffectType.NpcCast:
 								if (NpcAutoAttackEnabled)
 									await ApplyNpcCast(effect.Entity, effect.Target);
+								break;
+							case WorldTickEffectType.NpcPatrol:
+								await _output.BroadcastNpcPatrol(effect.Entity); // idle patrol - not gated on the combat sim
 								break;
 							case WorldTickEffectType.NpcMove:
 								if (NpcAutoAttackEnabled)

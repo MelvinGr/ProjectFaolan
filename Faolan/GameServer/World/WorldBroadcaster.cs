@@ -38,6 +38,13 @@ namespace Faolan.GameServer.World
 		// How long a dropped loot bag lingers before the tick fades + removes it (the IsLoot expiry).
 		private const double LootBagExpirySeconds = 120.0;
 
+		// #266 patrol cycle: estimated client WALK speed (world units/sec) used to time how long a patrol route takes to
+		// traverse, plus a dwell pause at the end, before the route is re-issued so the NPC keeps looping. These are the
+		// re-issue cadence only (the client drives the actual walk); tune against in-client pacing if a patrol pauses or
+		// restarts mid-walk. NpcMoveSpeed (12) is the RUN speed; a walk is roughly half.
+		private const float PatrolWalkSpeed = 6f;
+		private const double PatrolDwellSeconds = 2.0;
+
 		// Maps whose NPCs have been loaded into the world model (once per map, on first entry).
 		private readonly ConcurrentDictionary<uint, byte> _npcLoadedZones = new ConcurrentDictionary<uint, byte>();
 
@@ -149,6 +156,20 @@ namespace Faolan.GameServer.World
 			{
 				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
 					await SendWorldIir(viewer.Client, body);
+			}
+		}
+
+		// #266: (re-)issue a patrolling NPC's captured route to every in-range viewer that already sees it, so it keeps
+		// walking its loop (the tick fires this on each patrol cycle; retail re-paths idle patrols). Only known handles.
+		public async Task BroadcastNpcPatrol(WorldEntity npc)
+		{
+			foreach (var viewer in _sim
+				         .World
+				         .ZoneFor(npc.MapId)
+				         .PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
+			{
+				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
+					await SendPatrol(viewer.Client, npc);
 			}
 		}
 
@@ -515,11 +536,15 @@ namespace Faolan.GameServer.World
 				var entity = WorldEntity.ForNpc(handle, mapId, new Vector3(npc.PositionX, npc.PositionY, npc.PositionZ), new Vector3(npc.RotationX, npc.RotationY, npc.RotationZ), npcName ?? "NPC", vitals);
 				entity.Level = npc.Level;
 
-				// #266 patrol: attach this NPC's captured route (linked by exact spawn position) so it walks it.
+				// #266 patrol: attach this NPC's captured route (linked by exact spawn position) so it walks it. The cycle
+				// timer (path traversal time + dwell) drives the periodic re-issue that keeps it looping; the client
+				// walks the route once per issue, so re-issuing ~when it finishes makes a continuous patrol.
 				if (patrolByPosition.TryGetValue(PositionKey(npc.PositionX, npc.PositionY, npc.PositionZ), out var patrol) && patrol.Waypoints.Count > 0)
 				{
 					entity.PatrolWaypoints = patrol.Waypoints.OrderBy(w => w.Ordinal).Select(w => new Vector3(w.X, w.Y, w.Z)).ToList();
 					entity.PatrolSpeed = patrol.Speed;
+					entity.PatrolCycleSeconds = MoveTaskCodec.TotalPathLength(entity.Position, entity.PatrolWaypoints) / PatrolWalkSpeed + PatrolDwellSeconds;
+					entity.ArmPatrolCycle();
 				}
 				// Hostile = a faction creature (Npc.Community > 0, lifted from NpcStats.community by the importer).
 				// community 0 is the neutral/friendly community (quest-givers like Casilda/Kalanthes AND neutral critters

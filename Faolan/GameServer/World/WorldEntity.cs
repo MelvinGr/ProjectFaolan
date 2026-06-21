@@ -162,6 +162,23 @@ namespace Faolan.GameServer.World
 		public float PatrolSpeed { get; set; }
 		public bool Patrols => PatrolWaypoints.Count > 0;
 
+		// Seconds until the patrol route is re-issued (retail re-paths a one-shot patrol so it keeps looping). Set to
+		// the cycle length (path traversal time + dwell) when the route is issued; the tick counts it down.
+		private double _patrolReissueRemaining;
+		public double PatrolCycleSeconds { get; set; }
+
+		// Arms the patrol re-issue timer for the next cycle.
+		public void ArmPatrolCycle() => _patrolReissueRemaining = PatrolCycleSeconds;
+
+		// Counts down the patrol re-issue timer; true when a fresh route should be issued (then re-arm via ArmPatrolCycle).
+		public bool TickPatrolCycle(double dt)
+		{
+			if (!Patrols || PatrolCycleSeconds <= 0)
+				return false;
+			_patrolReissueRemaining -= dt;
+			return _patrolReissueRemaining <= 0;
+		}
+
 		public WorldEntity(uint handle, uint mapId, bool isPlayer, string name, INetworkClient client)
 		{
 			Handle = handle;

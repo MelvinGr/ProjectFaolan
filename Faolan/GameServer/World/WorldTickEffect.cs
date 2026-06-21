@@ -13,7 +13,8 @@ namespace Faolan.GameServer.World
 		NpcEnterCombat, // an NPC (Entity) just engaged a Target; broadcast the combat-mode stat (draw weapon, #218) + the aggro (HateList/ThreatLevel, #216)
 		NpcExitCombat, // an NPC (Entity) disengaged (leashed / lost its target); broadcast the combat-mode stat so it sheathes
 		NpcStopped, // an NPC (Entity) arrived home and stopped; broadcast its StopIIR (final position + facing, #190)
-		NpcCast // a CASTER NPC (Entity) casts a spell at a player (Target); the listener sends ApplySpell + applies damage (#232)
+		NpcCast, // a CASTER NPC (Entity) casts a spell at a player (Target); the listener sends ApplySpell + applies damage (#232)
+		NpcPatrol // a patrolling NPC (Entity) should (re-)issue its patrol route so it keeps walking its loop (#266)
 	}
 
 	// `Target` is the attacked/chased/aggroed player for NpcAttack/NpcMove/NpcEnterCombat; null otherwise.

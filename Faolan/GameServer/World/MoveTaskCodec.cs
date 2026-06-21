@@ -93,11 +93,25 @@ namespace Faolan.GameServer.World
 				.ToArray();
 		}
 
-		// Live overload: the trailer path-length is the from -> last-waypoint distance.
+		// Live overload: the trailer path-length is the TOTAL distance walked (from -> wp0 -> wp1 -> ... -> wpN), the
+		// sum of the segments. The client uses it for interpolation TIMING - a too-small value (e.g. the straight-line
+		// from->last) makes a winding patrol RUN to cover the real path in the short time, so a multi-waypoint loop
+		// must report its full traversal length to walk at the right pace. (For a straight path the sum equals
+		// from->last, matching the captured ratio-1.000 records; #266.)
 		public static byte[] BuildPathBody(uint handle, Vector3 from, IReadOnlyList<Vector3> waypoints)
 		{
-			var pathLength = waypoints.Count > 0 ? Vector3.Distance(from, waypoints[^1]) : 0f;
-			return BuildPathBody(handle, from, waypoints, pathLength);
+			return BuildPathBody(handle, from, waypoints, TotalPathLength(from, waypoints));
+		}
+
+		// Sum of the segment distances along from -> waypoints (the real walked length).
+		public static float TotalPathLength(Vector3 from, IReadOnlyList<Vector3> waypoints)
+		{
+			if (waypoints == null || waypoints.Count == 0)
+				return 0f;
+			var length = Vector3.Distance(from, waypoints[0]);
+			for (var i = 1; i < waypoints.Count; i++)
+				length += Vector3.Distance(waypoints[i - 1], waypoints[i]);
+			return length;
 		}
 
 		// Builds the 61-byte-frame MoveTask body for `handle` moving from `from` to `to`, facing `facing`. from==to is a
