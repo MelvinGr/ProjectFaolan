@@ -985,8 +985,16 @@ namespace Faolan.GameServer.World
 				         .ZoneFor(mapId)
 				         .PlayersInRange(position, WorldSimulation.PlayerInterestRange))
 			{
-				if (viewer.Client != null)
-					await SendLootBagUpdate(viewer.Client, body);
+				if (viewer.Client == null)
+					continue;
+
+				await SendLootBagUpdate(viewer.Client, body);
+				// #263: the LootBagFullUpdateIIR alone only renders a NEW world object on a playfield (re)load - the
+				// client otherwise treats it as an update to an object it doesn't have yet (verified: our bags only
+				// appeared after a relog). Retail follows the FullUpdate with a NewAllowedLooterIIR at the bag's
+				// mid-session spawn (capture fr1358), which is what makes the client INSTANTIATE + render it live. Name
+				// the viewer as the allowed looter (each in-range player may loot it).
+				await SendWorldIir(viewer.Client, WorldLoot.BuildNewAllowedLooterBody(handle, viewer.Handle));
 			}
 
 			return bag;

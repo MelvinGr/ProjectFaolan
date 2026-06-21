@@ -99,6 +99,23 @@ namespace Faolan.GameServer.World
 				.ToArray();
 		}
 
+		// "bag -> ALLOWED looter = this player" (NewAllowedLooterIIR), same shape as the current-looter body but the
+		// other sub-opcode. Retail sends this immediately AFTER the LootBagFullUpdateIIR at the bag's mid-session spawn
+		// (capture fr1358: 1e2e0139 0000c87a <bag> 00 0000c350 <player>) - it is what makes the client INSTANTIATE +
+		// render a freshly-introduced loot bag mid-session (#263); the bag's FullUpdate alone only renders on a
+		// playfield (re)load.
+		public static byte[] BuildNewAllowedLooterBody(uint bagHandle, uint playerHandle)
+		{
+			return new FaolanStream()
+				.WriteUInt32(NewAllowedLooterSubOpcode)
+				.WriteUInt32(LootTypeTag)
+				.WriteUInt32(bagHandle)
+				.WriteByte(0x00)
+				.WriteUInt32(EntityTypeTag)
+				.WriteUInt32(playerHandle)
+				.ToArray();
+		}
+
 		// Opens the loot WINDOW on the object (SimpleDynelVisualChange carrying the state string "Open"). 19 + len B:
 		// [subop][typetag][handle][00000000][0x00][u16 strLen][ascii]. The bag stays in the world; this just opens its UI.
 		public static byte[] BuildOpenWindowBody(uint typeTag, uint handle, string state = "Open")
