@@ -880,7 +880,7 @@ namespace Faolan.GameServer.World
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player != null && _sim.World.ZoneFor(player.MapId).TryGet(bagHandle, out var bag) && bag.IsLootable)
-				return bag.Name;
+				return bag.LootSourceName; // the dead NPC's name (e.g. "Scavenger Tuut"), NOT the bag's "Bag of loot"
 			return null;
 		}
 
@@ -916,7 +916,10 @@ namespace Faolan.GameServer.World
 			if (!deadNpc.IsDead)
 				return; // revived (or never died) before the linger fired - nothing to convert
 
-			var dropsContents = LootResolver.RollsDrop(Random.Shared.NextDouble());
+			// A quest mob the killer needs to LOOT (an active LootFromNpc goal targeting this NPC, #261) ALWAYS leaves a
+			// bag - the "key" must be lootable, not a 50/50 roll. Otherwise the normal drop chance applies.
+			var questDrop = deadNpc.LastAttackerHandle != 0 && await HasActiveLootGoalFor(deadNpc.LastAttackerHandle, deadNpc.Name);
+			var dropsContents = questDrop || LootResolver.RollsDrop(Random.Shared.NextDouble());
 			var items = await RollLootItems(dropsContents ? Random.Shared.Next(0, 3) : 0); // 0-2 items, or none
 			var cash = dropsContents ? LootResolver.RollCash(Random.Shared.NextDouble(), deadNpc.Level) : 0u;
 
@@ -926,15 +929,37 @@ namespace Faolan.GameServer.World
 			// then despawn the corpse so the NPC handle respawns clean at its spawn point (BroadcastNpcRespawn re-adds
 			// it to Known); the bag lives/loots/expires on its own (tick-managed via TickExpiry). Empty corpses just
 			// despawn (matching retail - not every kill leaves a bag).
-			if (items.Count > 0 || cash > 0)
+			// Spawn a bag when there's loot, OR unconditionally for a quest mob (the bag may be empty - looting it still
+			// completes the LootFromNpc goal, which matches on the bag's source NPC, not its contents).
+			if (questDrop || items.Count > 0 || cash > 0)
 			{
-				var bag = await SpawnLootBagAt(deadNpc.MapId, deadNpc.Position, deadNpc.Rotation, items, cash, deadNpc.LastAttackerHandle);
-				_logger.LogInformation("Loot: {Name} 0x{Handle:X8} dropped bag 0x{Bag:X8} ({Items} items, {Cash} tin, looter 0x{Looter:X8}) on map {Map}.",
-					deadNpc.Name, deadNpc.Handle, bag?.Handle ?? 0, items.Count, cash, deadNpc.LastAttackerHandle, deadNpc.MapId);
+				var bag = await SpawnLootBagAt(deadNpc.MapId, deadNpc.Position, deadNpc.Rotation, items, cash, deadNpc.LastAttackerHandle, deadNpc.Name);
+				_logger.LogInformation("Loot: {Name} 0x{Handle:X8} dropped bag 0x{Bag:X8} ({Items} items, {Cash} tin, looter 0x{Looter:X8}, quest={Quest}) on map {Map}.",
+					deadNpc.Name, deadNpc.Handle, bag?.Handle ?? 0, items.Count, cash, deadNpc.LastAttackerHandle, questDrop, deadNpc.MapId);
 			}
 
 			await BroadcastEntityDespawn(deadNpc); // remove the corpse render; the NPC revives via TickRespawn (or is removed if NoRespawn)
 			return;
+		}
+
+		// True if the character (by handle == character id) has an ACTIVE LootFromNpc quest goal targeting `npcName` -
+		// i.e. they need to loot this NPC's corpse for a quest (#261). Drives the guaranteed quest drop above.
+		private async Task<bool> HasActiveLootGoalFor(uint characterId, string npcName)
+		{
+			if (string.IsNullOrEmpty(npcName))
+				return false;
+			foreach (var quest in await _database.GetCharacterQuests(characterId))
+			{
+				if (quest.State != QuestState.Active)
+					continue;
+				var def = await _database.GetQuestDefinition(quest.QuestId);
+				var goal = def?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
+				if (goal != null && goal.GoalType == QuestGoalType.LootFromNpc &&
+				    string.Equals(goal.TargetName, npcName, StringComparison.OrdinalIgnoreCase))
+					return true;
+			}
+
+			return false;
 		}
 
 		// .spawnbag: drop a standalone loot bag at the player. Now that mid-session spawns carry the live playfield
@@ -960,7 +985,7 @@ namespace Faolan.GameServer.World
 		// of whatever dropped it. Used by .spawnbag AND by NPC death drops (#246) so the dead NPC's handle is free to
 		// respawn at its spawn point and the bag survives that respawn. Returns the bag, or null if the map has no
 		// loot template.
-		private async Task<WorldEntity> SpawnLootBagAt(uint mapId, Vector3 position, Vector3 rotation, IReadOnlyList<uint> itemTemplates, uint cashTin, uint allowedLooterHandle)
+		private async Task<WorldEntity> SpawnLootBagAt(uint mapId, Vector3 position, Vector3 rotation, IReadOnlyList<uint> itemTemplates, uint cashTin, uint allowedLooterHandle, string lootSourceName = null)
 		{
 			var template = GetLootTemplate();
 			if (template == null)
@@ -977,6 +1002,7 @@ namespace Faolan.GameServer.World
 			var bag = WorldEntity.ForLoot(handle, mapId, position, rotation, template.Name ?? "Loot", body, LootBagExpirySeconds);
 			bag.CashTin = cashTin;
 			bag.AllowedLooterHandle = allowedLooterHandle;
+			bag.LootSourceName = lootSourceName; // the corpse's NPC name, for LootFromNpc quest-goal matching (#261)
 			if (itemTemplates != null)
 				bag.LootItems.AddRange(itemTemplates);
 			_sim.World.ZoneFor(mapId).Add(bag);

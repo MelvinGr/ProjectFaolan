@@ -105,6 +105,12 @@ namespace Faolan.GameServer.World
 		// on this) is a later step (#101 shared-zone loot); today's Tortage is single-player-instanced so it's moot.
 		public uint AllowedLooterHandle { get; set; }
 
+		// For a LOOT BAG dropped by a kill: the NAME of the NPC whose corpse it is (e.g. "Scavenger Tuut"). The bag is a
+		// decoupled entity (#246) whose own Name is the generic "Bag of loot", so the source is recorded separately - it
+		// is the match key for a LootFromNpc quest goal (#261), since the quest item itself is RDB content we don't
+		// materialise. Null for a standalone .spawnbag (no source NPC).
+		public string LootSourceName { get; set; }
+
 		// The position this NPC stepped FROM on its last chase tick - the MoveTask broadcast sends from->to so the
 		// client interpolates the step (set just before Position is advanced toward the target).
 		public Vector3 MoveOrigin { get; set; }
