@@ -33,6 +33,14 @@ namespace Faolan.GameServer.Spawn
 			if (freshSpawn && read.Message.npc_stats != null)
 				read.Message.npc_stats.SpawnAnimation = 0;
 
+			// #184/#266: Casilda hangs in the chains (the 004709 hangingwoman decor sits at her spot) but her captured
+			// spawn often carries the generic standing idle (42024), so she stands free. Force her persistent idle to the
+			// hanging-pose anim (156196 - the non-default AnimIdleId her captures show at the cage). PERSISTENT POSE via
+			// the Bcc idle anim, not the transient SpawnAnimation (which left her undrawn). Quest-driven freeing is a
+			// follow-up; for now she's posed chained at spawn.
+			if (row?.Npc?.Name == "Casilda" && read.Message.Bcc != null)
+				read.Message.Bcc.AnimIdleId = 156196;
+
 			// Worn equipment from DB rows (#185): rebuild the CharacterIIR f23 list from NpcSpawnEquipment instead of
 			// the captured Data blob's. Only when the row has lifted equipment - else the parsed (Data) list stands,
 			// so a row predating the lift is unchanged. Byte-identical to the capture when the rows came from it.

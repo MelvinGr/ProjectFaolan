@@ -719,6 +719,26 @@ namespace Faolan.Importer
 				return 0;
 			}
 
+			// --dump-anim <Name>: read-only - per capture, decode the named NPC's persistent idle animation
+			// (CharacterBcc.AnimIdleId) from its FA015807, so a "posed" NPC's anim (e.g. Casilda hanging in the chains,
+			// #184/#266) can be identified by which capture shows the pose. Prints capture | AnimIdleId | position.
+			if (args.Contains("--dump-anim"))
+			{
+				var target = GetOption(args, "--dump-anim") ?? "Casilda";
+				foreach (var c in captures)
+					foreach (var e in NpcSpawnExtractor.Extract(c.Packets).Where(e => e.Name == target))
+					{
+						var body = e.Data is { Length: >= 12 }
+							? e.Data[(12 + (int)System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(e.Data.AsSpan(8, 4)))..]
+							: null;
+						var anim = body != null && PlayerSpawnReader.TryReadCharacterMessage(body, out var read)
+							? read.Message?.Bcc?.AnimIdleId.ToString() ?? "(no bcc)"
+							: "(unreadable)";
+						Console.WriteLine($"{c.Name[..System.Math.Min(40, c.Name.Length)]} | handle 0x{e.Handle:X} | AnimIdleId={anim} | pos=({e.X:0.#},{e.Z:0.#})");
+					}
+				return 0;
+			}
+
 			// --reseed-npcs: wipe the NPC spawn tables and re-import the BURST-TRUTH set (#266) - each map's authoritative
 			// login burst (faction mobs at retail density) PLUS the named/unique NPCs the burst misses (Casilda et al,
 			// outside the captured path). Drops the cross-session mid-session-spawn duplicates that otherwise accrete
