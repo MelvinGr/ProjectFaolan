@@ -127,6 +127,12 @@ namespace Faolan.GameServer.World
 					if (homeDist > NpcLeashRange)
 						entity.Returning = true;
 
+					// De-aggro return: when an NPC loses its target (the player left aggro range) while away from its
+					// spawn, walk it back home instead of leaving it standing where the chase ended. Patrollers are
+					// exempt - their route drives them; everyone else returns to origin (then heals on arrival, below).
+					if (target == null && homeDist > NpcMeleeRange && !entity.Patrols)
+						entity.Returning = true;
+
 					if (entity.Returning)
 					{
 						SetCombat(entity, false); // disengaged: sheathe the weapon while walking home
