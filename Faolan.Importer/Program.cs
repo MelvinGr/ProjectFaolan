@@ -784,6 +784,8 @@ namespace Faolan.Importer
 			{
 				ImportRdb(rdbDir);
 				await RdbMorphTargetImporter.ImportAsync(db, rdbDir);
+				var sp = await RdbSpellImporter.ImportAsync(db, rdbDir);
+				Console.WriteLine($"RDB spells: {sp.Seen} named records, {sp.Inserted} new, {sp.NamesSet} names set, {sp.CastTimesSet} cast times set.");
 			}
 
 			if (rdbItems)

@@ -303,25 +303,67 @@ namespace Faolan.GameServer
 
 							case ActionType.CastSpell:
 							{
-								var spellId = (uint)(args.SpellTarget?.SpellId ?? args.TypeId);
+								// The real spell id rides the action TRAILER (`target`, the uint32 read after the protobuf
+								// args), NOT args.SpellTarget.SpellId - that protobuf field is the constant 0xC350 type-word,
+								// so casts logged as "spell 50000" and ApplySpell carried a non-existent id (no effect shown).
+								// Decoded from the ice-strike capture (c2s 0x642CD3D6 cast): trailer = [u32 from=1][u32 spellId];
+								// 0x125D9B / 0x42CA77 are real learned-spell ids. args.SpellTarget.TargetHandle is the target. (#236)
+								var spellId = target != 0 ? target : (uint)(args.SpellTarget?.SpellId ?? args.TypeId);
 								var casterHandle = client.Session.Account.ClientInstance;
 								var targetHandle = (uint)(args.SpellTarget?.TargetHandle ?? 0);
 
-								Logger.LogInformation($"CastSpell spell={spellId} target=0x{targetHandle:X} {args}");
+								Logger.LogInformation($"CastSpell spell=0x{spellId:X} target=0x{targetHandle:X} {args}");
 
-								// Play the cast (caster -> target, or self when no target), then resolve its effect.
-								await ApplySpell(client, casterHandle, targetHandle == 0
-									? casterHandle
-									: targetHandle, spellId);
+									// Cast-begin ack (#236): retail answers the cast behavior with a BCC echo right away, which
+									// is what makes the client enter the channel state + render the cast bar (without it the
+									// client never channels - it sent only Mode 1, no progress ticks - and the cast looks
+									// instant). Ack every cast packet (begin + channel ticks); the effect itself is resolved
+									// once, below, after the cast time.
+									await _combat.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
 
-								// Casting costs mana - drain the caster's mana bar (the spell analogue of the melee
-								// stamina cost). Applies to offensive and self/buff casts alike.
-								await _combat.SpendCasterMana(client, spellId);
+								// Resolves the cast: play the ApplySpell (caster -> target, or self when no target), drain
+								// mana, and on an offensive cast apply damage + push the target's vitals (#69).
+								async Task Resolve()
+								{
+									// Cast-complete (#236): the cast bar is the form-0x0a cast behavior (retail BEGIN2/completion BCC,
+										// ice-strike idx481/534), not the form-4 begin. The echo-ack derives its form from the packet's
+										// seq word (form = seq+1), so to emit form 0x0a we stamp seq=9 onto a clone, with phase=3
+										// (cast-state complete). Without this the bar fills then hangs.
+										var completePayload = (byte[])rawPayload.Clone();
+										if (completePayload.Length > 17) { completePayload[16] = 0x00; completePayload[17] = 0x09; }
+										await _combat.SendBehaviorEchoAck(client, completePayload, 3);
+										await ApplySpell(client, casterHandle, targetHandle == 0 ? casterHandle : targetHandle, spellId);
+									await _combat.SpendCasterMana(client, spellId);
+									if (targetHandle != 0 && targetHandle != casterHandle)
+										await _combat.ResolveOffensiveCast(client, casterHandle, targetHandle, spellId);
+								}
 
-								// An offensive cast at another entity applies damage + pushes the target's vitals; a
-								// self/no-target cast is a buff (no damage), already registered by ApplySpell (#69).
-								if (targetHandle != 0 && targetHandle != casterHandle)
-									await _combat.ResolveOffensiveCast(client, casterHandle, targetHandle, spellId);
+								// Honor the spell's cast time (#236): retail resolves the effect only AFTER the cast time
+								// elapses (ice-strike capture: cast at frame 377, ApplySpell impact ~frame 441). Resolving on
+								// receipt skipped the client's cast bar. CastTime 0 (instant spell, or an un-populated row)
+								// resolves immediately. NB cast interruption on movement is not modelled yet (interim).
+								var spell = await Database.GetSpell(spellId);
+								var castMs = spell?.CastTime ?? 0;
+								if (castMs == 0)
+								{
+									await Resolve();
+								}
+								else
+								{
+									_ = Task.Run(async () =>
+									{
+										try
+										{
+											await Task.Delay(castMs);
+											if (client.Session?.Account != null)
+												await Resolve();
+										}
+										catch (Exception ex)
+										{
+											Logger.LogWarning(ex, "Deferred cast resolution failed for spell 0x{Spell:X}", spellId);
+										}
+									});
+								}
 
 								break;
 							}
