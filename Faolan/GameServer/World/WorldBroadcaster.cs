@@ -626,11 +626,18 @@ namespace Faolan.GameServer.World
 			if (player == null || !_sim.World.ZoneFor(player.MapId).TryGet(bagHandle, out var bag))
 				return;
 
-			await SendWorldIir(client, WorldLoot.BuildLootRemoveItemsBody(bag.Handle));
-
 			if (bag.LootItems.Any(i => i != 0) || bag.CashTin > 0)
-				return; // items/coins remain (0 = a drag-looted slot) - keep the bag open in the world
+				return; // items/coins remain (0 = a drag-looted slot) - keep the bag open in the world.
+			// Do NOT send LootRemoveItems on a PARTIAL take: it carries a COUNT (count x 0x3F1 landmark), not the
+			// dragged item's Pos, so it can't target one slot. On a manual single-drag the client already removes the
+			// dragged item from the open window itself (optimistic UI) - our grant (DispatchAddItem) just delivers it
+			// to the backpack. Sending LootRemoveItems here made the client drop an EXTRA (first) slot from the window
+			// (#226-2: "correct item granted, but the first slot disappears"). It's only correct as the loot-ALL
+			// completion below, where the whole bag fades anyway.
 
+			// Fully emptied -> the captured loot-all completion sequence (hoxxling gameplay fr4470): LootRemoveItems ->
+			// DispatchCloseLootBag -> looter resets -> fade -> consumed visual.
+			await SendWorldIir(client, WorldLoot.BuildLootRemoveItemsBody(bag.Handle));
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x58),
 					ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, client.Session.Account.ClientInstance),
