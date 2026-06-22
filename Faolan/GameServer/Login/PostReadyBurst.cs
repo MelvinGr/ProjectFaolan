@@ -44,12 +44,18 @@ namespace Faolan.GameServer
 
 			// record 2: 0x00002000 - the StartFixed3d destiny step (ScryScriptIIR 0xA36D3B74), constructed (was verbatim;
 			// byte-identical, proven by QuestTests.BuildScryStep_MatchesCapture). The body is [u32 len][step bytes].
-			var startFixed3d = ScryScript.BuildStep(instance, "StartFixed3d");
-			await new PacketStream()
-				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
-				.WriteUInt32((uint)startFixed3d.Length)
-				.WriteArray(startFixed3d)
-				.SendAsync(client);
+			// #234: SKIP on the create-world connection - the create destiny cutscene overlay (SendCreateCutsceneStep)
+			// already sends StartFixed3d at IntroDone (matching retail, which sends it ONCE there). Sending it here too
+			// (before the cutscene) is a DUPLICATE retail doesn't have (loopback f649) and re-engages the cinematic.
+			if (!client.Session.IsCreateWorldSession)
+			{
+				var startFixed3d = ScryScript.BuildStep(instance, "StartFixed3d");
+				await new PacketStream()
+					.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)
+					.WriteUInt32((uint)startFixed3d.Length)
+					.WriteArray(startFixed3d)
+					.SendAsync(client);
+			}
 
 			// record 2b (BEACH ONLY, #267): the destiny SCRIPT GROUP that builds the chained-Casilda tableau - it
 			// renders the `hangingwoman` chains and sets up the intro confinement ("invisible wall"). Retail sends
