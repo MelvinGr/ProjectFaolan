@@ -1,5 +1,23 @@
 # Spell / stat computation engine (formulas) — #270
 
+## RESOLVED: recast/cooldown is SERVER-AUTHORITATIVE (not client data)
+
+Found via the exe's recast strings. The recast timer is set by `FUN_007e1080` ("Setting recast timer on
+spell: ... to: <param2>"; param2 = recast centiseconds, ×0.01 = seconds). Its callers:
+- `FUN_008b0f50` = the **`SetSpellRecastTime` GameAction handler** — reads recast from the action
+  (`FUN_0089bd80(action, 0x2f9)`, param id `0x2f9` = recast centiseconds) and sets the timer.
+- `FUN_007e1230` = `ChangeLineRecastTime` — adjusts a spell line's recast by a supplied delta.
+
+GameActions in the exe: `SetSpellRecastTime`, `SetSpellLineRecastTime`, `ChangeRecastTime`,
+`ChangeLineRecastTime` (`e_Type_GC_GameAction_*`). **The server computes recast and pushes it to the client**
+at cast time; the client only enforces/displays it. This is why every client-data search failed (6 static + 2
+dynamic) — the recast simply isn't in the client. **Faolan defines it and sends the GameAction**, like retail.
+Same pattern likely for mana/damage. Implementation = a feature (emit `SetSpellRecastTime` on cast), not a
+decode; values from `Spell.Cooldown` (combos) + `Captures/spell_cooldowns_observed.tsv`.
+
+---
+
+
 **Why this exists:** an accurate emulator needs the *formulas*, not per-value lookups. Reverse-engineered from
 `AgeOfConan.exe` (Ghidra project `/home/melvin/Development/Ghidra/Aoc`, scripts in `Captures/ghidra/` +
 `scripts/`). Status: **foundation decoded; per-property completion is incremental.**
