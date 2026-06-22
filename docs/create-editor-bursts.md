@@ -134,7 +134,10 @@ create-specific to decode, only builder wiring to do:
      resource/regen pools; the lone `flag` byte is the base IIR's (0 in every capture). Decoded by
      `decode_create_iir_records.py` + `Captures/ghidra/DumpRegenReader.java`, built by
      `CreateEditorRecordBuilder.BuildRegenIir`.
-   - (`StatIIR`/`EnergyIIR`/`PlayfieldFIIR`/`GameTimeIIR` already had builders.)
+   - `StatIIR` (0xF98E10B3) / `EnergyIIR` (0x40749B8A) / `StatUpdateIIR` (0x96B8DC59) — had builders, and as of
+     0d51565 the last raw `IirId()` byte-literal records in `CreationScriptBurst` / `InitialBurst` /
+     `WorldPrepBurst` are now built via `CreateEditorRecordBuilder` too (the per-class StatIIR runs as loops). The
+     unused `C350` var + per-file `IirId` helpers were dropped. (`PlayfieldFIIR`/`GameTimeIIR` already wired.)
 
    **`ScryScriptIIR` now CONSTRUCTED (#223):** the two CreationScript records (the "Slave Galley" PreloadAssets
    step + "PlayOrSkip") are built by `ScryScript.BuildStep`, and the post-morph `StartScriptGroupOnClient`
