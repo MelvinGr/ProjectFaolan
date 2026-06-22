@@ -1,7 +1,7 @@
 // Decompile SimpleCharFullUpdateIIR_t::ReadSubClass (the FA015807 reader) to recover the 227-byte pre-IIR
 // scaffold block layout (the last un-lifted part of the NPC spawn, Gitea #185). Anchors on the unique error
 // strings inside the method. Run:
-//   /opt/ghidra/support/analyzeHeadless /tmp/ghidra-aoc/proj aoc -process AgeOfConan.exe -noanalysis \
+//   /opt/ghidra/support/analyzeHeadless /home/melvin/Development/Ghidra/Aoc aoc -process AgeOfConan.exe -noanalysis \
 //     -scriptPath Captures/ghidra -postScript DumpSpawnIir.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
@@ -25,7 +25,7 @@ public class DumpSpawnIir extends GhidraScript {
 
     @Override
     public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/tmp/ghidra-aoc/spawn_iir.txt");
+        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/spawn_iir.txt");
         DecompInterface di = new DecompInterface();
         di.setOptions(new DecompileOptions());
         di.openProgram(currentProgram);
@@ -51,6 +51,6 @@ public class DumpSpawnIir extends GhidraScript {
             }
         }
         out.close();
-        println("DumpSpawnIir done -> /tmp/ghidra-aoc/spawn_iir.txt");
+        println("DumpSpawnIir done -> /home/melvin/Development/Ghidra/Aoc/spawn_iir.txt");
     }
 }

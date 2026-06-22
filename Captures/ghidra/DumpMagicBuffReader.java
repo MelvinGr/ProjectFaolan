@@ -3,7 +3,7 @@
 //   the Activate method whose format string is "MagicBuffIIR_c::Activate, UpdateBuff with parameters: BuffTemplate "
 //     - it names the decoded fields (BuffTemplate, duration, magnitude, ...).
 // Run:
-//   /opt/ghidra/support/analyzeHeadless /tmp/ghidra-aoc/proj aoc -process AgeOfConan.exe -noanalysis \
+//   /opt/ghidra/support/analyzeHeadless /home/melvin/Development/Ghidra/Aoc aoc -process AgeOfConan.exe -noanalysis \
 //     -scriptPath Captures/ghidra -postScript DumpMagicBuffReader.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
@@ -55,7 +55,7 @@ public class DumpMagicBuffReader extends GhidraScript {
     }
 
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/tmp/ghidra-aoc/magicbuff_reader.txt");
+        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/magicbuff_reader.txt");
         di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
 
         Address knownVt = symbolAddr(KNOWN_VTABLE);
@@ -88,6 +88,6 @@ public class DumpMagicBuffReader extends GhidraScript {
             } else out.println("  (no function references the string)");
         }
         out.close();
-        println("DumpMagicBuffReader done -> /tmp/ghidra-aoc/magicbuff_reader.txt");
+        println("DumpMagicBuffReader done -> /home/melvin/Development/Ghidra/Aoc/magicbuff_reader.txt");
     }
 }

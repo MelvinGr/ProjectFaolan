@@ -13,7 +13,7 @@ public class DumpListBHelpers extends GhidraScript {
         0x004d55b0L, 0x0079b760L, 0x00922eb0L, // the per-entry inner-loop constructors/readers
     };
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/tmp/ghidra-aoc/listb_helpers.txt");
+        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/listb_helpers.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         for (long a : FNS) {
             Function f = getFunctionContaining(toAddr(a));
@@ -28,6 +28,6 @@ public class DumpListBHelpers extends GhidraScript {
             out.println();
         }
         out.close();
-        println("DumpListBHelpers done -> /tmp/ghidra-aoc/listb_helpers.txt");
+        println("DumpListBHelpers done -> /home/melvin/Development/Ghidra/Aoc/listb_helpers.txt");
     }
 }

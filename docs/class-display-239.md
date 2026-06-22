@@ -20,7 +20,7 @@ is the tradeskill; this bug is the class.)
 - **Not the snapshot / stat block / vitals / StatIIR.** `Captures/scripts/decode_statblock.py` confirms no
   class enum in the FullChar stat block; none of our stat messages carry it.
 
-## What it IS (Ghidra: `AgeOfConan.exe`, project `/tmp/ghidra-aoc/proj`)
+## What it IS (Ghidra: `AgeOfConan.exe`, project `/home/melvin/Development/Ghidra/Aoc`)
 
 The in-world class getter is **`GetClassName` = `FUN_01506030`** (registered in the AA-feat-planner script
 API `FUN_01504bf0`, alongside `GetAAFeatTreeDescription`/`HasFeat`/`TrainAAFeat`/…). It reads the **local
@@ -48,9 +48,9 @@ Also found: seeding the real Necro starting spells into `CharacterSpells` (the w
 broken; that's a separate sub-bug.
 
 Ghidra recipe: scripts in `Captures/ghidra/` but they must be run from a **space-free** path (the repo path
-contains a space and breaks Ghidra's source-bundle loader) — copy to `/tmp/ghidra-scripts`. Run e.g.
-`FNS=01506030 analyzeHeadless /tmp/ghidra-aoc/proj aoc -process AgeOfConan.exe -noanalysis -scriptPath
-/tmp/ghidra-scripts -postScript DecompileFns.java`.
+contains a space and breaks Ghidra's source-bundle loader) — copy to `/home/melvin/Development/Ghidra/Aoc/scripts`.
+Run e.g. `FNS=01506030 analyzeHeadless /home/melvin/Development/Ghidra/Aoc aoc -process AgeOfConan.exe -noanalysis
+-scriptPath /home/melvin/Development/Ghidra/Aoc/scripts -postScript DecompileFns.java`.
 
 ## Dynamic-analysis progress (2026-06-19, winedbg on Proton WoW64)
 

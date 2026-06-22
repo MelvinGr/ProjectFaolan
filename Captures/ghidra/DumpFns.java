@@ -6,7 +6,7 @@ import java.io.PrintWriter;
 public class DumpFns extends GhidraScript {
     static final long[] ADDRS = { 0x004e0390L, 0x01122b10L, 0x0048f900L, 0x0145ac80L };
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/tmp/ghidra-aoc/spawn_fns.txt");
+        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/spawn_fns.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         for (long addr : ADDRS) {
             Function f = getFunctionContaining(toAddr(addr));

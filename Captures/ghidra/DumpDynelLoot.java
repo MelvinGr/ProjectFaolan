@@ -17,7 +17,7 @@ public class DumpDynelLoot extends GhidraScript {
     }
     byte[] le(long v){ return new byte[]{(byte)v,(byte)(v>>8),(byte)(v>>16),(byte)(v>>24)}; }
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/tmp/ghidra-aoc/dynel_loot.txt");
+        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/dynel_loot.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         Set<Long> dumped = new HashSet<>();
         for (String anchor : ANCHORS) {
@@ -38,6 +38,6 @@ public class DumpDynelLoot extends GhidraScript {
                 a = currentProgram.getMemory().findBytes(a.add(1), needle, null, true, monitor);
             }
         }
-        out.close(); println("done -> /tmp/ghidra-aoc/dynel_loot.txt");
+        out.close(); println("done -> /home/melvin/Development/Ghidra/Aoc/dynel_loot.txt");
     }
 }

@@ -2,7 +2,7 @@
 // field layout the captures can't pin (the per-quest "stat" fields + objective records). These methods
 // reference unique error strings (e.g. "QuestFullUpdateIIR::ReadSubClass() Wrong IIR_t version"), so we find
 // the string, find the function that references its address, and decompile it. Run:
-//   /opt/ghidra/support/analyzeHeadless /tmp/ghidra-aoc/proj aoc -process AgeOfConan.exe -noanalysis \
+//   /opt/ghidra/support/analyzeHeadless /home/melvin/Development/Ghidra/Aoc aoc -process AgeOfConan.exe -noanalysis \
 //     -scriptPath Captures/ghidra -postScript DumpQuestIir.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
@@ -28,7 +28,7 @@ public class DumpQuestIir extends GhidraScript {
 
     @Override
     public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/tmp/ghidra-aoc/quest_iir.txt");
+        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/quest_iir.txt");
         DecompInterface di = new DecompInterface();
         di.setOptions(new DecompileOptions());
         di.openProgram(currentProgram);
@@ -55,6 +55,6 @@ public class DumpQuestIir extends GhidraScript {
             }
         }
         out.close();
-        println("DumpQuestIir done -> /tmp/ghidra-aoc/quest_iir.txt");
+        println("DumpQuestIir done -> /home/melvin/Development/Ghidra/Aoc/quest_iir.txt");
     }
 }

@@ -42,7 +42,7 @@ public class DumpRpcTables extends GhidraScript {
     @Override
     public void run() throws Exception {
         mem = currentProgram.getMemory();
-        PrintWriter out = new PrintWriter("/tmp/ghidra-aoc/rpc_tables.txt");
+        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/rpc_tables.txt");
 
         // 1) Collect every proxy/dispatch method string, sorted by address (= registration order).
         String[] markers = { "Proxy_t::", "InterfaceDispatch_t::DispatchMethod", "Dispatch_t::DispatchMethod" };
@@ -101,6 +101,6 @@ public class DumpRpcTables extends GhidraScript {
         }
         out.flush();
         out.close();
-        println("WROTE /tmp/ghidra-aoc/rpc_tables.txt (" + byAddr.size() + " strings)");
+        println("WROTE /home/melvin/Development/Ghidra/Aoc/rpc_tables.txt (" + byAddr.size() + " strings)");
     }
 }

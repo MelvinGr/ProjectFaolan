@@ -30,7 +30,7 @@ public class DumpDispatch extends GhidraScript {
 
     @Override
     public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/tmp/ghidra-aoc/dispatch.txt");
+        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/dispatch.txt");
         DecompInterface di = new DecompInterface();
         di.setOptions(new DecompileOptions());
         di.openProgram(currentProgram);
@@ -65,6 +65,6 @@ public class DumpDispatch extends GhidraScript {
         }
         out.flush();
         out.close();
-        println("WROTE /tmp/ghidra-aoc/dispatch.txt (" + dumped.size() + " dispatchers)");
+        println("WROTE /home/melvin/Development/Ghidra/Aoc/dispatch.txt (" + dumped.size() + " dispatchers)");
     }
 }

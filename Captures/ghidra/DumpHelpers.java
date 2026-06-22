@@ -6,7 +6,7 @@ import java.io.PrintWriter;
 public class DumpHelpers extends GhidraScript {
     static final long[] ADDRS = { 0x0080c620L, 0x00cbfb80L, 0x00870500L, 0x00cbf5d0L };
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/tmp/ghidra-aoc/helpers.txt");
+        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/helpers.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         for (long a : ADDRS) {
             Function f = getFunctionContaining(toAddr(a));
@@ -16,6 +16,6 @@ public class DumpHelpers extends GhidraScript {
                 out.println(r!=null&&r.decompileCompleted()?r.getDecompiledFunction().getC():"  <fail>"); } catch(Exception e){ out.println(e); }
             out.println();
         }
-        out.close(); println("done -> /tmp/ghidra-aoc/helpers.txt");
+        out.close(); println("done -> /home/melvin/Development/Ghidra/Aoc/helpers.txt");
     }
 }

@@ -4,7 +4,7 @@
 //      (FUN_01121c00) -> that's the ReadSubClass vtable slot index (same for every IIR subclass).
 //   2. For each target <Class>::vftable, read that same slot -> the class's ReadSubClass -> decompile.
 // Run:
-//   /opt/ghidra/support/analyzeHeadless /tmp/ghidra-aoc/proj aoc -process AgeOfConan.exe -noanalysis \
+//   /opt/ghidra/support/analyzeHeadless /home/melvin/Development/Ghidra/Aoc aoc -process AgeOfConan.exe -noanalysis \
 //     -scriptPath Captures/ghidra -postScript DumpVtableReaders.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
@@ -50,7 +50,7 @@ public class DumpVtableReaders extends GhidraScript {
     }
 
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/tmp/ghidra-aoc/vtable_readers.txt");
+        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/vtable_readers.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
 
         Address knownVt = vtableAddr(KNOWN_VTABLE);
@@ -76,6 +76,6 @@ public class DumpVtableReaders extends GhidraScript {
             out.println();
         }
         out.close();
-        println("DumpVtableReaders done -> /tmp/ghidra-aoc/vtable_readers.txt");
+        println("DumpVtableReaders done -> /home/melvin/Development/Ghidra/Aoc/vtable_readers.txt");
     }
 }

@@ -1,7 +1,7 @@
 // Decompile an explicit list of function addresses (passed via the FNS env var, comma-separated hex) to
-// /tmp/ghidra-aoc/fnlist.txt. General helper for following a decompiled call chain a level at a time.
+// /home/melvin/Development/Ghidra/Aoc/fnlist.txt. General helper for following a decompiled call chain a level at a time.
 // Run:
-//   FNS=004d4c70,0048f6d0,0048f720 /opt/ghidra/support/analyzeHeadless /tmp/ghidra-aoc/proj aoc \
+//   FNS=004d4c70,0048f6d0,0048f720 /opt/ghidra/support/analyzeHeadless /home/melvin/Development/Ghidra/Aoc aoc \
 //     -process AgeOfConan.exe -noanalysis -scriptPath Captures/ghidra -postScript DumpFnList.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
@@ -10,7 +10,7 @@ import java.io.PrintWriter;
 
 public class DumpFnList extends GhidraScript {
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/tmp/ghidra-aoc/fnlist.txt");
+        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/fnlist.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         String fns = System.getenv("FNS");
         if (fns == null) { out.println("set FNS=hex,hex,..."); out.close(); return; }
@@ -25,6 +25,6 @@ public class DumpFnList extends GhidraScript {
             } catch (Exception ex) { out.println("<exception: " + ex + ">"); }
         }
         out.close();
-        println("DumpFnList done -> /tmp/ghidra-aoc/fnlist.txt");
+        println("DumpFnList done -> /home/melvin/Development/Ghidra/Aoc/fnlist.txt");
     }
 }

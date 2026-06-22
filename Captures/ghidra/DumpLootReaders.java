@@ -4,7 +4,7 @@
 // The ReadSubClass slot index is the slot in the KNOWN SimpleCharFullUpdateIIR_t vtable whose pointer == its
 // reader (FUN_01121c00); read that slot in each target vtable. Decompile each reader + its direct callees.
 // Run:
-//   /opt/ghidra/support/analyzeHeadless /tmp/ghidra-aoc/proj aoc -process AgeOfConan.exe -noanalysis \
+//   /opt/ghidra/support/analyzeHeadless /home/melvin/Development/Ghidra/Aoc aoc -process AgeOfConan.exe -noanalysis \
 //     -scriptPath Captures/ghidra -postScript DumpLootReaders.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
@@ -44,7 +44,7 @@ public class DumpLootReaders extends GhidraScript {
     }
 
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/tmp/ghidra-aoc/loot_readers.txt");
+        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/loot_readers.txt");
         di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
 
         Address knownVt = symbolAddr(KNOWN_VTABLE);
@@ -75,6 +75,6 @@ public class DumpLootReaders extends GhidraScript {
             }
         }
         out.close();
-        println("DumpLootReaders done -> /tmp/ghidra-aoc/loot_readers.txt");
+        println("DumpLootReaders done -> /home/melvin/Development/Ghidra/Aoc/loot_readers.txt");
     }
 }

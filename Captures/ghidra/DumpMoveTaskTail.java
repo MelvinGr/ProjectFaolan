@@ -4,7 +4,7 @@ import ghidra.program.model.listing.Function;
 public class DumpMoveTaskTail extends GhidraScript {
     static final long[] FNS = { 0x00a4a9d0L, 0x00a3e400L, 0x00a3e510L };
     @Override public void run() throws Exception {
-        java.io.PrintWriter out=new java.io.PrintWriter("/tmp/ghidra-aoc/movetask_tail.txt");
+        java.io.PrintWriter out=new java.io.PrintWriter("/home/melvin/Development/Ghidra/Aoc/movetask_tail.txt");
         DecompInterface di=new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         for (long p: FNS){
             Function f=getFunctionContaining(toAddr(p));

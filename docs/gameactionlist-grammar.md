@@ -1,6 +1,6 @@
 # GameActionListIIR_t (0xF508F4C1) wire grammar — a property-map action list
 
-Recovered from `AgeOfConan.exe` (Ghidra `/tmp/ghidra-aoc/proj`). The "GameActionList" is the per-dynel
+Recovered from `AgeOfConan.exe` (Ghidra `/home/melvin/Development/Ghidra/Aoc`). The "GameActionList" is the per-dynel
 **spell/action list** — a `0x3F1`-framed list of action elements, each a **keyed stat/property map** (not the
 flat "header + verbatim tail" the capture-only model first suggested). Gitea #190.
 

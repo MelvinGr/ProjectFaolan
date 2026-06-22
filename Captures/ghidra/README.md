@@ -4,24 +4,24 @@ Recovers the 16-bit RPC method opcodes (`0x2000..0x20FF`) from `AgeOfConan.exe`.
 `docs/aoc-rpc-method-opcodes.md`; finding summary in `docs/aoc-opcode-ids.md` (Stage 3b).
 
 ## Reproduce
-Analyzed Ghidra project at `/tmp/ghidra-aoc/proj` (re-import if `/tmp` was cleared — exe is
-`/var/games/debian-installation/steamapps/common/Age of Conan/AgeOfConan.exe`, PE32 i386, stripped).
+Analyzed Ghidra project at `/home/melvin/Development/Ghidra/Aoc` (re-import if `/tmp` was cleared — exe is
+`/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/AgeOfConan.exe`, PE32 i386, stripped).
 Run each post-script against the already-analyzed program (no re-analysis):
 
 ```
-/opt/ghidra/support/analyzeHeadless /tmp/ghidra-aoc/proj aoc -process AgeOfConan.exe -noanalysis \
+/opt/ghidra/support/analyzeHeadless /home/melvin/Development/Ghidra/Aoc aoc -process AgeOfConan.exe -noanalysis \
   -scriptPath <this dir> -postScript <Script>.java
 ```
 
-1. **DumpRpcTables.java** -> `/tmp/ghidra-aoc/rpc_tables.txt`. Every `<Class>Proxy_t::<Method>` /
+1. **DumpRpcTables.java** -> `/home/melvin/Development/Ghidra/Aoc/rpc_tables.txt`. Every `<Class>Proxy_t::<Method>` /
    `Dispatch_t::DispatchMethod` string in address order (= c2s registration order) + the proxy
    constructors (the `min allowed` base check). Proves c2s order == `aoc-client-rpc-methods.json` order,
    base 0x2000.
-2. **DumpDispatch.java** -> `/tmp/ghidra-aoc/dispatch.txt`. Decompiles each `<Class>InterfaceDispatch_t::
+2. **DumpDispatch.java** -> `/home/melvin/Development/Ghidra/Aoc/dispatch.txt`. Decompiles each `<Class>InterfaceDispatch_t::
    DispatchMethod` — a `switch(methodIndex)` whose case N -> handler N. The switch is the authoritative
    s2c table (resolves the drift).
 3. Parse the switch cases into `disp_cases.json` (case -> handler FUN address), then
-   **DumpHandlerNames.java** (reads `/tmp/ghidra-aoc/handler_addrs.txt`) -> `/tmp/ghidra-aoc/handler_names.txt`
+   **DumpHandlerNames.java** (reads `/home/melvin/Development/Ghidra/Aoc/handler_addrs.txt`) -> `/home/melvin/Development/Ghidra/Aoc/handler_names.txt`
    (handler FUN -> its `<Class>Dispatch_t::<Method>` string).
 4. Assemble case+name -> `s2c_tables.json` and the markdown doc (see the inline python in the handoff /
    git history, or regenerate from `disp_cases.json` + `handler_names.txt`).

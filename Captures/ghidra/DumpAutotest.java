@@ -15,7 +15,7 @@ public class DumpAutotest extends GhidraScript {
         return sb.toString();
     }
     public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/tmp/ghidra-aoc/autotest.txt");
+        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/autotest.txt");
         Memory mem = currentProgram.getMemory();
         DecompInterface di = new DecompInterface();
         di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
@@ -53,6 +53,6 @@ public class DumpAutotest extends GhidraScript {
             }
         }
         out.close();
-        println("done -> /tmp/ghidra-aoc/autotest.txt");
+        println("done -> /home/melvin/Development/Ghidra/Aoc/autotest.txt");
     }
 }

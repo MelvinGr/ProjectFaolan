@@ -107,7 +107,7 @@ GameCharAgent conversation, not a world-entity spawn, and is in-client verified.
 ## Ghidra progress (2026-06-16) — the client-side "register handle" chain mapped
 
 The step that must run for the client to start polling `0x2020` for a handle is the dynel's insertion into the
-**playfield spaces** (the spatial/interest grid). Located it client-side (analyzed project `/tmp/ghidra-aoc/proj`;
+**playfield spaces** (the spatial/interest grid). Located it client-side (analyzed project `/home/melvin/Development/Ghidra/Aoc`;
 run headless scripts from a path WITHOUT spaces — the repo's `Captures/ghidra` dir fails Ghidra's bundle loader
 because of the `#`/space, so copy the `.java` to e.g. `/tmp/aocscripts` and run there):
 

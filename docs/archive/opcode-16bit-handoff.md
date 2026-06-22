@@ -34,14 +34,14 @@ the build's true order). Output: replace the invented/`[?]` names in
   `EnterWorld 0x20B6`. **Use these as anchors** to validate the recovered registration order.
 
 ## The Ghidra environment is READY (reuse it — analysis already done)
-- Project: `/tmp/ghidra-aoc/proj` (name `aoc`, program `AgeOfConan.exe`, 12.1.2). **NOTE: `/tmp` is ephemeral** —
+- Project: `/home/melvin/Development/Ghidra/Aoc` (name `aoc`, program `AgeOfConan.exe`, 12.1.2). **NOTE: `/tmp` is ephemeral** —
   if it's gone, re-import (`analyzeHeadless <projDir> aoc -import "<exe>"`, ~10–30 min one-time; the exe is at
   `/var/games/debian-installation/steamapps/common/Age of Conan/AgeOfConan.exe`, PE32 i386, **stripped, no PDB**).
-- Scripts: `/tmp/ghidra-aoc/scripts/{DumpReadSubClass,SurveyStrings}.java` (Java post-scripts; clone one).
+- Scripts: `/home/melvin/Development/Ghidra/Aoc/scripts/{DumpReadSubClass,SurveyStrings}.java` (Java post-scripts; clone one).
 - Fast re-run (NO re-analysis):
   ```
-  /opt/ghidra/support/analyzeHeadless /tmp/ghidra-aoc/proj aoc -process AgeOfConan.exe -noanalysis \
-    -scriptPath /tmp/ghidra-aoc/scripts -postScript YourScript.java > /tmp/ghidra-aoc/out.log 2>&1
+  /opt/ghidra/support/analyzeHeadless /home/melvin/Development/Ghidra/Aoc aoc -process AgeOfConan.exe -noanalysis \
+    -scriptPath /home/melvin/Development/Ghidra/Aoc/scripts -postScript YourScript.java > /home/melvin/Development/Ghidra/Aoc/out.log 2>&1
   ```
 - **Gotchas learned this session (important):**
   - Ghidra did NOT auto-create string xrefs. To find who references a string: find the string, walk back to the
@@ -99,7 +99,7 @@ The recovered `GameInterface`/`GameCharInterface` ordinals reproduce the known a
 > Recover the 16-bit RPC method opcodes from AgeOfConan.exe (read `docs/opcode-16bit-handoff.md`). This is the
 > parked Stage 3b gap (`docs/archive/opcode-re-plan.md`): the wire opcode `0x2000..0x20FF` = `0x2000 +` the
 > method's RPC registration index, which is assigned by registration ORDER (not a literal/hash/jump-table), so it
-> needs the Ghidra analysis already sitting at `/tmp/ghidra-aoc/proj` (reuse with `-process -noanalysis`; re-import
+> needs the Ghidra analysis already sitting at `/home/melvin/Development/Ghidra/Aoc` (reuse with `-process -noanalysis`; re-import
 > if `/tmp` was cleared). Names + signatures are already recovered (`docs/aoc-client-rpc-methods.json`, 376 c2s +
 > 401 s2c); you only need the numeric ids. Find each interface's method-registration site (anchor on the
 > `*Proxy_t::` / `DispatchMethod(` / `GameCharInterface` strings — note Ghidra didn't auto-create string xrefs, so

@@ -345,7 +345,7 @@ Remaining to author a fully-synthetic fresh-beach tails (and so delete the `.bin
   from a code/DB catalog) for the #193 construct-don't-replay purity goal — NOT a decode. No per-character
   generation is required (it's identical for every char).
 
-Dumps: `/tmp/ghidra-aoc/fullchar_reader.txt`, `/tmp/ghidra-aoc/fullchar_records.txt` (regenerate with the two
+Dumps: `/home/melvin/Development/Ghidra/Aoc/fullchar_reader.txt`, `/home/melvin/Development/Ghidra/Aoc/fullchar_records.txt` (regenerate with the two
 scripts above).
 
 ## Per-character CLASS + stats are NOT regenerated yet (2026-06-17, #239/#4/#186)

@@ -60,9 +60,9 @@ no env flag. `AdjustSnapshotPrefixRootLength` is kept only until `SnapshotPrefix
   `SnapshotItemBuilderTests`, `InventorySnapshotTests` — the builder/entry layers.
 
 ## Ghidra notes (reusable)
-Headless project at `/tmp/ghidra-aoc/proj` (rebuildable; the exe is stripped, no PDB). Anchor on error-string
+Headless project at `/home/melvin/Development/Ghidra/Aoc` (rebuildable; the exe is stripped, no PDB). Anchor on error-string
 literals and pointer-search the **C-string start's** LE32 in memory (Ghidra didn't auto-create the string
-xrefs). Scripts in `/tmp/ghidra-aoc/scripts/{DumpReadSubClass,SurveyStrings}.java`. The relevant functions:
+xrefs). Scripts in `/home/melvin/Development/Ghidra/Aoc/scripts/{DumpReadSubClass,SurveyStrings}.java`. The relevant functions:
 `n3InfoItemRemote::Construct = FUN_005b9d30`, `CoreFullPlayerCharacterIIR::ReadSubClass = FUN_00797440`,
 protobuf-blob read = `FUN_00cbfb80`, ReadU32(BE) = `FUN_0048f900`. See `docs/re/` for the saved decompiles +
 the subsystem string index.

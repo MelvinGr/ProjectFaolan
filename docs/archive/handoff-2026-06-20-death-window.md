@@ -744,7 +744,7 @@ DEAD and came back in the dead state with the window. Decoded:
 
 - Live gdb on the client: see agent memory `gdb_live_client_debugging` (attach `gdb -p <pid>`, Wine signal
   passthrough, breakpoints at the raw Ghidra addresses, MCP `kill` to trigger a local death). Ghidra project
-  at `/tmp/ghidra-aoc/proj`; helper scripts in `Captures/ghidra/`.
+  at `/home/melvin/Development/Ghidra/Aoc`; helper scripts in `Captures/ghidra/`.
 - Retail testing: throwaway account, **no anti-cheat** (per Melvin) — connect the client to Funcom, attach
   gdb, die / relog-while-dead. Capture retail traffic with `dumpcap -i wlo1 -f "net 37.18.0.0/16"` (works
   without root) then `Captures/tshark_dump.sh` to decode (GameServer traffic is zlib/plaintext; login is

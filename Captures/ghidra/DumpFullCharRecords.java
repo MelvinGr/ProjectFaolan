@@ -3,7 +3,7 @@
 // the 112-byte record list (FUN_00922c90), the StatList_t entry (FUN_0139d210), the FUN_0077d220/d5b0
 // list records (FUN_0077db70), and the length-prefixed string/blob reader (FUN_00cbfb80). #91 / .bin removal.
 // Run:
-//   /opt/ghidra/support/analyzeHeadless /tmp/ghidra-aoc/proj aoc -process AgeOfConan.exe -noanalysis \
+//   /opt/ghidra/support/analyzeHeadless /home/melvin/Development/Ghidra/Aoc aoc -process AgeOfConan.exe -noanalysis \
 //     -scriptPath Captures/ghidra -postScript DumpFullCharRecords.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
@@ -23,7 +23,7 @@ public class DumpFullCharRecords extends GhidraScript {
     };
 
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("/tmp/ghidra-aoc/fullchar_records.txt");
+        PrintWriter out = new PrintWriter("/home/melvin/Development/Ghidra/Aoc/fullchar_records.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         for (long a : FNS) {
             Function f = getFunctionContaining(toAddr(a));
@@ -39,6 +39,6 @@ public class DumpFullCharRecords extends GhidraScript {
             out.println();
         }
         out.close();
-        println("DumpFullCharRecords done -> /tmp/ghidra-aoc/fullchar_records.txt");
+        println("DumpFullCharRecords done -> /home/melvin/Development/Ghidra/Aoc/fullchar_records.txt");
     }
 }
