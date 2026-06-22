@@ -1,5 +1,51 @@
 # Handoff — Create-character flow reconstruct (#234)
 
+> ## UPDATE — session 2 (2026-06-22 PM): cutscene now PLAYS + lands playable; Kalanthes appears, walks up, but does NOT speak
+>
+> Big progress over the original symptom. The create flow now: black screen GONE → beach renders → the **retail
+> intro tableau** is correct (player prone on the sand, **Kalanthes seated right beside her** — verified in two
+> screenshots) → char is playable. Two things landed this session, plus the remaining blocker:
+>
+> **(A) Cinematic actor-binding — SOLVED (and the original "(1)" RE concern below was WRONG).** `ThisIsKalanthes`'s
+> `f6Field2` IS just the **live Kalanthes entity handle** — no separate `TagCharacterForCinematicScriptCommand` is
+> needed. The captured `97795` was the hoxxling session's value; binding OUR live handle (`LiveNpcHandle(client,
+> "Kalanthes", …)` — looks the NPC up in the player's zone) makes the cutscene camera focus the real Kalanthes.
+> Confirmed in-client: camera now points at him.
+>
+> **(B) Kalanthes walk-up — DONE by MoveTask replay.** Two captured MoveTasks (`96C46740`, Blablabla_* f657 +
+> f890), re-addressed to our live handle: f657 = intro TRANSFORM (snaps him to `333.2,146.3,706.0`, next to the
+> washed-ashore player); f890 = WALK PATH (to `324.7,145.4,705.1`). `SendKalanthesMoveTask` in
+> `CreateWorldCutsceneScripts.cs`, fired at case 0 (transform) + case 3 (walk, on the `Move` callback). In-client
+> he now moves up to the player. Caveat: he **slides** (no walk leg-animation) — minor; the path/timing are right.
+> Likely the path-form movement-mode byte or a missing anim flag; deferred (cosmetic).
+>
+> **(C) STILL BLOCKED: Kalanthes does not SPEAK (no WelcomeTutorial dialogue).** This is the remaining work.
+> Decoded the full retail callback→response Scry order from Blablabla_* and matched our cases to it exactly:
+> `cb0 → ThisIsKalanthes + StartScriptGroup 7088774`, `cb1 → WelcomeTutorial`, `cb2 → StartScriptGroup 7124502`,
+> `cb3(Move) → Kneel`, `cb4(IntroDone) → StartFixed3d`. We previously bundled group 7088774 with WelcomeTutorial at
+> case 1; reordered so the group loads at case 0 first (matching f665). **Still no dialogue.** So `WelcomeTutorial`
+> as a bare `ScryScript.BuildStep` Scry step is NOT sufficient to start Kalanthes's speech.
+>
+> **NEXT (the dialogue blocker), in priority order:**
+> 1. The ~53s gap between `Kneel` (f908) and `IntroDone` (f1054) in the capture is where the speech plays, yet there
+>    are NO server packets in that window — so the speech is driven CLIENT-SIDE off the script groups (7088774 /
+>    7124502 = RDB LuaArchive cutscene scripts), not off a server dialogue packet. Verify our `WelcomeTutorial`
+>    Scry step is byte-exact vs f734 (`00000030a36d3b740000c35001316d8a000000001f080510021800220f57656c636f6d655475746f7269616c2a00320408001000`)
+>    — esp. the `mode`/`flag` fields (f734 has `1002 1800` after the marker; our BuildStep mode:2 — confirm flag/the
+>    `1800` byte match). A wrong mode/flag could make the client accept the step but not RUN the script.
+> 2. Decode script groups **7088774 + 7124502** from the RDB LuaArchive (1992 scripts extracted, see `lua_vm`
+>    memory) — they likely contain the `playspeech`/`playanimation`/dialogue-subtitle commands. If the client needs
+>    the script BODY (not just the StartScriptGroup id) we may have to deliver it.
+> 3. Confirm the client even reaches case 1: add a log line per `SendCreateCutsceneStep` case and watch the server
+>    log during a run (the callbacks are `ClientLoadingDone → StartScript → StartScript → Move → IntroDone`).
+>
+> Code touched this session: `Faolan/GameServer/CreateFlow/CreateWorldCutsceneScripts.cs` only (actor-binding,
+> `SendKalanthesMoveTask` + the two captured MoveTask bodies, case reorder). The verbatim-burst RE concerns in the
+> ORIGINAL handover below (esp. the "(1) cinematic actor-tagging is genuine ScriptCommand RE" finding) are
+> SUPERSEDED by (A) above. **Everything below this box predates session 2.**
+
+---
+
 **Symptom (in-client, 2026-06-22):** create a new char → the destiny cutscene plays as a **black screen with
 correct audio** → after the cutscene the client **disconnects all connections**, then **reconnects and hangs**.
 
