@@ -35,6 +35,33 @@
 > actor `0x2c4e` is (its FA015807 name in the capture) and whether the camera's cinematic state keys on Kalanthes,
 > the player, or a dedicated cinematic stand-in.
 >
+> ### Session 3c (2026-06-22) — BCC route ATTEMPTED + REVERTED; the BCC error is a RED HERRING
+> Implemented + in-client tested (then reverted - kept only the committed ScryScript fixes):
+> - **Player cinematic BCC** (replay of Blablabla f387/f389, behaviorId 42011, re-addressed to the live player) AND
+>   the **scene freeze burst** (BehaviorControlCenter idle for all 32 KNOWN beach NPCs, `BuildBehaviorControlCenterIir(h,
+>   slot 7, behaviorId 41413, phase 1, field5 24)`, gated on `player.Known`). Both went out byte-correct (verified in
+>   our loopback: 32 freeze records in retail's f668-710 form + the player BCC).
+> - **Result: NO speech.** And `playstockphraseassubtitle` STILL timed out 60s, AND `cinematiccam failed to set
+>   cimatic state with BCC error` STILL fired. The player BCC made the char **translucent** (cinematic fade state -
+>   so the BCC IS processed) but that's an unwanted visual, so the whole BCC route was reverted.
+> - **KEY: the BCC error is BENIGN.** `...cam failed to set cimatic state with BCC error` ALSO fires at
+>   **character selection** (`characterselectioncam`, no world packets involved) - so it is NOT caused by missing
+>   server BCC and is not the speech blocker (matches Melvin: "many client-log errors also happen on retail").
+> - **PROVEN: the speech has NO server trigger.** During the full 64s WelcomeTutorial speech window (Blablabla
+>   f734->f889) Kalanthes receives ZERO packets; his only two are a BCC-idle (f889) + MoveTask (f890) AFTER the
+>   speech. So the subtitle is 100% client-side (script group 24063 `controlcamera` / `playstockphraseassubtitle`).
+>   Our `ThisIsKalanthes` binds the correct live handle (0x296D6, verified in our capture). Retail's cutscene is
+>   ALSO ~2 min (WelcomeTutorial->Kneel 64.5s, Kneel->StartFixed3d 53s) - long duration is normal; retail's phrases
+>   COMPLETE (~20s audio each), ours TIME OUT (never play).
+>
+> **REMAINING THEORIES (server side exhausted via the visible channels):** (1) a SECOND actor binding -
+> `TagCharacterForCinematicScriptCommand` maps a cinematic *script-object id* to the live handle, and the
+> `controlcamera` script may resolve its speaker that way rather than via `ThisIsKalanthes` (genuine cinematic-script
+> RE - PATH A). (2) the phrase audio/data is genuinely absent from this client's RDB (but that class of RDB-miss
+> also occurs on retail). Melvin notes "the tortage timeouts are NEW" - so a regression-window git-bisect of our
+> create flow (when did our cutscene last NOT time out?) may be the fastest lead. See memory
+> [[createworld_speech_needs_behaviorcc]].
+>
 > Tooling now in place for every test: a loopback capture runs to `/tmp/faolan_test.pcapng`; convert with
 > `Captures/tshark_dump.sh` and diff with `Captures/scripts/compare_create_cutscene.py <ours.tshark.json>`.
 > Code this session: `CreateFlow/CreateWorldCutsceneScripts.cs` + `Inbound/HandleCommandPacket.cs`.
