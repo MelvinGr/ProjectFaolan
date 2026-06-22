@@ -87,7 +87,7 @@ namespace Faolan.GameServer
 			// .teleport <mapId | name> <x> <y> <z>  - jump to a precise spot on a NAMED (or numeric) map in one command
 			// (#247). The map is the first token, the trailing three are the coordinates; the map name itself may contain
 			// spaces, so everything before the last three tokens is the map argument.
-			if (tokens.Length == 4
+			if (tokens.Length >= 4
 				&& float.TryParse(tokens[^3], NumberStyles.Float, CultureInfo.InvariantCulture, out var mpx)
 				&& float.TryParse(tokens[^2], NumberStyles.Float, CultureInfo.InvariantCulture, out var mpy)
 				&& float.TryParse(tokens[^1], NumberStyles.Float, CultureInfo.InvariantCulture, out var mpz))
