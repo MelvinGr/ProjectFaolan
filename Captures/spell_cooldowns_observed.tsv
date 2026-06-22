@@ -1,0 +1,13 @@
+# Spell recast/cooldown observed from retail tooltips (L80 necro), 2026-06-22.
+# Recast IS the cooldown. SPELL cooldown is NOT in the RDB record (proven: the value is absent in any unit
+# across all records, and no field is proportional to it) nor on ellatha - so these screenshot captures are
+# the only ground truth for spells. Combo cooldowns DO come from ellatha (Captures/ellatha_combos.tsv).
+# name	rank	cast	recast_s	mana
+Smite	1	instant	0	35
+Pestilential Blast	6	2.5s	0	130
+Ice Strike	6	2.0s	0	234
+Chill	5	instant	4	417
+Lifestrike	6	0.5s	12	360?
+Life Leech	?	1.0s	30	260
+Unimaginable Terror	2	1.0s	45	626
+Death's Terror	?	1.0s	90	130
