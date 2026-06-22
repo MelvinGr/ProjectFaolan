@@ -267,9 +267,9 @@ namespace Faolan.GameServer
 					// On the post-creation WORLD connection this is the last cutscene trigger (the beach /
 					// ApproachCasilda finale) - send the next chunk. On the EDITOR connection it instead marks
 					// the editor interactive (the editor connection then drives itself; see the create flow).
-					if (IsCreateWorldConnection(client))
+					if (IsCreateWorldConnection(client)) // #234 step2: drive the cutscene Scry steps over the burst-less world
 					{
-						await SendNextCreateWorldChunk(client);
+						await SendCreateCutsceneStep(client);
 						break;
 					}
 
@@ -283,8 +283,8 @@ namespace Faolan.GameServer
 				case "StartScript":
 				case "Move":
 				{
-					if (IsCreateWorldConnection(client))
-						await SendNextCreateWorldChunk(client);
+					if (IsCreateWorldConnection(client)) // #234 step2: drive the cutscene Scry steps over the burst-less world
+						await SendCreateCutsceneStep(client);
 					break;
 				}
 

@@ -48,7 +48,6 @@ namespace Faolan.Core.Network.Packets
 			return this;
 		}
 
-		[Obsolete("Use WriteHeader(ProtoEndpoint sender, ProtoEndpoint receiver, T opcode, byte[] headerData = null) instead.")]
 		public PacketStream WriteHeader<T>(byte[] sender, byte[] receiver, T opcode, byte[] headerData = null) where T : struct
 		{
 			WriteUInt32(0); // Write empty length

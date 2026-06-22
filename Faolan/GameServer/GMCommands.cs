@@ -301,13 +301,13 @@ namespace Faolan.GameServer
 
 		// The change-map prep IIR bodies (begin + destination announce) the retail teleport sends before the 0x2002
 		// handoff, built by the named TeleportCodec (#219, World/TeleportCodec.cs). In-client verification pending.
-		private async Task SendChangeMapPrep(INetworkClient client, uint destMapId, Vector3 position)
+		private async Task SendChangeMapPrep(INetworkClient client, uint destMapId, Vector3 position, uint destDescriptor = 0x00000014u)
 		{
 			var instance = client.Session.Account.ClientInstance;
 			// Source the destination playfield token from the destination map's burst so the announce matches the token
 			// the reconnect's world-entry will stamp (#219 / #211) - it is per-playfield-instance, not a constant.
 			var destToken = await _broadcaster.ResolveMapPlayfieldToken(destMapId);
-			foreach (var body in new[] { TeleportCodec.BuildBegin(instance, destMapId), TeleportCodec.BuildDestination(instance, destMapId, position, destPlayfieldToken: destToken) })
+			foreach (var body in new[] { TeleportCodec.BuildBegin(instance, destMapId), TeleportCodec.BuildDestination(instance, destMapId, position, destPlayfieldToken: destToken, destDescriptor: destDescriptor) })
 				await new PacketStream()
 					.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerCarrierOpcodes.IirCarrier)
 					.WriteArrayUInt32Length(s => s.WriteArray(body))

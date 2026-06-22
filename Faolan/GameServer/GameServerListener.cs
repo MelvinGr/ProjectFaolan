@@ -481,7 +481,13 @@ namespace Faolan.GameServer
 							"Post-creation world entry (clientInstance={ClientInstance:X8}, character={CharacterId:X8} '{Name}'): set creation spawn (rows={Rows}, pos=({X},{Y},{Z}), map={Map}); sending the creation world SCENE burst.",
 							clientInstance, client.Session.Character.Id, client.Session.Character.Name, spawnRows, client.Session.Character.PositionX, client.Session.Character.PositionY, client.Session.Character.PositionZ,
 							client.Session.Character.MapId);
-						await SendCreateWorldSceneBurst(client);
+						// #234 reconstruct (docs/handoff-2026-06-22-create-flow-reconstruct.md): the verbatim
+						// SendCreateWorldSceneBurst delivers the captured `hoxxling` world (wrong char) -> after the
+						// cutscene the client drops the connection and the reconnect hangs. Send the PROVEN burst-less
+						// live-char world + the destiny cutscene's Scry-script overlay instead (SendCreateWorldWithCutscene):
+						// the created char lands on the beach as ITSELF and the cutscene drives to IntroDone. Cutscene
+						// actors stay invisible until #185; SendCreateWorldSceneBurst stays as the golden reference.
+						await SendCreateWorldWithCutscene(client);
 					}
 					else if (isNewCharacter) // New character -> show the creator
 					{
@@ -952,6 +958,12 @@ namespace Faolan.GameServer
 						if (client.Session.AwaitingEnterWorld)
 						{
 							client.Session.AwaitingEnterWorld = false;
+							// #234: wash the new char ashore - retail's create flow sends a changemap-prep
+							// (IntendedTeleport 0x10D27BC0 + n3Teleport 0x5A32F0D7) to the Tortage Beach spawn on the
+							// EDITOR connection right before the handoff (Blablabla create capture f444/449: dest map
+							// 0x0FAA, pos 322.5,150,704.9, descriptor 0x32). Without it the player stays at the drowning
+							// cutscene's underwater end position. Mirrors GMCommands.DoTeleport (prep -> handoff).
+							await SendChangeMapPrep(client, Faolan.Core.Database.Tables.Map.TortageBeachId, Faolan.Core.Database.Tables.Map.NewPlayerSpawnSpawnPoint.Position, destDescriptor: 0x32);
 							await SendWorldHandoff(client);
 						}
 
