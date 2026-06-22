@@ -101,6 +101,28 @@ namespace Faolan.Tests
 			Assert.Equal(CombatResolver.ResolveKillXp(1), CombatResolver.ResolveKillXp(0));
 		}
 
+		// #76: the NPC max-HP fallback (for un-captured creatures) is fitted to the captured civilian baseline.
+		[Theory]
+		[InlineData(1u, 63u)]      // anchor: L1 baseline (27 NPCs)
+		[InlineData(20u, 933u)]    // anchor: L20 (43 NPCs)
+		[InlineData(40u, 2217u)]   // anchor: L40 (109 NPCs)
+		[InlineData(60u, 3276u)]   // anchor: L60
+		[InlineData(35u, 1952u)]   // interpolated, captured baseline 1953 (<1%)
+		[InlineData(45u, 2481u)]   // interpolated, captured baseline 2482 (<1%)
+		public void NpcMaxHealthForLevel_MatchesCapturedBaseline(uint level, uint expected)
+		{
+			Assert.Equal(expected, CombatResolver.NpcMaxHealthForLevel(level));
+		}
+
+		[Fact]
+		public void NpcMaxHealthForLevel_IsMonotonic_AndExtrapolatesAboveCap()
+		{
+			Assert.Equal(CombatResolver.NpcMaxHealthForLevel(1), CombatResolver.NpcMaxHealthForLevel(0)); // L0 == L1
+			for (uint l = 2; l <= 90; l++)
+				Assert.True(CombatResolver.NpcMaxHealthForLevel(l) > CombatResolver.NpcMaxHealthForLevel(l - 1));
+			Assert.Equal(3276u + 20 * 53u, CombatResolver.NpcMaxHealthForLevel(80)); // +53/level past the L60 anchor
+		}
+
 		[Fact]
 		public void ResolveSpellDamage_ScalesWithCasterLevel()
 		{

@@ -7,18 +7,47 @@ namespace Faolan.GameServer.Combat
 	/// </summary>
 	public static class CombatResolver
 	{
-		// Placeholder NPC max health until NPC stats are decoded from the spawn/snapshot data.
-		public const uint DefaultNpcMaxHealth = 100;
+		// Fallback NPC max health for a creature with NO captured spawn HP. The real per-creature HP is the captured
+		// NpcSpawn.Health (the wire value retail sent); this is only used when that's absent (a GM-spawned template,
+		// future content). It is NOT in the client RDB - the NpcSpawnDataExport stat tables aren't shipped (#76, see
+		// memory rdb_npc_hp_not_in_client) - so this curve is the only source for an un-captured creature.
+		public const uint DefaultNpcMaxHealth = 63; // the L1 civilian baseline (was a flat 100 placeholder)
 
-		// Provisional NPC max health from its level - used to seed a model NPC's vitals so its health bar scales with
-		// level (the real per-template HP isn't lifted from the spawn data yet, like ResolveSpellDamage). Level 0 maps
-		// to the level-1 value.
+		// Captured CIVILIAN-baseline HP per level (NpcSpawns.Health; HP is level-derived - the same value recurs across
+		// unrelated creatures, e.g. L20->933 for 43 NPCs, L40->2217 for 109). High-confidence anchors; HP is
+		// piecewise-linear between them. Validates to <1% at unsampled levels (L35->1953, L45->2482, L11->386 vs 382).
+		private static readonly (uint Level, uint Hp)[] NpcHpAnchors =
+		[
+			(1, 63), (5, 150), (10, 318), (15, 658), (20, 933), (30, 1688), (40, 2217), (50, 2746), (60, 3276)
+		];
+
+		// The steady civilian-baseline slope past the last anchor (L40->60 grow ~53 HP/level), used to extrapolate.
+		private const uint NpcHpPerLevelAboveCap = 53;
+
+		// NPC max health from its level: piecewise-linear over the captured baseline anchors, +53/level beyond the
+		// last. Level 0 maps to the level-1 value. Tougher creatures are a multiplier on this in retail; without
+		// per-creature data the civilian baseline is the best single estimate.
 		public static uint NpcMaxHealthForLevel(uint level)
 		{
 			var lvl = level == 0
 				? 1u
 				: level;
-			return DefaultNpcMaxHealth + lvl * 20u;
+
+			if (lvl <= NpcHpAnchors[0].Level)
+				return NpcHpAnchors[0].Hp;
+
+			for (var i = 1; i < NpcHpAnchors.Length; i++)
+			{
+				if (lvl > NpcHpAnchors[i].Level)
+					continue;
+
+				var (l0, h0) = NpcHpAnchors[i - 1];
+				var (l1, h1) = NpcHpAnchors[i];
+				return h0 + (uint)((ulong)(h1 - h0) * (lvl - l0) / (l1 - l0)); // linear interpolation
+			}
+
+			var last = NpcHpAnchors[^1];
+			return last.Hp + (lvl - last.Level) * NpcHpPerLevelAboveCap;
 		}
 
 		// Provisional XP awarded for killing an NPC of the given level. Level-scaled (a real XP curve / level
