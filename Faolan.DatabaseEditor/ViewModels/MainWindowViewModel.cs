@@ -1,11 +1,11 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
-using Faolan.Core.Database.Tables;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.DatabaseEditor.ViewModels
@@ -17,24 +17,24 @@ namespace Faolan.DatabaseEditor.ViewModels
 		// via the UI, save on command. (The server, by contrast, uses short-lived per-operation contexts.)
 		private readonly DatabaseContext? _context;
 
-		public Account? SelectedAccount
-		{
-			get;
-			set
-			{
-				if (ReferenceEquals(field, value))
-					return;
-
-				field = value;
-
-				RefreshSelectedAccount();
-				OnPropertyChanged(nameof(SelectedAccount));
-			}
-		}
+		// All rows loaded for the selected table, unfiltered. Rows is the filtered view bound to the UI.
+		private readonly List<RowViewModel> _allRows = [];
 
 		public AsyncRelayCommand SaveCommand { get; }
 
-		public Character? SelectedCharacter
+		public RelayCommand AddCommand { get; }
+
+		public RelayCommand DeleteCommand { get; }
+
+		// Every mapped entity type in the model - the editor follows the schema, so new tables/fields show up
+		// automatically with no per-table code (the whole point: "support all the new stuff that's been added").
+		public ObservableCollection<TableViewModel> Tables { get; } = [];
+
+		public ObservableCollection<RowViewModel> Rows { get; } = [];
+
+		public ObservableCollection<PropertyEditorViewModel> SelectedRowEditors { get; } = [];
+
+		public TableViewModel? SelectedTable
 		{
 			get;
 			set
@@ -44,103 +44,189 @@ namespace Faolan.DatabaseEditor.ViewModels
 
 				field = value;
 
-				RefreshSelectedCharacter();
-				OnPropertyChanged(nameof(SelectedCharacter));
+				RefreshRows();
+				OnPropertyChanged(nameof(SelectedTable));
 			}
 		}
 
-		public ObservableCollection<Account> Accounts { get; } = [];
+		public RowViewModel? SelectedRow
+		{
+			get;
+			set
+			{
+				if (ReferenceEquals(field, value))
+					return;
 
-		public ObservableCollection<Character> Characters { get; } = [];
+				field = value;
 
-		public ObservableCollection<PropertyEditorViewModel> SelectedAccountEditors { get; } = [];
+				RefreshEditors();
+				OnPropertyChanged(nameof(SelectedRow));
 
-		public ObservableCollection<PropertyEditorViewModel> SelectedCharacterEditors { get; } = [];
+				AddCommand.RaiseCanExecuteChanged();
+				DeleteCommand.RaiseCanExecuteChanged();
+			}
+		}
+
+		public string Filter
+		{
+			get;
+			set
+			{
+				if (field == value)
+					return;
+
+				field = value;
+
+				ApplyFilter();
+				OnPropertyChanged(nameof(Filter));
+			}
+		} = string.Empty;
+
+		public string Status
+		{
+			get;
+			private set
+			{
+				if (field == value)
+					return;
+
+				field = value;
+
+				OnPropertyChanged(nameof(Status));
+			}
+		} = string.Empty;
 
 		// Design-time constructor
 		public MainWindowViewModel()
 		{
 			SaveCommand = new AsyncRelayCommand(Save);
-
-			var account = new Account
-			{
-				// Fill these only if your Account type allows it.
-				// Name = "Design account"
-			};
-
-			var character = new Character
-			{
-				// Name = "Design character"
-			};
-
-			Accounts.Add(account);
-			Characters.Add(character);
-
-			SelectedAccount = account;
-			SelectedCharacter = character;
+			AddCommand = new RelayCommand(AddRow, () => SelectedTable is not null);
+			DeleteCommand = new RelayCommand(DeleteRow, () => SelectedRow is not null);
 		}
 
 		// Runtime constructor
 		public MainWindowViewModel(IDbContextFactory<DatabaseContext> contextFactory)
+			: this()
 		{
-			SaveCommand = new AsyncRelayCommand(Save);
-
 			_context = contextFactory.CreateDbContext();
 
-			var accounts = _context
-				.Accounts
-				.Include(a => a.Characters)
-				.ToList();
+			var tables = _context
+				.Model
+				.GetEntityTypes()
+				.Where(t => t.ClrType is not null && !t.IsOwned())
+				.Select(t => t.ClrType)
+				.Distinct()
+				.OrderBy(t => t.Name)
+				.Select(t => new TableViewModel(t));
 
-			foreach (var account in accounts)
-				Accounts.Add(account);
+			foreach (var table in tables)
+				Tables.Add(table);
 
-			SelectedAccount = Accounts.FirstOrDefault();
+			SelectedTable = Tables.FirstOrDefault();
 		}
 
 		public event PropertyChangedEventHandler? PropertyChanged;
 
+		private void RefreshRows()
+		{
+			_allRows.Clear();
+			SelectedRow = null;
+
+			if (_context is not null && SelectedTable is not null)
+			{
+				var set = (System.Collections.IEnumerable)SetMethod
+					.MakeGenericMethod(SelectedTable.ClrType)
+					.Invoke(_context, null)!;
+
+				foreach (var entity in set)
+					_allRows.Add(new RowViewModel(entity));
+			}
+
+			ApplyFilter();
+		}
+
+		private void ApplyFilter()
+		{
+			Rows.Clear();
+
+			var filter = Filter?.Trim();
+
+			var matches = string.IsNullOrEmpty(filter)
+				? _allRows
+				: _allRows.Where(r => r.Display.Contains(filter, StringComparison.OrdinalIgnoreCase));
+
+			foreach (var row in matches)
+				Rows.Add(row);
+
+			Status = SelectedTable is null
+				? string.Empty
+				: $"{SelectedTable.Name}: {Rows.Count} / {_allRows.Count} rows";
+
+			if (!Rows.Contains(SelectedRow!))
+				SelectedRow = Rows.FirstOrDefault();
+		}
+
+		private void RefreshEditors()
+		{
+			SelectedRowEditors.Clear();
+
+			if (SelectedRow is null)
+				return;
+
+			AddEditors(SelectedRowEditors, SelectedRow.Entity);
+		}
+
+		private void AddRow()
+		{
+			if (_context is null || SelectedTable is null)
+				return;
+
+			var entity = Activator.CreateInstance(SelectedTable.ClrType);
+
+			if (entity is null)
+				return;
+
+			_context.Add(entity);
+
+			var row = new RowViewModel(entity);
+
+			_allRows.Add(row);
+			Rows.Add(row);
+			SelectedRow = row;
+
+			Status = $"Added a new {SelectedTable.Name} row (unsaved - press Save to persist)";
+		}
+
+		private void DeleteRow()
+		{
+			if (_context is null || SelectedRow is null)
+				return;
+
+			_context.Remove(SelectedRow.Entity);
+
+			_allRows.Remove(SelectedRow);
+			Rows.Remove(SelectedRow);
+			SelectedRow = Rows.FirstOrDefault();
+
+			Status = $"Removed a {SelectedTable?.Name} row (unsaved - press Save to persist)";
+		}
+
+		private async Task Save()
+		{
+			if (_context is null)
+				return;
+
+			var changed = await _context.SaveChangesAsync();
+
+			Status = $"Saved - {changed} change(s) written";
+		}
+
+		private static readonly MethodInfo SetMethod =
+			typeof(DbContext).GetMethod(nameof(DbContext.Set), 1, Type.EmptyTypes)!;
+
 		private void OnPropertyChanged(string propertyName)
 		{
 			PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-		}
-
-		private void RefreshSelectedAccount()
-		{
-			SelectedAccountEditors.Clear();
-			Characters.Clear();
-			SelectedCharacterEditors.Clear();
-
-			if (SelectedAccount is null)
-			{
-				SelectedCharacter = null;
-				return;
-			}
-
-			AddEditors(SelectedAccountEditors, SelectedAccount);
-
-			if (SelectedAccount.Characters is not null)
-			{
-				foreach (var character in SelectedAccount.Characters)
-					Characters.Add(character);
-			}
-
-			SelectedCharacter = Characters.FirstOrDefault();
-		}
-
-		private void RefreshSelectedCharacter()
-		{
-			SelectedCharacterEditors.Clear();
-
-			if (SelectedCharacter is null)
-				return;
-
-			AddEditors(SelectedCharacterEditors, SelectedCharacter);
-		}
-
-		private Task Save()
-		{
-			return _context?.SaveChangesAsync() ?? Task.CompletedTask;
 		}
 
 		private static void AddEditors(ObservableCollection<PropertyEditorViewModel> editors, object model)

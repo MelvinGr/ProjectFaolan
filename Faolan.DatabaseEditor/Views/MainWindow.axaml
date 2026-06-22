@@ -4,8 +4,8 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:Faolan.DatabaseEditor.ViewModels"
         mc:Ignorable="d"
-        d:DesignWidth="1100"
-        d:DesignHeight="700"
+        d:DesignWidth="1200"
+        d:DesignHeight="760"
         x:Class="Faolan.DatabaseEditor.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="Faolan.DatabaseEditor">
@@ -14,123 +14,106 @@
         <vm:MainWindowViewModel />
     </Design.DataContext>
 
-    <Grid ColumnDefinitions="280,*"
-          RowDefinitions="*">
+    <DockPanel>
 
-        <!-- Accounts list -->
-        <Border Grid.Column="0"
+        <!-- Toolbar -->
+        <Border DockPanel.Dock="Top"
                 BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-                BorderThickness="0,0,1,0"
-                Padding="12">
+                BorderThickness="0,0,0,1"
+                Padding="12,8">
+            <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto">
+                <Button Grid.Column="0"
+                        Content="Add row"
+                        Command="{Binding AddCommand}"
+                        Padding="14,6"
+                        Margin="0,0,8,0" />
 
-            <DockPanel>
+                <Button Grid.Column="1"
+                        Content="Delete row"
+                        Command="{Binding DeleteCommand}"
+                        Padding="14,6"
+                        Margin="0,0,8,0" />
+
+                <Button Grid.Column="2"
+                        Content="Save"
+                        Command="{Binding SaveCommand}"
+                        Padding="18,6" />
+
+                <TextBlock Grid.Column="3"
+                           Text="{Binding Status}"
+                           VerticalAlignment="Center"
+                           Opacity="0.75"
+                           Margin="16,0" />
+            </Grid>
+        </Border>
+
+        <Grid ColumnDefinitions="240,320,*">
+
+            <!-- Tables -->
+            <Border Grid.Column="0"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                    BorderThickness="0,0,1,0"
+                    Padding="12">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top"
+                               Text="Tables"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,12" />
+
+                    <ListBox ItemsSource="{Binding Tables}"
+                             SelectedItem="{Binding SelectedTable, Mode=TwoWay}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:TableViewModel">
+                                <TextBlock Text="{Binding Name}"
+                                           Margin="0,3" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <!-- Rows -->
+            <Border Grid.Column="1"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                    BorderThickness="0,0,1,0"
+                    Padding="12">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top"
+                               Text="Rows"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,12" />
+
+                    <TextBox DockPanel.Dock="Top"
+                             Text="{Binding Filter, Mode=TwoWay}"
+                             PlaceholderText="Filter rows..."
+                             Margin="0,0,0,12" />
+
+                    <ListBox ItemsSource="{Binding Rows}"
+                             SelectedItem="{Binding SelectedRow, Mode=TwoWay}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:RowViewModel">
+                                <TextBlock Text="{Binding Display}"
+                                           Margin="0,3"
+                                           TextTrimming="CharacterEllipsis" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <!-- Property editors -->
+            <DockPanel Grid.Column="2"
+                       Margin="16">
                 <TextBlock DockPanel.Dock="Top"
-                           Text="Accounts"
+                           Text="Properties"
                            FontSize="18"
                            FontWeight="SemiBold"
                            Margin="0,0,0,12" />
 
-                <Button DockPanel.Dock="Bottom"
-                        Content="Save"
-                        Command="{Binding SaveCommand}"
-                        HorizontalAlignment="Stretch"
-                        Margin="0,12,0,0"
-                        Padding="18,8" />
-
-                <ListBox ItemsSource="{Binding Accounts}"
-                         SelectedItem="{Binding SelectedAccount, Mode=TwoWay}">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Margin="0,4">
-                                <TextBlock Text="{Binding UserName}"
-                                           FontWeight="SemiBold" />
-
-                                <TextBlock Text="{Binding Id}"
-                                           Opacity="0.65"
-                                           FontSize="12" />
-                            </StackPanel>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-            </DockPanel>
-        </Border>
-
-        <!-- Right side -->
-        <Grid Grid.Column="1"
-              RowDefinitions="Auto,*,Auto,*"
-              Margin="16">
-
-            <TextBlock Grid.Row="0"
-                       Text="Account properties"
-                       FontSize="18"
-                       FontWeight="SemiBold"
-                       Margin="0,0,0,12" />
-
-            <!-- Account property editors -->
-            <ScrollViewer Grid.Row="1">
-                <ItemsControl ItemsSource="{Binding SelectedAccountEditors}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:PropertyEditorViewModel">
-                            <Grid ColumnDefinitions="220,*"
-                                  Margin="0,4">
-
-                                <TextBlock Grid.Column="0"
-                                           Text="{Binding Name}"
-                                           VerticalAlignment="Center" />
-
-                                <TextBox Grid.Column="1"
-                                         Text="{Binding TextValue, Mode=TwoWay}"
-                                         IsVisible="{Binding UsesTextBox}" />
-
-                                <CheckBox Grid.Column="1"
-                                          IsChecked="{Binding BooleanValue, Mode=TwoWay}"
-                                          IsVisible="{Binding IsBoolean}" />
-
-                                <ComboBox Grid.Column="1"
-                                          ItemsSource="{Binding EnumValues}"
-                                          SelectedItem="{Binding Value, Mode=TwoWay}"
-                                          IsVisible="{Binding IsEnum}" />
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
-
-            <TextBlock Grid.Row="2"
-                       Text="Characters"
-                       FontSize="18"
-                       FontWeight="SemiBold"
-                       Margin="0,20,0,12" />
-
-            <!-- Character list + selected character properties -->
-            <Grid Grid.Row="3"
-                  ColumnDefinitions="280,*">
-
-                <Border Grid.Column="0"
-                        BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-                        BorderThickness="0,0,1,0"
-                        Padding="0,0,12,0">
-
-                    <ListBox ItemsSource="{Binding Characters}"
-                             SelectedItem="{Binding SelectedCharacter, Mode=TwoWay}">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel Margin="0,4">
-                                    <TextBlock Text="{Binding Name}"
-                                               FontWeight="SemiBold" />
-
-                                    <TextBlock Text="{Binding Id}"
-                                               Opacity="0.65"
-                                               FontSize="12" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                </Border>
-
-                <ScrollViewer Grid.Column="1"
-                              Margin="16,0,0,0">
-                    <ItemsControl ItemsSource="{Binding SelectedCharacterEditors}">
+                <ScrollViewer>
+                    <ItemsControl ItemsSource="{Binding SelectedRowEditors}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:PropertyEditorViewModel">
                                 <Grid ColumnDefinitions="220,*"
@@ -157,7 +140,7 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </ScrollViewer>
-            </Grid>
+            </DockPanel>
         </Grid>
-    </Grid>
+    </DockPanel>
 </Window>
