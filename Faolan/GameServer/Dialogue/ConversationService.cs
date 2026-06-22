@@ -65,9 +65,10 @@ namespace Faolan.GameServer.Dialogue
 		private const uint KnubotCloseChatWindowSubOpcode = (uint)GameServer0X2000RespondsOpcodes.KnubotCloseChatWindowIIR;
 
 		// The Knubot packets we CONSTRUCT from the typed codec (KnubotCodec) instead of replaying+substituting (#188):
-		// the spoken line and the window-open. Their content (XML / value) is lifted from the captured record and
-		// rebuilt with the LIVE player/NPC endpoints - byte-identical to the substitution path (ConversationConstruct
-		// tests) but routed through the typed codec, the first step toward sourcing the line from RDB/Lua.
+		// ALL FOUR record types - the spoken line (AppendText), the window-open, the answer list and the close. Their
+		// content (XML / options / value) is lifted from the captured record and rebuilt with the LIVE player/NPC
+		// endpoints - byte-identical to the substitution path (ConversationConstruct tests) but routed through the
+		// typed codec, the step toward sourcing the line content from RDB/Lua instead of the captured packet.
 		private const uint KnubotAppendTextSubOpcode = (uint)GameServer0X2000RespondsOpcodes.KnubotAppendTextIIR;
 		private const uint KnubotOpenChatWindowSubOpcode = (uint)GameServer0X2000RespondsOpcodes.KnubotOpenChatWindowIIR;
 
@@ -267,8 +268,9 @@ namespace Faolan.GameServer.Dialogue
 					grantSent = true;
 				}
 
-				// CONSTRUCT the spoken line / window-open through the typed codec (#188); replay the rest (AnswerList,
-				// CloseChatWindow, ...) verbatim with handle substitution until they too are constructed.
+				// CONSTRUCT every Knubot record through the typed codec (#188): AppendText (line) + OpenChatWindow +
+				// AnswerList + CloseChatWindow all rebuild via KnubotCodec re-addressed to the live endpoints. Only
+				// NON-Knubot records (e.g. interleaved quest packets) fall through to the substitution-replay below.
 				if (TryConstructKnubotRecord(p.Data, liveInstance, clickedNpcHandle, out var constructed))
 				{
 					await SendConstructedKnubot(client, ReadSenderInstance(p.Data), liveInstance, constructed);

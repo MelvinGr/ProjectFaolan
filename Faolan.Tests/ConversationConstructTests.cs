@@ -62,15 +62,42 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void Construct_OpenChatWindow_IsByteIdenticalToSubstitution()
+		{
+			var captured = Convert.FromHexString(KnubotCodecTestData.OpenChatWindowBody);
+			const uint capturedInst = 0x01316D8A, capturedNpc = 0x00002C7C;
+
+			var p = KnubotCodec.ParseOpenChatWindow(captured);
+			var construct = KnubotCodec.BuildOpenChatWindow(LiveInstance, ClickedNpc, p.Value, p.Env);
+			var substitute = SubstituteU32(SubstituteU32(captured, capturedInst, LiveInstance), capturedNpc, ClickedNpc);
+
+			Assert.Equal(Convert.ToHexStringLower(substitute), Convert.ToHexStringLower(construct));
+		}
+
+		[Fact]
+		public void Construct_CloseChatWindow_IsByteIdenticalToSubstitution()
+		{
+			var captured = Convert.FromHexString(KnubotCodecTestData.CloseChatWindowBody);
+			const uint capturedInst = 0x01316D8A, capturedNpc = 0x00002C7C;
+
+			var p = KnubotCodec.ParseStringList(captured);
+			var construct = KnubotCodec.BuildCloseChatWindow(LiveInstance, ClickedNpc, p.Strings, p.Env);
+			var substitute = SubstituteU32(SubstituteU32(captured, capturedInst, LiveInstance), capturedNpc, ClickedNpc);
+
+			Assert.Equal(Convert.ToHexStringLower(substitute), Convert.ToHexStringLower(construct));
+		}
+
+		[Fact]
 		public void TryConstructKnubotRecord_RebuildsAnswerListAndCloseChatWindow()
 		{
-			foreach (var recordHex in new[] { KnubotCodecTestData.AnswerListBody })
+			foreach (var recordHex in new[] { KnubotCodecTestData.AnswerListBody, KnubotCodecTestData.CloseChatWindowBody })
 			{
 				var record = Convert.FromHexString(recordHex);
 				var packet = WrapInPacket(record);
 				Assert.True(ConversationService.TryConstructKnubotRecord(packet, LiveInstance, ClickedNpc, out var rebuilt));
+				var sub = BinaryPrimitives.ReadUInt32BigEndian(record.AsSpan(4, 4)); // preserve AnswerList vs CloseChatWindow
 				var p = KnubotCodec.ParseStringList(record);
-				var expected = KnubotCodec.BuildAnswerList(LiveInstance, ClickedNpc, p.Strings, p.Env);
+				var expected = KnubotCodec.BuildStringList(sub, LiveInstance, ClickedNpc, p.Strings, p.Env);
 				Assert.Equal(Convert.ToHexStringLower(expected), Convert.ToHexStringLower(rebuilt));
 			}
 		}
