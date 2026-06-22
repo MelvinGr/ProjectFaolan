@@ -23,7 +23,7 @@ namespace Faolan.DatabaseEditor
 				builder.Environment.EnvironmentName = "Development";
 
 			builder.Configuration.SetBasePath(Directory.GetCurrentDirectory());
-			builder.Configuration.AddJsonFile(Path.GetFullPath("../../../faolan.json"));
+			builder.Configuration.AddJsonFile(Path.GetFullPath("/home/melvin/Development/C#/Project Faolan/faolan.json"));
 			builder.Configuration.AddCommandLine(args);
 
 			builder.Services.ConfigureFaolanDatabase(builder.Configuration);
