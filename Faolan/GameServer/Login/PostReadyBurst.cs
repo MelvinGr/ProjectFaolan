@@ -59,7 +59,14 @@ namespace Faolan.GameServer
 			// script) and why the gate never resolves. Gated to the beach so a non-Tortage login isn't steered into
 			// the intro destiny flow.
 			var onBeach = client.Session.Character?.MapId == Faolan.Core.Database.Tables.Map.TortageBeachId;
-			if (onBeach)
+			// DISABLED (kept for re-enable): the beach caging tableau (#267) forces Casilda into her captive/hanging
+			// animation (156196) and is supposed to render the `hangingwoman` chains around her - but the chains are the
+			// open #267 client-content blocker and don't instantiate, so she hangs posed-but-unchained and reads as
+			// "squashed" (the struggle anim also clips her head through her hair). Talking rescues her -> she snaps to
+			// the standing idle. Until the chains actually render, skip the tableau so she just STANDS. Flip this back to
+			// true (record 2b + record 4b ApproachCasilda below) once #267's chains instantiate client-side.
+			const bool beachCagingTableau = false;
+			if (onBeach && beachCagingTableau)
 			{
 				var startCasildaScene = ScryScript.BuildStartScriptGroup(instance, 385910);
 				await new PacketStream()
@@ -97,7 +104,7 @@ namespace Faolan.GameServer
 			// beach logins, steering the player toward the chained Casilda. Same intro flow as the 385910 script group
 			// above. (The fuller retail beach-login sequence also has CombatTutorial before StartFixed3d; left out for
 			// now - add if the chains/gate need it.)
-			if (onBeach)
+			if (onBeach && beachCagingTableau)
 			{
 				var approachCasilda = ScryScript.BuildStep(instance, "ApproachCasilda");
 				await new PacketStream()

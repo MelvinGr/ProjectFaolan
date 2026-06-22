@@ -33,14 +33,10 @@ namespace Faolan.GameServer.Spawn
 			if (freshSpawn && read.Message.npc_stats != null)
 				read.Message.npc_stats.SpawnAnimation = 0;
 
-			// #184/#266/#267: Casilda hangs in the chains in retail. An OLD fix forced her Bcc idle anim to 156196, but
-			// a dump comparison (decode of her 0x642CD3D6 BehaviorCC + her FA015807 across EVERY beach capture) shows
-			// retail spawns her with the plain STANDING idle 42024 - 156196 appears in no capture - and the chained look
-			// is part of the beach DESTINY SCENE (the 004709 hangingwoman decor + a captive BehaviorCC 161594). That
-			// scene doesn't render on our construct path: the chain decor delivers byte-exact yet never instantiates
-			// client-side, so the captive pose just looks like floating. Until the chains render (a client-content/scene
-			// problem, see #267), she is left retail-exact STANDING here - no pose override (forcing 161594/156196 only
-			// looked wrong without the chains). See [[casilda_184_not_spawn_swap]].
+			// #267: Casilda's two captured idles both render wrong WITHOUT the chains: her own 156196 is the
+			// captive/hanging pose (correct only inside the `hangingwoman` chains, the open #267 client-content blocker),
+			// and the generic 42024 her cross-session capture carries renders standing-but-squashed on her rig. We leave
+			// her captured idle as-is; the real fix is the chains rendering (#267). See [[casilda_184_not_spawn_swap]].
 
 			// Worn equipment from DB rows (#185): rebuild the CharacterIIR f23 list from NpcSpawnEquipment instead of
 			// the captured Data blob's. Only when the row has lifted equipment - else the parsed (Data) list stands,

@@ -355,6 +355,18 @@ namespace Faolan.Importer
 				Routes: PatrolPathExtractor.ExtractByHandle(c.Packets))).ToList();
 			var allMaps = perCap.SelectMany(p => p.All.Select(e => e.MapId)).Distinct().ToList();
 
+			// Backfill appearance morphs across captures (#268): a unique humanoid (e.g. Casilda) can be picked from a
+			// capture whose post-IIR is the RUNTIME-LADEN form (movement/buff state, not the clean appearance table), so
+			// NpcSpawnAppearanceCodec.TryDecodeAppearance yields NO morphs for that body. With no morph rows the spawn
+			// builder ships that stale runtime post-IIR verbatim and the NPC renders DISTORTED (squashed / head through
+			// hair) until the client full-loads her on dialogue. Take the richest morph set seen for that NAME in ANY
+			// capture, so a chosen runtime-laden body still gets a CLEAN generated appearance post-IIR (the builder
+			// regenerates it from morph rows). Keyed by name (a unique quest NPC is one identity across all its spots).
+			var morphsByName = new Dictionary<string, IReadOnlyList<NpcAppearanceMorph>>();
+			foreach (var e in perCap.SelectMany(p => p.All))
+				if (e.Morphs.Count > 0 && (!morphsByName.TryGetValue(e.Name ?? "", out var cur) || e.Morphs.Count > cur.Count))
+					morphsByName[e.Name ?? ""] = e.Morphs;
+
 			var spawns = new List<NpcSpawnEntry>();
 			var patrols = new List<PatrolPathEntry>();
 
@@ -369,6 +381,11 @@ namespace Faolan.Importer
 					// quest NPC at a walk position (Casilda was captured at 6 spots caged->escort; she ended up ~24u from
 					// her cage). Override to her caged quest spot so a reseed keeps her there (#266).
 					var e = UniqueNpcHomes.TryGetValue(e0.Name ?? "", out var home) ? e0 with { X = home.X, Y = home.Y, Z = home.Z } : e0;
+					// Backfill a clean appearance for a body that decoded none (runtime-laden post-IIR), from any capture
+					// of the same NPC that did (#268) - so the spawn regenerates a clean appearance instead of replaying
+					// the stale runtime blob (the "distorted Casilda" bug).
+					if (e.Morphs.Count == 0 && morphsByName.TryGetValue(e.Name ?? "", out var backfillMorphs))
+						e = e with { Morphs = backfillMorphs };
 					spawns.Add(e);
 					if (routes.TryGetValue(e.Handle, out var r) && r.Waypoints.Count > 0)
 						patrols.Add(new PatrolPathEntry(e.MapId, new Vector3(e.X, e.Y, e.Z), r.Speed, r.Waypoints, 0, r.Body));
