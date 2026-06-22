@@ -15,14 +15,16 @@ namespace Faolan.GameServer.Spawn
 	// genuinely fresh scaffold). See docs/archive/player-spawn-generation-plan.md "VALIDATED GRAMMAR".
 	public static class PlayerSpawnScaffoldRows
 	{
-		// The closing [u16 tag][u32 value] entry-table record (the final entry-table entry). It is PER-CLASS, not a
-		// single constant - #250: stamping one class's closer on another crashes the client's character construction
-		// (in-client: a Necromancer carrying the Barbarian closer 0x56B6/0x12C crashes the loading screen; its own
-		// 0x4301/0x190 loads). The VALUE is the archetype index x 100 (Soldier=100, Priest=200, Rogue=300, Mage=400),
-		// solid across all eight captured classes. The TAG is class-specific (race-independent: a race-1 and a
-		// Stygian Necromancer both load with 0x4301); the five values below are read off each class's create capture
-		// (Captures/*_create). Classes with no create capture yet reuse a same-archetype tag as a best-effort - those
-		// are FIXME until their create spawn is captured (Captures/scripts can re-extract the closer per class).
+		// The closing [u16 tag][u32 value] entry-table record (the final entry-table entry). #250: stamping the WRONG
+		// closer crashes the client's character construction at world entry. The VALUE is the archetype index x 100
+		// (Soldier=100, Priest=200, Rogue=300, Mage=400), solid across all captured classes. The TAGs below are read
+		// off each class's own create capture (Captures/*_create, re-extract with parse_spawn_scaffold.py). NB the
+		// tag is NOT actually class-keyed: the captured tags are evenly spaced (~0x3F1 apart) and SHARED across class
+		// pairs (Guardian+DarkTemplar 0x4ED4, Barbarian+Conqueror 0x56B6, Ranger+PriestOfMitra 0x52C5, Necro+Demo
+		// 0x4301, BearShaman+HeraldOfXotli 0x46F2), which points at a race/appearance index, not class. These per-
+		// class values match each test character's race; a fresh char of a DIFFERENT race may still need a different
+		// tag -> decode the real key (#269). Assassin has no clean create self-spawn yet (keeps the rogue 0x56B6
+		// best-effort).
 		private static (ushort Tag, uint Value) FreshCloser(Class @class)
 		{
 			var value = @class switch
@@ -35,16 +37,20 @@ namespace Faolan.GameServer.Spawn
 
 			var tag = @class switch
 			{
-				Class.Barbarian => (ushort)0x56B6,
 				Class.Guardian => (ushort)0x4ED4,
+				Class.Conqueror => (ushort)0x56B6,
+				Class.DarkTemplar => (ushort)0x4ED4,
+				Class.Barbarian => (ushort)0x56B6,
+				Class.Ranger => (ushort)0x52C5,
 				Class.BearShaman => (ushort)0x46F2,
-				Class.HeraldOfXotli => (ushort)0x46F2,
+				Class.PriestOfMitra => (ushort)0x52C5,
+				Class.TempestOfSet => (ushort)0x5AA7,
 				Class.Necromancer => (ushort)0x4301,
-				// No create capture yet - reuse a captured class of the same archetype (FIXME: capture to confirm).
-				Class.Conqueror or Class.DarkTemplar => (ushort)0x4ED4,    // Guardian (soldier)
-				Class.Assassin or Class.Ranger => (ushort)0x56B6,          // Barbarian (rogue)
-				Class.PriestOfMitra or Class.TempestOfSet => (ushort)0x46F2, // BearShaman (priest)
-				_ => (ushort)0x4301                                        // Demonologist -> Necromancer (mage)
+				Class.Demonologist => (ushort)0x4301,
+				Class.HeraldOfXotli => (ushort)0x46F2,
+				// No clean create self-spawn captured yet - keep the rogue best-effort (FIXME: capture to confirm).
+				Class.Assassin => (ushort)0x56B6,
+				_ => (ushort)0x4301
 			};
 
 			return (tag, value);
@@ -73,10 +79,17 @@ namespace Faolan.GameServer.Spawn
 		private static readonly Dictionary<Class, uint[]> FreshSkillIdsByClass = new()
 		{
 			[Class.Barbarian] = [1800, 6000, 6100, 6200, 6300, 6600, 6800, 6900, 7100, 8100, 8305, 8400, 13600, 14600, 124400, 318400, 318800, 328700, 328900, 331300],
+			[Class.Conqueror] = [2200, 6000, 6100, 6200, 6300, 6700, 6800, 6900, 7100, 8100, 8305, 8400, 13600, 14600, 54900, 318400, 318800, 328700, 328900, 331300],
 			[Class.Guardian] = [2000, 6000, 6200, 6500, 6700, 6800, 6900, 7100, 7500, 8100, 8305, 8400, 13600, 14600, 24700, 328700, 328900, 331300],
+			[Class.DarkTemplar] = [3100, 6000, 6200, 6700, 6800, 6900, 7100, 7500, 7800, 8100, 8305, 8400, 13600, 14600, 74600, 328700, 328900, 331300],
 			[Class.BearShaman] = [2900, 6300, 6600, 6700, 6800, 6900, 7100, 8100, 8305, 8400, 13600, 14600, 244300, 328700, 328900, 331300],
+			[Class.PriestOfMitra] = [2400, 6000, 6200, 6400, 6700, 6800, 6900, 7100, 7500, 7800, 8100, 8305, 8400, 8900, 13600, 14600, 198000, 328900, 331300],
+			[Class.TempestOfSet] = [2800, 6000, 6200, 6400, 6500, 6600, 6700, 6800, 6900, 7100, 7500, 7800, 8100, 8305, 8400, 8900, 13600, 14600, 234600, 328900, 331300],
 			[Class.Assassin] = [3400, 6400, 6700, 6900, 8100, 8305, 8400, 13600, 14600, 160000, 318000, 328700, 328900, 331300],
+			[Class.Ranger] = [3900, 6000, 6200, 6400, 6600, 6700, 6900, 7100, 7500, 8100, 8305, 8400, 13600, 14600, 175000, 318000, 328700, 328900, 331300],
 			[Class.Necromancer] = [4100, 6400, 6700, 6800, 6900, 7800, 8100, 8305, 8400, 8900, 13600, 14600, 85200, 328900, 331300],
+			[Class.Demonologist] = [4400, 6400, 6700, 6800, 6900, 7800, 8100, 8305, 8400, 8900, 13600, 14600, 104500, 328900, 331300],
+			[Class.HeraldOfXotli] = [4300, 6100, 6400, 6700, 6800, 6900, 7800, 8100, 8305, 8400, 13600, 14600, 114800, 328700, 328900, 331300],
 		};
 
 		// The fresh feat list for a class: the captured retail list when we have one, else the profession feat
