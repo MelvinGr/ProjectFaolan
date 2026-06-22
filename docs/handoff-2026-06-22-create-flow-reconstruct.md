@@ -113,6 +113,27 @@ NB the full retail order is: editor drowning (autonomous) → editor changemap-p
 MapChange + beach cutscene (Kalanthes, callback-driven) → `IntroDone`/`StartFixed3d` → world entry (0x201c, AFTER
 the cutscene in retail; we do burst-less up-front, which works) → CombatTutorial/destiny tutorial → gameplay.
 
+## Camera diagnosis (2026-06-22, decoded from Blablabla create f1054-1071) — THE next step
+
+The stuck camera is the cinematic letterbox NOT releasing. Decoded retail's post-`IntroDone` sequence on the world
+connection (port 7020): `IntroDone`(1054) → `StartFixed3d`(1055, byte-identical to ours) → **`0x201c` world-entry
+handshake ×3 (1056-58) → `0x2020` (1059) → MoveTasks(1062-66) → FA015807(1069) → `0x2020`/`0x2008`(1070-71)**. So
+retail does the playable **world establishment (the `0x201c` 5-entry handshake + spawns) AFTER the cutscene** -
+that is what exits the cinematic and hands control to the player (then `CombatTutorial` etc. are player-progress
+driven, no Scry callbacks between 1055-1174). Our burst-less does the `0x201c`/spawn establishment UP FRONT (before
+the cutscene), so post-`IntroDone` the client never receives the "now playable" `0x201c` and stays letterboxed.
+
+**Fix (reorder to match retail) — REORDER REQUIRED, not a bolt-on (tested):** I tried bolting `Send0X201C` on
+AFTER `IntroDone`/`StartFixed3d` (case 4) - it did NOT release the cinematic. Reason: my create flow calls
+`SendBurstlessWorldEntry` directly (the existing-char path is `SendWorldEntry` = `Send0X201C` + burst-less, so my
+create flow was even missing the `0x201c` entirely), and burst-less establishes the PLAYER (FA015807 + snapshot +
+0x2024 + interest) UP FRONT, before the cutscene. So the client is established cinematically before the cutscene
+and a later `0x201c` can't re-transition it. The real fix is the REORDER: before the cutscene send ONLY the
+playfield scene (MapChange + world objects); defer the PLAYER world-establishment (`Send0X201C` + player FA015807 +
+snapshot + `0x2024` + NPC interest) to AFTER `IntroDone`/`StartFixed3d` (case 4), matching retail's f1056-1071. I.e.
+SPLIT `SendBurstlessWorldEntry` into `scene-setup` (before) + `player-entry` (after the cutscene). This is the
+remaining camera/control work; everything up to the shore is committed + working (commit 28c2a77).
+
 NB the editor "drowning" cutscene (playfield 4000) is client-autonomous; the per-class CLOSER fix (the 7
 borrowed-closer classes crash — Assassin/Ranger/Conqueror/DarkTemplar/Priest/Tempest/Herald) is a SEPARATE
 prerequisite for those classes (only Barbarian/Guardian/BearShaman/Necromancer have real closers today).
