@@ -647,6 +647,11 @@ namespace Faolan.Importer
 
 		private static async Task<int> Main(string[] args)
 		{
+			// --v2: the in-progress module-based importer (docs/importer-v2-plan.md). Non-breaking - the v1
+			// path below is untouched until the port is complete. Try `--v2 --list` / `--v2 --dry-run`.
+			if (args.Contains("--v2"))
+				return await V2.ImportCli.RunAsync(args);
+
 			var dbPath = GetOption(args, "--db") ?? Path.Combine(RepoRoot, "faolan.db");
 			var capturesDir = GetOption(args, "--captures") ?? Path.Combine(RepoRoot, "Captures");
 			var archiveDir = GetOption(args, "--archive"); // dir with aocdatabase.sql (one-time ability/spell defs) // TODO: old sql import support can be removed
@@ -1059,10 +1064,6 @@ namespace Faolan.Importer
 				Console.WriteLine($"  {key,-20} {b,7} {a,8} {deltaText,7}");
 			}
 		}
-
-		// A capture's packets plus its base filename (no extension) - the name lets per-capture rules (e.g.
-		// quest-state dialogue conditions, ConversationConditions) target a specific capture.
-		public sealed record NamedCapture(string Name, List<CapturedPacket> Packets);
 
 		private static string CaptureBaseName(string path, string suffix) => StripSuffix(Path.GetFileName(path), suffix);
 
