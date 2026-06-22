@@ -131,7 +131,7 @@ namespace Faolan.GameServer
 				.WriteUInt32(id)
 				.WriteArray(0x00, 0x00, 0x00, 0x12, 0x00, 0x00, 0x00, 0x17, 0x00, 0x17, 0x2B, 0x19)
 				.SendAsync(client);
-			await IirId(GameServer0X2000RespondsOpcodes.StatIIR, [0x00, 0x00, 0xC3, 0x50], 0x00, 0x00, 0x00, 0x03, 0x60, 0x00, 0x00, 0x00, 0x03);
+			await Iir(GameServer0X2000RespondsOpcodes.StatIIR, CreateEditorRecordBuilder.BuildStatIir(CreateEditorRecordBuilder.CharacterWireType, id, 0x00, 0x0360, 0x03)); // #189: was verbatim
 			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x0000012Cu));
 			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00000708u));
 			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00001770u));
@@ -212,7 +212,7 @@ namespace Faolan.GameServer
 					0x29, 0xE6, 0x27, 0xCA, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01)
 				.SendAsync(client);
 			await Iir(GameServer0X2000RespondsOpcodes.CharacterActionIIR, CreateEditorRecordBuilder.BuildCharacterActionIir(id, 0x00050E24u));
-			await IirId(GameServer0X2000RespondsOpcodes.EnergyIIR, [0x00, 0x00, 0xC3, 0x50], 0x01, 0x00, 0x00, 0x00, 0x08);
+			await Iir(GameServer0X2000RespondsOpcodes.EnergyIIR, CreateEditorRecordBuilder.BuildEnergyIir(CreateEditorRecordBuilder.CharacterWireType, id, 0x01, 0x08)); // #189: was verbatim
 			await Iir(GameServer0X2000RespondsOpcodes.RegenIIR, CreateEditorRecordBuilder.BuildRegenIir(id, 0x000007EE, 0, 0x00000415));
 			return;
 
@@ -223,18 +223,6 @@ namespace Faolan.GameServer
 					.WriteArrayUInt32Length(s => s
 						.WriteUInt32(iir)
 						.WriteArray(body))
-					.SendAsync(client);
-			}
-
-			Task IirId(GameServer0X2000RespondsOpcodes iir, byte[] prefix, params byte[] suffix)
-			{
-				return new PacketStream()
-					.WriteHeader(sender, receiver, GameServerCarrierOpcodes.IirCarrier)
-					.WriteArrayUInt32Length(s => s
-						.WriteUInt32(iir)
-						.WriteArray(prefix)
-						.WriteUInt32(id)
-						.WriteArray(suffix))
 					.SendAsync(client);
 			}
 		}
