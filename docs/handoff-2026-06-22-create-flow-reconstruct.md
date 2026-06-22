@@ -148,6 +148,36 @@ Decoded retail's world connection (`Blablabla_*` port 7020) AND our flow (`/tmp/
 In-client now: create → drowning → loading screen → wash ashore → BRIEF gameplay/GUI control → then the (conflicted,
 actorless) Kalanthes cutscene re-engages and sticks. Big progress; these two items finish it.
 
+## PATH A chosen (full faithful continuous intro) — concrete plan + foundation (2026-06-22)
+
+Confirmed it's a SINGLE continuous cinematic in retail (no control until the very end), and that the StartFixed3d
+de-dup (commit b6eb9d7) reduced our mid-cinematic control flicker. The two pieces, both now scoped:
+
+**(1) Cinematic actor-tagging (Kalanthes) — TRACTABLE, not a content block.** Kalanthes IS a renderable beach NPC
+(NpcSpawns Id 10641 @ 293.78,145.2,727.26) and is only 36u from the wash-ashore spawn (well inside the 150u
+interest range), so he's already streamed - the gap is the CINEMATIC ACTOR BINDING. `TagCharacterForCinematicScriptCommand`
+(`FUN_014514c0`) parses an `"object"` reference telling the cutscene WHICH entity it controls (the walk-up). We
+send `ThisIsKalanthes` with the CAPTURED refs (`f6Field1=50000, f6Field2=97795`) - the live flow needs the LIVE
+Kalanthes handle bound. NEXT: decode how the cutscene references the actor (is `ThisIsKalanthes` f6 the actor
+id/handle? or is there a separate `TagCharacterForCinematic` packet?). FINDING: `ThisIsKalanthes`'s `f6 =
+{50000=0xC350 type, 97795=0x17E03}` is a ProtoID, but `97795` is NOT a spawn handle (no `FA015807` carries it; our
+live Kalanthes handle is `0x296D6`) - it's a CINEMATIC SCRIPT-OBJECT id. So the binding is INDIRECT: the cutscene
+refers to script-object `97795`, and a separate `TagCharacterForCinematicScriptCommand` (inside a ScriptGroup) maps
+that script-object -> the live Kalanthes entity handle. NEXT: find/decode that tag command (search Blablabla_* for
+the Kalanthes handle `0x296D6`-equivalent near f658, and the ScriptGroup that carries the tag), then emit it bound
+to OUR live Kalanthes handle. This is genuine cinematic-script RE (the ScriptCommand system), not a quick re-address.
+Same pattern for the Casilda actor. The walk-up is then a server MoveTask for Kalanthes during the cinematic.
+
+**(2) The full continuous destiny tutorial.** Replay retail's post-IntroDone sequence (Blablabla_* port 7020 from
+f1055): `StartFixed3d → 0x201c → CombatTutorial → ApproachCasilda → LeaveCasilda → Level → QuestRewards → ...`,
+each step triggered by client callbacks / player progress (combat done, reached Casilda, quest turn-in). Extend
+`SendCreateCutsceneStep` past case 4 with these, driven by the corresponding callbacks. Control is handed over only
+at the END. This overlaps the existing-char beach destiny flow (PostReadyBurst's ApproachCasilda, #267) and the
+Casilda chain (#261) - unify them.
+
+This is a multi-step epic (cinematic-actor RE + the full tutorial replay), best continued as a focused effort with
+the Ghidra/decode tooling. Foundation + first step (the Kalanthes actor binding) are the entry point.
+
 ---
 (superseded note below) **Fix (reorder to match retail) — REORDER REQUIRED, not a bolt-on (tested):** I tried bolting `Send0X201C` on
 AFTER `IntroDone`/`StartFixed3d` (case 4) - it did NOT release the cinematic. Reason: my create flow calls
