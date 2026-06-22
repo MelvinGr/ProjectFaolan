@@ -58,6 +58,23 @@ final           = + a stat-0x17d scaling layer            // FUN_008d7080, vtabl
 4. **Per-property paths** — decode mana, damage, recast end-to-end as each subsystem needs real numbers
    (decode-on-demand beats boiling the whole engine at once).
 
+## Dynamic analysis (gdb) — works again + findings
+
+**Toolchain:** gdb attach needs Proton sync OFF. The launcher now sets `PROTON_NO_ESYNC=1` **and**
+`PROTON_NO_FSYNC=1` (Program.cs:317-318, commit 3ed9442) — Proton experimental-11 defaults `WINEFSYNC=1`,
+and fsync's futex2 waits deadlock when gdb suspends threads (this is why earlier sessions worked and a
+mid-session direct/stale launch hung). Also pass Wine signals through, else gdb stops on them instead of your
+breakpoints: `handle SIGUSR1 SIGUSR2 SIGSEGV SIG33 SIG34 SIG35 nostop noprint pass`. Avoid `finish` inside
+breakpoint commands (aborts under Wine); instead break at the function's RET and read EAX (EDI is callee-saved,
+so the field-id survives). Getter `FUN_008d6c80` RETs: `0x8d6c94` (early, returns 0) and `0x8d6d7c` (main).
+
+**Captured (casting Hellfire Breath, recast 2s / cast 2.5s):** at `0x8d6d7c` the getter returns field→value
+incl. **`0x126 → 250`** = cast time 2.5s (✓ confirms 0x126 = cast, centiseconds). The cast read-set also hits
+`0x4b 0x7e 0x222-0x226 0x2cd 0x1bf 0xc4 0xbc 0x227 0x36 0x11f` — most return 0 (not record fields).
+**Recast (2s / 200cs) never appears as a getter return** on cast → recast is NOT read via the stat getter; it's
+applied by the **cooldown subsystem** (a separate function, likely at cast-complete/lock-spell). That's the next
+target now that gdb works: breakpoint the cooldown/recast-timer set and read the value there.
+
 Ground truth for validation: L80-necro tooltip recasts in `Captures/spell_cooldowns_observed.tsv` (Chill 4s,
 Lifestrike R6 12s, Life Leech 30s, Unimaginable Terror R2 45s, Death's Terror 90s); combo level/cooldown in
 `Captures/ellatha_combos.tsv`.
