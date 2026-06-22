@@ -20,6 +20,16 @@ namespace Faolan.Core
         public static bool IsDebug => false;
 #endif
 
+		// Account "premium" (subscribed) flag. Decoded by diffing the faolan-account-login-{nopremium,premium}
+		// captures: the only per-account difference in the PlayerAgent character list (0x20EF) trailing block is
+		// the subscribed flag byte 0x81 -> 0x80 and the unlocked-character-slot count 4 -> 10. Enabled globally so
+		// every account is treated as subscribed (see SendCharacterList).
+		public static bool Premium = true;
+
+		// Unlocked character-slot cap advertised in the 0x20EF trailing block (premium when subscribed, else free).
+		public const uint PremiumCharSlots = 10;
+		public const uint FreeCharSlots = 4;
+
 		public static readonly string BuildConfiguration;
 		public static readonly DateTime BuildDateTimeUtc;
 		public static readonly string BuildString;
