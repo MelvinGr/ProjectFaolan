@@ -444,11 +444,10 @@ namespace Faolan.GameServer
 		}
 
 		// .cancelbuff <id> | .cancelbuff all  - cancel a server-tracked buff on the player. <id> accepts hex
-		// (0x000B9000 / 000B9000 / B9000) or decimal. Mirrors the inbound CancelBuff (0x201E) right-click path:
-		// removes the entry from the ActiveBuffs registry, which stops tick stat-effects / re-assertion and
-		// makes .buffs accurate. NB the CLIENT-side icon removal is DUMP-GATED: retail's server->client buff-
-		// removal/dispel IIR isn't decoded yet (no capture), so the icon clears on relog for now - the server
-		// cancel is real, only the live visual push is pending a buff-cancel capture (#221-adjacent).
+		// (0x000B9000 / 000B9000 / B9000) or decimal. Removes the entry from the ActiveBuffs registry (stops tick
+		// stat-effects / re-assertion, makes .buffs accurate) AND pushes the decoded server->client buff-removal
+		// (#253: the ApplySpell rank-1 "end" twin with an empty payload, from the mount-dismount captures) so the
+		// client clears the icon LIVE - no relog needed.
 		private async Task CancelBuffCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -470,11 +469,12 @@ namespace Faolan.GameServer
 			{
 				var ids = entity.ActiveBuffs.Keys.ToArray();
 				foreach (var id in ids)
-					entity.ActiveBuffs.TryRemove(id, out _);
+					if (entity.ActiveBuffs.TryRemove(id, out _))
+						await SendBuffRemoval(client, entity.Handle, id); // #253: live icon clear
 				Logger.LogInformation("CancelBuff (.cancelbuff all): removed {Count} buff(s) from {CharId:X8}.", ids.Length, characterId);
 				await _agentServerDispatcher.SendSystemMessage(characterId,
 					ids.Length > 0
-						? $"Cancelled {ids.Length} buff(s) server-side (relog to clear the icons - the client-removal packet isn't decoded yet)."
+						? $"Cancelled {ids.Length} buff(s)."
 						: "No server-tracked buffs to cancel.");
 				return;
 			}
@@ -489,9 +489,10 @@ namespace Faolan.GameServer
 
 			if (entity.ActiveBuffs.TryRemove(buffId, out _))
 			{
+				await SendBuffRemoval(client, entity.Handle, buffId); // #253: push the live buff-removal so the icon clears
 				Logger.LogInformation("CancelBuff (.cancelbuff): buff 0x{Buff:X8} removed from {CharId:X8}.", buffId, characterId);
 				await _agentServerDispatcher.SendSystemMessage(characterId,
-					$"Cancelled buff 0x{buffId:X8} server-side (relog to clear the icon - the client-removal packet isn't decoded yet).");
+					$"Cancelled buff 0x{buffId:X8}.");
 			}
 			else
 			{

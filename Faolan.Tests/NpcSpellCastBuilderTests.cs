@@ -27,6 +27,19 @@ namespace Faolan.Tests
 			Assert.Equal(golden, built);
 		}
 
+		// #253: the server->client buff-REMOVAL carrier is the same ApplySpell shape with the rank-1 "end" spell id
+		// and an EMPTY payload. Byte-exact against the mount buff end captured at dismount (mount 0x31eb15, end id
+		// 0x31eb1501, self-applied to/from player handle 0x0802e5d4 - NecroL80 *_dismount, frame 1449).
+		[Fact]
+		public void Build_EmptyPayload_IsTheBuffRemovalEndTwin()
+		{
+			var capturedCarrier = Convert.FromHexString("6b87e3160000c3500802e5d4000031eb15010000c3500802e5d4");
+
+			var built = NpcSpellCastBuilder.Build(applyTo: 0x0802e5d4, applyFrom: 0x0802e5d4, spellId: 0x31eb1501, payload: []);
+
+			Assert.Equal(capturedCarrier, built);
+		}
+
 		[Fact]
 		public void Build_NpcIsTheCaster_PlayerIsTheTarget()
 		{

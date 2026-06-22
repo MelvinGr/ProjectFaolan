@@ -125,11 +125,12 @@ namespace Faolan.GameServer.World
 		public bool InCombat { get; set; }
 
 		// Active buffs/effects on this entity, keyed by buff (spell) id - reapplying refreshes the entry.
-		// Server-side bookkeeping only for now: the client tracks icon + duration itself from the ApplySpell
-		// data, and retail sends NO removal IIR on CancelBuff (just a FormatFeedback text), so removal here is
-		// what makes the cancel real. Durations come from the RDB spell defs once imported (TODO 5); entries
-		// with one expire on the tick, the rest live until cancel/disconnect. Stat effects land with the same
-		// spell-def work.
+		// On a server-initiated cancel the server pushes the decoded buff-removal IIR (#253: the ApplySpell rank-1
+		// "end" twin with an empty payload) so the client clears the icon live. On the client-initiated CancelBuff
+		// (0x201E right-click) retail sends only a FormatFeedback text - the client removes its own icon - and a
+		// timed buff is expired client-side from the ApplySpell duration. Durations come from the RDB spell defs once
+		// imported (TODO 5); entries with one expire on the tick, the rest live until cancel/disconnect. Stat effects
+		// land with the same spell-def work.
 		public ConcurrentDictionary<uint, ActiveBuff> ActiveBuffs { get; } = new ConcurrentDictionary<uint, ActiveBuff>();
 
 		// For a player: the handles this player currently sees (has been sent a spawn for). Interest management diffs

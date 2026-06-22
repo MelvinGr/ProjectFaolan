@@ -472,6 +472,22 @@ namespace Faolan.GameServer
 			}
 		}
 
+		// The server->client buff REMOVAL packet (#253), decoded from the mount-dismount captures (mount buff end
+		// 0x31eb1501 in *_dismount): the SAME ApplySpell (0x6B87E316) carrier as the apply, but with the spell id's
+		// rank byte set to 1 (the "end" twin) and an EMPTY effect payload. The client clears the buff icon on
+		// receipt - so a SERVER-initiated cancel (.cancelbuff / a dispel) now removes the icon live instead of only
+		// on relog. Byte-exact carrier content (after the IIR [u32 len=0x1A]):
+		//   [ApplySpell][c350][applyTo][u16 0][(base<<8)|1][c350][applyFrom]   (no payload)
+		private Task SendBuffRemoval(INetworkClient client, uint handle, uint appliedSpellId)
+		{
+			var endId = (appliedSpellId & 0xFFFFFF00u) | 0x01u; // the rank-1 "end" twin of the applied buff id
+
+			return new PacketStream()
+				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteArrayUInt32Length(s => s.WriteArray(Combat.NpcSpellCastBuilder.Build(handle, handle, endId, [])))
+				.SendAsync(client);
+		}
+
 		private static Task ReportDimensionId(INetworkClient client, uint realmId, byte[] sender = null, byte[] receiver = null)
 		{
 			var sender0 = sender ?? LoginWorldSender;
