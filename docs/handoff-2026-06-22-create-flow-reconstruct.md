@@ -123,7 +123,33 @@ that is what exits the cinematic and hands control to the player (then `CombatTu
 driven, no Scry callbacks between 1055-1174). Our burst-less does the `0x201c`/spawn establishment UP FRONT (before
 the cutscene), so post-`IntroDone` the client never receives the "now playable" `0x201c` and stays letterboxed.
 
-**Fix (reorder to match retail) — REORDER REQUIRED, not a bolt-on (tested):** I tried bolting `Send0X201C` on
+## 2026-06-22 (cont.) — loopback-dump diff vs retail: the camera/cutscene tail is TWO issues
+
+Decoded retail's world connection (`Blablabla_*` port 7020) AND our flow (`/tmp/ourcreate` loopback):
+- **Retail establishes the FULL world entry BEFORE the cutscene** (MapChange + ~40 spawns + player SNAPSHOT f474 +
+  `0x2024` ReadyForPlay f619 + abilities), THEN starts the cutscene (f631). So my ORIGINAL order (burst-less up
+  front) is correct - the reorder (defer player) was WRONG and broke the loading-screen dismiss; reverted. The
+  `0x201c` handshake comes AFTER `IntroDone` (f1056) but a bare `Send0X201C` bolt-on there did NOT release the
+  cinematic.
+- **Our flow has a DUPLICATE `StartFixed3d`** (loopback f649) BEFORE `ClientLoadingDone` that retail lacks:
+  `PostReadyBurst` (the existing-char post-`0x205F` beach destiny burst - `StartFixed3d`/`ApproachCasilda`/...) is
+  ALSO flushing on the create-world connection (server log "Flushing pending post-0x205F follow-up") and CONFLICTS
+  with my cutscene overlay. That's the in-client "GUI for a bit, then cutscene mode starts again."
+- **Kalanthes the cutscene actor never renders** (in-client: "didn't see Kalanthes"), so the "Kalanthes walks up"
+  step sticks - the #185 scene-actor gap.
+
+**Remaining create-flow work (2 items):**
+1. Deconflict: on the create-world connection (`IsCreateWorldSession`), DON'T run `PostReadyBurst`'s destiny steps
+   (StartFixed3d / ApproachCasilda / the caging tableau) - my `SendCreateCutsceneStep` overlay owns the destiny
+   flow. Keep any genuinely-needed post-ready bits (abilities). Gate in `FlushPendingPost205FFollowUp`/PostReadyBurst.
+2. Render Kalanthes (and the scene actors) for the cutscene (#185) + cinematic actor-tagging
+   (`TagCharacterForCinematicScriptCommand`, docs/create-cutscene-camera-paths.md) so the walk-up plays.
+
+In-client now: create → drowning → loading screen → wash ashore → BRIEF gameplay/GUI control → then the (conflicted,
+actorless) Kalanthes cutscene re-engages and sticks. Big progress; these two items finish it.
+
+---
+(superseded note below) **Fix (reorder to match retail) — REORDER REQUIRED, not a bolt-on (tested):** I tried bolting `Send0X201C` on
 AFTER `IntroDone`/`StartFixed3d` (case 4) - it did NOT release the cinematic. Reason: my create flow calls
 `SendBurstlessWorldEntry` directly (the existing-char path is `SendWorldEntry` = `Send0X201C` + burst-less, so my
 create flow was even missing the `0x201c` entirely), and burst-less establishes the PLAYER (FA015807 + snapshot +
