@@ -61,41 +61,58 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 		}
 
-		// One cutscene step per client callback (ClientLoadingDone -> StartScript -> StartScript -> Move -> IntroDone),
-		// driving the beach/Kalanthes destiny sequence to IntroDone. Scry scripts only (no world content); the steps +
-		// args are the ones the verbatim chunks (SendNextCreateWorldChunk cases 0-4) carry.
-		internal async Task SendCreateCutsceneStep(INetworkClient client)
+		// One cutscene step per client callback, driving the beach/Kalanthes destiny sequence to IntroDone. This is a
+		// call-and-RESPONSE: decoded from Blablabla_* (port 7020), retail's world connection runs
+		//   C2S PlayResult                  -> S2C ThisIsKalanthes
+		//   C2S StartScript int=7088774     -> S2C StartGroup 7088774  (then, ~2.7s later, WelcomeTutorial)
+		//   C2S StartScript int=7124502     -> S2C StartGroup 7124502
+		//   C2S Move                        -> S2C Kneel
+		//   C2S IntroDone                   -> S2C StartFixed3d (+ StartGroup 7727158)
+		// The crucial bit: the client REQUESTS each script group by id (StartScript carries the id in field 3) and
+		// waits for the server to ECHO BACK a StartGroup with the SAME id before it actually runs the group. Group
+		// 7088774 is Kalanthes's welcome-dialogue group, so without that echoed confirmation the speech never plays.
+		// (The earlier counter-based version pushed StartGroup 7088774 prematurely on ClientLoadingDone and then
+		// answered the client's StartScript 7088774 with WelcomeTutorial instead of the StartGroup echo -> no speech.)
+		// `groupId` is the requested id from the StartScript callback (0 for the other lifecycle callbacks).
+		internal async Task SendCreateCutsceneStep(INetworkClient client, string token, uint groupId)
 		{
 			var id = client.Session.Account.ClientInstance;
-			switch (client.Session.CreateWorldChunkIndex++)
+			switch (token)
 			{
-				case 0:
+				case "PlayResult":
 					// #234 cinematic actor-binding: ThisIsKalanthes's f6 = {0xC350 type, <Kalanthes ENTITY HANDLE>} -
-					// it tells the cutscene which live entity is Kalanthes (the walk-up actor). Decoded from
-					// Blablabla_* f658 (f6Field2 = 0x2C1C, a world-entry spawn handle). The captured 97795 is the
-					// hoxxling session's handle - bind OUR live Kalanthes (streamed by EnsureZoneNpcs, within range)
-					// or fall back to the captured value if he isn't loaded.
-					await SendScry(client, ScryScript.BuildStep(id, "ThisIsKalanthes", mode: 2, f6Field1: 50000, f6Field2: LiveNpcHandle(client, "Kalanthes", 97795)));
+					// it tells the cutscene which live entity is Kalanthes (the walk-up + speech actor). Decoded from
+					// Blablabla_* f658 (f6Field2 = 0x2C1C = the live Kalanthes spawn handle, == the MoveTask handle).
+					// Bind OUR live Kalanthes (streamed by EnsureZoneNpcs, within range) or fall back if unloaded.
+					// Retail sends this in RESPONSE to PlayResult (AFTER the player commits to playing the cutscene) -
+					// binding BEFORE the cinematic starts (on ClientLoadingDone) loses the actor when it initialises.
+					await SendScry(client, ScryScript.BuildStep(id, "ThisIsKalanthes", mode: 2, f6Field1: 50000, f6Field2: LiveNpcHandle(client, "Kalanthes", 0x2c1c)));
 					// Position Kalanthes next to the washed-ashore player (his cutscene start), so the walk-up reads
-					// (his DB spawn is back by the rocks). The walk path itself follows on the Move callback (case 3).
+					// (his DB spawn is back by the rocks). The walk path itself follows on the Move callback.
 					await SendKalanthesMoveTask(client, KalanthesIntroTransform);
-					// Retail loads WelcomeTutorial's script group HERE (callback 0, with ThisIsKalanthes - capture
-					// f665), then plays the dialogue step on the next callback. Bundling them (group+step together)
-					// fired the step before its group was set up -> no dialogue.
-					await SendScry(client, ScryScript.BuildStartScriptGroup(id, 7088774));
 					break;
-				case 1:
-					await SendScry(client, ScryScript.BuildStep(id, "WelcomeTutorial", mode: 2));
+
+				case "ClientLoadingDone":
+					// World finished loading. Retail's beach binds the actor on PlayResult (above), not here - no-op.
 					break;
-				case 2:
-					await SendScry(client, ScryScript.BuildStartScriptGroup(id, 7124502));
+
+				case "StartScript":
+					// Echo back the StartGroup the client just requested (same id) - the confirmation that actually
+					// RUNS the group on the client. Retail sends exactly this in response to each StartScript.
+					await SendScry(client, ScryScript.BuildStartScriptGroup(id, groupId));
+					// 7088774 is Kalanthes's welcome-dialogue group; retail follows its StartGroup with the
+					// WelcomeTutorial step (~2.7s later, no triggering callback) - bundle it here, callback-driven.
+					if (groupId == 7088774)
+						await SendScry(client, ScryScript.BuildStep(id, "WelcomeTutorial", mode: 2));
 					break;
-				case 3:
-					// The Move callback: Kalanthes walks up to the player (f890 path), then kneels.
+
+				case "Move":
+					// Kalanthes walks up to the player (f890 path), then kneels.
 					await SendKalanthesMoveTask(client, KalanthesWalkPath);
 					await SendScry(client, ScryScript.BuildStep(id, "Kneel", mode: 2));
 					break;
-				case 4:
+
+				case "IntroDone":
 					await SendScry(client, ScryScript.BuildStep(id, "StartFixed3d", mode: 2));
 					await SendScry(client, ScryScript.BuildStartScriptGroup(id, 7727158));
 					break;

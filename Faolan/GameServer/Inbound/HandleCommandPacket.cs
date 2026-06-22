@@ -96,6 +96,7 @@ namespace Faolan.GameServer
 			var pbEnd = packet.Body.Position + pbLength;
 
 			uint numericValue = 0;
+			uint scryType = 0; // ProtoScryScriptIIR field 2 = message type (2=ScriptMessage, 8=PlayOrSkipResultPlay, ...)
 			string token = null;
 			string valueString = null;
 
@@ -110,7 +111,9 @@ namespace Faolan.GameServer
 					case 0: // varint
 					{
 						var v = ReadProtobufVarint(packet.Body);
-						if (field == 3)
+						if (field == 2)
+							scryType = (uint)v;
+						else if (field == 3)
 							numericValue = (uint)v;
 						break;
 					}
@@ -135,8 +138,17 @@ namespace Faolan.GameServer
 			}
 
 			var character = client.Session.Character;
-			Logger.LogInformation("Character-editor script callback: token={Token}, numericValue={NumericValue} (0x{NumericValueHex:X}), value={Value}, clientInstance={ClientInstance:X8}.", token, numericValue, numericValue,
+			Logger.LogInformation("Character-editor script callback: token={Token}, scryType={ScryType}, numericValue={NumericValue} (0x{NumericValueHex:X}), value={Value}, clientInstance={ClientInstance:X8}.", token, scryType, numericValue, numericValue,
 				valueString ?? "", clientInstance);
+
+			// #234: the beach cutscene's PlayOrSkipResultPlay (scryType 8) carries NO name token. On the create-world
+			// connection it's the cue to bind the cinematic actor - retail sends ThisIsKalanthes in RESPONSE to
+			// PlayResult (AFTER the player commits to playing the cutscene), not before. Route it explicitly.
+			if (token == null && scryType == 8 && IsCreateWorldConnection(client))
+			{
+				await SendCreateCutsceneStep(client, "PlayResult", 0);
+				return;
+			}
 
 			switch (token)
 			{
@@ -269,7 +281,7 @@ namespace Faolan.GameServer
 					// the editor interactive (the editor connection then drives itself; see the create flow).
 					if (IsCreateWorldConnection(client)) // #234 step2: drive the cutscene Scry steps over the burst-less world
 					{
-						await SendCreateCutsceneStep(client);
+						await SendCreateCutsceneStep(client, token, numericValue);
 						break;
 					}
 
@@ -277,14 +289,15 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				// The intro cutscene is delivered one chunk per client script trigger, in order
-				// (ClientLoadingDone -> StartScript -> StartScript -> Move -> IntroDone), matching retail.
+				// The intro cutscene is a call-and-response: each client script trigger
+				// (ClientLoadingDone -> StartScript(7088774) -> StartScript(7124502) -> Move -> IntroDone) gets the
+				// matching Scry response, with StartScript echoing the requested group id (numericValue / field 3).
 				case "ClientLoadingDone":
 				case "StartScript":
 				case "Move":
 				{
 					if (IsCreateWorldConnection(client)) // #234 step2: drive the cutscene Scry steps over the burst-less world
-						await SendCreateCutsceneStep(client);
+						await SendCreateCutsceneStep(client, token, numericValue);
 					break;
 				}
 

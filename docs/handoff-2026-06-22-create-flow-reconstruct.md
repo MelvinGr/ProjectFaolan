@@ -1,5 +1,90 @@
 # Handoff — Create-character flow reconstruct (#234)
 
+> ## UPDATE — session 3b (2026-06-22): SPEECH ROOT CAUSE = missing BehaviorControlCenter cutscene packets (client log: cinematic-state BCC error → playstockphraseassubtitle times out 60s)
+>
+> Two ScryScript fixes landed this session (both verified byte-exact vs retail via a fresh loopback capture +
+> `Captures/scripts/compare_create_cutscene.py`): (1) `StartGroup` now ECHOES the client's requested group id
+> (call-and-response), and (2) `ThisIsKalanthes` now fires on `PlayResult` (after the player commits to the
+> cutscene), not `ClientLoadingDone` — matching retail. Our whole ScryScript channel now matches retail exactly
+> (steps, order, echoes, resource preload list all identical). **Kalanthes STILL doesn't speak.**
+>
+> **THE ACTUAL BLOCKER (from the client's `AgeOfConan.log`, decisive):**
+> ```
+> ERROR: Camera - cinematiccam failed to set cinematic state with BCC error
+> PlayStockPhraseScriptCommand.cpp(103): ScriptGroup 'character_creation Tortage Beach (client-side)' (id=24063)
+>   Script 'controlcamera' (id=3) Command 'playstockphraseassubtitle' (id=40/43/110): Timed out after 60.0 seconds
+> ```
+> Kalanthes's speech is a CLIENT-side `playstockphraseassubtitle` (3 lines) inside client script group 24063's
+> `controlcamera` script. It times out after **60s** because the cinematic camera **can't set cinematic state — a
+> BCC (BehaviorControlCenter) error**. That 60s timeout is the "takes way too long / things eventually happen"
+> symptom. The speech is NOT a chat string and NOT a packet string (both correctly ruled out) — it's a stock
+> phrase the client plays once it's in cinematic state, which it never reaches.
+>
+> **What's missing:** during the beach cutscene retail sends ~60 **BehaviorControlCenter (`0x642CD3D6`)** packets to
+> the scene actors (decoded from Blablabla idx 668-1050): an opening burst (~668-710) puts every beach NPC into a
+> type-7 idle/frozen state (`...0a08c5c302180128183000`), then per-actor behavior updates drive the performers —
+> esp. one primary actor `0x2c4e` stepped through ~13 incrementing states (`18 01`→`18 0d`) and Kalanthes
+> (`0x2c1c`, idx 889). **We send ZERO BehaviorCC.** This is the long-flagged "verbatim residue: BehaviorCC" (#223)
+> / scene-actor gap (#185), now pinned as the exact speech blocker. Handle is at body[12:16] (re-addressable like
+> MoveTask); grammar in `docs/behaviorcontrolcenter-grammar.md` + `Captures/scripts/decode_behaviorcc.py`.
+>
+> **NEXT:** replay the cutscene's BehaviorControlCenter sequence re-addressed to our live handles, timed to the
+> callbacks. Open question: the BCCs target ~40 distinct captured scene-actor handles (`0x2c22`-`0x2c7c`); mapping
+> each to our live entity is the hard part. Likely need at minimum (a) the freeze-all-NPCs opening burst and (b)
+> Kalanthes's + the primary performer's per-state updates for the camera to enter cinematic state. Determine which
+> actor `0x2c4e` is (its FA015807 name in the capture) and whether the camera's cinematic state keys on Kalanthes,
+> the player, or a dedicated cinematic stand-in.
+>
+> Tooling now in place for every test: a loopback capture runs to `/tmp/faolan_test.pcapng`; convert with
+> `Captures/tshark_dump.sh` and diff with `Captures/scripts/compare_create_cutscene.py <ours.tshark.json>`.
+> Code this session: `CreateFlow/CreateWorldCutsceneScripts.cs` + `Inbound/HandleCommandPacket.cs`.
+> **Everything below predates session 3b.**
+
+> ## UPDATE — session 3 (2026-06-22): the speech blocker is a call-and-RESPONSE bug — StartGroup must ECHO the client's requested id (FIX landed, needs in-client test)
+>
+> Root-caused the "Kalanthes doesn't speak" blocker from the capture. Three corrections to session 2's notes, then the fix:
+>
+> **Session-2 claims that were WRONG:**
+> - *"NO server packets in the Kneel→IntroDone window."* FALSE — that window (Blablabla idx 734→1055) is full of
+>   server traffic: MoveTask `0x96C46740` ×87, BehaviorControlCenter `0x642CD3D6` ×29, RegenIIR ×14,
+>   GameActionList `0xF508F4C1` ×10, despawn ×10, StatIIR ×4, FeedbackIIR ×1. These drive Kalanthes's
+>   movement + talk/kneel ANIMATIONS. But (confirmed) **none carries the speech string** — the speech text/voice
+>   is client-side, run by RDB script group **7088774** (NOT a LuaArchive id; those are 1–2472). NPC chat does
+>   NOT ride AgentServer (the chat conn in that window = keepalives only). So the speech depends entirely on the
+>   client actually RUNNING group 7088774.
+> - The `WelcomeTutorial` Scry step IS byte-exact vs f734 (`f1=5,f2=2,f3=0,f4="WelcomeTutorial",f5="",f6={0,0}`);
+>   the `18 00` worry was just field-3 flag=0, which our default matches. NOT the bug.
+> - `ThisIsKalanthes` in THIS capture has `f6={50000, 11292}` and **11292 = 0x2C1C = the live Kalanthes handle**
+>   (== the `00002c1c` handle in our MoveTask bodies), confirming session-2 finding (A): f6Field2 IS the live
+>   entity handle. All our Scry steps are byte-exact + correctly live-addressed. The packets weren't the problem.
+>
+> **THE BUG (decoded from Blablabla port-7020 c2s↔s2c interleave):** the beach cutscene is a call-and-RESPONSE.
+> The client REQUESTS each script group by id and waits for the server to ECHO a `StartGroup` with the SAME id
+> before it runs the group:
+> ```
+> C2S PlayResult                -> S2C ThisIsKalanthes
+> C2S StartScript int=7088774   -> S2C StartGroup 7088774   (then ~2.7s later: WelcomeTutorial)
+> C2S StartScript int=7124502   -> S2C StartGroup 7124502
+> C2S Move                      -> S2C Kneel
+> C2S IntroDone                 -> S2C StartFixed3d (+ StartGroup 7727158)
+> ```
+> Our counter-based `SendCreateCutsceneStep` pushed `StartGroup 7088774` PREMATURELY on `ClientLoadingDone`, then
+> answered the client's `StartScript 7088774` request with `WelcomeTutorial` **instead of the `StartGroup 7088774`
+> echo**. So the client never got the confirmation that runs group 7088774 → no speech.
+>
+> **FIX (landed, builds, 4/4 golden tests pass — NOT yet in-client tested):** made the handler token-driven and
+> ECHO the requested group id. `SendCreateCutsceneStep(client, token, numericValue)` now:
+> `ClientLoadingDone → ThisIsKalanthes + intro MoveTask`; `StartScript → StartGroup(numericValue)` and, when the
+> id is 7088774, also `WelcomeTutorial`; `Move → walk MoveTask + Kneel`; `IntroDone → StartFixed3d + StartGroup
+> 7727158`. Files: `CreateFlow/CreateWorldCutsceneScripts.cs` + the two call sites in `Inbound/HandleCommandPacket.cs`.
+> The `CreateWorldChunkIndex` counter is no longer used by the live path (still used by the golden burst).
+>
+> **NEXT:** in-client test a create (verified class: Barbarian/Guardian/BearShaman/Necromancer) and watch whether
+> Kalanthes now speaks the WelcomeTutorial. If still silent: the ~2.7s delay before WelcomeTutorial may matter
+> (retail sends it well after the StartGroup, no callback) — try gating it on a later callback or a timer. Also
+> consider whether the client's `StartScript` request must be answered on the SAME framing it arrived on.
+> **Everything below this box predates session 3.**
+
 > ## UPDATE — session 2 (2026-06-22 PM): cutscene now PLAYS + lands playable; Kalanthes appears, walks up, but does NOT speak
 >
 > Big progress over the original symptom. The create flow now: black screen GONE → beach renders → the **retail
