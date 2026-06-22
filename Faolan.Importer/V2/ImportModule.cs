@@ -42,6 +42,10 @@ namespace Faolan.Importer.V2
 		// The input this module needs; absent input gates it out of a run.
 		ImportSource Source { get; }
 
+		// Whether this module runs in the default (no --only) set. RDB modules are opt-in by source; a capture
+		// module can also opt out (e.g. mounts, which v1 only seeds via a separate flag).
+		bool InDefaultSet => Source is ImportSource.Captures or ImportSource.Tsv;
+
 		// Module names that must run before this one (the runner resolves + topo-sorts these).
 		IReadOnlyList<string> DependsOn { get; }
 

@@ -14,6 +14,20 @@ namespace Faolan.Importer.V2
 		public required string CapturesDir { get; init; }
 		public string? RdbDir { get; init; }
 
+		// Raw packet bytes across every capture PLUS the loose *.bin files in the captures dir - the input the
+		// item/map/spell/ability importers scan (matches v1's `itemPackets`).
+		public required IReadOnlyList<byte[]> RawPackets { get; init; }
+
+		// Per create-flow capture (filename contains "creat"), its packet bytes - the source for the starting
+		// ability/spell kits (each capture's grants are attributed to the class it created).
+		public required IReadOnlyList<IReadOnlyList<byte[]>> CreateCaptures { get; init; }
+
+		// rdb-* module sub-options (from --cdn / --store / --dump-templates). Out-of-DB write paths (store,
+		// dump) must be suppressed under DryRun by the module.
+		public string? RdbCdnBase { get; init; }
+		public string? RdbStoreDir { get; init; }
+		public string? DumpTemplatesDir { get; init; }
+
 		// Global write strategy + optional per-module overrides (--mode npcs=overwrite,items=insert).
 		public WriteMode Mode { get; init; } = WriteMode.Upsert;
 		public IReadOnlyDictionary<string, WriteMode> ModeOverrides { get; init; } = new Dictionary<string, WriteMode>();

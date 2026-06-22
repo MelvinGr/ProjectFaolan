@@ -16,8 +16,7 @@ namespace Faolan.Importer.V2.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var packets = ctx.Captures.SelectMany(c => c.Packets.Select(p => p.Bytes)).ToList();
-			var (total, inserted) = await CaptureItemImporter.ImportAsync(ctx.Db, packets);
+			var (total, inserted) = await CaptureItemImporter.ImportAsync(ctx.Db, ctx.RawPackets);
 			return new ImportResult($"{total} item-candidate packets, {inserted} new.");
 		}
 	}

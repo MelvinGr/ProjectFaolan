@@ -67,6 +67,14 @@ namespace Faolan.Importer.V2
 
 			var plan = ModuleRegistry.Plan(requested);
 
+			// Hard-skip: a module named in --skip is removed even if a dependency pulled it back in (mirrors v1
+			// --skip-characters, where character-state/learned-spells still run against the already-present chars).
+			if (skip != null)
+			{
+				var skipNames = skip.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToHashSet(StringComparer.OrdinalIgnoreCase);
+				plan = plan.Where(m => !skipNames.Contains(m.Name)).ToList();
+			}
+
 			// RDB modules are opt-in and need --rdb; fail fast rather than silently skipping a requested module.
 			var missingRdb = plan.Where(m => m.Source == ImportSource.Rdb && rdbDir == null).Select(m => m.Name).ToList();
 			if (missingRdb.Count > 0)
@@ -77,7 +85,19 @@ namespace Faolan.Importer.V2
 
 			Console.WriteLine($"Faolan.Importer v2: db={dbPath}  captures={capturesDir}  rdb={rdbDir ?? "(none)"}");
 			var captures = LoadCaptures(capturesDir);
-			Console.WriteLine($"Read {captures.Count} captures.");
+
+			// Raw packet bytes across every capture PLUS the loose *.bin files (v1's `itemPackets`).
+			var rawPackets = captures.SelectMany(c => c.Packets.Select(p => p.Bytes)).ToList();
+			foreach (var bin in Directory.EnumerateFiles(capturesDir, "*.bin"))
+				rawPackets.Add(await File.ReadAllBytesAsync(bin));
+
+			// Per create-flow capture (filename contains "creat"), its packet bytes - the starting-kit source.
+			var createCaptures = captures
+				.Where(c => c.Name.Contains("creat", StringComparison.OrdinalIgnoreCase))
+				.Select(c => (IReadOnlyList<byte[]>)c.Packets.Select(p => p.Bytes).ToList())
+				.ToList();
+
+			Console.WriteLine($"Read {captures.Count} captures ({rawPackets.Count} raw packets, {createCaptures.Count} create-flow).");
 
 			var options = new DbContextOptionsBuilder<DatabaseContext>()
 				.UseSqlite($"Data Source={dbPath}", x => x.MigrationsAssembly("Faolan"))
@@ -91,6 +111,11 @@ namespace Faolan.Importer.V2
 				Captures = captures,
 				CapturesDir = capturesDir,
 				RdbDir = rdbDir,
+				RawPackets = rawPackets,
+				CreateCaptures = createCaptures,
+				RdbCdnBase = GetOption(args, "--cdn"),
+				RdbStoreDir = GetOption(args, "--store"),
+				DumpTemplatesDir = GetOption(args, "--dump-templates"),
 				Mode = mode,
 				ModeOverrides = overrides,
 				DryRun = dryRun,

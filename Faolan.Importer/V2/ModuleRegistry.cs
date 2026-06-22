@@ -10,26 +10,46 @@ namespace Faolan.Importer.V2
 	// grows as each is ported. Registration order is the stable tie-break for the topo sort.
 	public static class ModuleRegistry
 	{
+		// Registered in v1 default-run order so a no-flag --v2 run sequences the same as the old linear import
+		// (the topo sort is stable by this order). RDB + mounts are opt-in (InDefaultSet == false).
 		public static IReadOnlyList<IImportModule> All { get; } =
 		[
-			// --- capture modules (ported so far) ---
+			// --- capture modules ---
+			new ListingsModule(),
 			new ItemsModule(),
-			new ShopsModule(),
+			new MapsModule(),
+			new SpellsModule(),
+			new AbilitiesModule(),
+			new StartingSpellsModule(),
 			new CharactersModule(),
-			// TODO(importer-v2): listings, maps, spells, abilities, starting-spells, conversations,
-			// character-state, learned-spells, npcs, world-objects, world-bursts, quests, mounts.
-			// --- rdb modules (opt-in, require --rdb) ---
-			// TODO(importer-v2): rdb-inventory, rdb-morphs, rdb-spells, rdb-maps, rdb-lua, rdb-respawns, rdb-items.
+			new ConversationsModule(),
+			new CharacterStateModule(),
+			new LearnedSpellsModule(),
+			new ShopsModule(),
+			new NpcsModule(),
+			new WorldObjectsModule(),
+			new WorldBurstsModule(),
+			new QuestsModule(),
+			new MountsModule(),       // opt-in
 			// --- tsv modules ---
-			// TODO(importer-v2): ellatha-levels, ellatha-combos.
+			new EllathaLevelsModule(),
+			new EllathaCombosModule(),
+			// --- rdb modules (opt-in, require --rdb) ---
+			new RdbInventoryModule(),
+			new RdbMorphsModule(),
+			new RdbSpellsModule(),
+			new RdbMapsModule(),
+			new RdbLuaModule(),
+			new RdbRespawnsModule(),
+			new RdbItemsModule(),
 		];
 
 		public static IImportModule? Find(string name) =>
 			All.FirstOrDefault(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase));
 
-		// The default set when no --only is given: every non-RDB module (RDB is opt-in - see plan "Decisions").
+		// The default set when no --only is given: every module that opts in (RDB + mounts are opt-in).
 		public static IReadOnlyList<IImportModule> DefaultSet =>
-			All.Where(m => m.Source is ImportSource.Captures or ImportSource.Tsv).ToList();
+			All.Where(m => m.InDefaultSet).ToList();
 
 		// Expands a requested set with its transitive dependencies, then returns it in dependency order
 		// (deps before dependents). Registration order in All breaks ties so runs are deterministic.
