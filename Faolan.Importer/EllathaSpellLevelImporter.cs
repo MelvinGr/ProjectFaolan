@@ -64,5 +64,53 @@ namespace Faolan.Importer
 			logger?.LogInformation("EllathaSpellLevelImporter: {Rows} ellatha rows, {Matched} DB spells matched, {Updated} levels set.", rows, matched, updated);
 			return (rows, matched, updated);
 		}
+
+		// Backfills Level + Cooldown for COMBOS from the ellatha combos list. Combos are RDB type 1040005 (same as
+		// spells) and already live in the Spells table under their EXACT name (no rank suffix), so match by name and
+		// set both columns on every id-variant. The combos list is the one source carrying cooldown (recast, seconds).
+		// A combo name appears once per archetype with the same stats, so de-dup by name. Idempotent.
+		public static async Task<(int Combos, int Matched, int Updated)> ImportCombosAsync(IDatabaseContext db, string tsvPath, ILogger logger = null)
+		{
+			if (!File.Exists(tsvPath))
+			{
+				logger?.LogWarning("EllathaSpellLevelImporter: {Path} not found - skipping combo backfill.", tsvPath);
+				return (0, 0, 0);
+			}
+
+			// name -> (level, cooldownSeconds). TSV columns: name, level, cooldown, stamina, archetype.
+			var byName = new Dictionary<string, (byte Level, ushort Cooldown)>();
+			foreach (var line in await File.ReadAllLinesAsync(tsvPath))
+			{
+				if (line.Length == 0 || line[0] == '#')
+					continue;
+
+				var c = line.Split('\t');
+				if (c.Length < 3 || !int.TryParse(c[1], out var level))
+					continue;
+
+				int.TryParse(c[2], out var cd); // cooldown may be blank -> 0
+				byName[c[0]] = (level is > 0 and <= byte.MaxValue ? (byte)level : (byte)0,
+					cd is > 0 and <= ushort.MaxValue ? (ushort)cd : (ushort)0);
+			}
+
+			var names = byName.Keys.ToList();
+			var spells = await db.Spells.Where(s => names.Contains(s.Name)).ToListAsync();
+			var updated = 0;
+			foreach (var spell in spells)
+			{
+				var (level, cooldown) = byName[spell.Name];
+				if (spell.Level != level || spell.Cooldown != cooldown)
+				{
+					if (level != 0)
+						spell.Level = level;
+					spell.Cooldown = cooldown;
+					updated++;
+				}
+			}
+
+			await db.SaveChangesAsync();
+			logger?.LogInformation("EllathaSpellLevelImporter (combos): {Combos} combos, {Matched} DB rows matched, {Updated} updated.", byName.Count, spells.Count, updated);
+			return (byName.Count, spells.Count, updated);
+		}
 	}
 }

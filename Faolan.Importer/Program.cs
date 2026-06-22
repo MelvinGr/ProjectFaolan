@@ -959,6 +959,15 @@ namespace Faolan.Importer
 				Console.WriteLine($"Ellatha spell levels: {lv.Rows} rows, {lv.Matched} matched, {lv.Updated} levels set.");
 			}
 
+			// Combos are RDB 1040005 (already in Spells); backfill their level + cooldown (the combos list is the one
+			// source with cooldown). By exact name.
+			var ellathaCombos = Path.Combine(capturesDir, "ellatha_combos.tsv");
+			if (File.Exists(ellathaCombos))
+			{
+				var cb = await EllathaSpellLevelImporter.ImportCombosAsync(db, ellathaCombos);
+				Console.WriteLine($"Ellatha combos: {cb.Combos} combos, {cb.Matched} matched, {cb.Updated} updated (level+cooldown).");
+			}
+
 			if (rdbItems)
 			{
 				if (rdbDir == null)

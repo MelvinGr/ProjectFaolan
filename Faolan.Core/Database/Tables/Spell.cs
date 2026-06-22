@@ -20,6 +20,13 @@ namespace Faolan.Core.Database.Tables
 
 		public ushort ManaCost { get; set; }
 
+		// Recast / cooldown in SECONDS. Backfilled from the ellatha combos list (the one bulk source that carries it)
+		// by EllathaSpellLevelImporter for combo rows. Magic-spell cooldown is NOT in any bulk source (proven not in
+		// the RDB record, and not on ellatha's spell list), so it stays 0 for spells - capture key ones by hand from
+		// retail tooltips (Captures/spell_cooldowns_observed.tsv). Seconds (not ms like CastTime) to match the source
+		// and fit values like Death's Terror 90s in a ushort. (#78)
+		public ushort Cooldown { get; set; }
+
 		// Min/Max damage are NOT stored in the RDB spell-data base record - the client COMPUTES them per rank/level
 		// from the spell's damage rating + the caster's stats, so they cannot be backfilled (RdbSpellImporter leaves
 		// them 0). Use DamageRating + level scaling instead. Kept so the legacy column isn't dropped from existing

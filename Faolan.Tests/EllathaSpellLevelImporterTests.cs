@@ -68,6 +68,50 @@ namespace Faolan.Tests
 			}
 		}
 
+		[Fact]
+		public async Task ComboBackfill_SetsLevelAndCooldown_ByExactName()
+		{
+			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-combo-{Guid.NewGuid():N}.db");
+			var tsv = Path.Combine(Path.GetTempPath(), $"combo-{Guid.NewGuid():N}.tsv");
+			try
+			{
+				// combos list cols: name, level, cooldown, stamina, archetype (same combo repeats per class)
+				File.WriteAllText(tsv, string.Join("\n",
+					"# name\tlevel\tcooldown\tstamina\tarchetype",
+					"Sweep\t2\t10\t20\tGuardian",
+					"Sweep\t2\t10\t20\tConqueror",
+					"Slam\t4\t15\t22\tGuardian"));
+
+				await using (var db = NewContext(dbPath))
+				{
+					await db.Database.EnsureCreatedAsync();
+					db.Spells.Add(new Spell { Id = 1, Name = "Sweep", Level = 0, Cooldown = 0 }); // two id-variants
+					db.Spells.Add(new Spell { Id = 2, Name = "Sweep", Level = 0, Cooldown = 0 });
+					db.Spells.Add(new Spell { Id = 3, Name = "Slam", Level = 0, Cooldown = 0 });
+					db.Spells.Add(new Spell { Id = 4, Name = "Fireball", Level = 0, Cooldown = 0 }); // untouched
+					await db.SaveChangesAsync();
+
+					var (combos, matched, updated) = await EllathaSpellLevelImporter.ImportCombosAsync(db, tsv);
+					Assert.Equal(2, combos);   // Sweep, Slam (deduped by name)
+					Assert.Equal(3, matched);  // 2x Sweep + 1 Slam
+					Assert.Equal(3, updated);
+				}
+
+				await using (var db = NewContext(dbPath))
+				{
+					Assert.Equal((2, 10), (db.Spells.Single(s => s.Id == 1).Level, (int)db.Spells.Single(s => s.Id == 1).Cooldown));
+					Assert.Equal((2, 10), (db.Spells.Single(s => s.Id == 2).Level, (int)db.Spells.Single(s => s.Id == 2).Cooldown));
+					Assert.Equal((4, 15), (db.Spells.Single(s => s.Id == 3).Level, (int)db.Spells.Single(s => s.Id == 3).Cooldown));
+					Assert.Equal((0, 0), (db.Spells.Single(s => s.Id == 4).Level, (int)db.Spells.Single(s => s.Id == 4).Cooldown));
+				}
+			}
+			finally
+			{
+				File.Delete(dbPath);
+				File.Delete(tsv);
+			}
+		}
+
 		private static DatabaseContext NewContext(string path)
 		{
 			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={path}", x => x.MigrationsAssembly("Faolan"))
