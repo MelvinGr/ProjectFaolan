@@ -68,7 +68,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void FreshRows_WithoutBody_HaveNoMorphEntries()
 		{
-			// Class drives the per-class closer (#250): a Barbarian's closer is 0x56B6 / value 300 (rogue = archetype 3).
+			// The closer (#250/#269) is derived: value = archetype*100, tag = (feat count + 2)*0x3F1. A Barbarian has
+			// 20 fresh feats -> tag (20+2)*0x3F1 = 0x56B6, value 300 (rogue = archetype 3).
 			var character = new Character { Id = 0x02000006, Class = Faolan.Core.Enums.Class.Barbarian };
 			Assert.True(PlayerSpawnScaffoldRows.EnsureFreshRows(character));
 
@@ -76,6 +77,44 @@ namespace Faolan.Tests
 			var closer = character.Attributes.Single(a => a.Sequence == 6);
 			Assert.Equal(7u, closer.StatId);
 			Assert.Equal(0x56B6, closer.Tag);
+			Assert.Equal(300u, closer.Value);
+		}
+
+		// #269 (decoded over 117 retail player self-spawns, zero violations): the closer tag is NOT a per-class
+		// constant - it is a COUNT marker, tag = (feat/skill IdList length + 2) * 0x3F1. So a fresh character's closer
+		// tag must equal that formula for EVERY class (this is why a mismatched closer crashes - #250). Includes the
+		// Assassin (14 feats -> 0x3F10), whose earlier hardcoded 0x56B6 guess was wrong.
+		[Theory]
+		[InlineData(Faolan.Core.Enums.Class.Guardian)]
+		[InlineData(Faolan.Core.Enums.Class.Conqueror)]
+		[InlineData(Faolan.Core.Enums.Class.DarkTemplar)]
+		[InlineData(Faolan.Core.Enums.Class.Barbarian)]
+		[InlineData(Faolan.Core.Enums.Class.Assassin)]
+		[InlineData(Faolan.Core.Enums.Class.Ranger)]
+		[InlineData(Faolan.Core.Enums.Class.BearShaman)]
+		[InlineData(Faolan.Core.Enums.Class.PriestOfMitra)]
+		[InlineData(Faolan.Core.Enums.Class.TempestOfSet)]
+		[InlineData(Faolan.Core.Enums.Class.Necromancer)]
+		[InlineData(Faolan.Core.Enums.Class.Demonologist)]
+		[InlineData(Faolan.Core.Enums.Class.HeraldOfXotli)]
+		public void FreshCloser_TagIsDerivedFromFeatCount(Faolan.Core.Enums.Class @class)
+		{
+			var character = new Character { Id = 0x02000008, Class = @class };
+			Assert.True(PlayerSpawnScaffoldRows.EnsureFreshRows(character));
+
+			var closer = character.Attributes.OrderBy(a => a.Sequence).Last();
+			var expectedTag = (ushort)((character.Skills.Count + 2) * 0x3F1);
+			Assert.Equal(expectedTag, closer.Tag);
+		}
+
+		[Fact]
+		public void FreshCloser_Assassin_Is0x3F10()
+		{
+			var character = new Character { Id = 0x02000009, Class = Faolan.Core.Enums.Class.Assassin };
+			Assert.True(PlayerSpawnScaffoldRows.EnsureFreshRows(character));
+
+			var closer = character.Attributes.OrderBy(a => a.Sequence).Last();
+			Assert.Equal(0x3F10, closer.Tag);  // 14 feats -> (14+2)*0x3F1
 			Assert.Equal(300u, closer.Value);
 		}
 

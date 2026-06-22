@@ -16,15 +16,16 @@ namespace Faolan.GameServer.Spawn
 	public static class PlayerSpawnScaffoldRows
 	{
 		// The closing [u16 tag][u32 value] entry-table record (the final entry-table entry). #250: stamping the WRONG
-		// closer crashes the client's character construction at world entry. The VALUE is the archetype index x 100
-		// (Soldier=100, Priest=200, Rogue=300, Mage=400), solid across all captured classes. The TAGs below are read
-		// off each class's own create capture (Captures/*_create, re-extract with parse_spawn_scaffold.py). NB the
-		// tag is NOT actually class-keyed: the captured tags are evenly spaced (~0x3F1 apart) and SHARED across class
-		// pairs (Guardian+DarkTemplar 0x4ED4, Barbarian+Conqueror 0x56B6, Ranger+PriestOfMitra 0x52C5, Necro+Demo
-		// 0x4301, BearShaman+HeraldOfXotli 0x46F2), which points at a race/appearance index, not class. These per-
-		// class values match each test character's race; a fresh char of a DIFFERENT race may still need a different
-		// tag -> decode the real key (#269). Assassin has no clean create self-spawn yet (keeps the rogue 0x56B6
-		// best-effort).
+		// closer crashes the client's character construction at world entry. DECODED (#269, 117 player self-spawns
+		// across every capture, zero violations - parse_spawn_scaffold.py): the closer is fully DERIVED, not a
+		// per-class constant.
+		//   VALUE = archetype index x 100 (Soldier=100, Priest=200, Rogue=300, Mage=400).
+		//   TAG   = (feat/skill IdList length + 2) x 0x3F1.
+		// So the tag is a COUNT marker the client uses to read the feat list - which is exactly why a mismatched one
+		// crashes. It is race-independent (same class -> same fresh feat list -> same count -> same tag) and holds
+		// for feat counts from 14 (Assassin -> 0x3F10) up to 47 (leveled chars). The old per-class hardcoded tags
+		// happened to match only because each class's feat-list length is fixed; computing it is correct for every
+		// feat list (incl. Assassin, whose interim 0x56B6 guess was wrong - 14 feats -> 0x3F10).
 		private static (ushort Tag, uint Value) FreshCloser(Class @class)
 		{
 			var value = @class switch
@@ -35,24 +36,7 @@ namespace Faolan.GameServer.Spawn
 				_ => 400u                                                                // Mage
 			};
 
-			var tag = @class switch
-			{
-				Class.Guardian => (ushort)0x4ED4,
-				Class.Conqueror => (ushort)0x56B6,
-				Class.DarkTemplar => (ushort)0x4ED4,
-				Class.Barbarian => (ushort)0x56B6,
-				Class.Ranger => (ushort)0x52C5,
-				Class.BearShaman => (ushort)0x46F2,
-				Class.PriestOfMitra => (ushort)0x52C5,
-				Class.TempestOfSet => (ushort)0x5AA7,
-				Class.Necromancer => (ushort)0x4301,
-				Class.Demonologist => (ushort)0x4301,
-				Class.HeraldOfXotli => (ushort)0x46F2,
-				// No clean create self-spawn captured yet - keep the rogue best-effort (FIXME: capture to confirm).
-				Class.Assassin => (ushort)0x56B6,
-				_ => (ushort)0x4301
-			};
-
+			var tag = (ushort)((FreshSkillIdsFor(@class).Length + 2) * 0x3F1);
 			return (tag, value);
 		}
 
