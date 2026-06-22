@@ -950,6 +950,15 @@ namespace Faolan.Importer
 				Console.WriteLine($"RDB spells: {sp.Seen} named records, {sp.Inserted} new, {sp.NamesSet} names set, {sp.CastTimesSet} cast times set.");
 			}
 
+			// Backfill spell levels from the scraped ellatha list (level isn't in the RDB record). Runs whenever the
+			// TSV is present, independent of --rdb.
+			var ellathaTsv = Path.Combine(capturesDir, "ellatha_spells.tsv");
+			if (File.Exists(ellathaTsv))
+			{
+				var lv = await EllathaSpellLevelImporter.ImportAsync(db, ellathaTsv);
+				Console.WriteLine($"Ellatha spell levels: {lv.Rows} rows, {lv.Matched} matched, {lv.Updated} levels set.");
+			}
+
 			if (rdbItems)
 			{
 				if (rdbDir == null)
