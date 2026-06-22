@@ -1,6 +1,13 @@
 # Faolan.Importer v2 — Reimplementation Plan
 
-Status: **proposed** · Supersedes the original `docs/archive/faolan-importer-plan.md`.
+Status: **IMPLEMENTED** (2026-06-23) · Supersedes the original `docs/archive/faolan-importer-plan.md`.
+
+The importer is now module-based: `Program.Main` delegates to `Faolan.Importer.V2.ImportCli`. All capture/tsv
+modules ship in the default run, rdb-* + mounts are opt-in, `--dry-run`/`--mode`/`--only`/`--skip`/`--list`/
+`--report` are live, the archive importer is deleted, and a full v2 run is **byte-identical** to the old v1
+import (verified via `.dump` diff). Step 2a remains partially open: `WriteMode` is honoured at the orchestration
+level (npcs/world-bursts/conversations) but the leaf CaptureX importers still do their inherent upsert for
+insert/upsert — threading `ctx.Mode` into each is the one tracked follow-up (the modules advertise + warn).
 
 ## Why v2
 

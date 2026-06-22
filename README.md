@@ -63,7 +63,7 @@ See `docs/client-launcher.md` for the full flag set and the loopback-capture tes
 migrates and reads it. To rebuild its content from the packet captures and client RDB:
 
 ```sh
-dotnet run --project Faolan.Importer -- --skip-characters    # keep --skip-characters on a populated DB
+dotnet run --project Faolan.Importer -- --skip characters    # module-based; --list to see modules, --dry-run to preview
 ```
 
 ## Project layout

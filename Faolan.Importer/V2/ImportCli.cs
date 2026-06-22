@@ -21,13 +21,19 @@ namespace Faolan.Importer.V2
 			var capturesDir = GetOption(args, "--captures") ?? Path.Combine(RepoRoot, "Captures");
 			var rdbDir = GetOption(args, "--rdb");
 
+			// --report <name>: read-only diagnostics (no import, bypasses the runner).
+			var report = GetOption(args, "--report");
+			if (report != null)
+				return await ReportCli.RunAsync(args, report);
+
 			// --list: catalog the modules and exit (no DB needed).
 			if (args.Contains("--list"))
 			{
 				Console.WriteLine("Importer v2 modules:");
 				foreach (var m in ModuleRegistry.All)
-					Console.WriteLine($"  {m.Name,-18} [{m.Source}]  {m.Description}"
+					Console.WriteLine($"  {m.Name,-18} [{m.Source}]{(m.InDefaultSet ? "" : " (opt-in)")}  {m.Description}"
 						+ (m.DependsOn.Count > 0 ? $"  (needs: {string.Join(", ", m.DependsOn)})" : ""));
+				Console.WriteLine("\nReports (read-only): --report conversation-states | anim | burst-coverage | worldobj  [--report-arg <name>]");
 				return 0;
 			}
 
