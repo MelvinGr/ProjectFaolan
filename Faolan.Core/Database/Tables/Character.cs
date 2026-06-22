@@ -156,10 +156,11 @@ namespace Faolan.Core.Database.Tables
 
 		// Class/level vitals. The LEVEL-1 values are anchored to the retail character sheet (read off the live
 		// client 2026-06-17, cross-checked against the world-entry FullChar snapshot stat block - see
-		// docs/handoff-2026-06-17-perclass-snapshot.md): Guardian 130/0/179, Assassin 98/0/236, Necromancer
-		// 89/246/0, Bear Shaman 108/171/178 (HP/Mana/Stamina). The classes WITHOUT a captured sheet yet
-		// (Dark Templar, ranged Priests, Herald of Xotli) keep ESTIMATES, flagged below. Which pools a class HAS
-		// matches memory class_resource_mana_stamina (a 0 anchor zeroes the pool so the client hides that bar).
+		// docs/handoff-2026-06-17-perclass-snapshot.md and #242): Guardian 130/0/179, Conqueror 168/0/178, Dark
+		// Templar 128/281/178, Assassin 98/0/236, Necromancer 89/246/0, Bear Shaman 108/171/178, Priest of Mitra
+		// 88/171/0 (HP/Mana/Stamina). The classes WITHOUT a captured sheet yet (Ranger, Tempest of Set, Herald of
+		// Xotli) keep ESTIMATES, flagged below. Which pools a class HAS matches memory class_resource_mana_stamina
+		// (a 0 anchor zeroes the pool so the client hides that bar).
 		// PER-LEVEL growth is still rough (no multi-level captures yet); only L1 is authoritative.
 		public static CharacterMaxStats CreateDefaults(Class @class, ushort level)
 		{
@@ -207,14 +208,18 @@ namespace Faolan.Core.Database.Tables
 		{
 			switch (@class)
 			{
-				// Melee Soldiers - STAMINA ONLY. Retail L1: Guardian HP 130 (base 120), Stamina 179.
+				// Melee Soldiers - STAMINA ONLY. Retail L1 (login snapshots, #242): Guardian HP 130 (base 120) /
+				// Stam 179, Conqueror HP 168 (base 160) / Stam 178.
 				case Class.Guardian:
-				case Class.Conqueror:
 					return (130, 60, 0, 0, 179, 54, 120);
 
-				// Dark Templar - Soldier hybrid, BOTH (ESTIMATE: no sheet captured yet).
+				case Class.Conqueror:
+					return (168, 60, 0, 0, 178, 54, 160);
+
+				// Dark Templar - Soldier hybrid, BOTH. Retail L1 (login snapshot, #242): HP 128 (base 120),
+				// Mana 281, Stamina 178.
 				case Class.DarkTemplar:
-					return (120, 60, 120, 30, 170, 54, 112);
+					return (128, 60, 281, 30, 178, 54, 120);
 
 				// Rogues - STAMINA ONLY. TWO captured points (Assassin): L1 HP 98 (base 90) / Stam 236 (Strie), L23 HP
 				// 1270 / Stam 736 (AssassinL23) -> growth ~53.3 HP, ~22.7 Stam per level.
@@ -223,8 +228,12 @@ namespace Faolan.Core.Database.Tables
 				case Class.Ranger:
 					return (98, 53, 0, 0, 236, 23, 90);
 
-				// Ranged Priests - MANA ONLY (ESTIMATE: no sheet captured yet).
+				// Priest of Mitra - ranged Priest, MANA ONLY. Retail L1 (login snapshot, #242): HP 88 (base 80),
+				// Mana 171, no stamina pool.
 				case Class.PriestOfMitra:
+					return (88, 45, 171, 30, 0, 0, 80);
+
+				// Tempest of Set - ranged Priest, MANA ONLY (ESTIMATE: no sheet captured yet).
 				case Class.TempestOfSet:
 					return (95, 45, 200, 30, 0, 0, 87);
 
