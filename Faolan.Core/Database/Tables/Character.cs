@@ -157,10 +157,10 @@ namespace Faolan.Core.Database.Tables
 		// Class/level vitals. The LEVEL-1 values are anchored to the retail character sheet (read off the live
 		// client 2026-06-17, cross-checked against the world-entry FullChar snapshot stat block - see
 		// docs/handoff-2026-06-17-perclass-snapshot.md and #242): Guardian 130/0/179, Conqueror 168/0/178, Dark
-		// Templar 128/281/178, Assassin 98/0/236, Necromancer 89/246/0, Bear Shaman 108/171/178, Priest of Mitra
-		// 88/171/0 (HP/Mana/Stamina). The classes WITHOUT a captured sheet yet (Ranger, Tempest of Set, Herald of
-		// Xotli) keep ESTIMATES, flagged below. Which pools a class HAS matches memory class_resource_mana_stamina
-		// (a 0 anchor zeroes the pool so the client hides that bar).
+		// Templar 128/281/178, Assassin 98/0/236, Necromancer 89/246/0, Demonologist 89/246/0, Bear Shaman
+		// 108/171/178, Priest of Mitra 88/171/0, Tempest of Set 88/171/0 (HP/Mana/Stamina). The classes WITHOUT a
+		// captured sheet yet (Ranger, Herald of Xotli) keep ESTIMATES, flagged below. Which pools a class HAS
+		// matches memory class_resource_mana_stamina (a 0 anchor zeroes the pool so the client hides that bar).
 		// PER-LEVEL growth is still rough (no multi-level captures yet); only L1 is authoritative.
 		public static CharacterMaxStats CreateDefaults(Class @class, ushort level)
 		{
@@ -228,14 +228,11 @@ namespace Faolan.Core.Database.Tables
 				case Class.Ranger:
 					return (98, 53, 0, 0, 236, 23, 90);
 
-				// Priest of Mitra - ranged Priest, MANA ONLY. Retail L1 (login snapshot, #242): HP 88 (base 80),
-				// Mana 171, no stamina pool.
+				// Ranged Priests - MANA ONLY. Retail L1 (login snapshots, #242): Priest of Mitra and Tempest of Set
+				// both HP 88 (base 80) / Mana 171 / no stamina pool.
 				case Class.PriestOfMitra:
-					return (88, 45, 171, 30, 0, 0, 80);
-
-				// Tempest of Set - ranged Priest, MANA ONLY (ESTIMATE: no sheet captured yet).
 				case Class.TempestOfSet:
-					return (95, 45, 200, 30, 0, 0, 87);
+					return (88, 45, 171, 30, 0, 0, 80);
 
 				// Bear Shaman - Priest melee hybrid, BOTH. Retail L1: HP 108 (base 100), Mana 171, Stamina 178.
 				case Class.BearShaman:
@@ -245,7 +242,8 @@ namespace Faolan.Core.Database.Tables
 				case Class.HeraldOfXotli:
 					return (95, 38, 200, 40, 150, 32, 87);
 
-				// Pure Mages - MANA ONLY. Retail L1 (Necromancer): HP 89 (base 80), Mana 246.
+				// Pure Mages - MANA ONLY. Retail L1 (login snapshots, #242): Necromancer and Demonologist both HP 89
+				// (base 80) / Mana 246 / no stamina pool.
 				case Class.Demonologist:
 				case Class.Necromancer:
 					return (89, 38, 246, 40, 0, 0, 80);
