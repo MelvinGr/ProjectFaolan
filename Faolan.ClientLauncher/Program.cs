@@ -315,6 +315,7 @@ namespace Faolan.ClientLauncher
 
 				SetIfUnset(psi, "PROTON_USE_WINED3D", "1");
 				SetIfUnset(psi, "PROTON_NO_ESYNC", "1");
+				SetIfUnset(psi, "PROTON_NO_FSYNC", "1");
 			}
 
 			foreach (var a in launchArgs)
