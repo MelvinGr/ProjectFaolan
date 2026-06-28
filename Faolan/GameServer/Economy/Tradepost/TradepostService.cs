@@ -469,6 +469,10 @@ namespace Faolan.GameServer.Economy.Tradepost
 			await _database.RemoveMailAttachment(mailId, attachment.ItemInstanceId);
 			mail.Attachments.Remove(attachment);
 			await TradepostResponses.SendMailMessage(client, mail, includeAttachments: false, inst);
+			// Complete the take with a result ack, mirroring MarkMailRead (#213): without it the client's mail-op state
+			// machine stays mid-take, so the FIRST delete click after a retrieve is swallowed (the mail survives until the
+			// mailbox is reopened, which resets that state); the ack lets the delete go through on the first try.
+			await TradepostResponses.SendMailResult(client, success: true, error: 0, inst);
 
 			_logger.LogInformation("Tradepost mail: {Char} took item (template {Template}) from mail 0x{Mail:X16} into bag slot {Slot}.",
 				character.Name, attachment.Template, mailId, slot);
