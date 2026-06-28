@@ -5,8 +5,10 @@ using Faolan.Core.Data;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.GameServer.Spawn;
+using ProtoBuf;
 
 namespace Faolan.Importer.Extractors
 {
@@ -58,6 +60,31 @@ namespace Faolan.Importer.Extractors
 			catch
 			{
 				// not a parseable shop packet
+			}
+
+			// Fourth source: loot bags (LootBagFullUpdateIIR 0xF096251E) - the bag's ProtoLootBagIIR inventory holds the
+			// same ProtoAcgItem identities, so the items only ever seen as loot (e.g. the Casilda chain key) get into the
+			// Items table too. Unlike the buildable sources, archetype-0 loot items are kept (quest keys have none).
+			try
+			{
+				ExtractFromLootBag(packetBytes, found);
+			}
+			catch
+			{
+				// not a parseable loot-bag packet
+			}
+
+			// Fifth source: live DispatchAddItem (0x2020) - its inventoryID container type IS the item's kind (0x68 Bag /
+			// 0x71 Quest), so a quest key delivered to the quest tab is TYPED Quest from data (no domain-knowledge guess).
+			// This is the only source that types an item the snapshot never showed in its quest container (the key only
+			// arrives via this live add in the chain captures). Carries `types` so the classification reaches the upsert.
+			try
+			{
+				ExtractFromAddItem(packetBytes, found, types);
+			}
+			catch
+			{
+				// not a parseable add-item packet
 			}
 
 			foreach (var (template, item) in found)
@@ -132,6 +159,65 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var e in ShopContentCodec.Parse(body).Entries)
 				into.TryAdd(e.Template, new CapturedItem(e.Data1, e.Data2, e.Data3, e.Data4, e.Archetype));
+		}
+
+		// Recovers (template -> CapturedItem) from a loot bag IIR carrier (0x2000 packet whose payload sub-opcode is
+		// 0xF096251E). The trailing ProtoLootBagIIR's inventory entries each carry a ProtoAcgItem (Key1 = the quad,
+		// Template1 = the id, Hash = the archetype) - identical to the snapshot/spawn sources. Archetype 0 is kept here
+		// (quest keys legitimately have none), so the item still lands in the DB even though it won't render in a snapshot.
+		private static void ExtractFromLootBag(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
+		{
+			var packet = new ConanPacket(packetBytes);
+			if (packet.Opcode != 0x2000)
+				return;
+
+			var payload = packet.Body.ReadArrayUInt32Length();
+			var s = new FaolanStream(payload);
+			if (s.ReadUInt32() != LootBagMessageCodec.SubOpcode)
+				return;
+
+			if (!LootBagMessageCodec.TryParse(payload.AsSpan(4), out var contents, out _) || contents?.Inventory?.Items == null)
+				return;
+
+			foreach (var listEntry in contents.Inventory.Items)
+			{
+				var acg = listEntry.Item?.ItemData;
+				if (acg?.Key1 == null || acg.Template1 == 0)
+					continue;
+				into.TryAdd(acg.Template1, new CapturedItem(acg.Key1.Key1, acg.Key1.Key2, acg.Key1.Key3, acg.Key1.Key4, acg.Hash));
+			}
+		}
+
+		// Recovers (template -> CapturedItem) AND the item's TYPE from a live DispatchAddItem (GameCharInterface s2c
+		// 0x2020). Its inventoryID's container type IS the item's kind (the protocol numbers equal ItemType/ContainerKind:
+		// 0x68 = 104 Bag/Normal, 0x71 = 113 Quest), so the Casilda chain key - delivered to the quest tab via a live 0x71
+		// add and NEVER present in any snapshot quest container - is typed Quest straight from the wire, no hardcoded
+		// override. Body grammar mirrors WriteAddItemBody: [u32 containerType][u32 charId][u32 itemPos][u32 len + entry]
+		// [u32 feedback]; the entry is a bare ProtoInventoryGameEntry (no Pos wrapper).
+		private static void ExtractFromAddItem(byte[] packetBytes, IDictionary<uint, CapturedItem> into, IDictionary<uint, ItemType> types)
+		{
+			var packet = new ConanPacket(packetBytes);
+			if (packet.Opcode != 0x2020)
+				return;
+
+			var body = packet.Body;
+			var containerType = body.ReadUInt32();
+			body.ReadUInt32(); // charId
+			body.ReadUInt32(); // itemPos
+			var entryBytes = body.ReadArrayUInt32Length();
+
+			var entry = Serializer.Deserialize<ProtoInventoryGameEntry>(entryBytes.AsMemory());
+			var acg = entry?.ItemData;
+			if (acg?.Key1 == null || acg.Template1 == 0)
+				return;
+
+			into.TryAdd(acg.Template1, new CapturedItem(acg.Key1.Key1, acg.Key1.Key2, acg.Key1.Key3, acg.Key1.Key4, acg.Hash));
+
+			// Only record the specific kinds (Quest/Resource); Normal items are left to the DB default so this never
+			// downgrades an item another source already classified.
+			var type = (ItemType)containerType;
+			if (types != null && Enum.IsDefined(typeof(ItemType), type) && type != ItemType.Normal)
+				types[acg.Template1] = type;
 		}
 
 		private static void ExtractFromSpawnEquipment(byte[] packetBytes, IDictionary<uint, CapturedItem> into)

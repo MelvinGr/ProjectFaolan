@@ -155,15 +155,9 @@ namespace Faolan.Importer.Captures
 			if (goal.Sequence == 0)
 				goal.Sequence = 1;
 
-			// Force the key item's Type to Quest (113) so it files into the player's QUEST tab on loot/relog (#261).
-			// ArchetypeHarvester can only infer an item's Type from the container a CAPTURE happened to show it in, and
-			// no capture has the Scavenger's Key in a quest tab, so it defaulted to Normal - domain-knowledge override.
-			if (questItemId != 0)
-			{
-				var keyItem = await db.Items.FirstOrDefaultAsync(i => i.Id == questItemId);
-				if (keyItem != null)
-					keyItem.Type = ItemType.Quest;
-			}
+			// NB the key item's Type (Quest 113) is NOT forced here - the `items` module types it from data: the chain
+			// captures deliver the key via a live DispatchAddItem (0x2020) to the 0x71 quest container, which
+			// ArchetypeHarvester.ExtractFromAddItem reads as ItemType.Quest. Run the `items` module to (re)type it.
 
 			await db.SaveChangesAsync();
 			Console.WriteLine($"Seeded chain stage: quest {questId} = {goalType} '{target}' (goal {goalId}, required {required}, keyItem {questItemId}) -> {nextQuestId}.");
