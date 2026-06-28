@@ -1003,20 +1003,24 @@ namespace Faolan.GameServer
 				"Sent a world/system chat line (ChatTextIIR 0xE0B51102).");
 		}
 
-		// .npcsay - CONSTRUCT a Knubot dialogue line (KnubotAppendTextIIR) from the live endpoints and push it to the
-		// player, addressed to its current conversation NPC (or itself as a fallback handle): opens the chat window then
-		// appends the captured greeting, rebuilt byte-for-byte by KnubotCodec. The test bootstrap for the #188 construct
-		// path (vs ConversationService's verbatim ConversationPacket replay). NEEDS IN-CLIENT VERIFICATION.
+		// .npcsay - re-serve the player's CURRENT conversation NPC's greeting through the real dialogue VM
+		// (ConversationService.ServeGreeting: PickConversationScreen -> ServeScreen, constructed via KnubotCodec from the
+		// conversation DB). Folds the old captured-sample bootstrap into #188 - it now exercises the production path on
+		// real DB dialogue, not a baked line. Requires an active conversation (open one by talking to an NPC first).
 		private async Task NpcSayCommand(INetworkClient client)
 		{
-			var npcHandle = client.Session.ConversationNpcHandle != 0
-				? client.Session.ConversationNpcHandle
-				: client.Session.Account.ClientInstance;
+			var session = client.Session;
+			if (session.ConversationNpcName == null || session.ConversationNpcHandle == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(session.Character.Id,
+					".npcsay: talk to an NPC first - this re-serves that NPC's greeting through the dialogue VM (#188).");
+				return;
+			}
 
-			await _broadcaster.SendKnubotOpenChatWindow(client, npcHandle);
-			await _broadcaster.SendKnubotAppendText(client, npcHandle, Dialogue.KnubotSampleLine.RemoteFormatXml);
-			await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
-				"Sent a constructed Knubot dialogue line (KnubotAppendTextIIR 0x4A3D899A).");
+			var served = await _conversation.ServeGreeting(client, session.ConversationNpcName, session.ConversationTypeId, session.ConversationNpcHandle);
+			await _agentServerDispatcher.SendSystemMessage(session.Character.Id, served
+				? $"Re-served {session.ConversationNpcName}'s greeting via the dialogue VM (constructed)."
+				: $"No conversation screen for {session.ConversationNpcName}.");
 		}
 
 		// .quest add|remove <id> | .quest list  - manage the player's quest journal. `add` records the quest +

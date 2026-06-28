@@ -35,12 +35,13 @@ namespace Faolan.Tests
 				Convert.ToHexStringLower(KnubotCodec.BuildAppendText(p.PlayerInstance, p.NpcHandle, p.Xml, p.Field, p.Trailing, p.Env)));
 		}
 
-		// The .npcsay GM sample (#188 construct path) is the faithful XML of the captured greeting: building it for the
-		// captured endpoints must reproduce the captured AppendText body byte-for-byte.
+		// The captured greeting's XML (#188 construct path): building it for the captured endpoints must reproduce the
+		// captured AppendText body byte-for-byte. The XML oracle now lives in the test project (KnubotCodecTestData);
+		// the runtime serves real dialogue from the conversation DB (ConversationService), not a baked sample.
 		[Fact]
-		public void NpcSaySample_BuildsTheCapturedLine()
+		public void CapturedGreetingXml_BuildsTheCapturedLine()
 		{
-			var rebuilt = KnubotCodec.BuildAppendText(0x110099BDu, 0x00042194u, Faolan.GameServer.Dialogue.KnubotSampleLine.RemoteFormatXml);
+			var rebuilt = KnubotCodec.BuildAppendText(0x110099BDu, 0x00042194u, KnubotCodecTestData.RemoteFormatXml);
 			Assert.Equal(KnubotCodecTestData.AppendTextBody, Convert.ToHexStringLower(rebuilt));
 		}
 

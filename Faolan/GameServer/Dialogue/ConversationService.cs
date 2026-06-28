@@ -439,6 +439,19 @@ namespace Faolan.GameServer.Dialogue
 			return true;
 		}
 
+		// Serves `npcName`'s greeting screen through the live CONSTRUCT path (PickConversationScreen -> ServeScreen,
+		// rebuilt via KnubotCodec re-addressed to `npcHandle`) - the #188 dialogue-VM entry the .npcsay GM command reuses
+		// instead of replaying a baked captured line. Returns false when the NPC has no matching screen for `typeId`.
+		public async Task<bool> ServeGreeting(INetworkClient client, string npcName, uint typeId, uint npcHandle)
+		{
+			var greeting = await PickConversationScreen(client, npcName, typeId, "");
+			if (greeting == null)
+				return false;
+
+			await ServeScreen(client, greeting, npcHandle);
+			return true;
+		}
+
 		// Completes any quest GIVEN by `npcName` whose objective is done (Active + GoalProgress >= GoalRequired): marks
 		// it Completed and sends QuestIIR state 2 -> 4 so the client journal moves it to the completed tab (#47). The
 		// kill only advances the objective; the quest is marked Completed here, on TURN-IN at the giver. Called as the
