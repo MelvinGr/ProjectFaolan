@@ -37,10 +37,11 @@ namespace Faolan.GameServer.Economy.Tradepost
 			0x44, 0x7D, 0x70, 0x0C, 0x42, 0xE6, 0x2E, 0x00, 0x44, 0x1A, 0x8D, 0xDB, 0x41, 0x70, 0x00, 0x00
 		];
 
-		// DispatchTradepostSearchResults body - PoC REPLAY of a captured single-row listing (necrol80 auctionhouse
-		// pkt#1028: seller "Jocko", item 0x755D, price 1,000,000, qty 1, + the item's ProtoAcgItem). [head:u32][row]*
-		// per docs/tradepost-protocol.md. Step 3 replaces this with DB-built rows (TradepostListing + the existing
-		// ProtoAcgItem builder); the embedded blob is the interim, like the beach seed (TODO #7 data-as-code).
+		// A captured single-row DispatchTradepostSearchResults body (necrol80 auctionhouse pkt#1028: seller "Jocko",
+		// item 0x755D, price 1,000,000, qty 1, + the item's ProtoAcgItem). [head:u32][row]* per
+		// docs/tradepost-protocol.md. The LIVE search path is fully DB-driven (SendSearchResults -> TradepostListingCodec);
+		// this blob is now kept ONLY as the byte-exact golden-test oracle (BuildSearchResultsBytes / TradepostResponseTests),
+		// the same role CapturedAccessPointBody plays for the open packet - it is no longer sent at runtime.
 		private static readonly byte[] SearchResultsReplayBody = Convert.FromHexString(
 			"000007e220d82b60902c95450c0457f300054a6f636b6f00000000000f4240000000010000755d000000000000000015" +
 			"da16700000008008c5aab28189ec8aec201205080010a1081204081a1001120708820210c0843d12090889021085aa8c" +
@@ -72,12 +73,6 @@ namespace Faolan.GameServer.Economy.Tradepost
 			return Build(TradepostProtocol.InterfaceMethod.DispatchSearchResults, TradepostListingCodec.Build(head, listings), inbound.Sender.Instance)
 				.SendAsync(client);
 		}
-
-		// Fallback when no DB listing matches the query: replay the captured single-row listing so the grid still
-		// renders something for the PoC (item-agnostic). Drops out naturally once listings are imported/seeded.
-		public static Task SendSearchResultsReplay(INetworkClient client, ConanPacket inbound) =>
-			Build(TradepostProtocol.InterfaceMethod.DispatchSearchResults, SearchResultsReplayBody, inbound.Sender.Instance)
-				.SendAsync(client);
 
 		// Push a mail (DispatchMailMessage 0x2002), built byte-exact from the Mail row by MailMessageCodec. The base
 		// form (includeAttachments=false) is the mailbox-poll/preview; with attachments it carries the bought item.
