@@ -120,6 +120,12 @@ namespace Faolan.GameServer
 					.SendAsync(client);
 			}
 
+			// #267 beach gate: if this character has ALREADY freed Casilda (relog after the intro talk stage), lift the
+			// gate up-front so they aren't re-confined behind the destiny wall (the live lift only fires on the freeing
+			// talk itself). No-op off the beach or before she's freed.
+			if (onBeach)
+				await _broadcaster.SendBeachGateOnEntry(client);
+
 			// record 5: 0x00002000, 154-byte body
 			await new PacketStream()
 				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)

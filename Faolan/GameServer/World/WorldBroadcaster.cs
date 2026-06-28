@@ -891,6 +891,47 @@ namespace Faolan.GameServer.World
 				.SendAsync(client);
 		}
 
+		// #267 beach gate: lift the Tortage beach "invisible wall" by sending the LeaveCasilda destiny Scry step. The
+		// create-world destiny scene confines the player to the chained-Casilda tableau; the client drops that
+		// confinement when Casilda is unchained, which on the wire is just this named step (plain mode-2 step, proven in
+		// the Approach/LeaveCasilda capture pairs - it's a state flip, not an animation). Sent on the standard world IIR
+		// conversation (same as every other live world record).
+		public Task LiftBeachGate(INetworkClient client)
+		{
+			var body = ScryScript.BuildStep(client.Session.Account.ClientInstance, "LeaveCasilda");
+			return SendWorldIir(client, body);
+		}
+
+		// #267: at world entry on the beach, lift the gate up-front for a character who has ALREADY freed Casilda (the
+		// talk stage is completed) - otherwise a returning player would be re-confined behind the destiny wall with no
+		// way to re-trigger the lift. No-op off the beach or before she's freed.
+		public async Task SendBeachGateOnEntry(INetworkClient client)
+		{
+			var character = client.Session?.Character;
+			if (character == null || character.MapId != Map.TortageBeachId)
+				return;
+			if (await IsCasildaFreed(character.Id))
+				await LiftBeachGate(client);
+		}
+
+		// Whether the character has freed Casilda - data-driven (no hard-coded quest ids): any COMPLETED quest whose
+		// first goal is a TalkToNpc goal targeting Casilda (the freeing stage of the intro chain, #261). The talk that
+		// frees her completes that quest, so its presence marks the gate as already lifted.
+		private async Task<bool> IsCasildaFreed(uint characterId)
+		{
+			foreach (var quest in await _database.GetCharacterQuests(characterId))
+			{
+				if (quest.State != QuestState.Completed)
+					continue;
+				var def = await _database.GetQuestDefinition(quest.QuestId);
+				var goal = def?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
+				if (goal?.GoalType == QuestGoalType.TalkToNpc && string.Equals(goal.TargetName, "Casilda", StringComparison.OrdinalIgnoreCase))
+					return true;
+			}
+
+			return false;
+		}
+
 		// Sends a QuestIIR (add/update a quest in the player's journal) to the player.
 		public Task SendQuestIir(INetworkClient client, uint questId, uint state)
 		{
