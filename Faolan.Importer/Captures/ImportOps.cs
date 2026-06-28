@@ -5,6 +5,7 @@ using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.GameServer.Spawn;
 using Faolan.Importer.Extractors;
@@ -125,12 +126,14 @@ namespace Faolan.Importer.Captures
 		private static async Task SeedCasildaChain(DatabaseContext db)
 		{
 			await SeedChainStage(db, 13479, 13563, QuestGoalType.Kill, "Scavenger Tuut", 5744);
-			await SeedChainStage(db, 13563, 13480, QuestGoalType.LootFromNpc, "Scavenger Tuut", 5867);
+			// The loot stage's key item: Scavenger Tuut's bag drops 319224 "Scavenger's Key" (#261), so the player sees
+			// and takes the actual key, not just an empty source-matched bag.
+			await SeedChainStage(db, 13563, 13480, QuestGoalType.LootFromNpc, "Scavenger Tuut", 5867, questItemId: 319224);
 			await SeedChainStage(db, 13480, 12407, QuestGoalType.TalkToNpc, "Casilda", 5745);
 			await SeedChainStage(db, 12407, 0, QuestGoalType.Escort, "Casilda", 3544);
 		}
 
-		private static async Task SeedChainStage(DatabaseContext db, uint questId, uint nextQuestId, QuestGoalType goalType, string target, uint goalId, uint required = 1)
+		private static async Task SeedChainStage(DatabaseContext db, uint questId, uint nextQuestId, QuestGoalType goalType, string target, uint goalId, uint required = 1, uint questItemId = 0)
 		{
 			var quest = await db.QuestDefinitions.Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == questId);
 			if (quest == null)
@@ -148,11 +151,22 @@ namespace Faolan.Importer.Captures
 			goal.GoalType = goalType;
 			goal.TargetName = target;
 			goal.RequiredCount = required;
+			goal.QuestItemId = questItemId;
 			if (goal.Sequence == 0)
 				goal.Sequence = 1;
 
+			// Force the key item's Type to Quest (113) so it files into the player's QUEST tab on loot/relog (#261).
+			// ArchetypeHarvester can only infer an item's Type from the container a CAPTURE happened to show it in, and
+			// no capture has the Scavenger's Key in a quest tab, so it defaulted to Normal - domain-knowledge override.
+			if (questItemId != 0)
+			{
+				var keyItem = await db.Items.FirstOrDefaultAsync(i => i.Id == questItemId);
+				if (keyItem != null)
+					keyItem.Type = ItemType.Quest;
+			}
+
 			await db.SaveChangesAsync();
-			Console.WriteLine($"Seeded chain stage: quest {questId} = {goalType} '{target}' (goal {goalId}, required {required}) -> {nextQuestId}.");
+			Console.WriteLine($"Seeded chain stage: quest {questId} = {goalType} '{target}' (goal {goalId}, required {required}, keyItem {questItemId}) -> {nextQuestId}.");
 		}
 
 		// The beach starter (quest 10238) per-goal objective detail (the snapshot's @609 region). Idempotent.

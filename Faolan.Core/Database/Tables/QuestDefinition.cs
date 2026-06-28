@@ -92,6 +92,12 @@ namespace Faolan.Core.Database.Tables
 		// Default Kill keeps the existing single-goal rows (seeded before this field) as kill goals.
 		public QuestGoalType GoalType { get; set; } = QuestGoalType.Kill;
 
+		// For a LootFromNpc goal: the quest item (the "key") the TargetName NPC's corpse bag must contain, as an
+		// Items.Id (#261). 0 = no specific item (the goal still completes on looting the bag - it matches on the source
+		// NPC, not contents). When set, the bag-drop guarantees this item so the player can actually SEE and take the key
+		// (e.g. Scavenger Tuut's bag -> 319224 "Scavenger's Key"). Data-driven: any quest's key item drops the same way.
+		public uint QuestItemId { get; set; }
+
 		// The goal's required amount - how many kills/collects/etc. complete it. Decoded from the QuestFullUpdate /
 		// snapshot @609 goal record (the word after goalIdRepeat; values 1/3/4/8/12/64 seen on the wire, #47). 0 = not
 		// set, treated as 1 by QuestObjectiveRegion.Build (preserves byte-exact for rows seeded before this field).

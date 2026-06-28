@@ -23,5 +23,10 @@ namespace Faolan.GameServer.World
 		// #262: make the named NPC in `mapId`'s zone follow (or stop following) the given player - the quest-driven
 		// companion trigger (Casilda after her rescue). No-op if no such NPC is loaded; returns true if applied.
 		bool SetNpcFollowByName(uint mapId, string npcName, uint playerHandle, bool follow);
+
+		// #261: the player's quest state changed, so re-evaluate quest-gated NPC visibility - reload their active quest
+		// set and run an interest pass so newly-qualified gated NPCs (e.g. Scavenger Tuut) spawn and no-longer-qualified
+		// ones despawn in-place, without waiting for the player or NPC to move.
+		Task RefreshQuestVisibility(INetworkClient client);
 	}
 }

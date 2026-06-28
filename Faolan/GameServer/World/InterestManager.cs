@@ -43,6 +43,8 @@ namespace Faolan.GameServer.World
 				{
 					if (other.IsLoot)
 						continue; // loot bags have their own open/fade lifecycle, not interest streaming
+					if (!other.IsVisibleTo(mover))
+						continue; // #261: a quest-gated NPC the mover doesn't yet qualify for - treat as not in range
 					inRange.Add(other.Handle);
 					if (mover.Known.Add(other.Handle))
 						events.Add(new InterestEvent(mover, other, InterestEventType.Spawn));
@@ -73,7 +75,7 @@ namespace Faolan.GameServer.World
 				if (!viewer.IsPlayer || viewer.Handle == mover.Handle)
 					continue;
 
-				if (Vector3.Distance(viewer.Position, mover.Position) <= range)
+				if (mover.IsVisibleTo(viewer) && Vector3.Distance(viewer.Position, mover.Position) <= range)
 				{
 					events.Add(new InterestEvent(viewer, mover, viewer.Known.Add(mover.Handle)
 						? InterestEventType.Spawn

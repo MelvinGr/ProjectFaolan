@@ -292,7 +292,12 @@ namespace Faolan.GameServer.Dialogue
 			// (retail clears it to 0x00 the instant you accept - capture frame 698) rather than persisting until the
 			// NPC re-streams. The clicked NPC IS the giver and is in view.
 			if (grantDef != null)
+			{
 				await _broadcaster.RefreshQuestGiverMarker(client, clickedNpcHandle);
+				// #261: accepting a quest may reveal quest-gated NPCs (e.g. Scavenger Tuut once you hold Casilda's kill
+				// quest) - re-run interest so they stream in immediately, not only after the player next moves.
+				await _broadcaster.RefreshQuestVisibility(client);
+			}
 
 			// A pure terminal screen (a CloseChatWindow with NO AnswerList) ENDS the dialogue: the window is now shut
 			// on the client. Recording it as the active position left the session "inside" a finished conversation,

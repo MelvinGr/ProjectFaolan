@@ -244,6 +244,14 @@ namespace Faolan.GameServer
 					var unk0 = packet.Body.ReadUInt32();
 					var clientInst = packet.Body.ReadUInt32();
 					var unk1 = packet.Body.ReadUInt16();
+					// Some Interact variants are short and carry NO actionType/args (observed: a 10-byte trailer ending
+					// `00 08` the client sends around loot/kill). Reading actionType unconditionally threw EndOfStreamException,
+					// which ReceivedPacket turns into a hard client.Stop() (disconnect). Bail gracefully on a short body.
+					if (packet.Body.Length - packet.Body.Position < sizeof(uint))
+					{
+						Logger.LogDebug("Interact: short body (unk1=0x{Unk1:X4}), no actionType - ignoring.", unk1);
+						break;
+					}
 					var actionType = packet.Body.ReadUInt32<ActionType>();
 					var args = packet.Body.ReadProtobufUInt32Length<InteractArgs>();
 

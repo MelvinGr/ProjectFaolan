@@ -27,9 +27,11 @@ namespace Faolan.GameServer
 	//   i_nFeedback    : u32    (always 0 in the captures)
 	public partial class GameServerListener
 	{
-		// Inventory container ID32 types seen in the captured DispatchAddItem inventoryID.
+		// Inventory container ID32 types seen in the captured DispatchAddItem inventoryID (these equal the ContainerKind
+		// numbers: 0x68 = 104 Bag, 0x71 = 113 Quest). The Casilda-chain captures (casilda_quest_first_stage /
+		// compeltefirstquest) deliver the quest key via a live add to 0x71 - the quest-items tab (#261).
 		internal const uint InventoryContainerBackpack = 0x68;
-		internal const uint InventoryContainerEquipped = 0x71;
+		internal const uint InventoryContainerQuest = 0x71;
 
 		internal static void WriteAddItemBody(FaolanStream s, uint containerType, uint charId, uint itemPos, byte[] entry, uint feedback = 0)
 		{
@@ -73,25 +75,38 @@ namespace Faolan.GameServer
 		private async Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, bool pushLiveAdd = true)
 		{
 			var item = await Database.GetItem(itemTemplateId);
-			if (item is not { Archetype: not 0 })
+			if (item == null)
 				return null;
 
 			var characterId = client.Session.Character.Id;
-			var slot = await FindFreeBagSlot(characterId);
+
+			// Quest items (Type 113, e.g. the Scavenger's Key) route to the QUEST container, not the backpack, so they
+			// land in the player's quest-items tab (#261). They are kept even with archetype 0 (quest items often have
+			// none); normal bag items still require an archetype so the snapshot can render them.
+			var isQuestItem = item.Type == Core.Enums.ItemType.Quest;
+			if (!isQuestItem && item.Archetype == 0)
+				return null;
+
+			var kind = isQuestItem ? FullCharSnapshotBuilder.QuestKind : FullCharSnapshotBuilder.BagKind;
+			var capacity = isQuestItem ? 48 : 24; // quest tab holds 48 (NewContainer(QuestKind, 48)); bag 24
+			var slot = await FindFreeContainerSlot(characterId, (int)kind, capacity);
 			if (slot == null)
 				return null;
 
-			await Database.SetCharacterInventorySlot(characterId, (int)FullCharSnapshotBuilder.BagKind, slot.Value, itemTemplateId, count);
+			await Database.SetCharacterInventorySlot(characterId, (int)kind, slot.Value, itemTemplateId, count);
 
 			if (!pushLiveAdd)
 				return slot;
 
+			// Live DispatchAddItem so the item appears without a relog. Quest items go to the QUEST container (0x71),
+			// matching retail's chain-capture delivery; everything else to the backpack (0x68).
+			var containerType = isQuestItem ? InventoryContainerQuest : InventoryContainerBackpack;
 			var entry = SnapshotItemBuilder.BuildListEntry(
 				(ulong)slot.Value,
-				FullCharSnapshotBuilder.ItemId(characterId, FullCharSnapshotBuilder.BagKind, (ulong)slot.Value),
-				FullCharSnapshotBuilder.RecordId(characterId, FullCharSnapshotBuilder.BagKind, (ulong)slot.Value),
+				FullCharSnapshotBuilder.ItemId(characterId, kind, (ulong)slot.Value),
+				FullCharSnapshotBuilder.RecordId(characterId, kind, (ulong)slot.Value),
 				count, item, item.Archetype).Item;
-			await SendAddItem(client, InventoryContainerBackpack, (uint)slot.Value, entry);
+			await SendAddItem(client, containerType, (uint)slot.Value, entry);
 			return slot;
 		}
 
@@ -130,21 +145,24 @@ namespace Faolan.GameServer
 				Logger.LogInformation("Re-delivered {Count} archetype-less bag item(s) to '{Name}' via live add (not in the snapshot).", pushed, character.Name);
 		}
 
-		// The first free backpack cell (0..23), skipping persisted rows and the legacy starter-bag cell (pos 1)
-		// while the FirstPosBag item still renders there. Null = bag full.
-		private async Task<int?> FindFreeBagSlot(uint characterId)
+		// The first free cell (0..capacity-1) in `container`, skipping persisted rows. For the backpack it also skips the
+		// legacy starter-bag cell (pos 1) while the FirstPosBag item still renders there. Null = container full.
+		private async Task<int?> FindFreeContainerSlot(uint characterId, int container, int capacity)
 		{
-			var equipment = await Database.GetCharacterEquipment(characterId);
 			var rows = await Database.GetCharacterInventory(characterId);
 			var taken = rows
-				.Where(r => r.Container == (int)FullCharSnapshotBuilder.BagKind)
+				.Where(r => r.Container == container)
 				.Select(r => r.Slot)
 				.ToHashSet();
-			if (equipment?.FirstPosBag is { Archetype: not 0 })
-				taken.Add(1);
+			if (container == (int)FullCharSnapshotBuilder.BagKind)
+			{
+				var equipment = await Database.GetCharacterEquipment(characterId);
+				if (equipment?.FirstPosBag is { Archetype: not 0 })
+					taken.Add(1);
+			}
 
 			return Enumerable
-				.Range(0, 24)
+				.Range(0, capacity)
 				.Where(s => !taken.Contains(s))
 				.Cast<int?>()
 				.FirstOrDefault();

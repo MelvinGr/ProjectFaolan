@@ -1124,6 +1124,10 @@ namespace Faolan.GameServer
 					await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .quest add|remove|complete <questId> | .quest list");
 					break;
 			}
+
+			// #261: a journal change can reveal/hide quest-gated NPCs (e.g. .quest add 13479 spawns Scavenger Tuut) -
+			// re-run interest so gated visibility updates live, mirroring the conversation accept path.
+			await _broadcaster.RefreshQuestVisibility(client);
 		}
 
 		// .save  - flush the live world state to the DB. The WorldEntity is the source of truth for live transform

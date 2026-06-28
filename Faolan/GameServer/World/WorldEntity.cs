@@ -137,6 +137,30 @@ namespace Faolan.GameServer.World
 		// against this set to decide what to spawn/despawn as entities move in and out of range. Unused for NPCs.
 		public HashSet<uint> Known { get; } = new HashSet<uint>();
 
+		// For a PLAYER: the quest ids the player currently has ACTIVE. Drives quest-gated NPC visibility (#261).
+		// Refreshed at world entry and whenever the player's quest state changes (accept / advance / complete).
+		public HashSet<uint> ActiveQuestIds { get; } = new HashSet<uint>();
+
+		// For an NPC: the quest ids that gate this NPC's visibility (null/empty = ungated, seen by everyone). A gated
+		// NPC is streamed only to a viewer holding one of these quests active - e.g. Scavenger Tuut appears only while
+		// you carry Casilda's kill quest. Data-driven from the quest goal definitions (kill-target NPCs that aren't
+		// quest givers), so it generalises to any number of quests/NPCs. See IsVisibleTo.
+		public IReadOnlyList<uint> GateQuestIds { get; set; }
+
+		// Whether `viewer` (a player) may see this entity in interest streaming. Ungated entities are visible to all;
+		// a gated NPC requires the viewer to hold one of its gating quests active.
+		public bool IsVisibleTo(WorldEntity viewer)
+		{
+			if (GateQuestIds == null || GateQuestIds.Count == 0)
+				return true;
+			if (viewer == null)
+				return false;
+			foreach (var questId in GateQuestIds)
+				if (viewer.ActiveQuestIds.Contains(questId))
+					return true;
+			return false;
+		}
+
 		// The owning connection for a player (so the broadcaster can send packets to it); null for NPCs.
 		public INetworkClient Client { get; }
 		public string Name { get; }

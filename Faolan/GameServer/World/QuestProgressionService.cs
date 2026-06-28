@@ -59,6 +59,7 @@ namespace Faolan.GameServer.World
 
 			// Snapshot the quests up front: CompleteAndSupersede writes the next stage Active, but the captured chain
 			// never re-matches the same trigger on the just-granted stage, so iterating the snapshot is safe.
+			var changed = false;
 			foreach (var quest in await _database.GetCharacterQuests(character.Id))
 			{
 				if (quest.State != QuestState.Active)
@@ -68,6 +69,7 @@ namespace Faolan.GameServer.World
 				var goal = def?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
 				if (!QuestProgress.Advances(quest, goal, triggerType, targetName))
 					continue;
+				changed = true;
 
 				var required = Math.Max(quest.GoalRequired, 1);
 				var progress = quest.GoalProgress + 1;
@@ -94,6 +96,11 @@ namespace Faolan.GameServer.World
 				if (triggerType == QuestGoalType.TalkToNpc && string.Equals(targetName, "Casilda", StringComparison.OrdinalIgnoreCase))
 					_outbound.SetNpcFollowByName(character.MapId, "Casilda", client.Session.Account.ClientInstance, follow: true);
 			}
+
+			// #261: a stage change can un-gate or re-gate NPCs (e.g. completing Casilda's kill stage despawns Tuut) -
+			// re-run the player's interest pass so gated visibility tracks the new quest state immediately.
+			if (changed)
+				await _outbound.RefreshQuestVisibility(client);
 		}
 
 		// Complete stage N and supersede it with stage N+1: the captured wire sequence + the state flip (mark N

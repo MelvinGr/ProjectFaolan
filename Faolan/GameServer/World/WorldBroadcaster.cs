@@ -278,6 +278,10 @@ namespace Faolan.GameServer.World
 
 			var zone = _sim.World.ZoneForEntity(entity);
 
+			// #261: seed the player's active-quest set before the first interest pass so quest-gated NPCs (e.g. Scavenger
+			// Tuut) are correctly included/excluded from the very start, not only after a quest change.
+			await LoadActiveQuestIds(entity);
+
 			// Interest is the SOLE NPC spawn path (since #23 made mid-session/interest spawns render; in-client verified
 			// 2026-06-16): NPCs are dropped from the world-entry burst (ReplayMapWorldBurst), so stream every in-range
 			// NPC here at entry (includeNonPlayers), each as its own FA015807 + name registration via DispatchInterest.
@@ -285,6 +289,32 @@ namespace Faolan.GameServer.World
 			// (~4x retail density) - cross-session mob dedup / interest tuning is a follow-up.
 			var npcEvents = InterestManager.ResolveMove(zone, entity, WorldSimulation.PlayerInterestRange, includeNonPlayers: true);
 			await DispatchInterest(npcEvents, null);
+		}
+
+		// #261: reload the player entity's ActiveQuestIds from the DB (the set interest gating tests gated NPCs against).
+		private async Task LoadActiveQuestIds(WorldEntity entity)
+		{
+			var characterId = entity?.Client?.Session.Character?.Id;
+			if (characterId == null)
+				return;
+			var quests = await _database.GetCharacterQuests(characterId.Value);
+			entity.ActiveQuestIds.Clear();
+			foreach (var quest in quests)
+				if (quest.State == QuestState.Active)
+					entity.ActiveQuestIds.Add(quest.QuestId);
+		}
+
+		// #261: re-evaluate quest-gated NPC visibility for one player after their quest state changed (accept / advance /
+		// complete). Reloads their active-quest set, then runs an interest pass so newly-qualified gated NPCs spawn and
+		// no-longer-qualified ones despawn in-place - no player/NPC movement required.
+		public async Task RefreshQuestVisibility(INetworkClient client)
+		{
+			var entity = _sim.PlayerWorldEntity(client);
+			if (entity == null)
+				return;
+			await LoadActiveQuestIds(entity);
+			var events = InterestManager.ResolveMove(_sim.World.ZoneForEntity(entity), entity, WorldSimulation.PlayerInterestRange, includeNonPlayers: true);
+			await DispatchInterest(events, null);
 		}
 
 		// After a player's Move: update interest and broadcast the resulting spawns/moves to nearby players.
@@ -325,6 +355,10 @@ namespace Faolan.GameServer.World
 
 		// Quest-giver NPC name -> granted quest id, cached once (small set).
 		private Dictionary<string, uint> _questGivers;
+
+		// Quest-gated NPC name -> the quest ids that reveal it (#261). Cached once; an NPC in this map is streamed only
+		// to players holding one of its quests active (see WorldEntity.GateQuestIds / IsVisibleTo).
+		private Dictionary<string, uint[]> _questGatedNpcs;
 
 		// #241: drive a quest-giver NPC's marker from the viewer's quest state when it enters view. Recomputed each
 		// time the NPC is streamed in, so the '!' transitions to '?' (and clears) as the player accepts/completes the
@@ -477,6 +511,9 @@ namespace Faolan.GameServer.World
 				.GroupBy(p => PositionKey(p.PositionX, p.PositionY, p.PositionZ))
 				.ToDictionary(g => g.Key, g => g.First());
 
+			// #261 quest-gated spawns: NPC name -> the quest ids that reveal it (kill-target NPCs that aren't givers).
+			_questGatedNpcs ??= await _database.GetQuestGatedNpcMap();
+
 			// The handle the map's world-burst renders each NPC under, keyed by the NPC's POSITION. Burst NPCs MUST
 			// carry their burst handle in the model so the per-player Known-set seeding lines up (entry seeds these)
 			// and the first move never re-streams them. Matching by HANDLE is wrong: the burst is ONE capture session
@@ -537,6 +574,10 @@ namespace Faolan.GameServer.World
 				var entity = WorldEntity.ForNpc(handle, mapId, new Vector3(npc.PositionX, npc.PositionY, npc.PositionZ), new Vector3(npc.RotationX, npc.RotationY, npc.RotationZ), npcName ?? "NPC", vitals);
 				entity.InstanceId = instanceId; // this NPC belongs to THIS copy of the map (#268)
 				entity.Level = npc.Level;
+				// #261: if this NPC's spawn is quest-gated, stamp the revealing quest ids so interest only streams it to
+				// players holding one of them (e.g. Scavenger Tuut while you carry Casilda's kill quest).
+				if (npcName != null && _questGatedNpcs.TryGetValue(npcName, out var gateQuests))
+					entity.GateQuestIds = gateQuests;
 
 				// #266 patrol: attach this NPC's captured route (linked by exact spawn position). REPLAY the captured
 				// MoveTask re-addressed to this entity (handle + from = its spawn) - the original form carries the real
@@ -1025,11 +1066,28 @@ namespace Faolan.GameServer.World
 				return; // revived (or never died) before the linger fired - nothing to convert
 
 			// A quest mob the killer needs to LOOT (an active LootFromNpc goal targeting this NPC, #261) ALWAYS leaves a
-			// bag - the "key" must be lootable, not a 50/50 roll. Otherwise the normal drop chance applies.
-			var questDrop = deadNpc.LastAttackerHandle != 0 && await HasActiveLootGoalFor(deadNpc.LastAttackerHandle, deadNpc.Name);
-			var dropsContents = questDrop || LootResolver.RollsDrop(Random.Shared.NextDouble());
-			var items = await RollLootItems(dropsContents ? Random.Shared.Next(0, 3) : 0); // 0-2 items, or none
-			var cash = dropsContents ? LootResolver.RollCash(Random.Shared.NextDouble(), deadNpc.Level) : 0u;
+			// bag - the "key" must be lootable, not a 50/50 roll. The goal may also name a specific key ITEM (QuestItemId).
+			var lootGoalItem = deadNpc.LastAttackerHandle != 0
+				? await ActiveLootGoalItemFor(deadNpc.LastAttackerHandle, deadNpc.Name)
+				: null;
+			var questDrop = lootGoalItem.HasValue;
+
+			List<uint> items;
+			uint cash;
+			if (questDrop)
+			{
+				// Quest loot mob: the bag holds ONLY the quest key (no random gear/cash), so the objective is unambiguous
+				// - e.g. Scavenger Tuut drops just the Scavenger's Key. An empty key id still drops an (empty) bag whose
+				// SOURCE NPC completes the goal on loot-all.
+				items = lootGoalItem is > 0 ? [lootGoalItem.Value] : [];
+				cash = 0;
+			}
+			else
+			{
+				var dropsContents = LootResolver.RollsDrop(Random.Shared.NextDouble());
+				items = await RollLootItems(dropsContents ? Random.Shared.Next(0, 3) : 0); // 0-2 items, or none
+				cash = dropsContents ? LootResolver.RollCash(Random.Shared.NextDouble(), deadNpc.Level) : 0u;
+			}
 
 			// DECOUPLED loot (#246): the bag is a SEPARATE IsLoot entity (its OWN handle) at the death spot, NOT the
 			// NPC's handle reused. Reusing it pinned the NPC's respawn to where it died (the client can't move a bag
@@ -1067,10 +1125,13 @@ namespace Faolan.GameServer.World
 
 		// True if the character (by handle == character id) has an ACTIVE LootFromNpc quest goal targeting `npcName` -
 		// i.e. they need to loot this NPC's corpse for a quest (#261). Drives the guaranteed quest drop above.
-		private async Task<bool> HasActiveLootGoalFor(uint characterId, string npcName)
+		// The killer's active LootFromNpc goal targeting `npcName`, if any (#261): returns its QuestItemId (the key item
+		// to put in the bag; may be 0 = no specific item), or null when there is no such goal. A non-null result both
+		// forces the bag drop (the key must be lootable, not a 50/50 roll) and names the key item to include.
+		private async Task<uint?> ActiveLootGoalItemFor(uint characterId, string npcName)
 		{
 			if (string.IsNullOrEmpty(npcName))
-				return false;
+				return null;
 			foreach (var quest in await _database.GetCharacterQuests(characterId))
 			{
 				if (quest.State != QuestState.Active)
@@ -1079,10 +1140,10 @@ namespace Faolan.GameServer.World
 				var goal = def?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
 				if (goal != null && goal.GoalType == QuestGoalType.LootFromNpc &&
 				    string.Equals(goal.TargetName, npcName, StringComparison.OrdinalIgnoreCase))
-					return true;
+					return goal.QuestItemId;
 			}
 
-			return false;
+			return null;
 		}
 
 		// .spawnbag: drop a standalone loot bag at the player. Now that mid-session spawns carry the live playfield
@@ -1254,7 +1315,12 @@ namespace Faolan.GameServer.World
 			foreach (var templateId in itemTemplateIds ?? Array.Empty<uint>())
 			{
 				var item = await _database.GetItem(templateId);
-				if (item == null || item.Archetype == 0)
+				// Keep any resolvable, NAMED item - the window can display it and (since LootItems + the splice both come
+				// from this one list) the display order stays consistent (#226). The old `Archetype == 0` skip also
+				// dropped legitimate quest items (e.g. Scavenger's Key, archetype 0) inserted as quest-goal keys (#261);
+				// random loot is already archetype-filtered at the source (GetRandomBuildableItems), so this only let the
+				// quest key through.
+				if (item == null || string.IsNullOrEmpty(item.Name))
 					continue;
 				resolved.Add((templateId, item));
 			}

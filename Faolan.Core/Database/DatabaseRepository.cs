@@ -37,6 +37,7 @@ namespace Faolan.Core.Database
 		Task<CharacterInventory[]> GetCharacterInventory(uint characterId);
 		Task<CharacterQuest[]> GetCharacterQuests(uint characterId);
 		Task<Dictionary<string, uint>> GetQuestGiverMap();
+		Task<Dictionary<string, uint[]>> GetQuestGatedNpcMap();
 		Task<CharacterSpell[]> GetCharacterSpells(uint characterId);
 		Task<bool> AddCharacterSpell(uint characterId, uint spellId);
 		Task<QuestDefinition> GetQuestDefinition(uint questId);
@@ -703,6 +704,33 @@ namespace Faolan.Core.Database
 			return grants
 				.GroupBy(g => g.NpcName)
 				.ToDictionary(g => g.Key, g => g.Min(x => x.GrantQuestId));
+		}
+
+		// NPCs whose world spawn is GATED on a quest (#261): an NPC that is a KILL-goal target of some quest needs to
+		// be present only while a player carries that quest, so it is streamed solely to holders (interest gating).
+		// Quest GIVERS are excluded - they must always be visible to hand the quest out (Casilda is both a giver and a
+		// later talk/escort target, so she stays ungated). Returns NpcName -> the quest ids that reveal it. Data-driven,
+		// so any future quest with a kill target gets the same treatment automatically.
+		public async Task<Dictionary<string, uint[]>> GetQuestGatedNpcMap()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var givers = (await ctx.ConversationNodes
+					.Where(n => n.GrantQuestId != 0 && n.NpcName != null)
+					.Select(n => n.NpcName)
+					.Distinct()
+					.ToListAsync())
+				.ToHashSet();
+
+			var killTargets = await ctx.QuestGoalDefinitions
+				.Where(g => g.GoalType == QuestGoalType.Kill && g.TargetName != null && g.TargetName != "")
+				.Join(ctx.QuestDefinitions, g => g.QuestDefinitionId, d => d.Id, (g, d) => new { g.TargetName, d.QuestId })
+				.Distinct()
+				.ToListAsync();
+
+			return killTargets
+				.Where(x => !givers.Contains(x.TargetName))
+				.GroupBy(x => x.TargetName)
+				.ToDictionary(g => g.Key, g => g.Select(x => x.QuestId).Distinct().ToArray());
 		}
 
 		// The spells a character has learned; GrantStartingSpells replays these as DispatchLearnSpell grants on login.
