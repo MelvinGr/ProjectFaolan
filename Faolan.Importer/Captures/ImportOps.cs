@@ -440,6 +440,20 @@ namespace Faolan.Importer.Captures
 		// Static world objects (decor/containers/zones), deduped by (map, position). Transient loot bags skipped.
 		public static async Task ImportWorldObjects(DatabaseContext db, List<WorldObjectEntry> objects)
 		{
+			// Purge any transient loot-bag rows that leaked in from old runtime persistence: a dropped loot bag is a
+			// live-only world entity (built from scratch by LootBagTemplate, never DB-persisted), so it must not sit in
+			// WorldObjects. They are the loot template (TemplateItemId 13782) WITHOUT a captured identity "[TAG]" suffix
+			// ("Bag of loot", item-named drops). Captured STATIC containers (e.g. "cimmerian_treasure_chest [QO2V ]")
+			// keep their tag and are preserved.
+			var stale = await db.WorldObjects
+				.Where(o => o.TemplateItemId == 13782 && o.Name != null && !o.Name.Contains("]"))
+				.ToListAsync();
+			if (stale.Count > 0)
+			{
+				db.WorldObjects.RemoveRange(stale);
+				Console.WriteLine($"World objects: purged {stale.Count} transient loot-bag row(s) (live-only entities).");
+			}
+
 			foreach (var e in objects)
 			{
 				if (e.DisplayName == "Bag of loot")
