@@ -35,6 +35,7 @@ namespace Faolan.Core.Database
 		DbSet<LuaScript> LuaScripts { get; }
 		DbSet<Mail> Mails { get; }
 		DbSet<MailAttachment> MailAttachments { get; }
+		DbSet<MapLootEntry> MapLootEntries { get; }
 		DbSet<Map> Maps { get; }
 		DbSet<MapWorldBurst> MapWorldBursts { get; }
 		DbSet<MapWorldBurstEntity> MapWorldBurstEntities { get; }
@@ -88,6 +89,7 @@ namespace Faolan.Core.Database
 		public DbSet<LuaScript> LuaScripts { get; set; }
 		public DbSet<Mail> Mails { get; set; }
 		public DbSet<MailAttachment> MailAttachments { get; set; }
+		public DbSet<MapLootEntry> MapLootEntries { get; set; }
 		public DbSet<Map> Maps { get; set; }
 		public DbSet<MapWorldBurst> MapWorldBursts { get; set; }
 		public DbSet<MapWorldBurstEntity> MapWorldBurstEntities { get; set; }

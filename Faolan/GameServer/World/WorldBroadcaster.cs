@@ -1085,7 +1085,7 @@ namespace Faolan.GameServer.World
 			else
 			{
 				var dropsContents = LootResolver.RollsDrop(Random.Shared.NextDouble());
-				items = await RollLootItems(dropsContents ? Random.Shared.Next(0, 3) : 0); // 0-2 items, or none
+				items = await RollLootItems(dropsContents ? Random.Shared.Next(0, 3) : 0, deadNpc.MapId); // 0-2 items, or none
 				cash = dropsContents ? LootResolver.RollCash(Random.Shared.NextDouble(), deadNpc.Level) : 0u;
 			}
 
@@ -1328,14 +1328,18 @@ namespace Faolan.GameServer.World
 			return resolved;
 		}
 
-		// A few random snapshot-buildable item templates (Archetype != 0) for a loot bag. Empty when count <= 0
-		// or the item table has no buildable rows.
-		private async Task<List<uint>> RollLootItems(int count)
+		// A few random snapshot-buildable item templates (Archetype != 0) for a loot bag. Drops from the MAP's loot pool
+		// (#273) - the items that map's captured bags actually carried - falling back to the all-items random sample when
+		// the map has no captured pool (so a map we have no loot data for still drops something). Empty when count <= 0.
+		private async Task<List<uint>> RollLootItems(int count, uint mapId)
 		{
 			if (count <= 0)
 				return new List<uint>();
 
-			var items = await _database.GetRandomBuildableItems(count);
+			var items = await _database.GetMapLootSample(mapId, count);
+			if (items.Length == 0)
+				items = await _database.GetRandomBuildableItems(count); // map has no captured loot pool - fall back
+
 			return items
 				.Select(i => i.Id)
 				.ToList();

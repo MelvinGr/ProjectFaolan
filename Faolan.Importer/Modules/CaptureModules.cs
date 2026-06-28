@@ -240,6 +240,24 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
+	// Per-map loot pool (#273): the items a map's captured loot bags carried, that NPC-kill drops on that map roll
+	// from instead of the all-items random sample. Needs the items first so the pool can be filtered to buildable rows.
+	public sealed class MapLootModule : IImportModule
+	{
+		public string Name => "map-loot";
+		public string Description => "Per-map loot pool from captured bag contents (#273).";
+		public ImportSource Source => ImportSource.Captures;
+		public IReadOnlyList<string> DependsOn => ["items"];
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Overwrite };
+
+		public async Task<ImportResult> RunAsync(ImportContext ctx)
+		{
+			var entries = MapLootExtractor.Merge(ctx.Captures.SelectMany(c => MapLootExtractor.Extract(c.Packets)));
+			var kept = await ImportOps.ImportMapLootPool(ctx.Db, entries);
+			return new ImportResult($"{kept} map-loot entries ({entries.Count} seen).");
+		}
+	}
+
 	// Per-map world-entry burst (structured IIR records). Beach (4010) is exempt (committed seed).
 	public sealed class WorldBurstsModule : IImportModule
 	{

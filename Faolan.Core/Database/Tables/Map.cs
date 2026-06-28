@@ -57,6 +57,9 @@ namespace Faolan.Core.Database.Tables
 		public virtual ICollection<RespawnPoint> RespawnPoints { get; set; }
 		public virtual ICollection<NpcSpawn> NpcSpawns { get; set; }
 
+		// The map's loot pool (#273): the items its captured bags carried, that kills on this map roll random drops from.
+		public virtual ICollection<MapLootEntry> LootEntries { get; set; }
+
 		[MaxLength(128)]
 		public string Name { get; set; }
 

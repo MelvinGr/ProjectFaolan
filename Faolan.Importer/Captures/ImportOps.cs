@@ -476,6 +476,29 @@ namespace Faolan.Importer.Captures
 			await db.SaveChangesAsync();
 		}
 
+		// Rebuild the per-map loot pool (#273) from the captured bag contents. Clean rebuild (the pool is fully derived
+		// from the captures, so a re-run should not accumulate stale rows), keyed for dedup by (MapId, ItemTemplateId).
+		// Only items that exist in the Items table are kept - an unknown template the server can't build is useless as a
+		// drop (the items module seeds those identities, so it runs first in the default order).
+		public static async Task<int> ImportMapLootPool(DatabaseContext db, List<MapLootPoolEntry> entries)
+		{
+			db.MapLootEntries.RemoveRange(await db.MapLootEntries.ToListAsync());
+
+			var knownItems = (await db.Items.Select(i => i.Id).ToListAsync()).ToHashSet();
+			var knownMaps = (await db.Maps.Select(m => m.Id).ToListAsync()).ToHashSet();
+			var kept = entries
+				.Where(e => knownMaps.Contains(e.MapId) && knownItems.Contains(e.ItemTemplateId)) // FK targets must exist
+				.GroupBy(e => (e.MapId, e.ItemTemplateId))
+				.Select(g => g.Key)
+				.ToList();
+
+			foreach (var (mapId, templateId) in kept)
+				db.MapLootEntries.Add(new MapLootEntry { MapId = mapId, ItemTemplateId = templateId });
+
+			await db.SaveChangesAsync();
+			return kept.Count;
+		}
+
 		public static NpcSpawn Populate(NpcSpawn row, NpcSpawnEntry e)
 		{
 			row.CapturedHandle = e.Handle;

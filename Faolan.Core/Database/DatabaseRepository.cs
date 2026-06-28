@@ -61,6 +61,7 @@ namespace Faolan.Core.Database
 		Task<Item> GetItem(uint id);
 		Task<Item[]> SearchItems(string nameSubstring, int limit = 25);
 		Task<Item[]> GetRandomBuildableItems(int count);
+		Task<Item[]> GetMapLootSample(uint mapId, int count);
 		Task<NpcSpawn[]> SearchNpcSpawns(string nameSubstring, int limit = 50);
 		Task<LuaScript> GetLuaScript(uint scriptId);
 
@@ -884,6 +885,25 @@ namespace Faolan.Core.Database
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx
 				.Items
+				.Where(i => i.Archetype != 0 && i.Name != null && i.Name != "" && i.Type == ItemType.Normal)
+				.OrderBy(_ => EF.Functions.Random())
+				.Take(count)
+				.ToArrayAsync();
+		}
+
+		// A random sample of the map's loot pool (#273): buildable items (same render constraints as
+		// GetRandomBuildableItems - Archetype != 0, named, Normal) that this map's captured bags carried. Returns empty
+		// when the map has no pool, so the caller falls back to the all-items random sample. SQLite RANDOM() order.
+		public async Task<Item[]> GetMapLootSample(uint mapId, int count)
+		{
+			if (count <= 0)
+				return [];
+
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.MapLootEntries
+				.Where(e => e.MapId == mapId)
+				.Join(ctx.Items, e => e.ItemTemplateId, i => i.Id, (e, i) => i)
 				.Where(i => i.Archetype != 0 && i.Name != null && i.Name != "" && i.Type == ItemType.Normal)
 				.OrderBy(_ => EF.Functions.Random())
 				.Take(count)

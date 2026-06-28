@@ -28,6 +28,7 @@ namespace Faolan.Importer.Cli
 			new ShopsModule(),
 			new NpcsModule(),
 			new WorldObjectsModule(),
+			new MapLootModule(),
 			new WorldBurstsModule(),
 			new QuestsModule(),
 			new MountsModule(),       // opt-in
