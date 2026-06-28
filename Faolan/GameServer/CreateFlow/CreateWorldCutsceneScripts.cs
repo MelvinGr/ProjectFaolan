@@ -1,6 +1,6 @@
 using System;
-using System.Buffers.Binary;
 using System.Linq;
+using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
@@ -89,7 +89,7 @@ namespace Faolan.GameServer
 					await SendScry(client, ScryScript.BuildStep(id, "ThisIsKalanthes", mode: 2, f6Field1: 50000, f6Field2: LiveNpcHandle(client, "Kalanthes", 0x2c1c)));
 					// Position Kalanthes next to the washed-ashore player (his cutscene start), so the walk-up reads
 					// (his DB spawn is back by the rocks). The walk path itself follows on the Move callback.
-					await SendKalanthesMoveTask(client, KalanthesIntroTransform);
+					await SendKalanthesMoveTask(client, BuildKalanthesIntroMove(LiveNpcHandle(client, "Kalanthes", 0x2c1c)));
 					break;
 
 				case "ClientLoadingDone":
@@ -108,7 +108,7 @@ namespace Faolan.GameServer
 
 				case "Move":
 					// Kalanthes walks up to the player (f890 path), then kneels.
-					await SendKalanthesMoveTask(client, KalanthesWalkPath);
+					await SendKalanthesMoveTask(client, BuildKalanthesWalkMove(LiveNpcHandle(client, "Kalanthes", 0x2c1c)));
 					await SendScry(client, ScryScript.BuildStep(id, "Kneel", mode: 2));
 					break;
 
@@ -130,29 +130,52 @@ namespace Faolan.GameServer
 			return npc?.Handle ?? fallback;
 		}
 
-		// #234 Kalanthes walk-up: the two captured MoveTasks (96C46740) from Blablabla_* f657 + f890, stripped of
-		// their leading [u32 len] (WriteArrayUInt32Length re-adds it). f657 is the intro TRANSFORM - it snaps
-		// Kalanthes to (333.2,146.3,706.0), right next to the washed-ashore player; f890 is the WALK PATH - he
-		// moves to (324.7,145.4,705.1), up to the player. Body layout: [96C46740][0000C350][handle u32 @8]...; the
-		// captured handle 0x2C1C is re-addressed to OUR live Kalanthes (same replay-a-captured-MoveTask mechanism
-		// the NPC patrol path uses). Positions are absolute beach coords keyed to the same wash-ashore spot, so they
-		// transfer verbatim.
-		private static readonly byte[] KalanthesIntroTransform = Convert.FromHexString(
-			"96c467400000c35000002c1c000043a6999a43124bf2443081aa0243a6999a43124bf2443081aa00000000bf3e417f000000003f2b49150000");
-		private static readonly byte[] KalanthesWalkPath = Convert.FromHexString(
-			"96c467400000c35000002c1c000043a6999a43124bf2443081aa040100020101000000000243a6999a43124bf2443081aa43a25c9743116eff4430489300410912a000000000000000000000000043a6999a43124bf2443081aa0001");
+		// #234/#193 Kalanthes walk-up, CONSTRUCTED from typed MoveTask data (no replayed hex blob). Decoded from the
+		// captured MoveTasks (96C46740) Blablabla_* f657 (intro) + f890 (walk): the intro is a mode-2 Rotate that SNAPS
+		// Kalanthes to the wash-ashore spot facing the player; the walk is a ListMoveTask[ PathMoveTask(2 waypoints) +
+		// WaitMoveTask ] that moves him UP to the player. Positions are absolute beach coords (byte-exact - the floats
+		// round-trip to the captured bits, KalanthesCutsceneMoveTests). Built with the LIVE Kalanthes handle directly.
+		private static readonly Vector3 KalanthesIntroPos = new(333.20001220703125f, 146.29666137695312f, 706.0260009765625f);
+		private static readonly Vector3 KalanthesWalkTarget = new(324.7233581542969f, 145.43357849121094f, 705.1339721679688f);
+		private static readonly Quaternion KalanthesIntroFacing = new(0f, -0.743186891078949f, 0f, 0.6690838932991028f);
+		private const float KalanthesWalkPathLength = 8.567047119140625f; // from -> target distance (interp timing)
 
-		// Replays a captured Kalanthes MoveTask re-addressed to OUR live entity handle, on the world conversation
-		// (WorldFraming + IirCarrier - the same framing every rendered NPC move goes out on).
-		private Task SendKalanthesMoveTask(INetworkClient client, byte[] capturedBody)
+		// The intro TRANSFORM: a stationary (from==to) mode-2 MoveTask placing Kalanthes at his cutscene start.
+		internal static byte[] BuildKalanthesIntroMove(uint handle) =>
+			MoveTaskCodec.BuildBody(handle, KalanthesIntroPos, KalanthesIntroPos, KalanthesIntroFacing);
+
+		// The WALK: ListMoveTask[ PathMoveTask(from -> target) + WaitMoveTask ], the exact captured composite shape,
+		// built from the typed model so it round-trips byte-exact while the positions stay explicit data.
+		internal static byte[] BuildKalanthesWalkMove(uint handle)
 		{
-			var body = (byte[])capturedBody.Clone();
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), LiveNpcHandle(client, "Kalanthes", 0x2c1c));
-			return new PacketStream()
+			static uint B(float f) => BitConverter.SingleToUInt32Bits(f);
+			var path = new MoveTaskNode
+			{
+				Mode = 1, HeaderFlags = 1, PathFlags = 0,
+				Waypoints =
+				[
+					B(KalanthesIntroPos.X), B(KalanthesIntroPos.Y), B(KalanthesIntroPos.Z),
+					B(KalanthesWalkTarget.X), B(KalanthesWalkTarget.Y), B(KalanthesWalkTarget.Z)
+				],
+				TrailerByte = 0,
+				TrailerWords = [B(KalanthesWalkPathLength), 0, 0, 0, B(KalanthesIntroPos.X), B(KalanthesIntroPos.Y), B(KalanthesIntroPos.Z)]
+			};
+			var wait = new MoveTaskNode { Mode = 0, HeaderFlags = 1 };
+			return new MoveTaskComposite
+			{
+				Handle = handle,
+				FromX = B(KalanthesIntroPos.X), FromY = B(KalanthesIntroPos.Y), FromZ = B(KalanthesIntroPos.Z),
+				Task = new MoveTaskNode { Mode = 4, HeaderFlags = 1, ListMin = 0, Children = [path, wait] }
+			}.Encode();
+		}
+
+		// Sends a constructed Kalanthes MoveTask on the world conversation (WorldFraming + IirCarrier - the same framing
+		// every rendered NPC move goes out on).
+		private Task SendKalanthesMoveTask(INetworkClient client, byte[] body) =>
+			new PacketStream()
 				.WriteHeader(World.WorldFraming.Sender, World.WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
 				.WriteArrayUInt32Length(s => s.WriteArray(body))
 				.SendAsync(client);
-		}
 
 		// A ScryScriptIIR step on the GameAgent->GameInterface conversation (the framing the verbatim burst uses).
 		private static Task SendScry(INetworkClient client, byte[] scry)
