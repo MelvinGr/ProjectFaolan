@@ -257,9 +257,14 @@ namespace Faolan.GameServer
 
 					if (actionType == ActionType.SwitchWeaponsButton)
 					{
-						// Has no extra data
-
-						Logger.LogInformation($"SwitchWeaponsButton: {args}");
+						// #259: the toggle carries no extra data. Echo-ack the behavior (docs/combat.md rule 1) and toggle
+						// the player's combat stance, pushing the CombatMode stat so the client draws/sheathes the weapon -
+						// the player analogue of the NPC weapon-draw (#218). NEEDS in-client verification of the exact
+						// mechanism (stat push vs behavior-only) against a capture.
+						await _combat.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
+						var drawn = _broadcaster.TogglePlayerCombatStance(client);
+						await _broadcaster.BroadcastPlayerCombatMode(client, drawn);
+						Logger.LogInformation("SwitchWeaponsButton -> combat stance {State}. {Args}", drawn ? "drawn" : "sheathed", args);
 					}
 					else
 					{

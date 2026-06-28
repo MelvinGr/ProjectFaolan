@@ -216,6 +216,44 @@ namespace Faolan.GameServer.World
 			return SendWorldRecord(client, record);
 		}
 
+		// The combat-mode stat value a PLAYER sends when it draws its weapon (#218/#259): 1, vs the mob's 4 (the field is
+		// a stance/mode code; 1 is the value the captured player carries on combat entry). 0 sheathes.
+		private const uint PlayerCombatModeValue = 1;
+
+		// #259 toggle-combat: flip the player's manual combat stance and return the new state. The player entity's
+		// InCombat flag is unused by the sim tick (players are skipped there), so it's the natural place to hold the
+		// toggle. No-op-safe: returns false if the player isn't in the world yet.
+		public bool TogglePlayerCombatStance(INetworkClient client)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null)
+				return false;
+			player.InCombat = !player.InCombat;
+			return player.InCombat;
+		}
+
+		// #259 toggle-combat: push the PLAYER's combat-mode stat (draw / sheathe their weapon) to themselves AND nearby
+		// viewers who see them, mirroring BroadcastNpcCombatMode. The local client needs the stat to draw its own avatar's
+		// weapon, so unlike the NPC path this also addresses the player's own connection. The captured player value is 1
+		// (vs the mob's 4); 0 sheathes.
+		public async Task BroadcastPlayerCombatMode(INetworkClient client, bool inCombat)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null)
+				return;
+
+			var stats = new CharacterStatBlock().Set(LegacyCharacterStatId.CombatMode, inCombat ? PlayerCombatModeValue : 0u);
+			var body = VitalsPacket.BuildStatBlockBody(player.Handle, stats);
+
+			await SendWorldIir(client, body); // the player's own view draws/sheathes its weapon
+			foreach (var viewer in _sim
+				         .World
+				         .ZoneForEntity(player)
+				         .PlayersInRange(player.Position, WorldSimulation.PlayerInterestRange))
+				if (viewer.Client != null && viewer.Client != client && viewer.Known.Contains(player.Handle))
+					await SendWorldIir(viewer.Client, body);
+		}
+
 		// An NPC engaged a target: push its aggro to every viewer in range that sees it - a HateListUpdate (the NPC now
 		// hates the target) plus a ThreatLevel, so the threat/aggro is visible the tick combat starts (#216). Additive
 		// to the combat-mode weapon-draw; gated with the rest of the combat sim by the caller.
