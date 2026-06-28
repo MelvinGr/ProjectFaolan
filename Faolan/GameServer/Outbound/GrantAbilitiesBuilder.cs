@@ -79,6 +79,7 @@ namespace Faolan.GameServer
 			const uint shortcutTypeAbility = 4;
 			const uint shortcutTypeSpell = 2;
 			const uint specialBarBase = 0x4E20;
+			const uint secondBarBase = 100; // page 2 / "bar 1" (slot = bar position, page 2 = +100; see ShortcutBarBuilder)
 
 			// Persist the class's starting spells. GrantStartingSpells (called right after this in SendWorldEntry) then
 			// reads CharacterSpells, sends them, and queues the post-ready re-announce - so the freshly-seeded spells
@@ -87,17 +88,20 @@ namespace Faolan.GameServer
 			foreach (var spellId in spells)
 				await Database.AddCharacterSpell(character.Id, spellId);
 
-			// Default bar (Strie/Faolanx create captures): the 3 Normal Attacks on the primary bar (slots 0,1,2), the
-			// other starting abilities (toggle-combat / switch-weapon / utility) on the special bar (0x4E20+), then the
-			// class spells after the attacks on the primary bar.
+			// Default bar layout: the player's primary visible action bar is bar 1 (the +100 page), so the full usable
+			// kit lands there - the 3 Normal Attacks (left/middle/right) on bar 1 slots 100,101,102, then the class
+			// SPELLS right after them on bar 1 (103+). The other starting abilities (toggle-combat / switch-weapon /
+			// utility) go on the special bar (0x4E20+). Bar 0 is left empty so the attacks/spells are not split across
+			// two bars. (Retail's create capture also keeps a copy of the attacks on bar 0, but the player wants the
+			// L/M/R attacks + spells together on bar 1.)
 			var abilities = await Database.GetStartingAbilities(character.Level, (uint)character.Class);
-			uint primarySlot = 0;
+			uint secondBarSlot = secondBarBase;
 			uint specialSlot = specialBarBase;
 			foreach (var ability in abilities)
 			{
 				var isNormalAttack = ability.Id is >= 0xBBC40 and <= 0xBBC60;
 				if (isNormalAttack)
-					await Database.SetCharacterShortcut(character.Id, primarySlot++, shortcutTypeAbility, ability.Id);
+					await Database.SetCharacterShortcut(character.Id, secondBarSlot++, shortcutTypeAbility, ability.Id);
 				else
 					await Database.SetCharacterShortcut(character.Id, specialSlot++, shortcutTypeAbility, ability.Id);
 
@@ -110,8 +114,10 @@ namespace Faolan.GameServer
 				await SendAbilityGrant(client, ability, announce: false);
 			}
 
+			// Spells go on bar 1 (the +100 page), after the page-2 normal attacks - matching retail (Herald 0x3006FF at
+			// slot 103), so the player sees them on their primary visible bar rather than bar 0.
 			foreach (var spellId in spells)
-				await Database.SetCharacterShortcut(character.Id, primarySlot++, shortcutTypeSpell, spellId);
+				await Database.SetCharacterShortcut(character.Id, secondBarSlot++, shortcutTypeSpell, spellId);
 
 			Logger.LogInformation("EnsureStartingLoadout: seeded default bar for '{Name}' (class={Class}): {A} abilities + {S} spells (#74/#71).",
 				character.Name, character.Class, abilities.Length, spells.Length);
