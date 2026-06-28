@@ -62,6 +62,8 @@ namespace Faolan.Core.Database
 		Task<Item[]> SearchItems(string nameSubstring, int limit = 25);
 		Task<Item[]> GetRandomBuildableItems(int count);
 		Task<Item[]> GetMapLootSample(uint mapId, int count);
+		Task<bool> SetItemRandomLootExcluded(uint itemId, bool excluded);
+		Task<Item[]> GetRandomLootExcludedItems();
 		Task<NpcSpawn[]> SearchNpcSpawns(string nameSubstring, int limit = 50);
 		Task<LuaScript> GetLuaScript(uint scriptId);
 
@@ -885,7 +887,7 @@ namespace Faolan.Core.Database
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx
 				.Items
-				.Where(i => i.Archetype != 0 && i.Name != null && i.Name != "" && i.Type == ItemType.Normal)
+				.Where(i => i.Archetype != 0 && i.Name != null && i.Name != "" && i.Type == ItemType.Normal && !i.ExcludeFromRandomLoot)
 				.OrderBy(_ => EF.Functions.Random())
 				.Take(count)
 				.ToArrayAsync();
@@ -904,9 +906,36 @@ namespace Faolan.Core.Database
 				.MapLootEntries
 				.Where(e => e.MapId == mapId)
 				.Join(ctx.Items, e => e.ItemTemplateId, i => i.Id, (e, i) => i)
-				.Where(i => i.Archetype != 0 && i.Name != null && i.Name != "" && i.Type == ItemType.Normal)
+				.Where(i => i.Archetype != 0 && i.Name != null && i.Name != "" && i.Type == ItemType.Normal && !i.ExcludeFromRandomLoot)
 				.OrderBy(_ => EF.Functions.Random())
 				.Take(count)
+				.ToArrayAsync();
+		}
+
+		// Sets (or clears) an item's random-loot exclusion (#273), persisted to faolan.db. Returns false when no such
+		// item exists. Used by the .noloot GM command so a unique/quest item spotted in-client can be excluded live.
+		public async Task<bool> SetItemRandomLootExcluded(uint itemId, bool excluded)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var item = await ctx.Items.FirstOrDefaultAsync(i => i.Id == itemId);
+			if (item == null)
+				return false;
+
+			item.ExcludeFromRandomLoot = excluded;
+			await ctx.SaveChangesAsync();
+			return true;
+		}
+
+		// Normal-typed items explicitly flagged out of random loot (#273) - i.e. the unique/quest items that needed the
+		// flag because their Type didn't already exclude them. (Quest/Resource items are excluded by Type, so listing
+		// them too would just flood the .noloot list output.)
+		public async Task<Item[]> GetRandomLootExcludedItems()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.Items
+				.Where(i => i.ExcludeFromRandomLoot && i.Type == ItemType.Normal)
+				.OrderBy(i => i.Name)
 				.ToArrayAsync();
 		}
 

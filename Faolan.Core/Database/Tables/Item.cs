@@ -21,6 +21,14 @@ namespace Faolan.Core.Database.Tables
 		// Normal / Quest / Resource, set at import from the container an item was captured in (default Normal).
 		public ItemType Type { get; set; }
 
+		// Keeps the item out of RANDOM loot rolls (the per-map pool sample + the all-items fallback, #273). The Type
+		// filter already excludes Quest/Resource, but some quest items are typed Normal (only ever seen in a loot bag,
+		// never a quest container) and UNIQUE items (e.g. Ape King's Treasure) are typed Normal too with no wire-derivable
+		// "unique" flag - this is the explicit lever for those. Seeded at import (non-Normal types + a curated unique
+		// denylist) and settable live via the .noloot GM command; the importer only ever SETS it, so live/manual flags
+		// survive a re-import. Does NOT stop an item being granted/quest-dropped/spawned - only random drops.
+		public bool ExcludeFromRandomLoot { get; set; }
+
 		// Per-TEMPLATE hash the client needs (alongside the Data quad) to fully realize/render the item from its RDB.
 		// On the wire it is ProtoAcgItem.Hash (and the FullChar snapshot tail's f8 field). It is NOT in the old C++
 		// `p_items`, so it can only be HARVESTED from a capture where the item sat in an inventory (a 0x737A6DF9

@@ -18,7 +18,8 @@ namespace Faolan.Importer.Modules
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
 			var (total, inserted) = await CaptureItemImporter.ImportAsync(ctx.Db, ctx.RawPackets);
-			return new ImportResult($"{total} item-candidate packets, {inserted} new.");
+			var excluded = await ImportOps.ApplyRandomLootExclusions(ctx.Db); // #273: quest/resource + curated uniques
+			return new ImportResult($"{total} item-candidate packets, {inserted} new, {excluded} newly excluded from random loot.");
 		}
 	}
 }

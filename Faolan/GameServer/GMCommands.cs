@@ -419,8 +419,50 @@ namespace Faolan.GameServer
 				["money"] = (client, arguments) => MoneyCommand(client, arguments),
 				["buffs"] = (client, _) => BuffsCommand(client),
 				["cancelbuff"] = (client, arguments) => CancelBuffCommand(client, arguments),
-				["spawnbag"] = (client, arguments) => SpawnBagCommand(client, arguments)
+				["spawnbag"] = (client, arguments) => SpawnBagCommand(client, arguments),
+				["noloot"] = (client, arguments) => NoLootCommand(client, arguments)
 			};
+		}
+
+		// .noloot <itemId> [on|off]  - flag an item OUT of (on, default) or back INTO (off) random loot rolls (#273).
+		// .noloot list               - list the Normal-typed items currently excluded (the unique/quest exclusions).
+		// The change persists to faolan.db, so it survives a restart and a re-import. Use it to stop a unique item (e.g.
+		// Ape King's Treasure) that retail bags carried from being randomly redropped; quest/resource items are already
+		// excluded by their type.
+		private async Task NoLootCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var parts = (arguments ?? "")
+				.Trim()
+				.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+			if (parts.Length >= 1 && parts[0].Equals("list", StringComparison.OrdinalIgnoreCase))
+			{
+				var excluded = await Database.GetRandomLootExcludedItems();
+				await _agentServerDispatcher.SendSystemMessage(characterId, excluded.Length == 0
+					? "No unique items are excluded from random loot."
+					: $"Excluded from random loot ({excluded.Length}): {string.Join(", ", excluded.Select(i => $"'{i.Name}' ({i.Id})"))}");
+				return;
+			}
+
+			if (parts.Length is < 1 or > 2 || !uint.TryParse(parts[0], out var itemId) ||
+			    (parts.Length == 2 && !parts[1].Equals("on", StringComparison.OrdinalIgnoreCase) && !parts[1].Equals("off", StringComparison.OrdinalIgnoreCase)))
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .noloot &lt;itemId&gt; [on|off]  or  .noloot list");
+				return;
+			}
+
+			var exclude = parts.Length < 2 || parts[1].Equals("on", StringComparison.OrdinalIgnoreCase);
+			var item = await Database.GetItem(itemId);
+			if (!await Database.SetItemRandomLootExcluded(itemId, exclude))
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"No item with id {itemId}.");
+				return;
+			}
+
+			await _agentServerDispatcher.SendSystemMessage(characterId, exclude
+				? $"'{item?.Name}' ({itemId}) will no longer drop as random loot."
+				: $"'{item?.Name}' ({itemId}) can drop as random loot again.");
 		}
 
 		// .buffs  - list the server-tracked active buffs on the player (the registry CancelBuff removes from).

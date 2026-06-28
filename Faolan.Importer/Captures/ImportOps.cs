@@ -499,6 +499,39 @@ namespace Faolan.Importer.Captures
 			return kept.Count;
 		}
 
+		// Curated unique/no-random-drop item templates (#273). UNIQUE items are typed Normal and carry no wire-derivable
+		// "unique" flag (the RDB item-template property table has no decoded unique field, and SearchCategory mixes them
+		// with ordinary sellables), so they can't be auto-detected - this is the hand-maintained denylist. Add a template
+		// id here (or set it live with `.noloot <id>`) when an item that shouldn't randomly drop is spotted in-client.
+		private static readonly uint[] UniqueLootDenylist =
+		[
+			354477, // Ape King's Treasure
+		];
+
+		// Seeds the random-loot exclusion flag (#273): excludes every Quest/Resource item (those typed from a non-Normal
+		// container) plus the curated unique denylist. ADD-ONLY - it never CLEARS the flag, so an item flagged live via
+		// .noloot (or by hand) survives a re-import. Returns the number of rows newly excluded.
+		public static async Task<int> ApplyRandomLootExclusions(DatabaseContext db)
+		{
+			var denylist = UniqueLootDenylist.ToHashSet();
+			var newlyExcluded = 0;
+			foreach (var item in await db.Items.ToListAsync())
+			{
+				if (item.ExcludeFromRandomLoot)
+					continue; // already excluded (a previous run, or a live .noloot) - never clear it
+
+				if (item.Type != ItemType.Normal || denylist.Contains(item.Id))
+				{
+					item.ExcludeFromRandomLoot = true;
+					newlyExcluded++;
+				}
+			}
+
+			if (newlyExcluded > 0)
+				await db.SaveChangesAsync();
+			return newlyExcluded;
+		}
+
 		public static NpcSpawn Populate(NpcSpawn row, NpcSpawnEntry e)
 		{
 			row.CapturedHandle = e.Handle;
