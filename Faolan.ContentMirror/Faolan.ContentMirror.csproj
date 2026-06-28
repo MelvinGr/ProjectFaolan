@@ -9,4 +9,7 @@
     <ItemGroup>
       <ProjectReference Include="..\Faolan.Core\Faolan.Core.csproj" />
     </ItemGroup>
+    <ItemGroup>
+      <PackageReference Update="System.Security.Cryptography.Xml" Version="10.0.9" />
+    </ItemGroup>
 </Project>
