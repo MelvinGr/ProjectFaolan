@@ -111,9 +111,21 @@ namespace Faolan.GameServer.World
 		// materialise. Null for a standalone .spawnbag (no source NPC).
 		public string LootSourceName { get; set; }
 
-		// The position this NPC stepped FROM on its last chase tick - the MoveTask broadcast sends from->to so the
-		// client interpolates the step (set just before Position is advanced toward the target).
+		// #272 smooth movement: MoveOrigin is the ACCUMULATION ANCHOR for the move-broadcast throttle - the start of the
+		// segment currently being built up. The model steps Position every tick, but a MoveTask is only broadcast once
+		// Position has travelled a retail-sized distance (MoveBroadcastSegment) from this anchor, at which point the anchor
+		// re-advances to Position. So the client interpolates ~6u segments instead of a 1.2u-per-tick snap (the jitter).
 		public Vector3 MoveOrigin { get; set; }
+
+		// #272: the FROM point of the segment the broadcaster actually sends (MoveFrom -> Position), captured when a move
+		// effect is queued. Distinct from MoveOrigin (which re-anchors to Position at that moment to start the next
+		// segment); the broadcaster reads MoveFrom so its segment isn't degenerate. Also the facing source for the StopIIR.
+		public Vector3 MoveFrom { get; set; }
+
+		// #272: true while this entity is mid-move (chasing / returning home / following a player). Drives the segment
+		// throttle (the anchor is seeded when a move starts) and the one-shot stop (so an arrival emits a single StopIIR).
+		// Cleared on arrival, death and respawn.
+		public bool Moving { get; set; }
 
 		// True while a leashed NPC is walking back to its spawn point - it ignores re-aggro until home (so a player
 		// camping the leash edge can't ping-pong it).
@@ -205,11 +217,10 @@ namespace Faolan.GameServer.World
 		// "releases" the NPC (e.g. Casilda after her rescue stage); the world tick steps the NPC toward that player and
 		// broadcasts a MoveTask each step - the same server-driven incremental-step follow retail uses (decoded from the
 		// Hoxxling gameplay capture: a stream of 0x96C46740 from->to ~6-7u steps tracking the player). Cleared when the
-		// leader leaves the zone / logs out. FollowMoving tracks whether she stepped last tick so a single Stop closes
+		// leader leaves the zone / logs out. The shared Moving flag tracks whether she stepped so a single Stop closes
 		// the move when she catches up (avoids spamming a stop every idle tick).
 		public uint FollowTargetHandle { get; set; }
 		public bool Following => FollowTargetHandle != 0;
-		public bool FollowMoving { get; set; }
 
 		// Arms the patrol re-issue timer for the next cycle.
 		public void ArmPatrolCycle() => _patrolReissueRemaining = PatrolCycleSeconds;
@@ -247,6 +258,7 @@ namespace Faolan.GameServer.World
 			_corpseLingerRemaining = CorpseLingerSeconds;
 			_corpseConverted = false;
 			InCombat = false; // combat ends on death; a respawn re-engages from a clean (sheathed) state
+			Moving = false; // a mid-chase death stops moving (the corpse doesn't stream a trailing move, #272)
 		}
 
 		// Advances the attack cooldown by dt; returns true (and re-arms for `interval`) when a swing is ready. Used by
@@ -306,6 +318,8 @@ namespace Faolan.GameServer.World
 			// (the spot it died), so without this the first post-respawn MoveTask streams origin=death -> spawn and
 			// the client renders the revived NPC back at its death location before walking home. Anchor it at spawn.
 			MoveOrigin = SpawnPosition;
+			MoveFrom = SpawnPosition;
+			Moving = false; // a fresh NPC starts stationary (#272); the next chase/return re-seeds the move anchor
 			// Drop any unlooted corpse-bag contents - the entity is a live NPC again, not a bag.
 			CashTin = 0;
 			LootItems.Clear();

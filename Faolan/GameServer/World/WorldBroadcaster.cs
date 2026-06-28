@@ -135,20 +135,19 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// An NPC stepped on the tick (chasing a target, or returning home): send its MoveTask to every player in range
-		// that already sees it, so they watch it move. Uses the PATROL form (origin -> this tick's position as a single
-		// waypoint, at NpcMoveSpeed) rather than the speed-less 61-byte form: the wire SPEED is what makes the client (a)
-		// interpolate the segment over speed*dt instead of snapping/teleporting and (b) pick a run gait over a walk.
-		// The NPC faces its travel direction implicitly (it walks toward the waypoint). Only viewers who know the handle
-		// get it (else they'd get a move for an unknown entity).
+		// An NPC moved a retail-sized segment (chasing a target, or returning home): send its MoveTask to every player in
+		// range that already sees it. The body is the 61-byte transform form for the SEGMENT (MoveFrom -> Position, facing
+		// the travel direction); the throttle in WorldState.Tick (#272) only queues this once the NPC has covered
+		// MoveBroadcastSegment (~6u, retail's chase step) since the last one, so the client interpolates a real segment
+		// over time instead of getting a 1.2u snap every tick (the jitter/teleport). Only viewers who know the handle get
+		// it (else they'd get a move for an unknown entity).
 		public async Task BroadcastNpcMove(WorldEntity npc)
 		{
-			// Send the 61-byte transform form (origin -> this tick's position, facing travel direction). NB the patrol
-			// form (BuildPatrol) was tried here but its anchor makes the client walk to the waypoint then BACK to the
-			// anchor, netting ZERO movement (the NPC jitters in place) - so we keep the plain transform. The walk-vs-run
-			// gait + the residual snap are the remaining #190 polish (needs the parametric "approach" MoveTask form).
-			var facing = npc.MoveOrigin.FaceTowards(npc.Position);
-			var body = MoveTaskCodec.BuildBody(npc.Handle, npc.MoveOrigin, npc.Position, facing);
+			// NB the patrol (mode-1 path) form was tried here but its trailer anchor makes the client walk to the waypoint
+			// then BACK to the anchor, netting ZERO movement (the NPC jitters in place) - so we keep the plain transform
+			// and instead fixed the cadence (coarser segments) so consecutive transforms chain smoothly.
+			var facing = npc.MoveFrom.FaceTowards(npc.Position);
+			var body = MoveTaskCodec.BuildBody(npc.Handle, npc.MoveFrom, npc.Position, facing);
 
 			foreach (var viewer in _sim
 				         .World
@@ -245,7 +244,7 @@ namespace Faolan.GameServer.World
 		// closing the MoveTask stream it was emitting while it chased/returned (#190). Faces the direction it travelled.
 		public async Task BroadcastNpcStop(WorldEntity npc)
 		{
-			var facing = npc.MoveOrigin.FaceTowards(npc.Position);
+			var facing = npc.MoveFrom.FaceTowards(npc.Position);
 			var record = StopCodec.Build(npc.Handle, npc.Position, facing.X, facing.Y, facing.Z, facing.W);
 
 			foreach (var viewer in _sim

@@ -33,6 +33,13 @@ namespace Faolan.GameServer.World
 		// follower ~one step behind; its MoveTasks track the player ~6-7u apart). A follower never leashes/aggros.
 		public const float FollowStopRange = 4f;
 
+		// #272 smooth movement: the client interpolates a MoveTask's from->to segment over the implied time, so the server
+		// must feed it retail-sized segments - retail's chase/follow stream is ~6-7u steps. The model still steps Position
+		// every tick (combat/interest fidelity), but a MoveTask is only broadcast once the entity has travelled this far
+		// since the last one; a 1.2u-per-tick (10 Hz) MoveTask flood is what the client can't interpolate -> the jitter/
+		// teleport (#272). At NpcMoveSpeed (12 u/s) this broadcasts ~twice a second.
+		public const float MoveBroadcastSegment = 6f;
+
 		// The live zones keyed by (mapId, instanceId) (#268). A map can have several copies (instances): the default
 		// shared instance plus any per-character Solo / per-party Group copies. Instance DefaultInstance (0) is the
 		// shared copy every Shared map uses - so ZoneFor(mapId) / the historical single-zone-per-map paths all resolve
@@ -154,11 +161,7 @@ namespace Faolan.GameServer.World
 						if (!zone.TryGet(entity.FollowTargetHandle, out var leader) || !leader.IsPlayer)
 						{
 							entity.FollowTargetHandle = 0;
-							if (entity.FollowMoving)
-							{
-								entity.FollowMoving = false;
-								effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcStopped));
-							}
+							EndMove(entity, stop: true, WorldTickEffectType.NpcFollow);
 							continue;
 						}
 
@@ -166,24 +169,11 @@ namespace Faolan.GameServer.World
 						var fdz = leader.Position.Z - entity.Position.Z;
 						var fdist = MathF.Sqrt(fdx * fdx + fdz * fdz);
 						if (fdist > FollowStopRange)
-						{
-							StepToward(entity, fdx, fdz, fdist, deltaSeconds, stopShort: FollowStopRange);
-							entity.FollowMoving = true;
-							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcFollow, leader));
-						}
-						else if (entity.FollowMoving)
-						{
-							entity.FollowMoving = false;
-							// Caught up: close the move FACING THE LEADER. The stop's facing is MoveOrigin->Position, but the
-							// last approach step is often tiny (she stops just outside FollowStopRange), so that direction is
-							// degenerate and she'd settle on the default heading (looks like turning back toward her spawn).
-							// Mirror MoveOrigin across her position so MoveOrigin->Position points straight at the leader.
-							entity.MoveOrigin = new Vector3(
-								2f * entity.Position.X - leader.Position.X,
-								entity.Position.Y,
-								2f * entity.Position.Z - leader.Position.Z);
-							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcStopped));
-						}
+							StepAndStream(entity, fdx, fdz, fdist, FollowStopRange, WorldTickEffectType.NpcFollow, leader);
+						else
+							// Caught up: flush the trailing approach (a real ~6u segment toward the leader, so its facing
+							// points straight at her) and close the move with a single StopIIR (#262/#272).
+							EndMove(entity, stop: true, WorldTickEffectType.NpcFollow);
 						continue;
 					}
 
@@ -217,14 +207,13 @@ namespace Faolan.GameServer.World
 						entity.ArmAttackCooldown(NpcAttackInterval);
 						if (homeDist > NpcMeleeRange)
 						{
-							StepToward(entity, homeDx, homeDz, homeDist, deltaSeconds);
-							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcMove));
+							StepAndStream(entity, homeDx, homeDz, homeDist, 0f, WorldTickEffectType.NpcMove, null);
 							continue;
 						}
 
 						entity.Returning = false;
 						entity.Vitals.ReviveToFull(); // home again
-						effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcStopped)); // arrived: stop moving (#190)
+						EndMove(entity, stop: true, WorldTickEffectType.NpcMove); // arrived: flush + stop (#190/#272)
 						continue;
 					}
 
@@ -232,6 +221,7 @@ namespace Faolan.GameServer.World
 					{
 						SetCombat(entity, false); // no target in range: disengage and sheathe
 						entity.ArmAttackCooldown(NpcAttackInterval); // re-aggro shouldn't swing instantly
+						EndMove(entity, stop: true, WorldTickEffectType.NpcMove); // stop if we were mid-chase (#272)
 						// Disengaged with no one in range: heal back to full so it can't be whittled from out of range.
 						if (entity.Vitals.Health < entity.Vitals.MaxHealth)
 							entity.Vitals.ReviveToFull();
@@ -251,19 +241,22 @@ namespace Faolan.GameServer.World
 					// the effect so the broadcaster can also push the aggro (HateList/ThreatLevel, #216).
 					SetCombat(entity, true, target);
 
-					// Chase: if the target is beyond melee range, step toward it (horizontal plane; keep terrain Y) and
-					// broadcast the move instead of swinging this tick. The client interpolates origin->position, so a
-					// 10 Hz step reads as the NPC running up to the player; it swings once it arrives in melee range.
+					// Chase: if the target is beyond melee range, step toward it (horizontal plane; keep terrain Y). The move
+					// is broadcast in retail-sized segments (StepAndStream throttle, #272) so the client interpolates the
+					// run up to the player smoothly; it swings once it arrives in melee range.
 					var dx = target.Position.X - entity.Position.X;
 					var dz = target.Position.Z - entity.Position.Z;
 					var horizontal = MathF.Sqrt(dx * dx + dz * dz);
 					if (horizontal > NpcMeleeRange)
 					{
-						StepToward(entity, dx, dz, horizontal, deltaSeconds, stopShort: NpcMeleeRange);
+						StepAndStream(entity, dx, dz, horizontal, NpcMeleeRange, WorldTickEffectType.NpcMove, target);
 						entity.ArmAttackCooldown(NpcAttackInterval); // wind up a swing for when it arrives
-						effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcMove, target));
 						continue;
 					}
+
+					// Reached melee: flush the trailing approach step so the client sees it close the last bit (no StopIIR -
+					// the swing/combat-mode draw plants it), then swing (#272).
+					EndMove(entity, stop: false, WorldTickEffectType.NpcMove);
 
 					if (entity.TickAttackReady(deltaSeconds, NpcAttackInterval))
 						// A caster NPC casts a spell on the same cadence; everyone else swings (#232).
@@ -284,6 +277,48 @@ namespace Faolan.GameServer.World
 				e.InCombat = inCombat;
 				effects.Add(new WorldTickEffect(e,
 					inCombat ? WorldTickEffectType.NpcEnterCombat : WorldTickEffectType.NpcExitCombat, target));
+			}
+
+			// Steps `e` toward (dx,dz) this tick and queues a move broadcast ONLY once it has travelled a retail-sized
+			// segment since the last one (#272), so the client interpolates ~6u segments instead of a per-tick snap. The
+			// model position advances every call regardless; `moveType` is NpcMove (chase/return) or NpcFollow (companion)
+			// so the loop gates/handles it correctly. `target` rides the effect (the aggro/leader the broadcaster wants).
+			void StepAndStream(WorldEntity e, float dx, float dz, float dist, float stopShort, WorldTickEffectType moveType, WorldEntity target)
+			{
+				if (!e.Moving) // a fresh move: anchor the first segment at the start point
+				{
+					e.MoveOrigin = e.Position;
+					e.Moving = true;
+				}
+
+				StepToward(e, dx, dz, dist, deltaSeconds, stopShort);
+				if (Vector3.DistanceSquared(e.MoveOrigin, e.Position) < MoveBroadcastSegment * MoveBroadcastSegment)
+					return; // segment too short to broadcast yet - keep accumulating
+
+				e.MoveFrom = e.MoveOrigin; // the segment the broadcaster sends (MoveFrom -> Position)
+				e.MoveOrigin = e.Position; // re-anchor for the next segment
+				effects.Add(new WorldTickEffect(e, moveType, target));
+			}
+
+			// Ends `e`'s move (it reached its target / home / leader): flushes the trailing sub-segment the throttle didn't
+			// broadcast (so the client walks the last bit instead of snapping) and, when `stop`, closes the stream with a
+			// single StopIIR. The flush's segment direction also gives the stop a non-degenerate facing. No-op if `e`
+			// wasn't moving, so an idle entity never re-emits a stop (#272).
+			void EndMove(WorldEntity e, bool stop, WorldTickEffectType moveType)
+			{
+				if (!e.Moving)
+					return;
+
+				e.Moving = false;
+				if (Vector3.DistanceSquared(e.MoveOrigin, e.Position) > 1e-4f)
+				{
+					e.MoveFrom = e.MoveOrigin;
+					e.MoveOrigin = e.Position;
+					effects.Add(new WorldTickEffect(e, moveType)); // final approach step (no target needed)
+				}
+
+				if (stop)
+					effects.Add(new WorldTickEffect(e, WorldTickEffectType.NpcStopped));
 			}
 		}
 
@@ -323,13 +358,12 @@ namespace Faolan.GameServer.World
 		}
 
 		// Advances `entity` one tick's worth toward (dx, dz) - a horizontal step at NpcMoveSpeed (keeping terrain Y),
-		// recording the origin so the broadcast can send origin->position for the client to interpolate. `stopShort`
-		// leaves that many units short of the point (melee range when chasing, follow range when following); 0 lands on
-		// it (returning home).
+		// `stopShort` leaves that many units short of the point (melee range when chasing, follow range when following);
+		// 0 lands on it (returning home). The broadcast anchor (MoveOrigin) is managed by StepAndStream, not here, so a
+		// caller that wants the step broadcast must go through StepAndStream.
 		private static void StepToward(WorldEntity entity, float dx, float dz, float distance, double deltaSeconds, float stopShort = 0f)
 		{
 			var travel = MathF.Min((float)(NpcMoveSpeed * deltaSeconds), distance - stopShort);
-			entity.MoveOrigin = entity.Position;
 			entity.Position = new Vector3(
 				entity.Position.X + dx / distance * travel,
 				entity.Position.Y,

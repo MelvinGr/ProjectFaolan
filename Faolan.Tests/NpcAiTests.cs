@@ -144,9 +144,10 @@ namespace Faolan.Tests
 			Assert.Same(npc, move.Entity);
 			Assert.Same(player, move.Target);
 
-			// It stepped toward the player (closer than it started, not past them) and recorded its origin.
+			// It stepped toward the player (closer than it started, not past them) and the broadcast segment recorded its
+			// origin (the from of the MoveFrom -> Position segment the client interpolates, #272).
 			Assert.True(npc.Position.X > 0 && npc.Position.X < 10);
-			Assert.Equal(0f, npc.MoveOrigin.X);
+			Assert.Equal(0f, npc.MoveFrom.X);
 		}
 
 		[Fact]
