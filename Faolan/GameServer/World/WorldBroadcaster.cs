@@ -824,7 +824,7 @@ namespace Faolan.GameServer.World
 			var entries = definitions
 				.Select(d => new WorldQuest.JournalEntry(d.QuestId, Record(d, QuestTextSlot.Title), Record(d, QuestTextSlot.ListSubLine)))
 				.ToList();
-			var trailing = Convert.FromHexString("00000000000003f100000000000003f100000000");
+			var trailing = WorldQuest.BuildTrackedQuestPointer();
 
 			var body = WorldQuest.BuildQuestJournal(client.Session.Account.ClientInstance, first.AreaId, areaHeader, entries, trailing);
 			return new PacketStream()

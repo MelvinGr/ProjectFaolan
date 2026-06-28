@@ -177,6 +177,21 @@ namespace Faolan.GameServer.World
 		public const ulong SnapshotQuestAcceptTime = 0x000111D354375554UL;
 		private const uint ChapterTag = 0x00000BD3; // per-quest grouping word, constant across Tortage quests
 		private const string RrlMagic = "RRL3"; // record-list magic that precedes the per-quest entries
+		private const uint ListFrame = 0x000003F1; // the (count+1)*0x3F1 list-framing invariant; 0x3F1 = an empty list
+
+		// The "currently tracked quest" pointer block that closes a QuestJournal: [u32 trackedQuestId][list A][list B],
+		// each list = [u32 (count+1)*0x3F1 framing][u32 count][entries]. Decoded byte-exact from every captured
+		// single-quest journal, which all carry the NO-TRACK state (trackedQuestId 0, both lists empty). The server does
+		// not drive quest TRACKING - the client picks which quest to follow - so this emits that no-track form from typed
+		// fields instead of a hex blob. (Pinning the populated tracked form needs a track-a-quest capture; #193.)
+		public static byte[] BuildTrackedQuestPointer(uint trackedQuestId = 0)
+		{
+			var w = new List<byte>(20);
+			WriteU32(w, trackedQuestId);
+			WriteU32(w, ListFrame); WriteU32(w, 0); // list A (empty)
+			WriteU32(w, ListFrame); WriteU32(w, 0); // list B (empty)
+			return w.ToArray();
+		}
 
 		// One <remoteformat>/<localized> text slot:  00 <u8 length> <ascii bytes>.  `key` is passed
 		// pre-escaped (it already contains entities like &#36; in the capture).
@@ -206,8 +221,8 @@ namespace Faolan.GameServer.World
 		//   per entry: [u32 index(1-based)][u32 questId][u32 chapter] <title> <subLine>
 		//   [trailing tracked-quest block]
 		// `areaHeader` is the 3 region/zone-title records (cat 50300 + two cat 52000 map/region names).
-		// `trailing` is the "currently tracked quest" pointer block (state-dependent; pass the captured
-		// no-tracked-quest block 00000000 000003f1 00000000 000003f1 00000000 for a single fresh quest).
+		// `trailing` is the "currently tracked quest" pointer block - pass BuildTrackedQuestPointer() (the typed
+		// no-track form; the server doesn't drive quest tracking).
 		public static byte[] BuildQuestJournal(uint playerHandle, uint areaId, IReadOnlyList<byte[]> areaHeader, IReadOnlyList<JournalEntry> entries, byte[] trailing)
 		{
 			var w = new List<byte>(256);

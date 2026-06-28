@@ -107,7 +107,7 @@ namespace Faolan.Tests
 					WorldQuest.RemoteFormat(13479, 50301, "@MSeS6Le,s-7YMf0t1R6"),
 					WorldQuest.RemoteFormat(13479, 50303, "i&#36;g&#92;DTrqI&#92;nBI0lUo6&amp;7"))
 			};
-			var trailing = Convert.FromHexString("00000000000003f100000000000003f100000000");
+			var trailing = WorldQuest.BuildTrackedQuestPointer();
 
 			var body = WorldQuest.BuildQuestJournal(0x01316D8A, 1054, areaHeader, entries, trailing);
 			Assert.Equal(CaptureBody("79f8c7a1"), Convert.ToHexString(body).ToLowerInvariant());
@@ -189,7 +189,7 @@ namespace Faolan.Tests
 			// Journal list (no timestamp) - byte-exact against frame 9947.
 			var areaHeader = new[] { Rec(QuestTextSlot.AreaTitle), Rec(QuestTextSlot.MapName), Rec(QuestTextSlot.RegionName) };
 			var entries = new[] { new WorldQuest.JournalEntry(0x34A7, Rec(QuestTextSlot.Title), Rec(QuestTextSlot.ListSubLine)) };
-			var trailing = Convert.FromHexString("00000000000003f100000000000003f100000000");
+			var trailing = WorldQuest.BuildTrackedQuestPointer();
 			var journal = WorldQuest.BuildQuestJournal(0x01316D8A, def.AreaId, areaHeader, entries, trailing);
 			Assert.Equal(CaptureBody("79f8c7a1"), Convert.ToHexString(journal).ToLowerInvariant());
 
