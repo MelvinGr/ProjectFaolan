@@ -225,6 +225,31 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void Respawn_ResetsToOriginalSpawnPoint()
+		{
+			var world = new WorldState();
+			var zone = world.ZoneFor(4010);
+			var npc = Npc(1, 0, 0); // homes at the origin
+			npc.RespawnDelaySeconds = 1.0;
+			zone.Add(npc);
+
+			// It died well away from its spawn (chased out, killed at range).
+			npc.Position = new Vector3(50f, 0, 30f);
+			npc.Vitals.ApplyHealthDelta(-100);
+			npc.MarkDead();
+
+			var respawned = false;
+			for (var i = 0; i < 100 && !respawned; i++)
+				foreach (var e in world.Tick(0.5))
+					respawned |= e.Type == WorldTickEffectType.NpcRespawned && e.Entity == npc;
+
+			Assert.True(respawned, "a dead NPC should respawn once its delay elapses");
+			// It reappears at its ORIGINAL spawn point, not where it was killed (#246).
+			Assert.Equal(npc.SpawnPosition, npc.Position);
+			Assert.Equal(npc.SpawnPosition, npc.MoveFrom);
+		}
+
+		[Fact]
 		public void ResolveNpcAttackDamage_ScalesWithLevel()
 		{
 			Assert.True(CombatResolver.ResolveNpcAttackDamage(10) > CombatResolver.ResolveNpcAttackDamage(1));
