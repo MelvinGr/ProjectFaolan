@@ -14,13 +14,6 @@
     </ItemGroup>
 
     <ItemGroup>
-        <!-- #249: the generic loot-bag geometry tail (kd-tree), the one reference-data piece of a loot bag. The bag
-             body is otherwise built from scratch (header/transform + identity from columns); this static geometry is
-             baked once so loot bags need NO captured world-object row (GetLootTemplate is map-independent). -->
-        <EmbeddedResource Include="GameServer\Economy\LootBagKdTreeTail.bin"/>
-    </ItemGroup>
-
-    <ItemGroup>
         <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.9" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9">
             <PrivateAssets>all</PrivateAssets>
