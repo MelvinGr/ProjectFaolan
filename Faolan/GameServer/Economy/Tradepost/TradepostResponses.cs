@@ -55,21 +55,23 @@ namespace Faolan.GameServer.Economy.Tradepost
 				.SendAsync(client);
 
 		// Reply to TradepostItemSearch with DB-backed listings for the searched item (rows built byte-exact by
-		// TradepostListingCodec, cheapest first). `head` echoes the query's category. Echoes the inbound
-		// TradepostInterface instance so the client matches the reply to its window.
-		public static Task SendSearchResults(INetworkClient client, ConanPacket inbound, uint head, IReadOnlyCollection<TradepostListing> listings) =>
-			Build(TradepostProtocol.InterfaceMethod.DispatchSearchResults, TradepostListingCodec.Build(head, listings, MintRowHandles), inbound.Sender.Instance)
+		// TradepostListingCodec, cheapest first). Echoes the inbound TradepostInterface instance so the client
+		// matches the reply to its window.
+		//
+		// head = (rowCount + 1) * 0x3F1 - the list-framing invariant the client uses to size the grid (#212).
+		// Decoded from the buy-from-AH capture: a 78-row result carries head 0x1375F = 79*0x3F1, a 5-row result
+		// 0x17A6 = 6*0x3F1, etc. The old code echoed the search CATEGORY here, which only equals (N+1)*0x3F1 for a
+		// single row ((1+1)*0x3F1 == 2018 == cat 0x7E2 - the coincidence that hid the bug and passed the single-row
+		// golden test), so EVERY multi-row result collapsed to one visible row. (The earlier "unique per-row handle"
+		// theory was a red herring: retail's per-row ItemHandle is a SHARED per-item value and the seller Handle
+		// repeats across rows, yet all rows render - the client keys rows by saleId, not handle. So the handles come
+		// straight off the stored listing rows, which already carry the retail-shaped shared ItemHandle + seller Handle.)
+		public static Task SendSearchResults(INetworkClient client, ConanPacket inbound, IReadOnlyCollection<TradepostListing> listings)
+		{
+			var head = (uint)(listings.Count + 1) * 0x3F1;
+			return Build(TradepostProtocol.InterfaceMethod.DispatchSearchResults, TradepostListingCodec.Build(head, listings), inbound.Sender.Instance)
 				.SendAsync(client);
-
-		// Unique per-row display handles for the search grid (#212). The client keys the grid by the per-row dynel
-		// handle, so all listings of an item must NOT share one handle or they collapse to a single visible row.
-		// Index-based within the response guarantees uniqueness; the buy path keys on SaleId, so these are throwaway
-		// display ids. High bases keep them clear of the small world-entity handle range.
-		private const uint RowHandleBase = 0x0C000000;
-		private const uint RowItemHandleBase = 0x15000000;
-
-		private static (uint Handle, uint ItemHandle) MintRowHandles(int index) =>
-			(RowHandleBase + (uint)index, RowItemHandleBase + (uint)index);
+		}
 
 		// Fallback when no DB listing matches the query: replay the captured single-row listing so the grid still
 		// renders something for the PoC (item-agnostic). Drops out naturally once listings are imported/seeded.

@@ -33,12 +33,10 @@ namespace Faolan.GameServer.Economy.Tradepost
 					logger.LogInformation("Tradepost: {Char} searched lang={Lang} itemId=0x{Item:X} page={Page} -> {Count} listing(s).",
 						CharName(client), query.Lang, query.ItemId, query.Page, listings.Count);
 
-					if (listings.Count > 0)
-						await TradepostResponses.SendSearchResults(client, packet, query.Category, listings);
-					else
-						// No imported/seeded listing for this item yet - replay the captured row so the grid still
-						// renders (PoC). Drops out once listings exist for the searched item.
-						await TradepostResponses.SendSearchResultsReplay(client, packet);
+					// Always send the real result: an empty match list yields an empty grid (head = (0+1)*0x3F1, no
+					// rows), not the captured single-row PoC replay - that interim showed a spurious "Torn Rags"
+					// (item 0x755D) row for every category whose searched item had no listings.
+					await TradepostResponses.SendSearchResults(client, packet, listings);
 					break;
 				}
 
