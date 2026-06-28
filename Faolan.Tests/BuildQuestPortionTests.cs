@@ -70,6 +70,26 @@ namespace Faolan.Tests
 				$"2-quest region must equal the capture; lengths golden={golden.Length} built={built.Length}; first diff @{diff}");
 		}
 
+		// A character holding NO snapshot quests (a freshly created char, or one who completed/abandoned the beach
+		// starter) carries the empty quest region. Byte-exact across all 20 *-create captures (the starter quest is
+		// delivered LIVE on create-world entry, not in the snapshot). See Captures/scripts/decode_snapshot_quests.py.
+		[Fact]
+		public void BuildEmptyQuestPortion_MatchesTheCreateCaptureRegion()
+		{
+			byte[] golden =
+			[
+				0x00, 0x00, 0x00, 0x18, // version 0x18
+				0x00, 0x00, 0x03, 0xF1, // empty Quest_c list ((0+1)*0x3F1)
+				0x00, 0x00, 0x03, 0xF1, // index tag
+				0x00, 0x00, 0x03, 0xF1, // empty index marker ((0+1)*0x3F1)
+				0x00, 0x00, 0x00, 0x00, // index count = 0
+				0x00, 0x01, 0x56, 0xE7  // terminal constant
+			];
+			Assert.Equal(golden, BeachTailsBuilder.BuildEmptyQuestPortion());
+			// The empty-quest list/null-primary path must route to the same region.
+			Assert.Equal(golden, BeachTailsBuilder.BuildQuestPortion([], primary: null, 0));
+		}
+
 		private static int IndexOf(byte[] hay, byte[] needle)
 		{
 			for (var i = 0; i + needle.Length <= hay.Length; i++)

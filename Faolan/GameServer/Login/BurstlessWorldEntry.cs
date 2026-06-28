@@ -38,7 +38,8 @@ namespace Faolan.GameServer
 		{
 			var character = client.Session.Character;
 			var equipment = await EnsureBeachStarterEquipment(character);
-			await EnsureBeachStarterQuest(character);
+			// The beach starter quest (10238) is granted ONCE at character creation (CommitCharacterName), not re-seeded
+			// here - so a completed/removed quest never reappears. The journal is now driven purely from CharacterQuests.
 			var inventoryRows = character != null
 				? await Database.GetCharacterInventory(character.Id)
 				: [];
@@ -98,7 +99,14 @@ namespace Faolan.GameServer
 				Logger.LogWarning("Burst-less entry (map={Map}, '{Name}'): player spawn not built (no scaffold rows?); avatar may not render.", mapId, character?.Name);
 			}
 
-			var (snapshotQuests, primaryQuest) = await LoadSnapshotQuests(character, beachDef);
+			// Retail split (proven byte-exact in the *-create vs *-login captures): a CREATE-world entry carries NO quests
+			// in the snapshot (empty Quest_c region) and grants the starter quest LIVE afterwards; a LOGIN entry carries
+			// the character's held quests in the snapshot. So the snapshot region is data-driven from CharacterQuests on
+			// login, and empty on create.
+			var isCreateEntry = client.Session.IsCreateWorldSession;
+			var (snapshotQuests, primaryQuest) = isCreateEntry
+				? (new System.Collections.Generic.List<QuestDefinition>(), (QuestDefinition)null)
+				: await LoadSnapshotQuests(character);
 			// #74/#71: the character's learned spells ride the snapshot's known-list so they survive relog + place on the
 			// action bar (instead of the per-login DispatchLearnSpell band-aid). Loaded after EnsureStartingLoadout has
 			// seeded a fresh character's class spells.
@@ -122,6 +130,17 @@ namespace Faolan.GameServer
 			// Interest spawns the NPCs + this player to nearby players; restore the quest journal.
 			await _broadcaster.BroadcastPlayerEntry(client);
 			await _broadcaster.RestorePlayerQuests(client);
+
+			// On a CREATE-world entry the snapshot carried no quests (empty region above), so deliver the starter quest
+			// LIVE exactly as retail does: QuestLogList (J-panel) then QuestFullUpdate (detail). It was persisted at
+			// character creation, so it rides the snapshot on every later login. RestorePlayerQuests skips it (it's
+			// snapshot-eligible), so this is the only live delivery and there is no double-send.
+			if (isCreateEntry && character != null && beachDef != null)
+			{
+				await _broadcaster.SendQuestLogList(client, beachDef, [BeachStarterQuestId]);
+				await _broadcaster.SendQuestFullUpdate(client, beachDef);
+				Logger.LogInformation("Create-world entry: delivered starter quest {QuestId} live to '{Name}'.", BeachStarterQuestId, character.Name);
+			}
 
 			// #262: if the player logs in mid-escort (Casilda freed, escort stage active), resume her follow now - the
 			// live talk-trigger only fires on the talk itself, so without this a relog leaves her standing at the cage.
@@ -156,20 +175,25 @@ namespace Faolan.GameServer
 		// primary (always held + seeded). A held quest joins only if its definition is snapshot-eligible (Quest_c
 		// scalars seeded + the 5 header text refs) - else BuildQuestPortion would throw; those fall to the live
 		// RestorePlayerQuests path.
-		private async Task<(System.Collections.Generic.List<QuestDefinition> Quests, QuestDefinition Primary)> LoadSnapshotQuests(Character character, QuestDefinition beachDef)
+		private async Task<(System.Collections.Generic.List<QuestDefinition> Quests, QuestDefinition Primary)> LoadSnapshotQuests(Character character)
 		{
-			var quests = new System.Collections.Generic.List<QuestDefinition> { beachDef };
-			if (character != null)
-				foreach (var cq in await Database.GetCharacterQuests(character.Id))
-				{
-					if (cq.QuestId == BeachStarterQuestId)
-						continue;
-					var def = await Database.GetQuestDefinition(cq.QuestId);
-					if (BeachTailsBuilder.IsSnapshotEligible(def))
-						quests.Add(def);
-				}
+			var quests = new System.Collections.Generic.List<QuestDefinition>();
+			if (character == null)
+				return (quests, null);
 
-			return (quests, beachDef);
+			// Data-driven: the journal is exactly the character's ACTIVE, snapshot-eligible quests - no quest is forced
+			// in. A completed/abandoned quest (not Active) is excluded, so it never lingers as a phantom (#...).
+			foreach (var cq in (await Database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Active))
+			{
+				var def = await Database.GetQuestDefinition(cq.QuestId);
+				if (BeachTailsBuilder.IsSnapshotEligible(def))
+					quests.Add(def);
+			}
+
+			// The tracked (primary) quest owns the snapshot's objective region + index terminal: the beach starter when
+			// held, else the first held quest (null only when the character holds none -> empty region).
+			var primary = quests.FirstOrDefault(q => q.QuestId == BeachStarterQuestId) ?? quests.FirstOrDefault();
+			return (quests, primary);
 		}
 
 		private byte[] BuildBurstlessSnapshot(INetworkClient client, CharacterEquipment equipment, CharacterInventory[] inventoryRows, uint[] characterTags, System.Collections.Generic.IReadOnlyList<QuestDefinition> snapshotQuests, QuestDefinition primaryQuest, IReadOnlyList<uint> knownSpellIds)

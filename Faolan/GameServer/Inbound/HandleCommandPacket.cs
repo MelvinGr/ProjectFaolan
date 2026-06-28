@@ -54,7 +54,13 @@ namespace Faolan.GameServer
 				character.RegenerateMaxStats();
 				// Persist the whole accumulated editor graph (name + sex/race/morphs Body + MaxStats) as one unit of work.
 				await Database.SaveCharacter(character);
-				Logger.LogInformation("Character-editor: committed character name '{Name}' for character {CharacterId:X8}.", name, character.Id);
+
+				// Grant the beach starter quest (10238) ONCE, here at character creation - retail auto-grants it on first
+				// beach entry; we persist it now so the journal is data-driven from CharacterQuests (delivered live on the
+				// create-world entry, then riding the snapshot on later logins) instead of baked into the snapshot. It is
+				// NOT re-seeded on world entry, so a completed/removed quest never reappears.
+				await Database.SetCharacterQuest(character.Id, World.WorldQuest.BeachStarterQuestId, QuestState.Active);
+				Logger.LogInformation("Character-editor: committed character name '{Name}' for character {CharacterId:X8}; granted starter quest {QuestId}.", name, character.Id, World.WorldQuest.BeachStarterQuestId);
 			}
 			catch (Exception e)
 			{

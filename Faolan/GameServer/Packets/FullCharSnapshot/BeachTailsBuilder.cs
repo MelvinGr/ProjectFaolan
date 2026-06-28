@@ -71,9 +71,30 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			return HeaderSlots.All(slots.Contains);
 		}
 
+		// The quest region a character with NO snapshot quests carries. Byte-exact constant across all 20 create
+		// captures: a freshly created character's snapshot has ZERO quest blocks (the starter quest is delivered LIVE
+		// instead - QuestLogList + QuestFullUpdate - then rides the snapshot only on later logins). Words:
+		//   version 0x18 ; empty Quest_c list 0x3F1 ; index tag 0x3F1 ; index marker (0+1)*0x3F1 ; count 0 ;
+		//   terminal 0x000156E7 (constant). See Captures/scripts/decode_snapshot_quests.py + the *-create captures.
+		private const uint EmptyQuestTerminal = 0x000156E7;
+
+		public static byte[] BuildEmptyQuestPortion()
+		{
+			using var w = new Faolan.Core.Data.FaolanStream();
+			w.WriteUInt32(QuestcRegion.Version);      // 0x18
+			w.WriteUInt32(QuestcRegion.Frame);        // 0x3F1 - empty Quest_c list ((0+1)*0x3F1)
+			w.WriteUInt32(QuestIndexRegion.IndexTag); // 0x3F1
+			w.WriteUInt32(QuestcRegion.Frame);        // 0x3F1 - empty index marker ((0+1)*0x3F1)
+			w.WriteUInt32(0);                          // index count = 0
+			w.WriteUInt32(EmptyQuestTerminal);         // 0x000156E7
+			return w.ToArray();
+		}
+
 		public static byte[] BuildQuestPortion(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, uint instance)
 		{
 			ArgumentNullException.ThrowIfNull(quests);
+			if (quests.Count == 0)
+				return BuildEmptyQuestPortion(); // no held snapshot quests -> the capture-proven empty region
 			ArgumentNullException.ThrowIfNull(primary);
 
 			// Wire order (decoded from the compeltefirstquest/Strie 2-quest region, byte-exact): the Quest_c list
@@ -153,7 +174,8 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		public static byte[] BuildFromScratch(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, Character character, uint instance, uint? playfieldToken = null, IReadOnlyList<uint> knownSpellIds = null)
 		{
 			ArgumentNullException.ThrowIfNull(quests);
-			ArgumentNullException.ThrowIfNull(primary);
+			// `primary` may be null IFF the character holds no snapshot quests (the empty-region create case); when
+			// quests are present BuildQuestPortion enforces a non-null primary.
 
 			var quest = BuildQuestPortion(quests, primary, instance);
 

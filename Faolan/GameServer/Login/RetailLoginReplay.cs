@@ -130,28 +130,6 @@ namespace Faolan.GameServer
 			}
 		}
 
-		// Persists the beach starting quest (10238) the world-entry snapshot already shows, so the journal matches the
-		// DB. Seeded ONCE: only when the character has NO row for it at all (so a later complete/abandon isn't undone by
-		// re-seeding an Active row on every login). Best-effort - a failure just leaves the journal/DB out of sync.
-		private async Task EnsureBeachStarterQuest(Character character)
-		{
-			if (character == null)
-				return;
-
-			try
-			{
-				var quests = await Database.GetCharacterQuests(character.Id);
-				if (quests.Any(q => q.QuestId == BeachStarterQuestId))
-					return; // already has it (active or completed) - leave the player's state alone
-
-				await Database.SetCharacterQuest(character.Id, BeachStarterQuestId, QuestState.Active);
-				Logger.LogInformation("Seeded beach starting quest {QuestId} for {Name}.", BeachStarterQuestId, character.Name);
-			}
-			catch (Exception ex)
-			{
-				Logger.LogWarning(ex, "Failed to seed beach starting quest for {CharacterId}.", character.Id);
-			}
-		}
 
 		// Loads the character's spawn-scaffold rows, seeding the fresh-character defaults once for characters that
 		// have none (like EnsureBeachStarterEquipment seeds starter gear). Returns null on failure - the spawn
