@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
 using Faolan.Importer;
+using Faolan.Importer.Rdb;
 using Xunit;
 
 namespace Faolan.Tests

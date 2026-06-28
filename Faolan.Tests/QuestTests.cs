@@ -3,6 +3,8 @@ using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.GameServer.World;
 using Faolan.Importer;
+using Faolan.Importer.Captures;
+using Faolan.Importer.Extractors;
 using Xunit;
 
 namespace Faolan.Tests

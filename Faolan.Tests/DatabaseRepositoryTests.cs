@@ -7,6 +7,7 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Importer;
+using Faolan.Importer.Captures;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 

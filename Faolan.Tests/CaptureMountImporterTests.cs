@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Importer;
+using Faolan.Importer.Captures;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 

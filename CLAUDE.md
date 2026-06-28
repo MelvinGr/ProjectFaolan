@@ -31,7 +31,7 @@ dotnet run --project Faolan.ClientLauncher -- --console --universeaddr 127.0.0.1
 # On client failures grab AgeOfConan.log (look for: stream bad, Dispatcher call ... failed,
 # invalid camera path, does not exist in any RDB). Restore `git checkout -- faolan.db` after runs.
 
-# Rebuild DB content from captures. The importer is MODULE-BASED (docs/importer-v2-plan.md): each subsystem
+# Rebuild DB content from captures. The importer is MODULE-BASED (docs/importer-plan.md): each subsystem
 # is a selectable module; `--dry-run` writes nothing (runs in a rolled-back txn, prints the per-table delta).
 dotnet run --project Faolan.Importer -- --skip characters     # idempotent EXCEPT characters; skip on a populated DB
 dotnet run --project Faolan.Importer -- --list                # catalog every module (+ which are opt-in)
@@ -39,7 +39,7 @@ dotnet run --project Faolan.Importer -- --only npcs --mode overwrite   # one mod
 dotnet run --project Faolan.Importer -- --only rdb-maps --rdb <dir>    # rdb-* + mounts are OPT-IN (not in the default run)
 dotnet run --project Faolan.Importer -- --report burst-coverage       # read-only diagnostics (was --burst-coverage / --dump-*)
 # Modes: --mode insert|upsert(default)|overwrite (per-module: --mode npcs=overwrite,items=insert). NO old-flag
-# aliases - the v1 one-off flags (--reseed-*, --rdb-maps, --archive, --dump-*) were removed in the v2 rewrite.
+# aliases - the legacy one-off flags (--reseed-*, --rdb-maps, --archive, --dump-*) don't exist; use the module CLI.
 
 # Wireshark plugin: full Conan+chat dissection (auto-follows the session from port 7010);
 # build+install once, then open captures in Wireshark (filter: faolan) or dump to JSON.

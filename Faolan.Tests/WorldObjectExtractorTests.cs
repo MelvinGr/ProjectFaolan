@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using Faolan.Importer;
+using Faolan.Importer.Extractors;
 using Faolan.Tests.Support;
 using Xunit;
 
