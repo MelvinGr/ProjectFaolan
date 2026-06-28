@@ -130,6 +130,24 @@ beach login, harmless even though they didn't fix the chains); added a generic `
 (WorldBroadcaster.DespawnWorldObjectForPlayer). Dropped the dead experiments (BehaviorCC pose send, visual-change,
 burst-handle).
 
+## Session 2026-06-29: invisible wall (issue 2) RESOLVED in code
+
+The lift is **not** an animation or a despawn (Melvin: "it just happens when you unchain her"). Captures carry
+both `ApproachCasilda` (confine) and **`LeaveCasilda`** (lift) as plain `ScryScriptIIR` steps (mode 2, flag 0, no
+resources, f6={0,0} - i.e. `ScryScript.BuildStep(instance, "LeaveCasilda")`). The create-world destiny scene
+raises the wall; we simply never sent the matching lift.
+
+Wired:
+- `WorldBroadcaster.LiftBeachGate` sends `LeaveCasilda` on the standard world IIR conversation.
+- `QuestProgressionService` sends it the moment the freeing talk-to-Casilda goal completes (the same branch that
+  makes her follow, #262) - the unchain moment.
+- `WorldBroadcaster.SendBeachGateOnEntry` lifts it up-front at beach entry for a character who already freed her
+  (`IsCasildaFreed`: a completed `TalkToNpc`/Casilda goal - data-driven, no hard-coded quest ids), called from
+  `PostReadyBurst` so a relog isn't re-confined.
+
+Still open for #267: the **chains don't render** (issue 1, client-content/scene). Needs in-client verification of
+the wall drop.
+
 ## Related
 Gitea #267 (this), #266 (Casilda done — position + hanging pose), #261 (the Casilda quest chain), #234 (create
 cutscene Scry layer — the construct-the-Scry-burst precedent), #210 (burstless world entry).
