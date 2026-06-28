@@ -38,6 +38,15 @@ namespace Faolan.GameServer
 		{
 			var character = client.Session.Character;
 			var equipment = await EnsureBeachStarterEquipment(character);
+
+			// Seed the class starting loadout (#74/#71) here in the SHARED world-entry path so a freshly CREATED character
+			// gets its class spells + default bar too - the create flow (CreateWorldCutsceneScripts) reaches world entry
+			// straight through SendBurstlessWorldEntry, bypassing SendWorldEntry's login-only EnsureStartingLoadout, so a
+			// new char previously had only its attack abilities and no spells until the first relog. Idempotent (gated on
+			// an empty bar), so this is a no-op on login (already seeded there). Runs BEFORE knownSpellIds is loaded below,
+			// so the freshly-seeded spells ride this entry's snapshot known-list (and place on the bar) with no relog.
+			await EnsureStartingLoadout(client);
+
 			// The beach starter quest (10238) is granted ONCE at character creation (CommitCharacterName), not re-seeded
 			// here - so a completed/removed quest never reappears. The journal is now driven purely from CharacterQuests.
 			var inventoryRows = character != null
