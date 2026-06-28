@@ -85,6 +85,8 @@ namespace Faolan.Tests
 			zone.Add(a);
 			zone.Add(b);
 			InterestManager.ResolveMove(zone, a, Range); // mutually visible
+			a.Confirmed.Add(2);
+			b.Confirmed.Add(1); // both clients polled (0x2020) -> built each other; a later despawn is now safe (#245)
 
 			// A runs far away.
 			var (events, _) = MoveTo(zone, a, 5000, 0);
@@ -92,6 +94,25 @@ namespace Faolan.Tests
 			Assert.True(events.Has(1, 2, InterestEventType.Despawn)); // A no longer sees B
 			Assert.True(events.Has(2, 1, InterestEventType.Despawn)); // B no longer sees A
 			Assert.False(a.Known.Contains(2) || b.Known.Contains(1));
+		}
+
+		[Fact]
+		public void UnconfirmedHandleLeavingRange_DoesNotDespawn()
+		{
+			// #245: an entity spawned to a still-loading client (Known) but not yet CONFIRMED (no 0x2020 poll) must NOT
+			// get an n3ToClientQuit when it briefly leaves range during the load-settle churn - that despawn crashes the
+			// client (pcDynel is NULL). It is dropped from Known silently instead.
+			var zone = new Zone(2040);
+			var a = Player(1, 0, 0);
+			var b = Player(2, 10, 0);
+			zone.Add(a);
+			zone.Add(b);
+			InterestManager.ResolveMove(zone, a, Range); // a + b mutually Known, but neither has polled (Confirmed empty)
+
+			var (events, _) = MoveTo(zone, a, 5000, 0); // a runs far away
+
+			Assert.False(events.Has(1, 2, InterestEventType.Despawn)); // no despawn for the unconfirmed handle
+			Assert.False(a.Known.Contains(2)); // but it's dropped from Known
 		}
 
 		[Fact]

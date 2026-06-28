@@ -63,7 +63,12 @@ namespace Faolan.GameServer.World
 						continue;
 
 					mover.Known.Remove(knownHandle);
-					if (zone.TryGet(knownHandle, out var gone))
+					// #245: only despawn what the client actually CONFIRMED constructing (polled via 0x2020). A
+					// still-loading client churns through CharDCMove position updates while settling; an entity spawned
+					// at the entry point that briefly leaves range here would otherwise get an n3ToClientQuit for a handle
+					// it hasn't built yet -> pcDynel-NULL loader crash. Unconfirmed handles are dropped from Known
+					// silently (no despawn); if the client later renders + re-ranges them, normal flow re-spawns them.
+					if (mover.Confirmed.Remove(knownHandle) && zone.TryGet(knownHandle, out var gone))
 						events.Add(new InterestEvent(mover, gone, InterestEventType.Despawn));
 				}
 			}
@@ -81,7 +86,9 @@ namespace Faolan.GameServer.World
 						? InterestEventType.Spawn
 						: InterestEventType.Move));
 				}
-				else if (viewer.Known.Remove(mover.Handle))
+				else if (viewer.Known.Remove(mover.Handle) && viewer.Confirmed.Remove(mover.Handle))
+					// #245: same gate for a viewer losing sight of the mover - never despawn a handle the viewer's client
+					// hasn't confirmed building (a still-loading viewer would crash on the unknown handle).
 					events.Add(new InterestEvent(viewer, mover, InterestEventType.Despawn));
 			}
 

@@ -592,6 +592,11 @@ namespace Faolan.GameServer
 						var characterId = packet.Body.ReadUInt32();
 						client.Session.LastGameServer2020RequestId = requestId;
 
+						// #245: the poll's requestId is a handle the client is CONFIRMING it built - record it so interest
+						// only ever despawns confirmed handles (a despawn for an unbuilt handle crashes a still-loading
+						// client: pcDynel is NULL). The self-handle poll is harmless (the player never despawns itself).
+						_simulation.PlayerWorldEntity(client)?.Confirmed.Add(requestId);
+
 						// 0x2020 is the client polling a spawned entity (requestId = the entity handle). Retail
 						// answers each with a 0x2008 SpawnCheck echoing that handle (verified: dikketest world conn
 						// polls Kalanthes 0x535A0 and gets a SpawnCheck for 0x535A0). This is what completes/renders

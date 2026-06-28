@@ -149,6 +149,12 @@ namespace Faolan.GameServer.World
 		// against this set to decide what to spawn/despawn as entities move in and out of range. Unused for NPCs.
 		public HashSet<uint> Known { get; } = new HashSet<uint>();
 
+		// For a player: the handles the client has actually CONFIRMED constructing - i.e. polled via 0x2020 (the poll's
+		// requestId is the entity handle; the server answers with a 0x2008 SpawnCheck that renders it). Known means "spawn
+		// sent"; Confirmed means "client built it". A despawn (n3ToClientQuit) for a Known-but-not-Confirmed handle hits a
+		// pcDynel-NULL loader crash on a still-loading client (#245), so interest only despawns Confirmed handles.
+		public HashSet<uint> Confirmed { get; } = new HashSet<uint>();
+
 		// For a PLAYER: the quest ids the player currently has ACTIVE. Drives quest-gated NPC visibility (#261).
 		// Refreshed at world entry and whenever the player's quest state changes (accept / advance / complete).
 		public HashSet<uint> ActiveQuestIds { get; } = new HashSet<uint>();
