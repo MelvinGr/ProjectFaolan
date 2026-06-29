@@ -48,7 +48,7 @@ namespace Faolan.Core.Rdb.Assets
 		// A joint's influence radius (model units) and the displacement gain that turns a node scale into the
 		// radial vertex displacement the skinning would produce. Tuned against the in-client morphs.
 		private const float Radius = 0.18f;
-		private const float Gain = 0.8f;
+		private const float Gain = 0.55f;
 
 		// Deform the body submesh positions in place. positions = the rendered base mesh's xyz array. No-op if neutral.
 		public static void Apply(float[] positions, Morphs morphs)
