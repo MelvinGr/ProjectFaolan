@@ -81,7 +81,8 @@
         _status = "building…";
         StateHasChanged();
 
-        var url = $"/api/character/{(int)c.Race}/{(int)c.Sex}/model.glb";
+        // Cache-bust so a rebuilt model isn't masked by the browser's cached glb.
+        var url = $"/api/character/{(int)c.Race}/{(int)c.Sex}/model.glb?t={DateTime.UtcNow.Ticks}";
         if (_module is not null)
             await _module.InvokeVoidAsync("show", "char-canvas", url);
 
