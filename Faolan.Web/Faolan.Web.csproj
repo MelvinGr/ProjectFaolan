@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <!-- SDK 10.0.109 ships without prune metadata for the ASP.NET Core shared framework; tolerate it. -->
+    <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Faolan.Core carries the DB context + the RDB model/asset pipeline (Rdb/Assets: RenderMeshReader, GlbWriter,
+         SkeletonReader, ...). The web frontend reuses these to build character glTF on demand. -->
+    <ProjectReference Include="..\Faolan.Core\Faolan.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Bump the repo-wide System.Security.Cryptography.Xml (Directory.Build.props pins 10.0.6) to match Faolan.Core. -->
+    <PackageReference Update="System.Security.Cryptography.Xml" Version="10.0.9" />
+  </ItemGroup>
+
+</Project>

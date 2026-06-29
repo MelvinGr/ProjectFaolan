@@ -1,0 +1,107 @@
+@page "/"
+@page "/characters"
+@rendermode InteractiveServer
+@using Faolan.Core.Database
+@using Faolan.Core.Database.Tables
+@using Faolan.Web.Services
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<DatabaseContext> DbFactory
+@inject CharacterModelService Models
+@inject IJSRuntime JS
+
+<PageTitle>Faolan — Character Viewer</PageTitle>
+
+<div class="viewer-page">
+    <aside class="roster">
+        <h2>Characters</h2>
+        @if (_characters is null)
+        {
+            <p>Loading…</p>
+        }
+        else if (_characters.Count == 0)
+        {
+            <p>No characters in the database.</p>
+        }
+        else
+        {
+            <ul>
+                @foreach (var c in _characters)
+                {
+                    <li>
+                        <button class="@(c.Id == _selected?.Id ? "sel" : "")" @onclick="() => Select(c)">
+                            <strong>@c.Name</strong>
+                            <span>@c.Race @c.Sex · @c.Class</span>
+                        </button>
+                    </li>
+                }
+            </ul>
+        }
+        @if (!Models.RdbAvailable)
+        {
+            <p class="warn">Client RDB not found — set <code>Rdb:Path</code>.</p>
+        }
+    </aside>
+
+    <section class="stage">
+        <canvas id="char-canvas"></canvas>
+        <div class="caption">
+            @if (_selected is not null)
+            {
+                <text>@_selected.Name — @_selected.Race @_selected.Sex (@_status)</text>
+            }
+            else
+            {
+                <text>Select a character to view their 3D model.</text>
+            }
+        </div>
+    </section>
+</div>
+
+@code {
+    private List<Character>? _characters;
+    private Character? _selected;
+    private string _status = "";
+    private IJSObjectReference? _module;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        _characters = await db.Characters.OrderBy(c => c.Name).ToListAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/viewer.js");
+    }
+
+    private async Task Select(Character c)
+    {
+        _selected = c;
+        _status = "building…";
+        StateHasChanged();
+
+        var url = $"/api/character/{(int)c.Race}/{(int)c.Sex}/model.glb";
+        if (_module is not null)
+            await _module.InvokeVoidAsync("show", "char-canvas", url);
+
+        _status = "loaded";
+    }
+}
+
+<style>
+    .viewer-page { display: flex; height: calc(100vh - 1rem); gap: 1rem; }
+    .roster { width: 240px; overflow-y: auto; }
+    .roster h2 { font-size: 1rem; margin: .25rem 0 .5rem; }
+    .roster ul { list-style: none; padding: 0; margin: 0; }
+    .roster button { width: 100%; text-align: left; display: flex; flex-direction: column;
+        background: #25272e; color: #ddd; border: 1px solid #33363d; border-radius: 6px;
+        padding: .4rem .6rem; margin-bottom: .35rem; cursor: pointer; }
+    .roster button.sel { border-color: #c8a24a; background: #2e2a1f; }
+    .roster button span { font-size: .75rem; color: #999; }
+    .roster .warn { color: #d88; font-size: .8rem; }
+    .stage { flex: 1; position: relative; background: #1b1d22; border-radius: 8px; overflow: hidden; }
+    .stage canvas { width: 100%; height: 100%; display: block; }
+    .caption { position: absolute; bottom: 0; left: 0; right: 0; padding: .5rem .75rem;
+        color: #ccc; background: linear-gradient(transparent, #000a); font-size: .85rem; }
+</style>

@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 
-namespace Faolan.Importer.Rdb.Assets
+namespace Faolan.Core.Rdb.Assets
 {
 	// Minimal binary-glTF (.glb) writer for decoded RenderMesh sub-meshes (#275 Phase 2). One glTF mesh with one
 	// primitive per sub-mesh; each primitive gets POSITION (+ NORMAL/TEXCOORD_0 when present) and a u32 index buffer.

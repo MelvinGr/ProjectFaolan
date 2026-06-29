@@ -3,7 +3,7 @@ using System.Buffers.Binary;
 using System.IO;
 using System.IO.Compression;
 
-namespace Faolan.Importer.Rdb.Assets
+namespace Faolan.Core.Rdb.Assets
 {
 	// Minimal RGBA8 -> PNG encoder (#275 Phase 2): enough to wrap decoded BCn texture data as a PNG that glTF can
 	// embed/reference. Writes a single IDAT of zlib-deflated, filter-0 scanlines. No third-party image dependency.

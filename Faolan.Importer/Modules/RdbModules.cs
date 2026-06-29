@@ -1,3 +1,4 @@
+using Faolan.Core.Rdb;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Faolan.Importer.Cli;

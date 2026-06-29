@@ -1,6 +1,6 @@
 using System;
 
-namespace Faolan.Importer.Rdb.Assets
+namespace Faolan.Core.Rdb.Assets
 {
 	// Decodes BC1 (DXT1) / BC3 (DXT5) block-compressed texture data to RGBA32. Used to turn an AoC FCTX diffuse
 	// (DXT1) into a PNG that glTF can reference (#275 Phase 2). Only the top mip is needed for the model preview.

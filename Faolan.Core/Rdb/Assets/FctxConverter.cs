@@ -3,7 +3,7 @@ using System.Buffers.Binary;
 using System.IO;
 using System.Text;
 
-namespace Faolan.Importer.Rdb.Assets
+namespace Faolan.Core.Rdb.Assets
 {
 	// Converts an Age of Conan FCTX texture container (RDB types 1010004/1010006/... ) to a standard DDS file.
 	// C# port of rdbreader's fctxconverter.cpp (philippelatulippe/rdbreader, GPLv3). FCTX is a thin wrapper around the

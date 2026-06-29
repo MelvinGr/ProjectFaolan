@@ -93,7 +93,7 @@ namespace Faolan.Importer.Cli
 		// with ms-range values). Field 0x126=cast/0x11F=range/0x15C=damage are already known.
 		private static void SpellFields(string rdbDir, string arg)
 		{
-			using var rdb = new Faolan.Importer.Rdb.RdbReader(rdbDir);
+			using var rdb = new Faolan.Core.Rdb.RdbReader(rdbDir);
 			var counts = new Dictionary<uint, int>();
 			var samples = new Dictionary<uint, List<uint>>();
 			uint? wanted = uint.TryParse(arg, out var w) ? w : null;
@@ -131,7 +131,7 @@ namespace Faolan.Importer.Cli
 		// extract its FCTX textures to DDS (+ --dump-mesh to also write the raw 1010001 geometry blob for the Phase 1 spike).
 		private static void RdbAssets(string rdbDir, string arg, string? outDir, bool dumpMesh)
 		{
-			using var rdb = new Faolan.Importer.Rdb.RdbReader(rdbDir);
+			using var rdb = new Faolan.Core.Rdb.RdbReader(rdbDir);
 
 			// Comma-separated ids => assemble them into one glb (character body + head + equipment).
 			if (arg != null && arg.Contains(','))
@@ -139,14 +139,14 @@ namespace Faolan.Importer.Cli
 				var ids = arg.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
 					.Select(s => uint.TryParse(s, out var u) ? u : 0u).Where(u => u != 0).ToList();
 				var outPath = System.IO.Path.Combine(outDir ?? ".", "assembled.glb");
-				var res = Faolan.Importer.Rdb.Assets.RdbAssetExtractor.Assemble(rdb, ids, outPath);
+				var res = Faolan.Core.Rdb.Assets.RdbAssetExtractor.Assemble(rdb, ids, outPath);
 				Console.WriteLine($"assembled {res.Used.Count}/{ids.Count} meshes: {res.Vertices} verts {res.Triangles} tris -> {outPath}");
 				return;
 			}
 
 			if (uint.TryParse(arg, out var meshIndexId))
 			{
-				var result = Faolan.Importer.Rdb.Assets.RdbAssetExtractor.Extract(rdb, meshIndexId, outDir, dumpMesh);
+				var result = Faolan.Core.Rdb.Assets.RdbAssetExtractor.Extract(rdb, meshIndexId, outDir, dumpMesh);
 				if (!result.Ok || result.Manifest is not { } m)
 				{
 					Console.WriteLine($"MESHINDEXFILE {meshIndexId} not found in RDB.");
@@ -173,20 +173,20 @@ namespace Faolan.Importer.Cli
 
 			// Corpus summary.
 			int manifests = 0, withGeometry = 0, geomLocal = 0, geomCdn = 0, texLocal = 0, texCdn = 0, texMissing = 0;
-			foreach (var e in rdb.EntriesOfType(Faolan.Importer.Rdb.Assets.RdbAssetExtractor.MeshIndexFileType))
+			foreach (var e in rdb.EntriesOfType(Faolan.Core.Rdb.Assets.RdbAssetExtractor.MeshIndexFileType))
 			{
 				if (e.Size == 0 || !e.IsLocal)
 					continue;
 
 				manifests++;
-				Faolan.Importer.Rdb.Assets.MeshIndexFile mesh;
-				try { mesh = Faolan.Importer.Rdb.Assets.MeshIndexFile.Parse(e.Id, rdb.ReadDecompressed(e)); }
+				Faolan.Core.Rdb.Assets.MeshIndexFile mesh;
+				try { mesh = Faolan.Core.Rdb.Assets.MeshIndexFile.Parse(e.Id, rdb.ReadDecompressed(e)); }
 				catch { continue; }
 
 				if (mesh.RenderMeshId is { } rmId)
 				{
 					withGeometry++;
-					if (rdb.TryGet(Faolan.Importer.Rdb.Assets.RdbAssetExtractor.RenderMeshType, rmId, out var rm))
+					if (rdb.TryGet(Faolan.Core.Rdb.Assets.RdbAssetExtractor.RenderMeshType, rmId, out var rm))
 						(rm.IsLocal ? ref geomLocal : ref geomCdn)++;
 				}
 
@@ -207,14 +207,14 @@ namespace Faolan.Importer.Cli
 		// Decode a skeleton (RDB type 1010002) and print key bone world positions (#275 Phase 3 skeleton validation).
 		private static void RdbSkeleton(string rdbDir, string arg)
 		{
-			using var rdb = new Faolan.Importer.Rdb.RdbReader(rdbDir);
+			using var rdb = new Faolan.Core.Rdb.RdbReader(rdbDir);
 			if (!uint.TryParse(arg, out var id) || !rdb.TryGet(1010002, id, out var e))
 			{
 				Console.WriteLine($"skeleton {arg} not found");
 				return;
 			}
 
-			var bones = Faolan.Importer.Rdb.Assets.SkeletonReader.Read(rdb.ReadDecompressed(e));
+			var bones = Faolan.Core.Rdb.Assets.SkeletonReader.Read(rdb.ReadDecompressed(e));
 			Console.WriteLine($"skeleton {id}: {bones.Count} bones");
 			foreach (var b in bones)
 				if (b.Name is "rig_bone_Hips" or "rig_bone_Neck" or "rig_bone_Head" or "rig_bone_Spine2" or "rig_bone_LeftHand" or "rig_bone_LeftFoot")
@@ -224,7 +224,7 @@ namespace Faolan.Importer.Cli
 				}
 		}
 
-		private static string Describe(Faolan.Importer.Rdb.Assets.RdbAssetExtractor.ResourceResult? r) =>
+		private static string Describe(Faolan.Core.Rdb.Assets.RdbAssetExtractor.ResourceResult? r) =>
 			r is { } v ? $"id={v.Id} type={v.Type} {v.Availability} ({v.Size} B)" : "(none)";
 
 		// Mirror of RdbSpellImporter.ReadIncreasingFields (kept private there); used only by the spell-fields report.

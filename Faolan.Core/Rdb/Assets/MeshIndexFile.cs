@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Xml.Linq;
 
-namespace Faolan.Importer.Rdb.Assets
+namespace Faolan.Core.Rdb.Assets
 {
 	// Parses an Age of Conan RDB MESHINDEXFILE record (type 1010030). Each record is a small XML manifest that ties a
 	// model together: it points at the actual geometry blob (<RenderMesh file="ID"/> -> RDB type 1010001), an optional

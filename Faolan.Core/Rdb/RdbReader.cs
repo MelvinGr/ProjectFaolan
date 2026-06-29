@@ -6,7 +6,7 @@ using System.IO.Compression;
 using System.Linq;
 using Faolan.Core.Crypt;
 
-namespace Faolan.Importer.Rdb
+namespace Faolan.Core.Rdb
 {
 	// Reads the Age of Conan client Resource DataBase. The offset index is `le.idx` (magic IBDR, version 5 for
 	// AoC / 7 for TSW); the bulk data is in `NN.rdbdata`. Each entry maps a (type, id) to a (file, offset, size);

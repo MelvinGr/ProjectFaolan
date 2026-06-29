@@ -2,7 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 
-namespace Faolan.Importer.Rdb.Assets
+namespace Faolan.Core.Rdb.Assets
 {
 	// Decodes the Age of Conan RDB RenderMesh geometry blob (type 1010001) - the geometry a MESHINDEXFILE points at.
 	// C# port of the validated dissector (Captures/scripts/decode_rendermesh.py, docs/rendermesh-grammar.md, #275).

@@ -3,7 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Numerics;
 
-namespace Faolan.Importer.Rdb.Assets
+namespace Faolan.Core.Rdb.Assets
 {
 	// Decodes an Age of Conan RDB skeleton (type 1010002) - the bind-pose bone hierarchy a skinned mesh / ANIMSYS
 	// references (#275 Phase 3). Validated against the 71-bone player skeleton (id 14853): composing each bone's local

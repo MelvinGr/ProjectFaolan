@@ -1,3 +1,4 @@
+using Faolan.Core.Rdb;
 using System;
 using System.Text;
 using System.Text.RegularExpressions;

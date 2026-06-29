@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Faolan.Importer.Rdb.Assets
+namespace Faolan.Core.Rdb.Assets
 {
 	// Phase 0 of the RDB -> 3D-model pipeline (Gitea #275): resolve a model's asset graph from its MESHINDEXFILE
 	// manifest and extract what is decodable today - the FCTX textures (-> DDS) and, on request, the raw geometry blob
@@ -137,6 +137,108 @@ namespace Faolan.Importer.Rdb.Assets
 		}
 
 		public readonly record struct AssembleResult(IReadOnlyList<uint> Used, int Vertices, int Triangles);
+
+		// Decode one model's geometry to its sub-meshes (null if the mesh-index or its local geometry is missing).
+		public static IReadOnlyList<RenderMeshReader.SubMesh>? ReadModel(RdbReader rdb, uint meshIndexId)
+		{
+			if (!rdb.TryGet(MeshIndexFileType, meshIndexId, out var idxEntry))
+				return null;
+
+			var mesh = MeshIndexFile.Parse(meshIndexId, rdb.ReadDecompressed(idxEntry));
+			if (mesh.RenderMeshId is not { } rmId || !rdb.TryGet(RenderMeshType, rmId, out var rmEntry) || !rmEntry.IsLocal)
+				return null;
+
+			var subs = RenderMeshReader.Read(rdb.ReadDecompressed(rmEntry));
+			return subs.Count > 0 ? subs : null;
+		}
+
+		// Build a character glb in memory: a body mesh + (optionally) a head seated at the body's neck. Heads are
+		// authored in head-local space, so the head is translated so its base aligns with the body's top ring centroid -
+		// a geometric stand-in for the skeleton's head-bone transform ([[SkeletonReader]]), good enough for a static view.
+		public static byte[]? BuildCharacterGlb(RdbReader rdb, uint bodyMeshIndexId, uint? headMeshIndexId)
+		{
+			var body = ReadModel(rdb, bodyMeshIndexId);
+			if (body == null)
+				return null;
+
+			var all = new List<RenderMeshReader.SubMesh>(body);
+
+			if (headMeshIndexId is { } hid && ReadModel(rdb, hid) is { } head)
+			{
+				var neck = NeckTop(body);
+				var anchor = BottomCenter(head);
+				var (dx, dy, dz) = (neck.x - anchor.x, neck.y - anchor.y, neck.z - anchor.z);
+				foreach (var s in head)
+					all.Add(Translate(s, dx, dy, dz));
+			}
+
+			return GlbWriter.Build(all, null);
+		}
+
+		// Centroid of the body's top ring (near max-Y) = where the head's base should sit (the neck).
+		private static (float x, float y, float z) NeckTop(IReadOnlyList<RenderMeshReader.SubMesh> model)
+		{
+			var maxY = float.MinValue;
+			foreach (var s in model)
+				for (var i = 1; i < s.Positions.Length; i += 3)
+					maxY = Math.Max(maxY, s.Positions[i]);
+
+			var band = maxY * 0.03f + 0.03f;
+			double sx = 0, sy = 0, sz = 0;
+			var n = 0;
+			foreach (var s in model)
+				for (var i = 0; i + 2 < s.Positions.Length; i += 3)
+					if (s.Positions[i + 1] >= maxY - band)
+					{
+						sx += s.Positions[i];
+						sy += s.Positions[i + 1];
+						sz += s.Positions[i + 2];
+						n++;
+					}
+
+			return n == 0 ? (0, maxY, 0) : ((float)(sx / n), (float)(sy / n), (float)(sz / n));
+		}
+
+		// Centroid of a model's lowest band (its base) - for a head, the neck stub.
+		private static (float x, float y, float z) BottomCenter(IReadOnlyList<RenderMeshReader.SubMesh> model)
+		{
+			var minY = float.MaxValue;
+			var maxY = float.MinValue;
+			foreach (var s in model)
+				for (var i = 1; i < s.Positions.Length; i += 3)
+				{
+					minY = Math.Min(minY, s.Positions[i]);
+					maxY = Math.Max(maxY, s.Positions[i]);
+				}
+
+			var band = (maxY - minY) * 0.1f + 1e-4f;
+			double sx = 0, sy = 0, sz = 0;
+			var n = 0;
+			foreach (var s in model)
+				for (var i = 0; i + 2 < s.Positions.Length; i += 3)
+					if (s.Positions[i + 1] <= minY + band)
+					{
+						sx += s.Positions[i];
+						sy += s.Positions[i + 1];
+						sz += s.Positions[i + 2];
+						n++;
+					}
+
+			return n == 0 ? (0, minY, 0) : ((float)(sx / n), (float)(sy / n), (float)(sz / n));
+		}
+
+		private static RenderMeshReader.SubMesh Translate(RenderMeshReader.SubMesh s, float dx, float dy, float dz)
+		{
+			var p = (float[])s.Positions.Clone();
+			for (var i = 0; i + 2 < p.Length; i += 3)
+			{
+				p[i] += dx;
+				p[i + 1] += dy;
+				p[i + 2] += dz;
+			}
+
+			return s with { Positions = p };
+		}
 
 		private static (string Status, long Size, string? OutFile) ExtractTexture(RdbReader rdb, uint type, uint id, string? outDir)
 		{

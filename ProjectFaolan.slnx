@@ -42,5 +42,6 @@
   <Project Path="Faolan.Importer/Faolan.Importer.csproj" />
   <Project Path="Faolan.Mcp/Faolan.Mcp.csproj" />
   <Project Path="Faolan.Tests\Faolan.Tests.csproj" />
+  <Project Path="Faolan.Web/Faolan.Web.csproj" />
   <Project Path="Faolan/Faolan.csproj" />
 </Solution>
