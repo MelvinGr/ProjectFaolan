@@ -172,6 +172,27 @@ namespace Faolan.Core.Rdb.Assets
 
 		public readonly record struct AssembleResult(IReadOnlyList<uint> Used, int Vertices, int Triangles);
 
+		// Decode a RenderMesh (type 1010001) DIRECTLY by its own id - no MESHINDEXFILE wrapper. Character appearance
+		// resources reference geometry this way: a *hairmesh_NNN ref is the rendermesh id NNN itself. Diffuse comes from
+		// the blob's header texture refs (these have no manifest/materials). Null if missing/non-local/empty.
+		public static IReadOnlyList<RenderMeshReader.SubMesh>? ReadRenderMeshDirect(RdbReader rdb, uint renderMeshId)
+		{
+			if (!rdb.TryGet(RenderMeshType, renderMeshId, out var rmEntry) || !rmEntry.IsLocal)
+				return null;
+
+			var blob = rdb.ReadDecompressed(rmEntry);
+			var subs = RenderMeshReader.Read(blob);
+			if (subs.Count == 0)
+				return null;
+
+			byte[]? diffuse = null;
+			foreach (var (type, id) in RenderMeshReader.ReadHeaderTextureRefs(blob))
+				if (TryDecodeTexture(rdb, type, id, out diffuse))
+					break;
+
+			return diffuse == null ? subs : subs.Select(s => s with { BaseColorPng = diffuse }).ToList();
+		}
+
 		// Decode one model's geometry to its sub-meshes (null if the mesh-index or its local geometry is missing).
 		public static IReadOnlyList<RenderMeshReader.SubMesh>? ReadModel(RdbReader rdb, uint meshIndexId)
 		{
@@ -189,7 +210,8 @@ namespace Faolan.Core.Rdb.Assets
 		// Build a character glb in memory: a body mesh + (optionally) a head seated at the body's neck. Heads are
 		// authored in head-local space, so the head is translated so its base aligns with the body's top ring centroid -
 		// a geometric stand-in for the skeleton's head-bone transform ([[SkeletonReader]]), good enough for a static view.
-		public static byte[]? BuildCharacterGlb(RdbReader rdb, uint bodyMeshIndexId, uint? headMeshIndexId)
+		public static byte[]? BuildCharacterGlb(RdbReader rdb, uint bodyMeshIndexId, uint? headMeshIndexId,
+			uint? hairRenderMeshId = null)
 		{
 			var body = ReadTexturedModel(rdb, bodyMeshIndexId);
 			if (body == null)
@@ -205,6 +227,11 @@ namespace Faolan.Core.Rdb.Assets
 				foreach (var s in head)
 					all.Add(Translate(s, dx, dy, dz));
 			}
+
+			// Hair is authored in full-body/world space (head at ~y1.7), not head-local, so it's added untranslated -
+			// it already sits at the head's world position (verified: hair y-range ~1.58-1.95 overlaps the seated head).
+			if (hairRenderMeshId is { } hr && ReadRenderMeshDirect(rdb, hr) is { } hair)
+				all.AddRange(hair);
 
 			return GlbWriter.Build(all, null);
 		}

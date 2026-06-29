@@ -48,6 +48,12 @@ namespace Faolan.Web
                 return glb is null ? Results.NotFound() : Results.File(glb, "model/gltf-binary");
             });
 
+            app.MapGet("/api/character/{id:long}/model.glb", (long id, CharacterModelService models) =>
+            {
+                var glb = models.BuildCharacterById((uint)id);
+                return glb is null ? Results.NotFound() : Results.File(glb, "model/gltf-binary");
+            });
+
             app.MapGet("/api/model/{meshIndexId:long}.glb", (long meshIndexId, CharacterModelService models) =>
             {
                 var glb = models.BuildModel((uint)meshIndexId);

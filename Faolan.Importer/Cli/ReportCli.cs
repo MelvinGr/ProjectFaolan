@@ -54,6 +54,9 @@ namespace Faolan.Importer.Cli
 				case "rdb-search":
 					RdbSearch(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", arg ?? "");
 					return 0;
+				case "rdb-id":
+					RdbId(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", arg ?? "");
+					return 0;
 				default:
 					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: conversation-states, anim, burst-coverage, worldobj, spell-fields, rdb-assets.");
 					return 1;
@@ -225,6 +228,23 @@ namespace Faolan.Importer.Cli
 					var w = b.WorldPosition;
 					Console.WriteLine($"  {b.Name,-22} world=({w.X:0.000}, {w.Y:0.000}, {w.Z:0.000})");
 				}
+		}
+
+		// List every (type, id) entry in the RDB index that has the given id, with availability. Used to discover what
+		// id-space a cross-reference lives in (e.g. a character's HeadMesh / *hairmesh resource id) (#275).
+		private static void RdbId(string rdbDir, string arg)
+		{
+			if (!uint.TryParse(arg, out var id))
+			{
+				Console.WriteLine($"rdb-id needs a numeric --report-arg, got '{arg}'");
+				return;
+			}
+
+			using var rdb = new Faolan.Core.Rdb.RdbReader(rdbDir);
+			var hits = rdb.Entries.Where(e => e.Id == id).OrderBy(e => e.Type).ToList();
+			Console.WriteLine($"id {id}: {hits.Count} entr(ies)");
+			foreach (var e in hits)
+				Console.WriteLine($"  type={e.Type,-9} {(e.File == 0xff ? "CDN " : "local")} size={e.Size}");
 		}
 
 		// Scan every MESHINDEXFILE (type 1010030) manifest and print those whose .max source path contains the given

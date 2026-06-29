@@ -1,6 +1,8 @@
+using Faolan.Core.Database;
 using Faolan.Core.Enums;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Web.Services
 {
@@ -12,11 +14,13 @@ namespace Faolan.Web.Services
 	public sealed class CharacterModelService
 	{
 		private readonly string _rdbDir;
+		private readonly IDbContextFactory<DatabaseContext> _dbFactory;
 		private readonly object _gate = new();
 		private RdbReader? _rdb;
 
-		public CharacterModelService(IConfiguration config)
+		public CharacterModelService(IConfiguration config, IDbContextFactory<DatabaseContext> dbFactory)
 		{
+			_dbFactory = dbFactory;
 			_rdbDir = config["Rdb:Path"]
 			          ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB";
 		}
@@ -45,15 +49,40 @@ namespace Faolan.Web.Services
 			[(Race.Stygian, Sex.Female)] = 1102540    // CDN -> female fallback
 		};
 
-		public byte[]? BuildCharacter(Race race, Sex sex)
+		public byte[]? BuildCharacter(Race race, Sex sex, uint? hairRmId = null)
 		{
 			var rdb = Reader();
 			var fallback = sex == Sex.Female ? LocalFemaleBody : LocalMaleBody;
 			var bodyId = BodyMesh.GetValueOrDefault((race, sex), fallback);
 			var headId = sex == Sex.Female ? FemaleHead : MaleHead;
 
-			return RdbAssetExtractor.BuildCharacterGlb(rdb, bodyId, headId)
-			       ?? RdbAssetExtractor.BuildCharacterGlb(rdb, fallback, headId);
+			return RdbAssetExtractor.BuildCharacterGlb(rdb, bodyId, headId, hairRmId)
+			       ?? RdbAssetExtractor.BuildCharacterGlb(rdb, fallback, headId, hairRmId);
+		}
+
+		// Build a specific character by id, using their stored appearance (CharacterBodyResources) - currently the
+		// chosen hairstyle (*hairmesh_NNN, where NNN is the hair rendermesh id). Head morph/face texscript still pending
+		// the CHARACTERCREATOR (1010700) decode (#275); HeadMesh is a creator index, not a resource id.
+		public byte[]? BuildCharacterById(uint characterId)
+		{
+			using var db = _dbFactory.CreateDbContext();
+			var character = db.Characters.AsNoTracking().FirstOrDefault(c => c.Id == characterId);
+			if (character is null)
+				return null;
+
+			var hairRef = db.CharacterBodyResources.AsNoTracking()
+				.Where(r => r.CharacterId == characterId && r.Ref.StartsWith("*hairmesh_"))
+				.Select(r => r.Ref)
+				.FirstOrDefault();
+
+			return BuildCharacter(character.Race, character.Sex, ParseResourceId(hairRef));
+		}
+
+		// "*hairmesh_203667" -> 203667 (the rendermesh id); null for any other/absent ref.
+		private static uint? ParseResourceId(string? reference)
+		{
+			var us = reference?.LastIndexOf('_') ?? -1;
+			return us >= 0 && uint.TryParse(reference!.AsSpan(us + 1), out var id) ? id : null;
 		}
 
 		// Build a single named model (any MESHINDEXFILE id) - lets the viewer show equipment/props too.

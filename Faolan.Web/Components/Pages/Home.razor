@@ -81,8 +81,9 @@
         _status = "building…";
         StateHasChanged();
 
-        // Cache-bust so a rebuilt model isn't masked by the browser's cached glb.
-        var url = $"/api/character/{(int)c.Race}/{(int)c.Sex}/model.glb?t={DateTime.UtcNow.Ticks}";
+        // Per-character model (uses stored appearance: hairstyle, ...). Cache-bust so a rebuilt model isn't masked
+        // by the browser's cached glb.
+        var url = $"/api/character/{c.Id}/model.glb?t={DateTime.UtcNow.Ticks}";
         if (_module is not null)
             await _module.InvokeVoidAsync("show", "char-canvas", url);
 
