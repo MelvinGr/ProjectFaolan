@@ -4,6 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 const states = new Map(); // canvasId -> { renderer, scene, camera, controls, model }
+if (typeof window !== 'undefined') window.__faolanStates = states; // dev hook (headless camera control)
 
 function setup(canvas) {
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -84,6 +85,7 @@ export async function show(canvasId, url) {
 
     state.scene.add(model);
     state.model = model;
+    state.modelSize = size; // dev hook: lets headless tooling frame the head
 
     const radius = Math.max(size.x, size.y, size.z);
     state.controls.target.set(0, size.y / 2, 0);

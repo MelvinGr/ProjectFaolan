@@ -278,3 +278,7 @@ Faolan.ClientHook/*.lib
 
 # CI runner registration token (docker-compose.yml reads it from here) - never commit
 .env
+
+# dev symlinks for running Faolan.Web from its project dir
+Faolan.Web/faolan.db
+Faolan.Web/faolan.json

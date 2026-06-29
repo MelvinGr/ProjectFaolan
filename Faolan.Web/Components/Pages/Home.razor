@@ -11,6 +11,8 @@
 
 <PageTitle>Faolan — Character Viewer</PageTitle>
 
+@* ?char=<id> deep-links a character so the viewer auto-loads it (used by headless screenshot tooling). *@
+
 <div class="viewer-page">
     <aside class="roster">
         <h2>Characters</h2>
@@ -58,6 +60,9 @@
 </div>
 
 @code {
+    [SupplyParameterFromQuery(Name = "char")]
+    public long? CharId { get; set; }
+
     private List<Character>? _characters;
     private Character? _selected;
     private string _status = "";
@@ -72,7 +77,13 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
+        {
             _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/viewer.js");
+
+            // Deep-link: ?char=<id> auto-loads that character once the viewer module is ready.
+            if (CharId is { } id && _characters?.FirstOrDefault(c => c.Id == id) is { } c)
+                await Select(c);
+        }
     }
 
     private async Task Select(Character c)

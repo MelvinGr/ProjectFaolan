@@ -501,6 +501,9 @@ namespace Faolan.Core.Rdb.Assets
 
 				if (hair is { Count: > 0 })
 				{
+					// Snap the head's X/Z bbox centre to the hair's bbox centre so the skull sits inside the hair cap.
+					// (Measured against captured bodies: this co-locates head and hair for both a compact cap and a
+					// ponytail style — the trailing braid doesn't skew the hair bbox centre enough to pull the head out.)
 					var hc = Center(hair);
 					var sc = Center(seated);
 					seated = seated.Select(s => Translate(s, hc.x - sc.x, 0, hc.z - sc.z)).ToList();
