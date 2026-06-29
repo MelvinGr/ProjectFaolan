@@ -117,16 +117,8 @@ namespace Faolan.Core.Rdb.Assets
 			if (!FctxConverter.TryDecodeTopMip(payload, out var rgba, out var w, out var h))
 				return false;
 
-			if (tint is { } t)
-				for (var i = 0; i + 2 < rgba.Length; i += 4)
-				{
-					rgba[i + 0] = (byte)(rgba[i + 0] * t.R / 255);
-					rgba[i + 1] = (byte)(rgba[i + 1] * t.G / 255);
-					rgba[i + 2] = (byte)(rgba[i + 2] * t.B / 255);
-				}
-
 			alphaMask = HasTransparency(rgba);
-			png = PngWriter.Encode(rgba, w, h);
+			png = SkiaImage.EncodePng(rgba, w, h, tint);
 			return true;
 		}
 
@@ -241,21 +233,12 @@ namespace Faolan.Core.Rdb.Assets
 					break;
 
 			if (!TryDecodeRgba(rdb, 1010004, overlayTextureId, out var over, out var ow, out var oh))
-				return baseRgba is null ? null : EncodeTinted(baseRgba, bw, bh, tint);
+				return baseRgba is null ? null : SkiaImage.EncodePng(baseRgba, bw, bh, tint);
 
-			if (baseRgba is null || ow != bw || oh != bh)
-				return EncodeTinted(over, ow, oh, tint); // sizes mismatch: just use the iris
+			if (baseRgba is null)
+				return SkiaImage.EncodePng(over, ow, oh, tint); // no base: just use the iris
 
-			for (var i = 0; i + 3 < baseRgba.Length; i += 4)
-			{
-				var a = over[i + 3];
-				baseRgba[i + 0] = (byte)((over[i + 0] * a + baseRgba[i + 0] * (255 - a)) / 255);
-				baseRgba[i + 1] = (byte)((over[i + 1] * a + baseRgba[i + 1] * (255 - a)) / 255);
-				baseRgba[i + 2] = (byte)((over[i + 2] * a + baseRgba[i + 2] * (255 - a)) / 255);
-				baseRgba[i + 3] = 255;
-			}
-
-			return EncodeTinted(baseRgba, bw, bh, tint);
+			return SkiaImage.CompositeOver(baseRgba, bw, bh, over, ow, oh, tint);
 		}
 
 		private static bool TryDecodeRgba(RdbReader rdb, uint type, uint id, out byte[] rgba, out int w, out int h)
@@ -266,19 +249,6 @@ namespace Faolan.Core.Rdb.Assets
 				return false;
 
 			return FctxConverter.TryDecodeTopMip(rdb.ReadDecompressed(e), out rgba, out w, out h);
-		}
-
-		private static byte[] EncodeTinted(byte[] rgba, int w, int h, Tint? tint)
-		{
-			if (tint is { } t)
-				for (var i = 0; i + 2 < rgba.Length; i += 4)
-				{
-					rgba[i + 0] = (byte)(rgba[i + 0] * t.R / 255);
-					rgba[i + 1] = (byte)(rgba[i + 1] * t.G / 255);
-					rgba[i + 2] = (byte)(rgba[i + 2] * t.B / 255);
-				}
-
-			return PngWriter.Encode(rgba, w, h);
 		}
 
 		// Decode one model's geometry to its sub-meshes (null if the mesh-index or its local geometry is missing).
