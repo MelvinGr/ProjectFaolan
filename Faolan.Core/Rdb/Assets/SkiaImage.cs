@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using SkiaSharp;
 
@@ -64,6 +65,40 @@ namespace Faolan.Core.Rdb.Assets
 				canvas.RotateDegrees(rotationDeg);
 				canvas.DrawBitmap(decalBmp, new SKRect(0, 0, dw, dh), new SKRect(-drawW / 2, -drawH / 2, drawW / 2, drawH / 2), paint);
 				canvas.Restore();
+			}
+
+			ForceOpaque(result);
+			return Encode(result, tint);
+		}
+
+		// One decal to lay onto a base atlas: RGBA pixels at (U,V) in 0..1, drawn ScaleFraction of the atlas width wide,
+		// rotated RotationDeg, alpha-blended by Blend.
+		public readonly record struct Decal(byte[] Rgba, int W, int H, float U, float V, float ScaleFraction, float RotationDeg, float Blend);
+
+		// Composite a set of decals (e.g. body tattoos) onto a base atlas in one pass, then encode opaque (+ optional tint).
+		public static byte[] CompositeDecals(byte[] baseRgba, int bw, int bh, IReadOnlyList<Decal> decals, RdbAssetExtractor.Tint? tint = null)
+		{
+			using var baseBmp = FromRgba(baseRgba, bw, bh);
+			using var result = new SKBitmap(Unpremul(bw, bh));
+			using (var canvas = new SKCanvas(result))
+			{
+				canvas.DrawBitmap(baseBmp, 0, 0);
+				foreach (var d in decals)
+				{
+					using var decalBmp = FromRgba(d.Rgba, d.W, d.H);
+					using var paint = new SKPaint
+					{
+						Color = SKColors.White.WithAlpha((byte)Math.Clamp(d.Blend * 255f, 0, 255)),
+						IsAntialias = true
+					};
+					var drawW = d.ScaleFraction * bw;
+					var drawH = drawW * d.H / d.W;
+					canvas.Save();
+					canvas.Translate(d.U * bw, d.V * bh);
+					canvas.RotateDegrees(d.RotationDeg);
+					canvas.DrawBitmap(decalBmp, new SKRect(0, 0, d.W, d.H), new SKRect(-drawW / 2, -drawH / 2, drawW / 2, drawH / 2), paint);
+					canvas.Restore();
+				}
 			}
 
 			ForceOpaque(result);

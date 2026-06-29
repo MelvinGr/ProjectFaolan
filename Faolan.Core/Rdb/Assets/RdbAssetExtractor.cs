@@ -106,6 +106,10 @@ namespace Faolan.Core.Rdb.Assets
 		// A per-character colour multiply from a TexScript "tinting" op (e.g. hair colour).
 		public readonly record struct Tint(byte R, byte G, byte B);
 
+		// A body tattoo/marking: an FCTX texture (1010004) projected onto the body atlas at (U,V) in 0..1, sized Scale
+		// percent of its native size, rotated Rotation degrees, alpha-blended by Blend. From a mesh -1/-2 TexScript.
+		public readonly record struct BodyDecal(uint TextureId, float U, float V, float Scale, float Rotation, float Blend);
+
 		private static bool TryDecodeTexture(RdbReader rdb, uint type, uint id, out byte[]? png, out bool alphaMask, Tint? tint = null)
 		{
 			png = null;
@@ -140,7 +144,8 @@ namespace Faolan.Core.Rdb.Assets
 
 		// Decode a model's geometry AND attach its own diffuse to every sub-mesh, so an assembled character textures each
 		// part (body skin, head) independently. Returns null when the mesh-index or its local geometry is missing.
-		private static IReadOnlyList<RenderMeshReader.SubMesh>? ReadTexturedModel(RdbReader rdb, uint meshIndexId, Tint? tint = null)
+		private static IReadOnlyList<RenderMeshReader.SubMesh>? ReadTexturedModel(RdbReader rdb, uint meshIndexId,
+			Tint? tint = null, IReadOnlyList<BodyDecal>? decals = null)
 		{
 			if (!rdb.TryGet(MeshIndexFileType, meshIndexId, out var idxEntry))
 				return null;
@@ -154,8 +159,42 @@ namespace Faolan.Core.Rdb.Assets
 			if (subs.Count == 0)
 				return null;
 
-			var (diffuse, alpha) = DecodeDiffusePng(rdb, mesh, blob, tint);
+			// With body decals (mesh -1/-2 tattoos), paste them into the body atlas (texture space); else plain diffuse.
+			var (diffuse, alpha) = decals is { Count: > 0 }
+				? (BuildBodyDiffuse(rdb, mesh, blob, tint, decals), false)
+				: DecodeDiffusePng(rdb, mesh, blob, tint);
 			return diffuse == null ? subs : subs.Select(s => s with { BaseColorPng = diffuse, AlphaMask = alpha }).ToList();
+		}
+
+		// Decode the body's base diffuse to RGBA, paste the character's tattoo decals onto it (texscript projecttexture is
+		// a 2D texture-space placement, not a 3D projection - Ghidra ProjectTextureOperation_c), then encode (+ skin tint).
+		private static byte[]? BuildBodyDiffuse(RdbReader rdb, MeshIndexFile mesh, ReadOnlySpan<byte> blob,
+			Tint? tint, IReadOnlyList<BodyDecal> decals)
+		{
+			byte[]? rgba = null;
+			int w = 0, h = 0;
+			foreach (var t in mesh.UniqueTextures)
+				if (TryDecodeRgba(rdb, t.Type!.Value, t.Id, out rgba, out w, out h))
+					break;
+			if (rgba is null)
+				foreach (var (type, id) in RenderMeshReader.ReadHeaderTextureRefs(blob))
+					if (TryDecodeRgba(rdb, type, id, out rgba, out w, out h))
+						break;
+			if (rgba is null)
+				return null;
+
+			// Ghidra (ProjectTextureOperation_c / FUN_00d88d50, projecttextureoperation.cpp): the decal is pasted into the
+			// base diffuse's TEXTURE space as a rect centred at (ucoord, vcoord), half-size = decalDim * scale*0.01 * 0.5 /
+			// atlasDim (scale is a percent; 0.01 = DAT_01f2800c, 0.5 = _DAT_02019f54), rotation in degrees. NOT a 3D
+			// projection. So ScaleFraction (full drawn width / atlas width) = decalW * scale * 0.01 / atlasW.
+			var placed = new List<SkiaImage.Decal>();
+			foreach (var d in decals)
+				if (TryDecodeRgba(rdb, 1010004, d.TextureId, out var dec, out var dw, out var dh) && dw > 0)
+					placed.Add(new SkiaImage.Decal(dec, dw, dh, d.U, d.V, dw * d.Scale * 0.01f / w, d.Rotation, d.Blend));
+
+			return placed.Count == 0
+				? SkiaImage.EncodePng(rgba, w, h, tint)
+				: SkiaImage.CompositeDecals(rgba, w, h, placed, tint);
 		}
 
 		// Assemble several models (e.g. a character's body + head + equipment, all authored in the same bind-pose space)
@@ -338,6 +377,52 @@ namespace Faolan.Core.Rdb.Assets
 			};
 		}
 
+		// Diagnostic: is the body's front UV mirrored left/right? Splits the body rendermesh vertices by sign(X) and
+		// reports each half's U range. Overlapping ranges => left and right share atlas texels (mirrored) => a tattoo
+		// can't be baked onto one side only. Disjoint ranges => unique unwrap => atlas placement can target one side.
+		public static object DescribeBodyUv(RdbReader rdb, uint bodyMeshIndexId)
+		{
+			if (!rdb.TryGet(MeshIndexFileType, bodyMeshIndexId, out var idx))
+				return new { found = false };
+			var mesh = MeshIndexFile.Parse(bodyMeshIndexId, rdb.ReadDecompressed(idx));
+			if (mesh.RenderMeshId is not { } rmId || !rdb.TryGet(RenderMeshType, rmId, out var rm) || !rdb.CanRead(rm))
+				return new { found = false, renderMeshId = mesh.RenderMeshId };
+
+			var subs = RenderMeshReader.Read(rdb.ReadDecompressed(rm));
+			float lMinU = 1, lMaxU = 0, rMinU = 1, rMaxU = 0;
+			int lN = 0, rN = 0;
+			foreach (var s in subs)
+			{
+				if (s.Uvs is null)
+					continue;
+				for (var i = 0; i < s.VertexCount; i++)
+				{
+					float x = s.Positions[i * 3], u = s.Uvs[i * 2];
+					if (x < -0.02f) { lMinU = Math.Min(lMinU, u); lMaxU = Math.Max(lMaxU, u); lN++; }
+					else if (x > 0.02f) { rMinU = Math.Min(rMinU, u); rMaxU = Math.Max(rMaxU, u); rN++; }
+				}
+			}
+
+			var overlap = Math.Min(lMaxU, rMaxU) - Math.Max(lMinU, rMinU);
+			return new
+			{
+				found = true, submeshes = subs.Count,
+				leftXverts = lN, leftU = new[] { lMinU, lMaxU },
+				rightXverts = rN, rightU = new[] { rMinU, rMaxU },
+				uOverlap = overlap, mirrored = overlap > 0.25f
+			};
+		}
+
+		// Diagnostic: decode an FCTX/texture resource (type, id) straight to PNG (no tint/decal), or null if absent.
+		public static byte[]? DecodeTexturePng(RdbReader rdb, uint type, uint id) =>
+			TryDecodeTexture(rdb, type, id, out var png, out _, null) ? png : null;
+
+		// Diagnostic: the decompressed payload of a resource as Latin1 text (XML resources read straight; binary is mojibake).
+		public static string? RawText(RdbReader rdb, uint type, uint id) =>
+			rdb.TryGet(type, id, out var e) && rdb.CanRead(e)
+				? System.Text.Encoding.Latin1.GetString(rdb.ReadDecompressed(e))
+				: null;
+
 		// Load + parse a TexScript (type 1010035) by id - the per-character colour op (skin/hair tint, eye iris).
 		public static TexScriptFile? LoadTexScript(RdbReader rdb, uint id) =>
 			rdb.TryGet(TexScriptFile.Type, id, out var e) && rdb.CanRead(e)
@@ -352,9 +437,10 @@ namespace Faolan.Core.Rdb.Assets
 		// is the OPAQUE small part (the lashes are an alpha cutout), and the iris goes there.
 		public static byte[]? BuildCharacterFromParts(RdbReader rdb, uint bodyMeshIndexId,
 			IReadOnlyList<uint> headLocalRenderMeshIds, uint? hairWorldRenderMeshId,
-			Tint? skinTint = null, Tint? hairTint = null, uint? eyeTextureId = null)
+			Tint? skinTint = null, Tint? hairTint = null, uint? eyeTextureId = null,
+			IReadOnlyList<BodyDecal>? bodyDecals = null)
 		{
-			var body = ReadTexturedModel(rdb, bodyMeshIndexId, skinTint);
+			var body = ReadTexturedModel(rdb, bodyMeshIndexId, skinTint, bodyDecals);
 			if (body == null)
 				return null;
 

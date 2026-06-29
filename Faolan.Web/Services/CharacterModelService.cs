@@ -84,8 +84,8 @@ namespace Faolan.Web.Services
 			var bodyFallback = character.Sex == Sex.Female ? LocalFemaleBody : LocalMaleBody;
 			var bodyId = BodyMesh.GetValueOrDefault((character.Race, character.Sex), bodyFallback);
 
-			// Classify the character's TexScripts (skin/hair tint, eye iris) by their mesh target (#275).
-			var (skinTint, hairTint, eyeTex) = ResolveTexScripts(rdb, resources);
+			// Classify the character's TexScripts (skin/hair tint, eye iris, body tattoos) by their mesh target (#275).
+			var (skinTint, hairTint, eyeTex, decals) = ResolveTexScripts(rdb, resources);
 
 			// CharacterBody.HeadMesh is stored in editor 2x units; the real CHARACTERCREATOR head monsterdataid is
 			// HeadMesh/2 ([[CaptureCharacterImporter]]). Resolve it to head+eyes+lashes meshes via MonsterData.
@@ -95,12 +95,21 @@ namespace Faolan.Web.Services
 
 			if (headMeshes.Count > 0)
 				// Try the exact race/sex body, then the local same-sex fallback (the exact body is often CDN-only).
-				return RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyId, headMeshes, hairRmId, skinTint, hairTint, eyeTex)
-				       ?? RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyFallback, headMeshes, hairRmId, skinTint, hairTint, eyeTex)
+				return RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyId, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals)
+				       ?? RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyFallback, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals)
 				       ?? BuildCharacter(character.Race, character.Sex, hairRmId);
 
 			return BuildCharacter(character.Race, character.Sex, hairRmId);
 		}
+
+		// Diagnostic: the decompressed text of an RDB resource (XML resources like TexScript 1010035), or null if absent.
+		public string? RawResourceText(uint type, uint id) => RdbAssetExtractor.RawText(Reader(), type, id);
+
+		// Diagnostic: decode an FCTX texture to PNG (for inspecting tattoo decal textures), or null if absent.
+		public byte[]? DecodeTexture(uint type, uint id) => RdbAssetExtractor.DecodeTexturePng(Reader(), type, id);
+
+		// Diagnostic: report whether the body's left/right UVs are mirrored.
+		public object DescribeBodyUv(uint bodyMeshIndexId) => RdbAssetExtractor.DescribeBodyUv(Reader(), bodyMeshIndexId);
 
 		// Diagnostic: surface the appearance-resolution chain for a character.
 		public object DebugCharacter(uint characterId)
@@ -130,7 +139,7 @@ namespace Faolan.Web.Services
 						: new { id, found = true, meshTarget = ts.MeshTarget, kind = ts.Op.Kind.ToString(), r = (int)ts.Op.R, g = (int)ts.Op.G, b = (int)ts.Op.B, textureId = ts.Op.TextureId };
 				})
 				.ToList();
-			var (skinTint, hairTint, eyeTex) = ResolveTexScripts(rdb, resources);
+			var (skinTint, hairTint, eyeTex, decals) = ResolveTexScripts(rdb, resources);
 
 			return new
 			{
@@ -149,18 +158,20 @@ namespace Faolan.Web.Services
 				{
 					skin = skinTint is { } s ? $"#{s.R:X2}{s.G:X2}{s.B:X2}" : null,
 					hair = hairTint is { } h ? $"#{h.R:X2}{h.G:X2}{h.B:X2}" : null,
-					eyeTexture = eyeTex
+					eyeTexture = eyeTex,
+					bodyDecals = decals
 				}
 			};
 		}
 
 		// Classify a character's *texscript_NNN resources by their mesh target: -3 skin tint, -4 hair tint, -5 eye iris
-		// (a projected texture). Body markings (-1/-2 tattoo decals) are not composited yet (#275).
-		private static (RdbAssetExtractor.Tint? Skin, RdbAssetExtractor.Tint? Hair, uint? EyeTexture) ResolveTexScripts(
-			RdbReader rdb, IEnumerable<string> resources)
+		// (a projected texture), -1/-2 body tattoo decals (placed projecttextures composited onto the body atlas).
+		private static (RdbAssetExtractor.Tint? Skin, RdbAssetExtractor.Tint? Hair, uint? EyeTexture,
+			IReadOnlyList<RdbAssetExtractor.BodyDecal> Decals) ResolveTexScripts(RdbReader rdb, IEnumerable<string> resources)
 		{
 			RdbAssetExtractor.Tint? skin = null, hair = null;
 			uint? eyeTex = null;
+			var decals = new List<RdbAssetExtractor.BodyDecal>();
 
 			foreach (var reference in resources)
 			{
@@ -180,10 +191,13 @@ namespace Faolan.Web.Services
 					case -5 when ts.Op.Kind == TexScriptFile.Kind.Project:
 						eyeTex = ts.Op.TextureId;
 						break;
+					case -1 or -2 when ts.Op.Kind == TexScriptFile.Kind.Project:
+						decals.Add(new RdbAssetExtractor.BodyDecal(ts.Op.TextureId, ts.Op.U, ts.Op.V, ts.Op.Scale, ts.Op.Rotation, ts.Op.Blend));
+						break;
 				}
 			}
 
-			return (skin, hair, eyeTex);
+			return (skin, hair, eyeTex, decals);
 		}
 
 		// "*hairmesh_203667" -> 203667 (the rendermesh id); null for any other/absent ref.

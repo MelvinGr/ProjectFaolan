@@ -17,9 +17,10 @@ namespace Faolan.Web
 
             // Like the game server, run from the repo root so faolan.json (DatabasePath, ...) + faolan.db resolve.
             builder.Configuration.SetBasePath(Directory.GetCurrentDirectory());
-            builder.Configuration.AddJsonFile(Path.GetFullPath("faolan.json"), optional: true);
+
+            builder.Configuration.AddJsonFile(Path.GetFullPath("faolan.json"));
             // The app's own appsettings.json (RdbDir, ...) lives next to the dll, not the CWD repo root.
-            builder.Configuration.AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.json"), optional: true);
+            builder.Configuration.AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.json"));
 
             builder.Services.AddRazorComponents()
                 .AddInteractiveServerComponents();
@@ -68,8 +69,31 @@ namespace Faolan.Web
                 return glb is null ? Results.NotFound() : Results.File(glb, "model/gltf-binary");
             });
 
-            app.MapGet("/api/debug/char/{id:long}", (long id, CharacterModelService models) =>
-                Results.Json(models.DebugCharacter((uint)id)));
+            if (app.Environment.IsDevelopment())
+            {
+                app.MapGet("/api/debug/char/{id:long}", (long id, CharacterModelService models) => Results.Json(models.DebugCharacter((uint)id)));
+
+                // Body UV mirror diagnostic (#275): is the body's left/right unwrap mirrored?
+                app.MapGet("/api/debug/bodyuv/{id:long}", (long id, CharacterModelService models) => Results.Json(models.DescribeBodyUv((uint)id)));
+
+                // Decode an FCTX texture (type/id) to PNG - for inspecting tattoo decal textures (#275).
+                app.MapGet("/api/debug/tex/{type:long}/{id:long}.png", (long type, long id, CharacterModelService models) =>
+                {
+                    var png = models.DecodeTexture((uint)type, (uint)id);
+                    return png is null
+                        ? Results.NotFound()
+                        : Results.Bytes(png, "image/png");
+                });
+
+                // Raw RDB resource text (e.g. a TexScript 1010035 XML) for protocol/asset RE.
+                app.MapGet("/api/debug/raw/{type:long}/{id:long}", (long type, long id, CharacterModelService models) =>
+                {
+                    var text = models.RawResourceText((uint)type, (uint)id);
+                    return text is null
+                        ? Results.NotFound()
+                        : Results.Text(text, "text/plain");
+                });
+            }
 
             app.MapRazorComponents<App>()
                 .AddInteractiveServerRenderMode();
