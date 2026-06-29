@@ -187,10 +187,12 @@ namespace Faolan.Core.Rdb.Assets
 			// base diffuse's TEXTURE space as a rect centred at (ucoord, vcoord), half-size = decalDim * scale*0.01 * 0.5 /
 			// atlasDim (scale is a percent; 0.01 = DAT_01f2800c, 0.5 = _DAT_02019f54), rotation in degrees. NOT a 3D
 			// projection. So ScaleFraction (full drawn width / atlas width) = decalW * scale * 0.01 / atlasW.
+			// Our body atlas U runs opposite to the client's authoring frame (the medallion otherwise lands on the wrong
+			// breast vs in-game), so mirror the centre U: 1-ucoord. Centred decals (ucoord 0.5) are unaffected.
 			var placed = new List<SkiaImage.Decal>();
 			foreach (var d in decals)
 				if (TryDecodeRgba(rdb, 1010004, d.TextureId, out var dec, out var dw, out var dh) && dw > 0)
-					placed.Add(new SkiaImage.Decal(dec, dw, dh, d.U, d.V, dw * d.Scale * 0.01f / w, d.Rotation, d.Blend));
+					placed.Add(new SkiaImage.Decal(dec, dw, dh, 1f - d.U, d.V, dw * d.Scale * 0.01f / w, d.Rotation, d.Blend));
 
 			return placed.Count == 0
 				? SkiaImage.EncodePng(rgba, w, h, tint)

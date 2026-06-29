@@ -165,7 +165,9 @@ namespace Faolan.Web.Services
 		}
 
 		// Classify a character's *texscript_NNN resources by their mesh target: -3 skin tint, -4 hair tint, -5 eye iris
-		// (a projected texture), -1/-2 body tattoo decals (placed projecttextures composited onto the body atlas).
+		// (a projected texture), -2 body tattoo decals (placed projecttextures composited onto the body atlas).
+		// mesh="-1" is the HEAD/face mesh slot, not the body - its projecttextures are face tattoos (a separate
+		// ticket) and must NOT be pasted onto the body atlas (else a face decal lands on the chest).
 		private static (RdbAssetExtractor.Tint? Skin, RdbAssetExtractor.Tint? Hair, uint? EyeTexture,
 			IReadOnlyList<RdbAssetExtractor.BodyDecal> Decals) ResolveTexScripts(RdbReader rdb, IEnumerable<string> resources)
 		{
@@ -191,7 +193,7 @@ namespace Faolan.Web.Services
 					case -5 when ts.Op.Kind == TexScriptFile.Kind.Project:
 						eyeTex = ts.Op.TextureId;
 						break;
-					case -1 or -2 when ts.Op.Kind == TexScriptFile.Kind.Project:
+					case -2 when ts.Op.Kind == TexScriptFile.Kind.Project:
 						decals.Add(new RdbAssetExtractor.BodyDecal(ts.Op.TextureId, ts.Op.U, ts.Op.V, ts.Op.Scale, ts.Op.Rotation, ts.Op.Blend));
 						break;
 				}
