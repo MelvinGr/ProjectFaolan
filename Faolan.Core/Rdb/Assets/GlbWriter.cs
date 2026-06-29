@@ -46,9 +46,12 @@ namespace Faolan.Core.Rdb.Assets
 						w => { foreach (var f in sub.Positions) WriteF32(w, f); }, Bounds(sub.Positions, 3))
 				};
 
-				if (sub.Normals != null)
-					attributes["NORMAL"] = AddAccessor(bin, bufferViews, accessors, ArrayBuffer, Float, sub.VertexCount, "VEC3",
-						w => { foreach (var f in sub.Normals) WriteF32(w, f); });
+				// Always emit SMOOTH normals welded by position. The RDB's packed UByte4N normals are ambiguous (and the
+				// browser's computeVertexNormals() facets the mesh because skinned bodies split vertices at every UV-island
+				// seam). Welding by position re-fuses those seam-split vertices so curvature shades continuously.
+				var normals = SmoothNormals(sub.Positions, sub.Indices);
+				attributes["NORMAL"] = AddAccessor(bin, bufferViews, accessors, ArrayBuffer, Float, sub.VertexCount, "VEC3",
+					w => { foreach (var f in normals) WriteF32(w, f); });
 
 				if (sub.Uvs != null)
 					attributes["TEXCOORD_0"] = AddAccessor(bin, bufferViews, accessors, ArrayBuffer, Float, sub.VertexCount, "VEC2",
@@ -151,6 +154,61 @@ namespace Faolan.Core.Rdb.Assets
 			accessors.Add(acc);
 			return accessors.Count - 1;
 		}
+
+		// Per-vertex smooth normals, area-weighted from face normals, with vertices welded by quantized position so the
+		// smoothing crosses UV-island seams (where the mesh duplicates a vertex with the same XYZ but a different UV).
+		// Without the weld, seam-split vertices each keep only their own faces' normals and the surface shades faceted.
+		private static float[] SmoothNormals(float[] pos, int[] idx)
+		{
+			var vc = pos.Length / 3;
+			var rep = new int[vc];
+			var byPos = new Dictionary<(long, long, long), int>(vc);
+			for (var i = 0; i < vc; i++)
+			{
+				var key = (Q(pos[i * 3]), Q(pos[i * 3 + 1]), Q(pos[i * 3 + 2]));
+				if (!byPos.TryGetValue(key, out var r))
+					byPos[key] = r = i;
+				rep[i] = r;
+			}
+
+			var acc = new float[vc * 3];
+			for (var t = 0; t + 2 < idx.Length; t += 3)
+			{
+				int a = idx[t], b = idx[t + 1], c = idx[t + 2];
+				// Face normal = (B-A) x (C-A); magnitude is twice the triangle area, so the sum is area-weighted.
+				float ex1 = pos[b * 3] - pos[a * 3], ey1 = pos[b * 3 + 1] - pos[a * 3 + 1], ez1 = pos[b * 3 + 2] - pos[a * 3 + 2];
+				float ex2 = pos[c * 3] - pos[a * 3], ey2 = pos[c * 3 + 1] - pos[a * 3 + 1], ez2 = pos[c * 3 + 2] - pos[a * 3 + 2];
+				float nx = ey1 * ez2 - ez1 * ey2, ny = ez1 * ex2 - ex1 * ez2, nz = ex1 * ey2 - ey1 * ex2;
+				foreach (var v in (ReadOnlySpan<int>)[a, b, c])
+				{
+					var r = rep[v];
+					acc[r * 3] += nx;
+					acc[r * 3 + 1] += ny;
+					acc[r * 3 + 2] += nz;
+				}
+			}
+
+			var normals = new float[vc * 3];
+			for (var i = 0; i < vc; i++)
+			{
+				var r = rep[i];
+				float x = acc[r * 3], y = acc[r * 3 + 1], z = acc[r * 3 + 2];
+				var len = MathF.Sqrt(x * x + y * y + z * z);
+				if (len <= 1e-8f)
+				{
+					normals[i * 3 + 1] = 1f; // degenerate fallback (up)
+					continue;
+				}
+
+				normals[i * 3] = x / len;
+				normals[i * 3 + 1] = y / len;
+				normals[i * 3 + 2] = z / len;
+			}
+
+			return normals;
+		}
+
+		private static long Q(float f) => (long)MathF.Round(f * 1000f); // weld tolerance: 1 unit = 1mm at AoC scale
 
 		private static (float[] min, float[] max) Bounds(float[] data, int comps)
 		{

@@ -67,11 +67,10 @@ export async function show(canvasId, url) {
     const gltf = await new GLTFLoader().loadAsync(url);
     const model = gltf.scene;
 
-    // The packed RDB vertex normals are ambiguous (two NORMAL decl fields) and produce banded shading on limbs.
-    // Recompute smooth normals from the geometry so curvature lights cleanly.
+    // Normals are now position-welded smooth normals baked by the C# GlbWriter (recomputing them here facets the mesh,
+    // because the glb splits vertices at every UV-island seam). Just keep smooth shading on.
     model.traverse(o => {
         if (o.isMesh) {
-            o.geometry.computeVertexNormals();
             o.material.flatShading = false;
             o.material.needsUpdate = true;
         }
