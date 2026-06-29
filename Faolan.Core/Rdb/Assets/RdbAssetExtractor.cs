@@ -355,6 +355,7 @@ namespace Faolan.Core.Rdb.Assets
 			uint? rmId = null;
 			string rmSource = "n/a";
 			var rmReadable = false;
+			object[] textureRefs = [];
 			try
 			{
 				var mesh = MeshIndexFile.Parse(meshIndexId, rdb.ReadDecompressed(idx));
@@ -363,6 +364,9 @@ namespace Faolan.Core.Rdb.Assets
 				{
 					rmSource = rm.IsLocal ? "local" : "cdn";
 					rmReadable = rdb.CanRead(rm);
+					if (rmReadable)
+						textureRefs = [.. RenderMeshReader.ReadHeaderTextureRefs(rdb.ReadDecompressed(rm))
+							.Select(r => (object)new { type = r.Type, id = r.Id })];
 				}
 			}
 			catch { /* parse failed - report what we have */ }
@@ -375,7 +379,8 @@ namespace Faolan.Core.Rdb.Assets
 				meshIndexReadable = rdb.CanRead(idx),
 				renderMeshId = rmId,
 				renderMeshSource = rmSource,
-				renderMeshReadable = rmReadable
+				renderMeshReadable = rmReadable,
+				textureRefs
 			};
 		}
 
