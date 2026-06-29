@@ -70,12 +70,53 @@ namespace Faolan.Web.Services
 			if (character is null)
 				return null;
 
+			var body = db.CharacterBodies.AsNoTracking().FirstOrDefault(b => b.CharacterId == characterId);
 			var hairRef = db.CharacterBodyResources.AsNoTracking()
 				.Where(r => r.CharacterId == characterId && r.Ref.StartsWith("*hairmesh_"))
 				.Select(r => r.Ref)
 				.FirstOrDefault();
+			var hairRmId = ParseResourceId(hairRef);
 
-			return BuildCharacter(character.Race, character.Sex, ParseResourceId(hairRef));
+			var rdb = Reader();
+			var bodyFallback = character.Sex == Sex.Female ? LocalFemaleBody : LocalMaleBody;
+			var bodyId = BodyMesh.GetValueOrDefault((character.Race, character.Sex), bodyFallback);
+
+			// CharacterBody.HeadMesh is stored in editor 2x units; the real CHARACTERCREATOR head monsterdataid is
+			// HeadMesh/2 ([[CaptureCharacterImporter]]). Resolve it to head+eyes+lashes meshes via MonsterData.
+			var headMeshes = body is { HeadMesh: > 0 }
+				? RdbAssetExtractor.ResolveHeadMeshes(rdb, body.HeadMesh / 2)
+				: [];
+
+			if (headMeshes.Count > 0)
+				// Try the exact race/sex body, then the local same-sex fallback (the exact body is often CDN-only).
+				return RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyId, headMeshes, hairRmId)
+				       ?? RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyFallback, headMeshes, hairRmId)
+				       ?? BuildCharacter(character.Race, character.Sex, hairRmId);
+
+			return BuildCharacter(character.Race, character.Sex, hairRmId);
+		}
+
+		// Diagnostic: surface the appearance-resolution chain for a character.
+		public object DebugCharacter(uint characterId)
+		{
+			using var db = _dbFactory.CreateDbContext();
+			var character = db.Characters.AsNoTracking().FirstOrDefault(c => c.Id == characterId);
+			var body = db.CharacterBodies.AsNoTracking().FirstOrDefault(b => b.CharacterId == characterId);
+			var resources = db.CharacterBodyResources.AsNoTracking().Where(r => r.CharacterId == characterId).Select(r => r.Ref).ToList();
+			var rdb = Reader();
+			var monsterId = body is { HeadMesh: > 0 } ? body.HeadMesh / 2 : 0;
+			var headMeshes = monsterId > 0 ? RdbAssetExtractor.ResolveHeadMeshes(rdb, monsterId) : [];
+			return new
+			{
+				found = character != null,
+				race = character?.Race.ToString(),
+				sex = character?.Sex.ToString(),
+				hasBody = body != null,
+				headMeshRaw = body?.HeadMesh,
+				monsterId,
+				headMeshes,
+				resources
+			};
 		}
 
 		// "*hairmesh_203667" -> 203667 (the rendermesh id); null for any other/absent ref.
@@ -90,6 +131,14 @@ namespace Faolan.Web.Services
 		{
 			var rdb = Reader();
 			var subs = RdbAssetExtractor.ReadModel(rdb, meshIndexId);
+			return subs is { Count: > 0 } ? GlbWriter.Build(subs) : null;
+		}
+
+		// Build a single RenderMesh (type 1010001) directly by id - for inspecting head/eye/hair meshes (#275).
+		public byte[]? BuildRenderMesh(uint renderMeshId)
+		{
+			var rdb = Reader();
+			var subs = RdbAssetExtractor.ReadRenderMeshDirect(rdb, renderMeshId);
 			return subs is { Count: > 0 } ? GlbWriter.Build(subs) : null;
 		}
 

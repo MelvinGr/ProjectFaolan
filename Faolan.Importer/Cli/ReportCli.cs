@@ -57,6 +57,9 @@ namespace Faolan.Importer.Cli
 				case "rdb-id":
 					RdbId(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", arg ?? "");
 					return 0;
+				case "rdb-dump":
+					RdbDump(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", arg ?? "", GetOption(args, "--out"));
+					return 0;
 				default:
 					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: conversation-states, anim, burst-coverage, worldobj, spell-fields, rdb-assets.");
 					return 1;
@@ -228,6 +231,29 @@ namespace Faolan.Importer.Cli
 					var w = b.WorldPosition;
 					Console.WriteLine($"  {b.Name,-22} world=({w.X:0.000}, {w.Y:0.000}, {w.Z:0.000})");
 				}
+		}
+
+		// List all entries of a TYPE (--report-arg <type>) and dump each decompressed payload to --out as
+		// <type>_<id>.bin for offline inspection. Used to crack new RDB record formats (e.g. CHARACTERCREATOR 1010700).
+		private static void RdbDump(string rdbDir, string arg, string? outDir)
+		{
+			if (!uint.TryParse(arg, out var type))
+			{
+				Console.WriteLine($"rdb-dump needs a numeric type in --report-arg, got '{arg}'");
+				return;
+			}
+
+			using var rdb = new Faolan.Core.Rdb.RdbReader(rdbDir);
+			if (outDir != null)
+				Directory.CreateDirectory(outDir);
+
+			foreach (var e in rdb.EntriesOfType(type).Where(e => e.File != 0xff))
+			{
+				var body = rdb.ReadDecompressed(e);
+				Console.WriteLine($"type={type} id={e.Id} decompressed={body.Length} B");
+				if (outDir != null)
+					File.WriteAllBytes(Path.Combine(outDir, $"{type}_{e.Id}.bin"), body);
+			}
 		}
 
 		// List every (type, id) entry in the RDB index that has the given id, with availability. Used to discover what

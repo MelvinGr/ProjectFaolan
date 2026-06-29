@@ -236,6 +236,47 @@ namespace Faolan.Core.Rdb.Assets
 			return GlbWriter.Build(all, null);
 		}
 
+		// Resolve a CHARACTERCREATOR head monsterdataid to its component RenderMesh ids (head + eyes + lashes) via the
+		// MonsterData (1010201) record. Empty if missing/non-local. These meshes are head-local (seat at the neck).
+		public static IReadOnlyList<uint> ResolveHeadMeshes(RdbReader rdb, uint monsterDataId)
+		{
+			if (!rdb.TryGet(MonsterDataFile.Type, monsterDataId, out var e) || !e.IsLocal)
+				return [];
+
+			return MonsterDataFile.Parse(monsterDataId, rdb.ReadDecompressed(e)).MeshIds;
+		}
+
+		// Assemble a character from decoded parts: body (meshindex) + head-local RenderMeshes (head/eyes/lashes from a
+		// MonsterData, seated together at the neck) + an optional world-space hair RenderMesh (added untranslated).
+		public static byte[]? BuildCharacterFromParts(RdbReader rdb, uint bodyMeshIndexId,
+			IReadOnlyList<uint> headLocalRenderMeshIds, uint? hairWorldRenderMeshId)
+		{
+			var body = ReadTexturedModel(rdb, bodyMeshIndexId);
+			if (body == null)
+				return null;
+
+			var all = new List<RenderMeshReader.SubMesh>(body);
+
+			var headParts = new List<RenderMeshReader.SubMesh>();
+			foreach (var rm in headLocalRenderMeshIds)
+				if (ReadRenderMeshDirect(rdb, rm) is { } part)
+					headParts.AddRange(part);
+
+			if (headParts.Count > 0)
+			{
+				var neck = NeckTop(body);
+				var anchor = BottomCenter(headParts);
+				var (dx, dy, dz) = (neck.x - anchor.x, neck.y - anchor.y, neck.z - anchor.z);
+				foreach (var s in headParts)
+					all.Add(Translate(s, dx, dy, dz));
+			}
+
+			if (hairWorldRenderMeshId is { } hr && ReadRenderMeshDirect(rdb, hr) is { } hair)
+				all.AddRange(hair);
+
+			return GlbWriter.Build(all, null);
+		}
+
 		// Centroid of the body's top ring (near max-Y) = where the head's base should sit (the neck).
 		private static (float x, float y, float z) NeckTop(IReadOnlyList<RenderMeshReader.SubMesh> model)
 		{

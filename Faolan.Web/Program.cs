@@ -60,6 +60,15 @@ namespace Faolan.Web
                 return glb is null ? Results.NotFound() : Results.File(glb, "model/gltf-binary");
             });
 
+            app.MapGet("/api/rm/{renderMeshId:long}.glb", (long renderMeshId, CharacterModelService models) =>
+            {
+                var glb = models.BuildRenderMesh((uint)renderMeshId);
+                return glb is null ? Results.NotFound() : Results.File(glb, "model/gltf-binary");
+            });
+
+            app.MapGet("/api/debug/char/{id:long}", (long id, CharacterModelService models) =>
+                Results.Json(models.DebugCharacter((uint)id)));
+
             app.MapRazorComponents<App>()
                 .AddInteractiveServerRenderMode();
 
