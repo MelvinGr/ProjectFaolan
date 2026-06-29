@@ -48,6 +48,9 @@ namespace Faolan.Importer.Cli
 				case "rdb-assets":
 					RdbAssets(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", arg, GetOption(args, "--out"), args.Contains("--dump-mesh"));
 					return 0;
+				case "rdb-skeleton":
+					RdbSkeleton(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", arg ?? "14853");
+					return 0;
 				default:
 					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: conversation-states, anim, burst-coverage, worldobj, spell-fields, rdb-assets.");
 					return 1;
@@ -199,6 +202,26 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"  with a RenderMesh ref         : {withGeometry} (geometry local={geomLocal} cdn={geomCdn})");
 			Console.WriteLine($"  texture refs: local={texLocal} cdn={texCdn} missing={texMissing}");
 			Console.WriteLine("Pass --report-arg <meshIndexId> [--out <dir>] [--dump-mesh] to extract one model.");
+		}
+
+		// Decode a skeleton (RDB type 1010002) and print key bone world positions (#275 Phase 3 skeleton validation).
+		private static void RdbSkeleton(string rdbDir, string arg)
+		{
+			using var rdb = new Faolan.Importer.Rdb.RdbReader(rdbDir);
+			if (!uint.TryParse(arg, out var id) || !rdb.TryGet(1010002, id, out var e))
+			{
+				Console.WriteLine($"skeleton {arg} not found");
+				return;
+			}
+
+			var bones = Faolan.Importer.Rdb.Assets.SkeletonReader.Read(rdb.ReadDecompressed(e));
+			Console.WriteLine($"skeleton {id}: {bones.Count} bones");
+			foreach (var b in bones)
+				if (b.Name is "rig_bone_Hips" or "rig_bone_Neck" or "rig_bone_Head" or "rig_bone_Spine2" or "rig_bone_LeftHand" or "rig_bone_LeftFoot")
+				{
+					var w = b.WorldPosition;
+					Console.WriteLine($"  {b.Name,-22} world=({w.X:0.000}, {w.Y:0.000}, {w.Z:0.000})");
+				}
 		}
 
 		private static string Describe(Faolan.Importer.Rdb.Assets.RdbAssetExtractor.ResourceResult? r) =>
