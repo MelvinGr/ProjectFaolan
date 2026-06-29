@@ -192,6 +192,15 @@ namespace Faolan.GameServer.Combat
 			return SendWorldPacket(client, body);
 		}
 
+		// The floating combat-damage number over the player when an NPC hits them (DamageResultIIR 0xFEC4158A,
+		// target=player + attacker=NPC). The player-attacks-NPC direction already fires this from the swing/cast
+		// resolve; this is the missing NPC-attacks-player half so the player sees the hit number, not just the HP
+		// bar move. Byte-exact builder (CombatEffectBuilder), golden-tested vs the captured NPC->player hit. #274.
+		public Task SendDamageNumber(INetworkClient client, uint targetHandle, uint attackerHandle, uint damage)
+		{
+			return SendWorldPacket(client, CombatEffectBuilder.BuildDamageResult(targetHandle, attackerHandle, damage, type: 2));
+		}
+
 		// Sends a caster NPC's spell cast to the player it targets (#232): the ApplySpell (0x6B87E316) framed from the
 		// NPC handle (applyFrom = npc, applyTo = player), built from the NPC's NpcSpell row by NpcSpellCastBuilder -
 		// the construct-from-data counterpart of the melee SendNpcAttackAnimation. The HP move rides the caller's

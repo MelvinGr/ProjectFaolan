@@ -43,6 +43,10 @@ namespace Faolan.GameServer.World
 		// damage/effect is the captured payload; visual + the HP move rides the caller's PushVitals (like the swing).
 		Task SendNpcSpellCast(INetworkClient client, uint npcHandle, NpcSpellCast spell);
 
+		// The floating combat-damage number over the player when an NPC hits them: DamageResultIIR (0xFEC4158A),
+		// target=player + attacker=NPC (the player-attacks-NPC direction already rides CombatService). #274.
+		Task SendDamageNumber(INetworkClient client, uint targetHandle, uint attackerHandle, uint damage);
+
 		// Remove an active buff icon: the retail "end-twin" of the apply (the SAME ApplySpell 0x6B87E316 carrier with
 		// the spell id's rank byte set to 1 and an EMPTY payload). Confirmed from the combat captures - retail expires
 		// timed buffs by sending this, not by letting the client self-expire - so the tick fires it when a tracked
@@ -276,6 +280,7 @@ namespace Faolan.GameServer.World
 
 			target.LastAttackerHandle = npc.Handle; // attribute the death to this mob, not self (instant respawn, #214)
 			vitals.ApplyHealthDelta(-damage);
+			await _output.SendDamageNumber(client, target.Handle, npc.Handle, (uint)damage); // floating hit number (#274)
 			await _output.PushVitals(client, vitals);
 
 			if (vitals.IsDead)
@@ -327,6 +332,7 @@ namespace Faolan.GameServer.World
 
 			target.LastAttackerHandle = npc.Handle; // attribute the death to this mob, not self (instant respawn, #214)
 			vitals.ApplyHealthDelta(-damage);
+			await _output.SendDamageNumber(client, target.Handle, npc.Handle, (uint)damage); // floating hit number (#274)
 			await _output.PushVitals(client, vitals);
 
 			if (vitals.IsDead)
