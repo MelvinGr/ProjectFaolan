@@ -15,7 +15,7 @@ namespace Faolan.Web.Services
 	{
 		private readonly string _rdbDir;
 		private readonly IDbContextFactory<DatabaseContext> _dbFactory;
-		private readonly object _gate = new();
+		private readonly Lock _gate = new();
 		private RdbReader? _rdb;
 
 		public CharacterModelService(IConfiguration config, IDbContextFactory<DatabaseContext> dbFactory)
