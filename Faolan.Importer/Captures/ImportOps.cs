@@ -255,6 +255,14 @@ namespace Faolan.Importer.Captures
 			["Casilda"] = new Vector3(361.64300537109375f, 153.34036254882813f, 717.66802978515625f),
 		};
 
+		// Unique quest-NPC home FACING (#267): the burst-truth dedup can pick a session where she'd already turned, so
+		// her facing drifts from the chained-at-the-post pose. Pin Casilda's rotation to her create-dump FA015807
+		// transform (quaternion 0, 0.8661140, 0, -0.4998470) - the byte-exact facing she has while chained at x≈362.
+		private static readonly Dictionary<string, Quaternion> UniqueNpcFacings = new()
+		{
+			["Casilda"] = new Quaternion(0f, 0.8661140203475952f, 0f, -0.4998469948768616f),
+		};
+
 		// The clean burst-truth NPC spawn set (#266): per capture one entry per distinct mob (dedup by handle),
 		// each type taken from its single authoritative session.
 		public static (List<NpcSpawnEntry> Spawns, List<PatrolPathEntry> Patrols) BuildBurstTruthSpawns(IReadOnlyList<NamedCapture> captures)
@@ -278,6 +286,8 @@ namespace Faolan.Importer.Captures
 				foreach (var e0 in chosen)
 				{
 					var e = UniqueNpcHomes.TryGetValue(e0.Name ?? "", out var home) ? e0 with { X = home.X, Y = home.Y, Z = home.Z } : e0;
+					if (UniqueNpcFacings.TryGetValue(e.Name ?? "", out var facing))
+						e = e with { RotX = facing.X, RotY = facing.Y, RotZ = facing.Z, RotW = facing.W };
 					if (e.Morphs.Count == 0 && morphsByName.TryGetValue(e.Name ?? "", out var backfillMorphs))
 						e = e with { Morphs = backfillMorphs };
 					spawns.Add(e);
