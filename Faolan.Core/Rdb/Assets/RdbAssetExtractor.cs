@@ -146,7 +146,7 @@ namespace Faolan.Core.Rdb.Assets
 		// Decode a model's geometry AND attach its own diffuse to every sub-mesh, so an assembled character textures each
 		// part (body skin, head) independently. Returns null when the mesh-index or its local geometry is missing.
 		private static IReadOnlyList<RenderMeshReader.SubMesh>? ReadTexturedModel(RdbReader rdb, uint meshIndexId,
-			Tint? tint = null, IReadOnlyList<BodyDecal>? decals = null)
+			Tint? tint = null, IReadOnlyList<BodyDecal>? decals = null, BodyMorphDeformer.Morphs? morphs = null)
 		{
 			if (!rdb.TryGet(MeshIndexFileType, meshIndexId, out var idxEntry))
 				return null;
@@ -159,6 +159,11 @@ namespace Faolan.Core.Rdb.Assets
 			var subs = RenderMeshReader.Read(blob);
 			if (subs.Count == 0)
 				return null;
+
+			// Apply body-proportion morphs (geometric region deform) to the body geometry in place before texturing.
+			if (morphs is { IsNeutral: false } m)
+				foreach (var sub in subs)
+					BodyMorphDeformer.Apply(sub.Positions, m);
 
 			// With body decals (mesh -1/-2 tattoos), paste them into the body atlas (texture space); else plain diffuse.
 			var (diffuse, alpha) = decals is { Count: > 0 }
@@ -453,9 +458,9 @@ namespace Faolan.Core.Rdb.Assets
 		public static byte[]? BuildCharacterFromParts(RdbReader rdb, uint bodyMeshIndexId,
 			IReadOnlyList<uint> headLocalRenderMeshIds, uint? hairWorldRenderMeshId,
 			Tint? skinTint = null, Tint? hairTint = null, uint? eyeTextureId = null,
-			IReadOnlyList<BodyDecal>? bodyDecals = null)
+			IReadOnlyList<BodyDecal>? bodyDecals = null, BodyMorphDeformer.Morphs? morphs = null)
 		{
-			var body = ReadTexturedModel(rdb, bodyMeshIndexId, skinTint, bodyDecals);
+			var body = ReadTexturedModel(rdb, bodyMeshIndexId, skinTint, bodyDecals, morphs);
 			if (body == null)
 				return null;
 

@@ -87,6 +87,11 @@ namespace Faolan.Web.Services
 			// Classify the character's TexScripts (skin/hair tint, eye iris, body tattoos) by their mesh target (#275).
 			var (skinTint, hairTint, eyeTex, decals) = ResolveTexScripts(rdb, resources);
 
+			// Body-proportion morphs (cluster-scale deform of the body mesh).
+			var morphs = body is null
+				? (BodyMorphDeformer.Morphs?)null
+				: new BodyMorphDeformer.Morphs(body.Arm, body.Chest, body.Bosom, body.Stomach, body.Arse, body.Thigh, body.Leg);
+
 			// CharacterBody.HeadMesh is stored in editor 2x units; the real CHARACTERCREATOR head monsterdataid is
 			// HeadMesh/2 ([[CaptureCharacterImporter]]). Resolve it to head+eyes+lashes meshes via MonsterData.
 			var headMeshes = body is { HeadMesh: > 0 }
@@ -95,8 +100,8 @@ namespace Faolan.Web.Services
 
 			if (headMeshes.Count > 0)
 				// Try the exact race/sex body, then the local same-sex fallback (the exact body is often CDN-only).
-				return RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyId, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals)
-				       ?? RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyFallback, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals)
+				return RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyId, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals, morphs)
+				       ?? RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyFallback, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals, morphs)
 				       ?? BuildCharacter(character.Race, character.Sex, hairRmId);
 
 			return BuildCharacter(character.Race, character.Sex, hairRmId);
