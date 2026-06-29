@@ -220,13 +220,65 @@ namespace Faolan.Core.Rdb.Assets
 			byte[]? diffuse = null;
 			var alpha = false;
 			if (overrideTextureId is { } ot)
-				TryDecodeTexture(rdb, 1010004, ot, out diffuse, out alpha, tint);
+				diffuse = CompositeOverlay(rdb, blob, ot, tint);
 			else
 				foreach (var (type, id) in RenderMeshReader.ReadHeaderTextureRefs(blob))
 					if (TryDecodeTexture(rdb, type, id, out diffuse, out alpha, tint))
 						break;
 
 			return diffuse == null ? subs : subs.Select(s => s with { BaseColorPng = diffuse, AlphaMask = alpha }).ToList();
+		}
+
+		// TexScript projecttexture for the eye: overlay the iris texture ON TOP of the mesh's own base (the eyeball
+		// sclera), alpha-blending where the iris is opaque, so the white of the eye is kept (replacing it outright
+		// leaves a floating iris in an empty socket). Returns an opaque PNG. Falls back to the base or the iris alone.
+		private static byte[]? CompositeOverlay(RdbReader rdb, ReadOnlySpan<byte> blob, uint overlayTextureId, Tint? tint)
+		{
+			byte[]? baseRgba = null;
+			int bw = 0, bh = 0;
+			foreach (var (type, id) in RenderMeshReader.ReadHeaderTextureRefs(blob))
+				if (TryDecodeRgba(rdb, type, id, out baseRgba, out bw, out bh))
+					break;
+
+			if (!TryDecodeRgba(rdb, 1010004, overlayTextureId, out var over, out var ow, out var oh))
+				return baseRgba is null ? null : EncodeTinted(baseRgba, bw, bh, tint);
+
+			if (baseRgba is null || ow != bw || oh != bh)
+				return EncodeTinted(over, ow, oh, tint); // sizes mismatch: just use the iris
+
+			for (var i = 0; i + 3 < baseRgba.Length; i += 4)
+			{
+				var a = over[i + 3];
+				baseRgba[i + 0] = (byte)((over[i + 0] * a + baseRgba[i + 0] * (255 - a)) / 255);
+				baseRgba[i + 1] = (byte)((over[i + 1] * a + baseRgba[i + 1] * (255 - a)) / 255);
+				baseRgba[i + 2] = (byte)((over[i + 2] * a + baseRgba[i + 2] * (255 - a)) / 255);
+				baseRgba[i + 3] = 255;
+			}
+
+			return EncodeTinted(baseRgba, bw, bh, tint);
+		}
+
+		private static bool TryDecodeRgba(RdbReader rdb, uint type, uint id, out byte[] rgba, out int w, out int h)
+		{
+			rgba = [];
+			w = h = 0;
+			if (!rdb.TryGet(type, id, out var e) || !e.IsLocal)
+				return false;
+
+			return FctxConverter.TryDecodeTopMip(rdb.ReadDecompressed(e), out rgba, out w, out h);
+		}
+
+		private static byte[] EncodeTinted(byte[] rgba, int w, int h, Tint? tint)
+		{
+			if (tint is { } t)
+				for (var i = 0; i + 2 < rgba.Length; i += 4)
+				{
+					rgba[i + 0] = (byte)(rgba[i + 0] * t.R / 255);
+					rgba[i + 1] = (byte)(rgba[i + 1] * t.G / 255);
+					rgba[i + 2] = (byte)(rgba[i + 2] * t.B / 255);
+				}
+
+			return PngWriter.Encode(rgba, w, h);
 		}
 
 		// Decode one model's geometry to its sub-meshes (null if the mesh-index or its local geometry is missing).
