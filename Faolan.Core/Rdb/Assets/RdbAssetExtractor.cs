@@ -59,7 +59,7 @@ namespace Faolan.Core.Rdb.Assets
 					if (outDir != null)
 					{
 						glb = $"model_{rmId}.glb";
-						File.WriteAllBytes(Path.Combine(outDir, glb), GlbWriter.Build(subs, DecodeDiffusePng(rdb, mesh)));
+						File.WriteAllBytes(Path.Combine(outDir, glb), GlbWriter.Build(subs, DecodeDiffusePng(rdb, mesh, blob)));
 					}
 				}
 			}
@@ -85,22 +85,56 @@ namespace Faolan.Core.Rdb.Assets
 			return new Result(true, mesh, manifest);
 		}
 
-		// The model's base-colour texture for the glTF material: the first local, BC1/BC3-decodable texture in the
-		// material list. Normal/specular maps are MIXD (BC4) and return false from TryDecodeTopMip, so they're skipped
-		// and the diffuse (DXT1, listed first via g_DiffuseTex=0) is what gets picked.
-		private static byte[]? DecodeDiffusePng(RdbReader rdb, MeshIndexFile mesh)
+		// The model's base-colour texture for the glTF material: the first local, BC1/BC3-decodable texture. We try the
+		// manifest's material list first (static props), then fall back to the RenderMesh header's own texture ref table
+		// (skinned character bodies have empty <MaterialSets/> and instead carry [id] refs in the geometry blob header).
+		// Normal/specular maps are MIXD (BC4) and return false from TryDecodeTopMip, so they're skipped and the diffuse
+		// (DXT1, listed first via g_DiffuseTex=0) is what gets picked.
+		private static byte[]? DecodeDiffusePng(RdbReader rdb, MeshIndexFile mesh, ReadOnlySpan<byte> blob = default)
 		{
 			foreach (var t in mesh.UniqueTextures)
-			{
-				if (!rdb.TryGet(t.Type!.Value, t.Id, out var e) || !e.IsLocal)
-					continue;
+				if (TryDecodeTexture(rdb, t.Type!.Value, t.Id, out var png))
+					return png;
 
-				var payload = rdb.ReadDecompressed(e);
-				if (FctxConverter.TryDecodeTopMip(payload, out var rgba, out var w, out var h))
-					return PngWriter.Encode(rgba, w, h);
-			}
+			foreach (var (type, id) in RenderMeshReader.ReadHeaderTextureRefs(blob))
+				if (TryDecodeTexture(rdb, type, id, out var png))
+					return png;
 
 			return null;
+		}
+
+		private static bool TryDecodeTexture(RdbReader rdb, uint type, uint id, out byte[]? png)
+		{
+			png = null;
+			if (!rdb.TryGet(type, id, out var e) || !e.IsLocal)
+				return false;
+
+			var payload = rdb.ReadDecompressed(e);
+			if (!FctxConverter.TryDecodeTopMip(payload, out var rgba, out var w, out var h))
+				return false;
+
+			png = PngWriter.Encode(rgba, w, h);
+			return true;
+		}
+
+		// Decode a model's geometry AND attach its own diffuse to every sub-mesh, so an assembled character textures each
+		// part (body skin, head) independently. Returns null when the mesh-index or its local geometry is missing.
+		private static IReadOnlyList<RenderMeshReader.SubMesh>? ReadTexturedModel(RdbReader rdb, uint meshIndexId)
+		{
+			if (!rdb.TryGet(MeshIndexFileType, meshIndexId, out var idxEntry))
+				return null;
+
+			var mesh = MeshIndexFile.Parse(meshIndexId, rdb.ReadDecompressed(idxEntry));
+			if (mesh.RenderMeshId is not { } rmId || !rdb.TryGet(RenderMeshType, rmId, out var rmEntry) || !rmEntry.IsLocal)
+				return null;
+
+			var blob = rdb.ReadDecompressed(rmEntry);
+			var subs = RenderMeshReader.Read(blob);
+			if (subs.Count == 0)
+				return null;
+
+			var diffuse = DecodeDiffusePng(rdb, mesh, blob);
+			return diffuse == null ? subs : subs.Select(s => s with { BaseColorPng = diffuse }).ToList();
 		}
 
 		// Assemble several models (e.g. a character's body + head + equipment, all authored in the same bind-pose space)
@@ -157,13 +191,13 @@ namespace Faolan.Core.Rdb.Assets
 		// a geometric stand-in for the skeleton's head-bone transform ([[SkeletonReader]]), good enough for a static view.
 		public static byte[]? BuildCharacterGlb(RdbReader rdb, uint bodyMeshIndexId, uint? headMeshIndexId)
 		{
-			var body = ReadModel(rdb, bodyMeshIndexId);
+			var body = ReadTexturedModel(rdb, bodyMeshIndexId);
 			if (body == null)
 				return null;
 
 			var all = new List<RenderMeshReader.SubMesh>(body);
 
-			if (headMeshIndexId is { } hid && ReadModel(rdb, hid) is { } head)
+			if (headMeshIndexId is { } hid && ReadTexturedModel(rdb, hid) is { } head)
 			{
 				var neck = NeckTop(body);
 				var anchor = BottomCenter(head);

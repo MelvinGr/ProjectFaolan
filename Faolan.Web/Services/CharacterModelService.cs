@@ -23,25 +23,31 @@ namespace Faolan.Web.Services
 
 		public bool RdbAvailable => Directory.Exists(_rdbDir) && File.Exists(Path.Combine(_rdbDir, "le.idx"));
 
-		// (race, sex) -> body mesh-index id. Only a subset of bodies are local in this client; the rest resolve to the
-		// Aquilonian male body so the page still shows a model until CDN fetch + the CHARACTERCREATOR mapping land.
-		private const uint AquilonianMaleBody = 1100584;
-		private const uint DefaultHead = 3226952; // a local full head (unique_head_saddur) MESHINDEXFILE id - interim default
+		// (race, sex) -> body MESHINDEXFILE id. Cimmerian/Stygian female bodies are CDN-only in this client, so they
+		// fall back to a LOCAL body of the same sex (so the sex is right even when the exact race body needs CDN fetch).
+		// Proper per-character resolution (face/hair/skin) is the CHARACTERCREATOR (1010700) + appearance work (#275).
+		private const uint LocalMaleBody = 1100584;   // aquilonian_male_body
+		private const uint LocalFemaleBody = 1102538; // aquilonian_female_body
+		private const uint DefaultHead = 3226952;     // unique_head_saddur (interim placeholder face)
 
 		private static readonly Dictionary<(Race, Sex), uint> BodyMesh = new()
 		{
 			[(Race.Aquilonian, Sex.Male)] = 1100584,
+			[(Race.Cimmerian, Sex.Male)] = 1102516,
 			[(Race.Stygian, Sex.Male)] = 1102518,
-			[(Race.Cimmerian, Sex.Female)] = 1102536,
-			[(Race.Stygian, Sex.Female)] = 1102540
+			[(Race.Aquilonian, Sex.Female)] = 1102538,
+			[(Race.Cimmerian, Sex.Female)] = 1102536, // CDN -> female fallback
+			[(Race.Stygian, Sex.Female)] = 1102540    // CDN -> female fallback
 		};
 
 		public byte[]? BuildCharacter(Race race, Sex sex)
 		{
 			var rdb = Reader();
-			var bodyId = BodyMesh.GetValueOrDefault((race, sex), AquilonianMaleBody);
+			var fallback = sex == Sex.Female ? LocalFemaleBody : LocalMaleBody;
+			var bodyId = BodyMesh.GetValueOrDefault((race, sex), fallback);
+
 			return RdbAssetExtractor.BuildCharacterGlb(rdb, bodyId, DefaultHead)
-			       ?? RdbAssetExtractor.BuildCharacterGlb(rdb, AquilonianMaleBody, DefaultHead);
+			       ?? RdbAssetExtractor.BuildCharacterGlb(rdb, fallback, DefaultHead);
 		}
 
 		// Build a single named model (any MESHINDEXFILE id) - lets the viewer show equipment/props too.

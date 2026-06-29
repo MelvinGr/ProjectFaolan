@@ -21,7 +21,9 @@ namespace Faolan.Core.Rdb.Assets
 		private const int Float = 5126, UInt = 5125; // glTF componentTypes
 		private const int ArrayBuffer = 34962, ElementArrayBuffer = 34963; // bufferView targets
 
-		// baseColorPng (optional): a PNG to embed as the model's base-colour texture (sampled by TEXCOORD_0).
+		// baseColorPng (optional): a fallback diffuse for sub-meshes that don't carry their own SubMesh.BaseColorPng.
+		// Each distinct PNG becomes its own glTF material/texture, so a body + head (or multi-material prop) texture
+		// independently.
 		public static byte[] Build(IReadOnlyList<RenderMeshReader.SubMesh> subs, byte[]? baseColorPng = null)
 		{
 			var bin = new MemoryStream();
@@ -29,9 +31,12 @@ namespace Faolan.Core.Rdb.Assets
 			var accessors = new List<object>();
 			var primitives = new List<object>();
 
+			// Material 0 is the untextured default; each distinct diffuse PNG gets its own material after it.
+			var textures = new List<byte[]>();
+			var materialOf = new Dictionary<byte[], int>(ReferenceEqualityComparer.Instance);
+
 			foreach (var sub in subs)
 			{
-				// indices
 				var idxAcc = AddAccessor(bin, bufferViews, accessors, ElementArrayBuffer, UInt, sub.Indices.Length, "SCALAR",
 					w => { foreach (var i in sub.Indices) WriteU32(w, (uint)i); });
 
@@ -49,28 +54,46 @@ namespace Faolan.Core.Rdb.Assets
 					attributes["TEXCOORD_0"] = AddAccessor(bin, bufferViews, accessors, ArrayBuffer, Float, sub.VertexCount, "VEC2",
 						w => { foreach (var f in sub.Uvs) WriteF32(w, f); });
 
+				var png = sub.BaseColorPng ?? baseColorPng;
+				var material = 0;
+				if (png is { Length: > 0 } && sub.Uvs != null)
+				{
+					if (!materialOf.TryGetValue(png, out material))
+					{
+						textures.Add(png);
+						material = textures.Count; // 0 = default, textured materials start at 1
+						materialOf[png] = material;
+					}
+				}
+
 				primitives.Add(new Dictionary<string, object>
 				{
 					["attributes"] = attributes,
 					["indices"] = idxAcc,
-					["material"] = 0,
+					["material"] = material,
 					["mode"] = 4 // TRIANGLES
 				});
 			}
 
-			// Optional embedded base-colour texture: pack the PNG into the BIN buffer as an image bufferView.
-			var pbr = new Dictionary<string, object> { ["baseColorFactor"] = new[] { 1f, 1f, 1f, 1f }, ["metallicFactor"] = 0.0f, ["roughnessFactor"] = 1.0f };
-			Dictionary<string, object>? imagesObj = null, texturesObj = null, samplersObj = null;
-			if (baseColorPng is { Length: > 0 })
+			// Embed each distinct diffuse PNG as an image bufferView and build the material/texture/image arrays.
+			var materials = new List<object> { new Dictionary<string, object> { ["name"] = "default", ["pbrMetallicRoughness"] = new Dictionary<string, object> { ["baseColorFactor"] = new[] { 0.78f, 0.74f, 0.7f, 1f }, ["metallicFactor"] = 0.0f, ["roughnessFactor"] = 1.0f }, ["doubleSided"] = true } };
+			var images = new List<object>();
+			var glTextures = new List<object>();
+			for (var i = 0; i < textures.Count; i++)
 			{
 				Align(bin);
 				var imgOffset = (int)bin.Length;
-				bin.Write(baseColorPng);
+				bin.Write(textures[i]);
 				var imgBv = bufferViews.Count;
-				bufferViews.Add(new Dictionary<string, object> { ["buffer"] = 0, ["byteOffset"] = imgOffset, ["byteLength"] = baseColorPng.Length });
-
-				imagesObj = new Dictionary<string, object> { ["bv"] = imgBv }; // placeholder marker; real arrays built below
-				pbr["baseColorTexture"] = new Dictionary<string, object> { ["index"] = 0, ["texCoord"] = 0 };
+				bufferViews.Add(new Dictionary<string, object> { ["buffer"] = 0, ["byteOffset"] = imgOffset, ["byteLength"] = textures[i].Length });
+				images.Add(new Dictionary<string, object> { ["bufferView"] = imgBv, ["mimeType"] = "image/png" });
+				glTextures.Add(new Dictionary<string, object> { ["source"] = i, ["sampler"] = 0 });
+				materials.Add(new Dictionary<string, object>
+				{
+					["name"] = $"mat{i}",
+					["pbrMetallicRoughness"] = new Dictionary<string, object> { ["baseColorTexture"] = new Dictionary<string, object> { ["index"] = i, ["texCoord"] = 0 }, ["metallicFactor"] = 0.0f, ["roughnessFactor"] = 1.0f },
+					["doubleSided"] = true
+				});
 			}
 
 			var binBytes = bin.ToArray();
@@ -81,17 +104,17 @@ namespace Faolan.Core.Rdb.Assets
 				["scenes"] = new[] { new Dictionary<string, object> { ["nodes"] = new[] { 0 } } },
 				["nodes"] = new[] { new Dictionary<string, object> { ["mesh"] = 0 } },
 				["meshes"] = new[] { new Dictionary<string, object> { ["primitives"] = primitives } },
-				["materials"] = new[] { new Dictionary<string, object> { ["name"] = "default", ["pbrMetallicRoughness"] = pbr, ["doubleSided"] = true } },
+				["materials"] = materials,
 				["buffers"] = new[] { new Dictionary<string, object> { ["byteLength"] = binBytes.Length } },
 				["bufferViews"] = bufferViews,
 				["accessors"] = accessors
 			};
 
-			if (imagesObj != null)
+			if (textures.Count > 0)
 			{
-				gltf["images"] = new[] { new Dictionary<string, object> { ["bufferView"] = (int)imagesObj["bv"], ["mimeType"] = "image/png" } };
+				gltf["images"] = images;
 				gltf["samplers"] = new[] { new Dictionary<string, object> { ["wrapS"] = 10497, ["wrapT"] = 10497, ["magFilter"] = 9729, ["minFilter"] = 9987 } };
-				gltf["textures"] = new[] { new Dictionary<string, object> { ["source"] = 0, ["sampler"] = 0 } };
+				gltf["textures"] = glTextures;
 			}
 
 			var json = JsonSerializer.SerializeToUtf8Bytes(gltf);

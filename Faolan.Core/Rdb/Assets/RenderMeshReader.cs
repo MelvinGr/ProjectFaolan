@@ -32,10 +32,48 @@ namespace Faolan.Core.Rdb.Assets
 		public readonly record struct VertexElement(int Offset, DeclType Type, DeclUsage Usage, int UsageIndex);
 
 		// One drawable sub-mesh: flat XYZ positions, optional XYZ normals + UV (UVs absent => empty), triangle indices.
+		// BaseColorPng (optional, set by the caller) lets sub-meshes from different models carry their own diffuse.
 		public sealed record SubMesh(float[] Positions, float[]? Normals, float[]? Uvs, int[] Indices)
 		{
+			public byte[]? BaseColorPng { get; init; }
 			public int VertexCount => Positions.Length / 3;
 			public int TriangleCount => Indices.Length / 3;
+		}
+
+		// Texture types that can appear in a rendermesh header's ref table.
+		private static readonly uint[] TextureTypes = [1010004, 1010006, 1010008, 1010013, 1010218, 1066606, 1066610];
+
+		// The textures referenced in the blob header (used when the manifest has no materials, e.g. skinned bodies).
+		// Two encodings: static props (ver 0x9003) store [type u32][id u32] pairs; skinned bodies (ver 0x7000) store
+		// bare [id u32] with the type implied FCTX (1010004). We disambiguate by whether the first word is a known type.
+		public static IReadOnlyList<(uint Type, uint Id)> ReadHeaderTextureRefs(ReadOnlySpan<byte> blob)
+		{
+			if (blob.Length < 24)
+				return [];
+
+			var count = (int)BinaryPrimitives.ReadUInt32LittleEndian(blob.Slice(16, 4));
+			if (count is < 1 or > 64 || 20 + count * 4 > blob.Length)
+				return [];
+
+			var first = BinaryPrimitives.ReadUInt32LittleEndian(blob.Slice(20, 4));
+			var pairs = Array.IndexOf(TextureTypes, first) >= 0; // [type,id] vs bare [id]
+			var refs = new List<(uint, uint)>();
+
+			if (pairs)
+			{
+				if (20 + count * 8 > blob.Length)
+					return [];
+				for (var i = 0; i < count; i++)
+					refs.Add((BinaryPrimitives.ReadUInt32LittleEndian(blob.Slice(20 + i * 8, 4)),
+						BinaryPrimitives.ReadUInt32LittleEndian(blob.Slice(24 + i * 8, 4))));
+			}
+			else
+			{
+				for (var i = 0; i < count; i++)
+					refs.Add((1010004, BinaryPrimitives.ReadUInt32LittleEndian(blob.Slice(20 + i * 4, 4))));
+			}
+
+			return refs;
 		}
 
 		public static IReadOnlyList<SubMesh> Read(ReadOnlySpan<byte> blob)
