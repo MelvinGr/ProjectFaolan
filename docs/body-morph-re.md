@@ -51,11 +51,39 @@ CC XML parser `FUN_01106a60` — so at runtime body morphs are applied **positio
 matched by name. `FUN_01106a60` itself is reached only through a **vtable** (`DATA @0203ec08`), i.e. virtual
 dispatch. There is no static string/const anchor into the runtime deform.
 
-## Conclusion
+## SOLVED — dynamic analysis (gdb on the live char-create screen)
 
-Static RE has eliminated every obvious data path and established that the body morph is a positional,
-vtable-dispatched deform with no static anchor — so the efficient route to the exact algorithm is **dynamic
-analysis** of the live client (gdb / RenderDoc on a known-morph character: breakpoint/diff the body vertex
-buffer between two morph values to catch the apply function), per [[gdb_live_client_debugging]]. The shipped
-`BodyMorphDeformer` (geometric region deform) remains the stand-in until then. If the morph turns out to be
-bone-scale, importing the rig (#275 follow-up) is the prerequisite to apply it.
+Found the runtime apply by searching the exe for morph action strings: `ApplyMorph` → **`FUN_00fede10`**
+(blend-shape morph apply). gdb attached to the live client (no ASLR, image base `0x400000` = Ghidra
+addresses; pass Wine signals `handle SIGUSR1/2/32-34/PWR nostop noprint pass`), with the Aquilonian-female
+char-create body on screen. Breakpoint in the case-1 delta loop (`0x00fee405`) fires on a **SIZE-slider
+drag** (not the "Random Body" button — that only sets values). Each hit exposes a morph entry (stride
+`0x4c`: name@+0, weight@+0x1c, type@+0x24) and its delta list.
+
+**The mechanism:** each body slider is a **deform-joint scale**, NOT a vertex blend shape. A morph's "delta
+list" is a sparse set of `(nodeIndex u32, weight f32)` pairs (stride 8). `FUN_00fede10` accumulates
+`weight × sliderValue × scale` into a per-node buffer, then writes each node's value to `node+0x40`; the
+mesh, skinned to those nodes, follows. The 7 body morphs and their exact data (captured live):
+
+| morph | min,max | joints (nodeIndex:weight) |
+|-------|---------|---------------------------|
+| arm | -0.05,0.05 | 6:.8 7:.8 8:.6 9:.4 + mirror 26-29 (shoulder→elbow falloff) |
+| chest | -0.10,0.10 | 4:.6 5:.8 6:.3 7:.2 26:.3 27:.2 |
+| bosom | -0.10,0.20 | 5:.2 76:.8 77:.8 (chest front, z>0) |
+| stomach | -0.15,0.20 | 2:.35 3:.7 4:.35 5:.15 (spine) |
+| arse | -0.10,0.10 | 2:.8 3:.3 4:.15 86:.2 93:.2 (pelvis+hips) |
+| thigh | -0.05,0.10 | 2:.2 86:.8 87:.2 93:.8 94:.2 |
+| leg | -0.035,0.10 | 86:.5 87:.8 88:.2 + mirror 93-95 (hip→ankle) |
+
+**Node world positions** dumped live (`FUN_00fede10` node loop: array at `*(*(model+0x16c)+0x1a0)`, count
+`+0x1a4` = 109 nodes, stride `0x50`, **world xyz at node+0x30**, morph scale at node+0x40). Validated vs
+anatomy (arm sweeps shoulder y1.58→elbow y1.13; bosom y1.4 z+0.05 front; leg hip1.08→ankle0.07; etc.). Full
+data with positions: `docs/morph-capture/body_morphs_aqf.json`. gdb scripts: `Captures/ghidra/dump_morph.gdb`
+(delta lists), `dump_nodes.gdb` (node array).
+
+DB slider [-100,100] → `t=slider/100` → client weight `= t × (t≥0 ? max : |min|)`. The viewer's
+`BodyMorphDeformer` now applies this data-driven (radial soft-skin about each joint's world position, weighted
+by the captured joint weight). Exact replication = standard linear-blend skinning with the captured node
+skeleton + the mesh's BLENDINDICES/WEIGHT (ties into the #275 rig-import follow-up). Note the captured node
+positions are the Aquilonian-female body in the muscular state; other race/sex bodies share the node topology
+(same indices/weights) but have their own positions — re-dump per body for exactness.

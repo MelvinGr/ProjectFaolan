@@ -1,0 +1,380 @@
+{
+ "_doc": "AoC body-proportion morphs, reverse-engineered from AgeOfConan.exe ApplyMorph (FUN_00fede10) + live gdb dump of the Aquilonian-female char-create deform-node array (#275). Each slider scales a weighted set of deform joints (node world positions from node+0x30); the skinned mesh follows. min/max = the per-morph asymmetric scale (CHARACTERCREATOR BodyNode). weight = the joint's influence (node+delta). DB slider in [-100,100] -> t=slider/100 -> clientWeight = t*(t>=0?max:|min|).",
+ "morphs": {
+  "arm": {
+   "min": -0.05,
+   "max": 0.05,
+   "joints": [
+    {
+     "node": 27,
+     "weight": 0.8,
+     "pos": [
+      -0.1425,
+      1.5423,
+      -0.062
+     ]
+    },
+    {
+     "node": 28,
+     "weight": 0.6,
+     "pos": [
+      -0.2276,
+      1.2656,
+      -0.08
+     ]
+    },
+    {
+     "node": 29,
+     "weight": 0.4,
+     "pos": [
+      -0.2536,
+      1.1391,
+      -0.0361
+     ]
+    },
+    {
+     "node": 26,
+     "weight": 0.8,
+     "pos": [
+      -0.0178,
+      1.5859,
+      -0.0691
+     ]
+    },
+    {
+     "node": 7,
+     "weight": 0.8,
+     "pos": [
+      0.1432,
+      1.5371,
+      -0.0924
+     ]
+    },
+    {
+     "node": 8,
+     "weight": 0.6,
+     "pos": [
+      0.2191,
+      1.2572,
+      -0.0978
+     ]
+    },
+    {
+     "node": 9,
+     "weight": 0.4,
+     "pos": [
+      0.2478,
+      1.1272,
+      -0.0679
+     ]
+    },
+    {
+     "node": 6,
+     "weight": 0.8,
+     "pos": [
+      0.0212,
+      1.5849,
+      -0.075
+     ]
+    }
+   ]
+  },
+  "arse": {
+   "min": -0.1,
+   "max": 0.1,
+   "joints": [
+    {
+     "node": 2,
+     "weight": 0.8,
+     "pos": [
+      -0.0016,
+      1.0528,
+      0.0004
+     ]
+    },
+    {
+     "node": 86,
+     "weight": 0.2,
+     "pos": [
+      -0.1176,
+      1.0761,
+      -0.0137
+     ]
+    },
+    {
+     "node": 93,
+     "weight": 0.2,
+     "pos": [
+      0.1007,
+      1.0741,
+      -0.0569
+     ]
+    },
+    {
+     "node": 3,
+     "weight": 0.3,
+     "pos": [
+      -0.0031,
+      1.2158,
+      -0.0146
+     ]
+    },
+    {
+     "node": 4,
+     "weight": 0.15,
+     "pos": [
+      -0.0006,
+      1.2712,
+      -0.0263
+     ]
+    }
+   ]
+  },
+  "bosom": {
+   "min": -0.1,
+   "max": 0.2,
+   "joints": [
+    {
+     "node": 5,
+     "weight": 0.2,
+     "pos": [
+      0.0018,
+      1.3387,
+      -0.0323
+     ]
+    },
+    {
+     "node": 77,
+     "weight": 0.8,
+     "pos": [
+      -0.087,
+      1.422,
+      0.0699
+     ]
+    },
+    {
+     "node": 76,
+     "weight": 0.8,
+     "pos": [
+      0.1206,
+      1.417,
+      0.0386
+     ]
+    }
+   ]
+  },
+  "chest": {
+   "min": -0.1,
+   "max": 0.1,
+   "joints": [
+    {
+     "node": 27,
+     "weight": 0.2,
+     "pos": [
+      -0.1425,
+      1.5423,
+      -0.062
+     ]
+    },
+    {
+     "node": 26,
+     "weight": 0.3,
+     "pos": [
+      -0.0178,
+      1.5859,
+      -0.0691
+     ]
+    },
+    {
+     "node": 7,
+     "weight": 0.2,
+     "pos": [
+      0.1432,
+      1.5371,
+      -0.0924
+     ]
+    },
+    {
+     "node": 6,
+     "weight": 0.3,
+     "pos": [
+      0.0212,
+      1.5849,
+      -0.075
+     ]
+    },
+    {
+     "node": 4,
+     "weight": 0.6,
+     "pos": [
+      -0.0006,
+      1.2712,
+      -0.0263
+     ]
+    },
+    {
+     "node": 5,
+     "weight": 0.8,
+     "pos": [
+      0.0018,
+      1.3387,
+      -0.0323
+     ]
+    }
+   ]
+  },
+  "leg": {
+   "min": -0.035,
+   "max": 0.1,
+   "joints": [
+    {
+     "node": 88,
+     "weight": 0.2,
+     "pos": [
+      -0.1635,
+      0.0732,
+      0.1044
+     ]
+    },
+    {
+     "node": 87,
+     "weight": 0.8,
+     "pos": [
+      -0.1312,
+      0.5794,
+      0.082
+     ]
+    },
+    {
+     "node": 86,
+     "weight": 0.5,
+     "pos": [
+      -0.1176,
+      1.0761,
+      -0.0137
+     ]
+    },
+    {
+     "node": 95,
+     "weight": 0.2,
+     "pos": [
+      0.0488,
+      0.0732,
+      -0.1449
+     ]
+    },
+    {
+     "node": 94,
+     "weight": 0.8,
+     "pos": [
+      0.0948,
+      0.5683,
+      -0.0421
+     ]
+    },
+    {
+     "node": 93,
+     "weight": 0.5,
+     "pos": [
+      0.1007,
+      1.0741,
+      -0.0569
+     ]
+    }
+   ]
+  },
+  "stomach": {
+   "min": -0.15,
+   "max": 0.2,
+   "joints": [
+    {
+     "node": 2,
+     "weight": 0.35,
+     "pos": [
+      -0.0016,
+      1.0528,
+      0.0004
+     ]
+    },
+    {
+     "node": 3,
+     "weight": 0.7,
+     "pos": [
+      -0.0031,
+      1.2158,
+      -0.0146
+     ]
+    },
+    {
+     "node": 4,
+     "weight": 0.35,
+     "pos": [
+      -0.0006,
+      1.2712,
+      -0.0263
+     ]
+    },
+    {
+     "node": 5,
+     "weight": 0.15,
+     "pos": [
+      0.0018,
+      1.3387,
+      -0.0323
+     ]
+    }
+   ]
+  },
+  "thigh": {
+   "min": -0.05,
+   "max": 0.1,
+   "joints": [
+    {
+     "node": 2,
+     "weight": 0.2,
+     "pos": [
+      -0.0016,
+      1.0528,
+      0.0004
+     ]
+    },
+    {
+     "node": 87,
+     "weight": 0.2,
+     "pos": [
+      -0.1312,
+      0.5794,
+      0.082
+     ]
+    },
+    {
+     "node": 86,
+     "weight": 0.8,
+     "pos": [
+      -0.1176,
+      1.0761,
+      -0.0137
+     ]
+    },
+    {
+     "node": 94,
+     "weight": 0.2,
+     "pos": [
+      0.0948,
+      0.5683,
+      -0.0421
+     ]
+    },
+    {
+     "node": 93,
+     "weight": 0.8,
+     "pos": [
+      0.1007,
+      1.0741,
+      -0.0569
+     ]
+    }
+   ]
+  }
+ }
+}
