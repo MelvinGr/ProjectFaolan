@@ -84,7 +84,8 @@ namespace Faolan.Importer.Rdb.Assets
 
 			var positions = new float[count * 3];
 			var normals = normEl is { Type: DeclType.UByte4N } ? new float[count * 3] : null;
-			var uvs = uvEl is { Type: DeclType.Float2 } ? new float[count * 2] : null;
+			// Props store UV as FLOAT2; skinned character meshes store it as SHORT2N (normalized shorts).
+			var uvs = uvEl is { Type: DeclType.Float2 or DeclType.Short2N } ? new float[count * 2] : null;
 
 			for (var i = 0; i < count; i++)
 			{
@@ -104,8 +105,16 @@ namespace Faolan.Importer.Rdb.Assets
 				if (uvs != null)
 				{
 					var o = uvEl!.Value.Offset;
-					uvs[i * 2 + 0] = ReadFloat(v, o + 0);
-					uvs[i * 2 + 1] = ReadFloat(v, o + 4);
+					if (uvEl.Value.Type == DeclType.Float2)
+					{
+						uvs[i * 2 + 0] = ReadFloat(v, o + 0);
+						uvs[i * 2 + 1] = ReadFloat(v, o + 4);
+					}
+					else // Short2N
+					{
+						uvs[i * 2 + 0] = BinaryPrimitives.ReadInt16LittleEndian(v.Slice(o + 0, 2)) / 32767f;
+						uvs[i * 2 + 1] = BinaryPrimitives.ReadInt16LittleEndian(v.Slice(o + 2, 2)) / 32767f;
+					}
 				}
 			}
 

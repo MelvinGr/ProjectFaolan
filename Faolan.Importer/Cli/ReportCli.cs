@@ -130,6 +130,17 @@ namespace Faolan.Importer.Cli
 		{
 			using var rdb = new Faolan.Importer.Rdb.RdbReader(rdbDir);
 
+			// Comma-separated ids => assemble them into one glb (character body + head + equipment).
+			if (arg != null && arg.Contains(','))
+			{
+				var ids = arg.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+					.Select(s => uint.TryParse(s, out var u) ? u : 0u).Where(u => u != 0).ToList();
+				var outPath = System.IO.Path.Combine(outDir ?? ".", "assembled.glb");
+				var res = Faolan.Importer.Rdb.Assets.RdbAssetExtractor.Assemble(rdb, ids, outPath);
+				Console.WriteLine($"assembled {res.Used.Count}/{ids.Count} meshes: {res.Vertices} verts {res.Triangles} tris -> {outPath}");
+				return;
+			}
+
 			if (uint.TryParse(arg, out var meshIndexId))
 			{
 				var result = Faolan.Importer.Rdb.Assets.RdbAssetExtractor.Extract(rdb, meshIndexId, outDir, dumpMesh);

@@ -103,6 +103,41 @@ namespace Faolan.Importer.Rdb.Assets
 			return null;
 		}
 
+		// Assemble several models (e.g. a character's body + head + equipment, all authored in the same bind-pose space)
+		// into one glb by concatenating their sub-meshes. Per-mesh diffuse is embedded when the mesh carries a material;
+		// skinned character bodies have none (item-system bound) so render untextured for now. No skinning/pose applied -
+		// a static bind-pose assembly, which is all a "view my character" page needs.
+		public static AssembleResult Assemble(RdbReader rdb, IReadOnlyList<uint> meshIndexIds, string outPath)
+		{
+			var all = new List<RenderMeshReader.SubMesh>();
+			byte[]? firstDiffuse = null;
+			var used = new List<uint>();
+			foreach (var meshIndexId in meshIndexIds)
+			{
+				if (!rdb.TryGet(MeshIndexFileType, meshIndexId, out var idxEntry))
+					continue;
+
+				var mesh = MeshIndexFile.Parse(meshIndexId, rdb.ReadDecompressed(idxEntry));
+				if (mesh.RenderMeshId is not { } rmId || !rdb.TryGet(RenderMeshType, rmId, out var rmEntry) || !rmEntry.IsLocal)
+					continue;
+
+				var subs = RenderMeshReader.Read(rdb.ReadDecompressed(rmEntry));
+				if (subs.Count == 0)
+					continue;
+
+				all.AddRange(subs);
+				used.Add(meshIndexId);
+				firstDiffuse ??= DecodeDiffusePng(rdb, mesh);
+			}
+
+			if (all.Count > 0)
+				File.WriteAllBytes(outPath, GlbWriter.Build(all, firstDiffuse));
+
+			return new AssembleResult(used, all.Sum(s => s.VertexCount), all.Sum(s => s.TriangleCount));
+		}
+
+		public readonly record struct AssembleResult(IReadOnlyList<uint> Used, int Vertices, int Triangles);
+
 		private static (string Status, long Size, string? OutFile) ExtractTexture(RdbReader rdb, uint type, uint id, string? outDir)
 		{
 			if (!rdb.TryGet(type, id, out var e))

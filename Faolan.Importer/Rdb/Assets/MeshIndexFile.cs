@@ -23,6 +23,10 @@ namespace Faolan.Importer.Rdb.Assets
 		uint? CollisionMeshId,
 		IReadOnlyList<MeshMaterial> Materials)
 	{
+		// True when the geometry is a skinned character/equipment body (<RenderSkinnedMesh>); its texture is bound by
+		// the item/character system, not the mesh manifest (MaterialSets is empty).
+		public bool Skinned { get; init; }
+
 		// The texture resources referenced anywhere in this model's materials, de-duplicated, in first-seen order.
 		public IReadOnlyList<TextureRef> UniqueTextures =>
 			Materials
@@ -53,9 +57,12 @@ namespace Faolan.Importer.Rdb.Assets
 
 			var source = root.Element("Source")?.Attribute("file")?.Value;
 
-			var renderMeshEl = root.Element("RenderMesh");
+			// Static props carry <RenderMesh>; skinned character/equipment bodies carry <RenderSkinnedMesh> (same RDB
+			// type 1010001, the vertex declaration just adds BLENDINDICES/BLENDWEIGHT). Geometry decodes the same way.
+			var renderMeshEl = root.Element("RenderMesh") ?? root.Element("RenderSkinnedMesh");
 			var renderMeshId = ParseUintAttr(renderMeshEl, "file");
 			var bounds = BoundingBox.TryParse(renderMeshEl);
+			var skinned = renderMeshEl?.Name.LocalName == "RenderSkinnedMesh";
 
 			// Collision is exported as <CollisionMesh2> (newer) or <CollisionMesh>; we only need its id for completeness.
 			var collisionEl = root.Element("CollisionMesh2") ?? root.Element("CollisionMesh");
@@ -65,7 +72,7 @@ namespace Faolan.Importer.Rdb.Assets
 				.Select(ParseMaterial)
 				.ToList();
 
-			return new MeshIndexFile(id, source, renderMeshId, bounds, collisionId, materials);
+			return new MeshIndexFile(id, source, renderMeshId, bounds, collisionId, materials) { Skinned = skinned };
 		}
 
 		private static MeshMaterial ParseMaterial(XElement el)
