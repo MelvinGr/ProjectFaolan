@@ -1065,7 +1065,12 @@ namespace Faolan.GameServer.World
 		// (returns false) if no such NPC is loaded in the zone.
 		public bool SetNpcFollowByName(uint mapId, string npcName, uint playerHandle, bool follow)
 		{
-			if (!_sim.World.TryGetZone(mapId, out var zone))
+			// Resolve the PLAYER's instance, not the default one: the beach is Solo-instanced (#268), so the player and
+			// their own Casilda live in a private playfield copy (e.g. 0x00A00001), not the shared instance 0. Find the
+			// map's live zone that actually contains this player, then look up Casilda in THAT copy - a TryGetZone(mapId)
+			// default-instance lookup misses her entirely and the follow silently no-ops.
+			var zone = _sim.World.ZonesForMap(mapId).FirstOrDefault(z => z.TryGet(playerHandle, out _));
+			if (zone == null)
 				return false;
 			var npc = zone.Entities.FirstOrDefault(e => !e.IsPlayer && e.Name == npcName);
 			if (npc == null)
