@@ -1,5 +1,22 @@
 # Handoff — Casilda / Tortage intro quest chain (Gitea epic #261)
 
+## STATUS 2026-06-29 (chain VERIFIED end-to-end in-client)
+
+The full beach chain `13479 kill Tuut -> 13563 loot key -> 13480 talk/free Casilda -> 12407 escort` runs and is
+verified in-client. Resolved since the 2026-06-21 status below:
+- The "BLOCKED on spawns" caveat is gone — Casilda + Tuut spawn from the DB and the chain drives end-to-end.
+- **Quest markers** correct through the whole chain: "!" fresh giver, **"?" on Casilda after looting Tuut's key**
+  (the active talk-stage marker — `ComputeGiverMarkerState` only looked at the giver quest 13479, Completed by
+  then; now it also returns "?" for an active TalkToNpc goal targeting the NPC, pushed via
+  `RefreshQuestMarkerByName` on supersession — commit 161542b), cleared after talking.
+- Casilda renders **chained** (captive BCC pose slot 5/159428 + her slot-18 chains item tpl402981) with correct
+  facing, un-chains on the talk-free, and **follows** (#262 follow done; arrival completion still open). The beach
+  "invisible wall" (#267) drops on the talk-free. Stage dialogue (#264), loot render (#263), corpse-bag mesh (#265)
+  all closed.
+- **Remaining:** stage-4 escort ARRIVAL completion (reach city, complete 12407) — Gitea #262.
+
+See [[casilda_quest_chain_261]], [[casilda_destiny_scry_steps]], docs/archive/handoff-2026-06-21-beach-gate.md.
+
 ## STATUS 2026-06-21 (chain engine + stages 1-3 wired)
 
 Build-plan steps 1-4 are DONE (server builds, 576 tests pass, faolan.db re-seeded):
