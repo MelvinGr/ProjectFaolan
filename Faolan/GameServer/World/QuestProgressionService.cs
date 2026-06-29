@@ -94,12 +94,7 @@ namespace Faolan.GameServer.World
 				// escort companion and follows them (the world tick steps her along, retail-style). Keyed by NAME
 				// (handles are session-volatile); the player's world-entity handle is its ClientInstance.
 				if (triggerType == QuestGoalType.TalkToNpc && string.Equals(targetName, "Casilda", StringComparison.OrdinalIgnoreCase))
-				{
 					_outbound.SetNpcFollowByName(character.MapId, "Casilda", client.Session.Account.ClientInstance, follow: true);
-					// #267: freeing (unchaining) Casilda also lifts the beach progression gate - send the ShacklesOff
-					// destiny step so the client drops the "invisible wall" confining the player to the intro tableau.
-					await _outbound.LiftBeachGate(client);
-				}
 			}
 
 			// #261: a stage change can un-gate or re-gate NPCs (e.g. completing Casilda's kill stage despawns Tuut) -

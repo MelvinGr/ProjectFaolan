@@ -57,8 +57,12 @@ QuestRewards` (beach), then `ShacklesOff, StartScriptGroup(2012264), GoingInside
 
 - `ApproachCasilda`/`LeaveCasilda` are **cycling tutorial-camera waypoints** (fire repeatedly, before she's
   freed) — NOT the wall lift.
-- **`ShacklesOff`** is the unchain step used for the beach wall lift (#267). ⚠️ Caveat: it occurs in **only one**
-  capture (`gameplay2` @5579), and there the beach chain is already complete and the prior grant is the city
-  quest **10286** — so its exact trigger relative to the beach wall is INFERRED (the #267 wiring sends it on the
-  beach free, 13480/talk-Casilda). Confirm in-client; if it turns out to be a city scene, the beach wall may lift
-  purely from the 13480→12407 quest-state change with no separate step.
+- **`ShacklesOff`** is the **PLAYER's** manacle removal (the player washes ashore in Slave Manacles, #220), and it
+  happens in **Tortage CITY, not on the beach**. PROVEN: `ShacklesOff` occurs in only one capture
+  (`Hoxxling_..._login_gameplay2` @5579), and that whole capture is in the city — it references maps 4020/4022 from
+  the very start and NEVER the beach (4010); the prior quest grant is the city quest 10286. So it fires AFTER the
+  beach→city transition. It is **NOT** the beach wall lift (a city packet can't lift a beach wall). The earlier
+  #267 wiring that sent `ShacklesOff` on the beach Casilda-free was WRONG and was reverted (in-client: the wall
+  stayed up). The beach "invisible wall" is still unsolved — most likely the beach→city transition itself (the
+  destiny confinement releases when you take the exit to the city), which overlaps with #262 (escort to city); it
+  is not a standalone "wall down" packet on the beach.

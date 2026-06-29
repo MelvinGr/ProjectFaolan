@@ -130,7 +130,22 @@ beach login, harmless even though they didn't fix the chains); added a generic `
 (WorldBroadcaster.DespawnWorldObjectForPlayer). Dropped the dead experiments (BehaviorCC pose send, visual-change,
 burst-handle).
 
-## Session 2026-06-29: invisible wall (issue 2) RESOLVED in code
+## Session 2026-06-29 (REVISED): ShacklesOff is the CITY player-unshackle, NOT the beach wall
+
+In-client result: the `ShacklesOff` wiring below did NOT lift the beach wall (it stayed up), so it was reverted.
+Proof it's a city event: `ShacklesOff` appears in only one capture (`Hoxxling_..._login_gameplay2` @5579), which
+is **entirely in Tortage city** (maps 4020/4022 from idx 13/308, never beach 4010); the prior grant is the city
+quest 10286. The player washes ashore in Slave Manacles (#220) and is unshackled by a SHORT CITY QUEST **after**
+the beach→city transition - that's what `ShacklesOff` is. A city packet can't lift a beach wall.
+
+⟹ The beach "invisible wall" is STILL unsolved. Best current theory: it is the destiny confinement that releases
+at the beach→city TRANSITION (taking the exit/portal to the city), i.e. entangled with #262 (escort to city), not
+a standalone beach "wall down" packet. Need a capture of the moment the player actually leaves the beach toward
+the city (the changemap trigger) to pin it.
+
+The reverted (wrong) attempt, kept for the record:
+
+## Session 2026-06-29: invisible wall (issue 2) RESOLVED in code [REVERTED - see above]
 
 The lift is **not** an animation or a despawn (Melvin: "it just happens when you unchain her"). Decoded the full
 destiny Scry step sequence from the **Hoxxling gameplay dumps** (`Hoxxling_..._login_gameplay{,2}.tshark.json`):
