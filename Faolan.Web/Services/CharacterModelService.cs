@@ -108,6 +108,9 @@ namespace Faolan.Web.Services
 		// Diagnostic: decode an FCTX texture to PNG (for inspecting tattoo decal textures), or null if absent.
 		public byte[]? DecodeTexture(uint type, uint id) => RdbAssetExtractor.DecodeTexturePng(Reader(), type, id);
 
+		// Diagnostic: raw decompressed bytes of an RDB resource (binary blob analysis, e.g. rendermesh DPPM morph chunk).
+		public byte[]? RawResourceBytes(uint type, uint id) => RdbAssetExtractor.RawBytes(Reader(), type, id);
+
 		// Diagnostic: report whether the body's left/right UVs are mirrored.
 		public object DescribeBodyUv(uint bodyMeshIndexId) => RdbAssetExtractor.DescribeBodyUv(Reader(), bodyMeshIndexId);
 

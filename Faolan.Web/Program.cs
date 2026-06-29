@@ -93,6 +93,15 @@ namespace Faolan.Web
                         ? Results.NotFound()
                         : Results.Text(text, "text/plain");
                 });
+
+                // Raw decompressed RDB resource bytes (binary blob analysis, e.g. the rendermesh DPPM morph-target chunk).
+                app.MapGet("/api/debug/blob/{type:long}/{id:long}", (long type, long id, CharacterModelService models) =>
+                {
+                    var bytes = models.RawResourceBytes((uint)type, (uint)id);
+                    return bytes is null
+                        ? Results.NotFound()
+                        : Results.Bytes(bytes, "application/octet-stream");
+                });
             }
 
             app.MapRazorComponents<App>()

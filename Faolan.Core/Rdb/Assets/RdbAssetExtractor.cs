@@ -431,6 +431,13 @@ namespace Faolan.Core.Rdb.Assets
 				? System.Text.Encoding.Latin1.GetString(rdb.ReadDecompressed(e))
 				: null;
 
+		// Diagnostic: the raw decompressed bytes of a resource (for binary blob analysis, e.g. the rendermesh DPPM
+		// morph-target chunk), or null if absent/unreadable.
+		public static byte[]? RawBytes(RdbReader rdb, uint type, uint id) =>
+			rdb.TryGet(type, id, out var e) && rdb.CanRead(e)
+				? rdb.ReadDecompressed(e)
+				: null;
+
 		// Load + parse a TexScript (type 1010035) by id - the per-character colour op (skin/hair tint, eye iris).
 		public static TexScriptFile? LoadTexScript(RdbReader rdb, uint id) =>
 			rdb.TryGet(TexScriptFile.Type, id, out var e) && rdb.CanRead(e)
