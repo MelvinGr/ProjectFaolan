@@ -134,6 +134,7 @@ namespace Faolan.ClientLauncher
 			string? username = null, password = null, charname = null, wine = null, universeAddr = null;
 			var proton = Environment.GetEnvironmentVariable("PROTON") ?? DefaultProton;
 			bool dx10 = false, dryRun = false, noConsole = true, streamOutput = false, patchLogin = false, detach = false, restore = false;
+			int? mirrorPort = null;
 
 			for (var i = 0; i < args.Length; i++)
 			{
@@ -174,6 +175,13 @@ namespace Faolan.ClientLauncher
 						noConsole = false;
 						streamOutput = true;
 						break;
+					// Point LocalConfig.xml's three CDN keys at the local ContentMirror for this session (reverted on
+					// exit), so loading-screen content pulls hit the store-and-forward mirror. Bare flag = 7081.
+					case "--mirror":
+						mirrorPort = i + 1 < args.Length && !args[i + 1].StartsWith('-') && int.TryParse(args[i + 1], out var mp)
+							? (i++, mp).mp
+							: 7081;
+						break;
 					case "--patch-login":
 						patchLogin = true;
 						break;
@@ -211,10 +219,13 @@ namespace Faolan.ClientLauncher
 				return 1;
 			}
 
-			// --restore: just heal a UniverseAddr left redirected by a hard-killed run (via the sidecar) and exit.
+			// --restore: just heal a UniverseAddr / mirror redirect left over from a hard-killed run (via the
+			// sidecars) and exit.
 			if (restore)
 			{
-				RecoverUniverseAddr(Path.GetDirectoryName(exe)!);
+				var dir = Path.GetDirectoryName(exe)!;
+				RecoverUniverseAddr(dir);
+				RestoreMirrorConfig(dir);
 				Console.WriteLine("restore done.");
 				return 0;
 			}
@@ -253,9 +264,10 @@ namespace Faolan.ClientLauncher
 
 			var gameDir = Path.GetDirectoryName(exe)!;
 
-			// Heal a UniverseAddr left redirected by a previous run that was hard-killed before it could revert
-			// (SIGKILL is uncatchable; `dotnet run` may not forward signals). The sidecar holds the real value.
+			// Heal a UniverseAddr / mirror redirect left over from a previous run that was hard-killed before it could
+			// revert (SIGKILL is uncatchable; `dotnet run` may not forward signals). The sidecars hold the originals.
 			RecoverUniverseAddr(gameDir);
+			RestoreMirrorConfig(gameDir);
 
 			// Point the client's login server (LocalConfig.xml <UniverseAddr>) at ours for this session. The
 			// original value is written to a sidecar first so the redirect survives a crash (next run heals it),
@@ -283,6 +295,15 @@ namespace Faolan.ClientLauncher
 
 				Console.CancelKeyPress += (_, _) => Revert();
 				AppDomain.CurrentDomain.ProcessExit += (_, _) => Revert();
+			}
+
+			// Point the three LocalConfig.xml CDN keys at the local ContentMirror for this session (reverted on exit,
+			// same crash-survival sidecar pattern as UniverseAddr).
+			var mirrorApplied = mirrorPort is { } port && SetMirrorConfig(gameDir, port);
+			if (mirrorApplied)
+			{
+				Console.CancelKeyPress += (_, _) => RestoreMirrorConfig(gameDir);
+				AppDomain.CurrentDomain.ProcessExit += (_, _) => RestoreMirrorConfig(gameDir);
 			}
 
 			var psi = new ProcessStartInfo
@@ -348,8 +369,9 @@ namespace Faolan.ClientLauncher
 			if (patchLogin && !OperatingSystem.IsWindows())
 				Task.Run(() => LoginKeyPatcher.PatchWhenReady());
 
-			// Stay in the foreground (tailing the log and/or holding the UniverseAddr override) until the client
-			// exits, then revert the config. Without either, launch detached and return.
+			// Stay in the foreground (tailing the log and/or holding a LocalConfig override) until the client exits,
+			// then revert the config. Without any reason to hold, launch detached and return.
+			var holdForConfig = originalUniverseAddr is not null || mirrorApplied;
 			try
 			{
 				if (streamOutput)
@@ -364,13 +386,13 @@ namespace Faolan.ClientLauncher
 
 					DumpNewLogContent(logPath, pos);
 				}
-				else if (originalUniverseAddr is not null && detach)
+				else if (holdForConfig && detach)
 				{
 					// Wait only until the client has read LocalConfig, then fall through to revert and return -
 					// the client keeps running.
 					WaitForClientStartup();
 				}
-				else if (originalUniverseAddr is not null)
+				else if (holdForConfig)
 					proc.WaitForExit();
 			}
 			finally
@@ -388,6 +410,12 @@ namespace Faolan.ClientLauncher
 					}
 
 					Console.WriteLine($"reverted UniverseAddr -> {originalUniverseAddr}");
+				}
+
+				if (mirrorApplied)
+				{
+					RestoreMirrorConfig(gameDir);
+					Console.WriteLine("reverted mirror CDN keys");
 				}
 			}
 
@@ -416,9 +444,12 @@ namespace Faolan.ClientLauncher
 			                    -c, --charname <s>  auto-enter this character
 			                    --universeaddr [a]  point LocalConfig.xml <UniverseAddr> (the login server) at `a` for this
 			                                        session, reverted on exit; bare flag = 127.0.0.1:7010 (replaces /etc/hosts)
-			                    --detach            with --universeaddr: revert + return once the client has read the config,
-			                                        instead of holding the foreground until the client exits
-			                    --restore           heal a UniverseAddr left redirected by a hard-killed run (via the sidecar), exit
+			                    --mirror [port]     point LocalConfig.xml's three CDN keys (HttpPatchAddr/ClientHttpPatchAddr/
+			                                        ControlHttpPatchAddr) at the local Faolan.ContentMirror for this session,
+			                                        reverted on exit; bare flag = port 7081
+			                    --detach            with --universeaddr/--mirror: revert + return once the client has read the
+			                                        config, instead of holding the foreground until the client exits
+			                    --restore           heal a UniverseAddr / mirror redirect left by a hard-killed run (via the sidecars), exit
 			                    --console           run in the foreground and tail AgeOfConan.log into THIS terminal (same content
 			                                        as the client console, no separate wineconsole window); also drops -noconsole
 			                    --patch-login       patch the client's DH key (Funcom -> CELLAO) in memory after launch so the
@@ -506,9 +537,13 @@ namespace Faolan.ClientLauncher
 		}
 
 		// Set LocalConfig.xml's <UniverseAddr> (the client's login server) to `addr`, returning the previous value
-		// (so the caller can revert), or null if nothing changed / the file or field is missing. Re-enables a
-		// LocalConfig.xml.disabled if that's all that's present.
-		private static string? SetUniverseAddr(string gameDir, string addr)
+		// (so the caller can revert), or null if nothing changed / the file or field is missing.
+		private static string? SetUniverseAddr(string gameDir, string addr) => SetConfigTag(gameDir, "UniverseAddr", addr);
+
+		// Set a single LocalConfig.xml <tag> to `value`, returning the previous value (so the caller can revert),
+		// or null if nothing changed / the file or field is missing. Re-enables a LocalConfig.xml.disabled if that's
+		// all that's present (the file is shared by UniverseAddr + the mirror CDN keys).
+		private static string? SetConfigTag(string gameDir, string tag, string value)
 		{
 			try
 			{
@@ -518,7 +553,7 @@ namespace Faolan.ClientLauncher
 					var disabled = path + ".disabled";
 					if (!File.Exists(disabled))
 					{
-						Console.Error.WriteLine("UniverseAddr: LocalConfig.xml not found; skipped.");
+						Console.Error.WriteLine($"{tag}: LocalConfig.xml not found; skipped.");
 						return null;
 					}
 
@@ -526,24 +561,25 @@ namespace Faolan.ClientLauncher
 				}
 
 				var text = File.ReadAllText(path);
-				var match = Regex.Match(text, "(<UniverseAddr>)(.*?)(</UniverseAddr>)");
+				var pattern = $"(<{tag}>)(.*?)(</{tag}>)";
+				var match = Regex.Match(text, pattern);
 				if (!match.Success)
 				{
-					Console.Error.WriteLine("UniverseAddr: no <UniverseAddr> in LocalConfig.xml; skipped.");
+					Console.Error.WriteLine($"{tag}: no <{tag}> in LocalConfig.xml; skipped.");
 					return null;
 				}
 
 				var current = match.Groups[2].Value;
-				if (current == addr)
+				if (current == value)
 					return null;
 
-				File.WriteAllText(path, Regex.Replace(text, "(<UniverseAddr>)(.*?)(</UniverseAddr>)", m => m.Groups[1].Value + addr + m.Groups[3].Value));
-				Console.WriteLine($"UniverseAddr: {current} -> {addr}");
+				File.WriteAllText(path, Regex.Replace(text, pattern, m => m.Groups[1].Value + value + m.Groups[3].Value));
+				Console.WriteLine($"{tag}: {current} -> {value}");
 				return current;
 			}
 			catch (Exception e)
 			{
-				Console.Error.WriteLine($"UniverseAddr update failed: {e.Message}");
+				Console.Error.WriteLine($"{tag} update failed: {e.Message}");
 				return null;
 			}
 		}
@@ -552,6 +588,69 @@ namespace Faolan.ClientLauncher
 		private static string SidecarPath(string gameDir)
 		{
 			return Path.Combine(gameDir, "LocalConfig.xml.faolan-revert");
+		}
+
+		// The three LocalConfig.xml CDN keys we point at the local ContentMirror, paired with the upstream tag the
+		// mirror routes them to (so the request path carries the tag). LocalConfig.xml is regenerated locally at
+		// startup and is NOT in the file manifest, so the redirect survives a patch run. (Moved here from
+		// Faolan.ContentMirror's old --patch/--restore: the launcher already owns LocalConfig.xml redirect+revert.)
+		private static readonly (string Key, string Tag)[] MirrorConfigKeys =
+		[
+			("HttpPatchAddr", "update"),
+			("ClientHttpPatchAddr", "gameupdate"),
+			("ControlHttpPatchAddr", "control")
+		];
+
+		// Sidecar holding the real CDN-key values while we've redirected them at the mirror (one `key=value` per line),
+		// so a hard-killed run can be healed on the next launch.
+		private static string MirrorSidecarPath(string gameDir)
+		{
+			return Path.Combine(gameDir, "LocalConfig.xml.faolan-mirror-revert");
+		}
+
+		// Point the three LocalConfig.xml CDN keys at the local ContentMirror (http://127.0.0.1:<port>/<tag>/upm),
+		// writing the originals to a sidecar first so the redirect survives a crash. Returns true if anything changed.
+		private static bool SetMirrorConfig(string gameDir, int port)
+		{
+			var originals = new List<string>();
+			foreach (var (key, tag) in MirrorConfigKeys)
+			{
+				var original = SetConfigTag(gameDir, key, $"http://127.0.0.1:{port}/{tag}/upm");
+				if (original is not null)
+					originals.Add($"{key}={original}");
+			}
+
+			if (originals.Count == 0)
+				return false;
+
+			File.WriteAllLines(MirrorSidecarPath(gameDir), originals);
+			return true;
+		}
+
+		// Revert the CDN keys from the mirror sidecar (each back to its saved original) and remove the sidecar.
+		private static void RestoreMirrorConfig(string gameDir)
+		{
+			var sidecar = MirrorSidecarPath(gameDir);
+			if (!File.Exists(sidecar))
+				return;
+
+			try
+			{
+				foreach (var line in File.ReadAllLines(sidecar))
+				{
+					var eq = line.IndexOf('=');
+					if (eq <= 0)
+						continue;
+
+					SetConfigTag(gameDir, line[..eq], line[(eq + 1)..]);
+				}
+
+				File.Delete(sidecar);
+			}
+			catch (Exception e)
+			{
+				Console.Error.WriteLine($"mirror config restore failed: {e.Message}");
+			}
 		}
 
 		private static int TryKill(int pid)

@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Text;
-using System.Xml.Linq;
 using Faolan.Core;
 
 // Faolan.ContentMirror - a store-and-forward mirror of Age of Conan's UPM content CDN.
@@ -13,23 +12,16 @@ using Faolan.Core;
 //   aoc-eu-control.live     /upm/control/...       manifest        (ControlHttpPatchAddr) -> tag "control"
 // The last path segment IS the md5 of the (compressed) payload, so the store is self-verifying and dedup-free.
 //
-// We redirect those three LocalConfig.xml keys at this server as http://127.0.0.1:<port>/<tag>/upm, so the request
-// path carries the upstream tag. On a miss we fetch the real CDN once (HTTP identity, raw bytes), store it under
-// store/<tag>/upm/<rest>, and serve it; on a hit we serve straight from disk - no upstream, no timeout. Running the
-// real ConanPatcher through it captures the whole current revision into store/, a server-independent archive.
+// Faolan.ClientLauncher --mirror redirects those three LocalConfig.xml keys at this server as
+// http://127.0.0.1:<port>/<tag>/upm, so the request path carries the upstream tag. On a miss we fetch the real CDN
+// once (HTTP identity, raw bytes), store it under store/<tag>/upm/<rest>, and serve it; on a hit we serve straight
+// from disk - no upstream, no timeout. Running the real ConanPatcher through it captures the whole current revision
+// into store/, a server-independent archive.
 
 namespace Faolan.ContentMirror
 {
 	public static class Program
 	{
-		// LocalConfig.xml keys we rewrite, paired with the tag they map to.
-		private static readonly (string Key, string Tag)[] ConfigKeys =
-		[
-			("HttpPatchAddr", "update"),
-			("ClientHttpPatchAddr", "gameupdate"),
-			("ControlHttpPatchAddr", "control")
-		];
-
 		private static readonly IReadOnlyDictionary<string, string> Upstreams = new Dictionary<string, string>
 		{
 			["update"] = "http://aoc-eu-update.live.ageofconan.com",
@@ -39,13 +31,9 @@ namespace Faolan.ContentMirror
 
 		public static int Main(string[] args)
 		{
-			// Config-patch helpers run and exit; no web host.
-			if (args.Length >= 1 && args[0] is "--patch" or "--restore")
-				return PatchConfig(args);
-
 			var port = GetOption(args, "--port") is { } p
 				? int.Parse(p)
-				: 7080;
+				: 7081;
 			var storeDir = Path.GetFullPath(GetOption(args, "--store") ?? "mirror-store");
 			Directory.CreateDirectory(storeDir);
 
@@ -142,8 +130,8 @@ namespace Faolan.ContentMirror
 
 			//app.MapGet("launchernotes2.php", () => Results.Ok(Statics.StartupBanner));
 
-			log.LogInformation("Faolan.ContentMirror on http://127.0.0.1:{Port}  store={Store}", port, storeDir);
-			log.LogInformation("Patch a client: dotnet run --project Faolan.ContentMirror -- --patch \"<AoC dir>\" --port {Port}", port);
+			log.LogInformation("Faolan.ContentMirror on http://127.0.0.1:{Port} store={Store}", port, storeDir);
+			log.LogInformation("Point a client at the mirror with: Faolan.ClientLauncher --mirror {Port}", port);
 			app.Run();
 			return 0;
 		}
@@ -154,63 +142,6 @@ namespace Faolan.ContentMirror
 			return i >= 0 && i + 1 < args.Length
 				? args[i + 1]
 				: null;
-		}
-
-		// Rewrite (or restore) the three patch-address keys in <AoC>/LocalConfig.xml. The patcher/client read these
-		// locally at startup and LocalConfig.xml is not in the file manifest, so the redirect survives a patch run.
-		private static int PatchConfig(string[] args)
-		{
-			var restore = args[0] == "--restore";
-			var aocDir = args.Length >= 2 && !args[1]
-				.StartsWith("--")
-				? args[1]
-				: Directory.GetCurrentDirectory();
-			var cfg = Path.Combine(aocDir, "LocalConfig.xml");
-			var backup = cfg + ".faolan-bak";
-
-			if (restore)
-			{
-				if (File.Exists(backup))
-				{
-					File.Copy(backup, cfg, true);
-					File.Delete(backup);
-					Console.WriteLine($"restored {cfg}");
-				}
-				else
-					Console.WriteLine("no backup found; nothing to restore");
-
-				return 0;
-			}
-
-			if (!File.Exists(cfg))
-			{
-				Console.Error.WriteLine($"not found: {cfg}");
-				return 1;
-			}
-
-			var port = GetOption(args, "--port") ?? "7080";
-			if (!File.Exists(backup))
-				File.Copy(cfg, backup);
-
-			var doc = XDocument.Load(cfg);
-			foreach (var (key, tag) in ConfigKeys)
-			{
-				var el = doc
-					.Descendants(key)
-					.FirstOrDefault();
-				if (el == null)
-				{
-					Console.Error.WriteLine($"warning: <{key}> not found in config");
-					continue;
-				}
-
-				el.Value = $"http://127.0.0.1:{port}/{tag}/upm";
-				Console.WriteLine($"{key} -> {el.Value}");
-			}
-
-			doc.Save(cfg);
-			Console.WriteLine($"patched {cfg} (backup at {backup}); run --restore to revert");
-			return 0;
 		}
 
 		// Replace the three real CDN /upm bases in a served LocalConfig.xml with this mirror, so a patcher that
