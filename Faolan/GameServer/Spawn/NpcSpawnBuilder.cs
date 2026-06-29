@@ -33,10 +33,11 @@ namespace Faolan.GameServer.Spawn
 			if (freshSpawn && read.Message.npc_stats != null)
 				read.Message.npc_stats.SpawnAnimation = 0;
 
-			// #267: Casilda's two captured idles both render wrong WITHOUT the chains: her own 156196 is the
-			// captive/hanging pose (correct only inside the `hangingwoman` chains, the open #267 client-content blocker),
-			// and the generic 42024 her cross-session capture carries renders standing-but-squashed on her rig. We leave
-			// her captured idle as-is; the real fix is the chains rendering (#267). See [[casilda_184_not_spawn_swap]].
+			// #267: Casilda's chained look comes from her WORN EQUIPMENT, not the captured idle and not the
+			// decor_chain_hangingwoman world object (that renders fine - it's byte-identical to retail). At the post she
+			// wears 4 pieces incl. slot-18 tpl402981 (the chains); while following she wears 3. The importer now keeps her
+			// fullest loadout (BuildBurstTruthSpawns equipByName), and the captive BCC pose (SendCasildaPose) supplies the
+			// hanging animation. We leave her captured idle as-is. See [[casilda_184_not_spawn_swap]].
 
 			// Worn equipment from DB rows (#185): rebuild the CharacterIIR f23 list from NpcSpawnEquipment instead of
 			// the captured Data blob's. Only when the row has lifted equipment - else the parsed (Data) list stands,

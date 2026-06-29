@@ -33,6 +33,9 @@ namespace Faolan.Importer.Cli
 				case "anim":
 					Anim(LoadCaptures(capturesDir), arg ?? "Casilda");
 					return 0;
+				case "equip":
+					Equip(LoadCaptures(capturesDir), arg ?? "Casilda");
+					return 0;
 				case "burst-coverage":
 					await BurstCoverage(dbPath);
 					return 0;
@@ -72,6 +75,31 @@ namespace Faolan.Importer.Cli
 						? read.Message?.Bcc?.AnimIdleId.ToString() ?? "(no bcc)"
 						: "(unreadable)";
 					Console.WriteLine($"{c.Name[..Math.Min(40, c.Name.Length)]} | handle 0x{e.Handle:X} | AnimIdleId={anim} | pos=({e.X:0.#},{e.Z:0.#})");
+				}
+		}
+
+		// Per capture, the named NPC's worn equipment (InventoryEntries: slot + template) from its FA015807 (#267).
+		private static void Equip(IReadOnlyList<NamedCapture> captures, string target)
+		{
+			foreach (var c in captures)
+				foreach (var e in NpcSpawnExtractor.Extract(c.Packets).Where(e => e.Name == target))
+				{
+					var body = e.Data is { Length: >= 12 }
+						? e.Data[(12 + (int)BinaryPrimitives.ReadUInt32BigEndian(e.Data.AsSpan(8, 4)))..]
+						: null;
+					if (body == null || !PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+					{
+						Console.WriteLine($"{c.Name[..Math.Min(44, c.Name.Length)]} | handle 0x{e.Handle:X} | (unreadable)");
+						continue;
+					}
+
+					var slots = read.Message.InventoryEntries
+						.Select(entry => NpcSpawnEquipmentBuilder.TryLift(entry, out var row)
+							? $"slot{row.Pos}=tpl{row.Template}[k={row.Key1},{row.Key2},{row.Key3},{row.Key4} lvl={row.Level} hash={row.Hash}]"
+							: "slot?=unliftable")
+						.ToList();
+					Console.WriteLine($"{c.Name[..Math.Min(44, c.Name.Length)]} | handle 0x{e.Handle:X} pos=({e.X:0.#},{e.Z:0.#})");
+					foreach (var s in slots) Console.WriteLine($"    {s}");
 				}
 		}
 

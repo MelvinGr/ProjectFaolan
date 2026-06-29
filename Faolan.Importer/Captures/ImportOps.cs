@@ -278,6 +278,15 @@ namespace Faolan.Importer.Captures
 				if (e.Morphs.Count > 0 && (!morphsByName.TryGetValue(e.Name ?? "", out var cur) || e.Morphs.Count > cur.Count))
 					morphsByName[e.Name ?? ""] = e.Morphs;
 
+			// Richest worn-equipment set per name (#267): the burst-truth dedup can pick a session where an NPC wears
+			// FEWER pieces than another capture of the same NPC - e.g. Casilda at the post wears 4 (incl. slot-18
+			// tpl402981, the CHAINS that make her look chained), but while FOLLOWING the player she wears only 3. Keep
+			// the fullest loadout so the chosen spawn isn't stripped of state-specific gear it has in another capture.
+			var equipByName = new Dictionary<string, IReadOnlyList<NpcSpawnEquipment>>();
+			foreach (var e in perCap.SelectMany(p => p.All))
+				if (e.Equipment.Count > 0 && (!equipByName.TryGetValue(e.Name ?? "", out var cur) || e.Equipment.Count > cur.Count))
+					equipByName[e.Name ?? ""] = e.Equipment;
+
 			var spawns = new List<NpcSpawnEntry>();
 			var patrols = new List<PatrolPathEntry>();
 
@@ -290,6 +299,8 @@ namespace Faolan.Importer.Captures
 						e = e with { RotX = facing.X, RotY = facing.Y, RotZ = facing.Z, RotW = facing.W };
 					if (e.Morphs.Count == 0 && morphsByName.TryGetValue(e.Name ?? "", out var backfillMorphs))
 						e = e with { Morphs = backfillMorphs };
+					if (equipByName.TryGetValue(e.Name ?? "", out var fullEquip) && fullEquip.Count > e.Equipment.Count)
+						e = e with { Equipment = fullEquip, HasEquipment = true };
 					spawns.Add(e);
 					if (routes.TryGetValue(e.Handle, out var r) && r.Waypoints.Count > 0)
 						patrols.Add(new PatrolPathEntry(e.MapId, new Vector3(e.X, e.Y, e.Z), r.Speed, r.Waypoints, 0, r.Body));
