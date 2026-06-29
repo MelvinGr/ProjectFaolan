@@ -39,10 +39,29 @@ namespace Faolan.Importer.Rdb.Assets
 
 			var renderMesh = DescribeResource(rdb, RenderMeshType, mesh.RenderMeshId);
 			string? meshDump = null;
-			if (dumpMesh && outDir != null && mesh.RenderMeshId is { } rmId && rdb.TryGet(RenderMeshType, rmId, out var rmEntry) && rmEntry.IsLocal)
+			string? glb = null;
+			int glbVerts = 0, glbTris = 0;
+			if (mesh.RenderMeshId is { } rmId && rdb.TryGet(RenderMeshType, rmId, out var rmEntry) && rmEntry.IsLocal)
 			{
-				meshDump = $"rendermesh_{rmId}.bin";
-				File.WriteAllBytes(Path.Combine(outDir, meshDump), rdb.ReadDecompressed(rmEntry));
+				var blob = rdb.ReadDecompressed(rmEntry);
+
+				if (dumpMesh && outDir != null)
+				{
+					meshDump = $"rendermesh_{rmId}.bin";
+					File.WriteAllBytes(Path.Combine(outDir, meshDump), blob);
+				}
+
+				var subs = RenderMeshReader.Read(blob);
+				if (subs.Count > 0)
+				{
+					glbVerts = subs.Sum(s => s.VertexCount);
+					glbTris = subs.Sum(s => s.TriangleCount);
+					if (outDir != null)
+					{
+						glb = $"model_{rmId}.glb";
+						File.WriteAllBytes(Path.Combine(outDir, glb), GlbWriter.Build(subs));
+					}
+				}
 			}
 
 			var manifest = new Manifest(
@@ -52,6 +71,8 @@ namespace Faolan.Importer.Rdb.Assets
 				renderMesh,
 				DescribeResource(rdb, 0, mesh.CollisionMeshId), // type unknown for collision; reported by id only
 				meshDump,
+				glb,
+				glb != null || glbVerts > 0 ? new GeometryResult(glbVerts, glbTris) : null,
 				mesh.Materials.Select(m => new MaterialResult(
 					m.Name,
 					m.Textures.Select(x => x.ToString()).ToList())).ToList(),
@@ -149,8 +170,12 @@ namespace Faolan.Importer.Rdb.Assets
 			ResourceResult? RenderMesh,
 			ResourceResult? CollisionMesh,
 			string? RenderMeshDump,
+			string? Glb,
+			GeometryResult? Geometry,
 			IReadOnlyList<MaterialResult> Materials,
 			IReadOnlyList<TextureResult> Textures);
+
+		public sealed record GeometryResult(int Vertices, int Triangles);
 
 		public sealed record ResourceResult(uint Id, uint Type, string Availability, long Size);
 

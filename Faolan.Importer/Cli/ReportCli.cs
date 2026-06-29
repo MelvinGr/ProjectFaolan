@@ -143,6 +143,8 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"  source       : {m.Source}");
 				Console.WriteLine($"  bounds       : {m.Bounds}");
 				Console.WriteLine($"  renderMesh   : {Describe(m.RenderMesh)}{(m.RenderMeshDump != null ? $" -> {m.RenderMeshDump}" : "")}");
+				if (m.Geometry is { } g)
+					Console.WriteLine($"  geometry     : {g.Vertices} verts {g.Triangles} tris{(m.Glb != null ? $" -> {m.Glb}" : "")}");
 				Console.WriteLine($"  collisionMesh: {Describe(m.CollisionMesh)}");
 				Console.WriteLine($"  materials    : {m.Materials.Count}");
 				foreach (var mat in m.Materials)
