@@ -891,6 +891,57 @@ namespace Faolan.GameServer.World
 				.SendAsync(client);
 		}
 
+		// #267: drop the beach "invisible wall". The wall is the Casilda chain decor's COLLISION (the
+		// `004709_Global__decor_chain_hangingwoman` SimpleDynel sent at world entry; its mesh doesn't render for us, so
+		// it reads as an invisible barrier). Retail flips it off with a SimpleDynel visual-change (state 5) to that dynel
+		// the instant Casilda is freed on the beach (Hoxxling gameplay idx 2053). Looked up by the chain world-object's
+		// identity so the handle matches what the client was sent at entry (its CapturedHandle). No-op off-beach / if the
+		// map has no such chain.
+		public async Task DropBeachWall(INetworkClient client)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null)
+				return;
+
+			var chain = (await _database.GetWorldObjects(player.MapId))
+				.FirstOrDefault(o => o.SubOpcode == SimpleDynelMessageCodec.SubOpcode
+				                     && o.Name != null && o.Name.Contains("decor_chain_hangingwoman"));
+			if (chain == null)
+				return;
+
+			await SendWorldIir(client, SimpleDynelMessageCodec.BuildVisualChange(chain.CapturedHandle, 0x05));
+			_logger.LogInformation("#267: dropped beach chain-wall collision (handle 0x{Handle:X8}) for {Player}.", chain.CapturedHandle, player.Name);
+		}
+
+		// #267: at world entry, drop the wall up-front for a character who has ALREADY freed Casilda (the talk stage is
+		// completed), so a returning player isn't blocked by the chain collision the world-entry burst re-sends. No-op
+		// off the beach or before she's freed.
+		public async Task SendBeachGateOnEntry(INetworkClient client)
+		{
+			var character = client.Session?.Character;
+			if (character == null || character.MapId != Map.TortageBeachId)
+				return;
+			if (await IsCasildaFreed(character.Id))
+				await DropBeachWall(client);
+		}
+
+		// Whether the character has freed Casilda - data-driven (no hard-coded quest ids): any COMPLETED quest whose
+		// first goal is a TalkToNpc goal targeting Casilda (the freeing stage of the intro chain, #261).
+		private async Task<bool> IsCasildaFreed(uint characterId)
+		{
+			foreach (var quest in await _database.GetCharacterQuests(characterId))
+			{
+				if (quest.State != QuestState.Completed)
+					continue;
+				var def = await _database.GetQuestDefinition(quest.QuestId);
+				var goal = def?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
+				if (goal?.GoalType == QuestGoalType.TalkToNpc && string.Equals(goal.TargetName, "Casilda", StringComparison.OrdinalIgnoreCase))
+					return true;
+			}
+
+			return false;
+		}
+
 		// Sends a QuestIIR (add/update a quest in the player's journal) to the player.
 		public Task SendQuestIir(INetworkClient client, uint questId, uint state)
 		{

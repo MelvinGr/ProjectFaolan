@@ -120,6 +120,11 @@ namespace Faolan.GameServer
 					.SendAsync(client);
 			}
 
+			// #267: if this character has ALREADY freed Casilda (relog after the beach talk stage), drop the chain-wall
+			// collision up-front so they aren't re-blocked by the world-entry burst's chain dynel.
+			if (onBeach)
+				await _broadcaster.SendBeachGateOnEntry(client);
+
 			// record 5: 0x00002000, 154-byte body
 			await new PacketStream()
 				.WriteHeader(ExistingCharacterWorldEntryPromptSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, instance), GameServerCarrierOpcodes.IirCarrier)

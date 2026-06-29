@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.IO;
+using Faolan.Core.Data;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Protobuf;
 using ProtoBuf;
@@ -79,6 +80,26 @@ namespace Faolan.GameServer.Spawn
 
 		// SimpleDynelFullUpdateIIR sub-opcode (the object class that carries a ProtoSimpleDynelIIR identity).
 		public const uint SubOpcode = 0x66AEDD50;
+
+		// SimpleDynelVisualChangeIIR (0xE7F4F8F8): flips a SimpleDynel's visual/collision STATE. Retail sends it to the
+		// Casilda chain decor (this class) the instant she's freed on the beach, switching it to state 5 - which drops the
+		// chain's COLLISION = the "invisible wall" (#267; the hangingwoman mesh doesn't render for us, so the dynel reads
+		// as an invisible barrier). Decoded byte-exact from Hoxxling gameplay idx 2053 (21 B):
+		//   [subop 0xE7F4F8F8][typeTag 0xC878][u32 handle][u32 0][u8 state][u32 0]
+		public const uint VisualChangeSubOpcode = 0xE7F4F8F8;
+		public const uint VisualChangeTypeTag = 0x0000C878;
+
+		public static byte[] BuildVisualChange(uint handle, byte state)
+		{
+			return new FaolanStream()
+				.WriteUInt32(VisualChangeSubOpcode)
+				.WriteUInt32(VisualChangeTypeTag)
+				.WriteUInt32(handle)
+				.WriteUInt32(0)
+				.WriteByte(state)
+				.WriteUInt32(0)
+				.ToArray();
+		}
 
 		// Builds the typed identity message from a WorldObject row's columns (the DB-source path). Kdtree is always 0
 		// on world dynels; the two nullable columns are emitted only when present, reproducing the captured field-set.

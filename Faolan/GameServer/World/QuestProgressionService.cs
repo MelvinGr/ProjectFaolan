@@ -94,7 +94,13 @@ namespace Faolan.GameServer.World
 				// escort companion and follows them (the world tick steps her along, retail-style). Keyed by NAME
 				// (handles are session-volatile); the player's world-entity handle is its ClientInstance.
 				if (triggerType == QuestGoalType.TalkToNpc && string.Equals(targetName, "Casilda", StringComparison.OrdinalIgnoreCase))
+				{
 					_outbound.SetNpcFollowByName(character.MapId, "Casilda", client.Session.Account.ClientInstance, follow: true);
+					// #267: freeing Casilda drops the beach "invisible wall" - the chain decor's collision (its mesh
+					// doesn't render for us, so it reads as an invisible barrier). Retail flips it off with a SimpleDynel
+					// visual-change to the chain dynel at this exact moment (Hoxxling gameplay idx 2053).
+					await _outbound.DropBeachWall(client);
+				}
 			}
 
 			// #261: a stage change can un-gate or re-gate NPCs (e.g. completing Casilda's kill stage despawns Tuut) -
