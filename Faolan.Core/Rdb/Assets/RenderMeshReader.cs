@@ -148,10 +148,12 @@ namespace Faolan.Core.Rdb.Assets
 						uvs[i * 2 + 0] = ReadFloat(v, o + 0);
 						uvs[i * 2 + 1] = ReadFloat(v, o + 4);
 					}
-					else // Short2N
+					else // Short2N - declared signed, but AoC packs UVs UNSIGNED ([0,65535] -> [0,1]); reading them
+					     // signed (/32767) wraps the upper half of each UV island into negative space and scrambles
+					     // the texture placement. Treat as USHORT2N.
 					{
-						uvs[i * 2 + 0] = BinaryPrimitives.ReadInt16LittleEndian(v.Slice(o + 0, 2)) / 32767f;
-						uvs[i * 2 + 1] = BinaryPrimitives.ReadInt16LittleEndian(v.Slice(o + 2, 2)) / 32767f;
+						uvs[i * 2 + 0] = BinaryPrimitives.ReadUInt16LittleEndian(v.Slice(o + 0, 2)) / 65535f;
+						uvs[i * 2 + 1] = BinaryPrimitives.ReadUInt16LittleEndian(v.Slice(o + 2, 2)) / 65535f;
 					}
 				}
 			}
