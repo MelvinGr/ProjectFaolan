@@ -6,6 +6,41 @@ namespace Faolan.Core.Rdb.Assets
 	// (DXT1) into a PNG that glTF can reference (#275 Phase 2). Only the top mip is needed for the model preview.
 	public static class BcDecoder
 	{
+		// Decode BC4 / ATI1 (AoC "MIXD") - a single-channel block format (one 8-byte interpolated-value block per 4x4
+		// tile, identical to the BC3 alpha block) - to RGBA32 grayscale (R=G=B=value, A=255). Used to inspect/apply the
+		// body normal/detail map (#275): the channel carries surface detail (nipples, navel, abs) the diffuse omits.
+		public static byte[] DecodeBc4(ReadOnlySpan<byte> blocks, int width, int height)
+		{
+			var rgba = new byte[width * height * 4];
+			var blocksW = Math.Max(1, (width + 3) / 4);
+			var blocksH = Math.Max(1, (height + 3) / 4);
+
+			var p = 0;
+			for (var by = 0; by < blocksH; by++)
+			for (var bx = 0; bx < blocksW; bx++)
+			{
+				if (p + 8 > blocks.Length)
+					return rgba;
+
+				Span<byte> vals = stackalloc byte[16];
+				DecodeAlphaBlock(blocks.Slice(p, 8), vals);
+				for (var i = 0; i < 16; i++)
+				{
+					var x = bx * 4 + (i & 3);
+					var y = by * 4 + (i >> 2);
+					if (x >= width || y >= height)
+						continue;
+					var o = (y * width + x) * 4;
+					rgba[o + 0] = rgba[o + 1] = rgba[o + 2] = vals[i];
+					rgba[o + 3] = 255;
+				}
+
+				p += 8;
+			}
+
+			return rgba;
+		}
+
 		// Decode the top-level mip of a BCn payload (block data only, no DDS/FCTX header) to RGBA32 (row-major, top-down).
 		public static byte[] Decode(ReadOnlySpan<byte> blocks, int width, int height, string fourCc)
 		{

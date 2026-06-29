@@ -110,7 +110,8 @@ namespace Faolan.Core.Rdb.Assets
 		// percent of its native size, rotated Rotation degrees, alpha-blended by Blend. From a mesh -1/-2 TexScript.
 		public readonly record struct BodyDecal(uint TextureId, float U, float V, float Scale, float Rotation, float Blend);
 
-		private static bool TryDecodeTexture(RdbReader rdb, uint type, uint id, out byte[]? png, out bool alphaMask, Tint? tint = null)
+		private static bool TryDecodeTexture(RdbReader rdb, uint type, uint id, out byte[]? png, out bool alphaMask,
+			Tint? tint = null, bool includeSingleChannel = false)
 		{
 			png = null;
 			alphaMask = false;
@@ -118,7 +119,7 @@ namespace Faolan.Core.Rdb.Assets
 				return false;
 
 			var payload = rdb.ReadDecompressed(e);
-			if (!FctxConverter.TryDecodeTopMip(payload, out var rgba, out var w, out var h))
+			if (!FctxConverter.TryDecodeTopMip(payload, out var rgba, out var w, out var h, includeSingleChannel))
 				return false;
 
 			alphaMask = HasTransparency(rgba);
@@ -422,7 +423,7 @@ namespace Faolan.Core.Rdb.Assets
 
 		// Diagnostic: decode an FCTX/texture resource (type, id) straight to PNG (no tint/decal), or null if absent.
 		public static byte[]? DecodeTexturePng(RdbReader rdb, uint type, uint id) =>
-			TryDecodeTexture(rdb, type, id, out var png, out _, null) ? png : null;
+			TryDecodeTexture(rdb, type, id, out var png, out _, null, includeSingleChannel: true) ? png : null;
 
 		// Diagnostic: the decompressed payload of a resource as Latin1 text (XML resources read straight; binary is mojibake).
 		public static string? RawText(RdbReader rdb, uint type, uint id) =>
