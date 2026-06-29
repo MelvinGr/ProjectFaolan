@@ -132,13 +132,24 @@ burst-handle).
 
 ## Session 2026-06-29: invisible wall (issue 2) RESOLVED in code
 
-The lift is **not** an animation or a despawn (Melvin: "it just happens when you unchain her"). Captures carry
-both `ApproachCasilda` (confine) and **`LeaveCasilda`** (lift) as plain `ScryScriptIIR` steps (mode 2, flag 0, no
-resources, f6={0,0} - i.e. `ScryScript.BuildStep(instance, "LeaveCasilda")`). The create-world destiny scene
-raises the wall; we simply never sent the matching lift.
+The lift is **not** an animation or a despawn (Melvin: "it just happens when you unchain her"). Decoded the full
+destiny Scry step sequence from the **Hoxxling gameplay dumps** (`Hoxxling_..._login_gameplay{,2}.tshark.json`):
+
+```
+gameplay  (beach intro):  StartFixed3d, StartScriptGroup(385910), WelcomeTutorial,
+                          ApproachCasilda(555), LeaveCasilda(1076), CombatTutorial, Level, ApproachCasilda(1828), QuestRewards
+gameplay2 (free+escort):  ShacklesOff(5579), StartScriptGroup(2012264)(10375), GoingInside(10460),
+                          StartScriptGroup(2012264)(11828), GoingOutside(11901)
+```
+
+KEY: `ApproachCasilda`/`LeaveCasilda` are **cycling tutorial-camera waypoints** ("walk up to her" / "walk away to
+go kill Tuut") - LeaveCasilda fires at 1076, long BEFORE she's freed, and Approach fires AGAIN at 1828. They are
+NOT the wall lift. The unchain/lift is **`ShacklesOff`** - a single mode-2 step (`ScryScript.BuildStep(instance,
+"ShacklesOff")`) that fires ONCE immediately after the freeing quest stage completes (gameplay2 idx 5565 quest
+supersede -> 5579 ShacklesOff). (My first pass wrongly used LeaveCasilda; corrected to ShacklesOff.)
 
 Wired:
-- `WorldBroadcaster.LiftBeachGate` sends `LeaveCasilda` on the standard world IIR conversation.
+- `WorldBroadcaster.LiftBeachGate` sends `ShacklesOff` on the standard world IIR conversation.
 - `QuestProgressionService` sends it the moment the freeing talk-to-Casilda goal completes (the same branch that
   makes her follow, #262) - the unchain moment.
 - `WorldBroadcaster.SendBeachGateOnEntry` lifts it up-front at beach entry for a character who already freed her
@@ -147,6 +158,14 @@ Wired:
 
 Still open for #267: the **chains don't render** (issue 1, client-content/scene). Needs in-client verification of
 the wall drop.
+
+### #262 escort -> city (decoded from the same dumps, for the next session)
+The escort to Tortage city is in `gameplay2`: after `ShacklesOff` the player + Casilda head to the city gate; the
+`GoingInside`/`GoingOutside` steps + `StartScriptGroup(2012264)` bracket a building (door) transition, and there
+are several `IntendedTeleport (0x10D27BC0)` + `n3Teleport (0x5A32F0D7)` map/door moves (idx 10377/11330/11830).
+The Hoxxling quest chain uses different ids than the necro Casilda chain (12371 -> 10286 -> 10287 -> 10915...,
+class/destiny-specific) - so wire the escort arrival by the trigger (reaching the city / the door transition), not
+by a hard-coded id, the same name-keyed way the rest of the chain is driven.
 
 ## Related
 Gitea #267 (this), #266 (Casilda done — position + hanging pose), #261 (the Casilda quest chain), #234 (create

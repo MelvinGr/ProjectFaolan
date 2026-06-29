@@ -891,14 +891,15 @@ namespace Faolan.GameServer.World
 				.SendAsync(client);
 		}
 
-		// #267 beach gate: lift the Tortage beach "invisible wall" by sending the LeaveCasilda destiny Scry step. The
+		// #267 beach gate: lift the Tortage beach "invisible wall" by sending the ShacklesOff destiny Scry step. The
 		// create-world destiny scene confines the player to the chained-Casilda tableau; the client drops that
-		// confinement when Casilda is unchained, which on the wire is just this named step (plain mode-2 step, proven in
-		// the Approach/LeaveCasilda capture pairs - it's a state flip, not an animation). Sent on the standard world IIR
-		// conversation (same as every other live world record).
+		// confinement when Casilda is unchained ("it just happens when you unchain her"), which on the wire is this named
+		// step. Decoded from the Hoxxling gameplay2 dump: a single ShacklesOff (plain mode-2 step) fires immediately after
+		// the freeing quest stage completes (idx 5565->5579) - it's a one-shot state flip, NOT the cycling
+		// Approach/LeaveCasilda tutorial-camera waypoints. Sent on the standard world IIR conversation.
 		public Task LiftBeachGate(INetworkClient client)
 		{
-			var body = ScryScript.BuildStep(client.Session.Account.ClientInstance, "LeaveCasilda");
+			var body = ScryScript.BuildStep(client.Session.Account.ClientInstance, "ShacklesOff");
 			return SendWorldIir(client, body);
 		}
 

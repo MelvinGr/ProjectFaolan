@@ -24,7 +24,7 @@ namespace Faolan.GameServer.World
 		// companion trigger (Casilda after her rescue). No-op if no such NPC is loaded; returns true if applied.
 		bool SetNpcFollowByName(uint mapId, string npcName, uint playerHandle, bool follow);
 
-		// #267: lift the Tortage beach progression gate (the "invisible wall") for the player by sending the LeaveCasilda
+		// #267: lift the Tortage beach progression gate (the "invisible wall") for the player by sending the ShacklesOff
 		// destiny Scry step - the client drops the confinement when Casilda is unchained. Sent the moment she's freed
 		// (the talk-goal completion); the create-world destiny scene raised the wall, this is the matching lift.
 		Task LiftBeachGate(INetworkClient client);
