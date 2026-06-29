@@ -163,9 +163,12 @@ the wall drop.
 The escort to Tortage city is in `gameplay2`: after `ShacklesOff` the player + Casilda head to the city gate; the
 `GoingInside`/`GoingOutside` steps + `StartScriptGroup(2012264)` bracket a building (door) transition, and there
 are several `IntendedTeleport (0x10D27BC0)` + `n3Teleport (0x5A32F0D7)` map/door moves (idx 10377/11330/11830).
-The Hoxxling quest chain uses different ids than the necro Casilda chain (12371 -> 10286 -> 10287 -> 10915...,
-class/destiny-specific) - so wire the escort arrival by the trigger (reaching the city / the door transition), not
-by a hard-coded id, the same name-keyed way the rest of the chain is driven.
+
+**Quest-id note (corrected):** the **beach** Casilda chain `13479 -> 13563 -> 13480 -> 12407` is the SAME for
+every class (verified guardian/necro/herald/assassin/conqueror - see `docs/tortage-intro-quest-ids.md`), NOT
+per-class. The `12371/10286/10287/10915/14012/14014/14020/13041` ids are the *post-beach Tortage CITY* destiny
+quests (a separate id band), which I briefly mis-read as a per-class chain. Still wire escort arrival by trigger
+(reaching the city / door transition), not a hard-coded id - the chain is data-driven (name-keyed) already.
 
 ## Related
 Gitea #267 (this), #266 (Casilda done — position + hanging pose), #261 (the Casilda quest chain), #234 (create
