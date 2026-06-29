@@ -291,8 +291,9 @@ namespace Faolan.Core.Rdb.Assets
 		// Assemble a character from decoded parts: body (meshindex) + head-local RenderMeshes (head/eyes/lashes from a
 		// MonsterData, seated together at the neck) + an optional world-space hair RenderMesh (added untranslated).
 		// skinTint/hairTint: per-character colour multiplies from their TexScripts. eyeTextureId: the projected iris
-		// texture (TexScript projecttexture) used as the eye mesh's diffuse. The head meshes arrive in MonsterData order
-		// [head(skin), eyes, lashes] - so skin tint applies to the body + the first head mesh, the eye texture to the second.
+		// texture (TexScript projecttexture) used as the eyeball mesh's diffuse. MonsterData lists [head, lashes, eyeball]
+		// but the order isn't guaranteed, so parts are identified by content: index 0 = head skin (largest), the eyeball
+		// is the OPAQUE small part (the lashes are an alpha cutout), and the iris goes there.
 		public static byte[]? BuildCharacterFromParts(RdbReader rdb, uint bodyMeshIndexId,
 			IReadOnlyList<uint> headLocalRenderMeshIds, uint? hairWorldRenderMeshId,
 			Tint? skinTint = null, Tint? hairTint = null, uint? eyeTextureId = null)
@@ -306,13 +307,20 @@ namespace Faolan.Core.Rdb.Assets
 			var headParts = new List<RenderMeshReader.SubMesh>();
 			for (var i = 0; i < headLocalRenderMeshIds.Count; i++)
 			{
-				// 0 = head skin (skin tint), 1 = eyes (override with the iris texture), 2+ = lashes/etc (untouched).
-				var part = i switch
+				var rm = headLocalRenderMeshIds[i];
+				if (i == 0)
 				{
-					0 => ReadRenderMeshDirect(rdb, headLocalRenderMeshIds[i], skinTint),
-					1 => ReadRenderMeshDirect(rdb, headLocalRenderMeshIds[i], null, eyeTextureId),
-					_ => ReadRenderMeshDirect(rdb, headLocalRenderMeshIds[i])
-				};
+					// The head skin itself (largest mesh) - apply the skin tint.
+					if (ReadRenderMeshDirect(rdb, rm, skinTint) is { } headSkin)
+						headParts.AddRange(headSkin);
+					continue;
+				}
+
+				// Eyeball vs eyelashes: load plain, then if it's the opaque part and we have an iris, reload with it.
+				var part = ReadRenderMeshDirect(rdb, rm);
+				if (part is { Count: > 0 } && eyeTextureId is { } eye && !part[0].AlphaMask
+				    && ReadRenderMeshDirect(rdb, rm, null, eye) is { } eyeball)
+					part = eyeball;
 				if (part is not null)
 					headParts.AddRange(part);
 			}
