@@ -554,25 +554,32 @@ namespace Faolan.GameServer.World
 		// point (the captures only ever carried one spot; the multi-spot framing isn't pinned). The client replies with
 		// RespawnMe(spawnPointId), handled inbound. If the map has no point, skip (the auto-timer still revives).
 		// Resolves the killer to put in the death's SimpleCharKilledBy record. The resurrect window (#214) goes into
-		// WAVE-respawn mode iff the killer resolves to the LOCAL player (the client's ResurrectView ctor looks the
-		// killer up and, finding a local non-proxy entity, sets its wave flag); a real mob killer makes it INSTANT
-		// like retail. So NEVER attribute a death to the player itself: prefer the last mob that hit them, else the
-		// nearest live hostile NPC (covers .kill / environmental deaths so they still go instant), else fall back to
-		// self only when no hostile is anywhere near (rare; would wave, but there's no other valid endpoint).
+		// WAVE-respawn mode (the dreaded countdown) IFF the killer resolves to the LOCAL player (the client's
+		// ResurrectView ctor looks the killer up and, finding a local non-proxy entity = the player, sets its wave
+		// flag); ANY other endpoint - a live mob, a now-dead corpse, even a handle the client has already despawned -
+		// makes it INSTANT like retail (the lookup just fails to find the local player). So the ONLY rule that matters
+		// is: never attribute a death to the player itself. The death CAUSE must not matter (#214/#274): a melee mob,
+		// a DoT whose caster has since died, .kill, or an environmental death must all resurrect instantly. Prefer the
+		// last attacker even if it has since died/despawned (still a non-self handle -> instant), else the nearest
+		// hostile, else self only when there was literally no attacker at all (rare; the one case that still waves).
 		private uint ResolveKiller(WorldEntity player, Vector3 deathPosition, uint mapId, uint selfHandle)
 		{
-			if (!World.TryGetZone(mapId, out var zone))
-				return selfHandle;
-
-			if (player != null && player.LastAttackerHandle != 0 && player.LastAttackerHandle != selfHandle
-			    && zone.TryGet(player.LastAttackerHandle, out var attacker) && attacker.Hostile && !attacker.IsDead)
+			// The last thing that hit them wins - alive or not. A stale/dead handle is fine: it just isn't the local
+			// player, so the client takes the instant path. This is what keeps a DoT-kill (caster long dead) instant.
+			if (player != null && player.LastAttackerHandle != 0 && player.LastAttackerHandle != selfHandle)
 				return player.LastAttackerHandle;
 
-			var nearest = zone.EntitiesInRange(deathPosition, PlayerInterestRange, selfHandle)
-				.Where(e => e.Hostile && !e.IsDead && e.Vitals != null)
-				.OrderBy(e => Vector3.Distance(e.Position, deathPosition))
-				.FirstOrDefault();
-			return nearest?.Handle ?? selfHandle;
+			if (World.TryGetZone(mapId, out var zone))
+			{
+				var nearest = zone.EntitiesInRange(deathPosition, PlayerInterestRange, selfHandle)
+					.Where(e => e.Hostile && !e.IsDead && e.Vitals != null)
+					.OrderBy(e => Vector3.Distance(e.Position, deathPosition))
+					.FirstOrDefault();
+				if (nearest != null)
+					return nearest.Handle;
+			}
+
+			return selfHandle;
 		}
 
 		private async Task SendDeathScreen(INetworkClient client, Character character, WorldEntity playerEntity, Vector3 deathPosition)
@@ -809,6 +816,15 @@ namespace Faolan.GameServer.World
 				if (_playerRespawnRemaining.TryAdd(client, 0))
 				{
 					_logger.LogInformation("Combat: {Player} died; awaiting release (RespawnMe).", character.Name);
+					// Death strips all (de)buffs/DoTs. Without this a bleed keeps ticking through the release window and
+					// resumes the instant the player revives to full - re-killing them and making resurrect look broken
+					// (#274). The client does NOT self-expire an icon, so clearing the server state alone leaves the
+					// debuff icon stuck on the bar (counting down) after resurrect - we must send each one's end-twin
+					// removal so the client drops the icon too. Do it BEFORE the dead-state BccIIR (these are plain
+					// debuff removals, not the wave-triggering death-effect spell SendDeathScreen deliberately skips).
+					foreach (var buff in pair.Value.ActiveBuffs)
+						await _output.SendBuffRemoval(client, pair.Value.Handle, buff.Value.CasterHandle, buff.Key);
+					pair.Value.ActiveBuffs.Clear();
 					// Persist the dead state (#214) so a logout-while-dead returns dead - the login snapshot then
 					// carries current-health = 0 and the client shows the release window at world entry.
 					character.IsDead = true;
