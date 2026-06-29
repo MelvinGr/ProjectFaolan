@@ -36,6 +36,9 @@ namespace Faolan.Core.Rdb.Assets
 		public sealed record SubMesh(float[] Positions, float[]? Normals, float[]? Uvs, int[] Indices)
 		{
 			public byte[]? BaseColorPng { get; init; }
+
+			// Alpha-tested (e.g. hair): the diffuse's alpha channel cuts out the strand edges (glTF alphaMode=MASK).
+			public bool AlphaMask { get; init; }
 			public int VertexCount => Positions.Length / 3;
 			public int TriangleCount => Indices.Length / 3;
 		}

@@ -262,19 +262,48 @@ namespace Faolan.Core.Rdb.Assets
 				if (ReadRenderMeshDirect(rdb, rm) is { } part)
 					headParts.AddRange(part);
 
+			// Hair is authored in world space (head at ~y1.7); it's the ground truth for where the head sits.
+			var hair = hairWorldRenderMeshId is { } hr ? ReadRenderMeshDirect(rdb, hr) : null;
+
 			if (headParts.Count > 0)
 			{
+				// Seat the head-local meshes (head/eyes/lashes) at the body's neck for Y, then - when we have hair -
+				// snap their X/Z to the hair's frame so the head sits inside the hairstyle (the geometric neck-seat alone
+				// lands the head a few cm off in Z relative to the world-space hair).
 				var neck = NeckTop(body);
 				var anchor = BottomCenter(headParts);
-				var (dx, dy, dz) = (neck.x - anchor.x, neck.y - anchor.y, neck.z - anchor.z);
-				foreach (var s in headParts)
-					all.Add(Translate(s, dx, dy, dz));
+				var seated = headParts.Select(s => Translate(s, neck.x - anchor.x, neck.y - anchor.y, neck.z - anchor.z)).ToList();
+
+				if (hair is { Count: > 0 })
+				{
+					var hc = Center(hair);
+					var sc = Center(seated);
+					seated = seated.Select(s => Translate(s, hc.x - sc.x, 0, hc.z - sc.z)).ToList();
+				}
+
+				all.AddRange(seated);
 			}
 
-			if (hairWorldRenderMeshId is { } hr && ReadRenderMeshDirect(rdb, hr) is { } hair)
-				all.AddRange(hair);
+			if (hair is { Count: > 0 })
+				all.AddRange(hair.Select(s => s with { AlphaMask = true }));
 
 			return GlbWriter.Build(all, null);
+		}
+
+		// Axis-aligned bounding-box centre of a set of sub-meshes.
+		private static (float x, float y, float z) Center(IReadOnlyList<RenderMeshReader.SubMesh> model)
+		{
+			float minX = float.MaxValue, minY = float.MaxValue, minZ = float.MaxValue;
+			float maxX = float.MinValue, maxY = float.MinValue, maxZ = float.MinValue;
+			foreach (var s in model)
+				for (var i = 0; i + 2 < s.Positions.Length; i += 3)
+				{
+					minX = Math.Min(minX, s.Positions[i]); maxX = Math.Max(maxX, s.Positions[i]);
+					minY = Math.Min(minY, s.Positions[i + 1]); maxY = Math.Max(maxY, s.Positions[i + 1]);
+					minZ = Math.Min(minZ, s.Positions[i + 2]); maxZ = Math.Max(maxZ, s.Positions[i + 2]);
+				}
+
+			return ((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2);
 		}
 
 		// Centroid of the body's top ring (near max-Y) = where the head's base should sit (the neck).

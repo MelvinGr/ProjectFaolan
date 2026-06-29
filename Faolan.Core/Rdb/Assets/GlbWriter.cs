@@ -31,9 +31,9 @@ namespace Faolan.Core.Rdb.Assets
 			var accessors = new List<object>();
 			var primitives = new List<object>();
 
-			// Material 0 is the untextured default; each distinct diffuse PNG gets its own material after it.
-			var textures = new List<byte[]>();
-			var materialOf = new Dictionary<byte[], int>(ReferenceEqualityComparer.Instance);
+			// Material 0 is the untextured default; each distinct (diffuse PNG, alpha-mode) pair gets its own material.
+			var textures = new List<(byte[] Png, bool AlphaMask)>();
+			var materialOf = new Dictionary<(byte[], bool), int>();
 
 			foreach (var sub in subs)
 			{
@@ -58,11 +58,12 @@ namespace Faolan.Core.Rdb.Assets
 				var material = 0;
 				if (png is { Length: > 0 } && sub.Uvs != null)
 				{
-					if (!materialOf.TryGetValue(png, out material))
+					var key = (png, sub.AlphaMask);
+					if (!materialOf.TryGetValue(key, out material))
 					{
-						textures.Add(png);
+						textures.Add(key);
 						material = textures.Count; // 0 = default, textured materials start at 1
-						materialOf[png] = material;
+						materialOf[key] = material;
 					}
 				}
 
@@ -81,19 +82,27 @@ namespace Faolan.Core.Rdb.Assets
 			var glTextures = new List<object>();
 			for (var i = 0; i < textures.Count; i++)
 			{
+				var (png, alphaMask) = textures[i];
 				Align(bin);
 				var imgOffset = (int)bin.Length;
-				bin.Write(textures[i]);
+				bin.Write(png);
 				var imgBv = bufferViews.Count;
-				bufferViews.Add(new Dictionary<string, object> { ["buffer"] = 0, ["byteOffset"] = imgOffset, ["byteLength"] = textures[i].Length });
+				bufferViews.Add(new Dictionary<string, object> { ["buffer"] = 0, ["byteOffset"] = imgOffset, ["byteLength"] = png.Length });
 				images.Add(new Dictionary<string, object> { ["bufferView"] = imgBv, ["mimeType"] = "image/png" });
 				glTextures.Add(new Dictionary<string, object> { ["source"] = i, ["sampler"] = 0 });
-				materials.Add(new Dictionary<string, object>
+				var material = new Dictionary<string, object>
 				{
 					["name"] = $"mat{i}",
 					["pbrMetallicRoughness"] = new Dictionary<string, object> { ["baseColorTexture"] = new Dictionary<string, object> { ["index"] = i, ["texCoord"] = 0 }, ["metallicFactor"] = 0.0f, ["roughnessFactor"] = 1.0f },
 					["doubleSided"] = true
-				});
+				};
+				if (alphaMask)
+				{
+					material["alphaMode"] = "MASK";
+					material["alphaCutoff"] = 0.5f;
+				}
+
+				materials.Add(material);
 			}
 
 			var binBytes = bin.ToArray();
