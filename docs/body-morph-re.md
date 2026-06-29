@@ -24,22 +24,38 @@ Status of the attempt to recover AoC's *exact* body-proportion morph deformation
   within `[min_value, max_value]`. Confirms the BodyNode clamp model (BODY morphs clamp to ±0.1; the
   importer stores the raw slider ~[-100,100]). Other refs: `FUN_012900e0`, `FUN_012940b0`.
 
-## What is still unknown (the blockers)
+## CLUS is NOT the morph system (the key reframe)
 
-1. **Cluster vertex membership.** The CLUS `(start,count)` do NOT index either render index buffer to give
-   name-coherent clusters — tested both the base index buffer and the DPPM index buffer in Python on the
-   Cimmerian-female body (rm 1102537): the named clusters land on the wrong geometry either way ("thighs"
-   at the feet, "neck" in the legs, etc.). So (start,count) index a *separate* per-vertex influence/pair
-   array (probably the INF0 chunk), which is not yet decoded.
-2. **The deform apply function** (the actual scale/offset math + per-cluster pivot/axis + slider
-   normalization) has not been located. `+0x624` is too common an offset (37 unrelated accesses) to anchor
-   on; the apply path is spread across the mesh-engine code.
+A second Ghidra pass settled it. The `FUN_00f73xxx` functions that consume the cluster vector
+(`mesh+0x624`, stride `0x2c`) all live in **`SandBox\modelconstraints.cpp`** / `ModelInstance.h` and only
+**toggle per-cluster status flags** ("pStatus") — enable/disable a body-part triangle group. The cluster
+set includes `_L_arm_decapitation` / `_R_arm_decapitation`. So **CLUS is the body-part visibility /
+constraint system** (gore dismemberment, hiding skin under armor), and its `(start,count)` are index-buffer
+**triangle ranges** that partition the mesh for selective show/hide (that is why the ranges sum exactly to
+the index count). It is not a proportion-morph carrier. The correct CLUS parse is
+`[u16 start][u16 count][u16 0x9030][u8 flag][u32 nameLen][name]` (numbers BEFORE name) — but it does not
+help morphs.
+
+Other carriers eliminated this pass:
+- **DPPM** = depth-pre-pass / alpha-safe mesh (assert *"DPP mesh for alpha-safe mesh %d"*).
+- **INF0** (`FUN_00e51b40`) = bbox/pivot floats into `mesh+0x2f0` + a **vertex-lighting** buffer ("unable
+  to create vertex lighting buffer"). Not morphs.
+- The body mesh-index (1102540) bundles two extra resources (`type=5204334`, `type=9398638`) — both turned
+  out to be **PNG textures**, not morph geometry.
+
+## Where the body morph actually is (still open)
+
+The CHARACTERCREATOR `BodyNodes/MorphNode` carry only `MorphName` + `min/max` (no target geometry, unlike
+`FaceNodes` which name blend targets). The morph names (`bosom`, `thigh`, ...) are referenced ONLY by the
+CC XML parser `FUN_01106a60` — so at runtime body morphs are applied **positionally** (a value array), not
+matched by name. `FUN_01106a60` itself is reached only through a **vtable** (`DATA @0203ec08`), i.e. virtual
+dispatch. There is no static string/const anchor into the runtime deform.
 
 ## Conclusion
 
-Ghidra clarified the *mechanism* and eliminated wrong theories (DPPM, simple index-range membership), but
-extracting the exact deformation is a deep multi-round trace (decode the INF0 influence array, find +
-decompile the apply, recover the pivot/axis/magnitude), not a constant lookup. The shipped approximation
-(`BodyMorphDeformer`, geometric region deform keyed to normalized height + radial/front-back position) is
-the practical stand-in. Resume points if revisited: decode the INF0 chunk grammar in the body blob; trace
-callers that read the mesh cluster vector together with a float weight.
+Static RE has eliminated every obvious data path and established that the body morph is a positional,
+vtable-dispatched deform with no static anchor — so the efficient route to the exact algorithm is **dynamic
+analysis** of the live client (gdb / RenderDoc on a known-morph character: breakpoint/diff the body vertex
+buffer between two morph values to catch the apply function), per [[gdb_live_client_debugging]]. The shipped
+`BodyMorphDeformer` (geometric region deform) remains the stand-in until then. If the morph turns out to be
+bone-scale, importing the rig (#275 follow-up) is the prerequisite to apply it.
