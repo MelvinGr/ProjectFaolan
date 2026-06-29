@@ -40,6 +40,18 @@ namespace Faolan.Importer.Rdb
 			return _entries.Where(e => e.Type == type);
 		}
 
+		// Resolve a single resource by its (type, id) key, the form RDB cross-references use ("TYPE:ID"). Builds a
+		// lookup on first use (873k entries, so linear scans per lookup would be quadratic when resolving a graph).
+		private Dictionary<(uint, uint), Entry>? _byKey;
+
+		public bool TryGet(uint type, uint id, out Entry entry)
+		{
+			_byKey ??= _entries
+				.GroupBy(e => (e.Type, e.Id))
+				.ToDictionary(g => g.Key, g => g.First());
+			return _byKey.TryGetValue((type, id), out entry);
+		}
+
 		// Reads an entry's payload, unwrapping the IOz1 + zlib container. Returns the decompressed bytes (which
 		// begin with the 12-byte RDB-Id data header), or the raw bytes if it isn't an IOz1/zlib entry.
 		public byte[] ReadDecompressed(Entry e)

@@ -45,8 +45,11 @@ namespace Faolan.Importer.Cli
 				case "spell-fields":
 					SpellFields(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", arg);
 					return 0;
+				case "rdb-assets":
+					RdbAssets(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", arg, GetOption(args, "--out"), args.Contains("--dump-mesh"));
+					return 0;
 				default:
-					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: conversation-states, anim, burst-coverage, worldobj.");
+					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: conversation-states, anim, burst-coverage, worldobj, spell-fields, rdb-assets.");
 					return 1;
 			}
 		}
@@ -118,6 +121,75 @@ namespace Faolan.Importer.Cli
 			foreach (var kv in counts.OrderByDescending(k => k.Value).Take(40))
 				Console.WriteLine($"0x{kv.Key:X3} ({kv.Key,4}) count={kv.Value,5}  samples={string.Join(",", samples[kv.Key])}");
 		}
+
+		// RDB -> 3D-model asset graph (Gitea #275, Phase 0). With no --report-arg: a corpus summary (how many
+		// MESHINDEXFILE manifests resolve to geometry, how their textures are split local vs CDN). With --report-arg
+		// <meshIndexId>: print that model's graph (RenderMesh id, materials, texture refs) and, if --out <dir> is given,
+		// extract its FCTX textures to DDS (+ --dump-mesh to also write the raw 1010001 geometry blob for the Phase 1 spike).
+		private static void RdbAssets(string rdbDir, string arg, string? outDir, bool dumpMesh)
+		{
+			using var rdb = new Faolan.Importer.Rdb.RdbReader(rdbDir);
+
+			if (uint.TryParse(arg, out var meshIndexId))
+			{
+				var result = Faolan.Importer.Rdb.Assets.RdbAssetExtractor.Extract(rdb, meshIndexId, outDir, dumpMesh);
+				if (!result.Ok || result.Manifest is not { } m)
+				{
+					Console.WriteLine($"MESHINDEXFILE {meshIndexId} not found in RDB.");
+					return;
+				}
+
+				Console.WriteLine($"MESHINDEXFILE {meshIndexId}");
+				Console.WriteLine($"  source       : {m.Source}");
+				Console.WriteLine($"  bounds       : {m.Bounds}");
+				Console.WriteLine($"  renderMesh   : {Describe(m.RenderMesh)}{(m.RenderMeshDump != null ? $" -> {m.RenderMeshDump}" : "")}");
+				Console.WriteLine($"  collisionMesh: {Describe(m.CollisionMesh)}");
+				Console.WriteLine($"  materials    : {m.Materials.Count}");
+				foreach (var mat in m.Materials)
+					Console.WriteLine($"    - {mat.Name}: [{string.Join(", ", mat.Textures)}]");
+				Console.WriteLine($"  textures     : {m.Textures.Count}");
+				foreach (var t in m.Textures)
+					Console.WriteLine($"    - {t.Ref,-18} {t.Status}{(t.Output != null ? $" -> {t.Output}" : "")}");
+				if (outDir != null)
+					Console.WriteLine($"  written to   : {outDir}");
+				return;
+			}
+
+			// Corpus summary.
+			int manifests = 0, withGeometry = 0, geomLocal = 0, geomCdn = 0, texLocal = 0, texCdn = 0, texMissing = 0;
+			foreach (var e in rdb.EntriesOfType(Faolan.Importer.Rdb.Assets.RdbAssetExtractor.MeshIndexFileType))
+			{
+				if (e.Size == 0 || !e.IsLocal)
+					continue;
+
+				manifests++;
+				Faolan.Importer.Rdb.Assets.MeshIndexFile mesh;
+				try { mesh = Faolan.Importer.Rdb.Assets.MeshIndexFile.Parse(e.Id, rdb.ReadDecompressed(e)); }
+				catch { continue; }
+
+				if (mesh.RenderMeshId is { } rmId)
+				{
+					withGeometry++;
+					if (rdb.TryGet(Faolan.Importer.Rdb.Assets.RdbAssetExtractor.RenderMeshType, rmId, out var rm))
+						(rm.IsLocal ? ref geomLocal : ref geomCdn)++;
+				}
+
+				foreach (var t in mesh.UniqueTextures)
+				{
+					if (!rdb.TryGet(t.Type!.Value, t.Id, out var te)) texMissing++;
+					else if (te.IsLocal) texLocal++;
+					else texCdn++;
+				}
+			}
+
+			Console.WriteLine($"MESHINDEXFILE manifests (local) : {manifests}");
+			Console.WriteLine($"  with a RenderMesh ref         : {withGeometry} (geometry local={geomLocal} cdn={geomCdn})");
+			Console.WriteLine($"  texture refs: local={texLocal} cdn={texCdn} missing={texMissing}");
+			Console.WriteLine("Pass --report-arg <meshIndexId> [--out <dir>] [--dump-mesh] to extract one model.");
+		}
+
+		private static string Describe(Faolan.Importer.Rdb.Assets.RdbAssetExtractor.ResourceResult? r) =>
+			r is { } v ? $"id={v.Id} type={v.Type} {v.Availability} ({v.Size} B)" : "(none)";
 
 		// Mirror of RdbSpellImporter.ReadIncreasingFields (kept private there); used only by the spell-fields report.
 		private static Dictionary<uint, uint> ReadIncreasingFields(ReadOnlySpan<byte> body)
