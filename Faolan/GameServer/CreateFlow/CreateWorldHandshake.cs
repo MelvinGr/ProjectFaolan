@@ -184,6 +184,16 @@ namespace Faolan.GameServer
 			client.Session.AwaitingEnterWorld = true;
 		}
 
+		// Reject a chosen name so the client re-prompts instead of dead-ending (no loading screen). Retail answers a
+		// bad TheNameIs with the same 0xA36D3B74 callback as NicknameOk but a different token: NicknameTaken (already in
+		// use, echoes the name) or NicknameInvalid (empty/unsaveable, empty value). Verbatim grammar from
+		// Captures/Stricken_soldier-guardian_create_random-actions (frames 151 taken / 158 invalid / 193 ok). The client
+		// then simply re-sends TheNameIs with a new name - no other packets are needed.
+		private Task SendNicknameRejected(INetworkClient client, string name, bool taken) =>
+			taken
+				? SendA36DCallback(client, "NicknameTaken", name)
+				: SendA36DCallback(client, "NicknameInvalid", "");
+
 		// The fixed trio the server sends after the last morph; tails are verbatim from dikketest with the
 		// client instance substituted. This is what nudges the client to send the TheNameIs callback.
 		private async Task SendPostMorphBurst(INetworkClient client)

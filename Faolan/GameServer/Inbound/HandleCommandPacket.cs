@@ -33,40 +33,44 @@ namespace Faolan.GameServer
 				Logger.LogDebug("Character-editor: unmapped morph '{Morph}'={Value} (slider not yet modelled).", morph, value);
 		}
 
-		private async Task CommitCharacterName(INetworkClient client, string name)
+		// The outcome of committing a chosen name, mirroring the retail create-editor's NicknameOk / NicknameTaken /
+		// NicknameInvalid callbacks (Captures/Stricken_soldier-guardian_create_random-actions: Stricken->taken,
+		// empty->invalid, Strickenen->ok).
+		private enum NameCommitResult { Committed, Taken, Invalid }
+
+		private async Task<NameCommitResult> CommitCharacterName(INetworkClient client, string name)
 		{
 			var character = client.Session.Character;
 			if (character == null || string.IsNullOrWhiteSpace(name))
-				return;
+				return NameCommitResult.Invalid;
 
 			if (string.Equals(character.Name, name, StringComparison.Ordinal))
-				return;
+				return NameCommitResult.Committed;
 
-			// ClientInstance is no longer a foreign key, so a normal SaveChanges no longer trips the temp
-			// create-instance FK; this persists the name together with the editor's other character edits
-			// (sex/race/class/...). A UNIQUE-constraint violation (name already taken) surfaces as an
-			// exception we tolerate so the client can retry with another name.
-			try
+			// Check the name is free BEFORE saving (Characters.Name is UNIQUE) so a taken name is rejected cleanly as
+			// NicknameTaken rather than blowing up the SaveCharacter unit of work. A row owned by THIS character doesn't
+			// count (idempotent re-name to the same value is handled above).
+			var existing = await Database.GetCharacterByName(name);
+			if (existing != null && existing.Id != character.Id)
 			{
-				character.Name = name;
-				// The class is chosen before naming (the final editor step), so regenerate vitals from the now-known
-				// class/level - replacing the level-1 rogue baseline seeded at row allocation.
-				character.RegenerateMaxStats();
-				// Persist the whole accumulated editor graph (name + sex/race/morphs Body + MaxStats) as one unit of work.
-				await Database.SaveCharacter(character);
+				Logger.LogInformation("Character-editor: name '{Name}' already taken by character {OwnerId:X8}; rejecting.", name, existing.Id);
+				return NameCommitResult.Taken;
+			}
 
-				// Grant the beach starter quest (10238) ONCE, here at character creation - retail auto-grants it on first
-				// beach entry; we persist it now so the journal is data-driven from CharacterQuests (delivered live on the
-				// create-world entry, then riding the snapshot on later logins) instead of baked into the snapshot. It is
-				// NOT re-seeded on world entry, so a completed/removed quest never reappears.
-				await Database.SetCharacterQuest(character.Id, World.WorldQuest.BeachStarterQuestId, QuestState.Active);
-				Logger.LogInformation("Character-editor: committed character name '{Name}' for character {CharacterId:X8}; granted starter quest {QuestId}.", name, character.Id, World.WorldQuest.BeachStarterQuestId);
-			}
-			catch (Exception e)
-			{
-				character.Name = null;
-				Logger.LogWarning(e, "Character-editor: failed to commit character name '{Name}' (possibly already taken).", name);
-			}
+			character.Name = name;
+			// The class is chosen before naming (the final editor step), so regenerate vitals from the now-known
+			// class/level - replacing the level-1 rogue baseline seeded at row allocation.
+			character.RegenerateMaxStats();
+			// Persist the whole accumulated editor graph (name + sex/race/morphs Body + MaxStats) as one unit of work.
+			await Database.SaveCharacter(character);
+
+			// Grant the beach starter quest (10238) ONCE, here at character creation - retail auto-grants it on first
+			// beach entry; we persist it now so the journal is data-driven from CharacterQuests (delivered live on the
+			// create-world entry, then riding the snapshot on later logins) instead of baked into the snapshot. It is
+			// NOT re-seeded on world entry, so a completed/removed quest never reappears.
+			await Database.SetCharacterQuest(character.Id, World.WorldQuest.BeachStarterQuestId, QuestState.Active);
+			Logger.LogInformation("Character-editor: committed character name '{Name}' for character {CharacterId:X8}; granted starter quest {QuestId}.", name, character.Id, World.WorldQuest.BeachStarterQuestId);
+			return NameCommitResult.Committed;
 		}
 
 		// Handles the client->server 0xA36D3B74 character-creation script callbacks.
@@ -231,14 +235,11 @@ namespace Faolan.GameServer
 					// named character and takes the normal world-entry path. The client may try several
 					// names (e.g. Stricken -> Strickennn -> Strickenen); the last one that sticks wins.
 					client.Session.PendingCharacterName = valueString;
-					await CommitCharacterName(client, valueString);
+					var commit = await CommitCharacterName(client, valueString);
 
-					// Only confirm the name to the client (NicknameOk + CharCreationFinished) if it actually
-					// persisted - a UNIQUE-constraint failure leaves Character.Name null, in which case retail
-					// would reject the name and the client retries with another. (Reject path not yet
-					// implemented; the client simply re-sends TheNameIs with a new name.)
-					if (client.Session.Character?.Name == valueString)
+					if (commit == NameCommitResult.Committed && client.Session.Character?.Name == valueString)
 					{
+						// Confirm the name (NicknameOk + CharCreationFinished) so the client advances to enter-world.
 						await SendNicknameAccepted(client, valueString);
 
 						// The character is now named; its NEXT GameServer connection (opened after the 0x2002
@@ -246,6 +247,13 @@ namespace Faolan.GameServer
 						// pending so the world Hello recognises that connection (and not later normal logins).
 						PendingCreateWorldEntry.TryAdd(client.Session.Character.Id, 0);
 						Logger.LogInformation("Create-editor: character {CharacterId:X8} named '{Name}'; marked pending create-world entry.", client.Session.Character.Id, valueString);
+					}
+					else
+					{
+						// Reject the name so the client re-prompts instead of silently stalling (no loading screen).
+						// NicknameTaken = already in use; NicknameInvalid = empty/unsaveable (retail callbacks, see
+						// SendNicknameRejected). Without this the create flow dead-ends on a duplicate name.
+						await SendNicknameRejected(client, valueString, commit == NameCommitResult.Taken);
 					}
 
 					break;
