@@ -91,23 +91,6 @@ namespace Faolan.GameServer
 			// sets it via ReplayMapWorldBurst.
 			client.Session.WorldEntered = true;
 
-			var toSend = new List<byte[]>(worldObjectRows.Length + 5)
-			{
-				BuildMapChange(client)
-			};
-			toSend.AddRange(BuildBurstlessWorldObjects(client, worldObjectRows, BeachPlayfieldId));
-
-			var playerSpawn = BuildBurstlessPlayerSpawn(client, equipment, scaffoldCharacter, BeachPlayfieldId);
-			if (playerSpawn != null)
-			{
-				toSend.Add(playerSpawn);
-				_broadcaster.CaptureOwnSpawnBody(client, playerSpawn); // so other players can be sent this player's spawn
-			}
-			else
-			{
-				Logger.LogWarning("Burst-less entry (map={Map}, '{Name}'): player spawn not built (no scaffold rows?); avatar may not render.", mapId, character?.Name);
-			}
-
 			// Retail split (proven byte-exact in the *-create vs *-login captures): a CREATE-world entry carries NO quests
 			// in the snapshot (empty Quest_c region) and grants the starter quest LIVE afterwards; a LOGIN entry carries
 			// the character's held quests in the snapshot. So the snapshot region is data-driven from CharacterQuests on
@@ -123,10 +106,34 @@ namespace Faolan.GameServer
 				? (await Database.GetCharacterSpells(character.Id)).Select(s => s.SpellId).ToArray()
 				: [];
 			var snapshot = BuildBurstlessSnapshot(client, equipment, inventoryRows, characterTags, snapshotQuests, primaryQuest, knownSpellIds);
-			toSend.Add(snapshot);
 			// Record this playfield's despawn token from the snapshot we actually send (WorldDespawn), as the burst path does.
+			// This MUST happen before the world objects are built: the snapshot establishes the player's current playfield
+			// INSTANCE token, and a spawn renders only when its 0x18 transform token matches it. NPCs already stream with
+			// this live token (and render); world objects used to be stamped with the MapChange ZONE id (BeachPlayfieldId)
+			// instead, so they landed in a different playfield and the client culled them - the beach decor, incl.
+			// Casilda's hanging chain, never rendered (#267). Stamp them with the same live token the NPCs use.
 			var snapBodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(snapshot.AsSpan(8, 4));
 			_broadcaster.CapturePlayfieldToken(mapId, instanceId, snapshot.AsSpan(snapBodyStart));
+			var playfieldToken = _simulation.World.ZoneFor(mapId, instanceId).PlayfieldToken;
+
+			var toSend = new List<byte[]>(worldObjectRows.Length + 5)
+			{
+				BuildMapChange(client)
+			};
+			toSend.AddRange(BuildBurstlessWorldObjects(client, worldObjectRows, playfieldToken));
+
+			var playerSpawn = BuildBurstlessPlayerSpawn(client, equipment, scaffoldCharacter, BeachPlayfieldId);
+			if (playerSpawn != null)
+			{
+				toSend.Add(playerSpawn);
+				_broadcaster.CaptureOwnSpawnBody(client, playerSpawn); // so other players can be sent this player's spawn
+			}
+			else
+			{
+				Logger.LogWarning("Burst-less entry (map={Map}, '{Name}'): player spawn not built (no scaffold rows?); avatar may not render.", mapId, character?.Name);
+			}
+
+			toSend.Add(snapshot);
 
 			toSend.Add(BuildVitals(client));
 			toSend.Add(BuildGameTime(client));
