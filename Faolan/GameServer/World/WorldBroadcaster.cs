@@ -911,6 +911,25 @@ namespace Faolan.GameServer.World
 
 			await SendWorldIir(client, SimpleDynelMessageCodec.BuildVisualChange(chain.CapturedHandle, 0x05));
 			_logger.LogInformation("#267: dropped beach chain-wall collision (handle 0x{Handle:X8}) for {Player}.", chain.CapturedHandle, player.Name);
+
+			// She's freed now: clear the captive (chained) struggle pose so she stands/walks normally as she follows
+			// (the live counterpart to the captive pose the interest stream sends while she's a prisoner).
+			var casilda = _sim.World.ZoneForEntity(player).Entities.FirstOrDefault(e => !e.IsPlayer && e.Name == "Casilda");
+			if (casilda != null)
+				await SendCasildaPose(client, casilda.Handle, captive: false);
+		}
+
+		// #267/#266: Casilda's captive (chained) vs freed pose, as a BehaviorControlCenterIIR. Captive = the struggle
+		// behavior the destiny scene runs while she's a prisoner (slot 5, behaviorId 159428); freed = her normal
+		// locomotion (slot 9, behaviorId 42010) so she walks when following. Both decoded from the Hoxxling + Blablatest
+		// beach captures (field5 24, field6 0, form 0x0004) - the captive struggle loops 159427/159428, freed transitions
+		// to slot-9 42010 at the rescue (Hoxxling gameplay idx 2056->2106).
+		private Task SendCasildaPose(INetworkClient client, uint casildaHandle, bool captive)
+		{
+			var body = captive
+				? CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(casildaHandle, 5, 159428, 1, 24, 0)
+				: CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(casildaHandle, 9, 42010, 1, 24, 0);
+			return SendWorldIir(client, body);
 		}
 
 		// #267: at world entry, drop the wall up-front for a character who has ALREADY freed Casilda (the talk stage is
@@ -1464,6 +1483,12 @@ namespace Faolan.GameServer.World
 						// #266: a patrolling NPC walks its captured route - issue the patrol MoveTask now it's in view.
 						if (ev.Subject.Patrols)
 							await SendPatrol(recipient, ev.Subject);
+						// #267: a not-yet-freed Casilda streams in CHAINED (the captive struggle pose); once the player has
+						// freed her she streams in normally (and follows). Per-viewer + per-instance (the beach is Solo).
+						if (!ev.Subject.IsPlayer && ev.Subject.Name == "Casilda"
+						    && recipient.Session?.Character != null
+						    && !await IsCasildaFreed(recipient.Session.Character.Id))
+							await SendCasildaPose(recipient, ev.Subject.Handle, captive: true);
 						break;
 					case InterestEventType.Move when move.HasValue:
 						await SendWorldMove(recipient, move.Value);
