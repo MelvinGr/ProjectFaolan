@@ -1,17 +1,19 @@
 using System;
+using System.Collections.Generic;
 
 namespace Faolan.Core.Rdb.Assets
 {
-	// Applies a character's body-proportion morphs (CharacterBodies Arm/Chest/Bosom/Stomach/Arse/Thigh/Leg) to the
-	// rendered body mesh for the 3D viewer (#275).
+	// Body-proportion morphs for the 3D character viewer (#275), reverse-engineered from AgeOfConan.exe
+	// ApplyMorph (FUN_00fede10) plus a live gdb capture of the char-create deform-node array
+	// (docs/body-morph-re.md, data in docs/morph-capture/body_morphs_aqf.json).
 	//
-	// AoC ships the authentic morph data as a CLUS section in the body rendermesh (30 named deformation clusters that
-	// index the DPPM morph-submesh), but the cluster name->geometry association is unreliable to recover (the leg-named
-	// clusters sit at the hands; the lower legs have no cluster at all) and the CHARACTERCREATOR BodyNode that drives
-	// magnitude is not decoded. So for the viewer we approximate the morphs GEOMETRICALLY: the body is a fixed A-pose,
-	// so each slider maps to an anatomical region defined by normalised height (+ radial / front-back position) and we
-	// scale that region's girth (or, for the bosom, push it forward). This is robust to whichever body mesh renders
-	// (the exact race/sex body or the local fallback) and gives a clearly slim-vs-full silhouette matching the sliders.
+	// AoC body morphs are NOT vertex blend shapes — each slider scales a weighted set of deform JOINTS, and
+	// the skinned mesh follows. We approximate the skinning with a radial soft-deform about each joint's
+	// captured world position (weighted by the captured joint weight), so the deformation sits at the
+	// authentic influence centres with the authentic per-joint falloff instead of guessed regions. (Exact
+	// replication = linear-blend skinning with the captured node skeleton + the mesh's BLENDINDICES/WEIGHT;
+	// that ties into the #275 rig-import follow-up.) The captured joints are the Aquilonian-female body; other
+	// humanoid bodies share the joint topology and are close enough for the viewer.
 	public static class BodyMorphDeformer
 	{
 		// The 7 body-proportion sliders as stored in CharacterBodies (raw editor units, range about [-100,100]).
@@ -20,218 +22,76 @@ namespace Faolan.Core.Rdb.Assets
 			public bool IsNeutral => Arm == 0 && Chest == 0 && Bosom == 0 && Stomach == 0 && Arse == 0 && Thigh == 0 && Leg == 0;
 		}
 
+		private readonly record struct Joint((float X, float Y, float Z) Pos, float Weight);
+		private readonly record struct MorphDef(float Min, float Max, Joint[] Joints);
+
+		// Captured Aquilonian-female deform-joint data: per morph the CHARACTERCREATOR min/max scale + the
+		// weighted joints (world position, influence weight) the slider drives.
+		private static readonly Dictionary<string, MorphDef> Defs = new()
+		{
+			["arm"] = new(-0.0500f, 0.0500f, [new((-0.1425f,1.5423f,-0.0620f),0.800f), new((-0.2276f,1.2656f,-0.0800f),0.600f), new((-0.2536f,1.1391f,-0.0361f),0.400f), new((-0.0178f,1.5859f,-0.0691f),0.800f), new((0.1432f,1.5371f,-0.0924f),0.800f), new((0.2191f,1.2572f,-0.0978f),0.600f), new((0.2478f,1.1272f,-0.0679f),0.400f), new((0.0212f,1.5849f,-0.0750f),0.800f)]),
+			["chest"] = new(-0.1000f, 0.1000f, [new((-0.1425f,1.5423f,-0.0620f),0.200f), new((-0.0178f,1.5859f,-0.0691f),0.300f), new((0.1432f,1.5371f,-0.0924f),0.200f), new((0.0212f,1.5849f,-0.0750f),0.300f), new((-0.0006f,1.2712f,-0.0263f),0.600f), new((0.0018f,1.3387f,-0.0323f),0.800f)]),
+			["bosom"] = new(-0.1000f, 0.2000f, [new((0.0018f,1.3387f,-0.0323f),0.200f), new((-0.0870f,1.4220f,0.0699f),0.800f), new((0.1206f,1.4170f,0.0386f),0.800f)]),
+			["stomach"] = new(-0.1500f, 0.2000f, [new((-0.0016f,1.0528f,0.0004f),0.350f), new((-0.0031f,1.2158f,-0.0146f),0.700f), new((-0.0006f,1.2712f,-0.0263f),0.350f), new((0.0018f,1.3387f,-0.0323f),0.150f)]),
+			["arse"] = new(-0.1000f, 0.1000f, [new((-0.0016f,1.0528f,0.0004f),0.800f), new((-0.1176f,1.0761f,-0.0137f),0.200f), new((0.1007f,1.0741f,-0.0569f),0.200f), new((-0.0031f,1.2158f,-0.0146f),0.300f), new((-0.0006f,1.2712f,-0.0263f),0.150f)]),
+			["thigh"] = new(-0.0500f, 0.1000f, [new((-0.0016f,1.0528f,0.0004f),0.200f), new((-0.1312f,0.5794f,0.0820f),0.200f), new((-0.1176f,1.0761f,-0.0137f),0.800f), new((0.0948f,0.5683f,-0.0421f),0.200f), new((0.1007f,1.0741f,-0.0569f),0.800f)]),
+			["leg"] = new(-0.0350f, 0.1000f, [new((-0.1635f,0.0732f,0.1044f),0.200f), new((-0.1312f,0.5794f,0.0820f),0.800f), new((-0.1176f,1.0761f,-0.0137f),0.500f), new((0.0488f,0.0732f,-0.1449f),0.200f), new((0.0948f,0.5683f,-0.0421f),0.800f), new((0.1007f,1.0741f,-0.0569f),0.500f)]),
+		};
+
+		// (slider accessor, morph name) for the 7 body sliders.
+		private static readonly (Func<Morphs, float> Value, string Name)[] Sliders =
+		[
+			(m => m.Arm, "arm"), (m => m.Chest, "chest"), (m => m.Bosom, "bosom"),
+			(m => m.Stomach, "stomach"), (m => m.Arse, "arse"), (m => m.Thigh, "thigh"), (m => m.Leg, "leg")
+		];
+
+		// A joint's influence radius (model units) and the displacement gain that turns a node scale into the
+		// radial vertex displacement the skinning would produce. Tuned against the in-client morphs.
+		private const float Radius = 0.20f;
+		private const float Gain = 2.5f;
+
 		// Deform the body submesh positions in place. positions = the rendered base mesh's xyz array. No-op if neutral.
 		public static void Apply(float[] positions, Morphs morphs)
 		{
 			if (morphs.IsNeutral)
 				return;
-
 			var n = positions.Length / 3;
 			if (n == 0)
 				return;
 
-			// Vertical extent -> normalised height ny in [0,1] (feet 0, head 1), so the height bands generalise across
-			// body meshes of different scale.
-			float ymin = float.MaxValue, ymax = float.MinValue;
-			for (var i = 0; i < n; i++)
-			{
-				var y = positions[i * 3 + 1];
-				if (y < ymin) ymin = y;
-				if (y > ymax) ymax = y;
-			}
-			var height = ymax - ymin;
-			if (height <= 1e-4f)
-				return;
-
 			var orig = (float[])positions.Clone();
-			var dispX = new float[n];
-			var dispY = new float[n];
-			var dispZ = new float[n];
+			var invR2 = 1f / (Radius * Radius);
 
-			// Girth morphs: thicken/thin a region's cross-section about its own centre (radial in X/Z, height
-			// preserved). Limb regions split left/right so each limb scales about its OWN centreline.
-			GirthRegion(orig, dispX, dispZ, ymin, height, morphs.Leg, 0.15f, 0.08f, 0.30f, limbX: 0.25f, perSide: true);    // calfs/shins
-			GirthRegion(orig, dispX, dispZ, ymin, height, morphs.Thigh, 0.17f, 0.27f, 0.52f, limbX: 0.25f, perSide: true);  // thighs
-			GirthRegion(orig, dispX, dispZ, ymin, height, morphs.Arse, 0.16f, 0.47f, 0.63f, limbX: 0.25f, perSide: false);  // hips/seat
-			GirthRegion(orig, dispX, dispZ, ymin, height, morphs.Stomach, 0.15f, 0.56f, 0.77f, limbX: 0.25f, perSide: false); // waist/belly
-			GirthRegion(orig, dispX, dispZ, ymin, height, morphs.Chest, 0.15f, 0.66f, 0.85f, limbX: 0.25f, perSide: false);   // ribcage
-			// Arms: select by |x| (they splay out past the torso) and scale girth about each arm's centreline.
-			ArmRegion(orig, dispX, dispY, dispZ, morphs.Arm, 0.15f, armX: 0.26f);
-			// Bosom: a forward (z) protrusion of the upper-chest front, not a girth scale.
-			BosomRegion(orig, dispZ, ymin, height, morphs.Bosom, 0.28f, 0.74f, 0.86f);
-
-			for (var v = 0; v < n; v++)
+			foreach (var (value, name) in Sliders)
 			{
-				positions[v * 3] = orig[v * 3] + dispX[v];
-				positions[v * 3 + 1] = orig[v * 3 + 1] + dispY[v];
-				positions[v * 3 + 2] = orig[v * 3 + 2] + dispZ[v];
-			}
-		}
-
-		// Scale a height-banded region's X/Z girth about its centre. raw is the slider [-100,100]; amp is the girth
-		// fraction at the slider extreme. limbX excludes the splayed arms; perSide scales each side about its own centre
-		// (legs) so thickening doesn't just widen the stance. A smooth window over [loN,hiN] feathers the band edges.
-		private static void GirthRegion(float[] p, float[] dispX, float[] dispZ, float ymin, float height,
-			float raw, float amp, float loN, float hiN, float limbX, bool perSide)
-		{
-			if (raw == 0)
-				return;
-			var k = raw / 100f * amp;
-			var n = p.Length / 3;
-
-			// Per-side centres (X/Z) over the windowed core verts.
-			Span<float> sumX = stackalloc float[2];
-			Span<float> sumZ = stackalloc float[2];
-			Span<float> sumW = stackalloc float[2];
-			for (var v = 0; v < n; v++)
-			{
-				var x = p[v * 3];
-				if (MathF.Abs(x) >= limbX)
+				var slider = value(morphs);
+				if (slider == 0 || !Defs.TryGetValue(name, out var def))
 					continue;
-				var w = Window((p[v * 3 + 1] - ymin) / height, loN, hiN);
-				if (w <= 0)
+				// DB slider [-100,100] -> t -> client node-scale via the captured asymmetric min/max.
+				var t = Math.Clamp(slider / 100f, -1f, 1f);
+				var strength = (t >= 0 ? t * def.Max : t * -def.Min) * Gain;
+				if (strength == 0)
 					continue;
-				var s = perSide && x < 0 ? 1 : 0;
-				sumX[s] += x * w; sumZ[s] += p[v * 3 + 2] * w; sumW[s] += w;
-			}
-			if (sumW[0] <= 0 && sumW[1] <= 0)
-				return;
-			Span<float> cx = stackalloc float[2];
-			Span<float> cz = stackalloc float[2];
-			for (var s = 0; s < 2; s++)
-				if (sumW[s] > 0) { cx[s] = sumX[s] / sumW[s]; cz[s] = sumZ[s] / sumW[s]; }
 
-			for (var v = 0; v < n; v++)
-			{
-				var x = p[v * 3];
-				if (MathF.Abs(x) >= limbX)
-					continue;
-				var w = Window((p[v * 3 + 1] - ymin) / height, loN, hiN);
-				if (w <= 0)
-					continue;
-				var s = perSide && x < 0 ? 1 : 0;
-				if (sumW[s] <= 0)
-					continue;
-				dispX[v] += (x - cx[s]) * k * w;
-				dispZ[v] += (p[v * 3 + 2] - cz[s]) * k * w;
-			}
-		}
-
-		// Scale each arm's girth about its medial (long) axis. Arms are the verts past the torso width (|x| >= armX);
-		// we split left/right and scale the per-vertex offset PERPENDICULAR to the arm's principal axis, so the arm
-		// thins/thickens radially and never collapses along its length.
-		private static void ArmRegion(float[] p, float[] dispX, float[] dispY, float[] dispZ, float raw, float amp, float armX)
-		{
-			if (raw == 0)
-				return;
-			var k = raw / 100f * amp;
-			var n = p.Length / 3;
-
-			for (var side = 0; side < 2; side++)
-			{
-				float cx = 0, cy = 0, cz = 0;
-				var count = 0;
-				for (var v = 0; v < n; v++)
+				foreach (var j in def.Joints)
 				{
-					var x = p[v * 3];
-					if (MathF.Abs(x) < armX || (x < 0) != (side == 1))
-						continue;
-					cx += x; cy += p[v * 3 + 1]; cz += p[v * 3 + 2]; count++;
-				}
-				if (count < 3)
-					continue;
-				cx /= count; cy /= count; cz /= count;
-
-				// Principal axis via power iteration on the covariance of the arm verts.
-				double c00 = 0, c01 = 0, c02 = 0, c11 = 0, c12 = 0, c22 = 0;
-				for (var v = 0; v < n; v++)
-				{
-					var x = p[v * 3];
-					if (MathF.Abs(x) < armX || (x < 0) != (side == 1))
-						continue;
-					double dx = x - cx, dy = p[v * 3 + 1] - cy, dz = p[v * 3 + 2] - cz;
-					c00 += dx * dx; c01 += dx * dy; c02 += dx * dz; c11 += dy * dy; c12 += dy * dz; c22 += dz * dz;
-				}
-				double ax = 1, ay = 0, az = 0;
-				for (var iter = 0; iter < 24; iter++)
-				{
-					var nx = c00 * ax + c01 * ay + c02 * az;
-					var ny2 = c01 * ax + c11 * ay + c12 * az;
-					var nz = c02 * ax + c12 * ay + c22 * az;
-					var len = Math.Sqrt(nx * nx + ny2 * ny2 + nz * nz);
-					if (len < 1e-12) break;
-					ax = nx / len; ay = ny2 / len; az = nz / len;
-				}
-
-				for (var v = 0; v < n; v++)
-				{
-					var x = p[v * 3];
-					if (MathF.Abs(x) < armX || (x < 0) != (side == 1))
-						continue;
-					double dx = x - cx, dy = p[v * 3 + 1] - cy, dz = p[v * 3 + 2] - cz;
-					var along = dx * ax + dy * ay + dz * az;
-					dispX[v] += (float)(dx - along * ax) * k;
-					dispY[v] += (float)(dy - along * ay) * k;
-					dispZ[v] += (float)(dz - along * az) * k;
+					var amp = strength * j.Weight;
+					for (var v = 0; v < n; v++)
+					{
+						var dx = orig[v * 3] - j.Pos.X;
+						var dy = orig[v * 3 + 1] - j.Pos.Y;
+						var dz = orig[v * 3 + 2] - j.Pos.Z;
+						var falloff = MathF.Exp(-(dx * dx + dy * dy + dz * dz) * invR2);
+						if (falloff < 0.02f)
+							continue;
+						// Radial scale about the joint: push verts out (fat) / in (thin) by the node scale.
+						var k = amp * falloff;
+						positions[v * 3] += dx * k;
+						positions[v * 3 + 1] += dy * k;
+						positions[v * 3 + 2] += dz * k;
+					}
 				}
 			}
-		}
-
-		// Push the upper-chest front forward (breast size). Only front verts (z above the band's centre) in the chest
-		// band are displaced, proportional to how far forward they already sit, so the chest swells/flattens.
-		private static void BosomRegion(float[] p, float[] dispZ, float ymin, float height, float raw, float amp, float loN, float hiN)
-		{
-			if (raw == 0)
-				return;
-			var k = raw / 100f * amp;
-			var n = p.Length / 3;
-
-			float sumZ = 0, sumW = 0;
-			for (var v = 0; v < n; v++)
-			{
-				if (MathF.Abs(p[v * 3]) >= 0.25f)
-					continue;
-				var w = Window((p[v * 3 + 1] - ymin) / height, loN, hiN);
-				if (w <= 0)
-					continue;
-				sumZ += p[v * 3 + 2] * w; sumW += w;
-			}
-			if (sumW <= 0)
-				return;
-			var cz = sumZ / sumW;
-
-			for (var v = 0; v < n; v++)
-			{
-				if (MathF.Abs(p[v * 3]) >= 0.25f)
-					continue;
-				var z = p[v * 3 + 2];
-				if (z <= cz)
-					continue; // front only
-				var w = Window((p[v * 3 + 1] - ymin) / height, loN, hiN);
-				if (w <= 0)
-					continue;
-				dispZ[v] += (z - cz) * k * w;
-			}
-		}
-
-		// Smooth trapezoidal window over [lo,hi] with a smoothstep feather at each edge, so banded regions blend into
-		// the unmorphed body instead of leaving a hard ring.
-		private static float Window(float t, float lo, float hi)
-		{
-			const float feather = 0.07f;
-			if (t <= lo - feather || t >= hi + feather)
-				return 0f;
-			if (t < lo + feather)
-				return SmoothStep((t - (lo - feather)) / (2 * feather));
-			if (t > hi - feather)
-				return SmoothStep(((hi + feather) - t) / (2 * feather));
-			return 1f;
-		}
-
-		private static float SmoothStep(float x)
-		{
-			x = Math.Clamp(x, 0f, 1f);
-			return x * x * (3f - 2f * x);
 		}
 	}
 }
