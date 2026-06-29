@@ -130,6 +130,34 @@ beach login, harmless even though they didn't fix the chains); added a generic `
 (WorldBroadcaster.DespawnWorldObjectForPlayer). Dropped the dead experiments (BehaviorCC pose send, visual-change,
 burst-handle).
 
+## Session 2026-06-29 (FINAL): the wall = the chain-decor COLLISION, dropped by a SimpleDynel visual-change
+
+Melvin clarified the in-client flow: kill Tuut -> **talk to Casilda -> she releases + starts following + the
+invisible wall drops, all on the beach** (the city transition is later, separate). So the wall lift IS at the
+talk-to-free moment (the original trigger), just a different packet than the ShacklesOff guess.
+
+Decoded from `Hoxxling_..._login_gameplay` at the talk-free moment (13480 completes @2048-2052):
+- @2053 `SimpleDynelVisualChangeIIR (0xE7F4F8F8)` to handle **0x4007**, type tag 0xC878, **state 5**
+  (21 B: `[subop][0xC878][handle][u32 0][u8 5][u32 0]`).
+- @2055/2056 BehaviorCC (player + Casilda pose), @2081+ MoveTasks (she starts following).
+
+Handle 0x4007 = the chain decor `0x66AEDD50 004709_Global__decor_chain_hangingwoman` (spawned in the login burst
+@37). ⟹ **The "invisible wall" is that chain dynel's COLLISION** - its hangingwoman mesh doesn't render for us
+(the long-standing issue 1), so the live dynel reads as an invisible barrier. Freeing Casilda flips it off with the
+visual-change. (This also explains why the chain "not rendering" and the "invisible wall" are the SAME object: the
+collision is live even though the mesh isn't.)
+
+Wired (#267):
+- `SimpleDynelMessageCodec.BuildVisualChange(handle, state)` - the 21-byte record.
+- `WorldBroadcaster.DropBeachWall` - looks up the beach chain world-object by identity
+  (`decor_chain_hangingwoman`, our `CapturedHandle 0x15DD8`) and sends visual-change state 5.
+- `QuestProgressionService` fires it on the talk-Casilda free (alongside the follow trigger).
+- `SendBeachGateOnEntry` drops it up-front for an already-freed relog.
+
+NEEDS in-client verification. If the wall still doesn't drop, the chain dynel may genuinely not be live
+client-side (then the wall is a separate destiny collision) - but the capture says it IS the chain dynel.
+
+---
 ## Session 2026-06-29 (REVISED): ShacklesOff is the CITY player-unshackle, NOT the beach wall
 
 In-client result: the `ShacklesOff` wiring below did NOT lift the beach wall (it stayed up), so it was reverted.
