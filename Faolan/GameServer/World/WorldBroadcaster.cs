@@ -7,6 +7,7 @@ using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core;
+using Faolan.Core.Data;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
@@ -919,16 +920,25 @@ namespace Faolan.GameServer.World
 				await SendCasildaPose(client, casilda.Handle, captive: false);
 		}
 
-		// #267/#266: Casilda's captive (chained) vs freed pose, as a BehaviorControlCenterIIR. Captive = the struggle
-		// behavior the destiny scene runs while she's a prisoner (slot 5, behaviorId 159428); freed = her normal
-		// locomotion (slot 9, behaviorId 42010) so she walks when following. Both decoded from the Hoxxling + Blablatest
-		// beach captures (field5 24, field6 0, form 0x0004) - the captive struggle loops 159427/159428, freed transitions
-		// to slot-9 42010 at the rescue (Hoxxling gameplay idx 2056->2106).
+		// #267/#266: Casilda's captive (chained) vs freed pose, as a BehaviorControlCenterIIR. Both decoded byte-exact
+		// from the Hoxxling beach gameplay capture's BCC (0x642CD3D6) records targeting her handle 0x00017ED0:
+		//  - CAPTIVE = the prisoner struggle the destiny scene loops (slot 5, behaviorId 159428, field5 24, no tail;
+		//    retail alternates 159428/159427 each phase but a single registration loops it).
+		//  - FREED = her slot-9 locomotion behavior 42010 (field5 24) WITH the 20-byte bound tail (boundA 0x12), the
+		//    record retail sends at the rescue (capture idx 2106) so she stops struggling and walks when following.
 		private Task SendCasildaPose(INetworkClient client, uint casildaHandle, bool captive)
 		{
-			var body = captive
+			// BuildBehaviorControlCenterIir returns the record BODY ([type][handle][form][slot][protobuf]) WITHOUT the
+			// 0x642CD3D6 sub-opcode (the create-burst Iir helper prepends it), so prepend it here - SendWorldIir only adds
+			// the carrier + length, not the sub-op, and the client drops a BCC record that doesn't start with it.
+			var record = captive
 				? CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(casildaHandle, 5, 159428, 1, 24, 0)
-				: CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(casildaHandle, 9, 42010, 1, 24, 0);
+				: CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(casildaHandle, 9, 42010, 7, 24, 0, boundA: 0x12, boundB: 0);
+			var body = new FaolanStream()
+				.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR)
+				.WriteArray(record)
+				.ToArray();
+			_logger.LogInformation("#267: sent Casilda {Pose} pose (handle 0x{Handle:X8}) to {Player}.", captive ? "CAPTIVE" : "freed", casildaHandle, client.Session?.Character?.Name);
 			return SendWorldIir(client, body);
 		}
 
