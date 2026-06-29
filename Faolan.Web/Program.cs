@@ -18,6 +18,8 @@ namespace Faolan.Web
             // Like the game server, run from the repo root so faolan.json (DatabasePath, ...) + faolan.db resolve.
             builder.Configuration.SetBasePath(Directory.GetCurrentDirectory());
             builder.Configuration.AddJsonFile(Path.GetFullPath("faolan.json"), optional: true);
+            // The app's own appsettings.json (RdbDir, ...) lives next to the dll, not the CWD repo root.
+            builder.Configuration.AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.json"), optional: true);
 
             builder.Services.AddRazorComponents()
                 .AddInteractiveServerComponents();

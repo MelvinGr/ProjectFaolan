@@ -90,20 +90,23 @@ namespace Faolan.Core.Rdb.Assets
 		// (skinned character bodies have empty <MaterialSets/> and instead carry [id] refs in the geometry blob header).
 		// Normal/specular maps are MIXD (BC4) and return false from TryDecodeTopMip, so they're skipped and the diffuse
 		// (DXT1, listed first via g_DiffuseTex=0) is what gets picked.
-		private static (byte[]? Png, bool AlphaMask) DecodeDiffusePng(RdbReader rdb, MeshIndexFile mesh, ReadOnlySpan<byte> blob = default)
+		private static (byte[]? Png, bool AlphaMask) DecodeDiffusePng(RdbReader rdb, MeshIndexFile mesh, ReadOnlySpan<byte> blob = default, Tint? tint = null)
 		{
 			foreach (var t in mesh.UniqueTextures)
-				if (TryDecodeTexture(rdb, t.Type!.Value, t.Id, out var png, out var alpha))
+				if (TryDecodeTexture(rdb, t.Type!.Value, t.Id, out var png, out var alpha, tint))
 					return (png, alpha);
 
 			foreach (var (type, id) in RenderMeshReader.ReadHeaderTextureRefs(blob))
-				if (TryDecodeTexture(rdb, type, id, out var png, out var alpha))
+				if (TryDecodeTexture(rdb, type, id, out var png, out var alpha, tint))
 					return (png, alpha);
 
 			return (null, false);
 		}
 
-		private static bool TryDecodeTexture(RdbReader rdb, uint type, uint id, out byte[]? png, out bool alphaMask)
+		// A per-character colour multiply from a TexScript "tinting" op (e.g. hair colour).
+		public readonly record struct Tint(byte R, byte G, byte B);
+
+		private static bool TryDecodeTexture(RdbReader rdb, uint type, uint id, out byte[]? png, out bool alphaMask, Tint? tint = null)
 		{
 			png = null;
 			alphaMask = false;
@@ -113,6 +116,14 @@ namespace Faolan.Core.Rdb.Assets
 			var payload = rdb.ReadDecompressed(e);
 			if (!FctxConverter.TryDecodeTopMip(payload, out var rgba, out var w, out var h))
 				return false;
+
+			if (tint is { } t)
+				for (var i = 0; i + 2 < rgba.Length; i += 4)
+				{
+					rgba[i + 0] = (byte)(rgba[i + 0] * t.R / 255);
+					rgba[i + 1] = (byte)(rgba[i + 1] * t.G / 255);
+					rgba[i + 2] = (byte)(rgba[i + 2] * t.B / 255);
+				}
 
 			alphaMask = HasTransparency(rgba);
 			png = PngWriter.Encode(rgba, w, h);
@@ -137,7 +148,7 @@ namespace Faolan.Core.Rdb.Assets
 
 		// Decode a model's geometry AND attach its own diffuse to every sub-mesh, so an assembled character textures each
 		// part (body skin, head) independently. Returns null when the mesh-index or its local geometry is missing.
-		private static IReadOnlyList<RenderMeshReader.SubMesh>? ReadTexturedModel(RdbReader rdb, uint meshIndexId)
+		private static IReadOnlyList<RenderMeshReader.SubMesh>? ReadTexturedModel(RdbReader rdb, uint meshIndexId, Tint? tint = null)
 		{
 			if (!rdb.TryGet(MeshIndexFileType, meshIndexId, out var idxEntry))
 				return null;
@@ -151,7 +162,7 @@ namespace Faolan.Core.Rdb.Assets
 			if (subs.Count == 0)
 				return null;
 
-			var (diffuse, alpha) = DecodeDiffusePng(rdb, mesh, blob);
+			var (diffuse, alpha) = DecodeDiffusePng(rdb, mesh, blob, tint);
 			return diffuse == null ? subs : subs.Select(s => s with { BaseColorPng = diffuse, AlphaMask = alpha }).ToList();
 		}
 
@@ -193,7 +204,10 @@ namespace Faolan.Core.Rdb.Assets
 		// Decode a RenderMesh (type 1010001) DIRECTLY by its own id - no MESHINDEXFILE wrapper. Character appearance
 		// resources reference geometry this way: a *hairmesh_NNN ref is the rendermesh id NNN itself. Diffuse comes from
 		// the blob's header texture refs (these have no manifest/materials). Null if missing/non-local/empty.
-		public static IReadOnlyList<RenderMeshReader.SubMesh>? ReadRenderMeshDirect(RdbReader rdb, uint renderMeshId)
+		// tint: a per-character colour multiply (TexScript tinting). overrideTextureId: use this FCTX as the diffuse
+		// instead of the mesh's own header texture (TexScript projecttexture, e.g. the chosen eye iris).
+		public static IReadOnlyList<RenderMeshReader.SubMesh>? ReadRenderMeshDirect(RdbReader rdb, uint renderMeshId,
+			Tint? tint = null, uint? overrideTextureId = null)
 		{
 			if (!rdb.TryGet(RenderMeshType, renderMeshId, out var rmEntry) || !rmEntry.IsLocal)
 				return null;
@@ -205,9 +219,12 @@ namespace Faolan.Core.Rdb.Assets
 
 			byte[]? diffuse = null;
 			var alpha = false;
-			foreach (var (type, id) in RenderMeshReader.ReadHeaderTextureRefs(blob))
-				if (TryDecodeTexture(rdb, type, id, out diffuse, out alpha))
-					break;
+			if (overrideTextureId is { } ot)
+				TryDecodeTexture(rdb, 1010004, ot, out diffuse, out alpha, tint);
+			else
+				foreach (var (type, id) in RenderMeshReader.ReadHeaderTextureRefs(blob))
+					if (TryDecodeTexture(rdb, type, id, out diffuse, out alpha, tint))
+						break;
 
 			return diffuse == null ? subs : subs.Select(s => s with { BaseColorPng = diffuse, AlphaMask = alpha }).ToList();
 		}
@@ -265,24 +282,43 @@ namespace Faolan.Core.Rdb.Assets
 			return MonsterDataFile.Parse(monsterDataId, rdb.ReadDecompressed(e)).MeshIds;
 		}
 
+		// Load + parse a TexScript (type 1010035) by id - the per-character colour op (skin/hair tint, eye iris).
+		public static TexScriptFile? LoadTexScript(RdbReader rdb, uint id) =>
+			rdb.TryGet(TexScriptFile.Type, id, out var e) && e.IsLocal
+				? TexScriptFile.Parse(id, rdb.ReadDecompressed(e))
+				: null;
+
 		// Assemble a character from decoded parts: body (meshindex) + head-local RenderMeshes (head/eyes/lashes from a
 		// MonsterData, seated together at the neck) + an optional world-space hair RenderMesh (added untranslated).
+		// skinTint/hairTint: per-character colour multiplies from their TexScripts. eyeTextureId: the projected iris
+		// texture (TexScript projecttexture) used as the eye mesh's diffuse. The head meshes arrive in MonsterData order
+		// [head(skin), eyes, lashes] - so skin tint applies to the body + the first head mesh, the eye texture to the second.
 		public static byte[]? BuildCharacterFromParts(RdbReader rdb, uint bodyMeshIndexId,
-			IReadOnlyList<uint> headLocalRenderMeshIds, uint? hairWorldRenderMeshId)
+			IReadOnlyList<uint> headLocalRenderMeshIds, uint? hairWorldRenderMeshId,
+			Tint? skinTint = null, Tint? hairTint = null, uint? eyeTextureId = null)
 		{
-			var body = ReadTexturedModel(rdb, bodyMeshIndexId);
+			var body = ReadTexturedModel(rdb, bodyMeshIndexId, skinTint);
 			if (body == null)
 				return null;
 
 			var all = new List<RenderMeshReader.SubMesh>(body);
 
 			var headParts = new List<RenderMeshReader.SubMesh>();
-			foreach (var rm in headLocalRenderMeshIds)
-				if (ReadRenderMeshDirect(rdb, rm) is { } part)
+			for (var i = 0; i < headLocalRenderMeshIds.Count; i++)
+			{
+				// 0 = head skin (skin tint), 1 = eyes (override with the iris texture), 2+ = lashes/etc (untouched).
+				var part = i switch
+				{
+					0 => ReadRenderMeshDirect(rdb, headLocalRenderMeshIds[i], skinTint),
+					1 => ReadRenderMeshDirect(rdb, headLocalRenderMeshIds[i], null, eyeTextureId),
+					_ => ReadRenderMeshDirect(rdb, headLocalRenderMeshIds[i])
+				};
+				if (part is not null)
 					headParts.AddRange(part);
+			}
 
 			// Hair is authored in world space (head at ~y1.7); it's the ground truth for where the head sits.
-			var hair = hairWorldRenderMeshId is { } hr ? ReadRenderMeshDirect(rdb, hr) : null;
+			var hair = hairWorldRenderMeshId is { } hr ? ReadRenderMeshDirect(rdb, hr, hairTint) : null;
 
 			if (headParts.Count > 0)
 			{
