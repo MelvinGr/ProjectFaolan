@@ -21,8 +21,7 @@ namespace Faolan.Web.Services
 		public CharacterModelService(IConfiguration config, IDbContextFactory<DatabaseContext> dbFactory)
 		{
 			_dbFactory = dbFactory;
-			_rdbDir = config["Rdb:Path"]
-			          ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB";
+			_rdbDir = config["RdbDir"] ?? throw new InvalidOperationException("RdbDir not configured");
 		}
 
 		public bool RdbAvailable => Directory.Exists(_rdbDir) && File.Exists(Path.Combine(_rdbDir, "le.idx"));

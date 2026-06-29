@@ -59,7 +59,7 @@ namespace Faolan.Core.Rdb.Assets
 					if (outDir != null)
 					{
 						glb = $"model_{rmId}.glb";
-						File.WriteAllBytes(Path.Combine(outDir, glb), GlbWriter.Build(subs, DecodeDiffusePng(rdb, mesh, blob)));
+						File.WriteAllBytes(Path.Combine(outDir, glb), GlbWriter.Build(subs, DecodeDiffusePng(rdb, mesh, blob).Png));
 					}
 				}
 			}
@@ -90,22 +90,23 @@ namespace Faolan.Core.Rdb.Assets
 		// (skinned character bodies have empty <MaterialSets/> and instead carry [id] refs in the geometry blob header).
 		// Normal/specular maps are MIXD (BC4) and return false from TryDecodeTopMip, so they're skipped and the diffuse
 		// (DXT1, listed first via g_DiffuseTex=0) is what gets picked.
-		private static byte[]? DecodeDiffusePng(RdbReader rdb, MeshIndexFile mesh, ReadOnlySpan<byte> blob = default)
+		private static (byte[]? Png, bool AlphaMask) DecodeDiffusePng(RdbReader rdb, MeshIndexFile mesh, ReadOnlySpan<byte> blob = default)
 		{
 			foreach (var t in mesh.UniqueTextures)
-				if (TryDecodeTexture(rdb, t.Type!.Value, t.Id, out var png))
-					return png;
+				if (TryDecodeTexture(rdb, t.Type!.Value, t.Id, out var png, out var alpha))
+					return (png, alpha);
 
 			foreach (var (type, id) in RenderMeshReader.ReadHeaderTextureRefs(blob))
-				if (TryDecodeTexture(rdb, type, id, out var png))
-					return png;
+				if (TryDecodeTexture(rdb, type, id, out var png, out var alpha))
+					return (png, alpha);
 
-			return null;
+			return (null, false);
 		}
 
-		private static bool TryDecodeTexture(RdbReader rdb, uint type, uint id, out byte[]? png)
+		private static bool TryDecodeTexture(RdbReader rdb, uint type, uint id, out byte[]? png, out bool alphaMask)
 		{
 			png = null;
+			alphaMask = false;
 			if (!rdb.TryGet(type, id, out var e) || !e.IsLocal)
 				return false;
 
@@ -113,8 +114,25 @@ namespace Faolan.Core.Rdb.Assets
 			if (!FctxConverter.TryDecodeTopMip(payload, out var rgba, out var w, out var h))
 				return false;
 
+			alphaMask = HasTransparency(rgba);
 			png = PngWriter.Encode(rgba, w, h);
 			return true;
+		}
+
+		// A diffuse is treated as alpha-tested (hair, eyelashes, ...) when a meaningful fraction of its texels are
+		// transparent. The 1% floor ignores stray anti-aliased edge pixels on otherwise-opaque skin maps.
+		private static bool HasTransparency(byte[] rgba)
+		{
+			var total = rgba.Length / 4;
+			if (total == 0)
+				return false;
+
+			var transparent = 0;
+			for (var i = 3; i < rgba.Length; i += 4)
+				if (rgba[i] < 128)
+					transparent++;
+
+			return transparent > total / 100;
 		}
 
 		// Decode a model's geometry AND attach its own diffuse to every sub-mesh, so an assembled character textures each
@@ -133,8 +151,8 @@ namespace Faolan.Core.Rdb.Assets
 			if (subs.Count == 0)
 				return null;
 
-			var diffuse = DecodeDiffusePng(rdb, mesh, blob);
-			return diffuse == null ? subs : subs.Select(s => s with { BaseColorPng = diffuse }).ToList();
+			var (diffuse, alpha) = DecodeDiffusePng(rdb, mesh, blob);
+			return diffuse == null ? subs : subs.Select(s => s with { BaseColorPng = diffuse, AlphaMask = alpha }).ToList();
 		}
 
 		// Assemble several models (e.g. a character's body + head + equipment, all authored in the same bind-pose space)
@@ -161,7 +179,7 @@ namespace Faolan.Core.Rdb.Assets
 
 				all.AddRange(subs);
 				used.Add(meshIndexId);
-				firstDiffuse ??= DecodeDiffusePng(rdb, mesh);
+				firstDiffuse ??= DecodeDiffusePng(rdb, mesh).Png;
 			}
 
 			if (all.Count > 0)
@@ -186,11 +204,12 @@ namespace Faolan.Core.Rdb.Assets
 				return null;
 
 			byte[]? diffuse = null;
+			var alpha = false;
 			foreach (var (type, id) in RenderMeshReader.ReadHeaderTextureRefs(blob))
-				if (TryDecodeTexture(rdb, type, id, out diffuse))
+				if (TryDecodeTexture(rdb, type, id, out diffuse, out alpha))
 					break;
 
-			return diffuse == null ? subs : subs.Select(s => s with { BaseColorPng = diffuse }).ToList();
+			return diffuse == null ? subs : subs.Select(s => s with { BaseColorPng = diffuse, AlphaMask = alpha }).ToList();
 		}
 
 		// Decode one model's geometry to its sub-meshes (null if the mesh-index or its local geometry is missing).
@@ -285,7 +304,7 @@ namespace Faolan.Core.Rdb.Assets
 			}
 
 			if (hair is { Count: > 0 })
-				all.AddRange(hair.Select(s => s with { AlphaMask = true }));
+				all.AddRange(hair); // AlphaMask already set from the hair texture's transparency
 
 			return GlbWriter.Build(all, null);
 		}
