@@ -59,7 +59,7 @@ namespace Faolan.Importer.Rdb.Assets
 					if (outDir != null)
 					{
 						glb = $"model_{rmId}.glb";
-						File.WriteAllBytes(Path.Combine(outDir, glb), GlbWriter.Build(subs));
+						File.WriteAllBytes(Path.Combine(outDir, glb), GlbWriter.Build(subs, DecodeDiffusePng(rdb, mesh)));
 					}
 				}
 			}
@@ -83,6 +83,24 @@ namespace Faolan.Importer.Rdb.Assets
 					JsonSerializer.Serialize(manifest, JsonOpts));
 
 			return new Result(true, mesh, manifest);
+		}
+
+		// The model's base-colour texture for the glTF material: the first local, BC1/BC3-decodable texture in the
+		// material list. Normal/specular maps are MIXD (BC4) and return false from TryDecodeTopMip, so they're skipped
+		// and the diffuse (DXT1, listed first via g_DiffuseTex=0) is what gets picked.
+		private static byte[]? DecodeDiffusePng(RdbReader rdb, MeshIndexFile mesh)
+		{
+			foreach (var t in mesh.UniqueTextures)
+			{
+				if (!rdb.TryGet(t.Type!.Value, t.Id, out var e) || !e.IsLocal)
+					continue;
+
+				var payload = rdb.ReadDecompressed(e);
+				if (FctxConverter.TryDecodeTopMip(payload, out var rgba, out var w, out var h))
+					return PngWriter.Encode(rgba, w, h);
+			}
+
+			return null;
 		}
 
 		private static (string Status, long Size, string? OutFile) ExtractTexture(RdbReader rdb, uint type, uint id, string? outDir)

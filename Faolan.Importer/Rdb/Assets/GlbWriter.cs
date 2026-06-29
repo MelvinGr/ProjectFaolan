@@ -21,7 +21,8 @@ namespace Faolan.Importer.Rdb.Assets
 		private const int Float = 5126, UInt = 5125; // glTF componentTypes
 		private const int ArrayBuffer = 34962, ElementArrayBuffer = 34963; // bufferView targets
 
-		public static byte[] Build(IReadOnlyList<RenderMeshReader.SubMesh> subs)
+		// baseColorPng (optional): a PNG to embed as the model's base-colour texture (sampled by TEXCOORD_0).
+		public static byte[] Build(IReadOnlyList<RenderMeshReader.SubMesh> subs, byte[]? baseColorPng = null)
 		{
 			var bin = new MemoryStream();
 			var bufferViews = new List<object>();
@@ -57,6 +58,21 @@ namespace Faolan.Importer.Rdb.Assets
 				});
 			}
 
+			// Optional embedded base-colour texture: pack the PNG into the BIN buffer as an image bufferView.
+			var pbr = new Dictionary<string, object> { ["baseColorFactor"] = new[] { 1f, 1f, 1f, 1f }, ["metallicFactor"] = 0.0f, ["roughnessFactor"] = 1.0f };
+			Dictionary<string, object>? imagesObj = null, texturesObj = null, samplersObj = null;
+			if (baseColorPng is { Length: > 0 })
+			{
+				Align(bin);
+				var imgOffset = (int)bin.Length;
+				bin.Write(baseColorPng);
+				var imgBv = bufferViews.Count;
+				bufferViews.Add(new Dictionary<string, object> { ["buffer"] = 0, ["byteOffset"] = imgOffset, ["byteLength"] = baseColorPng.Length });
+
+				imagesObj = new Dictionary<string, object> { ["bv"] = imgBv }; // placeholder marker; real arrays built below
+				pbr["baseColorTexture"] = new Dictionary<string, object> { ["index"] = 0, ["texCoord"] = 0 };
+			}
+
 			var binBytes = bin.ToArray();
 			var gltf = new Dictionary<string, object>
 			{
@@ -65,11 +81,18 @@ namespace Faolan.Importer.Rdb.Assets
 				["scenes"] = new[] { new Dictionary<string, object> { ["nodes"] = new[] { 0 } } },
 				["nodes"] = new[] { new Dictionary<string, object> { ["mesh"] = 0 } },
 				["meshes"] = new[] { new Dictionary<string, object> { ["primitives"] = primitives } },
-				["materials"] = new[] { new Dictionary<string, object> { ["name"] = "default", ["pbrMetallicRoughness"] = new Dictionary<string, object> { ["baseColorFactor"] = new[] { 0.7f, 0.65f, 0.5f, 1f }, ["metallicFactor"] = 0.0f, ["roughnessFactor"] = 1.0f } } },
+				["materials"] = new[] { new Dictionary<string, object> { ["name"] = "default", ["pbrMetallicRoughness"] = pbr, ["doubleSided"] = true } },
 				["buffers"] = new[] { new Dictionary<string, object> { ["byteLength"] = binBytes.Length } },
 				["bufferViews"] = bufferViews,
 				["accessors"] = accessors
 			};
+
+			if (imagesObj != null)
+			{
+				gltf["images"] = new[] { new Dictionary<string, object> { ["bufferView"] = (int)imagesObj["bv"], ["mimeType"] = "image/png" } };
+				gltf["samplers"] = new[] { new Dictionary<string, object> { ["wrapS"] = 10497, ["wrapT"] = 10497, ["magFilter"] = 9729, ["minFilter"] = 9987 } };
+				gltf["textures"] = new[] { new Dictionary<string, object> { ["source"] = 0, ["sampler"] = 0 } };
+			}
 
 			var json = JsonSerializer.SerializeToUtf8Bytes(gltf);
 			return Assemble(json, binBytes);

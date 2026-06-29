@@ -72,6 +72,37 @@ namespace Faolan.Importer.Rdb.Assets
 			return new Result(true, dds, header, warning);
 		}
 
+		// Decode the full-resolution (top) mip of an FCTX directly to RGBA32 - for embedding a base-colour PNG in glTF.
+		// Only the BC1/BC3 (DXT1/3/5) colour formats are handled (the diffuse maps); MIXD/normal maps return false.
+		public static bool TryDecodeTopMip(ReadOnlySpan<byte> payload, out byte[] rgba, out int width, out int height)
+		{
+			rgba = [];
+			width = height = 0;
+			if (!IsFctx(payload) || payload.Length < 24)
+				return false;
+
+			width = BinaryPrimitives.ReadUInt16LittleEndian(payload.Slice(12, 2));
+			height = BinaryPrimitives.ReadUInt16LittleEndian(payload.Slice(14, 2));
+			int mip = Math.Max(1, (int)payload[16]);
+			var fourCc = Encoding.ASCII.GetString(payload.Slice(20, 4));
+			var blockSize = BlockSizeFor(fourCc);
+			if (blockSize == 0 || fourCc == "MIXD")
+				return false;
+
+			var pixels = payload[24..];
+			// Smallest-first layout: the top mip is last; skip every smaller mip (n=mip..2).
+			var topOffset = 0;
+			for (var n = mip; n >= 2; n--)
+				topOffset += MipSize(width, height, n, blockSize);
+
+			var topLen = MipSize(width, height, 1, blockSize);
+			if (topOffset + topLen > pixels.Length)
+				return false;
+
+			rgba = BcDecoder.Decode(pixels.Slice(topOffset, topLen), width, height, fourCc);
+			return true;
+		}
+
 		// FCTX stores a DXT mip chain smallest-first; gather it back into DDS order (largest mip first).
 		private static byte[] ReorderMipsLargestFirst(ReadOnlySpan<byte> pixels, int width, int height, int mip, int blockSize, out string? warning)
 		{
