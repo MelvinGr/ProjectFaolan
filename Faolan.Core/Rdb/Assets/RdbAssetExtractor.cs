@@ -41,7 +41,7 @@ namespace Faolan.Core.Rdb.Assets
 			string? meshDump = null;
 			string? glb = null;
 			int glbVerts = 0, glbTris = 0;
-			if (mesh.RenderMeshId is { } rmId && rdb.TryGet(RenderMeshType, rmId, out var rmEntry) && rmEntry.IsLocal)
+			if (mesh.RenderMeshId is { } rmId && rdb.TryGet(RenderMeshType, rmId, out var rmEntry) && rdb.CanRead(rmEntry))
 			{
 				var blob = rdb.ReadDecompressed(rmEntry);
 
@@ -110,7 +110,7 @@ namespace Faolan.Core.Rdb.Assets
 		{
 			png = null;
 			alphaMask = false;
-			if (!rdb.TryGet(type, id, out var e) || !e.IsLocal)
+			if (!rdb.TryGet(type, id, out var e) || !rdb.CanRead(e))
 				return false;
 
 			var payload = rdb.ReadDecompressed(e);
@@ -146,7 +146,7 @@ namespace Faolan.Core.Rdb.Assets
 				return null;
 
 			var mesh = MeshIndexFile.Parse(meshIndexId, rdb.ReadDecompressed(idxEntry));
-			if (mesh.RenderMeshId is not { } rmId || !rdb.TryGet(RenderMeshType, rmId, out var rmEntry) || !rmEntry.IsLocal)
+			if (mesh.RenderMeshId is not { } rmId || !rdb.TryGet(RenderMeshType, rmId, out var rmEntry) || !rdb.CanRead(rmEntry))
 				return null;
 
 			var blob = rdb.ReadDecompressed(rmEntry);
@@ -173,7 +173,7 @@ namespace Faolan.Core.Rdb.Assets
 					continue;
 
 				var mesh = MeshIndexFile.Parse(meshIndexId, rdb.ReadDecompressed(idxEntry));
-				if (mesh.RenderMeshId is not { } rmId || !rdb.TryGet(RenderMeshType, rmId, out var rmEntry) || !rmEntry.IsLocal)
+				if (mesh.RenderMeshId is not { } rmId || !rdb.TryGet(RenderMeshType, rmId, out var rmEntry) || !rdb.CanRead(rmEntry))
 					continue;
 
 				var subs = RenderMeshReader.Read(rdb.ReadDecompressed(rmEntry));
@@ -201,7 +201,7 @@ namespace Faolan.Core.Rdb.Assets
 		public static IReadOnlyList<RenderMeshReader.SubMesh>? ReadRenderMeshDirect(RdbReader rdb, uint renderMeshId,
 			Tint? tint = null, uint? overrideTextureId = null)
 		{
-			if (!rdb.TryGet(RenderMeshType, renderMeshId, out var rmEntry) || !rmEntry.IsLocal)
+			if (!rdb.TryGet(RenderMeshType, renderMeshId, out var rmEntry) || !rdb.CanRead(rmEntry))
 				return null;
 
 			var blob = rdb.ReadDecompressed(rmEntry);
@@ -245,7 +245,7 @@ namespace Faolan.Core.Rdb.Assets
 		{
 			rgba = [];
 			w = h = 0;
-			if (!rdb.TryGet(type, id, out var e) || !e.IsLocal)
+			if (!rdb.TryGet(type, id, out var e) || !rdb.CanRead(e))
 				return false;
 
 			return FctxConverter.TryDecodeTopMip(rdb.ReadDecompressed(e), out rgba, out w, out h);
@@ -258,7 +258,7 @@ namespace Faolan.Core.Rdb.Assets
 				return null;
 
 			var mesh = MeshIndexFile.Parse(meshIndexId, rdb.ReadDecompressed(idxEntry));
-			if (mesh.RenderMeshId is not { } rmId || !rdb.TryGet(RenderMeshType, rmId, out var rmEntry) || !rmEntry.IsLocal)
+			if (mesh.RenderMeshId is not { } rmId || !rdb.TryGet(RenderMeshType, rmId, out var rmEntry) || !rdb.CanRead(rmEntry))
 				return null;
 
 			var subs = RenderMeshReader.Read(rdb.ReadDecompressed(rmEntry));
@@ -298,15 +298,49 @@ namespace Faolan.Core.Rdb.Assets
 		// MonsterData (1010201) record. Empty if missing/non-local. These meshes are head-local (seat at the neck).
 		public static IReadOnlyList<uint> ResolveHeadMeshes(RdbReader rdb, uint monsterDataId)
 		{
-			if (!rdb.TryGet(MonsterDataFile.Type, monsterDataId, out var e) || !e.IsLocal)
+			if (!rdb.TryGet(MonsterDataFile.Type, monsterDataId, out var e) || !rdb.CanRead(e))
 				return [];
 
 			return MonsterDataFile.Parse(monsterDataId, rdb.ReadDecompressed(e)).MeshIds;
 		}
 
+		// Diagnostic: resolve a MESHINDEXFILE to its RenderMesh and report where each lives (local rdbdata vs CDN) and
+		// whether it's currently readable (CDN entries are readable only if a mirror source is configured).
+		public static object DescribeMesh(RdbReader rdb, uint meshIndexId)
+		{
+			if (meshIndexId == 0 || !rdb.TryGet(MeshIndexFileType, meshIndexId, out var idx))
+				return new { meshIndexId, found = false };
+
+			uint? rmId = null;
+			string rmSource = "n/a";
+			var rmReadable = false;
+			try
+			{
+				var mesh = MeshIndexFile.Parse(meshIndexId, rdb.ReadDecompressed(idx));
+				rmId = mesh.RenderMeshId;
+				if (rmId is { } id && rdb.TryGet(RenderMeshType, id, out var rm))
+				{
+					rmSource = rm.IsLocal ? "local" : "cdn";
+					rmReadable = rdb.CanRead(rm);
+				}
+			}
+			catch { /* parse failed - report what we have */ }
+
+			return new
+			{
+				meshIndexId,
+				found = true,
+				meshIndexSource = idx.IsLocal ? "local" : "cdn",
+				meshIndexReadable = rdb.CanRead(idx),
+				renderMeshId = rmId,
+				renderMeshSource = rmSource,
+				renderMeshReadable = rmReadable
+			};
+		}
+
 		// Load + parse a TexScript (type 1010035) by id - the per-character colour op (skin/hair tint, eye iris).
 		public static TexScriptFile? LoadTexScript(RdbReader rdb, uint id) =>
-			rdb.TryGet(TexScriptFile.Type, id, out var e) && e.IsLocal
+			rdb.TryGet(TexScriptFile.Type, id, out var e) && rdb.CanRead(e)
 				? TexScriptFile.Parse(id, rdb.ReadDecompressed(e))
 				: null;
 

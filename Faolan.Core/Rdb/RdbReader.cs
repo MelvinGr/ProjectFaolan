@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Net.Http;
 using Faolan.Core.Crypt;
 
 namespace Faolan.Core.Rdb
@@ -19,13 +20,39 @@ namespace Faolan.Core.Rdb
 
 		private readonly string _rdbDir;
 
+		// Optional CDN source for on-demand resources (file == 0xFF): the Faolan.ContentMirror proxy base, e.g.
+		// "http://127.0.0.1:7080/gameupdate/upm/rdb". On-demand resources aren't in the local NN.rdbdata files; their
+		// payload is content-addressed by the entry's 16-byte md5 at <base>/res/<hex[0:2]>/<hex[2:3]>/<hex[3:]>. The
+		// proxy is store-and-forward, so a GET both serves and archives the blob (the real CDN must be reachable for a
+		// cold miss). Misses are negative-cached so a dead/absent resource is only attempted once per process.
+		private readonly string? _cdnBaseUrl;
+		private readonly HashSet<string> _cdnMisses = [];
+		private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(40) };
+
 		public int Count => _entries.Count;
 		public IReadOnlyList<Entry> Entries => _entries;
 
-		public RdbReader(string rdbDir)
+		public RdbReader(string rdbDir, string? cdnBaseUrl = null)
 		{
 			_rdbDir = rdbDir;
+			_cdnBaseUrl = string.IsNullOrWhiteSpace(cdnBaseUrl) ? null : cdnBaseUrl.TrimEnd('/');
 			ParseIndex(Path.Combine(rdbDir, "le.idx"));
+		}
+
+		// True if the entry's payload is (likely) readable - a local rdbdata entry, or a CDN entry with a configured
+		// source that hasn't already missed. A CDN "hit" is optimistic: the actual fetch may still 404 (then it's
+		// negative-cached and ReadRaw returns empty), which the asset callers already treat as "missing".
+		public bool CanRead(Entry e) =>
+			e.IsLocal || (_cdnBaseUrl != null && e.Hash.Length >= 16 && !_cdnMisses.Contains(Convert.ToHexStringLower(e.Hash)));
+
+		// The proxy URL for a CDN (file == 0xFF) entry, or null if no source is configured / the hash is absent.
+		public string? CdnUrl(Entry e)
+		{
+			if (_cdnBaseUrl is null || e.Hash.Length < 16)
+				return null;
+
+			var hex = Convert.ToHexStringLower(e.Hash);
+			return $"{_cdnBaseUrl}/res/{hex[..2]}/{hex.Substring(2, 1)}/{hex[3..]}";
 		}
 
 		public void Dispose()
@@ -134,6 +161,10 @@ namespace Faolan.Core.Rdb
 
 		private byte[] ReadRaw(Entry e)
 		{
+			// CDN (on-demand) entry: pull the content-addressed blob through the mirror proxy instead of a local file.
+			if (!e.IsLocal)
+				return FetchCdn(e);
+
 			var fs = GetDataFile(e.File);
 			fs.Seek(e.Offset, SeekOrigin.Begin);
 			var buf = new byte[e.Size];
@@ -148,6 +179,34 @@ namespace Faolan.Core.Rdb
 			}
 
 			return buf;
+		}
+
+		// Synchronously GET a CDN entry's blob through the mirror proxy. Returns empty (and negative-caches the hash) on
+		// any failure - no source configured, network error, or a 404 (resource not on the CDN / CDN unreachable).
+		private byte[] FetchCdn(Entry e)
+		{
+			var url = CdnUrl(e);
+			if (url is null)
+				return [];
+
+			try
+			{
+				using var resp = Http.Send(new HttpRequestMessage(HttpMethod.Get, url));
+				if (!resp.IsSuccessStatusCode)
+				{
+					_cdnMisses.Add(Convert.ToHexStringLower(e.Hash));
+					return [];
+				}
+
+				using var ms = new MemoryStream();
+				resp.Content.ReadAsStream().CopyTo(ms);
+				return ms.ToArray();
+			}
+			catch
+			{
+				_cdnMisses.Add(Convert.ToHexStringLower(e.Hash));
+				return [];
+			}
 		}
 
 		public static bool IsRdbh(ReadOnlySpan<byte> raw)

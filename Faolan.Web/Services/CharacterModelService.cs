@@ -14,6 +14,7 @@ namespace Faolan.Web.Services
 	public sealed class CharacterModelService
 	{
 		private readonly string _rdbDir;
+		private readonly string? _cdnUrl;
 		private readonly IDbContextFactory<DatabaseContext> _dbFactory;
 		private readonly Lock _gate = new();
 		private RdbReader? _rdb;
@@ -22,6 +23,9 @@ namespace Faolan.Web.Services
 		{
 			_dbFactory = dbFactory;
 			_rdbDir = config["RdbDir"] ?? throw new InvalidOperationException("RdbDir not configured");
+			// Optional ContentMirror proxy base for on-demand (CDN-only) resources, e.g. the CDN race bodies that aren't
+			// in the local RDB. Store-and-forward, so requesting one archives it for the future (#275, [[aoc_content_cdn_mirror]]).
+			_cdnUrl = config["CdnUrl"];
 		}
 
 		public bool RdbAvailable => Directory.Exists(_rdbDir) && File.Exists(Path.Combine(_rdbDir, "le.idx"));
@@ -108,6 +112,26 @@ namespace Faolan.Web.Services
 			var rdb = Reader();
 			var monsterId = body is { HeadMesh: > 0 } ? body.HeadMesh / 2 : 0;
 			var headMeshes = monsterId > 0 ? RdbAssetExtractor.ResolveHeadMeshes(rdb, monsterId) : [];
+
+			// Body mesh resolution + whether it's local or a CDN pull (the race body is often CDN-only).
+			var bodyFallback = character?.Sex == Sex.Female ? LocalFemaleBody : LocalMaleBody;
+			var bodyId = character != null ? BodyMesh.GetValueOrDefault((character.Race, character.Sex), bodyFallback) : 0;
+			var bodyStatus = RdbAssetExtractor.DescribeMesh(rdb, bodyId);
+
+			// Resolve each *texscript_NNN to its mesh-target + op so the skin/hair/eye classification is visible.
+			var texscripts = resources
+				.Where(r => r.StartsWith("*texscript_") && ParseResourceId(r) is not null)
+				.Select(r =>
+				{
+					var id = ParseResourceId(r)!.Value;
+					var ts = RdbAssetExtractor.LoadTexScript(rdb, id);
+					return ts is null
+						? new { id, found = false, meshTarget = 0, kind = "?", r = (int)0, g = (int)0, b = (int)0, textureId = 0u }
+						: new { id, found = true, meshTarget = ts.MeshTarget, kind = ts.Op.Kind.ToString(), r = (int)ts.Op.R, g = (int)ts.Op.G, b = (int)ts.Op.B, textureId = ts.Op.TextureId };
+				})
+				.ToList();
+			var (skinTint, hairTint, eyeTex) = ResolveTexScripts(rdb, resources);
+
 			return new
 			{
 				found = character != null,
@@ -117,7 +141,16 @@ namespace Faolan.Web.Services
 				headMeshRaw = body?.HeadMesh,
 				monsterId,
 				headMeshes,
-				resources
+				bodyId,
+				bodyStatus,
+				resources,
+				texscripts,
+				resolved = new
+				{
+					skin = skinTint is { } s ? $"#{s.R:X2}{s.G:X2}{s.B:X2}" : null,
+					hair = hairTint is { } h ? $"#{h.R:X2}{h.G:X2}{h.B:X2}" : null,
+					eyeTexture = eyeTex
+				}
 			};
 		}
 
@@ -182,7 +215,7 @@ namespace Faolan.Web.Services
 				return _rdb;
 
 			lock (_gate)
-				return _rdb ??= new RdbReader(_rdbDir);
+				return _rdb ??= new RdbReader(_rdbDir, _cdnUrl);
 		}
 	}
 }
