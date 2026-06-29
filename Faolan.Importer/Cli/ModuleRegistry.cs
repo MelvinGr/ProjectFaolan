@@ -19,6 +19,7 @@ namespace Faolan.Importer.Cli
 			new ItemsModule(),
 			new MapsModule(),
 			new SpellsModule(),
+			new StatDamageModule(),
 			new AbilitiesModule(),
 			new StartingSpellsModule(),
 			new CharactersModule(),

@@ -47,6 +47,11 @@ namespace Faolan.GameServer.World
 		// target=player + attacker=NPC (the player-attacks-NPC direction already rides CombatService). #274.
 		Task SendDamageNumber(INetworkClient client, uint targetHandle, uint attackerHandle, uint damage);
 
+		// A DoT tick's StatDamageIIR (0xE9F24184): the health effect on the player from an active bleed/HoT debuff -
+		// statValue = the player's resulting HealthCurrent, delta the per-tick change, type the damage-school flag,
+		// caster the NPC, spellBaseId the wire id >> 8. Paired with PushVitals for the bar move. #274.
+		Task SendStatDamage(INetworkClient client, uint targetHandle, uint statValue, int delta, uint type, uint casterHandle, uint spellBaseId);
+
 		// Remove an active buff icon: the retail "end-twin" of the apply (the SAME ApplySpell 0x6B87E316 carrier with
 		// the spell id's rank byte set to 1 and an EMPTY payload). Confirmed from the combat captures - retail expires
 		// timed buffs by sending this, not by letting the client self-expire - so the tick fires it when a tracked
@@ -325,7 +330,17 @@ namespace Faolan.GameServer.World
 			// Only a real effect (duration > 0) is tracked - an instant damage spell carries none and leaves no icon.
 			// CasterHandle = this NPC so the tick's removal twin mirrors the apply (applyTo=player, applyFrom=NPC).
 			if (debuffMs > 0)
-				target.ActiveBuffs[spell.SpellId] = new ActiveBuff(spell.SpellId, npc.Handle, DateTimeOffset.UtcNow, debuffMs / 1000.0);
+			{
+				// Attach the DoT effect (Spell.DotDelta, captured StatDamageIIR) so the tick bleeds the player's health
+				// while the debuff is active - Rend -8/tick etc. Looked up by base spell id (wire id >> 8). #274
+				var (dotDelta, dotType) = await DotEffect(spell.SpellId >> 8);
+				target.ActiveBuffs[spell.SpellId] = new ActiveBuff(spell.SpellId, npc.Handle, DateTimeOffset.UtcNow, debuffMs / 1000.0)
+				{
+					DotDelta = dotDelta,
+					DotType = dotType,
+					LastDotTick = DateTimeOffset.UtcNow,
+				};
+			}
 
 			if (target.GodMode) // .godmode: the NPC still casts, but the spell deals no damage
 				return;
@@ -671,6 +686,7 @@ namespace Faolan.GameServer.World
 					// Player death: push the release screen once; respawn is click-driven (RespawnMe), not timed.
 					await TickPlayerDeaths();
 					await TickBuffExpiry();
+					await TickDots();
 
 					// Rate-based systems: fire on their own cadence, scaled by the time actually elapsed since last fire.
 					if (regen.Advance(dt, out var regenElapsed))
@@ -710,6 +726,60 @@ namespace Faolan.GameServer.World
 						// Mirror the apply: applyTo = the affected player, applyFrom = the caster (self for a self-buff,
 						// the NPC for an NPC-cast debuff). CasterHandle carries the applyFrom (#274).
 						await _output.SendBuffRemoval(pair.Key, pair.Value.Handle, buff.Value.CasterHandle, buff.Key);
+					}
+				}
+			}
+		}
+
+		// Cached DoT effect per base spell id (Spell.DotDelta/DotType): looked up once per spell, then reused so the
+		// per-cast NPC path doesn't hit the DB. (delta 0 = not a DoT.)
+		private readonly ConcurrentDictionary<uint, (int Delta, uint Type)> _dotEffects = new();
+
+		private async Task<(int Delta, uint Type)> DotEffect(uint baseSpellId)
+		{
+			if (_dotEffects.TryGetValue(baseSpellId, out var cached))
+				return cached;
+			var spell = await _database.GetSpell(baseSpellId);
+			var effect = (spell?.DotDelta ?? 0, spell?.DotType ?? 0);
+			_dotEffects[baseSpellId] = effect;
+			return effect;
+		}
+
+		// Applies damage/heal-over-time from active DoT debuffs (#274). Each tracked buff with a DotDelta bleeds (or
+		// heals) the target's HealthCurrent on a fixed cadence, mirroring the captured StatDamageIIR cycle: the tick
+		// moves the player's vitals by the delta and sends the byte-exact StatDamageIIR (+ a PushVitals for the bar).
+		// Retail's bleeds tick roughly every couple of seconds; DotTickSeconds matches that.
+		private const double DotTickSeconds = 2.0;
+
+		private async Task TickDots()
+		{
+			var now = DateTimeOffset.UtcNow;
+			foreach (var pair in Players)
+			{
+				var entity = pair.Value;
+				var client = pair.Key;
+				var character = client.Session?.Character;
+				if (character == null)
+					continue;
+				var vitals = entity.Vitals;
+				if (vitals == null || vitals.IsDead)
+					continue;
+
+				foreach (var buff in entity.ActiveBuffs.Values)
+				{
+					if (buff.DotDelta == 0 || (now - buff.LastDotTick).TotalSeconds < DotTickSeconds)
+						continue;
+					buff.LastDotTick = now;
+
+					vitals.ApplyHealthDelta(buff.DotDelta);
+					await _output.SendStatDamage(client, entity.Handle, vitals.Health, buff.DotDelta, buff.DotType, buff.CasterHandle, buff.BuffId >> 8);
+					await _output.PushVitals(client, vitals);
+
+					if (vitals.IsDead)
+					{
+						entity.LastAttackerHandle = buff.CasterHandle; // a bleed can land the killing blow
+						_logger.LogInformation("Combat: {Player} bled out from buff 0x{Buff:X8}.", character.Name, buff.BuffId);
+						break;
 					}
 				}
 			}

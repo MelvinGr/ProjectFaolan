@@ -77,6 +77,22 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
+	// DoT effects (StatDamageIIR 0xE9F24184) -> Spell.DotDelta/DotType (#274).
+	public sealed class StatDamageModule : IImportModule
+	{
+		public string Name => "dot-effects";
+		public string Description => "DoT per-tick deltas from StatDamageIIR packets.";
+		public ImportSource Source => ImportSource.Captures;
+		public IReadOnlyList<string> DependsOn => ["spells"];
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Insert, WriteMode.Upsert };
+
+		public async Task<ImportResult> RunAsync(ImportContext ctx)
+		{
+			var (spells, updated) = await CaptureStatDamageImporter.ImportAsync(ctx.Db, ctx.RawPackets);
+			return new ImportResult($"{spells} DoT spells seen, {updated} written.");
+		}
+	}
+
 	// Ability grants (0x2052) -> Abilities. Also rehomes the 6 archive-only ability "slot" constants (the old
 	// ArchiveSqlImporter's only unique data) so the slot column survives a re-import without the archive.
 	public sealed class AbilitiesModule : IImportModule

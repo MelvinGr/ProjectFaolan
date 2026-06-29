@@ -158,6 +158,11 @@ namespace Faolan.GameServer
 			return _combat.SendDamageNumber(client, targetHandle, attackerHandle, damage);
 		}
 
+		Task IWorldOutbound.SendStatDamage(INetworkClient client, uint targetHandle, uint statValue, int delta, uint type, uint casterHandle, uint spellBaseId)
+		{
+			return _combat.SendStatDamage(client, targetHandle, statValue, delta, type, casterHandle, spellBaseId);
+		}
+
 		Task IWorldOutbound.BroadcastNpcMove(WorldEntity npc)
 		{
 			return _broadcaster.BroadcastNpcMove(npc);

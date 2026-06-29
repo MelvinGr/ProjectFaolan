@@ -26,6 +26,14 @@ namespace Faolan.Core.Database.Tables
 		// payload) so the icon disappears at 0 instead of sticking (#274).
 		public uint DurationMs { get; set; }
 
+		// Damage-over-time per tick on HealthCurrent, extracted from captured StatDamageIIR (0xE9F24184) records keyed
+		// by base spell id (the +41 signed delta; its affected stat at +33 is 0x1B HealthCurrent). Negative = a bleed
+		// debuff (Rend -8, 0x342F23 -5); 0 = not a DoT. The world tick applies this to the target's vitals + sends the
+		// StatDamageIIR while the debuff is active (#274). DotType is the +45 damage-school flag (1/4), carried so the
+		// rebuilt packet matches retail.
+		public int DotDelta { get; set; }
+		public uint DotType { get; set; }
+
 		public ushort ManaCost { get; set; }
 
 		// Recast / cooldown in SECONDS. Backfilled from the ellatha combos list (the one bulk source that carries it)

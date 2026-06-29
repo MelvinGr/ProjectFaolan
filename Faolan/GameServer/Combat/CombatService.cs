@@ -201,6 +201,13 @@ namespace Faolan.GameServer.Combat
 			return SendWorldPacket(client, CombatEffectBuilder.BuildDamageResult(targetHandle, attackerHandle, damage, type: 2));
 		}
 
+		// A DoT tick's StatDamageIIR (the health effect of an active bleed/HoT). idx 1 is the typical effect slot in
+		// the capture; statValue = the resulting HealthCurrent so the client's bar/number matches the vitals move. #274
+		public Task SendStatDamage(INetworkClient client, uint targetHandle, uint statValue, int delta, uint type, uint casterHandle, uint spellBaseId)
+		{
+			return SendWorldPacket(client, CombatEffectBuilder.BuildStatDamage(targetHandle, statValue, delta, type, casterHandle, idx: 1, spellBaseId));
+		}
+
 		// Sends a caster NPC's spell cast to the player it targets (#232): the ApplySpell (0x6B87E316) framed from the
 		// NPC handle (applyFrom = npc, applyTo = player), built from the NPC's NpcSpell row by NpcSpellCastBuilder -
 		// the construct-from-data counterpart of the melee SendNpcAttackAnimation. The HP move rides the caller's
