@@ -210,6 +210,14 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 		}
 
+		// The buff-removal end-twin (#274/#253): the same ApplySpell carrier as the apply, rank byte -> 1, empty
+		// payload. Routes the private SendBuffRemoval used by .cancelbuff so the world-tick expiry and the GM cancel
+		// share one builder.
+		Task IWorldOutbound.SendBuffRemoval(INetworkClient client, uint applyTo, uint applyFrom, uint appliedSpellId)
+		{
+			return SendBuffRemoval(client, applyTo, applyFrom, appliedSpellId);
+		}
+
 		Task IWorldOutbound.SendDeathPose(INetworkClient client, uint dyingHandle, System.Numerics.Vector3 deathPosition)
 		{
 			return new PacketStream()

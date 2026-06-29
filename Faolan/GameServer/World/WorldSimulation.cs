@@ -43,6 +43,13 @@ namespace Faolan.GameServer.World
 		// damage/effect is the captured payload; visual + the HP move rides the caller's PushVitals (like the swing).
 		Task SendNpcSpellCast(INetworkClient client, uint npcHandle, NpcSpellCast spell);
 
+		// Remove an active buff icon: the retail "end-twin" of the apply (the SAME ApplySpell 0x6B87E316 carrier with
+		// the spell id's rank byte set to 1 and an EMPTY payload). Confirmed from the combat captures - retail expires
+		// timed buffs by sending this, not by letting the client self-expire - so the tick fires it when a tracked
+		// buff's duration elapses, making the icon disappear at 0 instead of sticking. applyTo/applyFrom mirror the
+		// apply: equal for a self-buff, applyTo=player + applyFrom=NPC for an NPC-cast debuff (#274).
+		Task SendBuffRemoval(INetworkClient client, uint applyTo, uint applyFrom, uint appliedSpellId);
+
 		// Broadcast an NPC's tick step (its MoveTask transform) to the players who can see it - chasing a target or
 		// returning home - so they watch it move.
 		Task BroadcastNpcMove(WorldEntity npc);
@@ -290,9 +297,30 @@ namespace Faolan.GameServer.World
 			if (vitals.IsDead)
 				return;
 
-			var spell = npc.Spells[(int)(npc.AttackSwingCounter++ % (uint)npc.Spells.Count)];
+			var spell = npc.Spells[(int)(npc.AttackSwingCounter % (uint)npc.Spells.Count)];
+			var debuffMs = ActiveBuff.DurationMsFromPayload(spell.Payload);
+
+			// Retail re-applies an NPC debuff only AFTER the prior one expires (the combat capture's ~7s
+			// apply->end->re-apply cycle); the swings in between are NORMAL attacks. Re-sending the ApplySpell every 2s
+			// swing makes the client STACK the icon (piling up new copies at 0s with no countdown). So if the target
+			// already carries this debuff, swing normally this tick instead - the debuff keeps counting down and is
+			// re-cast once the tick expires it. (#274)
+			if (debuffMs > 0 && target.ActiveBuffs.ContainsKey(spell.SpellId))
+			{
+				await ApplyNpcAttack(npc, target);
+				return;
+			}
+
+			npc.AttackSwingCounter++;
 			var damage = (int)CombatResolver.ResolveNpcAttackDamage(npc.Level);
 			await _output.SendNpcSpellCast(client, npc.Handle, spell);
+
+			// Track the NPC's cast as a timed DEBUFF on the player so it counts down and clears its icon at 0, like a
+			// self-buff (#274). The duration is the cast payload's +8 field (centiseconds, see DurationMsFromPayload).
+			// Only a real effect (duration > 0) is tracked - an instant damage spell carries none and leaves no icon.
+			// CasterHandle = this NPC so the tick's removal twin mirrors the apply (applyTo=player, applyFrom=NPC).
+			if (debuffMs > 0)
+				target.ActiveBuffs[spell.SpellId] = new ActiveBuff(spell.SpellId, npc.Handle, DateTimeOffset.UtcNow, debuffMs / 1000.0);
 
 			if (target.GodMode) // .godmode: the NPC still casts, but the spell deals no damage
 				return;
@@ -636,7 +664,7 @@ namespace Faolan.GameServer.World
 
 					// Player death: push the release screen once; respawn is click-driven (RespawnMe), not timed.
 					await TickPlayerDeaths();
-					TickBuffExpiry();
+					await TickBuffExpiry();
 
 					// Rate-based systems: fire on their own cadence, scaled by the time actually elapsed since last fire.
 					if (regen.Advance(dt, out var regenElapsed))
@@ -659,9 +687,11 @@ namespace Faolan.GameServer.World
 		// Advances player death/respawn. A player whose vitals hit 0 starts a respawn countdown; when it elapses they
 		// are revived to full and re-entered at the closest known resurrection point (RespawnPlayer). Living players are
 		// untracked.
-		// Drops expired buffs (those with a known duration - none until the RDB spell defs land, but the model is
-		// live). No packet: the client expires its own icon from the ApplySpell data.
-		private void TickBuffExpiry()
+		// Drops expired buffs (those with a known duration, now imported from RDB field 0x008 into Spell.DurationMs and
+		// armed at apply time, #274) and tells the client by sending the retail end-twin removal (SendBuffRemoval). The
+		// client does NOT self-expire the icon - the combat captures show retail explicitly removes each timed buff
+		// with the rank-1 empty-payload twin - so without this the icon counts to 0 and sticks.
+		private async Task TickBuffExpiry()
 		{
 			var now = DateTimeOffset.UtcNow;
 			foreach (var pair in Players)
@@ -669,7 +699,12 @@ namespace Faolan.GameServer.World
 				foreach (var buff in pair.Value.ActiveBuffs)
 				{
 					if (buff.Value.Expired(now) && pair.Value.ActiveBuffs.TryRemove(buff.Key, out _))
+					{
 						_logger.LogInformation("Buff 0x{Buff:X8} expired on {Player}.", buff.Key, pair.Key.Session?.Character?.Name);
+						// Mirror the apply: applyTo = the affected player, applyFrom = the caster (self for a self-buff,
+						// the NPC for an NPC-cast debuff). CasterHandle carries the applyFrom (#274).
+						await _output.SendBuffRemoval(pair.Key, pair.Value.Handle, buff.Value.CasterHandle, buff.Key);
+					}
 				}
 			}
 		}

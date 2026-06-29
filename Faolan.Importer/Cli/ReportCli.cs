@@ -42,6 +42,9 @@ namespace Faolan.Importer.Cli
 				case "worldobj":
 					await WorldObj(dbPath, arg ?? "hangingwoman");
 					return 0;
+				case "spell-fields":
+					SpellFields(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", arg);
+					return 0;
 				default:
 					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: conversation-states, anim, burst-coverage, worldobj.");
 					return 1;
@@ -76,6 +79,64 @@ namespace Faolan.Importer.Cli
 						: "(unreadable)";
 					Console.WriteLine($"{c.Name[..Math.Min(40, c.Name.Length)]} | handle 0x{e.Handle:X} | AnimIdleId={anim} | pos=({e.X:0.#},{e.Z:0.#})");
 				}
+		}
+
+		// TEMP (#274): discover the spell DURATION field in the RDB spell-data records (type 1040005). Dumps either a
+		// specific spell's full increasing field table (--report-arg <decimal id>) or, with no arg, a histogram of how
+		// often each field id appears across all named spell records (so a duration field stands out as near-universal
+		// with ms-range values). Field 0x126=cast/0x11F=range/0x15C=damage are already known.
+		private static void SpellFields(string rdbDir, string arg)
+		{
+			using var rdb = new Faolan.Importer.Rdb.RdbReader(rdbDir);
+			var counts = new Dictionary<uint, int>();
+			var samples = new Dictionary<uint, List<uint>>();
+			uint? wanted = uint.TryParse(arg, out var w) ? w : null;
+			foreach (var e in rdb.EntriesOfType(1040005))
+			{
+				if (e.Size == 0 || e.File == 0xff) continue;
+				byte[] body;
+				try { body = rdb.ReadDecompressed(e); } catch { continue; }
+				if (body.Length < 12) continue;
+				var name = Faolan.Importer.Rdb.RdbItemImporter.ExtractName(body);
+				if (string.IsNullOrEmpty(name)) continue;
+				var fields = ReadIncreasingFields(body.AsSpan(12));
+				if (wanted is uint id && e.Id == id)
+				{
+					Console.WriteLine($"spell {e.Id} '{name}':");
+					foreach (var kv in fields.OrderBy(k => k.Key))
+						Console.WriteLine($"  0x{kv.Key:X3} ({kv.Key,4}) = {kv.Value}  (0x{kv.Value:X})");
+					return;
+				}
+				foreach (var kv in fields)
+				{
+					counts[kv.Key] = counts.GetValueOrDefault(kv.Key) + 1;
+					if (!samples.TryGetValue(kv.Key, out var l)) samples[kv.Key] = l = new();
+					if (l.Count < 8) l.Add(kv.Value);
+				}
+			}
+			if (wanted is not null) { Console.WriteLine($"spell {wanted} not found / unnamed"); return; }
+			foreach (var kv in counts.OrderByDescending(k => k.Value).Take(40))
+				Console.WriteLine($"0x{kv.Key:X3} ({kv.Key,4}) count={kv.Value,5}  samples={string.Join(",", samples[kv.Key])}");
+		}
+
+		// Mirror of RdbSpellImporter.ReadIncreasingFields (kept private there); used only by the spell-fields report.
+		private static Dictionary<uint, uint> ReadIncreasingFields(ReadOnlySpan<byte> body)
+		{
+			var words = body.Length / 4;
+			Dictionary<uint, uint> best = new();
+			for (var start = 0; start + 1 < words; start++)
+			{
+				uint last = 0; var haveLast = false; var cur = new Dictionary<uint, uint>();
+				for (var j = start; j + 1 < words; j++)
+				{
+					var fid = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(j * 4, 4));
+					if (fid == 0 || fid > 2000 || (haveLast && fid <= last)) break;
+					cur[fid] = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice((j + 1) * 4, 4));
+					last = fid; haveLast = true; j++;
+				}
+				if (cur.Count > best.Count) best = cur;
+			}
+			return best;
 		}
 
 		// Per capture, the named NPC's worn equipment (InventoryEntries: slot + template) from its FA015807 (#267).

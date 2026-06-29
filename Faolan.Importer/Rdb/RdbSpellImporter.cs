@@ -31,6 +31,7 @@ namespace Faolan.Importer.Rdb
 		private const uint CastTimeField = 0x126; // 294 - cast time in centiseconds (value * 10 = milliseconds)
 		private const uint RangeField = 0x11F;        // 287 - target range * 100 (Ice Strike 2500 -> 25 metres)
 		private const uint DamageRatingField = 0x15C; // 348 - spell damage rating * 100 (Ice 3000 -> 30.00%)
+		private const uint DurationField = 0x008;     // 8 - buff/effect duration in CENTISECONDS (×10ms); stored ×10 as ms. Rend 700=7s, Exhausted 10000=100s; 0 = none (#274)
 
 		public static async Task<(int Seen, int Inserted, int NamesSet, int CastTimesSet)> ImportAsync(IDatabaseContext db, string rdbDir, ILogger logger = null)
 		{
@@ -73,10 +74,11 @@ namespace Faolan.Importer.Rdb
 					: (ushort)0;
 				var range = fields.TryGetValue(RangeField, out var r) ? r / 100f : 0f;
 				var damageRating = fields.TryGetValue(DamageRatingField, out var dr) ? dr / 100f : 0f;
+				var durationMs = fields.TryGetValue(DurationField, out var du) ? du * 10 : 0u; // centiseconds -> ms
 
 				if (!byId.TryGetValue(entry.Id, out var spell))
 				{
-					spell = new Spell { Id = entry.Id, Name = name, CastTime = castTime, Range = range, DamageRating = damageRating };
+					spell = new Spell { Id = entry.Id, Name = name, CastTime = castTime, Range = range, DamageRating = damageRating, DurationMs = durationMs };
 					byId[entry.Id] = spell;
 					toAdd.Add(spell);
 					inserted++;
@@ -98,6 +100,7 @@ namespace Faolan.Importer.Rdb
 				}
 				spell.Range = range;
 				spell.DamageRating = damageRating;
+				spell.DurationMs = durationMs;
 			}
 
 			if (toAdd.Count > 0)

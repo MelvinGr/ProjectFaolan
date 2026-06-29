@@ -18,6 +18,14 @@ namespace Faolan.Core.Database.Tables
 		public float Range { get; set; }         // target range in metres (RDB field 0x11F / 100)
 		public float DamageRating { get; set; }  // spell damage rating percent (RDB field 0x15C / 100)
 
+		// Buff/effect duration in milliseconds. Imported from RDB field 0x008, which is in CENTISECONDS (×10ms - the
+		// same unit as the cast-time field; calibrated in-client: Rend 700->7s, Butcher 400->4s, Exhausted 10000->100s),
+		// so it is stored here ×10 as real ms. 0 = no self-duration on this record (an instant spell, or an ability
+		// whose timed effect lives on a separate EffectSpell record). Drives server-side buff expiry: when a self-buff
+		// with a known duration elapses, the world tick sends the retail end-twin removal (rank byte -> 1, empty
+		// payload) so the icon disappears at 0 instead of sticking (#274).
+		public uint DurationMs { get; set; }
+
 		public ushort ManaCost { get; set; }
 
 		// Recast / cooldown in SECONDS. Backfilled from the ellatha combos list (the one bulk source that carries it)

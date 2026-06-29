@@ -37,10 +37,20 @@ namespace Faolan.GameServer
 			return SendStatUpdate(client, vitals.ToVitalsBlock());
 		}
 
+		// A captured retail self-buff payload keyed by wire id, for VISUAL buff testing (#274). The icon only renders
+		// when the payload carries the buff's real effect descriptor (the generic synthesized blob has the wrong id at
+		// +24 so the client can't render it). Exhausted (0x000B9000) lifted byte-for-byte from the guardian combat
+		// capture (frame 2110); its +8 duration field is 0x2710 = 10s, so it also exercises the tick expiry + removal.
+		private static readonly Dictionary<uint, byte[]> CapturedBuffPayloads = new()
+		{
+			[0x000B9000] = Convert.FromHexString("0000000000000000000027100001000000010000000000000b900000000100000000000000000000000000000001000000000705ff5b"),
+		};
+
 		private Task ApplySpellTest(uint characterId, uint id)
 		{
 			var client = ClientForCharacter(characterId);
-			return ApplySpell(client, client.Session.Character.Id, client.Session.Character.Id, id);
+			CapturedBuffPayloads.TryGetValue(id, out var payload);
+			return ApplySpell(client, client.Session.Character.Id, client.Session.Character.Id, id, payload);
 		}
 
 		// .teleport <mapId>  - move the character to another playfield via the retail HANDOFF + RECONNECT.
@@ -511,8 +521,8 @@ namespace Faolan.GameServer
 			{
 				var ids = entity.ActiveBuffs.Keys.ToArray();
 				foreach (var id in ids)
-					if (entity.ActiveBuffs.TryRemove(id, out _))
-						await SendBuffRemoval(client, entity.Handle, id); // #253: live icon clear
+					if (entity.ActiveBuffs.TryRemove(id, out var removedAll))
+						await SendBuffRemoval(client, entity.Handle, removedAll.CasterHandle, id); // #253/#274: live icon clear (mirror applyFrom)
 				Logger.LogInformation("CancelBuff (.cancelbuff all): removed {Count} buff(s) from {CharId:X8}.", ids.Length, characterId);
 				await _agentServerDispatcher.SendSystemMessage(characterId,
 					ids.Length > 0
@@ -529,9 +539,9 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			if (entity.ActiveBuffs.TryRemove(buffId, out _))
+			if (entity.ActiveBuffs.TryRemove(buffId, out var removed))
 			{
-				await SendBuffRemoval(client, entity.Handle, buffId); // #253: push the live buff-removal so the icon clears
+				await SendBuffRemoval(client, entity.Handle, removed.CasterHandle, buffId); // #253/#274: push the live buff-removal so the icon clears (mirror applyFrom)
 				Logger.LogInformation("CancelBuff (.cancelbuff): buff 0x{Buff:X8} removed from {CharId:X8}.", buffId, characterId);
 				await _agentServerDispatcher.SendSystemMessage(characterId,
 					$"Cancelled buff 0x{buffId:X8}.");

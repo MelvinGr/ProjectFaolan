@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -445,7 +446,26 @@ namespace Faolan.GameServer
 				0x00, 0x00, 0x00, 0x00, 0x14, 0xC5, 0xC9, 0x12 // 348506386
 			};
 
-			data ??= spellData;
+			// The ApplySpell payload carries the buff DURATION at offset +8 (u32 BE) in CENTISECONDS (×10ms - calibrated
+			// in-client, see ActiveBuff.DurationMsFromPayload). For a REPLAYED payload (a captured mount/NPC/content
+			// blob passed in `data`) we read that duration straight from the bytes. For a SYNTHESIZED self-buff
+			// (data == null -> the default blob, whose +8 is a stale Scythe-Shield value) we look up the spell's real
+			// RDB duration (Spell.DurationMs, stored in ms) and STAMP it into +8 (back to centiseconds, /10) so the
+			// client counts down the correct time AND the server expires it at the same instant. The base spell id is
+			// the wire id minus its rank byte (id >> 8), matching the (base<<8)|rank buff-id convention. (#274)
+			uint durationMs;
+			if (data == null)
+			{
+				var spell = await Database.GetSpell(spellId) ?? await Database.GetSpell(spellId >> 8);
+				durationMs = spell?.DurationMs ?? 0;
+				data = (byte[])spellData.Clone();
+				if (durationMs > 0 && data.Length >= 12)
+					BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(8, 4), durationMs / 10); // ms -> centiseconds for the wire
+			}
+			else
+			{
+				durationMs = World.ActiveBuff.DurationMsFromPayload(data);
+			}
 
 			await new PacketStream()
 				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameServerCarrierOpcodes.IirCarrier)
@@ -463,28 +483,33 @@ namespace Faolan.GameServer
 			// Register a SELF-buff (applyTo == applyFrom) so the server tracks it (.buffs / CancelBuff / tick
 			// expiry). Centralized here so EVERY ApplySpell send path registers - the mount buff, .spelltest, the
 			// summon cast and the BCC cast path - not just the inbound cast handler (#69). Offensive casts
-			// (applyTo != applyFrom) are damage, not buffs, and are handled by ResolveOffensiveCast.
+			// (applyTo != applyFrom) are damage, not buffs, and are handled by ResolveOffensiveCast. A known duration
+			// (> 0) arms the tick to expire it + send the retail removal twin; 0 = no self-duration (lives until
+			// cancelled), e.g. an ability whose timed effect rides a separate EffectSpell record (#274).
 			if (applyTo == applyFrom)
 			{
 				var entity = _simulation.PlayerWorldEntity(client);
 				if (entity != null && entity.Handle == applyTo)
-					entity.ActiveBuffs[spellId] = new World.ActiveBuff(spellId, applyFrom, DateTimeOffset.UtcNow, null);
+					entity.ActiveBuffs[spellId] = new World.ActiveBuff(spellId, applyFrom, DateTimeOffset.UtcNow,
+						durationMs > 0 ? durationMs / 1000.0 : null);
 			}
 		}
 
-		// The server->client buff REMOVAL packet (#253), decoded from the mount-dismount captures (mount buff end
-		// 0x31eb1501 in *_dismount): the SAME ApplySpell (0x6B87E316) carrier as the apply, but with the spell id's
-		// rank byte set to 1 (the "end" twin) and an EMPTY effect payload. The client clears the buff icon on
-		// receipt - so a SERVER-initiated cancel (.cancelbuff / a dispel) now removes the icon live instead of only
-		// on relog. Byte-exact carrier content (after the IIR [u32 len=0x1A]):
+		// The server->client buff REMOVAL packet (#253/#274), decoded from the mount-dismount captures (mount buff end
+		// 0x31eb1501 in *_dismount) and the combat captures (NPC-debuff ends 0x31644901 with applyTo=player,
+		// applyFrom=NPC): the SAME ApplySpell (0x6B87E316) carrier as the apply, but with the spell id's rank byte set
+		// to 1 (the "end" twin) and an EMPTY effect payload. The client clears the buff icon on receipt - so a
+		// SERVER-initiated cancel (.cancelbuff), a dispel, or the tick-driven expiry removes the icon live instead of
+		// only on relog. applyTo/applyFrom MIRROR the apply: equal for a self-buff, applyTo=player + applyFrom=NPC for
+		// an NPC-cast debuff. Byte-exact carrier content (after the IIR [u32 len=0x1A]):
 		//   [ApplySpell][c350][applyTo][u16 0][(base<<8)|1][c350][applyFrom]   (no payload)
-		private Task SendBuffRemoval(INetworkClient client, uint handle, uint appliedSpellId)
+		private Task SendBuffRemoval(INetworkClient client, uint applyTo, uint applyFrom, uint appliedSpellId)
 		{
 			var endId = (appliedSpellId & 0xFFFFFF00u) | 0x01u; // the rank-1 "end" twin of the applied buff id
 
 			return new PacketStream()
 				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArrayUInt32Length(s => s.WriteArray(Combat.NpcSpellCastBuilder.Build(handle, handle, endId, [])))
+				.WriteArrayUInt32Length(s => s.WriteArray(Combat.NpcSpellCastBuilder.Build(applyTo, applyFrom, endId, [])))
 				.SendAsync(client);
 		}
 
