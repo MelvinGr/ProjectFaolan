@@ -419,10 +419,27 @@ namespace Faolan.GameServer.World
 			var character = client.Session.Character;
 			if (npcName == null || character == null)
 				return QuestMarkerNone;
+			var quests = await _database.GetCharacterQuests(character.Id);
+
+			// '?' (0x04) when the player has an ACTIVE quest whose current goal is to TALK to this NPC - she's the
+			// next step (e.g. the Casilda chain's talk-to-free stage 13480, active after looting Tuut's key). This is a
+			// SEPARATE source from the giver logic below: the giver quest (13479) is already Completed/superseded by
+			// then, so without this Casilda showed no '?'. Decoded from the captive-quest capture: retail sends 0x2008
+			// state 0x04 to her handle at the loot->talk transition (Blablatest fr1455).
+			foreach (var q in quests)
+			{
+				if (q.State != QuestState.Active)
+					continue;
+				var qDef = await _database.GetQuestDefinition(q.QuestId);
+				var qGoal = qDef?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
+				if (qGoal?.GoalType == QuestGoalType.TalkToNpc && string.Equals(qGoal.TargetName, npcName, StringComparison.OrdinalIgnoreCase))
+					return QuestMarkerTurnIn;
+			}
+
 			_questGivers ??= await _database.GetQuestGiverMap();
 			if (!_questGivers.TryGetValue(npcName, out var questId))
 				return QuestMarkerNone;
-			var held = Array.Find(await _database.GetCharacterQuests(character.Id), q => q.QuestId == questId);
+			var held = Array.Find(quests, q => q.QuestId == questId);
 			// '!' when the quest isn't held yet; '?' once its objective is done but it's still ACTIVE (awaiting turn-in
 			// at the giver - the quest is only marked Completed on turn-in, not on the kill, #47/#241); no marker while
 			// in progress or after it's been turned in (Completed).
@@ -454,6 +471,21 @@ namespace Faolan.GameServer.World
 				return;
 			if (_sim.World.ZoneForEntity(player).TryGet(npcHandle, out var npc) && !npc.IsPlayer)
 				await SendQuestMarkerIfGiver(client, npc);
+		}
+
+		// #267: re-send the NAMED NPC's quest marker in-place (handles are session-volatile, so resolve by name in the
+		// player's zone). Unlike RefreshQuestGiverMarker this does NOT gate on the quest-GIVER map, so it also drives the
+		// '?' talk marker for an NPC the player must talk to next (e.g. Casilda after Tuut's key, which activates the
+		// talk stage while she's out of the conversation/stream-in path that would otherwise refresh her marker).
+		public async Task RefreshQuestMarkerByName(INetworkClient client, string npcName)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null || string.IsNullOrEmpty(npcName))
+				return;
+			var npc = _sim.World.ZoneForEntity(player).Entities
+				.FirstOrDefault(e => !e.IsPlayer && string.Equals(e.Name, npcName, StringComparison.OrdinalIgnoreCase));
+			if (npc != null)
+				await SendQuestMarker(client, npc.Handle, await ComputeGiverMarkerState(client, npcName));
 		}
 
 		// DispatchSetQuestMarker body: [u32 0xC350][u32 npcHandle][u8 state], on the GameCharInterface dispatch

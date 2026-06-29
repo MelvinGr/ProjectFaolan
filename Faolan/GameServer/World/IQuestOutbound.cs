@@ -32,5 +32,10 @@ namespace Faolan.GameServer.World
 		// set and run an interest pass so newly-qualified gated NPCs (e.g. Scavenger Tuut) spawn and no-longer-qualified
 		// ones despawn in-place, without waiting for the player or NPC to move.
 		Task RefreshQuestVisibility(INetworkClient client);
+
+		// #267: re-send the named NPC's quest marker to the player in-place (handles are session-volatile, so by NAME).
+		// Used after a chain stage supersedes to a TALK goal while that NPC is away (e.g. looting Tuut's key activates
+		// the talk-Casilda stage), so her '?' appears immediately instead of only on the next 0x2020 poll / re-stream.
+		Task RefreshQuestMarkerByName(INetworkClient client, string npcName);
 	}
 }

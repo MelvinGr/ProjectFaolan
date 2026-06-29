@@ -124,6 +124,12 @@ namespace Faolan.GameServer.World
 			if (nextDef != null)
 				await _outbound.SendQuestFullUpdate(client, nextDef);
 
+			// #267: if the next stage is "talk to NPC X" (e.g. 13563 loot -> 13480 talk Casilda), push X's '?' marker
+			// now. The supersession happens away from X (looting Tuut's corpse), so without this her '?' wouldn't appear
+			// until the client re-polls/re-streams her - and she's often still in view, so that never fires.
+			if (nextGoal?.GoalType == QuestGoalType.TalkToNpc && !string.IsNullOrEmpty(nextGoal.TargetName))
+				await _outbound.RefreshQuestMarkerByName(client, nextGoal.TargetName);
+
 			_logger.LogInformation("Quest {Quest} completed for {Char}; superseded by {Next} (goal {Type}, target {Target}).",
 				quest.QuestId, character.Name, def.NextQuestId, nextGoal?.GoalType, nextGoal?.TargetName ?? "-");
 			await _agents.SendSystemMessage(character.Id, "Quest updated.");
