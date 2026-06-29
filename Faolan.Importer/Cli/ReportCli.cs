@@ -51,6 +51,9 @@ namespace Faolan.Importer.Cli
 				case "rdb-skeleton":
 					RdbSkeleton(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", arg ?? "14853");
 					return 0;
+				case "rdb-search":
+					RdbSearch(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", arg ?? "");
+					return 0;
 				default:
 					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: conversation-states, anim, burst-coverage, worldobj, spell-fields, rdb-assets.");
 					return 1;
@@ -222,6 +225,36 @@ namespace Faolan.Importer.Cli
 					var w = b.WorldPosition;
 					Console.WriteLine($"  {b.Name,-22} world=({w.X:0.000}, {w.Y:0.000}, {w.Z:0.000})");
 				}
+		}
+
+		// Scan every MESHINDEXFILE (type 1010030) manifest and print those whose .max source path contains the given
+		// substring (case-insensitive). Used to locate race/sex character meshes (head/body/etc.) by name (#275).
+		private static void RdbSearch(string rdbDir, string needle)
+		{
+			using var rdb = new Faolan.Core.Rdb.RdbReader(rdbDir);
+			needle = needle.ToLowerInvariant();
+			var hits = 0;
+			foreach (var e in rdb.EntriesOfType(Faolan.Core.Rdb.Assets.RdbAssetExtractor.MeshIndexFileType))
+			{
+				if (e.Size == 0)
+					continue;
+
+				Faolan.Core.Rdb.Assets.MeshIndexFile mesh;
+				try { mesh = Faolan.Core.Rdb.Assets.MeshIndexFile.Parse(e.Id, rdb.ReadDecompressed(e)); }
+				catch { continue; }
+
+				var src = mesh.SourceFile;
+				if (src == null || !src.ToLowerInvariant().Contains(needle))
+					continue;
+
+				var rm = mesh.RenderMeshId is { } rmId && rdb.TryGet(Faolan.Core.Rdb.Assets.RdbAssetExtractor.RenderMeshType, rmId, out var rmE)
+					? $"rm={rmId} {(rmE.File == 0xff ? "CDN" : "local")}"
+					: "rm=(none)";
+				Console.WriteLine($"meshIndex={e.Id,-9} skinned={mesh.Skinned,-5} {rm,-14} {src}");
+				hits++;
+			}
+
+			Console.WriteLine($"-- {hits} manifest(s) matched '{needle}'.");
 		}
 
 		private static string Describe(Faolan.Core.Rdb.Assets.RdbAssetExtractor.ResourceResult? r) =>

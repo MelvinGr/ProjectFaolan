@@ -28,7 +28,12 @@ namespace Faolan.Web.Services
 		// Proper per-character resolution (face/hair/skin) is the CHARACTERCREATOR (1010700) + appearance work (#275).
 		private const uint LocalMaleBody = 1100584;   // aquilonian_male_body
 		private const uint LocalFemaleBody = 1102538; // aquilonian_female_body
-		private const uint DefaultHead = 3226952;     // unique_head_saddur (interim placeholder face)
+
+		// Head base mesh by sex. The 3 European starting races (Aquilonian/Cimmerian/Stygian) share one head mesh and
+		// differ by morphs + face texscript, not by mesh (only Khitai has its own head). These are the shared European
+		// heads (female = beautiful_famale_heads.max, male = male_heads_old.max); per-character morph/texture is #275.
+		private const uint FemaleHead = 4502887;
+		private const uint MaleHead = 4821637;
 
 		private static readonly Dictionary<(Race, Sex), uint> BodyMesh = new()
 		{
@@ -45,9 +50,10 @@ namespace Faolan.Web.Services
 			var rdb = Reader();
 			var fallback = sex == Sex.Female ? LocalFemaleBody : LocalMaleBody;
 			var bodyId = BodyMesh.GetValueOrDefault((race, sex), fallback);
+			var headId = sex == Sex.Female ? FemaleHead : MaleHead;
 
-			return RdbAssetExtractor.BuildCharacterGlb(rdb, bodyId, DefaultHead)
-			       ?? RdbAssetExtractor.BuildCharacterGlb(rdb, fallback, DefaultHead);
+			return RdbAssetExtractor.BuildCharacterGlb(rdb, bodyId, headId)
+			       ?? RdbAssetExtractor.BuildCharacterGlb(rdb, fallback, headId);
 		}
 
 		// Build a single named model (any MESHINDEXFILE id) - lets the viewer show equipment/props too.

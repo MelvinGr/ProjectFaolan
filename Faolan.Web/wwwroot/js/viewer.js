@@ -18,10 +18,17 @@ function setup(canvas) {
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x404040, 1.1));
-    const key = new THREE.DirectionalLight(0xffffff, 1.4);
-    key.position.set(1, 2, 2);
+    // Soft three-point setup so skin curvature reads naturally (a single hard key exaggerates baked seams).
+    scene.add(new THREE.HemisphereLight(0xfff4e6, 0x303840, 1.0));
+    const key = new THREE.DirectionalLight(0xffffff, 1.1);
+    key.position.set(2, 3, 3);
     scene.add(key);
+    const fill = new THREE.DirectionalLight(0xbcd0ff, 0.5);
+    fill.position.set(-3, 1, 2);
+    scene.add(fill);
+    const rim = new THREE.DirectionalLight(0xffffff, 0.6);
+    rim.position.set(0, 2, -4);
+    scene.add(rim);
     scene.add(new THREE.GridHelper(4, 8, 0x444444, 0x333333));
 
     const state = { renderer, scene, camera, controls, model: null };
@@ -59,6 +66,16 @@ export async function show(canvasId, url) {
 
     const gltf = await new GLTFLoader().loadAsync(url);
     const model = gltf.scene;
+
+    // The packed RDB vertex normals are ambiguous (two NORMAL decl fields) and produce banded shading on limbs.
+    // Recompute smooth normals from the geometry so curvature lights cleanly.
+    model.traverse(o => {
+        if (o.isMesh) {
+            o.geometry.computeVertexNormals();
+            o.material.flatShading = false;
+            o.material.needsUpdate = true;
+        }
+    });
 
     const box = new THREE.Box3().setFromObject(model);
     const size = box.getSize(new THREE.Vector3());
