@@ -5,6 +5,7 @@
 @using Faolan.Web.Services
 @using AccountInfo = Faolan.Web.Services.AccountDetail
 @inject AccountAdminService AdminSvc
+@inject LiveSessionService Live
 @inject NavigationManager Nav
 
 <PageTitle>Account — Admin</PageTitle>
@@ -112,7 +113,15 @@
     {
         if (banned && _isSelf) return;
         var state = await AdminSvc.SetBannedAsync((uint)Id, banned);
-        _notice = state is null ? "Account not found." : $"Account is now {state}.";
+        if (state is null)
+        {
+            _notice = "Account not found.";
+        }
+        else
+        {
+            var kicked = banned ? await Live.KickAccountAsync((uint)Id) : 0;
+            _notice = $"Account is now {state}." + (kicked > 0 ? $" Kicked {kicked} live session(s)." : "");
+        }
         await Reload();
     }
 

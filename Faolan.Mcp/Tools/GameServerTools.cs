@@ -33,6 +33,15 @@ namespace Faolan.Mcp.Tools
 				: JsonSerializer.Serialize(sessions, JsonOptions);
 		}
 
+		[McpServerTool(Name = "kick_player"),
+		 Description("Force-disconnect a connected character from the live world (closes their world socket). Used by the web admin ban+kick. Returns whether a live session was closed.")]
+		public string KickPlayer([Description("Character id of a currently-connected player (see list_world_sessions)")] uint characterId)
+		{
+			return _dispatcher.DisconnectCharacter(characterId)
+				? $"Disconnected character {characterId} from the world."
+				: $"Character {characterId} is not currently connected to any GameServer listener.";
+		}
+
 		[McpServerTool(Name = "run_gm_command"),
 		 Description(
 			 "Run a GM command for a connected character on the LIVE server, exactly as if the player typed it in chat (e.g. \"teleport 5\", \"test\" to spawn the test NPC, \"help\" to list commands).")]

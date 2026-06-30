@@ -8,7 +8,7 @@ namespace Faolan.Web.Services
 	// One live connected player, as reported by the game server's MCP `list_sessions` tool. Mirrors
 	// Faolan.Core's SessionInfo record (we deserialize the tool's JSON rather than referencing the server types).
 	public sealed record LiveSession(
-		uint? CharacterId, string? CharacterName, ushort? CharacterLevel, string? AccountName);
+		uint? CharacterId, string? CharacterName, ushort? CharacterLevel, uint? AccountId, string? AccountName);
 
 	// Queries the RUNNING game server's in-process MCP endpoint (http://127.0.0.1:{McpPort}/mcp) for live presence.
 	// Faolan.Web is a separate process, so the only window into the server's in-memory sessions is this MCP call
@@ -52,6 +52,25 @@ namespace Faolan.Web.Services
 		public Task<string?> RunGmCommandAsync(uint characterId, string command, CancellationToken ct = default)
 			=> CallAsync("run_gm_command",
 				new Dictionary<string, object?> { ["characterId"] = characterId, ["command"] = command }, ct);
+
+		// Force-disconnect one connected character. Returns the tool's status text, or null if the server is offline.
+		public Task<string?> KickPlayerAsync(uint characterId, CancellationToken ct = default)
+			=> CallAsync("kick_player", new Dictionary<string, object?> { ["characterId"] = characterId }, ct);
+
+		// Kick every live session belonging to an account (used by the admin ban+kick). Returns how many were
+		// disconnected (0 when the account isn't online or the server is offline).
+		public async Task<int> KickAccountAsync(uint accountId, CancellationToken ct = default)
+		{
+			var sessions = await GetSessionsAsync(ct);
+			if (sessions is null)
+				return 0;
+
+			var kicked = 0;
+			foreach (var s in sessions.Where(s => s.AccountId == accountId && s.CharacterId is not null))
+				if (await KickPlayerAsync(s.CharacterId!.Value, ct) is { } r && r.StartsWith("Disconnected", StringComparison.Ordinal))
+					kicked++;
+			return kicked;
+		}
 
 		// Open a short-lived MCP client, call one tool, return its first text block (null = unreachable/failed).
 		private async Task<string?> CallAsync(string tool, IReadOnlyDictionary<string, object?>? args, CancellationToken ct)

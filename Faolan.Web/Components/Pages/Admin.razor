@@ -4,6 +4,7 @@
 @using Faolan.Core.Enums
 @using Faolan.Web.Services
 @inject AccountAdminService AdminSvc
+@inject LiveSessionService Live
 @inject NavigationManager Nav
 
 <PageTitle>Admin — Project Faolan</PageTitle>
@@ -88,7 +89,16 @@
     {
         if (banned && id == _selfId) return; // never ban yourself
         var state = await AdminSvc.SetBannedAsync(id, banned);
-        _notice = state is null ? "Account not found." : $"Account {Name(id)} is now {state}.";
+        if (state is null)
+        {
+            _notice = "Account not found.";
+        }
+        else
+        {
+            // A ban blocks the next login; also kick any live session so it takes effect immediately.
+            var kicked = banned ? await Live.KickAccountAsync(id) : 0;
+            _notice = $"Account {Name(id)} is now {state}." + (kicked > 0 ? $" Kicked {kicked} live session(s)." : "");
+        }
         await Reload();
     }
 

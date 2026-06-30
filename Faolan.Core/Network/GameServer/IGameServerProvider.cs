@@ -40,5 +40,12 @@ namespace Faolan.Core.Network.GameServer
 		///     character is not connected to this listener (so a dispatcher can try the next provider).
 		/// </summary>
 		CharacterLiveState GetCharacterLiveState(uint characterId);
+
+		/// <summary>
+		///     Force-disconnect a connected character (closes the world socket). Returns false when the
+		///     character is not connected to this listener (so a dispatcher can try the next provider). Used by
+		///     the web admin "ban + kick" path via MCP.
+		/// </summary>
+		bool DisconnectCharacter(uint characterId);
 	}
 }

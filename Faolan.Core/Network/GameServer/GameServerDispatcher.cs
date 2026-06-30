@@ -63,6 +63,18 @@ namespace Faolan.Core.Network.GameServer
 			return false;
 		}
 
+		public bool DisconnectCharacter(uint characterId)
+		{
+			IGameServerProvider[] providers;
+			lock (_lock)
+				providers = _providers.ToArray();
+
+			var disconnected = false;
+			foreach (var provider in providers)
+				disconnected |= provider.DisconnectCharacter(characterId);
+			return disconnected;
+		}
+
 		public IReadOnlyList<ZoneEntityInfo> GetZoneEntities(uint mapId)
 		{
 			IGameServerProvider[] providers;

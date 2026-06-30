@@ -36,6 +36,15 @@ namespace Faolan.GameServer
 			return true;
 		}
 
+		public bool DisconnectCharacter(uint characterId)
+		{
+			var client = ClientForCharacter(characterId);
+			if (client is null)
+				return false;
+			client.Stop();
+			return true;
+		}
+
 		public IReadOnlyList<ZoneEntityInfo> GetZoneEntities(uint mapId)
 		{
 			// Observer view: union every live instance (copy) of the map (#268), so the MCP tool sees all entities
