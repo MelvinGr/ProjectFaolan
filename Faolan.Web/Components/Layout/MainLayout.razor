@@ -6,7 +6,7 @@
         <a href="/characters">Characters</a>
         <AuthorizeView>
             <Authorized>
-                <span class="who">@context.User.Identity?.Name</span>
+                <a class="who" href="/account">@context.User.Identity?.Name</a>
                 <form method="post" action="/auth/logout"><button class="linkbtn" type="submit">Log out</button></form>
             </Authorized>
             <NotAuthorized>

@@ -10,6 +10,7 @@
         <AuthorizeView>
             <Authorized>
                 <a class="btn primary" href="/characters">Open the viewer</a>
+                <a class="btn" href="/account">My account</a>
                 <form method="post" action="/auth/logout"><button class="btn ghost" type="submit">Log out (@context.User.Identity?.Name)</button></form>
             </Authorized>
             <NotAuthorized>

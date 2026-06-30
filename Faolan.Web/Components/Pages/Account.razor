@@ -1,0 +1,107 @@
+@page "/account"
+@using System.Security.Claims
+@using Faolan.Core.Database
+@using Faolan.Core.Database.Tables
+@using Microsoft.EntityFrameworkCore
+@using AccountEntity = Faolan.Core.Database.Tables.Account
+@inject IDbContextFactory<DatabaseContext> DbFactory
+@inject NavigationManager Nav
+
+<PageTitle>Account — Project Faolan</PageTitle>
+
+@if (_account is null)
+{
+    <div class="account"><p class="muted">Loading…</p></div>
+}
+else
+{
+    <div class="account">
+        <h1>@_account.UserName</h1>
+
+        <div class="card meta">
+            <div class="row"><span class="k">Account type</span><span class="v">@_account.Type</span></div>
+            <div class="row"><span class="k">Status</span><span class="v">@_account.State</span></div>
+            <div class="row"><span class="k">Member since</span><span class="v">@_account.CreationDate.ToString("yyyy-MM-dd")</span></div>
+            <div class="row"><span class="k">Last login</span><span class="v">@(_account.LastConnection?.ToString("yyyy-MM-dd HH:mm") ?? "—")</span></div>
+            <div class="row"><span class="k">Characters</span><span class="v">@_characters.Count</span></div>
+        </div>
+
+        <div class="card">
+            <h2>Characters</h2>
+            @if (_characters.Count == 0)
+            {
+                <p class="muted">No characters yet.</p>
+            }
+            else
+            {
+                <ul class="chars">
+                    @foreach (var c in _characters)
+                    {
+                        <a class="char" href="@($"/characters?char={c.Id}")">
+                            <strong>@c.Name</strong>
+                            <span>Lvl @c.Level · @c.Race @c.Sex · @c.Class</span>
+                        </a>
+                    }
+                </ul>
+            }
+        </div>
+
+        <form method="post" action="/auth/logout" class="signout">
+            <button class="btn ghost" type="submit">Sign out</button>
+        </form>
+    </div>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private AccountEntity? _account;
+    private List<Character> _characters = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Account-only page: bounce to login when signed out (Routes uses a plain RouteView, so no [Authorize] gate).
+        if (AuthState is null
+            || (await AuthState).User is not { Identity.IsAuthenticated: true } user
+            || !uint.TryParse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var accountId))
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        _account = await db.Accounts.FirstOrDefaultAsync(a => a.Id == accountId);
+        if (_account is null)
+        {
+            Nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        _characters = await db.Characters
+            .Where(c => c.AccountId == accountId && c.Level > 0)
+            .OrderByDescending(c => c.Level).ThenBy(c => c.Name)
+            .ToListAsync();
+    }
+}
+
+<style>
+    .account { max-width: 36rem; margin: 6vh auto; padding: 0 1rem; }
+    .account > h1 { font-size: 2rem; margin-bottom: 1.25rem; }
+    .account .muted { color: var(--muted); }
+    .card { background: linear-gradient(180deg, var(--panel), #15171b); border: 1px solid var(--stone);
+        border-radius: var(--radius); padding: 1.1rem 1.25rem; margin-bottom: 1rem; box-shadow: var(--shadow); }
+    .card h2 { font-size: 1.05rem; margin: 0 0 .75rem; }
+    .meta .row { display: flex; justify-content: space-between; gap: 1rem; padding: .4rem 0;
+        border-bottom: 1px solid var(--stone-dark); }
+    .meta .row:last-child { border-bottom: none; }
+    .meta .k { color: var(--muted); }
+    .meta .v { color: var(--text); }
+    .chars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
+    .char { display: flex; flex-direction: column; text-decoration: none;
+        background: linear-gradient(var(--field), var(--field-2)); border: 1px solid var(--line);
+        border-radius: 6px; padding: .55rem .75rem; transition: border-color .12s, background .12s; }
+    .char:hover { border-color: var(--gold-dim); background: linear-gradient(#322d1d, #262112); }
+    .char strong { color: var(--gold-bright); }
+    .char span { color: var(--muted); font-size: .8rem; }
+    .signout { margin: .5rem 0 2rem; }
+</style>
