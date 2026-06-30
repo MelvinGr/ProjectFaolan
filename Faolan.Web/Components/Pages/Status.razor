@@ -1,0 +1,175 @@
+@page "/status"
+@using Faolan.Core.Database
+@using Faolan.Core.Database.Tables
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<DatabaseContext> DbFactory
+
+<PageTitle>Realm Status — Project Faolan</PageTitle>
+
+<div class="status">
+    <h1>Realm Status</h1>
+
+    @if (_loaded)
+    {
+        <div class="stat-cards">
+            <div class="scard"><div class="num">@_recent24h</div><div class="lbl">Active (24h)</div></div>
+            <div class="scard"><div class="num">@_accounts</div><div class="lbl">Accounts</div></div>
+            <div class="scard"><div class="num">@_chars</div><div class="lbl">Characters</div></div>
+            <div class="scard"><div class="num">@_items.ToString("N0")</div><div class="lbl">Items</div></div>
+            <div class="scard"><div class="num">@_maps</div><div class="lbl">Maps</div></div>
+            <div class="scard"><div class="num">@_spells.ToString("N0")</div><div class="lbl">Spells</div></div>
+        </div>
+
+        <div class="status-cols">
+            <section class="panel">
+                <h2>Recently active</h2>
+                @if (_recent.Count == 0)
+                {
+                    <p class="muted">No characters have logged in yet.</p>
+                }
+                else
+                {
+                    <ul class="recent">
+                        @foreach (var r in _recent)
+                        {
+                            <a class="rrow" href="@($"/characters?char={r.Id}")">
+                                <span class="rname">@r.Name</span>
+                                <span class="rsub">Lvl @r.Level · @r.Class · @r.Map</span>
+                                <span class="rwhen">@Ago(r.LastConnection)</span>
+                            </a>
+                        }
+                    </ul>
+                }
+            </section>
+
+            <section class="panel">
+                <h2>Classes</h2>
+                @if (_classes.Count == 0)
+                {
+                    <p class="muted">No characters yet.</p>
+                }
+                else
+                {
+                    <ul class="bars">
+                        @foreach (var c in _classes)
+                        {
+                            <li>
+                                <span class="bname">@c.Class</span>
+                                <div class="bbar"><i style="width:@(_classMax == 0 ? 0 : c.Count * 100 / _classMax)%"></i></div>
+                                <span class="bcount">@c.Count</span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </section>
+        </div>
+
+        <p class="status-foot">Snapshot from the game database · last login @(_lastLogin?.ToString("yyyy-MM-dd HH:mm 'UTC'") ?? "—")</p>
+    }
+    else
+    {
+        <p class="muted">Loading…</p>
+    }
+</div>
+
+@code {
+    private bool _loaded;
+    private int _accounts, _chars, _maps, _recent24h;
+    private long _items, _spells;
+    private DateTime? _lastLogin;
+    private int _classMax;
+
+    private record RecentRow(uint Id, string Name, ushort Level, string Class, string Map, DateTimeOffset? LastConnection);
+    private record ClassRow(string Class, int Count);
+
+    private List<RecentRow> _recent = [];
+    private List<ClassRow> _classes = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        _accounts = await db.Accounts.CountAsync();
+        _items = await db.Items.LongCountAsync();
+        _maps = await db.Maps.CountAsync();
+        _spells = await db.Spells.LongCountAsync();
+        _lastLogin = await db.Accounts.MaxAsync(a => (DateTime?)a.LastConnection);
+
+        // Roster is small; SQLite can't translate DateTimeOffset comparisons/ordering, so pull characters into memory
+        // and compute the recent list / class distribution client-side.
+        var chars = await db.Characters
+            .Where(c => c.Name != null && c.Name != "")
+            .Include(c => c.Map)
+            .ToListAsync();
+        _chars = chars.Count;
+
+        var dayAgo = DateTimeOffset.UtcNow.AddDays(-1);
+        _recent24h = chars.Count(c => c.LastConnection is { } lc && lc >= dayAgo);
+
+        _recent = chars
+            .OrderByDescending(c => c.LastConnection ?? DateTimeOffset.MinValue)
+            .Take(12)
+            .Select(c => new RecentRow((uint)c.Id, c.Name, c.Level, c.Class.ToString(),
+                c.Map?.Name ?? "—", c.LastConnection))
+            .ToList();
+
+        _classes = chars
+            .GroupBy(c => c.Class)
+            .Select(g => new ClassRow(g.Key.ToString(), g.Count()))
+            .OrderByDescending(x => x.Count)
+            .ToList();
+        _classMax = _classes.Count == 0 ? 0 : _classes.Max(c => c.Count);
+
+        _loaded = true;
+    }
+
+    private static string Ago(DateTimeOffset? when)
+    {
+        if (when is null) return "never";
+        var d = DateTimeOffset.UtcNow - when.Value.ToUniversalTime();
+        if (d.TotalMinutes < 1) return "just now";
+        if (d.TotalMinutes < 60) return $"{(int)d.TotalMinutes}m ago";
+        if (d.TotalHours < 24) return $"{(int)d.TotalHours}h ago";
+        if (d.TotalDays < 30) return $"{(int)d.TotalDays}d ago";
+        return when.Value.ToString("yyyy-MM-dd");
+    }
+}
+
+<style>
+    .status { max-width: 1000px; margin: 0 auto; padding: 1rem; }
+    .status > h1 { font-size: 1.9rem; margin-bottom: 1.25rem; }
+    .status .muted { color: var(--muted); font-size: .9rem; }
+
+    .stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: .75rem; margin-bottom: 1.5rem; }
+    .scard { text-align: center; padding: 1rem .5rem; border-radius: var(--radius);
+        background: linear-gradient(180deg, var(--panel), #15171b); border: 1px solid var(--stone); box-shadow: var(--shadow); }
+    .scard .num { font-family: var(--font-display); color: var(--gold-bright); font-size: 1.7rem; line-height: 1; }
+    .scard .lbl { color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; margin-top: .35rem; }
+
+    .status-cols { display: grid; grid-template-columns: 1.4fr 1fr; gap: 1rem; align-items: start; }
+    .panel { background: linear-gradient(180deg, var(--bg-2), #121419); border: 1px solid var(--stone-dark);
+        border-radius: var(--radius); padding: 1rem 1.1rem; }
+    .panel h2 { font-size: 1rem; margin-bottom: .75rem; }
+
+    .recent { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .4rem; }
+    .rrow { display: grid; grid-template-columns: 1fr auto; gap: .1rem .75rem; text-decoration: none;
+        background: linear-gradient(var(--field), var(--field-2)); border: 1px solid var(--line);
+        border-radius: 6px; padding: .5rem .65rem; transition: border-color .12s; }
+    .rrow:hover { border-color: var(--gold-dim); }
+    .rname { color: var(--gold-bright); font-size: .85rem; }
+    .rsub { color: var(--muted); font-size: .74rem; grid-column: 1; }
+    .rwhen { color: var(--gold); font-size: .72rem; grid-column: 2; grid-row: 1 / span 2; align-self: center; white-space: nowrap; }
+
+    .bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .45rem; }
+    .bars li { display: grid; grid-template-columns: 6.5rem 1fr auto; align-items: center; gap: .5rem; }
+    .bname { color: var(--text); font-size: .78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .bbar { height: 8px; border-radius: 4px; background: #0c0e11; border: 1px solid #00000080; overflow: hidden; }
+    .bbar i { display: block; height: 100%; background: linear-gradient(90deg, #6b5a1f, var(--gold-dim)); }
+    .bcount { color: var(--muted); font-size: .75rem; font-variant-numeric: tabular-nums; }
+
+    .status-foot { color: var(--muted); font-size: .76rem; margin-top: 1.25rem; text-align: center; }
+
+    @@media (max-width: 720px) {
+        .status-cols { grid-template-columns: 1fr; }
+    }
+</style>
