@@ -1,0 +1,257 @@
+@page "/characters"
+@rendermode InteractiveServer
+@using System.Security.Claims
+@using Faolan.Core.Database
+@using Faolan.Core.Database.Tables
+@using Faolan.Web.Services
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<DatabaseContext> DbFactory
+@inject CharacterModelService Models
+@inject IJSRuntime JS
+
+<PageTitle>Faolan — Character Viewer</PageTitle>
+
+@* ?char=<id> deep-links a character so the viewer auto-loads it (used by headless screenshot tooling). *@
+
+<div class="viewer-page">
+    <aside class="roster">
+        <h2>Characters</h2>
+        @if (_characters is null)
+        {
+            <p>Loading…</p>
+        }
+        else if (_characters.Count == 0)
+        {
+            <p>No characters in the database.</p>
+        }
+        else
+        {
+            <ul>
+                @foreach (var c in _characters)
+                {
+                    <li>
+                        <button class="@(c.Id == _selected?.Id ? "sel" : "")" @onclick="() => Select(c)">
+                            <strong>@c.Name</strong>
+                            <span>@c.Race @c.Sex · @c.Class</span>
+                        </button>
+                    </li>
+                }
+            </ul>
+        }
+        @if (!Models.RdbAvailable)
+        {
+            <p class="warn">Client RDB not found — set <code>Rdb:Path</code>.</p>
+        }
+    </aside>
+
+    <section class="stage">
+        <div class="equip-window">
+            <div class="equip-title">Equipment</div>
+            <div class="equip-grid">
+                @Slot("Head", "center-slot top")
+                <div class="equip-col left">
+                    @foreach (var s in LeftSlots)
+                    {
+                        @Slot(s)
+                    }
+                </div>
+                <div class="equip-center">
+                    <canvas id="char-canvas"></canvas>
+                </div>
+                <div class="equip-col right">
+                    @foreach (var s in RightSlots)
+                    {
+                        @Slot(s)
+                    }
+                </div>
+                @Slot("Legs", "center-slot bottom")
+            </div>
+            <div class="equip-bottom">
+                @foreach (var s in WeaponSlots)
+                {
+                    @Slot(s, "wide")
+                }
+            </div>
+            <div class="equip-tip">
+                @if (_selected is not null)
+                {
+                    <div class="tip-line">@_selected.Name — @_selected.Race @_selected.Sex (@_status)</div>
+                    <div class="tip-controls">
+                        <label class="pose">elbows
+                            <input type="range" id="pose-slider" min="0" max="90" value="0" />
+                        </label>
+                    </div>
+                }
+                else
+                {
+                    <div class="tip-line">Select a character to view their equipment.</div>
+                }
+            </div>
+        </div>
+    </section>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "char")]
+    public long? CharId { get; set; }
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private List<Character>? _characters;
+    private Character? _selected;
+    private string _status = "";
+    private IJSObjectReference? _module;
+    private IReadOnlyDictionary<string, (uint Id, string Name)> _equipment = new Dictionary<string, (uint, string)>();
+
+    // Slot display: the equipped item's name when filled, else the placeholder slot label.
+    private (bool Has, string Label, string Title) SlotInfo(string slot) =>
+        _equipment.TryGetValue(slot, out var it) ? (true, it.Name, it.Name) : (false, slot, slot);
+
+    // Render one paper-doll slot: a 3D thumbnail of the equipped item (filled in by JS), with the item name as the
+    // fallback/label (or the placeholder slot name when empty).
+    private RenderFragment Slot(string slot, string extra = "") => @<div class="slot @extra @(SlotInfo(slot).Has ? "filled" : "")" title="@SlotInfo(slot).Title" data-item="@(SlotInfo(slot).Has ? _equipment[slot].Id.ToString() : "")">
+        <img class="slot-img" alt="" />
+        <span class="@(SlotInfo(slot).Has ? "item" : "")">@SlotInfo(slot).Label</span>
+    </div>;
+
+    // Paper-doll equipment slots, arranged around the character preview (AoC layout; placeholders for now): Head sits
+    // centred above and Legs centred below, with armour columns flanking and a weapon/utility bar across the bottom.
+    private static readonly string[] LeftSlots = ["Neck", "Shoulder", "Cloak", "Chest", "Wrist"];
+    private static readonly string[] RightSlots = ["Hands", "Belt", "Boots", "Ring L", "Ring R"];
+    private static readonly string[] WeaponSlots = ["Main Hand", "Off Hand", "Ranged", "Tokens", "Bag"];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var query = db.Characters.AsQueryable();
+
+        // Public viewer: when signed in, scope the roster to this account's own characters; otherwise show all.
+        if (AuthState is not null)
+        {
+            var user = (await AuthState).User;
+            if (user.Identity?.IsAuthenticated == true
+                && uint.TryParse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var accountId))
+                query = query.Where(c => c.AccountId == accountId);
+        }
+
+        _characters = await query.OrderBy(c => c.Name).ToListAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/viewer.js");
+
+            // Deep-link: ?char=<id> auto-loads that character once the viewer module is ready.
+            if (CharId is { } id && _characters?.FirstOrDefault(c => c.Id == id) is { } c)
+                await Select(c);
+        }
+    }
+
+    private async Task Select(Character c)
+    {
+        _selected = c;
+        _equipment = Models.Equipment((uint)c.Id);
+        await Render();
+        if (_module is not null)
+        {
+            // Wire the pose slider, then render a 3D thumbnail into each equipped slot.
+            await _module.InvokeVoidAsync("bindPoseSlider", "char-canvas", "pose-slider");
+            await _module.InvokeVoidAsync("populateItemThumbs");
+        }
+    }
+
+    // (Re)build the selected character's model, overlaying the chosen armour set. Cache-bust so a rebuilt/redressed
+    // model isn't masked by the browser's cached glb.
+    private async Task Render()
+    {
+        if (_selected is null)
+            return;
+
+        _status = "building…";
+        StateHasChanged();
+
+        // The posable character rig (skinned body + head + hair), driven by the elbow slider.
+        var url = $"/api/character/{_selected.Id}/model.glb?rig=1&t={DateTime.UtcNow.Ticks}";
+        if (_module is not null)
+            await _module.InvokeVoidAsync("show", "char-canvas", url);
+
+        _status = "loaded";
+        StateHasChanged();
+    }
+}
+
+<style>
+    .viewer-page { display: flex; height: calc(100dvh - 1rem); gap: 1rem; }
+    .roster { width: 240px; overflow-y: auto; flex-shrink: 0; }
+    .roster h2 { font-size: 1rem; margin: .25rem 0 .5rem; }
+    .roster ul { list-style: none; padding: 0; margin: 0; }
+    .roster button { width: 100%; text-align: left; display: flex; flex-direction: column;
+        background: #25272e; color: #ddd; border: 1px solid #33363d; border-radius: 6px;
+        padding: .4rem .6rem; margin-bottom: .35rem; cursor: pointer; }
+    .roster button.sel { border-color: #c8a24a; background: #2e2a1f; }
+    .roster button span { font-size: .75rem; color: #999; }
+    .roster .warn { color: #d88; font-size: .8rem; }
+    .stage { flex: 1; min-height: 0; min-width: 0; }
+
+    /* AoC-style equipment paper-doll window: slot columns flanking the character preview. */
+    .equip-window { height: 100%; display: flex; flex-direction: column; box-sizing: border-box;
+        background: #16181c; border: 2px solid #5a4d33; border-radius: 8px; padding: .6rem;
+        box-shadow: inset 0 0 24px #000a; }
+    .equip-title { text-align: center; color: #d8c07a; font-weight: 600; letter-spacing: .12em;
+        text-transform: uppercase; font-size: .9rem; padding-bottom: .5rem; }
+    .equip-grid { flex: 1; display: grid; gap: .55rem; min-height: 0;
+        grid-template-columns: auto minmax(0,1fr) auto;
+        grid-template-rows: auto minmax(0,1fr) auto;
+        grid-template-areas: ".  top  ." "left center right" ".  bot  ."; }
+    .equip-col { display: flex; flex-direction: column; gap: .55rem; justify-content: center; }
+    .equip-col.left { grid-area: left; }
+    .equip-col.right { grid-area: right; }
+    .equip-center { grid-area: center; }
+    .center-slot { justify-self: center; }
+    .center-slot.top { grid-area: top; }
+    .center-slot.bottom { grid-area: bot; }
+    .equip-center { position: relative; min-width: 0; border-radius: 6px; overflow: hidden;
+        background: radial-gradient(120% 90% at 50% 35%, #1c3b38 0%, #0e1d22 70%, #0a1014 100%);
+        border: 1px solid #2c4a48; box-shadow: inset 0 0 30px #000c; }
+    .equip-center canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+    .slot { width: 52px; height: 52px; flex: 0 0 auto; border-radius: 5px;
+        background: linear-gradient(#2b2d33, #202229); border: 2px solid #4b4636;
+        box-shadow: inset 0 1px 0 #ffffff14, inset 0 0 10px #0008;
+        display: flex; align-items: center; justify-content: center; }
+    .slot:hover { border-color: #b89544; }
+    .slot span { font-size: .52rem; color: #8a8472; text-align: center; line-height: 1.1; padding: 0 2px;
+        text-transform: uppercase; letter-spacing: .03em; }
+    .slot.filled { border-color: #b89544; background: linear-gradient(#3a3526, #2a2619); }
+    .slot span.item { color: #e6d8a8; text-transform: none; font-size: .5rem; overflow: hidden;
+        display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+    .slot-img { display: none; position: absolute; inset: 2px; width: calc(100% - 4px); height: calc(100% - 4px);
+        object-fit: contain; }
+    .slot { position: relative; }
+    .slot.has-img .slot-img { display: block; }
+    .slot.has-img span { display: none; }
+    .slot.wide { width: 64px; }
+    .equip-bottom { display: flex; gap: .55rem; justify-content: center; padding-top: .6rem; }
+    .equip-tip { margin-top: .5rem; padding-top: .45rem; border-top: 1px solid #2c2a22; color: #c9c2a8;
+        font-size: .8rem; min-height: 2.4em; }
+    .tip-controls { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; margin-top: .3rem; }
+    .wardrobe { background: #25272e; color: #ddd; border: 1px solid #46484f; border-radius: 5px;
+        padding: .25rem .4rem; font-size: .8rem; max-width: 16rem; }
+    .pose { display: flex; align-items: center; gap: .4rem; font-size: .8rem; }
+    .pose input[type=range] { width: 8rem; accent-color: #c8a24a; }
+
+    /* Mobile: stack the roster into a horizontal strip above the panel; shrink the slots. */
+    @@media (max-width: 720px) {
+        .viewer-page { flex-direction: column; height: 100dvh; gap: .5rem; padding: .25rem; box-sizing: border-box; }
+        .roster { width: auto; max-height: 20vh; }
+        .roster h2 { display: none; }
+        .roster ul { display: flex; gap: .4rem; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: .25rem; }
+        .roster li { flex: 0 0 auto; }
+        .roster button { width: auto; white-space: nowrap; margin-bottom: 0; }
+        .slot { width: 40px; height: 40px; }
+        .slot.wide { width: 48px; }
+        .equip-grid { gap: .4rem; }
+        .pose input[type=range] { width: 6rem; }
+    }
+</style>

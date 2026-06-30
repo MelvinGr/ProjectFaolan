@@ -1,11 +1,18 @@
 using Faolan.Core;
+using Faolan.Core.Database;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Web.Components;
 using Faolan.Web.Services;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using System.Security.Claims;
 
 namespace Faolan.Web
 {
@@ -31,6 +38,18 @@ namespace Faolan.Web
             // The RDB-backed character model builder (#275).
             builder.Services.AddSingleton<CharacterModelService>();
 
+            // Cookie auth over the shared game Accounts table (passwords stored plaintext for now). The viewer is
+            // public; signing in scopes the roster to your own characters.
+            builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+                .AddCookie(o =>
+                {
+                    o.LoginPath = "/login";
+                    o.AccessDeniedPath = "/login";
+                    o.ExpireTimeSpan = TimeSpan.FromDays(14);
+                });
+            builder.Services.AddAuthorization();
+            builder.Services.AddCascadingAuthenticationState();
+
             var app = builder.Build();
 
             if (!app.Environment.IsDevelopment())
@@ -41,8 +60,53 @@ namespace Faolan.Web
 
             app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
             app.UseHttpsRedirection();
+            app.UseAuthentication();
+            app.UseAuthorization();
             app.UseAntiforgery();
             app.MapStaticAssets();
+
+            // Auth form posts (plaintext password for now). Antiforgery disabled here to keep the simple HTML forms.
+            app.MapPost("/auth/register", async (HttpContext ctx, IDbContextFactory<DatabaseContext> dbf,
+                [FromForm] string username, [FromForm] string password) =>
+            {
+                if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+                    return Results.Redirect("/register?error=invalid");
+                await using var db = await dbf.CreateDbContextAsync();
+                if (db.Accounts.Any(a => a.UserName == username))
+                    return Results.Redirect("/register?error=taken");
+
+                var account = new Account
+                {
+                    UserName = username,
+                    Password = password,
+                    Type = AccountType.Normal,
+                    State = AccountState.Active,
+                    CreationDate = DateTime.UtcNow,
+                    AuthChallenge = "",
+                    LastIpAddress = ""
+                };
+                db.Accounts.Add(account);
+                await db.SaveChangesAsync();
+                await SignIn(ctx, account);
+                return Results.Redirect("/characters");
+            }).DisableAntiforgery();
+
+            app.MapPost("/auth/login", async (HttpContext ctx, IDbContextFactory<DatabaseContext> dbf,
+                [FromForm] string username, [FromForm] string password) =>
+            {
+                await using var db = await dbf.CreateDbContextAsync();
+                var account = db.Accounts.FirstOrDefault(a => a.UserName == username);
+                if (account is null || account.Password != password)
+                    return Results.Redirect("/login?error=1");
+                await SignIn(ctx, account);
+                return Results.Redirect("/characters");
+            }).DisableAntiforgery();
+
+            app.MapPost("/auth/logout", async (HttpContext ctx) =>
+            {
+                await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                return Results.Redirect("/");
+            }).DisableAntiforgery();
 
             // glTF endpoints: a character's assembled model, and any single RDB model by id.
             app.MapGet("/api/character/{race}/{sex}/model.glb", (Race race, Sex sex, CharacterModelService models) =>
@@ -139,6 +203,15 @@ namespace Faolan.Web
                 .AddInteractiveServerRenderMode();
 
             app.Run();
+        }
+
+        // Issue the auth cookie for an account (id + username claims).
+        private static Task SignIn(HttpContext ctx, Account account)
+        {
+            var identity = new ClaimsIdentity(
+                [new Claim(ClaimTypes.NameIdentifier, account.Id.ToString()), new Claim(ClaimTypes.Name, account.UserName)],
+                CookieAuthenticationDefaults.AuthenticationScheme);
+            return ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
         }
     }
 }

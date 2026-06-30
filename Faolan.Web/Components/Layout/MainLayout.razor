@@ -1,6 +1,25 @@
 ﻿@inherits LayoutComponentBase
 
-@Body
+<header class="topbar">
+    <a class="brand" href="/">Project Faolan</a>
+    <nav>
+        <a href="/characters">Characters</a>
+        <AuthorizeView>
+            <Authorized>
+                <span class="who">@context.User.Identity?.Name</span>
+                <form method="post" action="/auth/logout"><button class="linkbtn" type="submit">Log out</button></form>
+            </Authorized>
+            <NotAuthorized>
+                <a href="/login">Log in</a>
+                <a href="/register">Register</a>
+            </NotAuthorized>
+        </AuthorizeView>
+    </nav>
+</header>
+
+<main class="content">
+    @Body
+</main>
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.

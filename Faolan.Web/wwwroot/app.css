@@ -36,3 +36,28 @@ h1:focus {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+/* --- Auth + top nav (registration/login) --- */
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    padding: .5rem 1rem; background: #16181c; border-bottom: 1px solid #2c2a22; }
+.topbar .brand { color: #d8c07a; font-weight: 600; letter-spacing: .05em; text-decoration: none; }
+.topbar nav { display: flex; align-items: center; gap: 1rem; }
+.topbar nav a { color: #b7b2a2; text-decoration: none; font-size: .9rem; }
+.topbar nav a:hover { color: #e6d8a8; }
+.topbar .who { color: #d8c07a; font-size: .85rem; }
+.topbar form { margin: 0; }
+.linkbtn { background: none; border: none; color: #b7b2a2; cursor: pointer; font: inherit; font-size: .9rem; padding: 0; }
+.linkbtn:hover { color: #e6d8a8; }
+.content { padding: .5rem; }
+
+.auth-card { max-width: 22rem; margin: 10vh auto; padding: 1.5rem; background: #1a1c20;
+    border: 1px solid #5a4d33; border-radius: 10px; text-align: center; }
+.auth-card h1 { color: #d8c07a; font-size: 1.4rem; margin: 0 0 1rem; }
+.auth-card form { display: flex; flex-direction: column; gap: .6rem; }
+.auth-card input { padding: .55rem .7rem; border-radius: 6px; border: 1px solid #46484f;
+    background: #25272e; color: #eee; font-size: .95rem; }
+.auth-card .btn { display: inline-block; padding: .6rem 1.4rem; border-radius: 7px; cursor: pointer;
+    border: 1px solid #5a4d33; color: #e6d8a8; background: #25272e; font-size: .95rem; }
+.auth-card .btn.primary { background: linear-gradient(#5a4d33, #463c28); border-color: #b89544; color: #fbeec2; }
+.auth-card .err { color: #e08a7a; font-size: .85rem; margin: .6rem 0 0; }
+.auth-card .alt { color: #9a937f; font-size: .85rem; margin: 1rem 0 0; }
+.auth-card .alt a { color: #d8c07a; }
