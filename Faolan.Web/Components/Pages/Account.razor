@@ -78,7 +78,7 @@ else
         }
 
         _characters = await db.Characters
-            .Where(c => c.AccountId == accountId && c.Level > 0)
+            .Where(c => c.AccountId == accountId && c.Name != null && c.Name != "")
             .OrderByDescending(c => c.Level).ThenBy(c => c.Name)
             .ToListAsync();
     }

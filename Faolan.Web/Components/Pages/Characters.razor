@@ -123,8 +123,8 @@
     protected override async Task OnInitializedAsync()
     {
         await using var db = await DbFactory.CreateDbContextAsync();
-        // Skip level-0 rows: unfinished/placeholder characters with no real progression to show.
-        var query = db.Characters.Where(c => c.Level > 0);
+        // Skip blank-name rows: unfinished/placeholder characters with nothing to show.
+        var query = db.Characters.Where(c => c.Name != null && c.Name != "");
 
         // Public viewer: when signed in, scope the roster to this account's own characters; otherwise show all.
         if (AuthState is not null)
