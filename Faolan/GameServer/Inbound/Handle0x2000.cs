@@ -131,6 +131,15 @@ namespace Faolan.GameServer
 							var livePosition = moveEntity?.Position ?? sessionCharacter.Position;
 							var liveRotation = moveEntity?.Rotation ?? sessionCharacter.Rotation.ToVector3();
 
+							// The CharDCMove carrier's movingType u16 is [u8 env][u8 flag1] (docs/chardcmove-grammar.md):
+							// the client streams its move with env=0x01 (the "I am the controlling client" flag); the
+							// server's echo + relay carry env=0x00. Retail strips it on both directions - verified
+							// byte-exact in the other-players-visible capture, where the c2s move and its s2c twin differ
+							// ONLY in this byte (c2s 0x011e -> s2c 0x001e). Forwarding the client's 0x01 verbatim made
+							// OTHER viewers treat B's move as locally-controlled and over-predict it from the velocity
+							// block, so B drifted/teleported even while standing still (#48). Clear the env byte.
+							var relayMovingType = (ushort)((ushort)movingType & 0x00FF);
+
 							// send to all (nearby) clients? (single client for now -> the session conversation;
 							// retail's move broadcast uses sender 0d13ce71b110 58 + receiver = the moving entity's
 							// instance, confirmed across Strie/dikketest/demol80 captures). Interest-managed broadcast to
@@ -141,7 +150,7 @@ namespace Faolan.GameServer
 									.WriteUInt32(pbOpcode)
 									.WriteUInt32(dataobjdec)
 									.WriteUInt32(dataclientinst)
-									.WriteUInt16(movingType)
+									.WriteUInt16(relayMovingType)
 									.WriteVector3BigEndian(livePosition)
 									.WriteVector3BigEndian(liveRotation)
 									.WriteArray(datadat))
@@ -149,7 +158,7 @@ namespace Faolan.GameServer
 
 							// Interest-managed broadcast: spawn this player to newly-near players and forward the move
 							// to players who already see them (docs/archive/server-architecture-roadmap.md). No-op solo.
-							await _broadcaster.BroadcastPlayerMove(client, (uint)pbOpcode, dataobjdec, dataclientinst, (ushort)movingType, livePosition, liveRotation, datadat);
+							await _broadcaster.BroadcastPlayerMove(client, (uint)pbOpcode, dataobjdec, dataclientinst, relayMovingType, livePosition, liveRotation, datadat);
 
 							break;
 						}
@@ -536,6 +545,17 @@ namespace Faolan.GameServer
 
 								break;
 							}
+						}
+
+						// #48: the combat responses above are framed to the ACTOR only - so the swing/cast was invisible
+						// to other players. Relay the actor's behavior (the BCC animation) to nearby viewers so the attack
+						// renders on their clients too (retail relays this exact echo body, only the frame receiver
+						// differs - other-players-visible capture). Limited to the world-visible combat behaviors.
+						if (actionType is ActionType.NormalAttack or ActionType.UnarmedAttack or ActionType.CastSpell)
+						{
+							var behaviorRelay = _combat.BuildBehaviorRelayBody(client, rawPayload, (uint)args.Mode);
+							if (behaviorRelay != null)
+								await _broadcaster.BroadcastBehaviorToViewers(client, behaviorRelay);
 						}
 					}
 

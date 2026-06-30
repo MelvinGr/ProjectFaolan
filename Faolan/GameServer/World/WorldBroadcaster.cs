@@ -386,6 +386,33 @@ namespace Faolan.GameServer.World
 			await DispatchInterest(events, new MoveForward(moveSubop, dataObject, dataClientInstance, movingType, position, rotation, tail));
 		}
 
+		// Relays a player's BEHAVIOR (the BehaviorControlCenterIIR swing/cast animation) to every other player who can
+		// already see them, so the attack/cast renders on the other clients - the combat analogue of BroadcastPlayerMove
+		// (#48). `body` is the same BCC echo the actor's own client receives (it already carries the actor's handle as
+		// instance); retail relays that exact body to nearby players, only the frame receiver differs (the
+		// other-players-visible capture shows s2c BCC for other-player handles 0x1316xxx). Gated on the viewer's Known
+		// set so a still-loading client isn't sent a behavior for a handle it hasn't built. No-op solo / when unseen.
+		public async Task BroadcastBehaviorToViewers(INetworkClient actor, byte[] body)
+		{
+			var entity = _sim.PlayerWorldEntity(actor);
+			if (entity == null || body == null)
+				return;
+
+			var zone = _sim.World.ZoneForEntity(entity);
+			if (zone == null)
+				return;
+
+			foreach (var viewer in zone.Entities)
+			{
+				if (!viewer.IsPlayer || viewer.Handle == entity.Handle || viewer.Client == null)
+					continue;
+				if (!viewer.Known.Contains(entity.Handle))
+					continue; // only players who already see the actor (their client has the handle)
+
+				await SendWorldIir(viewer.Client, body);
+			}
+		}
+
 		// DispatchSetQuestMarker (0x2008) state byte (decoded #241): 0x02 = '!' (quest available), 0x04 = '?' (ready
 		// to turn in), 0x00 = none.
 		private const byte QuestMarkerNone = 0x00, QuestMarkerAvailable = 0x02, QuestMarkerTurnIn = 0x04;

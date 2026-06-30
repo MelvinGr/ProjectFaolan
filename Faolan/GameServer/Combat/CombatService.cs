@@ -334,6 +334,21 @@ namespace Faolan.GameServer.Combat
 			return SendWorldPacket(client, BuildBehaviorEchoAckBody(rawPayload, instance, phase));
 		}
 
+		// Builds the BCC behavior echo a VIEWER should receive to render this actor's swing/cast: the same plain
+		// echo-ack body the actor's own client gets (instance = the actor's handle, args + phase, request tail), which
+		// is exactly what retail relays to nearby players (other-players-visible capture: s2c BCC for other-player
+		// handles, structurally identical to the self-echo - NOT the targeted result-block ack). The caller broadcasts
+		// it via WorldBroadcaster.BroadcastBehaviorToViewers. Null for a malformed payload. Phase = the request's Mode
+		// (non-zero for real attacks/casts); 1 as a defensive fallback so we never touch the actor's ack counter here.
+		public byte[] BuildBehaviorRelayBody(INetworkClient actor, byte[] rawPayload, uint mode)
+		{
+			if (rawPayload.Length < 26)
+				return null;
+
+			var instance = actor.Session.Account.ClientInstance;
+			return BuildBehaviorEchoAckBody(rawPayload, instance, mode != 0 ? mode : 1u);
+		}
+
 		// Frames a raw 0x2000 body on the world conversation.
 		private static Task SendWorldPacket(INetworkClient client, byte[] body)
 		{
