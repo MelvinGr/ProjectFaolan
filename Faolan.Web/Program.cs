@@ -1,12 +1,13 @@
 using Faolan.Core;
-using Faolan.Core.Crypt;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Web.Auth;
 using Faolan.Web.Components;
 using Faolan.Web.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -52,8 +53,26 @@ namespace Faolan.Web
             // In-game mail (read/compose) directly against the shared Mail table.
             builder.Services.AddScoped<MailService>();
 
-            // Cookie auth over the shared game Accounts table (passwords stored plaintext for now). The viewer is
-            // public; signing in scopes the roster to your own characters.
+            // Identity Core (UserManager only — no SignInManager/cookie schema) over the game's Accounts table via a
+            // custom store. UserManager handles register (CreateAsync) and login (CheckPasswordAsync); the password
+            // hasher delegates to the shared PasswordHashing format so the game-server login stays compatible, and
+            // CheckPasswordAsync auto-rehashes a legacy plaintext password. Cookie sign-in (below) is still ours.
+            builder.Services.AddIdentityCore<Account>(o =>
+            {
+                // Game usernames/passwords aren't ASCII/complexity-restricted — relax Identity's defaults.
+                o.User.AllowedUserNameCharacters = "";
+                o.Password.RequiredLength = 1;
+                o.Password.RequiredUniqueChars = 1;
+                o.Password.RequireDigit = false;
+                o.Password.RequireLowercase = false;
+                o.Password.RequireUppercase = false;
+                o.Password.RequireNonAlphanumeric = false;
+            });
+            builder.Services.AddScoped<IUserStore<Account>, AccountUserStore>();
+            builder.Services.AddScoped<IPasswordHasher<Account>, AccountPasswordHasher>();
+
+            // Cookie auth over the shared game Accounts table. The viewer is public; signing in scopes the roster to
+            // your own characters.
             builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
                 .AddCookie(o =>
                 {
@@ -79,47 +98,40 @@ namespace Faolan.Web
             app.UseAntiforgery();
             app.MapStaticAssets();
 
-            // Auth form posts (plaintext password for now). Antiforgery disabled here to keep the simple HTML forms.
-            app.MapPost("/auth/register", async (HttpContext ctx, IDbContextFactory<DatabaseContext> dbf,
+            // Auth form posts, via Identity's UserManager (hashing + legacy-plaintext auto-rehash). Antiforgery
+            // disabled here to keep the simple HTML forms.
+            app.MapPost("/auth/register", async (HttpContext ctx, UserManager<Account> users,
                 [FromForm] string username, [FromForm] string password) =>
             {
                 if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
                     return Results.Redirect("/register?error=invalid");
-                await using var db = await dbf.CreateDbContextAsync();
-                if (db.Accounts.Any(a => a.UserName == username))
-                    return Results.Redirect("/register?error=taken");
 
                 var account = new Account
                 {
                     UserName = username,
-                    Password = PasswordHashing.Hash(password),
                     Type = AccountType.Normal,
                     State = AccountState.Active,
                     CreationDate = DateTime.UtcNow,
                     AuthChallenge = "",
                     LastIpAddress = ""
                 };
-                db.Accounts.Add(account);
-                await db.SaveChangesAsync();
+                var result = await users.CreateAsync(account, password);
+                if (!result.Succeeded)
+                {
+                    var taken = result.Errors.Any(e => e.Code.Contains("Duplicate", StringComparison.OrdinalIgnoreCase));
+                    return Results.Redirect(taken ? "/register?error=taken" : "/register?error=invalid");
+                }
+
                 await SignIn(ctx, account);
                 return Results.Redirect("/characters");
             }).DisableAntiforgery();
 
-            app.MapPost("/auth/login", async (HttpContext ctx, IDbContextFactory<DatabaseContext> dbf,
+            app.MapPost("/auth/login", async (HttpContext ctx, UserManager<Account> users,
                 [FromForm] string username, [FromForm] string password) =>
             {
-                await using var db = await dbf.CreateDbContextAsync();
-                var account = db.Accounts.FirstOrDefault(a => a.UserName == username);
-                if (account is null || !PasswordHashing.Matches(account.Password, password))
+                var account = await users.FindByNameAsync(username);
+                if (account is null || !await users.CheckPasswordAsync(account, password))
                     return Results.Redirect("/login?error=1");
-
-                // Migrate a legacy plaintext password to a hash on first successful login.
-                if (PasswordHashing.NeedsRehash(account.Password))
-                {
-                    account.Password = PasswordHashing.Hash(password);
-                    await db.SaveChangesAsync();
-                }
-
                 await SignIn(ctx, account);
                 return Results.Redirect("/characters");
             }).DisableAntiforgery();
