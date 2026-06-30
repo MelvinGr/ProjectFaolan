@@ -18,6 +18,13 @@ namespace Faolan.GameServer.World
 		// How close a player must be for a hostile NPC to aggro + attack (world units).
 		public const float NpcAggroRange = 20f;
 
+		// #284 line-of-sight (tier 1, cheap heuristic): the max VERTICAL (Y/up) separation at which a hostile NPC will
+		// still aggro a player. Aggro range is otherwise a 3D sphere, so without this an NPC aggros a player standing
+		// directly above/below it - through a floor/ceiling or across a big drop (the most jarring "sees through
+		// geometry" case). Gating on a vertical delta stops that with no collision data; true wall/terrain occlusion
+		// (the RDB heightmap 1066611 / PhysX collision 1000012) is the higher tier tracked on #284. ~6u ≈ one storey.
+		public const float NpcAggroVerticalRange = 6f;
+
 		// How close (horizontal) an aggroed NPC must be to its target to swing; beyond this it chases.
 		public const float NpcMeleeRange = 3f;
 
@@ -400,6 +407,8 @@ namespace Faolan.GameServer.World
 					continue;
 				if (!npc.IsVisibleTo(player)) // a quest-gated NPC (e.g. Scavenger Tuut) must not aggro/attack a player it
 					continue;                 // was never streamed to - else the player takes hits from an invisible body
+				if (MathF.Abs(player.Position.Y - npc.Position.Y) > NpcAggroVerticalRange) // #284: not through a floor/drop
+					continue;
 
 				var dist = Vector3.Distance(player.Position, npc.Position);
 				if (dist < nearestDist)
