@@ -387,9 +387,13 @@ namespace Faolan.Web.Services
 		// [type][id][count] preamble followed by the raw PNG, so we carve from the PNG signature.
 		private static readonly byte[] PngSig = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
-		// Cheap check (no decompress) for whether a local top-down image exists for the map.
+		// Cheap check (no decompress / no HTTP) for whether a top-down image is reachable for the map — local OR
+		// fetchable from the configured CDN mirror.
 		public bool HasMapImage(uint mapId)
-			=> RdbAvailable && Reader().TryGet(1010209, mapId, out var e) && e.Size > 0 && e.File != 0xff;
+		{
+			var rdb = RdbAvailable ? Reader() : null;
+			return rdb is not null && rdb.TryGet(1010209, mapId, out var e) && e.Size > 0 && rdb.CanRead(e);
+		}
 
 		public byte[]? MapImage(uint mapId)
 		{
@@ -398,8 +402,9 @@ namespace Faolan.Web.Services
 			try
 			{
 				var rdb = Reader();
-				if (!rdb.TryGet(1010209, mapId, out var e) || e.Size == 0 || e.File == 0xff)
+				if (!rdb.TryGet(1010209, mapId, out var e) || e.Size == 0 || !rdb.CanRead(e))
 					return null;
+				// ReadDecompressed transparently fetches CDN-gated (file == 0xff) records via the ContentMirror.
 				var body = rdb.ReadDecompressed(e);
 				var idx = body.AsSpan().IndexOf(PngSig);
 				return idx < 0 ? null : body[idx..];
