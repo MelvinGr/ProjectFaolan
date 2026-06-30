@@ -7,6 +7,7 @@ using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Data;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
@@ -430,7 +431,9 @@ namespace Faolan.GameServer
 				["buffs"] = (client, _) => BuffsCommand(client),
 				["cancelbuff"] = (client, arguments) => CancelBuffCommand(client, arguments),
 				["spawnbag"] = (client, arguments) => SpawnBagCommand(client, arguments),
-				["noloot"] = (client, arguments) => NoLootCommand(client, arguments)
+				["noloot"] = (client, arguments) => NoLootCommand(client, arguments),
+				["ban"] = (client, arguments) => BanCommand(client, arguments, true),
+				["unban"] = (client, arguments) => BanCommand(client, arguments, false)
 			};
 		}
 
@@ -473,6 +476,61 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, exclude
 				? $"'{item?.Name}' ({itemId}) will no longer drop as random loot."
 				: $"'{item?.Name}' ({itemId}) can drop as random loot again.");
+		}
+
+		// .ban &lt;account|character name&gt;   - ban an account (sets State = Banned; login rejects non-Active accounts).
+		// .unban &lt;account|character name&gt; - lift a ban (State = Active). Accepts either the account username OR one of
+		// its character names. Banning also kicks the account's live world connections (the State change alone only
+		// blocks the NEXT login). You can't ban your own account.
+		private async Task BanCommand(INetworkClient client, string arguments, bool ban)
+		{
+			var gmId = client.Session.Character.Id;
+			var name = (arguments ?? "").Trim();
+			if (string.IsNullOrEmpty(name))
+			{
+				await _agentServerDispatcher.SendSystemMessage(gmId, $"Usage: .{(ban ? "ban" : "unban")} &lt;account or character name&gt;");
+				return;
+			}
+
+			// Resolve the target account: by username first, else by a character name -> its owning account.
+			var account = await Database.GetAccount(name);
+			if (account is null && await Database.GetCharacterByName(name) is { } ch)
+				account = await Database.GetAccount(ch.AccountId);
+
+			if (account is null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(gmId, $"<span style=\"color: red;\">No account or character named '{name}'.</span>");
+				return;
+			}
+
+			if (ban && account.Id == client.Session.Account?.Id)
+			{
+				await _agentServerDispatcher.SendSystemMessage(gmId, "<span style=\"color: red;\">You can't ban your own account.</span>");
+				return;
+			}
+
+			if (!await Database.SetAccountState(account.Id, ban ? AccountState.Banned : AccountState.Active))
+			{
+				await _agentServerDispatcher.SendSystemMessage(gmId, $"<span style=\"color: red;\">Account '{account.UserName}' not found.</span>");
+				return;
+			}
+
+			var kicked = 0;
+			if (ban)
+			{
+				// Snapshot before iterating: Stop() -> Disconnected mutates the client set.
+				foreach (var c in NetworkClients.Where(nc => nc.Session?.Account?.Id == account.Id).ToList())
+				{
+					if (c.Session?.Character?.Id is { } cid)
+						await _agentServerDispatcher.SendSystemMessage(cid, "<span style=\"color: red;\">You have been banned by a GM.</span>");
+					c.Stop();
+					kicked++;
+				}
+			}
+
+			await _agentServerDispatcher.SendSystemMessage(gmId, ban
+				? $"Banned account '{account.UserName}'{(kicked > 0 ? $" and kicked {kicked} live session(s)" : "")}."
+				: $"Unbanned account '{account.UserName}'.");
 		}
 
 		// .buffs  - list the server-tracked active buffs on the player (the registry CancelBuff removes from).

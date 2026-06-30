@@ -113,6 +113,7 @@ namespace Faolan.Core.Database
 		Task<T> Query<T>(Func<IDatabaseContext, Task<T>> work);
 		Task RemoveCharacterQuest(uint characterId, uint questId);
 		Task SaveAccount(Account account);
+		Task<bool> SetAccountState(uint accountId, AccountState state);
 		Task SaveCharacter(Character character);
 		Task SaveCharacterEquipment(CharacterEquipment equipment);
 		Task SaveCharacterScaffold(Character character);
@@ -1202,6 +1203,20 @@ namespace Faolan.Core.Database
 			tracked.AuthStatus = account.AuthStatus;
 			tracked.ClientInstance = account.ClientInstance;
 			await ctx.SaveChangesAsync();
+		}
+
+		// Set an account's State (e.g. Banned/Active) directly. Returns false if no such account. Used by the .ban GM
+		// command and the web admin panel; login rejects any account whose State != Active.
+		public async Task<bool> SetAccountState(uint accountId, AccountState state)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var tracked = await ctx.Accounts.FirstOrDefaultAsync(a => a.Id == accountId);
+			if (tracked == null)
+				return false;
+
+			tracked.State = state;
+			await ctx.SaveChangesAsync();
+			return true;
 		}
 
 		// Persists a (detached) character graph - the character row plus its Body if present - as a single unit of
