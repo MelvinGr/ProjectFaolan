@@ -45,32 +45,59 @@
     </aside>
 
     <section class="stage">
-        <canvas id="char-canvas"></canvas>
-        <div class="caption">
-            @if (_selected is not null)
-            {
-                <span>@_selected.Name — @_selected.Race @_selected.Sex (@_status)</span>
-                @if (string.IsNullOrEmpty(_equip))
+        <div class="equip-window">
+            <div class="equip-title">Equipment</div>
+            <div class="equip-grid">
+                <div class="equip-col">
+                    @foreach (var s in LeftSlots)
+                    {
+                        <div class="slot" title="@s"><span>@s</span></div>
+                    }
+                </div>
+                <div class="equip-center">
+                    <canvas id="char-canvas"></canvas>
+                </div>
+                <div class="equip-col">
+                    @foreach (var s in RightSlots)
+                    {
+                        <div class="slot" title="@s"><span>@s</span></div>
+                    }
+                </div>
+            </div>
+            <div class="equip-bottom">
+                @foreach (var s in BottomSlots)
                 {
-                    <label class="pose">elbows
-                        <input type="range" id="pose-slider" min="0" max="90" value="0" />
-                    </label>
+                    <div class="slot wide" title="@s"><span>@s</span></div>
                 }
-                @if (_armorSets is { Count: > 0 })
+            </div>
+            <div class="equip-tip">
+                @if (_selected is not null)
                 {
-                    <select class="wardrobe" value="@_equip" @onchange="OnEquipChanged" title="Preview an armour set">
-                        <option value="">— body (posable) —</option>
-                        @foreach (var set in _armorSets)
+                    <div class="tip-line">@_selected.Name — @_selected.Race @_selected.Sex (@_status)</div>
+                    <div class="tip-controls">
+                        @if (string.IsNullOrEmpty(_equip))
                         {
-                            <option value="@set.Equip">@($"{set.Number:0000}") @set.Name</option>
+                            <label class="pose">elbows
+                                <input type="range" id="pose-slider" min="0" max="90" value="0" />
+                            </label>
                         }
-                    </select>
+                        @if (_armorSets is { Count: > 0 })
+                        {
+                            <select class="wardrobe" value="@_equip" @onchange="OnEquipChanged" title="Preview an armour set">
+                                <option value="">— body (posable) —</option>
+                                @foreach (var set in _armorSets)
+                                {
+                                    <option value="@set.Equip">@($"{set.Number:0000}") @set.Name</option>
+                                }
+                            </select>
+                        }
+                    </div>
                 }
-            }
-            else
-            {
-                <span>Select a character to view their 3D model.</span>
-            }
+                else
+                {
+                    <div class="tip-line">Select a character to view their equipment.</div>
+                }
+            </div>
         </div>
     </section>
 </div>
@@ -85,6 +112,11 @@
     private IJSObjectReference? _module;
     private List<(int Number, string Name, string Equip)> _armorSets = [];
     private string _equip = "";
+
+    // Paper-doll equipment slots, arranged around the character preview (AoC layout; placeholders for now).
+    private static readonly string[] LeftSlots = ["Head", "Neck", "Shoulder", "Cloak", "Chest", "Wrist"];
+    private static readonly string[] RightSlots = ["Hands", "Belt", "Legs", "Boots", "Ring L", "Ring R"];
+    private static readonly string[] BottomSlots = ["Main Hand", "Off Hand", "Tokens", "Bag"];
 
     protected override async Task OnInitializedAsync()
     {
@@ -159,25 +191,48 @@
     .roster button.sel { border-color: #c8a24a; background: #2e2a1f; }
     .roster button span { font-size: .75rem; color: #999; }
     .roster .warn { color: #d88; font-size: .8rem; }
-    .stage { flex: 1; position: relative; background: #1b1d22; border-radius: 8px; overflow: hidden; min-height: 0; }
-    .stage canvas { width: 100%; height: 100%; display: block; touch-action: none; }
-    .caption { position: absolute; bottom: 0; left: 0; right: 0; padding: .5rem .75rem;
-        display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
-        color: #ccc; background: linear-gradient(transparent, #000a); font-size: .85rem; }
+    .stage { flex: 1; min-height: 0; min-width: 0; }
+
+    /* AoC-style equipment paper-doll window: slot columns flanking the character preview. */
+    .equip-window { height: 100%; display: flex; flex-direction: column; box-sizing: border-box;
+        background: #16181c; border: 2px solid #5a4d33; border-radius: 8px; padding: .6rem;
+        box-shadow: inset 0 0 24px #000a; }
+    .equip-title { text-align: center; color: #d8c07a; font-weight: 600; letter-spacing: .12em;
+        text-transform: uppercase; font-size: .9rem; padding-bottom: .5rem; }
+    .equip-grid { flex: 1; display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: .6rem; min-height: 0; }
+    .equip-col { display: flex; flex-direction: column; gap: .55rem; justify-content: center; }
+    .equip-center { position: relative; min-width: 0; border-radius: 6px; overflow: hidden;
+        background: radial-gradient(120% 90% at 50% 35%, #1c3b38 0%, #0e1d22 70%, #0a1014 100%);
+        border: 1px solid #2c4a48; box-shadow: inset 0 0 30px #000c; }
+    .equip-center canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+    .slot { width: 52px; height: 52px; flex: 0 0 auto; border-radius: 5px;
+        background: linear-gradient(#2b2d33, #202229); border: 2px solid #4b4636;
+        box-shadow: inset 0 1px 0 #ffffff14, inset 0 0 10px #0008;
+        display: flex; align-items: center; justify-content: center; }
+    .slot:hover { border-color: #b89544; }
+    .slot span { font-size: .52rem; color: #8a8472; text-align: center; line-height: 1.1; padding: 0 2px;
+        text-transform: uppercase; letter-spacing: .03em; }
+    .slot.wide { width: 64px; }
+    .equip-bottom { display: flex; gap: .55rem; justify-content: center; padding-top: .6rem; }
+    .equip-tip { margin-top: .5rem; padding-top: .45rem; border-top: 1px solid #2c2a22; color: #c9c2a8;
+        font-size: .8rem; min-height: 2.4em; }
+    .tip-controls { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; margin-top: .3rem; }
     .wardrobe { background: #25272e; color: #ddd; border: 1px solid #46484f; border-radius: 5px;
         padding: .25rem .4rem; font-size: .8rem; max-width: 16rem; }
     .pose { display: flex; align-items: center; gap: .4rem; font-size: .8rem; }
     .pose input[type=range] { width: 8rem; accent-color: #c8a24a; }
 
-    /* Mobile: stack the roster into a horizontal strip above the stage; the canvas takes the rest. */
+    /* Mobile: stack the roster into a horizontal strip above the panel; shrink the slots. */
     @@media (max-width: 720px) {
         .viewer-page { flex-direction: column; height: 100dvh; gap: .5rem; padding: .25rem; box-sizing: border-box; }
-        .roster { width: auto; max-height: 24vh; }
+        .roster { width: auto; max-height: 20vh; }
         .roster h2 { display: none; }
         .roster ul { display: flex; gap: .4rem; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: .25rem; }
         .roster li { flex: 0 0 auto; }
         .roster button { width: auto; white-space: nowrap; margin-bottom: 0; }
+        .slot { width: 40px; height: 40px; }
+        .slot.wide { width: 48px; }
+        .equip-grid { gap: .4rem; }
         .pose input[type=range] { width: 6rem; }
-        .caption { font-size: .8rem; gap: .5rem; }
     }
 </style>

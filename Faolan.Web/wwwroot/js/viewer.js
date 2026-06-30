@@ -77,7 +77,16 @@ export async function show(canvasId, url) {
         }
     });
 
-    const box = new THREE.Box3().setFromObject(model);
+    // Box3.setFromObject mis-measures a SkinnedMesh whose skeleton hasn't been posed yet (it collapsed our model to
+    // ~0.6 tall and framed the camera onto the legs). Union each mesh's POSITION-based geometry box instead.
+    model.updateWorldMatrix(true, true);
+    const box = new THREE.Box3();
+    model.traverse(o => {
+        if (o.isMesh && o.geometry) {
+            o.geometry.computeBoundingBox();
+            box.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld));
+        }
+    });
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     model.position.sub(center);                 // center at origin
