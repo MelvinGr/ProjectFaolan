@@ -80,17 +80,30 @@ namespace Faolan.ClientLauncher
 			}
 		}
 
-		// Kill any running AgeOfConan client. On Windows that's the named process; under Wine/Proton it's a Linux
-		// process whose /proc comm is the exe name (or whose cmdline references it - excluding this launcher).
-		private static void KillRunningClients()
+		// Kill the running AgeOfConan client launched from THIS `exe` path only (so a client running from a different
+		// install is left alone) - matched by the exe's full path in the process command line, NOT just the
+		// "AgeOfConan.exe" name. Under Wine/Proton the path appears in the Z:\ drive form, so we compare on a normalized
+		// signature (see ExePathSignature). On Windows we compare the process main-module path.
+		private static void KillRunningClients(string exe)
 		{
 			var killed = 0;
+			var sig = ExePathSignature(exe);
 
 			if (OperatingSystem.IsWindows())
 			{
 				foreach (var name in new[] { "AgeOfConan", "AgeOfConanDX10" })
 				foreach (var p in Process.GetProcessesByName(name))
-					killed += TryKill(p.Id);
+				{
+					try
+					{
+						if (NormalizePath(p.MainModule?.FileName ?? "").Contains(sig, StringComparison.Ordinal))
+							killed += TryKill(p.Id);
+					}
+					catch
+					{
+						// MainModule can throw (access denied / bitness mismatch / vanished); skip.
+					}
+				}
 			}
 			else
 			{
@@ -105,14 +118,14 @@ namespace Faolan.ClientLauncher
 						var comm = File
 							.ReadAllText(Path.Combine(dir, "comm"))
 							.Trim();
-						var isClient = comm.StartsWith("AgeOfConan", StringComparison.Ordinal);
-						if (!isClient)
-						{
-							var cmdline = File
-								.ReadAllText(Path.Combine(dir, "cmdline"))
-								.Replace('\0', ' ');
-							isClient = cmdline.Contains("AgeOfConan.exe", StringComparison.Ordinal) && !cmdline.Contains("Faolan.ClientLauncher", StringComparison.Ordinal) && comm != "dotnet";
-						}
+						var cmdline = File
+							.ReadAllText(Path.Combine(dir, "cmdline"))
+							.Replace('\0', ' ');
+						// Only this install's client: its cmdline must reference the exact exe PATH (not just the
+						// AgeOfConan.exe name), excluding this launcher (which carries the path in its own --exe args).
+						var isClient = NormalizePath(cmdline).Contains(sig, StringComparison.Ordinal)
+						               && !cmdline.Contains("Faolan.ClientLauncher", StringComparison.Ordinal)
+						               && comm != "dotnet";
 
 						if (isClient)
 							killed += TryKill(pid);
@@ -128,12 +141,43 @@ namespace Faolan.ClientLauncher
 				Console.WriteLine($"killed {killed} running client instance(s)");
 		}
 
+		// A normalized, case-insensitive fragment of the exe path used to recognise a running client from the SAME
+		// install in its command line. The path is compared below its root (leading separator dropped, backslashes
+		// unified to '/', lowercased) so both the native "/mnt/.../AgeOfConan.exe" and the Wine "Z:\mnt\...\AgeOfConan.exe"
+		// forms match the same install while a different install's path does not.
+		private static string ExePathSignature(string exe)
+		{
+			var full = exe;
+			try
+			{
+				full = Path.GetFullPath(exe);
+			}
+			catch
+			{
+				// keep the raw value if it can't be resolved
+			}
+
+			return NormalizePath(full).TrimStart('/');
+		}
+
+		private static string NormalizePath(string path) => path.Replace('\\', '/').ToLowerInvariant();
+
 		private static int Main(string[] args)
 		{
-			var exe = Environment.GetEnvironmentVariable("AOC_EXE") ?? DefaultExe;
-			string? username = null, password = null, charname = null, wine = null, universeAddr = null;
-			var proton = Environment.GetEnvironmentVariable("PROTON") ?? DefaultProton;
-			bool dx10 = false, dryRun = false, noConsole = true, streamOutput = false, patchLogin = false, detach = false, restore = false;
+			var exe = DefaultExe;
+			string? username = null;
+			string? password = null;
+			string? charname = null;
+			string? wine = null;
+			string? universeAddr = null;
+			var proton = DefaultProton;
+			var dx10 = false;
+			var dryRun = false;
+			var noConsole = true;
+			var streamOutput = false;
+			var patchLogin = false;
+			var detach = false;
+			var restore = false;
 			int? mirrorPort = null;
 
 			for (var i = 0; i < args.Length; i++)
@@ -259,8 +303,9 @@ namespace Faolan.ClientLauncher
 			if (dryRun)
 				return 0;
 
-			// Kill any client already running first (so repeated test launches start clean).
-			KillRunningClients();
+			// Kill a client already running from THIS exe path first (so repeated test launches start clean) - a client
+			// from a different install is left running.
+			KillRunningClients(exe);
 
 			var gameDir = Path.GetDirectoryName(exe)!;
 
