@@ -1,4 +1,5 @@
 using Faolan.Core.Database;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
@@ -245,6 +246,35 @@ namespace Faolan.Web.Services
 		// head + hair - skinned to the auto-selected skeleton, so the viewer's pose slider can articulate it. The body
 		// skins to its own bones; the rigid head/hair are bound to the Head bone. (Gear skinning is the separate #275 work.)
 		public byte[]? BuildCharacterRig(uint characterId) => BuildCharacterById(characterId, equipMeshIndexIds: null, rig: true);
+
+		// A character's equipped items keyed by the viewer's slot labels (only non-empty slots), to populate the
+		// equipment paper-doll. Item id + display name; the icon is resolved separately from the RDB item template.
+		public IReadOnlyDictionary<string, (uint Id, string Name)> Equipment(uint characterId)
+		{
+			using var db = _dbFactory.CreateDbContext();
+			var e = db.CharacterEquipment.AsNoTracking()
+				.Include(x => x.Head).Include(x => x.Neck).Include(x => x.Shoulder).Include(x => x.Cloak)
+				.Include(x => x.Chest).Include(x => x.Wrist).Include(x => x.Hands).Include(x => x.Belt)
+				.Include(x => x.Boots).Include(x => x.RingLeft).Include(x => x.RingRight).Include(x => x.Legs)
+				.Include(x => x.MainHandLeft).Include(x => x.OffHandLeft).Include(x => x.Tokens).Include(x => x.FirstPosBag)
+				.FirstOrDefault(x => x.CharacterId == characterId);
+			if (e is null)
+				return new Dictionary<string, (uint, string)>();
+
+			var map = new (string Slot, Item? Item)[]
+			{
+				("Head", e.Head), ("Neck", e.Neck), ("Shoulder", e.Shoulder), ("Cloak", e.Cloak),
+				("Chest", e.Chest), ("Wrist", e.Wrist), ("Hands", e.Hands), ("Belt", e.Belt),
+				("Boots", e.Boots), ("Ring L", e.RingLeft), ("Ring R", e.RingRight), ("Legs", e.Legs),
+				("Main Hand", e.MainHandLeft), ("Off Hand", e.OffHandLeft), ("Tokens", e.Tokens), ("Bag", e.FirstPosBag)
+			};
+
+			var result = new Dictionary<string, (uint, string)>();
+			foreach (var (slot, item) in map)
+				if (item is not null)
+					result[slot] = (item.Id, string.IsNullOrWhiteSpace(item.Name) ? $"Item {item.Id}" : item.Name);
+			return result;
+		}
 
 		// Build a single RenderMesh (type 1010001) directly by id - for inspecting head/eye/hair meshes (#275).
 		public byte[]? BuildRenderMesh(uint renderMeshId)

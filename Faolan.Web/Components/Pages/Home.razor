@@ -48,11 +48,11 @@
         <div class="equip-window">
             <div class="equip-title">Equipment</div>
             <div class="equip-grid">
-                <div class="slot center-slot top" title="Head"><span>Head</span></div>
+                @Slot("Head", "center-slot top")
                 <div class="equip-col left">
                     @foreach (var s in LeftSlots)
                     {
-                        <div class="slot" title="@s"><span>@s</span></div>
+                        @Slot(s)
                     }
                 </div>
                 <div class="equip-center">
@@ -61,15 +61,15 @@
                 <div class="equip-col right">
                     @foreach (var s in RightSlots)
                     {
-                        <div class="slot" title="@s"><span>@s</span></div>
+                        @Slot(s)
                     }
                 </div>
-                <div class="slot center-slot bottom" title="Legs"><span>Legs</span></div>
+                @Slot("Legs", "center-slot bottom")
             </div>
             <div class="equip-bottom">
                 @foreach (var s in WeaponSlots)
                 {
-                    <div class="slot wide" title="@s"><span>@s</span></div>
+                    @Slot(s, "wide")
                 }
             </div>
             <div class="equip-tip">
@@ -114,6 +114,16 @@
     private IJSObjectReference? _module;
     private List<(int Number, string Name, string Equip)> _armorSets = [];
     private string _equip = "";
+    private IReadOnlyDictionary<string, (uint Id, string Name)> _equipment = new Dictionary<string, (uint, string)>();
+
+    // Slot display: the equipped item's name when filled, else the placeholder slot label.
+    private (bool Has, string Label, string Title) SlotInfo(string slot) =>
+        _equipment.TryGetValue(slot, out var it) ? (true, it.Name, it.Name) : (false, slot, slot);
+
+    // Render one paper-doll slot: shows the equipped item's name (highlighted) or the placeholder slot label.
+    private RenderFragment Slot(string slot, string extra = "") => @<div class="slot @extra @(SlotInfo(slot).Has ? "filled" : "")" title="@SlotInfo(slot).Title">
+        <span class="@(SlotInfo(slot).Has ? "item" : "")">@SlotInfo(slot).Label</span>
+    </div>;
 
     // Paper-doll equipment slots, arranged around the character preview (AoC layout; placeholders for now): Head sits
     // centred above and Legs centred below, with armour columns flanking and a weapon/utility bar across the bottom.
@@ -143,6 +153,7 @@
     {
         _selected = c;
         _equip = "";
+        _equipment = Models.Equipment((uint)c.Id);
         // Offer the armour sets for this character's sex (wardrobe preview - the per-item look mapping is still open).
         _armorSets = Models.ArmorSets(c.Sex).Select(s => (s.Number, s.Name, string.Join(',', s.PieceMeshIndexIds))).ToList();
         await Render();
@@ -224,6 +235,9 @@
     .slot:hover { border-color: #b89544; }
     .slot span { font-size: .52rem; color: #8a8472; text-align: center; line-height: 1.1; padding: 0 2px;
         text-transform: uppercase; letter-spacing: .03em; }
+    .slot.filled { border-color: #b89544; background: linear-gradient(#3a3526, #2a2619); }
+    .slot span.item { color: #e6d8a8; text-transform: none; font-size: .5rem; overflow: hidden;
+        display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
     .slot.wide { width: 64px; }
     .equip-bottom { display: flex; gap: .55rem; justify-content: center; padding-top: .6rem; }
     .equip-tip { margin-top: .5rem; padding-top: .45rem; border-top: 1px solid #2c2a22; color: #c9c2a8;
