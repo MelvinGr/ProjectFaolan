@@ -19,6 +19,18 @@ namespace Faolan.Core.Rdb.Assets
 		[GeneratedRegex(@"_sets[\\/](\d+)[ _]?(.*?)[\\/]", RegexOptions.IgnoreCase)]
 		private static partial Regex SetPathRegex();
 
+		// Tidy a raw folder fragment into a readable set name: underscores->spaces, drop the trailing male/female word and
+		// any leading "+NNNN" / "-NNNN" / "set" tokens the export folders prefix, collapse whitespace.
+		private static string CleanName(string raw)
+		{
+			var s = raw.Replace('_', ' ').Replace('+', ' ');
+			s = Regex.Replace(s, @"\b(fe)?male\b", "", RegexOptions.IgnoreCase);
+			s = Regex.Replace(s, @"\bset\b", "", RegexOptions.IgnoreCase);
+			s = Regex.Replace(s, @"[-+]?\d{3,4}", " ");      // stray set-number tokens
+			s = Regex.Replace(s, @"\s+", " ").Trim();
+			return s;
+		}
+
 		// Scan every MESHINDEXFILE once, keep the skinned armour-set pieces, group by (set number, gender). Ordered by set
 		// number then gender. Pieces keep first-seen order. Expensive (full index scan) so callers should cache the result.
 		public static IReadOnlyList<ArmorSet> Build(RdbReader rdb)
@@ -44,7 +56,7 @@ namespace Faolan.Core.Rdb.Assets
 
 				var lower = src.ToLowerInvariant();
 				var gender = lower.Contains("female") ? "Female" : lower.Contains("male") ? "Male" : "Unisex";
-				var name = m.Groups[2].Value.Replace('_', ' ').Trim();
+				var name = CleanName(m.Groups[2].Value);
 
 				var key = (number, gender);
 				if (!groups.TryGetValue(key, out var g))
