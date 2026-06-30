@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Faolan.Core;
 using Faolan.Web.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -101,19 +102,6 @@ namespace Faolan.Web.Components.Pages
 			_busy = false;
 		}
 
-		private static string Money(ulong tin)
-		{
-			var (g, s, c, t) = (tin / 1_000_000, tin / 10_000 % 100, tin / 100 % 100, tin % 100);
-			var parts = new List<string>();
-			if (g > 0)
-				parts.Add($"{g}g");
-			if (s > 0)
-				parts.Add($"{s}s");
-			if (c > 0)
-				parts.Add($"{c}c");
-			if (t > 0 || parts.Count == 0)
-				parts.Add($"{t}t");
-			return string.Join(" ", parts);
-		}
+		private static string Money(ulong tin) => tin.ToCurrencyString();
 	}
 }

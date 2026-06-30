@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Web.Services;
 using Microsoft.AspNetCore.Components;
@@ -168,19 +169,6 @@ namespace Faolan.Web.Components.Pages
 		}
 
 		// Wallet in tin -> gold/silver/copper/tin (100 tin = 1 copper, 100 copper = 1 silver, 100 silver = 1 gold).
-		private static string FormatMoney(ulong tin)
-		{
-			var (g, s, c, t) = (tin / 1_000_000, tin / 10_000 % 100, tin / 100 % 100, tin % 100);
-			var parts = new List<string>();
-			if (g > 0)
-				parts.Add($"{g}g");
-			if (s > 0)
-				parts.Add($"{s}s");
-			if (c > 0)
-				parts.Add($"{c}c");
-			if (t > 0 || parts.Count == 0)
-				parts.Add($"{t}t");
-			return string.Join(" ", parts);
-		}
+		private static string FormatMoney(ulong tin) => tin.ToCurrencyString();
 	}
 }

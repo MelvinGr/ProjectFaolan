@@ -106,7 +106,7 @@ namespace Faolan.GameServer.World
 				.WriteUInt32(ReceiverClass)
 				.WriteUInt32(clientInstance)
 				.WriteByte(0x00)                                  // env
-				.WriteFloatBigEndian(position.X).WriteFloatBigEndian(position.Y).WriteFloatBigEndian(position.Z)
+				.WriteVector3BigEndian(position)
 				.WriteUInt32(0).WriteFloatBigEndian(facingX)
 				.WriteUInt32(0).WriteFloatBigEndian(facingZ)
 				.WriteByte(PlayfieldProxyVersion)

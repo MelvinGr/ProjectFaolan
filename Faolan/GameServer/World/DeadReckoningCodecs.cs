@@ -76,20 +76,22 @@ namespace Faolan.GameServer.World
 			var c = new FaolanStream();
 			c.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(r.Handle)
 				.WriteByte(r.Env).WriteByte(r.Flag1)
-				.WriteFloatBigEndian(r.Position.X).WriteFloatBigEndian(r.Position.Y).WriteFloatBigEndian(r.Position.Z);
+				.WriteVector3BigEndian(r.Position);
 			if (r.Bit4) c.WriteFloatBigEndian(r.FacingX);
-			else WriteVec3(c, r.MoveVector);
+			else c.WriteVector3BigEndian(r.MoveVector);
 			c.WriteFloatBigEndian(r.Param6).WriteByte(r.Flag2);
 			if (r.HasMoveBlock)
 			{
-				if (!r.Bit2) WriteVec3(c, r.Velocity);
-				if (!r.Bit3) WriteVec3(c, r.Acceleration);
+				if (!r.Bit2) c.WriteVector3BigEndian(r.Velocity);
+				if (!r.Bit3) c.WriteVector3BigEndian(r.Acceleration);
 				c.WriteFloatBigEndian(r.Param16);
-				if (!r.Bit1) WriteVec3(c, r.Heading);
+				if (!r.Bit1) c.WriteVector3BigEndian(r.Heading);
 				c.WriteFloatBigEndian(r.Param19).WriteByte(r.Bool1).WriteByte(r.Bool2);
 			}
 			return WithLength(c.ToArray());
 		}
+
+		// (was a local WriteVec3 helper; replaced by FaolanStream.WriteVector3BigEndian, #278)
 
 		// Convenience: the dominant 0x1e form - a stationary-ish update carrying only position + a 2D facing (no
 		// velocity/accel/heading vectors). facingX/facingZ are the unit heading pair (cos/sin); param19 is the
@@ -109,9 +111,6 @@ namespace Faolan.GameServer.World
 				Param19 = param19,
 			});
 		}
-
-		private static void WriteVec3(FaolanStream s, Vector3 v) =>
-			s.WriteFloatBigEndian(v.X).WriteFloatBigEndian(v.Y).WriteFloatBigEndian(v.Z);
 
 		internal static byte[] WithLength(byte[] body)
 		{
@@ -135,7 +134,7 @@ namespace Faolan.GameServer.World
 		{
 			var c = new FaolanStream();
 			c.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(handle).WriteByte(env)
-				.WriteFloatBigEndian(position.X).WriteFloatBigEndian(position.Y).WriteFloatBigEndian(position.Z)
+				.WriteVector3BigEndian(position)
 				.WriteFloatBigEndian(r0).WriteFloatBigEndian(r1).WriteFloatBigEndian(r2).WriteFloatBigEndian(r3);
 			return CharDCMoveCodec.WithLength(c.ToArray());
 		}
@@ -163,7 +162,7 @@ namespace Faolan.GameServer.World
 		{
 			var c = new FaolanStream();
 			c.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(handle).WriteByte(env)
-				.WriteFloatBigEndian(position.X).WriteFloatBigEndian(position.Y).WriteFloatBigEndian(position.Z)
+				.WriteVector3BigEndian(position)
 				.WriteFloatBigEndian(r0).WriteFloatBigEndian(r1).WriteFloatBigEndian(r2).WriteFloatBigEndian(r3)
 				.WriteByte(flag);
 			return CharDCMoveCodec.WithLength(c.ToArray());

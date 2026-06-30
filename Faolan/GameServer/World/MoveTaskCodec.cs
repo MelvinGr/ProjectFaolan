@@ -38,7 +38,7 @@ namespace Faolan.GameServer.World
 				.WriteUInt32(WireType)
 				.WriteUInt32(handle)
 				.WriteUInt16(0)
-				.WriteFloatBigEndian(from.X).WriteFloatBigEndian(from.Y).WriteFloatBigEndian(from.Z)
+				.WriteVector3BigEndian(from)
 				.WriteByte(ModeBarePosition)
 				.WriteByte(0x01)
 				.ToArray();
@@ -53,7 +53,7 @@ namespace Faolan.GameServer.World
 				.WriteUInt32(WireType)
 				.WriteUInt32(handle)
 				.WriteUInt16(0)
-				.WriteFloatBigEndian(from.X).WriteFloatBigEndian(from.Y).WriteFloatBigEndian(from.Z)
+				.WriteVector3BigEndian(from)
 				.WriteByte(ModeApproachTarget)
 				.WriteUInt32(WireType)
 				.WriteUInt32(targetHandle)
@@ -78,18 +78,18 @@ namespace Faolan.GameServer.World
 				.WriteUInt32(WireType)
 				.WriteUInt32(handle)
 				.WriteUInt16(0)
-				.WriteFloatBigEndian(from.X).WriteFloatBigEndian(from.Y).WriteFloatBigEndian(from.Z)
+				.WriteVector3BigEndian(from)
 				.WriteByte(ModePath)
 				.WriteByte(0x01)                     // WaitMoveTask base header flags (bit0 -> no dur/rem floats)
 				.WriteByte(0x00)                     // PathMoveTask F-flags (no optional floats; waypoint-list branch)
 				.WriteUInt32((uint)waypoints.Count);
 			foreach (var w in waypoints)
-				s.WriteFloatBigEndian(w.X).WriteFloatBigEndian(w.Y).WriteFloatBigEndian(w.Z);
+				s.WriteVector3BigEndian(w);
 			return s
 				.WriteByte(0x00)                     // trailer byte
 				.WriteFloatBigEndian(pathLength)
 				.WriteUInt64(0).WriteUInt32(0)       // 12 zero bytes
-				.WriteFloatBigEndian(from.X).WriteFloatBigEndian(from.Y).WriteFloatBigEndian(from.Z)
+				.WriteVector3BigEndian(from)
 				.ToArray();
 		}
 
@@ -111,17 +111,17 @@ namespace Faolan.GameServer.World
 				.WriteUInt32(WireType)
 				.WriteUInt32(handle)
 				.WriteUInt16(0)
-				.WriteFloatBigEndian(from.X).WriteFloatBigEndian(from.Y).WriteFloatBigEndian(from.Z)
+				.WriteVector3BigEndian(from)
 				.WriteByte(ModePath)
 				.WriteByte(0x01)                     // WaitMoveTask base header flags (bit0 SET -> no duration; retail 2-point form)
 				.WriteByte(0x00)                     // PathMoveTask F-flags (no optional floats; waypoint-list branch)
 				.WriteUInt32(2)                      // two control points: the spline needs >= 2 (client assert)
-				.WriteFloatBigEndian(from.X).WriteFloatBigEndian(from.Y).WriteFloatBigEndian(from.Z)
-				.WriteFloatBigEndian(to.X).WriteFloatBigEndian(to.Y).WriteFloatBigEndian(to.Z)
+				.WriteVector3BigEndian(from)
+				.WriteVector3BigEndian(to)
 				.WriteByte(0x00)                     // trailer byte
 				.WriteFloatBigEndian(pathLength)
 				.WriteUInt64(0).WriteUInt32(0)       // 12 zero bytes
-				.WriteFloatBigEndian(to.X).WriteFloatBigEndian(to.Y).WriteFloatBigEndian(to.Z) // anchor = DESTINATION (#272)
+				.WriteVector3BigEndian(to) // anchor = DESTINATION (#272)
 				.ToArray();
 		}
 
@@ -155,9 +155,9 @@ namespace Faolan.GameServer.World
 				.WriteUInt32(WireType)
 				.WriteUInt32(handle)
 				.WriteUInt16(0)
-				.WriteFloatBigEndian(from.X).WriteFloatBigEndian(from.Y).WriteFloatBigEndian(from.Z)
+				.WriteVector3BigEndian(from)
 				.WriteByte(0x02)
-				.WriteFloatBigEndian(to.X).WriteFloatBigEndian(to.Y).WriteFloatBigEndian(to.Z)
+				.WriteVector3BigEndian(to)
 				.WriteFloatBigEndian(facing.X).WriteFloatBigEndian(facing.Y).WriteFloatBigEndian(facing.Z).WriteFloatBigEndian(facing.W)
 				.WriteUInt16(0)
 				.ToArray();

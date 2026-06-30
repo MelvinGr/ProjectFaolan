@@ -113,9 +113,7 @@ namespace Faolan.GameServer.World
 				.WriteUInt32(0x0000C350)
 				.WriteUInt32(dyingHandle)
 				.WriteUInt16(0x0000)
-				.WriteFloatBigEndian(position.X)
-				.WriteFloatBigEndian(position.Y)
-				.WriteFloatBigEndian(position.Z)
+				.WriteVector3BigEndian(position)
 				.WriteByte(DeadMovementType)
 				.ToArray();
 	}

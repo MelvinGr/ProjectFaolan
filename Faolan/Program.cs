@@ -55,9 +55,11 @@ namespace Faolan
 			});
 
 			// Mirror the console log to a file. FAOLAN_LOG_FILE overrides the location (e.g. a mounted volume in a
-			// container); default is logs.txt in the working directory.
+			// container); default is logs/<epoch>.log (epoch = process start, unix seconds) so each run is a
+			// distinct, retained file instead of overwriting one logs.txt every start (#282).
 			builder.Logging.AddProvider(new FileLoggerProvider(
-				Environment.GetEnvironmentVariable("FAOLAN_LOG_FILE") ?? Path.GetFullPath("logs.txt")));
+				Environment.GetEnvironmentVariable("FAOLAN_LOG_FILE")
+				?? Path.GetFullPath(Path.Combine("logs", $"{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}.log"))));
 
 			builder.Services.AddLogging();
 

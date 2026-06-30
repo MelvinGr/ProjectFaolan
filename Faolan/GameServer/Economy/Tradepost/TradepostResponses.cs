@@ -107,9 +107,7 @@ namespace Faolan.GameServer.Economy.Tradepost
 		private static byte[] BuildAccessPointBody(Vector3 position, float radius)
 		{
 			var s = new FaolanStream(new byte[16], writable: true);
-			s.WriteFloatBigEndian(position.X);
-			s.WriteFloatBigEndian(position.Y);
-			s.WriteFloatBigEndian(position.Z);
+			s.WriteVector3BigEndian(position);
 			s.WriteFloatBigEndian(radius);
 			return s.ToArray();
 		}
