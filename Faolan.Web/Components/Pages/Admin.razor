@@ -30,7 +30,7 @@
                 {
                     var isSelf = a.Id == _selfId;
                     <tr class="@(a.State == AccountState.Banned ? "banned" : "")">
-                        <td class="aname">@a.UserName @if (isSelf) { <span class="you">you</span> }</td>
+                        <td class="aname"><a href="@($"/admin/account/{a.Id}")">@a.UserName</a> @if (isSelf) { <span class="you">you</span> }</td>
                         <td>
                             <select value="@a.Type" disabled="@isSelf"
                                     @onchange="e => ChangeType(a.Id, e.Value?.ToString())">
@@ -117,6 +117,8 @@
     .acct-table td { padding: .55rem .6rem; border-bottom: 1px solid var(--stone-dark); }
     .acct-table tr.banned { opacity: .65; }
     .aname { color: var(--gold-bright); font-weight: 600; }
+    .aname a { color: var(--gold-bright); text-decoration: none; }
+    .aname a:hover { text-decoration: underline; }
     .you { font-size: .62rem; color: var(--muted); border: 1px solid var(--line); border-radius: 8px; padding: 0 .4em; margin-left: .35rem; }
     .dim { color: var(--muted); }
     .acct-table select { background: var(--field); color: var(--text); border: 1px solid var(--line);
