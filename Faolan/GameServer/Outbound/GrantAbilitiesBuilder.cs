@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Data;
 using Faolan.Core.Database.Tables;
@@ -95,14 +96,23 @@ namespace Faolan.GameServer
 			// two bars. (Retail's create capture also keeps a copy of the attacks on bar 0, but the player wants the
 			// L/M/R attacks + spells together on bar 1.)
 			var abilities = await Database.GetStartingAbilities(character.Level, (uint)character.Class);
+
+			// The 3 Normal Attacks come back ordered by Ability.Slot, but retail lays them out on bar 1 with the
+			// 2nd and 3rd (bar slots 101/102) the other way round, so swap that pair before placing them (#285).
+			var normalAttacks = abilities.Where(a => a.Id is >= 0xBBC40 and <= 0xBBC60).ToList();
+			if (normalAttacks.Count >= 3)
+				(normalAttacks[1], normalAttacks[2]) = (normalAttacks[2], normalAttacks[1]);
+
 			uint secondBarSlot = secondBarBase;
+			foreach (var attack in normalAttacks)
+				await Database.SetCharacterShortcut(character.Id, secondBarSlot++, shortcutTypeAbility, attack.Id);
+
 			uint specialSlot = specialBarBase;
 			foreach (var ability in abilities)
 			{
+				// Normal attacks were placed (in retail order) just above; here only the special-bar abilities get a slot.
 				var isNormalAttack = ability.Id is >= 0xBBC40 and <= 0xBBC60;
-				if (isNormalAttack)
-					await Database.SetCharacterShortcut(character.Id, secondBarSlot++, shortcutTypeAbility, ability.Id);
-				else
+				if (!isNormalAttack)
 					await Database.SetCharacterShortcut(character.Id, specialSlot++, shortcutTypeAbility, ability.Id);
 
 				// Grant the ability NOW (pre-snapshot) so the client knows it when it restores the freshly-seeded bar
