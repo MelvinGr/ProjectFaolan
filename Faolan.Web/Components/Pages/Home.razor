@@ -105,8 +105,10 @@
     private (bool Has, string Label, string Title) SlotInfo(string slot) =>
         _equipment.TryGetValue(slot, out var it) ? (true, it.Name, it.Name) : (false, slot, slot);
 
-    // Render one paper-doll slot: shows the equipped item's name (highlighted) or the placeholder slot label.
-    private RenderFragment Slot(string slot, string extra = "") => @<div class="slot @extra @(SlotInfo(slot).Has ? "filled" : "")" title="@SlotInfo(slot).Title">
+    // Render one paper-doll slot: a 3D thumbnail of the equipped item (filled in by JS), with the item name as the
+    // fallback/label (or the placeholder slot name when empty).
+    private RenderFragment Slot(string slot, string extra = "") => @<div class="slot @extra @(SlotInfo(slot).Has ? "filled" : "")" title="@SlotInfo(slot).Title" data-item="@(SlotInfo(slot).Has ? _equipment[slot].Id.ToString() : "")">
+        <img class="slot-img" alt="" />
         <span class="@(SlotInfo(slot).Has ? "item" : "")">@SlotInfo(slot).Label</span>
     </div>;
 
@@ -139,9 +141,12 @@
         _selected = c;
         _equipment = Models.Equipment((uint)c.Id);
         await Render();
-        // Wire the pose slider to the client-side pose driver now it's in the DOM.
         if (_module is not null)
+        {
+            // Wire the pose slider, then render a 3D thumbnail into each equipped slot.
             await _module.InvokeVoidAsync("bindPoseSlider", "char-canvas", "pose-slider");
+            await _module.InvokeVoidAsync("populateItemThumbs");
+        }
     }
 
     // (Re)build the selected character's model, overlaying the chosen armour set. Cache-bust so a rebuilt/redressed
@@ -208,6 +213,11 @@
     .slot.filled { border-color: #b89544; background: linear-gradient(#3a3526, #2a2619); }
     .slot span.item { color: #e6d8a8; text-transform: none; font-size: .5rem; overflow: hidden;
         display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+    .slot-img { display: none; position: absolute; inset: 2px; width: calc(100% - 4px); height: calc(100% - 4px);
+        object-fit: contain; }
+    .slot { position: relative; }
+    .slot.has-img .slot-img { display: block; }
+    .slot.has-img span { display: none; }
     .slot.wide { width: 64px; }
     .equip-bottom { display: flex; gap: .55rem; justify-content: center; padding-top: .6rem; }
     .equip-tip { margin-top: .5rem; padding-top: .45rem; border-top: 1px solid #2c2a22; color: #c9c2a8;

@@ -433,6 +433,75 @@ namespace Faolan.Core.Rdb.Assets
 			return FctxConverter.TryDecodeTopMip(rdb.ReadDecompressed(e), out rgba, out w, out h);
 		}
 
+		// The item's 3D display model (the inventory/world mesh shown in equipment slots): decrypt the item template
+		// (TEA, key = the item's Data1..4), read property field 12 = the display MESHINDEXFILE id, and render it. Null
+		// when the item has no display mesh (armour pieces carry only a worn-look id, the still-open gear RE in #275).
+		public static byte[]? BuildItemModelGlb(RdbReader rdb, uint itemId, uint d1, uint d2, uint d3, uint d4)
+		{
+			if (ItemDisplayMeshIndex(rdb, itemId, [d1, d2, d3, d4]) is not { } meshIndexId)
+				return null;
+
+			var subs = ReadTexturedModel(rdb, meshIndexId);
+			return subs is { Count: > 0 } ? GlbWriter.Build(subs, null) : null;
+		}
+
+		// Decrypt an item template and return its display-mesh MESHINDEXFILE id (property field 12), or null.
+		public static uint? ItemDisplayMeshIndex(RdbReader rdb, uint itemId, uint[] key)
+		{
+			byte[]? template = null;
+			foreach (var type in new uint[] { 1000020, 1000620 })
+				if (rdb.TryGet(type, itemId, out var e) && e.IsLocal && e.Size > 0)
+				{
+					try { template = rdb.ReadDecrypted(e, key); break; }
+					catch { /* wrong key / not this type */ }
+				}
+
+			if (template is null || template.Length < 16)
+				return null;
+
+			var body = template.AsSpan(12);
+			var words = body.Length / 4;
+
+			// The property table is a strictly descending run of [fieldId][value] u32 pairs; find the longest such run.
+			int bestStart = -1, bestLen = 0;
+			for (var start = 0; start + 1 < words; start++)
+			{
+				uint last = 0;
+				var have = false;
+				var len = 0;
+				for (var j = start; j + 1 < words; j += 2)
+				{
+					var fid = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(j * 4, 4));
+					if (fid == 0 || fid > 2000 || (have && fid >= last))
+						break;
+					last = fid;
+					have = true;
+					len++;
+				}
+
+				if (len > bestLen) { bestLen = len; bestStart = start; }
+			}
+
+			if (bestStart < 0)
+				return null;
+
+			uint lastF = 0;
+			var haveF = false;
+			for (var j = bestStart; j + 1 < words; j += 2)
+			{
+				var fid = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(j * 4, 4));
+				if (fid == 0 || fid > 2000 || (haveF && fid >= lastF))
+					break;
+				var val = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(body.Slice((j + 1) * 4, 4));
+				if (fid == 12 && val > 1000 && rdb.TryGet(MeshIndexFileType, val, out var me) && me.Size > 0)
+					return val;
+				lastF = fid;
+				haveF = true;
+			}
+
+			return null;
+		}
+
 		// Decode one model's geometry to its sub-meshes (null if the mesh-index or its local geometry is missing).
 		public static IReadOnlyList<RenderMeshReader.SubMesh>? ReadModel(RdbReader rdb, uint meshIndexId)
 		{

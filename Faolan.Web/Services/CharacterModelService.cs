@@ -276,6 +276,17 @@ namespace Faolan.Web.Services
 			return result;
 		}
 
+		// Build an item's 3D display model (the inventory mesh shown in equipment slots), or null if it has none
+		// (armour pieces carry only a worn-look id, not a display mesh - the open gear RE).
+		public byte[]? ItemModel(uint itemId)
+		{
+			using var db = _dbFactory.CreateDbContext();
+			var item = db.Items.AsNoTracking().FirstOrDefault(i => i.Id == itemId);
+			return item is null
+				? null
+				: RdbAssetExtractor.BuildItemModelGlb(Reader(), itemId, item.Data1, item.Data2, item.Data3, item.Data4);
+		}
+
 		// Build a single RenderMesh (type 1010001) directly by id - for inspecting head/eye/hair meshes (#275).
 		public byte[]? BuildRenderMesh(uint renderMeshId)
 		{

@@ -159,6 +159,61 @@ export function bindPoseSlider(canvasId, sliderId) {
     }
 }
 
+// Render an item glb to a PNG data-URL with ONE reused offscreen renderer (so 16 equipment slots don't each take a
+// WebGL context). Null on load failure (the item has no display mesh -> the slot keeps its label).
+let _thumbRenderer = null;
+async function renderItemThumb(url) {
+    if (!_thumbRenderer) {
+        _thumbRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+        _thumbRenderer.setSize(96, 96);
+    }
+
+    let gltf;
+    try { gltf = await new GLTFLoader().loadAsync(url); }
+    catch { return null; }
+
+    const scene = new THREE.Scene();
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x40404a, 1.4));
+    const dl = new THREE.DirectionalLight(0xffffff, 1.3); dl.position.set(1.2, 2, 2.2); scene.add(dl);
+
+    const model = gltf.scene;
+    model.updateWorldMatrix(true, true);
+    const box = new THREE.Box3();
+    model.traverse(o => {
+        if (o.isMesh && o.geometry) {
+            o.geometry.computeBoundingBox();
+            box.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld));
+            o.material.flatShading = false;
+        }
+    });
+    const sphere = box.getBoundingSphere(new THREE.Sphere());
+    model.position.sub(sphere.center);
+    scene.add(model);
+
+    const cam = new THREE.PerspectiveCamera(32, 1, 0.001, 100);
+    const r = sphere.radius || 1;
+    cam.position.set(r * 1.3, r * 0.8, r * 2.1);
+    cam.lookAt(0, 0, 0);
+    _thumbRenderer.render(scene, cam);
+    return _thumbRenderer.domElement.toDataURL('image/png');
+}
+
+// Fill each filled equipment slot (.slot[data-item]) with a rendered thumbnail of its item's 3D model.
+export async function populateItemThumbs() {
+    for (const slot of document.querySelectorAll('.slot[data-item]')) {
+        const id = slot.getAttribute('data-item');
+        const img = slot.querySelector('.slot-img');
+        if (!id || !img || img.dataset.itemDone === id)
+            continue;
+        const data = await renderItemThumb(`/api/item/${id}/model.glb`);
+        if (data) {
+            img.src = data;
+            img.dataset.itemDone = id;
+            slot.classList.add('has-img');
+        }
+    }
+}
+
 // Dev hooks so headless tooling can drive the REAL viewer page (load a model URL + set the pose angle).
 if (typeof window !== 'undefined') {
     window.__faolanShow = show;

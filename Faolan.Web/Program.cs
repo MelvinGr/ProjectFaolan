@@ -93,6 +93,13 @@ namespace Faolan.Web
                 return glb is null ? Results.NotFound() : Results.File(glb, "model/gltf-binary");
             });
 
+            // An item's 3D display model for the equipment-slot thumbnails (404 when the item has no display mesh).
+            app.MapGet("/api/item/{itemId:long}/model.glb", (long itemId, CharacterModelService models) =>
+            {
+                var glb = models.ItemModel((uint)itemId);
+                return glb is null ? Results.NotFound() : Results.File(glb, "model/gltf-binary");
+            });
+
             if (app.Environment.IsDevelopment())
             {
                 app.MapGet("/api/debug/char/{id:long}", (long id, CharacterModelService models) => Results.Json(models.DebugCharacter((uint)id)));
