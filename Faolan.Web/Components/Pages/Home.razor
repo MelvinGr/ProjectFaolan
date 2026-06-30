@@ -77,22 +77,9 @@
                 {
                     <div class="tip-line">@_selected.Name — @_selected.Race @_selected.Sex (@_status)</div>
                     <div class="tip-controls">
-                        @if (string.IsNullOrEmpty(_equip))
-                        {
-                            <label class="pose">elbows
-                                <input type="range" id="pose-slider" min="0" max="90" value="0" />
-                            </label>
-                        }
-                        @if (_armorSets is { Count: > 0 })
-                        {
-                            <select class="wardrobe" value="@_equip" @onchange="OnEquipChanged" title="Preview an armour set">
-                                <option value="">— body (posable) —</option>
-                                @foreach (var set in _armorSets)
-                                {
-                                    <option value="@set.Equip">@($"{set.Number:0000}") @set.Name</option>
-                                }
-                            </select>
-                        }
+                        <label class="pose">elbows
+                            <input type="range" id="pose-slider" min="0" max="90" value="0" />
+                        </label>
                     </div>
                 }
                 else
@@ -112,8 +99,6 @@
     private Character? _selected;
     private string _status = "";
     private IJSObjectReference? _module;
-    private List<(int Number, string Name, string Equip)> _armorSets = [];
-    private string _equip = "";
     private IReadOnlyDictionary<string, (uint Id, string Name)> _equipment = new Dictionary<string, (uint, string)>();
 
     // Slot display: the equipped item's name when filled, else the placeholder slot label.
@@ -152,22 +137,10 @@
     private async Task Select(Character c)
     {
         _selected = c;
-        _equip = "";
         _equipment = Models.Equipment((uint)c.Id);
-        // Offer the armour sets for this character's sex (wardrobe preview - the per-item look mapping is still open).
-        _armorSets = Models.ArmorSets(c.Sex).Select(s => (s.Number, s.Name, string.Join(',', s.PieceMeshIndexIds))).ToList();
         await Render();
-        // The pose slider is now in the DOM (base body selected) - wire it to the client-side pose driver.
-        if (_module is not null && string.IsNullOrEmpty(_equip))
-            await _module.InvokeVoidAsync("bindPoseSlider", "char-canvas", "pose-slider");
-    }
-
-    private async Task OnEquipChanged(ChangeEventArgs e)
-    {
-        _equip = e.Value?.ToString() ?? "";
-        await Render();
-        // The slider re-appears when switching back to the base body; (re)bind it to the client-side pose driver.
-        if (_module is not null && string.IsNullOrEmpty(_equip))
+        // Wire the pose slider to the client-side pose driver now it's in the DOM.
+        if (_module is not null)
             await _module.InvokeVoidAsync("bindPoseSlider", "char-canvas", "pose-slider");
     }
 
@@ -178,14 +151,11 @@
         if (_selected is null)
             return;
 
-        _status = string.IsNullOrEmpty(_equip) ? "building…" : "dressing…";
+        _status = "building…";
         StateHasChanged();
 
-        // No armour => the posable BODY rig (skinned, driven by the elbow slider); an armour set => the static dressed
-        // assembly (the gear isn't skinned yet, so it's not posable).
-        var url = string.IsNullOrEmpty(_equip)
-            ? $"/api/character/{_selected.Id}/model.glb?rig=1&t={DateTime.UtcNow.Ticks}"
-            : $"/api/character/{_selected.Id}/model.glb?equip={_equip}&t={DateTime.UtcNow.Ticks}";
+        // The posable character rig (skinned body + head + hair), driven by the elbow slider.
+        var url = $"/api/character/{_selected.Id}/model.glb?rig=1&t={DateTime.UtcNow.Ticks}";
         if (_module is not null)
             await _module.InvokeVoidAsync("show", "char-canvas", url);
 
