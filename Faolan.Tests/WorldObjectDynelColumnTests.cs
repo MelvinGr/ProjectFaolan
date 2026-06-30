@@ -23,7 +23,7 @@ namespace Faolan.Tests
 			using var cmd = con.CreateCommand();
 			// All world-object classes (not just dynels) - they share the ProtoSimpleDynelIIR identity message.
 			cmd.CommandText = "SELECT Name,DisplayName,CarsGroup,IsClosed,QuestItemEffect,TemplateItemId,Kdtree,WaypointType,KdTreeTail,Data " +
-			                  "FROM WorldObjects WHERE DisplayName != null";
+			                  "FROM WorldObjects WHERE DisplayName IS NOT NULL";
 			using var r = cmd.ExecuteReader();
 			int total = 0, ok = 0, parseFail = 0, mismatch = 0, builtFromDb = 0;
 			while (r.Read())
