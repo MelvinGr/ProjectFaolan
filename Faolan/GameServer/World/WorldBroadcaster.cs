@@ -144,11 +144,14 @@ namespace Faolan.GameServer.World
 		// it (else they'd get a move for an unknown entity).
 		public async Task BroadcastNpcMove(WorldEntity npc)
 		{
-			// NB the patrol (mode-1 path) form was tried here but its trailer anchor makes the client walk to the waypoint
-			// then BACK to the anchor, netting ZERO movement (the NPC jitters in place) - so we keep the plain transform
-			// and instead fixed the cadence (coarser segments) so consecutive transforms chain smoothly.
-			var facing = npc.MoveFrom.FaceTowards(npc.Position);
-			var body = MoveTaskCodec.BuildBody(npc.Handle, npc.MoveFrom, npc.Position, facing);
+			// #272: send the mode-1 PathMoveTask WALK form (the client interpolates the segment over time) rather than the
+			// mode-2 RotateMoveTask transform, which is a position-SET the client SNAPS to. The segment is MoveFrom ->
+			// Position (the ~6u the throttle accumulated), so the client renders the NPC where the server model has it -
+			// walking that segment - rather than lagging behind a far-goal path while the model jumps into melee (which
+			// desyncs: the player takes hits from an NPC the client still shows mid-walk). The earlier path attempt reverted
+			// because its trailer anchored at the START (walk then back = net-zero); BuildWalkBody anchors it at the segment
+			// end (Position). Residual: consecutive segments still re-spline (a small snap) - the remaining #272 polish.
+			var body = MoveTaskCodec.BuildWalkBody(npc.Handle, npc.MoveFrom, npc.Position);
 
 			foreach (var viewer in _sim
 				         .World
