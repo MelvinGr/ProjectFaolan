@@ -1,4 +1,5 @@
 using Faolan.Core;
+using Faolan.Core.Crypt;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -91,7 +92,7 @@ namespace Faolan.Web
                 var account = new Account
                 {
                     UserName = username,
-                    Password = password,
+                    Password = PasswordHashing.Hash(password),
                     Type = AccountType.Normal,
                     State = AccountState.Active,
                     CreationDate = DateTime.UtcNow,
@@ -109,8 +110,16 @@ namespace Faolan.Web
             {
                 await using var db = await dbf.CreateDbContextAsync();
                 var account = db.Accounts.FirstOrDefault(a => a.UserName == username);
-                if (account is null || account.Password != password)
+                if (account is null || !PasswordHashing.Matches(account.Password, password))
                     return Results.Redirect("/login?error=1");
+
+                // Migrate a legacy plaintext password to a hash on first successful login.
+                if (PasswordHashing.NeedsRehash(account.Password))
+                {
+                    account.Password = PasswordHashing.Hash(password);
+                    await db.SaveChangesAsync();
+                }
+
                 await SignIn(ctx, account);
                 return Results.Redirect("/characters");
             }).DisableAntiforgery();

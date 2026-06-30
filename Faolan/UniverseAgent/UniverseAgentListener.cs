@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Faolan.Core.Crypt;
 using Faolan.Core.Database;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -65,8 +66,24 @@ namespace Faolan.UniverseAgent
 					bool authenticated;
 					if (credentials is not null && credentials.Challenge == account.AuthChallenge)
 					{
-						// Patched client: enforce the password, unless none is configured (the "-" sentinel).
-						authenticated = string.IsNullOrEmpty(account.Password) || account.Password == "-" || (credentials.Username == account.UserName && credentials.Password == account.Password);
+						// Patched client: enforce the password, unless none is configured (the "-" sentinel) - same as
+						// before. PasswordHashing.Matches verifies a stored PBKDF2 hash OR a legacy plaintext value.
+						if (string.IsNullOrEmpty(account.Password) || account.Password == "-")
+						{
+							authenticated = true;
+						}
+						else
+						{
+							authenticated = credentials.Username == account.UserName
+							                && PasswordHashing.Matches(account.Password, credentials.Password);
+
+							// Upgrade a legacy plaintext password to a hash on first successful login.
+							if (authenticated && PasswordHashing.NeedsRehash(account.Password))
+							{
+								account.Password = PasswordHashing.Hash(credentials.Password);
+								await Database.SetAccountPassword(account.Id, account.Password);
+							}
+						}
 
 						if (authenticated)
 							Logger.LogInformation("UniverseAgent login: password validated for {UserName} (patched client).", account.UserName);

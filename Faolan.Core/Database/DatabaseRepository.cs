@@ -114,6 +114,7 @@ namespace Faolan.Core.Database
 		Task RemoveCharacterQuest(uint characterId, uint questId);
 		Task SaveAccount(Account account);
 		Task<bool> SetAccountState(uint accountId, AccountState state);
+		Task<bool> SetAccountPassword(uint accountId, string password);
 		Task SaveCharacter(Character character);
 		Task SaveCharacterEquipment(CharacterEquipment equipment);
 		Task SaveCharacterScaffold(Character character);
@@ -1215,6 +1216,20 @@ namespace Faolan.Core.Database
 				return false;
 
 			tracked.State = state;
+			await ctx.SaveChangesAsync();
+			return true;
+		}
+
+		// Set an account's stored password (already hashed by the caller). Returns false if no such account. Used to
+		// migrate a legacy plaintext password to a hash on first successful login.
+		public async Task<bool> SetAccountPassword(uint accountId, string password)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var tracked = await ctx.Accounts.FirstOrDefaultAsync(a => a.Id == accountId);
+			if (tracked == null)
+				return false;
+
+			tracked.Password = password;
 			await ctx.SaveChangesAsync();
 			return true;
 		}
