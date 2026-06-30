@@ -21,9 +21,18 @@ namespace Faolan.GameServer.World
 		// How close (horizontal) an aggroed NPC must be to its target to swing; beyond this it chases.
 		public const float NpcMeleeRange = 3f;
 
-		// How fast a chasing NPC closes on its target (world units per second). A run-pace value so it keeps up with a
-		// fleeing player (a slower value rubber-bands) and the client reads the faster movement as a run, not a walk.
-		public const float NpcMoveSpeed = 12f;
+		// #272: how close a chasing NPC actually WALKS UP to its target (well inside NpcMeleeRange so it reaches contact
+		// and stays comfortably in swing range, not hovering exactly on the swing boundary where a drifting target leaves
+		// it perpetually a step away and never swinging). Must be < NpcMeleeRange.
+		public const float NpcContactRange = 1.5f;
+
+		// How fast a chasing NPC closes on its target (world units per second). Capture-measured: retail renders NPC
+		// locomotion at ~6.9 u/s (median over 207 clear-locomotion samples, mode 7; Captures movement trajectories). This
+		// MUST equal the speed the CLIENT renders the NPC at, because the client paces a no-duration 2-point MoveTask
+		// segment by the entity's movement speed, not by the packet: if the model steps faster than the client renders
+		// (the old 12 u/s), the model outruns the on-screen NPC and each new segment makes it jump forward = the #272
+		// chase teleport. 7 matches the render speed so consecutive segments chain smoothly. (Also ~PatrolWalkSpeed 6.)
+		public const float NpcMoveSpeed = 7f;
 
 		// How far (horizontal) an NPC will chase from its spawn before giving up and returning home (so a player can't
 		// drag a mob across the whole zone). Once it disengages it keeps returning until home, ignoring re-aggro.
@@ -37,7 +46,7 @@ namespace Faolan.GameServer.World
 		// must feed it retail-sized segments - retail's chase/follow stream is ~6-7u steps. The model still steps Position
 		// every tick (combat/interest fidelity), but a MoveTask is only broadcast once the entity has travelled this far
 		// since the last one; a 1.2u-per-tick (10 Hz) MoveTask flood is what the client can't interpolate -> the jitter/
-		// teleport (#272). At NpcMoveSpeed (12 u/s) this broadcasts ~twice a second.
+		// teleport (#272). At NpcMoveSpeed (7 u/s) this broadcasts ~once a second.
 		public const float MoveBroadcastSegment = 6f;
 
 		// The live zones keyed by (mapId, instanceId) (#268). A map can have several copies (instances): the default
@@ -247,16 +256,22 @@ namespace Faolan.GameServer.World
 					var dx = target.Position.X - entity.Position.X;
 					var dz = target.Position.Z - entity.Position.Z;
 					var horizontal = MathF.Sqrt(dx * dx + dz * dz);
+
+					// Walk up to CONTACT range (well inside swing range) so the NPC visibly closes on the player instead of
+					// stopping a swing-range away. While still outside swing range it only winds up; once inside swing range
+					// it swings even while taking the last steps to contact (#272).
+					if (horizontal > NpcContactRange)
+						StepAndStream(entity, dx, dz, horizontal, NpcContactRange, WorldTickEffectType.NpcMove, target);
+					else
+						// At contact: flush the trailing approach step so the client sees it close the last bit (no StopIIR -
+						// the swing/combat-mode draw plants it).
+						EndMove(entity, stop: false, WorldTickEffectType.NpcMove);
+
 					if (horizontal > NpcMeleeRange)
 					{
-						StepAndStream(entity, dx, dz, horizontal, NpcMeleeRange, WorldTickEffectType.NpcMove, target);
-						entity.ArmAttackCooldown(NpcAttackInterval); // wind up a swing for when it arrives
+						entity.ArmAttackCooldown(NpcAttackInterval); // still out of swing range: wind up for arrival
 						continue;
 					}
-
-					// Reached melee: flush the trailing approach step so the client sees it close the last bit (no StopIIR -
-					// the swing/combat-mode draw plants it), then swing (#272).
-					EndMove(entity, stop: false, WorldTickEffectType.NpcMove);
 
 					if (entity.TickAttackReady(deltaSeconds, NpcAttackInterval))
 						// A caster NPC casts a spell on the same cadence; everyone else swings (#232).
