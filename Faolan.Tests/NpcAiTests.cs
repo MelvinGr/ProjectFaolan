@@ -123,10 +123,11 @@ namespace Faolan.Tests
 			Assert.Same(npc, attack.Entity);
 			Assert.Same(player, attack.Target);
 
-			// Within the interval, no further swing.
-			Assert.Empty(world.Tick(WorldState.NpcAttackInterval / 2));
+			// Within the interval, no further swing. (The mob may still flush a trailing walk-up step toward contact
+			// range, #272 - that's an NpcMove, not a swing - so assert on the attack itself, not on emptiness.)
+			Assert.DoesNotContain(world.Tick(WorldState.NpcAttackInterval / 2), e => e.Type == WorldTickEffectType.NpcAttack);
 			// Once the interval elapses, it swings again.
-			Assert.Single(world.Tick(WorldState.NpcAttackInterval));
+			Assert.Single(world.Tick(WorldState.NpcAttackInterval), e => e.Type == WorldTickEffectType.NpcAttack);
 		}
 
 		[Fact]
@@ -139,10 +140,17 @@ namespace Faolan.Tests
 			zone.Add(npc);
 			zone.Add(player);
 
-			// The engage tick also carries the combat-mode (weapon-draw, #218) effect alongside the chase step.
-			var move = world.Tick(0.5).Single(e => e.Type == WorldTickEffectType.NpcMove);
-			Assert.Same(npc, move.Entity);
-			Assert.Same(player, move.Target);
+			// The engage tick also carries the combat-mode (weapon-draw, #218) effect alongside the chase step, and a
+			// chase MoveTask is only broadcast once the NPC has accumulated a retail-sized segment (#272 throttle:
+			// MoveBroadcastSegment), so a single 0.5s step (3.5u) is below threshold - tick until the first move fires.
+			WorldTickEffect? move = null;
+			for (var i = 0; i < 10 && move == null; i++)
+				foreach (var e in world.Tick(0.5))
+					if (e.Type == WorldTickEffectType.NpcMove)
+						move ??= e;
+			Assert.NotNull(move);
+			Assert.Same(npc, move.Value.Entity);
+			Assert.Same(player, move.Value.Target);
 
 			// It stepped toward the player (closer than it started, not past them) and the broadcast segment recorded its
 			// origin (the from of the MoveFrom -> Position segment the client interpolates, #272).
