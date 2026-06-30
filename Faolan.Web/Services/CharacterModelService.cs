@@ -330,6 +330,26 @@ namespace Faolan.Web.Services
 				.ToList();
 		}
 
+		// Armory search: named item templates matching an optional name fragment + type filter, paged. Returns the
+		// page of items (as display ItemInfo) and the total match count for the pager.
+		public (IReadOnlyList<ItemInfo> Items, int Total) SearchItems(string? query, int? type, int page, int pageSize)
+		{
+			using var db = _dbFactory.CreateDbContext();
+			var q = db.Items.AsNoTracking().Where(i => i.Name != null && i.Name != "");
+			if (!string.IsNullOrWhiteSpace(query))
+				q = q.Where(i => EF.Functions.Like(i.Name, $"%{query.Trim()}%"));
+			if (type is int t)
+				q = q.Where(i => (int)i.Type == t);
+
+			var total = q.Count();
+			var items = q.OrderBy(i => i.Name)
+				.Skip(page * pageSize).Take(pageSize)
+				.AsEnumerable()
+				.Select(i => ItemInfo.From(i))
+				.ToList();
+			return (items, total);
+		}
+
 		// Build an item's 3D display model (the inventory mesh shown in equipment slots), or null if it has none
 		// (armour pieces carry only a worn-look id, not a display mesh - the open gear RE).
 		public byte[]? ItemModel(uint itemId)
