@@ -1,0 +1,236 @@
+@page "/admin/db"
+@rendermode InteractiveServer
+@using System.Reflection
+@using System.Security.Claims
+@using Faolan.Core.Database
+@using Faolan.Web.Services
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<DatabaseContext> DbFactory
+@inject NavigationManager Nav
+@implements IDisposable
+
+<PageTitle>Database — Admin</PageTitle>
+
+<div class="dbe">
+    <div class="dbe-head">
+        <h1>Database</h1>
+        <span class="warn">⚠ edits the live game DB — the server may need a restart to pick up changes</span>
+    </div>
+
+    @if (!_authorized)
+    {
+        <p class="muted">Checking access…</p>
+    }
+    else
+    {
+        @if (_status is not null)
+        {
+            <p class="dbe-status @(_error ? "err" : "")">@_status</p>
+        }
+        <div class="dbe-grid">
+            <aside class="dbe-tables">
+                @foreach (var t in _tables)
+                {
+                    <button class="@(t == _table ? "sel" : "")" @onclick="() => SelectTable(t)">@t.Name</button>
+                }
+            </aside>
+
+            <section class="dbe-rows">
+                <input class="filter" placeholder="Filter rows…" @bind="_filter" @bind:event="oninput" />
+                <div class="rowlist">
+                    @foreach (var r in Filtered())
+                    {
+                        <button class="@(ReferenceEquals(r, _row) ? "sel" : "")" @onclick="() => SelectRow(r)">@r.ToString()</button>
+                    }
+                </div>
+                <div class="rowbar">
+                    <button class="btn" disabled="@(_table is null)" @onclick="AddRow">+ Add</button>
+                    <button class="btn" disabled="@(_row is null)" @onclick="DeleteRow">Delete</button>
+                    <button class="btn primary" @onclick="Save">Save</button>
+                    <span class="count">@_rows.Count loaded@(_rows.Count >= RowCap ? $" (cap {RowCap})" : "")</span>
+                </div>
+            </section>
+
+            <section class="dbe-fields">
+                @if (_row is null)
+                {
+                    <p class="muted">Select a row to edit.</p>
+                }
+                else
+                {
+                    @foreach (var f in _fields)
+                    {
+                        <div class="field">
+                            <label>@f.Name</label>
+                            @if (f.IsBool)
+                            {
+                                <input type="checkbox" checked="@f.BoolValue" @onchange="e => f.BoolValue = (bool)(e.Value ?? false)" />
+                            }
+                            else if (f.IsEnum)
+                            {
+                                <select value="@f.Text" @onchange="e => SetText(f, e.Value?.ToString())">
+                                    @foreach (var ev in f.EnumValues)
+                                    {
+                                        <option value="@ev">@ev</option>
+                                    }
+                                </select>
+                            }
+                            else
+                            {
+                                <input value="@f.Text" @onchange="e => SetText(f, e.Value?.ToString())" />
+                            }
+                        </div>
+                    }
+                }
+            </section>
+        </div>
+    }
+</div>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private const int RowCap = 500;
+    private static readonly MethodInfo SetMethod = typeof(DbContext).GetMethod(nameof(DbContext.Set), 1, Type.EmptyTypes)!;
+
+    private bool _authorized;
+    private DatabaseContext? _ctx;
+    private List<Type> _tables = [];
+    private Type? _table;
+    private readonly List<object> _rows = [];
+    private object? _row;
+    private IReadOnlyList<DbEditorField> _fields = [];
+    private string _filter = "";
+    private string? _status;
+    private bool _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+        if (user is null || !user.IsInRole("Admin"))
+        {
+            Nav.NavigateTo("/", forceLoad: true);
+            return;
+        }
+        _authorized = true;
+
+        _ctx = await DbFactory.CreateDbContextAsync();
+        _tables = _ctx.Model.GetEntityTypes()
+            .Where(t => t.ClrType is not null && !t.IsOwned())
+            .Select(t => t.ClrType).Distinct().OrderBy(t => t.Name).ToList();
+        if (_tables.Count > 0) SelectTable(_tables[0]);
+    }
+
+    private IEnumerable<object> Filtered() =>
+        string.IsNullOrWhiteSpace(_filter)
+            ? _rows
+            : _rows.Where(r => (r.ToString() ?? "").Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    private void SelectTable(Type t)
+    {
+        _table = t;
+        _row = null;
+        _fields = [];
+        _filter = "";
+        _rows.Clear();
+        if (_ctx is null) return;
+        try
+        {
+            var set = (System.Collections.IEnumerable)SetMethod.MakeGenericMethod(t).Invoke(_ctx, null)!;
+            foreach (var e in set)
+            {
+                _rows.Add(e);
+                if (_rows.Count >= RowCap) break;
+            }
+            Set($"{t.Name}: {_rows.Count} rows loaded");
+        }
+        catch (Exception ex) { Set(ex.Message, error: true); }
+    }
+
+    private void SelectRow(object r)
+    {
+        _row = r;
+        _fields = DbEditorField.Editable(r);
+    }
+
+    private void SetText(DbEditorField f, string? value)
+    {
+        try { f.Text = value ?? ""; }
+        catch (Exception ex) { Set($"{f.Name}: {ex.Message}", error: true); }
+    }
+
+    private void AddRow()
+    {
+        if (_ctx is null || _table is null) return;
+        try
+        {
+            var entity = Activator.CreateInstance(_table)!;
+            _ctx.Add(entity);
+            _rows.Insert(0, entity);
+            SelectRow(entity);
+            Set($"Added a new {_table.Name} (unsaved — press Save)");
+        }
+        catch (Exception ex) { Set(ex.Message, error: true); }
+    }
+
+    private void DeleteRow()
+    {
+        if (_ctx is null || _row is null) return;
+        _ctx.Remove(_row);
+        _rows.Remove(_row);
+        _row = null;
+        _fields = [];
+        Set("Removed (unsaved — press Save)");
+    }
+
+    private async Task Save()
+    {
+        if (_ctx is null) return;
+        try
+        {
+            var n = await _ctx.SaveChangesAsync();
+            Set($"Saved — {n} change(s) written");
+        }
+        catch (Exception ex) { Set(ex.InnerException?.Message ?? ex.Message, error: true); }
+    }
+
+    private void Set(string msg, bool error = false) { _status = msg; _error = error; }
+
+    public void Dispose() => _ctx?.Dispose();
+}
+
+<style>
+    .dbe { max-width: 1200px; margin: 0 auto; padding: 1rem; }
+    .dbe-head { display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; margin-bottom: .6rem; }
+    .dbe-head h1 { font-size: 1.7rem; margin: 0; }
+    .dbe .warn { color: #e0a85a; font-size: .8rem; }
+    .dbe .muted { color: var(--muted); }
+    .dbe-status { font-size: .85rem; color: var(--gold); margin: 0 0 .75rem; }
+    .dbe-status.err { color: var(--danger); }
+
+    .dbe-grid { display: grid; grid-template-columns: 200px 1.2fr 1.4fr; gap: 1rem; align-items: start; }
+    .dbe-tables, .dbe-rows, .dbe-fields { background: linear-gradient(180deg, var(--bg-2), #121419);
+        border: 1px solid var(--stone-dark); border-radius: var(--radius); padding: .6rem; }
+    .dbe-tables { max-height: 78vh; overflow-y: auto; display: flex; flex-direction: column; gap: .2rem; }
+    .dbe-tables button, .rowlist button { text-align: left; background: transparent; color: var(--text);
+        border: 1px solid transparent; border-radius: 5px; padding: .35rem .5rem; cursor: pointer; font-size: .82rem; }
+    .dbe-tables button:hover, .rowlist button:hover { background: var(--field); }
+    .dbe-tables button.sel, .rowlist button.sel { background: linear-gradient(#322d1d, #241f12); border-color: var(--gold-dim); color: var(--gold-bright); }
+
+    .filter { width: 100%; box-sizing: border-box; padding: .45rem .6rem; border-radius: 6px; border: 1px solid var(--line);
+        background: var(--field); color: var(--text); font-size: .85rem; margin-bottom: .5rem; }
+    .rowlist { max-height: 64vh; overflow-y: auto; display: flex; flex-direction: column; gap: .15rem; }
+    .rowlist button { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rowbar { display: flex; gap: .4rem; align-items: center; margin-top: .5rem; }
+    .rowbar .btn { padding: .4rem .8rem; font-size: .8rem; }
+    .rowbar .count { margin-left: auto; color: var(--muted); font-size: .75rem; }
+
+    .dbe-fields { max-height: 78vh; overflow-y: auto; }
+    .field { display: grid; grid-template-columns: 11rem 1fr; gap: .5rem; align-items: center; padding: .25rem 0; }
+    .field label { color: var(--muted); font-size: .8rem; overflow: hidden; text-overflow: ellipsis; }
+    .field input[type=text], .field input:not([type]), .field select {
+        width: 100%; box-sizing: border-box; padding: .35rem .5rem; border-radius: 5px; border: 1px solid var(--line);
+        background: var(--field); color: var(--text); font-size: .82rem; }
+
+    @@media (max-width: 900px) { .dbe-grid { grid-template-columns: 1fr; } }
+</style>
