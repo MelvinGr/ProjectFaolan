@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Faolan.Core.Rdb.Assets
 {
@@ -33,12 +34,24 @@ namespace Faolan.Core.Rdb.Assets
 
 		// One drawable sub-mesh: flat XYZ positions, optional XYZ normals + UV (UVs absent => empty), triangle indices.
 		// BaseColorPng (optional, set by the caller) lets sub-meshes from different models carry their own diffuse.
+		// BlendBones/BlendWeights (skinned bodies & equipment only): 4 skin influences per vertex. BlendBones are the
+		// LOGICAL skeleton bone indices (the on-wire BLENDINDICES are doubled - the engine's matrix-palette register
+		// stride is 2 per bone - so the reader has already halved them); BlendWeights are /255-normalised and sum to ~1.
 		public sealed record SubMesh(float[] Positions, float[]? Normals, float[]? Uvs, int[] Indices)
 		{
 			public byte[]? BaseColorPng { get; init; }
 
 			// Alpha-tested (e.g. hair): the diffuse's alpha channel cuts out the strand edges (glTF alphaMode=MASK).
 			public bool AlphaMask { get; init; }
+
+			// Per-vertex skin influences (null on static props): 4 entries per vertex, flat. BlendBones[i*4+k] is a LOCAL
+			// index into this sub-mesh's BonePalette; the matching BlendWeights[i*4+k] is its weight. BonePalette[local] is
+			// the skeleton bone NAME ([[SkeletonReader]]) - the mesh carries its own compact bone table (g_BoneN= in the
+			// material string), so the consumer maps palette name -> skeleton bone index to get the real skin joint.
+			public int[]? BlendBones { get; init; }
+			public float[]? BlendWeights { get; init; }
+			public string[]? BonePalette { get; init; }
+			public bool IsSkinned => BlendBones != null && BonePalette != null;
 			public int VertexCount => Positions.Length / 3;
 			public int TriangleCount => Indices.Length / 3;
 		}
@@ -81,6 +94,7 @@ namespace Faolan.Core.Rdb.Assets
 
 		public static IReadOnlyList<SubMesh> Read(ReadOnlySpan<byte> blob)
 		{
+			var palettes = ParseBonePalettes(blob);
 			var subs = new List<SubMesh>();
 			var pos = 0;
 			while (true)
@@ -92,10 +106,69 @@ namespace Faolan.Core.Rdb.Assets
 				var sub = TryReadSection(blob, anchor, out var next);
 				pos = next;
 				if (sub != null)
+				{
+					// A skinned section indexes the bone palette that precedes its declaration (the g_BoneN= block sits in
+					// the section's material-param string, right before the vertex decl). Pick the nearest one before it.
+					if (sub.BlendBones != null)
+						sub = sub with { BonePalette = NearestPaletteBefore(palettes, anchor) };
 					subs.Add(sub);
+				}
 			}
 
 			return subs;
+		}
+
+		// The mesh's per-section bone palette is exported as ASCII material params: g_Bone0="rig_bone_Head" g_Bone1="..."
+		// ... g_NumberOfBones=N. Each entry's local index is the BLENDINDICES value (already halved); the value is the
+		// skeleton bone NAME. We scan the whole blob for these blocks and remember each block's byte offset so a section
+		// can bind to the palette that precedes it.
+		private static List<(int Offset, string[] Names)> ParseBonePalettes(ReadOnlySpan<byte> blob)
+		{
+			var text = System.Text.Encoding.Latin1.GetString(blob);
+			var result = new List<(int, string[])>();
+			var rx = new System.Text.RegularExpressions.Regex("g_Bone(\\d+)=\"([^\"]*)\"");
+			var blockStart = 0;
+			while (true)
+			{
+				var first = text.IndexOf("g_Bone0=\"", blockStart, StringComparison.Ordinal);
+				if (first < 0)
+					break;
+
+				// Collect the contiguous g_BoneK="name" run from here up to g_NumberOfBones (or the next non-bone token).
+				var end = text.IndexOf("g_NumberOfBones", first, StringComparison.Ordinal);
+				var slice = end > first ? text.Substring(first, end - first) : text.Substring(first, Math.Min(8192, text.Length - first));
+				var byIndex = new SortedDictionary<int, string>();
+				foreach (System.Text.RegularExpressions.Match m in rx.Matches(slice))
+					byIndex[int.Parse(m.Groups[1].Value)] = m.Groups[2].Value;
+
+				if (byIndex.Count > 0 && byIndex.ContainsKey(0))
+				{
+					var names = new string[byIndex.Keys.Max() + 1];
+					foreach (var kv in byIndex)
+						names[kv.Key] = kv.Value;
+					result.Add((first, names));
+				}
+
+				blockStart = first + 9;
+			}
+
+			return result;
+		}
+
+		private static string[]? NearestPaletteBefore(List<(int Offset, string[] Names)> palettes, int anchor)
+		{
+			string[]? best = null;
+			var bestOff = int.MinValue;
+			foreach (var (off, names) in palettes)
+				if (off <= anchor && off > bestOff)
+				{
+					bestOff = off;
+					best = names;
+				}
+
+			// A mesh with a single palette (the common case) applies it to every section even if the string sits after a
+			// section's anchor; fall back to the first palette so single-material skinned bodies still bind.
+			return best ?? (palettes.Count > 0 ? palettes[0].Names : null);
 		}
 
 		private static SubMesh? TryReadSection(ReadOnlySpan<byte> blob, int anchor, out int next)
@@ -122,11 +195,18 @@ namespace Faolan.Core.Rdb.Assets
 
 			var normEl = Find(elements, DeclUsage.Normal);
 			var uvEl = Find(elements, DeclUsage.TexCoord);
+			// Skinned bodies/equipment: BLENDINDICES is UBYTE4 (4 register indices), BLENDWEIGHT is UBYTE4N (4 weights
+			// /255). Only emit skin influences when BOTH are present in the expected encodings.
+			var biEl = Find(elements, DeclUsage.BlendIndices);
+			var bwEl = Find(elements, DeclUsage.BlendWeight);
+			var skinned = biEl is { Type: DeclType.UByte4 } && bwEl is { Type: DeclType.UByte4N };
 
 			var positions = new float[count * 3];
 			var normals = normEl is { Type: DeclType.UByte4N } ? new float[count * 3] : null;
 			// Props store UV as FLOAT2; skinned character meshes store it as SHORT2N (normalized shorts).
 			var uvs = uvEl is { Type: DeclType.Float2 or DeclType.Short2N } ? new float[count * 2] : null;
+			var bones = skinned ? new int[count * 4] : null;
+			var weights = skinned ? new float[count * 4] : null;
 
 			for (var i = 0; i < count; i++)
 			{
@@ -160,6 +240,17 @@ namespace Faolan.Core.Rdb.Assets
 						uvs[i * 2 + 1] = BinaryPrimitives.ReadInt16LittleEndian(v.Slice(o + 2, 2)) / 32767f * 0.5f + 0.5f;
 					}
 				}
+
+				if (bones != null)
+				{
+					var io = biEl!.Value.Offset;
+					var wo = bwEl!.Value.Offset;
+					for (var k = 0; k < 4; k++)
+					{
+						bones[i * 4 + k] = v[io + k] >> 1; // on-wire index is the bone's palette register (bone * 2)
+						weights[i * 4 + k] = v[wo + k] / 255f;
+					}
+				}
 			}
 
 			var ibase = vbase + count * stride;
@@ -177,7 +268,7 @@ namespace Faolan.Core.Rdb.Assets
 			}
 
 			next = ibase + 4 + tri * 6;
-			return new SubMesh(positions, normals, uvs, indices);
+			return new SubMesh(positions, normals, uvs, indices) { BlendBones = bones, BlendWeights = weights };
 		}
 
 		// Walk D3DVERTEXELEMENT9 records (8 bytes: stream u16, offset u16, type u8, method u8, usage u8, usageIndex u8)

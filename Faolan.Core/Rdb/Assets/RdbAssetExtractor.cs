@@ -15,6 +15,36 @@ namespace Faolan.Core.Rdb.Assets
 	{
 		public const uint MeshIndexFileType = 1010030;
 		public const uint RenderMeshType = 1010001;
+		public const uint SkeletonType = 1010002;
+
+		// The validated 71-bone humanoid player rig ([[SkeletonReader]]); character bodies skin against this bone array.
+		public const uint HumanoidSkeletonId = 14853;
+
+		// Load + parse a skeleton (type 1010002) by id, or null if missing/non-local.
+		public static IReadOnlyList<SkeletonReader.Bone>? LoadSkeleton(RdbReader rdb, uint skeletonId)
+		{
+			if (skeletonId == 0 || !rdb.TryGet(SkeletonType, skeletonId, out var e) || !rdb.CanRead(e))
+				return null;
+
+			var bones = SkeletonReader.Read(rdb.ReadDecompressed(e));
+			return bones.Count > 0 ? bones : null;
+		}
+
+		// Build a skinned glb for one skinned model (body or equipment piece): its geometry + the character skeleton as a
+		// glTF skin, so the result is posable and (at rest) identical to the static extract. Diffuse comes from the mesh's
+		// own materials / header texture refs. Null if the mesh-index/geometry is missing or the geometry isn't skinned.
+		public static byte[]? BuildSkinnedModelGlb(RdbReader rdb, uint meshIndexId, uint skeletonId = HumanoidSkeletonId)
+		{
+			var subs = ReadTexturedModel(rdb, meshIndexId);
+			if (subs is not { Count: > 0 } || !subs.All(s => s.IsSkinned))
+				return null;
+
+			var skeleton = LoadSkeleton(rdb, skeletonId);
+			if (skeleton == null)
+				return null;
+
+			return GlbWriter.Build(subs, null, skeleton);
+		}
 
 		// Texture container type ids worth converting/dumping (FCTX variants + the PNG/JPEG types from rdbreader's enum).
 		private static readonly uint[] FctxTypes = [1010004, 1010006, 1010218, 1066606, 1066610];

@@ -18,14 +18,25 @@ namespace Faolan.Core.Rdb.Assets
 		private const uint ChunkJson = 0x4E4F534A; // "JSON"
 		private const uint ChunkBin = 0x004E4942; // "BIN\0"
 
-		private const int Float = 5126, UInt = 5125; // glTF componentTypes
+		private const int Float = 5126, UInt = 5125, UByte = 5121; // glTF componentTypes
 		private const int ArrayBuffer = 34962, ElementArrayBuffer = 34963; // bufferView targets
 
 		// baseColorPng (optional): a fallback diffuse for sub-meshes that don't carry their own SubMesh.BaseColorPng.
 		// Each distinct PNG becomes its own glTF material/texture, so a body + head (or multi-material prop) texture
 		// independently.
-		public static byte[] Build(IReadOnlyList<RenderMeshReader.SubMesh> subs, byte[]? baseColorPng = null)
+		//
+		// skeleton (optional): when supplied AND every sub-mesh carries skin influences, the mesh is written as a glTF
+		// skin - a node per bone (TRS = the bone's local rotation+translation, parented per the hierarchy), a skin with
+		// inverseBindMatrices, and JOINTS_0/WEIGHTS_0 on each primitive. The bone bind-pose world and the mesh bind-pose
+		// vertices share one frame, so at rest the SkinnedMesh is pixel-identical to the static mesh - and now posable.
+		public static byte[] Build(IReadOnlyList<RenderMeshReader.SubMesh> subs, byte[]? baseColorPng = null,
+			IReadOnlyList<SkeletonReader.Bone>? skeleton = null)
 		{
+			var skinned = skeleton is { Count: > 0 } && subs.Count > 0 && subs.All(s => s.IsSkinned);
+			// Map a skeleton bone NAME to its index, so a sub-mesh's local bone-palette name resolves to the real joint.
+			var boneIndexByName = skinned
+				? skeleton!.Select((b, i) => (b.Name, i)).GroupBy(x => x.Name).ToDictionary(g => g.Key, g => g.First().i)
+				: null;
 			var bin = new MemoryStream();
 			var bufferViews = new List<object>();
 			var accessors = new List<object>();
@@ -56,6 +67,33 @@ namespace Faolan.Core.Rdb.Assets
 				if (sub.Uvs != null)
 					attributes["TEXCOORD_0"] = AddAccessor(bin, bufferViews, accessors, ArrayBuffer, Float, sub.VertexCount, "VEC2",
 						w => { foreach (var f in sub.Uvs) WriteF32(w, f); });
+
+				if (skinned)
+				{
+					// JOINTS_0 is UNSIGNED_BYTE VEC4 (71 bones < 256); WEIGHTS_0 is FLOAT VEC4, renormalised so the four
+					// influences sum to 1 (the /255 weights sum to ~1 already, but a degenerate all-zero vertex would make
+					// a renderer divide by zero, so guard it to a single full weight on joint 0).
+					var bones = sub.BlendBones!;
+					var wts = sub.BlendWeights!;
+					var palette = sub.BonePalette!;
+					// Resolve each local palette index to a real skeleton joint via the bone name (unknown -> joint 0).
+					var local2joint = palette
+						.Select(n => n != null && boneIndexByName!.TryGetValue(n, out var ji) ? ji : 0)
+						.ToArray();
+					attributes["JOINTS_0"] = AddAccessor(bin, bufferViews, accessors, ArrayBuffer, UByte, sub.VertexCount, "VEC4",
+						w => { foreach (var b in bones) w.WriteByte((byte)(b >= 0 && b < local2joint.Length ? local2joint[b] : 0)); });
+					attributes["WEIGHTS_0"] = AddAccessor(bin, bufferViews, accessors, ArrayBuffer, Float, sub.VertexCount, "VEC4",
+						w =>
+						{
+							for (var i = 0; i < sub.VertexCount; i++)
+							{
+								float w0 = wts[i * 4], w1 = wts[i * 4 + 1], w2 = wts[i * 4 + 2], w3 = wts[i * 4 + 3];
+								var sum = w0 + w1 + w2 + w3;
+								if (sum <= 1e-6f) { WriteF32(w, 1f); WriteF32(w, 0f); WriteF32(w, 0f); WriteF32(w, 0f); }
+								else { WriteF32(w, w0 / sum); WriteF32(w, w1 / sum); WriteF32(w, w2 / sum); WriteF32(w, w3 / sum); }
+							}
+						});
+				}
 
 				var png = sub.BaseColorPng ?? baseColorPng;
 				var material = 0;
@@ -108,19 +146,66 @@ namespace Faolan.Core.Rdb.Assets
 				materials.Add(material);
 			}
 
+			// Skin: a node per bone (child of node 0 = the mesh node, so bone node index = 1 + bone index), plus the
+			// inverseBindMatrices accessor. inverseBindMatrices[j] = inverse(bone[j].bindWorld); written in System.Numerics
+			// natural field order, which is exactly glTF's column-major encoding of the equivalent column-vector matrix.
+			var nodes = new List<object> { skinned
+				? new Dictionary<string, object> { ["mesh"] = 0, ["skin"] = 0 }
+				: new Dictionary<string, object> { ["mesh"] = 0 } };
+			object? skins = null;
+			var sceneNodes = new List<int> { 0 };
+			if (skinned)
+			{
+				var bones = skeleton!;
+				var ibmAcc = AddAccessor(bin, bufferViews, accessors, -1, Float, bones.Count, "MAT4", w =>
+				{
+					foreach (var b in bones)
+					{
+						System.Numerics.Matrix4x4.Invert(b.World, out var inv);
+						foreach (var f in MatFields(inv)) WriteF32(w, f);
+					}
+				});
+
+				for (var j = 0; j < bones.Count; j++)
+				{
+					var b = bones[j];
+					var node = new Dictionary<string, object>
+					{
+						["name"] = b.Name,
+						["translation"] = new[] { b.LocalTranslation.X, b.LocalTranslation.Y, b.LocalTranslation.Z },
+						["rotation"] = new[] { b.LocalRotation.X, b.LocalRotation.Y, b.LocalRotation.Z, b.LocalRotation.W }
+					};
+					if (b.Children is { Length: > 0 })
+						node["children"] = b.Children.Where(c => c >= 0 && c < bones.Count).Select(c => 1 + c).ToArray();
+					nodes.Add(node);
+					if (b.Parent < 0)
+						sceneNodes.Add(1 + j); // a root bone hangs off the scene alongside the mesh node
+				}
+
+				var rootBone = bones.Select((b, i) => (b, i)).FirstOrDefault(x => x.b.Parent < 0).i;
+				skins = new[] { new Dictionary<string, object>
+				{
+					["joints"] = Enumerable.Range(0, bones.Count).Select(j => 1 + j).ToArray(),
+					["inverseBindMatrices"] = ibmAcc,
+					["skeleton"] = 1 + rootBone
+				} };
+			}
+
 			var binBytes = bin.ToArray();
 			var gltf = new Dictionary<string, object>
 			{
 				["asset"] = new Dictionary<string, object> { ["version"] = "2.0", ["generator"] = "Faolan RDB RenderMesh extractor (#275)" },
 				["scene"] = 0,
-				["scenes"] = new[] { new Dictionary<string, object> { ["nodes"] = new[] { 0 } } },
-				["nodes"] = new[] { new Dictionary<string, object> { ["mesh"] = 0 } },
+				["scenes"] = new[] { new Dictionary<string, object> { ["nodes"] = sceneNodes.ToArray() } },
+				["nodes"] = nodes,
 				["meshes"] = new[] { new Dictionary<string, object> { ["primitives"] = primitives } },
 				["materials"] = materials,
 				["buffers"] = new[] { new Dictionary<string, object> { ["byteLength"] = binBytes.Length } },
 				["bufferViews"] = bufferViews,
 				["accessors"] = accessors
 			};
+			if (skins != null)
+				gltf["skins"] = skins;
 
 			if (textures.Count > 0)
 			{
@@ -142,7 +227,10 @@ namespace Faolan.Core.Rdb.Assets
 			var len = (int)bin.Length - offset;
 
 			var bvIndex = bufferViews.Count;
-			bufferViews.Add(new Dictionary<string, object> { ["buffer"] = 0, ["byteOffset"] = offset, ["byteLength"] = len, ["target"] = target });
+			var bv = new Dictionary<string, object> { ["buffer"] = 0, ["byteOffset"] = offset, ["byteLength"] = len };
+			if (target >= 0) // inverseBindMatrices (target -1) must NOT carry a bufferView target per the glTF spec
+				bv["target"] = target;
+			bufferViews.Add(bv);
 
 			var acc = new Dictionary<string, object> { ["bufferView"] = bvIndex, ["componentType"] = componentType, ["count"] = count, ["type"] = type };
 			if (bounds is { } b)
@@ -207,6 +295,17 @@ namespace Faolan.Core.Rdb.Assets
 
 			return normals;
 		}
+
+		// System.Numerics.Matrix4x4 in natural (row-major) field order. For a row-vector matrix M this byte layout is
+		// identical to glTF's column-major encoding of M's column-vector equivalent (M^T), so an inverse-bind matrix
+		// computed with System.Numerics serialises straight into a glTF inverseBindMatrices accessor.
+		private static IEnumerable<float> MatFields(System.Numerics.Matrix4x4 m) =>
+		[
+			m.M11, m.M12, m.M13, m.M14,
+			m.M21, m.M22, m.M23, m.M24,
+			m.M31, m.M32, m.M33, m.M34,
+			m.M41, m.M42, m.M43, m.M44
+		];
 
 		private static long Q(float f) => (long)MathF.Round(f * 1000f); // weld tolerance: 1 unit = 1mm at AoC scale
 

@@ -51,6 +51,9 @@ namespace Faolan.Importer.Cli
 				case "rdb-skeleton":
 					RdbSkeleton(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", arg ?? "14853");
 					return 0;
+				case "rdb-rig":
+					RdbRig(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", arg ?? "", GetOption(args, "--out"), GetOption(args, "--skeleton"));
+					return 0;
 				case "rdb-search":
 					RdbSearch(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", arg ?? "");
 					return 0;
@@ -220,6 +223,36 @@ namespace Faolan.Importer.Cli
 		}
 
 		// Decode a skeleton (RDB type 1010002) and print key bone world positions (#275 Phase 3 skeleton validation).
+		// Emit a SKINNED glb for a skinned model (body/equipment): geometry + the character skeleton as a glTF skin.
+		// --report-arg <meshIndexId>  --out <dir>  [--skeleton <id>, default 14853].
+		private static void RdbRig(string rdbDir, string arg, string? outDir, string? skelArg)
+		{
+			using var rdb = new Faolan.Core.Rdb.RdbReader(rdbDir);
+			if (!uint.TryParse(arg, out var meshIndexId))
+			{
+				Console.WriteLine($"rdb-rig needs a numeric MESHINDEXFILE id in --report-arg, got '{arg}'");
+				return;
+			}
+
+			var skeletonId = uint.TryParse(skelArg, out var s) ? s : Faolan.Core.Rdb.Assets.RdbAssetExtractor.HumanoidSkeletonId;
+			var glb = Faolan.Core.Rdb.Assets.RdbAssetExtractor.BuildSkinnedModelGlb(rdb, meshIndexId, skeletonId);
+			if (glb == null)
+			{
+				Console.WriteLine($"meshindex {meshIndexId} is not a readable skinned model (or skeleton {skeletonId} missing).");
+				return;
+			}
+
+			var skeleton = Faolan.Core.Rdb.Assets.RdbAssetExtractor.LoadSkeleton(rdb, skeletonId);
+			Console.WriteLine($"skinned glb: meshindex={meshIndexId} skeleton={skeletonId} bones={skeleton?.Count} bytes={glb.Length}");
+			if (outDir != null)
+			{
+				Directory.CreateDirectory(outDir);
+				var path = Path.Combine(outDir, $"rig_{meshIndexId}.glb");
+				File.WriteAllBytes(path, glb);
+				Console.WriteLine($"  -> {path}");
+			}
+		}
+
 		private static void RdbSkeleton(string rdbDir, string arg)
 		{
 			using var rdb = new Faolan.Core.Rdb.RdbReader(rdbDir);

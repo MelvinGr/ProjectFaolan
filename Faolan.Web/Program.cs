@@ -69,9 +69,13 @@ namespace Faolan.Web
                     equip = string.Join(',', s.PieceMeshIndexIds)
                 })));
 
-            app.MapGet("/api/model/{meshIndexId:long}.glb", (long meshIndexId, CharacterModelService models) =>
+            // ?rig=1 returns the SKINNED model (body/equipment + character skeleton as a glTF skin, posable); ?skeleton=ID
+            // overrides the default humanoid rig (14853). Without ?rig it's the static mesh as before.
+            app.MapGet("/api/model/{meshIndexId:long}.glb", (long meshIndexId, bool? rig, long? skeleton, CharacterModelService models) =>
             {
-                var glb = models.BuildModel((uint)meshIndexId);
+                var glb = rig == true
+                    ? models.BuildRig((uint)meshIndexId, skeleton is { } s ? (uint)s : null)
+                    : models.BuildModel((uint)meshIndexId);
                 return glb is null ? Results.NotFound() : Results.File(glb, "model/gltf-binary");
             });
 

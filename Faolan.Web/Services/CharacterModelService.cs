@@ -236,6 +236,11 @@ namespace Faolan.Web.Services
 			return subs is { Count: > 0 } ? GlbWriter.Build(subs) : null;
 		}
 
+		// Build a SKINNED glb for a skinned model (body / equipment piece): geometry + the character skeleton as a glTF
+		// skin, so the result is posable (#275). Null if the model isn't skinned.
+		public byte[]? BuildRig(uint meshIndexId, uint? skeletonId = null) =>
+			RdbAssetExtractor.BuildSkinnedModelGlb(Reader(), meshIndexId, skeletonId ?? RdbAssetExtractor.HumanoidSkeletonId);
+
 		// Build a single RenderMesh (type 1010001) directly by id - for inspecting head/eye/hair meshes (#275).
 		public byte[]? BuildRenderMesh(uint renderMeshId)
 		{
