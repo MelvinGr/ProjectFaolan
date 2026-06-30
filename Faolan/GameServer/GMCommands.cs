@@ -224,8 +224,9 @@ namespace Faolan.GameServer
 			await SendWorldHandoff(client);
 		}
 
-		// .godmode  - toggle invincibility on yourself: hostile NPC swings land their animation but deal no damage
-		// (the flag lives on the player's live WorldEntity, so it clears on relog). Self-target only.
+		// .godmode  - toggle invincibility on yourself: hostile NPC swings land their animation but deal no damage.
+		// The toggle is persisted on the account (#279) and re-applied to the live WorldEntity on every world entry,
+		// so it survives relog AND map changes (a playfield change is a fresh world connection / entity). Self-target only.
 		private async Task ToggleGodModeCommand(INetworkClient client)
 		{
 			var characterId = client.Session.Character.Id;
@@ -237,13 +238,16 @@ namespace Faolan.GameServer
 			}
 
 			entity.GodMode = !entity.GodMode;
+			client.Session.Account.GmGodMode = entity.GodMode;
+			await Database.SaveAccount(client.Session.Account);
 			await _agentServerDispatcher.SendSystemMessage(characterId, entity.GodMode
 				? "God mode <span style=\"color: lime;\">ON</span> - you take no damage."
 				: "God mode <span style=\"color: red;\">OFF</span>.");
 		}
 
 		// .invisible  - toggle aggro invisibility on yourself: hostile NPCs won't target/aggro you (skipped in the
-		// sim's NearestPlayerInRange). Self-target only; clears on relog (lives on the live WorldEntity).
+		// sim's NearestPlayerInRange). Persisted on the account (#279) and re-applied on each world entry, so it
+		// survives relog and map changes. Self-target only.
 		private async Task ToggleInvisibleCommand(INetworkClient client)
 		{
 			var characterId = client.Session.Character.Id;
@@ -255,6 +259,8 @@ namespace Faolan.GameServer
 			}
 
 			entity.Invisible = !entity.Invisible;
+			client.Session.Account.GmInvisible = entity.Invisible;
+			await Database.SaveAccount(client.Session.Account);
 			await _agentServerDispatcher.SendSystemMessage(characterId, entity.Invisible
 				? "Invisible <span style=\"color: lime;\">ON</span> - NPCs won't aggro you."
 				: "Invisible <span style=\"color: red;\">OFF</span>.");

@@ -201,6 +201,13 @@ namespace Faolan.GameServer.World
 			// keep its current instance vs. a fresh placement that picks one from the map's mode (#268).
 			Players.TryGetValue(client, out var existing);
 			var entity = Players.GetOrAdd(client, _ => new WorldEntity(handle, character.MapId, true, character.Name ?? $"Character{handle}", client) { Vitals = EntityVitals.FromCharacter(character) });
+			// Re-apply the account-persisted GM toggles (#279): the live entity is fresh on each world entry (a map
+			// change is a new world connection), so these would otherwise be lost on every zone. Only GMs ever carry them.
+			if (client.Session?.Account is { } account)
+			{
+				entity.GodMode = account.GmGodMode;
+				entity.Invisible = account.GmInvisible;
+			}
 			var instanceId = World.ResolveEntryInstance(existing, character.MapId, instanceMode);
 			// The DB rotation is a quaternion; the live sim/movement layer is Vector3 (Euler degrees) - bridge it.
 			var zone = World.Place(entity, character.MapId, instanceId, character.Position, character.Rotation.ToVector3());

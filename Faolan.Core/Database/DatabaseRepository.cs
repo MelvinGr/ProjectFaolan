@@ -1213,6 +1213,8 @@ namespace Faolan.Core.Database
 
 			tracked.AuthStatus = account.AuthStatus;
 			tracked.ClientInstance = account.ClientInstance;
+			tracked.GmGodMode = account.GmGodMode;
+			tracked.GmInvisible = account.GmInvisible;
 			await ctx.SaveChangesAsync();
 		}
 

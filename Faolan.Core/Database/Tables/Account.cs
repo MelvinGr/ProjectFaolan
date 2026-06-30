@@ -39,6 +39,13 @@ namespace Faolan.Core.Database.Tables
 
 		public uint AuthStatus { get; set; }
 
+		// Persisted GM toggles (#279). Unlike the live WorldEntity flags (which clear on relog AND on every map
+		// change, since a playfield change is a fresh world connection), these survive on the account and are
+		// re-applied to the player's entity on each world entry. Only ever set true by the GM .godmode/.invisible
+		// commands (gated to AccountType >= GameMaster), so a normal account never carries them.
+		public bool GmGodMode { get; set; }
+		public bool GmInvisible { get; set; }
+
 		// The id the client is currently using for this session: a real Character.Id during normal play, or
 		// the temporary create-editor instance (0x021662C8) during character creation. Deliberately NOT a
 		// foreign key - it must hold the temp instance without a constraint violation (so db.SaveChanges
