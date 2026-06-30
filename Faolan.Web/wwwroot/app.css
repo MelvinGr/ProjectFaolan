@@ -122,6 +122,8 @@ h1:focus { outline: none; }
 .topbar nav { display: flex; align-items: center; gap: 1.25rem; }
 .topbar nav a { color: var(--muted); text-decoration: none; font-size: .9rem; letter-spacing: .02em; }
 .topbar nav a:hover { color: var(--gold); }
+.topbar nav a.admin-link { color: var(--gold-dim); }
+.topbar nav a.admin-link:hover { color: var(--gold-bright); }
 .topbar .who { color: var(--gold); font-size: .85rem; }
 .topbar form { margin: 0; }
 .linkbtn { background: none; border: none; color: var(--muted); cursor: pointer; font: inherit; font-size: .9rem; padding: 0; }

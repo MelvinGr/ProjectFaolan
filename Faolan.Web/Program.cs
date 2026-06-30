@@ -41,6 +41,9 @@ namespace Faolan.Web
             // Live presence: queries the running game server's MCP endpoint (separate process) for connected players.
             builder.Services.AddSingleton<LiveSessionService>();
 
+            // Admin tools over the shared Accounts table (ban/unban, account type).
+            builder.Services.AddScoped<AccountAdminService>();
+
             // Cookie auth over the shared game Accounts table (passwords stored plaintext for now). The viewer is
             // public; signing in scopes the roster to your own characters.
             builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -208,12 +211,19 @@ namespace Faolan.Web
             app.Run();
         }
 
-        // Issue the auth cookie for an account (id + username claims).
+        // Issue the auth cookie for an account (id + username claims, plus an "Admin" role for GM/Administrator
+        // accounts so the admin tools can gate on it).
         private static Task SignIn(HttpContext ctx, Account account)
         {
-            var identity = new ClaimsIdentity(
-                [new Claim(ClaimTypes.NameIdentifier, account.Id.ToString()), new Claim(ClaimTypes.Name, account.UserName)],
-                CookieAuthenticationDefaults.AuthenticationScheme);
+            var claims = new List<Claim>
+            {
+                new(ClaimTypes.NameIdentifier, account.Id.ToString()),
+                new(ClaimTypes.Name, account.UserName),
+            };
+            if (account.Type >= AccountType.GameMaster)
+                claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+
+            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
             return ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
         }
     }

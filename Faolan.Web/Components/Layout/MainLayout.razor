@@ -6,6 +6,9 @@
         <a href="/characters">Characters</a>
         <a href="/items">Armory</a>
         <a href="/status">Status</a>
+        <AuthorizeView Roles="Admin">
+            <a class="admin-link" href="/admin">Admin</a>
+        </AuthorizeView>
         <AuthorizeView>
             <Authorized>
                 <a class="who" href="/account">@context.User.Identity?.Name</a>
