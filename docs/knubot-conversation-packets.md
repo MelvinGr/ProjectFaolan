@@ -51,6 +51,22 @@ against its RDB — same deterministic-`key` mechanism as the quest journal
 (`docs/quest-log-handover.md`); so building a screen = emit base + the OpenChatWindow/AppendText/AnswerList
 records with the right `(id, category, key)` refs.
 
+## The non-dialogue packets in a node (`SetDialogueCamera`)
+
+A captured conversation node also carries packets that are **not** Knubot dialogue text (~48 of 355 rows in
+`faolan.db`). These are **`DispatchSetDialogueCamera`** — opcode **`0x2015`**, caller **GameCharAgent
+(`0xA9ECB95D`)** → receiver **GameCharInterface (`0x8B87F791`)** (a different endpoint pair than the Knubot
+dialogue's GameAgent→GameInterface `0x2000`). The body is the cinematic conversation camera's two focus
+entities + params:
+
+```
+[u32 0xC350][u32 npcHandle][u32 0xC350][u32 playerHandle][u32 0x05010119][trailer]
+```
+
+They carry no `remoteformat` text, so the structured-screen storage (#188) leaves them as raw `Data` and the
+runtime replays them re-addressed to the live player + NPC handles (alongside the interleaved quest-grant
+packets, which the WorldQuest builders construct). `ConversationScreenDecoder.Decode` returns null for them.
+
 ## Remaining for #188
 - Harvest the dialogue TREE (screens + option remoteformat refs + branching) from the RDB (the captures
   already give the screens; `memory rdb_extraction` for the RDB side).

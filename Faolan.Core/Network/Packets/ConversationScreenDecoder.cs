@@ -11,6 +11,11 @@ namespace Faolan.Core.Network.Packets
 	// screen from fields. Pure byte-slicing (no codec dependency); returns null for non-Knubot packets, which keep
 	// replaying from Data. Mirrors KnubotCodec's framing: carrier = Data[12 + headerLen ..] = [u32 len][u32 sub]
 	// [u32 0xC350][u32 instance][u8 env][u16 ver][u32 0xC350][u32 npc][ body ].
+	//
+	// The non-Knubot packets in a conversation node (~48 of 355 in faolan.db) are NOT dialogue text - they are
+	// DispatchSetDialogueCamera (opcode 0x2015, GameCharAgent 0xA9ECB95D -> GameCharInterface 0x8B87F791): the
+	// cinematic conversation camera, body = [0xC350][npcHandle][0xC350][playerHandle][camera params]. No remoteformat
+	// text, so nothing to structure; they (plus the interleaved quest-grant packets) replay from Data re-addressed.
 	public static class ConversationScreenDecoder
 	{
 		public const uint OpenChatWindow = 0x045B0B0F;
