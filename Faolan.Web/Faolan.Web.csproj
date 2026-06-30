@@ -17,6 +17,9 @@
   <ItemGroup>
     <!-- Bump the repo-wide System.Security.Cryptography.Xml (Directory.Build.props pins 10.0.6) to match Faolan.Core. -->
     <PackageReference Update="System.Security.Cryptography.Xml" Version="10.0.9" />
+    <!-- MCP client: the status page queries the running game server's in-process MCP endpoint (list_sessions) for
+         live presence. Same SDK version as Faolan.Mcp (the server side). -->
+    <PackageReference Include="ModelContextProtocol" Version="1.4.0" />
   </ItemGroup>
 
 </Project>

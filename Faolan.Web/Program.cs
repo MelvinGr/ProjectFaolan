@@ -38,6 +38,9 @@ namespace Faolan.Web
             // The RDB-backed character model builder (#275).
             builder.Services.AddSingleton<CharacterModelService>();
 
+            // Live presence: queries the running game server's MCP endpoint (separate process) for connected players.
+            builder.Services.AddSingleton<LiveSessionService>();
+
             // Cookie auth over the shared game Accounts table (passwords stored plaintext for now). The viewer is
             // public; signing in scopes the roster to your own characters.
             builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)

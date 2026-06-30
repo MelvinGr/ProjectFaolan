@@ -1,8 +1,10 @@
 @page "/status"
 @using Faolan.Core.Database
 @using Faolan.Core.Database.Tables
+@using Faolan.Web.Services
 @using Microsoft.EntityFrameworkCore
 @inject IDbContextFactory<DatabaseContext> DbFactory
+@inject LiveSessionService Live
 
 <PageTitle>Realm Status — Project Faolan</PageTitle>
 
@@ -11,6 +13,35 @@
 
     @if (_loaded)
     {
+        <div class="server-banner @(_online is null ? "offline" : "online")">
+            <span class="dot"></span>
+            @if (_online is null)
+            {
+                <span>Game server offline</span>
+            }
+            else
+            {
+                <span><strong>Server online</strong> · @_online.Count player@(_online.Count == 1 ? "" : "s") connected</span>
+            }
+        </div>
+
+        @if (_online is { Count: > 0 })
+        {
+            <section class="panel online-now">
+                <h2>Online now</h2>
+                <ul class="recent">
+                    @foreach (var s in _online)
+                    {
+                        <a class="rrow" href="@(s.CharacterId is { } id ? $"/characters?char={id}" : "#")">
+                            <span class="rname">@(s.CharacterName ?? "(in character select)")</span>
+                            <span class="rsub">@(s.CharacterLevel is { } lvl ? $"Lvl {lvl}" : "—")@(s.AccountName is { } a ? $" · {a}" : "")</span>
+                            <span class="rwhen live">online</span>
+                        </a>
+                    }
+                </ul>
+            </section>
+        }
+
         <div class="stat-cards">
             <div class="scard"><div class="num">@_recent24h</div><div class="lbl">Active (24h)</div></div>
             <div class="scard"><div class="num">@_accounts</div><div class="lbl">Accounts</div></div>
@@ -74,6 +105,7 @@
 
 @code {
     private bool _loaded;
+    private IReadOnlyList<LiveSession>? _online; // null = game server unreachable (offline)
     private int _accounts, _chars, _maps, _recent24h;
     private long _items, _spells;
     private DateTime? _lastLogin;
@@ -120,6 +152,9 @@
             .ToList();
         _classMax = _classes.Count == 0 ? 0 : _classes.Max(c => c.Count);
 
+        // Live presence from the running game server's MCP endpoint (null when it's offline).
+        _online = await Live.GetSessionsAsync();
+
         _loaded = true;
     }
 
@@ -139,6 +174,18 @@
     .status { max-width: 1000px; margin: 0 auto; padding: 1rem; }
     .status > h1 { font-size: 1.9rem; margin-bottom: 1.25rem; }
     .status .muted { color: var(--muted); font-size: .9rem; }
+
+    .server-banner { display: flex; align-items: center; gap: .6rem; padding: .65rem 1rem; margin-bottom: 1.25rem;
+        border-radius: var(--radius); border: 1px solid var(--stone-dark); font-size: .9rem; color: var(--text);
+        background: linear-gradient(180deg, var(--bg-2), #121419); }
+    .server-banner strong { color: var(--gold-bright); }
+    .server-banner .dot { width: .65rem; height: .65rem; border-radius: 50%; flex-shrink: 0; }
+    .server-banner.online .dot { background: #5fd06a; box-shadow: 0 0 8px #5fd06a; animation: pulse 2s infinite; }
+    .server-banner.offline .dot { background: #6c6c6c; }
+    .server-banner.offline { color: var(--muted); }
+    @@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+    .online-now { margin-bottom: 1.25rem; }
+    .rwhen.live { color: #5fd06a; }
 
     .stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: .75rem; margin-bottom: 1.5rem; }
     .scard { text-align: center; padding: 1rem .5rem; border-radius: var(--radius);
