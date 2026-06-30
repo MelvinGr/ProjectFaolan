@@ -76,3 +76,36 @@ map). The universal "load resource by `(type,id)`" is a **method on `LocalRDBSou
 turn-key capture. Last prep before the live session: enumerate `LocalRDBSource_c::vftable` (VtableSlots.java) and
 pick the get-by-id slot (two int args → blob/stream), or just break on the `0107xxxx` reads and filter
 `type==1010030`.
+
+## Update (2026-06-30): mechanism pinned to runtime attr 0x2da; precise capture identified
+
+Offline RE narrowed the resolution exactly (no live client needed for these):
+
+- **Look-id is not a direct meshindex.** `--report rdb-id 13117` → meshindex 13117 is the Tortage building
+  `tortage_addon_c30.max`. The known armour look-ids share no consistent RDB type (13117 → {1010030,
+  0x4f696e, 0x8f696e}; 17153 → {1010001, 1010301, 1010302}; 18162 → nothing local). So `(look)→mesh` is a
+  client-runtime computation, not an RDB id-of-fixed-type lookup.
+- **Body-armour builder `FUN_008b9ca0`** (thiscall; `[EBP+8]`=avatar, gate `[avatar+0x1b0]==2`):
+  ```
+  PUSH 0x30b ; CALL 0089bd80 → EAX → EBX            (attr 0x30b = secondary param)
+  PUSH 0x2da ; CALL 0089bd80 → EAX                  (attr 0x2da = the meshindex id)
+  MOV [ECX+0x14], 0xf696e                            (struct type = MESHINDEXFILE)
+  0x008b9d05: MOV [ECX+0x10], EAX                    (struct id = attr 0x2da)  ← decisive
+  CALL 0x005b07e0                                    (visual mesh loader)
+  ```
+  So the **body-armour meshindex id = runtime attribute 0x2da (730)**, type `0xf696e`. `FUN_0089bd80(obj,
+  attrId)` is the generic runtime-attribute getter (aggregates base+mods); attr 0x2da/0x30b are NOT static
+  template fields (the gown template has neither field 730 nor 779). ~7 sibling builders for other slots:
+  008b9ca0/008b9d40/008afd00/008b00b0/008b0370/008b0600/0080acd0 (call-site EAX-dump addrs in
+  `Captures/ghidra/capture_armorbuild.gdb`).
+- **`VisualCatMesh` string is a logging tag** for the FUN_00fe*/00ff* visual subsystem (e.g. FUN_00feee20
+  "Animpool is empty!"), not the resolver — earlier note retracted.
+
+**Capture plan (supersedes the RDB-fetch-breakpoint plan above): cache-proof in-world re-equip.** The builder
+recomputes the meshindex every time the avatar visual is (re)built, regardless of whether the mesh DATA is
+cached — so the fragile "catch the load on world entry" path (and its loading-screen crash) is unnecessary.
+Instead: be in-world, attach `Captures/ghidra/capture_armorbuild.gdb` (set its `attach PIDHERE` to the live
+`Z:\...AgeOfConan.exe` wow64 pid), then **re-equip the gown** (server/GM) → breakpoint 0x008b9d05 logs
+`meshindex=<id>`. Then `--report rdb-assets --report-arg <id>` extracts the actual gown mesh. Note `FUN_005b07e0`
+got 0 hits as a world-entry breakpoint (client crashed mid-load before render) — it is the loader but not a
+reliable world-entry trigger; the builder call-site is the right hook.
