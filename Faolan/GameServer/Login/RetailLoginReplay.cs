@@ -44,18 +44,21 @@ namespace Faolan.GameServer
 		private const uint StarterFemaleChestItem = 324139; // Silver Gown
 		private const uint StarterFemaleLegsItem = 324171; // Silver Bottom
 
-		// Per-class starting WEAPON (the main-hand-left slot, 0x06), harvested from the *create* captures (#220):
-		// Tortage hands each recruit an improvised weapon, and it is CLASS-specific (per-archetype is disproven - the
-		// two Soldier classes in the captures, Conqueror and Guardian, do NOT share a weapon). Coverage is only the
-		// classes the create dumps actually contain, like the ability kit's partial coverage; the rest start unarmed
-		// until more create captures land. Necromancer is confirmed by two independent create dumps (randochar +
-		// faolanx); Assassin by one (Strie). Barbarian + Guardian create dumps show NO starting weapon. (The Fleshy
-		// Club / Broken Oar seen elsewhere are NOT create-flow starters - they came from a level-2 char and a login
-		// capture respectively, so they are deliberately excluded.)
+		// Per-class starting WEAPON (the main-hand-left slot, 0x06), harvested from the *create* captures (#220).
+		// Coverage is only the classes a create dump actually shows armed - the rest start unarmed until more create
+		// captures land. The Fleshy Club / Broken Oar / Broken Bottle seen elsewhere are NOT create-flow starters -
+		// they came from a level-2 char and login captures respectively, so they are deliberately excluded.
+		//
+		// #276/#286: re-harvested every per-class CREATE capture (slot 0x06 of the equipped container, via the
+		// ProtoAcgItem template1 fixed32; Captures/scripts decode). Result: the equipped container in the create
+		// flow carries ONLY the slave outfit (chest gown / leg bottom + wrist Slave Manacles) - NO class delivers a
+		// MainHandLeft weapon at create. The earlier Necromancer = Broken Bottle (3395744) was a mis-harvest from a
+		// LOGIN capture (Broken Bottle is absent from every create dump), and Melvin confirmed a Broken Bottle is
+		// wrong for a caster - so it is removed and casters now start unarmed, matching the create captures. Assassin
+		// is the one documented create-verified entry (Strie) and is kept.
 		private static readonly Dictionary<Class, uint> StarterClassWeapon = new Dictionary<Class, uint>
 		{
-			[Class.Necromancer] = 3395744, // Broken Bottle
-			[Class.Assassin] = 3735601     // Marlin Spike
+			[Class.Assassin] = 3735601 // Marlin Spike
 		};
 
 		// Equipped-container slot id -> the CharacterEquipment nav (archive player_items slot bytes).
