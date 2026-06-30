@@ -3,6 +3,7 @@
 <PageTitle>Project Faolan</PageTitle>
 
 <div class="landing">
+    <div class="crest">⚔</div>
     <h1>Project Faolan</h1>
     <p class="tag">An Age of Conan server emulator — explore characters, their gear, and 3D models.</p>
     <div class="cta">
@@ -21,14 +22,14 @@
 </div>
 
 <style>
-    .landing { max-width: 40rem; margin: 12vh auto; text-align: center; padding: 0 1rem; }
-    .landing h1 { font-size: 2.6rem; color: #d8c07a; letter-spacing: .04em; margin: 0 0 .5rem; }
-    .landing .tag { color: #b7b2a2; font-size: 1.05rem; margin-bottom: 2rem; }
+    .landing { max-width: 42rem; margin: 14vh auto; text-align: center; padding: 0 1rem; }
+    .crest { width: 4.5rem; height: 4.5rem; margin: 0 auto 1.25rem; border-radius: 50%;
+        display: grid; place-items: center; font-size: 1.9rem; color: var(--gold);
+        background: radial-gradient(circle at 50% 35%, #2a2517, #15171b);
+        border: 1px solid var(--stone); box-shadow: inset 0 0 18px #000a, 0 6px 22px #0008; }
+    .landing h1 { font-size: 3rem; letter-spacing: .06em; margin: 0 0 .6rem;
+        text-shadow: 0 2px 18px #0008; }
+    .landing .tag { color: var(--muted); font-size: 1.1rem; margin: 0 auto 2.25rem; max-width: 32rem; }
     .cta { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; align-items: center; }
     .cta form { margin: 0; }
-    .btn { display: inline-block; padding: .6rem 1.4rem; border-radius: 7px; text-decoration: none;
-        border: 1px solid #5a4d33; color: #e6d8a8; background: #25272e; font-size: .95rem; cursor: pointer; }
-    .btn.primary { background: linear-gradient(#5a4d33, #463c28); border-color: #b89544; color: #fbeec2; }
-    .btn.ghost { background: transparent; color: #9a937f; }
-    .btn:hover { border-color: #b89544; }
 </style>
