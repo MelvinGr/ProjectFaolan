@@ -38,6 +38,10 @@ namespace Faolan.Web
             // The RDB-backed character model builder (#275).
             builder.Services.AddSingleton<CharacterModelService>();
 
+            // Cache for the expensive deterministic renders (item glbs, map pngs). Size is counted in bytes; cap the
+            // cache so a scrape can't grow it unbounded.
+            builder.Services.AddMemoryCache(o => o.SizeLimit = 256 * 1024 * 1024);
+
             // Live presence: queries the running game server's MCP endpoint (separate process) for connected players.
             builder.Services.AddSingleton<LiveSessionService>();
 
@@ -117,11 +121,16 @@ namespace Faolan.Web
                 return Results.Redirect("/");
             }).DisableAntiforgery();
 
+            // Browser cache for deterministic-by-id renders (item models, race/sex base, map images): a day, immutable.
+            static void CacheADay(HttpContext ctx) => ctx.Response.Headers.CacheControl = "public, max-age=86400, immutable";
+
             // glTF endpoints: a character's assembled model, and any single RDB model by id.
-            app.MapGet("/api/character/{race}/{sex}/model.glb", (Race race, Sex sex, CharacterModelService models) =>
+            app.MapGet("/api/character/{race}/{sex}/model.glb", (Race race, Sex sex, HttpContext ctx, CharacterModelService models) =>
             {
                 var glb = models.BuildCharacter(race, sex);
-                return glb is null ? Results.NotFound() : Results.File(glb, "model/gltf-binary");
+                if (glb is null) return Results.NotFound();
+                CacheADay(ctx);
+                return Results.File(glb, "model/gltf-binary");
             });
 
             // ?equip=290301,290354 overlays those armor MESHINDEXFILE ids on the character (gear preview, #275).
@@ -167,10 +176,12 @@ namespace Faolan.Web
             });
 
             // An item's 3D display model for the equipment-slot thumbnails (404 when the item has no display mesh).
-            app.MapGet("/api/item/{itemId:long}/model.glb", (long itemId, CharacterModelService models) =>
+            app.MapGet("/api/item/{itemId:long}/model.glb", (long itemId, HttpContext ctx, CharacterModelService models) =>
             {
                 var glb = models.ItemModel((uint)itemId);
-                return glb is null ? Results.NotFound() : Results.File(glb, "model/gltf-binary");
+                if (glb is null) return Results.NotFound();
+                CacheADay(ctx);
+                return Results.File(glb, "model/gltf-binary");
             });
 
             // Live world radar feed (admin only): the map's entities (from the running server via MCP) + world bounds.
@@ -197,7 +208,9 @@ namespace Faolan.Web
                 if (!(ctx.User?.IsInRole("Admin") ?? false))
                     return Results.StatusCode(StatusCodes.Status403Forbidden);
                 var png = models.MapImage((uint)mapId);
-                return png is null ? Results.NotFound() : Results.File(png, "image/png");
+                if (png is null) return Results.NotFound();
+                CacheADay(ctx);
+                return Results.File(png, "image/png");
             });
 
             if (app.Environment.IsDevelopment())

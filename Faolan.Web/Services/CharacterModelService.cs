@@ -4,6 +4,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Faolan.Web.Services
 {
@@ -37,16 +38,37 @@ namespace Faolan.Web.Services
 		private readonly string? _cdnUrl;
 		private readonly IDbContextFactory<DatabaseContext> _dbFactory;
 		private readonly Lock _gate = new();
+		private readonly IMemoryCache _cache;
 		private RdbReader? _rdb;
 		private IReadOnlyList<ArmorSetCatalog.ArmorSet>? _armorSets;
 
-		public CharacterModelService(IConfiguration config, IDbContextFactory<DatabaseContext> dbFactory)
+		// Deterministic renders are cached for a while after last use; the empty array is the "no model" sentinel so a
+		// 404 result is cached too (a slot with no display mesh isn't rebuilt on every draw).
+		private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(30);
+		private static readonly byte[] None = [];
+
+		public CharacterModelService(IConfiguration config, IDbContextFactory<DatabaseContext> dbFactory, IMemoryCache cache)
 		{
 			_dbFactory = dbFactory;
+			_cache = cache;
 			_rdbDir = config["RdbDir"] ?? throw new InvalidOperationException("RdbDir not configured");
 			// Optional ContentMirror proxy base for on-demand (CDN-only) resources, e.g. the CDN race bodies that aren't
 			// in the local RDB. Store-and-forward, so requesting one archives it for the future (#275, [[aoc_content_cdn_mirror]]).
 			_cdnUrl = config["CdnUrl"];
+		}
+
+		// Cache a deterministic render (keyed string -> bytes). Caches the "no model" result too. Size-tracked so the
+		// MemoryCache size cap can evict.
+		private byte[]? Cached(string key, Func<byte[]?> build)
+		{
+			var bytes = _cache.GetOrCreate(key, entry =>
+			{
+				var result = build() ?? None;
+				entry.SlidingExpiration = CacheTtl;
+				entry.Size = Math.Max(result.Length, 1);
+				return result;
+			})!;
+			return bytes.Length == 0 ? null : bytes;
 		}
 
 		public bool RdbAvailable => Directory.Exists(_rdbDir) && File.Exists(Path.Combine(_rdbDir, "le.idx"));
@@ -352,14 +374,14 @@ namespace Faolan.Web.Services
 
 		// Build an item's 3D display model (the inventory mesh shown in equipment slots), or null if it has none
 		// (armour pieces carry only a worn-look id, not a display mesh - the open gear RE).
-		public byte[]? ItemModel(uint itemId)
+		public byte[]? ItemModel(uint itemId) => Cached($"item:{itemId}", () =>
 		{
 			using var db = _dbFactory.CreateDbContext();
 			var item = db.Items.AsNoTracking().FirstOrDefault(i => i.Id == itemId);
 			return item is null
 				? null
 				: RdbAssetExtractor.BuildItemModelGlb(Reader(), itemId, item.Data1, item.Data2, item.Data3, item.Data4);
-		}
+		});
 
 		// Build a single RenderMesh (type 1010001) directly by id - for inspecting head/eye/hair meshes (#275).
 		public byte[]? BuildRenderMesh(uint renderMeshId)
@@ -399,17 +421,20 @@ namespace Faolan.Web.Services
 		{
 			if (!RdbAvailable)
 				return null;
-			try
+			return Cached($"map:{mapId}", () =>
 			{
-				var rdb = Reader();
-				if (!rdb.TryGet(1010209, mapId, out var e) || e.Size == 0 || !rdb.CanRead(e))
-					return null;
-				// ReadDecompressed transparently fetches CDN-gated (file == 0xff) records via the ContentMirror.
-				var body = rdb.ReadDecompressed(e);
-				var idx = body.AsSpan().IndexOf(PngSig);
-				return idx < 0 ? null : body[idx..];
-			}
-			catch { return null; }
+				try
+				{
+					var rdb = Reader();
+					if (!rdb.TryGet(1010209, mapId, out var e) || e.Size == 0 || !rdb.CanRead(e))
+						return null;
+					// ReadDecompressed transparently fetches CDN-gated (file == 0xff) records via the ContentMirror.
+					var body = rdb.ReadDecompressed(e);
+					var idx = body.AsSpan().IndexOf(PngSig);
+					return idx < 0 ? null : body[idx..];
+				}
+				catch { return null; }
+			});
 		}
 
 		public (int Width, int Height)? MapBounds(uint mapId)
