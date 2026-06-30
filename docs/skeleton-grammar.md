@@ -41,3 +41,30 @@ attractor bone's world transform (from the skeleton above) ∘ the attractor's l
   differ from the rig names (`rig_bone_Neck`, …) — the body→rig bone-name mapping still needs to be established to
   drive skinning from this skeleton (not needed for a static bind-pose assembly).
 ```
+
+## Rig import — binding the mesh to the skeleton (#275 Phase 10)
+
+A skinned RenderMesh (`<RenderSkinnedMesh>`, type 1010001) carries, per vertex, `BLENDINDICES` (UBYTE4 @ decl
+offset 32) and `BLENDWEIGHT` (UBYTE4N @ 36, each `/255`, four summing to ~255). It does **not** index the skeleton
+directly:
+
+- **Matrix-palette register stride.** The on-wire BLENDINDICES are `bone * 2` (the engine stores each bone as two
+  shader constant registers), so the body uses values `0,2,4,…,102`. Halve them to get the **local palette index**
+  (`0..51` here).
+- **Per-mesh bone palette.** The local index maps to a bone **name** via the palette exported in the rendermesh's
+  ASCII material/param string: `g_Bone0="rig_bone_Head" g_Bone1="rig_bone_Neck" … g_NumberOfBones=N`. The palette
+  is a compact, mesh-specific subset/reordering of the skeleton (the body's 52 entries are root→offhand; the
+  head/neck/face bones are absent because the head is a separate mesh).
+- **Resolve to a joint by NAME.** `skeletonJoint = indexOf(skeleton.bones, palette[localIndex].Name)`. Using the
+  local palette index as a direct skeleton index scrambles the limbs (it passes a rest-pose check but fails an
+  anatomical bone↔vertex-cluster check, because `inverseBind = inverse(boneWorld)` makes rest-pose identity hold
+  for *any* assignment).
+
+`GlbWriter.Build(subs, png, skeleton)` emits the glTF skin: one node per bone (`translation`+`rotation` from the
+bone's local TRS, parented via the child lists), a `skin` with `inverseBindMatrices[j] = inverse(bone[j].World)`,
+and per-primitive `JOINTS_0` (UNSIGNED_BYTE VEC4, name-remapped) + `WEIGHTS_0` (FLOAT VEC4, renormalised). The
+inverse-bind matrix is written in `System.Numerics.Matrix4x4` natural field order, which is exactly glTF's
+column-major encoding of the equivalent column-vector matrix. Because the skeleton's bind-pose world and the mesh's
+bind-pose vertices share one frame and scale, the skinned mesh at rest is pixel-identical to the static extract
+(validated err 6e-7) — and now posable. Tooling: `--report rdb-rig --report-arg <meshIndexId> [--skeleton <id>]`,
+web `/api/model/{id}.glb?rig=1`, test `Faolan.Tests/RigSkinningTests.cs`.
