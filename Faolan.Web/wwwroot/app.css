@@ -114,10 +114,12 @@ h1:focus { outline: none; }
     position: sticky; top: 0; z-index: 10;
 }
 .topbar .brand {
+    display: flex; align-items: center; gap: .55rem;
     font-family: var(--font-display);
     color: var(--gold); font-weight: 700; font-size: 1.05rem;
     letter-spacing: .08em; text-transform: uppercase; text-decoration: none;
 }
+.topbar .brand-logo { width: 1.6rem; height: 1.6rem; display: block; }
 .topbar .brand:hover { color: var(--gold-bright); }
 .topbar nav { display: flex; align-items: center; gap: 1.25rem; }
 .topbar nav a { color: var(--muted); text-decoration: none; font-size: .9rem; letter-spacing: .02em; }
