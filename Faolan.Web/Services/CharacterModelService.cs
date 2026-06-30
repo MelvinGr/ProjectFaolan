@@ -382,6 +382,31 @@ namespace Faolan.Web.Services
 		// used to scale the live radar. Null when the RDB is unavailable or the playfield is CDN-gated. Cached.
 		private readonly System.Collections.Concurrent.ConcurrentDictionary<uint, (int W, int H)?> _mapBounds = new();
 
+		// A map's top-down image (RDB type 1010209 keyed by playfield id) as a ready-to-serve PNG, or null when the
+		// RDB is unavailable, the map has no local image (CDN-gated), or no PNG is embedded. The record is a small
+		// [type][id][count] preamble followed by the raw PNG, so we carve from the PNG signature.
+		private static readonly byte[] PngSig = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+
+		// Cheap check (no decompress) for whether a local top-down image exists for the map.
+		public bool HasMapImage(uint mapId)
+			=> RdbAvailable && Reader().TryGet(1010209, mapId, out var e) && e.Size > 0 && e.File != 0xff;
+
+		public byte[]? MapImage(uint mapId)
+		{
+			if (!RdbAvailable)
+				return null;
+			try
+			{
+				var rdb = Reader();
+				if (!rdb.TryGet(1010209, mapId, out var e) || e.Size == 0 || e.File == 0xff)
+					return null;
+				var body = rdb.ReadDecompressed(e);
+				var idx = body.AsSpan().IndexOf(PngSig);
+				return idx < 0 ? null : body[idx..];
+			}
+			catch { return null; }
+		}
+
 		public (int Width, int Height)? MapBounds(uint mapId)
 		{
 			if (!RdbAvailable)

@@ -3,10 +3,13 @@
 let _timer = null;
 let _canvasId = null;
 let _mapId = null;
+let _mapImg = null;       // loaded terrain image for the current map (or null)
+let _mapImgFor = null;    // which map id _mapImg belongs to
 const RES = 760; // internal canvas resolution (square); CSS scales it to the layout.
 
 export function start(canvasId, mapId) {
     _canvasId = canvasId;
+    loadMapImage(mapId);
     _mapId = mapId;
     const c = document.getElementById(canvasId);
     if (c) { c.width = RES; c.height = RES; }
@@ -15,7 +18,17 @@ export function start(canvasId, mapId) {
     _timer = setInterval(poll, 3000);
 }
 
-export function setMap(mapId) { _mapId = mapId; poll(); }
+export function setMap(mapId) { loadMapImage(mapId); _mapId = mapId; poll(); }
+
+// Fetch the map's top-down terrain PNG (404 = no image for this map -> grid background).
+function loadMapImage(mapId) {
+    _mapImg = null;
+    _mapImgFor = mapId;
+    const img = new Image();
+    img.onload = () => { if (_mapImgFor === mapId) _mapImg = img; };
+    img.onerror = () => { if (_mapImgFor === mapId) _mapImg = null; };
+    img.src = `/api/zone/${mapId}/map.png`;
+}
 export function stop() { if (_timer) { clearInterval(_timer); _timer = null; } }
 
 async function poll() {
@@ -33,15 +46,9 @@ function setStatus(text, cls) {
     if (el) { el.textContent = text; el.className = 'radar-status ' + (cls || ''); }
 }
 
-function draw(data) {
-    const canvas = document.getElementById(_canvasId);
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const W = canvas.width, H = canvas.height;
+const MARGIN = 14;
 
-    // Backdrop + grid.
-    ctx.fillStyle = '#0c0e11';
-    ctx.fillRect(0, 0, W, H);
+function drawGrid(ctx, W, H) {
     ctx.strokeStyle = '#1b2733';
     ctx.lineWidth = 1;
     for (let i = 1; i < 12; i++) {
@@ -49,16 +56,25 @@ function draw(data) {
         ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, H); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(W, p); ctx.stroke();
     }
-    ctx.strokeStyle = '#2c2a22';
-    ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+}
 
-    if (data === null) { setStatus('Game server offline', 'off'); return; }
+function draw(data) {
+    const canvas = document.getElementById(_canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+
+    ctx.fillStyle = '#0c0e11';
+    ctx.fillRect(0, 0, W, H);
+
+    if (data === null) { drawGrid(ctx, W, H); setStatus('Game server offline', 'off'); return; }
 
     const ents = data.entities || [];
     // Extent: real world bounds when known, else auto-fit to the entities (with padding) so a few NPCs still spread out.
     let minX = 0, maxX = data.bounds ? data.bounds.w : 0, minZ = 0, maxZ = data.bounds ? data.bounds.h : 0;
     if (!data.bounds) {
         if (ents.length === 0) {
+            drawGrid(ctx, W, H);
             setStatus(data.online ? 'No entities loaded on this map yet' : 'Game server offline', data.online ? '' : 'off');
             return;
         }
@@ -67,8 +83,23 @@ function draw(data) {
         const padX = (maxX - minX) * 0.1 + 5, padZ = (maxZ - minZ) * 0.1 + 5;
         minX -= padX; maxX += padX; minZ -= padZ; maxZ += padZ;
     }
+
+    // Background: the real terrain image (only when we have absolute world bounds to place it against), else a grid.
+    const plot = W - 2 * MARGIN;
+    if (data.bounds && _mapImg) {
+        // World plane [0,w]x[0,h] fills the plot rect. Flip vertically so image-row-0 (south in the source) maps to
+        // the bottom, matching the north-up dot transform below.
+        ctx.save();
+        ctx.translate(MARGIN, MARGIN);
+        ctx.scale(1, -1);
+        ctx.drawImage(_mapImg, 0, -plot, plot, plot);
+        ctx.restore();
+    } else {
+        drawGrid(ctx, W, H);
+    }
+
     const spanX = (maxX - minX) || 1, spanZ = (maxZ - minZ) || 1;
-    const margin = 14;
+    const margin = MARGIN;
     const sx = x => margin + ((x - minX) / spanX) * (W - 2 * margin);
     // Flip Z so larger Z (north) is up.
     const sz = z => margin + (1 - (z - minZ) / spanZ) * (H - 2 * margin);

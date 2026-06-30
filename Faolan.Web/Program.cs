@@ -185,8 +185,19 @@ namespace Faolan.Web
                 {
                     online = entities is not null,
                     bounds = bounds is { } b ? new { w = b.Width, h = b.Height } : null,
+                    hasMap = models.HasMapImage((uint)mapId),
                     entities = entities ?? []
                 });
+            });
+
+            // A map's top-down terrain image (RDB type 1010209), for the radar background. Admin only; 404 when the
+            // map has no local image.
+            app.MapGet("/api/zone/{mapId:long}/map.png", (long mapId, HttpContext ctx, CharacterModelService models) =>
+            {
+                if (!(ctx.User?.IsInRole("Admin") ?? false))
+                    return Results.StatusCode(StatusCodes.Status403Forbidden);
+                var png = models.MapImage((uint)mapId);
+                return png is null ? Results.NotFound() : Results.File(png, "image/png");
             });
 
             if (app.Environment.IsDevelopment())
