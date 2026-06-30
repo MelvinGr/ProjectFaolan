@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Data;
 using Faolan.Core.Database;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
@@ -48,6 +49,36 @@ namespace Faolan.AgentServer
 
 			await _gameServerDispatcher.RunGmCommand(client.Session.Character.Id, text);
 			return true;
+		}
+
+		// #95: write-behind chat-history persistence. Records a channel post (isWhisper=false, target=null) or a tell
+		// (isWhisper=true, target=recipient) to the ChatMessages table. Guarded: a DB hiccup must NEVER break the live
+		// chat relay, so any failure is logged and swallowed. The sender identity matches the wire (ClientInstance ==
+		// character id for a player; see player_handle_equals_character_id).
+		private async Task PersistChat(INetworkClient client, byte channelType, uint channelId, uint? target, bool isWhisper, string message)
+		{
+			try
+			{
+				var senderId = client.Session?.Account?.ClientInstance ?? 0;
+				var senderName = client.Session?.Character?.Name?.Length > 0
+					? client.Session.Character.Name
+					: $"Character{senderId}";
+				await Database.SaveChatMessage(new ChatMessage
+				{
+					SentAt = DateTimeOffset.UtcNow,
+					SenderId = senderId,
+					SenderName = senderName,
+					ChannelType = channelType,
+					ChannelId = channelId,
+					TargetId = target,
+					IsWhisper = isWhisper,
+					Text = message?.Length > 512 ? message[..512] : message
+				});
+			}
+			catch (Exception ex)
+			{
+				Logger.LogWarning(ex, "Failed to persist chat message (history only; live relay unaffected).");
+			}
 		}
 
 		public IReadOnlyList<SessionInfo> GetSessions()
@@ -167,6 +198,9 @@ namespace Faolan.AgentServer
 
 					await BroadcastChannelChat(client, channelType, channelId, message);
 
+					// #95: persist the channel post to chat history (write-behind, never breaks the live relay above).
+					await PersistChat(client, channelType, channelId, target: null, isWhisper: false, message);
+
 					// Posts on the Claude channel are additionally recorded for the MCP bridge (Claude polls the log
 					// and replies via SendClaudeChannelMessage); the normal broadcast above still shows them in-game.
 					if (Configuration.McpEnabled && channelId == ClaudeChannel.ChannelId)
@@ -195,6 +229,9 @@ namespace Faolan.AgentServer
 						: $"Character{senderId}";
 
 					Logger.LogInformation("AgentServer whisper {Sender} -> {Target:X8}: {Message}", senderName, targetCharacterId, message);
+
+					// #95: persist the whisper to chat history (channelType/id 0 for a tell; recipient in TargetId).
+					await PersistChat(client, channelType: 0, channelId: 0, target: targetCharacterId, isWhisper: true, message);
 
 					// A tell to Claude's synthetic identity goes into the MCP bridge log as a private message
 					// (the client learns Claude's id from the channel posts' 0x0014, so /tell Claude works). The

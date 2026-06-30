@@ -27,6 +27,7 @@ namespace Faolan.Core.Database
 		DbSet<CharacterSpawnFrame> CharacterSpawnFrames { get; }
 		DbSet<CharacterSpell> CharacterSpells { get; }
 		DbSet<CharacterTag> CharacterTags { get; }
+		DbSet<ChatMessage> ChatMessages { get; }
 		DbSet<ClassStartingSpell> ClassStartingSpells { get; }
 		DbSet<ConversationNode> ConversationNodes { get; }
 		DbSet<ConversationPacket> ConversationPackets { get; }
@@ -81,6 +82,7 @@ namespace Faolan.Core.Database
 		public DbSet<CharacterSpawnFrame> CharacterSpawnFrames { get; set; }
 		public DbSet<CharacterSpell> CharacterSpells { get; set; }
 		public DbSet<CharacterTag> CharacterTags { get; set; }
+		public DbSet<ChatMessage> ChatMessages { get; set; }
 		public DbSet<ClassStartingSpell> ClassStartingSpells { get; set; }
 		public DbSet<ConversationNode> ConversationNodes { get; set; }
 		public DbSet<ConversationPacket> ConversationPackets { get; set; }

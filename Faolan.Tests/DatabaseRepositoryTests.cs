@@ -561,6 +561,41 @@ namespace Faolan.Tests
 			}
 		}
 
+		[Fact]
+		public async Task ChatMessages_PersistAndQueryRecent_NewestFirst_AndByChannel()
+		{
+			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-chat-{Guid.NewGuid():N}.db");
+			try
+			{
+				var (repo, factory) = NewRepo(dbPath);
+				await using (var ctx = await factory.CreateDbContextAsync())
+					await ctx.Database.EnsureCreatedAsync();
+
+				var t0 = DateTimeOffset.UtcNow;
+				await repo.SaveChatMessage(new ChatMessage { SentAt = t0, SenderId = 1, SenderName = "A", ChannelType = 5, ChannelId = 100, Text = "first" });
+				await repo.SaveChatMessage(new ChatMessage { SentAt = t0.AddSeconds(1), SenderId = 2, SenderName = "B", ChannelType = 5, ChannelId = 100, Text = "second" });
+				await repo.SaveChatMessage(new ChatMessage { SentAt = t0.AddSeconds(2), SenderId = 1, SenderName = "A", TargetId = 2, IsWhisper = true, Text = "psst" });
+
+				var all = await repo.GetRecentChatMessages();
+				Assert.Equal(3, all.Length);
+				Assert.Equal("psst", all[0].Text); // newest-first
+				Assert.True(all[0].IsWhisper);
+				Assert.Equal(2u, all[0].TargetId);
+
+				var ch100 = await repo.GetRecentChatMessages(channelId: 100);
+				Assert.Equal(2, ch100.Length); // the whisper (channel 0) is excluded
+				Assert.All(ch100, m => Assert.Equal(100u, m.ChannelId));
+				Assert.Equal("second", ch100[0].Text); // newest-first within the channel
+
+				Assert.Single(await repo.GetRecentChatMessages(limit: 1)); // limit honoured
+			}
+			finally
+			{
+				if (File.Exists(dbPath))
+					File.Delete(dbPath);
+			}
+		}
+
 		private static (DatabaseRepository repo, IDbContextFactory<DatabaseContext> factory) NewRepo(string path)
 		{
 			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={path}")

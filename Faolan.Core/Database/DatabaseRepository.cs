@@ -114,6 +114,8 @@ namespace Faolan.Core.Database
 		Task<T> Query<T>(Func<IDatabaseContext, Task<T>> work);
 		Task RemoveCharacterQuest(uint characterId, uint questId);
 		Task SaveAccount(Account account);
+		Task SaveChatMessage(ChatMessage message);
+		Task<ChatMessage[]> GetRecentChatMessages(int limit = 100, uint? channelId = null);
 		Task<bool> SetAccountState(uint accountId, AccountState state);
 		Task<bool> SetAccountPassword(uint accountId, string password);
 		Task SaveCharacter(Character character);
@@ -1216,6 +1218,28 @@ namespace Faolan.Core.Database
 			tracked.GmGodMode = account.GmGodMode;
 			tracked.GmInvisible = account.GmInvisible;
 			await ctx.SaveChangesAsync();
+		}
+
+		// Persists one chat line (#95): a channel post or a whisper, recorded write-behind by the AgentServer so chat
+		// history survives a restart. Never throws back into the chat relay - a persistence hiccup must not drop the
+		// live message - so the caller wraps it defensively.
+		public async Task SaveChatMessage(ChatMessage message)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			ctx.ChatMessages.Add(message);
+			await ctx.SaveChangesAsync();
+		}
+
+		// Recent chat history newest-first, optionally for a single channel (#95). For the web/MCP log + moderation.
+		public async Task<ChatMessage[]> GetRecentChatMessages(int limit = 100, uint? channelId = null)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var q = ctx.ChatMessages.AsNoTracking();
+			if (channelId.HasValue)
+				q = q.Where(m => m.ChannelId == channelId.Value);
+			// Order by the auto-increment Id (monotonic with insertion = chronological); SQLite can't ORDER BY a
+			// DateTimeOffset column.
+			return await q.OrderByDescending(m => m.Id).Take(limit).ToArrayAsync();
 		}
 
 		// Set an account's State (e.g. Banned/Active) directly. Returns false if no such account. Used by the .ban GM
