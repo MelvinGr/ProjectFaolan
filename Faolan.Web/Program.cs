@@ -44,6 +44,9 @@ namespace Faolan.Web
             // Admin tools over the shared Accounts table (ban/unban, account type).
             builder.Services.AddScoped<AccountAdminService>();
 
+            // In-game mail (read/compose) directly against the shared Mail table.
+            builder.Services.AddScoped<MailService>();
+
             // Cookie auth over the shared game Accounts table (passwords stored plaintext for now). The viewer is
             // public; signing in scopes the roster to your own characters.
             builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)

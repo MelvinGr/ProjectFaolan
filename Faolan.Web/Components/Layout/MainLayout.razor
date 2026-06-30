@@ -13,6 +13,7 @@
         </AuthorizeView>
         <AuthorizeView>
             <Authorized>
+                <a href="/mail">Mail</a>
                 <a class="who" href="/account">@context.User.Identity?.Name</a>
                 <form method="post" action="/auth/logout"><button class="linkbtn" type="submit">Log out</button></form>
             </Authorized>
