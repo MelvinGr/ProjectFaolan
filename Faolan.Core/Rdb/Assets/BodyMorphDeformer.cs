@@ -50,6 +50,84 @@ namespace Faolan.Core.Rdb.Assets
 		private const float Radius = 0.18f;
 		private const float Gain = 0.55f;
 
+		// LBS morph (the exact path #275): instead of the radial approximation, displace each vertex using the mesh's
+		// REAL skin weights. Each morph joint maps to the nearest skeleton bone; that bone gets a morph SCALE; a vertex
+		// then scales away from each bone it's weighted to, by skin-weight x bone-scale. boneWorld = bone name -> world
+		// position; the per-vertex influences are the mesh's BlendBones (local palette indices) + BlendWeights + palette.
+		// Returns a new positions array (or the same instance if neutral / nothing maps).
+		public static float[] ApplyLbs(float[] positions, int[] blendBones, float[] blendWeights, string[] palette,
+			IReadOnlyDictionary<string, (float X, float Y, float Z)> boneWorld, Morphs morphs)
+		{
+			if (morphs.IsNeutral || boneWorld.Count == 0)
+				return positions;
+
+			// Per-bone accumulated morph scale: map each morph joint to its nearest skeleton bone.
+			var boneScale = new Dictionary<string, float>();
+			foreach (var (value, name) in Sliders)
+			{
+				var slider = value(morphs);
+				if (slider == 0 || !Defs.TryGetValue(name, out var def))
+					continue;
+				var t = Math.Clamp(slider / 100f, -1f, 1f);
+				var strength = t >= 0 ? t * def.Max : t * -def.Min;
+				if (strength == 0)
+					continue;
+
+				foreach (var j in def.Joints)
+				{
+					var nearest = NearestBone(boneWorld, j.Pos);
+					if (nearest != null)
+						boneScale[nearest] = (boneScale.TryGetValue(nearest, out var s) ? s : 0) + j.Weight * strength;
+				}
+			}
+
+			if (boneScale.Count == 0)
+				return positions;
+
+			var outPos = (float[])positions.Clone();
+			var n = positions.Length / 3;
+			for (var v = 0; v < n; v++)
+			{
+				float vx = positions[v * 3], vy = positions[v * 3 + 1], vz = positions[v * 3 + 2];
+				float dx = 0, dy = 0, dz = 0;
+				for (var k = 0; k < 4; k++)
+				{
+					var w = blendWeights[v * 4 + k];
+					if (w <= 0)
+						continue;
+					var li = blendBones[v * 4 + k];
+					if (li < 0 || li >= palette.Length || palette[li] is not { } bn
+					    || !boneScale.TryGetValue(bn, out var scale) || !boneWorld.TryGetValue(bn, out var bp))
+						continue;
+					// LBS scale about the bone: vertex moves out/in proportional to its distance from the bone.
+					var ws = w * scale;
+					dx += ws * (vx - bp.X);
+					dy += ws * (vy - bp.Y);
+					dz += ws * (vz - bp.Z);
+				}
+
+				outPos[v * 3] = vx + dx;
+				outPos[v * 3 + 1] = vy + dy;
+				outPos[v * 3 + 2] = vz + dz;
+			}
+
+			return outPos;
+		}
+
+		private static string? NearestBone(IReadOnlyDictionary<string, (float X, float Y, float Z)> boneWorld, (float X, float Y, float Z) p)
+		{
+			string? best = null;
+			var bestD = float.MaxValue;
+			foreach (var (name, w) in boneWorld)
+			{
+				float dx = w.X - p.X, dy = w.Y - p.Y, dz = w.Z - p.Z;
+				var d = dx * dx + dy * dy + dz * dz;
+				if (d < bestD) { bestD = d; best = name; }
+			}
+
+			return best;
+		}
+
 		// Deform the body submesh positions in place. positions = the rendered base mesh's xyz array. No-op if neutral.
 		public static void Apply(float[] positions, Morphs morphs)
 		{

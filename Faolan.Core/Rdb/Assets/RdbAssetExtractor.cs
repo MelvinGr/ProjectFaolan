@@ -596,7 +596,9 @@ namespace Faolan.Core.Rdb.Assets
 			IReadOnlyList<BodyDecal>? bodyDecals = null, BodyMorphDeformer.Morphs? morphs = null,
 			IReadOnlyList<uint>? equipmentMeshIndexIds = null, bool rig = false)
 		{
-			var body = ReadTexturedModel(rdb, bodyMeshIndexId, skinTint, bodyDecals, morphs);
+			// Static view uses the geometric morph here; the rig path reads the body un-morphed and applies the exact
+			// LBS morph (via the mesh skin weights + skeleton) once the skeleton is selected.
+			var body = ReadTexturedModel(rdb, bodyMeshIndexId, skinTint, bodyDecals, rig ? null : morphs);
 			if (body == null)
 				return null;
 
@@ -659,6 +661,18 @@ namespace Faolan.Core.Rdb.Assets
 			// and skin the SEATED head to it. Hair has no skin of its own, so bind it rigidly to the world Head bone.
 			if (rig && SelectSkeletonForMesh(rdb, all) is { } bodySkel)
 			{
+				// Exact LBS body morph: displace the body verts using their skin weights + the skeleton bone positions
+				// (replaces the geometric radial approximation; the head/neck verts morph consistently with the body).
+				if (morphs is { IsNeutral: false } m)
+				{
+					var boneWorld = new Dictionary<string, (float, float, float)>();
+					foreach (var bb in bodySkel)
+						boneWorld.TryAdd(bb.Name, (bb.WorldPosition.X, bb.WorldPosition.Y, bb.WorldPosition.Z));
+					for (var i = 0; i < body.Count; i++)
+						if (all[i] is { BlendBones: { } bbones, BlendWeights: { } bweights, BonePalette: { } bpal } s)
+							all[i] = s with { Positions = BodyMorphDeformer.ApplyLbs(s.Positions, bbones, bweights, bpal, boneWorld, m) };
+				}
+
 				var combined = bodySkel;
 				if (headParts is { Count: > 0 } && headParts.All(s => s.IsSkinned)
 				    && SelectSkeletonForMesh(rdb, headParts) is { } headSkel
