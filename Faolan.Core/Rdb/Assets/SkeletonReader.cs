@@ -57,7 +57,10 @@ namespace Faolan.Core.Rdb.Assets
 			return bones;
 		}
 
-		// Resolve parents from the child lists, then compose world matrices root-down.
+		// Resolve parents from the child lists, then compose each bone's world matrix by walking up the parent chain.
+		// The walk is iterative with a visited guard: a handful of shipped skeletons have a CYCLIC parent chain (a bone
+		// reachable as its own ancestor), which would otherwise recurse forever and StackOverflow (uncatchable) the moment
+		// we scan the whole 1010002 corpus to auto-pick a rig.
 		private static void ComposeWorld(List<Bone> bones)
 		{
 			for (var i = 0; i < bones.Count; i++)
@@ -65,17 +68,24 @@ namespace Faolan.Core.Rdb.Assets
 					if (c >= 0 && c < bones.Count)
 						bones[c].Parent = i;
 
+			var seen = new HashSet<int>();
 			for (var i = 0; i < bones.Count; i++)
-				Solve(bones, i);
-		}
+			{
+				seen.Clear();
+				// world = local_i * local_parent * local_grandparent * ... (row-vector convention).
+				var world = Matrix4x4.Identity;
+				var j = i;
+				while (j >= 0 && j < bones.Count && seen.Add(j))
+				{
+					var b = bones[j];
+					var local = Matrix4x4.CreateFromQuaternion(NormalizeOrIdentity(b.LocalRotation))
+					            * Matrix4x4.CreateTranslation(b.LocalTranslation);
+					world *= local;
+					j = b.Parent;
+				}
 
-		private static Matrix4x4 Solve(List<Bone> bones, int i)
-		{
-			var b = bones[i];
-			var local = Matrix4x4.CreateFromQuaternion(NormalizeOrIdentity(b.LocalRotation))
-			            * Matrix4x4.CreateTranslation(b.LocalTranslation);
-			b.World = b.Parent >= 0 ? local * Solve(bones, b.Parent) : local;
-			return b.World;
+				bones[i].World = world;
+			}
 		}
 
 		private static Quaternion NormalizeOrIdentity(Quaternion q) =>

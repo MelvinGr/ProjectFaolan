@@ -17,7 +17,7 @@ namespace Faolan.Core.Rdb.Assets
 		public const uint RenderMeshType = 1010001;
 		public const uint SkeletonType = 1010002;
 
-		// The validated 71-bone humanoid player rig ([[SkeletonReader]]); character bodies skin against this bone array.
+		// A humanoid rig used as a last-resort fallback when auto-selection finds no skeleton covering a mesh's palette.
 		public const uint HumanoidSkeletonId = 14853;
 
 		// Load + parse a skeleton (type 1010002) by id, or null if missing/non-local.
@@ -33,17 +33,122 @@ namespace Faolan.Core.Rdb.Assets
 		// Build a skinned glb for one skinned model (body or equipment piece): its geometry + the character skeleton as a
 		// glTF skin, so the result is posable and (at rest) identical to the static extract. Diffuse comes from the mesh's
 		// own materials / header texture refs. Null if the mesh-index/geometry is missing or the geometry isn't skinned.
-		public static byte[]? BuildSkinnedModelGlb(RdbReader rdb, uint meshIndexId, uint skeletonId = HumanoidSkeletonId)
+		// skeletonId: explicit rig, or null to AUTO-SELECT the skeleton whose bone names cover the mesh's bone palette
+		// (different bodies need different rigs - male has forearm-twist+thumb bones, female has breast bones - so a
+		// single hardcoded skeleton sends the missing bones' vertices to the root and mangles them when posed).
+		public static byte[]? BuildSkinnedModelGlb(RdbReader rdb, uint meshIndexId, uint? skeletonId = null)
 		{
 			var subs = ReadTexturedModel(rdb, meshIndexId);
 			if (subs is not { Count: > 0 } || !subs.All(s => s.IsSkinned))
 				return null;
 
-			var skeleton = LoadSkeleton(rdb, skeletonId);
+			var skeleton = skeletonId is { } sid ? LoadSkeleton(rdb, sid) : SelectSkeletonForMesh(rdb, subs);
 			if (skeleton == null)
 				return null;
 
 			return GlbWriter.Build(subs, null, skeleton);
+		}
+
+		// id -> the skeleton's bone names (built once from every local 1010002), to find rigs covering a mesh palette.
+		private static Dictionary<uint, HashSet<string>>? _skeletonNames;
+		// palette signature -> chosen skeleton id, so the per-mesh scan only happens once per distinct palette.
+		private static readonly Dictionary<string, uint> _skeletonForPalette = [];
+
+		private static Dictionary<uint, HashSet<string>> SkeletonNameIndex(RdbReader rdb)
+		{
+			if (_skeletonNames != null)
+				return _skeletonNames;
+
+			var idx = new Dictionary<uint, HashSet<string>>();
+			foreach (var e in rdb.EntriesOfType(SkeletonType))
+			{
+				if (!e.IsLocal || e.Size == 0)
+					continue;
+				try
+				{
+					var bones = SkeletonReader.Read(rdb.ReadDecompressed(e));
+					if (bones.Count > 0)
+						idx[e.Id] = bones.Select(b => b.Name).ToHashSet();
+				}
+				catch { /* skip unparseable skeletons */ }
+			}
+
+			return _skeletonNames = idx;
+		}
+
+		// Pick the skeleton that best fits a skinned mesh: among rigs whose bone names cover the mesh's whole bone palette
+		// (so no influence falls back to the root), the one whose bones sit closest to the vertices weighted to them.
+		public static IReadOnlyList<SkeletonReader.Bone>? SelectSkeletonForMesh(RdbReader rdb, IReadOnlyList<RenderMeshReader.SubMesh> subs)
+		{
+			// The mesh's bone palette + the weighted centroid of the vertices bound to each bone (by name).
+			var palette = new HashSet<string>();
+			var sum = new Dictionary<string, System.Numerics.Vector3>();
+			var wsum = new Dictionary<string, float>();
+			foreach (var s in subs)
+			{
+				if (s.BonePalette is not { } pal || s.BlendBones is not { } bones || s.BlendWeights is not { } weights)
+					continue;
+				foreach (var n in pal)
+					if (n != null)
+						palette.Add(n);
+				for (var i = 0; i < s.VertexCount; i++)
+					for (var k = 0; k < 4; k++)
+					{
+						var w = weights[i * 4 + k];
+						var li = bones[i * 4 + k];
+						if (w <= 0 || li < 0 || li >= pal.Length)
+							continue;
+						var name = pal[li];
+						if (name == null)
+							continue;
+						var p = new System.Numerics.Vector3(s.Positions[i * 3], s.Positions[i * 3 + 1], s.Positions[i * 3 + 2]);
+						sum[name] = (sum.TryGetValue(name, out var v) ? v : default) + p * w;
+						wsum[name] = (wsum.TryGetValue(name, out var ww) ? ww : 0) + w;
+					}
+			}
+
+			if (palette.Count == 0)
+				return null;
+
+			var centroid = wsum.ToDictionary(kv => kv.Key, kv => sum[kv.Key] / kv.Value);
+			var sig = string.Join('\n', palette.OrderBy(n => n, StringComparer.Ordinal));
+
+			var index = SkeletonNameIndex(rdb);
+			if (_skeletonForPalette.TryGetValue(sig, out var cached))
+				return LoadSkeleton(rdb, cached);
+
+			uint bestId = 0;
+			var bestScore = float.MaxValue;
+			foreach (var (id, names) in index)
+			{
+				if (!palette.IsSubsetOf(names) || LoadSkeleton(rdb, id) is not { } bones)
+					continue;
+
+				var world = new Dictionary<string, System.Numerics.Vector3>();
+				foreach (var b in bones)
+					world.TryAdd(b.Name, b.WorldPosition); // some skeletons repeat a bone name; first wins
+				double d = 0;
+				var n = 0;
+				foreach (var (name, c) in centroid)
+					if (world.TryGetValue(name, out var w))
+					{
+						d += (w - c).Length();
+						n++;
+					}
+
+				var score = n > 0 ? (float)(d / n) : float.MaxValue;
+				if (score < bestScore)
+				{
+					bestScore = score;
+					bestId = id;
+				}
+			}
+
+			if (bestId == 0)
+				return LoadSkeleton(rdb, HumanoidSkeletonId); // no covering rig found - fall back to the humanoid base
+
+			_skeletonForPalette[sig] = bestId;
+			return LoadSkeleton(rdb, bestId);
 		}
 
 		// Texture container type ids worth converting/dumping (FCTX variants + the PNG/JPEG types from rdbreader's enum).

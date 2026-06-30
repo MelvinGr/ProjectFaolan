@@ -234,16 +234,15 @@ namespace Faolan.Importer.Cli
 				return;
 			}
 
-			var skeletonId = uint.TryParse(skelArg, out var s) ? s : Faolan.Core.Rdb.Assets.RdbAssetExtractor.HumanoidSkeletonId;
+			uint? skeletonId = uint.TryParse(skelArg, out var s) ? s : null; // null => auto-select by bone palette
 			var glb = Faolan.Core.Rdb.Assets.RdbAssetExtractor.BuildSkinnedModelGlb(rdb, meshIndexId, skeletonId);
 			if (glb == null)
 			{
-				Console.WriteLine($"meshindex {meshIndexId} is not a readable skinned model (or skeleton {skeletonId} missing).");
+				Console.WriteLine($"meshindex {meshIndexId} is not a readable skinned model (or no matching skeleton).");
 				return;
 			}
 
-			var skeleton = Faolan.Core.Rdb.Assets.RdbAssetExtractor.LoadSkeleton(rdb, skeletonId);
-			Console.WriteLine($"skinned glb: meshindex={meshIndexId} skeleton={skeletonId} bones={skeleton?.Count} bytes={glb.Length}");
+			Console.WriteLine($"skinned glb: meshindex={meshIndexId} skeleton={(skeletonId?.ToString() ?? "auto")} bytes={glb.Length}");
 			if (outDir != null)
 			{
 				Directory.CreateDirectory(outDir);

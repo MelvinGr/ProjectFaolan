@@ -237,9 +237,9 @@ namespace Faolan.Web.Services
 		}
 
 		// Build a SKINNED glb for a skinned model (body / equipment piece): geometry + the character skeleton as a glTF
-		// skin, so the result is posable (#275). Null if the model isn't skinned.
+		// skin, so the result is posable (#275). skeletonId null => auto-select the rig matching the mesh's bone palette.
 		public byte[]? BuildRig(uint meshIndexId, uint? skeletonId = null) =>
-			RdbAssetExtractor.BuildSkinnedModelGlb(Reader(), meshIndexId, skeletonId ?? RdbAssetExtractor.HumanoidSkeletonId);
+			RdbAssetExtractor.BuildSkinnedModelGlb(Reader(), meshIndexId, skeletonId);
 
 		// Build a single RenderMesh (type 1010001) directly by id - for inspecting head/eye/hair meshes (#275).
 		public byte[]? BuildRenderMesh(uint renderMeshId)
