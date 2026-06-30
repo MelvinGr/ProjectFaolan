@@ -24,5 +24,14 @@ namespace Faolan.Tests
 		{
 			Assert.Equal("1g 1t", 1_000_001u.ToCurrencyString());
 		}
+
+		[Theory]
+		[InlineData(0ul, "0g 0s 0c 0t")]
+		[InlineData(250ul, "0g 0s 2c 50t")]
+		[InlineData(1_010_101ul, "1g 1s 1c 1t")]
+		public void ToCurrencyString_ShowAllUnits_AlwaysEmitsAllFour(ulong tin, string expected)
+		{
+			Assert.Equal(expected, tin.ToCurrencyString(showAllUnits: true));
+		}
 	}
 }
