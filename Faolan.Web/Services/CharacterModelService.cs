@@ -377,5 +377,30 @@ namespace Faolan.Web.Services
 			lock (_gate)
 				return _rdb ??= new RdbReader(_rdbDir, _cdnUrl);
 		}
+
+		// A map's world extent (tilemap Width/Height in world units) from the RDB playfield description (1070003),
+		// used to scale the live radar. Null when the RDB is unavailable or the playfield is CDN-gated. Cached.
+		private readonly System.Collections.Concurrent.ConcurrentDictionary<uint, (int W, int H)?> _mapBounds = new();
+
+		public (int Width, int Height)? MapBounds(uint mapId)
+		{
+			if (!RdbAvailable)
+				return null;
+
+			return _mapBounds.GetOrAdd(mapId, id =>
+			{
+				try
+				{
+					var rdb = Reader();
+					if (!rdb.TryGet(1070003, id, out var e) || e.Size == 0 || e.File == 0xff)
+						return null;
+					var xml = System.Text.Encoding.Latin1.GetString(rdb.ReadDecompressed(e));
+					var m = System.Text.RegularExpressions.Regex.Match(xml,
+						"<tilemap[^>]*Width=\"(\\d+)\"[^>]*Height=\"(\\d+)\"");
+					return m.Success ? (int.Parse(m.Groups[1].Value), int.Parse(m.Groups[2].Value)) : null;
+				}
+				catch { return null; }
+			});
+		}
 	}
 }

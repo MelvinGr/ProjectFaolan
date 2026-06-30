@@ -170,6 +170,22 @@ namespace Faolan.Web
                 return glb is null ? Results.NotFound() : Results.File(glb, "model/gltf-binary");
             });
 
+            // Live world radar feed (admin only): the map's entities (from the running server via MCP) + world bounds.
+            app.MapGet("/api/zone/{mapId:long}", async (long mapId, HttpContext ctx, LiveSessionService live, CharacterModelService models) =>
+            {
+                if (!(ctx.User?.IsInRole("Admin") ?? false))
+                    return Results.StatusCode(StatusCodes.Status403Forbidden);
+
+                var entities = await live.GetZoneEntitiesAsync((uint)mapId);
+                var bounds = models.MapBounds((uint)mapId);
+                return Results.Json(new
+                {
+                    online = entities is not null,
+                    bounds = bounds is { } b ? new { w = b.Width, h = b.Height } : null,
+                    entities = entities ?? []
+                });
+            });
+
             if (app.Environment.IsDevelopment())
             {
                 app.MapGet("/api/debug/char/{id:long}", (long id, CharacterModelService models) => Results.Json(models.DebugCharacter((uint)id)));

@@ -10,6 +10,12 @@ namespace Faolan.Web.Services
 	public sealed record LiveSession(
 		uint? CharacterId, string? CharacterName, ushort? CharacterLevel, uint? AccountId, string? AccountName);
 
+	// One live entity in a zone (player/npc/loot), as reported by the MCP list_zone_entities tool. Mirrors
+	// Faolan.Core's ZoneEntityInfo. X/Z are the ground plane (Y is height) — the radar plots X vs Z.
+	public sealed record ZoneEntity(
+		uint Handle, string Name, string Kind, uint Level, bool Hostile, bool Dead,
+		uint? Health, uint? MaxHealth, float X, float Y, float Z);
+
 	// Queries the RUNNING game server's in-process MCP endpoint (http://127.0.0.1:{McpPort}/mcp) for live presence.
 	// Faolan.Web is a separate process, so the only window into the server's in-memory sessions is this MCP call
 	// (DB-only data can't see who is connected right now). Returns null when the server/MCP endpoint is unreachable
@@ -39,6 +45,26 @@ namespace Faolan.Web.Services
 			if (!text.TrimStart().StartsWith('['))
 				return [];
 			try { return JsonSerializer.Deserialize<List<LiveSession>>(text, JsonOptions) ?? []; }
+			catch { return []; }
+		}
+
+		// Live entities on a map (players/NPCs/loot with positions), or null if the server is unreachable. Empty list
+		// when the zone isn't loaded this run.
+		public async Task<IReadOnlyList<ZoneEntity>?> GetZoneEntitiesAsync(uint mapId, CancellationToken ct = default)
+		{
+			var text = await CallAsync("list_zone_entities",
+				new Dictionary<string, object?> { ["mapId"] = mapId }, ct);
+			if (text is null)
+				return null;
+			if (!text.TrimStart().StartsWith('['))
+				return []; // "No live entities on map ..."
+			try
+			{
+				var list = JsonSerializer.Deserialize<List<ZoneEntity>>(text, JsonOptions) ?? [];
+				// The zone query unions every live instance of the map (#268), so each entity repeats per copy —
+				// dedupe by handle for the radar.
+				return list.GroupBy(e => e.Handle).Select(g => g.First()).ToList();
+			}
 			catch { return []; }
 		}
 
