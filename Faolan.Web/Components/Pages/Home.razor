@@ -48,7 +48,8 @@
         <div class="equip-window">
             <div class="equip-title">Equipment</div>
             <div class="equip-grid">
-                <div class="equip-col">
+                <div class="slot center-slot top" title="Head"><span>Head</span></div>
+                <div class="equip-col left">
                     @foreach (var s in LeftSlots)
                     {
                         <div class="slot" title="@s"><span>@s</span></div>
@@ -57,15 +58,16 @@
                 <div class="equip-center">
                     <canvas id="char-canvas"></canvas>
                 </div>
-                <div class="equip-col">
+                <div class="equip-col right">
                     @foreach (var s in RightSlots)
                     {
                         <div class="slot" title="@s"><span>@s</span></div>
                     }
                 </div>
+                <div class="slot center-slot bottom" title="Legs"><span>Legs</span></div>
             </div>
             <div class="equip-bottom">
-                @foreach (var s in BottomSlots)
+                @foreach (var s in WeaponSlots)
                 {
                     <div class="slot wide" title="@s"><span>@s</span></div>
                 }
@@ -113,10 +115,11 @@
     private List<(int Number, string Name, string Equip)> _armorSets = [];
     private string _equip = "";
 
-    // Paper-doll equipment slots, arranged around the character preview (AoC layout; placeholders for now).
-    private static readonly string[] LeftSlots = ["Head", "Neck", "Shoulder", "Cloak", "Chest", "Wrist"];
-    private static readonly string[] RightSlots = ["Hands", "Belt", "Legs", "Boots", "Ring L", "Ring R"];
-    private static readonly string[] BottomSlots = ["Main Hand", "Off Hand", "Tokens", "Bag"];
+    // Paper-doll equipment slots, arranged around the character preview (AoC layout; placeholders for now): Head sits
+    // centred above and Legs centred below, with armour columns flanking and a weapon/utility bar across the bottom.
+    private static readonly string[] LeftSlots = ["Neck", "Shoulder", "Cloak", "Chest", "Wrist"];
+    private static readonly string[] RightSlots = ["Hands", "Belt", "Boots", "Ring L", "Ring R"];
+    private static readonly string[] WeaponSlots = ["Main Hand", "Off Hand", "Ranged", "Tokens", "Bag"];
 
     protected override async Task OnInitializedAsync()
     {
@@ -199,8 +202,17 @@
         box-shadow: inset 0 0 24px #000a; }
     .equip-title { text-align: center; color: #d8c07a; font-weight: 600; letter-spacing: .12em;
         text-transform: uppercase; font-size: .9rem; padding-bottom: .5rem; }
-    .equip-grid { flex: 1; display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: .6rem; min-height: 0; }
+    .equip-grid { flex: 1; display: grid; gap: .55rem; min-height: 0;
+        grid-template-columns: auto minmax(0,1fr) auto;
+        grid-template-rows: auto minmax(0,1fr) auto;
+        grid-template-areas: ".  top  ." "left center right" ".  bot  ."; }
     .equip-col { display: flex; flex-direction: column; gap: .55rem; justify-content: center; }
+    .equip-col.left { grid-area: left; }
+    .equip-col.right { grid-area: right; }
+    .equip-center { grid-area: center; }
+    .center-slot { justify-self: center; }
+    .center-slot.top { grid-area: top; }
+    .center-slot.bottom { grid-area: bot; }
     .equip-center { position: relative; min-width: 0; border-radius: 6px; overflow: hidden;
         background: radial-gradient(120% 90% at 50% 35%, #1c3b38 0%, #0e1d22 70%, #0a1014 100%);
         border: 1px solid #2c4a48; box-shadow: inset 0 0 30px #000c; }
