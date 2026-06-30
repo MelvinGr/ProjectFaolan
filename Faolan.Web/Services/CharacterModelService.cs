@@ -312,6 +312,24 @@ namespace Faolan.Web.Services
 				.ToList();
 		}
 
+		// The character's learned spells, resolved to readable names via the Spells catalog (RDB-imported). Ordered by
+		// level then name. Range is metres, Damage is the spell's damage-rating percent (0 when not a damage spell).
+		public IReadOnlyList<(string Name, byte Level, float Range, float Damage)> Spells(uint characterId)
+		{
+			using var db = _dbFactory.CreateDbContext();
+			return db.CharacterSpells.AsNoTracking()
+				.Where(x => x.CharacterId == characterId)
+				.Join(db.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => s)
+				.OrderBy(s => s.Level).ThenBy(s => s.Name)
+				.AsEnumerable()
+				.Select(s => (
+					string.IsNullOrWhiteSpace(s.Name) ? $"Spell {s.Id}" : s.Name,
+					s.Level,
+					s.Range,
+					s.DamageRating))
+				.ToList();
+		}
+
 		// Build an item's 3D display model (the inventory mesh shown in equipment slots), or null if it has none
 		// (armour pieces carry only a worn-look id, not a display mesh - the open gear RE).
 		public byte[]? ItemModel(uint itemId)

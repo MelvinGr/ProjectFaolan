@@ -79,6 +79,26 @@
                     <div class="srow"><span class="k">Location</span><span class="v">@_mapName</span></div>
                     <div class="srow"><span class="k">Guild</span><span class="v">@(_guildName ?? "—")</span></div>
                 </div>
+
+                @if (_spells.Count > 0)
+                {
+                    <div class="spellbook">
+                        <div class="sb-title">Spells <span class="sb-count">@_spells.Count</span></div>
+                        <ul>
+                            @foreach (var sp in _spells)
+                            {
+                                <li>
+                                    <span class="sp-name">@sp.Name</span>
+                                    <span class="sp-meta">
+                                        @if (sp.Level > 0) { <span>L@sp.Level</span> }
+                                        @if (sp.Damage > 0) { <span>@sp.Damage.ToString("0")% dmg</span> }
+                                        @if (sp.Range > 0) { <span>@sp.Range.ToString("0")m</span> }
+                                    </span>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                }
             }
         </aside>
 
@@ -174,6 +194,7 @@
     private string _mapName = "—";
     private string _money = "0";
     private string? _guildName;
+    private IReadOnlyList<(string Name, byte Level, float Range, float Damage)> _spells = [];
 
     // Carried items, split into Normal/Quest/Resources tabs and paged into the grid (AoC-style backpack: 4×6 per page).
     private const int InvPageSize = 24;
@@ -309,6 +330,7 @@
         _mapName = full?.Map?.Name ?? "—";
         _guildName = full?.Guild?.Name;
         _money = FormatMoney(full?.Money ?? 0);
+        _spells = Models.Spells((uint)c.Id);
     }
 
     // Wallet in tin -> gold/silver/copper/tin (100 tin = 1 copper, 100 copper = 1 silver, 100 silver = 1 gold).
@@ -386,6 +408,16 @@
     .srow:last-child { border-bottom: none; }
     .srow .k { color: var(--muted); }
     .srow .v { color: var(--text); text-align: right; }
+    .spellbook { margin-top: .85rem; }
+    .sb-title { font-size: .7rem; text-transform: uppercase; letter-spacing: .1em; color: var(--gold);
+        padding-bottom: .4rem; margin-bottom: .4rem; border-bottom: 1px solid var(--stone-dark);
+        display: flex; align-items: center; gap: .4rem; }
+    .sb-count { font-size: .62rem; color: var(--gold); background: #0007; border-radius: 8px; padding: 0 .4em; }
+    .spellbook ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .3rem; }
+    .spellbook li { display: flex; flex-direction: column; background: linear-gradient(var(--field), var(--field-2));
+        border: 1px solid var(--line); border-radius: 5px; padding: .35rem .5rem; }
+    .sp-name { color: var(--gold-bright); font-size: .78rem; }
+    .sp-meta { display: flex; gap: .5rem; color: var(--muted); font-size: .68rem; margin-top: .1rem; }
 
     /* AoC-style equipment paper-doll window: slot columns flanking the character preview. */
     .equip-window { height: 100%; display: flex; flex-direction: column; box-sizing: border-box;
