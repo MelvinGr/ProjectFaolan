@@ -1,0 +1,93 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Faolan rig viewer (#275)</title>
+<style>
+  html,body{margin:0;height:100%;background:#1b1d22;color:#ddd;font-family:system-ui,sans-serif;overflow:hidden}
+  #c{display:block;width:100vw;height:100vh;touch-action:none}
+  #ui{position:fixed;left:0;right:0;bottom:0;padding:12px 16px;background:linear-gradient(transparent,#000a);display:flex;gap:14px;align-items:center}
+  #ui label{font-size:13px;white-space:nowrap}
+  #pose{flex:1}
+  #status{position:fixed;top:10px;left:12px;font-size:12px;color:#9aa}
+</style>
+<!-- same three.js CDN + importmap the Blazor app uses (App.razor) -->
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="status">loading…</div>
+<div id="ui">
+  <label>elbows</label>
+  <input id="pose" type="range" min="0" max="95" value="0">
+  <label id="deg">0°</label>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const params = new URLSearchParams(location.search);
+const id = params.get('id') || '1100584';                 // default = aquilonian male body
+const skel = params.get('skeleton');
+const url = `/api/model/${id}.glb?rig=true` + (skel ? `&skeleton=${skel}` : '');
+
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1b1d22);
+const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+scene.add(new THREE.HemisphereLight(0xfff4e6, 0x303840, 1.0));
+for (const [c, i, p] of [[0xffffff,1.1,[2,3,3]],[0xbcd0ff,0.5,[-3,1,2]],[0xffffff,0.6,[0,2,-4]]]) {
+  const l = new THREE.DirectionalLight(c, i); l.position.set(...p); scene.add(l);
+}
+scene.add(new THREE.GridHelper(4, 8, 0x444444, 0x333333));
+
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize); resize();
+(function loop(){ requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
+
+let skinned = null, bind = null;
+const status = document.getElementById('status');
+new GLTFLoader().loadAsync(url).then(gltf => {
+  const model = gltf.scene;
+  model.traverse(o => { if (o.isMesh) { o.material.flatShading = false; o.material.needsUpdate = true; }
+                        if (o.isSkinnedMesh && !skinned) { skinned = o; bind = new Map(o.skeleton.bones.map(b => [b.name, b.quaternion.clone()])); } });
+  const box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
+  model.position.sub(center); model.position.y += size.y / 2;
+  scene.add(model);
+  const r = Math.max(size.x, size.y, size.z);
+  controls.target.set(0, size.y / 2, 0);
+  camera.position.set(0, size.y * 0.55, r * 2.4); controls.update();
+  status.textContent = skinned ? `rig: ${skinned.skeleton.bones.length} bones — drag to rotate` : 'loaded (no skin)';
+}).catch(e => status.textContent = 'load error: ' + e.message);
+
+// Live elbow pose: compose a delta about each forearm's local -X hinge onto its bind rotation.
+const slider = document.getElementById('pose'), degLbl = document.getElementById('deg');
+slider.addEventListener('input', () => {
+  const deg = +slider.value; degLbl.textContent = deg + '°';
+  if (!skinned) return;
+  const by = new Map(skinned.skeleton.bones.map(b => [b.name, b]));
+  for (const [n, q] of bind) by.get(n).quaternion.copy(q);
+  for (const n of ['rig_bone_LeftForearm', 'rig_bone_RightForearm']) {
+    const b = by.get(n);
+    if (b) b.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(-1, 0, 0), deg * Math.PI / 180));
+  }
+});
+</script>
+</body>
+</html>
