@@ -93,26 +93,19 @@ namespace Faolan.GameServer.World
 				.ToArray();
 		}
 
-		// The NPC walk speed the segment DURATION is computed against - matches WorldState.NpcMoveSpeed (the rate the
-		// server model steps), so the client animates a segment in the same wall-time the server took to traverse it and
-		// the next segment arrives just as the client finishes -> seamless chaining instead of a catch-up snap (#272).
-		public const float WalkSpeed = 12f;
-
-		// One-way WALK from `from` to `to` (#272): a mode-1 PathMoveTask the client interpolates over `duration` seconds (a
-		// real, paced walk), unlike the mode-2 RotateMoveTask (`BuildBody`) which is a rotate/set-position the client SNAPS
-		// to. Two things make it smooth:
-		//  - The WaitMoveTask header carries [duration][remaining] (header-flags bit0 CLEAR): the client walks the segment
-		//    in exactly `length/WalkSpeed` seconds, matching the server's step rate, so consecutive segments flow without
-		//    the client jumping ahead to catch up (and without RUNNING, the no-duration default that made patrols sprint).
-		//  - The spline needs >= 2 control points (client assert splinepath.cpp:37 `points->size() >= 2`), so the waypoint
-		//    list is BOTH endpoints [from, to]; a single point crashes the client.
-		// The 29-byte finalizer's anchor (its trailing x/y/z) is the DESTINATION, not the start - that's where the client
-		// settles after the path, so anchoring at `from` made the NPC walk to the waypoint then BACK (the net-zero jitter
-		// that reverted the path form before). pathLength = from->to.
+		// One-way WALK from `from` to `to` (#272): a mode-1 PathMoveTask the client interpolates over time (a real walk),
+		// unlike the mode-2 RotateMoveTask (`BuildBody`) which is a rotate/set-position the client SNAPS to. This matches
+		// retail's 2-point movement-segment form exactly (capture-verified over 5763 records): header-flags 0x01 (bit0 SET
+		// -> NO [duration][remaining]; retail does NOT pace a short 2-point segment by duration, it uses the entity's
+		// movement-speed attribute), F-flags 0x00 (waypoint-list branch), a 2-point spline [from, to] (the client asserts
+		// points->size() >= 2, splinepath.cpp:37 - a single point crashes it), and the 29-byte finalizer with
+		// pathLength == the segment distance (capture ratio 1.000 for 2-point records) and its anchor at the DESTINATION
+		// (anchoring at `from` made the NPC walk to the waypoint then BACK - the net-zero jitter that reverted the path
+		// form before). NB the residual chase snap is NOT this packet form (it's retail-exact) but a SPEED mismatch: the
+		// model's emit cadence (NpcMoveSpeed) must equal the speed the client renders the NPC at, else segments mis-chain.
 		public static byte[] BuildWalkBody(uint handle, Vector3 from, Vector3 to)
 		{
 			var pathLength = Vector3.Distance(from, to);
-			var duration = pathLength / WalkSpeed; // seconds to walk the segment at the model's step rate
 			return new FaolanStream()
 				.WriteUInt32(MoveTaskSubOpcode)
 				.WriteUInt32(WireType)
@@ -120,8 +113,7 @@ namespace Faolan.GameServer.World
 				.WriteUInt16(0)
 				.WriteFloatBigEndian(from.X).WriteFloatBigEndian(from.Y).WriteFloatBigEndian(from.Z)
 				.WriteByte(ModePath)
-				.WriteByte(0x00)                     // WaitMoveTask base header flags (bit0 CLEAR -> [duration][remaining] follow)
-				.WriteFloatBigEndian(duration).WriteFloatBigEndian(duration) // duration + remaining (full at start)
+				.WriteByte(0x01)                     // WaitMoveTask base header flags (bit0 SET -> no duration; retail 2-point form)
 				.WriteByte(0x00)                     // PathMoveTask F-flags (no optional floats; waypoint-list branch)
 				.WriteUInt32(2)                      // two control points: the spline needs >= 2 (client assert)
 				.WriteFloatBigEndian(from.X).WriteFloatBigEndian(from.Y).WriteFloatBigEndian(from.Z)

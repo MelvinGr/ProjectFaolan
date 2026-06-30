@@ -1,6 +1,6 @@
 #! /bin/sh
 
-dotnet ./Faolan.Web/bin/Debug/Faolan.Web.dll --urls http://0.0.0.0:7080 --contentRoot ../../
+dotnet run --project ./Faolan.Web/Faolan.Web.csproj
 
-#dotnet ./Faolan.ContentMirror/bin/Debug/Faolan.ContentMirror --store "/mnt/btrfs/@games/mirror-archive"
+#dotnet run ./Faolan.ContentMirror/Faolan.ContentMirror.csproj -- --store "/mnt/btrfs/@games/mirror-archive"
 
