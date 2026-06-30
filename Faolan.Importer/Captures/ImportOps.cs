@@ -23,6 +23,22 @@ namespace Faolan.Importer.Captures
 		public const uint BeachMapId = 0x00000FAA;
 
 		// Upsert (never wipe): refresh from a clean slate so stale handle-keyed (un-named) nodes don't linger.
+		// One ConversationPacket: keep the raw Data (fallback + non-Knubot replay) and, for the four Knubot dialogue
+		// IIRs, also store the screen STRUCTURED (#188) so the runtime builds it from fields.
+		private static ConversationPacket BuildPacket(byte[] data, int sequence)
+		{
+			var pkt = new ConversationPacket { Sequence = sequence, Data = data };
+			if (Faolan.Core.Network.Packets.ConversationScreenDecoder.Decode(data) is { } cols)
+			{
+				pkt.SubOpcode = cols.SubOpcode;
+				pkt.Env = cols.Env;
+				pkt.Field = cols.Field;
+				pkt.Flag = cols.Flag;
+				pkt.ScreensJson = cols.ScreensJson;
+			}
+			return pkt;
+		}
+
 		public static async Task ImportConversations(DatabaseContext db, List<ConversationEntry> conversations)
 		{
 			var existing = await db.ConversationNodes.Include(n => n.Packets).ToListAsync();
@@ -39,7 +55,7 @@ namespace Faolan.Importer.Captures
 					CapturedInstance = e.CapturedInstance,
 					ConditionScript = e.ConditionScript,
 					GrantQuestId = e.GrantQuestId,
-					Packets = e.Packets.Select((p, i) => new ConversationPacket { Sequence = i, Data = p }).ToList()
+					Packets = e.Packets.Select((p, i) => BuildPacket(p, i)).ToList()
 				});
 
 			await db.SaveChangesAsync();

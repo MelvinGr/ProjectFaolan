@@ -1,5 +1,7 @@
 using System;
 using System.Buffers.Binary;
+using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Packets;
 using Faolan.GameServer.Dialogue;
 using Xunit;
 
@@ -109,6 +111,38 @@ namespace Faolan.Tests
 			BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(8, 4), (uint)header.Length);
 			Buffer.BlockCopy(record, 0, packet, 12 + header.Length, record.Length);
 			return packet;
+		}
+
+		// The structured-column construct (#188) must be BYTE-IDENTICAL to the Data-path construct, so persisting the
+		// decoded screen and building from it doesn't change the wire output.
+		[Fact]
+		public void BuildFromColumns_IsByteIdenticalToTheDataPath()
+		{
+			foreach (var recordHex in new[]
+			         {
+				         KnubotCodecTestData.AppendTextBody,
+				         KnubotCodecTestData.AnswerListBody,
+				         KnubotCodecTestData.CloseChatWindowBody,
+			         })
+			{
+				var packet = WrapInPacket(Convert.FromHexString(recordHex));
+
+				var cols = ConversationScreenDecoder.Decode(packet);
+				Assert.NotNull(cols);
+				var p = new ConversationPacket
+				{
+					Data = packet,
+					SubOpcode = cols.SubOpcode,
+					Env = cols.Env,
+					Field = cols.Field,
+					Flag = cols.Flag,
+					ScreensJson = cols.ScreensJson,
+				};
+
+				var fromColumns = ConversationService.BuildKnubotFromColumns(p, LiveInstance, ClickedNpc, "", "");
+				Assert.True(ConversationService.TryConstructKnubotRecord(packet, LiveInstance, ClickedNpc, "", "", out var fromData));
+				Assert.Equal(Convert.ToHexStringLower(fromData), Convert.ToHexStringLower(fromColumns));
+			}
 		}
 
 		[Fact]

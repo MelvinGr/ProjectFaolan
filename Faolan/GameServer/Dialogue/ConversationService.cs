@@ -117,6 +117,31 @@ namespace Faolan.GameServer.Dialogue
 			return false;
 		}
 
+		// The packet's Knubot sub-opcode: the stored column when structured, else read from the raw Data.
+		private static uint SubOpcodeOf(ConversationPacket p) => p.SubOpcode ?? ConversationSubOpcode(p.Data);
+
+		// Construct a Knubot record from the STRUCTURED columns (#188) - the screen text comes from ScreensJson, the
+		// live player name/guild are regenerated in. Byte-identical to the Data-path construct for the same inputs
+		// (gated by ConversationStructuredScreenTests), so swapping the source doesn't change the wire output.
+		internal static byte[] BuildKnubotFromColumns(ConversationPacket p, uint liveInstance, uint npcHandle,
+			string playerName, string guildName)
+		{
+			var env = p.Env ?? 0;
+			var screens = string.IsNullOrEmpty(p.ScreensJson)
+				? System.Array.Empty<string>()
+				: System.Text.Json.JsonSerializer.Deserialize<string[]>(p.ScreensJson) ?? System.Array.Empty<string>();
+
+			byte[] Screen(int i) => WithLivePlayer(System.Text.Encoding.Latin1.GetBytes(screens[i]), playerName, guildName);
+
+			if (p.SubOpcode == KnubotOpenChatWindowSubOpcode)
+				return KnubotCodec.BuildOpenChatWindow(liveInstance, npcHandle, p.Flag ?? 0, env);
+			if (p.SubOpcode == KnubotAppendTextSubOpcode)
+				return KnubotCodec.BuildAppendText(liveInstance, npcHandle, Screen(0), p.Field ?? 1, p.Flag ?? 1, env);
+			// AnswerList + CloseChatWindow: the string-list grammar.
+			var strings = screens.Select((_, i) => Screen(i)).ToList();
+			return KnubotCodec.BuildStringList(p.SubOpcode!.Value, liveInstance, npcHandle, strings, env);
+		}
+
 		// Regenerate the live player's name/guild into a captured screen's remoteformat XML via the structured
 		// builder (so the captured player's name no longer shows to everyone). SAFETY: only rebuilds when the parser
 		// reproduces the captured XML byte-for-byte first; otherwise the original bytes are returned untouched, so an
@@ -271,7 +296,7 @@ namespace Faolan.GameServer.Dialogue
 			// instantly closes, can't accept). When the screen has a real AnswerList, drop the spurious close; a pure
 			// terminal screen (CloseChatWindow only) is kept.
 			var orderedPackets = node.Packets.OrderBy(p => p.Sequence).ToList();
-			var hasAnswerList = orderedPackets.Any(p => ConversationSubOpcode(p.Data) == KnubotAnswerListSubOpcode);
+			var hasAnswerList = orderedPackets.Any(p => SubOpcodeOf(p) == KnubotAnswerListSubOpcode);
 
 			// Remember the GameAgent instance this conversation's packets are sent from (retail varies it per
 			// conversation). SendConversationClose must reuse it - a close from a different instance (e.g. the old
@@ -288,7 +313,7 @@ namespace Faolan.GameServer.Dialogue
 
 			foreach (var p in orderedPackets)
 			{
-				var subOp = ConversationSubOpcode(p.Data);
+				var subOp = SubOpcodeOf(p);
 				if (hasAnswerList && subOp == KnubotCloseChatWindowSubOpcode)
 					continue; // skip the spurious close so the option list stays interactive
 
@@ -297,6 +322,15 @@ namespace Faolan.GameServer.Dialogue
 				{
 					await SendQuestGrantPackets(client, grantDef);
 					grantSent = true;
+				}
+
+				// Preferred path: the screen is stored STRUCTURED (#188) - build it from the columns. Falls back to
+				// decoding/patching the raw Data when the columns aren't populated (re-import) or it's non-Knubot.
+				if (p.SubOpcode is not null)
+				{
+					var fromColumns = BuildKnubotFromColumns(p, liveInstance, clickedNpcHandle, playerName, guildName);
+					await SendConstructedKnubot(client, ReadSenderInstance(p.Data), liveInstance, fromColumns);
+					continue;
 				}
 
 				// CONSTRUCT every Knubot record through the typed codec (#188): AppendText (line) + OpenChatWindow +
