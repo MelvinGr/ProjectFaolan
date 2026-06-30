@@ -57,8 +57,11 @@ namespace Faolan.Web.Services
 			_cdnUrl = config["CdnUrl"];
 		}
 
+		// Linked to every cached render so ClearRenderCache can evict them all at once.
+		private CancellationTokenSource _cacheReset = new();
+
 		// Cache a deterministic render (keyed string -> bytes). Caches the "no model" result too. Size-tracked so the
-		// MemoryCache size cap can evict.
+		// MemoryCache size cap can evict; linked to the reset token so the admin "clear cache" button drops them all.
 		private byte[]? Cached(string key, Func<byte[]?> build)
 		{
 			var bytes = _cache.GetOrCreate(key, entry =>
@@ -66,9 +69,20 @@ namespace Faolan.Web.Services
 				var result = build() ?? None;
 				entry.SlidingExpiration = CacheTtl;
 				entry.Size = Math.Max(result.Length, 1);
+				entry.AddExpirationToken(new Microsoft.Extensions.Primitives.CancellationChangeToken(_cacheReset.Token));
 				return result;
 			})!;
 			return bytes.Length == 0 ? null : bytes;
+		}
+
+		// Drop every cached item model / map image (e.g. after a faolan.db re-import). Cancels the shared token so all
+		// linked entries are evicted, then swaps in a fresh one for new entries.
+		public void ClearRenderCache()
+		{
+			var old = _cacheReset;
+			_cacheReset = new CancellationTokenSource();
+			old.Cancel();
+			old.Dispose();
 		}
 
 		public bool RdbAvailable => Directory.Exists(_rdbDir) && File.Exists(Path.Combine(_rdbDir, "le.idx"));
