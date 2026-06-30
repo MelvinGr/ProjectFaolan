@@ -101,7 +101,7 @@ export async function show(canvasId, url) {
             state.bind = new Map(o.skeleton.bones.map(b => [b.name, b.quaternion.clone()]));
         }
     });
-    if (state.poseDeg) applyDemoPose(state, state.poseDeg); // re-apply the current pose angle across a reload
+    applyPose(state); // re-apply the current pose across a reload
 
     state.scene.add(model);
     state.model = model;
@@ -126,37 +126,78 @@ export async function show(canvasId, url) {
     state.controls.update();
 }
 
-// Pose a loaded rig by bending both elbows `deg` degrees about each forearm's local -X hinge (0 = bind/rest). The delta
-// is composed onto each bone's BIND rotation; the render loop refreshes world matrices + the skeleton every frame, so
-// children follow correctly. No-op if the model isn't skinned.
-function applyDemoPose(state, deg) {
+// Posable joints. Each control bends one or more rig bones `deg` degrees about a LOCAL axis (0 = bind/rest). Left/right
+// pairs share the same local axis — the rig is mirrored so one axis bends both the same anatomical way (verified on the
+// elbows). Angles compose onto each bone's BIND rotation; the render loop refreshes the skeleton every frame so children
+// follow. Axes/ranges are empirical — tweak the axis sign or swap components if a joint bends the wrong way.
+const POSE_CONTROLS = [
+    { id: 'head',      label: 'head',      axis: [1, 0, 0], min: -35, max: 35,  bones: ['rig_bone_Neck', 'rig_bone_Head'] },
+    { id: 'turn',      label: 'head turn', axis: [0, 1, 0], min: -60, max: 60,  bones: ['rig_bone_Neck'] },
+    { id: 'spine',     label: 'spine',     axis: [1, 0, 0], min: -25, max: 35,  bones: ['rig_bone_Spine1', 'rig_bone_Spine2'] },
+    { id: 'shoulders', label: 'shoulders', axis: [0, 0, 1], min: -90, max: 20,  bones: ['rig_bone_LeftArm', 'rig_bone_RightArm'] },
+    { id: 'elbows',    label: 'elbows',    axis: [-1, 0, 0], min: 0,  max: 120, bones: ['rig_bone_LeftForearm', 'rig_bone_RightForearm'] },
+    { id: 'wrists',    label: 'wrists',    axis: [-1, 0, 0], min: -45, max: 45, bones: ['rig_bone_LeftHand', 'rig_bone_RightHand'] },
+    { id: 'hips',      label: 'hips',      axis: [1, 0, 0], min: -35, max: 60,  bones: ['rig_bone_LeftUpleg', 'rig_bone_RightUpleg'] },
+    { id: 'knees',     label: 'knees',     axis: [1, 0, 0], min: -120, max: 0,  bones: ['rig_bone_LeftLeg', 'rig_bone_Rightleg'] },
+    { id: 'ankles',    label: 'ankles',    axis: [1, 0, 0], min: -30, max: 30,  bones: ['rig_bone_LeftFoot', 'rig_bone_RightFoot'] },
+];
+
+// Re-pose the rig from `state.pose` (id -> degrees). Resets every bone to bind, then layers each non-zero control. No-op
+// if the model isn't skinned.
+function applyPose(state) {
     if (!state.skinned) return;
     const byName = new Map(state.skinned.skeleton.bones.map(b => [b.name, b]));
     for (const [name, q] of state.bind) byName.get(name)?.quaternion.copy(q); // reset to bind first
-    if (deg)
-        for (const name of ['rig_bone_LeftForearm', 'rig_bone_RightForearm']) {
-            const b = byName.get(name);
-            if (b) b.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(-1, 0, 0), deg * Math.PI / 180));
-        }
+    const pose = state.pose ?? {};
+    for (const ctl of POSE_CONTROLS) {
+        const deg = pose[ctl.id] || 0;
+        if (!deg) continue;
+        const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(...ctl.axis), deg * Math.PI / 180);
+        for (const name of ctl.bones) byName.get(name)?.quaternion.multiply(q);
+    }
 }
 
-// Set the rig's elbow pose to `deg` degrees (0 = rest). Driven by the viewer page's pose slider.
-export function setPose(canvasId, deg) {
+// Set one pose control to `deg` degrees (0 = rest). Driven by the per-joint sliders.
+export function setPose(canvasId, id, deg) {
     const state = states.get(canvasId);
     if (!state) return false;
-    state.poseDeg = deg || 0;
+    (state.pose ??= {})[id] = deg || 0;
     if (!state.skinned) return false;
-    applyDemoPose(state, state.poseDeg);
+    applyPose(state);
     return true;
 }
 
-// Wire a range <input> to drive the pose directly on the client (no Blazor round-trip per drag = smooth on mobile).
-export function bindPoseSlider(canvasId, sliderId) {
-    const el = document.getElementById(sliderId);
-    if (el && !el.dataset.bound) {
-        el.dataset.bound = '1';
-        el.addEventListener('input', () => setPose(canvasId, +el.value));
+// Build a labelled range slider per joint into `containerId` and wire each to drive the pose client-side (no Blazor
+// round-trip per drag = smooth on mobile). Idempotent: rebuilt each character select, preserving nothing (rest pose).
+export function buildPoseControls(canvasId, containerId) {
+    const host = document.getElementById(containerId);
+    if (!host) return;
+    const state = states.get(canvasId);
+    if (state) state.pose = {};
+    host.innerHTML = '';
+
+    for (const ctl of POSE_CONTROLS) {
+        const label = document.createElement('label');
+        label.className = 'pose';
+        label.append(ctl.label);
+        const input = document.createElement('input');
+        input.type = 'range';
+        input.min = ctl.min; input.max = ctl.max; input.value = 0;
+        input.addEventListener('input', () => setPose(canvasId, ctl.id, +input.value));
+        input.addEventListener('dblclick', () => { input.value = 0; setPose(canvasId, ctl.id, 0); });
+        label.append(input);
+        host.append(label);
     }
+
+    const reset = document.createElement('button');
+    reset.type = 'button';
+    reset.className = 'pose-reset';
+    reset.textContent = 'reset pose';
+    reset.addEventListener('click', () => {
+        for (const input of host.querySelectorAll('input[type=range]')) input.value = 0;
+        if (state) { state.pose = {}; applyPose(state); }
+    });
+    host.append(reset);
 }
 
 // Render an item glb to a PNG data-URL with ONE reused offscreen renderer (so 16 equipment slots don't each take a
