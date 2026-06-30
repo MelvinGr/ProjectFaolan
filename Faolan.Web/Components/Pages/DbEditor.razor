@@ -66,6 +66,19 @@
                             {
                                 <input type="checkbox" checked="@f.BoolValue" @onchange="e => f.BoolValue = (bool)(e.Value ?? false)" />
                             }
+                            else if (_fks.TryGetValue(f.Name, out var fk))
+                            {
+                                <select value="@f.Text" @onchange="e => SetText(f, e.Value?.ToString())">
+                                    @if (fk.Nullable)
+                                    {
+                                        <option value="">(none)</option>
+                                    }
+                                    @foreach (var o in fk.Items)
+                                    {
+                                        <option value="@o.Value">@o.Label</option>
+                                    }
+                                </select>
+                            }
                             else if (f.IsEnum)
                             {
                                 <select value="@f.Text" @onchange="e => SetText(f, e.Value?.ToString())">
@@ -104,6 +117,12 @@
     private string? _status;
     private bool _error;
 
+    // Foreign-key pickers for the current table: FK column name -> the related rows to choose from.
+    private const int FkOptionCap = 1000; // bigger FK targets (Items/Spells) keep the plain number box
+    private readonly Dictionary<string, FkOptions> _fks = new();
+    private sealed record FkOption(string Value, string Label);
+    private sealed record FkOptions(List<FkOption> Items, bool Nullable);
+
     protected override async Task OnInitializedAsync()
     {
         var user = AuthState is null ? null : (await AuthState).User;
@@ -133,6 +152,7 @@
         _fields = [];
         _filter = "";
         _rows.Clear();
+        _fks.Clear();
         if (_ctx is null) return;
         try
         {
@@ -142,9 +162,38 @@
                 _rows.Add(e);
                 if (_rows.Count >= RowCap) break;
             }
+            ComputeForeignKeys(t);
             Set($"{t.Name}: {_rows.Count} rows loaded");
         }
         catch (Exception ex) { Set(ex.Message, error: true); }
+    }
+
+    // Build a dropdown for each single-column foreign key: the related entity's rows (key value -> display). Targets
+    // larger than the cap keep the plain number box (a 20k dropdown is unusable).
+    private void ComputeForeignKeys(Type t)
+    {
+        var et = _ctx!.Model.FindEntityType(t);
+        if (et is null) return;
+        foreach (var fk in et.GetForeignKeys())
+        {
+            if (fk.Properties.Count != 1 || fk.PrincipalKey.Properties.Count != 1)
+                continue;
+            var column = fk.Properties[0].Name;             // e.g. RealmId
+            var principal = fk.PrincipalEntityType.ClrType;  // e.g. Realm
+            var keyProp = principal.GetProperty(fk.PrincipalKey.Properties[0].Name);
+            if (keyProp is null || _fks.ContainsKey(column))
+                continue;
+
+            var items = new List<FkOption>();
+            var overCap = false;
+            foreach (var row in (System.Collections.IEnumerable)SetMethod.MakeGenericMethod(principal).Invoke(_ctx, null)!)
+            {
+                if (items.Count >= FkOptionCap) { overCap = true; break; }
+                items.Add(new FkOption(keyProp.GetValue(row)?.ToString() ?? "", row.ToString() ?? ""));
+            }
+            if (!overCap)
+                _fks[column] = new FkOptions(items.OrderBy(o => o.Label).ToList(), fk.Properties[0].IsNullable);
+        }
     }
 
     private void SelectRow(object r)
