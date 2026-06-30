@@ -63,6 +63,9 @@ namespace Faolan.Importer.Cli
 				case "item-template":
 					ItemTemplate(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", dbPath, arg ?? "", GetOption(args, "--out"));
 					return 0;
+				case "rdb-types":
+					RdbTypes(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB");
+					return 0;
 				default:
 					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: conversation-states, anim, burst-coverage, worldobj, spell-fields, rdb-assets.");
 					return 1;
@@ -279,6 +282,20 @@ namespace Faolan.Importer.Cli
 		// Decrypt one item's RDB template (type 1000020/1000620) with its stored Data1..4 TEA key and surface everything
 		// that could be a worn-appearance mesh ref: every ASCII string, the property table, and every u32 that resolves
 		// to a MESHINDEXFILE (1010030) / MonsterData (1010201) / RenderMesh (1010001) entry in the RDB (#275 gear).
+		// type -> (entry count, local count) histogram of the whole RDB index, to spot candidate record families.
+		private static void RdbTypes(string rdbDir)
+		{
+			using var rdb = new Faolan.Core.Rdb.RdbReader(rdbDir);
+			var hist = new Dictionary<uint, (int total, int local)>();
+			foreach (var e in rdb.Entries)
+			{
+				var cur = hist.GetValueOrDefault(e.Type);
+				hist[e.Type] = (cur.total + 1, cur.local + (e.File != 0xff ? 1 : 0));
+			}
+			foreach (var kv in hist.OrderByDescending(k => k.Value.total))
+				Console.WriteLine($"type {kv.Key,-10} total={kv.Value.total,-8} local={kv.Value.local}");
+		}
+
 		private static void ItemTemplate(string rdbDir, string dbPath, string arg, string outDir = null)
 		{
 			if (!uint.TryParse(arg, out var itemId))
