@@ -145,6 +145,30 @@ namespace Faolan.Tests
 			}
 		}
 
+		// SetDialogueCamera (#188): decode a real captured camera packet into columns and rebuild it byte-for-byte
+		// (with the captured handles) - so it can be constructed from the columns instead of replayed.
+		[Fact]
+		public void BuildDialogueCameraPacket_ReproducesTheCapturedPacket()
+		{
+			// Real SetDialogueCamera packet (GameCharAgent:0x58 -> GameCharInterface:0x02165eff, opcode 0x2015).
+			var captured = Convert.FromHexString(
+				"000000397100ae7d000000170a070d5db9eca91058120a0d91f7878b10ffbdd9102015" +
+				"0000c3500004de8a0000c35002165eff05010119000000000000");
+
+			var cols = ConversationScreenDecoder.Decode(captured);
+			Assert.NotNull(cols);
+			Assert.Equal(ConversationScreenDecoder.SetDialogueCamera, cols.SubOpcode);
+			Assert.Equal(0x58u, cols.CameraAgentInstance);
+
+			// The captured body's two handles: [0xC350][npc][0xC350][player] at 12 + headerLen.
+			var body = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(captured.AsSpan(8, 4));
+			var npc = BinaryPrimitives.ReadUInt32BigEndian(captured.AsSpan(body + 4, 4));
+			var player = BinaryPrimitives.ReadUInt32BigEndian(captured.AsSpan(body + 12, 4));
+
+			var rebuilt = ConversationService.BuildDialogueCameraPacket(cols.CameraAgentInstance!.Value, player, npc, cols.CameraParams);
+			Assert.Equal(Convert.ToHexStringLower(captured), Convert.ToHexStringLower(rebuilt));
+		}
+
 		[Fact]
 		public void TryConstructKnubotRecord_LiftsAndRebuildsFromAFullPacket()
 		{

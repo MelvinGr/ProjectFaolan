@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core.Data;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
@@ -179,6 +180,32 @@ namespace Faolan.GameServer.Dialogue
 				.SendAsync(client);
 		}
 
+		// Constructs the dialogue camera (DispatchSetDialogueCamera 0x2015) from the structured columns (#188):
+		// GameCharAgent:<agentInstance> -> GameCharInterface:<player>, body [0xC350][npc][0xC350][player][params].
+		// Byte-identical to the captured packet re-addressed (gated by the construct test).
+		private static Task SendDialogueCamera(INetworkClient client, uint agentInstance, uint liveInstance,
+			uint npcHandle, byte[] cameraParams) =>
+			client.SendAsync(BuildDialogueCameraPacket(agentInstance, liveInstance, npcHandle, cameraParams));
+
+		internal static byte[] BuildDialogueCameraPacket(uint agentInstance, uint liveInstance, uint npcHandle, byte[] cameraParams)
+		{
+			var body = new FaolanStream()
+				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(npcHandle)
+				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(liveInstance)
+				.WriteArray(cameraParams ?? Array.Empty<byte>())
+				.ToArray();
+
+			var ps = new PacketStream()
+				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, agentInstance),
+					ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, liveInstance),
+					(ushort)ConversationScreenDecoder.SetDialogueCamera);
+			ps.WriteArray(body);
+			ps.WriteLengthHash();
+			return ps.ToArray();
+		}
+
 		// Reads the GameAgent sender instance out of a captured packet's RPC header. Header layout (PacketStream):
 		// [u32 len][u32 crc][u32 headerLen][0x0a][byteLen][sender endpoint][0x12]... where a ProtoEndpoint is
 		// [0x0D <type LE32> 0x10 <instance varint>]. Falls back to 0x08 (the common value / SendConversationClose's)
@@ -324,12 +351,15 @@ namespace Faolan.GameServer.Dialogue
 					grantSent = true;
 				}
 
-				// Preferred path: the screen is stored STRUCTURED (#188) - build it from the columns. Falls back to
-				// decoding/patching the raw Data when the columns aren't populated (re-import) or it's non-Knubot.
-				if (p.SubOpcode is not null)
+				// Preferred path: the packet is stored STRUCTURED (#188) - build it from the columns. Falls back to
+				// decoding/patching the raw Data when the columns aren't populated (re-import gap) or unrecognised.
+				if (p.SubOpcode is { } structuredSub)
 				{
-					var fromColumns = BuildKnubotFromColumns(p, liveInstance, clickedNpcHandle, playerName, guildName);
-					await SendConstructedKnubot(client, ReadSenderInstance(p.Data), liveInstance, fromColumns);
+					if (structuredSub == ConversationScreenDecoder.SetDialogueCamera)
+						await SendDialogueCamera(client, p.CameraAgentInstance ?? 0x08, liveInstance, clickedNpcHandle, p.CameraParams);
+					else
+						await SendConstructedKnubot(client, ReadSenderInstance(p.Data), liveInstance,
+							BuildKnubotFromColumns(p, liveInstance, clickedNpcHandle, playerName, guildName));
 					continue;
 				}
 

@@ -20,11 +20,19 @@ namespace Faolan.Core.Database.Tables
 		public int Sequence { get; set; }
 		public uint ConversationNodeId { get; set; }
 
-		// --- structured Knubot screen (#188); null = non-Knubot, use Data ---------------------------------------
-		public uint? SubOpcode { get; set; }       // 0x045B0B0F / 0x4A3D899A / 0xF164A4A5 / 0xC4AF39EB
+		// --- structured screen (#188); null SubOpcode = unrecognised, use Data ----------------------------------
+		// SubOpcode is the Knubot dialogue IIR (0x045B0B0F / 0x4A3D899A / 0xF164A4A5 / 0xC4AF39EB) OR the dialogue
+		// camera (0x2015 DispatchSetDialogueCamera). Knubot uses Env/Field/Flag/ScreensJson; the camera uses
+		// CameraAgentInstance + CameraParams. The npc/player handles are always the live ones at send time.
+		public uint? SubOpcode { get; set; }
 		public byte? Env { get; set; }             // KnubotBaseIIR env byte
 		public uint? Field { get; set; }           // AppendText/CloseChatWindow scalar (null for Open/AnswerList)
 		public byte? Flag { get; set; }            // OpenChatWindow/AppendText trailing flag (null otherwise)
 		public string ScreensJson { get; set; }    // JSON array of the remoteformat XML screen(s); null for Open
+
+		// SetDialogueCamera (0x2015): the GameCharAgent sender instance (varies per conversation) + the 10 camera
+		// param bytes after the two endpoint handles. Body = [0xC350][npc][0xC350][player][CameraParams].
+		public uint? CameraAgentInstance { get; set; }
+		public byte[] CameraParams { get; set; }
 	}
 }

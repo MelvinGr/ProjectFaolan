@@ -35,6 +35,8 @@ namespace Faolan.Importer.Captures
 				pkt.Field = cols.Field;
 				pkt.Flag = cols.Flag;
 				pkt.ScreensJson = cols.ScreensJson;
+				pkt.CameraAgentInstance = cols.CameraAgentInstance;
+				pkt.CameraParams = cols.CameraParams;
 			}
 			return pkt;
 		}
