@@ -60,6 +60,9 @@ namespace Faolan.Importer.Cli
 				case "rdb-dump":
 					RdbDump(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", arg ?? "", GetOption(args, "--out"));
 					return 0;
+				case "item-template":
+					ItemTemplate(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", dbPath, arg ?? "", GetOption(args, "--out"));
+					return 0;
 				default:
 					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: conversation-states, anim, burst-coverage, worldobj, spell-fields, rdb-assets.");
 					return 1;
@@ -271,6 +274,102 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"id {id}: {hits.Count} entr(ies)");
 			foreach (var e in hits)
 				Console.WriteLine($"  type={e.Type,-9} {(e.File == 0xff ? "CDN " : "local")} size={e.Size}");
+		}
+
+		// Decrypt one item's RDB template (type 1000020/1000620) with its stored Data1..4 TEA key and surface everything
+		// that could be a worn-appearance mesh ref: every ASCII string, the property table, and every u32 that resolves
+		// to a MESHINDEXFILE (1010030) / MonsterData (1010201) / RenderMesh (1010001) entry in the RDB (#275 gear).
+		private static void ItemTemplate(string rdbDir, string dbPath, string arg, string outDir = null)
+		{
+			if (!uint.TryParse(arg, out var itemId))
+			{
+				Console.WriteLine($"item-template needs a numeric item id in --report-arg, got '{arg}'");
+				return;
+			}
+
+			using var db = new DatabaseContext(new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={dbPath}").Options);
+			var item = db.Items.FirstOrDefault(i => i.Id == itemId);
+			if (item is null)
+			{
+				Console.WriteLine($"item {itemId} not in DB");
+				return;
+			}
+
+			Console.WriteLine($"item {itemId} \"{item.Name}\" type={item.Type} cat={item.SearchCategory} key={item.Data1:X8},{item.Data2:X8},{item.Data3:X8},{item.Data4:X8}");
+			using var rdb = new Faolan.Core.Rdb.RdbReader(rdbDir);
+			var key = new[] { item.Data1, item.Data2, item.Data3, item.Data4 };
+			byte[] template = null;
+			foreach (var type in new uint[] { 1000020, 1000620 })
+				if (rdb.TryGet(type, itemId, out var e) && e.File != 0xff && e.Size > 0)
+				{
+					try { template = rdb.ReadDecrypted(e, key); Console.WriteLine($"decrypted type={type} {template.Length} B"); break; }
+					catch (Exception ex) { Console.WriteLine($"decrypt type={type} failed: {ex.Message}"); }
+				}
+			if (template is null) { Console.WriteLine("no template entry"); return; }
+
+			if (outDir != null)
+			{
+				Directory.CreateDirectory(outDir);
+				File.WriteAllBytes(Path.Combine(outDir, $"item_{itemId}.bin"), template);
+			}
+
+			var body = template.AsSpan(12);
+
+			// Every printable ASCII run >= 3 chars (asset/mesh names look like "armor_..._body" / "*bodymesh_NNN").
+			Console.WriteLine("-- strings --");
+			for (var i = 0; i < body.Length;)
+			{
+				var j = i;
+				while (j < body.Length && body[j] >= 32 && body[j] <= 126) j++;
+				if (j - i >= 3)
+					Console.WriteLine($"  @{i,5} {System.Text.Encoding.ASCII.GetString(body.Slice(i, j - i))}");
+				i = j < body.Length ? j + 1 : j;
+			}
+
+			// Property table: the longest run of [fieldId][value] u32 pairs with strictly-decreasing fieldId in (0,2000].
+			Console.WriteLine("-- property table (fieldId=value) --");
+			var words = body.Length / 4;
+			var bestStart = -1; var bestLen = 0;
+			for (var start = 0; start + 1 < words; start++)
+			{
+				uint last = 0; var have = false; var len = 0;
+				for (var j = start; j + 1 < words; j += 2)
+				{
+					var fid = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(j * 4, 4));
+					if (fid == 0 || fid > 2000 || (have && fid >= last)) break;
+					last = fid; have = true; len++;
+				}
+				if (len > bestLen) { bestLen = len; bestStart = start; }
+			}
+			if (bestStart >= 0)
+			{
+				uint last = 0; var have = false;
+				for (var j = bestStart; j + 1 < words; j += 2)
+				{
+					var fid = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(j * 4, 4));
+					if (fid == 0 || fid > 2000 || (have && fid >= last)) break;
+					var val = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice((j + 1) * 4, 4));
+					var resolves = "";
+					foreach (var t in new uint[] { 1010030, 1010201, 1010001, 1010200, 1000700, 1010700 })
+						if (val > 1000 && rdb.TryGet(t, val, out var re) && re.Size > 0)
+							resolves += $" [->{t} {(re.File == 0xff ? "CDN" : "loc")}]";
+					Console.WriteLine($"  field {fid,4} = {val}{resolves}");
+					last = fid; have = true;
+				}
+			}
+
+			// Every u32 that resolves to a known character-asset RDB entry - candidate worn-mesh references.
+			Console.WriteLine("-- u32 -> RDB asset refs --");
+			var refTypes = new uint[] { 1010030, 1010201, 1010001, 1010200 };
+			for (var i = 0; i + 4 <= body.Length; i += 4)
+			{
+				var v = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(i, 4));
+				if (v < 1000)
+					continue;
+				foreach (var t in refTypes)
+					if (rdb.TryGet(t, v, out var re) && re.Size > 0)
+						Console.WriteLine($"  @{i,5} {v} -> type {t} ({(re.File == 0xff ? "CDN" : "local")} {re.Size} B)");
+			}
 		}
 
 		// Scan every MESHINDEXFILE (type 1010030) manifest and print those whose .max source path contains the given

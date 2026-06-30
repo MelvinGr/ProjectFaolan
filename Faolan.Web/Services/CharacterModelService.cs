@@ -66,7 +66,7 @@ namespace Faolan.Web.Services
 		// Build a specific character by id, using their stored appearance (CharacterBodyResources) - currently the
 		// chosen hairstyle (*hairmesh_NNN, where NNN is the hair rendermesh id). Head morph/face texscript still pending
 		// the CHARACTERCREATOR (1010700) decode (#275); HeadMesh is a creator index, not a resource id.
-		public byte[]? BuildCharacterById(uint characterId)
+		public byte[]? BuildCharacterById(uint characterId, IReadOnlyList<uint>? equipMeshIndexIds = null)
 		{
 			using var db = _dbFactory.CreateDbContext();
 			var character = db.Characters.AsNoTracking().FirstOrDefault(c => c.Id == characterId);
@@ -100,8 +100,8 @@ namespace Faolan.Web.Services
 
 			if (headMeshes.Count > 0)
 				// Try the exact race/sex body, then the local same-sex fallback (the exact body is often CDN-only).
-				return RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyId, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals, morphs)
-				       ?? RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyFallback, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals, morphs)
+				return RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyId, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals, morphs, equipMeshIndexIds)
+				       ?? RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyFallback, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals, morphs, equipMeshIndexIds)
 				       ?? BuildCharacter(character.Race, character.Sex, hairRmId);
 
 			return BuildCharacter(character.Race, character.Sex, hairRmId);

@@ -458,13 +458,23 @@ namespace Faolan.Core.Rdb.Assets
 		public static byte[]? BuildCharacterFromParts(RdbReader rdb, uint bodyMeshIndexId,
 			IReadOnlyList<uint> headLocalRenderMeshIds, uint? hairWorldRenderMeshId,
 			Tint? skinTint = null, Tint? hairTint = null, uint? eyeTextureId = null,
-			IReadOnlyList<BodyDecal>? bodyDecals = null, BodyMorphDeformer.Morphs? morphs = null)
+			IReadOnlyList<BodyDecal>? bodyDecals = null, BodyMorphDeformer.Morphs? morphs = null,
+			IReadOnlyList<uint>? equipmentMeshIndexIds = null)
 		{
 			var body = ReadTexturedModel(rdb, bodyMeshIndexId, skinTint, bodyDecals, morphs);
 			if (body == null)
 				return null;
 
 			var all = new List<RenderMeshReader.SubMesh>(body);
+
+			// Worn equipment: skinned armor meshes are authored in the SAME body-world bind-pose space as the body, so
+			// they overlay directly with no transform (the visible half of "wearing gear" - the item->mesh look mapping
+			// that picks WHICH meshindex is the separate, still-open RE in #275). Each piece carries its own diffuse via
+			// the mesh-index materials / header refs; pieces with none render untextured.
+			if (equipmentMeshIndexIds is { Count: > 0 })
+				foreach (var equipId in equipmentMeshIndexIds)
+					if (ReadTexturedModel(rdb, equipId) is { } worn)
+						all.AddRange(worn);
 
 			var headParts = new List<RenderMeshReader.SubMesh>();
 			for (var i = 0; i < headLocalRenderMeshIds.Count; i++)

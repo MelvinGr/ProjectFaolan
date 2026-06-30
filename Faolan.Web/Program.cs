@@ -51,9 +51,12 @@ namespace Faolan.Web
                 return glb is null ? Results.NotFound() : Results.File(glb, "model/gltf-binary");
             });
 
-            app.MapGet("/api/character/{id:long}/model.glb", (long id, CharacterModelService models) =>
+            // ?equip=290301,290354 overlays those armor MESHINDEXFILE ids on the character (gear preview, #275).
+            app.MapGet("/api/character/{id:long}/model.glb", (long id, string? equip, CharacterModelService models) =>
             {
-                var glb = models.BuildCharacterById((uint)id);
+                var equipIds = equip?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(s => uint.TryParse(s, out var v) ? v : 0u).Where(v => v != 0).ToList();
+                var glb = models.BuildCharacterById((uint)id, equipIds is { Count: > 0 } ? equipIds : null);
                 return glb is null ? Results.NotFound() : Results.File(glb, "model/gltf-binary");
             });
 
