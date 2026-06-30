@@ -66,9 +66,14 @@ namespace Faolan.Importer.Captures
 					?? await db.Npcs.FirstOrDefaultAsync(n => n.Name == e.Name);
 				if (type == null)
 				{
-					type = new Npc { TemplateId = e.TemplateId, Name = e.Name, Community = e.Community };
+					type = new Npc { TemplateId = e.TemplateId, Name = e.Name, Community = e.Community, Race = e.Race, Sex = e.Sex };
 					db.Npcs.Add(type);
 					await db.SaveChangesAsync();
+				}
+				else
+				{
+					type.Race = e.Race; // type-level appearance (#287)
+					type.Sex = e.Sex;
 				}
 
 				db.NpcSpawns.Add(new NpcSpawn
@@ -86,8 +91,6 @@ namespace Faolan.Importer.Captures
 					RotationW = e.RotW,
 					Level = e.Level,
 					Health = e.Health,
-					Race = e.Race,
-					Sex = e.Sex,
 					HeadMesh = e.HeadMesh,
 					MonsterData = e.MonsterData,
 					MonsterScale = e.MonsterScale,

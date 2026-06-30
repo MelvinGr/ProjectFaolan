@@ -31,8 +31,9 @@ namespace Faolan.Core.Database.Tables
 		public uint MapId { get; set; }
 		public uint MonsterData { get; set; }
 		public uint MonsterScale { get; set; }
-		public uint Race { get; set; }
-		public uint Sex { get; set; }
+
+		// Race/Sex moved to the Npc TYPE table (#287): they are type-level identity (every placement of a type shares
+		// them), so they live on `Npc` now and are reached via the `Npc` navigation.
 
 		// The humanoid appearance / morph table lifted from the captured post-IIR (#185) - empty for animals, which
 		// carry no such table. When present, NpcSpawnBuilder generates the post-IIR from these rows instead of

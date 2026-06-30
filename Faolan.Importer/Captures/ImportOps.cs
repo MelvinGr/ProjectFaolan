@@ -391,10 +391,12 @@ namespace Faolan.Importer.Captures
 				{
 					if (!string.IsNullOrEmpty(e.Name)) npc.Name = e.Name;
 					npc.Community = e.Community;
+					npc.Race = e.Race; // type-level appearance (#287)
+					npc.Sex = e.Sex;
 				}
 				else
 				{
-					npc = new Npc { TemplateId = e.TemplateId, Name = e.Name, Community = e.Community };
+					npc = new Npc { TemplateId = e.TemplateId, Name = e.Name, Community = e.Community, Race = e.Race, Sex = e.Sex };
 					db.Npcs.Add(npc);
 					byTemplate[e.TemplateId] = npc;
 				}
@@ -579,8 +581,7 @@ namespace Faolan.Importer.Captures
 			row.RotationY = e.RotY;
 			row.RotationZ = e.RotZ;
 			row.RotationW = e.RotW;
-			row.Race = e.Race;
-			row.Sex = e.Sex;
+			// Race/Sex are type-level now (#287) - set on the Npc type in UpsertNpcTypes, not on the spawn row.
 			row.Level = e.Level;
 			row.MonsterScale = e.MonsterScale;
 			row.MonsterData = e.MonsterData;

@@ -21,6 +21,12 @@ namespace Faolan.Core.Database.Tables
 		// Faction/community (NpcStats.community): 0 = neutral/friendly, > 0 = a hostile faction.
 		public uint Community { get; set; }
 
+		// Type-level appearance identity (#287): the creature's race and sex code, the same across every placement of
+		// this type (moved off NpcSpawn, where it was duplicated per instance). Sourced from the captured
+		// CharacterStats.race / CharacterStats.sex (sex code = the Sex enum + 2: MALE=2 / FEMALE=3).
+		public uint Race { get; set; }
+		public uint Sex { get; set; }
+
 		// The placements of this type across all maps.
 		public virtual ICollection<NpcSpawn> Spawns { get; set; } = new List<NpcSpawn>();
 
