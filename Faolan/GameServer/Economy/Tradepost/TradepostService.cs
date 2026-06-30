@@ -467,6 +467,11 @@ namespace Faolan.GameServer.Economy.Tradepost
 
 			await _database.RemoveMailAttachment(mailId, attachment.ItemInstanceId);
 			mail.Attachments.Remove(attachment);
+			// #213: also bank any attached money on the take so the re-sent mail shows NO remaining attachment - the
+			// client greys out delete while a mail still has unclaimed contents, so leaving the money behind is what
+			// pinned the delete button (and "take all" never credited the tin). Retail captures never carry mail money,
+			// so there's no observed take-money op; crediting it with the item take matches the player expectation.
+			await GrantMailMoney(client, mail);
 			await TradepostResponses.SendMailMessage(client, mail, includeAttachments: false, inst);
 			// Complete the take with a result ack, mirroring MarkMailRead (#213): without it the client's mail-op state
 			// machine stays mid-take, so the FIRST delete click after a retrieve is swallowed (the mail survives until the
@@ -475,6 +480,23 @@ namespace Faolan.GameServer.Economy.Tradepost
 
 			_logger.LogInformation("Tradepost mail: {Char} took item (template {Template}) from mail 0x{Mail:X16} into bag slot {Slot}.",
 				character.Name, attachment.Template, mailId, slot);
+		}
+
+		// Banks any money attached to a mail into the recipient's wallet and clears it from the mail (#213). Idempotent -
+		// a 0-money mail is a no-op - so it's safe to call on every take. Without this the tin was never credited and the
+		// unclaimed money kept the client's delete button greyed out (a mail with attachments can't be deleted).
+		private async Task GrantMailMoney(INetworkClient client, Mail mail)
+		{
+			if (mail == null || mail.Money == 0)
+				return;
+			var character = client.Session.Character;
+			var credited = mail.Money;
+			character.Money += credited;
+			await _database.SetCharacterMoney(character.Id, character.Money);
+			await _outbound.SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Gain);
+			await _database.SetMailMoney(mail.MailId, 0);
+			mail.Money = 0;
+			_logger.LogInformation("Tradepost mail: {Char} banked {Tin} tin from mail 0x{Mail:X16}.", character.Name, credited, mail.MailId);
 		}
 
 		// Builds the live DispatchAddItem entry for a mail attachment from its stored instance identity (no Items

@@ -85,6 +85,7 @@ namespace Faolan.Core.Database
 		Task<List<Mail>> GetMailsForRecipient(string recipientName);
 		Task<Mail> GetMailByWireId(ulong mailId);
 		Task SetMailRead(ulong mailId, bool read);
+		Task SetMailMoney(ulong mailId, ulong money);
 		Task RemoveMailAttachment(ulong mailId, ulong itemInstanceId);
 		Task DeleteMail(ulong mailId);
 
@@ -603,6 +604,15 @@ namespace Faolan.Core.Database
 			await ctx.Mails
 				.Where(m => m.MailId == mailId)
 				.ExecuteUpdateAsync(s => s.SetProperty(m => m.IsRead, read));
+		}
+
+		// Updates a mail's attached money (tin); 0 clears it once the recipient has banked it (#213).
+		public async Task SetMailMoney(ulong mailId, ulong money)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await ctx.Mails
+				.Where(m => m.MailId == mailId)
+				.ExecuteUpdateAsync(s => s.SetProperty(m => m.Money, money));
 		}
 
 		// Removes one escrowed attachment from a mail once the recipient has taken it into the bag (GetMailItem).
