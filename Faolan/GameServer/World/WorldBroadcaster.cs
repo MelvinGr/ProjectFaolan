@@ -128,11 +128,7 @@ namespace Faolan.GameServer.World
 				// no longer has it. Known.Add gates the spawn to viewers who actually need it + restores the #245
 				// invariant (Known == "was sent"), so later move/combat broadcasts (which check Known) reach it.
 				if (viewer.Client != null && viewer.Known.Add(npc.Handle))
-				{
-					await SendWorldSpawn(viewer.Client, npc);
-					if (npc.Patrols) // #266: resume its patrol after respawn
-						await SendPatrol(viewer.Client, npc);
-				}
+					await SendWorldSpawn(viewer.Client, npc); // #266: no route replay - the tick drives a server-side wander
 			}
 		}
 

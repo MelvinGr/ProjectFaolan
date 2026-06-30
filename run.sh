@@ -13,7 +13,7 @@ case "${1:-}" in
         ;;
 
     --client)
-        dotnet run --project ./Faolan.ClientLauncher/Faolan.ClientLauncher.csproj -- \
+        dotnet run --project ./Faolan.ClientLauncher/Faolan.ClientLauncher.csproj --no-build -- \
             --console \
             --universeaddr 127.0.0.1:7010 \
             --mirror 7081

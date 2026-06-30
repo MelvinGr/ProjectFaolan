@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Numerics;
@@ -209,10 +210,14 @@ namespace Faolan.GameServer.World
 		public IReadOnlyList<Vector3> PatrolWaypoints { get; set; } = [];
 		public float PatrolSpeed { get; set; }
 
-		// The captured MoveTask record re-addressed to THIS entity (handle + from = its spawn), ready to send verbatim.
-		// Replaying the captured form preserves its real speed/flags so the client walks (not run-crawls) the route.
+		// The captured MoveTask record re-addressed to THIS entity (kept as the wander-anchor source only; no longer
+		// replayed verbatim - retail does NOT walk a continuous route, see Patrols/NextWanderPoint).
 		public byte[] PatrolBody { get; set; }
-		public bool Patrols => PatrolBody != null;
+
+		// #266 retail wander: a beach NPC with captured anchor points drifts between them - capture-measured as a SINGLE
+		// short 2-point MoveTask to a nearby anchor every ~25-60s (NOT a continuous route, NOT client-driven). The server
+		// owns the position (every client sees the same spot; a chase begins from where it actually is, not its spawn).
+		public bool Patrols => PatrolWaypoints.Count > 0;
 
 		// Seconds until the patrol route is re-issued (retail re-paths a one-shot patrol so it keeps looping). Set to
 		// the cycle length (path traversal time + dwell) when the route is issued; the tick counts it down.
@@ -228,16 +233,28 @@ namespace Faolan.GameServer.World
 		public uint FollowTargetHandle { get; set; }
 		public bool Following => FollowTargetHandle != 0;
 
-		// Arms the patrol re-issue timer for the next cycle.
-		public void ArmPatrolCycle() => _patrolReissueRemaining = PatrolCycleSeconds;
+		// Arms the next wander move for a randomized ~25-60s (capture-measured retail cadence: a beach NPC drifts every
+		// 30-80s, the spread keeps a pack from moving in lockstep).
+		public void ArmPatrolCycle() => _patrolReissueRemaining = 25.0 + Random.Shared.NextDouble() * 35.0;
 
-		// Counts down the patrol re-issue timer; true when a fresh route should be issued (then re-arm via ArmPatrolCycle).
+		// Counts down the wander timer; true when it's time for the next 2-point wander move (then re-arm via ArmPatrolCycle).
 		public bool TickPatrolCycle(double dt)
 		{
-			if (!Patrols || PatrolCycleSeconds <= 0)
+			if (!Patrols)
 				return false;
 			_patrolReissueRemaining -= dt;
 			return _patrolReissueRemaining <= 0;
+		}
+
+		// The next wander destination: a captured anchor point other than where we already are (so the move isn't a no-op).
+		public Vector3 NextWanderPoint()
+		{
+			if (PatrolWaypoints.Count == 1)
+				return PatrolWaypoints[0];
+			Vector3 p;
+			do { p = PatrolWaypoints[Random.Shared.Next(PatrolWaypoints.Count)]; }
+			while (Vector3.DistanceSquared(p, Position) < 1f);
+			return p;
 		}
 
 		public WorldEntity(uint handle, uint mapId, bool isPlayer, string name, INetworkClient client)

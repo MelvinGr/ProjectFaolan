@@ -234,12 +234,16 @@ namespace Faolan.GameServer.World
 						// Disengaged with no one in range: heal back to full so it can't be whittled from out of range.
 						if (entity.Vitals.Health < entity.Vitals.MaxHealth)
 							entity.Vitals.ReviveToFull();
-						// #266: idle + at home -> keep its captured patrol going. The client walks the route; when a cycle
-						// elapses (path traversal + dwell) re-issue it so it loops (retail re-paths idle patrols).
+						// #266 retail wander (capture-verified): a beach NPC drifts with a SINGLE short 2-point move to a
+						// nearby anchor every ~25-60s - NOT a continuous client-walked route. Server-driven: we move the
+						// model to the destination and broadcast the one MoveFrom->Position segment, so every player sees the
+						// same spot and a later chase starts from where the NPC actually is (no aggro-from-spawn teleport).
 						if (entity.Patrols && entity.TickPatrolCycle(deltaSeconds))
 						{
+							entity.MoveFrom = entity.Position;
+							entity.Position = entity.NextWanderPoint();
 							entity.ArmPatrolCycle();
-							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcPatrol));
+							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcMove));
 						}
 						continue;
 					}
