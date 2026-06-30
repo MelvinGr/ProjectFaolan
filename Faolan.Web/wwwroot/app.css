@@ -167,3 +167,16 @@ h1:focus { outline: none; }
     background: #b32121; padding: 1rem; color: white;
 }
 .blazor-error-boundary::after { content: "An error has occurred."; }
+
+/* ---- Item tooltip (floating, appended to <body> by viewer.js) -------------- */
+.item-tooltip {
+    position: fixed; z-index: 2000; pointer-events: none; max-width: 18rem;
+    background: linear-gradient(180deg, #1d1f25, #14161a);
+    border: 1px solid var(--gold-dim); border-radius: 7px;
+    padding: .5rem .65rem; box-shadow: 0 8px 24px #000b;
+    font-size: .8rem; color: var(--text);
+}
+.item-tooltip .tt-name { font-family: var(--font-display); color: var(--gold-bright); font-size: .92rem; letter-spacing: .02em; }
+.item-tooltip .tt-meta { color: var(--gold); font-size: .74rem; margin-top: .1rem; }
+.item-tooltip .tt-row { color: var(--text); margin-top: .25rem; }
+.item-tooltip .tt-id { color: #6f6a5c; font-size: .68rem; margin-top: .35rem; }

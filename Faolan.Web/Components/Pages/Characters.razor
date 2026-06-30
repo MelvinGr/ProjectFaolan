@@ -139,15 +139,8 @@
                 @for (var i = 0; i < InvPageSize; i++)
                 {
                     var idx = _invPage * InvPageSize + i;
-                    var item = _selected is not null && idx < tabItems.Count ? tabItems[idx] : ((uint Id, string Name, uint Count, string Tab)?)null;
-                    <div class="slot @(item is not null ? "filled" : "")" title="@(item?.Name)" data-item="@(item?.Id.ToString() ?? "")">
-                        <img class="slot-img" alt="" />
-                        <span class="@(item is not null ? "item" : "")">@(item?.Name)</span>
-                        @if (item is { Count: > 1 } it)
-                        {
-                            <span class="count">@it.Count</span>
-                        }
-                    </div>
+                    var item = _selected is not null && idx < tabItems.Count ? tabItems[idx].Info : (ItemInfo?)null;
+                    @ItemSlot(item, "")
                 }
             </div>
             <div class="inv-foot">
@@ -185,26 +178,38 @@
     // Carried items, split into Normal/Quest/Resources tabs and paged into the grid (AoC-style backpack: 4×6 per page).
     private const int InvPageSize = 24;
     private static readonly string[] InvTabs = ["Normal", "Quest", "Resources"];
-    private IReadOnlyList<(uint Id, string Name, uint Count, string Tab)> _inventory = [];
+    private IReadOnlyList<(ItemInfo Info, string Tab)> _inventory = [];
     private string _invTab = "Normal";
     private int _invPage;
-    private List<(uint Id, string Name, uint Count, string Tab)> TabItems
+    private List<(ItemInfo Info, string Tab)> TabItems
         => _inventory.Where(i => i.Tab == _invTab).ToList();
     private int InvPageCount => Math.Max(1, (int)Math.Ceiling(TabItems.Count / (double)InvPageSize));
     private bool _refreshThumbs;
     private IJSObjectReference? _module;
-    private IReadOnlyDictionary<string, (uint Id, string Name)> _equipment = new Dictionary<string, (uint, string)>();
+    private IReadOnlyDictionary<string, ItemInfo> _equipment = new Dictionary<string, ItemInfo>();
 
-    // Slot display: the equipped item's name when filled, else the placeholder slot label.
-    private (bool Has, string Label, string Title) SlotInfo(string slot) =>
-        _equipment.TryGetValue(slot, out var it) ? (true, it.Name, it.Name) : (false, slot, slot);
-
-    // Render one paper-doll slot: a 3D thumbnail of the equipped item (filled in by JS), with the item name as the
-    // fallback/label (or the placeholder slot name when empty).
-    private RenderFragment Slot(string slot, string extra = "") => @<div class="slot @extra @(SlotInfo(slot).Has ? "filled" : "")" title="@SlotInfo(slot).Title" data-item="@(SlotInfo(slot).Has ? _equipment[slot].Id.ToString() : "")">
+    // Render one item slot (equipment or bag): a 3D thumbnail filled in by JS, the item name as fallback/label (or the
+    // placeholder label when empty), a stack-count badge, and data-* attributes the JS tooltip reads on hover.
+    private RenderFragment ItemSlot(ItemInfo? info, string label, string extra = "") => @<div
+        class="slot @extra @(info is not null ? "filled" : "")"
+        data-item="@(info?.Id.ToString() ?? "")"
+        data-name="@(info?.Name)"
+        data-type="@(info?.Type)"
+        data-level="@(info?.Level ?? 0)"
+        data-value="@(info?.Value ?? 0)"
+        data-sell="@(info?.Sell ?? 0)"
+        data-count="@(info?.Count ?? 0)">
         <img class="slot-img" alt="" />
-        <span class="@(SlotInfo(slot).Has ? "item" : "")">@SlotInfo(slot).Label</span>
+        <span class="@(info is not null ? "item" : "")">@(info?.Name ?? label)</span>
+        @if (info is { Count: > 1 } c)
+        {
+            <span class="count">@c.Count</span>
+        }
     </div>;
+
+    // Equipment paper-doll slot by name (placeholder label = the slot name).
+    private RenderFragment Slot(string slot, string extra = "") =>
+        ItemSlot(_equipment.TryGetValue(slot, out var it) ? it : (ItemInfo?)null, slot, extra);
 
     // Paper-doll equipment slots, arranged around the character preview (AoC layout; placeholders for now): Head sits
     // centred above and Legs centred below, with armour columns flanking and a weapon/utility bar across the bottom.
@@ -235,6 +240,7 @@
         if (firstRender)
         {
             _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/viewer.js");
+            await _module.InvokeVoidAsync("initItemTooltips");
 
             // Deep-link: ?char=<id> auto-loads that character once the viewer module is ready.
             if (CharId is { } id && _characters?.FirstOrDefault(c => c.Id == id) is { } c)

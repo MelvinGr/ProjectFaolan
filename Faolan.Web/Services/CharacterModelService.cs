@@ -7,6 +7,25 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Web.Services
 {
+	// Display-facing item details for the viewer's slots + tooltips. Sell = vendor sell price (round(Value/10), 0 when
+	// the value is unknown or the item is no-sell). Count is the stack size (1 for worn gear).
+	public readonly record struct ItemInfo(uint Id, string Name, string Type, byte Level, uint Value, uint Sell, uint Count)
+	{
+		public static ItemInfo From(Item item, uint count = 1)
+		{
+			var value = item.Value;
+			return new ItemInfo(
+				item.Id,
+				string.IsNullOrWhiteSpace(item.Name) ? $"Item {item.Id}" : item.Name,
+				item.Type.ToString(),
+				item.Level,
+				value,
+				value > 0 ? (uint)Math.Round(value / 10.0) : 0,
+				count);
+		}
+	}
+
+
 	// Builds a character's 3D model (glTF/glb) on demand from the client RDB, reusing the Faolan.Core asset pipeline
 	// (#275). Holds one RdbReader for the process (it memory-maps the index + keeps the data files open). Race/sex ->
 	// mesh-index ids is an interim hardcoded table; the proper source is the CHARACTERCREATOR tables (1010700) +
@@ -249,7 +268,7 @@ namespace Faolan.Web.Services
 
 		// A character's equipped items keyed by the viewer's slot labels (only non-empty slots), to populate the
 		// equipment paper-doll. Item id + display name; the icon is resolved separately from the RDB item template.
-		public IReadOnlyDictionary<string, (uint Id, string Name)> Equipment(uint characterId)
+		public IReadOnlyDictionary<string, ItemInfo> Equipment(uint characterId)
 		{
 			using var db = _dbFactory.CreateDbContext();
 			var e = db.CharacterEquipment.AsNoTracking()
@@ -259,7 +278,7 @@ namespace Faolan.Web.Services
 				.Include(x => x.MainHandLeft).Include(x => x.OffHandLeft).Include(x => x.Tokens).Include(x => x.FirstPosBag)
 				.FirstOrDefault(x => x.CharacterId == characterId);
 			if (e is null)
-				return new Dictionary<string, (uint, string)>();
+				return new Dictionary<string, ItemInfo>();
 
 			var map = new (string Slot, Item? Item)[]
 			{
@@ -269,17 +288,17 @@ namespace Faolan.Web.Services
 				("Main Hand", e.MainHandLeft), ("Off Hand", e.OffHandLeft), ("Tokens", e.Tokens), ("Bag", e.FirstPosBag)
 			};
 
-			var result = new Dictionary<string, (uint, string)>();
+			var result = new Dictionary<string, ItemInfo>();
 			foreach (var (slot, item) in map)
 				if (item is not null)
-					result[slot] = (item.Id, string.IsNullOrWhiteSpace(item.Name) ? $"Item {item.Id}" : item.Name);
+					result[slot] = ItemInfo.From(item);
 			return result;
 		}
 
 		// The character's carried (non-worn) items — the backpack/quest/resource contents — as a flat, display-ordered
 		// list (container, then slot), each tagged with its tab. Empty slots are dropped; the viewer pages what remains.
 		// Containers: 104 = normal backpack, 112 = resources, 113 = quest (Faolan.Core/Enums/ItemType.cs).
-		public IReadOnlyList<(uint Id, string Name, uint Count, string Tab)> Inventory(uint characterId)
+		public IReadOnlyList<(ItemInfo Info, string Tab)> Inventory(uint characterId)
 		{
 			using var db = _dbFactory.CreateDbContext();
 			return db.CharacterInventory.AsNoTracking()
@@ -288,9 +307,7 @@ namespace Faolan.Web.Services
 				.OrderBy(x => x.Container).ThenBy(x => x.Slot)
 				.AsEnumerable()
 				.Select(x => (
-					x.Item!.Id,
-					string.IsNullOrWhiteSpace(x.Item.Name) ? $"Item {x.Item.Id}" : x.Item.Name,
-					x.Count,
+					ItemInfo.From(x.Item!, x.Count),
 					x.Container switch { 113 => "Quest", 112 => "Resources", _ => "Normal" }))
 				.ToList();
 		}

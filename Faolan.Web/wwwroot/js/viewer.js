@@ -265,6 +265,70 @@ export async function populateItemThumbs() {
     }
 }
 
+// --- Item tooltips -----------------------------------------------------------
+// A single floating panel, populated from the hovered slot's data-* attributes (name/type/level/value/sell/count/id).
+// Appended to <body> (outside the Blazor-scoped component) so it can overflow the panels.
+let _tip = null;
+const esc = s => (s ?? '').replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+
+// tin -> g/s/c/t (100 tin = 1 copper, 100 copper = 1 silver, 100 silver = 1 gold) — mirrors the C# wallet formatter.
+function fmtMoney(tin) {
+    const g = Math.floor(tin / 1e6), s = Math.floor(tin / 1e4) % 100, c = Math.floor(tin / 100) % 100, t = tin % 100;
+    const p = [];
+    if (g) p.push(g + 'g'); if (s) p.push(s + 's'); if (c) p.push(c + 'c'); if (t || !p.length) p.push(t + 't');
+    return p.join(' ');
+}
+
+function tipHtml(ds) {
+    const out = [`<div class="tt-name">${esc(ds.name)}</div>`];
+    const meta = [];
+    if (ds.type && ds.type !== 'Normal') meta.push(esc(ds.type));
+    if (+ds.level > 0) meta.push('Level ' + ds.level);
+    if (meta.length) out.push(`<div class="tt-meta">${meta.join(' · ')}</div>`);
+    if (+ds.count > 1) out.push(`<div class="tt-row">Stack of ${ds.count}</div>`);
+    if (+ds.sell > 0) out.push(`<div class="tt-row">Sells for ${fmtMoney(+ds.sell)}</div>`);
+    else if (+ds.value > 0) out.push(`<div class="tt-row">Value ${ds.value}</div>`);
+    out.push(`<div class="tt-id">#${esc(ds.item)}</div>`);
+    return out.join('');
+}
+
+function moveTip(e) {
+    if (!_tip) return;
+    const pad = 14, w = _tip.offsetWidth, h = _tip.offsetHeight;
+    let x = e.clientX + pad, y = e.clientY + pad;
+    if (x + w > window.innerWidth - 8) x = e.clientX - w - pad;
+    if (y + h > window.innerHeight - 8) y = e.clientY - h - pad;
+    _tip.style.left = Math.max(8, x) + 'px';
+    _tip.style.top = Math.max(8, y) + 'px';
+}
+
+function hideTip() { if (_tip) _tip.style.display = 'none'; }
+
+export function initItemTooltips() {
+    if (document._tipInit) return;
+    document._tipInit = true;
+    _tip = document.createElement('div');
+    _tip.className = 'item-tooltip';
+    _tip.style.display = 'none';
+    document.body.appendChild(_tip);
+
+    const slotAt = t => {
+        const s = t?.closest?.('.slot[data-item]');
+        return s && s.getAttribute('data-item') ? s : null;
+    };
+    document.addEventListener('mouseover', e => {
+        const s = slotAt(e.target);
+        if (!s) { hideTip(); return; }
+        _tip.innerHTML = tipHtml(s.dataset);
+        _tip.style.display = 'block';
+        moveTip(e);
+    });
+    document.addEventListener('mousemove', e => {
+        if (_tip.style.display !== 'block') return;
+        if (slotAt(e.target)) moveTip(e); else hideTip();
+    });
+}
+
 // Dev hooks so headless tooling can drive the REAL viewer page (load a model URL + set the pose angle).
 if (typeof window !== 'undefined') {
     window.__faolanShow = show;
