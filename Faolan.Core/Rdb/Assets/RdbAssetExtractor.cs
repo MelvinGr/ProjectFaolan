@@ -673,26 +673,37 @@ namespace Faolan.Core.Rdb.Assets
 							all[i] = s with { Positions = BodyMorphDeformer.ApplyLbs(s.Positions, bbones, bweights, bpal, boneWorld, m) };
 				}
 
-				var combined = bodySkel;
-				if (headParts is { Count: > 0 } && headParts.All(s => s.IsSkinned)
+				var combined = new List<SkeletonReader.Bone>(bodySkel);
+				var bodyHeadPos = bodySkel.FirstOrDefault(b => b.Name == "rig_bone_Head")?.WorldPosition;
+
+				// Head: mount its facial sub-rig under the body's Head bone, aligning the two rig_bone_Head world positions
+				// (translation-only, so the face keeps its forward orientation). The head verts are seated by the same shift.
+				if (headParts is { Count: > 0 } && headParts.All(s => s.IsSkinned) && bodyHeadPos is { } bhp
 				    && SelectSkeletonForMesh(rdb, headParts) is { } headSkel
-				    && bodySkel.FirstOrDefault(b => b.Name == "rig_bone_Head") is { } bodyHeadBone
 				    && headSkel.FirstOrDefault(b => b.Name == "rig_bone_Head") is { } headHeadBone)
 				{
-					// Place the head by aligning its rig_bone_Head to the BODY's rig_bone_Head world position (the
-					// anatomically-correct head location from the skeleton), translation-only so the face keeps its
-					// forward orientation. This is more accurate than the geometric neck-seat used for the static view.
-					var headSeat = bodyHeadBone.WorldPosition - headHeadBone.WorldPosition;
-					combined = CombineSkeletons(bodySkel, headSkel, "rig_bone_Head", headSeat);
-					all.AddRange(headParts.Select(s => PrefixHeadPalette(Translate(s, headSeat.X, headSeat.Y, headSeat.Z))));
+					var seat = bhp - headHeadBone.WorldPosition;
+					MountSubRig(combined, headSkel, "rig_bone_Head", "h:", seat);
+					all.AddRange(headParts.Select(s => PrefixPalette(Translate(s, seat.X, seat.Y, seat.Z), "h:")));
 				}
 				else
 				{
 					all.AddRange(seatedHead.Select(s => BindToBone(s, "rig_bone_Head"))); // no facial skin -> rigid head
 				}
 
-				if (hair is { Count: > 0 })
-					all.AddRange(hair.Select(s => BindToBone(s, "rig_bone_Head")));
+				// Hair: same treatment - the hair carries its own rig (strand/braid/ponytail bones under rig_bone_Head).
+				if (hair is { Count: > 0 } && hair.All(s => s.IsSkinned) && bodyHeadPos is { } bhp2
+				    && SelectSkeletonForMesh(rdb, hair) is { } hairSkel
+				    && hairSkel.FirstOrDefault(b => b.Name == "rig_bone_Head") is { } hairHeadBone)
+				{
+					var seat = bhp2 - hairHeadBone.WorldPosition;
+					MountSubRig(combined, hairSkel, "rig_bone_Head", "hr:", seat);
+					all.AddRange(hair.Select(s => PrefixPalette(Translate(s, seat.X, seat.Y, seat.Z), "hr:")));
+				}
+				else if (hair is { Count: > 0 })
+				{
+					all.AddRange(hair.Select(s => BindToBone(s, "rig_bone_Head"))); // no hair rig -> rigid hair
+				}
 
 				return GlbWriter.Build(all, null, combined);
 			}
@@ -715,70 +726,71 @@ namespace Faolan.Core.Rdb.Assets
 			return s with { BlendBones = bones, BlendWeights = weights, BonePalette = [boneName] };
 		}
 
-		// Head bones are prefixed when merged into a body rig so their rig_bone_Head etc. don't collide with the body's.
-		private const string HeadBonePrefix = "h:";
+		// Re-label a sub-mesh's bone palette with a prefix so it resolves to a mounted sub-rig's (head/hair) joints.
+		private static RenderMeshReader.SubMesh PrefixPalette(RenderMeshReader.SubMesh s, string prefix) =>
+			s.BonePalette is { } pal ? s with { BonePalette = pal.Select(n => n == null ? null : prefix + n).ToArray() } : s;
 
-		// Re-label a head sub-mesh's bone palette with the head prefix so it resolves to the merged head sub-rig's joints.
-		private static RenderMeshReader.SubMesh PrefixHeadPalette(RenderMeshReader.SubMesh s) =>
-			s.BonePalette is { } pal ? s with { BonePalette = pal.Select(n => n == null ? null : HeadBonePrefix + n).ToArray() } : s;
-
-		// Mount a head's facial sub-rig onto a body rig. The head skeleton's root is rig_bone_Head (head-local origin).
-		// We SEAT the head by translation `seat` (the same neck placement the static view uses, which keeps the head's
-		// own forward orientation - inheriting the body Head bone's orientation instead flips the face backward), and
-		// re-parent the head root under the body's Head bone so the head still FOLLOWS head/neck posing. Each head bone's
-		// inverse-bind uses its SEATED world (head-local world shifted by `seat`), and the head verts are seated to match.
-		// Head bones are prefixed to stay distinct from the body's. Returns the body skeleton unchanged if no Head bone.
-		private static IReadOnlyList<SkeletonReader.Bone> CombineSkeletons(
-			IReadOnlyList<SkeletonReader.Bone> body, IReadOnlyList<SkeletonReader.Bone> head, string sharedHeadBone,
-			System.Numerics.Vector3 seat)
+		// Mount a sub-rig (the head's facial rig, or the hair rig) onto a body rig under the shared bone (rig_bone_Head).
+		// We take the sub-tree of `source` rooted at that shared bone, SEAT it by translation `seat` (aligning the two
+		// shared bones' world positions, keeping the sub-rig's own orientation so a face/hairstyle isn't flipped), and
+		// re-parent the sub-tree root under the body's shared bone so it FOLLOWS head/neck posing. Each appended bone keeps
+		// its own seated world for inverse-bind; bones are `prefix`ed to stay distinct (the mesh palette is prefixed too).
+		// Appends in place to `combined`. The sub-rig's mesh verts must be seated by the same `seat`.
+		private static void MountSubRig(List<SkeletonReader.Bone> combined, IReadOnlyList<SkeletonReader.Bone> source,
+			string sharedBone, string prefix, System.Numerics.Vector3 seat)
 		{
-			var bodyHead = -1;
-			for (var i = 0; i < body.Count; i++)
-				if (body[i].Name == sharedHeadBone) { bodyHead = i; break; }
-			if (bodyHead < 0)
-				return body;
+			var bodyShared = combined.FindIndex(b => b.Name == sharedBone);
+			var srcShared = -1;
+			for (var i = 0; i < source.Count; i++)
+				if (source[i].Name == sharedBone) { srcShared = i; break; }
+			if (bodyShared < 0 || srcShared < 0)
+				return;
 
-			var headRoot = -1;
-			for (var i = 0; i < head.Count; i++)
-				if (head[i].Name == sharedHeadBone) { headRoot = i; break; }
-
-			var nB = body.Count;
-			var combined = new List<SkeletonReader.Bone>(body);
-			var bodyHeadWorld = body[bodyHead].World;
-			System.Numerics.Matrix4x4.Invert(bodyHeadWorld, out var bodyHeadInv);
-
-			System.Numerics.Matrix4x4 Seated(System.Numerics.Matrix4x4 w)
+			// Collect the sub-tree rooted at the shared bone (BFS over child lists).
+			var keep = new List<int>();
+			var seen = new HashSet<int>();
+			var q = new Queue<int>();
+			q.Enqueue(srcShared);
+			seen.Add(srcShared);
+			while (q.Count > 0)
 			{
-				w.Translation += seat; // translation-only seat: world position shifts, orientation unchanged
-				return w;
+				var i = q.Dequeue();
+				keep.Add(i);
+				foreach (var c in source[i].Children)
+					if (c >= 0 && c < source.Count && seen.Add(c))
+						q.Enqueue(c);
 			}
 
-			for (var i = 0; i < head.Count; i++)
-			{
-				var h = head[i];
-				var children = h.Children.Where(c => c >= 0 && c < head.Count).Select(c => nB + c).ToArray();
-				var seatedWorld = Seated(h.World);
-				if (i == headRoot)
-				{
-					// Parent under the body Head bone so the head follows it; local (row-vector) = seatedWorld * inverse(parentWorld).
-					var localM = seatedWorld * bodyHeadInv;
-					System.Numerics.Matrix4x4.Decompose(localM, out _, out var rot, out var trans);
-					var root = new SkeletonReader.Bone(HeadBonePrefix + h.Name, rot, trans, children) { Parent = bodyHead, World = seatedWorld };
-					combined.Add(root);
+			// source index -> combined index for the kept bones.
+			var map = new Dictionary<int, int>();
+			for (var k = 0; k < keep.Count; k++)
+				map[keep[k]] = combined.Count + k;
 
-					var bh = combined[bodyHead];
-					combined[bodyHead] = new SkeletonReader.Bone(bh.Name, bh.LocalRotation, bh.LocalTranslation, [.. bh.Children, nB + i])
-					{ Parent = bh.Parent, World = bh.World };
+			System.Numerics.Matrix4x4.Invert(combined[bodyShared].World, out var bodySharedInv);
+
+			foreach (var si in keep)
+			{
+				var h = source[si];
+				var children = h.Children.Where(c => map.ContainsKey(c)).Select(c => map[c]).ToArray();
+				var seatedWorld = h.World;
+				seatedWorld.Translation += seat; // translation-only seat
+				if (si == srcShared)
+				{
+					// Parent under the body shared bone; local (row-vector) = seatedWorld * inverse(parentWorld).
+					var localM = seatedWorld * bodySharedInv;
+					System.Numerics.Matrix4x4.Decompose(localM, out _, out var rot, out var trans);
+					combined.Add(new SkeletonReader.Bone(prefix + h.Name, rot, trans, children) { Parent = bodyShared, World = seatedWorld });
+
+					var bs = combined[bodyShared];
+					combined[bodyShared] = new SkeletonReader.Bone(bs.Name, bs.LocalRotation, bs.LocalTranslation, [.. bs.Children, map[si]])
+					{ Parent = bs.Parent, World = bs.World };
 				}
 				else
 				{
-					// Keep the head-local local transform (relative to its head-skeleton parent); seated world is for ibm.
-					combined.Add(new SkeletonReader.Bone(HeadBonePrefix + h.Name, h.LocalRotation, h.LocalTranslation, children)
-					{ Parent = h.Parent >= 0 ? nB + h.Parent : -1, World = seatedWorld });
+					combined.Add(new SkeletonReader.Bone(prefix + h.Name, h.LocalRotation, h.LocalTranslation, children)
+					{ Parent = map.GetValueOrDefault(h.Parent, -1), World = seatedWorld });
 				}
 			}
-
-			return combined;
 		}
 
 		// Axis-aligned bounding-box centre of a set of sub-meshes.
