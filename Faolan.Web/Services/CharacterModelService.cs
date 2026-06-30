@@ -18,6 +18,7 @@ namespace Faolan.Web.Services
 		private readonly IDbContextFactory<DatabaseContext> _dbFactory;
 		private readonly Lock _gate = new();
 		private RdbReader? _rdb;
+		private IReadOnlyList<ArmorSetCatalog.ArmorSet>? _armorSets;
 
 		public CharacterModelService(IConfiguration config, IDbContextFactory<DatabaseContext> dbFactory)
 		{
@@ -105,6 +106,16 @@ namespace Faolan.Web.Services
 				       ?? BuildCharacter(character.Race, character.Sex, hairRmId);
 
 			return BuildCharacter(character.Race, character.Sex, hairRmId);
+		}
+
+		// The wearable armour-set catalogue (built once from the RDB, then cached). Optionally filtered to a sex.
+		public IReadOnlyList<ArmorSetCatalog.ArmorSet> ArmorSets(Sex? sex = null)
+		{
+			_armorSets ??= ArmorSetCatalog.Build(Reader());
+			var want = sex == Sex.Female ? "Female" : sex == Sex.Male ? "Male" : null;
+			return want is null
+				? _armorSets
+				: _armorSets.Where(s => s.Gender == want || s.Gender == "Unisex").ToList();
 		}
 
 		// Diagnostic: the decompressed text of an RDB resource (XML resources like TexScript 1010035), or null if absent.

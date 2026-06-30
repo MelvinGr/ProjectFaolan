@@ -60,6 +60,15 @@ namespace Faolan.Web
                 return glb is null ? Results.NotFound() : Results.File(glb, "model/gltf-binary");
             });
 
+            // Wearable armour-set catalogue (optionally filtered by ?sex=Female/Male), for the viewer's wardrobe picker.
+            app.MapGet("/api/armorsets", (Sex? sex, CharacterModelService models) =>
+                Results.Json(models.ArmorSets(sex).Select(s => new
+                {
+                    s.Number, s.Gender, s.Name,
+                    label = $"{s.Number:0000} {s.Name} ({s.Gender})",
+                    equip = string.Join(',', s.PieceMeshIndexIds)
+                })));
+
             app.MapGet("/api/model/{meshIndexId:long}.glb", (long meshIndexId, CharacterModelService models) =>
             {
                 var glb = models.BuildModel((uint)meshIndexId);
