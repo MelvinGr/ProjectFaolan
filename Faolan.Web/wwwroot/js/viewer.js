@@ -83,6 +83,17 @@ export async function show(canvasId, url) {
     model.position.sub(center);                 // center at origin
     model.position.y += size.y / 2;             // stand on the grid
 
+    // Capture a skinned rig (if any) so the model can be posed. Store each bone's bind rotation to compose deltas onto.
+    state.skinned = null;
+    state.bind = null;
+    model.traverse(o => {
+        if (o.isSkinnedMesh && !state.skinned) {
+            state.skinned = o;
+            state.bind = new Map(o.skeleton.bones.map(b => [b.name, b.quaternion.clone()]));
+        }
+    });
+    if (state.poseOn) applyDemoPose(state); // re-apply if posing was left enabled across a reload
+
     state.scene.add(model);
     state.model = model;
     state.modelSize = size; // dev hook: lets headless tooling frame the head
@@ -91,4 +102,37 @@ export async function show(canvasId, url) {
     state.controls.target.set(0, size.y / 2, 0);
     state.camera.position.set(0, size.y * 0.6, radius * 2.2);
     state.controls.update();
+}
+
+// Apply a fixed demo pose to a loaded rig so the skeleton is visibly articulated (both forearms forward+up about
+// their local -X hinge - the anatomically clean elbow bend). Composes the delta onto each bone's BIND rotation; the
+// render loop (renderer.render every frame) refreshes world matrices + the skeleton, so children follow correctly.
+function applyDemoPose(state) {
+    if (!state.skinned) return;
+    const byName = new Map(state.skinned.skeleton.bones.map(b => [b.name, b]));
+    for (const [name, q] of state.bind) byName.get(name).quaternion.copy(q); // reset to bind first
+    const bend = (name, axis, deg) => {
+        const b = byName.get(name);
+        if (!b) return;
+        b.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(...axis).normalize(), deg * Math.PI / 180));
+    };
+    bend('rig_bone_LeftForearm', [-1, 0, 0], 72);
+    bend('rig_bone_RightForearm', [-1, 0, 0], 72);
+}
+
+// Toggle the demo pose on a canvas's rig (no-op if the loaded model isn't skinned).
+export function setPose(canvasId, on) {
+    const state = states.get(canvasId);
+    if (!state) return false;
+    state.poseOn = on;
+    if (!state.skinned) return false;
+    if (on) applyDemoPose(state);
+    else for (const [name, q] of state.bind) state.skinned.skeleton.getBoneByName(name).quaternion.copy(q);
+    return true;
+}
+
+// Dev hooks so headless tooling can drive the REAL viewer page (load a model URL + toggle the pose).
+if (typeof window !== 'undefined') {
+    window.__faolanShow = show;
+    window.__faolanSetPose = setPose;
 }
