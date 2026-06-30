@@ -134,11 +134,11 @@ namespace Faolan.Importer.Cli
 				foreach (var kv in fields)
 				{
 					counts[kv.Key] = counts.GetValueOrDefault(kv.Key) + 1;
-					if (!samples.TryGetValue(kv.Key, out var l)) samples[kv.Key] = l = new();
+					if (!samples.TryGetValue(kv.Key, out var l)) samples[kv.Key] = l = new List<uint>();
 					if (l.Count < 8) l.Add(kv.Value);
 				}
 			}
-			if (wanted is not null) { Console.WriteLine($"spell {wanted} not found / unnamed"); return; }
+			if (wanted != null) { Console.WriteLine($"spell {wanted} not found / unnamed"); return; }
 			foreach (var kv in counts.OrderByDescending(k => k.Value).Take(40))
 				Console.WriteLine($"0x{kv.Key:X3} ({kv.Key,4}) count={kv.Value,5}  samples={string.Join(",", samples[kv.Key])}");
 		}
@@ -338,7 +338,7 @@ namespace Faolan.Importer.Cli
 
 			using var db = new DatabaseContext(new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={dbPath}").Options);
 			var item = db.Items.FirstOrDefault(i => i.Id == itemId);
-			if (item is null)
+			if (item == null)
 			{
 				Console.WriteLine($"item {itemId} not in DB");
 				return;
@@ -354,7 +354,7 @@ namespace Faolan.Importer.Cli
 					try { template = rdb.ReadDecrypted(e, key); Console.WriteLine($"decrypted type={type} {template.Length} B"); break; }
 					catch (Exception ex) { Console.WriteLine($"decrypt type={type} failed: {ex.Message}"); }
 				}
-			if (template is null) { Console.WriteLine("no template entry"); return; }
+			if (template == null) { Console.WriteLine("no template entry"); return; }
 
 			if (outDir != null)
 			{
@@ -458,7 +458,7 @@ namespace Faolan.Importer.Cli
 		private static Dictionary<uint, uint> ReadIncreasingFields(ReadOnlySpan<byte> body)
 		{
 			var words = body.Length / 4;
-			Dictionary<uint, uint> best = new();
+			Dictionary<uint, uint> best = new Dictionary<uint, uint>();
 			for (var start = 0; start + 1 < words; start++)
 			{
 				uint last = 0; var haveLast = false; var cur = new Dictionary<uint, uint>();

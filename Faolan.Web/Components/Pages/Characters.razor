@@ -1,10 +1,8 @@
 @page "/characters"
-@rendermode InteractiveServer
-@using System.Security.Claims
 @using Faolan.Core.Database
-@using Faolan.Core.Database.Tables
 @using Faolan.Web.Services
 @using Microsoft.EntityFrameworkCore
+@rendermode InteractiveServer
 @inject IDbContextFactory<DatabaseContext> DbFactory
 @inject CharacterModelService Models
 @inject IJSRuntime JS
@@ -16,7 +14,7 @@
 <div class="viewer-page">
     <aside class="roster">
         <h2>Characters</h2>
-        @if (_characters is null)
+        @if (_characters == null)
         {
             <p>Loading…</p>
         }
@@ -30,7 +28,9 @@
                 @foreach (var c in _characters)
                 {
                     <li>
-                        <button class="@(c.Id == _selected?.Id ? "sel" : "")" @onclick="() => Select(c)">
+                        <button class="@(c.Id == _selected?.Id
+                                           ? "sel"
+                                           : "")" @onclick="() => Select(c)">
                             <strong>@c.Name</strong>
                             <span>@c.Race @c.Sex · @c.Class</span>
                         </button>
@@ -46,7 +46,7 @@
 
     <section class="stage">
         <aside class="stats-panel">
-            @if (_selected is null)
+            @if (_selected == null)
             {
                 <p class="stats-empty">Select a character to view their sheet.</p>
             }
@@ -61,20 +61,27 @@
                 <div class="vitals">
                     @if (_health > 0)
                     {
-                        <div class="vital hp"><span class="vlabel">Health</span><div class="vbar"><i style="width:100%"></i></div><span class="vval">@_health</span></div>
+                        <div class="vital hp"><span class="vlabel">Health</span>
+                            <div class="vbar"><i style="width:100%"></i></div>
+                            <span class="vval">@_health</span></div>
                     }
                     @if (_mana > 0)
                     {
-                        <div class="vital mp"><span class="vlabel">Mana</span><div class="vbar"><i style="width:100%"></i></div><span class="vval">@_mana</span></div>
+                        <div class="vital mp"><span class="vlabel">Mana</span>
+                            <div class="vbar"><i style="width:100%"></i></div>
+                            <span class="vval">@_mana</span></div>
                     }
                     @if (_stamina > 0)
                     {
-                        <div class="vital sp"><span class="vlabel">Stamina</span><div class="vbar"><i style="width:100%"></i></div><span class="vval">@_stamina</span></div>
+                        <div class="vital sp"><span class="vlabel">Stamina</span>
+                            <div class="vbar"><i style="width:100%"></i></div>
+                            <span class="vval">@_stamina</span></div>
                     }
                 </div>
 
                 <div class="stat-rows">
-                    <div class="srow"><span class="k">Experience</span><span class="v">@_selected.Experience.ToString("N0")</span></div>
+                    <div class="srow"><span class="k">Experience</span><span
+                            class="v">@_selected.Experience.ToString("N0")</span></div>
                     <div class="srow"><span class="k">Money</span><span class="v">@_money</span></div>
                     <div class="srow"><span class="k">Location</span><span class="v">@_mapName</span></div>
                     <div class="srow"><span class="k">Guild</span><span class="v">@(_guildName ?? "—")</span></div>
@@ -90,9 +97,18 @@
                                 <li>
                                     <span class="sp-name">@sp.Name</span>
                                     <span class="sp-meta">
-                                        @if (sp.Level > 0) { <span>L@sp.Level</span> }
-                                        @if (sp.Damage > 0) { <span>@sp.Damage.ToString("0")% dmg</span> }
-                                        @if (sp.Range > 0) { <span>@sp.Range.ToString("0")m</span> }
+                                        @if (sp.Level > 0)
+                                        {
+                                            <span>L@sp.Level</span>
+                                        }
+                                        @if (sp.Damage > 0)
+                                        {
+                                            <span>@sp.Damage.ToString("0")% dmg</span>
+                                        }
+                                        @if (sp.Range > 0)
+                                        {
+                                            <span>@sp.Range.ToString("0")m</span>
+                                        }
                                     </span>
                                 </li>
                             }
@@ -130,7 +146,7 @@
                 }
             </div>
             <div class="equip-tip">
-                @if (_selected is not null)
+                @if (_selected != null)
                 {
                     <div class="tip-line">@_selected.Name — @_selected.Race @_selected.Sex (@_status)</div>
                     <div class="tip-controls" id="pose-controls"></div>
@@ -150,8 +166,14 @@
                 @foreach (var tab in InvTabs)
                 {
                     var n = _inventory.Count(i => i.Tab == tab);
-                    <button class="inv-tab @(tab == _invTab ? "sel" : "")" @onclick="() => SelectInvTab(tab)">
-                        @tab @if (n > 0) { <span class="tabcount">@n</span> }
+                    <button class="inv-tab @(tab == _invTab
+                                               ? "sel"
+                                               : "")" @onclick="() => SelectInvTab(tab)">
+                        @tab
+                        @if (n > 0)
+                        {
+                            <span class="tabcount">@n</span>
+                        }
                     </button>
                 }
             </div>
@@ -159,7 +181,9 @@
                 @for (var i = 0; i < InvPageSize; i++)
                 {
                     var idx = _invPage * InvPageSize + i;
-                    var item = _selected is not null && idx < tabItems.Count ? tabItems[idx].Info : (ItemInfo?)null;
+                    var item = _selected != null && idx < tabItems.Count
+                        ? tabItems[idx].Info
+                        : (ItemInfo?)null;
                     @ItemSlot(item, "")
                 }
             </div>
@@ -168,11 +192,15 @@
                 {
                     <button class="inv-page" disabled="@(_invPage == 0)" @onclick="() => PageInventory(-1)">‹</button>
                     <span>Page @(_invPage + 1) of @InvPageCount</span>
-                    <button class="inv-page" disabled="@(_invPage >= InvPageCount - 1)" @onclick="() => PageInventory(1)">›</button>
+                    <button class="inv-page" disabled="@(_invPage >= InvPageCount - 1)"
+                            @onclick="() => PageInventory(1)">›
+                    </button>
                 }
                 else
                 {
-                    <span>@tabItems.Count item@(tabItems.Count == 1 ? "" : "s")</span>
+                    <span>@tabItems.Count item@(tabItems.Count == 1
+                                                      ? ""
+                                                      : "s")</span>
                 }
             </div>
         </div>
@@ -180,335 +208,29 @@
 </div>
 
 @code {
-    [SupplyParameterFromQuery(Name = "char")]
-    public long? CharId { get; set; }
-
-    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
-
-    private List<Character>? _characters;
-    private Character? _selected;
-    private string _status = "";
-
-    // Selected character's sheet: vitals (player-facing MaxStats) + a few resolved fields.
-    private uint _health, _mana, _stamina;
-    private string _mapName = "—";
-    private string _money = "0";
-    private string? _guildName;
-    private IReadOnlyList<(string Name, byte Level, float Range, float Damage)> _spells = [];
-
-    // Carried items, split into Normal/Quest/Resources tabs and paged into the grid (AoC-style backpack: 4×6 per page).
-    private const int InvPageSize = 24;
-    private static readonly string[] InvTabs = ["Normal", "Quest", "Resources"];
-    private IReadOnlyList<(ItemInfo Info, string Tab)> _inventory = [];
-    private string _invTab = "Normal";
-    private int _invPage;
-    private List<(ItemInfo Info, string Tab)> TabItems
-        => _inventory.Where(i => i.Tab == _invTab).ToList();
-    private int InvPageCount => Math.Max(1, (int)Math.Ceiling(TabItems.Count / (double)InvPageSize));
-    private bool _refreshThumbs;
-    private IJSObjectReference? _module;
-    private IReadOnlyDictionary<string, ItemInfo> _equipment = new Dictionary<string, ItemInfo>();
 
     // Render one item slot (equipment or bag): a 3D thumbnail filled in by JS, the item name as fallback/label (or the
     // placeholder label when empty), a stack-count badge, and data-* attributes the JS tooltip reads on hover.
-    private RenderFragment ItemSlot(ItemInfo? info, string label, string extra = "") => @<div
-        class="slot @extra @(info is not null ? "filled" : "")"
-        data-item="@(info?.Id.ToString() ?? "")"
-        data-name="@(info?.Name)"
-        data-type="@(info?.Type)"
-        data-level="@(info?.Level ?? 0)"
-        data-value="@(info?.Value ?? 0)"
-        data-sell="@(info?.Sell ?? 0)"
-        data-count="@(info?.Count ?? 0)">
-        <img class="slot-img" alt="" />
-        <span class="@(info is not null ? "item" : "")">@(info?.Name ?? label)</span>
-        @if (info is { Count: > 1 } c)
-        {
-            <span class="count">@c.Count</span>
-        }
-    </div>;
+    private RenderFragment ItemSlot(ItemInfo? info, string label, string extra = "") =>
+        @<div
+            class="slot @extra @(info != null
+                                   ? "filled"
+                                   : "")"
+            data-item="@(info?.Id.ToString() ?? "")"
+            data-name="@(info?.Name)"
+            data-type="@(info?.Type)"
+            data-level="@(info?.Level ?? 0)"
+            data-value="@(info?.Value ?? 0)"
+            data-sell="@(info?.Sell ?? 0)"
+            data-count="@(info?.Count ?? 0)">
+            <img class="slot-img" alt=""/>
+            <span class="@(info != null
+                             ? "item"
+                             : "")">@(info?.Name ?? label)</span>
+            @if (info is { Count: > 1 } c)
+            {
+                <span class="count">@c.Count</span>
+            }
+        </div>;
 
-    // Equipment paper-doll slot by name (placeholder label = the slot name).
-    private RenderFragment Slot(string slot, string extra = "") =>
-        ItemSlot(_equipment.TryGetValue(slot, out var it) ? it : (ItemInfo?)null, slot, extra);
-
-    // Paper-doll equipment slots, arranged around the character preview (AoC layout; placeholders for now): Head sits
-    // centred above and Legs centred below, with armour columns flanking and a weapon/utility bar across the bottom.
-    private static readonly string[] LeftSlots = ["Neck", "Shoulder", "Cloak", "Chest", "Wrist"];
-    private static readonly string[] RightSlots = ["Hands", "Belt", "Boots", "Ring L", "Ring R"];
-    private static readonly string[] WeaponSlots = ["Main Hand", "Off Hand", "Ranged", "Tokens", "Bag"];
-
-    protected override async Task OnInitializedAsync()
-    {
-        await using var db = await DbFactory.CreateDbContextAsync();
-        // Skip blank-name rows: unfinished/placeholder characters with nothing to show.
-        var query = db.Characters.Where(c => c.Name != null && c.Name != "");
-
-        // Public viewer: when signed in, scope the roster to this account's own characters; otherwise show all.
-        if (AuthState is not null)
-        {
-            var user = (await AuthState).User;
-            if (user.Identity?.IsAuthenticated == true
-                && uint.TryParse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var accountId))
-                query = query.Where(c => c.AccountId == accountId);
-        }
-
-        _characters = await query.OrderBy(c => c.Name).ToListAsync();
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/viewer.js");
-            await _module.InvokeVoidAsync("initItemTooltips");
-
-            // Deep-link: ?char=<id> auto-loads that character once the viewer module is ready.
-            if (CharId is { } id && _characters?.FirstOrDefault(c => c.Id == id) is { } c)
-                await Select(c);
-        }
-
-        // After an inventory page flip the new slots exist in the DOM — (re)render their item thumbnails.
-        if (_refreshThumbs && _module is not null)
-        {
-            _refreshThumbs = false;
-            await _module.InvokeVoidAsync("populateItemThumbs");
-        }
-    }
-
-    private void PageInventory(int delta)
-    {
-        _invPage = Math.Clamp(_invPage + delta, 0, InvPageCount - 1);
-        _refreshThumbs = true;
-    }
-
-    private void SelectInvTab(string tab)
-    {
-        _invTab = tab;
-        _invPage = 0;
-        _refreshThumbs = true;
-    }
-
-    private async Task Select(Character c)
-    {
-        _selected = c;
-        _equipment = Models.Equipment((uint)c.Id);
-        _inventory = Models.Inventory((uint)c.Id);
-        // Open on the first tab that actually has items (most characters only carry Normal).
-        _invTab = InvTabs.FirstOrDefault(t => _inventory.Any(i => i.Tab == t)) ?? "Normal";
-        _invPage = 0;
-        await LoadSheet(c);
-        await Render();
-        if (_module is not null)
-        {
-            // Build the per-joint pose sliders, then render a 3D thumbnail into each equipped slot.
-            await _module.InvokeVoidAsync("buildPoseControls", "char-canvas", "pose-controls");
-            await _module.InvokeVoidAsync("populateItemThumbs");
-        }
-    }
-
-    // Load the selected character's sheet data: vitals (MaxStats, regenerated from class/level if missing), the map
-    // name and guild, and a formatted wallet.
-    private async Task LoadSheet(Character c)
-    {
-        await using var db = await DbFactory.CreateDbContextAsync();
-        var full = await db.Characters
-            .Include(x => x.MaxStats)
-            .Include(x => x.Map)
-            .Include(x => x.Guild)
-            .FirstOrDefaultAsync(x => x.Id == c.Id);
-
-        var stats = full?.MaxStats;
-        if (stats is null && full is not null)
-        {
-            full.RegenerateMaxStats(); // older rows may predate the MaxStats block
-            stats = full.MaxStats;
-        }
-        _health = stats?.Health ?? 0;
-        _mana = stats?.Mana ?? 0;
-        _stamina = stats?.Stamina ?? 0;
-        _mapName = full?.Map?.Name ?? "—";
-        _guildName = full?.Guild?.Name;
-        _money = FormatMoney(full?.Money ?? 0);
-        _spells = Models.Spells((uint)c.Id);
-    }
-
-    // Wallet in tin -> gold/silver/copper/tin (100 tin = 1 copper, 100 copper = 1 silver, 100 silver = 1 gold).
-    private static string FormatMoney(ulong tin)
-    {
-        var (g, s, c, t) = (tin / 1_000_000, tin / 10_000 % 100, tin / 100 % 100, tin % 100);
-        var parts = new List<string>();
-        if (g > 0) parts.Add($"{g}g");
-        if (s > 0) parts.Add($"{s}s");
-        if (c > 0) parts.Add($"{c}c");
-        if (t > 0 || parts.Count == 0) parts.Add($"{t}t");
-        return string.Join(" ", parts);
-    }
-
-    // (Re)build the selected character's model, overlaying the chosen armour set. Cache-bust so a rebuilt/redressed
-    // model isn't masked by the browser's cached glb.
-    private async Task Render()
-    {
-        if (_selected is null)
-            return;
-
-        _status = "building…";
-        StateHasChanged();
-
-        // The posable character rig (skinned body + head + hair), driven by the elbow slider.
-        var url = $"/api/character/{_selected.Id}/model.glb?rig=1&t={DateTime.UtcNow.Ticks}";
-        if (_module is not null)
-            await _module.InvokeVoidAsync("show", "char-canvas", url);
-
-        _status = "loaded";
-        StateHasChanged();
-    }
 }
-
-<style>
-    .viewer-page { display: flex; height: calc(100dvh - 4.5rem); gap: 1rem; }
-    .roster { width: 240px; overflow-y: auto; flex-shrink: 0;
-        background: linear-gradient(180deg, var(--bg-2), #121419);
-        border: 1px solid var(--stone-dark); border-radius: var(--radius); padding: .6rem; }
-    .roster h2 { font-size: .85rem; letter-spacing: .12em; text-transform: uppercase;
-        color: var(--gold); margin: .15rem 0 .65rem; padding-bottom: .5rem; border-bottom: 1px solid var(--stone-dark); }
-    .roster ul { list-style: none; padding: 0; margin: 0; }
-    .roster button { width: 100%; text-align: left; display: flex; flex-direction: column;
-        background: linear-gradient(var(--field), var(--field-2)); color: var(--text);
-        border: 1px solid var(--line); border-radius: 6px;
-        padding: .45rem .6rem; margin-bottom: .35rem; cursor: pointer; transition: border-color .12s, background .12s; }
-    .roster button:hover { border-color: var(--stone); }
-    .roster button.sel { border-color: var(--gold-dim); background: linear-gradient(#322d1d, #262112); }
-    .roster button strong { color: var(--gold-bright); font-weight: 600; }
-    .roster button span { font-size: .75rem; color: var(--muted); }
-    .roster .warn { color: var(--danger); font-size: .8rem; }
-    .stage { flex: 1; min-height: 0; min-width: 0; display: flex; gap: 1rem; }
-
-    /* Character sheet: vitals + resolved fields, beside the paper-doll. */
-    .stats-panel { width: 230px; flex-shrink: 0; overflow-y: auto;
-        background: linear-gradient(180deg, var(--bg-2), #121419);
-        border: 1px solid var(--stone-dark); border-radius: var(--radius); padding: .85rem; }
-    .stats-empty { color: var(--muted); font-size: .85rem; }
-    .stat-head { text-align: center; padding-bottom: .65rem; margin-bottom: .65rem; border-bottom: 1px solid var(--stone-dark); }
-    .stat-name { font-family: var(--font-display); color: var(--gold); font-size: 1.15rem; letter-spacing: .03em; }
-    .stat-sub { color: var(--text); font-size: .82rem; margin-top: .15rem; }
-    .stat-sub2 { color: var(--muted); font-size: .76rem; text-transform: capitalize; }
-    .vitals { display: flex; flex-direction: column; gap: .45rem; margin-bottom: .8rem; }
-    .vital { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .15rem .5rem; }
-    .vlabel { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-    .vval { font-size: .8rem; color: var(--text); font-variant-numeric: tabular-nums; }
-    .vbar { grid-column: 1 / -1; height: 7px; border-radius: 4px; overflow: hidden;
-        background: #0c0e11; border: 1px solid #00000080; box-shadow: inset 0 1px 2px #000a; }
-    .vbar i { display: block; height: 100%; border-radius: 3px; }
-    .vital.hp .vbar i { background: linear-gradient(90deg, #7a1f1f, #c64b3a); }
-    .vital.mp .vbar i { background: linear-gradient(90deg, #1f3a7a, #3f76d0); }
-    .vital.sp .vbar i { background: linear-gradient(90deg, #6b5a1f, #d8b53f); }
-    .stat-rows { display: flex; flex-direction: column; }
-    .srow { display: flex; justify-content: space-between; gap: .75rem; padding: .35rem 0; border-bottom: 1px solid var(--stone-dark); font-size: .8rem; }
-    .srow:last-child { border-bottom: none; }
-    .srow .k { color: var(--muted); }
-    .srow .v { color: var(--text); text-align: right; }
-    .spellbook { margin-top: .85rem; }
-    .sb-title { font-size: .7rem; text-transform: uppercase; letter-spacing: .1em; color: var(--gold);
-        padding-bottom: .4rem; margin-bottom: .4rem; border-bottom: 1px solid var(--stone-dark);
-        display: flex; align-items: center; gap: .4rem; }
-    .sb-count { font-size: .62rem; color: var(--gold); background: #0007; border-radius: 8px; padding: 0 .4em; }
-    .spellbook ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .3rem; }
-    .spellbook li { display: flex; flex-direction: column; background: linear-gradient(var(--field), var(--field-2));
-        border: 1px solid var(--line); border-radius: 5px; padding: .35rem .5rem; }
-    .sp-name { color: var(--gold-bright); font-size: .78rem; }
-    .sp-meta { display: flex; gap: .5rem; color: var(--muted); font-size: .68rem; margin-top: .1rem; }
-
-    /* AoC-style equipment paper-doll window: slot columns flanking the character preview. */
-    .equip-window { height: 100%; display: flex; flex-direction: column; box-sizing: border-box;
-        background: linear-gradient(180deg, var(--bg-2), #101216); border: 2px solid var(--stone);
-        border-radius: var(--radius); padding: .7rem; box-shadow: inset 0 0 24px #000a, var(--shadow); }
-    .equip-title { text-align: center; color: var(--gold); font-family: var(--font-display);
-        font-weight: 600; letter-spacing: .14em; text-transform: uppercase; font-size: .95rem;
-        padding-bottom: .6rem; }
-    .equip-grid { flex: 1; display: grid; gap: .55rem; min-height: 0;
-        grid-template-columns: auto minmax(0,1fr) auto;
-        grid-template-rows: auto minmax(0,1fr) auto;
-        grid-template-areas: ".  top  ." "left center right" ".  bot  ."; }
-    .equip-col { display: flex; flex-direction: column; gap: .55rem; justify-content: center; }
-    .equip-col.left { grid-area: left; }
-    .equip-col.right { grid-area: right; }
-    .equip-center { grid-area: center; }
-    .center-slot { justify-self: center; }
-    .center-slot.top { grid-area: top; }
-    .center-slot.bottom { grid-area: bot; }
-    .equip-center { position: relative; min-width: 0; border-radius: 6px; overflow: hidden;
-        background: radial-gradient(120% 90% at 50% 35%, #1c3b38 0%, #0e1d22 70%, #0a1014 100%);
-        border: 1px solid #2c4a48; box-shadow: inset 0 0 30px #000c; }
-    .equip-center canvas { width: 100%; height: 100%; display: block; touch-action: none; }
-    .slot { width: 52px; height: 52px; flex: 0 0 auto; border-radius: 5px;
-        background: linear-gradient(#2b2d33, #202229); border: 2px solid #4b4636;
-        box-shadow: inset 0 1px 0 #ffffff14, inset 0 0 10px #0008;
-        display: flex; align-items: center; justify-content: center; }
-    .slot:hover { border-color: #b89544; }
-    .slot span { font-size: .52rem; color: #8a8472; text-align: center; line-height: 1.1; padding: 0 2px;
-        text-transform: uppercase; letter-spacing: .03em; }
-    .slot.filled { border-color: #b89544; background: linear-gradient(#3a3526, #2a2619); }
-    .slot span.item { color: #e6d8a8; text-transform: none; font-size: .5rem; overflow: hidden;
-        display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
-    .slot-img { display: none; position: absolute; inset: 2px; width: calc(100% - 4px); height: calc(100% - 4px);
-        object-fit: contain; }
-    .slot { position: relative; }
-    .slot.has-img .slot-img { display: block; }
-    .slot.has-img span { display: none; }
-    .slot.wide { width: 64px; }
-    .equip-bottom { display: flex; gap: .55rem; justify-content: center; padding-top: .6rem; }
-    .equip-tip { margin-top: .5rem; padding-top: .45rem; border-top: 1px solid var(--stone-dark); color: #c9c2a8;
-        font-size: .8rem; }
-    .tip-controls { display: flex; align-items: center; gap: .35rem .9rem; flex-wrap: wrap; margin-top: .45rem; }
-    .pose { display: flex; align-items: center; gap: .35rem; font-size: .72rem; color: var(--muted);
-        text-transform: uppercase; letter-spacing: .03em; }
-    .pose input[type=range] { width: 5.5rem; accent-color: var(--gold-dim); }
-    .pose-reset { background: linear-gradient(var(--field), var(--field-2)); color: var(--muted);
-        border: 1px solid var(--line); border-radius: 5px; padding: .2rem .6rem; font-size: .72rem;
-        cursor: pointer; text-transform: uppercase; letter-spacing: .03em; }
-    .pose-reset:hover { border-color: var(--gold-dim); color: var(--gold); }
-
-    /* AoC-style inventory: a paged 4-column bag grid. */
-    .inv-window { width: 252px; flex-shrink: 0; display: flex; flex-direction: column; box-sizing: border-box;
-        background: linear-gradient(180deg, var(--bg-2), #101216); border: 2px solid var(--stone);
-        border-radius: var(--radius); padding: .7rem; box-shadow: inset 0 0 24px #000a, var(--shadow); }
-    .inv-tabs { display: flex; gap: .25rem; padding-bottom: .6rem; }
-    .inv-tab { flex: 1; display: flex; align-items: center; justify-content: center; gap: .3rem;
-        background: linear-gradient(#1d1f25, #15171b); color: var(--muted); cursor: pointer;
-        border: 1px solid var(--stone-dark); border-bottom: none; border-radius: 6px 6px 0 0;
-        padding: .35rem .25rem; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; }
-    .inv-tab:hover { color: var(--gold); }
-    .inv-tab.sel { color: var(--gold-bright); background: linear-gradient(#322d1d, #241f12); border-color: var(--gold-dim); }
-    .inv-tab .tabcount { font-size: .62rem; color: var(--gold); background: #0007; border-radius: 8px; padding: 0 .35em; }
-    .inv-tab.sel .tabcount { color: var(--gold-bright); }
-    .inv-grid { display: grid; grid-template-columns: repeat(4, 52px); gap: .5rem; justify-content: center;
-        align-content: start; flex: 1; overflow-y: auto; }
-    .inv-grid .slot .count { position: absolute; right: 2px; bottom: 1px; font-size: .58rem; color: var(--gold-bright);
-        background: #000a; border-radius: 3px; padding: 0 2px; line-height: 1.3; }
-    .inv-foot { display: flex; align-items: center; justify-content: center; gap: .6rem; padding-top: .6rem;
-        margin-top: .4rem; border-top: 1px solid var(--stone-dark); color: var(--muted); font-size: .78rem; }
-    .inv-page { background: linear-gradient(var(--field), var(--field-2)); color: var(--gold); cursor: pointer;
-        border: 1px solid var(--line); border-radius: 5px; width: 1.5rem; height: 1.5rem; line-height: 1;
-        font-size: 1rem; }
-    .inv-page:hover:not(:disabled) { border-color: var(--gold-dim); }
-    .inv-page:disabled { opacity: .35; cursor: default; }
-
-    /* Mobile: stack the roster into a horizontal strip above the panel; shrink the slots. */
-    @@media (max-width: 720px) {
-        .viewer-page { flex-direction: column; height: 100dvh; gap: .5rem; padding: .25rem; box-sizing: border-box; }
-        .roster { width: auto; max-height: 20vh; }
-        .roster h2 { display: none; }
-        .roster ul { display: flex; gap: .4rem; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: .25rem; }
-        .roster li { flex: 0 0 auto; }
-        .roster button { width: auto; white-space: nowrap; margin-bottom: 0; }
-        .slot { width: 40px; height: 40px; }
-        .slot.wide { width: 48px; }
-        .equip-grid { gap: .4rem; }
-        .pose input[type=range] { width: 4.5rem; }
-        .stage { flex-direction: column; }
-        .stats-panel { width: auto; order: 2; max-height: 34vh; }
-        .inv-window { width: auto; order: 3; }
-        .inv-grid { grid-template-columns: repeat(4, 44px); }
-    }
-</style>

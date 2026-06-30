@@ -3,7 +3,7 @@
 <PageTitle>Project Faolan</PageTitle>
 
 <div class="landing">
-    <img class="crest-logo" src="logo.png" alt="Project Faolan" />
+    <img class="crest-logo" src="logo.png" alt="Project Faolan"/>
     <h1>Project Faolan</h1>
     <p class="tag">An Age of Conan server emulator — explore characters, their gear, and 3D models.</p>
     <div class="cta">
@@ -11,7 +11,9 @@
             <Authorized>
                 <a class="btn primary" href="/characters">Open the viewer</a>
                 <a class="btn" href="/account">My account</a>
-                <form method="post" action="/auth/logout"><button class="btn ghost" type="submit">Log out (@context.User.Identity?.Name)</button></form>
+                <form method="post" action="/auth/logout">
+                    <button class="btn ghost" type="submit">Log out (@context.User.Identity?.Name)</button>
+                </form>
             </Authorized>
             <NotAuthorized>
                 <a class="btn primary" href="/login">Log in</a>
@@ -21,14 +23,3 @@
         </AuthorizeView>
     </div>
 </div>
-
-<style>
-    .landing { max-width: 42rem; margin: 14vh auto; text-align: center; padding: 0 1rem; }
-    .crest-logo { width: 6rem; height: 6rem; margin: 0 auto 1.25rem; display: block;
-        filter: drop-shadow(0 6px 22px #0009); }
-    .landing h1 { font-size: 3rem; letter-spacing: .06em; margin: 0 0 .6rem;
-        text-shadow: 0 2px 18px #0008; }
-    .landing .tag { color: var(--muted); font-size: 1.1rem; margin: 0 auto 2.25rem; max-width: 32rem; }
-    .cta { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; align-items: center; }
-    .cta form { margin: 0; }
-</style>

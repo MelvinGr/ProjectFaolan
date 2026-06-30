@@ -190,7 +190,7 @@ namespace Faolan.Core.Rdb.Assets
 				return null;
 
 			var posEl = Find(elements, DeclUsage.Position);
-			if (posEl is null)
+			if (posEl == null)
 				return null;
 
 			var normEl = Find(elements, DeclUsage.Normal);

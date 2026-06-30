@@ -1,7 +1,7 @@
 ﻿@inherits LayoutComponentBase
 
 <header class="topbar">
-    <a class="brand" href="/"><img class="brand-logo" src="logo-small.png" alt="" />Project Faolan</a>
+    <a class="brand" href="/"><img class="brand-logo" src="logo-small.png" alt=""/>Project Faolan</a>
     <nav>
         <a href="/characters">Characters</a>
         <a href="/items">Armory</a>
@@ -16,7 +16,9 @@
             <Authorized>
                 <a href="/mail">Mail</a>
                 <a class="who" href="/account">@context.User.Identity?.Name</a>
-                <form method="post" action="/auth/logout"><button class="linkbtn" type="submit">Log out</button></form>
+                <form method="post" action="/auth/logout">
+                    <button class="linkbtn" type="submit">Log out</button>
+                </form>
             </Authorized>
             <NotAuthorized>
                 <a href="/login">Log in</a>

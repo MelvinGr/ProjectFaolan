@@ -1,4 +1,3 @@
-using System;
 using System.Threading.Tasks;
 using Faolan.Core.Crypt;
 using Faolan.Core.Database;
@@ -64,7 +63,7 @@ namespace Faolan.UniverseAgent
 					// mismatch) keeps the legacy accept-any behaviour, so turning this on never breaks login.
 					var credentials = LoginEncryption.Decrypt(loginKey);
 					bool authenticated;
-					if (credentials is not null && credentials.Challenge == account.AuthChallenge)
+					if (credentials != null && credentials.Challenge == account.AuthChallenge)
 					{
 						// Patched client: enforce the password, unless none is configured (the "-" sentinel) - same as
 						// before. PasswordHashing.Matches verifies a stored PBKDF2 hash OR a legacy plaintext value.

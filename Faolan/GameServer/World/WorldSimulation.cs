@@ -740,7 +740,7 @@ namespace Faolan.GameServer.World
 
 		// Cached DoT effect per base spell id (Spell.DotDelta/DotType): looked up once per spell, then reused so the
 		// per-cast NPC path doesn't hit the DB. (delta 0 = not a DoT.)
-		private readonly ConcurrentDictionary<uint, (int Delta, uint Type)> _dotEffects = new();
+		private readonly ConcurrentDictionary<uint, (int Delta, uint Type)> _dotEffects = new ConcurrentDictionary<uint, (int Delta, uint Type)>();
 
 		private async Task<(int Delta, uint Type)> DotEffect(uint baseSpellId)
 		{

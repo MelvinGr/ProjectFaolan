@@ -101,7 +101,7 @@ namespace Faolan.Tests
 		{
 			// #245: an entity spawned to a still-loading client (Known) but not yet CONFIRMED (no 0x2020 poll) must NOT
 			// get an n3ToClientQuit when it briefly leaves range during the load-settle churn - that despawn crashes the
-			// client (pcDynel is NULL). It is dropped from Known silently instead.
+			// client (pcDynel == null). It is dropped from Known silently instead.
 			var zone = new Zone(2040);
 			var a = Player(1, 0, 0);
 			var b = Player(2, 10, 0);

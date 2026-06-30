@@ -1,6 +1,4 @@
-using System;
 using System.IO;
-using System.Linq;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Xunit;
 

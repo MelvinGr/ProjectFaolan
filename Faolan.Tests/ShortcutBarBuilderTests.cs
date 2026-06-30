@@ -30,8 +30,7 @@ namespace Faolan.Tests
 			"00004e22000000040039e783" + Zeros +
 			"00004e2300000004004b3ec8" + Zeros;
 
-		private static CharacterShortcut S(uint slot, uint type, uint id) =>
-			new() { Slot = slot, ShortcutType = type, TargetId = id };
+		private static CharacterShortcut S(uint slot, uint type, uint id) => new CharacterShortcut { Slot = slot, ShortcutType = type, TargetId = id };
 
 		[Fact]
 		public void BuildBody_ReproducesStriesCapturedBar_ByteExact()

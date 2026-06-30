@@ -10,7 +10,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 	public sealed class SnapshotTails
 	{
 		[JsonIgnore]
-		public bool HasKnownRepeatedStatTable => PostAccessBlock?.LargestAdjacentRepeatedRun is not null;
+		public bool HasKnownRepeatedStatTable => PostAccessBlock?.LargestAdjacentRepeatedRun != null;
 
 		[JsonIgnore]
 		public byte[] OriginalData { get; private init; } = [];
@@ -19,7 +19,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// the recovered FullPlayerCharacterIIR grammar (docs/fullplayer-snapshot-reader.md) instead of an opaque
 		// header+string blob. Replaces the former Header0/Unknown*/RemoteFormat* fields, which were really the
 		// first Quest_c record's header + its 5 <remoteformat> strings.
-		public QuestcRegion Quests { get; init; } = new();
+		public QuestcRegion Quests { get; init; } = new QuestcRegion();
 
 		// The @609 per-goal objective-detail region (chapterTag + per-goal records), modeled from the recovered
 		// grammar (QuestObjectiveRegion, docs/fullplayer-snapshot-reader.md) instead of riding in the opaque blob.
@@ -59,10 +59,10 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 			writer.WriteArray(Quests.ToArray());
 
-			if (QuestObjectives is not null)
+			if (QuestObjectives != null)
 				writer.WriteArray(QuestObjectives.ToArray());
 
-			if (QuestIndex is not null)
+			if (QuestIndex != null)
 				writer.WriteArray(QuestIndex.ToArray());
 
 			writer.WriteArray(UnknownBeforeAccessWindowTable);
@@ -70,7 +70,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			foreach (var entry in AccessWindowEntries)
 				WriteAccessWindowEntry(writer, entry);
 
-			if (PostAccessBlock is not null)
+			if (PostAccessBlock != null)
 				WritePostAccessBlock(writer, PostAccessBlock);
 			else
 				writer.WriteArray(UnknownAfterAccessWindowTable);
@@ -245,7 +245,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 					if (!UInt32RangesEqual(values, startIndex, startIndex + length, length))
 						continue;
 
-					if (bestRun is null || length > bestRun.Length)
+					if (bestRun == null || length > bestRun.Length)
 					{
 						bestRun = new TailsRepeatedUInt32Run
 						{
@@ -480,7 +480,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		{
 			var repeatedRun = FindLargestAdjacentRepeatedRun(values);
 
-			if (repeatedRun is null)
+			if (repeatedRun == null)
 				return null;
 
 			var prefix = CopyRange(values, 0, repeatedRun.StartIndex);
@@ -696,8 +696,8 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 			if (entry.ChildMode != 0)
 			{
-				if (entry.Child is null)
-					throw new InvalidOperationException($"Access-window entry at 0x{entry.Offset:X8} has childMode {entry.ChildMode}, but Child is null.");
+				if (entry.Child == null)
+					throw new InvalidOperationException($"Access-window entry at 0x{entry.Offset:X8} has childMode {entry.ChildMode}, but Child == null.");
 
 				WriteAccessWindowChild(writer, entry.ChildMode, entry.Child);
 			}
@@ -769,7 +769,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 		public override string ToString()
 		{
-			var child = Child is null
+			var child = Child == null
 				? ""
 				: $" | child: {Child}";
 
@@ -794,12 +794,12 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		{
 			if (!HasDetails)
 			{
-				return Id is null
+				return Id == null
 					? $"variant={Variant}"
 					: $"variant={Variant}, id=0x{Id:X8} ({Id})";
 			}
 
-			var id = Id is null
+			var id = Id == null
 				? ""
 				: $"id=0x{Id:X8} ({Id}), ";
 

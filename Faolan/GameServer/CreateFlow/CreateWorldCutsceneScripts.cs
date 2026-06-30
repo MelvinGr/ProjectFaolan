@@ -135,9 +135,9 @@ namespace Faolan.GameServer
 		// Kalanthes to the wash-ashore spot facing the player; the walk is a ListMoveTask[ PathMoveTask(2 waypoints) +
 		// WaitMoveTask ] that moves him UP to the player. Positions are absolute beach coords (byte-exact - the floats
 		// round-trip to the captured bits, KalanthesCutsceneMoveTests). Built with the LIVE Kalanthes handle directly.
-		private static readonly Vector3 KalanthesIntroPos = new(333.20001220703125f, 146.29666137695312f, 706.0260009765625f);
-		private static readonly Vector3 KalanthesWalkTarget = new(324.7233581542969f, 145.43357849121094f, 705.1339721679688f);
-		private static readonly Quaternion KalanthesIntroFacing = new(0f, -0.743186891078949f, 0f, 0.6690838932991028f);
+		private static readonly Vector3 KalanthesIntroPos = new Vector3(333.20001220703125f, 146.29666137695312f, 706.0260009765625f);
+		private static readonly Vector3 KalanthesWalkTarget = new Vector3(324.7233581542969f, 145.43357849121094f, 705.1339721679688f);
+		private static readonly Quaternion KalanthesIntroFacing = new Quaternion(0f, -0.743186891078949f, 0f, 0.6690838932991028f);
 		private const float KalanthesWalkPathLength = 8.567047119140625f; // from -> target distance (interp timing)
 
 		// The intro TRANSFORM: a stationary (from==to) mode-2 MoveTask placing Kalanthes at his cutscene start.

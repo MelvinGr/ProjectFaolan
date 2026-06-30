@@ -77,7 +77,7 @@ namespace Faolan.Mcp
 
 		public async Task StopAsync(CancellationToken cancellationToken)
 		{
-			if (_app is null)
+			if (_app == null)
 				return;
 
 			await _app.StopAsync(cancellationToken);

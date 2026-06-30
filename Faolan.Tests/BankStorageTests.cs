@@ -1,7 +1,6 @@
 using Faolan.GameServer.Economy.Bank;
 using System;
 using Faolan.Core.Data;
-using Faolan.GameServer;
 using Xunit;
 
 namespace Faolan.Tests

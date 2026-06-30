@@ -1,11 +1,9 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
-using Faolan.Core.Data;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -42,7 +40,7 @@ namespace Faolan.GameServer
 		// when the payload carries the buff's real effect descriptor (the generic synthesized blob has the wrong id at
 		// +24 so the client can't render it). Exhausted (0x000B9000) lifted byte-for-byte from the guardian combat
 		// capture (frame 2110); its +8 duration field is 0x2710 = 10s, so it also exercises the tick expiry + removal.
-		private static readonly Dictionary<uint, byte[]> CapturedBuffPayloads = new()
+		private static readonly Dictionary<uint, byte[]> CapturedBuffPayloads = new Dictionary<uint, byte[]>
 		{
 			[0x000B9000] = Convert.FromHexString("0000000000000000000027100001000000010000000000000b900000000100000000000000000000000000000001000000000705ff5b"),
 		};
@@ -494,10 +492,10 @@ namespace Faolan.GameServer
 
 			// Resolve the target account: by username first, else by a character name -> its owning account.
 			var account = await Database.GetAccount(name);
-			if (account is null && await Database.GetCharacterByName(name) is { } ch)
+			if (account == null && await Database.GetCharacterByName(name) is { } ch)
 				account = await Database.GetAccount(ch.AccountId);
 
-			if (account is null)
+			if (account == null)
 			{
 				await _agentServerDispatcher.SendSystemMessage(gmId, $"<span style=\"color: red;\">No account or character named '{name}'.</span>");
 				return;

@@ -1,4 +1,3 @@
-using System;
 using Faolan.Core.Data;
 using Faolan.GameServer.World;
 

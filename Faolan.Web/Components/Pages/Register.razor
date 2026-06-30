@@ -5,15 +5,15 @@
 <div class="auth-card">
     <h1>Create account</h1>
     <form method="post" action="/auth/register">
-        <input name="username" placeholder="Username" autocomplete="username" required autofocus />
-        <input name="password" type="password" placeholder="Password" autocomplete="new-password" required />
+        <input name="username" placeholder="Username" autocomplete="username" required autofocus/>
+        <input name="password" type="password" placeholder="Password" autocomplete="new-password" required/>
         <button class="btn primary" type="submit">Register</button>
     </form>
     @if (Error == "taken")
     {
         <p class="err">That username is already taken.</p>
     }
-    else if (Error is not null)
+    else if (Error != null)
     {
         <p class="err">Please enter a username and password.</p>
     }
@@ -21,5 +21,8 @@
 </div>
 
 @code {
-    [SupplyParameterFromQuery(Name = "error")] public string? Error { get; set; }
+
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? Error { get; set; }
+
 }

@@ -1,7 +1,6 @@
 using System;
 using System.Linq;
 using Faolan.Core.Network.Packets;
-using Faolan.Importer;
 using Faolan.Importer.Captures;
 using Xunit;
 

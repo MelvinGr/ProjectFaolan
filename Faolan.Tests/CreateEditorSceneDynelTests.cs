@@ -76,7 +76,7 @@ namespace Faolan.Tests
 		private sealed class SingleOptionsContextFactory(DbContextOptions<DatabaseContext> options)
 			: IDbContextFactory<DatabaseContext>
 		{
-			public DatabaseContext CreateDbContext() => new(options);
+			public DatabaseContext CreateDbContext() => new DatabaseContext(options);
 			public Task<DatabaseContext> CreateDbContextAsync(CancellationToken ct = default) => Task.FromResult(new DatabaseContext(options));
 		}
 

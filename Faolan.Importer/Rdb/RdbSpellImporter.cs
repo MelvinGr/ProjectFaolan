@@ -120,7 +120,7 @@ namespace Faolan.Importer.Rdb
 		private static Dictionary<uint, uint> ReadIncreasingFields(ReadOnlySpan<byte> body)
 		{
 			var words = body.Length / 4;
-			Dictionary<uint, uint> best = new();
+			Dictionary<uint, uint> best = new Dictionary<uint, uint>();
 			for (var start = 0; start + 1 < words; start++)
 			{
 				uint last = 0;

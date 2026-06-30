@@ -36,7 +36,7 @@ namespace Faolan.Mcp.Tools
 		public async Task<string> GetItem([Description("Numeric item id")] uint id)
 		{
 			var item = await _db.GetItem(id);
-			return item is null
+			return item == null
 				? $"No item with id {id}."
 				: Serialize(item);
 		}
@@ -88,7 +88,7 @@ namespace Faolan.Mcp.Tools
 		public async Task<string> GetSpell([Description("Numeric spell id")] uint id)
 		{
 			var spell = await _db.GetSpell(id);
-			return spell is null
+			return spell == null
 				? $"No spell with id {id}."
 				: Serialize(spell);
 		}

@@ -1,5 +1,4 @@
 using Faolan.Core.Data;
-using Faolan.Core.Network;
 
 namespace Faolan.Core.Network.Packets
 {

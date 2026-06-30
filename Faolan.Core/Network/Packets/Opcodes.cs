@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Faolan.Core.Network.Packets
+﻿namespace Faolan.Core.Network.Packets
 {
 	namespace Opcodes
 	{

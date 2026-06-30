@@ -190,6 +190,6 @@ namespace Faolan.GameServer.World
 		public uint U32() { var v = BinaryPrimitives.ReadUInt32BigEndian(_b.Slice(_i)); _i += 4; return v; }
 		public float Float() { var v = BinaryPrimitives.ReadSingleBigEndian(_b.Slice(_i)); _i += 4; return v; }
 		public byte Byte() { return _b[_i++]; }
-		public Vector3 Vec3() => new(Float(), Float(), Float());
+		public Vector3 Vec3() => new Vector3(Float(), Float(), Float());
 	}
 }

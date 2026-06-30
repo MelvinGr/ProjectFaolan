@@ -48,7 +48,7 @@ namespace Faolan.GameServer.World
 
 		// (mapId, instanceId) zones whose NPCs have been loaded into the world model (once per instance, on first entry
 		// to that copy - each instance gets its own NPC population) (#268).
-		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), byte> _npcLoadedZones = new();
+		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), byte> _npcLoadedZones = new ConcurrentDictionary<(uint MapId, uint InstanceId), byte>();
 
 		// Cached loot-bag template (a captured "Bag of loot" world object) per map; null values cache loot-less maps.
 		private readonly IDatabaseRepository _database;
@@ -75,7 +75,7 @@ namespace Faolan.GameServer.World
 
 		// Despawn a world-owned entity (a killed NPC, an expired loot bag) for every nearby player THAT ACTUALLY HAS IT
 		// in their Known set. The Known guard is the #245 invariant: an n3ToClientQuit for a handle the recipient was
-		// never sent crashes the client (`pcDynel is NULL`) - a still-loading player in range of an entity it never
+		// never sent crashes the client (`pcDynel == null`) - a still-loading player in range of an entity it never
 		// received must not get a despawn for it. Interest is the sole NPC spawn path now, so Known is the authoritative
 		// "was this entity sent to this client" record; the interest path (ResolveMove) already only despawns Known
 		// handles, but this range-based world-tick path did not. Removes the handle as it despawns. Uses the same

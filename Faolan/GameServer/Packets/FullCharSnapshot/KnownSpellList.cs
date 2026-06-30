@@ -24,7 +24,8 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 		public List<KnownSpellRecord> Records { get; init; } = [];
 
-		public static KnownSpellList FromSpellIds(IReadOnlyList<uint> spellIds) => new()
+		public static KnownSpellList FromSpellIds(IReadOnlyList<uint> spellIds) =>
+			new KnownSpellList
 		{
 			Records = [.. (spellIds ?? []).Select(id => new KnownSpellRecord(id, SpellType))]
 		};

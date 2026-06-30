@@ -29,7 +29,7 @@ namespace Faolan.Core.Crypt
 		}
 
 		public static bool IsHashed(string? stored) =>
-			stored is not null && stored.StartsWith(Prefix, StringComparison.Ordinal);
+			stored != null && stored.StartsWith(Prefix, StringComparison.Ordinal);
 
 		// Verify a supplied password against a stored PBKDF2 hash. False for non-hash / malformed input.
 		public static bool Verify(string password, string? stored)

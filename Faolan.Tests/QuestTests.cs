@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.GameServer.World;
-using Faolan.Importer;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
 using Xunit;
@@ -322,11 +321,9 @@ namespace Faolan.Tests
 			Assert.True(QuestProgress.Advances(Live(0, 0), Goal(QuestGoalType.TalkToNpc, "Casilda"), QuestGoalType.TalkToNpc, "Casilda"));
 		}
 
-		private static CharacterQuest Live(uint progress, uint required, QuestState state = QuestState.Active) =>
-			new() { QuestId = 1, State = state, GoalProgress = progress, GoalRequired = required };
+		private static CharacterQuest Live(uint progress, uint required, QuestState state = QuestState.Active) => new CharacterQuest { QuestId = 1, State = state, GoalProgress = progress, GoalRequired = required };
 
-		private static QuestGoalDefinition Goal(QuestGoalType type, string target) =>
-			new() { GoalType = type, TargetName = target, Sequence = 1 };
+		private static QuestGoalDefinition Goal(QuestGoalType type, string target) => new QuestGoalDefinition { GoalType = type, TargetName = target, Sequence = 1 };
 
 		private static CharacterQuest KillQuest(string target, uint progress, uint required, QuestState state = QuestState.Active)
 		{

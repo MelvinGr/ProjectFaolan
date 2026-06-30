@@ -1,5 +1,5 @@
+using System.Security.Claims;
 using Faolan.Core;
-using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Web.Auth;
@@ -8,287 +8,337 @@ using Faolan.Web.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using System.Security.Claims;
 
 namespace Faolan.Web
 {
-    public class Program
-    {
-        public static void Main(string[] args)
-        {
-            var builder = WebApplication.CreateBuilder(args);
+	public class Program
+	{
+		public static void Main(string[] args)
+		{
+			var builder = WebApplication.CreateBuilder(args);
 
-            // Like the game server, run from the repo root so faolan.json (DatabasePath, ...) + faolan.db resolve.
-            builder.Configuration.SetBasePath(Directory.GetCurrentDirectory());
+			builder.Configuration.AddJsonFile(Path.GetFullPath("/home/melvin/Development/C#/Project Faolan/faolan.json"));
+			// The app's own appsettings.json (RdbDir, ...) lives next to the dll, not the CWD repo root.
+			builder.Configuration.AddJsonFile("appsettings.json");
 
-            builder.Configuration.AddJsonFile(Path.GetFullPath("faolan.json"));
-            // The app's own appsettings.json (RdbDir, ...) lives next to the dll, not the CWD repo root.
-            builder.Configuration.AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.json"));
+			builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 
-            builder.Services.AddRazorComponents()
-                .AddInteractiveServerComponents();
+			// faolan.db (read-only here, for the character roster) via the shared pooled-factory registration.
+			builder.Services.ConfigureFaolanDatabase(builder.Configuration);
 
-            // faolan.db (read-only here, for the character roster) via the shared pooled-factory registration.
-            builder.Services.ConfigureFaolanDatabase(builder.Configuration);
+			// The RDB-backed character model builder (#275).
+			builder.Services.AddSingleton<CharacterModelService>();
 
-            // The RDB-backed character model builder (#275).
-            builder.Services.AddSingleton<CharacterModelService>();
+			// Cache for the expensive deterministic renders (item glbs, map pngs). Size is counted in bytes; cap the
+			// cache so a scrape can't grow it unbounded.
+			builder.Services.AddMemoryCache(o => o.SizeLimit = 256 * 1024 * 1024);
 
-            // Cache for the expensive deterministic renders (item glbs, map pngs). Size is counted in bytes; cap the
-            // cache so a scrape can't grow it unbounded.
-            builder.Services.AddMemoryCache(o => o.SizeLimit = 256 * 1024 * 1024);
+			// Live presence: queries the running game server's MCP endpoint (separate process) for connected players.
+			builder.Services.AddSingleton<LiveSessionService>();
 
-            // Live presence: queries the running game server's MCP endpoint (separate process) for connected players.
-            builder.Services.AddSingleton<LiveSessionService>();
+			// Admin tools over the shared Accounts table (ban/unban, account type).
+			builder.Services.AddScoped<AccountAdminService>();
 
-            // Admin tools over the shared Accounts table (ban/unban, account type).
-            builder.Services.AddScoped<AccountAdminService>();
+			// In-game mail (read/compose) directly against the shared Mail table.
+			builder.Services.AddScoped<MailService>();
 
-            // In-game mail (read/compose) directly against the shared Mail table.
-            builder.Services.AddScoped<MailService>();
+			// Identity Core (UserManager only — no SignInManager/cookie schema) over the game's Accounts table via a
+			// custom store. UserManager handles register (CreateAsync) and login (CheckPasswordAsync); the password
+			// hasher delegates to the shared PasswordHashing format so the game-server login stays compatible, and
+			// CheckPasswordAsync auto-rehashes a legacy plaintext password. Cookie sign-in (below) is still ours.
+			builder.Services.AddIdentityCore<Account>(o =>
+			{
+				// Game usernames/passwords aren't ASCII/complexity-restricted — relax Identity's defaults.
+				o.User.AllowedUserNameCharacters = "";
+				o.Password.RequiredLength = 1;
+				o.Password.RequiredUniqueChars = 1;
+				o.Password.RequireDigit = false;
+				o.Password.RequireLowercase = false;
+				o.Password.RequireUppercase = false;
+				o.Password.RequireNonAlphanumeric = false;
+			});
+			builder.Services.AddScoped<IUserStore<Account>, AccountUserStore>();
+			builder.Services.AddScoped<IPasswordHasher<Account>, AccountPasswordHasher>();
 
-            // Identity Core (UserManager only — no SignInManager/cookie schema) over the game's Accounts table via a
-            // custom store. UserManager handles register (CreateAsync) and login (CheckPasswordAsync); the password
-            // hasher delegates to the shared PasswordHashing format so the game-server login stays compatible, and
-            // CheckPasswordAsync auto-rehashes a legacy plaintext password. Cookie sign-in (below) is still ours.
-            builder.Services.AddIdentityCore<Account>(o =>
-            {
-                // Game usernames/passwords aren't ASCII/complexity-restricted — relax Identity's defaults.
-                o.User.AllowedUserNameCharacters = "";
-                o.Password.RequiredLength = 1;
-                o.Password.RequiredUniqueChars = 1;
-                o.Password.RequireDigit = false;
-                o.Password.RequireLowercase = false;
-                o.Password.RequireUppercase = false;
-                o.Password.RequireNonAlphanumeric = false;
-            });
-            builder.Services.AddScoped<IUserStore<Account>, AccountUserStore>();
-            builder.Services.AddScoped<IPasswordHasher<Account>, AccountPasswordHasher>();
+			// Cookie auth over the shared game Accounts table. The viewer is public; signing in scopes the roster to
+			// your own characters.
+			builder
+				.Services
+				.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+				.AddCookie(o =>
+				{
+					o.LoginPath = "/login";
+					o.AccessDeniedPath = "/login";
+					o.ExpireTimeSpan = TimeSpan.FromDays(14);
+				});
+			builder.Services.AddAuthorization();
+			builder.Services.AddCascadingAuthenticationState();
 
-            // Cookie auth over the shared game Accounts table. The viewer is public; signing in scopes the roster to
-            // your own characters.
-            builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-                .AddCookie(o =>
-                {
-                    o.LoginPath = "/login";
-                    o.AccessDeniedPath = "/login";
-                    o.ExpireTimeSpan = TimeSpan.FromDays(14);
-                });
-            builder.Services.AddAuthorization();
-            builder.Services.AddCascadingAuthenticationState();
+			var app = builder.Build();
 
-            var app = builder.Build();
+			if (!app.Environment.IsDevelopment())
+			{
+				app.UseExceptionHandler("/Error", true);
+				app.UseHsts();
+			}
 
-            if (!app.Environment.IsDevelopment())
-            {
-                app.UseExceptionHandler("/Error", createScopeForErrors: true);
-                app.UseHsts();
-            }
+			app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+			app.UseHttpsRedirection();
+			app.UseAuthentication();
+			app.UseAuthorization();
+			app.UseAntiforgery();
+			app.MapStaticAssets();
 
-            app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-            app.UseHttpsRedirection();
-            app.UseAuthentication();
-            app.UseAuthorization();
-            app.UseAntiforgery();
-            app.MapStaticAssets();
+			// Auth form posts, via Identity's UserManager (hashing + legacy-plaintext auto-rehash). Antiforgery
+			// disabled here to keep the simple HTML forms.
+			app
+				.MapPost("/auth/register",
+					async (HttpContext ctx, UserManager<Account> users, [FromForm] string username, [FromForm] string password) =>
+					{
+						if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+							return Results.Redirect("/register?error=invalid");
 
-            // Auth form posts, via Identity's UserManager (hashing + legacy-plaintext auto-rehash). Antiforgery
-            // disabled here to keep the simple HTML forms.
-            app.MapPost("/auth/register", async (HttpContext ctx, UserManager<Account> users,
-                [FromForm] string username, [FromForm] string password) =>
-            {
-                if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
-                    return Results.Redirect("/register?error=invalid");
+						var account = new Account
+						{
+							UserName = username,
+							Type = AccountType.Normal,
+							State = AccountState.Active,
+							CreationDate = DateTime.UtcNow,
+							AuthChallenge = "",
+							LastIpAddress = ""
+						};
+						var result = await users.CreateAsync(account, password);
+						if (!result.Succeeded)
+						{
+							var taken = result.Errors.Any(e => e.Code.Contains("Duplicate", StringComparison.OrdinalIgnoreCase));
+							return Results.Redirect(taken
+								? "/register?error=taken"
+								: "/register?error=invalid");
+						}
 
-                var account = new Account
-                {
-                    UserName = username,
-                    Type = AccountType.Normal,
-                    State = AccountState.Active,
-                    CreationDate = DateTime.UtcNow,
-                    AuthChallenge = "",
-                    LastIpAddress = ""
-                };
-                var result = await users.CreateAsync(account, password);
-                if (!result.Succeeded)
-                {
-                    var taken = result.Errors.Any(e => e.Code.Contains("Duplicate", StringComparison.OrdinalIgnoreCase));
-                    return Results.Redirect(taken ? "/register?error=taken" : "/register?error=invalid");
-                }
+						await SignIn(ctx, account);
+						return Results.Redirect("/characters");
+					})
+				.DisableAntiforgery();
 
-                await SignIn(ctx, account);
-                return Results.Redirect("/characters");
-            }).DisableAntiforgery();
+			app
+				.MapPost("/auth/login",
+					async (HttpContext ctx, UserManager<Account> users, [FromForm] string username, [FromForm] string password) =>
+					{
+						var account = await users.FindByNameAsync(username);
+						if (account == null || !await users.CheckPasswordAsync(account, password))
+							return Results.Redirect("/login?error=1");
 
-            app.MapPost("/auth/login", async (HttpContext ctx, UserManager<Account> users,
-                [FromForm] string username, [FromForm] string password) =>
-            {
-                var account = await users.FindByNameAsync(username);
-                if (account is null || !await users.CheckPasswordAsync(account, password))
-                    return Results.Redirect("/login?error=1");
-                await SignIn(ctx, account);
-                return Results.Redirect("/characters");
-            }).DisableAntiforgery();
+						await SignIn(ctx, account);
+						return Results.Redirect("/characters");
+					})
+				.DisableAntiforgery();
 
-            app.MapPost("/auth/logout", async (HttpContext ctx) =>
-            {
-                await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-                return Results.Redirect("/");
-            }).DisableAntiforgery();
+			app
+				.MapPost("/auth/logout",
+					async (HttpContext ctx) =>
+					{
+						await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+						return Results.Redirect("/");
+					})
+				.DisableAntiforgery();
 
-            // Browser cache for deterministic-by-id renders (item models, race/sex base, map images): a day, immutable.
-            static void CacheADay(HttpContext ctx) => ctx.Response.Headers.CacheControl = "public, max-age=86400, immutable";
+			// Browser cache for deterministic-by-id renders (item models, race/sex base, map images): a day, immutable.
+			static void CacheADay(HttpContext ctx)
+			{
+				ctx.Response.Headers.CacheControl = "public, max-age=86400, immutable";
+			}
 
-            // glTF endpoints: a character's assembled model, and any single RDB model by id.
-            app.MapGet("/api/character/{race}/{sex}/model.glb", (Race race, Sex sex, HttpContext ctx, CharacterModelService models) =>
-            {
-                var glb = models.BuildCharacter(race, sex);
-                if (glb is null) return Results.NotFound();
-                CacheADay(ctx);
-                return Results.File(glb, "model/gltf-binary");
-            });
+			// glTF endpoints: a character's assembled model, and any single RDB model by id.
+			app.MapGet("/api/character/{race}/{sex}/model.glb",
+				(Race race, Sex sex, HttpContext ctx, CharacterModelService models) =>
+				{
+					var glb = models.BuildCharacter(race, sex);
+					if (glb == null)
+						return Results.NotFound();
 
-            // ?equip=290301,290354 overlays those armor MESHINDEXFILE ids on the character (gear preview, #275).
-            // ?rig=1 returns the character's BODY as a posable skinned rig instead of the static assembled model.
-            app.MapGet("/api/character/{id:long}/model.glb", (long id, string? equip, string? rig, CharacterModelService models) =>
-            {
-                if (rig is "1" or "true" or "True")
-                {
-                    var rigGlb = models.BuildCharacterRig((uint)id);
-                    return rigGlb is null ? Results.NotFound() : Results.File(rigGlb, "model/gltf-binary");
-                }
+					CacheADay(ctx);
+					return Results.File(glb, "model/gltf-binary");
+				});
 
-                var equipIds = equip?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                    .Select(s => uint.TryParse(s, out var v) ? v : 0u).Where(v => v != 0).ToList();
-                var glb = models.BuildCharacterById((uint)id, equipIds is { Count: > 0 } ? equipIds : null);
-                return glb is null ? Results.NotFound() : Results.File(glb, "model/gltf-binary");
-            });
+			// ?equip=290301,290354 overlays those armor MESHINDEXFILE ids on the character (gear preview, #275).
+			// ?rig=1 returns the character's BODY as a posable skinned rig instead of the static assembled model.
+			app.MapGet("/api/character/{id:long}/model.glb",
+				(long id, string? equip, string? rig, CharacterModelService models) =>
+				{
+					if (rig is "1" or "true" or "True")
+					{
+						var rigGlb = models.BuildCharacterRig((uint)id);
+						return rigGlb == null
+							? Results.NotFound()
+							: Results.File(rigGlb, "model/gltf-binary");
+					}
 
-            // Wearable armour-set catalogue (optionally filtered by ?sex=Female/Male), for the viewer's wardrobe picker.
-            app.MapGet("/api/armorsets", (Sex? sex, CharacterModelService models) =>
-                Results.Json(models.ArmorSets(sex).Select(s => new
-                {
-                    s.Number, s.Gender, s.Name,
-                    label = $"{s.Number:0000} {s.Name} ({s.Gender})",
-                    equip = string.Join(',', s.PieceMeshIndexIds)
-                })));
+					var equipIds = equip
+						?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+						.Select(s => uint.TryParse(s, out var v)
+							? v
+							: 0u)
+						.Where(v => v != 0)
+						.ToList();
+					var glb = models.BuildCharacterById((uint)id,
+						equipIds is { Count: > 0 }
+							? equipIds
+							: null);
+					return glb == null
+						? Results.NotFound()
+						: Results.File(glb, "model/gltf-binary");
+				});
 
-            // ?rig=1 (or rig=true) returns the SKINNED model (body/equipment + character skeleton as a glTF skin,
-            // posable); ?skeleton=ID overrides the default humanoid rig (14853). Without ?rig it's the static mesh.
-            app.MapGet("/api/model/{meshIndexId:long}.glb", (long meshIndexId, string? rig, long? skeleton, CharacterModelService models) =>
-            {
-                var wantRig = rig is "1" or "true" or "True";
-                var glb = wantRig
-                    ? models.BuildRig((uint)meshIndexId, skeleton is { } s ? (uint)s : null)
-                    : models.BuildModel((uint)meshIndexId);
-                return glb is null ? Results.NotFound() : Results.File(glb, "model/gltf-binary");
-            });
+			// Wearable armour-set catalogue (optionally filtered by ?sex=Female/Male), for the viewer's wardrobe picker.
+			app.MapGet("/api/armorsets",
+				(Sex? sex, CharacterModelService models) => Results.Json(models
+				.ArmorSets(sex)
+				.Select(s => new
+				{
+					s.Number,
+					s.Gender,
+					s.Name,
+					label = $"{s.Number:0000} {s.Name} ({s.Gender})",
+					equip = string.Join(',', s.PieceMeshIndexIds)
+				})));
 
-            app.MapGet("/api/rm/{renderMeshId:long}.glb", (long renderMeshId, CharacterModelService models) =>
-            {
-                var glb = models.BuildRenderMesh((uint)renderMeshId);
-                return glb is null ? Results.NotFound() : Results.File(glb, "model/gltf-binary");
-            });
+			// ?rig=1 (or rig=true) returns the SKINNED model (body/equipment + character skeleton as a glTF skin,
+			// posable); ?skeleton=ID overrides the default humanoid rig (14853). Without ?rig it's the static mesh.
+			app.MapGet("/api/model/{meshIndexId:long}.glb",
+				(long meshIndexId, string? rig, long? skeleton, CharacterModelService models) =>
+				{
+					var wantRig = rig is "1" or "true" or "True";
+					var glb = wantRig
+						? models.BuildRig((uint)meshIndexId,
+							skeleton is { } s
+								? (uint)s
+								: null)
+						: models.BuildModel((uint)meshIndexId);
+					return glb == null
+						? Results.NotFound()
+						: Results.File(glb, "model/gltf-binary");
+				});
 
-            // An item's 3D display model for the equipment-slot thumbnails (404 when the item has no display mesh).
-            app.MapGet("/api/item/{itemId:long}/model.glb", (long itemId, HttpContext ctx, CharacterModelService models) =>
-            {
-                var glb = models.ItemModel((uint)itemId);
-                if (glb is null) return Results.NotFound();
-                CacheADay(ctx);
-                return Results.File(glb, "model/gltf-binary");
-            });
+			app.MapGet("/api/rm/{renderMeshId:long}.glb",
+				(long renderMeshId, CharacterModelService models) =>
+				{
+					var glb = models.BuildRenderMesh((uint)renderMeshId);
+					return glb == null
+						? Results.NotFound()
+						: Results.File(glb, "model/gltf-binary");
+				});
 
-            // Live world radar feed (admin only): the map's entities (from the running server via MCP) + world bounds.
-            app.MapGet("/api/zone/{mapId:long}", async (long mapId, HttpContext ctx, LiveSessionService live, CharacterModelService models) =>
-            {
-                if (!(ctx.User?.IsInRole("Admin") ?? false))
-                    return Results.StatusCode(StatusCodes.Status403Forbidden);
+			// An item's 3D display model for the equipment-slot thumbnails (404 when the item has no display mesh).
+			app.MapGet("/api/item/{itemId:long}/model.glb",
+				(long itemId, HttpContext ctx, CharacterModelService models) =>
+				{
+					var glb = models.ItemModel((uint)itemId);
+					if (glb == null)
+						return Results.NotFound();
 
-                var entities = await live.GetZoneEntitiesAsync((uint)mapId);
-                var bounds = models.MapBounds((uint)mapId);
-                return Results.Json(new
-                {
-                    online = entities is not null,
-                    bounds = bounds is { } b ? new { w = b.Width, h = b.Height } : null,
-                    hasMap = models.HasMapImage((uint)mapId),
-                    entities = entities ?? []
-                });
-            });
+					CacheADay(ctx);
+					return Results.File(glb, "model/gltf-binary");
+				});
 
-            // A map's top-down terrain image (RDB type 1010209), for the radar background. Admin only; 404 when the
-            // map has no local image.
-            app.MapGet("/api/zone/{mapId:long}/map.png", (long mapId, HttpContext ctx, CharacterModelService models) =>
-            {
-                if (!(ctx.User?.IsInRole("Admin") ?? false))
-                    return Results.StatusCode(StatusCodes.Status403Forbidden);
-                var png = models.MapImage((uint)mapId);
-                if (png is null) return Results.NotFound();
-                CacheADay(ctx);
-                return Results.File(png, "image/png");
-            });
+			// Live world radar feed (admin only): the map's entities (from the running server via MCP) + world bounds.
+			app.MapGet("/api/zone/{mapId:long}",
+				async (long mapId, HttpContext ctx, LiveSessionService live, CharacterModelService models) =>
+				{
+					if (!(ctx.User?.IsInRole("Admin") ?? false))
+						return Results.StatusCode(StatusCodes.Status403Forbidden);
 
-            if (app.Environment.IsDevelopment())
-            {
-                app.MapGet("/api/debug/char/{id:long}", (long id, CharacterModelService models) => Results.Json(models.DebugCharacter((uint)id)));
+					var entities = await live.GetZoneEntitiesAsync((uint)mapId);
+					var bounds = models.MapBounds((uint)mapId);
+					return Results.Json(new
+					{
+						online = entities != null,
+						bounds = bounds is { } b
+							? new
+							{
+								w = b.Width,
+								h = b.Height
+							}
+							: null,
+						hasMap = models.HasMapImage((uint)mapId),
+						entities = entities ?? []
+					});
+				});
 
-                // Body UV mirror diagnostic (#275): is the body's left/right unwrap mirrored?
-                app.MapGet("/api/debug/bodyuv/{id:long}", (long id, CharacterModelService models) => Results.Json(models.DescribeBodyUv((uint)id)));
+			// A map's top-down terrain image (RDB type 1010209), for the radar background. Admin only; 404 when the
+			// map has no local image.
+			app.MapGet("/api/zone/{mapId:long}/map.png",
+				(long mapId, HttpContext ctx, CharacterModelService models) =>
+				{
+					if (!(ctx.User?.IsInRole("Admin") ?? false))
+						return Results.StatusCode(StatusCodes.Status403Forbidden);
 
-                // Decode an FCTX texture (type/id) to PNG - for inspecting tattoo decal textures (#275).
-                app.MapGet("/api/debug/tex/{type:long}/{id:long}.png", (long type, long id, CharacterModelService models) =>
-                {
-                    var png = models.DecodeTexture((uint)type, (uint)id);
-                    return png is null
-                        ? Results.NotFound()
-                        : Results.Bytes(png, "image/png");
-                });
+					var png = models.MapImage((uint)mapId);
+					if (png == null)
+						return Results.NotFound();
 
-                // Raw RDB resource text (e.g. a TexScript 1010035 XML) for protocol/asset RE.
-                app.MapGet("/api/debug/raw/{type:long}/{id:long}", (long type, long id, CharacterModelService models) =>
-                {
-                    var text = models.RawResourceText((uint)type, (uint)id);
-                    return text is null
-                        ? Results.NotFound()
-                        : Results.Text(text, "text/plain");
-                });
+					CacheADay(ctx);
+					return Results.File(png, "image/png");
+				});
 
-                // Raw decompressed RDB resource bytes (binary blob analysis, e.g. the rendermesh DPPM morph-target chunk).
-                app.MapGet("/api/debug/blob/{type:long}/{id:long}", (long type, long id, CharacterModelService models) =>
-                {
-                    var bytes = models.RawResourceBytes((uint)type, (uint)id);
-                    return bytes is null
-                        ? Results.NotFound()
-                        : Results.Bytes(bytes, "application/octet-stream");
-                });
-            }
+			if (app.Environment.IsDevelopment())
+			{
+				app.MapGet("/api/debug/char/{id:long}", (long id, CharacterModelService models) => Results.Json(models.DebugCharacter((uint)id)));
 
-            app.MapRazorComponents<App>()
-                .AddInteractiveServerRenderMode();
+				// Body UV mirror diagnostic (#275): is the body's left/right unwrap mirrored?
+				app.MapGet("/api/debug/bodyuv/{id:long}", (long id, CharacterModelService models) => Results.Json(models.DescribeBodyUv((uint)id)));
 
-            app.Run();
-        }
+				// Decode an FCTX texture (type/id) to PNG - for inspecting tattoo decal textures (#275).
+				app.MapGet("/api/debug/tex/{type:long}/{id:long}.png",
+					(long type, long id, CharacterModelService models) =>
+					{
+						var png = models.DecodeTexture((uint)type, (uint)id);
+						return png == null
+							? Results.NotFound()
+							: Results.Bytes(png, "image/png");
+					});
 
-        // Issue the auth cookie for an account (id + username claims, plus an "Admin" role for GM/Administrator
-        // accounts so the admin tools can gate on it).
-        private static Task SignIn(HttpContext ctx, Account account)
-        {
-            var claims = new List<Claim>
-            {
-                new(ClaimTypes.NameIdentifier, account.Id.ToString()),
-                new(ClaimTypes.Name, account.UserName),
-            };
-            if (account.Type >= AccountType.GameMaster)
-                claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+				// Raw RDB resource text (e.g. a TexScript 1010035 XML) for protocol/asset RE.
+				app.MapGet("/api/debug/raw/{type:long}/{id:long}",
+					(long type, long id, CharacterModelService models) =>
+					{
+						var text = models.RawResourceText((uint)type, (uint)id);
+						return text == null
+							? Results.NotFound()
+							: Results.Text(text, "text/plain");
+					});
 
-            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-            return ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
-        }
-    }
+				// Raw decompressed RDB resource bytes (binary blob analysis, e.g. the rendermesh DPPM morph-target chunk).
+				app.MapGet("/api/debug/blob/{type:long}/{id:long}",
+					(long type, long id, CharacterModelService models) =>
+					{
+						var bytes = models.RawResourceBytes((uint)type, (uint)id);
+						return bytes == null
+							? Results.NotFound()
+							: Results.Bytes(bytes, "application/octet-stream");
+					});
+			}
+
+			app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
+
+			app.Run();
+		}
+
+		// Issue the auth cookie for an account (id + username claims, plus an "Admin" role for GM/Administrator
+		// accounts so the admin tools can gate on it).
+		private static Task SignIn(HttpContext ctx, Account account)
+		{
+			var claims = new List<Claim>
+			{
+				new Claim(ClaimTypes.NameIdentifier, account.Id.ToString()),
+				new Claim(ClaimTypes.Name, account.UserName)
+			};
+			if (account.Type >= AccountType.GameMaster)
+				claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+
+			var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+			return ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
+		}
+	}
 }

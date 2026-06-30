@@ -86,17 +86,17 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 	public sealed class CapturedCharacterStats
 	{
 		public decimal? HealthMax =>
-			HealthMaxRaw is null
+			HealthMaxRaw == null
 				? null
 				: HealthMaxRaw.Value / 100m;
 
 		public decimal? ManaMax =>
-			ManaMaxRaw is null
+			ManaMaxRaw == null
 				? null
 				: ManaMaxRaw.Value / 100m;
 
 		public decimal? StaminaCurrent =>
-			StaminaCurrentRaw is null
+			StaminaCurrentRaw == null
 				? null
 				: StaminaCurrentRaw.Value / 100m;
 

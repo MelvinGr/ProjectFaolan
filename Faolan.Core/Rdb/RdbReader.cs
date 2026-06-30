@@ -27,7 +27,7 @@ namespace Faolan.Core.Rdb
 		// cold miss). Misses are negative-cached so a dead/absent resource is only attempted once per process.
 		private readonly string? _cdnBaseUrl;
 		private readonly HashSet<string> _cdnMisses = [];
-		private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(40) };
+		private static readonly HttpClient Http = new HttpClient { Timeout = TimeSpan.FromSeconds(40) };
 
 		public int Count => _entries.Count;
 		public IReadOnlyList<Entry> Entries => _entries;
@@ -48,7 +48,7 @@ namespace Faolan.Core.Rdb
 		// The proxy URL for a CDN (file == 0xFF) entry, or null if no source is configured / the hash is absent.
 		public string? CdnUrl(Entry e)
 		{
-			if (_cdnBaseUrl is null || e.Hash.Length < 16)
+			if (_cdnBaseUrl == null || e.Hash.Length < 16)
 				return null;
 
 			var hex = Convert.ToHexStringLower(e.Hash);
@@ -186,7 +186,7 @@ namespace Faolan.Core.Rdb
 		private byte[] FetchCdn(Entry e)
 		{
 			var url = CdnUrl(e);
-			if (url is null)
+			if (url == null)
 				return [];
 
 			try

@@ -20,7 +20,7 @@ namespace Faolan.Importer.Modules
 		public IReadOnlyList<string> DependsOn => [];
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Insert, WriteMode.Upsert, WriteMode.Overwrite };
 
-		private static readonly Dictionary<uint, string> TypeNames = new()
+		private static readonly Dictionary<uint, string> TypeNames = new Dictionary<uint, string>
 		{
 			[0] = "ScriptGroup", [1000010] = "Filenames", [1000077] = "ContentSpawnDataExport", [1000078] = "AcgSpawnDataExport",
 			[1000079] = "NpcSpawnDataExport", [1000083] = "TreasureDataExport", [1000090] = "ResurrectionPointsExport",

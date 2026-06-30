@@ -1,0 +1,651 @@
+.viewer-page {
+    display: flex;
+    height: calc(100dvh - 4.5rem);
+    gap: 1rem;
+}
+
+.roster {
+    width: 240px;
+    overflow-y: auto;
+    flex-shrink: 0;
+    background: linear-gradient(180deg, var(--bg-2), #121419);
+    border: 1px solid var(--stone-dark);
+    border-radius: var(--radius);
+    padding: .6rem;
+}
+
+.roster h2 {
+    font-size: .85rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin: .15rem 0 .65rem;
+    padding-bottom: .5rem;
+    border-bottom: 1px solid var(--stone-dark);
+}
+
+.roster ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.roster button {
+    width: 100%;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(var(--field), var(--field-2));
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: .45rem .6rem;
+    margin-bottom: .35rem;
+    cursor: pointer;
+    transition: border-color .12s, background .12s;
+}
+
+.roster button:hover {
+    border-color: var(--stone);
+}
+
+.roster button.sel {
+    border-color: var(--gold-dim);
+    background: linear-gradient(#322d1d, #262112);
+}
+
+.roster button strong {
+    color: var(--gold-bright);
+    font-weight: 600;
+}
+
+.roster button span {
+    font-size: .75rem;
+    color: var(--muted);
+}
+
+.roster .warn {
+    color: var(--danger);
+    font-size: .8rem;
+}
+
+.stage {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    gap: 1rem;
+}
+
+/* Character sheet: vitals + resolved fields, beside the paper-doll. */
+.stats-panel {
+    width: 230px;
+    flex-shrink: 0;
+    overflow-y: auto;
+    background: linear-gradient(180deg, var(--bg-2), #121419);
+    border: 1px solid var(--stone-dark);
+    border-radius: var(--radius);
+    padding: .85rem;
+}
+
+.stats-empty {
+    color: var(--muted);
+    font-size: .85rem;
+}
+
+.stat-head {
+    text-align: center;
+    padding-bottom: .65rem;
+    margin-bottom: .65rem;
+    border-bottom: 1px solid var(--stone-dark);
+}
+
+.stat-name {
+    font-family: var(--font-display);
+    color: var(--gold);
+    font-size: 1.15rem;
+    letter-spacing: .03em;
+}
+
+.stat-sub {
+    color: var(--text);
+    font-size: .82rem;
+    margin-top: .15rem;
+}
+
+.stat-sub2 {
+    color: var(--muted);
+    font-size: .76rem;
+    text-transform: capitalize;
+}
+
+.vitals {
+    display: flex;
+    flex-direction: column;
+    gap: .45rem;
+    margin-bottom: .8rem;
+}
+
+.vital {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: .15rem .5rem;
+}
+
+.vlabel {
+    font-size: .68rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted);
+}
+
+.vval {
+    font-size: .8rem;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+}
+
+.vbar {
+    grid-column: 1 / -1;
+    height: 7px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: #0c0e11;
+    border: 1px solid #00000080;
+    box-shadow: inset 0 1px 2px #000a;
+}
+
+.vbar i {
+    display: block;
+    height: 100%;
+    border-radius: 3px;
+}
+
+.vital.hp .vbar i {
+    background: linear-gradient(90deg, #7a1f1f, #c64b3a);
+}
+
+.vital.mp .vbar i {
+    background: linear-gradient(90deg, #1f3a7a, #3f76d0);
+}
+
+.vital.sp .vbar i {
+    background: linear-gradient(90deg, #6b5a1f, #d8b53f);
+}
+
+.stat-rows {
+    display: flex;
+    flex-direction: column;
+}
+
+.srow {
+    display: flex;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: .35rem 0;
+    border-bottom: 1px solid var(--stone-dark);
+    font-size: .8rem;
+}
+
+.srow:last-child {
+    border-bottom: none;
+}
+
+.srow .k {
+    color: var(--muted);
+}
+
+.srow .v {
+    color: var(--text);
+    text-align: right;
+}
+
+.spellbook {
+    margin-top: .85rem;
+}
+
+.sb-title {
+    font-size: .7rem;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--gold);
+    padding-bottom: .4rem;
+    margin-bottom: .4rem;
+    border-bottom: 1px solid var(--stone-dark);
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+}
+
+.sb-count {
+    font-size: .62rem;
+    color: var(--gold);
+    background: #0007;
+    border-radius: 8px;
+    padding: 0 .4em;
+}
+
+.spellbook ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: .3rem;
+}
+
+.spellbook li {
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(var(--field), var(--field-2));
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: .35rem .5rem;
+}
+
+.sp-name {
+    color: var(--gold-bright);
+    font-size: .78rem;
+}
+
+.sp-meta {
+    display: flex;
+    gap: .5rem;
+    color: var(--muted);
+    font-size: .68rem;
+    margin-top: .1rem;
+}
+
+/* AoC-style equipment paper-doll window: slot columns flanking the character preview. */
+.equip-window {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    background: linear-gradient(180deg, var(--bg-2), #101216);
+    border: 2px solid var(--stone);
+    border-radius: var(--radius);
+    padding: .7rem;
+    box-shadow: inset 0 0 24px #000a, var(--shadow);
+}
+
+.equip-title {
+    text-align: center;
+    color: var(--gold);
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    font-size: .95rem;
+    padding-bottom: .6rem;
+}
+
+.equip-grid {
+    flex: 1;
+    display: grid;
+    gap: .55rem;
+    min-height: 0;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas: ".  top  ." "left center right" ".  bot  .";
+}
+
+.equip-col {
+    display: flex;
+    flex-direction: column;
+    gap: .55rem;
+    justify-content: center;
+}
+
+.equip-col.left {
+    grid-area: left;
+}
+
+.equip-col.right {
+    grid-area: right;
+}
+
+.equip-center {
+    grid-area: center;
+}
+
+.center-slot {
+    justify-self: center;
+}
+
+.center-slot.top {
+    grid-area: top;
+}
+
+.center-slot.bottom {
+    grid-area: bot;
+}
+
+.equip-center {
+    position: relative;
+    min-width: 0;
+    border-radius: 6px;
+    overflow: hidden;
+    background: radial-gradient(120% 90% at 50% 35%, #1c3b38 0%, #0e1d22 70%, #0a1014 100%);
+    border: 1px solid #2c4a48;
+    box-shadow: inset 0 0 30px #000c;
+}
+
+.equip-center canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+}
+
+.slot {
+    width: 52px;
+    height: 52px;
+    flex: 0 0 auto;
+    border-radius: 5px;
+    background: linear-gradient(#2b2d33, #202229);
+    border: 2px solid #4b4636;
+    box-shadow: inset 0 1px 0 #ffffff14, inset 0 0 10px #0008;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.slot:hover {
+    border-color: #b89544;
+}
+
+.slot span {
+    font-size: .52rem;
+    color: #8a8472;
+    text-align: center;
+    line-height: 1.1;
+    padding: 0 2px;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+
+.slot.filled {
+    border-color: #b89544;
+    background: linear-gradient(#3a3526, #2a2619);
+}
+
+.slot span.item {
+    color: #e6d8a8;
+    text-transform: none;
+    font-size: .5rem;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+}
+
+.slot-img {
+    display: none;
+    position: absolute;
+    inset: 2px;
+    width: calc(100% - 4px);
+    height: calc(100% - 4px);
+    object-fit: contain;
+}
+
+.slot {
+    position: relative;
+}
+
+.slot.has-img .slot-img {
+    display: block;
+}
+
+.slot.has-img span {
+    display: none;
+}
+
+.slot.wide {
+    width: 64px;
+}
+
+.equip-bottom {
+    display: flex;
+    gap: .55rem;
+    justify-content: center;
+    padding-top: .6rem;
+}
+
+.equip-tip {
+    margin-top: .5rem;
+    padding-top: .45rem;
+    border-top: 1px solid var(--stone-dark);
+    color: #c9c2a8;
+    font-size: .8rem;
+}
+
+.tip-controls {
+    display: flex;
+    align-items: center;
+    gap: .35rem .9rem;
+    flex-wrap: wrap;
+    margin-top: .45rem;
+}
+
+.pose {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+    font-size: .72rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+
+.pose input[type=range] {
+    width: 5.5rem;
+    accent-color: var(--gold-dim);
+}
+
+.pose-reset {
+    background: linear-gradient(var(--field), var(--field-2));
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: .2rem .6rem;
+    font-size: .72rem;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+
+.pose-reset:hover {
+    border-color: var(--gold-dim);
+    color: var(--gold);
+}
+
+/* AoC-style inventory: a paged 4-column bag grid. */
+.inv-window {
+    width: 252px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    background: linear-gradient(180deg, var(--bg-2), #101216);
+    border: 2px solid var(--stone);
+    border-radius: var(--radius);
+    padding: .7rem;
+    box-shadow: inset 0 0 24px #000a, var(--shadow);
+}
+
+.inv-tabs {
+    display: flex;
+    gap: .25rem;
+    padding-bottom: .6rem;
+}
+
+.inv-tab {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .3rem;
+    background: linear-gradient(#1d1f25, #15171b);
+    color: var(--muted);
+    cursor: pointer;
+    border: 1px solid var(--stone-dark);
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    padding: .35rem .25rem;
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.inv-tab:hover {
+    color: var(--gold);
+}
+
+.inv-tab.sel {
+    color: var(--gold-bright);
+    background: linear-gradient(#322d1d, #241f12);
+    border-color: var(--gold-dim);
+}
+
+.inv-tab .tabcount {
+    font-size: .62rem;
+    color: var(--gold);
+    background: #0007;
+    border-radius: 8px;
+    padding: 0 .35em;
+}
+
+.inv-tab.sel .tabcount {
+    color: var(--gold-bright);
+}
+
+.inv-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 52px);
+    gap: .5rem;
+    justify-content: center;
+    align-content: start;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.inv-grid .slot .count {
+    position: absolute;
+    right: 2px;
+    bottom: 1px;
+    font-size: .58rem;
+    color: var(--gold-bright);
+    background: #000a;
+    border-radius: 3px;
+    padding: 0 2px;
+    line-height: 1.3;
+}
+
+.inv-foot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .6rem;
+    padding-top: .6rem;
+    margin-top: .4rem;
+    border-top: 1px solid var(--stone-dark);
+    color: var(--muted);
+    font-size: .78rem;
+}
+
+.inv-page {
+    background: linear-gradient(var(--field), var(--field-2));
+    color: var(--gold);
+    cursor: pointer;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    width: 1.5rem;
+    height: 1.5rem;
+    line-height: 1;
+    font-size: 1rem;
+}
+
+.inv-page:hover:not(:disabled) {
+    border-color: var(--gold-dim);
+}
+
+.inv-page:disabled {
+    opacity: .35;
+    cursor: default;
+}
+
+/* Mobile: stack the roster into a horizontal strip above the panel; shrink the slots. */
+@@media (max-width: 720px) {
+    .viewer-page {
+        flex-direction: column;
+        height: 100dvh;
+        gap: .5rem;
+        padding: .25rem;
+        box-sizing: border-box;
+    }
+
+    .roster {
+        width: auto;
+        max-height: 20vh;
+    }
+
+    .roster h2 {
+        display: none;
+    }
+
+    .roster ul {
+        display: flex;
+        gap: .4rem;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: .25rem;
+    }
+
+    .roster li {
+        flex: 0 0 auto;
+    }
+
+    .roster button {
+        width: auto;
+        white-space: nowrap;
+        margin-bottom: 0;
+    }
+
+    .slot {
+        width: 40px;
+        height: 40px;
+    }
+
+    .slot.wide {
+        width: 48px;
+    }
+
+    .equip-grid {
+        gap: .4rem;
+    }
+
+    .pose input[type=range] {
+        width: 4.5rem;
+    }
+
+    .stage {
+        flex-direction: column;
+    }
+
+    .stats-panel {
+        width: auto;
+        order: 2;
+        max-height: 34vh;
+    }
+
+    .inv-window {
+        width: auto;
+        order: 3;
+    }
+
+    .inv-grid {
+        grid-template-columns: repeat(4, 44px);
+    }
+}

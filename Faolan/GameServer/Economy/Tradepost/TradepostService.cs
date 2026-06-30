@@ -10,7 +10,6 @@ using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Microsoft.Extensions.Logging;
-using Faolan.GameServer;
 
 namespace Faolan.GameServer.Economy.Tradepost
 {

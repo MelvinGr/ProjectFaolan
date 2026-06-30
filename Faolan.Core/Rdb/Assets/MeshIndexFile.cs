@@ -31,7 +31,7 @@ namespace Faolan.Core.Rdb.Assets
 		public IReadOnlyList<TextureRef> UniqueTextures =>
 			Materials
 				.SelectMany(m => m.Textures)
-				.Where(t => t.Type is not null)
+				.Where(t => t.Type != null)
 				.GroupBy(t => (t.Type, t.Id))
 				.Select(g => g.First())
 				.ToList();
@@ -93,7 +93,7 @@ namespace Faolan.Core.Rdb.Assets
 
 	public sealed record MeshMaterial(string Name, IReadOnlyList<TextureRef> Textures);
 
-	// A material's texture slot. The client stores these as "TYPE:ID" (e.g. "1010004:4766566"); Type is null when the
+	// A material's texture slot. The client stores these as "TYPE:ID" (e.g. "1010004:4766566"); Type == null when the
 	// value isn't the type:id form (then Raw carries it verbatim so nothing is silently dropped).
 	public readonly record struct TextureRef(uint? Type, uint Id, string Raw)
 	{
@@ -108,14 +108,14 @@ namespace Faolan.Core.Rdb.Assets
 			return new TextureRef(null, 0, path);
 		}
 
-		public override string ToString() => Type is null ? Raw : $"{Type}:{Id}";
+		public override string ToString() => Type == null ? Raw : $"{Type}:{Id}";
 	}
 
 	public readonly record struct BoundingBox(float MinX, float MinY, float MinZ, float MaxX, float MaxY, float MaxZ)
 	{
 		public static BoundingBox? TryParse(XElement? el)
 		{
-			if (el is null)
+			if (el == null)
 				return null;
 
 			float? F(string name) =>

@@ -5,7 +5,6 @@ using System.Text;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.GameServer.Spawn;
-using Faolan.Importer;
 using Faolan.Importer.Rdb;
 using Xunit;
 

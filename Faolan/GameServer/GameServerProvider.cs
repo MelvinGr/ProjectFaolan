@@ -25,7 +25,7 @@ namespace Faolan.GameServer
 		public async Task<bool> RunGmCommand(uint characterId, string commandText)
 		{
 			var client = ClientForCharacter(characterId);
-			if (client is null)
+			if (client == null)
 				return false;
 
 			// HandleGmCommand strips a single leading prefix char (".teleport" -> "teleport"), so ensure one is present.
@@ -39,7 +39,7 @@ namespace Faolan.GameServer
 		public bool DisconnectCharacter(uint characterId)
 		{
 			var client = ClientForCharacter(characterId);
-			if (client is null)
+			if (client == null)
 				return false;
 			client.Stop();
 			return true;
@@ -63,7 +63,7 @@ namespace Faolan.GameServer
 		public CharacterLiveState GetCharacterLiveState(uint characterId)
 		{
 			var client = ClientForCharacter(characterId);
-			var entity = client is null
+			var entity = client == null
 				? null
 				: _simulation.PlayerWorldEntity(client);
 			if (entity == null)

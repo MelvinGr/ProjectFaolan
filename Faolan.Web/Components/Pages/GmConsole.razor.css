@@ -1,0 +1,135 @@
+.gm {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+.gm-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.gm-head h1 {
+    font-size: 1.7rem;
+    margin: 0;
+}
+
+.gm .muted {
+    color: var(--muted);
+}
+
+.offline {
+    background: linear-gradient(180deg, #2a1c1c, #15171b);
+    border: 1px solid #5a2d2d;
+    color: #e8c2c2;
+    border-radius: 7px;
+    padding: .65rem .9rem;
+}
+
+.notice {
+    background: linear-gradient(180deg, #1f2a1f, #15171b);
+    border: 1px solid #3c5a3c;
+    color: #cfe6c6;
+    border-radius: 7px;
+    padding: .55rem .8rem;
+    font-size: .85rem;
+    margin-bottom: 1rem;
+}
+
+.panel {
+    background: linear-gradient(180deg, var(--bg-2), #121419);
+    border: 1px solid var(--stone-dark);
+    border-radius: var(--radius);
+    padding: .9rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.panel h2 {
+    font-size: .95rem;
+    margin-bottom: .6rem;
+}
+
+.ti {
+    flex: 1;
+    min-width: 0;
+    padding: .5rem .65rem;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--field);
+    color: var(--text);
+    font-size: .88rem;
+}
+
+.ti:focus {
+    outline: none;
+    border-color: var(--gold-dim);
+}
+
+.bcast-row, .prow, .quick {
+    display: flex;
+    gap: .5rem;
+    align-items: center;
+}
+
+.quick {
+    margin-top: .5rem;
+    flex-wrap: wrap;
+}
+
+.quick .cmd {
+    min-width: 10rem;
+}
+
+.panel .btn {
+    padding: .5rem .9rem;
+    white-space: nowrap;
+}
+
+.tp {
+    display: flex;
+    gap: .4rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: .5rem;
+    padding-top: .5rem;
+    border-top: 1px solid var(--stone-dark);
+}
+
+.tplabel {
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--muted);
+}
+
+.tp .tpor {
+    color: var(--muted);
+    font-size: .75rem;
+}
+
+.tp .tpsel {
+    flex: 0 1 11rem;
+}
+
+.tp .tpc {
+    flex: 0 0 4.2rem;
+}
+
+.phead {
+    display: flex;
+    align-items: baseline;
+    gap: .5rem;
+    margin-bottom: .6rem;
+}
+
+.pname {
+    color: var(--gold-bright);
+    font-weight: 600;
+}
+
+.psub {
+    color: var(--muted);
+    font-size: .78rem;
+}

@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
@@ -118,7 +117,7 @@ namespace Faolan.Tests
 
 		private sealed class Factory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>
 		{
-			public DatabaseContext CreateDbContext() => new(options);
+			public DatabaseContext CreateDbContext() => new DatabaseContext(options);
 		}
 	}
 }

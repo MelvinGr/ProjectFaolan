@@ -317,11 +317,11 @@ namespace Faolan.Core.Rdb.Assets
 			foreach (var t in mesh.UniqueTextures)
 				if (TryDecodeRgba(rdb, t.Type!.Value, t.Id, out rgba, out w, out h))
 					break;
-			if (rgba is null)
+			if (rgba == null)
 				foreach (var (type, id) in RenderMeshReader.ReadHeaderTextureRefs(blob))
 					if (TryDecodeRgba(rdb, type, id, out rgba, out w, out h))
 						break;
-			if (rgba is null)
+			if (rgba == null)
 				return null;
 
 			// Ghidra (ProjectTextureOperation_c / FUN_00d88d50, projecttextureoperation.cpp): the decal is pasted into the
@@ -415,9 +415,9 @@ namespace Faolan.Core.Rdb.Assets
 					break;
 
 			if (!TryDecodeRgba(rdb, 1010004, overlayTextureId, out var over, out var ow, out var oh))
-				return baseRgba is null ? null : SkiaImage.EncodePng(baseRgba, bw, bh, tint);
+				return baseRgba == null ? null : SkiaImage.EncodePng(baseRgba, bw, bh, tint);
 
-			if (baseRgba is null)
+			if (baseRgba == null)
 				return SkiaImage.EncodePng(over, ow, oh, tint); // no base: just use the iris
 
 			return SkiaImage.CompositeOver(baseRgba, bw, bh, over, ow, oh, tint);
@@ -456,7 +456,7 @@ namespace Faolan.Core.Rdb.Assets
 					catch { /* wrong key / not this type */ }
 				}
 
-			if (template is null || template.Length < 16)
+			if (template == null || template.Length < 16)
 				return null;
 
 			var body = template.AsSpan(12);
@@ -610,7 +610,7 @@ namespace Faolan.Core.Rdb.Assets
 			int lN = 0, rN = 0;
 			foreach (var s in subs)
 			{
-				if (s.Uvs is null)
+				if (s.Uvs == null)
 					continue;
 				for (var i = 0; i < s.VertexCount; i++)
 				{
@@ -699,7 +699,7 @@ namespace Faolan.Core.Rdb.Assets
 				if (part is { Count: > 0 } && eyeTextureId is { } eye && !part[0].AlphaMask
 				    && ReadRenderMeshDirect(rdb, rm, null, eye) is { } eyeball)
 					part = eyeball;
-				if (part is not null)
+				if (part != null)
 					headParts.AddRange(part);
 			}
 
@@ -1010,7 +1010,7 @@ namespace Faolan.Core.Rdb.Assets
 			return null;
 		}
 
-		private static readonly JsonSerializerOptions JsonOpts = new()
+		private static readonly JsonSerializerOptions JsonOpts = new JsonSerializerOptions
 		{
 			WriteIndented = true,
 			DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
@@ -1018,7 +1018,7 @@ namespace Faolan.Core.Rdb.Assets
 
 		public readonly record struct Result(bool Ok, MeshIndexFile? Mesh, Manifest? Manifest)
 		{
-			public static Result NotFound(uint id) => new(false, null, null);
+			public static Result NotFound(uint id) => new Result(false, null, null);
 		}
 
 		public sealed record Manifest(

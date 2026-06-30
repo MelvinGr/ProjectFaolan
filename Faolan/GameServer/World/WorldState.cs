@@ -44,7 +44,7 @@ namespace Faolan.GameServer.World
 		// shared instance plus any per-character Solo / per-party Group copies. Instance DefaultInstance (0) is the
 		// shared copy every Shared map uses - so ZoneFor(mapId) / the historical single-zone-per-map paths all resolve
 		// to it and behave exactly as before instancing existed.
-		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), Zone> _zones = new();
+		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), Zone> _zones = new ConcurrentDictionary<(uint MapId, uint InstanceId), Zone>();
 
 		// The shared instance id every Shared map (and every pre-instancing call site) uses - one zone per map.
 		public const uint DefaultInstance = 0;

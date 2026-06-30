@@ -25,7 +25,7 @@ namespace Faolan.Core.Rdb.Assets
 
 		public readonly record struct Result(bool Ok, byte[] Dds, FctxHeader Header, string? Warning)
 		{
-			public static Result Fail(string warning) => new(false, [], default, warning);
+			public static Result Fail(string warning) => new Result(false, [], default, warning);
 		}
 
 		// True if the payload starts with the FCTX magic (after RdbReader has unwrapped any IOz1/zlib container).

@@ -1,7 +1,6 @@
 using System;
 using System.Buffers.Binary;
 using System.IO;
-using System.Linq;
 using Faolan.Core.Data;
 using Faolan.Core.Network.Conan;
 using Faolan.GameServer;
@@ -89,6 +88,6 @@ namespace Faolan.Tests
 			Assert.True(captured.SequenceEqual(built), "from-scratch world-object packet must be byte-identical to the capture");
 		}
 
-		private static RecordingNetworkClient BeachClient() => new(StriePlayerInstance);
+		private static RecordingNetworkClient BeachClient() => new RecordingNetworkClient(StriePlayerInstance);
 	}
 }

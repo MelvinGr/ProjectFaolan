@@ -1,4 +1,3 @@
-using System;
 using System.IO;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Xunit;

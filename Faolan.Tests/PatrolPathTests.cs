@@ -1,9 +1,7 @@
 using System;
 using System.Buffers.Binary;
-using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.GameServer.Spawn;
-using Faolan.Importer;
 using Faolan.Importer.Extractors;
 using Faolan.Tests.Support;
 using Xunit;

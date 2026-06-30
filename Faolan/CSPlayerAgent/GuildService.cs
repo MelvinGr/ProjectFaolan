@@ -6,7 +6,6 @@ using Faolan.Core.Data;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
-using Faolan.Core.Network.AgentServer;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.GameServer;
 using Faolan.Core.Network.Packets;
@@ -43,12 +42,12 @@ namespace Faolan.CSPlayerAgent
 		// handling can come later).
 		private sealed record PendingGuildInvite(uint GuildId, string GuildName, string InviterName);
 
-		private readonly ConcurrentDictionary<uint, PendingGuildInvite> _pendingGuildInvites = new();
+		private readonly ConcurrentDictionary<uint, PendingGuildInvite> _pendingGuildInvites = new ConcurrentDictionary<uint, PendingGuildInvite>();
 
 		// Reply endpoints per connected client, captured from its Authenticate packet, so guild events can be
 		// PUSHED to a different player's connection (invites, member-joined fan-out) with correctly addressed
 		// headers - those packets are not replies, so there is no incoming packet to echo.
-		private readonly ConcurrentDictionary<INetworkClient, (ProtoMessage Sender, ProtoMessage Receiver)> _replyEndpoints = new();
+		private readonly ConcurrentDictionary<INetworkClient, (ProtoMessage Sender, ProtoMessage Receiver)> _replyEndpoints = new ConcurrentDictionary<INetworkClient, (ProtoMessage Sender, ProtoMessage Receiver)>();
 
 		// Remember a connected client's reply endpoints (captured from its Authenticate packet) so guild pushes can
 		// be addressed to it later. Called by the listener on auth.

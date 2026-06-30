@@ -1,7 +1,5 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
-using System.Linq;
 using Faolan.Core.Data;
 using Faolan.Core.Network.Conan;
 using Faolan.GameServer.Packets.FullCharSnapshot;

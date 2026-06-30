@@ -7,7 +7,7 @@ namespace Faolan.Core.Database.Tables
 	//
 	// For the four Knubot dialogue IIRs (#188) the screen is also stored STRUCTURED so the runtime constructs it
 	// from fields instead of lifting/patching the raw blob: SubOpcode + Env + Field/Flag scalars + the decoded
-	// remoteformat XML screen(s) (ScreensJson). When SubOpcode is null the packet is non-Knubot (or unpopulated) and
+	// remoteformat XML screen(s) (ScreensJson). When SubOpcode == null the packet is non-Knubot (or unpopulated) and
 	// the runtime falls back to the Data path. The screen XML is the dialogue TEXT template (its content key is the
 	// harvested, client-validated hash); the live player name/guild are regenerated into it at send time.
 	public class ConversationPacket : BaseEntity

@@ -6,7 +6,6 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.GameServer;
 using Faolan.GameServer.Packets.FullCharSnapshot;
-using Faolan.Importer;
 using Faolan.Importer.Captures;
 using Microsoft.EntityFrameworkCore;
 using Xunit;

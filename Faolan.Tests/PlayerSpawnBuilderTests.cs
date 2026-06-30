@@ -1,6 +1,5 @@
 using System;
 using System.Buffers.Binary;
-using System.Linq;
 using System.Numerics;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -83,15 +82,11 @@ namespace Faolan.Tests
 			Assert.Equal(0x0A1B2C3Du, rebuilt.Handle);
 		}
 
-		private static Vector3 DecodeVec3(byte[] v) => new(
-			BinaryPrimitives.ReadSingleLittleEndian(v.AsSpan(1, 4)),
-			BinaryPrimitives.ReadSingleLittleEndian(v.AsSpan(6, 4)),
-			BinaryPrimitives.ReadSingleLittleEndian(v.AsSpan(11, 4)));
+		private static Vector3 DecodeVec3(byte[] v) =>
+			new Vector3(BinaryPrimitives.ReadSingleLittleEndian(v.AsSpan(1, 4)), BinaryPrimitives.ReadSingleLittleEndian(v.AsSpan(6, 4)), BinaryPrimitives.ReadSingleLittleEndian(v.AsSpan(11, 4)));
 
-		private static Quaternion DecodeQuat(byte[] q) => new(
-			BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(1, 4)),
-			BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(6, 4)),
-			BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(11, 4)),
-			BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(16, 4)));
+		private static Quaternion DecodeQuat(byte[] q) =>
+			new Quaternion(BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(1, 4)), BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(6, 4)), BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(11, 4)),
+				BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(16, 4)));
 	}
 }

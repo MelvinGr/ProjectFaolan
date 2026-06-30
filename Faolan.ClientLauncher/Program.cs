@@ -244,11 +244,11 @@ namespace Faolan.ClientLauncher
 			if (noConsole)
 				launchArgs.Add("-noconsole");
 			launchArgs.AddRange(["-clienthash", clientHash, "-key", key]);
-			if (username is not null)
+			if (username != null)
 				launchArgs.AddRange(["-username", username]);
-			if (password is not null)
+			if (password != null)
 				launchArgs.AddRange(["-password", password]);
-			if (charname is not null)
+			if (charname != null)
 				launchArgs.AddRange(["-charname", charname]);
 
 			Console.WriteLine($"exe        : {exe}");
@@ -272,10 +272,10 @@ namespace Faolan.ClientLauncher
 			// Point the client's login server (LocalConfig.xml <UniverseAddr>) at ours for this session. The
 			// original value is written to a sidecar first so the redirect survives a crash (next run heals it),
 			// and reverted after the client exits (and on Ctrl+C / process exit).
-			var originalUniverseAddr = universeAddr is null
+			var originalUniverseAddr = universeAddr == null
 				? null
 				: SetUniverseAddr(gameDir, universeAddr);
-			if (originalUniverseAddr is not null)
+			if (originalUniverseAddr != null)
 			{
 				File.WriteAllText(SidecarPath(gameDir), originalUniverseAddr);
 				var revertTo = originalUniverseAddr;
@@ -316,7 +316,7 @@ namespace Faolan.ClientLauncher
 			// command; otherwise launch through Proton (`proton run <exe> <args>`) with the Steam compat env.
 			if (OperatingSystem.IsWindows())
 				psi.FileName = exe;
-			else if (wine is not null)
+			else if (wine != null)
 			{
 				psi.FileName = wine;
 				psi.ArgumentList.Add(exe);
@@ -371,7 +371,7 @@ namespace Faolan.ClientLauncher
 
 			// Stay in the foreground (tailing the log and/or holding a LocalConfig override) until the client exits,
 			// then revert the config. Without any reason to hold, launch detached and return.
-			var holdForConfig = originalUniverseAddr is not null || mirrorApplied;
+			var holdForConfig = originalUniverseAddr != null || mirrorApplied;
 			try
 			{
 				if (streamOutput)
@@ -397,7 +397,7 @@ namespace Faolan.ClientLauncher
 			}
 			finally
 			{
-				if (originalUniverseAddr is not null)
+				if (originalUniverseAddr != null)
 				{
 					SetUniverseAddr(gameDir, originalUniverseAddr);
 					try
@@ -616,7 +616,7 @@ namespace Faolan.ClientLauncher
 			foreach (var (key, tag) in MirrorConfigKeys)
 			{
 				var original = SetConfigTag(gameDir, key, $"http://127.0.0.1:{port}/{tag}/upm");
-				if (original is not null)
+				if (original != null)
 					originals.Add($"{key}={original}");
 			}
 

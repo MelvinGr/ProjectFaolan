@@ -59,7 +59,7 @@ namespace Faolan.Tests
 
 			var creds = LoginEncryption.Decrypt(tampered);
 
-			Assert.True(creds is null || creds.Challenge != "deadbeefcafebabe0123456789abcdef");
+			Assert.True(creds == null || creds.Challenge != "deadbeefcafebabe0123456789abcdef");
 		}
 
 		[Fact]

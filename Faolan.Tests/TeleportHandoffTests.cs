@@ -1,6 +1,5 @@
 using System;
 using System.Numerics;
-using Faolan.GameServer;
 using Faolan.GameServer.World;
 using Xunit;
 

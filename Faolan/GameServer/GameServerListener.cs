@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
@@ -32,7 +31,7 @@ namespace Faolan.GameServer
 		// ConcurrentDictionary-as-set: these statics are mutated from different connection threads (add on one
 		// connection's handler, remove on the reconnect's), and other clients can teleport/log in concurrently, so a
 		// plain HashSet would race and corrupt. The byte value is unused.
-		private static readonly ConcurrentDictionary<uint, byte> PendingCreateWorldEntry = new();
+		private static readonly ConcurrentDictionary<uint, byte> PendingCreateWorldEntry = new ConcurrentDictionary<uint, byte>();
 
 		// Client instances awaiting a TELEPORT/changemap re-entry: added in DoTeleport before the 0x2002 handoff and
 		// consumed on the reconnect Hello. A direct GameServer->GameServer changemap reconnect carries NO 0x205F (the
@@ -41,7 +40,7 @@ namespace Faolan.GameServer
 		// Screen never fires and the client sits on the loading screen forever (the totem-recall hang, Gitea #28).
 		// Static for the same reason as PendingCreateWorldEntry: the old + reconnect connections are different sessions
 		// on the one listener instance. ConcurrentDictionary-as-set (see PendingCreateWorldEntry) for thread safety.
-		private static readonly ConcurrentDictionary<uint, byte> PendingTeleportReentry = new();
+		private static readonly ConcurrentDictionary<uint, byte> PendingTeleportReentry = new ConcurrentDictionary<uint, byte>();
 
 		// Combat domain logic: melee/spell damage, NPC kill lifecycle, XP/leveling, kill-quest tracking + the combat
 		// wire packets. The opcode dispatch (Handle0x2000) and GM .hurt/.heal call into it. See Combat/CombatService.cs.
@@ -612,7 +611,7 @@ namespace Faolan.GameServer
 
 						// #245: the poll's requestId is a handle the client is CONFIRMING it built - record it so interest
 						// only ever despawns confirmed handles (a despawn for an unbuilt handle crashes a still-loading
-						// client: pcDynel is NULL). The self-handle poll is harmless (the player never despawns itself).
+						// client: pcDynel == null). The self-handle poll is harmless (the player never despawns itself).
 						_simulation.PlayerWorldEntity(client)?.Confirmed.Add(requestId);
 
 						// 0x2020 is the client polling a spawned entity (requestId = the entity handle). Retail

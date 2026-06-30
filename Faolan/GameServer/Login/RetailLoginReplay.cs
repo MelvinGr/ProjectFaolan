@@ -3,16 +3,11 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Faolan.Core.Data;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
-using Faolan.Core.Extensions;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
-using Faolan.Core.Network.Protobuf;
-using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.GameServer.Spawn;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
@@ -57,7 +52,7 @@ namespace Faolan.GameServer
 		// faolanx); Assassin by one (Strie). Barbarian + Guardian create dumps show NO starting weapon. (The Fleshy
 		// Club / Broken Oar seen elsewhere are NOT create-flow starters - they came from a level-2 char and a login
 		// capture respectively, so they are deliberately excluded.)
-		private static readonly Dictionary<Class, uint> StarterClassWeapon = new()
+		private static readonly Dictionary<Class, uint> StarterClassWeapon = new Dictionary<Class, uint>
 		{
 			[Class.Necromancer] = 3395744, // Broken Bottle
 			[Class.Assassin] = 3735601     // Marlin Spike

@@ -22,7 +22,7 @@ namespace Faolan.GameServer.World
 		public uint FromX { get; set; }
 		public uint FromY { get; set; }
 		public uint FromZ { get; set; }
-		public MoveTaskNode Task { get; set; } = new();
+		public MoveTaskNode Task { get; set; } = new MoveTaskNode();
 
 		// Parse the inner record (starting at the subop, the shape the MoveTaskCodec builders emit), throwing on any
 		// structure the grammar doesn't cover so an unrecognised form is never silently mis-encoded.

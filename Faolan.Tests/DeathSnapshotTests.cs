@@ -3,7 +3,6 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text.Json;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Xunit;
@@ -125,7 +124,7 @@ namespace Faolan.Tests
 
 		private static int IndexOf(byte[]? haystack, ReadOnlySpan<byte> needle)
 		{
-			if (haystack is null)
+			if (haystack == null)
 				return -1;
 			for (var i = 0; i + needle.Length <= haystack.Length; i++)
 				if (haystack.AsSpan(i, needle.Length).SequenceEqual(needle))

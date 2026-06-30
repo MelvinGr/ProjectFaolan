@@ -12,38 +12,59 @@ export function start(canvasId, mapId) {
     loadMapImage(mapId);
     _mapId = mapId;
     const c = document.getElementById(canvasId);
-    if (c) { c.width = RES; c.height = RES; }
+    if (c) {
+        c.width = RES;
+        c.height = RES;
+    }
     stop();
     poll();
     _timer = setInterval(poll, 3000);
 }
 
-export function setMap(mapId) { loadMapImage(mapId); _mapId = mapId; poll(); }
+export function setMap(mapId) {
+    loadMapImage(mapId);
+    _mapId = mapId;
+    poll();
+}
 
 // Fetch the map's top-down terrain PNG (404 = no image for this map -> grid background).
 function loadMapImage(mapId) {
     _mapImg = null;
     _mapImgFor = mapId;
     const img = new Image();
-    img.onload = () => { if (_mapImgFor === mapId) _mapImg = img; };
-    img.onerror = () => { if (_mapImgFor === mapId) _mapImg = null; };
+    img.onload = () => {
+        if (_mapImgFor === mapId) _mapImg = img;
+    };
+    img.onerror = () => {
+        if (_mapImgFor === mapId) _mapImg = null;
+    };
     img.src = `/api/zone/${mapId}/map.png`;
 }
-export function stop() { if (_timer) { clearInterval(_timer); _timer = null; } }
+
+export function stop() {
+    if (_timer) {
+        clearInterval(_timer);
+        _timer = null;
+    }
+}
 
 async function poll() {
     if (!_canvasId || _mapId == null) return;
     let data = null;
     try {
-        const r = await fetch(`/api/zone/${_mapId}`, { headers: { 'Accept': 'application/json' } });
+        const r = await fetch(`/api/zone/${_mapId}`, {headers: {'Accept': 'application/json'}});
         if (r.ok) data = await r.json();
-    } catch { /* offline */ }
+    } catch { /* offline */
+    }
     draw(data);
 }
 
 function setStatus(text, cls) {
     const el = document.getElementById('radar-status');
-    if (el) { el.textContent = text; el.className = 'radar-status ' + (cls || ''); }
+    if (el) {
+        el.textContent = text;
+        el.className = 'radar-status ' + (cls || '');
+    }
 }
 
 const MARGIN = 14;
@@ -53,8 +74,14 @@ function drawGrid(ctx, W, H) {
     ctx.lineWidth = 1;
     for (let i = 1; i < 12; i++) {
         const p = (i / 12) * W;
-        ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, H); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(W, p); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(p, 0);
+        ctx.lineTo(p, H);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, p);
+        ctx.lineTo(W, p);
+        ctx.stroke();
     }
 }
 
@@ -67,7 +94,11 @@ function draw(data) {
     ctx.fillStyle = '#0c0e11';
     ctx.fillRect(0, 0, W, H);
 
-    if (data === null) { drawGrid(ctx, W, H); setStatus('Game server offline', 'off'); return; }
+    if (data === null) {
+        drawGrid(ctx, W, H);
+        setStatus('Game server offline', 'off');
+        return;
+    }
 
     const ents = data.entities || [];
     // Extent: real world bounds when known, else auto-fit to the entities (with padding) so a few NPCs still spread out.
@@ -78,10 +109,15 @@ function draw(data) {
             setStatus(data.online ? 'No entities loaded on this map yet' : 'Game server offline', data.online ? '' : 'off');
             return;
         }
-        minX = Math.min(...ents.map(e => e.x)); maxX = Math.max(...ents.map(e => e.x));
-        minZ = Math.min(...ents.map(e => e.z)); maxZ = Math.max(...ents.map(e => e.z));
+        minX = Math.min(...ents.map(e => e.x));
+        maxX = Math.max(...ents.map(e => e.x));
+        minZ = Math.min(...ents.map(e => e.z));
+        maxZ = Math.max(...ents.map(e => e.z));
         const padX = (maxX - minX) * 0.1 + 5, padZ = (maxZ - minZ) * 0.1 + 5;
-        minX -= padX; maxX += padX; minZ -= padZ; maxZ += padZ;
+        minX -= padX;
+        maxX += padX;
+        minZ -= padZ;
+        maxZ += padZ;
     }
 
     // Background: the real terrain image (only when we have absolute world bounds to place it against), else a grid.
@@ -104,7 +140,7 @@ function draw(data) {
     // Flip Z so larger Z (north) is up.
     const sz = z => margin + (1 - (z - minZ) / spanZ) * (H - 2 * margin);
 
-    const colors = { player: '#5fd06a', loot: '#9a937f' };
+    const colors = {player: '#5fd06a', loot: '#9a937f'};
     let players = 0, npcs = 0, loot = 0;
 
     // Loot first (lowest), then NPCs, players on top.
@@ -117,8 +153,14 @@ function draw(data) {
         if (e.dead) color = '#555';
         const r = e.kind === 'player' ? 6 : e.kind === 'loot' ? 3 : 4;
 
-        if (e.kind === 'player') { players++; ctx.shadowColor = color; ctx.shadowBlur = 8; }
-        else { e.kind === 'loot' ? loot++ : npcs++; ctx.shadowBlur = 0; }
+        if (e.kind === 'player') {
+            players++;
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 8;
+        } else {
+            e.kind === 'loot' ? loot++ : npcs++;
+            ctx.shadowBlur = 0;
+        }
 
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);

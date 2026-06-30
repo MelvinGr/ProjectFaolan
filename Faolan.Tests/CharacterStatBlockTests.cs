@@ -1,6 +1,5 @@
 using System;
 using System.Buffers.Binary;
-using Faolan.Core.Data;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.GameServer.World;
 using Xunit;

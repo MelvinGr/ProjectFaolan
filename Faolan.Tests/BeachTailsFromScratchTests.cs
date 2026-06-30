@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
@@ -108,7 +107,7 @@ namespace Faolan.Tests
 			var def = await LoadDefinition(BeachStarterQuestId);
 			Assert.NotNull(def);
 
-			CharacterMaxStats Stats() => new() { Health = 4321, Mana = 765, Stamina = 543 };
+			CharacterMaxStats Stats() => new CharacterMaxStats { Health = 4321, Mana = 765, Stamina = 543 };
 			var alive = new Character { Level = 7, Experience = 98760, MaxStats = Stats(), IsDead = false };
 			var dead = new Character { Level = 7, Experience = 98760, MaxStats = Stats(), IsDead = true };
 			const uint live = 0x0802ABCD;
@@ -159,7 +158,7 @@ namespace Faolan.Tests
 
 		private sealed class Factory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>
 		{
-			public DatabaseContext CreateDbContext() => new(options);
+			public DatabaseContext CreateDbContext() => new DatabaseContext(options);
 		}
 	}
 }

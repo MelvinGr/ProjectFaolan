@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Linq;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.Spawn;

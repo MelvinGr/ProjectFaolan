@@ -125,7 +125,7 @@ namespace Faolan.Core.Network
 
 		public override void Start()
 		{
-			if (_receiveTask is not null)
+			if (_receiveTask != null)
 				return;
 
 			_cancellationTokenSource = new CancellationTokenSource();
@@ -171,7 +171,7 @@ namespace Faolan.Core.Network
 				if (packet?.IsValid != true)
 					throw new InvalidOperationException($"{typeof(TPacket).Name} was invalid");
 
-				if (ReceivedPacket is not null)
+				if (ReceivedPacket != null)
 					await ReceivedPacket(this, packet);
 			}
 		}

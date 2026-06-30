@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -47,7 +46,7 @@ namespace Faolan.Core.Rdb.Assets
 				catch { continue; }
 
 				var src = mesh.SourceFile;
-				if (!mesh.Skinned || src is null || mesh.RenderMeshId is null)
+				if (!mesh.Skinned || src == null || mesh.RenderMeshId == null)
 					continue;
 
 				var m = SetPathRegex().Match(src);

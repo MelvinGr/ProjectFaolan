@@ -18,7 +18,8 @@ namespace Faolan.Tests
 			"d1061a530a140de5971bd61556c078261d9280fde2255a5c7bf112140de5971bd61556c078261d9280fde2255a5c7bf1" +
 			"1a140de5971bd61556c078261d9280fde2255a5c7bf125970a3e002d970a3e0038014500000000";
 
-		private static TradepostListing JockoListing() => new()
+		private static TradepostListing JockoListing() =>
+			new TradepostListing
 		{
 			SaleId = 0x20d82b60902c9545,
 			Handle = 0x0c0457f3,

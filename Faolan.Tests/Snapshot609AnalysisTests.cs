@@ -91,7 +91,7 @@ namespace Faolan.Tests
 
 		private sealed class Factory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>
 		{
-			public DatabaseContext CreateDbContext() => new(options);
+			public DatabaseContext CreateDbContext() => new DatabaseContext(options);
 		}
 	}
 }

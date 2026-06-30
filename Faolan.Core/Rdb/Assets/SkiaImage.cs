@@ -10,7 +10,7 @@ namespace Faolan.Core.Rdb.Assets
 	// decoding stays in BcDecoder/FctxConverter - Skia decodes standard image formats, not GPU-compressed blocks.
 	public static class SkiaImage
 	{
-		private static SKImageInfo Unpremul(int w, int h) => new(w, h, SKColorType.Rgba8888, SKAlphaType.Unpremul);
+		private static SKImageInfo Unpremul(int w, int h) => new SKImageInfo(w, h, SKColorType.Rgba8888, SKAlphaType.Unpremul);
 
 		// Wrap an RGBA8888 (R,G,B,A) byte buffer in an SKBitmap (copies into Skia-owned pixels).
 		public static SKBitmap FromRgba(byte[] rgba, int w, int h)

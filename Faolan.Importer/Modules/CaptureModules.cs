@@ -105,7 +105,7 @@ namespace Faolan.Importer.Modules
 
 		// Ability id -> 0x2052 grant leading "slot" word. Was carried in the old archive sqlite `abilities`
 		// table (mirrors the AddAbilitySlot migration backfill); kept here now the archive import is gone.
-		private static readonly Dictionary<uint, uint> AbilitySlots = new()
+		private static readonly Dictionary<uint, uint> AbilitySlots = new Dictionary<uint, uint>
 		{
 			[269272] = 106,   // Rest
 			[769094] = 108,   // Normal Attack Left

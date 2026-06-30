@@ -1,0 +1,161 @@
+.dbe {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+.dbe-head {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: .6rem;
+}
+
+.dbe-head h1 {
+    font-size: 1.7rem;
+    margin: 0;
+}
+
+.dbe .warn {
+    color: #e0a85a;
+    font-size: .8rem;
+}
+
+.dbe .muted {
+    color: var(--muted);
+}
+
+.dbe-status {
+    font-size: .85rem;
+    color: var(--gold);
+    margin: 0 0 .75rem;
+}
+
+.dbe-status.err {
+    color: var(--danger);
+}
+
+.dbe-grid {
+    display: grid;
+    grid-template-columns: 200px 1.2fr 1.4fr;
+    gap: 1rem;
+    align-items: start;
+}
+
+.dbe-tables, .dbe-rows, .dbe-fields {
+    background: linear-gradient(180deg, var(--bg-2), #121419);
+    border: 1px solid var(--stone-dark);
+    border-radius: var(--radius);
+    padding: .6rem;
+}
+
+.dbe-tables {
+    max-height: 78vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: .2rem;
+}
+
+.dbe-tables button, .rowlist button {
+    text-align: left;
+    background: transparent;
+    color: var(--text);
+    border: 1px solid transparent;
+    border-radius: 5px;
+    padding: .35rem .5rem;
+    cursor: pointer;
+    font-size: .82rem;
+}
+
+.dbe-tables button:hover, .rowlist button:hover {
+    background: var(--field);
+}
+
+.dbe-tables button.sel, .rowlist button.sel {
+    background: linear-gradient(#322d1d, #241f12);
+    border-color: var(--gold-dim);
+    color: var(--gold-bright);
+}
+
+.filter {
+    width: 100%;
+    box-sizing: border-box;
+    padding: .45rem .6rem;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--field);
+    color: var(--text);
+    font-size: .85rem;
+    margin-bottom: .5rem;
+}
+
+.rowlist {
+    max-height: 64vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+}
+
+.rowlist button {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.rowbar {
+    display: flex;
+    gap: .4rem;
+    align-items: center;
+    margin-top: .5rem;
+}
+
+.rowbar .btn {
+    padding: .4rem .8rem;
+    font-size: .8rem;
+}
+
+.rowbar .count {
+    margin-left: auto;
+    color: var(--muted);
+    font-size: .75rem;
+}
+
+.dbe-fields {
+    max-height: 78vh;
+    overflow-y: auto;
+}
+
+.field {
+    display: grid;
+    grid-template-columns: 11rem 1fr;
+    gap: .5rem;
+    align-items: center;
+    padding: .25rem 0;
+}
+
+.field label {
+    color: var(--muted);
+    font-size: .8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.field input[type=text], .field input:not([type]), .field select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: .35rem .5rem;
+    border-radius: 5px;
+    border: 1px solid var(--line);
+    background: var(--field);
+    color: var(--text);
+    font-size: .82rem;
+}
+
+@@media (max-width: 900px) {
+    .dbe-grid {
+        grid-template-columns: 1fr;
+    }
+}

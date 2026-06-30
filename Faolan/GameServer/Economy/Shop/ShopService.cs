@@ -11,7 +11,6 @@ using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
 using Microsoft.Extensions.Logging;
-using Faolan.GameServer;
 
 namespace Faolan.GameServer.Economy.Shop
 {
@@ -43,14 +42,14 @@ namespace Faolan.GameServer.Economy.Shop
 		// The last sale per connection, so UndoLastSoldItem can restore it (retail's undo is single-step too).
 		private sealed record LastShopSale(int Container, int Slot, uint ItemId, uint Count, uint PriceTin);
 
-		private readonly ConcurrentDictionary<INetworkClient, LastShopSale> _lastShopSale = new();
+		private readonly ConcurrentDictionary<INetworkClient, LastShopSale> _lastShopSale = new ConcurrentDictionary<INetworkClient, LastShopSale>();
 
 		// The shop window the client currently has open, recorded when we send DispatchShopData. BuyItem only
 		// carries the session-volatile shop instance + a slot position, so we need the open window's wares to
 		// resolve the position back to a template id and price it. Keyed by Pos (the shop-window slot).
 		private sealed record OpenShop(uint Instance, string VendorName, IReadOnlyDictionary<uint, ShopItem> WaresByPos);
 
-		private readonly ConcurrentDictionary<INetworkClient, OpenShop> _openShop = new();
+		private readonly ConcurrentDictionary<INetworkClient, OpenShop> _openShop = new ConcurrentDictionary<INetworkClient, OpenShop>();
 
 		// Session-volatile shop instance ids we hand the client in DispatchShopData (the value the BuyItem echoes
 		// back). Uniqueness only needs to hold within a session; a process-wide counter is plenty.

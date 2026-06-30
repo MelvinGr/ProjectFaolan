@@ -1,13 +1,13 @@
 // three.js glTF viewer for the Faolan character/model pages (#275). ES module loaded via Blazor JS interop.
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 
 const states = new Map(); // canvasId -> { renderer, scene, camera, controls, model }
 if (typeof window !== 'undefined') window.__faolanStates = states; // dev hook (headless camera control)
 
 function setup(canvas) {
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    const renderer = new THREE.WebGLRenderer({canvas, antialias: true});
     renderer.setPixelRatio(window.devicePixelRatio);
 
     const scene = new THREE.Scene();
@@ -32,7 +32,7 @@ function setup(canvas) {
     scene.add(rim);
     scene.add(new THREE.GridHelper(4, 8, 0x444444, 0x333333));
 
-    const state = { renderer, scene, camera, controls, model: null };
+    const state = {renderer, scene, camera, controls, model: null};
     states.set(canvas.id, state);
 
     function resize() {
@@ -42,6 +42,7 @@ function setup(canvas) {
         camera.aspect = w / h;
         camera.updateProjectionMatrix();
     }
+
     window.addEventListener('resize', resize);
     resize();
 
@@ -131,15 +132,50 @@ export async function show(canvasId, url) {
 // elbows). Angles compose onto each bone's BIND rotation; the render loop refreshes the skeleton every frame so children
 // follow. Axes/ranges are empirical — tweak the axis sign or swap components if a joint bends the wrong way.
 const POSE_CONTROLS = [
-    { id: 'head',      label: 'head',      axis: [1, 0, 0], min: -35, max: 35,  bones: ['rig_bone_Neck', 'rig_bone_Head'] },
-    { id: 'turn',      label: 'head turn', axis: [0, 1, 0], min: -60, max: 60,  bones: ['rig_bone_Neck'] },
-    { id: 'spine',     label: 'spine',     axis: [1, 0, 0], min: -25, max: 35,  bones: ['rig_bone_Spine1', 'rig_bone_Spine2'] },
-    { id: 'shoulders', label: 'shoulders', axis: [0, 0, 1], min: -90, max: 20,  bones: ['rig_bone_LeftArm', 'rig_bone_RightArm'] },
-    { id: 'elbows',    label: 'elbows',    axis: [-1, 0, 0], min: 0,  max: 120, bones: ['rig_bone_LeftForearm', 'rig_bone_RightForearm'] },
-    { id: 'wrists',    label: 'wrists',    axis: [-1, 0, 0], min: -45, max: 45, bones: ['rig_bone_LeftHand', 'rig_bone_RightHand'] },
-    { id: 'hips',      label: 'hips',      axis: [1, 0, 0], min: -35, max: 60,  bones: ['rig_bone_LeftUpleg', 'rig_bone_RightUpleg'] },
-    { id: 'knees',     label: 'knees',     axis: [1, 0, 0], min: -120, max: 0,  bones: ['rig_bone_LeftLeg', 'rig_bone_Rightleg'] },
-    { id: 'ankles',    label: 'ankles',    axis: [1, 0, 0], min: -30, max: 30,  bones: ['rig_bone_LeftFoot', 'rig_bone_RightFoot'] },
+    {id: 'head', label: 'head', axis: [1, 0, 0], min: -35, max: 35, bones: ['rig_bone_Neck', 'rig_bone_Head']},
+    {id: 'turn', label: 'head turn', axis: [0, 1, 0], min: -60, max: 60, bones: ['rig_bone_Neck']},
+    {id: 'spine', label: 'spine', axis: [1, 0, 0], min: -25, max: 35, bones: ['rig_bone_Spine1', 'rig_bone_Spine2']},
+    {
+        id: 'shoulders',
+        label: 'shoulders',
+        axis: [0, 0, 1],
+        min: -90,
+        max: 20,
+        bones: ['rig_bone_LeftArm', 'rig_bone_RightArm']
+    },
+    {
+        id: 'elbows',
+        label: 'elbows',
+        axis: [-1, 0, 0],
+        min: 0,
+        max: 120,
+        bones: ['rig_bone_LeftForearm', 'rig_bone_RightForearm']
+    },
+    {
+        id: 'wrists',
+        label: 'wrists',
+        axis: [-1, 0, 0],
+        min: -45,
+        max: 45,
+        bones: ['rig_bone_LeftHand', 'rig_bone_RightHand']
+    },
+    {
+        id: 'hips',
+        label: 'hips',
+        axis: [1, 0, 0],
+        min: -35,
+        max: 60,
+        bones: ['rig_bone_LeftUpleg', 'rig_bone_RightUpleg']
+    },
+    {id: 'knees', label: 'knees', axis: [1, 0, 0], min: -120, max: 0, bones: ['rig_bone_LeftLeg', 'rig_bone_Rightleg']},
+    {
+        id: 'ankles',
+        label: 'ankles',
+        axis: [1, 0, 0],
+        min: -30,
+        max: 30,
+        bones: ['rig_bone_LeftFoot', 'rig_bone_RightFoot']
+    },
 ];
 
 // Re-pose the rig from `state.pose` (id -> degrees). Resets every bone to bind, then layers each non-zero control. No-op
@@ -182,9 +218,14 @@ export function buildPoseControls(canvasId, containerId) {
         label.append(ctl.label);
         const input = document.createElement('input');
         input.type = 'range';
-        input.min = ctl.min; input.max = ctl.max; input.value = 0;
+        input.min = ctl.min;
+        input.max = ctl.max;
+        input.value = 0;
         input.addEventListener('input', () => setPose(canvasId, ctl.id, +input.value));
-        input.addEventListener('dblclick', () => { input.value = 0; setPose(canvasId, ctl.id, 0); });
+        input.addEventListener('dblclick', () => {
+            input.value = 0;
+            setPose(canvasId, ctl.id, 0);
+        });
         label.append(input);
         host.append(label);
     }
@@ -195,7 +236,10 @@ export function buildPoseControls(canvasId, containerId) {
     reset.textContent = 'reset pose';
     reset.addEventListener('click', () => {
         for (const input of host.querySelectorAll('input[type=range]')) input.value = 0;
-        if (state) { state.pose = {}; applyPose(state); }
+        if (state) {
+            state.pose = {};
+            applyPose(state);
+        }
     });
     host.append(reset);
 }
@@ -203,19 +247,25 @@ export function buildPoseControls(canvasId, containerId) {
 // Render an item glb to a PNG data-URL with ONE reused offscreen renderer (so 16 equipment slots don't each take a
 // WebGL context). Null on load failure (the item has no display mesh -> the slot keeps its label).
 let _thumbRenderer = null;
+
 async function renderItemThumb(url) {
     if (!_thumbRenderer) {
-        _thumbRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+        _thumbRenderer = new THREE.WebGLRenderer({antialias: true, alpha: true, preserveDrawingBuffer: true});
         _thumbRenderer.setSize(96, 96);
     }
 
     let gltf;
-    try { gltf = await new GLTFLoader().loadAsync(url); }
-    catch { return null; }
+    try {
+        gltf = await new GLTFLoader().loadAsync(url);
+    } catch {
+        return null;
+    }
 
     const scene = new THREE.Scene();
     scene.add(new THREE.HemisphereLight(0xffffff, 0x40404a, 1.4));
-    const dl = new THREE.DirectionalLight(0xffffff, 1.3); dl.position.set(1.2, 2, 2.2); scene.add(dl);
+    const dl = new THREE.DirectionalLight(0xffffff, 1.3);
+    dl.position.set(1.2, 2, 2.2);
+    scene.add(dl);
 
     const model = gltf.scene;
     model.updateWorldMatrix(true, true);
@@ -278,13 +328,16 @@ export async function populateItemThumbs() {
 // A single floating panel, populated from the hovered slot's data-* attributes (name/type/level/value/sell/count/id).
 // Appended to <body> (outside the Blazor-scoped component) so it can overflow the panels.
 let _tip = null;
-const esc = s => (s ?? '').replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+const esc = s => (s ?? '').replace(/[&<>"]/g, m => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[m]));
 
 // tin -> g/s/c/t (100 tin = 1 copper, 100 copper = 1 silver, 100 silver = 1 gold) — mirrors the C# wallet formatter.
 function fmtMoney(tin) {
     const g = Math.floor(tin / 1e6), s = Math.floor(tin / 1e4) % 100, c = Math.floor(tin / 100) % 100, t = tin % 100;
     const p = [];
-    if (g) p.push(g + 'g'); if (s) p.push(s + 's'); if (c) p.push(c + 'c'); if (t || !p.length) p.push(t + 't');
+    if (g) p.push(g + 'g');
+    if (s) p.push(s + 's');
+    if (c) p.push(c + 'c');
+    if (t || !p.length) p.push(t + 't');
     return p.join(' ');
 }
 
@@ -311,7 +364,9 @@ function moveTip(e) {
     _tip.style.top = Math.max(8, y) + 'px';
 }
 
-function hideTip() { if (_tip) _tip.style.display = 'none'; }
+function hideTip() {
+    if (_tip) _tip.style.display = 'none';
+}
 
 export function initItemTooltips() {
     if (document._tipInit) return;
@@ -327,7 +382,10 @@ export function initItemTooltips() {
     };
     document.addEventListener('mouseover', e => {
         const s = slotAt(e.target);
-        if (!s) { hideTip(); return; }
+        if (!s) {
+            hideTip();
+            return;
+        }
         _tip.innerHTML = tipHtml(s.dataset);
         _tip.style.display = 'block';
         moveTip(e);

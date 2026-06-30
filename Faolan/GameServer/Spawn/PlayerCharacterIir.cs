@@ -11,7 +11,8 @@ namespace Faolan.GameServer.Spawn
 	// are always replaced by ApplyCharacter (every character carries buildable gear), so they are not reproduced here.
 	public static class PlayerCharacterIir
 	{
-		public static ProtoCoreCharacterIIR BuildBaseMessage() => new()
+		public static ProtoCoreCharacterIIR BuildBaseMessage() =>
+			new ProtoCoreCharacterIIR
 		{
 			// Name is always overridden by ApplyCharacter; kept as the template's value for the from-template parity.
 			Name = "Strie",

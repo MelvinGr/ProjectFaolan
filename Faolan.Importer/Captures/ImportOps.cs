@@ -268,7 +268,7 @@ namespace Faolan.Importer.Captures
 		}
 
 		// Unique quest-NPC home positions (they move during their quest, so dedup must not strand them). #266
-		private static readonly Dictionary<string, Vector3> UniqueNpcHomes = new()
+		private static readonly Dictionary<string, Vector3> UniqueNpcHomes = new Dictionary<string, Vector3>
 		{
 			["Casilda"] = new Vector3(361.64300537109375f, 153.34036254882813f, 717.66802978515625f),
 		};
@@ -276,7 +276,7 @@ namespace Faolan.Importer.Captures
 		// Unique quest-NPC home FACING (#267): the burst-truth dedup can pick a session where she'd already turned, so
 		// her facing drifts from the chained-at-the-post pose. Pin Casilda's rotation to her create-dump FA015807
 		// transform (quaternion 0, 0.8661140, 0, -0.4998470) - the byte-exact facing she has while chained at x≈362.
-		private static readonly Dictionary<string, Quaternion> UniqueNpcFacings = new()
+		private static readonly Dictionary<string, Quaternion> UniqueNpcFacings = new Dictionary<string, Quaternion>
 		{
 			["Casilda"] = new Quaternion(0f, 0.8661140203475952f, 0f, -0.4998469948768616f),
 		};

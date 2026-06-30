@@ -60,7 +60,7 @@ namespace Faolan.GameServer.Spawn
 		// Barbarian); this list still matters for the actual feat/AA content, just not the class label.
 		private static readonly uint[] CommonFreshSkillIds = [6900, 8100, 8305, 8400, 13600, 14600, 328900, 331300];
 
-		private static readonly Dictionary<Class, uint[]> FreshSkillIdsByClass = new()
+		private static readonly Dictionary<Class, uint[]> FreshSkillIdsByClass = new Dictionary<Class, uint[]>
 		{
 			[Class.Barbarian] = [1800, 6000, 6100, 6200, 6300, 6600, 6800, 6900, 7100, 8100, 8305, 8400, 13600, 14600, 124400, 318400, 318800, 328700, 328900, 331300],
 			[Class.Conqueror] = [2200, 6000, 6100, 6200, 6300, 6700, 6800, 6900, 7100, 8100, 8305, 8400, 13600, 14600, 54900, 318400, 318800, 328700, 328900, 331300],

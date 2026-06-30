@@ -21,13 +21,9 @@ namespace Faolan.Core.Network.Packets
 
 		// Root attrs, then the `knubot="X" {antitag} >` slot - antitag sits between two spaces (empty when absent,
 		// giving the double space `knubot="0"  >`), so the optional group must NOT eat the trailing space.
-		private static readonly Regex RootRx = new(
-			"^<remoteformat id=\"(?<id>.*?)\" category=\"(?<cat>.*?)\" key=\"(?<key>.*?)\" knubot=\"(?<knubot>.*?)\" (?:antitag=\"(?<antitag>.*?)\")? >",
-			RegexOptions.Compiled);
+		private static readonly Regex RootRx = new Regex("^<remoteformat id=\"(?<id>.*?)\" category=\"(?<cat>.*?)\" key=\"(?<key>.*?)\" knubot=\"(?<knubot>.*?)\" (?:antitag=\"(?<antitag>.*?)\")? >", RegexOptions.Compiled);
 
-		private static readonly Regex ParamRx = new(
-			"<parameter value=\"7;(?<inner>.*?)\" name=\"(?<name>.*?)\" />",
-			RegexOptions.Compiled);
+		private static readonly Regex ParamRx = new Regex("<parameter value=\"7;(?<inner>.*?)\" name=\"(?<name>.*?)\" />", RegexOptions.Compiled);
 
 		public static Screen Parse(string xml)
 		{
@@ -57,8 +53,7 @@ namespace Faolan.Core.Network.Packets
 		}
 
 		// Convenience for the two live (session) parameters: a literal string entry the client renders verbatim.
-		public static Parameter StringEntry(string name, string value, string flags = "") =>
-			new(name, $"<stringentry string=\"{value}\" flags=\"{flags}\" >");
+		public static Parameter StringEntry(string name, string value, string flags = "") => new Parameter(name, $"<stringentry string=\"{value}\" flags=\"{flags}\" >");
 
 		// Regenerate the session-specific string-entry parameters (name = player, guildname = guild) from live values,
 		// preserving each parameter's captured flags. Other parameters (NPC name, localized tokens) are kept as-is.
@@ -75,7 +70,7 @@ namespace Faolan.Core.Network.Packets
 			return s with { Parameters = pars };
 		}
 
-		private static readonly Regex FlagsRx = new("flags=\"(?<f>.*?)\"", RegexOptions.Compiled);
+		private static readonly Regex FlagsRx = new Regex("flags=\"(?<f>.*?)\"", RegexOptions.Compiled);
 
 		private static string FlagsOf(string innerRaw)
 		{

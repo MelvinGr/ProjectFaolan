@@ -1,8 +1,7 @@
 @page "/admin"
-@rendermode InteractiveServer
-@using System.Security.Claims
 @using Faolan.Core.Enums
 @using Faolan.Web.Services
+@rendermode InteractiveServer
 @inject AccountAdminService AdminSvc
 @inject LiveSessionService Live
 @inject CharacterModelService Models
@@ -22,138 +21,60 @@
     }
     else
     {
-        @if (_notice is not null)
+        @if (_notice != null)
         {
             <p class="notice">@_notice</p>
         }
+
         <table class="acct-table">
             <thead>
-                <tr><th>Account</th><th>Type</th><th>State</th><th>Last login</th><th>Chars</th><th>Actions</th></tr>
+            <tr>
+                <th>Account</th>
+                <th>Type</th>
+                <th>State</th>
+                <th>Last login</th>
+                <th>Chars</th>
+                <th>Actions</th>
+            </tr>
             </thead>
             <tbody>
-                @foreach (var a in _accounts)
-                {
-                    var isSelf = a.Id == _selfId;
-                    <tr class="@(a.State == AccountState.Banned ? "banned" : "")">
-                        <td class="aname"><a href="@($"/admin/account/{a.Id}")">@a.UserName</a> @if (isSelf) { <span class="you">you</span> }</td>
-                        <td>
-                            <select value="@a.Type" disabled="@isSelf"
-                                    @onchange="e => ChangeType(a.Id, e.Value?.ToString())">
-                                @foreach (var t in Enum.GetValues<AccountType>())
-                                {
-                                    <option value="@t" selected="@(t == a.Type)">@t</option>
-                                }
-                            </select>
-                        </td>
-                        <td><span class="state @a.State.ToString().ToLower()">@a.State</span></td>
-                        <td class="dim">@(a.LastConnection?.ToString("yyyy-MM-dd HH:mm") ?? "—")</td>
-                        <td class="dim">@a.Characters</td>
-                        <td>
-                            @if (a.State == AccountState.Banned)
+            @foreach (var a in _accounts)
+            {
+                var isSelf = a.Id == _selfId;
+                <tr class="@(a.State == AccountState.Banned
+                               ? "banned"
+                               : "")">
+                    <td class="aname"><a href="@($"/admin/account/{a.Id}")">@a.UserName</a>
+                        @if (isSelf)
+                        {
+                            <span class="you">you</span>
+                        }
+                    </td>
+                    <td>
+                        <select value="@a.Type" disabled="@isSelf"
+                                @onchange="e => ChangeType(a.Id, e.Value?.ToString())">
+                            @foreach (var t in Enum.GetValues<AccountType>())
                             {
-                                <button class="abtn unban" @onclick="() => SetBan(a.Id, false)">Unban</button>
+                                <option value="@t" selected="@(t == a.Type)">@t</option>
                             }
-                            else
-                            {
-                                <button class="abtn ban" disabled="@isSelf" @onclick="() => SetBan(a.Id, true)">Ban</button>
-                            }
-                        </td>
-                    </tr>
-                }
+                        </select>
+                    </td>
+                    <td><span class="state @a.State.ToString().ToLower()">@a.State</span></td>
+                    <td class="dim">@(a.LastConnection?.ToString("yyyy-MM-dd HH:mm") ?? "—")</td>
+                    <td class="dim">@a.Characters</td>
+                    <td>
+                        @if (a.State == AccountState.Banned)
+                        {
+                            <button class="abtn unban" @onclick="() => SetBan(a.Id, false)">Unban</button>
+                        }
+                        else
+                        {
+                            <button class="abtn ban" disabled="@isSelf" @onclick="() => SetBan(a.Id, true)">Ban</button>
+                        }
+                    </td>
+                </tr>
+            }
             </tbody>
         </table>
     }
 </div>
-
-@code {
-    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
-
-    private bool _authorized;
-    private uint _selfId;
-    private List<AccountRow> _accounts = [];
-    private string? _notice;
-
-    protected override async Task OnInitializedAsync()
-    {
-        // Gate: GM/Administrator only (the "Admin" role is stamped at sign-in from the account type).
-        var user = AuthState is null ? null : (await AuthState).User;
-        if (user is null || !user.IsInRole("Admin"))
-        {
-            Nav.NavigateTo("/", forceLoad: true);
-            return;
-        }
-        uint.TryParse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value, out _selfId);
-        _authorized = true;
-        await Reload();
-    }
-
-    private async Task Reload() => _accounts = await AdminSvc.ListAccountsAsync();
-
-    private async Task SetBan(uint id, bool banned)
-    {
-        if (banned && id == _selfId) return; // never ban yourself
-        var state = await AdminSvc.SetBannedAsync(id, banned);
-        if (state is null)
-        {
-            _notice = "Account not found.";
-        }
-        else
-        {
-            // A ban blocks the next login; also kick any live session so it takes effect immediately.
-            var kicked = banned ? await Live.KickAccountAsync(id) : 0;
-            _notice = $"Account {Name(id)} is now {state}." + (kicked > 0 ? $" Kicked {kicked} live session(s)." : "");
-        }
-        await Reload();
-    }
-
-    private async Task ChangeType(uint id, string? value)
-    {
-        if (id == _selfId) return; // don't change your own privileges
-        if (!Enum.TryParse<AccountType>(value, out var type)) return;
-        var set = await AdminSvc.SetTypeAsync(id, type);
-        _notice = set is null ? "Account not found." : $"Account {Name(id)} set to {set}.";
-        await Reload();
-    }
-
-    private void ClearCache()
-    {
-        Models.ClearRenderCache();
-        _notice = "Render cache cleared (item models + map images).";
-    }
-
-    private string Name(uint id) => _accounts.FirstOrDefault(a => a.Id == id)?.UserName ?? id.ToString();
-}
-
-<style>
-    .admin { max-width: 880px; margin: 0 auto; padding: 1rem; }
-    .admin-top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
-    .admin-top h1 { font-size: 1.7rem; margin: 0; }
-    .admin .muted { color: var(--muted); }
-    .notice { background: linear-gradient(180deg, #1f2a1f, #15171b); border: 1px solid #3c5a3c; color: #cfe6c6;
-        border-radius: 7px; padding: .55rem .8rem; font-size: .85rem; margin-bottom: 1rem; }
-
-    .acct-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
-    .acct-table th { text-align: left; color: var(--muted); font-weight: 600; font-size: .72rem;
-        text-transform: uppercase; letter-spacing: .06em; padding: .5rem .6rem; border-bottom: 1px solid var(--stone); }
-    .acct-table td { padding: .55rem .6rem; border-bottom: 1px solid var(--stone-dark); }
-    .acct-table tr.banned { opacity: .65; }
-    .aname { color: var(--gold-bright); font-weight: 600; }
-    .aname a { color: var(--gold-bright); text-decoration: none; }
-    .aname a:hover { text-decoration: underline; }
-    .you { font-size: .62rem; color: var(--muted); border: 1px solid var(--line); border-radius: 8px; padding: 0 .4em; margin-left: .35rem; }
-    .dim { color: var(--muted); }
-    .acct-table select { background: var(--field); color: var(--text); border: 1px solid var(--line);
-        border-radius: 5px; padding: .25rem .4rem; font-size: .8rem; }
-    .acct-table select:disabled { opacity: .5; }
-
-    .state { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; padding: .1rem .45em; border-radius: 8px; }
-    .state.active { color: #8fd08a; background: #1f2a1f; }
-    .state.banned { color: #e89a8a; background: #2a1c1c; }
-    .state.unactivated { color: var(--muted); background: #222; }
-
-    .abtn { border-radius: 5px; padding: .3rem .7rem; font-size: .78rem; cursor: pointer; border: 1px solid var(--line);
-        background: linear-gradient(var(--field), var(--field-2)); color: var(--text); }
-    .abtn.ban:hover:not(:disabled) { border-color: #a44; color: #f0b3a6; }
-    .abtn.unban { border-color: #3c5a3c; color: #cfe6c6; }
-    .abtn:disabled { opacity: .4; cursor: default; }
-</style>

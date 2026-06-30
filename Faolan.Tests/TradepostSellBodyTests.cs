@@ -1,4 +1,3 @@
-using Faolan.GameServer.Economy.Tradepost;
 using System;
 using Faolan.Core.Data;
 using Xunit;

@@ -112,7 +112,8 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			block.Values.InsertRange(idx + 1, insert);
 		}
 
-		public static TailsPostAccessBlock CreateFreshBlock() => new()
+		public static TailsPostAccessBlock CreateFreshBlock() =>
+			new TailsPostAccessBlock
 		{
 			Marker0 = Marker,
 			Marker1 = Marker,

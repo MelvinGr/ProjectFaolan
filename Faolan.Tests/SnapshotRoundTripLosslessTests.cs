@@ -4,7 +4,6 @@ using System.Linq;
 using Faolan.Core.Data;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Conan;
-using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Xunit;

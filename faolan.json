@@ -1,15 +1,11 @@
 {
   "ServerIpAddress": "127.0.0.1",
-
   "UniverseAgentPort": 7010,
   "PlayerAgentPort": 7011,
   "CSPlayerAgentPort": 7001,
   "AgentServerPort": 7012,
-
   "McpEnabled": true,
   "McpPort": 7099,
-
-  "DatabasePath": "faolan.db",
-
+  "DatabasePath": "/home/melvin/Development/C#/Project Faolan/faolan.db",
   "WelcomeString": "Welcome to Project Faolan!"
 }

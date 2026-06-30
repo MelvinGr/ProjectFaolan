@@ -293,7 +293,7 @@ namespace Faolan.Core.Database
 			// part of the key because (TypeId, Mode, Field3) is NOT NPC-unique: the same mode means different
 			// conversations for different NPCs / quest states (e.g. mode 1 is Casilda's create intro but Kalanthes's
 			// regular login dialog). Handles are stable because scenes are replayed verbatim. Packets cascade-delete.
-			// Keyed by NPC NAME (stable identity), not the session-volatile handle. NpcName is nullable; SQLite treats
+			// Keyed by NPC NAME (stable identity), not the session-volatile handle. NpcName == nullable; SQLite treats
 			// NULLs as distinct, so nodes whose NPC couldn't be named stay distinct rows.
 			modelBuilder
 				.Entity<ConversationNode>()
