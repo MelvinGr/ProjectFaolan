@@ -11,7 +11,7 @@ namespace Faolan.Core
 		// (and a zero amount renders as "0t"); pass showAllUnits: true to always emit all four
 		// (e.g. "0g 0s 2c 50t"). Generic over any integer width so it works on the server's
 		// ulong/uint wallets and the web layer's projections alike (#280).
-		public static string ToCurrencyString<T>(this T amount, bool showAllUnits = true) where T : IBinaryInteger<T>
+		public static string ToCurrencyString<T>(this T amount, bool showAllUnits = false) where T : IBinaryInteger<T>
 		{
 			var tin = Convert.ToUInt64(amount);
 
