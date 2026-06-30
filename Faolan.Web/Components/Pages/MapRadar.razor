@@ -7,6 +7,7 @@
 @inject IDbContextFactory<DatabaseContext> DbFactory
 @inject LiveSessionService Live
 @inject IJSRuntime JS
+@inject NavigationManager Nav
 @implements IAsyncDisposable
 
 <PageTitle>Live Map — Admin</PageTitle>
@@ -57,7 +58,10 @@
     {
         var user = AuthState is null ? null : (await AuthState).User;
         if (user is null || !user.IsInRole("Admin"))
-            return; // not authorized -> nothing rendered; redirect happens client-side below
+        {
+            Nav.NavigateTo("/", forceLoad: true);
+            return;
+        }
 
         _authorized = true;
 
@@ -77,14 +81,8 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
+        if (firstRender && _authorized)
         {
-            // Routes uses a plain RouteView, so gate client-side too: bounce non-admins.
-            if (!_authorized)
-            {
-                await JS.InvokeVoidAsync("location.assign", "/");
-                return;
-            }
             _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/radar.js");
             await _module.InvokeVoidAsync("start", "radar-canvas", MapId);
         }
