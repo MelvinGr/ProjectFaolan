@@ -92,46 +92,65 @@ export async function show(canvasId, url) {
             state.bind = new Map(o.skeleton.bones.map(b => [b.name, b.quaternion.clone()]));
         }
     });
-    if (state.poseOn) applyDemoPose(state); // re-apply if posing was left enabled across a reload
+    if (state.poseDeg) applyDemoPose(state, state.poseDeg); // re-apply the current pose angle across a reload
 
     state.scene.add(model);
     state.model = model;
     state.modelSize = size; // dev hook: lets headless tooling frame the head
 
-    const radius = Math.max(size.x, size.y, size.z);
-    state.controls.target.set(0, size.y / 2, 0);
-    state.camera.position.set(0, size.y * 0.6, radius * 2.2);
+    // Frame the whole model for the CURRENT aspect (portrait phones are width-limited, so fit both axes of the bounding
+    // sphere - otherwise a tall body gets cropped to just the legs). Resize the renderer + aspect to the live canvas
+    // first: on mobile the layout often hasn't settled when setup() ran, leaving a stale (square) projection.
+    const sphere = box.getBoundingSphere(new THREE.Sphere());
+    const cw = canvas.clientWidth || canvas.width, chh = canvas.clientHeight || canvas.height;
+    if (cw > 0 && chh > 0) {
+        state.renderer.setSize(cw, chh, false);
+        state.camera.aspect = cw / chh;
+        state.camera.updateProjectionMatrix();
+    }
+    const vFov = state.camera.fov * Math.PI / 180;
+    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * state.camera.aspect);
+    const dist = Math.max(sphere.radius / Math.sin(vFov / 2), sphere.radius / Math.sin(hFov / 2)) * 1.08;
+    const cy = size.y / 2;
+    state.controls.target.set(0, cy, 0);
+    state.camera.position.set(0, cy, dist);
     state.controls.update();
 }
 
-// Apply a fixed demo pose to a loaded rig so the skeleton is visibly articulated (both forearms forward+up about
-// their local -X hinge - the anatomically clean elbow bend). Composes the delta onto each bone's BIND rotation; the
-// render loop (renderer.render every frame) refreshes world matrices + the skeleton, so children follow correctly.
-function applyDemoPose(state) {
+// Pose a loaded rig by bending both elbows `deg` degrees about each forearm's local -X hinge (0 = bind/rest). The delta
+// is composed onto each bone's BIND rotation; the render loop refreshes world matrices + the skeleton every frame, so
+// children follow correctly. No-op if the model isn't skinned.
+function applyDemoPose(state, deg) {
     if (!state.skinned) return;
     const byName = new Map(state.skinned.skeleton.bones.map(b => [b.name, b]));
-    for (const [name, q] of state.bind) byName.get(name).quaternion.copy(q); // reset to bind first
-    const bend = (name, axis, deg) => {
-        const b = byName.get(name);
-        if (!b) return;
-        b.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(...axis).normalize(), deg * Math.PI / 180));
-    };
-    bend('rig_bone_LeftForearm', [-1, 0, 0], 72);
-    bend('rig_bone_RightForearm', [-1, 0, 0], 72);
+    for (const [name, q] of state.bind) byName.get(name)?.quaternion.copy(q); // reset to bind first
+    if (deg)
+        for (const name of ['rig_bone_LeftForearm', 'rig_bone_RightForearm']) {
+            const b = byName.get(name);
+            if (b) b.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(-1, 0, 0), deg * Math.PI / 180));
+        }
 }
 
-// Toggle the demo pose on a canvas's rig (no-op if the loaded model isn't skinned).
-export function setPose(canvasId, on) {
+// Set the rig's elbow pose to `deg` degrees (0 = rest). Driven by the viewer page's pose slider.
+export function setPose(canvasId, deg) {
     const state = states.get(canvasId);
     if (!state) return false;
-    state.poseOn = on;
+    state.poseDeg = deg || 0;
     if (!state.skinned) return false;
-    if (on) applyDemoPose(state);
-    else for (const [name, q] of state.bind) state.skinned.skeleton.getBoneByName(name).quaternion.copy(q);
+    applyDemoPose(state, state.poseDeg);
     return true;
 }
 
-// Dev hooks so headless tooling can drive the REAL viewer page (load a model URL + toggle the pose).
+// Wire a range <input> to drive the pose directly on the client (no Blazor round-trip per drag = smooth on mobile).
+export function bindPoseSlider(canvasId, sliderId) {
+    const el = document.getElementById(sliderId);
+    if (el && !el.dataset.bound) {
+        el.dataset.bound = '1';
+        el.addEventListener('input', () => setPose(canvasId, +el.value));
+    }
+}
+
+// Dev hooks so headless tooling can drive the REAL viewer page (load a model URL + set the pose angle).
 if (typeof window !== 'undefined') {
     window.__faolanShow = show;
     window.__faolanSetPose = setPose;

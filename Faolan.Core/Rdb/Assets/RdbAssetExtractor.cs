@@ -594,7 +594,7 @@ namespace Faolan.Core.Rdb.Assets
 			IReadOnlyList<uint> headLocalRenderMeshIds, uint? hairWorldRenderMeshId,
 			Tint? skinTint = null, Tint? hairTint = null, uint? eyeTextureId = null,
 			IReadOnlyList<BodyDecal>? bodyDecals = null, BodyMorphDeformer.Morphs? morphs = null,
-			IReadOnlyList<uint>? equipmentMeshIndexIds = null)
+			IReadOnlyList<uint>? equipmentMeshIndexIds = null, bool rig = false)
 		{
 			var body = ReadTexturedModel(rdb, bodyMeshIndexId, skinTint, bodyDecals, morphs);
 			if (body == null)
@@ -635,6 +635,9 @@ namespace Faolan.Core.Rdb.Assets
 			// Hair is authored in world space (head at ~y1.7); it's the ground truth for where the head sits.
 			var hair = hairWorldRenderMeshId is { } hr ? ReadRenderMeshDirect(rdb, hr, hairTint) : null;
 
+			// The head/eyes/hair are rigid world-space parts (collected here, then either added as static geometry or -
+			// for a rig - bound to the Head bone so they're part of the same skinned model).
+			var decor = new List<RenderMeshReader.SubMesh>();
 			if (headParts.Count > 0)
 			{
 				// Seat the head-local meshes (head/eyes/lashes) at the body's neck for Y, then - when we have hair -
@@ -654,13 +657,34 @@ namespace Faolan.Core.Rdb.Assets
 					seated = seated.Select(s => Translate(s, hc.x - sc.x, 0, hc.z - sc.z)).ToList();
 				}
 
-				all.AddRange(seated);
+				decor.AddRange(seated);
 			}
 
 			if (hair is { Count: > 0 })
-				all.AddRange(hair); // AlphaMask already set from the hair texture's transparency
+				decor.AddRange(hair); // AlphaMask already set from the hair texture's transparency
 
+			// Rig: the body (+ worn gear) are skinned to their own bones; bind the rigid head/hair to the Head bone so
+			// the whole character is one posable skinned model (head follows the head bone; the elbow slider leaves it put).
+			if (rig && SelectSkeletonForMesh(rdb, all) is { } skeleton)
+			{
+				all.AddRange(decor.Select(s => BindToBone(s, "rig_bone_Head")));
+				return GlbWriter.Build(all, null, skeleton);
+			}
+
+			all.AddRange(decor);
 			return GlbWriter.Build(all, null);
+		}
+
+		// Make a static sub-mesh follow a single skeleton bone: bind every vertex 100% to that bone (palette slot 0). At
+		// rest the inverse-bind cancels the bone's bind transform so the geometry stays where it is; when the bone moves
+		// the whole part moves rigidly with it. Used to attach the rigid head/hair to the Head bone of a character rig.
+		private static RenderMeshReader.SubMesh BindToBone(RenderMeshReader.SubMesh s, string boneName)
+		{
+			var bones = new int[s.VertexCount * 4]; // all slots = palette index 0
+			var weights = new float[s.VertexCount * 4];
+			for (var i = 0; i < s.VertexCount; i++)
+				weights[i * 4] = 1f;
+			return s with { BlendBones = bones, BlendWeights = weights, BonePalette = [boneName] };
 		}
 
 		// Axis-aligned bounding-box centre of a set of sub-meshes.

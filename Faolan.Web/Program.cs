@@ -52,8 +52,15 @@ namespace Faolan.Web
             });
 
             // ?equip=290301,290354 overlays those armor MESHINDEXFILE ids on the character (gear preview, #275).
-            app.MapGet("/api/character/{id:long}/model.glb", (long id, string? equip, CharacterModelService models) =>
+            // ?rig=1 returns the character's BODY as a posable skinned rig instead of the static assembled model.
+            app.MapGet("/api/character/{id:long}/model.glb", (long id, string? equip, string? rig, CharacterModelService models) =>
             {
+                if (rig is "1" or "true" or "True")
+                {
+                    var rigGlb = models.BuildCharacterRig((uint)id);
+                    return rigGlb is null ? Results.NotFound() : Results.File(rigGlb, "model/gltf-binary");
+                }
+
                 var equipIds = equip?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                     .Select(s => uint.TryParse(s, out var v) ? v : 0u).Where(v => v != 0).ToList();
                 var glb = models.BuildCharacterById((uint)id, equipIds is { Count: > 0 } ? equipIds : null);

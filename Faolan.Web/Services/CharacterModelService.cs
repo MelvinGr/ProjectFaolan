@@ -67,7 +67,7 @@ namespace Faolan.Web.Services
 		// Build a specific character by id, using their stored appearance (CharacterBodyResources) - currently the
 		// chosen hairstyle (*hairmesh_NNN, where NNN is the hair rendermesh id). Head morph/face texscript still pending
 		// the CHARACTERCREATOR (1010700) decode (#275); HeadMesh is a creator index, not a resource id.
-		public byte[]? BuildCharacterById(uint characterId, IReadOnlyList<uint>? equipMeshIndexIds = null)
+		public byte[]? BuildCharacterById(uint characterId, IReadOnlyList<uint>? equipMeshIndexIds = null, bool rig = false)
 		{
 			using var db = _dbFactory.CreateDbContext();
 			var character = db.Characters.AsNoTracking().FirstOrDefault(c => c.Id == characterId);
@@ -101,8 +101,8 @@ namespace Faolan.Web.Services
 
 			if (headMeshes.Count > 0)
 				// Try the exact race/sex body, then the local same-sex fallback (the exact body is often CDN-only).
-				return RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyId, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals, morphs, equipMeshIndexIds)
-				       ?? RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyFallback, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals, morphs, equipMeshIndexIds)
+				return RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyId, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals, morphs, equipMeshIndexIds, rig)
+				       ?? RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyFallback, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals, morphs, equipMeshIndexIds, rig)
 				       ?? BuildCharacter(character.Race, character.Sex, hairRmId);
 
 			return BuildCharacter(character.Race, character.Sex, hairRmId);
@@ -240,6 +240,11 @@ namespace Faolan.Web.Services
 		// skin, so the result is posable (#275). skeletonId null => auto-select the rig matching the mesh's bone palette.
 		public byte[]? BuildRig(uint meshIndexId, uint? skeletonId = null) =>
 			RdbAssetExtractor.BuildSkinnedModelGlb(Reader(), meshIndexId, skeletonId);
+
+		// Build a character as a posable rig (skinned glb): the full assembled character - body (morphs + skin + decals) +
+		// head + hair - skinned to the auto-selected skeleton, so the viewer's pose slider can articulate it. The body
+		// skins to its own bones; the rigid head/hair are bound to the Head bone. (Gear skinning is the separate #275 work.)
+		public byte[]? BuildCharacterRig(uint characterId) => BuildCharacterById(characterId, equipMeshIndexIds: null, rig: true);
 
 		// Build a single RenderMesh (type 1010001) directly by id - for inspecting head/eye/hair meshes (#275).
 		public byte[]? BuildRenderMesh(uint renderMeshId)
