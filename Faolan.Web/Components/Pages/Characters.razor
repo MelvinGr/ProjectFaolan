@@ -45,6 +45,43 @@
     </aside>
 
     <section class="stage">
+        <aside class="stats-panel">
+            @if (_selected is null)
+            {
+                <p class="stats-empty">Select a character to view their sheet.</p>
+            }
+            else
+            {
+                <div class="stat-head">
+                    <div class="stat-name">@_selected.Name</div>
+                    <div class="stat-sub">Level @_selected.Level · @_selected.Class</div>
+                    <div class="stat-sub2">@_selected.Race · @_selected.Sex</div>
+                </div>
+
+                <div class="vitals">
+                    @if (_health > 0)
+                    {
+                        <div class="vital hp"><span class="vlabel">Health</span><div class="vbar"><i style="width:100%"></i></div><span class="vval">@_health</span></div>
+                    }
+                    @if (_mana > 0)
+                    {
+                        <div class="vital mp"><span class="vlabel">Mana</span><div class="vbar"><i style="width:100%"></i></div><span class="vval">@_mana</span></div>
+                    }
+                    @if (_stamina > 0)
+                    {
+                        <div class="vital sp"><span class="vlabel">Stamina</span><div class="vbar"><i style="width:100%"></i></div><span class="vval">@_stamina</span></div>
+                    }
+                </div>
+
+                <div class="stat-rows">
+                    <div class="srow"><span class="k">Experience</span><span class="v">@_selected.Experience.ToString("N0")</span></div>
+                    <div class="srow"><span class="k">Money</span><span class="v">@_money</span></div>
+                    <div class="srow"><span class="k">Location</span><span class="v">@_mapName</span></div>
+                    <div class="srow"><span class="k">Guild</span><span class="v">@(_guildName ?? "—")</span></div>
+                </div>
+            }
+        </aside>
+
         <div class="equip-window">
             <div class="equip-title">Equipment</div>
             <div class="equip-grid">
@@ -96,6 +133,12 @@
     private List<Character>? _characters;
     private Character? _selected;
     private string _status = "";
+
+    // Selected character's sheet: vitals (player-facing MaxStats) + a few resolved fields.
+    private uint _health, _mana, _stamina;
+    private string _mapName = "—";
+    private string _money = "0";
+    private string? _guildName;
     private IJSObjectReference? _module;
     private IReadOnlyDictionary<string, (uint Id, string Name)> _equipment = new Dictionary<string, (uint, string)>();
 
@@ -150,6 +193,7 @@
     {
         _selected = c;
         _equipment = Models.Equipment((uint)c.Id);
+        await LoadSheet(c);
         await Render();
         if (_module is not null)
         {
@@ -157,6 +201,43 @@
             await _module.InvokeVoidAsync("buildPoseControls", "char-canvas", "pose-controls");
             await _module.InvokeVoidAsync("populateItemThumbs");
         }
+    }
+
+    // Load the selected character's sheet data: vitals (MaxStats, regenerated from class/level if missing), the map
+    // name and guild, and a formatted wallet.
+    private async Task LoadSheet(Character c)
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var full = await db.Characters
+            .Include(x => x.MaxStats)
+            .Include(x => x.Map)
+            .Include(x => x.Guild)
+            .FirstOrDefaultAsync(x => x.Id == c.Id);
+
+        var stats = full?.MaxStats;
+        if (stats is null && full is not null)
+        {
+            full.RegenerateMaxStats(); // older rows may predate the MaxStats block
+            stats = full.MaxStats;
+        }
+        _health = stats?.Health ?? 0;
+        _mana = stats?.Mana ?? 0;
+        _stamina = stats?.Stamina ?? 0;
+        _mapName = full?.Map?.Name ?? "—";
+        _guildName = full?.Guild?.Name;
+        _money = FormatMoney(full?.Money ?? 0);
+    }
+
+    // Wallet in tin -> gold/silver/copper/tin (100 tin = 1 copper, 100 copper = 1 silver, 100 silver = 1 gold).
+    private static string FormatMoney(ulong tin)
+    {
+        var (g, s, c, t) = (tin / 1_000_000, tin / 10_000 % 100, tin / 100 % 100, tin % 100);
+        var parts = new List<string>();
+        if (g > 0) parts.Add($"{g}g");
+        if (s > 0) parts.Add($"{s}s");
+        if (c > 0) parts.Add($"{c}c");
+        if (t > 0 || parts.Count == 0) parts.Add($"{t}t");
+        return string.Join(" ", parts);
     }
 
     // (Re)build the selected character's model, overlaying the chosen armour set. Cache-bust so a rebuilt/redressed
@@ -196,7 +277,32 @@
     .roster button strong { color: var(--gold-bright); font-weight: 600; }
     .roster button span { font-size: .75rem; color: var(--muted); }
     .roster .warn { color: var(--danger); font-size: .8rem; }
-    .stage { flex: 1; min-height: 0; min-width: 0; }
+    .stage { flex: 1; min-height: 0; min-width: 0; display: flex; gap: 1rem; }
+
+    /* Character sheet: vitals + resolved fields, beside the paper-doll. */
+    .stats-panel { width: 230px; flex-shrink: 0; overflow-y: auto;
+        background: linear-gradient(180deg, var(--bg-2), #121419);
+        border: 1px solid var(--stone-dark); border-radius: var(--radius); padding: .85rem; }
+    .stats-empty { color: var(--muted); font-size: .85rem; }
+    .stat-head { text-align: center; padding-bottom: .65rem; margin-bottom: .65rem; border-bottom: 1px solid var(--stone-dark); }
+    .stat-name { font-family: var(--font-display); color: var(--gold); font-size: 1.15rem; letter-spacing: .03em; }
+    .stat-sub { color: var(--text); font-size: .82rem; margin-top: .15rem; }
+    .stat-sub2 { color: var(--muted); font-size: .76rem; text-transform: capitalize; }
+    .vitals { display: flex; flex-direction: column; gap: .45rem; margin-bottom: .8rem; }
+    .vital { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .15rem .5rem; }
+    .vlabel { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    .vval { font-size: .8rem; color: var(--text); font-variant-numeric: tabular-nums; }
+    .vbar { grid-column: 1 / -1; height: 7px; border-radius: 4px; overflow: hidden;
+        background: #0c0e11; border: 1px solid #00000080; box-shadow: inset 0 1px 2px #000a; }
+    .vbar i { display: block; height: 100%; border-radius: 3px; }
+    .vital.hp .vbar i { background: linear-gradient(90deg, #7a1f1f, #c64b3a); }
+    .vital.mp .vbar i { background: linear-gradient(90deg, #1f3a7a, #3f76d0); }
+    .vital.sp .vbar i { background: linear-gradient(90deg, #6b5a1f, #d8b53f); }
+    .stat-rows { display: flex; flex-direction: column; }
+    .srow { display: flex; justify-content: space-between; gap: .75rem; padding: .35rem 0; border-bottom: 1px solid var(--stone-dark); font-size: .8rem; }
+    .srow:last-child { border-bottom: none; }
+    .srow .k { color: var(--muted); }
+    .srow .v { color: var(--text); text-align: right; }
 
     /* AoC-style equipment paper-doll window: slot columns flanking the character preview. */
     .equip-window { height: 100%; display: flex; flex-direction: column; box-sizing: border-box;
@@ -260,5 +366,7 @@
         .slot.wide { width: 48px; }
         .equip-grid { gap: .4rem; }
         .pose input[type=range] { width: 4.5rem; }
+        .stage { flex-direction: column; }
+        .stats-panel { width: auto; order: 2; max-height: 34vh; }
     }
 </style>
