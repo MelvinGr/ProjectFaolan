@@ -277,8 +277,9 @@ namespace Faolan.Web.Services
 		}
 
 		// The character's carried (non-worn) items — the backpack/quest/resource contents — as a flat, display-ordered
-		// list (container, then slot). Empty slots are dropped; the viewer packs what remains into its grid.
-		public IReadOnlyList<(uint Id, string Name, uint Count)> Inventory(uint characterId)
+		// list (container, then slot), each tagged with its tab. Empty slots are dropped; the viewer pages what remains.
+		// Containers: 104 = normal backpack, 112 = resources, 113 = quest (Faolan.Core/Enums/ItemType.cs).
+		public IReadOnlyList<(uint Id, string Name, uint Count, string Tab)> Inventory(uint characterId)
 		{
 			using var db = _dbFactory.CreateDbContext();
 			return db.CharacterInventory.AsNoTracking()
@@ -289,7 +290,8 @@ namespace Faolan.Web.Services
 				.Select(x => (
 					x.Item!.Id,
 					string.IsNullOrWhiteSpace(x.Item.Name) ? $"Item {x.Item.Id}" : x.Item.Name,
-					x.Count))
+					x.Count,
+					x.Container switch { 113 => "Quest", 112 => "Resources", _ => "Normal" }))
 				.ToList();
 		}
 
