@@ -77,7 +77,7 @@ dotnet run --project Faolan.Importer -- --skip characters    # module-based; --l
 | `Faolan.ClientLauncher/` | Launches the retail client unattended (patcher stand-in). |
 | `Faolan.ContentMirror/` | Store-and-forward proxy for the client's content CDN (fixes the loading hang). |
 | `Faolan.Wireshark/` | A Wireshark/tshark C plugin that fully dissects the Conan protocol (the canonical capture tool). |
-| `Faolan.DatabaseEditor/` | Desktop editor for `faolan.db`. |
+| `Faolan.Web/` | Blazor web app: public character/equipment 3D viewer + armory, plus admin/GM tools (live map radar, GM console, ban, mail, a generic `faolan.db` editor) gated to GameMaster accounts. |
 | `Faolan.Tests/` | The unit/golden test suite. |
 | `Captures/` | Reference packet traces + Python dissectors used for protocol comparison. |
 

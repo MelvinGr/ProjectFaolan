@@ -9,9 +9,17 @@ re-addressed to the live player + clicked NPC, framed on the conversation endpoi
 instance>`) like `SendConversationClose`. The quest-grant packets in the flow are built by the `WorldQuest`
 builders. So `ServeScreen` no longer replays any packet — substitution-replay survives only as a fallback for
 an unexpected sub-opcode. Proven byte-identical to the old handle-substitution
-(`ConversationConstructTests`/`KnubotCodecTests`). Remaining: source the remoteformat from RDB text + the
-Lua/tag VM (vs the captured line) so the NPC greets with the live player's name, retiring the captured-XML
-dependency entirely.
+(`ConversationConstructTests`/`KnubotCodecTests`).
+
+**Stored structured (2026-06-30).** Every packet of a node is now decoded into structured `ConversationPacket`
+columns (`ConversationScreenDecoder` → `SubOpcode/Env/Field/Flag/ScreensJson`, plus `CameraAgentInstance/
+CameraParams` for the camera) and BUILT from those columns at send time, not from the raw `Data` blob (kept
+only as a fallback). All 355/355 rows are structured — 307 Knubot screens + 48 `SetDialogueCamera` (see below);
+zero raw replay. The remoteformat XML itself is parsed/rebuilt byte-exact by `RemoteFormatXml`, and the **live
+player name/guild are regenerated** into each screen (`RemoteFormatXml.WithLivePlayer`) so the NPC greets the
+real character — the captured player's name is gone. **Remaining:** the screen TEXT (`id`/`category`/`key`)
+is still the captured template; generating it from RDB text + the Lua/tag VM is blocked on the harvested,
+client-validated content `key` (non-computable, same as the item TEA keys — see `docs/quest-log-handover.md`).
 
 `AnswerList` (0xF164A4A5) and `CloseChatWindow` (0xC4AF39EB) **share one grammar** (validated 197/197 +
 48/48): the KnubotBase header then `[u32 count][ count x ([u16 len][remoteformat string]) ]`. CloseChatWindow
