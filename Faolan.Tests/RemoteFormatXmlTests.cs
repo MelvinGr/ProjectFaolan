@@ -51,6 +51,23 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void WithLivePlayer_RegeneratesNameAndGuild_KeepingTheRest()
+		{
+			var s = RemoteFormatXml.WithLivePlayer(RemoteFormatXml.Parse(AppendXml), "Conan", "Cimmerians");
+			var xml = RemoteFormatXml.Build(s);
+
+			// Player name regenerated (captured flags="m" preserved), guild filled, the captured player gone.
+			Assert.Contains("string=&quot;Conan&quot; flags=&quot;m&quot;", xml);
+			Assert.Contains("string=&quot;Cimmerians&quot;", xml);
+			Assert.DoesNotContain("DemoL80", xml);
+			// NPC name + localized tokens untouched.
+			Assert.Contains("localized id=&quot;15148&quot;", xml);
+			Assert.Contains("Not in guild [Legacy of Cimmeria]", xml);
+			// Root (incl. the harvested key) unchanged.
+			Assert.StartsWith("<remoteformat id=\"33600\" category=\"50002\" key=\"djaj!xgdVQpMtKta6Csp\"", xml);
+		}
+
+		[Fact]
 		public void Build_FromScratch_WithLiveStringEntry()
 		{
 			// Generate a screen with a live player-name parameter built from session data (no captured value).

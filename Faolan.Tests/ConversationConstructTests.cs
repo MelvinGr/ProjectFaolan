@@ -94,7 +94,7 @@ namespace Faolan.Tests
 			{
 				var record = Convert.FromHexString(recordHex);
 				var packet = WrapInPacket(record);
-				Assert.True(ConversationService.TryConstructKnubotRecord(packet, LiveInstance, ClickedNpc, out var rebuilt));
+				Assert.True(ConversationService.TryConstructKnubotRecord(packet, LiveInstance, ClickedNpc, "", "", out var rebuilt));
 				var sub = BinaryPrimitives.ReadUInt32BigEndian(record.AsSpan(4, 4)); // preserve AnswerList vs CloseChatWindow
 				var p = KnubotCodec.ParseStringList(record);
 				var expected = KnubotCodec.BuildStringList(sub, LiveInstance, ClickedNpc, p.Strings, p.Env);
@@ -123,7 +123,7 @@ namespace Faolan.Tests
 			Buffer.BlockCopy(header, 0, packet, 12, header.Length);
 			Buffer.BlockCopy(record, 0, packet, 12 + header.Length, record.Length);
 
-			Assert.True(ConversationService.TryConstructKnubotRecord(packet, LiveInstance, ClickedNpc, out var rebuilt));
+			Assert.True(ConversationService.TryConstructKnubotRecord(packet, LiveInstance, ClickedNpc, "", "", out var rebuilt));
 
 			var expected = KnubotCodec.BuildAppendText(LiveInstance, ClickedNpc,
 				KnubotCodec.ParseAppendText(record).Xml, 1, 1, 0);
@@ -158,7 +158,7 @@ namespace Faolan.Tests
 			// a non-constructed sub-opcode (here a quest MainQuestUpdate 0x504B7924) must stay on the substitution path
 			var record = Convert.FromHexString("0000000c504b79240000c350110099bd00");
 			var packet = WrapInPacket(record);
-			Assert.False(ConversationService.TryConstructKnubotRecord(packet, LiveInstance, ClickedNpc, out _));
+			Assert.False(ConversationService.TryConstructKnubotRecord(packet, LiveInstance, ClickedNpc, "", "", out _));
 		}
 	}
 }

@@ -60,6 +60,29 @@ namespace Faolan.Core.Network.Packets
 		public static Parameter StringEntry(string name, string value, string flags = "") =>
 			new(name, $"<stringentry string=\"{value}\" flags=\"{flags}\" >");
 
+		// Regenerate the session-specific string-entry parameters (name = player, guildname = guild) from live values,
+		// preserving each parameter's captured flags. Other parameters (NPC name, localized tokens) are kept as-is.
+		public static Screen WithLivePlayer(Screen s, string playerName, string guildName)
+		{
+			var pars = new List<Parameter>(s.Parameters.Count);
+			foreach (var p in s.Parameters)
+				pars.Add(p.Name switch
+				{
+					"name" => StringEntry("name", playerName, FlagsOf(p.InnerRaw)),
+					"guildname" => StringEntry("guildname", guildName, FlagsOf(p.InnerRaw)),
+					_ => p
+				});
+			return s with { Parameters = pars };
+		}
+
+		private static readonly Regex FlagsRx = new("flags=\"(?<f>.*?)\"", RegexOptions.Compiled);
+
+		private static string FlagsOf(string innerRaw)
+		{
+			var m = FlagsRx.Match(innerRaw);
+			return m.Success ? m.Groups["f"].Value : "";
+		}
+
 		// XML escape/unescape for the parameter value's inner (& must be first on the way out, last on the way in).
 		private static string Escape(string s) =>
 			s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");

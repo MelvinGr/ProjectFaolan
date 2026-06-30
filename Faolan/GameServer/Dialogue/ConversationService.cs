@@ -75,7 +75,8 @@ namespace Faolan.GameServer.Dialogue
 		// Lifts the IIR carrier payload (the [u32 len][record]) out of a captured full conversation packet and, if it
 		// is an AppendText or OpenChatWindow, rebuilds it through KnubotCodec re-addressed to the live player + clicked
 		// NPC. Returns false for every other sub-opcode (those stay on the substitution-replay path).
-		internal static bool TryConstructKnubotRecord(byte[] capturedPacket, uint liveInstance, uint clickedNpcHandle, out byte[] record)
+		internal static bool TryConstructKnubotRecord(byte[] capturedPacket, uint liveInstance, uint clickedNpcHandle,
+			string playerName, string guildName, out byte[] record)
 		{
 			record = null;
 			if (capturedPacket == null || capturedPacket.Length < 12)
@@ -92,7 +93,8 @@ namespace Faolan.GameServer.Dialogue
 			if (sub == KnubotAppendTextSubOpcode)
 			{
 				var p = KnubotCodec.ParseAppendText(carrier);
-				record = KnubotCodec.BuildAppendText(liveInstance, clickedNpcHandle, p.Xml, p.Field, p.Trailing, p.Env);
+				var xml = WithLivePlayer(p.Xml, playerName, guildName);
+				record = KnubotCodec.BuildAppendText(liveInstance, clickedNpcHandle, xml, p.Field, p.Trailing, p.Env);
 				return true;
 			}
 
@@ -107,11 +109,35 @@ namespace Faolan.GameServer.Dialogue
 			if (sub == KnubotAnswerListSubOpcode || sub == KnubotCloseChatWindowSubOpcode)
 			{
 				var p = KnubotCodec.ParseStringList(carrier);
-				record = KnubotCodec.BuildStringList(sub, liveInstance, clickedNpcHandle, p.Strings, p.Env);
+				var strings = p.Strings.Select(x => WithLivePlayer(x, playerName, guildName)).ToList();
+				record = KnubotCodec.BuildStringList(sub, liveInstance, clickedNpcHandle, strings, p.Env);
 				return true;
 			}
 
 			return false;
+		}
+
+		// Regenerate the live player's name/guild into a captured screen's remoteformat XML via the structured
+		// builder (so the captured player's name no longer shows to everyone). SAFETY: only rebuilds when the parser
+		// reproduces the captured XML byte-for-byte first; otherwise the original bytes are returned untouched, so an
+		// unrecognised screen variant can never be corrupted.
+		private static byte[] WithLivePlayer(byte[] screenXml, string playerName, string guildName)
+		{
+			if (screenXml == null || screenXml.Length == 0 || string.IsNullOrEmpty(playerName))
+				return screenXml;
+			try
+			{
+				var xml = System.Text.Encoding.Latin1.GetString(screenXml);
+				var screen = RemoteFormatXml.Parse(xml);
+				if (RemoteFormatXml.Build(screen) != xml)
+					return screenXml; // not byte-exact roundtrippable -> leave it alone
+				var rebuilt = RemoteFormatXml.Build(RemoteFormatXml.WithLivePlayer(screen, playerName, guildName ?? ""));
+				return System.Text.Encoding.Latin1.GetBytes(rebuilt);
+			}
+			catch
+			{
+				return screenXml;
+			}
 		}
 
 		// Frames a constructed Knubot record exactly as retail does (verified against the captures): the conversation
@@ -234,6 +260,11 @@ namespace Faolan.GameServer.Dialogue
 			var oldInstanceVarint = Varint.Encode(node.CapturedInstance);
 			var newInstanceVarint = Varint.Encode(liveInstance);
 
+			// The live player's name/guild are regenerated into each screen's remoteformat XML (replacing the captured
+			// player's), so a dialogue addresses the player who's actually talking. Guild is empty when guildless.
+			var playerName = client.Session.Character?.Name ?? "";
+			var guildName = client.Session.Character?.Guild?.Name ?? "";
+
 			// A captured screen that offers options (AnswerList 0xF164A4A5) sometimes ALSO carries a trailing
 			// CloseChatWindow (0xC4AF39EB) - the captured session closed the window right after. Replaying that close
 			// auto-shuts the dialogue the player should be picking from (observed: Casilda's greeting opens then
@@ -271,7 +302,7 @@ namespace Faolan.GameServer.Dialogue
 				// CONSTRUCT every Knubot record through the typed codec (#188): AppendText (line) + OpenChatWindow +
 				// AnswerList + CloseChatWindow all rebuild via KnubotCodec re-addressed to the live endpoints. Only
 				// NON-Knubot records (e.g. interleaved quest packets) fall through to the substitution-replay below.
-				if (TryConstructKnubotRecord(p.Data, liveInstance, clickedNpcHandle, out var constructed))
+				if (TryConstructKnubotRecord(p.Data, liveInstance, clickedNpcHandle, playerName, guildName, out var constructed))
 				{
 					await SendConstructedKnubot(client, ReadSenderInstance(p.Data), liveInstance, constructed);
 					continue;
