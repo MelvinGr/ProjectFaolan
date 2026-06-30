@@ -68,6 +68,27 @@
                                 <button class="btn" disabled="@(_busy || string.IsNullOrWhiteSpace(Cmd(cid)))"
                                         @onclick="() => Gm(cid, Cmd(cid))">Run</button>
                             </div>
+
+                            <div class="tp">
+                                <span class="tplabel">Teleport</span>
+                                @if (Others(cid).Count > 0)
+                                {
+                                    <select class="ti tpsel" value="@TpTarget(cid)" @onchange="e => _tpTarget[cid] = uint.TryParse(e.Value?.ToString(), out var v) ? v : 0">
+                                        <option value="0">to player…</option>
+                                        @foreach (var o in Others(cid))
+                                        {
+                                            <option value="@o.CharacterId">@(o.CharacterName ?? o.CharacterId?.ToString())</option>
+                                        }
+                                    </select>
+                                    <button class="btn" disabled="@(_busy || TpTarget(cid) == 0)" @onclick="() => TeleportToPlayer(cid)">Go</button>
+                                }
+                                <span class="tpor">or</span>
+                                <input class="ti tpc" placeholder="map" value="@Tp(_tpMap, cid)" @oninput="e => _tpMap[cid] = e.Value?.ToString() ?? string.Empty" />
+                                <input class="ti tpc" placeholder="x" value="@Tp(_tpX, cid)" @oninput="e => _tpX[cid] = e.Value?.ToString() ?? string.Empty" />
+                                <input class="ti tpc" placeholder="y" value="@Tp(_tpY, cid)" @oninput="e => _tpY[cid] = e.Value?.ToString() ?? string.Empty" />
+                                <input class="ti tpc" placeholder="z" value="@Tp(_tpZ, cid)" @oninput="e => _tpZ[cid] = e.Value?.ToString() ?? string.Empty" />
+                                <button class="btn" disabled="@_busy" @onclick="() => TeleportToCoords(cid)">Go</button>
+                            </div>
                         }
                         else
                         {
@@ -90,9 +111,15 @@
     private string? _notice;
     private readonly Dictionary<uint, string> _msgs = new();
     private readonly Dictionary<uint, string> _cmds = new();
+    private readonly Dictionary<uint, uint> _tpTarget = new();
+    private readonly Dictionary<uint, string> _tpMap = new(), _tpX = new(), _tpY = new(), _tpZ = new();
 
     private string Msg(uint id) => _msgs.TryGetValue(id, out var v) ? v : "";
     private string Cmd(uint id) => _cmds.TryGetValue(id, out var v) ? v : "";
+    private uint TpTarget(uint id) => _tpTarget.TryGetValue(id, out var v) ? v : 0;
+    private static string Tp(Dictionary<uint, string> d, uint id) => d.TryGetValue(id, out var v) ? v : "";
+    private List<LiveSession> Others(uint id) =>
+        _online?.Where(o => o.CharacterId is not null && o.CharacterId != id).ToList() ?? [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -143,6 +170,41 @@
         await Refresh();
         _busy = false;
     }
+
+    // Teleport the source character to wherever the selected target character currently is (their live map + position).
+    private async Task TeleportToPlayer(uint srcId)
+    {
+        var targetId = TpTarget(srcId);
+        if (targetId == 0) return;
+        _busy = true;
+        var live = await Live.GetCharacterLiveAsync(targetId);
+        if (live is null)
+            _notice = "Couldn't read the target's live position (not connected?).";
+        else
+            _notice = await Live.TeleportAsync(srcId, live.MapId, live.X, live.Y, live.Z) ?? "Server unreachable.";
+        await Refresh();
+        _busy = false;
+    }
+
+    // Teleport the source character to a raw map and/or x/y/z (blank map = current map; blank coords = map default).
+    private async Task TeleportToCoords(uint srcId)
+    {
+        uint? map = uint.TryParse(Tp(_tpMap, srcId), out var mv) ? mv : null;
+        float? Parse(string s) => float.TryParse(s, System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out var f) ? f : null;
+        var (x, y, z) = (Parse(Tp(_tpX, srcId)), Parse(Tp(_tpY, srcId)), Parse(Tp(_tpZ, srcId)));
+
+        // Need either a map or a full coordinate triple.
+        if (map is null && (x is null || y is null || z is null))
+        {
+            _notice = "Enter a map id, or a full x/y/z (and optionally a map).";
+            return;
+        }
+        _busy = true;
+        _notice = await Live.TeleportAsync(srcId, map, x, y, z) ?? "Server unreachable.";
+        await Refresh();
+        _busy = false;
+    }
 }
 
 <style>
@@ -165,6 +227,13 @@
     .quick { margin-top: .5rem; flex-wrap: wrap; }
     .quick .cmd { min-width: 10rem; }
     .panel .btn { padding: .5rem .9rem; white-space: nowrap; }
+
+    .tp { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; margin-top: .5rem;
+        padding-top: .5rem; border-top: 1px solid var(--stone-dark); }
+    .tplabel { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+    .tp .tpor { color: var(--muted); font-size: .75rem; }
+    .tp .tpsel { flex: 0 1 11rem; }
+    .tp .tpc { flex: 0 0 4.2rem; }
 
     .phead { display: flex; align-items: baseline; gap: .5rem; margin-bottom: .6rem; }
     .pname { color: var(--gold-bright); font-weight: 600; }

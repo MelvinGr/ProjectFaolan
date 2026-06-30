@@ -16,6 +16,9 @@ namespace Faolan.Web.Services
 		uint Handle, string Name, string Kind, uint Level, bool Hostile, bool Dead,
 		uint? Health, uint? MaxHealth, float X, float Y, float Z);
 
+	// A connected character's live map + position (subset of CharacterLiveState).
+	public sealed record CharLive(uint MapId, float X, float Y, float Z);
+
 	// Queries the RUNNING game server's in-process MCP endpoint (http://127.0.0.1:{McpPort}/mcp) for live presence.
 	// Faolan.Web is a separate process, so the only window into the server's in-memory sessions is this MCP call
 	// (DB-only data can't see who is connected right now). Returns null when the server/MCP endpoint is unreachable
@@ -78,6 +81,38 @@ namespace Faolan.Web.Services
 		public Task<string?> RunGmCommandAsync(uint characterId, string command, CancellationToken ct = default)
 			=> CallAsync("run_gm_command",
 				new Dictionary<string, object?> { ["characterId"] = characterId, ["command"] = command }, ct);
+
+		// A connected character's LIVE map + position (from get_character's Live block), or null if not connected /
+		// server offline. Used to teleport one character to another.
+		public async Task<CharLive?> GetCharacterLiveAsync(uint characterId, CancellationToken ct = default)
+		{
+			var text = await CallAsync("get_character",
+				new Dictionary<string, object?> { ["characterId"] = characterId }, ct);
+			if (text is null || !text.TrimStart().StartsWith('{'))
+				return null;
+			try { return JsonSerializer.Deserialize<GetCharResult>(text, JsonOptions)?.Live; }
+			catch { return null; }
+		}
+
+		private sealed record GetCharResult(CharLive? Live);
+
+		// Teleport a connected character to a destination, via the .teleport GM command (full map+coords form). Pass a
+		// map id and x/y/z to land at a position on another map; x/y/z alone moves on the current map; map alone jumps
+		// to that map's default. Returns the tool's status text (null = server offline).
+		public Task<string?> TeleportAsync(uint characterId, uint? mapId, float? x, float? y, float? z, CancellationToken ct = default)
+		{
+			var inv = System.Globalization.CultureInfo.InvariantCulture;
+			string cmd;
+			if (mapId is { } m && x is { } px && y is { } py && z is { } pz)
+				cmd = $"teleport {m} {px.ToString(inv)} {py.ToString(inv)} {pz.ToString(inv)}";
+			else if (x is { } ax && y is { } ay && z is { } az)
+				cmd = $"teleport {ax.ToString(inv)} {ay.ToString(inv)} {az.ToString(inv)}";
+			else if (mapId is { } mo)
+				cmd = $"teleport {mo}";
+			else
+				return Task.FromResult<string?>("Give a map and/or x y z.");
+			return RunGmCommandAsync(characterId, cmd, ct);
+		}
 
 		// Force-disconnect one connected character. Returns the tool's status text, or null if the server is offline.
 		public Task<string?> KickPlayerAsync(uint characterId, CancellationToken ct = default)
