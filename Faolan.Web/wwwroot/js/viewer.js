@@ -249,13 +249,22 @@ function clearThumb(slot, img) {
 }
 
 export async function populateItemThumbs() {
-    for (const slot of document.querySelectorAll('.slot[data-item]')) {
+    const slots = document.querySelectorAll('.slot[data-item]');
+
+    // Pass 1 (synchronous): drop every stale thumbnail up front, so a paged/reused slot never shows the PREVIOUS
+    // item's icon while the new ones render. Without this, slots later in the async loop below keep their old image
+    // until the loop reaches them.
+    for (const slot of slots) {
         const id = slot.getAttribute('data-item');
         const img = slot.querySelector('.slot-img');
-        if (!img) continue;
-        if (!id) { clearThumb(slot, img); continue; }     // emptied slot
-        if (img.dataset.itemDone === id) continue;         // already current
-        clearThumb(slot, img);                             // changed item — drop the old thumb first
+        if (img && img.dataset.itemDone !== id) clearThumb(slot, img);
+    }
+
+    // Pass 2 (async): render the thumbnails that are now missing.
+    for (const slot of slots) {
+        const id = slot.getAttribute('data-item');
+        const img = slot.querySelector('.slot-img');
+        if (!img || !id || img.dataset.itemDone === id) continue;
         const data = await renderItemThumb(`/api/item/${id}/model.glb`);
         if (data) {
             img.src = data;
