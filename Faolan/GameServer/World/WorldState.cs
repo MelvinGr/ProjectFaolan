@@ -379,6 +379,9 @@ namespace Faolan.GameServer.World
 			{
 				if (player.Invisible) // .invisible: a hidden player draws no aggro
 					continue;
+				if (!npc.IsVisibleTo(player)) // a quest-gated NPC (e.g. Scavenger Tuut) must not aggro/attack a player it
+					continue;                 // was never streamed to - else the player takes hits from an invisible body
+
 				var dist = Vector3.Distance(player.Position, npc.Position);
 				if (dist < nearestDist)
 				{
