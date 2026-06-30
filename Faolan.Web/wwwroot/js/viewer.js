@@ -239,13 +239,23 @@ async function renderItemThumb(url) {
     return _thumbRenderer.domElement.toDataURL('image/png');
 }
 
-// Fill each filled equipment slot (.slot[data-item]) with a rendered thumbnail of its item's 3D model.
+// Fill each filled slot (.slot[data-item], equipment + inventory) with a rendered thumbnail of its item's 3D model.
+// Clears stale thumbnails when a slot empties or changes item (inventory paging reuses the same slot elements).
+function clearThumb(slot, img) {
+    if (img.dataset.itemDone === undefined && !slot.classList.contains('has-img')) return;
+    img.removeAttribute('src');
+    delete img.dataset.itemDone;
+    slot.classList.remove('has-img');
+}
+
 export async function populateItemThumbs() {
     for (const slot of document.querySelectorAll('.slot[data-item]')) {
         const id = slot.getAttribute('data-item');
         const img = slot.querySelector('.slot-img');
-        if (!id || !img || img.dataset.itemDone === id)
-            continue;
+        if (!img) continue;
+        if (!id) { clearThumb(slot, img); continue; }     // emptied slot
+        if (img.dataset.itemDone === id) continue;         // already current
+        clearThumb(slot, img);                             // changed item — drop the old thumb first
         const data = await renderItemThumb(`/api/item/${id}/model.glb`);
         if (data) {
             img.src = data;

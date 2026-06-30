@@ -276,6 +276,23 @@ namespace Faolan.Web.Services
 			return result;
 		}
 
+		// The character's carried (non-worn) items — the backpack/quest/resource contents — as a flat, display-ordered
+		// list (container, then slot). Empty slots are dropped; the viewer packs what remains into its grid.
+		public IReadOnlyList<(uint Id, string Name, uint Count)> Inventory(uint characterId)
+		{
+			using var db = _dbFactory.CreateDbContext();
+			return db.CharacterInventory.AsNoTracking()
+				.Where(x => x.CharacterId == characterId && x.ItemId != null)
+				.Include(x => x.Item)
+				.OrderBy(x => x.Container).ThenBy(x => x.Slot)
+				.AsEnumerable()
+				.Select(x => (
+					x.Item!.Id,
+					string.IsNullOrWhiteSpace(x.Item.Name) ? $"Item {x.Item.Id}" : x.Item.Name,
+					x.Count))
+				.ToList();
+		}
+
 		// Build an item's 3D display model (the inventory mesh shown in equipment slots), or null if it has none
 		// (armour pieces carry only a worn-look id, not a display mesh - the open gear RE).
 		public byte[]? ItemModel(uint itemId)
