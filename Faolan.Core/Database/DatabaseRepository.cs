@@ -121,7 +121,6 @@ namespace Faolan.Core.Database
 		Task SaveCharacter(Character character);
 		Task SaveCharacterEquipment(CharacterEquipment equipment);
 		Task SaveCharacterScaffold(Character character);
-		Task SaveCharacterAttributes(uint characterId, ICollection<CharacterAttribute> attributes);
 		Task SaveCharacterTransform(uint characterId, Vector3 position, Quaternion rotation, uint mapId);
 
 		Task SaveCharacterBind(uint characterId, uint respawnPointId);
@@ -1331,21 +1330,6 @@ namespace Faolan.Core.Database
 				ctx.CharacterScaffoldPairs.AddRange(character.ScaffoldPairs);
 			if (character.SpawnFrame != null)
 				ctx.CharacterSpawnFrames.Add(character.SpawnFrame);
-
-			await ctx.SaveChangesAsync();
-		}
-
-		// Persists ONLY the entry-table (CharacterAttributes), leaving skills / spawn-frame / pairs untouched. Used to
-		// propagate an appearance edit into an existing scaffold (PlayerSpawnScaffoldRows.RefreshAppearance). The
-		// attributes passed in must be fresh, navigation-free rows (CharacterId only) so EF doesn't cascade-insert the
-		// parent Character - which is why this can't reuse SaveCharacterScaffold with a GetCharacterScaffold-loaded graph.
-		public async Task SaveCharacterAttributes(uint characterId, ICollection<CharacterAttribute> attributes)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-
-			ctx.CharacterAttributes.RemoveRange(ctx.CharacterAttributes.Where(a => a.CharacterId == characterId));
-			if (attributes != null)
-				ctx.CharacterAttributes.AddRange(attributes);
 
 			await ctx.SaveChangesAsync();
 		}
