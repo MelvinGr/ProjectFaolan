@@ -365,6 +365,10 @@ namespace Faolan.Core.Rdb.Assets
 			public AlphaMode Alpha { get; init; }
 			public bool IsSkinned => BlendBones != null && BonePalette != null;
 			public byte[]? BaseColorPng { get; init; }
+
+			// Optional tangent-space normal map (PNG) attached as the glTF material's normalTexture - for the body it's
+			// derived from the MIXD surface-detail/height map (muscle/ab/navel relief the flat diffuse omits).
+			public byte[]? NormalPng { get; init; }
 			public float[]? BlendWeights { get; init; }
 			public int TriangleCount => Indices.Length / 3;
 			public int VertexCount => Positions.Length / 3;

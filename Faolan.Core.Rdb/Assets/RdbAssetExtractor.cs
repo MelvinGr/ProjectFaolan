@@ -1219,15 +1219,70 @@ namespace Faolan.Core.Rdb.Assets
 			// header texture refs. Always go through BuildBodyDiffuse so the gutter dilation runs whether or not the
 			// character has tattoo decals; the atlas is opaque skin, so the alpha is always Opaque.
 			var diffuse = BuildBodyDiffuse(rdb, null, blob, tint, decals ?? []);
-			return diffuse == null
-				? subs
-				: subs
-					.Select(s => s with
-					{
-						BaseColorPng = diffuse,
-						Alpha = RenderMeshReader.AlphaMode.Opaque
-					})
-					.ToList();
+			if (diffuse == null)
+				return subs;
+
+			// The MIXD detail map (2nd header ref) as a tangent-space normal map, so the body shows the muscle/ab/navel
+			// relief the flat diffuse omits (#293).
+			var normal = BuildBodyNormal(rdb, blob);
+			return subs
+				.Select(s => s with
+				{
+					BaseColorPng = diffuse,
+					NormalPng = normal,
+					Alpha = RenderMeshReader.AlphaMode.Opaque
+				})
+				.ToList();
+		}
+
+		// Resolve the body's MIXD surface-detail map from the RenderMesh header texture refs (the single-channel one
+		// alongside the DXT1 diffuse) and turn it into a tangent-space normal-map PNG. Null when there's no MIXD ref or
+		// it can't be decoded. The MIXD channel carries height/relief detail (muscle/abs/navel/nails) the diffuse omits.
+		private static byte[]? BuildBodyNormal(RdbReader rdb, ReadOnlySpan<byte> blob)
+		{
+			foreach (var (type, id) in RenderMeshReader.ReadHeaderTextureRefs(blob))
+			{
+				if (RawBytes(rdb, type, id) is not { Length: >= 24 } raw || Encoding.ASCII.GetString(raw.AsSpan(20, 4)) != "MIXD")
+					continue;
+
+				if (FctxConverter.TryDecodeTopMip(raw, out var height, out var w, out var h, includeSingleChannel: true))
+					return NormalMapFromHeight(height, w, h);
+			}
+
+			return null;
+		}
+
+		// Convert a single-channel height/detail map (grayscale RGBA, value in R) to a tangent-space normal-map PNG via
+		// central-difference gradients. glTF normal convention: +X right, +Y up, +Z out; encoded (n*0.5+0.5). The MIXD
+		// channel is faint, so the gradient is scaled up a little to make the relief read under the viewer's soft lighting.
+		private static byte[] NormalMapFromHeight(byte[] height, int w, int h)
+		{
+			const float strength = 4f;
+			var rgba = new byte[w * h * 4];
+
+			float H(int x, int y)
+			{
+				x = Math.Clamp(x, 0, w - 1);
+				y = Math.Clamp(y, 0, h - 1);
+				return height[(y * w + x) * 4] / 255f;
+			}
+
+			for (var y = 0; y < h; y++)
+			for (var x = 0; x < w; x++)
+			{
+				var dx = (H(x + 1, y) - H(x - 1, y)) * strength;
+				var dy = (H(x, y + 1) - H(x, y - 1)) * strength;
+				// Image V runs downward while glTF normals are +Y up, so the Y gradient keeps its sign and X is negated.
+				float nx = -dx, ny = dy, nz = 1f;
+				var inv = 1f / MathF.Sqrt(nx * nx + ny * ny + nz * nz);
+				var o = (y * w + x) * 4;
+				rgba[o + 0] = (byte)Math.Clamp((nx * inv * 0.5f + 0.5f) * 255f, 0, 255);
+				rgba[o + 1] = (byte)Math.Clamp((ny * inv * 0.5f + 0.5f) * 255f, 0, 255);
+				rgba[o + 2] = (byte)Math.Clamp((nz * inv * 0.5f + 0.5f) * 255f, 0, 255);
+				rgba[o + 3] = 255;
+			}
+
+			return SkiaImage.EncodePng(rgba, w, h);
 		}
 
 		// Decode a model's geometry AND attach its own diffuse to every sub-mesh, so an assembled character textures each

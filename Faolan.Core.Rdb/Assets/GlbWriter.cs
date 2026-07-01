@@ -41,9 +41,10 @@ namespace Faolan.Core.Rdb.Assets
 			var accessors = new List<object>();
 			var primitives = new List<object>();
 
-			// Material 0 is the untextured default; each distinct (diffuse PNG, alpha-mode) pair gets its own material.
-			var textures = new List<(byte[] Png, RenderMeshReader.AlphaMode Alpha)>();
-			var materialOf = new Dictionary<(byte[], RenderMeshReader.AlphaMode), int>();
+			// Material 0 is the untextured default; each distinct (baseColor PNG, normal PNG, alpha-mode) triple gets its
+			// own material. PNGs (base + normal) are embedded once each and shared between materials that reuse them.
+			var materialKeys = new List<(byte[] Base, byte[]? Normal, RenderMeshReader.AlphaMode Alpha)>();
+			var materialOf = new Dictionary<(byte[], byte[]?, RenderMeshReader.AlphaMode), int>();
 
 			foreach (var sub in subs)
 			{
@@ -175,11 +176,11 @@ namespace Faolan.Core.Rdb.Assets
 				var material = 0;
 				if (png is { Length: > 0 } && sub.Uvs != null)
 				{
-					var key = (png, sub.Alpha);
+					var key = (png, sub.NormalPng, sub.Alpha);
 					if (!materialOf.TryGetValue(key, out material))
 					{
-						textures.Add(key);
-						material = textures.Count; // 0 = default, textured materials start at 1
+						materialKeys.Add(key);
+						material = materialKeys.Count; // 0 = default, textured materials start at 1
 						materialOf[key] = material;
 					}
 				}
@@ -216,9 +217,14 @@ namespace Faolan.Core.Rdb.Assets
 			};
 			var images = new List<object>();
 			var glTextures = new List<object>();
-			for (var i = 0; i < textures.Count; i++)
+			var textureIndexOf = new Dictionary<byte[], int>(ReferenceEqualityComparer.Instance);
+
+			// Embed a PNG once as an image+texture (deduped by reference) and return its glTF texture index.
+			int EmbedTexture(byte[] png)
 			{
-				var (png, alpha) = textures[i];
+				if (textureIndexOf.TryGetValue(png, out var existing))
+					return existing;
+
 				Align(bin);
 				var imgOffset = (int)bin.Length;
 				bin.Write(png);
@@ -229,24 +235,32 @@ namespace Faolan.Core.Rdb.Assets
 					["byteOffset"] = imgOffset,
 					["byteLength"] = png.Length
 				});
+				var imgIdx = images.Count;
 				images.Add(new Dictionary<string, object>
 				{
 					["bufferView"] = imgBv,
 					["mimeType"] = "image/png"
 				});
+				var texIdx = glTextures.Count;
 				glTextures.Add(new Dictionary<string, object>
 				{
-					["source"] = i,
+					["source"] = imgIdx,
 					["sampler"] = 0
 				});
+				textureIndexOf[png] = texIdx;
+				return texIdx;
+			}
+
+			foreach (var (basePng, normalPng, alpha) in materialKeys)
+			{
 				var material = new Dictionary<string, object>
 				{
-					["name"] = $"mat{i}",
+					["name"] = $"mat{materials.Count}",
 					["pbrMetallicRoughness"] = new Dictionary<string, object>
 					{
 						["baseColorTexture"] = new Dictionary<string, object>
 						{
-							["index"] = i,
+							["index"] = EmbedTexture(basePng),
 							["texCoord"] = 0
 						},
 						["metallicFactor"] = 0.0f,
@@ -254,6 +268,15 @@ namespace Faolan.Core.Rdb.Assets
 					},
 					["doubleSided"] = true
 				};
+				if (normalPng is { Length: > 0 })
+				{
+					material["normalTexture"] = new Dictionary<string, object>
+					{
+						["index"] = EmbedTexture(normalPng),
+						["texCoord"] = 0
+					};
+				}
+
 				if (alpha == RenderMeshReader.AlphaMode.Cutout)
 				{
 					material["alphaMode"] = "MASK";
@@ -368,7 +391,7 @@ namespace Faolan.Core.Rdb.Assets
 			if (skins != null)
 				gltf["skins"] = skins;
 
-			if (textures.Count > 0)
+			if (glTextures.Count > 0)
 			{
 				gltf["images"] = images;
 				gltf["samplers"] = new[]
