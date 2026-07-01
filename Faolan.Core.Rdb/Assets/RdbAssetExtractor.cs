@@ -96,9 +96,9 @@ namespace Faolan.Core.Rdb.Assets
 			var all = new List<RenderMeshReader.SubMesh>(body);
 
 			// Worn equipment: skinned armor meshes are authored in the SAME body-world bind-pose space as the body, so
-			// they overlay directly with no transform (the visible half of "wearing gear" - the item->mesh look mapping
-			// that picks WHICH meshindex is the separate, still-open RE in #275). Each piece carries its own diffuse via
-			// the mesh-index materials / header refs; pieces with none render untextured.
+			// they overlay directly with no transform. Which meshindex an equipped item maps to is resolved offline from
+			// the item template's field-9 sub-record (#275 SOLVED, ItemLookResolver). Each piece carries its own diffuse
+			// via the mesh-index materials / header refs; pieces with none render untextured.
 			if (equipmentMeshIndexIds is { Count: > 0 })
 			{
 				foreach (var equipId in equipmentMeshIndexIds)

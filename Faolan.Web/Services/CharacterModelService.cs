@@ -151,10 +151,9 @@ namespace Faolan.Web.Services
 				: (uint?)null;
 
 			// No explicit overlay => dress the character in their ACTUAL equipped gear, resolved from the item templates
-			// (#275, ItemLookResolver). The posable rig stays body-only (gear skinning is separate).
-			equipMeshIndexIds ??= rig
-				? null
-				: ResolveEquippedMeshes(characterId, character.Sex);
+			// (#275, ItemLookResolver). Worn armour meshes are authored in body bind-pose space, so they overlay in the
+			// static view and skin to the body skeleton in the rig path alike.
+			equipMeshIndexIds ??= ResolveEquippedMeshes(characterId, character.Sex);
 
 			return BuildFromSpec(Reader(), character.Sex, character.Race, hairRmId, headMonster, morphs, resources, equipMeshIndexIds, rig);
 		}
