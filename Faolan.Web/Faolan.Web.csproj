@@ -13,6 +13,7 @@
              SkeletonReader, ...). The web frontend reuses these to build character glTF on demand. -->
         <ProjectReference Include="..\Faolan.Core\Faolan.Core.csproj"/>
         <ProjectReference Include="..\Faolan.Core.Spawn\Faolan.Core.Spawn.csproj"/>
+        <ProjectReference Include="..\Faolan.Core.Rdb\Faolan.Core.Rdb.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
