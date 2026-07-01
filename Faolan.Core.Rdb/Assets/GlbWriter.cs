@@ -273,7 +273,10 @@ namespace Faolan.Core.Rdb.Assets
 					material["normalTexture"] = new Dictionary<string, object>
 					{
 						["index"] = EmbedTexture(normalPng),
-						["texCoord"] = 0
+						["texCoord"] = 0,
+						// Half strength: the full BC5 relief over-darkens the breast underside/creases under the viewer's
+						// soft lighting; 0.5 keeps the ab/collarbone/muscle detail without the harsh shadows.
+						["scale"] = 0.5f
 					};
 				}
 

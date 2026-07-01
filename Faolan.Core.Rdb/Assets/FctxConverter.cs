@@ -184,6 +184,32 @@ namespace Faolan.Core.Rdb.Assets
 				: BcDecoder.DecodeBc4(chain.Slice(chain.Length - topLen, topLen), width, height);
 		}
 
+		// Decode the full-res tangent-space NORMAL map from a MIXD container to RGBA (X=R, Y=G, Z reconstructed). The
+		// MIXD layout (all body maps, 1024x1024) is: [seg1 spec/gloss ??][BC5/ATI2 normal chain][ "ATI1" ][BC4 detail
+		// chain]. The BC5 normal chain sits immediately before the "ATI1" tag and is smallest-first, so its full-res mip
+		// is the topLen bytes ending at the tag. Returns false when there's no MIXD/ATI1 or the chain is too short.
+		public static bool TryDecodeMixdNormal(ReadOnlySpan<byte> payload, out byte[] rgba, out int width, out int height)
+		{
+			rgba = [];
+			width = height = 0;
+			if (!IsFctx(payload) || payload.Length < 24)
+				return false;
+
+			width = BinaryPrimitives.ReadUInt16LittleEndian(payload.Slice(12, 2));
+			height = BinaryPrimitives.ReadUInt16LittleEndian(payload.Slice(14, 2));
+			if (Encoding.ASCII.GetString(payload.Slice(20, 4)) != "MIXD")
+				return false;
+
+			var pixels = payload[24..];
+			var tag = pixels.LastIndexOf(Ati1Tag);
+			var topLen = MipSize(width, height, 1, 16); // BC5 = 16 bytes/block
+			if (tag < topLen)
+				return false;
+
+			rgba = BcDecoder.DecodeBc5Normal(pixels.Slice(tag - topLen, topLen), width, height);
+			return true;
+		}
+
 		// BCn block size at mip level n (1-based; n=1 is full resolution). Blocks cover 4x4 texel tiles.
 		private static int MipSize(int width, int height, int n, int blockSize)
 		{

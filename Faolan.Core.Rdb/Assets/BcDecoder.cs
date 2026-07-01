@@ -75,6 +75,49 @@ namespace Faolan.Core.Rdb.Assets
 			return rgba;
 		}
 
+		// Decode BC5 / ATI2 (two BC4 8-byte blocks per 16-byte block: X in the first, Y in the second) to an RGB
+		// tangent-space normal map: R=X, G=Y stored directly (already 0..255 = -1..1), B = reconstructed Z
+		// (sqrt(1-x^2-y^2), re-encoded *0.5+0.5), A=255. Used for the MIXD container's BC5 normal sub-texture.
+		public static byte[] DecodeBc5Normal(ReadOnlySpan<byte> blocks, int width, int height)
+		{
+			var rgba = new byte[width * height * 4];
+			var blocksW = Math.Max(1, (width + 3) / 4);
+			var blocksH = Math.Max(1, (height + 3) / 4);
+
+			var p = 0;
+			for (var by = 0; by < blocksH; by++)
+			for (var bx = 0; bx < blocksW; bx++)
+			{
+				if (p + 16 > blocks.Length)
+					return rgba;
+
+				Span<byte> xs = stackalloc byte[16];
+				Span<byte> ys = stackalloc byte[16];
+				DecodeAlphaBlock(blocks.Slice(p, 8), xs);
+				DecodeAlphaBlock(blocks.Slice(p + 8, 8), ys);
+				for (var i = 0; i < 16; i++)
+				{
+					var x = bx * 4 + (i & 3);
+					var y = by * 4 + (i >> 2);
+					if (x >= width || y >= height)
+						continue;
+
+					var nx = xs[i] / 127.5f - 1f;
+					var ny = ys[i] / 127.5f - 1f;
+					var nz = MathF.Sqrt(Math.Max(0f, 1f - nx * nx - ny * ny));
+					var o = (y * width + x) * 4;
+					rgba[o + 0] = xs[i];
+					rgba[o + 1] = ys[i];
+					rgba[o + 2] = (byte)((nz * 0.5f + 0.5f) * 255f);
+					rgba[o + 3] = 255;
+				}
+
+				p += 16;
+			}
+
+			return rgba;
+		}
+
 		private static void DecodeAlphaBlock(ReadOnlySpan<byte> b, Span<byte> outAlpha)
 		{
 			Span<int> a = stackalloc int[8];
