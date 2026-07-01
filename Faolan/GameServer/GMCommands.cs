@@ -1148,7 +1148,18 @@ namespace Faolan.GameServer
 			// On an increase, emit the retail level-up attribute feedback (one AttributeChanged line per primary) so
 			// the change shows the same as an XP-driven ding (#209); the vitals push above already raised the maxima.
 			if (level > previousLevel)
+			{
 				await SendLevelUpFeedback(client, level, (uint)(level - previousLevel));
+
+				// Level-gated ability unlocks, announced - same as the XP-driven ding (CombatService.PushLevelUp):
+				// retail grants e.g. Rest as an announced 0x2052 at the L1->L2 ding (#209/#73).
+				foreach (var ability in await Database.GetStartingAbilities(level, (uint)character.Class))
+				{
+					if (ability.Level > previousLevel)
+						await SendAbilityGrant(client, ability);
+				}
+			}
+
 			await _agentServerDispatcher.SendSystemMessage(character.Id, $"Level set to {level} (relog to refresh the full character sheet).");
 		}
 

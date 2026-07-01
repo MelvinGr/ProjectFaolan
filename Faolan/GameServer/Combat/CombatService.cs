@@ -37,14 +37,20 @@ namespace Faolan.GameServer.Combat
 
 		private readonly WorldSimulation _sim;
 
+		// The announced 0x2052 ability grant lives on the listener (GrantAbilitiesBuilder); the XP-driven ding needs
+		// it for level-gated unlocks (#209/#73 - Rest at L2), so it's injected as the single-op delegate seam the
+		// composition pattern prescribes (CLAUDE.md). Null-safe for tests that construct the service without it.
+		private readonly Func<INetworkClient, Ability, Task> _announceAbilityGrant;
+
 		// Quest kill-goals route through the QuestProgressionService (#261), which owns the broadcaster + system-message
 		// seams; combat packets frame themselves directly (SendWorldPacket), so this service no longer needs either.
-		public CombatService(WorldSimulation sim, IDatabaseRepository database, QuestProgressionService questProgression, ILogger logger)
+		public CombatService(WorldSimulation sim, IDatabaseRepository database, QuestProgressionService questProgression, ILogger logger, Func<INetworkClient, Ability, Task> announceAbilityGrant = null)
 		{
 			_sim = sim;
 			_database = database;
 			_questProgression = questProgression;
 			_logger = logger;
+			_announceAbilityGrant = announceAbilityGrant;
 		}
 
 		// Builds the BCC behavior echo a VIEWER should receive to render this actor's swing/cast: the same plain
@@ -461,6 +467,20 @@ namespace Faolan.GameServer.Combat
 				.Set(LegacyCharacterStatId.Exp, character.Experience)
 				.Set(LegacyCharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
 			await SendStatUpdate(killer, block, killer.Session.Account.ClientInstance);
+
+			// Level-gated ability unlocks (#209/#73): retail grants the abilities that unlock at the new level as
+			// ANNOUNCED 0x2052s at the ding (Rest at the L1->L2 ding - Blablabla frame 9937, Blablatest 1357,
+			// Stihetfv 685 - and in every L2+ char's login re-grant). GetStartingAbilities is level-filtered, so
+			// the ding grants are the delta above the pre-ding level.
+			if (_announceAbilityGrant != null)
+			{
+				var previousLevel = character.Level - levelsGained;
+				foreach (var ability in await _database.GetStartingAbilities(character.Level, (uint)character.Class))
+				{
+					if (ability.Level > previousLevel)
+						await _announceAbilityGrant(killer, ability);
+				}
+			}
 		}
 
 		// The NPC's authoritative live vitals: the world-model entity's if it is a tracked NPC (also returned, so the

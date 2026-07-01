@@ -124,7 +124,7 @@ namespace Faolan.GameServer
 			_persistence = new PlayerPersistenceService(database, logger, _simulation);
 			_broadcaster = new WorldBroadcaster(_simulation, database, logger);
 			_questProgression = new QuestProgressionService(database, _broadcaster, agentServerDispatcher, logger);
-			_combat = new CombatService(_simulation, database, _questProgression, logger);
+			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAbilityGrant(c, a)); // announced level-up unlocks (#209/#73)
 			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression, _luaVm);
 			_loot = new LootService(_broadcaster, this, database, _questProgression, logger);
 			_equipment = new EquipmentService(database, logger);

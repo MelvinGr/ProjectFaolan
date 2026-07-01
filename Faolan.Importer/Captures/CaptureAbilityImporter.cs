@@ -34,7 +34,19 @@ namespace Faolan.Importer.Captures
 			[769095] = "Normal Attack Right",
 			[769099] = "Normal Attack Front",
 			[3316611] = "Toggle Combat",
-			[3675584] = "Switch Weapon"
+			[3675584] = "Switch Weapon",
+			[269272] = "Rest"
+		};
+
+		// Abilities whose grant is LEVEL-gated, not part of the L1 create kit (#209/#73). Rest (269272) is absent
+		// from every create capture's login grants but arrives as an announced 0x2052 at the first ding (L1->L2:
+		// Blablabla frame 9937, Blablatest 1357, Stihetfv 685) and is in every L2+ char's login re-grant - so its
+		// unlock level is 2. The create-capture starter scan would otherwise misattribute it as a starting ability
+		// (the ding happens inside the create captures). GetStartingAbilities filters Level <= level, so a known
+		// level both keeps it out of the L1 kit and re-grants it on every L2+ login, matching all 30+ captures.
+		private static readonly Dictionary<uint, byte> KnownLevels = new Dictionary<uint, byte>
+		{
+			[269272] = 2 // Rest
 		};
 
 		// rawPackets = ALL captures (catalogs every ability's Slot/Data identity seen on the wire). createCaptures =
@@ -99,6 +111,7 @@ namespace Faolan.Importer.Captures
 				a.Data2 = g.D2;
 				a.Data3 = g.D3;
 				a.Data4 = g.D4;
+				a.Level = KnownLevels.GetValueOrDefault(id, (byte)1);
 				a.IsStartingAbility = starters.Contains(id);
 				a.Class = starters.Contains(id)
 					? ClassFor(id)

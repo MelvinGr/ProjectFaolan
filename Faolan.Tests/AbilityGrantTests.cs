@@ -25,7 +25,18 @@ namespace Faolan.Tests
 			 1660108369u,
 			 1296666148u,
 			 2957995211u,
-			 "00000070000bbc4b000bbc4b000000000000000149314b4bcd429cfd62f33e514d498e24b04f6ccbcd429cfd62f33e514d498e24b04f6ccbb290805c29e627cab290805c29e627ca000000010000000001")]
+			 "00000070000bbc4b000bbc4b000000000000000149314b4bcd429cfd62f33e514d498e24b04f6ccbcd429cfd62f33e514d498e24b04f6ccbb290805c29e627cab290805c29e627ca000000010000000001"),
+		 // The level-gated Rest unlock (#209/#73): the announced grant retail sends at the L1->L2 ding (Blablabla
+		 // levelup capture, frame 9937) - the SAME grant grammar, proving the ding grant needs no new builder,
+		 // only the level-gated hook + the Level=2 row.
+		 InlineData(269272u,
+			 106u,
+			 1312109365u,
+			 2023574725u,
+			 3133773807u,
+			 3870783406u,
+			 1887832719u,
+			 "0000006a00041bd800041bd800000000000000014e353335789d4cc5bac997efe6b777ae70860a8f789d4cc5bac997efe6b777ae70860a8fb290805c29e627cab290805c29e627ca000000010000000001")]
 		public void BuildAbilityGrantBody_MatchesCapture(uint id, uint slot, uint data0, uint data1, uint data2, uint data3, uint data4, string expectedHex)
 		{
 			var ability = new Ability
