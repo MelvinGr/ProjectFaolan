@@ -823,8 +823,9 @@ namespace Faolan.Core.Rdb.Assets
 				: ((float)(sx / n), (float)(sy / n), (float)(sz / n));
 		}
 
-		// Decode the body's base diffuse to RGBA, paste the character's tattoo decals onto it (texscript projecttexture is
-		// a 2D texture-space placement, not a 3D projection - Ghidra ProjectTextureOperation_c), then encode (+ skin tint).
+		// Decode the body's base diffuse to RGBA, dilate its background gutter into the skin (BodyAtlasDilator, so UV-island
+		// seams don't sample the flat gutter), paste the character's tattoo decals on top (texscript projecttexture is a 2D
+		// texture-space placement, not a 3D projection - Ghidra ProjectTextureOperation_c), then encode (+ skin tint).
 		private static byte[]? BuildBodyDiffuse(RdbReader rdb, MeshIndexFile? mesh, ReadOnlySpan<byte> blob, Tint? tint, IReadOnlyList<BodyDecal> decals)
 		{
 			byte[]? rgba = null;
@@ -846,6 +847,14 @@ namespace Faolan.Core.Rdb.Assets
 
 			if (rgba == null)
 				return null;
+
+			// Pad the atlas: fill the flat tan background gutter with the nearest skin colour (then smooth it) so the mesh's
+			// UV-island edge triangles don't sample the gutter and show as lighter seam/blotch artifacts (the atlas
+			// edge-padding a game engine does at texture-build time; the raw RDB atlas lacks it). Island pixels are kept
+			// exactly; decals below paste onto those island pixels. Cached per source atlas inside the dilator.
+			rgba = BodyAtlasDilator.Dilate(rgba, w, h);
+
+			//TODO: Scale 2x as test
 
 			// Ghidra (ProjectTextureOperation_c / FUN_00d88d50, projecttextureoperation.cpp): the decal is pasted into the
 			// base diffuse's TEXTURE space as a rect centred at (ucoord, vcoord), half-size = decalDim * scale*0.01 * 0.5 /
@@ -1206,18 +1215,17 @@ namespace Faolan.Core.Rdb.Assets
 					BodyMorphDeformer.Apply(sub.Positions, m);
 			}
 
-			// Skinned bodies have no material manifest, so pass no MeshIndexFile - the diffuse resolves from the blob's
-			// own header texture refs (with decals pasted in atlas space when present, else plain + skin tint).
-			var (diffuse, alpha) = decals is { Count: > 0 }
-				? (BuildBodyDiffuse(rdb, null, blob, tint, decals), RenderMeshReader.AlphaMode.Opaque)
-				: DecodeDiffusePng(rdb, null, blob, tint);
+			// Skinned bodies have no material manifest, so pass no MeshIndexFile - the diffuse resolves from the blob's own
+			// header texture refs. Always go through BuildBodyDiffuse so the gutter dilation runs whether or not the
+			// character has tattoo decals; the atlas is opaque skin, so the alpha is always Opaque.
+			var diffuse = BuildBodyDiffuse(rdb, null, blob, tint, decals ?? []);
 			return diffuse == null
 				? subs
 				: subs
 					.Select(s => s with
 					{
 						BaseColorPng = diffuse,
-						Alpha = alpha
+						Alpha = RenderMeshReader.AlphaMode.Opaque
 					})
 					.ToList();
 		}
