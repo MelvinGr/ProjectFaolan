@@ -819,3 +819,104 @@
         grid-template-columns: repeat(4, 44px);
     }
 }
+
+/* Floating-window collapse button (in the drag bar) + collapsed state (hide the body, keep the bar). */
+.win-collapse {
+    margin-left: auto;
+    width: 20px;
+    height: 20px;
+    line-height: 1;
+    border: 1px solid var(--stone);
+    border-radius: 4px;
+    background: #0004;
+    color: var(--gold);
+    cursor: pointer;
+    font-size: .8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.win-collapse:hover {
+    background: #b8954422;
+    border-color: var(--gold);
+}
+
+.pose-window.collapsed .win-body,
+.pose-window.collapsed .edit-scroll,
+.pose-window.collapsed .edit-actions,
+.pose-window.collapsed .edit-error {
+    display: none;
+}
+
+.pose-window.collapsed .pose-window-bar {
+    border-bottom: 0;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+/* Idle-animation on/off toggle in the pose window. */
+.idle-toggle {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    font-size: .72rem;
+    color: #c9c2ab;
+    margin-bottom: .5rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.idle-toggle input {
+    accent-color: var(--gold);
+    cursor: pointer;
+}
+
+/* Per-slot show/hide-in-render toggle (top-right of an equipped paper-doll slot). ● shown, ○ hidden. */
+.slot-hide {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    line-height: 1;
+    border: 1px solid var(--stone);
+    border-radius: 50%;
+    background: #12141a;
+    color: var(--gold);
+    font-size: .6rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3;
+    opacity: 0;
+    transition: opacity .1s;
+}
+
+.slot:hover .slot-hide,
+.slot-hide.off {
+    opacity: 1;
+}
+
+.slot-hide.off {
+    color: #7a7566;
+    border-style: dashed;
+}
+
+.slot-hide:hover {
+    border-color: var(--gold);
+}
+
+/* Reset the morph-slider fieldset wrapper (no default fieldset chrome); dim it when disabled (non-owned char). */
+.morph-set {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+}
+
+.morph-set:disabled {
+    opacity: .5;
+}

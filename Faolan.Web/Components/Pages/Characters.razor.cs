@@ -36,6 +36,17 @@ namespace Faolan.Web.Components.Pages
 		private IReadOnlyList<(string Name, byte Level, float Range, float Damage)> _spells = [];
 
 		private List<Character>? _characters;
+
+		// The signed-in account (null = anonymous public viewer). Ownership gates the inventory panel + appearance editing.
+		private uint? _accountId;
+		private bool _ownsSelected;
+
+		// Viewer toggles: which equipment slots are hidden from the 3D render, whether the synthetic idle plays, and the
+		// collapsed state of each floating window.
+		private readonly HashSet<string> _hiddenSlots = [];
+		private bool _idleOn = true;
+		private bool _poseCollapsed, _editCollapsed;
+
 		private string _editStatus = "";
 		private string _eHairStyle = "", _eHairColor = "", _eEyes = "", _eSkin = "", _eBodyTat = "", _eFaceTat = "";
 		private string _invTab = "Normal";
@@ -90,7 +101,10 @@ namespace Faolan.Web.Components.Pages
 			{
 				var user = (await AuthState).User;
 				if (user.Identity?.IsAuthenticated == true && uint.TryParse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var accountId))
+				{
+					_accountId = accountId;
 					query = query.Where(c => c.AccountId == accountId);
+				}
 			}
 
 			_characters = await query.OrderBy(c => c.Name).ToListAsync();
@@ -208,7 +222,7 @@ namespace Faolan.Web.Components.Pages
 
 		// (Re)build the selected character's model, overlaying the chosen armour set. Cache-bust so a rebuilt/redressed
 		// model isn't masked by the browser's cached glb.
-		private async Task Render()
+		private async Task Render(bool keepCamera = false)
 		{
 			if (_selected == null)
 				return;
@@ -216,13 +230,37 @@ namespace Faolan.Web.Components.Pages
 			_status = "building…";
 			StateHasChanged();
 
-			// The posable character rig (skinned body + head + hair), driven by the elbow slider.
-			var url = $"/api/character/{_selected.Id}/model.glb?rig=1&t={DateTime.UtcNow.Ticks}";
+			// The posable character rig (skinned body + head + hair). ?hide= drops the slots toggled off in the paper-doll.
+			var hide = _hiddenSlots.Count > 0
+				? "&hide=" + Uri.EscapeDataString(string.Join(',', _hiddenSlots))
+				: "";
+			var url = $"/api/character/{_selected.Id}/model.glb?rig=1{hide}&t={DateTime.UtcNow.Ticks}";
 			if (_module != null)
-				await _module.InvokeVoidAsync("show", "char-canvas", url);
+			{
+				await _module.InvokeVoidAsync("show", "char-canvas", url, keepCamera);
+				await _module.InvokeVoidAsync("setIdle", "char-canvas", _idleOn);
+			}
 
 			_status = "loaded";
 			StateHasChanged();
+		}
+
+		// Show/hide one equipped piece in the 3D render (per-slot paper-doll toggle). Keeps the camera so toggling doesn't
+		// reframe the view.
+		private async Task ToggleSlotHidden(string slot)
+		{
+			if (!_hiddenSlots.Add(slot))
+				_hiddenSlots.Remove(slot);
+
+			await Render(keepCamera: true);
+		}
+
+		// Enable/disable the synthetic idle animation.
+		private async Task ToggleIdle(ChangeEventArgs e)
+		{
+			_idleOn = e.Value as bool? ?? true;
+			if (_module != null)
+				await _module.InvokeVoidAsync("setIdle", "char-canvas", _idleOn);
 		}
 
 		private async Task RevertEdit()
@@ -261,6 +299,8 @@ namespace Faolan.Web.Components.Pages
 		private async Task Select(Character c)
 		{
 			_selected = c;
+			_ownsSelected = _accountId is { } aid && c.AccountId == aid;
+			_hiddenSlots.Clear();
 			_equipment = Models.Equipment(c.Id);
 			_inventory = Models.Inventory(c.Id);
 			// Open on the first tab that actually has items (most characters only carry Normal).
@@ -294,7 +334,8 @@ namespace Faolan.Web.Components.Pages
 					? it
 					: null,
 				slot,
-				extra);
+				extra,
+				slot);
 		}
 
 		// Wallet in tin -> gold/silver/copper/tin (100 tin = 1 copper, 100 copper = 1 silver, 100 silver = 1 gold).

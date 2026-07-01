@@ -166,11 +166,16 @@ namespace Faolan.Web
 			// ?equip=290301,290354 overlays those armor MESHINDEXFILE ids on the character (gear preview, #275).
 			// ?rig=1 returns the character's BODY as a posable skinned rig instead of the static assembled model.
 			app.MapGet("/api/character/{id:long}/model.glb",
-				(long id, string? equip, string? rig, CharacterModelService models) =>
+				(long id, string? equip, string? rig, string? hide, CharacterModelService models) =>
 				{
+					// ?hide=Chest,Legs drops those equipment slots from the auto-resolved gear (the viewer's per-slot toggle).
+					var hidden = hide
+						?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+						.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
 					if (rig is "1" or "true" or "True")
 					{
-						var rigGlb = models.BuildCharacterRig((uint)id);
+						var rigGlb = models.BuildCharacterRig((uint)id, hidden);
 						return rigGlb == null
 							? Results.NotFound()
 							: Results.File(rigGlb, "model/gltf-binary");
@@ -186,7 +191,8 @@ namespace Faolan.Web
 					var glb = models.BuildCharacterById((uint)id,
 						equipIds is { Count: > 0 }
 							? equipIds
-							: null);
+							: null,
+						hiddenSlots: hidden);
 					return glb == null
 						? Results.NotFound()
 						: Results.File(glb, "model/gltf-binary");

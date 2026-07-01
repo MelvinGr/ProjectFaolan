@@ -128,7 +128,7 @@ namespace Faolan.Web.Services
 		// Build a specific character by id, using their stored appearance (CharacterBodyResources) - currently the
 		// chosen hairstyle (*hairmesh_NNN, where NNN is the hair rendermesh id). Head morph/face texscript still pending
 		// the CHARACTERCREATOR (1010700) decode (#275); HeadMesh is a creator index, not a resource id.
-		public byte[]? BuildCharacterById(uint characterId, IReadOnlyList<uint>? equipMeshIndexIds = null, bool rig = false)
+		public byte[]? BuildCharacterById(uint characterId, IReadOnlyList<uint>? equipMeshIndexIds = null, bool rig = false, IReadOnlySet<string>? hiddenSlots = null)
 		{
 			using var db = _dbFactory.CreateDbContext();
 			var character = db.Characters.AsNoTracking().FirstOrDefault(c => c.Id == characterId);
@@ -152,8 +152,9 @@ namespace Faolan.Web.Services
 
 			// No explicit overlay => dress the character in their ACTUAL equipped gear, resolved from the item templates
 			// (#275, ItemLookResolver). Worn armour meshes are authored in body bind-pose space, so they overlay in the
-			// static view and skin to the body skeleton in the rig path alike.
-			equipMeshIndexIds ??= ResolveEquippedMeshes(characterId, character.Sex);
+			// static view and skin to the body skeleton in the rig path alike. hiddenSlots drops individual pieces (the
+			// viewer's per-slot show/hide toggle).
+			equipMeshIndexIds ??= ResolveEquippedMeshes(characterId, character.Sex, hiddenSlots);
 
 			return BuildFromSpec(Reader(), character.Sex, character.Race, hairRmId, headMonster, morphs, resources, equipMeshIndexIds, rig);
 		}
@@ -161,7 +162,7 @@ namespace Faolan.Web.Services
 		// Resolve a character's worn armour MESHINDEXFILE ids from their equipped items (#275). Each equipped item's
 		// decrypted template carries its worn mesh(es) in field 9 (ItemLookResolver); weapons/jewellery carry none.
 		// Male/female variants of one garment collapse to the character's sex. Login-independent - RDB + faolan.db only.
-		public IReadOnlyList<uint> ResolveEquippedMeshes(uint characterId, Sex sex)
+		public IReadOnlyList<uint> ResolveEquippedMeshes(uint characterId, Sex sex, IReadOnlySet<string>? hiddenSlots = null)
 		{
 			using var db = _dbFactory.CreateDbContext();
 			var eq = db.CharacterEquipment.AsNoTracking()
@@ -172,12 +173,22 @@ namespace Faolan.Web.Services
 			if (eq == null)
 				return [];
 
+			// Slot names match the viewer's equipment paper-doll labels so a hidden slot maps 1:1 to the hide toggle.
+			var slots = new (string Slot, Item? Item)[]
+			{
+				("Head", eq.Head), ("Chest", eq.Chest), ("Legs", eq.Legs), ("Hands", eq.Hands), ("Boots", eq.Boots),
+				("Shoulder", eq.Shoulder), ("Wrist", eq.Wrist), ("Belt", eq.Belt), ("Cloak", eq.Cloak), ("Tokens", eq.Tokens)
+			};
+
 			var rdb = Reader();
 			var want = sex == Sex.Female ? "Female" : "Male";
 			var seen = new HashSet<uint>();
 			var result = new List<uint>();
-			foreach (var item in new[] { eq.Head, eq.Chest, eq.Legs, eq.Hands, eq.Boots, eq.Shoulder, eq.Wrist, eq.Belt, eq.Cloak, eq.Tokens })
+			foreach (var (slot, item) in slots)
 			{
+				if (hiddenSlots != null && hiddenSlots.Contains(slot))
+					continue;
+
 				var template = DecryptTemplate(rdb, item);
 				if (template == null)
 					continue;
@@ -248,9 +259,9 @@ namespace Faolan.Web.Services
 		// Build a character as a posable rig (skinned glb): the full assembled character - body (morphs + skin + decals) +
 		// head + hair - skinned to the auto-selected skeleton, so the viewer's pose slider can articulate it. The body
 		// skins to its own bones; the rigid head/hair are bound to the Head bone. (Gear skinning is the separate #275 work.)
-		public byte[]? BuildCharacterRig(uint characterId)
+		public byte[]? BuildCharacterRig(uint characterId, IReadOnlySet<string>? hiddenSlots = null)
 		{
-			return BuildCharacterById(characterId, null, true);
+			return BuildCharacterById(characterId, null, true, hiddenSlots);
 		}
 
 		// Build a single named model (any MESHINDEXFILE id) - lets the viewer show equipment/props too.

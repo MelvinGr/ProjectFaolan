@@ -259,6 +259,16 @@ function applyPose(state) {
     }
 }
 
+// Enable/disable the synthetic idle animation for a canvas. When turned off, snap the rig back to its bind+pose so
+// it holds still instead of freezing mid-breath.
+export function setIdle(canvasId, on) {
+    const state = states.get(canvasId);
+    if (!state) return false;
+    state.idle = !!on;
+    if (!state.idle && state.skinned) applyPose(state);
+    return true;
+}
+
 // Set one pose control to `deg` degrees (0 = rest). Driven by the per-joint sliders.
 export function setPose(canvasId, id, deg) {
     const state = states.get(canvasId);

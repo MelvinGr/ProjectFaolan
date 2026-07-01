@@ -157,9 +157,11 @@
             </div>
         </div>
 
-        @{
+        @* Inventory is private: only shown for a character the signed-in account owns. *@
+        @if (_ownsSelected)
+        {
             var tabItems = TabItems;
-        }
+
         <div class="inv-window">
             <div class="inv-tabs">
                 @foreach (var tab in InvTabs)
@@ -203,15 +205,25 @@
                 }
             </div>
         </div>
+        }
     </section>
 
     @if (_selected != null)
     {
-        <div class="pose-window" id="pose-window">
+        <div class="pose-window @(_poseCollapsed ? "collapsed" : "")" id="pose-window">
             <div class="pose-window-bar" id="pose-window-bar">
                 <span class="pose-window-title">Pose — @_selected.Name</span>
+                <button class="win-collapse" type="button" title="@(_poseCollapsed ? "Expand" : "Collapse")"
+                        @onclick="() => _poseCollapsed = !_poseCollapsed" @onclick:stopPropagation="true"
+                        @onpointerdown:stopPropagation="true">@(_poseCollapsed ? "▢" : "—")</button>
             </div>
-            <div class="tip-controls" id="pose-controls"></div>
+            <div class="win-body">
+                <label class="idle-toggle">
+                    <input type="checkbox" checked="@_idleOn" @onchange="ToggleIdle"/>
+                    <span>Idle animation</span>
+                </label>
+                <div class="tip-controls" id="pose-controls"></div>
+            </div>
         </div>
     }
 
@@ -224,6 +236,8 @@
 
             <div class="edit-scroll">
                 <div class="edit-head">Body</div>
+                @* Morph sliders are editable only for a character you own — a disabled fieldset greys out all 7. *@
+                <fieldset class="morph-set" disabled="@(!_ownsSelected)">
                 <label class="pose"><span>Arm</span><input type="range" min="@MorphMin("arm")" max="@MorphMax("arm")"
                                                            @bind="_eArm" @bind:after="PreviewEdit"/></label>
                 <label class="pose"><span>Chest</span><input type="range" min="@MorphMin("chest")"
@@ -242,6 +256,7 @@
                                                              @bind:after="PreviewEdit"/></label>
                 <label class="pose"><span>Leg</span><input type="range" min="@MorphMin("leg")" max="@MorphMax("leg")"
                                                            @bind="_eLeg" @bind:after="PreviewEdit"/></label>
+                </fieldset>
 
                 <div class="edit-head">Hair</div>
                 <label class="edit-row"><span>Style</span>
@@ -340,7 +355,11 @@
             </div>
 
             <div class="edit-actions">
-                <button class="pose-reset" @onclick="SaveEdit">Save</button>
+                @* Save only appears for a character you own; others get a preview-only editor. *@
+                @if (_ownsSelected)
+                {
+                    <button class="pose-reset" @onclick="SaveEdit">Save</button>
+                }
                 <button class="pose-reset" @onclick="RevertEdit">Revert</button>
                 <span class="edit-status">@_editStatus</span>
             </div>
@@ -353,10 +372,9 @@
 </div>
 
 @code {
-
     // Render one item slot (equipment or bag): a 3D thumbnail filled in by JS, the item name as fallback/label (or the
     // placeholder label when empty), a stack-count badge, and data-* attributes the JS tooltip reads on hover.
-    private RenderFragment ItemSlot(ItemInfo? info, string label, string extra = "") =>
+    private RenderFragment ItemSlot(ItemInfo? info, string label, string extra = "", string? equipSlot = null) =>
         @<div
             class="slot @extra @(info != null
                                    ? "filled"
@@ -375,6 +393,16 @@
             @if (info is { Count: > 1 } c)
             {
                 <span class="count">@c.Count</span>
+            }
+            @* Per-slot show/hide-in-render toggle (equipped items only): ● shown, ○ hidden. *@
+            @if (equipSlot != null && info != null)
+            {
+                var hidden = _hiddenSlots.Contains(equipSlot);
+                <button class="slot-hide @(hidden ? "off" : "")" type="button"
+                        title="@(hidden ? "Show in render" : "Hide from render")"
+                        @onclick="() => ToggleSlotHidden(equipSlot)" @onclick:stopPropagation="true">
+                    @(hidden ? "○" : "●")
+                </button>
             }
         </div>;
 
