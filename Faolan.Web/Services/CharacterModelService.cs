@@ -7,6 +7,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
+using Faolan.Core.Spawn;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Primitives;
@@ -272,7 +273,38 @@ namespace Faolan.Web.Services
 				db.CharacterBodyResources.Add(new CharacterBodyResource { CharacterId = characterId, Sequence = seq++, Ref = reference });
 
 			db.SaveChanges();
+
+			PropagateToScaffold(characterId);
 			return true;
+		}
+
+		// Rebuild the character's spawn-scaffold appearance entries from the just-saved resources so the edit shows
+		// in-game on the next login - now possible because PlayerSpawnScaffoldRows lives in Faolan.Core.Spawn (#290),
+		// which the web can reference. No-op when the character has no scaffold yet (first login seeds it from the new
+		// resources via EnsureFreshRows). The game server's login-time RefreshAppearance stays as a safety net.
+		private void PropagateToScaffold(uint characterId)
+		{
+			using var db = _dbFactory.CreateDbContext();
+			var character = db.Characters.AsNoTracking()
+				.Include(c => c.Attributes)
+				.Include(c => c.SpawnFrame)
+				.Include(c => c.Body)
+				.Include(c => c.BodyResources)
+				.FirstOrDefault(c => c.Id == characterId);
+			if (character?.SpawnFrame?.PreFrame == null || character.Attributes is not { Count: > 0 })
+				return;
+
+			var refs = character.BodyResources.Select(r => r.Ref).ToList();
+			var registry = db.MorphTargets.AsNoTracking().Where(m => refs.Contains(m.Name)).ToDictionary(m => m.Name);
+			var weighted = PlayerSpawnScaffoldRows.BuildWeightedEntries(character.BodyResources, registry);
+
+			if (!PlayerSpawnScaffoldRows.RefreshAppearance(character, weighted))
+				return;
+
+			// Persist only the entry table (fresh, navigation-free rows - so EF doesn't cascade-insert the parent).
+			db.CharacterAttributes.RemoveRange(db.CharacterAttributes.Where(a => a.CharacterId == characterId));
+			db.CharacterAttributes.AddRange(character.Attributes);
+			db.SaveChanges();
 		}
 
 		// The character's CURRENT appearance selections, to seed the editor when a character is opened: the 7 body
