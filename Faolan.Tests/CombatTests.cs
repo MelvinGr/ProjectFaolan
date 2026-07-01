@@ -30,17 +30,19 @@ namespace Faolan.Tests
 			var state = new CombatState();
 			var created = 0;
 
-			var first = state.GetOrAdd(0x2C58, () =>
-			{
-				created++;
-				return EntityVitals.FromMax(100, 0, 100);
-			});
+			var first = state.GetOrAdd(0x2C58,
+				() =>
+				{
+					created++;
+					return EntityVitals.FromMax(100, 0, 100);
+				});
 			first.ApplyHealthDelta(-40);
-			var second = state.GetOrAdd(0x2C58, () =>
-			{
-				created++;
-				return EntityVitals.FromMax(100, 0, 100);
-			});
+			var second = state.GetOrAdd(0x2C58,
+				() =>
+				{
+					created++;
+					return EntityVitals.FromMax(100, 0, 100);
+				});
 
 			Assert.Equal(1, created); // factory ran once
 			Assert.Same(first, second); // same tracked entity
@@ -48,6 +50,28 @@ namespace Faolan.Tests
 
 			state.Remove(0x2C58);
 			Assert.False(state.TryGet(0x2C58, out _));
+		}
+
+		[Fact]
+		public void NpcMaxHealthForLevel_IsMonotonic_AndExtrapolatesAboveCap()
+		{
+			Assert.Equal(CombatResolver.NpcMaxHealthForLevel(1), CombatResolver.NpcMaxHealthForLevel(0)); // L0 == L1
+			for (uint l = 2; l <= 90; l++)
+				Assert.True(CombatResolver.NpcMaxHealthForLevel(l) > CombatResolver.NpcMaxHealthForLevel(l - 1));
+			Assert.Equal(3276u + 20 * 53u, CombatResolver.NpcMaxHealthForLevel(80)); // +53/level past the L60 anchor
+		}
+
+		// #76: the NPC max-HP fallback (for un-captured creatures) is fitted to the captured civilian baseline.
+		[Theory, InlineData(1u, 63u), InlineData(20u, 933u), InlineData(40u, 2217u), InlineData(60u, 3276u), InlineData(35u, 1952u), InlineData(45u, 2481u)]
+		// anchor: L1 baseline (27 NPCs)
+		// anchor: L20 (43 NPCs)
+		// anchor: L40 (109 NPCs)
+		// anchor: L60
+		// interpolated, captured baseline 1953 (<1%)
+			// interpolated, captured baseline 2482 (<1%)
+		public void NpcMaxHealthForLevel_MatchesCapturedBaseline(uint level, uint expected)
+		{
+			Assert.Equal(expected, CombatResolver.NpcMaxHealthForLevel(level));
 		}
 
 		[Fact]
@@ -101,28 +125,6 @@ namespace Faolan.Tests
 			Assert.Equal(CombatResolver.ResolveKillXp(1), CombatResolver.ResolveKillXp(0));
 		}
 
-		// #76: the NPC max-HP fallback (for un-captured creatures) is fitted to the captured civilian baseline.
-		[Theory]
-		[InlineData(1u, 63u)]      // anchor: L1 baseline (27 NPCs)
-		[InlineData(20u, 933u)]    // anchor: L20 (43 NPCs)
-		[InlineData(40u, 2217u)]   // anchor: L40 (109 NPCs)
-		[InlineData(60u, 3276u)]   // anchor: L60
-		[InlineData(35u, 1952u)]   // interpolated, captured baseline 1953 (<1%)
-		[InlineData(45u, 2481u)]   // interpolated, captured baseline 2482 (<1%)
-		public void NpcMaxHealthForLevel_MatchesCapturedBaseline(uint level, uint expected)
-		{
-			Assert.Equal(expected, CombatResolver.NpcMaxHealthForLevel(level));
-		}
-
-		[Fact]
-		public void NpcMaxHealthForLevel_IsMonotonic_AndExtrapolatesAboveCap()
-		{
-			Assert.Equal(CombatResolver.NpcMaxHealthForLevel(1), CombatResolver.NpcMaxHealthForLevel(0)); // L0 == L1
-			for (uint l = 2; l <= 90; l++)
-				Assert.True(CombatResolver.NpcMaxHealthForLevel(l) > CombatResolver.NpcMaxHealthForLevel(l - 1));
-			Assert.Equal(3276u + 20 * 53u, CombatResolver.NpcMaxHealthForLevel(80)); // +53/level past the L60 anchor
-		}
-
 		[Fact]
 		public void ResolveSpellDamage_ScalesWithCasterLevel()
 		{
@@ -157,9 +159,7 @@ namespace Faolan.Tests
 			// .Set order (current then max per vital; ids in-client verified, see LegacyCharacterStatId):
 			// count(06) + HealthCurrent(001B) + HealthMax(0001) + StaminaCurrent(01F8) + StaminaMax(01F9)
 			//           + ManaCurrent(01FA) + ManaMax(01FB), each = 0x189C.
-			Assert.Equal("060000001b0000189c000000010000189c000001f80000189c000001f90000189c000001fa0000189c000001fb0000189c", ToHex(v
-				.ToVitalsBlock()
-				.ToArray()));
+			Assert.Equal("060000001b0000189c000000010000189c000001f80000189c000001f90000189c000001fa0000189c000001fb0000189c", ToHex(v.ToVitalsBlock().ToArray()));
 		}
 
 		private static string ToHex(byte[] bytes)

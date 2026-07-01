@@ -3,7 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.Json.Serialization;
-using Faolan.Core.Data;
+using Faolan.Core;
 
 namespace Faolan.GameServer.Packets.FullCharSnapshot
 {
@@ -15,21 +15,6 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		[JsonIgnore]
 		public byte[] OriginalData { get; private init; } = [];
 
-		// The quest JOURNAL region at the START of the tails (version + 0x3F1-framed Quest_c list), modeled from
-		// the recovered FullPlayerCharacterIIR grammar (docs/fullplayer-snapshot-reader.md) instead of an opaque
-		// header+string blob. Replaces the former Header0/Unknown*/RemoteFormat* fields, which were really the
-		// first Quest_c record's header + its 5 <remoteformat> strings.
-		public QuestcRegion Quests { get; init; } = new QuestcRegion();
-
-		// The @609 per-goal objective-detail region (chapterTag + per-goal records), modeled from the recovered
-		// grammar (QuestObjectiveRegion, docs/fullplayer-snapshot-reader.md) instead of riding in the opaque blob.
-		// Null when the tails carry no such region (no chapterTag at the boundary) - then it stays in UnknownBefore.
-		public QuestObjectiveRegion? QuestObjectives { get; init; }
-
-		// The quest INDEX region (the [0x3F1] index + the "W6QT" goal-id table) between the @609 objective region and
-		// the access-window table; modeled by QuestIndexRegion. Null when not present (then it rides UnknownBefore).
-		public QuestIndexRegion? QuestIndex { get; init; }
-
 		public byte[] UnknownAfterAccessWindowTable { get; init; }
 
 		// Everything between the @609 objective region and the access-window table (the quest INDEX + any tail);
@@ -40,6 +25,21 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 		public List<PfAccessWindowEntry> AccessWindowEntries { get; init; }
 
+		// The quest JOURNAL region at the START of the tails (version + 0x3F1-framed Quest_c list), modeled from
+		// the recovered FullPlayerCharacterIIR grammar (docs/fullplayer-snapshot-reader.md) instead of an opaque
+		// header+string blob. Replaces the former Header0/Unknown*/RemoteFormat* fields, which were really the
+		// first Quest_c record's header + its 5 <remoteformat> strings.
+		public QuestcRegion Quests { get; init; } = new QuestcRegion();
+
+		// The quest INDEX region (the [0x3F1] index + the "W6QT" goal-id table) between the @609 objective region and
+		// the access-window table; modeled by QuestIndexRegion. Null when not present (then it rides UnknownBefore).
+		public QuestIndexRegion? QuestIndex { get; init; }
+
+		// The @609 per-goal objective-detail region (chapterTag + per-goal records), modeled from the recovered
+		// grammar (QuestObjectiveRegion, docs/fullplayer-snapshot-reader.md) instead of riding in the opaque blob.
+		// Null when the tails carry no such region (no chapterTag at the boundary) - then it stays in UnknownBefore.
+		public QuestObjectiveRegion? QuestObjectives { get; init; }
+
 		public TailsPostAccessBlock? PostAccessBlock { get; init; }
 
 		// Back-compat shim: the lead quest's STATE word (@20). World entry historically patched the live
@@ -49,8 +49,15 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		[JsonIgnore]
 		public uint Level
 		{
-			get => Quests.Records.Count > 0 ? Quests.Records[0].State : 0;
-			set { if (Quests.Records.Count > 0) Quests.Records[0].State = value; }
+			get =>
+				Quests.Records.Count > 0
+					? Quests.Records[0].State
+					: 0;
+			set
+			{
+				if (Quests.Records.Count > 0)
+					Quests.Records[0].State = value;
+			}
 		}
 
 		public byte[] ToArray()
@@ -75,17 +82,6 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			else
 				writer.WriteArray(UnknownAfterAccessWindowTable);
 
-			return writer.ToArray();
-		}
-
-		// Serializes a sequence of access-window entries to their wire bytes (the inverse of the parse loop in
-		// Deserialize). Used by the from-scratch tails builder to emit the game-static PFAccessWindow_ catalog
-		// (AccessWindowCatalog) instead of a captured byte blob; byte-identical to the captured region (#258).
-		public static byte[] SerializeAccessWindowEntries(IEnumerable<PfAccessWindowEntry> entries)
-		{
-			using var writer = new FaolanStream();
-			foreach (var entry in entries)
-				WriteAccessWindowEntry(writer, entry);
 			return writer.ToArray();
 		}
 
@@ -164,53 +160,15 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			};
 		}
 
-		// Parses the @609 per-goal objective-detail region when the boundary opens with the 0x0BD3 chapterTag;
-		// reports the offset just past it (= the start of the quest index / remaining opaque blob). Returns null and
-		// leaves `afterObjectives == boundary` for any tails without that region or that fail to parse cleanly.
-		private static QuestObjectiveRegion? TryParseQuestObjectives(byte[] data, int boundary, out int afterObjectives)
+		// Serializes a sequence of access-window entries to their wire bytes (the inverse of the parse loop in
+		// Deserialize). Used by the from-scratch tails builder to emit the game-static PFAccessWindow_ catalog
+		// (AccessWindowCatalog) instead of a captured byte blob; byte-identical to the captured region (#258).
+		public static byte[] SerializeAccessWindowEntries(IEnumerable<PfAccessWindowEntry> entries)
 		{
-			afterObjectives = boundary;
-			if (boundary + 4 > data.Length)
-				return null;
-			// The objective region opens with the goal-list framing word (goals+1)*0x3F1 (#255); the beach's is 0xBD3.
-			var lead = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(boundary, 4));
-			if (lead == 0 || lead % QuestObjectiveRegion.Frame != 0)
-				return null;
-
-			try
-			{
-				var region = QuestObjectiveRegion.Parse(data, boundary, out var consumed);
-				afterObjectives = boundary + consumed;
-				return region;
-			}
-			catch (Exception)
-			{
-				afterObjectives = boundary;
-				return null;
-			}
-		}
-
-		// Parses the quest index region when the boundary opens with the 0x3F1 index tag; its trailer runs to
-		// `endOffset` (the access-window table start). Returns null (and leaves `afterIndex == offset`) for tails
-		// without it or that fail to parse cleanly, so an unrecognised shape stays in the opaque blob.
-		private static QuestIndexRegion? TryParseQuestIndex(byte[] data, int offset, int endOffset, out int afterIndex)
-		{
-			afterIndex = offset;
-			if (offset + 4 > data.Length || endOffset < offset
-				|| BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(offset, 4)) != QuestIndexRegion.IndexTag)
-				return null;
-
-			try
-			{
-				var region = QuestIndexRegion.Parse(data, offset, endOffset);
-				afterIndex = endOffset; // the region consumes to the boundary (its trailer is the remainder)
-				return region;
-			}
-			catch (Exception)
-			{
-				afterIndex = offset;
-				return null;
-			}
+			using var writer = new FaolanStream();
+			foreach (var entry in entries)
+				WriteAccessWindowEntry(writer, entry);
+			return writer.ToArray();
 		}
 
 		private static List<uint> CopyRange(List<uint> values, int startIndex, int length)
@@ -268,9 +226,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 			for (var i = startOffset; i <= data.Length - pattern.Length; i++)
 			{
-				if (data
-				    .AsSpan(i, pattern.Length)
-				    .SequenceEqual(pattern))
+				if (data.AsSpan(i, pattern.Length).SequenceEqual(pattern))
 					return i;
 			}
 
@@ -307,9 +263,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			if (data[nameEndOffset] != 0)
 				return false;
 
-			return data
-				.AsSpan(nameOffset, nameLength)
-				.StartsWith("PFAccessWindow_"u8);
+			return data.AsSpan(nameOffset, nameLength).StartsWith("PFAccessWindow_"u8);
 		}
 
 		private static PfAccessWindowChild ReadAccessWindowChild(FaolanStream reader, byte[] data, byte childMode)
@@ -495,6 +449,55 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 				RepeatCount = repeatedRun.RepeatCount,
 				FooterValues = footer
 			};
+		}
+
+		// Parses the quest index region when the boundary opens with the 0x3F1 index tag; its trailer runs to
+		// `endOffset` (the access-window table start). Returns null (and leaves `afterIndex == offset`) for tails
+		// without it or that fail to parse cleanly, so an unrecognised shape stays in the opaque blob.
+		private static QuestIndexRegion? TryParseQuestIndex(byte[] data, int offset, int endOffset, out int afterIndex)
+		{
+			afterIndex = offset;
+			if (offset + 4 > data.Length || endOffset < offset || BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(offset, 4)) != QuestIndexRegion.IndexTag)
+				return null;
+
+			try
+			{
+				var region = QuestIndexRegion.Parse(data, offset, endOffset);
+				afterIndex = endOffset; // the region consumes to the boundary (its trailer is the remainder)
+				return region;
+			}
+			catch (Exception)
+			{
+				afterIndex = offset;
+				return null;
+			}
+		}
+
+		// Parses the @609 per-goal objective-detail region when the boundary opens with the 0x0BD3 chapterTag;
+		// reports the offset just past it (= the start of the quest index / remaining opaque blob). Returns null and
+		// leaves `afterObjectives == boundary` for any tails without that region or that fail to parse cleanly.
+		private static QuestObjectiveRegion? TryParseQuestObjectives(byte[] data, int boundary, out int afterObjectives)
+		{
+			afterObjectives = boundary;
+			if (boundary + 4 > data.Length)
+				return null;
+
+			// The objective region opens with the goal-list framing word (goals+1)*0x3F1 (#255); the beach's is 0xBD3.
+			var lead = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(boundary, 4));
+			if (lead == 0 || lead % QuestObjectiveRegion.Frame != 0)
+				return null;
+
+			try
+			{
+				var region = QuestObjectiveRegion.Parse(data, boundary, out var consumed);
+				afterObjectives = boundary + consumed;
+				return region;
+			}
+			catch (Exception)
+			{
+				afterObjectives = boundary;
+				return null;
+			}
 		}
 
 		private static bool TryReadAccessWindowEntry(FaolanStream reader, byte[] data, out PfAccessWindowEntry entry)
@@ -868,33 +871,6 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			set => SetValue(CharacterValueIndex.CurrentStamina, value * 100);
 		}
 
-		// Authors the WHOLE per-class vitals block (#4/#186): for HP/Mana/Stamina it sets the DISPLAYED max AND the
-		// lower base/secondary the client reads into a parallel slot, each ×100, keeping the +148 repeated copies in
-		// sync. The old per-stat setters (CurrentHp/Mana/Stamina) touched only the displayed slot, leaving the base
-		// slots - and the second mana copy [60] - at the captured Strie (Rogue) template's values; that internal
-		// inconsistency is the suspected cause of #4 (a Necromancer showed ~0 mana because [60] stayed 0 while [64]
-		// held 24600) and the in-client "gear vanished" snapshot reject. Verified slot map across four archetypes'
-		// retail LOGIN snapshots (decode_statblock.py): HP displayed [23]/[54], base [21]/[56]; mana displayed
-		// [60]=[64], secondary [62]; stamina displayed [68], secondary [66]. Pass CharacterMaxStats.SnapshotVitals().
-		public void ApplyClassVitals(uint hp, uint hpBase, uint mana, uint manaBase, uint stamina, uint staminaBase)
-		{
-			// HP: [21]/[23] are pre-repeated-block standalone slots (like CurrentHpExtra, no +148 copy); [54]/[56] live
-			// inside the repeated block, so SetValue also writes their [202]/[204] copies.
-			Values[21] = hpBase * 100;
-			Values[(int)CharacterValueIndex.CurrentHpExtra] = hp * 100; // [23]
-			SetValue(CharacterValueIndex.CurrentHp, hp * 100);          // [54] (+[202])
-			SetValue((CharacterValueIndex)56, hpBase * 100);            // [56] (+[204])
-
-			// Mana: the displayed max lives in BOTH [60] and [64]; [62] is the ~6-lower secondary.
-			SetValue((CharacterValueIndex)60, mana * 100);              // [60] (+[208])
-			SetValue(CharacterValueIndex.ManaSecondary, manaBase * 100); // [62] (+[210])
-			SetValue(CharacterValueIndex.CurrentMana, mana * 100);       // [64] (+[212])
-
-			// Stamina: displayed [68], secondary [66].
-			SetValue((CharacterValueIndex)66, staminaBase * 100);       // [66] (+[214])
-			SetValue(CharacterValueIndex.CurrentStamina, stamina * 100); // [68] (+[216])
-		}
-
 		public uint CurrentXp
 		{
 			get => GetValue(CharacterValueIndex.CurrentXp) / 10;
@@ -963,6 +939,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			// 24600, Bear Shaman [62]=16500 vs displayed 17100. NOT the displayed max — see CurrentMana below.
 			ManaSecondary = 62,
 			Unknown63 = 63,
+
 			// The displayed MAX mana (×100). Verified against retail LOGIN snapshots: Necro [64]=24600 (=246 mana,
 			// matches the client sheet), Bear Shaman [64]=17100 (=171). Index 60 carries the same value; [62] is a
 			// ~6-lower secondary. (The earlier "[64]=2276 / use 62" note came from an UNSETTLED create snapshot.)
@@ -1085,6 +1062,33 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			PvpKillsSeason = 180, // factor 10
 			Unknown181 = 181,
 			Unknown182 = 182 // PvpKillsOverall ?
+		}
+
+		// Authors the WHOLE per-class vitals block (#4/#186): for HP/Mana/Stamina it sets the DISPLAYED max AND the
+		// lower base/secondary the client reads into a parallel slot, each ×100, keeping the +148 repeated copies in
+		// sync. The old per-stat setters (CurrentHp/Mana/Stamina) touched only the displayed slot, leaving the base
+		// slots - and the second mana copy [60] - at the captured Strie (Rogue) template's values; that internal
+		// inconsistency is the suspected cause of #4 (a Necromancer showed ~0 mana because [60] stayed 0 while [64]
+		// held 24600) and the in-client "gear vanished" snapshot reject. Verified slot map across four archetypes'
+		// retail LOGIN snapshots (decode_statblock.py): HP displayed [23]/[54], base [21]/[56]; mana displayed
+		// [60]=[64], secondary [62]; stamina displayed [68], secondary [66]. Pass CharacterMaxStats.SnapshotVitals().
+		public void ApplyClassVitals(uint hp, uint hpBase, uint mana, uint manaBase, uint stamina, uint staminaBase)
+		{
+			// HP: [21]/[23] are pre-repeated-block standalone slots (like CurrentHpExtra, no +148 copy); [54]/[56] live
+			// inside the repeated block, so SetValue also writes their [202]/[204] copies.
+			Values[21] = hpBase * 100;
+			Values[(int)CharacterValueIndex.CurrentHpExtra] = hp * 100; // [23]
+			SetValue(CharacterValueIndex.CurrentHp, hp * 100); // [54] (+[202])
+			SetValue((CharacterValueIndex)56, hpBase * 100); // [56] (+[204])
+
+			// Mana: the displayed max lives in BOTH [60] and [64]; [62] is the ~6-lower secondary.
+			SetValue((CharacterValueIndex)60, mana * 100); // [60] (+[208])
+			SetValue(CharacterValueIndex.ManaSecondary, manaBase * 100); // [62] (+[210])
+			SetValue(CharacterValueIndex.CurrentMana, mana * 100); // [64] (+[212])
+
+			// Stamina: displayed [68], secondary [66].
+			SetValue((CharacterValueIndex)66, staminaBase * 100); // [66] (+[214])
+			SetValue(CharacterValueIndex.CurrentStamina, stamina * 100); // [68] (+[216])
 		}
 
 		public uint GetValue(CharacterValueIndex index)

@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using System.Numerics;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets.Opcodes;
 
@@ -17,9 +17,7 @@ namespace Faolan.GameServer.World
 	//   [subop 0x96C46740][0x0000C350][handle][u16 0][from: 3 floats][u8 0x02][to: 3 floats][quat: 4 floats][u16 0]
 	public static class MoveTaskCodec
 	{
-		public const uint MoveTaskSubOpcode = (uint)GameServer0X2000RespondsOpcodes.MoveTaskIIR;
-		private const uint WireType = EntityClass.Character; // the shared 0xC350 type word
-		public const int BodyLength = 57;
+		public const byte ModeApproachTarget = 0x08;
 
 		// The MoveTask "mode" byte (at body offset 26, after the from-position) selects the form (decoded from the
 		// captures, #53): 0x00 = a bare position, 0x02 = the stationary from/to/facing below, 0x04 = a multi-waypoint
@@ -27,22 +25,9 @@ namespace Faolan.GameServer.World
 		public const byte ModeBarePosition = 0x00;
 		public const byte ModePath = 0x01;
 		public const byte ModeStationary = 0x02;
-		public const byte ModeApproachTarget = 0x08;
-
-		// mode-00: a bare position update - [u16 0][from 3 floats][0x00][0x01] (28-byte body / 32-byte frame). The
-		// simplest move; the dominant shape for the player's own position ticks. Validated 74/74.
-		public static byte[] BuildBarePositionBody(uint handle, Vector3 from)
-		{
-			return new FaolanStream()
-				.WriteUInt32(MoveTaskSubOpcode)
-				.WriteUInt32(WireType)
-				.WriteUInt32(handle)
-				.WriteUInt16(0)
-				.WriteVector3BigEndian(from)
-				.WriteByte(ModeBarePosition)
-				.WriteByte(0x01)
-				.ToArray();
-		}
+		public const int BodyLength = 57;
+		public const uint MoveTaskSubOpcode = (uint)GameServer0X2000RespondsOpcodes.MoveTaskIIR;
+		private const uint WireType = EntityClass.Character; // the shared 0xC350 type word
 
 		// mode-08: approach/face a target entity - [u16 0][from 3 floats][0x08][u32 0xC350 type][u32 targetHandle]
 		// [0x01][9 zero bytes] (45-byte body / 49-byte frame). The NPC "turn to / move toward" a dynel. Validated 825/825.
@@ -63,6 +48,33 @@ namespace Faolan.GameServer.World
 				.ToArray();
 		}
 
+		// mode-00: a bare position update - [u16 0][from 3 floats][0x00][0x01] (28-byte body / 32-byte frame). The
+		// simplest move; the dominant shape for the player's own position ticks. Validated 74/74.
+		public static byte[] BuildBarePositionBody(uint handle, Vector3 from)
+		{
+			return new FaolanStream().WriteUInt32(MoveTaskSubOpcode).WriteUInt32(WireType).WriteUInt32(handle).WriteUInt16(0).WriteVector3BigEndian(from).WriteByte(ModeBarePosition).WriteByte(0x01).ToArray();
+		}
+
+		// Builds the 61-byte-frame MoveTask body for `handle` moving from `from` to `to`, facing `facing`. from==to is a
+		// stationary orientation/position update (the capture's shape); from!=to is a step the client walks along.
+		public static byte[] BuildBody(uint handle, Vector3 from, Vector3 to, Quaternion facing)
+		{
+			return new FaolanStream()
+				.WriteUInt32(MoveTaskSubOpcode)
+				.WriteUInt32(WireType)
+				.WriteUInt32(handle)
+				.WriteUInt16(0)
+				.WriteVector3BigEndian(from)
+				.WriteByte(0x02)
+				.WriteVector3BigEndian(to)
+				.WriteFloatBigEndian(facing.X)
+				.WriteFloatBigEndian(facing.Y)
+				.WriteFloatBigEndian(facing.Z)
+				.WriteFloatBigEndian(facing.W)
+				.WriteUInt16(0)
+				.ToArray();
+		}
+
 		// mode-01 PathMoveTask: the multi-waypoint patrol path - decoded from the captures + the client reader
 		// FUN_00a483b0 (docs/movetask-grammar.md, #53). Canonical shape (92/92 captured else-branch records): the
 		// WaitMoveTask base header with flags=0x01 (bit0 set -> no duration/remaining floats) + the PathMoveTask
@@ -80,17 +92,28 @@ namespace Faolan.GameServer.World
 				.WriteUInt16(0)
 				.WriteVector3BigEndian(from)
 				.WriteByte(ModePath)
-				.WriteByte(0x01)                     // WaitMoveTask base header flags (bit0 -> no dur/rem floats)
-				.WriteByte(0x00)                     // PathMoveTask F-flags (no optional floats; waypoint-list branch)
+				.WriteByte(0x01) // WaitMoveTask base header flags (bit0 -> no dur/rem floats)
+				.WriteByte(0x00) // PathMoveTask F-flags (no optional floats; waypoint-list branch)
 				.WriteUInt32((uint)waypoints.Count);
 			foreach (var w in waypoints)
 				s.WriteVector3BigEndian(w);
 			return s
-				.WriteByte(0x00)                     // trailer byte
+				.WriteByte(0x00) // trailer byte
 				.WriteFloatBigEndian(pathLength)
-				.WriteUInt64(0).WriteUInt32(0)       // 12 zero bytes
+				.WriteUInt64(0)
+				.WriteUInt32(0) // 12 zero bytes
 				.WriteVector3BigEndian(from)
 				.ToArray();
+		}
+
+		// Live overload: the trailer path-length is the TOTAL distance walked (from -> wp0 -> wp1 -> ... -> wpN), the
+		// sum of the segments. The client uses it for interpolation TIMING - a too-small value (e.g. the straight-line
+		// from->last) makes a winding patrol RUN to cover the real path in the short time, so a multi-waypoint loop
+		// must report its full traversal length to walk at the right pace. (For a straight path the sum equals
+		// from->last, matching the captured ratio-1.000 records; #266.)
+		public static byte[] BuildPathBody(uint handle, Vector3 from, IReadOnlyList<Vector3> waypoints)
+		{
+			return BuildPathBody(handle, from, waypoints, TotalPathLength(from, waypoints));
 		}
 
 		// One-way WALK from `from` to `to` (#272): a mode-1 PathMoveTask the client interpolates over time (a real walk),
@@ -113,26 +136,17 @@ namespace Faolan.GameServer.World
 				.WriteUInt16(0)
 				.WriteVector3BigEndian(from)
 				.WriteByte(ModePath)
-				.WriteByte(0x01)                     // WaitMoveTask base header flags (bit0 SET -> no duration; retail 2-point form)
-				.WriteByte(0x00)                     // PathMoveTask F-flags (no optional floats; waypoint-list branch)
-				.WriteUInt32(2)                      // two control points: the spline needs >= 2 (client assert)
+				.WriteByte(0x01) // WaitMoveTask base header flags (bit0 SET -> no duration; retail 2-point form)
+				.WriteByte(0x00) // PathMoveTask F-flags (no optional floats; waypoint-list branch)
+				.WriteUInt32(2) // two control points: the spline needs >= 2 (client assert)
 				.WriteVector3BigEndian(from)
 				.WriteVector3BigEndian(to)
-				.WriteByte(0x00)                     // trailer byte
+				.WriteByte(0x00) // trailer byte
 				.WriteFloatBigEndian(pathLength)
-				.WriteUInt64(0).WriteUInt32(0)       // 12 zero bytes
+				.WriteUInt64(0)
+				.WriteUInt32(0) // 12 zero bytes
 				.WriteVector3BigEndian(to) // anchor = DESTINATION (#272)
 				.ToArray();
-		}
-
-		// Live overload: the trailer path-length is the TOTAL distance walked (from -> wp0 -> wp1 -> ... -> wpN), the
-		// sum of the segments. The client uses it for interpolation TIMING - a too-small value (e.g. the straight-line
-		// from->last) makes a winding patrol RUN to cover the real path in the short time, so a multi-waypoint loop
-		// must report its full traversal length to walk at the right pace. (For a straight path the sum equals
-		// from->last, matching the captured ratio-1.000 records; #266.)
-		public static byte[] BuildPathBody(uint handle, Vector3 from, IReadOnlyList<Vector3> waypoints)
-		{
-			return BuildPathBody(handle, from, waypoints, TotalPathLength(from, waypoints));
 		}
 
 		// Sum of the segment distances along from -> waypoints (the real walked length).
@@ -140,27 +154,11 @@ namespace Faolan.GameServer.World
 		{
 			if (waypoints == null || waypoints.Count == 0)
 				return 0f;
+
 			var length = Vector3.Distance(from, waypoints[0]);
 			for (var i = 1; i < waypoints.Count; i++)
 				length += Vector3.Distance(waypoints[i - 1], waypoints[i]);
 			return length;
-		}
-
-		// Builds the 61-byte-frame MoveTask body for `handle` moving from `from` to `to`, facing `facing`. from==to is a
-		// stationary orientation/position update (the capture's shape); from!=to is a step the client walks along.
-		public static byte[] BuildBody(uint handle, Vector3 from, Vector3 to, Quaternion facing)
-		{
-			return new FaolanStream()
-				.WriteUInt32(MoveTaskSubOpcode)
-				.WriteUInt32(WireType)
-				.WriteUInt32(handle)
-				.WriteUInt16(0)
-				.WriteVector3BigEndian(from)
-				.WriteByte(0x02)
-				.WriteVector3BigEndian(to)
-				.WriteFloatBigEndian(facing.X).WriteFloatBigEndian(facing.Y).WriteFloatBigEndian(facing.Z).WriteFloatBigEndian(facing.W)
-				.WriteUInt16(0)
-				.ToArray();
 		}
 	}
 }

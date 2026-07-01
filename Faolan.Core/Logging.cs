@@ -21,10 +21,13 @@ namespace Faolan.Core
 			// disk I/O on the hot path.
 			_streamWriter = new StreamWriter(new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite)) { AutoFlush = false };
 			_flushTimer = new Timer(_ =>
-			{
-				lock (FileLogger.Lock)
-					_streamWriter.Flush();
-			}, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+				{
+					lock (FileLogger.Lock)
+						_streamWriter.Flush();
+				},
+				null,
+				TimeSpan.FromSeconds(1),
+				TimeSpan.FromSeconds(1));
 		}
 
 		public void Dispose()

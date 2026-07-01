@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.GameServer;
@@ -20,26 +20,23 @@ namespace Faolan.Tests
 	// the capture byte for byte.
 	public class DispatchAddItemTests
 	{
-		private const string InventoryCapture = "/home/melvin/Development/C#/Project Faolan/Captures/strie-login-inventory.bin";
-		private const uint SlaveManaclesId = 3361557;
-
 		// Captured DispatchAddItem method body (frame 2881 of the questcomplete capture).
-		private const string CapturedBody =
-			"0000006801316d8a000000000000007d08b2b6ecdab1ec8aec201204080010011208080810ffffffff0f1206081710b2e634" +
-			"1204082e10071a530a140d99bf60dd15f67309761dcaed497925d2c7ed8d12140d99bf60dd15f67309761dcaed497925d2c" +
-			"7ed8d1a140d99bf60dd15f67309761dcaed497925d2c7ed8d25154b33002d154b33003801453550554300000000";
+		private const string CapturedBody = "0000006801316d8a000000000000007d08b2b6ecdab1ec8aec201204080010011208080810ffffffff0f1206081710b2e634" +
+		                                    "1204082e10071a530a140d99bf60dd15f67309761dcaed497925d2c7ed8d12140d99bf60dd15f67309761dcaed497925d2c" +
+		                                    "7ed8d1a140d99bf60dd15f67309761dcaed497925d2c7ed8d25154b33002d154b33003801453550554300000000";
 
 		// The bare ProtoInventoryGameEntry carried as i_cEntry (the InventoryListEntry.item without the Pos wrapper).
-		private const string CapturedEntry =
-			"08b2b6ecdab1ec8aec201204080010011208080810ffffffff0f1206081710b2e6341204082e10071a530a140d99bf60dd15" +
-			"f67309761dcaed497925d2c7ed8d12140d99bf60dd15f67309761dcaed497925d2c7ed8d1a140d99bf60dd15f67309761dca" +
-			"ed497925d2c7ed8d25154b33002d154b330038014535505543";
+		private const string CapturedEntry = "08b2b6ecdab1ec8aec201204080010011208080810ffffffff0f1206081710b2e6341204082e10071a530a140d99bf60dd15" +
+		                                     "f67309761dcaed497925d2c7ed8d12140d99bf60dd15f67309761dcaed497925d2c7ed8d1a140d99bf60dd15f67309761dca" + "ed497925d2c7ed8d25154b33002d154b330038014535505543";
+
+		private const string InventoryCapture = "/home/melvin/Development/C#/Project Faolan/Captures/strie-login-inventory.bin";
+		private const uint CharId = 0x01316d8a;
+		private const uint ItemPos = 0;
+		private const uint SlaveManaclesId = 3361557;
 
 		// Per-instance state read from the captured add-item: the item GUID, inventory record id, container slot,
 		// and the four extra stat records the live add carries (flags, stat8, recordId, level).
 		private const ulong ItemId = 2366689308843907890;
-		private const uint CharId = 0x01316d8a;
-		private const uint ItemPos = 0;
 		private const ulong RecordId = 865074;
 
 		[Fact]
@@ -63,8 +60,10 @@ namespace Faolan.Tests
 				Assert.NotEqual(0u, item!.Archetype);
 
 				// 1) The entry blob: same template the snapshot builds, but the live add's per-instance stat set.
-				var entry = SnapshotItemBuilder.BuildInventoryEntry(
-					ItemId, item, item.Archetype, [
+				var entry = SnapshotItemBuilder.BuildInventoryEntry(ItemId,
+					item,
+					item.Archetype,
+					[
 						new SnapshotItemBuilder.ItemStat(0, 1),
 						new SnapshotItemBuilder.ItemStat(8, 0xffffffff),
 						new SnapshotItemBuilder.ItemStat(23, (uint)RecordId),
@@ -87,8 +86,7 @@ namespace Faolan.Tests
 
 		private static DatabaseContext NewContext(string path)
 		{
-			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={path}", x => x.MigrationsAssembly("Faolan"))
-				.Options;
+			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={path}", x => x.MigrationsAssembly("Faolan")).Options;
 			return new DatabaseContext(options);
 		}
 	}

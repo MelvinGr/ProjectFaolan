@@ -1,7 +1,7 @@
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
@@ -29,9 +29,14 @@ namespace Faolan.GameServer.Economy.Bank
 	// withdraw) is reached through the shared IEconomyOutbound port (the listener implements it).
 	public sealed class BankService
 	{
+		private const uint BankDisabledSlots = 30; // captured disabled-slot count (unpurchased bank space)
+
+		private const uint BankIirSubOpcode = (uint)GameServer0X2000RespondsOpcodes.BankIIR; // BankIIR_t
+		private const uint BankMaxSize = 50; // captured bank capacity
+		private const ushort BankRegisterOpcode = 0x201C;
 		private readonly IDatabaseRepository _database;
-		private readonly ILogger _logger;
 		private readonly IEconomyOutbound _outbound;
+		private readonly ILogger _logger;
 
 		public BankService(IDatabaseRepository database, ILogger logger, IEconomyOutbound outbound)
 		{
@@ -40,43 +45,15 @@ namespace Faolan.GameServer.Economy.Bank
 			_outbound = outbound;
 		}
 
-		private const uint BankIirSubOpcode = (uint)GameServer0X2000RespondsOpcodes.BankIIR; // BankIIR_t
-		private const uint BankMaxSize = 50; // captured bank capacity
-		private const uint BankDisabledSlots = 30; // captured disabled-slot count (unpurchased bank space)
-		private const ushort BankRegisterOpcode = 0x201C;
-
-		// The BankIIR record (everything after the 0x2000 packet's u32 length prefix). Golden-tested byte-exact
-		// against the captured bank (BankStorageTests).
-		public static byte[] BuildBankIirRecord(uint charInstance, byte[] containerBlob)
+		// Rebuilds the personal bank container (kind 105) from the character's freshly-persisted CharacterInventory
+		// rows and re-sends it. Reuses the same path as the .ah bank tab open.
+		public async Task ResendBank(INetworkClient client)
 		{
-			return new FaolanStream()
-				.WriteUInt32(BankIirSubOpcode)
-				.WriteUInt32(0x0000C350u)
-				.WriteUInt32(charInstance)
-				.WriteByte(0x01)
-				.WriteUInt32((uint)containerBlob.Length)
-				.WriteArray(containerBlob)
-				.ToArray();
-		}
-
-		// One 0x201c bank-slot registration body (20 bytes): [u32 kind=105][u32 charInstance][u32 slot][u32 0x17]
-		// [u16 0x0f][u16 recordId]. Sent once per occupied bank slot before the BankIIR content.
-		public static void WriteBankSlotRegistration(FaolanStream s, uint charInstance, uint slot, ushort recordId)
-		{
-			s
-				.WriteUInt32(FullCharSnapshotBuilder.BankKind)
-				.WriteUInt32(charInstance)
-				.WriteUInt32(slot)
-				.WriteUInt32(0x17u)
-				.WriteUInt16((ushort)0x000F)
-				.WriteUInt16(recordId);
-		}
-
-		private static byte[] SerializeContainer(ProtoInventoryGame container)
-		{
-			using var ms = new MemoryStream();
-			Serializer.Serialize(ms, container);
-			return ms.ToArray();
+			var characterId = client.Session.Character.Id;
+			var rows = await _database.GetCharacterInventory(characterId);
+			var bankRows = rows.Where(r => r.Container == (int)FullCharSnapshotBuilder.BankKind).ToList();
+			var bank = FullCharSnapshotBuilder.BuildContainer(FullCharSnapshotBuilder.BankKind, BankMaxSize, BankDisabledSlots, characterId, bankRows);
+			await SendBank(client, bank);
 		}
 
 		// Sends the bank: a 0x201c slot registration per occupied cell, then the BankIIR content. The container is
@@ -96,26 +73,9 @@ namespace Faolan.GameServer.Economy.Bank
 			}
 
 			var record = BuildBankIirRecord(charInstance, SerializeContainer(bank));
-			await new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArrayUInt32Length(record)
-				.SendAsync(client);
+			await new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(record).SendAsync(client);
 
-			_logger.LogInformation("Bank: sent {Count} items to {Character} (BankIIR, container kind {Kind}).",
-				bank.Items.Count, client.Session.Character?.Name, FullCharSnapshotBuilder.BankKind);
-		}
-
-		// Rebuilds the personal bank container (kind 105) from the character's freshly-persisted CharacterInventory
-		// rows and re-sends it. Reuses the same path as the .ah bank tab open.
-		public async Task ResendBank(INetworkClient client)
-		{
-			var characterId = client.Session.Character.Id;
-			var rows = await _database.GetCharacterInventory(characterId);
-			var bankRows = rows
-				.Where(r => r.Container == (int)FullCharSnapshotBuilder.BankKind)
-				.ToList();
-			var bank = FullCharSnapshotBuilder.BuildContainer(FullCharSnapshotBuilder.BankKind, BankMaxSize, BankDisabledSlots, characterId, bankRows);
-			await SendBank(client, bank);
+			_logger.LogInformation("Bank: sent {Count} items to {Character} (BankIIR, container kind {Kind}).", bank.Items.Count, client.Session.Character?.Name, FullCharSnapshotBuilder.BankKind);
 		}
 
 		// Live-renders a MoveItemInInventory that touches the personal bank (kind 105). PersistInventoryMove has
@@ -153,13 +113,36 @@ namespace Faolan.GameServer.Economy.Bank
 				if (item is not { Archetype: not 0 })
 					return;
 
-				var entry = SnapshotItemBuilder.BuildListEntry(
-					(ulong)dPos,
-					FullCharSnapshotBuilder.ItemId(character.Id, FullCharSnapshotBuilder.BagKind, (ulong)dPos),
-					FullCharSnapshotBuilder.RecordId(character.Id, FullCharSnapshotBuilder.BagKind, (ulong)dPos),
-					row.Count, item, item.Archetype).Item;
+				var entry = SnapshotItemBuilder.BuildListEntry((ulong)dPos,
+						FullCharSnapshotBuilder.ItemId(character.Id, FullCharSnapshotBuilder.BagKind, (ulong)dPos),
+						FullCharSnapshotBuilder.RecordId(character.Id, FullCharSnapshotBuilder.BagKind, (ulong)dPos),
+						row.Count,
+						item,
+						item.Archetype)
+					.Item;
 				await _outbound.SendAddItem(client, 0x68u, (uint)dPos, entry);
 			}
+		}
+
+		// The BankIIR record (everything after the 0x2000 packet's u32 length prefix). Golden-tested byte-exact
+		// against the captured bank (BankStorageTests).
+		public static byte[] BuildBankIirRecord(uint charInstance, byte[] containerBlob)
+		{
+			return new FaolanStream().WriteUInt32(BankIirSubOpcode).WriteUInt32(0x0000C350u).WriteUInt32(charInstance).WriteByte(0x01).WriteUInt32((uint)containerBlob.Length).WriteArray(containerBlob).ToArray();
+		}
+
+		// One 0x201c bank-slot registration body (20 bytes): [u32 kind=105][u32 charInstance][u32 slot][u32 0x17]
+		// [u16 0x0f][u16 recordId]. Sent once per occupied bank slot before the BankIIR content.
+		public static void WriteBankSlotRegistration(FaolanStream s, uint charInstance, uint slot, ushort recordId)
+		{
+			s.WriteUInt32(FullCharSnapshotBuilder.BankKind).WriteUInt32(charInstance).WriteUInt32(slot).WriteUInt32(0x17u).WriteUInt16((ushort)0x000F).WriteUInt16(recordId);
+		}
+
+		private static byte[] SerializeContainer(ProtoInventoryGame container)
+		{
+			using var ms = new MemoryStream();
+			Serializer.Serialize(ms, container);
+			return ms.ToArray();
 		}
 	}
 }

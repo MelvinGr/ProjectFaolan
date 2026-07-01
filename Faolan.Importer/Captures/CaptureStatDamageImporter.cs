@@ -70,6 +70,7 @@ namespace Faolan.Importer.Captures
 				var inner = packet.Body.ReadArrayUInt32Length();
 				if (inner.Length < 65 || BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(0, 4)) != StatDamageSubOpcode)
 					return;
+
 				seen++;
 
 				var delta = BinaryPrimitives.ReadInt32BigEndian(inner.AsSpan(37, 4));

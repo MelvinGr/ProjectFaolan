@@ -1,4 +1,4 @@
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.Spawn;
@@ -14,7 +14,12 @@ namespace Faolan.GameServer.Economy
 	public static class LootBagTemplate
 	{
 		public const uint SubOpcode = 0xF096251E; // LootBagFullUpdateIIR
-		public const uint TypeTag = 0x0000C87A;   // the loot typetag (WorldLoot.LootTypeTag)
+		public const uint TypeTag = 0x0000C87A; // the loot typetag (WorldLoot.LootTypeTag)
+		private const uint DefaultMaxSize = 10;
+
+		// The loot inventory's container KIND (ID32 type) on the wire; the instance is left 0 here and the live items +
+		// size are spliced per drop (SpliceLootContents). Loot ops key on the bag ENTITY handle, not this id.
+		private const uint LootContainerKind = 115;
 
 		// The loot bag's kd-tree / spatial-bounds node, decoded from the captured loot-bag tail and CONSTANT across all
 		// 10 captured bags (Captures/scripts, every *-login/gameplay bag). A single leaf node:
@@ -24,12 +29,26 @@ namespace Faolan.GameServer.Economy
 		private const uint NodeTag = 0x0000475C;
 		private const uint NodeType = 0x000F6A19;
 
-		// The loot inventory's container KIND (ID32 type) on the wire; the instance is left 0 here and the live items +
-		// size are spliced per drop (SpliceLootContents). Loot ops key on the bag ENTITY handle, not this id.
-		private const uint LootContainerKind = 115;
-		private const uint DefaultMaxSize = 10;
-
 		public static bool IsAvailable => true; // always - the tail is constructed, never loaded
+
+		// The 49-byte kd-tree bounds node, byte-exact vs the captured loot-bag geometry (LootBagTemplateTests).
+		public static byte[] BuildBounds()
+		{
+			using var w = new FaolanStream();
+			w.WriteUInt32(NodeTag);
+			w.WriteUInt32(NodeType);
+			w.WriteUInt64(0); // children / flags
+			w.WriteFloatBigEndian(-0.5f); // AABB min x
+			w.WriteFloatBigEndian(-0.5f); // AABB min y
+			w.WriteFloatBigEndian(-0.5f); // AABB min z
+			w.WriteFloatBigEndian(0.5f); // AABB max x
+			w.WriteFloatBigEndian(0.5f); // AABB max y
+			w.WriteFloatBigEndian(0.5f); // AABB max z
+			w.WriteFloatBigEndian(1.0f); // scale
+			w.WriteUInt32(0);
+			w.WriteByte(0);
+			return w.ToArray();
+		}
 
 		// A fresh WorldObject carrying the generic loot bag's identity columns + the from-scratch geometry/contents tail.
 		public static WorldObject Create()
@@ -47,34 +66,20 @@ namespace Faolan.GameServer.Economy
 			};
 		}
 
-		// The 49-byte kd-tree bounds node, byte-exact vs the captured loot-bag geometry (LootBagTemplateTests).
-		public static byte[] BuildBounds()
-		{
-			using var w = new FaolanStream();
-			w.WriteUInt32(NodeTag);
-			w.WriteUInt32(NodeType);
-			w.WriteUInt64(0);                 // children / flags
-			w.WriteFloatBigEndian(-0.5f);     // AABB min x
-			w.WriteFloatBigEndian(-0.5f);     // AABB min y
-			w.WriteFloatBigEndian(-0.5f);     // AABB min z
-			w.WriteFloatBigEndian(0.5f);      // AABB max x
-			w.WriteFloatBigEndian(0.5f);      // AABB max y
-			w.WriteFloatBigEndian(0.5f);      // AABB max z
-			w.WriteFloatBigEndian(1.0f);      // scale
-			w.WriteUInt32(0);
-			w.WriteByte(0);
-			return w.ToArray();
-		}
-
 		// A clean, empty ProtoLootBagIIR scaffold (no owner, no items) - SpliceLootContents fills in the live cash +
 		// items per drop. Built via the proven typed codec, not a captured blob.
 		private static ProtoLootBagIIR BuildEmptyScaffold()
 		{
-			return LootBagMessageCodec.BuildLootBag(0, new ProtoInventoryGame
-			{
-				InventoryId = new ProtoID32 { Type = LootContainerKind, Instance = 0 },
-				MaxSize = DefaultMaxSize
-			});
+			return LootBagMessageCodec.BuildLootBag(0,
+				new ProtoInventoryGame
+				{
+					InventoryId = new ProtoID32
+					{
+						Type = LootContainerKind,
+						Instance = 0
+					},
+					MaxSize = DefaultMaxSize
+				});
 		}
 	}
 }

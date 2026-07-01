@@ -63,16 +63,20 @@ namespace Faolan.GameServer.Spawn
 				var humanoid = read.Message.InventoryEntries.Count > 0;
 				if (humanoid && row.Morphs is { Count: > 0 })
 				{
-					var morphs = row.Morphs
+					var morphs = row
+						.Morphs
 						.OrderBy(m => m.Ordinal)
-						.Select(m => new NpcAppearanceMorph { MorphId = m.MorphId, Value = m.Value, Text = m.Text ?? "" })
+						.Select(m => new NpcAppearanceMorph
+						{
+							MorphId = m.MorphId,
+							Value = m.Value,
+							Text = m.Text ?? ""
+						})
 						.ToList();
 					body = NpcSpawnAppearanceCodec.WithAppearancePostIir(NpcSpawnScaffold.WithMinimalPreIir(body), morphs);
 				}
 				else
-				{
 					body = NpcSpawnScaffold.WithFreshScaffolds(body, humanoid);
-				}
 			}
 
 			return true;

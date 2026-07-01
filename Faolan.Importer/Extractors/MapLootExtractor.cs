@@ -16,8 +16,8 @@ namespace Faolan.Importer.Extractors
 	// Sibling of WorldObjectExtractor (which keeps the bag as a world object); this one lifts only the contents.
 	public static class MapLootExtractor
 	{
-		private const uint MapChangeSubOpcode = 0x5D85BFC7;
 		private const uint LootBagSubOpcode = 0xF096251E;
+		private const uint MapChangeSubOpcode = 0x5D85BFC7;
 		private const uint Opcode2000 = 0x2000;
 
 		public static List<MapLootPoolEntry> Extract(IReadOnlyList<CapturedPacket> packets)
@@ -51,10 +51,19 @@ namespace Faolan.Importer.Extractors
 		// Dedup to one row per (map, item); a bag's items repeat across captures and several bags carry the same item.
 		public static List<MapLootPoolEntry> Merge(IEnumerable<MapLootPoolEntry> all)
 		{
-			return all
-				.GroupBy(e => (e.MapId, e.ItemTemplateId))
-				.Select(g => g.First())
-				.ToList();
+			return all.GroupBy(e => (e.MapId, e.ItemTemplateId)).Select(g => g.First()).ToList();
+		}
+
+		private static byte[] GetBody(byte[] full)
+		{
+			if (full.Length < 12)
+				return [];
+
+			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(8, 4));
+			var bodyStart = 12 + headerLen;
+			return bodyStart <= full.Length
+				? full[bodyStart..]
+				: [];
 		}
 
 		// The item template ids inside a loot-bag IIR record (mirrors ArchetypeHarvester.ExtractFromLootBag, but yields
@@ -75,18 +84,6 @@ namespace Faolan.Importer.Extractors
 				if (acg != null && acg.Template1 != 0)
 					yield return acg.Template1;
 			}
-		}
-
-		private static byte[] GetBody(byte[] full)
-		{
-			if (full.Length < 12)
-				return [];
-
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(8, 4));
-			var bodyStart = 12 + headerLen;
-			return bodyStart <= full.Length
-				? full[bodyStart..]
-				: [];
 		}
 	}
 }

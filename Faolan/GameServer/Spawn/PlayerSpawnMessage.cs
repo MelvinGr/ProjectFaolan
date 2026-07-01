@@ -9,6 +9,13 @@ namespace Faolan.GameServer.Spawn
 	// both produce the same per-character overrides from one place.
 	public static class PlayerSpawnMessage
 	{
+		// CharacterStats.bcc_state value for a dead character (alive==1). The behavior-controller Dead state enum.
+		private const uint DeadBccState = 29;
+
+		// The forced "death" animation id retail sets in a dead player's BCC (Stihetfv login-while-dead FA015807).
+		// Capture-derived (conqueror); may be per-skeleton - see the call site.
+		private const uint DeathForcedAnimId = 41877;
+
 		// Mutates `message` in place: name, identity (sex/race/level + cur==max vitals), editor looks, worn equipment.
 		// Fields with no DB value (race/sex 0, no Body, no buildable gear) keep the template's captured value.
 		public static void ApplyCharacter(ProtoCoreCharacterIIR message, Character character, CharacterEquipment equipment)
@@ -39,7 +46,9 @@ namespace Faolan.GameServer.Spawn
 				if (maxStats != null)
 				{
 					message.Stats.Life = maxStats.Health * 100;
-					message.Stats.Health = character.IsDead ? 0 : maxStats.Health * 100;
+					message.Stats.Health = character.IsDead
+						? 0
+						: maxStats.Health * 100;
 					message.Stats.MaxStamina = maxStats.Stamina * 100;
 					message.Stats.Stamina = maxStats.Stamina * 100;
 					message.Stats.MaxMana = maxStats.Mana * 100;
@@ -101,12 +110,5 @@ namespace Faolan.GameServer.Spawn
 				message.Bcc.AnimForcedBlend = true;
 			}
 		}
-
-		// The forced "death" animation id retail sets in a dead player's BCC (Stihetfv login-while-dead FA015807).
-		// Capture-derived (conqueror); may be per-skeleton - see the call site.
-		private const uint DeathForcedAnimId = 41877;
-
-		// CharacterStats.bcc_state value for a dead character (alive==1). The behavior-controller Dead state enum.
-		private const uint DeadBccState = 29;
 	}
 }

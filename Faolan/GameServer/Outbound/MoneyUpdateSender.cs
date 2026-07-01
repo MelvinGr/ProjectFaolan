@@ -1,5 +1,5 @@
 using System.Threading.Tasks;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
@@ -24,14 +24,6 @@ namespace Faolan.GameServer
 
 	public partial class GameServerListener
 	{
-		// The 12-byte wire body; golden-tested against the captured first-coin-loot update (MoneyUpdateTests).
-		internal static void WriteMoneyUpdateBody(FaolanStream s, ulong balanceTin, MoneyUpdateReason reason)
-		{
-			s
-				.WriteUInt64(balanceTin)
-				.WriteUInt32((uint)reason);
-		}
-
 		// Pushes the character's wallet balance, framed on the same login-world conversation as the 0x201C
 		// record stream (the retail money updates ride that conversation).
 		private async Task SendMoneyUpdate(INetworkClient client, ulong balanceTin, MoneyUpdateReason reason)
@@ -42,6 +34,12 @@ namespace Faolan.GameServer
 			await ps.SendAsync(client);
 
 			Logger.LogInformation("UpdateCash: {Balance} tin ({Reason}) -> {Character}.", balanceTin, reason, client.Session.Character?.Name);
+		}
+
+		// The 12-byte wire body; golden-tested against the captured first-coin-loot update (MoneyUpdateTests).
+		internal static void WriteMoneyUpdateBody(FaolanStream s, ulong balanceTin, MoneyUpdateReason reason)
+		{
+			s.WriteUInt64(balanceTin).WriteUInt32((uint)reason);
 		}
 	}
 }

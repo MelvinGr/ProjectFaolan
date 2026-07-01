@@ -3,15 +3,15 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Protobuf;
+using Faolan.Core.Network.Spawn;
 using Faolan.GameServer.Inventory;
 using Faolan.GameServer.Packets.FullCharSnapshot;
-using Faolan.Core.Spawn;
 using Faolan.GameServer.Spawn;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
@@ -124,6 +124,7 @@ namespace Faolan.Importer.Captures
 				best.Remove(name);
 				otherPlayers++;
 			}
+
 			if (otherPlayers > 0)
 				Console.WriteLine($"Characters: skipped {otherPlayers} other player(s) visible in captures (not the played character).");
 
@@ -149,8 +150,7 @@ namespace Faolan.Importer.Captures
 				// the class id (verified 10/10 against the captured character lists, all pre-frame variants;
 				// the high byte is an archetype group). This covers OTHER players too - the char list (0x20EF)
 				// only exists for the capturing account's own characters and serves as the cross-check.
-				var classId = charList.GetValueOrDefault(name)
-					?.Class ?? (body.Length > 136
+				var classId = charList.GetValueOrDefault(name)?.Class ?? (body.Length > 136
 					? body[136]
 					: 0u);
 
@@ -179,9 +179,7 @@ namespace Faolan.Importer.Captures
 				Id = originalId,
 				AccountId = accountId,
 				Name = name,
-				AuthChallenge = Guid
-					.NewGuid()
-					.ToString("N"),
+				AuthChallenge = Guid.NewGuid().ToString("N"),
 				CreationDate = DateTime.UtcNow,
 				Level = (ushort)Math.Max(1, stats.Level),
 				Race = (Race)stats.Race,
@@ -338,10 +336,7 @@ namespace Faolan.Importer.Captures
 		// server's (first) realm, creating a default one when the DB has none yet.
 		private static async Task<uint> FindOrCreateRealm(DatabaseContext db)
 		{
-			var realm = await db
-				.Realms
-				.OrderBy(r => r.Id)
-				.FirstOrDefaultAsync();
+			var realm = await db.Realms.OrderBy(r => r.Id).FirstOrDefaultAsync();
 			if (realm == null)
 			{
 				realm = new Realm
@@ -466,8 +461,7 @@ namespace Faolan.Importer.Captures
 						Container = (int)container.InventoryId.Type,
 						Slot = (int)entry.Pos,
 						ItemId = templateId,
-						Count = entry.Item.StatLists.FirstOrDefault(s => s.Stat == 26)
-							?.Value ?? 1
+						Count = entry.Item.StatLists.FirstOrDefault(s => s.Stat == 26)?.Value ?? 1
 					});
 					stored++;
 				}
@@ -479,14 +473,16 @@ namespace Faolan.Importer.Captures
 		// The creator names its temp instances "Character<instance>" until the real name is committed.
 		private static bool IsCreatorTempName(string name)
 		{
-			return name.Length > 9 && name.StartsWith("Character", StringComparison.Ordinal) && name
-				.Skip(9)
-				.All(char.IsAsciiDigit);
+			return name.Length > 9 && name.StartsWith("Character", StringComparison.Ordinal) && name.Skip(9).All(char.IsAsciiDigit);
 		}
 
 		private static async Task<uint> ResolveMapId(DatabaseContext db, uint spawnMapId, CharListEntry listEntry)
 		{
-			foreach (var candidate in new[] { spawnMapId, listEntry?.MapId ?? 0 })
+			foreach (var candidate in new[]
+			{
+				spawnMapId,
+				listEntry?.MapId ?? 0
+			})
 			{
 				if (candidate != 0 && await db.Maps.AnyAsync(m => m.Id == candidate))
 					return candidate;

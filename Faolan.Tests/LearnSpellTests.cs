@@ -9,10 +9,9 @@ namespace Faolan.Tests
 	// (invariant across all 68 packets; see Captures/scripts/decode_learn_spell.py).
 	public class LearnSpellTests
 	{
-		[Theory]
-		[InlineData(0x003006ffu, "003006ff")] // faolan hoxxling-login-gameplay frame 665
-		[InlineData(0x00119110u, "00119110")] // hoxxling guild-gameplay frame 3336
-		[InlineData(0x0041b9aeu, "0041b9ae")]
+		[Theory, InlineData(0x003006ffu, "003006ff"), InlineData(0x00119110u, "00119110"), InlineData(0x0041b9aeu, "0041b9ae")]
+		// faolan hoxxling-login-gameplay frame 665
+		// hoxxling guild-gameplay frame 3336
 		public void BuildLearnSpellBody_IsTheBareSpellId(uint spellId, string expectedHex)
 		{
 			var body = GameServerListener.BuildLearnSpellBody(spellId);

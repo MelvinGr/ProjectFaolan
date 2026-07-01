@@ -1,5 +1,5 @@
 using System.Numerics;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Network.Packets.Opcodes;
 
 namespace Faolan.GameServer.World
@@ -17,42 +17,98 @@ namespace Faolan.GameServer.World
 	public static class TeleportCodec
 	{
 		public const uint IntendedTeleportSubOpcode = (uint)GameServer0X2000RespondsOpcodes.IntendedTeleportIIR; // 0x10D27BC0
-		public const uint N3TeleportSubOpcode = (uint)GameServer0X2000RespondsOpcodes.N3TeleportIIR;            // 0x5A32F0D7
-
-		private const uint ReceiverClass = 0x0000C350;     // Character class tag
-		private const byte PlayfieldProxyVersion = 0x62;   // 'b' - the PlayfieldProxy stream version (FUN_00a6a600)
+		public const uint N3TeleportSubOpcode = (uint)GameServer0X2000RespondsOpcodes.N3TeleportIIR; // 0x5A32F0D7
+		private const byte PlayfieldProxyVersion = 0x62; // 'b' - the PlayfieldProxy stream version (FUN_00a6a600)
 		private const uint PlayfieldClassWord = 0x0000C79C; // PlayfieldProxy u32[0] (constant in the captures)
-		private const uint ProxyReadyFlag = 0x00000001;     // dest proxy u32[5] - instance valid/ready flag
-		private const uint ProxyInstanceWord = 0x00009C50;  // dest proxy u32[6] (constant in the captures)
-		private const uint PositionBlobTag = 0x00018704;    // first word of the length-prefixed spawn-position blob
+		private const uint PositionBlobTag = 0x00018704; // first word of the length-prefixed spawn-position blob
+		private const uint ProxyInstanceWord = 0x00009C50; // dest proxy u32[6] (constant in the captures)
+		private const uint ProxyReadyFlag = 0x00000001; // dest proxy u32[5] - instance valid/ready flag
 
-		// The PlayfieldProxy stream (FUN_00a6a600): version 'b' + 8 u32 + a trailing bool. u32[0]=class word,
-		// u32[1]=map; u32[5..7] pin the destination instance (zero in the "begin" body, set in the dest announce).
-		private static FaolanStream WritePlayfieldProxy(FaolanStream s, uint mapId, uint slot5, uint slot6, uint slot7)
-		{
-			return s
-				.WriteByte(PlayfieldProxyVersion)
-				.WriteUInt32(PlayfieldClassWord) // [0]
-				.WriteUInt32(mapId)              // [1] destination map
-				.WriteUInt32(0).WriteUInt32(0).WriteUInt32(0) // [2..4]
-				.WriteUInt32(slot5)              // [5]
-				.WriteUInt32(slot6)              // [6]
-				.WriteUInt32(slot7)              // [7]
-				.WriteByte(0x00);                // trailing bool
-		}
+		private const uint ReceiverClass = 0x0000C350; // Character class tag
 
 		// 0x10D27BC0 "begin teleport to map N": carrier + env + a PlayfieldProxy carrying only the class word and the
 		// destination map (instance slots zero) + a trailing bool.
 		//   [u32 subop][u32 0xC350][u32 clientInstance][u8 env=01][PlayfieldProxy][u8 bool=0]
 		public static byte[] BuildBegin(uint clientInstance, uint destMapId)
 		{
+			var s = new FaolanStream().WriteUInt32(IntendedTeleportSubOpcode).WriteUInt32(ReceiverClass).WriteUInt32(clientInstance).WriteByte(0x01); // env
+			WritePlayfieldProxy(s, destMapId, 0, 0, 0);
+			return s.WriteByte(0x00).ToArray(); // IntendedTeleportIIR trailing bool (-> obj+0x40)
+		}
+
+		// 0x5A32F0D7 destination announce: carrier + 7 leading words (the last = 1.0f) + the fully-specified
+		// destination PlayfieldProxy + 2 words + a length-prefixed spawn-position blob + a trailing bool.
+		//   [u32 subop][u32 0xC350][u32 clientInstance][u8 env=00]
+		//   [6x u32 0][f32 1.0]                                  # 7 leading words (-> obj+0x2c..)
+		//   [PlayfieldProxy with slot5=1, slot6=0x9C50, slot7=destPlayfieldToken]
+		//   [u32 0][u32 0]                                       # -> obj+0x6c / +0x70
+		//   [u32 len=20][u32 0x18704][pos x/y/z f32 BE][u32 destDescriptor]   # the position blob (FUN_00cbf5d0)
+		//   [u8 bool=0]                                          # -> obj+0x90
+		// destPlayfieldToken is the destination playfield-INSTANCE token (NOT a per-map constant - the captured
+		// 0x00503570 was that session's instance); the live change-map path sources it from the destination map's
+		// burst via WorldBroadcaster.ResolveMapPlayfieldToken so it matches the reconnect's world-entry stamp (#211).
+		// destDescriptor (0x14 map 2010 / 0xBE map 2000) is the position blob's trailing word - a per-zone descriptor
+		// not yet derivable from the data. Both default to the map-2010 capture values for the golden / a burst-less map.
+		public static byte[] BuildDestination(uint clientInstance, uint destMapId, Vector3 position, uint destPlayfieldToken = 0x00503570u, uint destDescriptor = 0x00000014u)
+		{
+			// The 20-byte spawn-position blob the dest reader pulls via the length-prefixed sub-stream.
+			var positionBlob = new FaolanStream().WriteUInt32(PositionBlobTag).WriteVector3BigEndian(position).WriteUInt32(destDescriptor).ToArray();
+
 			var s = new FaolanStream()
-				.WriteUInt32(IntendedTeleportSubOpcode)
+				.WriteUInt32(N3TeleportSubOpcode)
 				.WriteUInt32(ReceiverClass)
 				.WriteUInt32(clientInstance)
-				.WriteByte(0x01);                    // env
-			WritePlayfieldProxy(s, destMapId, 0, 0, 0);
-			return s.WriteByte(0x00).ToArray();      // IntendedTeleportIIR trailing bool (-> obj+0x40)
+				.WriteByte(0x00) // env
+				.WriteArray(new byte[24]) // 6 leading words = 0
+				.WriteFloatBigEndian(1.0f); // 7th leading word = 1.0
+			WritePlayfieldProxy(s, destMapId, ProxyReadyFlag, ProxyInstanceWord, destPlayfieldToken);
+			return s
+				.WriteUInt32(0)
+				.WriteUInt32(0) // obj+0x6c / +0x70
+				.WriteUInt32((uint)positionBlob.Length)
+				.WriteArray(positionBlob)
+				.WriteByte(0x00) // n3TeleportIIR trailing bool
+				.ToArray();
+		}
+
+		// The same-map REVIVE destination announce (#214): the n3Teleport (0x5A32F0D7) retail sends right after the
+		// revive IntendedTeleport - THIS is the packet that actually relocates the player to the res point (no loading
+		// screen, same map). Its grammar DIFFERS from the cross-map BuildDestination: the spawn position is right after
+		// env (not in a trailing length-prefixed blob), the proxy carries 0xC7A0 (not 0xC79C) + map + player handle
+		// with the instance slots ZERO, and there's no leading 6-zero/1.0f block. Decoded byte-for-byte from the beach
+		// resurrect (Stihetfv #1277, 92 bytes, map 0xFAA):
+		//   [u32 subop][u32 0xC350][u32 clientInstance][u8 env=0]
+		//   [f32 X][f32 Y][f32 Z]                         # res point position
+		//   [u32 0][f32 facingX][u32 0][f32 facingZ]      # 2D heading
+		//   [u8 0x62][u32 0xC7A0][u32 map][u32 0][u32 playerHandle][u32 0 x4]   # PlayfieldProxy (instance slots 0)
+		//   [u32 0][u32 0][u32 0][u8 0][u8 1]             # trailing
+		public static byte[] BuildReviveDestination(uint clientInstance, uint mapId, uint playerHandle, Vector3 position, float facingX, float facingZ)
+		{
+			return new FaolanStream()
+				.WriteUInt32(N3TeleportSubOpcode)
+				.WriteUInt32(ReceiverClass)
+				.WriteUInt32(clientInstance)
+				.WriteByte(0x00) // env
+				.WriteVector3BigEndian(position)
+				.WriteUInt32(0)
+				.WriteFloatBigEndian(facingX)
+				.WriteUInt32(0)
+				.WriteFloatBigEndian(facingZ)
+				.WriteByte(PlayfieldProxyVersion)
+				.WriteUInt32(0x0000C7A0) // proxy[0] (revive uses 0xC7A0, not 0xC79C)
+				.WriteUInt32(mapId) // proxy[1] = current map
+				.WriteUInt32(0) // proxy[2]
+				.WriteUInt32(playerHandle) // proxy[3]
+				.WriteUInt32(0)
+				.WriteUInt32(0)
+				.WriteUInt32(0)
+				.WriteUInt32(0) // proxy[4..7] (instance slots zero)
+				.WriteUInt32(0)
+				.WriteUInt32(0)
+				.WriteUInt32(0) // trailing words
+				.WriteByte(0x00)
+				.WriteByte(0x01) // trailing bytes
+				.ToArray();
 		}
 
 		// The same-map REVIVE teleport (#214): the single IntendedTeleport (0x10D27BC0) retail sends after the
@@ -73,90 +129,35 @@ namespace Faolan.GameServer.World
 				.WriteUInt32(IntendedTeleportSubOpcode)
 				.WriteUInt32(ReceiverClass)
 				.WriteUInt32(clientInstance)
-				.WriteByte(0x01)                      // env
+				.WriteByte(0x01) // env
 				.WriteByte(PlayfieldProxyVersion)
-				.WriteUInt32(PlayfieldClassWord)      // [0]
-				.WriteUInt32(mapId)                   // [1] = the CURRENT map (same-map revive)
-				.WriteUInt32(0)                       // [2]
-				.WriteUInt32(playerHandle)            // [3] = the reviving player (beach capture)
-				.WriteUInt32(0)                       // [4]
-				.WriteUInt32(ProxyReadyFlag)          // [5] = 1 (instance ready)
-				.WriteUInt32(ProxyInstanceWord)       // [6] = 0x9C50
-				.WriteUInt32(playfieldToken)          // [7] = the LIVE playfield-instance token
-				.WriteByte(0x00);                     // PlayfieldProxy trailing bool
-			return s.WriteByte(0x01).ToArray();       // IntendedTeleportIIR trailing bool = 1
+				.WriteUInt32(PlayfieldClassWord) // [0]
+				.WriteUInt32(mapId) // [1] = the CURRENT map (same-map revive)
+				.WriteUInt32(0) // [2]
+				.WriteUInt32(playerHandle) // [3] = the reviving player (beach capture)
+				.WriteUInt32(0) // [4]
+				.WriteUInt32(ProxyReadyFlag) // [5] = 1 (instance ready)
+				.WriteUInt32(ProxyInstanceWord) // [6] = 0x9C50
+				.WriteUInt32(playfieldToken) // [7] = the LIVE playfield-instance token
+				.WriteByte(0x00); // PlayfieldProxy trailing bool
+			return s.WriteByte(0x01).ToArray(); // IntendedTeleportIIR trailing bool = 1
 		}
 
-		// The same-map REVIVE destination announce (#214): the n3Teleport (0x5A32F0D7) retail sends right after the
-		// revive IntendedTeleport - THIS is the packet that actually relocates the player to the res point (no loading
-		// screen, same map). Its grammar DIFFERS from the cross-map BuildDestination: the spawn position is right after
-		// env (not in a trailing length-prefixed blob), the proxy carries 0xC7A0 (not 0xC79C) + map + player handle
-		// with the instance slots ZERO, and there's no leading 6-zero/1.0f block. Decoded byte-for-byte from the beach
-		// resurrect (Stihetfv #1277, 92 bytes, map 0xFAA):
-		//   [u32 subop][u32 0xC350][u32 clientInstance][u8 env=0]
-		//   [f32 X][f32 Y][f32 Z]                         # res point position
-		//   [u32 0][f32 facingX][u32 0][f32 facingZ]      # 2D heading
-		//   [u8 0x62][u32 0xC7A0][u32 map][u32 0][u32 playerHandle][u32 0 x4]   # PlayfieldProxy (instance slots 0)
-		//   [u32 0][u32 0][u32 0][u8 0][u8 1]             # trailing
-		public static byte[] BuildReviveDestination(uint clientInstance, uint mapId, uint playerHandle, Vector3 position,
-			float facingX, float facingZ)
+		// The PlayfieldProxy stream (FUN_00a6a600): version 'b' + 8 u32 + a trailing bool. u32[0]=class word,
+		// u32[1]=map; u32[5..7] pin the destination instance (zero in the "begin" body, set in the dest announce).
+		private static FaolanStream WritePlayfieldProxy(FaolanStream s, uint mapId, uint slot5, uint slot6, uint slot7)
 		{
-			return new FaolanStream()
-				.WriteUInt32(N3TeleportSubOpcode)
-				.WriteUInt32(ReceiverClass)
-				.WriteUInt32(clientInstance)
-				.WriteByte(0x00)                                  // env
-				.WriteVector3BigEndian(position)
-				.WriteUInt32(0).WriteFloatBigEndian(facingX)
-				.WriteUInt32(0).WriteFloatBigEndian(facingZ)
-				.WriteByte(PlayfieldProxyVersion)
-				.WriteUInt32(0x0000C7A0)                          // proxy[0] (revive uses 0xC7A0, not 0xC79C)
-				.WriteUInt32(mapId)                              // proxy[1] = current map
-				.WriteUInt32(0)                                  // proxy[2]
-				.WriteUInt32(playerHandle)                       // proxy[3]
-				.WriteUInt32(0).WriteUInt32(0).WriteUInt32(0).WriteUInt32(0) // proxy[4..7] (instance slots zero)
-				.WriteUInt32(0).WriteUInt32(0).WriteUInt32(0)    // trailing words
-				.WriteByte(0x00).WriteByte(0x01)                 // trailing bytes
-				.ToArray();
-		}
-
-		// 0x5A32F0D7 destination announce: carrier + 7 leading words (the last = 1.0f) + the fully-specified
-		// destination PlayfieldProxy + 2 words + a length-prefixed spawn-position blob + a trailing bool.
-		//   [u32 subop][u32 0xC350][u32 clientInstance][u8 env=00]
-		//   [6x u32 0][f32 1.0]                                  # 7 leading words (-> obj+0x2c..)
-		//   [PlayfieldProxy with slot5=1, slot6=0x9C50, slot7=destPlayfieldToken]
-		//   [u32 0][u32 0]                                       # -> obj+0x6c / +0x70
-		//   [u32 len=20][u32 0x18704][pos x/y/z f32 BE][u32 destDescriptor]   # the position blob (FUN_00cbf5d0)
-		//   [u8 bool=0]                                          # -> obj+0x90
-		// destPlayfieldToken is the destination playfield-INSTANCE token (NOT a per-map constant - the captured
-		// 0x00503570 was that session's instance); the live change-map path sources it from the destination map's
-		// burst via WorldBroadcaster.ResolveMapPlayfieldToken so it matches the reconnect's world-entry stamp (#211).
-		// destDescriptor (0x14 map 2010 / 0xBE map 2000) is the position blob's trailing word - a per-zone descriptor
-		// not yet derivable from the data. Both default to the map-2010 capture values for the golden / a burst-less map.
-		public static byte[] BuildDestination(uint clientInstance, uint destMapId, Vector3 position,
-			uint destPlayfieldToken = 0x00503570u, uint destDescriptor = 0x00000014u)
-		{
-			// The 20-byte spawn-position blob the dest reader pulls via the length-prefixed sub-stream.
-			var positionBlob = new FaolanStream()
-				.WriteUInt32(PositionBlobTag)
-				.WriteVector3BigEndian(position)
-				.WriteUInt32(destDescriptor)
-				.ToArray();
-
-			var s = new FaolanStream()
-				.WriteUInt32(N3TeleportSubOpcode)
-				.WriteUInt32(ReceiverClass)
-				.WriteUInt32(clientInstance)
-				.WriteByte(0x00)                     // env
-				.WriteArray(new byte[24])            // 6 leading words = 0
-				.WriteFloatBigEndian(1.0f);          // 7th leading word = 1.0
-			WritePlayfieldProxy(s, destMapId, ProxyReadyFlag, ProxyInstanceWord, destPlayfieldToken);
 			return s
-				.WriteUInt32(0).WriteUInt32(0)       // obj+0x6c / +0x70
-				.WriteUInt32((uint)positionBlob.Length)
-				.WriteArray(positionBlob)
-				.WriteByte(0x00)                     // n3TeleportIIR trailing bool
-				.ToArray();
+				.WriteByte(PlayfieldProxyVersion)
+				.WriteUInt32(PlayfieldClassWord) // [0]
+				.WriteUInt32(mapId) // [1] destination map
+				.WriteUInt32(0)
+				.WriteUInt32(0)
+				.WriteUInt32(0) // [2..4]
+				.WriteUInt32(slot5) // [5]
+				.WriteUInt32(slot6) // [6]
+				.WriteUInt32(slot7) // [7]
+				.WriteByte(0x00); // trailing bool
 		}
 	}
 }

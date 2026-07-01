@@ -1,10 +1,10 @@
-using Faolan.GameServer.Inventory;
 using System;
 using System.IO;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.GameServer.Inventory;
 using Faolan.Importer.Captures;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -84,11 +84,7 @@ namespace Faolan.Tests
 				// Assert: a fresh context sees RingLeft set and FirstPosBag cleared.
 				await using (var db = NewContext(dbPath))
 				{
-					var equipment = await db
-						.CharacterEquipment
-						.Include(e => e.RingLeft)
-						.Include(e => e.FirstPosBag)
-						.FirstAsync(e => e.CharacterId == characterId);
+					var equipment = await db.CharacterEquipment.Include(e => e.RingLeft).Include(e => e.FirstPosBag).FirstAsync(e => e.CharacterId == characterId);
 					Assert.NotNull(equipment.RingLeft);
 					Assert.Equal(royalSignet, equipment.RingLeft!.Id);
 					Assert.Null(equipment.FirstPosBag);
@@ -103,10 +99,7 @@ namespace Faolan.Tests
 
 		private static DatabaseContext NewContext(string path)
 		{
-			var options = new DbContextOptionsBuilder<DatabaseContext>()
-				.UseSqlite($"Data Source={path}", x => x.MigrationsAssembly("Faolan"))
-				.UseLazyLoadingProxies()
-				.Options;
+			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={path}", x => x.MigrationsAssembly("Faolan")).UseLazyLoadingProxies().Options;
 			return new DatabaseContext(options);
 		}
 	}

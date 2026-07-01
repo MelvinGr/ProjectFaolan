@@ -61,9 +61,7 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task InitialBurst_WithDb_IsByteIdenticalToGolden()
 		{
-			var options = new DbContextOptionsBuilder<DatabaseContext>()
-				.UseSqlite($"Data Source={FaolanDbPath()};Mode=ReadOnly")
-				.Options;
+			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={FaolanDbPath()};Mode=ReadOnly").Options;
 			var repo = new DatabaseRepository(new SingleOptionsContextFactory(options));
 			var client = new RecordingNetworkClient(0x02000001); // the instance the golden was recorded with
 
@@ -73,29 +71,30 @@ namespace Faolan.Tests
 			Assert.Equal(Convert.ToHexString(Golden.Bytes("InitialBurst")), Convert.ToHexString(bytes));
 		}
 
-		private sealed class SingleOptionsContextFactory(DbContextOptions<DatabaseContext> options)
-			: IDbContextFactory<DatabaseContext>
-		{
-			public DatabaseContext CreateDbContext() => new DatabaseContext(options);
-			public Task<DatabaseContext> CreateDbContextAsync(CancellationToken ct = default) => Task.FromResult(new DatabaseContext(options));
-		}
-
 		// The SimpleDynel record body in the burst: [u32 0x0000C878][u32 handle][u32 0] 2C 0A 0F 0D <posX> ... ;
 		// WorldObjectBuilder consumes/produces exactly this body (the bytes after the 0x2000 carrier prefix). Returns
 		// (handle, body) for each of the burst's dynel records, lifted from the capture-locked InitialBurst.bin.
 		private static List<(uint Handle, byte[] Body)> ExtractBurstDynelRecords()
 		{
 			var burst = Golden.Bytes("InitialBurst");
-			var sig = new byte[] { 0x00, 0x00, 0xC8, 0x78 };
+			var sig = new byte[]
+			{
+				0x00,
+				0x00,
+				0xC8,
+				0x78
+			};
 			var result = new List<(uint, byte[])>();
 			for (var i = 0; i + 13 < burst.Length;)
 			{
 				var at = IndexOf(burst, sig, i);
 				if (at < 0)
 					break;
+
 				i = at + 1;
 				if (burst[at + 12] != 0x2C) // the transform group tag - confirms this is a SimpleDynel record body
 					continue;
+
 				// the carrier length [u32] sits 4 bytes before the subOpcode (8 bytes before the body): len = 4 + body
 				var bodyLen = (int)BinaryPrimitives.ReadUInt32BigEndian(burst.AsSpan(at - 8, 4)) - 4;
 				var handle = BinaryPrimitives.ReadUInt32BigEndian(burst.AsSpan(at + 4, 4));
@@ -113,16 +112,10 @@ namespace Faolan.Tests
 			return message.DisplayName;
 		}
 
-		private static Dictionary<string, WorldObject> LoadMap4000ObjectsByDisplayName()
+		private static string FaolanDbPath([CallerFilePath] string thisFile = "")
 		{
-			var options = new DbContextOptionsBuilder<DatabaseContext>()
-				.UseSqlite($"Data Source={FaolanDbPath()};Mode=ReadOnly")
-				.Options;
-			using var ctx = new DatabaseContext(options);
-			var map = new Dictionary<string, WorldObject>();
-			foreach (var o in ctx.WorldObjects.Where(o => o.MapId == 4000 && o.DisplayName != null).AsNoTracking())
-				map.TryAdd(o.DisplayName, o);
-			return map;
+			// thisFile = <repo>/Faolan.Tests/CreateEditorSceneDynelTests.cs -> <repo>/faolan.db
+			return Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(thisFile)!)!, "faolan.db");
 		}
 
 		private static int IndexOf(byte[] haystack, byte[] needle, int start)
@@ -131,7 +124,12 @@ namespace Faolan.Tests
 			{
 				var ok = true;
 				for (var j = 0; j < needle.Length; j++)
-					if (haystack[i + j] != needle[j]) { ok = false; break; }
+					if (haystack[i + j] != needle[j])
+					{
+						ok = false;
+						break;
+					}
+
 				if (ok)
 					return i;
 			}
@@ -139,10 +137,27 @@ namespace Faolan.Tests
 			return -1;
 		}
 
-		private static string FaolanDbPath([CallerFilePath] string thisFile = "")
+		private static Dictionary<string, WorldObject> LoadMap4000ObjectsByDisplayName()
 		{
-			// thisFile = <repo>/Faolan.Tests/CreateEditorSceneDynelTests.cs -> <repo>/faolan.db
-			return Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(thisFile)!)!, "faolan.db");
+			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={FaolanDbPath()};Mode=ReadOnly").Options;
+			using var ctx = new DatabaseContext(options);
+			var map = new Dictionary<string, WorldObject>();
+			foreach (var o in ctx.WorldObjects.Where(o => o.MapId == 4000 && o.DisplayName != null).AsNoTracking())
+				map.TryAdd(o.DisplayName, o);
+			return map;
+		}
+
+		private sealed class SingleOptionsContextFactory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>
+		{
+			public DatabaseContext CreateDbContext()
+			{
+				return new DatabaseContext(options);
+			}
+
+			public Task<DatabaseContext> CreateDbContextAsync(CancellationToken ct = default)
+			{
+				return Task.FromResult(new DatabaseContext(options));
+			}
 		}
 	}
 }

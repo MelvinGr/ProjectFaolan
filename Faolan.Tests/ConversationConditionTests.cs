@@ -10,16 +10,24 @@ namespace Faolan.Tests
 	public class ConversationConditionTests
 	{
 		[Fact]
+		public void BadCondition_DoesNotMatch_WhenNonPermissive()
+		{
+			var vm = new LuaScriptVm();
+			// A malformed gate must not hijack every player (the runtime uses permissive: false).
+			Assert.False(vm.RunCondition("this is not lua", new GameLuaPlayer([], []), false));
+		}
+
+		[Fact]
 		public void HasCompletedQuest_GatesTheVariant()
 		{
 			var vm = new LuaScriptVm();
 			const string condition = "return player:HasCompletedQuest(13479)";
 
-			var afterQuest = new GameLuaPlayer(tags: [], completedQuests: [13479u]);
-			var beforeQuest = new GameLuaPlayer(tags: [], completedQuests: []);
+			var afterQuest = new GameLuaPlayer([], [13479u]);
+			var beforeQuest = new GameLuaPlayer([], []);
 
-			Assert.True(vm.RunCondition(condition, afterQuest, permissive: false));
-			Assert.False(vm.RunCondition(condition, beforeQuest, permissive: false));
+			Assert.True(vm.RunCondition(condition, afterQuest, false));
+			Assert.False(vm.RunCondition(condition, beforeQuest, false));
 		}
 
 		[Fact]
@@ -28,16 +36,8 @@ namespace Faolan.Tests
 			var vm = new LuaScriptVm();
 			const string condition = "return player:HasTag(5001)";
 
-			Assert.True(vm.RunCondition(condition, new GameLuaPlayer([5001u], []), permissive: false));
-			Assert.False(vm.RunCondition(condition, new GameLuaPlayer([], []), permissive: false));
-		}
-
-		[Fact]
-		public void BadCondition_DoesNotMatch_WhenNonPermissive()
-		{
-			var vm = new LuaScriptVm();
-			// A malformed gate must not hijack every player (the runtime uses permissive: false).
-			Assert.False(vm.RunCondition("this is not lua", new GameLuaPlayer([], []), permissive: false));
+			Assert.True(vm.RunCondition(condition, new GameLuaPlayer([5001u], []), false));
+			Assert.False(vm.RunCondition(condition, new GameLuaPlayer([], []), false));
 		}
 	}
 }

@@ -7,6 +7,7 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Protobuf;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -61,52 +62,6 @@ namespace Faolan.Importer.Captures
 			return listings;
 		}
 
-		// Maps one parsed search-results row to a TradepostListing. Inverse of TradepostListingCodec.BuildEntry, so a
-		// row re-imported and rebuilt reproduces the captured bytes (proven by CaptureListingImporterTests).
-		public static TradepostListing ToListing(TradepostListingCodec.ParsedRow row)
-		{
-			var item = row.Entry.ItemData ?? new Core.Network.Protobuf.ProtoAcgItem();
-			var key = item.Key1 ?? new Core.Network.Protobuf.ProtoDecryptionKey();
-
-			uint flags = 0, timestamp = 0;
-			foreach (var stat in row.Entry.StatLists)
-			{
-				if (stat.Stat == TradepostListingCodec.StatFlags) flags = stat.Value;
-				else if (stat.Stat == TradepostListingCodec.StatTimestamp) timestamp = stat.Value;
-			}
-
-			return new TradepostListing
-			{
-				SaleId = row.SaleId,
-				Handle = row.Handle,
-				SellerName = row.Seller,
-				Price = row.Price,
-				Quantity = row.Quantity,
-				ItemId = row.ItemId,
-				InstanceField = row.InstanceField,
-				ItemHandle = row.ItemHandle,
-				EntryFlags = flags,
-				Timestamp = timestamp,
-				Data1 = key.Key1,
-				Data2 = key.Key2,
-				Data3 = key.Key3,
-				Data4 = key.Key4,
-				Template = item.Template1,
-				ItemLevel = item.Level,
-				ItemHash = item.Hash
-			};
-		}
-
-		// Last capture wins for a saleId seen multiple times (re-walks of the same search just re-emit the same
-		// listing with session-shifted volatile ids).
-		public static List<TradepostListing> Merge(IEnumerable<TradepostListing> listings)
-		{
-			return listings
-				.GroupBy(l => l.SaleId)
-				.Select(g => g.Last())
-				.ToList();
-		}
-
 		// Ensures each listed item exists as an Items TEMPLATE so a bought item can persist (CharacterInventory.ItemId
 		// FK) and be re-rendered on relog. The AH listing carries the per-template identity quad + level (verified
 		// identical across a template's listings) but NO archetype (the search-results ProtoAcgItem.Hash is 0), so
@@ -122,9 +77,7 @@ namespace Faolan.Importer.Captures
 			// search-key ItemId (the FK target, #257). They're usually equal but can differ; both must exist as Items
 			// rows. For each id, pick a representative listing - one whose Template matches if any (carries the real
 			// instance identity), else one whose ItemId matches (a catalog placeholder).
-			var neededIds = merged.Select(l => l.Template).Where(t => t != 0)
-				.Concat(merged.Select(l => l.ItemId).Where(i => i != 0))
-				.Distinct();
+			var neededIds = merged.Select(l => l.Template).Where(t => t != 0).Concat(merged.Select(l => l.ItemId).Where(i => i != 0)).Distinct();
 			foreach (var tmpl in neededIds)
 			{
 				if (await db.Items.AnyAsync(i => i.Id == tmpl))
@@ -197,19 +150,67 @@ namespace Faolan.Importer.Captures
 
 			await db.SaveChangesAsync();
 
-			logger?.LogInformation("Tradepost listings: {Seen} seen, {Added} added, {Updated} updated; {Harvested} item template(s) harvested.",
-				merged.Count, added, updated, harvested);
+			logger?.LogInformation("Tradepost listings: {Seen} seen, {Added} added, {Updated} updated; {Harvested} item template(s) harvested.", merged.Count, added, updated, harvested);
 
 			return (merged.Count, added, updated);
+		}
+
+		// Last capture wins for a saleId seen multiple times (re-walks of the same search just re-emit the same
+		// listing with session-shifted volatile ids).
+		public static List<TradepostListing> Merge(IEnumerable<TradepostListing> listings)
+		{
+			return listings.GroupBy(l => l.SaleId).Select(g => g.Last()).ToList();
+		}
+
+		// Maps one parsed search-results row to a TradepostListing. Inverse of TradepostListingCodec.BuildEntry, so a
+		// row re-imported and rebuilt reproduces the captured bytes (proven by CaptureListingImporterTests).
+		public static TradepostListing ToListing(TradepostListingCodec.ParsedRow row)
+		{
+			var item = row.Entry.ItemData ?? new ProtoAcgItem();
+			var key = item.Key1 ?? new ProtoDecryptionKey();
+
+			uint flags = 0, timestamp = 0;
+			foreach (var stat in row.Entry.StatLists)
+			{
+				if (stat.Stat == TradepostListingCodec.StatFlags)
+					flags = stat.Value;
+				else if (stat.Stat == TradepostListingCodec.StatTimestamp)
+					timestamp = stat.Value;
+			}
+
+			return new TradepostListing
+			{
+				SaleId = row.SaleId,
+				Handle = row.Handle,
+				SellerName = row.Seller,
+				Price = row.Price,
+				Quantity = row.Quantity,
+				ItemId = row.ItemId,
+				InstanceField = row.InstanceField,
+				ItemHandle = row.ItemHandle,
+				EntryFlags = flags,
+				Timestamp = timestamp,
+				Data1 = key.Key1,
+				Data2 = key.Key2,
+				Data3 = key.Key3,
+				Data4 = key.Key4,
+				Template = item.Template1,
+				ItemLevel = item.Level,
+				ItemHash = item.Hash
+			};
 		}
 
 		private static bool ContainsSequence(ReadOnlySpan<byte> haystack, ReadOnlySpan<byte> needle)
 		{
 			if (needle.Length == 0 || haystack.Length < needle.Length)
 				return false;
+
 			for (var i = 0; i <= haystack.Length - needle.Length; i++)
+			{
 				if (haystack.Slice(i, needle.Length).SequenceEqual(needle))
 					return true;
+			}
+
 			return false;
 		}
 	}

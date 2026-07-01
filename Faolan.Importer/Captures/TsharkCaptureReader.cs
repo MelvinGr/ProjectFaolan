@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using Faolan.Core.Crypt;
@@ -76,6 +77,13 @@ namespace Faolan.Importer.Captures
 			return list;
 		}
 
+		private static uint ParseHex(JsonElement p, string key)
+		{
+			return p.TryGetProperty(key, out var el) && el.ValueKind == JsonValueKind.String && TryParseHexUInt(el.GetString(), out var v)
+				? v
+				: 0u;
+		}
+
 		// Rebuilds the exact on-wire packet from the dump's framing fields + body. Returns null if a required field
 		// is missing/malformed (so a partial record is skipped rather than corrupting the stream).
 		private static byte[] Rebuild(JsonElement p, byte[] body, uint opcode)
@@ -126,8 +134,7 @@ namespace Faolan.Importer.Captures
 			BinaryPrimitives.WriteUInt32LittleEndian(clsLe, cls);
 			bytes.AddRange(clsLe);
 
-			if (p.TryGetProperty(instanceKey, out var instEl) && instEl.ValueKind == JsonValueKind.String &&
-			    TryParseHexULong(instEl.GetString(), out var inst))
+			if (p.TryGetProperty(instanceKey, out var instEl) && instEl.ValueKind == JsonValueKind.String && TryParseHexULong(instEl.GetString(), out var inst))
 			{
 				bytes.Add(0x10);
 				bytes.AddRange(Varint(inst));
@@ -135,6 +142,28 @@ namespace Faolan.Importer.Captures
 
 			endpoint = bytes.ToArray();
 			return true;
+		}
+
+		private static bool TryParseHexUInt(string s, out uint value)
+		{
+			value = 0;
+			if (string.IsNullOrEmpty(s))
+				return false;
+
+			if (s.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+				s = s[2..];
+			return uint.TryParse(s, NumberStyles.HexNumber, null, out value);
+		}
+
+		private static bool TryParseHexULong(string s, out ulong value)
+		{
+			value = 0;
+			if (string.IsNullOrEmpty(s) || s == "None")
+				return false;
+
+			if (s.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+				s = s[2..];
+			return ulong.TryParse(s, NumberStyles.HexNumber, null, out value);
 		}
 
 		private static IEnumerable<byte> Varint(ulong n)
@@ -146,34 +175,8 @@ namespace Faolan.Importer.Captures
 				if (n != 0)
 					b |= 0x80;
 				yield return b;
-			} while (n != 0);
-		}
-
-		private static uint ParseHex(JsonElement p, string key)
-		{
-			return p.TryGetProperty(key, out var el) && el.ValueKind == JsonValueKind.String && TryParseHexUInt(el.GetString(), out var v)
-				? v
-				: 0u;
-		}
-
-		private static bool TryParseHexUInt(string s, out uint value)
-		{
-			value = 0;
-			if (string.IsNullOrEmpty(s))
-				return false;
-			if (s.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
-				s = s[2..];
-			return uint.TryParse(s, System.Globalization.NumberStyles.HexNumber, null, out value);
-		}
-
-		private static bool TryParseHexULong(string s, out ulong value)
-		{
-			value = 0;
-			if (string.IsNullOrEmpty(s) || s == "None")
-				return false;
-			if (s.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
-				s = s[2..];
-			return ulong.TryParse(s, System.Globalization.NumberStyles.HexNumber, null, out value);
+			}
+			while (n != 0);
 		}
 	}
 }

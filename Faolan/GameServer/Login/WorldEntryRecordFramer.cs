@@ -1,6 +1,6 @@
 using System;
 using System.Buffers.Binary;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
@@ -27,21 +27,6 @@ namespace Faolan.GameServer
 		// The trailing bytes of the 8-byte blob prefix after [flag][BE32 blobLen]: the captured beach field5, constant
 		// for the world-entry snapshot (the live splice path preserves these same bytes via SetSnapshotBlobLength).
 		private static readonly byte[] SnapshotPrefixField5 = [0x28, 0x81, 0x06];
-
-		// Prepends the shared world-entry RpcHeader + outer length/CRC (the WriteHeader/WriteLengthHash path) to a
-		// record body that ALREADY carries its own [u32 bodyLen] prefix - i.e. the `packet[bodyStart..]` form that
-		// IirRecordCodec, SpawnPacketBuilder and WriteArrayUInt32Length all produce. This is the keystone that lets a
-		// from-scratch record body reach the wire without a captured packet header.
-		internal static byte[] FrameWorldEntryRecord(INetworkClient client, params ReadOnlySpan<byte> bodyWithLenPrefix)
-		{
-			var ps = new PacketStream();
-			ps
-				.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(bodyWithLenPrefix);
-			return ps
-				.WriteLengthHash()
-				.ToArray();
-		}
 
 		// The 8-byte IIR blob prefix the client (n3InfoItemRemote::Construct) reads before the FullCharacterIIR root:
 		// [u8 flag=0][u32 BE blobLen][field5]. blobLen = field5.Length + rootLength (the client reads EXACTLY blobLen
@@ -90,6 +75,17 @@ namespace Faolan.GameServer
 		{
 			ArgumentNullException.ThrowIfNull(spawnBody);
 			return FrameWorldEntryRecord(client, spawnBody);
+		}
+
+		// Prepends the shared world-entry RpcHeader + outer length/CRC (the WriteHeader/WriteLengthHash path) to a
+		// record body that ALREADY carries its own [u32 bodyLen] prefix - i.e. the `packet[bodyStart..]` form that
+		// IirRecordCodec, SpawnPacketBuilder and WriteArrayUInt32Length all produce. This is the keystone that lets a
+		// from-scratch record body reach the wire without a captured packet header.
+		internal static byte[] FrameWorldEntryRecord(INetworkClient client, params ReadOnlySpan<byte> bodyWithLenPrefix)
+		{
+			var ps = new PacketStream();
+			ps.WriteHeader(LoginWorldSender, LoginWorldReceiver(client), GameServerCarrierOpcodes.IirCarrier).WriteArray(bodyWithLenPrefix);
+			return ps.WriteLengthHash().ToArray();
 		}
 	}
 }

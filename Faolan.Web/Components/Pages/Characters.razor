@@ -224,13 +224,24 @@
 
             <div class="edit-scroll">
                 <div class="edit-head">Body</div>
-                <label class="pose"><span>Arm</span><input type="range" min="@MorphMin("arm")" max="@MorphMax("arm")" @bind="_eArm" @bind:after="PreviewEdit" /></label>
-                <label class="pose"><span>Chest</span><input type="range" min="@MorphMin("chest")" max="@MorphMax("chest")" @bind="_eChest" @bind:after="PreviewEdit" /></label>
-                <label class="pose"><span>Bosom</span><input type="range" min="@MorphMin("bosom")" max="@MorphMax("bosom")" @bind="_eBosom" @bind:after="PreviewEdit" /></label>
-                <label class="pose"><span>Stomach</span><input type="range" min="@MorphMin("stomach")" max="@MorphMax("stomach")" @bind="_eStomach" @bind:after="PreviewEdit" /></label>
-                <label class="pose"><span>Arse</span><input type="range" min="@MorphMin("arse")" max="@MorphMax("arse")" @bind="_eArse" @bind:after="PreviewEdit" /></label>
-                <label class="pose"><span>Thigh</span><input type="range" min="@MorphMin("thigh")" max="@MorphMax("thigh")" @bind="_eThigh" @bind:after="PreviewEdit" /></label>
-                <label class="pose"><span>Leg</span><input type="range" min="@MorphMin("leg")" max="@MorphMax("leg")" @bind="_eLeg" @bind:after="PreviewEdit" /></label>
+                <label class="pose"><span>Arm</span><input type="range" min="@MorphMin("arm")" max="@MorphMax("arm")"
+                                                           @bind="_eArm" @bind:after="PreviewEdit"/></label>
+                <label class="pose"><span>Chest</span><input type="range" min="@MorphMin("chest")"
+                                                             max="@MorphMax("chest")" @bind="_eChest"
+                                                             @bind:after="PreviewEdit"/></label>
+                <label class="pose"><span>Bosom</span><input type="range" min="@MorphMin("bosom")"
+                                                             max="@MorphMax("bosom")" @bind="_eBosom"
+                                                             @bind:after="PreviewEdit"/></label>
+                <label class="pose"><span>Stomach</span><input type="range" min="@MorphMin("stomach")"
+                                                               max="@MorphMax("stomach")" @bind="_eStomach"
+                                                               @bind:after="PreviewEdit"/></label>
+                <label class="pose"><span>Arse</span><input type="range" min="@MorphMin("arse")" max="@MorphMax("arse")"
+                                                            @bind="_eArse" @bind:after="PreviewEdit"/></label>
+                <label class="pose"><span>Thigh</span><input type="range" min="@MorphMin("thigh")"
+                                                             max="@MorphMax("thigh")" @bind="_eThigh"
+                                                             @bind:after="PreviewEdit"/></label>
+                <label class="pose"><span>Leg</span><input type="range" min="@MorphMin("leg")" max="@MorphMax("leg")"
+                                                           @bind="_eLeg" @bind:after="PreviewEdit"/></label>
 
                 <div class="edit-head">Hair</div>
                 <label class="edit-row"><span>Style</span>
@@ -244,10 +255,23 @@
                 </label>
                 <div class="edit-row"><span>Colour</span>
                     <div class="swatches">
-                        <button type="button" class="swatch none @(string.IsNullOrEmpty(_eHairColor) ? "sel" : "")" title="none" @onclick="@(async () => { _eHairColor = string.Empty; await PreviewEdit(); })"></button>
+                        <button type="button" class="swatch none @(string.IsNullOrEmpty(_eHairColor)
+                                                                     ? "sel"
+                                                                     : "")" title="none" @onclick="@(async () =>
+                                                                                                   {
+                                                                                                       _eHairColor = string.Empty;
+                                                                                                       await PreviewEdit();
+                                                                                                   })"></button>
                         @foreach (var o in _appOptions.HairColor)
                         {
-                            <button type="button" class="swatch @(_eHairColor == o.Value ? "sel" : "")" style="background:@o.Color" title="@o.Color" @onclick="@(async () => { _eHairColor = o.Value; await PreviewEdit(); })"></button>
+                            <button type="button" class="swatch @(_eHairColor == o.Value
+                                                                    ? "sel"
+                                                                    : "")" style="background:@o.Color" title="@o.Color"
+                                    @onclick="@(async () =>
+                                              {
+                                                  _eHairColor = o.Value;
+                                                  await PreviewEdit();
+                                              })"></button>
                         }
                     </div>
                 </div>
@@ -257,7 +281,14 @@
                     <div class="swatches">
                         @foreach (var o in _appOptions.Skin)
                         {
-                            <button type="button" class="swatch @(_eSkin == o.Value ? "sel" : "")" style="background:@o.Color" title="@o.Color" @onclick="@(async () => { _eSkin = o.Value; await PreviewEdit(); })"></button>
+                            <button type="button" class="swatch @(_eSkin == o.Value
+                                                                    ? "sel"
+                                                                    : "")" style="background:@o.Color" title="@o.Color"
+                                    @onclick="@(async () =>
+                                              {
+                                                  _eSkin = o.Value;
+                                                  await PreviewEdit();
+                                              })"></button>
                         }
                     </div>
                 </div>
@@ -265,7 +296,14 @@
                     <div class="swatches">
                         @foreach (var o in _appOptions.Eyes)
                         {
-                            <button type="button" class="swatch @(_eEyes == o.Value ? "sel" : "")" style="background:@o.Color" title="@o.Color" @onclick="@(async () => { _eEyes = o.Value; await PreviewEdit(); })"></button>
+                            <button type="button" class="swatch @(_eEyes == o.Value
+                                                                    ? "sel"
+                                                                    : "")" style="background:@o.Color" title="@o.Color"
+                                    @onclick="@(async () =>
+                                              {
+                                                  _eEyes = o.Value;
+                                                  await PreviewEdit();
+                                              })"></button>
                         }
                     </div>
                 </div>

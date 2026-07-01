@@ -1,7 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.IO;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Network.Conan;
 using Faolan.GameServer;
 using Faolan.GameServer.Packets.FullCharSnapshot;
@@ -17,18 +17,25 @@ namespace Faolan.Tests
 	// override engine, which the live login path already exercises in-client).
 	public class WorldEntryRecordFramerTests
 	{
-		private const string SnapshotCap = "/home/melvin/Development/C#/Project Faolan/Captures/strie-login-inventory.bin";
 		private const string PlayerSpawnCap = "/home/melvin/Development/C#/Project Faolan/Captures/strie-login-playerspawn.bin";
+		private const string SnapshotCap = "/home/melvin/Development/C#/Project Faolan/Captures/strie-login-inventory.bin";
 		private const string WorldObjectCap = "/home/melvin/Development/C#/Project Faolan/Captures/strie-login-worldobject.bin";
 		private const uint StriePlayerInstance = 0x02165EFF;
 
-		private static (byte[] Root, byte[] Tails) SplitBeachSnapshot()
+		// The 8-byte blob prefix built from scratch equals the captured beach prefix (the BE32 blobLen model).
+		[Fact]
+		public void BuildSnapshotPrefix_MatchesCapturedBeachPrefix()
 		{
+			var (root, _) = SplitBeachSnapshot();
 			var packet = new ConanPacket(File.ReadAllBytes(SnapshotCap));
 			var stream = new FaolanStream(packet.Body.ReadArrayUInt32Length());
-			stream.ReadUInt32(); stream.ReadUInt32(); stream.ReadUInt32();
+			stream.ReadUInt32();
+			stream.ReadUInt32();
+			stream.ReadUInt32();
 			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(stream);
-			return (parts.Root.ToArray(), parts.Tails.ToArray());
+
+			var built = GameServerListener.BuildSnapshotPrefix(root.Length);
+			Assert.Equal(parts.Prefix, built);
 		}
 
 		[Fact]
@@ -41,20 +48,6 @@ namespace Faolan.Tests
 
 			Assert.Equal(captured.Length, built.Length);
 			Assert.True(captured.SequenceEqual(built), "from-scratch snapshot packet must be byte-identical to the capture");
-		}
-
-		// The 8-byte blob prefix built from scratch equals the captured beach prefix (the BE32 blobLen model).
-		[Fact]
-		public void BuildSnapshotPrefix_MatchesCapturedBeachPrefix()
-		{
-			var (root, _) = SplitBeachSnapshot();
-			var packet = new ConanPacket(File.ReadAllBytes(SnapshotCap));
-			var stream = new FaolanStream(packet.Body.ReadArrayUInt32Length());
-			stream.ReadUInt32(); stream.ReadUInt32(); stream.ReadUInt32();
-			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(stream);
-
-			var built = GameServerListener.BuildSnapshotPrefix(root.Length);
-			Assert.Equal(parts.Prefix, built);
 		}
 
 		// The player FA015807 spawn packet, framed from scratch around its captured record body, reproduces the
@@ -88,6 +81,20 @@ namespace Faolan.Tests
 			Assert.True(captured.SequenceEqual(built), "from-scratch world-object packet must be byte-identical to the capture");
 		}
 
-		private static RecordingNetworkClient BeachClient() => new RecordingNetworkClient(StriePlayerInstance);
+		private static RecordingNetworkClient BeachClient()
+		{
+			return new RecordingNetworkClient(StriePlayerInstance);
+		}
+
+		private static (byte[] Root, byte[] Tails) SplitBeachSnapshot()
+		{
+			var packet = new ConanPacket(File.ReadAllBytes(SnapshotCap));
+			var stream = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+			stream.ReadUInt32();
+			stream.ReadUInt32();
+			stream.ReadUInt32();
+			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(stream);
+			return (parts.Root.ToArray(), parts.Tails.ToArray());
+		}
 	}
 }

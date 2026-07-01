@@ -12,7 +12,9 @@ namespace Faolan.GameServer.Scripting
 		int GetIntStat(int statId);
 		string GetTagName(int tagId);
 		bool HasBuff(int buffId);
+
 		bool HasCompletedQuest(int questId);
+
 		// True if the player has the quest at all (active OR completed) - "has accepted it". Lets dialogue distinguish
 		// the fresh OFFER greeting (not accepted) from the in-progress one (accepted, not yet done).
 		bool HasQuest(int questId);

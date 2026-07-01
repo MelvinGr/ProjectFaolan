@@ -21,21 +21,6 @@ namespace Faolan.Tests
 		private const uint BeachStarterQuestId = 10238;
 		private const uint TemplateInstance = 0x02165EFF;
 
-		[Fact]
-		public async Task BuildFromScratch_ReproducesTheTemplate_ByteForByte()
-		{
-			var def = await LoadDefinition(BeachStarterQuestId);
-			Assert.NotNull(def);
-
-			// character = null -> the stat skeleton stays at its (Strie) baseline, instance = the template's, so no
-			// re-addressing: the assembly must equal the captured tails exactly.
-			var built = BeachTailsBuilder.BuildFromScratch(def, character: null, TemplateInstance);
-
-			var template = File.ReadAllBytes(TemplatePath);
-			Assert.Equal(template.Length, built.Length);
-			Assert.True(template.SequenceEqual(built), "from-scratch tails must equal BeachTailsTemplate.bin byte-for-byte");
-		}
-
 		// The template IS Strie (an Assassin/Rogue: HP 98 base 90, Mana 0, Stamina 236 base 230). When the WHOLE
 		// per-class stat block is authored (#4) for an Assassin at L1 it must reproduce that block exactly - i.e. the
 		// production beach flip stays BYTE-IDENTICAL to the proven captured path for the baseline class, and the
@@ -60,6 +45,93 @@ namespace Faolan.Tests
 			Assert.True(template.SequenceEqual(built), "authoring the per-class block for an Assassin L1 must still equal the captured Strie template byte-for-byte");
 		}
 
+		// #214 step 2: a DEAD character's from-scratch tails carry current-health = 0 (the release-window gate)
+		// while the max/base HP side stays full - the same shape the retail login-while-dead snapshot has. An alive
+		// character with identical stats keeps full current health, so the only difference is the dead flag.
+		[Fact]
+		public async Task BuildFromScratch_DeadCharacter_ZeroesCurrentHealthKeepsMax()
+		{
+			var def = await LoadDefinition(BeachStarterQuestId);
+			Assert.NotNull(def);
+
+			CharacterMaxStats Stats()
+			{
+				return new CharacterMaxStats
+				{
+					Health = 4321,
+					Mana = 765,
+					Stamina = 543
+				};
+			}
+
+			var alive = new Character
+			{
+				Level = 7,
+				Experience = 98760,
+				MaxStats = Stats(),
+				IsDead = false
+			};
+			var dead = new Character
+			{
+				Level = 7,
+				Experience = 98760,
+				MaxStats = Stats(),
+				IsDead = true
+			};
+			const uint live = 0x0802ABCD;
+
+			var aliveTails = SnapshotTails.Deserialize(BeachTailsBuilder.BuildFromScratch(def, alive, live));
+			var deadTails = SnapshotTails.Deserialize(BeachTailsBuilder.BuildFromScratch(def, dead, live));
+
+			Assert.Equal(4321u, aliveTails.PostAccessBlock!.CurrentHp); // alive: full current health
+			Assert.Equal(0u, deadTails.PostAccessBlock!.CurrentHp); // dead: current health = 0 (the gate)
+
+			// Max/base HP side is untouched by death - the slot [21] base stays full in both.
+			Assert.Equal(aliveTails.PostAccessBlock.Values[21], deadTails.PostAccessBlock.Values[21]);
+			Assert.True(deadTails.PostAccessBlock.Values[21] > 0u, "dead snapshot keeps the max-health side populated");
+		}
+
+		[Fact]
+		public async Task BuildFromScratch_ReAddressesInstance()
+		{
+			var def = await LoadDefinition(BeachStarterQuestId);
+			const uint live = 0x0802ABCD;
+			var built = BeachTailsBuilder.BuildFromScratch(def, null, live);
+
+			// the template instance must be gone, the live one present (raw big-endian)
+			var needleOld = new byte[]
+			{
+				0x02,
+				0x16,
+				0x5E,
+				0xFF
+			};
+			var needleNew = new byte[]
+			{
+				0x08,
+				0x02,
+				0xAB,
+				0xCD
+			};
+			Assert.False(Contains(built, needleOld), "template instance should be re-addressed away");
+			Assert.True(Contains(built, needleNew), "live instance should be present");
+		}
+
+		[Fact]
+		public async Task BuildFromScratch_ReproducesTheTemplate_ByteForByte()
+		{
+			var def = await LoadDefinition(BeachStarterQuestId);
+			Assert.NotNull(def);
+
+			// character = null -> the stat skeleton stays at its (Strie) baseline, instance = the template's, so no
+			// re-addressing: the assembly must equal the captured tails exactly.
+			var built = BeachTailsBuilder.BuildFromScratch(def, null, TemplateInstance);
+
+			var template = File.ReadAllBytes(TemplatePath);
+			Assert.Equal(template.Length, built.Length);
+			Assert.True(template.SequenceEqual(built), "from-scratch tails must equal BeachTailsTemplate.bin byte-for-byte");
+		}
+
 		// The captured-byte tests above only exercise the Strie baseline. The production flip (authoring the tails
 		// instead of replaying the captured burst) relies on BuildFromScratch staying STRUCTURALLY valid for any
 		// character - a different class/level patches different vitals into the stat block, and the snapshot framing
@@ -76,7 +148,12 @@ namespace Faolan.Tests
 			{
 				Level = 7,
 				Experience = 98760,
-				MaxStats = new CharacterMaxStats { Health = 4321, Mana = 765, Stamina = 543 }
+				MaxStats = new CharacterMaxStats
+				{
+					Health = 4321,
+					Mana = 765,
+					Stamina = 543
+				}
 			};
 			const uint live = 0x0802ABCD;
 
@@ -98,54 +175,14 @@ namespace Faolan.Tests
 			Assert.Equal(98760u, tails.PostAccessBlock.CurrentXp);
 		}
 
-		// #214 step 2: a DEAD character's from-scratch tails carry current-health = 0 (the release-window gate)
-		// while the max/base HP side stays full - the same shape the retail login-while-dead snapshot has. An alive
-		// character with identical stats keeps full current health, so the only difference is the dead flag.
-		[Fact]
-		public async Task BuildFromScratch_DeadCharacter_ZeroesCurrentHealthKeepsMax()
-		{
-			var def = await LoadDefinition(BeachStarterQuestId);
-			Assert.NotNull(def);
-
-			CharacterMaxStats Stats() => new CharacterMaxStats { Health = 4321, Mana = 765, Stamina = 543 };
-			var alive = new Character { Level = 7, Experience = 98760, MaxStats = Stats(), IsDead = false };
-			var dead = new Character { Level = 7, Experience = 98760, MaxStats = Stats(), IsDead = true };
-			const uint live = 0x0802ABCD;
-
-			var aliveTails = SnapshotTails.Deserialize(BeachTailsBuilder.BuildFromScratch(def, alive, live));
-			var deadTails = SnapshotTails.Deserialize(BeachTailsBuilder.BuildFromScratch(def, dead, live));
-
-			Assert.Equal(4321u, aliveTails.PostAccessBlock!.CurrentHp); // alive: full current health
-			Assert.Equal(0u, deadTails.PostAccessBlock!.CurrentHp);     // dead: current health = 0 (the gate)
-
-			// Max/base HP side is untouched by death - the slot [21] base stays full in both.
-			Assert.Equal(aliveTails.PostAccessBlock.Values[21], deadTails.PostAccessBlock.Values[21]);
-			Assert.True(deadTails.PostAccessBlock.Values[21] > 0u, "dead snapshot keeps the max-health side populated");
-		}
-
-		// The quest portion = the Quest_c journal (KnownHeaderLength) + the @609 objective region + the index region.
-		private static int QuestRegionTrailerLength(SnapshotTails tails) =>
-			(tails.QuestObjectives?.ToArray().Length ?? 0) + (tails.QuestIndex?.ToArray().Length ?? 0);
-
-		[Fact]
-		public async Task BuildFromScratch_ReAddressesInstance()
-		{
-			var def = await LoadDefinition(BeachStarterQuestId);
-			const uint live = 0x0802ABCD;
-			var built = BeachTailsBuilder.BuildFromScratch(def, character: null, live);
-
-			// the template instance must be gone, the live one present (raw big-endian)
-			var needleOld = new byte[] { 0x02, 0x16, 0x5E, 0xFF };
-			var needleNew = new byte[] { 0x08, 0x02, 0xAB, 0xCD };
-			Assert.False(Contains(built, needleOld), "template instance should be re-addressed away");
-			Assert.True(Contains(built, needleNew), "live instance should be present");
-		}
-
 		private static bool Contains(byte[] hay, byte[] needle)
 		{
 			for (var i = 0; i + needle.Length <= hay.Length; i++)
+			{
 				if (hay.AsSpan(i, needle.Length).SequenceEqual(needle))
 					return true;
+			}
+
 			return false;
 		}
 
@@ -156,9 +193,18 @@ namespace Faolan.Tests
 			return await repo.GetQuestDefinition(questId);
 		}
 
+		// The quest portion = the Quest_c journal (KnownHeaderLength) + the @609 objective region + the index region.
+		private static int QuestRegionTrailerLength(SnapshotTails tails)
+		{
+			return (tails.QuestObjectives?.ToArray().Length ?? 0) + (tails.QuestIndex?.ToArray().Length ?? 0);
+		}
+
 		private sealed class Factory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>
 		{
-			public DatabaseContext CreateDbContext() => new DatabaseContext(options);
+			public DatabaseContext CreateDbContext()
+			{
+				return new DatabaseContext(options);
+			}
 		}
 	}
 }

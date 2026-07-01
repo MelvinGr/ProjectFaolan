@@ -27,7 +27,9 @@ namespace Faolan.Tests
 
 			var handle = BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(SpawnPacketBuilder.HandleOffset, 4));
 			var position = new Vector3(ReadLE(template, SpawnPacketBuilder.PosXOffset), ReadLE(template, SpawnPacketBuilder.PosYOffset), ReadLE(template, SpawnPacketBuilder.PosZOffset));
-			var rotation = new Quaternion(ReadLE(template, SpawnPacketBuilder.RotXOffset), ReadLE(template, SpawnPacketBuilder.RotYOffset), ReadLE(template, SpawnPacketBuilder.RotZOffset),
+			var rotation = new Quaternion(ReadLE(template, SpawnPacketBuilder.RotXOffset),
+				ReadLE(template, SpawnPacketBuilder.RotYOffset),
+				ReadLE(template, SpawnPacketBuilder.RotZOffset),
 				ReadLE(template, SpawnPacketBuilder.RotWOffset));
 
 			var built = SpawnPacketBuilder.BuildSpawn(template, handle, position, rotation, read.Message);
@@ -45,7 +47,9 @@ namespace Faolan.Tests
 
 			var handle = BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(SpawnPacketBuilder.HandleOffset, 4));
 			var position = new Vector3(ReadLE(template, SpawnPacketBuilder.PosXOffset), ReadLE(template, SpawnPacketBuilder.PosYOffset), ReadLE(template, SpawnPacketBuilder.PosZOffset));
-			var rotation = new Quaternion(ReadLE(template, SpawnPacketBuilder.RotXOffset), ReadLE(template, SpawnPacketBuilder.RotYOffset), ReadLE(template, SpawnPacketBuilder.RotZOffset),
+			var rotation = new Quaternion(ReadLE(template, SpawnPacketBuilder.RotXOffset),
+				ReadLE(template, SpawnPacketBuilder.RotYOffset),
+				ReadLE(template, SpawnPacketBuilder.RotZOffset),
 				ReadLE(template, SpawnPacketBuilder.RotWOffset));
 
 			var built = SpawnPacketBuilder.BuildSpawnBody(template, handle, position, rotation);
@@ -81,9 +85,7 @@ namespace Faolan.Tests
 
 			// Re-encoding the decoded IIR reproduces the captured slice byte-for-byte (the splice oracle).
 			var reEncoded = result.Message.ToProtobufBytes();
-			Assert.Equal(body
-				.AsSpan(result.Offset, result.Length)
-				.ToArray(), reEncoded);
+			Assert.Equal(body.AsSpan(result.Offset, result.Length).ToArray(), reEncoded);
 		}
 
 		// Renaming an NPC (a length change) grows the body and adjusts the two NPC length prefixes (body length @0

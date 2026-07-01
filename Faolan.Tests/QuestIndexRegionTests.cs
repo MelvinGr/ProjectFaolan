@@ -8,8 +8,23 @@ namespace Faolan.Tests
 	// @609 objective region and the access-window table. docs/fullplayer-snapshot-reader.md, #186.
 	public class QuestIndexRegionTests
 	{
-		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan.Tests/Assets/BeachTailsTemplate.bin";
 		private const int RegionStart = 1168, RegionEnd = 1292; // index region / access-window table boundaries
+		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan.Tests/Assets/BeachTailsTemplate.bin";
+
+		[Fact]
+		public void Parse_DecodesTheIndexAndGoalTable()
+		{
+			var region = QuestIndexRegion.Parse(File.ReadAllBytes(TemplatePath), RegionStart, RegionEnd);
+
+			Assert.Equal(0x7E2u, region.Marker);
+			Assert.Equal(new[]
+				{
+					10238u
+				},
+				region.QuestIds);
+			Assert.Equal(8, region.GoalIds.Count); // the eight goal-step ids (index 1..8)
+			Assert.Equal(10238u, region.GoalIds[0]);
+		}
 
 		[Fact]
 		public void Parse_ThenToArray_RoundTripsByteExact()
@@ -19,17 +34,6 @@ namespace Faolan.Tests
 			var region = QuestIndexRegion.Parse(template, RegionStart, RegionEnd);
 
 			Assert.Equal(template[RegionStart..RegionEnd], region.ToArray());
-		}
-
-		[Fact]
-		public void Parse_DecodesTheIndexAndGoalTable()
-		{
-			var region = QuestIndexRegion.Parse(File.ReadAllBytes(TemplatePath), RegionStart, RegionEnd);
-
-			Assert.Equal(0x7E2u, region.Marker);
-			Assert.Equal(new[] { 10238u }, region.QuestIds);
-			Assert.Equal(8, region.GoalIds.Count); // the eight goal-step ids (index 1..8)
-			Assert.Equal(10238u, region.GoalIds[0]);
 		}
 	}
 }

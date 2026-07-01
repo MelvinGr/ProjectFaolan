@@ -188,7 +188,8 @@
     font-size: .76rem;
 }
 
-@@media (max-width: 720px) {
+@
+@media (max-width: 720px) {
     .cards {
         grid-template-columns: 1fr;
     }

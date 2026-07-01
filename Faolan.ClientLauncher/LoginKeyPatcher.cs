@@ -58,10 +58,7 @@ namespace Faolan.ClientLauncher
 
 				try
 				{
-					if (File
-					    .ReadAllText(Path.Combine(dir, "comm"))
-					    .Trim()
-					    .StartsWith("AgeOfConan", StringComparison.Ordinal))
+					if (File.ReadAllText(Path.Combine(dir, "comm")).Trim().StartsWith("AgeOfConan", StringComparison.Ordinal))
 						return pid;
 				}
 				catch
@@ -164,9 +161,7 @@ namespace Faolan.ClientLauncher
 								RandomAccess.Write(handle, Cellao, hitAddr);
 								var verify = new byte[Cellao.Length];
 								RandomAccess.Read(handle, verify, hitAddr);
-								if (verify
-								    .AsSpan()
-								    .SequenceEqual(Cellao))
+								if (verify.AsSpan().SequenceEqual(Cellao))
 									return Result.Patched;
 							}
 							catch (UnauthorizedAccessException)

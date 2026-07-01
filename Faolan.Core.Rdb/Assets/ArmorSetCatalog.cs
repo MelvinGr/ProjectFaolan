@@ -13,22 +13,8 @@ namespace Faolan.Core.Rdb.Assets
 	// item) - that appearance id is buried in the 1000020 template's trailing binary sub-record and is still open RE.
 	public sealed partial class ArmorSetCatalog
 	{
-		public sealed record ArmorSet(int Number, string Gender, string Name, IReadOnlyList<uint> PieceMeshIndexIds);
-
 		[GeneratedRegex(@"_sets[\\/](\d+)[ _]?(.*?)[\\/]", RegexOptions.IgnoreCase)]
 		private static partial Regex SetPathRegex();
-
-		// Tidy a raw folder fragment into a readable set name: underscores->spaces, drop the trailing male/female word and
-		// any leading "+NNNN" / "-NNNN" / "set" tokens the export folders prefix, collapse whitespace.
-		private static string CleanName(string raw)
-		{
-			var s = raw.Replace('_', ' ').Replace('+', ' ');
-			s = Regex.Replace(s, @"\b(fe)?male\b", "", RegexOptions.IgnoreCase);
-			s = Regex.Replace(s, @"\bset\b", "", RegexOptions.IgnoreCase);
-			s = Regex.Replace(s, @"[-+]?\d{3,4}", " ");      // stray set-number tokens
-			s = Regex.Replace(s, @"\s+", " ").Trim();
-			return s;
-		}
 
 		// Scan every MESHINDEXFILE once, keep the skinned armour-set pieces, group by (set number, gender). Ordered by set
 		// number then gender. Pieces keep first-seen order. Expensive (full index scan) so callers should cache the result.
@@ -42,8 +28,14 @@ namespace Faolan.Core.Rdb.Assets
 					continue;
 
 				MeshIndexFile mesh;
-				try { mesh = MeshIndexFile.Parse(e.Id, rdb.ReadDecompressed(e)); }
-				catch { continue; }
+				try
+				{
+					mesh = MeshIndexFile.Parse(e.Id, rdb.ReadDecompressed(e));
+				}
+				catch
+				{
+					continue;
+				}
 
 				var src = mesh.SourceFile;
 				if (!mesh.Skinned || src == null || mesh.RenderMeshId == null)
@@ -65,10 +57,21 @@ namespace Faolan.Core.Rdb.Assets
 				g.Ids.Add(e.Id);
 			}
 
-			return groups
-				.Select(kv => new ArmorSet(kv.Key.Number, kv.Key.Gender, kv.Value.Name, kv.Value.Ids))
-				.OrderBy(s => s.Number).ThenBy(s => s.Gender)
-				.ToList();
+			return groups.Select(kv => new ArmorSet(kv.Key.Number, kv.Key.Gender, kv.Value.Name, kv.Value.Ids)).OrderBy(s => s.Number).ThenBy(s => s.Gender).ToList();
 		}
+
+		// Tidy a raw folder fragment into a readable set name: underscores->spaces, drop the trailing male/female word and
+		// any leading "+NNNN" / "-NNNN" / "set" tokens the export folders prefix, collapse whitespace.
+		private static string CleanName(string raw)
+		{
+			var s = raw.Replace('_', ' ').Replace('+', ' ');
+			s = Regex.Replace(s, @"\b(fe)?male\b", "", RegexOptions.IgnoreCase);
+			s = Regex.Replace(s, @"\bset\b", "", RegexOptions.IgnoreCase);
+			s = Regex.Replace(s, @"[-+]?\d{3,4}", " "); // stray set-number tokens
+			s = Regex.Replace(s, @"\s+", " ").Trim();
+			return s;
+		}
+
+		public sealed record ArmorSet(int Number, string Gender, string Name, IReadOnlyList<uint> PieceMeshIndexIds);
 	}
 }

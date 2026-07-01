@@ -9,6 +9,7 @@ using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.Dialogue;
 using Faolan.GameServer.Packets.Protobuf;
+using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
 // ReSharper disable once CheckNamespace
@@ -47,15 +48,14 @@ namespace Faolan.GameServer
 					{
 						if (IsRetailCreateEditorFlow(client))
 						{
-							Logger.LogInformation("Observed retail create-editor 0xF98E10B3 while pendingPost205F={PendingPost205F}, pendingReady={PendingReady}.", client.Session.HasPendingPost205FFollowUp,
+							Logger.LogInformation("Observed retail create-editor 0xF98E10B3 while pendingPost205F={PendingPost205F}, pendingReady={PendingReady}.",
+								client.Session.HasPendingPost205FFollowUp,
 								client.Session.HasPendingCreateEditorReadyFollowUp);
 							break;
 						}
 
 						if (client.Session.HasPendingPost205FFollowUp)
-						{
 							Logger.LogInformation("Queued new-character 0xF98E10B3 while post-0x205F handoff is still pending.");
-						}
 						else
 							Logger.LogInformation("Ignoring standalone new-character 0xF98E10B3 because the post-0x205F handoff has already been flushed.");
 					}
@@ -103,7 +103,9 @@ namespace Faolan.GameServer
 							{
 								Logger.LogWarning(
 									"Ignoring movement packet {MovingType} because no resolved character is attached to the GameServer session yet. dataobjdec=0x{DataObject:X}, dataclientinst=0x{DataClientInstance:X}.",
-									movingType, dataobjdec, dataclientinst);
+									movingType,
+									dataobjdec,
+									dataclientinst);
 								break;
 							}
 
@@ -193,9 +195,7 @@ namespace Faolan.GameServer
 						if (IsRetailCreateEditorFlow(client))
 						{
 							if (client.Session.HasFlushedCreateEditorPostReady)
-							{
 								Logger.LogInformation("Client sent ReadyForPlayScreen after the deadlock-breaker already flushed the post-ready burst; not re-flushing.");
-							}
 							else
 							{
 								client.Session.CreateEditorTempInstanceCount = 0;
@@ -261,6 +261,7 @@ namespace Faolan.GameServer
 						Logger.LogDebug("Interact: short body (unk1=0x{Unk1:X4}), no actionType - ignoring.", unk1);
 						break;
 					}
+
 					var actionType = packet.Body.ReadUInt32<ActionType>();
 					var args = packet.Body.ReadProtobufUInt32Length<InteractArgs>();
 
@@ -273,7 +274,11 @@ namespace Faolan.GameServer
 						await _combat.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
 						var drawn = _broadcaster.TogglePlayerCombatStance(client);
 						await _broadcaster.BroadcastPlayerCombatMode(client, drawn);
-						Logger.LogInformation("SwitchWeaponsButton -> combat stance {State}. {Args}", drawn ? "drawn" : "sheathed", args);
+						Logger.LogInformation("SwitchWeaponsButton -> combat stance {State}. {Args}",
+							drawn
+								? "drawn"
+								: "sheathed",
+							args);
 					}
 					else
 					{
@@ -298,7 +303,7 @@ namespace Faolan.GameServer
 								// channelled summon plays, then spawn the mount creature at the player so it renders
 								// (the FA015807 mount NPC, harvested by CaptureMountImporter). This is the proper
 								// client-cast mount flow - and the clean mid-session client-CAST-spawn render test.
-								var mount = World.MountCatalog.ForId(from) ?? World.MountCatalog.Default;
+								var mount = MountCatalog.ForId(from) ?? MountCatalog.Default;
 								Logger.LogInformation("SummonMount: from=0x{From:X} -> {Mount} (spell 0x{Spell:X}). {Args}", from, mount.CreatureName, mount.SummonSpellId, args);
 
 								var self = client.Session.Account.ClientInstance;
@@ -330,31 +335,43 @@ namespace Faolan.GameServer
 								// so casts logged as "spell 50000" and ApplySpell carried a non-existent id (no effect shown).
 								// Decoded from the ice-strike capture (c2s 0x642CD3D6 cast): trailer = [u32 from=1][u32 spellId];
 								// 0x125D9B / 0x42CA77 are real learned-spell ids. args.SpellTarget.TargetHandle is the target. (#236)
-								var spellId = target != 0 ? target : (uint)(args.SpellTarget?.SpellId ?? args.TypeId);
+								var spellId = target != 0
+									? target
+									: (uint)(args.SpellTarget?.SpellId ?? args.TypeId);
 								var casterHandle = client.Session.Account.ClientInstance;
 								var targetHandle = (uint)(args.SpellTarget?.TargetHandle ?? 0);
 
 								Logger.LogInformation($"CastSpell spell=0x{spellId:X} target=0x{targetHandle:X} {args}");
 
-									// Cast-begin ack (#236): retail answers the cast behavior with a BCC echo right away, which
-									// is what makes the client enter the channel state + render the cast bar (without it the
-									// client never channels - it sent only Mode 1, no progress ticks - and the cast looks
-									// instant). Ack every cast packet (begin + channel ticks); the effect itself is resolved
-									// once, below, after the cast time.
-									await _combat.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
+								// Cast-begin ack (#236): retail answers the cast behavior with a BCC echo right away, which
+								// is what makes the client enter the channel state + render the cast bar (without it the
+								// client never channels - it sent only Mode 1, no progress ticks - and the cast looks
+								// instant). Ack every cast packet (begin + channel ticks); the effect itself is resolved
+								// once, below, after the cast time.
+								await _combat.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
 
 								// Resolves the cast: play the ApplySpell (caster -> target, or self when no target), drain
 								// mana, and on an offensive cast apply damage + push the target's vitals (#69).
 								async Task Resolve()
 								{
 									// Cast-complete (#236): the cast bar is the form-0x0a cast behavior (retail BEGIN2/completion BCC,
-										// ice-strike idx481/534), not the form-4 begin. The echo-ack derives its form from the packet's
-										// seq word (form = seq+1), so to emit form 0x0a we stamp seq=9 onto a clone, with phase=3
-										// (cast-state complete). Without this the bar fills then hangs.
-										var completePayload = (byte[])rawPayload.Clone();
-										if (completePayload.Length > 17) { completePayload[16] = 0x00; completePayload[17] = 0x09; }
-										await _combat.SendBehaviorEchoAck(client, completePayload, 3);
-										await ApplySpell(client, casterHandle, targetHandle == 0 ? casterHandle : targetHandle, spellId);
+									// ice-strike idx481/534), not the form-4 begin. The echo-ack derives its form from the packet's
+									// seq word (form = seq+1), so to emit form 0x0a we stamp seq=9 onto a clone, with phase=3
+									// (cast-state complete). Without this the bar fills then hangs.
+									var completePayload = (byte[])rawPayload.Clone();
+									if (completePayload.Length > 17)
+									{
+										completePayload[16] = 0x00;
+										completePayload[17] = 0x09;
+									}
+
+									await _combat.SendBehaviorEchoAck(client, completePayload, 3);
+									await ApplySpell(client,
+										casterHandle,
+										targetHandle == 0
+											? casterHandle
+											: targetHandle,
+										spellId);
 									await _combat.SpendCasterMana(client, spellId);
 									if (targetHandle != 0 && targetHandle != casterHandle)
 										await _combat.ResolveOffensiveCast(client, casterHandle, targetHandle, spellId);
@@ -367,9 +384,7 @@ namespace Faolan.GameServer
 								var spell = await Database.GetSpell(spellId);
 								var castMs = spell?.CastTime ?? 0;
 								if (castMs == 0)
-								{
 									await Resolve();
-								}
 								else
 								{
 									_ = Task.Run(async () =>
@@ -456,8 +471,15 @@ namespace Faolan.GameServer
 								// bug). Conversation replay is coverage-bound, so an un-captured branch is expected.
 								else if (client.Session.WorldEntered)
 								{
-									var routedName = client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var rn) ? rn : "<unmapped handle>";
-									Logger.LogInformation("TalkToNpc: no conversation node for npcHandle=0x{Npc:X} (name={Name}, typeId={TypeId}, mode={Mode}, field3={Field3}); closing the window.", npcHandle, routedName, args.TypeId, args.Mode, args.Field3);
+									var routedName = client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var rn)
+										? rn
+										: "<unmapped handle>";
+									Logger.LogInformation("TalkToNpc: no conversation node for npcHandle=0x{Npc:X} (name={Name}, typeId={TypeId}, mode={Mode}, field3={Field3}); closing the window.",
+										npcHandle,
+										routedName,
+										args.TypeId,
+										args.Mode,
+										args.Field3);
 									await _conversation.SendConversationClose(client, npcHandle); // #217: close the CLICKED NPC's window (re-address the camera release)
 								}
 
@@ -476,10 +498,9 @@ namespace Faolan.GameServer
 									case MoveItemInInventoryDirection.InventoryToEquipped:
 									case MoveItemInInventoryDirection.BagToEquipped:
 									{
-										var fromSlot = from;
 										var targetSlot = (CharacterEquipmentSlot)target;
 
-										Logger.LogInformation($"{direction}: ({fromSlot} -> {targetSlot}) {args}");
+										Logger.LogInformation($"{direction}: ({from} -> {targetSlot}) {args}");
 
 										// The trailing struct (after from/target) carries the item's template handle as a
 										// big-endian uint32; persist the equip into CharacterEquipment.
@@ -490,7 +511,7 @@ namespace Faolan.GameServer
 											? await Database.GetItem(equipHandle)
 											: null;
 										if (equipHandle != 0)
-											await _equipment.PersistEquip(client, targetSlot, equipHandle, (int)fromSlot);
+											await _equipment.PersistEquip(client, targetSlot, equipHandle, (int)from);
 
 										// Retail's reply: the behavior ack carrying the item's identity quad + a 0x201C
 										// entry (prefix 0x65, state = the destination slot). Capture frames 289-290.
@@ -505,13 +526,12 @@ namespace Faolan.GameServer
 									case MoveItemInInventoryDirection.EquippedToBag:
 									{
 										var fromSlot = (CharacterEquipmentSlot)from;
-										var targetSlot = target;
 
-										Logger.LogInformation($"{direction}: ({fromSlot} -> {targetSlot}) {args}");
+										Logger.LogInformation($"{direction}: ({fromSlot} -> {target}) {args}");
 
 										// Unequip is identified by the source equip slot (the trailing handle is 0);
 										// `target` is the bag cell the item lands in.
-										await _equipment.PersistUnequip(client, fromSlot, (int)targetSlot);
+										await _equipment.PersistUnequip(client, fromSlot, (int)target);
 
 										// Retail's reply: the behavior ack with null identity + a 0x201C entry
 										// (prefix 0x68, state 0). Capture frames 320-321.
@@ -717,8 +737,7 @@ namespace Faolan.GameServer
 					// After we relocate the player on resurrect (IntendedTeleport + n3Teleport, #214), the client echoes
 					// the teleport records back; benign acks, no reply needed - log quietly instead of spamming a system
 					// message into chat.
-					if ((uint)pbOpcode == (uint)GameServer0X2000RespondsOpcodes.N3TeleportIIR
-					    || (uint)pbOpcode == (uint)GameServer0X2000RespondsOpcodes.IntendedTeleportIIR)
+					if ((uint)pbOpcode == (uint)GameServer0X2000RespondsOpcodes.N3TeleportIIR || (uint)pbOpcode == (uint)GameServer0X2000RespondsOpcodes.IntendedTeleportIIR)
 					{
 						Logger.LogDebug("GameServer 0x2000 client teleport-ack {SubOpcodeHex} ({RawLength} bytes).", pbOpcode.ToHex(), rawPayload.Length);
 						break;

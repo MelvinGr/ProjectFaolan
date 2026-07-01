@@ -28,6 +28,48 @@ namespace Faolan.GameServer.Inventory
 			_logger = logger;
 		}
 
+		// Persists an item drop (DropItem - the client sends only the source side of MoveItemInInventoryArgs) by
+		// clearing the source cell, so the dropped item does not reappear in the bag on relog. (Whether a ground
+		// loot bag spawns is a separate world-sim concern; this only removes it from the player's persisted bag.)
+		public async Task PersistDropItem(INetworkClient client, MoveItemInInventoryArgs move)
+		{
+			var character = client.Session.Character;
+			if (character == null || move?.SourceContainerId == null)
+				return;
+
+			var kind = (int)move.SourceContainerId.Type;
+			var pos = (int)move.SourceItemPos;
+			if (kind == (int)FullCharSnapshotBuilder.EquippedKind)
+				return; // equipped items are unequipped, not dropped, through this path
+
+			try
+			{
+				const int bag = (int)FullCharSnapshotBuilder.BagKind;
+				const int firstBagPos = 1; // FullCharSnapshotBuilder.BagFirstPos
+
+				// Dropping the legacy seeded FirstPosBag (no row backs it) clears the equipment nav instead.
+				if (kind == bag && pos == firstBagPos)
+				{
+					var equipment = await _database.GetCharacterEquipment(character.Id);
+					var rows = await _database.GetCharacterInventory(character.Id);
+					if (equipment?.FirstPosBag != null && rows.All(r => !(r.Container == bag && r.Slot == firstBagPos)))
+					{
+						equipment.FirstPosBag = null;
+						await _database.SaveCharacterEquipment(equipment);
+						_logger.LogInformation("Persisted DROP: FirstPosBag (bag[{Pos}]) for character {CharacterId}.", pos, character.Id);
+						return;
+					}
+				}
+
+				await _database.SetCharacterInventorySlot(character.Id, kind, pos, null);
+				_logger.LogInformation("Persisted DROP: {Kind}[{Pos}] for character {CharacterId}.", kind, pos, character.Id);
+			}
+			catch (Exception ex)
+			{
+				_logger.LogWarning(ex, "Failed to persist drop {Kind}[{Pos}].", kind, pos);
+			}
+		}
+
 		// Player equipped an item: bag slot `fromBagSlot` -> equip slot `targetSlot`, carrying the item's template
 		// handle (the p_items/Items id). Persists targetSlot = item and consumes the bag source: the
 		// CharacterInventory row at fromBagSlot when it holds this template, plus the legacy FirstPosBag nav.
@@ -75,40 +117,6 @@ namespace Faolan.GameServer.Inventory
 			catch (Exception ex)
 			{
 				_logger.LogWarning(ex, "Failed to persist equip of item {Handle} to {Slot}.", itemHandle, targetSlot);
-			}
-		}
-
-		// Player unequipped the item in equip slot `fromSlot` into bag cell `targetBagSlot`. Persists fromSlot =
-		// empty and parks the item as a CharacterInventory bag row at that cell, so multiple unequips coexist
-		// (the old behavior parked everything into the single FirstPosBag nav - a second unequip lost the first).
-		public async Task PersistUnequip(INetworkClient client, CharacterEquipmentSlot fromSlot, int targetBagSlot)
-		{
-			var character = client.Session.Character;
-			if (character == null)
-				return;
-
-			try
-			{
-				var equipment = await _database.GetCharacterEquipment(character.Id);
-				if (equipment == null)
-					return;
-
-				var current = GetEquipmentSlot(equipment, fromSlot);
-				if (current == null)
-				{
-					_logger.LogInformation("Unequip not persisted: equip slot {Slot} holds no DB item (captured-only).", fromSlot);
-					return;
-				}
-
-				SetEquipmentSlot(equipment, fromSlot, null);
-				await _database.SaveCharacterEquipment(equipment);
-				await _database.SetCharacterInventorySlot(character.Id, (int)FullCharSnapshotBuilder.BagKind, targetBagSlot, current.Id);
-
-				_logger.LogInformation("Persisted UNEQUIP: {Name} ({Id}) from {Slot} -> bag[{BagSlot}] for character {CharacterId}.", current.Name, current.Id, fromSlot, targetBagSlot, character.Id);
-			}
-			catch (Exception ex)
-			{
-				_logger.LogWarning(ex, "Failed to persist unequip from {Slot}.", fromSlot);
 			}
 		}
 
@@ -177,55 +185,20 @@ namespace Faolan.GameServer.Inventory
 				await _database.SetCharacterInventorySlot(character.Id, dKind, dPos, srcId, srcCount);
 				await _database.SetCharacterInventorySlot(character.Id, sKind, sPos, dstId, dstCount);
 
-				_logger.LogInformation("Persisted MOVE: item {Src} {SKind}[{SPos}] -> {DKind}[{DPos}]{Swap} for character {CharacterId}.", srcId, sKind, sPos, dKind, dPos, dstId.HasValue
-					? $" (swap with {dstId})"
-					: string.Empty, character.Id);
+				_logger.LogInformation("Persisted MOVE: item {Src} {SKind}[{SPos}] -> {DKind}[{DPos}]{Swap} for character {CharacterId}.",
+					srcId,
+					sKind,
+					sPos,
+					dKind,
+					dPos,
+					dstId.HasValue
+						? $" (swap with {dstId})"
+						: string.Empty,
+					character.Id);
 			}
 			catch (Exception ex)
 			{
 				_logger.LogWarning(ex, "Failed to persist inventory move {SKind}[{SPos}] -> {DKind}[{DPos}].", sKind, sPos, dKind, dPos);
-			}
-		}
-
-		// Persists an item drop (DropItem - the client sends only the source side of MoveItemInInventoryArgs) by
-		// clearing the source cell, so the dropped item does not reappear in the bag on relog. (Whether a ground
-		// loot bag spawns is a separate world-sim concern; this only removes it from the player's persisted bag.)
-		public async Task PersistDropItem(INetworkClient client, MoveItemInInventoryArgs move)
-		{
-			var character = client.Session.Character;
-			if (character == null || move?.SourceContainerId == null)
-				return;
-
-			var kind = (int)move.SourceContainerId.Type;
-			var pos = (int)move.SourceItemPos;
-			if (kind == (int)FullCharSnapshotBuilder.EquippedKind)
-				return; // equipped items are unequipped, not dropped, through this path
-
-			try
-			{
-				const int bag = (int)FullCharSnapshotBuilder.BagKind;
-				const int firstBagPos = 1; // FullCharSnapshotBuilder.BagFirstPos
-
-				// Dropping the legacy seeded FirstPosBag (no row backs it) clears the equipment nav instead.
-				if (kind == bag && pos == firstBagPos)
-				{
-					var equipment = await _database.GetCharacterEquipment(character.Id);
-					var rows = await _database.GetCharacterInventory(character.Id);
-					if (equipment?.FirstPosBag != null && rows.All(r => !(r.Container == bag && r.Slot == firstBagPos)))
-					{
-						equipment.FirstPosBag = null;
-						await _database.SaveCharacterEquipment(equipment);
-						_logger.LogInformation("Persisted DROP: FirstPosBag (bag[{Pos}]) for character {CharacterId}.", pos, character.Id);
-						return;
-					}
-				}
-
-				await _database.SetCharacterInventorySlot(character.Id, kind, pos, null);
-				_logger.LogInformation("Persisted DROP: {Kind}[{Pos}] for character {CharacterId}.", kind, pos, character.Id);
-			}
-			catch (Exception ex)
-			{
-				_logger.LogWarning(ex, "Failed to persist drop {Kind}[{Pos}].", kind, pos);
 			}
 		}
 
@@ -251,12 +224,51 @@ namespace Faolan.GameServer.Inventory
 
 				await _database.SetCharacterInventorySlot(character.Id, bag, sourceSlot, src.ItemId, src.Count - splitSize);
 				await _database.SetCharacterInventorySlot(character.Id, bag, targetSlot, src.ItemId, splitSize);
-				_logger.LogInformation("Persisted SPLIT: bag[{Src}] {Total} -> bag[{Src}] {Remaining} + bag[{Dst}] {Split} for character {CharacterId}.", sourceSlot, src.Count, src.Count - splitSize, targetSlot, splitSize,
+				_logger.LogInformation("Persisted SPLIT: bag[{Src}] {Total} -> bag[{Src}] {Remaining} + bag[{Dst}] {Split} for character {CharacterId}.",
+					sourceSlot,
+					src.Count,
+					src.Count - splitSize,
+					targetSlot,
+					splitSize,
 					character.Id);
 			}
 			catch (Exception ex)
 			{
 				_logger.LogWarning(ex, "Failed to persist stack split bag[{Src}] -> bag[{Dst}].", sourceSlot, targetSlot);
+			}
+		}
+
+		// Player unequipped the item in equip slot `fromSlot` into bag cell `targetBagSlot`. Persists fromSlot =
+		// empty and parks the item as a CharacterInventory bag row at that cell, so multiple unequips coexist
+		// (the old behavior parked everything into the single FirstPosBag nav - a second unequip lost the first).
+		public async Task PersistUnequip(INetworkClient client, CharacterEquipmentSlot fromSlot, int targetBagSlot)
+		{
+			var character = client.Session.Character;
+			if (character == null)
+				return;
+
+			try
+			{
+				var equipment = await _database.GetCharacterEquipment(character.Id);
+				if (equipment == null)
+					return;
+
+				var current = GetEquipmentSlot(equipment, fromSlot);
+				if (current == null)
+				{
+					_logger.LogInformation("Unequip not persisted: equip slot {Slot} holds no DB item (captured-only).", fromSlot);
+					return;
+				}
+
+				SetEquipmentSlot(equipment, fromSlot, null);
+				await _database.SaveCharacterEquipment(equipment);
+				await _database.SetCharacterInventorySlot(character.Id, (int)FullCharSnapshotBuilder.BagKind, targetBagSlot, current.Id);
+
+				_logger.LogInformation("Persisted UNEQUIP: {Name} ({Id}) from {Slot} -> bag[{BagSlot}] for character {CharacterId}.", current.Name, current.Id, fromSlot, targetBagSlot, character.Id);
+			}
+			catch (Exception ex)
+			{
+				_logger.LogWarning(ex, "Failed to persist unequip from {Slot}.", fromSlot);
 			}
 		}
 

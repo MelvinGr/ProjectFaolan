@@ -1,6 +1,6 @@
-using Faolan.Core.Rdb;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Faolan.Core.Rdb;
 using Faolan.Importer.Cli;
 using Faolan.Importer.Rdb;
 
@@ -14,20 +14,39 @@ namespace Faolan.Importer.Modules
 	// types we care about (item-template / NPC-stat / dialogue / playfield).
 	public sealed class RdbInventoryModule : IImportModule
 	{
-		public string Name => "rdb-inventory";
-		public string Description => "Read-only RDB resource-type inventory.";
-		public ImportSource Source => ImportSource.Rdb;
-		public IReadOnlyList<string> DependsOn => [];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Insert, WriteMode.Upsert, WriteMode.Overwrite };
-
 		private static readonly Dictionary<uint, string> TypeNames = new Dictionary<uint, string>
 		{
-			[0] = "ScriptGroup", [1000010] = "Filenames", [1000077] = "ContentSpawnDataExport", [1000078] = "AcgSpawnDataExport",
-			[1000079] = "NpcSpawnDataExport", [1000083] = "TreasureDataExport", [1000090] = "ResurrectionPointsExport",
-			[1010001] = "3DModel", [1010004] = "Texture/FCTX", [1010035] = "TextScript", [1010201] = "MonsterData",
-			[1010223] = "LuaArchive", [1010700] = "CharacterCreator", [1020003] = "Lip", [1030002] = "TextStrings",
+			[0] = "ScriptGroup",
+			[1000010] = "Filenames",
+			[1000077] = "ContentSpawnDataExport",
+			[1000078] = "AcgSpawnDataExport",
+			[1000079] = "NpcSpawnDataExport",
+			[1000083] = "TreasureDataExport",
+			[1000090] = "ResurrectionPointsExport",
+			[1010001] = "3DModel",
+			[1010004] = "Texture/FCTX",
+			[1010035] = "TextScript",
+			[1010201] = "MonsterData",
+			[1010223] = "LuaArchive",
+			[1010700] = "CharacterCreator",
+			[1020003] = "Lip",
+			[1030002] = "TextStrings",
 			[1070003] = "PlayfieldDescription"
 		};
+
+		public ImportSource Source => ImportSource.Rdb;
+		public IReadOnlyList<string> DependsOn => [];
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert,
+				WriteMode.Overwrite
+			};
+
+		public string Description => "Read-only RDB resource-type inventory.";
+		public string Name => "rdb-inventory";
 
 		public Task<ImportResult> RunAsync(ImportContext ctx)
 		{
@@ -42,11 +61,18 @@ namespace Faolan.Importer.Modules
 
 	public sealed class RdbMorphsModule : IImportModule
 	{
-		public string Name => "rdb-morphs";
-		public string Description => "Morph-target registry from the RDB.";
 		public ImportSource Source => ImportSource.Rdb;
 		public IReadOnlyList<string> DependsOn => [];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Insert, WriteMode.Upsert };
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "Morph-target registry from the RDB.";
+		public string Name => "rdb-morphs";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
@@ -57,11 +83,18 @@ namespace Faolan.Importer.Modules
 
 	public sealed class RdbAppearanceModule : IImportModule
 	{
-		public string Name => "rdb-appearance";
-		public string Description => "Character-creator appearance choices (per sex/race hair/colours/tattoos/heads + names) from the RDB.";
 		public ImportSource Source => ImportSource.Rdb;
 		public IReadOnlyList<string> DependsOn => [];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Insert, WriteMode.Upsert };
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "Character-creator appearance choices (per sex/race hair/colours/tattoos/heads + names) from the RDB.";
+		public string Name => "rdb-appearance";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
@@ -72,11 +105,18 @@ namespace Faolan.Importer.Modules
 
 	public sealed class RdbSpellsModule : IImportModule
 	{
-		public string Name => "rdb-spells";
-		public string Description => "Named spell records (cast time/name) from the RDB.";
 		public ImportSource Source => ImportSource.Rdb;
 		public IReadOnlyList<string> DependsOn => [];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Insert, WriteMode.Upsert };
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "Named spell records (cast time/name) from the RDB.";
+		public string Name => "rdb-spells";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
@@ -87,11 +127,18 @@ namespace Faolan.Importer.Modules
 
 	public sealed class RdbMapsModule : IImportModule
 	{
-		public string Name => "rdb-maps";
-		public string Description => "Map names + ids from the RDB playfield descriptions.";
 		public ImportSource Source => ImportSource.Rdb;
 		public IReadOnlyList<string> DependsOn => [];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Insert, WriteMode.Upsert };
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "Map names + ids from the RDB playfield descriptions.";
+		public string Name => "rdb-maps";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
@@ -102,11 +149,18 @@ namespace Faolan.Importer.Modules
 
 	public sealed class RdbLuaModule : IImportModule
 	{
-		public string Name => "rdb-lua";
-		public string Description => "LuaArchive conversation/quest scripts from the RDB.";
 		public ImportSource Source => ImportSource.Rdb;
 		public IReadOnlyList<string> DependsOn => [];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Insert, WriteMode.Upsert };
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "LuaArchive conversation/quest scripts from the RDB.";
+		public string Name => "rdb-lua";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
@@ -119,16 +173,25 @@ namespace Faolan.Importer.Modules
 	// (--store) is suppressed (an out-of-DB write the transaction rollback can't undo).
 	public sealed class RdbRespawnsModule : IImportModule
 	{
-		public string Name => "rdb-respawns";
-		public string Description => "Resurrection points (CDN-backed).";
 		public ImportSource Source => ImportSource.Rdb;
 		public IReadOnlyList<string> DependsOn => [];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Insert, WriteMode.Upsert };
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "Resurrection points (CDN-backed).";
+		public string Name => "rdb-respawns";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
 			var cdn = ctx.RdbCdnBase ?? RdbRespawnImporter.DefaultCdnBase;
-			var store = ctx.DryRun ? null : ctx.RdbStoreDir; // don't archive blobs to disk on a dry run
+			var store = ctx.DryRun
+				? null
+				: ctx.RdbStoreDir; // don't archive blobs to disk on a dry run
 			var r = await RdbRespawnImporter.ImportAsync(ctx.Db, ctx.RdbDir!, cdn, store);
 			return new ImportResult($"{r.Points} points across {r.Maps} maps ({r.Empty} empty, {r.FetchFailed} fetch failures).");
 		}
@@ -137,15 +200,24 @@ namespace Faolan.Importer.Modules
 	// Decrypts each keyed item's RDB template. Under --dry-run the --dump-templates disk write is suppressed.
 	public sealed class RdbItemsModule : IImportModule
 	{
-		public string Name => "rdb-items";
-		public string Description => "Decrypt keyed item RDB templates (names/categories/values).";
 		public ImportSource Source => ImportSource.Rdb;
 		public IReadOnlyList<string> DependsOn => [];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Insert, WriteMode.Upsert };
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "Decrypt keyed item RDB templates (names/categories/values).";
+		public string Name => "rdb-items";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var dump = ctx.DryRun ? null : ctx.DumpTemplatesDir;
+			var dump = ctx.DryRun
+				? null
+				: ctx.DumpTemplatesDir;
 			var r = await RdbItemImporter.ImportAsync(ctx.Db, ctx.RdbDir!, dump);
 			return new ImportResult($"{r.Decrypted}/{r.Keyed} decrypted; {r.NamesAdded} names, {r.CategoriesAdded} categories, {r.ValuesAdded} values.");
 		}

@@ -41,43 +41,28 @@ namespace Faolan.ContentMirror
 			builder.WebHost.UseUrls($"http://127.0.0.1:{port}");
 			// Don't let HttpClient transparently gunzip: we store and re-serve the exact payload bytes the client's
 			// own decompressor expects. Requesting identity upstream keeps HTTP out of the picture entirely.
-			builder
-				.Services
-				.AddHttpClient("cdn")
-				.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AutomaticDecompression = DecompressionMethods.None });
+			builder.Services.AddHttpClient("cdn").ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AutomaticDecompression = DecompressionMethods.None });
 
 			var app = builder.Build();
 			var log = app.Logger;
 			long hits = 0, misses = 0, bytes = 0;
 			var inflight = new ConcurrentDictionary<string, SemaphoreSlim>();
 
-			app.MapGet("/{tag}/upm/{**rest}", async (string tag, string rest, HttpContext ctx, IHttpClientFactory http) =>
-			{
-				if (!Upstreams.TryGetValue(tag, out var upstreamBase))
-					return Results.NotFound($"unknown tag '{tag}'");
-
-				var query = ctx.Request.QueryString.Value ?? "";
-				var localPath = Path.Combine(storeDir, tag, "upm", rest.Replace('/', Path.DirectorySeparatorChar));
-
-				// The patcher fetches <ControlHttpPatchAddr>/<folder>/LocalConfig.xml and OVERWRITES the local copy
-				// with it - which would revert our redirect to the real CDN. So for that file we archive the real
-				// bytes but serve a copy whose three patch-addr keys point back at this mirror, keeping the redirect
-				// sticky across a patch run.
-				var isConfig = tag == "control" && rest.EndsWith("LocalConfig.xml", StringComparison.OrdinalIgnoreCase);
-
-				if (query.Length == 0 && File.Exists(localPath))
+			app.MapGet("/{tag}/upm/{**rest}",
+				async (string tag, string rest, HttpContext ctx, IHttpClientFactory http) =>
 				{
-					Interlocked.Increment(ref hits);
-					return isConfig
-						? Results.File(RewriteConfig(await File.ReadAllBytesAsync(localPath), port), "application/octet-stream")
-						: Results.File(localPath, "application/octet-stream");
-				}
+					if (!Upstreams.TryGetValue(tag, out var upstreamBase))
+						return Results.NotFound($"unknown tag '{tag}'");
 
-				// Single-flight per path so 5 patcher connections don't all fetch the same blob.
-				var gate = inflight.GetOrAdd(localPath, _ => new SemaphoreSlim(1, 1));
-				await gate.WaitAsync();
-				try
-				{
+					var query = ctx.Request.QueryString.Value ?? "";
+					var localPath = Path.Combine(storeDir, tag, "upm", rest.Replace('/', Path.DirectorySeparatorChar));
+
+					// The patcher fetches <ControlHttpPatchAddr>/<folder>/LocalConfig.xml and OVERWRITES the local copy
+					// with it - which would revert our redirect to the real CDN. So for that file we archive the real
+					// bytes but serve a copy whose three patch-addr keys point back at this mirror, keeping the redirect
+					// sticky across a patch run.
+					var isConfig = tag == "control" && rest.EndsWith("LocalConfig.xml", StringComparison.OrdinalIgnoreCase);
+
 					if (query.Length == 0 && File.Exists(localPath))
 					{
 						Interlocked.Increment(ref hits);
@@ -86,47 +71,62 @@ namespace Faolan.ContentMirror
 							: Results.File(localPath, "application/octet-stream");
 					}
 
-					var url = $"{upstreamBase}/upm/{rest}{query}";
-					var client = http.CreateClient("cdn");
-					client.DefaultRequestHeaders.AcceptEncoding.ParseAdd("identity");
-					var resp = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
-					if (!resp.IsSuccessStatusCode)
+					// Single-flight per path so 5 patcher connections don't all fetch the same blob.
+					var gate = inflight.GetOrAdd(localPath, _ => new SemaphoreSlim(1, 1));
+					await gate.WaitAsync();
+					try
 					{
-						log.LogWarning("UPSTREAM {Status} {Url}", (int)resp.StatusCode, url);
-						return Results.StatusCode((int)resp.StatusCode);
-					}
+						if (query.Length == 0 && File.Exists(localPath))
+						{
+							Interlocked.Increment(ref hits);
+							return isConfig
+								? Results.File(RewriteConfig(await File.ReadAllBytesAsync(localPath), port), "application/octet-stream")
+								: Results.File(localPath, "application/octet-stream");
+						}
 
-					var body = await resp.Content.ReadAsByteArrayAsync();
-					if (query.Length == 0) // never cache query responses (manifest probes etc.)
+						var url = $"{upstreamBase}/upm/{rest}{query}";
+						var client = http.CreateClient("cdn");
+						client.DefaultRequestHeaders.AcceptEncoding.ParseAdd("identity");
+						var resp = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+						if (!resp.IsSuccessStatusCode)
+						{
+							log.LogWarning("UPSTREAM {Status} {Url}", (int)resp.StatusCode, url);
+							return Results.StatusCode((int)resp.StatusCode);
+						}
+
+						var body = await resp.Content.ReadAsByteArrayAsync();
+						if (query.Length == 0) // never cache query responses (manifest probes etc.)
+						{
+							Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
+							var tmp = localPath + ".tmp" + Environment.CurrentManagedThreadId;
+							await File.WriteAllBytesAsync(tmp, body);
+							File.Move(tmp, localPath, true);
+						}
+
+						var m = Interlocked.Increment(ref misses);
+						var b = Interlocked.Add(ref bytes, body.Length);
+						if (m % 100 == 0)
+							log.LogInformation("progress: {Misses} stored, {Hits} hits, {MB:F1} MB", m, Interlocked.Read(ref hits), b / 1048576.0);
+						log.LogInformation("MISS {Tag} {Rest} ({Size}b)", tag, rest, body.Length);
+						return Results.File(isConfig
+								? RewriteConfig(body, port)
+								: body,
+							"application/octet-stream");
+					}
+					finally
 					{
-						Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
-						var tmp = localPath + ".tmp" + Environment.CurrentManagedThreadId;
-						await File.WriteAllBytesAsync(tmp, body);
-						File.Move(tmp, localPath, true);
+						gate.Release();
 					}
+				});
 
-					var m = Interlocked.Increment(ref misses);
-					var b = Interlocked.Add(ref bytes, body.Length);
-					if (m % 100 == 0)
-						log.LogInformation("progress: {Misses} stored, {Hits} hits, {MB:F1} MB", m, Interlocked.Read(ref hits), b / 1048576.0);
-					log.LogInformation("MISS {Tag} {Rest} ({Size}b)", tag, rest, body.Length);
-					return Results.File(isConfig
-						? RewriteConfig(body, port)
-						: body, "application/octet-stream");
-				}
-				finally
+			app.MapGet("/_stats",
+				() => Results.Ok(new
 				{
-					gate.Release();
-				}
-			});
-
-			app.MapGet("/_stats", () => Results.Ok(new
-			{
-				hits = Interlocked.Read(ref hits),
-				stored = Interlocked.Read(ref misses),
-				mb = Interlocked.Read(ref bytes) / 1048576.0,
-				storeDir
-			}));
+					hits = Interlocked.Read(ref hits),
+					stored = Interlocked.Read(ref misses),
+					mb = Interlocked.Read(ref bytes) / 1048576.0,
+					storeDir
+				}));
 
 			//app.MapGet("launchernotes2.php", () => Results.Ok(Statics.StartupBanner));
 

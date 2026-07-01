@@ -11,41 +11,14 @@ namespace Faolan.Tests
 	// re-encoding it reproduces the bytes, so the from-DB path owns the grammar in code instead of slicing the blob.
 	public class NpcSpawnPreIirTests
 	{
-		[Theory, InlineData("SpawnNpcCrocodile"), InlineData("SpawnNpcCasilda")]
-		public void PreIir_DecodeEncode_IsByteIdentical(string golden)
+		[Fact]
+		public void PostIir_BuildMinimal_MatchesCapturedMinimalNpc()
 		{
-			var body = Golden.Bytes(golden);
+			var body = Golden.Bytes("SpawnNpcMinimalPanther");
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var read));
+			var captured = body[(read.Offset + read.Length)..];
 
-			Assert.True(NpcSpawnPreIirCodec.TryDecode(body, out var scaffold, out var offset));
-			Assert.Equal(NpcSpawnPreIir.ExpectedVersion, scaffold.Version);
-
-			var captured = body[offset..(offset + NpcSpawnPreIir.FixedLength)];
-			Assert.Equal(captured, NpcSpawnPreIirCodec.Encode(scaffold));
-		}
-
-		[Theory, InlineData("SpawnNpcCrocodile"), InlineData("SpawnNpcCasilda")]
-		public void PreIir_HasTheDecodedShape(string golden)
-		{
-			var body = Golden.Bytes(golden);
-			Assert.True(NpcSpawnPreIirCodec.TryDecode(body, out var scaffold, out _));
-
-			Assert.Equal(NpcSpawnPreIir.WordCount, scaffold.Words.Length);
-			Assert.Equal(NpcSpawnPreIir.ByteCount, scaffold.Flags.Length);
-			Assert.Equal(new byte[] { 0x00, 0x00, 0x03, 0xF1 }, scaffold.Sublist); // count==0 framing word
-		}
-
-		// The pre-IIR scaffold CAN carry the NPC's RDB script-binding diagnostic string (the script-bound PvP
-		// festival NPCs in the login capture do, docs/fa015807-spawn-reader.md), but Crocodile and Casilda - both
-		// confirmed to render in-client - carry NO script string: their 53 scaffold words are scalars / floats /
-		// session-volatile handles, not text, so DecodeScriptText recovers nothing. This is the evidence that an
-		// empty script buffer is a valid, rendering form (Gitea #185 construction route b).
-		[Theory, InlineData("SpawnNpcCrocodile"), InlineData("SpawnNpcCasilda")]
-		public void PreIir_ScriptText_IsEmptyForBeachNpcs(string golden)
-		{
-			var body = Golden.Bytes(golden);
-			Assert.True(NpcSpawnPreIirCodec.TryDecode(body, out var scaffold, out _));
-
-			Assert.Equal("", scaffold.DecodeScriptText());
+			Assert.Equal(captured, NpcSpawnScaffold.BuildMinimalPostIir());
 		}
 
 		[Theory, InlineData("SpawnNpcCrocodile"), InlineData("SpawnNpcCasilda")]
@@ -77,14 +50,79 @@ namespace Faolan.Tests
 			Assert.Equal(captured, NpcSpawnPreIirCodec.Encode(NpcSpawnPreIir.BuildMinimal()));
 		}
 
-		[Fact]
-		public void PostIir_BuildMinimal_MatchesCapturedMinimalNpc()
+		[Theory, InlineData("SpawnNpcCrocodile"), InlineData("SpawnNpcCasilda")]
+		public void PreIir_DecodeEncode_IsByteIdentical(string golden)
 		{
-			var body = Golden.Bytes("SpawnNpcMinimalPanther");
-			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var read));
-			var captured = body[(read.Offset + read.Length)..];
+			var body = Golden.Bytes(golden);
 
-			Assert.Equal(captured, NpcSpawnScaffold.BuildMinimalPostIir());
+			Assert.True(NpcSpawnPreIirCodec.TryDecode(body, out var scaffold, out var offset));
+			Assert.Equal(NpcSpawnPreIir.ExpectedVersion, scaffold.Version);
+
+			var captured = body[offset..(offset + NpcSpawnPreIir.FixedLength)];
+			Assert.Equal(captured, NpcSpawnPreIirCodec.Encode(scaffold));
+		}
+
+		[Theory, InlineData("SpawnNpcCrocodile"), InlineData("SpawnNpcCasilda")]
+		public void PreIir_HasTheDecodedShape(string golden)
+		{
+			var body = Golden.Bytes(golden);
+			Assert.True(NpcSpawnPreIirCodec.TryDecode(body, out var scaffold, out _));
+
+			Assert.Equal(NpcSpawnPreIir.WordCount, scaffold.Words.Length);
+			Assert.Equal(NpcSpawnPreIir.ByteCount, scaffold.Flags.Length);
+			Assert.Equal(new byte[]
+				{
+					0x00,
+					0x00,
+					0x03,
+					0xF1
+				},
+				scaffold.Sublist); // count==0 framing word
+		}
+
+		// The pre-IIR scaffold CAN carry the NPC's RDB script-binding diagnostic string (the script-bound PvP
+		// festival NPCs in the login capture do, docs/fa015807-spawn-reader.md), but Crocodile and Casilda - both
+		// confirmed to render in-client - carry NO script string: their 53 scaffold words are scalars / floats /
+		// session-volatile handles, not text, so DecodeScriptText recovers nothing. This is the evidence that an
+		// empty script buffer is a valid, rendering form (Gitea #185 construction route b).
+		[Theory, InlineData("SpawnNpcCrocodile"), InlineData("SpawnNpcCasilda")]
+		public void PreIir_ScriptText_IsEmptyForBeachNpcs(string golden)
+		{
+			var body = Golden.Bytes(golden);
+			Assert.True(NpcSpawnPreIirCodec.TryDecode(body, out var scaffold, out _));
+
+			Assert.Equal("", scaffold.DecodeScriptText());
+		}
+
+		// An animal carries no appearance table, so WithFreshScaffolds resets BOTH scaffolds - byte-identical to
+		// WithMinimalScaffolds (the validated #185 path).
+		[Fact]
+		public void WithFreshScaffolds_Animal_ResetsBothScaffolds()
+		{
+			var original = Golden.Bytes("SpawnNpcCrocodile");
+			Assert.Equal(NpcSpawnScaffold.WithMinimalScaffolds(original), NpcSpawnScaffold.WithFreshScaffolds(original, false));
+		}
+
+		// WithFreshScaffolds is the live-path scaffold pass. For a HUMANOID it always resets the pre-IIR but KEEPS
+		// the captured post-IIR - the appearance / morph table ("*key=val" texscript string + [morphId][float]
+		// pairs). Collapsing it to the minimal form drops that table and the client renders the NPC bald (#243).
+		[Fact]
+		public void WithFreshScaffolds_Humanoid_ResetsPreIir_KeepsAppearancePostIir()
+		{
+			var original = Golden.Bytes("SpawnNpcCasilda");
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(original, out var before));
+			var capturedPostIir = original[(before.Offset + before.Length)..];
+
+			var fresh = NpcSpawnScaffold.WithFreshScaffolds(original, true);
+
+			// pre-IIR is the from-scratch minimal scaffold (length-preserving, so the IIR doesn't shift)...
+			Assert.True(NpcSpawnPreIirCodec.TryDecode(fresh, out _, out var preOffset));
+			Assert.Equal(NpcSpawnPreIirCodec.Encode(NpcSpawnPreIir.BuildMinimal()), fresh[preOffset..(preOffset + NpcSpawnPreIir.FixedLength)]);
+
+			// ...but the captured post-IIR (Casilda's morph/appearance table) is preserved verbatim, NOT minimized.
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(fresh, out var after));
+			Assert.Equal(capturedPostIir, fresh[(after.Offset + after.Length)..]);
+			Assert.NotEqual(NpcSpawnScaffold.BuildMinimalPostIir(), fresh[(after.Offset + after.Length)..]);
 		}
 
 		// WithMinimalScaffolds is the wire-side "lift": it rewrites a captured NPC body's runtime-state pre-IIR +
@@ -101,49 +139,12 @@ namespace Faolan.Tests
 
 			// pre-IIR is now the from-scratch minimal scaffold.
 			Assert.True(NpcSpawnPreIirCodec.TryDecode(minimal, out _, out var preOffset));
-			Assert.Equal(
-				NpcSpawnPreIirCodec.Encode(NpcSpawnPreIir.BuildMinimal()),
-				minimal[preOffset..(preOffset + NpcSpawnPreIir.FixedLength)]);
+			Assert.Equal(NpcSpawnPreIirCodec.Encode(NpcSpawnPreIir.BuildMinimal()), minimal[preOffset..(preOffset + NpcSpawnPreIir.FixedLength)]);
 
 			// post-IIR is now the from-scratch minimal scaffold, and the identity (name) survived the rewrite.
 			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(minimal, out var after));
 			Assert.Equal(before.Message.Name, after.Message.Name);
 			Assert.Equal(NpcSpawnScaffold.BuildMinimalPostIir(), minimal[(after.Offset + after.Length)..]);
-		}
-
-		// WithFreshScaffolds is the live-path scaffold pass. For a HUMANOID it always resets the pre-IIR but KEEPS
-		// the captured post-IIR - the appearance / morph table ("*key=val" texscript string + [morphId][float]
-		// pairs). Collapsing it to the minimal form drops that table and the client renders the NPC bald (#243).
-		[Fact]
-		public void WithFreshScaffolds_Humanoid_ResetsPreIir_KeepsAppearancePostIir()
-		{
-			var original = Golden.Bytes("SpawnNpcCasilda");
-			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(original, out var before));
-			var capturedPostIir = original[(before.Offset + before.Length)..];
-
-			var fresh = NpcSpawnScaffold.WithFreshScaffolds(original, humanoid: true);
-
-			// pre-IIR is the from-scratch minimal scaffold (length-preserving, so the IIR doesn't shift)...
-			Assert.True(NpcSpawnPreIirCodec.TryDecode(fresh, out _, out var preOffset));
-			Assert.Equal(
-				NpcSpawnPreIirCodec.Encode(NpcSpawnPreIir.BuildMinimal()),
-				fresh[preOffset..(preOffset + NpcSpawnPreIir.FixedLength)]);
-
-			// ...but the captured post-IIR (Casilda's morph/appearance table) is preserved verbatim, NOT minimized.
-			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(fresh, out var after));
-			Assert.Equal(capturedPostIir, fresh[(after.Offset + after.Length)..]);
-			Assert.NotEqual(NpcSpawnScaffold.BuildMinimalPostIir(), fresh[(after.Offset + after.Length)..]);
-		}
-
-		// An animal carries no appearance table, so WithFreshScaffolds resets BOTH scaffolds - byte-identical to
-		// WithMinimalScaffolds (the validated #185 path).
-		[Fact]
-		public void WithFreshScaffolds_Animal_ResetsBothScaffolds()
-		{
-			var original = Golden.Bytes("SpawnNpcCrocodile");
-			Assert.Equal(
-				NpcSpawnScaffold.WithMinimalScaffolds(original),
-				NpcSpawnScaffold.WithFreshScaffolds(original, humanoid: false));
 		}
 	}
 }

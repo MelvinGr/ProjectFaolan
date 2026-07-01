@@ -1,10 +1,10 @@
-using Faolan.GameServer.World;
 using System;
 using System.Threading.Tasks;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
@@ -38,7 +38,7 @@ namespace Faolan.GameServer
 
 			var sequence = ++client.Session.MorphActivitySequence;
 
-			_ = Task.Run(async () =>
+			_ = Task.Run((Func<Task>)(async () =>
 			{
 				try
 				{
@@ -55,7 +55,7 @@ namespace Faolan.GameServer
 				{
 					Logger.LogWarning(e, "Character-editor: failed to send the post-morph burst.");
 				}
-			});
+			}));
 		}
 
 		// Builds an outgoing 0xA36D3B74 script callback: subOpcode + ack(0xC350) + clientInstance +
@@ -109,10 +109,7 @@ namespace Faolan.GameServer
 		// ScryScript.BuildStartScriptGroup) on the same conversation framing as SendCreateEditor2000.
 		private Task SendCreateEditor2000Record(INetworkClient client, byte[] record)
 		{
-			return new PacketStream()
-				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArrayUInt32Length(s => s.WriteArray(record))
-				.SendAsync(client);
+			return new PacketStream().WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(s => s.WriteArray(record)).SendAsync(client);
 		}
 
 		// Sends the 0xBADF5A4B ack for one SetMorphValue. The wire layout (after the 0x2000 wrapper) is:
@@ -171,10 +168,13 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 
 			await SendA36DCallback(client, "NicknameOk", name);
-			await SendCreateEditor2000(client, 0xF508F4C1u, [
-				0x00, 0x00, 0x00, 0x07, 0xE2, 0x00, 0x00, 0xCF, 0xEF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
-				0x00, 0x09, 0x00, 0x00, 0x46, 0x37, 0x00, 0x00, 0x00, 0x00, 0x00
-			], instance);
+			await SendCreateEditor2000(client,
+				0xF508F4C1u,
+				[
+					0x00, 0x00, 0x00, 0x07, 0xE2, 0x00, 0x00, 0xCF, 0xEF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
+					0x00, 0x09, 0x00, 0x00, 0x46, 0x37, 0x00, 0x00, 0x00, 0x00, 0x00
+				],
+				instance);
 			await SendA36DCallback(client, "CharCreationFinished", "");
 
 			// Step 3: the world-prep / scene burst that lets the client proceed to enter-world (0x206E).
@@ -189,10 +189,12 @@ namespace Faolan.GameServer
 		// use, echoes the name) or NicknameInvalid (empty/unsaveable, empty value). Verbatim grammar from
 		// Captures/Stricken_soldier-guardian_create_random-actions (frames 151 taken / 158 invalid / 193 ok). The client
 		// then simply re-sends TheNameIs with a new name - no other packets are needed.
-		private Task SendNicknameRejected(INetworkClient client, string name, bool taken) =>
-			taken
+		private Task SendNicknameRejected(INetworkClient client, string name, bool taken)
+		{
+			return taken
 				? SendA36DCallback(client, "NicknameTaken", name)
 				: SendA36DCallback(client, "NicknameInvalid", "");
+		}
 
 		// The fixed trio the server sends after the last morph; tails are verbatim from dikketest with the
 		// client instance substituted. This is what nudges the client to send the TheNameIs callback.
@@ -202,8 +204,10 @@ namespace Faolan.GameServer
 
 			await SendCreateEditor2000(client, 0xF98E10B3u, [0x01, 0x00, 0x00, 0x05, 0x78, 0x00, 0x00, 0x00, 0x00], instance);
 			await SendCreateEditor2000Record(client, ScryScript.BuildStartScriptGroup(instance, 35820)); // StartScriptGroupOnClient (#223)
-			await SendCreateEditor2000(client, 0x96B8DC59u,
-				[0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x2A, 0xF8, 0x00, 0x00, 0x01, 0xF9, 0x00, 0x00, 0x43, 0x30, 0x00, 0x00, 0x01, 0xFB, 0x00, 0x00, 0x00, 0x00], instance);
+			await SendCreateEditor2000(client,
+				0x96B8DC59u,
+				[0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x2A, 0xF8, 0x00, 0x00, 0x01, 0xF9, 0x00, 0x00, 0x43, 0x30, 0x00, 0x00, 0x01, 0xFB, 0x00, 0x00, 0x00, 0x00],
+				instance);
 		}
 
 		// Step 4: the enter-world handoff. The client learns the world server address ONLY from this 0x2002
@@ -217,11 +221,7 @@ namespace Faolan.GameServer
 			var realm = await Database.GetRealm(client.Session.Character.RealmId);
 			var address = $"{realm.IpAddress}:{realm.Port}";
 
-			await new PacketStream()
-				.WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerCarrierOpcodes.WorldHandoff)
-				.WriteByte(0x00)
-				.WriteStringByteLength(address)
-				.SendAsync(client);
+			await new PacketStream().WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerCarrierOpcodes.WorldHandoff).WriteByte(0x00).WriteStringByteLength(address).SendAsync(client);
 
 			Logger.LogInformation("Create-editor: sent enter-world handoff (0x2002) advertising world server {Address}.", address);
 		}

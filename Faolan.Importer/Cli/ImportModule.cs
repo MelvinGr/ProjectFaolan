@@ -33,18 +33,8 @@ namespace Faolan.Importer.Cli
 
 	public interface IImportModule
 	{
-		// CLI token (kebab-case) used by --only/--skip and shown by --list.
-		string Name { get; }
-
-		// One-line description for --list and the dry-run header.
-		string Description { get; }
-
 		// The input this module needs; absent input gates it out of a run.
 		ImportSource Source { get; }
-
-		// Whether this module runs in the default (no --only) set. RDB modules are opt-in by source; a capture
-		// module can also opt out (e.g. mounts, which are seeded only via --only mounts).
-		bool InDefaultSet => Source is ImportSource.Captures or ImportSource.Tsv;
 
 		// Module names that must run before this one (the runner resolves + topo-sorts these).
 		IReadOnlyList<string> DependsOn { get; }
@@ -52,6 +42,16 @@ namespace Faolan.Importer.Cli
 		// The write modes this module can honour. The runner warns + falls back to the module's first
 		// supported mode if an unsupported one is requested.
 		IReadOnlySet<WriteMode> SupportedModes { get; }
+
+		// One-line description for --list and the dry-run header.
+		string Description { get; }
+
+		// CLI token (kebab-case) used by --only/--skip and shown by --list.
+		string Name { get; }
+
+		// Whether this module runs in the default (no --only) set. RDB modules are opt-in by source; a capture
+		// module can also opt out (e.g. mounts, which are seeded only via --only mounts).
+		bool InDefaultSet => Source is ImportSource.Captures or ImportSource.Tsv;
 
 		Task<ImportResult> RunAsync(ImportContext ctx);
 	}

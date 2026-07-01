@@ -1,5 +1,4 @@
 using System.IO;
-using Faolan.Core.Network.Packets;
 
 namespace Faolan.Core.Crypt
 {
@@ -81,7 +80,10 @@ namespace Faolan.Core.Crypt
 			0x36A0360B, 0x8E1C516E, 0x866616A7, 0x3EDA71C2, 0x2C6FDE2C, 0x94D3B949, 0x090481F0, 0xB1B8E695, 0xA30D497B, 0x1BB12E1E, 0x43D23E48, 0xFB6E592D, 0xE9DBF6C3, 0x516791A6, 0xCCB0A91F, 0x740CCE7A, 0x66B96194, 0xDE0506F1
 		];
 
-		public static unsafe uint Calculate(PacketStream packetBuffer)
+		// Skips the leading 8-byte [length][crc32] header of a framed packet stream. Typed as FaolanStream (the
+		// base of PacketStream) so this primitive lives in Faolan.Core.Abstractions without depending on the
+		// Network.Packets layer above it.
+		public static unsafe uint Calculate(FaolanStream packetBuffer)
 		{
 			fixed (byte* pointer = packetBuffer.ToArray()) // skip length and hash
 				return Calculate((uint*)pointer + 2, packetBuffer.Length - sizeof(uint) * 2);

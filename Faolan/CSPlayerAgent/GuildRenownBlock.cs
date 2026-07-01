@@ -1,6 +1,6 @@
 using System;
 using System.Buffers.Binary;
-using Faolan.Core.Data;
+using Faolan.Core;
 
 namespace Faolan.CSPlayerAgent
 {
@@ -32,29 +32,81 @@ namespace Faolan.CSPlayerAgent
 		public static readonly uint[] StatSlotIds =
 		[
 			0x4FFB0, 0x4FFB1, 0x50014, 0x50078, 0x500DC, 0x50140, 0x501A4,
-			0x50208, 0x50209, 0x5026C, 0x5026D, 0x502D0, 0x50334,
+			0x50208, 0x50209, 0x5026C, 0x5026D, 0x502D0, 0x50334
 		];
 
-		public byte Flag { get; set; } = 0x01;                          // ReadByte -> param_1[4]
-		public uint[] StatIds { get; set; } = (uint[])StatSlotIds.Clone(); // ReadList -> param_1+0x39 (13 stat-slot ids)
-		public byte BoolA { get; set; } = 1;                            // ReadByte -> param_1[0x1b]
-		public byte BoolB { get; set; }                                 // ReadByte -> param_1[0x6d]
-		public uint[] Group1 { get; set; } = new uint[3];               // ReadU32 x3 -> param_1[0x20..0x22]
-		public byte BoolC { get; set; }                                 // ReadByte -> param_1[0x2a]
-		public byte BoolD { get; set; }                                 // ReadByte -> param_1[0xa9]
-		public uint[] Group2 { get; set; } = new uint[2];               // ReadU32 x2 -> param_1[0x2b..0x2c]
+		public byte BoolA { get; set; } = 1; // ReadByte -> param_1[0x1b]
+		public byte BoolB { get; set; } // ReadByte -> param_1[0x6d]
+		public byte BoolC { get; set; } // ReadByte -> param_1[0x2a]
+		public byte BoolD { get; set; } // ReadByte -> param_1[0xa9]
+
+		public byte Flag { get; set; } = 0x01; // ReadByte -> param_1[4]
+		public uint Group5 { get; set; } // ReadU32 -> param_1[0x6a]
+		public uint[] Group1 { get; set; } = new uint[3]; // ReadU32 x3 -> param_1[0x20..0x22]
+		public uint[] Group2 { get; set; } = new uint[2]; // ReadU32 x2 -> param_1[0x2b..0x2c]
+		public uint[] Group3 { get; set; } = new uint[6]; // ReadU32 x6 -> param_1[0x2d,2e,2f,30,32,33]
+
+		public uint[] Group4 { get; set; } = new uint[2]; // ReadU32 x2 -> param_1[0x58..0x59]
+
 		// The second 0x3F1 list (count 3 in the capture) - feat/city stat ids. ReadList -> param_1+0x1c.
 		public uint[] List2 { get; set; } = new uint[3];
-		public uint[] Group3 { get; set; } = new uint[6];               // ReadU32 x6 -> param_1[0x2d,2e,2f,30,32,33]
+		public uint[] StatIds { get; set; } = (uint[])StatSlotIds.Clone(); // ReadList -> param_1+0x39 (13 stat-slot ids)
+		public ulong Counters64D { get; set; } // ReadU64 -> param_1[0x56]
+		public ulong[] Counters64B { get; set; } = new ulong[8]; // ReadU64 x8 -> param_1[0x68,0x66,0x60,0x5e,0x5c,0x5a,0x64,0x62]
+
+		public ulong[] Counters64C { get; set; } = new ulong[3]; // ReadU64 x3 -> param_1[0x50,0x52,0x54]
+
 		// The renown counters (case-3 leading ReadU64 x6 -> param_1[0x3e,0x40,0x42,0x44,0x46,0x48]).
 		// RenownCounters[1] (param_1[0x40]) is the accumulating renown total - the only field that changed between
 		// the two captured snapshots, and the value ForRenown sets. Zeroed for a fresh guild.
 		public ulong[] RenownCounters { get; set; } = new ulong[6];
-		public uint[] Group4 { get; set; } = new uint[2];               // ReadU32 x2 -> param_1[0x58..0x59]
-		public ulong[] Counters64B { get; set; } = new ulong[8];        // ReadU64 x8 -> param_1[0x68,0x66,0x60,0x5e,0x5c,0x5a,0x64,0x62]
-		public ulong[] Counters64C { get; set; } = new ulong[3];        // ReadU64 x3 -> param_1[0x50,0x52,0x54]
-		public uint Group5 { get; set; }                                // ReadU32 -> param_1[0x6a]
-		public ulong Counters64D { get; set; }                          // ReadU64 -> param_1[0x56]
+
+		// Serializes to the 277-byte wire block (byte-identical to the captured block when round-tripped).
+		public byte[] Encode()
+		{
+			var s = new FaolanStream().WriteByte(Flag);
+			WriteList(s, StatIds);
+			s.WriteByte(BoolA).WriteByte(BoolB);
+			foreach (var v in Group1)
+				s.WriteUInt32(v);
+			s.WriteByte(BoolC).WriteByte(BoolD);
+			foreach (var v in Group2)
+				s.WriteUInt32(v);
+			WriteList(s, List2);
+			foreach (var v in Group3)
+				s.WriteUInt32(v);
+			foreach (var v in RenownCounters)
+				s.WriteUInt64(v);
+			foreach (var v in Group4)
+				s.WriteUInt32(v);
+			foreach (var v in Counters64B)
+				s.WriteUInt64(v);
+			foreach (var v in Counters64C)
+				s.WriteUInt64(v);
+			s.WriteUInt32(Group5).WriteUInt64(Counters64D);
+			return s.ToArray();
+		}
+
+		// The captured "Sepulchra Invictus" block as structured fields (replaces the old hand-transcribed verbatim
+		// blob, which had dropped 3 bytes -> 274 not 277, misaligning the roster). Encode() reproduces the capture
+		// byte-for-byte (GuildRenownBlockTests). Used as the cosmetic placeholder until a guild's own renown is
+		// wired; the large values (caps 0x01C9C380 / 0x3A1D51C0, the feat/city stats) are this guild's, not generic.
+		public static GuildRenownBlock CapturedPlaceholder()
+		{
+			return new GuildRenownBlock
+			{
+				Flag = 0x01,
+				BoolA = 1,
+				Group1 = [1523, 12, 2070],
+				List2 = [0x410, 0x816, 0xBEA],
+				Group3 = [57, 0, 84, 84, 0, 0],
+				RenownCounters = [111747, 20085677, 1225359, 45185, 13896395, 1058420],
+				Group4 = [3, 30000000],
+				Counters64B = [0, 0, 0, 0, 0, 17, 0, 0],
+				Counters64C = [25111741, 42286280, 26217713],
+				Counters64D = 975000000
+			};
+		}
 
 		// Decodes a 277-byte block. Throws on a malformed 0x3F1 list word or wrong length (the block is fixed-size
 		// for govForm 1; a different govForm would have a different layout/length and is out of scope).
@@ -83,47 +135,8 @@ namespace Faolan.CSPlayerAgent
 
 			if (o != Length)
 				throw new InvalidOperationException($"renown block decoded {o} bytes, expected {Length}");
+
 			return b;
-		}
-
-		// Serializes to the 277-byte wire block (byte-identical to the captured block when round-tripped).
-		public byte[] Encode()
-		{
-			var s = new FaolanStream().WriteByte(Flag);
-			WriteList(s, StatIds);
-			s.WriteByte(BoolA).WriteByte(BoolB);
-			foreach (var v in Group1) s.WriteUInt32(v);
-			s.WriteByte(BoolC).WriteByte(BoolD);
-			foreach (var v in Group2) s.WriteUInt32(v);
-			WriteList(s, List2);
-			foreach (var v in Group3) s.WriteUInt32(v);
-			foreach (var v in RenownCounters) s.WriteUInt64(v);
-			foreach (var v in Group4) s.WriteUInt32(v);
-			foreach (var v in Counters64B) s.WriteUInt64(v);
-			foreach (var v in Counters64C) s.WriteUInt64(v);
-			s.WriteUInt32(Group5).WriteUInt64(Counters64D);
-			return s.ToArray();
-		}
-
-		// The captured "Sepulchra Invictus" block as structured fields (replaces the old hand-transcribed verbatim
-		// blob, which had dropped 3 bytes -> 274 not 277, misaligning the roster). Encode() reproduces the capture
-		// byte-for-byte (GuildRenownBlockTests). Used as the cosmetic placeholder until a guild's own renown is
-		// wired; the large values (caps 0x01C9C380 / 0x3A1D51C0, the feat/city stats) are this guild's, not generic.
-		public static GuildRenownBlock CapturedPlaceholder()
-		{
-			return new GuildRenownBlock
-			{
-				Flag = 0x01,
-				BoolA = 1,
-				Group1 = [1523, 12, 2070],
-				List2 = [0x410, 0x816, 0xBEA],
-				Group3 = [57, 0, 84, 84, 0, 0],
-				RenownCounters = [111747, 20085677, 1225359, 45185, 13896395, 1058420],
-				Group4 = [3, 30000000],
-				Counters64B = [0, 0, 0, 0, 0, 17, 0, 0],
-				Counters64C = [25111741, 42286280, 26217713],
-				Counters64D = 975000000,
-			};
 		}
 
 		// A fresh-guild block: the placeholder scaffold (stat-ids, caps) with the accumulating renown counters
@@ -155,27 +168,8 @@ namespace Faolan.CSPlayerAgent
 			var word = ReadU32(b, ref o);
 			if (word % ListMultiplier != 0)
 				throw new InvalidOperationException($"0x3F1 list word {word:X} not a multiple of {ListMultiplier:X}");
+
 			return ReadU32s(b, ref o, (int)(word / ListMultiplier) - 1);
-		}
-
-		private static void WriteList(FaolanStream s, uint[] items)
-		{
-			s.WriteUInt32((uint)(items.Length + 1) * ListMultiplier);
-			foreach (var v in items) s.WriteUInt32(v);
-		}
-
-		private static uint[] ReadU32s(ReadOnlySpan<byte> b, ref int o, int n)
-		{
-			var r = new uint[n];
-			for (var i = 0; i < n; i++) r[i] = ReadU32(b, ref o);
-			return r;
-		}
-
-		private static ulong[] ReadU64s(ReadOnlySpan<byte> b, ref int o, int n)
-		{
-			var r = new ulong[n];
-			for (var i = 0; i < n; i++) r[i] = ReadU64(b, ref o);
-			return r;
 		}
 
 		private static uint ReadU32(ReadOnlySpan<byte> b, ref int o)
@@ -185,11 +179,34 @@ namespace Faolan.CSPlayerAgent
 			return v;
 		}
 
+		private static uint[] ReadU32s(ReadOnlySpan<byte> b, ref int o, int n)
+		{
+			var r = new uint[n];
+			for (var i = 0; i < n; i++)
+				r[i] = ReadU32(b, ref o);
+			return r;
+		}
+
 		private static ulong ReadU64(ReadOnlySpan<byte> b, ref int o)
 		{
 			var v = BinaryPrimitives.ReadUInt64BigEndian(b.Slice(o, 8));
 			o += 8;
 			return v;
+		}
+
+		private static ulong[] ReadU64s(ReadOnlySpan<byte> b, ref int o, int n)
+		{
+			var r = new ulong[n];
+			for (var i = 0; i < n; i++)
+				r[i] = ReadU64(b, ref o);
+			return r;
+		}
+
+		private static void WriteList(FaolanStream s, uint[] items)
+		{
+			s.WriteUInt32((uint)(items.Length + 1) * ListMultiplier);
+			foreach (var v in items)
+				s.WriteUInt32(v);
 		}
 	}
 }

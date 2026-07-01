@@ -30,18 +30,6 @@ namespace Faolan.GameServer.World
 			_simulation = simulation;
 		}
 
-		// Starts the periodic crash-safety flush of the live world state. Mirrors WorldSimulation.Start/StopAsync:
-		// the listener owns the lifetime token and awaits StopAsync() on shutdown so a mid-tick save isn't raced.
-		public void Start(CancellationToken cancellationToken)
-		{
-			_autoSaveTask = AutoSaveLoop(cancellationToken);
-		}
-
-		public Task StopAsync()
-		{
-			return _autoSaveTask;
-		}
-
 		// Flushes every connected player's live world state; returns how many were saved. Used by the autosave loop
 		// and the .save GM command.
 		public async Task<int> FlushAllAsync()
@@ -78,6 +66,18 @@ namespace Faolan.GameServer.World
 				_logger.LogWarning(ex, "Failed to flush world state for {Name} (0x{Handle:X8}).", entity.Name, entity.Handle);
 				return false;
 			}
+		}
+
+		// Starts the periodic crash-safety flush of the live world state. Mirrors WorldSimulation.Start/StopAsync:
+		// the listener owns the lifetime token and awaits StopAsync() on shutdown so a mid-tick save isn't raced.
+		public void Start(CancellationToken cancellationToken)
+		{
+			_autoSaveTask = AutoSaveLoop(cancellationToken);
+		}
+
+		public Task StopAsync()
+		{
+			return _autoSaveTask;
 		}
 
 		private async Task AutoSaveLoop(CancellationToken cancellationToken)

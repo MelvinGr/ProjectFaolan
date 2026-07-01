@@ -1,13 +1,12 @@
 using System.Collections.Concurrent;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Xml.Linq;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Network.Spawn;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
-using Faolan.Core.Spawn;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Primitives;
@@ -53,6 +52,8 @@ namespace Faolan.Web.Services
 		// Proper per-character resolution (face/hair/skin) is the CHARACTERCREATOR (1010700) + appearance work (#275).
 		private const uint LocalMaleBody = 1100584; // aquilonian_male_body
 		private const uint MaleHead = 4821637;
+
+		private static readonly AppearanceOptions EmptyOptions = new AppearanceOptions([], [], [], [], [], [], [], 0, 0, new Dictionary<string, int[]>());
 		private static readonly byte[] None = [];
 
 		// A map's top-down image (RDB type 1010209 keyed by playfield id) as a ready-to-serve PNG, or null when the
@@ -180,176 +181,6 @@ namespace Faolan.Web.Services
 				? (null, $"Body mesh {bodyId} for {race} {sex} could not be built (CDN-only or missing in the local RDB).")
 				: (glb, null);
 		}
-
-		// Shared assembler for the stored (BuildCharacterById) and ad-hoc (BuildCharacterCustom) paths: resolve the
-		// TexScripts (skin/hair tint, eye iris, body tattoo - by mesh target, #275), the head meshes and the body, then
-		// build the glb. Tries the exact race/sex body first, then the local same-sex fallback (the exact body is often
-		// CDN-only), then a bare body.
-		private byte[]? BuildFromSpec(RdbReader rdb, Sex sex, Race race, uint? hairRmId, uint? headMonster,
-			BodyMorphDeformer.Morphs? morphs, IReadOnlyList<string>? texRefs, IReadOnlyList<uint>? equipMeshIndexIds, bool rig)
-		{
-			var bodyFallback = sex == Sex.Female
-				? LocalFemaleBody
-				: LocalMaleBody;
-			var bodyId = BodyMesh.GetValueOrDefault((race, sex), bodyFallback);
-
-			var (skinTint, hairTint, eyeTex, decals) = ResolveTexScripts(rdb, texRefs ?? []);
-
-			var headMeshes = headMonster is > 0
-				? RdbAssetExtractor.ResolveHeadMeshes(rdb, headMonster.Value)
-				: [];
-
-			if (headMeshes.Count > 0)
-			{
-				return RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyId, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals, morphs, equipMeshIndexIds, rig) ??
-				       RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyFallback, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals, morphs, equipMeshIndexIds, rig) ??
-				       BuildCharacter(race, sex, hairRmId);
-			}
-
-			return BuildCharacter(race, sex, hairRmId);
-		}
-
-		// The appearance choices legal for a given SEX+RACE, read from the imported AppearanceChoice rows (built by
-		// the rdb-appearance importer from the client CHARACTERCREATOR table + resource names). Colours carry their hex
-		// (swatches); tattoos/heads carry a friendly Name, hair falls back to an ordinal label.
-		public AppearanceOptions GetAppearanceOptions(Sex sex, Race race)
-		{
-			using var db = _dbFactory.CreateDbContext();
-			var rows = db.AppearanceChoices.AsNoTracking()
-				.Where(c => c.Sex == (byte)sex && c.Race == (byte)race)
-				.OrderBy(c => c.Sequence)
-				.ToList();
-			if (rows.Count == 0)
-				return EmptyOptions;
-
-			List<AppearanceOption> Cat(string category) => rows
-				.Where(r => r.Category == category)
-				.Select(r => new AppearanceOption(r.Value, string.IsNullOrEmpty(r.Name) ? $"#{r.Sequence + 1}" : r.Name, r.Color))
-				.ToList();
-
-			var morphLimits = rows
-				.Where(r => r.Category == "morph")
-				.GroupBy(r => r.Value)
-				.ToDictionary(g => g.Key, g => new[] { g.First().Min, g.First().Max });
-			var height = rows.FirstOrDefault(r => r.Category == "height");
-
-			return new AppearanceOptions(
-				Cat("hair"), Cat("haircolor"), Cat("eyecolor"), Cat("skincolor"),
-				Cat("bodymarkings"), Cat("facemarkings"), Cat("head"),
-				height?.Min ?? 0, height?.Max ?? 0, morphLimits);
-		}
-
-		private static readonly AppearanceOptions EmptyOptions = new([], [], [], [], [], [], [], 0, 0, new Dictionary<string, int[]>());
-
-		// Persist an edited appearance to the character's CharacterBody (morphs + head) and CharacterBodyResources
-		// (the chosen hair/colour/tattoo refs, re-sequenced). This is what the editor's Save writes; the web viewer
-		// reads these back so the change sticks. Returns false when the character does not exist.
-		public bool SaveAppearance(uint characterId, AppearanceSpec spec)
-		{
-			using var db = _dbFactory.CreateDbContext();
-			if (!db.Characters.Any(c => c.Id == characterId))
-				return false;
-
-			var body = db.CharacterBodies.FirstOrDefault(b => b.CharacterId == characterId);
-			if (body == null)
-			{
-				body = new CharacterBody { CharacterId = characterId };
-				db.CharacterBodies.Add(body);
-			}
-
-			body.Arm = spec.Arm;
-			body.Chest = spec.Chest;
-			body.Bosom = spec.Bosom;
-			body.Stomach = spec.Stomach;
-			body.Arse = spec.Arse;
-			body.Thigh = spec.Thigh;
-			body.Leg = spec.Leg;
-			if (spec.HeadMesh > 0)
-				body.HeadMesh = spec.HeadMesh;
-
-			db.CharacterBodyResources.RemoveRange(db.CharacterBodyResources.Where(r => r.CharacterId == characterId));
-			var seq = 0;
-			foreach (var reference in spec.Refs.Where(r => !string.IsNullOrWhiteSpace(r)).Distinct())
-				db.CharacterBodyResources.Add(new CharacterBodyResource { CharacterId = characterId, Sequence = seq++, Ref = reference });
-
-			db.SaveChanges();
-
-			PropagateToScaffold(characterId);
-			return true;
-		}
-
-		// Rebuild the character's spawn-scaffold appearance entries from the just-saved resources so the edit shows
-		// in-game on the next login - now possible because PlayerSpawnScaffoldRows lives in Faolan.Core.Spawn (#290),
-		// which the web can reference. No-op when the character has no scaffold yet (first login seeds it from the new
-		// resources via EnsureFreshRows). The game server's login-time RefreshAppearance stays as a safety net.
-		private void PropagateToScaffold(uint characterId)
-		{
-			using var db = _dbFactory.CreateDbContext();
-			var character = db.Characters.AsNoTracking()
-				.Include(c => c.Attributes)
-				.Include(c => c.SpawnFrame)
-				.Include(c => c.Body)
-				.Include(c => c.BodyResources)
-				.FirstOrDefault(c => c.Id == characterId);
-			if (character?.SpawnFrame?.PreFrame == null || character.Attributes is not { Count: > 0 })
-				return;
-
-			var refs = character.BodyResources.Select(r => r.Ref).ToList();
-			var registry = db.MorphTargets.AsNoTracking().Where(m => refs.Contains(m.Name)).ToDictionary(m => m.Name);
-			var weighted = PlayerSpawnScaffoldRows.BuildWeightedEntries(character.BodyResources, registry);
-
-			if (!PlayerSpawnScaffoldRows.RefreshAppearance(character, weighted))
-				return;
-
-			// Persist only the entry table (fresh, navigation-free rows - so EF doesn't cascade-insert the parent).
-			db.CharacterAttributes.RemoveRange(db.CharacterAttributes.Where(a => a.CharacterId == characterId));
-			db.CharacterAttributes.AddRange(character.Attributes);
-			db.SaveChanges();
-		}
-
-		// The character's CURRENT appearance selections, to seed the editor when a character is opened: the 7 body
-		// morphs, the head (editor 2x units), and the chosen resource ref in each render-role category (or "" = none).
-		public AppearanceCurrent GetCurrentAppearance(uint characterId)
-		{
-			using var db = _dbFactory.CreateDbContext();
-			var body = db.CharacterBodies.AsNoTracking().FirstOrDefault(b => b.CharacterId == characterId);
-			var byCat = db.CharacterBodyResources.AsNoTracking()
-				.Where(r => r.CharacterId == characterId)
-				.Join(db.MorphTargets.AsNoTracking(), r => r.Ref, m => m.Name, (r, m) => new { m.Category, r.Ref })
-				.ToList()
-				.GroupBy(x => x.Category)
-				.ToDictionary(g => g.Key, g => g.First().Ref);
-
-			string Cat(byte c) => byCat.GetValueOrDefault(c, "");
-			return new AppearanceCurrent(
-				body?.Arm ?? 0, body?.Chest ?? 0, body?.Bosom ?? 0, body?.Stomach ?? 0, body?.Arse ?? 0, body?.Thigh ?? 0, body?.Leg ?? 0,
-				body?.HeadMesh ?? 0,
-				Cat(3), Cat(6), Cat(7), Cat(8), Cat(9), Cat(10));
-		}
-
-		public sealed record AppearanceCurrent(
-			float Arm, float Chest, float Bosom, float Stomach, float Arse, float Thigh, float Leg, uint HeadMesh,
-			string HairStyle, string HairColor, string Eyes, string Skin, string BodyTattoo, string FaceTattoo);
-
-		// One pickable option. Value = what the editor stores/sends (a "*hairmesh_"/"*texscript_" ref, or a head
-		// monsterdataid); Color = the swatch hex for colour lists (null otherwise).
-		public sealed record AppearanceOption(string Value, string Label, string? Color);
-
-		public sealed record AppearanceOptions(
-			IReadOnlyList<AppearanceOption> HairStyle,
-			IReadOnlyList<AppearanceOption> HairColor,
-			IReadOnlyList<AppearanceOption> Eyes,
-			IReadOnlyList<AppearanceOption> Skin,
-			IReadOnlyList<AppearanceOption> BodyTattoo,
-			IReadOnlyList<AppearanceOption> FaceTattoo,
-			IReadOnlyList<AppearanceOption> Heads,
-			int HeightMin,
-			int HeightMax,
-			IReadOnlyDictionary<string, int[]> MorphLimits);
-
-		public sealed record AppearanceSpec(
-			float Arm, float Chest, float Bosom, float Stomach, float Arse, float Thigh, float Leg,
-			uint HeadMesh, IReadOnlyList<string> Refs);
 
 		// Build a character as a posable rig (skinned glb): the full assembled character - body (morphs + skin + decals) +
 		// head + hair - skinned to the auto-selected skeleton, so the viewer's pose slider can articulate it. The body
@@ -551,6 +382,85 @@ namespace Faolan.Web.Services
 			return result;
 		}
 
+		// The appearance choices legal for a given SEX+RACE, read from the imported AppearanceChoice rows (built by
+		// the rdb-appearance importer from the client CHARACTERCREATOR table + resource names). Colours carry their hex
+		// (swatches); tattoos/heads carry a friendly Name, hair falls back to an ordinal label.
+		public AppearanceOptions GetAppearanceOptions(Sex sex, Race race)
+		{
+			using var db = _dbFactory.CreateDbContext();
+			var rows = db.AppearanceChoices.AsNoTracking().Where(c => c.Sex == (byte)sex && c.Race == (byte)race).OrderBy(c => c.Sequence).ToList();
+			if (rows.Count == 0)
+				return EmptyOptions;
+
+			List<AppearanceOption> Cat(string category)
+			{
+				return rows
+					.Where(r => r.Category == category)
+					.Select(r => new AppearanceOption(r.Value,
+						string.IsNullOrEmpty(r.Name)
+							? $"#{r.Sequence + 1}"
+							: r.Name,
+						r.Color))
+					.ToList();
+			}
+
+			var morphLimits = rows
+				.Where(r => r.Category == "morph")
+				.GroupBy(r => r.Value)
+				.ToDictionary(g => g.Key,
+					g => new[]
+					{
+						g.First().Min,
+						g.First().Max
+					});
+			var height = rows.FirstOrDefault(r => r.Category == "height");
+
+			return new AppearanceOptions(Cat("hair"), Cat("haircolor"), Cat("eyecolor"), Cat("skincolor"), Cat("bodymarkings"), Cat("facemarkings"), Cat("head"), height?.Min ?? 0, height?.Max ?? 0, morphLimits);
+		}
+
+		// The character's CURRENT appearance selections, to seed the editor when a character is opened: the 7 body
+		// morphs, the head (editor 2x units), and the chosen resource ref in each render-role category (or "" = none).
+		public AppearanceCurrent GetCurrentAppearance(uint characterId)
+		{
+			using var db = _dbFactory.CreateDbContext();
+			var body = db.CharacterBodies.AsNoTracking().FirstOrDefault(b => b.CharacterId == characterId);
+			var byCat = db
+				.CharacterBodyResources
+				.AsNoTracking()
+				.Where(r => r.CharacterId == characterId)
+				.Join(db.MorphTargets.AsNoTracking(),
+				r => r.Ref,
+				m => m.Name,
+				(r, m) => new
+				{
+					m.Category,
+					r.Ref
+				})
+				.ToList()
+				.GroupBy(x => x.Category)
+				.ToDictionary(g => g.Key, g => g.First().Ref);
+
+			string Cat(byte c)
+			{
+				return byCat.GetValueOrDefault(c, "");
+			}
+
+			return new AppearanceCurrent(body?.Arm ?? 0,
+				body?.Chest ?? 0,
+				body?.Bosom ?? 0,
+				body?.Stomach ?? 0,
+				body?.Arse ?? 0,
+				body?.Thigh ?? 0,
+				body?.Leg ?? 0,
+				body?.HeadMesh ?? 0,
+				Cat(3),
+				Cat(6),
+				Cat(7),
+				Cat(8),
+				Cat(9),
+				Cat(10));
+		}
+
 		// Cheap check (no decompress / no HTTP) for whether a top-down image is reachable for the map — local OR
 		// fetchable from the configured CDN mirror.
 		public bool HasMapImage(uint mapId)
@@ -666,6 +576,48 @@ namespace Faolan.Web.Services
 			return RdbAssetExtractor.RawText(Reader(), type, id);
 		}
 
+		// Persist an edited appearance to the character's CharacterBody (morphs + head) and CharacterBodyResources
+		// (the chosen hair/colour/tattoo refs, re-sequenced). This is what the editor's Save writes; the web viewer
+		// reads these back so the change sticks. Returns false when the character does not exist.
+		public bool SaveAppearance(uint characterId, AppearanceSpec spec)
+		{
+			using var db = _dbFactory.CreateDbContext();
+			if (!db.Characters.Any(c => c.Id == characterId))
+				return false;
+
+			var body = db.CharacterBodies.FirstOrDefault(b => b.CharacterId == characterId);
+			if (body == null)
+			{
+				body = new CharacterBody { CharacterId = characterId };
+				db.CharacterBodies.Add(body);
+			}
+
+			body.Arm = spec.Arm;
+			body.Chest = spec.Chest;
+			body.Bosom = spec.Bosom;
+			body.Stomach = spec.Stomach;
+			body.Arse = spec.Arse;
+			body.Thigh = spec.Thigh;
+			body.Leg = spec.Leg;
+			if (spec.HeadMesh > 0)
+				body.HeadMesh = spec.HeadMesh;
+
+			db.CharacterBodyResources.RemoveRange(db.CharacterBodyResources.Where(r => r.CharacterId == characterId));
+			var seq = 0;
+			foreach (var reference in spec.Refs.Where(r => !string.IsNullOrWhiteSpace(r)).Distinct())
+				db.CharacterBodyResources.Add(new CharacterBodyResource
+				{
+					CharacterId = characterId,
+					Sequence = seq++,
+					Ref = reference
+				});
+
+			db.SaveChanges();
+
+			PropagateToScaffold(characterId);
+			return true;
+		}
+
 		// Armory search: named item templates matching an optional name fragment + type filter, paged. Returns the
 		// page of items (as display ItemInfo) and the total match count for the pager.
 		public (IReadOnlyList<ItemInfo> Items, int Total) SearchItems(string? query, int? type, int page, int pageSize)
@@ -701,6 +653,32 @@ namespace Faolan.Web.Services
 				.ToList();
 		}
 
+		// Shared assembler for the stored (BuildCharacterById) and ad-hoc (BuildCharacterCustom) paths: resolve the
+		// TexScripts (skin/hair tint, eye iris, body tattoo - by mesh target, #275), the head meshes and the body, then
+		// build the glb. Tries the exact race/sex body first, then the local same-sex fallback (the exact body is often
+		// CDN-only), then a bare body.
+		private byte[]? BuildFromSpec(RdbReader rdb, Sex sex, Race race, uint? hairRmId, uint? headMonster, BodyMorphDeformer.Morphs? morphs, IReadOnlyList<string>? texRefs, IReadOnlyList<uint>? equipMeshIndexIds, bool rig)
+		{
+			var bodyFallback = sex == Sex.Female
+				? LocalFemaleBody
+				: LocalMaleBody;
+			var bodyId = BodyMesh.GetValueOrDefault((race, sex), bodyFallback);
+
+			var (skinTint, hairTint, eyeTex, decals) = ResolveTexScripts(rdb, texRefs ?? []);
+
+			var headMeshes = headMonster is > 0
+				? RdbAssetExtractor.ResolveHeadMeshes(rdb, headMonster.Value)
+				: [];
+
+			if (headMeshes.Count > 0)
+			{
+				return RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyId, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals, morphs, equipMeshIndexIds, rig) ??
+				       RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyFallback, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals, morphs, equipMeshIndexIds, rig) ?? BuildCharacter(race, sex, hairRmId);
+			}
+
+			return BuildCharacter(race, sex, hairRmId);
+		}
+
 		// Cache a deterministic render (keyed string -> bytes). Caches the "no model" result too. Size-tracked so the
 		// MemoryCache size cap can evict; linked to the reset token so the admin "clear cache" button drops them all.
 		private byte[]? Cached(string key, Func<byte[]?> build)
@@ -717,6 +695,30 @@ namespace Faolan.Web.Services
 			return bytes.Length == 0
 				? null
 				: bytes;
+		}
+
+		// Rebuild the character's spawn-scaffold appearance entries from the just-saved resources so the edit shows
+		// in-game on the next login - now possible because PlayerSpawnScaffoldRows lives in Faolan.Core.Spawn (#290),
+		// which the web can reference. No-op when the character has no scaffold yet (first login seeds it from the new
+		// resources via EnsureFreshRows). The game server's login-time RefreshAppearance stays as a safety net.
+		private void PropagateToScaffold(uint characterId)
+		{
+			using var db = _dbFactory.CreateDbContext();
+			var character = db.Characters.AsNoTracking().Include(c => c.Attributes).Include(c => c.SpawnFrame).Include(c => c.Body).Include(c => c.BodyResources).FirstOrDefault(c => c.Id == characterId);
+			if (character?.SpawnFrame?.PreFrame == null || character.Attributes is not { Count: > 0 })
+				return;
+
+			var refs = character.BodyResources.Select(r => r.Ref).ToList();
+			var registry = db.MorphTargets.AsNoTracking().Where(m => refs.Contains(m.Name)).ToDictionary(m => m.Name);
+			var weighted = PlayerSpawnScaffoldRows.BuildWeightedEntries(character.BodyResources, registry);
+
+			if (!PlayerSpawnScaffoldRows.RefreshAppearance(character, weighted))
+				return;
+
+			// Persist only the entry table (fresh, navigation-free rows - so EF doesn't cascade-insert the parent).
+			db.CharacterAttributes.RemoveRange(db.CharacterAttributes.Where(a => a.CharacterId == characterId));
+			db.CharacterAttributes.AddRange(character.Attributes);
+			db.SaveChanges();
 		}
 
 		private RdbReader Reader()
@@ -773,5 +775,39 @@ namespace Faolan.Web.Services
 
 			return (skin, hair, eyeTex, decals);
 		}
+
+		public sealed record AppearanceCurrent(
+			float Arm,
+			float Chest,
+			float Bosom,
+			float Stomach,
+			float Arse,
+			float Thigh,
+			float Leg,
+			uint HeadMesh,
+			string HairStyle,
+			string HairColor,
+			string Eyes,
+			string Skin,
+			string BodyTattoo,
+			string FaceTattoo);
+
+		// One pickable option. Value = what the editor stores/sends (a "*hairmesh_"/"*texscript_" ref, or a head
+		// monsterdataid); Color = the swatch hex for colour lists (null otherwise).
+		public sealed record AppearanceOption(string Value, string Label, string? Color);
+
+		public sealed record AppearanceOptions(
+			IReadOnlyList<AppearanceOption> HairStyle,
+			IReadOnlyList<AppearanceOption> HairColor,
+			IReadOnlyList<AppearanceOption> Eyes,
+			IReadOnlyList<AppearanceOption> Skin,
+			IReadOnlyList<AppearanceOption> BodyTattoo,
+			IReadOnlyList<AppearanceOption> FaceTattoo,
+			IReadOnlyList<AppearanceOption> Heads,
+			int HeightMin,
+			int HeightMax,
+			IReadOnlyDictionary<string, int[]> MorphLimits);
+
+		public sealed record AppearanceSpec(float Arm, float Chest, float Bosom, float Stomach, float Arse, float Thigh, float Leg, uint HeadMesh, IReadOnlyList<string> Refs);
 	}
 }

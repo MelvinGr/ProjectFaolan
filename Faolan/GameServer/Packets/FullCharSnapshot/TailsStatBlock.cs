@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Faolan.Core.Data;
+using Faolan.Core;
 
 namespace Faolan.GameServer.Packets.FullCharSnapshot
 {
@@ -14,10 +14,10 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 	// this baseline (the genuinely-fixed fresh-char stats) + the already-computed patches.
 	public static class TailsStatBlock
 	{
-		public const uint Marker = 1009;          // 0x3F1, twice
-		public const uint BlockType = 0x46F2;
-		public const int RepeatedRunStart = 35;   // the 35..182 sub-block is copied to 183..330 (Length 148)
 		public const int RepeatedRunLength = 148;
+		public const int RepeatedRunStart = 35; // the 35..182 sub-block is copied to 183..330 (Length 148)
+		public const uint BlockType = 0x46F2;
+		public const uint Marker = 1009; // 0x3F1, twice
 
 		// 338 u32 values; for the beach starter (Strie) the char-derived slots already hold Strie's values, so the
 		// skeleton reproduces the template block as-is. Trailer = a single 0x00 byte.
@@ -54,18 +54,24 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			0x0, 0x0
 		];
 
-		// Serializes a stat block to its wire bytes: [u32 Marker0][u32 Marker1][u32 BlockType][u32 x Values][Trailer]
-		// (mirrors SnapshotTails.WritePostAccessBlock). 12 + Values.Count*4 + Trailer bytes - 1365 for the fresh block.
-		public static byte[] Serialize(TailsPostAccessBlock block)
+		public static TailsPostAccessBlock CreateFreshBlock()
 		{
-			var w = new FaolanStream();
-			w.WriteUInt32(block.Marker0);
-			w.WriteUInt32(block.Marker1);
-			w.WriteUInt32(block.BlockType);
-			foreach (var value in block.Values)
-				w.WriteUInt32(value);
-			w.WriteArray(block.Trailer);
-			return w.ToArray();
+			return new TailsPostAccessBlock
+			{
+				Marker0 = Marker,
+				Marker1 = Marker,
+				BlockType = BlockType,
+				Values = [..Skeleton],
+				Trailer = [0x00],
+				// Non-null so HasKnownRepeatedStatTable is true and the caller's vitals patches (which write the +148
+				// copy too) fire; the run mirrors RepeatedBlockStartIndex/Offset on TailsPostAccessBlock.
+				LargestAdjacentRepeatedRun = new TailsRepeatedUInt32Run
+				{
+					StartIndex = RepeatedRunStart,
+					Length = RepeatedRunLength,
+					RepeatCount = 2
+				}
+			};
 		}
 
 		// The known-spell list lives INSIDE this stat block as a 0x3F1-framed list of 12-byte records (KnownSpellList),
@@ -79,8 +85,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		{
 			for (var i = 4; i < values.Count; i++)
 			{
-				if (values[i] != 0 && values[i] % KnownSpellList.Frame == 0
-				    && values[i - 4] == 0x566 && values[i - 3] == 0 && values[i - 2] == 0x290 && values[i - 1] == 0)
+				if (values[i] != 0 && values[i] % KnownSpellList.Frame == 0 && values[i - 4] == 0x566 && values[i - 3] == 0 && values[i - 2] == 0x290 && values[i - 1] == 0)
 					return i;
 			}
 
@@ -112,20 +117,18 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			block.Values.InsertRange(idx + 1, insert);
 		}
 
-		public static TailsPostAccessBlock CreateFreshBlock() =>
-			new TailsPostAccessBlock
+		// Serializes a stat block to its wire bytes: [u32 Marker0][u32 Marker1][u32 BlockType][u32 x Values][Trailer]
+		// (mirrors SnapshotTails.WritePostAccessBlock). 12 + Values.Count*4 + Trailer bytes - 1365 for the fresh block.
+		public static byte[] Serialize(TailsPostAccessBlock block)
 		{
-			Marker0 = Marker,
-			Marker1 = Marker,
-			BlockType = BlockType,
-			Values = [..Skeleton],
-			Trailer = [0x00],
-			// Non-null so HasKnownRepeatedStatTable is true and the caller's vitals patches (which write the +148
-			// copy too) fire; the run mirrors RepeatedBlockStartIndex/Offset on TailsPostAccessBlock.
-			LargestAdjacentRepeatedRun = new TailsRepeatedUInt32Run
-			{
-				StartIndex = RepeatedRunStart, Length = RepeatedRunLength, RepeatCount = 2
-			}
-		};
+			var w = new FaolanStream();
+			w.WriteUInt32(block.Marker0);
+			w.WriteUInt32(block.Marker1);
+			w.WriteUInt32(block.BlockType);
+			foreach (var value in block.Values)
+				w.WriteUInt32(value);
+			w.WriteArray(block.Trailer);
+			return w.ToArray();
+		}
 	}
 }

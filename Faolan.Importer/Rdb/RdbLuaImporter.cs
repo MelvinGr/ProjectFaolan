@@ -1,4 +1,3 @@
-using Faolan.Core.Rdb;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Rdb;
 
 namespace Faolan.Importer.Rdb
 {
@@ -20,9 +20,7 @@ namespace Faolan.Importer.Rdb
 		public static async Task<int> ImportAsync(DatabaseContext db, string rdbDir)
 		{
 			using var rdb = new RdbReader(rdbDir);
-			var entry = rdb
-				.EntriesOfType(LuaArchiveType)
-				.FirstOrDefault(e => e.Size > 0);
+			var entry = rdb.EntriesOfType(LuaArchiveType).FirstOrDefault(e => e.Size > 0);
 			if (entry.Size == 0)
 				return 0;
 
@@ -32,11 +30,14 @@ namespace Faolan.Importer.Rdb
 			db.LuaScripts.RemoveRange(db.LuaScripts);
 			await db.SaveChangesAsync();
 			foreach (var (id, source) in scripts)
+			{
 				db.LuaScripts.Add(new LuaScript
 				{
 					Id = id,
 					Source = source
 				});
+			}
+
 			await db.SaveChangesAsync();
 
 			return scripts.Count;

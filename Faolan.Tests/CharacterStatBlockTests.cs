@@ -16,15 +16,25 @@ namespace Faolan.Tests
 		{
 			// Captured packet sends the CURRENT ids (0x1B/0x1F8/0x1FA) - an entity announcing its full vitals on
 			// spawn (current == max at full health; ids in-client verified, see LegacyCharacterStatId).
-			var block = new CharacterStatBlock()
-				.Set(LegacyCharacterStatId.HealthCurrent, 63)
-				.Set(LegacyCharacterStatId.StaminaCurrent, 63)
-				.Set(LegacyCharacterStatId.ManaCurrent, 63);
+			var block = new CharacterStatBlock().Set(LegacyCharacterStatId.HealthCurrent, 63).Set(LegacyCharacterStatId.StaminaCurrent, 63).Set(LegacyCharacterStatId.ManaCurrent, 63);
 
 			Assert.Equal(3, block.Count);
 
 			// count(03) + HealthCurrent(001B)=189C + StaminaCurrent(01F8)=189C + ManaCurrent(01FA)=189C
 			Assert.Equal("030000001b0000189c000001f80000189c000001fa0000189c", ToHex(block.ToArray()));
+		}
+
+		[Fact]
+		public void BuildStatBlockBody_NpcCombatMode_MatchesCapturedFrame()
+		{
+			// strickenbla combat capture frame 6424: the combat-mode (weapon-draw) update on beach mob 0x00002C56 the
+			// tick before its first swing - stat 0x14 (CombatMode) = 4. The full IIR body (after the u32 length prefix)
+			// is [96b8dc59][0000c350][handle][00000000][count=1][statId 0x14][value 4]. Decodes the empty-handed-swing
+			// fix (#218); see WorldBroadcaster.BroadcastNpcCombatMode.
+			var stats = new CharacterStatBlock().Set(LegacyCharacterStatId.CombatMode, 4);
+			var body = VitalsPacket.BuildStatBlockBody(0x00002C56u, stats);
+
+			Assert.Equal("96b8dc590000c35000002c5600000000010000001400000004", ToHex(body));
 		}
 
 		[Fact]
@@ -59,11 +69,18 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void TryParse_ReturnsFalseWhenTruncated()
+		{
+			// count says 2 records (needs 17 bytes) but only one is present.
+			var bytes = FromHex("020000001b0000189c");
+			Assert.False(CharacterStatBlock.TryParse(bytes, out _, out var consumed));
+			Assert.Equal(0, consumed);
+		}
+
+		[Fact]
 		public void TryParse_RoundTripsBuild_AndReportsConsumed()
 		{
-			var block = new CharacterStatBlock()
-				.Set(LegacyCharacterStatId.HealthCurrent, 63)
-				.SetRaw(LegacyCharacterStatId.Level, 25);
+			var block = new CharacterStatBlock().Set(LegacyCharacterStatId.HealthCurrent, 63).SetRaw(LegacyCharacterStatId.Level, 25);
 			var built = block.ToArray();
 
 			// Append trailing bytes: TryParse must consume only the block and report the right length.
@@ -76,22 +93,18 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void TryParse_ReturnsFalseWhenTruncated()
+		public void VitalsPacket_StatUpdateBody_RejectsWrongSubOpcode()
 		{
-			// count says 2 records (needs 17 bytes) but only one is present.
-			var bytes = FromHex("020000001b0000189c");
-			Assert.False(CharacterStatBlock.TryParse(bytes, out _, out var consumed));
-			Assert.Equal(0, consumed);
+			var body = new byte[17];
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), 0x0000C350u);
+			Assert.False(VitalsPacket.TryParseStatUpdateBody(body, out _, out _));
 		}
 
 		[Fact]
 		public void VitalsPacket_StatUpdateBody_RoundTrips()
 		{
 			// Reconstruct the 0x96B8DC59 IIR body (the bytes wrapped by WriteArrayUInt32Length) and parse it back.
-			var stats = new CharacterStatBlock()
-				.Set(LegacyCharacterStatId.HealthCurrent, 63)
-				.Set(LegacyCharacterStatId.StaminaCurrent, 63)
-				.Set(LegacyCharacterStatId.ManaCurrent, 63);
+			var stats = new CharacterStatBlock().Set(LegacyCharacterStatId.HealthCurrent, 63).Set(LegacyCharacterStatId.StaminaCurrent, 63).Set(LegacyCharacterStatId.ManaCurrent, 63);
 			const uint handle = 0x0002324B;
 
 			var statBytes = stats.ToArray();
@@ -107,32 +120,11 @@ namespace Faolan.Tests
 			Assert.Equal(ToHex(statBytes), ToHex(parsedStats.ToArray()));
 		}
 
-		[Fact]
-		public void BuildStatBlockBody_NpcCombatMode_MatchesCapturedFrame()
-		{
-			// strickenbla combat capture frame 6424: the combat-mode (weapon-draw) update on beach mob 0x00002C56 the
-			// tick before its first swing - stat 0x14 (CombatMode) = 4. The full IIR body (after the u32 length prefix)
-			// is [96b8dc59][0000c350][handle][00000000][count=1][statId 0x14][value 4]. Decodes the empty-handed-swing
-			// fix (#218); see WorldBroadcaster.BroadcastNpcCombatMode.
-			var stats = new CharacterStatBlock().Set(LegacyCharacterStatId.CombatMode, 4);
-			var body = VitalsPacket.BuildStatBlockBody(0x00002C56u, stats);
-
-			Assert.Equal("96b8dc590000c35000002c5600000000010000001400000004", ToHex(body));
-		}
-
-		[Fact]
-		public void VitalsPacket_StatUpdateBody_RejectsWrongSubOpcode()
-		{
-			var body = new byte[17];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), 0x0000C350u);
-			Assert.False(VitalsPacket.TryParseStatUpdateBody(body, out _, out _));
-		}
-
 		private static byte[] FromHex(string hex)
 		{
 			var bytes = new byte[hex.Length / 2];
 			for (var i = 0; i < bytes.Length; i++)
-				bytes[i] = System.Convert.ToByte(hex.Substring(i * 2, 2), 16);
+				bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
 			return bytes;
 		}
 

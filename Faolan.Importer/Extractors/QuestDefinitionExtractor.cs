@@ -42,51 +42,61 @@ namespace Faolan.Importer.Extractors
 			return byQuest.Values.Where(q => q.TextRefs.Any(r => r.Slot == QuestTextSlot.Title)).ToList();
 		}
 
+		private static string Attr(string xml, string name)
+		{
+			var m = Regex.Match(xml, name + "=\"([^\"]*)\"");
+			return m.Success
+				? m.Groups[1].Value
+				: null;
+		}
+
+		private static uint AttrUInt(string xml, string name)
+		{
+			var v = Attr(xml, name);
+			return v != null && uint.TryParse(v, out var n)
+				? n
+				: 0u;
+		}
+
+		private static QuestDefinition GetOrAdd(Dictionary<uint, QuestDefinition> byQuest, uint questId)
+		{
+			if (!byQuest.TryGetValue(questId, out var def))
+				byQuest[questId] = def = new QuestDefinition { QuestId = questId };
+			return def;
+		}
+
+		private static int IndexOf(byte[] haystack, byte[] needle, int from)
+		{
+			for (var i = from; i <= haystack.Length - needle.Length; i++)
+			{
+				var ok = true;
+				for (var j = 0; j < needle.Length; j++)
+				{
+					if (haystack[i + j] != needle[j])
+					{
+						ok = false;
+						break;
+					}
+				}
+
+				if (ok)
+					return i;
+			}
+
+			return -1;
+		}
+
 		// Bytes = [..8..][u32 headerLen][header][body]; body = [u32 len][u32 subop][u32 ack][u32 player][record area...].
 		private static byte[] InnerBody(byte[] bytes)
 		{
 			if (bytes == null || bytes.Length < 12)
 				return null;
+
 			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(bytes.AsSpan(8, 4));
 			var start = 12 + headerLen;
-			return start < bytes.Length ? bytes[start..] : null;
-		}
-
-		private sealed record TextRecord(int Offset, int Length, string Tag, uint Id, uint Category, string Key, string Flags);
-
-		// A <remoteformat>/<localized> slot: 00 <u8 len> <ascii xml>. Returns null if no record starts at off.
-		private static TextRecord ReadRecord(byte[] b, int off)
-		{
-			if (off + 2 > b.Length || b[off] != 0x00 || b[off + 2] != (byte)'<')
-				return null;
-			int len = b[off + 1];
-			if (off + 2 + len > b.Length || b[off + 2 + len - 1] != (byte)'>')
-				return null;
-
-			var xml = Encoding.ASCII.GetString(b, off + 2, len);
-			var tag = xml.Substring(1, xml.IndexOf(' ') - 1);
-			uint id = AttrUInt(xml, "id");
-			uint cat = AttrUInt(xml, "category");
-			var key = Attr(xml, "key");
-			var flags = Attr(xml, "flags");
-			return new TextRecord(off, 2 + len, tag, id, cat, key, flags);
-		}
-
-		private static IEnumerable<TextRecord> Records(byte[] b, int from)
-		{
-			for (var off = from; off + 2 <= b.Length;)
-			{
-				var rec = ReadRecord(b, off);
-				if (rec != null)
-				{
-					yield return rec;
-					off += rec.Length;
-				}
-				else
-				{
-					off++;
-				}
-			}
+			return start < bytes.Length
+				? bytes[start..]
+				: null;
 		}
 
 		private static void MergeFullUpdate(byte[] body, Dictionary<uint, QuestDefinition> byQuest)
@@ -139,9 +149,11 @@ namespace Faolan.Importer.Extractors
 			var idx = IndexOf(body, magic, 16);
 			if (idx < 0)
 				return;
+
 			var off = idx + 4 + 4; // skip RRL3 + 00000000
 			if (off + 4 > body.Length)
 				return;
+
 			var count = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(off, 4));
 			off += 4;
 
@@ -152,10 +164,12 @@ namespace Faolan.Importer.Extractors
 				var title = ReadRecord(body, off);
 				if (title == null)
 					break;
+
 				off += title.Length;
 				var subLine = ReadRecord(body, off);
 				if (subLine == null)
 					break;
+
 				off += subLine.Length;
 
 				if (subLine.Category == 50303 && byQuest.TryGetValue(questId, out var def))
@@ -163,17 +177,46 @@ namespace Faolan.Importer.Extractors
 			}
 		}
 
-		private static QuestDefinition GetOrAdd(Dictionary<uint, QuestDefinition> byQuest, uint questId)
+		// A <remoteformat>/<localized> slot: 00 <u8 len> <ascii xml>. Returns null if no record starts at off.
+		private static TextRecord ReadRecord(byte[] b, int off)
 		{
-			if (!byQuest.TryGetValue(questId, out var def))
-				byQuest[questId] = def = new QuestDefinition { QuestId = questId };
-			return def;
+			if (off + 2 > b.Length || b[off] != 0x00 || b[off + 2] != (byte)'<')
+				return null;
+
+			int len = b[off + 1];
+			if (off + 2 + len > b.Length || b[off + 2 + len - 1] != (byte)'>')
+				return null;
+
+			var xml = Encoding.ASCII.GetString(b, off + 2, len);
+			var tag = xml.Substring(1, xml.IndexOf(' ') - 1);
+			var id = AttrUInt(xml, "id");
+			var cat = AttrUInt(xml, "category");
+			var key = Attr(xml, "key");
+			var flags = Attr(xml, "flags");
+			return new TextRecord(off, 2 + len, tag, id, cat, key, flags);
+		}
+
+		private static IEnumerable<TextRecord> Records(byte[] b, int from)
+		{
+			for (var off = from; off + 2 <= b.Length;)
+			{
+				var rec = ReadRecord(b, off);
+				if (rec != null)
+				{
+					yield return rec;
+
+					off += rec.Length;
+				}
+				else
+					off++;
+			}
 		}
 
 		private static void SetRef(QuestDefinition def, QuestTextSlot slot, TextRecord rec)
 		{
 			if (rec == null)
 				return;
+
 			var existing = def.TextRefs.FirstOrDefault(r => r.Slot == slot);
 			if (existing == null)
 				def.TextRefs.Add(existing = new QuestTextRef { Slot = slot });
@@ -184,35 +227,6 @@ namespace Faolan.Importer.Extractors
 			existing.Flags = rec.Flags;
 		}
 
-		private static int IndexOf(byte[] haystack, byte[] needle, int from)
-		{
-			for (var i = from; i <= haystack.Length - needle.Length; i++)
-			{
-				var ok = true;
-				for (var j = 0; j < needle.Length; j++)
-					if (haystack[i + j] != needle[j])
-					{
-						ok = false;
-						break;
-					}
-
-				if (ok)
-					return i;
-			}
-
-			return -1;
-		}
-
-		private static string Attr(string xml, string name)
-		{
-			var m = Regex.Match(xml, name + "=\"([^\"]*)\"");
-			return m.Success ? m.Groups[1].Value : null;
-		}
-
-		private static uint AttrUInt(string xml, string name)
-		{
-			var v = Attr(xml, name);
-			return v != null && uint.TryParse(v, out var n) ? n : 0u;
-		}
+		private sealed record TextRecord(int Offset, int Length, string Tag, uint Id, uint Category, string Key, string Flags);
 	}
 }

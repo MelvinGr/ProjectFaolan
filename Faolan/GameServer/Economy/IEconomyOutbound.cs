@@ -13,13 +13,13 @@ namespace Faolan.GameServer
 	// (Cross-connection LOOKUP seams like ClientForCharacter are a different concern and stay as their own seam.)
 	public interface IEconomyOutbound
 	{
-		// Push the wallet update (absolute balance in TIN) to the client. See Outbound/MoneyUpdateSender.
-		Task SendMoneyUpdate(INetworkClient client, ulong balanceTin, MoneyUpdateReason reason);
+		// Grant an item template into the first free backpack slot, returning the slot (or null when full).
+		Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1);
 
 		// Push a live single-item add into a container (backpack 0x68, bank 0x69, ...). See Outbound/AddItemBuilder.
 		Task SendAddItem(INetworkClient client, uint containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback = 0);
 
-		// Grant an item template into the first free backpack slot, returning the slot (or null when full).
-		Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1);
+		// Push the wallet update (absolute balance in TIN) to the client. See Outbound/MoneyUpdateSender.
+		Task SendMoneyUpdate(INetworkClient client, ulong balanceTin, MoneyUpdateReason reason);
 	}
 }

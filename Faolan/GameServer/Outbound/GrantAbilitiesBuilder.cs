@@ -1,7 +1,8 @@
 using System;
+using System.Buffers.Binary;
 using System.Linq;
 using System.Threading.Tasks;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
@@ -13,52 +14,35 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
+		internal const int AbilityGrantBodyLength = 81; // 20 u32 fields + the announce byte
+
 		// The 0x2052 ability-grant body carries this same 16-byte pair twice, identical for every ability and across
 		// every grant burst in the strickenbla combat capture - a fixed category/owner word, not ability-specific.
 		private const uint AbilityGrantConstantA = 0xB290805C;
 		private const uint AbilityGrantConstantB = 0x29E627CA;
 
-		// Grants the character's starting abilities so the player has castable attacks in-world (enables the combat
-		// test, TODO #3). The set is the universal starting kit every captured character receives via 0x2052 on
-		// login - the `Abilities` table, imported from the retail grants by CaptureAbilityImporter (3 Normal Attack
-		// directions + toggle-combat / switch-weapon / utility). Sent on the spawn conversation (same family as the
-		// 0x201c handshake), after the world has been built. (Class-specific SPELLS are a separate, not-yet-decoded
-		// grant - no capture exercises it; see TODO #3 / docs/archive/opcode-re-plan.md.)
-		private async Task GrantStartingAbilities(INetworkClient client)
-		{
-			var character = client.Session.Character;
-			if (character == null)
-				return;
+		// The persistent self-buff every character carries in-world (the protective "shield" buff, #221). Re-applied on
+		// each login AND playfield change: it lives in FlushPendingPost205FFollowUp next to the ability/spell re-grants,
+		// and the teleport/changemap re-entry re-arms that flush, so zoning re-asserts it too. Class-agnostic - every
+		// character gets it. Applied via the proven ApplySpell (MagicBuff 0x6B87E316) self-buff path, so it also lands in
+		// ActiveBuffs (.buffs / CancelBuff / expiry).
+		//
+		// CAPTURE-PROVEN spell id + payload (#221): the starting self-buff is wire id 0x000B9000 - base 0x0B90 (2960),
+		// apply rank 0x00 ((base<<8)|rank). It is applied to EVERY freshly-created character on the beach in all 11
+		// create captures (Captures/*_create.tshark.json - Necro/Guardian/Assassin/Barbarian/BearShaman/Herald, etc.),
+		// so it is class-agnostic, exactly as this re-apply assumes. (Earlier this was an INTERIM guess - Scythe Shield
+		// 0x02387E00 - on the false premise the id was in no capture; it is in every create capture.)
+		private const uint ShieldBuffSpellId = 0x000B9000;
 
-			var abilities = await Database.GetStartingAbilities(character.Level, (uint)character.Class);
-			// Login is a SILENT re-grant: the abilities were already learned (in the create flow / on first learn), so
-			// the announce flag is cleared - otherwise the client pops "You have learned a new ability" for the whole
-			// starting kit on every login. Retail does exactly this: the create-flow grants carry the announce byte
-			// 0x01, the per-login re-grants carry 0x00 (the ONLY differing byte; see BuildAbilityGrantBody).
-			foreach (var ability in abilities)
-				await SendAbilityGrant(client, ability, announce: false);
-
-			Logger.LogInformation("GrantStartingAbilities: re-granted {Count} abilities (silent) to '{Name}' (class={Class}, level={Level}).", abilities.Length, character.Name, character.Class, character.Level);
-		}
-
-		// Re-grants the character's learned spells on login - the spell counterpart to GrantStartingAbilities (#74).
-		// Retail re-sends a caster's whole learned set via DispatchLearnSpell on every world entry (invariant across
-		// every login capture: NecroL80 always relearns her 5, DemoL80 his 9); the client silently no-ops spells it
-		// already knows, so this is safe to replay each login. The set is the character's CharacterSpells rows (seeded
-		// for captured characters by CaptureSpellImporter, grown live by .learnspell). Sent after GrantStartingAbilities.
-		private async Task GrantStartingSpells(INetworkClient client)
-		{
-			var character = client.Session.Character;
-			if (character == null)
-				return;
-
-			var spells = await Database.GetCharacterSpells(character.Id);
-			foreach (var spell in spells)
-				await SendLearnSpell(client, spell.SpellId);
-
-			if (spells.Length > 0)
-				Logger.LogInformation("GrantStartingSpells: re-granted {Count} learned spells to '{Name}' (class={Class}).", spells.Length, character.Name, character.Class);
-		}
+		// The captured MagicBuff effect payload for 0x000B9000 (the 54 bytes after applyFrom in the create-capture
+		// ApplySpell, e.g. Stickienecro_mage-necromancer_create pkt#284). Only the trailing u32 (@50) is a per-cast
+		// counter/timestamp - kept as captured; the client doesn't validate it for a self-buff.
+		private static readonly byte[] ShieldBuffPayload =
+		[
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x27, 0x10, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0B, 0x90, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x08, 0xA8, 0x15, 0xAD
+		];
 
 		// Seeds a fresh character's starting loadout the first time it enters the world with an empty action bar
 		// (#74/#71): the class's level-1 SPELLS (persisted to CharacterSpells so GrantStartingSpells sends them this
@@ -103,11 +87,11 @@ namespace Faolan.GameServer
 			if (normalAttacks.Count >= 3)
 				(normalAttacks[1], normalAttacks[2]) = (normalAttacks[2], normalAttacks[1]);
 
-			uint secondBarSlot = secondBarBase;
+			var secondBarSlot = secondBarBase;
 			foreach (var attack in normalAttacks)
 				await Database.SetCharacterShortcut(character.Id, secondBarSlot++, shortcutTypeAbility, attack.Id);
 
-			uint specialSlot = specialBarBase;
+			var specialSlot = specialBarBase;
 			foreach (var ability in abilities)
 			{
 				// Normal attacks were placed (in retail order) just above; here only the special-bar abilities get a slot.
@@ -121,7 +105,7 @@ namespace Faolan.GameServer
 				// fresh-necro capture's list is spells only, type 2 - no type-5 ability records), so unlike the SPELLS
 				// (which the known-list now lists, #74) the abilities still need this pre-snapshot grant for bar
 				// placement. Silent: the post-ready GrantStartingAbilities re-grants the whole kit anyway.
-				await SendAbilityGrant(client, ability, announce: false);
+				await SendAbilityGrant(client, ability, false);
 			}
 
 			// Spells go on bar 1 (the +100 page), after the page-2 normal attacks - matching retail (Herald 0x3006FF at
@@ -129,32 +113,31 @@ namespace Faolan.GameServer
 			foreach (var spellId in spells)
 				await Database.SetCharacterShortcut(character.Id, secondBarSlot++, shortcutTypeSpell, spellId);
 
-			Logger.LogInformation("EnsureStartingLoadout: seeded default bar for '{Name}' (class={Class}): {A} abilities + {S} spells (#74/#71).",
-				character.Name, character.Class, abilities.Length, spells.Length);
+			Logger.LogInformation("EnsureStartingLoadout: seeded default bar for '{Name}' (class={Class}): {A} abilities + {S} spells (#74/#71).", character.Name, character.Class, abilities.Length, spells.Length);
 		}
 
-		// The persistent self-buff every character carries in-world (the protective "shield" buff, #221). Re-applied on
-		// each login AND playfield change: it lives in FlushPendingPost205FFollowUp next to the ability/spell re-grants,
-		// and the teleport/changemap re-entry re-arms that flush, so zoning re-asserts it too. Class-agnostic - every
-		// character gets it. Applied via the proven ApplySpell (MagicBuff 0x6B87E316) self-buff path, so it also lands in
-		// ActiveBuffs (.buffs / CancelBuff / expiry).
-		//
-		// CAPTURE-PROVEN spell id + payload (#221): the starting self-buff is wire id 0x000B9000 - base 0x0B90 (2960),
-		// apply rank 0x00 ((base<<8)|rank). It is applied to EVERY freshly-created character on the beach in all 11
-		// create captures (Captures/*_create.tshark.json - Necro/Guardian/Assassin/Barbarian/BearShaman/Herald, etc.),
-		// so it is class-agnostic, exactly as this re-apply assumes. (Earlier this was an INTERIM guess - Scythe Shield
-		// 0x02387E00 - on the false premise the id was in no capture; it is in every create capture.)
-		private const uint ShieldBuffSpellId = 0x000B9000;
+		// Grants the character's starting abilities so the player has castable attacks in-world (enables the combat
+		// test, TODO #3). The set is the universal starting kit every captured character receives via 0x2052 on
+		// login - the `Abilities` table, imported from the retail grants by CaptureAbilityImporter (3 Normal Attack
+		// directions + toggle-combat / switch-weapon / utility). Sent on the spawn conversation (same family as the
+		// 0x201c handshake), after the world has been built. (Class-specific SPELLS are a separate, not-yet-decoded
+		// grant - no capture exercises it; see TODO #3 / docs/archive/opcode-re-plan.md.)
+		private async Task GrantStartingAbilities(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			if (character == null)
+				return;
 
-		// The captured MagicBuff effect payload for 0x000B9000 (the 54 bytes after applyFrom in the create-capture
-		// ApplySpell, e.g. Stickienecro_mage-necromancer_create pkt#284). Only the trailing u32 (@50) is a per-cast
-		// counter/timestamp - kept as captured; the client doesn't validate it for a self-buff.
-		private static readonly byte[] ShieldBuffPayload =
-		[
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x27, 0x10, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0B, 0x90, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x08, 0xA8, 0x15, 0xAD
-		];
+			var abilities = await Database.GetStartingAbilities(character.Level, (uint)character.Class);
+			// Login is a SILENT re-grant: the abilities were already learned (in the create flow / on first learn), so
+			// the announce flag is cleared - otherwise the client pops "You have learned a new ability" for the whole
+			// starting kit on every login. Retail does exactly this: the create-flow grants carry the announce byte
+			// 0x01, the per-login re-grants carry 0x00 (the ONLY differing byte; see BuildAbilityGrantBody).
+			foreach (var ability in abilities)
+				await SendAbilityGrant(client, ability, false);
+
+			Logger.LogInformation("GrantStartingAbilities: re-granted {Count} abilities (silent) to '{Name}' (class={Class}, level={Level}).", abilities.Length, character.Name, character.Class, character.Level);
+		}
 
 		private async Task GrantStartingBuffs(INetworkClient client)
 		{
@@ -170,6 +153,33 @@ namespace Faolan.GameServer
 			Logger.LogInformation("GrantStartingBuffs: applied the shield self-buff 0x{Spell:X8} to '{Name}'.", ShieldBuffSpellId, character.Name);
 		}
 
+		// Re-grants the character's learned spells on login - the spell counterpart to GrantStartingAbilities (#74).
+		// Retail re-sends a caster's whole learned set via DispatchLearnSpell on every world entry (invariant across
+		// every login capture: NecroL80 always relearns her 5, DemoL80 his 9); the client silently no-ops spells it
+		// already knows, so this is safe to replay each login. The set is the character's CharacterSpells rows (seeded
+		// for captured characters by CaptureSpellImporter, grown live by .learnspell). Sent after GrantStartingAbilities.
+		private async Task GrantStartingSpells(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			if (character == null)
+				return;
+
+			var spells = await Database.GetCharacterSpells(character.Id);
+			foreach (var spell in spells)
+				await SendLearnSpell(client, spell.SpellId);
+
+			if (spells.Length > 0)
+				Logger.LogInformation("GrantStartingSpells: re-granted {Count} learned spells to '{Name}' (class={Class}).", spells.Length, character.Name, character.Class);
+		}
+
+		// Builds a single 0x2052 ability-grant packet from an Ability row. `announce` controls whether the client pops
+		// the "You have learned a new ability" toast: true on a genuine first learn (create flow / .grantability / future
+		// level-up), false for the silent per-login re-grant.
+		private Task SendAbilityGrant(INetworkClient client, Ability ability, bool announce = true)
+		{
+			return new PacketStream().WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), (ushort)0x2052).WriteArray(BuildAbilityGrantBody(ability, announce)).SendAsync(client);
+		}
+
 		// Sends a live spell grant (DispatchLearnSpell, s2c 0x200A) - the retail "learn a spell" packet (#73). Grants a
 		// spell mid-session (level-up / quest-reward / GM) without rebuilding the FullChar snapshot. Rides the same
 		// GameCharInterface conversation as the 0x2052 ability grant; the body is a single u32 spell id (decoded in
@@ -178,30 +188,7 @@ namespace Faolan.GameServer
 		// 0x2011 have no capture oracle yet, so they are not built - see #73.)
 		private Task SendLearnSpell(INetworkClient client, uint spellId)
 		{
-			return new PacketStream()
-				.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchLearnSpell)
-				.WriteArray(BuildLearnSpellBody(spellId))
-				.SendAsync(client);
-		}
-
-		// The DispatchLearnSpell 0x200A body: just the big-endian u32 spell id (`i_nSpellID`). Proven byte-exact
-		// against the captured grants in LearnSpellTests.
-		internal static byte[] BuildLearnSpellBody(uint spellId)
-		{
-			return new FaolanStream()
-				.WriteUInt32(spellId)
-				.ToArray();
-		}
-
-		// Builds a single 0x2052 ability-grant packet from an Ability row. `announce` controls whether the client pops
-		// the "You have learned a new ability" toast: true on a genuine first learn (create flow / .grantability / future
-		// level-up), false for the silent per-login re-grant.
-		private Task SendAbilityGrant(INetworkClient client, Ability ability, bool announce = true)
-		{
-			return new PacketStream()
-				.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), (ushort)0x2052)
-				.WriteArray(BuildAbilityGrantBody(ability, announce))
-				.SendAsync(client);
+			return new PacketStream().WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchLearnSpell).WriteArray(BuildLearnSpellBody(spellId)).SendAsync(client);
 		}
 
 		// The 0x2052 body (everything after the opcode), byte-for-byte as retail (locked by AbilityGrantTests against
@@ -235,7 +222,12 @@ namespace Faolan.GameServer
 				.ToArray();
 		}
 
-		internal const int AbilityGrantBodyLength = 81; // 20 u32 fields + the announce byte
+		// The DispatchLearnSpell 0x200A body: just the big-endian u32 spell id (`i_nSpellID`). Proven byte-exact
+		// against the captured grants in LearnSpellTests.
+		internal static byte[] BuildLearnSpellBody(uint spellId)
+		{
+			return new FaolanStream().WriteUInt32(spellId).ToArray();
+		}
 
 		// The inverse of BuildAbilityGrantBody: recovers the Ability (Slot/Id/Data0..4) and the announce flag from a
 		// 0x2052 body. Validates the fixed words (the duplicated Id, the 0/1 constants, the B290805C/29E627CA pair, the
@@ -250,7 +242,7 @@ namespace Faolan.GameServer
 
 			Span<uint> f = stackalloc uint[20];
 			for (var i = 0; i < 20; i++)
-				f[i] = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(body.Slice(i * 4, 4));
+				f[i] = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(i * 4, 4));
 
 			var slot = f[0];
 			var id = f[1];
@@ -265,8 +257,7 @@ namespace Faolan.GameServer
 				return false;
 			if (f[10] != data1 || f[11] != data2 || f[12] != data3 || f[13] != data4)
 				return false;
-			if (f[14] != AbilityGrantConstantA || f[15] != AbilityGrantConstantB ||
-			    f[16] != AbilityGrantConstantA || f[17] != AbilityGrantConstantB)
+			if (f[14] != AbilityGrantConstantA || f[15] != AbilityGrantConstantB || f[16] != AbilityGrantConstantA || f[17] != AbilityGrantConstantB)
 				return false;
 			if (f[18] != 0x00000001 || f[19] != 0x00000000)
 				return false;
@@ -275,7 +266,16 @@ namespace Faolan.GameServer
 			if (announceByte > 1)
 				return false;
 
-			ability = new Ability { Slot = slot, Id = id, Data0 = data0, Data1 = data1, Data2 = data2, Data3 = data3, Data4 = data4 };
+			ability = new Ability
+			{
+				Slot = slot,
+				Id = id,
+				Data0 = data0,
+				Data1 = data1,
+				Data2 = data2,
+				Data3 = data3,
+				Data4 = data4
+			};
 			announce = announceByte == 1;
 			return true;
 		}

@@ -7,28 +7,30 @@ namespace Faolan.GameServer.Scripting
 	// after the script runs (persist new tags, advance goals, etc.). Built per script run.
 	public sealed class GameLuaPlayer : ILuaPlayer
 	{
-		private readonly HashSet<int> _completedQuests;
 		private readonly HashSet<int> _activeQuests;
+		private readonly HashSet<int> _completedQuests;
 		private readonly HashSet<int> _tags;
-		public List<(int Hash, int Count)> SpawnedItems { get; } = new List<(int Hash, int Count)>();
+		public List<(int Hash, int Count)> SpawnedItems { get; } = [];
 
 		// Effects recorded during the run, for the caller to persist/apply.
-		public List<int> AddedTags { get; } = new List<int>();
-		public List<int> CastSpells { get; } = new List<int>();
-		public List<int> SolvedGoals { get; } = new List<int>();
+		public List<int> AddedTags { get; } = [];
+		public List<int> CastSpells { get; } = [];
+		public List<int> SolvedGoals { get; } = [];
 
 		public GameLuaPlayer(IEnumerable<uint> tags, IEnumerable<uint> completedQuests, IEnumerable<uint> activeQuests = null)
 		{
-			_tags = new HashSet<int>();
+			_tags = [];
 			foreach (var t in tags)
 				_tags.Add((int)t);
-			_completedQuests = new HashSet<int>();
+			_completedQuests = [];
 			foreach (var q in completedQuests)
 				_completedQuests.Add((int)q);
-			_activeQuests = new HashSet<int>();
+			_activeQuests = [];
 			if (activeQuests != null)
+			{
 				foreach (var q in activeQuests)
 					_activeQuests.Add((int)q);
+			}
 		}
 
 		public void AddTag(int tagId)

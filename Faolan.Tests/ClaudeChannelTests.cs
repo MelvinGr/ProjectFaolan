@@ -16,6 +16,28 @@ namespace Faolan.Tests
 		private static readonly TimeSpan Grace = TimeSpan.FromSeconds(120);
 
 		[Fact]
+		public void InitialCursor_AllOld_SkipsEverything()
+		{
+			(ulong, DateTime)[] messages = [(1, Now.AddMinutes(-10)), (2, Now.AddMinutes(-5))];
+			// Whole log is backlog -> floor is the latest (2); nothing is newer, so nothing is forwarded.
+			Assert.Equal(2UL, ChannelBridge.InitialCursor(messages, Now, Grace));
+		}
+
+		[Fact]
+		public void InitialCursor_AllRecent_ForwardsEverything()
+		{
+			(ulong, DateTime)[] messages = [(1, Now.AddSeconds(-40)), (2, Now.AddSeconds(-10))];
+			// No backlog floor -> 0, so the loop forwards both (Sequence > 0).
+			Assert.Equal(0UL, ChannelBridge.InitialCursor(messages, Now, Grace));
+		}
+
+		[Fact]
+		public void InitialCursor_EmptyLog_IsZero()
+		{
+			Assert.Equal(0UL, ChannelBridge.InitialCursor([], Now, Grace));
+		}
+
+		[Fact]
 		public void InitialCursor_ForwardsRecentPosts_SkipsOldBacklog()
 		{
 			// seq 1-3 are old (10+ min ago), seq 4-5 landed 30s before the bridge connected.
@@ -31,28 +53,6 @@ namespace Faolan.Tests
 			// Floor is the newest OLD message (3); the loop forwards everything with Sequence > 3 (the recent 4, 5).
 			Assert.Equal(3UL, ChannelBridge.InitialCursor(messages, Now, Grace));
 		}
-
-		[Fact]
-		public void InitialCursor_AllRecent_ForwardsEverything()
-		{
-			(ulong, DateTime)[] messages = [(1, Now.AddSeconds(-40)), (2, Now.AddSeconds(-10))];
-			// No backlog floor -> 0, so the loop forwards both (Sequence > 0).
-			Assert.Equal(0UL, ChannelBridge.InitialCursor(messages, Now, Grace));
-		}
-
-		[Fact]
-		public void InitialCursor_AllOld_SkipsEverything()
-		{
-			(ulong, DateTime)[] messages = [(1, Now.AddMinutes(-10)), (2, Now.AddMinutes(-5))];
-			// Whole log is backlog -> floor is the latest (2); nothing is newer, so nothing is forwarded.
-			Assert.Equal(2UL, ChannelBridge.InitialCursor(messages, Now, Grace));
-		}
-
-		[Fact]
-		public void InitialCursor_EmptyLog_IsZero()
-		{
-			Assert.Equal(0UL, ChannelBridge.InitialCursor([], Now, Grace));
-		}
 	}
 
 	// The Claude chat-bridge channel log. #97: the inbound MODE (whisper vs channel) is carried structurally on the
@@ -63,37 +63,37 @@ namespace Faolan.Tests
 		public void Append_ChannelPost_IsNotViaWhisper()
 		{
 			var channel = new ClaudeChannel();
-			var entry = channel.Append(0x1234, "Hoxxling", "hello channel", fromClaude: false, viaWhisper: false);
+			var entry = channel.Append(0x1234, "Hoxxling", "hello channel", false, false);
 
 			Assert.False(entry.ViaWhisper);
 			Assert.Equal("hello channel", entry.Message); // no mode prefix baked into the text
 		}
 
 		[Fact]
+		public void Append_DefaultsToChannelMode()
+		{
+			var channel = new ClaudeChannel();
+			var entry = channel.Append(0x1234, "Hoxxling", "hi", false);
+
+			Assert.False(entry.ViaWhisper);
+		}
+
+		[Fact]
 		public void Append_Whisper_IsViaWhisper_WithCleanText()
 		{
 			var channel = new ClaudeChannel();
-			var entry = channel.Append(0x1234, "Hoxxling", "psst", fromClaude: false, viaWhisper: true);
+			var entry = channel.Append(0x1234, "Hoxxling", "psst", false, true);
 
 			Assert.True(entry.ViaWhisper);
 			Assert.Equal("psst", entry.Message); // the mode is the flag, not a "(whisper) " prefix
 		}
 
 		[Fact]
-		public void Append_DefaultsToChannelMode()
-		{
-			var channel = new ClaudeChannel();
-			var entry = channel.Append(0x1234, "Hoxxling", "hi", fromClaude: false);
-
-			Assert.False(entry.ViaWhisper);
-		}
-
-		[Fact]
 		public void ReadSince_PreservesModePerMessage()
 		{
 			var channel = new ClaudeChannel();
-			channel.Append(0x1, "A", "on channel", fromClaude: false, viaWhisper: false);
-			channel.Append(0x2, "B", "in private", fromClaude: false, viaWhisper: true);
+			channel.Append(0x1, "A", "on channel", false, false);
+			channel.Append(0x2, "B", "in private", false, true);
 
 			var messages = channel.ReadSince(0);
 			Assert.Equal(2, messages.Count);

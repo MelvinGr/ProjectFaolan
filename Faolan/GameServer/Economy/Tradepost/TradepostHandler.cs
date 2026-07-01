@@ -1,6 +1,7 @@
 using System;
+using System.Text;
 using System.Threading.Tasks;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
@@ -30,8 +31,7 @@ namespace Faolan.GameServer.Economy.Tradepost
 				{
 					var query = ParseSearch(packet.Body);
 					var listings = await database.GetTradepostListings(query.ItemId);
-					logger.LogInformation("Tradepost: {Char} searched lang={Lang} itemId=0x{Item:X} page={Page} -> {Count} listing(s).",
-						CharName(client), query.Lang, query.ItemId, query.Page, listings.Count);
+					logger.LogInformation("Tradepost: {Char} searched lang={Lang} itemId=0x{Item:X} page={Page} -> {Count} listing(s).", CharName(client), query.Lang, query.ItemId, query.Page, listings.Count);
 
 					// Always send the real result: an empty match list yields an empty grid (head = (0+1)*0x3F1, no
 					// rows), not the captured single-row PoC replay - that interim showed a spurious "Torn Rags"
@@ -86,25 +86,27 @@ namespace Faolan.GameServer.Economy.Tradepost
 					break;
 
 				default:
-					logger.LogInformation("Tradepost: {Char} unknown method 0x{Method:X4} (bodylen={Len}).",
-						CharName(client), packet.Opcode, packet.Body?.Length ?? 0);
+					logger.LogInformation("Tradepost: {Char} unknown method 0x{Method:X4} (bodylen={Len}).", CharName(client), packet.Opcode, packet.Body?.Length ?? 0);
 					break;
 			}
 		}
 
-		// TradepostItemSearch query: [u16 len][lang ascii][cat:u32][page:u32][cat2:u32][itemId:u32][filter+price...].
-		// Category is echoed back as the search-results `head` (const 0x7E2 in the captures).
-		private readonly record struct SearchQuery(string Lang, uint Category, uint Page, uint ItemId);
+		private static string CharName(INetworkClient client)
+		{
+			return client.Session?.Character?.Name ?? "?";
+		}
 
 		private static SearchQuery ParseSearch(FaolanStream body)
 		{
-			if (body == null) return new SearchQuery("", 0x7e2, 0, 0);
+			if (body == null)
+				return new SearchQuery("", 0x7e2, 0, 0);
+
 			try
 			{
-				var lang = System.Text.Encoding.ASCII.GetString(body.ReadArrayUInt16Length());
-				var cat = body.ReadUInt32();   // category root (const 0x7E2 in captures)
+				var lang = Encoding.ASCII.GetString(body.ReadArrayUInt16Length());
+				var cat = body.ReadUInt32(); // category root (const 0x7E2 in captures)
 				var page = body.ReadUInt32();
-				body.ReadUInt32();             // cat2 (mirror of cat)
+				body.ReadUInt32(); // cat2 (mirror of cat)
 				var itemId = body.ReadUInt32();
 				return new SearchQuery(lang, cat, page, itemId);
 			}
@@ -114,7 +116,8 @@ namespace Faolan.GameServer.Economy.Tradepost
 			}
 		}
 
-		private static string CharName(INetworkClient client) =>
-			client.Session?.Character?.Name ?? "?";
+		// TradepostItemSearch query: [u16 len][lang ascii][cat:u32][page:u32][cat2:u32][itemId:u32][filter+price...].
+		// Category is echoed back as the search-results `head` (const 0x7E2 in the captures).
+		private readonly record struct SearchQuery(string Lang, uint Category, uint Page, uint ItemId);
 	}
 }

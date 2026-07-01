@@ -36,9 +36,7 @@ namespace Faolan.Importer.Rdb
 		// The raw (IOz1+zlib) blob for a content hash. Served from the store if archived, else fetched + archived.
 		public async Task<byte[]> FetchRawAsync(byte[] hash)
 		{
-			var h = Convert
-				.ToHexString(hash)
-				.ToLowerInvariant();
+			var h = Convert.ToHexString(hash).ToLowerInvariant();
 			var rest = $"rdb/res/{h[..2]}/{h.Substring(2, 1)}/{h[3..]}";
 
 			var stored = _storeDir == null

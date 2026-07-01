@@ -2,6 +2,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
+using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
 
 // ReSharper disable once CheckNamespace
@@ -18,10 +19,15 @@ namespace Faolan.GameServer
 		// notification. Replayed verbatim (key + localized string id unchanged) with only the live session instance
 		// substituted, so it is guaranteed byte-valid. Arbitrary literal text would need a literal-text FIFO template
 		// (or an RDB string id) - a follow-up.
-		private const string AreaNameBannerXml =
-			"<remoteformat token=\"showfifomessagefromserver(8)|main(1)|GenericDisplayAreaName\" category=\"50018\" " +
-			"key=\"pcAdIWYhSXfTFDe5I1g7\" knubot=\"0\"  ><parameter value=\"7;&lt;localized category=&#39;50025&#39; " +
-			"token=&#39;DisplayedText(3)|GenericDisplayAreaName|3474586&#39;&gt;\" name=\"DisplayedText\" /></remoteformat>";
+		private const string AreaNameBannerXml = "<remoteformat token=\"showfifomessagefromserver(8)|main(1)|GenericDisplayAreaName\" category=\"50018\" " +
+		                                         "key=\"pcAdIWYhSXfTFDe5I1g7\" knubot=\"0\"  ><parameter value=\"7;&lt;localized category=&#39;50025&#39; " +
+		                                         "token=&#39;DisplayedText(3)|GenericDisplayAreaName|3474586&#39;&gt;\" name=\"DisplayedText\" /></remoteformat>";
+
+		// Sends the proven GenericDisplayAreaName FIFO banner - the top-of-screen notification overlay.
+		private Task SendAreaNameBanner(INetworkClient client)
+		{
+			return SendFeedback(client, AreaNameBannerXml);
+		}
 
 		// Pushes a FormatFeedback message (raw remoteformat XML) to the client's on-screen feedback. typeFlags =
 		// FifoBannerTypeFlags for the top-of-screen FIFO banner. Addressed to the player's GameInterface instance.
@@ -36,9 +42,6 @@ namespace Faolan.GameServer
 			await ps.SendAsync(client);
 		}
 
-		// Sends the proven GenericDisplayAreaName FIFO banner - the top-of-screen notification overlay.
-		private Task SendAreaNameBanner(INetworkClient client) => SendFeedback(client, AreaNameBannerXml);
-
 		// Emits the level-up attribute feedback: one AttributeChanged/Increased on-screen line per primary attribute
 		// that rose (#209). This is the VISIBLE half of a level-up; the caller still pushes the new vitals maxima.
 		// `levelsGained` covers a multi-level jump (e.g. a `.level 40` set). The growth amounts are provisional
@@ -46,7 +49,7 @@ namespace Faolan.GameServer
 		private async Task SendLevelUpFeedback(INetworkClient client, uint newLevel, uint levelsGained = 1)
 		{
 			var character = client.Session.Character;
-			foreach (var (attributeId, amount) in Combat.AttributeGrowth.ForLevelGain(character.Class, newLevel, levelsGained))
+			foreach (var (attributeId, amount) in AttributeGrowth.ForLevelGain(character.Class, newLevel, levelsGained))
 				await SendFeedback(client, AttributeChangedFeedback.BuildXml(attributeId, amount), AttributeChangedFeedback.TypeFlags, AttributeChangedFeedback.Footer);
 		}
 	}

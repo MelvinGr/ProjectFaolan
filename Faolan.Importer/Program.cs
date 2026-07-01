@@ -8,6 +8,9 @@ namespace Faolan.Importer
 	// the entry point only: it delegates to the CLI. `--list` shows every module; `--dry-run` writes nothing.
 	internal static class Program
 	{
-		private static Task<int> Main(string[] args) => ImportCli.RunAsync(args);
+		private static Task<int> Main(string[] args)
+		{
+			return ImportCli.RunAsync(args);
+		}
 	}
 }

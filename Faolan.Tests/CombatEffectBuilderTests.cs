@@ -13,10 +13,9 @@ namespace Faolan.Tests
 		[Fact]
 		public void DamageResult_IsByteIdentical()
 		{
-			var captured = Convert.FromHexString(
-				"fec4158a0000c35001316d8a000000c35000002c5600000053000000020000000000000000");
+			var captured = Convert.FromHexString("fec4158a0000c35001316d8a000000c35000002c5600000053000000020000000000000000");
 
-			var built = CombatEffectBuilder.BuildDamageResult(target: 0x01316D8A, attacker: 0x00002C56, damage: 83, type: 2);
+			var built = CombatEffectBuilder.BuildDamageResult(0x01316D8A, 0x00002C56, 83, 2);
 
 			Assert.Equal(captured, built);
 		}
@@ -26,12 +25,9 @@ namespace Faolan.Tests
 		[Fact]
 		public void StatDamage_IsByteIdentical()
 		{
-			var captured = Convert.FromHexString(
-				"e9f241840000c35001316d8a0000002ffa0000000000000000000000000000001b00000002" +
-				"fffffff8000000010000c35000002c5800000001000000000031644900000001000000000000000000000000");
+			var captured = Convert.FromHexString("e9f241840000c35001316d8a0000002ffa0000000000000000000000000000001b00000002" + "fffffff8000000010000c35000002c5800000001000000000031644900000001000000000000000000000000");
 
-			var built = CombatEffectBuilder.BuildStatDamage(
-				target: 0x01316D8A, statValue: 0x2FFA, delta: -8, statId: 1, caster: 0x00002C58, idx: 1, spellBaseId: 0x316449);
+			var built = CombatEffectBuilder.BuildStatDamage(0x01316D8A, 0x2FFA, -8, 1, 0x00002C58, 1, 0x316449);
 
 			Assert.Equal(captured, built);
 		}

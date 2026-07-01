@@ -1,9 +1,9 @@
-using Faolan.Core.Spawn;
 using System;
 using System.Buffers.Binary;
 using System.Numerics;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Spawn;
 
 namespace Faolan.GameServer.Spawn
 {
@@ -52,19 +52,6 @@ namespace Faolan.GameServer.Spawn
 			return PlayerSpawnScaffoldCodec.Generate(scaffold);
 		}
 
-		// Vec3 = [0D x][15 y][1D z], each a little-endian fixed32 - the transform's protobuf float triple (15 bytes).
-		private static byte[] EncodeVec3(Vector3 v)
-		{
-			var b = new byte[15];
-			b[0] = VecField1;
-			BinaryPrimitives.WriteSingleLittleEndian(b.AsSpan(1, 4), v.X);
-			b[5] = VecField2;
-			BinaryPrimitives.WriteSingleLittleEndian(b.AsSpan(6, 4), v.Y);
-			b[10] = VecField3;
-			BinaryPrimitives.WriteSingleLittleEndian(b.AsSpan(11, 4), v.Z);
-			return b;
-		}
-
 		// Quat = [0D x][15 y][1D z][25 w], each a little-endian fixed32 (20 bytes).
 		private static byte[] EncodeQuat(Quaternion q)
 		{
@@ -77,6 +64,19 @@ namespace Faolan.GameServer.Spawn
 			BinaryPrimitives.WriteSingleLittleEndian(b.AsSpan(11, 4), q.Z);
 			b[15] = VecField4;
 			BinaryPrimitives.WriteSingleLittleEndian(b.AsSpan(16, 4), q.W);
+			return b;
+		}
+
+		// Vec3 = [0D x][15 y][1D z], each a little-endian fixed32 - the transform's protobuf float triple (15 bytes).
+		private static byte[] EncodeVec3(Vector3 v)
+		{
+			var b = new byte[15];
+			b[0] = VecField1;
+			BinaryPrimitives.WriteSingleLittleEndian(b.AsSpan(1, 4), v.X);
+			b[5] = VecField2;
+			BinaryPrimitives.WriteSingleLittleEndian(b.AsSpan(6, 4), v.Y);
+			b[10] = VecField3;
+			BinaryPrimitives.WriteSingleLittleEndian(b.AsSpan(11, 4), v.Z);
 			return b;
 		}
 	}

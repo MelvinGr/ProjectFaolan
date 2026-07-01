@@ -31,8 +31,12 @@ namespace Faolan.Importer.Cli
 			{
 				Console.WriteLine("Importer modules:");
 				foreach (var m in ModuleRegistry.All)
-					Console.WriteLine($"  {m.Name,-18} [{m.Source}]{(m.InDefaultSet ? "" : " (opt-in)")}  {m.Description}"
-						+ (m.DependsOn.Count > 0 ? $"  (needs: {string.Join(", ", m.DependsOn)})" : ""));
+				{
+					Console.WriteLine($"  {m.Name,-18} [{m.Source}]{(m.InDefaultSet ? "" : " (opt-in)")}  {m.Description}" + (m.DependsOn.Count > 0
+						? $"  (needs: {string.Join(", ", m.DependsOn)})"
+						: ""));
+				}
+
 				Console.WriteLine("\nReports (read-only): --report conversation-states | anim | burst-coverage | worldobj  [--report-arg <name>]");
 				return 0;
 			}
@@ -46,6 +50,7 @@ namespace Faolan.Importer.Cli
 				await Console.Error.WriteLineAsync($"Database not found: {dbPath} (the DB is the source of truth; point --db at it).");
 				return 1;
 			}
+
 			if (!Directory.Exists(capturesDir))
 			{
 				await Console.Error.WriteLineAsync($"Captures directory not found: {capturesDir}");
@@ -98,16 +103,11 @@ namespace Faolan.Importer.Cli
 				rawPackets.Add(await File.ReadAllBytesAsync(bin));
 
 			// Per create-flow capture (filename contains "creat"), its packet bytes - the starting-kit source.
-			var createCaptures = captures
-				.Where(c => c.Name.Contains("creat", StringComparison.OrdinalIgnoreCase))
-				.Select(c => (IReadOnlyList<byte[]>)c.Packets.Select(p => p.Bytes).ToList())
-				.ToList();
+			var createCaptures = captures.Where(c => c.Name.Contains("creat", StringComparison.OrdinalIgnoreCase)).Select(c => (IReadOnlyList<byte[]>)c.Packets.Select(p => p.Bytes).ToList()).ToList();
 
 			Console.WriteLine($"Read {captures.Count} captures ({rawPackets.Count} raw packets, {createCaptures.Count} create-flow).");
 
-			var options = new DbContextOptionsBuilder<DatabaseContext>()
-				.UseSqlite($"Data Source={dbPath}", x => x.MigrationsAssembly("Faolan"))
-				.Options;
+			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={dbPath}", x => x.MigrationsAssembly("Faolan")).Options;
 			await using var db = new DatabaseContext(options);
 			await db.Database.MigrateAsync(); // outside the runner's transaction (migrations can't run inside one)
 
@@ -132,19 +132,26 @@ namespace Faolan.Importer.Cli
 			return await ImportRunner.RunAsync(ctx, plan);
 		}
 
-		private static IReadOnlyList<IImportModule> ResolveNames(string csv, out List<string> unknown)
+		private static string? GetOption(string[] args, string name)
 		{
-			unknown = [];
-			var modules = new List<IImportModule>();
-			foreach (var name in csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+			var i = Array.IndexOf(args, name);
+			return i >= 0 && i + 1 < args.Length
+				? args[i + 1]
+				: null;
+		}
+
+		private static List<NamedCapture> LoadCaptures(string capturesDir)
+		{
+			var captures = new List<NamedCapture>();
+			foreach (var ts in Directory.EnumerateFiles(capturesDir, "*.tshark.json"))
 			{
-				var m = ModuleRegistry.Find(name);
-				if (m == null)
-					unknown.Add(name);
-				else
-					modules.Add(m);
+				var name = Path.GetFileName(ts);
+				if (name.EndsWith(".tshark.json", StringComparison.OrdinalIgnoreCase))
+					name = name[..^".tshark.json".Length];
+				captures.Add(new NamedCapture(name, TsharkCaptureReader.Read(ts)));
 			}
-			return modules;
+
+			return captures;
 		}
 
 		// --mode upsert | insert | overwrite, with optional per-module overrides:
@@ -164,34 +171,35 @@ namespace Faolan.Importer.Cli
 				else
 					overrides[token[..eq]] = ParseWriteMode(token[(eq + 1)..]);
 			}
+
 			return (mode, overrides);
 		}
 
-		private static WriteMode ParseWriteMode(string s) => s.Trim().ToLowerInvariant() switch
+		private static WriteMode ParseWriteMode(string s)
 		{
-			"insert" => WriteMode.Insert,
-			"upsert" => WriteMode.Upsert,
-			"overwrite" => WriteMode.Overwrite,
-			_ => throw new ArgumentException($"Unknown write mode '{s}' (expected insert|upsert|overwrite).")
-		};
-
-		private static List<NamedCapture> LoadCaptures(string capturesDir)
-		{
-			var captures = new List<NamedCapture>();
-			foreach (var ts in Directory.EnumerateFiles(capturesDir, "*.tshark.json"))
+			return s.Trim().ToLowerInvariant() switch
 			{
-				var name = Path.GetFileName(ts);
-				if (name.EndsWith(".tshark.json", StringComparison.OrdinalIgnoreCase))
-					name = name[..^".tshark.json".Length];
-				captures.Add(new NamedCapture(name, TsharkCaptureReader.Read(ts)));
-			}
-			return captures;
+				"insert"    => WriteMode.Insert,
+				"upsert"    => WriteMode.Upsert,
+				"overwrite" => WriteMode.Overwrite,
+				_           => throw new ArgumentException($"Unknown write mode '{s}' (expected insert|upsert|overwrite).")
+			};
 		}
 
-		private static string? GetOption(string[] args, string name)
+		private static IReadOnlyList<IImportModule> ResolveNames(string csv, out List<string> unknown)
 		{
-			var i = Array.IndexOf(args, name);
-			return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
+			unknown = [];
+			var modules = new List<IImportModule>();
+			foreach (var name in csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+			{
+				var m = ModuleRegistry.Find(name);
+				if (m == null)
+					unknown.Add(name);
+				else
+					modules.Add(m);
+			}
+
+			return modules;
 		}
 	}
 }

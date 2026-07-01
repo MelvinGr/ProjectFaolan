@@ -16,8 +16,8 @@ namespace Faolan.GameServer.Inventory
 	// passing the whole listener (which would re-introduce the god-class dependency the extraction removes).
 	public sealed class ItemUseService
 	{
-		private readonly IDatabaseRepository _database;
 		private readonly Func<INetworkClient, Task> _recallToBind;
+		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
 
 		public ItemUseService(IDatabaseRepository database, Func<INetworkClient, Task> recallToBind, ILogger logger)
@@ -35,8 +35,7 @@ namespace Faolan.GameServer.Inventory
 			if (character == null)
 				return;
 
-			var item = (await _database.GetCharacterInventory(character.Id))
-				.FirstOrDefault(i => i.Container == container && i.Slot == slot)?.Item;
+			var item = (await _database.GetCharacterInventory(character.Id)).FirstOrDefault(i => i.Container == container && i.Slot == slot)?.Item;
 			if (item == null)
 			{
 				_logger.LogInformation("UseInventoryItem: no item at container {Container} slot {Slot}.", container, slot);

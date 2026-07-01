@@ -1,6 +1,5 @@
-using Faolan.Core.Spawn;
 using Faolan.Core.Database.Tables;
-using Faolan.GameServer.Spawn;
+using Faolan.Core.Network.Spawn;
 using Xunit;
 
 namespace Faolan.Tests

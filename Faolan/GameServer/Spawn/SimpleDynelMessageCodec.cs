@@ -1,7 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.IO;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Protobuf;
 using ProtoBuf;
@@ -18,50 +18,39 @@ namespace Faolan.GameServer.Spawn
 	// now (its data is RDB geometry, not yet in the DB).
 	public static class SimpleDynelMessageCodec
 	{
+		// SimpleDynelFullUpdateIIR sub-opcode (the object class that carries a ProtoSimpleDynelIIR identity).
+		public const uint SubOpcode = 0x66AEDD50;
+
+		// SimpleDynelVisualChangeIIR (0xE7F4F8F8): flips a SimpleDynel's visual/collision STATE. Retail sends it to the
+		// Casilda chain decor (this class) the instant she's freed on the beach, switching it to state 5 - which drops the
+		// chain's COLLISION = the "invisible wall" (#267; the hangingwoman mesh doesn't render for us, so the dynel reads
+		// as an invisible barrier). Decoded byte-exact from Hoxxling gameplay idx 2053 (21 B):
+		//   [subop 0xE7F4F8F8][typeTag 0xC878][u32 handle][u32 0][u8 state][u32 0]
+		public const uint VisualChangeSubOpcode = 0xE7F4F8F8;
+
+		public const uint VisualChangeTypeTag = 0x0000C878;
+
 		// The record header before the transform: [u32 type][u32 handle][u32 0].
 		private const int HeaderLength = 12;
 
-		// Locates the identity message's u32 length-prefix within a SimpleDynel IIR record body (the bytes after the
-		// 0x2000 carrier's [u32 len][u32 iirType] prefix): skip the 12-byte header, then the base-class transform
-		// (a varint-length-delimited ProtoGameCodeDynelIIR sub-message). Returns false if the framing is malformed.
-		public static bool TryLocateMessage(ReadOnlySpan<byte> record, out int offset)
+		// Copies a parsed identity message into a WorldObject row's columns (the importer path). The nullable columns
+		// stay null when the field is absent, so ToMessage round-trips back to the same wire bytes.
+		public static void ApplyColumns(WorldObject row, ProtoSimpleDynelIIR message)
 		{
-			offset = 0;
-			var i = HeaderLength;
-			if (record.Length <= i)
-				return false;
-
-			// transform = [varint len][len bytes]
-			if (!TryReadVarint(record, ref i, out var transformLen))
-				return false;
-			i += (int)transformLen;
-			if (i + 4 > record.Length)
-				return false;
-
-			offset = i;
-			return true;
-		}
-
-		// Parses the typed ProtoSimpleDynelIIR out of a SimpleDynel IIR record body. `consumed` is the number of bytes
-		// the message occupies (the 4-byte length prefix + the protobuf), so the caller knows where the kd-tree tail
-		// begins. Returns false if the record can't be framed.
-		public static bool TryParse(ReadOnlySpan<byte> record, out ProtoSimpleDynelIIR message, out int messageStart, out int consumed)
-		{
-			message = null;
-			messageStart = 0;
-			consumed = 0;
-			if (!TryLocateMessage(record, out var offset))
-				return false;
-
-			var blobLen = (int)BinaryPrimitives.ReadUInt32BigEndian(record.Slice(offset, 4));
-			if (offset + 4 + blobLen > record.Length)
-				return false;
-
-			var blob = record.Slice(offset + 4, blobLen).ToArray();
-			message = Serializer.Deserialize<ProtoSimpleDynelIIR>(blob.AsMemory());
-			messageStart = offset;
-			consumed = 4 + blobLen;
-			return true;
+			row.Kdtree = message.Kdtree;
+			row.Name = message.Name;
+			row.DisplayName = message.DisplayName;
+			row.CarsGroup = message.CarsGroup;
+			row.IsClosed = message.IsClosed;
+			row.QuestItemEffect = message.ShouldSerializeQuestItemEffect()
+				? message.QuestItemEffect
+				: null;
+			row.WaypointType = message.ShouldSerializeWaypointType()
+				? message.WaypointType
+				: null;
+			row.TemplateItemId = message.ShouldSerializeTemplateItemId()
+				? message.TemplateItemId
+				: null;
 		}
 
 		// Serializes a typed ProtoSimpleDynelIIR to the on-wire identity message: [u32 BE blobLen][protobuf]. Byte-exact
@@ -78,27 +67,9 @@ namespace Faolan.GameServer.Spawn
 			return outBytes;
 		}
 
-		// SimpleDynelFullUpdateIIR sub-opcode (the object class that carries a ProtoSimpleDynelIIR identity).
-		public const uint SubOpcode = 0x66AEDD50;
-
-		// SimpleDynelVisualChangeIIR (0xE7F4F8F8): flips a SimpleDynel's visual/collision STATE. Retail sends it to the
-		// Casilda chain decor (this class) the instant she's freed on the beach, switching it to state 5 - which drops the
-		// chain's COLLISION = the "invisible wall" (#267; the hangingwoman mesh doesn't render for us, so the dynel reads
-		// as an invisible barrier). Decoded byte-exact from Hoxxling gameplay idx 2053 (21 B):
-		//   [subop 0xE7F4F8F8][typeTag 0xC878][u32 handle][u32 0][u8 state][u32 0]
-		public const uint VisualChangeSubOpcode = 0xE7F4F8F8;
-		public const uint VisualChangeTypeTag = 0x0000C878;
-
 		public static byte[] BuildVisualChange(uint handle, byte state)
 		{
-			return new FaolanStream()
-				.WriteUInt32(VisualChangeSubOpcode)
-				.WriteUInt32(VisualChangeTypeTag)
-				.WriteUInt32(handle)
-				.WriteUInt32(0)
-				.WriteByte(state)
-				.WriteUInt32(0)
-				.ToArray();
+			return new FaolanStream().WriteUInt32(VisualChangeSubOpcode).WriteUInt32(VisualChangeTypeTag).WriteUInt32(handle).WriteUInt32(0).WriteByte(state).WriteUInt32(0).ToArray();
 		}
 
 		// Builds the typed identity message from a WorldObject row's columns (the DB-source path). Kdtree is always 0
@@ -146,18 +117,48 @@ namespace Faolan.GameServer.Spawn
 			return false;
 		}
 
-		// Copies a parsed identity message into a WorldObject row's columns (the importer path). The nullable columns
-		// stay null when the field is absent, so ToMessage round-trips back to the same wire bytes.
-		public static void ApplyColumns(WorldObject row, ProtoSimpleDynelIIR message)
+		// Locates the identity message's u32 length-prefix within a SimpleDynel IIR record body (the bytes after the
+		// 0x2000 carrier's [u32 len][u32 iirType] prefix): skip the 12-byte header, then the base-class transform
+		// (a varint-length-delimited ProtoGameCodeDynelIIR sub-message). Returns false if the framing is malformed.
+		public static bool TryLocateMessage(ReadOnlySpan<byte> record, out int offset)
 		{
-			row.Kdtree = message.Kdtree;
-			row.Name = message.Name;
-			row.DisplayName = message.DisplayName;
-			row.CarsGroup = message.CarsGroup;
-			row.IsClosed = message.IsClosed;
-			row.QuestItemEffect = message.ShouldSerializeQuestItemEffect() ? message.QuestItemEffect : null;
-			row.WaypointType = message.ShouldSerializeWaypointType() ? message.WaypointType : null;
-			row.TemplateItemId = message.ShouldSerializeTemplateItemId() ? message.TemplateItemId : null;
+			offset = 0;
+			var i = HeaderLength;
+			if (record.Length <= i)
+				return false;
+
+			// transform = [varint len][len bytes]
+			if (!TryReadVarint(record, ref i, out var transformLen))
+				return false;
+
+			i += (int)transformLen;
+			if (i + 4 > record.Length)
+				return false;
+
+			offset = i;
+			return true;
+		}
+
+		// Parses the typed ProtoSimpleDynelIIR out of a SimpleDynel IIR record body. `consumed` is the number of bytes
+		// the message occupies (the 4-byte length prefix + the protobuf), so the caller knows where the kd-tree tail
+		// begins. Returns false if the record can't be framed.
+		public static bool TryParse(ReadOnlySpan<byte> record, out ProtoSimpleDynelIIR message, out int messageStart, out int consumed)
+		{
+			message = null;
+			messageStart = 0;
+			consumed = 0;
+			if (!TryLocateMessage(record, out var offset))
+				return false;
+
+			var blobLen = (int)BinaryPrimitives.ReadUInt32BigEndian(record.Slice(offset, 4));
+			if (offset + 4 + blobLen > record.Length)
+				return false;
+
+			var blob = record.Slice(offset + 4, blobLen).ToArray();
+			message = Serializer.Deserialize<ProtoSimpleDynelIIR>(blob.AsMemory());
+			messageStart = offset;
+			consumed = 4 + blobLen;
+			return true;
 		}
 
 		// Replaces the identity message inside a built dynel body with one constructed from the WorldObject's columns,
@@ -188,6 +189,7 @@ namespace Faolan.GameServer.Spawn
 				value |= (ulong)(x & 0x7f) << shift;
 				if ((x & 0x80) == 0)
 					return true;
+
 				shift += 7;
 			}
 

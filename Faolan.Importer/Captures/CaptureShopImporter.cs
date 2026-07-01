@@ -20,8 +20,6 @@ namespace Faolan.Importer.Captures
 	// templates referenced here resolve. Re-importing a vendor replaces its stock wholesale.
 	public static class CaptureShopImporter
 	{
-		public sealed record ShopEntry(string VendorName, uint MaxSize, IReadOnlyList<ShopContentCodec.ShopEntry> Items);
-
 		public static List<ShopEntry> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
 			var names = ConversationExtractor.BuildSpawnNameMap(packets);
@@ -60,16 +58,6 @@ namespace Faolan.Importer.Captures
 			return shops;
 		}
 
-		// Last capture wins for a vendor seen multiple times (stock is the same in practice; sessions only
-		// shift the volatile ids).
-		public static List<ShopEntry> Merge(IEnumerable<ShopEntry> entries)
-		{
-			return entries
-				.GroupBy(e => e.VendorName, StringComparer.OrdinalIgnoreCase)
-				.Select(g => g.Last())
-				.ToList();
-		}
-
 		public static async Task<(int Seen, int Added, int Updated)> ImportAsync(IDatabaseContext db, IEnumerable<ShopEntry> shops, ILogger logger = null)
 		{
 			var added = 0;
@@ -77,16 +65,10 @@ namespace Faolan.Importer.Captures
 			var merged = Merge(shops);
 			foreach (var e in merged)
 			{
-				var shop = await db
-					.Shops
-					.Include(s => s.Items)
-					.FirstOrDefaultAsync(s => s.VendorName == e.VendorName);
+				var shop = await db.Shops.Include(s => s.Items).FirstOrDefaultAsync(s => s.VendorName == e.VendorName);
 				if (shop == null)
 				{
-					shop = new Shop
-					{
-						VendorName = e.VendorName
-					};
+					shop = new Shop { VendorName = e.VendorName };
 					db.Shops.Add(shop);
 					added++;
 				}
@@ -116,5 +98,14 @@ namespace Faolan.Importer.Captures
 			await db.SaveChangesAsync();
 			return (merged.Count, added, updated);
 		}
+
+		// Last capture wins for a vendor seen multiple times (stock is the same in practice; sessions only
+		// shift the volatile ids).
+		public static List<ShopEntry> Merge(IEnumerable<ShopEntry> entries)
+		{
+			return entries.GroupBy(e => e.VendorName, StringComparer.OrdinalIgnoreCase).Select(g => g.Last()).ToList();
+		}
+
+		public sealed record ShopEntry(string VendorName, uint MaxSize, IReadOnlyList<ShopContentCodec.ShopEntry> Items);
 	}
 }

@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core;
-using Faolan.Core.Data;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -12,6 +11,7 @@ using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.AgentServer;
 using Faolan.Core.Network.GameServer;
+using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -20,65 +20,16 @@ namespace Faolan.AgentServer
 {
 	public partial class AgentServerListener : Server<AgentServerPacket, AgentServerPacketFactory, AgentServerMessageFramer>, IAgentServerProvider
 	{
+		private readonly ClaudeChannel _claudeChannel;
 		private readonly IAgentServerDispatcher _dispatcher;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
-		private readonly ClaudeChannel _claudeChannel;
 
-		public AgentServerListener(ILogger<AgentServerListener> logger, IConfiguration configuration, IDatabaseRepository database, IAgentServerDispatcher dispatcher, IGameServerDispatcher gameServerDispatcher, ClaudeChannel claudeChannel) : base(
-			configuration.AgentServerPort, logger, configuration, database, new AgentServerOutgoingPacketLogger(logger))
+		public AgentServerListener(ILogger<AgentServerListener> logger, IConfiguration configuration, IDatabaseRepository database, IAgentServerDispatcher dispatcher, IGameServerDispatcher gameServerDispatcher,
+			ClaudeChannel claudeChannel) : base(configuration.AgentServerPort, logger, configuration, database, new AgentServerOutgoingPacketLogger(logger))
 		{
 			_dispatcher = dispatcher;
 			_gameServerDispatcher = gameServerDispatcher;
 			_claudeChannel = claudeChannel;
-		}
-
-		/// <summary>
-		///     If <paramref name="message" /> is a '.command' (single leading dot) from a GameMaster, run it as a GM
-		///     command on the player's world session (via the GameServer dispatcher) and return true so the caller
-		///     suppresses the chat broadcast/echo. Mirrors the '/say' GM gate in
-		///     <see cref="GameServer.GameServerListener" /> so commands work in every chat channel.
-		/// </summary>
-		private async Task<bool> TryRunChatGmCommand(INetworkClient client, string message)
-		{
-			var text = message?.TrimStart() ?? string.Empty;
-			if (text.Length <= 2 || text[0] != '.' || text[1] == '.')
-				return false;
-
-			if (client.Session.Character == null || client.Session.Account is not { } account || account.Type < AccountType.GameMaster)
-				return false;
-
-			await _gameServerDispatcher.RunGmCommand(client.Session.Character.Id, text);
-			return true;
-		}
-
-		// #95: write-behind chat-history persistence. Records a channel post (isWhisper=false, target=null) or a tell
-		// (isWhisper=true, target=recipient) to the ChatMessages table. Guarded: a DB hiccup must NEVER break the live
-		// chat relay, so any failure is logged and swallowed. The sender identity matches the wire (ClientInstance ==
-		// character id for a player; see player_handle_equals_character_id).
-		private async Task PersistChat(INetworkClient client, byte channelType, uint channelId, uint? target, bool isWhisper, string message)
-		{
-			try
-			{
-				var senderId = client.Session?.Account?.ClientInstance ?? 0;
-				var senderName = client.Session?.Character?.Name?.Length > 0
-					? client.Session.Character.Name
-					: $"Character{senderId}";
-				await Database.SaveChatMessage(new ChatMessage
-				{
-					SentAt = DateTimeOffset.UtcNow,
-					SenderId = senderId,
-					SenderName = senderName,
-					ChannelType = channelType,
-					ChannelId = channelId,
-					TargetId = target,
-					IsWhisper = isWhisper,
-					Text = message?.Length > 512 ? message[..512] : message
-				});
-			}
-			catch (Exception ex)
-			{
-				Logger.LogWarning(ex, "Failed to persist chat message (history only; live relay unaffected).");
-			}
 		}
 
 		public IReadOnlyList<SessionInfo> GetSessions()
@@ -123,8 +74,10 @@ namespace Faolan.AgentServer
 
 					if (client.Session.Account.ClientInstance != clientInstance)
 					{
-						Logger.LogWarning("AgentServer hello: account {AccountId:X8} currently tracks client instance {TrackedClientInstance:X8}, but received {ClientInstance:X8}.", accountId,
-							client.Session.Account.ClientInstance, clientInstance);
+						Logger.LogWarning("AgentServer hello: account {AccountId:X8} currently tracks client instance {TrackedClientInstance:X8}, but received {ClientInstance:X8}.",
+							accountId,
+							client.Session.Account.ClientInstance,
+							clientInstance);
 					}
 
 					var resolvedCharacter = await Database.GetCharacterForAccount(accountId, clientInstance);
@@ -156,9 +109,7 @@ namespace Faolan.AgentServer
 					if (Configuration.McpEnabled)
 						await SendChannelSubscription(client, ClaudeChannel.ChannelType, ClaudeChannel.ChannelId, ClaudeChannel.ChannelName, ClaudeChannel.ChannelFlag);
 
-					await new FaolanStream()
-						.WriteUInt32(0x00050000)
-						.SendAsync(client);
+					await new FaolanStream().WriteUInt32(0x00050000).SendAsync(client);
 
 					await new FaolanStream()
 						.WriteUInt16(AgentServerRespondsOpcodes.Ox0014)
@@ -199,7 +150,7 @@ namespace Faolan.AgentServer
 					await BroadcastChannelChat(client, channelType, channelId, message);
 
 					// #95: persist the channel post to chat history (write-behind, never breaks the live relay above).
-					await PersistChat(client, channelType, channelId, target: null, isWhisper: false, message);
+					await PersistChat(client, channelType, channelId, null, false, message);
 
 					// Posts on the Claude channel are additionally recorded for the MCP bridge (Claude polls the log
 					// and replies via SendClaudeChannelMessage); the normal broadcast above still shows them in-game.
@@ -209,7 +160,7 @@ namespace Faolan.AgentServer
 						var senderName = client.Session.Character?.Name?.Length > 0
 							? client.Session.Character.Name
 							: $"Character{senderId}";
-						_claudeChannel.Append(senderId, senderName, message, fromClaude: false, viaWhisper: false);
+						_claudeChannel.Append(senderId, senderName, message, false, false);
 					}
 
 					break;
@@ -231,7 +182,7 @@ namespace Faolan.AgentServer
 					Logger.LogInformation("AgentServer whisper {Sender} -> {Target:X8}: {Message}", senderName, targetCharacterId, message);
 
 					// #95: persist the whisper to chat history (channelType/id 0 for a tell; recipient in TargetId).
-					await PersistChat(client, channelType: 0, channelId: 0, target: targetCharacterId, isWhisper: true, message);
+					await PersistChat(client, 0, 0, targetCharacterId, true, message);
 
 					// A tell to Claude's synthetic identity goes into the MCP bridge log as a private message
 					// (the client learns Claude's id from the channel posts' 0x0014, so /tell Claude works). The
@@ -239,7 +190,7 @@ namespace Faolan.AgentServer
 					// matching how it was addressed - NOT as a "(whisper) " text prefix the bridge would have to parse.
 					if (Configuration.McpEnabled && targetCharacterId == ClaudeChannel.SenderId)
 					{
-						_claudeChannel.Append(senderId, senderName, message, fromClaude: false, viaWhisper: true);
+						_claudeChannel.Append(senderId, senderName, message, false, true);
 						break;
 					}
 
@@ -252,13 +203,7 @@ namespace Faolan.AgentServer
 						break;
 					}
 
-					await new FaolanStream()
-						.WriteUInt16(AgentServerRespondsOpcodes.Ox0014)
-						.WriteArrayUInt16Length(s => s
-							.WriteUInt32(senderId)
-							.WriteUInt32(0x00000000)
-							.WriteString(senderName))
-						.SendAsync(target);
+					await new FaolanStream().WriteUInt16(AgentServerRespondsOpcodes.Ox0014).WriteArrayUInt16Length(s => s.WriteUInt32(senderId).WriteUInt32(0x00000000).WriteString(senderName)).SendAsync(target);
 					await target.SendAsync(BuildWhisper(senderId, message));
 
 					break;
@@ -267,10 +212,7 @@ namespace Faolan.AgentServer
 				case AgentServerOpcodes.ChatReady:
 				{
 					// Small chat-init handshake (body 00 01 02); retail echoes it back verbatim.
-					await new FaolanStream()
-						.WriteUInt16(AgentServerRespondsOpcodes.Ox0064)
-						.WriteArrayUInt16Length(s => s.WriteArray(packet.Body.ReadRemainingArray()))
-						.SendAsync(client);
+					await new FaolanStream().WriteUInt16(AgentServerRespondsOpcodes.Ox0064).WriteArrayUInt16Length(s => s.WriteArray(packet.Body.ReadRemainingArray())).SendAsync(client);
 
 					break;
 				}
@@ -281,6 +223,57 @@ namespace Faolan.AgentServer
 					break;
 				}
 			}
+		}
+
+		// #95: write-behind chat-history persistence. Records a channel post (isWhisper=false, target=null) or a tell
+		// (isWhisper=true, target=recipient) to the ChatMessages table. Guarded: a DB hiccup must NEVER break the live
+		// chat relay, so any failure is logged and swallowed. The sender identity matches the wire (ClientInstance ==
+		// character id for a player; see player_handle_equals_character_id).
+		private async Task PersistChat(INetworkClient client, byte channelType, uint channelId, uint? target, bool isWhisper, string message)
+		{
+			try
+			{
+				var senderId = client.Session?.Account?.ClientInstance ?? 0;
+				var senderName = client.Session?.Character?.Name?.Length > 0
+					? client.Session.Character.Name
+					: $"Character{senderId}";
+				await Database.SaveChatMessage(new ChatMessage
+				{
+					SentAt = DateTimeOffset.UtcNow,
+					SenderId = senderId,
+					SenderName = senderName,
+					ChannelType = channelType,
+					ChannelId = channelId,
+					TargetId = target,
+					IsWhisper = isWhisper,
+					Text = message?.Length > 512
+						? message[..512]
+						: message
+				});
+			}
+			catch (Exception ex)
+			{
+				Logger.LogWarning(ex, "Failed to persist chat message (history only; live relay unaffected).");
+			}
+		}
+
+		/// <summary>
+		///     If <paramref name="message" /> is a '.command' (single leading dot) from a GameMaster, run it as a GM
+		///     command on the player's world session (via the GameServer dispatcher) and return true so the caller
+		///     suppresses the chat broadcast/echo. Mirrors the '/say' GM gate in
+		///     <see cref="GameServerListener" /> so commands work in every chat channel.
+		/// </summary>
+		private async Task<bool> TryRunChatGmCommand(INetworkClient client, string message)
+		{
+			var text = message?.TrimStart() ?? string.Empty;
+			if (text.Length <= 2 || text[0] != '.' || text[1] == '.')
+				return false;
+
+			if (client.Session.Character == null || client.Session.Account is not { } account || account.Type < AccountType.GameMaster)
+				return false;
+
+			await _gameServerDispatcher.RunGmCommand(client.Session.Character.Id, text);
+			return true;
 		}
 	}
 }

@@ -33,8 +33,7 @@ namespace Faolan.Mcp.Tools
 			return JsonSerializer.Serialize(sessions, JsonOptions);
 		}
 
-		[McpServerTool(Name = "send_system_message"),
-		 Description("Send an in-game system message (the yellow server text) to one connected character. Supports basic HTML like <br /> and <span style=\"color: red;\">.")]
+		[McpServerTool(Name = "send_system_message"), Description("Send an in-game system message (the yellow server text) to one connected character. Supports basic HTML like <br /> and <span style=\"color: red;\">.")]
 		public async Task<string> SendSystemMessage([Description("Character id of a currently-connected player (see list_sessions)")] uint characterId, [Description("The message text")] string message)
 		{
 			if (string.IsNullOrWhiteSpace(message))

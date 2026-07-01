@@ -24,7 +24,7 @@ namespace Faolan.GameServer.Inventory
 			return item.Id switch
 			{
 				TotemOfOriginsId => ItemUseType.TotemRecall,
-				_ => ItemUseType.None
+				_                => ItemUseType.None
 			};
 		}
 	}

@@ -5,6 +5,11 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Faolan.Core\Faolan.Core.csproj" />
+        <PackageReference Include="SkiaSharp" Version="4.148.0"/>
+        <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.148.0"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Faolan.Core\Faolan.Core.csproj"/>
     </ItemGroup>
 </Project>

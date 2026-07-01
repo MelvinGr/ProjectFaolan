@@ -1,6 +1,7 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
-using Faolan.Core.Data;
+using Faolan.Core;
 
 namespace Faolan.GameServer.Packets.FullCharSnapshot
 {
@@ -21,83 +22,17 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		public const uint Sentinel = 0x000000F1;
 		public const uint TableMagic = 0x57365154; // "W6QT"
 		private const uint MinQuestId = 0x1000;
+		public byte[] Trailer { get; init; } = [];
+		public List<uint> GoalIds { get; init; } = [];
+		public List<uint> QuestIds { get; init; } = [];
 
 		public uint Marker { get; init; } = 0x7E2;
-		public List<uint> QuestIds { get; init; } = [];
 
 		// The W6QT goal-id table's three lead words (1 / 7 / 0 in the template) + the goal-step ids (their index is the
 		// 1-based position) + the fixed trailer carried verbatim.
 		public uint TableField1 { get; init; }
 		public uint TableField2 { get; init; }
 		public uint TableField3 { get; init; }
-		public List<uint> GoalIds { get; init; } = [];
-		public byte[] Trailer { get; init; } = [];
-
-		public static QuestIndexRegion Parse(byte[] data, int offset, int endOffset)
-		{
-			ArgumentNullException.ThrowIfNull(data);
-			using var r = new FaolanStream(data, false) { Position = checked((uint)offset) };
-
-			var tag = r.ReadUInt32();
-			if (tag != IndexTag)
-				throw new InvalidOperationException($"Quest index: tag 0x{tag:X} != 0x{IndexTag:X}");
-			var marker = r.ReadUInt32();
-
-			var questIds = new List<uint>();
-			while (PeekUInt32(data, r.Position) >= MinQuestId)
-				questIds.Add(r.ReadUInt32());
-			var count = r.ReadUInt32();
-			if (count != questIds.Count)
-				throw new InvalidOperationException($"Quest index: count {count} != ids {questIds.Count}");
-			var sentinel = r.ReadUInt32();
-			if (sentinel != Sentinel)
-				throw new InvalidOperationException($"Quest index: sentinel 0x{sentinel:X} != 0x{Sentinel:X}");
-
-			var magic = r.ReadUInt32();
-			if (magic != TableMagic)
-				throw new InvalidOperationException($"Quest index: table magic 0x{magic:X} != 0x{TableMagic:X}");
-			var f1 = r.ReadUInt32();
-			var f2 = r.ReadUInt32();
-			var f3 = r.ReadUInt32();
-			var n = r.ReadUInt32();
-			var goalIds = new List<uint>((int)n);
-			for (uint i = 0; i < n; i++)
-			{
-				goalIds.Add(r.ReadUInt32());
-				var idx = r.ReadUInt32();
-				if (idx != i + 1)
-					throw new InvalidOperationException($"Quest index: goal idx {idx} != {i + 1}");
-			}
-
-			var trailer = r.ReadArray((uint)(endOffset - r.Position));
-			return new QuestIndexRegion
-			{
-				Marker = marker, QuestIds = questIds,
-				TableField1 = f1, TableField2 = f2, TableField3 = f3, GoalIds = goalIds, Trailer = trailer
-			};
-		}
-
-		// GENERATES the index region from the indexed quest ids + the per-quest goal-step ids (+ the W6QT table's
-		// three lead words and the trailer word), synthesizing the constants (tag/sentinel/magic, the 1..n goal
-		// indices, the trailer's [1][0][0]). The MARKER is DERIVED from the quest count: it is the `0x3F1` list-framing
-		// word `0x3F1 * (count + 1)` (decoded across captures: 1 quest -> 0x7E2, 2 quests -> 0xBD3 - the same
-		// record-count invariant the client asserts), NOT a per-quest constant. The quest ids / count / sentinel follow
-		// from the character's quest list; the goal-step ids + trailer word are per-quest data (seeded). #186.
-		public static QuestIndexRegion Build(IReadOnlyList<uint> questIds, IReadOnlyList<uint> goalSteps,
-			uint tableField1, uint tableField2, uint tableField3, uint trailerQuestId, uint trailerWord)
-		{
-			ArgumentNullException.ThrowIfNull(questIds);
-			ArgumentNullException.ThrowIfNull(goalSteps);
-			var trailer = new FaolanStream()
-				.WriteUInt32(trailerQuestId).WriteUInt32(1).WriteUInt32(0).WriteUInt32(0).WriteUInt32(trailerWord)
-				.ToArray();
-			return new QuestIndexRegion
-			{
-				Marker = IndexTag * (uint)(questIds.Count + 1), QuestIds = [.. questIds],
-				TableField1 = tableField1, TableField2 = tableField2, TableField3 = tableField3,
-				GoalIds = [.. goalSteps], Trailer = trailer
-			};
-		}
 
 		public byte[] ToArray()
 		{
@@ -124,7 +59,84 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			return w.ToArray();
 		}
 
-		private static uint PeekUInt32(byte[] data, uint position) =>
-			System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(checked((int)position), 4));
+		// GENERATES the index region from the indexed quest ids + the per-quest goal-step ids (+ the W6QT table's
+		// three lead words and the trailer word), synthesizing the constants (tag/sentinel/magic, the 1..n goal
+		// indices, the trailer's [1][0][0]). The MARKER is DERIVED from the quest count: it is the `0x3F1` list-framing
+		// word `0x3F1 * (count + 1)` (decoded across captures: 1 quest -> 0x7E2, 2 quests -> 0xBD3 - the same
+		// record-count invariant the client asserts), NOT a per-quest constant. The quest ids / count / sentinel follow
+		// from the character's quest list; the goal-step ids + trailer word are per-quest data (seeded). #186.
+		public static QuestIndexRegion Build(IReadOnlyList<uint> questIds, IReadOnlyList<uint> goalSteps, uint tableField1, uint tableField2, uint tableField3, uint trailerQuestId, uint trailerWord)
+		{
+			ArgumentNullException.ThrowIfNull(questIds);
+			ArgumentNullException.ThrowIfNull(goalSteps);
+			var trailer = new FaolanStream().WriteUInt32(trailerQuestId).WriteUInt32(1).WriteUInt32(0).WriteUInt32(0).WriteUInt32(trailerWord).ToArray();
+			return new QuestIndexRegion
+			{
+				Marker = IndexTag * (uint)(questIds.Count + 1),
+				QuestIds = [.. questIds],
+				TableField1 = tableField1,
+				TableField2 = tableField2,
+				TableField3 = tableField3,
+				GoalIds = [.. goalSteps],
+				Trailer = trailer
+			};
+		}
+
+		public static QuestIndexRegion Parse(byte[] data, int offset, int endOffset)
+		{
+			ArgumentNullException.ThrowIfNull(data);
+			using var r = new FaolanStream(data, false) { Position = checked((uint)offset) };
+
+			var tag = r.ReadUInt32();
+			if (tag != IndexTag)
+				throw new InvalidOperationException($"Quest index: tag 0x{tag:X} != 0x{IndexTag:X}");
+
+			var marker = r.ReadUInt32();
+
+			var questIds = new List<uint>();
+			while (PeekUInt32(data, r.Position) >= MinQuestId)
+				questIds.Add(r.ReadUInt32());
+			var count = r.ReadUInt32();
+			if (count != questIds.Count)
+				throw new InvalidOperationException($"Quest index: count {count} != ids {questIds.Count}");
+
+			var sentinel = r.ReadUInt32();
+			if (sentinel != Sentinel)
+				throw new InvalidOperationException($"Quest index: sentinel 0x{sentinel:X} != 0x{Sentinel:X}");
+
+			var magic = r.ReadUInt32();
+			if (magic != TableMagic)
+				throw new InvalidOperationException($"Quest index: table magic 0x{magic:X} != 0x{TableMagic:X}");
+
+			var f1 = r.ReadUInt32();
+			var f2 = r.ReadUInt32();
+			var f3 = r.ReadUInt32();
+			var n = r.ReadUInt32();
+			var goalIds = new List<uint>((int)n);
+			for (uint i = 0; i < n; i++)
+			{
+				goalIds.Add(r.ReadUInt32());
+				var idx = r.ReadUInt32();
+				if (idx != i + 1)
+					throw new InvalidOperationException($"Quest index: goal idx {idx} != {i + 1}");
+			}
+
+			var trailer = r.ReadArray((uint)(endOffset - r.Position));
+			return new QuestIndexRegion
+			{
+				Marker = marker,
+				QuestIds = questIds,
+				TableField1 = f1,
+				TableField2 = f2,
+				TableField3 = f3,
+				GoalIds = goalIds,
+				Trailer = trailer
+			};
+		}
+
+		private static uint PeekUInt32(byte[] data, uint position)
+		{
+			return BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(checked((int)position), 4));
+		}
 	}
 }

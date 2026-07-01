@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
+using Faolan.GameServer.Combat;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.GameServer.World;
 
@@ -31,14 +32,16 @@ namespace Faolan.GameServer
 			// #214: a dead character must NOT get its current health refilled here - the world-entry snapshot just set
 			// HealthCurrent = 0 to latch the client's dead state, and this post-snapshot vitals update would otherwise
 			// refill the bar (and un-latch the release window). Send 0 current health while dead.
-			var currentHealth = character.IsDead ? 0u : stats.Health;
+			var currentHealth = character.IsDead
+				? 0u
+				: stats.Health;
 			var block = new CharacterStatBlock()
 				.Set(LegacyCharacterStatId.HealthCurrent, currentHealth)
 				.Set(LegacyCharacterStatId.StaminaCurrent, stats.Stamina)
 				.Set(LegacyCharacterStatId.ManaCurrent, stats.Mana)
 				.Set(LegacyCharacterStatId.Level, character.Level)
 				.Set(LegacyCharacterStatId.Exp, character.Experience)
-				.Set(LegacyCharacterStatId.MaxExp, Combat.LevelingResolver.XpForNextLevel(character.Level));
+				.Set(LegacyCharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
 
 			return BuildStatUpdate(client, block);
 		}
@@ -64,10 +67,7 @@ namespace Faolan.GameServer
 		{
 			// Emit the values under the CURRENT ids (0x001B/0x01F8/0x01FA) - matches the retail full-spawn announce,
 			// which sends current (== max at full health) and lets the client show full bars; max rides the snapshot.
-			var stats = new CharacterStatBlock()
-				.Set(LegacyCharacterStatId.HealthCurrent, health)
-				.Set(LegacyCharacterStatId.StaminaCurrent, stamina)
-				.Set(LegacyCharacterStatId.ManaCurrent, mana);
+			var stats = new CharacterStatBlock().Set(LegacyCharacterStatId.HealthCurrent, health).Set(LegacyCharacterStatId.StaminaCurrent, stamina).Set(LegacyCharacterStatId.ManaCurrent, mana);
 
 			return SendStatUpdate(client, stats);
 		}

@@ -28,9 +28,7 @@ namespace Faolan.Tests
 			var args = Convert.FromHexString("0801"); // only field1
 			var spliced = CombatService.InsertBehaviorPhaseField(args, 5);
 
-			Assert.Equal("080118 05".Replace(" ", ""), Convert
-				.ToHexString(spliced)
-				.ToLowerInvariant());
+			Assert.Equal("080118 05".Replace(" ", ""), Convert.ToHexString(spliced).ToLowerInvariant());
 		}
 
 		[Fact]
@@ -40,9 +38,7 @@ namespace Faolan.Tests
 			// right after field2.
 			var spliced = CombatService.InsertBehaviorPhaseField(Convert.FromHexString("0801100128 0a".Replace(" ", "")), 200);
 
-			Assert.Equal("08011001 18c801 280a".Replace(" ", ""), Convert
-				.ToHexString(spliced)
-				.ToLowerInvariant());
+			Assert.Equal("08011001 18c801 280a".Replace(" ", ""), Convert.ToHexString(spliced).ToLowerInvariant());
 		}
 	}
 }

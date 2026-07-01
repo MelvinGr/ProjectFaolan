@@ -1,4 +1,4 @@
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets.Opcodes;
 
@@ -22,7 +22,7 @@ namespace Faolan.GameServer.Combat
 				.WriteUInt32(GameServer0X2000RespondsOpcodes.DamageResultIIR)
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(target)
-				.WriteByte((byte)0)
+				.WriteByte(0)
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(attacker)
 				.WriteUInt32(damage)
@@ -45,7 +45,7 @@ namespace Faolan.GameServer.Combat
 				.WriteUInt32(GameServer0X2000RespondsOpcodes.StatDamageIIR)
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(target)
-				.WriteByte((byte)0)
+				.WriteByte(0)
 				.WriteUInt32(statValue)
 				.WriteUInt32(0)
 				.WriteUInt32(0)

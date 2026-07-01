@@ -23,8 +23,8 @@ namespace Faolan.Importer.Rdb
 	public static class RdbAppearanceImporter
 	{
 		private const uint CreatorType = 1010700;
-		private const uint TexScriptType = 1010035;
 		private const uint MonsterDataType = 1010201;
+		private const uint TexScriptType = 1010035;
 
 		public static async Task<int> ImportAsync(DatabaseContext db, string rdbDir)
 		{
@@ -38,10 +38,18 @@ namespace Faolan.Importer.Rdb
 
 			var bytes = rdb.ReadDecompressed(entry);
 			var start = Array.IndexOf(bytes, (byte)'<');
-			var root = XDocument.Parse(Encoding.UTF8.GetString(bytes, start < 0 ? 0 : start, bytes.Length - (start < 0 ? 0 : start))).Root!;
+			var root = XDocument.Parse(Encoding.UTF8.GetString(bytes,
+					start < 0
+						? 0
+						: start,
+					bytes.Length - (start < 0
+						? 0
+						: start)))
+				.Root!;
 
 			// name= of a referenced RDB resource (cached; the same texscript is shared across races).
 			var nameCache = new Dictionary<(uint, uint), string>();
+
 			string ResourceName(uint type, uint id)
 			{
 				if (nameCache.TryGetValue((type, id), out var cached))
@@ -76,7 +84,9 @@ namespace Faolan.Importer.Rdb
 					: Sex.Male;
 
 				// Per-sex morph min/max, stored once per race (so a single (sex,race) query returns them).
-				var morphs = sexEl.Elements("BodyNodes").Elements("MorphNode")
+				var morphs = sexEl
+					.Elements("BodyNodes")
+					.Elements("MorphNode")
 					.Select((mn, i) => (Name: (string)mn.Attribute("MorphName"), Min: Scale(mn.Attribute("min_value")), Max: Scale(mn.Attribute("max_value")), Seq: i))
 					.Where(m => m.Name != null)
 					.ToList();
@@ -106,6 +116,7 @@ namespace Faolan.Importer.Rdb
 						var mid = (uint?)(int?)he.Attribute("monsterdataid") ?? 0;
 						if (mid == 0)
 							continue;
+
 						rows.Add(Row(sex, race, "head", hseq++, mid.ToString(), null, CleanHeadName(ResourceName(MonsterDataType, mid)), 0, 0));
 					}
 				}
@@ -120,8 +131,7 @@ namespace Faolan.Importer.Rdb
 
 		// Adds one category's option elements (id "0" = the creator's none placeholder, skipped). colourAttr set ->
 		// store the hex swatch; nameFn set -> resolve a friendly name from the resource.
-		private static void AddList(List<AppearanceChoice> rows, Sex sex, Race race, string category, IEnumerable<XElement> elems,
-			string idAttr, string prefix, string colourAttr, Func<uint, string> nameFn)
+		private static void AddList(List<AppearanceChoice> rows, Sex sex, Race race, string category, IEnumerable<XElement> elems, string idAttr, string prefix, string colourAttr, Func<uint, string> nameFn)
 		{
 			var seq = 0;
 			foreach (var e in elems)
@@ -138,18 +148,31 @@ namespace Faolan.Importer.Rdb
 			}
 		}
 
-		private static AppearanceChoice Row(Sex sex, Race race, string category, int seq, string value, string colour, string name, int min, int max) => new AppearanceChoice
+		// "female_aquilonian_generic_thick_1_head" -> "Generic Thick 1".
+		private static string CleanHeadName(string raw)
 		{
-			Sex = (byte)sex,
-			Race = (byte)race,
-			Category = category,
-			Sequence = seq,
-			Value = value,
-			Color = colour,
-			Name = name,
-			Min = min,
-			Max = max
-		};
+			if (string.IsNullOrWhiteSpace(raw))
+				return null;
+
+			var s = raw;
+			foreach (var strip in new[]
+			{
+				"female_",
+				"male_",
+				"aquilonian_",
+				"cimmerian_",
+				"stygian_",
+				"khitan_",
+				"generic_",
+				"_head"
+			})
+				s = s.Replace(strip, "", StringComparison.OrdinalIgnoreCase);
+			s = s.Replace('_', ' ').Trim();
+			if (s.Length == 0)
+				return null;
+
+			return CultureInfo.InvariantCulture.TextInfo.ToTitleCase(s);
+		}
 
 		// "Face (Tattoo) Cimmerian - The Mountain Cat (F)" -> "The Mountain Cat". Keeps the whole string if it has no
 		// " - " segment.
@@ -157,6 +180,7 @@ namespace Faolan.Importer.Rdb
 		{
 			if (string.IsNullOrWhiteSpace(raw))
 				return null;
+
 			var dash = raw.LastIndexOf(" - ", StringComparison.Ordinal);
 			var s = dash >= 0
 				? raw[(dash + 3)..]
@@ -167,23 +191,28 @@ namespace Faolan.Importer.Rdb
 				: null;
 		}
 
-		// "female_aquilonian_generic_thick_1_head" -> "Generic Thick 1".
-		private static string CleanHeadName(string raw)
+		private static AppearanceChoice Row(Sex sex, Race race, string category, int seq, string value, string colour, string name, int min, int max)
 		{
-			if (string.IsNullOrWhiteSpace(raw))
-				return null;
-			var s = raw;
-			foreach (var strip in new[] { "female_", "male_", "aquilonian_", "cimmerian_", "stygian_", "khitan_", "generic_", "_head" })
-				s = s.Replace(strip, "", StringComparison.OrdinalIgnoreCase);
-			s = s.Replace('_', ' ').Trim();
-			if (s.Length == 0)
-				return null;
-			return CultureInfo.InvariantCulture.TextInfo.ToTitleCase(s);
+			return new AppearanceChoice
+			{
+				Sex = (byte)sex,
+				Race = (byte)race,
+				Category = category,
+				Sequence = seq,
+				Value = value,
+				Color = colour,
+				Name = name,
+				Min = min,
+				Max = max
+			};
 		}
 
-		private static int Scale(XAttribute attr) => attr != null && double.TryParse(attr.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var v)
-			? (int)Math.Round(v * 1000)
-			: 0;
+		private static int Scale(XAttribute attr)
+		{
+			return attr != null && double.TryParse(attr.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var v)
+				? (int)Math.Round(v * 1000)
+				: 0;
+		}
 
 		private static bool TryRace(string name, out Race race)
 		{

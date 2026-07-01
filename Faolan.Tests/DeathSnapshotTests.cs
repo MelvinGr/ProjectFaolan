@@ -27,6 +27,24 @@ namespace Faolan.Tests
 		private const uint HealthMaxStatId = 0x0001;
 
 		[Fact]
+		public void AliveLoginSnapshots_AllHaveNonZeroHealthCurrent()
+		{
+			// Every normal login snapshot carries full current health - the dead==0 signal is unambiguous.
+			foreach (var capture in new[]
+			{
+				"Strie_rogue-assassin_login.tshark.json",
+				"Stihetfv_soldier-conqueror_login.tshark.json",
+				"Fwfnwfjwk_soldier-guardian_login.tshark.json",
+				"Faolanx_mage-necromancer_login.tshark.json"
+			})
+			{
+				var pairs = StatBlockPairs(capture);
+				Assert.True(pairs.TryGetValue(HealthCurrentStatId, out var current), $"{capture}: HealthCurrent present");
+				Assert.True(current > 0u, $"{capture}: alive snapshot has non-zero HealthCurrent (got {current})");
+			}
+		}
+
+		[Fact]
 		public void DeadLoginSnapshot_HasHealthCurrentZero_WhileMaxStaysFull()
 		{
 			var pairs = StatBlockPairs("retail_login-while-dead_resurrect-window.tshark.json");
@@ -34,26 +52,8 @@ namespace Faolan.Tests
 			Assert.True(pairs.TryGetValue(HealthCurrentStatId, out var current), "HealthCurrent (0x1B) present");
 			Assert.True(pairs.TryGetValue(HealthMaxStatId, out var max), "HealthMax (0x01) present");
 
-			Assert.Equal(0u, current);   // dead: current health is exactly 0
+			Assert.Equal(0u, current); // dead: current health is exactly 0
 			Assert.True(max > 0u, "max-health side stays populated when dead");
-		}
-
-		[Fact]
-		public void AliveLoginSnapshots_AllHaveNonZeroHealthCurrent()
-		{
-			// Every normal login snapshot carries full current health - the dead==0 signal is unambiguous.
-			foreach (var capture in new[]
-			         {
-				         "Strie_rogue-assassin_login.tshark.json",
-				         "Stihetfv_soldier-conqueror_login.tshark.json",
-				         "Fwfnwfjwk_soldier-guardian_login.tshark.json",
-				         "Faolanx_mage-necromancer_login.tshark.json",
-			         })
-			{
-				var pairs = StatBlockPairs(capture);
-				Assert.True(pairs.TryGetValue(HealthCurrentStatId, out var current), $"{capture}: HealthCurrent present");
-				Assert.True(current > 0u, $"{capture}: alive snapshot has non-zero HealthCurrent (got {current})");
-			}
 		}
 
 		[Fact]
@@ -64,18 +64,54 @@ namespace Faolan.Tests
 			// exactly the shape the retail dead snapshot carries.
 			const uint hp = 196, hpBase = 196;
 			var block = TailsStatBlock.CreateFreshBlock();
-			block.ApplyClassVitals(hp, hpBase, mana: 0, manaBase: 0, stamina: 217, staminaBase: 197);
+			block.ApplyClassVitals(hp, hpBase, 0, 0, 217, 197);
 
 			Assert.Equal(hp, block.CurrentHp); // sanity: alive shape first
 
-			block.CurrentHp = 0;               // the dead patch
+			block.CurrentHp = 0; // the dead patch
 
-			Assert.Equal(0u, block.Values[23]);                  // CurrentHpExtra
-			Assert.Equal(0u, block.Values[54]);                  // CurrentHp (repeated-block slot)
-			Assert.Equal(0u, block.Values[54 + 148]);            // [202] copy
-			Assert.Equal(hpBase * 100, block.Values[21]);        // base/max-side stays full
-			Assert.Equal(hpBase * 100, block.Values[56]);        // [56] (+[204])
-			Assert.Equal(hpBase * 100, block.Values[56 + 148]);  // [204] copy
+			Assert.Equal(0u, block.Values[23]); // CurrentHpExtra
+			Assert.Equal(0u, block.Values[54]); // CurrentHp (repeated-block slot)
+			Assert.Equal(0u, block.Values[54 + 148]); // [202] copy
+			Assert.Equal(hpBase * 100, block.Values[21]); // base/max-side stays full
+			Assert.Equal(hpBase * 100, block.Values[56]); // [56] (+[204])
+			Assert.Equal(hpBase * 100, block.Values[56 + 148]); // [204] copy
+		}
+
+		private static int IndexOf(byte[]? haystack, ReadOnlySpan<byte> needle)
+		{
+			if (haystack == null)
+				return -1;
+
+			for (var i = 0; i + needle.Length <= haystack.Length; i++)
+			{
+				if (haystack.AsSpan(i, needle.Length).SequenceEqual(needle))
+					return i;
+			}
+
+			return -1;
+		}
+
+		private static byte[]? SnapshotBody(string path)
+		{
+			if (!File.Exists(path))
+				return null;
+
+			using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
+			if (!doc.RootElement.TryGetProperty("Packets", out var packets))
+				return null;
+
+			foreach (var p in packets.EnumerateArray())
+			{
+				if (!p.TryGetProperty("BodyHex", out var bh))
+					continue;
+
+				var hex = bh.GetString() ?? "";
+				if (hex.Length >= 16 && hex.Substring(8, 8).Equals("737a6df9", StringComparison.OrdinalIgnoreCase))
+					return Convert.FromHexString(hex);
+			}
+
+			return null;
 		}
 
 		// --- helpers: read the tails stat block ([statId,value] pairs) straight from a tshark capture ---
@@ -99,37 +135,6 @@ namespace Faolan.Tests
 			}
 
 			return pairs;
-		}
-
-		private static byte[]? SnapshotBody(string path)
-		{
-			if (!File.Exists(path))
-				return null;
-
-			using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
-			if (!doc.RootElement.TryGetProperty("Packets", out var packets))
-				return null;
-
-			foreach (var p in packets.EnumerateArray())
-			{
-				if (!p.TryGetProperty("BodyHex", out var bh))
-					continue;
-				var hex = bh.GetString() ?? "";
-				if (hex.Length >= 16 && hex.Substring(8, 8).Equals("737a6df9", StringComparison.OrdinalIgnoreCase))
-					return Convert.FromHexString(hex);
-			}
-
-			return null;
-		}
-
-		private static int IndexOf(byte[]? haystack, ReadOnlySpan<byte> needle)
-		{
-			if (haystack == null)
-				return -1;
-			for (var i = 0; i + needle.Length <= haystack.Length; i++)
-				if (haystack.AsSpan(i, needle.Length).SequenceEqual(needle))
-					return i;
-			return -1;
 		}
 	}
 }

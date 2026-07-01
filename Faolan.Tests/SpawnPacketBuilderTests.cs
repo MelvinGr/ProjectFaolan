@@ -32,7 +32,9 @@ namespace Faolan.Tests
 
 			var handle = BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(SpawnPacketBuilder.HandleOffset, 4));
 			var position = new Vector3(ReadLE(template, SpawnPacketBuilder.PosXOffset), ReadLE(template, SpawnPacketBuilder.PosYOffset), ReadLE(template, SpawnPacketBuilder.PosZOffset));
-			var rotation = new Quaternion(ReadLE(template, SpawnPacketBuilder.RotXOffset), ReadLE(template, SpawnPacketBuilder.RotYOffset), ReadLE(template, SpawnPacketBuilder.RotZOffset),
+			var rotation = new Quaternion(ReadLE(template, SpawnPacketBuilder.RotXOffset),
+				ReadLE(template, SpawnPacketBuilder.RotYOffset),
+				ReadLE(template, SpawnPacketBuilder.RotZOffset),
 				ReadLE(template, SpawnPacketBuilder.RotWOffset));
 
 			var built = SpawnPacketBuilder.BuildSpawnBody(template, handle, position, rotation);

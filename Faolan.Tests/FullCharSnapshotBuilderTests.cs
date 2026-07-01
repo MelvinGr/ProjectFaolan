@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Conan;
 using Faolan.GameServer.Packets.FullCharSnapshot;
@@ -47,26 +47,12 @@ namespace Faolan.Tests
 			var first = FullCharSnapshotBuilder.BuildContainers(0x02000005, equipped, (Signet, Signet.Archetype));
 			var second = FullCharSnapshotBuilder.BuildContainers(0x02000005, equipped, (Signet, Signet.Archetype));
 
-			var ids = first
-				.SelectMany(c => c.Items)
-				.Select(e => e.Item.ItemId)
-				.ToList();
-			var recordIds = first
-				.SelectMany(c => c.Items)
-				.SelectMany(e => e.Item.StatLists.Where(s => s.Stat == 23))
-				.Select(s => s.Value)
-				.ToList();
+			var ids = first.SelectMany(c => c.Items).Select(e => e.Item.ItemId).ToList();
+			var recordIds = first.SelectMany(c => c.Items).SelectMany(e => e.Item.StatLists.Where(s => s.Stat == 23)).Select(s => s.Value).ToList();
 
-			Assert.Equal(ids.Count, ids
-				.Distinct()
-				.Count());
-			Assert.Equal(recordIds.Count, recordIds
-				.Distinct()
-				.Count());
-			Assert.Equal(ids, second
-				.SelectMany(c => c.Items)
-				.Select(e => e.Item.ItemId)
-				.ToList()); // stable across logins
+			Assert.Equal(ids.Count, ids.Distinct().Count());
+			Assert.Equal(recordIds.Count, recordIds.Distinct().Count());
+			Assert.Equal(ids, second.SelectMany(c => c.Items).Select(e => e.Item.ItemId).ToList()); // stable across logins
 		}
 
 		[Fact]
@@ -76,10 +62,31 @@ namespace Faolan.Tests
 
 			var containers = FullCharSnapshotBuilder.BuildContainers(0x02000005, equipped, (Signet, Signet.Archetype));
 
-			Assert.Equal(new uint[] { 101, 104, 112, 113 }, containers.Select(c => c.InventoryId.Type));
+			Assert.Equal(new uint[]
+				{
+					101,
+					104,
+					112,
+					113
+				},
+				containers.Select(c => c.InventoryId.Type));
 			Assert.All(containers, c => Assert.Equal(0x02000005u, c.InventoryId.Instance));
-			Assert.Equal(new uint[] { 1028, 24, 48, 48 }, containers.Select(c => c.MaxSize));
-			Assert.Equal(new uint[] { 0, 0, 12, 0 }, containers.Select(c => c.DisabledSlotsCount));
+			Assert.Equal(new uint[]
+				{
+					1028,
+					24,
+					48,
+					48
+				},
+				containers.Select(c => c.MaxSize));
+			Assert.Equal(new uint[]
+				{
+					0,
+					0,
+					12,
+					0
+				},
+				containers.Select(c => c.DisabledSlotsCount));
 
 			var worn = Assert.Single(containers[0].Items);
 			Assert.Equal(0x12u, worn.Pos);
@@ -134,14 +141,15 @@ namespace Faolan.Tests
 			var containers = FullCharSnapshotBuilder.BuildContainers(0x02000005, new Dictionary<ulong, (Item, uint)>(), (Manacles, Manacles.Archetype), rows);
 
 			var bag = containers[1].Items;
-			Assert.Equal(new uint[] { 1, 3 }, bag.Select(e => e.Pos)); // row at 1 wins over FirstPosBag; pos-ascending
+			Assert.Equal(new uint[]
+				{
+					1,
+					3
+				},
+				bag.Select(e => e.Pos)); // row at 1 wins over FirstPosBag; pos-ascending
 			Assert.Equal(Signet.Id, bag[0].Item.ItemData.Template1);
 			Assert.Equal(Manacles.Id, bag[1].Item.ItemData.Template1);
-			Assert.Equal(2u, bag[1]
-				.Item
-				.StatLists
-				.Single(s => s.Stat == 26)
-				.Value); // stack count from the row
+			Assert.Equal(2u, bag[1].Item.StatLists.Single(s => s.Stat == 26).Value); // stack count from the row
 		}
 
 		// The world-entry tail patch (live level + current vitals) must survive the tails serialize and leave
@@ -168,8 +176,7 @@ namespace Faolan.Tests
 			parts.Tails.Level = 42;
 			var patched = SnapshotTails.Deserialize(parts.Tails.ToArray());
 			Assert.Equal(42u, patched.Level);
-			Assert.Equal(original.Length, parts.Tails.ToArray()
-				.Length); // fixed-width patch, no resize
+			Assert.Equal(original.Length, parts.Tails.ToArray().Length); // fixed-width patch, no resize
 
 			// The live-vitals/XP patch slots round-trip too. The bigboy capture is the tails model's reference
 			// fixture, so its stat table MUST be recognized - a silent skip here would mean the world-entry

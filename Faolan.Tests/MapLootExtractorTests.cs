@@ -27,7 +27,7 @@ namespace Faolan.Tests
 
 			var entries = MapLootExtractor.Extract(packets);
 
-			Assert.Equal(2, entries.Count);                       // the chest holds two items
+			Assert.Equal(2, entries.Count); // the chest holds two items
 			Assert.All(entries, e => Assert.Equal(4010u, e.MapId));
 			Assert.Equal(2, entries.Select(e => e.ItemTemplateId).Distinct().Count());
 		}
@@ -41,38 +41,14 @@ namespace Faolan.Tests
 		[Fact]
 		public void Merge_DedupsRepeatedMapItemPairs()
 		{
-			var merged = MapLootExtractor.Merge(new[]
-			{
+			var merged = MapLootExtractor.Merge([
 				new MapLootPoolEntry(4010, 1),
-				new MapLootPoolEntry(4010, 1),  // duplicate (same map + item)
+				new MapLootPoolEntry(4010, 1), // duplicate (same map + item)
 				new MapLootPoolEntry(4010, 2),
-				new MapLootPoolEntry(4020, 1)   // same item, different map - kept
-			});
+				new MapLootPoolEntry(4020, 1) // same item, different map - kept
+			]);
 
 			Assert.Equal(3, merged.Count);
-		}
-
-		private static CapturedPacket MapChange(uint mapId)
-		{
-			var content = new byte[38];
-			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(4, 4), 0x5D85BFC7); // body@4 = subop
-			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(34, 4), mapId);     // body@34 = map
-			return Wrap(0x5D85BFC7, content);
-		}
-
-		// A loot-bag carrier packet: body = [u32 payloadLen][u32 subOpcode=F096251E][record].
-		private static CapturedPacket LootBag(byte[] record)
-		{
-			var payload = new byte[8 + record.Length];
-			BinaryPrimitives.WriteUInt32BigEndian(payload.AsSpan(0, 4), (uint)(4 + record.Length)); // payload len
-			BinaryPrimitives.WriteUInt32BigEndian(payload.AsSpan(4, 4), 0xF096251E);                // sub-opcode
-			record.CopyTo(payload, 8);
-			return new CapturedPacket(0, true, 0x2000, 0xF096251E, FramePacket(payload));
-		}
-
-		private static CapturedPacket Wrap(uint subOpcode, byte[] body)
-		{
-			return new CapturedPacket(0, true, 0x2000, subOpcode, FramePacket(body));
 		}
 
 		// Prepends the 12-byte framing header (len + crc + headerLen=0) the body extractor skips.
@@ -81,6 +57,29 @@ namespace Faolan.Tests
 			var full = new byte[12 + body.Length]; // headerLen = 0 at offset 8
 			body.CopyTo(full, 12);
 			return full;
+		}
+
+		// A loot-bag carrier packet: body = [u32 payloadLen][u32 subOpcode=F096251E][record].
+		private static CapturedPacket LootBag(byte[] record)
+		{
+			var payload = new byte[8 + record.Length];
+			BinaryPrimitives.WriteUInt32BigEndian(payload.AsSpan(0, 4), (uint)(4 + record.Length)); // payload len
+			BinaryPrimitives.WriteUInt32BigEndian(payload.AsSpan(4, 4), 0xF096251E); // sub-opcode
+			record.CopyTo(payload, 8);
+			return new CapturedPacket(0, true, 0x2000, 0xF096251E, FramePacket(payload));
+		}
+
+		private static CapturedPacket MapChange(uint mapId)
+		{
+			var content = new byte[38];
+			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(4, 4), 0x5D85BFC7); // body@4 = subop
+			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(34, 4), mapId); // body@34 = map
+			return Wrap(0x5D85BFC7, content);
+		}
+
+		private static CapturedPacket Wrap(uint subOpcode, byte[] body)
+		{
+			return new CapturedPacket(0, true, 0x2000, subOpcode, FramePacket(body));
 		}
 	}
 }

@@ -12,6 +12,19 @@ namespace Faolan.Tests
 	// can construct an NPC cast from an NpcSpell row instead of replaying a captured blob.
 	public class NpcSpellCastBuilderTests
 	{
+		// #253: the server->client buff-REMOVAL carrier is the same ApplySpell shape with the rank-1 "end" spell id
+		// and an EMPTY payload. Byte-exact against the mount buff end captured at dismount (mount 0x31eb15, end id
+		// 0x31eb1501, self-applied to/from player handle 0x0802e5d4 - NecroL80 *_dismount, frame 1449).
+		[Fact]
+		public void Build_EmptyPayload_IsTheBuffRemovalEndTwin()
+		{
+			var capturedCarrier = Convert.FromHexString("6b87e3160000c3500802e5d4000031eb15010000c3500802e5d4");
+
+			var built = NpcSpellCastBuilder.Build(0x0802e5d4, 0x0802e5d4, 0x31eb1501, []);
+
+			Assert.Equal(capturedCarrier, built);
+		}
+
 		[Fact]
 		public void Build_FromCapturedFields_IsByteIdentical()
 		{
@@ -27,26 +40,13 @@ namespace Faolan.Tests
 			Assert.Equal(golden, built);
 		}
 
-		// #253: the server->client buff-REMOVAL carrier is the same ApplySpell shape with the rank-1 "end" spell id
-		// and an EMPTY payload. Byte-exact against the mount buff end captured at dismount (mount 0x31eb15, end id
-		// 0x31eb1501, self-applied to/from player handle 0x0802e5d4 - NecroL80 *_dismount, frame 1449).
-		[Fact]
-		public void Build_EmptyPayload_IsTheBuffRemovalEndTwin()
-		{
-			var capturedCarrier = Convert.FromHexString("6b87e3160000c3500802e5d4000031eb15010000c3500802e5d4");
-
-			var built = NpcSpellCastBuilder.Build(applyTo: 0x0802e5d4, applyFrom: 0x0802e5d4, spellId: 0x31eb1501, payload: []);
-
-			Assert.Equal(capturedCarrier, built);
-		}
-
 		[Fact]
 		public void Build_NpcIsTheCaster_PlayerIsTheTarget()
 		{
 			// applyFrom = the NPC handle (the caster), applyTo = the player handle - the tell of an NPC cast.
-			var built = NpcSpellCastBuilder.Build(applyTo: 0x1316E71, applyFrom: 0x00017E29, spellId: 0x316AA600, payload: []);
+			var built = NpcSpellCastBuilder.Build(0x1316E71, 0x00017E29, 0x316AA600, []);
 
-			Assert.Equal(0x1316E71u, BinaryPrimitives.ReadUInt32BigEndian(built.AsSpan(8, 4)));   // applyTo = player
+			Assert.Equal(0x1316E71u, BinaryPrimitives.ReadUInt32BigEndian(built.AsSpan(8, 4))); // applyTo = player
 			Assert.Equal(0x316AA600u, BinaryPrimitives.ReadUInt32BigEndian(built.AsSpan(14, 4))); // spellId
 			Assert.Equal(0x00017E29u, BinaryPrimitives.ReadUInt32BigEndian(built.AsSpan(22, 4))); // applyFrom = NPC
 		}

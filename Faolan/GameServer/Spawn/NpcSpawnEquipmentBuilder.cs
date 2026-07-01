@@ -16,10 +16,7 @@ namespace Faolan.GameServer.Spawn
 		// Rebuilds the InventoryEntries (ordered by slot) from the stored rows.
 		public static List<ProtoCoreCharacterIIR.InventoryEntry> BuildEntries(IEnumerable<NpcSpawnEquipment> rows)
 		{
-			return rows
-				.OrderBy(r => r.Pos)
-				.Select(BuildEntry)
-				.ToList();
+			return rows.OrderBy(r => r.Pos).Select(BuildEntry).ToList();
 		}
 
 		public static ProtoCoreCharacterIIR.InventoryEntry BuildEntry(NpcSpawnEquipment row)

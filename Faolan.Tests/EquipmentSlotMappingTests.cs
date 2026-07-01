@@ -1,6 +1,6 @@
-using Faolan.GameServer.Inventory;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.GameServer.Inventory;
 using Xunit;
 
 namespace Faolan.Tests

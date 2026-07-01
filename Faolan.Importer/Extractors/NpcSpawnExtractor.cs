@@ -16,6 +16,14 @@ namespace Faolan.Importer.Extractors
 		public float RotY { get; init; }
 		public float RotZ { get; init; }
 
+		// The humanoid appearance/morph table lifted from the post-IIR (#185), empty for animals. Lets the spawn's
+		// post-IIR generate from rows instead of the Data blob.
+		public IReadOnlyList<NpcAppearanceMorph> Morphs { get; init; } = [];
+
+		// The worn equipment lifted from the CharacterIIR f23 (#185), empty for unarmed NPCs and for any NPC whose
+		// items don't match the reproducible ProtoAcgItem shape (then equipment stays sourced from the Data blob).
+		public IReadOnlyList<NpcSpawnEquipment> Equipment { get; init; } = [];
+
 		// NpcStats.community = the faction id: 0 = neutral/friendly, > 0 = a hostile faction (drives aggro hostility).
 		public uint Community { get; init; }
 		public uint HeadMesh { get; init; }
@@ -28,14 +36,6 @@ namespace Faolan.Importer.Extractors
 		public uint Race { get; init; }
 		public uint Sex { get; init; }
 		public uint TemplateId { get; init; }
-
-		// The humanoid appearance/morph table lifted from the post-IIR (#185), empty for animals. Lets the spawn's
-		// post-IIR generate from rows instead of the Data blob.
-		public IReadOnlyList<NpcAppearanceMorph> Morphs { get; init; } = [];
-
-		// The worn equipment lifted from the CharacterIIR f23 (#185), empty for unarmed NPCs and for any NPC whose
-		// items don't match the reproducible ProtoAcgItem shape (then equipment stays sourced from the Data blob).
-		public IReadOnlyList<NpcSpawnEquipment> Equipment { get; init; } = [];
 	}
 
 	// Extracts NPC entity spawns (FA015807) per map from a capture: tracks the current map (MapChange 5D85BFC7),
@@ -99,7 +99,9 @@ namespace Faolan.Importer.Extractors
 			foreach (var p in packets)
 			{
 				var body = GetBody(p.Bytes);
-				var subop = body.Length >= 8 ? BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)) : 0;
+				var subop = body.Length >= 8
+					? BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4))
+					: 0;
 
 				if (p.Opcode == Opcode2000 && p.IsDownload && subop == MapChangeSubOpcode && body.Length >= 38)
 				{
@@ -110,6 +112,7 @@ namespace Faolan.Importer.Extractors
 
 				if (currentMap == 0)
 					continue;
+
 				if (p.Opcode == Opcode2020) // client spawn poll - ends the pre-poll burst window
 				{
 					sawPoll = true;
@@ -126,46 +129,6 @@ namespace Faolan.Importer.Extractors
 			}
 
 			return entries;
-		}
-
-		// Builds one NPC spawn entry from an FA015807 body (transform + lifted identity/appearance/equipment). Returns
-		// false for a body too short to hold the transform, or the player's own spawn (handle in the instance range).
-		private static bool TryBuildEntry(byte[] body, byte[] fullBytes, uint currentMap, out NpcSpawnEntry entry)
-		{
-			entry = null;
-			if (body.Length < SpawnPacketBuilder.RotWOffset + 4)
-				return false; // too short to hold the transform (position + rotation)
-
-			var handle = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
-			if (handle >= InstanceRangeStart)
-				return false; // the player's own spawn
-
-			var identity = LiftIdentity(body);
-			var name = !string.IsNullOrEmpty(identity.Name)
-				? identity.Name
-				: ExtractName(body);
-
-			// Humanoid appearance/morph table (#185) - decoded from the post-IIR; empty for animals.
-			var morphs = NpcSpawnAppearanceCodec.TryDecodeAppearance(body, out var decoded)
-				? decoded
-				: [];
-
-			entry = identity with
-			{
-				MapId = currentMap,
-				Name = name,
-				Handle = handle,
-				X = ReadLE(body, SpawnPacketBuilder.PosXOffset),
-				Y = ReadLE(body, SpawnPacketBuilder.PosYOffset),
-				Z = ReadLE(body, SpawnPacketBuilder.PosZOffset),
-				Data = fullBytes,
-				RotX = ReadLE(body, SpawnPacketBuilder.RotXOffset),
-				RotY = ReadLE(body, SpawnPacketBuilder.RotYOffset),
-				RotZ = ReadLE(body, SpawnPacketBuilder.RotZOffset),
-				RotW = ReadLE(body, SpawnPacketBuilder.RotWOffset),
-				Morphs = morphs
-			};
-			return true;
 		}
 
 		// Dedup by (map, spawn point); keep the first seen.
@@ -275,6 +238,46 @@ namespace Faolan.Importer.Extractors
 		private static float ReadLE(byte[] body, int offset)
 		{
 			return BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(offset, 4));
+		}
+
+		// Builds one NPC spawn entry from an FA015807 body (transform + lifted identity/appearance/equipment). Returns
+		// false for a body too short to hold the transform, or the player's own spawn (handle in the instance range).
+		private static bool TryBuildEntry(byte[] body, byte[] fullBytes, uint currentMap, out NpcSpawnEntry entry)
+		{
+			entry = null;
+			if (body.Length < SpawnPacketBuilder.RotWOffset + 4)
+				return false; // too short to hold the transform (position + rotation)
+
+			var handle = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
+			if (handle >= InstanceRangeStart)
+				return false; // the player's own spawn
+
+			var identity = LiftIdentity(body);
+			var name = !string.IsNullOrEmpty(identity.Name)
+				? identity.Name
+				: ExtractName(body);
+
+			// Humanoid appearance/morph table (#185) - decoded from the post-IIR; empty for animals.
+			var morphs = NpcSpawnAppearanceCodec.TryDecodeAppearance(body, out var decoded)
+				? decoded
+				: [];
+
+			entry = identity with
+			{
+				MapId = currentMap,
+				Name = name,
+				Handle = handle,
+				X = ReadLE(body, SpawnPacketBuilder.PosXOffset),
+				Y = ReadLE(body, SpawnPacketBuilder.PosYOffset),
+				Z = ReadLE(body, SpawnPacketBuilder.PosZOffset),
+				Data = fullBytes,
+				RotX = ReadLE(body, SpawnPacketBuilder.RotXOffset),
+				RotY = ReadLE(body, SpawnPacketBuilder.RotYOffset),
+				RotZ = ReadLE(body, SpawnPacketBuilder.RotZOffset),
+				RotW = ReadLE(body, SpawnPacketBuilder.RotWOffset),
+				Morphs = morphs
+			};
+			return true;
 		}
 	}
 }

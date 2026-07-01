@@ -15,7 +15,9 @@ namespace Faolan.Core.Rdb
 	// Validated end-to-end against a real client (TextStrings 1030002 -> TDC2 strings).
 	public sealed class RdbReader : IDisposable
 	{
+		private static readonly HttpClient Http = new HttpClient { Timeout = TimeSpan.FromSeconds(40) };
 		private readonly Dictionary<int, FileStream> _dataFiles = new Dictionary<int, FileStream>();
+		private readonly HashSet<string> _cdnMisses = [];
 		private readonly List<Entry> _entries = [];
 
 		private readonly string _rdbDir;
@@ -26,8 +28,10 @@ namespace Faolan.Core.Rdb
 		// proxy is store-and-forward, so a GET both serves and archives the blob (the real CDN must be reachable for a
 		// cold miss). Misses are negative-cached so a dead/absent resource is only attempted once per process.
 		private readonly string? _cdnBaseUrl;
-		private readonly HashSet<string> _cdnMisses = [];
-		private static readonly HttpClient Http = new HttpClient { Timeout = TimeSpan.FromSeconds(40) };
+
+		// Resolve a single resource by its (type, id) key, the form RDB cross-references use ("TYPE:ID"). Builds a
+		// lookup on first use (873k entries, so linear scans per lookup would be quadratic when resolving a graph).
+		private Dictionary<(uint, uint), Entry>? _byKey;
 
 		public int Count => _entries.Count;
 		public IReadOnlyList<Entry> Entries => _entries;
@@ -35,15 +39,26 @@ namespace Faolan.Core.Rdb
 		public RdbReader(string rdbDir, string? cdnBaseUrl = null)
 		{
 			_rdbDir = rdbDir;
-			_cdnBaseUrl = string.IsNullOrWhiteSpace(cdnBaseUrl) ? null : cdnBaseUrl.TrimEnd('/');
+			_cdnBaseUrl = string.IsNullOrWhiteSpace(cdnBaseUrl)
+				? null
+				: cdnBaseUrl.TrimEnd('/');
 			ParseIndex(Path.Combine(rdbDir, "le.idx"));
+		}
+
+		public void Dispose()
+		{
+			foreach (var fs in _dataFiles.Values)
+				fs.Dispose();
+			_dataFiles.Clear();
 		}
 
 		// True if the entry's payload is (likely) readable - a local rdbdata entry, or a CDN entry with a configured
 		// source that hasn't already missed. A CDN "hit" is optimistic: the actual fetch may still 404 (then it's
 		// negative-cached and ReadRaw returns empty), which the asset callers already treat as "missing".
-		public bool CanRead(Entry e) =>
-			e.IsLocal || (_cdnBaseUrl != null && e.Hash.Length >= 16 && !_cdnMisses.Contains(Convert.ToHexStringLower(e.Hash)));
+		public bool CanRead(Entry e)
+		{
+			return e.IsLocal || (_cdnBaseUrl != null && e.Hash.Length >= 16 && !_cdnMisses.Contains(Convert.ToHexStringLower(e.Hash)));
+		}
 
 		// The proxy URL for a CDN (file == 0xFF) entry, or null if no source is configured / the hash is absent.
 		public string? CdnUrl(Entry e)
@@ -55,28 +70,9 @@ namespace Faolan.Core.Rdb
 			return $"{_cdnBaseUrl}/res/{hex[..2]}/{hex.Substring(2, 1)}/{hex[3..]}";
 		}
 
-		public void Dispose()
-		{
-			foreach (var fs in _dataFiles.Values)
-				fs.Dispose();
-			_dataFiles.Clear();
-		}
-
 		public IEnumerable<Entry> EntriesOfType(uint type)
 		{
 			return _entries.Where(e => e.Type == type);
-		}
-
-		// Resolve a single resource by its (type, id) key, the form RDB cross-references use ("TYPE:ID"). Builds a
-		// lookup on first use (873k entries, so linear scans per lookup would be quadratic when resolving a graph).
-		private Dictionary<(uint, uint), Entry>? _byKey;
-
-		public bool TryGet(uint type, uint id, out Entry entry)
-		{
-			_byKey ??= _entries
-				.GroupBy(e => (e.Type, e.Id))
-				.ToDictionary(g => g.Key, g => g.First());
-			return _byKey.TryGetValue((type, id), out entry);
 		}
 
 		// Reads an entry's payload, unwrapping the IOz1 + zlib container. Returns the decompressed bytes (which
@@ -104,13 +100,44 @@ namespace Faolan.Core.Rdb
 			return UnwrapIOz1(inner);
 		}
 
+		public bool TryGet(uint type, uint id, out Entry entry)
+		{
+			_byKey ??= _entries.GroupBy(e => (e.Type, e.Id)).ToDictionary(g => g.Key, g => g.First());
+			return _byKey.TryGetValue((type, id), out entry);
+		}
+
 		// Counts entries per type (for the type-inventory phase).
 		public IEnumerable<(uint Type, int Count)> TypeCounts()
 		{
-			return _entries
-				.GroupBy(e => e.Type)
-				.Select(g => (g.Key, g.Count()))
-				.OrderByDescending(x => x.Item2);
+			return _entries.GroupBy(e => e.Type).Select(g => (g.Key, g.Count())).OrderByDescending(x => x.Item2);
+		}
+
+		// Synchronously GET a CDN entry's blob through the mirror proxy. Returns empty (and negative-caches the hash) on
+		// any failure - no source configured, network error, or a 404 (resource not on the CDN / CDN unreachable).
+		private byte[] FetchCdn(Entry e)
+		{
+			var url = CdnUrl(e);
+			if (url == null)
+				return [];
+
+			try
+			{
+				using var resp = Http.Send(new HttpRequestMessage(HttpMethod.Get, url));
+				if (!resp.IsSuccessStatusCode)
+				{
+					_cdnMisses.Add(Convert.ToHexStringLower(e.Hash));
+					return [];
+				}
+
+				using var ms = new MemoryStream();
+				resp.Content.ReadAsStream().CopyTo(ms);
+				return ms.ToArray();
+			}
+			catch
+			{
+				_cdnMisses.Add(Convert.ToHexStringLower(e.Hash));
+				return [];
+			}
 		}
 
 		private FileStream GetDataFile(int file)
@@ -152,9 +179,7 @@ namespace Faolan.Core.Rdb
 				var offset = BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan(d + 4, 4));
 				var size = BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan(d + 8, 4));
 
-				var hash = b
-					.AsSpan(d + 28, 16)
-					.ToArray(); // 16-byte content hash = CDN path md5 for file==0xFF resources
+				var hash = b.AsSpan(d + 28, 16).ToArray(); // 16-byte content hash = CDN path md5 for file==0xFF resources
 				_entries.Add(new Entry(type, id, file, offset, size, hash));
 			}
 		}
@@ -179,34 +204,6 @@ namespace Faolan.Core.Rdb
 			}
 
 			return buf;
-		}
-
-		// Synchronously GET a CDN entry's blob through the mirror proxy. Returns empty (and negative-caches the hash) on
-		// any failure - no source configured, network error, or a 404 (resource not on the CDN / CDN unreachable).
-		private byte[] FetchCdn(Entry e)
-		{
-			var url = CdnUrl(e);
-			if (url == null)
-				return [];
-
-			try
-			{
-				using var resp = Http.Send(new HttpRequestMessage(HttpMethod.Get, url));
-				if (!resp.IsSuccessStatusCode)
-				{
-					_cdnMisses.Add(Convert.ToHexStringLower(e.Hash));
-					return [];
-				}
-
-				using var ms = new MemoryStream();
-				resp.Content.ReadAsStream().CopyTo(ms);
-				return ms.ToArray();
-			}
-			catch
-			{
-				_cdnMisses.Add(Convert.ToHexStringLower(e.Hash));
-				return [];
-			}
 		}
 
 		public static bool IsRdbh(ReadOnlySpan<byte> raw)

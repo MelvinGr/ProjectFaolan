@@ -1,10 +1,10 @@
-using Faolan.Core.Network;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network;
 using Faolan.Core.Network.Packets.Opcodes;
 
 namespace Faolan.GameServer.Spawn
@@ -73,10 +73,7 @@ namespace Faolan.GameServer.Spawn
 		public static byte[] BuildPatrol(uint handle, PatrolPath path)
 		{
 			ArgumentNullException.ThrowIfNull(path);
-			var waypoints = path.Waypoints
-				.OrderBy(w => w.Ordinal)
-				.Select(w => new Vector3(w.X, w.Y, w.Z))
-				.ToList();
+			var waypoints = path.Waypoints.OrderBy(w => w.Ordinal).Select(w => new Vector3(w.X, w.Y, w.Z)).ToList();
 			return BuildPatrol(handle, path.Position, waypoints, path.Speed);
 		}
 

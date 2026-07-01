@@ -15,26 +15,14 @@ namespace Faolan.Core.Rdb.Assets
 	//
 	// Record layout: 12-byte RDB-Id header (type,id,marker) then the raw XML (no <?xml?> decl in most records, and the
 	// file paths carry Windows backslashes inside attribute values, which is valid XML). We parse from the first '<'.
-	public sealed record MeshIndexFile(
-		uint Id,
-		string? SourceFile,
-		uint? RenderMeshId,
-		BoundingBox? Bounds,
-		uint? CollisionMeshId,
-		IReadOnlyList<MeshMaterial> Materials)
+	public sealed record MeshIndexFile(uint Id, string? SourceFile, uint? RenderMeshId, BoundingBox? Bounds, uint? CollisionMeshId, IReadOnlyList<MeshMaterial> Materials)
 	{
 		// True when the geometry is a skinned character/equipment body (<RenderSkinnedMesh>); its texture is bound by
 		// the item/character system, not the mesh manifest (MaterialSets is empty).
 		public bool Skinned { get; init; }
 
 		// The texture resources referenced anywhere in this model's materials, de-duplicated, in first-seen order.
-		public IReadOnlyList<TextureRef> UniqueTextures =>
-			Materials
-				.SelectMany(m => m.Textures)
-				.Where(t => t.Type != null)
-				.GroupBy(t => (t.Type, t.Id))
-				.Select(g => g.First())
-				.ToList();
+		public IReadOnlyList<TextureRef> UniqueTextures => Materials.SelectMany(m => m.Textures).Where(t => t.Type != null).GroupBy(t => (t.Type, t.Id)).Select(g => g.First()).ToList();
 
 		public static MeshIndexFile Parse(uint id, ReadOnlySpan<byte> decompressed)
 		{
@@ -68,9 +56,7 @@ namespace Faolan.Core.Rdb.Assets
 			var collisionEl = root.Element("CollisionMesh2") ?? root.Element("CollisionMesh");
 			var collisionId = ParseUintAttr(collisionEl, "file");
 
-			var materials = (root.Element("Materials")?.Elements("Material") ?? [])
-				.Select(ParseMaterial)
-				.ToList();
+			var materials = (root.Element("Materials")?.Elements("Material") ?? []).Select(ParseMaterial).ToList();
 
 			return new MeshIndexFile(id, source, renderMeshId, bounds, collisionId, materials) { Skinned = skinned };
 		}
@@ -78,16 +64,16 @@ namespace Faolan.Core.Rdb.Assets
 		private static MeshMaterial ParseMaterial(XElement el)
 		{
 			var name = el.Attribute("Name")?.Value ?? "";
-			var textures = el.Elements("Texture")
-				.Select(t => TextureRef.Parse(t.Attribute("Path")?.Value ?? ""))
-				.ToList();
+			var textures = el.Elements("Texture").Select(t => TextureRef.Parse(t.Attribute("Path")?.Value ?? "")).ToList();
 			return new MeshMaterial(name, textures);
 		}
 
 		private static uint? ParseUintAttr(XElement? el, string attr)
 		{
 			var v = el?.Attribute(attr)?.Value;
-			return uint.TryParse(v, out var u) ? u : null;
+			return uint.TryParse(v, out var u)
+				? u
+				: null;
 		}
 	}
 
@@ -97,38 +83,46 @@ namespace Faolan.Core.Rdb.Assets
 	// value isn't the type:id form (then Raw carries it verbatim so nothing is silently dropped).
 	public readonly record struct TextureRef(uint? Type, uint Id, string Raw)
 	{
+		public override string ToString()
+		{
+			return Type == null
+				? Raw
+				: $"{Type}:{Id}";
+		}
+
 		public static TextureRef Parse(string path)
 		{
 			var colon = path.IndexOf(':');
-			if (colon > 0
-			    && uint.TryParse(path.AsSpan(0, colon), out var type)
-			    && uint.TryParse(path.AsSpan(colon + 1), out var id))
+			if (colon > 0 && uint.TryParse(path.AsSpan(0, colon), out var type) && uint.TryParse(path.AsSpan(colon + 1), out var id))
 				return new TextureRef(type, id, path);
 
 			return new TextureRef(null, 0, path);
 		}
-
-		public override string ToString() => Type == null ? Raw : $"{Type}:{Id}";
 	}
 
 	public readonly record struct BoundingBox(float MinX, float MinY, float MinZ, float MaxX, float MaxY, float MaxZ)
 	{
+		public override string ToString()
+		{
+			return $"({MinX:0.##},{MinY:0.##},{MinZ:0.##})..({MaxX:0.##},{MaxY:0.##},{MaxZ:0.##})";
+		}
+
 		public static BoundingBox? TryParse(XElement? el)
 		{
 			if (el == null)
 				return null;
 
-			float? F(string name) =>
-				float.TryParse(el.Attribute(name)?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var f) ? f : null;
+			float? F(string name)
+			{
+				return float.TryParse(el.Attribute(name)?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var f)
+					? f
+					: null;
+			}
 
-			if (F("min_x") is { } minX && F("min_y") is { } minY && F("min_z") is { } minZ
-			    && F("max_x") is { } maxX && F("max_y") is { } maxY && F("max_z") is { } maxZ)
+			if (F("min_x") is { } minX && F("min_y") is { } minY && F("min_z") is { } minZ && F("max_x") is { } maxX && F("max_y") is { } maxY && F("max_z") is { } maxZ)
 				return new BoundingBox(minX, minY, minZ, maxX, maxY, maxZ);
 
 			return null;
 		}
-
-		public override string ToString() =>
-			$"({MinX:0.##},{MinY:0.##},{MinZ:0.##})..({MaxX:0.##},{MaxY:0.##},{MaxZ:0.##})";
 	}
 }

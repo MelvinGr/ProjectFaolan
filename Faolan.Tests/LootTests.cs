@@ -15,9 +15,7 @@ namespace Faolan.Tests
 		{
 			// hoxxling-login-gameplay: fade bag 0x000021FE over 3.0s (0x40400000 big-endian float).
 			var body = WorldLoot.BuildFadeBody(WorldLoot.LootTypeTag, 0x000021FE, 3.0f);
-			Assert.Equal("66180b200000c87a000021fe0040400000", Convert
-				.ToHexString(body)
-				.ToLowerInvariant());
+			Assert.Equal("66180b200000c87a000021fe0040400000", Convert.ToHexString(body).ToLowerInvariant());
 		}
 
 		[Fact]
@@ -25,9 +23,7 @@ namespace Faolan.Tests
 		{
 			// hoxxling-login-gameplay: bag 0x000021FE -> looter player 0x01316E71.
 			var body = WorldLoot.BuildNewCurrentLooterBody(0x000021FE, 0x01316E71);
-			Assert.Equal("d06568c80000c87a000021fe000000c35001316e71", Convert
-				.ToHexString(body)
-				.ToLowerInvariant());
+			Assert.Equal("d06568c80000c87a000021fe000000c35001316e71", Convert.ToHexString(body).ToLowerInvariant());
 		}
 
 		[Fact]
@@ -35,9 +31,7 @@ namespace Faolan.Tests
 		{
 			// hoxxling-login-gameplay: SimpleDynelVisualChange "Open" on bag 0x000021FE opens the loot window.
 			var body = WorldLoot.BuildOpenWindowBody(WorldLoot.LootTypeTag, 0x000021FE);
-			Assert.Equal("e7f4f8f80000c87a000021fe000000000000044f70656e", Convert
-				.ToHexString(body)
-				.ToLowerInvariant());
+			Assert.Equal("e7f4f8f80000c87a000021fe000000000000044f70656e", Convert.ToHexString(body).ToLowerInvariant());
 		}
 
 		[Fact]

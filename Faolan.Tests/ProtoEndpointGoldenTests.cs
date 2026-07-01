@@ -33,9 +33,7 @@ namespace Faolan.Tests
 		// report-server-id receiver, editor instance 0x021662C8 (RetailCreateEditorPostReadyAck)
 		public void Endpoint_SerializesToHandRolledHeaderBytes(uint type, uint instance, string expectedHex)
 		{
-			var bytes = ConanEndpoints
-				.Endpoint(type, instance)
-				.ToProtobufBytes();
+			var bytes = ConanEndpoints.Endpoint(type, instance).ToProtobufBytes();
 			Assert.Equal(expectedHex, Convert.ToHexString(bytes));
 		}
 	}

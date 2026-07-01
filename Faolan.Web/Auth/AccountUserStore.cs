@@ -43,11 +43,13 @@ namespace Faolan.Web.Auth
 		{
 			await using var db = await _dbf.CreateDbContextAsync(ct);
 			if (await db.Accounts.AnyAsync(a => a.UserName.ToUpper() == user.UserName.ToUpper(), ct))
+			{
 				return IdentityResult.Failed(new IdentityError
 				{
 					Code = "DuplicateUserName",
 					Description = "Username already taken."
 				});
+			}
 
 			db.Accounts.Add(user);
 			await db.SaveChangesAsync(ct);
@@ -111,11 +113,13 @@ namespace Faolan.Web.Auth
 			await using var db = await _dbf.CreateDbContextAsync(ct);
 			var tracked = await db.Accounts.FirstOrDefaultAsync(a => a.Id == user.Id, ct);
 			if (tracked == null)
+			{
 				return IdentityResult.Failed(new IdentityError
 				{
 					Code = "NotFound",
 					Description = "Account not found."
 				});
+			}
 
 			// Only the fields this store owns (password migration is the live use; username for completeness).
 			tracked.Password = user.Password;

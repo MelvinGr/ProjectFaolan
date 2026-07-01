@@ -1,4 +1,3 @@
-using Faolan.Core.Spawn;
 using System;
 using System.Buffers.Binary;
 using System.Linq;
@@ -21,6 +20,50 @@ namespace Faolan.Tests
 	// docs/archive/player-spawn-generation-plan.md.
 	public class PlayerSpawnGenerationTests
 	{
+		// A DEAD character's player FA015807 self-spawn (the SimpleCharFullUpdateIIR that CONSTRUCTS the local
+		// SimpleChar whose dead-flag gates the release/resurrect window) carries CURRENT health = 0 while life/max
+		// stays full - matching the retail login-while-dead capture (Stihetfv #50: health(f7)=0, life(f6) full).
+		// An alive character keeps cur==max. This is the FA015807 analogue of the snapshot HealthCurrent=0
+		// (#214); the SimpleChar is built from THIS packet, not the 0x737A6DF9 snapshot.
+		[Theory, InlineData(false, 19600u), InlineData(true, 0u)]
+		// alive: current health == max (196 * 100)
+			// dead:  current health == 0,   max/life stays full
+		public void ApplyCharacter_DeadCharacter_ZeroesCurrentHealthKeepsLifeFull(bool isDead, uint expectedHealth)
+		{
+			var message = ((ReadOnlySpan<byte>)CharacterMessage(Golden.Bytes("SpawnStrieTemplate"))).FromProtobuf<ProtoCoreCharacterIIR>();
+			var character = new Character
+			{
+				Name = "Testie",
+				Race = Race.Cimmerian,
+				Sex = Sex.Male,
+				Level = 1,
+				IsDead = isDead,
+				MaxStats = new CharacterMaxStats
+				{
+					Health = 196,
+					Mana = 0,
+					Stamina = 197
+				}
+			};
+
+			PlayerSpawnMessage.ApplyCharacter(message, character, new CharacterEquipment());
+
+			Assert.Equal(expectedHealth, message.Stats.Health);
+			Assert.Equal(196u * 100, message.Stats.Life); // life (max) is full regardless of dead state
+			if (isDead)
+			{
+				Assert.Equal(29u, message.Stats.BccState); // bcc_state=29 = the Dead behavior-controller state (alive=1)
+				Assert.False(message.CanFall); // a dead corpse reports can_fall=0 (alive keeps the template value)
+				Assert.Equal(41877u, message.Bcc.AnimForcedId); // forced death pose animation
+				Assert.True(message.Bcc.AnimForcedBlend);
+			}
+			else
+			{
+				Assert.Equal(1u, message.Stats.BccState); // alive: template's bcc_state (1)
+				Assert.Equal(0u, message.Bcc.AnimForcedId); // alive: no forced animation (template carries none)
+			}
+		}
+
 		[Fact]
 		public void PlayerCharacterMessage_DecodesExpectedIdentity()
 		{
@@ -43,45 +86,6 @@ namespace Faolan.Tests
 			Assert.Equal(2285694u / 2, read.Message.Stats.HeadMesh);
 			Assert.Equal(10u / 2, read.Message.Stats.VoiceSet);
 			Assert.Equal(194u / 2, read.Message.Stats.MonsterScale);
-		}
-
-		// A DEAD character's player FA015807 self-spawn (the SimpleCharFullUpdateIIR that CONSTRUCTS the local
-		// SimpleChar whose dead-flag gates the release/resurrect window) carries CURRENT health = 0 while life/max
-		// stays full - matching the retail login-while-dead capture (Stihetfv #50: health(f7)=0, life(f6) full).
-		// An alive character keeps cur==max. This is the FA015807 analogue of the snapshot HealthCurrent=0
-		// (#214); the SimpleChar is built from THIS packet, not the 0x737A6DF9 snapshot.
-		[Theory]
-		[InlineData(false, 19600u)] // alive: current health == max (196 * 100)
-		[InlineData(true, 0u)]      // dead:  current health == 0,   max/life stays full
-		public void ApplyCharacter_DeadCharacter_ZeroesCurrentHealthKeepsLifeFull(bool isDead, uint expectedHealth)
-		{
-			var message = ((ReadOnlySpan<byte>)CharacterMessage(Golden.Bytes("SpawnStrieTemplate"))).FromProtobuf<ProtoCoreCharacterIIR>();
-			var character = new Character
-			{
-				Name = "Testie",
-				Race = Race.Cimmerian,
-				Sex = Sex.Male,
-				Level = 1,
-				IsDead = isDead,
-				MaxStats = new CharacterMaxStats { Health = 196, Mana = 0, Stamina = 197 },
-			};
-
-			PlayerSpawnMessage.ApplyCharacter(message, character, new CharacterEquipment());
-
-			Assert.Equal(expectedHealth, message.Stats.Health);
-			Assert.Equal(196u * 100, message.Stats.Life); // life (max) is full regardless of dead state
-			if (isDead)
-			{
-				Assert.Equal(29u, message.Stats.BccState); // bcc_state=29 = the Dead behavior-controller state (alive=1)
-				Assert.False(message.CanFall);             // a dead corpse reports can_fall=0 (alive keeps the template value)
-				Assert.Equal(41877u, message.Bcc.AnimForcedId); // forced death pose animation
-				Assert.True(message.Bcc.AnimForcedBlend);
-			}
-			else
-			{
-				Assert.Equal(1u, message.Stats.BccState);  // alive: template's bcc_state (1)
-				Assert.Equal(0u, message.Bcc.AnimForcedId); // alive: no forced animation (template carries none)
-			}
 		}
 
 		[Fact]
@@ -183,14 +187,15 @@ namespace Faolan.Tests
 
 			var entries = PlayerSpawnEquipment.BuildInventoryEntries(equipment);
 
-			Assert.Equal(
-				new[]
+			Assert.Equal(new[]
 				{
-					((uint)CharacterEquipmentSlot.Tokens, 5u), ((uint)CharacterEquipmentSlot.MainWeapon, 1u), ((uint)CharacterEquipmentSlot.OffHandWeapon, 2u), ((uint)CharacterEquipmentSlot.RangedWeapon, 3u),
+					((uint)CharacterEquipmentSlot.Tokens, 5u),
+					((uint)CharacterEquipmentSlot.MainWeapon, 1u),
+					((uint)CharacterEquipmentSlot.OffHandWeapon, 2u),
+					((uint)CharacterEquipmentSlot.RangedWeapon, 3u),
 					((uint)CharacterEquipmentSlot.Ammo, 4u)
-				}, entries
-					.Select(e => (e.Pos, e.Item.Template1))
-					.ToArray());
+				},
+				entries.Select(e => (e.Pos, e.Item.Template1)).ToArray());
 		}
 
 		// The dynamic reader locates the CharacterIIR in any spawn; on the Strie template it must agree with the fixed
@@ -243,9 +248,7 @@ namespace Faolan.Tests
 		{
 			var length = (int)BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(SpawnPacketBuilder.NameInnerLengthOffset, 4));
 			Assert.Equal(0x0A, template[SpawnPacketBuilder.NameTagOffset]); // field 1 (name)
-			return template
-				.AsSpan(SpawnPacketBuilder.NameTagOffset, length)
-				.ToArray();
+			return template.AsSpan(SpawnPacketBuilder.NameTagOffset, length).ToArray();
 		}
 	}
 }

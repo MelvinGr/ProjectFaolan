@@ -13,7 +13,10 @@ namespace Faolan.UniverseAgent
 {
 	public partial class UniverseAgentListener : Server<ConanPacket, ConanPacketFactory, ConanMessageFramer>
 	{
-		public UniverseAgentListener(ILogger<UniverseAgentListener> logger, IConfiguration configuration, IDatabaseRepository database) : base(configuration.UniverseAgentPort, logger, configuration, database,
+		public UniverseAgentListener(ILogger<UniverseAgentListener> logger, IConfiguration configuration, IDatabaseRepository database) : base(configuration.UniverseAgentPort,
+			logger,
+			configuration,
+			database,
 			new ConanOutgoingPacketLogger(logger, "UniverseAgent", typeof(UniverseAgentResponseOpcodes)))
 		{
 		}
@@ -68,13 +71,10 @@ namespace Faolan.UniverseAgent
 						// Patched client: enforce the password, unless none is configured (the "-" sentinel) - same as
 						// before. PasswordHashing.Matches verifies a stored PBKDF2 hash OR a legacy plaintext value.
 						if (string.IsNullOrEmpty(account.Password) || account.Password == "-")
-						{
 							authenticated = true;
-						}
 						else
 						{
-							authenticated = credentials.Username == account.UserName
-							                && PasswordHashing.Matches(account.Password, credentials.Password);
+							authenticated = credentials.Username == account.UserName && PasswordHashing.Matches(account.Password, credentials.Password);
 
 							// Upgrade a legacy plaintext password to a hash on first successful login.
 							if (authenticated && PasswordHashing.NeedsRehash(account.Password))
@@ -108,7 +108,7 @@ namespace Faolan.UniverseAgent
 					}
 
 					Logger.LogInformation("UniverseAgent login accepted for user {UserName} ({AccountId})", account.UserName, account.Id.ToHex());
-					await Database.UpdateLastInfo(account, client);
+					await Database.UpdateLastInfo(account, client.IpAddress);
 
 					await SetRegionState(client);
 					await SendPlayerAgentRealm(client);

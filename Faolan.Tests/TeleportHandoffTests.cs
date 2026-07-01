@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.Numerics;
 using Faolan.GameServer.World;
 using Xunit;
@@ -15,9 +16,24 @@ namespace Faolan.Tests
 		public void BuildTeleportBeginBody_MatchesCapture()
 		{
 			var body = TeleportCodec.BuildBegin(0x08006F31, 2010);
-			Assert.Equal(
-				"10d27bc00000c35008006f3101620000c79c000007da0000000000000000000000000000000000000000000000000000",
-				Convert.ToHexStringLower(body));
+			Assert.Equal("10d27bc00000c35008006f3101620000c79c000007da0000000000000000000000000000000000000000000000000000", Convert.ToHexStringLower(body));
+		}
+
+		[Fact]
+		public void BuildTeleportBeginBody_MatchesSecondCapture()
+		{
+			// Frame 4417: same session, destination map 2000 (0x07D0).
+			var body = TeleportCodec.BuildBegin(0x08006F31, 2000);
+			Assert.Equal("10d27bc00000c35008006f3101620000c79c000007d00000000000000000000000000000000000000000000000000000", Convert.ToHexStringLower(body));
+		}
+
+		[Fact]
+		public void BuildTeleportBeginBody_SubstitutesInstanceAndMap()
+		{
+			var body = TeleportCodec.BuildBegin(0x0200ABCD, 0x0FAA);
+			// clientInstance @8, destMap @18 (both big-endian u32)
+			Assert.Equal(0x0200ABCDu, BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(8, 4)));
+			Assert.Equal(0x0FAAu, BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(18, 4)));
 		}
 
 		[Fact]
@@ -30,44 +46,24 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void BuildTeleportBeginBody_MatchesSecondCapture()
-		{
-			// Frame 4417: same session, destination map 2000 (0x07D0).
-			var body = TeleportCodec.BuildBegin(0x08006F31, 2000);
-			Assert.Equal(
-				"10d27bc00000c35008006f3101620000c79c000007d00000000000000000000000000000000000000000000000000000",
-				Convert.ToHexStringLower(body));
-		}
-
-		[Fact]
 		public void BuildTeleportDestBody_MatchesSecondCapture()
 		{
 			// Frame 4420: map 2000, pos 927/115/858, with that destination's playfield token (0x00503610) and
 			// descriptor (0xBE) - the two destination-derived fields that differ from the map-2010 capture.
-			var body = TeleportCodec.BuildDestination(0x08006F31, 2000, new Vector3(927f, 115f, 858f),
-				0x00503610u, 0x000000BEu);
+			var body = TeleportCodec.BuildDestination(0x08006F31, 2000, new Vector3(927f, 115f, 858f), 0x00503610u, 0x000000BEu);
 			Assert.Equal(
 				"5a32f0d70000c35008006f31000000000000000000000000000000000000000000000000003f800000620000c79c000007d00000000000000000000000000000000100009c500050361000000000000000000000000014000187044467c00042e6000044568000000000be00",
 				Convert.ToHexStringLower(body));
 		}
 
 		[Fact]
-		public void BuildTeleportBeginBody_SubstitutesInstanceAndMap()
-		{
-			var body = TeleportCodec.BuildBegin(0x0200ABCD, 0x0FAA);
-			// clientInstance @8, destMap @18 (both big-endian u32)
-			Assert.Equal(0x0200ABCDu, System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(8, 4)));
-			Assert.Equal(0x0FAAu, System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(18, 4)));
-		}
-
-		[Fact]
 		public void BuildTeleportDestBody_SubstitutesMapAndPosition()
 		{
 			var body = TeleportCodec.BuildDestination(0x0200ABCD, 0x0FAA, new Vector3(322.5f, 145.31f, 704.9f));
-			Assert.Equal(0x0FAAu, System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(46, 4)));
-			Assert.Equal(322.5f, System.Buffers.Binary.BinaryPrimitives.ReadSingleBigEndian(body.AsSpan(91, 4)));
-			Assert.Equal(145.31f, System.Buffers.Binary.BinaryPrimitives.ReadSingleBigEndian(body.AsSpan(95, 4)));
-			Assert.Equal(704.9f, System.Buffers.Binary.BinaryPrimitives.ReadSingleBigEndian(body.AsSpan(99, 4)));
+			Assert.Equal(0x0FAAu, BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(46, 4)));
+			Assert.Equal(322.5f, BinaryPrimitives.ReadSingleBigEndian(body.AsSpan(91, 4)));
+			Assert.Equal(145.31f, BinaryPrimitives.ReadSingleBigEndian(body.AsSpan(95, 4)));
+			Assert.Equal(704.9f, BinaryPrimitives.ReadSingleBigEndian(body.AsSpan(99, 4)));
 		}
 	}
 }

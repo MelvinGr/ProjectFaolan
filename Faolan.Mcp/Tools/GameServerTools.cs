@@ -24,45 +24,39 @@ namespace Faolan.Mcp.Tools
 			_dispatcher = dispatcher;
 		}
 
-		[McpServerTool(Name = "list_world_sessions"), Description("List clients connected to the live GameServer (world) listeners, with account/character identity and source ip. Read-only.")]
-		public string ListWorldSessions()
-		{
-			var sessions = _dispatcher.GetSessions();
-			return sessions.Count == 0
-				? "No clients are currently connected to the GameServer."
-				: JsonSerializer.Serialize(sessions, JsonOptions);
-		}
-
-		[McpServerTool(Name = "kick_player"),
-		 Description("Force-disconnect a connected character from the live world (closes their world socket). Used by the web admin ban+kick. Returns whether a live session was closed.")]
-		public string KickPlayer([Description("Character id of a currently-connected player (see list_world_sessions)")] uint characterId)
-		{
-			return _dispatcher.DisconnectCharacter(characterId)
-				? $"Disconnected character {characterId} from the world."
-				: $"Character {characterId} is not currently connected to any GameServer listener.";
-		}
-
-		[McpServerTool(Name = "run_gm_command"),
+		[McpServerTool(Name = "add_item"),
 		 Description(
-			 "Run a GM command for a connected character on the LIVE server, exactly as if the player typed it in chat (e.g. \"teleport 5\", \"test\" to spawn the test NPC, \"help\" to list commands).")]
-		public async Task<string> RunGmCommand([Description("Character id of a currently-connected player (see list_world_sessions)")] uint characterId,
-			[Description("GM command text, with or without the leading '.' (e.g. \"teleport 5\")")] string command)
+			 "Add an item by faolan.db item id to a connected character's bag - persisted AND delivered LIVE via the DispatchAddItem (0x2020) packet, so it appears in the bag without a relog. The item must be snapshot-buildable (Archetype != 0). Wrapper over the .additem GM command; find ids with search_items.")]
+		public async Task<string> AddItem([Description("Character id of a currently-connected player")] uint characterId, [Description("Item id (see search_items / get_item)")] uint itemId,
+			[Description("Stack count (default 1)")] uint count = 1)
 		{
-			var ok = await _dispatcher.RunGmCommand(characterId, command);
+			var ok = await _dispatcher.RunGmCommand(characterId, $".additem {itemId} {count}");
 			return ok
-				? $"Ran GM command '{command}' for character {characterId}."
+				? $"Ran add of {count}x item {itemId} for character {characterId} (the in-game system-message reply states the bag slot, or why it failed)."
 				: $"Character {characterId} is not currently connected to any GameServer listener.";
 		}
 
-		[McpServerTool(Name = "list_zone_entities"),
-		 Description(
-			 "Dump the live world model for a map: every entity in the zone (players, NPCs, loot bags) with handle, level, vitals, hostility and position. The feedback loop for spawn/combat/loot work. Read-only; empty until a player has entered the map this run.")]
-		public string ListZoneEntities([Description("Map id (see list_maps)")] uint mapId)
+		[McpServerTool(Name = "add_tag"), Description("Set a character tag (the Lua/dialogue state flags) on a connected character (wrapper over the .tag GM command). Current tags: see get_character.")]
+		public async Task<string> AddTag([Description("Character id of a currently-connected player")] uint characterId, [Description("Numeric tag id")] uint tagId)
 		{
-			var entities = _dispatcher.GetZoneEntities(mapId);
-			return entities.Count == 0
-				? $"No live entities on map {mapId} (zone not loaded this run, or empty)."
-				: JsonSerializer.Serialize(entities, JsonOptions);
+			var ok = await _dispatcher.RunGmCommand(characterId, $".tag add {tagId}");
+			return ok
+				? $"Set tag {tagId} on character {characterId}."
+				: $"Character {characterId} is not currently connected to any GameServer listener.";
+		}
+
+		[McpServerTool(Name = "adjust_money"),
+		 Description("Set or add to a connected character's wallet, in tin, the game's smallest coin (wrapper over the .money GM command; 100 tin = 1 copper, 1000000 tin = 1 gold). The client HUD updates live.")]
+		public async Task<string> AdjustMoney([Description("Character id of a currently-connected player")] uint characterId, [Description("Amount in tin")] ulong tin,
+			[Description("true = add to the balance, false = set the balance")] bool add = true)
+		{
+			var ok = await _dispatcher.RunGmCommand(characterId,
+				add
+					? $".money +{tin}"
+					: $".money {tin}");
+			return ok
+				? $"{(add ? "Added" : "Set")} {tin} tin {(add ? "to" : "as")} character {characterId}'s wallet."
+				: $"Character {characterId} is not currently connected to any GameServer listener.";
 		}
 
 		[McpServerTool(Name = "despawn_entity"),
@@ -74,6 +68,14 @@ namespace Faolan.Mcp.Tools
 			var ok = await _dispatcher.RunGmCommand(characterId, $".despawnnpc {entityHandle}");
 			return ok
 				? $"Ran despawn of {entityHandle} in character {characterId}'s zone (the in-game system-message reply states whether the handle was found)."
+				: $"Character {characterId} is not currently connected to any GameServer listener.";
+		}
+
+		[McpServerTool(Name = "kick_player"), Description("Force-disconnect a connected character from the live world (closes their world socket). Used by the web admin ban+kick. Returns whether a live session was closed.")]
+		public string KickPlayer([Description("Character id of a currently-connected player (see list_world_sessions)")] uint characterId)
+		{
+			return _dispatcher.DisconnectCharacter(characterId)
+				? $"Disconnected character {characterId} from the world."
 				: $"Character {characterId} is not currently connected to any GameServer listener.";
 		}
 
@@ -89,40 +91,24 @@ namespace Faolan.Mcp.Tools
 				: $"Character {characterId} is not currently connected to any GameServer listener.";
 		}
 
-		[McpServerTool(Name = "add_item"),
-		 Description(
-			 "Add an item by faolan.db item id to a connected character's bag - persisted AND delivered LIVE via the DispatchAddItem (0x2020) packet, so it appears in the bag without a relog. The item must be snapshot-buildable (Archetype != 0). Wrapper over the .additem GM command; find ids with search_items.")]
-		public async Task<string> AddItem([Description("Character id of a currently-connected player")] uint characterId, [Description("Item id (see search_items / get_item)")] uint itemId,
-			[Description("Stack count (default 1)")] uint count = 1)
+		[McpServerTool(Name = "list_world_sessions"), Description("List clients connected to the live GameServer (world) listeners, with account/character identity and source ip. Read-only.")]
+		public string ListWorldSessions()
 		{
-			var ok = await _dispatcher.RunGmCommand(characterId, $".additem {itemId} {count}");
-			return ok
-				? $"Ran add of {count}x item {itemId} for character {characterId} (the in-game system-message reply states the bag slot, or why it failed)."
-				: $"Character {characterId} is not currently connected to any GameServer listener.";
+			var sessions = _dispatcher.GetSessions();
+			return sessions.Count == 0
+				? "No clients are currently connected to the GameServer."
+				: JsonSerializer.Serialize(sessions, JsonOptions);
 		}
 
-		[McpServerTool(Name = "spawn_bag"),
+		[McpServerTool(Name = "list_zone_entities"),
 		 Description(
-			 "Drop a loot bag at a connected character's feet with a couple of random items + coins (the same bag an NPC kill can drop). Open it in-client and \"loot all\" to grant the items live (DispatchAddItem) and the coins. Wrapper over the .spawnbag GM command.")]
-		public async Task<string> SpawnBag([Description("Character id of a currently-connected player (see list_world_sessions)")] uint characterId)
+			 "Dump the live world model for a map: every entity in the zone (players, NPCs, loot bags) with handle, level, vitals, hostility and position. The feedback loop for spawn/combat/loot work. Read-only; empty until a player has entered the map this run.")]
+		public string ListZoneEntities([Description("Map id (see list_maps)")] uint mapId)
 		{
-			var ok = await _dispatcher.RunGmCommand(characterId, ".spawnbag");
-			return ok
-				? $"Ran .spawnbag for character {characterId} (the in-game system-message reply lists the bag handle + items, or why it failed)."
-				: $"Character {characterId} is not currently connected to any GameServer listener.";
-		}
-
-		[McpServerTool(Name = "adjust_money"),
-		 Description("Set or add to a connected character's wallet, in tin, the game's smallest coin (wrapper over the .money GM command; 100 tin = 1 copper, 1000000 tin = 1 gold). The client HUD updates live.")]
-		public async Task<string> AdjustMoney([Description("Character id of a currently-connected player")] uint characterId, [Description("Amount in tin")] ulong tin,
-			[Description("true = add to the balance, false = set the balance")] bool add = true)
-		{
-			var ok = await _dispatcher.RunGmCommand(characterId, add
-				? $".money +{tin}"
-				: $".money {tin}");
-			return ok
-				? $"{(add ? "Added" : "Set")} {tin} tin {(add ? "to" : "as")} character {characterId}'s wallet."
-				: $"Character {characterId} is not currently connected to any GameServer listener.";
+			var entities = _dispatcher.GetZoneEntities(mapId);
+			return entities.Count == 0
+				? $"No live entities on map {mapId} (zone not loaded this run, or empty)."
+				: JsonSerializer.Serialize(entities, JsonOptions);
 		}
 
 		[McpServerTool(Name = "manage_quest"),
@@ -140,13 +126,25 @@ namespace Faolan.Mcp.Tools
 				: $"Character {characterId} is not currently connected to any GameServer listener.";
 		}
 
-		[McpServerTool(Name = "add_tag"),
-		 Description("Set a character tag (the Lua/dialogue state flags) on a connected character (wrapper over the .tag GM command). Current tags: see get_character.")]
-		public async Task<string> AddTag([Description("Character id of a currently-connected player")] uint characterId, [Description("Numeric tag id")] uint tagId)
+		[McpServerTool(Name = "run_gm_command"),
+		 Description("Run a GM command for a connected character on the LIVE server, exactly as if the player typed it in chat (e.g. \"teleport 5\", \"test\" to spawn the test NPC, \"help\" to list commands).")]
+		public async Task<string> RunGmCommand([Description("Character id of a currently-connected player (see list_world_sessions)")] uint characterId,
+			[Description("GM command text, with or without the leading '.' (e.g. \"teleport 5\")")] string command)
 		{
-			var ok = await _dispatcher.RunGmCommand(characterId, $".tag add {tagId}");
+			var ok = await _dispatcher.RunGmCommand(characterId, command);
 			return ok
-				? $"Set tag {tagId} on character {characterId}."
+				? $"Ran GM command '{command}' for character {characterId}."
+				: $"Character {characterId} is not currently connected to any GameServer listener.";
+		}
+
+		[McpServerTool(Name = "spawn_bag"),
+		 Description(
+			 "Drop a loot bag at a connected character's feet with a couple of random items + coins (the same bag an NPC kill can drop). Open it in-client and \"loot all\" to grant the items live (DispatchAddItem) and the coins. Wrapper over the .spawnbag GM command.")]
+		public async Task<string> SpawnBag([Description("Character id of a currently-connected player (see list_world_sessions)")] uint characterId)
+		{
+			var ok = await _dispatcher.RunGmCommand(characterId, ".spawnbag");
+			return ok
+				? $"Ran .spawnbag for character {characterId} (the in-game system-message reply lists the bag handle + items, or why it failed)."
 				: $"Character {characterId} is not currently connected to any GameServer listener.";
 		}
 
@@ -163,7 +161,8 @@ namespace Faolan.Mcp.Tools
 		}
 
 		[McpServerTool(Name = "teleport_character"),
-		 Description("Teleport a connected character (convenience wrapper over the .teleport GM command). Either give a destination map id, OR give x/y/z to move to a position on the character's CURRENT map (no map change). Map id takes priority if both are supplied.")]
+		 Description(
+			 "Teleport a connected character (convenience wrapper over the .teleport GM command). Either give a destination map id, OR give x/y/z to move to a position on the character's CURRENT map (no map change). Map id takes priority if both are supplied.")]
 		public async Task<string> TeleportCharacter([Description("Character id of a currently-connected player")] uint characterId,
 			[Description("Destination map id (see list_maps); omit to teleport by position instead")] uint? mapId = null,
 			[Description("X coordinate on the current map (requires y and z; ignored if mapId is given)")] float? x = null,

@@ -14,8 +14,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildKalanthesIntroMove_ReproducesTheCapturedTransform()
 		{
-			var expected = Convert.FromHexString(
-				"96c467400000c35000002c1c000043a6999a43124bf2443081aa0243a6999a43124bf2443081aa00000000bf3e417f000000003f2b49150000");
+			var expected = Convert.FromHexString("96c467400000c35000002c1c000043a6999a43124bf2443081aa0243a6999a43124bf2443081aa00000000bf3e417f000000003f2b49150000");
 			Assert.Equal(expected, GameServerListener.BuildKalanthesIntroMove(CapturedHandle));
 		}
 

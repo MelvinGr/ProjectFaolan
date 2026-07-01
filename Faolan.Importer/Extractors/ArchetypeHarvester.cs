@@ -1,7 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
@@ -100,92 +100,12 @@ namespace Faolan.Importer.Extractors
 			}
 		}
 
-		// `types` (optional) receives the item's classification from the container it was found in - only the
-		// specific kinds (Quest/Resource) are recorded; Normal items are left to the DB default. Kept separate from
-		// CapturedItem so the identity quad's equality (the conflict check) is unaffected.
-		private static Dictionary<uint, CapturedItem> ExtractFromRoot(ProtoMessage root, IDictionary<uint, ItemType> types = null)
-		{
-			var map = new Dictionary<uint, CapturedItem>();
-
-			foreach (InventorySnapshotInspector.ContainerKind kind in Enum.GetValues(typeof(InventorySnapshotInspector.ContainerKind)))
-			{
-				var container = InventorySnapshotInspector.GetContainer(root, kind);
-				var itemType = ClassifyContainer(kind);
-
-				foreach (var entry in InventorySnapshotInspector.GetContainerEntries(container))
-				{
-					var template = InventorySnapshotInspector.GetEntryTemplateId(entry);
-					var archetype = InventorySnapshotInspector.GetEntryArchetype(entry);
-					var quad = InventorySnapshotInspector.GetEntryIdentityQuad(entry);
-
-					if (template.HasValue && archetype.HasValue && quad.HasValue)
-					{
-						map[template.Value] = new CapturedItem(quad.Value.Data1, quad.Value.Data2, quad.Value.Data3, quad.Value.Data4, archetype.Value);
-						if (types != null && itemType != ItemType.Normal)
-							types[template.Value] = itemType;
-					}
-				}
-			}
-
-			return map;
-		}
-
 		// The container an item was captured in IS its kind: ItemType's values are the same protocol container-kind
 		// numbers as ContainerKind (Equipped 101 / Bag=Normal 104 / Resource 112 / Quest 113), so this is a direct
 		// cast.
 		private static ItemType ClassifyContainer(InventorySnapshotInspector.ContainerKind kind)
 		{
 			return (ItemType)(uint)kind;
-		}
-
-		// Recovers (template -> CapturedItem) from a character SPAWN's worn equipment. The spawn body holds a
-		// ProtoCoreCharacterIIR whose InventoryEntries are the worn items, each a ProtoAcgItem carrying the same
-		// identity the inventory snapshot does (Key1.Key1..4 = the Data quad, Template1 = the template id, Hash =
-		// the archetype). PlayerSpawnReader scans the body for the character message, so this works on any packet
-		// that contains a spawn (FA015807) - we just try it on every packet's Conan body.
-		private static void ExtractFromShopData(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
-		{
-			if (packetBytes.Length < 12 + 32)
-				return;
-
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(packetBytes.AsSpan(8, 4));
-			var bodyStart = 12 + headerLen;
-			if (bodyStart >= packetBytes.Length)
-				return;
-
-			var body = packetBytes[bodyStart..];
-			if (!ShopContentCodec.LooksLikeShopData(body))
-				return;
-
-			foreach (var e in ShopContentCodec.Parse(body).Entries)
-				into.TryAdd(e.Template, new CapturedItem(e.Data1, e.Data2, e.Data3, e.Data4, e.Archetype));
-		}
-
-		// Recovers (template -> CapturedItem) from a loot bag IIR carrier (0x2000 packet whose payload sub-opcode is
-		// 0xF096251E). The trailing ProtoLootBagIIR's inventory entries each carry a ProtoAcgItem (Key1 = the quad,
-		// Template1 = the id, Hash = the archetype) - identical to the snapshot/spawn sources. Archetype 0 is kept here
-		// (quest keys legitimately have none), so the item still lands in the DB even though it won't render in a snapshot.
-		private static void ExtractFromLootBag(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
-		{
-			var packet = new ConanPacket(packetBytes);
-			if (packet.Opcode != 0x2000)
-				return;
-
-			var payload = packet.Body.ReadArrayUInt32Length();
-			var s = new FaolanStream(payload);
-			if (s.ReadUInt32() != LootBagMessageCodec.SubOpcode)
-				return;
-
-			if (!LootBagMessageCodec.TryParse(payload.AsSpan(4), out var contents, out _) || contents?.Inventory?.Items == null)
-				return;
-
-			foreach (var listEntry in contents.Inventory.Items)
-			{
-				var acg = listEntry.Item?.ItemData;
-				if (acg?.Key1 == null || acg.Template1 == 0)
-					continue;
-				into.TryAdd(acg.Template1, new CapturedItem(acg.Key1.Key1, acg.Key1.Key2, acg.Key1.Key3, acg.Key1.Key4, acg.Hash));
-			}
 		}
 
 		// Recovers (template -> CapturedItem) AND the item's TYPE from a live DispatchAddItem (GameCharInterface s2c
@@ -218,6 +138,87 @@ namespace Faolan.Importer.Extractors
 			var type = (ItemType)containerType;
 			if (types != null && Enum.IsDefined(typeof(ItemType), type) && type != ItemType.Normal)
 				types[acg.Template1] = type;
+		}
+
+		// Recovers (template -> CapturedItem) from a loot bag IIR carrier (0x2000 packet whose payload sub-opcode is
+		// 0xF096251E). The trailing ProtoLootBagIIR's inventory entries each carry a ProtoAcgItem (Key1 = the quad,
+		// Template1 = the id, Hash = the archetype) - identical to the snapshot/spawn sources. Archetype 0 is kept here
+		// (quest keys legitimately have none), so the item still lands in the DB even though it won't render in a snapshot.
+		private static void ExtractFromLootBag(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
+		{
+			var packet = new ConanPacket(packetBytes);
+			if (packet.Opcode != 0x2000)
+				return;
+
+			var payload = packet.Body.ReadArrayUInt32Length();
+			var s = new FaolanStream(payload);
+			if (s.ReadUInt32() != LootBagMessageCodec.SubOpcode)
+				return;
+
+			if (!LootBagMessageCodec.TryParse(payload.AsSpan(4), out var contents, out _) || contents?.Inventory?.Items == null)
+				return;
+
+			foreach (var listEntry in contents.Inventory.Items)
+			{
+				var acg = listEntry.Item?.ItemData;
+				if (acg?.Key1 == null || acg.Template1 == 0)
+					continue;
+
+				into.TryAdd(acg.Template1, new CapturedItem(acg.Key1.Key1, acg.Key1.Key2, acg.Key1.Key3, acg.Key1.Key4, acg.Hash));
+			}
+		}
+
+		// `types` (optional) receives the item's classification from the container it was found in - only the
+		// specific kinds (Quest/Resource) are recorded; Normal items are left to the DB default. Kept separate from
+		// CapturedItem so the identity quad's equality (the conflict check) is unaffected.
+		private static Dictionary<uint, CapturedItem> ExtractFromRoot(ProtoMessage root, IDictionary<uint, ItemType> types = null)
+		{
+			var map = new Dictionary<uint, CapturedItem>();
+
+			foreach (InventorySnapshotInspector.ContainerKind kind in Enum.GetValues(typeof(InventorySnapshotInspector.ContainerKind)))
+			{
+				var container = InventorySnapshotInspector.GetContainer(root, kind);
+				var itemType = ClassifyContainer(kind);
+
+				foreach (var entry in InventorySnapshotInspector.GetContainerEntries(container))
+				{
+					var template = InventorySnapshotInspector.GetEntryTemplateId(entry);
+					var archetype = InventorySnapshotInspector.GetEntryArchetype(entry);
+					var quad = InventorySnapshotInspector.GetEntryIdentityQuad(entry);
+
+					if (template.HasValue && archetype.HasValue && quad.HasValue)
+					{
+						map[template.Value] = new CapturedItem(quad.Value.Data1, quad.Value.Data2, quad.Value.Data3, quad.Value.Data4, archetype.Value);
+						if (types != null && itemType != ItemType.Normal)
+							types[template.Value] = itemType;
+					}
+				}
+			}
+
+			return map;
+		}
+
+		// Recovers (template -> CapturedItem) from a character SPAWN's worn equipment. The spawn body holds a
+		// ProtoCoreCharacterIIR whose InventoryEntries are the worn items, each a ProtoAcgItem carrying the same
+		// identity the inventory snapshot does (Key1.Key1..4 = the Data quad, Template1 = the template id, Hash =
+		// the archetype). PlayerSpawnReader scans the body for the character message, so this works on any packet
+		// that contains a spawn (FA015807) - we just try it on every packet's Conan body.
+		private static void ExtractFromShopData(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
+		{
+			if (packetBytes.Length < 12 + 32)
+				return;
+
+			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(packetBytes.AsSpan(8, 4));
+			var bodyStart = 12 + headerLen;
+			if (bodyStart >= packetBytes.Length)
+				return;
+
+			var body = packetBytes[bodyStart..];
+			if (!ShopContentCodec.LooksLikeShopData(body))
+				return;
+
+			foreach (var e in ShopContentCodec.Parse(body).Entries)
+				into.TryAdd(e.Template, new CapturedItem(e.Data1, e.Data2, e.Data3, e.Data4, e.Archetype));
 		}
 
 		private static void ExtractFromSpawnEquipment(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
@@ -264,8 +265,7 @@ namespace Faolan.Importer.Extractors
 			body.ReadUInt32(); // c350
 			body.ReadUInt32(); // instance
 
-			root = InventorySnapshotInspector.ParseInventoryPacketBody(body)
-				.Root;
+			root = InventorySnapshotInspector.ParseInventoryPacketBody(body).Root;
 			return true;
 		}
 

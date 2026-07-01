@@ -154,7 +154,8 @@
     font-size: .82rem;
 }
 
-@@media (max-width: 900px) {
+@
+@media (max-width: 900px) {
     .dbe-grid {
         grid-template-columns: 1fr;
     }

@@ -1,11 +1,10 @@
-using Faolan.Core.Spawn;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
-using Faolan.GameServer.Spawn;
+using Faolan.Core.Network.Spawn;
 using Faolan.Importer.Rdb;
 using Xunit;
 
@@ -44,19 +43,18 @@ namespace Faolan.Tests
 		public void EnsureFreshRows_UsesTheResolvedWeightedEntries()
 		{
 			var weighted = PlayerSpawnScaffoldRows.BuildWeightedEntries(Resources(FaolanxRefs), RegistryDict());
-			var character = new Character { Id = 0x02000007, Class = Class.Necromancer }; // Faolanx is a mage-necromancer
+			var character = new Character
+			{
+				Id = 0x02000007,
+				Class = Class.Necromancer
+			}; // Faolanx is a mage-necromancer
 
 			Assert.True(PlayerSpawnScaffoldRows.EnsureFreshRows(character, weighted));
 
 			// 7 weighted + no morphs + the closer at idx 8.
 			Assert.Equal(8, character.Attributes.Count);
-			var rows = character
-				.Attributes
-				.OrderBy(a => a.Sequence)
-				.ToList();
-			Assert.Equal(FaolanxWire, rows
-				.Take(7)
-				.Select(a => a.Tag));
+			var rows = character.Attributes.OrderBy(a => a.Sequence).ToList();
+			Assert.Equal(FaolanxWire, rows.Take(7).Select(a => a.Tag));
 			Assert.Equal(8u, rows[7].StatId);
 			Assert.Equal(0x4301, rows[7].Tag); // Necromancer's per-class closer (#250); was the old hardcoded 0x56B6
 		}
@@ -109,7 +107,8 @@ namespace Faolan.Tests
 
 		private static Dictionary<string, MorphTarget> RegistryDict()
 		{
-			return Registry.ToDictionary(r => r.Ref, r => new MorphTarget
+			return Registry.ToDictionary(r => r.Ref,
+			r => new MorphTarget
 			{
 				Id = r.Tag,
 				Name = r.Ref,

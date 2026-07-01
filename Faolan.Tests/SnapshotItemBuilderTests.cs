@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Conan;
@@ -91,7 +91,6 @@ namespace Faolan.Tests
 				return;
 
 			// Swap in Slave Manacles (3361557) - a buildable item present in this capture.
-			const uint swapInItem = SlaveManaclesId;
 
 			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-swap-{Guid.NewGuid():N}.db");
 			try
@@ -101,7 +100,7 @@ namespace Faolan.Tests
 				{
 					await db.Database.EnsureCreatedAsync();
 					await CaptureItemImporter.ImportAsync(db, [await File.ReadAllBytesAsync(InventoryCapture)]);
-					item = await db.Items.FindAsync(swapInItem);
+					item = await db.Items.FindAsync(SlaveManaclesId);
 				}
 
 				Assert.NotNull(item);
@@ -116,9 +115,7 @@ namespace Faolan.Tests
 				var parts = InventorySnapshotInspector.ParseInventoryPacketBody(body);
 
 				var bag = InventorySnapshotInspector.GetContainer(parts.Root, InventorySnapshotInspector.ContainerKind.Bag);
-				var before = InventorySnapshotInspector
-					.GetContainerEntries(bag)
-					.ToList();
+				var before = InventorySnapshotInspector.GetContainerEntries(bag).ToList();
 				var original = before[0];
 				var slot = InventorySnapshotInspector.GetEntrySlot(original) ?? 0;
 				var itemId = InventorySnapshotInspector.GetEntryItemId(original) ?? 0;
@@ -131,14 +128,12 @@ namespace Faolan.Tests
 				// Re-serialize the whole root and re-parse, as the live path does.
 				var reparsed = ProtoMessage.Parse(parts.Root.ToArray());
 				var bag2 = InventorySnapshotInspector.GetContainer(reparsed, InventorySnapshotInspector.ContainerKind.Bag);
-				var after = InventorySnapshotInspector
-					.GetContainerEntries(bag2)
-					.ToList();
+				var after = InventorySnapshotInspector.GetContainerEntries(bag2).ToList();
 
 				Assert.Equal(before.Count, after.Count); // entry count unchanged (in-place replace)
 				var first = InventorySnapshotInspector.GetEntryBySlot(bag2, slot);
 				Assert.NotNull(first);
-				Assert.Equal(swapInItem, InventorySnapshotInspector.GetEntryTemplateId(first!));
+				Assert.Equal(SlaveManaclesId, InventorySnapshotInspector.GetEntryTemplateId(first!));
 				Assert.Equal(itemId, InventorySnapshotInspector.GetEntryItemId(first!));
 				Assert.Equal(recordId, InventorySnapshotInspector.GetEntryRecordId(first!));
 			}
@@ -151,8 +146,7 @@ namespace Faolan.Tests
 
 		private static DatabaseContext NewContext(string path)
 		{
-			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={path}", x => x.MigrationsAssembly("Faolan"))
-				.Options;
+			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={path}", x => x.MigrationsAssembly("Faolan")).Options;
 			return new DatabaseContext(options);
 		}
 	}

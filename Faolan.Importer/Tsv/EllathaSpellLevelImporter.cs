@@ -88,8 +88,11 @@ namespace Faolan.Importer.Tsv
 					continue;
 
 				int.TryParse(c[2], out var cd); // cooldown may be blank -> 0
-				byName[c[0]] = (level is > 0 and <= byte.MaxValue ? (byte)level : (byte)0,
-					cd is > 0 and <= ushort.MaxValue ? (ushort)cd : (ushort)0);
+				byName[c[0]] = (level is > 0 and <= byte.MaxValue
+					? (byte)level
+					: (byte)0, cd is > 0 and <= ushort.MaxValue
+					? (ushort)cd
+					: (ushort)0);
 			}
 
 			var names = byName.Keys.ToList();

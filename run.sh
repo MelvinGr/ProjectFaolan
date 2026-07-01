@@ -17,7 +17,7 @@ case "${1:-}" in
             --exe '/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/AgeOfConan.exe' \
             --console \
             --universeaddr 127.0.0.1:7010 \
-            --mirror 7081
+            --mirror 7081 &
         ;;
 
     --client2)
@@ -25,7 +25,7 @@ case "${1:-}" in
             --exe '/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan 2/AgeOfConan.exe' \
             --console \
             --universeaddr 127.0.0.1:7010 \
-            --mirror 7081
+            --mirror 7081 &
         ;;
 
     --claude)

@@ -11,6 +11,28 @@ namespace Faolan.Tests
 	public class NpcAiTests
 	{
 		[Fact]
+		public void ArrivesHome_EmitsNpcStopped()
+		{
+			var world = new WorldState();
+			var zone = world.ZoneFor(4010);
+			var npc = Npc(1, 0, 0);
+			npc.Position = new Vector3(WorldState.NpcLeashRange + 5f, 0, 0); // chased out past the leash
+			zone.Add(npc);
+			zone.Add(Player(2, WorldState.NpcLeashRange + 6f, 0));
+
+			world.Tick(0.5); // flips to returning
+			var stopped = false;
+			for (var i = 0; i < 400 && !stopped; i++)
+			{
+				foreach (var e in world.Tick(0.5))
+					stopped |= e.Type == WorldTickEffectType.NpcStopped && e.Entity == npc;
+			}
+
+			Assert.True(stopped, "an NPC arriving home should emit NpcStopped (#190)");
+			Assert.False(npc.Returning);
+		}
+
+		[Fact]
 		public void AttacksNearestPlayer()
 		{
 			var world = new WorldState();
@@ -24,8 +46,27 @@ namespace Faolan.Tests
 
 			// The engage tick also carries the combat-mode (weapon-draw, #218) effect, so select the attack itself.
 			var effects = world.Tick(WorldState.NpcAttackInterval);
-			Assert.Same(near, effects.Single(e => e.Type == WorldTickEffectType.NpcAttack)
-				.Target);
+			Assert.Same(near, effects.Single(e => e.Type == WorldTickEffectType.NpcAttack).Target);
+		}
+
+		[Fact]
+		public void Chase_ArrivesInMeleeRangeThenAttacks()
+		{
+			var world = new WorldState();
+			var zone = world.ZoneFor(4010);
+			var npc = Npc(1, 0, 0);
+			zone.Add(npc);
+			zone.Add(Player(2, 8, 0));
+
+			// Several seconds of chasing closes the gap; eventually a swing lands once inside melee range.
+			var sawAttack = false;
+			for (var i = 0; i < 40 && !sawAttack; i++)
+			{
+				foreach (var e in world.Tick(0.5))
+					sawAttack |= e.Type == WorldTickEffectType.NpcAttack;
+			}
+
+			Assert.True(sawAttack);
 		}
 
 		[Fact]
@@ -72,14 +113,19 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void NonHostileNpc_DoesNotAttack()
+		public void EnterCombat_EffectCarriesAggroTarget()
 		{
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
-			zone.Add(Npc(1, 0, 0, hostile: false)); // a quest-giver / vendor
-			zone.Add(Player(2, 3, 0)); // right next to it
+			var npc = Npc(1, 0, 0);
+			var player = Player(2, 3, 0);
+			zone.Add(npc);
+			zone.Add(player);
 
-			Assert.Empty(world.Tick(WorldState.NpcAttackInterval));
+			// The engage tick emits NpcEnterCombat carrying the aggroed target (so the broadcaster can push HateList/
+			// ThreatLevel, #216).
+			var enter = world.Tick(WorldState.NpcAttackInterval).Single(e => e.Type == WorldTickEffectType.NpcEnterCombat);
+			Assert.Same(player, enter.Target);
 		}
 
 		[Fact]
@@ -96,17 +142,34 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void PlayerOnDifferentFloor_DrawsNoAggro()
+		public void LeashedNpc_StopsChasingAndReturnsHome()
 		{
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
-			zone.Add(Npc(1, 0, 0));
-			// Right above the NPC (1u horizontal) but a storey up - through a floor (#284 vertical-delta gate).
-			var player = new WorldEntity(2, 4010, true, "P2", null)
-				{ Position = new Vector3(1, WorldState.NpcAggroVerticalRange + 2f, 0) };
-			zone.Add(player);
+			var npc = Npc(1, 0, 0); // spawns (and homes) at the origin
+			npc.Position = new Vector3(WorldState.NpcLeashRange + 5f, 0, 0); // already chased out past the leash
+			zone.Add(npc);
+			zone.Add(Player(2, WorldState.NpcLeashRange + 6f, 0)); // a player right next to it, well within aggro range
 
-			Assert.Empty(world.Tick(WorldState.NpcAttackInterval)); // no aggro across the vertical gap -> no effects
+			// First tick past the leash flips it to returning; it then ignores the adjacent player and heads home.
+			world.Tick(0.5);
+			Assert.True(npc.Returning, "NPC should leash after straying past NpcLeashRange");
+
+			for (var i = 0; i < 400 && npc.Returning; i++)
+				world.Tick(0.5);
+			Assert.False(npc.Returning);
+			Assert.True(npc.Position.X < WorldState.NpcMeleeRange + 0.001f, "NPC returned home, not parked by the player");
+		}
+
+		[Fact]
+		public void NonHostileNpc_DoesNotAttack()
+		{
+			var world = new WorldState();
+			var zone = world.ZoneFor(4010);
+			zone.Add(Npc(1, 0, 0, hostile: false)); // a quest-giver / vendor
+			zone.Add(Player(2, 3, 0)); // right next to it
+
+			Assert.Empty(world.Tick(WorldState.NpcAttackInterval));
 		}
 
 		[Fact]
@@ -118,6 +181,39 @@ namespace Faolan.Tests
 			zone.Add(Player(2, 1000, 1000)); // far away
 
 			Assert.Empty(world.Tick(WorldState.NpcAttackInterval * 2));
+		}
+
+		[Fact]
+		public void PlayerBeyondMeleeRange_ChasesTowardPlayer()
+		{
+			var world = new WorldState();
+			var zone = world.ZoneFor(4010);
+			var npc = Npc(1, 0, 0);
+			var player = Player(2, 10, 0); // aggro range (20) but beyond melee (3)
+			zone.Add(npc);
+			zone.Add(player);
+
+			// The engage tick also carries the combat-mode (weapon-draw, #218) effect alongside the chase step, and a
+			// chase MoveTask is only broadcast once the NPC has accumulated a retail-sized segment (#272 throttle:
+			// MoveBroadcastSegment), so a single 0.5s step (3.5u) is below threshold - tick until the first move fires.
+			WorldTickEffect? move = null;
+			for (var i = 0; i < 10 && move == null; i++)
+			{
+				foreach (var e in world.Tick(0.5))
+				{
+					if (e.Type == WorldTickEffectType.NpcMove)
+						move ??= e;
+				}
+			}
+
+			Assert.NotNull(move);
+			Assert.Same(npc, move.Value.Entity);
+			Assert.Same(player, move.Value.Target);
+
+			// It stepped toward the player (closer than it started, not past them) and the broadcast segment recorded its
+			// origin (the from of the MoveFrom -> Position segment the client interpolates, #272).
+			Assert.True(npc.Position.X > 0 && npc.Position.X < 10);
+			Assert.Equal(0f, npc.MoveFrom.X);
 		}
 
 		[Fact]
@@ -145,105 +241,23 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void PlayerBeyondMeleeRange_ChasesTowardPlayer()
+		public void PlayerOnDifferentFloor_DrawsNoAggro()
 		{
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
-			var npc = Npc(1, 0, 0);
-			var player = Player(2, 10, 0); // aggro range (20) but beyond melee (3)
-			zone.Add(npc);
+			zone.Add(Npc(1, 0, 0));
+			// Right above the NPC (1u horizontal) but a storey up - through a floor (#284 vertical-delta gate).
+			var player = new WorldEntity(2, 4010, true, "P2", null) { Position = new Vector3(1, WorldState.NpcAggroVerticalRange + 2f, 0) };
 			zone.Add(player);
 
-			// The engage tick also carries the combat-mode (weapon-draw, #218) effect alongside the chase step, and a
-			// chase MoveTask is only broadcast once the NPC has accumulated a retail-sized segment (#272 throttle:
-			// MoveBroadcastSegment), so a single 0.5s step (3.5u) is below threshold - tick until the first move fires.
-			WorldTickEffect? move = null;
-			for (var i = 0; i < 10 && move == null; i++)
-				foreach (var e in world.Tick(0.5))
-					if (e.Type == WorldTickEffectType.NpcMove)
-						move ??= e;
-			Assert.NotNull(move);
-			Assert.Same(npc, move.Value.Entity);
-			Assert.Same(player, move.Value.Target);
-
-			// It stepped toward the player (closer than it started, not past them) and the broadcast segment recorded its
-			// origin (the from of the MoveFrom -> Position segment the client interpolates, #272).
-			Assert.True(npc.Position.X > 0 && npc.Position.X < 10);
-			Assert.Equal(0f, npc.MoveFrom.X);
+			Assert.Empty(world.Tick(WorldState.NpcAttackInterval)); // no aggro across the vertical gap -> no effects
 		}
 
 		[Fact]
-		public void LeashedNpc_StopsChasingAndReturnsHome()
+		public void ResolveNpcAttackDamage_ScalesWithLevel()
 		{
-			var world = new WorldState();
-			var zone = world.ZoneFor(4010);
-			var npc = Npc(1, 0, 0); // spawns (and homes) at the origin
-			npc.Position = new Vector3(WorldState.NpcLeashRange + 5f, 0, 0); // already chased out past the leash
-			zone.Add(npc);
-			zone.Add(Player(2, WorldState.NpcLeashRange + 6f, 0)); // a player right next to it, well within aggro range
-
-			// First tick past the leash flips it to returning; it then ignores the adjacent player and heads home.
-			world.Tick(0.5);
-			Assert.True(npc.Returning, "NPC should leash after straying past NpcLeashRange");
-
-			for (var i = 0; i < 400 && npc.Returning; i++)
-				world.Tick(0.5);
-			Assert.False(npc.Returning);
-			Assert.True(npc.Position.X < WorldState.NpcMeleeRange + 0.001f, "NPC returned home, not parked by the player");
-		}
-
-		[Fact]
-		public void EnterCombat_EffectCarriesAggroTarget()
-		{
-			var world = new WorldState();
-			var zone = world.ZoneFor(4010);
-			var npc = Npc(1, 0, 0);
-			var player = Player(2, 3, 0);
-			zone.Add(npc);
-			zone.Add(player);
-
-			// The engage tick emits NpcEnterCombat carrying the aggroed target (so the broadcaster can push HateList/
-			// ThreatLevel, #216).
-			var enter = world.Tick(WorldState.NpcAttackInterval).Single(e => e.Type == WorldTickEffectType.NpcEnterCombat);
-			Assert.Same(player, enter.Target);
-		}
-
-		[Fact]
-		public void ArrivesHome_EmitsNpcStopped()
-		{
-			var world = new WorldState();
-			var zone = world.ZoneFor(4010);
-			var npc = Npc(1, 0, 0);
-			npc.Position = new Vector3(WorldState.NpcLeashRange + 5f, 0, 0); // chased out past the leash
-			zone.Add(npc);
-			zone.Add(Player(2, WorldState.NpcLeashRange + 6f, 0));
-
-			world.Tick(0.5); // flips to returning
-			var stopped = false;
-			for (var i = 0; i < 400 && !stopped; i++)
-				foreach (var e in world.Tick(0.5))
-					stopped |= e.Type == WorldTickEffectType.NpcStopped && e.Entity == npc;
-
-			Assert.True(stopped, "an NPC arriving home should emit NpcStopped (#190)");
-			Assert.False(npc.Returning);
-		}
-
-		[Fact]
-		public void Chase_ArrivesInMeleeRangeThenAttacks()
-		{
-			var world = new WorldState();
-			var zone = world.ZoneFor(4010);
-			var npc = Npc(1, 0, 0);
-			zone.Add(npc);
-			zone.Add(Player(2, 8, 0));
-
-			// Several seconds of chasing closes the gap; eventually a swing lands once inside melee range.
-			var sawAttack = false;
-			for (var i = 0; i < 40 && !sawAttack; i++)
-				foreach (var e in world.Tick(0.5))
-					sawAttack |= e.Type == WorldTickEffectType.NpcAttack;
-
-			Assert.True(sawAttack);
+			Assert.True(CombatResolver.ResolveNpcAttackDamage(10) > CombatResolver.ResolveNpcAttackDamage(1));
+			Assert.Equal(CombatResolver.ResolveNpcAttackDamage(1), CombatResolver.ResolveNpcAttackDamage(0));
 		}
 
 		[Fact]
@@ -262,20 +276,15 @@ namespace Faolan.Tests
 
 			var respawned = false;
 			for (var i = 0; i < 100 && !respawned; i++)
+			{
 				foreach (var e in world.Tick(0.5))
 					respawned |= e.Type == WorldTickEffectType.NpcRespawned && e.Entity == npc;
+			}
 
 			Assert.True(respawned, "a dead NPC should respawn once its delay elapses");
 			// It reappears at its ORIGINAL spawn point, not where it was killed (#246).
 			Assert.Equal(npc.SpawnPosition, npc.Position);
 			Assert.Equal(npc.SpawnPosition, npc.MoveFrom);
-		}
-
-		[Fact]
-		public void ResolveNpcAttackDamage_ScalesWithLevel()
-		{
-			Assert.True(CombatResolver.ResolveNpcAttackDamage(10) > CombatResolver.ResolveNpcAttackDamage(1));
-			Assert.Equal(CombatResolver.ResolveNpcAttackDamage(1), CombatResolver.ResolveNpcAttackDamage(0));
 		}
 
 		private static WorldEntity Npc(uint handle, float x, float z, uint level = 1, bool hostile = true)

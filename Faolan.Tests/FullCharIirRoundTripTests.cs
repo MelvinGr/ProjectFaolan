@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Protobuf;
@@ -28,6 +28,59 @@ namespace Faolan.Tests
 		public FullCharIirRoundTripTests(ITestOutputHelper output)
 		{
 			_output = output;
+		}
+
+		// The AUTHORING oracle (#57): FullCharSnapshotBuilder.BuildRoot, fed a captured root's own field values,
+		// must re-encode that root byte-identically - so the snapshot path can author the root from typed inputs
+		// (DB containers + account flags + tag/spell state) instead of carrying the captured protobuf root.
+		[Fact]
+		public void BuildRoot_FromCapturedFields_ReEncodesByteIdentically()
+		{
+			var ok = 0;
+
+			foreach (var (source, body) in SnapshotBodies())
+			{
+				byte[] rootBytes;
+				try
+				{
+					var stream = new FaolanStream(body);
+					stream.ReadUInt32(); // subop
+					stream.ReadUInt32(); // c350
+					stream.ReadUInt32(); // instance
+					rootBytes = InventorySnapshotInspector.ParseInventoryPacketBody(stream).Root.ToArray();
+				}
+				catch
+				{
+					continue; // truncated/non-splitting - covered by the round-trip test above
+				}
+
+				var decoded = ((ReadOnlySpan<byte>)rootBytes).FromProtobuf<ProtoFullCharacterIIR>();
+
+				// f2/f3 are absent on every captured snapshot; BuildRoot doesn't author them, so a capture that
+				// carried them would fail here (a guard against a silently-dropped field).
+				Assert.False(decoded.ShouldSerializeFreeFeatRespecs(), $"{source}: unexpected free_feat_respecs");
+				Assert.False(decoded.ShouldSerializeFeatResets(), $"{source}: unexpected feat_resets");
+
+				var rebuilt = FullCharSnapshotBuilder.BuildRoot(decoded.CharacterTags,
+					decoded.ShouldSerializeExpansionFlags()
+						? decoded.ExpansionFlags
+						: null,
+					decoded.ShouldSerializeSubscriptionFlags()
+						? decoded.SubscriptionFlags
+						: null,
+					decoded.ShouldSerializeHasNewClaimItems()
+						? decoded.HasNewClaimItems
+						: null,
+					decoded.ShouldSerializeHasSpellbook()
+						? decoded.HasSpellbook
+						: null,
+					decoded.Inventories);
+
+				Assert.True(rootBytes.SequenceEqual(rebuilt.ToProtobufBytes()), $"{source}: BuildRoot did not reproduce the captured root ({rootBytes.Length} bytes)");
+				ok++;
+			}
+
+			Assert.True(ok >= 2, $"expected at least the two .bin fixtures to author byte-identically (ok={ok})");
 		}
 
 		[Fact]
@@ -71,58 +124,15 @@ namespace Faolan.Tests
 			Assert.True(ok >= 2, $"expected at least the two .bin fixtures to round-trip (ok={ok}, total={total})");
 		}
 
-		// The AUTHORING oracle (#57): FullCharSnapshotBuilder.BuildRoot, fed a captured root's own field values,
-		// must re-encode that root byte-identically - so the snapshot path can author the root from typed inputs
-		// (DB containers + account flags + tag/spell state) instead of carrying the captured protobuf root.
-		[Fact]
-		public void BuildRoot_FromCapturedFields_ReEncodesByteIdentically()
-		{
-			var ok = 0;
-
-			foreach (var (source, body) in SnapshotBodies())
-			{
-				byte[] rootBytes;
-				try
-				{
-					var stream = new FaolanStream(body);
-					stream.ReadUInt32(); // subop
-					stream.ReadUInt32(); // c350
-					stream.ReadUInt32(); // instance
-					rootBytes = InventorySnapshotInspector.ParseInventoryPacketBody(stream).Root.ToArray();
-				}
-				catch
-				{
-					continue; // truncated/non-splitting - covered by the round-trip test above
-				}
-
-				var decoded = ((ReadOnlySpan<byte>)rootBytes).FromProtobuf<ProtoFullCharacterIIR>();
-
-				// f2/f3 are absent on every captured snapshot; BuildRoot doesn't author them, so a capture that
-				// carried them would fail here (a guard against a silently-dropped field).
-				Assert.False(decoded.ShouldSerializeFreeFeatRespecs(), $"{source}: unexpected free_feat_respecs");
-				Assert.False(decoded.ShouldSerializeFeatResets(), $"{source}: unexpected feat_resets");
-
-				var rebuilt = FullCharSnapshotBuilder.BuildRoot(
-					decoded.CharacterTags,
-					decoded.ShouldSerializeExpansionFlags() ? decoded.ExpansionFlags : null,
-					decoded.ShouldSerializeSubscriptionFlags() ? decoded.SubscriptionFlags : null,
-					decoded.ShouldSerializeHasNewClaimItems() ? decoded.HasNewClaimItems : null,
-					decoded.ShouldSerializeHasSpellbook() ? decoded.HasSpellbook : null,
-					decoded.Inventories);
-
-				Assert.True(rootBytes.SequenceEqual(rebuilt.ToProtobufBytes()),
-					$"{source}: BuildRoot did not reproduce the captured root ({rootBytes.Length} bytes)");
-				ok++;
-			}
-
-			Assert.True(ok >= 2, $"expected at least the two .bin fixtures to author byte-identically (ok={ok})");
-		}
-
 		// All 0x737A6DF9 bodies (after [subop][c350][instance]) we can harvest: the two .bin fixtures + every
 		// snapshot in the analyzer JSON captures.
 		private static IEnumerable<(string Source, byte[] Body)> SnapshotBodies()
 		{
-			foreach (var bin in new[] { "account-stricken997-character-Strie-login-randomActions-bigboy.bin", "strie-login-inventory.bin" })
+			foreach (var bin in new[]
+			{
+				"account-stricken997-character-Strie-login-randomActions-bigboy.bin",
+				"strie-login-inventory.bin"
+			})
 			{
 				var path = Path.Combine(CapturesDir, bin);
 				if (!File.Exists(path))
@@ -135,9 +145,7 @@ namespace Faolan.Tests
 			if (!Directory.Exists(CapturesDir))
 				yield break;
 
-			foreach (var json in Directory
-				         .EnumerateFiles(CapturesDir, "*.json")
-				         .OrderBy(f => f))
+			foreach (var json in Directory.EnumerateFiles(CapturesDir, "*.json").OrderBy(f => f))
 			{
 				if (json.EndsWith(".tshark.json", StringComparison.OrdinalIgnoreCase))
 					continue; // tshark dumps use a different schema (BodyHex, not RawBytesBase64) - not this test's input
@@ -151,6 +159,7 @@ namespace Faolan.Tests
 				{
 					if (!p.TryGetProperty("RawBytesBase64", out var rawEl))
 						continue;
+
 					var raw = Convert.FromBase64String(rawEl.GetString() ?? "");
 					if (raw.Length < 32)
 						continue;

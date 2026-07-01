@@ -24,10 +24,10 @@ namespace Faolan.Importer.Extractors
 	//   [anchor vec3 = curPos][00 01]           anchor + terminator
 	public static class PatrolPathExtractor
 	{
+		private const uint InstanceRangeStart = 0x02000000; // player/own-entity handles (a player isn't a patrol)
 		private const uint MapChangeSubOpcode = 0x5D85BFC7;
 		private const uint MoveTaskSubOpcode = 0x96C46740;
 		private const uint Opcode2000 = 0x2000;
-		private const uint InstanceRangeStart = 0x02000000; // player/own-entity handles (a player isn't a patrol)
 
 		// The constant 10-byte segment-list + move-block header of the canonical single-segment patrol.
 		private static readonly byte[] CanonicalHeader = [0x04, 0x01, 0x00, 0x02, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00];
@@ -98,8 +98,14 @@ namespace Faolan.Importer.Extractors
 
 				MoveTaskComposite task;
 				// Parse expects the record starting at the subop; GetBody includes the leading [u32 len], so skip it.
-				try { task = MoveTaskComposite.Parse(body[4..]); }
-				catch { continue; } // a form the grammar can't parse (should not happen - 6225/6225) - skip defensively
+				try
+				{
+					task = MoveTaskComposite.Parse(body[4..]);
+				}
+				catch
+				{
+					continue;
+				} // a form the grammar can't parse (should not happen - 6225/6225) - skip defensively
 
 				if (task.Handle == 0 || task.Handle >= InstanceRangeStart)
 					continue; // a player's MoveTask, not an NPC patrol
@@ -131,20 +137,6 @@ namespace Faolan.Importer.Extractors
 			return byHandle;
 		}
 
-		// Gathers every PathMoveTask (mode 1) waypoint in a move-task tree (recursing into mode-4 ListMoveTask). The
-		// node stores 3 raw big-endian float-bit u32 per waypoint (kept as bits for exact round-trip).
-		private static void CollectPathWaypoints(MoveTaskNode node, List<Vector3> waypoints)
-		{
-			if (node.Mode == 1)
-				for (var i = 0; i + 2 < node.Waypoints.Count; i += 3)
-					waypoints.Add(new Vector3(Bits(node.Waypoints[i]), Bits(node.Waypoints[i + 1]), Bits(node.Waypoints[i + 2])));
-
-			foreach (var child in node.Children)
-				CollectPathWaypoints(child, waypoints);
-		}
-
-		private static float Bits(uint raw) => BitConverter.UInt32BitsToSingle(raw);
-
 		// Dedup by (map, spawn point); keep the first seen - like NpcSpawnExtractor.Merge.
 		public static List<PatrolPathEntry> Merge(IEnumerable<PatrolPathEntry> all)
 		{
@@ -153,6 +145,42 @@ namespace Faolan.Importer.Extractors
 				seen.TryAdd((e.MapId, e.Position.X, e.Position.Y, e.Position.Z), e);
 
 			return seen.Values.ToList();
+		}
+
+		private static float Bits(uint raw)
+		{
+			return BitConverter.UInt32BitsToSingle(raw);
+		}
+
+		// Gathers every PathMoveTask (mode 1) waypoint in a move-task tree (recursing into mode-4 ListMoveTask). The
+		// node stores 3 raw big-endian float-bit u32 per waypoint (kept as bits for exact round-trip).
+		private static void CollectPathWaypoints(MoveTaskNode node, List<Vector3> waypoints)
+		{
+			if (node.Mode == 1)
+			{
+				for (var i = 0; i + 2 < node.Waypoints.Count; i += 3)
+					waypoints.Add(new Vector3(Bits(node.Waypoints[i]), Bits(node.Waypoints[i + 1]), Bits(node.Waypoints[i + 2])));
+			}
+
+			foreach (var child in node.Children)
+				CollectPathWaypoints(child, waypoints);
+		}
+
+		private static byte[] GetBody(byte[] full)
+		{
+			if (full.Length < 12)
+				return [];
+
+			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(8, 4));
+			var bodyStart = 12 + headerLen;
+			return bodyStart <= full.Length
+				? full[bodyStart..]
+				: [];
+		}
+
+		private static Vector3 ReadVec3(byte[] b, int offset)
+		{
+			return new Vector3(BinaryPrimitives.ReadSingleBigEndian(b.AsSpan(offset, 4)), BinaryPrimitives.ReadSingleBigEndian(b.AsSpan(offset + 4, 4)), BinaryPrimitives.ReadSingleBigEndian(b.AsSpan(offset + 8, 4)));
 		}
 
 		// True (with the parsed fields) iff `body` is EXACTLY the canonical single-segment patrol - the form
@@ -196,14 +224,17 @@ namespace Faolan.Importer.Extractors
 
 			if (b[i] != 0x00) // trailer flag
 				return false;
+
 			var spd = BinaryPrimitives.ReadSingleBigEndian(b.AsSpan(i + 1, 4));
 			i += 5;
 			if (b.AsSpan(i, 12).ContainsAnyExcept((byte)0)) // 12-byte pad must be zero
 				return false;
+
 			i += 12;
 
 			if (ReadVec3(b, i) != curPos) // anchor must equal the current position
 				return false;
+
 			i += 12;
 
 			if (b[i] != 0x00 || b[i + 1] != 0x01) // terminator
@@ -213,26 +244,6 @@ namespace Faolan.Importer.Extractors
 			speed = spd;
 			waypoints = wps;
 			return true;
-		}
-
-		private static Vector3 ReadVec3(byte[] b, int offset)
-		{
-			return new Vector3(
-				BinaryPrimitives.ReadSingleBigEndian(b.AsSpan(offset, 4)),
-				BinaryPrimitives.ReadSingleBigEndian(b.AsSpan(offset + 4, 4)),
-				BinaryPrimitives.ReadSingleBigEndian(b.AsSpan(offset + 8, 4)));
-		}
-
-		private static byte[] GetBody(byte[] full)
-		{
-			if (full.Length < 12)
-				return [];
-
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(8, 4));
-			var bodyStart = 12 + headerLen;
-			return bodyStart <= full.Length
-				? full[bodyStart..]
-				: [];
 		}
 	}
 }

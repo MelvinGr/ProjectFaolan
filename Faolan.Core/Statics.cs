@@ -3,12 +3,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
-using Faolan.Core.Database;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Faolan.Core
 {
@@ -45,9 +41,7 @@ namespace Faolan.Core
 			// NowUnixTimeSeconds, must never depend on the build info being present.
 			var entryAssembly = Assembly.GetEntryAssembly();
 
-			var assemblyMetadata = entryAssembly?
-				.GetCustomAttributes<AssemblyMetadataAttribute>()
-				.ToDictionary(k => k.Key, v => v.Value) ?? new Dictionary<string, string>();
+			var assemblyMetadata = entryAssembly?.GetCustomAttributes<AssemblyMetadataAttribute>().ToDictionary(k => k.Key, v => v.Value) ?? new Dictionary<string, string>();
 
 			BuildConfiguration = assemblyMetadata.GetValueOrDefault("BuildConfiguration", "unknown");
 			BuildDateTimeUtc = assemblyMetadata.TryGetValue("BuildDateTimeUtc", out var buildDate)
@@ -58,7 +52,9 @@ namespace Faolan.Core
 			// so the HEAD SHA rides along for free - no custom metadata needed.
 			var informationalVersion = entryAssembly?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "";
 			var plusIndex = informationalVersion.IndexOf('+');
-			var gitSha = plusIndex >= 0 ? informationalVersion[(plusIndex + 1)..] : informationalVersion;
+			var gitSha = plusIndex >= 0
+				? informationalVersion[(plusIndex + 1)..]
+				: informationalVersion;
 
 			BuildString = $"{BuildConfiguration} {gitSha} @ {BuildDateTimeUtc:G} UTC";
 
@@ -81,18 +77,5 @@ namespace Faolan.Core
 			(Race.Cimmerian, ArchType.Rogue, Class.Barbarian), (Race.Cimmerian, ArchType.Rogue, Class.Ranger), (Race.Stygian, ArchType.Priest, Class.TempestOfSet), (Race.Stygian, ArchType.Rogue, Class.Ranger),
 			(Race.Stygian, ArchType.Rogue, Class.Assassin), (Race.Stygian, ArchType.Mage, Class.HeraldOfXotli), (Race.Stygian, ArchType.Mage, Class.Demonologist), (Race.Stygian, ArchType.Mage, Class.Necromancer)
 		];
-
-		public static IServiceCollection ConfigureFaolanDatabase(this IServiceCollection services, IConfiguration configuration)
-		{
-			// Game-server persistence model: live state lives in memory (the session); the DB is a persistence
-			// boundary touched only at save/load points. So contexts are SHORT-LIVED, one per unit of work, created
-			// from a pooled factory - never held open across a connection or game tick (which would leak/stale and
-			// is not thread-safe). The repository owns all context lifetime via this factory.
-			services.AddPooledDbContextFactory<DatabaseContext>(options => { options.UseSqlite($"Data Source={configuration.DatabasePath}", x => x.MigrationsAssembly("Faolan")); });
-
-			services.AddSingleton<IDatabaseRepository, DatabaseRepository>();
-
-			return services;
-		}
 	}
 }

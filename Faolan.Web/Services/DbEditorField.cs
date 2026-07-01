@@ -48,9 +48,12 @@ namespace Faolan.Web.Services
 		private object Convert(string text)
 		{
 			if (string.IsNullOrWhiteSpace(text))
+			{
 				return IsNullable || Type == typeof(string)
 					? null
 					: Activator.CreateInstance(Type);
+			}
+
 			if (Type == typeof(string))
 				return text;
 			if (Type == typeof(Guid))

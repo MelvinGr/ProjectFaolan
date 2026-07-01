@@ -1,7 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Numerics;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Protobuf;
@@ -15,6 +15,98 @@ namespace Faolan.GameServer.Spawn
 	// class. Byte-identical to the captured body when the row's columns match the capture (WorldObjectBuilderTests).
 	public static class WorldObjectBuilder
 	{
+		// Builds a world-object body FROM SCRATCH (#249) - no captured `Data`: the header (subOpcode + typeTag +
+		// handle, fieldA=0) + the transform (pos/rot + the live playfield token as the 0x18 4-byte varint) + the
+		// identity message generated from the row's columns (SimpleDynelMessageCodec) + the row's KdTreeTail (the
+		// static geometry). Byte-identical to a captured body when fed that object's columns + KdTreeTail + transform
+		// (WorldObjectBuilderTests). This is how a loot bag is spawned with NO captured world-object row in the world
+		// (the loot system's bag definition is a baked constant - LootBagTemplate). Returns false if the row has no
+		// lifted columns (DisplayName) or no KdTreeTail.
+		public static bool BuildFromScratch(WorldObject row, uint handle, Vector3 position, Quaternion rotation, uint typeTag, uint playfieldToken, out byte[] body)
+		{
+			body = null;
+			if (row?.DisplayName == null || row.KdTreeTail == null)
+				return false;
+
+			var head = new FaolanStream()
+				.WriteUInt32(0) // body length placeholder @0 (set below)
+				.WriteUInt32(row.SubOpcode)
+				.WriteUInt32(typeTag)
+				.WriteUInt32(handle)
+				.WriteUInt32(0) // fieldA
+				.WriteByte(0x2C)
+				.WriteByte(0x0A)
+				.WriteArrayByteLength(new ProtoVec3
+				{
+					X = position.X,
+					Y = position.Y,
+					Z = position.Z
+				}.ToProtobufBytes())
+				.WriteByte(0x12)
+				.WriteArrayByteLength(new ProtoQuat
+				{
+					X = rotation.X,
+					Y = rotation.Y,
+					Z = rotation.Z,
+					W = rotation.W
+				}.ToProtobufBytes())
+				.WriteByte(0x18)
+				.WriteArray(EncodePlayfieldVarint(playfieldToken))
+				.ToArray();
+
+			var identity = SimpleDynelMessageCodec.BuildMessage(SimpleDynelMessageCodec.ToMessage(row)); // [u32 len][record]
+
+			body = new byte[head.Length + identity.Length + row.KdTreeTail.Length];
+			head.CopyTo(body, 0);
+			identity.CopyTo(body, head.Length);
+			row.KdTreeTail.CopyTo(body, head.Length + identity.Length);
+			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)(body.Length - 4));
+			return true;
+		}
+
+		// The captured `Data` is the full Conan packet ([u32 len][u32 crc][u32 headerLen][header][body]); the
+		// object body starts after the 12-byte prefix + the header. Returns null if the framing is malformed.
+		// Public so the importer can lift the dynel identity columns from the same body the builder consumes.
+		public static byte[] ExtractBody(byte[] data)
+		{
+			if (data == null || data.Length < 12)
+				return null;
+
+			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(8, 4));
+			var bodyStart = 12 + headerLen;
+			return bodyStart <= data.Length
+				? data[bodyStart..]
+				: null;
+		}
+
+		// Identity discriminator for deduping/matching world objects: the SimpleDynel `display_name` (a stable
+		// localized id), or "" for object classes that carry no such id. Two distinct props can sit at the EXACT
+		// same coordinates (e.g. the map-4000 editor scene has localized 347659 and 3072626 at one spot, #222), so
+		// position alone is not a unique key - the dedup and the burst/world-entry matching both key by (position,
+		// identity). Reads from a carrier body ([u32 len][u32 subOpcode][record]); the record's identity message is
+		// the same ProtoSimpleDynelIIR the lift codec parses. "" when the class has no display_name or the body is
+		// malformed (such objects don't collide, so position alone keeps disambiguating them).
+		public static string ReadIdentity(ReadOnlySpan<byte> carrierBody)
+		{
+			if (carrierBody.Length <= 8)
+				return string.Empty;
+
+			var subOpcode = BinaryPrimitives.ReadUInt32BigEndian(carrierBody.Slice(4, 4));
+			return subOpcode == SimpleDynelMessageCodec.SubOpcode && SimpleDynelMessageCodec.TryParse(carrierBody.Slice(8), out var message, out _, out _)
+				? message.DisplayName ?? string.Empty
+				: string.Empty;
+		}
+
+		// As ReadIdentity(body), reading the identity from a stored row's OWN captured Data. Used to key the table
+		// rows the same way the burst bodies are keyed, so the two sides always agree regardless of lift status.
+		public static string ReadIdentity(WorldObject row)
+		{
+			var body = ExtractBody(row?.Data);
+			return body == null
+				? string.Empty
+				: ReadIdentity(body);
+		}
+
 		public static bool TryBuild(WorldObject row, uint handle, out byte[] body)
 		{
 			return TryBuild(row, handle, new Vector3(row?.PositionX ?? 0, row?.PositionY ?? 0, row?.PositionZ ?? 0), new Quaternion(row?.RotationX ?? 0, row?.RotationY ?? 0, row?.RotationZ ?? 0, row?.RotationW ?? 1), out body);
@@ -59,54 +151,6 @@ namespace Faolan.GameServer.Spawn
 			return true;
 		}
 
-		// Builds a world-object body FROM SCRATCH (#249) - no captured `Data`: the header (subOpcode + typeTag +
-		// handle, fieldA=0) + the transform (pos/rot + the live playfield token as the 0x18 4-byte varint) + the
-		// identity message generated from the row's columns (SimpleDynelMessageCodec) + the row's KdTreeTail (the
-		// static geometry). Byte-identical to a captured body when fed that object's columns + KdTreeTail + transform
-		// (WorldObjectBuilderTests). This is how a loot bag is spawned with NO captured world-object row in the world
-		// (the loot system's bag definition is a baked constant - LootBagTemplate). Returns false if the row has no
-		// lifted columns (DisplayName) or no KdTreeTail.
-		public static bool BuildFromScratch(WorldObject row, uint handle, Vector3 position, Quaternion rotation, uint typeTag, uint playfieldToken, out byte[] body)
-		{
-			body = null;
-			if (row?.DisplayName == null || row.KdTreeTail == null)
-				return false;
-
-			var head = new FaolanStream()
-				.WriteUInt32(0) // body length placeholder @0 (set below)
-				.WriteUInt32(row.SubOpcode)
-				.WriteUInt32(typeTag)
-				.WriteUInt32(handle)
-				.WriteUInt32(0) // fieldA
-				.WriteByte(0x2C)
-				.WriteByte(0x0A)
-				.WriteArrayByteLength(new ProtoVec3 { X = position.X, Y = position.Y, Z = position.Z }.ToProtobufBytes())
-				.WriteByte(0x12)
-				.WriteArrayByteLength(new ProtoQuat { X = rotation.X, Y = rotation.Y, Z = rotation.Z, W = rotation.W }.ToProtobufBytes())
-				.WriteByte(0x18)
-				.WriteArray(EncodePlayfieldVarint(playfieldToken))
-				.ToArray();
-
-			var identity = SimpleDynelMessageCodec.BuildMessage(SimpleDynelMessageCodec.ToMessage(row)); // [u32 len][record]
-
-			body = new byte[head.Length + identity.Length + row.KdTreeTail.Length];
-			head.CopyTo(body, 0);
-			identity.CopyTo(body, head.Length);
-			row.KdTreeTail.CopyTo(body, head.Length + identity.Length);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)(body.Length - 4));
-			return true;
-		}
-
-		// The playfield token in the transform is a 4-byte LEB128 varint (the fixed width SpawnPlayfieldRewriter
-		// assumes); tokens are < 2^28 so 4 bytes always suffice.
-		private static byte[] EncodePlayfieldVarint(uint token) =>
-		[
-			(byte)((token & 0x7F) | 0x80),
-			(byte)(((token >> 7) & 0x7F) | 0x80),
-			(byte)(((token >> 14) & 0x7F) | 0x80),
-			(byte)((token >> 21) & 0x7F)
-		];
-
 		// Builds a body by splicing the DB row's object IDENTITY (the length-delimited message + the raw tail,
 		// everything after the transform) onto the LIVE placement (`liveBody`'s header + transform + playfield).
 		// The placement (handle / position / playfield = the per-session world id) stays live; only the object
@@ -143,47 +187,17 @@ namespace Faolan.GameServer.Spawn
 			return true;
 		}
 
-		// Identity discriminator for deduping/matching world objects: the SimpleDynel `display_name` (a stable
-		// localized id), or "" for object classes that carry no such id. Two distinct props can sit at the EXACT
-		// same coordinates (e.g. the map-4000 editor scene has localized 347659 and 3072626 at one spot, #222), so
-		// position alone is not a unique key - the dedup and the burst/world-entry matching both key by (position,
-		// identity). Reads from a carrier body ([u32 len][u32 subOpcode][record]); the record's identity message is
-		// the same ProtoSimpleDynelIIR the lift codec parses. "" when the class has no display_name or the body is
-		// malformed (such objects don't collide, so position alone keeps disambiguating them).
-		public static string ReadIdentity(ReadOnlySpan<byte> carrierBody)
+		// The playfield token in the transform is a 4-byte LEB128 varint (the fixed width SpawnPlayfieldRewriter
+		// assumes); tokens are < 2^28 so 4 bytes always suffice.
+		private static byte[] EncodePlayfieldVarint(uint token)
 		{
-			if (carrierBody.Length <= 8)
-				return string.Empty;
-
-			var subOpcode = BinaryPrimitives.ReadUInt32BigEndian(carrierBody.Slice(4, 4));
-			return subOpcode == SimpleDynelMessageCodec.SubOpcode && SimpleDynelMessageCodec.TryParse(carrierBody.Slice(8), out var message, out _, out _)
-				? message.DisplayName ?? string.Empty
-				: string.Empty;
-		}
-
-		// As ReadIdentity(body), reading the identity from a stored row's OWN captured Data. Used to key the table
-		// rows the same way the burst bodies are keyed, so the two sides always agree regardless of lift status.
-		public static string ReadIdentity(WorldObject row)
-		{
-			var body = ExtractBody(row?.Data);
-			return body == null
-				? string.Empty
-				: ReadIdentity(body);
-		}
-
-		// The captured `Data` is the full Conan packet ([u32 len][u32 crc][u32 headerLen][header][body]); the
-		// object body starts after the 12-byte prefix + the header. Returns null if the framing is malformed.
-		// Public so the importer can lift the dynel identity columns from the same body the builder consumes.
-		public static byte[] ExtractBody(byte[] data)
-		{
-			if (data == null || data.Length < 12)
-				return null;
-
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(8, 4));
-			var bodyStart = 12 + headerLen;
-			return bodyStart <= data.Length
-				? data[bodyStart..]
-				: null;
+			return
+			[
+				(byte)((token & 0x7F) | 0x80),
+				(byte)(((token >> 7) & 0x7F) | 0x80),
+				(byte)(((token >> 14) & 0x7F) | 0x80),
+				(byte)((token >> 21) & 0x7F)
+			];
 		}
 
 		// Offset where the object message's u32 length prefix begins: just after the 0x2C transform group

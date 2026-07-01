@@ -1,6 +1,6 @@
 using System.Security.Claims;
-using Faolan.Core;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Extensions;
 using Faolan.Web.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -20,34 +20,34 @@ namespace Faolan.Web.Components.Pages
 		private static readonly string[] LeftSlots = ["Neck", "Shoulder", "Cloak", "Chest", "Wrist"];
 		private static readonly string[] RightSlots = ["Hands", "Belt", "Boots", "Ring L", "Ring R"];
 		private static readonly string[] WeaponSlots = ["Main Hand", "Off Hand", "Ranged", "Tokens", "Bag"];
-		private bool _refreshThumbs;
-		private Character? _selected;
-		private IJSObjectReference? _module;
-		private int _invPage;
-		private IReadOnlyDictionary<string, ItemInfo> _equipment = new Dictionary<string, ItemInfo>();
-		private IReadOnlyList<(ItemInfo Info, string Tab)> _inventory = [];
-		private IReadOnlyList<(string Name, byte Level, float Range, float Damage)> _spells = [];
-
-		private List<Character>? _characters;
-		private string _invTab = "Normal";
-		private string _mapName = "—";
-		private string _money = "0";
-		private string _status = "";
-		private string? _guildName;
-
-		// Selected character's sheet: vitals (player-facing MaxStats) + a few resolved fields.
-		private uint _health, _mana, _stamina;
 
 		// --- Appearance editor (floating window) -------------------------------------------------------------
 		// The pickable resources (loaded once) + the live edit state seeded from the character on select. Body
 		// morphs are the decoded signed slider values (the unit CharacterBody stores / BodyMorphDeformer takes);
 		// _eHead is editor-2x units. Preview is a strict ad-hoc build (no fallback) - _editError shows why it failed.
 		private CharacterModelService.AppearanceOptions? _appOptions;
+		private bool _refreshThumbs;
+		private Character? _selected;
+		private IJSObjectReference? _module;
 		private int _eArm, _eChest, _eBosom, _eStomach, _eArse, _eThigh, _eLeg;
-		private uint _eHead;
-		private string _eHairStyle = "", _eHairColor = "", _eEyes = "", _eSkin = "", _eBodyTat = "", _eFaceTat = "";
-		private string? _editError;
+		private int _invPage;
+		private IReadOnlyDictionary<string, ItemInfo> _equipment = new Dictionary<string, ItemInfo>();
+		private IReadOnlyList<(ItemInfo Info, string Tab)> _inventory = [];
+		private IReadOnlyList<(string Name, byte Level, float Range, float Damage)> _spells = [];
+
+		private List<Character>? _characters;
 		private string _editStatus = "";
+		private string _eHairStyle = "", _eHairColor = "", _eEyes = "", _eSkin = "", _eBodyTat = "", _eFaceTat = "";
+		private string _invTab = "Normal";
+		private string _mapName = "—";
+		private string _money = "0";
+		private string _status = "";
+		private string? _editError;
+		private string? _guildName;
+		private uint _eHead;
+
+		// Selected character's sheet: vitals (player-facing MaxStats) + a few resolved fields.
+		private uint _health, _mana, _stamina;
 
 		[SupplyParameterFromQuery(Name = "char")]
 		public long? CharId { get; set; }
@@ -96,74 +96,28 @@ namespace Faolan.Web.Components.Pages
 			_characters = await query.OrderBy(c => c.Name).ToListAsync();
 		}
 
-		// Load the selected character's sheet data: vitals (MaxStats, regenerated from class/level if missing), the map
-		// name and guild, and a formatted wallet.
-		private async Task LoadSheet(Character c)
+		private string BuildPreviewUrl()
 		{
-			await using var db = await DbFactory.CreateDbContextAsync();
-			var full = await db.Characters.Include(x => x.MaxStats).Include(x => x.Map).Include(x => x.Guild).FirstOrDefaultAsync(x => x.Id == c.Id);
-
-			var stats = full?.MaxStats;
-			if (stats == null && full != null)
+			var tex = new[]
 			{
-				full.RegenerateMaxStats(); // older rows may predate the MaxStats block
-				stats = full.MaxStats;
-			}
+				_eHairColor,
+				_eEyes,
+				_eSkin,
+				_eBodyTat,
+				_eFaceTat
+			}.Where(s => !string.IsNullOrEmpty(s));
+			var texJoined = string.Join(',', tex);
+			var hair = ParseRefId(_eHairStyle);
+			var head = _eHead; // already a head monsterdataid
 
-			_health = stats?.Health ?? 0;
-			_mana = stats?.Mana ?? 0;
-			_stamina = stats?.Stamina ?? 0;
-			_mapName = full?.Map?.Name ?? "—";
-			_guildName = full?.Guild?.Name;
-			_money = FormatMoney(full?.Money ?? 0);
-			_spells = Models.Spells(c.Id);
-		}
-
-		private void PageInventory(int delta)
-		{
-			_invPage = Math.Clamp(_invPage + delta, 0, InvPageCount - 1);
-			_refreshThumbs = true;
-		}
-
-		// (Re)build the selected character's model, overlaying the chosen armour set. Cache-bust so a rebuilt/redressed
-		// model isn't masked by the browser's cached glb.
-		private async Task Render()
-		{
-			if (_selected == null)
-				return;
-
-			_status = "building…";
-			StateHasChanged();
-
-			// The posable character rig (skinned body + head + hair), driven by the elbow slider.
-			var url = $"/api/character/{_selected.Id}/model.glb?rig=1&t={DateTime.UtcNow.Ticks}";
-			if (_module != null)
-				await _module.InvokeVoidAsync("show", "char-canvas", url);
-
-			_status = "loaded";
-			StateHasChanged();
-		}
-
-		private async Task Select(Character c)
-		{
-			_selected = c;
-			_equipment = Models.Equipment(c.Id);
-			_inventory = Models.Inventory(c.Id);
-			// Open on the first tab that actually has items (most characters only carry Normal).
-			_invTab = InvTabs.FirstOrDefault(t => _inventory.Any(i => i.Tab == t)) ?? "Normal";
-			_invPage = 0;
-			LoadEditState(c);
-			await LoadSheet(c);
-			await Render();
-			if (_module != null)
-			{
-				// Build the per-joint pose sliders (in the floating pose window) + make both floating windows
-				// (pose + appearance editor) draggable, then render a 3D thumbnail into each equipped slot.
-				await _module.InvokeVoidAsync("buildPoseControls", "char-canvas", "pose-controls");
-				await _module.InvokeVoidAsync("makeDraggable", "pose-window", "pose-window-bar");
-				await _module.InvokeVoidAsync("makeDraggable", "edit-window", "edit-window-bar");
-				await _module.InvokeVoidAsync("populateItemThumbs");
-			}
+			var q = $"/api/character/custom/model.glb?sex={_selected!.Sex}&race={_selected.Race}" + (hair > 0
+					? $"&hair={hair}"
+					: "") + (head > 0
+					? $"&head={head}"
+					: "") + $"&arm={_eArm}&chest={_eChest}&bosom={_eBosom}&stomach={_eStomach}&arse={_eArse}&thigh={_eThigh}&leg={_eLeg}" + (texJoined.Length > 0
+					? $"&tex={Uri.EscapeDataString(texJoined)}"
+					: "") + $"&t={DateTime.UtcNow.Ticks}";
+			return q;
 		}
 
 		// Seed the editor state from the character's stored appearance (called on select). Body morphs come back as
@@ -192,6 +146,49 @@ namespace Faolan.Web.Components.Pages
 			_editStatus = "";
 		}
 
+		// Load the selected character's sheet data: vitals (MaxStats, regenerated from class/level if missing), the map
+		// name and guild, and a formatted wallet.
+		private async Task LoadSheet(Character c)
+		{
+			await using var db = await DbFactory.CreateDbContextAsync();
+			var full = await db.Characters.Include(x => x.MaxStats).Include(x => x.Map).Include(x => x.Guild).FirstOrDefaultAsync(x => x.Id == c.Id);
+
+			var stats = full?.MaxStats;
+			if (stats == null && full != null)
+			{
+				full.RegenerateMaxStats(); // older rows may predate the MaxStats block
+				stats = full.MaxStats;
+			}
+
+			_health = stats?.Health ?? 0;
+			_mana = stats?.Mana ?? 0;
+			_stamina = stats?.Stamina ?? 0;
+			_mapName = full?.Map?.Name ?? "—";
+			_guildName = full?.Guild?.Name;
+			_money = FormatMoney(full?.Money ?? 0);
+			_spells = Models.Spells(c.Id);
+		}
+
+		private int MorphMax(string morph)
+		{
+			return _appOptions?.MorphLimits.TryGetValue(morph, out var v) == true
+				? v[1]
+				: 250;
+		}
+
+		private int MorphMin(string morph)
+		{
+			return _appOptions?.MorphLimits.TryGetValue(morph, out var v) == true
+				? v[0]
+				: -250;
+		}
+
+		private void PageInventory(int delta)
+		{
+			_invPage = Math.Clamp(_invPage + delta, 0, InvPageCount - 1);
+			_refreshThumbs = true;
+		}
+
 		// Live-preview the current edit state via the strict ad-hoc build endpoint. show() returns null on success or
 		// the server's error text (missing asset) on failure - surfaced in _editError, no silent fallback.
 		private async Task PreviewEdit()
@@ -209,36 +206,23 @@ namespace Faolan.Web.Components.Pages
 			StateHasChanged();
 		}
 
-		private string BuildPreviewUrl()
-		{
-			var tex = new[] { _eHairColor, _eEyes, _eSkin, _eBodyTat, _eFaceTat }.Where(s => !string.IsNullOrEmpty(s));
-			var texJoined = string.Join(',', tex);
-			var hair = ParseRefId(_eHairStyle);
-			var head = _eHead; // already a head monsterdataid
-
-			var q = $"/api/character/custom/model.glb?sex={_selected!.Sex}&race={_selected.Race}" +
-			        (hair > 0 ? $"&hair={hair}" : "") +
-			        (head > 0 ? $"&head={head}" : "") +
-			        $"&arm={_eArm}&chest={_eChest}&bosom={_eBosom}&stomach={_eStomach}&arse={_eArse}&thigh={_eThigh}&leg={_eLeg}" +
-			        (texJoined.Length > 0 ? $"&tex={Uri.EscapeDataString(texJoined)}" : "") +
-			        $"&t={DateTime.UtcNow.Ticks}";
-			return q;
-		}
-
-		// Persist the current edit state to the character (direct server-side service call - no open write endpoint).
-		private void SaveEdit()
+		// (Re)build the selected character's model, overlaying the chosen armour set. Cache-bust so a rebuilt/redressed
+		// model isn't masked by the browser's cached glb.
+		private async Task Render()
 		{
 			if (_selected == null)
 				return;
 
-			var refs = new[] { _eHairStyle, _eHairColor, _eEyes, _eSkin, _eBodyTat, _eFaceTat }
-				.Where(s => !string.IsNullOrEmpty(s))
-				.ToList();
-			// Persist HeadMesh in the stored editor-2x units (the editor works in monsterdataid = HeadMesh/2).
-			var spec = new CharacterModelService.AppearanceSpec(_eArm, _eChest, _eBosom, _eStomach, _eArse, _eThigh, _eLeg, _eHead * 2, refs);
-			_editStatus = Models.SaveAppearance(_selected.Id, spec)
-				? "saved ✓"
-				: "save failed";
+			_status = "building…";
+			StateHasChanged();
+
+			// The posable character rig (skinned body + head + hair), driven by the elbow slider.
+			var url = $"/api/character/{_selected.Id}/model.glb?rig=1&t={DateTime.UtcNow.Ticks}";
+			if (_module != null)
+				await _module.InvokeVoidAsync("show", "char-canvas", url);
+
+			_status = "loaded";
+			StateHasChanged();
 		}
 
 		private async Task RevertEdit()
@@ -250,16 +234,50 @@ namespace Faolan.Web.Components.Pages
 			await PreviewEdit();
 		}
 
-		private int MorphMin(string morph) => _appOptions?.MorphLimits.TryGetValue(morph, out var v) == true ? v[0] : -250;
-
-		private int MorphMax(string morph) => _appOptions?.MorphLimits.TryGetValue(morph, out var v) == true ? v[1] : 250;
-
-		private static uint ParseRefId(string reference)
+		// Persist the current edit state to the character (direct server-side service call - no open write endpoint).
+		private void SaveEdit()
 		{
-			var i = reference.LastIndexOf('_');
-			return i >= 0 && uint.TryParse(reference.AsSpan(i + 1), out var v)
-				? v
-				: 0;
+			if (_selected == null)
+				return;
+
+			var refs = new[]
+				{
+					_eHairStyle,
+					_eHairColor,
+					_eEyes,
+					_eSkin,
+					_eBodyTat,
+					_eFaceTat
+				}
+				.Where(s => !string.IsNullOrEmpty(s))
+				.ToList();
+			// Persist HeadMesh in the stored editor-2x units (the editor works in monsterdataid = HeadMesh/2).
+			var spec = new CharacterModelService.AppearanceSpec(_eArm, _eChest, _eBosom, _eStomach, _eArse, _eThigh, _eLeg, _eHead * 2, refs);
+			_editStatus = Models.SaveAppearance(_selected.Id, spec)
+				? "saved ✓"
+				: "save failed";
+		}
+
+		private async Task Select(Character c)
+		{
+			_selected = c;
+			_equipment = Models.Equipment(c.Id);
+			_inventory = Models.Inventory(c.Id);
+			// Open on the first tab that actually has items (most characters only carry Normal).
+			_invTab = InvTabs.FirstOrDefault(t => _inventory.Any(i => i.Tab == t)) ?? "Normal";
+			_invPage = 0;
+			LoadEditState(c);
+			await LoadSheet(c);
+			await Render();
+			if (_module != null)
+			{
+				// Build the per-joint pose sliders (in the floating pose window) + make both floating windows
+				// (pose + appearance editor) draggable, then render a 3D thumbnail into each equipped slot.
+				await _module.InvokeVoidAsync("buildPoseControls", "char-canvas", "pose-controls");
+				await _module.InvokeVoidAsync("makeDraggable", "pose-window", "pose-window-bar");
+				await _module.InvokeVoidAsync("makeDraggable", "edit-window", "edit-window-bar");
+				await _module.InvokeVoidAsync("populateItemThumbs");
+			}
 		}
 
 		private void SelectInvTab(string tab)
@@ -280,6 +298,17 @@ namespace Faolan.Web.Components.Pages
 		}
 
 		// Wallet in tin -> gold/silver/copper/tin (100 tin = 1 copper, 100 copper = 1 silver, 100 silver = 1 gold).
-		private static string FormatMoney(ulong tin) => tin.ToCurrencyString();
+		private static string FormatMoney(ulong tin)
+		{
+			return tin.ToCurrencyString();
+		}
+
+		private static uint ParseRefId(string reference)
+		{
+			var i = reference.LastIndexOf('_');
+			return i >= 0 && uint.TryParse(reference.AsSpan(i + 1), out var v)
+				? v
+				: 0;
+		}
 	}
 }

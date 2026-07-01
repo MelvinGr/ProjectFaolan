@@ -47,16 +47,14 @@ namespace Faolan.GameServer
 
 		private static Vector3 PositionOf(byte[] template)
 		{
-			return new Vector3(
-				BinaryPrimitives.ReadSingleLittleEndian(template.AsSpan(SpawnPacketBuilder.PosXOffset, 4)),
+			return new Vector3(BinaryPrimitives.ReadSingleLittleEndian(template.AsSpan(SpawnPacketBuilder.PosXOffset, 4)),
 				BinaryPrimitives.ReadSingleLittleEndian(template.AsSpan(SpawnPacketBuilder.PosYOffset, 4)),
 				BinaryPrimitives.ReadSingleLittleEndian(template.AsSpan(SpawnPacketBuilder.PosZOffset, 4)));
 		}
 
 		private static Quaternion RotationOf(byte[] template)
 		{
-			return new Quaternion(
-				BinaryPrimitives.ReadSingleLittleEndian(template.AsSpan(SpawnPacketBuilder.RotXOffset, 4)),
+			return new Quaternion(BinaryPrimitives.ReadSingleLittleEndian(template.AsSpan(SpawnPacketBuilder.RotXOffset, 4)),
 				BinaryPrimitives.ReadSingleLittleEndian(template.AsSpan(SpawnPacketBuilder.RotYOffset, 4)),
 				BinaryPrimitives.ReadSingleLittleEndian(template.AsSpan(SpawnPacketBuilder.RotZOffset, 4)),
 				BinaryPrimitives.ReadSingleLittleEndian(template.AsSpan(SpawnPacketBuilder.RotWOffset, 4)));

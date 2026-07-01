@@ -46,30 +46,38 @@ namespace Faolan.Mcp.Tools
 			var tags = await _db.GetCharacterTags(characterId);
 
 			return JsonSerializer.Serialize(new
-			{
-				character.Id,
-				character.Name,
-				character.Level,
-				character.Experience,
-				MoneyCopper = character.Money,
-				character.MapId,
-				character.AccountId,
-				character.GuildId,
-				Live = _gameServer.GetCharacterLiveState(characterId), // null = not connected to a world listener
-				Inventory = inventory
+				{
+					character.Id,
+					character.Name,
+					character.Level,
+					character.Experience,
+					MoneyCopper = character.Money,
+					character.MapId,
+					character.AccountId,
+					character.GuildId,
+					Live = _gameServer.GetCharacterLiveState(characterId), // null = not connected to a world listener
+					Inventory = inventory
 					.OrderBy(r => r.Container)
 					.ThenBy(r => r.Slot)
-					.Select(r => new { r.Container, r.Slot, r.ItemId, ItemName = r.Item?.Name, r.Count }),
-				Quests = quests.Select(q => new
-				{
-					q.QuestId,
-					State = q.State.ToString(),
-					q.GoalProgress,
-					q.GoalRequired,
-					q.GoalTargetName
-				}),
-				Tags = tags
-			}, JsonOptions);
+					.Select(r => new
+					{
+						r.Container,
+						r.Slot,
+						r.ItemId,
+						ItemName = r.Item?.Name,
+						r.Count
+					}),
+					Quests = quests.Select(q => new
+					{
+						q.QuestId,
+						State = q.State.ToString(),
+						q.GoalProgress,
+						q.GoalRequired,
+						q.GoalTargetName
+					}),
+					Tags = tags
+				},
+				JsonOptions);
 		}
 	}
 }

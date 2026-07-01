@@ -15,15 +15,18 @@ namespace Faolan.GameServer.Spawn
 		// 4-byte-varint range, the transform can't be located, or the existing token isn't a 4-byte varint.
 		public static bool TryRewrite(byte[] carrierBody, uint value)
 		{
-			if (value is < (1u << 21) or >= (1u << 28) || carrierBody == null || carrierBody.Length <= 8)
+			if (value is < 1u << 21 or >= 1u << 28 || carrierBody == null || carrierBody.Length <= 8)
 				return false;
 
 			var record = carrierBody.AsSpan(8); // skip [u32 len][u32 subOpcode]
 			if (!TryPlayfieldVarintStart(record, out var start) || start + 4 > record.Length)
 				return false;
+
 			for (var k = 0; k < 4; k++) // the existing token must also be a 4-byte varint
-				if (((record[start + k] & 0x80) != 0) != (k < 3))
+			{
+				if ((record[start + k] & 0x80) != 0 != k < 3)
 					return false;
+			}
 
 			record[start + 0] = (byte)(0x80 | (value & 0x7F));
 			record[start + 1] = (byte)(0x80 | ((value >> 7) & 0x7F));
@@ -41,17 +44,21 @@ namespace Faolan.GameServer.Spawn
 			var i = 12;
 			if (b.Length <= i || b[i] != 0x2C)
 				return false;
+
 			i++;
 			if (i + 1 >= b.Length || b[i] != 0x0A)
 				return false;
+
 			i += 2 + b[i + 1]; // 0A vec3
 			if (i + 1 >= b.Length || b[i] != 0x12)
 				return false;
+
 			i += 2 + b[i + 1]; // 12 quat
 			if (i < b.Length && b[i] == 0x25)
 				i += 5; // optional 25 scale
 			if (i >= b.Length || b[i] != 0x18)
 				return false;
+
 			start = i + 1;
 			return true;
 		}

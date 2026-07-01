@@ -1,5 +1,5 @@
 using System.Threading.Tasks;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
@@ -19,13 +19,26 @@ namespace Faolan.GameServer
 	//   i_nAmountToRemove: u32    quantity to remove (0 in every captured remove - the equipped-slot clear / "all")
 	public partial class GameServerListener
 	{
-		internal static void WriteRemoveItemBody(FaolanStream s, uint containerType, uint charId, uint itemPos, uint amountToRemove)
+		// Removes an item from the player's backpack: clears the persisted CharacterInventory bag cell (so it stays
+		// gone across relog) AND pushes the live DispatchRemoveItem so it disappears immediately. The mirror of
+		// GrantItemToBackpack. Returns true if a row was cleared.
+		private async Task<bool> RemoveItemFromBackpack(INetworkClient client, int slot, uint amountToRemove = 0)
 		{
-			s
-				.WriteUInt32(containerType)
-				.WriteUInt32(charId)
-				.WriteUInt32(itemPos)
-				.WriteUInt32(amountToRemove);
+			var characterId = client.Session.Character.Id;
+			var rows = await Database.GetCharacterInventory(characterId);
+			var present = false;
+			foreach (var r in rows)
+			{
+				if (r.Container == (int)FullCharSnapshotBuilder.BagKind && r.Slot == slot)
+					present = true;
+			}
+
+			if (!present)
+				return false;
+
+			await Database.SetCharacterInventorySlot(characterId, (int)FullCharSnapshotBuilder.BagKind, slot, null);
+			await SendRemoveItem(client, InventoryContainerBackpack, (uint)slot, amountToRemove);
+			return true;
 		}
 
 		// Pushes a live item removal to the client (the inverse of SendAddItem).
@@ -39,23 +52,9 @@ namespace Faolan.GameServer
 			await ps.SendAsync(client);
 		}
 
-		// Removes an item from the player's backpack: clears the persisted CharacterInventory bag cell (so it stays
-		// gone across relog) AND pushes the live DispatchRemoveItem so it disappears immediately. The mirror of
-		// GrantItemToBackpack. Returns true if a row was cleared.
-		private async Task<bool> RemoveItemFromBackpack(INetworkClient client, int slot, uint amountToRemove = 0)
+		internal static void WriteRemoveItemBody(FaolanStream s, uint containerType, uint charId, uint itemPos, uint amountToRemove)
 		{
-			var characterId = client.Session.Character.Id;
-			var rows = await Database.GetCharacterInventory(characterId);
-			var present = false;
-			foreach (var r in rows)
-				if (r.Container == (int)FullCharSnapshotBuilder.BagKind && r.Slot == slot)
-					present = true;
-			if (!present)
-				return false;
-
-			await Database.SetCharacterInventorySlot(characterId, (int)FullCharSnapshotBuilder.BagKind, slot, itemId: null);
-			await SendRemoveItem(client, InventoryContainerBackpack, (uint)slot, amountToRemove);
-			return true;
+			s.WriteUInt32(containerType).WriteUInt32(charId).WriteUInt32(itemPos).WriteUInt32(amountToRemove);
 		}
 	}
 }

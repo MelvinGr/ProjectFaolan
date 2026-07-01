@@ -2,7 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
@@ -24,6 +24,10 @@ namespace Faolan.GameServer.Combat
 	// a per-session CombatState backs NPCs not in the model (e.g. the built-NPC test). See protocol_stats_and_combat.
 	public sealed class CombatService
 	{
+		// The 8-byte filler retail writes where an item identity quad would otherwise go in a behavior ack
+		// (B2 90 80 5C 29 E6 27 CA - the same null-identity padding as the 0xF result block and the 0x2052 grant).
+		internal static readonly byte[] NullIdentityFiller = [0xB2, 0x90, 0x80, 0x5C, 0x29, 0xE6, 0x27, 0xCA];
+
 		// Fallback vitals store for NPCs NOT in the world model (e.g. the built-NPC test) - model NPCs and players
 		// keep their vitals on their WorldEntity (the single source of truth). In-memory, never persisted.
 		private readonly CombatState _combat = new CombatState();
@@ -43,6 +47,25 @@ namespace Faolan.GameServer.Combat
 			_logger = logger;
 		}
 
+		// Builds the BCC behavior echo a VIEWER should receive to render this actor's swing/cast: the same plain
+		// echo-ack body the actor's own client gets (instance = the actor's handle, args + phase, request tail), which
+		// is exactly what retail relays to nearby players (other-players-visible capture: s2c BCC for other-player
+		// handles, structurally identical to the self-echo - NOT the targeted result-block ack). The caller broadcasts
+		// it via WorldBroadcaster.BroadcastBehaviorToViewers. Null for a malformed payload. Phase = the request's Mode
+		// (non-zero for real attacks/casts); 1 as a defensive fallback so we never touch the actor's ack counter here.
+		public byte[] BuildBehaviorRelayBody(INetworkClient actor, byte[] rawPayload, uint mode)
+		{
+			if (rawPayload.Length < 26)
+				return null;
+
+			var instance = actor.Session.Account.ClientInstance;
+			return BuildBehaviorEchoAckBody(rawPayload,
+				instance,
+				mode != 0
+					? mode
+					: 1u);
+		}
+
 		// The player's own live vitals - the WORLD MODEL is the single source of truth: they live on the player's
 		// WorldEntity (like NPCs'), seeded from CharacterMaxStats. World-authoritative, never persisted (only
 		// CharacterMaxStats is). Falls back to a transient seed only if the player isn't in the world yet (no combat/
@@ -56,6 +79,19 @@ namespace Faolan.GameServer.Combat
 			return entity.Vitals ??= EntityVitals.FromCharacter(client.Session.Character);
 		}
 
+		// Applies `damage` to an NPC and pushes its 0x96B8DC59 health update; on death, runs the kill lifecycle
+		// (despawn + scheduled respawn). Vitals resolve from the WORLD MODEL when the target is a model NPC (the
+		// authoritative owner), else fall back to the per-session store (e.g. the built-NPC test). Shared by the melee
+		// and spell paths.
+		// .kill GM command: kill an NPC target outright by applying its full remaining health as damage, so it runs
+		// the normal death lifecycle (vitals push, despawn/corpse-loot, XP, kill-quest advance). No-op if the target
+		// isn't a live NPC in the killer's zone.
+		public Task KillNpc(INetworkClient client, uint targetHandle)
+		{
+			var target = ResolveNpcVitals(client, targetHandle, out _);
+			return ApplyNpcDamage(client, targetHandle, (int)target.Health, ".kill command");
+		}
+
 		// Resolves an offensive cast: applies damage to the target's live vitals and pushes a 0x96B8DC59 update so
 		// its health bar moves. The ApplySpell cast itself is broadcast by the caller.
 		public async Task ResolveOffensiveCast(INetworkClient client, uint casterHandle, uint targetHandle, uint spellId)
@@ -63,6 +99,42 @@ namespace Faolan.GameServer.Combat
 			var casterLevel = client.Session.Character?.Level ?? 1;
 			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel);
 			await ApplyNpcDamage(client, targetHandle, damage, $"spell {spellId} from 0x{casterHandle:X8}");
+		}
+
+		// The generic "every behavior gets an echo-ack" reply (docs/combat.md rule 1) for an Interact request with no
+		// special result block - the air-swing path uses it, and so does a plain item-use (RightClickItem, e.g. the
+		// Totem of Origin #206). Phase = the request's Mode, or the legacy session counter when the caller didn't
+		// parse the args. No-op for a malformed (too-short) payload.
+		public Task SendBehaviorEchoAck(INetworkClient client, byte[] rawPayload, uint mode)
+		{
+			if (rawPayload.Length < 26)
+				return Task.CompletedTask;
+
+			var instance = client.Session.Account.ClientInstance;
+			var phase = mode != 0
+				? mode
+				: (uint)(++client.Session.NormalAttackAckPhase);
+			return SendWorldPacket(client, BuildBehaviorEchoAckBody(rawPayload, instance, phase));
+		}
+
+		// The floating combat-damage number over the player when an NPC hits them (DamageResultIIR 0xFEC4158A,
+		// target=player + attacker=NPC). The player-attacks-NPC direction already fires this from the swing/cast
+		// resolve; this is the missing NPC-attacks-player half so the player sees the hit number, not just the HP
+		// bar move. Byte-exact builder (CombatEffectBuilder), golden-tested vs the captured NPC->player hit. #274.
+		public Task SendDamageNumber(INetworkClient client, uint targetHandle, uint attackerHandle, uint damage)
+		{
+			return SendWorldPacket(client, CombatEffectBuilder.BuildDamageResult(targetHandle, attackerHandle, damage, 2));
+		}
+
+		// Acks an equip/unequip move (Interact 0x09) and appends the 0x201C bookkeeping entry retail sends with it:
+		// prefix 0x65 + state = the destination equip slot for a move INTO a slot, prefix 0x68 + state 0 for a move
+		// OUT of one (combat capture frames 289-290/320-321/375-376).
+		public async Task SendEquipMoveAck(INetworkClient client, byte[] rawPayload, uint mode, Item movedItem)
+		{
+			if (rawPayload.Length < 26)
+				return;
+
+			await SendWorldPacket(client, BuildEquipMoveAckBody(rawPayload, client.Session.Account.ClientInstance, mode, movedItem));
 		}
 
 		// The melee swing / auto-attack (Interact ActionType 0x0F). Retail's response sequence, reproduced from the
@@ -184,103 +256,26 @@ namespace Faolan.GameServer.Combat
 			// ability id. The capture's beach mobs use ~0xBEEC (48876) across several NPCs (per-NPC jitter of a few);
 			// 0xBEEC is the representative value. (The earlier 769094 was the Normal Attack ABILITY id - wrong field,
 			// which played the player's hit-react + audio but left the NPC body un-animated.)
-			var body = CombatPacketCodec.BuildNpcAttackAnimationAckBody(
-				npcHandle, playerHandle, damage,
-				typeId: 0xBEEC, swingCounter: swingCounter, f5: 24, f11: 64, f12: 56,
-				resultType: 0xCB, resultK1: 1, resultK2: 2);
+			var body = CombatPacketCodec.BuildNpcAttackAnimationAckBody(npcHandle, playerHandle, damage, 0xBEEC, swingCounter, 24, 64, 56, 0xCB, 1, 2);
 			return SendWorldPacket(client, body);
-		}
-
-		// The floating combat-damage number over the player when an NPC hits them (DamageResultIIR 0xFEC4158A,
-		// target=player + attacker=NPC). The player-attacks-NPC direction already fires this from the swing/cast
-		// resolve; this is the missing NPC-attacks-player half so the player sees the hit number, not just the HP
-		// bar move. Byte-exact builder (CombatEffectBuilder), golden-tested vs the captured NPC->player hit. #274.
-		public Task SendDamageNumber(INetworkClient client, uint targetHandle, uint attackerHandle, uint damage)
-		{
-			return SendWorldPacket(client, CombatEffectBuilder.BuildDamageResult(targetHandle, attackerHandle, damage, type: 2));
-		}
-
-		// A DoT tick's StatDamageIIR (the health effect of an active bleed/HoT). idx 1 is the typical effect slot in
-		// the capture; statValue = the resulting HealthCurrent so the client's bar/number matches the vitals move. #274
-		public Task SendStatDamage(INetworkClient client, uint targetHandle, uint statValue, int delta, uint type, uint casterHandle, uint spellBaseId)
-		{
-			return SendWorldPacket(client, CombatEffectBuilder.BuildStatDamage(targetHandle, statValue, delta, type, casterHandle, idx: 1, spellBaseId));
 		}
 
 		// Sends a caster NPC's spell cast to the player it targets (#232): the ApplySpell (0x6B87E316) framed from the
 		// NPC handle (applyFrom = npc, applyTo = player), built from the NPC's NpcSpell row by NpcSpellCastBuilder -
 		// the construct-from-data counterpart of the melee SendNpcAttackAnimation. The HP move rides the caller's
 		// PushVitals; this is the cast packet/effect.
-		public Task SendNpcSpellCast(INetworkClient client, uint npcHandle, World.NpcSpellCast spell)
+		public Task SendNpcSpellCast(INetworkClient client, uint npcHandle, NpcSpellCast spell)
 		{
 			var playerHandle = client.Session.Account.ClientInstance;
 			var body = NpcSpellCastBuilder.Build(playerHandle, npcHandle, spell.SpellId, spell.Payload);
 			return SendWorldPacket(client, body);
 		}
 
-		// The 8-byte filler retail writes where an item identity quad would otherwise go in a behavior ack
-		// (B2 90 80 5C 29 E6 27 CA - the same null-identity padding as the 0xF result block and the 0x2052 grant).
-		internal static readonly byte[] NullIdentityFiller = [0xB2, 0x90, 0x80, 0x5C, 0x29, 0xE6, 0x27, 0xCA];
-
-		// Builds the generic BehaviorControlCenterIIR echo-ack body for an Interact request: retail acks every
-		// behavior request by echoing it with the sequence incremented and a field3 "phase" spliced into the args -
-		// and the phase value IS THE REQUEST'S OWN Mode (field 2), not a server counter (armed+unarmed combat
-		// capture 2026-06-12: every ack's 0x18 varint equals the request's 0x10 varint). The tail is echoed verbatim
-		// (or replaced by `tailOverride`) with 12 zero bytes appended. This is the complete ack for air swings; the
-		// result-block ack (SendNormalAttackResponse) is the targeted-hit variant.
-		internal static byte[] BuildBehaviorEchoAckBody(byte[] rawPayload, uint instance, uint phase, byte[] tailOverride = null)
+		// A DoT tick's StatDamageIIR (the health effect of an active bleed/HoT). idx 1 is the typical effect slot in
+		// the capture; statValue = the resulting HealthCurrent so the client's bar/number matches the vitals move. #274
+		public Task SendStatDamage(INetworkClient client, uint targetHandle, uint statValue, int delta, uint type, uint casterHandle, uint spellBaseId)
 		{
-			// rawPayload = [bodyLen u32][subop u32][c350 u32][instance u32][seq u16][behaviorId u32][argsLen u32][args][tail]
-			var seq = (ushort)((rawPayload[16] << 8) | rawPayload[17]);
-			var behaviorId = BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(18, 4));
-			var argsLen = (int)BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(22, 4));
-			var echoedArgs = InsertBehaviorPhaseField(rawPayload[26..(26 + argsLen)], phase);
-			var tail = tailOverride ?? rawPayload[(26 + argsLen)..];
-
-			using var s = new FaolanStream();
-			s
-				.WriteUInt32(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR)
-				.WriteUInt32(0x0000C350u)
-				.WriteUInt32(instance)
-				.WriteUInt16((ushort)(seq + 1))
-				.WriteUInt32(behaviorId)
-				.WriteUInt32((uint)echoedArgs.Length)
-				.WriteArray(echoedArgs)
-				.WriteArray(tail)
-				.WriteArray(new byte[12]);
-			return s.ToArray();
-		}
-
-		// The equip/unequip (Interact 0x09) ack: the echo-ack with the tail's zero padding replaced by an identity
-		// block - the first 28 tail bytes ([0/srcSlot][destSlot][item][item][0][flags][0]) echoed, then the moved
-		// item's Data1..4 key quad twice + the null filler twice (equip), or the null filler six times (unequip).
-		// Byte-exact against the capture's frames 289/320/375 (BehaviorAckTests).
-		internal static byte[] BuildEquipMoveAckBody(byte[] rawPayload, uint instance, uint phase, Item item)
-		{
-			var argsLen = (int)BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(22, 4));
-			var reqTail = rawPayload[(26 + argsLen)..];
-
-			using var tail = new FaolanStream();
-			tail.WriteArray(reqTail[..Math.Min(28, reqTail.Length)]);
-			if (item != null)
-			{
-				for (var i = 0; i < 2; i++)
-					tail
-						.WriteUInt32(item.Data1)
-						.WriteUInt32(item.Data2)
-						.WriteUInt32(item.Data3)
-						.WriteUInt32(item.Data4);
-				tail
-					.WriteArray(NullIdentityFiller)
-					.WriteArray(NullIdentityFiller);
-			}
-			else
-			{
-				for (var i = 0; i < 6; i++)
-					tail.WriteArray(NullIdentityFiller);
-			}
-
-			return BuildBehaviorEchoAckBody(rawPayload, instance, phase, tail.ToArray());
+			return SendWorldPacket(client, CombatEffectBuilder.BuildStatDamage(targetHandle, statValue, delta, type, casterHandle, 1, spellBaseId));
 		}
 
 		// The unarmed swing (Interact action 0x11, empty main hand; behavior TypeIds 1089xx, ability id in the
@@ -307,70 +302,19 @@ namespace Faolan.GameServer.Combat
 			await SendSwingDamage(client, instance, targetHandle, damage);
 		}
 
-		// Acks an equip/unequip move (Interact 0x09) and appends the 0x201C bookkeeping entry retail sends with it:
-		// prefix 0x65 + state = the destination equip slot for a move INTO a slot, prefix 0x68 + state 0 for a move
-		// OUT of one (combat capture frames 289-290/320-321/375-376).
-		public async Task SendEquipMoveAck(INetworkClient client, byte[] rawPayload, uint mode, Item movedItem)
+		// Spends the caster's mana for a cast and pushes the caster's own 0x96B8DC59 update so the mana bar drops -
+		// the spell/mana analogue of the melee swing's stamina cost. (Mana isn't carried by EnergyIIR, which is
+		// stamina-only in the captures; it rides the vitals stat block.) Per-spell costs aren't decoded yet, so the
+		// cost is provisional. No-op if the player has no mana pool.
+		public async Task SpendCasterMana(INetworkClient client, uint spellId)
 		{
-			if (rawPayload.Length < 26)
+			var player = GetOrAddPlayerVitals(client);
+			if (player.MaxMana == 0)
 				return;
 
-			await SendWorldPacket(client, BuildEquipMoveAckBody(rawPayload, client.Session.Account.ClientInstance, mode, movedItem));
-		}
-
-		// The generic "every behavior gets an echo-ack" reply (docs/combat.md rule 1) for an Interact request with no
-		// special result block - the air-swing path uses it, and so does a plain item-use (RightClickItem, e.g. the
-		// Totem of Origin #206). Phase = the request's Mode, or the legacy session counter when the caller didn't
-		// parse the args. No-op for a malformed (too-short) payload.
-		public Task SendBehaviorEchoAck(INetworkClient client, byte[] rawPayload, uint mode)
-		{
-			if (rawPayload.Length < 26)
-				return Task.CompletedTask;
-
-			var instance = client.Session.Account.ClientInstance;
-			var phase = mode != 0
-				? mode
-				: (uint)(++client.Session.NormalAttackAckPhase);
-			return SendWorldPacket(client, BuildBehaviorEchoAckBody(rawPayload, instance, phase));
-		}
-
-		// Builds the BCC behavior echo a VIEWER should receive to render this actor's swing/cast: the same plain
-		// echo-ack body the actor's own client gets (instance = the actor's handle, args + phase, request tail), which
-		// is exactly what retail relays to nearby players (other-players-visible capture: s2c BCC for other-player
-		// handles, structurally identical to the self-echo - NOT the targeted result-block ack). The caller broadcasts
-		// it via WorldBroadcaster.BroadcastBehaviorToViewers. Null for a malformed payload. Phase = the request's Mode
-		// (non-zero for real attacks/casts); 1 as a defensive fallback so we never touch the actor's ack counter here.
-		public byte[] BuildBehaviorRelayBody(INetworkClient actor, byte[] rawPayload, uint mode)
-		{
-			if (rawPayload.Length < 26)
-				return null;
-
-			var instance = actor.Session.Account.ClientInstance;
-			return BuildBehaviorEchoAckBody(rawPayload, instance, mode != 0 ? mode : 1u);
-		}
-
-		// Frames a raw 0x2000 body on the world conversation.
-		private static Task SendWorldPacket(INetworkClient client, byte[] body)
-		{
-			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArrayUInt32Length(s => s.WriteArray(body))
-				.SendAsync(client);
-		}
-
-		// The hit side of a swing: DamageResultIIR + the target's live-vitals application + the player's EnergyIIR
-		// stamina update (the retail post-ack trio of the armed swing path).
-		private async Task SendSwingDamage(INetworkClient client, uint instance, uint targetHandle, uint damage)
-		{
-			await SendWorldPacket(client, CombatPacketCodec.BuildDamageResultBody(instance, targetHandle, damage));
-
-			await ApplyNpcDamage(client, targetHandle, (int)damage, $"melee from 0x{instance:X8}");
-
-			// Cleave: the swing also hits the hostile NPCs clustered around the target (#18).
-			await ApplyMeleeCleave(client, instance, targetHandle, damage);
-
-			var player = GetOrAddPlayerVitals(client);
-			await SendWorldPacket(client, CombatPacketCodec.BuildEnergyBody(instance, player.Stamina));
+			var cost = CombatResolver.ResolveSpellManaCost(spellId, client.Session.Character?.Level ?? 1);
+			player.ApplyManaDelta(-(int)cost);
+			await SendStatUpdate(client, player.ToVitalsBlock(), client.Session.Account.ClientInstance);
 		}
 
 		// Melee cleave (#18): an AoC swing hits an arc, not just the selected target. After the primary hit, splash the
@@ -389,34 +333,6 @@ namespace Faolan.GameServer.Combat
 				await SendWorldPacket(client, CombatPacketCodec.BuildDamageResultBody(instance, secondary.Handle, damage));
 				await ApplyNpcDamage(client, secondary.Handle, (int)damage, $"melee cleave from 0x{instance:X8}");
 			}
-		}
-
-		// Spends the caster's mana for a cast and pushes the caster's own 0x96B8DC59 update so the mana bar drops -
-		// the spell/mana analogue of the melee swing's stamina cost. (Mana isn't carried by EnergyIIR, which is
-		// stamina-only in the captures; it rides the vitals stat block.) Per-spell costs aren't decoded yet, so the
-		// cost is provisional. No-op if the player has no mana pool.
-		public async Task SpendCasterMana(INetworkClient client, uint spellId)
-		{
-			var player = GetOrAddPlayerVitals(client);
-			if (player.MaxMana == 0)
-				return;
-
-			var cost = CombatResolver.ResolveSpellManaCost(spellId, client.Session.Character?.Level ?? 1);
-			player.ApplyManaDelta(-(int)cost);
-			await SendStatUpdate(client, player.ToVitalsBlock(), client.Session.Account.ClientInstance);
-		}
-
-		// Applies `damage` to an NPC and pushes its 0x96B8DC59 health update; on death, runs the kill lifecycle
-		// (despawn + scheduled respawn). Vitals resolve from the WORLD MODEL when the target is a model NPC (the
-		// authoritative owner), else fall back to the per-session store (e.g. the built-NPC test). Shared by the melee
-		// and spell paths.
-		// .kill GM command: kill an NPC target outright by applying its full remaining health as damage, so it runs
-		// the normal death lifecycle (vitals push, despawn/corpse-loot, XP, kill-quest advance). No-op if the target
-		// isn't a live NPC in the killer's zone.
-		public Task KillNpc(INetworkClient client, uint targetHandle)
-		{
-			var target = ResolveNpcVitals(client, targetHandle, out _);
-			return ApplyNpcDamage(client, targetHandle, (int)target.Health, ".kill command");
 		}
 
 		private async Task ApplyNpcDamage(INetworkClient client, uint targetHandle, int damage, string cause)
@@ -461,9 +377,7 @@ namespace Faolan.GameServer.Combat
 
 			await _database.SetCharacterProgress(character.Id, character.Experience, character.Level);
 
-			var block = new CharacterStatBlock()
-				.Set(LegacyCharacterStatId.Exp, character.Experience)
-				.Set(LegacyCharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
+			var block = new CharacterStatBlock().Set(LegacyCharacterStatId.Exp, character.Experience).Set(LegacyCharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
 			await SendStatUpdate(killer, block, killer.Session.Account.ClientInstance);
 			_logger.LogInformation("Combat: {Name} gained {Xp} XP ({Exp}/{Max}).", character.Name, xp, character.Experience, LevelingResolver.XpForNextLevel(character.Level));
 		}
@@ -473,11 +387,12 @@ namespace Faolan.GameServer.Combat
 		// not spawned via the burst (e.g. the built-NPC test).
 		private EntityVitals GetOrAddNpcVitals(INetworkClient client, uint targetHandle)
 		{
-			return _combat.GetOrAdd(targetHandle, () =>
-			{
-				var maxHealth = client.Session.SpawnedNpcMaxHealthByHandle.GetValueOrDefault(targetHandle, CombatResolver.DefaultNpcMaxHealth);
-				return EntityVitals.FromMax(maxHealth, 0, maxHealth);
-			});
+			return _combat.GetOrAdd(targetHandle,
+				() =>
+				{
+					var maxHealth = client.Session.SpawnedNpcMaxHealthByHandle.GetValueOrDefault(targetHandle, CombatResolver.DefaultNpcMaxHealth);
+					return EntityVitals.FromMax(maxHealth, 0, maxHealth);
+				});
 		}
 
 		// An NPC was killed by `killer`: a model NPC is marked dead (starting its respawn timer), despawned for nearby
@@ -505,8 +420,13 @@ namespace Faolan.GameServer.Combat
 				await AwardKillXp(killer, npcEntity.Level);
 
 				_logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); corpse lingers {Linger}s then becomes lootable, {Fate}.",
-					npcEntity.Name, targetHandle, cause, WorldEntity.CorpseLingerSeconds,
-					npcEntity.NoRespawn ? $"then fades (no respawn)" : $"respawns in {npcEntity.RespawnDelaySeconds}s");
+					npcEntity.Name,
+					targetHandle,
+					cause,
+					WorldEntity.CorpseLingerSeconds,
+					npcEntity.NoRespawn
+						? "then fades (no respawn)"
+						: $"respawns in {npcEntity.RespawnDelaySeconds}s");
 				// Quest chain (#261): a kill advances/completes any matching kill goal. A chained stage (e.g. Casilda's
 				// 13479) completes + supersedes to the next stage; a chainless kill quest keeps the legacy turn-in path.
 				await _questProgression.AdvanceKillGoals(killer, npcEntity.Name);
@@ -543,29 +463,89 @@ namespace Faolan.GameServer.Combat
 			await SendStatUpdate(killer, block, killer.Session.Account.ClientInstance);
 		}
 
-		// Frames a FormatFeedbackIIR body (which already carries its own u32 length prefix) raw on the world
-		// conversation - unlike SendWorldPacket, which length-wraps a bare body.
-		private static Task SendWorldFeedback(INetworkClient client, byte[] feedbackBody)
-		{
-			return new PacketStream()
-				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(feedbackBody)
-				.SendAsync(client);
-		}
-
 		// The NPC's authoritative live vitals: the world-model entity's if it is a tracked NPC (also returned, so the
 		// caller can run its death lifecycle), otherwise the per-session vitals (npcEntity null).
 		private EntityVitals ResolveNpcVitals(INetworkClient client, uint targetHandle, out WorldEntity npcEntity)
 		{
 			var player = _sim.PlayerWorldEntity(client);
-			if (player != null && _sim
-				    .World
-				    .ZoneForEntity(player)
-				    .TryGet(targetHandle, out npcEntity) && !npcEntity.IsPlayer && npcEntity.Vitals != null)
+			if (player != null && _sim.World.ZoneForEntity(player).TryGet(targetHandle, out npcEntity) && !npcEntity.IsPlayer && npcEntity.Vitals != null)
 				return npcEntity.Vitals;
 
 			npcEntity = null;
 			return GetOrAddNpcVitals(client, targetHandle);
+		}
+
+		// The hit side of a swing: DamageResultIIR + the target's live-vitals application + the player's EnergyIIR
+		// stamina update (the retail post-ack trio of the armed swing path).
+		private async Task SendSwingDamage(INetworkClient client, uint instance, uint targetHandle, uint damage)
+		{
+			await SendWorldPacket(client, CombatPacketCodec.BuildDamageResultBody(instance, targetHandle, damage));
+
+			await ApplyNpcDamage(client, targetHandle, (int)damage, $"melee from 0x{instance:X8}");
+
+			// Cleave: the swing also hits the hostile NPCs clustered around the target (#18).
+			await ApplyMeleeCleave(client, instance, targetHandle, damage);
+
+			var player = GetOrAddPlayerVitals(client);
+			await SendWorldPacket(client, CombatPacketCodec.BuildEnergyBody(instance, player.Stamina));
+		}
+
+		// Builds the generic BehaviorControlCenterIIR echo-ack body for an Interact request: retail acks every
+		// behavior request by echoing it with the sequence incremented and a field3 "phase" spliced into the args -
+		// and the phase value IS THE REQUEST'S OWN Mode (field 2), not a server counter (armed+unarmed combat
+		// capture 2026-06-12: every ack's 0x18 varint equals the request's 0x10 varint). The tail is echoed verbatim
+		// (or replaced by `tailOverride`) with 12 zero bytes appended. This is the complete ack for air swings; the
+		// result-block ack (SendNormalAttackResponse) is the targeted-hit variant.
+		internal static byte[] BuildBehaviorEchoAckBody(byte[] rawPayload, uint instance, uint phase, byte[] tailOverride = null)
+		{
+			// rawPayload = [bodyLen u32][subop u32][c350 u32][instance u32][seq u16][behaviorId u32][argsLen u32][args][tail]
+			var seq = (ushort)((rawPayload[16] << 8) | rawPayload[17]);
+			var behaviorId = BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(18, 4));
+			var argsLen = (int)BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(22, 4));
+			var echoedArgs = InsertBehaviorPhaseField(rawPayload[26..(26 + argsLen)], phase);
+			var tail = tailOverride ?? rawPayload[(26 + argsLen)..];
+
+			using var s = new FaolanStream();
+			s
+				.WriteUInt32(GameServer0X2000RespondsOpcodes.BehaviorControlCenterIIR)
+				.WriteUInt32(0x0000C350u)
+				.WriteUInt32(instance)
+				.WriteUInt16((ushort)(seq + 1))
+				.WriteUInt32(behaviorId)
+				.WriteUInt32((uint)echoedArgs.Length)
+				.WriteArray(echoedArgs)
+				.WriteArray(tail)
+				.WriteArray(new byte[12]);
+			return s.ToArray();
+		}
+
+		// The equip/unequip (Interact 0x09) ack: the echo-ack with the tail's zero padding replaced by an identity
+		// block - the first 28 tail bytes ([0/srcSlot][destSlot][item][item][0][flags][0]) echoed, then the moved
+		// item's Data1..4 key quad twice + the null filler twice (equip), or the null filler six times (unequip).
+		// Byte-exact against the capture's frames 289/320/375 (BehaviorAckTests).
+		internal static byte[] BuildEquipMoveAckBody(byte[] rawPayload, uint instance, uint phase, Item item)
+		{
+			var argsLen = (int)BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(22, 4));
+			var reqTail = rawPayload[(26 + argsLen)..];
+
+			using var tail = new FaolanStream();
+			tail.WriteArray(reqTail[..Math.Min(28, reqTail.Length)]);
+			if (item != null)
+			{
+				for (var i = 0; i < 2; i++)
+				{
+					tail.WriteUInt32(item.Data1).WriteUInt32(item.Data2).WriteUInt32(item.Data3).WriteUInt32(item.Data4);
+				}
+
+				tail.WriteArray(NullIdentityFiller).WriteArray(NullIdentityFiller);
+			}
+			else
+			{
+				for (var i = 0; i < 6; i++)
+					tail.WriteArray(NullIdentityFiller);
+			}
+
+			return BuildBehaviorEchoAckBody(rawPayload, instance, phase, tail.ToArray());
 		}
 
 		// Splices field3 (the behaviour "phase", tag 0x18 varint) into the request args right after field2, matching
@@ -634,6 +614,19 @@ namespace Faolan.GameServer.Combat
 		private static Task SendStatUpdate(INetworkClient client, CharacterStatBlock stats, uint? entityHandle = null)
 		{
 			return client.SendAsync(VitalsPacket.BuildStatUpdate(client, stats, entityHandle));
+		}
+
+		// Frames a FormatFeedbackIIR body (which already carries its own u32 length prefix) raw on the world
+		// conversation - unlike SendWorldPacket, which length-wraps a bare body.
+		private static Task SendWorldFeedback(INetworkClient client, byte[] feedbackBody)
+		{
+			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier).WriteArray(feedbackBody).SendAsync(client);
+		}
+
+		// Frames a raw 0x2000 body on the world conversation.
+		private static Task SendWorldPacket(INetworkClient client, byte[] body)
+		{
+			return new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
 		}
 	}
 }

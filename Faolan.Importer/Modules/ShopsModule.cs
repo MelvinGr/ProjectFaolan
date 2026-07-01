@@ -10,11 +10,18 @@ namespace Faolan.Importer.Modules
 	// TODO(importer step 2a): thread ctx.Mode (Insert/Overwrite) into CaptureShopImporter.
 	public sealed class ShopsModule : IImportModule
 	{
-		public string Name => "shops";
-		public string Description => "Vendor shop windows (0x2033 NPC trade lists).";
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Insert, WriteMode.Upsert };
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "Vendor shop windows (0x2033 NPC trade lists).";
+		public string Name => "shops";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{

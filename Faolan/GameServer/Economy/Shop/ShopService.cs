@@ -1,9 +1,10 @@
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
@@ -28,168 +29,28 @@ namespace Faolan.GameServer.Economy.Shop
 	// on the listener because they're shared by many subsystems).
 	public sealed class ShopService
 	{
-		private readonly IDatabaseRepository _database;
-		private readonly ILogger _logger;
-		private readonly IEconomyOutbound _outbound;
-
-		public ShopService(IDatabaseRepository database, ILogger logger, IEconomyOutbound outbound)
-		{
-			_database = database;
-			_logger = logger;
-			_outbound = outbound;
-		}
-
-		// The last sale per connection, so UndoLastSoldItem can restore it (retail's undo is single-step too).
-		private sealed record LastShopSale(int Container, int Slot, uint ItemId, uint Count, uint PriceTin);
-
-		private readonly ConcurrentDictionary<INetworkClient, LastShopSale> _lastShopSale = new ConcurrentDictionary<INetworkClient, LastShopSale>();
-
-		// The shop window the client currently has open, recorded when we send DispatchShopData. BuyItem only
-		// carries the session-volatile shop instance + a slot position, so we need the open window's wares to
-		// resolve the position back to a template id and price it. Keyed by Pos (the shop-window slot).
-		private sealed record OpenShop(uint Instance, string VendorName, IReadOnlyDictionary<uint, ShopItem> WaresByPos);
-
-		private readonly ConcurrentDictionary<INetworkClient, OpenShop> _openShop = new ConcurrentDictionary<INetworkClient, OpenShop>();
-
-		// Session-volatile shop instance ids we hand the client in DispatchShopData (the value the BuyItem echoes
-		// back). Uniqueness only needs to hold within a session; a process-wide counter is plenty.
-		private static int _shopInstanceSeq;
-
-		// The per-unit value in tin (the wallet wire unit) = round(Item.Value / 10), where Item.Value is the RDB
-		// item-template's field 74. Proven by the captured sales (190->19, 920->92, 560->56 tin; #137). Value 0 is a
-		// genuinely valueless item (the template carries field 74 == 0, e.g. the unsellable Totem of Origins) -> 0,
-		// NOT a price; SELL treats that as unsellable and BUY adds its markup on top.
-		private static uint PerUnitValueTin(uint value)
-		{
-			return value > 0 ? System.Math.Max(1u, (value + 5) / 10) : 0;
-		}
-
-		// Vendor SELL price in tin (what the player gets selling to the vendor) = round(value/10) per unit. Returns 0
-		// for a valueless item (Item.Value == 0) - HandleSellItemToShop refuses to sell those (they are no-value /
-		// no-sell, like the Totem of Origins), rather than inventing a level-based price.
-		public static uint VendorPriceTin(uint value, uint count)
-		{
-			return PerUnitValueTin(value) * System.Math.Max(1u, count);
-		}
-
 		// Vendor BUY price in tin (what the player pays): a flat markup over the SAME item's sell value so wares
 		// can't be flipped for free (buy > sell). Grounded in the real value when known; the markup itself has no
 		// captured anchor and stays the open part (#137). A value-less ware still costs at least the markup (min 1
 		// per-unit) so the shop never gives it away free.
 		public const uint VendorBuyMarkup = 4;
 
-		public static uint VendorBuyPriceTin(uint value, uint count)
+		// Session-volatile shop instance ids we hand the client in DispatchShopData (the value the BuyItem echoes
+		// back). Uniqueness only needs to hold within a session; a process-wide counter is plenty.
+		private static int _shopInstanceSeq;
+
+		private readonly ConcurrentDictionary<INetworkClient, LastShopSale> _lastShopSale = new ConcurrentDictionary<INetworkClient, LastShopSale>();
+
+		private readonly ConcurrentDictionary<INetworkClient, OpenShop> _openShop = new ConcurrentDictionary<INetworkClient, OpenShop>();
+		private readonly IDatabaseRepository _database;
+		private readonly IEconomyOutbound _outbound;
+		private readonly ILogger _logger;
+
+		public ShopService(IDatabaseRepository database, ILogger logger, IEconomyOutbound outbound)
 		{
-			return System.Math.Max(1u, PerUnitValueTin(value)) * System.Math.Max(1u, count) * VendorBuyMarkup;
-		}
-
-		// DL 0x2035 - tells the client the bag slot was sold (it clears the slot itself).
-		// Body golden-tested against the captured slot-5 sale (ShopTests).
-		public static void WriteItemSoldBody(FaolanStream s, uint container, uint characterId, uint slot)
-		{
-			s
-				.WriteUInt32(container)
-				.WriteUInt32(characterId)
-				.WriteUInt32(slot);
-		}
-
-		// UL 0x2034 SellItem: validate the bag slot, price the item, remove it, credit the wallet, and confirm
-		// with DispatchItemSoldToShop + the 0x2005 balance update (retail's exact reply trio minus the 0x201C
-		// record-stream entry, which is bookkeeping we don't model).
-		public async Task HandleSellItemToShop(INetworkClient client, ConanPacket packet)
-		{
-			packet.Body.ReadUInt32(); // shop ID32 type (0xC75B)
-			var shopId = packet.Body.ReadUInt32();
-			var container = packet.Body.ReadUInt32();
-			var sellerId = packet.Body.ReadUInt32();
-			var slot = packet.Body.ReadUInt32();
-
-			var character = client.Session.Character;
-			if (character == null)
-				return;
-
-			var row = (await _database.GetCharacterInventory(character.Id))
-				.FirstOrDefault(i => i.Container == (int)container && i.Slot == (int)slot);
-			if (row?.Item == null)
-			{
-				_logger.LogWarning("SellItem to shop {Shop:X}: no item in container {Container} slot {Slot} for {Character}.", shopId, container, slot, character.Name);
-				return;
-			}
-
-			var price = VendorPriceTin(row.Item.Value, row.Count);
-			if (price == 0)
-			{
-				// A valueless item (RDB value 0, e.g. the Totem of Origins) is no-sell - refuse rather than invent
-				// a price. The client keeps the item in the slot since we send no DispatchItemSoldToShop.
-				_logger.LogInformation("SellItem: {Item} (template {Template}) is valueless / not sellable for {Character}.", row.Item.Name, row.Item.Id, character.Name);
-				return;
-			}
-
-			await _database.SetCharacterInventorySlot(character.Id, (int)container, (int)slot, null);
-			character.Money += price;
-			await _database.SetCharacterMoney(character.Id, character.Money);
-			_lastShopSale[client] = new LastShopSale((int)container, (int)slot, row.ItemId ?? 0, row.Count, price);
-
-			var ps = new PacketStream();
-			ps.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, GameCharInterfaceDispatchOpcodes.DispatchItemSoldToShop);
-			WriteItemSoldBody(ps, container, sellerId, slot);
-			await ps.SendAsync(client);
-			await _outbound.SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Gain);
-
-			_logger.LogInformation("Shop: {Character} sold \"{Item}\" x{Count} (container {Container} slot {Slot}) for {Price} tin (wallet {Balance}).",
-				character.Name, row.Item.Name, row.Count, container, slot, price, character.Money);
-		}
-
-		// UL 0x2035 UndoLastSoldItem: restore the last sale (item back to its slot, price debited).
-		public async Task HandleUndoLastSoldItem(INetworkClient client)
-		{
-			var character = client.Session.Character;
-			if (character == null || !_lastShopSale.TryRemove(client, out var sale) || sale.ItemId == 0)
-			{
-				_logger.LogInformation("UndoLastSoldItem: nothing to undo.");
-				return;
-			}
-
-			await _database.SetCharacterInventorySlot(character.Id, sale.Container, sale.Slot, sale.ItemId, sale.Count);
-			character.Money = character.Money >= sale.PriceTin
-				? character.Money - sale.PriceTin
-				: 0;
-			await _database.SetCharacterMoney(character.Id, character.Money);
-			await _outbound.SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Spend);
-
-			_logger.LogInformation("Shop: {Character} undid the sale of item {ItemId} (slot {Slot}); {Price} tin debited (wallet {Balance}).",
-				character.Name, sale.ItemId, sale.Slot, sale.PriceTin, character.Money);
-		}
-
-		// DL 0x2033 DispatchShopData: serve a vendor's window and remember it for this session so BuyItem can
-		// resolve a clicked slot. `npcHandle` is the vendor's world-entity handle (the client renders the window
-		// against it). NB: the window only OPENS in-client off the client's own NPC trade-initiation (the shop is
-		// KnubotStartTrade-gated, same family as the mid-session-spawn blocker); a cold push doesn't pop the
-		// window. This sets up the server-side state so the BUY round-trip is complete and exercisable.
-		public async Task SendShopData(INetworkClient client, Faolan.Core.Database.Tables.Shop shop, uint npcHandle)
-		{
-			// The codec's item resolver is synchronous; pre-resolve each ware's Items row up front.
-			var resolved = new Dictionary<uint, Item>();
-			foreach (var ware in shop.Items)
-				if (!resolved.ContainsKey(ware.ItemTemplateId))
-					resolved[ware.ItemTemplateId] = await _database.GetItem(ware.ItemTemplateId);
-
-			var instance = (uint)(0x00010000 + (Interlocked.Increment(ref _shopInstanceSeq) & 0xFFFF));
-			var body = ShopContentCodec.Build(instance, npcHandle, shop.MaxSize, shop.Items, id => resolved.GetValueOrDefault(id));
-
-			// Track only the wares that actually resolved (the codec skips the rest, so their slots aren't on the wire).
-			var waresByPos = shop.Items
-				.Where(w => resolved.GetValueOrDefault(w.ItemTemplateId) != null)
-				.ToDictionary(w => w.Pos);
-			_openShop[client] = new OpenShop(instance, shop.VendorName, waresByPos);
-
-			var ps = new PacketStream();
-			ps.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x58), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, client.Session.Account.ClientInstance), GameCharInterfaceDispatchOpcodes.DispatchShopData);
-			ps.WriteArray(body);
-			await ps.SendAsync(client);
-
-			_logger.LogInformation("Shop: served \"{Vendor}\" (instance 0x{Instance:X}, {Count} wares) to {Character}.",
-				shop.VendorName, instance, waresByPos.Count, client.Session.Character?.Name);
+			_database = database;
+			_logger = logger;
+			_outbound = outbound;
 		}
 
 		// UL 0x2033 BuyItem [shop ID32 type][shop instance][slot]: resolve the clicked slot against the open shop,
@@ -217,8 +78,7 @@ namespace Faolan.GameServer.Economy.Shop
 			var price = VendorBuyPriceTin(wareItem?.Value ?? 0, ware.Count);
 			if (character.Money < price)
 			{
-				_logger.LogInformation("BuyItem: {Character} can't afford ware {Template} at slot {Pos} ({Price} tin, has {Balance}).",
-					character.Name, ware.ItemTemplateId, pos, price, character.Money);
+				_logger.LogInformation("BuyItem: {Character} can't afford ware {Template} at slot {Pos} ({Price} tin, has {Balance}).", character.Name, ware.ItemTemplateId, pos, price, character.Money);
 				return;
 			}
 
@@ -226,8 +86,7 @@ namespace Faolan.GameServer.Economy.Shop
 			var slot = await _outbound.GrantItemToBackpack(client, ware.ItemTemplateId, ware.Count);
 			if (slot == null)
 			{
-				_logger.LogWarning("BuyItem: couldn't grant ware {Template} to {Character} (bag full or item not buildable); purchase aborted.",
-					ware.ItemTemplateId, character.Name);
+				_logger.LogWarning("BuyItem: couldn't grant ware {Template} to {Character} (bag full or item not buildable); purchase aborted.", ware.ItemTemplateId, character.Name);
 				return;
 			}
 
@@ -236,7 +95,157 @@ namespace Faolan.GameServer.Economy.Shop
 			await _outbound.SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Spend);
 
 			_logger.LogInformation("Shop: {Character} bought ware {Template} x{Count} (slot {Pos}) from \"{Vendor}\" for {Price} tin into bag slot {BagSlot} (wallet {Balance}).",
-				character.Name, ware.ItemTemplateId, ware.Count, pos, shop.VendorName, price, slot, character.Money);
+				character.Name,
+				ware.ItemTemplateId,
+				ware.Count,
+				pos,
+				shop.VendorName,
+				price,
+				slot,
+				character.Money);
 		}
+
+		// UL 0x2034 SellItem: validate the bag slot, price the item, remove it, credit the wallet, and confirm
+		// with DispatchItemSoldToShop + the 0x2005 balance update (retail's exact reply trio minus the 0x201C
+		// record-stream entry, which is bookkeeping we don't model).
+		public async Task HandleSellItemToShop(INetworkClient client, ConanPacket packet)
+		{
+			packet.Body.ReadUInt32(); // shop ID32 type (0xC75B)
+			var shopId = packet.Body.ReadUInt32();
+			var container = packet.Body.ReadUInt32();
+			var sellerId = packet.Body.ReadUInt32();
+			var slot = packet.Body.ReadUInt32();
+
+			var character = client.Session.Character;
+			if (character == null)
+				return;
+
+			var row = (await _database.GetCharacterInventory(character.Id)).FirstOrDefault(i => i.Container == (int)container && i.Slot == (int)slot);
+			if (row?.Item == null)
+			{
+				_logger.LogWarning("SellItem to shop {Shop:X}: no item in container {Container} slot {Slot} for {Character}.", shopId, container, slot, character.Name);
+				return;
+			}
+
+			var price = VendorPriceTin(row.Item.Value, row.Count);
+			if (price == 0)
+			{
+				// A valueless item (RDB value 0, e.g. the Totem of Origins) is no-sell - refuse rather than invent
+				// a price. The client keeps the item in the slot since we send no DispatchItemSoldToShop.
+				_logger.LogInformation("SellItem: {Item} (template {Template}) is valueless / not sellable for {Character}.", row.Item.Name, row.Item.Id, character.Name);
+				return;
+			}
+
+			await _database.SetCharacterInventorySlot(character.Id, (int)container, (int)slot, null);
+			character.Money += price;
+			await _database.SetCharacterMoney(character.Id, character.Money);
+			_lastShopSale[client] = new LastShopSale((int)container, (int)slot, row.ItemId ?? 0, row.Count, price);
+
+			var ps = new PacketStream();
+			ps.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, GameCharInterfaceDispatchOpcodes.DispatchItemSoldToShop);
+			WriteItemSoldBody(ps, container, sellerId, slot);
+			await ps.SendAsync(client);
+			await _outbound.SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Gain);
+
+			_logger.LogInformation("Shop: {Character} sold \"{Item}\" x{Count} (container {Container} slot {Slot}) for {Price} tin (wallet {Balance}).",
+				character.Name,
+				row.Item.Name,
+				row.Count,
+				container,
+				slot,
+				price,
+				character.Money);
+		}
+
+		// UL 0x2035 UndoLastSoldItem: restore the last sale (item back to its slot, price debited).
+		public async Task HandleUndoLastSoldItem(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			if (character == null || !_lastShopSale.TryRemove(client, out var sale) || sale.ItemId == 0)
+			{
+				_logger.LogInformation("UndoLastSoldItem: nothing to undo.");
+				return;
+			}
+
+			await _database.SetCharacterInventorySlot(character.Id, sale.Container, sale.Slot, sale.ItemId, sale.Count);
+			character.Money = character.Money >= sale.PriceTin
+				? character.Money - sale.PriceTin
+				: 0;
+			await _database.SetCharacterMoney(character.Id, character.Money);
+			await _outbound.SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Spend);
+
+			_logger.LogInformation("Shop: {Character} undid the sale of item {ItemId} (slot {Slot}); {Price} tin debited (wallet {Balance}).", character.Name, sale.ItemId, sale.Slot, sale.PriceTin, character.Money);
+		}
+
+		// DL 0x2033 DispatchShopData: serve a vendor's window and remember it for this session so BuyItem can
+		// resolve a clicked slot. `npcHandle` is the vendor's world-entity handle (the client renders the window
+		// against it). NB: the window only OPENS in-client off the client's own NPC trade-initiation (the shop is
+		// KnubotStartTrade-gated, same family as the mid-session-spawn blocker); a cold push doesn't pop the
+		// window. This sets up the server-side state so the BUY round-trip is complete and exercisable.
+		public async Task SendShopData(INetworkClient client, Core.Database.Tables.Shop shop, uint npcHandle)
+		{
+			// The codec's item resolver is synchronous; pre-resolve each ware's Items row up front.
+			var resolved = new Dictionary<uint, Item>();
+			foreach (var ware in shop.Items)
+			{
+				if (!resolved.ContainsKey(ware.ItemTemplateId))
+					resolved[ware.ItemTemplateId] = await _database.GetItem(ware.ItemTemplateId);
+			}
+
+			var instance = (uint)(0x00010000 + (Interlocked.Increment(ref _shopInstanceSeq) & 0xFFFF));
+			var body = ShopContentCodec.Build(instance, npcHandle, shop.MaxSize, shop.Items, id => resolved.GetValueOrDefault(id));
+
+			// Track only the wares that actually resolved (the codec skips the rest, so their slots aren't on the wire).
+			var waresByPos = shop.Items.Where(w => resolved.GetValueOrDefault(w.ItemTemplateId) != null).ToDictionary(w => w.Pos);
+			_openShop[client] = new OpenShop(instance, shop.VendorName, waresByPos);
+
+			var ps = new PacketStream();
+			ps.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x58),
+				ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, client.Session.Account.ClientInstance),
+				GameCharInterfaceDispatchOpcodes.DispatchShopData);
+			ps.WriteArray(body);
+			await ps.SendAsync(client);
+
+			_logger.LogInformation("Shop: served \"{Vendor}\" (instance 0x{Instance:X}, {Count} wares) to {Character}.", shop.VendorName, instance, waresByPos.Count, client.Session.Character?.Name);
+		}
+
+		public static uint VendorBuyPriceTin(uint value, uint count)
+		{
+			return Math.Max(1u, PerUnitValueTin(value)) * Math.Max(1u, count) * VendorBuyMarkup;
+		}
+
+		// Vendor SELL price in tin (what the player gets selling to the vendor) = round(value/10) per unit. Returns 0
+		// for a valueless item (Item.Value == 0) - HandleSellItemToShop refuses to sell those (they are no-value /
+		// no-sell, like the Totem of Origins), rather than inventing a level-based price.
+		public static uint VendorPriceTin(uint value, uint count)
+		{
+			return PerUnitValueTin(value) * Math.Max(1u, count);
+		}
+
+		// DL 0x2035 - tells the client the bag slot was sold (it clears the slot itself).
+		// Body golden-tested against the captured slot-5 sale (ShopTests).
+		public static void WriteItemSoldBody(FaolanStream s, uint container, uint characterId, uint slot)
+		{
+			s.WriteUInt32(container).WriteUInt32(characterId).WriteUInt32(slot);
+		}
+
+		// The per-unit value in tin (the wallet wire unit) = round(Item.Value / 10), where Item.Value is the RDB
+		// item-template's field 74. Proven by the captured sales (190->19, 920->92, 560->56 tin; #137). Value 0 is a
+		// genuinely valueless item (the template carries field 74 == 0, e.g. the unsellable Totem of Origins) -> 0,
+		// NOT a price; SELL treats that as unsellable and BUY adds its markup on top.
+		private static uint PerUnitValueTin(uint value)
+		{
+			return value > 0
+				? Math.Max(1u, (value + 5) / 10)
+				: 0;
+		}
+
+		// The last sale per connection, so UndoLastSoldItem can restore it (retail's undo is single-step too).
+		private sealed record LastShopSale(int Container, int Slot, uint ItemId, uint Count, uint PriceTin);
+
+		// The shop window the client currently has open, recorded when we send DispatchShopData. BuyItem only
+		// carries the session-volatile shop instance + a slot position, so we need the open window's wares to
+		// resolve the position back to a template id and price it. Keyed by Pos (the shop-window slot).
+		private sealed record OpenShop(uint Instance, string VendorName, IReadOnlyDictionary<uint, ShopItem> WaresByPos);
 	}
 }

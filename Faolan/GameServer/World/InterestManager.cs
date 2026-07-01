@@ -45,10 +45,12 @@ namespace Faolan.GameServer.World
 						continue; // loot bags have their own open/fade lifecycle, not interest streaming
 					if (other.IsDead)
 						continue; // #246: a killed NPC awaiting respawn must NOT be re-streamed - interest would spawn it
-						          // ALIVE at its death spot (well before the 15s timer), and that re-add to Known then gates
-						          // out the real respawn's relocate-to-spawn, pinning it at the death location for good.
+
+					// ALIVE at its death spot (well before the 15s timer), and that re-add to Known then gates
+					// out the real respawn's relocate-to-spawn, pinning it at the death location for good.
 					if (!other.IsVisibleTo(mover))
 						continue; // #261: a quest-gated NPC the mover doesn't yet qualify for - treat as not in range
+
 					inRange.Add(other.Handle);
 					if (mover.Known.Add(other.Handle))
 						events.Add(new InterestEvent(mover, other, InterestEventType.Spawn));
@@ -86,9 +88,11 @@ namespace Faolan.GameServer.World
 
 				if (mover.IsVisibleTo(viewer) && Vector3.Distance(viewer.Position, mover.Position) <= range)
 				{
-					events.Add(new InterestEvent(viewer, mover, viewer.Known.Add(mover.Handle)
-						? InterestEventType.Spawn
-						: InterestEventType.Move));
+					events.Add(new InterestEvent(viewer,
+						mover,
+						viewer.Known.Add(mover.Handle)
+							? InterestEventType.Spawn
+							: InterestEventType.Move));
 				}
 				else if (viewer.Known.Remove(mover.Handle) && viewer.Confirmed.Remove(mover.Handle))
 					// #245: same gate for a viewer losing sight of the mover - never despawn a handle the viewer's client

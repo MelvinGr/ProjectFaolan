@@ -1,4 +1,3 @@
-using Faolan.Core.Rdb;
 using System;
 using System.Globalization;
 using System.Linq;
@@ -7,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Rdb;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Rdb
@@ -24,18 +24,16 @@ namespace Faolan.Importer.Rdb
 
 		// Group 1 = Guid (the client resurrection-point id = the spawnPointId the 0x2024 release screen sends and the
 		// client echoes in RespawnMe; #214), 2 = name, 3 = discoverable, 4/5/6 = position. Guid precedes name in the XML.
-		private static readonly Regex PointRx = new Regex("<resurrectionpoint\\b[^>]*?\\bGuid=\"([0-9]+)\"[^>]*?\\bname=\"([^\"]*)\"[^>]*?\\bdiscoverable=\"([^\"]*)\"[^>]*?>\\s*<position\\s+x=\"([-0-9.]+)\"\\s+y=\"([-0-9.]+)\"\\s+z=\"([-0-9.]+)\"",
-			RegexOptions.Compiled | RegexOptions.Singleline);
+		private static readonly Regex PointRx =
+			new Regex("<resurrectionpoint\\b[^>]*?\\bGuid=\"([0-9]+)\"[^>]*?\\bname=\"([^\"]*)\"[^>]*?\\bdiscoverable=\"([^\"]*)\"[^>]*?>\\s*<position\\s+x=\"([-0-9.]+)\"\\s+y=\"([-0-9.]+)\"\\s+z=\"([-0-9.]+)\"",
+				RegexOptions.Compiled | RegexOptions.Singleline);
 
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string cdnBase, string storeDir = null)
 		{
 			using var rdb = new RdbReader(rdbDir);
 			using var cdn = new RdbCdnCache(cdnBase, storeDir);
 
-			var ourMaps = (await db
-				.Maps
-				.Select(m => m.Id)
-				.ToListAsync()).ToHashSet();
+			var ourMaps = (await db.Maps.Select(m => m.Id).ToListAsync()).ToHashSet();
 
 			// Fresh import: drop existing points (cascade clears CharacterRespawnPoints) and rebuild from the CDN.
 			db.CharacterRespawnPoints.RemoveRange(db.CharacterRespawnPoints);
@@ -43,9 +41,7 @@ namespace Faolan.Importer.Rdb
 			await db.SaveChangesAsync();
 
 			int maps = 0, points = 0, fetchFailed = 0, empty = 0;
-			foreach (var e in rdb
-				         .EntriesOfType(ResurrectionPointsType)
-				         .Where(e => ourMaps.Contains(e.Id)))
+			foreach (var e in rdb.EntriesOfType(ResurrectionPointsType).Where(e => ourMaps.Contains(e.Id)))
 			{
 				byte[] dec;
 				try
@@ -66,10 +62,7 @@ namespace Faolan.Importer.Rdb
 				{
 					var guid = uint.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture);
 					var name = m.Groups[2].Value;
-					var alwaysKnown = m
-						.Groups[3]
-						.Value
-						.Equals("false", StringComparison.OrdinalIgnoreCase);
+					var alwaysKnown = m.Groups[3].Value.Equals("false", StringComparison.OrdinalIgnoreCase);
 					var x = float.Parse(m.Groups[4].Value, CultureInfo.InvariantCulture);
 					var y = float.Parse(m.Groups[5].Value, CultureInfo.InvariantCulture);
 					var z = float.Parse(m.Groups[6].Value, CultureInfo.InvariantCulture);

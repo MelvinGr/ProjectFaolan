@@ -1,4 +1,4 @@
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.GameServer.World;
 
 namespace Faolan.GameServer.Spawn
@@ -14,34 +14,30 @@ namespace Faolan.GameServer.Spawn
 	// DynelFullUpdateCodecTests prove byte-exact reconstruction.
 	public static class DynelFullUpdateCodec
 	{
-		public sealed record Parsed(uint SubOpcode, uint TypeWord, uint Handle, byte Env, byte[] TransformBlob, byte[] GeometryTail);
+		public static byte[] Build(uint subOpcode, uint typeWord, uint handle, byte env, byte[] identityBlob, byte[] geometryTail)
+		{
+			var c = new FaolanStream().WriteUInt32(subOpcode).WriteUInt32(typeWord).WriteUInt32(handle).WriteByte(env).WriteArrayUInt32Length(identityBlob).WriteArray(geometryTail);
+			return CharDCMoveCodec.WithLength(c.ToArray());
+		}
+
+		public static byte[] Build(Parsed p)
+		{
+			return Build(p.SubOpcode, p.TypeWord, p.Handle, p.Env, p.TransformBlob, p.GeometryTail);
+		}
 
 		public static Parsed Parse(byte[] record)
 		{
 			var s = new FaolanStream(record);
-			s.ReadUInt32();                          // len
+			s.ReadUInt32(); // len
 			var sub = s.ReadUInt32();
 			var type = s.ReadUInt32();
 			var handle = s.ReadUInt32();
 			var env = s.ReadByte();
-			var blob = s.ReadArrayUInt32Length();    // [u32 blobLen][blob]
-			var tail = s.ReadRemainingArray();       // kd-tree/bounds + trailing scalars (opaque RDB geometry)
+			var blob = s.ReadArrayUInt32Length(); // [u32 blobLen][blob]
+			var tail = s.ReadRemainingArray(); // kd-tree/bounds + trailing scalars (opaque RDB geometry)
 			return new Parsed(sub, type, handle, env, blob, tail);
 		}
 
-		public static byte[] Build(uint subOpcode, uint typeWord, uint handle, byte env, byte[] identityBlob, byte[] geometryTail)
-		{
-			var c = new FaolanStream()
-				.WriteUInt32(subOpcode)
-				.WriteUInt32(typeWord)
-				.WriteUInt32(handle)
-				.WriteByte(env)
-				.WriteArrayUInt32Length(identityBlob)
-				.WriteArray(geometryTail);
-			return CharDCMoveCodec.WithLength(c.ToArray());
-		}
-
-		public static byte[] Build(Parsed p) =>
-			Build(p.SubOpcode, p.TypeWord, p.Handle, p.Env, p.TransformBlob, p.GeometryTail);
+		public sealed record Parsed(uint SubOpcode, uint TypeWord, uint Handle, byte Env, byte[] TransformBlob, byte[] GeometryTail);
 	}
 }

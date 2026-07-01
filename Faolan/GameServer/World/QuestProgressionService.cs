@@ -25,10 +25,10 @@ namespace Faolan.GameServer.World
 	// See docs/handoff-2026-06-21-casilda-quest-chain.md. Replaces the single-stage #47 turn-in for chained quests.
 	public sealed class QuestProgressionService
 	{
-		private readonly IDatabaseRepository _database;
-		private readonly IQuestOutbound _outbound;
 		private readonly IAgentServerDispatcher _agents;
+		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
+		private readonly IQuestOutbound _outbound;
 
 		public QuestProgressionService(IDatabaseRepository database, IQuestOutbound outbound, IAgentServerDispatcher agents, ILogger logger)
 		{
@@ -39,14 +39,23 @@ namespace Faolan.GameServer.World
 		}
 
 		// A kill of `npcName` by the player: advance any active kill goal targeting it.
-		public Task AdvanceKillGoals(INetworkClient client, string npcName) => Advance(client, QuestGoalType.Kill, npcName);
+		public Task AdvanceKillGoals(INetworkClient client, string npcName)
+		{
+			return Advance(client, QuestGoalType.Kill, npcName);
+		}
 
 		// The player looted `sourceNpcName`'s corpse bag: advance any active loot-from-NPC goal targeting it. The quest
 		// item (the scavenger's key) is RDB content we don't materialise, so the bag's SOURCE NPC name is the match key.
-		public Task AdvanceLootGoals(INetworkClient client, string sourceNpcName) => Advance(client, QuestGoalType.LootFromNpc, sourceNpcName);
+		public Task AdvanceLootGoals(INetworkClient client, string sourceNpcName)
+		{
+			return Advance(client, QuestGoalType.LootFromNpc, sourceNpcName);
+		}
 
 		// The player opened `npcName`'s greeting: advance any active talk goal targeting it (e.g. freeing Casilda).
-		public Task AdvanceTalkGoals(INetworkClient client, string npcName) => Advance(client, QuestGoalType.TalkToNpc, npcName);
+		public Task AdvanceTalkGoals(INetworkClient client, string npcName)
+		{
+			return Advance(client, QuestGoalType.TalkToNpc, npcName);
+		}
 
 		// Advance every active goal of `triggerType` whose target matches `targetName` for the player's quests. Each
 		// match ticks the objective; reaching the required count completes the stage (supersede to the next, or, for a
@@ -69,6 +78,7 @@ namespace Faolan.GameServer.World
 				var goal = def?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
 				if (!QuestProgress.Advances(quest, goal, triggerType, targetName))
 					continue;
+
 				changed = true;
 
 				var required = Math.Max(quest.GoalRequired, 1);
@@ -95,7 +105,7 @@ namespace Faolan.GameServer.World
 				// (handles are session-volatile); the player's world-entity handle is its ClientInstance.
 				if (triggerType == QuestGoalType.TalkToNpc && string.Equals(targetName, "Casilda", StringComparison.OrdinalIgnoreCase))
 				{
-					_outbound.SetNpcFollowByName(character.MapId, "Casilda", client.Session.Account.ClientInstance, follow: true);
+					_outbound.SetNpcFollowByName(character.MapId, "Casilda", client.Session.Account.ClientInstance, true);
 					// #267: freeing Casilda drops the beach "invisible wall" - the chain decor's collision (its mesh
 					// doesn't render for us, so it reads as an invisible barrier). Retail flips it off with a SimpleDynel
 					// visual-change to the chain dynel at this exact moment (Hoxxling gameplay idx 2053).
@@ -130,8 +140,7 @@ namespace Faolan.GameServer.World
 			if (nextGoal?.GoalType == QuestGoalType.TalkToNpc && !string.IsNullOrEmpty(nextGoal.TargetName))
 				await _outbound.RefreshQuestMarkerByName(client, nextGoal.TargetName);
 
-			_logger.LogInformation("Quest {Quest} completed for {Char}; superseded by {Next} (goal {Type}, target {Target}).",
-				quest.QuestId, character.Name, def.NextQuestId, nextGoal?.GoalType, nextGoal?.TargetName ?? "-");
+			_logger.LogInformation("Quest {Quest} completed for {Char}; superseded by {Next} (goal {Type}, target {Target}).", quest.QuestId, character.Name, def.NextQuestId, nextGoal?.GoalType, nextGoal?.TargetName ?? "-");
 			await _agents.SendSystemMessage(character.Id, "Quest updated.");
 		}
 

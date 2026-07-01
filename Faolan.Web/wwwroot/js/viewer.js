@@ -51,6 +51,7 @@ function setup(canvas) {
             camera.updateProjectionMatrix();
         }
     }
+
     state.resize = resize;
 
     window.addEventListener('resize', resize);
@@ -84,7 +85,8 @@ export async function show(canvasId, url, keepCamera) {
                 const p = await r.json().catch(() => null);
                 return (p && (p.detail || p.title)) || ('Load failed: ' + r.status);
             }
-        } catch { }
+        } catch {
+        }
         return 'Failed to load model.';
     }
 
@@ -287,7 +289,10 @@ export function makeDraggable(windowId, handleId) {
         win.style.left = r.left + 'px';
         win.style.top = r.top + 'px';
         win.style.right = 'auto';
-        startX = e.clientX; startY = e.clientY; originX = r.left; originY = r.top;
+        startX = e.clientX;
+        startY = e.clientY;
+        originX = r.left;
+        originY = r.top;
         handle.setPointerCapture(e.pointerId);
         e.preventDefault();
     });
@@ -296,7 +301,13 @@ export function makeDraggable(windowId, handleId) {
         win.style.left = (originX + e.clientX - startX) + 'px';
         win.style.top = (originY + e.clientY - startY) + 'px';
     });
-    const end = e => { dragging = false; try { handle.releasePointerCapture(e.pointerId); } catch { } };
+    const end = e => {
+        dragging = false;
+        try {
+            handle.releasePointerCapture(e.pointerId);
+        } catch {
+        }
+    };
     handle.addEventListener('pointerup', end);
     handle.addEventListener('pointercancel', end);
 }

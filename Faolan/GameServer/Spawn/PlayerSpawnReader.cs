@@ -40,9 +40,7 @@ namespace Faolan.GameServer.Spawn
 
 				try
 				{
-					var message = body
-						.AsSpan(i, messageLength)
-						.FromProtobuf<ProtoCoreCharacterIIR>();
+					var message = body.AsSpan(i, messageLength).FromProtobuf<ProtoCoreCharacterIIR>();
 					if (!string.IsNullOrEmpty(message.Name) && message.Name.Length == nameLen)
 					{
 						result = new Result(i, messageLength, message);

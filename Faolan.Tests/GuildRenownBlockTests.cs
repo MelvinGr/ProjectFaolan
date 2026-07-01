@@ -11,15 +11,6 @@ namespace Faolan.Tests
 	// blob (which had been hand-transcribed 3 bytes short -> 274 not 277, misaligning the roster after it).
 	public class GuildRenownBlockTests
 	{
-		[Fact]
-		public void Decode_ReEncode_IsByteIdentical()
-		{
-			var golden = Golden.Bytes("GuildRenownBlock");
-
-			var block = GuildRenownBlock.Decode(golden);
-			Assert.Equal(golden, block.Encode());
-		}
-
 		// The structured factory (no captured blob) reproduces the capture byte-for-byte - so GuildService can
 		// emit a constructed block instead of carrying the verbatim (and previously malformed) template.
 		[Fact]
@@ -38,6 +29,15 @@ namespace Faolan.Tests
 			Assert.Equal(3, block.List2.Length); // the second 0x3F1 list (count 3)
 			// RenownCounters[1] is the renown total that ticked between the two captured snapshots.
 			Assert.Equal(20085677ul, block.RenownCounters[1]);
+		}
+
+		[Fact]
+		public void Decode_ReEncode_IsByteIdentical()
+		{
+			var golden = Golden.Bytes("GuildRenownBlock");
+
+			var block = GuildRenownBlock.Decode(golden);
+			Assert.Equal(golden, block.Encode());
 		}
 
 		[Fact]

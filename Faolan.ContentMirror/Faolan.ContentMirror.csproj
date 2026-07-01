@@ -7,9 +7,9 @@
         <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
     </PropertyGroup>
     <ItemGroup>
-      <ProjectReference Include="..\Faolan.Core\Faolan.Core.csproj" />
+        <ProjectReference Include="..\Faolan.Core\Faolan.Core.csproj"/>
     </ItemGroup>
     <ItemGroup>
-      <PackageReference Update="System.Security.Cryptography.Xml" Version="10.0.9" />
+        <PackageReference Update="System.Security.Cryptography.Xml" Version="10.0.9"/>
     </ItemGroup>
 </Project>

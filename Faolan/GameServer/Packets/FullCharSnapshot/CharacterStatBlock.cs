@@ -1,7 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
-using Faolan.Core.Data;
+using Faolan.Core;
 
 namespace Faolan.GameServer.Packets.FullCharSnapshot
 {
@@ -22,6 +22,36 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 		/// <summary>The parsed/built records at wire scale, in order ([statId], [rawValue]).</summary>
 		public IReadOnlyList<(uint StatId, uint RawValue)> Records => _records;
+
+		/// <summary>Adds a record using the player-facing value; the wire scale for the stat is applied.</summary>
+		public CharacterStatBlock Set(LegacyCharacterStatId statId, uint displayValue)
+		{
+			return SetRaw(statId, displayValue * LegacyCharacterStatEntry.GetScale(statId));
+		}
+
+		/// <summary>Adds a record using the already-scaled wire value.</summary>
+		public CharacterStatBlock SetRaw(LegacyCharacterStatId statId, uint rawValue)
+		{
+			_records.Add(((uint)statId, rawValue));
+			return this;
+		}
+
+		public byte[] ToArray()
+		{
+			using var stream = new FaolanStream();
+			WriteTo(stream);
+			return stream.ToArray();
+		}
+
+		/// <summary>Writes <c>[count:1][N×(statId:u32, value:u32)]</c> (big-endian) into <paramref name="stream" />.</summary>
+		public FaolanStream WriteTo(FaolanStream stream)
+		{
+			stream.WriteByte((byte)_records.Count);
+			foreach (var (statId, rawValue) in _records)
+				stream.WriteUInt32(statId).WriteUInt32(rawValue);
+
+			return stream;
+		}
 
 		/// <summary>
 		///     The inverse of <see cref="WriteTo" />: parses <c>[count:1][N×(statId:u32, value:u32)]</c> (big-endian)
@@ -51,40 +81,6 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 			consumed = needed;
 			return true;
-		}
-
-		/// <summary>Adds a record using the player-facing value; the wire scale for the stat is applied.</summary>
-		public CharacterStatBlock Set(LegacyCharacterStatId statId, uint displayValue)
-		{
-			return SetRaw(statId, displayValue * LegacyCharacterStatEntry.GetScale(statId));
-		}
-
-		/// <summary>Adds a record using the already-scaled wire value.</summary>
-		public CharacterStatBlock SetRaw(LegacyCharacterStatId statId, uint rawValue)
-		{
-			_records.Add(((uint)statId, rawValue));
-			return this;
-		}
-
-		public byte[] ToArray()
-		{
-			using var stream = new FaolanStream();
-			WriteTo(stream);
-			return stream.ToArray();
-		}
-
-		/// <summary>Writes <c>[count:1][N×(statId:u32, value:u32)]</c> (big-endian) into <paramref name="stream" />.</summary>
-		public FaolanStream WriteTo(FaolanStream stream)
-		{
-			stream.WriteByte((byte)_records.Count);
-			foreach (var (statId, rawValue) in _records)
-			{
-				stream
-					.WriteUInt32(statId)
-					.WriteUInt32(rawValue);
-			}
-
-			return stream;
 		}
 	}
 }

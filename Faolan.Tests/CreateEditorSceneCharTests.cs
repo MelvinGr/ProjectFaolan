@@ -18,7 +18,11 @@ namespace Faolan.Tests
 	public class CreateEditorSceneCharTests
 	{
 		private readonly ITestOutputHelper _o;
-		public CreateEditorSceneCharTests(ITestOutputHelper o) => _o = o;
+
+		public CreateEditorSceneCharTests(ITestOutputHelper o)
+		{
+			_o = o;
+		}
 
 		[Fact]
 		public void EverySceneChar_ReconstructsFromItself_ByteExact()
@@ -46,8 +50,10 @@ namespace Faolan.Tests
 			Assert.Equal(body.Length, rebuilt.Length);
 			const int varintOffset = 53;
 			for (var i = 0; i < body.Length; i++)
+			{
 				if (i < varintOffset || i >= varintOffset + 4)
 					Assert.Equal(body[i], rebuilt[i]);
+			}
 		}
 
 		// SimpleChar records are framed by the Iir() helper as [u32 len][u32 0xFA015807][body]; the body is
@@ -55,16 +61,24 @@ namespace Faolan.Tests
 		private static List<(string Name, byte[] Body)> ExtractBurstCharRecords()
 		{
 			var burst = Golden.Bytes("InitialBurst");
-			var op = new byte[] { 0xFA, 0x01, 0x58, 0x07 };
+			var op = new byte[]
+			{
+				0xFA,
+				0x01,
+				0x58,
+				0x07
+			};
 			var result = new List<(string, byte[])>();
 			for (var i = 0; i + 16 < burst.Length;)
 			{
 				var at = IndexOf(burst, op, i);
 				if (at < 0)
 					break;
+
 				i = at + 1;
 				if (BinaryPrimitives.ReadUInt32BigEndian(burst.AsSpan(at + 4, 4)) != 0x0000C350u)
 					continue; // body must open with the character entity-class tag
+
 				var bodyLen = (int)BinaryPrimitives.ReadUInt32BigEndian(burst.AsSpan(at - 4, 4)) - 4;
 				var body = burst.AsSpan(at + 4, bodyLen).ToArray();
 				PlayerSpawnReader.TryReadCharacterMessage(body, out var read);
@@ -80,7 +94,12 @@ namespace Faolan.Tests
 			{
 				var ok = true;
 				for (var j = 0; j < needle.Length; j++)
-					if (haystack[i + j] != needle[j]) { ok = false; break; }
+					if (haystack[i + j] != needle[j])
+					{
+						ok = false;
+						break;
+					}
+
 				if (ok)
 					return i;
 			}

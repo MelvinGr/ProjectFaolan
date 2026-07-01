@@ -12,8 +12,9 @@ namespace Faolan.Importer.Cli
 		public static async Task<int> RunAsync(ImportContext ctx, IReadOnlyList<IImportModule> plan)
 		{
 			ctx.Out.WriteLine($"Plan ({plan.Count} modules): {string.Join(" -> ", plan.Select(m => m.Name))}");
-			ctx.Out.WriteLine($"Mode: {ctx.Mode}{(ctx.ModeOverrides.Count > 0 ? " (" + string.Join(", ", ctx.ModeOverrides.Select(o => $"{o.Key}={o.Value}")) + ")" : "")}"
-				+ (ctx.DryRun ? "   [DRY-RUN - nothing will be written]" : ""));
+			ctx.Out.WriteLine($"Mode: {ctx.Mode}{(ctx.ModeOverrides.Count > 0 ? " (" + string.Join(", ", ctx.ModeOverrides.Select(o => $"{o.Key}={o.Value}")) + ")" : "")}" + (ctx.DryRun
+				? "   [DRY-RUN - nothing will be written]"
+				: ""));
 
 			var before = await TableSnapshot.CaptureAsync(ctx.Db);
 

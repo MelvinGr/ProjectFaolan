@@ -43,6 +43,7 @@ namespace Faolan.Importer.Extractors
 		// them apart.
 		private const long AnyContext = -1;
 
+		// An NPC is "state-managed" once it appears in any rule: its dialogue then comes ONLY from classified captures.
 		private static readonly List<(string CaptureBaseName, string NpcName, long RequiredContextId, string Condition)> Rules =
 		[
 			// Casilda OFFER (fresh char, quest 13479 not yet accepted) = the canonical fresh first-quest capture:
@@ -62,10 +63,9 @@ namespace Faolan.Importer.Extractors
 			// HasCompletedQuest(13479) (true from stage 1, so it wrongly showed during the whole chain, #264) - move it to
 			// HasCompletedQuest(13480) so it only shows once she's actually been freed.
 			("Stihetfv_soldier-conqueror_login_compat_compeltefirstquest", "Casilda", AnyContext, $"return player:HasCompletedQuest({CasildaFreeQuest})"),
-			("Stihetfv_soldier-conqueror_login_after_first_quest_kalanthes_chat", "Casilda", AnyContext, $"return player:HasCompletedQuest({CasildaFreeQuest})"),
+			("Stihetfv_soldier-conqueror_login_after_first_quest_kalanthes_chat", "Casilda", AnyContext, $"return player:HasCompletedQuest({CasildaFreeQuest})")
 		];
 
-		// An NPC is "state-managed" once it appears in any rule: its dialogue then comes ONLY from classified captures.
 		private static readonly HashSet<string> ManagedNpcs = Rules.Select(r => r.NpcName).ToHashSet();
 
 		// Applies the quest-state classification to one capture's extracted entries. For a managed NPC, an entry from a
@@ -79,6 +79,7 @@ namespace Faolan.Importer.Extractors
 				if (!string.IsNullOrEmpty(e.ConditionScript))
 				{
 					yield return e;
+
 					continue;
 				}
 
@@ -86,8 +87,7 @@ namespace Faolan.Importer.Extractors
 				// Match the rule for this (capture, NPC) whose RequiredContextId is AnyContext or equals the entry's
 				// captured quest state (#264). A context-specific rule only claims its own state's screens; the rest of
 				// that capture's screens for the NPC fall through to "no rule" and are dropped (managed-NPC hygiene).
-				var rule = Rules.FirstOrDefault(r => r.CaptureBaseName == captureBaseName && r.NpcName == e.NpcName &&
-				                                     (r.RequiredContextId == AnyContext || r.RequiredContextId == e.QuestContextId));
+				var rule = Rules.FirstOrDefault(r => r.CaptureBaseName == captureBaseName && r.NpcName == e.NpcName && (r.RequiredContextId == AnyContext || r.RequiredContextId == e.QuestContextId));
 
 				if (managed && rule.NpcName == null)
 					continue; // managed NPC, unclassified capture/state -> drop so it can't pollute the per-state tree

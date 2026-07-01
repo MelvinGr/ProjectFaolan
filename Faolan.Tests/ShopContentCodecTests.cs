@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Packets;
+using Faolan.GameServer.Economy.Shop;
 using Xunit;
 
 namespace Faolan.Tests
@@ -14,7 +15,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void CapturedTraderBlob_RoundTrips_ByteExact()
 		{
-			var captured = Faolan.GameServer.Economy.Shop.ShopReplayData.DispatchShopDataBody;
+			var captured = ShopReplayData.DispatchShopDataBody;
 			var parsed = ShopContentCodec.Parse(captured);
 
 			Assert.Equal(0x1E7Eu, parsed.ShopInstance);
@@ -23,27 +24,24 @@ namespace Faolan.Tests
 
 			// Rebuild from the parsed rows, resolving item identity from the entries themselves (the importer
 			// stores the same quads/archetypes in Items).
-			var items = parsed
-				.Entries
-				.Select(e => new ShopItem
-				{
-					Pos = e.Pos,
-					ItemTemplateId = e.Template,
-					Count = e.Count,
-					Stat356 = e.Stat356,
-					TailLevel = e.TailLevel
-				});
-			var byTemplate = parsed
-				.Entries
-				.ToDictionary(e => e.Template, e => new Item
-				{
-					Id = e.Template,
-					Archetype = e.Archetype,
-					Data1 = e.Data1,
-					Data2 = e.Data2,
-					Data3 = e.Data3,
-					Data4 = e.Data4
-				});
+			var items = parsed.Entries.Select(e => new ShopItem
+			{
+				Pos = e.Pos,
+				ItemTemplateId = e.Template,
+				Count = e.Count,
+				Stat356 = e.Stat356,
+				TailLevel = e.TailLevel
+			});
+			var byTemplate = parsed.Entries.ToDictionary(e => e.Template,
+			e => new Item
+			{
+				Id = e.Template,
+				Archetype = e.Archetype,
+				Data1 = e.Data1,
+				Data2 = e.Data2,
+				Data3 = e.Data3,
+				Data4 = e.Data4
+			});
 
 			var rebuilt = ShopContentCodec.Build(parsed.ShopInstance, parsed.NpcHandle, parsed.MaxSize, items, t => byTemplate[t]);
 

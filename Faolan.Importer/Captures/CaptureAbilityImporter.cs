@@ -3,7 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Conan;
@@ -24,8 +24,8 @@ namespace Faolan.Importer.Captures
 	// classes/levels present in the captures) - that is expected.
 	public static class CaptureAbilityImporter
 	{
-		private const ushort AbilityGrantOpcode = 0x2052;
 		private const uint ChangeClassSubOpcode = 0xA36D3B74; // client->server character-editor script callback
+		private const ushort AbilityGrantOpcode = 0x2052;
 
 		// The few human-readable names the old archive knows (the rest are client-side / unknown).
 		private static readonly Dictionary<uint, string> KnownNames = new Dictionary<uint, string>
@@ -40,8 +40,7 @@ namespace Faolan.Importer.Captures
 		// rawPackets = ALL captures (catalogs every ability's Slot/Data identity seen on the wire). createCaptures =
 		// the create-flow captures, one CapturedPacket list each, used to flag IsStartingAbility AND attribute the
 		// per-capture class (from the ChangeClass command in that capture).
-		public static async Task<(int Seen, int Inserted, int Updated)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets,
-			IEnumerable<IReadOnlyList<byte[]>> createCaptures, ILogger logger = null)
+		public static async Task<(int Seen, int Inserted, int Updated)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, IEnumerable<IReadOnlyList<byte[]>> createCaptures, ILogger logger = null)
 		{
 			var grants = new Dictionary<uint, (uint Slot, uint D0, uint D1, uint D2, uint D3, uint D4)>();
 			foreach (var packet in rawPackets)
@@ -61,7 +60,9 @@ namespace Faolan.Importer.Captures
 				{
 					starters.Add(id);
 					if (cls is { } c)
-						(idToClasses.TryGetValue(id, out var set) ? set : idToClasses[id] = new HashSet<uint>()).Add(c);
+						(idToClasses.TryGetValue(id, out var set)
+							? set
+							: idToClasses[id] = new HashSet<uint>()).Add(c);
 				}
 			}
 
@@ -69,10 +70,7 @@ namespace Faolan.Importer.Captures
 				return (0, 0, 0);
 
 			var ids = grants.Keys.ToList();
-			var existing = await db
-				.Abilities
-				.Where(a => ids.Contains(a.Id))
-				.ToDictionaryAsync(a => a.Id);
+			var existing = await db.Abilities.Where(a => ids.Contains(a.Id)).ToDictionaryAsync(a => a.Id);
 
 			var inserted = 0;
 			var updated = 0;
@@ -100,7 +98,9 @@ namespace Faolan.Importer.Captures
 				a.Data3 = g.D3;
 				a.Data4 = g.D4;
 				a.IsStartingAbility = starters.Contains(id);
-				a.Class = starters.Contains(id) ? ClassFor(id) : 0u;
+				a.Class = starters.Contains(id)
+					? ClassFor(id)
+					: 0u;
 				if (string.IsNullOrEmpty(a.Name) && KnownNames.TryGetValue(id, out var n))
 					a.Name = n;
 			}
@@ -108,7 +108,12 @@ namespace Faolan.Importer.Captures
 			await db.SaveChangesAsync();
 			var generic = starters.Count(s => ClassFor(s) == 0);
 			logger?.LogInformation("CaptureAbilityImporter: {Seen} ability grants seen ({Starters} starting: {Generic} generic + {Specific} class-specific), {Inserted} new, {Updated} updated.",
-				grants.Count, starters.Count, generic, starters.Count - generic, inserted, updated);
+				grants.Count,
+				starters.Count,
+				generic,
+				starters.Count - generic,
+				inserted,
+				updated);
 			return (grants.Count, inserted, updated);
 
 			// An ability granted under >= 2 distinct classes (or under none we could attribute) is GENERIC (Class 0);
@@ -119,6 +124,45 @@ namespace Faolan.Importer.Captures
 					? classes.Single()
 					: 0u;
 			}
+		}
+
+		// The character class chosen in this capture, read from its ChangeClass editor callback (client->server
+		// 0xA36D3B74, body = [ack u32][instance u32][reserved u8][pbLen u32][protobuf: f3 varint=value, f4 string=token]).
+		// The editor sends class as 2x the real id (see HandleCommandPacket), so the class = value/2. Returns null when
+		// the capture carries no ChangeClass (e.g. a login capture) so its grants stay generic by default.
+		internal static uint? DetectClass(IReadOnlyList<byte[]> capture)
+		{
+			foreach (var packetBytes in capture)
+			{
+				try
+				{
+					if (TryReadChangeClass(packetBytes, out var classId, out _))
+						return classId;
+				}
+				catch
+				{
+					// not a parseable editor callback
+				}
+			}
+
+			return null;
+		}
+
+		private static ulong ReadVarint(FaolanStream s)
+		{
+			ulong value = 0;
+			var shift = 0;
+			while (true)
+			{
+				var b = s.ReadByte();
+				value |= (ulong)(b & 0x7f) << shift;
+				if ((b & 0x80) == 0)
+					break;
+
+				shift += 7;
+			}
+
+			return value;
 		}
 
 		// 0x2052 body (no length prefix): [slot][id][id][0][1][data0][data1..4][data1..4][constA][constB]x2[1][0][u8].
@@ -152,28 +196,6 @@ namespace Faolan.Importer.Captures
 			}
 		}
 
-		// The character class chosen in this capture, read from its ChangeClass editor callback (client->server
-		// 0xA36D3B74, body = [ack u32][instance u32][reserved u8][pbLen u32][protobuf: f3 varint=value, f4 string=token]).
-		// The editor sends class as 2x the real id (see HandleCommandPacket), so the class = value/2. Returns null when
-		// the capture carries no ChangeClass (e.g. a login capture) so its grants stay generic by default.
-		internal static uint? DetectClass(IReadOnlyList<byte[]> capture)
-		{
-			foreach (var packetBytes in capture)
-			{
-				try
-				{
-					if (TryReadChangeClass(packetBytes, out var classId, out _))
-						return classId;
-				}
-				catch
-				{
-					// not a parseable editor callback
-				}
-			}
-
-			return null;
-		}
-
 		// Mirrors HandleCommandPacket: a 0x2000 IIR whose sub-opcode is 0xA36D3B74 (editor script callback) and whose
 		// body is [ack u32][instance u32][reserved u8][pbLen u32][protobuf: f3 varint=value, f4 string=token]. True only
 		// for the ChangeClass token, returning value/2 as the class id (the editor sends class as 2x the real id).
@@ -189,6 +211,7 @@ namespace Faolan.Importer.Captures
 			s.ReadUInt32(); // IIR length
 			if (s.ReadUInt32() != ChangeClassSubOpcode) // sub-opcode
 				return false;
+
 			s.ReadUInt32(); // ack
 			s.ReadUInt32(); // client instance
 			s.ReadByte(); // reserved
@@ -222,24 +245,9 @@ namespace Faolan.Importer.Captures
 
 			if (token != "ChangeClass")
 				return false;
+
 			classId = numericValue / 2;
 			return true;
-		}
-
-		private static ulong ReadVarint(FaolanStream s)
-		{
-			ulong value = 0;
-			var shift = 0;
-			while (true)
-			{
-				var b = s.ReadByte();
-				value |= (ulong)(b & 0x7f) << shift;
-				if ((b & 0x80) == 0)
-					break;
-				shift += 7;
-			}
-
-			return value;
 		}
 	}
 }

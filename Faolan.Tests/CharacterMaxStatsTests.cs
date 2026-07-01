@@ -55,8 +55,7 @@ namespace Faolan.Tests
 			character.RegenerateMaxStats();
 
 			Assert.NotNull(character.MaxStats);
-			Assert.Equal(CharacterMaxStats.CreateDefaults(Class.Guardian, 5)
-				.Health, character.MaxStats!.Health);
+			Assert.Equal(CharacterMaxStats.CreateDefaults(Class.Guardian, 5).Health, character.MaxStats!.Health);
 		}
 
 		[Fact]
@@ -75,8 +74,7 @@ namespace Faolan.Tests
 
 			Assert.Same(seeded, character.MaxStats); // same tracked row, not a replacement
 			Assert.Equal(42u, character.MaxStats!.Id);
-			Assert.Equal(CharacterMaxStats.CreateDefaults(Class.Necromancer, 20)
-				.Mana, character.MaxStats.Mana);
+			Assert.Equal(CharacterMaxStats.CreateDefaults(Class.Necromancer, 20).Mana, character.MaxStats.Mana);
 		}
 	}
 }

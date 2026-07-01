@@ -17,11 +17,18 @@ namespace Faolan.Importer.Modules
 	// AH listings (TradepostListing) from the captured search results (0x2005).
 	public sealed class ListingsModule : IImportModule
 	{
-		public string Name => "listings";
-		public string Description => "Auction-house listings (0x2005 search results).";
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Insert, WriteMode.Upsert };
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "Auction-house listings (0x2005 search results).";
+		public string Name => "listings";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
@@ -34,11 +41,18 @@ namespace Faolan.Importer.Modules
 	// Maps (MapChange) + the #31 tooling-suffix name sanitize backfill.
 	public sealed class MapsModule : IImportModule
 	{
-		public string Name => "maps";
-		public string Description => "Maps from MapChange packets (+ name sanitize).";
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Insert, WriteMode.Upsert };
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "Maps from MapChange packets (+ name sanitize).";
+		public string Name => "maps";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
@@ -54,6 +68,7 @@ namespace Faolan.Importer.Modules
 					renamed++;
 				}
 			}
+
 			if (renamed > 0)
 				await ctx.Db.SaveChangesAsync();
 
@@ -64,11 +79,18 @@ namespace Faolan.Importer.Modules
 	// Cast/applied spell ids (ApplySpell) -> Spells.
 	public sealed class SpellsModule : IImportModule
 	{
-		public string Name => "spells";
-		public string Description => "Spell ids from ApplySpell packets.";
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Insert, WriteMode.Upsert };
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "Spell ids from ApplySpell packets.";
+		public string Name => "spells";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
@@ -80,11 +102,18 @@ namespace Faolan.Importer.Modules
 	// DoT effects (StatDamageIIR 0xE9F24184) -> Spell.DotDelta/DotType (#274).
 	public sealed class StatDamageModule : IImportModule
 	{
-		public string Name => "dot-effects";
-		public string Description => "DoT per-tick deltas from StatDamageIIR packets.";
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => ["spells"];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Insert, WriteMode.Upsert };
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "DoT per-tick deltas from StatDamageIIR packets.";
+		public string Name => "dot-effects";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
@@ -97,23 +126,30 @@ namespace Faolan.Importer.Modules
 	// ArchiveSqlImporter's only unique data) so the slot column survives a re-import without the archive.
 	public sealed class AbilitiesModule : IImportModule
 	{
-		public string Name => "abilities";
-		public string Description => "Ability grants (0x2052), incl. the rehomed slot seed.";
-		public ImportSource Source => ImportSource.Captures;
-		public IReadOnlyList<string> DependsOn => [];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Insert, WriteMode.Upsert };
-
 		// Ability id -> 0x2052 grant leading "slot" word. Was carried in the old archive sqlite `abilities`
 		// table (mirrors the AddAbilitySlot migration backfill); kept here now the archive import is gone.
 		private static readonly Dictionary<uint, uint> AbilitySlots = new Dictionary<uint, uint>
 		{
-			[269272] = 106,   // Rest
-			[769094] = 108,   // Normal Attack Left
-			[769095] = 109,   // Normal Attack Right
-			[769099] = 112,   // Normal Attack Front
+			[269272] = 106, // Rest
+			[769094] = 108, // Normal Attack Left
+			[769095] = 109, // Normal Attack Right
+			[769099] = 112, // Normal Attack Front
 			[3316611] = 1250, // toggle combat
-			[3675584] = 259   // switch weapon
+			[3675584] = 259 // switch weapon
 		};
+
+		public ImportSource Source => ImportSource.Captures;
+		public IReadOnlyList<string> DependsOn => [];
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "Ability grants (0x2052), incl. the rehomed slot seed.";
+		public string Name => "abilities";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
@@ -121,11 +157,14 @@ namespace Faolan.Importer.Modules
 
 			var slotted = 0;
 			foreach (var ability in await ctx.Db.Abilities.ToListAsync())
+			{
 				if (AbilitySlots.TryGetValue(ability.Id, out var slot) && ability.Slot != slot)
 				{
 					ability.Slot = slot;
 					slotted++;
 				}
+			}
+
 			if (slotted > 0)
 				await ctx.Db.SaveChangesAsync();
 
@@ -136,11 +175,18 @@ namespace Faolan.Importer.Modules
 	// Per-class STARTING spells (#74) from the create captures' 0x200A grants.
 	public sealed class StartingSpellsModule : IImportModule
 	{
-		public string Name => "starting-spells";
-		public string Description => "Per-class starting spells (create 0x200A grants).";
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Insert, WriteMode.Upsert };
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "Per-class starting spells (create 0x200A grants).";
+		public string Name => "starting-spells";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
@@ -153,16 +199,15 @@ namespace Faolan.Importer.Modules
 	// rows must be purged), so Overwrite-only.
 	public sealed class ConversationsModule : IImportModule
 	{
-		public string Name => "conversations";
-		public string Description => "NPC dialogue trees (per-capture condition-tagged, clean rebuild).";
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Overwrite };
+		public string Description => "NPC dialogue trees (per-capture condition-tagged, clean rebuild).";
+		public string Name => "conversations";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var conversations = ConversationExtractor.Merge(
-				ctx.Captures.SelectMany(c => ConversationConditions.Apply(c.Name, ConversationExtractor.Extract(c.Packets))));
+			var conversations = ConversationExtractor.Merge(ctx.Captures.SelectMany(c => ConversationConditions.Apply(c.Name, ConversationExtractor.Extract(c.Packets))));
 			await ImportOps.ImportConversations(ctx.Db, conversations);
 			return new ImportResult($"{conversations.Count} conversation nodes (rebuilt).");
 		}
@@ -171,11 +216,18 @@ namespace Faolan.Importer.Modules
 	// Observed live character state: wallet balances + hotbar slots. Needs the characters to exist.
 	public sealed class CharacterStateModule : IImportModule
 	{
-		public string Name => "character-state";
-		public string Description => "Wallet balances + hotbar slots from captures.";
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => ["characters"];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Insert, WriteMode.Upsert };
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "Wallet balances + hotbar slots from captures.";
+		public string Name => "character-state";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
@@ -187,11 +239,18 @@ namespace Faolan.Importer.Modules
 	// Per-character LEARNED spell sets (#74) re-granted on login (DispatchLearnSpell). Needs characters + spells.
 	public sealed class LearnedSpellsModule : IImportModule
 	{
-		public string Name => "learned-spells";
-		public string Description => "Per-character learned spell sets (0x200A grants).";
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => ["characters", "spells"];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Insert, WriteMode.Upsert };
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "Per-character learned spell sets (0x200A grants).";
+		public string Name => "learned-spells";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
@@ -207,11 +266,18 @@ namespace Faolan.Importer.Modules
 	// --reseed-npcs wipe (NpcSpawns + morphs/equipment + patrol only; NpcSpells left as-is).
 	public sealed class NpcsModule : IImportModule
 	{
-		public string Name => "npcs";
-		public string Description => "NPC spawns/types/spells/patrol (burst-truth set, #266).";
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => ["characters"];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Upsert, WriteMode.Overwrite };
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Upsert,
+				WriteMode.Overwrite
+			};
+
+		public string Description => "NPC spawns/types/spells/patrol (burst-truth set, #266).";
+		public string Name => "npcs";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
@@ -234,7 +300,9 @@ namespace Faolan.Importer.Modules
 			await ImportOps.LinkSpellsToTypes(ctx.Db);
 			await ImportOps.ImportPatrolPaths(ctx.Db, patrols);
 
-			var prefix = removed > 0 ? $"removed {removed}; " : "";
+			var prefix = removed > 0
+				? $"removed {removed}; "
+				: "";
 			return new ImportResult($"{prefix}{spawns.Count} spawns, {npcSpells.Count} npc-spell pairs ({spellsAdded} new), {patrols.Count} patrol routes.");
 		}
 	}
@@ -242,11 +310,18 @@ namespace Faolan.Importer.Modules
 	// Static world objects (decor/containers/zones).
 	public sealed class WorldObjectsModule : IImportModule
 	{
-		public string Name => "world-objects";
-		public string Description => "Static world objects (decor/containers/zones).";
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Insert, WriteMode.Upsert };
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "Static world objects (decor/containers/zones).";
+		public string Name => "world-objects";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
@@ -260,11 +335,11 @@ namespace Faolan.Importer.Modules
 	// from instead of the all-items random sample. Needs the items first so the pool can be filtered to buildable rows.
 	public sealed class MapLootModule : IImportModule
 	{
-		public string Name => "map-loot";
-		public string Description => "Per-map loot pool from captured bag contents (#273).";
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => ["items"];
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Overwrite };
+		public string Description => "Per-map loot pool from captured bag contents (#273).";
+		public string Name => "map-loot";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
@@ -277,11 +352,18 @@ namespace Faolan.Importer.Modules
 	// Per-map world-entry burst (structured IIR records). Beach (4010) is exempt (committed seed).
 	public sealed class WorldBurstsModule : IImportModule
 	{
-		public string Name => "world-bursts";
-		public string Description => "Per-map world-entry burst (structured IIR records).";
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Upsert, WriteMode.Overwrite };
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Upsert,
+				WriteMode.Overwrite
+			};
+
+		public string Description => "Per-map world-entry burst (structured IIR records).";
+		public string Name => "world-bursts";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
@@ -294,11 +376,18 @@ namespace Faolan.Importer.Modules
 	// Quest journal-content definitions + the hand-decoded snapshot/chain seeds (beach 10238, Casilda #261/#255).
 	public sealed class QuestsModule : IImportModule
 	{
-		public string Name => "quests";
-		public string Description => "Quest definitions + beach/Casilda snapshot seeds.";
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Insert, WriteMode.Upsert };
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "Quest definitions + beach/Casilda snapshot seeds.";
+		public string Name => "quests";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
@@ -312,12 +401,19 @@ namespace Faolan.Importer.Modules
 	// set, so opt-in via --only mounts.
 	public sealed class MountsModule : IImportModule
 	{
-		public string Name => "mounts";
-		public string Description => "Summonable mount creatures (#27, opt-in).";
-		public ImportSource Source => ImportSource.Captures;
 		public bool InDefaultSet => false;
+		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
-		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Insert, WriteMode.Upsert };
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "Summonable mount creatures (#27, opt-in).";
+		public string Name => "mounts";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{

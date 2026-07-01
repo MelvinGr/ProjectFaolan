@@ -22,13 +22,22 @@ namespace Faolan.ClientLauncher
 
 		private const string SteamAppId = "217750";
 
+		// The three LocalConfig.xml CDN keys we point at the local ContentMirror, paired with the upstream tag the
+		// mirror routes them to (so the request path carries the tag). LocalConfig.xml is regenerated locally at
+		// startup and is NOT in the file manifest, so the redirect survives a patch run. (Moved here from
+		// Faolan.ContentMirror's old --patch/--restore: the launcher already owns LocalConfig.xml redirect+revert.)
+		private static readonly (string Key, string Tag)[] MirrorConfigKeys =
+		[
+			("HttpPatchAddr", "update"),
+			("ClientHttpPatchAddr", "gameupdate"),
+			("ControlHttpPatchAddr", "control")
+		];
+
 		private static bool ClientIsRunning()
 		{
 			if (OperatingSystem.IsWindows())
 			{
-				return Process.GetProcessesByName("AgeOfConan")
-					.Length > 0 || Process.GetProcessesByName("AgeOfConanDX10")
-					.Length > 0;
+				return Process.GetProcessesByName("AgeOfConan").Length > 0 || Process.GetProcessesByName("AgeOfConanDX10").Length > 0;
 			}
 
 			foreach (var dir in Directory.EnumerateDirectories("/proc"))
@@ -38,10 +47,7 @@ namespace Faolan.ClientLauncher
 
 				try
 				{
-					if (File
-					    .ReadAllText(Path.Combine(dir, "comm"))
-					    .Trim()
-					    .StartsWith("AgeOfConan", StringComparison.Ordinal))
+					if (File.ReadAllText(Path.Combine(dir, "comm")).Trim().StartsWith("AgeOfConan", StringComparison.Ordinal))
 						return true;
 				}
 				catch
@@ -80,6 +86,25 @@ namespace Faolan.ClientLauncher
 			}
 		}
 
+		// A normalized, case-insensitive fragment of the exe path used to recognise a running client from the SAME
+		// install in its command line. The path is compared below its root (leading separator dropped, backslashes
+		// unified to '/', lowercased) so both the native "/mnt/.../AgeOfConan.exe" and the Wine "Z:\mnt\...\AgeOfConan.exe"
+		// forms match the same install while a different install's path does not.
+		private static string ExePathSignature(string exe)
+		{
+			var full = exe;
+			try
+			{
+				full = Path.GetFullPath(exe);
+			}
+			catch
+			{
+				// keep the raw value if it can't be resolved
+			}
+
+			return NormalizePath(full).TrimStart('/');
+		}
+
 		// Kill the running AgeOfConan client launched from THIS `exe` path only (so a client running from a different
 		// install is left alone) - matched by the exe's full path in the process command line, NOT just the
 		// "AgeOfConan.exe" name. Under Wine/Proton the path appears in the Z:\ drive form, so we compare on a normalized
@@ -91,7 +116,11 @@ namespace Faolan.ClientLauncher
 
 			if (OperatingSystem.IsWindows())
 			{
-				foreach (var name in new[] { "AgeOfConan", "AgeOfConanDX10" })
+				foreach (var name in new[]
+				{
+					"AgeOfConan",
+					"AgeOfConanDX10"
+				})
 				foreach (var p in Process.GetProcessesByName(name))
 				{
 					try
@@ -115,17 +144,11 @@ namespace Faolan.ClientLauncher
 
 					try
 					{
-						var comm = File
-							.ReadAllText(Path.Combine(dir, "comm"))
-							.Trim();
-						var cmdline = File
-							.ReadAllText(Path.Combine(dir, "cmdline"))
-							.Replace('\0', ' ');
+						var comm = File.ReadAllText(Path.Combine(dir, "comm")).Trim();
+						var cmdline = File.ReadAllText(Path.Combine(dir, "cmdline")).Replace('\0', ' ');
 						// Only this install's client: its cmdline must reference the exact exe PATH (not just the
 						// AgeOfConan.exe name), excluding this launcher (which carries the path in its own --exe args).
-						var isClient = NormalizePath(cmdline).Contains(sig, StringComparison.Ordinal)
-						               && !cmdline.Contains("Faolan.ClientLauncher", StringComparison.Ordinal)
-						               && comm != "dotnet";
+						var isClient = NormalizePath(cmdline).Contains(sig, StringComparison.Ordinal) && !cmdline.Contains("Faolan.ClientLauncher", StringComparison.Ordinal) && comm != "dotnet";
 
 						if (isClient)
 							killed += TryKill(pid);
@@ -140,27 +163,6 @@ namespace Faolan.ClientLauncher
 			if (killed > 0)
 				Console.WriteLine($"killed {killed} running client instance(s)");
 		}
-
-		// A normalized, case-insensitive fragment of the exe path used to recognise a running client from the SAME
-		// install in its command line. The path is compared below its root (leading separator dropped, backslashes
-		// unified to '/', lowercased) so both the native "/mnt/.../AgeOfConan.exe" and the Wine "Z:\mnt\...\AgeOfConan.exe"
-		// forms match the same install while a different install's path does not.
-		private static string ExePathSignature(string exe)
-		{
-			var full = exe;
-			try
-			{
-				full = Path.GetFullPath(exe);
-			}
-			catch
-			{
-				// keep the raw value if it can't be resolved
-			}
-
-			return NormalizePath(full).TrimStart('/');
-		}
-
-		private static string NormalizePath(string path) => path.Replace('\\', '/').ToLowerInvariant();
 
 		private static int Main(string[] args)
 		{
@@ -208,8 +210,7 @@ namespace Faolan.ClientLauncher
 					// Point LocalConfig.xml <UniverseAddr> at our server for this session (reverted on exit). Bare
 					// flag defaults to Faolan's 127.0.0.1:7010; replaces the need for an /etc/hosts override.
 					case "--universeaddr":
-						universeAddr = i + 1 < args.Length && !args[i + 1]
-							.StartsWith('-')
+						universeAddr = i + 1 < args.Length && !args[i + 1].StartsWith('-')
 							? args[++i]
 							: "127.0.0.1:7010";
 						break;
@@ -472,9 +473,19 @@ namespace Faolan.ClientLauncher
 		private static string Md5Hex(string path)
 		{
 			using var stream = File.OpenRead(path);
-			return Convert
-				.ToHexString(MD5.HashData(stream))
-				.ToLowerInvariant();
+			return Convert.ToHexString(MD5.HashData(stream)).ToLowerInvariant();
+		}
+
+		// Sidecar holding the real CDN-key values while we've redirected them at the mirror (one `key=value` per line),
+		// so a hard-killed run can be healed on the next launch.
+		private static string MirrorSidecarPath(string gameDir)
+		{
+			return Path.Combine(gameDir, "LocalConfig.xml.faolan-mirror-revert");
+		}
+
+		private static string NormalizePath(string path)
+		{
+			return path.Replace('\\', '/').ToLowerInvariant();
 		}
 
 		private static void PrintHelp()
@@ -522,9 +533,7 @@ namespace Faolan.ClientLauncher
 
 			try
 			{
-				var saved = File
-					.ReadAllText(sidecar)
-					.Trim();
+				var saved = File.ReadAllText(sidecar).Trim();
 				if (saved.Length > 0)
 				{
 					SetUniverseAddr(gameDir, saved);
@@ -539,51 +548,31 @@ namespace Faolan.ClientLauncher
 			}
 		}
 
-		// Flip the PE subsystem byte: GUI(2) <-> CUI/console(3). The offset is computed from the PE header (no magic
-		// constant); only writes when it differs and the current value is a sane 2/3 (so we never corrupt the exe).
-		private static void SetConsoleSubsystem(string exe, bool console)
+		// Revert the CDN keys from the mirror sidecar (each back to its saved original) and remove the sidecar.
+		private static void RestoreMirrorConfig(string gameDir)
 		{
+			var sidecar = MirrorSidecarPath(gameDir);
+			if (!File.Exists(sidecar))
+				return;
+
 			try
 			{
-				using var fs = new FileStream(exe, FileMode.Open, FileAccess.ReadWrite);
-				using var br = new BinaryReader(fs, Encoding.ASCII, true);
+				foreach (var line in File.ReadAllLines(sidecar))
+				{
+					var eq = line.IndexOf('=');
+					if (eq <= 0)
+						continue;
 
-				fs.Position = 0x3c;
-				var peOffset = br.ReadInt32();
-				fs.Position = peOffset;
-				if (br.ReadUInt32() != 0x0000_4550) // "PE\0\0"
-					return;
+					SetConfigTag(gameDir, line[..eq], line[(eq + 1)..]);
+				}
 
-				var subsystemOffset = peOffset + 4 + 20 + 68; // PE sig + COFF header + Subsystem offset in optional header
-				fs.Position = subsystemOffset;
-				var current = br.ReadByte();
-				var want = (byte)(console
-					? 3
-					: 2);
-
-				if (current is not (2 or 3) || current == want)
-					return;
-
-				fs.Position = subsystemOffset;
-				fs.WriteByte(want);
-				Console.WriteLine($"patched PE subsystem -> {(console ? "CUI (console)" : "GUI")}");
+				File.Delete(sidecar);
 			}
 			catch (Exception e)
 			{
-				Console.Error.WriteLine($"subsystem patch skipped: {e.Message}");
+				Console.Error.WriteLine($"mirror config restore failed: {e.Message}");
 			}
 		}
-
-		// Set a child-process env var only if it isn't already set in the real environment (so the shell can override).
-		private static void SetIfUnset(ProcessStartInfo psi, string name, string value)
-		{
-			if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(name)))
-				psi.Environment[name] = value;
-		}
-
-		// Set LocalConfig.xml's <UniverseAddr> (the client's login server) to `addr`, returning the previous value
-		// (so the caller can revert), or null if nothing changed / the file or field is missing.
-		private static string? SetUniverseAddr(string gameDir, string addr) => SetConfigTag(gameDir, "UniverseAddr", addr);
 
 		// Set a single LocalConfig.xml <tag> to `value`, returning the previous value (so the caller can revert),
 		// or null if nothing changed / the file or field is missing. Re-enables a LocalConfig.xml.disabled if that's
@@ -629,28 +618,46 @@ namespace Faolan.ClientLauncher
 			}
 		}
 
-		// Sidecar holding the real <UniverseAddr> while we've redirected it, so a hard-killed run can be healed.
-		private static string SidecarPath(string gameDir)
+		// Flip the PE subsystem byte: GUI(2) <-> CUI/console(3). The offset is computed from the PE header (no magic
+		// constant); only writes when it differs and the current value is a sane 2/3 (so we never corrupt the exe).
+		private static void SetConsoleSubsystem(string exe, bool console)
 		{
-			return Path.Combine(gameDir, "LocalConfig.xml.faolan-revert");
+			try
+			{
+				using var fs = new FileStream(exe, FileMode.Open, FileAccess.ReadWrite);
+				using var br = new BinaryReader(fs, Encoding.ASCII, true);
+
+				fs.Position = 0x3c;
+				var peOffset = br.ReadInt32();
+				fs.Position = peOffset;
+				if (br.ReadUInt32() != 0x0000_4550) // "PE\0\0"
+					return;
+
+				var subsystemOffset = peOffset + 4 + 20 + 68; // PE sig + COFF header + Subsystem offset in optional header
+				fs.Position = subsystemOffset;
+				var current = br.ReadByte();
+				var want = (byte)(console
+					? 3
+					: 2);
+
+				if (current is not (2 or 3) || current == want)
+					return;
+
+				fs.Position = subsystemOffset;
+				fs.WriteByte(want);
+				Console.WriteLine($"patched PE subsystem -> {(console ? "CUI (console)" : "GUI")}");
+			}
+			catch (Exception e)
+			{
+				Console.Error.WriteLine($"subsystem patch skipped: {e.Message}");
+			}
 		}
 
-		// The three LocalConfig.xml CDN keys we point at the local ContentMirror, paired with the upstream tag the
-		// mirror routes them to (so the request path carries the tag). LocalConfig.xml is regenerated locally at
-		// startup and is NOT in the file manifest, so the redirect survives a patch run. (Moved here from
-		// Faolan.ContentMirror's old --patch/--restore: the launcher already owns LocalConfig.xml redirect+revert.)
-		private static readonly (string Key, string Tag)[] MirrorConfigKeys =
-		[
-			("HttpPatchAddr", "update"),
-			("ClientHttpPatchAddr", "gameupdate"),
-			("ControlHttpPatchAddr", "control")
-		];
-
-		// Sidecar holding the real CDN-key values while we've redirected them at the mirror (one `key=value` per line),
-		// so a hard-killed run can be healed on the next launch.
-		private static string MirrorSidecarPath(string gameDir)
+		// Set a child-process env var only if it isn't already set in the real environment (so the shell can override).
+		private static void SetIfUnset(ProcessStartInfo psi, string name, string value)
 		{
-			return Path.Combine(gameDir, "LocalConfig.xml.faolan-mirror-revert");
+			if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(name)))
+				psi.Environment[name] = value;
 		}
 
 		// Point the three LocalConfig.xml CDN keys at the local ContentMirror (http://127.0.0.1:<port>/<tag>/upm),
@@ -672,30 +679,17 @@ namespace Faolan.ClientLauncher
 			return true;
 		}
 
-		// Revert the CDN keys from the mirror sidecar (each back to its saved original) and remove the sidecar.
-		private static void RestoreMirrorConfig(string gameDir)
+		// Set LocalConfig.xml's <UniverseAddr> (the client's login server) to `addr`, returning the previous value
+		// (so the caller can revert), or null if nothing changed / the file or field is missing.
+		private static string? SetUniverseAddr(string gameDir, string addr)
 		{
-			var sidecar = MirrorSidecarPath(gameDir);
-			if (!File.Exists(sidecar))
-				return;
+			return SetConfigTag(gameDir, "UniverseAddr", addr);
+		}
 
-			try
-			{
-				foreach (var line in File.ReadAllLines(sidecar))
-				{
-					var eq = line.IndexOf('=');
-					if (eq <= 0)
-						continue;
-
-					SetConfigTag(gameDir, line[..eq], line[(eq + 1)..]);
-				}
-
-				File.Delete(sidecar);
-			}
-			catch (Exception e)
-			{
-				Console.Error.WriteLine($"mirror config restore failed: {e.Message}");
-			}
+		// Sidecar holding the real <UniverseAddr> while we've redirected it, so a hard-killed run can be healed.
+		private static string SidecarPath(string gameDir)
+		{
+			return Path.Combine(gameDir, "LocalConfig.xml.faolan-revert");
 		}
 
 		private static int TryKill(int pid)

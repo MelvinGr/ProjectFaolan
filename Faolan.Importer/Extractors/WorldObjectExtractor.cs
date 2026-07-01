@@ -13,11 +13,11 @@ namespace Faolan.Importer.Extractors
 		public float RotX { get; init; }
 		public float RotY { get; init; }
 		public float RotZ { get; init; }
-		public string Name { get; init; } = string.Empty;
-		public uint ObjectId { get; init; }
 
 		// The display_name identity (localized id) that disambiguates two props sharing an exact position (#222).
 		public string DisplayName { get; init; } = string.Empty;
+		public string Name { get; init; } = string.Empty;
+		public uint ObjectId { get; init; }
 	}
 
 	// Extracts the static world objects per map from a capture: tracks the current map (MapChange 5D85BFC7), then

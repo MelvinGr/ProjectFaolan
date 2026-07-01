@@ -36,20 +36,13 @@ namespace Faolan.Importer.Reports
 
 		public static async Task RunAsync(DatabaseContext db)
 		{
-			var bursts = await db
-				.MapWorldBursts
-				.Include(b => b.Entities)
-				.ToListAsync();
+			var bursts = await db.MapWorldBursts.Include(b => b.Entities).ToListAsync();
 
-			var npcsByMap = (await db.NpcSpawns.ToListAsync())
-				.GroupBy(n => n.MapId)
-				.ToDictionary(g => g.Key, g => Index(g, n => (n.PositionX, n.PositionY, n.PositionZ)));
+			var npcsByMap = (await db.NpcSpawns.ToListAsync()).GroupBy(n => n.MapId).ToDictionary(g => g.Key, g => Index(g, n => (n.PositionX, n.PositionY, n.PositionZ)));
 			// World objects are keyed by (position, identity): two props can share an exact position (#222), so the
 			// identity (display_name, read from the row's own Data) disambiguates them - matching what the importer
 			// dedup and the live world-entry replay do.
-			var objectsByMap = (await db.WorldObjects.ToListAsync())
-				.GroupBy(o => o.MapId)
-				.ToDictionary(g => g.Key, g => IndexObjects(g));
+			var objectsByMap = (await db.WorldObjects.ToListAsync()).GroupBy(o => o.MapId).ToDictionary(g => g.Key, g => IndexObjects(g));
 
 			Console.WriteLine();
 			Console.WriteLine("Burst reconstruction coverage (construct-don't-replay gate)");
@@ -138,7 +131,8 @@ namespace Faolan.Importer.Reports
 		// True if this record is already reproducible without the burst: a server-generated global/player record, or a
 		// world entity whose table row (matched by spawn position) rebuilds byte-identical via the same builder the
 		// replay uses. Otherwise it is still burst-only; `residualFamily` names why so the report can tally it.
-		private static bool IsConstructable(MapWorldBurstEntity e, uint playerInstance, IReadOnlyDictionary<(int, int, int), NpcSpawn> npcs, IReadOnlyDictionary<(int, int, int, string), WorldObject> objects, out string residualFamily)
+		private static bool IsConstructable(MapWorldBurstEntity e, uint playerInstance, IReadOnlyDictionary<(int, int, int), NpcSpawn> npcs, IReadOnlyDictionary<(int, int, int, string), WorldObject> objects,
+			out string residualFamily)
 		{
 			residualFamily = null;
 
@@ -166,9 +160,7 @@ namespace Faolan.Importer.Reports
 						return false;
 					}
 
-					if (npcs.TryGetValue(npcKey, out var npcRow) && NpcSpawnBuilder.TryBuild(npcRow, e.Handle, out var npcBody) && npcBodyArr
-						    .AsSpan()
-						    .SequenceEqual(npcBody))
+					if (npcs.TryGetValue(npcKey, out var npcRow) && NpcSpawnBuilder.TryBuild(npcRow, e.Handle, out var npcBody) && npcBodyArr.AsSpan().SequenceEqual(npcBody))
 						return true;
 
 					residualFamily = npcs.ContainsKey(npcKey)
@@ -200,9 +192,7 @@ namespace Faolan.Importer.Reports
 						return false;
 					}
 
-					if (objBodyArr
-					    .AsSpan()
-					    .SequenceEqual(objBody))
+					if (objBodyArr.AsSpan().SequenceEqual(objBody))
 						return true;
 
 					residualFamily = "world object (cross-session: identity differs from table row)";
@@ -241,7 +231,8 @@ namespace Faolan.Importer.Reports
 				return false;
 
 			body = full[bodyStart..];
-			key = PositionKey(BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.PosXOffset, 4)), BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.PosYOffset, 4)),
+			key = PositionKey(BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.PosXOffset, 4)),
+				BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.PosYOffset, 4)),
 				BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.PosZOffset, 4)));
 			return true;
 		}

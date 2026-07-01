@@ -20,11 +20,6 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 	// proven to re-serialize the wire byte-for-byte (AocProtocolDecodeTests).
 	public static class SnapshotItemBuilder
 	{
-		// One (stat id, value) record of a ProtoInventoryGameEntry.stat_list. The world-entry snapshot uses a
-		// fixed triple (BuildListEntry below); the incremental DispatchAddItem (0x2020) s2c carries a richer,
-		// per-instance set captured from retail, so BuildInventoryEntry takes the stat list as a parameter.
-		public readonly record struct ItemStat(uint Stat, uint Value);
-
 		public static ProtoField BuildEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, uint archetype, ulong flags = 1, ulong f7 = 1)
 		{
 			var entry = BuildListEntry(slot, itemId, recordId, count, item, archetype, flags, f7);
@@ -39,22 +34,6 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 				FieldNumber = 4,
 				WireType = 2,
 				MessageValue = ProtoMessage.Parse(ms.ToArray())
-			};
-		}
-
-		// The typed form, used directly by FullCharSnapshotBuilder's generated containers. The world-entry snapshot
-		// entry carries the fixed (flags, recordId, count) stat triple.
-		public static ProtoInventoryGame.InventoryListEntry BuildListEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, uint archetype, ulong flags = 1, ulong f7 = 1)
-		{
-			return new ProtoInventoryGame.InventoryListEntry
-			{
-				Pos = (uint)slot,
-				Item = BuildInventoryEntry(itemId, item, archetype, [
-						new ItemStat(0, (uint)flags),
-						new ItemStat(23, (uint)recordId),
-						new ItemStat(26, (uint)count)
-					],
-					f7)
 			};
 		}
 
@@ -88,9 +67,34 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			};
 
 			foreach (var stat in stats)
-				entry.StatLists.Add(new ProtoInventoryGameEntry.StatValue { Stat = stat.Stat, Value = stat.Value });
+			{
+				entry.StatLists.Add(new ProtoInventoryGameEntry.StatValue
+				{
+					Stat = stat.Stat,
+					Value = stat.Value
+				});
+			}
 
 			return entry;
+		}
+
+		// The typed form, used directly by FullCharSnapshotBuilder's generated containers. The world-entry snapshot
+		// entry carries the fixed (flags, recordId, count) stat triple.
+		public static ProtoInventoryGame.InventoryListEntry BuildListEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, uint archetype, ulong flags = 1, ulong f7 = 1)
+		{
+			return new ProtoInventoryGame.InventoryListEntry
+			{
+				Pos = (uint)slot,
+				Item = BuildInventoryEntry(itemId,
+					item,
+					archetype,
+					[
+						new ItemStat(0, (uint)flags),
+						new ItemStat(23, (uint)recordId),
+						new ItemStat(26, (uint)count)
+					],
+					f7)
+			};
 		}
 
 		// Convenience overload: an item is buildable iff it has an archetype (DB column, harvested from captures).
@@ -104,5 +108,10 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			entry = BuildEntry(slot, itemId, recordId, count, item, item.Archetype, flags, f7);
 			return true;
 		}
+
+		// One (stat id, value) record of a ProtoInventoryGameEntry.stat_list. The world-entry snapshot uses a
+		// fixed triple (BuildListEntry below); the incremental DispatchAddItem (0x2020) s2c carries a richer,
+		// per-instance set captured from retail, so BuildInventoryEntry takes the stat list as a parameter.
+		public readonly record struct ItemStat(uint Stat, uint Value);
 	}
 }

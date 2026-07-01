@@ -2,8 +2,10 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
@@ -22,48 +24,8 @@ namespace Faolan.GameServer.Dialogue
 	// collaborator; quest-journal pushes go through the WorldBroadcaster, branch conditions through the Lua VM.
 	public sealed class ConversationService
 	{
-		private readonly IDatabaseRepository _database;
-		private readonly ILogger _logger;
-		private readonly WorldBroadcaster _broadcaster;
-		private readonly QuestProgressionService _questProgression;
-		private readonly LuaScriptVm _luaVm;
-
-		public ConversationService(IDatabaseRepository database, ILogger logger, WorldBroadcaster broadcaster, QuestProgressionService questProgression, LuaScriptVm luaVm)
-		{
-			_database = database;
-			_logger = logger;
-			_broadcaster = broadcaster;
-			_questProgression = questProgression;
-			_luaVm = luaVm;
-		}
-
-		// Byte-array find/replace from offset 8 (skips the length+crc prefix). Copied from RetailLoginReplay's
-		// private helper - a small self-contained util; duplicating it keeps this service free of the listener.
-		private static void ReplaceAll(byte[] buffer, byte[] find, byte[] repl)
-		{
-			for (var i = 8; i + find.Length <= buffer.Length; i++)
-			{
-				var match = true;
-				for (var j = 0; j < find.Length; j++)
-				{
-					if (buffer[i + j] != find[j])
-					{
-						match = false;
-						break;
-					}
-				}
-
-				if (match)
-				{
-					repl.CopyTo(buffer, i);
-					i += find.Length - 1;
-				}
-			}
-		}
-
 		// The Knubot packets that END a conversation stage: an answer list (the next options) or a close-window.
 		private const uint KnubotAnswerListSubOpcode = (uint)GameServer0X2000RespondsOpcodes.KnubotAnswerListIIR;
-		private const uint KnubotCloseChatWindowSubOpcode = (uint)GameServer0X2000RespondsOpcodes.KnubotCloseChatWindowIIR;
 
 		// The Knubot packets we CONSTRUCT from the typed codec (KnubotCodec) instead of replaying+substituting (#188):
 		// ALL FOUR record types - the spoken line (AppendText), the window-open, the answer list and the close. Their
@@ -71,175 +33,8 @@ namespace Faolan.GameServer.Dialogue
 		// endpoints - byte-identical to the substitution path (ConversationConstruct tests) but routed through the
 		// typed codec, the step toward sourcing the line content from RDB/Lua instead of the captured packet.
 		private const uint KnubotAppendTextSubOpcode = (uint)GameServer0X2000RespondsOpcodes.KnubotAppendTextIIR;
+		private const uint KnubotCloseChatWindowSubOpcode = (uint)GameServer0X2000RespondsOpcodes.KnubotCloseChatWindowIIR;
 		private const uint KnubotOpenChatWindowSubOpcode = (uint)GameServer0X2000RespondsOpcodes.KnubotOpenChatWindowIIR;
-
-		// Lifts the IIR carrier payload (the [u32 len][record]) out of a captured full conversation packet and, if it
-		// is an AppendText or OpenChatWindow, rebuilds it through KnubotCodec re-addressed to the live player + clicked
-		// NPC. Returns false for every other sub-opcode (those stay on the substitution-replay path).
-		internal static bool TryConstructKnubotRecord(byte[] capturedPacket, uint liveInstance, uint clickedNpcHandle,
-			string playerName, string guildName, out byte[] record)
-		{
-			record = null;
-			if (capturedPacket == null || capturedPacket.Length < 12)
-				return false;
-
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(capturedPacket.AsSpan(8, 4));
-			var start = 12 + headerLen;
-			if (start + 8 > capturedPacket.Length)
-				return false;
-
-			var carrier = capturedPacket.AsSpan(start).ToArray(); // [u32 len][sub][...]
-			var sub = BinaryPrimitives.ReadUInt32BigEndian(carrier.AsSpan(4, 4));
-
-			if (sub == KnubotAppendTextSubOpcode)
-			{
-				var p = KnubotCodec.ParseAppendText(carrier);
-				var xml = WithLivePlayer(p.Xml, playerName, guildName);
-				record = KnubotCodec.BuildAppendText(liveInstance, clickedNpcHandle, xml, p.Field, p.Trailing, p.Env);
-				return true;
-			}
-
-			if (sub == KnubotOpenChatWindowSubOpcode)
-			{
-				var p = KnubotCodec.ParseOpenChatWindow(carrier);
-				record = KnubotCodec.BuildOpenChatWindow(liveInstance, clickedNpcHandle, p.Value, p.Env);
-				return true;
-			}
-
-			// AnswerList + CloseChatWindow share the string-list grammar; rebuild re-addressed to the live endpoints.
-			if (sub == KnubotAnswerListSubOpcode || sub == KnubotCloseChatWindowSubOpcode)
-			{
-				var p = KnubotCodec.ParseStringList(carrier);
-				var strings = p.Strings.Select(x => WithLivePlayer(x, playerName, guildName)).ToList();
-				record = KnubotCodec.BuildStringList(sub, liveInstance, clickedNpcHandle, strings, p.Env);
-				return true;
-			}
-
-			return false;
-		}
-
-		// The packet's Knubot sub-opcode: the stored column when structured, else read from the raw Data.
-		private static uint SubOpcodeOf(ConversationPacket p) => p.SubOpcode ?? ConversationSubOpcode(p.Data);
-
-		// Construct a Knubot record from the STRUCTURED columns (#188) - the screen text comes from ScreensJson, the
-		// live player name/guild are regenerated in. Byte-identical to the Data-path construct for the same inputs
-		// (gated by ConversationStructuredScreenTests), so swapping the source doesn't change the wire output.
-		internal static byte[] BuildKnubotFromColumns(ConversationPacket p, uint liveInstance, uint npcHandle,
-			string playerName, string guildName)
-		{
-			var env = p.Env ?? 0;
-			var screens = string.IsNullOrEmpty(p.ScreensJson)
-				? System.Array.Empty<string>()
-				: System.Text.Json.JsonSerializer.Deserialize<string[]>(p.ScreensJson) ?? System.Array.Empty<string>();
-
-			byte[] Screen(int i) => WithLivePlayer(System.Text.Encoding.Latin1.GetBytes(screens[i]), playerName, guildName);
-
-			if (p.SubOpcode == KnubotOpenChatWindowSubOpcode)
-				return KnubotCodec.BuildOpenChatWindow(liveInstance, npcHandle, p.Flag ?? 0, env);
-			if (p.SubOpcode == KnubotAppendTextSubOpcode)
-				return KnubotCodec.BuildAppendText(liveInstance, npcHandle, Screen(0), p.Field ?? 1, p.Flag ?? 1, env);
-			// AnswerList + CloseChatWindow: the string-list grammar.
-			var strings = screens.Select((_, i) => Screen(i)).ToList();
-			return KnubotCodec.BuildStringList(p.SubOpcode!.Value, liveInstance, npcHandle, strings, env);
-		}
-
-		// Regenerate the live player's name/guild into a captured screen's remoteformat XML via the structured
-		// builder (so the captured player's name no longer shows to everyone). SAFETY: only rebuilds when the parser
-		// reproduces the captured XML byte-for-byte first; otherwise the original bytes are returned untouched, so an
-		// unrecognised screen variant can never be corrupted.
-		private static byte[] WithLivePlayer(byte[] screenXml, string playerName, string guildName)
-		{
-			if (screenXml == null || screenXml.Length == 0 || string.IsNullOrEmpty(playerName))
-				return screenXml;
-			try
-			{
-				var xml = System.Text.Encoding.Latin1.GetString(screenXml);
-				var screen = RemoteFormatXml.Parse(xml);
-				if (RemoteFormatXml.Build(screen) != xml)
-					return screenXml; // not byte-exact roundtrippable -> leave it alone
-				var rebuilt = RemoteFormatXml.Build(RemoteFormatXml.WithLivePlayer(screen, playerName, guildName ?? ""));
-				return System.Text.Encoding.Latin1.GetBytes(rebuilt);
-			}
-			catch
-			{
-				return screenXml;
-			}
-		}
-
-		// Frames a constructed Knubot record exactly as retail does (verified against the captures): the conversation
-		// runs sender `GameAgent:<conversationAgentInstance>` -> receiver `GameInterface:<playerHandle>` on opcode
-		// 0x2000. Retail VARIES the GameAgent instance per conversation (0x07..0x5a observed; 0x08 the most common),
-		// and the client addresses its KnubotAnswer back to whatever instance sent the screen - so we PRESERVE the
-		// captured packet's sender instance rather than hardcoding one, matching the replay path byte-for-byte.
-		private static Task SendConstructedKnubot(INetworkClient client, uint senderInstance, uint liveInstance, byte[] record)
-		{
-			return new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, senderInstance),
-					ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, liveInstance), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(record)
-				.SendAsync(client);
-		}
-
-		// Constructs the dialogue camera (DispatchSetDialogueCamera 0x2015) from the structured columns (#188):
-		// GameCharAgent:<agentInstance> -> GameCharInterface:<player>, body [0xC350][npc][0xC350][player][params].
-		// Byte-identical to the captured packet re-addressed (gated by the construct test).
-		private static Task SendDialogueCamera(INetworkClient client, uint agentInstance, uint liveInstance,
-			uint npcHandle, byte[] cameraParams) =>
-			client.SendAsync(BuildDialogueCameraPacket(agentInstance, liveInstance, npcHandle, cameraParams));
-
-		internal static byte[] BuildDialogueCameraPacket(uint agentInstance, uint liveInstance, uint npcHandle, byte[] cameraParams)
-		{
-			var body = new FaolanStream()
-				.WriteUInt32(EntityClass.Character)
-				.WriteUInt32(npcHandle)
-				.WriteUInt32(EntityClass.Character)
-				.WriteUInt32(liveInstance)
-				.WriteArray(cameraParams ?? Array.Empty<byte>())
-				.ToArray();
-
-			var ps = new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, agentInstance),
-					ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, liveInstance),
-					(ushort)ConversationScreenDecoder.SetDialogueCamera);
-			ps.WriteArray(body);
-			ps.WriteLengthHash();
-			return ps.ToArray();
-		}
-
-		// Reads the GameAgent sender instance out of a captured packet's RPC header. Header layout (PacketStream):
-		// [u32 len][u32 crc][u32 headerLen][0x0a][byteLen][sender endpoint][0x12]... where a ProtoEndpoint is
-		// [0x0D <type LE32> 0x10 <instance varint>]. Falls back to 0x08 (the common value / SendConversationClose's)
-		// if the header is shaped unexpectedly.
-		internal static uint ReadSenderInstance(byte[] packet)
-		{
-			const uint Fallback = 0x08;
-			if (packet == null || packet.Length < 14 || packet[12] != 0x0a)
-				return Fallback;
-
-			var senderLen = packet[13];
-			var i = 14;
-			var end = i + senderLen;
-			if (end > packet.Length || packet[i] != 0x0d)
-				return Fallback;
-
-			i += 1 + 4;                    // skip 0x0D + the fixed32 type
-			if (i >= end || packet[i] != 0x10)
-				return Fallback;
-			i++;                           // skip the 0x10 instance tag
-
-			uint value = 0;
-			var shift = 0;
-			while (i < end)
-			{
-				var bb = packet[i++];
-				value |= (uint)(bb & 0x7f) << shift;
-				if ((bb & 0x80) == 0)
-					return value;
-				shift += 7;
-			}
-
-			return Fallback;
-		}
 
 		// A KnubotCloseChatWindow (0xC4AF39EB) body, captured verbatim. It closes the NPC chat window with an EMPTY
 		// answer list (the remoteformat is id="0" with no options) - retail's "this NPC has nothing (more) to say"
@@ -257,27 +52,42 @@ namespace Faolan.GameServer.Dialogue
 			0x74, 0x3E
 		];
 
-		// Closes the NPC chat window gracefully (KnubotCloseChatWindow with an empty answer list), re-addressed to the
-		// live player. Sent when a TalkToNpc has NO matching conversation node, so the client never hangs mid-dialogue
-		// waiting for a reply that won't come - the "advance a step with no captured branch -> chat locks, can't ESC"
-		// bug. (Conversation replay is coverage-bound: (Mode, Field3) is quest-state-dependent and the captures cover
-		// only some states per NPC, so an un-captured branch is expected; closing the window is the right answer.)
-		// Clears the session's conversation state - the player is no longer in a dialogue. Sends nothing; use this
-		// when the CLIENT ended the conversation (it sent KnubotCloseChatWindow), so we just tear down our state and
-		// don't echo a close back. Leaving state set is what let a stale conversation be re-entered (#217).
-		public static void EndConversation(INetworkClient client)
-		{
-			// #217: remember which NPC we just closed so the reflexive post-close greeting (the client re-fires one
-			// with no new SelectDeselect) is absorbed rather than re-opening the dialogue. Cleared when the player
-			// re-selects an NPC (SelectDeselect) = genuine intent to talk again.
-			if (client.Session.ConversationNpcHandle != 0)
-				client.Session.ConversationEndedNpcHandle = client.Session.ConversationNpcHandle;
+		private readonly IDatabaseRepository _database;
+		private readonly ILogger _logger;
+		private readonly LuaScriptVm _luaVm;
+		private readonly QuestProgressionService _questProgression;
+		private readonly WorldBroadcaster _broadcaster;
 
-			client.Session.ConversationAnswerPath = null;
-			client.Session.ConversationNpcName = null;
-			client.Session.ConversationTypeId = 0;
-			client.Session.ConversationNpcHandle = 0;
-			client.Session.ConversationAgentInstance = 0;
+		public ConversationService(IDatabaseRepository database, ILogger logger, WorldBroadcaster broadcaster, QuestProgressionService questProgression, LuaScriptVm luaVm)
+		{
+			_database = database;
+			_logger = logger;
+			_broadcaster = broadcaster;
+			_questProgression = questProgression;
+			_luaVm = luaVm;
+		}
+
+		// The player picked option `answerIndex` in the active conversation: navigate to the child screen at the
+		// extended answer-path and serve it. An un-walked branch (no captured screen) closes the window gracefully so
+		// the client never hangs. No-op when no conversation is active.
+		public async Task AdvanceConversation(INetworkClient client, uint answerIndex)
+		{
+			var path = client.Session.ConversationAnswerPath;
+			if (path == null)
+				return;
+
+			var childPath = path.Length == 0
+				? answerIndex.ToString()
+				: $"{path}>{answerIndex}";
+			var screen = await PickConversationScreen(client, client.Session.ConversationNpcName, client.Session.ConversationTypeId, childPath);
+			if (screen == null)
+			{
+				_logger.LogInformation("Conversation: no captured screen for npc={Name} path='{Path}' (un-walked branch); closing.", client.Session.ConversationNpcName, childPath);
+				await SendConversationClose(client);
+				return;
+			}
+
+			await ServeScreen(client, screen, client.Session.ConversationNpcHandle);
 		}
 
 		public Task SendConversationClose(INetworkClient client, uint npcHandle = 0)
@@ -292,15 +102,174 @@ namespace Faolan.GameServer.Dialogue
 				npcHandle = client.Session.ConversationNpcHandle;
 			// The close must ride the SAME GameAgent instance the conversation's screens used (#217); 0x08 is the
 			// fallback when there was no active conversation. Captured BEFORE EndConversation clears it.
-			var agentInstance = client.Session.ConversationAgentInstance != 0 ? client.Session.ConversationAgentInstance : 0x08;
+			var agentInstance = client.Session.ConversationAgentInstance != 0
+				? client.Session.ConversationAgentInstance
+				: 0x08;
 			EndConversation(client); // end any active conversation
 			var id = client.Session.Account.ClientInstance;
 
 			// CONSTRUCT the close via KnubotCodec from the captured empty-remoteformat reply, re-addressed to the live
 			// player AND the live NPC (the captured string is reused verbatim), on the same sender (GameAgent:0x08).
 			var captured = KnubotCodec.ParseStringList(KnubotCloseChatWindowBody);
-			var record = KnubotCodec.BuildCloseChatWindow(id, npcHandle != 0 ? npcHandle : captured.NpcHandle, captured.Strings, captured.Env);
+			var record = KnubotCodec.BuildCloseChatWindow(id,
+				npcHandle != 0
+					? npcHandle
+					: captured.NpcHandle,
+				captured.Strings,
+				captured.Env);
 			return SendConstructedKnubot(client, agentInstance, id, record);
+		}
+
+		// Serves `npcName`'s greeting screen through the live CONSTRUCT path (PickConversationScreen -> ServeScreen,
+		// rebuilt via KnubotCodec re-addressed to `npcHandle`) - the #188 dialogue-VM entry the .npcsay GM command reuses
+		// instead of replaying a baked captured line. Returns false when the NPC has no matching screen for `typeId`.
+		public async Task<bool> ServeGreeting(INetworkClient client, string npcName, uint typeId, uint npcHandle)
+		{
+			var greeting = await PickConversationScreen(client, npcName, typeId, "");
+			if (greeting == null)
+				return false;
+
+			await ServeScreen(client, greeting, npcHandle);
+			return true;
+		}
+
+		// Starts an NPC conversation from its greeting: routes by the clicked NPC's stable NAME (handles are
+		// session-volatile) to the dialogue's "" screen and serves it. Returns true if a greeting was found+served.
+		// Runs for world-burst (beach) AND create-world sessions; the create-world scripted intro stays the fallback
+		// for NPCs with no captured dialogue. The nodes live in the DB (ConversationNode/ConversationPacket), imported
+		// from captures by Faolan.Importer. (Option picks after the greeting are KnubotAnswers -> AdvanceConversation.)
+		public async Task<bool> TryReplayConversation(INetworkClient client, uint typeId, uint field3, uint clickedNpcHandle)
+		{
+			if (!client.Session.WorldEntered && !client.Session.IsCreateWorldSession)
+				return false;
+
+			// The client sends TalkToNpc(field3=0) [greeting] then a TalkToNpc(field3!=0) the same instant (retail
+			// answers that second one with nothing). Only the greeting opens the dialogue; a non-greeting click while a
+			// conversation is already active is absorbed (return true, no reply) so it doesn't reset or close it.
+			if (field3 != 0)
+				return client.Session.ConversationAnswerPath != null;
+
+			// #217: absorb the reflexive greeting the client re-fires right after we close (it keeps the NPC
+			// targeted and re-talks with no new SelectDeselect). Stays suppressed until the player re-selects the
+			// NPC, so a deliberate re-talk still opens. This is what makes "unknown path -> just exit" actually stay
+			// exited instead of instantly re-triggering.
+			if (clickedNpcHandle != 0 && clickedNpcHandle == client.Session.ConversationEndedNpcHandle)
+			{
+				_logger.LogInformation("Conversation: suppressed the reflexive post-close greeting for NPC 0x{Npc:X} (#217; re-select to talk again).", clickedNpcHandle);
+				return true;
+			}
+
+			if (!client.Session.SpawnedNpcNamesByHandle.TryGetValue(clickedNpcHandle, out var npcName))
+				return false; // unknown NPC (not spawned this session) -> create-world scripted intro fallback
+
+			// Turn-in (#47): a CHAINLESS quest whose objective is already done completes when talking to its giver - the
+			// reply is the reward greeting and the journal moves to Completed. (Chained stages supersede below instead.)
+			await TryTurnInQuests(client, npcName);
+
+			// Pick the greeting in the player's CURRENT (pre-completion) quest state so a talk-stage shows its OWN
+			// dialogue: e.g. Casilda's "I'll protect you now" one-off is gated on HasQuest(13480), so it must be picked
+			// while 13480 is still active (#264).
+			var greeting = await PickConversationScreen(client, npcName, typeId, "");
+			if (greeting == null)
+				return false;
+
+			await ServeScreen(client, greeting, clickedNpcHandle);
+
+			// Quest chain (#261/#264): NOW complete the TalkToNpc goal (e.g. freeing Casilda, 13480 -> escort 12407),
+			// AFTER serving the greeting - so the freeing dialogue shows once, then the stage completes; the next talk
+			// sees the post-freeing (completed) state and gets the post-quest greeting. Matches retail (capture: open ->
+			// supersede -> options).
+			await _questProgression.AdvanceTalkGoals(client, npcName);
+			return true;
+		}
+
+		// Picks the conversation-screen variant whose Lua CONDITION passes for the live player (quest/tag-gated
+		// dialogue, issue #37). Most screens have a single unconditional variant - fast path. When conditioned
+		// variants exist, evaluate each (conditioned-first) against the character's tags + completed quests via the
+		// LuaScriptVm, and serve the first that passes; the unconditional "" variant is the fallback. A condition
+		// script error is treated as "doesn't match" (permissive=false) so a bad gate can't hijack every player.
+		private async Task<ConversationNode> PickConversationScreen(INetworkClient client, string npcName, uint typeId, string answerPath)
+		{
+			var variants = await _database.GetConversationScreens(npcName, typeId, answerPath);
+			if (variants.Count == 0)
+				return null;
+			if (variants.Count == 1 || variants.All(v => string.IsNullOrEmpty(v.ConditionScript)))
+				return variants[0]; // GetConversationScreens orders the unconditional fallback last
+
+			var character = client.Session.Character;
+			var tags = character != null
+				? await _database.GetCharacterTags(character.Id)
+				: [];
+			var quests = character != null
+				? await _database.GetCharacterQuests(character.Id)
+				: [];
+			var completed = quests.Where(q => q.State == QuestState.Completed).Select(q => q.QuestId);
+			var active = quests.Where(q => q.State == QuestState.Active).Select(q => q.QuestId);
+			var player = new GameLuaPlayer(tags, completed, active);
+
+			ConversationNode fallback = null;
+			foreach (var v in variants)
+			{
+				if (string.IsNullOrEmpty(v.ConditionScript))
+				{
+					fallback = v;
+					continue;
+				}
+
+				if (_luaVm.RunCondition(v.ConditionScript, player, false))
+				{
+					_logger.LogInformation("Conversation: npc={Name} path='{Path}' matched conditioned variant.", npcName, answerPath);
+					return v;
+				}
+			}
+
+			return fallback;
+		}
+
+		// Reaching a conversation node that GRANTS a quest accepts it for the player: persist it ACTIVE and return its
+		// definition so ServeScreen can deliver the single QuestFullUpdate inline (the retail grant shape - see above).
+		// Returns null when the player already has the quest (re-serving the node must not re-grant) or it has no
+		// definition (state is still persisted; there is just nothing to render).
+		private async Task<QuestDefinition> PrepareQuestGrant(INetworkClient client, ConversationNode node)
+		{
+			var character = client.Session?.Character;
+			if (character == null)
+				return null;
+
+			var existing = await _database.GetCharacterQuests(character.Id);
+			if (existing.Any(q => q.QuestId == node.GrantQuestId))
+				return null; // already accepted (active) or completed - don't re-grant
+
+			var def = await _database.GetQuestDefinition(node.GrantQuestId);
+
+			// Seed the quest's first objective so kills can advance it (#47): GoalRequired = the goal record's decoded
+			// count (QuestGoalDefinition.RequiredCount), GoalTargetName = the seeded kill target (QuestGoalDefinition.
+			// TargetName - server-side, sourced per quest since it's not on the wire). With both set,
+			// CombatService.AdvanceKillQuests matches a kill of that NPC and advances/completes the quest (e.g. Casilda's
+			// 13479 = kill 1 "Scavenger Tuut"). A talk/collect goal leaves TargetName null - no kill matching, count 0.
+			var firstGoal = def?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
+			var goalRequired = firstGoal is { RequiredCount: > 0 }
+				? firstGoal.RequiredCount
+				: 0u;
+			var goalTargetName = firstGoal?.TargetName;
+
+			await _database.SetCharacterQuest(character.Id, node.GrantQuestId, QuestState.Active, goalRequired: goalRequired, goalTargetName: goalTargetName);
+			_logger.LogInformation("Quest {QuestId} granted to {Name} from {Npc}'s dialogue (goalRequired={Req}, target={Target}).", node.GrantQuestId, character.Name, node.NpcName, goalRequired, goalTargetName ?? "-");
+			return def;
+		}
+
+		// Sends the two retail grant packets in order: the QuestLogList (populates the J-panel - all active quests,
+		// just-granted tracked first) then the QuestFullUpdate (the quest's detail). Order + presence both matter: the
+		// list is what makes the quest appear in the log (decoded from the grant capture).
+		private async Task SendQuestGrantPackets(INetworkClient client, QuestDefinition grantDef)
+		{
+			var character = client.Session.Character;
+			var active = await _database.GetCharacterQuests(character.Id);
+			var ids = new List<uint> { grantDef.QuestId };
+			ids.AddRange(active.Where(q => q.State == QuestState.Active && q.QuestId != grantDef.QuestId).Select(q => q.QuestId));
+
+			await _broadcaster.SendQuestLogList(client, grantDef, ids);
+			await _broadcaster.SendQuestFullUpdate(client, grantDef);
 		}
 
 		// Serves one dialogue SCREEN: re-addresses its captured response packets to the live player + clicked NPC and
@@ -335,7 +304,9 @@ namespace Faolan.GameServer.Dialogue
 			// AppendText -> QuestLogList (0x504B7924, the J-panel list) -> QuestFullUpdate (0x63268258, the detail) ->
 			// AnswerList, with NO QuestIIR and NO QuestJournal (capture randochar-login-get-casilda-quest frame 687-688).
 			// The QuestLogList is what POPULATES the log; sending only the full-update (the detail) leaves the log empty.
-			var grantDef = node.GrantQuestId != 0 ? await PrepareQuestGrant(client, node) : null;
+			var grantDef = node.GrantQuestId != 0
+				? await PrepareQuestGrant(client, node)
+				: null;
 			var grantSent = false;
 
 			foreach (var p in orderedPackets)
@@ -358,8 +329,10 @@ namespace Faolan.GameServer.Dialogue
 					if (structuredSub == ConversationScreenDecoder.SetDialogueCamera)
 						await SendDialogueCamera(client, p.CameraAgentInstance ?? 0x08, liveInstance, clickedNpcHandle, p.CameraParams);
 					else
-						await SendConstructedKnubot(client, ReadSenderInstance(p.Data), liveInstance,
-							BuildKnubotFromColumns(p, liveInstance, clickedNpcHandle, playerName, guildName));
+					{
+						await SendConstructedKnubot(client, ReadSenderInstance(p.Data), liveInstance, BuildKnubotFromColumns(p, liveInstance, clickedNpcHandle, playerName, guildName));
+					}
+
 					continue;
 				}
 
@@ -415,138 +388,6 @@ namespace Faolan.GameServer.Dialogue
 			_logger.LogInformation("Conversation screen (npc={Name}, typeId={TypeId}, path='{Path}') -> {Packets} packet(s) for NPC 0x{Npc:X}.", node.NpcName, node.TypeId, node.AnswerPath, node.Packets.Count, clickedNpcHandle);
 		}
 
-		// Reaching a conversation node that GRANTS a quest accepts it for the player: persist it ACTIVE and return its
-		// definition so ServeScreen can deliver the single QuestFullUpdate inline (the retail grant shape - see above).
-		// Returns null when the player already has the quest (re-serving the node must not re-grant) or it has no
-		// definition (state is still persisted; there is just nothing to render).
-		private async Task<QuestDefinition> PrepareQuestGrant(INetworkClient client, ConversationNode node)
-		{
-			var character = client.Session?.Character;
-			if (character == null)
-				return null;
-
-			var existing = await _database.GetCharacterQuests(character.Id);
-			if (existing.Any(q => q.QuestId == node.GrantQuestId))
-				return null; // already accepted (active) or completed - don't re-grant
-
-			var def = await _database.GetQuestDefinition(node.GrantQuestId);
-
-			// Seed the quest's first objective so kills can advance it (#47): GoalRequired = the goal record's decoded
-			// count (QuestGoalDefinition.RequiredCount), GoalTargetName = the seeded kill target (QuestGoalDefinition.
-			// TargetName - server-side, sourced per quest since it's not on the wire). With both set,
-			// CombatService.AdvanceKillQuests matches a kill of that NPC and advances/completes the quest (e.g. Casilda's
-			// 13479 = kill 1 "Scavenger Tuut"). A talk/collect goal leaves TargetName null - no kill matching, count 0.
-			var firstGoal = def?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
-			var goalRequired = firstGoal is { RequiredCount: > 0 } ? firstGoal.RequiredCount : 0u;
-			var goalTargetName = firstGoal?.TargetName;
-
-			await _database.SetCharacterQuest(character.Id, node.GrantQuestId, QuestState.Active, goalRequired: goalRequired, goalTargetName: goalTargetName);
-			_logger.LogInformation("Quest {QuestId} granted to {Name} from {Npc}'s dialogue (goalRequired={Req}, target={Target}).", node.GrantQuestId, character.Name, node.NpcName, goalRequired, goalTargetName ?? "-");
-			return def;
-		}
-
-		// Sends the two retail grant packets in order: the QuestLogList (populates the J-panel - all active quests,
-		// just-granted tracked first) then the QuestFullUpdate (the quest's detail). Order + presence both matter: the
-		// list is what makes the quest appear in the log (decoded from the grant capture).
-		private async Task SendQuestGrantPackets(INetworkClient client, QuestDefinition grantDef)
-		{
-			var character = client.Session.Character;
-			var active = await _database.GetCharacterQuests(character.Id);
-			var ids = new List<uint> { grantDef.QuestId };
-			ids.AddRange(active
-				.Where(q => q.State == QuestState.Active && q.QuestId != grantDef.QuestId)
-				.Select(q => q.QuestId));
-
-			await _broadcaster.SendQuestLogList(client, grantDef, ids);
-			await _broadcaster.SendQuestFullUpdate(client, grantDef);
-		}
-
-		// The player picked option `answerIndex` in the active conversation: navigate to the child screen at the
-		// extended answer-path and serve it. An un-walked branch (no captured screen) closes the window gracefully so
-		// the client never hangs. No-op when no conversation is active.
-		public async Task AdvanceConversation(INetworkClient client, uint answerIndex)
-		{
-			var path = client.Session.ConversationAnswerPath;
-			if (path == null)
-				return;
-
-			var childPath = path.Length == 0
-				? answerIndex.ToString()
-				: $"{path}>{answerIndex}";
-			var screen = await PickConversationScreen(client, client.Session.ConversationNpcName, client.Session.ConversationTypeId, childPath);
-			if (screen == null)
-			{
-				_logger.LogInformation("Conversation: no captured screen for npc={Name} path='{Path}' (un-walked branch); closing.", client.Session.ConversationNpcName, childPath);
-				await SendConversationClose(client);
-				return;
-			}
-
-			await ServeScreen(client, screen, client.Session.ConversationNpcHandle);
-		}
-
-		// Starts an NPC conversation from its greeting: routes by the clicked NPC's stable NAME (handles are
-		// session-volatile) to the dialogue's "" screen and serves it. Returns true if a greeting was found+served.
-		// Runs for world-burst (beach) AND create-world sessions; the create-world scripted intro stays the fallback
-		// for NPCs with no captured dialogue. The nodes live in the DB (ConversationNode/ConversationPacket), imported
-		// from captures by Faolan.Importer. (Option picks after the greeting are KnubotAnswers -> AdvanceConversation.)
-		public async Task<bool> TryReplayConversation(INetworkClient client, uint typeId, uint field3, uint clickedNpcHandle)
-		{
-			if (!client.Session.WorldEntered && !client.Session.IsCreateWorldSession)
-				return false;
-
-			// The client sends TalkToNpc(field3=0) [greeting] then a TalkToNpc(field3!=0) the same instant (retail
-			// answers that second one with nothing). Only the greeting opens the dialogue; a non-greeting click while a
-			// conversation is already active is absorbed (return true, no reply) so it doesn't reset or close it.
-			if (field3 != 0)
-				return client.Session.ConversationAnswerPath != null;
-
-			// #217: absorb the reflexive greeting the client re-fires right after we close (it keeps the NPC
-			// targeted and re-talks with no new SelectDeselect). Stays suppressed until the player re-selects the
-			// NPC, so a deliberate re-talk still opens. This is what makes "unknown path -> just exit" actually stay
-			// exited instead of instantly re-triggering.
-			if (clickedNpcHandle != 0 && clickedNpcHandle == client.Session.ConversationEndedNpcHandle)
-			{
-				_logger.LogInformation("Conversation: suppressed the reflexive post-close greeting for NPC 0x{Npc:X} (#217; re-select to talk again).", clickedNpcHandle);
-				return true;
-			}
-
-			if (!client.Session.SpawnedNpcNamesByHandle.TryGetValue(clickedNpcHandle, out var npcName))
-				return false; // unknown NPC (not spawned this session) -> create-world scripted intro fallback
-
-			// Turn-in (#47): a CHAINLESS quest whose objective is already done completes when talking to its giver - the
-			// reply is the reward greeting and the journal moves to Completed. (Chained stages supersede below instead.)
-			await TryTurnInQuests(client, npcName);
-
-			// Pick the greeting in the player's CURRENT (pre-completion) quest state so a talk-stage shows its OWN
-			// dialogue: e.g. Casilda's "I'll protect you now" one-off is gated on HasQuest(13480), so it must be picked
-			// while 13480 is still active (#264).
-			var greeting = await PickConversationScreen(client, npcName, typeId, "");
-			if (greeting == null)
-				return false;
-
-			await ServeScreen(client, greeting, clickedNpcHandle);
-
-			// Quest chain (#261/#264): NOW complete the TalkToNpc goal (e.g. freeing Casilda, 13480 -> escort 12407),
-			// AFTER serving the greeting - so the freeing dialogue shows once, then the stage completes; the next talk
-			// sees the post-freeing (completed) state and gets the post-quest greeting. Matches retail (capture: open ->
-			// supersede -> options).
-			await _questProgression.AdvanceTalkGoals(client, npcName);
-			return true;
-		}
-
-		// Serves `npcName`'s greeting screen through the live CONSTRUCT path (PickConversationScreen -> ServeScreen,
-		// rebuilt via KnubotCodec re-addressed to `npcHandle`) - the #188 dialogue-VM entry the .npcsay GM command reuses
-		// instead of replaying a baked captured line. Returns false when the NPC has no matching screen for `typeId`.
-		public async Task<bool> ServeGreeting(INetworkClient client, string npcName, uint typeId, uint npcHandle)
-		{
-			var greeting = await PickConversationScreen(client, npcName, typeId, "");
-			if (greeting == null)
-				return false;
-
-			await ServeScreen(client, greeting, npcHandle);
-			return true;
-		}
-
 		// Completes any quest GIVEN by `npcName` whose objective is done (Active + GoalProgress >= GoalRequired): marks
 		// it Completed and sends QuestIIR state 2 -> 4 so the client journal moves it to the completed tab (#47). The
 		// kill only advances the objective; the quest is marked Completed here, on TURN-IN at the giver. Called as the
@@ -571,43 +412,145 @@ namespace Faolan.GameServer.Dialogue
 			_logger.LogInformation("Quest {Quest} turned in to {Npc} by {Char} (objective {Progress}/{Required}).", held.QuestId, npcName, character.Name, held.GoalProgress, held.GoalRequired);
 		}
 
-		// Picks the conversation-screen variant whose Lua CONDITION passes for the live player (quest/tag-gated
-		// dialogue, issue #37). Most screens have a single unconditional variant - fast path. When conditioned
-		// variants exist, evaluate each (conditioned-first) against the character's tags + completed quests via the
-		// LuaScriptVm, and serve the first that passes; the unconditional "" variant is the fallback. A condition
-		// script error is treated as "doesn't match" (permissive=false) so a bad gate can't hijack every player.
-		private async Task<ConversationNode> PickConversationScreen(INetworkClient client, string npcName, uint typeId, string answerPath)
+		// Closes the NPC chat window gracefully (KnubotCloseChatWindow with an empty answer list), re-addressed to the
+		// live player. Sent when a TalkToNpc has NO matching conversation node, so the client never hangs mid-dialogue
+		// waiting for a reply that won't come - the "advance a step with no captured branch -> chat locks, can't ESC"
+		// bug. (Conversation replay is coverage-bound: (Mode, Field3) is quest-state-dependent and the captures cover
+		// only some states per NPC, so an un-captured branch is expected; closing the window is the right answer.)
+		// Clears the session's conversation state - the player is no longer in a dialogue. Sends nothing; use this
+		// when the CLIENT ended the conversation (it sent KnubotCloseChatWindow), so we just tear down our state and
+		// don't echo a close back. Leaving state set is what let a stale conversation be re-entered (#217).
+		public static void EndConversation(INetworkClient client)
 		{
-			var variants = await _database.GetConversationScreens(npcName, typeId, answerPath);
-			if (variants.Count == 0)
-				return null;
-			if (variants.Count == 1 || variants.All(v => string.IsNullOrEmpty(v.ConditionScript)))
-				return variants[0]; // GetConversationScreens orders the unconditional fallback last
+			// #217: remember which NPC we just closed so the reflexive post-close greeting (the client re-fires one
+			// with no new SelectDeselect) is absorbed rather than re-opening the dialogue. Cleared when the player
+			// re-selects an NPC (SelectDeselect) = genuine intent to talk again.
+			if (client.Session.ConversationNpcHandle != 0)
+				client.Session.ConversationEndedNpcHandle = client.Session.ConversationNpcHandle;
 
-			var character = client.Session.Character;
-			var tags = character != null ? await _database.GetCharacterTags(character.Id) : System.Array.Empty<uint>();
-			var quests = character != null ? await _database.GetCharacterQuests(character.Id) : System.Array.Empty<CharacterQuest>();
-			var completed = quests.Where(q => q.State == QuestState.Completed).Select(q => q.QuestId);
-			var active = quests.Where(q => q.State == QuestState.Active).Select(q => q.QuestId);
-			var player = new Scripting.GameLuaPlayer(tags, completed, active);
+			client.Session.ConversationAnswerPath = null;
+			client.Session.ConversationNpcName = null;
+			client.Session.ConversationTypeId = 0;
+			client.Session.ConversationNpcHandle = 0;
+			client.Session.ConversationAgentInstance = 0;
+		}
 
-			ConversationNode fallback = null;
-			foreach (var v in variants)
+		internal static byte[] BuildDialogueCameraPacket(uint agentInstance, uint liveInstance, uint npcHandle, byte[] cameraParams)
+		{
+			var body = new FaolanStream().WriteUInt32(EntityClass.Character).WriteUInt32(npcHandle).WriteUInt32(EntityClass.Character).WriteUInt32(liveInstance).WriteArray(cameraParams ?? []).ToArray();
+
+			var ps = new PacketStream().WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, agentInstance),
+				ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, liveInstance),
+				(ushort)ConversationScreenDecoder.SetDialogueCamera);
+			ps.WriteArray(body);
+			ps.WriteLengthHash();
+			return ps.ToArray();
+		}
+
+		// Construct a Knubot record from the STRUCTURED columns (#188) - the screen text comes from ScreensJson, the
+		// live player name/guild are regenerated in. Byte-identical to the Data-path construct for the same inputs
+		// (gated by ConversationStructuredScreenTests), so swapping the source doesn't change the wire output.
+		internal static byte[] BuildKnubotFromColumns(ConversationPacket p, uint liveInstance, uint npcHandle, string playerName, string guildName)
+		{
+			var env = p.Env ?? 0;
+			var screens = string.IsNullOrEmpty(p.ScreensJson)
+				? []
+				: JsonSerializer.Deserialize<string[]>(p.ScreensJson) ?? [];
+
+			byte[] Screen(int i)
 			{
-				if (string.IsNullOrEmpty(v.ConditionScript))
-				{
-					fallback = v;
-					continue;
-				}
-
-				if (_luaVm.RunCondition(v.ConditionScript, player, permissive: false))
-				{
-					_logger.LogInformation("Conversation: npc={Name} path='{Path}' matched conditioned variant.", npcName, answerPath);
-					return v;
-				}
+				return WithLivePlayer(Encoding.Latin1.GetBytes(screens[i]), playerName, guildName);
 			}
 
-			return fallback;
+			if (p.SubOpcode == KnubotOpenChatWindowSubOpcode)
+				return KnubotCodec.BuildOpenChatWindow(liveInstance, npcHandle, p.Flag ?? 0, env);
+			if (p.SubOpcode == KnubotAppendTextSubOpcode)
+				return KnubotCodec.BuildAppendText(liveInstance, npcHandle, Screen(0), p.Field ?? 1, p.Flag ?? 1, env);
+
+			// AnswerList + CloseChatWindow: the string-list grammar.
+			var strings = screens.Select((_, i) => Screen(i)).ToList();
+			return KnubotCodec.BuildStringList(p.SubOpcode!.Value, liveInstance, npcHandle, strings, env);
+		}
+
+		// Reads the GameAgent sender instance out of a captured packet's RPC header. Header layout (PacketStream):
+		// [u32 len][u32 crc][u32 headerLen][0x0a][byteLen][sender endpoint][0x12]... where a ProtoEndpoint is
+		// [0x0D <type LE32> 0x10 <instance varint>]. Falls back to 0x08 (the common value / SendConversationClose's)
+		// if the header is shaped unexpectedly.
+		internal static uint ReadSenderInstance(byte[] packet)
+		{
+			const uint Fallback = 0x08;
+			if (packet == null || packet.Length < 14 || packet[12] != 0x0a)
+				return Fallback;
+
+			var senderLen = packet[13];
+			var i = 14;
+			var end = i + senderLen;
+			if (end > packet.Length || packet[i] != 0x0d)
+				return Fallback;
+
+			i += 1 + 4; // skip 0x0D + the fixed32 type
+			if (i >= end || packet[i] != 0x10)
+				return Fallback;
+
+			i++; // skip the 0x10 instance tag
+
+			uint value = 0;
+			var shift = 0;
+			while (i < end)
+			{
+				var bb = packet[i++];
+				value |= (uint)(bb & 0x7f) << shift;
+				if ((bb & 0x80) == 0)
+					return value;
+
+				shift += 7;
+			}
+
+			return Fallback;
+		}
+
+		// Lifts the IIR carrier payload (the [u32 len][record]) out of a captured full conversation packet and, if it
+		// is an AppendText or OpenChatWindow, rebuilds it through KnubotCodec re-addressed to the live player + clicked
+		// NPC. Returns false for every other sub-opcode (those stay on the substitution-replay path).
+		internal static bool TryConstructKnubotRecord(byte[] capturedPacket, uint liveInstance, uint clickedNpcHandle, string playerName, string guildName, out byte[] record)
+		{
+			record = null;
+			if (capturedPacket == null || capturedPacket.Length < 12)
+				return false;
+
+			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(capturedPacket.AsSpan(8, 4));
+			var start = 12 + headerLen;
+			if (start + 8 > capturedPacket.Length)
+				return false;
+
+			var carrier = capturedPacket.AsSpan(start).ToArray(); // [u32 len][sub][...]
+			var sub = BinaryPrimitives.ReadUInt32BigEndian(carrier.AsSpan(4, 4));
+
+			if (sub == KnubotAppendTextSubOpcode)
+			{
+				var p = KnubotCodec.ParseAppendText(carrier);
+				var xml = WithLivePlayer(p.Xml, playerName, guildName);
+				record = KnubotCodec.BuildAppendText(liveInstance, clickedNpcHandle, xml, p.Field, p.Trailing, p.Env);
+				return true;
+			}
+
+			if (sub == KnubotOpenChatWindowSubOpcode)
+			{
+				var p = KnubotCodec.ParseOpenChatWindow(carrier);
+				record = KnubotCodec.BuildOpenChatWindow(liveInstance, clickedNpcHandle, p.Value, p.Env);
+				return true;
+			}
+
+			// AnswerList + CloseChatWindow share the string-list grammar; rebuild re-addressed to the live endpoints.
+			if (sub == KnubotAnswerListSubOpcode || sub == KnubotCloseChatWindowSubOpcode)
+			{
+				var p = KnubotCodec.ParseStringList(carrier);
+				var strings = p.Strings.Select(x => WithLivePlayer(x, playerName, guildName)).ToList();
+				record = KnubotCodec.BuildStringList(sub, liveInstance, clickedNpcHandle, strings, p.Env);
+				return true;
+			}
+
+			return false;
 		}
 
 		// The conversation IIR sub-opcode of a stored packet: full Conan packet is [len4][crc4][headerLen4][header]
@@ -616,9 +559,63 @@ namespace Faolan.GameServer.Dialogue
 		{
 			if (packet == null || packet.Length < 12)
 				return 0;
+
 			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
 			var off = 12 + headerLen + 4;
-			return off + 4 <= packet.Length ? BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(off, 4)) : 0;
+			return off + 4 <= packet.Length
+				? BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(off, 4))
+				: 0;
+		}
+
+		// Byte-array find/replace from offset 8 (skips the length+crc prefix). Copied from RetailLoginReplay's
+		// private helper - a small self-contained util; duplicating it keeps this service free of the listener.
+		private static void ReplaceAll(byte[] buffer, byte[] find, byte[] repl)
+		{
+			for (var i = 8; i + find.Length <= buffer.Length; i++)
+			{
+				var match = true;
+				for (var j = 0; j < find.Length; j++)
+				{
+					if (buffer[i + j] != find[j])
+					{
+						match = false;
+						break;
+					}
+				}
+
+				if (match)
+				{
+					repl.CopyTo(buffer, i);
+					i += find.Length - 1;
+				}
+			}
+		}
+
+		// Frames a constructed Knubot record exactly as retail does (verified against the captures): the conversation
+		// runs sender `GameAgent:<conversationAgentInstance>` -> receiver `GameInterface:<playerHandle>` on opcode
+		// 0x2000. Retail VARIES the GameAgent instance per conversation (0x07..0x5a observed; 0x08 the most common),
+		// and the client addresses its KnubotAnswer back to whatever instance sent the screen - so we PRESERVE the
+		// captured packet's sender instance rather than hardcoding one, matching the replay path byte-for-byte.
+		private static Task SendConstructedKnubot(INetworkClient client, uint senderInstance, uint liveInstance, byte[] record)
+		{
+			return new PacketStream()
+				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, senderInstance), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, liveInstance), GameServerCarrierOpcodes.IirCarrier)
+				.WriteArray(record)
+				.SendAsync(client);
+		}
+
+		// Constructs the dialogue camera (DispatchSetDialogueCamera 0x2015) from the structured columns (#188):
+		// GameCharAgent:<agentInstance> -> GameCharInterface:<player>, body [0xC350][npc][0xC350][player][params].
+		// Byte-identical to the captured packet re-addressed (gated by the construct test).
+		private static Task SendDialogueCamera(INetworkClient client, uint agentInstance, uint liveInstance, uint npcHandle, byte[] cameraParams)
+		{
+			return client.SendAsync(BuildDialogueCameraPacket(agentInstance, liveInstance, npcHandle, cameraParams));
+		}
+
+		// The packet's Knubot sub-opcode: the stored column when structured, else read from the raw Data.
+		private static uint SubOpcodeOf(ConversationPacket p)
+		{
+			return p.SubOpcode ?? ConversationSubOpcode(p.Data);
 		}
 
 		// Replaces every big-endian uint32 occurrence of oldVal with newVal after the 8-byte length+crc prefix.
@@ -638,6 +635,31 @@ namespace Faolan.GameServer.Dialogue
 					BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(i, 4), newVal);
 					i += 3;
 				}
+			}
+		}
+
+		// Regenerate the live player's name/guild into a captured screen's remoteformat XML via the structured
+		// builder (so the captured player's name no longer shows to everyone). SAFETY: only rebuilds when the parser
+		// reproduces the captured XML byte-for-byte first; otherwise the original bytes are returned untouched, so an
+		// unrecognised screen variant can never be corrupted.
+		private static byte[] WithLivePlayer(byte[] screenXml, string playerName, string guildName)
+		{
+			if (screenXml == null || screenXml.Length == 0 || string.IsNullOrEmpty(playerName))
+				return screenXml;
+
+			try
+			{
+				var xml = Encoding.Latin1.GetString(screenXml);
+				var screen = RemoteFormatXml.Parse(xml);
+				if (RemoteFormatXml.Build(screen) != xml)
+					return screenXml; // not byte-exact roundtrippable -> leave it alone
+
+				var rebuilt = RemoteFormatXml.Build(RemoteFormatXml.WithLivePlayer(screen, playerName, guildName ?? ""));
+				return Encoding.Latin1.GetBytes(rebuilt);
+			}
+			catch
+			{
+				return screenXml;
 			}
 		}
 	}

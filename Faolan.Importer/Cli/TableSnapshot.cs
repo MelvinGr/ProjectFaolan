@@ -15,21 +15,13 @@ namespace Faolan.Importer.Cli
 	{
 		public static async Task<Dictionary<string, int>> CaptureAsync(DatabaseContext db)
 		{
-			var tables = db.Model
-				.GetEntityTypes()
-				.Select(e => e.GetTableName())
-				.Where(t => !string.IsNullOrEmpty(t))
-				.Distinct()
-				.OrderBy(t => t)
-				.ToList();
+			var tables = db.Model.GetEntityTypes().Select(e => e.GetTableName()).Where(t => !string.IsNullOrEmpty(t)).Distinct().OrderBy(t => t).ToList();
 
 			var counts = new Dictionary<string, int>();
 			foreach (var table in tables)
 			{
 				// Table names come from the trusted EF model (not user input), so the interpolation is safe.
-				var count = await db.Database
-					.SqlQueryRaw<int>($"SELECT COUNT(*) AS Value FROM \"{table}\"")
-					.SingleAsync();
+				var count = await db.Database.SqlQueryRaw<int>($"SELECT COUNT(*) AS Value FROM \"{table}\"").SingleAsync();
 				counts[table!] = count;
 			}
 
@@ -47,6 +39,7 @@ namespace Faolan.Importer.Cli
 				var b = before.GetValueOrDefault(table);
 				if (a == b)
 					continue;
+
 				any = true;
 				var delta = a - b;
 				@out.WriteLine($"  {table,-28} {b,8} {a,9} {(delta >= 0 ? "+" : "")}{delta,6}");

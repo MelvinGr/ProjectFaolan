@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Database.Tables;
 
 namespace Faolan.GameServer.Outbound

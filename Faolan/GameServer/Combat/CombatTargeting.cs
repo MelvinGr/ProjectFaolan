@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -26,7 +27,7 @@ namespace Faolan.GameServer.Combat
 		public static IReadOnlyList<WorldEntity> CleaveTargets(Zone zone, WorldEntity primary, float radius, int max)
 		{
 			if (zone == null || primary == null || max <= 0)
-				return System.Array.Empty<WorldEntity>();
+				return Array.Empty<WorldEntity>();
 
 			return zone
 				.EntitiesInRange(primary.Position, radius, primary.Handle)

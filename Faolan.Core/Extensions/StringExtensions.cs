@@ -25,9 +25,7 @@ namespace Faolan.Core.Extensions
 			{
 				var spaces = totalLength - str.Length;
 				var padLeft = spaces / 2 + str.Length;
-				return str
-					.PadLeft(padLeft, c)
-					.PadRight(totalLength, c);
+				return str.PadLeft(padLeft, c).PadRight(totalLength, c);
 			}
 
 			public string ToTitleCase(bool force = true)
@@ -41,8 +39,11 @@ namespace Faolan.Core.Extensions
 			{
 				return str.StartsWith("0x") || str.StartsWith("0X") || str.StartsWith("#")
 					? byte.TryParse(str.Substring(str[0] == '#'
-						? 1
-						: 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out output)
+							? 1
+							: 2),
+						NumberStyles.HexNumber,
+						CultureInfo.InvariantCulture,
+						out output)
 					: byte.TryParse(str, out output);
 			}
 
@@ -50,8 +51,11 @@ namespace Faolan.Core.Extensions
 			{
 				return str.StartsWith("0x") || str.StartsWith("0X") || str.StartsWith("#")
 					? ushort.TryParse(str.Substring(str[0] == '#'
-						? 1
-						: 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out output)
+							? 1
+							: 2),
+						NumberStyles.HexNumber,
+						CultureInfo.InvariantCulture,
+						out output)
 					: ushort.TryParse(str, out output);
 			}
 
@@ -59,8 +63,11 @@ namespace Faolan.Core.Extensions
 			{
 				return str.StartsWith("0x") || str.StartsWith("0X") || str.StartsWith("#")
 					? uint.TryParse(str.Substring(str[0] == '#'
-						? 1
-						: 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out output)
+							? 1
+							: 2),
+						NumberStyles.HexNumber,
+						CultureInfo.InvariantCulture,
+						out output)
 					: uint.TryParse(str, out output);
 			}
 
@@ -68,8 +75,11 @@ namespace Faolan.Core.Extensions
 			{
 				return str.StartsWith("0x") || str.StartsWith("0X") || str.StartsWith("#")
 					? ulong.TryParse(str.Substring(str[0] == '#'
-						? 1
-						: 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out output)
+							? 1
+							: 2),
+						NumberStyles.HexNumber,
+						CultureInfo.InvariantCulture,
+						out output)
 					: ulong.TryParse(str, out output);
 			}
 		}

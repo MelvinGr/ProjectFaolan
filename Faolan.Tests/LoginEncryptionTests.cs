@@ -91,9 +91,9 @@ namespace Faolan.Tests
 		public void ServerPublic_IsCellaoPublicKey()
 		{
 			// g^ServerPrivate mod N must equal the documented CELLAO_PUB (the value patched into the client).
-			var expected = BigInteger.Parse(
-				"0" + "26b5a3b4ac1177f24a2d9de44bafef477ff23ef1cb5f646919b1be26516053030b65d5afb60cef6f49de539958ba0b79" + "22a099319b8016a8673cb27a696ae4b60fdece25ddcdad42e7f0056b87fc35687fe033b242e17e960d79806fd46c4a79" +
-				"cbc64f558660a50cabc1c242dace70de6af452e3433f97e30e202567f187de70", NumberStyles.HexNumber);
+			var expected = BigInteger.Parse("0" + "26b5a3b4ac1177f24a2d9de44bafef477ff23ef1cb5f646919b1be26516053030b65d5afb60cef6f49de539958ba0b79" +
+			                                "22a099319b8016a8673cb27a696ae4b60fdece25ddcdad42e7f0056b87fc35687fe033b242e17e960d79806fd46c4a79" + "cbc64f558660a50cabc1c242dace70de6af452e3433f97e30e202567f187de70",
+				NumberStyles.HexNumber);
 
 			Assert.Equal(expected, LoginEncryption.ServerPublic);
 		}

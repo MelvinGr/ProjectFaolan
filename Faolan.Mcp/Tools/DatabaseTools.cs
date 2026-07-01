@@ -55,35 +55,6 @@ namespace Faolan.Mcp.Tools
 			return Serialize(objects);
 		}
 
-		[McpServerTool(Name = "search_items"), Description("Search items by name substring (case-insensitive). Returns id/name/level/type/archetype (type = Normal/Quest/Resource/Equipped classification) - use get_item for the full record, add_item to grant one.")]
-		public async Task<string> SearchItems([Description("Name substring to match, e.g. \"potion\"")] string name, [Description("Max results (default 25)")] int limit = 25)
-		{
-			var items = await _db.SearchItems(name, limit);
-			return items.Length == 0
-				? $"No items matching '{name}'."
-				: Serialize(items.Select(i => new { i.Id, i.Name, i.Level, Type = i.Type.ToString(), i.Archetype }));
-		}
-
-		[McpServerTool(Name = "search_npc_spawns"),
-		 Description("Search captured NPC spawn rows by name substring (case-insensitive), across all maps. Spawnable=true rows can be spawned at a player with spawn_npc.")]
-		public async Task<string> SearchNpcSpawns([Description("Name substring to match, e.g. \"croc\"")] string name, [Description("Max results (default 50)")] int limit = 50)
-		{
-			var spawns = await _db.SearchNpcSpawns(name, limit);
-			return spawns.Length == 0
-				? $"No NPC spawns matching '{name}'."
-				: Serialize(spawns.Select(n => new
-				{
-					n.Id,
-					Name = n.Npc?.Name, // #244: name/community live on the Npc type
-					n.MapId,
-					n.Level,
-					n.Health,
-					Community = n.Npc?.Community ?? 0,
-					Position = new { X = n.PositionX, Y = n.PositionY, Z = n.PositionZ },
-					Spawnable = n.Data != null
-				}));
-		}
-
 		[McpServerTool(Name = "get_spell"), Description("Look up a single spell from faolan.db by its numeric id. Returns the spell record as JSON.")]
 		public async Task<string> GetSpell([Description("Numeric spell id")] uint id)
 		{
@@ -98,6 +69,47 @@ namespace Faolan.Mcp.Tools
 		{
 			var maps = await _db.GetMaps();
 			return Serialize(maps);
+		}
+
+		[McpServerTool(Name = "search_items"),
+		 Description("Search items by name substring (case-insensitive). Returns id/name/level/type/archetype (type = Normal/Quest/Resource/Equipped classification) - use get_item for the full record, add_item to grant one.")]
+		public async Task<string> SearchItems([Description("Name substring to match, e.g. \"potion\"")] string name, [Description("Max results (default 25)")] int limit = 25)
+		{
+			var items = await _db.SearchItems(name, limit);
+			return items.Length == 0
+				? $"No items matching '{name}'."
+				: Serialize(items.Select(i => new
+				{
+					i.Id,
+					i.Name,
+					i.Level,
+					Type = i.Type.ToString(),
+					i.Archetype
+				}));
+		}
+
+		[McpServerTool(Name = "search_npc_spawns"), Description("Search captured NPC spawn rows by name substring (case-insensitive), across all maps. Spawnable=true rows can be spawned at a player with spawn_npc.")]
+		public async Task<string> SearchNpcSpawns([Description("Name substring to match, e.g. \"croc\"")] string name, [Description("Max results (default 50)")] int limit = 50)
+		{
+			var spawns = await _db.SearchNpcSpawns(name, limit);
+			return spawns.Length == 0
+				? $"No NPC spawns matching '{name}'."
+				: Serialize(spawns.Select(n => new
+				{
+					n.Id,
+					n.Npc?.Name, // #244: name/community live on the Npc type
+					n.MapId,
+					n.Level,
+					n.Health,
+					Community = n.Npc?.Community ?? 0,
+					Position = new
+					{
+						X = n.PositionX,
+						Y = n.PositionY,
+						Z = n.PositionZ
+					},
+					Spawnable = n.Data != null
+				}));
 		}
 
 		private static string Serialize(object value)

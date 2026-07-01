@@ -12,11 +12,11 @@ namespace Faolan.Importer.Modules
 	// TODO(importer step 2a): Upsert support; Overwrite only behind --force (cascades to 12 child tables).
 	public sealed class CharactersModule : IImportModule
 	{
-		public string Name => "characters";
-		public string Description => "Captured characters (incl. other players) and their bodies/gear.";
 		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => ["items"];
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Insert };
+		public string Description => "Captured characters (incl. other players) and their bodies/gear.";
+		public string Name => "characters";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{

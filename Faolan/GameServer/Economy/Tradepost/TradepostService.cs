@@ -1,7 +1,8 @@
+using System;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core;
-using Faolan.Core.Data;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
@@ -29,29 +30,6 @@ namespace Faolan.GameServer.Economy.Tradepost
 	// Data quad isn't preserved into the bag yet - an interim, like vendor BUY).
 	public sealed class TradepostService
 	{
-		private readonly IDatabaseRepository _database;
-		private readonly ILogger _logger;
-		private readonly IEconomyOutbound _outbound;
-
-		public TradepostService(IDatabaseRepository database, ILogger logger, IEconomyOutbound outbound)
-		{
-			_database = database;
-			_logger = logger;
-			_outbound = outbound;
-		}
-
-		// The first free backpack cell (0..23), skipping persisted rows + the legacy starter-bag cell while it renders.
-		// Null = bag full. Read-only DB helper (mirrors AddItemBuilder.FindFreeBagSlot - kept local to avoid a 4th seam).
-		private async Task<int?> FindFreeBagSlot(uint characterId)
-		{
-			var equipment = await _database.GetCharacterEquipment(characterId);
-			var rows = await _database.GetCharacterInventory(characterId);
-			var taken = rows.Where(r => r.Container == (int)FullCharSnapshotBuilder.BagKind).Select(r => r.Slot).ToHashSet();
-			if (equipment?.FirstPosBag is { Archetype: not 0 })
-				taken.Add(1);
-			return Enumerable.Range(0, 24).Where(s => !taken.Contains(s)).Cast<int?>().FirstOrDefault();
-		}
-
 		// Mail wire/DB constants (MailConstants.EndpointClass / FooterUnread / AttachmentTrailerWord / ExpirySeconds) live in
 		// the shared Faolan.Core MailConstants so the server and the MCP economy tools agree on one source.
 
@@ -59,32 +37,18 @@ namespace Faolan.GameServer.Economy.Tradepost
 		// 0=flags, 258=price, 265=timestamp), pushed as 0x201c stat updates on container 105. Only the flag VALUES
 		// below are bank-overlay-specific.
 
-		private const uint BankFlagListed = 0x401;      // flags value while listed for sale
+		private const uint BankFlagListed = 0x401; // flags value while listed for sale
 		private const uint BankFlagMailPending = 0x8001; // flags value while attached to an outgoing mail
-		private const uint BankFlagNormal = 0x001;      // flags value once unlisted / mail cancelled
+		private const uint BankFlagNormal = 0x001; // flags value once unlisted / mail cancelled
+		private readonly IDatabaseRepository _database;
+		private readonly IEconomyOutbound _outbound;
+		private readonly ILogger _logger;
 
-		// Pushes one bank-slot stat update (0x201c on container 105): [kind=105][charInstance][slot][statId][value],
-		// byte-exact to the capture (F376/F377/F364/F398). Rides the same GameCharAgent conversation as the bank
-		// slot registrations (BankHandler), so the client applies it to the live bank cell.
-		private Task SendBankSlotStat(INetworkClient client, uint slot, uint statId, uint value)
+		public TradepostService(IDatabaseRepository database, ILogger logger, IEconomyOutbound outbound)
 		{
-			return new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x58), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, client.Session.Account.ClientInstance), (ushort)0x201C)
-				.WriteArray(BuildBankSlotStatBody(client.Session.Character.Id, slot, statId, value))
-				.SendAsync(client);
-		}
-
-		// The 0x201c bank-slot stat-update body: [kind=105][charInstance][slot][statId][value] (all u32 BE). Locked
-		// byte-exact to the capture by TradepostBankStatTests.
-		internal static byte[] BuildBankSlotStatBody(uint charInstance, uint slot, uint statId, uint value)
-		{
-			return new FaolanStream()
-				.WriteUInt32(FullCharSnapshotBuilder.BankKind)
-				.WriteUInt32(charInstance)
-				.WriteUInt32(slot)
-				.WriteUInt32(statId)
-				.WriteUInt32(value)
-				.ToArray();
+			_database = database;
+			_logger = logger;
+			_outbound = outbound;
 		}
 
 		// TradepostBuyItem (0x200E) [saleId:u64][searchResultId:u64]: charge the buyer and deliver the listed item via
@@ -106,8 +70,7 @@ namespace Faolan.GameServer.Economy.Tradepost
 
 			if (character.Money < listing.Price)
 			{
-				_logger.LogInformation("Tradepost BUY: {Char} can't afford listing 0x{Sale:X16} ({Price} tin, has {Balance}).",
-					character.Name, saleId, listing.Price, character.Money);
+				_logger.LogInformation("Tradepost BUY: {Char} can't afford listing 0x{Sale:X16} ({Price} tin, has {Balance}).", character.Name, saleId, listing.Price, character.Money);
 				return;
 			}
 
@@ -127,10 +90,149 @@ namespace Faolan.GameServer.Economy.Tradepost
 
 			// Push the mail (base, no attachment): it carries its own MailId, which the client then targets with the
 			// GetMail* ops to preview + take the item. Echo the inbound TradepostInterface instance.
-			await TradepostResponses.SendMailMessage(client, mail, includeAttachments: false, packet.Sender.Instance);
+			await TradepostResponses.SendMailMessage(client, mail, false, packet.Sender.Instance);
 
 			_logger.LogInformation("Tradepost BUY: {Char} bought listing 0x{Sale:X16} (item 0x{Item:X}) for {Price} tin -> mail 0x{Mail:X16} (wallet {Balance}).",
-				character.Name, saleId, listing.ItemId, listing.Price, mail.MailId, character.Money);
+				character.Name,
+				saleId,
+				listing.ItemId,
+				listing.Price,
+				mail.MailId,
+				character.Money);
+		}
+
+		// CancelMail (0x2009) [mailId:u64]: recall/delete one of the player's mails (capture F403). We delete it; any
+		// escrowed attachment is dropped with it (the AH buy-delivery mail is the only attachment source today).
+		internal async Task HandleTradepostCancelMail(INetworkClient client, ConanPacket packet)
+		{
+			var character = client.Session.Character;
+			if (character == null)
+				return;
+
+			var mailId = packet.Body.ReadUInt64();
+
+			// If the sender (this player) attached a bank item, clear its mail-pending overlay (capture F404: flag -> 1)
+			// - the item never left the bank, so cancelling just frees it.
+			var mail = await _database.GetMailByWireId(mailId);
+			if (mail != null && mail.SenderName == character.Name && (mail.Attachments?.Count ?? 0) > 0)
+				await SendBankSlotStat(client, mail.SenderBankSlot, TradepostListingCodec.StatFlags, BankFlagNormal);
+
+			await _database.DeleteMail(mailId);
+			_logger.LogInformation("Tradepost mail: {Char} cancelled/deleted mail 0x{Mail:X16}.", character.Name, mailId);
+		}
+
+		// TradepostCancelSellItem (0x200C) [nBankItemSlot:u32]: pull the seller's own listing (capture F397 = slot 6).
+		// The item never left the bank (it just had the "listed" overlay), so cancelling only deletes the listing -
+		// the client clears the overlay itself.
+		internal async Task HandleTradepostCancelSell(INetworkClient client, ConanPacket packet)
+		{
+			var character = client.Session.Character;
+			if (character == null)
+				return;
+
+			var bankSlot = packet.Body.ReadUInt32();
+
+			var listing = await _database.GetTradepostListingBySellerSlot(character.Name, bankSlot);
+			if (listing == null)
+			{
+				_logger.LogWarning("Tradepost CANCELSELL: {Char} has no listing for bank slot {Slot}.", character.Name, bankSlot);
+				return;
+			}
+
+			await _database.DeleteTradepostListing(listing.SaleId);
+			// Clear the bank-slot overlay (capture F398): flag back to normal, price to 0.
+			await SendBankSlotStat(client, bankSlot, TradepostListingCodec.StatFlags, BankFlagNormal);
+			await SendBankSlotStat(client, bankSlot, TradepostListingCodec.StatPrice, 0);
+			_logger.LogInformation("Tradepost CANCELSELL: {Char} cancelled listing 0x{Sale:X16} (bank slot {Slot}); item stays in the bank.", character.Name, listing.SaleId, bankSlot);
+		}
+
+		// TradepostChangeItemPrice (0x200B) [nBankItemSlot:u32][nNewPrice:u64]: reprice the seller's own listing,
+		// addressed by the origin bank slot (capture F363 = slot 6 -> 5,000,000 tin). No tradepost reply (re-poll).
+		internal async Task HandleTradepostChangePrice(INetworkClient client, ConanPacket packet)
+		{
+			var character = client.Session.Character;
+			if (character == null)
+				return;
+
+			var bankSlot = packet.Body.ReadUInt32();
+			var newPrice = packet.Body.ReadUInt64();
+
+			var listing = await _database.GetTradepostListingBySellerSlot(character.Name, bankSlot);
+			if (listing == null)
+			{
+				_logger.LogWarning("Tradepost CHANGEPRICE: {Char} has no listing for bank slot {Slot}.", character.Name, bankSlot);
+				return;
+			}
+
+			await _database.SetTradepostListingPrice(listing.SaleId, newPrice);
+			// Update the bank-slot overlay's price stat (capture F364).
+			await SendBankSlotStat(client, bankSlot, TradepostListingCodec.StatPrice, (uint)newPrice);
+			_logger.LogInformation("Tradepost CHANGEPRICE: {Char} repriced listing 0x{Sale:X16} (bank slot {Slot}) {Old} -> {New} tin.", character.Name, listing.SaleId, bankSlot, listing.Price, newPrice);
+		}
+
+		// The mailbox ops (GetAllMails / GetMailByID / GetItemData preview / GetMailItem take / MarkMailRead /
+		// DeleteMail). All address the buyer's own mail by the wire MailId; GetMailItem grants the escrowed item.
+		internal async Task HandleTradepostMailOp(INetworkClient client, ConanPacket packet, TradepostProtocol.AgentMethod method)
+		{
+			var character = client.Session.Character;
+			if (character == null)
+				return;
+
+			var inst = packet.Sender.Instance;
+
+			switch (method)
+			{
+				case TradepostProtocol.AgentMethod.GetAllMails:
+				{
+					var mails = await _database.GetMailsForRecipient(character.Name);
+					foreach (var m in mails)
+						await TradepostResponses.SendMailMessage(client, m, false, inst);
+					await TradepostResponses.SendRetrieveMailResult(client, inst);
+					_logger.LogInformation("Tradepost mail: {Char} polled the mailbox -> {Count} mail(s).", character.Name, mails.Count);
+					break;
+				}
+
+				case TradepostProtocol.AgentMethod.GetMailByID:
+				{
+					var mail = await _database.GetMailByWireId(packet.Body.ReadUInt64());
+					if (mail != null)
+						await TradepostResponses.SendMailMessage(client, mail, false, inst);
+					break;
+				}
+
+				case TradepostProtocol.AgentMethod.GetItemData:
+				{
+					// Preview: the mail WITH its attachment (the client shows the item in the mail; nothing is granted).
+					var mail = await _database.GetMailByWireId(packet.Body.ReadUInt64());
+					if (mail != null)
+						await TradepostResponses.SendMailMessage(client, mail, true, inst);
+					break;
+				}
+
+				case TradepostProtocol.AgentMethod.GetMailItem:
+				{
+					var mailId = packet.Body.ReadUInt64();
+					var itemInstanceId = packet.Body.ReadUInt64();
+					await TakeMailItem(client, mailId, itemInstanceId, inst);
+					break;
+				}
+
+				case TradepostProtocol.AgentMethod.MarkMailRead:
+				{
+					var mailId = packet.Body.ReadUInt64();
+					await _database.SetMailRead(mailId, true);
+					await TradepostResponses.SendMailResult(client, true, 0, inst);
+					break;
+				}
+
+				case TradepostProtocol.AgentMethod.DeleteMail:
+				{
+					var mailId = packet.Body.ReadUInt64();
+					await _database.DeleteMail(mailId);
+					_logger.LogInformation("Tradepost mail: {Char} deleted mail 0x{Mail:X16}.", character.Name, mailId);
+					break;
+				}
+			}
 		}
 
 		// TradepostSellItem (0x200A) [nBankItemSlot:u32][nPrice:u64]: list one of the player's BANK items (container
@@ -165,8 +267,10 @@ namespace Faolan.GameServer.Economy.Tradepost
 				SellerName = character.Name,
 				BankSlot = (uint)bankSlot,
 				Price = price,
-				Quantity = row.Count == 0 ? 1u : row.Count,
-				ItemId = searchCategory,     // #181: the item-type search category (was row.Item.Id, the template)
+				Quantity = row.Count == 0
+					? 1u
+					: row.Count,
+				ItemId = searchCategory, // #181: the item-type search category (was row.Item.Id, the template)
 				InstanceField = 0,
 				ItemHandle = 0,
 				EntryFlags = TradepostListingCodec.DefaultEntryFlags,
@@ -195,58 +299,13 @@ namespace Faolan.GameServer.Economy.Tradepost
 			await _outbound.SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Spend);
 
 			_logger.LogInformation("Tradepost SELL: {Char} listed \"{Item}\" x{Qty} (bank slot {Slot}, template {Template}) for {Price} tin -> sale 0x{Sale:X16}.",
-				character.Name, row.Item.Name, listing.Quantity, bankSlot, row.Item.Id, price, listing.SaleId);
-		}
-
-		// TradepostChangeItemPrice (0x200B) [nBankItemSlot:u32][nNewPrice:u64]: reprice the seller's own listing,
-		// addressed by the origin bank slot (capture F363 = slot 6 -> 5,000,000 tin). No tradepost reply (re-poll).
-		internal async Task HandleTradepostChangePrice(INetworkClient client, ConanPacket packet)
-		{
-			var character = client.Session.Character;
-			if (character == null)
-				return;
-
-			var bankSlot = packet.Body.ReadUInt32();
-			var newPrice = packet.Body.ReadUInt64();
-
-			var listing = await _database.GetTradepostListingBySellerSlot(character.Name, bankSlot);
-			if (listing == null)
-			{
-				_logger.LogWarning("Tradepost CHANGEPRICE: {Char} has no listing for bank slot {Slot}.", character.Name, bankSlot);
-				return;
-			}
-
-			await _database.SetTradepostListingPrice(listing.SaleId, newPrice);
-			// Update the bank-slot overlay's price stat (capture F364).
-			await SendBankSlotStat(client, bankSlot, TradepostListingCodec.StatPrice, (uint)newPrice);
-			_logger.LogInformation("Tradepost CHANGEPRICE: {Char} repriced listing 0x{Sale:X16} (bank slot {Slot}) {Old} -> {New} tin.",
-				character.Name, listing.SaleId, bankSlot, listing.Price, newPrice);
-		}
-
-		// TradepostCancelSellItem (0x200C) [nBankItemSlot:u32]: pull the seller's own listing (capture F397 = slot 6).
-		// The item never left the bank (it just had the "listed" overlay), so cancelling only deletes the listing -
-		// the client clears the overlay itself.
-		internal async Task HandleTradepostCancelSell(INetworkClient client, ConanPacket packet)
-		{
-			var character = client.Session.Character;
-			if (character == null)
-				return;
-
-			var bankSlot = packet.Body.ReadUInt32();
-
-			var listing = await _database.GetTradepostListingBySellerSlot(character.Name, bankSlot);
-			if (listing == null)
-			{
-				_logger.LogWarning("Tradepost CANCELSELL: {Char} has no listing for bank slot {Slot}.", character.Name, bankSlot);
-				return;
-			}
-
-			await _database.DeleteTradepostListing(listing.SaleId);
-			// Clear the bank-slot overlay (capture F398): flag back to normal, price to 0.
-			await SendBankSlotStat(client, bankSlot, TradepostListingCodec.StatFlags, BankFlagNormal);
-			await SendBankSlotStat(client, bankSlot, TradepostListingCodec.StatPrice, 0);
-			_logger.LogInformation("Tradepost CANCELSELL: {Char} cancelled listing 0x{Sale:X16} (bank slot {Slot}); item stays in the bank.",
-				character.Name, listing.SaleId, bankSlot);
+				character.Name,
+				row.Item.Name,
+				listing.Quantity,
+				bankSlot,
+				row.Item.Id,
+				price,
+				listing.SaleId);
 		}
 
 		// SendMail (0x2002) [u16+recipient][u16+body][money:u64][0x7E2:u32][bankItemSlot:u32]: a player-composed mail,
@@ -259,17 +318,17 @@ namespace Faolan.GameServer.Economy.Tradepost
 			if (character == null)
 				return;
 
-			var recipientName = System.Text.Encoding.ASCII.GetString(packet.Body.ReadArrayUInt16Length());
-			var bodyText = System.Text.Encoding.ASCII.GetString(packet.Body.ReadArrayUInt16Length());
+			var recipientName = Encoding.ASCII.GetString(packet.Body.ReadArrayUInt16Length());
+			var bodyText = Encoding.ASCII.GetString(packet.Body.ReadArrayUInt16Length());
 			var money = packet.Body.ReadUInt64();
-			packet.Body.ReadUInt32();                         // 0x7E2 category constant (preserved)
+			packet.Body.ReadUInt32(); // 0x7E2 category constant (preserved)
 			var bankSlot = (int)packet.Body.ReadUInt32();
 
 			var recipient = await _database.GetCharacterByName(recipientName);
 			if (recipient == null)
 			{
 				_logger.LogInformation("Tradepost mail: {Char} -> unknown recipient '{Recipient}'; rejected.", character.Name, recipientName);
-				await TradepostResponses.SendMailSendResult(client, success: false, packet.Sender.Instance);
+				await TradepostResponses.SendMailSendResult(client, false, packet.Sender.Instance);
 				return;
 			}
 
@@ -297,8 +356,10 @@ namespace Faolan.GameServer.Economy.Tradepost
 				mail.SenderBankSlot = (uint)bankSlot;
 				mail.Attachments.Add(new MailAttachment
 				{
-					ItemInstanceId = (ulong)System.Random.Shared.NextInt64(1, long.MaxValue),
-					Quantity = row.Count == 0 ? 1u : row.Count,
+					ItemInstanceId = (ulong)Random.Shared.NextInt64(1, long.MaxValue),
+					Quantity = row.Count == 0
+						? 1u
+						: row.Count,
 					Data1 = row.Item.Data1,
 					Data2 = row.Item.Data2,
 					Data3 = row.Item.Data3,
@@ -313,7 +374,7 @@ namespace Faolan.GameServer.Economy.Tradepost
 			}
 
 			await _database.CreateMail(mail);
-			await TradepostResponses.SendMailSendResult(client, success: true, packet.Sender.Instance);
+			await TradepostResponses.SendMailSendResult(client, true, packet.Sender.Instance);
 
 			// Draw the mail-pending overlay on the kept bank item (capture F500: stat 0 = flags 0x8001).
 			if (row?.Item != null)
@@ -324,93 +385,118 @@ namespace Faolan.GameServer.Economy.Tradepost
 			// the HUD stays in sync (reflects any attached money debit elsewhere; the item attachment itself is free).
 			await _outbound.SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Spend);
 
-			_logger.LogInformation("Tradepost mail: {Char} sent mail 0x{Mail:X16} to {Recipient} (\"{Body}\", money {Money}, attach {HasItem}).",
-				character.Name, mail.MailId, recipient.Name, bodyText, money, row?.Item != null);
+			_logger.LogInformation("Tradepost mail: {Char} sent mail 0x{Mail:X16} to {Recipient} (\"{Body}\", money {Money}, attach {HasItem}).", character.Name, mail.MailId, recipient.Name, bodyText, money, row?.Item != null);
 		}
 
-		// CancelMail (0x2009) [mailId:u64]: recall/delete one of the player's mails (capture F403). We delete it; any
-		// escrowed attachment is dropped with it (the AH buy-delivery mail is the only attachment source today).
-		internal async Task HandleTradepostCancelMail(INetworkClient client, ConanPacket packet)
+		// A unique wire MailId. The id is session/instance-volatile (like entity handles), so a random 64-bit value
+		// is fine; retry on the rare collision with an existing persisted mail.
+		private async Task<ulong> AllocateMailId()
 		{
-			var character = client.Session.Character;
-			if (character == null)
-				return;
-
-			var mailId = packet.Body.ReadUInt64();
-
-			// If the sender (this player) attached a bank item, clear its mail-pending overlay (capture F404: flag -> 1)
-			// - the item never left the bank, so cancelling just frees it.
-			var mail = await _database.GetMailByWireId(mailId);
-			if (mail != null && mail.SenderName == character.Name && (mail.Attachments?.Count ?? 0) > 0)
-				await SendBankSlotStat(client, mail.SenderBankSlot, TradepostListingCodec.StatFlags, BankFlagNormal);
-
-			await _database.DeleteMail(mailId);
-			_logger.LogInformation("Tradepost mail: {Char} cancelled/deleted mail 0x{Mail:X16}.", character.Name, mailId);
-		}
-
-		// The mailbox ops (GetAllMails / GetMailByID / GetItemData preview / GetMailItem take / MarkMailRead /
-		// DeleteMail). All address the buyer's own mail by the wire MailId; GetMailItem grants the escrowed item.
-		internal async Task HandleTradepostMailOp(INetworkClient client, ConanPacket packet, TradepostProtocol.AgentMethod method)
-		{
-			var character = client.Session.Character;
-			if (character == null)
-				return;
-
-			var inst = packet.Sender.Instance;
-
-			switch (method)
+			for (var attempt = 0; attempt < 8; attempt++)
 			{
-				case TradepostProtocol.AgentMethod.GetAllMails:
-				{
-					var mails = await _database.GetMailsForRecipient(character.Name);
-					foreach (var m in mails)
-						await TradepostResponses.SendMailMessage(client, m, includeAttachments: false, inst);
-					await TradepostResponses.SendRetrieveMailResult(client, inst);
-					_logger.LogInformation("Tradepost mail: {Char} polled the mailbox -> {Count} mail(s).", character.Name, mails.Count);
-					break;
-				}
-
-				case TradepostProtocol.AgentMethod.GetMailByID:
-				{
-					var mail = await _database.GetMailByWireId(packet.Body.ReadUInt64());
-					if (mail != null)
-						await TradepostResponses.SendMailMessage(client, mail, includeAttachments: false, inst);
-					break;
-				}
-
-				case TradepostProtocol.AgentMethod.GetItemData:
-				{
-					// Preview: the mail WITH its attachment (the client shows the item in the mail; nothing is granted).
-					var mail = await _database.GetMailByWireId(packet.Body.ReadUInt64());
-					if (mail != null)
-						await TradepostResponses.SendMailMessage(client, mail, includeAttachments: true, inst);
-					break;
-				}
-
-				case TradepostProtocol.AgentMethod.GetMailItem:
-				{
-					var mailId = packet.Body.ReadUInt64();
-					var itemInstanceId = packet.Body.ReadUInt64();
-					await TakeMailItem(client, mailId, itemInstanceId, inst);
-					break;
-				}
-
-				case TradepostProtocol.AgentMethod.MarkMailRead:
-				{
-					var mailId = packet.Body.ReadUInt64();
-					await _database.SetMailRead(mailId, true);
-					await TradepostResponses.SendMailResult(client, success: true, error: 0, inst);
-					break;
-				}
-
-				case TradepostProtocol.AgentMethod.DeleteMail:
-				{
-					var mailId = packet.Body.ReadUInt64();
-					await _database.DeleteMail(mailId);
-					_logger.LogInformation("Tradepost mail: {Char} deleted mail 0x{Mail:X16}.", character.Name, mailId);
-					break;
-				}
+				var id = (ulong)Random.Shared.NextInt64(1, long.MaxValue);
+				if (await _database.GetMailByWireId(id) == null)
+					return id;
 			}
+
+			return (ulong)Random.Shared.NextInt64(1, long.MaxValue);
+		}
+
+		// A unique sale id for a new listing (session-volatile, like the mail id); retry on the rare collision.
+		private async Task<ulong> AllocateSaleId()
+		{
+			for (var attempt = 0; attempt < 8; attempt++)
+			{
+				var id = (ulong)Random.Shared.NextInt64(1, long.MaxValue);
+				if (await _database.GetTradepostListingBySaleId(id) == null)
+					return id;
+			}
+
+			return (ulong)Random.Shared.NextInt64(1, long.MaxValue);
+		}
+
+		// Builds the system mail for a completed AH purchase: recipient = the buyer, sender empty (system), the bought
+		// item escrowed as an attachment, body = the TradePostGUI_MailItemBought remoteformat. The item-name fragment
+		// is left empty (the per-item RDB name key is unsynthesizable - see TradepostMailBody); the item still
+		// delivers, only its name in the mail text degrades.
+		private async Task<Mail> BuildPurchaseMail(string buyer, TradepostListing listing)
+		{
+			var now = Statics.NowUnixTimeSeconds;
+
+			var mail = new Mail
+			{
+				MailId = await AllocateMailId(),
+				RecipientClass = MailConstants.EndpointClass,
+				RecipientName = buyer,
+				SenderClass = MailConstants.EndpointClass,
+				SenderName = "",
+				BodyXml = TradepostMailBody.BuildItemBought(buyer, listing.SaleId, "", listing.SellerName, listing.Price.ToString()),
+				FooterWord = MailConstants.FooterUnread,
+				Money = 0,
+				Timestamp1 = now,
+				Timestamp2 = now + MailConstants.ExpirySeconds
+			};
+
+			mail.Attachments.Add(new MailAttachment
+			{
+				ItemInstanceId = listing.SaleId,
+				Quantity = listing.Quantity == 0
+					? 1
+					: listing.Quantity,
+				Data1 = listing.Data1,
+				Data2 = listing.Data2,
+				Data3 = listing.Data3,
+				Data4 = listing.Data4,
+				Template = listing.Template,
+				ItemLevel = listing.ItemLevel,
+				ItemHash = listing.ItemHash,
+				TrailerWord = MailConstants.AttachmentTrailerWord,
+				TrailerClass = MailConstants.EndpointClass,
+				TrailerTail = 0
+			});
+
+			return mail;
+		}
+
+		// The first free backpack cell (0..23), skipping persisted rows + the legacy starter-bag cell while it renders.
+		// Null = bag full. Read-only DB helper (mirrors AddItemBuilder.FindFreeBagSlot - kept local to avoid a 4th seam).
+		private async Task<int?> FindFreeBagSlot(uint characterId)
+		{
+			var equipment = await _database.GetCharacterEquipment(characterId);
+			var rows = await _database.GetCharacterInventory(characterId);
+			var taken = rows.Where(r => r.Container == (int)FullCharSnapshotBuilder.BagKind).Select(r => r.Slot).ToHashSet();
+			if (equipment?.FirstPosBag is { Archetype: not 0 })
+				taken.Add(1);
+			return Enumerable.Range(0, 24).Where(s => !taken.Contains(s)).Cast<int?>().FirstOrDefault();
+		}
+
+		// Banks any money attached to a mail into the recipient's wallet and clears it from the mail (#213). Idempotent -
+		// a 0-money mail is a no-op - so it's safe to call on every take. Without this the tin was never credited and the
+		// unclaimed money kept the client's delete button greyed out (a mail with attachments can't be deleted).
+		private async Task GrantMailMoney(INetworkClient client, Mail mail)
+		{
+			if (mail == null || mail.Money == 0)
+				return;
+
+			var character = client.Session.Character;
+			var credited = mail.Money;
+			character.Money += credited;
+			await _database.SetCharacterMoney(character.Id, character.Money);
+			await _outbound.SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Gain);
+			await _database.SetMailMoney(mail.MailId, 0);
+			mail.Money = 0;
+			_logger.LogInformation("Tradepost mail: {Char} banked {Tin} tin from mail 0x{Mail:X16}.", character.Name, credited, mail.MailId);
+		}
+
+		// Pushes one bank-slot stat update (0x201c on container 105): [kind=105][charInstance][slot][statId][value],
+		// byte-exact to the capture (F376/F377/F364/F398). Rides the same GameCharAgent conversation as the bank
+		// slot registrations (BankHandler), so the client applies it to the live bank cell.
+		private Task SendBankSlotStat(INetworkClient client, uint slot, uint statId, uint value)
+		{
+			return new PacketStream()
+				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x58), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, client.Session.Account.ClientInstance), (ushort)0x201C)
+				.WriteArray(BuildBankSlotStatBody(client.Session.Character.Id, slot, statId, value))
+				.SendAsync(client);
 		}
 
 		// GetMailItem: grant the escrowed attachment into the bag, then drop it from the mail and re-send the
@@ -425,12 +511,10 @@ namespace Faolan.GameServer.Economy.Tradepost
 		{
 			var character = client.Session.Character;
 			var mail = await _database.GetMailByWireId(mailId);
-			var attachment = mail?.Attachments?.FirstOrDefault(a => a.ItemInstanceId == itemInstanceId)
-				?? mail?.Attachments?.FirstOrDefault();
+			var attachment = mail?.Attachments?.FirstOrDefault(a => a.ItemInstanceId == itemInstanceId) ?? mail?.Attachments?.FirstOrDefault();
 			if (mail == null || attachment == null)
 			{
-				_logger.LogWarning("Tradepost mail: {Char} tried to take item 0x{Item:X16} from mail 0x{Mail:X16} (no such attachment).",
-					character.Name, itemInstanceId, mailId);
+				_logger.LogWarning("Tradepost mail: {Char} tried to take item 0x{Item:X16} from mail 0x{Mail:X16} (no such attachment).", character.Name, itemInstanceId, mailId);
 				return;
 			}
 
@@ -444,7 +528,9 @@ namespace Faolan.GameServer.Economy.Tradepost
 			var entry = BuildMailItemEntry(attachment, character.Id, slot.Value);
 			await _outbound.SendAddItem(client, 0x68u, (uint)slot.Value, entry);
 
-			var qty = attachment.Quantity == 0 ? 1u : attachment.Quantity;
+			var qty = attachment.Quantity == 0
+				? 1u
+				: attachment.Quantity;
 			var item = await _database.GetItem(attachment.Template);
 			if (item != null)
 				// The listing importer harvests every listed item into Items (so the CharacterInventory.ItemId FK
@@ -452,8 +538,9 @@ namespace Faolan.GameServer.Economy.Tradepost
 				// re-rendered on relog by RedeliverNonSnapshotBagItems via the live add path.
 				await _database.SetCharacterInventorySlot(character.Id, (int)FullCharSnapshotBuilder.BagKind, slot.Value, attachment.Template, qty);
 			else
-				_logger.LogInformation("Tradepost mail: delivered template {Template} to {Char} LIVE-ONLY (no Items row; won't persist across relog).",
-					attachment.Template, character.Name);
+			{
+				_logger.LogInformation("Tradepost mail: delivered template {Template} to {Char} LIVE-ONLY (no Items row; won't persist across relog).", attachment.Template, character.Name);
+			}
 
 			// For a PLAYER mail, the attached item was still sitting in the SENDER's bank (with the mail-pending
 			// overlay) - now that the recipient has taken it, remove it from the sender's bank so it isn't duplicated.
@@ -472,31 +559,20 @@ namespace Faolan.GameServer.Economy.Tradepost
 			// pinned the delete button (and "take all" never credited the tin). Retail captures never carry mail money,
 			// so there's no observed take-money op; crediting it with the item take matches the player expectation.
 			await GrantMailMoney(client, mail);
-			await TradepostResponses.SendMailMessage(client, mail, includeAttachments: false, inst);
+			await TradepostResponses.SendMailMessage(client, mail, false, inst);
 			// Complete the take with a result ack, mirroring MarkMailRead (#213): without it the client's mail-op state
 			// machine stays mid-take, so the FIRST delete click after a retrieve is swallowed (the mail survives until the
 			// mailbox is reopened, which resets that state); the ack lets the delete go through on the first try.
-			await TradepostResponses.SendMailResult(client, success: true, error: 0, inst);
+			await TradepostResponses.SendMailResult(client, true, 0, inst);
 
-			_logger.LogInformation("Tradepost mail: {Char} took item (template {Template}) from mail 0x{Mail:X16} into bag slot {Slot}.",
-				character.Name, attachment.Template, mailId, slot);
+			_logger.LogInformation("Tradepost mail: {Char} took item (template {Template}) from mail 0x{Mail:X16} into bag slot {Slot}.", character.Name, attachment.Template, mailId, slot);
 		}
 
-		// Banks any money attached to a mail into the recipient's wallet and clears it from the mail (#213). Idempotent -
-		// a 0-money mail is a no-op - so it's safe to call on every take. Without this the tin was never credited and the
-		// unclaimed money kept the client's delete button greyed out (a mail with attachments can't be deleted).
-		private async Task GrantMailMoney(INetworkClient client, Mail mail)
+		// The 0x201c bank-slot stat-update body: [kind=105][charInstance][slot][statId][value] (all u32 BE). Locked
+		// byte-exact to the capture by TradepostBankStatTests.
+		internal static byte[] BuildBankSlotStatBody(uint charInstance, uint slot, uint statId, uint value)
 		{
-			if (mail == null || mail.Money == 0)
-				return;
-			var character = client.Session.Character;
-			var credited = mail.Money;
-			character.Money += credited;
-			await _database.SetCharacterMoney(character.Id, character.Money);
-			await _outbound.SendMoneyUpdate(client, character.Money, MoneyUpdateReason.Gain);
-			await _database.SetMailMoney(mail.MailId, 0);
-			mail.Money = 0;
-			_logger.LogInformation("Tradepost mail: {Char} banked {Tin} tin from mail 0x{Mail:X16}.", character.Name, credited, mail.MailId);
+			return new FaolanStream().WriteUInt32(FullCharSnapshotBuilder.BankKind).WriteUInt32(charInstance).WriteUInt32(slot).WriteUInt32(statId).WriteUInt32(value).ToArray();
 		}
 
 		// Builds the live DispatchAddItem entry for a mail attachment from its stored instance identity (no Items
@@ -505,8 +581,16 @@ namespace Faolan.GameServer.Economy.Tradepost
 		// the template via its RDB, so this renders even for items we don't have as Items rows.
 		private static ProtoInventoryGameEntry BuildMailItemEntry(MailAttachment a, uint charId, int slot)
 		{
-			var key = new ProtoDecryptionKey { Key1 = a.Data1, Key2 = a.Data2, Key3 = a.Data3, Key4 = a.Data4 };
-			var qty = a.Quantity == 0 ? 1u : a.Quantity;
+			var key = new ProtoDecryptionKey
+			{
+				Key1 = a.Data1,
+				Key2 = a.Data2,
+				Key3 = a.Data3,
+				Key4 = a.Data4
+			};
+			var qty = a.Quantity == 0
+				? 1u
+				: a.Quantity;
 			var entry = new ProtoInventoryGameEntry
 			{
 				ItemId = FullCharSnapshotBuilder.ItemId(charId, FullCharSnapshotBuilder.BagKind, (ulong)slot),
@@ -521,79 +605,22 @@ namespace Faolan.GameServer.Economy.Tradepost
 					Hash = a.ItemHash
 				}
 			};
-			entry.StatLists.Add(new ProtoInventoryGameEntry.StatValue { Stat = 0, Value = 1 });
-			entry.StatLists.Add(new ProtoInventoryGameEntry.StatValue { Stat = 23, Value = (uint)FullCharSnapshotBuilder.RecordId(charId, FullCharSnapshotBuilder.BagKind, (ulong)slot) });
-			entry.StatLists.Add(new ProtoInventoryGameEntry.StatValue { Stat = 26, Value = qty });
-			return entry;
-		}
-
-		// Builds the system mail for a completed AH purchase: recipient = the buyer, sender empty (system), the bought
-		// item escrowed as an attachment, body = the TradePostGUI_MailItemBought remoteformat. The item-name fragment
-		// is left empty (the per-item RDB name key is unsynthesizable - see TradepostMailBody); the item still
-		// delivers, only its name in the mail text degrades.
-		private async Task<Mail> BuildPurchaseMail(string buyer, TradepostListing listing)
-		{
-			var now = Statics.NowUnixTimeSeconds;
-
-			var mail = new Mail
+			entry.StatLists.Add(new ProtoInventoryGameEntry.StatValue
 			{
-				MailId = await AllocateMailId(),
-				RecipientClass = MailConstants.EndpointClass,
-				RecipientName = buyer,
-				SenderClass = MailConstants.EndpointClass,
-				SenderName = "",
-				BodyXml = TradepostMailBody.BuildItemBought(
-					buyer, listing.SaleId, itemNameEscaped: "", listing.SellerName, listing.Price.ToString()),
-				FooterWord = MailConstants.FooterUnread,
-				Money = 0,
-				Timestamp1 = now,
-				Timestamp2 = now + MailConstants.ExpirySeconds
-			};
-
-			mail.Attachments.Add(new MailAttachment
-			{
-				ItemInstanceId = listing.SaleId,
-				Quantity = listing.Quantity == 0 ? 1 : listing.Quantity,
-				Data1 = listing.Data1,
-				Data2 = listing.Data2,
-				Data3 = listing.Data3,
-				Data4 = listing.Data4,
-				Template = listing.Template,
-				ItemLevel = listing.ItemLevel,
-				ItemHash = listing.ItemHash,
-				TrailerWord = MailConstants.AttachmentTrailerWord,
-				TrailerClass = MailConstants.EndpointClass,
-				TrailerTail = 0
+				Stat = 0,
+				Value = 1
 			});
-
-			return mail;
-		}
-
-		// A unique wire MailId. The id is session/instance-volatile (like entity handles), so a random 64-bit value
-		// is fine; retry on the rare collision with an existing persisted mail.
-		private async Task<ulong> AllocateMailId()
-		{
-			for (var attempt = 0; attempt < 8; attempt++)
+			entry.StatLists.Add(new ProtoInventoryGameEntry.StatValue
 			{
-				var id = (ulong)System.Random.Shared.NextInt64(1, long.MaxValue);
-				if (await _database.GetMailByWireId(id) == null)
-					return id;
-			}
-
-			return (ulong)System.Random.Shared.NextInt64(1, long.MaxValue);
-		}
-
-		// A unique sale id for a new listing (session-volatile, like the mail id); retry on the rare collision.
-		private async Task<ulong> AllocateSaleId()
-		{
-			for (var attempt = 0; attempt < 8; attempt++)
+				Stat = 23,
+				Value = (uint)FullCharSnapshotBuilder.RecordId(charId, FullCharSnapshotBuilder.BagKind, (ulong)slot)
+			});
+			entry.StatLists.Add(new ProtoInventoryGameEntry.StatValue
 			{
-				var id = (ulong)System.Random.Shared.NextInt64(1, long.MaxValue);
-				if (await _database.GetTradepostListingBySaleId(id) == null)
-					return id;
-			}
-
-			return (ulong)System.Random.Shared.NextInt64(1, long.MaxValue);
+				Stat = 26,
+				Value = qty
+			});
+			return entry;
 		}
 	}
 }

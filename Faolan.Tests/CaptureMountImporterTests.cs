@@ -36,14 +36,9 @@ namespace Faolan.Tests
 				Assert.True(seen >= 1, "expected at least one mount creature harvested from the capture");
 				Assert.True(seeded >= 1);
 
-				var mounts = await db.NpcSpawns
-					.Include(n => n.Npc)
-					.Where(n => n.MapId == CaptureMountImporter.MountMapId)
-					.ToListAsync();
+				var mounts = await db.NpcSpawns.Include(n => n.Npc).Where(n => n.MapId == CaptureMountImporter.MountMapId).ToListAsync();
 
-				Assert.Contains(mounts, m =>
-					string.Equals(m.Npc!.Name, "Fading Black Horse", StringComparison.OrdinalIgnoreCase)
-					&& m.Data != null && m.Data.Length > 0);
+				Assert.Contains(mounts, m => string.Equals(m.Npc!.Name, "Fading Black Horse", StringComparison.OrdinalIgnoreCase) && m.Data != null && m.Data.Length > 0);
 			}
 			finally
 			{
@@ -54,9 +49,7 @@ namespace Faolan.Tests
 
 		private static DatabaseContext NewContext(string path)
 		{
-			var options = new DbContextOptionsBuilder<DatabaseContext>()
-				.UseSqlite($"Data Source={path}", x => x.MigrationsAssembly("Faolan"))
-				.Options;
+			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={path}", x => x.MigrationsAssembly("Faolan")).Options;
 			return new DatabaseContext(options);
 		}
 	}

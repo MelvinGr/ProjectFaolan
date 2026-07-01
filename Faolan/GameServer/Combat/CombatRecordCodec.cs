@@ -1,5 +1,5 @@
 using System;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.GameServer.World;
@@ -18,21 +18,23 @@ namespace Faolan.GameServer.Combat
 		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.CombatShieldIIR;
 		private const uint IirMarker = EntityClass.Character;
 
-		public sealed record Parsed(uint Handle, byte Env, uint Value);
-
-		public static byte[] Build(uint handle, uint value, byte env = 0x00) =>
-			CharDCMoveCodec.WithLength(new FaolanStream()
-				.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(handle).WriteByte(env)
-				.WriteUInt32(value).ToArray());
+		public static byte[] Build(uint handle, uint value, byte env = 0x00)
+		{
+			return CharDCMoveCodec.WithLength(new FaolanStream().WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(handle).WriteByte(env).WriteUInt32(value).ToArray());
+		}
 
 		public static Parsed Parse(byte[] body)
 		{
 			var s = new FaolanStream(body);
-			s.ReadUInt32(); s.ReadUInt32(); s.ReadUInt32();   // len, subop, marker
+			s.ReadUInt32();
+			s.ReadUInt32();
+			s.ReadUInt32(); // len, subop, marker
 			var handle = s.ReadUInt32();
 			var env = s.ReadByte();
 			return new Parsed(handle, env, s.ReadUInt32());
 		}
+
+		public sealed record Parsed(uint Handle, byte Env, uint Value);
 	}
 
 	// ThreatLevelIIR_c (0x1745EF6C) - a threat/aggro level (u32) plus a bool (FUN_007a8fd0).
@@ -41,22 +43,24 @@ namespace Faolan.GameServer.Combat
 		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.ThreatLevelIIR;
 		private const uint IirMarker = EntityClass.Character;
 
-		public sealed record Parsed(uint Handle, byte Env, uint Threat, byte Flag);
-
-		public static byte[] Build(uint handle, uint threat, byte flag, byte env = 0x00) =>
-			CharDCMoveCodec.WithLength(new FaolanStream()
-				.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(handle).WriteByte(env)
-				.WriteUInt32(threat).WriteByte(flag).ToArray());
+		public static byte[] Build(uint handle, uint threat, byte flag, byte env = 0x00)
+		{
+			return CharDCMoveCodec.WithLength(new FaolanStream().WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(handle).WriteByte(env).WriteUInt32(threat).WriteByte(flag).ToArray());
+		}
 
 		public static Parsed Parse(byte[] body)
 		{
 			var s = new FaolanStream(body);
-			s.ReadUInt32(); s.ReadUInt32(); s.ReadUInt32();
+			s.ReadUInt32();
+			s.ReadUInt32();
+			s.ReadUInt32();
 			var handle = s.ReadUInt32();
 			var env = s.ReadByte();
 			var threat = s.ReadUInt32();
 			return new Parsed(handle, env, threat, s.ReadByte());
 		}
+
+		public sealed record Parsed(uint Handle, byte Env, uint Threat, byte Flag);
 	}
 
 	// HateListUpdateIIR (0x8A01E5A1) - a hate/aggro entry: a flag byte then three u32s (FUN_007a93a0); in the capture
@@ -67,22 +71,33 @@ namespace Faolan.GameServer.Combat
 		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.HateListUpdateIIR;
 		private const uint IirMarker = EntityClass.Character;
 
-		public sealed record Parsed(uint Handle, byte Env, byte Flag, uint Marker, uint Target, uint Count);
-
-		public static byte[] Build(uint handle, uint target, uint count = 1, byte flag = 0x00, byte env = 0x00) =>
-			CharDCMoveCodec.WithLength(new FaolanStream()
-				.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(handle).WriteByte(env)
-				.WriteByte(flag).WriteUInt32(IirMarker).WriteUInt32(target).WriteUInt32(count).ToArray());
+		public static byte[] Build(uint handle, uint target, uint count = 1, byte flag = 0x00, byte env = 0x00)
+		{
+			return CharDCMoveCodec.WithLength(new FaolanStream()
+				.WriteUInt32(SubOpcode)
+				.WriteUInt32(IirMarker)
+				.WriteUInt32(handle)
+				.WriteByte(env)
+				.WriteByte(flag)
+				.WriteUInt32(IirMarker)
+				.WriteUInt32(target)
+				.WriteUInt32(count)
+				.ToArray());
+		}
 
 		public static Parsed Parse(byte[] body)
 		{
 			var s = new FaolanStream(body);
-			s.ReadUInt32(); s.ReadUInt32(); s.ReadUInt32();
+			s.ReadUInt32();
+			s.ReadUInt32();
+			s.ReadUInt32();
 			var handle = s.ReadUInt32();
 			var env = s.ReadByte();
 			var flag = s.ReadByte();
 			return new Parsed(handle, env, flag, s.ReadUInt32(), s.ReadUInt32(), s.ReadUInt32());
 		}
+
+		public sealed record Parsed(uint Handle, byte Env, byte Flag, uint Marker, uint Target, uint Count);
 	}
 
 	// StatDamageIIR_t (0xE9F24184) - the damage result. The carrier handle is the target; the long form is 17 u32
@@ -91,31 +106,35 @@ namespace Faolan.GameServer.Combat
 	// which is enough to construct one from a captured template + the live target/attacker handles.
 	public static class StatDamageCodec
 	{
+		public const int WordCount = 17;
 		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.StatDamageIIR;
 		private const uint IirMarker = EntityClass.Character;
-		public const int WordCount = 17;
-
-		public sealed record Parsed(uint Handle, byte Env, uint[] Words);
 
 		public static byte[] Build(uint handle, uint[] words, byte env = 0x00)
 		{
 			if (words.Length != WordCount)
 				throw new ArgumentException($"StatDamage long form is {WordCount} words", nameof(words));
-			var c = new FaolanStream()
-				.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(handle).WriteByte(env);
-			foreach (var w in words) c.WriteUInt32(w);
+
+			var c = new FaolanStream().WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(handle).WriteByte(env);
+			foreach (var w in words)
+				c.WriteUInt32(w);
 			return CharDCMoveCodec.WithLength(c.ToArray());
 		}
 
 		public static Parsed Parse(byte[] body)
 		{
 			var s = new FaolanStream(body);
-			s.ReadUInt32(); s.ReadUInt32(); s.ReadUInt32();
+			s.ReadUInt32();
+			s.ReadUInt32();
+			s.ReadUInt32();
 			var handle = s.ReadUInt32();
 			var env = s.ReadByte();
 			var words = new uint[WordCount];
-			for (var i = 0; i < WordCount; i++) words[i] = s.ReadUInt32();
+			for (var i = 0; i < WordCount; i++)
+				words[i] = s.ReadUInt32();
 			return new Parsed(handle, env, words);
 		}
+
+		public sealed record Parsed(uint Handle, byte Env, uint[] Words);
 	}
 }

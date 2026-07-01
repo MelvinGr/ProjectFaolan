@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -21,24 +22,37 @@ namespace Faolan.Core.Rdb.Assets
 		public static MonsterDataFile Parse(uint id, byte[] decompressed)
 		{
 			var text = Encoding.Latin1.GetString(decompressed);
-			var start = text.IndexOf('<', text.IndexOf("<monsterdata", System.StringComparison.Ordinal) is var i && i >= 0 ? i : 0);
+			var start = text.IndexOf('<',
+				text.IndexOf("<monsterdata", StringComparison.Ordinal) is var i && i >= 0
+					? i
+					: 0);
 			var end = text.LastIndexOf('>');
 			if (start < 0 || end <= start)
 				return new MonsterDataFile(id, null, null, []);
 
 			XElement root;
-			try { root = XElement.Parse(text.Substring(start, end - start + 1)); }
-			catch { return new MonsterDataFile(id, null, null, []); }
+			try
+			{
+				root = XElement.Parse(text.Substring(start, end - start + 1));
+			}
+			catch
+			{
+				return new MonsterDataFile(id, null, null, []);
+			}
 
-			var meshes = root.Elements("mesh")
-				.Select(e => uint.TryParse(e.Attribute("mesh")?.Value, out var m) ? m : 0u)
+			var meshes = root
+				.Elements("mesh")
+				.Select(e => uint.TryParse(e.Attribute("mesh")?.Value, out var m)
+					? m
+					: 0u)
 				.Where(m => m != 0)
 				.ToList();
 
-			return new MonsterDataFile(
-				id,
+			return new MonsterDataFile(id,
 				root.Attribute("name")?.Value,
-				uint.TryParse(root.Attribute("skeleton")?.Value, out var sk) ? sk : null,
+				uint.TryParse(root.Attribute("skeleton")?.Value, out var sk)
+					? sk
+					: null,
 				meshes);
 		}
 	}

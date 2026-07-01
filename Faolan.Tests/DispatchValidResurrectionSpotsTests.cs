@@ -1,6 +1,6 @@
 using System;
 using System.Numerics;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.GameServer;
 using Xunit;
@@ -13,10 +13,7 @@ namespace Faolan.Tests
 	// Exact float bit patterns are reconstructed so the assertion is byte-for-byte against the capture.
 	public class DispatchValidResurrectionSpotsTests
 	{
-		private const string CapturedBody =
-			"446b8aa04326059444877ccd000007e244812c7b431a6ac14473f5c30000c7a0000007da000000000000000000000000000f5c460000000a00";
-
-		private static float Bits(uint u) => BitConverter.UInt32BitsToSingle(u);
+		private const string CapturedBody = "446b8aa04326059444877ccd000007e244812c7b431a6ac14473f5c30000c7a0000007da000000000000000000000000000f5c460000000a00";
 
 		[Fact]
 		public void ValidResurrectionSpotsBody_MatchesCapture()
@@ -35,6 +32,11 @@ namespace Faolan.Tests
 			GameServerListener.WriteValidResurrectionSpotsBody(s, deathPosition, [spot]);
 
 			Assert.Equal(CapturedBody, Convert.ToHexStringLower(s.ToArray()));
+		}
+
+		private static float Bits(uint u)
+		{
+			return BitConverter.UInt32BitsToSingle(u);
 		}
 	}
 }

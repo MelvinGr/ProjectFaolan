@@ -6,7 +6,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 	///     - 64-bit big-endian: (statId &lt;&lt; 32) | rawValue
 	///     - compact 7-byte big-endian: 3-byte statId + 4-byte rawValue
 	/// </summary>
-	///  TODO: Rename legacy?
+	/// TODO: Rename legacy?
 	public enum LegacyCharacterStatId : uint
 	{
 		// Vitals are sent as a (current, max) pair per stat in the 0x96B8DC59 update. The current/max id assignment

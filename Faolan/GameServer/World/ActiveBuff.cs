@@ -10,12 +10,13 @@ namespace Faolan.GameServer.World
 	// spell's RDB DurationMs (#274).
 	public sealed record ActiveBuff(uint BuffId, uint CasterHandle, DateTimeOffset AppliedAt, double? DurationSeconds)
 	{
+		public DateTimeOffset LastDotTick { get; set; }
+
 		// Damage-over-time per tick on the target's HealthCurrent (from Spell.DotDelta, captured StatDamageIIR):
 		// negative = a bleed/poison debuff, positive = a heal-over-time, 0 = no DoT. DotType is the +45 damage-school
 		// flag carried into the rebuilt packet. LastDotTick is mutable tick bookkeeping (the world tick stamps it). #274
 		public int DotDelta { get; init; }
 		public uint DotType { get; init; }
-		public DateTimeOffset LastDotTick { get; set; }
 
 		public bool Expired(DateTimeOffset now)
 		{
@@ -28,7 +29,9 @@ namespace Faolan.GameServer.World
 		// MILLISECONDS (×10) so callers stay in ms. Returns 0 when the payload is too short / carries no duration. (#274)
 		public static uint DurationMsFromPayload(byte[] payload)
 		{
-			return payload is { Length: >= 12 } ? BinaryPrimitives.ReadUInt32BigEndian(payload.AsSpan(8, 4)) * 10 : 0;
+			return payload is { Length: >= 12 }
+				? BinaryPrimitives.ReadUInt32BigEndian(payload.AsSpan(8, 4)) * 10
+				: 0;
 		}
 	}
 }

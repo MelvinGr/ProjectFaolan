@@ -2,7 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
-using Faolan.Core.Data;
+using Faolan.Core;
 
 namespace Faolan.GameServer.Spawn
 {
@@ -13,9 +13,9 @@ namespace Faolan.GameServer.Spawn
 	// Captures/scripts/decode_npc_morphs.py.
 	public sealed class NpcAppearanceMorph
 	{
-		public uint MorphId { get; set; }
 		public float Value { get; set; }
 		public string Text { get; set; } = "";
+		public uint MorphId { get; set; }
 	}
 
 	// Decodes / re-encodes the humanoid NPC post-IIR appearance table byte-exact. The post-IIR (the stream after
@@ -30,8 +30,10 @@ namespace Faolan.GameServer.Spawn
 	//   terminator (constant 20 bytes)
 	public static class NpcSpawnAppearanceCodec
 	{
-		private const uint HeaderWord0 = 0;
+		// One fixed-shape entry minus its string: [u32 id][f32 value][u32 0][u8 0] = 13 bytes, then [u8 strLen][str].
+		private const int EntryFixedLength = 13;
 		private const uint FirstRecordLen = 5;
+		private const uint HeaderWord0 = 0;
 		private const uint RecordCount = 2;
 
 		// record1 = the empty leading list ([u8 0][u32 0x3F1]).
@@ -47,8 +49,16 @@ namespace Faolan.GameServer.Spawn
 			0x00, 0x00, 0x03, 0xF1
 		];
 
-		// One fixed-shape entry minus its string: [u32 id][f32 value][u32 0][u8 0] = 13 bytes, then [u8 strLen][str].
-		private const int EntryFixedLength = 13;
+		// Builds the post-IIR bytes for a humanoid from its morph rows (the inverse of TryDecodeAppearance).
+		public static byte[] BuildPostIir(IReadOnlyList<NpcAppearanceMorph> morphs)
+		{
+			var stream = new FaolanStream().WriteUInt32(HeaderWord0).WriteUInt32(FirstRecordLen).WriteUInt32(RecordCount).WriteArray(Record1).WriteUInt32((uint)morphs.Count);
+
+			foreach (var morph in morphs)
+				stream.WriteUInt32(morph.MorphId).WriteFloatBigEndian(morph.Value).WriteUInt32(0).WriteByte(0).WriteArrayByteLength(Encoding.ASCII.GetBytes(morph.Text ?? ""));
+
+			return stream.WriteArray(Terminator).ToArray();
+		}
 
 		// Decodes the appearance/morph table out of an FA015807 body's post-IIR. Returns false (morphs = empty) if
 		// the body has no CharacterIIR, or its post-IIR is not the clean humanoid appearance shape (animal minimal
@@ -76,17 +86,27 @@ namespace Faolan.GameServer.Spawn
 			{
 				if (o + EntryFixedLength + 1 > post.Length)
 					return false;
+
 				var morphId = BinaryPrimitives.ReadUInt32BigEndian(post.Slice(o, 4));
 				var value = BinaryPrimitives.ReadSingleBigEndian(post.Slice(o + 4, 4));
 				if (BinaryPrimitives.ReadUInt32BigEndian(post.Slice(o + 8, 4)) != 0 || post[o + 12] != 0)
 					return false; // not the clean appearance shape (field2/field3 carry runtime state)
+
 				var strLen = post[o + 13];
 				o += EntryFixedLength + 1;
 				if (o + strLen > post.Length)
 					return false;
-				var text = strLen == 0 ? "" : Encoding.ASCII.GetString(post.Slice(o, strLen));
+
+				var text = strLen == 0
+					? ""
+					: Encoding.ASCII.GetString(post.Slice(o, strLen));
 				o += strLen;
-				result.Add(new NpcAppearanceMorph { MorphId = morphId, Value = value, Text = text });
+				result.Add(new NpcAppearanceMorph
+				{
+					MorphId = morphId,
+					Value = value,
+					Text = text
+				});
 			}
 
 			// What remains must be exactly the constant terminator - else this is a runtime-bearing form, skip it.
@@ -95,27 +115,6 @@ namespace Faolan.GameServer.Spawn
 
 			morphs = result;
 			return true;
-		}
-
-		// Builds the post-IIR bytes for a humanoid from its morph rows (the inverse of TryDecodeAppearance).
-		public static byte[] BuildPostIir(IReadOnlyList<NpcAppearanceMorph> morphs)
-		{
-			var stream = new FaolanStream()
-				.WriteUInt32(HeaderWord0)
-				.WriteUInt32(FirstRecordLen)
-				.WriteUInt32(RecordCount)
-				.WriteArray(Record1)
-				.WriteUInt32((uint)morphs.Count);
-
-			foreach (var morph in morphs)
-				stream
-					.WriteUInt32(morph.MorphId)
-					.WriteFloatBigEndian(morph.Value)
-					.WriteUInt32(0)
-					.WriteByte((byte)0)
-					.WriteArrayByteLength(Encoding.ASCII.GetBytes(morph.Text ?? ""));
-
-			return stream.WriteArray(Terminator).ToArray();
 		}
 
 		// Replaces an FA015807 body's post-IIR with one built from the given morph rows, adjusting the inner

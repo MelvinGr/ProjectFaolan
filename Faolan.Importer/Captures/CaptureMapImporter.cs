@@ -29,11 +29,7 @@ namespace Faolan.Importer.Captures
 				return 0;
 
 			var ids = found.Keys.ToList();
-			var existing = await db
-				.Maps
-				.Where(m => ids.Contains(m.Id))
-				.Select(m => m.Id)
-				.ToListAsync();
+			var existing = await db.Maps.Where(m => ids.Contains(m.Id)).Select(m => m.Id).ToListAsync();
 			var existingSet = existing.ToHashSet();
 
 			var inserted = 0;

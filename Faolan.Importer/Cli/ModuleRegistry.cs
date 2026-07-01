@@ -32,7 +32,7 @@ namespace Faolan.Importer.Cli
 			new MapLootModule(),
 			new WorldBurstsModule(),
 			new QuestsModule(),
-			new MountsModule(),       // opt-in
+			new MountsModule(), // opt-in
 			// --- tsv modules ---
 			new EllathaLevelsModule(),
 			new EllathaCombosModule(),
@@ -44,15 +44,16 @@ namespace Faolan.Importer.Cli
 			new RdbMapsModule(),
 			new RdbLuaModule(),
 			new RdbRespawnsModule(),
-			new RdbItemsModule(),
+			new RdbItemsModule()
 		];
 
-		public static IImportModule? Find(string name) =>
-			All.FirstOrDefault(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase));
-
 		// The default set when no --only is given: every module that opts in (RDB + mounts are opt-in).
-		public static IReadOnlyList<IImportModule> DefaultSet =>
-			All.Where(m => m.InDefaultSet).ToList();
+		public static IReadOnlyList<IImportModule> DefaultSet => All.Where(m => m.InDefaultSet).ToList();
+
+		public static IImportModule? Find(string name)
+		{
+			return All.FirstOrDefault(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase));
+		}
 
 		// Expands a requested set with its transitive dependencies, then returns it in dependency order
 		// (deps before dependents). Registration order in All breaks ties so runs are deterministic.
@@ -66,6 +67,7 @@ namespace Faolan.Importer.Cli
 				var m = pending.Pop();
 				if (!wanted.Add(m.Name))
 					continue;
+
 				foreach (var dep in m.DependsOn)
 					pending.Push(Find(dep) ?? throw new InvalidOperationException($"Module '{m.Name}' depends on unknown module '{dep}'."));
 			}
@@ -79,8 +81,10 @@ namespace Faolan.Importer.Cli
 			{
 				if (done.Contains(m.Name))
 					return;
+
 				if (!onStack.Add(m.Name))
 					throw new InvalidOperationException($"Dependency cycle through module '{m.Name}'.");
+
 				foreach (var dep in m.DependsOn)
 					Visit(Find(dep)!);
 				onStack.Remove(m.Name);

@@ -1,4 +1,3 @@
-using Faolan.Core.Rdb;
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
@@ -7,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
+using Faolan.Core.Rdb;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Rdb
@@ -78,10 +78,7 @@ namespace Faolan.Importer.Rdb
 					byTypeId[(type, e.Id)] = e;
 			}
 
-			var items = await db
-				.Items
-				.Where(i => i.Data1 != 0 || i.Data2 != 0 || i.Data3 != 0 || i.Data4 != 0)
-				.ToListAsync();
+			var items = await db.Items.Where(i => i.Data1 != 0 || i.Data2 != 0 || i.Data3 != 0 || i.Data4 != 0).ToListAsync();
 
 			if (dumpDir != null)
 				Directory.CreateDirectory(dumpDir);
@@ -91,7 +88,13 @@ namespace Faolan.Importer.Rdb
 
 			foreach (var item in items)
 			{
-				var key = new[] { item.Data1, item.Data2, item.Data3, item.Data4 };
+				var key = new[]
+				{
+					item.Data1,
+					item.Data2,
+					item.Data3,
+					item.Data4
+				};
 
 				RdbReader.Entry entry = default;
 				uint matchedType = 0;
@@ -179,14 +182,6 @@ namespace Faolan.Importer.Rdb
 			return new Result(items.Count, decrypted, noEntry, headerMismatch, decryptFailed, namesAdded, categoriesAdded, valuesAdded);
 		}
 
-		// Template strings backslash-escape apostrophes/quotes (e.g. "Aspirant\'s Cap"); undo that for the stored name.
-		private static string Unescape(string s)
-		{
-			return s.Contains('\\')
-				? s.Replace("\\'", "'").Replace("\\\"", "\"").Replace("\\\\", "\\")
-				: s;
-		}
-
 		private static bool IsPrintableAscii(ReadOnlySpan<byte> s)
 		{
 			foreach (var c in s)
@@ -197,8 +192,6 @@ namespace Faolan.Importer.Rdb
 
 			return true;
 		}
-
-		public readonly record struct Result(int Keyed, int Decrypted, int NoEntry, int HeaderMismatch, int DecryptFailed, int NamesAdded, int CategoriesAdded, int ValuesAdded);
 
 		// Reads the value of property-table field `fieldId` from a decrypted template body (the span AFTER the
 		// 12-byte RDB-Id header). The property table is the longest run of [fieldId u32][value u32] LE pairs with
@@ -223,17 +216,20 @@ namespace Faolan.Importer.Rdb
 					var fid = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(j * 4, 4));
 					if (fid == 0 || fid > 2000 || (haveLast && fid >= last))
 						break;
+
 					var val = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice((j + 1) * 4, 4));
 					if (fid == fieldId)
 					{
 						found = true;
 						fv = val;
 					}
+
 					last = fid;
 					haveLast = true;
 					len++;
 					j++; // consumed the value word too
 				}
+
 				if (len > bestLen)
 				{
 					bestLen = len;
@@ -246,5 +242,15 @@ namespace Faolan.Importer.Rdb
 				value = bestValue;
 			return bestFound;
 		}
+
+		// Template strings backslash-escape apostrophes/quotes (e.g. "Aspirant\'s Cap"); undo that for the stored name.
+		private static string Unescape(string s)
+		{
+			return s.Contains('\\')
+				? s.Replace("\\'", "'").Replace("\\\"", "\"").Replace("\\\\", "\\")
+				: s;
+		}
+
+		public readonly record struct Result(int Keyed, int Decrypted, int NoEntry, int HeaderMismatch, int DecryptFailed, int NamesAdded, int CategoriesAdded, int ValuesAdded);
 	}
 }

@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.GameServer.Packets.FullCharSnapshot;
@@ -19,56 +20,6 @@ namespace Faolan.Tests
 		private const string GoldenPath = "/home/melvin/Development/C#/Project Faolan/Faolan.Tests/QuestPortion2QuestGolden.bin";
 		private const uint CaptureInstance = 0x021663DD; // Stihetfv's client instance (the goal records carry it)
 
-		// Casilda 13479's journal record is a per-quest CONSTANT (byte-identical across its active + completed login
-		// captures, #255). Generate it via BuildSingle from the DB and assert it matches the record in the captured
-		// 2-quest region byte-for-byte - the core proof that a non-beach quest's record generates correctly. (The full
-		// region isn't byte-compared: the capture's char COMPLETED the beach quest, so its beach record carries
-		// obj-list progress a held-but-fresh beach record doesn't - that record is proven separately + in production.)
-		[Fact]
-		public void BuildSingle_Casilda13479_MatchesTheCapturedRecord_ByteForByte()
-		{
-			var golden = File.ReadAllBytes(GoldenPath);
-			// the 13479 record's signature in the region: [listKey=0x34A7][ver=1][questId=0x34A7]
-			var sig = new byte[] { 0, 0, 0x34, 0xA7, 0, 0, 0, 1, 0, 0, 0x34, 0xA7 };
-			var off = IndexOf(golden, sig);
-			Assert.True(off >= 0, "13479 record signature present in the golden region");
-
-			var casilda = LoadDefinition(13479).GetAwaiter().GetResult();
-			Assert.NotNull(casilda);
-			var rec = QuestcRecord.BuildSingle(casilda, casilda.SnapshotState, casilda.SnapshotN, casilda.SnapshotFieldEc,
-				casilda.SnapshotFieldF0, casilda.SnapshotFieldF8, casilda.SnapshotField28);
-			using var w = new Faolan.Core.Data.FaolanStream();
-			rec.Write(w);
-			var built = w.ToArray();
-
-			var slice = golden.AsSpan(off, built.Length).ToArray();
-			var diff = -1;
-			for (var i = 0; i < built.Length; i++)
-				if (slice[i] != built[i]) { diff = i; break; }
-			Assert.True(slice.SequenceEqual(built), $"13479 record must match the capture; first diff @{diff} of {built.Length}");
-		}
-
-		// The whole 2-quest region (beach + Casilda) must reproduce the captured login snapshot's quest region
-		// byte-for-byte - the proof that the multi-quest assembly (record order, the objective region between the
-		// primary record and the others, the multi-quest index) is correct + client-valid.
-		[Fact]
-		public async Task BuildQuestPortion_ReproducesTheTwoQuestCapture_ByteForByte()
-		{
-			var beach = await LoadDefinition(10238);
-			var casilda = await LoadDefinition(13479);
-			Assert.NotNull(beach);
-			Assert.NotNull(casilda);
-
-			var built = BeachTailsBuilder.BuildQuestPortion([beach, casilda], primary: beach, CaptureInstance);
-			var golden = File.ReadAllBytes(GoldenPath);
-
-			var diff = -1;
-			for (var i = 0; i < Math.Min(golden.Length, built.Length); i++)
-				if (golden[i] != built[i]) { diff = i; break; }
-			Assert.True(golden.SequenceEqual(built),
-				$"2-quest region must equal the capture; lengths golden={golden.Length} built={built.Length}; first diff @{diff}");
-		}
-
 		// A character holding NO snapshot quests (a freshly created char, or one who completed/abandoned the beach
 		// starter) carries the empty quest region. Byte-exact across all 20 *-create captures (the starter quest is
 		// delivered LIVE on create-world entry, not in the snapshot). See Captures/scripts/decode_snapshot_quests.py.
@@ -82,18 +33,36 @@ namespace Faolan.Tests
 				0x00, 0x00, 0x03, 0xF1, // index tag
 				0x00, 0x00, 0x03, 0xF1, // empty index marker ((0+1)*0x3F1)
 				0x00, 0x00, 0x00, 0x00, // index count = 0
-				0x00, 0x01, 0x56, 0xE7  // terminal constant
+				0x00, 0x01, 0x56, 0xE7 // terminal constant
 			];
 			Assert.Equal(golden, BeachTailsBuilder.BuildEmptyQuestPortion());
 			// The empty-quest list/null-primary path must route to the same region.
-			Assert.Equal(golden, BeachTailsBuilder.BuildQuestPortion([], primary: null, 0));
+			Assert.Equal(golden, BeachTailsBuilder.BuildQuestPortion([], null, 0));
 		}
 
-		private static int IndexOf(byte[] hay, byte[] needle)
+		// The whole 2-quest region (beach + Casilda) must reproduce the captured login snapshot's quest region
+		// byte-for-byte - the proof that the multi-quest assembly (record order, the objective region between the
+		// primary record and the others, the multi-quest index) is correct + client-valid.
+		[Fact]
+		public async Task BuildQuestPortion_ReproducesTheTwoQuestCapture_ByteForByte()
 		{
-			for (var i = 0; i + needle.Length <= hay.Length; i++)
-				if (hay.AsSpan(i, needle.Length).SequenceEqual(needle)) return i;
-			return -1;
+			var beach = await LoadDefinition(10238);
+			var casilda = await LoadDefinition(13479);
+			Assert.NotNull(beach);
+			Assert.NotNull(casilda);
+
+			var built = BeachTailsBuilder.BuildQuestPortion([beach, casilda], beach, CaptureInstance);
+			var golden = File.ReadAllBytes(GoldenPath);
+
+			var diff = -1;
+			for (var i = 0; i < Math.Min(golden.Length, built.Length); i++)
+				if (golden[i] != built[i])
+				{
+					diff = i;
+					break;
+				}
+
+			Assert.True(golden.SequenceEqual(built), $"2-quest region must equal the capture; lengths golden={golden.Length} built={built.Length}; first diff @{diff}");
 		}
 
 		// Single-quest path must still equal the beach-only portion (regression guard for the generalization).
@@ -101,19 +70,72 @@ namespace Faolan.Tests
 		public async Task BuildQuestPortion_SingleBeachQuest_EqualsBuildBeachQuestPortion()
 		{
 			var beach = await LoadDefinition(10238);
-			var built = BeachTailsBuilder.BuildQuestPortion([beach], primary: beach, CaptureInstance);
+			var built = BeachTailsBuilder.BuildQuestPortion([beach], beach, CaptureInstance);
 			var beachOnly = BeachTailsBuilder.BuildBeachQuestPortion(beach, beach.SnapshotState, CaptureInstance);
 			Assert.True(beachOnly.SequenceEqual(built), "single-quest portion must equal BuildBeachQuestPortion");
+		}
+
+		// Casilda 13479's journal record is a per-quest CONSTANT (byte-identical across its active + completed login
+		// captures, #255). Generate it via BuildSingle from the DB and assert it matches the record in the captured
+		// 2-quest region byte-for-byte - the core proof that a non-beach quest's record generates correctly. (The full
+		// region isn't byte-compared: the capture's char COMPLETED the beach quest, so its beach record carries
+		// obj-list progress a held-but-fresh beach record doesn't - that record is proven separately + in production.)
+		[Fact]
+		public void BuildSingle_Casilda13479_MatchesTheCapturedRecord_ByteForByte()
+		{
+			var golden = File.ReadAllBytes(GoldenPath);
+			// the 13479 record's signature in the region: [listKey=0x34A7][ver=1][questId=0x34A7]
+			var sig = new byte[]
+			{
+				0,
+				0,
+				0x34,
+				0xA7,
+				0,
+				0,
+				0,
+				1,
+				0,
+				0,
+				0x34,
+				0xA7
+			};
+			var off = IndexOf(golden, sig);
+			Assert.True(off >= 0, "13479 record signature present in the golden region");
+
+			var casilda = LoadDefinition(13479).GetAwaiter().GetResult();
+			Assert.NotNull(casilda);
+			var rec = QuestcRecord.BuildSingle(casilda, casilda.SnapshotState, casilda.SnapshotN, casilda.SnapshotFieldEc, casilda.SnapshotFieldF0, casilda.SnapshotFieldF8, casilda.SnapshotField28);
+			using var w = new FaolanStream();
+			rec.Write(w);
+			var built = w.ToArray();
+
+			var slice = golden.AsSpan(off, built.Length).ToArray();
+			var diff = -1;
+			for (var i = 0; i < built.Length; i++)
+				if (slice[i] != built[i])
+				{
+					diff = i;
+					break;
+				}
+
+			Assert.True(slice.SequenceEqual(built), $"13479 record must match the capture; first diff @{diff} of {built.Length}");
+		}
+
+		private static int IndexOf(byte[] hay, byte[] needle)
+		{
+			for (var i = 0; i + needle.Length <= hay.Length; i++)
+				if (hay.AsSpan(i, needle.Length).SequenceEqual(needle))
+					return i;
+
+			return -1;
 		}
 
 		private static async Task<QuestDefinition> LoadDefinition(uint questId)
 		{
 			var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={DbPath}").Options;
 			await using var ctx = new DatabaseContext(options);
-			return await ctx.QuestDefinitions
-				.Include(q => q.TextRefs)
-				.Include(q => q.Goals)
-				.FirstOrDefaultAsync(q => q.QuestId == questId);
+			return await ctx.QuestDefinitions.Include(q => q.TextRefs).Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == questId);
 		}
 	}
 }

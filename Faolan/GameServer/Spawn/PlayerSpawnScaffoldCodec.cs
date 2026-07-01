@@ -3,7 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets.Opcodes;
-using Faolan.Core.Spawn;
+using Faolan.Core.Network.Spawn;
 
 namespace Faolan.GameServer.Spawn
 {
@@ -119,7 +119,11 @@ namespace Faolan.GameServer.Spawn
 			else
 				WriteU32(b, ref i, Marker);
 
-			foreach (var pairs in new[] { s.EndPairs, s.EndPairs2 })
+			foreach (var pairs in new[]
+			{
+				s.EndPairs,
+				s.EndPairs2
+			})
 			{
 				WriteU32(b, ref i, (uint)pairs.Count);
 				foreach (var pair in pairs)
@@ -155,22 +159,16 @@ namespace Faolan.GameServer.Spawn
 			if (body[i] != 0x0A)
 				throw new FormatException("no vec3");
 
-			s.Vec3 = body
-				.AsSpan(i + 2, body[i + 1])
-				.ToArray();
+			s.Vec3 = body.AsSpan(i + 2, body[i + 1]).ToArray();
 			i += 2 + body[i + 1];
 			if (body[i] != 0x12)
 				throw new FormatException("no quat");
 
-			s.Quat = body
-				.AsSpan(i + 2, body[i + 1])
-				.ToArray();
+			s.Quat = body.AsSpan(i + 2, body[i + 1]).ToArray();
 			i += 2 + body[i + 1];
 			if (body[i] == 0x25)
 			{
-				s.Scale = body
-					.AsSpan(i + 1, 4)
-					.ToArray();
+				s.Scale = body.AsSpan(i + 1, 4).ToArray();
 				i += 5;
 			}
 
@@ -185,12 +183,8 @@ namespace Faolan.GameServer.Spawn
 			if (BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(iir.Offset - 4, 4)) != (uint)iir.Length)
 				throw new FormatException("CharacterIIR length prefix mismatch");
 
-			s.PreFrame = body
-				.AsSpan(i, iir.Offset - 4 - i)
-				.ToArray();
-			s.CharacterIir = body
-				.AsSpan(iir.Offset, iir.Length)
-				.ToArray();
+			s.PreFrame = body.AsSpan(i, iir.Offset - 4 - i).ToArray();
+			s.CharacterIir = body.AsSpan(iir.Offset, iir.Length).ToArray();
 
 			ParsePostIir(body, iir.Offset + iir.Length, s);
 			return s;
@@ -213,9 +207,7 @@ namespace Faolan.GameServer.Spawn
 				if (BinaryPrimitives.ReadUInt32BigEndian(b.AsSpan(i + 32, 4)) != EntityClass.Character)
 					throw new FormatException("buff record shape mismatch");
 
-				s.BuffRecords.Add(b
-					.AsSpan(i, BuffRecordSize)
-					.ToArray());
+				s.BuffRecords.Add(b.AsSpan(i, BuffRecordSize).ToArray());
 				i += BuffRecordSize;
 			}
 

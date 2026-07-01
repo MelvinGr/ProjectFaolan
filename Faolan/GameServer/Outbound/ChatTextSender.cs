@@ -17,11 +17,17 @@ namespace Faolan.GameServer
 		// Replayed verbatim (localized token ids + keys unchanged) with only the live session instance substituted,
 		// so it is guaranteed byte-valid. Arbitrary LITERAL text would need a literal-text remoteformat template (or
 		// RDB string ids) - the same follow-up the FormatFeedback FIFO banner has.
-		private const string CriteriaSystemLineXml =
-			"<remoteformat id=\"562\" category=\"100\" key=\"6segSK/UI?Kc`Tzg.tio\" knubot=\"0\"  >" +
-			"<parameter value=\"7;&lt;localized token=&quot;CriteriaYou&quot; category=&quot;130&quot; flags=&quot;&quot; " +
-			"key=&quot;^4L2&amp;#36;dU5AGjcTX_xJ[*Q&quot; &gt;\" /><parameter value=\"7;&lt;localized id=&quot;700&quot; " +
-			"category=&quot;55200&quot; flags=&quot;&quot; key=&quot;MpRf.Cx.%^MGdFXT&amp;quot;9X(&quot; &gt;\" /></remoteformat>";
+		private const string CriteriaSystemLineXml = "<remoteformat id=\"562\" category=\"100\" key=\"6segSK/UI?Kc`Tzg.tio\" knubot=\"0\"  >" +
+		                                             "<parameter value=\"7;&lt;localized token=&quot;CriteriaYou&quot; category=&quot;130&quot; flags=&quot;&quot; " +
+		                                             "key=&quot;^4L2&amp;#36;dU5AGjcTX_xJ[*Q&quot; &gt;\" /><parameter value=\"7;&lt;localized id=&quot;700&quot; " +
+		                                             "category=&quot;55200&quot; flags=&quot;&quot; key=&quot;MpRf.Cx.%^MGdFXT&amp;quot;9X(&quot; &gt;\" /></remoteformat>";
+
+		// Sends the proven captured system line - the test bootstrap for the ChatTextIIR path until a literal-text
+		// remoteformat template lands.
+		private Task SendSampleWorldChat(INetworkClient client)
+		{
+			return SendWorldChat(client, CriteriaSystemLineXml);
+		}
 
 		// Pushes a ChatTextIIR (raw remoteformat XML) to the client's chat window. Addressed to the player's
 		// GameInterface instance, on the world conversation.
@@ -35,9 +41,5 @@ namespace Faolan.GameServer
 			ps.WriteArray(body);
 			await ps.SendAsync(client);
 		}
-
-		// Sends the proven captured system line - the test bootstrap for the ChatTextIIR path until a literal-text
-		// remoteformat template lands.
-		private Task SendSampleWorldChat(INetworkClient client) => SendWorldChat(client, CriteriaSystemLineXml);
 	}
 }

@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Text;
 
 namespace Faolan.Core.Rdb.Assets
 {
@@ -14,13 +15,6 @@ namespace Faolan.Core.Rdb.Assets
 	// Quaternion + translation are LOCAL (relative to parent); world = parentWorld * local.
 	public static class SkeletonReader
 	{
-		public sealed record Bone(string Name, Quaternion LocalRotation, Vector3 LocalTranslation, int[] Children)
-		{
-			public int Parent { get; set; } = -1;
-			public Matrix4x4 World { get; set; } = Matrix4x4.Identity;
-			public Vector3 WorldPosition => World.Translation;
-		}
-
 		public static IReadOnlyList<Bone> Read(ReadOnlySpan<byte> blob)
 		{
 			if (blob.Length < 20)
@@ -36,7 +30,7 @@ namespace Faolan.Core.Rdb.Assets
 				if (nameLen < 0 || p + nameLen + 32 > blob.Length)
 					break;
 
-				var name = System.Text.Encoding.Latin1.GetString(blob.Slice(p, nameLen));
+				var name = Encoding.Latin1.GetString(blob.Slice(p, nameLen));
 				p += nameLen;
 
 				var q = new Quaternion(F(blob, p), F(blob, p + 4), F(blob, p + 8), F(blob, p + 12));
@@ -64,9 +58,13 @@ namespace Faolan.Core.Rdb.Assets
 		private static void ComposeWorld(List<Bone> bones)
 		{
 			for (var i = 0; i < bones.Count; i++)
+			{
 				foreach (var c in bones[i].Children)
+				{
 					if (c >= 0 && c < bones.Count)
 						bones[c].Parent = i;
+				}
+			}
 
 			var seen = new HashSet<int>();
 			for (var i = 0; i < bones.Count; i++)
@@ -78,8 +76,7 @@ namespace Faolan.Core.Rdb.Assets
 				while (j >= 0 && j < bones.Count && seen.Add(j))
 				{
 					var b = bones[j];
-					var local = Matrix4x4.CreateFromQuaternion(NormalizeOrIdentity(b.LocalRotation))
-					            * Matrix4x4.CreateTranslation(b.LocalTranslation);
+					var local = Matrix4x4.CreateFromQuaternion(NormalizeOrIdentity(b.LocalRotation)) * Matrix4x4.CreateTranslation(b.LocalTranslation);
 					world *= local;
 					j = b.Parent;
 				}
@@ -88,9 +85,23 @@ namespace Faolan.Core.Rdb.Assets
 			}
 		}
 
-		private static Quaternion NormalizeOrIdentity(Quaternion q) =>
-			q.LengthSquared() < 1e-12f ? Quaternion.Identity : Quaternion.Normalize(q);
+		private static float F(ReadOnlySpan<byte> b, int off)
+		{
+			return BinaryPrimitives.ReadSingleLittleEndian(b.Slice(off, 4));
+		}
 
-		private static float F(ReadOnlySpan<byte> b, int off) => BinaryPrimitives.ReadSingleLittleEndian(b.Slice(off, 4));
+		private static Quaternion NormalizeOrIdentity(Quaternion q)
+		{
+			return q.LengthSquared() < 1e-12f
+				? Quaternion.Identity
+				: Quaternion.Normalize(q);
+		}
+
+		public sealed record Bone(string Name, Quaternion LocalRotation, Vector3 LocalTranslation, int[] Children)
+		{
+			public int Parent { get; set; } = -1;
+			public Matrix4x4 World { get; set; } = Matrix4x4.Identity;
+			public Vector3 WorldPosition => World.Translation;
+		}
 	}
 }

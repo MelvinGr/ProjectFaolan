@@ -20,8 +20,7 @@ namespace Faolan.GameServer.Scripting
 		{
 			try
 			{
-				var result = Build(player)
-					.DoString(source);
+				var result = Build(player).DoString(source);
 				return result.Type == DataType.Boolean
 					? result.Boolean
 					: permissive;
@@ -38,8 +37,7 @@ namespace Faolan.GameServer.Scripting
 		{
 			try
 			{
-				Build(player)
-					.DoString(source);
+				Build(player).DoString(source);
 				return true;
 			}
 			catch (InterpreterException)

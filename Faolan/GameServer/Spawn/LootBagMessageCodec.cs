@@ -24,28 +24,6 @@ namespace Faolan.GameServer.Spawn
 		// LootBagFullUpdateIIR sub-opcode.
 		public const uint SubOpcode = 0xF096251E;
 
-		// Locates and parses the trailing ProtoLootBagIIR out of a loot-bag IIR record body (the bytes after the
-		// 0x2000 carrier's [u32 len][u32 iirType] prefix). The contents blob is the FINAL length-prefixed message:
-		// its [u32 len] is the unique offset where len + 4 consumes exactly to the end of the record. Returns false
-		// if no such framing exists. `contentsStart` is the offset of the [u32 len] prefix.
-		public static bool TryParse(ReadOnlySpan<byte> record, out ProtoLootBagIIR contents, out int contentsStart)
-		{
-			contents = null;
-			contentsStart = 0;
-			for (var k = 0; k + 4 <= record.Length; k++)
-			{
-				var len = BinaryPrimitives.ReadUInt32BigEndian(record.Slice(k, 4));
-				if (len == 0 || k + 4 + len != record.Length)
-					continue;
-
-				contents = Serializer.Deserialize<ProtoLootBagIIR>(record.Slice(k + 4, (int)len).ToArray().AsMemory());
-				contentsStart = k;
-				return true;
-			}
-
-			return false;
-		}
-
 		// Serializes a typed ProtoLootBagIIR to the on-wire trailing blob: [u32 BE len][protobuf].
 		public static byte[] BuildContents(ProtoLootBagIIR contents)
 		{
@@ -68,13 +46,51 @@ namespace Faolan.GameServer.Spawn
 			return new ProtoLootBagIIR
 			{
 				Cash = cash,
-				CurrentLooterId = new ProtoID32 { Type = 0, Instance = 0 },
-				OwnerId = new ProtoID32 { Type = 0, Instance = 0 },
-				DropperId = new ProtoID32 { Type = 0, Instance = 0 },
-				AllowedLooterId = new ProtoID32 { Type = 0, Instance = 0 },
+				CurrentLooterId = new ProtoID32
+				{
+					Type = 0,
+					Instance = 0
+				},
+				OwnerId = new ProtoID32
+				{
+					Type = 0,
+					Instance = 0
+				},
+				DropperId = new ProtoID32
+				{
+					Type = 0,
+					Instance = 0
+				},
+				AllowedLooterId = new ProtoID32
+				{
+					Type = 0,
+					Instance = 0
+				},
 				HasMasterLooter = false,
 				Inventory = inventory
 			};
+		}
+
+		// Locates and parses the trailing ProtoLootBagIIR out of a loot-bag IIR record body (the bytes after the
+		// 0x2000 carrier's [u32 len][u32 iirType] prefix). The contents blob is the FINAL length-prefixed message:
+		// its [u32 len] is the unique offset where len + 4 consumes exactly to the end of the record. Returns false
+		// if no such framing exists. `contentsStart` is the offset of the [u32 len] prefix.
+		public static bool TryParse(ReadOnlySpan<byte> record, out ProtoLootBagIIR contents, out int contentsStart)
+		{
+			contents = null;
+			contentsStart = 0;
+			for (var k = 0; k + 4 <= record.Length; k++)
+			{
+				var len = BinaryPrimitives.ReadUInt32BigEndian(record.Slice(k, 4));
+				if (len == 0 || k + 4 + len != record.Length)
+					continue;
+
+				contents = Serializer.Deserialize<ProtoLootBagIIR>(record.Slice(k + 4, (int)len).ToArray().AsMemory());
+				contentsStart = k;
+				return true;
+			}
+
+			return false;
 		}
 	}
 }

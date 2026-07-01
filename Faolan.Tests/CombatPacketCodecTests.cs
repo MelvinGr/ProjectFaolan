@@ -18,15 +18,10 @@ namespace Faolan.Tests
 			var body = CombatPacketCodec.BuildDamageResultBody(Attacker, Target, 0x2A);
 
 			Assert.Equal(CombatPacketCodec.DamageResultBodyLength, body.Length);
-			Assert.Equal(
-				"fec4158a0000c350021663dd000000c35000017e290000002a000000020000000000000000",
-				Convert.ToHexStringLower(body));
+			Assert.Equal("fec4158a0000c350021663dd000000c35000017e290000002a000000020000000000000000", Convert.ToHexStringLower(body));
 		}
 
-		[Theory]
-		[InlineData(0u)]
-		[InlineData(42u)]
-		[InlineData(0xFFFFFFFFu)]
+		[Theory, InlineData(0u), InlineData(42u), InlineData(0xFFFFFFFFu)]
 		public void DamageResultBody_RoundTrips(uint damage)
 		{
 			var body = CombatPacketCodec.BuildDamageResultBody(Attacker, Target, damage);
@@ -46,9 +41,7 @@ namespace Faolan.Tests
 			Assert.Equal("40749b8a0000c350021663dd010000189c", Convert.ToHexStringLower(body));
 		}
 
-		[Theory]
-		[InlineData(0u)]
-		[InlineData(6300u)]
+		[Theory, InlineData(0u), InlineData(6300u)]
 		public void EnergyBody_RoundTrips(uint stamina)
 		{
 			var body = CombatPacketCodec.BuildEnergyBody(Attacker, stamina);
@@ -65,15 +58,10 @@ namespace Faolan.Tests
 		[Fact]
 		public void NpcAttackAnimationAck_MatchesCapturedFrame6472()
 		{
-			var body = CombatPacketCodec.BuildNpcAttackAnimationAckBody(
-				npcHandle: 0x00002C56, playerHandle: 0x01316D8A, damage: 0x53,
-				typeId: 49731, swingCounter: 3, f5: 24, f11: 67, f12: 60,
-				resultType: 0xCD, resultK1: 1, resultK2: 2);
+			var body = CombatPacketCodec.BuildNpcAttackAnimationAckBody(0x00002C56, 0x01316D8A, 0x53, 49731, 3, 24, 67, 60, 0xCD, 1, 2);
 
-			Assert.Equal(
-				"642cd3d60000c35000002c5600040000000f0000001908c38403180328183000520908d08603108adbc5095843603c" +
-				"000000000000000000000001000000000000000000000000000000000000000000000000000000010000c35001316d8a" +
-				"0000000006000000cd000000000000000100000053000000020000000000000000",
+			Assert.Equal("642cd3d60000c35000002c5600040000000f0000001908c38403180328183000520908d08603108adbc5095843603c" + "000000000000000000000001000000000000000000000000000000000000000000000000000000010000c35001316d8a" +
+			             "0000000006000000cd000000000000000100000053000000020000000000000000",
 				Convert.ToHexStringLower(body));
 		}
 

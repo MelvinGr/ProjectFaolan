@@ -1,4 +1,3 @@
-using Faolan.Core.Rdb;
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
@@ -7,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Rdb;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Rdb
@@ -24,9 +24,7 @@ namespace Faolan.Importer.Rdb
 		public static async Task<int> ImportAsync(DatabaseContext db, string rdbDir)
 		{
 			using var rdb = new RdbReader(rdbDir);
-			var entry = rdb
-				.EntriesOfType(RegistryType)
-				.FirstOrDefault();
+			var entry = rdb.EntriesOfType(RegistryType).FirstOrDefault();
 			if (entry.Size == 0)
 			{
 				Console.WriteLine($"RDB morph targets: registry type {RegistryType} not found; skipping.");

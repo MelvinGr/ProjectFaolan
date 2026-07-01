@@ -1,5 +1,6 @@
 using System;
-using Faolan.Core.Data;
+using System.Text;
+using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.CSPlayerAgent;
@@ -14,15 +15,13 @@ namespace Faolan.Tests
 	{
 		// The 0x202A invite body Kyloth's invite produced for Hoxxling: guild ID32 (0xDEB7:0x7585B)
 		// "Sepulchra Invictus", invitee ID32 (0xC350:0x01316E71), inviter name "Kyloth".
-		private const string CapturedInviteBody =
-			"0000deb70007585b0012536570756c6368726120496e7669637475730000c35001316e7100064b796c6f7468";
+		private const string CapturedInviteBody = "0000deb70007585b0012536570756c6368726120496e7669637475730000c35001316e7100064b796c6f7468";
 
 		// Hoxxling's member record from the 0x202F member-joined that followed the accept: rank 0, online,
 		// playfield 0xFAA, level 4, class 0x2B (Herald of Xotli), zeroed counters.
-		private const string CapturedMemberRecord =
-			"030301316e710008486f78786c696e67000100000faa040000002b" + // head..class
-			"0000000000000000" + // unknown0 + lastSeen (online)
-			"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"; // 48-byte counters
+		private const string CapturedMemberRecord = "030301316e710008486f78786c696e67000100000faa040000002b" + // head..class
+		                                            "0000000000000000" + // unknown0 + lastSeen (online)
+		                                            "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"; // 48-byte counters
 
 		[Fact]
 		public void GuildInviteBody_Matches_CapturedBytes()
@@ -57,10 +56,19 @@ namespace Faolan.Tests
 			Assert.Equal(CapturedMemberRecord, Convert.ToHexStringLower(s.ToArray()));
 		}
 
+		[Fact]
+		public void GuildTagBody_Matches_ExpectedLayout()
+		{
+			var s = new FaolanStream();
+			GameServerListener.WriteGuildTagBody(s, 0x01316E71, "Sepulchra Invictus");
+
+			// subop 2550C99A + type 0000C350 + char 01316E71 + u16 0 + len 0012 + "Sepulchra Invictus"
+			Assert.Equal("2550c99a0000c35001316e7100000012" + Convert.ToHexStringLower(Encoding.UTF8.GetBytes("Sepulchra Invictus")), Convert.ToHexStringLower(s.ToArray()));
+		}
+
 		// The in-world guild-tag IIR body (GuildUpdateIIR 0x2550C99A): [subop][0000C350][char][u16 0][string name].
-		[Theory]
-		[InlineData(0x01316E71u, "Sepulchra Invictus")]
-		[InlineData(0x00090000u, "")] // empty name clears the tag
+		[Theory, InlineData(0x01316E71u, "Sepulchra Invictus"), InlineData(0x00090000u, "")]
+			// empty name clears the tag
 		public void GuildTagBody_RoundTrips(uint characterId, string guildName)
 		{
 			var s = new FaolanStream();
@@ -70,18 +78,6 @@ namespace Faolan.Tests
 			Assert.True(GameServerListener.TryParseGuildTagBody(body, out var parsedId, out var parsedName));
 			Assert.Equal(characterId, parsedId);
 			Assert.Equal(guildName, parsedName);
-		}
-
-		[Fact]
-		public void GuildTagBody_Matches_ExpectedLayout()
-		{
-			var s = new FaolanStream();
-			GameServerListener.WriteGuildTagBody(s, 0x01316E71, "Sepulchra Invictus");
-
-			// subop 2550C99A + type 0000C350 + char 01316E71 + u16 0 + len 0012 + "Sepulchra Invictus"
-			Assert.Equal(
-				"2550c99a0000c35001316e7100000012" + Convert.ToHexStringLower(System.Text.Encoding.UTF8.GetBytes("Sepulchra Invictus")),
-				Convert.ToHexStringLower(s.ToArray()));
 		}
 
 		[Fact]

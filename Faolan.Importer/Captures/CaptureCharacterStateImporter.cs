@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Conan;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
@@ -20,8 +21,6 @@ namespace Faolan.Importer.Captures
 	public static class CaptureCharacterStateImporter
 	{
 		private const uint GameCharInterfaceType = 0x8B87F791;
-
-		public sealed record CaptureState(Dictionary<uint, ulong> MoneyByCharacter, Dictionary<uint, Dictionary<uint, (uint Type, uint Target)>> ShortcutsByCharacter, Dictionary<uint, HashSet<uint>> RemovedSlotsByCharacter);
 
 		public static CaptureState Extract(IReadOnlyList<CapturedPacket> packets)
 		{
@@ -63,19 +62,16 @@ namespace Faolan.Importer.Captures
 						var target = packet.Body.ReadUInt32();
 						shortcuts.TryAdd(character, new Dictionary<uint, (uint, uint)>());
 						shortcuts[character][slot] = (type, target);
-						removed.GetValueOrDefault(character)
-							?.Remove(slot);
+						removed.GetValueOrDefault(character)?.Remove(slot);
 						break;
 					}
 
 					case 0x2071 when packet.Body.Length == 4: // RemoveShortcut
 					{
 						var slot = packet.Body.ReadUInt32();
-						shortcuts.GetValueOrDefault(character)
-							?.Remove(slot);
+						shortcuts.GetValueOrDefault(character)?.Remove(slot);
 						removed.TryAdd(character, new HashSet<uint>());
-						removed[character]
-							.Add(slot);
+						removed[character].Add(slot);
 						break;
 					}
 				}
@@ -107,10 +103,7 @@ namespace Faolan.Importer.Captures
 					if (!await db.Characters.AnyAsync(c => c.Id == characterId))
 						continue;
 
-					var existing = await db
-						.CharacterShortcuts
-						.Where(s => s.CharacterId == characterId)
-						.ToDictionaryAsync(s => s.Slot);
+					var existing = await db.CharacterShortcuts.Where(s => s.CharacterId == characterId).ToDictionaryAsync(s => s.Slot);
 					foreach (var (slot, (type, target)) in slots)
 					{
 						if (existing.TryGetValue(slot, out var row))
@@ -120,7 +113,7 @@ namespace Faolan.Importer.Captures
 						}
 						else
 						{
-							db.CharacterShortcuts.Add(new Core.Database.Tables.CharacterShortcut
+							db.CharacterShortcuts.Add(new CharacterShortcut
 							{
 								CharacterId = characterId,
 								Slot = slot,
@@ -146,5 +139,7 @@ namespace Faolan.Importer.Captures
 			await db.SaveChangesAsync();
 			return (moneySeeded, shortcutsSeeded);
 		}
+
+		public sealed record CaptureState(Dictionary<uint, ulong> MoneyByCharacter, Dictionary<uint, Dictionary<uint, (uint Type, uint Target)>> ShortcutsByCharacter, Dictionary<uint, HashSet<uint>> RemovedSlotsByCharacter);
 	}
 }

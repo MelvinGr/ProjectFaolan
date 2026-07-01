@@ -1,14 +1,14 @@
-using Faolan.Core.Spawn;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
-using Faolan.GameServer.Spawn;
+using Faolan.Core.Network.Spawn;
+using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
 // ReSharper disable once CheckNamespace
@@ -33,11 +33,6 @@ namespace Faolan.GameServer
 			if (!CharacterMorphs.TryApply(EnsureBody(character), morph, value))
 				Logger.LogDebug("Character-editor: unmapped morph '{Morph}'={Value} (slider not yet modelled).", morph, value);
 		}
-
-		// The outcome of committing a chosen name, mirroring the retail create-editor's NicknameOk / NicknameTaken /
-		// NicknameInvalid callbacks (Captures/Stricken_soldier-guardian_create_random-actions: Stricken->taken,
-		// empty->invalid, Strickenen->ok).
-		private enum NameCommitResult { Committed, Taken, Invalid }
 
 		private async Task<NameCommitResult> CommitCharacterName(INetworkClient client, string name)
 		{
@@ -69,8 +64,8 @@ namespace Faolan.GameServer
 			// beach entry; we persist it now so the journal is data-driven from CharacterQuests (delivered live on the
 			// create-world entry, then riding the snapshot on later logins) instead of baked into the snapshot. It is
 			// NOT re-seeded on world entry, so a completed/removed quest never reappears.
-			await Database.SetCharacterQuest(character.Id, World.WorldQuest.BeachStarterQuestId, QuestState.Active);
-			Logger.LogInformation("Character-editor: committed character name '{Name}' for character {CharacterId:X8}; granted starter quest {QuestId}.", name, character.Id, World.WorldQuest.BeachStarterQuestId);
+			await Database.SetCharacterQuest(character.Id, WorldQuest.BeachStarterQuestId, QuestState.Active);
+			Logger.LogInformation("Character-editor: committed character name '{Name}' for character {CharacterId:X8}; granted starter quest {QuestId}.", name, character.Id, WorldQuest.BeachStarterQuestId);
 			return NameCommitResult.Committed;
 		}
 
@@ -149,8 +144,13 @@ namespace Faolan.GameServer
 			}
 
 			var character = client.Session.Character;
-			Logger.LogInformation("Character-editor script callback: token={Token}, scryType={ScryType}, numericValue={NumericValue} (0x{NumericValueHex:X}), value={Value}, clientInstance={ClientInstance:X8}.", token, scryType, numericValue, numericValue,
-				valueString ?? "", clientInstance);
+			Logger.LogInformation("Character-editor script callback: token={Token}, scryType={ScryType}, numericValue={NumericValue} (0x{NumericValueHex:X}), value={Value}, clientInstance={ClientInstance:X8}.",
+				token,
+				scryType,
+				numericValue,
+				numericValue,
+				valueString ?? "",
+				clientInstance);
 
 			// #234: the beach cutscene's PlayOrSkipResultPlay (scryType 8) carries NO name token. On the create-world
 			// connection it's the cue to bind the cinematic actor - retail sends ThisIsKalanthes in RESPONSE to
@@ -200,8 +200,7 @@ namespace Faolan.GameServer
 				{
 					if (character != null)
 					{
-						EnsureBody(character)
-							.HeadMesh = numericValue;
+						EnsureBody(character).HeadMesh = numericValue;
 					}
 
 					break;
@@ -211,8 +210,7 @@ namespace Faolan.GameServer
 				{
 					if (character != null)
 					{
-						EnsureBody(character)
-							.Size = (byte)numericValue;
+						EnsureBody(character).Size = (byte)numericValue;
 					}
 
 					break;
@@ -222,8 +220,7 @@ namespace Faolan.GameServer
 				{
 					if (character != null)
 					{
-						EnsureBody(character)
-							.Voice = (byte)numericValue;
+						EnsureBody(character).Voice = (byte)numericValue;
 					}
 
 					break;
@@ -368,6 +365,16 @@ namespace Faolan.GameServer
 				Sequence = character.BodyResources.Count,
 				Ref = resourceRef
 			});
+		}
+
+		// The outcome of committing a chosen name, mirroring the retail create-editor's NicknameOk / NicknameTaken /
+		// NicknameInvalid callbacks (Captures/Stricken_soldier-guardian_create_random-actions: Stricken->taken,
+		// empty->invalid, Strickenen->ok).
+		private enum NameCommitResult
+		{
+			Committed,
+			Taken,
+			Invalid
 		}
 	}
 }

@@ -1,5 +1,5 @@
 using System;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.GameServer;
 using Xunit;
 
@@ -14,23 +14,14 @@ namespace Faolan.Tests
 		// Captured DispatchRemoveItem body (strickenbla questcomplete frame 3680; identical shape in the hoxxling
 		// gameplay captures): container 0x71 (equipped), charId 0x01316D8A, pos 0, amount 0.
 		private const string CapturedBody = "0000007101316d8a0000000000000000";
-		private const uint EquippedContainer = 0x71;
 		private const uint CharId = 0x01316d8a;
-
-		[Fact]
-		public void RemoveItemBody_MatchesCapture()
-		{
-			var s = new FaolanStream();
-			GameServerListener.WriteRemoveItemBody(s, EquippedContainer, CharId, itemPos: 0, amountToRemove: 0);
-
-			Assert.Equal(CapturedBody, Convert.ToHexStringLower(s.ToArray()));
-		}
+		private const uint EquippedContainer = 0x71;
 
 		[Fact]
 		public void RemoveItemBody_EncodesFields()
 		{
 			var s = new FaolanStream();
-			GameServerListener.WriteRemoveItemBody(s, GameServerListener.InventoryContainerBackpack, CharId, itemPos: 5, amountToRemove: 2);
+			GameServerListener.WriteRemoveItemBody(s, GameServerListener.InventoryContainerBackpack, CharId, 5, 2);
 			var body = s.ToArray();
 
 			Assert.Equal(16, body.Length);
@@ -39,6 +30,15 @@ namespace Faolan.Tests
 			Assert.Equal(CharId, r.ReadUInt32());
 			Assert.Equal(5u, r.ReadUInt32());
 			Assert.Equal(2u, r.ReadUInt32());
+		}
+
+		[Fact]
+		public void RemoveItemBody_MatchesCapture()
+		{
+			var s = new FaolanStream();
+			GameServerListener.WriteRemoveItemBody(s, EquippedContainer, CharId, 0, 0);
+
+			Assert.Equal(CapturedBody, Convert.ToHexStringLower(s.ToArray()));
 		}
 	}
 }

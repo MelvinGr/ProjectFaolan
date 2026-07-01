@@ -27,10 +27,7 @@ namespace Faolan.Importer.Captures
 				return (0, 0);
 
 			var ids = harvested.Keys.ToList();
-			var existing = await db
-				.Items
-				.Where(i => ids.Contains(i.Id))
-				.ToDictionaryAsync(i => i.Id);
+			var existing = await db.Items.Where(i => ids.Contains(i.Id)).ToDictionaryAsync(i => i.Id);
 
 			var inserted = 0;
 			foreach (var (id, ci) in harvested)

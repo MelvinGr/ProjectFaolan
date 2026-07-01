@@ -15,36 +15,6 @@ namespace Faolan.GameServer.World
 		// Seconds between an aggroed NPC's swings.
 		public const double NpcAttackInterval = 2.0;
 
-		// How close a player must be for a hostile NPC to aggro + attack (world units).
-		public const float NpcAggroRange = 20f;
-
-		// #284 line-of-sight (tier 1, cheap heuristic): the max VERTICAL (Y/up) separation at which a hostile NPC will
-		// still aggro a player. Aggro range is otherwise a 3D sphere, so without this an NPC aggros a player standing
-		// directly above/below it - through a floor/ceiling or across a big drop (the most jarring "sees through
-		// geometry" case). Gating on a vertical delta stops that with no collision data; true wall/terrain occlusion
-		// (the RDB heightmap 1066611 / PhysX collision 1000012) is the higher tier tracked on #284. ~6u ≈ one storey.
-		public const float NpcAggroVerticalRange = 6f;
-
-		// How close (horizontal) an aggroed NPC must be to its target to swing; beyond this it chases.
-		public const float NpcMeleeRange = 3f;
-
-		// #272: how close a chasing NPC actually WALKS UP to its target (well inside NpcMeleeRange so it reaches contact
-		// and stays comfortably in swing range, not hovering exactly on the swing boundary where a drifting target leaves
-		// it perpetually a step away and never swinging). Must be < NpcMeleeRange.
-		public const float NpcContactRange = 1.5f;
-
-		// How fast a chasing NPC closes on its target (world units per second). Capture-measured: retail renders NPC
-		// locomotion at ~6.9 u/s (median over 207 clear-locomotion samples, mode 7; Captures movement trajectories). This
-		// MUST equal the speed the CLIENT renders the NPC at, because the client paces a no-duration 2-point MoveTask
-		// segment by the entity's movement speed, not by the packet: if the model steps faster than the client renders
-		// (the old 12 u/s), the model outruns the on-screen NPC and each new segment makes it jump forward = the #272
-		// chase teleport. 7 matches the render speed so consecutive segments chain smoothly. (Also ~PatrolWalkSpeed 6.)
-		public const float NpcMoveSpeed = 7f;
-
-		// How far (horizontal) an NPC will chase from its spawn before giving up and returning home (so a player can't
-		// drag a mob across the whole zone). Once it disengages it keeps returning until home, ignoring re-aggro.
-		public const float NpcLeashRange = 40f;
-
 		// #262 companion-follow: how far behind the leading player a follower trails before it steps up (retail keeps the
 		// follower ~one step behind; its MoveTasks track the player ~6-7u apart). A follower never leashes/aggros.
 		public const float FollowStopRange = 4f;
@@ -56,14 +26,44 @@ namespace Faolan.GameServer.World
 		// teleport (#272). At NpcMoveSpeed (7 u/s) this broadcasts ~once a second.
 		public const float MoveBroadcastSegment = 6f;
 
+		// How close a player must be for a hostile NPC to aggro + attack (world units).
+		public const float NpcAggroRange = 20f;
+
+		// #284 line-of-sight (tier 1, cheap heuristic): the max VERTICAL (Y/up) separation at which a hostile NPC will
+		// still aggro a player. Aggro range is otherwise a 3D sphere, so without this an NPC aggros a player standing
+		// directly above/below it - through a floor/ceiling or across a big drop (the most jarring "sees through
+		// geometry" case). Gating on a vertical delta stops that with no collision data; true wall/terrain occlusion
+		// (the RDB heightmap 1066611 / PhysX collision 1000012) is the higher tier tracked on #284. ~6u ≈ one storey.
+		public const float NpcAggroVerticalRange = 6f;
+
+		// #272: how close a chasing NPC actually WALKS UP to its target (well inside NpcMeleeRange so it reaches contact
+		// and stays comfortably in swing range, not hovering exactly on the swing boundary where a drifting target leaves
+		// it perpetually a step away and never swinging). Must be < NpcMeleeRange.
+		public const float NpcContactRange = 1.5f;
+
+		// How far (horizontal) an NPC will chase from its spawn before giving up and returning home (so a player can't
+		// drag a mob across the whole zone). Once it disengages it keeps returning until home, ignoring re-aggro.
+		public const float NpcLeashRange = 40f;
+
+		// How close (horizontal) an aggroed NPC must be to its target to swing; beyond this it chases.
+		public const float NpcMeleeRange = 3f;
+
+		// How fast a chasing NPC closes on its target (world units per second). Capture-measured: retail renders NPC
+		// locomotion at ~6.9 u/s (median over 207 clear-locomotion samples, mode 7; Captures movement trajectories). This
+		// MUST equal the speed the CLIENT renders the NPC at, because the client paces a no-duration 2-point MoveTask
+		// segment by the entity's movement speed, not by the packet: if the model steps faster than the client renders
+		// (the old 12 u/s), the model outruns the on-screen NPC and each new segment makes it jump forward = the #272
+		// chase teleport. 7 matches the render speed so consecutive segments chain smoothly. (Also ~PatrolWalkSpeed 6.)
+		public const float NpcMoveSpeed = 7f;
+
+		// The shared instance id every Shared map (and every pre-instancing call site) uses - one zone per map.
+		public const uint DefaultInstance = 0;
+
 		// The live zones keyed by (mapId, instanceId) (#268). A map can have several copies (instances): the default
 		// shared instance plus any per-character Solo / per-party Group copies. Instance DefaultInstance (0) is the
 		// shared copy every Shared map uses - so ZoneFor(mapId) / the historical single-zone-per-map paths all resolve
 		// to it and behave exactly as before instancing existed.
 		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), Zone> _zones = new ConcurrentDictionary<(uint MapId, uint InstanceId), Zone>();
-
-		// The shared instance id every Shared map (and every pre-instancing call site) uses - one zone per map.
-		public const uint DefaultInstance = 0;
 
 		// Server-global monotonic allocator for playfield-instance tokens, mirroring retail's behaviour (a steadily
 		// increasing per-instance id stamped into despawns; see protocol_despawn_n3toclientquit). Every Zone gets a
@@ -93,8 +93,7 @@ namespace Faolan.GameServer.World
 		// in this same copy.
 		public Zone Place(WorldEntity entity, uint mapId, uint instanceId, Vector3 position, Vector3 rotation)
 		{
-			if ((entity.MapId != mapId || entity.InstanceId != instanceId)
-			    && _zones.TryGetValue((entity.MapId, entity.InstanceId), out var oldZone))
+			if ((entity.MapId != mapId || entity.InstanceId != instanceId) && _zones.TryGetValue((entity.MapId, entity.InstanceId), out var oldZone))
 				oldZone.Remove(entity.Handle);
 
 			entity.MapId = mapId;
@@ -122,7 +121,9 @@ namespace Faolan.GameServer.World
 			if (existing != null && existing.MapId == mapId && existing.InstanceId != DefaultInstance)
 				return existing.InstanceId; // already in a private copy of this same map - stay in it
 
-			return mode == MapInstanceMode.Solo ? NextPlayfieldToken() : DefaultInstance;
+			return mode == MapInstanceMode.Solo
+				? NextPlayfieldToken()
+				: DefaultInstance;
 		}
 
 		// Advances the world model by `deltaSeconds` (docs/archive/server-architecture-roadmap.md) and returns the wire-visible
@@ -165,6 +166,7 @@ namespace Faolan.GameServer.World
 						}
 						else if (entity.TickRespawn(deltaSeconds))
 							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcRespawned));
+
 						continue;
 					}
 
@@ -177,7 +179,7 @@ namespace Faolan.GameServer.World
 						if (!zone.TryGet(entity.FollowTargetHandle, out var leader) || !leader.IsPlayer)
 						{
 							entity.FollowTargetHandle = 0;
-							EndMove(entity, stop: true, WorldTickEffectType.NpcFollow);
+							EndMove(entity, true, WorldTickEffectType.NpcFollow);
 							continue;
 						}
 
@@ -189,7 +191,7 @@ namespace Faolan.GameServer.World
 						else
 							// Caught up: flush the trailing approach (a real ~6u segment toward the leader, so its facing
 							// points straight at her) and close the move with a single StopIIR (#262/#272).
-							EndMove(entity, stop: true, WorldTickEffectType.NpcFollow);
+							EndMove(entity, true, WorldTickEffectType.NpcFollow);
 						continue;
 					}
 
@@ -229,7 +231,7 @@ namespace Faolan.GameServer.World
 
 						entity.Returning = false;
 						entity.Vitals.ReviveToFull(); // home again
-						EndMove(entity, stop: true, WorldTickEffectType.NpcMove); // arrived: flush + stop (#190/#272)
+						EndMove(entity, true, WorldTickEffectType.NpcMove); // arrived: flush + stop (#190/#272)
 						continue;
 					}
 
@@ -237,7 +239,7 @@ namespace Faolan.GameServer.World
 					{
 						SetCombat(entity, false); // no target in range: disengage and sheathe
 						entity.ArmAttackCooldown(NpcAttackInterval); // re-aggro shouldn't swing instantly
-						EndMove(entity, stop: true, WorldTickEffectType.NpcMove); // stop if we were mid-chase (#272)
+						EndMove(entity, true, WorldTickEffectType.NpcMove); // stop if we were mid-chase (#272)
 						// Disengaged with no one in range: heal back to full so it can't be whittled from out of range.
 						if (entity.Vitals.Health < entity.Vitals.MaxHealth)
 							entity.Vitals.ReviveToFull();
@@ -252,6 +254,7 @@ namespace Faolan.GameServer.World
 							entity.ArmPatrolCycle();
 							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcMove));
 						}
+
 						continue;
 					}
 
@@ -276,7 +279,7 @@ namespace Faolan.GameServer.World
 					else
 						// At contact: flush the trailing approach step so the client sees it close the last bit (no StopIIR -
 						// the swing/combat-mode draw plants it).
-						EndMove(entity, stop: false, WorldTickEffectType.NpcMove);
+						EndMove(entity, false, WorldTickEffectType.NpcMove);
 
 					if (horizontal > NpcMeleeRange)
 					{
@@ -286,7 +289,11 @@ namespace Faolan.GameServer.World
 
 					if (entity.TickAttackReady(deltaSeconds, NpcAttackInterval))
 						// A caster NPC casts a spell on the same cadence; everyone else swings (#232).
-						effects.Add(new WorldTickEffect(entity, entity.IsCaster ? WorldTickEffectType.NpcCast : WorldTickEffectType.NpcAttack, target));
+						effects.Add(new WorldTickEffect(entity,
+							entity.IsCaster
+								? WorldTickEffectType.NpcCast
+								: WorldTickEffectType.NpcAttack,
+							target));
 				}
 			}
 
@@ -302,7 +309,10 @@ namespace Faolan.GameServer.World
 
 				e.InCombat = inCombat;
 				effects.Add(new WorldTickEffect(e,
-					inCombat ? WorldTickEffectType.NpcEnterCombat : WorldTickEffectType.NpcExitCombat, target));
+					inCombat
+						? WorldTickEffectType.NpcEnterCombat
+						: WorldTickEffectType.NpcExitCombat,
+					target));
 			}
 
 			// Steps `e` toward (dx,dz) this tick and queues a move broadcast ONLY once it has travelled a retail-sized
@@ -348,6 +358,12 @@ namespace Faolan.GameServer.World
 			}
 		}
 
+		// Read-only lookup of the default shared instance; does NOT mint a zone for an untracked map.
+		public bool TryGetZone(uint mapId, out Zone zone)
+		{
+			return _zones.TryGetValue((mapId, DefaultInstance), out zone);
+		}
+
 		// The default shared instance of a map (pre-instancing callers, tests, the burst-token resolve path).
 		public Zone ZoneFor(uint mapId)
 		{
@@ -358,7 +374,11 @@ namespace Faolan.GameServer.World
 		public Zone ZoneFor(uint mapId, uint instanceId)
 		{
 			return _zones.GetOrAdd((mapId, instanceId),
-				key => new Zone(key.MapId) { InstanceId = key.InstanceId, PlayfieldToken = NextPlayfieldToken() });
+			key => new Zone(key.MapId)
+			{
+				InstanceId = key.InstanceId,
+				PlayfieldToken = NextPlayfieldToken()
+			});
 		}
 
 		// The zone the entity currently lives in - its (MapId, InstanceId) copy. The routing primitive every
@@ -368,32 +388,15 @@ namespace Faolan.GameServer.World
 			return ZoneFor(entity.MapId, entity.InstanceId);
 		}
 
-		// Read-only lookup of the default shared instance; does NOT mint a zone for an untracked map.
-		public bool TryGetZone(uint mapId, out Zone zone)
-		{
-			return _zones.TryGetValue((mapId, DefaultInstance), out zone);
-		}
-
 		// Every live instance of a map (all copies), for observers (MCP) that want the whole map regardless of which
 		// copy an entity is in.
 		public IEnumerable<Zone> ZonesForMap(uint mapId)
 		{
 			foreach (var kvp in _zones)
+			{
 				if (kvp.Key.MapId == mapId)
 					yield return kvp.Value;
-		}
-
-		// Advances `entity` one tick's worth toward (dx, dz) - a horizontal step at NpcMoveSpeed (keeping terrain Y),
-		// `stopShort` leaves that many units short of the point (melee range when chasing, follow range when following);
-		// 0 lands on it (returning home). The broadcast anchor (MoveOrigin) is managed by StepAndStream, not here, so a
-		// caller that wants the step broadcast must go through StepAndStream.
-		private static void StepToward(WorldEntity entity, float dx, float dz, float distance, double deltaSeconds, float stopShort = 0f)
-		{
-			var travel = MathF.Min((float)(NpcMoveSpeed * deltaSeconds), distance - stopShort);
-			entity.Position = new Vector3(
-				entity.Position.X + dx / distance * travel,
-				entity.Position.Y,
-				entity.Position.Z + dz / distance * travel);
+			}
 		}
 
 		// The closest player within `range` of the NPC (its aggro target), or null if none.
@@ -406,7 +409,7 @@ namespace Faolan.GameServer.World
 				if (player.Invisible) // .invisible: a hidden player draws no aggro
 					continue;
 				if (!npc.IsVisibleTo(player)) // a quest-gated NPC (e.g. Scavenger Tuut) must not aggro/attack a player it
-					continue;                 // was never streamed to - else the player takes hits from an invisible body
+					continue; // was never streamed to - else the player takes hits from an invisible body
 				if (MathF.Abs(player.Position.Y - npc.Position.Y) > NpcAggroVerticalRange) // #284: not through a floor/drop
 					continue;
 
@@ -419,6 +422,16 @@ namespace Faolan.GameServer.World
 			}
 
 			return nearest;
+		}
+
+		// Advances `entity` one tick's worth toward (dx, dz) - a horizontal step at NpcMoveSpeed (keeping terrain Y),
+		// `stopShort` leaves that many units short of the point (melee range when chasing, follow range when following);
+		// 0 lands on it (returning home). The broadcast anchor (MoveOrigin) is managed by StepAndStream, not here, so a
+		// caller that wants the step broadcast must go through StepAndStream.
+		private static void StepToward(WorldEntity entity, float dx, float dz, float distance, double deltaSeconds, float stopShort = 0f)
+		{
+			var travel = MathF.Min((float)(NpcMoveSpeed * deltaSeconds), distance - stopShort);
+			entity.Position = new Vector3(entity.Position.X + dx / distance * travel, entity.Position.Y, entity.Position.Z + dz / distance * travel);
 		}
 	}
 }

@@ -1,5 +1,5 @@
 using System;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.GameServer;
 using Xunit;
 

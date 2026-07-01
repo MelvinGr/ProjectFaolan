@@ -1,4 +1,3 @@
-using Faolan.Core.Spawn;
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
@@ -9,7 +8,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
-using Faolan.GameServer.Spawn;
+using Faolan.Core.Network.Spawn;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
@@ -18,17 +17,20 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-		// Tortage Beach (0xFAA/4010) - the universal fallback world. Its burst is always seeded (the proven blob), so
-		// any character whose own map has no usable burst still enters a real, rendered world instead of a hand-built
-		// one. (There is no hand-built login/teleport path anymore.)
-		private const uint DefaultWorldMapId = Map.TortageBeachId;
-
 		// The Tortage beach world-entry snapshot (0x737A6DF9) embeds quest 10238 in its tails for EVERY character
 		// (verified across the Strie / hoxxling / randochar captures - it is the canonical beach starting quest, not
 		// a per-character artifact). Since the snapshot is replayed and the client renders that quest, persist it so
 		// the DB matches what the journal shows (otherwise CharacterQuests is empty while the journal shows a quest -
 		// see snapshot_embeds_strie_quest). See EnsureBeachStarterQuest / WorldQuest.BeachStarterQuestId.
 		private const uint BeachStarterQuestId = WorldQuest.BeachStarterQuestId;
+
+		// Tortage Beach (0xFAA/4010) - the universal fallback world. Its burst is always seeded (the proven blob), so
+		// any character whose own map has no usable burst still enters a real, rendered world instead of a hand-built
+		// one. (There is no hand-built login/teleport path anymore.)
+		private const uint DefaultWorldMapId = Map.TortageBeachId;
+
+		// Male (Sex 0): loincloth in the legs slot, no chest item.
+		private const uint StarterMaleLegsItem = 3805575; // Red Loincloth
 
 		// Default starter gear for beach characters (item ids that are fully buildable: p_items identity + harvested
 		// archetype), keyed by the CharacterEquipment slot they go in. Slot-appropriate so the client accepts them.
@@ -37,9 +39,6 @@ namespace Faolan.GameServer
 		// + bottom (the exact garment COLOUR is randomised per character in retail, so one representative set is used
 		// per sex). Character.Sex 0 = male, 1 = female (the create-flow captures confirm this against the worn gear).
 		private const uint StarterWristItem = 3361557; // Slave Manacles (wrist, 0x12) - universal
-
-		// Male (Sex 0): loincloth in the legs slot, no chest item.
-		private const uint StarterMaleLegsItem = 3805575; // Red Loincloth
 
 		// Female (Sex 1): a gown (chest) + matching bottom (legs). Retail randomises the garment COLOUR per
 		// character, so pick a colour at random from the slave-gown set (all fully buildable - Archetype + Data
@@ -50,7 +49,14 @@ namespace Faolan.GameServer
 			(324140, 324168), // Purple
 			(324067, 324172), // Red
 			(324139, 324171), // Silver
-			(105844, 324175)  // White
+			(105844, 324175) // White
+		];
+
+		// Equipped-container slot id -> the CharacterEquipment nav (archive player_items slot bytes).
+		private static readonly (ulong Slot, Func<CharacterEquipment, Item> Get)[] InventoryEquippedSlots =
+		[
+			(0x01, e => e.Neck), (0x02, e => e.Head), (0x03, e => e.Tokens), (0x05, e => e.Chest), (0x06, e => e.MainHandLeft), (0x07, e => e.Belt), (0x08, e => e.OffHandLeft), (0x09, e => e.RingLeft),
+			(0x0a, e => e.RingRight), (0x0b, e => e.Cloak), (0x0c, e => e.Shoulder), (0x0e, e => e.Boots), (0x0f, e => e.Hands), (0x10, e => e.Legs), (0x12, e => e.Wrist), (0x14, e => e.MainHandRight), (0x15, e => e.OffHandRight)
 		];
 
 		// Per-class starting WEAPON (the main-hand-left slot, 0x06), harvested from the *create* captures (#220).
@@ -69,32 +75,6 @@ namespace Faolan.GameServer
 		{
 			[Class.Assassin] = 3735601 // Marlin Spike
 		};
-
-		// Equipped-container slot id -> the CharacterEquipment nav (archive player_items slot bytes).
-		private static readonly (ulong Slot, Func<CharacterEquipment, Item> Get)[] InventoryEquippedSlots =
-		[
-			(0x01, e => e.Neck), (0x02, e => e.Head), (0x03, e => e.Tokens), (0x05, e => e.Chest), (0x06, e => e.MainHandLeft), (0x07, e => e.Belt), (0x08, e => e.OffHandLeft), (0x09, e => e.RingLeft),
-			(0x0a, e => e.RingRight), (0x0b, e => e.Cloak), (0x0c, e => e.Shoulder), (0x0e, e => e.Boots), (0x0f, e => e.Hands), (0x10, e => e.Legs), (0x12, e => e.Wrist), (0x14, e => e.MainHandRight), (0x15, e => e.OffHandRight)
-		];
-
-		// Sets the snapshot's protobuf-blob length to match a regenerated root. The 8-byte prefix the client reads
-		// is [u8 flag][u32 BE blobLen][field5 = the rest], where the client (n3InfoItemRemote::Construct ->
-		// FUN_00cbfb80 in AgeOfConan.exe) reads EXACTLY blobLen bytes as the protobuf blob = field5 + the
-		// FullCharacterIIR root, then expects the 0x18 version. So blobLen = field5Len + rootLength, written as a
-		// 4-byte big-endian int at prefix offset 1. (This SUPERSEDES AdjustSnapshotPrefixRootLength, which adjusted
-		// a byte-misaligned protobuf-varint model and corrupted the real length on resize — see
-		// docs/archive/db-container-handoff.md / [[protocol_containeradditem]].) field5Len = prefix.Length - 5 (the flag +
-		// the 4 length bytes); the captured field5 bytes at prefix[5..] are preserved unchanged.
-		internal static byte[] SetSnapshotBlobLength(byte[] prefix, int rootLength)
-		{
-			if (prefix.Length < 5 || rootLength < 0)
-				return prefix;
-
-			var field5Len = prefix.Length - 5;
-			var result = (byte[])prefix.Clone();
-			BinaryPrimitives.WriteUInt32BigEndian(result.AsSpan(1, 4), (uint)(field5Len + rootLength));
-			return result;
-		}
 
 		// Loads the character's CharacterEquipment (creating it and seeding default starter gear if absent), with the
 		// item navs included so they can be built into the snapshot. Beach characters only.
@@ -121,8 +101,12 @@ namespace Faolan.GameServer
 					Id = character.Id,
 					CharacterId = character.Id,
 					Wrist = await Database.GetItem(StarterWristItem),
-					Chest = female ? await Database.GetItem(femaleOutfit.Gown) : null,
-					Legs = await Database.GetItem(female ? femaleOutfit.Bottom : StarterMaleLegsItem),
+					Chest = female
+						? await Database.GetItem(femaleOutfit.Gown)
+						: null,
+					Legs = await Database.GetItem(female
+						? femaleOutfit.Bottom
+						: StarterMaleLegsItem),
 					// Class-specific improvised weapon (main-hand-left); only the classes the create dumps cover.
 					MainHandLeft = StarterClassWeapon.TryGetValue(character.Class, out var weaponId)
 						? await Database.GetItem(weaponId)
@@ -138,7 +122,6 @@ namespace Faolan.GameServer
 				return null;
 			}
 		}
-
 
 		// Loads the character's spawn-scaffold rows, seeding the fresh-character defaults once for characters that
 		// have none (like EnsureBeachStarterEquipment seeds starter gear). Returns null on failure - the spawn
@@ -158,14 +141,12 @@ namespace Faolan.GameServer
 				List<ScaffoldEntry> weighted = null;
 				if (scaffoldCharacter.BodyResources is { Count: > 0 })
 				{
-					var registry = await Database.GetMorphTargets(scaffoldCharacter
-						.BodyResources
-						.Select(r => r.Ref)
-						.ToArray());
+					var registry = await Database.GetMorphTargets(scaffoldCharacter.BodyResources.Select(r => r.Ref).ToArray());
 					weighted = PlayerSpawnScaffoldRows.BuildWeightedEntries(scaffoldCharacter.BodyResources, registry);
 					if (weighted == null)
 					{
-						Logger.LogWarning("Character {CharacterId} has {Count} chosen appearance resources but none resolved via MorphTargets (registry imported?); using the default weighted entries.", character.Id,
+						Logger.LogWarning("Character {CharacterId} has {Count} chosen appearance resources but none resolved via MorphTargets (registry imported?); using the default weighted entries.",
+							character.Id,
 							scaffoldCharacter.BodyResources.Count);
 					}
 				}
@@ -236,8 +217,26 @@ namespace Faolan.GameServer
 			await SendBurstlessWorldEntry(client, mapId);
 		}
 
+		// Sets the snapshot's protobuf-blob length to match a regenerated root. The 8-byte prefix the client reads
+		// is [u8 flag][u32 BE blobLen][field5 = the rest], where the client (n3InfoItemRemote::Construct ->
+		// FUN_00cbfb80 in AgeOfConan.exe) reads EXACTLY blobLen bytes as the protobuf blob = field5 + the
+		// FullCharacterIIR root, then expects the 0x18 version. So blobLen = field5Len + rootLength, written as a
+		// 4-byte big-endian int at prefix offset 1. (This SUPERSEDES AdjustSnapshotPrefixRootLength, which adjusted
+		// a byte-misaligned protobuf-varint model and corrupted the real length on resize — see
+		// docs/archive/db-container-handoff.md / [[protocol_containeradditem]].) field5Len = prefix.Length - 5 (the flag +
+		// the 4 length bytes); the captured field5 bytes at prefix[5..] are preserved unchanged.
+		internal static byte[] SetSnapshotBlobLength(byte[] prefix, int rootLength)
+		{
+			if (prefix.Length < 5 || rootLength < 0)
+				return prefix;
+
+			var field5Len = prefix.Length - 5;
+			var result = (byte[])prefix.Clone();
+			BinaryPrimitives.WriteUInt32BigEndian(result.AsSpan(1, 4), (uint)(field5Len + rootLength));
+			return result;
+		}
+
 		// SendPostReadyBurst (the post-0x2024 login record stream) is built as explicit PacketStream sends
 		// in PostReadyBurst.cs.
-
 	}
 }

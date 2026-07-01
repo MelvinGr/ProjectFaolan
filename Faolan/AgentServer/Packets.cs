@@ -1,9 +1,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Network;
 using Faolan.Core.Network.AgentServer;
+using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
 using Microsoft.Extensions.Logging;
 
@@ -34,6 +35,51 @@ namespace Faolan.AgentServer
 			}
 		}
 
+		public async Task<int> SendClaudeChannelMessage(string message)
+		{
+			// Claude's post on the Claude channel: the same 0x0014 sender-info + 0x0041 relay pair as a player post
+			// (see BroadcastChannelChat), but under the synthetic Claude identity. Every client is subscribed to the
+			// channel (Hello sends the subscription), so a plain broadcast reaches everyone.
+			var delivered = 0;
+			foreach (var client in NetworkClients)
+			{
+				await new FaolanStream()
+					.WriteUInt16(AgentServerRespondsOpcodes.Ox0014)
+					.WriteArrayUInt16Length(s => s.WriteUInt32(ClaudeChannel.SenderId).WriteUInt32(0x00000000).WriteString(ClaudeChannel.SenderName))
+					.SendAsync(client);
+
+				await new FaolanStream()
+					.WriteUInt16(AgentServerRespondsOpcodes.ChannelChat)
+					.WriteArrayUInt16Length(s => s.WriteByte(ClaudeChannel.ChannelType).WriteUInt32(ClaudeChannel.ChannelId).WriteUInt32(ClaudeChannel.SenderId).WriteString(message).WriteUInt16(0x0000))
+					.SendAsync(client);
+
+				delivered++;
+			}
+
+			_claudeChannel.Append(ClaudeChannel.SenderId, ClaudeChannel.SenderName, message, true);
+
+			return delivered;
+		}
+
+		// Whispers a single character as the synthetic Claude identity: the 0x0014 sender info + the 0x001E tell
+		// (the exact delivery shape of a player tell - see the whisper capture / WhisperTests). Logged on the
+		// Claude channel log so the bridge conversation history stays complete.
+		public async Task<bool> SendClaudeWhisper(uint targetCharacterId, string message)
+		{
+			var target = ClientForCharacter(targetCharacterId);
+			if (target == null)
+				return false;
+
+			await new FaolanStream()
+				.WriteUInt16(AgentServerRespondsOpcodes.Ox0014)
+				.WriteArrayUInt16Length(s => s.WriteUInt32(ClaudeChannel.SenderId).WriteUInt32(0x00000000).WriteString(ClaudeChannel.SenderName))
+				.SendAsync(target);
+			await target.SendAsync(BuildWhisper(ClaudeChannel.SenderId, message));
+
+			_claudeChannel.Append(ClaudeChannel.SenderId, ClaudeChannel.SenderName, $"(whisper to {targetCharacterId:X8}) {message}", true, true);
+			return true;
+		}
+
 		public async Task SendSystemMessage(uint characterId, string message)
 		{
 			var client = ClientForCharacter(characterId);
@@ -51,79 +97,6 @@ namespace Faolan.AgentServer
 			return Task.WhenAll(NetworkClients.Select(c => SendSystemMessage(c, message)));
 		}
 
-		// Whispers a single character as the synthetic Claude identity: the 0x0014 sender info + the 0x001E tell
-		// (the exact delivery shape of a player tell - see the whisper capture / WhisperTests). Logged on the
-		// Claude channel log so the bridge conversation history stays complete.
-		public async Task<bool> SendClaudeWhisper(uint targetCharacterId, string message)
-		{
-			var target = ClientForCharacter(targetCharacterId);
-			if (target == null)
-				return false;
-
-			await new FaolanStream()
-				.WriteUInt16(AgentServerRespondsOpcodes.Ox0014)
-				.WriteArrayUInt16Length(s => s
-					.WriteUInt32(ClaudeChannel.SenderId)
-					.WriteUInt32(0x00000000)
-					.WriteString(ClaudeChannel.SenderName))
-				.SendAsync(target);
-			await target.SendAsync(BuildWhisper(ClaudeChannel.SenderId, message));
-
-			_claudeChannel.Append(ClaudeChannel.SenderId, ClaudeChannel.SenderName, $"(whisper to {targetCharacterId:X8}) {message}", fromClaude: true, viaWhisper: true);
-			return true;
-		}
-
-		// An incoming tell (0x001E): [u32 peerCharacterId][string][00 01 00] - the peer slot carries the SENDER's
-		// id on delivery (and the target's id in the client's request, same shape both ways). Byte-exact against
-		// the whisper capture (WhisperTests). The receiving client resolves the name from the preceding 0x0014.
-		internal static byte[] BuildWhisper(uint peerCharacterId, string message)
-		{
-			using var stream = new FaolanStream();
-			stream
-				.WriteUInt16(AgentServerRespondsOpcodes.Whisper)
-				.WriteArrayUInt16Length(s => s
-					.WriteUInt32(peerCharacterId)
-					.WriteString(message)
-					.WriteByte(0x00)
-					.WriteByte(0x01)
-					.WriteByte(0x00));
-			return stream.ToArray();
-		}
-
-		public async Task<int> SendClaudeChannelMessage(string message)
-		{
-			// Claude's post on the Claude channel: the same 0x0014 sender-info + 0x0041 relay pair as a player post
-			// (see BroadcastChannelChat), but under the synthetic Claude identity. Every client is subscribed to the
-			// channel (Hello sends the subscription), so a plain broadcast reaches everyone.
-			var delivered = 0;
-			foreach (var client in NetworkClients)
-			{
-				await new FaolanStream()
-					.WriteUInt16(AgentServerRespondsOpcodes.Ox0014)
-					.WriteArrayUInt16Length(s => s
-						.WriteUInt32(ClaudeChannel.SenderId)
-						.WriteUInt32(0x00000000)
-						.WriteString(ClaudeChannel.SenderName))
-					.SendAsync(client);
-
-				await new FaolanStream()
-					.WriteUInt16(AgentServerRespondsOpcodes.ChannelChat)
-					.WriteArrayUInt16Length(s => s
-						.WriteByte(ClaudeChannel.ChannelType)
-						.WriteUInt32(ClaudeChannel.ChannelId)
-						.WriteUInt32(ClaudeChannel.SenderId)
-						.WriteString(message)
-						.WriteUInt16(0x0000))
-					.SendAsync(client);
-
-				delivered++;
-			}
-
-			_claudeChannel.Append(ClaudeChannel.SenderId, ClaudeChannel.SenderName, message, fromClaude: true);
-
-			return delivered;
-		}
-
 		// Relays a channel chat message (0x0041) to every connected client, preceded by the sender's identity
 		// (0x0014) so the client can show the speaker's name. The channel (type+id) from the original post is kept
 		// verbatim - the client only displays it in a channel it is subscribed to, so the per-channel routing is the
@@ -138,22 +111,11 @@ namespace Faolan.AgentServer
 
 			foreach (var client in NetworkClients)
 			{
-				await new FaolanStream()
-					.WriteUInt16(AgentServerRespondsOpcodes.Ox0014)
-					.WriteArrayUInt16Length(s => s
-						.WriteUInt32(senderId)
-						.WriteUInt32(0x00000000)
-						.WriteString(senderName))
-					.SendAsync(client);
+				await new FaolanStream().WriteUInt16(AgentServerRespondsOpcodes.Ox0014).WriteArrayUInt16Length(s => s.WriteUInt32(senderId).WriteUInt32(0x00000000).WriteString(senderName)).SendAsync(client);
 
 				await new FaolanStream()
 					.WriteUInt16(AgentServerRespondsOpcodes.ChannelChat)
-					.WriteArrayUInt16Length(s => s
-						.WriteByte(channelType)
-						.WriteUInt32(channelId)
-						.WriteUInt32(senderId)
-						.WriteString(message)
-						.WriteUInt16(0x0000))
+					.WriteArrayUInt16Length(s => s.WriteByte(channelType).WriteUInt32(channelId).WriteUInt32(senderId).WriteString(message).WriteUInt16(0x0000))
 					.SendAsync(client);
 			}
 		}
@@ -163,26 +125,22 @@ namespace Faolan.AgentServer
 		// verified from the raw login pcap.
 		private Task SendChannelSubscription(INetworkClient client, byte type, uint id, string name, uint flag)
 		{
-			return new FaolanStream()
-				.WriteUInt16(AgentServerRespondsOpcodes.Ox003C)
-				.WriteArrayUInt16Length(s => s
-					.WriteByte(type)
-					.WriteUInt32(id)
-					.WriteString(name)
-					.WriteUInt32(flag)
-					.WriteUInt16(0x0000))
-				.SendAsync(client);
+			return new FaolanStream().WriteUInt16(AgentServerRespondsOpcodes.Ox003C).WriteArrayUInt16Length(s => s.WriteByte(type).WriteUInt32(id).WriteString(name).WriteUInt32(flag).WriteUInt16(0x0000)).SendAsync(client);
 		}
 
 		private Task SendSystemMessage(INetworkClient client, string message)
 		{
-			return new FaolanStream()
-				.WriteUInt16(AgentServerRespondsOpcodes.SystemMessage)
-				.WriteArrayUInt16Length(s => s
-					.WriteUInt16(0x0000)
-					.WriteString(message)
-					.WriteUInt16(0x0000))
-				.SendAsync(client);
+			return new FaolanStream().WriteUInt16(AgentServerRespondsOpcodes.SystemMessage).WriteArrayUInt16Length(s => s.WriteUInt16(0x0000).WriteString(message).WriteUInt16(0x0000)).SendAsync(client);
+		}
+
+		// An incoming tell (0x001E): [u32 peerCharacterId][string][00 01 00] - the peer slot carries the SENDER's
+		// id on delivery (and the target's id in the client's request, same shape both ways). Byte-exact against
+		// the whisper capture (WhisperTests). The receiving client resolves the name from the preceding 0x0014.
+		internal static byte[] BuildWhisper(uint peerCharacterId, string message)
+		{
+			using var stream = new FaolanStream();
+			stream.WriteUInt16(AgentServerRespondsOpcodes.Whisper).WriteArrayUInt16Length(s => s.WriteUInt32(peerCharacterId).WriteString(message).WriteByte(0x00).WriteByte(0x01).WriteByte(0x00));
+			return stream.ToArray();
 		}
 	}
 }

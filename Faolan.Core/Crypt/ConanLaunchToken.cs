@@ -49,7 +49,9 @@ namespace Faolan.Core.Crypt
 		/// <summary>The <c>-key</c> value for the current time.</summary>
 		public static string Now()
 		{
-			return ForUnixTime(Statics.NowUnixTimeSeconds);
+			// The 32-bit unix seconds the wire/DB use (mirrors Statics.NowUnixTimeSeconds; inlined so this crypto
+			// leaf doesn't depend on the Faolan.Core umbrella).
+			return ForUnixTime((uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds());
 		}
 	}
 }

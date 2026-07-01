@@ -1,7 +1,7 @@
-using Faolan.Core.Spawn;
 using System;
 using System.IO;
 using System.Runtime.CompilerServices;
+using Faolan.Core.Network.Spawn;
 using Faolan.GameServer.Spawn;
 using Xunit;
 
@@ -28,9 +28,7 @@ namespace Faolan.Tests
 			var donor = Support.Golden.Bytes("SpawnStrieTemplate");
 			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(donor, out var strie));
 
-			s.CharacterIir = donor
-				.AsSpan(strie.Offset, strie.Length)
-				.ToArray(); // different length than Dikketest's
+			s.CharacterIir = donor.AsSpan(strie.Offset, strie.Length).ToArray(); // different length than Dikketest's
 			var rebuilt = PlayerSpawnScaffoldCodec.Generate(s);
 
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(rebuilt, out var back, out var error), $"reparse failed: {error}");

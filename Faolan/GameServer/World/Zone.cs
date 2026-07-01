@@ -17,8 +17,6 @@ namespace Faolan.GameServer.World
 
 		public IReadOnlyCollection<WorldEntity> Entities => _entities.Values.ToArray();
 
-		public uint MapId { get; }
-
 		// Which copy (instance) of MapId this zone is (#268). Together with MapId it is the zone's identity key in
 		// WorldState. 0 = the default shared instance (the historical single-zone-per-map behaviour); a Solo/Group
 		// map mints a non-zero id per copy. Distinct from PlayfieldToken (the WIRE token below): the InstanceId is
@@ -26,6 +24,8 @@ namespace Faolan.GameServer.World
 		// per-instance burst stamping lands - #268 step 4 - is shared across a Solo map's copies, harmlessly, since a
 		// client only ever sees its own instance).
 		public uint InstanceId { get; set; }
+
+		public uint MapId { get; }
 
 		// The per-playfield-instance token stamped into every despawn so the client scopes the removal to this playfield
 		// (see WorldDespawn). Minted by WorldState on zone creation as a fallback; for a REPLAYED playfield the burst's
@@ -59,8 +59,7 @@ namespace Faolan.GameServer.World
 		// Players within `range` of `position` - the broadcast recipients for a move/spawn/say/etc.
 		public IEnumerable<WorldEntity> PlayersInRange(Vector3 position, float range, uint? excludeHandle = null)
 		{
-			return EntitiesInRange(position, range, excludeHandle)
-				.Where(e => e.IsPlayer);
+			return EntitiesInRange(position, range, excludeHandle).Where(e => e.IsPlayer);
 		}
 
 		public bool Remove(uint handle)

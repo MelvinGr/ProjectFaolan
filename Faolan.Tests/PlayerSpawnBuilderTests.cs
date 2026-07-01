@@ -1,4 +1,3 @@
-using Faolan.Core.Spawn;
 using System;
 using System.Buffers.Binary;
 using System.Numerics;
@@ -6,6 +5,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Protobuf;
+using Faolan.Core.Network.Spawn;
 using Faolan.GameServer.Spawn;
 using Faolan.Tests.Support;
 using Xunit;
@@ -19,6 +19,17 @@ namespace Faolan.Tests
 	// the rows->wire assembly reproduce the capture.
 	public class PlayerSpawnBuilderTests
 	{
+		[Fact]
+		public void BuildFromScratch_NoScaffoldRows_ReturnsNull()
+		{
+			var template = Golden.Bytes("SpawnStrieTemplate");
+			Assert.True(PlayerSpawnScaffoldCodec.TryParse(template, out var scaffold, out _));
+
+			// A character with no scaffold rows -> the builder can't fill the frame and falls back (null).
+			var built = PlayerSpawnBuilder.BuildFromScratch(scaffold.Handle, scaffold.Playfield, Vector3.Zero, Quaternion.Identity, scaffold.CharacterIir, new Character { Id = 1 });
+			Assert.Null(built);
+		}
+
 		[Fact]
 		public void BuildFromScratch_ReproducesStrieTemplate()
 		{
@@ -40,17 +51,6 @@ namespace Faolan.Tests
 			Assert.True(template.SequenceEqual(built), "from-scratch player body must be byte-identical to the Strie template");
 		}
 
-		[Fact]
-		public void BuildFromScratch_NoScaffoldRows_ReturnsNull()
-		{
-			var template = Golden.Bytes("SpawnStrieTemplate");
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(template, out var scaffold, out _));
-
-			// A character with no scaffold rows -> the builder can't fill the frame and falls back (null).
-			var built = PlayerSpawnBuilder.BuildFromScratch(scaffold.Handle, scaffold.Playfield, Vector3.Zero, Quaternion.Identity, scaffold.CharacterIir, new Character { Id = 1 });
-			Assert.Null(built);
-		}
-
 		// The burst-less composition (#210): the server-owned CharacterIIR template overridden with a NEW character's
 		// identity (PlayerSpawnMessage) + built into a player body (PlayerSpawnBuilder) must produce a body that
 		// re-parses with the overridden name - i.e. the override -> re-encode -> scaffold-assemble chain fits together.
@@ -67,7 +67,12 @@ namespace Faolan.Tests
 				Race = Race.Cimmerian,
 				Sex = Sex.Male,
 				Level = 1,
-				MaxStats = new CharacterMaxStats { Health = 100, Mana = 0, Stamina = 200 }
+				MaxStats = new CharacterMaxStats
+				{
+					Health = 100,
+					Mana = 0,
+					Stamina = 200
+				}
 			};
 			PlayerSpawnMessage.ApplyCharacter(message, character, new CharacterEquipment());
 
@@ -83,11 +88,17 @@ namespace Faolan.Tests
 			Assert.Equal(0x0A1B2C3Du, rebuilt.Handle);
 		}
 
-		private static Vector3 DecodeVec3(byte[] v) =>
-			new Vector3(BinaryPrimitives.ReadSingleLittleEndian(v.AsSpan(1, 4)), BinaryPrimitives.ReadSingleLittleEndian(v.AsSpan(6, 4)), BinaryPrimitives.ReadSingleLittleEndian(v.AsSpan(11, 4)));
-
-		private static Quaternion DecodeQuat(byte[] q) =>
-			new Quaternion(BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(1, 4)), BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(6, 4)), BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(11, 4)),
+		private static Quaternion DecodeQuat(byte[] q)
+		{
+			return new Quaternion(BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(1, 4)),
+				BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(6, 4)),
+				BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(11, 4)),
 				BinaryPrimitives.ReadSingleLittleEndian(q.AsSpan(16, 4)));
+		}
+
+		private static Vector3 DecodeVec3(byte[] v)
+		{
+			return new Vector3(BinaryPrimitives.ReadSingleLittleEndian(v.AsSpan(1, 4)), BinaryPrimitives.ReadSingleLittleEndian(v.AsSpan(6, 4)), BinaryPrimitives.ReadSingleLittleEndian(v.AsSpan(11, 4)));
+		}
 	}
 }

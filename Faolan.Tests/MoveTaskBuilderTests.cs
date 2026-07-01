@@ -36,7 +36,12 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildPatrol_PairsWithSpawnHandleAndIsBigEndian()
 		{
-			var waypoints = new[] { new Vector3(100f, 10f, 200f), new Vector3(110f, 11f, 210f), new Vector3(120f, 12f, 220f) };
+			var waypoints = new[]
+			{
+				new Vector3(100f, 10f, 200f),
+				new Vector3(110f, 11f, 210f),
+				new Vector3(120f, 12f, 220f)
+			};
 			var built = MoveTaskBuilder.BuildPatrol(0x000900A1u, new Vector3(100f, 10f, 200f), waypoints, 4.5f);
 
 			Assert.Equal(MoveTaskBuilder.SubOpcode, BinaryPrimitives.ReadUInt32BigEndian(built.AsSpan(4, 4)));
@@ -44,7 +49,12 @@ namespace Faolan.Tests
 			Assert.Equal((byte)0x04, built[30]); // patrol task type
 			Assert.Equal((byte)waypoints.Length, built[40]);
 			Assert.Equal((uint)(built.Length - 4), BinaryPrimitives.ReadUInt32BigEndian(built.AsSpan(0, 4)));
-			Assert.Equal(new byte[] { 0x00, 0x01 }, built[^2..]); // terminator
+			Assert.Equal(new byte[]
+				{
+					0x00,
+					0x01
+				},
+				built[^2..]); // terminator
 		}
 
 		[Fact]

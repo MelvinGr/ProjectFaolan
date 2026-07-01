@@ -21,7 +21,16 @@ namespace Faolan.Importer.Extractors
 	// player's quest state AT THE GREETING. Lets a single capture that talks to one NPC at MULTIPLE chain stages (e.g.
 	// Casilda: offer pre-quest, then "free me" once you have the key) be split per-state, since the answer path alone
 	// ("" greeting both times) can't distinguish them (#264). 0 = no quest active at the greeting.
-	public sealed record ConversationEntry(uint TypeId, string AnswerPath, uint CapturedNpcHandle, uint CapturedInstance, List<byte[]> Packets, string NpcName, string ConditionScript = "", uint GrantQuestId = 0, uint QuestContextId = 0);
+	public sealed record ConversationEntry(
+		uint TypeId,
+		string AnswerPath,
+		uint CapturedNpcHandle,
+		uint CapturedInstance,
+		List<byte[]> Packets,
+		string NpcName,
+		string ConditionScript = "",
+		uint GrantQuestId = 0,
+		uint QuestContextId = 0);
 
 	// Reconstructs each NPC's dialogue as a TREE of screens keyed by answer-index PATH, from the captured request/
 	// response flow. The grammar (memory protocol_conversation_routing): a conversation INSTANCE = TalkToNpc(f3=0)
@@ -125,11 +134,8 @@ namespace Faolan.Importer.Extractors
 							questsSeen.Add(questId);
 					}
 				}
-				else if (p.IsDownload && active &&
-				         (p.Opcode == Opcode2015 || (p.Opcode == Opcode2000 && ResponseSubOpcodes.Contains(p.SubOpcode))))
-				{
+				else if (p.IsDownload && active && (p.Opcode == Opcode2015 || (p.Opcode == Opcode2000 && ResponseSubOpcodes.Contains(p.SubOpcode))))
 					screen.Add(p.Bytes);
-				}
 			}
 
 			Flush();
@@ -164,19 +170,16 @@ namespace Faolan.Importer.Extractors
 				if (!best.TryGetValue(key, out var cur) || score > cur.score)
 				{
 					// Preserve a grant seen in any capture of this screen even if the highest-scoring replay didn't see it.
-					var grant = e.GrantQuestId != 0 ? e.GrantQuestId : cur.entry?.GrantQuestId ?? 0;
+					var grant = e.GrantQuestId != 0
+						? e.GrantQuestId
+						: cur.entry?.GrantQuestId ?? 0;
 					best[key] = (score, e with { GrantQuestId = grant });
 				}
 				else if (e.GrantQuestId != 0 && cur.entry.GrantQuestId == 0)
-				{
 					best[key] = (cur.score, cur.entry with { GrantQuestId = e.GrantQuestId });
-				}
 			}
 
-			return best
-				.Values
-				.Select(v => v.entry)
-				.ToList();
+			return best.Values.Select(v => v.entry).ToList();
 		}
 
 		// Maps each FA015807 spawn's handle to its embedded name (0x0A <len> <utf8>), so a conversation's NPC handle

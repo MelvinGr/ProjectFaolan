@@ -1,6 +1,6 @@
 using System;
 using System.IO;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Network.Conan;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Xunit;
@@ -14,32 +14,14 @@ namespace Faolan.Tests
 	public class BeachSnapshotConstructionTests
 	{
 		private const string Cap = "/home/melvin/Development/C#/Project Faolan/Captures/strie-login-inventory.bin";
+
 		// Where the server-owned beach tails template asset lives in the source tree.
 		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan.Tests/Assets/BeachTailsTemplate.bin";
 		private readonly ITestOutputHelper _o;
-		public BeachSnapshotConstructionTests(ITestOutputHelper o) => _o = o;
 
-		private static (byte[] Prefix, byte[] Root, byte[] Tails) SplitBeach()
+		public BeachSnapshotConstructionTests(ITestOutputHelper o)
 		{
-			var packet = new ConanPacket(File.ReadAllBytes(Cap));
-			var stream = new FaolanStream(packet.Body.ReadArrayUInt32Length());
-			stream.ReadUInt32(); stream.ReadUInt32(); stream.ReadUInt32();
-			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(stream);
-			return (parts.Prefix, parts.Root.ToArray(), parts.Tails.ToArray());
-		}
-
-		[Fact]
-		public void BeachPrefix_ConstantsHold()
-		{
-			var (prefix, root, _) = SplitBeach();
-			_o.WriteLine($"prefix = {Convert.ToHexString(prefix)} rootLen={root.Length}");
-			Assert.Equal(8, prefix.Length);
-			Assert.Equal(new byte[] { 0x00, 0x00, 0x00, 0x02 }, prefix[..4]); // base IIR version 2
-			Assert.Equal(new byte[] { 0x81, 0x06 }, prefix[6..]);             // trailing varint (769)
-
-			// prefix[4..6] varint = const + rootLen; pin the const for the beach template.
-			var varint = ReadVarint(prefix, 4, out _);
-			Assert.Equal(BeachSnapshotPrefix.RootLengthConstant + (ulong)root.Length, varint);
+			_o = o;
 		}
 
 		[Fact]
@@ -50,18 +32,30 @@ namespace Faolan.Tests
 			Assert.Equal(prefix, built);
 		}
 
-		// Extracts the server-owned beach tails template asset from the capture (run once; the asset is committed).
 		[Fact]
-		public void ExtractBeachTailsTemplate()
+		public void BeachPrefix_ConstantsHold()
 		{
-			var (_, _, tails) = SplitBeach();
-			Directory.CreateDirectory(Path.GetDirectoryName(TemplatePath)!);
-			File.WriteAllBytes(TemplatePath, tails);
-			_o.WriteLine($"wrote {tails.Length} bytes to {TemplatePath}");
-			Assert.Equal(9282, tails.Length);
+			var (prefix, root, _) = SplitBeach();
+			_o.WriteLine($"prefix = {Convert.ToHexString(prefix)} rootLen={root.Length}");
+			Assert.Equal(8, prefix.Length);
+			Assert.Equal(new byte[]
+				{
+					0x00,
+					0x00,
+					0x00,
+					0x02
+				},
+				prefix[..4]); // base IIR version 2
+			Assert.Equal(new byte[]
+				{
+					0x81,
+					0x06
+				},
+				prefix[6..]); // trailing varint (769)
 
-			// Round-trips through the structured model.
-			Assert.True(SnapshotTails.Deserialize(tails).ToArray().SequenceEqual(tails));
+			// prefix[4..6] varint = const + rootLen; pin the const for the beach template.
+			var varint = ReadVarint(prefix, 4, out _);
+			Assert.Equal(BeachSnapshotPrefix.RootLengthConstant + (ulong)root.Length, varint);
 		}
 
 		// (The byte-exact tails build is proven against this same template by BeachTailsFromScratchTests
@@ -86,10 +80,26 @@ namespace Faolan.Tests
 			content.WriteArray(tails);
 
 			var s = new FaolanStream(content.ToArray());
-			s.ReadUInt32(); s.ReadUInt32(); s.ReadUInt32();
+			s.ReadUInt32();
+			s.ReadUInt32();
+			s.ReadUInt32();
 			var reparsed = InventorySnapshotInspector.ParseInventoryPacketBody(s);
 			Assert.True(reparsed.Root.ToArray().SequenceEqual(root));
 			Assert.True(reparsed.Tails.ToArray().SequenceEqual(tails));
+		}
+
+		// Extracts the server-owned beach tails template asset from the capture (run once; the asset is committed).
+		[Fact]
+		public void ExtractBeachTailsTemplate()
+		{
+			var (_, _, tails) = SplitBeach();
+			Directory.CreateDirectory(Path.GetDirectoryName(TemplatePath)!);
+			File.WriteAllBytes(TemplatePath, tails);
+			_o.WriteLine($"wrote {tails.Length} bytes to {TemplatePath}");
+			Assert.Equal(9282, tails.Length);
+
+			// Round-trips through the structured model.
+			Assert.True(SnapshotTails.Deserialize(tails).ToArray().SequenceEqual(tails));
 		}
 
 		// Decode result (UnknownBefore progression block): two different L1 beach characters' tails are byte-
@@ -111,22 +121,40 @@ namespace Faolan.Tests
 			{
 				var packet = new ConanPacket(File.ReadAllBytes(Path.Combine(Path.GetDirectoryName(Cap)!, file)));
 				var s = new FaolanStream(packet.Body.ReadArrayUInt32Length());
-				s.ReadUInt32(); s.ReadUInt32(); s.ReadUInt32();
+				s.ReadUInt32();
+				s.ReadUInt32();
+				s.ReadUInt32();
 				return InventorySnapshotInspector.ParseInventoryPacketBody(s).Tails.UnknownBeforeAccessWindowTable ?? [];
 			}
 		}
 
 		private static ulong ReadVarint(byte[] data, int pos, out int end)
 		{
-			ulong v = 0; var shift = 0; end = pos;
+			ulong v = 0;
+			var shift = 0;
+			end = pos;
 			while (end < data.Length)
 			{
 				var b = data[end++];
 				v |= (ulong)(b & 0x7F) << shift;
-				if ((b & 0x80) == 0) break;
+				if ((b & 0x80) == 0)
+					break;
+
 				shift += 7;
 			}
+
 			return v;
+		}
+
+		private static (byte[] Prefix, byte[] Root, byte[] Tails) SplitBeach()
+		{
+			var packet = new ConanPacket(File.ReadAllBytes(Cap));
+			var stream = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+			stream.ReadUInt32();
+			stream.ReadUInt32();
+			stream.ReadUInt32();
+			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(stream);
+			return (parts.Prefix, parts.Root.ToArray(), parts.Tails.ToArray());
 		}
 	}
 }

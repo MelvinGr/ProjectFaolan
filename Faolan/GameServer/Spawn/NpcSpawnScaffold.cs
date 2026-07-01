@@ -1,6 +1,6 @@
 using System;
 using System.Buffers.Binary;
-using Faolan.Core.Data;
+using Faolan.Core;
 
 namespace Faolan.GameServer.Spawn
 {
@@ -31,14 +31,14 @@ namespace Faolan.GameServer.Spawn
 	// foundation, byte-exact here.
 	public static class NpcSpawnScaffold
 	{
-		// word0 is constant 0 across the corpus (the player spawn has 2 in this slot).
-		private const uint HeaderWord0 = 0;
-
 		// The minimal post-IIR length, in bytes (the constant freshly-spawned form).
 		public const int MinimalPostIirLength = 41;
 
 		// firstRecordLen = len(post) - 36 (the header's self-length of the first record group).
 		private const int RecordLenBias = 36;
+
+		// word0 is constant 0 across the corpus (the player spawn has 2 in this slot).
+		private const uint HeaderWord0 = 0;
 
 		// The single record group in the minimal form (recordCount == 1).
 		private const uint MinimalRecordCount = 1;
@@ -57,12 +57,45 @@ namespace Faolan.GameServer.Spawn
 		// constant terminator body. Byte-identical to the 23 minimal-form NPCs in the beach burst.
 		public static byte[] BuildMinimalPostIir()
 		{
-			return new FaolanStream()
-				.WriteUInt32(HeaderWord0)
-				.WriteUInt32((uint)(MinimalPostIirLength - RecordLenBias))
-				.WriteUInt32(MinimalRecordCount)
-				.WriteArray(MinimalBody)
-				.ToArray();
+			return new FaolanStream().WriteUInt32(HeaderWord0).WriteUInt32((uint)(MinimalPostIirLength - RecordLenBias)).WriteUInt32(MinimalRecordCount).WriteArray(MinimalBody).ToArray();
+		}
+
+		// The fresh-spawn scaffold pass used by the live spawn path. Like WithMinimalScaffolds, but a HUMANOID
+		// keeps its captured post-IIR instead of collapsing to the 41-byte minimal form: a humanoid's post-IIR
+		// carries that NPC's APPEARANCE / morph table (the "*key=val" texscript string + [morphId][float] pairs -
+		// decoded on Casilda, Gitea #243), and the minimal form drops it, so the client renders the NPC bald. An
+		// animal carries no such table (it ships exactly the minimal form), so it still gets the validated #185
+		// minimal post-IIR reset. The pre-IIR (transform/bounds runtime block) is always reset to minimal for both.
+		public static byte[] WithFreshScaffolds(byte[] body, bool humanoid)
+		{
+			body = WithMinimalPreIir(body);
+			return humanoid
+				? body
+				: WithMinimalPostIir(body);
+		}
+
+		// Replaces an FA015807 body's post-IIR scaffold with the minimal session-independent form, adjusting the
+		// inner body-length field (@0, which tracks total body size 1:1 - same convention as
+		// SpawnPacketBuilder.SetCharacterMessage). A cross-session NpcSpawn row's captured post-IIR carries another
+		// session's runtime state (movement waypoints / buff timers) that the client rejects; swapping in the
+		// minimal form is the candidate fix for the cross-session render rejection (see
+		// [[world-packets-construct-not-replay]]). No-op (returns the body unchanged) if no CharacterIIR is found.
+		public static byte[] WithMinimalPostIir(byte[] body)
+		{
+			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+				return body;
+
+			var postStart = read.Offset + read.Length;
+			var minimal = BuildMinimalPostIir();
+
+			var result = new byte[postStart + minimal.Length];
+			Array.Copy(body, 0, result, 0, postStart); // header + transform + pre-IIR + the IIR itself (unchanged)
+			minimal.CopyTo(result, postStart);
+
+			var delta = result.Length - body.Length;
+			var bodyLength = BinaryPrimitives.ReadUInt32BigEndian(result.AsSpan(0, 4));
+			BinaryPrimitives.WriteUInt32BigEndian(result.AsSpan(0, 4), (uint)(bodyLength + delta));
+			return result;
 		}
 
 		// Replaces an FA015807 body's PRE-IIR scaffold (the 223-byte block between the transform and the embedded
@@ -91,42 +124,6 @@ namespace Faolan.GameServer.Spawn
 		{
 			return WithMinimalPostIir(WithMinimalPreIir(body));
 		}
-
-		// The fresh-spawn scaffold pass used by the live spawn path. Like WithMinimalScaffolds, but a HUMANOID
-		// keeps its captured post-IIR instead of collapsing to the 41-byte minimal form: a humanoid's post-IIR
-		// carries that NPC's APPEARANCE / morph table (the "*key=val" texscript string + [morphId][float] pairs -
-		// decoded on Casilda, Gitea #243), and the minimal form drops it, so the client renders the NPC bald. An
-		// animal carries no such table (it ships exactly the minimal form), so it still gets the validated #185
-		// minimal post-IIR reset. The pre-IIR (transform/bounds runtime block) is always reset to minimal for both.
-		public static byte[] WithFreshScaffolds(byte[] body, bool humanoid)
-		{
-			body = WithMinimalPreIir(body);
-			return humanoid ? body : WithMinimalPostIir(body);
-		}
-
-		// Replaces an FA015807 body's post-IIR scaffold with the minimal session-independent form, adjusting the
-		// inner body-length field (@0, which tracks total body size 1:1 - same convention as
-		// SpawnPacketBuilder.SetCharacterMessage). A cross-session NpcSpawn row's captured post-IIR carries another
-		// session's runtime state (movement waypoints / buff timers) that the client rejects; swapping in the
-		// minimal form is the candidate fix for the cross-session render rejection (see
-		// [[world-packets-construct-not-replay]]). No-op (returns the body unchanged) if no CharacterIIR is found.
-		public static byte[] WithMinimalPostIir(byte[] body)
-		{
-			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
-				return body;
-
-			var postStart = read.Offset + read.Length;
-			var minimal = BuildMinimalPostIir();
-
-			var result = new byte[postStart + minimal.Length];
-			Array.Copy(body, 0, result, 0, postStart); // header + transform + pre-IIR + the IIR itself (unchanged)
-			minimal.CopyTo(result, postStart);
-
-			var delta = result.Length - body.Length;
-			var bodyLength = BinaryPrimitives.ReadUInt32BigEndian(result.AsSpan(0, 4));
-			BinaryPrimitives.WriteUInt32BigEndian(result.AsSpan(0, 4), (uint)(bodyLength + delta));
-			return result;
-		}
 	}
 
 	// Typed, mutable view of the NPC post-IIR scaffold header (the stream after the embedded CoreCharacterIIR):
@@ -140,11 +137,17 @@ namespace Faolan.GameServer.Spawn
 	{
 		// The 12-byte header ([u32 word0][u32 firstRecordLen][u32 recordCount]).
 		private const int HeaderLength = 12;
-
-		public uint Word0 { get; set; }
+		public byte[] Records { get; set; } = [];
 		public uint FirstRecordLen { get; set; }
 		public uint RecordCount { get; set; } = 1;
-		public byte[] Records { get; set; } = [];
+
+		public uint Word0 { get; set; }
+
+		// Serializes the scaffold to its wire bytes (the 12-byte header + the raw record body).
+		public byte[] Encode()
+		{
+			return new FaolanStream().WriteUInt32(Word0).WriteUInt32(FirstRecordLen).WriteUInt32(RecordCount).WriteArray(Records).ToArray();
+		}
 
 		// Decodes the post-IIR scaffold from an FA015807 body (the bytes after the embedded CoreCharacterIIR,
 		// located via PlayerSpawnReader). Returns false if no CharacterIIR is found or the post-IIR is too short
@@ -164,20 +167,9 @@ namespace Faolan.GameServer.Spawn
 				Word0 = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(start, 4)),
 				FirstRecordLen = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(start + 4, 4)),
 				RecordCount = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(start + 8, 4)),
-				Records = body[(start + HeaderLength)..],
+				Records = body[(start + HeaderLength)..]
 			};
 			return true;
-		}
-
-		// Serializes the scaffold to its wire bytes (the 12-byte header + the raw record body).
-		public byte[] Encode()
-		{
-			return new FaolanStream()
-				.WriteUInt32(Word0)
-				.WriteUInt32(FirstRecordLen)
-				.WriteUInt32(RecordCount)
-				.WriteArray(Records)
-				.ToArray();
 		}
 	}
 }

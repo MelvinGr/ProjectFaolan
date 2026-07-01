@@ -16,7 +16,9 @@ namespace Faolan.GameServer.Combat
 		// for the eventual per-class/per-level table - the provisional model ignores them beyond the level count.
 		public static IReadOnlyList<(uint AttributeId, uint Amount)> ForLevelGain(Class @class, uint newLevel, uint levelsGained = 1)
 		{
-			var amount = levelsGained == 0 ? 1u : levelsGained;
+			var amount = levelsGained == 0
+				? 1u
+				: levelsGained;
 			var gains = new List<(uint, uint)>(AttributeChangedFeedback.PrimaryAttributeIds.Length);
 			foreach (var id in AttributeChangedFeedback.PrimaryAttributeIds)
 				gains.Add((id, amount));

@@ -18,6 +18,16 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void TickCorpseLinger_FiresOnceAfterLingerThenStops()
+		{
+			var npc = DeadNpc(20.0); // long respawn so only the linger is in play
+			Assert.False(npc.TickCorpseLinger(1.0)); // 1s, still the dying creature
+			Assert.False(npc.TickCorpseLinger(1.0)); // 2s
+			Assert.True(npc.TickCorpseLinger(1.0)); // 3s -> corpse becomes lootable (CorpseLingerSeconds)
+			Assert.False(npc.TickCorpseLinger(1.0)); // already converted -> never fires again this death
+		}
+
+		[Fact]
 		public void TickRespawn_NoOpWhileAlive()
 		{
 			var npc = WorldEntity.ForNpc(1, 2040, Vector3.Zero, Vector3.Zero, "Mob", EntityVitals.FromMax(50, 0, 50));
@@ -43,21 +53,11 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void TickCorpseLinger_FiresOnceAfterLingerThenStops()
-		{
-			var npc = DeadNpc(20.0); // long respawn so only the linger is in play
-			Assert.False(npc.TickCorpseLinger(1.0)); // 1s, still the dying creature
-			Assert.False(npc.TickCorpseLinger(1.0)); // 2s
-			Assert.True(npc.TickCorpseLinger(1.0)); // 3s -> corpse becomes lootable (CorpseLingerSeconds)
-			Assert.False(npc.TickCorpseLinger(1.0)); // already converted -> never fires again this death
-		}
-
-		[Fact]
 		public void WorldStateTick_CorpseBecomesLootableThenRespawns()
 		{
 			var world = new WorldState();
 			var zone = world.ZoneFor(2040);
-			var npc = DeadNpc(10.0);
+			var npc = DeadNpc();
 			zone.Add(npc);
 
 			// Death-animation linger (~3s): the corpse converts to a lootable bag, still dead.

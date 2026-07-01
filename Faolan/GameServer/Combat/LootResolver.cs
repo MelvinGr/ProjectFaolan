@@ -12,12 +12,6 @@ namespace Faolan.GameServer.Combat
 		// How long a dropped loot bag stays in the world before it expires and despawns.
 		public const double LootExpirySeconds = 120.0;
 
-		// True if `roll` (expected in [0,1)) is under the drop chance.
-		public static bool RollsDrop(double roll, double dropChance = DefaultDropChance)
-		{
-			return roll < dropChance;
-		}
-
 		// Coins a dropped bag carries (tin, the wallet wire unit), scaled by the NPC's level. The retail beach
 		// bags consistently granted 2 tin per loot (the +2 steps in the 0x2005 wallet captures - level ~2-5
 		// NPCs); higher-level values are extrapolated, not data-derived. Pure: the caller supplies the roll.
@@ -25,6 +19,12 @@ namespace Faolan.GameServer.Combat
 		{
 			var max = 1 + npcLevel; // level 2 -> 1..3 tin, centred near the observed 2
 			return (uint)(1 + roll * max);
+		}
+
+		// True if `roll` (expected in [0,1)) is under the drop chance.
+		public static bool RollsDrop(double roll, double dropChance = DefaultDropChance)
+		{
+			return roll < dropChance;
 		}
 	}
 }

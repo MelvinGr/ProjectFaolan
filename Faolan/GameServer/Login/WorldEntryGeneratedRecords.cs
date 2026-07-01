@@ -32,9 +32,7 @@ namespace Faolan.GameServer
 					s.WriteUInt64(0x0001920C6A024E93);
 					s.WriteUInt32(0x3F800000); // float 1.0 (time rate)
 				});
-			return ps
-				.WriteLengthHash()
-				.ToArray();
+			return ps.WriteLengthHash().ToArray();
 		}
 
 		// 0x5D85BFC7 MapChange - tells the client which playfield/instance the player is entering. Built from the
@@ -81,9 +79,7 @@ namespace Faolan.GameServer
 					s.WriteUInt32(0x00000007);
 					s.WriteUInt32(0x00000000);
 				});
-			return ps
-				.WriteLengthHash()
-				.ToArray();
+			return ps.WriteLengthHash().ToArray();
 		}
 	}
 }

@@ -746,7 +746,8 @@
 }
 
 /* Mobile: stack the roster into a horizontal strip above the panel; shrink the slots. */
-@@media (max-width: 720px) {
+@
+@media (max-width: 720px) {
     .viewer-page {
         flex-direction: column;
         height: 100dvh;

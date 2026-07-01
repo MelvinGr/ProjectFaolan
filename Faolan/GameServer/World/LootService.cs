@@ -19,11 +19,11 @@ namespace Faolan.GameServer.World
 	// persist-only left the items un-takeable), so the server item-grant push is what actually delivers them.
 	public sealed class LootService
 	{
-		private readonly WorldBroadcaster _broadcaster;
-		private readonly IEconomyOutbound _outbound;
 		private readonly IDatabaseRepository _database;
-		private readonly QuestProgressionService _questProgression;
+		private readonly IEconomyOutbound _outbound;
 		private readonly ILogger _logger;
+		private readonly QuestProgressionService _questProgression;
+		private readonly WorldBroadcaster _broadcaster;
 
 		public LootService(WorldBroadcaster broadcaster, IEconomyOutbound outbound, IDatabaseRepository database, QuestProgressionService questProgression, ILogger logger)
 		{
@@ -32,6 +32,14 @@ namespace Faolan.GameServer.World
 			_database = database;
 			_questProgression = questProgression;
 			_logger = logger;
+		}
+
+		// CloseLootBag: the client closed the loot window without taking everything.
+		public async Task HandleCloseLootBag(INetworkClient client, ConanPacket packet)
+		{
+			packet.Body.ReadUInt32(); // loot typetag (0xC87A)
+			var bagHandle = packet.Body.ReadUInt32();
+			await _broadcaster.CloseLootBag(client, bagHandle);
 		}
 
 		// 0x2043 TryLootAll: the loot-all click. Grant every item the bag carries into the backpack (persist + live
@@ -58,34 +66,6 @@ namespace Faolan.GameServer.World
 			await _broadcaster.AfterLootTake(client, bagHandle);
 		}
 
-		// 0x2044 TryLootItem: a single drag of one item out of the loot window.
-		public async Task HandleLootItem(INetworkClient client, ConanPacket packet)
-		{
-			packet.Body.ReadUInt32();                 // loot typetag (0xC87A)
-			var bagHandle = packet.Body.ReadUInt32();
-			var itemIndex = packet.Body.ReadUInt32(); // which item (display index) the player dragged
-
-			var sourceNpc = _broadcaster.BagSourceName(client, bagHandle);
-			var item = _broadcaster.TakeBagItem(client, bagHandle, (int)itemIndex);
-			if (item != null)
-			{
-				await _outbound.GrantItemToBackpack(client, item.Value);
-				await _questProgression.AdvanceLootGoals(client, sourceNpc); // #261 loot-from-NPC goal (the key)
-			}
-
-			// Confirm the take: tell the client to remove the dragged slot (itemIndex) from the open window. AfterLootTake
-			// only consumes/fades the bag once it is fully emptied, so a partial drag leaves it open with the rest.
-			await _broadcaster.AfterLootTake(client, bagHandle, itemIndex);
-		}
-
-		// CloseLootBag: the client closed the loot window without taking everything.
-		public async Task HandleCloseLootBag(INetworkClient client, ConanPacket packet)
-		{
-			packet.Body.ReadUInt32(); // loot typetag (0xC87A)
-			var bagHandle = packet.Body.ReadUInt32();
-			await _broadcaster.CloseLootBag(client, bagHandle);
-		}
-
 		// 0x2045 TryLootCash: loot the bag's coins; fires on every loot alongside TryLootAll.
 		public async Task HandleLootCash(INetworkClient client, ConanPacket packet)
 		{
@@ -103,6 +83,26 @@ namespace Faolan.GameServer.World
 			}
 			else
 				_logger.LogDebug("TryLootCash for bag 0x{Bag:X8}: no coins to grant.", bagHandle);
+		}
+
+		// 0x2044 TryLootItem: a single drag of one item out of the loot window.
+		public async Task HandleLootItem(INetworkClient client, ConanPacket packet)
+		{
+			packet.Body.ReadUInt32(); // loot typetag (0xC87A)
+			var bagHandle = packet.Body.ReadUInt32();
+			var itemIndex = packet.Body.ReadUInt32(); // which item (display index) the player dragged
+
+			var sourceNpc = _broadcaster.BagSourceName(client, bagHandle);
+			var item = _broadcaster.TakeBagItem(client, bagHandle, (int)itemIndex);
+			if (item != null)
+			{
+				await _outbound.GrantItemToBackpack(client, item.Value);
+				await _questProgression.AdvanceLootGoals(client, sourceNpc); // #261 loot-from-NPC goal (the key)
+			}
+
+			// Confirm the take: tell the client to remove the dragged slot (itemIndex) from the open window. AfterLootTake
+			// only consumes/fades the bag once it is fully emptied, so a partial drag leaves it open with the rest.
+			await _broadcaster.AfterLootTake(client, bagHandle, itemIndex);
 		}
 	}
 }

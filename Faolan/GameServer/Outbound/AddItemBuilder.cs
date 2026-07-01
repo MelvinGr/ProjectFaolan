@@ -1,7 +1,8 @@
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Faolan.Core.Data;
+using Faolan.Core;
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
@@ -33,33 +34,20 @@ namespace Faolan.GameServer
 		internal const uint InventoryContainerBackpack = 0x68;
 		internal const uint InventoryContainerQuest = 0x71;
 
-		internal static void WriteAddItemBody(FaolanStream s, uint containerType, uint charId, uint itemPos, byte[] entry, uint feedback = 0)
+		// The first free cell (0..capacity-1) in `container`, skipping persisted rows. For the backpack it also skips the
+		// legacy starter-bag cell (pos 1) while the FirstPosBag item still renders there. Null = container full.
+		private async Task<int?> FindFreeContainerSlot(uint characterId, int container, int capacity)
 		{
-			s
-				.WriteUInt32(containerType)
-				.WriteUInt32(charId)
-				.WriteUInt32(itemPos)
-				.WriteArrayUInt32Length(entry)
-				.WriteUInt32(feedback);
-		}
+			var rows = await Database.GetCharacterInventory(characterId);
+			var taken = rows.Where(r => r.Container == container).Select(r => r.Slot).ToHashSet();
+			if (container == (int)FullCharSnapshotBuilder.BagKind)
+			{
+				var equipment = await Database.GetCharacterEquipment(characterId);
+				if (equipment?.FirstPosBag is { Archetype: not 0 })
+					taken.Add(1);
+			}
 
-		internal static byte[] SerializeInventoryEntry(ProtoInventoryGameEntry entry)
-		{
-			using var ms = new MemoryStream();
-			Serializer.Serialize(ms, entry);
-			return ms.ToArray();
-		}
-
-		// Pushes one item into the client's inventory live, on the same GameCharAgent conversation the wallet
-		// updates (0x2005) ride.
-		private async Task SendAddItem(INetworkClient client, uint containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback = 0)
-		{
-			var charId = client.Session.Character.Id;
-
-			var ps = new PacketStream();
-			ps.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchAddItem);
-			WriteAddItemBody(ps, containerType, charId, itemPos, SerializeInventoryEntry(entry), feedback);
-			await ps.SendAsync(client);
+			return Enumerable.Range(0, capacity).Where(s => !taken.Contains(s)).Cast<int?>().FirstOrDefault();
 		}
 
 		// Grants an item to the player's backpack: persists it to a free CharacterInventory bag cell (so it
@@ -83,12 +71,16 @@ namespace Faolan.GameServer
 			// Quest items (Type 113, e.g. the Scavenger's Key) route to the QUEST container, not the backpack, so they
 			// land in the player's quest-items tab (#261). They are kept even with archetype 0 (quest items often have
 			// none); normal bag items still require an archetype so the snapshot can render them.
-			var isQuestItem = item.Type == Core.Enums.ItemType.Quest;
+			var isQuestItem = item.Type == ItemType.Quest;
 			if (!isQuestItem && item.Archetype == 0)
 				return null;
 
-			var kind = isQuestItem ? FullCharSnapshotBuilder.QuestKind : FullCharSnapshotBuilder.BagKind;
-			var capacity = isQuestItem ? 48 : 24; // quest tab holds 48 (NewContainer(QuestKind, 48)); bag 24
+			var kind = isQuestItem
+				? FullCharSnapshotBuilder.QuestKind
+				: FullCharSnapshotBuilder.BagKind;
+			var capacity = isQuestItem
+				? 48
+				: 24; // quest tab holds 48 (NewContainer(QuestKind, 48)); bag 24
 			var slot = await FindFreeContainerSlot(characterId, (int)kind, capacity);
 			if (slot == null)
 				return null;
@@ -100,12 +92,16 @@ namespace Faolan.GameServer
 
 			// Live DispatchAddItem so the item appears without a relog. Quest items go to the QUEST container (0x71),
 			// matching retail's chain-capture delivery; everything else to the backpack (0x68).
-			var containerType = isQuestItem ? InventoryContainerQuest : InventoryContainerBackpack;
-			var entry = SnapshotItemBuilder.BuildListEntry(
-				(ulong)slot.Value,
-				FullCharSnapshotBuilder.ItemId(characterId, kind, (ulong)slot.Value),
-				FullCharSnapshotBuilder.RecordId(characterId, kind, (ulong)slot.Value),
-				count, item, item.Archetype).Item;
+			var containerType = isQuestItem
+				? InventoryContainerQuest
+				: InventoryContainerBackpack;
+			var entry = SnapshotItemBuilder.BuildListEntry((ulong)slot.Value,
+					FullCharSnapshotBuilder.ItemId(characterId, kind, (ulong)slot.Value),
+					FullCharSnapshotBuilder.RecordId(characterId, kind, (ulong)slot.Value),
+					count,
+					item,
+					item.Archetype)
+				.Item;
 			await SendAddItem(client, containerType, (uint)slot.Value, entry);
 			return slot;
 		}
@@ -124,13 +120,12 @@ namespace Faolan.GameServer
 
 			var rows = await Database.GetCharacterInventory(character.Id);
 			var pushed = 0;
-			foreach (var row in rows.Where(r => r.Container == (int)FullCharSnapshotBuilder.BagKind
-			                                    && r.ItemId != null && r.Item is { Archetype: 0 }))
+			foreach (var row in rows.Where(r => r.Container == (int)FullCharSnapshotBuilder.BagKind && r.ItemId != null && r.Item is { Archetype: 0 }))
 			{
 				var slot = (ulong)row.Slot;
-				var entry = SnapshotItemBuilder.BuildInventoryEntry(
-					FullCharSnapshotBuilder.ItemId(character.Id, FullCharSnapshotBuilder.BagKind, slot),
-					row.Item, 0,
+				var entry = SnapshotItemBuilder.BuildInventoryEntry(FullCharSnapshotBuilder.ItemId(character.Id, FullCharSnapshotBuilder.BagKind, slot),
+					row.Item,
+					0,
 					[
 						new SnapshotItemBuilder.ItemStat(0, 1),
 						new SnapshotItemBuilder.ItemStat(23, (uint)FullCharSnapshotBuilder.RecordId(character.Id, FullCharSnapshotBuilder.BagKind, slot)),
@@ -145,27 +140,28 @@ namespace Faolan.GameServer
 				Logger.LogInformation("Re-delivered {Count} archetype-less bag item(s) to '{Name}' via live add (not in the snapshot).", pushed, character.Name);
 		}
 
-		// The first free cell (0..capacity-1) in `container`, skipping persisted rows. For the backpack it also skips the
-		// legacy starter-bag cell (pos 1) while the FirstPosBag item still renders there. Null = container full.
-		private async Task<int?> FindFreeContainerSlot(uint characterId, int container, int capacity)
+		// Pushes one item into the client's inventory live, on the same GameCharAgent conversation the wallet
+		// updates (0x2005) ride.
+		private async Task SendAddItem(INetworkClient client, uint containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback = 0)
 		{
-			var rows = await Database.GetCharacterInventory(characterId);
-			var taken = rows
-				.Where(r => r.Container == container)
-				.Select(r => r.Slot)
-				.ToHashSet();
-			if (container == (int)FullCharSnapshotBuilder.BagKind)
-			{
-				var equipment = await Database.GetCharacterEquipment(characterId);
-				if (equipment?.FirstPosBag is { Archetype: not 0 })
-					taken.Add(1);
-			}
+			var charId = client.Session.Character.Id;
 
-			return Enumerable
-				.Range(0, capacity)
-				.Where(s => !taken.Contains(s))
-				.Cast<int?>()
-				.FirstOrDefault();
+			var ps = new PacketStream();
+			ps.WriteHeader(LoginWorld201CSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchAddItem);
+			WriteAddItemBody(ps, containerType, charId, itemPos, SerializeInventoryEntry(entry), feedback);
+			await ps.SendAsync(client);
+		}
+
+		internal static byte[] SerializeInventoryEntry(ProtoInventoryGameEntry entry)
+		{
+			using var ms = new MemoryStream();
+			Serializer.Serialize(ms, entry);
+			return ms.ToArray();
+		}
+
+		internal static void WriteAddItemBody(FaolanStream s, uint containerType, uint charId, uint itemPos, byte[] entry, uint feedback = 0)
+		{
+			s.WriteUInt32(containerType).WriteUInt32(charId).WriteUInt32(itemPos).WriteArrayUInt32Length(entry).WriteUInt32(feedback);
 		}
 	}
 }

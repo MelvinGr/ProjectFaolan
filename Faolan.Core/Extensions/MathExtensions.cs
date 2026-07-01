@@ -15,12 +15,6 @@ namespace Faolan.Core.Extensions
 
 		extension(Vector3 vector3)
 		{
-			public Quaternion ToQuaternion()
-			{
-				var radians = vector3 * (MathF.PI / 180.0f);
-				return Quaternion.CreateFromYawPitchRoll(radians.Y, radians.X, radians.Z);
-			}
-
 			// A yaw-only facing quaternion (rotation about the Y/up axis) that points `from` at `target` - the
 			// (0, qy, 0, qw) shape the capture's MoveTask facings all use. Returns identity (facing +Z) when the two
 			// points coincide. Yaw measured from +Z toward +X (atan2(dx, dz)), matching the captured Y-axis quaternions.
@@ -33,6 +27,12 @@ namespace Faolan.Core.Extensions
 
 				var yaw = MathF.Atan2(dx, dz);
 				return new Quaternion(0f, MathF.Sin(yaw / 2f), 0f, MathF.Cos(yaw / 2f));
+			}
+
+			public Quaternion ToQuaternion()
+			{
+				var radians = vector3 * (MathF.PI / 180.0f);
+				return Quaternion.CreateFromYawPitchRoll(radians.Y, radians.X, radians.Z);
 			}
 		}
 

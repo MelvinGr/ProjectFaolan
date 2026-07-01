@@ -19,13 +19,14 @@ namespace Faolan.Tests
 			zone.Add(Npc(4, 5, 0));
 			zone.Add(Npc(5, 100, 0));
 
-			var seen = zone
-				.EntitiesInRange(new Vector3(0, 0, 0), 50f)
-				.Select(e => e.Handle)
-				.OrderBy(h => h)
-				.ToArray();
+			var seen = zone.EntitiesInRange(new Vector3(0, 0, 0), 50f).Select(e => e.Handle).OrderBy(h => h).ToArray();
 
-			Assert.Equal(new uint[] { 1, 4 }, seen); // self + near npc; the far npc is out of range
+			Assert.Equal(new uint[]
+				{
+					1,
+					4
+				},
+				seen); // self + near npc; the far npc is out of range
 		}
 
 		[Fact]
@@ -43,18 +44,13 @@ namespace Faolan.Tests
 
 			world.Place(e, 2040, new Vector3(10, 0, 10), Vector3.Zero);
 			Assert.Equal(2040u, e.MapId);
-			Assert.Equal(1, world.ZoneFor(2040)
-				.Count);
+			Assert.Equal(1, world.ZoneFor(2040).Count);
 
 			// A map change moves the entity out of the old zone into the new one.
 			world.Place(e, 3000, new Vector3(5, 0, 5), Vector3.Zero);
-			Assert.Equal(0, world.ZoneFor(2040)
-				.Count);
-			Assert.Equal(1, world.ZoneFor(3000)
-				.Count);
-			Assert.True(world
-				.ZoneFor(3000)
-				.TryGet(1, out _));
+			Assert.Equal(0, world.ZoneFor(2040).Count);
+			Assert.Equal(1, world.ZoneFor(3000).Count);
+			Assert.True(world.ZoneFor(3000).TryGet(1, out _));
 		}
 
 		[Fact]
@@ -65,16 +61,22 @@ namespace Faolan.Tests
 			var near = Player(2, 30, 0); // within 50
 			var far = Player(3, 200, 0); // outside 50
 			var npc = Npc(4, 5, 0); // close but not a player
-			foreach (var e in new[] { self, near, far, npc })
+			foreach (var e in new[]
+			{
+				self,
+				near,
+				far,
+				npc
+			})
 				zone.Add(e);
 
-			var seen = zone
-				.PlayersInRange(self.Position, 50f, self.Handle)
-				.Select(e => e.Handle)
-				.OrderBy(h => h)
-				.ToArray();
+			var seen = zone.PlayersInRange(self.Position, 50f, self.Handle).Select(e => e.Handle).OrderBy(h => h).ToArray();
 
-			Assert.Equal(new uint[] { 2 }, seen); // only the near player; self excluded, far out of range, npc filtered
+			Assert.Equal(new uint[]
+				{
+					2
+				},
+				seen); // only the near player; self excluded, far out of range, npc filtered
 		}
 
 		[Fact]
@@ -86,25 +88,63 @@ namespace Faolan.Tests
 
 			world.Remove(e);
 
-			Assert.Equal(0, world.ZoneFor(2040)
-				.Count);
+			Assert.Equal(0, world.ZoneFor(2040).Count);
 		}
 
 		[Fact]
-		public void ZoneFor_MintsAMonotonicPlayfieldToken()
+		public void ResolveEntryInstance_KeepsCopyOnReentry_NewCopyOnMapChange( /* #268 */)
 		{
 			var world = new WorldState();
+			var solo = world.ResolveEntryInstance(null, 4010, MapInstanceMode.Solo);
+			var p = Player(1, 0, 0);
+			world.Place(p, 4010, solo, p.Position, Vector3.Zero);
 
-			var first = world.ZoneFor(2040)
-				.PlayfieldToken;
-			var second = world.ZoneFor(4010)
-				.PlayfieldToken;
+			// Same-map re-entry (respawn/teleport back) keeps the player's existing copy.
+			Assert.Equal(solo, world.ResolveEntryInstance(p, 4010, MapInstanceMode.Solo));
+			// A different map mints a fresh copy (the old instance id doesn't carry across maps).
+			Assert.NotEqual(solo, world.ResolveEntryInstance(p, 5000, MapInstanceMode.Solo));
+		}
 
-			Assert.NotEqual(0u, first); // every zone has a token from creation (despawns never skipped for lack of one)
-			Assert.True(second > first, "playfield tokens are allocated monotonically");
-			// re-fetching the same map returns the same zone, not a fresh token
-			Assert.Equal(first, world.ZoneFor(2040)
-				.PlayfieldToken);
+		[Fact]
+		public void Shared_PlacesEveryoneInOneCopy( /* #268 */)
+		{
+			var world = new WorldState();
+			var a = world.ResolveEntryInstance(null, 4010, MapInstanceMode.Shared);
+			var b = world.ResolveEntryInstance(null, 4010, MapInstanceMode.Shared);
+			Assert.Equal(WorldState.DefaultInstance, a);
+			Assert.Equal(WorldState.DefaultInstance, b); // a Shared map always resolves to the one shared copy
+
+			var p1 = Player(1, 0, 0);
+			var p2 = Player(2, 1, 0);
+			world.Place(p1, 4010, a, p1.Position, Vector3.Zero);
+			world.Place(p2, 4010, b, p2.Position, Vector3.Zero);
+
+			Assert.Same(world.ZoneForEntity(p1), world.ZoneForEntity(p2)); // same zone object
+			Assert.Equal(2, world.ZoneForEntity(p1).Count);
+			// and they see each other via interest
+			var events = InterestManager.ResolveMove(world.ZoneForEntity(p1), p1, 50f);
+			Assert.Contains(events, e => e.Subject.Handle == 2);
+		}
+
+		[Fact]
+		public void Solo_GivesEachPlayerAPrivateCopy_NoCrossVisibility( /* #268 */)
+		{
+			var world = new WorldState();
+			var i1 = world.ResolveEntryInstance(null, 4010, MapInstanceMode.Solo);
+			var i2 = world.ResolveEntryInstance(null, 4010, MapInstanceMode.Solo);
+			Assert.NotEqual(WorldState.DefaultInstance, i1);
+			Assert.NotEqual(i1, i2); // a fresh private copy per entry
+
+			var p1 = Player(1, 0, 0);
+			var p2 = Player(2, 0, 0); // SAME position as p1
+			world.Place(p1, 4010, i1, p1.Position, Vector3.Zero);
+			world.Place(p2, 4010, i2, p2.Position, Vector3.Zero);
+
+			Assert.NotSame(world.ZoneForEntity(p1), world.ZoneForEntity(p2));
+			Assert.Equal(1, world.ZoneForEntity(p1).Count); // alone in their own copy
+			// p1 does NOT see p2 despite the identical position - different instances.
+			var events = InterestManager.ResolveMove(world.ZoneForEntity(p1), p1, 50f);
+			Assert.DoesNotContain(events, e => e.Subject.Handle == 2);
 		}
 
 		[Fact]
@@ -136,59 +176,17 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void Shared_PlacesEveryoneInOneCopy(/* #268 */)
+		public void ZoneFor_MintsAMonotonicPlayfieldToken()
 		{
 			var world = new WorldState();
-			var a = world.ResolveEntryInstance(null, 4010, MapInstanceMode.Shared);
-			var b = world.ResolveEntryInstance(null, 4010, MapInstanceMode.Shared);
-			Assert.Equal(WorldState.DefaultInstance, a);
-			Assert.Equal(WorldState.DefaultInstance, b); // a Shared map always resolves to the one shared copy
 
-			var p1 = Player(1, 0, 0);
-			var p2 = Player(2, 1, 0);
-			world.Place(p1, 4010, a, p1.Position, Vector3.Zero);
-			world.Place(p2, 4010, b, p2.Position, Vector3.Zero);
+			var first = world.ZoneFor(2040).PlayfieldToken;
+			var second = world.ZoneFor(4010).PlayfieldToken;
 
-			Assert.Same(world.ZoneForEntity(p1), world.ZoneForEntity(p2)); // same zone object
-			Assert.Equal(2, world.ZoneForEntity(p1).Count);
-			// and they see each other via interest
-			var events = InterestManager.ResolveMove(world.ZoneForEntity(p1), p1, 50f);
-			Assert.Contains(events, e => e.Subject.Handle == 2);
-		}
-
-		[Fact]
-		public void Solo_GivesEachPlayerAPrivateCopy_NoCrossVisibility(/* #268 */)
-		{
-			var world = new WorldState();
-			var i1 = world.ResolveEntryInstance(null, 4010, MapInstanceMode.Solo);
-			var i2 = world.ResolveEntryInstance(null, 4010, MapInstanceMode.Solo);
-			Assert.NotEqual(WorldState.DefaultInstance, i1);
-			Assert.NotEqual(i1, i2); // a fresh private copy per entry
-
-			var p1 = Player(1, 0, 0);
-			var p2 = Player(2, 0, 0); // SAME position as p1
-			world.Place(p1, 4010, i1, p1.Position, Vector3.Zero);
-			world.Place(p2, 4010, i2, p2.Position, Vector3.Zero);
-
-			Assert.NotSame(world.ZoneForEntity(p1), world.ZoneForEntity(p2));
-			Assert.Equal(1, world.ZoneForEntity(p1).Count); // alone in their own copy
-			// p1 does NOT see p2 despite the identical position - different instances.
-			var events = InterestManager.ResolveMove(world.ZoneForEntity(p1), p1, 50f);
-			Assert.DoesNotContain(events, e => e.Subject.Handle == 2);
-		}
-
-		[Fact]
-		public void ResolveEntryInstance_KeepsCopyOnReentry_NewCopyOnMapChange(/* #268 */)
-		{
-			var world = new WorldState();
-			var solo = world.ResolveEntryInstance(null, 4010, MapInstanceMode.Solo);
-			var p = Player(1, 0, 0);
-			world.Place(p, 4010, solo, p.Position, Vector3.Zero);
-
-			// Same-map re-entry (respawn/teleport back) keeps the player's existing copy.
-			Assert.Equal(solo, world.ResolveEntryInstance(p, 4010, MapInstanceMode.Solo));
-			// A different map mints a fresh copy (the old instance id doesn't carry across maps).
-			Assert.NotEqual(solo, world.ResolveEntryInstance(p, 5000, MapInstanceMode.Solo));
+			Assert.NotEqual(0u, first); // every zone has a token from creation (despawns never skipped for lack of one)
+			Assert.True(second > first, "playfield tokens are allocated monotonically");
+			// re-fetching the same map returns the same zone, not a fresh token
+			Assert.Equal(first, world.ZoneFor(2040).PlayfieldToken);
 		}
 
 		private static WorldEntity Npc(uint handle, float x, float z)

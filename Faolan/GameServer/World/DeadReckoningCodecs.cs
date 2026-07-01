@@ -1,7 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Numerics;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets.Opcodes;
 
@@ -17,22 +17,24 @@ namespace Faolan.GameServer.World
 	// vectors are present (FUN_007ad6b0). Parse/Build preserve every field so the record round-trips byte-exact.
 	public sealed class CharDCMove
 	{
-		public uint Handle;
-		public byte Env;
-		public byte Flag1;
-		public Vector3 Position;
-		public float FacingX;          // bit4 set: the collapsed facing (with Param6 = a unit 2D heading)
-		public Vector3 MoveVector;     // bit4 clear: the full post-position vector
-		public float Param6;
-		public byte Flag2;
-		// the velocity/accel/heading block, present only when Flag2 < 8:
-		public Vector3 Velocity;       // present when !bit2
-		public Vector3 Acceleration;   // present when !bit3
-		public float Param16;
-		public Vector3 Heading;        // present when !bit1
-		public float Param19;
 		public byte Bool1;
 		public byte Bool2;
+		public byte Env;
+		public byte Flag1;
+		public byte Flag2;
+		public float FacingX; // bit4 set: the collapsed facing (with Param6 = a unit 2D heading)
+		public float Param16;
+		public float Param19;
+		public float Param6;
+		public uint Handle;
+		public Vector3 Acceleration; // present when !bit3
+		public Vector3 Heading; // present when !bit1
+		public Vector3 MoveVector; // bit4 clear: the full post-position vector
+
+		public Vector3 Position;
+
+		// the velocity/accel/heading block, present only when Flag2 < 8:
+		public Vector3 Velocity; // present when !bit2
 
 		public bool Bit1 => (Flag1 & 0x02) != 0;
 		public bool Bit2 => (Flag1 & 0x04) != 0;
@@ -46,48 +48,27 @@ namespace Faolan.GameServer.World
 		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.CharDCMoveIIR;
 		private const uint IirMarker = EntityClass.Character;
 
-		public static CharDCMove Parse(byte[] body)
-		{
-			var s = new ReadCursor(body);
-			s.U32();                                   // len
-			if (s.U32() != SubOpcode) throw new InvalidOperationException("not a CharDCMoveIIR record");
-			s.U32();                                   // 0xC350 marker
-			var r = new CharDCMove { Handle = s.U32(), Env = s.Byte(), Flag1 = s.Byte() };
-			r.Position = s.Vec3();
-			if (r.Bit4) r.FacingX = s.Float();
-			else r.MoveVector = s.Vec3();
-			r.Param6 = s.Float();
-			r.Flag2 = s.Byte();
-			if (r.HasMoveBlock)
-			{
-				if (!r.Bit2) r.Velocity = s.Vec3();
-				if (!r.Bit3) r.Acceleration = s.Vec3();
-				r.Param16 = s.Float();
-				if (!r.Bit1) r.Heading = s.Vec3();
-				r.Param19 = s.Float();
-				r.Bool1 = s.Byte();
-				r.Bool2 = s.Byte();
-			}
-			return r;
-		}
-
 		public static byte[] Build(CharDCMove r)
 		{
 			var c = new FaolanStream();
-			c.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(r.Handle)
-				.WriteByte(r.Env).WriteByte(r.Flag1)
-				.WriteVector3BigEndian(r.Position);
-			if (r.Bit4) c.WriteFloatBigEndian(r.FacingX);
-			else c.WriteVector3BigEndian(r.MoveVector);
+			c.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(r.Handle).WriteByte(r.Env).WriteByte(r.Flag1).WriteVector3BigEndian(r.Position);
+			if (r.Bit4)
+				c.WriteFloatBigEndian(r.FacingX);
+			else
+				c.WriteVector3BigEndian(r.MoveVector);
 			c.WriteFloatBigEndian(r.Param6).WriteByte(r.Flag2);
 			if (r.HasMoveBlock)
 			{
-				if (!r.Bit2) c.WriteVector3BigEndian(r.Velocity);
-				if (!r.Bit3) c.WriteVector3BigEndian(r.Acceleration);
+				if (!r.Bit2)
+					c.WriteVector3BigEndian(r.Velocity);
+				if (!r.Bit3)
+					c.WriteVector3BigEndian(r.Acceleration);
 				c.WriteFloatBigEndian(r.Param16);
-				if (!r.Bit1) c.WriteVector3BigEndian(r.Heading);
+				if (!r.Bit1)
+					c.WriteVector3BigEndian(r.Heading);
 				c.WriteFloatBigEndian(r.Param19).WriteByte(r.Bool1).WriteByte(r.Bool2);
 			}
+
 			return WithLength(c.ToArray());
 		}
 
@@ -102,14 +83,52 @@ namespace Faolan.GameServer.World
 			{
 				Handle = handle,
 				Env = 0x01,
-				Flag1 = 0x1e,        // bit1|bit2|bit3|bit4 -> collapsed facing, no optional vectors
+				Flag1 = 0x1e, // bit1|bit2|bit3|bit4 -> collapsed facing, no optional vectors
 				Position = position,
 				FacingX = facingX,
 				Param6 = facingZ,
 				Flag2 = 0x07,
 				Param16 = 0f,
-				Param19 = param19,
+				Param19 = param19
 			});
+		}
+
+		public static CharDCMove Parse(byte[] body)
+		{
+			var s = new ReadCursor(body);
+			s.U32(); // len
+			if (s.U32() != SubOpcode)
+				throw new InvalidOperationException("not a CharDCMoveIIR record");
+
+			s.U32(); // 0xC350 marker
+			var r = new CharDCMove
+			{
+				Handle = s.U32(),
+				Env = s.Byte(),
+				Flag1 = s.Byte()
+			};
+			r.Position = s.Vec3();
+			if (r.Bit4)
+				r.FacingX = s.Float();
+			else
+				r.MoveVector = s.Vec3();
+			r.Param6 = s.Float();
+			r.Flag2 = s.Byte();
+			if (r.HasMoveBlock)
+			{
+				if (!r.Bit2)
+					r.Velocity = s.Vec3();
+				if (!r.Bit3)
+					r.Acceleration = s.Vec3();
+				r.Param16 = s.Float();
+				if (!r.Bit1)
+					r.Heading = s.Vec3();
+				r.Param19 = s.Float();
+				r.Bool1 = s.Byte();
+				r.Bool2 = s.Byte();
+			}
+
+			return r;
 		}
 
 		internal static byte[] WithLength(byte[] body)
@@ -128,25 +147,25 @@ namespace Faolan.GameServer.World
 		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.StopIIR;
 		private const uint IirMarker = EntityClass.Character;
 
-		public sealed record Parsed(uint Handle, byte Env, Vector3 Position, float R0, float R1, float R2, float R3);
-
 		public static byte[] Build(uint handle, Vector3 position, float r0, float r1, float r2, float r3, byte env = 0x00)
 		{
 			var c = new FaolanStream();
-			c.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(handle).WriteByte(env)
-				.WriteVector3BigEndian(position)
-				.WriteFloatBigEndian(r0).WriteFloatBigEndian(r1).WriteFloatBigEndian(r2).WriteFloatBigEndian(r3);
+			c.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(handle).WriteByte(env).WriteVector3BigEndian(position).WriteFloatBigEndian(r0).WriteFloatBigEndian(r1).WriteFloatBigEndian(r2).WriteFloatBigEndian(r3);
 			return CharDCMoveCodec.WithLength(c.ToArray());
 		}
 
 		public static Parsed Parse(byte[] body)
 		{
 			var s = new ReadCursor(body);
-			s.U32(); s.U32(); s.U32();             // len, subop, marker
+			s.U32();
+			s.U32();
+			s.U32(); // len, subop, marker
 			var handle = s.U32();
 			var env = s.Byte();
 			return new Parsed(handle, env, s.Vec3(), s.Float(), s.Float(), s.Float(), s.Float());
 		}
+
+		public sealed record Parsed(uint Handle, byte Env, Vector3 Position, float R0, float R1, float R2, float R3);
 	}
 
 	// SetPosIIR_c (0x04B80B24) - the teleport/snap record: position(3) + rotation(4) floats + a trailing bool
@@ -156,14 +175,19 @@ namespace Faolan.GameServer.World
 		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.SetPosIIR;
 		private const uint IirMarker = EntityClass.Character;
 
-		public sealed record Parsed(uint Handle, byte Env, Vector3 Position, float R0, float R1, float R2, float R3, byte Flag);
-
 		public static byte[] Build(uint handle, Vector3 position, float r0, float r1, float r2, float r3, byte flag = 0x00, byte env = 0x00)
 		{
 			var c = new FaolanStream();
-			c.WriteUInt32(SubOpcode).WriteUInt32(IirMarker).WriteUInt32(handle).WriteByte(env)
+			c
+				.WriteUInt32(SubOpcode)
+				.WriteUInt32(IirMarker)
+				.WriteUInt32(handle)
+				.WriteByte(env)
 				.WriteVector3BigEndian(position)
-				.WriteFloatBigEndian(r0).WriteFloatBigEndian(r1).WriteFloatBigEndian(r2).WriteFloatBigEndian(r3)
+				.WriteFloatBigEndian(r0)
+				.WriteFloatBigEndian(r1)
+				.WriteFloatBigEndian(r2)
+				.WriteFloatBigEndian(r3)
 				.WriteByte(flag);
 			return CharDCMoveCodec.WithLength(c.ToArray());
 		}
@@ -171,13 +195,17 @@ namespace Faolan.GameServer.World
 		public static Parsed Parse(byte[] body)
 		{
 			var s = new ReadCursor(body);
-			s.U32(); s.U32(); s.U32();
+			s.U32();
+			s.U32();
+			s.U32();
 			var handle = s.U32();
 			var env = s.Byte();
 			var pos = s.Vec3();
 			var (r0, r1, r2, r3) = (s.Float(), s.Float(), s.Float(), s.Float());
 			return new Parsed(handle, env, pos, r0, r1, r2, r3, s.Byte());
 		}
+
+		public sealed record Parsed(uint Handle, byte Env, Vector3 Position, float R0, float R1, float R2, float R3, byte Flag);
 	}
 
 	// A tiny big-endian read cursor over a record body (the protocol is big-endian; floats are raw-body BE).
@@ -185,10 +213,35 @@ namespace Faolan.GameServer.World
 	{
 		private readonly ReadOnlySpan<byte> _b;
 		private int _i;
-		public ReadCursor(ReadOnlySpan<byte> b) { _b = b; _i = 0; }
-		public uint U32() { var v = BinaryPrimitives.ReadUInt32BigEndian(_b.Slice(_i)); _i += 4; return v; }
-		public float Float() { var v = BinaryPrimitives.ReadSingleBigEndian(_b.Slice(_i)); _i += 4; return v; }
-		public byte Byte() { return _b[_i++]; }
-		public Vector3 Vec3() => new Vector3(Float(), Float(), Float());
+
+		public ReadCursor(ReadOnlySpan<byte> b)
+		{
+			_b = b;
+			_i = 0;
+		}
+
+		public uint U32()
+		{
+			var v = BinaryPrimitives.ReadUInt32BigEndian(_b.Slice(_i));
+			_i += 4;
+			return v;
+		}
+
+		public float Float()
+		{
+			var v = BinaryPrimitives.ReadSingleBigEndian(_b.Slice(_i));
+			_i += 4;
+			return v;
+		}
+
+		public byte Byte()
+		{
+			return _b[_i++];
+		}
+
+		public Vector3 Vec3()
+		{
+			return new Vector3(Float(), Float(), Float());
+		}
 	}
 }

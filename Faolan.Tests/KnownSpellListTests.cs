@@ -21,35 +21,9 @@ namespace Faolan.Tests
 		private const uint TemplateInstance = 0x02165EFF;
 
 		// The captured count word + 2 records from Faolanx's snapshot (pkt51 @0x25F6): the byte-exact target shape.
-		private static readonly byte[] FaolanxKnownListGolden =
-			Convert.FromHexString("00000bd30042ca77ffffffff0000000200125d9bffffffff00000002");
+		private static readonly byte[] FaolanxKnownListGolden = Convert.FromHexString("00000bd30042ca77ffffffff0000000200125d9bffffffff00000002");
 
 		private static readonly uint[] FaolanxSpellIds = [0x42CA77, 0x125D9B];
-
-		[Fact]
-		public void ToArray_FreshNecro_MatchesTheCapturedFaolanxList()
-		{
-			var built = KnownSpellList.FromSpellIds(FaolanxSpellIds).ToArray();
-			Assert.Equal(FaolanxKnownListGolden, built);
-		}
-
-		[Fact]
-		public void RoundTrip_CapturedList_IsLossless()
-		{
-			var parsed = KnownSpellList.Parse(FaolanxKnownListGolden, 0, out var consumed);
-			Assert.Equal(FaolanxKnownListGolden.Length, consumed);
-			Assert.Equal(2, parsed.Records.Count);
-			Assert.Equal(new KnownSpellRecord(0x42CA77, 2), parsed.Records[0]);
-			Assert.Equal(new KnownSpellRecord(0x125D9B, 2), parsed.Records[1]);
-			Assert.Equal(FaolanxKnownListGolden, parsed.ToArray());
-		}
-
-		[Fact]
-		public void EmptyList_IsJustTheFrameCountWord()
-		{
-			var empty = KnownSpellList.FromSpellIds([]).ToArray();
-			Assert.Equal(Convert.FromHexString("000003f1"), empty);
-		}
 
 		// Injecting an empty list must leave the from-scratch tails byte-identical to the captured beach template, so
 		// the existing golden (and a fresh character with no spells) is never disturbed.
@@ -59,7 +33,7 @@ namespace Faolan.Tests
 			var def = await LoadDefinition(BeachStarterQuestId);
 			Assert.NotNull(def);
 
-			var built = BeachTailsBuilder.BuildFromScratch(def, character: null, TemplateInstance, playfieldToken: null, knownSpellIds: []);
+			var built = BeachTailsBuilder.BuildFromScratch(def, null, TemplateInstance, null, []);
 
 			var template = File.ReadAllBytes(TemplatePath);
 			Assert.True(template.SequenceEqual(built), "an empty known-list must equal BeachTailsTemplate.bin byte-for-byte");
@@ -74,8 +48,8 @@ namespace Faolan.Tests
 			var def = await LoadDefinition(BeachStarterQuestId);
 			Assert.NotNull(def);
 
-			var empty = BeachTailsBuilder.BuildFromScratch(def, character: null, TemplateInstance, playfieldToken: null, knownSpellIds: []);
-			var withSpells = BeachTailsBuilder.BuildFromScratch(def, character: null, TemplateInstance, playfieldToken: null, knownSpellIds: FaolanxSpellIds);
+			var empty = BeachTailsBuilder.BuildFromScratch(def, null, TemplateInstance, null, []);
+			var withSpells = BeachTailsBuilder.BuildFromScratch(def, null, TemplateInstance, null, FaolanxSpellIds);
 
 			// Two 12-byte records spliced in.
 			Assert.Equal(empty.Length + 24, withSpells.Length);
@@ -88,23 +62,48 @@ namespace Faolan.Tests
 			var slotStart = countOffset + 16; // past the 16-byte landmark to the count word
 
 			// Everything BEFORE the count word is identical between the two builds.
-			Assert.True(empty.AsSpan(0, slotStart).SequenceEqual(withSpells.AsSpan(0, slotStart)),
-				"bytes before the known-list must be unchanged");
+			Assert.True(empty.AsSpan(0, slotStart).SequenceEqual(withSpells.AsSpan(0, slotStart)), "bytes before the known-list must be unchanged");
 
 			// The populated build carries the captured count + records at the slot.
-			Assert.True(withSpells.AsSpan(slotStart, FaolanxKnownListGolden.Length).SequenceEqual(FaolanxKnownListGolden),
-				"the spliced known-list must equal the captured Faolanx bytes");
+			Assert.True(withSpells.AsSpan(slotStart, FaolanxKnownListGolden.Length).SequenceEqual(FaolanxKnownListGolden), "the spliced known-list must equal the captured Faolanx bytes");
 
 			// Everything AFTER the list (the empty build's trailing bytes) is preserved, just shifted by 24.
-			Assert.True(empty.AsSpan(slotStart + 4).SequenceEqual(withSpells.AsSpan(slotStart + FaolanxKnownListGolden.Length)),
-				"bytes after the known-list must be preserved (shifted by the records)");
+			Assert.True(empty.AsSpan(slotStart + 4).SequenceEqual(withSpells.AsSpan(slotStart + FaolanxKnownListGolden.Length)), "bytes after the known-list must be preserved (shifted by the records)");
+		}
+
+		[Fact]
+		public void EmptyList_IsJustTheFrameCountWord()
+		{
+			var empty = KnownSpellList.FromSpellIds([]).ToArray();
+			Assert.Equal(Convert.FromHexString("000003f1"), empty);
+		}
+
+		[Fact]
+		public void RoundTrip_CapturedList_IsLossless()
+		{
+			var parsed = KnownSpellList.Parse(FaolanxKnownListGolden, 0, out var consumed);
+			Assert.Equal(FaolanxKnownListGolden.Length, consumed);
+			Assert.Equal(2, parsed.Records.Count);
+			Assert.Equal(new KnownSpellRecord(0x42CA77, 2), parsed.Records[0]);
+			Assert.Equal(new KnownSpellRecord(0x125D9B, 2), parsed.Records[1]);
+			Assert.Equal(FaolanxKnownListGolden, parsed.ToArray());
+		}
+
+		[Fact]
+		public void ToArray_FreshNecro_MatchesTheCapturedFaolanxList()
+		{
+			var built = KnownSpellList.FromSpellIds(FaolanxSpellIds).ToArray();
+			Assert.Equal(FaolanxKnownListGolden, built);
 		}
 
 		private static int IndexOf(byte[] hay, byte[] needle)
 		{
 			for (var i = 0; i + needle.Length <= hay.Length; i++)
+			{
 				if (hay.AsSpan(i, needle.Length).SequenceEqual(needle))
 					return i;
+			}
+
 			return -1;
 		}
 
@@ -117,7 +116,10 @@ namespace Faolan.Tests
 
 		private sealed class Factory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>
 		{
-			public DatabaseContext CreateDbContext() => new DatabaseContext(options);
+			public DatabaseContext CreateDbContext()
+			{
+				return new DatabaseContext(options);
+			}
 		}
 	}
 }

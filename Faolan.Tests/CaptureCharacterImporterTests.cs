@@ -26,8 +26,7 @@ namespace Faolan.Tests
 			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-charimp-{Guid.NewGuid():N}.db");
 			try
 			{
-				var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={dbPath}")
-					.Options;
+				var options = new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={dbPath}").Options;
 				await using var db = new DatabaseContext(options);
 				await db.Database.EnsureCreatedAsync();
 				db.Accounts.Add(new Account
@@ -71,13 +70,7 @@ namespace Faolan.Tests
 
 				Assert.Equal((1, 1, 0), result);
 
-				var character = await db
-					.Characters
-					.Include(c => c.MaxStats)
-					.Include(c => c.Body)
-					.Include(c => c.Attributes)
-					.Include(c => c.Skills)
-					.SingleAsync(c => c.Name == "Dikketest");
+				var character = await db.Characters.Include(c => c.MaxStats).Include(c => c.Body).Include(c => c.Attributes).Include(c => c.Skills).SingleAsync(c => c.Name == "Dikketest");
 				Assert.Equal(0x01316D2Bu, character.Id); // the ORIGINAL retail id (the spawn handle)
 				Assert.Equal(7u, character.AccountId);
 				Assert.Equal(Sex.Female, character.Sex); // dikketest: editor ChangeSex 6 -> wire 3 = female
@@ -85,11 +78,7 @@ namespace Faolan.Tests
 				Assert.Equal(18u, (uint)character.Class); // the pre-frame island's low byte @135/136
 				Assert.Equal(4000u, character.MapId);
 				// RealmId is required; the importer find-or-creates the server's realm (none seeded here).
-				Assert.Equal(await db
-					.Realms
-					.OrderBy(r => r.Id)
-					.Select(r => r.Id)
-					.FirstAsync(), character.RealmId);
+				Assert.Equal(await db.Realms.OrderBy(r => r.Id).Select(r => r.Id).FirstAsync(), character.RealmId);
 				Assert.Equal(2285694u, character.Body!.HeadMesh); // editor 2x units (wire 1142847)
 				Assert.Equal(322.5f, character.PositionX); // the Tortage beach intro spawn (ProtoVec3 fields)
 				Assert.Equal(145.3113250732f, character.PositionY, 0.001f);

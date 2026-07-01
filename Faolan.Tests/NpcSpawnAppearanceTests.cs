@@ -10,6 +10,15 @@ namespace Faolan.Tests
 	// that lets the appearance table generate from the DB so NpcSpawn.Data can be retired (Gitea #185 / #243).
 	public class NpcSpawnAppearanceTests
 	{
+		// Animals carry no appearance table (the 41-byte minimal post-IIR), so the decoder declines them - they
+		// stay on the minimal-scaffold path.
+		[Theory, InlineData("SpawnNpcCrocodile"), InlineData("SpawnNpcMinimalPanther")]
+		public void DecodeAppearance_Animal_ReturnsFalse(string golden)
+		{
+			Assert.False(NpcSpawnAppearanceCodec.TryDecodeAppearance(Golden.Bytes(golden), out var morphs));
+			Assert.Empty(morphs);
+		}
+
 		[Fact]
 		public void DecodeAppearance_Casilda_RoundTripsBuildPostIir()
 		{
@@ -37,15 +46,6 @@ namespace Faolan.Tests
 			var body = Golden.Bytes("SpawnNpcCasilda");
 			Assert.True(NpcSpawnAppearanceCodec.TryDecodeAppearance(body, out var morphs));
 			Assert.Equal(body, NpcSpawnAppearanceCodec.WithAppearancePostIir(body, morphs));
-		}
-
-		// Animals carry no appearance table (the 41-byte minimal post-IIR), so the decoder declines them - they
-		// stay on the minimal-scaffold path.
-		[Theory, InlineData("SpawnNpcCrocodile"), InlineData("SpawnNpcMinimalPanther")]
-		public void DecodeAppearance_Animal_ReturnsFalse(string golden)
-		{
-			Assert.False(NpcSpawnAppearanceCodec.TryDecodeAppearance(Golden.Bytes(golden), out var morphs));
-			Assert.Empty(morphs);
 		}
 	}
 }

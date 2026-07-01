@@ -1,4 +1,3 @@
-using Faolan.Core.Rdb;
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
@@ -6,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Rdb;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -28,11 +28,11 @@ namespace Faolan.Importer.Rdb
 	// base record); only Name + CastTime are written. Idempotent: re-running only rewrites changed values. (#236)
 	public static class RdbSpellImporter
 	{
-		private const uint SpellDataType = 1040005;
 		private const uint CastTimeField = 0x126; // 294 - cast time in centiseconds (value * 10 = milliseconds)
-		private const uint RangeField = 0x11F;        // 287 - target range * 100 (Ice Strike 2500 -> 25 metres)
 		private const uint DamageRatingField = 0x15C; // 348 - spell damage rating * 100 (Ice 3000 -> 30.00%)
-		private const uint DurationField = 0x008;     // 8 - buff/effect duration in CENTISECONDS (×10ms); stored ×10 as ms. Rend 700=7s, Exhausted 10000=100s; 0 = none (#274)
+		private const uint DurationField = 0x008; // 8 - buff/effect duration in CENTISECONDS (×10ms); stored ×10 as ms. Rend 700=7s, Exhausted 10000=100s; 0 = none (#274)
+		private const uint RangeField = 0x11F; // 287 - target range * 100 (Ice Strike 2500 -> 25 metres)
+		private const uint SpellDataType = 1040005;
 
 		public static async Task<(int Seen, int Inserted, int NamesSet, int CastTimesSet)> ImportAsync(IDatabaseContext db, string rdbDir, ILogger logger = null)
 		{
@@ -73,13 +73,27 @@ namespace Faolan.Importer.Rdb
 				var castTime = fields.TryGetValue(CastTimeField, out var cs)
 					? (ushort)Math.Min(cs * 10, ushort.MaxValue)
 					: (ushort)0;
-				var range = fields.TryGetValue(RangeField, out var r) ? r / 100f : 0f;
-				var damageRating = fields.TryGetValue(DamageRatingField, out var dr) ? dr / 100f : 0f;
-				var durationMs = fields.TryGetValue(DurationField, out var du) ? du * 10 : 0u; // centiseconds -> ms
+				var range = fields.TryGetValue(RangeField, out var r)
+					? r / 100f
+					: 0f;
+				var damageRating = fields.TryGetValue(DamageRatingField, out var dr)
+					? dr / 100f
+					: 0f;
+				var durationMs = fields.TryGetValue(DurationField, out var du)
+					? du * 10
+					: 0u; // centiseconds -> ms
 
 				if (!byId.TryGetValue(entry.Id, out var spell))
 				{
-					spell = new Spell { Id = entry.Id, Name = name, CastTime = castTime, Range = range, DamageRating = damageRating, DurationMs = durationMs };
+					spell = new Spell
+					{
+						Id = entry.Id,
+						Name = name,
+						CastTime = castTime,
+						Range = range,
+						DamageRating = damageRating,
+						DurationMs = durationMs
+					};
 					byId[entry.Id] = spell;
 					toAdd.Add(spell);
 					inserted++;
@@ -94,11 +108,13 @@ namespace Faolan.Importer.Rdb
 					spell.Name = name;
 					namesSet++;
 				}
+
 				if (spell.CastTime != castTime)
 				{
 					spell.CastTime = castTime;
 					castTimesSet++;
 				}
+
 				spell.Range = range;
 				spell.DamageRating = damageRating;
 				spell.DurationMs = durationMs;
@@ -108,8 +124,7 @@ namespace Faolan.Importer.Rdb
 				db.Spells.AddRange(toAdd);
 			await db.SaveChangesAsync();
 
-			logger?.LogInformation("RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set.",
-				seen, inserted, namesSet, castTimesSet);
+			logger?.LogInformation("RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set.", seen, inserted, namesSet, castTimesSet);
 			return (seen, inserted, namesSet, castTimesSet);
 		}
 
@@ -120,7 +135,7 @@ namespace Faolan.Importer.Rdb
 		private static Dictionary<uint, uint> ReadIncreasingFields(ReadOnlySpan<byte> body)
 		{
 			var words = body.Length / 4;
-			Dictionary<uint, uint> best = new Dictionary<uint, uint>();
+			var best = new Dictionary<uint, uint>();
 			for (var start = 0; start + 1 < words; start++)
 			{
 				uint last = 0;
@@ -131,11 +146,13 @@ namespace Faolan.Importer.Rdb
 					var fid = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(j * 4, 4));
 					if (fid == 0 || fid > 2000 || (haveLast && fid <= last))
 						break;
+
 					cur[fid] = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice((j + 1) * 4, 4));
 					last = fid;
 					haveLast = true;
 					j++; // consumed the value word too
 				}
+
 				if (cur.Count > best.Count)
 					best = cur;
 			}

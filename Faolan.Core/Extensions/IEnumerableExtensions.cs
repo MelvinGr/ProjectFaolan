@@ -17,10 +17,28 @@ namespace Faolan.Core.Extensions
 			var bytesArray = bytes.ToArray();
 			var bytesLength = bytesArray.Length;
 
-			var hexChars = new[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
+			var hexChars = new[]
+			{
+				'0',
+				'1',
+				'2',
+				'3',
+				'4',
+				'5',
+				'6',
+				'7',
+				'8',
+				'9',
+				'A',
+				'B',
+				'C',
+				'D',
+				'E',
+				'F'
+			};
 
-			var firstHexColumn = 8 // 8 characters for the address
-			                     + 3; // 3 spaces
+			const int firstHexColumn = 8 // 8 characters for the address
+			                           + 3; // 3 spaces
 
 			var firstCharColumn = firstHexColumn + bytesPerLine * 3 // - 2 digit for the hexadecimal value and 1 space
 			                                     + (bytesPerLine - 1) / 8 // - 1 extra space every 8 characters from the 9th

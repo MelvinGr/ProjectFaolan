@@ -9,13 +9,14 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
+		internal const string CreateWorldResourceManifest =
+			"1010004:793713;1010004:793714;1070003:4000;1000097:4000;1010030:156211;1010030:239448;1010030:565913;1010004:3728533;1060668:4000;1000059:4000;1060667:167368;1010004:3075445;1010004:3180025;1010004:221285;1010004:3663190;1010004:208923;1010004:208266;1010004:226891;1010004:3663191;1010004:3656109;1010030:210069;1010001:210070;1010004:3075452;1010004:3075450;1010004:3075451;1010300:4000;1000049:4000;1066611:4000;1000013:40000000;1000015:40000000;1010506:4000;1000058:4000;1010207:110006;1010207:262241;1010207:568806;1010207:3420331;1010207:167183";
+
 		// The create-world ScryScript step content (decoded by Captures/scripts/decode_scryscript.py, #223): the PlayOrSkip(72)
 		// remoteformat token for the "Slave Galley" creation step (f4) and the RDB resource manifest the client preloads
 		// (f5, "rdbId:value;..."). Carried as named strings now (was a verbatim hex blob); ScryScript.BuildStep frames them.
 		internal const string CreateWorldScriptToken =
 			"<remoteformat token=\"playorskip(72)|onclientconnected(1)|NEW_character_creation Slave Galley (server-side)\" category=\"50023\" key=\"&quot;B]SZ.AGRGrAyOGe*BG-\" knubot=\"0\"  ></remoteformat>";
-		internal const string CreateWorldResourceManifest =
-			"1010004:793713;1010004:793714;1070003:4000;1000097:4000;1010030:156211;1010030:239448;1010030:565913;1010004:3728533;1060668:4000;1000059:4000;1060667:167368;1010004:3075445;1010004:3180025;1010004:221285;1010004:3663190;1010004:208923;1010004:208266;1010004:226891;1010004:3663191;1010004:3656109;1010030:210069;1010001:210070;1010004:3075452;1010004:3075450;1010004:3075451;1010300:4000;1000049:4000;1066611:4000;1000013:40000000;1000015:40000000;1010506:4000;1000058:4000;1010207:110006;1010207:262241;1010207:568806;1010207:3420331;1010207:167183";
 
 		// Retail create-editor CHARACTER-CREATION SCRIPT burst from
 		// Captures/account-stricken998-character-create-no-worldenter.json (GameServer port 7030), rows 274-302/324-331.
@@ -34,7 +35,16 @@ namespace Faolan.GameServer
 		internal static async Task SendRetailCreateEditorCreationScriptBurst(INetworkClient client)
 		{
 			var id = client.Session.Account.ClientInstance;
-			var sender = new byte[] { 0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x59 };
+			var sender = new byte[]
+			{
+				0x0D,
+				0x13,
+				0xCE,
+				0x71,
+				0xB1,
+				0x10,
+				0x59
+			};
 			var receiver = ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id);
 
 			const uint W = CreateEditorRecordBuilder.CharacterWireType; // EntityClass.Character (0xC350)
@@ -60,8 +70,60 @@ namespace Faolan.GameServer
 					.WriteUInt32(id)
 					.WriteArray(0x00, 0x00, 0x00, 0x0B, 0x90, 0x00, 0x00, 0x00, 0xC3, 0x50)
 					.WriteUInt32(id)
-					.WriteArray(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x27, 0x10, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0B, 0x90, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
-						0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x3D, 0x5F, 0xC9, 0x66))
+					.WriteArray(0x00,
+						0x00,
+						0x00,
+						0x00,
+						0x00,
+						0x00,
+						0x00,
+						0x00,
+						0x00,
+						0x00,
+						0x27,
+						0x10,
+						0x00,
+						0x01,
+						0x00,
+						0x00,
+						0x00,
+						0x01,
+						0x00,
+						0x00,
+						0x00,
+						0x00,
+						0x00,
+						0x00,
+						0x0B,
+						0x90,
+						0x00,
+						0x00,
+						0x00,
+						0x01,
+						0x00,
+						0x00,
+						0x00,
+						0x00,
+						0x00,
+						0x00,
+						0x00,
+						0x00,
+						0x00,
+						0x00,
+						0x00,
+						0x00,
+						0x00,
+						0x00,
+						0x00,
+						0x01,
+						0x00,
+						0x00,
+						0x00,
+						0x00,
+						0x3D,
+						0x5F,
+						0xC9,
+						0x66))
 				.SendAsync(client);
 
 			await Iir(GameServer0X2000RespondsOpcodes.EnergyIIR, CreateEditorRecordBuilder.BuildEnergyIir(W, id, 0x01, 0x00));
@@ -72,12 +134,11 @@ namespace Faolan.GameServer
 				await Iir(GameServer0X2000RespondsOpcodes.StatIIR, CreateEditorRecordBuilder.BuildStatIir(W, id, 0x01, statId, 0x00));
 			await Iir(GameServer0X2000RespondsOpcodes.StatIIR, CreateEditorRecordBuilder.BuildStatIir(W, id, 0x00, 0x0F428F, 0x00));
 
-			await Iir(GameServer0X2000RespondsOpcodes.StatUpdateIIR, CreateEditorRecordBuilder.BuildStatUpdateIir(id,
-				[(0x1Bu, 0x1F40u), (0xBAu, 0x00u), (0x1FFu, 0x00u), (0x200u, 0x301u), (0x201u, 0x00u), (0x25Fu, 0x59EA5C54u)], W));
+			await Iir(GameServer0X2000RespondsOpcodes.StatUpdateIIR, CreateEditorRecordBuilder.BuildStatUpdateIir(id, [(0x1Bu, 0x1F40u), (0xBAu, 0x00u), (0x1FFu, 0x00u), (0x200u, 0x301u), (0x201u, 0x00u), (0x25Fu, 0x59EA5C54u)]));
 
 			// ScryScriptIIR: the create-world "PlayOrSkip(72) Slave Galley" remoteformat + its RDB resource manifest,
 			// then the "PlayOrSkip" ScriptMessage (decoded by Captures/scripts/decode_scryscript.py).
-			await IirRecord(ScryScript.BuildStep(id, CreateWorldScriptToken, mode: 7, resources: CreateWorldResourceManifest, f6Field1: 6177372, f6Field2: 9422303));
+			await IirRecord(ScryScript.BuildStep(id, CreateWorldScriptToken, 7, resources: CreateWorldResourceManifest, f6Field1: 6177372, f6Field2: 9422303));
 			await IirRecord(ScryScript.BuildStep(id, "PlayOrSkip"));
 
 			// SetMorphValue setup (hair meshes, then a texscript) on the editor entities.
@@ -93,22 +154,14 @@ namespace Faolan.GameServer
 			// a body never desyncs it.
 			Task Iir(GameServer0X2000RespondsOpcodes iir, params byte[] body)
 			{
-				return new PacketStream()
-					.WriteHeader(sender, receiver, GameServerCarrierOpcodes.IirCarrier)
-					.WriteArrayUInt32Length(s => s
-						.WriteUInt32(iir)
-						.WriteArray(body))
-					.SendAsync(client);
+				return new PacketStream().WriteHeader(sender, receiver, GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(s => s.WriteUInt32(iir).WriteArray(body)).SendAsync(client);
 			}
 
 			// Sends a fully-built IIR record (one that already begins with its sub-opcode, e.g. ScryScript.BuildStep);
 			// the length prefix is recomputed by WriteArrayUInt32Length.
 			Task IirRecord(byte[] record)
 			{
-				return new PacketStream()
-					.WriteHeader(sender, receiver, GameServerCarrierOpcodes.IirCarrier)
-					.WriteArrayUInt32Length(s => s.WriteArray(record))
-					.SendAsync(client);
+				return new PacketStream().WriteHeader(sender, receiver, GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(s => s.WriteArray(record)).SendAsync(client);
 			}
 		}
 	}

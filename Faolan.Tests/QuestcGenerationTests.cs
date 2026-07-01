@@ -16,29 +16,27 @@ namespace Faolan.Tests
 	// @0xf0/@0xf8 words) are carried per-quest. Gitea #186 / #91.
 	public class QuestcGenerationTests
 	{
+		private const int RegionEnd = 609;
 		private const string DbPath = "/home/melvin/Development/C#/Project Faolan/faolan.db";
 		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan.Tests/Assets/BeachTailsTemplate.bin";
-		private const int RegionEnd = 609;
+		private const uint BeachStarterQuestId = 10238;
 
 		// The per-character quest STATE (1 = active); the only quest-portion value that isn't quest-definition data
 		// (it comes from CharacterQuest live). Everything else now rides in QuestDefinition (seeded for 10238).
 		private const uint BeachState = 1;
-		private const uint BeachStarterQuestId = 10238;
 
+		// The production helper (gated FAOLAN_GENERATE_BEACH_QUEST_TAILS path) builds the quest portion byte-identical
+		// to the beach template's @0..1292 - so flipping the flag splices identical bytes for a fresh beach char. #186.
 		[Fact]
-		public async Task BuildSingle_ReproducesBeachStarterRegion_ByteExact()
+		public async Task BuildBeachQuestPortion_MatchesTemplate_ByteExact()
 		{
 			var def = await LoadDefinition(BeachStarterQuestId);
 			Assert.NotNull(def);
 
-			// All scalars sourced from the DB (SnapshotN/FieldEc/FieldF0/FieldF8) - no literals but the per-char state.
-			var record = QuestcRecord.BuildSingle(def, BeachState, def.SnapshotN, def.SnapshotFieldEc, def.SnapshotFieldF0, def.SnapshotFieldF8);
-			var region = new QuestcRegion { Records = { record } };
-			var built = region.ToArray();
+			var portion = BeachTailsBuilder.BuildBeachQuestPortion(def, BeachState, 0x02165EFF);
 
-			var template = File.ReadAllBytes(TemplatePath);
-			Assert.Equal(RegionEnd, built.Length);
-			Assert.Equal(template[..RegionEnd], built);
+			Assert.Equal(BeachTailsBuilder.QuestPortionLength, portion.Length);
+			Assert.Equal(File.ReadAllBytes(TemplatePath)[..1292], portion);
 		}
 
 		// The @609 objective region GENERATES from the DB per-goal model (QuestGoalDefinition rows seeded for the beach
@@ -57,6 +55,22 @@ namespace Faolan.Tests
 			Assert.Equal(template[RegionEnd..1168], built);
 		}
 
+		[Fact]
+		public async Task BuildSingle_ReproducesBeachStarterRegion_ByteExact()
+		{
+			var def = await LoadDefinition(BeachStarterQuestId);
+			Assert.NotNull(def);
+
+			// All scalars sourced from the DB (SnapshotN/FieldEc/FieldF0/FieldF8) - no literals but the per-char state.
+			var record = QuestcRecord.BuildSingle(def, BeachState, def.SnapshotN, def.SnapshotFieldEc, def.SnapshotFieldF0, def.SnapshotFieldF8);
+			var region = new QuestcRegion { Records = { record } };
+			var built = region.ToArray();
+
+			var template = File.ReadAllBytes(TemplatePath);
+			Assert.Equal(RegionEnd, built.Length);
+			Assert.Equal(template[..RegionEnd], built);
+		}
+
 		// The WHOLE quest portion of the tails (@0..1292 = Quest_c + @609 + index) regenerates byte-exact from the DB
 		// (the journal + per-goal model) plus the per-quest scalars/index data NOW SOURCED FROM THE DB - proving the
 		// .bin's entire quest region authors from server state with ZERO literals (only the per-character state). #186.
@@ -67,35 +81,15 @@ namespace Faolan.Tests
 			Assert.NotNull(def);
 			const uint instance = 0x02165EFF;
 
-			var quests = new QuestcRegion
-			{
-				Records = { QuestcRecord.BuildSingle(def, BeachState, def.SnapshotN, def.SnapshotFieldEc, def.SnapshotFieldF0, def.SnapshotFieldF8) }
-			};
+			var quests = new QuestcRegion { Records = { QuestcRecord.BuildSingle(def, BeachState, def.SnapshotN, def.SnapshotFieldEc, def.SnapshotFieldF0, def.SnapshotFieldF8) } };
 			var objectives = QuestObjectiveRegion.Build(def, instance);
 			var goalSteps = def.IndexGoalSteps.Split(',').Select(uint.Parse).ToArray();
-			var index = QuestIndexRegion.Build(
-				questIds: [def.QuestId], goalSteps: goalSteps,
-				tableField1: def.IndexTableField1, tableField2: def.IndexTableField2, tableField3: def.IndexTableField3,
-				trailerQuestId: def.QuestId, trailerWord: def.IndexTrailerWord);
+			var index = QuestIndexRegion.Build([def.QuestId], goalSteps, def.IndexTableField1, def.IndexTableField2, def.IndexTableField3, def.QuestId, def.IndexTrailerWord);
 
 			byte[] built = [.. quests.ToArray(), .. objectives.ToArray(), .. index.ToArray()];
 
 			var template = File.ReadAllBytes(TemplatePath);
 			Assert.Equal(template[..1292], built);
-		}
-
-		// The production helper (gated FAOLAN_GENERATE_BEACH_QUEST_TAILS path) builds the quest portion byte-identical
-		// to the beach template's @0..1292 - so flipping the flag splices identical bytes for a fresh beach char. #186.
-		[Fact]
-		public async Task BuildBeachQuestPortion_MatchesTemplate_ByteExact()
-		{
-			var def = await LoadDefinition(BeachStarterQuestId);
-			Assert.NotNull(def);
-
-			var portion = BeachTailsBuilder.BuildBeachQuestPortion(def, state: BeachState, instance: 0x02165EFF);
-
-			Assert.Equal(BeachTailsBuilder.QuestPortionLength, portion.Length);
-			Assert.Equal(File.ReadAllBytes(TemplatePath)[..1292], portion);
 		}
 
 		private static async Task<QuestDefinition> LoadDefinition(uint questId)
@@ -107,7 +101,10 @@ namespace Faolan.Tests
 
 		private sealed class Factory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>
 		{
-			public DatabaseContext CreateDbContext() => new DatabaseContext(options);
+			public DatabaseContext CreateDbContext()
+			{
+				return new DatabaseContext(options);
+			}
 		}
 	}
 }

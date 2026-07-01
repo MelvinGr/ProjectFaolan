@@ -1,4 +1,4 @@
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets.Opcodes;
 

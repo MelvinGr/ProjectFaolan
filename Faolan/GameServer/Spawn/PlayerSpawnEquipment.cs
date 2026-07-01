@@ -79,9 +79,7 @@ namespace Faolan.GameServer.Spawn
 				entries.Add(BuildEntry((uint)slot, item));
 			}
 
-			return entries
-				.OrderBy(e => e.Pos)
-				.ToList();
+			return entries.OrderBy(e => e.Pos).ToList();
 		}
 	}
 }

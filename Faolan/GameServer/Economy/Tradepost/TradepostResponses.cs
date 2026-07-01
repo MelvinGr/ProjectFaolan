@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Text;
 using System.Threading.Tasks;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
@@ -17,10 +18,6 @@ namespace Faolan.GameServer.Economy.Tradepost
 	// server-initiated open).
 	public static class TradepostResponses
 	{
-		// Server source endpoint for tradepost dispatches: GameCharAgent sub-id 0x59, constant across both
-		// captures (same bytes as NewCharacterReadyForPlayScreenSender).
-		private const uint GameCharAgentInstance = 0x59;
-
 		// The client's TradepostInterface object instance - constant 0x08006F31 across both captures (different
 		// chars/sessions), so it appears to be a deterministic client-side allocation. Used when the server opens
 		// the tradepost without an inbound packet to echo (the auctioneer-interact / GM trigger). It is the same
@@ -28,6 +25,13 @@ namespace Faolan.GameServer.Economy.Tradepost
 		public const uint DefaultInterfaceInstance = MailConstants.EndpointClass;
 
 		private const float AccessRadius = 15.0f;
+
+		// The captured DispatchSendMailResult message for a player SendMail (F500): a generic result remoteformat.
+		private const string SendMailResultXml = "<remoteformat id=\"0\" category=\"0\" key=\"C4O?^XE&#39;^VC4O?^XE&#39;^V\" knubot=\"0\"  ></remoteformat>";
+
+		// Server source endpoint for tradepost dispatches: GameCharAgent sub-id 0x59, constant across both
+		// captures (same bytes as NewCharacterReadyForPlayScreenSender).
+		private const uint GameCharAgentInstance = 0x59;
 
 		// DispatchOpenTradepost body = the auctioneer access point [posX][posY][posZ][maxRadius] (big-endian floats).
 		// This captured value (Tortage auctioneer + 15.0) is kept only as the golden-test oracle; live opens build
@@ -42,18 +46,59 @@ namespace Faolan.GameServer.Economy.Tradepost
 		// docs/tradepost-protocol.md. The LIVE search path is fully DB-driven (SendSearchResults -> TradepostListingCodec);
 		// this blob is now kept ONLY as the byte-exact golden-test oracle (BuildSearchResultsBytes / TradepostResponseTests),
 		// the same role CapturedAccessPointBody plays for the open packet - it is no longer sent at runtime.
-		private static readonly byte[] SearchResultsReplayBody = Convert.FromHexString(
-			"000007e220d82b60902c95450c0457f300054a6f636b6f00000000000f4240000000010000755d000000000000000015" +
-			"da16700000008008c5aab28189ec8aec201205080010a1081204081a1001120708820210c0843d12090889021085aa8c" +
-			"d1061a530a140de5971bd61556c078261d9280fde2255a5c7bf112140de5971bd61556c078261d9280fde2255a5c7bf1" +
-			"1a140de5971bd61556c078261d9280fde2255a5c7bf125970a3e002d970a3e0038014500000000");
+		private static readonly byte[] SearchResultsReplayBody = Convert.FromHexString("000007e220d82b60902c95450c0457f300054a6f636b6f00000000000f4240000000010000755d000000000000000015" +
+		                                                                               "da16700000008008c5aab28189ec8aec201205080010a1081204081a1001120708820210c0843d12090889021085aa8c" +
+		                                                                               "d1061a530a140de5971bd61556c078261d9280fde2255a5c7bf112140de5971bd61556c078261d9280fde2255a5c7bf1" +
+		                                                                               "1a140de5971bd61556c078261d9280fde2255a5c7bf125970a3e002d970a3e0038014500000000");
+
+		// Finalized on-the-wire bytes (length + crc filled) — for byte-exact golden tests vs the captured packets.
+		// Open uses the captured access-point body (the oracle); search uses the replay body.
+		public static byte[] BuildOpenTradepostBytes(uint interfaceInstance)
+		{
+			return Finalize(Build(TradepostProtocol.InterfaceMethod.DispatchOpenTradepost, CapturedAccessPointBody, interfaceInstance));
+		}
+
+		public static byte[] BuildSearchResultsBytes(uint interfaceInstance)
+		{
+			return Finalize(Build(TradepostProtocol.InterfaceMethod.DispatchSearchResults, SearchResultsReplayBody, interfaceInstance));
+		}
+
+		// Push a mail (DispatchMailMessage 0x2002), built byte-exact from the Mail row by MailMessageCodec. The base
+		// form (includeAttachments=false) is the mailbox-poll/preview; with attachments it carries the bought item.
+		public static Task SendMailMessage(INetworkClient client, Mail mail, bool includeAttachments, uint interfaceInstance = DefaultInterfaceInstance)
+		{
+			return Build(TradepostProtocol.InterfaceMethod.DispatchMailMessage, MailMessageCodec.Build(mail, includeAttachments), interfaceInstance).SendAsync(client);
+		}
+
+		// DispatchSendMailResult (0x2003) [u8 success][u8 error] - the result of a send/mark/delete op.
+		public static Task SendMailResult(INetworkClient client, bool success, byte error = 0, uint interfaceInstance = DefaultInterfaceInstance)
+		{
+			return Build(TradepostProtocol.InterfaceMethod.DispatchSendMailResult, [Convert.ToByte(success), error], interfaceInstance).SendAsync(client);
+		}
+
+		// DispatchSendMailResult for a player SendMail (0x2002 -> 0x2003): [u8 success][u16 len + remoteformat XML]
+		// (byte-shape from the sell capture F500). success=0 lets the client show "couldn't send" (e.g. bad recipient).
+		public static Task SendMailSendResult(INetworkClient client, bool success, uint interfaceInstance = DefaultInterfaceInstance)
+		{
+			var s = new FaolanStream();
+			s.WriteByte(Convert.ToByte(success));
+			s.WriteArrayUInt16Length(Encoding.ASCII.GetBytes(SendMailResultXml));
+			return Build(TradepostProtocol.InterfaceMethod.DispatchSendMailResult, s.ToArray(), interfaceInstance).SendAsync(client);
+		}
 
 		// Open the auction house at `position` (the auctioneer/player location) so the client's within-radius check
 		// passes. The real trigger is the player interacting with an auctioneer NPC; for now a GM command supplies
 		// the player's live position (the capture shows DispatchOpenTradepost precedes TradepostOpen).
-		public static Task SendOpenTradepost(INetworkClient client, Vector3 position, uint interfaceInstance = DefaultInterfaceInstance) =>
-			Build(TradepostProtocol.InterfaceMethod.DispatchOpenTradepost, BuildAccessPointBody(position, AccessRadius), interfaceInstance)
-				.SendAsync(client);
+		public static Task SendOpenTradepost(INetworkClient client, Vector3 position, uint interfaceInstance = DefaultInterfaceInstance)
+		{
+			return Build(TradepostProtocol.InterfaceMethod.DispatchOpenTradepost, BuildAccessPointBody(position, AccessRadius), interfaceInstance).SendAsync(client);
+		}
+
+		// DispatchRetrieveMailResult (0x2004) - a single 0x01 byte (the "mailbox retrieved" ack in the capture).
+		public static Task SendRetrieveMailResult(INetworkClient client, uint interfaceInstance = DefaultInterfaceInstance)
+		{
+			return Build(TradepostProtocol.InterfaceMethod.DispatchRetrieveMailResult, [0x01], interfaceInstance).SendAsync(client);
+		}
 
 		// Reply to TradepostItemSearch with DB-backed listings for the searched item (rows built byte-exact by
 		// TradepostListingCodec, cheapest first). Echoes the inbound TradepostInterface instance so the client
@@ -70,52 +115,21 @@ namespace Faolan.GameServer.Economy.Tradepost
 		public static Task SendSearchResults(INetworkClient client, ConanPacket inbound, IReadOnlyCollection<TradepostListing> listings)
 		{
 			var head = (uint)(listings.Count + 1) * 0x3F1;
-			return Build(TradepostProtocol.InterfaceMethod.DispatchSearchResults, TradepostListingCodec.Build(head, listings), inbound.Sender.Instance)
-				.SendAsync(client);
-		}
-
-		// Push a mail (DispatchMailMessage 0x2002), built byte-exact from the Mail row by MailMessageCodec. The base
-		// form (includeAttachments=false) is the mailbox-poll/preview; with attachments it carries the bought item.
-		public static Task SendMailMessage(INetworkClient client, Faolan.Core.Database.Tables.Mail mail, bool includeAttachments, uint interfaceInstance = DefaultInterfaceInstance) =>
-			Build(TradepostProtocol.InterfaceMethod.DispatchMailMessage, MailMessageCodec.Build(mail, includeAttachments), interfaceInstance)
-				.SendAsync(client);
-
-		// DispatchSendMailResult (0x2003) [u8 success][u8 error] - the result of a send/mark/delete op.
-		public static Task SendMailResult(INetworkClient client, bool success, byte error = 0, uint interfaceInstance = DefaultInterfaceInstance) =>
-			Build(TradepostProtocol.InterfaceMethod.DispatchSendMailResult, [Convert.ToByte(success), error], interfaceInstance)
-				.SendAsync(client);
-
-		// The captured DispatchSendMailResult message for a player SendMail (F500): a generic result remoteformat.
-		private const string SendMailResultXml =
-			"<remoteformat id=\"0\" category=\"0\" key=\"C4O?^XE&#39;^VC4O?^XE&#39;^V\" knubot=\"0\"  ></remoteformat>";
-
-		// DispatchSendMailResult for a player SendMail (0x2002 -> 0x2003): [u8 success][u16 len + remoteformat XML]
-		// (byte-shape from the sell capture F500). success=0 lets the client show "couldn't send" (e.g. bad recipient).
-		public static Task SendMailSendResult(INetworkClient client, bool success, uint interfaceInstance = DefaultInterfaceInstance)
-		{
-			var s = new FaolanStream();
-			s.WriteByte(Convert.ToByte(success));
-			s.WriteArrayUInt16Length(System.Text.Encoding.ASCII.GetBytes(SendMailResultXml));
-			return Build(TradepostProtocol.InterfaceMethod.DispatchSendMailResult, s.ToArray(), interfaceInstance).SendAsync(client);
-		}
-
-		// DispatchRetrieveMailResult (0x2004) - a single 0x01 byte (the "mailbox retrieved" ack in the capture).
-		public static Task SendRetrieveMailResult(INetworkClient client, uint interfaceInstance = DefaultInterfaceInstance) =>
-			Build(TradepostProtocol.InterfaceMethod.DispatchRetrieveMailResult, [0x01], interfaceInstance)
-				.SendAsync(client);
-
-		private static byte[] BuildAccessPointBody(Vector3 position, float radius)
-		{
-			var s = new FaolanStream(new byte[16], writable: true);
-			s.WriteVector3BigEndian(position);
-			s.WriteFloatBigEndian(radius);
-			return s.ToArray();
+			return Build(TradepostProtocol.InterfaceMethod.DispatchSearchResults, TradepostListingCodec.Build(head, listings), inbound.Sender.Instance).SendAsync(client);
 		}
 
 		private static PacketStream Build(TradepostProtocol.InterfaceMethod method, byte[] body, uint interfaceInstance)
 		{
-			var sender = new ProtoEndpoint { Type = ConanEndpoints.GameCharAgentType, Instance = GameCharAgentInstance };
-			var receiver = new ProtoEndpoint { Type = TradepostProtocol.InterfaceType, Instance = interfaceInstance };
+			var sender = new ProtoEndpoint
+			{
+				Type = ConanEndpoints.GameCharAgentType,
+				Instance = GameCharAgentInstance
+			};
+			var receiver = new ProtoEndpoint
+			{
+				Type = TradepostProtocol.InterfaceType,
+				Instance = interfaceInstance
+			};
 
 			var stream = new PacketStream();
 			stream.WriteHeader(sender, receiver, method);
@@ -123,13 +137,13 @@ namespace Faolan.GameServer.Economy.Tradepost
 			return stream;
 		}
 
-		// Finalized on-the-wire bytes (length + crc filled) — for byte-exact golden tests vs the captured packets.
-		// Open uses the captured access-point body (the oracle); search uses the replay body.
-		public static byte[] BuildOpenTradepostBytes(uint interfaceInstance) =>
-			Finalize(Build(TradepostProtocol.InterfaceMethod.DispatchOpenTradepost, CapturedAccessPointBody, interfaceInstance));
-
-		public static byte[] BuildSearchResultsBytes(uint interfaceInstance) =>
-			Finalize(Build(TradepostProtocol.InterfaceMethod.DispatchSearchResults, SearchResultsReplayBody, interfaceInstance));
+		private static byte[] BuildAccessPointBody(Vector3 position, float radius)
+		{
+			var s = new FaolanStream(new byte[16], true);
+			s.WriteVector3BigEndian(position);
+			s.WriteFloatBigEndian(radius);
+			return s.ToArray();
+		}
 
 		private static byte[] Finalize(PacketStream stream)
 		{

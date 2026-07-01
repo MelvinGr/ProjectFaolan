@@ -103,9 +103,7 @@ namespace Faolan.Web.Components.Pages
 				}
 
 				if (!overCap)
-				{
 					_fks[column] = new FkOptions(items.OrderBy(o => o.Label).ToList(), fk.Properties[0].IsNullable);
-				}
 			}
 		}
 

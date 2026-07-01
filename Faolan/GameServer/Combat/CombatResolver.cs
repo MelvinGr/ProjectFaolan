@@ -13,6 +13,9 @@ namespace Faolan.GameServer.Combat
 		// memory rdb_npc_hp_not_in_client) - so this curve is the only source for an un-captured creature.
 		public const uint DefaultNpcMaxHealth = 63; // the L1 civilian baseline (was a flat 100 placeholder)
 
+		// The steady civilian-baseline slope past the last anchor (L40->60 grow ~53 HP/level), used to extrapolate.
+		private const uint NpcHpPerLevelAboveCap = 53;
+
 		// Captured CIVILIAN-baseline HP per level (NpcSpawns.Health; HP is level-derived - the same value recurs across
 		// unrelated creatures, e.g. L20->933 for 43 NPCs, L40->2217 for 109). High-confidence anchors; HP is
 		// piecewise-linear between them. Validates to <1% at unsampled levels (L35->1953, L45->2482, L11->386 vs 382).
@@ -20,9 +23,6 @@ namespace Faolan.GameServer.Combat
 		[
 			(1, 63), (5, 150), (10, 318), (15, 658), (20, 933), (30, 1688), (40, 2217), (50, 2746), (60, 3276)
 		];
-
-		// The steady civilian-baseline slope past the last anchor (L40->60 grow ~53 HP/level), used to extrapolate.
-		private const uint NpcHpPerLevelAboveCap = 53;
 
 		// NPC max health from its level: piecewise-linear over the captured baseline anchors, +53/level beyond the
 		// last. Level 0 maps to the level-1 value. Tougher creatures are a multiplier on this in retail; without

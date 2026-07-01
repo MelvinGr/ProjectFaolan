@@ -1,5 +1,5 @@
 using System;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets.Opcodes;
 
@@ -21,11 +21,11 @@ namespace Faolan.GameServer.World
 	// usually 0 (a small id in some captures, undecoded); the 0x7E2 / 4 / 1 words are constant across all 570 captures.
 	public static class GameActionListCodec
 	{
-		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.GameActionListIIR;
-		private const uint WireType = EntityClass.Character; // the shared 0xC350 type word
-		public const uint Head = 0x000007E2;
 		public const uint ConstFour = 4;
+		public const uint Head = 0x000007E2;
+		public const uint SubOpcode = (uint)GameServer0X2000RespondsOpcodes.GameActionListIIR;
 		public const ulong ConstOne = 1;
+		private const uint WireType = EntityClass.Character; // the shared 0xC350 type word
 
 		// Builds the GameActionList body for `dynelHandle`, delivered to `frameHandle`, carrying `actionTail` verbatim.
 		public static byte[] BuildBody(uint frameHandle, uint dynelHandle, uint field3, byte[] actionTail)
@@ -45,8 +45,6 @@ namespace Faolan.GameServer.World
 				.ToArray();
 		}
 
-		public sealed record Parsed(uint FrameHandle, uint DynelHandle, uint Field3, byte[] ActionTail);
-
 		// Parses a captured/built body back into its header fields + the verbatim action tail (the inverse of BuildBody;
 		// validates the constant 0x7E2 / 4 / 1 words so a malformed body is rejected rather than mis-framed).
 		public static Parsed Parse(byte[] body)
@@ -57,15 +55,18 @@ namespace Faolan.GameServer.World
 			var subop = r.ReadUInt32();
 			if (subop != SubOpcode)
 				throw new InvalidOperationException($"GameActionList: subop 0x{subop:X} != 0x{SubOpcode:X}");
+
 			r.ReadUInt32(); // 0xC350 type word
 			var frameHandle = r.ReadUInt32();
 
 			var flag = r.ReadByte();
 			if (flag != 0)
 				throw new InvalidOperationException($"GameActionList: flag 0x{flag:X} != 0");
+
 			var head = r.ReadUInt32();
 			if (head != Head)
 				throw new InvalidOperationException($"GameActionList: head 0x{head:X} != 0x{Head:X}");
+
 			var dynelHandle = r.ReadUInt32();
 			var field3 = r.ReadUInt32();
 			var four = r.ReadUInt32();
@@ -76,5 +77,7 @@ namespace Faolan.GameServer.World
 			var tail = r.ReadArray(r.Length - r.Position);
 			return new Parsed(frameHandle, dynelHandle, field3, tail);
 		}
+
+		public sealed record Parsed(uint FrameHandle, uint DynelHandle, uint Field3, byte[] ActionTail);
 	}
 }

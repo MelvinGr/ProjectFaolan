@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Numerics;
 using Faolan.Core.Database.Tables;
 using Faolan.GameServer.Spawn;
 using Faolan.Importer.Extractors;
@@ -31,9 +32,20 @@ namespace Faolan.Tests
 			Assert.Equal(captured[40], (byte)entry.Waypoints.Count); // count byte == extracted waypoints
 
 			// Materialize the DB rows the importer would persist, then rebuild from them via the DB-sourced overload.
-			var path = new PatrolPath { MapId = entry.MapId, Position = entry.Position, Speed = entry.Speed };
+			var path = new PatrolPath
+			{
+				MapId = entry.MapId,
+				Position = entry.Position,
+				Speed = entry.Speed
+			};
 			for (var i = 0; i < entry.Waypoints.Count; i++)
-				path.Waypoints.Add(new PatrolWaypoint { Ordinal = i, X = entry.Waypoints[i].X, Y = entry.Waypoints[i].Y, Z = entry.Waypoints[i].Z });
+				path.Waypoints.Add(new PatrolWaypoint
+				{
+					Ordinal = i,
+					X = entry.Waypoints[i].X,
+					Y = entry.Waypoints[i].Y,
+					Z = entry.Waypoints[i].Z
+				});
 
 			var built = MoveTaskBuilder.BuildPatrol(handle, path);
 
@@ -44,7 +56,7 @@ namespace Faolan.Tests
 		public void Extractor_SkipsNonCanonicalMoveTask()
 		{
 			// A stationary MoveTask (task type 0x06) is not a patrol; the extractor must ignore it.
-			var stationary = MoveTaskBuilder.BuildStationary(0x00017E03u, new System.Numerics.Vector3(333f, 7f, 706f));
+			var stationary = MoveTaskBuilder.BuildStationary(0x00017E03u, new Vector3(333f, 7f, 706f));
 			Assert.Empty(PatrolPathExtractor.Extract([MapChange(4010), MoveTask(stationary)]));
 		}
 
@@ -57,14 +69,17 @@ namespace Faolan.Tests
 			return new CapturedPacket(0, false, 0x2000, BinaryPrimitives.ReadUInt32BigEndian(carrierBody.AsSpan(4, 4)), full);
 		}
 
-		private static CapturedPacket MoveTask(byte[] carrierBody) => Frame(carrierBody);
-
 		private static CapturedPacket MapChange(uint mapId)
 		{
 			var body = new byte[38];
 			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), MapChangeSubOpcode);
 			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(34, 4), mapId);
 			return Frame(body);
+		}
+
+		private static CapturedPacket MoveTask(byte[] carrierBody)
+		{
+			return Frame(carrierBody);
 		}
 	}
 }

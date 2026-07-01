@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Numerics;
 using System.Threading.Tasks;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
@@ -26,13 +26,23 @@ namespace Faolan.GameServer
 	// only ever carried ONE spot, so the multi-spot list framing is not pinned - we send one (the closest known point).
 	public partial class GameServerListener
 	{
-		// Sender is GameCharAgent at instance 0x59 (NB: NOT 0x58 like the add/remove-item LoginWorld201CSender).
-		private static readonly byte[] ResurrectionSpotsSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59);
+		private const uint ResSpotConstA = 0x0000C7A0;
+		private const uint ResSpotConstB = 0x0000000A;
 
 		// Capture-derived constants whose semantics aren't decoded yet (same in both captured deaths).
 		private const uint ResSpotsHeader = 0x000007E2;
-		private const uint ResSpotConstA = 0x0000C7A0;
-		private const uint ResSpotConstB = 0x0000000A;
+
+		// Sender is GameCharAgent at instance 0x59 (NB: NOT 0x58 like the add/remove-item LoginWorld201CSender).
+		private static readonly byte[] ResurrectionSpotsSender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59);
+
+		// Pushes the death/release screen: the player's death position + the resurrection spots they can pick.
+		private Task SendValidResurrectionSpots(INetworkClient client, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots)
+		{
+			var ps = new PacketStream();
+			ps.WriteHeader(ResurrectionSpotsSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchValidResurrectionSpots);
+			WriteValidResurrectionSpotsBody(ps, deathPosition, spots);
+			return ps.SendAsync(client);
+		}
 
 		internal static void WriteValidResurrectionSpotsBody(FaolanStream s, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots)
 		{
@@ -50,15 +60,6 @@ namespace Faolan.GameServer
 			}
 
 			s.WriteByte(0x00);
-		}
-
-		// Pushes the death/release screen: the player's death position + the resurrection spots they can pick.
-		private Task SendValidResurrectionSpots(INetworkClient client, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots)
-		{
-			var ps = new PacketStream();
-			ps.WriteHeader(ResurrectionSpotsSender, LoginWorld201CReceiver(client), GameCharInterfaceDispatchOpcodes.DispatchValidResurrectionSpots);
-			WriteValidResurrectionSpotsBody(ps, deathPosition, spots);
-			return ps.SendAsync(client);
 		}
 	}
 }

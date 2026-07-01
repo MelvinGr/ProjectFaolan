@@ -22,8 +22,7 @@ namespace Faolan.Tests
 			con.Open();
 			using var cmd = con.CreateCommand();
 			// All world-object classes (not just dynels) - they share the ProtoSimpleDynelIIR identity message.
-			cmd.CommandText = "SELECT Name,DisplayName,CarsGroup,IsClosed,QuestItemEffect,TemplateItemId,Kdtree,WaypointType,KdTreeTail,Data " +
-			                  "FROM WorldObjects WHERE DisplayName IS NOT NULL";
+			cmd.CommandText = "SELECT Name,DisplayName,CarsGroup,IsClosed,QuestItemEffect,TemplateItemId,Kdtree,WaypointType,KdTreeTail,Data " + "FROM WorldObjects WHERE DisplayName IS NOT NULL";
 			using var r = cmd.ExecuteReader();
 			int total = 0, ok = 0, parseFail = 0, mismatch = 0, builtFromDb = 0;
 			while (r.Read())
@@ -36,11 +35,19 @@ namespace Faolan.Tests
 					DisplayName = r.GetString(1),
 					CarsGroup = (uint)r.GetInt64(2),
 					IsClosed = r.GetBoolean(3),
-					QuestItemEffect = r.IsDBNull(4) ? null : (uint)r.GetInt64(4),
-					TemplateItemId = r.IsDBNull(5) ? null : (uint)r.GetInt64(5),
+					QuestItemEffect = r.IsDBNull(4)
+						? null
+						: (uint)r.GetInt64(4),
+					TemplateItemId = r.IsDBNull(5)
+						? null
+						: (uint)r.GetInt64(5),
 					Kdtree = (uint)r.GetInt64(6),
-					WaypointType = r.IsDBNull(7) ? null : (uint)r.GetInt64(7),
-					KdTreeTail = r.IsDBNull(8) ? null : (byte[])r[8]
+					WaypointType = r.IsDBNull(7)
+						? null
+						: (uint)r.GetInt64(7),
+					KdTreeTail = r.IsDBNull(8)
+						? null
+						: (byte[])r[8]
 				};
 				var data = (byte[])r[9];
 				var body = WorldObjectBuilder.ExtractBody(data);

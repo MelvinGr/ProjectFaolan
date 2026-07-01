@@ -24,8 +24,28 @@ namespace Faolan.GameServer.World
 		// Gracefully fade an entity out for the players in range (n3ToClientFade) - used for expired loot.
 		Task BroadcastEntityFade(WorldEntity entity);
 
+		// Broadcast an NPC's aggro on a target (HateListUpdate + ThreatLevel) to nearby viewers, so the threat/aggro is
+		// visible the tick it engages (#216).
+		Task BroadcastNpcAggro(WorldEntity npc, WorldEntity target);
+
+		// Broadcast an NPC's combat-mode change (engaged -> draw weapon, disengaged -> sheathe) to the players who can
+		// see it, as the captured stat-20 update. Without it the NPC swings empty-handed (#218).
+		Task BroadcastNpcCombatMode(WorldEntity npc, bool inCombat);
+
+		// Broadcast an NPC's tick step (its MoveTask transform) to the players who can see it - chasing a target or
+		// returning home - so they watch it move.
+		Task BroadcastNpcMove(WorldEntity npc);
+
+		// (Re-)issue a patrolling NPC's captured route to the players who can see it, so it keeps walking its loop
+		// (retail re-paths idle patrols; #266).
+		Task BroadcastNpcPatrol(WorldEntity npc);
+
 		// Re-render a respawned NPC for the players in range (its stored FA015807 spawn body).
 		Task BroadcastNpcRespawn(WorldEntity npc);
+
+		// Broadcast an NPC's StopIIR (final position + facing) when it arrives home and stops moving, closing the move
+		// it was streaming (#190).
+		Task BroadcastNpcStop(WorldEntity npc);
 
 		// Convert a dead NPC's corpse to a lootable bag in place (after its death-animation linger), or despawn it if
 		// no loot bag can be built for the map.
@@ -33,6 +53,37 @@ namespace Faolan.GameServer.World
 
 		// Push a 0x96B8DC59 vitals update for the player (regen tick, NPC-attack damage).
 		Task PushVitals(INetworkClient client, EntityVitals vitals);
+
+		// Re-run the world-entry render path for the player (used to respawn them at a resurrection point).
+		Task ReenterWorld(INetworkClient client);
+
+		// Remove an active buff icon: the retail "end-twin" of the apply (the SAME ApplySpell 0x6B87E316 carrier with
+		// the spell id's rank byte set to 1 and an EMPTY payload). Confirmed from the combat captures - retail expires
+		// timed buffs by sending this, not by letting the client self-expire - so the tick fires it when a tracked
+		// buff's duration elapses, making the icon disappear at 0 instead of sticking. applyTo/applyFrom mirror the
+		// apply: equal for a self-buff, applyTo=player + applyFrom=NPC for an NPC-cast debuff (#274).
+		Task SendBuffRemoval(INetworkClient client, uint applyTo, uint applyFrom, uint appliedSpellId);
+
+		// The floating combat-damage number over the player when an NPC hits them: DamageResultIIR (0xFEC4158A),
+		// target=player + attacker=NPC (the player-attacks-NPC direction already rides CombatService). #274.
+		Task SendDamageNumber(INetworkClient client, uint targetHandle, uint attackerHandle, uint damage);
+
+		// The in-session DEATH action (BccIIR 0x642CD3D6, behaviorId 41877) that transitions the live SimpleChar INTO
+		// the dead state (bcc_state 29) so the release window shows - the in-session analogue of the login spawn's
+		// bcc_state=29. Sent at the end of the death sequence (#214).
+		Task SendDeathBcc(INetworkClient client, uint dyingHandle);
+
+		// The self-applied death-state effect (ApplySpell 0x6B87E316, spell 0x0009F000) retail sends right after the
+		// release screen (#214). Without it the SimpleCharKilledBy + 0x2024 still left the client alive in-client.
+		Task SendDeathEffect(INetworkClient client, uint dyingHandle);
+
+		// The death-pose MoveTask (0x96C46740 movement-type 0x06) retail forces onto the dying player just before the
+		// kill record (#214); puts the avatar into the dead/incapacitated state at the death position.
+		Task SendDeathPose(INetworkClient client, uint dyingHandle, Vector3 deathPosition);
+
+		// The explicit death trigger (SimpleCharKilledByUpdateIIR 0xB066AFC2) the client needs to enter the dead
+		// (release-screen) state - a health=0 StatUpdate alone doesn't (#214). Sent before SendResurrectionScreen.
+		Task SendDeathTrigger(INetworkClient client, uint dyingHandle, uint killerEndpoint);
 
 		// Send the NPC's attack-animation ack to the player it hit (the decoded "second BccAck" - BehaviorControlCenterIIR
 		// with actor = NPC handle), so the client plays the NPC's swing + the player's hit-react. Visual only - the HP
@@ -43,79 +94,28 @@ namespace Faolan.GameServer.World
 		// damage/effect is the captured payload; visual + the HP move rides the caller's PushVitals (like the swing).
 		Task SendNpcSpellCast(INetworkClient client, uint npcHandle, NpcSpellCast spell);
 
-		// The floating combat-damage number over the player when an NPC hits them: DamageResultIIR (0xFEC4158A),
-		// target=player + attacker=NPC (the player-attacks-NPC direction already rides CombatService). #274.
-		Task SendDamageNumber(INetworkClient client, uint targetHandle, uint attackerHandle, uint damage);
-
-		// A DoT tick's StatDamageIIR (0xE9F24184): the health effect on the player from an active bleed/HoT debuff -
-		// statValue = the player's resulting HealthCurrent, delta the per-tick change, type the damage-school flag,
-		// caster the NPC, spellBaseId the wire id >> 8. Paired with PushVitals for the bar move. #274.
-		Task SendStatDamage(INetworkClient client, uint targetHandle, uint statValue, int delta, uint type, uint casterHandle, uint spellBaseId);
-
-		// Remove an active buff icon: the retail "end-twin" of the apply (the SAME ApplySpell 0x6B87E316 carrier with
-		// the spell id's rank byte set to 1 and an EMPTY payload). Confirmed from the combat captures - retail expires
-		// timed buffs by sending this, not by letting the client self-expire - so the tick fires it when a tracked
-		// buff's duration elapses, making the icon disappear at 0 instead of sticking. applyTo/applyFrom mirror the
-		// apply: equal for a self-buff, applyTo=player + applyFrom=NPC for an NPC-cast debuff (#274).
-		Task SendBuffRemoval(INetworkClient client, uint applyTo, uint applyFrom, uint appliedSpellId);
-
-		// Broadcast an NPC's tick step (its MoveTask transform) to the players who can see it - chasing a target or
-		// returning home - so they watch it move.
-		Task BroadcastNpcMove(WorldEntity npc);
-
-		// (Re-)issue a patrolling NPC's captured route to the players who can see it, so it keeps walking its loop
-		// (retail re-paths idle patrols; #266).
-		Task BroadcastNpcPatrol(WorldEntity npc);
-
-		// Broadcast an NPC's combat-mode change (engaged -> draw weapon, disengaged -> sheathe) to the players who can
-		// see it, as the captured stat-20 update. Without it the NPC swings empty-handed (#218).
-		Task BroadcastNpcCombatMode(WorldEntity npc, bool inCombat);
-
-		// Broadcast an NPC's aggro on a target (HateListUpdate + ThreatLevel) to nearby viewers, so the threat/aggro is
-		// visible the tick it engages (#216).
-		Task BroadcastNpcAggro(WorldEntity npc, WorldEntity target);
-
-		// Broadcast an NPC's StopIIR (final position + facing) when it arrives home and stops moving, closing the move
-		// it was streaming (#190).
-		Task BroadcastNpcStop(WorldEntity npc);
-
-		// Re-run the world-entry render path for the player (used to respawn them at a resurrection point).
-		Task ReenterWorld(INetworkClient client);
-
 		// Push the death/release screen: DispatchValidResurrectionSpots with the death position + the spots the
 		// player may resurrect at. The client replies with RespawnMe(spawnPointId) (handled inbound).
 		Task SendResurrectionScreen(INetworkClient client, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots);
 
-		// The explicit death trigger (SimpleCharKilledByUpdateIIR 0xB066AFC2) the client needs to enter the dead
-		// (release-screen) state - a health=0 StatUpdate alone doesn't (#214). Sent before SendResurrectionScreen.
-		Task SendDeathTrigger(INetworkClient client, uint dyingHandle, uint killerEndpoint);
-
-		// The self-applied death-state effect (ApplySpell 0x6B87E316, spell 0x0009F000) retail sends right after the
-		// release screen (#214). Without it the SimpleCharKilledBy + 0x2024 still left the client alive in-client.
-		Task SendDeathEffect(INetworkClient client, uint dyingHandle);
-
-		// The death-pose MoveTask (0x96C46740 movement-type 0x06) retail forces onto the dying player just before the
-		// kill record (#214); puts the avatar into the dead/incapacitated state at the death position.
-		Task SendDeathPose(INetworkClient client, uint dyingHandle, Vector3 deathPosition);
-
 		// The revive action (BccIIR 0x642CD3D6) retail sends on RespawnMe to transition the player out of the Dead
 		// substate (bcc_state 29→1) - closes the release window + revives IN PLACE, NOT a world re-entry (#214).
 		Task SendRevive(INetworkClient client, uint handle, uint respawnPointId);
-
-		// The same-map revive teleport (IntendedTeleport 0x10D27BC0) relocating the revived player to the chosen res
-		// point with NO loading screen. playfieldToken MUST be the client's LIVE token (Zone.PlayfieldToken) so the
-		// client recognizes the same playfield and just repositions (#214).
-		Task SendReviveTeleport(INetworkClient client, uint handle, uint mapId, uint playfieldToken);
 
 		// The actual position move to the res point: the revive n3Teleport (0x5A32F0D7) carrying the destination
 		// position. The IntendedTeleport above only confirms the playfield (no move); retail follows it with THIS to
 		// relocate the player (#214, decoded from the beach resurrect sequence IntendedTeleport -> n3Teleport).
 		Task SendReviveDestination(INetworkClient client, uint handle, uint mapId, Vector3 position, float facingX, float facingZ);
 
-		// The in-session DEATH action (BccIIR 0x642CD3D6, behaviorId 41877) that transitions the live SimpleChar INTO
-		// the dead state (bcc_state 29) so the release window shows - the in-session analogue of the login spawn's
-		// bcc_state=29. Sent at the end of the death sequence (#214).
-		Task SendDeathBcc(INetworkClient client, uint dyingHandle);
+		// The same-map revive teleport (IntendedTeleport 0x10D27BC0) relocating the revived player to the chosen res
+		// point with NO loading screen. playfieldToken MUST be the client's LIVE token (Zone.PlayfieldToken) so the
+		// client recognizes the same playfield and just repositions (#214).
+		Task SendReviveTeleport(INetworkClient client, uint handle, uint mapId, uint playfieldToken);
+
+		// A DoT tick's StatDamageIIR (0xE9F24184): the health effect on the player from an active bleed/HoT debuff -
+		// statValue = the player's resulting HealthCurrent, delta the per-tick change, type the damage-school flag,
+		// caster the NPC, spellBaseId the wire id >> 8. Paired with PushVitals for the bar move. #274.
+		Task SendStatDamage(INetworkClient client, uint targetHandle, uint statValue, int delta, uint type, uint casterHandle, uint spellBaseId);
 	}
 
 	// The live in-memory world (docs/archive/server-architecture-roadmap.md): owns the world model + the connected players'
@@ -141,6 +141,12 @@ namespace Faolan.GameServer.World
 		// wall-clock dt, not the nominal period, so a late tick doesn't desync the rates.
 		private const double BaseTickSeconds = 0.1;
 
+		// Applies damage/heal-over-time from active DoT debuffs (#274). Each tracked buff with a DotDelta bleeds (or
+		// heals) the target's HealthCurrent on a fixed cadence, mirroring the captured StatDamageIIR cycle: the tick
+		// moves the player's vitals by the delta and sends the byte-exact StatDamageIIR (+ a PushVitals for the bar).
+		// Retail's bleeds tick roughly every couple of seconds; DotTickSeconds matches that.
+		private const double DotTickSeconds = 2.0;
+
 		// Vitals regen cadence (rate-based; dt-scaled by the real elapsed time when it fires).
 		private const double RegenIntervalSeconds = 1.0;
 
@@ -153,6 +159,10 @@ namespace Faolan.GameServer.World
 
 		// Players currently dead, with the seconds remaining until respawn (counted down every tick).
 		private readonly ConcurrentDictionary<INetworkClient, double> _playerRespawnRemaining = new ConcurrentDictionary<INetworkClient, double>();
+
+		// Cached DoT effect per base spell id (Spell.DotDelta/DotType): looked up once per spell, then reused so the
+		// per-cast NPC path doesn't hit the DB. (delta 0 = not a DoT.)
+		private readonly ConcurrentDictionary<uint, (int Delta, uint Type)> _dotEffects = new ConcurrentDictionary<uint, (int Delta, uint Type)>();
 		private readonly ConcurrentDictionary<uint, HashSet<uint>> _discoveredRespawnByCharacter = new ConcurrentDictionary<uint, HashSet<uint>>();
 
 		// Per-map resurrection points + per-character discovered sets, cached to keep the discovery tick off the DB.
@@ -175,6 +185,13 @@ namespace Faolan.GameServer.World
 			_database = database;
 			_agents = agents;
 			_logger = logger;
+		}
+
+		// True while the player is dead and awaiting resurrection (used to route the c2s 0x2024 to RespawnMe rather
+		// than the login ReadyForPlayScreen - they share the opcode).
+		public bool IsAwaitingRespawn(INetworkClient client)
+		{
+			return Players.TryGetValue(client, out var entity) && entity.Vitals?.IsDead == true;
 		}
 
 		// The player's live world entity for this connection (authoritative transform + vitals), or null if not in the
@@ -208,13 +225,18 @@ namespace Faolan.GameServer.World
 				entity.GodMode = account.GmGodMode;
 				entity.Invisible = account.GmInvisible;
 			}
+
 			var instanceId = World.ResolveEntryInstance(existing, character.MapId, instanceMode);
 			// The DB rotation is a quaternion; the live sim/movement layer is Vector3 (Euler degrees) - bridge it.
 			var zone = World.Place(entity, character.MapId, instanceId, character.Position, character.Rotation.ToVector3());
-			var nearby = zone
-				.PlayersInRange(character.Position, PlayerInterestRange, handle)
-				.Count();
-			_logger.LogInformation("World: player {Name} (0x{Handle:X8}) entered map {Map} instance 0x{Instance:X8} at {Pos}; {Nearby} other player(s) in range.", entity.Name, handle, character.MapId, instanceId, character.Position, nearby);
+			var nearby = zone.PlayersInRange(character.Position, PlayerInterestRange, handle).Count();
+			_logger.LogInformation("World: player {Name} (0x{Handle:X8}) entered map {Map} instance 0x{Instance:X8} at {Pos}; {Nearby} other player(s) in range.",
+				entity.Name,
+				handle,
+				character.MapId,
+				instanceId,
+				character.Position,
+				nearby);
 		}
 
 		// Removes the player from the world model on disconnect. The caller broadcasts the despawn FIRST (while the
@@ -227,6 +249,42 @@ namespace Faolan.GameServer.World
 
 			World.Remove(entity);
 			_playerRespawnRemaining.TryRemove(client, out _);
+			return true;
+		}
+
+		// The player clicked a spot on the release screen: RespawnMe(spawnPointId) (c2s 0x2024). spawnPointId is the
+		// RespawnPoint.Id we sent in DispatchValidResurrectionSpots, echoed back. Revive at that point; if the id
+		// doesn't resolve, fall back to the closest-known logic (RespawnPlayer). No-op if the player isn't dead.
+		public async Task<bool> RespawnAtChosenPoint(INetworkClient client, uint spawnPointId)
+		{
+			if (!Players.TryGetValue(client, out var entity) || client.Session?.Character == null)
+				return false;
+
+			var vitals = entity.Vitals;
+			if (vitals == null || !vitals.IsDead)
+				return false;
+
+			_playerRespawnRemaining.TryRemove(client, out _);
+			var character = client.Session.Character;
+			var point = await _database.GetRespawnPoint(spawnPointId); // for logging/future teleport; revive works without it
+
+			vitals.ReviveToFull();
+			if (character.IsDead)
+			{
+				character.IsDead = false;
+				await _database.SaveCharacterDeadState(character.Id, false);
+			}
+
+			// Retail's RespawnMe revive (decoded from the beach death+resurrect capture, Stihetfv #1382-1387) is a
+			// LIGHTWEIGHT IN-PLACE sequence on the existing SimpleChar, NOT a world re-entry: a BccIIR (0x642CD3D6)
+			// flips bcc_state 29→1 (closes the release window), then a vitals update restores HP. Our old ReenterWorld
+			// re-ran the whole world entry, which (a) rebuilt the dead spawn when IsDead lingered and (b) corrupted the
+			// client into the sticky wave-respawn UI. We revive in place; honoring a FAR res point via IntendedTeleport
+			// (0x10D27BC0) is the follow-up (the beach point is adjacent to the death spot). docs/handoff-2026-06-20-death-window.md.
+			await _output.SendRevive(client, entity.Handle, spawnPointId);
+			await _output.PushVitals(client, vitals);
+			_logger.LogInformation("Combat: {Player} resurrected (chosen spot {Spot}).", character.Name, point?.Name ?? $"0x{spawnPointId:X}");
+			await RelocateToRespawnPoint(client, entity, character, point);
 			return true;
 		}
 
@@ -245,9 +303,7 @@ namespace Faolan.GameServer.World
 			}
 
 			ids.Add(entity.Handle);
-			foreach (var near in World
-				         .ZoneForEntity(entity)
-				         .PlayersInRange(entity.Position, SayRangeUnits, entity.Handle))
+			foreach (var near in World.ZoneForEntity(entity).PlayersInRange(entity.Position, SayRangeUnits, entity.Handle))
 				ids.Add(near.Handle);
 
 			return ids;
@@ -265,6 +321,23 @@ namespace Faolan.GameServer.World
 		public Task StopAsync()
 		{
 			return _tickTask;
+		}
+
+		// The player's "release/resurrect" click (GameCharAgent.RespawnMe 0x2024) - retail respawn is click-driven,
+		// the tick timer is only the fallback. Respawns immediately if the player is actually dead; returns false
+		// (and does nothing) otherwise.
+		public async Task<bool> TryRespawnNow(INetworkClient client)
+		{
+			if (!Players.TryGetValue(client, out var entity) || client.Session?.Character == null)
+				return false;
+
+			var vitals = entity.Vitals;
+			if (vitals == null || !vitals.IsDead)
+				return false;
+
+			_playerRespawnRemaining.TryRemove(client, out _);
+			await RespawnPlayer(client, vitals);
+			return true;
 		}
 
 		// Applies an aggroed NPC's swing to the target player: reduce the player's live vitals and push a 0x96B8DC59
@@ -345,7 +418,7 @@ namespace Faolan.GameServer.World
 				{
 					DotDelta = dotDelta,
 					DotType = dotType,
-					LastDotTick = DateTimeOffset.UtcNow,
+					LastDotTick = DateTimeOffset.UtcNow
 				};
 			}
 
@@ -391,6 +464,17 @@ namespace Faolan.GameServer.World
 					_logger.LogInformation("World: {Player} discovered resurrection point '{Point}'.", character.Name, point.Name);
 				}
 			}
+		}
+
+		private async Task<(int Delta, uint Type)> DotEffect(uint baseSpellId)
+		{
+			if (_dotEffects.TryGetValue(baseSpellId, out var cached))
+				return cached;
+
+			var spell = await _database.GetSpell(baseSpellId);
+			var effect = (spell?.DotDelta ?? 0, spell?.DotType ?? 0);
+			_dotEffects[baseSpellId] = effect;
+			return effect;
 		}
 
 		// A character's discovered respawn-point ids, cached (loaded once, updated on discovery) to keep the discovery
@@ -440,97 +524,6 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// The player's "release/resurrect" click (GameCharAgent.RespawnMe 0x2024) - retail respawn is click-driven,
-		// the tick timer is only the fallback. Respawns immediately if the player is actually dead; returns false
-		// (and does nothing) otherwise.
-		public async Task<bool> TryRespawnNow(INetworkClient client)
-		{
-			if (!Players.TryGetValue(client, out var entity) || client.Session?.Character == null)
-				return false;
-
-			var vitals = entity.Vitals;
-			if (vitals == null || !vitals.IsDead)
-				return false;
-
-			_playerRespawnRemaining.TryRemove(client, out _);
-			await RespawnPlayer(client, vitals);
-			return true;
-		}
-
-		// True while the player is dead and awaiting resurrection (used to route the c2s 0x2024 to RespawnMe rather
-		// than the login ReadyForPlayScreen - they share the opcode).
-		public bool IsAwaitingRespawn(INetworkClient client) =>
-			Players.TryGetValue(client, out var entity) && entity.Vitals?.IsDead == true;
-
-		// The player clicked a spot on the release screen: RespawnMe(spawnPointId) (c2s 0x2024). spawnPointId is the
-		// RespawnPoint.Id we sent in DispatchValidResurrectionSpots, echoed back. Revive at that point; if the id
-		// doesn't resolve, fall back to the closest-known logic (RespawnPlayer). No-op if the player isn't dead.
-		public async Task<bool> RespawnAtChosenPoint(INetworkClient client, uint spawnPointId)
-		{
-			if (!Players.TryGetValue(client, out var entity) || client.Session?.Character == null)
-				return false;
-			var vitals = entity.Vitals;
-			if (vitals == null || !vitals.IsDead)
-				return false;
-
-			_playerRespawnRemaining.TryRemove(client, out _);
-			var character = client.Session.Character;
-			var point = await _database.GetRespawnPoint(spawnPointId); // for logging/future teleport; revive works without it
-
-			vitals.ReviveToFull();
-			if (character.IsDead)
-			{
-				character.IsDead = false;
-				await _database.SaveCharacterDeadState(character.Id, false);
-			}
-
-			// Retail's RespawnMe revive (decoded from the beach death+resurrect capture, Stihetfv #1382-1387) is a
-			// LIGHTWEIGHT IN-PLACE sequence on the existing SimpleChar, NOT a world re-entry: a BccIIR (0x642CD3D6)
-			// flips bcc_state 29→1 (closes the release window), then a vitals update restores HP. Our old ReenterWorld
-			// re-ran the whole world entry, which (a) rebuilt the dead spawn when IsDead lingered and (b) corrupted the
-			// client into the sticky wave-respawn UI. We revive in place; honoring a FAR res point via IntendedTeleport
-			// (0x10D27BC0) is the follow-up (the beach point is adjacent to the death spot). docs/handoff-2026-06-20-death-window.md.
-			await _output.SendRevive(client, entity.Handle, spawnPointId);
-			await _output.PushVitals(client, vitals);
-			_logger.LogInformation("Combat: {Player} resurrected (chosen spot {Spot}).", character.Name, point?.Name ?? $"0x{spawnPointId:X}");
-			await RelocateToRespawnPoint(client, entity, character, point);
-			return true;
-		}
-
-		// Revives a dead player via the LIGHTWEIGHT in-place revive (the retail RespawnMe sequence, #214): BccIIR
-		// bcc_state 29→1 (closes the release window) + a vitals restore - NOT a world re-entry. The old re-entry path
-		// re-rendered the whole world (and, while IsDead lingered, rebuilt the DEAD spawn / corrupted the client into
-		// the sticky wave-respawn UI). The resolved point's id parameterizes the BccIIR; we revive in place (honoring
-		// a far point's relocation via IntendedTeleport 0x10D27BC0 is the follow-up). Used by the click (TryRespawnNow)
-		// and the tick fallback.
-		private async Task RespawnPlayer(INetworkClient client, EntityVitals vitals)
-		{
-			var character = client.Session.Character;
-			var entity = PlayerWorldEntity(client);
-			vitals.ReviveToFull();
-
-			if (character.IsDead)
-			{
-				character.IsDead = false;
-				await _database.SaveCharacterDeadState(character.Id, false);
-			}
-
-			// The point the player would respawn at (closest known, else the map's AlwaysKnown/first) - used as the
-			// BccIIR revive id. Revive in place (no teleport yet), so the character position is left at the death spot.
-			var deathPos = entity?.Position ?? character.Position;
-			var points = await GetRespawnPointsCached(character.MapId);
-			var target = points.Length > 0
-				? RespawnResolver.ClosestKnown(deathPos, points, await GetDiscoveredRespawnCached(character.Id))
-				  ?? points.FirstOrDefault(p => p.AlwaysKnown) ?? points.FirstOrDefault()
-				: null;
-
-			var handle = entity?.Handle ?? client.Session.Account.ClientInstance;
-			await _output.SendRevive(client, handle, target?.Id ?? 0);
-			await _output.PushVitals(client, vitals);
-			_logger.LogInformation("Combat: {Player} resurrected (point '{Point}', map {Map}).", character.Name, target?.Name ?? "none", character.MapId);
-			await RelocateToRespawnPoint(client, entity, character, target);
-		}
-
 		// Move a just-revived player to their resurrection point on the SAME map with NO loading screen: update the
 		// authoritative server position, send the IntendedTeleport (the LIVE playfield token so the client recognizes
 		// the same playfield and doesn't reload), then the CharDCMove teleport that actually JUMPS the avatar there
@@ -551,7 +544,9 @@ namespace Faolan.GameServer.World
 			var rot = new Quaternion(point.RotationX, point.RotationY, point.RotationZ, point.RotationW);
 			var fwd = Vector3.Transform(Vector3.UnitZ, rot);
 			var hlen = MathF.Sqrt(fwd.X * fwd.X + fwd.Z * fwd.Z);
-			var (facingX, facingZ) = hlen > 1e-4f ? (fwd.X / hlen, fwd.Z / hlen) : (1f, 0f);
+			var (facingX, facingZ) = hlen > 1e-4f
+				? (fwd.X / hlen, fwd.Z / hlen)
+				: (1f, 0f);
 			await _output.SendReviveDestination(client, entity.Handle, character.MapId, dest, facingX, facingZ);
 			_logger.LogInformation("Combat: {Player} relocated to '{Spot}' {Dest} (token 0x{Token:X}).", character.Name, point.Name, dest, liveToken);
 		}
@@ -578,10 +573,7 @@ namespace Faolan.GameServer.World
 
 			if (World.TryGetZone(mapId, out var zone))
 			{
-				var nearest = zone.EntitiesInRange(deathPosition, PlayerInterestRange, selfHandle)
-					.Where(e => e.Hostile && !e.IsDead && e.Vitals != null)
-					.OrderBy(e => Vector3.Distance(e.Position, deathPosition))
-					.FirstOrDefault();
+				var nearest = zone.EntitiesInRange(deathPosition, PlayerInterestRange, selfHandle).Where(e => e.Hostile && !e.IsDead && e.Vitals != null).OrderBy(e => Vector3.Distance(e.Position, deathPosition)).FirstOrDefault();
 				if (nearest != null)
 					return nearest.Handle;
 			}
@@ -589,38 +581,37 @@ namespace Faolan.GameServer.World
 			return selfHandle;
 		}
 
-		private async Task SendDeathScreen(INetworkClient client, Character character, WorldEntity playerEntity, Vector3 deathPosition)
+		// Revives a dead player via the LIGHTWEIGHT in-place revive (the retail RespawnMe sequence, #214): BccIIR
+		// bcc_state 29→1 (closes the release window) + a vitals restore - NOT a world re-entry. The old re-entry path
+		// re-rendered the whole world (and, while IsDead lingered, rebuilt the DEAD spawn / corrupted the client into
+		// the sticky wave-respawn UI). The resolved point's id parameterizes the BccIIR; we revive in place (honoring
+		// a far point's relocation via IntendedTeleport 0x10D27BC0 is the follow-up). Used by the click (TryRespawnNow)
+		// and the tick fallback.
+		private async Task RespawnPlayer(INetworkClient client, EntityVitals vitals)
 		{
-			var points = await GetRespawnPointsCached(character.MapId);
-			if (points.Length == 0)
-				return;
+			var character = client.Session.Character;
+			var entity = PlayerWorldEntity(client);
+			vitals.ReviveToFull();
 
-			var discovered = await GetDiscoveredRespawnCached(character.Id);
-			var spot = RespawnResolver.ClosestKnown(deathPosition, points, discovered)
-				?? points.FirstOrDefault(p => p.AlwaysKnown)
-				?? points[0];
-			// #214: replay the retail BEACH player-death sequence (Stihetfv_..._login-die-resurect-beach pkt#1179) in
-			// order: death-pose MoveTask (type 0x06) -> SimpleCharKilledBy -> 0x2024 release screen -> death BccIIR.
-			// The death-pose MoveTask drops the avatar into the dead pose; the BccIIR (bcc_state 29) enters the Dead
-			// substate (window + camera pan). The kill record's KILLER must NOT be the player itself or the client's
-			// ResurrectView ctor goes into WAVE-respawn mode (#214, proven by live gdb: the ctor looks the killer up
-			// in its entity registry and, finding a local non-proxy entity = the player, sets +0x476 -> wave). Resolve
-			// it to the actual mob (ResolveKiller) so the client takes the instant RespawnMe (0x2024) path like retail.
-			//
-			// NB: we deliberately do NOT send the self-applied death-effect ApplySpell(0x0009F000) here. It came from
-			// the AssassinL23 (map 2010) capture, but the retail BEACH death does NOT send it (proven by gdb 2026-06-20):
-			// that spell's client RDB effect sets stat 0x546 (the wave-respawn timer) = 15, ANOTHER wave trigger. The
-			// dead state is fully driven by the BccIIR below, so the effect is redundant; dropping it + the mob-killer
-			// above are the two fixes that make the client take the instant-respawn path like retail beach.
-			var handle = client.Session.Account.ClientInstance;
-			var killer = ResolveKiller(playerEntity, deathPosition, character.MapId, handle);
-			await _output.SendDeathPose(client, handle, deathPosition);
-			await _output.SendDeathTrigger(client, handle, killer);
-			await _output.SendResurrectionScreen(client, deathPosition, [spot]);
-			// The BccIIR that transitions the live SimpleChar into the dead state (bcc_state 29) - retail sends it after
-			// the release screen. This is what shows the release window for an IN-SESSION death (the login spawn's
-			// bcc_state=29 only covers login-while-dead).
-			await _output.SendDeathBcc(client, handle);
+			if (character.IsDead)
+			{
+				character.IsDead = false;
+				await _database.SaveCharacterDeadState(character.Id, false);
+			}
+
+			// The point the player would respawn at (closest known, else the map's AlwaysKnown/first) - used as the
+			// BccIIR revive id. Revive in place (no teleport yet), so the character position is left at the death spot.
+			var deathPos = entity?.Position ?? character.Position;
+			var points = await GetRespawnPointsCached(character.MapId);
+			var target = points.Length > 0
+				? RespawnResolver.ClosestKnown(deathPos, points, await GetDiscoveredRespawnCached(character.Id)) ?? points.FirstOrDefault(p => p.AlwaysKnown) ?? points.FirstOrDefault()
+				: null;
+
+			var handle = entity?.Handle ?? client.Session.Account.ClientInstance;
+			await _output.SendRevive(client, handle, target?.Id ?? 0);
+			await _output.PushVitals(client, vitals);
+			_logger.LogInformation("Combat: {Player} resurrected (point '{Point}', map {Map}).", character.Name, target?.Name ?? "none", character.MapId);
+			await RelocateToRespawnPoint(client, entity, character, target);
 		}
 
 		// The server game loop (docs/archive/server-architecture-roadmap.md): a 10 Hz base tick that advances continuous systems
@@ -637,8 +628,7 @@ namespace Faolan.GameServer.World
 				while (await timer.WaitForNextTickAsync(cancellationToken))
 				{
 					var now = Stopwatch.GetTimestamp();
-					var dt = Stopwatch.GetElapsedTime(lastTimestamp, now)
-						.TotalSeconds;
+					var dt = Stopwatch.GetElapsedTime(lastTimestamp, now).TotalSeconds;
 					lastTimestamp = now;
 
 					// Continuous-time systems: every base tick, with the actual elapsed dt. The tick returns the
@@ -677,6 +667,7 @@ namespace Faolan.GameServer.World
 								if (NpcAutoAttackEnabled)
 									await _output.BroadcastNpcMove(effect.Entity);
 								break;
+
 							case WorldTickEffectType.NpcEnterCombat:
 							case WorldTickEffectType.NpcExitCombat:
 								// Draw (enter) or sheathe (exit) the NPC's weapon for nearby viewers - #218. Gated with the
@@ -688,6 +679,7 @@ namespace Faolan.GameServer.World
 									if (effect.Type == WorldTickEffectType.NpcEnterCombat && effect.Target != null)
 										await _output.BroadcastNpcAggro(effect.Entity, effect.Target);
 								}
+
 								break;
 							case WorldTickEffectType.NpcStopped:
 								// The NPC arrived home and stopped; close its move with a StopIIR (#190).
@@ -720,6 +712,38 @@ namespace Faolan.GameServer.World
 			}
 		}
 
+		private async Task SendDeathScreen(INetworkClient client, Character character, WorldEntity playerEntity, Vector3 deathPosition)
+		{
+			var points = await GetRespawnPointsCached(character.MapId);
+			if (points.Length == 0)
+				return;
+
+			var discovered = await GetDiscoveredRespawnCached(character.Id);
+			var spot = RespawnResolver.ClosestKnown(deathPosition, points, discovered) ?? points.FirstOrDefault(p => p.AlwaysKnown) ?? points[0];
+			// #214: replay the retail BEACH player-death sequence (Stihetfv_..._login-die-resurect-beach pkt#1179) in
+			// order: death-pose MoveTask (type 0x06) -> SimpleCharKilledBy -> 0x2024 release screen -> death BccIIR.
+			// The death-pose MoveTask drops the avatar into the dead pose; the BccIIR (bcc_state 29) enters the Dead
+			// substate (window + camera pan). The kill record's KILLER must NOT be the player itself or the client's
+			// ResurrectView ctor goes into WAVE-respawn mode (#214, proven by live gdb: the ctor looks the killer up
+			// in its entity registry and, finding a local non-proxy entity = the player, sets +0x476 -> wave). Resolve
+			// it to the actual mob (ResolveKiller) so the client takes the instant RespawnMe (0x2024) path like retail.
+			//
+			// NB: we deliberately do NOT send the self-applied death-effect ApplySpell(0x0009F000) here. It came from
+			// the AssassinL23 (map 2010) capture, but the retail BEACH death does NOT send it (proven by gdb 2026-06-20):
+			// that spell's client RDB effect sets stat 0x546 (the wave-respawn timer) = 15, ANOTHER wave trigger. The
+			// dead state is fully driven by the BccIIR below, so the effect is redundant; dropping it + the mob-killer
+			// above are the two fixes that make the client take the instant-respawn path like retail beach.
+			var handle = client.Session.Account.ClientInstance;
+			var killer = ResolveKiller(playerEntity, deathPosition, character.MapId, handle);
+			await _output.SendDeathPose(client, handle, deathPosition);
+			await _output.SendDeathTrigger(client, handle, killer);
+			await _output.SendResurrectionScreen(client, deathPosition, [spot]);
+			// The BccIIR that transitions the live SimpleChar into the dead state (bcc_state 29) - retail sends it after
+			// the release screen. This is what shows the release window for an IN-SESSION death (the login spawn's
+			// bcc_state=29 only covers login-while-dead).
+			await _output.SendDeathBcc(client, handle);
+		}
+
 		// Advances player death/respawn. A player whose vitals hit 0 starts a respawn countdown; when it elapses they
 		// are revived to full and re-entered at the closest known resurrection point (RespawnPlayer). Living players are
 		// untracked.
@@ -745,26 +769,6 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// Cached DoT effect per base spell id (Spell.DotDelta/DotType): looked up once per spell, then reused so the
-		// per-cast NPC path doesn't hit the DB. (delta 0 = not a DoT.)
-		private readonly ConcurrentDictionary<uint, (int Delta, uint Type)> _dotEffects = new ConcurrentDictionary<uint, (int Delta, uint Type)>();
-
-		private async Task<(int Delta, uint Type)> DotEffect(uint baseSpellId)
-		{
-			if (_dotEffects.TryGetValue(baseSpellId, out var cached))
-				return cached;
-			var spell = await _database.GetSpell(baseSpellId);
-			var effect = (spell?.DotDelta ?? 0, spell?.DotType ?? 0);
-			_dotEffects[baseSpellId] = effect;
-			return effect;
-		}
-
-		// Applies damage/heal-over-time from active DoT debuffs (#274). Each tracked buff with a DotDelta bleeds (or
-		// heals) the target's HealthCurrent on a fixed cadence, mirroring the captured StatDamageIIR cycle: the tick
-		// moves the player's vitals by the delta and sends the byte-exact StatDamageIIR (+ a PushVitals for the bar).
-		// Retail's bleeds tick roughly every couple of seconds; DotTickSeconds matches that.
-		private const double DotTickSeconds = 2.0;
-
 		private async Task TickDots()
 		{
 			var now = DateTimeOffset.UtcNow;
@@ -775,6 +779,7 @@ namespace Faolan.GameServer.World
 				var character = client.Session?.Character;
 				if (character == null)
 					continue;
+
 				var vitals = entity.Vitals;
 				if (vitals == null || vitals.IsDead)
 					continue;
@@ -783,6 +788,7 @@ namespace Faolan.GameServer.World
 				{
 					if (buff.DotDelta == 0 || (now - buff.LastDotTick).TotalSeconds < DotTickSeconds)
 						continue;
+
 					buff.LastDotTick = now;
 
 					vitals.ApplyHealthDelta(buff.DotDelta);

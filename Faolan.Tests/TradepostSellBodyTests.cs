@@ -1,5 +1,6 @@
 using System;
-using Faolan.Core.Data;
+using Faolan.Core;
+using Faolan.GameServer.Economy.Tradepost;
 using Xunit;
 
 namespace Faolan.Tests
@@ -9,29 +10,24 @@ namespace Faolan.Tests
 	// (GameServerListener.HandleTradepostSell) reads exactly these two fields off the body.
 	public class TradepostSellBodyTests
 	{
+		// The "listed" overlay rides on 0x201c bank-slot stat updates: [kind=105][charInst][slot][statId][value].
+		// Byte-exact vs the sell capture's F376 (slot 6, stat 258=price=1,000,000, char instance 0x0802e5d4).
 		[Fact]
-		public void SellItemBody_DecodesSlotAndPrice()
+		public void BankSlotStatBody_MatchesCapturedOverlayUpdate()
 		{
-			var body = Convert.FromHexString("0000000600000000000f4240");
-			var s = new FaolanStream(body);
+			var body = TradepostService.BuildBankSlotStatBody(0x0802e5d4, 6, 258, 1_000_000);
 
-			var bankSlot = s.ReadUInt32();
-			var price = s.ReadUInt64();
-
-			Assert.Equal(6u, bankSlot);
-			Assert.Equal(1_000_000ul, price);
-			Assert.Equal(body.Length, (int)s.Position); // the whole 12-byte body is consumed
+			Assert.Equal("000000690802e5d40000000600000102000f4240", Convert.ToHexStringLower(body));
 		}
 
-		// TradepostChangeItemPrice (0x200B), capture F363: same [slot:u32][price:u64] shape as SellItem.
+		// CancelMail (0x2009), capture F403: a u64 mail id.
 		[Fact]
-		public void ChangePriceBody_DecodesSlotAndNewPrice()
+		public void CancelMailBody_DecodesMailId()
 		{
-			var body = Convert.FromHexString("0000000600000000004c4b40");
+			var body = Convert.FromHexString("20d82b5b17d2e9d4");
 			var s = new FaolanStream(body);
 
-			Assert.Equal(6u, s.ReadUInt32());
-			Assert.Equal(5_000_000ul, s.ReadUInt64());
+			Assert.Equal(0x20d82b5b17d2e9d4ul, s.ReadUInt64());
 			Assert.Equal(body.Length, (int)s.Position);
 		}
 
@@ -46,25 +42,30 @@ namespace Faolan.Tests
 			Assert.Equal(body.Length, (int)s.Position);
 		}
 
-		// CancelMail (0x2009), capture F403: a u64 mail id.
+		// TradepostChangeItemPrice (0x200B), capture F363: same [slot:u32][price:u64] shape as SellItem.
 		[Fact]
-		public void CancelMailBody_DecodesMailId()
+		public void ChangePriceBody_DecodesSlotAndNewPrice()
 		{
-			var body = Convert.FromHexString("20d82b5b17d2e9d4");
+			var body = Convert.FromHexString("0000000600000000004c4b40");
 			var s = new FaolanStream(body);
 
-			Assert.Equal(0x20d82b5b17d2e9d4ul, s.ReadUInt64());
+			Assert.Equal(6u, s.ReadUInt32());
+			Assert.Equal(5_000_000ul, s.ReadUInt64());
 			Assert.Equal(body.Length, (int)s.Position);
 		}
 
-		// The "listed" overlay rides on 0x201c bank-slot stat updates: [kind=105][charInst][slot][statId][value].
-		// Byte-exact vs the sell capture's F376 (slot 6, stat 258=price=1,000,000, char instance 0x0802e5d4).
 		[Fact]
-		public void BankSlotStatBody_MatchesCapturedOverlayUpdate()
+		public void SellItemBody_DecodesSlotAndPrice()
 		{
-			var body = Faolan.GameServer.Economy.Tradepost.TradepostService.BuildBankSlotStatBody(0x0802e5d4, slot: 6, statId: 258, value: 1_000_000);
+			var body = Convert.FromHexString("0000000600000000000f4240");
+			var s = new FaolanStream(body);
 
-			Assert.Equal("000000690802e5d40000000600000102000f4240", Convert.ToHexStringLower(body));
+			var bankSlot = s.ReadUInt32();
+			var price = s.ReadUInt64();
+
+			Assert.Equal(6u, bankSlot);
+			Assert.Equal(1_000_000ul, price);
+			Assert.Equal(body.Length, (int)s.Position); // the whole 12-byte body is consumed
 		}
 	}
 }

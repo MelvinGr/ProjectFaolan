@@ -11,7 +11,7 @@ namespace Faolan.GameServer.Economy.Tradepost
 	// (client->server); TradepostInterface is the CLIENT object the server dispatches to (server->client).
 	public static class TradepostProtocol
 	{
-		public const uint AgentType = 0x3D744981;     // TradepostAgent      (client -> server endpoint)
+		public const uint AgentType = 0x3D744981; // TradepostAgent      (client -> server endpoint)
 		public const uint InterfaceType = 0xF2C2D5B5; // TradepostInterface  (server -> client endpoint)
 
 		// Client -> server methods (selector after the endpoints) - the complete recovered
@@ -48,19 +48,21 @@ namespace Faolan.GameServer.Economy.Tradepost
 		// off by one (recovered-as-0x2004, true 0x2005). Values below are the TRUE registration order.
 		public enum InterfaceMethod : ushort
 		{
-			DispatchOpenTradepost = 0x2000,          // [posX][posY][posZ][maxRadius] floats (big-endian)
-			DispatchClose = 0x2001,                  // no-arg (the catalog-missed insertion)
-			DispatchMailMessage = 0x2002,            // [mailId][recipient ep][sender ep][remoteformat body](+attachment)
-			DispatchSendMailResult = 0x2003,         // [bSuccess][cError]
-			DispatchRetrieveMailResult = 0x2004,     // (was nicknamed "Ack" - body 0x01)
-			DispatchSearchResults = 0x2005,          // DispatchTradepostSearchResults; [head:u32][row]* (see TradepostSearchResults)
+			DispatchOpenTradepost = 0x2000, // [posX][posY][posZ][maxRadius] floats (big-endian)
+			DispatchClose = 0x2001, // no-arg (the catalog-missed insertion)
+			DispatchMailMessage = 0x2002, // [mailId][recipient ep][sender ep][remoteformat body](+attachment)
+			DispatchSendMailResult = 0x2003, // [bSuccess][cError]
+			DispatchRetrieveMailResult = 0x2004, // (was nicknamed "Ack" - body 0x01)
+			DispatchSearchResults = 0x2005, // DispatchTradepostSearchResults; [head:u32][row]* (see TradepostSearchResults)
 			DispatchDeleteCanceledMail = 0x2006,
 			DispatchDeleteCanceledMailItem = 0x2007
 		}
 
 		// Inbound (client->server) tradepost packets address the TradepostAgent endpoint. We accept either field
 		// matching, to be robust to caller/endpoint ordering in the header.
-		public static bool IsInbound(ConanPacket packet) =>
-			packet.Receiver.Type == AgentType || packet.Sender.Type == InterfaceType;
+		public static bool IsInbound(ConanPacket packet)
+		{
+			return packet.Receiver.Type == AgentType || packet.Sender.Type == InterfaceType;
+		}
 	}
 }

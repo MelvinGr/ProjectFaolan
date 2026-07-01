@@ -2,7 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
-using Faolan.Core.Data;
+using Faolan.Core;
 
 namespace Faolan.GameServer.Packets.FullCharSnapshot
 {
@@ -17,18 +17,12 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 	// here (Faolanx's list has no type-5 records), so this carries spells only.
 	public sealed class KnownSpellList
 	{
-		public const uint Frame = 1009;       // 0x3F1
-		public const uint Unbound = 0xFFFFFFFF; // the "no bound bar slot" word
-		public const byte SpellType = 2;
 		public const byte FeatType = 5;
+		public const byte SpellType = 2;
+		public const uint Frame = 1009; // 0x3F1
+		public const uint Unbound = 0xFFFFFFFF; // the "no bound bar slot" word
 
 		public List<KnownSpellRecord> Records { get; init; } = [];
-
-		public static KnownSpellList FromSpellIds(IReadOnlyList<uint> spellIds) =>
-			new KnownSpellList
-		{
-			Records = [.. (spellIds ?? []).Select(id => new KnownSpellRecord(id, SpellType))]
-		};
 
 		// The count word + the records, big-endian (the on-wire bytes that replace the empty list's count word).
 		public byte[] ToArray()
@@ -43,6 +37,11 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			}
 
 			return w.ToArray();
+		}
+
+		public static KnownSpellList FromSpellIds(IReadOnlyList<uint> spellIds)
+		{
+			return new KnownSpellList { Records = [.. (spellIds ?? []).Select(id => new KnownSpellRecord(id, SpellType))] };
 		}
 
 		// Parses the [count][records] sub-structure beginning at `data[offset]` (the count word). `consumed` reports the
@@ -63,6 +62,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 				var unbound = BinaryPrimitives.ReadUInt32BigEndian(data.Slice(pos + 4, 4));
 				if (unbound != Unbound)
 					throw new InvalidOperationException($"known-list record {i} at 0x{pos:X} has slot word 0x{unbound:X}, expected 0x{Unbound:X}.");
+
 				var type = (byte)BinaryPrimitives.ReadUInt32BigEndian(data.Slice(pos + 8, 4));
 				records.Add(new KnownSpellRecord(id, type));
 				pos += 12;

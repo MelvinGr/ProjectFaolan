@@ -14,16 +14,18 @@ namespace Faolan.CSPlayerAgent
 {
 	public partial class CsPlayerAgentListener : Server<ConanPacket, ConanPacketFactory, ConanMessageFramer>
 	{
-		// World-listener seam: lets the guild flow check who is online (member records) and push the in-world
-		// guild tag (0x2550C99A) onto a character's live GameServer connection on join/leave.
-		private readonly IGameServerDispatcher _gameServerDispatcher;
-
 		// Composed collaborator: owns the guild RPC handlers, wire builders, and pending-invite / reply-endpoint
 		// state. The cross-connection lookup (ClientForCharacter, on the Server base) is injected as a delegate seam.
 		private readonly GuildService _guild;
 
-		public CsPlayerAgentListener(ILogger<CsPlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database, IGameServerDispatcher gameServerDispatcher) : base(configuration.CsPlayerAgentPort, logger,
-			configuration, database,
+		// World-listener seam: lets the guild flow check who is online (member records) and push the in-world
+		// guild tag (0x2550C99A) onto a character's live GameServer connection on join/leave.
+		private readonly IGameServerDispatcher _gameServerDispatcher;
+
+		public CsPlayerAgentListener(ILogger<CsPlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database, IGameServerDispatcher gameServerDispatcher) : base(configuration.CsPlayerAgentPort,
+			logger,
+			configuration,
+			database,
 			new ConanOutgoingPacketLogger(logger, "CsPlayerAgent", typeof(CsPlayerAgentResponseOpcodes)))
 		{
 			_gameServerDispatcher = gameServerDispatcher;
@@ -65,13 +67,17 @@ namespace Faolan.CSPlayerAgent
 
 					if (account.ClientInstance != characterId)
 					{
-						Logger.LogWarning("CsPlayerAgent Authenticate: account {AccountId:X8} currently tracks client instance {TrackedClientInstance:X8}, but received {ClientInstance:X8}.", accountId, account.ClientInstance,
+						Logger.LogWarning("CsPlayerAgent Authenticate: account {AccountId:X8} currently tracks client instance {TrackedClientInstance:X8}, but received {ClientInstance:X8}.",
+							accountId,
+							account.ClientInstance,
 							characterId);
 					}
 
 					if (character.Id != characterId)
 					{
-						Logger.LogInformation("CsPlayerAgent Authenticate: resolved temporary client instance {ClientInstance:X8} to pending character {CharacterId:X8} for account {AccountId:X8}.", characterId, character.Id,
+						Logger.LogInformation("CsPlayerAgent Authenticate: resolved temporary client instance {ClientInstance:X8} to pending character {CharacterId:X8} for account {AccountId:X8}.",
+							characterId,
+							character.Id,
 							accountId);
 					}
 
@@ -86,19 +92,13 @@ namespace Faolan.CSPlayerAgent
 					// pushed to it later without an incoming packet to echo.
 					_guild.RememberReplyEndpoints(client, packet.ReceiverBytes, packet.SenderBytes);
 
-					await new PacketStream()
-						.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CsPlayerAgentResponseOpcodes.Authenticate)
-						.WriteUInt32(authReply)
-						.SendAsync(client);
+					await new PacketStream().WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CsPlayerAgentResponseOpcodes.Authenticate).WriteUInt32(authReply).SendAsync(client);
 
 					// Guilded character: retail pushes the 0x203F full guild update right after the
 					// Authenticate ack (claim_login_reward dump), before the 0x20D0/0x20C5 pair.
 					await _guild.SendGuildStateOnLogin(client, packet);
 
-					await new PacketStream()
-						.WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CsPlayerAgentResponseOpcodes.Ox20D0, [0x01])
-						.WriteArray(0x00, 0x00, 0x03, 0xF1)
-						.SendAsync(client);
+					await new PacketStream().WriteHeader(packet.ReceiverBytes, packet.SenderBytes, CsPlayerAgentResponseOpcodes.Ox20D0, [0x01]).WriteArray(0x00, 0x00, 0x03, 0xF1).SendAsync(client);
 
 					//if(character.Name == null)
 					{

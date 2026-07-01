@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using Faolan.Core;
+using Faolan.Core.Extensions;
 using Faolan.Web.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -102,6 +102,9 @@ namespace Faolan.Web.Components.Pages
 			_busy = false;
 		}
 
-		private static string Money(ulong tin) => tin.ToCurrencyString();
+		private static string Money(ulong tin)
+		{
+			return tin.ToCurrencyString();
+		}
 	}
 }

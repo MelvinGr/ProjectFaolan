@@ -26,19 +26,25 @@ namespace Faolan.GameServer.World
 		public static readonly IReadOnlyList<MountDef> All =
 		[
 			new MountDef(0x3E34F1u, "Fading Black Horse", FadingHorseSummonSpell),
-			new MountDef(0x3E34F2u, "Swift Fading Black Horse", FadingHorseSummonSpell),
+			new MountDef(0x3E34F2u, "Swift Fading Black Horse", FadingHorseSummonSpell)
 		];
-
-		private static readonly Dictionary<uint, MountDef> ById = BuildById();
-		private static readonly Dictionary<string, MountDef> ByName = BuildByName();
 
 		// The default mount the GM `.mount` command summons when given no argument (the in-client-observed Tortage mount).
 		public static MountDef Default => All[0];
+		private static readonly Dictionary<uint, MountDef> ById = BuildById();
+		private static readonly Dictionary<string, MountDef> ByName = BuildByName();
 
-		public static MountDef ForId(uint id) => ById.GetValueOrDefault(id);
+		public static MountDef ForId(uint id)
+		{
+			return ById.GetValueOrDefault(id);
+		}
 
-		public static MountDef ForName(string name) =>
-			name != null && ByName.TryGetValue(name.ToLowerInvariant(), out var m) ? m : null;
+		public static MountDef ForName(string name)
+		{
+			return name != null && ByName.TryGetValue(name.ToLowerInvariant(), out var m)
+				? m
+				: null;
+		}
 
 		private static Dictionary<uint, MountDef> BuildById()
 		{

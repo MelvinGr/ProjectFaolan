@@ -14,23 +14,25 @@ namespace Faolan.Importer.Extractors
 
 	public static class NpcSpellExtractor
 	{
-		private const uint Opcode2000 = 0x2000;
-		private const uint ApplySpellSubOpcode = 0x6B87E316;
+		private const int ApplyFromOffset = 26;
 
 		// Body offsets (inside the 0x2000 IIR carrier): [u32 len][u32 subop][u32 c350][u32 applyTo][u16 0]
 		// [u32 spellId][u32 c350][u32 applyFrom][payload...].
 		private const int ApplyToOffset = 12;
-		private const int SpellIdOffset = 18;
-		private const int ApplyFromOffset = 26;
 		private const int PayloadOffset = 30;
+		private const int SpellIdOffset = 18;
+		private const uint ApplySpellSubOpcode = 0x6B87E316;
+		private const uint Opcode2000 = 0x2000;
 
 		public static List<NpcSpellEntry> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
 			// applyFrom (NPC entity handle) -> NPC name, from THIS capture's spawns (handles are session-scoped).
 			var nameByHandle = new Dictionary<uint, string>();
 			foreach (var spawn in NpcSpawnExtractor.Extract(packets))
+			{
 				if (!string.IsNullOrEmpty(spawn.Name))
 					nameByHandle[spawn.Handle] = spawn.Name;
+			}
 
 			var entries = new List<NpcSpellEntry>();
 			foreach (var p in packets)
@@ -60,6 +62,7 @@ namespace Faolan.Importer.Extractors
 					: [];
 				if (payload.Length == 0) // the rank-1 EMPTY twin is the buff-end/terminator, not a standalone cast (#232)
 					continue;
+
 				entries.Add(new NpcSpellEntry(name, spellId, payload));
 			}
 
@@ -79,6 +82,7 @@ namespace Faolan.Importer.Extractors
 		{
 			if (full.Length < 12)
 				return [];
+
 			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(8, 4));
 			var bodyStart = 12 + headerLen;
 			return bodyStart <= full.Length

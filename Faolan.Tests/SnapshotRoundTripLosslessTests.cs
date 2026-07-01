@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
-using Faolan.Core.Data;
+using Faolan.Core;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Protobuf;
@@ -22,22 +22,13 @@ namespace Faolan.Tests
 	{
 		private const string CapturesDir = "/home/melvin/Development/C#/Project Faolan/Captures";
 		private readonly ITestOutputHelper _o;
-		public SnapshotRoundTripLosslessTests(ITestOutputHelper o) => _o = o;
 
-		private static byte[] SplitRoot(string bin)
+		public SnapshotRoundTripLosslessTests(ITestOutputHelper o)
 		{
-			var packet = new ConanPacket(File.ReadAllBytes(Path.Combine(CapturesDir, bin)));
-			var stream = new FaolanStream(packet.Body.ReadArrayUInt32Length());
-			stream.ReadUInt32();
-			stream.ReadUInt32();
-			stream.ReadUInt32();
-			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(stream);
-			return parts.Root.ToArray();
+			_o = o;
 		}
 
-		[Theory]
-		[InlineData("strie-login-inventory.bin")]
-		[InlineData("account-stricken997-character-Strie-login-randomActions-bigboy.bin")]
+		[Theory, InlineData("strie-login-inventory.bin"), InlineData("account-stricken997-character-Strie-login-randomActions-bigboy.bin")]
 		public void TypedRoundTrip_NoEdit_IsByteLossless(string bin)
 		{
 			if (!File.Exists(Path.Combine(CapturesDir, bin)))
@@ -58,6 +49,17 @@ namespace Faolan.Tests
 			}
 
 			Assert.True(roundTripped.SequenceEqual(verbatim), $"typed round-trip is NOT byte-lossless ({verbatim.Length} -> {roundTripped.Length})");
+		}
+
+		private static byte[] SplitRoot(string bin)
+		{
+			var packet = new ConanPacket(File.ReadAllBytes(Path.Combine(CapturesDir, bin)));
+			var stream = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+			stream.ReadUInt32();
+			stream.ReadUInt32();
+			stream.ReadUInt32();
+			var parts = InventorySnapshotInspector.ParseInventoryPacketBody(stream);
+			return parts.Root.ToArray();
 		}
 	}
 }

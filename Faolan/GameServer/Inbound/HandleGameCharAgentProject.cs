@@ -44,8 +44,8 @@ namespace Faolan.GameServer
 			}
 
 			// RequestAggroStatus(const ID32& charId, const ID32& targetId): each ID32 is [u32 type][u32 instance].
-			packet.Body.ReadUInt32();                  // charId.type   (0x0000C350)
-			packet.Body.ReadUInt32();                  // charId.instance (the polling player)
+			packet.Body.ReadUInt32(); // charId.type   (0x0000C350)
+			packet.Body.ReadUInt32(); // charId.instance (the polling player)
 			var targetType = packet.Body.ReadUInt32(); // targetId.type (0x0000C350)
 			var targetInstance = packet.Body.ReadUInt32();
 
@@ -61,12 +61,8 @@ namespace Faolan.GameServer
 			uint category = 0;
 			// Resolve the target in the player's OWN instance (copy) of the map (#268), not the default shared zone.
 			var player = _simulation.PlayerWorldEntity(client);
-			if (player != null
-			    && _simulation.World.ZoneForEntity(player).TryGet(targetInstance, out var target)
-			    && target.Hostile)
-			{
+			if (player != null && _simulation.World.ZoneForEntity(player).TryGet(targetInstance, out var target) && target.Hostile)
 				category = 1;
-			}
 
 			await new PacketStream()
 				.WriteHeader(ExistingCharacterPostReadyReportServerIdSender, ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceProjectType, instance), GameServerCarrierOpcodes.IirCarrier)

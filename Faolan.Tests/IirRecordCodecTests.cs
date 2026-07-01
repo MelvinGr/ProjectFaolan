@@ -17,8 +17,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Parse_LiftsIirHeaderFields()
 		{
-			var endpoints = Endpoints()
-				.First();
+			var endpoints = Endpoints().First();
 			var packet = BuildPacket(endpoints, IirRecordCodec.IirOpcode, IirBody(0x5D85BFC7, 0xABCD, 0x00081906, 0x00000F42, [0xAA, 0xBB]));
 
 			var record = IirRecordCodec.Parse(packet, 7);
@@ -28,20 +27,30 @@ namespace Faolan.Tests
 			Assert.Equal(0x00081906u, record.Handle);
 			Assert.Equal(0x00000F42u, record.FieldA);
 			Assert.Equal(7, record.Sequence);
-			Assert.Equal(new byte[] { 0xAA, 0xBB }, record.Body);
+			Assert.Equal(new byte[]
+				{
+					0xAA,
+					0xBB
+				},
+				record.Body);
 		}
 
 		[Fact]
 		public void Parse_NonIirOpcode_KeepsWholeBody()
 		{
-			var endpoints = Endpoints()
-				.First();
+			var endpoints = Endpoints().First();
 			var manifest = BuildPacket(endpoints, 0x2076, [0x01, 0x02, 0x03]);
 
 			var record = IirRecordCodec.Parse(manifest, 0);
 			Assert.Equal((ushort)0x2076, record.Opcode);
 			Assert.Equal(0u, record.IirType);
-			Assert.Equal(new byte[] { 0x01, 0x02, 0x03 }, record.Body);
+			Assert.Equal(new byte[]
+				{
+					0x01,
+					0x02,
+					0x03
+				},
+				record.Body);
 		}
 
 		[Fact]

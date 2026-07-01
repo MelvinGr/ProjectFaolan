@@ -13,6 +13,14 @@ namespace Faolan.Tests
 		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan.Tests/Assets/BeachTailsTemplate.bin";
 
 		[Fact]
+		public void Catalog_HasTheExpectedShape()
+		{
+			Assert.Equal(86, AccessWindowCatalog.Entries.Count);
+			// Every entry is a real PFAccessWindow_ playfield record (the catalog is the game-static reference data).
+			Assert.All(AccessWindowCatalog.Entries, e => Assert.StartsWith("PFAccessWindow_", e.InternalName));
+		}
+
+		[Fact]
 		public void Catalog_SerializesByteExactToTheCapturedRegion()
 		{
 			var template = SnapshotTails.Deserialize(File.ReadAllBytes(TemplatePath));
@@ -24,14 +32,6 @@ namespace Faolan.Tests
 			var fromCatalog = SnapshotTails.SerializeAccessWindowEntries(AccessWindowCatalog.Entries);
 
 			Assert.Equal(fromTemplate, fromCatalog);
-		}
-
-		[Fact]
-		public void Catalog_HasTheExpectedShape()
-		{
-			Assert.Equal(86, AccessWindowCatalog.Entries.Count);
-			// Every entry is a real PFAccessWindow_ playfield record (the catalog is the game-static reference data).
-			Assert.All(AccessWindowCatalog.Entries, e => Assert.StartsWith("PFAccessWindow_", e.InternalName));
 		}
 	}
 }

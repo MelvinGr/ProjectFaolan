@@ -1,4 +1,4 @@
-using Faolan.Core.Data;
+using Faolan.Core;
 using Xunit;
 
 namespace Faolan.Tests
@@ -51,9 +51,7 @@ namespace Faolan.Tests
 			stream.WriteUInt32(0x00004ED4u);
 			foreach (var (name, value) in Tweaks)
 			{
-				stream
-					.WriteString(name)
-					.WriteDoubleBigEndian(value);
+				stream.WriteString(name).WriteDoubleBigEndian(value);
 			}
 
 			Assert.Equal(RetailGameTweaksBody, stream.ToArray());
@@ -62,11 +60,20 @@ namespace Faolan.Tests
 		[Fact]
 		public void WriteDoubleBigEndian_IsBigEndian()
 		{
-			var bytes = new FaolanStream()
-				.Also(s => s.WriteDoubleBigEndian(1.0))
-				.ToArray();
+			var bytes = new FaolanStream().Also(s => s.WriteDoubleBigEndian(1.0)).ToArray();
 			// 1.0d = 0x3FF0000000000000, big-endian on the wire.
-			Assert.Equal(new byte[] { 0x3F, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }, bytes);
+			Assert.Equal(new byte[]
+				{
+					0x3F,
+					0xF0,
+					0x00,
+					0x00,
+					0x00,
+					0x00,
+					0x00,
+					0x00
+				},
+				bytes);
 		}
 	}
 }
