@@ -1,0 +1,76 @@
+/* Shared window/panel card. Chrome only (border, title bar, collapse); the content + its styles stay in the caller. */
+.win {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, var(--bg-2), #101216);
+    border: 2px solid var(--stone);
+    border-radius: var(--radius);
+    box-shadow: inset 0 0 24px #000a, var(--shadow);
+    padding: .55rem .65rem .65rem;
+}
+
+/* Floating windows hover over the layout and are dragged by their title bar; docked ones sit in normal flow. */
+.win.floating {
+    position: fixed;
+    z-index: 50;
+}
+
+.win-bar {
+    display: flex;
+    align-items: center;
+    user-select: none;
+    border-bottom: 1px solid var(--stone-dark);
+    padding-bottom: .45rem;
+    margin-bottom: .55rem;
+}
+
+.win.floating .win-bar {
+    cursor: move;
+}
+
+.win-title {
+    color: var(--gold);
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    font-size: .82rem;
+}
+
+.win-collapse {
+    margin-left: auto;
+    width: 20px;
+    height: 20px;
+    line-height: 1;
+    border: 1px solid var(--stone);
+    border-radius: 4px;
+    background: #0004;
+    color: var(--gold);
+    cursor: pointer;
+    font-size: .8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
+.win-collapse:hover {
+    background: #b8954422;
+    border-color: var(--gold);
+}
+
+/* Collapsed: hide every child except the title bar so the card shrinks to just the bar. */
+.win.collapsed > *:not(.win-bar) {
+    display: none;
+}
+
+.win.collapsed {
+    padding-bottom: .5rem;
+}
+
+.win.collapsed .win-bar {
+    border-bottom: 0;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}

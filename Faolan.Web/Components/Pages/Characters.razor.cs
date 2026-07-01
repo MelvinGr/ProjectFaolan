@@ -41,11 +41,10 @@ namespace Faolan.Web.Components.Pages
 		private uint? _accountId;
 		private bool _ownsSelected;
 
-		// Viewer toggles: which equipment slots are hidden from the 3D render, whether the synthetic idle plays, and the
-		// collapsed state of each floating window.
+		// Viewer toggles: which equipment slots are hidden from the 3D render, and whether the synthetic idle plays.
+		// (Each floating Window component owns its own collapse state + drag registration.)
 		private readonly HashSet<string> _hiddenSlots = [];
 		private bool _idleOn = true;
-		private bool _poseCollapsed, _editCollapsed;
 
 		private string _editStatus = "";
 		private string _eHairStyle = "", _eHairColor = "", _eEyes = "", _eSkin = "", _eBodyTat = "", _eFaceTat = "";
@@ -311,11 +310,9 @@ namespace Faolan.Web.Components.Pages
 			await Render();
 			if (_module != null)
 			{
-				// Build the per-joint pose sliders (in the floating pose window) + make both floating windows
-				// (pose + appearance editor) draggable, then render a 3D thumbnail into each equipped slot.
+				// Build the per-joint pose sliders (in the floating pose Window; the Window components self-register their
+				// own drag), then render a 3D thumbnail into each equipped slot.
 				await _module.InvokeVoidAsync("buildPoseControls", "char-canvas", "pose-controls");
-				await _module.InvokeVoidAsync("makeDraggable", "pose-window", "pose-window-bar");
-				await _module.InvokeVoidAsync("makeDraggable", "edit-window", "edit-window-bar");
 				await _module.InvokeVoidAsync("populateItemThumbs");
 			}
 		}

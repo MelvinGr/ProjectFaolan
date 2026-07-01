@@ -421,34 +421,8 @@
     font-size: .8rem;
 }
 
-/* Floating, draggable windows (pose + appearance editor), detached from the equipment panel. .pose-window is the
-   shared card; each window is anchored by its id so they don't overlap on open. */
-.pose-window {
-    position: fixed;
-    z-index: 50;
-    box-sizing: border-box;
-    background: linear-gradient(180deg, var(--bg-2), #101216);
-    border: 2px solid var(--stone);
-    border-radius: var(--radius);
-    box-shadow: inset 0 0 24px #000a, var(--shadow);
-    padding: .55rem .65rem .65rem;
-}
-
-#pose-window {
-    bottom: 1.25rem;
-    right: 1.25rem;
-    width: 15rem;
-}
-
-#edit-window {
-    top: 4.75rem;
-    right: 1.25rem;
-    width: 16.5rem;
-    max-height: 84vh;
-    display: flex;
-    flex-direction: column;
-}
-
+/* The floating Pose/Edit windows are the shared <Window> component (Components/Shared/Window.razor[.css]); only their
+   CONTENT is styled here. Positioning/size is passed via the component's Style parameter. */
 .edit-scroll {
     overflow-y: auto;
     display: flex;
@@ -566,25 +540,6 @@
     border: 1px solid #6b2a20;
     border-radius: 5px;
     line-height: 1.3;
-}
-
-.pose-window-bar {
-    display: flex;
-    align-items: center;
-    cursor: move;
-    user-select: none;
-    border-bottom: 1px solid var(--stone-dark);
-    padding-bottom: .45rem;
-    margin-bottom: .55rem;
-}
-
-.pose-window-title {
-    color: var(--gold);
-    font-family: var(--font-display);
-    font-weight: 600;
-    letter-spacing: .1em;
-    text-transform: uppercase;
-    font-size: .82rem;
 }
 
 .tip-controls {
@@ -818,43 +773,6 @@
     .inv-grid {
         grid-template-columns: repeat(4, 44px);
     }
-}
-
-/* Floating-window collapse button (in the drag bar) + collapsed state (hide the body, keep the bar). */
-.win-collapse {
-    margin-left: auto;
-    width: 20px;
-    height: 20px;
-    line-height: 1;
-    border: 1px solid var(--stone);
-    border-radius: 4px;
-    background: #0004;
-    color: var(--gold);
-    cursor: pointer;
-    font-size: .8rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.win-collapse:hover {
-    background: #b8954422;
-    border-color: var(--gold);
-}
-
-/* Collapsed: hide EVERY child except the title bar so the window shrinks to just the bar (not a full-height empty box). */
-.pose-window.collapsed > *:not(.pose-window-bar) {
-    display: none;
-}
-
-.pose-window.collapsed {
-    padding-bottom: .5rem;
-}
-
-.pose-window.collapsed .pose-window-bar {
-    border-bottom: 0;
-    margin-bottom: 0;
-    padding-bottom: 0;
 }
 
 /* Idle-animation on/off toggle in the pose window. */

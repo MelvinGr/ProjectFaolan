@@ -86,11 +86,11 @@ namespace Faolan.Core.Network.Packets
 			return this;
 		}
 
-		public void Send(INetworkClient client)
+		/*public void Send(INetworkClient client)
 		{
 			WriteLengthHash();
 			client.Send(ToArray());
-		}
+		}*/
 
 		public Task SendAsync(INetworkClient client)
 		{
@@ -114,13 +114,13 @@ namespace Faolan.Core.Network.Packets
 	{
 		extension(FaolanStream stream)
 		{
-			public void Send(INetworkClient client)
+			/*public void Send(INetworkClient client)
 			{
 				if (stream is PacketStream s)
 					s.Send(client);
 				else
 					client.Send(stream.ToArray());
-			}
+			}*/
 
 			public Task SendAsync(INetworkClient client)
 			{

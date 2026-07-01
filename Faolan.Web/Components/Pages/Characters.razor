@@ -210,33 +210,20 @@
 
     @if (_selected != null)
     {
-        <div class="pose-window @(_poseCollapsed ? "collapsed" : "")" id="pose-window">
-            <div class="pose-window-bar" id="pose-window-bar">
-                <span class="pose-window-title">Pose — @_selected.Name</span>
-                <button class="win-collapse" type="button" title="@(_poseCollapsed ? "Expand" : "Collapse")"
-                        @onclick="() => _poseCollapsed = !_poseCollapsed" @onclick:stopPropagation="true"
-                        @onpointerdown:stopPropagation="true">@(_poseCollapsed ? "▢" : "—")</button>
-            </div>
-            <div class="win-body">
-                <label class="idle-toggle">
-                    <input type="checkbox" checked="@_idleOn" @onchange="ToggleIdle"/>
-                    <span>Idle animation</span>
-                </label>
-                <div class="tip-controls" id="pose-controls"></div>
-            </div>
-        </div>
+        <Window Title="Pose" Id="pose-window"
+                Style="bottom:1.25rem; right:1.25rem; width:15rem;">
+            <label class="idle-toggle">
+                <input type="checkbox" checked="@_idleOn" @onchange="ToggleIdle"/>
+                <span>Idle animation</span>
+            </label>
+            <div class="tip-controls" id="pose-controls"></div>
+        </Window>
     }
 
     @if (_selected != null && _appOptions != null)
     {
-        <div class="pose-window edit-window @(_editCollapsed ? "collapsed" : "")" id="edit-window">
-            <div class="pose-window-bar" id="edit-window-bar">
-                <span class="pose-window-title">Edit — @_selected.Name</span>
-                <button class="win-collapse" type="button" title="@(_editCollapsed ? "Expand" : "Collapse")"
-                        @onclick="() => _editCollapsed = !_editCollapsed" @onclick:stopPropagation="true"
-                        @onpointerdown:stopPropagation="true">@(_editCollapsed ? "▢" : "—")</button>
-            </div>
-
+        <Window Title="Edit" Id="edit-window" Class="edit-window"
+                Style="top:4.75rem; right:1.25rem; width:16.5rem; max-height:84vh;">
             <div class="edit-scroll">
                 <div class="edit-head">Body</div>
                 @* Morph sliders are editable only for a character you own — a disabled fieldset greys out all 7. *@
@@ -370,7 +357,7 @@
             {
                 <div class="edit-error">@_editError</div>
             }
-        </div>
+        </Window>
     }
 </div>
 
