@@ -42,8 +42,8 @@ namespace Faolan.Core.Rdb.Assets
 			var primitives = new List<object>();
 
 			// Material 0 is the untextured default; each distinct (diffuse PNG, alpha-mode) pair gets its own material.
-			var textures = new List<(byte[] Png, bool AlphaMask)>();
-			var materialOf = new Dictionary<(byte[], bool), int>();
+			var textures = new List<(byte[] Png, RenderMeshReader.AlphaMode Alpha)>();
+			var materialOf = new Dictionary<(byte[], RenderMeshReader.AlphaMode), int>();
 
 			foreach (var sub in subs)
 			{
@@ -173,7 +173,7 @@ namespace Faolan.Core.Rdb.Assets
 				var material = 0;
 				if (png is { Length: > 0 } && sub.Uvs != null)
 				{
-					var key = (png, sub.AlphaMask);
+					var key = (png, sub.Alpha);
 					if (!materialOf.TryGetValue(key, out material))
 					{
 						textures.Add(key);
@@ -216,7 +216,7 @@ namespace Faolan.Core.Rdb.Assets
 			var glTextures = new List<object>();
 			for (var i = 0; i < textures.Count; i++)
 			{
-				var (png, alphaMask) = textures[i];
+				var (png, alpha) = textures[i];
 				Align(bin);
 				var imgOffset = (int)bin.Length;
 				bin.Write(png);
@@ -252,10 +252,14 @@ namespace Faolan.Core.Rdb.Assets
 					},
 					["doubleSided"] = true
 				};
-				if (alphaMask)
+				if (alpha == RenderMeshReader.AlphaMode.Cutout)
 				{
 					material["alphaMode"] = "MASK";
 					material["alphaCutoff"] = 0.5f;
+				}
+				else if (alpha == RenderMeshReader.AlphaMode.Blend)
+				{
+					material["alphaMode"] = "BLEND";
 				}
 
 				materials.Add(material);

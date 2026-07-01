@@ -347,6 +347,14 @@ namespace Faolan.Core.Rdb.Assets
 
 		public readonly record struct VertexElement(int Offset, DeclType Type, DeclUsage Usage, int UsageIndex);
 
+		// How a sub-mesh's diffuse alpha channel is rendered (see SubMesh.Alpha).
+		public enum AlphaMode
+		{
+			Opaque,
+			Cutout,
+			Blend
+		}
+
 		// One drawable sub-mesh: flat XYZ positions, optional XYZ normals + UV (UVs absent => empty), triangle indices.
 		// BaseColorPng (optional, set by the caller) lets sub-meshes from different models carry their own diffuse.
 		// BlendBones/BlendWeights (skinned bodies & equipment only): 4 skin influences per vertex. BlendBones are the
@@ -354,8 +362,9 @@ namespace Faolan.Core.Rdb.Assets
 		// stride is 2 per bone - so the reader has already halved them); BlendWeights are /255-normalised and sum to ~1.
 		public sealed record SubMesh(float[] Positions, float[]? Normals, float[]? Uvs, int[] Indices)
 		{
-			// Alpha-tested (e.g. hair): the diffuse's alpha channel cuts out the strand edges (glTF alphaMode=MASK).
-			public bool AlphaMask { get; init; }
+			// How the diffuse's alpha channel renders: Opaque (ignore it - e.g. an alpha specular/gloss map), Cutout
+			// (alpha-test holes, e.g. hair strands -> glTF MASK) or Blend (semi-transparent, e.g. sheer cloth -> BLEND).
+			public AlphaMode Alpha { get; init; }
 			public bool IsSkinned => BlendBones != null && BonePalette != null;
 			public byte[]? BaseColorPng { get; init; }
 			public float[]? BlendWeights { get; init; }

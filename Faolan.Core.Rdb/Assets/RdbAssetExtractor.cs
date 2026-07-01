@@ -122,7 +122,7 @@ namespace Faolan.Core.Rdb.Assets
 
 				// Eyeball vs eyelashes: load plain, then if it's the opaque part and we have an iris, reload with it.
 				var part = ReadRenderMeshDirect(rdb, rm);
-				if (part is { Count: > 0 } && eyeTextureId is { } eye && !part[0].AlphaMask && ReadRenderMeshDirect(rdb, rm, null, eye) is { } eyeball)
+				if (part is { Count: > 0 } && eyeTextureId is { } eye && part[0].Alpha == RenderMeshReader.AlphaMode.Opaque && ReadRenderMeshDirect(rdb, rm, null, eye) is { } eyeball)
 					part = eyeball;
 				if (part != null)
 					headParts.AddRange(part);
@@ -157,14 +157,16 @@ namespace Faolan.Core.Rdb.Assets
 			// and skin the SEATED head to it. Hair has no skin of its own, so bind it rigidly to the world Head bone.
 			if (rig && SelectSkeletonForMesh(rdb, all) is { } bodySkel)
 			{
-				// Exact LBS body morph: displace the body verts using their skin weights + the skeleton bone positions
-				// (replaces the geometric radial approximation; the head/neck verts morph consistently with the body).
+				// Exact LBS body morph: displace the verts using their skin weights + the skeleton bone positions (replaces
+				// the geometric radial approximation; the head/neck verts morph consistently with the body). Applied to the
+				// WORN GEAR too (all = body + equipment here) - the armour skins to the same bones, so the same LBS
+				// displacement makes it conform to the morphed body instead of clipping through it.
 				if (morphs is { IsNeutral: false } m)
 				{
 					var boneWorld = new Dictionary<string, (float, float, float)>();
 					foreach (var bb in bodySkel)
 						boneWorld.TryAdd(bb.Name, (bb.WorldPosition.X, bb.WorldPosition.Y, bb.WorldPosition.Z));
-					for (var i = 0; i < body.Count; i++)
+					for (var i = 0; i < all.Count; i++)
 					{
 						if (all[i] is { BlendBones: { } bbones, BlendWeights: { } bweights, BonePalette: { } bpal } s)
 							all[i] = s with { Positions = BodyMorphDeformer.ApplyLbs(s.Positions, bbones, bweights, bpal, boneWorld, m) };
@@ -613,7 +615,7 @@ namespace Faolan.Core.Rdb.Assets
 				return null;
 
 			byte[]? diffuse = null;
-			var alpha = false;
+			var alpha = RenderMeshReader.AlphaMode.Opaque;
 			if (overrideTextureId is { } ot)
 				diffuse = CompositeOverlay(rdb, blob, ot, tint);
 			else
@@ -631,7 +633,7 @@ namespace Faolan.Core.Rdb.Assets
 					.Select(s => s with
 					{
 						BaseColorPng = diffuse,
-						AlphaMask = alpha
+						Alpha = alpha
 					})
 					.ToList();
 		}
@@ -880,7 +882,7 @@ namespace Faolan.Core.Rdb.Assets
 		// (skinned character bodies have empty <MaterialSets/> and instead carry [id] refs in the geometry blob header).
 		// Normal/specular maps are MIXD (BC4) and return false from TryDecodeTopMip, so they're skipped and the diffuse
 		// (DXT1, listed first via g_DiffuseTex=0) is what gets picked.
-		private static (byte[]? Png, bool AlphaMask) DecodeDiffusePng(RdbReader rdb, MeshIndexFile mesh, ReadOnlySpan<byte> blob = default, Tint? tint = null)
+		private static (byte[]? Png, RenderMeshReader.AlphaMode Alpha) DecodeDiffusePng(RdbReader rdb, MeshIndexFile mesh, ReadOnlySpan<byte> blob = default, Tint? tint = null)
 		{
 			foreach (var t in mesh.UniqueTextures)
 			{
@@ -894,7 +896,7 @@ namespace Faolan.Core.Rdb.Assets
 					return (png, alpha);
 			}
 
-			return (null, false);
+			return (null, RenderMeshReader.AlphaMode.Opaque);
 		}
 
 		private static ResourceResult? DescribeResource(RdbReader rdb, uint type, uint? id)
@@ -986,20 +988,33 @@ namespace Faolan.Core.Rdb.Assets
 
 		// A diffuse is treated as alpha-tested (hair, eyelashes, ...) when a meaningful fraction of its texels are
 		// transparent. The 1% floor ignores stray anti-aliased edge pixels on otherwise-opaque skin maps.
-		private static bool HasTransparency(byte[] rgba)
+		// Classify how a decoded texture's alpha channel should render. AoC diffuse alpha is overloaded: it can be a
+		// cut-out mask (hair strands, lattice - reaches ~0 at the holes), a semi-transparent opacity map (sheer cloth -
+		// lots of mid-alpha, few/no full holes) OR a specular/gloss map that is NOT transparency at all (a smooth
+		// gradient, mostly opaque, no holes). Key on the shape: near-zero holes => Cutout (MASK); else a large body of
+		// mid-alpha => Blend (semi-transparent); else Opaque (ignore the channel, e.g. a spec map).
+		private static RenderMeshReader.AlphaMode ClassifyAlpha(byte[] rgba)
 		{
 			var total = rgba.Length / 4;
 			if (total == 0)
-				return false;
+				return RenderMeshReader.AlphaMode.Opaque;
 
-			var transparent = 0;
+			int holes = 0, translucent = 0;
 			for (var i = 3; i < rgba.Length; i += 4)
 			{
-				if (rgba[i] < 128)
-					transparent++;
+				var a = rgba[i];
+				if (a < 16)
+					holes++;
+				else if (a < 240)
+					translucent++;
 			}
 
-			return transparent > total / 100;
+			if (holes > total / 100)
+				return RenderMeshReader.AlphaMode.Cutout;
+
+			return translucent > total / 10
+				? RenderMeshReader.AlphaMode.Blend
+				: RenderMeshReader.AlphaMode.Opaque;
 		}
 
 		// Mount a sub-rig (the head's facial rig, or the hair rig) onto a body rig under the shared bone (rig_bone_Head).
@@ -1153,7 +1168,7 @@ namespace Faolan.Core.Rdb.Assets
 
 			// With body decals (mesh -1/-2 tattoos), paste them into the body atlas (texture space); else plain diffuse.
 			var (diffuse, alpha) = decals is { Count: > 0 }
-				? (BuildBodyDiffuse(rdb, mesh, blob, tint, decals), false)
+				? (BuildBodyDiffuse(rdb, mesh, blob, tint, decals), RenderMeshReader.AlphaMode.Opaque)
 				: DecodeDiffusePng(rdb, mesh, blob, tint);
 			return diffuse == null
 				? subs
@@ -1161,7 +1176,7 @@ namespace Faolan.Core.Rdb.Assets
 					.Select(s => s with
 					{
 						BaseColorPng = diffuse,
-						AlphaMask = alpha
+						Alpha = alpha
 					})
 					.ToList();
 		}
@@ -1215,10 +1230,10 @@ namespace Faolan.Core.Rdb.Assets
 			return FctxConverter.TryDecodeTopMip(rdb.ReadDecompressed(e), out rgba, out w, out h);
 		}
 
-		private static bool TryDecodeTexture(RdbReader rdb, uint type, uint id, out byte[]? png, out bool alphaMask, Tint? tint = null, bool includeSingleChannel = false)
+		private static bool TryDecodeTexture(RdbReader rdb, uint type, uint id, out byte[]? png, out RenderMeshReader.AlphaMode alpha, Tint? tint = null, bool includeSingleChannel = false)
 		{
 			png = null;
-			alphaMask = false;
+			alpha = RenderMeshReader.AlphaMode.Opaque;
 			if (!rdb.TryGet(type, id, out var e) || !rdb.CanRead(e))
 				return false;
 
@@ -1226,7 +1241,7 @@ namespace Faolan.Core.Rdb.Assets
 			if (!FctxConverter.TryDecodeTopMip(payload, out var rgba, out var w, out var h, includeSingleChannel))
 				return false;
 
-			alphaMask = HasTransparency(rgba);
+			alpha = ClassifyAlpha(rgba);
 			png = SkiaImage.EncodePng(rgba, w, h, tint);
 			return true;
 		}
