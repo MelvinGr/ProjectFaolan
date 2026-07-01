@@ -177,6 +177,30 @@ namespace Faolan.GameServer.Economy.Shop
 			_logger.LogInformation("Shop: {Character} undid the sale of item {ItemId} (slot {Slot}); {Price} tin debited (wallet {Balance}).", character.Name, sale.ItemId, sale.Slot, sale.PriceTin, character.Money);
 		}
 
+		// The real shop-OPEN trigger (#134): the client clicked a vendor NPC (a TalkToNpc BCC Interact whose
+		// SpellTarget is the vendor handle), and the shop window is gated on the reply riding THAT conversation -
+		// a cold DispatchShopData never pops it. Retail's reply sequence (sell_items_to_trader frames 1189/1193,
+		// see ShopOpenBuilder): the 0x0D155695 trade-select echo, the bare (unpadded) BCC echo-ack, then the shop
+		// content. `rawPayload` is the inbound Interact exactly as received (the echo re-frames it).
+		public async Task HandleVendorTradeOpen(INetworkClient client, byte[] rawPayload, uint mode, Core.Database.Tables.Shop shop, uint npcHandle)
+		{
+			var instance = client.Session.Account.ClientInstance;
+			await SendWorldPacket(client, ShopOpenBuilder.BuildTradeSelectEcho(instance, npcHandle));
+			await SendWorldPacket(client, Combat.CombatService.BuildBehaviorEchoAckBody(rawPayload, instance, mode, padTail: false));
+			await SendShopData(client, shop, npcHandle);
+
+			_logger.LogInformation("Shop: vendor trade-open for \"{Vendor}\" (npc 0x{Handle:X8}) by {Character}.", shop.VendorName, npcHandle, client.Session.Character?.Name);
+		}
+
+		// The world-conversation IIR carrier (same framing every world IIR uses; cf. CombatService.SendWorldPacket).
+		private static Task SendWorldPacket(INetworkClient client, byte[] body)
+		{
+			return new PacketStream()
+				.WriteHeader(World.WorldFraming.Sender, World.WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteArrayUInt32Length(s => s.WriteArray(body))
+				.SendAsync(client);
+		}
+
 		// DL 0x2033 DispatchShopData: serve a vendor's window and remember it for this session so BuyItem can
 		// resolve a clicked slot. `npcHandle` is the vendor's world-entity handle (the client renders the window
 		// against it). NB: the window only OPENS in-client off the client's own NPC trade-initiation (the shop is

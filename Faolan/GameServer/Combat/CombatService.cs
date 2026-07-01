@@ -494,9 +494,11 @@ namespace Faolan.GameServer.Combat
 		// behavior request by echoing it with the sequence incremented and a field3 "phase" spliced into the args -
 		// and the phase value IS THE REQUEST'S OWN Mode (field 2), not a server counter (armed+unarmed combat
 		// capture 2026-06-12: every ack's 0x18 varint equals the request's 0x10 varint). The tail is echoed verbatim
-		// (or replaced by `tailOverride`) with 12 zero bytes appended. This is the complete ack for air swings; the
-		// result-block ack (SendNormalAttackResponse) is the targeted-hit variant.
-		internal static byte[] BuildBehaviorEchoAckBody(byte[] rawPayload, uint instance, uint phase, byte[] tailOverride = null)
+		// (or replaced by `tailOverride`) with 12 zero bytes appended - EXCEPT the vendor trade-open ack (#134),
+		// where retail echoes the tail bare (frame 1193 of the sell_items_to_trader capture ends at the request's
+		// 4-byte tail, no pad): pass padTail=false there. This is the complete ack for air swings; the result-block
+		// ack (SendNormalAttackResponse) is the targeted-hit variant.
+		internal static byte[] BuildBehaviorEchoAckBody(byte[] rawPayload, uint instance, uint phase, byte[] tailOverride = null, bool padTail = true)
 		{
 			// rawPayload = [bodyLen u32][subop u32][c350 u32][instance u32][seq u16][behaviorId u32][argsLen u32][args][tail]
 			var seq = (ushort)((rawPayload[16] << 8) | rawPayload[17]);
@@ -514,8 +516,9 @@ namespace Faolan.GameServer.Combat
 				.WriteUInt32(behaviorId)
 				.WriteUInt32((uint)echoedArgs.Length)
 				.WriteArray(echoedArgs)
-				.WriteArray(tail)
-				.WriteArray(new byte[12]);
+				.WriteArray(tail);
+			if (padTail)
+				s.WriteArray(new byte[12]);
 			return s.ToArray();
 		}
 

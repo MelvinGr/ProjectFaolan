@@ -450,6 +450,21 @@ namespace Faolan.GameServer
 								var npcHandle = (uint)(args.SpellTarget?.TargetHandle ?? 0);
 								Logger.LogInformation("TalkToNpc: from=0x{From:X}, target=0x{Target:X}, npcHandle=0x{NpcHandle:X}, args={Args}", from, target, npcHandle, args);
 
+								// Vendor trade-open (#134): when the clicked NPC is a shop vendor (matched by NAME - the
+								// stable key), retail answers the interact itself with the trade-select echo + bare BCC
+								// echo + DispatchShopData riding this conversation (sell_items_to_trader frames
+								// 1188-1193) - no knubot screens in between. Checked on the greeting click only
+								// (Field3 == 0, like the captured open).
+								if (npcHandle != 0 && args.Field3 == 0 && client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var vendorNpcName))
+								{
+									var vendorShop = await Database.GetShopByVendorName(vendorNpcName);
+									if (vendorShop != null)
+									{
+										await _shop.HandleVendorTradeOpen(client, rawPayload, (uint)args.Mode, vendorShop, npcHandle);
+										break;
+									}
+								}
+
 								// Real branching dialogue: replay the captured conversation node for whichever NPC/node
 								// the client asked for, re-addressed to the clicked NPC.
 								if (await _conversation.TryReplayConversation(client, (uint)args.TypeId, (uint)args.Field3, npcHandle))
