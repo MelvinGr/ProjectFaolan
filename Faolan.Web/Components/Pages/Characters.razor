@@ -45,7 +45,7 @@
     </aside>
 
     <section class="stage">
-        <aside class="stats-panel">
+        <Window Floating="false" Title="Sheet" Class="stats-win">
             @if (_selected == null)
             {
                 <p class="stats-empty">Select a character to view their sheet.</p>
@@ -116,10 +116,9 @@
                     </div>
                 }
             }
-        </aside>
+        </Window>
 
-        <div class="equip-window">
-            <div class="equip-title">Equipment</div>
+        <Window Floating="false" Title="Equipment" Class="equip-win">
             <div class="equip-grid">
                 @Slot("Head", "center-slot top")
                 <div class="equip-col left">
@@ -155,14 +154,14 @@
                     <div class="tip-line">Select a character to view their equipment.</div>
                 }
             </div>
-        </div>
+        </Window>
 
         @* Inventory is private: only shown for a character the signed-in account owns. *@
         @if (_ownsSelected)
         {
             var tabItems = TabItems;
 
-        <div class="inv-window">
+        <Window Floating="false" Title="Inventory" Class="inv-win">
             <div class="inv-tabs">
                 @foreach (var tab in InvTabs)
                 {
@@ -204,21 +203,9 @@
                                                       : "s")</span>
                 }
             </div>
-        </div>
+        </Window>
         }
     </section>
-
-    @if (_selected != null)
-    {
-        <Window Title="Pose" Id="pose-window"
-                Style="bottom:1.25rem; right:1.25rem; width:15rem;">
-            <label class="idle-toggle">
-                <input type="checkbox" checked="@_idleOn" @onchange="ToggleIdle"/>
-                <span>Idle animation</span>
-            </label>
-            <div class="tip-controls" id="pose-controls"></div>
-        </Window>
-    }
 
     @if (_selected != null && _appOptions != null)
     {
@@ -357,6 +344,18 @@
             {
                 <div class="edit-error">@_editError</div>
             }
+        </Window>
+    }
+
+    @if (_selected != null)
+    {
+        <Window Title="Pose" Collapsed="true" Id="pose-window"
+                Style="bottom:1.25rem; right:1.25rem; width:15rem;">
+            <label class="idle-toggle">
+                <input type="checkbox" checked="@_idleOn" @onchange="ToggleIdle"/>
+                <span>Idle animation</span>
+            </label>
+            <div class="tip-controls" id="pose-controls"></div>
         </Window>
     }
 </div>

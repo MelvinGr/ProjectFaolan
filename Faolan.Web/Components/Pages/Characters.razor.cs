@@ -106,7 +106,7 @@ namespace Faolan.Web.Components.Pages
 				}
 			}
 
-			_characters = await query.OrderBy(c => c.Name).ToListAsync();
+			_characters = await query.OrderBy(c => c.CreationDate).ToListAsync();
 		}
 
 		private string BuildPreviewUrl()

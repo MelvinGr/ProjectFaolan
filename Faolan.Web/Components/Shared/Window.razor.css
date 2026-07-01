@@ -60,8 +60,9 @@
     border-color: var(--gold);
 }
 
-/* Collapsed: hide every child except the title bar so the card shrinks to just the bar. */
-.win.collapsed > *:not(.win-bar) {
+/* Collapsed: hide every child except the title bar so the card shrinks to just the bar. ::deep because the body is the
+   caller's ChildContent (parent CSS scope), which a plain component-scoped `> *` selector would not match. */
+.win.collapsed > ::deep *:not(.win-bar) {
     display: none;
 }
 
