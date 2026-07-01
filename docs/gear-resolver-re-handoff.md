@@ -31,6 +31,34 @@ now auto-dresses the character from their `faolan.db` equipment (byte-identical 
 > NOTE: deleting a character's `Prefs/.../Preview.bin` **crashes** this client on char-select (null-deref on
 > the missing file, before the in-world resolver ever runs) — do not delete it. It was never needed anyway.
 
+### Rendering in the viewer (also shipped)
+
+The `/characters` page requests `model.glb?rig=1` (the posable skinned rig), so the gear had to render *and*
+skin *and* morph there, not just as a static overlay:
+
+- **Skinning:** the armour MESHINDEXFILE geometry carries its own per-vertex bone weights + palette (even the
+  pieces whose manifest is `<RenderMesh>` not `<RenderSkinnedMesh>` — `ReadModel` reports `IsSkinned=true`).
+  `BuildCharacterFromParts` adds the equip meshes before skeleton selection, so `GlbWriter` skins the whole
+  assembly to one shared skeleton (body + head + hair + gear, all with `JOINTS_0`/`WEIGHTS_0`). No separate
+  rigging step is needed. ⚠️ `GlbWriter` only emits a *skinned* glb when **every** submesh is skinned; a future
+  genuinely-rigid gear piece would flip the whole model back to static — bind such pieces to their anchor bone
+  (like the hair path) instead of failing the all-skinned check.
+- **Morph:** the LBS body-morph loop was extended from `body.Count` to all body+gear submeshes, so worn gear
+  conforms to a morphed body (same skeleton + weights) instead of clipping through it.
+- **Alpha (3-way):** AoC diffuse alpha is overloaded. `ClassifyAlpha` (was `HasTransparency`): near-zero
+  "holes" (>1% of texels) ⇒ **Cutout** (glTF `MASK`, hair/lattice); else a large mid-alpha body (>10%) ⇒
+  **Blend** (glTF `BLEND`, sheer cloth); else **Opaque** (ignore the channel — many armour maps put a
+  specular/gloss gradient in alpha, which the old `alpha<128` test mistook for transparency and alpha-MASK
+  carved into ragged holes). `SubMesh.Alpha` (enum) replaced the old `AlphaMask` bool; `GlbWriter` emits
+  `MASK`/`BLEND` accordingly. The Silver Gown's sheer cloth reads translucent; its trim + the manacles stay
+  opaque; hair/eyelashes keep their cutout.
+
+**Gitea #275 is reopened + labelled `needs-tuning`** — remaining tweaks: dial in the sheer/BLEND opacity level
+(and possible double-sided-BLEND depth-sort artifacts); the alpha classification is heuristic (revisit if a
+spec-map-in-alpha piece gets wrongly blended, or a sheer piece stays opaque); the M/F sex-variant collapse is
+path-name based (verify on more items); weapons/held items + non-armor slots carry no field-9 mesh (not yet
+rendered).
+
 Everything below is the original RE investigation, kept for reference.
 
 ---
