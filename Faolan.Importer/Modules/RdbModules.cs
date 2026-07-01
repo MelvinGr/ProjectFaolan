@@ -55,6 +55,21 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
+	public sealed class RdbAppearanceModule : IImportModule
+	{
+		public string Name => "rdb-appearance";
+		public string Description => "Character-creator appearance choices (per sex/race hair/colours/tattoos/heads + names) from the RDB.";
+		public ImportSource Source => ImportSource.Rdb;
+		public IReadOnlyList<string> DependsOn => [];
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode> { WriteMode.Insert, WriteMode.Upsert };
+
+		public async Task<ImportResult> RunAsync(ImportContext ctx)
+		{
+			var n = await RdbAppearanceImporter.ImportAsync(ctx.Db, ctx.RdbDir!);
+			return new ImportResult($"{n} appearance choices imported.");
+		}
+	}
+
 	public sealed class RdbSpellsModule : IImportModule
 	{
 		public string Name => "rdb-spells";

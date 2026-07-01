@@ -39,6 +39,7 @@ namespace Faolan.Importer.Cli
 			// --- rdb modules (opt-in, require --rdb) ---
 			new RdbInventoryModule(),
 			new RdbMorphsModule(),
+			new RdbAppearanceModule(),
 			new RdbSpellsModule(),
 			new RdbMapsModule(),
 			new RdbLuaModule(),

@@ -208,127 +208,37 @@ namespace Faolan.Web.Services
 			return BuildCharacter(race, sex, hairRmId);
 		}
 
-		// The appearance choices legal for a given SEX+RACE, parsed from the client's CHARACTERCREATOR table (RDB
-		// 1010700 - plaintext XML: <sex><race> lists of hair / haircolor / eyecolor / skincolor / body+face markings /
-		// heads + a height range, and per-sex body-morph min/max). This is the SAME table the retail creator uses to
-		// gate the choices, so the editor offers exactly what that race+sex can pick. Colours carry their hex (for
-		// swatches). Parsed once and cached. (This cracks the per-race/sex half of the #275 CHARACTERCREATOR decode.)
+		// The appearance choices legal for a given SEX+RACE, read from the imported AppearanceChoice rows (built by
+		// the rdb-appearance importer from the client CHARACTERCREATOR table + resource names). Colours carry their hex
+		// (swatches); tattoos/heads carry a friendly Name, hair falls back to an ordinal label.
 		public AppearanceOptions GetAppearanceOptions(Sex sex, Race race)
 		{
-			EnsureCreator();
-			return _creatorSets!.GetValueOrDefault((sex, race)) ?? EmptyOptions;
+			using var db = _dbFactory.CreateDbContext();
+			var rows = db.AppearanceChoices.AsNoTracking()
+				.Where(c => c.Sex == (byte)sex && c.Race == (byte)race)
+				.OrderBy(c => c.Sequence)
+				.ToList();
+			if (rows.Count == 0)
+				return EmptyOptions;
+
+			List<AppearanceOption> Cat(string category) => rows
+				.Where(r => r.Category == category)
+				.Select(r => new AppearanceOption(r.Value, string.IsNullOrEmpty(r.Name) ? $"#{r.Sequence + 1}" : r.Name, r.Color))
+				.ToList();
+
+			var morphLimits = rows
+				.Where(r => r.Category == "morph")
+				.GroupBy(r => r.Value)
+				.ToDictionary(g => g.Key, g => new[] { g.First().Min, g.First().Max });
+			var height = rows.FirstOrDefault(r => r.Category == "height");
+
+			return new AppearanceOptions(
+				Cat("hair"), Cat("haircolor"), Cat("eyecolor"), Cat("skincolor"),
+				Cat("bodymarkings"), Cat("facemarkings"), Cat("head"),
+				height?.Min ?? 0, height?.Max ?? 0, morphLimits);
 		}
 
 		private static readonly AppearanceOptions EmptyOptions = new([], [], [], [], [], [], [], 0, 0, new Dictionary<string, int[]>());
-
-		private void EnsureCreator()
-		{
-			if (_creatorSets != null)
-				return;
-
-			var rdb = Reader(); // outside the lock: Reader() locks _gate too, and _gate (System.Threading.Lock) is not reentrant
-
-			lock (_gate)
-			{
-				if (_creatorSets != null)
-					return;
-
-				var entry = rdb.EntriesOfType(CreatorType).OrderByDescending(e => e.Size).First();
-				var bytes = rdb.ReadDecompressed(entry);
-				var start = Array.IndexOf(bytes, (byte)'<');
-				var xml = Encoding.UTF8.GetString(bytes, start < 0 ? 0 : start, bytes.Length - (start < 0 ? 0 : start));
-				var root = System.Xml.Linq.XDocument.Parse(xml).Root!;
-
-				var sets = new Dictionary<(Sex, Race), AppearanceOptions>();
-				foreach (var sexEl in root.Elements())
-				{
-					var sex = string.Equals(sexEl.Name.LocalName, "female", StringComparison.OrdinalIgnoreCase)
-						? Sex.Female
-						: Sex.Male;
-
-					// Per-sex body-morph min/max. min_value/max_value are the float morph space; CharacterBody stores
-					// the signed value x1000 (spawn float = value/1000), so scale to those units for the slider bounds.
-					var limits = new Dictionary<string, int[]>();
-					foreach (var mn in sexEl.Elements("BodyNodes").Elements("MorphNode"))
-					{
-						var name = (string?)mn.Attribute("MorphName");
-						if (name != null)
-							limits[name] = [Scale(mn.Attribute("min_value")), Scale(mn.Attribute("max_value"))];
-					}
-
-					foreach (var raceEl in sexEl.Elements())
-					{
-						if (!TryRace(raceEl.Name.LocalName, out var race))
-							continue;
-
-						List<AppearanceOption> Refs(string tag, string prefix, string idAttr, bool colour) => raceEl
-							.Elements(tag)
-							.Select((e, i) => MakeOption(prefix, (string?)e.Attribute(idAttr), i, colour
-								? (string?)e.Attribute("color")
-								: null))
-							.OfType<AppearanceOption>()
-							.ToList();
-
-						var heads = raceEl
-							.Elements("head")
-							.Select((e, i) => new AppearanceOption((string?)e.Attribute("monsterdataid") ?? "0", $"#{i + 1} · {(string?)e.Attribute("monsterdataid")}", null))
-							.Where(o => o.Value != "0")
-							.ToList();
-
-						var height = raceEl.Element("height");
-						sets[(sex, race)] = new AppearanceOptions(
-							Refs("hair", "*hairmesh_", "meshid", false),
-							Refs("haircolor", "*texscript_", "texscript", true),
-							Refs("eyecolor", "*texscript_", "texscript", true),
-							Refs("skincolor", "*texscript_", "texscript", true),
-							Refs("bodymarkings", "*texscript_", "texscript", false),
-							Refs("facemarkings", "*texscript_", "texscript", false),
-							heads,
-							(int?)height?.Attribute("min") ?? 0,
-							(int?)height?.Attribute("max") ?? 0,
-							limits);
-					}
-				}
-
-				_creatorSets = sets;
-			}
-		}
-
-		// A resource option from an id; the id "0" is the creator's "none" placeholder (skipped - the UI has its own
-		// none entry). prefix = "*hairmesh_" / "*texscript_"; colour = the swatch hex (null for non-colour lists).
-		private static AppearanceOption? MakeOption(string prefix, string? id, int index, string? colour)
-		{
-			return string.IsNullOrEmpty(id) || id == "0"
-				? null
-				: new AppearanceOption(prefix + id, colour ?? $"#{index} · {id}", colour);
-		}
-
-		private static int Scale(System.Xml.Linq.XAttribute? attr) => attr != null && double.TryParse(attr.Value,
-			System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v)
-			? (int)Math.Round(v * 1000)
-			: 0;
-
-		private static bool TryRace(string name, out Race race)
-		{
-			switch (name.ToLowerInvariant())
-			{
-				case "aquilonian":
-					race = Race.Aquilonian;
-					return true;
-				case "cimmerian":
-					race = Race.Cimmerian;
-					return true;
-				case "stygian":
-					race = Race.Stygian;
-					return true;
-				default:
-					race = default; // khitan is not in the Race enum
-					return false;
-			}
-		}
-
-		private const uint CreatorType = 1010700;
-		private Dictionary<(Sex, Race), AppearanceOptions>? _creatorSets;
 
 		// Persist an edited appearance to the character's CharacterBody (morphs + head) and CharacterBodyResources
 		// (the chosen hair/colour/tattoo refs, re-sequenced). This is what the editor's Save writes; the web viewer
