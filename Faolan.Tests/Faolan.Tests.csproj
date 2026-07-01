@@ -5,6 +5,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Faolan\Faolan.csproj"/>
+        <ProjectReference Include="..\Faolan.Core.Spawn\Faolan.Core.Spawn.csproj"/>
         <ProjectReference Include="..\Faolan.Importer\Faolan.Importer.csproj"/>
     </ItemGroup>
 

@@ -38,6 +38,7 @@
   <Project Path="Faolan.ClientLauncher/Faolan.ClientLauncher.csproj" />
   <Project Path="Faolan.ContentMirror/Faolan.ContentMirror.csproj" />
   <Project Path="Faolan.Core/Faolan.Core.csproj" />
+  <Project Path="Faolan.Core.Spawn/Faolan.Core.Spawn.csproj" />
   <Project Path="Faolan.Importer/Faolan.Importer.csproj" />
   <Project Path="Faolan.Mcp/Faolan.Mcp.csproj" />
   <Project Path="Faolan.Tests\Faolan.Tests.csproj" />

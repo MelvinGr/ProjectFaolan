@@ -11,6 +11,7 @@ using Faolan.Core.Extensions;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.Inventory;
 using Faolan.GameServer.Packets.FullCharSnapshot;
+using Faolan.Core.Spawn;
 using Faolan.GameServer.Spawn;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;

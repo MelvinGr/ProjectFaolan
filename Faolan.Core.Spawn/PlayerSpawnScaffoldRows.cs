@@ -4,7 +4,7 @@ using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 
-namespace Faolan.GameServer.Spawn
+namespace Faolan.Core.Spawn
 {
 	// Maps the spawn scaffold between its wire form (PlayerSpawnScaffold) and the character's DB rows
 	// (CharacterAttribute / CharacterSkill / CharacterScaffoldPair / CharacterSpawnFrame), so a player spawn can

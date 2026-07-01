@@ -5,6 +5,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\Faolan.Core\Faolan.Core.csproj"/>
+        <ProjectReference Include="..\Faolan.Core.Spawn\Faolan.Core.Spawn.csproj"/>
         <!-- In-process MCP server (Claude tooling); call services.AddMcp(). -->
         <ProjectReference Include="..\Faolan.Mcp\Faolan.Mcp.csproj"/>
     </ItemGroup>

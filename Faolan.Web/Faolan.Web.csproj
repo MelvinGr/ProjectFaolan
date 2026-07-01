@@ -12,6 +12,7 @@
         <!-- Faolan.Core carries the DB context + the RDB model/asset pipeline (Rdb/Assets: RenderMeshReader, GlbWriter,
              SkeletonReader, ...). The web frontend reuses these to build character glTF on demand. -->
         <ProjectReference Include="..\Faolan.Core\Faolan.Core.csproj"/>
+        <ProjectReference Include="..\Faolan.Core.Spawn\Faolan.Core.Spawn.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
