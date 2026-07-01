@@ -551,6 +551,7 @@ namespace Faolan.GameServer
 				["despawnnpc"] = (client, arguments) => DespawnNpcCommand(client, arguments),
 				["despawnobj"] = (client, arguments) => DespawnWorldObjectCommand(client, arguments),
 				["npcfollow"] = (client, arguments) => NpcFollowCommand(client, arguments),
+				["shield"] = (client, arguments) => CombatShieldCommand(client, arguments),
 				["delete"] = (client, arguments) => DeleteCommand(client, arguments),
 				["kill"] = (client, arguments) => KillCommand(client, arguments),
 				["additem"] = (client, arguments) => AddItemCommand(client, arguments),
@@ -789,6 +790,45 @@ namespace Faolan.GameServer
 			var npc = _broadcaster.SetNpcFollow(client, handle, !stop);
 			await _agentServerDispatcher.SendSystemMessage(characterId,
 				npc == null ? $"No followable entity 0x{handle:X8} in this zone." : stop ? $"{npc.Name} (0x{handle:X8}) stopped following." : $"{npc.Name} (0x{handle:X8}) now follows you.");
+		}
+
+		// .shield [handle] [L M R | packed]  - set an entity's directional shield-arc distribution (#20 decode 2):
+		// broadcasts a CombatShieldIIR (0xCFFD0519) whose u32 is the decimal-packed per-direction count
+		// (hundreds=Left, tens=Mid, units=Right; the client clamps digit-sum > 3 back to 111 = one per arc).
+		// No handle = the selected target; no value = the retail default 111. The in-client verification
+		// bootstrap for the blue arcs (does the target's combat rose light up?).
+		private async Task CombatShieldCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var parts = (arguments ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+			// Leading handle arg only when it parses as one AND isn't a bare shield digit (handles are hex/large).
+			var i = 0;
+			var handle = client.Session.SelectedTargetHandle;
+			if (parts.Length > 0 && (parts.Length == 2 || parts.Length == 4) && TryParseHandle(parts[0], out var parsedHandle))
+			{
+				handle = parsedHandle;
+				i = 1;
+			}
+
+			if (handle == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .shield [&lt;handle&gt;] [L M R | packed]  (no handle = your selected target; no value = 111)");
+				return;
+			}
+
+			var value = CombatShieldBuilder.DefaultDistribution;
+			if (parts.Length - i == 3 && uint.TryParse(parts[i], out var l) && uint.TryParse(parts[i + 1], out var m) && uint.TryParse(parts[i + 2], out var r))
+				value = l * 100 + m * 10 + r;
+			else if (parts.Length - i == 1 && uint.TryParse(parts[i], out var packed))
+				value = packed;
+
+			await new PacketStream()
+				.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+				.WriteArrayUInt32Length(s => s.WriteArray(CombatShieldBuilder.Build(handle, value)))
+				.SendAsync(client);
+
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Shield distribution {value} (L{value / 100 % 10} M{value / 10 % 10} R{value % 10}) sent for 0x{handle:X8}.");
 		}
 
 		// .npcsay - re-serve the player's CURRENT conversation NPC's greeting through the real dialogue VM
