@@ -842,11 +842,13 @@
     border-color: var(--gold);
 }
 
-.pose-window.collapsed .win-body,
-.pose-window.collapsed .edit-scroll,
-.pose-window.collapsed .edit-actions,
-.pose-window.collapsed .edit-error {
+/* Collapsed: hide EVERY child except the title bar so the window shrinks to just the bar (not a full-height empty box). */
+.pose-window.collapsed > *:not(.pose-window-bar) {
     display: none;
+}
+
+.pose-window.collapsed {
+    padding-bottom: .5rem;
 }
 
 .pose-window.collapsed .pose-window-bar {

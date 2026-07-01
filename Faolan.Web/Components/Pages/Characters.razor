@@ -229,9 +229,12 @@
 
     @if (_selected != null && _appOptions != null)
     {
-        <div class="pose-window edit-window" id="edit-window">
+        <div class="pose-window edit-window @(_editCollapsed ? "collapsed" : "")" id="edit-window">
             <div class="pose-window-bar" id="edit-window-bar">
                 <span class="pose-window-title">Edit — @_selected.Name</span>
+                <button class="win-collapse" type="button" title="@(_editCollapsed ? "Expand" : "Collapse")"
+                        @onclick="() => _editCollapsed = !_editCollapsed" @onclick:stopPropagation="true"
+                        @onpointerdown:stopPropagation="true">@(_editCollapsed ? "▢" : "—")</button>
             </div>
 
             <div class="edit-scroll">
