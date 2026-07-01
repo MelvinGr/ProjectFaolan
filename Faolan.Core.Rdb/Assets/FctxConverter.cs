@@ -21,6 +21,9 @@ namespace Faolan.Core.Rdb.Assets
 		private const uint DDSD_CAPS = 0x1, DDSD_HEIGHT = 0x2, DDSD_WIDTH = 0x4, DDSD_PIXELFORMAT = 0x1000, DDSD_MIPMAPCOUNT = 0x20000;
 		private const uint DdsMagic = 0x20534444; // "DDS "
 
+		// The ATI1 (BC4) detail sub-texture inside a MIXD container is tagged "ATI1" immediately before its mip data.
+		private static ReadOnlySpan<byte> Ati1Tag => "ATI1"u8;
+
 		public static Result Convert(ReadOnlySpan<byte> payload)
 		{
 			if (!IsFctx(payload))
@@ -40,6 +43,16 @@ namespace Faolan.Core.Rdb.Assets
 
 			var header = new FctxHeader(fourCc, width, height, mip, unknown1, unknown2);
 			var pixels = payload[24..];
+
+			// MIXD is a CONTAINER of several concatenated maps (see DecodeMixdDetail); the usable single-channel body
+			// detail map is the trailing ATI1/BC4 sub-chain. Narrow to it before reordering, else the DDS is built from
+			// the wrong bytes. (Its "ATI1" tag doubles as the DDS fourcc, so the export is a standard single-channel DDS.)
+			if (fourCc == "MIXD")
+			{
+				var tag = pixels.LastIndexOf(Ati1Tag);
+				if (tag >= 0)
+					pixels = pixels[(tag + Ati1Tag.Length)..];
+			}
 
 			var blockSize = BlockSizeFor(fourCc);
 			var ddsFourCc = fourCc == "MIXD"
@@ -87,6 +100,17 @@ namespace Faolan.Core.Rdb.Assets
 				return false;
 
 			var pixels = payload[24..];
+
+			// MIXD ("MIXeD") is NOT a single mip chain - it is a CONTAINER of several concatenated maps. The body's
+			// surface-detail map is a trailing ATI1 (single-channel BC4) sub-texture carrying its OWN smallest-first mip
+			// chain; decode that sub-chain's full-res mip (anchored on its "ATI1" tag) rather than treating the whole
+			// payload as one chain from the start - the latter lands mid-container and decodes to noise.
+			if (fourCc == "MIXD")
+			{
+				rgba = DecodeMixdDetail(pixels, width, height);
+				return rgba.Length > 0;
+			}
+
 			// Smallest-first layout: the top mip is last; skip every smaller mip (n=mip..2).
 			var topOffset = 0;
 			for (var n = mip; n >= 2; n--)
@@ -96,9 +120,7 @@ namespace Faolan.Core.Rdb.Assets
 			if (topOffset + topLen > pixels.Length)
 				return false;
 
-			rgba = fourCc == "MIXD"
-				? BcDecoder.DecodeBc4(pixels.Slice(topOffset, topLen), width, height)
-				: BcDecoder.Decode(pixels.Slice(topOffset, topLen), width, height, fourCc);
+			rgba = BcDecoder.Decode(pixels.Slice(topOffset, topLen), width, height, fourCc);
 			return true;
 		}
 
@@ -145,6 +167,21 @@ namespace Faolan.Core.Rdb.Assets
 			{
 				BinaryPrimitives.WriteUInt32LittleEndian(dds.AsSpan(off, 4), v);
 			}
+		}
+
+		// Extract + decode the full-res mip of the trailing ATI1/BC4 detail map from a MIXD container's pixel bytes (the
+		// payload after the 24-byte FCTX header). The sub-chain is smallest-first, so its full-res mip is the last block
+		// run. Empty array when no ATI1 sub-texture is present or the chain is too short to hold a full-res mip.
+		private static byte[] DecodeMixdDetail(ReadOnlySpan<byte> pixels, int width, int height)
+		{
+			var topLen = MipSize(width, height, 1, 8);
+			var tag = pixels.LastIndexOf(Ati1Tag);
+			var chain = tag >= 0
+				? pixels[(tag + Ati1Tag.Length)..]
+				: pixels;
+			return chain.Length < topLen
+				? []
+				: BcDecoder.DecodeBc4(chain.Slice(chain.Length - topLen, topLen), width, height);
 		}
 
 		// BCn block size at mip level n (1-based; n=1 is full resolution). Blocks cover 4x4 texel tiles.
