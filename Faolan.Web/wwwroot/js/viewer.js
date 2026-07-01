@@ -61,10 +61,47 @@ function setup(canvas) {
         requestAnimationFrame(loop);
         resize();
         controls.update();
+        if (state.skinned && state.idle !== false) applyIdle(state, performance.now() / 1000);
         renderer.render(scene, camera);
     })();
 
     return state;
+}
+
+// A subtle synthetic idle (breathing + weight-shift) layered on the bind+pose each frame. This is NOT a retail clip -
+// the authentic movement_idle keyframes live in the RDB ANIMSYS 'LMXB' container (type 1010511; e.g. skeleton 14853 ->
+// eunuch_idle2 clip 14906), which is a proprietary property-tree/curve format still to be decoded (#275 follow-up). The
+// breathing period (4s) mirrors the retail movement_idle duration. No-op unless the model is a skinned rig.
+const IDLE_AXES = { pitch: [1, 0, 0], yaw: [0, 1, 0], roll: [0, 0, 1] };
+
+function idleRot(byName, name, axis, deg) {
+    const b = byName.get(name);
+    if (!b || !deg) return;
+    b.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(...axis), deg * Math.PI / 180));
+}
+
+function applyIdle(state, t) {
+    applyPose(state); // reset to bind + slider pose, then layer the idle on top
+    const byName = new Map(state.skinned.skeleton.bones.map(b => [b.name, b]));
+    const TAU = Math.PI * 2;
+    const breathe = Math.sin(t * TAU / 4.0);   // chest rise/fall, 4s (retail movement_idle duration)
+    const sway = Math.sin(t * TAU / 7.3);       // slow weight shift side to side
+    const drift = Math.sin(t * TAU / 9.1);      // slow head/gaze drift
+
+    // Breathing: expand the chest and let the shoulders lift a touch on the in-breath; the neck counter-rotates so the
+    // head stays level rather than nodding with the ribcage.
+    idleRot(byName, 'rig_bone_Spine1', IDLE_AXES.pitch, breathe * 0.9 - 0.3);
+    idleRot(byName, 'rig_bone_Spine2', IDLE_AXES.pitch, breathe * 0.8);
+    idleRot(byName, 'rig_bone_Neck', IDLE_AXES.pitch, -breathe * 0.7);
+    idleRot(byName, 'rig_bone_LeftShoulder', IDLE_AXES.pitch, breathe * 0.6);
+    idleRot(byName, 'rig_bone_RightShoulder', IDLE_AXES.pitch, breathe * 0.6);
+
+    // Weight shift: a gentle sway through the hips + a counter-lean in the lower spine so it reads as balance, not a lean.
+    idleRot(byName, 'rig_bone_Hips', IDLE_AXES.roll, sway * 0.8);
+    idleRot(byName, 'rig_bone_Spine', IDLE_AXES.roll, -sway * 0.6);
+
+    // Slow gaze drift.
+    idleRot(byName, 'rig_bone_Head', IDLE_AXES.yaw, drift * 1.6);
 }
 
 // Load (or reload) a glb URL into the named canvas. Frames the camera to the model unless keepCamera is set (the
