@@ -72,19 +72,19 @@ namespace Faolan.Core.Rdb.Assets
 			return new AssembleResult(used, all.Sum(s => s.VertexCount), all.Sum(s => s.TriangleCount));
 		}
 
-		// Assemble a character from decoded parts: body (meshindex) + head-local RenderMeshes (head/eyes/lashes from a
-		// MonsterData, seated together at the neck) + an optional world-space hair RenderMesh (added untranslated).
+		// Assemble a character from decoded parts: body (skinned RenderMesh id) + head-local RenderMeshes (head/eyes/lashes
+		// from a MonsterData, seated together at the neck) + an optional world-space hair RenderMesh (added untranslated).
 		// skinTint/hairTint: per-character colour multiplies from their TexScripts. eyeTextureId: the projected iris
 		// texture (TexScript projecttexture) used as the eyeball mesh's diffuse. MonsterData lists [head, lashes, eyeball]
 		// but the order isn't guaranteed, so parts are identified by content: index 0 = head skin (largest), the eyeball
 		// is the OPAQUE small part (the lashes are an alpha cutout), and the iris goes there.
-		public static byte[]? BuildCharacterFromParts(RdbReader rdb, uint bodyMeshIndexId, IReadOnlyList<uint> headLocalRenderMeshIds, uint? hairWorldRenderMeshId, Tint? skinTint = null, Tint? hairTint = null,
+		public static byte[]? BuildCharacterFromParts(RdbReader rdb, uint bodyRenderMeshId, IReadOnlyList<uint> headLocalRenderMeshIds, uint? hairWorldRenderMeshId, Tint? skinTint = null, Tint? hairTint = null,
 			uint? eyeTextureId = null, IReadOnlyList<BodyDecal>? bodyDecals = null, BodyMorphDeformer.Morphs? morphs = null, IReadOnlyList<uint>? equipmentMeshIndexIds = null, bool rig = false)
 		{
 			// Static view uses the geometric morph here; the rig path reads the body un-morphed and applies the exact
 			// LBS morph (via the mesh skin weights + skeleton) once the skeleton is selected.
-			var body = ReadTexturedModel(rdb,
-				bodyMeshIndexId,
+			var body = ReadTexturedBody(rdb,
+				bodyRenderMeshId,
 				skinTint,
 				bodyDecals,
 				rig
@@ -208,12 +208,12 @@ namespace Faolan.Core.Rdb.Assets
 			return GlbWriter.Build(all);
 		}
 
-		// Build a character glb in memory: a body mesh + (optionally) a head seated at the body's neck. Heads are
-		// authored in head-local space, so the head is translated so its base aligns with the body's top ring centroid -
-		// a geometric stand-in for the skeleton's head-bone transform ([[SkeletonReader]]), good enough for a static view.
-		public static byte[]? BuildCharacterGlb(RdbReader rdb, uint bodyMeshIndexId, uint? headMeshIndexId, uint? hairRenderMeshId = null)
+		// Build a character glb in memory: a body (skinned RenderMesh id) + (optionally) a head seated at the body's neck.
+		// Heads are authored in head-local space, so the head is translated so its base aligns with the body's top ring
+		// centroid - a geometric stand-in for the skeleton's head-bone transform ([[SkeletonReader]]), fine for a static view.
+		public static byte[]? BuildCharacterGlb(RdbReader rdb, uint bodyRenderMeshId, uint? headMeshIndexId, uint? hairRenderMeshId = null)
 		{
-			var body = ReadTexturedModel(rdb, bodyMeshIndexId);
+			var body = ReadTexturedBody(rdb, bodyRenderMeshId);
 			if (body == null)
 				return null;
 
@@ -638,6 +638,49 @@ namespace Faolan.Core.Rdb.Assets
 					.ToList();
 		}
 
+		// Resolve a CHARACTERCREATOR body monsterdataid to its primary skinned body RenderMesh id (RDB type 1010001). The
+		// MonsterData (1010201) lists the body's component meshes as <mesh> ids that are EITHER a MESHINDEXFILE (1010030,
+		// e.g. the male race bodies) OR a RenderMesh (1010001, e.g. the female race bodies) - we normalise both to the
+		// underlying RenderMesh id and keep the one with the most vertices (the full body, vs. tiny detail meshes). Null if
+		// none is locally readable. This is the authoritative per-race/sex body (CHARACTERCREATOR <body monsterdataid>);
+		// the old hardcoded MESHINDEXFILE table pointed the female bodies at a censored/wrong atlas + CDN-only meshes.
+		public static uint? ResolveBodyRenderMesh(RdbReader rdb, uint monsterDataId)
+		{
+			if (monsterDataId == 0 || !rdb.TryGet(MonsterDataFile.Type, monsterDataId, out var e) || !rdb.CanRead(e))
+				return null;
+
+			uint best = 0;
+			var bestVerts = -1;
+			foreach (var meshId in MonsterDataFile.Parse(monsterDataId, rdb.ReadDecompressed(e)).MeshIds)
+			{
+				if (ResolveToRenderMesh(rdb, meshId) is not { } rmId || !rdb.TryGet(RenderMeshType, rmId, out var rmEntry) || !rdb.CanRead(rmEntry))
+					continue;
+
+				var verts = RenderMeshReader.Read(rdb.ReadDecompressed(rmEntry)).Sum(s => s.VertexCount);
+				if (verts > bestVerts)
+				{
+					bestVerts = verts;
+					best = rmId;
+				}
+			}
+
+			return best == 0
+				? null
+				: best;
+		}
+
+		// An appearance <mesh> id is either a RenderMesh (1010001) directly or a MESHINDEXFILE (1010030) wrapping one;
+		// return the underlying RenderMesh id (preferring a readable one), or null when neither resolves.
+		private static uint? ResolveToRenderMesh(RdbReader rdb, uint meshId)
+		{
+			if (rdb.TryGet(RenderMeshType, meshId, out var direct) && rdb.CanRead(direct))
+				return meshId;
+			if (rdb.TryGet(MeshIndexFileType, meshId, out var idx) && rdb.CanRead(idx))
+				return MeshIndexFile.Parse(meshId, rdb.ReadDecompressed(idx)).RenderMeshId;
+
+			return null;
+		}
+
 		// Resolve a CHARACTERCREATOR head monsterdataid to its component RenderMesh ids (head + eyes + lashes) via the
 		// MonsterData (1010201) record. Empty if missing/non-local. These meshes are head-local (seat at the neck).
 		public static IReadOnlyList<uint> ResolveHeadMeshes(RdbReader rdb, uint monsterDataId)
@@ -792,11 +835,11 @@ namespace Faolan.Core.Rdb.Assets
 
 		// Decode the body's base diffuse to RGBA, paste the character's tattoo decals onto it (texscript projecttexture is
 		// a 2D texture-space placement, not a 3D projection - Ghidra ProjectTextureOperation_c), then encode (+ skin tint).
-		private static byte[]? BuildBodyDiffuse(RdbReader rdb, MeshIndexFile mesh, ReadOnlySpan<byte> blob, Tint? tint, IReadOnlyList<BodyDecal> decals)
+		private static byte[]? BuildBodyDiffuse(RdbReader rdb, MeshIndexFile? mesh, ReadOnlySpan<byte> blob, Tint? tint, IReadOnlyList<BodyDecal> decals)
 		{
 			byte[]? rgba = null;
 			int w = 0, h = 0;
-			foreach (var t in mesh.UniqueTextures)
+			foreach (var t in mesh?.UniqueTextures ?? [])
 			{
 				if (TryDecodeRgba(rdb, t.Type!.Value, t.Id, out rgba, out w, out h))
 					break;
@@ -882,9 +925,9 @@ namespace Faolan.Core.Rdb.Assets
 		// (skinned character bodies have empty <MaterialSets/> and instead carry [id] refs in the geometry blob header).
 		// Normal/specular maps are MIXD (BC4) and return false from TryDecodeTopMip, so they're skipped and the diffuse
 		// (DXT1, listed first via g_DiffuseTex=0) is what gets picked.
-		private static (byte[]? Png, RenderMeshReader.AlphaMode Alpha) DecodeDiffusePng(RdbReader rdb, MeshIndexFile mesh, ReadOnlySpan<byte> blob = default, Tint? tint = null)
+		private static (byte[]? Png, RenderMeshReader.AlphaMode Alpha) DecodeDiffusePng(RdbReader rdb, MeshIndexFile? mesh, ReadOnlySpan<byte> blob = default, Tint? tint = null)
 		{
-			foreach (var t in mesh.UniqueTextures)
+			foreach (var t in mesh?.UniqueTextures ?? [])
 			{
 				if (TryDecodeTexture(rdb, t.Type!.Value, t.Id, out var png, out var alpha, tint))
 					return (png, alpha);
@@ -1141,6 +1184,43 @@ namespace Faolan.Core.Rdb.Assets
 						.ToArray()
 				}
 				: s;
+		}
+
+		// Decode a body directly from its skinned RenderMesh id (not a MESHINDEXFILE wrapper): geometry + optional
+		// proportion morphs + the body diffuse (from the blob header texture refs, since skinned bodies carry no material
+		// manifest), with the skin tint and any projected body-tattoo decals baked in - the same texturing ReadTexturedModel
+		// does, but sourced from a RenderMesh id (the CHARACTERCREATOR body meshes are referenced this way, via
+		// ResolveBodyRenderMesh). Null if the RenderMesh is missing/non-local/empty.
+		private static IReadOnlyList<RenderMeshReader.SubMesh>? ReadTexturedBody(RdbReader rdb, uint renderMeshId, Tint? tint = null, IReadOnlyList<BodyDecal>? decals = null, BodyMorphDeformer.Morphs? morphs = null)
+		{
+			if (!rdb.TryGet(RenderMeshType, renderMeshId, out var rmEntry) || !rdb.CanRead(rmEntry))
+				return null;
+
+			var blob = rdb.ReadDecompressed(rmEntry);
+			var subs = RenderMeshReader.Read(blob);
+			if (subs.Count == 0)
+				return null;
+
+			if (morphs is { IsNeutral: false } m)
+			{
+				foreach (var sub in subs)
+					BodyMorphDeformer.Apply(sub.Positions, m);
+			}
+
+			// Skinned bodies have no material manifest, so pass no MeshIndexFile - the diffuse resolves from the blob's
+			// own header texture refs (with decals pasted in atlas space when present, else plain + skin tint).
+			var (diffuse, alpha) = decals is { Count: > 0 }
+				? (BuildBodyDiffuse(rdb, null, blob, tint, decals), RenderMeshReader.AlphaMode.Opaque)
+				: DecodeDiffusePng(rdb, null, blob, tint);
+			return diffuse == null
+				? subs
+				: subs
+					.Select(s => s with
+					{
+						BaseColorPng = diffuse,
+						Alpha = alpha
+					})
+					.ToList();
 		}
 
 		// Decode a model's geometry AND attach its own diffuse to every sub-mesh, so an assembled character textures each

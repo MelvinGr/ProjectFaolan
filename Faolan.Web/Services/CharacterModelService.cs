@@ -45,12 +45,6 @@ namespace Faolan.Web.Services
 		// differ by morphs + face texscript, not by mesh (only Khitai has its own head). These are the shared European
 		// heads (female = beautiful_famale_heads.max, male = male_heads_old.max); per-character morph/texture is #275.
 		private const uint FemaleHead = 4502887;
-		private const uint LocalFemaleBody = 1102538; // aquilonian_female_body
-
-		// (race, sex) -> body MESHINDEXFILE id. Cimmerian/Stygian female bodies are CDN-only in this client, so they
-		// fall back to a LOCAL body of the same sex (so the sex is right even when the exact race body needs CDN fetch).
-		// Proper per-character resolution (face/hair/skin) is the CHARACTERCREATOR (1010700) + appearance work (#275).
-		private const uint LocalMaleBody = 1100584; // aquilonian_male_body
 		private const uint MaleHead = 4821637;
 
 		private static readonly AppearanceOptions EmptyOptions = new AppearanceOptions([], [], [], [], [], [], [], 0, 0, new Dictionary<string, int[]>());
@@ -61,14 +55,20 @@ namespace Faolan.Web.Services
 		// [type][id][count] preamble followed by the raw PNG, so we carve from the PNG signature.
 		private static readonly byte[] PngSig = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
-		private static readonly Dictionary<(Race, Sex), uint> BodyMesh = new Dictionary<(Race, Sex), uint>
+		// (race, sex) -> the body's CHARACTERCREATOR monsterdata id (RDB type 1010700 <body monsterdataid>, the
+		// authoritative per-race/sex body). The MonsterData in turn names the body's skinned RenderMesh, resolved via
+		// RdbAssetExtractor.ResolveBodyRenderMesh (a <mesh> is either a 1010030 mesh-index - the male bodies - or a 1010001
+		// RenderMesh directly - the female bodies). This replaces the old hardcoded MESHINDEXFILE table, which pointed the
+		// FEMALE bodies at a censored/wrong atlas (no nipples + a torso/limb tone seam) and at CDN-only meshes; the
+		// monsterdata bodies are the correct, locally-present ones for all three races (#275).
+		private static readonly Dictionary<(Race, Sex), uint> BodyMonster = new()
 		{
-			[(Race.Aquilonian, Sex.Male)] = 1100584,
-			[(Race.Cimmerian, Sex.Male)] = 1102516,
-			[(Race.Stygian, Sex.Male)] = 1102518,
-			[(Race.Aquilonian, Sex.Female)] = 1102538,
-			[(Race.Cimmerian, Sex.Female)] = 1102536, // CDN -> female fallback
-			[(Race.Stygian, Sex.Female)] = 1102540 // CDN -> female fallback
+			[(Race.Aquilonian, Sex.Male)] = 1091335,
+			[(Race.Cimmerian, Sex.Male)] = 1091337,
+			[(Race.Stygian, Sex.Male)] = 1091339,
+			[(Race.Aquilonian, Sex.Female)] = 1091334,
+			[(Race.Cimmerian, Sex.Female)] = 1091336,
+			[(Race.Stygian, Sex.Female)] = 1091338
 		};
 
 		// Deterministic renders are cached for a while after last use; the empty array is the "no model" sentinel so a
@@ -111,18 +111,31 @@ namespace Faolan.Web.Services
 				: _armorSets.Where(s => s.Gender == want || s.Gender == "Unisex").ToList();
 		}
 
+		// The body's skinned RenderMesh id for a race/sex, via its CHARACTERCREATOR monsterdata (BodyMonster ->
+		// ResolveBodyRenderMesh). Falls back to the same-sex Aquilonian body if a race body can't be resolved (all three
+		// race bodies are locally present today, so the fallback is belt-and-braces, and it keeps the correct sex). Returns
+		// 0 only when even the fallback is unavailable. Lenient by design - the STRICT editor path resolves without this.
+		private static uint BodyRenderMesh(RdbReader rdb, Race race, Sex sex)
+		{
+			if (BodyMonster.TryGetValue((race, sex), out var monster) && RdbAssetExtractor.ResolveBodyRenderMesh(rdb, monster) is { } rm)
+				return rm;
+
+			return BodyMonster.TryGetValue((Race.Aquilonian, sex), out var fallback) && RdbAssetExtractor.ResolveBodyRenderMesh(rdb, fallback) is { } fallbackRm
+				? fallbackRm
+				: 0;
+		}
+
 		public byte[]? BuildCharacter(Race race, Sex sex, uint? hairRmId = null)
 		{
 			var rdb = Reader();
-			var fallback = sex == Sex.Female
-				? LocalFemaleBody
-				: LocalMaleBody;
-			var bodyId = BodyMesh.GetValueOrDefault((race, sex), fallback);
+			var bodyRm = BodyRenderMesh(rdb, race, sex);
+			if (bodyRm == 0)
+				return null;
+
 			var headId = sex == Sex.Female
 				? FemaleHead
 				: MaleHead;
-
-			return RdbAssetExtractor.BuildCharacterGlb(rdb, bodyId, headId, hairRmId) ?? RdbAssetExtractor.BuildCharacterGlb(rdb, fallback, headId, hairRmId);
+			return RdbAssetExtractor.BuildCharacterGlb(rdb, bodyRm, headId, hairRmId);
 		}
 
 		// Build a specific character by id, using their stored appearance (CharacterBodyResources) - currently the
@@ -238,8 +251,11 @@ namespace Faolan.Web.Services
 		{
 			var rdb = Reader();
 
-			if (!BodyMesh.TryGetValue((race, sex), out var bodyId) || bodyId == 0)
-				return (null, $"No body mesh is mapped for {race} {sex}.");
+			if (!BodyMonster.TryGetValue((race, sex), out var bodyMonster))
+				return (null, $"No body monsterdata is mapped for {race} {sex}.");
+
+			if (RdbAssetExtractor.ResolveBodyRenderMesh(rdb, bodyMonster) is not { } bodyRm)
+				return (null, $"Body monsterdata {bodyMonster} for {race} {sex} could not be resolved (CDN-only or missing in the local RDB).");
 
 			if (headMonster is not > 0)
 				return (null, "No head selected (head monsterdata id required).");
@@ -250,9 +266,9 @@ namespace Faolan.Web.Services
 
 			var (skinTint, hairTint, eyeTex, decals) = ResolveTexScripts(rdb, texRefs ?? []);
 
-			var glb = RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyId, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals, morphs, null, true);
+			var glb = RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyRm, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals, morphs, null, true);
 			return glb == null
-				? (null, $"Body mesh {bodyId} for {race} {sex} could not be built (CDN-only or missing in the local RDB).")
+				? (null, $"Body RenderMesh {bodyRm} for {race} {sex} could not be built.")
 				: (glb, null);
 		}
 
@@ -316,14 +332,13 @@ namespace Faolan.Web.Services
 				? RdbAssetExtractor.ResolveHeadMeshes(rdb, monsterId)
 				: [];
 
-			// Body mesh resolution + whether it's local or a CDN pull (the race body is often CDN-only).
-			var bodyFallback = character?.Sex == Sex.Female
-				? LocalFemaleBody
-				: LocalMaleBody;
-			var bodyId = character != null
-				? BodyMesh.GetValueOrDefault((character.Race, character.Sex), bodyFallback)
+			// Body resolution: the CHARACTERCREATOR monsterdata id + the skinned RenderMesh it resolves to.
+			var bodyMonster = character != null
+				? BodyMonster.GetValueOrDefault((character.Race, character.Sex))
 				: 0;
-			var bodyStatus = RdbAssetExtractor.DescribeMesh(rdb, bodyId);
+			var bodyRenderMesh = character != null
+				? BodyRenderMesh(rdb, character.Race, character.Sex)
+				: 0;
 
 			// Resolve each *texscript_NNN to its mesh-target + op so the skin/hair/eye classification is visible.
 			var texscripts = resources
@@ -368,8 +383,8 @@ namespace Faolan.Web.Services
 				headMeshRaw = body?.HeadMesh,
 				monsterId,
 				headMeshes,
-				bodyId,
-				bodyStatus,
+				bodyMonster,
+				bodyRenderMesh,
 				resources,
 				texscripts,
 				resolved = new
@@ -727,16 +742,12 @@ namespace Faolan.Web.Services
 				.ToList();
 		}
 
-		// Shared assembler for the stored (BuildCharacterById) and ad-hoc (BuildCharacterCustom) paths: resolve the
-		// TexScripts (skin/hair tint, eye iris, body tattoo - by mesh target, #275), the head meshes and the body, then
-		// build the glb. Tries the exact race/sex body first, then the local same-sex fallback (the exact body is often
-		// CDN-only), then a bare body.
+		// Shared assembler for the stored-character path (BuildCharacterById): resolve the TexScripts (skin/hair tint, eye
+		// iris, body tattoo - by mesh target, #275), the head meshes and the body RenderMesh (BodyRenderMesh, which itself
+		// falls back to the same-sex Aquilonian body), then build the glb; falls back to a bare body when parts are missing.
 		private byte[]? BuildFromSpec(RdbReader rdb, Sex sex, Race race, uint? hairRmId, uint? headMonster, BodyMorphDeformer.Morphs? morphs, IReadOnlyList<string>? texRefs, IReadOnlyList<uint>? equipMeshIndexIds, bool rig)
 		{
-			var bodyFallback = sex == Sex.Female
-				? LocalFemaleBody
-				: LocalMaleBody;
-			var bodyId = BodyMesh.GetValueOrDefault((race, sex), bodyFallback);
+			var bodyRm = BodyRenderMesh(rdb, race, sex);
 
 			var (skinTint, hairTint, eyeTex, decals) = ResolveTexScripts(rdb, texRefs ?? []);
 
@@ -744,10 +755,10 @@ namespace Faolan.Web.Services
 				? RdbAssetExtractor.ResolveHeadMeshes(rdb, headMonster.Value)
 				: [];
 
-			if (headMeshes.Count > 0)
+			if (bodyRm != 0 && headMeshes.Count > 0)
 			{
-				return RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyId, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals, morphs, equipMeshIndexIds, rig) ??
-				       RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyFallback, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals, morphs, equipMeshIndexIds, rig) ?? BuildCharacter(race, sex, hairRmId);
+				return RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyRm, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals, morphs, equipMeshIndexIds, rig) ??
+				       BuildCharacter(race, sex, hairRmId);
 			}
 
 			return BuildCharacter(race, sex, hairRmId);
