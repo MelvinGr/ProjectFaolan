@@ -3,14 +3,44 @@
 **Goal:** render a character's actual equipped gear in the Faolan.Web 3D viewer, driven by the character's
 equipment in `faolan.db` — for any character, without depending on client-side login caches.
 
-**Blocker:** an item's worn mesh is *not* in the item template. The item carries an indirect **look-id**
-(template body offset @16), which the **client** resolves to one or more skinned-armour meshindexes. That
-resolver is client code. This doc captures everything learned trying to crack it, so it can be continued.
+## STATUS: SOLVED (2026-07-01) — no client RE needed
 
-**Status: NOT solved.** The tooling is solved (live RE now works via Frida). The exact resolver function is
-still unfound — it is buried deep in the character visual-build subsystem. ~12 targeted captures + Ghidra
-decompiles narrowed it a lot but did not isolate it. A pragmatic alternative (capture-table) is described at
-the end and is the recommended path to actually shipping gear rendering.
+The worn mesh **is in the item template after all** — the earlier premise (an indirect look-id resolved by
+client code) was wrong. The look-id at template body offset @16 (13117 for Darkandskiny's cotton set) is a
+**red herring**: it is a dye/appearance grouping that *coincidentally collides* with an unrelated resource id
+(1010030:13117 is a Tortage building; 5204334/9398638:13117 are that building's PNG textures). It does not
+drive the mesh.
+
+**The real mapping:** each equipped item's decrypted template carries its worn armour meshindex(es) in a
+**byte-packed trailing sub-record, tagged by field-id 9** — `... 09 00 00 00 <meshIndexId u32> ...`. The value
+resolves to a MESHINDEXFILE (type 1010030) under `items\armor`. The existing item-template report never
+surfaced it because it scans u32s **word-aligned** and this sub-record is unaligned. An item may carry several
+field-9 entries: a genuine male/female pair of one garment (pick by character sex) OR distinct pieces (e.g.
+the slave manacles carry both the handcuff mesh `700842` and a base cotton body `700815` — keep both).
+
+Verified for **Darkandskiny** (Cimmerian female; Chest=Silver Gown 324139, Legs=Silver Bottom 324171,
+Wrist=Slave Manacles 3361557): field-9 yields exactly `{323713, 323725, 700842, 700815}` — the same set the
+in-client capture verified. Generalises across plate/cloth/helms/boots (each gives its M+F variants); weapons
+carry no field-9 armour mesh (correct — they are held meshes).
+
+**Shipped:** `Faolan.Core.Rdb/Assets/ItemLookResolver.cs` (field-9 extraction + per-item sex-variant collapse)
++ `CharacterModelService.ResolveEquippedMeshes` wiring. `/api/character/{id}/model.glb` with **no** `?equip`
+now auto-dresses the character from their `faolan.db` equipment (byte-identical to the explicit known-good
+`?equip=` overlay). Fully offline: RDB + faolan.db only, no Preview.bin / Frida / live client.
+
+> NOTE: deleting a character's `Prefs/.../Preview.bin` **crashes** this client on char-select (null-deref on
+> the missing file, before the in-world resolver ever runs) — do not delete it. It was never needed anyway.
+
+Everything below is the original RE investigation, kept for reference.
+
+---
+
+**Original blocker (now disproven):** an item's worn mesh is *not* in the item template. The item carries an
+indirect **look-id** (template body offset @16), which the **client** resolves to one or more skinned-armour
+meshindexes. That resolver is client code. This doc captures everything learned trying to crack it.
+
+**Original status: NOT solved.** The tooling is solved (live RE now works via Frida). The exact resolver
+function is still unfound — it is buried deep in the character visual-build subsystem.
 
 ## Verified target data
 

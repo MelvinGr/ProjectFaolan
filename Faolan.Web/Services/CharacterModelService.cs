@@ -150,7 +150,71 @@ namespace Faolan.Web.Services
 				? body.HeadMesh / 2
 				: (uint?)null;
 
+			// No explicit overlay => dress the character in their ACTUAL equipped gear, resolved from the item templates
+			// (#275, ItemLookResolver). The posable rig stays body-only (gear skinning is separate).
+			equipMeshIndexIds ??= rig
+				? null
+				: ResolveEquippedMeshes(characterId, character.Sex);
+
 			return BuildFromSpec(Reader(), character.Sex, character.Race, hairRmId, headMonster, morphs, resources, equipMeshIndexIds, rig);
+		}
+
+		// Resolve a character's worn armour MESHINDEXFILE ids from their equipped items (#275). Each equipped item's
+		// decrypted template carries its worn mesh(es) in field 9 (ItemLookResolver); weapons/jewellery carry none.
+		// Male/female variants of one garment collapse to the character's sex. Login-independent - RDB + faolan.db only.
+		public IReadOnlyList<uint> ResolveEquippedMeshes(uint characterId, Sex sex)
+		{
+			using var db = _dbFactory.CreateDbContext();
+			var eq = db.CharacterEquipment.AsNoTracking()
+				.Include(e => e.Head).Include(e => e.Chest).Include(e => e.Legs).Include(e => e.Hands)
+				.Include(e => e.Boots).Include(e => e.Shoulder).Include(e => e.Wrist).Include(e => e.Belt)
+				.Include(e => e.Cloak).Include(e => e.Tokens)
+				.FirstOrDefault(e => e.CharacterId == characterId);
+			if (eq == null)
+				return [];
+
+			var rdb = Reader();
+			var want = sex == Sex.Female ? "Female" : "Male";
+			var seen = new HashSet<uint>();
+			var result = new List<uint>();
+			foreach (var item in new[] { eq.Head, eq.Chest, eq.Legs, eq.Hands, eq.Boots, eq.Shoulder, eq.Wrist, eq.Belt, eq.Cloak, eq.Tokens })
+			{
+				var template = DecryptTemplate(rdb, item);
+				if (template == null)
+					continue;
+
+				foreach (var meshId in ItemLookResolver.WornMeshIds(rdb, template, want))
+					if (seen.Add(meshId))
+						result.Add(meshId);
+			}
+
+			return result;
+		}
+
+		// Decrypt an item's RDB template (type 1000020/1000620) with its stored per-template TEA key (Data1..4), or null
+		// when the item has no key / no local template entry.
+		private static byte[]? DecryptTemplate(RdbReader rdb, Item? item)
+		{
+			if (item == null || (item.Data1 == 0 && item.Data2 == 0 && item.Data3 == 0 && item.Data4 == 0))
+				return null;
+
+			var key = new[] { item.Data1, item.Data2, item.Data3, item.Data4 };
+			foreach (var type in new uint[] { 1000020, 1000620 })
+			{
+				if (rdb.TryGet(type, item.Id, out var e) && e.File != 0xff && e.Size > 0)
+				{
+					try
+					{
+						return rdb.ReadDecrypted(e, key);
+					}
+					catch
+					{
+						return null;
+					}
+				}
+			}
+
+			return null;
 		}
 
 		// Build a character glb from an EXPLICIT appearance spec instead of the stored one - the live-preview path for the
