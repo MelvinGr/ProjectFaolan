@@ -301,14 +301,16 @@ namespace Faolan.GameServer
 								// 4th byte is the mount variant index, target = 0). The server answers exactly like
 								// the `.mount` GM command: cast the summon spell (ApplySpell 0x6B87E316) so the
 								// channelled summon plays, then spawn the mount creature at the player so it renders
-								// (the FA015807 mount NPC, harvested by CaptureMountImporter). This is the proper
-								// client-cast mount flow - and the clean mid-session client-CAST-spawn render test.
+								// (the FA015807 mount NPC, harvested by CaptureMountImporter), then apply the captured
+								// RIDE buff (0x31EB1500, NecroL80 mount capture frame 520) that actually seats the
+								// player - the summon+spawn alone never mounts (#26, in-client 2026-06-17).
 								var mount = MountCatalog.ForId(from) ?? MountCatalog.Default;
 								Logger.LogInformation("SummonMount: from=0x{From:X} -> {Mount} (spell 0x{Spell:X}). {Args}", from, mount.CreatureName, mount.SummonSpellId, args);
 
 								var self = client.Session.Account.ClientInstance;
 								await ApplySpell(client, self, self, mount.SummonSpellId);
 								await _broadcaster.SpawnMountForPlayer(client, mount.CreatureName);
+								await ApplySpell(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload()); // seat the rider (#26)
 
 								break;
 							}

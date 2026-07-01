@@ -710,9 +710,10 @@ namespace Faolan.GameServer
 		}
 
 		// .mount [mountIdHex]  - server-force a mount summon, the same path the client-cast SummonMount now drives
-		// (#27): cast the summon spell (channeled ApplySpell 0x6B87E316 / 0xF508F4C1) AND spawn the mount creature at
-		// the player so it appears. <mountId> selects the catalog mount (default 0x3E34F1 "Fading Black Horse"); the
-		// player actually RIDING (the MountedRun movement transition) is the client's part and in-client-gated.
+		// (#27): cast the summon spell (channeled ApplySpell 0x6B87E316 / 0xF508F4C1), spawn the mount creature at
+		// the player so it appears, then apply the captured RIDE buff (0x31EB1500) that seats the player - the
+		// in-client test 2026-06-17 proved the summon+spawn alone never mounts (#26). <mountId> selects the catalog
+		// mount (default 0x3E34F1 "Fading Black Horse").
 		private async Task MountCommand(INetworkClient client, string arguments)
 		{
 			var mount = MountCatalog.Default;
@@ -722,6 +723,7 @@ namespace Faolan.GameServer
 			var self = client.Session.Account.ClientInstance;
 			await ApplySpell(client, self, self, mount.SummonSpellId); // the channeled summon cast (broadcast)
 			await _broadcaster.SpawnMountForPlayer(client, mount.CreatureName);
+			await ApplySpell(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload()); // seat the rider (#26)
 		}
 
 		// .noloot <itemId> [on|off]  - flag an item OUT of (on, default) or back INTO (off) random loot rolls (#273).

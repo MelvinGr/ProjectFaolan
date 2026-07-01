@@ -23,6 +23,29 @@ namespace Faolan.GameServer.World
 		// variants use it; the swift variant's own id is not separately captured, so it shares this summon.
 		public const uint FadingHorseSummonSpell = 0x3BAD7Du;
 
+		// The RIDE buff (#26): after the horse spawns, retail applies a second SELF ApplySpell - spell base 0x31EB15,
+		// apply rank 00 - the mounted/riding state; the dismount is its end twin 0x31EB1501 with an empty payload.
+		// Fully captured in NecroL80_..._login_mount_move_dismount (apply frame 520 / end frame 1449). The summon alone
+		// spawns the horse but never seats the player (proven in-client 2026-06-17).
+		public const uint RideSpell = 0x31EB1500u;
+
+		// Frame 520's 54-byte ride-buff payload, verbatim (capture truth): +8 u32 BE = duration 8_640_000 cs = 24 h,
+		// the spell base 0x31EB15 rides at +23, and the trailing u32 is the per-cast counter (the only field #221
+		// observed differing between apply instances).
+		private static readonly byte[] RideBuffPayloadBytes =
+		[
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x83, 0xD6, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x31, 0xEB, 0x15, 0x00, 0x00, 0x00, 0x50, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x50, 0x00, 0x00, 0x00, 0x00, 0x15, 0x60, 0xF9, 0xBB
+		];
+
+		// A fresh copy per cast (ApplySpell treats caller-supplied data as replayed content; keep the captured
+		// original immutable).
+		public static byte[] RideBuffPayload()
+		{
+			return (byte[])RideBuffPayloadBytes.Clone();
+		}
+
 		public static readonly IReadOnlyList<MountDef> All =
 		[
 			new MountDef(0x3E34F1u, "Fading Black Horse", FadingHorseSummonSpell),
