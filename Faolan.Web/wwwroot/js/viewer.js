@@ -35,19 +35,30 @@ function setup(canvas) {
     const state = {renderer, scene, camera, controls, model: null};
     states.set(canvas.id, state);
 
+    // Sync the drawing buffer + camera aspect to the live canvas box. Idempotent (only touches three.js when the
+    // size actually changed) so it is safe to call every frame - which is what fixes the horizontal stretch: the
+    // canvas box is often not laid out yet when setup() runs (height 0), so a one-shot resize leaves a stale square
+    // aspect against a wide canvas. Reading clientWidth/clientHeight (never the buffer attributes) keeps the aspect
+    // honest once layout settles.
     function resize() {
         const w = canvas.clientWidth, h = canvas.clientHeight;
         if (w === 0 || h === 0) return;
-        renderer.setSize(w, h, false);
-        camera.aspect = w / h;
-        camera.updateProjectionMatrix();
+        const dpr = window.devicePixelRatio;
+        if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr))
+            renderer.setSize(w, h, false);
+        if (camera.aspect !== w / h) {
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+        }
     }
+    state.resize = resize;
 
     window.addEventListener('resize', resize);
     resize();
 
     (function loop() {
         requestAnimationFrame(loop);
+        resize();
         controls.update();
         renderer.render(scene, camera);
     })();
@@ -112,12 +123,7 @@ export async function show(canvasId, url) {
     // sphere - otherwise a tall body gets cropped to just the legs). Resize the renderer + aspect to the live canvas
     // first: on mobile the layout often hasn't settled when setup() ran, leaving a stale (square) projection.
     const sphere = box.getBoundingSphere(new THREE.Sphere());
-    const cw = canvas.clientWidth || canvas.width, chh = canvas.clientHeight || canvas.height;
-    if (cw > 0 && chh > 0) {
-        state.renderer.setSize(cw, chh, false);
-        state.camera.aspect = cw / chh;
-        state.camera.updateProjectionMatrix();
-    }
+    state.resize(); // sync renderer + aspect to the live canvas box (from clientWidth/Height only) before framing
     const vFov = state.camera.fov * Math.PI / 180;
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * state.camera.aspect);
     const dist = Math.max(sphere.radius / Math.sin(vFov / 2), sphere.radius / Math.sin(hFov / 2)) * 1.08;
