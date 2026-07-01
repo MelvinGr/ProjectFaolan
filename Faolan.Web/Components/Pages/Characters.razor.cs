@@ -106,7 +106,8 @@ namespace Faolan.Web.Components.Pages
 				}
 			}
 
-			_characters = await query.OrderBy(c => c.CreationDate).ToListAsync();
+			// Order by creation date client-side: SQLite can't ORDER BY a DateTimeOffset column.
+			_characters = (await query.ToListAsync()).OrderBy(c => c.CreationDate).ToList();
 		}
 
 		private string BuildPreviewUrl()

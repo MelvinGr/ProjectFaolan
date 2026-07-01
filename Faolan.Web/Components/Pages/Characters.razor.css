@@ -78,14 +78,22 @@
 }
 
 /* Character sheet: vitals + resolved fields, beside the paper-doll. */
-.stats-panel {
+/* Docked windows (Sheet / Equipment / Inventory) are the shared <Window Floating="false"> component — it provides the
+   card chrome, so only LAYOUT is set here, reaching the component root via ::deep. */
+.stage ::deep .stats-win {
     width: 230px;
     flex-shrink: 0;
     overflow-y: auto;
-    background: linear-gradient(180deg, var(--bg-2), #121419);
-    border: 1px solid var(--stone-dark);
-    border-radius: var(--radius);
-    padding: .85rem;
+}
+
+.stage ::deep .equip-win {
+    flex: 1;
+    height: 100%;
+}
+
+.stage ::deep .inv-win {
+    width: 300px;
+    flex-shrink: 0;
 }
 
 .stats-empty {
@@ -258,28 +266,7 @@
 }
 
 /* AoC-style equipment paper-doll window: slot columns flanking the character preview. */
-.equip-window {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    box-sizing: border-box;
-    background: linear-gradient(180deg, var(--bg-2), #101216);
-    border: 2px solid var(--stone);
-    border-radius: var(--radius);
-    padding: .7rem;
-    box-shadow: inset 0 0 24px #000a, var(--shadow);
-}
 
-.equip-title {
-    text-align: center;
-    color: var(--gold);
-    font-family: var(--font-display);
-    font-weight: 600;
-    letter-spacing: .14em;
-    text-transform: uppercase;
-    font-size: .95rem;
-    padding-bottom: .6rem;
-}
 
 .equip-grid {
     flex: 1;
@@ -586,18 +573,6 @@
 }
 
 /* AoC-style inventory: a paged 4-column bag grid. */
-.inv-window {
-    width: 300px;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    box-sizing: border-box;
-    background: linear-gradient(180deg, var(--bg-2), #101216);
-    border: 2px solid var(--stone);
-    border-radius: var(--radius);
-    padding: .7rem;
-    box-shadow: inset 0 0 24px #000a, var(--shadow);
-}
 
 .inv-tabs {
     display: flex;
@@ -759,13 +734,13 @@
         flex-direction: column;
     }
 
-    .stats-panel {
+    .stage ::deep .stats-win {
         width: auto;
         order: 2;
         max-height: 34vh;
     }
 
-    .inv-window {
+    .stage ::deep .inv-win {
         width: auto;
         order: 3;
     }
