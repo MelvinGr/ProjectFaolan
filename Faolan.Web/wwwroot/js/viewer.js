@@ -338,7 +338,10 @@ export function makeDraggable(windowId, handleId) {
         const r = win.getBoundingClientRect();
         win.style.left = r.left + 'px';
         win.style.top = r.top + 'px';
+        // Clear the CSS anchors so ONLY left/top drive position. The pose window is bottom-anchored (bottom:1.25rem);
+        // leaving `bottom` set alongside a new `top` stretches the fixed element to span both edges (it grows vertically).
         win.style.right = 'auto';
+        win.style.bottom = 'auto';
         startX = e.clientX;
         startY = e.clientY;
         originX = r.left;
