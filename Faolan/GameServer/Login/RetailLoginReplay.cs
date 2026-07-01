@@ -170,7 +170,20 @@ namespace Faolan.GameServer
 				}
 
 				if (!PlayerSpawnScaffoldRows.EnsureFreshRows(scaffoldCharacter, weighted))
+				{
+					// Already seeded. If the character has resolvable editor resources (a created/edited char, NOT a
+					// captured one), rebuild the appearance entries from the CURRENT resources so a web appearance edit
+					// (which rewrites Body/BodyResources) shows up on this login - preserving skills/frame/pairs.
+					if (weighted != null && PlayerSpawnScaffoldRows.RefreshAppearance(scaffoldCharacter, weighted))
+					{
+						// Persist ONLY the entry table (fresh, nav-free rows) - not the whole scaffold graph, whose
+						// loaded skills/frame carry a Character back-nav that would cascade-insert the parent.
+						await Database.SaveCharacterAttributes(scaffoldCharacter.Id, scaffoldCharacter.Attributes);
+						Logger.LogInformation("Refreshed spawn-scaffold appearance from current resources for character {CharacterId}.", character.Id);
+					}
+
 					return scaffoldCharacter;
+				}
 
 				await Database.SaveCharacterScaffold(scaffoldCharacter);
 				Logger.LogInformation("Seeded fresh spawn-scaffold rows for character {CharacterId}.", character.Id);

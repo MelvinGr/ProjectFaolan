@@ -158,6 +158,36 @@ namespace Faolan.GameServer.Spawn
 			return true;
 		}
 
+		// Rebuilds ONLY the appearance portion of an EXISTING scaffold (the weighted appearance entries + the editor
+		// morphs + the closer) from the character's current CharacterBody / CharacterBodyResources, leaving skills,
+		// spawn-frame and scaffold-pairs intact. This propagates a later appearance edit (e.g. the Faolan.Web editor,
+		// which rewrites Body/BodyResources) into the spawn the game sends on the next login, WITHOUT resetting the
+		// character's progression the way a full EnsureFreshRows would. Returns false when there's no scaffold to
+		// refresh (the caller then seeds a fresh one). For an unedited character it reproduces the same entries it was
+		// seeded with, so it is a no-op in effect.
+		public static bool RefreshAppearance(Character character, IReadOnlyList<ScaffoldEntry> weightedAppearance = null)
+		{
+			if (character?.SpawnFrame?.PreFrame == null || character.Attributes is not { Count: > 0 })
+				return false;
+
+			var entries = new List<ScaffoldEntry>(weightedAppearance ?? FreshWeightedAttributes);
+			entries.AddRange(CharacterMorphs.BuildEntries(character.Body, (uint)entries.Count + 1));
+			var closer = FreshCloser(character.Class);
+			entries.Add(new ScaffoldEntry((uint)entries.Count + 1, closer.Tag, closer.Value));
+
+			character.Attributes = entries
+				.Select((e, sequence) => new CharacterAttribute
+				{
+					CharacterId = character.Id,
+					Sequence = sequence,
+					StatId = e.Index,
+					Tag = e.Tag,
+					Value = e.Value
+				})
+				.ToList();
+			return true;
+		}
+
 		// Replaces the character's scaffold rows with the scaffold's content (extraction: captured spawn -> rows).
 		public static void ExtractTo(Character character, PlayerSpawnScaffold scaffold)
 		{
