@@ -5,11 +5,11 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="SkiaSharp" Version="4.148.0"/>
-        <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.148.0"/>
+        <ProjectReference Include="..\Faolan.Core\Faolan.Core.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Faolan.Core\Faolan.Core.csproj"/>
+        <PackageReference Include="SkiaSharp" Version="4.148.0" />
+        <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.148.0"  Condition="$([MSBuild]::IsOSPlatform('Linux'))" />
     </ItemGroup>
 </Project>

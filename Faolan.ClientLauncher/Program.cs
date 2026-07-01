@@ -402,7 +402,7 @@ namespace Faolan.ClientLauncher
 			                    --universeaddr [a]  point LocalConfig.xml <UniverseAddr> (the login server) at `a`; bare flag =
 			                                        127.0.0.1:7010 (replaces /etc/hosts). PERSISTS - undo with --restore
 			                    --mirror [port]     point LocalConfig.xml's three CDN keys (HttpPatchAddr/ClientHttpPatchAddr/
-			                                        ControlHttpPatchAddr) at the local Faolan.ContentMirror; bare flag = port
+			                                        ControlHttpPatchAddr) at the local Faolan.Web.Content; bare flag = port
 			                                        7081. PERSISTS - undo with --restore
 			                    --restore           put LocalConfig.xml's UniverseAddr + 3 CDN keys back to the retail Funcom
 			                                        URLs and exit (no backup file; the redirects above are not auto-reverted)

@@ -36,7 +36,6 @@
     <File Path="Faolan.Wireshark/wireshark/plugin.c" />
   </Folder>
   <Project Path="Faolan.ClientLauncher/Faolan.ClientLauncher.csproj" />
-  <Project Path="Faolan.ContentMirror/Faolan.ContentMirror.csproj" />
   <Project Path="Faolan.Core/Faolan.Core.csproj" />
   <Project Path="Faolan.Core.Database/Faolan.Core.Database.csproj" />
   <Project Path="Faolan.Core.Network/Faolan.Core.Network.csproj" />
@@ -44,6 +43,7 @@
   <Project Path="Faolan.Importer/Faolan.Importer.csproj" />
   <Project Path="Faolan.Mcp/Faolan.Mcp.csproj" />
   <Project Path="Faolan.Tests\Faolan.Tests.csproj" />
+  <Project Path="Faolan.Web.Content\Faolan.Web.Content.csproj" />
   <Project Path="Faolan.Web/Faolan.Web.csproj" />
   <Project Path="Faolan/Faolan.csproj" />
 </Solution>

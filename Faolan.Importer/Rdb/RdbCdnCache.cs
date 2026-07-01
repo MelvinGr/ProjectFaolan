@@ -7,7 +7,7 @@ namespace Faolan.Importer.Rdb
 {
 	// Store-and-forward fetch for on-demand (file==0xFF) RDB resources: the le.idx 16-byte content hash is the CDN
 	// path md5 (<host>/upm/rdb/res/<h0:2>/<h2:1>/<h3:>). If a store dir is given, fetched blobs are ALSO written to it
-	// in the Faolan.ContentMirror layout (<store>/gameupdate/upm/rdb/res/...) and read-from-store-first - so every
+	// in the Faolan.Web.Content layout (<store>/gameupdate/upm/rdb/res/...) and read-from-store-first - so every
 	// resource we pull is archived locally for preservation and the mirror can later serve it offline. See
 	// [[aoc_content_cdn_mirror]].
 	public sealed class RdbCdnCache : IDisposable

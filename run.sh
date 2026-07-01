@@ -3,13 +3,18 @@
 set -eu
 
 case "${1:-}" in
+    --faolan)
+        dotnet run --project ./Faolan/Faolan.csproj
+        ;;
+
     --web)
         dotnet run --project ./Faolan.Web/Faolan.Web.csproj
         ;;
 
     --cdn)
-        dotnet run --project ./Faolan.ContentMirror/Faolan.ContentMirror.csproj -- \
-            --store "/mnt/btrfs/@games/mirror-archive"
+        dotnet run --project ./Faolan.Web.Content/Faolan.Web.Content.csproj -- \
+            --store "/mnt/btrfs/@games/mirror-archive" \
+            --ip 127.0.0.1 --port 7081
         ;;
 
     --client)
@@ -17,7 +22,7 @@ case "${1:-}" in
             --exe '/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/AgeOfConan.exe' \
             --console \
             --universeaddr 127.0.0.1:7010 \
-            --mirror 7081 &
+            --mirror 7081
         ;;
 
     --client2)
@@ -25,7 +30,7 @@ case "${1:-}" in
             --exe '/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan 2/AgeOfConan.exe' \
             --console \
             --universeaddr 127.0.0.1:7010 \
-            --mirror 7081 &
+            --mirror 7081
         ;;
 
     --claude)

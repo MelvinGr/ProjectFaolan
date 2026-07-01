@@ -3,7 +3,7 @@ using System.Collections.Immutable;
 using System.Net;
 using System.Text;
 
-// Faolan.ContentMirror - a store-and-forward mirror of Age of Conan's UPM content CDN.
+// Faolan.Web.Content - a store-and-forward mirror of Age of Conan's UPM content CDN.
 //
 // AoC's patcher + client pull immutable, content-addressed blobs from three hosts, all under /upm:
 //   aoc-eu-update.live      /upm/client/<md5>      client files   (HttpPatchAddr)        -> tag "update"
@@ -18,7 +18,7 @@ using System.Text;
 // from disk - no upstream, no timeout. Running the real ConanPatcher through it captures the whole current revision
 // into store/, a server-independent archive.
 
-namespace Faolan.ContentMirror
+namespace Faolan.Web.Content
 {
 	public static class Program
 	{
@@ -31,6 +31,8 @@ namespace Faolan.ContentMirror
 
 		public static int Main(string[] args)
 		{
+			var ip = GetOption(args, "--ip") ?? "127.0.0.1";
+
 			var port = GetOption(args, "--port") is { } p
 				? int.Parse(p)
 				: 7081;
@@ -39,7 +41,7 @@ namespace Faolan.ContentMirror
 			Directory.CreateDirectory(storeDir);
 
 			var builder = WebApplication.CreateBuilder(args);
-			builder.WebHost.UseUrls($"http://127.0.0.1:{port}");
+			builder.WebHost.UseUrls($"http://{ip}:{port}");
 			// Don't let HttpClient transparently gunzip: we store and re-serve the exact payload bytes the client's
 			// own decompressor expects. Requesting identity upstream keeps HTTP out of the picture entirely.
 			builder.Services.AddHttpClient("cdn").ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AutomaticDecompression = DecompressionMethods.None });
@@ -62,32 +64,34 @@ namespace Faolan.ContentMirror
 					// with it - which would revert our redirect to the real CDN. So for that file we archive the real
 					// bytes but serve a copy whose three patch-addr keys point back at this mirror, keeping the redirect
 					// sticky across a patch run.
-					var isConfig = tag == "control" && rest.EndsWith("LocalConfig.xml", StringComparison.OrdinalIgnoreCase);
+					if (tag == "control" && rest.EndsWith("LocalConfig.xml", StringComparison.OrdinalIgnoreCase))
+					{
+						return Results.File(RewriteConfig(await File.ReadAllBytesAsync(localPath), port), "application/octet-stream");
+					}
 
 					if (query.Length == 0 && File.Exists(localPath))
 					{
 						Interlocked.Increment(ref hits);
-						return isConfig
-							? Results.File(RewriteConfig(await File.ReadAllBytesAsync(localPath), port), "application/octet-stream")
-							: Results.File(localPath, "application/octet-stream");
+						return Results.File(localPath, "application/octet-stream");
 					}
 
 					// Single-flight per path so 5 patcher connections don't all fetch the same blob.
 					var gate = inflight.GetOrAdd(localPath, _ => new SemaphoreSlim(1, 1));
 					await gate.WaitAsync();
+
 					try
 					{
 						if (query.Length == 0 && File.Exists(localPath))
 						{
 							Interlocked.Increment(ref hits);
-							return isConfig
-								? Results.File(RewriteConfig(await File.ReadAllBytesAsync(localPath), port), "application/octet-stream")
-								: Results.File(localPath, "application/octet-stream");
+							return Results.File(localPath, "application/octet-stream");
 						}
 
 						var url = $"{upstreamBase}/upm/{rest}{query}";
+
 						var client = http.CreateClient("cdn");
 						client.DefaultRequestHeaders.AcceptEncoding.ParseAdd("identity");
+
 						var resp = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
 						if (!resp.IsSuccessStatusCode)
 						{
@@ -107,12 +111,10 @@ namespace Faolan.ContentMirror
 						var m = Interlocked.Increment(ref misses);
 						var b = Interlocked.Add(ref bytes, body.Length);
 						if (m % 100 == 0)
-							log.LogInformation("progress: {Misses} stored, {Hits} hits, {MB:F1} MB", m, Interlocked.Read(ref hits), b / 1048576.0);
+							log.LogInformation("progress: {Misses} stored, {Hits} hits, {MB:F1} MB", m, Interlocked.Read(ref hits), b / 1024f / 1024f);
+
 						log.LogInformation("MISS {Tag} {Rest} ({Size}b)", tag, rest, body.Length);
-						return Results.File(isConfig
-								? RewriteConfig(body, port)
-								: body,
-							"application/octet-stream");
+						return Results.File(body, "application/octet-stream");
 					}
 					finally
 					{
@@ -125,14 +127,13 @@ namespace Faolan.ContentMirror
 				{
 					hits = Interlocked.Read(ref hits),
 					stored = Interlocked.Read(ref misses),
-					mb = Interlocked.Read(ref bytes) / 1048576.0,
+					mb = Interlocked.Read(ref bytes) / 1024f / 1024f,
 					storeDir
 				}));
 
 			//app.MapGet("launchernotes2.php", () => Results.Ok(Statics.StartupBanner));
 
-			log.LogInformation("Faolan.ContentMirror on http://127.0.0.1:{Port} store={Store}", port, storeDir);
-			log.LogInformation("Point a client at the mirror with: Faolan.ClientLauncher --mirror {Port}", port);
+			log.LogInformation("Faolan.Web.Content on http://{ip}:{Port} store={Store}", ip, port, storeDir);
 			app.Run();
 			return 0;
 		}
@@ -151,7 +152,7 @@ namespace Faolan.ContentMirror
 		{
 			var text = Encoding.UTF8.GetString(body);
 			foreach (var (tag, host) in Upstreams)
-				text = text.Replace($"{host}/upm", $"http://127.0.0.1:{port}/{tag}/upm");
+				text = text.Replace($"{host}/upm", $"http://127.0.0.1:{port}/{tag}/upm"); // TODO: External IP
 			return Encoding.UTF8.GetBytes(text);
 		}
 	}

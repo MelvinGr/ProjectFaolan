@@ -22,7 +22,7 @@ namespace Faolan.Core.Rdb
 
 		private readonly string _rdbDir;
 
-		// Optional CDN source for on-demand resources (file == 0xFF): the Faolan.ContentMirror proxy base, e.g.
+		// Optional CDN source for on-demand resources (file == 0xFF): the Faolan.Web.Content proxy base, e.g.
 		// "http://127.0.0.1:7080/gameupdate/upm/rdb". On-demand resources aren't in the local NN.rdbdata files; their
 		// payload is content-addressed by the entry's 16-byte md5 at <base>/res/<hex[0:2]>/<hex[2:3]>/<hex[3:]>. The
 		// proxy is store-and-forward, so a GET both serves and archives the blob (the real CDN must be reachable for a
