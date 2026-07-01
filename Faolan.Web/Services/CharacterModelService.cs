@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -136,36 +137,277 @@ namespace Faolan.Web.Services
 			var resources = db.CharacterBodyResources.AsNoTracking().Where(r => r.CharacterId == characterId).Select(r => r.Ref).ToList();
 			var hairRmId = ParseResourceId(resources.FirstOrDefault(r => r.StartsWith("*hairmesh_")));
 
-			var rdb = Reader();
-			var bodyFallback = character.Sex == Sex.Female
-				? LocalFemaleBody
-				: LocalMaleBody;
-			var bodyId = BodyMesh.GetValueOrDefault((character.Race, character.Sex), bodyFallback);
-
-			// Classify the character's TexScripts (skin/hair tint, eye iris, body tattoos) by their mesh target (#275).
-			var (skinTint, hairTint, eyeTex, decals) = ResolveTexScripts(rdb, resources);
-
 			// Body-proportion morphs (cluster-scale deform of the body mesh).
 			var morphs = body == null
 				? (BodyMorphDeformer.Morphs?)null
 				: new BodyMorphDeformer.Morphs(body.Arm, body.Chest, body.Bosom, body.Stomach, body.Arse, body.Thigh, body.Leg);
 
 			// CharacterBody.HeadMesh is stored in editor 2x units; the real CHARACTERCREATOR head monsterdataid is
-			// HeadMesh/2 ([[CaptureCharacterImporter]]). Resolve it to head+eyes+lashes meshes via MonsterData.
-			var headMeshes = body is { HeadMesh: > 0 }
-				? RdbAssetExtractor.ResolveHeadMeshes(rdb, body.HeadMesh / 2)
+			// HeadMesh/2 ([[CaptureCharacterImporter]]).
+			var headMonster = body is { HeadMesh: > 0 }
+				? body.HeadMesh / 2
+				: (uint?)null;
+
+			return BuildFromSpec(Reader(), character.Sex, character.Race, hairRmId, headMonster, morphs, resources, equipMeshIndexIds, rig);
+		}
+
+		// Build a character glb from an EXPLICIT appearance spec instead of the stored one - the live-preview path for the
+		// web appearance editor (nothing is persisted; the editor calls this on every control change). texRefs are the
+		// chosen *hairmesh_/*texscript_ resource refs; morphs are the 7 body-proportion sliders; headMonster is the
+		// CHARACTERCREATOR head monsterdataid (HeadMesh/2). Gear is intentionally omitted so skin/tattoos are visible.
+		//
+		// STRICT (no fallbacks): if a required asset is missing, returns the reason in Error instead of silently
+		// substituting a default/local body - so the editor surfaces exactly what is unavailable (e.g. a CDN-only body).
+		public (byte[]? Glb, string? Error) BuildCharacterCustom(Sex sex, Race race, uint? hairRmId, uint? headMonster, BodyMorphDeformer.Morphs? morphs, IReadOnlyList<string>? texRefs)
+		{
+			var rdb = Reader();
+
+			if (!BodyMesh.TryGetValue((race, sex), out var bodyId) || bodyId == 0)
+				return (null, $"No body mesh is mapped for {race} {sex}.");
+
+			if (headMonster is not > 0)
+				return (null, "No head selected (head monsterdata id required).");
+
+			var headMeshes = RdbAssetExtractor.ResolveHeadMeshes(rdb, headMonster.Value);
+			if (headMeshes.Count == 0)
+				return (null, $"Head monsterdata {headMonster} was not found in the RDB.");
+
+			var (skinTint, hairTint, eyeTex, decals) = ResolveTexScripts(rdb, texRefs ?? []);
+
+			var glb = RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyId, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals, morphs, null, true);
+			return glb == null
+				? (null, $"Body mesh {bodyId} for {race} {sex} could not be built (CDN-only or missing in the local RDB).")
+				: (glb, null);
+		}
+
+		// Shared assembler for the stored (BuildCharacterById) and ad-hoc (BuildCharacterCustom) paths: resolve the
+		// TexScripts (skin/hair tint, eye iris, body tattoo - by mesh target, #275), the head meshes and the body, then
+		// build the glb. Tries the exact race/sex body first, then the local same-sex fallback (the exact body is often
+		// CDN-only), then a bare body.
+		private byte[]? BuildFromSpec(RdbReader rdb, Sex sex, Race race, uint? hairRmId, uint? headMonster,
+			BodyMorphDeformer.Morphs? morphs, IReadOnlyList<string>? texRefs, IReadOnlyList<uint>? equipMeshIndexIds, bool rig)
+		{
+			var bodyFallback = sex == Sex.Female
+				? LocalFemaleBody
+				: LocalMaleBody;
+			var bodyId = BodyMesh.GetValueOrDefault((race, sex), bodyFallback);
+
+			var (skinTint, hairTint, eyeTex, decals) = ResolveTexScripts(rdb, texRefs ?? []);
+
+			var headMeshes = headMonster is > 0
+				? RdbAssetExtractor.ResolveHeadMeshes(rdb, headMonster.Value)
 				: [];
 
 			if (headMeshes.Count > 0)
-				// Try the exact race/sex body, then the local same-sex fallback (the exact body is often CDN-only).
 			{
 				return RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyId, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals, morphs, equipMeshIndexIds, rig) ??
 				       RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyFallback, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals, morphs, equipMeshIndexIds, rig) ??
-				       BuildCharacter(character.Race, character.Sex, hairRmId);
+				       BuildCharacter(race, sex, hairRmId);
 			}
 
-			return BuildCharacter(character.Race, character.Sex, hairRmId);
+			return BuildCharacter(race, sex, hairRmId);
 		}
+
+		// The appearance choices legal for a given SEX+RACE, parsed from the client's CHARACTERCREATOR table (RDB
+		// 1010700 - plaintext XML: <sex><race> lists of hair / haircolor / eyecolor / skincolor / body+face markings /
+		// heads + a height range, and per-sex body-morph min/max). This is the SAME table the retail creator uses to
+		// gate the choices, so the editor offers exactly what that race+sex can pick. Colours carry their hex (for
+		// swatches). Parsed once and cached. (This cracks the per-race/sex half of the #275 CHARACTERCREATOR decode.)
+		public AppearanceOptions GetAppearanceOptions(Sex sex, Race race)
+		{
+			EnsureCreator();
+			return _creatorSets!.GetValueOrDefault((sex, race)) ?? EmptyOptions;
+		}
+
+		private static readonly AppearanceOptions EmptyOptions = new([], [], [], [], [], [], [], 0, 0, new Dictionary<string, int[]>());
+
+		private void EnsureCreator()
+		{
+			if (_creatorSets != null)
+				return;
+
+			var rdb = Reader(); // outside the lock: Reader() locks _gate too, and _gate (System.Threading.Lock) is not reentrant
+
+			lock (_gate)
+			{
+				if (_creatorSets != null)
+					return;
+
+				var entry = rdb.EntriesOfType(CreatorType).OrderByDescending(e => e.Size).First();
+				var bytes = rdb.ReadDecompressed(entry);
+				var start = Array.IndexOf(bytes, (byte)'<');
+				var xml = Encoding.UTF8.GetString(bytes, start < 0 ? 0 : start, bytes.Length - (start < 0 ? 0 : start));
+				var root = System.Xml.Linq.XDocument.Parse(xml).Root!;
+
+				var sets = new Dictionary<(Sex, Race), AppearanceOptions>();
+				foreach (var sexEl in root.Elements())
+				{
+					var sex = string.Equals(sexEl.Name.LocalName, "female", StringComparison.OrdinalIgnoreCase)
+						? Sex.Female
+						: Sex.Male;
+
+					// Per-sex body-morph min/max. min_value/max_value are the float morph space; CharacterBody stores
+					// the signed value x1000 (spawn float = value/1000), so scale to those units for the slider bounds.
+					var limits = new Dictionary<string, int[]>();
+					foreach (var mn in sexEl.Elements("BodyNodes").Elements("MorphNode"))
+					{
+						var name = (string?)mn.Attribute("MorphName");
+						if (name != null)
+							limits[name] = [Scale(mn.Attribute("min_value")), Scale(mn.Attribute("max_value"))];
+					}
+
+					foreach (var raceEl in sexEl.Elements())
+					{
+						if (!TryRace(raceEl.Name.LocalName, out var race))
+							continue;
+
+						List<AppearanceOption> Refs(string tag, string prefix, string idAttr, bool colour) => raceEl
+							.Elements(tag)
+							.Select((e, i) => MakeOption(prefix, (string?)e.Attribute(idAttr), i, colour
+								? (string?)e.Attribute("color")
+								: null))
+							.OfType<AppearanceOption>()
+							.ToList();
+
+						var heads = raceEl
+							.Elements("head")
+							.Select((e, i) => new AppearanceOption((string?)e.Attribute("monsterdataid") ?? "0", $"#{i + 1} · {(string?)e.Attribute("monsterdataid")}", null))
+							.Where(o => o.Value != "0")
+							.ToList();
+
+						var height = raceEl.Element("height");
+						sets[(sex, race)] = new AppearanceOptions(
+							Refs("hair", "*hairmesh_", "meshid", false),
+							Refs("haircolor", "*texscript_", "texscript", true),
+							Refs("eyecolor", "*texscript_", "texscript", true),
+							Refs("skincolor", "*texscript_", "texscript", true),
+							Refs("bodymarkings", "*texscript_", "texscript", false),
+							Refs("facemarkings", "*texscript_", "texscript", false),
+							heads,
+							(int?)height?.Attribute("min") ?? 0,
+							(int?)height?.Attribute("max") ?? 0,
+							limits);
+					}
+				}
+
+				_creatorSets = sets;
+			}
+		}
+
+		// A resource option from an id; the id "0" is the creator's "none" placeholder (skipped - the UI has its own
+		// none entry). prefix = "*hairmesh_" / "*texscript_"; colour = the swatch hex (null for non-colour lists).
+		private static AppearanceOption? MakeOption(string prefix, string? id, int index, string? colour)
+		{
+			return string.IsNullOrEmpty(id) || id == "0"
+				? null
+				: new AppearanceOption(prefix + id, colour ?? $"#{index} · {id}", colour);
+		}
+
+		private static int Scale(System.Xml.Linq.XAttribute? attr) => attr != null && double.TryParse(attr.Value,
+			System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v)
+			? (int)Math.Round(v * 1000)
+			: 0;
+
+		private static bool TryRace(string name, out Race race)
+		{
+			switch (name.ToLowerInvariant())
+			{
+				case "aquilonian":
+					race = Race.Aquilonian;
+					return true;
+				case "cimmerian":
+					race = Race.Cimmerian;
+					return true;
+				case "stygian":
+					race = Race.Stygian;
+					return true;
+				default:
+					race = default; // khitan is not in the Race enum
+					return false;
+			}
+		}
+
+		private const uint CreatorType = 1010700;
+		private Dictionary<(Sex, Race), AppearanceOptions>? _creatorSets;
+
+		// Persist an edited appearance to the character's CharacterBody (morphs + head) and CharacterBodyResources
+		// (the chosen hair/colour/tattoo refs, re-sequenced). This is what the editor's Save writes; the web viewer
+		// reads these back so the change sticks. Returns false when the character does not exist.
+		public bool SaveAppearance(uint characterId, AppearanceSpec spec)
+		{
+			using var db = _dbFactory.CreateDbContext();
+			if (!db.Characters.Any(c => c.Id == characterId))
+				return false;
+
+			var body = db.CharacterBodies.FirstOrDefault(b => b.CharacterId == characterId);
+			if (body == null)
+			{
+				body = new CharacterBody { CharacterId = characterId };
+				db.CharacterBodies.Add(body);
+			}
+
+			body.Arm = spec.Arm;
+			body.Chest = spec.Chest;
+			body.Bosom = spec.Bosom;
+			body.Stomach = spec.Stomach;
+			body.Arse = spec.Arse;
+			body.Thigh = spec.Thigh;
+			body.Leg = spec.Leg;
+			if (spec.HeadMesh > 0)
+				body.HeadMesh = spec.HeadMesh;
+
+			db.CharacterBodyResources.RemoveRange(db.CharacterBodyResources.Where(r => r.CharacterId == characterId));
+			var seq = 0;
+			foreach (var reference in spec.Refs.Where(r => !string.IsNullOrWhiteSpace(r)).Distinct())
+				db.CharacterBodyResources.Add(new CharacterBodyResource { CharacterId = characterId, Sequence = seq++, Ref = reference });
+
+			db.SaveChanges();
+			return true;
+		}
+
+		// The character's CURRENT appearance selections, to seed the editor when a character is opened: the 7 body
+		// morphs, the head (editor 2x units), and the chosen resource ref in each render-role category (or "" = none).
+		public AppearanceCurrent GetCurrentAppearance(uint characterId)
+		{
+			using var db = _dbFactory.CreateDbContext();
+			var body = db.CharacterBodies.AsNoTracking().FirstOrDefault(b => b.CharacterId == characterId);
+			var byCat = db.CharacterBodyResources.AsNoTracking()
+				.Where(r => r.CharacterId == characterId)
+				.Join(db.MorphTargets.AsNoTracking(), r => r.Ref, m => m.Name, (r, m) => new { m.Category, r.Ref })
+				.ToList()
+				.GroupBy(x => x.Category)
+				.ToDictionary(g => g.Key, g => g.First().Ref);
+
+			string Cat(byte c) => byCat.GetValueOrDefault(c, "");
+			return new AppearanceCurrent(
+				body?.Arm ?? 0, body?.Chest ?? 0, body?.Bosom ?? 0, body?.Stomach ?? 0, body?.Arse ?? 0, body?.Thigh ?? 0, body?.Leg ?? 0,
+				body?.HeadMesh ?? 0,
+				Cat(3), Cat(6), Cat(7), Cat(8), Cat(9), Cat(10));
+		}
+
+		public sealed record AppearanceCurrent(
+			float Arm, float Chest, float Bosom, float Stomach, float Arse, float Thigh, float Leg, uint HeadMesh,
+			string HairStyle, string HairColor, string Eyes, string Skin, string BodyTattoo, string FaceTattoo);
+
+		// One pickable option. Value = what the editor stores/sends (a "*hairmesh_"/"*texscript_" ref, or a head
+		// monsterdataid); Color = the swatch hex for colour lists (null otherwise).
+		public sealed record AppearanceOption(string Value, string Label, string? Color);
+
+		public sealed record AppearanceOptions(
+			IReadOnlyList<AppearanceOption> HairStyle,
+			IReadOnlyList<AppearanceOption> HairColor,
+			IReadOnlyList<AppearanceOption> Eyes,
+			IReadOnlyList<AppearanceOption> Skin,
+			IReadOnlyList<AppearanceOption> BodyTattoo,
+			IReadOnlyList<AppearanceOption> FaceTattoo,
+			IReadOnlyList<AppearanceOption> Heads,
+			int HeightMin,
+			int HeightMax,
+			IReadOnlyDictionary<string, int[]> MorphLimits);
+
+		public sealed record AppearanceSpec(
+			float Arm, float Chest, float Bosom, float Stomach, float Arse, float Thigh, float Leg,
+			uint HeadMesh, IReadOnlyList<string> Refs);
 
 		// Build a character as a posable rig (skinned glb): the full assembled character - body (morphs + skin + decals) +
 		// head + hair - skinned to the auto-selected skeleton, so the viewer's pose slider can articulate it. The body

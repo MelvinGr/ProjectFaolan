@@ -66,18 +66,34 @@ function setup(canvas) {
     return state;
 }
 
-// Load (or reload) a glb URL into the named canvas, framing the camera to the model.
-export async function show(canvasId, url) {
+// Load (or reload) a glb URL into the named canvas. Frames the camera to the model unless keepCamera is set (the
+// appearance editor reloads on every tweak and must NOT reset the user's orbit/zoom). Returns null on success, or the
+// server's error text on failure (the strict appearance-preview endpoint returns 422 with a reason) - so the caller can
+// surface exactly what is missing instead of a silent failure.
+export async function show(canvasId, url, keepCamera) {
     const canvas = document.getElementById(canvasId);
-    if (!canvas) return;
-    const state = states.get(canvasId) ?? setup(canvas);
+    if (!canvas) return 'Canvas not found.';
 
+    let gltf;
+    try {
+        gltf = await new GLTFLoader().loadAsync(url);
+    } catch (e) {
+        try {
+            const r = await fetch(url);
+            if (!r.ok) {
+                const p = await r.json().catch(() => null);
+                return (p && (p.detail || p.title)) || ('Load failed: ' + r.status);
+            }
+        } catch { }
+        return 'Failed to load model.';
+    }
+
+    const state = states.get(canvasId) ?? setup(canvas);
     if (state.model) {
         state.scene.remove(state.model);
         state.model = null;
     }
 
-    const gltf = await new GLTFLoader().loadAsync(url);
     const model = gltf.scene;
 
     // Normals are now position-welded smooth normals baked by the C# GlbWriter (recomputing them here facets the mesh,
@@ -122,15 +138,20 @@ export async function show(canvasId, url) {
     // Frame the whole model for the CURRENT aspect (portrait phones are width-limited, so fit both axes of the bounding
     // sphere - otherwise a tall body gets cropped to just the legs). Resize the renderer + aspect to the live canvas
     // first: on mobile the layout often hasn't settled when setup() ran, leaving a stale (square) projection.
-    const sphere = box.getBoundingSphere(new THREE.Sphere());
-    state.resize(); // sync renderer + aspect to the live canvas box (from clientWidth/Height only) before framing
-    const vFov = state.camera.fov * Math.PI / 180;
-    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * state.camera.aspect);
-    const dist = Math.max(sphere.radius / Math.sin(vFov / 2), sphere.radius / Math.sin(hFov / 2)) * 1.08;
-    const cy = size.y / 2;
-    state.controls.target.set(0, cy, 0);
-    state.camera.position.set(0, cy, dist);
+    state.resize(); // sync renderer + aspect to the live canvas box (from clientWidth/Height only)
+
+    // Frame the model - but not on an editor live-preview reload (keepCamera), so the user's orbit/zoom is preserved.
+    if (!keepCamera) {
+        const sphere = box.getBoundingSphere(new THREE.Sphere());
+        const vFov = state.camera.fov * Math.PI / 180;
+        const hFov = 2 * Math.atan(Math.tan(vFov / 2) * state.camera.aspect);
+        const dist = Math.max(sphere.radius / Math.sin(vFov / 2), sphere.radius / Math.sin(hFov / 2)) * 1.08;
+        const cy = size.y / 2;
+        state.controls.target.set(0, cy, 0);
+        state.camera.position.set(0, cy, dist);
+    }
     state.controls.update();
+    return null;
 }
 
 // Posable joints. Each control bends one or more rig bones `deg` degrees about a LOCAL axis (0 = bind/rest). Left/right

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Rdb.Assets;
 using Faolan.Web.Auth;
 using Faolan.Web.Components;
 using Faolan.Web.Services;
@@ -190,6 +191,28 @@ namespace Faolan.Web
 						? Results.NotFound()
 						: Results.File(glb, "model/gltf-binary");
 				});
+
+			// Appearance-editor LIVE PREVIEW: build a character glb from explicit query params (nothing persisted).
+			// Strict - a missing asset returns 422 with the reason (no silent fallback), which the editor displays.
+			app.MapGet("/api/character/custom/model.glb",
+				(Sex sex, Race race, uint? hair, uint? head,
+					float? arm, float? chest, float? bosom, float? stomach, float? arse, float? thigh, float? leg,
+					string? tex, CharacterModelService models) =>
+				{
+					var refs = (tex ?? "")
+						.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+						.ToList();
+					var morphs = new BodyMorphDeformer.Morphs(arm ?? 0, chest ?? 0, bosom ?? 0, stomach ?? 0, arse ?? 0, thigh ?? 0, leg ?? 0);
+					var (glb, error) = models.BuildCharacterCustom(sex, race, hair, head, morphs, refs);
+					return glb == null
+						? Results.Problem(detail: error, statusCode: 422)
+						: Results.File(glb, "model/gltf-binary");
+				});
+
+			// The appearance choices legal for a sex+race (hair / colours / body+face tattoo / heads + morph limits),
+			// from the CHARACTERCREATOR table, for the editor's pickers. (SAVE is a direct server-side service call
+			// from the Blazor component - no open write endpoint.)
+			app.MapGet("/api/appearance/options", (Sex sex, Race race, CharacterModelService models) => Results.Json(models.GetAppearanceOptions(sex, race)));
 
 			// Wearable armour-set catalogue (optionally filtered by ?sex=Female/Male), for the viewer's wardrobe picker.
 			app.MapGet("/api/armorsets",

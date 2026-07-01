@@ -214,6 +214,104 @@
             <div class="tip-controls" id="pose-controls"></div>
         </div>
     }
+
+    @if (_selected != null && _appOptions != null)
+    {
+        <div class="pose-window edit-window" id="edit-window">
+            <div class="pose-window-bar" id="edit-window-bar">
+                <span class="pose-window-title">Edit — @_selected.Name</span>
+            </div>
+
+            <div class="edit-scroll">
+                <div class="edit-head">Body</div>
+                <label class="pose"><span>Arm</span><input type="range" min="@MorphMin("arm")" max="@MorphMax("arm")" @bind="_eArm" @bind:after="PreviewEdit" /></label>
+                <label class="pose"><span>Chest</span><input type="range" min="@MorphMin("chest")" max="@MorphMax("chest")" @bind="_eChest" @bind:after="PreviewEdit" /></label>
+                <label class="pose"><span>Bosom</span><input type="range" min="@MorphMin("bosom")" max="@MorphMax("bosom")" @bind="_eBosom" @bind:after="PreviewEdit" /></label>
+                <label class="pose"><span>Stomach</span><input type="range" min="@MorphMin("stomach")" max="@MorphMax("stomach")" @bind="_eStomach" @bind:after="PreviewEdit" /></label>
+                <label class="pose"><span>Arse</span><input type="range" min="@MorphMin("arse")" max="@MorphMax("arse")" @bind="_eArse" @bind:after="PreviewEdit" /></label>
+                <label class="pose"><span>Thigh</span><input type="range" min="@MorphMin("thigh")" max="@MorphMax("thigh")" @bind="_eThigh" @bind:after="PreviewEdit" /></label>
+                <label class="pose"><span>Leg</span><input type="range" min="@MorphMin("leg")" max="@MorphMax("leg")" @bind="_eLeg" @bind:after="PreviewEdit" /></label>
+
+                <div class="edit-head">Hair</div>
+                <label class="edit-row"><span>Style</span>
+                    <select @bind="_eHairStyle" @bind:after="PreviewEdit">
+                        <option value="">— none —</option>
+                        @foreach (var o in _appOptions.HairStyle)
+                        {
+                            <option value="@o.Value">@o.Label</option>
+                        }
+                    </select>
+                </label>
+                <div class="edit-row"><span>Colour</span>
+                    <div class="swatches">
+                        <button type="button" class="swatch none @(string.IsNullOrEmpty(_eHairColor) ? "sel" : "")" title="none" @onclick="@(async () => { _eHairColor = string.Empty; await PreviewEdit(); })"></button>
+                        @foreach (var o in _appOptions.HairColor)
+                        {
+                            <button type="button" class="swatch @(_eHairColor == o.Value ? "sel" : "")" style="background:@o.Color" title="@o.Color" @onclick="@(async () => { _eHairColor = o.Value; await PreviewEdit(); })"></button>
+                        }
+                    </div>
+                </div>
+
+                <div class="edit-head">Face</div>
+                <div class="edit-row"><span>Skin</span>
+                    <div class="swatches">
+                        @foreach (var o in _appOptions.Skin)
+                        {
+                            <button type="button" class="swatch @(_eSkin == o.Value ? "sel" : "")" style="background:@o.Color" title="@o.Color" @onclick="@(async () => { _eSkin = o.Value; await PreviewEdit(); })"></button>
+                        }
+                    </div>
+                </div>
+                <div class="edit-row"><span>Eyes</span>
+                    <div class="swatches">
+                        @foreach (var o in _appOptions.Eyes)
+                        {
+                            <button type="button" class="swatch @(_eEyes == o.Value ? "sel" : "")" style="background:@o.Color" title="@o.Color" @onclick="@(async () => { _eEyes = o.Value; await PreviewEdit(); })"></button>
+                        }
+                    </div>
+                </div>
+                <label class="edit-row"><span>Head</span>
+                    <select @bind="_eHead" @bind:after="PreviewEdit">
+                        <option value="0">— default —</option>
+                        @foreach (var o in _appOptions.Heads)
+                        {
+                            <option value="@o.Value">@o.Label</option>
+                        }
+                    </select>
+                </label>
+
+                <div class="edit-head">Tattoos</div>
+                <label class="edit-row"><span>Body</span>
+                    <select @bind="_eBodyTat" @bind:after="PreviewEdit">
+                        <option value="">— none —</option>
+                        @foreach (var o in _appOptions.BodyTattoo)
+                        {
+                            <option value="@o.Value">@o.Label</option>
+                        }
+                    </select>
+                </label>
+                <label class="edit-row"><span>Face</span>
+                    <select @bind="_eFaceTat" @bind:after="PreviewEdit">
+                        <option value="">— none —</option>
+                        @foreach (var o in _appOptions.FaceTattoo)
+                        {
+                            <option value="@o.Value">@o.Label</option>
+                        }
+                    </select>
+                </label>
+                <div class="edit-note">Face tattoo &amp; head morph don't render yet (#275) — they still save.</div>
+            </div>
+
+            <div class="edit-actions">
+                <button class="pose-reset" @onclick="SaveEdit">Save</button>
+                <button class="pose-reset" @onclick="RevertEdit">Revert</button>
+                <span class="edit-status">@_editStatus</span>
+            </div>
+            @if (_editError != null)
+            {
+                <div class="edit-error">@_editError</div>
+            }
+        </div>
+    }
 </div>
 
 @code {

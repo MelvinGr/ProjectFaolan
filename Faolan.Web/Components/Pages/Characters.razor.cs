@@ -38,6 +38,17 @@ namespace Faolan.Web.Components.Pages
 		// Selected character's sheet: vitals (player-facing MaxStats) + a few resolved fields.
 		private uint _health, _mana, _stamina;
 
+		// --- Appearance editor (floating window) -------------------------------------------------------------
+		// The pickable resources (loaded once) + the live edit state seeded from the character on select. Body
+		// morphs are the decoded signed slider values (the unit CharacterBody stores / BodyMorphDeformer takes);
+		// _eHead is editor-2x units. Preview is a strict ad-hoc build (no fallback) - _editError shows why it failed.
+		private CharacterModelService.AppearanceOptions? _appOptions;
+		private int _eArm, _eChest, _eBosom, _eStomach, _eArse, _eThigh, _eLeg;
+		private uint _eHead;
+		private string _eHairStyle = "", _eHairColor = "", _eEyes = "", _eSkin = "", _eBodyTat = "", _eFaceTat = "";
+		private string? _editError;
+		private string _editStatus = "";
+
 		[SupplyParameterFromQuery(Name = "char")]
 		public long? CharId { get; set; }
 
@@ -141,16 +152,114 @@ namespace Faolan.Web.Components.Pages
 			// Open on the first tab that actually has items (most characters only carry Normal).
 			_invTab = InvTabs.FirstOrDefault(t => _inventory.Any(i => i.Tab == t)) ?? "Normal";
 			_invPage = 0;
+			LoadEditState(c);
 			await LoadSheet(c);
 			await Render();
 			if (_module != null)
 			{
-				// Build the per-joint pose sliders (in the floating pose window) + make that window draggable,
-				// then render a 3D thumbnail into each equipped slot.
+				// Build the per-joint pose sliders (in the floating pose window) + make both floating windows
+				// (pose + appearance editor) draggable, then render a 3D thumbnail into each equipped slot.
 				await _module.InvokeVoidAsync("buildPoseControls", "char-canvas", "pose-controls");
 				await _module.InvokeVoidAsync("makeDraggable", "pose-window", "pose-window-bar");
+				await _module.InvokeVoidAsync("makeDraggable", "edit-window", "edit-window-bar");
 				await _module.InvokeVoidAsync("populateItemThumbs");
 			}
+		}
+
+		// Seed the editor state from the character's stored appearance (called on select). Body morphs come back as
+		// floats (whole-number slider values); keep them as ints for clean slider binding + preview URLs.
+		private void LoadEditState(Character c)
+		{
+			// Options are gated to this character's race+sex (CHARACTERCREATOR table).
+			_appOptions = Models.GetAppearanceOptions(c.Sex, c.Race);
+
+			var a = Models.GetCurrentAppearance(c.Id);
+			_eArm = (int)a.Arm;
+			_eChest = (int)a.Chest;
+			_eBosom = (int)a.Bosom;
+			_eStomach = (int)a.Stomach;
+			_eArse = (int)a.Arse;
+			_eThigh = (int)a.Thigh;
+			_eLeg = (int)a.Leg;
+			_eHead = a.HeadMesh / 2; // stored HeadMesh is editor-2x; the editor works in head monsterdataid units
+			_eHairStyle = a.HairStyle;
+			_eHairColor = a.HairColor;
+			_eEyes = a.Eyes;
+			_eSkin = a.Skin;
+			_eBodyTat = a.BodyTattoo;
+			_eFaceTat = a.FaceTattoo;
+			_editError = null;
+			_editStatus = "";
+		}
+
+		// Live-preview the current edit state via the strict ad-hoc build endpoint. show() returns null on success or
+		// the server's error text (missing asset) on failure - surfaced in _editError, no silent fallback.
+		private async Task PreviewEdit()
+		{
+			if (_selected == null || _module == null)
+				return;
+
+			_editStatus = "building…";
+			StateHasChanged();
+			// keepCamera: true - preserve the user's orbit/zoom across an edit (don't reframe on every tweak).
+			_editError = await _module.InvokeAsync<string?>("show", "char-canvas", BuildPreviewUrl(), true);
+			_editStatus = _editError == null
+				? "preview"
+				: "";
+			StateHasChanged();
+		}
+
+		private string BuildPreviewUrl()
+		{
+			var tex = new[] { _eHairColor, _eEyes, _eSkin, _eBodyTat, _eFaceTat }.Where(s => !string.IsNullOrEmpty(s));
+			var texJoined = string.Join(',', tex);
+			var hair = ParseRefId(_eHairStyle);
+			var head = _eHead; // already a head monsterdataid
+
+			var q = $"/api/character/custom/model.glb?sex={_selected!.Sex}&race={_selected.Race}" +
+			        (hair > 0 ? $"&hair={hair}" : "") +
+			        (head > 0 ? $"&head={head}" : "") +
+			        $"&arm={_eArm}&chest={_eChest}&bosom={_eBosom}&stomach={_eStomach}&arse={_eArse}&thigh={_eThigh}&leg={_eLeg}" +
+			        (texJoined.Length > 0 ? $"&tex={Uri.EscapeDataString(texJoined)}" : "") +
+			        $"&t={DateTime.UtcNow.Ticks}";
+			return q;
+		}
+
+		// Persist the current edit state to the character (direct server-side service call - no open write endpoint).
+		private void SaveEdit()
+		{
+			if (_selected == null)
+				return;
+
+			var refs = new[] { _eHairStyle, _eHairColor, _eEyes, _eSkin, _eBodyTat, _eFaceTat }
+				.Where(s => !string.IsNullOrEmpty(s))
+				.ToList();
+			// Persist HeadMesh in the stored editor-2x units (the editor works in monsterdataid = HeadMesh/2).
+			var spec = new CharacterModelService.AppearanceSpec(_eArm, _eChest, _eBosom, _eStomach, _eArse, _eThigh, _eLeg, _eHead * 2, refs);
+			_editStatus = Models.SaveAppearance(_selected.Id, spec)
+				? "saved ✓"
+				: "save failed";
+		}
+
+		private async Task RevertEdit()
+		{
+			if (_selected == null)
+				return;
+
+			LoadEditState(_selected);
+			await PreviewEdit();
+		}
+
+		private int MorphMin(string morph) => _appOptions?.MorphLimits.TryGetValue(morph, out var v) == true ? v[0] : -250;
+
+		private int MorphMax(string morph) => _appOptions?.MorphLimits.TryGetValue(morph, out var v) == true ? v[1] : 250;
+
+		private static uint ParseRefId(string reference)
+		{
+			var i = reference.LastIndexOf('_');
+			return i >= 0 && uint.TryParse(reference.AsSpan(i + 1), out var v)
+				? v
+				: 0;
 		}
 
 		private void SelectInvTab(string tab)
