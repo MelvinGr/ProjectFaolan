@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using System.Net;
 using System.Text;
 
@@ -21,12 +22,12 @@ namespace Faolan.ContentMirror
 {
 	public static class Program
 	{
-		private static readonly IReadOnlyDictionary<string, string> Upstreams = new Dictionary<string, string>
+		private static readonly ImmutableDictionary<string, string> Upstreams = new Dictionary<string, string>
 		{
 			["update"] = "http://aoc-eu-update.live.ageofconan.com",
 			["gameupdate"] = "http://aoc-eu-gameupdate.live.ageofconan.com",
 			["control"] = "http://aoc-eu-control.live.ageofconan.com"
-		};
+		}.ToImmutableDictionary();
 
 		public static int Main(string[] args)
 		{

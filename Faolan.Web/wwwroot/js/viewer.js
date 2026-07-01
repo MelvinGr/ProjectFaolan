@@ -331,6 +331,9 @@ export function makeDraggable(windowId, handleId) {
 
     let startX = 0, startY = 0, originX = 0, originY = 0, dragging = false;
     handle.addEventListener('pointerdown', e => {
+        // Don't start a drag when the press lands on a control in the bar (e.g. the collapse button) - the drag's
+        // preventDefault + pointer-capture would otherwise swallow its click.
+        if (e.target.closest('button, input, select, a')) return;
         dragging = true;
         const r = win.getBoundingClientRect();
         win.style.left = r.left + 'px';
