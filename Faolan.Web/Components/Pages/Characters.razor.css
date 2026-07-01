@@ -632,7 +632,7 @@
 
 /* AoC-style inventory: a paged 4-column bag grid. */
 .inv-window {
-    width: 252px;
+    width: 300px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
@@ -692,8 +692,8 @@
 
 .inv-grid {
     display: grid;
-    grid-template-columns: repeat(4, 52px);
-    gap: .5rem;
+    grid-template-columns: repeat(4, 56px);
+    gap: .6rem;
     justify-content: center;
     align-content: start;
     flex: 1;
