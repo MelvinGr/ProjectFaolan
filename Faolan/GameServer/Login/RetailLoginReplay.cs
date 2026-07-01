@@ -40,9 +40,17 @@ namespace Faolan.GameServer
 		// Male (Sex 0): loincloth in the legs slot, no chest item.
 		private const uint StarterMaleLegsItem = 3805575; // Red Loincloth
 
-		// Female (Sex 1): a gown (chest) + matching bottom (legs).
-		private const uint StarterFemaleChestItem = 324139; // Silver Gown
-		private const uint StarterFemaleLegsItem = 324171; // Silver Bottom
+		// Female (Sex 1): a gown (chest) + matching bottom (legs). Retail randomises the garment COLOUR per
+		// character, so pick a colour at random from the slave-gown set (all fully buildable - Archetype + Data
+		// present, Type 101 - same as the Silver pair that was the sole representative before).
+		private static readonly (uint Gown, uint Bottom)[] StarterFemaleOutfits =
+		[
+			(324066, 324176), // Blue
+			(324140, 324168), // Purple
+			(324067, 324172), // Red
+			(324139, 324171), // Silver
+			(105844, 324175)  // White
+		];
 
 		// Per-class starting WEAPON (the main-hand-left slot, 0x06), harvested from the *create* captures (#220).
 		// Coverage is only the classes a create dump actually shows armed - the rest start unarmed until more create
@@ -105,13 +113,15 @@ namespace Faolan.GameServer
 				// left exactly as the player left it. Sex-specific slave outfit (#220): both sexes wear the manacles;
 				// males add a loincloth (legs), females a gown (chest) + bottom (legs). See the Starter* constants.
 				var female = character.Sex == Sex.Female;
+				// Retail randomises the female slave-outfit colour per character (males always get the loincloth).
+				var femaleOutfit = StarterFemaleOutfits[Random.Shared.Next(StarterFemaleOutfits.Length)];
 				equipment = new CharacterEquipment
 				{
 					Id = character.Id,
 					CharacterId = character.Id,
 					Wrist = await Database.GetItem(StarterWristItem),
-					Chest = female ? await Database.GetItem(StarterFemaleChestItem) : null,
-					Legs = await Database.GetItem(female ? StarterFemaleLegsItem : StarterMaleLegsItem),
+					Chest = female ? await Database.GetItem(femaleOutfit.Gown) : null,
+					Legs = await Database.GetItem(female ? femaleOutfit.Bottom : StarterMaleLegsItem),
 					// Class-specific improvised weapon (main-hand-left); only the classes the create dumps cover.
 					MainHandLeft = StarterClassWeapon.TryGetValue(character.Class, out var weaponId)
 						? await Database.GetItem(weaponId)
