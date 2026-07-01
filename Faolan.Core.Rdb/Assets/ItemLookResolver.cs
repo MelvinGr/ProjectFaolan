@@ -20,24 +20,6 @@ namespace Faolan.Core.Rdb.Assets
 		// The field-id that tags a worn-mesh reference in the template's trailing sub-record.
 		private const uint WornMeshField = 9;
 
-		public readonly record struct WornMesh(uint MeshIndexId, string SourcePath, bool Skinned)
-		{
-			// The gender the mesh's export path names, or null when the asset is gender-neutral. "female" is tested
-			// first because it contains "male" as a substring.
-			public string? Gender
-			{
-				get
-				{
-					var p = SourcePath.Replace('/', '\\').ToLowerInvariant();
-					if (p.Contains("female"))
-						return "Female";
-					if (p.Contains("male"))
-						return "Male";
-					return null;
-				}
-			}
-		}
-
 		// Extract every distinct worn armour meshindex tagged by field 9 in a DECRYPTED item template (the raw bytes from
 		// RdbReader.ReadDecrypted, including the 12-byte RDB-Id header). Ordered by first appearance.
 		public static IReadOnlyList<WornMesh> FromTemplate(RdbReader rdb, ReadOnlySpan<byte> decrypted)
@@ -78,16 +60,6 @@ namespace Faolan.Core.Rdb.Assets
 			return result;
 		}
 
-		// The worn meshindex ids for one item, with same-garment male/female variants collapsed to the wanted gender.
-		// An item can legitimately carry several DIFFERENT pieces (e.g. the slave manacles carry both the handcuff mesh
-		// and a base cotton body) - those are kept; only a genuine M/F pair of the SAME garment is a variant choice.
-		// wantGender is "Female"/"Male" (null => keep everything). Falls back to the opposite/neutral variant when the
-		// wanted gender is absent, so an item that only ships one gender still renders.
-		public static IReadOnlyList<uint> WornMeshIds(RdbReader rdb, ReadOnlySpan<byte> decrypted, string? wantGender)
-		{
-			return SelectForGender(FromTemplate(rdb, decrypted), wantGender);
-		}
-
 		public static IReadOnlyList<uint> SelectForGender(IReadOnlyList<WornMesh> meshes, string? wantGender)
 		{
 			if (wantGender == null)
@@ -99,12 +71,24 @@ namespace Faolan.Core.Rdb.Assets
 				var list = group.ToList();
 				var hasPair = list.Any(m => m.Gender == "Female") && list.Any(m => m.Gender == "Male");
 				if (hasPair)
-					picked.Add((list.FirstOrDefault(m => m.Gender == wantGender).MeshIndexId is var id and not 0 ? id : list[0].MeshIndexId));
+					picked.Add(list.FirstOrDefault(m => m.Gender == wantGender).MeshIndexId is var id and not 0
+						? id
+						: list[0].MeshIndexId);
 				else
 					picked.AddRange(list.Select(m => m.MeshIndexId));
 			}
 
 			return picked;
+		}
+
+		// The worn meshindex ids for one item, with same-garment male/female variants collapsed to the wanted gender.
+		// An item can legitimately carry several DIFFERENT pieces (e.g. the slave manacles carry both the handcuff mesh
+		// and a base cotton body) - those are kept; only a genuine M/F pair of the SAME garment is a variant choice.
+		// wantGender is "Female"/"Male" (null => keep everything). Falls back to the opposite/neutral variant when the
+		// wanted gender is absent, so an item that only ships one gender still renders.
+		public static IReadOnlyList<uint> WornMeshIds(RdbReader rdb, ReadOnlySpan<byte> decrypted, string? wantGender)
+		{
+			return SelectForGender(FromTemplate(rdb, decrypted), wantGender);
 		}
 
 		// Normalise a mesh export path to a garment identity so male/female variants of one garment collapse together:
@@ -126,6 +110,25 @@ namespace Faolan.Core.Rdb.Assets
 		private static uint ReadU32(ReadOnlySpan<byte> d, int i)
 		{
 			return (uint)(d[i] | (d[i + 1] << 8) | (d[i + 2] << 16) | (d[i + 3] << 24));
+		}
+
+		public readonly record struct WornMesh(uint MeshIndexId, string SourcePath, bool Skinned)
+		{
+			// The gender the mesh's export path names, or null when the asset is gender-neutral. "female" is tested
+			// first because it contains "male" as a substring.
+			public string? Gender
+			{
+				get
+				{
+					var p = SourcePath.Replace('/', '\\').ToLowerInvariant();
+					if (p.Contains("female"))
+						return "Female";
+					if (p.Contains("male"))
+						return "Male";
+
+					return null;
+				}
+			}
 		}
 	}
 }

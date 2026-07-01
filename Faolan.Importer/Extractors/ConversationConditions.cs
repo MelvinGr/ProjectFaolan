@@ -43,7 +43,6 @@ namespace Faolan.Importer.Extractors
 		// them apart.
 		private const long AnyContext = -1;
 
-		// An NPC is "state-managed" once it appears in any rule: its dialogue then comes ONLY from classified captures.
 		private static readonly List<(string CaptureBaseName, string NpcName, long RequiredContextId, string Condition)> Rules =
 		[
 			// Casilda OFFER (fresh char, quest 13479 not yet accepted) = the canonical fresh first-quest capture:
@@ -67,6 +66,8 @@ namespace Faolan.Importer.Extractors
 		];
 
 		private static readonly HashSet<string> ManagedNpcs = Rules.Select(r => r.NpcName).ToHashSet();
+
+		// An NPC is "state-managed" once it appears in any rule: its dialogue then comes ONLY from classified captures.
 
 		// Applies the quest-state classification to one capture's extracted entries. For a managed NPC, an entry from a
 		// capture with no rule is DROPPED (returns nothing); a classified capture's entries are tagged with that rule's

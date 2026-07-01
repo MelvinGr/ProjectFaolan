@@ -124,11 +124,13 @@ namespace Faolan.Tests
 			{
 				var ok = true;
 				for (var j = 0; j < needle.Length; j++)
+				{
 					if (haystack[i + j] != needle[j])
 					{
 						ok = false;
 						break;
 					}
+				}
 
 				if (ok)
 					return i;

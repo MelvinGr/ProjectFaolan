@@ -407,9 +407,11 @@ namespace Faolan.Importer.Cli
 				{
 					withGeometry++;
 					if (rdb.TryGet(RdbAssetExtractor.RenderMeshType, rmId, out var rm))
+					{
 						(rm.IsLocal
 							? ref geomLocal
 							: ref geomCdn)++;
+					}
 				}
 
 				foreach (var t in mesh.UniqueTextures)

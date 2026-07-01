@@ -60,9 +60,11 @@ namespace Faolan.Importer.Captures
 				{
 					starters.Add(id);
 					if (cls is { } c)
+					{
 						(idToClasses.TryGetValue(id, out var set)
 							? set
 							: idToClasses[id] = new HashSet<uint>()).Add(c);
+					}
 				}
 			}
 

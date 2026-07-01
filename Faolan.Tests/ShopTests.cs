@@ -57,7 +57,7 @@ namespace Faolan.Tests
 		// tmpl 3887364
 		// tmpl 3917245 (sold x7 = 392 tin)
 		// tmpl 3724525 (round half up: 20.6 -> 21)
-			// tmpl 3719048 (63.7 -> 64)
+		// tmpl 3719048 (63.7 -> 64)
 		public void VendorSellPrice_IsRoundedValueOverTen(uint value, uint expectedPerUnit)
 		{
 			Assert.Equal(expectedPerUnit, ShopService.VendorPriceTin(value, 1));

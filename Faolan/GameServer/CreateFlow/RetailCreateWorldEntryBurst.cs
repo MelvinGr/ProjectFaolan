@@ -102264,7 +102264,7 @@ namespace Faolan.GameServer
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArrayUInt32Length(s => s.WriteArray(ScryScript.BuildStep(id, "ThisIsKalanthes", 2, f6Field1: 50000, f6Field2: 97795)))
+						.WriteArrayUInt32Length(s => s.WriteArray(ScryScript.BuildStep(id, "ThisIsKalanthes", f6Field1: 50000, f6Field2: 97795)))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -107350,7 +107350,7 @@ namespace Faolan.GameServer
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArrayUInt32Length(s => s.WriteArray(ScryScript.BuildStep(id, "WelcomeTutorial", 2)))
+						.WriteArrayUInt32Length(s => s.WriteArray(ScryScript.BuildStep(id, "WelcomeTutorial")))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -127107,7 +127107,7 @@ namespace Faolan.GameServer
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArrayUInt32Length(s => s.WriteArray(ScryScript.BuildStep(id, "Kneel", 2)))
+						.WriteArrayUInt32Length(s => s.WriteArray(ScryScript.BuildStep(id, "Kneel")))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
@@ -145487,7 +145487,7 @@ namespace Faolan.GameServer
 				case 4:
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-						.WriteArrayUInt32Length(s => s.WriteArray(ScryScript.BuildStep(id, "StartFixed3d", 2)))
+						.WriteArrayUInt32Length(s => s.WriteArray(ScryScript.BuildStep(id, "StartFixed3d")))
 						.SendAsync(client);
 					await new PacketStream()
 						.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x08),

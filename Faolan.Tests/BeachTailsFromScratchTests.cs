@@ -54,16 +54,6 @@ namespace Faolan.Tests
 			var def = await LoadDefinition(BeachStarterQuestId);
 			Assert.NotNull(def);
 
-			CharacterMaxStats Stats()
-			{
-				return new CharacterMaxStats
-				{
-					Health = 4321,
-					Mana = 765,
-					Stamina = 543
-				};
-			}
-
 			var alive = new Character
 			{
 				Level = 7,
@@ -89,6 +79,17 @@ namespace Faolan.Tests
 			// Max/base HP side is untouched by death - the slot [21] base stays full in both.
 			Assert.Equal(aliveTails.PostAccessBlock.Values[21], deadTails.PostAccessBlock.Values[21]);
 			Assert.True(deadTails.PostAccessBlock.Values[21] > 0u, "dead snapshot keeps the max-health side populated");
+			return;
+
+			CharacterMaxStats Stats()
+			{
+				return new CharacterMaxStats
+				{
+					Health = 4321,
+					Mana = 765,
+					Stamina = 543
+				};
+			}
 		}
 
 		[Fact]

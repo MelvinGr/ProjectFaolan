@@ -21,11 +21,17 @@ namespace Faolan.Web.Components.Pages
 		private static readonly string[] RightSlots = ["Hands", "Belt", "Boots", "Ring L", "Ring R"];
 		private static readonly string[] WeaponSlots = ["Main Hand", "Off Hand", "Ranged", "Tokens", "Bag"];
 
+		// Viewer toggles: which equipment slots are hidden from the 3D render, and whether the synthetic idle plays.
+		// (Each floating Window component owns its own collapse state + drag registration.)
+		private readonly HashSet<string> _hiddenSlots = [];
+
 		// --- Appearance editor (floating window) -------------------------------------------------------------
 		// The pickable resources (loaded once) + the live edit state seeded from the character on select. Body
 		// morphs are the decoded signed slider values (the unit CharacterBody stores / BodyMorphDeformer takes);
 		// _eHead is editor-2x units. Preview is a strict ad-hoc build (no fallback) - _editError shows why it failed.
 		private CharacterModelService.AppearanceOptions? _appOptions;
+		private bool _idleOn = true;
+		private bool _ownsSelected;
 		private bool _refreshThumbs;
 		private Character? _selected;
 		private IJSObjectReference? _module;
@@ -36,15 +42,6 @@ namespace Faolan.Web.Components.Pages
 		private IReadOnlyList<(string Name, byte Level, float Range, float Damage)> _spells = [];
 
 		private List<Character>? _characters;
-
-		// The signed-in account (null = anonymous public viewer). Ownership gates the inventory panel + appearance editing.
-		private uint? _accountId;
-		private bool _ownsSelected;
-
-		// Viewer toggles: which equipment slots are hidden from the 3D render, and whether the synthetic idle plays.
-		// (Each floating Window component owns its own collapse state + drag registration.)
-		private readonly HashSet<string> _hiddenSlots = [];
-		private bool _idleOn = true;
 
 		private string _editStatus = "";
 		private string _eHairStyle = "", _eHairColor = "", _eEyes = "", _eSkin = "", _eBodyTat = "", _eFaceTat = "";
@@ -58,6 +55,9 @@ namespace Faolan.Web.Components.Pages
 
 		// Selected character's sheet: vitals (player-facing MaxStats) + a few resolved fields.
 		private uint _health, _mana, _stamina;
+
+		// The signed-in account (null = anonymous public viewer). Ownership gates the inventory panel + appearance editing.
+		private uint? _accountId;
 
 		[SupplyParameterFromQuery(Name = "char")]
 		public long? CharId { get; set; }
@@ -245,24 +245,6 @@ namespace Faolan.Web.Components.Pages
 			StateHasChanged();
 		}
 
-		// Show/hide one equipped piece in the 3D render (per-slot paper-doll toggle). Keeps the camera so toggling doesn't
-		// reframe the view.
-		private async Task ToggleSlotHidden(string slot)
-		{
-			if (!_hiddenSlots.Add(slot))
-				_hiddenSlots.Remove(slot);
-
-			await Render(keepCamera: true);
-		}
-
-		// Enable/disable the synthetic idle animation.
-		private async Task ToggleIdle(ChangeEventArgs e)
-		{
-			_idleOn = e.Value as bool? ?? true;
-			if (_module != null)
-				await _module.InvokeVoidAsync("setIdle", "char-canvas", _idleOn);
-		}
-
 		private async Task RevertEdit()
 		{
 			if (_selected == null)
@@ -334,6 +316,24 @@ namespace Faolan.Web.Components.Pages
 				slot,
 				extra,
 				slot);
+		}
+
+		// Enable/disable the synthetic idle animation.
+		private async Task ToggleIdle(ChangeEventArgs e)
+		{
+			_idleOn = e.Value as bool? ?? true;
+			if (_module != null)
+				await _module.InvokeVoidAsync("setIdle", "char-canvas", _idleOn);
+		}
+
+		// Show/hide one equipped piece in the 3D render (per-slot paper-doll toggle). Keeps the camera so toggling doesn't
+		// reframe the view.
+		private async Task ToggleSlotHidden(string slot)
+		{
+			if (!_hiddenSlots.Add(slot))
+				_hiddenSlots.Remove(slot);
+
+			await Render(true);
 		}
 
 		// Wallet in tin -> gold/silver/copper/tin (100 tin = 1 copper, 100 copper = 1 silver, 100 silver = 1 gold).

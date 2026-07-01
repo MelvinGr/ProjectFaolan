@@ -160,7 +160,7 @@ namespace Faolan.AgentServer
 						var senderName = client.Session.Character?.Name?.Length > 0
 							? client.Session.Character.Name
 							: $"Character{senderId}";
-						_claudeChannel.Append(senderId, senderName, message, false, false);
+						_claudeChannel.Append(senderId, senderName, message, false);
 					}
 
 					break;

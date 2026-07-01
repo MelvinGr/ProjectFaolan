@@ -16,6 +16,18 @@ namespace Faolan.Core.Network.Packets
 		{
 		}
 
+		/*public void Send(INetworkClient client)
+		{
+			WriteLengthHash();
+			client.Send(ToArray());
+		}*/
+
+		public Task SendAsync(INetworkClient client)
+		{
+			WriteLengthHash();
+			return client.SendAsync(ToArray());
+		}
+
 		public PacketStream WriteHeader<T>(ProtoMessage sender, ProtoMessage receiver, T opcode, byte[] headerData = null) where T : struct
 		{
 			WriteUInt32(0); // Write empty length
@@ -86,18 +98,6 @@ namespace Faolan.Core.Network.Packets
 			return this;
 		}
 
-		/*public void Send(INetworkClient client)
-		{
-			WriteLengthHash();
-			client.Send(ToArray());
-		}*/
-
-		public Task SendAsync(INetworkClient client)
-		{
-			WriteLengthHash();
-			return client.SendAsync(ToArray());
-		}
-
 		public PacketStream WriteLengthHash()
 		{
 			var oldPos = Position;
@@ -124,7 +124,9 @@ namespace Faolan.Core.Network.Packets
 
 			public Task SendAsync(INetworkClient client)
 			{
-				return stream is PacketStream s ? s.SendAsync(client) : client.SendAsync(stream.ToArray());
+				return stream is PacketStream s
+					? s.SendAsync(client)
+					: client.SendAsync(stream.ToArray());
 			}
 		}
 	}

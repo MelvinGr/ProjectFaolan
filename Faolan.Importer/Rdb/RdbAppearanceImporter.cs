@@ -50,32 +50,6 @@ namespace Faolan.Importer.Rdb
 			// name= of a referenced RDB resource (cached; the same texscript is shared across races).
 			var nameCache = new Dictionary<(uint, uint), string>();
 
-			string ResourceName(uint type, uint id)
-			{
-				if (nameCache.TryGetValue((type, id), out var cached))
-					return cached;
-
-				string name = null;
-				if (rdb.TryGet(type, id, out var e))
-				{
-					try
-					{
-						var data = rdb.ReadDecompressed(e);
-						var text = Encoding.ASCII.GetString(data, 0, Math.Min(400, data.Length));
-						var m = Regex.Match(text, "name=\"([^\"]+)\"");
-						if (m.Success)
-							name = m.Groups[1].Value;
-					}
-					catch
-					{
-						// leave null
-					}
-				}
-
-				nameCache[(type, id)] = name;
-				return name;
-			}
-
 			var rows = new List<AppearanceChoice>();
 			foreach (var sexEl in root.Elements())
 			{
@@ -127,6 +101,32 @@ namespace Faolan.Importer.Rdb
 			var n = await db.SaveChangesAsync();
 			Console.WriteLine($"RDB appearance: imported {rows.Count} choices across {rows.Select(r => (r.Sex, r.Race)).Distinct().Count()} sex/race combos.");
 			return n;
+
+			string ResourceName(uint type, uint id)
+			{
+				if (nameCache.TryGetValue((type, id), out var cached))
+					return cached;
+
+				string name = null;
+				if (rdb.TryGet(type, id, out var e))
+				{
+					try
+					{
+						var data = rdb.ReadDecompressed(e);
+						var text = Encoding.ASCII.GetString(data, 0, Math.Min(400, data.Length));
+						var m = Regex.Match(text, "name=\"([^\"]+)\"");
+						if (m.Success)
+							name = m.Groups[1].Value;
+					}
+					catch
+					{
+						// leave null
+					}
+				}
+
+				nameCache[(type, id)] = name;
+				return name;
+			}
 		}
 
 		// Adds one category's option elements (id "0" = the creator's none placeholder, skipped). colourAttr set ->

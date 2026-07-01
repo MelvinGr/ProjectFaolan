@@ -63,7 +63,7 @@ namespace Faolan.Tests
 		public void Append_ChannelPost_IsNotViaWhisper()
 		{
 			var channel = new ClaudeChannel();
-			var entry = channel.Append(0x1234, "Hoxxling", "hello channel", false, false);
+			var entry = channel.Append(0x1234, "Hoxxling", "hello channel", false);
 
 			Assert.False(entry.ViaWhisper);
 			Assert.Equal("hello channel", entry.Message); // no mode prefix baked into the text
@@ -92,7 +92,7 @@ namespace Faolan.Tests
 		public void ReadSince_PreservesModePerMessage()
 		{
 			var channel = new ClaudeChannel();
-			channel.Append(0x1, "A", "on channel", false, false);
+			channel.Append(0x1, "A", "on channel", false);
 			channel.Append(0x2, "B", "in private", false, true);
 
 			var messages = channel.ReadSince(0);

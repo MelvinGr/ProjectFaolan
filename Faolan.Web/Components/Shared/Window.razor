@@ -5,40 +5,60 @@
 @* Reusable panel/window: a titled card with a collapse toggle and, when Floating, fixed positioning + drag-by-title-bar.
    Docked (Floating=false) windows sit in normal flow. Positioning/sizing for a floating window is passed via Style. The
    body is the child content, rendered as direct children of the card so a scrolling region inside keeps its layout. *@
-<div class="win @(Floating ? "floating" : "docked") @Class @(_collapsed ? "collapsed" : "")" id="@Id" style="@Style">
+<div class="win @(Floating
+                    ? "floating"
+                    : "docked") @Class @(_collapsed
+                                           ? "collapsed"
+                                           : "")" id="@Id" style="@Style">
     <div class="win-bar" id="@BarId">
         <span class="win-title">@Title</span>
         @HeaderExtra
         @if (Floating && Collapsible)
         {
-            <button class="win-collapse" type="button" title="@(_collapsed ? "Expand" : "Collapse")"
+            <button class="win-collapse" type="button" title="@(_collapsed
+                                                                  ? "Expand"
+                                                                  : "Collapse")"
                     @onclick="() => _collapsed = !_collapsed" @onclick:stopPropagation="true"
-                    @onpointerdown:stopPropagation="true">@(_collapsed ? "▢" : "—")</button>
+                    @onpointerdown:stopPropagation="true">@(_collapsed
+                    ? "▢"
+                    : "—")</button>
         }
     </div>
     @ChildContent
 </div>
 
 @code {
-    [Parameter] public string Title { get; set; } = "";
+
+    [Parameter]
+    public string Title { get; set; } = "";
 
     // DOM id for the card (drag targets <Id>-bar). Required for Floating windows so the drag handle can be found.
-    [Parameter] public string? Id { get; set; }
-    [Parameter] public string? Class { get; set; }
+    [Parameter]
+    public string? Id { get; set; }
+
+    [Parameter]
+    public string? Class { get; set; }
 
     // Inline style for the card - anchor/size a floating window here (e.g. "top:4.75rem; right:1.25rem; width:16.5rem;").
-    [Parameter] public string? Style { get; set; }
+    [Parameter]
+    public string? Style { get; set; }
 
     // Floating: position:fixed + draggable by the title bar. Docked (false): normal document flow.
-    [Parameter] public bool Floating { get; set; }
-    [Parameter] public bool Collapsible { get; set; } = true;
+    [Parameter]
+    public bool Floating { get; set; }
 
-    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter]
+    public bool Collapsible { get; set; } = true;
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
 
     // Optional extra controls in the title bar (before the collapse button).
-    [Parameter] public RenderFragment? HeaderExtra { get; set; }
+    [Parameter]
+    public RenderFragment? HeaderExtra { get; set; }
 
-    [Parameter] public bool Collapsed { get; set; }
+    [Parameter]
+    public bool Collapsed { get; set; }
 
     private bool _collapsed;
 
@@ -75,4 +95,5 @@
             }
         }
     }
+
 }

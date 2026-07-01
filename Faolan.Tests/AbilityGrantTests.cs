@@ -61,7 +61,7 @@ namespace Faolan.Tests
 				Data4 = 3015939650u
 			};
 
-			var announced = ToHex(GameServerListener.BuildAbilityGrantBody(ability, true));
+			var announced = ToHex(GameServerListener.BuildAbilityGrantBody(ability));
 			var silent = ToHex(GameServerListener.BuildAbilityGrantBody(ability, false));
 
 			Assert.EndsWith("0000000001", announced);

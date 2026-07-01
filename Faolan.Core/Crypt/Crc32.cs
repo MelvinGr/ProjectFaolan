@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 
 namespace Faolan.Core.Crypt
@@ -86,7 +87,7 @@ namespace Faolan.Core.Crypt
 		public static unsafe uint Calculate(FaolanStream packetBuffer)
 		{
 			fixed (byte* pointer = packetBuffer.ToArray()) // skip length and hash
-				return Calculate((uint*)pointer + 2, packetBuffer.Length - sizeof(uint) * 2);
+				return Calculate((uint*)(pointer + sizeof(uint) * 2), packetBuffer.Length - sizeof(uint) * 2);
 		}
 
 		public static unsafe uint Calculate(MemoryStream data)
@@ -95,7 +96,7 @@ namespace Faolan.Core.Crypt
 				return Calculate((uint*)pointer, data.Length);
 		}
 
-		public static unsafe uint Calculate(byte[] data)
+		public static unsafe uint Calculate(ReadOnlySpan<byte> data)
 		{
 			fixed (byte* pointer = data)
 				return Calculate((uint*)pointer, data.Length);

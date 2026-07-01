@@ -22,6 +22,14 @@ namespace Faolan.Core.Rdb.Assets
 		// Texture types that can appear in a rendermesh header's ref table.
 		private static readonly uint[] TextureTypes = [1010004, 1010006, 1010008, 1010013, 1010218, 1066606, 1066610];
 
+		// How a sub-mesh's diffuse alpha channel is rendered (see SubMesh.Alpha).
+		public enum AlphaMode
+		{
+			Opaque,
+			Cutout,
+			Blend
+		}
+
 		public enum DeclType : byte
 		{
 			Float1 = 0,
@@ -110,9 +118,7 @@ namespace Faolan.Core.Rdb.Assets
 					return [];
 
 				for (var i = 0; i < count; i++)
-				{
 					refs.Add((BinaryPrimitives.ReadUInt32LittleEndian(blob.Slice(20 + i * 8, 4)), BinaryPrimitives.ReadUInt32LittleEndian(blob.Slice(24 + i * 8, 4))));
-				}
 			}
 			else
 			{
@@ -346,14 +352,6 @@ namespace Faolan.Core.Rdb.Assets
 		}
 
 		public readonly record struct VertexElement(int Offset, DeclType Type, DeclUsage Usage, int UsageIndex);
-
-		// How a sub-mesh's diffuse alpha channel is rendered (see SubMesh.Alpha).
-		public enum AlphaMode
-		{
-			Opaque,
-			Cutout,
-			Blend
-		}
 
 		// One drawable sub-mesh: flat XYZ positions, optional XYZ normals + UV (UVs absent => empty), triangle indices.
 		// BaseColorPng (optional, set by the caller) lets sub-meshes from different models carry their own diffuse.

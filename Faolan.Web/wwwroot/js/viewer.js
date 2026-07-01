@@ -72,7 +72,7 @@ function setup(canvas) {
 // the authentic movement_idle keyframes live in the RDB ANIMSYS 'LMXB' container (type 1010511; e.g. skeleton 14853 ->
 // eunuch_idle2 clip 14906), which is a proprietary property-tree/curve format still to be decoded (#275 follow-up). The
 // breathing period (4s) mirrors the retail movement_idle duration. No-op unless the model is a skinned rig.
-const IDLE_AXES = { pitch: [1, 0, 0], yaw: [0, 1, 0], roll: [0, 0, 1] };
+const IDLE_AXES = {pitch: [1, 0, 0], yaw: [0, 1, 0], roll: [0, 0, 1]};
 
 function idleRot(byName, name, axis, deg) {
     const b = byName.get(name);

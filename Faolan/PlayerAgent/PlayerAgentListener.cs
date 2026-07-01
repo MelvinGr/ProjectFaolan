@@ -179,9 +179,7 @@ namespace Faolan.PlayerAgent
 					gameTweaks.WriteUInt32(0x00004ED4);
 
 					foreach (var (name, value) in Defaults)
-					{
 						gameTweaks.WriteString(name).WriteDoubleBigEndian(value);
-					}
 
 					await gameTweaks.SendAsync(client);
 

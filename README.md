@@ -68,18 +68,18 @@ dotnet run --project Faolan.Importer -- --skip characters    # module-based; --l
 
 ## Project layout
 
-| Project | Purpose |
-|---------|---------|
-| `Faolan/` | The server host — runs every protocol listener as a hosted service. |
-| `Faolan.Core/` | Shared networking, database, protobuf, crypto, and enums. |
-| `Faolan.Importer/` | CLI that (re)builds `faolan.db` from packet captures + the client RDB. |
-| `Faolan.Mcp/` | In-process MCP server exposing DB queries + live-session inspection to Claude. |
-| `Faolan.ClientLauncher/` | Launches the retail client unattended (patcher stand-in). |
-| `Faolan.ContentMirror/` | Store-and-forward proxy for the client's content CDN (fixes the loading hang). |
-| `Faolan.Wireshark/` | A Wireshark/tshark C plugin that fully dissects the Conan protocol (the canonical capture tool). |
-| `Faolan.Web/` | Blazor web app: public character/equipment 3D viewer + armory, plus admin/GM tools (live map radar, GM console, ban, mail, a generic `faolan.db` editor) gated to GameMaster accounts. |
-| `Faolan.Tests/` | The unit/golden test suite. |
-| `Captures/` | Reference packet traces + Python dissectors used for protocol comparison. |
+| Project                  | Purpose                                                                                                                                                                                |
+|--------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Faolan/`                | The server host — runs every protocol listener as a hosted service.                                                                                                                    |
+| `Faolan.Core/`           | Shared networking, database, protobuf, crypto, and enums.                                                                                                                              |
+| `Faolan.Importer/`       | CLI that (re)builds `faolan.db` from packet captures + the client RDB.                                                                                                                 |
+| `Faolan.Mcp/`            | In-process MCP server exposing DB queries + live-session inspection to Claude.                                                                                                         |
+| `Faolan.ClientLauncher/` | Launches the retail client unattended (patcher stand-in).                                                                                                                              |
+| `Faolan.ContentMirror/`  | Store-and-forward proxy for the client's content CDN (fixes the loading hang).                                                                                                         |
+| `Faolan.Wireshark/`      | A Wireshark/tshark C plugin that fully dissects the Conan protocol (the canonical capture tool).                                                                                       |
+| `Faolan.Web/`            | Blazor web app: public character/equipment 3D viewer + armory, plus admin/GM tools (live map radar, GM console, ban, mail, a generic `faolan.db` editor) gated to GameMaster accounts. |
+| `Faolan.Tests/`          | The unit/golden test suite.                                                                                                                                                            |
+| `Captures/`              | Reference packet traces + Python dissectors used for protocol comparison.                                                                                                              |
 
 ## Documentation
 

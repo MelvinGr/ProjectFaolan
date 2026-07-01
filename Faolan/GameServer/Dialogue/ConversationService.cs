@@ -329,9 +329,7 @@ namespace Faolan.GameServer.Dialogue
 					if (structuredSub == ConversationScreenDecoder.SetDialogueCamera)
 						await SendDialogueCamera(client, p.CameraAgentInstance ?? 0x08, liveInstance, clickedNpcHandle, p.CameraParams);
 					else
-					{
 						await SendConstructedKnubot(client, ReadSenderInstance(p.Data), liveInstance, BuildKnubotFromColumns(p, liveInstance, clickedNpcHandle, playerName, guildName));
-					}
 
 					continue;
 				}
@@ -457,11 +455,6 @@ namespace Faolan.GameServer.Dialogue
 				? []
 				: JsonSerializer.Deserialize<string[]>(p.ScreensJson) ?? [];
 
-			byte[] Screen(int i)
-			{
-				return WithLivePlayer(Encoding.Latin1.GetBytes(screens[i]), playerName, guildName);
-			}
-
 			if (p.SubOpcode == KnubotOpenChatWindowSubOpcode)
 				return KnubotCodec.BuildOpenChatWindow(liveInstance, npcHandle, p.Flag ?? 0, env);
 			if (p.SubOpcode == KnubotAppendTextSubOpcode)
@@ -470,6 +463,11 @@ namespace Faolan.GameServer.Dialogue
 			// AnswerList + CloseChatWindow: the string-list grammar.
 			var strings = screens.Select((_, i) => Screen(i)).ToList();
 			return KnubotCodec.BuildStringList(p.SubOpcode!.Value, liveInstance, npcHandle, strings, env);
+
+			byte[] Screen(int i)
+			{
+				return WithLivePlayer(Encoding.Latin1.GetBytes(screens[i]), playerName, guildName);
+			}
 		}
 
 		// Reads the GameAgent sender instance out of a captured packet's RPC header. Header layout (PacketStream):

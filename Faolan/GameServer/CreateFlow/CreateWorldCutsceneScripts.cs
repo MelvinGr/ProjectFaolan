@@ -59,7 +59,7 @@ namespace Faolan.GameServer
 					// Bind OUR live Kalanthes (streamed by EnsureZoneNpcs, within range) or fall back if unloaded.
 					// Retail sends this in RESPONSE to PlayResult (AFTER the player commits to playing the cutscene) -
 					// binding BEFORE the cinematic starts (on ClientLoadingDone) loses the actor when it initialises.
-					await SendScry(client, ScryScript.BuildStep(id, "ThisIsKalanthes", 2, f6Field1: 50000, f6Field2: LiveNpcHandle(client, "Kalanthes", 0x2c1c)));
+					await SendScry(client, ScryScript.BuildStep(id, "ThisIsKalanthes", f6Field1: 50000, f6Field2: LiveNpcHandle(client, "Kalanthes", 0x2c1c)));
 					// Position Kalanthes next to the washed-ashore player (his cutscene start), so the walk-up reads
 					// (his DB spawn is back by the rocks). The walk path itself follows on the Move callback.
 					await SendKalanthesMoveTask(client, BuildKalanthesIntroMove(LiveNpcHandle(client, "Kalanthes", 0x2c1c)));
@@ -76,17 +76,17 @@ namespace Faolan.GameServer
 					// 7088774 is Kalanthes's welcome-dialogue group; retail follows its StartGroup with the
 					// WelcomeTutorial step (~2.7s later, no triggering callback) - bundle it here, callback-driven.
 					if (groupId == 7088774)
-						await SendScry(client, ScryScript.BuildStep(id, "WelcomeTutorial", 2));
+						await SendScry(client, ScryScript.BuildStep(id, "WelcomeTutorial"));
 					break;
 
 				case "Move":
 					// Kalanthes walks up to the player (f890 path), then kneels.
 					await SendKalanthesMoveTask(client, BuildKalanthesWalkMove(LiveNpcHandle(client, "Kalanthes", 0x2c1c)));
-					await SendScry(client, ScryScript.BuildStep(id, "Kneel", 2));
+					await SendScry(client, ScryScript.BuildStep(id, "Kneel"));
 					break;
 
 				case "IntroDone":
-					await SendScry(client, ScryScript.BuildStep(id, "StartFixed3d", 2));
+					await SendScry(client, ScryScript.BuildStep(id, "StartFixed3d"));
 					await SendScry(client, ScryScript.BuildStartScriptGroup(id, 7727158));
 					break;
 			}
@@ -168,11 +168,6 @@ namespace Faolan.GameServer
 		// built from the typed model so it round-trips byte-exact while the positions stay explicit data.
 		internal static byte[] BuildKalanthesWalkMove(uint handle)
 		{
-			static uint B(float f)
-			{
-				return BitConverter.SingleToUInt32Bits(f);
-			}
-
 			var path = new MoveTaskNode
 			{
 				Mode = 1,
@@ -205,6 +200,11 @@ namespace Faolan.GameServer
 					Children = [path, wait]
 				}
 			}.Encode();
+
+			static uint B(float f)
+			{
+				return BitConverter.SingleToUInt32Bits(f);
+			}
 		}
 
 		// A ScryScriptIIR step on the GameAgent->GameInterface conversation (the framing the verbatim burst uses).

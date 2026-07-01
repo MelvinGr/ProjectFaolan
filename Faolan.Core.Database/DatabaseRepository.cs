@@ -334,9 +334,7 @@ namespace Faolan.Core.Database
 			var lowered = (name ?? "").ToLowerInvariant();
 			var query = ctx.NpcSpawns.Where(n => n.MapId == mapId && n.Npc != null && n.Npc.Name != null && n.Npc.Name.ToLower() == lowered); // #244: name lives on the type
 			if (x is { } px && y is { } py && z is { } pz)
-			{
 				query = query.Where(n => n.PositionX >= px - radius && n.PositionX <= px + radius && n.PositionY >= py - radius && n.PositionY <= py + radius && n.PositionZ >= pz - radius && n.PositionZ <= pz + radius);
-			}
 
 			return await query.ExecuteDeleteAsync();
 		}

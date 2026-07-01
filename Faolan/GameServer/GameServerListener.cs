@@ -568,9 +568,7 @@ namespace Faolan.GameServer
 					{
 						LogPacketBodyDebug("GameServer 0x207E body", packet.Body.ToArray());
 						if (packet.Body.Length > 0)
-						{
 							Logger.LogInformation("0x207E decoded: value0={Value0:X2}", packet.Body.ToArray()[0]);
-						}
 					}
 
 					break;

@@ -23,7 +23,7 @@ namespace Faolan.Tests
 
 		[Theory, InlineData(ConanEndpoints.GameCharAgentType, (ushort)0x2FFF), InlineData(0xDEADBEEF, (ushort)0x2000)]
 		// opcode out of the catalog
-			// class not multiplexed here
+		// class not multiplexed here
 		public void Resolve_UnknownPairs_ReturnUnknown(uint receiverClass, ushort opcode)
 		{
 			Assert.Equal("Unknown", GameServerMethodNames.Resolve(receiverClass, opcode));

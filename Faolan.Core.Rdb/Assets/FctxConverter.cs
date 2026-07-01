@@ -118,11 +118,6 @@ namespace Faolan.Core.Rdb.Assets
 		{
 			var dds = new byte[128 + body.Length];
 
-			void U32(int off, uint v)
-			{
-				BinaryPrimitives.WriteUInt32LittleEndian(dds.AsSpan(off, 4), v);
-			}
-
 			U32(0, DdsMagic);
 			U32(4, 124); // header size
 			U32(8, DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH | DDSD_PIXELFORMAT | DDSD_MIPMAPCOUNT);
@@ -145,6 +140,11 @@ namespace Faolan.Core.Rdb.Assets
 
 			body.CopyTo(dds.AsSpan(128));
 			return dds;
+
+			void U32(int off, uint v)
+			{
+				BinaryPrimitives.WriteUInt32LittleEndian(dds.AsSpan(off, 4), v);
+			}
 		}
 
 		// BCn block size at mip level n (1-based; n=1 is full resolution). Blocks cover 4x4 texel tiles.

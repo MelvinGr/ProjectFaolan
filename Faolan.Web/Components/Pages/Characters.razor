@@ -161,49 +161,50 @@
         {
             var tabItems = TabItems;
 
-        <Window Floating="false" Title="Inventory" Class="inv-win">
-            <div class="inv-tabs">
-                @foreach (var tab in InvTabs)
-                {
-                    var n = _inventory.Count(i => i.Tab == tab);
-                    <button class="inv-tab @(tab == _invTab
-                                               ? "sel"
-                                               : "")" @onclick="() => SelectInvTab(tab)">
-                        @tab
-                        @if (n > 0)
-                        {
-                            <span class="tabcount">@n</span>
-                        }
-                    </button>
-                }
-            </div>
-            <div class="inv-grid">
-                @for (var i = 0; i < InvPageSize; i++)
-                {
-                    var idx = _invPage * InvPageSize + i;
-                    var item = _selected != null && idx < tabItems.Count
-                        ? tabItems[idx].Info
-                        : (ItemInfo?)null;
-                    @ItemSlot(item, "")
-                }
-            </div>
-            <div class="inv-foot">
-                @if (tabItems.Count > InvPageSize)
-                {
-                    <button class="inv-page" disabled="@(_invPage == 0)" @onclick="() => PageInventory(-1)">‹</button>
-                    <span>Page @(_invPage + 1) of @InvPageCount</span>
-                    <button class="inv-page" disabled="@(_invPage >= InvPageCount - 1)"
-                            @onclick="() => PageInventory(1)">›
-                    </button>
-                }
-                else
-                {
-                    <span>@tabItems.Count item@(tabItems.Count == 1
-                                                      ? ""
-                                                      : "s")</span>
-                }
-            </div>
-        </Window>
+            <Window Floating="false" Title="Inventory" Class="inv-win">
+                <div class="inv-tabs">
+                    @foreach (var tab in InvTabs)
+                    {
+                        var n = _inventory.Count(i => i.Tab == tab);
+                        <button class="inv-tab @(tab == _invTab
+                                                   ? "sel"
+                                                   : "")" @onclick="() => SelectInvTab(tab)">
+                            @tab
+                            @if (n > 0)
+                            {
+                                <span class="tabcount">@n</span>
+                            }
+                        </button>
+                    }
+                </div>
+                <div class="inv-grid">
+                    @for (var i = 0; i < InvPageSize; i++)
+                    {
+                        var idx = _invPage * InvPageSize + i;
+                        var item = _selected != null && idx < tabItems.Count
+                            ? tabItems[idx].Info
+                            : (ItemInfo?)null;
+                        @ItemSlot(item, "")
+                    }
+                </div>
+                <div class="inv-foot">
+                    @if (tabItems.Count > InvPageSize)
+                    {
+                        <button class="inv-page" disabled="@(_invPage == 0)" @onclick="() => PageInventory(-1)">‹
+                        </button>
+                        <span>Page @(_invPage + 1) of @InvPageCount</span>
+                        <button class="inv-page" disabled="@(_invPage >= InvPageCount - 1)"
+                                @onclick="() => PageInventory(1)">›
+                        </button>
+                    }
+                    else
+                    {
+                        <span>@tabItems.Count item@(tabItems.Count == 1
+                                                          ? ""
+                                                          : "s")</span>
+                    }
+                </div>
+            </Window>
         }
     </section>
 
@@ -215,24 +216,27 @@
                 <div class="edit-head">Body</div>
                 @* Morph sliders are editable only for a character you own — a disabled fieldset greys out all 7. *@
                 <fieldset class="morph-set" disabled="@(!_ownsSelected)">
-                <label class="pose"><span>Arm</span><input type="range" min="@MorphMin("arm")" max="@MorphMax("arm")"
-                                                           @bind="_eArm" @bind:after="PreviewEdit"/></label>
-                <label class="pose"><span>Chest</span><input type="range" min="@MorphMin("chest")"
-                                                             max="@MorphMax("chest")" @bind="_eChest"
-                                                             @bind:after="PreviewEdit"/></label>
-                <label class="pose"><span>Bosom</span><input type="range" min="@MorphMin("bosom")"
-                                                             max="@MorphMax("bosom")" @bind="_eBosom"
-                                                             @bind:after="PreviewEdit"/></label>
-                <label class="pose"><span>Stomach</span><input type="range" min="@MorphMin("stomach")"
-                                                               max="@MorphMax("stomach")" @bind="_eStomach"
-                                                               @bind:after="PreviewEdit"/></label>
-                <label class="pose"><span>Arse</span><input type="range" min="@MorphMin("arse")" max="@MorphMax("arse")"
-                                                            @bind="_eArse" @bind:after="PreviewEdit"/></label>
-                <label class="pose"><span>Thigh</span><input type="range" min="@MorphMin("thigh")"
-                                                             max="@MorphMax("thigh")" @bind="_eThigh"
-                                                             @bind:after="PreviewEdit"/></label>
-                <label class="pose"><span>Leg</span><input type="range" min="@MorphMin("leg")" max="@MorphMax("leg")"
-                                                           @bind="_eLeg" @bind:after="PreviewEdit"/></label>
+                    <label class="pose"><span>Arm</span><input type="range" min="@MorphMin("arm")"
+                                                               max="@MorphMax("arm")"
+                                                               @bind="_eArm" @bind:after="PreviewEdit"/></label>
+                    <label class="pose"><span>Chest</span><input type="range" min="@MorphMin("chest")"
+                                                                 max="@MorphMax("chest")" @bind="_eChest"
+                                                                 @bind:after="PreviewEdit"/></label>
+                    <label class="pose"><span>Bosom</span><input type="range" min="@MorphMin("bosom")"
+                                                                 max="@MorphMax("bosom")" @bind="_eBosom"
+                                                                 @bind:after="PreviewEdit"/></label>
+                    <label class="pose"><span>Stomach</span><input type="range" min="@MorphMin("stomach")"
+                                                                   max="@MorphMax("stomach")" @bind="_eStomach"
+                                                                   @bind:after="PreviewEdit"/></label>
+                    <label class="pose"><span>Arse</span><input type="range" min="@MorphMin("arse")"
+                                                                max="@MorphMax("arse")"
+                                                                @bind="_eArse" @bind:after="PreviewEdit"/></label>
+                    <label class="pose"><span>Thigh</span><input type="range" min="@MorphMin("thigh")"
+                                                                 max="@MorphMax("thigh")" @bind="_eThigh"
+                                                                 @bind:after="PreviewEdit"/></label>
+                    <label class="pose"><span>Leg</span><input type="range" min="@MorphMin("leg")"
+                                                               max="@MorphMax("leg")"
+                                                               @bind="_eLeg" @bind:after="PreviewEdit"/></label>
                 </fieldset>
 
                 <div class="edit-head">Hair</div>
@@ -361,6 +365,7 @@
 </div>
 
 @code {
+
     // Render one item slot (equipment or bag): a 3D thumbnail filled in by JS, the item name as fallback/label (or the
     // placeholder label when empty), a stack-count badge, and data-* attributes the JS tooltip reads on hover.
     private RenderFragment ItemSlot(ItemInfo? info, string label, string extra = "", string? equipSlot = null) =>
@@ -387,10 +392,16 @@
             @if (equipSlot != null && info != null)
             {
                 var hidden = _hiddenSlots.Contains(equipSlot);
-                <button class="slot-hide @(hidden ? "off" : "")" type="button"
-                        title="@(hidden ? "Show in render" : "Hide from render")"
+                <button class="slot-hide @(hidden
+                                             ? "off"
+                                             : "")" type="button"
+                        title="@(hidden
+                                   ? "Show in render"
+                                   : "Hide from render")"
                         @onclick="() => ToggleSlotHidden(equipSlot)" @onclick:stopPropagation="true">
-                    @(hidden ? "○" : "●")
+                    @(hidden
+                        ? "○"
+                        : "●")
                 </button>
             }
         </div>;

@@ -56,11 +56,13 @@ namespace Faolan.Tests
 
 			var diff = -1;
 			for (var i = 0; i < Math.Min(golden.Length, built.Length); i++)
+			{
 				if (golden[i] != built[i])
 				{
 					diff = i;
 					break;
 				}
+			}
 
 			Assert.True(golden.SequenceEqual(built), $"2-quest region must equal the capture; lengths golden={golden.Length} built={built.Length}; first diff @{diff}");
 		}
@@ -113,11 +115,13 @@ namespace Faolan.Tests
 			var slice = golden.AsSpan(off, built.Length).ToArray();
 			var diff = -1;
 			for (var i = 0; i < built.Length; i++)
+			{
 				if (slice[i] != built[i])
 				{
 					diff = i;
 					break;
 				}
+			}
 
 			Assert.True(slice.SequenceEqual(built), $"13479 record must match the capture; first diff @{diff} of {built.Length}");
 		}
@@ -125,8 +129,10 @@ namespace Faolan.Tests
 		private static int IndexOf(byte[] hay, byte[] needle)
 		{
 			for (var i = 0; i + needle.Length <= hay.Length; i++)
+			{
 				if (hay.AsSpan(i, needle.Length).SequenceEqual(needle))
 					return i;
+			}
 
 			return -1;
 		}

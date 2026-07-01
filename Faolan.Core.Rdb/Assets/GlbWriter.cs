@@ -134,9 +134,11 @@ namespace Faolan.Core.Rdb.Assets
 						w =>
 						{
 							foreach (var b in bones)
+							{
 								w.WriteByte((byte)(b >= 0 && b < local2joint.Length
 									? local2joint[b]
 									: 0));
+							}
 						});
 					attributes["WEIGHTS_0"] = AddAccessor(bin,
 						bufferViews,
@@ -258,9 +260,7 @@ namespace Faolan.Core.Rdb.Assets
 					material["alphaCutoff"] = 0.5f;
 				}
 				else if (alpha == RenderMeshReader.AlphaMode.Blend)
-				{
 					material["alphaMode"] = "BLEND";
-				}
 
 				materials.Add(material);
 			}

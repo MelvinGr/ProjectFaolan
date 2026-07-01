@@ -48,11 +48,13 @@ namespace Faolan.Importer.Captures
 
 			// Ensure the sentinel Mounts map exists (NpcSpawn.MapId is an FK into Maps).
 			if (!await db.Maps.AnyAsync(m => m.Id == MountMapId))
+			{
 				db.Maps.Add(new Map
 				{
 					Id = MountMapId,
 					Name = "Mounts (summon templates)"
 				});
+			}
 
 			// Replace any prior mount rows so a re-run reseeds cleanly (isolated to the sentinel map).
 			var stale = await db.NpcSpawns.Where(n => n.MapId == MountMapId).ToListAsync();

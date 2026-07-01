@@ -65,9 +65,7 @@ namespace Faolan.Web.Content
 					// bytes but serve a copy whose three patch-addr keys point back at this mirror, keeping the redirect
 					// sticky across a patch run.
 					if (tag == "control" && rest.EndsWith("LocalConfig.xml", StringComparison.OrdinalIgnoreCase))
-					{
 						return Results.File(RewriteConfig(await File.ReadAllBytesAsync(localPath), port), "application/octet-stream");
-					}
 
 					if (query.Length == 0 && File.Exists(localPath))
 					{

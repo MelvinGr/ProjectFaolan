@@ -145,12 +145,6 @@ namespace Faolan.Web
 					})
 				.DisableAntiforgery();
 
-			// Browser cache for deterministic-by-id renders (item models, race/sex base, map images): a day, immutable.
-			static void CacheADay(HttpContext ctx)
-			{
-				ctx.Response.Headers.CacheControl = "public, max-age=86400, immutable";
-			}
-
 			// glTF endpoints: a character's assembled model, and any single RDB model by id.
 			app.MapGet("/api/character/{race}/{sex}/model.glb",
 				(Race race, Sex sex, HttpContext ctx, CharacterModelService models) =>
@@ -169,9 +163,7 @@ namespace Faolan.Web
 				(long id, string? equip, string? rig, string? hide, CharacterModelService models) =>
 				{
 					// ?hide=Chest,Legs drops those equipment slots from the auto-resolved gear (the viewer's per-slot toggle).
-					var hidden = hide
-						?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-						.ToHashSet(StringComparer.OrdinalIgnoreCase);
+					var hidden = hide?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
 					if (rig is "1" or "true" or "True")
 					{
@@ -348,6 +340,13 @@ namespace Faolan.Web
 			app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 
 			app.Run();
+			return;
+
+			// Browser cache for deterministic-by-id renders (item models, race/sex base, map images): a day, immutable.
+			static void CacheADay(HttpContext ctx)
+			{
+				ctx.Response.Headers.CacheControl = "public, max-age=86400, immutable";
+			}
 		}
 
 		// Issue the auth cookie for an account (id + username claims, plus an "Admin" role for GM/Administrator

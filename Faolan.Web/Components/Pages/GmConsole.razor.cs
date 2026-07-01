@@ -101,13 +101,6 @@ namespace Faolan.Web.Components.Pages
 				? mv
 				: null;
 
-			float? Parse(string s)
-			{
-				return float.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var f)
-					? f
-					: null;
-			}
-
 			var (x, y, z) = (Parse(Tp(_tpX, srcId)), Parse(Tp(_tpY, srcId)), Parse(Tp(_tpZ, srcId)));
 
 			// Need either a map or a full coordinate triple.
@@ -121,6 +114,14 @@ namespace Faolan.Web.Components.Pages
 			_notice = await Live.TeleportAsync(srcId, map, x, y, z) ?? "Server unreachable.";
 			await Refresh();
 			_busy = false;
+			return;
+
+			float? Parse(string s)
+			{
+				return float.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var f)
+					? f
+					: null;
+			}
 		}
 
 		private async Task TeleportToPlayer(uint srcId)

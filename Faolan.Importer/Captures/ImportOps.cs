@@ -94,40 +94,6 @@ namespace Faolan.Importer.Captures
 			var spawns = new List<NpcSpawnEntry>();
 			var patrols = new List<PatrolPathEntry>();
 
-			void Take(List<NpcSpawnEntry> chosen, Dictionary<uint, PatrolPathEntry> routes)
-			{
-				foreach (var e0 in chosen)
-				{
-					var e = UniqueNpcHomes.TryGetValue(e0.Name ?? "", out var home)
-						? e0 with
-						{
-							X = home.X,
-							Y = home.Y,
-							Z = home.Z
-						}
-						: e0;
-					if (UniqueNpcFacings.TryGetValue(e.Name ?? "", out var facing))
-						e = e with
-						{
-							RotX = facing.X,
-							RotY = facing.Y,
-							RotZ = facing.Z,
-							RotW = facing.W
-						};
-					if (e.Morphs.Count == 0 && morphsByName.TryGetValue(e.Name ?? "", out var backfillMorphs))
-						e = e with { Morphs = backfillMorphs };
-					if (equipByName.TryGetValue(e.Name ?? "", out var fullEquip) && fullEquip.Count > e.Equipment.Count)
-						e = e with
-						{
-							Equipment = fullEquip,
-							HasEquipment = true
-						};
-					spawns.Add(e);
-					if (routes.TryGetValue(e.Handle, out var r) && r.Waypoints.Count > 0)
-						patrols.Add(new PatrolPathEntry(e.MapId, new Vector3(e.X, e.Y, e.Z), r.Speed, r.Waypoints, 0, r.Body));
-				}
-			}
-
 			var burstNamesByMap = new Dictionary<uint, HashSet<string>>();
 			foreach (var map in allMaps)
 			{
@@ -148,6 +114,46 @@ namespace Faolan.Importer.Captures
 			}
 
 			return (NpcSpawnExtractor.Merge(spawns), patrols);
+
+			void Take(List<NpcSpawnEntry> chosen, Dictionary<uint, PatrolPathEntry> routes)
+			{
+				foreach (var e0 in chosen)
+				{
+					var e = UniqueNpcHomes.TryGetValue(e0.Name ?? "", out var home)
+						? e0 with
+						{
+							X = home.X,
+							Y = home.Y,
+							Z = home.Z
+						}
+						: e0;
+					if (UniqueNpcFacings.TryGetValue(e.Name ?? "", out var facing))
+					{
+						e = e with
+						{
+							RotX = facing.X,
+							RotY = facing.Y,
+							RotZ = facing.Z,
+							RotW = facing.W
+						};
+					}
+
+					if (e.Morphs.Count == 0 && morphsByName.TryGetValue(e.Name ?? "", out var backfillMorphs))
+						e = e with { Morphs = backfillMorphs };
+					if (equipByName.TryGetValue(e.Name ?? "", out var fullEquip) && fullEquip.Count > e.Equipment.Count)
+					{
+						e = e with
+						{
+							Equipment = fullEquip,
+							HasEquipment = true
+						};
+					}
+
+					spawns.Add(e);
+					if (routes.TryGetValue(e.Handle, out var r) && r.Waypoints.Count > 0)
+						patrols.Add(new PatrolPathEntry(e.MapId, new Vector3(e.X, e.Y, e.Z), r.Speed, r.Waypoints, 0, r.Body));
+				}
+			}
 		}
 
 		public static async Task ImportConversations(DatabaseContext db, List<ConversationEntry> conversations)
@@ -191,11 +197,13 @@ namespace Faolan.Importer.Captures
 				.ToList();
 
 			foreach (var (mapId, templateId) in kept)
+			{
 				db.MapLootEntries.Add(new MapLootEntry
 				{
 					MapId = mapId,
 					ItemTemplateId = templateId
 				});
+			}
 
 			await db.SaveChangesAsync();
 			return kept.Count;
@@ -320,6 +328,7 @@ namespace Faolan.Importer.Captures
 				existing.Speed = e.Speed;
 				existing.Body = e.Body;
 				for (var i = 0; i < e.Waypoints.Count; i++)
+				{
 					existing.Waypoints.Add(new PatrolWaypoint
 					{
 						Ordinal = i,
@@ -327,6 +336,7 @@ namespace Faolan.Importer.Captures
 						Y = e.Waypoints[i].Y,
 						Z = e.Waypoints[i].Z
 					});
+				}
 			}
 
 			await db.SaveChangesAsync();
@@ -388,6 +398,7 @@ namespace Faolan.Importer.Captures
 				var candidates = await db.WorldObjects.Where(o => o.MapId == e.MapId && o.PositionX == e.X && o.PositionY == e.Y && o.PositionZ == e.Z).ToListAsync();
 				var existing = candidates.FirstOrDefault(o => WorldObjectBuilder.ReadIdentity(o) == e.DisplayName);
 				if (existing == null)
+				{
 					db.WorldObjects.Add(PopulateObject(new WorldObject
 						{
 							MapId = e.MapId,
@@ -396,6 +407,7 @@ namespace Faolan.Importer.Captures
 							PositionZ = e.Z
 						},
 						e));
+				}
 				else
 					PopulateObject(existing, e);
 			}
@@ -454,6 +466,7 @@ namespace Faolan.Importer.Captures
 
 			row.Morphs.Clear();
 			for (var i = 0; i < e.Morphs.Count; i++)
+			{
 				row.Morphs.Add(new NpcSpawnMorph
 				{
 					Ordinal = i,
@@ -461,6 +474,7 @@ namespace Faolan.Importer.Captures
 					Value = e.Morphs[i].Value,
 					Text = e.Morphs[i].Text ?? ""
 				});
+			}
 
 			row.Equipment.Clear();
 			foreach (var eq in e.Equipment)

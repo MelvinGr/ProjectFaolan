@@ -240,9 +240,7 @@ namespace Faolan.Core.Network.Spawn
 
 			scaffold.IdList.Clear();
 			if (character.Skills != null)
-			{
 				scaffold.IdList.AddRange(character.Skills.OrderBy(s => s.SkillId).Select(s => new ScaffoldIdEntry(s.Rank, s.SkillId)));
-			}
 
 			scaffold.EndPairs.Clear();
 			scaffold.EndPairs2.Clear();

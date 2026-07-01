@@ -33,34 +33,22 @@ namespace Faolan.Core.Extensions
 			var enumType = Enum.GetUnderlyingType(value.GetType());
 
 			if (enumType == typeof(byte) || enumType == typeof(sbyte))
-			{
 				return Convert.ToByte(value).ToHex();
-			}
 
 			if (enumType == typeof(ushort) || enumType == typeof(short))
-			{
 				return Convert.ToUInt16(value).ToHex();
-			}
 
 			if (enumType == typeof(uint) || enumType == typeof(int))
-			{
 				return Convert.ToUInt32(value).ToHex();
-			}
 
 			if (enumType == typeof(ulong) || enumType == typeof(long))
-			{
 				return Convert.ToUInt64(value).ToHex();
-			}
 
 			if (enumType == typeof(float))
-			{
 				return Convert.ToUInt32(value).ToHex();
-			}
 
 			if (enumType == typeof(double))
-			{
 				return Convert.ToUInt64(value).ToHex();
-			}
 
 			throw new Exception("Unknown enum type!");
 		}

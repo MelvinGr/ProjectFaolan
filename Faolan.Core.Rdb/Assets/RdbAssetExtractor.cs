@@ -289,11 +289,13 @@ namespace Faolan.Core.Rdb.Assets
 
 			var mesh = MeshIndexFile.Parse(bodyMeshIndexId, rdb.ReadDecompressed(idx));
 			if (mesh.RenderMeshId is not { } rmId || !rdb.TryGet(RenderMeshType, rmId, out var rm) || !rdb.CanRead(rm))
+			{
 				return new
 				{
 					found = false,
 					renderMeshId = mesh.RenderMeshId
 				};
+			}
 
 			var subs = RenderMeshReader.Read(rdb.ReadDecompressed(rm));
 			float lMinU = 1, lMaxU = 0, rMinU = 1, rMaxU = 0;
@@ -348,11 +350,13 @@ namespace Faolan.Core.Rdb.Assets
 		public static object DescribeMesh(RdbReader rdb, uint meshIndexId)
 		{
 			if (meshIndexId == 0 || !rdb.TryGet(MeshIndexFileType, meshIndexId, out var idx))
+			{
 				return new
 				{
 					meshIndexId,
 					found = false
 				};
+			}
 
 			uint? rmId = null;
 			var rmSource = "n/a";
@@ -462,9 +466,7 @@ namespace Faolan.Core.Rdb.Assets
 				textures);
 
 			if (outDir != null)
-			{
 				File.WriteAllText(Path.Combine(outDir, $"{meshIndexId}.manifest.json"), JsonSerializer.Serialize(manifest, JsonOpts));
-			}
 
 			return new Result(true, mesh, manifest);
 		}
@@ -667,18 +669,6 @@ namespace Faolan.Core.Rdb.Assets
 			return best == 0
 				? null
 				: best;
-		}
-
-		// An appearance <mesh> id is either a RenderMesh (1010001) directly or a MESHINDEXFILE (1010030) wrapping one;
-		// return the underlying RenderMesh id (preferring a readable one), or null when neither resolves.
-		private static uint? ResolveToRenderMesh(RdbReader rdb, uint meshId)
-		{
-			if (rdb.TryGet(RenderMeshType, meshId, out var direct) && rdb.CanRead(direct))
-				return meshId;
-			if (rdb.TryGet(MeshIndexFileType, meshId, out var idx) && rdb.CanRead(idx))
-				return MeshIndexFile.Parse(meshId, rdb.ReadDecompressed(idx)).RenderMeshId;
-
-			return null;
 		}
 
 		// Resolve a CHARACTERCREATOR head monsterdataid to its component RenderMesh ids (head + eyes + lashes) via the
@@ -896,6 +886,37 @@ namespace Faolan.Core.Rdb.Assets
 			return ((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2);
 		}
 
+		// A diffuse is treated as alpha-tested (hair, eyelashes, ...) when a meaningful fraction of its texels are
+		// transparent. The 1% floor ignores stray anti-aliased edge pixels on otherwise-opaque skin maps.
+		// Classify how a decoded texture's alpha channel should render. AoC diffuse alpha is overloaded: it can be a
+		// cut-out mask (hair strands, lattice - reaches ~0 at the holes), a semi-transparent opacity map (sheer cloth -
+		// lots of mid-alpha, few/no full holes) OR a specular/gloss map that is NOT transparency at all (a smooth
+		// gradient, mostly opaque, no holes). Key on the shape: near-zero holes => Cutout (MASK); else a large body of
+		// mid-alpha => Blend (semi-transparent); else Opaque (ignore the channel, e.g. a spec map).
+		private static RenderMeshReader.AlphaMode ClassifyAlpha(byte[] rgba)
+		{
+			var total = rgba.Length / 4;
+			if (total == 0)
+				return RenderMeshReader.AlphaMode.Opaque;
+
+			int holes = 0, translucent = 0;
+			for (var i = 3; i < rgba.Length; i += 4)
+			{
+				var a = rgba[i];
+				if (a < 16)
+					holes++;
+				else if (a < 240)
+					translucent++;
+			}
+
+			if (holes > total / 100)
+				return RenderMeshReader.AlphaMode.Cutout;
+
+			return translucent > total / 10
+				? RenderMeshReader.AlphaMode.Blend
+				: RenderMeshReader.AlphaMode.Opaque;
+		}
+
 		// TexScript projecttexture for the eye: overlay the iris texture ON TOP of the mesh's own base (the eyeball
 		// sclera), alpha-blending where the iris is opaque, so the white of the eye is kept (replacing it outright
 		// leaves a floating iris in an empty socket). Returns an opaque PNG. Falls back to the base or the iris alone.
@@ -910,9 +931,11 @@ namespace Faolan.Core.Rdb.Assets
 			}
 
 			if (!TryDecodeRgba(rdb, 1010004, overlayTextureId, out var over, out var ow, out var oh))
+			{
 				return baseRgba == null
 					? null
 					: SkiaImage.EncodePng(baseRgba, bw, bh, tint);
+			}
 
 			if (baseRgba == null)
 				return SkiaImage.EncodePng(over, ow, oh, tint); // no base: just use the iris
@@ -946,13 +969,16 @@ namespace Faolan.Core.Rdb.Assets
 		{
 			if (id is not { } rid)
 				return null;
+
 			if (type != 0 && rdb.TryGet(type, rid, out var e))
+			{
 				return new ResourceResult(rid,
 					type,
 					e.IsLocal
 						? "local"
 						: "cdn",
 					e.Size);
+			}
 
 			// Collision (type unknown): probe the two known collision payload types so the report still says where it is.
 			foreach (var probe in new uint[]
@@ -962,12 +988,14 @@ namespace Faolan.Core.Rdb.Assets
 			})
 			{
 				if (rdb.TryGet(probe, rid, out var ce))
+				{
 					return new ResourceResult(rid,
 						probe,
 						ce.IsLocal
 							? "local"
 							: "cdn",
 						ce.Size);
+				}
 			}
 
 			return new ResourceResult(rid, type, "missing", 0);
@@ -1029,37 +1057,6 @@ namespace Faolan.Core.Rdb.Assets
 			return null;
 		}
 
-		// A diffuse is treated as alpha-tested (hair, eyelashes, ...) when a meaningful fraction of its texels are
-		// transparent. The 1% floor ignores stray anti-aliased edge pixels on otherwise-opaque skin maps.
-		// Classify how a decoded texture's alpha channel should render. AoC diffuse alpha is overloaded: it can be a
-		// cut-out mask (hair strands, lattice - reaches ~0 at the holes), a semi-transparent opacity map (sheer cloth -
-		// lots of mid-alpha, few/no full holes) OR a specular/gloss map that is NOT transparency at all (a smooth
-		// gradient, mostly opaque, no holes). Key on the shape: near-zero holes => Cutout (MASK); else a large body of
-		// mid-alpha => Blend (semi-transparent); else Opaque (ignore the channel, e.g. a spec map).
-		private static RenderMeshReader.AlphaMode ClassifyAlpha(byte[] rgba)
-		{
-			var total = rgba.Length / 4;
-			if (total == 0)
-				return RenderMeshReader.AlphaMode.Opaque;
-
-			int holes = 0, translucent = 0;
-			for (var i = 3; i < rgba.Length; i += 4)
-			{
-				var a = rgba[i];
-				if (a < 16)
-					holes++;
-				else if (a < 240)
-					translucent++;
-			}
-
-			if (holes > total / 100)
-				return RenderMeshReader.AlphaMode.Cutout;
-
-			return translucent > total / 10
-				? RenderMeshReader.AlphaMode.Blend
-				: RenderMeshReader.AlphaMode.Opaque;
-		}
-
 		// Mount a sub-rig (the head's facial rig, or the hair rig) onto a body rig under the shared bone (rig_bone_Head).
 		// We take the sub-tree of `source` rooted at that shared bone, SEAT it by translation `seat` (aligning the two
 		// shared bones' world positions, keeping the sub-rig's own orientation so a face/hairstyle isn't flipped), and
@@ -1071,11 +1068,13 @@ namespace Faolan.Core.Rdb.Assets
 			var bodyShared = combined.FindIndex(b => b.Name == sharedBone);
 			var srcShared = -1;
 			for (var i = 0; i < source.Count; i++)
+			{
 				if (source[i].Name == sharedBone)
 				{
 					srcShared = i;
 					break;
 				}
+			}
 
 			if (bodyShared < 0 || srcShared < 0)
 				return;
@@ -1259,6 +1258,18 @@ namespace Faolan.Core.Rdb.Assets
 						Alpha = alpha
 					})
 					.ToList();
+		}
+
+		// An appearance <mesh> id is either a RenderMesh (1010001) directly or a MESHINDEXFILE (1010030) wrapping one;
+		// return the underlying RenderMesh id (preferring a readable one), or null when neither resolves.
+		private static uint? ResolveToRenderMesh(RdbReader rdb, uint meshId)
+		{
+			if (rdb.TryGet(RenderMeshType, meshId, out var direct) && rdb.CanRead(direct))
+				return meshId;
+			if (rdb.TryGet(MeshIndexFileType, meshId, out var idx) && rdb.CanRead(idx))
+				return MeshIndexFile.Parse(meshId, rdb.ReadDecompressed(idx)).RenderMeshId;
+
+			return null;
 		}
 
 		private static Dictionary<uint, HashSet<string>> SkeletonNameIndex(RdbReader rdb)

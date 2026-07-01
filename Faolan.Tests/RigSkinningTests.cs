@@ -99,20 +99,6 @@ namespace Faolan.Tests
 		{
 			var ms = new MemoryStream();
 
-			void U32(uint v)
-			{
-				Span<byte> b = stackalloc byte[4];
-				BinaryPrimitives.WriteUInt32LittleEndian(b, v);
-				ms.Write(b);
-			}
-
-			void F32(float v)
-			{
-				Span<byte> b = stackalloc byte[4];
-				BinaryPrimitives.WriteSingleLittleEndian(b, v);
-				ms.Write(b);
-			}
-
 			ms.Write(new byte[12]);
 			U32(0x10000);
 			U32((uint)bones.Length);
@@ -131,6 +117,20 @@ namespace Faolan.Tests
 			}
 
 			return ms.ToArray();
+
+			void U32(uint v)
+			{
+				Span<byte> b = stackalloc byte[4];
+				BinaryPrimitives.WriteUInt32LittleEndian(b, v);
+				ms.Write(b);
+			}
+
+			void F32(float v)
+			{
+				Span<byte> b = stackalloc byte[4];
+				BinaryPrimitives.WriteSingleLittleEndian(b, v);
+				ms.Write(b);
+			}
 		}
 	}
 }

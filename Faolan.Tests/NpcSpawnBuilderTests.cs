@@ -25,6 +25,7 @@ namespace Faolan.Tests
 			var row = RowFromCapturedBody(capturedBody);
 			Assert.True(NpcSpawnAppearanceCodec.TryDecodeAppearance(capturedBody, out var morphs));
 			for (var i = 0; i < morphs.Count; i++)
+			{
 				row.Morphs.Add(new NpcSpawnMorph
 				{
 					Ordinal = i,
@@ -32,6 +33,7 @@ namespace Faolan.Tests
 					Value = morphs[i].Value,
 					Text = morphs[i].Text
 				});
+			}
 
 			var handle = BinaryPrimitives.ReadUInt32BigEndian(capturedBody.AsSpan(SpawnPacketBuilder.HandleOffset, 4));
 			Assert.True(NpcSpawnBuilder.TryBuild(row, handle, out var body, true));

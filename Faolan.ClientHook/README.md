@@ -6,10 +6,12 @@ path, see `docs/client-autotest.md`). Addresses come from the Ghidra project (`/
 `Captures/ghidra/`); the exe is NOT ASLR (ImageBase `0x400000`), so addresses are absolute.
 
 ## Build (pure LLVM — no mingw / Windows SDK)
+
 ```
 cmake -S Faolan.ClientHook -B Faolan.ClientHook/build
 cmake --build Faolan.ClientHook/build        # -> build/faolan_hook.dll (32-bit)
 ```
+
 `llvm-dlltool` makes the kernel32 import lib from `kernel32.def`; `clang --target=i686-pc-windows-msvc
 -fasm-blocks` compiles (freestanding, no CRT, inline kernel32 prototypes); `lld-link` links. (The CMake
 project is `LANGUAGES NONE` + custom commands — there's no CRT/SDK for CMake's normal toolchain detection to
@@ -22,6 +24,7 @@ link a test program against.) Melvin injects `build/faolan_hook.dll` into the ru
 > `docs/client-debug-logging.md`.
 
 ## What it does (on `DLL_PROCESS_ATTACH`)
+
 1. **Hooks every interface dispatcher** → a full server→client PACKET FEED. Each
    `*InterfaceDispatch_t::DispatchMethod(opcode, …)` (thiscall; opcode = first stack arg) logs `disp <iface>
    <opcode>` to `faolan_hook.log`: **GameChar** (`0x004BC7B0` — snapshot/quest/inventory/combat),
@@ -34,6 +37,7 @@ link a test program against.) Melvin injects `build/faolan_hook.dll` into the ru
 4. Writes `faolan_hook.log` (client CWD) with the exe base, pid, per-hook OK/SKIP, and the live hook output.
 
 ## Adding hooks (the framework)
+
 Add a row to `g_hooks[]`: `{ addr, PROLOGUE_STD (or a new signature read at `file_off = VA - 0x400C00`),
 steal_len, detour, &trampoline, name }`, plus a `__declspec(naked)` detour that reads the field of interest and
 `jmp dword ptr [g_tramp_*]`. (clang's `-fasm-blocks` won't expand `__asm{}` inside a macro, so detours are

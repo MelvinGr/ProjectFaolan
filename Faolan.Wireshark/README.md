@@ -71,16 +71,16 @@ preference.
 
 Useful fields:
 
-| field | meaning |
-| --- | --- |
-| `faolan.pkt.opcode` | 16-bit method opcode (raw hex; method index 0x2000+position) |
-| `faolan.pkt.sender_class` / `receiver_class` | ProtoEndpoint class id, resolved to class name |
-| `faolan.pkt.sender_instance` / `receiver_instance` | character/zone instance |
-| `faolan.pkt.len` / `crc` / `header_len` / `header_extra` / `body` | packet layout fields |
-| `faolan.chat.opcode` / `faolan.chat.len` / `faolan.chat.body` | AgentServer chat packets |
-| `faolan.compression_state` | Plain / TransitionHeader / Compressed / Failed / Chat / Skipped |
-| `faolan.stream_note` | retransmission / out-of-order / capture-gap diagnostics |
-| `faolan.decompressed` | inflated bytes produced in this frame (own data source) |
+| field                                                             | meaning                                                         |
+|-------------------------------------------------------------------|-----------------------------------------------------------------|
+| `faolan.pkt.opcode`                                               | 16-bit method opcode (raw hex; method index 0x2000+position)    |
+| `faolan.pkt.sender_class` / `receiver_class`                      | ProtoEndpoint class id, resolved to class name                  |
+| `faolan.pkt.sender_instance` / `receiver_instance`                | character/zone instance                                         |
+| `faolan.pkt.len` / `crc` / `header_len` / `header_extra` / `body` | packet layout fields                                            |
+| `faolan.chat.opcode` / `faolan.chat.len` / `faolan.chat.body`     | AgentServer chat packets                                        |
+| `faolan.compression_state`                                        | Plain / TransitionHeader / Compressed / Failed / Chat / Skipped |
+| `faolan.stream_note`                                              | retransmission / out-of-order / capture-gap diagnostics         |
+| `faolan.decompressed`                                             | inflated bytes produced in this frame (own data source)         |
 
 Packets completed in a frame appear under the "Faolan Conan packets" data source; the COL_INFO
 column shows `ReceiverClass 0xOPCODE` per packet.

@@ -131,7 +131,7 @@ namespace Faolan.Tests
 		// captured packet's instance so the constructed framing matches retail byte-for-byte. ReadSenderInstance must
 		// recover exactly what the real endpoint encoder (ConanEndpoints) wrote.
 		[Theory, InlineData(0x08u), InlineData(0x0Eu), InlineData(0x5Au), InlineData(0x01316E71u)]
-			// a multi-byte varint instance, for good measure
+		// a multi-byte varint instance, for good measure
 		public void ReadSenderInstance_RecoversTheEncodedGameAgentInstance(uint instance)
 		{
 			var sender = ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, instance);

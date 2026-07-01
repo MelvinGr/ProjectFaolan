@@ -256,7 +256,7 @@ namespace Faolan.GameServer.Combat
 			// ability id. The capture's beach mobs use ~0xBEEC (48876) across several NPCs (per-NPC jitter of a few);
 			// 0xBEEC is the representative value. (The earlier 769094 was the Normal Attack ABILITY id - wrong field,
 			// which played the player's hit-react + audio but left the NPC body un-animated.)
-			var body = CombatPacketCodec.BuildNpcAttackAnimationAckBody(npcHandle, playerHandle, damage, 0xBEEC, swingCounter, 24, 64, 56, 0xCB, 1, 2);
+			var body = CombatPacketCodec.BuildNpcAttackAnimationAckBody(npcHandle, playerHandle, damage, 0xBEEC, swingCounter);
 			return SendWorldPacket(client, body);
 		}
 
@@ -533,9 +533,7 @@ namespace Faolan.GameServer.Combat
 			if (item != null)
 			{
 				for (var i = 0; i < 2; i++)
-				{
 					tail.WriteUInt32(item.Data1).WriteUInt32(item.Data2).WriteUInt32(item.Data3).WriteUInt32(item.Data4);
-				}
 
 				tail.WriteArray(NullIdentityFiller).WriteArray(NullIdentityFiller);
 			}

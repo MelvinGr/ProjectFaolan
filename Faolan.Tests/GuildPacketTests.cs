@@ -68,7 +68,7 @@ namespace Faolan.Tests
 
 		// The in-world guild-tag IIR body (GuildUpdateIIR 0x2550C99A): [subop][0000C350][char][u16 0][string name].
 		[Theory, InlineData(0x01316E71u, "Sepulchra Invictus"), InlineData(0x00090000u, "")]
-			// empty name clears the tag
+		// empty name clears the tag
 		public void GuildTagBody_RoundTrips(uint characterId, string guildName)
 		{
 			var s = new FaolanStream();

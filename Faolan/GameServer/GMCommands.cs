@@ -1066,9 +1066,7 @@ namespace Faolan.GameServer
 				TeleportCodec.BuildBegin(instance, destMapId),
 				TeleportCodec.BuildDestination(instance, destMapId, position, destToken, destDescriptor)
 			})
-			{
 				await new PacketStream().WriteHeader(CreateEditorMorphAckSender, CreateEditorReceiver(client), GameServerCarrierOpcodes.IirCarrier).WriteArrayUInt32Length(s => s.WriteArray(body)).SendAsync(client);
-			}
 		}
 
 		private Task SendGmHelpText(uint characterId)

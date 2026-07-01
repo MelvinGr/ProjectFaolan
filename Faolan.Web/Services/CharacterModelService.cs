@@ -61,7 +61,7 @@ namespace Faolan.Web.Services
 		// RenderMesh directly - the female bodies). This replaces the old hardcoded MESHINDEXFILE table, which pointed the
 		// FEMALE bodies at a censored/wrong atlas (no nipples + a torso/limb tone seam) and at CDN-only meshes; the
 		// monsterdata bodies are the correct, locally-present ones for all three races (#275).
-		private static readonly Dictionary<(Race, Sex), uint> BodyMonster = new()
+		private static readonly Dictionary<(Race, Sex), uint> BodyMonster = new Dictionary<(Race, Sex), uint>
 		{
 			[(Race.Aquilonian, Sex.Male)] = 1091335,
 			[(Race.Cimmerian, Sex.Male)] = 1091337,
@@ -111,20 +111,6 @@ namespace Faolan.Web.Services
 				: _armorSets.Where(s => s.Gender == want || s.Gender == "Unisex").ToList();
 		}
 
-		// The body's skinned RenderMesh id for a race/sex, via its CHARACTERCREATOR monsterdata (BodyMonster ->
-		// ResolveBodyRenderMesh). Falls back to the same-sex Aquilonian body if a race body can't be resolved (all three
-		// race bodies are locally present today, so the fallback is belt-and-braces, and it keeps the correct sex). Returns
-		// 0 only when even the fallback is unavailable. Lenient by design - the STRICT editor path resolves without this.
-		private static uint BodyRenderMesh(RdbReader rdb, Race race, Sex sex)
-		{
-			if (BodyMonster.TryGetValue((race, sex), out var monster) && RdbAssetExtractor.ResolveBodyRenderMesh(rdb, monster) is { } rm)
-				return rm;
-
-			return BodyMonster.TryGetValue((Race.Aquilonian, sex), out var fallback) && RdbAssetExtractor.ResolveBodyRenderMesh(rdb, fallback) is { } fallbackRm
-				? fallbackRm
-				: 0;
-		}
-
 		public byte[]? BuildCharacter(Race race, Sex sex, uint? hairRmId = null)
 		{
 			var rdb = Reader();
@@ -170,74 +156,6 @@ namespace Faolan.Web.Services
 			equipMeshIndexIds ??= ResolveEquippedMeshes(characterId, character.Sex, hiddenSlots);
 
 			return BuildFromSpec(Reader(), character.Sex, character.Race, hairRmId, headMonster, morphs, resources, equipMeshIndexIds, rig);
-		}
-
-		// Resolve a character's worn armour MESHINDEXFILE ids from their equipped items (#275). Each equipped item's
-		// decrypted template carries its worn mesh(es) in field 9 (ItemLookResolver); weapons/jewellery carry none.
-		// Male/female variants of one garment collapse to the character's sex. Login-independent - RDB + faolan.db only.
-		public IReadOnlyList<uint> ResolveEquippedMeshes(uint characterId, Sex sex, IReadOnlySet<string>? hiddenSlots = null)
-		{
-			using var db = _dbFactory.CreateDbContext();
-			var eq = db.CharacterEquipment.AsNoTracking()
-				.Include(e => e.Head).Include(e => e.Chest).Include(e => e.Legs).Include(e => e.Hands)
-				.Include(e => e.Boots).Include(e => e.Shoulder).Include(e => e.Wrist).Include(e => e.Belt)
-				.Include(e => e.Cloak).Include(e => e.Tokens)
-				.FirstOrDefault(e => e.CharacterId == characterId);
-			if (eq == null)
-				return [];
-
-			// Slot names match the viewer's equipment paper-doll labels so a hidden slot maps 1:1 to the hide toggle.
-			var slots = new (string Slot, Item? Item)[]
-			{
-				("Head", eq.Head), ("Chest", eq.Chest), ("Legs", eq.Legs), ("Hands", eq.Hands), ("Boots", eq.Boots),
-				("Shoulder", eq.Shoulder), ("Wrist", eq.Wrist), ("Belt", eq.Belt), ("Cloak", eq.Cloak), ("Tokens", eq.Tokens)
-			};
-
-			var rdb = Reader();
-			var want = sex == Sex.Female ? "Female" : "Male";
-			var seen = new HashSet<uint>();
-			var result = new List<uint>();
-			foreach (var (slot, item) in slots)
-			{
-				if (hiddenSlots != null && hiddenSlots.Contains(slot))
-					continue;
-
-				var template = DecryptTemplate(rdb, item);
-				if (template == null)
-					continue;
-
-				foreach (var meshId in ItemLookResolver.WornMeshIds(rdb, template, want))
-					if (seen.Add(meshId))
-						result.Add(meshId);
-			}
-
-			return result;
-		}
-
-		// Decrypt an item's RDB template (type 1000020/1000620) with its stored per-template TEA key (Data1..4), or null
-		// when the item has no key / no local template entry.
-		private static byte[]? DecryptTemplate(RdbReader rdb, Item? item)
-		{
-			if (item == null || (item.Data1 == 0 && item.Data2 == 0 && item.Data3 == 0 && item.Data4 == 0))
-				return null;
-
-			var key = new[] { item.Data1, item.Data2, item.Data3, item.Data4 };
-			foreach (var type in new uint[] { 1000020, 1000620 })
-			{
-				if (rdb.TryGet(type, item.Id, out var e) && e.File != 0xff && e.Size > 0)
-				{
-					try
-					{
-						return rdb.ReadDecrypted(e, key);
-					}
-					catch
-					{
-						return null;
-					}
-				}
-			}
-
-			return null;
 		}
 
 		// Build a character glb from an EXPLICIT appearance spec instead of the stored one - the live-preview path for the
@@ -481,18 +399,6 @@ namespace Faolan.Web.Services
 			if (rows.Count == 0)
 				return EmptyOptions;
 
-			List<AppearanceOption> Cat(string category)
-			{
-				return rows
-					.Where(r => r.Category == category)
-					.Select(r => new AppearanceOption(r.Value,
-						string.IsNullOrEmpty(r.Name)
-							? $"#{r.Sequence + 1}"
-							: r.Name,
-						r.Color))
-					.ToList();
-			}
-
 			var morphLimits = rows
 				.Where(r => r.Category == "morph")
 				.GroupBy(r => r.Value)
@@ -505,6 +411,18 @@ namespace Faolan.Web.Services
 			var height = rows.FirstOrDefault(r => r.Category == "height");
 
 			return new AppearanceOptions(Cat("hair"), Cat("haircolor"), Cat("eyecolor"), Cat("skincolor"), Cat("bodymarkings"), Cat("facemarkings"), Cat("head"), height?.Min ?? 0, height?.Max ?? 0, morphLimits);
+
+			List<AppearanceOption> Cat(string category)
+			{
+				return rows
+					.Where(r => r.Category == category)
+					.Select(r => new AppearanceOption(r.Value,
+						string.IsNullOrEmpty(r.Name)
+							? $"#{r.Sequence + 1}"
+							: r.Name,
+						r.Color))
+					.ToList();
+			}
 		}
 
 		// The character's CURRENT appearance selections, to seed the editor when a character is opened: the 7 body
@@ -529,11 +447,6 @@ namespace Faolan.Web.Services
 				.GroupBy(x => x.Category)
 				.ToDictionary(g => g.Key, g => g.First().Ref);
 
-			string Cat(byte c)
-			{
-				return byCat.GetValueOrDefault(c, "");
-			}
-
 			return new AppearanceCurrent(body?.Arm ?? 0,
 				body?.Chest ?? 0,
 				body?.Bosom ?? 0,
@@ -548,6 +461,11 @@ namespace Faolan.Web.Services
 				Cat(8),
 				Cat(9),
 				Cat(10));
+
+			string Cat(byte c)
+			{
+				return byCat.GetValueOrDefault(c, "");
+			}
 		}
 
 		// Cheap check (no decompress / no HTTP) for whether a top-down image is reachable for the map — local OR
@@ -665,6 +583,69 @@ namespace Faolan.Web.Services
 			return RdbAssetExtractor.RawText(Reader(), type, id);
 		}
 
+		// Resolve a character's worn armour MESHINDEXFILE ids from their equipped items (#275). Each equipped item's
+		// decrypted template carries its worn mesh(es) in field 9 (ItemLookResolver); weapons/jewellery carry none.
+		// Male/female variants of one garment collapse to the character's sex. Login-independent - RDB + faolan.db only.
+		public IReadOnlyList<uint> ResolveEquippedMeshes(uint characterId, Sex sex, IReadOnlySet<string>? hiddenSlots = null)
+		{
+			using var db = _dbFactory.CreateDbContext();
+			var eq = db
+				.CharacterEquipment
+				.AsNoTracking()
+				.Include(e => e.Head)
+				.Include(e => e.Chest)
+				.Include(e => e.Legs)
+				.Include(e => e.Hands)
+				.Include(e => e.Boots)
+				.Include(e => e.Shoulder)
+				.Include(e => e.Wrist)
+				.Include(e => e.Belt)
+				.Include(e => e.Cloak)
+				.Include(e => e.Tokens)
+				.FirstOrDefault(e => e.CharacterId == characterId);
+			if (eq == null)
+				return [];
+
+			// Slot names match the viewer's equipment paper-doll labels so a hidden slot maps 1:1 to the hide toggle.
+			var slots = new (string Slot, Item? Item)[]
+			{
+				("Head", eq.Head),
+				("Chest", eq.Chest),
+				("Legs", eq.Legs),
+				("Hands", eq.Hands),
+				("Boots", eq.Boots),
+				("Shoulder", eq.Shoulder),
+				("Wrist", eq.Wrist),
+				("Belt", eq.Belt),
+				("Cloak", eq.Cloak),
+				("Tokens", eq.Tokens)
+			};
+
+			var rdb = Reader();
+			var want = sex == Sex.Female
+				? "Female"
+				: "Male";
+			var seen = new HashSet<uint>();
+			var result = new List<uint>();
+			foreach (var (slot, item) in slots)
+			{
+				if (hiddenSlots != null && hiddenSlots.Contains(slot))
+					continue;
+
+				var template = DecryptTemplate(rdb, item);
+				if (template == null)
+					continue;
+
+				foreach (var meshId in ItemLookResolver.WornMeshIds(rdb, template, want))
+				{
+					if (seen.Add(meshId))
+						result.Add(meshId);
+				}
+			}
+
+			return result;
+		}
+
 		// Persist an edited appearance to the character's CharacterBody (morphs + head) and CharacterBodyResources
 		// (the chosen hair/colour/tattoo refs, re-sequenced). This is what the editor's Save writes; the web viewer
 		// reads these back so the change sticks. Returns false when the character does not exist.
@@ -694,12 +675,14 @@ namespace Faolan.Web.Services
 			db.CharacterBodyResources.RemoveRange(db.CharacterBodyResources.Where(r => r.CharacterId == characterId));
 			var seq = 0;
 			foreach (var reference in spec.Refs.Where(r => !string.IsNullOrWhiteSpace(r)).Distinct())
+			{
 				db.CharacterBodyResources.Add(new CharacterBodyResource
 				{
 					CharacterId = characterId,
 					Sequence = seq++,
 					Ref = reference
 				});
+			}
 
 			db.SaveChanges();
 
@@ -757,8 +740,7 @@ namespace Faolan.Web.Services
 
 			if (bodyRm != 0 && headMeshes.Count > 0)
 			{
-				return RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyRm, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals, morphs, equipMeshIndexIds, rig) ??
-				       BuildCharacter(race, sex, hairRmId);
+				return RdbAssetExtractor.BuildCharacterFromParts(rdb, bodyRm, headMeshes, hairRmId, skinTint, hairTint, eyeTex, decals, morphs, equipMeshIndexIds, rig) ?? BuildCharacter(race, sex, hairRmId);
 			}
 
 			return BuildCharacter(race, sex, hairRmId);
@@ -813,6 +795,56 @@ namespace Faolan.Web.Services
 
 			lock (_gate)
 				return _rdb ??= new RdbReader(_rdbDir, _cdnUrl);
+		}
+
+		// The body's skinned RenderMesh id for a race/sex, via its CHARACTERCREATOR monsterdata (BodyMonster ->
+		// ResolveBodyRenderMesh). Falls back to the same-sex Aquilonian body if a race body can't be resolved (all three
+		// race bodies are locally present today, so the fallback is belt-and-braces, and it keeps the correct sex). Returns
+		// 0 only when even the fallback is unavailable. Lenient by design - the STRICT editor path resolves without this.
+		private static uint BodyRenderMesh(RdbReader rdb, Race race, Sex sex)
+		{
+			if (BodyMonster.TryGetValue((race, sex), out var monster) && RdbAssetExtractor.ResolveBodyRenderMesh(rdb, monster) is { } rm)
+				return rm;
+
+			return BodyMonster.TryGetValue((Race.Aquilonian, sex), out var fallback) && RdbAssetExtractor.ResolveBodyRenderMesh(rdb, fallback) is { } fallbackRm
+				? fallbackRm
+				: 0;
+		}
+
+		// Decrypt an item's RDB template (type 1000020/1000620) with its stored per-template TEA key (Data1..4), or null
+		// when the item has no key / no local template entry.
+		private static byte[]? DecryptTemplate(RdbReader rdb, Item? item)
+		{
+			if (item == null || (item.Data1 == 0 && item.Data2 == 0 && item.Data3 == 0 && item.Data4 == 0))
+				return null;
+
+			var key = new[]
+			{
+				item.Data1,
+				item.Data2,
+				item.Data3,
+				item.Data4
+			};
+			foreach (var type in new uint[]
+			{
+				1000020,
+				1000620
+			})
+			{
+				if (rdb.TryGet(type, item.Id, out var e) && e.File != 0xff && e.Size > 0)
+				{
+					try
+					{
+						return rdb.ReadDecrypted(e, key);
+					}
+					catch
+					{
+						return null;
+					}
+				}
+			}
+
+			return null;
 		}
 
 		// "*hairmesh_203667" -> 203667 (the rendermesh id); null for any other/absent ref.

@@ -90,14 +90,6 @@ namespace Faolan.Importer.Captures
 			if (idToClasses.Count == 0)
 				return (0, 0);
 
-			// A spell seen under exactly one class is specific to it; under >= 2 (or none we could attribute) it is generic.
-			uint ClassFor(uint id)
-			{
-				return idToClasses[id].Count == 1
-					? idToClasses[id].Single()
-					: 0u;
-			}
-
 			// Ensure the Spell catalog has a row for every starting spell id (the 0x200A learn grants are NOT cataloged
 			// by ImportAsync, which only sees ApplySpell casts) - ClassStartingSpell.SpellId is a FK into Spells. Save
 			// the catalog rows FIRST so the FK target exists before the ClassStartingSpell inserts (the dependent only
@@ -143,6 +135,14 @@ namespace Faolan.Importer.Captures
 
 			logger?.LogInformation("CaptureSpellImporter: {Spells} class starting spells harvested ({Inserted} new ClassStartingSpell rows).", idToClasses.Count, inserted);
 			return (idToClasses.Count, inserted);
+
+			// A spell seen under exactly one class is specific to it; under >= 2 (or none we could attribute) it is generic.
+			uint ClassFor(uint id)
+			{
+				return idToClasses[id].Count == 1
+					? idToClasses[id].Single()
+					: 0u;
+			}
 		}
 
 		// Seeds each captured character's LEARNED spell set (CharacterSpell rows) from the DispatchLearnSpell grants

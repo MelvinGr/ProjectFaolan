@@ -40,8 +40,6 @@ namespace Faolan.GameServer.Spawn
 		// defaults to it - byte-identical to the most-minimal captured NPCs (e.g. Kier-Dheed's Panther).
 		public const uint DefaultCategory = 0x6f;
 
-		// The full wire layout: the 32 pre-sublist fields (IsByteField), the sublist, then 27 trailing u32.
-		// Entry == (isByte, isSublist).
 		internal static readonly int[] WordStructOffsets =
 		[
 			0x184, 0x188, 0x18c, 0x190, 0x194, 0x198, 0x19c, 0x1a8, 0x1b0, 0x1c0, 0x1c8, 0x1d0, 0x1d8, 0x1e0, 0x1e8, 0x1f0, 0x1b8,
@@ -66,6 +64,9 @@ namespace Faolan.GameServer.Spawn
 		];
 
 		internal static readonly (bool IsByte, bool IsSublist)[] Layout = BuildLayout();
+
+		// The full wire layout: the 32 pre-sublist fields (IsByteField), the sublist, then 27 trailing u32.
+		// Entry == (isByte, isSublist).
 
 		// The C++ struct offset each of the 53 u32 is stored to, in WIRE order. Only used to reassemble the
 		// script-binding char buffer (DecodeScriptText); irrelevant to byte-exact wire round-trip.
@@ -114,21 +115,27 @@ namespace Faolan.GameServer.Spawn
 				else
 				{
 					if (run.Length >= 6)
+					{
 						sb
 							.Append(sb.Length > 0
 								? " | "
 								: "")
 							.Append(run);
+					}
+
 					run.Clear();
 				}
 			}
 
 			if (run.Length >= 6)
+			{
 				sb
 					.Append(sb.Length > 0
 						? " | "
 						: "")
 					.Append(run);
+			}
+
 			return sb.ToString();
 		}
 

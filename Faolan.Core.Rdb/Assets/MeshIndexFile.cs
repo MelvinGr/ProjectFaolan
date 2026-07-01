@@ -112,17 +112,17 @@ namespace Faolan.Core.Rdb.Assets
 			if (el == null)
 				return null;
 
+			if (F("min_x") is { } minX && F("min_y") is { } minY && F("min_z") is { } minZ && F("max_x") is { } maxX && F("max_y") is { } maxY && F("max_z") is { } maxZ)
+				return new BoundingBox(minX, minY, minZ, maxX, maxY, maxZ);
+
+			return null;
+
 			float? F(string name)
 			{
 				return float.TryParse(el.Attribute(name)?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var f)
 					? f
 					: null;
 			}
-
-			if (F("min_x") is { } minX && F("min_y") is { } minY && F("min_z") is { } minZ && F("max_x") is { } maxX && F("max_y") is { } maxY && F("max_z") is { } maxZ)
-				return new BoundingBox(minX, minY, minZ, maxX, maxY, maxZ);
-
-			return null;
 		}
 	}
 }

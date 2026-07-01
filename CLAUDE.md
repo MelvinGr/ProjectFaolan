@@ -106,6 +106,7 @@ git) and the server only migrates + reads/writes at save/load points. The sqlite
 OFF by default — `PRAGMA foreign_keys=ON` before manual deletes or you orphan child rows.
 
 **Wire protocol essentials:**
+
 - `PacketStream.WriteHeader(...)` + `SendAsync(...)` computes length + CRC; build packets with
   `PacketStream`/`FaolanStream` helpers. Integers are big-endian; protobuf fixed32 floats are
   little-endian while raw-body floats are big-endian (`WriteFloat` LE / `WriteFloatBigEndian` are both

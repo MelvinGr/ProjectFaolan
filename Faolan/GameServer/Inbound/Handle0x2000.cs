@@ -350,33 +350,6 @@ namespace Faolan.GameServer
 								// once, below, after the cast time.
 								await _combat.SendBehaviorEchoAck(client, rawPayload, (uint)args.Mode);
 
-								// Resolves the cast: play the ApplySpell (caster -> target, or self when no target), drain
-								// mana, and on an offensive cast apply damage + push the target's vitals (#69).
-								async Task Resolve()
-								{
-									// Cast-complete (#236): the cast bar is the form-0x0a cast behavior (retail BEGIN2/completion BCC,
-									// ice-strike idx481/534), not the form-4 begin. The echo-ack derives its form from the packet's
-									// seq word (form = seq+1), so to emit form 0x0a we stamp seq=9 onto a clone, with phase=3
-									// (cast-state complete). Without this the bar fills then hangs.
-									var completePayload = (byte[])rawPayload.Clone();
-									if (completePayload.Length > 17)
-									{
-										completePayload[16] = 0x00;
-										completePayload[17] = 0x09;
-									}
-
-									await _combat.SendBehaviorEchoAck(client, completePayload, 3);
-									await ApplySpell(client,
-										casterHandle,
-										targetHandle == 0
-											? casterHandle
-											: targetHandle,
-										spellId);
-									await _combat.SpendCasterMana(client, spellId);
-									if (targetHandle != 0 && targetHandle != casterHandle)
-										await _combat.ResolveOffensiveCast(client, casterHandle, targetHandle, spellId);
-								}
-
 								// Honor the spell's cast time (#236): retail resolves the effect only AFTER the cast time
 								// elapses (ice-strike capture: cast at frame 377, ApplySpell impact ~frame 441). Resolving on
 								// receipt skipped the client's cast bar. CastTime 0 (instant spell, or an un-populated row)
@@ -403,6 +376,33 @@ namespace Faolan.GameServer
 								}
 
 								break;
+
+								// Resolves the cast: play the ApplySpell (caster -> target, or self when no target), drain
+								// mana, and on an offensive cast apply damage + push the target's vitals (#69).
+								async Task Resolve()
+								{
+									// Cast-complete (#236): the cast bar is the form-0x0a cast behavior (retail BEGIN2/completion BCC,
+									// ice-strike idx481/534), not the form-4 begin. The echo-ack derives its form from the packet's
+									// seq word (form = seq+1), so to emit form 0x0a we stamp seq=9 onto a clone, with phase=3
+									// (cast-state complete). Without this the bar fills then hangs.
+									var completePayload = (byte[])rawPayload.Clone();
+									if (completePayload.Length > 17)
+									{
+										completePayload[16] = 0x00;
+										completePayload[17] = 0x09;
+									}
+
+									await _combat.SendBehaviorEchoAck(client, completePayload, 3);
+									await ApplySpell(client,
+										casterHandle,
+										targetHandle == 0
+											? casterHandle
+											: targetHandle,
+										spellId);
+									await _combat.SpendCasterMana(client, spellId);
+									if (targetHandle != 0 && targetHandle != casterHandle)
+										await _combat.ResolveOffensiveCast(client, casterHandle, targetHandle, spellId);
+								}
 							}
 
 							case ActionType.NormalAttack:

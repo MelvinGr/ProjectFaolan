@@ -199,9 +199,7 @@ namespace Faolan.GameServer
 				case "ChangeHeadMesh":
 				{
 					if (character != null)
-					{
 						EnsureBody(character).HeadMesh = numericValue;
-					}
 
 					break;
 				}
@@ -209,9 +207,7 @@ namespace Faolan.GameServer
 				case "ChangeSize":
 				{
 					if (character != null)
-					{
 						EnsureBody(character).Size = (byte)numericValue;
-					}
 
 					break;
 				}
@@ -219,9 +215,7 @@ namespace Faolan.GameServer
 				case "ChangeVoice":
 				{
 					if (character != null)
-					{
 						EnsureBody(character).Voice = (byte)numericValue;
-					}
 
 					break;
 				}

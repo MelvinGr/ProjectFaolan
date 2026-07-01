@@ -68,7 +68,7 @@ namespace Faolan.Tests
 		// anchor: L40 (109 NPCs)
 		// anchor: L60
 		// interpolated, captured baseline 1953 (<1%)
-			// interpolated, captured baseline 2482 (<1%)
+		// interpolated, captured baseline 2482 (<1%)
 		public void NpcMaxHealthForLevel_MatchesCapturedBaseline(uint level, uint expected)
 		{
 			Assert.Equal(expected, CombatResolver.NpcMaxHealthForLevel(level));

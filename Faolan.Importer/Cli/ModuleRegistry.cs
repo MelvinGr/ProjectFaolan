@@ -77,6 +77,11 @@ namespace Faolan.Importer.Cli
 			var done = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 			var onStack = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+			foreach (var m in All.Where(m => wanted.Contains(m.Name)))
+				Visit(m);
+
+			return ordered;
+
 			void Visit(IImportModule m)
 			{
 				if (done.Contains(m.Name))
@@ -91,11 +96,6 @@ namespace Faolan.Importer.Cli
 				done.Add(m.Name);
 				ordered.Add(m);
 			}
-
-			foreach (var m in All.Where(m => wanted.Contains(m.Name)))
-				Visit(m);
-
-			return ordered;
 		}
 	}
 }

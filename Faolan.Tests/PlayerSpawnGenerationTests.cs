@@ -27,7 +27,7 @@ namespace Faolan.Tests
 		// (#214); the SimpleChar is built from THIS packet, not the 0x737A6DF9 snapshot.
 		[Theory, InlineData(false, 19600u), InlineData(true, 0u)]
 		// alive: current health == max (196 * 100)
-			// dead:  current health == 0,   max/life stays full
+		// dead:  current health == 0,   max/life stays full
 		public void ApplyCharacter_DeadCharacter_ZeroesCurrentHealthKeepsLifeFull(bool isDead, uint expectedHealth)
 		{
 			var message = ((ReadOnlySpan<byte>)CharacterMessage(Golden.Bytes("SpawnStrieTemplate"))).FromProtobuf<ProtoCoreCharacterIIR>();

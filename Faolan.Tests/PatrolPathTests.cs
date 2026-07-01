@@ -39,6 +39,7 @@ namespace Faolan.Tests
 				Speed = entry.Speed
 			};
 			for (var i = 0; i < entry.Waypoints.Count; i++)
+			{
 				path.Waypoints.Add(new PatrolWaypoint
 				{
 					Ordinal = i,
@@ -46,6 +47,7 @@ namespace Faolan.Tests
 					Y = entry.Waypoints[i].Y,
 					Z = entry.Waypoints[i].Z
 				});
+			}
 
 			var built = MoveTaskBuilder.BuildPatrol(handle, path);
 

@@ -35,16 +35,6 @@ namespace Faolan.Core.Network.Packets
 			if (start + 8 > data.Length)
 				return null;
 
-			uint U32(int rel)
-			{
-				return BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(start + rel, 4));
-			}
-
-			ushort U16(int rel)
-			{
-				return BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(start + rel, 2));
-			}
-
 			var sub = U32(4);
 			if (sub is not (OpenChatWindow or AppendText or AnswerList or CloseChatWindow))
 				return DecodeCamera(data, headerLen, start);
@@ -56,14 +46,6 @@ namespace Faolan.Core.Network.Packets
 			uint? field = null;
 			byte? flag = null;
 			var screens = new List<string>();
-
-			void ReadScreen()
-			{
-				var ln = U16(o);
-				o += 2;
-				screens.Add(Encoding.Latin1.GetString(data, start + o, ln));
-				o += ln;
-			}
 
 			switch (sub)
 			{
@@ -90,6 +72,24 @@ namespace Faolan.Core.Network.Packets
 			}
 
 			return new Columns(sub, env, field, flag, screens);
+
+			uint U32(int rel)
+			{
+				return BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(start + rel, 4));
+			}
+
+			ushort U16(int rel)
+			{
+				return BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(start + rel, 2));
+			}
+
+			void ReadScreen()
+			{
+				var ln = U16(o);
+				o += 2;
+				screens.Add(Encoding.Latin1.GetString(data, start + o, ln));
+				o += ln;
+			}
 		}
 
 		// DispatchSetDialogueCamera (opcode 0x2015 in the rpcHeader, not an IIR sub). Payload (after the rpcHeader)
