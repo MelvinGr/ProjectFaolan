@@ -209,7 +209,7 @@
 
     @if (_selected != null && _appOptions != null)
     {
-        <Window Title="Edit" Id="edit-window" Class="edit-window"
+        <Window Title="Edit" Floating="true" Collapsed="true" Id="edit-window" Class="edit-window"
                 Style="top:4.75rem; right:1.25rem; width:16.5rem; max-height:84vh;">
             <div class="edit-scroll">
                 <div class="edit-head">Body</div>
@@ -349,7 +349,7 @@
 
     @if (_selected != null)
     {
-        <Window Title="Pose" Collapsed="true" Id="pose-window"
+        <Window Title="Pose" Floating="true" Collapsed="true" Id="pose-window"
                 Style="bottom:1.25rem; right:1.25rem; width:15rem;">
             <label class="idle-toggle">
                 <input type="checkbox" checked="@_idleOn" @onchange="ToggleIdle"/>

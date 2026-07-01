@@ -5,15 +5,15 @@
 @* Reusable panel/window: a titled card with a collapse toggle and, when Floating, fixed positioning + drag-by-title-bar.
    Docked (Floating=false) windows sit in normal flow. Positioning/sizing for a floating window is passed via Style. The
    body is the child content, rendered as direct children of the card so a scrolling region inside keeps its layout. *@
-<div class="win @(Floating ? "floating" : "docked") @Class @(Collapsed ? "collapsed" : "")" id="@Id" style="@Style">
+<div class="win @(Floating ? "floating" : "docked") @Class @(_collapsed ? "collapsed" : "")" id="@Id" style="@Style">
     <div class="win-bar" id="@BarId">
         <span class="win-title">@Title</span>
         @HeaderExtra
-        @if (Collapsible)
+        @if (Floating && Collapsible)
         {
-            <button class="win-collapse" type="button" title="@(Collapsed ? "Expand" : "Collapse")"
-                    @onclick="() => Collapsed = !Collapsed" @onclick:stopPropagation="true"
-                    @onpointerdown:stopPropagation="true">@(Collapsed ? "▢" : "—")</button>
+            <button class="win-collapse" type="button" title="@(_collapsed ? "Expand" : "Collapse")"
+                    @onclick="() => _collapsed = !_collapsed" @onclick:stopPropagation="true"
+                    @onpointerdown:stopPropagation="true">@(_collapsed ? "▢" : "—")</button>
         }
     </div>
     @ChildContent
@@ -30,7 +30,7 @@
     [Parameter] public string? Style { get; set; }
 
     // Floating: position:fixed + draggable by the title bar. Docked (false): normal document flow.
-    [Parameter] public bool Floating { get; set; } = true;
+    [Parameter] public bool Floating { get; set; }
     [Parameter] public bool Collapsible { get; set; } = true;
 
     [Parameter] public RenderFragment? ChildContent { get; set; }
@@ -40,9 +40,18 @@
 
     [Parameter] public bool Collapsed { get; set; }
 
+    private bool _collapsed;
+
     private IJSObjectReference? _module;
 
     private string BarId => $"{Id}-bar";
+
+    // Seed the runtime collapse state from the Collapsed parameter ONCE. Keeping the toggle in a private field (not the
+    // parameter) means a parent re-render can't reset it - a [Parameter] set internally is overwritten on the next render.
+    protected override void OnInitialized()
+    {
+        _collapsed = Collapsed;
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
