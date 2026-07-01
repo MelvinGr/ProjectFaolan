@@ -250,6 +250,36 @@ export function buildPoseControls(canvasId, containerId) {
     host.append(reset);
 }
 
+// Make a floating window draggable by its title bar. Idempotent (guarded by a dataset flag) so it can be re-called
+// after each Blazor re-render. Switches the window to left/top positioning on first drag so it moves regardless of the
+// initial right-anchored CSS.
+export function makeDraggable(windowId, handleId) {
+    const win = document.getElementById(windowId);
+    const handle = document.getElementById(handleId);
+    if (!win || !handle || handle.dataset.dragInit) return;
+    handle.dataset.dragInit = '1';
+
+    let startX = 0, startY = 0, originX = 0, originY = 0, dragging = false;
+    handle.addEventListener('pointerdown', e => {
+        dragging = true;
+        const r = win.getBoundingClientRect();
+        win.style.left = r.left + 'px';
+        win.style.top = r.top + 'px';
+        win.style.right = 'auto';
+        startX = e.clientX; startY = e.clientY; originX = r.left; originY = r.top;
+        handle.setPointerCapture(e.pointerId);
+        e.preventDefault();
+    });
+    handle.addEventListener('pointermove', e => {
+        if (!dragging) return;
+        win.style.left = (originX + e.clientX - startX) + 'px';
+        win.style.top = (originY + e.clientY - startY) + 'px';
+    });
+    const end = e => { dragging = false; try { handle.releasePointerCapture(e.pointerId); } catch { } };
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+}
+
 // Render an item glb to a PNG data-URL with ONE reused offscreen renderer (so 16 equipment slots don't each take a
 // WebGL context). Null on load failure (the item has no display mesh -> the slot keeps its label).
 let _thumbRenderer = null;

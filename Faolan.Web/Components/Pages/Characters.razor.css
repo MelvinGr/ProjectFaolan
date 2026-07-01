@@ -421,18 +421,55 @@
     font-size: .8rem;
 }
 
-.tip-controls {
+/* Floating, draggable pose window (detached from the equipment panel). */
+.pose-window {
+    position: fixed;
+    top: 4.75rem;
+    right: 1.25rem;
+    z-index: 50;
+    width: 15rem;
+    box-sizing: border-box;
+    background: linear-gradient(180deg, var(--bg-2), #101216);
+    border: 2px solid var(--stone);
+    border-radius: var(--radius);
+    box-shadow: inset 0 0 24px #000a, var(--shadow);
+    padding: .55rem .65rem .65rem;
+}
+
+.pose-window-bar {
     display: flex;
     align-items: center;
-    gap: .35rem .9rem;
-    flex-wrap: wrap;
-    margin-top: .45rem;
+    cursor: move;
+    user-select: none;
+    border-bottom: 1px solid var(--stone-dark);
+    padding-bottom: .45rem;
+    margin-bottom: .55rem;
+}
+
+.pose-window-title {
+    color: var(--gold);
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    font-size: .82rem;
+}
+
+.tip-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: .4rem;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: .2rem;
 }
 
 .pose {
     display: flex;
     align-items: center;
-    gap: .35rem;
+    justify-content: space-between;
+    gap: .5rem;
     font-size: .72rem;
     color: var(--muted);
     text-transform: uppercase;

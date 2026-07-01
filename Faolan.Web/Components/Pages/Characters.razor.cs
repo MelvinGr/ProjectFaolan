@@ -145,8 +145,10 @@ namespace Faolan.Web.Components.Pages
 			await Render();
 			if (_module != null)
 			{
-				// Build the per-joint pose sliders, then render a 3D thumbnail into each equipped slot.
+				// Build the per-joint pose sliders (in the floating pose window) + make that window draggable,
+				// then render a 3D thumbnail into each equipped slot.
 				await _module.InvokeVoidAsync("buildPoseControls", "char-canvas", "pose-controls");
+				await _module.InvokeVoidAsync("makeDraggable", "pose-window", "pose-window-bar");
 				await _module.InvokeVoidAsync("populateItemThumbs");
 			}
 		}

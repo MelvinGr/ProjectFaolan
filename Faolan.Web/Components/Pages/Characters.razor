@@ -149,7 +149,6 @@
                 @if (_selected != null)
                 {
                     <div class="tip-line">@_selected.Name — @_selected.Race @_selected.Sex (@_status)</div>
-                    <div class="tip-controls" id="pose-controls"></div>
                 }
                 else
                 {
@@ -205,6 +204,16 @@
             </div>
         </div>
     </section>
+
+    @if (_selected != null)
+    {
+        <div class="pose-window" id="pose-window">
+            <div class="pose-window-bar" id="pose-window-bar">
+                <span class="pose-window-title">Pose — @_selected.Name</span>
+            </div>
+            <div class="tip-controls" id="pose-controls"></div>
+        </div>
+    }
 </div>
 
 @code {
