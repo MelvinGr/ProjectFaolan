@@ -185,12 +185,12 @@ namespace Faolan.Importer.Modules
 				WriteMode.Upsert
 			};
 
-		public string Description => "Per-class starting spells (create 0x200A grants).";
-		public string Name => "starting-spells";
+		public string Description => "Per-class spell access map (create 0x200A grants).";
+		public string Name => "class-spells";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var (harvested, added) = await CaptureSpellImporter.ImportClassStartingSpellsAsync(ctx.Db, ctx.CreateCaptures);
+			var (harvested, added) = await CaptureSpellImporter.ImportClassSpellsAsync(ctx.Db, ctx.CreateCaptures);
 			return new ImportResult($"{harvested} harvested, {added} new.");
 		}
 	}

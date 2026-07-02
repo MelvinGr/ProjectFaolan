@@ -96,7 +96,8 @@ namespace Faolan.Core.Database
 		Task<Spell[]> GetSpells();
 		Task<Ability[]> GetStartingAbilities(uint level, uint @class);
 
-		Task<uint[]> GetStartingSpells(uint level, uint @class);
+		Task<uint[]> GetStartingSpells(uint level, Class @class);
+		Task<uint[]> GetClassSpellsUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive);
 		Task<TradepostListing> GetTradepostListingBySaleId(ulong saleId);
 		Task<TradepostListing> GetTradepostListingBySellerSlot(string sellerName, uint bankSlot);
 
@@ -882,14 +883,36 @@ namespace Faolan.Core.Database
 			return await ctx.Abilities.Where(a => a.IsStartingAbility && a.Level <= level && (a.Class == 0 || a.Class == @class)).OrderBy(a => a.Slot).ToArrayAsync();
 		}
 
-		// Starting SPELLS for a character (#74): the generic set (Class == 0) plus the spells specific to the
-		// character's own class, up to its level. Harvested from the create-flow captures (ClassStartingSpell);
-		// coverage is whatever the captures supplied (casters we have a beach capture for - physical classes have
-		// none at L1, which is correct). The spell analogue of GetStartingAbilities.
-		public async Task<uint[]> GetStartingSpells(uint level, uint @class)
+		// SPELLS a character has learned by its current level (#74): every spell its class (or the generic Class 0 set)
+		// has ACCESS to (ClassSpells) whose unlock level (Spells.Level - NOT ClassSpells, which is pure membership) is
+		// at or below `level`. Coverage is whatever the class<->spell map supplied (only the create-capture starters
+		// today; a class-aware ellatha scrape fills the progression). The spell analogue of GetStartingAbilities.
+		public async Task<uint[]> GetStartingSpells(uint level, Class @class)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.ClassStartingSpells.Where(s => s.Level <= level && (s.Class == 0 || s.Class == @class)).OrderBy(s => s.Id).Select(s => s.SpellId).ToArrayAsync();
+			return await ctx.ClassSpells
+				.Where(cs => cs.Class == 0 || cs.Class == @class)
+				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => s)
+				.Where(s => s.Level <= level)
+				.OrderBy(s => s.Level).ThenBy(s => s.Id)
+				.Select(s => s.Id)
+				.Distinct()
+				.ToArrayAsync();
+		}
+
+		// The class spells whose unlock level (Spells.Level) falls in (fromLevelExclusive, toLevelInclusive] - the
+		// spells NEWLY learned crossing from one level to another (the level-up delta). Grants these on a ding.
+		public async Task<uint[]> GetClassSpellsUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.ClassSpells
+				.Where(cs => cs.Class == 0 || cs.Class == @class)
+				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => s)
+				.Where(s => s.Level > fromLevelExclusive && s.Level <= toLevelInclusive)
+				.OrderBy(s => s.Level).ThenBy(s => s.Id)
+				.Select(s => s.Id)
+				.Distinct()
+				.ToArrayAsync();
 		}
 
 		// One listing by its unique sale id - the buy targets this (TradepostBuyItem [saleId]).

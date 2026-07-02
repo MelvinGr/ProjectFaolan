@@ -29,7 +29,7 @@ namespace Faolan.Core.Database
 		DbSet<CharacterSpell> CharacterSpells { get; }
 		DbSet<CharacterTag> CharacterTags { get; }
 		DbSet<ChatMessage> ChatMessages { get; }
-		DbSet<ClassStartingSpell> ClassStartingSpells { get; }
+		DbSet<ClassSpell> ClassSpells { get; }
 		DbSet<ConversationNode> ConversationNodes { get; }
 		DbSet<ConversationPacket> ConversationPackets { get; }
 		DbSet<Guild> Guilds { get; }
@@ -85,7 +85,7 @@ namespace Faolan.Core.Database
 		public DbSet<CharacterSpell> CharacterSpells { get; set; }
 		public DbSet<CharacterTag> CharacterTags { get; set; }
 		public DbSet<ChatMessage> ChatMessages { get; set; }
-		public DbSet<ClassStartingSpell> ClassStartingSpells { get; set; }
+		public DbSet<ClassSpell> ClassSpells { get; set; }
 		public DbSet<ConversationNode> ConversationNodes { get; set; }
 		public DbSet<ConversationPacket> ConversationPackets { get; set; }
 		public DbSet<Guild> Guilds { get; set; }
@@ -214,18 +214,18 @@ namespace Faolan.Core.Database
 				.IsUnique();
 			modelBuilder.Entity<ConversationNode>().HasMany(n => n.Packets).WithOne(p => p.Node).OnDelete(DeleteBehavior.Cascade);
 
-			// A class's starting spell is unique per (Class, SpellId) - re-importing the same create capture upserts.
+			// A class<->spell access row is unique per (Class, SpellId) - re-importing the same capture upserts.
 			modelBuilder
-				.Entity<ClassStartingSpell>()
+				.Entity<ClassSpell>()
 				.HasIndex(s => new
 				{
 					s.Class,
 					s.SpellId
 				})
 				.IsUnique();
-			// SpellId references the Spell catalog (the importer catalogs every starting spell id). Restrict so a
+			// SpellId references the Spell catalog (the importer catalogs every harvested spell id). Restrict so a
 			// spell can't be deleted out from under a class loadout.
-			modelBuilder.Entity<ClassStartingSpell>().HasOne(s => s.Spell).WithMany().HasForeignKey(s => s.SpellId).OnDelete(DeleteBehavior.Restrict);
+			modelBuilder.Entity<ClassSpell>().HasOne(s => s.Spell).WithMany().HasForeignKey(s => s.SpellId).OnDelete(DeleteBehavior.Restrict);
 
 			// A captured NPC spawn is deduped by its (map, spawn point); the entity handle is session-scoped.
 			modelBuilder

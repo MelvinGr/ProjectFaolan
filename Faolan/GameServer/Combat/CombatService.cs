@@ -42,15 +42,20 @@ namespace Faolan.GameServer.Combat
 		// composition pattern prescribes (CLAUDE.md). Null-safe for tests that construct the service without it.
 		private readonly Func<INetworkClient, Ability, Task> _announceAbilityGrant;
 
+		// The listener's live spell-learn op (DispatchLearnSpell 0x200A), for the level-up spell unlocks (#209). Same
+		// narrow-seam pattern as _announceAbilityGrant. Null-safe for tests that construct the service without it.
+		private readonly Func<INetworkClient, uint, Task> _learnSpell;
+
 		// Quest kill-goals route through the QuestProgressionService (#261), which owns the broadcaster + system-message
 		// seams; combat packets frame themselves directly (SendWorldPacket), so this service no longer needs either.
-		public CombatService(WorldSimulation sim, IDatabaseRepository database, QuestProgressionService questProgression, ILogger logger, Func<INetworkClient, Ability, Task> announceAbilityGrant = null)
+		public CombatService(WorldSimulation sim, IDatabaseRepository database, QuestProgressionService questProgression, ILogger logger, Func<INetworkClient, Ability, Task> announceAbilityGrant = null, Func<INetworkClient, uint, Task> learnSpell = null)
 		{
 			_sim = sim;
 			_database = database;
 			_questProgression = questProgression;
 			_logger = logger;
 			_announceAbilityGrant = announceAbilityGrant;
+			_learnSpell = learnSpell;
 		}
 
 		// Builds the BCC behavior echo a VIEWER should receive to render this actor's swing/cast: the same plain
@@ -486,13 +491,25 @@ namespace Faolan.GameServer.Combat
 			// ANNOUNCED 0x2052s at the ding (Rest at the L1->L2 ding - Blablabla frame 9937, Blablatest 1357,
 			// Stihetfv 685 - and in every L2+ char's login re-grant). GetStartingAbilities is level-filtered, so
 			// the ding grants are the delta above the pre-ding level.
+			var previousLevel = character.Level - levelsGained;
 			if (_announceAbilityGrant != null)
 			{
-				var previousLevel = character.Level - levelsGained;
 				foreach (var ability in await _database.GetStartingAbilities(character.Level, (uint)character.Class))
 				{
 					if (ability.Level > previousLevel)
 						await _announceAbilityGrant(killer, ability);
+				}
+			}
+
+			// Level-gated SPELL unlocks (#209/#74): the class's spells whose Spells.Level falls in the newly-crossed
+			// range - learned (DispatchLearnSpell) and persisted to CharacterSpells so they ride every relog, exactly
+			// like .learnspell / a create-flow starter.
+			if (_learnSpell != null)
+			{
+				foreach (var spellId in await _database.GetClassSpellsUnlockedBetween(character.Class, previousLevel, character.Level))
+				{
+					await _learnSpell(killer, spellId);
+					await _database.AddCharacterSpell(character.Id, spellId);
 				}
 			}
 		}

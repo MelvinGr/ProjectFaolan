@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Conan;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -59,14 +60,15 @@ namespace Faolan.Importer.Captures
 			return (ids.Count, inserted);
 		}
 
-		// Harvests each CLASS's starting spell set from the create-flow captures into ClassStartingSpell (#74) - the
-		// spell analogue of CaptureAbilityImporter's class-aware ability extraction. A freshly-created caster receives
-		// its level-1 spells via DispatchLearnSpell (0x200A) on the beach (Necromancer 0x125D9B/0x42CA77, Herald of
-		// Xotli 0x3006FF; physical classes get none, correctly). Each create capture is attributed to its class via the
-		// same ChangeClass editor command CaptureAbilityImporter uses (value/2). A spell granted under >= 2 distinct
-		// classes is GENERIC (Class 0); under exactly one it is class-specific. Upserts on (Class, SpellId), so it is
-		// safe to re-run. Coverage is necessarily only the classes/levels present in the captures.
-		public static async Task<(int Spells, int Inserted)> ImportClassStartingSpellsAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<byte[]>> createCaptures, ILogger logger = null)
+		// Harvests each CLASS's spell ACCESS from the create-flow captures into ClassSpell (#74) - the spell analogue of
+		// CaptureAbilityImporter's class-aware ability extraction. A freshly-created caster receives its level-1 spells
+		// via DispatchLearnSpell (0x200A) on the beach (Necromancer 0x125D9B/0x42CA77, Herald of Xotli 0x3006FF;
+		// physical classes get none, correctly). Each create capture is attributed to its class via the same ChangeClass
+		// editor command CaptureAbilityImporter uses (value/2). A spell granted under >= 2 distinct classes is GENERIC
+		// (Class 0); under exactly one it is class-specific. Upserts on (Class, SpellId), so it is safe to re-run. This
+		// is pure membership (the spell's unlock LEVEL lives on Spells.Level); coverage is only the classes present in
+		// the captures - a class-aware ellatha scrape fills the full per-level progression.
+		public static async Task<(int Spells, int Inserted)> ImportClassSpellsAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<byte[]>> createCaptures, ILogger logger = null)
 		{
 			// spellId -> the distinct classes whose create capture granted it (null class = unattributed capture).
 			var idToClasses = new Dictionary<uint, HashSet<uint>>();
@@ -91,8 +93,8 @@ namespace Faolan.Importer.Captures
 				return (0, 0);
 
 			// Ensure the Spell catalog has a row for every starting spell id (the 0x200A learn grants are NOT cataloged
-			// by ImportAsync, which only sees ApplySpell casts) - ClassStartingSpell.SpellId is a FK into Spells. Save
-			// the catalog rows FIRST so the FK target exists before the ClassStartingSpell inserts (the dependent only
+			// by ImportAsync, which only sees ApplySpell casts) - ClassSpell.SpellId is a FK into Spells. Save the
+			// catalog rows FIRST so the FK target exists before the ClassSpell inserts (the dependent only
 			// carries the scalar SpellId, so EF won't order the principal ahead of it on its own).
 			var cataloged = (await db.Spells.Select(s => s.Id).ToListAsync()).ToHashSet();
 			var newCatalog = false;
@@ -112,7 +114,7 @@ namespace Faolan.Importer.Captures
 			if (newCatalog)
 				await db.SaveChangesAsync();
 
-			var existing = await db.ClassStartingSpells.ToDictionaryAsync(s => (s.Class, s.SpellId));
+			var existing = await db.ClassSpells.ToDictionaryAsync(s => ((uint)s.Class, s.SpellId));
 			var inserted = 0;
 			foreach (var id in idToClasses.Keys)
 			{
@@ -120,20 +122,19 @@ namespace Faolan.Importer.Captures
 				if (existing.ContainsKey((cls, id)))
 					continue;
 
-				db.ClassStartingSpells.Add(new ClassStartingSpell
+				db.ClassSpells.Add(new ClassSpell
 				{
-					Class = cls,
-					Level = 1,
+					Class = (Class)cls,
 					SpellId = id
 				});
 				inserted++;
 			}
 
-			// Saves the new catalog rows (Spells) and the new ClassStartingSpell rows together; EF orders the inserts
-			// so the FK target exists first.
+			// Saves the new catalog rows (Spells) and the new ClassSpell rows together; EF orders the inserts so the
+			// FK target exists first.
 			await db.SaveChangesAsync();
 
-			logger?.LogInformation("CaptureSpellImporter: {Spells} class starting spells harvested ({Inserted} new ClassStartingSpell rows).", idToClasses.Count, inserted);
+			logger?.LogInformation("CaptureSpellImporter: {Spells} class spells harvested ({Inserted} new ClassSpell rows).", idToClasses.Count, inserted);
 			return (idToClasses.Count, inserted);
 
 			// A spell seen under exactly one class is specific to it; under >= 2 (or none we could attribute) it is generic.

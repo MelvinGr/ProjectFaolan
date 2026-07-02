@@ -1206,6 +1206,14 @@ namespace Faolan.GameServer
 					if (ability.Level > previousLevel)
 						await SendAbilityGrant(client, ability);
 				}
+
+				// Level-gated SPELL unlocks (#209/#74): the class's spells whose Spells.Level is in the crossed range,
+				// learned + persisted like .learnspell (so they ride every relog). Same as the XP-driven ding.
+				foreach (var spellId in await Database.GetClassSpellsUnlockedBetween(character.Class, previousLevel, level))
+				{
+					await SendLearnSpell(client, spellId);
+					await Database.AddCharacterSpell(character.Id, spellId);
+				}
 			}
 
 			await _agentServerDispatcher.SendSystemMessage(character.Id, $"Level set to {level} (relog to refresh the full character sheet).");

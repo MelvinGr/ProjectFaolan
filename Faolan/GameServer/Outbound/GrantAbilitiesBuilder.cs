@@ -69,7 +69,7 @@ namespace Faolan.GameServer
 			// Persist the class's starting spells. GrantStartingSpells (called right after this in SendWorldEntry) then
 			// reads CharacterSpells, sends them, and queues the post-ready re-announce - so the freshly-seeded spells
 			// ride the same path as an existing character's learned set, on this login and every relog.
-			var spells = await Database.GetStartingSpells(character.Level, (uint)character.Class);
+			var spells = await Database.GetStartingSpells(character.Level, character.Class);
 			foreach (var spellId in spells)
 				await Database.AddCharacterSpell(character.Id, spellId);
 
