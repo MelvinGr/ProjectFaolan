@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Faolan.Core;
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
@@ -95,17 +96,56 @@ Console.WriteLine("[player] -> RequestSmallCharList");
 
 var listPacket = await player.ReadUntilAsync((ushort)PlayerAgentResponseOpcodes.SmallCharList, timeout, Log);
 var count = listPacket.Body.ReadUInt32() / 1009 - 1; // (count+1)*1009 framing
-Console.WriteLine();
-Console.WriteLine($"===== CHARACTER SELECT — {count} character(s) =====");
+var roster = new List<(uint Id, string Challenge)>();
 for (var i = 0; i < count; i++)
+	roster.Add((listPacket.Body.ReadUInt32(), listPacket.Body.ReadString()));
+Console.WriteLine($"[player] <- SmallCharList  ({count} character id(s))");
+
+// Ask for the full realm data by echoing the ids+challenges back; the server replies with the full character
+// list (names, level, class/race/sex, map) - the actual character-select screen content.
+await player.SendAsync(Build(Server(0x8204), PlayerAgentOpcodes.RequestCharRealmData, p =>
 {
-	var id = listPacket.Body.ReadUInt32();
-	var authChallenge = listPacket.Body.ReadString();
-	Console.WriteLine($"  [{i}] characterId=0x{id:X8} ({id})  authChallenge=\"{authChallenge}\"");
+	p.WriteUInt32((uint)((roster.Count + 1) * 1009));
+	foreach (var (id, challenge) in roster)
+	{
+		p.WriteUInt32(id);
+		p.WriteString(challenge);
+	}
+}));
+Console.WriteLine("[player] -> RequestCharRealmData");
+
+var full = await player.ReadUntilAsync((ushort)PlayerAgentResponseOpcodes.SendCharacterList, timeout, Log);
+var b = full.Body;
+b.ReadUInt32();                          // ClientInstance
+var fullCount = b.ReadUInt32() / 1009 - 1;
+Console.WriteLine();
+Console.WriteLine($"===== CHARACTER SELECT — {fullCount} character(s) =====");
+for (var i = 0; i < fullCount; i++)
+{
+	var id = b.ReadUInt32();
+	b.ReadUInt32();                      // PlayerInstance
+	b.ReadUInt32();                      // id (repeat)
+	var name = b.ReadString();
+	var realmId = b.ReadUInt32();
+	var sex = (Sex)(byte)b.ReadUInt32();
+	var lastConn = b.ReadString();
+	b.ReadUInt32();                      // 0
+	var mapId = b.ReadUInt32();
+	var level = b.ReadUInt32();
+	var cls = (Class)(byte)b.ReadUInt32();
+	b.ReadUInt32(); b.ReadUInt32();      // 0, 0
+	b.ReadUInt32();                      // 0x60355308
+	b.ReadUInt32();                      // 2
+	var race = (Race)(byte)b.ReadUInt32();
+	b.ReadString();                      // language
+	b.ReadUInt32(); b.ReadUInt32();      // 0, 0
+	b.ReadString();                      // per-char auth challenge
+	b.ReadUInt32(); b.ReadUInt32();      // 0, 1
+	Console.WriteLine($"  [{i}] \"{name}\"  L{level} {cls} · {race} · {sex}  map={mapId} realm={realmId}  id=0x{id:X8}  last={lastConn}");
 }
 
 Console.WriteLine();
-Console.WriteLine("Reached the character-select screen. (Names/appearance need RequestCharRealmData -> SendCharacterList.)");
+Console.WriteLine("Reached the character-select screen (full list with names).");
 return 0;
 
 static void Log(ConanPacket p) => Console.WriteLine($"      (skipped 0x{p.Opcode:X4}, {p.Body.Length} body bytes)");
