@@ -103,6 +103,19 @@ namespace Faolan.Importer.Extractors
 					// not a parseable bank packet
 				}
 
+				// Seventh source: mail attachments (DispatchMailMessage 0x2002). The AH-buy delivery escrows the bought
+				// item as a mail attachment - a ProtoInventoryGameEntry in the same codec as everywhere else. Taken mail
+				// items also arrive via the live-add source, so this only adds ones seen in a mailbox but never claimed;
+				// still worth harvesting so a future mail capture's items land without a code change.
+				try
+				{
+					ExtractFromMail(packetBytes, found);
+				}
+				catch
+				{
+					// not a parseable mail packet
+				}
+
 				foreach (var (template, item) in found)
 				{
 				if (into.TryGetValue(template, out var existing))
@@ -216,6 +229,24 @@ namespace Faolan.Importer.Extractors
 				var archetype = InventorySnapshotInspector.GetEntryArchetype(entry);
 				if (template.HasValue && quad.HasValue)
 					into.TryAdd(template.Value, new CapturedItem(quad.Value.Data1, quad.Value.Data2, quad.Value.Data3, quad.Value.Data4, archetype ?? 0));
+			}
+		}
+
+		// Recovers (template -> CapturedItem) from a DispatchMailMessage (S->C 0x2002) that carries attachments (the
+		// AH-buy delivery escrows the bought item as a mail attachment). Reuses MailMessageCodec.Parse - the canonical
+		// inverse of the builder - so the wire grammar lives in one place. 0x2002 is class-multiplexed, but a non-mail
+		// body either throws (caught by the caller) or yields attachments with no real identity, which we skip.
+		private static void ExtractFromMail(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
+		{
+			var packet = new ConanPacket(packetBytes);
+			if (packet.Opcode != 0x2002)
+				return;
+
+			var mail = MailMessageCodec.Parse(packet.Body.ToArray());
+			foreach (var a in mail.Attachments)
+			{
+				if (a.Template != 0 && (a.Data1 | a.Data2 | a.Data3 | a.Data4) != 0)
+					into.TryAdd(a.Template, new CapturedItem(a.Data1, a.Data2, a.Data3, a.Data4, a.ItemHash));
 			}
 		}
 
