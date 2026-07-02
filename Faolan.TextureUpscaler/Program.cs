@@ -10,7 +10,8 @@ using Faolan.TextureUpscaler;
 // Usage:
 //   dotnet run --project Faolan.TextureUpscaler -- --rdb <RDB dir> --bin /usr/bin/realesrgan-ncnn-vulkan \
 //       --model realesrgan-x4plus --model-dir /usr/share/realesrgan-ncnn-vulkan/models \
-//       [--scale 4] [--datafile 210] [--type 1010004] [--limit N] [--dry-run]
+//       [--scale 4] [--datafile 210] [--type 1010004] [--id 21,66,86] [--limit N] [--dry-run]
+// --id  = only these specific resource ids (comma-separated); --type = which RDB type(s); --limit = first N found.
 //
 // SAFETY: writes le.idx + a new NN.rdbdata IN PLACE. It backs le.idx up to le.idx.faolan-bak first. Stop the game
 // before running. --dry-run does everything except the write.
@@ -35,6 +36,9 @@ foreach (var e in rdb.Entries)
 {
 	if (!opt.Types.Contains(e.Type) || e.Size == 0 || !rdb.CanRead(e))
 		continue;
+
+	if (opt.Ids.Count > 0 && !opt.Ids.Contains(e.Id))
+		continue; // --id filter: only these specific resource ids
 
 	byte[] head;
 	try
@@ -125,6 +129,10 @@ static Options ParseArgs(string[] a)
 			case "--scale": o.Scale = int.Parse(a[++i]); break;
 			case "--datafile": o.DataFile = byte.Parse(a[++i]); break;
 			case "--type": o.Types.Add(uint.Parse(a[++i])); break;
+			case "--id":
+				foreach (var s in a[++i].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+					o.Ids.Add(uint.Parse(s));
+				break;
 			case "--limit": o.Limit = int.Parse(a[++i]); break;
 			case "--dry-run": o.DryRun = true; break;
 		}
@@ -147,4 +155,5 @@ sealed class Options
 	public int Limit;
 	public bool DryRun;
 	public HashSet<uint> Types = [];
+	public HashSet<uint> Ids = [];
 }
