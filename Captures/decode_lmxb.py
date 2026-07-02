@@ -26,10 +26,12 @@ validated end-to-end against the client RDB.
   1010003  the actual keyframe CURVES, keyed by the clip's rdbname.
       RDB-Id header [u32 type=1010003][u32 id][u32 type2=1000003][u32 flags=0x20000][f32 duration]
       [u32 frameCount] then a sequence of per-bone tracks:
-        track = [u32 nameLen][ascii rig_bone_*][channels...]
-        channel = [u32 keyCount][keyCount x f32 ...]  -- keyframe times are real seconds (0,0.04,0.08 = 25fps)
-      Values are plain float32 (NOT quantized). Translation channels are metre offsets, rotation channels
-      are quaternion components. Decodable straight to glTF animation channels.
+        track = [u32 nameLen][ascii rig_bone_*][T-channel][R-channel]
+        T-channel (translation) = [u32 nKeysT][nKeysT x f32 time][nKeysT x (f32 x,y,z)]     # metres, vec3
+        R-channel (rotation)    = [u32 nKeysR][nKeysR x f32 time][nKeysR x (f32 x,y,z,w)]   # UNIT quaternion
+      Keyframe times are real seconds (25 fps). Values are plain float32 (NOT quantized); rotation quats verify
+      to |q|=1.0. Static bones are 1-key channels. Decodable straight to glTF animation channels (T = translation
+      sampler, R = rotation sampler; skeleton bone names match rig_bone_* directly).
 
 Usage: python3 Captures/decode_lmxb.py            # self-validates on 14532 + dumps a 1010003 sample
 Reads the client RDB directly (RdbReader path from the agent memory client_rdb_install_path).
@@ -114,25 +116,36 @@ class Lmxb:
             self.dump(c, depth + 1)
 
 
+def _channel(d, p, width):
+    """[u32 count][count f32 times][count x width f32 values] -> (times, [tuple], next_p).
+    Bounds-checked: raises ValueError on a count that overruns the buffer (a variant channel layout)."""
+    cnt = struct.unpack_from("<I", d, p)[0]
+    p += 4
+    if cnt < 0 or p + cnt * 4 * (1 + width) > len(d):
+        raise ValueError("channel count %d overruns buffer (variant layout)" % cnt)
+    times = list(struct.unpack_from("<%df" % cnt, d, p))
+    p += cnt * 4
+    vals = [struct.unpack_from("<%df" % width, d, p + i * width * 4) for i in range(cnt)]
+    return times, vals, p + cnt * width * 4
+
+
 def parse_curve(d):
-    """1010003 per-bone keyframe tracks -> list of (bone, [channel float-lists])."""
-    typ, cid, typ2, flags = struct.unpack_from("<IIII", d, 0)
+    """1010003 per-bone keyframe tracks. Each bone = a translation (vec3) channel then a rotation (quat) channel."""
+    cid = struct.unpack_from("<I", d, 4)[0]
     duration = struct.unpack_from("<f", d, 16)[0]
     frames = struct.unpack_from("<I", d, 20)[0]
     p = 24
-    tracks = []
+    bones = []
     while p + 4 <= len(d):
         nl = struct.unpack_from("<I", d, p)[0]
         if not (0 < nl < 64) or d[p + 4:p + 5] != b"r":  # tracks are 'rig_bone_*'
             break
         name = d[p + 4:p + 4 + nl].decode("latin1")
         p += 4 + nl
-        # channels run until the next track's nameLen+'rig_bone_' (or EOF)
-        nxt = d.find(b"rig_bone_", p)
-        end = (nxt - 4) if nxt > 0 else len(d)
-        tracks.append((name, d[p:end]))
-        p = end
-    return dict(id=cid, duration=duration, frames=frames, tracks=tracks)
+        t_times, t_vals, p = _channel(d, p, 3)  # translation vec3
+        r_times, r_vals, p = _channel(d, p, 4)  # rotation quat (x,y,z,w)
+        bones.append(dict(bone=name, translate=list(zip(t_times, t_vals)), rotate=list(zip(r_times, r_vals))))
+    return dict(id=cid, duration=duration, frames=frames, bones=bones)
 
 
 if __name__ == "__main__":
@@ -143,10 +156,14 @@ if __name__ == "__main__":
     print("=== 1010511:14532 (movement_idle) metadata tree ===")
     L.dump()
 
-    # --- characterise a real curve resource ---
+    # --- decode + validate real curve resources (every bone parses; every rotation key is a unit quaternion) ---
+    import math
     for cid in (11761, 11709):
-        d = r.dec(1010003, cid)
-        c = parse_curve(d)
-        print(f"\n=== 1010003:{c['id']} curves: duration={c['duration']}s frames={c['frames']} bones={len(c['tracks'])} ===")
-        for name, blob in c["tracks"][:4]:
-            print(f"  {name}: {len(blob)} bytes of channel data")
+        c = parse_curve(r.dec(1010003, cid))
+        nkeys = sum(len(b["rotate"]) for b in c["bones"])
+        bad = sum(1 for b in c["bones"] for _, q in b["rotate"] if abs(math.sqrt(sum(x * x for x in q)) - 1.0) > 1e-3)
+        print(f"\n=== 1010003:{c['id']} duration={c['duration']:.2f}s frames={c['frames']} bones={len(c['bones'])} ===")
+        print(f"  parsed all bones; {nkeys} rotation keys, {bad} non-unit quaternions")
+        h = next(b for b in c["bones"] if b["bone"] == "rig_bone_Hips")
+        print(f"  Hips: {len(h['translate'])} T-keys, {len(h['rotate'])} R-keys; "
+              f"T[0]={tuple(round(x,3) for x in h['translate'][0][1])} R[0]={tuple(round(x,3) for x in h['rotate'][0][1])}")
