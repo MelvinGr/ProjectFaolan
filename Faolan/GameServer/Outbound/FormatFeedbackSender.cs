@@ -59,11 +59,22 @@ namespace Faolan.GameServer
 				var currentXp = lvl == toLevel ? thisXp + finalRemainingXp : thisXp; // only the final level carries partial XP
 				ReadOnlySpan<uint> deltas = [currentXp, thisXp, nextXp, 1u, 8u, 0u];
 
-				var ps = new PacketStream();
-				ps.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), (ushort)0x2000);
-				ps.WriteArray(NewLevelIirCodec.Build(instance, lvl, deltas));
-				await ps.SendAsync(client);
+				await SendWorldIir(client, NewLevelIirCodec.Build(instance, lvl, deltas));
+
+				// The combos unlocked at this level (class-independent, level-keyed; retail sends them right after the
+				// NewLevelIIR - combat-levelup capture ordering).
+				foreach (var comboId in LevelComboCatalog.ForLevel(lvl))
+					await SendWorldIir(client, ComboBookIirCodec.Build(instance, comboId));
 			}
+		}
+
+		// Sends a pre-framed world IIR body ([len]-prefixed) on the world conversation (opcode 0x2000).
+		private Task SendWorldIir(INetworkClient client, byte[] body)
+		{
+			var ps = new PacketStream();
+			ps.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), (ushort)0x2000);
+			ps.WriteArray(body);
+			return ps.SendAsync(client);
 		}
 
 		// Emits the level-up attribute feedback: one AttributeChanged/Increased on-screen line per primary attribute
