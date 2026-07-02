@@ -36,6 +36,33 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
+	// Class<->spell ACCESS map from the AoC fandom wiki's per-class spell categories (#296), by base name.
+	public sealed class WikiClassSpellsModule : IImportModule
+	{
+		public ImportSource Source => ImportSource.Tsv;
+		public IReadOnlyList<string> DependsOn => [];
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "Class<->spell access map from the AoC fandom wiki (aoc_wiki_class_spells.tsv).";
+		public string Name => "wiki-class-spells";
+
+		public async Task<ImportResult> RunAsync(ImportContext ctx)
+		{
+			var tsv = Path.Combine(ctx.CapturesDir, "aoc_wiki_class_spells.tsv");
+			if (!File.Exists(tsv))
+				return new ImportResult("skipped (no aoc_wiki_class_spells.tsv).");
+
+			var r = await WikiClassSpellImporter.ImportAsync(ctx.Db, tsv);
+			return new ImportResult($"{r.Rows} wiki rows, {r.Matched} matched, {r.Inserted} new ClassSpell rows.");
+		}
+	}
+
 	// Combo LEVEL + COOLDOWN (the combos list is the one source with cooldown), by exact name.
 	public sealed class EllathaCombosModule : IImportModule
 	{

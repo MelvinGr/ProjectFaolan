@@ -36,6 +36,7 @@ namespace Faolan.Importer.Cli
 			// --- tsv modules ---
 			new EllathaLevelsModule(),
 			new EllathaCombosModule(),
+			new WikiClassSpellsModule(),
 			// --- rdb modules (opt-in, require --rdb) ---
 			new RdbInventoryModule(),
 			new RdbMorphsModule(),
