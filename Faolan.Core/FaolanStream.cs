@@ -31,6 +31,12 @@ namespace Faolan.Core
 
 		public byte[] ReadArray(uint length)
 		{
+			// Never allocate more than the buffer can supply: a hostile length-prefix (up to 0xFFFFFFFF) would
+			// otherwise trigger a multi-GB allocation before ReadExactly fails - an OOM DoS. Checking against the
+			// bytes actually remaining is safe because no legitimate read can exceed the packet.
+			if (length > Length - Position)
+				throw new EndOfStreamException($"ReadArray length {length} exceeds {Length - Position} byte(s) remaining");
+
 			var buffer = new byte[length];
 			ReadExactly(buffer);
 

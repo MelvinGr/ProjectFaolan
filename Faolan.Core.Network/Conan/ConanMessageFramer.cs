@@ -134,6 +134,12 @@ namespace Faolan.Core.Network.Conan
 					if (count <= 0)
 						break;
 
+					// Cap total inflated output: a few-KB compressed packet could otherwise inflate to gigabytes
+					// (a zlib bomb) → OOM. A decompressed packet still has to fit the MaxPacketSize framing budget,
+					// so anything past that is hostile - drop it (null → the connection gets no data from this push).
+					if (bos.Length + count > MaxPacketSize)
+						return null;
+
 					bos.Write(buf, 0, count);
 				}
 
