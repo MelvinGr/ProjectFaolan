@@ -93,6 +93,21 @@ namespace Faolan.Core.Rdb.Assets
 			return Encode(bmp, tint);
 		}
 
+		// Decode a PNG (or any Skia-supported image) to an RGBA8888 buffer + dimensions. For reading an external
+		// upscaler's output back into the texture pipeline (#295).
+		public static (byte[] Rgba, int W, int H) DecodePng(byte[] png)
+		{
+			using var raw = SKBitmap.Decode(png) ?? throw new ArgumentException("not a decodable image");
+			// Normalise to RGBA8888 unpremul regardless of the source's native colour type/alpha.
+			using var bmp = new SKBitmap(Unpremul(raw.Width, raw.Height));
+			if (!raw.CopyTo(bmp, SKColorType.Rgba8888))
+				throw new ArgumentException("failed to convert decoded image to RGBA8888");
+
+			var rgba = new byte[bmp.Width * bmp.Height * 4];
+			Marshal.Copy(bmp.GetPixels(), rgba, 0, rgba.Length);
+			return (rgba, bmp.Width, bmp.Height);
+		}
+
 		// Wrap an RGBA8888 (R,G,B,A) byte buffer in an SKBitmap (copies into Skia-owned pixels).
 		public static SKBitmap FromRgba(byte[] rgba, int w, int h)
 		{
