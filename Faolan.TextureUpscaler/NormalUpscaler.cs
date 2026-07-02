@@ -1,4 +1,3 @@
-using System;
 using Faolan.Core.Rdb.Assets;
 
 namespace Faolan.TextureUpscaler

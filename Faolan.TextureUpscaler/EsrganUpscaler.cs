@@ -13,25 +13,24 @@ namespace Faolan.TextureUpscaler
 	{
 		private readonly string _bin;
 		private readonly string _model;
-		private readonly int _scale;
 		private readonly string? _modelDir;
+
+		public int Scale { get; }
 
 		public EsrganUpscaler(string bin, string model, int scale, string? modelDir = null)
 		{
 			_bin = bin;
 			_model = model;
-			_scale = scale;
+			Scale = scale;
 			_modelDir = modelDir;
 		}
-
-		public int Scale => _scale;
 
 		// The Func<rgba, srcW, srcH, dstW, dstH, rgba> the replacer expects. dstW/dstH must equal src*scale (the
 		// model's fixed factor); an off-scale request throws.
 		public byte[] Upscale(byte[] rgba, int sw, int sh, int dw, int dh)
 		{
-			if (dw != sw * _scale || dh != sh * _scale)
-				throw new ArgumentException($"realesrgan model is x{_scale}; requested {sw}x{sh} -> {dw}x{dh}");
+			if (dw != sw * Scale || dh != sh * Scale)
+				throw new ArgumentException($"realesrgan model is x{Scale}; requested {sw}x{sh} -> {dw}x{dh}");
 
 			var tmp = Path.Combine(Path.GetTempPath(), "faolan-esrgan-" + Guid.NewGuid().ToString("N"));
 			var inPng = tmp + "-in.png";
@@ -46,10 +45,14 @@ namespace Faolan.TextureUpscaler
 					RedirectStandardOutput = true,
 					UseShellExecute = false
 				};
-				psi.ArgumentList.Add("-i"); psi.ArgumentList.Add(inPng);
-				psi.ArgumentList.Add("-o"); psi.ArgumentList.Add(outPng);
-				psi.ArgumentList.Add("-s"); psi.ArgumentList.Add(_scale.ToString());
-				psi.ArgumentList.Add("-n"); psi.ArgumentList.Add(_model);
+				psi.ArgumentList.Add("-i");
+				psi.ArgumentList.Add(inPng);
+				psi.ArgumentList.Add("-o");
+				psi.ArgumentList.Add(outPng);
+				psi.ArgumentList.Add("-s");
+				psi.ArgumentList.Add(Scale.ToString());
+				psi.ArgumentList.Add("-n");
+				psi.ArgumentList.Add(_model);
 				if (_modelDir != null)
 				{
 					psi.ArgumentList.Add("-m");
