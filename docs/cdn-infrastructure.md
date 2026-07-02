@@ -63,8 +63,43 @@ X-Check-Cacheable: YES
 
 Akamai config slot **`1705`**, CP code **`1557746`** front this property.
 
+## What the control host serves (`cdn-web-nj4.funcom.com`)
+
+Probed directly 2026-07-02. Project folder = `AoCLiveEU` (`<HttpPatchFolder>`). Only two files respond 200;
+everything else is 403 (dir listing) / 404 (unknown file).
+
+**`/upm/AoCLiveEU/PatchInfoClient.txt`** — the manifest root:
+```
+RootHash=ebeff2218c35d2b40c3378b8bb7e8c5b
+PatchVersion=x2415731e261f929936356732afb4f155
+PatcherSetupHash=c90c98efd3c237c2ee55fc019013a3e6
+RDBHash=86050b1e20d758a880aa809828414dbb
+RDBHash-5=5c18a47e04858047024fa40d83196ce5   (per RDB/le.idx version: 5, 6, 7)
+RDBHash-6=0f700ec04e0ed8bfdcff3b6298acd6a1
+RDBHash-7=2dacaedef5e17de3f0cdad2789b7008f
+```
+
+**`/upm/AoCLiveEU/LocalConfig.xml`** — the real upstream config (the one the mirror archives + rewrites). Leaks:
+- **Live game server (UniverseAgent): `dm09-nj4.ageofconan.com:7010` = `37.18.192.43`**
+- Languages `en,es,fr,de,ru,pl`; flags: Khitan chars / AA / offline leveling + AA training enabled
+- `<DevName>conan</DevName>`, `<PreferencesName>Conan</PreferencesName>`, the three real CDN addrs
+
+### Funcom NJ4 datacenter (`37.18.192.0/24`)
+Both the game and the control CDN live here: game server `dm09-nj4 = .43`, control CDN `cdn-web-nj4 = .154/.155`.
+
+### Bulk-download path is decommissioned
+Every manifest `PatchInfoClient.txt` references — `RDBHashes`, `FileHashes`, `RootHash` (tried
+`rdb/pack/%c%c/%s`, `client/<hash>`, folder-relative filenames — all forms) — returns **404**. Only
+`PatchInfoClient.txt` (control) + on-demand `rdb/res/<hash>` blobs (gameupdate, via Akamai) are live. So a full
+patcher-driven download can't complete (matches the patcher's "exits without bulk-downloading" behaviour); the
+only way to enumerate the full resource set is the local `le.idx` / `RDBHashIndex.bin` driving the `res/` sweep.
+Patcher path templates (from `ConanPatcher.exe` strings): `/PatchInfoClient.txt`, `rdb/pack/%c%c/%s`, `rdb/res/`,
+plus config keys incl. `Universe/Client/FallbackHttpPatchAddr` (no value present in the served config).
+
 ## Summary
 
 **Akamai edge (AkamaiGHost 22.5.4) in front of a legacy Apache 2.2.15 / CentOS origin** for game + client
 content (`gameupdate`, `update`); the control/manifest host (`control`) is served straight from Funcom's own
-`cdn-web-nj4.funcom.com` (`37.18.192.0/24`).
+`cdn-web-nj4.funcom.com` (`37.18.192.0/24`), the same NJ4 datacenter as the live game server. The control host
+still serves `PatchInfoClient.txt` + `LocalConfig.xml`, but the bulk file manifests are gone — only Akamai's
+on-demand `rdb/res/` layer remains for content.
