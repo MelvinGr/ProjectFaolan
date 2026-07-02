@@ -97,15 +97,26 @@ namespace Faolan.Core.Rdb.Assets
 		// upscaler's output back into the texture pipeline (#295).
 		public static (byte[] Rgba, int W, int H) DecodePng(byte[] png)
 		{
-			using var raw = SKBitmap.Decode(png) ?? throw new ArgumentException("not a decodable image");
-			// Normalise to RGBA8888 unpremul regardless of the source's native colour type/alpha.
-			using var bmp = new SKBitmap(Unpremul(raw.Width, raw.Height));
-			if (!raw.CopyTo(bmp, SKColorType.Rgba8888))
-				throw new ArgumentException("failed to convert decoded image to RGBA8888");
+			// Decode STRAIGHT to RGBA8888 UNPREMUL via the codec. SKBitmap.Decode defaults to premultiplied alpha,
+			// which folds alpha into RGB (darkens semi-transparent textures) - we want straight, non-premultiplied
+			// colour to feed back into DXT encoding.
+			using var data = SKData.CreateCopy(png);
+			using var codec = SKCodec.Create(data) ?? throw new ArgumentException("not a decodable image");
+			var info = new SKImageInfo(codec.Info.Width, codec.Info.Height, SKColorType.Rgba8888, SKAlphaType.Unpremul);
+			var rgba = new byte[info.Width * info.Height * 4];
+			var handle = System.Runtime.InteropServices.GCHandle.Alloc(rgba, System.Runtime.InteropServices.GCHandleType.Pinned);
+			try
+			{
+				var res = codec.GetPixels(info, handle.AddrOfPinnedObject());
+				if (res != SKCodecResult.Success && res != SKCodecResult.IncompleteInput)
+					throw new ArgumentException($"image decode failed: {res}");
+			}
+			finally
+			{
+				handle.Free();
+			}
 
-			var rgba = new byte[bmp.Width * bmp.Height * 4];
-			Marshal.Copy(bmp.GetPixels(), rgba, 0, rgba.Length);
-			return (rgba, bmp.Width, bmp.Height);
+			return (rgba, info.Width, info.Height);
 		}
 
 		// Wrap an RGBA8888 (R,G,B,A) byte buffer in an SKBitmap (copies into Skia-owned pixels).
