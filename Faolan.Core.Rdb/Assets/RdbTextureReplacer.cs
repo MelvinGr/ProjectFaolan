@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 
 namespace Faolan.Core.Rdb.Assets
 {
@@ -8,21 +9,29 @@ namespace Faolan.Core.Rdb.Assets
 	// container/encode/inline path is the point; swap the resampler for quality. DXT1 only for now (opaque diffuse).
 	public static class RdbTextureReplacer
 	{
-		// Build an upscaled DXT1 FCTX replacement blob for the given texture entry, or null if it isn't a decodable
-		// DXT-colour FCTX. `scale` multiplies both dimensions (2 = double res). `upscale` replaces the resampler.
-		public static byte[]? BuildUpscaledDxt1(RdbReader rdb, uint type, uint id, int scale = 2, Func<byte[], int, int, int, int, byte[]>? upscale = null)
+		// Build an upscaled FCTX replacement blob for the given texture entry, PRESERVING its format (DXT1 or DXT5),
+		// or null if it isn't a decodable DXT-colour FCTX (MIXD/normal maps return null). `scale` multiplies both
+		// dimensions (2 = double res). `upscale` replaces the resampler (default bilinear).
+		public static byte[]? BuildUpscaled(RdbReader rdb, uint type, uint id, int scale = 2, Func<byte[], int, int, int, int, byte[]>? upscale = null)
 		{
 			if (scale < 1 || !rdb.TryGet(type, id, out var e) || !rdb.CanRead(e))
 				return null;
 
 			var payload = rdb.ReadDecompressed(e);
+			if (!FctxConverter.IsFctx(payload) || payload.Length < 24)
+				return null;
+
+			var fourCc = Encoding.ASCII.GetString(payload, 20, 4);
+			if (fourCc != "DXT1" && fourCc != "DXT5")
+				return null; // MIXD/DXT3/unknown - not yet re-encodable
+
 			if (!FctxConverter.TryDecodeTopMip(payload, out var rgba, out var w, out var h))
-				return null; // not a decodable DXT colour FCTX (MIXD/normal maps return false)
+				return null;
 
 			var nw = w * scale;
 			var nh = h * scale;
 			var up = (upscale ?? Bilinear)(rgba, w, h, nw, nh);
-			return FctxEncoder.WrapIOz1(FctxEncoder.EncodeDxt1(up, nw, nh));
+			return FctxEncoder.WrapIOz1(FctxEncoder.Encode(up, nw, nh, fourCc));
 		}
 
 		// Bilinear resample RGBA32 (row-major, top-down) from (sw,sh) to (dw,dh).

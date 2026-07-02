@@ -12,10 +12,19 @@ namespace Faolan.Core.Rdb.Assets
 	// output of Encode is ready to be IOz1+zlib-wrapped and inlined via RdbWriter.
 	public static class FctxEncoder
 	{
-		// Encode RGBA32 (row-major, top-down) as a full-mip FCTX DXT1 blob. Mip levels: full res down to 1×1, each
-		// dimension = max(1, dim >> level), box-downsampled from the previous.
+		// Encode RGBA32 (row-major, top-down) as a full-mip FCTX DXT1 blob.
 		public static byte[] EncodeDxt1(byte[] rgba, int width, int height)
 		{
+			return Encode(rgba, width, height, "DXT1");
+		}
+
+		// Encode RGBA32 as a full-mip FCTX blob in `fourCc` (DXT1 = opaque colour, DXT5 = colour + alpha). Mip
+		// levels: full res down to 1×1, each dimension = max(1, dim >> level), box-downsampled from the previous.
+		public static byte[] Encode(byte[] rgba, int width, int height, string fourCc)
+		{
+			if (fourCc != "DXT1" && fourCc != "DXT5")
+				throw new NotSupportedException($"FCTX encode fourcc '{fourCc}' not supported (DXT1/DXT5 only)");
+
 			var mipCount = MipCount(width, height);
 			using var ms = new MemoryStream();
 
@@ -28,9 +37,9 @@ namespace Faolan.Core.Rdb.Assets
 			ms.WriteByte((byte)mipCount);
 			ms.WriteByte((byte)mipCount);
 			WriteU16(ms, 0);
-			ms.Write(Encoding.ASCII.GetBytes("DXT1"));
+			ms.Write(Encoding.ASCII.GetBytes(fourCc));
 
-			// Build every mip's RGBA (level 0 = full res), then write BC1 blocks SMALLEST-first.
+			// Build every mip's RGBA (level 0 = full res), then write blocks SMALLEST-first.
 			var levels = new byte[mipCount][];
 			var dims = new (int W, int H)[mipCount];
 			levels[0] = rgba;
@@ -46,7 +55,9 @@ namespace Faolan.Core.Rdb.Assets
 			}
 
 			for (var n = mipCount - 1; n >= 0; n--)
-				ms.Write(BcEncoder.EncodeBc1(levels[n], dims[n].W, dims[n].H));
+				ms.Write(fourCc == "DXT5"
+					? BcEncoder.EncodeBc3(levels[n], dims[n].W, dims[n].H)
+					: BcEncoder.EncodeBc1(levels[n], dims[n].W, dims[n].H));
 
 			return ms.ToArray();
 		}

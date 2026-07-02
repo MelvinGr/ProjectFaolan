@@ -59,6 +59,31 @@ namespace Faolan.Tests
 			Assert.InRange(rgba[2], 42, 58);
 		}
 
+		[Theory]
+		[InlineData(64, 64)]
+		[InlineData(128, 32)]
+		public void EncodeDxt5_RoundTripsColourAndAlpha(int w, int h)
+		{
+			var src = GradientWithAlpha(w, h);
+
+			var fctx = FctxEncoder.Encode(src, w, h, "DXT5");
+
+			// includeSingleChannel:false path decodes DXT5 as colour; verify dims + colour, then check alpha survives.
+			Assert.True(FctxConverter.TryDecodeTopMip(fctx, out var rgba, out var dw, out var dh));
+			Assert.Equal((w, h), (dw, dh));
+
+			long colErr = 0, aErr = 0;
+			for (var i = 0; i < w * h; i++)
+			{
+				for (var c = 0; c < 3; c++)
+					colErr += Math.Abs(src[i * 4 + c] - rgba[i * 4 + c]);
+				aErr += Math.Abs(src[i * 4 + 3] - rgba[i * 4 + 3]);
+			}
+
+			Assert.True(colErr / (double)(w * h * 3) < 12, "DXT5 colour MAE too high");
+			Assert.True(aErr / (double)(w * h) < 12, "DXT5 alpha MAE too high");
+		}
+
 		[Fact]
 		public void WrapIOz1_RoundTripsThroughReader()
 		{
@@ -68,6 +93,15 @@ namespace Faolan.Tests
 			// The reader's IOz1 unwrap must recover the exact FCTX bytes (this is what RdbWriter inlines).
 			var unwrapped = RdbReader.UnwrapIOz1Public(wrapped);
 			Assert.Equal(fctx, unwrapped);
+		}
+
+		private static byte[] GradientWithAlpha(int w, int h)
+		{
+			var rgba = Gradient(w, h);
+			for (var y = 0; y < h; y++)
+			for (var x = 0; x < w; x++)
+				rgba[(y * w + x) * 4 + 3] = (byte)(x * 255 / Math.Max(1, w - 1)); // horizontal alpha ramp
+			return rgba;
 		}
 
 		private static byte[] Gradient(int w, int h)
