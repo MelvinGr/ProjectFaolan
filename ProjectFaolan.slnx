@@ -42,6 +42,7 @@
     <Project Path="Faolan.Core.Rdb/Faolan.Core.Rdb.csproj" />
     <Project Path="Faolan.Importer/Faolan.Importer.csproj" />
     <Project Path="Faolan.Mcp/Faolan.Mcp.csproj" />
+    <Project Path="Faolan.TestClient/Faolan.TestClient.csproj" />
     <Project Path="Faolan.Tests\Faolan.Tests.csproj" />
     <Project Path="Faolan.TextureUpscaler/Faolan.TextureUpscaler.csproj" />
     <Project Path="Faolan.Web.Content\Faolan.Web.Content.csproj" />
