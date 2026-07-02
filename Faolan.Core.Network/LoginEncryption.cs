@@ -24,12 +24,12 @@ namespace Faolan.Core.Network
 		// when a formatting pass reordered members).
 		public static BigInteger ServerPublic => BigInteger.ModPow(G, ServerPrivate, N);
 
+		// 1024-bit safe prime + generator, baked into the client.
 		private static readonly BigInteger N = ParseHex("eca2e8c85d863dcdc26a429a71a9815ad052f6139669dd659f98ae159d313d13c6bf2838e10a69b6478b64a24bd054ba" +
-		                                                "8248e8fa778703b418408249440b2c1edd28853e240d8a7e49540b76d120d3b1ad2878b1b99490eb4a2a5e84caa8a91c" + "ecbdb1aa7c816e8be343246f80c637abc653b893fd91686cf8d32d6cfe5f2a6f");
+		                                                "8248e8fa778703b418408249440b2c1edd28853e240d8a7e49540b76d120d3b1ad2878b1b99490eb4a2a5e84caa8a91c" +
+		                                                "ecbdb1aa7c816e8be343246f80c637abc653b893fd91686cf8d32d6cfe5f2a6f");
 
 		private static readonly BigInteger G = 5;
-
-		// 1024-bit safe prime + generator, baked into the client.
 
 		// Our (CellAO/Faolan) DH keypair. ServerPrivate stays server-side; ServerPublic is what gets patched into
 		// the client in place of Funcom's key (tools/patch_aoc_login_key.py / the FaolanLauncher).
