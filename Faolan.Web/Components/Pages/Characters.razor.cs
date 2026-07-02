@@ -30,7 +30,6 @@ namespace Faolan.Web.Components.Pages
 		// morphs are the decoded signed slider values (the unit CharacterBody stores / BodyMorphDeformer takes);
 		// _eHead is editor-2x units. Preview is a strict ad-hoc build (no fallback) - _editError shows why it failed.
 		private CharacterModelService.AppearanceOptions? _appOptions;
-		private bool _idleOn = true;
 		private bool _ownsSelected;
 		private bool _refreshThumbs;
 		private Character? _selected;
@@ -236,10 +235,7 @@ namespace Faolan.Web.Components.Pages
 				: "";
 			var url = $"/api/character/{_selected.Id}/model.glb?rig=1{hide}&t={DateTime.UtcNow.Ticks}";
 			if (_module != null)
-			{
 				await _module.InvokeVoidAsync("show", "char-canvas", url, keepCamera);
-				await _module.InvokeVoidAsync("setIdle", "char-canvas", _idleOn);
-			}
 
 			_status = "loaded";
 			StateHasChanged();
@@ -293,9 +289,10 @@ namespace Faolan.Web.Components.Pages
 			await Render();
 			if (_module != null)
 			{
-				// Build the per-joint pose sliders (in the floating pose Window; the Window components self-register their
-				// own drag), then render a 3D thumbnail into each equipped slot.
+				// Build the per-joint pose sliders + the authentic-animation dropdown (in the floating pose Window; the
+				// Window components self-register their own drag), then render a 3D thumbnail into each equipped slot.
 				await _module.InvokeVoidAsync("buildPoseControls", "char-canvas", "pose-controls");
+				await _module.InvokeVoidAsync("buildAnimationControls", "char-canvas", "anim-select");
 				await _module.InvokeVoidAsync("populateItemThumbs");
 			}
 		}
@@ -316,14 +313,6 @@ namespace Faolan.Web.Components.Pages
 				slot,
 				extra,
 				slot);
-		}
-
-		// Enable/disable the synthetic idle animation.
-		private async Task ToggleIdle(ChangeEventArgs e)
-		{
-			_idleOn = e.Value as bool? ?? true;
-			if (_module != null)
-				await _module.InvokeVoidAsync("setIdle", "char-canvas", _idleOn);
 		}
 
 		// Show/hide one equipped piece in the 3D render (per-slot paper-doll toggle). Keeps the camera so toggling doesn't

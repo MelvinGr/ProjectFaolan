@@ -355,9 +355,9 @@
     {
         <Window Title="Pose" Floating="true" Collapsed="true" Id="pose-window"
                 Style="bottom:1.25rem; right:1.25rem; width:15rem;">
-            <label class="idle-toggle">
-                <input type="checkbox" checked="@_idleOn" @onchange="ToggleIdle"/>
-                <span>Idle animation</span>
+            <label class="anim-select">
+                <span>Animation</span>
+                <select id="anim-select"></select>
             </label>
             <div class="tip-controls" id="pose-controls"></div>
         </Window>

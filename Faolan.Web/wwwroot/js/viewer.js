@@ -57,51 +57,30 @@ function setup(canvas) {
     window.addEventListener('resize', resize);
     resize();
 
+    state.clock = new THREE.Clock();
     (function loop() {
         requestAnimationFrame(loop);
         resize();
         controls.update();
-        if (state.skinned && state.idle !== false) applyIdle(state, performance.now() / 1000);
+        const dt = state.clock.getDelta();
+        // An authentic ANIMSYS clip (if one is selected) drives the rig via its mixer; otherwise hold the bind+pose.
+        if (state.mixer) state.mixer.update(dt);
         renderer.render(scene, camera);
     })();
 
     return state;
 }
 
-// A subtle synthetic idle (breathing + weight-shift) layered on the bind+pose each frame. This is NOT a retail clip -
-// the authentic movement_idle keyframes live in the RDB ANIMSYS 'LMXB' container (type 1010511; e.g. skeleton 14853 ->
-// eunuch_idle2 clip 14906), which is a proprietary property-tree/curve format still to be decoded (#275 follow-up). The
-// breathing period (4s) mirrors the retail movement_idle duration. No-op unless the model is a skinned rig.
-const IDLE_AXES = {pitch: [1, 0, 0], yaw: [0, 1, 0], roll: [0, 0, 1]};
-
-function idleRot(byName, name, axis, deg) {
-    const b = byName.get(name);
-    if (!b || !deg) return;
-    b.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(...axis), deg * Math.PI / 180));
-}
-
-function applyIdle(state, t) {
-    applyPose(state); // reset to bind + slider pose, then layer the idle on top
-    const byName = new Map(state.skinned.skeleton.bones.map(b => [b.name, b]));
-    const TAU = Math.PI * 2;
-    const breathe = Math.sin(t * TAU / 4.0);   // chest rise/fall, 4s (retail movement_idle duration)
-    const sway = Math.sin(t * TAU / 7.3);       // slow weight shift side to side
-    const drift = Math.sin(t * TAU / 9.1);      // slow head/gaze drift
-
-    // Breathing: expand the chest and let the shoulders lift a touch on the in-breath; the neck counter-rotates so the
-    // head stays level rather than nodding with the ribcage.
-    idleRot(byName, 'rig_bone_Spine1', IDLE_AXES.pitch, breathe * 0.9 - 0.3);
-    idleRot(byName, 'rig_bone_Spine2', IDLE_AXES.pitch, breathe * 0.8);
-    idleRot(byName, 'rig_bone_Neck', IDLE_AXES.pitch, -breathe * 0.7);
-    idleRot(byName, 'rig_bone_LeftShoulder', IDLE_AXES.pitch, breathe * 0.6);
-    idleRot(byName, 'rig_bone_RightShoulder', IDLE_AXES.pitch, breathe * 0.6);
-
-    // Weight shift: a gentle sway through the hips + a counter-lean in the lower spine so it reads as balance, not a lean.
-    idleRot(byName, 'rig_bone_Hips', IDLE_AXES.roll, sway * 0.8);
-    idleRot(byName, 'rig_bone_Spine', IDLE_AXES.roll, -sway * 0.6);
-
-    // Slow gaze drift.
-    idleRot(byName, 'rig_bone_Head', IDLE_AXES.yaw, drift * 1.6);
+// Build a THREE.AnimationClip from a decoded clip (/api/animation/{rdbname}.json): per bone, a translation (vec3) and
+// rotation (quaternion) keyframe track keyed on the bone's node name, which matches the rig's rig_bone_* nodes so the
+// AnimationMixer binds them automatically. Authentic RDB curves (#292) - replaces the old synthetic idle.
+function buildClip(json) {
+    const tracks = [];
+    for (const b of json.bones) {
+        if (b.rotTimes.length) tracks.push(new THREE.QuaternionKeyframeTrack(b.bone + '.quaternion', b.rotTimes, b.rot));
+        if (b.posTimes.length) tracks.push(new THREE.VectorKeyframeTrack(b.bone + '.position', b.posTimes, b.pos));
+    }
+    return new THREE.AnimationClip('clip_' + json.rdbname, json.duration, tracks);
 }
 
 // Load (or reload) a glb URL into the named canvas. Frames the camera to the model unless keepCamera is set (the
@@ -132,6 +111,8 @@ export async function show(canvasId, url, keepCamera) {
         state.scene.remove(state.model);
         state.model = null;
     }
+    // Drop any mixer bound to the outgoing model; it's re-created below if a clip was selected.
+    state.mixer = null;
 
     const model = gltf.scene;
 
@@ -190,6 +171,9 @@ export async function show(canvasId, url, keepCamera) {
         state.camera.position.set(0, cy, dist);
     }
     state.controls.update();
+
+    // Re-apply a selected clip across a model reload (gear toggle / appearance edit) so it keeps playing.
+    if (state.selectedAnim) playAnimation(canvasId, state.selectedAnim);
     return null;
 }
 
@@ -259,14 +243,73 @@ function applyPose(state) {
     }
 }
 
-// Enable/disable the synthetic idle animation for a canvas. When turned off, snap the rig back to its bind+pose so
-// it holds still instead of freezing mid-breath.
-export function setIdle(canvasId, on) {
+// Play an authentic ANIMSYS clip on the rig (by rdbname). Fetches /api/animation/{rdbname}.json, builds a looping
+// THREE.AnimationClip, and drives it via an AnimationMixer rooted at the model (binds to the rig_bone_* nodes by
+// name). rdbname 0 / falsy stops playback and returns to the bind+pose. Remembers the choice so a model reload
+// (gear toggle, appearance edit) re-applies it. Returns null on success or an error string.
+export async function playAnimation(canvasId, rdbname) {
     const state = states.get(canvasId);
-    if (!state) return false;
-    state.idle = !!on;
-    if (!state.idle && state.skinned) applyPose(state);
-    return true;
+    if (!state) return 'no viewer';
+    state.selectedAnim = rdbname || 0;
+
+    if (!rdbname) return stopAnimation(canvasId);
+    if (!state.skinned) return 'model is not a rig';
+
+    let json;
+    try {
+        const r = await fetch('/api/animation/' + rdbname + '.json');
+        if (!r.ok) return 'clip ' + rdbname + ' unavailable (' + r.status + ')';
+        json = await r.json();
+    } catch (e) {
+        return 'clip fetch failed';
+    }
+    // A late response for a since-changed selection must not hijack the current one.
+    if (state.selectedAnim !== rdbname) return null;
+
+    state.mixer = new THREE.AnimationMixer(state.model);
+    state.mixer.clipAction(buildClip(json)).reset().play();
+    return null;
+}
+
+// Stop any playing clip and hold the bind + slider pose.
+export function stopAnimation(canvasId) {
+    const state = states.get(canvasId);
+    if (!state) return 'no viewer';
+    state.selectedAnim = 0;
+    if (state.mixer) {
+        state.mixer.stopAllAction();
+        state.mixer = null;
+    }
+    if (state.skinned) applyPose(state);
+    return null;
+}
+
+// Populate a <select> with the skeleton's authentic clips (/api/animations) and wire it to play the chosen one. The
+// first option is "none" (bind pose). Rebuilt on each character select; JS owns the element (no Blazor round-trip).
+export async function buildAnimationControls(canvasId, selectId, skeleton) {
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    sel.innerHTML = '';
+    const none = document.createElement('option');
+    none.value = '0';
+    none.textContent = '— none (bind pose) —';
+    sel.append(none);
+
+    let clips = [];
+    try {
+        const r = await fetch('/api/animations' + (skeleton ? '?skeleton=' + skeleton : ''));
+        if (r.ok) clips = await r.json();
+    } catch {
+    }
+    for (const c of clips) {
+        const o = document.createElement('option');
+        o.value = c.rdbname;
+        o.textContent = c.name + '  (' + c.duration.toFixed(1) + 's)';
+        sel.append(o);
+    }
+
+    sel.value = '0';
+    sel.onchange = () => playAnimation(canvasId, +sel.value);
 }
 
 // Set one pose control to `deg` degrees (0 = rest). Driven by the per-joint sliders.

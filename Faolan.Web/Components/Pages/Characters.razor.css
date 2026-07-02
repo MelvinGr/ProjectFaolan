@@ -767,6 +767,28 @@
     cursor: pointer;
 }
 
+/* Authentic-animation dropdown (top of the pose window). */
+.anim-select {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    font-size: .72rem;
+    color: #c9c2ab;
+    margin-bottom: .5rem;
+    user-select: none;
+}
+
+.anim-select select {
+    flex: 1;
+    min-width: 0;
+    background: #26282e;
+    color: #e8e2cf;
+    border: 1px solid #3a3d45;
+    border-radius: .25rem;
+    padding: .15rem .3rem;
+    font-size: .72rem;
+}
+
 /* Per-slot show/hide-in-render toggle (top-right of an equipped paper-doll slot). ● shown, ○ hidden. */
 .slot-hide {
     position: absolute;

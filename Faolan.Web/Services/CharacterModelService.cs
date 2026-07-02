@@ -425,6 +425,38 @@ namespace Faolan.Web.Services
 			}
 		}
 
+		// The authentic ANIMSYS clips available for a skeleton (#292), for the viewer's animation dropdown. Defaults to
+		// the humanoid rig the viewer skins to; CDN-only clips resolve through the ContentMirror via Reader(). Returns
+		// (name, rdbname, duration) sorted by name.
+		public IReadOnlyList<AnimationCatalog.ClipInfo> ListAnimations(uint? skeletonId = null)
+		{
+			return RdbAvailable
+				? AnimationCatalog.ListClips(Reader(), skeletonId ?? RdbAssetExtractor.HumanoidSkeletonId)
+				: [];
+		}
+
+		// One clip's decoded keyframes (type 1010003, by rdbname), shaped for the viewer to build THREE.KeyframeTracks:
+		// per-bone position (vec3) + rotation (quat xyzw) with their key times (seconds). Null if unavailable/variant.
+		public object? GetAnimation(uint rdbname)
+		{
+			if (!RdbAvailable || AnimationCatalog.DecodeClip(Reader(), rdbname) is not { } clip)
+				return null;
+
+			return new
+			{
+				rdbname = clip.Rdbname,
+				duration = clip.Duration,
+				bones = clip.Bones.Select(b => new
+				{
+					bone = b.Bone,
+					posTimes = b.PosTimes,
+					pos = b.Pos,
+					rotTimes = b.RotTimes,
+					rot = b.Rot
+				})
+			};
+		}
+
 		// The character's CURRENT appearance selections, to seed the editor when a character is opened: the 7 body
 		// morphs, the head (editor 2x units), and the chosen resource ref in each render-role category (or "" = none).
 		public AppearanceCurrent GetCurrentAppearance(uint characterId)

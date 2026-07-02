@@ -208,6 +208,22 @@ namespace Faolan.Web
 			// from the Blazor component - no open write endpoint.)
 			app.MapGet("/api/appearance/options", (Sex sex, Race race, CharacterModelService models) => Results.Json(models.GetAppearanceOptions(sex, race)));
 
+			// Authentic ANIMSYS clips for the viewer's animation dropdown (#292). ?skeleton=ID overrides the default
+			// humanoid rig. Returns [{name, rdbname, duration}] sorted by name.
+			app.MapGet("/api/animations", (uint? skeleton, CharacterModelService models) => Results.Json(models.ListAnimations(skeleton)));
+
+			// One clip's decoded keyframes (by rdbname), for THREE.AnimationClip. CDN-only clips resolve via the mirror.
+			app.MapGet("/api/animation/{rdbname:long}.json",
+				(long rdbname, HttpContext ctx, CharacterModelService models) =>
+				{
+					var clip = models.GetAnimation((uint)rdbname);
+					if (clip == null)
+						return Results.NotFound();
+
+					CacheADay(ctx);
+					return Results.Json(clip);
+				});
+
 			// Wearable armour-set catalogue (optionally filtered by ?sex=Female/Male), for the viewer's wardrobe picker.
 			app.MapGet("/api/armorsets",
 				(Sex? sex, CharacterModelService models) => Results.Json(models
