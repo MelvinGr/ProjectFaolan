@@ -22,16 +22,35 @@ namespace Faolan.Core.Rdb.Assets
 				return null;
 
 			var fourCc = Encoding.ASCII.GetString(payload, 20, 4);
-			if (fourCc != "DXT1" && fourCc != "DXT5")
-				return null; // MIXD/DXT3/unknown - not yet re-encodable
+			var resample = upscale ?? Bilinear;
 
-			if (!FctxConverter.TryDecodeTopMip(payload, out var rgba, out var w, out var h))
+			if (fourCc == "MIXD")
+			{
+				// Normal + detail sub-textures, both upscaled; seg1 is regenerated as zero-padding (BC5-path only).
+				if (!FctxConverter.TryDecodeMixdNormal(payload, out var nrm, out var w, out var h) ||
+				    !FctxConverter.TryDecodeTopMip(payload, out var det, out _, out _, includeSingleChannel: true))
+					return null;
+
+				var nw = w * scale;
+				var nh = h * scale;
+				var upN = resample(nrm, w, h, nw, nh);
+				var upDrgba = resample(det, w, h, nw, nh);
+				var upD = new byte[nw * nh];
+				for (var i = 0; i < nw * nh; i++)
+					upD[i] = upDrgba[i * 4]; // detail is single-channel (decoded to R)
+				return FctxEncoder.WrapIOz1(FctxEncoder.EncodeMixd(upN, upD, nw, nh));
+			}
+
+			if (fourCc != "DXT1" && fourCc != "DXT5")
+				return null; // DXT3/unknown - not re-encodable
+
+			if (!FctxConverter.TryDecodeTopMip(payload, out var rgba, out var cw, out var ch))
 				return null;
 
-			var nw = w * scale;
-			var nh = h * scale;
-			var up = (upscale ?? Bilinear)(rgba, w, h, nw, nh);
-			return FctxEncoder.WrapIOz1(FctxEncoder.Encode(up, nw, nh, fourCc));
+			var cnw = cw * scale;
+			var cnh = ch * scale;
+			var up = resample(rgba, cw, ch, cnw, cnh);
+			return FctxEncoder.WrapIOz1(FctxEncoder.Encode(up, cnw, cnh, fourCc));
 		}
 
 		// Bilinear resample RGBA32 (row-major, top-down) from (sw,sh) to (dw,dh).

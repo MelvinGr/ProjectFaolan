@@ -73,6 +73,36 @@ namespace Faolan.Core.Rdb.Assets
 			return outp;
 		}
 
+		// RGBA32 normal map (R=X, G=Y) → BC5/ATI2 blocks (16 bytes / 4×4 tile: X interp block then Y interp block).
+		// The inverse of BcDecoder.DecodeBc5Normal (which reconstructs Z). For the MIXD normal sub-texture.
+		public static byte[] EncodeBc5(ReadOnlySpan<byte> rgba, int width, int height)
+		{
+			var (bw, bh) = Blocks(width, height);
+			var outp = new byte[bw * bh * 16];
+			var o = 0;
+			Span<byte> xs = stackalloc byte[16];
+			Span<byte> ys = stackalloc byte[16];
+			for (var by = 0; by < bh; by++)
+			for (var bx = 0; bx < bw; bx++)
+			{
+				for (var py = 0; py < 4; py++)
+				for (var px = 0; px < 4; px++)
+				{
+					var x = Math.Min(bx * 4 + px, width - 1);
+					var y = Math.Min(by * 4 + py, height - 1);
+					var si = (y * width + x) * 4;
+					xs[py * 4 + px] = rgba[si];     // R = normal X
+					ys[py * 4 + px] = rgba[si + 1]; // G = normal Y
+				}
+
+				EncodeInterpBlock(xs, outp.AsSpan(o, 8));
+				EncodeInterpBlock(ys, outp.AsSpan(o + 8, 8));
+				o += 16;
+			}
+
+			return outp;
+		}
+
 		private static (int, int) Blocks(int w, int h)
 		{
 			return (Math.Max(1, (w + 3) / 4), Math.Max(1, (h + 3) / 4));

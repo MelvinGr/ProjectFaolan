@@ -85,6 +85,56 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void EncodeBc5_RoundTripsNormalXY()
+		{
+			int w = 64, h = 64;
+			var normal = NormalMap(w, h);
+
+			var bc5 = BcEncoder.EncodeBc5(normal, w, h);
+			var back = BcDecoder.DecodeBc5Normal(bc5, w, h);
+
+			long xErr = 0, yErr = 0;
+			for (var i = 0; i < w * h; i++)
+			{
+				xErr += Math.Abs(normal[i * 4] - back[i * 4]);
+				yErr += Math.Abs(normal[i * 4 + 1] - back[i * 4 + 1]);
+			}
+
+			Assert.True(xErr / (double)(w * h) < 10, "BC5 X MAE too high");
+			Assert.True(yErr / (double)(w * h) < 10, "BC5 Y MAE too high");
+		}
+
+		[Fact]
+		public void EncodeMixd_RoundTripsNormalAndDetail()
+		{
+			int w = 64, h = 64;
+			var normal = NormalMap(w, h);
+			var detail = new byte[w * h];
+			for (var y = 0; y < h; y++)
+			for (var x = 0; x < w; x++)
+				detail[y * w + x] = (byte)((x ^ y) & 0xff);
+
+			var mixd = FctxEncoder.EncodeMixd(normal, detail, w, h);
+			Assert.True(FctxConverter.IsFctx(mixd));
+
+			// Normal: TryDecodeMixdNormal reads the top BC5 mip (before the ATI1 tag).
+			Assert.True(FctxConverter.TryDecodeMixdNormal(mixd, out var nrm, out var nw, out var nh));
+			Assert.Equal((w, h), (nw, nh));
+			long nErr = 0;
+			for (var i = 0; i < w * h; i++)
+				nErr += Math.Abs(normal[i * 4] - nrm[i * 4]) + Math.Abs(normal[i * 4 + 1] - nrm[i * 4 + 1]);
+			Assert.True(nErr / (double)(w * h * 2) < 10, "MIXD normal MAE too high");
+
+			// Detail: TryDecodeTopMip(includeSingleChannel) routes MIXD to the ATI1/BC4 detail.
+			Assert.True(FctxConverter.TryDecodeTopMip(mixd, out var det, out var dw, out var dh, includeSingleChannel: true));
+			Assert.Equal((w, h), (dw, dh));
+			long dErr = 0;
+			for (var i = 0; i < w * h; i++)
+				dErr += Math.Abs(detail[i] - det[i * 4]); // detail decoded as grayscale (R=value)
+			Assert.True(dErr / (double)(w * h) < 12, "MIXD detail MAE too high");
+		}
+
+		[Fact]
 		public void WrapIOz1_RoundTripsThroughReader()
 		{
 			var fctx = FctxEncoder.EncodeDxt1(Gradient(32, 32), 32, 32);
@@ -93,6 +143,23 @@ namespace Faolan.Tests
 			// The reader's IOz1 unwrap must recover the exact FCTX bytes (this is what RdbWriter inlines).
 			var unwrapped = RdbReader.UnwrapIOz1Public(wrapped);
 			Assert.Equal(fctx, unwrapped);
+		}
+
+		private static byte[] NormalMap(int w, int h)
+		{
+			// A smooth tangent-space normal field (R=X, G=Y around 128 = flat, gently varying).
+			var rgba = new byte[w * h * 4];
+			for (var y = 0; y < h; y++)
+			for (var x = 0; x < w; x++)
+			{
+				var i = (y * w + x) * 4;
+				rgba[i] = (byte)(128 + 60 * Math.Sin(x * 0.2));     // X
+				rgba[i + 1] = (byte)(128 + 60 * Math.Sin(y * 0.2)); // Y
+				rgba[i + 2] = 255;                                  // Z (reconstructed on decode)
+				rgba[i + 3] = 255;
+			}
+
+			return rgba;
 		}
 
 		private static byte[] GradientWithAlpha(int w, int h)
