@@ -21,8 +21,9 @@ namespace Faolan.Web.Components.Pages
 		private static readonly string[] RightSlots = ["Hands", "Belt", "Boots", "Ring L", "Ring R"];
 		private static readonly string[] WeaponSlots = ["Main Hand", "Off Hand", "Ranged", "Tokens", "Bag"];
 
-		// Viewer toggles: which equipment slots are hidden from the 3D render, and whether the synthetic idle plays.
-		// (Each floating Window component owns its own collapse state + drag registration.)
+		// Which equipment slots are hidden from the 3D render (the per-slot paper-doll toggle). The animation
+		// dropdown + pose sliders are owned client-side by viewer.js. (Each floating Window component owns its own
+		// collapse state + drag registration.)
 		private readonly HashSet<string> _hiddenSlots = [];
 
 		// --- Appearance editor (floating window) -------------------------------------------------------------
