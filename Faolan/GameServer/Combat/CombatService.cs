@@ -449,6 +449,20 @@ namespace Faolan.GameServer.Combat
 		private async Task PushLevelUp(INetworkClient killer, Character character, uint levelsGained)
 		{
 			var instance = killer.Session.Account.ClientInstance;
+
+			// The level-up EVENT first (0x6D314743) - fires the client's "reached level N" banner + effect (#209);
+			// retail sends a SEPARATE event PER level ahead of the AttributeChanged lines (combat-levelup frame 9937,
+			// and Hoxxling's L2/L3/L4 as three), each carrying [level, currentXP, xpThisLevel, xpNextLevel, 1, 8, 0].
+			var fromLevel = character.Level - levelsGained;
+			for (var lvl = fromLevel + 1; lvl <= character.Level; lvl++)
+			{
+				var thisXp = LevelingResolver.CumulativeXpForLevel(lvl);
+				var nextXp = LevelingResolver.CumulativeXpForLevel(lvl + 1);
+				var currentXp = lvl == character.Level ? thisXp + character.Experience : thisXp;
+				ReadOnlySpan<uint> deltas = [currentXp, thisXp, nextXp, 1u, 8u, 0u];
+				await SendWorldFeedback(killer, NewLevelIirCodec.Build(instance, lvl, deltas));
+			}
+
 			foreach (var (attributeId, amount) in AttributeGrowth.ForLevelGain(character.Class, character.Level, levelsGained))
 				await SendWorldFeedback(killer, AttributeChangedFeedback.Build(instance, attributeId, amount));
 

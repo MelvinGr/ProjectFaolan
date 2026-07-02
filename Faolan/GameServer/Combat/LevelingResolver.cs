@@ -38,5 +38,18 @@ namespace Faolan.GameServer.Combat
 				: level;
 			return 100u * l;
 		}
+
+		// Running-total experience needed to have REACHED `level` (sum of every XpForNextLevel below it). The
+		// NewLevelIIR level-up summary carries cumulative XP (retail's field 2/3 are the this-level/next-level
+		// thresholds), so this projects our within-level curve onto that running-total form. (Retail's real
+		// thresholds differ - our curve is the provisional #24 ramp - but they stay self-consistent with the
+		// Exp/MaxExp stat push.) Cumulative(1)=0, (2)=100, (3)=300, ...
+		public static uint CumulativeXpForLevel(uint level)
+		{
+			var l = level == 0
+				? 1u
+				: level;
+			return 100u * (l - 1) * l / 2;
+		}
 	}
 }

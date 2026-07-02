@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Network;
@@ -40,6 +41,29 @@ namespace Faolan.GameServer
 			ps.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), (ushort)0x2000);
 			ps.WriteArray(body);
 			await ps.SendAsync(client);
+		}
+
+		// Emits the retail level-up dings: ONE NewLevelIIR_t (0x6D314743) per level gained - the event that fires the
+		// client's "Congratulations, you have reached level N!" banner + the level-up visual/audio effect (#209). The
+		// banner text is client-side and gated on this packet; the raw Level stat + AttributeChanged lines alone show
+		// nothing. Retail sends a SEPARATE event per level (Hoxxling dinged L2/L3/L4 as three, frames 9937->), each
+		// carrying [newLevel, currentXP, xpThisLevel, xpNextLevel, 1, 8, 0] (fields 5/6/7 constant across every
+		// capture). Sent before the AttributeChanged burst (combat-levelup capture ordering).
+		private async Task SendLevelUpDings(INetworkClient client, uint fromLevel, uint toLevel, uint finalRemainingXp)
+		{
+			var instance = client.Session.Account.ClientInstance;
+			for (var lvl = fromLevel + 1; lvl <= toLevel; lvl++)
+			{
+				var thisXp = LevelingResolver.CumulativeXpForLevel(lvl);
+				var nextXp = LevelingResolver.CumulativeXpForLevel(lvl + 1);
+				var currentXp = lvl == toLevel ? thisXp + finalRemainingXp : thisXp; // only the final level carries partial XP
+				ReadOnlySpan<uint> deltas = [currentXp, thisXp, nextXp, 1u, 8u, 0u];
+
+				var ps = new PacketStream();
+				ps.WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), (ushort)0x2000);
+				ps.WriteArray(NewLevelIirCodec.Build(instance, lvl, deltas));
+				await ps.SendAsync(client);
+			}
 		}
 
 		// Emits the level-up attribute feedback: one AttributeChanged/Increased on-screen line per primary attribute

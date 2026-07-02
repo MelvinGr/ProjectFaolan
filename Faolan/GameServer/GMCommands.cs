@@ -1176,6 +1176,11 @@ namespace Faolan.GameServer
 
 			var previousLevel = character.Level;
 			character.Level = level;
+			// A GM `.level` set jumps to the START of the target level, so zero the within-level XP: otherwise stale
+			// progress from a higher level shows against the (smaller) new MaxExp and the XP bar renders NEGATIVE on a
+			// level-DOWN (the bar's fill = Exp/MaxExp with Exp > MaxExp, or Exp for a level whose threshold is now below
+			// the carried total). Fresh level = empty bar.
+			character.Experience = 0;
 			character.RegenerateMaxStats();
 			await Database.SaveCharacter(character);
 
@@ -1189,6 +1194,9 @@ namespace Faolan.GameServer
 			// the change shows the same as an XP-driven ding (#209); the vitals push above already raised the maxima.
 			if (level > previousLevel)
 			{
+				// One NewLevelIIR ding per level gained first (fires the client's "reached level N" banner + effect),
+				// THEN the per-attribute AttributeChanged lines - retail's order (combat-levelup capture 9937->9939).
+				await SendLevelUpDings(client, previousLevel, level, character.Experience);
 				await SendLevelUpFeedback(client, level, (uint)(level - previousLevel));
 
 				// Level-gated ability unlocks, announced - same as the XP-driven ding (CombatService.PushLevelUp):
