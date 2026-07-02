@@ -114,8 +114,12 @@ internal class Program
 			Console.WriteLine($"DRY-RUN: would inline {blobs.Count} textures ({color} colour, {mixd} MIXD), {skipped} skipped, {failed} failed.");
 		else
 		{
-			var n = RdbWriter.InlineEntries(opt.Rdb, opt.DataFile, blobs);
-			Console.WriteLine($"inlined {n} textures ({color} colour, {mixd} MIXD) into {opt.DataFile:D2}.rdbdata; {skipped} skipped, {failed} failed. le.idx backup: le.idx.faolan-bak");
+			var results = RdbWriter.InlineEntries(opt.Rdb, opt.DataFile, blobs);
+			Console.WriteLine($"inlined {results.Count} textures ({color} colour, {mixd} MIXD) into {opt.DataFile:D2}.rdbdata; {skipped} skipped, {failed} failed. le.idx backup: le.idx.faolan-bak");
+			// #295: also update RDBHashIndex.bin so the client's startup content-validation accepts the replaced blobs
+			// (their bytes/hash changed) instead of re-downloading them and reverting le.idx before world-load.
+			var patched = RdbManifestWriter.Patch(opt.Rdb, results);
+			Console.WriteLine($"patched {patched} manifest records in RDBHashIndex.bin ({results.Count} resources). backup: RDBHashIndex.bin.faolan-bak");
 		}
 
 		return 0;
