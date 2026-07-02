@@ -17,6 +17,10 @@ namespace Faolan.Core.Rdb.Assets
 			var blocksW = Math.Max(1, (width + 3) / 4);
 			var blocksH = Math.Max(1, (height + 3) / 4);
 
+			// Hoisted out of the block loop: a per-iteration stackalloc never frees until the method returns, so a
+			// large (e.g. 4x-upscaled) texture's block count overflows the stack. The buffer is fully rewritten each
+			// block (DecodeAlphaBlock writes all 16), so reuse is safe.
+			Span<byte> alpha = stackalloc byte[16];
 			var p = 0;
 			for (var by = 0; by < blocksH; by++)
 			for (var bx = 0; bx < blocksW; bx++)
@@ -24,7 +28,6 @@ namespace Faolan.Core.Rdb.Assets
 				if (p + blockBytes > blocks.Length)
 					return rgba;
 
-				Span<byte> alpha = stackalloc byte[16];
 				if (bc3)
 				{
 					DecodeAlphaBlock(blocks.Slice(p, 8), alpha);
@@ -48,6 +51,8 @@ namespace Faolan.Core.Rdb.Assets
 			var blocksW = Math.Max(1, (width + 3) / 4);
 			var blocksH = Math.Max(1, (height + 3) / 4);
 
+			// Hoisted out of the loop (see Decode): reused each block, fully rewritten by DecodeAlphaBlock.
+			Span<byte> vals = stackalloc byte[16];
 			var p = 0;
 			for (var by = 0; by < blocksH; by++)
 			for (var bx = 0; bx < blocksW; bx++)
@@ -55,7 +60,6 @@ namespace Faolan.Core.Rdb.Assets
 				if (p + 8 > blocks.Length)
 					return rgba;
 
-				Span<byte> vals = stackalloc byte[16];
 				DecodeAlphaBlock(blocks.Slice(p, 8), vals);
 				for (var i = 0; i < 16; i++)
 				{
@@ -84,6 +88,9 @@ namespace Faolan.Core.Rdb.Assets
 			var blocksW = Math.Max(1, (width + 3) / 4);
 			var blocksH = Math.Max(1, (height + 3) / 4);
 
+			// Hoisted out of the loop (see Decode): both reused each block, fully rewritten by DecodeAlphaBlock.
+			Span<byte> xs = stackalloc byte[16];
+			Span<byte> ys = stackalloc byte[16];
 			var p = 0;
 			for (var by = 0; by < blocksH; by++)
 			for (var bx = 0; bx < blocksW; bx++)
@@ -91,8 +98,6 @@ namespace Faolan.Core.Rdb.Assets
 				if (p + 16 > blocks.Length)
 					return rgba;
 
-				Span<byte> xs = stackalloc byte[16];
-				Span<byte> ys = stackalloc byte[16];
 				DecodeAlphaBlock(blocks.Slice(p, 8), xs);
 				DecodeAlphaBlock(blocks.Slice(p + 8, 8), ys);
 				for (var i = 0; i < 16; i++)
