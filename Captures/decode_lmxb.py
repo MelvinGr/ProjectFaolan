@@ -42,6 +42,11 @@ RDB = os.environ.get("AOC_RDB", "/mnt/btrfs/@games/debian-installation/steamapps
 
 
 class Rdb:
+    # On-demand (file==0xff) entries live on the UPM CDN, content-addressed by the entry's 16-byte md5. When
+    # Faolan.Web.Content (the store-and-forward mirror) is running, fetch them through it - same scheme the C#
+    # RdbReader.FetchCdn / RdbCdnCache use: <mirror>/gameupdate/upm/rdb/res/<h0:2>/<h2:1>/<h3:>.
+    MIRROR = os.environ.get("AOC_MIRROR", "http://127.0.0.1:7081")
+
     def __init__(self, d=RDB):
         b = open(os.path.join(d, "le.idx"), "rb").read()
         assert b[:4] == b"IBDR"
@@ -51,20 +56,36 @@ class Rdb:
         idx, det = 28, 28 + n * 8
         self.dir = d
         self.bykey = {}
+        self.hash = {}
         for i in range(n):
             t, eid = struct.unpack_from("<II", b, idx + i * 8)
             o = det + i * stride
             self.bykey[(t, eid)] = (b[o] & 0xff, *struct.unpack_from("<II", b, o + 4))
+            self.hash[(t, eid)] = b[o + 28:o + 44]
         self._fh = {}
+
+    @staticmethod
+    def _unwrap(r):
+        return zlib.decompress(r[8:]) if r[:4] == b"IOz1" else r
 
     def dec(self, t, eid):
         f, off, size = self.bykey[(t, eid)]
         if f == 0xff:
-            return None
+            return self._fetch_cdn(t, eid)
         fh = self._fh.get(f) or self._fh.setdefault(f, open(os.path.join(self.dir, f"{f:02d}.rdbdata"), "rb"))
         fh.seek(off)
-        r = fh.read(size)
-        return zlib.decompress(r[8:]) if r[:4] == b"IOz1" else r
+        return self._unwrap(fh.read(size))
+
+    def _fetch_cdn(self, t, eid):
+        import urllib.request
+        h = self.hash[(t, eid)].hex()
+        url = f"{self.MIRROR}/gameupdate/upm/rdb/res/{h[:2]}/{h[2:3]}/{h[3:]}"
+        try:
+            with urllib.request.urlopen(url, timeout=60) as resp:
+                return self._unwrap(resp.read())
+        except Exception as e:
+            print(f"  [cdn miss for ({t},{eid}) {url}: {e}]", file=sys.stderr)
+            return None
 
 
 class Lmxb:
