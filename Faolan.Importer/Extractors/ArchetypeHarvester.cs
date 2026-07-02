@@ -1,10 +1,12 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.IO;
 using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
+using Faolan.Core.Network.Packets.Opcodes;
 using Faolan.Core.Network.Protobuf;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.GameServer.Spawn;
@@ -23,6 +25,7 @@ namespace Faolan.Importer.Extractors
 	public static class ArchetypeHarvester
 	{
 		private const uint InventorySubOpcode = 0x737A6DF9;
+		private const uint BankIirSubOpcode = (uint)GameServer0X2000RespondsOpcodes.BankIIR; // 0x0BA1C1CB - same framing
 
 		// Parses one on-wire packet and merges every (templateId -> CapturedItem) it can recover - from an inventory
 		// snapshot's containers AND/OR a character spawn's worn equipment - into `into`. Conflicting identities for the
@@ -87,8 +90,21 @@ namespace Faolan.Importer.Extractors
 				// not a parseable add-item packet
 			}
 
-			foreach (var (template, item) in found)
-			{
+			// Sixth source: the personal BANK (BankIIR 0x0BA1C1CB). Unlike the world-entry snapshot (a multi-container
+				// root), the bank packet carries a SINGLE container blob (kind 105) after [c350][instance][u8 env][u32 len];
+				// its field-4 entries are the stashed items in the same InventoryListEntry codec. This is the ONLY source
+				// that reaches items a character merely STASHED (crafting mats/food/spare gear - never worn, vended, looted).
+				try
+				{
+					ExtractFromBankIir(packetBytes, found);
+				}
+				catch
+				{
+					// not a parseable bank packet
+				}
+
+				foreach (var (template, item) in found)
+				{
 				if (into.TryGetValue(template, out var existing))
 				{
 					if (!existing.Equals(item))
@@ -168,6 +184,41 @@ namespace Faolan.Importer.Extractors
 			}
 		}
 
+		// Recovers (template -> CapturedItem) from a BankIIR (0x0BA1C1CB) - the personal bank, delivered on-demand
+		// (protocol_bank_storage). Body after the sub-opcode is [u32 c350][u32 instance][u8 env=01][u32 len][blob],
+		// where blob is a SINGLE ProtoInventoryGame container (kind 105 = ContainerKind.Bank) whose field-4 entries
+		// use the same InventoryListEntry codec as the snapshot. Bank entries carry a real archetype, so banked-only
+		// items become buildable too. Identity only - the bank holds every kind in one container, so no type stamp.
+		private static void ExtractFromBankIir(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
+		{
+			var packet = new ConanPacket(packetBytes);
+			if (packet.Opcode != 0x2000)
+				return;
+
+			var body = new FaolanStream(packet.Body.ReadArrayUInt32Length());
+			if (body.ReadUInt32() != BankIirSubOpcode)
+				return;
+
+			body.ReadUInt32(); // c350
+			body.ReadUInt32(); // instance
+			body.ReadByte();   // env marker (0x01)
+			var blob = body.ReadArrayUInt32Length();
+
+			using var ms = new MemoryStream(blob, false);
+			var container = ProtoMessage.Parse(ms);
+			if (InventorySnapshotInspector.GetContainerKind(container) != (ulong)InventorySnapshotInspector.ContainerKind.Bank)
+				return;
+
+			foreach (var entry in InventorySnapshotInspector.GetContainerEntries(container))
+			{
+				var template = InventorySnapshotInspector.GetEntryTemplateId(entry);
+				var quad = InventorySnapshotInspector.GetEntryIdentityQuad(entry);
+				var archetype = InventorySnapshotInspector.GetEntryArchetype(entry);
+				if (template.HasValue && quad.HasValue)
+					into.TryAdd(template.Value, new CapturedItem(quad.Value.Data1, quad.Value.Data2, quad.Value.Data3, quad.Value.Data4, archetype ?? 0));
+			}
+		}
+
 		// `types` (optional) receives the item's classification from the container it was found in - only the
 		// specific kinds (Quest/Resource) are recorded; Normal items are left to the DB default. Kept separate from
 		// CapturedItem so the identity quad's equality (the conflict check) is unaffected.
@@ -189,7 +240,9 @@ namespace Faolan.Importer.Extractors
 					if (template.HasValue && archetype.HasValue && quad.HasValue)
 					{
 						map[template.Value] = new CapturedItem(quad.Value.Data1, quad.Value.Data2, quad.Value.Data3, quad.Value.Data4, archetype.Value);
-						if (types != null && itemType != ItemType.Normal)
+						// Only classify from a container whose kind IS a real ItemType (Resource/Quest); the Bank (105)
+						// holds items of every kind in one container, so it must NOT stamp a type - leave the DB default.
+						if (types != null && itemType != ItemType.Normal && Enum.IsDefined(typeof(ItemType), itemType))
 							types[template.Value] = itemType;
 					}
 				}
