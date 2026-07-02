@@ -79,5 +79,49 @@ namespace Faolan.Importer.Tsv
 			logger?.LogInformation("WikiClassSpellImporter: {Rows} wiki rows, {Matched} matched a spell, {Inserted} new ClassSpell rows.", wanted.Count, matched, inserted);
 			return (wanted.Count, matched, inserted);
 		}
+
+		// Backfills Spell.Level from the wiki per-class spell tables (aoc_wiki_spell_levels.tsv: spellName, level). The
+		// wiki level is the BASE spell's attainable level, so it only sets the RANK-1 / unranked row (higher ranks carry
+		// their own level from ellatha) and ONLY where the level is currently 0 (never overwrites ellatha's per-rank
+		// data). Complements EllathaSpellLevelImporter for the spells ellatha's ranked list missed. Idempotent.
+		public static async Task<(int Rows, int Updated)> ImportLevelsAsync(IDatabaseContext db, string tsvPath, ILogger logger = null)
+		{
+			if (!File.Exists(tsvPath))
+			{
+				logger?.LogWarning("WikiClassSpellImporter: {Path} not found - skipping spell-level backfill.", tsvPath);
+				return (0, 0);
+			}
+
+			var levelByBase = new Dictionary<string, byte>();
+			var rows = 0;
+			foreach (var line in await File.ReadAllLinesAsync(tsvPath))
+			{
+				if (line.Length == 0 || line[0] == '#')
+					continue;
+				var c = line.Split('\t');
+				if (c.Length < 2 || !byte.TryParse(c[1], out var lvl) || lvl == 0)
+					continue;
+				rows++;
+				levelByBase[BaseKey(c[0])] = lvl;
+			}
+
+			// Only the base/rank-1 rows currently at Level 0 (Name == base, or "base (Rank 1)").
+			var candidates = await db.Spells
+				.Where(s => s.Level == 0 && s.Name != null && s.Name != "" && (!s.Name.Contains("(Rank ") || s.Name.Contains("(Rank 1)")))
+				.ToListAsync();
+			var updated = 0;
+			foreach (var s in candidates)
+			{
+				if (levelByBase.TryGetValue(BaseKey(s.Name), out var lvl))
+				{
+					s.Level = lvl;
+					updated++;
+				}
+			}
+
+			await db.SaveChangesAsync();
+			logger?.LogInformation("WikiClassSpellImporter: {Rows} wiki level rows, {Updated} base spell levels set.", rows, updated);
+			return (rows, updated);
+		}
 	}
 }
