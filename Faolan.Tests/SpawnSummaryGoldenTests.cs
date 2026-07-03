@@ -48,7 +48,7 @@ namespace Faolan.Tests
 				OrientationMode = 1
 			};
 
-			Assert.Equal(GoldenSummary, Convert.ToHexString(summary.ToProtobufBytes()));
+			Assert.Equal(GoldenSummary, Convert.ToHexString(summary.ToProtobuf()));
 		}
 
 		[Fact]
@@ -65,7 +65,7 @@ namespace Faolan.Tests
 				HardcoreLevel = 0
 			};
 
-			Assert.Equal(GoldenStats, Convert.ToHexString(stats.ToProtobufBytes()));
+			Assert.Equal(GoldenStats, Convert.ToHexString(stats.ToProtobuf()));
 		}
 	}
 }

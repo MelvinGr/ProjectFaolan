@@ -36,7 +36,7 @@ namespace Faolan.Tests
 
 			var verbatim = SplitRoot(bin);
 			var typed = ((ReadOnlySpan<byte>)verbatim).FromProtobuf<ProtoFullCharacterIIR>();
-			var roundTripped = typed.ToProtobufBytes();
+			var roundTripped = typed.ToProtobuf();
 
 			_o.WriteLine($"{bin}: verbatim={verbatim.Length} roundTripped={roundTripped.Length} inventories={typed.Inventories.Count}");
 

@@ -93,7 +93,7 @@ namespace Faolan.Tests
 			var message = CharacterMessage(Golden.Bytes("SpawnStrieTemplate"));
 
 			var decoded = ((ReadOnlySpan<byte>)message).FromProtobuf<ProtoCoreCharacterIIR>();
-			var reencoded = decoded.ToProtobufBytes();
+			var reencoded = decoded.ToProtobuf();
 
 			Assert.Equal(message.Length, reencoded.Length);
 			Assert.True(message.SequenceEqual(reencoded), "ProtoCoreCharacterIIR did not re-encode byte-identically");

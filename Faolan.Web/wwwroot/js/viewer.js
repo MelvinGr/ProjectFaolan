@@ -78,9 +78,25 @@ function buildClip(json) {
     const tracks = [];
     for (const b of json.bones) {
         if (b.rotTimes.length) tracks.push(new THREE.QuaternionKeyframeTrack(b.bone + '.quaternion', b.rotTimes, b.rot));
-        if (b.posTimes.length) tracks.push(new THREE.VectorKeyframeTrack(b.bone + '.position', b.posTimes, b.pos));
+        // Only animate a bone's POSITION when it actually translates over the clip (e.g. the Hips root/hip bob).
+        // In the RDB curves every other bone carries a single constant position key == its bind offset; applying
+        // that overrides the mesh rig's own bind, and any small difference between the animation skeleton's bind
+        // and the mesh's bind DISPLACES the bone and stretches the mesh. Static bones keep their .glb bind
+        // (rotation-driven only), which is how skeletal animation is meant to work - bone lengths are fixed. (#292)
+        if (b.posTimes.length > 1 && !isConstantVec(b.pos, 3)) {
+            tracks.push(new THREE.VectorKeyframeTrack(b.bone + '.position', b.posTimes, b.pos));
+        }
     }
     return new THREE.AnimationClip('clip_' + json.rdbname, json.duration, tracks);
+}
+
+// True when every keyframe tuple in `values` (flat, `width` per key) equals the first within a small epsilon - i.e.
+// the channel never moves, so its keyframe track is redundant with the bind pose.
+function isConstantVec(values, width) {
+    for (let i = width; i + width <= values.length; i += width)
+        for (let c = 0; c < width; c++)
+            if (Math.abs(values[i + c] - values[c]) > 1e-4) return false;
+    return true;
 }
 
 // Load (or reload) a glb URL into the named canvas. Frames the camera to the model unless keepCamera is set (the

@@ -80,7 +80,7 @@ namespace Faolan.GameServer.Spawn
 					X = position.X,
 					Y = position.Y,
 					Z = position.Z
-				}.ToProtobufBytes())
+				}.ToProtobuf())
 				.WriteByte(0x12)
 				.WriteArrayByteLength(new ProtoQuat
 				{
@@ -88,7 +88,7 @@ namespace Faolan.GameServer.Spawn
 					Y = rotation.Y,
 					Z = rotation.Z,
 					W = rotation.W
-				}.ToProtobufBytes())
+				}.ToProtobuf())
 				.WriteArray(template.AsSpan(TransformEndOffset))
 				.ToArray();
 		}
@@ -110,7 +110,7 @@ namespace Faolan.GameServer.Spawn
 
 			var iirOffset = read.Offset;
 			var oldLen = read.Length;
-			var payload = character.ToProtobufBytes();
+			var payload = character.ToProtobuf();
 			var delta = payload.Length - oldLen;
 
 			var result = new byte[body.Length + delta];

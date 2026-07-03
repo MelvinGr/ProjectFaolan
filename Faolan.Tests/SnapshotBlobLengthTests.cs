@@ -75,7 +75,7 @@ namespace Faolan.Tests
 			typed.Inventories.Clear();
 			foreach (var c in FullCharSnapshotBuilder.BuildContainers(instance, equipped, bagFirst, rows))
 				typed.Inventories.Add(c);
-			var genRoot = typed.ToProtobufBytes();
+			var genRoot = typed.ToProtobuf();
 			Assert.NotEqual(verbatimRootLen, genRoot.Length); // a real resize, so the prefix MUST be corrected
 
 			var newPrefix = GameServerListener.SetSnapshotBlobLength(prefix, genRoot.Length);

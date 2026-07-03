@@ -22,7 +22,7 @@ namespace Faolan.Tests
 			// Re-encoding the typed ProtoCoreCharacterIIR (which contains CharacterStats) reproduces the captured
 			// message slice byte-for-byte - the build-side oracle, located structurally (no fixed Strie offset).
 			var captured = template.AsSpan(read.Offset, read.Length).ToArray();
-			Assert.Equal(Convert.ToHexString(captured), Convert.ToHexString(read.Message.ToProtobufBytes()));
+			Assert.Equal(Convert.ToHexString(captured), Convert.ToHexString(read.Message.ToProtobuf()));
 		}
 
 		[Fact]

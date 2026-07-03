@@ -77,7 +77,7 @@ namespace Faolan.Core.Network.Packets
 		// so the output is byte-identical to the literal-array overload (locked by ProtoEndpointGoldenTests).
 		public PacketStream WriteHeader<T>(ProtoEndpoint sender, ProtoEndpoint receiver, T opcode, byte[] headerData = null) where T : struct
 		{
-			return WriteHeader(sender.ToProtobufBytes(), receiver.ToProtobufBytes(), opcode, headerData);
+			return WriteHeader(sender.ToProtobuf(), receiver.ToProtobuf(), opcode, headerData);
 		}
 
 		public PacketStream WriteHeaderProto<T>(byte[] sender, byte[] receiver, T opcode, byte[] headerData = null) where T : struct

@@ -47,7 +47,7 @@ namespace Faolan.Core.Network.Conan
 		// and other call sites that still pass raw endpoint blobs.
 		public static byte[] EndpointBytes(uint type, uint instance)
 		{
-			return Endpoint(type, instance).ToProtobufBytes();
+			return Endpoint(type, instance).ToProtobuf();
 		}
 	}
 }

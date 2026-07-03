@@ -41,7 +41,7 @@ namespace Faolan.GameServer.Spawn
 					X = position.X,
 					Y = position.Y,
 					Z = position.Z
-				}.ToProtobufBytes())
+				}.ToProtobuf())
 				.WriteByte(0x12)
 				.WriteArrayByteLength(new ProtoQuat
 				{
@@ -49,7 +49,7 @@ namespace Faolan.GameServer.Spawn
 					Y = rotation.Y,
 					Z = rotation.Z,
 					W = rotation.W
-				}.ToProtobufBytes())
+				}.ToProtobuf())
 				.WriteByte(0x18)
 				.WriteArray(EncodePlayfieldVarint(playfieldToken))
 				.ToArray();

@@ -84,7 +84,7 @@ namespace Faolan.Tests
 			Assert.Equal(hasEquipment, result.Message.InventoryEntries.Count > 0);
 
 			// Re-encoding the decoded IIR reproduces the captured slice byte-for-byte (the splice oracle).
-			var reEncoded = result.Message.ToProtobufBytes();
+			var reEncoded = result.Message.ToProtobuf();
 			Assert.Equal(body.AsSpan(result.Offset, result.Length).ToArray(), reEncoded);
 		}
 

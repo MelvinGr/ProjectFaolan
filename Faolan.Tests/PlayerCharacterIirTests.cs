@@ -23,9 +23,9 @@ namespace Faolan.Tests
 			// The template with its worn-gear entries stripped (Build always replaces them per character).
 			var stripped = ((ReadOnlySpan<byte>)template).FromProtobuf<ProtoCoreCharacterIIR>();
 			stripped.InventoryEntries.Clear();
-			var strippedBytes = stripped.ToProtobufBytes();
+			var strippedBytes = stripped.ToProtobuf();
 
-			var built = PlayerCharacterIir.Build(null, null).ToProtobufBytes();
+			var built = PlayerCharacterIir.Build(null, null).ToProtobuf();
 
 			Assert.Equal(strippedBytes, built);
 		}

@@ -43,7 +43,7 @@ namespace Faolan.GameServer
 				? character.Rotation
 				: Quaternion.Identity;
 
-			var body = PlayerSpawnBuilder.BuildFromScratch(client.Session.Account.ClientInstance, playfield, character.Position, rotation, message.ToProtobufBytes(), scaffoldCharacter);
+			var body = PlayerSpawnBuilder.BuildFromScratch(client.Session.Account.ClientInstance, playfield, character.Position, rotation, message.ToProtobuf(), scaffoldCharacter);
 			return body == null
 				? null
 				: BuildWorldEntrySpawn(client, body);
@@ -248,7 +248,7 @@ namespace Faolan.GameServer
 				false,
 				true,
 				FullCharSnapshotBuilder.BuildContainers(instance, equipped, bagFirst, inventoryRows ?? []));
-			return typedRoot.ToProtobufBytes();
+			return typedRoot.ToProtobuf();
 		}
 	}
 }

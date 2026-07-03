@@ -76,7 +76,7 @@ namespace Faolan.Tests
 						: null,
 					decoded.Inventories);
 
-				Assert.True(rootBytes.SequenceEqual(rebuilt.ToProtobufBytes()), $"{source}: BuildRoot did not reproduce the captured root ({rootBytes.Length} bytes)");
+				Assert.True(rootBytes.SequenceEqual(rebuilt.ToProtobuf()), $"{source}: BuildRoot did not reproduce the captured root ({rootBytes.Length} bytes)");
 				ok++;
 			}
 
@@ -113,7 +113,7 @@ namespace Faolan.Tests
 				}
 
 				var decoded = ((ReadOnlySpan<byte>)rootBytes).FromProtobuf<ProtoFullCharacterIIR>();
-				var reencoded = decoded.ToProtobufBytes();
+				var reencoded = decoded.ToProtobuf();
 
 				Assert.True(rootBytes.SequenceEqual(reencoded), $"{source}: ProtoFullCharacterIIR did not re-encode byte-identically (root {rootBytes.Length} -> {reencoded.Length})");
 				Assert.True(decoded.Inventories.Count > 0, $"{source}: no inventory containers decoded");

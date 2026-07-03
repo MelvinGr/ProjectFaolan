@@ -21,7 +21,7 @@ namespace Faolan.Tests
 				Y = y,
 				Z = z,
 				W = w
-			}.ToProtobufBytes();
+			}.ToProtobuf();
 
 			Assert.Equal(20, bytes.Length); // 4 * 5 - the old 0x14 length prefix
 			Assert.Equal(Convert.ToHexString(HandRolledQuat(x, y, z, w)), Convert.ToHexString(bytes));
@@ -37,7 +37,7 @@ namespace Faolan.Tests
 				X = x,
 				Y = y,
 				Z = z
-			}.ToProtobufBytes();
+			}.ToProtobuf();
 
 			Assert.Equal(15, bytes.Length); // 3 * (1 tag + 4 float bytes) - the old 0x0F length prefix
 			Assert.Equal(Convert.ToHexString(HandRolledVec3(x, y, z)), Convert.ToHexString(bytes));

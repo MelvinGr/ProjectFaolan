@@ -78,7 +78,7 @@ namespace Faolan.Tests
 			var scaffoldCharacter = new Character { Id = 0x0A1B2C3D };
 			PlayerSpawnScaffoldRows.ExtractTo(scaffoldCharacter, scaffold);
 
-			var body = PlayerSpawnBuilder.BuildFromScratch(0x0A1B2C3D, scaffold.Playfield, new Vector3(1, 2, 3), Quaternion.Identity, message.ToProtobufBytes(), scaffoldCharacter);
+			var body = PlayerSpawnBuilder.BuildFromScratch(0x0A1B2C3D, scaffold.Playfield, new Vector3(1, 2, 3), Quaternion.Identity, message.ToProtobuf(), scaffoldCharacter);
 
 			Assert.NotNull(body);
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var rebuilt, out var err), err);

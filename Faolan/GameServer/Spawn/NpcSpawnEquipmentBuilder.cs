@@ -75,7 +75,7 @@ namespace Faolan.GameServer.Spawn
 
 			// Byte-exact gate: only accept entries the rebuilt row reproduces exactly (guards any item carrying
 			// fields the row doesn't model - extra ProtoAcgItem fields, an absent level/hash, etc.).
-			if (!BuildEntry(row).ToProtobufBytes().SequenceEqual(entry.ToProtobufBytes()))
+			if (!BuildEntry(row).ToProtobuf().SequenceEqual(entry.ToProtobuf()))
 			{
 				row = null;
 				return false;
