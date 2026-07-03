@@ -4,6 +4,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using Faolan.GameServer;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Xunit;
 
@@ -17,7 +18,7 @@ namespace Faolan.Tests
 	// the dead state with NO SimpleCharKilledBy / NO ApplySpell - so the dead-state lives in the SNAPSHOT.
 	//
 	// Decoded (Captures/scripts/decode_death_snapshot.py): the dead-state is the tails stat block's
-	// current-health stat, statId 0x001B (LegacyCharacterStatId.HealthCurrent) = 0 (while HealthMax stays full).
+	// current-health stat, statId 0x001B (CharacterStatId.HealthCurrent) = 0 (while HealthMax stays full).
 	// That maps 1:1 onto TailsPostAccessBlock.CurrentHp (Values[23]/[54], +[202]). These tests lock both halves:
 	// the captured dead snapshot really has HealthCurrent==0, and the builder can produce that dead shape.
 	public class DeathSnapshotTests

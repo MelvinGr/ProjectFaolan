@@ -33,7 +33,7 @@ namespace Faolan.Tests
 			var def = await LoadDefinition(BeachStarterQuestId);
 			Assert.NotNull(def);
 
-			var built = BeachTailsBuilder.BuildFromScratch(def, null, TemplateInstance, null, []);
+			var built = SnapshotTailsBuilder.BuildFromScratch(def, null, TemplateInstance, null, []);
 
 			var template = File.ReadAllBytes(TemplatePath);
 			Assert.True(template.SequenceEqual(built), "an empty known-list must equal BeachTailsTemplate.bin byte-for-byte");
@@ -48,8 +48,8 @@ namespace Faolan.Tests
 			var def = await LoadDefinition(BeachStarterQuestId);
 			Assert.NotNull(def);
 
-			var empty = BeachTailsBuilder.BuildFromScratch(def, null, TemplateInstance, null, []);
-			var withSpells = BeachTailsBuilder.BuildFromScratch(def, null, TemplateInstance, null, FaolanxSpellIds);
+			var empty = SnapshotTailsBuilder.BuildFromScratch(def, null, TemplateInstance, null, []);
+			var withSpells = SnapshotTailsBuilder.BuildFromScratch(def, null, TemplateInstance, null, FaolanxSpellIds);
 
 			// Two 12-byte records spliced in.
 			Assert.Equal(empty.Length + 24, withSpells.Length);

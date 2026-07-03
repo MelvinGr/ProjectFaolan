@@ -28,7 +28,7 @@ namespace Faolan.Tests
 		public void BeachPrefix_BuildsFromScratch_ByteIdentical()
 		{
 			var (prefix, root, _) = SplitBeach();
-			var built = BeachSnapshotPrefix.Build(root.Length);
+			var built = SnapshotPrefix.Build(root.Length);
 			Assert.Equal(prefix, built);
 		}
 
@@ -55,7 +55,7 @@ namespace Faolan.Tests
 
 			// prefix[4..6] varint = const + rootLen; pin the const for the beach template.
 			var varint = ReadVarint(prefix, 4, out _);
-			Assert.Equal(BeachSnapshotPrefix.RootLengthConstant + (ulong)root.Length, varint);
+			Assert.Equal(SnapshotPrefix.RootLengthConstant + (ulong)root.Length, varint);
 		}
 
 		// (The byte-exact tails build is proven against this same template by BeachTailsFromScratchTests
@@ -69,7 +69,7 @@ namespace Faolan.Tests
 		public void BeachSnapshot_PrefixPlusTails_ReassemblesConsistently()
 		{
 			var (_, root, tails) = SplitBeach();
-			var prefix = BeachSnapshotPrefix.Build(root.Length);
+			var prefix = SnapshotPrefix.Build(root.Length);
 
 			using var content = new FaolanStream();
 			content.WriteUInt32(0x737A6DF9);
@@ -104,7 +104,7 @@ namespace Faolan.Tests
 
 		// Decode result (UnknownBefore progression block): two different L1 beach characters' tails are byte-
 		// identical except their instance references. Proves the beach tails are content-fixed + (level, vitals,
-		// instance), so BeachTailsBuilder's template + instance-swap fully reproduces them for any beach character.
+		// instance), so SnapshotTailsBuilder's template + instance-swap fully reproduces them for any beach character.
 		[Fact]
 		public void TwoBeachCharacters_TailsDifferOnlyAtInstanceAndStats()
 		{

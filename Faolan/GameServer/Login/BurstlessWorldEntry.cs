@@ -18,7 +18,7 @@ namespace Faolan.GameServer
 	// Builds the world-entry packets entirely from generated/structured pieces - NO captured burst (#210). Each
 	// record is assembled from a row/the character + wrapped in the shared world-entry header (FrameWorldEntryRecord):
 	//   - player spawn  -> PlayerSpawnBuilder.BuildFromScratch (scaffold + transform from DB) with the CharacterIIR
-	//                      built from code (PlayerCharacterIir.BuildBaseMessage) + overridden per character,
+	//                      built from code + per-character (PlayerCharacterIir.Build),
 	//   - snapshot      -> BuildWorldEntrySnapshot (root from BuildRoot/BuildContainers, tails from BuildFromScratch),
 	//   - world objects -> WorldObjectBuilder.TryBuild(row) framed per object.
 	// Used by the FAOLAN_BURSTLESS_ENTRY path in RetailLoginReplay; the globals (MapChange/Vitals/GameTime) + the
@@ -33,10 +33,9 @@ namespace Faolan.GameServer
 		private byte[] BuildBurstlessPlayerSpawn(INetworkClient client, CharacterEquipment equipment, Character scaffoldCharacter, uint playfield)
 		{
 			var character = client.Session.Character;
-			// The base CharacterIIR is built from code (PlayerCharacterIir, formerly PlayerCharacterIirTemplate.bin, #258);
-			// PlayerSpawnMessage overrides name/identity/looks/worn gear per character.
-			var message = PlayerCharacterIir.BuildBaseMessage();
-			PlayerSpawnMessage.ApplyCharacter(message, character, equipment);
+			// The CharacterIIR is built from code (PlayerCharacterIir, formerly PlayerCharacterIirTemplate.bin, #258):
+			// the fixed render template with this character's name/identity/looks/worn gear applied.
+			var message = PlayerCharacterIir.Build(character, equipment);
 
 			// A near-zero stored quaternion (the degenerate W=0 default) can't be realised by the avatar; fall back to
 			// identity rather than risk it (the live splice path guards the same way).
@@ -55,7 +54,7 @@ namespace Faolan.GameServer
 		{
 			var instance = client.Session.Account.ClientInstance;
 			var root = BuildBurstlessSnapshotRoot(instance, equipment, inventoryRows, characterTags);
-			var tails = BeachTailsBuilder.BuildFromScratch(snapshotQuests, primaryQuest, client.Session.Character, instance, null, knownSpellIds);
+			var tails = SnapshotTailsBuilder.BuildFromScratch(snapshotQuests, primaryQuest, client.Session.Character, instance, null, knownSpellIds);
 			return BuildWorldEntrySnapshot(client, root, tails);
 		}
 
@@ -88,7 +87,7 @@ namespace Faolan.GameServer
 			foreach (var cq in (await Database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Active))
 			{
 				var def = await Database.GetQuestDefinition(cq.QuestId);
-				if (BeachTailsBuilder.IsSnapshotEligible(def))
+				if (SnapshotTailsBuilder.IsSnapshotEligible(def))
 					quests.Add(def);
 			}
 
@@ -100,7 +99,7 @@ namespace Faolan.GameServer
 
 		// Builds + sends the entire world entry from generated/structured pieces - no captured burst (#210). Mirrors
 		// SendWorldEntry's world-model setup + record order (MapChange, objects, player spawn, snapshot, vitals,
-		// gametime), then runs interest for the NPCs. Beach-shaped (BeachTailsBuilder + BeachPlayfieldId); a non-beach
+		// gametime), then runs interest for the NPCs. Beach-shaped (SnapshotTailsBuilder + BeachPlayfieldId); a non-beach
 		// map would get beach tails, so the flag is for a beach login until per-map sourcing lands.
 		private async Task SendBurstlessWorldEntry(INetworkClient client, uint mapId)
 		{

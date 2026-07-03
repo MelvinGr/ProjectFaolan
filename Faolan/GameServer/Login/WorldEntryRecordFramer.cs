@@ -15,7 +15,7 @@ namespace Faolan.GameServer
 	// builds from scratch can be put on the wire by wrapping it in that shared header + outer length/CRC; only the
 	// lone IirType=0x00000000 control record uses a different endpoint pair and is excluded.
 	//
-	// The body construction lives elsewhere (FullCharSnapshotBuilder / BeachTailsBuilder for the snapshot, the
+	// The body construction lives elsewhere (FullCharSnapshotBuilder / SnapshotTailsBuilder for the snapshot, the
 	// SpawnPacketBuilder override engine for spawns); these framers just assemble the wire packet. Each is proven
 	// byte-identical to its capture (WorldEntryRecordFramerTests).
 	public partial class GameServerListener

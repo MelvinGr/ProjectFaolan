@@ -1,13 +1,12 @@
-namespace Faolan.GameServer.Packets.FullCharSnapshot
+namespace Faolan.GameServer
 {
 	/// <summary>
-	///     Known legacy stat ids seen in the mixed SpawnPlayer / bigboy capture families.
-	///     Two encodings are currently confirmed:
+	///     Character stat ids seen in the SpawnPlayer / snapshot / 0x96B8DC59 vitals capture families.
+	///     Two on-wire encodings are confirmed:
 	///     - 64-bit big-endian: (statId &lt;&lt; 32) | rawValue
 	///     - compact 7-byte big-endian: 3-byte statId + 4-byte rawValue
 	/// </summary>
-	/// TODO: Rename legacy?
-	public enum LegacyCharacterStatId : uint
+	public enum CharacterStatId : uint
 	{
 		// Vitals are sent as a (current, max) pair per stat in the 0x96B8DC59 update. The current/max id assignment
 		// is **proven in-client** (2026-06-14, live .setstat probes on Darktemplarchar): setting 0x0001 moved the
@@ -48,16 +47,18 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		Dexterity = 0x032E
 	}
 
-	public sealed class LegacyCharacterStatEntry
+	// The x100 / x10 wire scale a stat's player-facing value is multiplied by (vitals x100, attributes x10, the rest
+	// x1). CharacterStatBlock.Set applies it so callers pass display values.
+	public static class CharacterStatIdExtensions
 	{
-		public static uint GetScale(LegacyCharacterStatId statId)
+		public static uint GetScale(this CharacterStatId statId)
 		{
 			return statId switch
 			{
-				LegacyCharacterStatId.HealthCurrent or LegacyCharacterStatId.HealthMax or LegacyCharacterStatId.StaminaMax or LegacyCharacterStatId.StaminaCurrent or LegacyCharacterStatId.ManaMax
-					or LegacyCharacterStatId.ManaCurrent => 100,
+				CharacterStatId.HealthCurrent or CharacterStatId.HealthMax or CharacterStatId.StaminaMax or CharacterStatId.StaminaCurrent or CharacterStatId.ManaMax
+					or CharacterStatId.ManaCurrent => 100,
 
-				LegacyCharacterStatId.Strength or LegacyCharacterStatId.Constitution or LegacyCharacterStatId.Intelligence or LegacyCharacterStatId.Wisdom or LegacyCharacterStatId.Dexterity => 10,
+				CharacterStatId.Strength or CharacterStatId.Constitution or CharacterStatId.Intelligence or CharacterStatId.Wisdom or CharacterStatId.Dexterity => 10,
 
 				_ => 1
 			};

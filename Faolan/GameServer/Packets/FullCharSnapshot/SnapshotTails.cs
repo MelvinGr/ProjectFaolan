@@ -44,7 +44,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 		// Back-compat shim: the lead quest's STATE word (@20). World entry historically patched the live
 		// character "level" here - the field is actually the first Quest_c record's state (for a fresh beach
-		// char level == state == 1, so the write was a no-op). Kept so BeachTailsBuilder/RetailLoginReplay
+		// char level == state == 1, so the write was a no-op). Kept so SnapshotTailsBuilder/RetailLoginReplay
 		// continue to compile and produce identical bytes.
 		[JsonIgnore]
 		public uint Level

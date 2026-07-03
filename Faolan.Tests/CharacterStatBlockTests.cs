@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using Faolan.GameServer;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.GameServer.World;
 using Xunit;
@@ -15,8 +16,8 @@ namespace Faolan.Tests
 		public void Build_VitalsBlock_MatchesCapturedBytes()
 		{
 			// Captured packet sends the CURRENT ids (0x1B/0x1F8/0x1FA) - an entity announcing its full vitals on
-			// spawn (current == max at full health; ids in-client verified, see LegacyCharacterStatId).
-			var block = new CharacterStatBlock().Set(LegacyCharacterStatId.HealthCurrent, 63).Set(LegacyCharacterStatId.StaminaCurrent, 63).Set(LegacyCharacterStatId.ManaCurrent, 63);
+			// spawn (current == max at full health; ids in-client verified, see CharacterStatId).
+			var block = new CharacterStatBlock().Set(CharacterStatId.HealthCurrent, 63).Set(CharacterStatId.StaminaCurrent, 63).Set(CharacterStatId.ManaCurrent, 63);
 
 			Assert.Equal(3, block.Count);
 
@@ -31,7 +32,7 @@ namespace Faolan.Tests
 			// tick before its first swing - stat 0x14 (CombatMode) = 4. The full IIR body (after the u32 length prefix)
 			// is [96b8dc59][0000c350][handle][00000000][count=1][statId 0x14][value 4]. Decodes the empty-handed-swing
 			// fix (#218); see WorldBroadcaster.BroadcastNpcCombatMode.
-			var stats = new CharacterStatBlock().Set(LegacyCharacterStatId.CombatMode, 4);
+			var stats = new CharacterStatBlock().Set(CharacterStatId.CombatMode, 4);
 			var body = VitalsPacket.BuildStatBlockBody(0x00002C56u, stats);
 
 			Assert.Equal("96b8dc590000c35000002c5600000000010000001400000004", ToHex(body));
@@ -41,14 +42,14 @@ namespace Faolan.Tests
 		public void Set_AppliesVitalsScale()
 		{
 			// HealthCurrent (0x001B) is a ×100 vital: display 63 -> raw 6300 (0x189C).
-			var block = new CharacterStatBlock().Set(LegacyCharacterStatId.HealthCurrent, 63);
+			var block = new CharacterStatBlock().Set(CharacterStatId.HealthCurrent, 63);
 			Assert.Equal("010000001b0000189c", ToHex(block.ToArray()));
 		}
 
 		[Fact]
 		public void SetRaw_DoesNotApplyScale()
 		{
-			var block = new CharacterStatBlock().SetRaw(LegacyCharacterStatId.Level, 25);
+			var block = new CharacterStatBlock().SetRaw(CharacterStatId.Level, 25);
 
 			// count(01) + Level(0036) = 25 (0x19), unscaled
 			Assert.Equal("010000003600000019", ToHex(block.ToArray()));
@@ -63,9 +64,9 @@ namespace Faolan.Tests
 			Assert.True(CharacterStatBlock.TryParse(bytes, out var block, out var consumed));
 			Assert.Equal(bytes.Length, consumed);
 			Assert.Equal(3, block.Count);
-			Assert.Equal(((uint)LegacyCharacterStatId.HealthCurrent, 6300u), block.Records[0]);
-			Assert.Equal(((uint)LegacyCharacterStatId.StaminaCurrent, 6300u), block.Records[1]);
-			Assert.Equal(((uint)LegacyCharacterStatId.ManaCurrent, 6300u), block.Records[2]);
+			Assert.Equal(((uint)CharacterStatId.HealthCurrent, 6300u), block.Records[0]);
+			Assert.Equal(((uint)CharacterStatId.StaminaCurrent, 6300u), block.Records[1]);
+			Assert.Equal(((uint)CharacterStatId.ManaCurrent, 6300u), block.Records[2]);
 		}
 
 		[Fact]
@@ -80,7 +81,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void TryParse_RoundTripsBuild_AndReportsConsumed()
 		{
-			var block = new CharacterStatBlock().Set(LegacyCharacterStatId.HealthCurrent, 63).SetRaw(LegacyCharacterStatId.Level, 25);
+			var block = new CharacterStatBlock().Set(CharacterStatId.HealthCurrent, 63).SetRaw(CharacterStatId.Level, 25);
 			var built = block.ToArray();
 
 			// Append trailing bytes: TryParse must consume only the block and report the right length.
@@ -104,7 +105,7 @@ namespace Faolan.Tests
 		public void VitalsPacket_StatUpdateBody_RoundTrips()
 		{
 			// Reconstruct the 0x96B8DC59 IIR body (the bytes wrapped by WriteArrayUInt32Length) and parse it back.
-			var stats = new CharacterStatBlock().Set(LegacyCharacterStatId.HealthCurrent, 63).Set(LegacyCharacterStatId.StaminaCurrent, 63).Set(LegacyCharacterStatId.ManaCurrent, 63);
+			var stats = new CharacterStatBlock().Set(CharacterStatId.HealthCurrent, 63).Set(CharacterStatId.StaminaCurrent, 63).Set(CharacterStatId.ManaCurrent, 63);
 			const uint handle = 0x0002324B;
 
 			var statBytes = stats.ToArray();

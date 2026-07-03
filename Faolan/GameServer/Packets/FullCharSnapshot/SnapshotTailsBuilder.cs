@@ -11,10 +11,10 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 	// Builds the beach 0x737A6DF9 snapshot TAILS entirely FROM SCRATCH (BuildFromScratch) - no captured-tails
 	// template: the generated quest portion + the game-static PFAccessWindow_ catalog (AccessWindowCatalog typed
 	// entries) + the code stat skeleton (TailsStatBlock) with the live character's vitals/XP + learned spells patched
-	// in. The prefix is built by BeachSnapshotPrefix, the root by FullCharSnapshotBuilder. The former captured
+	// in. The prefix is built by SnapshotPrefix, the root by FullCharSnapshotBuilder. The former captured
 	// BeachTailsTemplate.bin asset is retired from the runtime (#258) - it survives only as the byte-exact golden
 	// oracle in Faolan.Tests (BeachTailsFromScratchTests proves BuildFromScratch reproduces it for the captured char).
-	public static class BeachTailsBuilder
+	public static class SnapshotTailsBuilder
 	{
 		// GENERATES the quest PORTION of the tails (@0..1292 = Quest_c journal + @609 objective region + index) from a
 		// quest's DB definition + its seeded snapshot-generation fields, with the player's live `instance` (#186). The
@@ -47,7 +47,9 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// captured order). Reproduces that capture's 2247-byte quest region byte-exact (BuildQuestPortionTests).
 		private static readonly QuestTextSlot[] HeaderSlots = [QuestTextSlot.Title, QuestTextSlot.Summary, QuestTextSlot.AreaTitle, QuestTextSlot.RegionName, QuestTextSlot.MapName];
 
-		public static byte[] BuildBeachQuestPortion(QuestDefinition def, uint state, uint instance)
+		// The single-quest quest portion (golden-test oracle for the multi-quest BuildQuestPortion: for one held quest
+		// the two are byte-identical - see BuildQuestPortionTests).
+		public static byte[] BuildSingleQuestPortion(QuestDefinition def, uint state, uint instance)
 		{
 			ArgumentNullException.ThrowIfNull(def);
 
@@ -76,14 +78,14 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		}
 
 		// Builds the WHOLE beach 0x737A6DF9 tails FROM SCRATCH - no captured-tails template (#186). Assembles the three
-		// regions, each independently proven byte-exact: the generated quest portion (BuildBeachQuestPortion, @0..1292),
+		// regions, each independently proven byte-exact: the generated quest portion (BuildQuestPortion, @0..1292),
 		// the game-static access-window catalog (AccessWindowCatalog typed entries, @1292..7917), and the code stat
 		// skeleton (TailsStatBlock.CreateFreshBlock, @7917..end) with the live character's vitals/XP patched in. Then
 		// re-addresses the template instance + stamps the playfield token. For the captured beach
 		// character + instance this reproduces BeachTailsTemplate.bin byte-for-byte (BeachTailsFromScratchTests), so the
 		// template .bin is no longer needed to author a beach entry.
-		// Beach-only convenience (golden tests + the single-quest path): delegates to the multi-quest form with just
-		// the beach quest. BuildQuestPortion([beach], beach) == BuildBeachQuestPortion, so byte-identical.
+		// Single-quest convenience (golden tests + the single-quest path): delegates to the multi-quest form with just
+		// the beach quest. BuildFromScratch([beach], beach) == BuildFromScratch(beach), so byte-identical.
 		public static byte[] BuildFromScratch(QuestDefinition beachDef, Character character, uint instance, uint? playfieldToken = null, IReadOnlyList<uint> knownSpellIds = null)
 		{
 			ArgumentNullException.ThrowIfNull(beachDef);
@@ -109,7 +111,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			// was all level-1 chars, so the level slot was misclassified as "fixed" - without this the client reads
 			// level 1 from the snapshot and blocks every level-gated spell/item regardless of the player's real level.
 			if (character != null)
-				block.SetStat((uint)LegacyCharacterStatId.Level, character.Level);
+				block.SetStat((uint)CharacterStatId.Level, character.Level);
 
 			if (character?.MaxStats != null)
 			{

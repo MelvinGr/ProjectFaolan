@@ -10,7 +10,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 	// HP/Mana/Stamina + archetype, XP, the playfield token + position, one session slot) - the other 313 are this
 	// FIXED baseline, identical for every fresh character. CreateFreshBlock() returns a PostAccessBlock seeded with
 	// the skeleton; the caller patches the character-derived slots via the existing setters (CurrentHp/Mana/Stamina/
-	// CurrentXp + Level), exactly as BeachTailsBuilder already does on the parsed block - so generating == relocating
+	// CurrentXp + Level), exactly as SnapshotTailsBuilder already does on the parsed block - so generating == relocating
 	// this baseline (the genuinely-fixed fresh-char stats) + the already-computed patches.
 	public static class TailsStatBlock
 	{

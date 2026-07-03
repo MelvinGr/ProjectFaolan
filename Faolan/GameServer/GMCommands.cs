@@ -1190,7 +1190,7 @@ namespace Faolan.GameServer
 			// (#209): the kill path (CombatService.PushLevelUp) sets the same three stats, so both level-up paths emit an
 			// identical Level + AttributeChanged-burst + vitals max push.
 			await SendStatUpdate(client,
-				new CharacterStatBlock().Set(LegacyCharacterStatId.Level, level).Set(LegacyCharacterStatId.Exp, character.Experience).Set(LegacyCharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(level)));
+				new CharacterStatBlock().Set(CharacterStatId.Level, level).Set(CharacterStatId.Exp, character.Experience).Set(CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(level)));
 			await SendVitals(client);
 			// On an increase, emit the retail level-up attribute feedback (one AttributeChanged line per primary) so
 			// the change shows the same as an XP-driven ding (#209); the vitals push above already raised the maxima.
@@ -1233,7 +1233,7 @@ namespace Faolan.GameServer
 		private Task SetStatCommand(INetworkClient client, string arguments)
 		{
 			var parts = (arguments ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
-			var statId = (LegacyCharacterStatId)Convert.ToUInt32(parts[0], 16);
+			var statId = (CharacterStatId)Convert.ToUInt32(parts[0], 16);
 			var value = uint.Parse(parts[1]);
 
 			return SendStatUpdate(client, new CharacterStatBlock().Set(statId, value));
@@ -1249,7 +1249,7 @@ namespace Faolan.GameServer
 			var value = uint.Parse(parts[2]);
 			var block = new CharacterStatBlock();
 			for (var id = start; id <= end; id++)
-				block.Set((LegacyCharacterStatId)id, value);
+				block.Set((CharacterStatId)id, value);
 			return SendStatUpdate(client, block);
 		}
 

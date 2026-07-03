@@ -1,3 +1,4 @@
+using Faolan.GameServer;
 using Faolan.GameServer.Combat;
 using Xunit;
 
@@ -156,7 +157,7 @@ namespace Faolan.Tests
 			var v = EntityVitals.FromMax(63, 63, 63);
 
 			// Full entity (current == max == 63 -> raw 6300 = 0x189C). Emits the current AND max id per vital, in
-			// .Set order (current then max per vital; ids in-client verified, see LegacyCharacterStatId):
+			// .Set order (current then max per vital; ids in-client verified, see CharacterStatId):
 			// count(06) + HealthCurrent(001B) + HealthMax(0001) + StaminaCurrent(01F8) + StaminaMax(01F9)
 			//           + ManaCurrent(01FA) + ManaMax(01FB), each = 0x189C.
 			Assert.Equal("060000001b0000189c000000010000189c000001f80000189c000001f90000189c000001fa0000189c000001fb0000189c", ToHex(v.ToVitalsBlock().ToArray()));

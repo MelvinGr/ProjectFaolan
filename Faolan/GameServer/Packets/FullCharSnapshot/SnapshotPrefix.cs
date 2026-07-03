@@ -14,7 +14,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 	//                              beach tails template, so it is constant for the beach snapshot.
 	//   [81 06]                    trailing varint (769), constant for the beach template.
 	// Proven across two beach captures (varint - rootLen = 4483 in both) and byte-reconstructs the captured prefix.
-	public static class BeachSnapshotPrefix
+	public static class SnapshotPrefix
 	{
 		// varint value = RootLengthConstant + rootLength. Pinned from the beach captures (strie root 683 / varint
 		// 5166; bigboy root 678 / varint 5161).

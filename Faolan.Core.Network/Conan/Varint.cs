@@ -4,7 +4,7 @@ using System.IO;
 namespace Faolan.Core.Network.Conan
 {
 	// The single canonical base-128 varint (protobuf LEB128) codec for the Conan wire format. Replaces the
-	// hand-rolled EncodeVarint / WriteVarint copies that used to live in PacketBurstHelper, BeachSnapshotPrefix,
+	// hand-rolled EncodeVarint / WriteVarint copies that used to live in PacketBurstHelper, SnapshotPrefix,
 	// ConversationReplay, ScryScript, PlayerSpawnScaffoldCodec and ProtoMessage. Use FaolanStream.WriteVarint for
 	// stream writes; these statics are for the byte[]/List<byte> builders.
 	public static class Varint

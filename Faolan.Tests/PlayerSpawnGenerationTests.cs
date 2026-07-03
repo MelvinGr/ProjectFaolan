@@ -28,9 +28,8 @@ namespace Faolan.Tests
 		[Theory, InlineData(false, 19600u), InlineData(true, 0u)]
 		// alive: current health == max (196 * 100)
 		// dead:  current health == 0,   max/life stays full
-		public void ApplyCharacter_DeadCharacter_ZeroesCurrentHealthKeepsLifeFull(bool isDead, uint expectedHealth)
+		public void Build_DeadCharacter_ZeroesCurrentHealthKeepsLifeFull(bool isDead, uint expectedHealth)
 		{
-			var message = ((ReadOnlySpan<byte>)CharacterMessage(Golden.Bytes("SpawnStrieTemplate"))).FromProtobuf<ProtoCoreCharacterIIR>();
 			var character = new Character
 			{
 				Name = "Testie",
@@ -46,7 +45,7 @@ namespace Faolan.Tests
 				}
 			};
 
-			PlayerSpawnMessage.ApplyCharacter(message, character, new CharacterEquipment());
+			var message = PlayerCharacterIir.Build(character, new CharacterEquipment());
 
 			Assert.Equal(expectedHealth, message.Stats.Health);
 			Assert.Equal(196u * 100, message.Stats.Life); // life (max) is full regardless of dead state

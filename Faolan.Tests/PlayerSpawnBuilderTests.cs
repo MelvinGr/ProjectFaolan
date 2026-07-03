@@ -51,16 +51,15 @@ namespace Faolan.Tests
 			Assert.True(template.SequenceEqual(built), "from-scratch player body must be byte-identical to the Strie template");
 		}
 
-		// The burst-less composition (#210): the server-owned CharacterIIR template overridden with a NEW character's
-		// identity (PlayerSpawnMessage) + built into a player body (PlayerSpawnBuilder) must produce a body that
-		// re-parses with the overridden name - i.e. the override -> re-encode -> scaffold-assemble chain fits together.
+		// The burst-less composition (#210): the from-code CharacterIIR built for a NEW character (PlayerCharacterIir.
+		// Build) + assembled into a player body (PlayerSpawnBuilder) must produce a body that re-parses with that
+		// character's name - i.e. the build -> re-encode -> scaffold-assemble chain fits together.
 		[Fact]
 		public void BuildFromScratch_WithOverriddenIdentity_ParsesBackWithNewName()
 		{
 			var template = Golden.Bytes("SpawnStrieTemplate");
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(template, out var scaffold, out _));
 
-			var message = ((ReadOnlySpan<byte>)scaffold.CharacterIir).FromProtobuf<ProtoCoreCharacterIIR>();
 			var character = new Character
 			{
 				Name = "Newcomer",
@@ -74,7 +73,7 @@ namespace Faolan.Tests
 					Stamina = 200
 				}
 			};
-			PlayerSpawnMessage.ApplyCharacter(message, character, new CharacterEquipment());
+			var message = PlayerCharacterIir.Build(character, new CharacterEquipment());
 
 			var scaffoldCharacter = new Character { Id = 0x0A1B2C3D };
 			PlayerSpawnScaffoldRows.ExtractTo(scaffoldCharacter, scaffold);

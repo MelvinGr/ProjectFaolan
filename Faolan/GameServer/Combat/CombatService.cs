@@ -389,7 +389,7 @@ namespace Faolan.GameServer.Combat
 
 			await _database.SetCharacterProgress(character.Id, character.Experience, character.Level);
 
-			var block = new CharacterStatBlock().Set(LegacyCharacterStatId.Exp, character.Experience).Set(LegacyCharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
+			var block = new CharacterStatBlock().Set(CharacterStatId.Exp, character.Experience).Set(CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
 			await SendStatUpdate(killer, block, killer.Session.Account.ClientInstance);
 			_logger.LogInformation("Combat: {Name} gained {Xp} XP ({Exp}/{Max}).", character.Name, xp, character.Experience, LevelingResolver.XpForNextLevel(character.Level));
 		}
@@ -488,9 +488,9 @@ namespace Faolan.GameServer.Combat
 
 			var block = vitals
 				.ToVitalsBlock()
-				.Set(LegacyCharacterStatId.Level, character.Level)
-				.Set(LegacyCharacterStatId.Exp, character.Experience)
-				.Set(LegacyCharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
+				.Set(CharacterStatId.Level, character.Level)
+				.Set(CharacterStatId.Exp, character.Experience)
+				.Set(CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
 			await SendStatUpdate(killer, block, killer.Session.Account.ClientInstance);
 
 			// Level-gated ability unlocks (#209/#73): retail grants the abilities that unlock at the new level as

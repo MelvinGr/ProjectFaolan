@@ -11,7 +11,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 	///     docs/archive/quests-and-combat.md): a single-byte record count, then N records of
 	///     <c>[uint32 statId BE][uint32 value BE]</c>.
 	///     Values are stored at wire scale: vitals (Health/Mana/Stamina) ×100, attributes ×10, everything else ×1
-	///     (see <see cref="LegacyCharacterStatEntry.GetScale" />). Use <see cref="Set" /> with the player-facing
+	///     (see <see cref="CharacterStatIdExtensions.GetScale" />). Use <see cref="Set" /> with the player-facing
 	///     value (it applies the scale) or <see cref="SetRaw" /> with the already-scaled wire value.
 	/// </summary>
 	public sealed class CharacterStatBlock
@@ -24,13 +24,13 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		public IReadOnlyList<(uint StatId, uint RawValue)> Records => _records;
 
 		/// <summary>Adds a record using the player-facing value; the wire scale for the stat is applied.</summary>
-		public CharacterStatBlock Set(LegacyCharacterStatId statId, uint displayValue)
+		public CharacterStatBlock Set(CharacterStatId statId, uint displayValue)
 		{
-			return SetRaw(statId, displayValue * LegacyCharacterStatEntry.GetScale(statId));
+			return SetRaw(statId, displayValue * CharacterStatIdExtensions.GetScale(statId));
 		}
 
 		/// <summary>Adds a record using the already-scaled wire value.</summary>
-		public CharacterStatBlock SetRaw(LegacyCharacterStatId statId, uint rawValue)
+		public CharacterStatBlock SetRaw(CharacterStatId statId, uint rawValue)
 		{
 			_records.Add(((uint)statId, rawValue));
 			return this;

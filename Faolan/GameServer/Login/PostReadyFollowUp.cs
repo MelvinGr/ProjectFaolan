@@ -253,7 +253,7 @@ namespace Faolan.GameServer
 				// go out POST-ready: a mid-load stat 0x43 (in the world-entry vitals) crashes the loader; a post-ready
 				// one is fine (proven in-client: `.setstat 43 <class>` flips the sheet). REPLACE with the real
 				// (computed) source once decoded - see docs/class-display-239.md / Gitea #239.
-				await SendStatUpdate(client, new CharacterStatBlock().Set((LegacyCharacterStatId)0x43, (uint)client.Session.Character.Class));
+				await SendStatUpdate(client, new CharacterStatBlock().Set((CharacterStatId)0x43, (uint)client.Session.Character.Class));
 
 				// Re-deliver any persisted bag items the world-entry snapshot dropped for lacking an archetype
 				// (AH-bought items - harvested template, no archetype) via the live add path, so they survive relog.

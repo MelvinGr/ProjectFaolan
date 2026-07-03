@@ -8,24 +8,24 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// #258 follow-up: the base player-spawn ProtoCoreCharacterIIR is now built from code (PlayerCharacterIir) instead
-	// of the captured PlayerCharacterIirTemplate.bin blob. These prove the code build reproduces the template exactly
-	// except for the worn-gear entries - which PlayerSpawnMessage.ApplyCharacter always replaces with the character's
-	// own gear, so they are intentionally not reproduced. The .bin survives only as this golden oracle.
+	// of the captured PlayerCharacterIirTemplate.bin blob. These prove the bare template (PlayerCharacterIir.Build with
+	// no character) reproduces the .bin exactly except for the worn-gear entries - which Build always replaces with the
+	// character's own gear, so they are intentionally not reproduced. The .bin survives only as this golden oracle.
 	public class PlayerCharacterIirTests
 	{
 		private const string TemplatePath = "/home/melvin/Development/C#/Project Faolan/Faolan.Tests/Assets/PlayerCharacterIirTemplate.bin";
 
 		[Fact]
-		public void BuildBaseMessage_EqualsTheTemplate_ExceptWornGear()
+		public void BuildBareTemplate_EqualsTheTemplate_ExceptWornGear()
 		{
 			var template = File.ReadAllBytes(TemplatePath);
 
-			// The template with its worn-gear entries stripped (ApplyCharacter always replaces them per character).
+			// The template with its worn-gear entries stripped (Build always replaces them per character).
 			var stripped = ((ReadOnlySpan<byte>)template).FromProtobuf<ProtoCoreCharacterIIR>();
 			stripped.InventoryEntries.Clear();
 			var strippedBytes = stripped.ToProtobufBytes();
 
-			var built = PlayerCharacterIir.BuildBaseMessage().ToProtobufBytes();
+			var built = PlayerCharacterIir.Build(null, null).ToProtobufBytes();
 
 			Assert.Equal(strippedBytes, built);
 		}
@@ -38,7 +38,7 @@ namespace Faolan.Tests
 			var template = File.ReadAllBytes(TemplatePath);
 			var msg = ((ReadOnlySpan<byte>)template).FromProtobuf<ProtoCoreCharacterIIR>();
 			Assert.Equal(4, msg.InventoryEntries.Count);
-			Assert.Empty(PlayerCharacterIir.BuildBaseMessage().InventoryEntries);
+			Assert.Empty(PlayerCharacterIir.Build(null, null).InventoryEntries);
 		}
 	}
 }

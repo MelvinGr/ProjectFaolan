@@ -36,12 +36,12 @@ namespace Faolan.GameServer
 				? 0u
 				: stats.Health;
 			var block = new CharacterStatBlock()
-				.Set(LegacyCharacterStatId.HealthCurrent, currentHealth)
-				.Set(LegacyCharacterStatId.StaminaCurrent, stats.Stamina)
-				.Set(LegacyCharacterStatId.ManaCurrent, stats.Mana)
-				.Set(LegacyCharacterStatId.Level, character.Level)
-				.Set(LegacyCharacterStatId.Exp, character.Experience)
-				.Set(LegacyCharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
+				.Set(CharacterStatId.HealthCurrent, currentHealth)
+				.Set(CharacterStatId.StaminaCurrent, stats.Stamina)
+				.Set(CharacterStatId.ManaCurrent, stats.Mana)
+				.Set(CharacterStatId.Level, character.Level)
+				.Set(CharacterStatId.Exp, character.Experience)
+				.Set(CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
 
 			return BuildStatUpdate(client, block);
 		}
@@ -67,7 +67,7 @@ namespace Faolan.GameServer
 		{
 			// Emit the values under the CURRENT ids (0x001B/0x01F8/0x01FA) - matches the retail full-spawn announce,
 			// which sends current (== max at full health) and lets the client show full bars; max rides the snapshot.
-			var stats = new CharacterStatBlock().Set(LegacyCharacterStatId.HealthCurrent, health).Set(LegacyCharacterStatId.StaminaCurrent, stamina).Set(LegacyCharacterStatId.ManaCurrent, mana);
+			var stats = new CharacterStatBlock().Set(CharacterStatId.HealthCurrent, health).Set(CharacterStatId.StaminaCurrent, stamina).Set(CharacterStatId.ManaCurrent, mana);
 
 			return SendStatUpdate(client, stats);
 		}

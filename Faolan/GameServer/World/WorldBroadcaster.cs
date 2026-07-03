@@ -361,7 +361,7 @@ namespace Faolan.GameServer.World
 		// get it (mirrors BroadcastNpcMove).
 		public async Task BroadcastNpcCombatMode(WorldEntity npc, bool inCombat)
 		{
-			var stats = new CharacterStatBlock().Set(LegacyCharacterStatId.CombatMode,
+			var stats = new CharacterStatBlock().Set(CharacterStatId.CombatMode,
 				inCombat
 					? NpcCombatModeValue
 					: 0u);
@@ -450,7 +450,7 @@ namespace Faolan.GameServer.World
 			if (player == null)
 				return;
 
-			var stats = new CharacterStatBlock().Set(LegacyCharacterStatId.CombatMode,
+			var stats = new CharacterStatBlock().Set(CharacterStatId.CombatMode,
 				inCombat
 					? PlayerCombatModeValue
 					: 0u);
@@ -917,7 +917,7 @@ namespace Faolan.GameServer.World
 			foreach (var quest in active)
 			{
 				var def = await _database.GetQuestDefinition(quest.QuestId);
-				if (BeachTailsBuilder.IsSnapshotEligible(def))
+				if (SnapshotTailsBuilder.IsSnapshotEligible(def))
 					continue; // delivered in the snapshot's quest region
 
 				await SendQuestIir(client, quest.QuestId, WorldQuest.StateActive);

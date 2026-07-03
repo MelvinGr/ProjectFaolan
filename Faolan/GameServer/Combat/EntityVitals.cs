@@ -83,19 +83,19 @@ namespace Faolan.GameServer.Combat
 		/// <summary>
 		///     The vitals as a <c>0x96B8DC59</c> stat block, emitting the current AND max id for each of
 		///     Health/Stamina/Mana. The current/max ids are in-client verified (2026-06-14): current =
-		///     {0x001B,0x01F8,0x01FA}, max = {0x0001,0x01F9,0x01FB} (see LegacyCharacterStatId). A regen/damage delta
+		///     {0x001B,0x01F8,0x01FA}, max = {0x0001,0x01F9,0x01FB} (see CharacterStatId). A regen/damage delta
 		///     mutates the CURRENT value, so it must ride the current id - sending it under the max id (the old bug)
 		///     grew the player's MAX bar instead of refilling current.
 		/// </summary>
 		public CharacterStatBlock ToVitalsBlock()
 		{
 			return new CharacterStatBlock()
-				.Set(LegacyCharacterStatId.HealthCurrent, Health)
-				.Set(LegacyCharacterStatId.HealthMax, MaxHealth)
-				.Set(LegacyCharacterStatId.StaminaCurrent, Stamina)
-				.Set(LegacyCharacterStatId.StaminaMax, MaxStamina)
-				.Set(LegacyCharacterStatId.ManaCurrent, Mana)
-				.Set(LegacyCharacterStatId.ManaMax, MaxMana);
+				.Set(CharacterStatId.HealthCurrent, Health)
+				.Set(CharacterStatId.HealthMax, MaxHealth)
+				.Set(CharacterStatId.StaminaCurrent, Stamina)
+				.Set(CharacterStatId.StaminaMax, MaxStamina)
+				.Set(CharacterStatId.ManaCurrent, Mana)
+				.Set(CharacterStatId.ManaMax, MaxMana);
 		}
 
 		/// <summary>
