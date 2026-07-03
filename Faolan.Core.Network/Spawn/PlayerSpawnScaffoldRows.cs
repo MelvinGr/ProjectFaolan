@@ -31,6 +31,22 @@ namespace Faolan.Core.Network.Spawn
 			[Class.HeraldOfXotli] = [4300, 6100, 6400, 6700, 6800, 6900, 7800, 8100, 8305, 8400, 13600, 14600, 114800, 328700, 328900, 331300]
 		};
 
+		// The FULL feat/ability scaffold a high-level character of the class carries, harvested from the captured
+		// retail chars (NecroL80 L80 Necro, DemoL80 L80 Demo, AssassinL23 L23 Assassin, Hakotep L24 Herald). A spell's
+		// in-client usability is gated on the char having the feat that unlocks it - and that spell->feat mapping
+		// lives ONLY in the server GDB (never transmitted; the client just receives the resulting feat-id LIST). So
+		// we can't grant the ONE exact feat per spell; instead we replicate a working char's whole scaffold, which
+		// makes every class spell the char has learned castable. Over-grants feats (no per-level GDB breakdown), and
+		// only covers the classes we have a high-level capture for. See [[feat_trees_decode_251]] (GDB-mapping-
+		// blocked, NOT RDB-key-blocked) and Gitea #298/#251/#74. Ascending ids (the wire/codec require it).
+		private static readonly Dictionary<Class, uint[]> FullSkillIdsByClass = new Dictionary<Class, uint[]>
+		{
+			[Class.Necromancer] = [4100, 7002, 8909, 13603, 18502, 85279, 86200, 86507, 299901, 301403, 302303, 302603, 303103, 304503, 304803, 304903, 305102, 305403, 305702, 306902, 307802, 308102, 308402, 313104, 321202, 321502, 323205, 323305, 323405, 323505, 326000, 326300, 326600, 327402, 327505, 328908, 329400, 330400, 330500, 331300, 1440500, 1445000],
+			[Class.Demonologist] = [4400, 7002, 8909, 13603, 18502, 104579, 104600, 299901, 301403, 302303, 302603, 303103, 304503, 304803, 304903, 305102, 305403, 305702, 306902, 307802, 308102, 308402, 313704, 321701, 322402, 323201, 323300, 323402, 323501, 326000, 326300, 326600, 327200, 327500, 328908, 329400, 330400, 330500, 331300, 1410900, 1411300, 1440000, 1440400, 1440500, 1440700, 1441902, 1445000],
+			[Class.Assassin] = [3400, 13603, 14101, 14801, 15000, 16707, 160022, 160300, 165600, 301200, 302100, 302900, 304600, 305101, 305200, 305500, 307600, 307900, 308200, 309100, 318100, 323301, 328703, 328902, 329302, 330400, 331300],
+			[Class.HeraldOfXotli] = [4300, 7700, 13603, 14101, 18502, 114823, 114900, 117801, 119000, 300300, 301200, 302100, 302400, 302900, 304300, 304600, 305101, 305200, 305500, 307600, 307900, 308200, 328703, 328902, 330400, 331300]
+		};
+
 		// Dikketest's 6 weighted attributes (weight 1.0). The tags are per-character (likely the chosen
 		// race/class/head presets - mapping not yet cracked), so fresh characters keep Dikketest's proven set.
 		// The character's morph entries are generated from its CharacterBody (see CharacterMorphs), not stored here.
@@ -194,6 +210,16 @@ namespace Faolan.Core.Network.Spawn
 				.ToArray();
 		}
 
+		// The full high-level feat scaffold for a class (harvested from a captured retail char), or null when we have
+		// no high-level capture for that class. Used on level-up to make the class's learned spells castable (the
+		// feat-presence gate; see FullSkillIdsByClass). Ascending ids.
+		public static uint[] FullSkillIdsFor(Class @class)
+		{
+			return FullSkillIdsByClass.TryGetValue(@class, out var ids)
+				? ids
+				: null;
+		}
+
 		// Rebuilds ONLY the appearance portion of an EXISTING scaffold (the weighted appearance entries + the editor
 		// morphs + the closer) from the character's current CharacterBody / CharacterBodyResources, leaving skills,
 		// spawn-frame and scaffold-pairs intact. This propagates a later appearance edit (e.g. the Faolan.Web editor,
@@ -241,6 +267,14 @@ namespace Faolan.Core.Network.Spawn
 			scaffold.IdList.Clear();
 			if (character.Skills != null)
 				scaffold.IdList.AddRange(character.Skills.OrderBy(s => s.SkillId).Select(s => new ScaffoldIdEntry(s.Rank, s.SkillId)));
+
+			// The closer (last entry-table record) carries the COUNT MARKER the client uses to read the feat list:
+			// TAG = (IdList.Count + 2) * 0x3F1 (see FreshCloser). It was stored at the FRESH skill count, so once the
+			// class feat scaffold is granted on level-up (#298) the skill count grows and the stored tag goes stale ->
+			// the client miscounts the feat list and CoreCharacterFullUpdateIIR asserts (a_cBlob.HasFailed). Recompute
+			// it from the ACTUAL IdList here so the wire is always self-consistent (value/archetype is left intact).
+			if (scaffold.Entries.Count > 0)
+				scaffold.Entries[^1] = scaffold.Entries[^1] with { Tag = (ushort)((scaffold.IdList.Count + 2) * 0x3F1) };
 
 			scaffold.EndPairs.Clear();
 			scaffold.EndPairs2.Clear();

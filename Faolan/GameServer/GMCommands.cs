@@ -10,6 +10,7 @@ using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Spawn;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.Economy.Tradepost;
 using Faolan.GameServer.Packets.FullCharSnapshot;
@@ -539,6 +540,7 @@ namespace Faolan.GameServer
 				["spelltest"] = (client, arguments) => ApplySpellTest(client.Session.Character.Id, uint.Parse(arguments)),
 				["vitals"] = (client, arguments) => SetVitalsCommand(client, arguments),
 				["setstat"] = (client, arguments) => SetStatCommand(client, arguments),
+				["setstatrange"] = (client, arguments) => SetStatRangeCommand(client, arguments),
 				["level"] = (client, arguments) => SetLevelCommand(client, arguments),
 				["learnspell"] = (client, arguments) => LearnSpellCommand(client, arguments),
 				["hurt"] = (client, arguments) => AdjustOwnHealthCommand(client, arguments, false),
@@ -1214,6 +1216,13 @@ namespace Faolan.GameServer
 					await SendLearnSpell(client, spellId);
 					await Database.AddCharacterSpell(character.Id, spellId);
 				}
+
+				// Feat scaffold (#298/#251): a learned spell only becomes CASTABLE once the char carries the feat that
+				// unlocks it. That spell->feat map is server-GDB-only (never on the wire), so we grant the whole
+				// harvested class scaffold instead of the one exact feat. Rides the scaffold on the next spawn (relog).
+				var fullScaffold = PlayerSpawnScaffoldRows.FullSkillIdsFor(character.Class);
+				if (fullScaffold != null)
+					await Database.EnsureCharacterSkills(character.Id, fullScaffold);
 			}
 
 			await _agentServerDispatcher.SendSystemMessage(character.Id, $"Level set to {level} (relog to refresh the full character sheet).");
@@ -1228,6 +1237,20 @@ namespace Faolan.GameServer
 			var value = uint.Parse(parts[1]);
 
 			return SendStatUpdate(client, new CharacterStatBlock().Set(statId, value));
+		}
+
+		// .setstatrange <startHex> <endHex> <value>  - DEBUG sweep: push every stat id in [start, end] set to `value`
+		// in one 0x96B8DC59 update, to bisect which stat a client behaviour keys off (e.g. the spell-usability level).
+		private Task SetStatRangeCommand(INetworkClient client, string arguments)
+		{
+			var parts = (arguments ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+			var start = Convert.ToUInt32(parts[0], 16);
+			var end = Convert.ToUInt32(parts[1], 16);
+			var value = uint.Parse(parts[2]);
+			var block = new CharacterStatBlock();
+			for (var id = start; id <= end; id++)
+				block.Set((LegacyCharacterStatId)id, value);
+			return SendStatUpdate(client, block);
 		}
 
 		// .vitals [health] [stamina] [mana]  - push a 0x96B8DC59 vitals update. With no args, sends the character's

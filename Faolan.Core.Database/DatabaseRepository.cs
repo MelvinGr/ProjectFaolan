@@ -12,6 +12,7 @@ namespace Faolan.Core.Database
 	public interface IDatabaseRepository
 	{
 		Task<bool> AddCharacterSpell(uint characterId, uint spellId);
+		Task<int> EnsureCharacterSkills(uint characterId, IEnumerable<uint> skillIds);
 		Task AddCharacterTag(uint characterId, uint tagId);
 		Task<bool> CheckLogin(string username, string password);
 		Task<Character> CreateCharacter(uint accountId, uint realmId);
@@ -173,6 +174,37 @@ namespace Faolan.Core.Database
 			});
 			await ctx.SaveChangesAsync();
 			return true;
+		}
+
+		// Ensures the character's spawn scaffold (CharacterSkills) contains every id in `skillIds` (rank 0 for any
+		// added), idempotent. Used on level-up to grant the class feat scaffold so learned spells become castable
+		// (the client gates spell usability on feat presence). Returns the number of newly-added skill rows.
+		public async Task<int> EnsureCharacterSkills(uint characterId, IEnumerable<uint> skillIds)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var existing = await ctx.CharacterSkills
+				.Where(s => s.CharacterId == characterId)
+				.Select(s => s.SkillId)
+				.ToListAsync();
+			var have = existing.ToHashSet();
+			var added = 0;
+			foreach (var id in skillIds)
+			{
+				if (!have.Add(id))
+					continue;
+
+				ctx.CharacterSkills.Add(new CharacterSkill
+				{
+					CharacterId = characterId,
+					SkillId = id,
+					Rank = 0
+				});
+				added++;
+			}
+
+			if (added > 0)
+				await ctx.SaveChangesAsync();
+			return added;
 		}
 
 		// Sets a tag on a character (idempotent - no duplicate row).

@@ -9,6 +9,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.Core.Network.Spawn;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
@@ -516,6 +517,12 @@ namespace Faolan.GameServer.Combat
 					await _learnSpell(killer, spellId);
 					await _database.AddCharacterSpell(character.Id, spellId);
 				}
+
+				// Feat scaffold (#298/#251): grant the harvested class scaffold so the just-learned spells become
+				// castable (the client gates usability on feat presence; the exact spell->feat map is server-GDB-only).
+				var fullScaffold = PlayerSpawnScaffoldRows.FullSkillIdsFor(character.Class);
+				if (fullScaffold != null)
+					await _database.EnsureCharacterSkills(character.Id, fullScaffold);
 			}
 		}
 
