@@ -49,9 +49,15 @@ namespace Faolan.Importer.Tsv
 				wanted.Add((classId, BaseKey(c[2])));
 			}
 
-			// base-name-key -> the ids of every rank row of that base.
+			// base-name-key -> ONE id per rank of that base. A logical spell exists as multiple catalog ids (the two
+			// RDB id-ranges: one is the real castable record with CastTime > 0, the other an instant/free variant with
+			// CastTime 0). Keep ONE id per full (rank-specific) NAME - the real cast (CastTime > 0), tie-break lowest id
+			// - so a class never learns the same spell twice or gets handed the wrong instant variant.
+			var reps = (await db.Spells.Where(s => s.Name != null && s.Name != "").Select(s => new { s.Id, s.Name, s.CastTime }).ToListAsync())
+				.GroupBy(s => s.Name)
+				.Select(g => g.OrderByDescending(x => x.CastTime > 0).ThenBy(x => x.Id).First());
 			var byBase = new Dictionary<string, List<uint>>();
-			foreach (var s in await db.Spells.Where(s => s.Name != null && s.Name != "").Select(s => new { s.Id, s.Name }).ToListAsync())
+			foreach (var s in reps)
 			{
 				var key = BaseKey(s.Name);
 				(byBase.TryGetValue(key, out var ids) ? ids : byBase[key] = []).Add(s.Id);
@@ -76,7 +82,24 @@ namespace Faolan.Importer.Tsv
 			}
 
 			await db.SaveChangesAsync();
-			logger?.LogInformation("WikiClassSpellImporter: {Rows} wiki rows, {Matched} matched a spell, {Inserted} new ClassSpell rows.", wanted.Count, matched, inserted);
+
+			// Final dedup: collapse any (Class, spell-NAME) that still has >1 catalog id (e.g. a create-capture starter
+			// whose captured id differs from the wiki rep, or a name spanning both RDB id-ranges) to the real castable
+			// record (CastTime > 0, tie lowest id) - so a class never learns the same spell twice / the instant variant.
+			var joined = await db.ClassSpells.Join(db.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => new { cs, s.Name, s.CastTime }).ToListAsync();
+			var removed = joined
+				.GroupBy(x => (x.cs.Class, x.Name))
+				.Where(g => g.Count() > 1)
+				.SelectMany(g => g.OrderByDescending(x => x.CastTime > 0).ThenBy(x => x.cs.SpellId).Skip(1))
+				.Select(x => x.cs)
+				.ToList();
+			if (removed.Count > 0)
+			{
+				db.ClassSpells.RemoveRange(removed);
+				await db.SaveChangesAsync();
+			}
+
+			logger?.LogInformation("WikiClassSpellImporter: {Rows} wiki rows, {Matched} matched a spell, {Inserted} new, {Deduped} dup ids dropped.", wanted.Count, matched, inserted, removed.Count);
 			return (wanted.Count, matched, inserted);
 		}
 

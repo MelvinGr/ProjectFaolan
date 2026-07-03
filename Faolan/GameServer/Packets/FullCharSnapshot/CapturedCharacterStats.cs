@@ -50,18 +50,6 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 	public sealed class LegacyCharacterStatEntry
 	{
-		public decimal ScaledValue =>
-			GetScale(StatId) switch
-			{
-				100 => RawValue / 100m,
-				10  => RawValue / 10m,
-				_   => RawValue
-			};
-
-		public required LegacyCharacterStatId StatId { get; init; }
-
-		public required uint RawValue { get; init; }
-
 		public static uint GetScale(LegacyCharacterStatId statId)
 		{
 			return statId switch
@@ -73,91 +61,6 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 				_ => 1
 			};
-		}
-	}
-
-	/// <summary>
-	///     Strongly typed view over the exact screenshot-aligned values that are already confirmed
-	///     in the bigboy / SpawnPlayer capture family.
-	///     Intentionally conservative: only fields with clustered or repeated evidence are promoted
-	///     to named properties here. Less certain mappings should remain as raw <see cref="LegacyCharacterStatEntry" />
-	///     instances until more captures are decoded.
-	/// </summary>
-	public sealed class CapturedCharacterStats
-	{
-		public decimal? HealthMax =>
-			HealthMaxRaw == null
-				? null
-				: HealthMaxRaw.Value / 100m;
-
-		public decimal? ManaMax =>
-			ManaMaxRaw == null
-				? null
-				: ManaMaxRaw.Value / 100m;
-
-		public decimal? StaminaCurrent =>
-			StaminaCurrentRaw == null
-				? null
-				: StaminaCurrentRaw.Value / 100m;
-
-		public uint? AnnihilationLosses { get; set; }
-		public uint? CaptureSkullLosses { get; set; }
-		public uint? CaptureSkullWins { get; set; }
-		public uint? HealthMaxRaw { get; set; }
-
-		public uint? Level { get; set; }
-
-		public uint? ManaMaxRaw { get; set; }
-		public uint? OverallDeaths { get; set; }
-		public uint? OverallKills { get; set; }
-		public uint? PvpLevel { get; set; }
-
-		public uint? StaminaCurrentRaw { get; set; }
-
-		public void Apply(LegacyCharacterStatEntry entry)
-		{
-			switch (entry.StatId)
-			{
-				case LegacyCharacterStatId.HealthMax:
-					HealthMaxRaw = entry.RawValue;
-					break;
-
-				case LegacyCharacterStatId.ManaMax:
-					ManaMaxRaw = entry.RawValue;
-					break;
-
-				case LegacyCharacterStatId.StaminaCurrent:
-					StaminaCurrentRaw = entry.RawValue;
-					break;
-
-				case LegacyCharacterStatId.Level:
-					Level = entry.RawValue;
-					break;
-
-				case LegacyCharacterStatId.PvpLevel:
-					PvpLevel = entry.RawValue;
-					break;
-
-				case LegacyCharacterStatId.KillingBlows:
-					OverallKills = entry.RawValue;
-					break;
-
-				case LegacyCharacterStatId.Death:
-					OverallDeaths = entry.RawValue;
-					break;
-
-				case LegacyCharacterStatId.AnnihilationLose:
-					AnnihilationLosses = entry.RawValue;
-					break;
-
-				case LegacyCharacterStatId.CaptureSkullWin:
-					CaptureSkullWins = entry.RawValue;
-					break;
-
-				case LegacyCharacterStatId.CaptureSkullLose:
-					CaptureSkullLosses = entry.RawValue;
-					break;
-			}
 		}
 	}
 }
