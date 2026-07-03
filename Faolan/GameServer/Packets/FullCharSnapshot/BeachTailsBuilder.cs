@@ -104,6 +104,13 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			var quest = BuildQuestPortion(quests, primary, instance);
 
 			var block = TailsStatBlock.CreateFreshBlock();
+
+			// Derive the character's LEVEL (stat 0x36) into the sheet. The skeleton hardcodes 1 because its diff sample
+			// was all level-1 chars, so the level slot was misclassified as "fixed" - without this the client reads
+			// level 1 from the snapshot and blocks every level-gated spell/item regardless of the player's real level.
+			if (character != null)
+				block.SetStat((uint)LegacyCharacterStatId.Level, character.Level);
+
 			if (character?.MaxStats != null)
 			{
 				block.CurrentXp = character.Experience;

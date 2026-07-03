@@ -1102,6 +1102,21 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			Values[GetRepeatedCopyIndex(index)] = value;
 		}
 
+		// The block is a [statId, value] stat sheet: a stat's value is the slot immediately after each occurrence of
+		// its id (a stat appears in the leading displayed section, the repeated run, AND the run's +148 copy). Sets the
+		// value at EVERY occurrence so the sheet is internally consistent. Used to DERIVE character stats (Level 0x36,
+		// XP 0x34, MaxXP 0x15E, ...) from the character instead of carrying the skeleton's fixed value - the fix for
+		// hardcoded Level: the 313-value "fixed skeleton" was diffed only across level-1 characters, so the level slot
+		// never varied and was misclassified as fixed (it is really character-derived).
+		public void SetStat(uint statId, uint value)
+		{
+			for (var i = 0; i + 1 < Values.Count; i++)
+			{
+				if (Values[i] == statId)
+					Values[i + 1] = value;
+			}
+		}
+
 		private static int GetRepeatedCopyIndex(CharacterValueIndex index)
 		{
 			var indexx = (int)index;
