@@ -284,6 +284,31 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
+	// Per-character personal BANK (CharacterInventory container kind 105) from the on-demand BankIIR packets - the
+	// bank is not in the login snapshot, so it needs its own pass. Needs characters (attribution) + items (the
+	// templates the bank references).
+	public sealed class CharacterBankModule : IImportModule
+	{
+		public ImportSource Source => ImportSource.Captures;
+		public IReadOnlyList<string> DependsOn => ["characters", "items"];
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "Per-character bank contents (BankIIR, kind 105).";
+		public string Name => "character-bank";
+
+		public async Task<ImportResult> RunAsync(ImportContext ctx)
+		{
+			var (chars, items) = await CaptureBankImporter.ImportAsync(ctx.Db, ctx.RawPackets);
+			return new ImportResult($"{chars} characters, {items} bank items.");
+		}
+	}
+
 	// Vendor shop windows handled in ShopsModule.cs; characters in CharactersModule.cs.
 
 	// The burst-truth NPC set (#266): spawns + types + npc-spells + spell-type links + patrol routes. Needs
