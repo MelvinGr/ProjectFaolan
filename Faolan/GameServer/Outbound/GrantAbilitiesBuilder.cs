@@ -109,8 +109,11 @@ namespace Faolan.GameServer
 			}
 
 			// Spells go on bar 1 (the +100 page), after the page-2 normal attacks - matching retail (Herald 0x3006FF at
-			// slot 103), so the player sees them on their primary visible bar rather than bar 0.
-			foreach (var spellId in spells)
+			// slot 103), so the player sees them on their primary visible bar rather than bar 0. ONE per spell family
+			// (highest known rank) so the bar shows distinct icons, not every rank (Ice Strike R1/R2/R3 share an icon,
+			// which made a leveled caster's bar look like it just repeated). All ranks are still learned above.
+			var barSpells = await Database.GetStartingBarSpells(character.Level, character.Class);
+			foreach (var spellId in barSpells)
 				await Database.SetCharacterShortcut(character.Id, secondBarSlot++, shortcutTypeSpell, spellId);
 
 			Logger.LogInformation("EnsureStartingLoadout: seeded default bar for '{Name}' (class={Class}): {A} abilities + {S} spells (#74/#71).", character.Name, character.Class, abilities.Length, spells.Length);

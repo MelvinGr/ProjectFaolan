@@ -259,6 +259,31 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
+	// Per-character quest JOURNAL (CharacterQuest) recovered from the capture's s2c QuestIIR/QuestGoal packets, so an
+	// imported character carries its active/completed quests + goal progress. Needs characters (attribution) and the
+	// quest definitions (the journal references them).
+	public sealed class CharacterQuestsModule : IImportModule
+	{
+		public ImportSource Source => ImportSource.Captures;
+		public IReadOnlyList<string> DependsOn => ["characters", "quests"];
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "Per-character quest journals (QuestIIR/QuestGoal).";
+		public string Name => "character-quests";
+
+		public async Task<ImportResult> RunAsync(ImportContext ctx)
+		{
+			var (chars, quests) = await CaptureQuestImporter.ImportAsync(ctx.Db, ctx.RawPackets);
+			return new ImportResult($"{chars} characters, {quests} quest rows.");
+		}
+	}
+
 	// Vendor shop windows handled in ShopsModule.cs; characters in CharactersModule.cs.
 
 	// The burst-truth NPC set (#266): spawns + types + npc-spells + spell-type links + patrol routes. Needs

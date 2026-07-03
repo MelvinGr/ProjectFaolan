@@ -98,6 +98,7 @@ namespace Faolan.Core.Database
 		Task<Ability[]> GetStartingAbilities(uint level, uint @class);
 
 		Task<uint[]> GetStartingSpells(uint level, Class @class);
+		Task<uint[]> GetStartingBarSpells(uint level, Class @class);
 		Task<uint[]> GetClassSpellsUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive);
 		Task<TradepostListing> GetTradepostListingBySaleId(ulong saleId);
 		Task<TradepostListing> GetTradepostListingBySellerSlot(string sellerName, uint bankSlot);
@@ -930,6 +931,46 @@ namespace Faolan.Core.Database
 				.Select(s => s.Id)
 				.Distinct()
 				.ToArrayAsync();
+		}
+
+		// The spells to place on the DEFAULT action bar: ONE per spell family (the highest rank the character can use),
+		// so the bar shows one icon per spell instead of every rank (Ice Strike R1/R2/R3... all share one icon, which
+		// makes the bar look like it "repeats"). The full ranked set is still LEARNED via GetStartingSpells; this is
+		// bar placement only. Families are ordered by when first acquired (their lowest unlock level) so the bar reads
+		// low -> high. Family key = the spell name with a trailing " (Rank N)" stripped.
+		public async Task<uint[]> GetStartingBarSpells(uint level, Class @class)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var candidates = await ctx.ClassSpells
+				.Where(cs => cs.Class == 0 || cs.Class == @class)
+				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => s)
+				.Where(s => s.Level <= level)
+				.Select(s => new { s.Id, s.Name, s.Level })
+				.ToListAsync();
+
+			return candidates
+				.GroupBy(s => StripRankSuffix(s.Name))
+				.Select(g => new
+				{
+					BestId = g.OrderByDescending(s => s.Level).ThenByDescending(s => s.Id).First().Id,
+					FirstLevel = g.Min(s => s.Level)
+				})
+				.OrderBy(x => x.FirstLevel).ThenBy(x => x.BestId)
+				.Select(x => x.BestId)
+				.ToArray();
+		}
+
+		// The spell-family key: the name with a trailing " (Rank N)" removed (and trailing spaces trimmed - a few
+		// catalog names carry a double space before the rank, e.g. "Freeze  (Rank 2)").
+		private static string StripRankSuffix(string name)
+		{
+			if (string.IsNullOrEmpty(name))
+				return name ?? "";
+
+			var i = name.IndexOf(" (Rank ", StringComparison.Ordinal);
+			return (i >= 0
+				? name[..i]
+				: name).TrimEnd();
 		}
 
 		// The class spells whose unlock level (Spells.Level) falls in (fromLevelExclusive, toLevelInclusive] - the

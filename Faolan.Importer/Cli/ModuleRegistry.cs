@@ -26,6 +26,7 @@ namespace Faolan.Importer.Cli
 			new ConversationsModule(),
 			new CharacterStateModule(),
 			new LearnedSpellsModule(),
+			new CharacterQuestsModule(),
 			new ShopsModule(),
 			new NpcsModule(),
 			new WorldObjectsModule(),
