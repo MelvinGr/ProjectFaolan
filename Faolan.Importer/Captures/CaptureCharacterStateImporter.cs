@@ -82,56 +82,61 @@ namespace Faolan.Importer.Captures
 
 		public static async Task<(int MoneySeeded, int ShortcutsSeeded)> ImportAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<CapturedPacket>> captures)
 		{
+			// Replay ALL captures' state events as ONE stream ordered by real capture time (CapturedPacket.Ticks =
+			// epoch microseconds), so a character that appears in several captures ends on its LATEST-in-time wallet +
+			// hotbar. (Extract orders by Ticks and un-removes/un-adds a slot on the opposite event, so its final
+			// `shortcuts` = the last bar and `removed` = slots deleted at the end - the two never overlap.) The old
+			// per-capture pass both lost that global order and double-inserted a slot for a repeat character - the
+			// earlier capture's pending Add wasn't visible to the next capture's `existing` query, so the same
+			// (CharacterId, Slot) was Added twice -> UNIQUE constraint crash that aborted the whole import.
+			var state = Extract(captures.SelectMany(c => c).ToList());
+
 			var moneySeeded = 0;
 			var shortcutsSeeded = 0;
-			foreach (var capture in captures)
+
+			foreach (var (characterId, balance) in state.MoneyByCharacter)
 			{
-				var state = Extract(capture);
+				var character = await db.Characters.FirstOrDefaultAsync(c => c.Id == characterId);
+				if (character == null)
+					continue;
 
-				foreach (var (characterId, balance) in state.MoneyByCharacter)
+				character.Money = balance;
+				moneySeeded++;
+			}
+
+			foreach (var (characterId, slots) in state.ShortcutsByCharacter)
+			{
+				if (!await db.Characters.AnyAsync(c => c.Id == characterId))
+					continue;
+
+				var existing = await db.CharacterShortcuts.Where(s => s.CharacterId == characterId).ToDictionaryAsync(s => s.Slot);
+				foreach (var (slot, (type, target)) in slots)
 				{
-					var character = await db.Characters.FirstOrDefaultAsync(c => c.Id == characterId);
-					if (character == null)
-						continue;
-
-					character.Money = balance;
-					moneySeeded++;
-				}
-
-				foreach (var (characterId, slots) in state.ShortcutsByCharacter)
-				{
-					if (!await db.Characters.AnyAsync(c => c.Id == characterId))
-						continue;
-
-					var existing = await db.CharacterShortcuts.Where(s => s.CharacterId == characterId).ToDictionaryAsync(s => s.Slot);
-					foreach (var (slot, (type, target)) in slots)
+					if (existing.TryGetValue(slot, out var row))
 					{
-						if (existing.TryGetValue(slot, out var row))
+						row.ShortcutType = type;
+						row.TargetId = target;
+					}
+					else
+					{
+						db.CharacterShortcuts.Add(new CharacterShortcut
 						{
-							row.ShortcutType = type;
-							row.TargetId = target;
-						}
-						else
-						{
-							db.CharacterShortcuts.Add(new CharacterShortcut
-							{
-								CharacterId = characterId,
-								Slot = slot,
-								ShortcutType = type,
-								TargetId = target
-							});
-						}
-
-						shortcutsSeeded++;
+							CharacterId = characterId,
+							Slot = slot,
+							ShortcutType = type,
+							TargetId = target
+						});
 					}
 
-					if (state.RemovedSlotsByCharacter.TryGetValue(characterId, out var removedSlots))
+					shortcutsSeeded++;
+				}
+
+				if (state.RemovedSlotsByCharacter.TryGetValue(characterId, out var removedSlots))
+				{
+					foreach (var slot in removedSlots)
 					{
-						foreach (var slot in removedSlots)
-						{
-							if (existing.TryGetValue(slot, out var row))
-								db.CharacterShortcuts.Remove(row);
-						}
+						if (existing.TryGetValue(slot, out var row))
+							db.CharacterShortcuts.Remove(row);
 					}
 				}
 			}

@@ -41,10 +41,10 @@ namespace Faolan.Importer.Captures
 				if (!doc.RootElement.TryGetProperty("Packets", out var packets) || packets.ValueKind != JsonValueKind.Array)
 					return list;
 
-				long tick = 0;
+				long seq = 0;
 				foreach (var p in packets.EnumerateArray())
 				{
-					tick++;
+					seq++;
 					// Conan = the game/agent connections (the conversation lives here); skip the AgentServer chat stream.
 					if (!p.TryGetProperty("Protocol", out var proto) || proto.GetString() != "Conan")
 						continue;
@@ -67,6 +67,15 @@ namespace Faolan.Importer.Captures
 					var subOpcode = body.Length >= 8
 						? BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4))
 						: 0u;
+
+					// Real capture timestamp (frame.time_epoch, seconds) as epoch MICROSECONDS, so packets sort in
+					// true wall-clock order ACROSS captures - not just within one file. Falls back to the per-file
+					// sequence when TimeUtc is absent. (Used by CaptureCharacterStateImporter to take a character's
+					// LATEST-in-time wallet/hotbar when it appears in several captures.)
+					var tick = p.TryGetProperty("TimeUtc", out var tEl) && tEl.ValueKind == JsonValueKind.String
+					           && double.TryParse(tEl.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var epoch)
+						? (long)(epoch * 1_000_000)
+						: seq;
 
 					var full = Rebuild(p, body, opcode);
 					if (full != null)
