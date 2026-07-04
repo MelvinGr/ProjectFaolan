@@ -79,14 +79,22 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// The number of stat pairs a full sheet carries: StatList#1 (the displayed stats) + StatList#2's single copy.
 		public static int SheetSize => StatList1.Length + StatList2Half.Length;
 
-		public static TailsPostAccessBlock CreateFreshBlock(KnownSpellList known = null)
+		// The fresh-character baseline stat sheet (StatList#1's 17 displayed pairs + StatList#2's 74 sheet pairs, ONE
+		// copy), as a fresh mutable list - the caller patches the character-derived slots (level/...) on IT before
+		// building, so nothing has to SetStat the finished block (which would also scan the inline known-list).
+		public static List<(uint Id, uint Value)> FreshSheet()
 		{
-			// The fresh skeleton is just the fixed baseline sheet (StatList#1 + StatList#2's one copy) run through the
-			// generic builder - byte-identical to the captured beach block (proven by BeachTailsFromScratchTests).
 			var sheet = new List<(uint, uint)>(SheetSize);
 			sheet.AddRange(StatList1);
 			sheet.AddRange(StatList2Half);
-			return CreateBlock(sheet, known);
+			return sheet;
+		}
+
+		public static TailsPostAccessBlock CreateFreshBlock(KnownSpellList known = null)
+		{
+			// The fresh skeleton is just the baseline sheet run through the generic builder - byte-identical to the
+			// captured beach block (proven by BeachTailsFromScratchTests).
+			return CreateBlock(FreshSheet(), known);
 		}
 
 		// Builds a stat block from a full stat sheet: `sheet` is StatList#1 (its first StatList1.Length pairs - the

@@ -110,59 +110,52 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 			// #74/#71: the character's learned spells are built INTO the stat block's known-list (no-op when empty).
 			var knownList = KnownSpellList.FromSpellIds(knownSpellIds);
+			var imported = statSheet is { Count: > 0 } && statSheet.Count == TailsStatBlock.SheetSize;
 
-			TailsPostAccessBlock block;
-
-			if (statSheet is { Count: > 0 } && statSheet.Count == TailsStatBlock.SheetSize)
+			// Build the full stat SHEET and apply every BY-ID override to IT, THEN construct the block (with the known-
+			// list) in one pass. The overrides MUST NOT be post-hoc SetStat calls on the built block: SetStat scans ALL
+			// Values, which now include the inline known-list records, so a spell id colliding with an override stat id
+			// would corrupt a record -> malformed known-list -> the client drops the connection. (The positional
+			// SetValue ops below - CurrentXp/vitals/CurrentHp - stay in the stat region and never scan, so they are safe.)
+			List<(uint Id, uint Value)> sheet;
+			if (imported)
 			{
-				// The character has a captured stat sheet (CharacterStat): author the WHOLE sheet from its REAL retail
-				// values (built directly, with the known-list, in one construction - not via SetStat, which scans all
-				// Values and would corrupt the trailer's 0x1 word and the known-list ids). Values are wire-scale as captured.
-				block = TailsStatBlock.CreateBlock([.. statSheet.Select(s => ((uint)s.Id, s.Value))], knownList);
-
-				// Reset the SESSION/MAP-volatile slots to the fresh baseline: their captured value is specific to the
-				// retail session it came from, and replaying it into a fresh login misbehaves - 0xBF (the playfield-
-				// token/position slot) hides the entire abilities tab (verified by bisecting NecroL80's sheet). These ids
-				// are not in the trailer nor the known-list records, so the targeted SetStat is safe.
+				// The character's REAL captured sheet, with the SESSION/MAP-volatile 0xBF (playfield/position - a stale
+				// one hides the abilities tab, verified by bisecting NecroL80's sheet) and the character-derived XP-companion
+				// slots (0x15E MaxExp, 0x39) reset to baseline. XP (0x34) itself is authored positionally below.
+				sheet = [.. statSheet.Select(s => ((uint)s.Id, s.Value))];
 				foreach (var id in TailsStatBlock.VolatileStatIds)
-					block.SetStat(id, TailsStatBlock.SkeletonValueOf(id));
-
-				// XP is CHARACTER-derived (canonical in the character/level), not persistent sheet state: a captured
-				// max-level XP replayed verbatim renders as a garbage/negative XP bar in-client. Author 0x34 from the
-				// character (as the fresh path does) and reset its companion slots (0x15E MaxExp, 0x39) to baseline.
-				if (character != null)
-					block.CurrentXp = character.Experience;
-				block.SetStat((uint)CharacterStatId.MaxExp, TailsStatBlock.SkeletonValueOf((uint)CharacterStatId.MaxExp));
-				block.SetStat(0x39, TailsStatBlock.SkeletonValueOf(0x39));
-
-				// #214: a dead character logs in dead - the stored sheet is its alive-at-capture health, so still zero
-				// current-health so the client shows the release window at world entry.
-				if (character?.IsDead == true)
-					block.CurrentHp = 0;
+					SetSheet(sheet, id, TailsStatBlock.SkeletonValueOf(id));
+				SetSheet(sheet, (uint)CharacterStatId.MaxExp, TailsStatBlock.SkeletonValueOf((uint)CharacterStatId.MaxExp));
+				SetSheet(sheet, 0x39, TailsStatBlock.SkeletonValueOf(0x39));
 			}
 			else
 			{
-				// No captured sheet (a freshly-created character): fresh skeleton + targeted level/XP/class-vitals
-				// patches. The skeleton hardcodes level 1 (its diff sample was all level-1 chars), so without the level
-				// patch the client blocks every level-gated spell/item.
-				block = TailsStatBlock.CreateFreshBlock(knownList);
+				// No captured sheet (a freshly-created character): the fresh skeleton with its LEVEL patched (the
+				// skeleton hardcodes 1, so without this the client blocks every level-gated spell/item).
+				sheet = TailsStatBlock.FreshSheet();
 				if (character != null)
+					SetSheet(sheet, (uint)CharacterStatId.Level, character.Level);
+			}
+
+			var block = TailsStatBlock.CreateBlock(sheet, knownList);
+
+			// Positional post-ops (SetValue-based, confined to the stat region - they do NOT scan the inline known-list).
+			if (character != null)
+			{
+				block.CurrentXp = character.Experience;
+
+				// A fresh character's per-class vitals (displayed + base/secondary slots) so the sheet is internally
+				// consistent (#4/#186); an imported character already carries its real vitals in the sheet.
+				if (!imported && character.MaxStats != null)
 				{
-					block.SetStat((uint)CharacterStatId.Level, character.Level);
-
-					if (character.MaxStats != null)
-					{
-						block.CurrentXp = character.Experience;
-						// Author the WHOLE per-class stat block (displayed + base/secondary slots) so it is internally
-						// consistent (#4/#186), not just the displayed maxima. For the captured beach char (Strie, Assassin
-						// 98/0/236, base 90/0/230) this reproduces the template's slots exactly, so the golden stays byte-exact.
-						var v = character.MaxStats.SnapshotVitals(character.Class);
-						block.ApplyClassVitals(v.Hp, v.HpBase, v.Mana, v.ManaBase, v.Stamina, v.StaminaBase);
-
-						if (character.IsDead)
-							block.CurrentHp = 0;
-					}
+					var v = character.MaxStats.SnapshotVitals(character.Class);
+					block.ApplyClassVitals(v.Hp, v.HpBase, v.Mana, v.ManaBase, v.Stamina, v.StaminaBase);
 				}
+
+				// #214: a dead character logs in dead - zero current-health so the client shows the release window.
+				if (character.IsDead && (imported || character.MaxStats != null))
+					block.CurrentHp = 0;
 			}
 
 			var statBytes = TailsStatBlock.Serialize(block);
@@ -177,6 +170,16 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 				WorldDespawn.TryReplacePlayfieldToken(tails, playfieldToken.Value);
 
 			return tails;
+		}
+
+		// Sets a stat id's value at EVERY occurrence in the sheet (a few ids appear in both StatList#1 and StatList#2).
+		// Applied to the sheet BEFORE the block is built, so - unlike TailsPostAccessBlock.SetStat - it never scans the
+		// inline known-list records.
+		private static void SetSheet(List<(uint Id, uint Value)> sheet, uint statId, uint value)
+		{
+			for (var i = 0; i < sheet.Count; i++)
+				if (sheet[i].Id == statId)
+					sheet[i] = (statId, value);
 		}
 
 		public static byte[] BuildQuestPortion(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, uint instance)

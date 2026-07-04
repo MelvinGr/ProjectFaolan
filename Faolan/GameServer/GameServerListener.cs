@@ -1042,8 +1042,16 @@ namespace Faolan.GameServer
 		// it never collides with GameAgent.ChatVicinity, which shares opcode 0x2002.
 		private async Task HandleRequestBindLocation(INetworkClient client, ConanPacket packet)
 		{
-			packet.Body.ReadUInt32(); // ID32 type (0x0000C350)
-			var requesterId = packet.Body.ReadUInt32();
+			// body = [u32 ID32 type][u32 requesterId]; tolerate a SHORT/empty poll (the client sends a bare-header
+			// variant) - the reply is derived from the character, not the body, and requesterId is only for the log.
+			// Reading past a short body threw EndOfStreamException, which propagated out of ReceivedPacket and CLOSED
+			// the connection (the client dropped at world entry).
+			uint requesterId = 0;
+			if (packet.Body.Length >= 8)
+			{
+				packet.Body.ReadUInt32(); // ID32 type (0x0000C350)
+				requesterId = packet.Body.ReadUInt32();
+			}
 
 			// The bind playfield is the map of the character's persisted bind RespawnPoint (set by .bind / a
 			// wayfarer); an unbound character (or one whose point vanished) falls back to its current map.
