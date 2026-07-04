@@ -51,7 +51,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			foreach (var row in (rows ?? []).Where(r => r.Item != null).OrderBy(r => r.Slot))
 			{
 				var slot = (ulong)row.Slot;
-				container.Items.Add(SnapshotItemBuilder.BuildListEntry(slot, ItemId(instance, kind, slot), RecordId(instance, kind, slot), row.Count, row.Item, row.Item.Archetype));
+				container.Items.Add(SnapshotItemBuilder.BuildListEntry(slot, ItemId(instance, kind, slot), RecordId(instance, kind, slot), row.Count, row.Item, row.Item.Hash));
 			}
 
 			return container;
@@ -76,13 +76,13 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			// silently absent, like the equipped path.
 			var byKind = containers.ToDictionary(c => c.InventoryId.Type);
 			var bagSlotsTaken = new HashSet<ulong>();
-			foreach (var row in (inventoryRows ?? []).Where(r => r.Item is { Archetype: not 0 }).OrderBy(r => r.Slot))
+			foreach (var row in (inventoryRows ?? []).Where(r => r.Item is { Hash: not 0 }).OrderBy(r => r.Slot))
 			{
 				if (!byKind.TryGetValue((uint)row.Container, out var container))
 					continue;
 
 				var slot = (ulong)row.Slot;
-				container.Items.Add(SnapshotItemBuilder.BuildListEntry(slot, ItemId(instance, (uint)row.Container, slot), RecordId(instance, (uint)row.Container, slot), row.Count, row.Item, row.Item.Archetype));
+				container.Items.Add(SnapshotItemBuilder.BuildListEntry(slot, ItemId(instance, (uint)row.Container, slot), RecordId(instance, (uint)row.Container, slot), row.Count, row.Item, row.Item.Hash));
 				if (container.InventoryId.Type == BagKind)
 					bagSlotsTaken.Add(slot);
 			}

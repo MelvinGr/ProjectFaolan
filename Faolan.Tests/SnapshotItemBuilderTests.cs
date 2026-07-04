@@ -70,7 +70,7 @@ namespace Faolan.Tests
 				Assert.Equal(Convert.ToHexString(expected), Convert.ToHexString(produced));
 
 				// 4) And via the item's own archetype (harvested into Items) - the fully DB-driven path.
-				Assert.Equal(Archetype, item.Archetype);
+				Assert.Equal(Archetype, item.Hash);
 				Assert.True(SnapshotItemBuilder.TryBuildEntry(Slot, ItemId, RecordId, Count, item, out var auto));
 				Assert.Equal(Convert.ToHexString(expected), Convert.ToHexString(auto.MessageValue!.ToArray()));
 			}
@@ -104,8 +104,8 @@ namespace Faolan.Tests
 				}
 
 				Assert.NotNull(item);
-				Assert.NotEqual(0u, item!.Archetype);
-				var archetype = item.Archetype;
+				Assert.NotEqual(0u, item!.Hash);
+				var archetype = item.Hash;
 
 				var packet = new ConanPacket(await File.ReadAllBytesAsync(InventoryCapture));
 				var body = new FaolanStream(packet.Body.ReadArrayUInt32Length());

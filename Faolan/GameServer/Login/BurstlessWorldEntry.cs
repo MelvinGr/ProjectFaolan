@@ -238,12 +238,12 @@ namespace Faolan.GameServer
 			foreach (var (slot, get) in InventoryEquippedSlots)
 			{
 				var item = get(equipment);
-				if (item is { Archetype: not 0 })
-					equipped[slot] = (item, item.Archetype);
+				if (item is { Hash: not 0 })
+					equipped[slot] = (item, item.Hash);
 			}
 
-			(Item, uint)? bagFirst = equipment.FirstPosBag is { Archetype: not 0 }
-				? (equipment.FirstPosBag, equipment.FirstPosBag.Archetype)
+			(Item, uint)? bagFirst = equipment.FirstPosBag is { Hash: not 0 }
+				? (equipment.FirstPosBag, equipment.FirstPosBag.Hash)
 				: null;
 
 			var typedRoot = FullCharSnapshotBuilder.BuildRoot(characterTags,

@@ -111,7 +111,7 @@ namespace Faolan.Tests
 					Data2 = 0xDF665726,
 					Data3 = 0x09000E2A,
 					Data4 = 0x892A0B17,
-					Archetype = 0x1234
+					Hash = 0x1234
 				},
 				Chest = new Item
 				{
@@ -120,12 +120,12 @@ namespace Faolan.Tests
 					Data2 = 0xCCEBE6CF,
 					Data3 = 0xED8B315D,
 					Data4 = 0x1E1E835F,
-					Archetype = 0x5678
+					Hash = 0x5678
 				},
 				Belt = new Item
 				{
 					Id = 0x99,
-					Archetype = 0
+					Hash = 0
 				} // not buildable (no archetype) -> skipped
 			};
 
@@ -156,31 +156,31 @@ namespace Faolan.Tests
 				{
 					Id = 1,
 					Data1 = 1,
-					Archetype = 1
+					Hash = 1
 				},
 				OffHandLeft = new Item
 				{
 					Id = 2,
 					Data1 = 2,
-					Archetype = 2
+					Hash = 2
 				},
 				MainHandRight = new Item
 				{
 					Id = 3,
 					Data1 = 3,
-					Archetype = 3
+					Hash = 3
 				},
 				OffHandRight = new Item
 				{
 					Id = 4,
 					Data1 = 4,
-					Archetype = 4
+					Hash = 4
 				},
 				Tokens = new Item
 				{
 					Id = 5,
 					Data1 = 5,
-					Archetype = 5
+					Hash = 5
 				}
 			};
 

@@ -59,7 +59,7 @@ namespace Faolan.GameServer
 			}
 
 			var item = await Database.GetItem(itemId);
-			if (item is not { Archetype: not 0 })
+			if (item is not { Hash: not 0 })
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId,
 					item == null

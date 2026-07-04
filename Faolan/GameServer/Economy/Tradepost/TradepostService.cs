@@ -281,7 +281,7 @@ namespace Faolan.GameServer.Economy.Tradepost
 				Data4 = row.Item.Data4,
 				Template = row.Item.Id,
 				ItemLevel = row.Item.Level,
-				ItemHash = row.Item.Archetype
+				ItemHash = row.Item.Hash
 			};
 			await _database.CreateTradepostListing(listing);
 
@@ -366,7 +366,7 @@ namespace Faolan.GameServer.Economy.Tradepost
 					Data4 = row.Item.Data4,
 					Template = row.Item.Id,
 					ItemLevel = row.Item.Level,
-					ItemHash = row.Item.Archetype,
+					ItemHash = row.Item.Hash,
 					TrailerWord = MailConstants.AttachmentTrailerWord,
 					TrailerClass = MailConstants.EndpointClass,
 					TrailerTail = 0
@@ -465,7 +465,7 @@ namespace Faolan.GameServer.Economy.Tradepost
 			var equipment = await _database.GetCharacterEquipment(characterId);
 			var rows = await _database.GetCharacterInventory(characterId);
 			var taken = rows.Where(r => r.Container == (int)FullCharSnapshotBuilder.BagKind).Select(r => r.Slot).ToHashSet();
-			if (equipment?.FirstPosBag is { Archetype: not 0 })
+			if (equipment?.FirstPosBag is { Hash: not 0 })
 				taken.Add(1);
 			return Enumerable.Range(0, 24).Where(s => !taken.Contains(s)).Cast<int?>().FirstOrDefault();
 		}

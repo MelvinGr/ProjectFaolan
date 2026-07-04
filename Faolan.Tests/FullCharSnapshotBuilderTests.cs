@@ -22,7 +22,7 @@ namespace Faolan.Tests
 			Data2 = 2,
 			Data3 = 3,
 			Data4 = 4,
-			Archetype = 0x43555035
+			Hash = 0x43555035
 		};
 
 		private static readonly Item Signet = new Item
@@ -32,7 +32,7 @@ namespace Faolan.Tests
 			Data2 = 6,
 			Data3 = 7,
 			Data4 = 8,
-			Archetype = 0x12345678
+			Hash = 0x12345678
 		};
 
 		[Fact]
@@ -40,12 +40,12 @@ namespace Faolan.Tests
 		{
 			var equipped = new Dictionary<ulong, (Item, uint)>
 			{
-				[0x05] = (Manacles, Manacles.Archetype),
-				[0x12] = (Manacles, Manacles.Archetype)
+				[0x05] = (Manacles, Manacles.Hash),
+				[0x12] = (Manacles, Manacles.Hash)
 			};
 
-			var first = FullCharSnapshotBuilder.BuildContainers(0x02000005, equipped, (Signet, Signet.Archetype));
-			var second = FullCharSnapshotBuilder.BuildContainers(0x02000005, equipped, (Signet, Signet.Archetype));
+			var first = FullCharSnapshotBuilder.BuildContainers(0x02000005, equipped, (Signet, Signet.Hash));
+			var second = FullCharSnapshotBuilder.BuildContainers(0x02000005, equipped, (Signet, Signet.Hash));
 
 			var ids = first.SelectMany(c => c.Items).Select(e => e.Item.ItemId).ToList();
 			var recordIds = first.SelectMany(c => c.Items).SelectMany(e => e.Item.StatLists.Where(s => s.Stat == 23)).Select(s => s.Value).ToList();
@@ -58,9 +58,9 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildContainers_MatchesTheCapturedShape()
 		{
-			var equipped = new Dictionary<ulong, (Item, uint)> { [0x12] = (Manacles, Manacles.Archetype) };
+			var equipped = new Dictionary<ulong, (Item, uint)> { [0x12] = (Manacles, Manacles.Hash) };
 
-			var containers = FullCharSnapshotBuilder.BuildContainers(0x02000005, equipped, (Signet, Signet.Archetype));
+			var containers = FullCharSnapshotBuilder.BuildContainers(0x02000005, equipped, (Signet, Signet.Hash));
 
 			Assert.Equal(new uint[]
 				{
@@ -132,13 +132,13 @@ namespace Faolan.Tests
 					Item = new Item
 					{
 						Id = 9,
-						Archetype = 0
+						Hash = 0
 					},
 					ItemId = 9
 				} // not buildable
 			};
 
-			var containers = FullCharSnapshotBuilder.BuildContainers(0x02000005, new Dictionary<ulong, (Item, uint)>(), (Manacles, Manacles.Archetype), rows);
+			var containers = FullCharSnapshotBuilder.BuildContainers(0x02000005, new Dictionary<ulong, (Item, uint)>(), (Manacles, Manacles.Hash), rows);
 
 			var bag = containers[1].Items;
 			Assert.Equal(new uint[]

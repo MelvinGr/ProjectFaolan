@@ -83,7 +83,7 @@ namespace Faolan.Core.Network.Packets
 							Template1 = item.Id,
 							Template2 = item.Id,
 							Level = row.TailLevel,
-							Hash = item.Archetype
+							Hash = item.Hash
 						}
 					}
 				});

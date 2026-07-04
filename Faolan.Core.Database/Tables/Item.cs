@@ -4,9 +4,9 @@ using Faolan.Core.Enums;
 namespace Faolan.Core.Database.Tables
 {
 	//[Index(nameof(Name), IsUnique = true)]
-	// An item TEMPLATE: the stable identity (Data quad + Archetype) the client needs to realize an item, keyed by
+	// An item TEMPLATE: the stable identity (Data quad + Hash) the client needs to realize an item, keyed by
 	// the template id (BaseEntity.Id). Sourced from the old C++ `p_items` (Archive/), real captured inventories, and
-	// AH listings - see the per-field notes (the Data quad vs Archetype distinction is the crux of what renders how).
+	// AH listings - see the per-field notes (the Data quad vs Hash distinction is the crux of what renders how).
 	public class Item : BaseEntity
 	{
 		// Keeps the item out of RANDOM loot rolls (the per-map pool sample + the all-items fallback, #273). The Type
@@ -34,9 +34,9 @@ namespace Faolan.Core.Database.Tables
 		// `p_items`, so it can only be HARVESTED from a capture where the item sat in an inventory (a 0x737A6DF9
 		// snapshot or a 0x2020 add-item) - it is absent from sources that only describe the template abstractly (AH
 		// search-results carry Hash=0). An item is "fully buildable" (renders via the archetype-gated world-entry
-		// snapshot) iff Archetype != 0 AND it has a Data quad; the more forgiving live DispatchAddItem (0x2020) path
-		// renders an item by template even with Archetype/Hash == 0 (used for AH-bought items we lack an archetype for).
-		public uint Archetype { get; set; }
+		// snapshot) iff Hash != 0 AND it has a Data quad; the more forgiving live DispatchAddItem (0x2020) path
+		// renders an item by template even with Hash == 0 (used for AH-bought items we lack a hash for).
+		public uint Hash { get; set; }
 
 		// The item's stable identity QUAD (Data1..Data4) - the per-template 16-byte ProtoDecryptionKey repeated in
 		// the inventory snapshot tail and the add-item packet, and the TEA key for the item's encrypted RDB template.

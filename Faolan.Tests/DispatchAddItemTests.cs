@@ -57,12 +57,12 @@ namespace Faolan.Tests
 				}
 
 				Assert.NotNull(item);
-				Assert.NotEqual(0u, item!.Archetype);
+				Assert.NotEqual(0u, item!.Hash);
 
 				// 1) The entry blob: same template the snapshot builds, but the live add's per-instance stat set.
 				var entry = SnapshotItemBuilder.BuildInventoryEntry(ItemId,
 					item,
-					item.Archetype,
+					item.Hash,
 					[
 						new SnapshotItemBuilder.ItemStat(0, 1),
 						new SnapshotItemBuilder.ItemStat(8, 0xffffffff),

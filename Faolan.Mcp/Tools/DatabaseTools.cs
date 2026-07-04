@@ -84,7 +84,7 @@ namespace Faolan.Mcp.Tools
 					i.Name,
 					i.Level,
 					Type = i.Type.ToString(),
-					i.Archetype
+					i.Hash
 				}));
 		}
 

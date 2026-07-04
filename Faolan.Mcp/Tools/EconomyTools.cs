@@ -66,7 +66,7 @@ namespace Faolan.Mcp.Tools
 				Data4 = item.Data4,
 				Template = item.Id,
 				ItemLevel = item.Level,
-				ItemHash = item.Archetype
+				ItemHash = item.Hash
 			};
 
 			await _db.CreateTradepostListing(listing);
@@ -181,7 +181,7 @@ namespace Faolan.Mcp.Tools
 					Data4 = item.Data4,
 					Template = item.Id,
 					ItemLevel = item.Level,
-					ItemHash = item.Archetype,
+					ItemHash = item.Hash,
 					TrailerWord = MailConstants.AttachmentTrailerWord,
 					TrailerClass = MailConstants.EndpointClass,
 					TrailerTail = 0

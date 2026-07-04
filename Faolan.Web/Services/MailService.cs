@@ -105,7 +105,7 @@ namespace Faolan.Web.Services
 					Data4 = item.Data4,
 					Template = item.Id,
 					ItemLevel = item.Level,
-					ItemHash = item.Archetype,
+					ItemHash = item.Hash,
 					TrailerWord = MailConstants.AttachmentTrailerWord,
 					TrailerClass = MailConstants.EndpointClass,
 					TrailerTail = 0

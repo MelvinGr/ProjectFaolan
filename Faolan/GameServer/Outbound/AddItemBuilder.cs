@@ -43,7 +43,7 @@ namespace Faolan.GameServer
 			if (container == (int)FullCharSnapshotBuilder.BagKind)
 			{
 				var equipment = await Database.GetCharacterEquipment(characterId);
-				if (equipment?.FirstPosBag is { Archetype: not 0 })
+				if (equipment?.FirstPosBag is { Hash: not 0 })
 					taken.Add(1);
 			}
 
@@ -72,7 +72,7 @@ namespace Faolan.GameServer
 			// land in the player's quest-items tab (#261). They are kept even with archetype 0 (quest items often have
 			// none); normal bag items still require an archetype so the snapshot can render them.
 			var isQuestItem = item.Type == ItemType.Quest;
-			if (!isQuestItem && item.Archetype == 0)
+			if (!isQuestItem && item.Hash == 0)
 				return null;
 
 			var kind = isQuestItem
@@ -100,7 +100,7 @@ namespace Faolan.GameServer
 					FullCharSnapshotBuilder.RecordId(characterId, kind, (ulong)slot.Value),
 					count,
 					item,
-					item.Archetype)
+					item.Hash)
 				.Item;
 			await SendAddItem(client, containerType, (uint)slot.Value, entry);
 			return slot;
@@ -120,7 +120,7 @@ namespace Faolan.GameServer
 
 			var rows = await Database.GetCharacterInventory(character.Id);
 			var pushed = 0;
-			foreach (var row in rows.Where(r => r.Container == (int)FullCharSnapshotBuilder.BagKind && r.ItemId != null && r.Item is { Archetype: 0 }))
+			foreach (var row in rows.Where(r => r.Container == (int)FullCharSnapshotBuilder.BagKind && r.ItemId != null && r.Item is { Hash: 0 }))
 			{
 				var slot = (ulong)row.Slot;
 				var entry = SnapshotItemBuilder.BuildInventoryEntry(FullCharSnapshotBuilder.ItemId(character.Id, FullCharSnapshotBuilder.BagKind, slot),

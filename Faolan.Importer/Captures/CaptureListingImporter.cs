@@ -90,7 +90,7 @@ namespace Faolan.Importer.Captures
 					Name = "",
 					Level = (byte)Math.Min(src.ItemLevel, byte.MaxValue),
 					Type = ItemType.Normal,
-					Archetype = src.ItemHash, // 0 for AH listings - rendered by-template via the live add, not the snapshot
+					Hash = src.ItemHash, // 0 for AH listings - rendered by-template via the live add, not the snapshot
 					Data0 = 0,
 					Data1 = src.Data1,
 					Data2 = src.Data2,

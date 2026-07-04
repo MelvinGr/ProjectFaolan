@@ -110,7 +110,7 @@ namespace Faolan.GameServer.Economy.Bank
 					return;
 
 				var item = await _database.GetItem(row.ItemId.Value);
-				if (item is not { Archetype: not 0 })
+				if (item is not { Hash: not 0 })
 					return;
 
 				var entry = SnapshotItemBuilder.BuildListEntry((ulong)dPos,
@@ -118,7 +118,7 @@ namespace Faolan.GameServer.Economy.Bank
 						FullCharSnapshotBuilder.RecordId(character.Id, FullCharSnapshotBuilder.BagKind, (ulong)dPos),
 						row.Count,
 						item,
-						item.Archetype)
+						item.Hash)
 					.Item;
 				await _outbound.SendAddItem(client, 0x68u, (uint)dPos, entry);
 			}

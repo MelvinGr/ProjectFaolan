@@ -48,7 +48,7 @@ namespace Faolan.Importer.Captures
 				item.Data2 = ci.Data2;
 				item.Data3 = ci.Data3;
 				item.Data4 = ci.Data4;
-				item.Archetype = ci.Archetype;
+				item.Hash = ci.Archetype;
 
 				// Classify Quest/Resource items by the container they were captured in; only ever UPGRADE from the
 				// default Normal so a classification survives a later capture that holds the item in a bag.

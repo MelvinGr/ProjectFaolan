@@ -35,7 +35,7 @@ namespace Faolan.GameServer.Spawn
 					Template1 = item.Id,
 					Template2 = item.Id,
 					Level = 1,
-					Hash = item.Archetype
+					Hash = item.Hash
 				}
 			};
 		}
@@ -52,7 +52,7 @@ namespace Faolan.GameServer.Spawn
 			foreach (var slot in Enum.GetValues<CharacterEquipmentSlot>())
 			{
 				var item = equipment[slot];
-				if (item == null || item.Archetype == 0) // only fully-buildable items (real identity + archetype)
+				if (item == null || item.Hash == 0) // only fully-buildable items (real identity + archetype)
 					continue;
 
 				entries.Add(BuildEntry(slot, item));

@@ -56,7 +56,7 @@ namespace Faolan.Tests
 					{
 						Id = itemId,
 						Name = "Ape King's Treasure",
-						Archetype = 1497905484,
+						Hash = 1497905484,
 						Data1 = 1,
 						Data2 = 2,
 						Data3 = 3,

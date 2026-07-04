@@ -108,7 +108,7 @@ namespace Faolan.Tests
 					Data2 = d2,
 					Data3 = d3,
 					Data4 = d4,
-					Archetype = arch
+					Hash = arch
 				};
 			}
 		}

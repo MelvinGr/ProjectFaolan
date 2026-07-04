@@ -1582,7 +1582,7 @@ namespace Faolan.GameServer.World
 			foreach (var (pos, item) in entries)
 			{
 				var guid = ((ulong)handle << 16) | pos; // synthetic per-instance id (display only)
-				contents.Inventory.Items.Add(SnapshotItemBuilder.BuildListEntry(pos, guid, guid, 1, item, item.Archetype));
+				contents.Inventory.Items.Add(SnapshotItemBuilder.BuildListEntry(pos, guid, guid, 1, item, item.Hash));
 				maxPos = Math.Max(maxPos, pos);
 			}
 

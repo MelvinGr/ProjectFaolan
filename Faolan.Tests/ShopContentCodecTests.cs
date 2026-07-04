@@ -36,7 +36,7 @@ namespace Faolan.Tests
 			e => new Item
 			{
 				Id = e.Template,
-				Archetype = e.Archetype,
+				Hash = e.Archetype,
 				Data1 = e.Data1,
 				Data2 = e.Data2,
 				Data3 = e.Data3,

@@ -715,7 +715,7 @@ namespace Faolan.Core.Database
 				.MapLootEntries
 				.Where(e => e.MapId == mapId)
 				.Join(ctx.Items, e => e.ItemTemplateId, i => i.Id, (e, i) => i)
-				.Where(i => i.Archetype != 0 && i.Name != null && i.Name != "" && i.Type == ItemType.Normal && !i.ExcludeFromRandomLoot)
+				.Where(i => i.Hash != 0 && i.Name != null && i.Name != "" && i.Type == ItemType.Normal && !i.ExcludeFromRandomLoot)
 				.OrderBy(_ => EF.Functions.Random())
 				.Take(count)
 				.ToArrayAsync();
@@ -848,7 +848,7 @@ namespace Faolan.Core.Database
 		public async Task<Item[]> GetRandomBuildableItems(int count)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Items.Where(i => i.Archetype != 0 && i.Name != null && i.Name != "" && i.Type == ItemType.Normal && !i.ExcludeFromRandomLoot).OrderBy(_ => EF.Functions.Random()).Take(count).ToArrayAsync();
+			return await ctx.Items.Where(i => i.Hash != 0 && i.Name != null && i.Name != "" && i.Type == ItemType.Normal && !i.ExcludeFromRandomLoot).OrderBy(_ => EF.Functions.Random()).Take(count).ToArrayAsync();
 		}
 
 		// Normal-typed items explicitly flagged out of random loot (#273) - i.e. the unique/quest items that needed the

@@ -102,10 +102,10 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		public static bool TryBuildEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, out ProtoField entry, ulong flags = 1, ulong f7 = 1)
 		{
 			entry = null;
-			if (item == null || item.Archetype == 0)
+			if (item == null || item.Hash == 0)
 				return false;
 
-			entry = BuildEntry(slot, itemId, recordId, count, item, item.Archetype, flags, f7);
+			entry = BuildEntry(slot, itemId, recordId, count, item, item.Hash, flags, f7);
 			return true;
 		}
 
