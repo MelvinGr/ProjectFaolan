@@ -179,14 +179,24 @@ namespace Faolan.GameServer
 			if (character == null)
 				return;
 
-			var combos = await Database.GetCharacterCombos(character.Id);
 			var instance = client.Session.Account.ClientInstance;
-			foreach (var combo in combos)
-				await new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
-					.WriteArray(ComboBookIirCodec.Build(instance, combo.ComboId)).SendAsync(client);
 
-			if (combos.Length > 0)
-				Logger.LogInformation("GrantCharacterCombos: emitted {Count} combos to '{Name}' (class={Class}).", combos.Length, character.Name, character.Class);
+			// The combo book = the persisted CharacterCombo rows UNION the level-derived catalog. #299: a max-level
+			// IMPORTED character never dinged, so it has no CharacterCombo rows and its book was empty after relog;
+			// deriving from LevelComboCatalog.ForLevel(1..Level) re-emits the full book on every login (deduped).
+			var comboIds = new HashSet<uint>();
+			foreach (var combo in await Database.GetCharacterCombos(character.Id))
+				comboIds.Add(combo.ComboId);
+			for (uint lvl = 1; lvl <= character.Level; lvl++)
+				foreach (var comboId in Combat.LevelComboCatalog.ForLevel(lvl))
+					comboIds.Add(comboId);
+
+			foreach (var comboId in comboIds)
+				await new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+					.WriteArray(ComboBookIirCodec.Build(instance, comboId)).SendAsync(client);
+
+			if (comboIds.Count > 0)
+				Logger.LogInformation("GrantCharacterCombos: emitted {Count} combos to '{Name}' (class={Class}, level {Level}).", comboIds.Count, character.Name, character.Class, character.Level);
 		}
 
 		private async Task GrantStartingBuffs(INetworkClient client)
