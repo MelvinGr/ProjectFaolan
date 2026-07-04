@@ -39,6 +39,9 @@ namespace Faolan.Importer.Cli
 				case "equip":
 					Equip(LoadCaptures(capturesDir), arg ?? "Casilda");
 					return 0;
+				case "snapshot":
+					SnapshotScan(LoadCaptures(capturesDir));
+					return 0;
 				case "worldobj":
 					await WorldObj(dbPath, arg ?? "hangingwoman");
 					return 0;
@@ -75,6 +78,48 @@ namespace Faolan.Importer.Cli
 				default:
 					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: conversation-states, anim, worldobj, spell-fields, rdb-assets.");
 					return 1;
+			}
+		}
+
+		// The biggest 0x737A6DF9 FullChar snapshots across the captures: size, instance, and the byte offsets where
+		// the 0x737A6DF9 subop recurs in the body (>1 => the "snapshot" is several records concatenated, not one).
+		private static void SnapshotScan(IReadOnlyList<NamedCapture> captures)
+		{
+			var snaps = new List<(string Cap, byte[] Body)>();
+			foreach (var c in captures)
+			foreach (var p in c.Packets)
+			{
+				if (!p.IsDownload || p.SubOpcode != 0x737A6DF9u)
+					continue;
+				var body = p.Bytes.Length >= 16 ? p.Bytes[(12 + (int)BinaryPrimitives.ReadUInt32BigEndian(p.Bytes.AsSpan(8, 4)))..] : [];
+				if (body.Length >= 16)
+					snaps.Add((c.Name, body));
+			}
+
+			foreach (var (cap, body) in snaps.OrderByDescending(s => s.Body.Length).Take(6))
+			{
+				var positions = new List<int>();
+				for (var i = 0; i + 4 <= body.Length; i++)
+					if (body[i] == 0x73 && body[i + 1] == 0x7A && body[i + 2] == 0x6D && body[i + 3] == 0xF9)
+						positions.Add(i);
+				var instance = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
+				Console.WriteLine($"{cap[..Math.Min(46, cap.Length)],-46} size={body.Length,8} instance=0x{instance:X8} 0x737A6DF9@[{string.Join(",", positions)}]");
+				Console.WriteLine($"    first48: {Convert.ToHexString(body.AsSpan(0, Math.Min(48, body.Length)))}");
+
+				try
+				{
+					var s = new Faolan.Core.FaolanStream(body);
+					s.ReadUInt32();
+					s.ReadUInt32();
+					s.ReadUInt32();
+					s.ReadUInt32();
+					var rootMsg = Faolan.GameServer.Packets.FullCharSnapshot.InventorySnapshotInspector.ParseInventoryRoot(s);
+					Console.WriteLine($"    inventory-root: OK ({rootMsg.Fields.Count} fields)");
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"    inventory-root: FAIL - {ex.GetType().Name}: {ex.Message}");
+				}
 			}
 		}
 

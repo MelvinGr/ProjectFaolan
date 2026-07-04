@@ -481,7 +481,10 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 			try
 			{
-				var scanEnd = Math.Min(bodyStream.Length, originalPosition + 128);
+				// Inventory containers follow a variable-length quest-journal prefix in the root; a high-quest char
+				// (NecroL80, 43 quests) pushes them to ~offset 400 - past the old 128-byte window, which silently dropped
+				// her carried inventory. 8192 has headroom for 1000+ quests; the scan fails fast on non-container offsets.
+				var scanEnd = Math.Min(bodyStream.Length, originalPosition + 8192);
 
 				for (var offset = originalPosition; offset < scanEnd; offset++)
 				{
