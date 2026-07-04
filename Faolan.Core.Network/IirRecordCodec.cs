@@ -1,10 +1,10 @@
 using System;
 using System.Buffers.Binary;
-using Faolan.Core.Database.Tables;
+
 
 namespace Faolan.Core.Network
 {
-	// Decomposes a world-burst packet into a structured MapWorldBurstEntity and rebuilds the exact bytes back.
+	// Decomposes a world-burst packet into a structured IirRecord and rebuilds the exact bytes back.
 	//
 	// Every burst packet is `RpcHeader + <opcode> + <body>`. The RpcHeader is self-describing: the combined endpoint
 	// section + opcode length is a big-endian u32 at offset 8, so the body always starts at `12 + that`. For an IIR
@@ -22,7 +22,7 @@ namespace Faolan.Core.Network
 		private const int IirHeaderFields = 20; // bodyLen + IirType + TypeTag + Handle + FieldA
 
 		// Splits a raw burst packet into its structured form. `sequence` is the packet's order within the burst.
-		public static MapWorldBurstEntity Parse(byte[] packet, int sequence)
+		public static IirRecord Parse(byte[] packet, int sequence)
 		{
 			if (packet == null)
 				throw new ArgumentNullException(nameof(packet));
@@ -30,7 +30,7 @@ namespace Faolan.Core.Network
 			var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(EndpointLengthOffset, 4));
 			var opcode = BinaryPrimitives.ReadUInt16BigEndian(packet.AsSpan(bodyStart - 2, 2));
 
-			var record = new MapWorldBurstEntity
+			var record = new IirRecord
 			{
 				Sequence = sequence,
 				Opcode = opcode,
@@ -53,7 +53,7 @@ namespace Faolan.Core.Network
 		}
 
 		// Reconstructs the exact original packet bytes from a structured record.
-		public static byte[] Rebuild(MapWorldBurstEntity record)
+		public static byte[] Rebuild(IirRecord record)
 		{
 			if (record == null)
 				throw new ArgumentNullException(nameof(record));

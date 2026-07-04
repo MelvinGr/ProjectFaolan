@@ -33,7 +33,6 @@ namespace Faolan.Importer.Cli
 			new NpcsModule(),
 			new WorldObjectsModule(),
 			new MapLootModule(),
-			new WorldBurstsModule(),
 			new QuestsModule(),
 			new MountsModule(), // opt-in
 			// --- tsv modules ---

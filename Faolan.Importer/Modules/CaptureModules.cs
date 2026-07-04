@@ -429,30 +429,6 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
-	// Per-map world-entry burst (structured IIR records). Beach (4010) is exempt (committed seed).
-	public sealed class WorldBurstsModule : IImportModule
-	{
-		public ImportSource Source => ImportSource.Captures;
-		public IReadOnlyList<string> DependsOn => [];
-
-		public IReadOnlySet<WriteMode> SupportedModes =>
-			new HashSet<WriteMode>
-			{
-				WriteMode.Upsert,
-				WriteMode.Overwrite
-			};
-
-		public string Description => "Per-map world-entry burst (structured IIR records).";
-		public string Name => "world-bursts";
-
-		public async Task<ImportResult> RunAsync(ImportContext ctx)
-		{
-			var bursts = MapWorldBurstExtractor.Merge(ctx.Captures.SelectMany(c => MapWorldBurstExtractor.Extract(c.Packets)));
-			await ImportOps.ImportMapWorldBursts(ctx.Db, bursts);
-			return new ImportResult($"{bursts.Count} map bursts.");
-		}
-	}
-
 	// Quest journal-content definitions + the hand-decoded snapshot/chain seeds (beach 10238, Casilda #261/#255).
 	public sealed class QuestsModule : IImportModule
 	{

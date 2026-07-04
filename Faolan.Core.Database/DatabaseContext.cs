@@ -44,8 +44,6 @@ namespace Faolan.Core.Database
 		DbSet<MailAttachment> MailAttachments { get; }
 		DbSet<Map> Maps { get; }
 		DbSet<MapLootEntry> MapLootEntries { get; }
-		DbSet<MapWorldBurst> MapWorldBursts { get; }
-		DbSet<MapWorldBurstEntity> MapWorldBurstEntities { get; }
 		DbSet<MorphTarget> MorphTargets { get; }
 		DbSet<Npc> Npcs { get; }
 		DbSet<NpcSpawn> NpcSpawns { get; }
@@ -105,8 +103,6 @@ namespace Faolan.Core.Database
 		public DbSet<MailAttachment> MailAttachments { get; set; }
 		public DbSet<Map> Maps { get; set; }
 		public DbSet<MapLootEntry> MapLootEntries { get; set; }
-		public DbSet<MapWorldBurst> MapWorldBursts { get; set; }
-		public DbSet<MapWorldBurstEntity> MapWorldBurstEntities { get; set; }
 		public DbSet<MorphTarget> MorphTargets { get; set; }
 		public DbSet<Npc> Npcs { get; set; }
 		public DbSet<NpcSpawn> NpcSpawns { get; set; }
@@ -293,8 +289,6 @@ namespace Faolan.Core.Database
 				.IsUnique();
 
 			// One world burst per map; its structured IIR records cascade-delete.
-			modelBuilder.Entity<MapWorldBurst>().HasIndex(b => b.MapId).IsUnique();
-			modelBuilder.Entity<MapWorldBurst>().HasMany(b => b.Entities).WithOne(e => e.Burst).OnDelete(DeleteBehavior.Cascade);
 		}
 	}
 }

@@ -209,41 +209,6 @@ namespace Faolan.Importer.Captures
 			return kept.Count;
 		}
 
-		// Upsert per map: replace that map's burst; leave other maps untouched. Beach is exempt.
-		public static async Task ImportMapWorldBursts(DatabaseContext db, List<MapWorldBurstEntry> bursts)
-		{
-			var keptMaps = bursts.Select(e => e.MapId).ToHashSet();
-			var stale = await db.MapWorldBursts.Include(b => b.Entities).Where(b => b.CapturedInstance == 0 || (b.MapId != BeachMapId && !keptMaps.Contains(b.MapId))).ToListAsync();
-			if (stale.Count > 0)
-			{
-				db.MapWorldBurstEntities.RemoveRange(stale.SelectMany(b => b.Entities));
-				db.MapWorldBursts.RemoveRange(stale);
-			}
-
-			foreach (var e in bursts)
-			{
-				if (e.MapId == BeachMapId)
-					continue;
-
-				var burst = await db.MapWorldBursts.Include(b => b.Entities).FirstOrDefaultAsync(b => b.MapId == e.MapId);
-				if (burst == null)
-				{
-					burst = new MapWorldBurst { MapId = e.MapId };
-					db.MapWorldBursts.Add(burst);
-				}
-				else if (burst.Entities != null)
-					db.MapWorldBurstEntities.RemoveRange(burst.Entities);
-
-				burst.CapturedInstance = e.CapturedInstance;
-				burst.Entities = e
-					.Packets
-					.Select((p, i) => IirRecordCodec.Parse(p, i))
-					.Where(r => !IirMessageTypes.IsServerGenerated(r.IirType, r.Handle, e.CapturedInstance) && !IirMessageTypes.IsTransientGameplay(r.IirType))
-					.ToList();
-			}
-
-			await db.SaveChangesAsync();
-		}
 
 		// Upsert by (map, spawn point); never wipe. Ensures Npc TYPE rows exist first (#244).
 		public static async Task ImportNpcSpawns(DatabaseContext db, List<NpcSpawnEntry> spawns)

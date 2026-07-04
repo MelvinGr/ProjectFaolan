@@ -8,7 +8,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Locks the lossless round-trip of IirRecordCodec: a world-burst packet decomposed into a structured
-	// MapWorldBurstEntity and rebuilt must be byte-for-byte identical to the original. This is the safety net that
+	// IirRecord and rebuilt must be byte-for-byte identical to the original. This is the safety net that
 	// lets the burst live as queryable IIR rows instead of opaque blobs while the proven byte-preserving replay
 	// (RewriteBurstInstance in-place) keeps working. (The exhaustive proof is over all 3283 captured packets across
 	// all 10 maps; these synthetic packets reproduce the exact framing and lock the codec's behaviour.)

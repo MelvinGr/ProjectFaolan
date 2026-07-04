@@ -75,7 +75,6 @@ namespace Faolan.Core.Database
 		Task<Item[]> GetMapLootSample(uint mapId, int count);
 		Task<Map[]> GetMaps();
 
-		Task<MapWorldBurst> GetMapWorldBurst(uint mapId);
 		Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names);
 		Task<NpcSpawn> GetNpcSpawnByName(string name);
 		Task<NpcSpawn[]> GetNpcSpawns(uint mapId);
@@ -727,20 +726,6 @@ namespace Faolan.Core.Database
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Maps.OrderBy(m => m.Id).ToArrayAsync();
-		}
-
-		public async Task<MapWorldBurst> GetMapWorldBurst(uint mapId)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var burst = await ctx.MapWorldBursts.Include(b => b.Entities).FirstOrDefaultAsync(b => b.MapId == mapId);
-
-			// Guard: a burst with an unknown captured instance (0) can't be re-addressed, so treat it as absent and
-			// let login fall back. Out-of-range instances ARE supported now - RewriteBurstInstance pads the live id's
-			// varint to the captured length (overlong), keeping the substitution length-preserving.
-			if (burst is { CapturedInstance: 0 })
-				return null;
-
-			return burst;
 		}
 
 		// Resolves appearance resource refs ("*texscript_1108153") to their client-registry entries (imported

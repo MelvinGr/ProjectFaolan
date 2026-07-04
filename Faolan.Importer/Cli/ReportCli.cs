@@ -12,7 +12,6 @@ using Faolan.GameServer.Spawn;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
 using Faolan.Importer.Rdb;
-using Faolan.Importer.Reports;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
@@ -39,9 +38,6 @@ namespace Faolan.Importer.Cli
 					return 0;
 				case "equip":
 					Equip(LoadCaptures(capturesDir), arg ?? "Casilda");
-					return 0;
-				case "burst-coverage":
-					await BurstCoverage(dbPath);
 					return 0;
 				case "worldobj":
 					await WorldObj(dbPath, arg ?? "hangingwoman");
@@ -77,7 +73,7 @@ namespace Faolan.Importer.Cli
 					RdbTypes(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB");
 					return 0;
 				default:
-					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: conversation-states, anim, burst-coverage, worldobj, spell-fields, rdb-assets.");
+					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: conversation-states, anim, worldobj, spell-fields, rdb-assets.");
 					return 1;
 			}
 		}
@@ -98,12 +94,6 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// How much of each map's stored world burst is reconstructable from the DB tables (construct-don't-replay).
-		private static async Task BurstCoverage(string dbPath)
-		{
-			await using var db = OpenDb(dbPath);
-			await BurstCoverageReport.RunAsync(db);
-		}
 
 		// Per-NPC dialogue screens + mid-conversation quest grants per (capture, NPC) (#37).
 		private static void ConversationStates(IReadOnlyList<NamedCapture> captures)

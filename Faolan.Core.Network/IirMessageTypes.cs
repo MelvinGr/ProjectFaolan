@@ -6,7 +6,7 @@ namespace Faolan.Core.Network
 	// message-type id (the 0x2000 sub-opcode). This is the recovered catalog (names from the client .proto schema)
 	// plus the classification that drives world-burst storage: SERVER-GENERATED records (globals + the player's own
 	// state) are NOT stored in the per-map burst - the server builds them from the live map/character on world entry
-	// - while everything else (world entities) is stored as MapWorldBurstEntity rows. See IirRecordCodec.
+	// - while everything else (world entities) is decomposed into IirRecord (see IirRecordCodec).
 	public static class IirMessageTypes
 	{
 		public const uint BehaviorControlCenter = 0x642CD3D6;

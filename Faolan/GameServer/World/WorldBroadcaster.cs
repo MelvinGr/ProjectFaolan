@@ -702,29 +702,14 @@ namespace Faolan.GameServer.World
 			// #261 quest-gated spawns: NPC name -> the quest ids that reveal it (kill-target NPCs that aren't givers).
 			_questGatedNpcs ??= await _database.GetQuestGatedNpcMap();
 
-			// The handle the map's world-burst renders each NPC under, keyed by the NPC's POSITION. Burst NPCs MUST
-			// carry their burst handle in the model so the per-player Known-set seeding lines up (entry seeds these)
-			// and the first move never re-streams them. Matching by HANDLE is wrong: the burst is ONE capture session
-			// while NpcSpawns is the union of all sessions, so the burst's wire handle equals NpcSpawns.CapturedHandle
-			// for only ~18 of the beach's 42 burst NPCs - the other ~24 would be missed and re-streamed (the flood
-			// behind the loader crash). Position is the stable identity (it is exactly how TryRebuildNpcSpawnFromDb
-			// matches a burst packet to its row), so key the alignment on position instead.
-			var burst = await _database.GetMapWorldBurst(mapId);
-			var burstHandleByPosition = BuildBurstHandleByPosition(burst);
-
 			// NpcSpawns accretes one row per capture observation, so the same physical NPC appears many times - the
 			// same name at near-identical positions across sessions (e.g. Kalanthes captured 5×, all at his hideout).
-			// Keyed-by-handle Add already collapses same-handle rows; this collapses the cross-session re-captures too,
-			// by (name, coarse position cell), so the map isn't populated with stacked duplicates. Genuinely-separate
-			// mobs of the same name (Pillagers spread across the beach) fall in different cells and all survive.
-			// Burst-position rows are ordered FIRST so they win their cell - the kept entity is then the exact one the
-			// burst rendered, and it inherits the burst's wire handle below so the two never stack.
-			// Burst-as-truth now lives in the IMPORTER (#266, BuildBurstTruthSpawns): NpcSpawns holds only each map's
-			// authoritative login-burst faction set + the named/unique NPCs the burst misses, so the cross-session
-			// duplicate density (a Crocodile logged at 50 spots -> 50 phantom copies) never reaches the DB. This load
-			// path therefore just reads the already-clean rows; the cell-dedup below is a cheap residual safety net.
+			// Burst-as-truth lives in the IMPORTER now (#266, BuildBurstTruthSpawns): NpcSpawns holds only each map's
+			// authoritative login-burst faction set + the named/unique NPCs, so the cross-session duplicate density (a
+			// Crocodile logged at 50 spots -> 50 phantom copies) never reaches the DB. This load path just reads the
+			// already-clean rows; the (name, coarse cell) dedup below is a cheap residual safety net.
 			var seenCells = new HashSet<(string, int, int, int)>();
-			foreach (var npc in npcs.OrderByDescending(n => burstHandleByPosition.ContainsKey(PositionKey(n.PositionX, n.PositionY, n.PositionZ))))
+			foreach (var npc in npcs)
 			{
 				// The type identity (name/community) lives on the Npc type now (#244); a spawn with no type is a phantom
 				// capture artifact (no real creature) - skip it.
@@ -754,12 +739,9 @@ namespace Faolan.GameServer.World
 					? npc.Health
 					: CombatResolver.NpcMaxHealthForLevel(npc.Level);
 				var vitals = EntityVitals.FromMax(maxHealth, 0, maxHealth);
-				// If the burst rendered an NPC at this position, adopt the handle the client already knows it by (so
-				// Known-seeding matches and interest never re-spawns a duplicate); otherwise this NPC is burst-free and
-				// uses its captured handle - it streams in on the player's first move (Casilda et al, outside the burst).
-				var handle = burstHandleByPosition.TryGetValue(PositionKey(npc.PositionX, npc.PositionY, npc.PositionZ), out var bh)
-					? bh
-					: npc.CapturedHandle;
+				// World entry is burst-less, so every NPC streams in on the player's first move (interest) under its own
+				// captured handle - there is no separate burst handle to reconcile with.
+				var handle = npc.CapturedHandle;
 				var entity = WorldEntity.ForNpc(handle, mapId, new Vector3(npc.PositionX, npc.PositionY, npc.PositionZ), new Vector3(npc.RotationX, npc.RotationY, npc.RotationZ), npcName ?? "NPC", vitals);
 				entity.InstanceId = instanceId; // this NPC belongs to THIS copy of the map (#268)
 				entity.Level = npc.Level;
@@ -802,13 +784,12 @@ namespace Faolan.GameServer.World
 				zone.Add(entity);
 			}
 
-			_logger.LogInformation("World: loaded {Count} NPC(s) into map {Map} instance 0x{Instance:X8} ({Raw} rows, {Collapsed} cross-session re-captures collapsed; {BurstAligned} aligned to burst handles).",
+			_logger.LogInformation("World: loaded {Count} NPC(s) into map {Map} instance 0x{Instance:X8} ({Raw} rows, {Collapsed} cross-session re-captures collapsed).",
 				zone.Count,
 				mapId,
 				instanceId,
 				npcs.Length,
-				npcs.Length - seenCells.Count,
-				burstHandleByPosition.Count);
+				npcs.Length - seenCells.Count);
 		}
 
 		// A player opened a world object (Interact UseObject). If it's a loot bag in their zone, OPEN ITS LOOT WINDOW
@@ -1533,34 +1514,6 @@ namespace Faolan.GameServer.World
 		// Maps each FA015807 NPC the burst renders to (rounded position) -> the wire handle it renders under, by
 		// rebuilding the burst record and reading the spawn body's transform. EnsureZoneNpcs uses this to give the
 		// model NPC at that position the same handle the client already knows, so Known-seeding lines up.
-		private static Dictionary<(int, int, int), uint> BuildBurstHandleByPosition(MapWorldBurst burst)
-		{
-			var map = new Dictionary<(int, int, int), uint>();
-			if (burst?.Entities == null)
-				return map;
-
-			foreach (var e in burst.Entities)
-			{
-				if (e.IirType != 0xFA015807u)
-					continue;
-
-				var pkt = IirRecordCodec.Rebuild(e);
-				if (pkt.Length < 12)
-					continue;
-
-				var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(pkt.AsSpan(8, 4));
-				if (bodyStart + SpawnPacketBuilder.PosZOffset + 4 > pkt.Length)
-					continue;
-
-				var x = BinaryPrimitives.ReadSingleLittleEndian(pkt.AsSpan(bodyStart + SpawnPacketBuilder.PosXOffset, 4));
-				var y = BinaryPrimitives.ReadSingleLittleEndian(pkt.AsSpan(bodyStart + SpawnPacketBuilder.PosYOffset, 4));
-				var z = BinaryPrimitives.ReadSingleLittleEndian(pkt.AsSpan(bodyStart + SpawnPacketBuilder.PosZOffset, 4));
-				map[PositionKey(x, y, z)] = e.Handle; // last write wins; the burst lists each entity once
-			}
-
-			return map;
-		}
-
 		// Quantizes a world position to a stable integer key (×100, rounded) - the same scheme RetailLoginReplay uses
 		// to match burst packets to NpcSpawns rows, so the two agree on which NPC sits at a given spot.
 		private static (int, int, int) PositionKey(float x, float y, float z)
