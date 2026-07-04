@@ -27,7 +27,7 @@ namespace Faolan.GameServer
 	{
 		// The beach playfield id MapChange/BuildMapChange emits (0x004FE428); the spawn transform + world objects scope
 		// to it. Threaded as one value so the snapshot/spawn/objects agree (per-map sourcing is a follow-up).
-		private const uint BeachPlayfieldId = 0x004FE428;
+		private const uint BeachPlayfieldId = World.WorldState.DefaultPlayfieldToken;
 
 		// The complete burst-less player FA015807 spawn packet, or null when the character has no scaffold rows yet.
 		private byte[] BuildBurstlessPlayerSpawn(INetworkClient client, CharacterEquipment equipment, Character scaffoldCharacter, uint playfield)

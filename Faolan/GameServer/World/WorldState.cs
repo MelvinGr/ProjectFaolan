@@ -72,6 +72,12 @@ namespace Faolan.GameServer.World
 		// the AUTHORITATIVE source once we GENERATE playfields (construct-don't-replay) and write the token into the
 		// generated entry packets ourselves. Seeded clear of the observed retail pools (~0x004F.. / ~0x01EA..) so a
 		// minted token is recognisably ours in a capture.
+		// The single playfield-instance token every (burst-less) world-entry stamps - beach-derived, but threaded
+		// through map-change / spawn / world-objects for EVERY playfield so the client keeps the abilities tab (a
+		// token that disagrees across those packets makes the client hide it). Shared so the cross-map teleport
+		// dest-announce can carry the same value the destination's entry will stamp (WorldBroadcaster).
+		public const uint DefaultPlayfieldToken = 0x004FE428;
+
 		private uint _nextPlayfieldToken = 0x00A00000;
 
 		// Mints the next playfield-instance token. Thread-safe (zones can be created from any connection).

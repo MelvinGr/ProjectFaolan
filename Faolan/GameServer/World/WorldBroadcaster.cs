@@ -870,20 +870,13 @@ namespace Faolan.GameServer.World
 				await SendQuestMarkerIfGiver(client, npc);
 		}
 
-		// Resolves the playfield token a map's world-entry will stamp (extracted from its stored burst's FullChar
-		// snapshot, the same source CapturePlayfieldToken uses on entry). A cross-map teleport's destination announce
-		// must carry THIS token, not a captured constant: the token is per-playfield-INSTANCE (it differs between the
-		// changemap capture and our burst), so the dest-announce only matches the destination world-entry if both come
-		// from the same burst (#219 / #211). Caches it on the destination zone and returns it; falls back to the zone's
-		// current (possibly minted) token when the map has no burst.
-		public async Task<uint> ResolveMapPlayfieldToken(uint mapId)
+		// Resolves the playfield token a map's world-entry will stamp for a cross-map teleport's destination announce.
+		// The (burst-less) world-entry stamps the same constant token for every playfield (WorldState.DefaultPlayfieldToken,
+		// threaded through map-change/spawn/world-objects), so the announce carries THAT value to line up with the
+		// destination's entry (#219 / #211) - no longer re-extracted from a stored MapWorldBurst.
+		public Task<uint> ResolveMapPlayfieldToken(uint mapId)
 		{
-			var zone = _sim.World.ZoneFor(mapId);
-			var burst = await _database.GetMapWorldBurst(mapId);
-			var fullCharBody = burst?.Entities?.FirstOrDefault(e => e.IirType == IirMessageTypes.FullChar)?.Body;
-			if (fullCharBody != null && WorldDespawn.TryExtractPlayfieldToken(fullCharBody, out var token))
-				zone.PlayfieldToken = token;
-			return zone.PlayfieldToken;
+			return Task.FromResult(WorldState.DefaultPlayfieldToken);
 		}
 
 		// On world entry: re-send the player's persisted active quests so their journal is restored.
