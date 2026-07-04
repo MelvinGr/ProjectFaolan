@@ -87,7 +87,7 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(4)]
 		public string Language { get; set; }
 
-		[MaxLength(45)] // INET6_ADDRSTRLEN 46
+		[MaxLength(64)] // INET6_ADDRSTRLEN 46
 		public string LastIpAddress { get; set; }
 
 		[MaxLength(128)]

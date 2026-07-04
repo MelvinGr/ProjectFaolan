@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Faolan.Core.Database.Tables
@@ -22,6 +23,7 @@ namespace Faolan.Core.Database.Tables
 
 		// The casting NPC's name (matched against the live WorldEntity / NpcSpawn name). Retained during the #244
 		// expand phase as the live join key; superseded by the NpcId FK below once the loader reads spells via the type.
+		[MaxLength(128)]
 		public string NpcName { get; set; }
 
 		// The full wire spell id the NPC casts: (rdbBase << 8) | rank. The client resolves the visual/effect from it.

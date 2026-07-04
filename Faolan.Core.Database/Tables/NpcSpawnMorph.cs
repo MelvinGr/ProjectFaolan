@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Faolan.Core.Database.Tables
@@ -16,6 +17,7 @@ namespace Faolan.Core.Database.Tables
 		public int Ordinal { get; set; }
 
 		// The texscript / resource ref on the entries that carry one (else empty).
+		[MaxLength(128)]
 		public string Text { get; set; } = "";
 
 		public uint MorphId { get; set; }

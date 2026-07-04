@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -18,6 +19,7 @@ namespace Faolan.Core.Database.Tables
 		public virtual ICollection<QuestGoalDefinition> Goals { get; set; } = new List<QuestGoalDefinition>();
 
 		public virtual ICollection<QuestTextRef> TextRefs { get; set; } = new List<QuestTextRef>();
+		[MaxLength(128)]
 		public string IndexGoalSteps { get; set; }
 
 		// The quest's region/area id (e.g. 1054), carried raw in both the journal and full-update packets.
@@ -88,6 +90,7 @@ namespace Faolan.Core.Database.Tables
 		//   Escort     - escorting the NPC named TargetName to a destination (not yet wired; Gitea sub-ticket).
 		// Default Kill keeps the existing single-goal rows (seeded before this field) as kill goals.
 		public QuestGoalType GoalType { get; set; } = QuestGoalType.Kill;
+		[MaxLength(128)]
 		public string ObjectiveKey { get; set; }
 
 		// The NPC this goal is ABOUT, interpreted per GoalType: the NPC to kill (Kill), whose corpse bag to loot
@@ -96,8 +99,11 @@ namespace Faolan.Core.Database.Tables
 		// correlation (the NPC at the QuestGoal-complete frame) + domain knowledge (#47/#261, e.g. Casilda's chain
 		// 13479 = kill "Scavenger Tuut", 13563 = loot "Scavenger Tuut"'s bag, 13480 = talk "Casilda").
 		// Null/empty = target not yet sourced.
+		[MaxLength(128)]
 		public string TargetName { get; set; }
+		[MaxLength(64)]
 		public string TrailingFlags { get; set; }
+		[MaxLength(128)]
 		public string TrailingKey { get; set; }
 
 		// Two of the "reserved" header words: 0 for most goals; the beach goal 2 carries a number + a 4-char tag
@@ -149,10 +155,12 @@ namespace Faolan.Core.Database.Tables
 		public QuestTextSlot Slot { get; set; }
 
 		// <localized flags="...">; null/empty for remoteformat slots.
+		[MaxLength(64)]
 		public string Flags { get; set; }
 
 		// The deterministic content hash from the capture (pre-escaped, e.g. contains &#36;). Render-critical:
 		// the client validates it, a wrong key yields blank text.
+		[MaxLength(256)]
 		public string KeyText { get; set; }
 		public uint Category { get; set; }
 

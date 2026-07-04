@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Faolan.Core.Database.Tables
@@ -15,6 +16,7 @@ namespace Faolan.Core.Database.Tables
 		public int Sequence { get; set; }
 
 		// The resource ref as sent by the editor, e.g. "*texscript_1108153".
+		[MaxLength(128)]
 		public string Ref { get; set; }
 
 		public uint CharacterId { get; set; }

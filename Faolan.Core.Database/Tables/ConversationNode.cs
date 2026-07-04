@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Collections.Generic;
 
 namespace Faolan.Core.Database.Tables
@@ -13,6 +14,7 @@ namespace Faolan.Core.Database.Tables
 		// The answer-index path to this screen within the NPC's dialogue: "" = the greeting, "0" = after picking
 		// option 0, "0>1" = then option 1, ... The runtime tracks the live player's path and serves the matching
 		// screen. This is the STABLE branch key (the old Mode/Field3 were session-volatile counters).
+		[MaxLength(128)]
 		public string AnswerPath { get; set; }
 
 		// A Lua CONDITION source (run against the live player via LuaScriptVm.RunCondition) that gates this screen
@@ -20,6 +22,7 @@ namespace Faolan.Core.Database.Tables
 		// Casilda's pre- vs post-first-quest greeting). "" = unconditional (the fallback / current behaviour). The
 		// runtime picks the first variant whose condition passes for the player, else the "" one. Part of the
 		// tag/quest dialogue VM (issue #37 / §6); the importer tags each captured variant with the state it came from.
+		[MaxLength(256)]
 		public string ConditionScript { get; set; } = "";
 
 		// The NPC's name, resolved at import from the captured FA015807 spawn with this handle. NPC dynel handles are
@@ -30,6 +33,7 @@ namespace Faolan.Core.Database.Tables
 		// neither is more durable; every conversational NPC has a unique name; and the lookup is name-keyed end-to-end
 		// with both sides matching the same ReadSpawnName output. Switch to template_id only if same-named conversational
 		// NPCs ever appear - until then name is correct and the simpler key.)
+		[MaxLength(128)]
 		public string NpcName { get; set; }
 		public uint CapturedInstance { get; set; }
 

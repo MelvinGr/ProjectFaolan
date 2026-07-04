@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 namespace Faolan.Core.Database.Tables
 {
 	// A combo definition catalog entry, imported from the client RDB type 1010206 ("Combo animation defs") - which,
@@ -9,6 +10,7 @@ namespace Faolan.Core.Database.Tables
 	{
 		// The combo id (Id, from BaseEntity) is the RDB 1010206 entry id = the ComboBookIIR/CharacterCombo combo id.
 
+		[MaxLength(128)]
 		public string Name { get; set; }
 
 		// The character level the combo unlocks at (XML `level`). This IS present here (unlike the ability templates).
@@ -25,10 +27,12 @@ namespace Faolan.Core.Database.Tables
 		public int Criteria { get; set; } // weapon/state criteria code (XML `criteria`)
 		public int Quality { get; set; } // XML `quality`
 
+		[MaxLength(128)]
 		public string Animation { get; set; } // XML `animation`
 
 		// The input action sequence that performs the combo, comma-separated (e.g. "CombatUpperRight,CombatUpperLeft"),
 		// from the child <action name="..."/> elements in order.
+		[MaxLength(128)]
 		public string Actions { get; set; }
 	}
 }

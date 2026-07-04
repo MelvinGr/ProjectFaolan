@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 namespace Faolan.Core.Database.Tables
 {
 	// An ability/skill catalog entry (keyed by its RDB id). Data0..4 is the ability's stable identity quad from the
@@ -7,6 +8,7 @@ namespace Faolan.Core.Database.Tables
 	// class/level requirement). This replaces the old IsStartingAbility flag + single Class/Level columns.
 	public class Ability : BaseEntity
 	{
+		[MaxLength(128)]
 		public string Name { get; set; }
 
 		public uint Data0 { get; set; }

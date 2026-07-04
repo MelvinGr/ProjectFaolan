@@ -19,6 +19,7 @@ namespace Faolan.Core.Database.Tables
 
 		// The mail body, a remoteformat XML string (length-prefixed u16 on the wire). For an AH delivery it is the
 		// TradePostGUI_MailItemBought token with the buyer + item parameters.
+		[MaxLength(4096)]
 		public string BodyXml { get; set; }
 
 		[MaxLength(64)]

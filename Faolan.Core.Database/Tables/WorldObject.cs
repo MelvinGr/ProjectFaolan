@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System;
 
 namespace Faolan.Core.Database.Tables
@@ -32,7 +33,9 @@ namespace Faolan.Core.Database.Tables
 		// (#187). Null on un-lifted rows (those still use Data). The transform (pos/rot) is rebuilt from Base3DEntity's
 		// columns and the live playfield comes from the burst, so with this the row's Data is no longer read at render.
 		public byte[] KdTreeTail { get; set; }
+		[MaxLength(128)]
 		public string DisplayName { get; set; } // proto field 3
+		[MaxLength(128)]
 		public string Name { get; set; }
 		public uint CapturedHandle { get; set; }
 		public uint CarsGroup { get; set; } // proto field 5

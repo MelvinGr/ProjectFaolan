@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Faolan.Core.Database.Tables
@@ -22,6 +23,7 @@ namespace Faolan.Core.Database.Tables
 		public byte[] Data { get; set; }
 
 		public int Sequence { get; set; }
+		[MaxLength(8192)]
 		public string ScreensJson { get; set; } // JSON array of the remoteformat XML screen(s); null for Open
 		public uint ConversationNodeId { get; set; }
 

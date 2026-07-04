@@ -26,7 +26,7 @@ namespace Faolan.Core.Database.Tables
 		[ConstrainToEnumValues]
 		public ItemType Type { get; set; }
 
-		[MaxLength(255)]
+		[MaxLength(256)]
 		public string Name { get; set; }
 
 		// Per-TEMPLATE hash the client needs (alongside the Data quad) to fully realize/render the item from its RDB.

@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Collections.Generic;
 
 namespace Faolan.Core.Database.Tables
@@ -19,6 +20,7 @@ namespace Faolan.Core.Database.Tables
 		public virtual ICollection<NpcSpell> Spells { get; set; } = new List<NpcSpell>();
 
 		// The creature's display name (the stable join key conversations/shops/spells use).
+		[MaxLength(128)]
 		public string Name { get; set; }
 
 		// Faction/community (NpcStats.community): 0 = neutral/friendly, > 0 = a hostile faction.

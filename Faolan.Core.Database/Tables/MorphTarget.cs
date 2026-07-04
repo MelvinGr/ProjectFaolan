@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 namespace Faolan.Core.Database.Tables
 {
 	// One entry of the client's character-customization registry (RDB type 1000076 id 0): every selectable
@@ -18,6 +19,7 @@ namespace Faolan.Core.Database.Tables
 		// Id (from BaseEntity) = the wire tag = the registry's 1-based id minus 1.
 
 		// The registry name: a slider name ("arm", "02_BrowLow") or a resource ref ("*texscript_1108153").
+		[MaxLength(128)]
 		public string Name { get; set; }
 	}
 }
