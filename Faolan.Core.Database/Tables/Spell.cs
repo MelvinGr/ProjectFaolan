@@ -1,4 +1,3 @@
-using System;
 using System.ComponentModel.DataAnnotations;
 
 namespace Faolan.Core.Database.Tables
@@ -43,15 +42,5 @@ namespace Faolan.Core.Database.Tables
 		public ushort Cooldown { get; set; }
 
 		public ushort ManaCost { get; set; }
-
-		// Min/Max damage are NOT stored in the RDB spell-data base record - the client COMPUTES them per rank/level
-		// from the spell's damage rating + the caster's stats, so they cannot be backfilled (RdbSpellImporter leaves
-		// them 0). Use DamageRating + level scaling instead. Kept so the legacy column isn't dropped from existing
-		// rows. (#236)
-		[Obsolete("Rank/level-computed client-side; not in the RDB record and not backfillable. Use DamageRating.")]
-		public ushort MaxDamage { get; set; }
-
-		[Obsolete("Rank/level-computed client-side; not in the RDB record and not backfillable. Use DamageRating.")]
-		public ushort MinDamage { get; set; }
 	}
 }
