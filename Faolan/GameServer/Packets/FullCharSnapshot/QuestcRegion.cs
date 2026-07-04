@@ -23,6 +23,21 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 	// tails' front region instead of the former opaque header+string fields) - the live snapshot is byte-
 	// identical (BeachSnapshotConstructionTests). Generating DIFFERENT quests from a character's CharacterQuests
 	// is the next step and is gated by an in-client chat-connect smoke test.
+	//
+	// #304 RE 2026-07-05 (Ghidra FUN_0091df50 = the per-record reader, decompiled; validated 4-u32 helper
+	// FUN_00cc0540, ReadString FUN_0048f840, ReadU64 FUN_0048f720). The REAL per-record grammar is:
+	//   ver(=1) · questId@+0xc · state@+0x10 · field114@+0x114 · field118@+0x118 · n@+0x14 · 5×string ·
+	//   fieldEc@+0xec · areaId@+0xcc · field2c@+0x2c · field11c@+0x11c · accept:u64@+0x20 · field28@+0x28 ·
+	//   objlist1(+0x10c) · objlist2(+0x110) · fieldF0:u32@+0xf0 · fieldF8:u64@+0xf8 · objlist3(+0x100) ·
+	//   objlist4(+0x104) · <MORE post-obj4 data — a +0xac/+0xb0 list this codec does NOT yet model>.
+	// Each ObjRec IS 16 u32 (confirmed: 2 words + 4-word cc0540 + 2 words + 4-word cc0540 + 2 words, scrambled
+	// into an 18-word struct). TWO CORRECTIONS to the model below: (1) the word this codec calls `Marker`/`0x412`
+	// is actually the variable `n` (goal count) — the `!= 0x412` assert only holds for the beach template and
+	// REJECTS real progressed snapshots (NecroL80's 27-quest login: n=2 in rec0); (2) `field2c` is NOT a second
+	// questId (the `questId2 == questId` assert is likewise beach-only). The round-trip below is still byte-exact
+	// for the BEACH template (its objlists are empty and n happened to be 0x412), but PARSING arbitrary snapshots
+	// needs this grammar + the post-obj4 tail decoded. TODO(#186/#304): finish the post-obj4 structure, drop the
+	// two beach-only asserts, then this region parses every login snapshot (not just the create template).
 	public sealed class QuestcRegion
 	{
 		public const uint Frame = 0x3F1; // 1009 - the list-count framing multiplier
