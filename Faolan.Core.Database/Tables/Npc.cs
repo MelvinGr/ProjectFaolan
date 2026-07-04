@@ -26,11 +26,13 @@ namespace Faolan.Core.Database.Tables
 		// Faction/community (NpcStats.community): 0 = neutral/friendly, > 0 = a hostile faction.
 		public uint Community { get; set; }
 
-		// Type-level appearance identity (#287): the creature's race and sex code, the same across every placement of
-		// this type (moved off NpcSpawn, where it was duplicated per instance). Sourced from the captured
-		// CharacterStats.race / CharacterStats.sex (sex code = the Sex enum + 2: MALE=2 / FEMALE=3).
+		// Deliberately raw uint, NOT the player Race/Sex enums, despite the names - a different domain: this is a
+		// CREATURE model-race code (observed 0..98, far beyond the 3 playable races Aquilonian/Cimmerian/Stygian), so
+		// the 3-value Race enum (and its [ConstrainToEnumValues] check) would reject most values. Don't "fix" the type.
 		public uint Race { get; set; }
 
+		// Wire-encoded creature sex: 2 = MALE, 3 = FEMALE (= the Sex enum + 2), plus 0 for none. NOT the player Sex
+		// enum (0/1), so it stays uint - see the Race note above.
 		public uint Sex { get; set; }
 
 		// The stable per-type identity (NpcStats.f4 / NpcSpawn.TemplateId). Unique - one Npc row per template.
