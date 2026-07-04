@@ -113,7 +113,7 @@ namespace Faolan.Core.Network.Spawn
 				{
 					CharacterId = character.Id,
 					Sequence = sequence,
-					StatId = e.Index,
+					EntryIndex = e.Index,
 					Tag = e.Tag,
 					Value = e.Value
 				})
@@ -138,7 +138,7 @@ namespace Faolan.Core.Network.Spawn
 				{
 					CharacterId = character.Id,
 					Sequence = sequence,
-					StatId = e.Index,
+					EntryIndex = e.Index,
 					Tag = e.Tag,
 					Value = e.Value
 				})
@@ -245,7 +245,7 @@ namespace Faolan.Core.Network.Spawn
 				{
 					CharacterId = character.Id,
 					Sequence = sequence,
-					StatId = e.Index,
+					EntryIndex = e.Index,
 					Tag = e.Tag,
 					Value = e.Value
 				})
@@ -268,7 +268,7 @@ namespace Faolan.Core.Network.Spawn
 			scaffold.BuffRecords.Clear();
 
 			scaffold.Entries.Clear();
-			scaffold.Entries.AddRange(character.Attributes.OrderBy(a => a.Sequence).Select(a => new ScaffoldEntry(a.StatId, a.Tag, a.Value)));
+			scaffold.Entries.AddRange(character.Attributes.OrderBy(a => a.Sequence).Select(a => new ScaffoldEntry(a.EntryIndex, a.Tag, a.Value)));
 
 			scaffold.IdList.Clear();
 			if (character.Skills != null)

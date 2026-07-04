@@ -148,7 +148,7 @@ namespace Faolan.Tests
 
 			Assert.Equal(7, character.Attributes.Count);
 			var closer = character.Attributes.Single(a => a.Sequence == 6);
-			Assert.Equal(7u, closer.StatId);
+			Assert.Equal(7u, closer.EntryIndex);
 			Assert.Equal(0x56B6, closer.Tag);
 			Assert.Equal(300u, closer.Value);
 		}

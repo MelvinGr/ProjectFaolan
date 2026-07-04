@@ -55,7 +55,7 @@ namespace Faolan.Tests
 			Assert.Equal(8, character.Attributes.Count);
 			var rows = character.Attributes.OrderBy(a => a.Sequence).ToList();
 			Assert.Equal(FaolanxWire, rows.Take(7).Select(a => a.Tag));
-			Assert.Equal(8u, rows[7].StatId);
+			Assert.Equal(8u, rows[7].EntryIndex);
 			Assert.Equal(0x4301, rows[7].Tag); // Necromancer's per-class closer (#250); was the old hardcoded 0x56B6
 		}
 
