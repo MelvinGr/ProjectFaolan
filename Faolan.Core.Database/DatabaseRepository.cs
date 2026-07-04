@@ -50,6 +50,8 @@ namespace Faolan.Core.Database
 		Task<CharacterShortcut[]> GetCharacterShortcuts(uint characterId);
 		Task<CharacterSpell[]> GetCharacterSpells(uint characterId);
 		Task<CharacterStat[]> GetCharacterStats(uint characterId);
+		Task<CharacterAbility[]> GetCharacterAbilities(uint characterId);
+		Task<CharacterCombo[]> GetCharacterCombos(uint characterId);
 		Task<uint[]> GetCharacterTags(uint characterId);
 
 		Task<ConversationNode> GetConversationScreen(string npcName, uint typeId, string answerPath);
@@ -552,6 +554,22 @@ namespace Faolan.Core.Database
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.CharacterStats.Where(s => s.CharacterId == characterId).OrderBy(s => s.Ordinal).ToArrayAsync();
+		}
+
+		// The character's granted abilities (CharacterAbility) - the authoritative per-character ability set, re-granted
+		// on login by GrantCharacterAbilities. Empty for a freshly-created character (the class-starting set is used).
+		public async Task<CharacterAbility[]> GetCharacterAbilities(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.CharacterAbilities.Where(a => a.CharacterId == characterId).OrderBy(a => a.Id).ToArrayAsync();
+		}
+
+		// The character's combo book (CharacterCombo) - re-emitted on login by GrantCharacterCombos (a max-level
+		// imported character never dings, so this is how it keeps its combos).
+		public async Task<CharacterCombo[]> GetCharacterCombos(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.CharacterCombos.Where(c => c.CharacterId == characterId).OrderBy(c => c.Id).ToArrayAsync();
 		}
 
 		public async Task<uint[]> GetCharacterTags(uint characterId)

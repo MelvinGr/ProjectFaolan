@@ -259,6 +259,33 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
+	// Per-character ABILITY sets (0x2052) + COMBO books (ComboBookIIR) re-granted on login. Abilities and combos are
+	// NOT in the snapshot known-list, so retail re-sends them on every world entry; this persists what to replay (the
+	// action bar is only shortcuts, never the grant source). Needs characters (attribution) + abilities (the catalog
+	// the ability grants resolve against).
+	public sealed class CharacterAbilitiesModule : IImportModule
+	{
+		public ImportSource Source => ImportSource.Captures;
+		public IReadOnlyList<string> DependsOn => ["characters", "abilities"];
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "Per-character ability sets (0x2052) + combo books (ComboBookIIR).";
+		public string Name => "character-abilities";
+
+		public async Task<ImportResult> RunAsync(ImportContext ctx)
+		{
+			var (aChars, aRows) = await CaptureAbilityImporter.ImportCharacterAbilitiesAsync(ctx.Db, ctx.RawPackets);
+			var (cChars, cRows) = await CaptureAbilityImporter.ImportCharacterCombosAsync(ctx.Db, ctx.RawPackets);
+			return new ImportResult($"{aRows} ability rows ({aChars} chars), {cRows} combo rows ({cChars} chars).");
+		}
+	}
+
 	// Per-character quest JOURNAL (CharacterQuest) recovered from the capture's s2c QuestIIR/QuestGoal packets, so an
 	// imported character carries its active/completed quests + goal progress. Needs characters (attribution) and the
 	// quest definitions (the journal references them).

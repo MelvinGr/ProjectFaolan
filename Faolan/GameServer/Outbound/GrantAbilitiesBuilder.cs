@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core;
@@ -7,6 +8,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Packets;
 using Faolan.Core.Network.Packets.Opcodes;
+using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
 // ReSharper disable once CheckNamespace
@@ -74,30 +76,21 @@ namespace Faolan.GameServer
 			foreach (var spellId in spells)
 				await Database.AddCharacterSpell(character.Id, spellId);
 
-			var abilities = await Database.GetStartingAbilities(character.Level, (uint)character.Class);
+			// Grant the character's ABILITIES from its authoritative per-character set (CharacterAbility, imported from
+			// the retail 0x2052 grants) - NOT from the bar (the bar is only shortcuts). A freshly-created character with
+			// no set gets the class-starting kit. Granted pre-snapshot so the client can place them when it restores the
+			// bar mid-load (abilities aren't in the snapshot known-list). Its COMBO book is emitted the same way.
+			var abilities = await GetLoadoutAbilities(character);
 			foreach (var ability in abilities)
-				// Grant the ability NOW (pre-snapshot) so the client knows it when it restores the bar mid-load and
-				// can place it (abilities aren't in the snapshot known-list). Silent: post-ready re-grants the kit.
 				await SendAbilityGrant(client, ability, false);
+			await GrantCharacterCombos(client);
 
 			// The BAR layout is only SEEDED when the character has none. An imported or player-customised bar is left
-			// exactly as it is - we just made its slots resolvable above.
+			// exactly as it is. NB the bar is only SHORTCUTS - never the source of truth for what the character KNOWS
+			// (that is the snapshot known-list -> CharacterSpells, plus CharacterAbility / CharacterCombo re-granted on
+			// login); we never add a bar target to those sets (it "learned" a spell/ability twice when the bar
+			// referenced a different id than the known set for the same thing - e.g. two "Quell the Ether (Rank 5)" ids).
 			var existingShortcuts = await Database.GetCharacterShortcuts(character.Id);
-
-			// NB the bar is just SHORTCUTS - it is NOT the source of truth for what the character KNOWS. The known-spell
-			// set is the snapshot known-list (CharacterSpells); we do NOT add the bar's spell targets to it. Doing so
-			// used to "learn" a spell twice when the bar referenced a different id than the known-list for the same spell
-			// (e.g. two ids both named "Quell the Ether (Rank 5)"), showing a duplicate in the spellbook.
-
-			// Grant every ABILITY on the bar (an imported bar references abilities beyond the class-starting
-			// set - GetStartingAbilities only returns the IsStartingAbility ones). SendAbilityGrant needs the row;
-			// ids we don't have cataloged are skipped (that slot stays empty).
-			foreach (var abilityId in existingShortcuts.Where(s => s.ShortcutType == shortcutTypeAbility).Select(s => s.TargetId).Distinct())
-			{
-				var ability = await Database.GetAbility(abilityId);
-				if (ability != null)
-					await SendAbilityGrant(client, ability, false);
-			}
 
 			if (existingShortcuts.Length > 0)
 			{
@@ -146,15 +139,54 @@ namespace Faolan.GameServer
 			if (character == null)
 				return;
 
-			var abilities = await Database.GetStartingAbilities(character.Level, (uint)character.Class);
+			var abilities = await GetLoadoutAbilities(character);
 			// Login is a SILENT re-grant: the abilities were already learned (in the create flow / on first learn), so
 			// the announce flag is cleared - otherwise the client pops "You have learned a new ability" for the whole
-			// starting kit on every login. Retail does exactly this: the create-flow grants carry the announce byte
+			// kit on every login. Retail does exactly this: the create-flow grants carry the announce byte
 			// 0x01, the per-login re-grants carry 0x00 (the ONLY differing byte; see BuildAbilityGrantBody).
 			foreach (var ability in abilities)
 				await SendAbilityGrant(client, ability, false);
 
 			Logger.LogInformation("GrantCharacterAbilities: re-granted {Count} abilities (silent) to '{Name}' (class={Class}, level={Level}).", abilities.Length, character.Name, character.Class, character.Level);
+		}
+
+		// The abilities to grant a character on login: its authoritative per-character set (CharacterAbility, imported
+		// from the retail 0x2052 grants) resolved to Ability rows, or the class-starting kit for a freshly-created
+		// character with no persisted set. NOT derived from the bar (the bar is only shortcuts).
+		private async Task<Ability[]> GetLoadoutAbilities(Character character)
+		{
+			var granted = await Database.GetCharacterAbilities(character.Id);
+			if (granted.Length == 0)
+				return await Database.GetStartingAbilities(character.Level, (uint)character.Class);
+
+			var abilities = new List<Ability>(granted.Length);
+			foreach (var ga in granted)
+			{
+				var ability = await Database.GetAbility(ga.AbilityId);
+				if (ability != null) // ids we do not have cataloged are skipped (that bar slot stays empty)
+					abilities.Add(ability);
+			}
+
+			return [.. abilities];
+		}
+
+		// Re-emits the character's COMBO book (CharacterCombo) on login as ComboBookIIR grants - the combo counterpart to
+		// GrantCharacterAbilities. Combos are class/level content the client's book gains per level (LevelComboCatalog);
+		// a MAX-LEVEL imported character never dings, so without this its combo book would be empty. Not in the snapshot.
+		private async Task GrantCharacterCombos(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			if (character == null)
+				return;
+
+			var combos = await Database.GetCharacterCombos(character.Id);
+			var instance = client.Session.Account.ClientInstance;
+			foreach (var combo in combos)
+				await new PacketStream().WriteHeader(WorldFraming.Sender, WorldFraming.Receiver(client), GameServerCarrierOpcodes.IirCarrier)
+					.WriteArray(ComboBookIirCodec.Build(instance, combo.ComboId)).SendAsync(client);
+
+			if (combos.Length > 0)
+				Logger.LogInformation("GrantCharacterCombos: emitted {Count} combos to '{Name}' (class={Class}).", combos.Length, character.Name, character.Class);
 		}
 
 		private async Task GrantStartingBuffs(INetworkClient client)

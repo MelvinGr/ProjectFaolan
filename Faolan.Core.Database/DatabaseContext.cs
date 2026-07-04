@@ -26,6 +26,8 @@ namespace Faolan.Core.Database
 		DbSet<CharacterShortcut> CharacterShortcuts { get; }
 		DbSet<CharacterSkill> CharacterSkills { get; }
 		DbSet<CharacterStat> CharacterStats { get; }
+		DbSet<CharacterAbility> CharacterAbilities { get; }
+		DbSet<CharacterCombo> CharacterCombos { get; }
 		DbSet<CharacterSpawnFrame> CharacterSpawnFrames { get; }
 		DbSet<CharacterSpell> CharacterSpells { get; }
 		DbSet<CharacterTag> CharacterTags { get; }
@@ -83,6 +85,8 @@ namespace Faolan.Core.Database
 		public DbSet<CharacterShortcut> CharacterShortcuts { get; set; }
 		public DbSet<CharacterSkill> CharacterSkills { get; set; }
 		public DbSet<CharacterStat> CharacterStats { get; set; }
+		public DbSet<CharacterAbility> CharacterAbilities { get; set; }
+		public DbSet<CharacterCombo> CharacterCombos { get; set; }
 		public DbSet<CharacterSpawnFrame> CharacterSpawnFrames { get; set; }
 		public DbSet<CharacterSpell> CharacterSpells { get; set; }
 		public DbSet<CharacterTag> CharacterTags { get; set; }

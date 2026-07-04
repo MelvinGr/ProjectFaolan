@@ -26,8 +26,11 @@ namespace Faolan.Importer.Captures
 	{
 		private const uint ChangeClassSubOpcode = 0xA36D3B74; // client->server character-editor script callback
 		private const ushort AbilityGrantOpcode = 0x2052;
+		private const ushort IirCarrierOpcode = 0x2000; // ComboBookIIR rides the 0x2000 world-conversation carrier
+		private const uint ComboBookSubOpcode = 0xA8BBEB7F;
 
 		// The few human-readable names the old archive knows (the rest are client-side / unknown).
+		[Obsolete]
 		private static readonly Dictionary<uint, string> KnownNames = new Dictionary<uint, string>
 		{
 			[769094] = "Normal Attack Left",
@@ -178,6 +181,119 @@ namespace Faolan.Importer.Captures
 			}
 
 			return value;
+		}
+
+		// Seeds each captured character's granted ABILITY set (CharacterAbility rows) from the 0x2052 grants, keyed by
+		// the grant's RpcHeader receiver instance (= character id) - the ability twin of CaptureSpellImporter's learned-
+		// spell seeding. Abilities are NOT in the snapshot known-list, so this is the authoritative per-character set
+		// (the action bar is only shortcuts). Only characters already in the DB are touched; idempotent.
+		public static async Task<(int Characters, int Inserted)> ImportCharacterAbilitiesAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger logger = null)
+		{
+			var byCharacter = new Dictionary<uint, HashSet<uint>>();
+			foreach (var packet in rawPackets)
+				TryReadCharacterGrant(packet, byCharacter, isCombo: false);
+
+			var (characters, inserted) = await SeedPerCharacterAsync(db, byCharacter,
+				async cid => (await db.CharacterAbilities.Where(a => a.CharacterId == cid).Select(a => a.AbilityId).ToListAsync()).ToHashSet(),
+				(cid, id) => db.CharacterAbilities.Add(new CharacterAbility { CharacterId = cid, AbilityId = id }));
+
+			logger?.LogInformation("CaptureAbilityImporter: per-character ability sets for {C} characters, {I} new CharacterAbility rows.", characters, inserted);
+			return (characters, inserted);
+		}
+
+		// Seeds each captured character's COMBO book (CharacterCombo rows) from the ComboBookIIR grants (0x2000 carrier,
+		// sub-opcode 0xA8BBEB7F), keyed by the RpcHeader receiver instance (= character id). Combos are class/level
+		// content the client's combo book gains per level; a max-level imported character never dings, so this persisted
+		// set is what GrantCharacterCombos re-emits on login. Only characters already in the DB are touched; idempotent.
+		public static async Task<(int Characters, int Inserted)> ImportCharacterCombosAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger logger = null)
+		{
+			var byCharacter = new Dictionary<uint, HashSet<uint>>();
+			foreach (var packet in rawPackets)
+				TryReadCharacterGrant(packet, byCharacter, isCombo: true);
+
+			var (characters, inserted) = await SeedPerCharacterAsync(db, byCharacter,
+				async cid => (await db.CharacterCombos.Where(c => c.CharacterId == cid).Select(c => c.ComboId).ToListAsync()).ToHashSet(),
+				(cid, id) => db.CharacterCombos.Add(new CharacterCombo { CharacterId = cid, ComboId = id }));
+
+			logger?.LogInformation("CaptureAbilityImporter: combo books for {C} characters, {I} new CharacterCombo rows.", characters, inserted);
+			return (characters, inserted);
+		}
+
+		// Shared per-character seeding: for every (characterId -> id set), skip characters not in the DB and ids already
+		// recorded, add the rest via the supplied factory, save once. Returns (characters touched, rows inserted).
+		private static async Task<(int Characters, int Inserted)> SeedPerCharacterAsync(IDatabaseContext db, Dictionary<uint, HashSet<uint>> byCharacter,
+			Func<uint, Task<HashSet<uint>>> loadExisting, Action<uint, uint> add)
+		{
+			if (byCharacter.Count == 0)
+				return (0, 0);
+
+			var characters = 0;
+			var inserted = 0;
+			foreach (var (characterId, ids) in byCharacter)
+			{
+				if (!await db.Characters.AnyAsync(c => c.Id == characterId))
+					continue;
+
+				var existing = await loadExisting(characterId);
+				var added = false;
+				foreach (var id in ids)
+				{
+					if (!existing.Add(id))
+						continue;
+
+					add(characterId, id);
+					inserted++;
+					added = true;
+				}
+
+				if (added)
+					characters++;
+			}
+
+			if (inserted > 0)
+				await db.SaveChangesAsync();
+
+			return (characters, inserted);
+		}
+
+		// Reads one per-character grant into byCharacter, keyed by the RpcHeader receiver (= character id): an ability
+		// grant (0x2052, ability id = body word 1, doubled) or a ComboBookIIR combo (0x2000 carrier, sub 0xA8BBEB7F,
+		// comboId at body offset 18 after [len][subop][marker][instance][u16 addflag]).
+		private static void TryReadCharacterGrant(byte[] packetBytes, IDictionary<uint, HashSet<uint>> byCharacter, bool isCombo)
+		{
+			try
+			{
+				var packet = new ConanPacket(packetBytes);
+				var body = packet.Body.ReadRemainingArray();
+
+				uint id;
+				if (isCombo)
+				{
+					if (packet.Opcode != IirCarrierOpcode || body.Length < 22 || BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)) != ComboBookSubOpcode)
+						return;
+					id = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(18, 4));
+				}
+				else
+				{
+					if (packet.Opcode != AbilityGrantOpcode || body.Length < 12)
+						return;
+					id = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)); // ability id (word 1)
+					if (id != BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(8, 4)))
+						return; // id appears twice; guard against mis-parses
+				}
+
+				if (id == 0)
+					return;
+
+				var characterId = packet.Receiver.Instance;
+				(byCharacter.TryGetValue(characterId, out var set)
+					? set
+					: byCharacter[characterId] = new HashSet<uint>()).Add(id);
+			}
+			catch
+			{
+				// not a parseable per-character grant
+			}
 		}
 
 		// 0x2052 body (no length prefix): [slot][id][id][0][1][data0][data1..4][data1..4][constA][constB]x2[1][0][u8].
