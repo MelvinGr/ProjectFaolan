@@ -16,6 +16,15 @@ namespace Faolan.GameServer
 		private static async Task SendRetailCreateEditorPost205FBurst(INetworkClient client)
 		{
 			var id = client.Session.Account.ClientInstance;
+
+			// StatIIR (0xF98E10B3) carrier for the avatar: constructed via CreateEditorRecordBuilder (was 18 identical
+			// verbatim blobs). #189/#304 - the record grammar [type][handle][flag][statId][value] is byte-exact-locked
+			// by CreateEditorRecordTests; the frame ([u32 len][u32 iirType][record]) matches every other converted carrier.
+			Task StatIir(byte flag, uint statId, uint value) =>
+				new PacketStream()
+					.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
+					.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.StatIIR).WriteArray(CreateEditorRecordBuilder.BuildStatIir(CreateEditorRecordBuilder.CharacterWireType, id, flag, statId, value)))
+					.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x92, 0x00)
@@ -24,22 +33,12 @@ namespace Faolan.GameServer
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x93, 0x00)
 				.SendAsync(client);
-			await new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x15, 0xF9, 0x8E, 0x10, 0xB3, 0x00, 0x00, 0xC3, 0x50)
-				.WriteUInt32(id)
-				.WriteArray(0x01, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00)
-				.SendAsync(client);
+			await StatIir(0x01, 0x13, 0x00);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x94, 0x00)
 				.SendAsync(client);
-			await new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x15, 0xF9, 0x8E, 0x10, 0xB3, 0x00, 0x00, 0xC3, 0x50)
-				.WriteUInt32(id)
-				.WriteArray(0x01, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00)
-				.SendAsync(client);
+			await StatIir(0x01, 0x13, 0x00);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x94, 0x00)
@@ -48,22 +47,12 @@ namespace Faolan.GameServer
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x95, 0x00)
 				.SendAsync(client);
-			await new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x15, 0xF9, 0x8E, 0x10, 0xB3, 0x00, 0x00, 0xC3, 0x50)
-				.WriteUInt32(id)
-				.WriteArray(0x01, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00)
-				.SendAsync(client);
+			await StatIir(0x01, 0x13, 0x00);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x96, 0x00)
 				.SendAsync(client);
-			await new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x15, 0xF9, 0x8E, 0x10, 0xB3, 0x00, 0x00, 0xC3, 0x50)
-				.WriteUInt32(id)
-				.WriteArray(0x01, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00)
-				.SendAsync(client);
+			await StatIir(0x01, 0x13, 0x00);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x96, 0x00)
@@ -110,142 +99,72 @@ namespace Faolan.GameServer
 				.WriteUInt32(id)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x96)
 				.SendAsync(client);
-			await new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x15, 0xF9, 0x8E, 0x10, 0xB3, 0x00, 0x00, 0xC3, 0x50)
-				.WriteUInt32(id)
-				.WriteArray(0x01, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00)
-				.SendAsync(client);
+			await StatIir(0x01, 0x13, 0x00);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x94, 0x00)
 				.SendAsync(client);
-			await new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x15, 0xF9, 0x8E, 0x10, 0xB3, 0x00, 0x00, 0xC3, 0x50)
-				.WriteUInt32(id)
-				.WriteArray(0x01, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00)
-				.SendAsync(client);
+			await StatIir(0x01, 0x13, 0x00);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x96, 0x00)
 				.SendAsync(client);
-			await new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x15, 0xF9, 0x8E, 0x10, 0xB3, 0x00, 0x00, 0xC3, 0x50)
-				.WriteUInt32(id)
-				.WriteArray(0x01, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00)
-				.SendAsync(client);
+			await StatIir(0x01, 0x13, 0x00);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x94, 0x00)
 				.SendAsync(client);
-			await new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x15, 0xF9, 0x8E, 0x10, 0xB3, 0x00, 0x00, 0xC3, 0x50)
-				.WriteUInt32(id)
-				.WriteArray(0x01, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00)
-				.SendAsync(client);
+			await StatIir(0x01, 0x13, 0x00);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x96, 0x00)
 				.SendAsync(client);
-			await new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x15, 0xF9, 0x8E, 0x10, 0xB3, 0x00, 0x00, 0xC3, 0x50)
-				.WriteUInt32(id)
-				.WriteArray(0x01, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00)
-				.SendAsync(client);
+			await StatIir(0x01, 0x13, 0x00);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x94, 0x00)
 				.SendAsync(client);
-			await new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x15, 0xF9, 0x8E, 0x10, 0xB3, 0x00, 0x00, 0xC3, 0x50)
-				.WriteUInt32(id)
-				.WriteArray(0x01, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00)
-				.SendAsync(client);
+			await StatIir(0x01, 0x13, 0x00);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x96, 0x00)
 				.SendAsync(client);
-			await new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x15, 0xF9, 0x8E, 0x10, 0xB3, 0x00, 0x00, 0xC3, 0x50)
-				.WriteUInt32(id)
-				.WriteArray(0x01, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00)
-				.SendAsync(client);
+			await StatIir(0x01, 0x13, 0x00);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x94, 0x00)
 				.SendAsync(client);
-			await new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x15, 0xF9, 0x8E, 0x10, 0xB3, 0x00, 0x00, 0xC3, 0x50)
-				.WriteUInt32(id)
-				.WriteArray(0x01, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00)
-				.SendAsync(client);
+			await StatIir(0x01, 0x13, 0x00);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x96, 0x00)
 				.SendAsync(client);
-			await new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x15, 0xF9, 0x8E, 0x10, 0xB3, 0x00, 0x00, 0xC3, 0x50)
-				.WriteUInt32(id)
-				.WriteArray(0x01, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00)
-				.SendAsync(client);
+			await StatIir(0x01, 0x13, 0x00);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x94, 0x00)
 				.SendAsync(client);
-			await new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x15, 0xF9, 0x8E, 0x10, 0xB3, 0x00, 0x00, 0xC3, 0x50)
-				.WriteUInt32(id)
-				.WriteArray(0x01, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00)
-				.SendAsync(client);
+			await StatIir(0x01, 0x13, 0x00);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x96, 0x00)
 				.SendAsync(client);
-			await new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x15, 0xF9, 0x8E, 0x10, 0xB3, 0x00, 0x00, 0xC3, 0x50)
-				.WriteUInt32(id)
-				.WriteArray(0x01, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00)
-				.SendAsync(client);
+			await StatIir(0x01, 0x13, 0x00);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x94, 0x00)
 				.SendAsync(client);
-			await new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x15, 0xF9, 0x8E, 0x10, 0xB3, 0x00, 0x00, 0xC3, 0x50)
-				.WriteUInt32(id)
-				.WriteArray(0x01, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00)
-				.SendAsync(client);
+			await StatIir(0x01, 0x13, 0x00);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x96, 0x00)
 				.SendAsync(client);
-			await new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x15, 0xF9, 0x8E, 0x10, 0xB3, 0x00, 0x00, 0xC3, 0x50)
-				.WriteUInt32(id)
-				.WriteArray(0x01, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00)
-				.SendAsync(client);
+			await StatIir(0x01, 0x13, 0x00);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x94, 0x00)
 				.SendAsync(client);
-			await new PacketStream()
-				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x15, 0xF9, 0x8E, 0x10, 0xB3, 0x00, 0x00, 0xC3, 0x50)
-				.WriteUInt32(id)
-				.WriteArray(0x01, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00)
-				.SendAsync(client);
+			await StatIir(0x01, 0x13, 0x00);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameCharInterfaceType, id), GameCharInterfaceDispatchOpcodes.DispatchSetQuestMarker)
 				.WriteArray(0x00, 0x00, 0xC3, 0x50, 0x00, 0x09, 0xFF, 0x96, 0x00)
