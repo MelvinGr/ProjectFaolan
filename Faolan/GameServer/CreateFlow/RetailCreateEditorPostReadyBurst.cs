@@ -33,7 +33,7 @@ namespace Faolan.GameServer
 		// template ids 50000:65525x), delivered on two GameActionListIIR (0xF508F4C1) records for dynel 0xD00C.
 		// The two captured variants differ ONLY in the leading action-id word; the property-map action-tail
 		// grammar is still opaque (#190) so it rides verbatim, while the record HEADER is constructed via
-		// GameActionListCodec.BuildBody (construct-don't-replay - see SendCreateEditorGameActionList).
+		// GameActionListCodec.BuildBody (construct-don't-replay - see SendGameActionListRecord).
 		private static readonly byte[] CreateEditorTemplateChoiceActionTailA =
 		[
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x09, 0x00, 0x39, 0xBF, 0x93, 0x00, 0x50,
@@ -57,7 +57,7 @@ namespace Faolan.GameServer
 		// Emits a GameActionListIIR (0xF508F4C1) carrier for `dynel`, delivered to frame `id`. The fixed record
 		// header (subop/type/Head/four/one, decoded 570/570) is CONSTRUCTED via GameActionListCodec.BuildBody and
 		// the still-opaque property-map action tail rides verbatim; the carrier length is computed from the body.
-		private static Task SendCreateEditorGameActionList(INetworkClient client, byte agentSub, uint id, uint dynel, byte[] actionTail)
+		private static Task SendGameActionListRecord(INetworkClient client, byte agentSub, uint id, uint dynel, byte[] actionTail)
 		{
 			var body = GameActionListCodec.BuildBody(id, dynel, 0u, actionTail);
 			return new PacketStream()
@@ -146,8 +146,8 @@ namespace Faolan.GameServer
 				.WriteUInt32(id)
 				.WriteArray(0x00)
 				.SendAsync(client);
-			await SendCreateEditorGameActionList(client, 0x59, id, 0xD00Cu, CreateEditorTemplateChoiceActionTailA);
-			await SendCreateEditorGameActionList(client, 0x59, id, 0xD00Cu, CreateEditorTemplateChoiceActionTailB);
+			await SendGameActionListRecord(client, 0x59, id, 0xD00Cu, CreateEditorTemplateChoiceActionTailA);
+			await SendGameActionListRecord(client, 0x59, id, 0xD00Cu, CreateEditorTemplateChoiceActionTailB);
 
 			// After the post-ready editor handoff, retail streams the character-creation script burst
 			// (rows 274-331) that actually launches the Slave Galley creation scene via the
