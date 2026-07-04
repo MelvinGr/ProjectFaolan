@@ -87,10 +87,11 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// template .bin is no longer needed to author a beach entry.
 		// Single-quest convenience (golden tests + the single-quest path): delegates to the multi-quest form with just
 		// the beach quest. BuildFromScratch([beach], beach) == BuildFromScratch(beach), so byte-identical.
-		public static byte[] BuildFromScratch(QuestDefinition beachDef, Character character, uint instance, uint? playfieldToken = null, IReadOnlyList<uint> knownSpellIds = null)
+		public static byte[] BuildFromScratch(QuestDefinition beachDef, Character character, uint instance, uint? playfieldToken = null, IReadOnlyList<uint> knownSpellIds = null,
+			IReadOnlyList<(CharacterStatId Id, uint Value)> statSheet = null)
 		{
 			ArgumentNullException.ThrowIfNull(beachDef);
-			return BuildFromScratch([beachDef], beachDef, character, instance, playfieldToken, knownSpellIds);
+			return BuildFromScratch([beachDef], beachDef, character, instance, playfieldToken, knownSpellIds, statSheet);
 		}
 
 		// The player's full set of snapshot-eligible held quests (#255): the journal region carries every held
@@ -98,7 +99,8 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// the beach-only overload. `primary` is the tracked quest (the beach quest when held). `knownSpellIds` are the
 		// character's learned spells - spliced into the stat block's known-list so they persist across relog + place on
 		// the action bar (#74/#71); null/empty leaves the list empty (byte-identical to the captured beach tails).
-		public static byte[] BuildFromScratch(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, Character character, uint instance, uint? playfieldToken = null, IReadOnlyList<uint> knownSpellIds = null)
+		public static byte[] BuildFromScratch(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, Character character, uint instance, uint? playfieldToken = null, IReadOnlyList<uint> knownSpellIds = null,
+			IReadOnlyList<(CharacterStatId Id, uint Value)> statSheet = null)
 		{
 			ArgumentNullException.ThrowIfNull(quests);
 			// `primary` may be null IFF the character holds no snapshot quests (the empty-region create case); when
@@ -108,25 +110,38 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 			var block = TailsStatBlock.CreateFreshBlock();
 
-			// Derive the character's LEVEL (stat 0x36) into the sheet. The skeleton hardcodes 1 because its diff sample
-			// was all level-1 chars, so the level slot was misclassified as "fixed" - without this the client reads
-			// level 1 from the snapshot and blocks every level-gated spell/item regardless of the player's real level.
-			if (character != null)
+			if (statSheet is { Count: > 0 })
+			{
+				// The character has a captured stat sheet (CharacterStat): author the WHOLE sheet from its REAL retail
+				// values, replacing the fresh skeleton + the level/vitals patches below. Values are already at wire
+				// scale (as captured); SetStat writes every occurrence of the id (both StatList#2 copies).
+				foreach (var (id, value) in statSheet)
+					block.SetStat((uint)id, value);
+
+				// #214: a dead character logs in dead - the stored sheet is its alive-at-capture health, so still zero
+				// current-health so the client shows the release window at world entry.
+				if (character?.IsDead == true)
+					block.CurrentHp = 0;
+			}
+			else if (character != null)
+			{
+				// No captured sheet (a freshly-created character): keep the fresh skeleton and apply the targeted
+				// level/XP/class-vitals patches. The skeleton hardcodes level 1 (its diff sample was all level-1
+				// chars), so without the level patch the client blocks every level-gated spell/item.
 				block.SetStat((uint)CharacterStatId.Level, character.Level);
 
-			if (character?.MaxStats != null)
-			{
-				block.CurrentXp = character.Experience;
-				// Author the WHOLE per-class stat block (displayed + base/secondary slots) so it is internally
-				// consistent (#4/#186), not just the displayed maxima. For the captured beach char (Strie, Assassin
-				// 98/0/236, base 90/0/230) this reproduces the template's slots exactly, so the golden stays byte-exact.
-				var v = character.MaxStats.SnapshotVitals(character.Class);
-				block.ApplyClassVitals(v.Hp, v.HpBase, v.Mana, v.ManaBase, v.Stamina, v.StaminaBase);
+				if (character.MaxStats != null)
+				{
+					block.CurrentXp = character.Experience;
+					// Author the WHOLE per-class stat block (displayed + base/secondary slots) so it is internally
+					// consistent (#4/#186), not just the displayed maxima. For the captured beach char (Strie, Assassin
+					// 98/0/236, base 90/0/230) this reproduces the template's slots exactly, so the golden stays byte-exact.
+					var v = character.MaxStats.SnapshotVitals(character.Class);
+					block.ApplyClassVitals(v.Hp, v.HpBase, v.Mana, v.ManaBase, v.Stamina, v.StaminaBase);
 
-				// #214: a dead character logs in dead - zero current-health (HealthCurrent stat 0x1B) while leaving
-				// the max/base side full, so the client shows the release window at world entry (decode_death_snapshot.py).
-				if (character.IsDead)
-					block.CurrentHp = 0;
+					if (character.IsDead)
+						block.CurrentHp = 0;
+				}
 			}
 
 			// #74/#71: splice the character's learned spells into the stat block's known-list (no-op when empty).

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.GameServer.Packets.FullCharSnapshot;
@@ -50,11 +51,11 @@ namespace Faolan.GameServer
 		}
 
 		private byte[] BuildBurstlessSnapshot(INetworkClient client, CharacterEquipment equipment, CharacterInventory[] inventoryRows, uint[] characterTags, IReadOnlyList<QuestDefinition> snapshotQuests,
-			QuestDefinition primaryQuest, IReadOnlyList<uint> knownSpellIds)
+			QuestDefinition primaryQuest, IReadOnlyList<uint> knownSpellIds, IReadOnlyList<(CharacterStatId Id, uint Value)> statSheet)
 		{
 			var instance = client.Session.Account.ClientInstance;
 			var root = BuildBurstlessSnapshotRoot(instance, equipment, inventoryRows, characterTags);
-			var tails = SnapshotTailsBuilder.BuildFromScratch(snapshotQuests, primaryQuest, client.Session.Character, instance, null, knownSpellIds);
+			var tails = SnapshotTailsBuilder.BuildFromScratch(snapshotQuests, primaryQuest, client.Session.Character, instance, null, knownSpellIds, statSheet);
 			return BuildWorldEntrySnapshot(client, root, tails);
 		}
 
@@ -172,7 +173,12 @@ namespace Faolan.GameServer
 			var knownSpellIds = character != null
 				? (await Database.GetCharacterSpells(character.Id)).Select(s => s.SpellId).ToArray()
 				: [];
-			var snapshot = BuildBurstlessSnapshot(client, equipment, inventoryRows, characterTags, snapshotQuests, primaryQuest, knownSpellIds);
+			// The character's captured stat sheet (level/vitals/attributes/PvP counters/ratings), authored into the
+			// snapshot's stat block per-character; empty for a freshly-created character (skeleton + patches then).
+			var statSheet = character != null
+				? (await Database.GetCharacterStats(character.Id)).Select(s => (s.StatId, s.Value)).ToArray()
+				: [];
+			var snapshot = BuildBurstlessSnapshot(client, equipment, inventoryRows, characterTags, snapshotQuests, primaryQuest, knownSpellIds, statSheet);
 			// Record this playfield's despawn token from the snapshot we actually send (WorldDespawn), as the burst path does.
 			// This MUST happen before the world objects are built: the snapshot establishes the player's current playfield
 			// INSTANCE token, and a spawn renders only when its 0x18 transform token matches it. NPCs already stream with

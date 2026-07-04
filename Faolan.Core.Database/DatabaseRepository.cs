@@ -49,6 +49,7 @@ namespace Faolan.Core.Database
 		Task<Character> GetCharacterScaffold(uint characterId);
 		Task<CharacterShortcut[]> GetCharacterShortcuts(uint characterId);
 		Task<CharacterSpell[]> GetCharacterSpells(uint characterId);
+		Task<CharacterStat[]> GetCharacterStats(uint characterId);
 		Task<uint[]> GetCharacterTags(uint characterId);
 
 		Task<ConversationNode> GetConversationScreen(string npcName, uint typeId, string answerPath);
@@ -543,6 +544,14 @@ namespace Faolan.Core.Database
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.CharacterSpells.Where(s => s.CharacterId == characterId).OrderBy(s => s.Id).ToArrayAsync();
+		}
+
+		// The character's stat sheet (CharacterStat) in wire order (Ordinal) - the FullChar snapshot's stat block,
+		// authored per-character into the tails. Empty for a freshly-created character (falls back to the skeleton).
+		public async Task<CharacterStat[]> GetCharacterStats(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.CharacterStats.Where(s => s.CharacterId == characterId).OrderBy(s => s.Ordinal).ToArrayAsync();
 		}
 
 		public async Task<uint[]> GetCharacterTags(uint characterId)
