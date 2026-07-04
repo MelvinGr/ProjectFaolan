@@ -1,3 +1,5 @@
+using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -11,26 +13,27 @@ namespace Faolan.Importer.Captures
 {
 	// Seeds captured characters' live STATE from their session traffic - the pieces that aren't part of the
 	// character's identity but were observed on the wire:
-	//  - wallet: the LAST 0x2005 money update of the capture ([u64 balanceCopper][u32 reason], 12-byte body;
-	//    the value is the absolute balance - see Send0x2005_MoneyUpdate / protocol notes in docs).
-	//  - hotbar: AddShortcut (0x206E, [type][slot][target][0]) / RemoveShortcut (0x2071, [slot]) replayed in
-	//    order; UpdateShortcut (0x206F) is skipped - its field semantics are undecoded.
-	// Packets are attributed to a character via the RpcHeader GameCharInterface endpoint instance (= the
-	// character id): the DOWNLOAD's receiver, the UPLOAD's sender/caller. Only characters already in the DB
-	// are touched (CaptureCharacterImporter materializes captured characters on their original ids first).
+	//  - wallet: the LAST 0x2005 money update ([u64 balance][u32 reason], 12-byte body; absolute balance).
+	//  - hotbar: the FULL saved bar from DispatchShortcutBarReply (0x2076, s2c) - the authoritative bar retail
+	//    sends at login. We take the LATEST one in the capture (a character's final saved bar) and use it wholesale;
+	//    the incremental AddShortcut/RemoveShortcut (0x206E/0x2071) events are NOT read - they only carry the
+	//    player's mid-session re-drags, not the actual saved bar, so an imported char must copy the 0x2076 snapshot.
+	// Packets attribute to a character via the RpcHeader GameCharInterface endpoint instance (= the character id):
+	// the DOWNLOAD's receiver. Only characters already in the DB are touched (CaptureCharacterImporter first).
 	public static class CaptureCharacterStateImporter
 	{
 		private const uint GameCharInterfaceType = 0x8B87F791;
+		private const uint ListFrame = 0x3F1; // (count + 1) * 0x3F1 list framing (matches ShortcutBarBuilder)
+		private const int ShortcutEntrySize = 24; // [u32 slot][u32 type][u32 target][u32 0][u32 0][u32 0]
 
 		public static CaptureState Extract(IReadOnlyList<CapturedPacket> packets)
 		{
 			var money = new Dictionary<uint, ulong>();
-			var shortcuts = new Dictionary<uint, Dictionary<uint, (uint, uint)>>();
-			var removed = new Dictionary<uint, HashSet<uint>>();
+			var shortcuts = new Dictionary<uint, Dictionary<uint, (uint Type, uint Target)>>();
 
 			foreach (var p in packets.OrderBy(p => p.Ticks))
 			{
-				if (p.Opcode is not (0x2005 or 0x206E or 0x2071))
+				if (!p.IsDownload || p.Opcode is not (0x2005 or 0x2076))
 					continue;
 
 				ConanPacket packet;
@@ -43,52 +46,48 @@ namespace Faolan.Importer.Captures
 					continue;
 				}
 
-				if (p.IsDownload && packet.Opcode == 0x2005 && packet.Body.Length == 12 && packet.Receiver.Type == GameCharInterfaceType)
+				if (packet.Receiver.Type != GameCharInterfaceType)
+					continue;
+
+				var character = packet.Receiver.Instance;
+
+				if (packet.Opcode == 0x2005 && packet.Body.Length == 12)
 				{
-					money[packet.Receiver.Instance] = packet.Body.ReadUInt64(); // last one wins (absolute balance)
+					money[character] = packet.Body.ReadUInt64(); // last one wins (absolute balance)
 					continue;
 				}
 
-				if (p.IsDownload || packet.Sender.Type != GameCharInterfaceType)
+				// DispatchShortcutBarReply (0x2076): the whole saved bar. Body = [u32 (count+1)*0x3F1][entry * count],
+				// entry = [u32 slot][u32 type][u32 target][u32 0][u32 0][u32 0]. Latest in the capture wins.
+				var body = packet.Body.ReadRemainingArray();
+				if (body.Length < 4)
 					continue;
 
-				var character = packet.Sender.Instance;
-				switch (packet.Opcode)
-				{
-					case 0x206E when packet.Body.Length == 16: // AddShortcut (the 16-byte body excludes the create-editor enter-world variant)
-					{
-						var type = packet.Body.ReadUInt32();
-						var slot = packet.Body.ReadUInt32();
-						var target = packet.Body.ReadUInt32();
-						shortcuts.TryAdd(character, new Dictionary<uint, (uint, uint)>());
-						shortcuts[character][slot] = (type, target);
-						removed.GetValueOrDefault(character)?.Remove(slot);
-						break;
-					}
+				var framing = BinaryPrimitives.ReadUInt32BigEndian(body);
+				if (framing < ListFrame || framing % ListFrame != 0)
+					continue; // not a shortcut-bar reply (0x2076 collides across classes; the framing disambiguates)
 
-					case 0x2071 when packet.Body.Length == 4: // RemoveShortcut
-					{
-						var slot = packet.Body.ReadUInt32();
-						shortcuts.GetValueOrDefault(character)?.Remove(slot);
-						removed.TryAdd(character, new HashSet<uint>());
-						removed[character].Add(slot);
-						break;
-					}
+				var count = (int)(framing / ListFrame) - 1;
+				var bar = new Dictionary<uint, (uint, uint)>();
+				for (var i = 0; i < count && 4 + (i + 1) * ShortcutEntrySize <= body.Length; i++)
+				{
+					var off = 4 + i * ShortcutEntrySize;
+					var slot = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(off, 4));
+					var type = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(off + 4, 4));
+					var target = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(off + 8, 4));
+					bar[slot] = (type, target);
 				}
+
+				shortcuts[character] = bar; // the full saved bar is authoritative (replaces any earlier one)
 			}
 
-			return new CaptureState(money, shortcuts, removed);
+			return new CaptureState(money, shortcuts);
 		}
 
 		public static async Task<(int MoneySeeded, int ShortcutsSeeded)> ImportAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<CapturedPacket>> captures)
 		{
-			// Replay ALL captures' state events as ONE stream ordered by real capture time (CapturedPacket.Ticks =
-			// epoch microseconds), so a character that appears in several captures ends on its LATEST-in-time wallet +
-			// hotbar. (Extract orders by Ticks and un-removes/un-adds a slot on the opposite event, so its final
-			// `shortcuts` = the last bar and `removed` = slots deleted at the end - the two never overlap.) The old
-			// per-capture pass both lost that global order and double-inserted a slot for a repeat character - the
-			// earlier capture's pending Add wasn't visible to the next capture's `existing` query, so the same
-			// (CharacterId, Slot) was Added twice -> UNIQUE constraint crash that aborted the whole import.
+			// Replay ALL captures' state as one stream ordered by real capture time (CapturedPacket.Ticks = epoch
+			// microseconds), so a character seen in several captures ends on its LATEST-in-time wallet + saved bar.
 			var state = Extract(captures.SelectMany(c => c).ToList());
 
 			var moneySeeded = 0;
@@ -109,35 +108,26 @@ namespace Faolan.Importer.Captures
 				if (!await db.Characters.AnyAsync(c => c.Id == characterId))
 					continue;
 
-				var existing = await db.CharacterShortcuts.Where(s => s.CharacterId == characterId).ToDictionaryAsync(s => s.Slot);
-				foreach (var (slot, (type, target)) in slots)
+				// The captured bar is the whole bar: replace the character's shortcuts with it. Flush the deletes
+				// before the inserts so a re-run doesn't hit the UNIQUE (CharacterId, Slot) index (EF doesn't order
+				// delete-before-insert for a non-PK unique key).
+				var old = await db.CharacterShortcuts.Where(s => s.CharacterId == characterId).ToListAsync();
+				if (old.Count > 0)
 				{
-					if (existing.TryGetValue(slot, out var row))
-					{
-						row.ShortcutType = type;
-						row.TargetId = target;
-					}
-					else
-					{
-						db.CharacterShortcuts.Add(new CharacterShortcut
-						{
-							CharacterId = characterId,
-							Slot = slot,
-							ShortcutType = type,
-							TargetId = target
-						});
-					}
-
-					shortcutsSeeded++;
+					db.CharacterShortcuts.RemoveRange(old);
+					await db.SaveChangesAsync();
 				}
 
-				if (state.RemovedSlotsByCharacter.TryGetValue(characterId, out var removedSlots))
+				foreach (var (slot, (type, target)) in slots)
 				{
-					foreach (var slot in removedSlots)
+					db.CharacterShortcuts.Add(new CharacterShortcut
 					{
-						if (existing.TryGetValue(slot, out var row))
-							db.CharacterShortcuts.Remove(row);
-					}
+						CharacterId = characterId,
+						Slot = slot,
+						ShortcutType = type,
+						TargetId = target
+					});
+					shortcutsSeeded++;
 				}
 			}
 
@@ -145,6 +135,6 @@ namespace Faolan.Importer.Captures
 			return (moneySeeded, shortcutsSeeded);
 		}
 
-		public sealed record CaptureState(Dictionary<uint, ulong> MoneyByCharacter, Dictionary<uint, Dictionary<uint, (uint Type, uint Target)>> ShortcutsByCharacter, Dictionary<uint, HashSet<uint>> RemovedSlotsByCharacter);
+		public sealed record CaptureState(Dictionary<uint, ulong> MoneyByCharacter, Dictionary<uint, Dictionary<uint, (uint Type, uint Target)>> ShortcutsByCharacter);
 	}
 }
