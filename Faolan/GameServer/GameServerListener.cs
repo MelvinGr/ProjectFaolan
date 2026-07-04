@@ -529,11 +529,10 @@ namespace Faolan.GameServer
 					}
 					else
 					{
-						// Existing-character login: the DB-driven world entry - replay the character's current-map
-						// world burst (or the beach burst as a universal fallback), re-addressed to this character, so
-						// the client builds the playfield and renders the NPCs. The 0x201c handshake comes from us; the
-						// player's own position/name/inventory are rebuilt from the DB. (The old hand-built fallback -
-						// MapChange/SpawnPlayer + a hardcoded-path inventory .bin - was removed; see SendWorldEntry.)
+						// Existing-character login: the DB-driven, burst-less world entry - the character's current-map
+						// world content is CONSTRUCTED from the DB (WorldObject/NpcSpawn tables) and addressed to this
+						// character, so the client builds the playfield and renders the NPCs. The 0x201c handshake comes
+						// from us; the player's own position/name/inventory are rebuilt from the DB too. (See SendWorldEntry.)
 						await SendWorldEntry(client);
 						// Abilities (0x2052) are granted AFTER 0x2024 ReadyForPlayScreen (in FlushPendingPost205FFollowUp),
 						// matching the retail login order (handshake -> 0x2024 -> 0x2052). Granting them eagerly here -
@@ -632,7 +631,7 @@ namespace Faolan.GameServer
 						// 0x2020 is the client polling a spawned entity (requestId = the entity handle). Retail
 						// answers each with a 0x2008 SpawnCheck echoing that handle (verified: dikketest world conn
 						// polls Kalanthes 0x535A0 and gets a SpawnCheck for 0x535A0). This is what completes/renders
-						// each entity. Both existing-character login (world-burst replay) AND post-creation world
+						// each entity. Both existing-character login (burst-less world entry) AND post-creation world
 						// entry need it: the create-world flow's old hand-built batch answered the wrong, hardcoded
 						// capture handles (0x818xx) on Strie's instance, so its entities (incl. Kalanthes) were never
 						// confirmed and the intro cinematic ("invalid camera path Kalanthes") failed.

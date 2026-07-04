@@ -42,6 +42,9 @@ namespace Faolan.Importer.Cli
 				case "snapshot":
 					SnapshotScan(LoadCaptures(capturesDir));
 					return 0;
+				case "mapchange":
+					MapChangeScan(LoadCaptures(capturesDir));
+					return 0;
 				case "worldobj":
 					await WorldObj(dbPath, arg ?? "hangingwoman");
 					return 0;
@@ -79,6 +82,27 @@ namespace Faolan.Importer.Cli
 					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: conversation-states, anim, worldobj, spell-fields, rdb-assets.");
 					return 1;
 			}
+		}
+
+		// One 0x5D85BFC7 MapChange body per distinct map across the captures, so the map-build constants can be diffed
+		// against BuildMapChange's hardcoded (beach) values - to see whether they're per-map or universal.
+		private static void MapChangeScan(IReadOnlyList<NamedCapture> captures)
+		{
+			var byMap = new Dictionary<uint, string>();
+			foreach (var c in captures)
+			foreach (var p in c.Packets)
+			{
+				if (p.Opcode != 0x2000u || p.SubOpcode != 0x5D85BFC7u || p.Bytes.Length < 16)
+					continue;
+				var body = p.Bytes[(12 + (int)BinaryPrimitives.ReadUInt32BigEndian(p.Bytes.AsSpan(8, 4)))..];
+				if (body.Length < 40)
+					continue;
+				var map = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(34, 4));
+				byMap.TryAdd(map, $"{c.Name[..Math.Min(40, c.Name.Length)]} len={body.Length} {Convert.ToHexString(body)}");
+			}
+
+			foreach (var (map, line) in byMap.OrderBy(kv => kv.Key))
+				Console.WriteLine($"map=0x{map:X8} {line}");
 		}
 
 		// The biggest 0x737A6DF9 FullChar snapshots across the captures: size, instance, and the byte offsets where

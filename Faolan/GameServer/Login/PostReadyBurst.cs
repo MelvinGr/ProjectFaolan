@@ -17,7 +17,7 @@ namespace Faolan.GameServer
 		// capture as explicit PacketStream sends: the live player instance is written inline (the receiver is built via
 		// ConanEndpoints.EndpointBytes(type, instance), WriteUInt32(instance) where the body carries it), so no ids are
 		// hard-coded. The remaining body
-		// bytes are opaque captured payloads (quest/UI blobs). TODO: per-map/DB-driven import like the world burst.
+		// bytes are opaque captured payloads (quest/UI blobs). TODO: per-map/DB-driven construction, like the world content.
 		private async Task SendPostReadyBurst(INetworkClient client)
 		{
 			var instance = client.Session.Account.ClientInstance;
