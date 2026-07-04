@@ -24,40 +24,15 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 	// identical (BeachSnapshotConstructionTests). Generating DIFFERENT quests from a character's CharacterQuests
 	// is the next step and is gated by an in-client chat-connect smoke test.
 	//
-	// #304 RE 2026-07-05 (Ghidra FUN_0091df50 = the per-record reader, decompiled; validated 4-u32 helper
-	// FUN_00cc0540, ReadString FUN_0048f840, ReadU64 FUN_0048f720). The REAL per-record grammar is:
-	//   ver(=1) · questId@+0xc · state@+0x10 · field114@+0x114 · field118@+0x118 · n@+0x14 · 5×string ·
-	//   fieldEc@+0xec · areaId@+0xcc · field2c@+0x2c · field11c@+0x11c · accept:u64@+0x20 · field28@+0x28 ·
-	//   objlist1(+0x10c) · objlist2(+0x110) · fieldF0:u32@+0xf0 · fieldF8:u64@+0xf8 · objlist3(+0x100) ·
-	//   objlist4(+0x104) · <a NESTED 0x3F1-framed sub-list — see below>.
-	// Each ObjRec IS 16 u32 (confirmed: 2 words + 4-word cc0540 + 2 words + 4-word cc0540 + 2 words, scrambled
-	// into an 18-word struct). TWO CORRECTIONS to the model below: (1) the word this codec calls `Marker`/`0x412`
-	// is actually the variable `n` (goal count) — the `!= 0x412` assert only holds for the beach template and
-	// REJECTS real progressed snapshots (NecroL80's 27-quest login: n=2 in rec0); (2) `field2c` is NOT a second
-	// questId (the `questId2 == questId` assert is likewise beach-only).
-	//
-	// KEY 2026-07-05 FINDING (why the beach codec can't parse real snapshots — validated on NecroL80's rec0 bytes):
-	// after obj4 each quest record carries a NESTED `0x3F1`-framed sub-list `[u32 0x3F1*(k+1)][k × nested-record]`
-	// (rec0: `0x7E2 = 0x3F1*2` ⇒ k=1; the nested record then carries the PLAYER HANDLE 0x0802E5D4 + quest/goal
-	// ids — i.e. per-character goal PROGRESS, which the empty beach template never exercised). So the real
-	// Quest_c record is deeply nested, NOT the flat header+4-objlists the beach round-trip suggested. The beach
-	// golden test still passes (that template has empty objlists and no nested progress). To parse ARBITRARY
-	// login snapshots the nested sub-list reader must be decompiled (Ghidra: FUN_0182d4c9 is the sub-call between
-	// obj2 and F0; the driver is FUN_0091f5c0, per-record reader FUN_0091df50). Header grammar above is fully
-	// decoded + validated on NecroL80's rec0.
-	//
-	// FULL MAP (deep RE 2026-07-05, validated byte-exact on NecroL80's rec0 @ snapshot offset 11024):
-	//   record = [listKey=questId] header(above) obj1 obj2 [F0:u32][F8:u64] obj3 obj4
-	//            [nested PROGRESS sub-list: u32 frame=0x3F1*(k+1); k × (4 u32: flag=1, goalId, PLAYER HANDLE,
-	//             questId)]   // rec0: frame=0x7E2 ⇒ k=1, entry=[1, 12, 0x0802E5D4, 13907]
-	//   Each ObjRec = 16 u32 (reader FUN_0091df50 calls 21-31 / 71-81; the 4-u32 helper is FUN_00cc0540; the
-	//   post-obj4 calls 84-92 are std::sort (FUN_009202d0 introsort) + vector-push, NOT reads). rec0 round-trips.
-	//   BUT the per-record structure is VARIABLE: rec1 (questId 6451) has EMPTY strings + n=0 and embeds a
-	//   `"WTHD"` (0x57544844) magic sub-block — so progressed/other quest kinds carry extra magic-tagged blocks
-	//   this flat model does not cover. Fully reconstructing every variant (WTHD block grammar, etc.) is a
-	//   dedicated multi-session decode; rec0 + the nested progress list + the header are DONE. The beach golden
-	//   test stays byte-exact. TODO(#186/#304): decode the WTHD sub-block + remaining record variants, drop the
-	//   two beach-only asserts (Marker→n, questId2→field2c), then generate/parse arbitrary login quest journals.
+	// #304 RE 2026-07-05: the FULL structure is decoded from the client readers (Ghidra FUN_0091f5c0 driver +
+	// FUN_0091df50 per-record) and validated byte-exact on NecroL80's lvl80 login — see docs/questc-region-decode.md.
+	// Two fields below are MISLABELED (beach-template coincidence): `Marker`(asserted 0x412) is really the variable
+	// `n` goal-count, and `QuestId2`(asserted ==questId) is really `field2c`; both asserts REJECT real progressed
+	// snapshots. Each record also ends with a NESTED 0x3F1-framed per-goal PROGRESS sub-list (empty on the beach
+	// template, so unmodeled here) whose entries carry a `"WTHD"` block that is **opaque server data with no client
+	// reader** (FindConst = 0 hits) — the hard limit of client-only RE. Production is unaffected: fresh chars (the
+	// only journals we generate) have empty objlists + empty progress. TODO(#186): parse/generate progressed
+	// journals once the WTHD fields are pinned (needs a server spec or a progressed-capture corpus).
 	public sealed class QuestcRegion
 	{
 		public const uint Frame = 0x3F1; // 1009 - the list-count framing multiplier
