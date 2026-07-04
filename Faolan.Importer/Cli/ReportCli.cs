@@ -135,21 +135,34 @@ namespace Faolan.Importer.Cli
 		// against BuildMapChange's hardcoded (beach) values - to see whether they're per-map or universal.
 		private static void MapChangeScan(IReadOnlyList<NamedCapture> captures)
 		{
-			var byMap = new Dictionary<uint, string>();
+			// Every MapChange body per map, with the session-dynamic fields masked (instance@42, token@58, token@75), so
+			// we can tell whether the map-build constants are CONSISTENT per map (1 distinct masked body across all its
+			// captures) or still vary by session - the gate for whether a per-map stored template is sound.
+			var byMap = new Dictionary<uint, List<(string Cap, string Masked)>>();
 			foreach (var c in captures)
 			foreach (var p in c.Packets)
 			{
 				if (p.Opcode != 0x2000u || p.SubOpcode != 0x5D85BFC7u || p.Bytes.Length < 16)
 					continue;
 				var body = p.Bytes[(12 + (int)BinaryPrimitives.ReadUInt32BigEndian(p.Bytes.AsSpan(8, 4)))..];
-				if (body.Length < 40)
+				if (body.Length < 79)
 					continue;
 				var map = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(34, 4));
-				byMap.TryAdd(map, $"{c.Name[..Math.Min(40, c.Name.Length)]} len={body.Length} {Convert.ToHexString(body)}");
+				var masked = (byte[])body.Clone();
+				Array.Clear(masked, 42, 4); // instance
+				Array.Clear(masked, 58, 4); // playfield token
+				Array.Clear(masked, 75, 4); // playfield token (2nd)
+				(byMap.TryGetValue(map, out var l) ? l : byMap[map] = []).Add((c.Name, Convert.ToHexString(masked)));
 			}
 
-			foreach (var (map, line) in byMap.OrderBy(kv => kv.Key))
-				Console.WriteLine($"map=0x{map:X8} {line}");
+			foreach (var (map, list) in byMap.OrderBy(kv => kv.Key))
+			{
+				var distinct = list.Select(x => x.Masked).Distinct().ToList();
+				Console.WriteLine($"map=0x{map:X8}  {list.Count} caps  {distinct.Count} distinct masked  {(distinct.Count == 1 ? "CONSISTENT" : "*** VARIES ***")}");
+				if (distinct.Count > 1)
+					foreach (var d in distinct)
+						Console.WriteLine($"    {d}  <- {string.Join(", ", list.Where(x => x.Masked == d).Select(x => x.Cap[..Math.Min(34, x.Cap.Length)]).Distinct().Take(4))}");
+			}
 		}
 
 		// The biggest 0x737A6DF9 FullChar snapshots across the captures: size, instance, and the byte offsets where

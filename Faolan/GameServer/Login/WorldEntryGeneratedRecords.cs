@@ -35,15 +35,15 @@ namespace Faolan.GameServer
 			return ps.WriteLengthHash().ToArray();
 		}
 
-		// 0x5D85BFC7 MapChange - tells the client which playfield/instance the player is entering. Built from the
-		// character's map + live instance + the shared playfield token (WorldState.DefaultPlayfieldToken). The remaining
-		// fields are opaque map-build constants (view/fog/...) currently lifted verbatim from the BEACH capture. They
-		// DO vary per map (`--report mapchange`: FieldA + the offset-22/26 u32s differ across maps), so a non-beach map
-		// gets the wrong ones today - a working-but-imperfect fallback. TODO: store the captured MapChange body per map
-		// (Map table) and re-address the dynamic fields here, now feasible since we have non-beach captures.
+		// 0x5D85BFC7 MapChange - tells the client which playfield/instance the player is entering. Built entirely from
+		// the live character + shared token: the map id, the player's ENTRY POSITION, the live instance, and
+		// WorldState.DefaultPlayfieldToken. Everything else is UNIVERSAL - the same bytes on every map. `--report
+		// mapchange` proved this: across all captures the ONLY per-session variation is the position, so there are NO
+		// per-map build constants and nothing here is beach-specific (the old hardcoded beach spawn was the one leak).
 		internal static byte[] BuildMapChange(INetworkClient client)
 		{
-			var mapId = client.Session.Character.MapId;
+			var character = client.Session.Character;
+			var mapId = character.MapId;
 			var instance = client.Session.Account.ClientInstance;
 
 			var ps = new PacketStream();
@@ -54,11 +54,14 @@ namespace Faolan.GameServer
 					s.WriteUInt32(IirMessageTypes.MapChange);
 					s.WriteUInt32(0x00000000); // TypeTag (global record)
 					s.WriteUInt32(0x00000000); // Handle (global record)
-					s.WriteUInt32(0x0043A140); // FieldA
-					// --- body (91 bytes) ---
-					s.WriteUInt16(0x0043);
-					s.WriteUInt32(0x114FB344);
-					s.WriteUInt32(0x30399A62);
+					// The record's "FieldA" slot + the body's first bytes are actually the player's ENTRY POSITION
+					// straddling the framing: [pad 0x00][posX][posY][posZ big-endian floats][0x62]. This is the ONLY
+					// per-session-varying field (--report mapchange), so it comes from the character, not a beach constant.
+					s.WriteByte(0x00);
+					s.WriteFloatBigEndian(character.PositionX);
+					s.WriteFloatBigEndian(character.PositionY);
+					s.WriteFloatBigEndian(character.PositionZ);
+					s.WriteByte(0x62);
 					s.WriteUInt32(0x0000C79C);
 					s.WriteUInt32(mapId); // map (beach = 0x00000FAA)
 					s.WriteUInt32(0x00000000);

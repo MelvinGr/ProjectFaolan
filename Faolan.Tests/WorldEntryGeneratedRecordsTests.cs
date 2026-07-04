@@ -56,7 +56,16 @@ namespace Faolan.Tests
 		private static RecordingNetworkClient BeachClient()
 		{
 			var client = new RecordingNetworkClient(StriePlayerInstance);
-			client.Session.Character = new Character { MapId = BeachMapId };
+			// BuildMapChange now writes the character's real entry position; the captured golden bytes are the Tortage
+			// Beach create-spawn, so set it from that single source of truth.
+			var spawn = Map.NewPlayerSpawnSpawnPoint.Position;
+			client.Session.Character = new Character
+			{
+				MapId = BeachMapId,
+				PositionX = spawn.X,
+				PositionY = spawn.Y,
+				PositionZ = spawn.Z
+			};
 			return client;
 		}
 	}
