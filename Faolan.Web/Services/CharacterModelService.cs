@@ -803,8 +803,8 @@ namespace Faolan.Web.Services
 		private void PropagateToScaffold(uint characterId)
 		{
 			using var db = _dbFactory.CreateDbContext();
-			var character = db.Characters.AsNoTracking().Include(c => c.Attributes).Include(c => c.SpawnFrame).Include(c => c.Body).Include(c => c.BodyResources).FirstOrDefault(c => c.Id == characterId);
-			if (character?.SpawnFrame?.PreFrame == null || character.Attributes is not { Count: > 0 })
+			var character = db.Characters.AsNoTracking().Include(c => c.Attributes).Include(c => c.Body).Include(c => c.BodyResources).FirstOrDefault(c => c.Id == characterId);
+			if (character?.Attributes is not { Count: > 0 })
 				return;
 
 			var refs = character.BodyResources.Select(r => r.Ref).ToList();

@@ -40,15 +40,20 @@ namespace Faolan.Tests
 			var position = DecodeVec3(scaffold.Vec3);
 			var rotation = DecodeQuat(scaffold.Quat);
 
-			// The scaffold rows (entry table / id list / pre-IIR frame) on a Character, as EnsureSpawnScaffoldRows seeds.
-			var scaffoldCharacter = new Character { Id = scaffold.Handle };
+			// The scaffold rows (entry table / id list) on a Character. Strie is an Assassin; the pre-IIR frame is now
+			// reconstructed from that class (not stored), so the from-scratch body equals the template's CONSTRUCTED
+			// form - same transform/rows/IIR, canonical FreshPreFrame(Assassin), EntryTableX 0xB7, no buff records.
+			var scaffoldCharacter = new Character { Id = scaffold.Handle, Class = Class.Assassin };
 			PlayerSpawnScaffoldRows.ExtractTo(scaffoldCharacter, scaffold);
 
 			var built = PlayerSpawnBuilder.BuildFromScratch(scaffold.Handle, scaffold.Playfield, position, rotation, scaffold.CharacterIir, scaffoldCharacter);
 
 			Assert.NotNull(built);
-			Assert.Equal(template.Length, built.Length);
-			Assert.True(template.SequenceEqual(built), "from-scratch player body must be byte-identical to the Strie template");
+			Assert.True(PlayerSpawnScaffoldCodec.TryParse(template, out var expected, out _));
+			expected.PreFrame = PlayerSpawnScaffoldRows.FreshPreFrame(Class.Assassin);
+			expected.EntryTableX = 0xB7;
+			expected.BuffRecords.Clear();
+			Assert.Equal(Convert.ToHexString(PlayerSpawnScaffoldCodec.Generate(expected)), Convert.ToHexString(built));
 		}
 
 		// The burst-less composition (#210): the from-code CharacterIIR built for a NEW character (PlayerCharacterIir.

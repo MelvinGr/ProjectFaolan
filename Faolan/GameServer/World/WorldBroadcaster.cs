@@ -756,7 +756,7 @@ namespace Faolan.GameServer.World
 				// run-crawled). The cycle timer (path time + dwell) re-issues it so it keeps looping.
 				if (patrolByPosition.TryGetValue(PositionKey(npc.PositionX, npc.PositionY, npc.PositionZ), out var patrol) && patrol.Body is { Length: > 0 } && patrol.Waypoints.Count > 0)
 				{
-					entity.PatrolWaypoints = patrol.Waypoints.OrderBy(w => w.Ordinal).Select(w => new Vector3(w.X, w.Y, w.Z)).ToList();
+					entity.PatrolWaypoints = patrol.Waypoints.OrderBy(w => w.Ordinal).Select(w => new Vector3(w.PositionX, w.PositionY, w.PositionZ)).ToList();
 					entity.PatrolSpeed = patrol.Speed;
 					entity.PatrolBody = ReaddressPatrol(patrol.Body, handle, entity.Position);
 					entity.PatrolCycleSeconds = MoveTaskCodec.TotalPathLength(entity.Position, entity.PatrolWaypoints) / PatrolWalkSpeed + PatrolDwellSeconds;

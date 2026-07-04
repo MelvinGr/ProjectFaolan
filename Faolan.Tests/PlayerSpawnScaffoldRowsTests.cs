@@ -10,30 +10,32 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Locks the scaffold <-> DB-rows mapping: extracting a captured spawn into CharacterAttribute /
-	// CharacterSkill / CharacterScaffoldPair / CharacterSpawnFrame rows and regenerating from those rows must
-	// reproduce the captured body byte-for-byte (the DB-generated player spawn oracle). Buff records are
-	// transient and not stored, so a buffed capture round-trips to its unbuffed form.
+	// Locks the scaffold <-> DB-rows mapping: extracting a captured spawn into CharacterAttribute / CharacterSkill /
+	// CharacterScaffoldPair rows and regenerating from those rows reproduces the row-carried content byte-for-byte.
+	// The pre-IIR frame + EntryTableX are NOT stored - they're reconstructed from Character.Class (FreshPreFrame) - so
+	// a capture round-trips to its CONSTRUCTED form: the buff records + transient frame islands drop out.
 	public class PlayerSpawnScaffoldRowsTests
 	{
 		// Buff records are session state, not character data: rows from a buffed capture regenerate the same
 		// spawn WITHOUT the buff records (= the parsed scaffold with BuffRecords cleared).
 		[Fact]
-		public void BuffedSpawn_RoundTripsToItsUnbuffedForm()
+		public void BuffedSpawn_RoundTripsToItsUnbuffedConstructedForm()
 		{
+			// Hoxxling is a Herald of Xotli; his buffed capture regenerates WITHOUT the buff records (transient) and
+			// with the frame reconstructed from his class - i.e. its constructed form.
 			var body = Golden("SpawnHoxxlingBuffed");
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var expected, out _));
-			expected.BuffRecords.Clear();
-
-			Assert.Equal(Convert.ToHexString(PlayerSpawnScaffoldCodec.Generate(expected)), Convert.ToHexString(RoundTripThroughRows(body)));
+			Assert.Equal(Convert.ToHexString(ConstructedForm(body, Class.HeraldOfXotli)), Convert.ToHexString(RoundTripThroughRows(body, Class.HeraldOfXotli)));
 		}
 
-		[Theory, InlineData("SpawnDikketestLogin"), InlineData("SpawnNecroL80KingsCastle"), InlineData("SpawnDemoL80RandomActions")]
-		public void ExtractThenApply_RegeneratesByteIdentically(string name)
+		// The row-carried content (entry table / feat id-list / pair lists) + IIR still regenerate byte-exact; only the
+		// pre-IIR frame is now the constructed canonical form (FreshPreFrame(class)). Dikketest's captured frame already
+		// equals FreshPreFrame(Barbarian), so his case is still byte-identical to the raw capture.
+		[Theory, InlineData("SpawnDikketestLogin", Class.Barbarian), InlineData("SpawnNecroL80KingsCastle", Class.Necromancer), InlineData("SpawnDemoL80RandomActions", Class.Demonologist)]
+		public void ExtractThenApply_RegeneratesTheConstructedForm(string name, Class @class)
 		{
 			var body = Golden(name);
 
-			Assert.Equal(Convert.ToHexString(body), Convert.ToHexString(RoundTripThroughRows(body)));
+			Assert.Equal(Convert.ToHexString(ConstructedForm(body, @class)), Convert.ToHexString(RoundTripThroughRows(body, @class)));
 		}
 
 		[Fact]
@@ -152,11 +154,11 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void Template_ExtractThenApply_RegeneratesByteIdentically()
+		public void Template_ExtractThenApply_RegeneratesTheConstructedForm()
 		{
-			var body = Support.Golden.Bytes("SpawnStrieTemplate");
+			var body = Support.Golden.Bytes("SpawnStrieTemplate"); // Strie is an Assassin
 
-			Assert.Equal(Convert.ToHexString(body), Convert.ToHexString(RoundTripThroughRows(body)));
+			Assert.Equal(Convert.ToHexString(ConstructedForm(body, Class.Assassin)), Convert.ToHexString(RoundTripThroughRows(body, Class.Assassin)));
 		}
 
 		[Fact]
@@ -178,11 +180,23 @@ namespace Faolan.Tests
 			return Path.Combine(Path.GetDirectoryName(thisFile)!, "Golden");
 		}
 
-		private static byte[] RoundTripThroughRows(byte[] body)
+		// The frame + EntryTableX are no longer stored - TryApplyFrom reconstructs them from the character's class. So
+		// a captured spawn round-trips to its CONSTRUCTED form: identical rows (entry table / feats / pairs) + IIR, with
+		// the frame regenerated as FreshPreFrame(class), EntryTableX 0xB7, and transient buff/session records dropped.
+		private static byte[] ConstructedForm(byte[] body, Class @class)
+		{
+			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var s, out _));
+			s.PreFrame = PlayerSpawnScaffoldRows.FreshPreFrame(@class);
+			s.EntryTableX = 0xB7;
+			s.BuffRecords.Clear();
+			return PlayerSpawnScaffoldCodec.Generate(s);
+		}
+
+		private static byte[] RoundTripThroughRows(byte[] body, Class @class)
 		{
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out var error), $"parse failed: {error}");
 
-			var character = new Character { Id = 0x02000005 };
+			var character = new Character { Id = 0x02000005, Class = @class };
 			PlayerSpawnScaffoldRows.ExtractTo(character, scaffold);
 
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var rebuilt, out _)); // fresh instance, then rows overwrite

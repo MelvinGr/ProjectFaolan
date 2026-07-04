@@ -29,7 +29,6 @@ namespace Faolan.Core.Database
 		DbSet<CharacterStat> CharacterStats { get; }
 		DbSet<CharacterAbility> CharacterAbilities { get; }
 		DbSet<CharacterCombo> CharacterCombos { get; }
-		DbSet<CharacterSpawnFrame> CharacterSpawnFrames { get; }
 		DbSet<CharacterSpell> CharacterSpells { get; }
 		DbSet<CharacterTag> CharacterTags { get; }
 		DbSet<ChatMessage> ChatMessages { get; }
@@ -88,7 +87,6 @@ namespace Faolan.Core.Database
 		public DbSet<CharacterStat> CharacterStats { get; set; }
 		public DbSet<CharacterAbility> CharacterAbilities { get; set; }
 		public DbSet<CharacterCombo> CharacterCombos { get; set; }
-		public DbSet<CharacterSpawnFrame> CharacterSpawnFrames { get; set; }
 		public DbSet<CharacterSpell> CharacterSpells { get; set; }
 		public DbSet<CharacterTag> CharacterTags { get; set; }
 		public DbSet<ChatMessage> ChatMessages { get; set; }
@@ -183,7 +181,6 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<Character>().HasMany(c => c.Attributes).WithOne(a => a.Character).HasForeignKey(a => a.CharacterId).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Character>().HasMany(c => c.Skills).WithOne(s => s.Character).HasForeignKey(s => s.CharacterId).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Character>().HasMany(c => c.ScaffoldPairs).WithOne(s => s.Character).HasForeignKey(s => s.CharacterId).OnDelete(DeleteBehavior.Cascade);
-			modelBuilder.Entity<Character>().HasOne(c => c.SpawnFrame).WithOne(s => s.Character).HasForeignKey<CharacterSpawnFrame>(s => s.CharacterId).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Character>().HasMany(c => c.BodyResources).WithOne(r => r.Character).HasForeignKey(r => r.CharacterId).OnDelete(DeleteBehavior.Cascade);
 
 			// Hotbar shortcuts delete with the character.

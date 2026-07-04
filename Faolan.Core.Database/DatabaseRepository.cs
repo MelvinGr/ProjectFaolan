@@ -532,7 +532,6 @@ namespace Faolan.Core.Database
 				.Include(c => c.Attributes)
 				.Include(c => c.Skills)
 				.Include(c => c.ScaffoldPairs)
-				.Include(c => c.SpawnFrame)
 				.Include(c => c.Body)
 				.Include(c => c.BodyResources)
 				.FirstOrDefaultAsync(c => c.Id == characterId);
@@ -1108,7 +1107,7 @@ namespace Faolan.Core.Database
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			ctx.Characters.Update(character); // TrackGraph: default (store-generated) keys -> Added, set keys -> Modified
 
-			// Dependents keyed on a non-store-generated value - the shared-PK one-to-ones (Body/MaxStats/SpawnFrame on
+			// Dependents keyed on a non-store-generated value - the shared-PK one-to-ones (Body/MaxStats on
 			// CharacterId) and the compound-PK junctions - carry a SET key even when brand-new, so Update() marks a new
 			// one Modified and SaveChanges would fail with a 0-rows concurrency error. Flip any Modified dependent whose
 			// row doesn't actually exist yet to Added so it inserts instead. (SaveCharacter is the cold full-graph path;
@@ -1180,7 +1179,6 @@ namespace Faolan.Core.Database
 			ctx.CharacterAttributes.RemoveRange(ctx.CharacterAttributes.Where(a => a.CharacterId == character.Id));
 			ctx.CharacterSkills.RemoveRange(ctx.CharacterSkills.Where(s => s.CharacterId == character.Id));
 			ctx.CharacterScaffoldPairs.RemoveRange(ctx.CharacterScaffoldPairs.Where(p => p.CharacterId == character.Id));
-			ctx.CharacterSpawnFrames.RemoveRange(ctx.CharacterSpawnFrames.Where(f => f.CharacterId == character.Id));
 
 			if (character.Attributes != null)
 				ctx.CharacterAttributes.AddRange(character.Attributes);
@@ -1188,8 +1186,6 @@ namespace Faolan.Core.Database
 				ctx.CharacterSkills.AddRange(character.Skills);
 			if (character.ScaffoldPairs != null)
 				ctx.CharacterScaffoldPairs.AddRange(character.ScaffoldPairs);
-			if (character.SpawnFrame != null)
-				ctx.CharacterSpawnFrames.Add(character.SpawnFrame);
 
 			await ctx.SaveChangesAsync();
 		}

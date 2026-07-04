@@ -7,7 +7,7 @@ using Faolan.Core.Enums;
 namespace Faolan.Core.Network.Spawn
 {
 	// Maps the spawn scaffold between its wire form (PlayerSpawnScaffold) and the character's DB rows
-	// (CharacterAttribute / CharacterSkill / CharacterScaffoldPair / CharacterSpawnFrame), so a player spawn can
+	// (CharacterAttribute / CharacterSkill / CharacterScaffoldPair), so a player spawn can
 	// be GENERATED from the database instead of spliced into captured template bytes. Buff/timer records are
 	// transient session state and are deliberately not stored - a buffed captured spawn extracts to the same rows
 	// as its unbuffed form. Fresh characters get the fresh-character defaults below (extracted from the Dikketest
@@ -96,15 +96,8 @@ namespace Faolan.Core.Network.Spawn
 		// weighted-attribute defaults when the character's own editor choices are resolvable.
 		public static bool EnsureFreshRows(Character character, IReadOnlyList<ScaffoldEntry> weightedAppearance = null)
 		{
-			if (character.SpawnFrame?.PreFrame != null && character.Attributes is { Count: > 0 })
+			if (character.Attributes is { Count: > 0 })
 				return false;
-
-			character.SpawnFrame = new CharacterSpawnFrame
-			{
-				CharacterId = character.Id,
-				PreFrame = FreshPreFrame(character.Class),
-				EntryTableX = 0xB7
-			};
 
 			// Entry table: the weighted appearance entries (the character's chosen resources, or Dikketest's
 			// proven set when none resolve), then the character's OWN editor morphs (CharacterMorphs - absent
@@ -162,13 +155,9 @@ namespace Faolan.Core.Network.Spawn
 				.ToList();
 
 			character.ScaffoldPairs = scaffold.EndPairs.Select(p => Pair(character.Id, 0, p)).Concat(scaffold.EndPairs2.Select(p => Pair(character.Id, 1, p))).ToList();
-
-			character.SpawnFrame = new CharacterSpawnFrame
-			{
-				CharacterId = character.Id,
-				PreFrame = scaffold.PreFrame,
-				EntryTableX = scaffold.EntryTableX
-			};
+			// The pre-IIR frame + EntryTableX are NOT extracted: they're not character data (the frame is a constant
+			// skeleton + the archetype/class island + the transient RDB script char buffer; EntryTableX is const 0xB7).
+			// TryApplyFrom reconstructs them from Character.Class - see FreshPreFrame + docs/fa015807-spawn-reader.md.
 		}
 
 		// The normal-login pre-IIR frame (239 bytes) with the fresh-character island values: the near-constant
@@ -243,7 +232,7 @@ namespace Faolan.Core.Network.Spawn
 		// seeded with, so it is a no-op in effect.
 		public static bool RefreshAppearance(Character character, IReadOnlyList<ScaffoldEntry> weightedAppearance = null)
 		{
-			if (character?.SpawnFrame?.PreFrame == null || character.Attributes is not { Count: > 0 })
+			if (character?.Attributes is not { Count: > 0 })
 				return false;
 
 			var entries = new List<ScaffoldEntry>(weightedAppearance ?? FreshWeightedAttributes);
@@ -268,11 +257,14 @@ namespace Faolan.Core.Network.Spawn
 		// the character has no scaffold rows yet (caller falls back to the captured-spawn splice path).
 		public static bool TryApplyFrom(Character character, PlayerSpawnScaffold scaffold)
 		{
-			if (character?.SpawnFrame?.PreFrame == null || character.Attributes == null || character.Attributes.Count == 0)
+			if (character?.Attributes == null || character.Attributes.Count == 0)
 				return false;
 
-			scaffold.PreFrame = character.SpawnFrame.PreFrame;
-			scaffold.EntryTableX = character.SpawnFrame.EntryTableX;
+			// The frame + EntryTableX are CONSTRUCTED, not stored: FreshPreFrame(class) is the constant skeleton with
+			// the archetype/class island written from the character's class; EntryTableX is the constant 0xB7. The
+			// captured session islands (RDB script char buffer, buff/timer table) are transient and correctly absent.
+			scaffold.PreFrame = FreshPreFrame(character.Class);
+			scaffold.EntryTableX = 0xB7;
 			scaffold.BuffRecords.Clear();
 
 			scaffold.Entries.Clear();

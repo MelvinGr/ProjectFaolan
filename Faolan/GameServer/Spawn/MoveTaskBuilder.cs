@@ -73,7 +73,7 @@ namespace Faolan.GameServer.Spawn
 		public static byte[] BuildPatrol(uint handle, PatrolPath path)
 		{
 			ArgumentNullException.ThrowIfNull(path);
-			var waypoints = path.Waypoints.OrderBy(w => w.Ordinal).Select(w => new Vector3(w.X, w.Y, w.Z)).ToList();
+			var waypoints = path.Waypoints.OrderBy(w => w.Ordinal).Select(w => new Vector3(w.PositionX, w.PositionY, w.PositionZ)).ToList();
 			return BuildPatrol(handle, path.Position, waypoints, path.Speed);
 		}
 
