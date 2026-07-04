@@ -44,8 +44,20 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 	// golden test still passes (that template has empty objlists and no nested progress). To parse ARBITRARY
 	// login snapshots the nested sub-list reader must be decompiled (Ghidra: FUN_0182d4c9 is the sub-call between
 	// obj2 and F0; the driver is FUN_0091f5c0, per-record reader FUN_0091df50). Header grammar above is fully
-	// decoded + validated on NecroL80's rec0. TODO(#186/#304): decode the nested progress sub-list, drop the two
-	// beach-only asserts, then this region parses every login snapshot.
+	// decoded + validated on NecroL80's rec0.
+	//
+	// FULL MAP (deep RE 2026-07-05, validated byte-exact on NecroL80's rec0 @ snapshot offset 11024):
+	//   record = [listKey=questId] header(above) obj1 obj2 [F0:u32][F8:u64] obj3 obj4
+	//            [nested PROGRESS sub-list: u32 frame=0x3F1*(k+1); k × (4 u32: flag=1, goalId, PLAYER HANDLE,
+	//             questId)]   // rec0: frame=0x7E2 ⇒ k=1, entry=[1, 12, 0x0802E5D4, 13907]
+	//   Each ObjRec = 16 u32 (reader FUN_0091df50 calls 21-31 / 71-81; the 4-u32 helper is FUN_00cc0540; the
+	//   post-obj4 calls 84-92 are std::sort (FUN_009202d0 introsort) + vector-push, NOT reads). rec0 round-trips.
+	//   BUT the per-record structure is VARIABLE: rec1 (questId 6451) has EMPTY strings + n=0 and embeds a
+	//   `"WTHD"` (0x57544844) magic sub-block — so progressed/other quest kinds carry extra magic-tagged blocks
+	//   this flat model does not cover. Fully reconstructing every variant (WTHD block grammar, etc.) is a
+	//   dedicated multi-session decode; rec0 + the nested progress list + the header are DONE. The beach golden
+	//   test stays byte-exact. TODO(#186/#304): decode the WTHD sub-block + remaining record variants, drop the
+	//   two beach-only asserts (Marker→n, questId2→field2c), then generate/parse arbitrary login quest journals.
 	public sealed class QuestcRegion
 	{
 		public const uint Frame = 0x3F1; // 1009 - the list-count framing multiplier
