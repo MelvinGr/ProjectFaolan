@@ -138,10 +138,16 @@ create-specific to decode, only builder wiring to do:
      0d51565 the last raw `IirId()` byte-literal records in `CreationScriptBurst` / `InitialBurst` /
      `WorldPrepBurst` are now built via `CreateEditorRecordBuilder` too (the per-class StatIIR runs as loops). The
      unused `C350` var + per-file `IirId` helpers were dropped. (`PlayfieldFIIR`/`GameTimeIIR` already wired.)
-     The remaining verbatim carriers of this family in `Post205FBurst` (18× StatIIR stat-0x13) and
-     `WorldEntryBurst` (7× StatIIR incl. 2 for NPC handle 0x00017ED0, 1× EnergyIIR, 2× StatUpdateIIR) were
-     converted the same way (#304) — **no StatIIR/EnergyIIR/StatUpdateIIR verbatim carrier remains in ANY
-     CreateFlow burst** (the `GameActionListIIR` 0xF508F4C1 records too, via `GameActionListCodec`).
+     The verbatim carriers of this family that are **avatar-directed** (frame = the live `id`) were converted
+     the same way (#304): 18× StatIIR in `Post205FBurst`; in `WorldEntryBurst` 5× StatIIR (+2× StatIIR /
+     2× StatUpdateIIR / 1× EnergyIIR / 1× FeedbackIIR / 1× CharInPlayIIR) + the live-cutscene EnergyIIR in
+     `CreateWorldCutsceneScripts`; plus the 3 `id`-frame `GameActionListIIR` (0xF508F4C1) via
+     `GameActionListCodec` and `CharInPlayIIR` in `PostReadyBurst`. **Correction:** an earlier claim of "no
+     StatIIR/… verbatim carrier remains in ANY burst" was WRONG — it was blind to the byte-per-line carriers.
+     `WorldEntryBurst` still emits **34 verbatim decoded-record carriers with capture-specific NPC/dynel handles**
+     (27× GameActionListIIR + 7× StatUpdateIIR, frames 0x00017E0x/2x/3x/D0); those belong to the **#234
+     intro-cutscene reconstruction** (they must be re-addressed to live entities, not merely reframed), not this
+     header-residue cleanup, so they are left as-is.
 
    **`ScryScriptIIR` now CONSTRUCTED (#223):** the two CreationScript records (the "Slave Galley" PreloadAssets
    step + "PlayOrSkip") are built by `ScryScript.BuildStep`, and the post-morph `StartScriptGroupOnClient`
