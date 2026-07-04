@@ -556,7 +556,7 @@ namespace Faolan.Importer.Captures
 				{
 					CharacterId = characterId,
 					Ordinal = i,
-					StatId = pairs[i].Id,
+					StatId = (CharacterStatId)pairs[i].Id,
 					Value = pairs[i].Value
 				});
 

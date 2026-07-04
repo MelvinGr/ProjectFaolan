@@ -1,3 +1,4 @@
+using Faolan.Core.Enums;
 using Faolan.Core.Database.Tables;
 using Faolan.GameServer.Packets.FullCharSnapshot;
 

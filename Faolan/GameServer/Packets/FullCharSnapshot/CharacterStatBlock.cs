@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using Faolan.Core;
+using Faolan.Core.Enums;
 
 namespace Faolan.GameServer.Packets.FullCharSnapshot
 {
@@ -16,23 +17,23 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 	/// </summary>
 	public sealed class CharacterStatBlock
 	{
-		private readonly List<(uint StatId, uint RawValue)> _records = [];
+		private readonly List<(CharacterStatId StatId, uint RawValue)> _records = [];
 
 		public int Count => _records.Count;
 
 		/// <summary>The parsed/built records at wire scale, in order ([statId], [rawValue]).</summary>
-		public IReadOnlyList<(uint StatId, uint RawValue)> Records => _records;
+		public IReadOnlyList<(CharacterStatId StatId, uint RawValue)> Records => _records;
 
 		/// <summary>Adds a record using the player-facing value; the wire scale for the stat is applied.</summary>
 		public CharacterStatBlock Set(CharacterStatId statId, uint displayValue)
 		{
-			return SetRaw(statId, displayValue * CharacterStatIdExtensions.GetScale(statId));
+			return SetRaw(statId, displayValue * statId.GetScale());
 		}
 
 		/// <summary>Adds a record using the already-scaled wire value.</summary>
 		public CharacterStatBlock SetRaw(CharacterStatId statId, uint rawValue)
 		{
-			_records.Add(((uint)statId, rawValue));
+			_records.Add((statId, rawValue));
 			return this;
 		}
 
@@ -74,7 +75,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			for (var i = 0; i < count; i++)
 			{
 				var off = 1 + i * 8;
-				var statId = BinaryPrimitives.ReadUInt32BigEndian(data.Slice(off, 4));
+				var statId = (CharacterStatId)BinaryPrimitives.ReadUInt32BigEndian(data.Slice(off, 4));
 				var rawValue = BinaryPrimitives.ReadUInt32BigEndian(data.Slice(off + 4, 4));
 				block._records.Add((statId, rawValue));
 			}

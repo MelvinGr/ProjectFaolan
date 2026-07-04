@@ -1,3 +1,4 @@
+using Faolan.Core.Enums;
 using System;
 using System.Buffers.Binary;
 using Faolan.GameServer;
@@ -64,9 +65,9 @@ namespace Faolan.Tests
 			Assert.True(CharacterStatBlock.TryParse(bytes, out var block, out var consumed));
 			Assert.Equal(bytes.Length, consumed);
 			Assert.Equal(3, block.Count);
-			Assert.Equal(((uint)CharacterStatId.HealthCurrent, 6300u), block.Records[0]);
-			Assert.Equal(((uint)CharacterStatId.StaminaCurrent, 6300u), block.Records[1]);
-			Assert.Equal(((uint)CharacterStatId.ManaCurrent, 6300u), block.Records[2]);
+			Assert.Equal((CharacterStatId.HealthCurrent, 6300u), block.Records[0]);
+			Assert.Equal((CharacterStatId.StaminaCurrent, 6300u), block.Records[1]);
+			Assert.Equal((CharacterStatId.ManaCurrent, 6300u), block.Records[2]);
 		}
 
 		[Fact]

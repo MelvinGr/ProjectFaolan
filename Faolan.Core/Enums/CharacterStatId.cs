@@ -1,4 +1,4 @@
-namespace Faolan.GameServer
+namespace Faolan.Core.Enums
 {
 	/// <summary>
 	///     Character stat ids seen in the SpawnPlayer / snapshot / 0x96B8DC59 vitals capture families.

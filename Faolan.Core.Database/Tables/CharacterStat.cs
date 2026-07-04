@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
@@ -21,7 +22,7 @@ namespace Faolan.Core.Database.Tables
 		// disambiguates repeated stat ids.
 		public int Ordinal { get; set; }
 
-		public uint StatId { get; set; }
+		public CharacterStatId StatId { get; set; }
 
 		public uint Value { get; set; }
 	}
