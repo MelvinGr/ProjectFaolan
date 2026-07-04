@@ -395,7 +395,7 @@ namespace Faolan.Web.Services
 		public AppearanceOptions GetAppearanceOptions(Sex sex, Race race)
 		{
 			using var db = _dbFactory.CreateDbContext();
-			var rows = db.AppearanceChoices.AsNoTracking().Where(c => c.Sex == (byte)sex && c.Race == (byte)race).OrderBy(c => c.Sequence).ToList();
+			var rows = db.AppearanceChoices.AsNoTracking().Where(c => c.Sex == sex && c.Race == race).OrderBy(c => c.Sequence).ToList();
 			if (rows.Count == 0)
 				return EmptyOptions;
 

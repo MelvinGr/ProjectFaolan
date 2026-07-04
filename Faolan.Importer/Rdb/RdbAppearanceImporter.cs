@@ -48,7 +48,7 @@ namespace Faolan.Importer.Rdb
 				.Root!;
 
 			// name= of a referenced RDB resource (cached; the same texscript is shared across races).
-			var nameCache = new Dictionary<(uint, uint), string>();
+			var nameCache = new Dictionary<(uint, uint), string?>();
 
 			var rows = new List<AppearanceChoice>();
 			foreach (var sexEl in root.Elements())
@@ -61,7 +61,7 @@ namespace Faolan.Importer.Rdb
 				var morphs = sexEl
 					.Elements("BodyNodes")
 					.Elements("MorphNode")
-					.Select((mn, i) => (Name: (string)mn.Attribute("MorphName"), Min: Scale(mn.Attribute("min_value")), Max: Scale(mn.Attribute("max_value")), Seq: i))
+					.Select((mn, i) => (Name: (string?)mn.Attribute("MorphName"), Min: Scale(mn.Attribute("min_value")), Max: Scale(mn.Attribute("max_value")), Seq: i))
 					.Where(m => m.Name != null)
 					.ToList();
 
@@ -102,12 +102,12 @@ namespace Faolan.Importer.Rdb
 			Console.WriteLine($"RDB appearance: imported {rows.Count} choices across {rows.Select(r => (r.Sex, r.Race)).Distinct().Count()} sex/race combos.");
 			return n;
 
-			string ResourceName(uint type, uint id)
+			string? ResourceName(uint type, uint id)
 			{
 				if (nameCache.TryGetValue((type, id), out var cached))
 					return cached;
 
-				string name = null;
+				string? name = null;
 				if (rdb.TryGet(type, id, out var e))
 				{
 					try
@@ -136,12 +136,12 @@ namespace Faolan.Importer.Rdb
 			var seq = 0;
 			foreach (var e in elems)
 			{
-				var idText = (string)e.Attribute(idAttr);
+				var idText = (string?)e.Attribute(idAttr);
 				if (string.IsNullOrEmpty(idText) || idText == "0" || !uint.TryParse(idText, out var id))
 					continue;
 
 				var colour = colourAttr != null
-					? (string)e.Attribute(colourAttr)
+					? (string?)e.Attribute(colourAttr)
 					: null;
 				var name = nameFn?.Invoke(id);
 				rows.Add(Row(sex, race, category, seq++, prefix + id, colour, name, 0, 0));
@@ -149,7 +149,7 @@ namespace Faolan.Importer.Rdb
 		}
 
 		// "female_aquilonian_generic_thick_1_head" -> "Generic Thick 1".
-		private static string CleanHeadName(string raw)
+		private static string? CleanHeadName(string raw)
 		{
 			if (string.IsNullOrWhiteSpace(raw))
 				return null;
@@ -176,7 +176,7 @@ namespace Faolan.Importer.Rdb
 
 		// "Face (Tattoo) Cimmerian - The Mountain Cat (F)" -> "The Mountain Cat". Keeps the whole string if it has no
 		// " - " segment.
-		private static string CleanTexName(string raw)
+		private static string? CleanTexName(string raw)
 		{
 			if (string.IsNullOrWhiteSpace(raw))
 				return null;
@@ -195,8 +195,8 @@ namespace Faolan.Importer.Rdb
 		{
 			return new AppearanceChoice
 			{
-				Sex = (byte)sex,
-				Race = (byte)race,
+				Sex = sex,
+				Race = race,
 				Category = category,
 				Sequence = seq,
 				Value = value,
@@ -207,7 +207,7 @@ namespace Faolan.Importer.Rdb
 			};
 		}
 
-		private static int Scale(XAttribute attr)
+		private static int Scale(XAttribute? attr)
 		{
 			return attr != null && double.TryParse(attr.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var v)
 				? (int)Math.Round(v * 1000)

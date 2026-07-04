@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using Faolan.Core.Enums;
+
 namespace Faolan.Core.Database.Tables
 {
 	// One selectable character-appearance choice for a given sex+race, imported from the client's CHARACTERCREATOR
@@ -8,9 +10,12 @@ namespace Faolan.Core.Database.Tables
 	// what the Faolan.Web appearance editor reads for its race/sex-gated pickers (replacing a runtime XML parse).
 	public class AppearanceChoice : BaseEntity
 	{
-		public byte Race { get; set; }
+		[ConstrainToEnumValues]
+		public Race Race { get; set; }
 
-		public byte Sex { get; set; }
+		[ConstrainToEnumValues]
+		public Sex Sex { get; set; }
+
 		public int Max { get; set; }
 
 		// Bounds for the morph/height rows (in CharacterBody signed-slider units for morphs); 0 for option rows.
