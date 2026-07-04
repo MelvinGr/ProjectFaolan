@@ -3434,6 +3434,97 @@ namespace Faolan.Core.Network.Protobuf
 
     }
 
+    [global::ProtoBuf.ProtoContract()]
+    public partial class ProtoInteractIIR : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"type_id")]
+        public ulong TypeId
+        {
+            get => __pbn__TypeId.GetValueOrDefault();
+            set => __pbn__TypeId = value;
+        }
+        public bool ShouldSerializeTypeId() => __pbn__TypeId != null;
+        public void ResetTypeId() => __pbn__TypeId = null;
+        private ulong? __pbn__TypeId;
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"mode")]
+        public ulong Mode
+        {
+            get => __pbn__Mode.GetValueOrDefault();
+            set => __pbn__Mode = value;
+        }
+        public bool ShouldSerializeMode() => __pbn__Mode != null;
+        public void ResetMode() => __pbn__Mode = null;
+        private ulong? __pbn__Mode;
+
+        [global::ProtoBuf.ProtoMember(3, Name = @"field3")]
+        public ulong Field3
+        {
+            get => __pbn__Field3.GetValueOrDefault();
+            set => __pbn__Field3 = value;
+        }
+        public bool ShouldSerializeField3() => __pbn__Field3 != null;
+        public void ResetField3() => __pbn__Field3 = null;
+        private ulong? __pbn__Field3;
+
+        [global::ProtoBuf.ProtoMember(5, Name = @"category")]
+        public ulong Category
+        {
+            get => __pbn__Category.GetValueOrDefault();
+            set => __pbn__Category = value;
+        }
+        public bool ShouldSerializeCategory() => __pbn__Category != null;
+        public void ResetCategory() => __pbn__Category = null;
+        private ulong? __pbn__Category;
+
+        [global::ProtoBuf.ProtoMember(6, Name = @"field6")]
+        public ulong Field6
+        {
+            get => __pbn__Field6.GetValueOrDefault();
+            set => __pbn__Field6 = value;
+        }
+        public bool ShouldSerializeField6() => __pbn__Field6 != null;
+        public void ResetField6() => __pbn__Field6 = null;
+        private ulong? __pbn__Field6;
+
+        [global::ProtoBuf.ProtoMember(10, Name = @"spell_target")]
+        public ProtoCastSpellTarget SpellTarget { get; set; }
+
+    }
+
+    [global::ProtoBuf.ProtoContract()]
+    public partial class ProtoCastSpellTarget : global::ProtoBuf.IExtensible
+    {
+        private global::ProtoBuf.IExtension __pbn__extensionData;
+        global::ProtoBuf.IExtension global::ProtoBuf.IExtensible.GetExtensionObject(bool createIfMissing)
+            => global::ProtoBuf.Extensible.GetExtensionObject(ref __pbn__extensionData, createIfMissing);
+
+        [global::ProtoBuf.ProtoMember(1, Name = @"spell_id")]
+        public ulong SpellId
+        {
+            get => __pbn__SpellId.GetValueOrDefault();
+            set => __pbn__SpellId = value;
+        }
+        public bool ShouldSerializeSpellId() => __pbn__SpellId != null;
+        public void ResetSpellId() => __pbn__SpellId = null;
+        private ulong? __pbn__SpellId;
+
+        [global::ProtoBuf.ProtoMember(2, Name = @"target_handle")]
+        public ulong TargetHandle
+        {
+            get => __pbn__TargetHandle.GetValueOrDefault();
+            set => __pbn__TargetHandle = value;
+        }
+        public bool ShouldSerializeTargetHandle() => __pbn__TargetHandle != null;
+        public void ResetTargetHandle() => __pbn__TargetHandle = null;
+        private ulong? __pbn__TargetHandle;
+
+    }
+
 }
 
 #pragma warning restore CS0612, CS0618, CS1591, CS3021, CS8981, IDE0079, IDE1006, RCS1036, RCS1057, RCS1085, RCS1192

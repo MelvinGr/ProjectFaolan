@@ -218,7 +218,7 @@ namespace Faolan.Importer.Extractors
 				: [];
 		}
 
-		// Walks the InteractArgs protobuf -> (typeId f1, mode f2, field3 f3, npc handle = field10.SpellTarget.f2).
+		// Walks the ProtoInteractIIR protobuf -> (typeId f1, mode f2, field3 f3, npc handle = field10.SpellTarget.f2).
 		private static (uint TypeId, uint Mode, uint Field3, uint Npc) ParseArgs(ReadOnlySpan<byte> a)
 		{
 			uint typeId = 0, mode = 0, field3 = 0, npc = 0;

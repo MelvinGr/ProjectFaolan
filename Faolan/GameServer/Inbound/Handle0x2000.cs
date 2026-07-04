@@ -264,7 +264,7 @@ namespace Faolan.GameServer
 					}
 
 					var actionType = packet.Body.ReadUInt32<ActionType>();
-					var args = packet.Body.ReadProtobufUInt32Length<InteractArgs>();
+					var args = packet.Body.ReadProtobufUInt32Length<ProtoInteractIIR>();
 
 					if (actionType == ActionType.SwitchWeaponsButton)
 					{
