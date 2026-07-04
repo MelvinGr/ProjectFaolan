@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using Faolan.Core;
+using Stat = Faolan.Core.Enums.CharacterStatId;
 
 namespace Faolan.GameServer.Packets.FullCharSnapshot
 {
@@ -26,30 +27,38 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// "repeated run"). Every value is a named (statId, value) - the character-derived stats (Level 0x36, XP 0x34,
 		// MaxXP 0x15E, HP 0x1B, mana, stamina) are overwritten from the character by the caller; the rest are the fresh
 		// baseline (armour/resists/... we do not model yet, so carried as their fixed defaults). No opaque blob.
-		private static readonly (uint Id, uint Value)[] StatList1 =
+		private static readonly (Stat Id, uint Value)[] StatList1 =
 		[
-			(0x252,0x0), (0x253,0x0), (0x254,0x0), (0x255,0x0), (0x0,0x1), (0xE0,0x0),
-			(0xAE,0x2), (0xAD,0x2), (0xBF,0x4FE428), (0x40B,0x0), (0x1,0x2328), (0x1B,0x2648),
-			(0x36,0x1), (0x34,0x0), (0x15E,0x64), (0x39,0x0), (0xA9,0x0)
+			(Stat.Unknown0, 0x0), (Stat.Unknown1, 0x0), (Stat.Unknown2, 0x0), (Stat.Unknown3, 0x0),
+			(Stat.Unknown4, 0x1), (Stat.Unknown5, 0x0), (Stat.Unknown6, 0x2), (Stat.Unknown7, 0x2),
+			(Stat.Unknown8, 0x4FE428), (Stat.Unknown9, 0x0), (Stat.HealthMax, 0x2328), (Stat.HealthCurrent, 0x2648),
+			(Stat.Level, 0x1), (Stat.Exp, 0x0), (Stat.MaxExp, 0x64), (Stat.Unknown10, 0x0),
+			(Stat.Unknown11, 0x0)
 		];
 
-		// One half of StatList#2; the client carries it twice (base + current). The [0x566][0x290] pair at the tail is
-		// the known-spell-list landmark FindKnownSpellCountIndex keys on.
-		private static readonly (uint Id, uint Value)[] StatList2Half =
+		// One half of StatList#2; the client carries it twice (base + current). Its last two slots (Unknown63 then
+		// KillingBlows) are the tail the known-spell list is built right after (CreateBlock).
+		private static readonly (Stat Id, uint Value)[] StatList2Half =
 		[
-			(0x534,0x0), (0x16B,0x0), (0x44A,0x0), (0x163,0x0), (0x161,0xDAC), (0x449,0x0),
-			(0xA5,0x6F), (0x241,0x0), (0x113,0x8), (0x1B,0x2648), (0x1,0x2328), (0x328,0xA),
-			(0x1FA,0x0), (0x1FB,0x0), (0x1FA,0x0), (0x1F9,0x59D8), (0x1F8,0x5C30), (0x324,0xA),
-			(0x4F,0x0), (0xC,0x0), (0x22,0x0), (0x3B,0x3), (0x15E,0x64), (0x39,0x0),
-			(0x36,0x1), (0x46,0x0), (0x33,0x0), (0x34,0x0), (0xB,0x3E8), (0x3A,0xBA),
-			(0x21,0x0), (0x4B,0x0), (0xD7,0x0), (0x185,0x0), (0x25F,0x59EA506E), (0x6A,0x14),
-			(0xF3,0x0), (0x445,0x0), (0x43D,0x0), (0x33E,0x0), (0x33C,0x0), (0x8C,0x0),
-			(0x338,0x0), (0x332,0x0), (0x39D,0x64), (0x39B,0x64), (0x398,0x64), (0x39A,0x64),
-			(0x7F,0x0), (0x5B,0x0), (0x3C,0x0), (0x1C8,0x0), (0x14B,0x0), (0x3D,0x0),
-			(0x575,0x0), (0x560,0x0), (0x573,0x0), (0x29F,0x0), (0x56E,0x0), (0x29E,0x0),
-			(0x571,0x0), (0x29D,0x0), (0x56B,0x0), (0x29C,0x0), (0x570,0x0), (0x29B,0x0),
-			(0x56A,0x0), (0x29A,0x0), (0x569,0x0), (0x564,0x0), (0x567,0x0), (0x292,0x0),
-			(0x566,0x0), (0x290,0x0)
+			(Stat.Unknown12, 0x0), (Stat.Unknown13, 0x0), (Stat.Unknown14, 0x0), (Stat.Unknown15, 0x0),
+			(Stat.PvpMaxExp, 0xDAC), (Stat.Unknown16, 0x0), (Stat.Unknown17, 0x6F), (Stat.Unknown18, 0x0),
+			(Stat.Unknown19, 0x8), (Stat.HealthCurrent, 0x2648), (Stat.HealthMax, 0x2328), (Stat.Intelligence, 0xA),
+			(Stat.ManaCurrent, 0x0), (Stat.ManaMax, 0x0), (Stat.ManaCurrent, 0x0), (Stat.StaminaMax, 0x59D8),
+			(Stat.StaminaCurrent, 0x5C30), (Stat.Strength, 0xA), (Stat.Unknown20, 0x0), (Stat.Unknown21, 0x0),
+			(Stat.Unknown22, 0x0), (Stat.Unknown23, 0x3), (Stat.MaxExp, 0x64), (Stat.Unknown10, 0x0),
+			(Stat.Level, 0x1), (Stat.PvpLevel, 0x0), (Stat.PvpExp, 0x0), (Stat.Exp, 0x0),
+			(Stat.Unknown24, 0x3E8), (Stat.Unknown25, 0xBA), (Stat.Unknown26, 0x0), (Stat.Unknown27, 0x0),
+			(Stat.Unknown28, 0x0), (Stat.Unknown29, 0x0), (Stat.Unknown30, 0x59EA506E), (Stat.Unknown31, 0x14),
+			(Stat.Unknown32, 0x0), (Stat.Unknown33, 0x0), (Stat.Unknown34, 0x0), (Stat.Unknown35, 0x0),
+			(Stat.Unknown36, 0x0), (Stat.Unknown37, 0x0), (Stat.Unknown38, 0x0), (Stat.Unknown39, 0x0),
+			(Stat.Unknown40, 0x64), (Stat.Unknown41, 0x64), (Stat.Unknown42, 0x64), (Stat.Unknown43, 0x64),
+			(Stat.Unknown44, 0x0), (Stat.Unknown45, 0x0), (Stat.Unknown46, 0x0), (Stat.Unknown47, 0x0),
+			(Stat.Unknown48, 0x0), (Stat.Unknown49, 0x0), (Stat.Unknown50, 0x0), (Stat.Unknown51, 0x0),
+			(Stat.Unknown52, 0x0), (Stat.Unknown53, 0x0), (Stat.Unknown54, 0x0), (Stat.Unknown55, 0x0),
+			(Stat.Unknown56, 0x0), (Stat.CaptureSkullLose, 0x0), (Stat.Unknown57, 0x0), (Stat.CaptureSkullWin, 0x0),
+			(Stat.Unknown58, 0x0), (Stat.AnnihilationLose, 0x0), (Stat.Unknown59, 0x0), (Stat.AnnihilationWin, 0x0),
+			(Stat.Unknown60, 0x0), (Stat.Unknown61, 0x0), (Stat.Unknown62, 0x0), (Stat.Death, 0x0),
+			(Stat.Unknown63, 0x0), (Stat.KillingBlows, 0x0)
 		];
 
 		// The fixed words AFTER the known-spell list at the block tail (the known-list - its count word then the 12-byte
@@ -68,10 +77,10 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		public static uint SkeletonValueOf(uint statId)
 		{
 			foreach (var (id, value) in StatList1)
-				if (id == statId)
+				if ((uint)id == statId)
 					return value;
 			foreach (var (id, value) in StatList2Half)
-				if (id == statId)
+				if ((uint)id == statId)
 					return value;
 			return 0;
 		}
@@ -85,8 +94,10 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		public static List<(uint Id, uint Value)> FreshSheet()
 		{
 			var sheet = new List<(uint, uint)>(SheetSize);
-			sheet.AddRange(StatList1);
-			sheet.AddRange(StatList2Half);
+			foreach (var (id, value) in StatList1)
+				sheet.Add(((uint)id, value));
+			foreach (var (id, value) in StatList2Half)
+				sheet.Add(((uint)id, value));
 			return sheet;
 		}
 
