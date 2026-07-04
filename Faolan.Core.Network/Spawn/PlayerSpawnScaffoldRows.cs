@@ -102,7 +102,7 @@ namespace Faolan.Core.Network.Spawn
 			character.SpawnFrame = new CharacterSpawnFrame
 			{
 				CharacterId = character.Id,
-				PreFrame = FreshPreFrame(),
+				PreFrame = FreshPreFrame(character.Class),
 				EntryTableX = 0xB7
 			};
 
@@ -174,12 +174,26 @@ namespace Faolan.Core.Network.Spawn
 		// The normal-login pre-IIR frame (239 bytes) with the fresh-character island values: the near-constant
 		// skeleton (0x05 lead, the 0x7E2/0x3F1 constants, the 41 00 00 82 08 closer) + Dikketest's per-char
 		// values at the two known islands.
-		public static byte[] FreshPreFrame()
+		// The frame's archetype code at @70 (abs-135 high byte): Soldier=1, Priest=2, Rogue=3, Mage=4. This is a
+		// DIFFERENT numbering than the ArchType enum, recovered from the captured player spawns (each class maps to
+		// exactly one value across all its sessions - the only genuine per-character field in the whole pre-IIR frame;
+		// everything else that varies is the RDB script-engine char buffer, transient/zero for a player). See
+		// docs/fa015807-spawn-reader.md (FUN_01121c00) + docs/archive/player-spawn-generation-plan.md.
+		private static byte FrameArchetype(Class @class) => @class switch
+		{
+			Class.Conqueror or Class.DarkTemplar or Class.Guardian => 1,        // Soldier
+			Class.PriestOfMitra or Class.TempestOfSet or Class.BearShaman => 2, // Priest
+			Class.Barbarian or Class.Ranger or Class.Assassin => 3,            // Rogue
+			Class.HeraldOfXotli or Class.Demonologist or Class.Necromancer => 4, // Mage
+			_ => 3
+		};
+
+		public static byte[] FreshPreFrame(Class @class)
 		{
 			var f = new byte[239];
 			f[0] = 0x05;
-			f[70] = 0x03; // u16 island @70 = 0x0312
-			f[71] = 0x12;
+			f[70] = FrameArchetype(@class); // @135 hi byte = archetype (Soldier1/Priest2/Rogue3/Mage4)
+			f[71] = (byte)@class;           // @136 = the class byte (0x12 Barbarian .. 0x2c Demonologist)
 			f[76] = 0x6F; // constant marker
 			f[81] = 0x41; // constant marker 0x4170
 			f[82] = 0x70;
