@@ -100,10 +100,12 @@ namespace Faolan.GameServer.Combat
 		public sealed record Parsed(uint Handle, byte Env, byte Flag, uint Marker, uint Target, uint Count);
 	}
 
-	// StatDamageIIR_t (0xE9F24184) - the damage result. The carrier handle is the target; the long form is 17 u32
-	// (FUN_008d57c0 + the FUN_00897b60 tail), one of which is the attacker handle (preceded by a 0xC350 marker). Until
-	// each word is field-named, this is parsed/rebuilt as a fixed 17-word record (preserving the values verbatim),
-	// which is enough to construct one from a captured template + the live target/attacker handles.
+	// StatDamageIIR_t (0xE9F24184) - the buff/debuff stat effect on the target (FUN_008d57c0 + the FUN_00897b60 tail).
+	// The 17-u32 long form is DECODED: it is the SAME record CombatEffectBuilder.BuildStatDamage field-names and the
+	// combat FSM sends at runtime -
+	//   [statValue][0][0][0][0x1b][2][i32 delta][statId][0xC350 marker][caster][idx][0][spellBaseId][1][0][0][0]  (#274)
+	// This codec keeps them as raw words ONLY for its own byte-exact round-trip test; the runtime path constructs from
+	// the named fields via CombatEffectBuilder, so nothing ships verbatim here.
 	public static class StatDamageCodec
 	{
 		public const int WordCount = 17;
