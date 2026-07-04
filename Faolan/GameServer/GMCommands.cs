@@ -553,6 +553,7 @@ namespace Faolan.GameServer
 				["despawnnpc"] = (client, arguments) => DespawnNpcCommand(client, arguments),
 				["despawnobj"] = (client, arguments) => DespawnWorldObjectCommand(client, arguments),
 				["npcfollow"] = (client, arguments) => NpcFollowCommand(client, arguments),
+				["pet"] = (client, arguments) => PetCommand(client, arguments),
 				["shield"] = (client, arguments) => CombatShieldCommand(client, arguments),
 				["delete"] = (client, arguments) => DeleteCommand(client, arguments),
 				["kill"] = (client, arguments) => KillCommand(client, arguments),
@@ -1300,6 +1301,31 @@ namespace Faolan.GameServer
 		// .spawnnpc <npc name>  - spawn a captured NPC (any NpcSpawns row with spawn Data, matched by name,
 		// case-insensitive, e.g. ".spawnnpc crocodile") at the player. Killable + hostile per its row; the test
 		// bootstrap for combat/AI work and the seam the MCP spawn_npc tool routes through.
+		// .pet <npc name>  - MINION MVP (#307): summon a creature that renders next to you and FOLLOWS you, built
+		// on the existing mid-session spawn (SpawnNpcForPlayer) + companion-follow (SetNpcFollow, #262). The retail
+		// necro-pet path (a summon spell that spawns an owned, commandable minion) is the follow-up - see #307 and
+		// docs/summon-pet-decode.md; this gives a working following minion now via a GM trigger.
+		private async Task PetCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var name = (arguments ?? "").Trim();
+			if (name.Length == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .pet <npc name>  - summon a creature that follows you (minion MVP)");
+				return;
+			}
+
+			var entity = await _broadcaster.SpawnNpcForPlayer(client, name);
+			if (entity == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"No spawnable NPC named '{name}' (needs a captured NpcSpawns row with spawn data).");
+				return;
+			}
+
+			_broadcaster.SetNpcFollow(client, entity.Handle, true);
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Summoned {entity.Name} (0x{entity.Handle:X8}) as a follower minion.");
+		}
+
 		private async Task SpawnNpcCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
