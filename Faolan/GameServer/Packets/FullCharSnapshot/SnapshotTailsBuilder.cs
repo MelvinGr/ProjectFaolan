@@ -108,19 +108,22 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 			var quest = BuildQuestPortion(quests, primary, instance);
 
+			// #74/#71: the character's learned spells are built INTO the stat block's known-list (no-op when empty).
+			var knownList = KnownSpellList.FromSpellIds(knownSpellIds);
+
 			TailsPostAccessBlock block;
 
 			if (statSheet is { Count: > 0 } && statSheet.Count == TailsStatBlock.SheetSize)
 			{
 				// The character has a captured stat sheet (CharacterStat): author the WHOLE sheet from its REAL retail
-				// values (built directly - not via SetStat, which scans all Values and would corrupt the trailer's 0x1
-				// word and the known-list ids). Values are already at wire scale as captured.
-				block = TailsStatBlock.CreateBlock([.. statSheet.Select(s => ((uint)s.Id, s.Value))]);
+				// values (built directly, with the known-list, in one construction - not via SetStat, which scans all
+				// Values and would corrupt the trailer's 0x1 word and the known-list ids). Values are wire-scale as captured.
+				block = TailsStatBlock.CreateBlock([.. statSheet.Select(s => ((uint)s.Id, s.Value))], knownList);
 
 				// Reset the SESSION/MAP-volatile slots to the fresh baseline: their captured value is specific to the
 				// retail session it came from, and replaying it into a fresh login misbehaves - 0xBF (the playfield-
-				// token/position slot) hides the entire abilities tab (verified by bisecting NecroL80's sheet). SetStat is
-				// safe here (these ids are not in the trailer, and this runs BEFORE the known-list splice).
+				// token/position slot) hides the entire abilities tab (verified by bisecting NecroL80's sheet). These ids
+				// are not in the trailer nor the known-list records, so the targeted SetStat is safe.
 				foreach (var id in TailsStatBlock.VolatileStatIds)
 					block.SetStat(id, TailsStatBlock.SkeletonValueOf(id));
 
@@ -142,7 +145,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 				// No captured sheet (a freshly-created character): fresh skeleton + targeted level/XP/class-vitals
 				// patches. The skeleton hardcodes level 1 (its diff sample was all level-1 chars), so without the level
 				// patch the client blocks every level-gated spell/item.
-				block = TailsStatBlock.CreateFreshBlock();
+				block = TailsStatBlock.CreateFreshBlock(knownList);
 				if (character != null)
 				{
 					block.SetStat((uint)CharacterStatId.Level, character.Level);
@@ -161,9 +164,6 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 					}
 				}
 			}
-
-			// #74/#71: splice the character's learned spells into the stat block's known-list (no-op when empty).
-			TailsStatBlock.InjectKnownSpells(block, KnownSpellList.FromSpellIds(knownSpellIds));
 
 			var statBytes = TailsStatBlock.Serialize(block);
 

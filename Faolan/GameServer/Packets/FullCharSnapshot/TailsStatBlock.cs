@@ -52,8 +52,9 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			(0x566,0x0), (0x290,0x0)
 		];
 
-		// The tail after StatList#2: the empty known-spell list (count 0x3F1) + the trailing pair-list.
-		private static readonly uint[] Trailer = [0x3F1, 0x1, 0x1000000, 0x0, 0x0, 0x0, 0x0];
+		// The fixed words AFTER the known-spell list at the block tail (the known-list - its count word then the 12-byte
+		// records - is built inline by CreateBlock, so it is no longer spliced in after the fact).
+		private static readonly uint[] TrailerRest = [0x1, 0x1000000, 0x0, 0x0, 0x0, 0x0];
 
 		// Stat slots that are SESSION/MAP-volatile, NOT stable character state: the captured value belongs to the retail
 		// session it was recorded in, so authoring from an imported sheet must NOT replay it - it is reset to the fresh
@@ -78,22 +79,24 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// The number of stat pairs a full sheet carries: StatList#1 (the displayed stats) + StatList#2's single copy.
 		public static int SheetSize => StatList1.Length + StatList2Half.Length;
 
-		public static TailsPostAccessBlock CreateFreshBlock()
+		public static TailsPostAccessBlock CreateFreshBlock(KnownSpellList known = null)
 		{
 			// The fresh skeleton is just the fixed baseline sheet (StatList#1 + StatList#2's one copy) run through the
 			// generic builder - byte-identical to the captured beach block (proven by BeachTailsFromScratchTests).
 			var sheet = new List<(uint, uint)>(SheetSize);
 			sheet.AddRange(StatList1);
 			sheet.AddRange(StatList2Half);
-			return CreateBlock(sheet);
+			return CreateBlock(sheet, known);
 		}
 
 		// Builds a stat block from a full stat sheet: `sheet` is StatList#1 (its first StatList1.Length pairs - the
 		// displayed stats) followed by StatList#2 (the remaining pairs, ONE copy). StatList#2 is emitted TWICE on the
-		// wire (base + current), so the block is [17 displayed pairs][StatList#2 count][74 sheet pairs x2][trailer].
-		// This authors the character's REAL captured sheet (or the fresh skeleton) by CONSTRUCTING the Values directly,
-		// so nothing scans the whole list (SetStat would also overwrite the trailer's 0x1 word and the known-list ids).
-		public static TailsPostAccessBlock CreateBlock(IReadOnlyList<(uint Id, uint Value)> sheet)
+		// wire (base + current), so the block is [17 displayed pairs][StatList#2 count][74 sheet pairs x2][known-spell
+		// list][trailer]. The KNOWN-SPELL LIST is built inline here - its count word ((records+1)*0x3F1) then each 12-
+		// byte [id][0xFFFFFFFF][type] record; a null/empty list is just the count 0x3F1 (byte-identical to the fresh
+		// skeleton). Everything is CONSTRUCTED directly, so nothing scans the whole list (SetStat would otherwise also
+		// overwrite the trailer's 0x1 word and the known-list ids - the reason this used to be a fragile post-hoc splice).
+		public static TailsPostAccessBlock CreateBlock(IReadOnlyList<(uint Id, uint Value)> sheet, KnownSpellList known = null)
 		{
 			var displayedCount = StatList1.Length;
 			var sheetCount = sheet.Count - displayedCount;
@@ -113,7 +116,16 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 					values.Add(sheet[i].Value);
 				}
 
-			values.AddRange(Trailer);
+			var records = known?.Records ?? [];
+			values.Add(((uint)records.Count + 1) * StatPairList.Frame); // known-spell list count (0x3F1 when empty)
+			foreach (var record in records)
+			{
+				values.Add(record.Id);
+				values.Add(KnownSpellList.Unbound);
+				values.Add(record.Type);
+			}
+
+			values.AddRange(TrailerRest);
 
 			return new TailsPostAccessBlock
 			{
@@ -187,50 +199,8 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			return true;
 		}
 
-		// The known-spell list lives INSIDE this stat block as a 0x3F1-framed list of 12-byte records (KnownSpellList),
-		// identified by the two trailing StatList#2 stat IDS (0x566 then 0x290, the last two sheet slots) immediately
-		// followed by a count word that is a positive multiple of 0x3F1. The fresh skeleton carries it empty (count
-		// 0x3F1, 0 records). InjectKnownSpells rewrites the count and splices the character's learned-spell records in
-		// after it, growing Values. The landmark keys on the stat IDS, NOT their values: an imported character carries
-		// real values at those slots (0x290 = KillingBlows), so requiring [0x566][0][0x290][0] would fail. The count
-		// appears after the SECOND StatList#2 copy; the first copy is followed by 0x534 (not a 0x3F1 multiple, so
-		// skipped) - the multiple-of-0x3F1 is the discriminator. Splices into the Values list (past the repeated stat
-		// block 35..330, so the +148 copies are untouched). See docs/handoff-2026-06-20-snapshot-known-spell-list.md.
-		public static int FindKnownSpellCountIndex(IReadOnlyList<uint> values)
-		{
-			for (var i = 4; i < values.Count; i++)
-			{
-				if (values[i] != 0 && values[i] % KnownSpellList.Frame == 0 && values[i - 4] == 0x566 && values[i - 2] == 0x290)
-					return i;
-			}
-
-			return -1;
-		}
-
-		// Splices the character's known-spell records into the stat block's known-list. No-op for an empty list (so the
-		// fresh skeleton stays byte-identical to the beach template). Each record is 3 big-endian u32s
-		// (id, 0xFFFFFFFF, type); the count word becomes (records + 1) * 0x3F1.
-		public static void InjectKnownSpells(TailsPostAccessBlock block, KnownSpellList known)
-		{
-			if (known is not { Records.Count: > 0 })
-				return;
-
-			var idx = FindKnownSpellCountIndex(block.Values);
-			if (idx < 0)
-				throw new InvalidOperationException("Could not locate the known-spell list count word in the stat block.");
-
-			block.Values[idx] = ((uint)known.Records.Count + 1) * KnownSpellList.Frame;
-
-			var insert = new List<uint>(known.Records.Count * 3);
-			foreach (var record in known.Records)
-			{
-				insert.Add(record.Id);
-				insert.Add(KnownSpellList.Unbound);
-				insert.Add(record.Type);
-			}
-
-			block.Values.InsertRange(idx + 1, insert);
-		}
+		// (The known-spell list is no longer spliced in after the fact - CreateBlock builds it inline at the block tail,
+		// so the former FindKnownSpellCountIndex landmark search + InjectKnownSpells splice are gone.)
 
 		// Serializes a stat block to its wire bytes: [u32 Marker0][u32 Marker1][u32 BlockType][u32 x Values][Trailer]
 		// (mirrors SnapshotTails.WritePostAccessBlock). 12 + Values.Count*4 + Trailer bytes - 1365 for the fresh block.
