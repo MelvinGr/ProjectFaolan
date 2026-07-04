@@ -21,6 +21,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		public const byte SpellType = 2;
 		public const uint Frame = 1009; // 0x3F1
 		public const uint Unbound = 0xFFFFFFFF; // the "no bound bar slot" word
+		public const int RecordSize = 12; // [u32 id][u32 0xFFFFFFFF][u32 type]
 
 		public List<KnownSpellRecord> Records { get; init; } = [];
 
@@ -42,6 +43,40 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		public static KnownSpellList FromSpellIds(IReadOnlyList<uint> spellIds)
 		{
 			return new KnownSpellList { Records = [.. (spellIds ?? []).Select(id => new KnownSpellRecord(id, SpellType))] };
+		}
+
+		// Locates + parses the known-spell list inside a raw 0x737A6DF9 snapshot body, WITHOUT deserializing the whole
+		// tails (which a high-level caster's spellbook/pet/quest data can trip). Keys on the list's OWN structure - a
+		// count word that is a multiple of 0x3F1 with >= 1 record, whose FIRST record carries the 0xFFFFFFFF slot word
+		// - rather than the preceding stat-block landmark (whose values shift with level). That count%0x3F1 AND the
+		// 0xFFFFFFFF slot word together are extremely selective, and Parse then validates EVERY record's slot word, so
+		// a false hit is rejected. Returns the LARGEST valid list (the real spellbook; a snapshot can carry a smaller
+		// unrelated 0xFFFFFFFF-framed list too). False when none is found.
+		public static bool TryExtractFromSnapshot(ReadOnlySpan<byte> body, out KnownSpellList list)
+		{
+			list = null;
+			for (var i = 0; i + 4 + RecordSize <= body.Length; i++)
+			{
+				var count = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(i, 4));
+				if (count <= Frame || count % Frame != 0)
+					continue; // not a framed list with at least one record
+
+				if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(i + 4 + 4, 4)) != Unbound)
+					continue; // first record's slot word isn't the known-list marker
+
+				try
+				{
+					var candidate = Parse(body, i, out _);
+					if (list == null || candidate.Records.Count > list.Records.Count)
+						list = candidate;
+				}
+				catch (InvalidOperationException)
+				{
+					// a later record failed to validate - not the known-list; keep scanning
+				}
+			}
+
+			return list != null;
 		}
 
 		// Parses the [count][records] sub-structure beginning at `data[offset]` (the count word). `consumed` reports the

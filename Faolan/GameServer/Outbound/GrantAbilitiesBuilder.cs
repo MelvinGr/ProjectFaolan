@@ -44,45 +44,73 @@ namespace Faolan.GameServer
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x08, 0xA8, 0x15, 0xAD
 		];
 
-		// Seeds a fresh character's starting loadout the first time it enters the world with an empty action bar
-		// (#74/#71): the class's level-1 SPELLS (persisted to CharacterSpells so GrantStartingSpells sends them this
-		// session AND re-grants them every login) and the default action-bar layout (CharacterShortcuts). Mirrors what
-		// the retail create flow places on the beach - harvested per class from the create captures (Necromancer
-		// 0x125D9B/0x42CA77, Herald 0x3006FF; physical classes get no L1 spells). Idempotent: gated on an empty
-		// CharacterShortcuts set, so a player's customised bar is never overwritten. Runs at the start of world entry,
-		// before GrantStartingSpells (which then sends the spells this session). The bar restores via ShortcutBarReply.
-		private async Task EnsureStartingLoadout(INetworkClient client)
+		// Ensures the character's LOADOUT on EVERY world entry (#74/#71), not just at creation:
+		//  (1) ALWAYS makes the class's spells + abilities KNOWN to the client (the client keeps no persistent kit),
+		//      so the spellbook fills and every action-bar slot - default OR imported - resolves to an icon; also
+		//      grants whatever spells/abilities the character's existing bar already references.
+		//  (2) Seeds the DEFAULT bar layout ONLY when the character has no bar yet (a fresh character), mirroring the
+		//      retail create-flow beach loadout - a customised or imported bar is left exactly as it is.
+		// Runs at the start of world entry, before GrantCharacterSpells (which re-announces the spells this session);
+		// the bar itself restores to the client via ShortcutBarReply.
+		private async Task EnsureCharacterLoadout(INetworkClient client)
 		{
 			var character = client.Session.Character;
 			if (character == null)
 				return;
-
-			var existingShortcuts = await Database.GetCharacterShortcuts(character.Id);
-			if (existingShortcuts.Length > 0)
-				return; // already seeded, or the player has placed/customised the bar - leave it alone
 
 			const uint shortcutTypeAbility = 4;
 			const uint shortcutTypeSpell = 2;
 			const uint specialBarBase = 0x4E20;
 			const uint secondBarBase = 100; // page 2 / "bar 1" (slot = bar position, page 2 = +100; see ShortcutBarBuilder)
 
-			// Persist the class's starting spells. GrantStartingSpells (called right after this in SendWorldEntry) then
-			// reads CharacterSpells, sends them, and queues the post-ready re-announce - so the freshly-seeded spells
-			// ride the same path as an existing character's learned set, on this login and every relog.
-			var spells = await Database.GetStartingSpells(character.Level, character.Class);
+			// Seed the class's spells ONLY for a character whose spellbook is EMPTY (a freshly-created one). An
+			// imported character already carries its REAL spellbook (the snapshot known-list = its actual highest-rank
+			// spells), so padding it with the full all-rank class set would bloat it far past what retail shows. The
+			// abilities below are still granted every login (they're never in the snapshot known-list, and the client
+			// keeps no persistent kit), and the bar's own spells are ensured resolvable further down.
+			var spells = (await Database.GetCharacterSpells(character.Id)).Length == 0
+				? await Database.GetStartingSpells(character.Level, character.Class)
+				: [];
 			foreach (var spellId in spells)
 				await Database.AddCharacterSpell(character.Id, spellId);
+
+			var abilities = await Database.GetStartingAbilities(character.Level, (uint)character.Class);
+			foreach (var ability in abilities)
+				// Grant the ability NOW (pre-snapshot) so the client knows it when it restores the bar mid-load and
+				// can place it (abilities aren't in the snapshot known-list). Silent: post-ready re-grants the kit.
+				await SendAbilityGrant(client, ability, false);
+
+			// The BAR layout is only SEEDED when the character has none. An imported or player-customised bar is left
+			// exactly as it is - we just made its slots resolvable above.
+			var existingShortcuts = await Database.GetCharacterShortcuts(character.Id);
+
+			// Belt-and-braces: make every SPELL already on the bar known too, so an imported bar that points at
+			// spells beyond the class-starting set (higher ranks, off-class placements) still renders every slot.
+			foreach (var spellId in existingShortcuts.Where(s => s.ShortcutType == shortcutTypeSpell).Select(s => s.TargetId))
+				await Database.AddCharacterSpell(character.Id, spellId);
+
+			// ...and grant every ABILITY on the bar (an imported bar references abilities beyond the class-starting
+			// set - GetStartingAbilities only returns the IsStartingAbility ones). SendAbilityGrant needs the row;
+			// ids we don't have cataloged are skipped (that slot stays empty).
+			foreach (var abilityId in existingShortcuts.Where(s => s.ShortcutType == shortcutTypeAbility).Select(s => s.TargetId).Distinct())
+			{
+				var ability = await Database.GetAbility(abilityId);
+				if (ability != null)
+					await SendAbilityGrant(client, ability, false);
+			}
+
+			if (existingShortcuts.Length > 0)
+			{
+				Logger.LogInformation("EnsureCharacterLoadout: granted {S} spells + {A} abilities to '{Name}' (class={Class}); kept its existing {N}-slot bar.", spells.Length, abilities.Length, character.Name, character.Class, existingShortcuts.Length);
+				return;
+			}
 
 			// Default bar layout: the player's primary visible action bar is bar 1 (the +100 page), so the full usable
 			// kit lands there - the 3 Normal Attacks (left/middle/right) on bar 1 slots 100,101,102, then the class
 			// SPELLS right after them on bar 1 (103+). The other starting abilities (toggle-combat / switch-weapon /
 			// utility) go on the special bar (0x4E20+). Bar 0 is left empty so the attacks/spells are not split across
-			// two bars. (Retail's create capture also keeps a copy of the attacks on bar 0, but the player wants the
-			// L/M/R attacks + spells together on bar 1.)
-			var abilities = await Database.GetStartingAbilities(character.Level, (uint)character.Class);
-
-			// The 3 Normal Attacks come back ordered by Ability.Slot, but retail lays them out on bar 1 with the
-			// 2nd and 3rd (bar slots 101/102) the other way round, so swap that pair before placing them (#285).
+			// two bars. The 3 Normal Attacks come back ordered by Ability.Slot, but retail lays them out on bar 1 with
+			// the 2nd and 3rd (bar slots 101/102) the other way round, so swap that pair before placing them (#285).
 			var normalAttacks = abilities.Where(a => a.Id is >= 0xBBC40 and <= 0xBBC60).ToList();
 			if (normalAttacks.Count >= 3)
 				(normalAttacks[1], normalAttacks[2]) = (normalAttacks[2], normalAttacks[1]);
@@ -92,21 +120,8 @@ namespace Faolan.GameServer
 				await Database.SetCharacterShortcut(character.Id, secondBarSlot++, shortcutTypeAbility, attack.Id);
 
 			var specialSlot = specialBarBase;
-			foreach (var ability in abilities)
-			{
-				// Normal attacks were placed (in retail order) just above; here only the special-bar abilities get a slot.
-				var isNormalAttack = ability.Id is >= 0xBBC40 and <= 0xBBC60;
-				if (!isNormalAttack)
-					await Database.SetCharacterShortcut(character.Id, specialSlot++, shortcutTypeAbility, ability.Id);
-
-				// Grant the ability NOW (pre-snapshot) so the client knows it when it restores the freshly-seeded bar
-				// mid-load and can place it - otherwise the post-0x2024 GrantStartingAbilities arrives AFTER the bar
-				// restore and the slot renders empty. Abilities are NOT carried in the snapshot known-list (the Faolanx
-				// fresh-necro capture's list is spells only, type 2 - no type-5 ability records), so unlike the SPELLS
-				// (which the known-list now lists, #74) the abilities still need this pre-snapshot grant for bar
-				// placement. Silent: the post-ready GrantStartingAbilities re-grants the whole kit anyway.
-				await SendAbilityGrant(client, ability, false);
-			}
+			foreach (var ability in abilities.Where(a => a.Id is < 0xBBC40 or > 0xBBC60))
+				await Database.SetCharacterShortcut(character.Id, specialSlot++, shortcutTypeAbility, ability.Id);
 
 			// Spells go on bar 1 (the +100 page), after the page-2 normal attacks - matching retail (Herald 0x3006FF at
 			// slot 103), so the player sees them on their primary visible bar rather than bar 0. ONE per spell family
@@ -116,7 +131,7 @@ namespace Faolan.GameServer
 			foreach (var spellId in barSpells)
 				await Database.SetCharacterShortcut(character.Id, secondBarSlot++, shortcutTypeSpell, spellId);
 
-			Logger.LogInformation("EnsureStartingLoadout: seeded default bar for '{Name}' (class={Class}): {A} abilities + {S} spells (#74/#71).", character.Name, character.Class, abilities.Length, spells.Length);
+			Logger.LogInformation("EnsureCharacterLoadout: seeded default bar for '{Name}' (class={Class}): {A} abilities + {S} spells (#74/#71).", character.Name, character.Class, abilities.Length, spells.Length);
 		}
 
 		// Grants the character's starting abilities so the player has castable attacks in-world (enables the combat
@@ -125,7 +140,7 @@ namespace Faolan.GameServer
 		// directions + toggle-combat / switch-weapon / utility). Sent on the spawn conversation (same family as the
 		// 0x201c handshake), after the world has been built. (Class-specific SPELLS are a separate, not-yet-decoded
 		// grant - no capture exercises it; see TODO #3 / docs/archive/opcode-re-plan.md.)
-		private async Task GrantStartingAbilities(INetworkClient client)
+		private async Task GrantCharacterAbilities(INetworkClient client)
 		{
 			var character = client.Session.Character;
 			if (character == null)
@@ -139,7 +154,7 @@ namespace Faolan.GameServer
 			foreach (var ability in abilities)
 				await SendAbilityGrant(client, ability, false);
 
-			Logger.LogInformation("GrantStartingAbilities: re-granted {Count} abilities (silent) to '{Name}' (class={Class}, level={Level}).", abilities.Length, character.Name, character.Class, character.Level);
+			Logger.LogInformation("GrantCharacterAbilities: re-granted {Count} abilities (silent) to '{Name}' (class={Class}, level={Level}).", abilities.Length, character.Name, character.Class, character.Level);
 		}
 
 		private async Task GrantStartingBuffs(INetworkClient client)
@@ -156,12 +171,12 @@ namespace Faolan.GameServer
 			Logger.LogInformation("GrantStartingBuffs: applied the shield self-buff 0x{Spell:X8} to '{Name}'.", ShieldBuffSpellId, character.Name);
 		}
 
-		// Re-grants the character's learned spells on login - the spell counterpart to GrantStartingAbilities (#74).
+		// Re-grants the character's learned spells on login - the spell counterpart to GrantCharacterAbilities (#74).
 		// Retail re-sends a caster's whole learned set via DispatchLearnSpell on every world entry (invariant across
 		// every login capture: NecroL80 always relearns her 5, DemoL80 his 9); the client silently no-ops spells it
 		// already knows, so this is safe to replay each login. The set is the character's CharacterSpells rows (seeded
-		// for captured characters by CaptureSpellImporter, grown live by .learnspell). Sent after GrantStartingAbilities.
-		private async Task GrantStartingSpells(INetworkClient client)
+		// for captured characters by CaptureSpellImporter, grown live by .learnspell). Sent after GrantCharacterAbilities.
+		private async Task GrantCharacterSpells(INetworkClient client)
 		{
 			var character = client.Session.Character;
 			if (character == null)
@@ -172,7 +187,7 @@ namespace Faolan.GameServer
 				await SendLearnSpell(client, spell.SpellId);
 
 			if (spells.Length > 0)
-				Logger.LogInformation("GrantStartingSpells: re-granted {Count} learned spells to '{Name}' (class={Class}).", spells.Length, character.Name, character.Class);
+				Logger.LogInformation("GrantCharacterSpells: re-granted {Count} learned spells to '{Name}' (class={Class}).", spells.Length, character.Name, character.Class);
 		}
 
 		// Builds a single 0x2052 ability-grant packet from an Ability row. `announce` controls whether the client pops

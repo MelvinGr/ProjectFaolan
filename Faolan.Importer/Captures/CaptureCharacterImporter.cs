@@ -295,6 +295,7 @@ namespace Faolan.Importer.Captures
 			// was sent for this character's instance. Items not in the DB are skipped like the worn ones.
 			var carried = 0;
 			var carriedTotal = 0;
+			var knownSpells = 0;
 			if (snapshots is { Count: > 0 })
 			{
 				try
@@ -305,12 +306,24 @@ namespace Faolan.Importer.Captures
 				{
 					Console.WriteLine($"Character '{name}': carried-inventory import failed ({e.GetType().Name}: {e.Message}); worn equipment only.");
 				}
+
+				// The character's SPELLBOOK is the snapshot's known-spell list (its actual highest-rank spells), NOT
+				// the incremental DispatchLearnSpell grants (which only carry a session's re-learns). Scanned straight
+				// out of the raw snapshot bytes so it survives a tails-parse failure on a large caster snapshot.
+				try
+				{
+					knownSpells = await ImportKnownSpells(db, character.Id, snapshots);
+				}
+				catch (Exception e)
+				{
+					Console.WriteLine($"Character '{name}': known-spell import failed ({e.GetType().Name}: {e.Message}).");
+				}
 			}
 
 			await db.SaveChangesAsync();
 
 			Console.WriteLine(
-				$"Character '{name}': id {character.Id:X8}{(originalId == 0 ? " (generated)" : "")}, level {character.Level} {character.Sex} {character.Race} {character.Class}, map {character.MapId}, {worn}/{message.InventoryEntries.Count} worn, {carried}/{carriedTotal} carried, {character.Attributes.Count} scaffold entries, {character.Skills.Count} skill ids.");
+				$"Character '{name}': id {character.Id:X8}{(originalId == 0 ? " (generated)" : "")}, level {character.Level} {character.Sex} {character.Race} {character.Class}, map {character.MapId}, {worn}/{message.InventoryEntries.Count} worn, {carried}/{carriedTotal} carried, {knownSpells} spells, {character.Attributes.Count} scaffold entries, {character.Skills.Count} skill ids.");
 		}
 
 		private static async Task<uint> FindOrCreateImportAccount(DatabaseContext db)
@@ -468,6 +481,39 @@ namespace Faolan.Importer.Captures
 			}
 
 			return (stored, total);
+		}
+
+		// The character's SPELLBOOK from its FullChar snapshot's known-spell list (KnownSpellList): each type-2 record
+		// is a learned spell (the char's actual highest-rank set). Scanned from the raw snapshot bytes (no tails
+		// deserialize). The largest snapshot that yields a list wins; idempotent (skips already-recorded spells).
+		private static async Task<int> ImportKnownSpells(DatabaseContext db, uint characterId, IReadOnlyList<byte[]> snapshotBodies)
+		{
+			KnownSpellList known = null;
+			foreach (var body in snapshotBodies.OrderByDescending(b => b.Length))
+				if (KnownSpellList.TryExtractFromSnapshot(body, out known))
+					break;
+
+			if (known == null)
+				return 0;
+
+			var existing = (await db.CharacterSpells.Where(s => s.CharacterId == characterId).Select(s => s.SpellId).ToListAsync()).ToHashSet();
+			var added = 0;
+			foreach (var id in known.Records.Where(r => r.Type == KnownSpellList.SpellType).Select(r => r.Id).Distinct())
+			{
+				if (!existing.Add(id))
+					continue;
+
+				db.CharacterSpells.Add(new CharacterSpell
+				{
+					CharacterId = characterId,
+					SpellId = id
+				});
+				added++;
+			}
+
+			if (added > 0)
+				await db.SaveChangesAsync();
+			return added;
 		}
 
 		// The creator names its temp instances "Character<instance>" until the real name is committed.
