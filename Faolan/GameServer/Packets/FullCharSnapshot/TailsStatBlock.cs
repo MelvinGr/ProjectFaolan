@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using Faolan.Core;
 
@@ -91,6 +92,60 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 					RepeatCount = 2
 				}
 			};
+		}
+
+		// Scans a raw 0x737A6DF9 snapshot body for the stat block and returns its (statId, value) pairs in order:
+		// StatList#1 (the 17 displayed stats, count word 0x46F2) then StatList#2's first copy (the 74 sheet stats - the
+		// sheet is written TWICE on the wire, base + current; we keep one). Null when not found. This is the inverse of
+		// the generated block - the importer uses it to store a character's REAL stat sheet from its login snapshot.
+		public static List<(uint Id, uint Value)> ExtractFromSnapshot(ReadOnlySpan<byte> body)
+		{
+			for (var i = 0; i + 8 <= body.Length; i++)
+			{
+				if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(i, 4)) != BlockType)
+					continue; // not a StatList#1 count word (0x46F2)
+
+				if (!TryReadStatList(body, i, out var displayed, out var afterDisplayed) || displayed.Count != StatList1.Length)
+					continue;
+
+				// Reject a spurious 0x46F2 that is really a stat VALUE: the displayed stat ids are all small.
+				if (displayed.Exists(p => p.Id >= 0x700))
+					continue;
+
+				if (!TryReadStatList(body, afterDisplayed, out var sheet, out _) || sheet.Count < StatList2Half.Length * 2)
+					continue;
+
+				var pairs = new List<(uint, uint)>(StatList1.Length + StatList2Half.Length);
+				pairs.AddRange(displayed);
+				pairs.AddRange(sheet.GetRange(0, StatList2Half.Length)); // first copy = the 74 unique sheet stats
+				return pairs;
+			}
+
+			return null;
+		}
+
+		private static bool TryReadStatList(ReadOnlySpan<byte> body, int off, out List<(uint Id, uint Value)> list, out int end)
+		{
+			list = null;
+			end = off;
+			var count = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(off, 4));
+			if (count == 0 || count % StatPairList.Frame != 0)
+				return false;
+
+			var n = (int)(count / StatPairList.Frame) - 1;
+			if (off + 4 + n * 8 > body.Length)
+				return false;
+
+			list = new List<(uint, uint)>(n);
+			var p = off + 4;
+			for (var i = 0; i < n; i++)
+			{
+				list.Add((BinaryPrimitives.ReadUInt32BigEndian(body.Slice(p, 4)), BinaryPrimitives.ReadUInt32BigEndian(body.Slice(p + 4, 4))));
+				p += 8;
+			}
+
+			end = p;
+			return true;
 		}
 
 		// The known-spell list lives INSIDE this stat block as a 0x3F1-framed list of 12-byte records (KnownSpellList),

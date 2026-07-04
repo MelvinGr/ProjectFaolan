@@ -296,6 +296,7 @@ namespace Faolan.Importer.Captures
 			var carried = 0;
 			var carriedTotal = 0;
 			var knownSpells = 0;
+			var statSlots = 0;
 			if (snapshots is { Count: > 0 })
 			{
 				try
@@ -318,12 +319,23 @@ namespace Faolan.Importer.Captures
 				{
 					Console.WriteLine($"Character '{name}': known-spell import failed ({e.GetType().Name}: {e.Message}).");
 				}
+
+				// The character's STAT SHEET (level/vitals/attributes/PvP/ratings/...) authored from the snapshot's
+				// stat block, replacing the fixed fresh-char skeleton for this character. Scanned from raw bytes.
+				try
+				{
+					statSlots = await ImportStatBlock(db, character.Id, snapshots);
+				}
+				catch (Exception e)
+				{
+					Console.WriteLine($"Character '{name}': stat-block import failed ({e.GetType().Name}: {e.Message}).");
+				}
 			}
 
 			await db.SaveChangesAsync();
 
 			Console.WriteLine(
-				$"Character '{name}': id {character.Id:X8}{(originalId == 0 ? " (generated)" : "")}, level {character.Level} {character.Sex} {character.Race} {character.Class}, map {character.MapId}, {worn}/{message.InventoryEntries.Count} worn, {carried}/{carriedTotal} carried, {knownSpells} spells, {character.Attributes.Count} scaffold entries, {character.Skills.Count} skill ids.");
+				$"Character '{name}': id {character.Id:X8}{(originalId == 0 ? " (generated)" : "")}, level {character.Level} {character.Sex} {character.Race} {character.Class}, map {character.MapId}, {worn}/{message.InventoryEntries.Count} worn, {carried}/{carriedTotal} carried, {knownSpells} spells, {statSlots} stat slots, {character.Attributes.Count} scaffold entries, {character.Skills.Count} skill ids.");
 		}
 
 		private static async Task<uint> FindOrCreateImportAccount(DatabaseContext db)
@@ -514,6 +526,42 @@ namespace Faolan.Importer.Captures
 			if (added > 0)
 				await db.SaveChangesAsync();
 			return added;
+		}
+
+		// The character's STAT SHEET (CharacterStat rows) from its FullChar snapshot stat block: the 17 displayed stats
+		// then the 74 sheet stats, in wire order (Ordinal), so the snapshot generator authors them PER-CHARACTER
+		// instead of the fixed fresh skeleton. The snapshot is the whole sheet, so it replaces any existing rows.
+		private static async Task<int> ImportStatBlock(DatabaseContext db, uint characterId, IReadOnlyList<byte[]> snapshotBodies)
+		{
+			List<(uint Id, uint Value)> pairs = null;
+			foreach (var body in snapshotBodies.OrderByDescending(b => b.Length))
+			{
+				pairs = TailsStatBlock.ExtractFromSnapshot(body);
+				if (pairs != null)
+					break;
+			}
+
+			if (pairs == null)
+				return 0;
+
+			var old = await db.CharacterStats.Where(s => s.CharacterId == characterId).ToListAsync();
+			if (old.Count > 0)
+			{
+				db.CharacterStats.RemoveRange(old);
+				await db.SaveChangesAsync();
+			}
+
+			for (var i = 0; i < pairs.Count; i++)
+				db.CharacterStats.Add(new CharacterStat
+				{
+					CharacterId = characterId,
+					Ordinal = i,
+					StatId = pairs[i].Id,
+					Value = pairs[i].Value
+				});
+
+			await db.SaveChangesAsync();
+			return pairs.Count;
 		}
 
 		// The creator names its temp instances "Character<instance>" until the real name is committed.
