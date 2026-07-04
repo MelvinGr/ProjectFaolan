@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core;
@@ -30,10 +29,6 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		//   version 0x18 ; empty Quest_c list 0x3F1 ; index tag 0x3F1 ; index marker (0+1)*0x3F1 ; count 0 ;
 		//   terminal 0x000156E7 (constant). See Captures/scripts/decode_snapshot_quests.py + the *-create captures.
 		private const uint EmptyQuestTerminal = 0x000156E7;
-
-		// The captured instance baked into the static regions (Strie's); substituted for the live character's instance
-		// so the per-session entity references in the tails address the logged-in player (as the burst path re-addresses).
-		private const uint TemplateInstance = 0x02165EFF;
 
 		// The game-static PFAccessWindow_ playfield catalog (the tails region @1292..7917) - the one tails region that
 		// is reference data, not generated. Emitted from the TYPED AccessWindowCatalog (the 86 PfAccessWindowEntry
@@ -162,10 +157,10 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 			byte[] tails = [.. quest, .. AccessWindowTable, .. statBytes];
 
-			// The quest portion already carries `instance`; the static access-window + stat regions carry the template's
-			// (Strie's) instance, so re-address those occurrences. (No-op on the quest portion - it has no TemplateInstance.)
-			if (instance != TemplateInstance)
-				ReplaceRawUInt32(tails, TemplateInstance, instance);
+			// The tails are fully addressed to the live player already: the quest portion is BUILT with `instance`, and
+			// the access-window + stat regions carry no per-session ids (both are game-static). Only this session's live
+			// playfield token still needs stamping. (The old ReplaceRawUInt32 template-instance re-address is retired -
+			// it dated from when the stat region was the BeachTailsTemplate.bin blob, which had Strie's instance baked in.)
 			if (playfieldToken.HasValue)
 				WorldDespawn.TryReplacePlayfieldToken(tails, playfieldToken.Value);
 
@@ -260,20 +255,5 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			return HeaderSlots.All(slots.Contains);
 		}
 
-		// Replaces every big-endian uint32 occurrence of `find` with `replace` (the tails are raw records, not
-		// protobuf, so entity references appear as raw 4-byte big-endian values).
-		private static void ReplaceRawUInt32(byte[] data, uint find, uint replace)
-		{
-			Span<byte> needle = stackalloc byte[4];
-			BinaryPrimitives.WriteUInt32BigEndian(needle, find);
-			for (var i = 0; i + 4 <= data.Length; i++)
-			{
-				if (data[i] == needle[0] && data[i + 1] == needle[1] && data[i + 2] == needle[2] && data[i + 3] == needle[3])
-				{
-					BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(i, 4), replace);
-					i += 3;
-				}
-			}
-		}
 	}
 }
