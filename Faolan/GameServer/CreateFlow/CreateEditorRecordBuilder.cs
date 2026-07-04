@@ -113,11 +113,29 @@ namespace Faolan.GameServer
 			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteUInt16((ushort)0x0001).WriteUInt32(comboId).ToArray();
 		}
 
+		// CharInPlayIIR (0x864CFEF8): the "character is now in play" signal. 9 bytes:
+		//   [u32 type][u32 handle][u8 flag]
+		// An EMPTY record - the client reader (FUN_0075a920) only resolves the SimpleChar for `handle` and logs; the
+		// carrier handle is the whole message (docs/iir-readers-combat-world.md). flag is the base IIR's, 0 in every capture.
+		public static byte[] BuildCharInPlayIir(uint handle, byte flag = 0, uint type = CharacterWireType)
+		{
+			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteByte(flag).ToArray();
+		}
+
 		// EnergyIIR (0x40749B8A): an entity energy/value record. 13 bytes:
 		//   [u32 type][u32 handle][u8 flag][u32 value]
 		public static byte[] BuildEnergyIir(uint type, uint handle, byte flag, uint value)
 		{
 			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteByte(flag).WriteUInt32(value).ToArray();
+		}
+
+		// FeedbackIIR (0xBA1FD222): a UI feedback signal. 22 bytes:
+		//   [u32 type][u32 handle][u8 flag][u32 a][u32 b][u32 c][u8 d]
+		// The client reader (FUN_0079f8e0) reads [u32x3][u8] after the base IIR flag (docs/iir-readers-conversation-misc.md);
+		// the three words + trailing byte are an opaque numeric feedback payload, carried by value.
+		public static byte[] BuildFeedbackIir(uint handle, byte flag, uint a, uint b, uint c, byte d, uint type = CharacterWireType)
+		{
+			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteByte(flag).WriteUInt32(a).WriteUInt32(b).WriteUInt32(c).WriteByte(d).ToArray();
 		}
 
 		// GameTimeIIR (0x4F57DC08, "SetDayTime"): the in-game day-time + a wall-clock timestamp + the time rate.

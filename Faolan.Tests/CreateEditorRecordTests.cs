@@ -70,6 +70,22 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void CharInPlayIir_MatchesCapturedBytes()
+		{
+			// The "character in play" signal: type=C350 handle=021662C8 flag=00 (the whole message is the handle).
+			var bytes = CreateEditorRecordBuilder.BuildCharInPlayIir(0x021662C8);
+			Assert.Equal("0000c350021662c800", Convert.ToHexString(bytes).ToLowerInvariant());
+		}
+
+		[Fact]
+		public void FeedbackIir_MatchesCapturedBytes()
+		{
+			// The world-entry FeedbackIIR: type=C350 handle=021662C8 flag=01, payload [0, 0x64, 0x096A3A84][u8 01].
+			var bytes = CreateEditorRecordBuilder.BuildFeedbackIir(0x021662C8, 0x01, 0x00000000, 0x00000064, 0x096A3A84, 0x01);
+			Assert.Equal("0000c350021662c8010000000000000064096a3a8401", Convert.ToHexString(bytes).ToLowerInvariant());
+		}
+
+		[Fact]
 		public void GameTimeIir_MatchesCapturedBytes()
 		{
 			// First GameTimeIIR of the editor stream: dayTime=0x0147929b00000000, flag=02,

@@ -142,9 +142,7 @@ namespace Faolan.GameServer
 				.SendAsync(client);
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x59), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x0D, 0x86, 0x4C, 0xFE, 0xF8, 0x00, 0x00, 0xC3, 0x50)
-				.WriteUInt32(id)
-				.WriteArray(0x00)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.CharInPlayIIR).WriteArray(CreateEditorRecordBuilder.BuildCharInPlayIir(id)))
 				.SendAsync(client);
 			await SendGameActionListRecord(client, 0x59, id, 0xD00Cu, CreateEditorTemplateChoiceActionTailA);
 			await SendGameActionListRecord(client, 0x59, id, 0xD00Cu, CreateEditorTemplateChoiceActionTailB);
