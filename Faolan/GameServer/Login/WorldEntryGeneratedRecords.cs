@@ -55,12 +55,15 @@ namespace Faolan.GameServer
 					s.WriteUInt32(0x00000000); // TypeTag (global record)
 					s.WriteUInt32(0x00000000); // Handle (global record)
 					// The record's "FieldA" slot + the body's first bytes are actually the player's ENTRY POSITION
-					// straddling the framing: [pad 0x00][posX][posY][posZ big-endian floats][0x62]. This is the ONLY
+					// straddling the framing: [pad 0x00][posX][posY][posZ big-endian floats]. This is the ONLY
 					// per-session-varying field (--report mapchange), so it comes from the character, not a beach constant.
 					s.WriteByte(0x00);
 					s.WriteFloatBigEndian(character.PositionX);
 					s.WriteFloatBigEndian(character.PositionY);
 					s.WriteFloatBigEndian(character.PositionZ);
+					// 0x62 = 'b', the version byte that opens the embedded PlayfieldProxy stream ([u8 'b'][u32x8][u8 bool] -
+					// the client rejects any other version, docs/iir-readers-conversation-misc.md); the u32x8 descriptor
+					// follows (0xC79C, mapId, instance, token, ...).
 					s.WriteByte(0x62);
 					s.WriteUInt32(0x0000C79C);
 					s.WriteUInt32(mapId); // map (beach = 0x00000FAA)
