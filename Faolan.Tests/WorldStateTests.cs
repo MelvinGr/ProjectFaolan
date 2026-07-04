@@ -42,12 +42,12 @@ namespace Faolan.Tests
 			var world = new WorldState();
 			var e = Player(1, 0, 0);
 
-			world.Place(e, 2040, new Vector3(10, 0, 10), Vector3.Zero);
+			world.Place(e, 2040, new Vector3(10, 0, 10), Quaternion.Identity);
 			Assert.Equal(2040u, e.MapId);
 			Assert.Equal(1, world.ZoneFor(2040).Count);
 
 			// A map change moves the entity out of the old zone into the new one.
-			world.Place(e, 3000, new Vector3(5, 0, 5), Vector3.Zero);
+			world.Place(e, 3000, new Vector3(5, 0, 5), Quaternion.Identity);
 			Assert.Equal(0, world.ZoneFor(2040).Count);
 			Assert.Equal(1, world.ZoneFor(3000).Count);
 			Assert.True(world.ZoneFor(3000).TryGet(1, out _));
@@ -84,7 +84,7 @@ namespace Faolan.Tests
 		{
 			var world = new WorldState();
 			var e = Player(1, 0, 0);
-			world.Place(e, 2040, Vector3.Zero, Vector3.Zero);
+			world.Place(e, 2040, Vector3.Zero, Quaternion.Identity);
 
 			world.Remove(e);
 
@@ -97,7 +97,7 @@ namespace Faolan.Tests
 			var world = new WorldState();
 			var solo = world.ResolveEntryInstance(null, 4010, MapInstanceMode.Solo);
 			var p = Player(1, 0, 0);
-			world.Place(p, 4010, solo, p.Position, Vector3.Zero);
+			world.Place(p, 4010, solo, p.Position, Quaternion.Identity);
 
 			// Same-map re-entry (respawn/teleport back) keeps the player's existing copy.
 			Assert.Equal(solo, world.ResolveEntryInstance(p, 4010, MapInstanceMode.Solo));
@@ -116,8 +116,8 @@ namespace Faolan.Tests
 
 			var p1 = Player(1, 0, 0);
 			var p2 = Player(2, 1, 0);
-			world.Place(p1, 4010, a, p1.Position, Vector3.Zero);
-			world.Place(p2, 4010, b, p2.Position, Vector3.Zero);
+			world.Place(p1, 4010, a, p1.Position, Quaternion.Identity);
+			world.Place(p2, 4010, b, p2.Position, Quaternion.Identity);
 
 			Assert.Same(world.ZoneForEntity(p1), world.ZoneForEntity(p2)); // same zone object
 			Assert.Equal(2, world.ZoneForEntity(p1).Count);
@@ -137,8 +137,8 @@ namespace Faolan.Tests
 
 			var p1 = Player(1, 0, 0);
 			var p2 = Player(2, 0, 0); // SAME position as p1
-			world.Place(p1, 4010, i1, p1.Position, Vector3.Zero);
-			world.Place(p2, 4010, i2, p2.Position, Vector3.Zero);
+			world.Place(p1, 4010, i1, p1.Position, Quaternion.Identity);
+			world.Place(p2, 4010, i2, p2.Position, Quaternion.Identity);
 
 			Assert.NotSame(world.ZoneForEntity(p1), world.ZoneForEntity(p2));
 			Assert.Equal(1, world.ZoneForEntity(p1).Count); // alone in their own copy
@@ -154,11 +154,11 @@ namespace Faolan.Tests
 			// broadcaster can draw the NPC's weapon (#218). When the player leaves range it disengages: InCombat clears
 			// and NpcExitCombat is emitted (sheathe). The transition fires once, not every tick.
 			var world = new WorldState();
-			var npc = WorldEntity.ForNpc(10, 2040, new Vector3(0, 0, 0), Vector3.Zero, "Mob", EntityVitals.FromMax(100, 0, 100));
+			var npc = WorldEntity.ForNpc(10, 2040, new Vector3(0, 0, 0), Quaternion.Identity, "Mob", EntityVitals.FromMax(100, 0, 100));
 			npc.Hostile = true;
 			var player = Player(1, 5, 0); // within aggro range (20)
-			world.Place(npc, 2040, new Vector3(0, 0, 0), Vector3.Zero);
-			world.Place(player, 2040, player.Position, Vector3.Zero);
+			world.Place(npc, 2040, new Vector3(0, 0, 0), Quaternion.Identity);
+			world.Place(player, 2040, player.Position, Quaternion.Identity);
 
 			var first = world.Tick(0.1);
 			Assert.Contains(first, e => e.Type == WorldTickEffectType.NpcEnterCombat && e.Entity == npc);

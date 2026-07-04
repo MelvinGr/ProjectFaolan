@@ -12,7 +12,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Entity_WithoutVitals_IsNeverDead()
 		{
-			var npc = WorldEntity.ForNpc(1, 2040, Vector3.Zero, Vector3.Zero, "Decor");
+			var npc = WorldEntity.ForNpc(1, 2040, Vector3.Zero, Quaternion.Identity, "Decor");
 			Assert.False(npc.IsDead);
 			Assert.False(npc.TickRespawn(100.0));
 		}
@@ -30,7 +30,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void TickRespawn_NoOpWhileAlive()
 		{
-			var npc = WorldEntity.ForNpc(1, 2040, Vector3.Zero, Vector3.Zero, "Mob", EntityVitals.FromMax(50, 0, 50));
+			var npc = WorldEntity.ForNpc(1, 2040, Vector3.Zero, Quaternion.Identity, "Mob", EntityVitals.FromMax(50, 0, 50));
 			Assert.False(npc.TickRespawn(100.0));
 			Assert.False(npc.IsDead);
 		}
@@ -81,7 +81,7 @@ namespace Faolan.Tests
 		{
 			var world = new WorldState();
 			var zone = world.ZoneFor(2040);
-			zone.Add(WorldEntity.ForNpc(1, 2040, Vector3.Zero, Vector3.Zero, "Alive", EntityVitals.FromMax(50, 0, 50)));
+			zone.Add(WorldEntity.ForNpc(1, 2040, Vector3.Zero, Quaternion.Identity, "Alive", EntityVitals.FromMax(50, 0, 50)));
 			// Player far out of aggro range, so the living NPC neither respawns (alive) nor attacks (out of range).
 			zone.Add(new WorldEntity(2, 2040, true, "Player", null) { Position = new Vector3(1000, 0, 1000) });
 
@@ -106,7 +106,7 @@ namespace Faolan.Tests
 
 		private static WorldEntity DeadNpc(double respawnDelay = 10.0)
 		{
-			var npc = WorldEntity.ForNpc(0x1234, 2040, new Vector3(10, 0, 20), new Vector3(0, 1, 0), "Mob", EntityVitals.FromMax(80, 0, 80));
+			var npc = WorldEntity.ForNpc(0x1234, 2040, new Vector3(10, 0, 20), Quaternion.Identity, "Mob", EntityVitals.FromMax(80, 0, 80));
 			npc.RespawnDelaySeconds = respawnDelay;
 			npc.Vitals.ApplyHealthDelta(-80); // killing blow
 			Assert.True(npc.IsDead);

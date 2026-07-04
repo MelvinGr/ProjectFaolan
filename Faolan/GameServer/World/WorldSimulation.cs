@@ -228,7 +228,7 @@ namespace Faolan.GameServer.World
 
 			var instanceId = World.ResolveEntryInstance(existing, character.MapId, instanceMode);
 			// The DB rotation is a quaternion; the live sim/movement layer is Vector3 (Euler degrees) - bridge it.
-			var zone = World.Place(entity, character.MapId, instanceId, character.Position, character.Rotation.ToVector3());
+			var zone = World.Place(entity, character.MapId, instanceId, character.Position, character.Rotation);
 			var nearby = zone.PlayersInRange(character.Position, PlayerInterestRange, handle).Count();
 			_logger.LogInformation("World: player {Name} (0x{Handle:X8}) entered map {Map} instance 0x{Instance:X8} at {Pos}; {Nearby} other player(s) in range.",
 				entity.Name,

@@ -57,8 +57,8 @@ namespace Faolan.GameServer.World
 				// entity is the live WorldEntity (Vector3 Euler rotation); the DB Character stores a quaternion.
 				character.MapId = entity.MapId;
 				character.Position = entity.Position;
-				character.Rotation = entity.Rotation.ToQuaternion();
-				await _database.SaveCharacterTransform(character.Id, entity.Position, entity.Rotation.ToQuaternion(), entity.MapId);
+				character.Rotation = entity.Rotation;
+				await _database.SaveCharacterTransform(character.Id, entity.Position, entity.Rotation, entity.MapId);
 				return true;
 			}
 			catch (Exception ex)

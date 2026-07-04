@@ -742,7 +742,7 @@ namespace Faolan.GameServer.World
 				// World entry is burst-less, so every NPC streams in on the player's first move (interest) under its own
 				// captured handle - there is no separate burst handle to reconcile with.
 				var handle = npc.CapturedHandle;
-				var entity = WorldEntity.ForNpc(handle, mapId, new Vector3(npc.PositionX, npc.PositionY, npc.PositionZ), new Vector3(npc.RotationX, npc.RotationY, npc.RotationZ), npcName ?? "NPC", vitals);
+				var entity = WorldEntity.ForNpc(handle, mapId, npc.Position, npc.Rotation, npcName ?? "NPC", vitals);
 				entity.InstanceId = instanceId; // this NPC belongs to THIS copy of the map (#268)
 				entity.Level = npc.Level;
 				// #261: if this NPC's spawn is quest-gated, stamp the revealing quest ids so interest only streams it to
@@ -1451,7 +1451,7 @@ namespace Faolan.GameServer.World
 		// of whatever dropped it. Used by .spawnbag AND by NPC death drops (#246) so the dead NPC's handle is free to
 		// respawn at its spawn point and the bag survives that respawn. Returns the bag, or null if the map has no
 		// loot template.
-		private async Task<WorldEntity> SpawnLootBagAt(uint mapId, uint instanceId, Vector3 position, Vector3 rotation, IReadOnlyList<uint> itemTemplates, uint cashTin, uint allowedLooterHandle, string lootSourceName = null)
+		private async Task<WorldEntity> SpawnLootBagAt(uint mapId, uint instanceId, Vector3 position, Quaternion rotation, IReadOnlyList<uint> itemTemplates, uint cashTin, uint allowedLooterHandle, string lootSourceName = null)
 		{
 			var template = GetLootTemplate();
 			if (template == null)

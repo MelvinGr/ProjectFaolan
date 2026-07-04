@@ -213,11 +213,11 @@ namespace Faolan.GameServer.World
 		// re-advances to Position. So the client interpolates ~6u segments instead of a 1.2u-per-tick snap (the jitter).
 		public Vector3 MoveOrigin { get; set; }
 		public Vector3 Position { get; set; }
-		public Vector3 Rotation { get; set; }
+		public Quaternion Rotation { get; set; }
 
 		// Where the entity respawns (its original spawn point) - set for NPCs by ForNpc.
 		public Vector3 SpawnPosition { get; set; }
-		public Vector3 SpawnRotation { get; set; }
+		public Quaternion SpawnRotation { get; set; }
 
 		public WorldEntity(uint handle, uint mapId, bool isPlayer, string name, INetworkClient client)
 		{
@@ -379,7 +379,7 @@ namespace Faolan.GameServer.World
 		// A transient loot bag dropped on a kill (a world object, not a player/NPC): no vitals, no respawn; it sits at
 		// its drop spot until its expiry elapses, then the tick despawns + removes it. `spawnBody` is its prebuilt
 		// FA-family world-object body (re-framed per recipient like any spawn).
-		public static WorldEntity ForLoot(uint handle, uint mapId, Vector3 position, Vector3 rotation, string name, byte[] spawnBody, double expirySeconds)
+		public static WorldEntity ForLoot(uint handle, uint mapId, Vector3 position, Quaternion rotation, string name, byte[] spawnBody, double expirySeconds)
 		{
 			return new WorldEntity(handle, mapId, false, name, null)
 			{
@@ -393,7 +393,7 @@ namespace Faolan.GameServer.World
 
 		// Convenience factory for an NPC (no owning client) placed at a fixed transform. The transform is also recorded
 		// as the spawn point the NPC returns to on respawn. Optional vitals make it killable + respawnable by the tick.
-		public static WorldEntity ForNpc(uint handle, uint mapId, Vector3 position, Vector3 rotation, string name, EntityVitals vitals = null)
+		public static WorldEntity ForNpc(uint handle, uint mapId, Vector3 position, Quaternion rotation, string name, EntityVitals vitals = null)
 		{
 			return new WorldEntity(handle, mapId, false, name, null)
 			{

@@ -121,7 +121,7 @@ namespace Faolan.GameServer
 							if (moveEntity != null)
 							{
 								moveEntity.Position = movePosition;
-								moveEntity.Rotation = moveRotation;
+								moveEntity.Rotation = moveRotation.ToQuaternion();
 							}
 							else
 							{
@@ -131,7 +131,7 @@ namespace Faolan.GameServer
 							}
 
 							var livePosition = moveEntity?.Position ?? sessionCharacter.Position;
-							var liveRotation = moveEntity?.Rotation ?? sessionCharacter.Rotation.ToVector3();
+							var liveRotation = moveEntity?.Rotation.ToVector3() ?? sessionCharacter.Rotation.ToVector3();
 
 							// The CharDCMove carrier's movingType u16 is [u8 env][u8 flag1] (docs/chardcmove-grammar.md):
 							// the client streams its move with env=0x01 (the "I am the controlling client" flag); the

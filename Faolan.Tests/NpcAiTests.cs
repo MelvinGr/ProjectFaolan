@@ -289,7 +289,7 @@ namespace Faolan.Tests
 
 		private static WorldEntity Npc(uint handle, float x, float z, uint level = 1, bool hostile = true)
 		{
-			var e = WorldEntity.ForNpc(handle, 4010, new Vector3(x, 0, z), Vector3.Zero, "Mob", EntityVitals.FromMax(100, 0, 100));
+			var e = WorldEntity.ForNpc(handle, 4010, new Vector3(x, 0, z), Quaternion.Identity, "Mob", EntityVitals.FromMax(100, 0, 100));
 			e.Hostile = hostile;
 			return e;
 		}

@@ -17,7 +17,7 @@ namespace Faolan.Tests
 		{
 			var zone = new Zone(2040);
 			var a = Player(1, 0, 0);
-			var npc = WorldEntity.ForNpc(99, 2040, new Vector3(5, 0, 0), Vector3.Zero, "Kalanthes"); // right next to A
+			var npc = WorldEntity.ForNpc(99, 2040, new Vector3(5, 0, 0), Quaternion.Identity, "Kalanthes"); // right next to A
 			zone.Add(a);
 			zone.Add(npc);
 			a.Known.Add(99); // entry seeded this: the burst already rendered it
@@ -50,7 +50,7 @@ namespace Faolan.Tests
 		{
 			var zone = new Zone(2040);
 			var a = Player(1, 0, 0);
-			var npc = WorldEntity.ForNpc(99, 2040, new Vector3(5, 0, 0), Vector3.Zero, "Mob"); // right next to A
+			var npc = WorldEntity.ForNpc(99, 2040, new Vector3(5, 0, 0), Quaternion.Identity, "Mob"); // right next to A
 			zone.Add(a);
 			zone.Add(npc);
 
@@ -65,7 +65,7 @@ namespace Faolan.Tests
 		{
 			var zone = new Zone(2040);
 			var a = Player(1, 0, 0);
-			var npc = WorldEntity.ForNpc(99, 2040, new Vector3(1000, 0, 0), Vector3.Zero, "Casilda"); // far
+			var npc = WorldEntity.ForNpc(99, 2040, new Vector3(1000, 0, 0), Quaternion.Identity, "Casilda"); // far
 			zone.Add(a);
 			zone.Add(npc);
 

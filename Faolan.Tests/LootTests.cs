@@ -37,7 +37,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void LootBag_ExpiresAfterItsLifetime_AndIsNeitherPlayerNorNpc()
 		{
-			var bag = WorldEntity.ForLoot(0xABCD, 4010, new Vector3(1, 2, 3), Vector3.Zero, "Bag of loot", [1, 2, 3], 5.0);
+			var bag = WorldEntity.ForLoot(0xABCD, 4010, new Vector3(1, 2, 3), Quaternion.Identity, "Bag of loot", [1, 2, 3], 5.0);
 
 			Assert.True(bag.IsLoot);
 			Assert.False(bag.IsPlayer);
@@ -64,7 +64,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void TickExpiry_NoOpForNonLoot()
 		{
-			var npc = WorldEntity.ForNpc(1, 4010, Vector3.Zero, Vector3.Zero, "Mob", EntityVitals.FromMax(10, 0, 10));
+			var npc = WorldEntity.ForNpc(1, 4010, Vector3.Zero, Quaternion.Identity, "Mob", EntityVitals.FromMax(10, 0, 10));
 			Assert.False(npc.TickExpiry(1000.0));
 		}
 
@@ -73,7 +73,7 @@ namespace Faolan.Tests
 		{
 			var world = new WorldState();
 			var zone = world.ZoneFor(4010);
-			var bag = WorldEntity.ForLoot(0x40000001, 4010, Vector3.Zero, Vector3.Zero, "Bag of loot", [9], 1.0);
+			var bag = WorldEntity.ForLoot(0x40000001, 4010, Vector3.Zero, Quaternion.Identity, "Bag of loot", [9], 1.0);
 			zone.Add(bag);
 
 			Assert.Empty(world.Tick(0.5)); // 0.5s, still around

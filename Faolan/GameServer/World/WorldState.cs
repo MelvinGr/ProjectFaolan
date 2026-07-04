@@ -88,7 +88,7 @@ namespace Faolan.GameServer.World
 
 		// Adds the entity to the default shared instance of `mapId` (pre-instancing callers / tests). See the
 		// instance-aware overload.
-		public Zone Place(WorldEntity entity, uint mapId, Vector3 position, Vector3 rotation)
+		public Zone Place(WorldEntity entity, uint mapId, Vector3 position, Quaternion rotation)
 		{
 			return Place(entity, mapId, DefaultInstance, position, rotation);
 		}
@@ -97,7 +97,7 @@ namespace Faolan.GameServer.World
 		// if its map OR instance changed (#268). Returns the zone it now lives in so the caller can run interest
 		// queries against it. The entity's MapId/InstanceId are updated to match - so every later ZoneForEntity lands
 		// in this same copy.
-		public Zone Place(WorldEntity entity, uint mapId, uint instanceId, Vector3 position, Vector3 rotation)
+		public Zone Place(WorldEntity entity, uint mapId, uint instanceId, Vector3 position, Quaternion rotation)
 		{
 			if ((entity.MapId != mapId || entity.InstanceId != instanceId) && _zones.TryGetValue((entity.MapId, entity.InstanceId), out var oldZone))
 				oldZone.Remove(entity.Handle);
