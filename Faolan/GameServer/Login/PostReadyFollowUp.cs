@@ -245,16 +245,12 @@ namespace Faolan.GameServer
 				// Then the post-ready world-state/quest record stream (verbatim from the Strie login capture).
 				await SendPostReadyBurst(client);
 
-				// #239 INTERIM WORKAROUND - NOT RETAIL-ACCURATE. The in-world character sheet reads the CLASS from
-				// player stat 0x43 (fallback 0x1F): Ghidra GetClassName -> getAttr(0x130) -> playerStat(0x43)||(0x1F),
-				// in the same id space as the char-list Character.Class. RETAIL DOES NOT SEND THIS STAT - verified
-				// absent from every stat-update packet (0x96B8DC59/StatIIR) AND the FullChar snapshot across all
-				// captured logins; the retail client COMPUTES stat 0x43 client-side from char data whose source we
-				// have not yet decoded. As a stop-gap we force-feed it so fresh chars stop showing Barbarian. It MUST
-				// go out POST-ready: a mid-load stat 0x43 (in the world-entry vitals) crashes the loader; a post-ready
-				// one is fine (proven in-client: `.setstat 43 <class>` flips the sheet). REPLACE with the real
-				// (computed) source once decoded - see docs/class-display-239.md / Gitea #239.
-				await SendStatUpdate(client, new CharacterStatBlock().Set((CharacterStatId)0x43, (uint)client.Session.Character.Class));
+				// #239/#304 RESOLVED 2026-07-05 - the class force-feed (SetStat 0x43 = Class) was REMOVED as proven
+				// redundant, matching retail (which never sends stat 0x43 either). The in-world class is derived
+				// CLIENT-SIDE from the char data we already deliver (docs/class-display-239.md). Verified in-client
+				// with the force-feed DISABLED on BOTH paths: an existing lvl80 login read stat 0x43 = Necromancer,
+				// and a freshly-created char read stat 0x43 = HeraldOfXotli - both displayed correctly. The earlier
+				// interim predated the client-derivation working; no server-side class stat is needed.
 
 				// Re-deliver any persisted bag items the world-entry snapshot dropped for lacking an hash
 				// (AH-bought items - harvested template, no hash) via the live add path, so they survive relog.

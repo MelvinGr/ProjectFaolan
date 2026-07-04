@@ -223,10 +223,22 @@ Therefore the in-world class is **derived client-side from the char-select `Clas
 **PlayerAgent char-list**, which every capture/our server sends correctly) — the client caches it and applies it
 as `stat 0x43` when it Activates the player spawn. The GameServer login stream has no class at all. This is why
 "retail computes it client-side" (the original 2026-06-19 hypothesis) was right, and pins the source to the
-char-select cache. **Our force-feed is the functional equivalent** of that client-side application; a
-"retail-accurate" version would mean getting the client to run its own char-select→`0x43` caching on our
-world-entry path (handshake-dependent, likely not worth it). Recommendation: **keep the interim, close the #304
-sub-item as won't-fix-by-design.**
+char-select cache.
+
+## RESOLVED — force-feed REMOVED, our client already derives the class (2026-07-05)
+
+Tested directly: ran the Faolan server with the `SetStat(0x43)` force-feed **disabled** and read `stat 0x43`
+live from the client on **both** entry paths:
+
+- **Existing-char login** (lvl80): `stat 0x43 = 41 = Necromancer` — correct, no force-feed.
+- **Freshly-created char** (full create-flow + intro cutscene): `stat 0x43 = 43 = HeraldOfXotli` — correct, no
+  force-feed.
+
+So **our client already derives the class client-side exactly like retail**, on both login and create-flow — the
+force-feed was pure redundant, non-retail residue (it predated the client-derivation working). It has been
+**deleted** from `FlushPendingPost205FFollowUp`. `#239` stays closed; the `#304` `PostReadyFollowUp` sub-item is
+**done** (residue removed, now retail-accurate — the client does the derivation, the server sends nothing). The
+`generic_stats`/`g_Int32StatsOrder` spelunking below is retained only as decode reference.
 
 ### (superseded) generic_stats decode — kept for reference
 
