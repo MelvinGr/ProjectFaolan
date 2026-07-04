@@ -52,36 +52,14 @@ namespace Faolan.Importer.Captures
 			[269272] = 2 // Rest
 		};
 
-		// rawPackets = ALL captures (catalogs every ability's Slot/Data identity seen on the wire). createCaptures =
-		// the create-flow captures, one CapturedPacket list each, used to flag IsStartingAbility AND attribute the
-		// per-capture class (from the ChangeClass command in that capture).
-		public static async Task<(int Seen, int Inserted, int Updated)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, IEnumerable<IReadOnlyList<byte[]>> createCaptures, ILogger logger = null)
+		// rawPackets = ALL captures. Catalogs every ability's Id + Slot/Data identity seen on the wire (the Data quad is
+		// also its RDB 1000020 TEA key, so RdbAbilityImporter can name it). The class<->ability ACCESS and per-class
+		// unlock LEVEL are NOT set here - they are derived from the per-character grants (DeriveClassAbilitiesAsync).
+		public static async Task<(int Seen, int Inserted, int Updated)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger logger = null)
 		{
 			var grants = new Dictionary<uint, (uint Slot, uint D0, uint D1, uint D2, uint D3, uint D4)>();
 			foreach (var packet in rawPackets)
 				TryReadAbilityGrant(packet, grants);
-
-			// Per-create-capture: detect the class, collect its granted ability ids. Build id -> set of classes.
-			var idToClasses = new Dictionary<uint, HashSet<uint>>();
-			var starters = new HashSet<uint>();
-			foreach (var capture in createCaptures)
-			{
-				var cls = DetectClass(capture);
-				var perCapture = new Dictionary<uint, (uint, uint, uint, uint, uint, uint)>();
-				foreach (var packet in capture)
-					TryReadAbilityGrant(packet, perCapture);
-
-				foreach (var id in perCapture.Keys)
-				{
-					starters.Add(id);
-					if (cls is { } c)
-					{
-						(idToClasses.TryGetValue(id, out var set)
-							? set
-							: idToClasses[id] = new HashSet<uint>()).Add(c);
-					}
-				}
-			}
 
 			if (grants.Count == 0)
 				return (0, 0, 0);
@@ -98,7 +76,6 @@ namespace Faolan.Importer.Captures
 					a = new Ability
 					{
 						Id = id,
-						Level = 1,
 						Name = KnownNames.GetValueOrDefault(id, string.Empty)
 					};
 					db.Abilities.Add(a);
@@ -114,34 +91,13 @@ namespace Faolan.Importer.Captures
 				a.Data2 = g.D2;
 				a.Data3 = g.D3;
 				a.Data4 = g.D4;
-				a.Level = KnownLevels.GetValueOrDefault(id, (byte)1);
-				a.IsStartingAbility = starters.Contains(id);
-				a.Class = starters.Contains(id)
-					? ClassFor(id)
-					: 0u;
 				if (string.IsNullOrEmpty(a.Name) && KnownNames.TryGetValue(id, out var n))
 					a.Name = n;
 			}
 
 			await db.SaveChangesAsync();
-			var generic = starters.Count(s => ClassFor(s) == 0);
-			logger?.LogInformation("CaptureAbilityImporter: {Seen} ability grants seen ({Starters} starting: {Generic} generic + {Specific} class-specific), {Inserted} new, {Updated} updated.",
-				grants.Count,
-				starters.Count,
-				generic,
-				starters.Count - generic,
-				inserted,
-				updated);
+			logger?.LogInformation("CaptureAbilityImporter: {Seen} ability grants seen, {Inserted} new, {Updated} updated.", grants.Count, inserted, updated);
 			return (grants.Count, inserted, updated);
-
-			// An ability granted under >= 2 distinct classes (or under none we could attribute) is GENERIC (Class 0);
-			// one seen under exactly one class is specific to it.
-			uint ClassFor(uint id)
-			{
-				return idToClasses.TryGetValue(id, out var classes) && classes.Count == 1
-					? classes.Single()
-					: 0u;
-			}
 		}
 
 		// The character class chosen in this capture, read from its ChangeClass editor callback (client->server
@@ -217,6 +173,48 @@ namespace Faolan.Importer.Captures
 
 			logger?.LogInformation("CaptureAbilityImporter: combo books for {C} characters, {I} new CharacterCombo rows.", characters, inserted);
 			return (characters, inserted);
+		}
+
+		// Derives the class<->ability ACCESS (ClassAbility) from the per-character grants (CharacterAbility x Character):
+		// a row per (class, ability) that a captured character of that class holds, with the ability's PER-CLASS unlock
+		// level = the MIN level of that class's holders (create-flow chars land its universal kit at L1; gameplay-only
+		// abilities land at their high char levels -> naturally gated out of a fresh char). The data-driven replacement
+		// for IsStartingAbility + the single Ability.Class - true multi-class (Spellweaving lands under every captured
+		// caster class, not a wrong "generic"). The ability RDB template carries no class/level, so this is the source.
+		public static async Task<(int Inserted, int Updated)> DeriveClassAbilitiesAsync(IDatabaseContext db, ILogger logger = null)
+		{
+			var grants = await db.CharacterAbilities
+				.Join(db.Characters, ca => ca.CharacterId, c => c.Id, (ca, c) => new { ca.AbilityId, c.Level, c.Class })
+				.ToListAsync();
+
+			var abilityIds = (await db.Abilities.Select(a => a.Id).ToListAsync()).ToHashSet();
+			var existing = await db.ClassAbilities.ToDictionaryAsync(x => (x.Class, x.AbilityId));
+
+			var inserted = 0;
+			var updated = 0;
+			foreach (var g in grants.Where(x => abilityIds.Contains(x.AbilityId)).GroupBy(x => (x.Class, x.AbilityId)))
+			{
+				var minLevel = (byte)Math.Clamp(g.Min(x => (int)x.Level), 1, 255);
+				if (existing.TryGetValue(g.Key, out var row))
+				{
+					if (row.Level != minLevel)
+					{
+						row.Level = minLevel;
+						updated++;
+					}
+				}
+				else
+				{
+					db.ClassAbilities.Add(new ClassAbility { Class = g.Key.Class, AbilityId = g.Key.AbilityId, Level = minLevel });
+					inserted++;
+				}
+			}
+
+			if (inserted > 0 || updated > 0)
+				await db.SaveChangesAsync();
+
+			logger?.LogInformation("CaptureAbilityImporter: derived {Inserted} ClassAbility rows ({Updated} levels updated) from per-character grants.", inserted, updated);
+			return (inserted, updated);
 		}
 
 		// Shared per-character seeding: for every (characterId -> id set), skip characters not in the DB and ids already

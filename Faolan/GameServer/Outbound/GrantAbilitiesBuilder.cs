@@ -157,7 +157,7 @@ namespace Faolan.GameServer
 		{
 			var granted = await Database.GetCharacterAbilities(character.Id);
 			if (granted.Length == 0)
-				return await Database.GetStartingAbilities(character.Level, (uint)character.Class);
+				return await Database.GetClassAbilities(character.Level, character.Class);
 
 			var abilities = new List<Ability>(granted.Length);
 			foreach (var ga in granted)

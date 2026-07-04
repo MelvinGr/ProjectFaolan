@@ -153,7 +153,7 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var (seen, added, updated) = await CaptureAbilityImporter.ImportAsync(ctx.Db, ctx.RawPackets, ctx.CreateCaptures);
+			var (seen, added, updated) = await CaptureAbilityImporter.ImportAsync(ctx.Db, ctx.RawPackets);
 
 			var slotted = 0;
 			foreach (var ability in await ctx.Db.Abilities.ToListAsync())
@@ -282,7 +282,10 @@ namespace Faolan.Importer.Modules
 		{
 			var (aChars, aRows) = await CaptureAbilityImporter.ImportCharacterAbilitiesAsync(ctx.Db, ctx.RawPackets);
 			var (cChars, cRows) = await CaptureAbilityImporter.ImportCharacterCombosAsync(ctx.Db, ctx.RawPackets);
-			return new ImportResult($"{aRows} ability rows ({aChars} chars), {cRows} combo rows ({cChars} chars).");
+			// Derive the class<->ability access (ClassAbility) from the per-character grants just imported (the data-driven
+			// replacement for IsStartingAbility - the ability RDB template has no class/level requirement).
+			var (caInserted, _) = await CaptureAbilityImporter.DeriveClassAbilitiesAsync(ctx.Db);
+			return new ImportResult($"{aRows} ability rows ({aChars} chars), {cRows} combo rows ({cChars} chars); {caInserted} ClassAbility rows.");
 		}
 	}
 

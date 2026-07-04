@@ -98,7 +98,8 @@ namespace Faolan.Core.Database
 
 		Task<Spell> GetSpell(uint id);
 		Task<Spell[]> GetSpells();
-		Task<Ability[]> GetStartingAbilities(uint level, uint @class);
+		Task<Ability[]> GetClassAbilities(uint level, Class @class);
+		Task<Ability[]> GetClassAbilitiesUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive);
 
 		Task<uint[]> GetStartingSpells(uint level, Class @class);
 		Task<uint[]> GetStartingBarSpells(uint level, Class @class);
@@ -929,24 +930,38 @@ namespace Faolan.Core.Database
 			return await ctx.Spells.OrderBy(s => s.Id).ToArrayAsync();
 		}
 
-		// The universal starting ability kit (IsStartingAbility) - the abilities every new character receives via
-		// 0x2052 during creation (3 Normal Attack directions + toggle-combat / switch-weapon / utility), imported
-		// from the retail create-flow grants by CaptureAbilityImporter. The `level` is reserved for future
-		// level-gating; today the whole starting kit is level 1. The catalog also holds higher-level / class
-		// abilities (IsStartingAbility = false) which are NOT granted here.
-		// Starting abilities for a character: the generic kit (Class == 0, granted to everyone) plus the abilities
-		// specific to the character's own class, up to its level. Class-specific coverage is whatever the captures
-		// supplied (incomplete by design); the generic kit is always present.
-		public async Task<Ability[]> GetStartingAbilities(uint level, uint @class)
+		// The abilities a character of `class` has access to up to `level`, from the class<->ability ACCESS map
+		// (ClassAbility): true multi-class membership with a PER-CLASS unlock level, derived from the per-character
+		// grants (CaptureAbilityImporter.DeriveClassAbilitiesAsync) - the data-driven replacement for the old
+		// IsStartingAbility flag. Coverage is whatever the captures supplied (the classes we have captures for).
+		public async Task<Ability[]> GetClassAbilities(uint level, Class @class)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Abilities.Where(a => a.IsStartingAbility && a.Level <= level && (a.Class == 0 || a.Class == @class)).OrderBy(a => a.Slot).ToArrayAsync();
+			return await ctx.ClassAbilities
+				.Where(ca => ca.Class == @class && ca.Level <= level)
+				.Include(ca => ca.Ability)
+				.Select(ca => ca.Ability)
+				.OrderBy(a => a.Slot)
+				.ToArrayAsync();
+		}
+
+		// The abilities a character of `class` unlocks in the level band (fromExclusive, toInclusive] - the ability
+		// analogue of GetClassSpellsUnlockedBetween, used to grant the ding's newly-unlocked abilities on level-up.
+		public async Task<Ability[]> GetClassAbilitiesUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.ClassAbilities
+				.Where(ca => ca.Class == @class && ca.Level > fromLevelExclusive && ca.Level <= toLevelInclusive)
+				.Include(ca => ca.Ability)
+				.OrderBy(ca => ca.Level).ThenBy(ca => ca.AbilityId)
+				.Select(ca => ca.Ability)
+				.ToArrayAsync();
 		}
 
 		// SPELLS a character has learned by its current level (#74): every spell its class (or the generic Class 0 set)
 		// has ACCESS to (ClassSpells) whose unlock level (Spells.Level - NOT ClassSpells, which is pure membership) is
 		// at or below `level`. Coverage is whatever the class<->spell map supplied (only the create-capture starters
-		// today; a class-aware ellatha scrape fills the progression). The spell analogue of GetStartingAbilities.
+		// today; a class-aware ellatha scrape fills the progression). The spell analogue of GetClassAbilities.
 		public async Task<uint[]> GetStartingSpells(uint level, Class @class)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();

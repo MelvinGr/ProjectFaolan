@@ -170,7 +170,7 @@ namespace Faolan.Importer.Cli
 				var key = new[] { a.Data1, a.Data2, a.Data3, a.Data4 };
 				if (!rdb.TryGet(1000020, a.Id, out var e) || e.File == 0xff || e.Size == 0)
 				{
-					Console.WriteLine($"0x{a.Id:X8} slot={a.Slot,-5} start={(a.IsStartingAbility ? 1 : 0)} (no 1000020 entry)");
+					Console.WriteLine($"0x{a.Id:X8} slot={a.Slot,-5} (no 1000020 entry)");
 					continue;
 				}
 
@@ -188,7 +188,7 @@ namespace Faolan.Importer.Cli
 				var name = RdbItemImporter.ExtractName(body);
 				var fields = ReadIncreasingFields(body.AsSpan(12));
 				var fieldStr = string.Join(" ", fields.OrderBy(f => f.Key).Select(f => $"{f.Key}={f.Value}"));
-				Console.WriteLine($"0x{a.Id:X8} slot={a.Slot,-5} start={(a.IsStartingAbility ? 1 : 0)} \"{name}\"  | {fieldStr}");
+				Console.WriteLine($"0x{a.Id:X8} slot={a.Slot,-5} \"{name}\"  | {fieldStr}");
 			}
 		}
 

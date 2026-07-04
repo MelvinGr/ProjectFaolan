@@ -496,16 +496,13 @@ namespace Faolan.GameServer.Combat
 
 			// Level-gated ability unlocks (#209/#73): retail grants the abilities that unlock at the new level as
 			// ANNOUNCED 0x2052s at the ding (Rest at the L1->L2 ding - Blablabla frame 9937, Blablatest 1357,
-			// Stihetfv 685 - and in every L2+ char's login re-grant). GetStartingAbilities is level-filtered, so
-			// the ding grants are the delta above the pre-ding level.
+			// Stihetfv 685 - and in every L2+ char's login re-grant). The class<->ability map gives the per-class
+			// unlock level, so the ding grants are the band newly crossed.
 			var previousLevel = character.Level - levelsGained;
 			if (_announceAbilityGrant != null)
 			{
-				foreach (var ability in await _database.GetStartingAbilities(character.Level, (uint)character.Class))
-				{
-					if (ability.Level > previousLevel)
-						await _announceAbilityGrant(killer, ability);
-				}
+				foreach (var ability in await _database.GetClassAbilitiesUnlockedBetween(character.Class, previousLevel, character.Level))
+					await _announceAbilityGrant(killer, ability);
 			}
 
 			// Level-gated SPELL unlocks (#209/#74): the class's spells whose Spells.Level falls in the newly-crossed
