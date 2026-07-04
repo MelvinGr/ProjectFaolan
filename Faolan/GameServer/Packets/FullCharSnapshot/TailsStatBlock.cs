@@ -55,23 +55,42 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// The tail after StatList#2: the empty known-spell list (count 0x3F1) + the trailing pair-list.
 		private static readonly uint[] Trailer = [0x3F1, 0x1, 0x1000000, 0x0, 0x0, 0x0, 0x0];
 
+		// The number of stat pairs a full sheet carries: StatList#1 (the displayed stats) + StatList#2's single copy.
+		public static int SheetSize => StatList1.Length + StatList2Half.Length;
+
 		public static TailsPostAccessBlock CreateFreshBlock()
 		{
-			// Assemble the Values array from the structured StatLists (byte-identical to the captured block):
-			// StatList#1 pairs, then StatList#2's count word + its 74 pairs twice, then the trailer.
+			// The fresh skeleton is just the fixed baseline sheet (StatList#1 + StatList#2's one copy) run through the
+			// generic builder - byte-identical to the captured beach block (proven by BeachTailsFromScratchTests).
+			var sheet = new List<(uint, uint)>(SheetSize);
+			sheet.AddRange(StatList1);
+			sheet.AddRange(StatList2Half);
+			return CreateBlock(sheet);
+		}
+
+		// Builds a stat block from a full stat sheet: `sheet` is StatList#1 (its first StatList1.Length pairs - the
+		// displayed stats) followed by StatList#2 (the remaining pairs, ONE copy). StatList#2 is emitted TWICE on the
+		// wire (base + current), so the block is [17 displayed pairs][StatList#2 count][74 sheet pairs x2][trailer].
+		// This authors the character's REAL captured sheet (or the fresh skeleton) by CONSTRUCTING the Values directly,
+		// so nothing scans the whole list (SetStat would also overwrite the trailer's 0x1 word and the known-list ids).
+		public static TailsPostAccessBlock CreateBlock(IReadOnlyList<(uint Id, uint Value)> sheet)
+		{
+			var displayedCount = StatList1.Length;
+			var sheetCount = sheet.Count - displayedCount;
+
 			var values = new List<uint>(338);
-			foreach (var (id, value) in StatList1)
+			for (var i = 0; i < displayedCount; i++)
 			{
-				values.Add(id);
-				values.Add(value);
+				values.Add(sheet[i].Id);
+				values.Add(sheet[i].Value);
 			}
 
-			values.Add(((uint)StatList2Half.Length * 2 + 1) * StatPairList.Frame); // StatList#2 count = 0x24B45
+			values.Add(((uint)sheetCount * 2 + 1) * StatPairList.Frame); // StatList#2 count = 0x24B45 for 74 pairs
 			for (var copy = 0; copy < 2; copy++)
-				foreach (var (id, value) in StatList2Half)
+				for (var i = displayedCount; i < sheet.Count; i++)
 				{
-					values.Add(id);
-					values.Add(value);
+					values.Add(sheet[i].Id);
+					values.Add(sheet[i].Value);
 				}
 
 			values.AddRange(Trailer);
@@ -80,7 +99,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			{
 				Marker0 = Marker, // the two preceding empty framed lists (List E / F)
 				Marker1 = Marker,
-				BlockType = ((uint)StatList1.Length + 1) * StatPairList.Frame, // StatList#1 count word = 0x46F2
+				BlockType = ((uint)displayedCount + 1) * StatPairList.Frame, // StatList#1 count word = 0x46F2
 				Values = values,
 				Trailer = [0x00],
 				// Non-null so HasKnownRepeatedStatTable is true and the caller's vitals patches (which write the +148
@@ -149,17 +168,19 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		}
 
 		// The known-spell list lives INSIDE this stat block as a 0x3F1-framed list of 12-byte records (KnownSpellList),
-		// identified by the 16-byte landmark [0x566][0][0x290][0] immediately followed by a count word that is a positive
-		// multiple of 0x3F1. The fresh skeleton carries it empty (count 0x3F1, 0 records). InjectKnownSpells rewrites the
-		// count and splices the character's learned-spell records in after it, growing Values. The landmark word [0x566]
-		// also precedes an UNRELATED list (count 0x534, not a 0x3F1 multiple), so the multiple-of-0x3F1 count is the
-		// discriminator. Splices into the Values list (the count index is past the repeated stat block 35..330, so the
-		// +148 copies are untouched). See docs/handoff-2026-06-20-snapshot-known-spell-list.md.
+		// identified by the two trailing StatList#2 stat IDS (0x566 then 0x290, the last two sheet slots) immediately
+		// followed by a count word that is a positive multiple of 0x3F1. The fresh skeleton carries it empty (count
+		// 0x3F1, 0 records). InjectKnownSpells rewrites the count and splices the character's learned-spell records in
+		// after it, growing Values. The landmark keys on the stat IDS, NOT their values: an imported character carries
+		// real values at those slots (0x290 = KillingBlows), so requiring [0x566][0][0x290][0] would fail. The count
+		// appears after the SECOND StatList#2 copy; the first copy is followed by 0x534 (not a 0x3F1 multiple, so
+		// skipped) - the multiple-of-0x3F1 is the discriminator. Splices into the Values list (past the repeated stat
+		// block 35..330, so the +148 copies are untouched). See docs/handoff-2026-06-20-snapshot-known-spell-list.md.
 		public static int FindKnownSpellCountIndex(IReadOnlyList<uint> values)
 		{
 			for (var i = 4; i < values.Count; i++)
 			{
-				if (values[i] != 0 && values[i] % KnownSpellList.Frame == 0 && values[i - 4] == 0x566 && values[i - 3] == 0 && values[i - 2] == 0x290 && values[i - 1] == 0)
+				if (values[i] != 0 && values[i] % KnownSpellList.Frame == 0 && values[i - 4] == 0x566 && values[i - 2] == 0x290)
 					return i;
 			}
 

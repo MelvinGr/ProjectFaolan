@@ -108,39 +108,42 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 			var quest = BuildQuestPortion(quests, primary, instance);
 
-			var block = TailsStatBlock.CreateFreshBlock();
+			TailsPostAccessBlock block;
 
-			if (statSheet is { Count: > 0 })
+			if (statSheet is { Count: > 0 } && statSheet.Count == TailsStatBlock.SheetSize)
 			{
 				// The character has a captured stat sheet (CharacterStat): author the WHOLE sheet from its REAL retail
-				// values, replacing the fresh skeleton + the level/vitals patches below. Values are already at wire
-				// scale (as captured); SetStat writes every occurrence of the id (both StatList#2 copies).
-				foreach (var (id, value) in statSheet)
-					block.SetStat((uint)id, value);
+				// values (built directly - not via SetStat, which scans all Values and would corrupt the trailer's 0x1
+				// word and the known-list ids). Values are already at wire scale as captured.
+				block = TailsStatBlock.CreateBlock([.. statSheet.Select(s => ((uint)s.Id, s.Value))]);
 
 				// #214: a dead character logs in dead - the stored sheet is its alive-at-capture health, so still zero
 				// current-health so the client shows the release window at world entry.
 				if (character?.IsDead == true)
 					block.CurrentHp = 0;
 			}
-			else if (character != null)
+			else
 			{
-				// No captured sheet (a freshly-created character): keep the fresh skeleton and apply the targeted
-				// level/XP/class-vitals patches. The skeleton hardcodes level 1 (its diff sample was all level-1
-				// chars), so without the level patch the client blocks every level-gated spell/item.
-				block.SetStat((uint)CharacterStatId.Level, character.Level);
-
-				if (character.MaxStats != null)
+				// No captured sheet (a freshly-created character): fresh skeleton + targeted level/XP/class-vitals
+				// patches. The skeleton hardcodes level 1 (its diff sample was all level-1 chars), so without the level
+				// patch the client blocks every level-gated spell/item.
+				block = TailsStatBlock.CreateFreshBlock();
+				if (character != null)
 				{
-					block.CurrentXp = character.Experience;
-					// Author the WHOLE per-class stat block (displayed + base/secondary slots) so it is internally
-					// consistent (#4/#186), not just the displayed maxima. For the captured beach char (Strie, Assassin
-					// 98/0/236, base 90/0/230) this reproduces the template's slots exactly, so the golden stays byte-exact.
-					var v = character.MaxStats.SnapshotVitals(character.Class);
-					block.ApplyClassVitals(v.Hp, v.HpBase, v.Mana, v.ManaBase, v.Stamina, v.StaminaBase);
+					block.SetStat((uint)CharacterStatId.Level, character.Level);
 
-					if (character.IsDead)
-						block.CurrentHp = 0;
+					if (character.MaxStats != null)
+					{
+						block.CurrentXp = character.Experience;
+						// Author the WHOLE per-class stat block (displayed + base/secondary slots) so it is internally
+						// consistent (#4/#186), not just the displayed maxima. For the captured beach char (Strie, Assassin
+						// 98/0/236, base 90/0/230) this reproduces the template's slots exactly, so the golden stays byte-exact.
+						var v = character.MaxStats.SnapshotVitals(character.Class);
+						block.ApplyClassVitals(v.Hp, v.HpBase, v.Mana, v.ManaBase, v.Stamina, v.StaminaBase);
+
+						if (character.IsDead)
+							block.CurrentHp = 0;
+					}
 				}
 			}
 
