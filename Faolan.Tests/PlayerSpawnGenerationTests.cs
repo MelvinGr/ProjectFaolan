@@ -126,7 +126,7 @@ namespace Faolan.Tests
 				{
 					Id = 0x99,
 					Hash = 0
-				} // not buildable (no archetype) -> skipped
+				} // not buildable (no hash) -> skipped
 			};
 
 			var entries = PlayerSpawnEquipment.BuildInventoryEntries(equipment);

@@ -101,7 +101,7 @@ namespace Faolan.Tests
 			var tsv = Path.Combine(Path.GetTempPath(), $"combo-{Guid.NewGuid():N}.tsv");
 			try
 			{
-				// combos list cols: name, level, cooldown, stamina, archetype (same combo repeats per class)
+				// combos list cols: name, level, cooldown, stamina, hash (same combo repeats per class)
 				File.WriteAllText(tsv, string.Join("\n", "# name\tlevel\tcooldown\tstamina\tarchetype", "Sweep\t2\t10\t20\tGuardian", "Sweep\t2\t10\t20\tConqueror", "Slam\t4\t15\t22\tGuardian"));
 
 				await using (var db = NewContext(dbPath))

@@ -21,14 +21,14 @@ namespace Faolan.Tests
 	public class SnapshotItemBuilderTests
 	{
 		private const string InventoryCapture = "/home/melvin/Development/C#/Project Faolan/Captures/strie-login-inventory.bin";
-		private const uint Archetype = 1129664565;
+		private const uint Hash = 1129664565;
 		private const uint SlaveManaclesId = 3361557;
 		private const ulong Count = 1;
 		private const ulong ItemId = 2366689308620230826;
 		private const ulong RecordId = 2693654;
 
 		// Per-instance state read from the captured Slave Manacles entry (these are NOT template data - they are
-		// the character's specific item instance: its GUID, inventory record id, stack count, and archetype hash).
+		// the character's specific item instance: its GUID, inventory record id, stack count, and hash hash).
 		private const ulong Slot = 18;
 
 		[Fact]
@@ -64,13 +64,13 @@ namespace Faolan.Tests
 				Assert.NotNull(item);
 
 				// 3) Build the entry from the DB template + captured per-instance state, assert byte-identical.
-				var built = SnapshotItemBuilder.BuildEntry(Slot, ItemId, RecordId, Count, item, Archetype);
+				var built = SnapshotItemBuilder.BuildEntry(Slot, ItemId, RecordId, Count, item, Hash);
 				var produced = built.MessageValue!.ToArray();
 
 				Assert.Equal(Convert.ToHexString(expected), Convert.ToHexString(produced));
 
-				// 4) And via the item's own archetype (harvested into Items) - the fully DB-driven path.
-				Assert.Equal(Archetype, item.Hash);
+				// 4) And via the item's own hash (harvested into Items) - the fully DB-driven path.
+				Assert.Equal(Hash, item.Hash);
 				Assert.True(SnapshotItemBuilder.TryBuildEntry(Slot, ItemId, RecordId, Count, item, out var auto));
 				Assert.Equal(Convert.ToHexString(expected), Convert.ToHexString(auto.MessageValue!.ToArray()));
 			}
@@ -105,7 +105,7 @@ namespace Faolan.Tests
 
 				Assert.NotNull(item);
 				Assert.NotEqual(0u, item!.Hash);
-				var archetype = item.Hash;
+				var hash = item.Hash;
 
 				var packet = new ConanPacket(await File.ReadAllBytesAsync(InventoryCapture));
 				var body = new FaolanStream(packet.Body.ReadArrayUInt32Length());
@@ -122,7 +122,7 @@ namespace Faolan.Tests
 				var recordId = InventorySnapshotInspector.GetEntryRecordId(original) ?? 0;
 				var count = InventorySnapshotInspector.GetEntryCount(original) ?? 1;
 
-				var built = SnapshotItemBuilder.BuildEntry(slot, itemId, recordId, count, item, archetype);
+				var built = SnapshotItemBuilder.BuildEntry(slot, itemId, recordId, count, item, hash);
 				bag.Fields[bag.Fields.IndexOf(original)] = built;
 
 				// Re-serialize the whole root and re-parse, as the live path does.

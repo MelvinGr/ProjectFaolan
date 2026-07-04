@@ -15,14 +15,14 @@ using ProtoBuf;
 namespace Faolan.Importer.Extractors
 {
 	// Harvests the full identity of every item seen in captures: the template id, the Data1..4 identity quad, and
-	// the archetype. Two sources, both yielding (template -> CapturedItem): the 0x737A6DF9 inventory snapshot
-	// (bag/equipped container entries, tail.f8 archetype) AND the FA015807 character SPAWN's worn-equipment entries
-	// (ProtoAcgItem: Key1..4 = the quad, Template1 = id, Hash = archetype). The spawn source is what makes items a
+	// the hash. Two sources, both yielding (template -> CapturedItem): the 0x737A6DF9 inventory snapshot
+	// (bag/equipped container entries, tail.f8 hash) AND the FA015807 character SPAWN's worn-equipment entries
+	// (ProtoAcgItem: Key1..4 = the quad, Template1 = id, Hash = hash). The spawn source is what makes items a
 	// character only ever WORE (never carried in a bag snapshot - e.g. Seadog's Shorts) buildable, so the spawn
-	// equipment renderer (PlayerSpawnEquipment, gated on Archetype != 0) can draw them. The quad + archetype are
+	// equipment renderer (PlayerSpawnEquipment, gated on Hash != 0) can draw them. The quad + hash are
 	// exactly what SnapshotItemBuilder / PlayerSpawnEquipment need. Merged result is embedded as
 	// Data/archive/captured-items.tsv and imported into the `Items` table. See docs/archive/spawn-dissection-plan.md Phase 5.
-	public static class ArchetypeHarvester
+	public static class ItemHashHarvester
 	{
 		private const uint InventorySubOpcode = 0x737A6DF9;
 		private const uint BankIirSubOpcode = (uint)GameServer0X2000RespondsOpcodes.BankIIR; // 0x0BA1C1CB - same framing
@@ -54,7 +54,7 @@ namespace Faolan.Importer.Extractors
 			}
 
 			// Third source: vendor windows (DispatchShopData 0x2033) - every ware carries the same ProtoAcgItem
-			// identity (quad + template + archetype), so a single shop capture adds its whole stock to the
+			// identity (quad + template + hash), so a single shop capture adds its whole stock to the
 			// buildable-item catalog. See ShopContentCodec / Captures/scripts/decode_shopdata.py.
 			try
 			{
@@ -67,7 +67,7 @@ namespace Faolan.Importer.Extractors
 
 			// Fourth source: loot bags (LootBagFullUpdateIIR 0xF096251E) - the bag's ProtoLootBagIIR inventory holds the
 			// same ProtoAcgItem identities, so the items only ever seen as loot (e.g. the Casilda chain key) get into the
-			// Items table too. Unlike the buildable sources, archetype-0 loot items are kept (quest keys have none).
+			// Items table too. Unlike the buildable sources, hash-0 loot items are kept (quest keys have none).
 			try
 			{
 				ExtractFromLootBag(packetBytes, found);
@@ -177,7 +177,7 @@ namespace Faolan.Importer.Extractors
 
 		// Recovers (template -> CapturedItem) from a loot bag IIR carrier (0x2000 packet whose payload sub-opcode is
 		// 0xF096251E). The trailing ProtoLootBagIIR's inventory entries each carry a ProtoAcgItem (Key1 = the quad,
-		// Template1 = the id, Hash = the archetype) - identical to the snapshot/spawn sources. Archetype 0 is kept here
+		// Template1 = the id, Hash = the hash) - identical to the snapshot/spawn sources. Hash 0 is kept here
 		// (quest keys legitimately have none), so the item still lands in the DB even though it won't render in a snapshot.
 		private static void ExtractFromLootBag(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
 		{
@@ -206,7 +206,7 @@ namespace Faolan.Importer.Extractors
 		// Recovers (template -> CapturedItem) from a BankIIR (0x0BA1C1CB) - the personal bank, delivered on-demand
 		// (protocol_bank_storage). Body after the sub-opcode is [u32 c350][u32 instance][u8 env=01][u32 len][blob],
 		// where blob is a SINGLE ProtoInventoryGame container (kind 105 = ContainerKind.Bank) whose field-4 entries
-		// use the same InventoryListEntry codec as the snapshot. Bank entries carry a real archetype, so banked-only
+		// use the same InventoryListEntry codec as the snapshot. Bank entries carry a real hash, so banked-only
 		// items become buildable too. Identity only - the bank holds every kind in one container, so no type stamp.
 		private static void ExtractFromBankIir(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
 		{
@@ -232,9 +232,9 @@ namespace Faolan.Importer.Extractors
 			{
 				var template = InventorySnapshotInspector.GetEntryTemplateId(entry);
 				var quad = InventorySnapshotInspector.GetEntryIdentityQuad(entry);
-				var archetype = InventorySnapshotInspector.GetEntryArchetype(entry);
+				var hash = InventorySnapshotInspector.GetEntryArchetype(entry);
 				if (template.HasValue && quad.HasValue)
-					into.TryAdd(template.Value, new CapturedItem(quad.Value.Data1, quad.Value.Data2, quad.Value.Data3, quad.Value.Data4, archetype ?? 0));
+					into.TryAdd(template.Value, new CapturedItem(quad.Value.Data1, quad.Value.Data2, quad.Value.Data3, quad.Value.Data4, hash ?? 0));
 			}
 		}
 
@@ -271,12 +271,12 @@ namespace Faolan.Importer.Extractors
 				foreach (var entry in InventorySnapshotInspector.GetContainerEntries(container))
 				{
 					var template = InventorySnapshotInspector.GetEntryTemplateId(entry);
-					var archetype = InventorySnapshotInspector.GetEntryArchetype(entry);
+					var hash = InventorySnapshotInspector.GetEntryArchetype(entry);
 					var quad = InventorySnapshotInspector.GetEntryIdentityQuad(entry);
 
-					if (template.HasValue && archetype.HasValue && quad.HasValue)
+					if (template.HasValue && hash.HasValue && quad.HasValue)
 					{
-						map[template.Value] = new CapturedItem(quad.Value.Data1, quad.Value.Data2, quad.Value.Data3, quad.Value.Data4, archetype.Value);
+						map[template.Value] = new CapturedItem(quad.Value.Data1, quad.Value.Data2, quad.Value.Data3, quad.Value.Data4, hash.Value);
 						// Only classify from a container whose kind IS a real ItemType (Resource/Quest); the Bank (105)
 						// holds items of every kind in one container, so it must NOT stamp a type - leave the DB default.
 						if (types != null && itemType != ItemType.Normal && Enum.IsDefined(typeof(ItemType), itemType))
@@ -291,7 +291,7 @@ namespace Faolan.Importer.Extractors
 		// Recovers (template -> CapturedItem) from a character SPAWN's worn equipment. The spawn body holds a
 		// ProtoCoreCharacterIIR whose InventoryEntries are the worn items, each a ProtoAcgItem carrying the same
 		// identity the inventory snapshot does (Key1.Key1..4 = the Data quad, Template1 = the template id, Hash =
-		// the archetype). PlayerSpawnReader scans the body for the character message, so this works on any packet
+		// the hash). PlayerSpawnReader scans the body for the character message, so this works on any packet
 		// that contains a spawn (FA015807) - we just try it on every packet's Conan body.
 		private static void ExtractFromShopData(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
 		{
@@ -308,7 +308,7 @@ namespace Faolan.Importer.Extractors
 				return;
 
 			foreach (var e in ShopContentCodec.Parse(body).Entries)
-				into.TryAdd(e.Template, new CapturedItem(e.Data1, e.Data2, e.Data3, e.Data4, e.Archetype));
+				into.TryAdd(e.Template, new CapturedItem(e.Data1, e.Data2, e.Data3, e.Data4, e.Hash));
 		}
 
 		private static void ExtractFromSpawnEquipment(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
@@ -331,11 +331,11 @@ namespace Faolan.Importer.Extractors
 					continue;
 
 				var template = acg.Template1;
-				var archetype = acg.Hash;
-				if (template == 0 || archetype == 0)
-					continue; // need both a template and a real archetype to be buildable
+				var hash = acg.Hash;
+				if (template == 0 || hash == 0)
+					continue; // need both a template and a real hash to be buildable
 
-				into[template] = new CapturedItem(acg.Key1.Key1, acg.Key1.Key2, acg.Key1.Key3, acg.Key1.Key4, archetype);
+				into[template] = new CapturedItem(acg.Key1.Key1, acg.Key1.Key2, acg.Key1.Key3, acg.Key1.Key4, hash);
 			}
 		}
 
@@ -359,6 +359,6 @@ namespace Faolan.Importer.Extractors
 			return true;
 		}
 
-		public readonly record struct CapturedItem(uint Data1, uint Data2, uint Data3, uint Data4, uint Archetype);
+		public readonly record struct CapturedItem(uint Data1, uint Data2, uint Data3, uint Data4, uint Hash);
 	}
 }

@@ -64,7 +64,7 @@ namespace Faolan.GameServer
 				await _agentServerDispatcher.SendSystemMessage(characterId,
 					item == null
 						? $"No item with id {itemId}."
-						: $"Item {itemId} ('{item.Name}') has no archetype - not snapshot-buildable.");
+						: $"Item {itemId} ('{item.Name}') has no hash - not snapshot-buildable.");
 				return;
 			}
 

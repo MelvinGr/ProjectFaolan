@@ -36,7 +36,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		public static void DumpContainerSummary(ProtoMessage? container)
 		{
 			foreach (var entry in GetContainerSummary(container))
-				Console.WriteLine($"slot={entry.Slot}, " + $"itemId={entry.ItemId}, " + $"props=[{string.Join(", ", entry.Properties)}], " + $"f4={entry.TemplateA}, " + $"f5={entry.TemplateB}, " + $"f8=0x{entry.Archetype:X8}");
+				Console.WriteLine($"slot={entry.Slot}, " + $"itemId={entry.ItemId}, " + $"props=[{string.Join(", ", entry.Properties)}], " + $"f4={entry.TemplateA}, " + $"f5={entry.TemplateB}, " + $"f8=0x{entry.Hash:X8}");
 		}
 
 		public static void DumpEntry(ProtoField entry)
@@ -449,9 +449,9 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 			var templateB = tail?.Fields.FirstOrDefault(x => x.FieldNumber == 5 && x.WireType == 5)?.Fixed32Value;
 
-			var archetype = tail?.Fields.FirstOrDefault(x => x.FieldNumber == 8 && x.WireType == 5)?.Fixed32Value;
+			var hash = tail?.Fields.FirstOrDefault(x => x.FieldNumber == 8 && x.WireType == 5)?.Fixed32Value;
 
-			return new InventoryEntrySummary(GetEntrySlot(entry), GetEntryItemId(entry), properties, templateA, templateB, archetype);
+			return new InventoryEntrySummary(GetEntrySlot(entry), GetEntryItemId(entry), properties, templateA, templateB, hash);
 		}
 
 		private static long FindInventoryRootEndOffset(FaolanStream bodyStream, long inventoryRootOffset)
@@ -740,7 +740,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 		public sealed record InventoryPacketParts(byte[] Prefix, ProtoMessage Root, SnapshotTails Tails);
 
-		public sealed record InventoryEntrySummary(ulong? Slot, ulong? ItemId, string[] Properties, uint? TemplateA, uint? TemplateB, uint? Archetype);
+		public sealed record InventoryEntrySummary(ulong? Slot, ulong? ItemId, string[] Properties, uint? TemplateA, uint? TemplateB, uint? Hash);
 
 		public interface ITailRecord
 		{

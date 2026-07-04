@@ -14,7 +14,7 @@ namespace Faolan.Core.Network.Packets
 	//   [shop ID32 (type 0xC75B)][vendor NPC ID32 (type 0xC350)][u32 contentLength][ProtoInventoryGame]
 	// The content is the SAME ProtoInventoryGame the FullChar snapshot uses for the player's bag, with
 	// inventory_id.type = 111 (the shop container; bag = 104) and per-slot InventoryListEntry items whose
-	// ProtoAcgItem tail carries the item's full identity (Data1..4 quad + template id + archetype). Shop
+	// ProtoAcgItem tail carries the item's full identity (Data1..4 quad + template id + hash). Shop
 	// entries differ from bag entries only in their stat list: (0, 0x200000), (26, count), (356, perSlot)
 	// instead of (0, flags), (23, recordId), (26, count) - and item_id = 0 (wares have no instance GUID).
 	public static class ShopContentCodec
@@ -23,7 +23,7 @@ namespace Faolan.Core.Network.Packets
 		private const uint CharacterWireType = EntityClass.Character;
 
 		// Builds the full 0x2033 body from rows. `resolveItem` maps a template id to its Items row (for the
-		// quad + archetype); unresolvable slots are skipped (the importer harvests the wares into Items from
+		// quad + hash); unresolvable slots are skipped (the importer harvests the wares into Items from
 		// the same packets, so resolution only fails on a hand-made shop with a bogus template).
 		public static byte[] Build(uint shopInstance, uint npcHandle, uint maxSize, IEnumerable<ShopItem> items, Func<uint, Item> resolveItem)
 		{
@@ -137,7 +137,7 @@ namespace Faolan.Core.Network.Packets
 			return new ShopContent(shopInstance, npcHandle, inv.MaxSize, entries);
 		}
 
-		public sealed record ShopEntry(uint Pos, uint Template, uint Count, uint Stat356, uint TailLevel, uint Archetype, uint Data1, uint Data2, uint Data3, uint Data4);
+		public sealed record ShopEntry(uint Pos, uint Template, uint Count, uint Stat356, uint TailLevel, uint Hash, uint Data1, uint Data2, uint Data3, uint Data4);
 
 		public sealed record ShopContent(uint ShopInstance, uint NpcHandle, uint MaxSize, IReadOnlyList<ShopEntry> Entries);
 	}

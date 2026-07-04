@@ -10,7 +10,7 @@ namespace Faolan.GameServer.Spawn
 	// Builds the worn-equipment InventoryEntries for a player's SimpleCharFullUpdate spawn from the character's
 	// CharacterEquipment. Each worn item becomes a ProtoCoreCharacterIIR.InventoryEntry { pos = the equip slot id,
 	// item = ProtoAcgItem(visual) } - the same Item -> ProtoAcgItem encoding the inventory snapshot uses
-	// (SnapshotItemBuilder): keys = the item's Data1..4 quad, templates = Item.Id, hash = archetype. Replaces the
+	// (SnapshotItemBuilder): keys = the item's Data1..4 quad, templates = Item.Id, hash = hash. Replaces the
 	// captured player's equipment in the spawn (see SpawnPacketBuilder.SetCharacterMessage / PlayerSpawnReader).
 	public static class PlayerSpawnEquipment
 	{
@@ -52,7 +52,7 @@ namespace Faolan.GameServer.Spawn
 			foreach (var slot in Enum.GetValues<CharacterEquipmentSlot>())
 			{
 				var item = equipment[slot];
-				if (item == null || item.Hash == 0) // only fully-buildable items (real identity + archetype)
+				if (item == null || item.Hash == 0) // only fully-buildable items (real identity + hash)
 					continue;
 
 				entries.Add(BuildEntry(slot, item));

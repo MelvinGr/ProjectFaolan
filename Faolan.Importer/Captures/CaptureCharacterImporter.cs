@@ -148,7 +148,7 @@ namespace Faolan.Importer.Captures
 
 				// The class lives in the pre-IIR frame's u16 value island at body offset 135: its LOW byte is
 				// the class id (verified 10/10 against the captured character lists, all pre-frame variants;
-				// the high byte is an archetype group). This covers OTHER players too - the char list (0x20EF)
+				// the high byte is an hash group). This covers OTHER players too - the char list (0x20EF)
 				// only exists for the capturing account's own characters and serves as the cross-check.
 				var classId = charList.GetValueOrDefault(name)?.Class ?? (body.Length > 136
 					? body[136]

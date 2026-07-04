@@ -256,8 +256,8 @@ namespace Faolan.GameServer
 				// (computed) source once decoded - see docs/class-display-239.md / Gitea #239.
 				await SendStatUpdate(client, new CharacterStatBlock().Set((CharacterStatId)0x43, (uint)client.Session.Character.Class));
 
-				// Re-deliver any persisted bag items the world-entry snapshot dropped for lacking an archetype
-				// (AH-bought items - harvested template, no archetype) via the live add path, so they survive relog.
+				// Re-deliver any persisted bag items the world-entry snapshot dropped for lacking an hash
+				// (AH-bought items - harvested template, no hash) via the live add path, so they survive relog.
 				await RedeliverNonSnapshotBagItems(client);
 
 				// (The post-load second-snapshot delivery was removed 2026-06-12: the client ignores/rejects a

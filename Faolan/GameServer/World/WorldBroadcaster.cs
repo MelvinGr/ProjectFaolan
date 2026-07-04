@@ -1271,7 +1271,7 @@ namespace Faolan.GameServer.World
 		}
 
 		// Resolves the rolled item templates to the ones the loot window can DISPLAY (in the item table AND
-		// Archetype != 0 - a 0-archetype template has no inventory entry the client can render). Filtering here, before
+		// Hash != 0 - a 0-hash template has no inventory entry the client can render). Filtering here, before
 		// the bag is built, keeps the bag's LootItems and the spliced display list in ONE shared order so the single-drag
 		// take index matches the client's display Pos (#226). Preserves the rolled order; drops unknown/non-buildable.
 		private async Task<List<(uint TemplateId, Item Item)>> ResolveBuildableLoot(IReadOnlyList<uint> itemTemplateIds)
@@ -1281,9 +1281,9 @@ namespace Faolan.GameServer.World
 			{
 				var item = await _database.GetItem(templateId);
 				// Keep any resolvable, NAMED item - the window can display it and (since LootItems + the splice both come
-				// from this one list) the display order stays consistent (#226). The old `Archetype == 0` skip also
-				// dropped legitimate quest items (e.g. Scavenger's Key, archetype 0) inserted as quest-goal keys (#261);
-				// random loot is already archetype-filtered at the source (GetRandomBuildableItems), so this only let the
+				// from this one list) the display order stays consistent (#226). The old `Hash == 0` skip also
+				// dropped legitimate quest items (e.g. Scavenger's Key, hash 0) inserted as quest-goal keys (#261);
+				// random loot is already hash-filtered at the source (GetRandomBuildableItems), so this only let the
 				// quest key through.
 				if (item == null || string.IsNullOrEmpty(item.Name))
 					continue;
@@ -1294,7 +1294,7 @@ namespace Faolan.GameServer.World
 			return resolved;
 		}
 
-		// A few random snapshot-buildable item templates (Archetype != 0) for a loot bag. Drops from the MAP's loot pool
+		// A few random snapshot-buildable item templates (Hash != 0) for a loot bag. Drops from the MAP's loot pool
 		// (#273) - the items that map's captured bags actually carried - falling back to the all-items random sample when
 		// the map has no captured pool (so a map we have no loot data for still drops something). Empty when count <= 0.
 		private async Task<List<uint>> RollLootItems(int count, uint mapId)
@@ -1459,7 +1459,7 @@ namespace Faolan.GameServer.World
 
 			var handle = NextLootHandle();
 
-			// Resolve the rolled templates to the items the loot window can actually DISPLAY (Archetype != 0, present in
+			// Resolve the rolled templates to the items the loot window can actually DISPLAY (Hash != 0, present in
 			// the item table) ONCE, here - so the bag's LootItems and the spliced display list share ONE ordering. A
 			// non-buildable template dropped only at splice-time (the old behaviour) shifted every later display slot,
 			// so a single-drag (TakeBagItem indexes LootItems by the client's display Pos) removed/granted the WRONG

@@ -503,7 +503,7 @@ namespace Faolan.GameServer.Economy.Tradepost
 		// now-itemless mail so the client clears the attachment. The item is RENDERED live from the attachment's
 		// stored INSTANCE identity (Data quad + template + level + hash) - the same fields the AH grid renders from -
 		// so it works even when the listed template isn't in our Items table (most AH listings reference retail
-		// templates we never harvested, and listing.ItemHash/archetype is 0). Persistence is conditional: only a real
+		// templates we never harvested, and listing.ItemHash/hash is 0). Persistence is conditional: only a real
 		// buildable Items row can be written to CharacterInventory (the ItemId FK requires it) and re-rendered by the
 		// world-entry snapshot, so an un-harvested item is a LIVE-ONLY delivery (kept this session, lost on relog).
 		// Aborts (item left in the mail) only on a full bag, so the player can retry.
@@ -534,7 +534,7 @@ namespace Faolan.GameServer.Economy.Tradepost
 			var item = await _database.GetItem(attachment.Template);
 			if (item != null)
 				// The listing importer harvests every listed item into Items (so the CharacterInventory.ItemId FK
-				// holds), letting the bought item persist. Archetype-0 items the world-entry snapshot drops are
+				// holds), letting the bought item persist. Hash-0 items the world-entry snapshot drops are
 				// re-rendered on relog by RedeliverNonSnapshotBagItems via the live add path.
 				await _database.SetCharacterInventorySlot(character.Id, (int)FullCharSnapshotBuilder.BagKind, slot.Value, attachment.Template, qty);
 			else

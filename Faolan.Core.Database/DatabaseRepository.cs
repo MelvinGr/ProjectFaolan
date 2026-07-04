@@ -273,7 +273,7 @@ namespace Faolan.Core.Database
 					AuthChallenge = Guid.NewGuid().ToString("N"),
 					Level = 1,
 					// The real Class/Race are committed later in the editor, but the columns are enum-constrained (no
-					// "unchosen" value exists), so seed a valid placeholder - the rogue archetype the baseline MaxStats
+					// "unchosen" value exists), so seed a valid placeholder - the rogue hash the baseline MaxStats
 					// below already assumes - overwritten when the player commits their choice.
 					Class = Class.Barbarian,
 					Race = Race.Cimmerian,
@@ -703,7 +703,7 @@ namespace Faolan.Core.Database
 		}
 
 		// A random sample of the map's loot pool (#273): buildable items (same render constraints as
-		// GetRandomBuildableItems - Archetype != 0, named, Normal) that this map's captured bags carried. Returns empty
+		// GetRandomBuildableItems - Hash != 0, named, Normal) that this map's captured bags carried. Returns empty
 		// when the map has no pool, so the caller falls back to the all-items random sample. SQLite RANDOM() order.
 		public async Task<Item[]> GetMapLootSample(uint mapId, int count)
 		{
@@ -841,7 +841,7 @@ namespace Faolan.Core.Database
 			return grants.GroupBy(g => g.NpcName).ToDictionary(g => g.Key, g => g.Min(x => x.GrantQuestId));
 		}
 
-		// A random sample of snapshot-buildable gear/normal items (Archetype != 0, so SnapshotItemBuilder can
+		// A random sample of snapshot-buildable gear/normal items (Hash != 0, so SnapshotItemBuilder can
 		// render them; not a Quest or Resource item, so those don't end up as random loot). Used to fill loot bags
 		// with a couple of test items (.spawnbag, NPC-kill drops). SQLite RANDOM() order; fewer than `count` come
 		// back only when the item table has fewer matching rows.

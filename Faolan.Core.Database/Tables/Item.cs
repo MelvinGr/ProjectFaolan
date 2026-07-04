@@ -33,7 +33,7 @@ namespace Faolan.Core.Database.Tables
 		// On the wire it is ProtoAcgItem.Hash (and the FullChar snapshot tail's f8 field). It is NOT in the old C++
 		// `p_items`, so it can only be HARVESTED from a capture where the item sat in an inventory (a 0x737A6DF9
 		// snapshot or a 0x2020 add-item) - it is absent from sources that only describe the template abstractly (AH
-		// search-results carry Hash=0). An item is "fully buildable" (renders via the archetype-gated world-entry
+		// search-results carry Hash=0). An item is "fully buildable" (renders via the hash-gated world-entry
 		// snapshot) iff Hash != 0 AND it has a Data quad; the more forgiving live DispatchAddItem (0x2020) path
 		// renders an item by template even with Hash == 0 (used for AH-bought items we lack a hash for).
 		public uint Hash { get; set; }

@@ -69,8 +69,8 @@ namespace Faolan.GameServer
 			var characterId = client.Session.Character.Id;
 
 			// Quest items (Type 113, e.g. the Scavenger's Key) route to the QUEST container, not the backpack, so they
-			// land in the player's quest-items tab (#261). They are kept even with archetype 0 (quest items often have
-			// none); normal bag items still require an archetype so the snapshot can render them.
+			// land in the player's quest-items tab (#261). They are kept even with hash 0 (quest items often have
+			// none); normal bag items still require an hash so the snapshot can render them.
 			var isQuestItem = item.Type == ItemType.Quest;
 			if (!isQuestItem && item.Hash == 0)
 				return null;
@@ -107,11 +107,11 @@ namespace Faolan.GameServer
 		}
 
 		// Re-delivers, via the proven live DispatchAddItem (0x2020) path, the persisted BAG items the world-entry
-		// snapshot DROPPED because they carry no archetype (Archetype == 0 - e.g. an AH-bought item whose template
-		// we harvested from a listing, which has no archetype). The snapshot only renders Archetype != 0 rows
+		// snapshot DROPPED because they carry no hash (Hash == 0 - e.g. an AH-bought item whose template
+		// we harvested from a listing, which has no hash). The snapshot only renders Hash != 0 rows
 		// (FullCharSnapshotBuilder), and embedding a half-identified item in the chat-critical 0x737A6DF9 root is
 		// risky, so these ride the mid-session add-item mechanism (which renders by template / Hash 0) once at login.
-		// Items WITH an archetype already rode the snapshot, so this only touches the dropped ones (no duplication).
+		// Items WITH an hash already rode the snapshot, so this only touches the dropped ones (no duplication).
 		private async Task RedeliverNonSnapshotBagItems(INetworkClient client)
 		{
 			var character = client.Session?.Character;
@@ -137,7 +137,7 @@ namespace Faolan.GameServer
 			}
 
 			if (pushed > 0)
-				Logger.LogInformation("Re-delivered {Count} archetype-less bag item(s) to '{Name}' via live add (not in the snapshot).", pushed, character.Name);
+				Logger.LogInformation("Re-delivered {Count} hash-less bag item(s) to '{Name}' via live add (not in the snapshot).", pushed, character.Name);
 		}
 
 		// Pushes one item into the client's inventory live, on the same GameCharAgent conversation the wallet

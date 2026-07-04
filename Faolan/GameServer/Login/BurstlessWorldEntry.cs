@@ -234,7 +234,7 @@ namespace Faolan.GameServer
 		// does, but produced standalone (no captured packet to splice into).
 		private static byte[] BuildBurstlessSnapshotRoot(uint instance, CharacterEquipment equipment, CharacterInventory[] inventoryRows, uint[] characterTags)
 		{
-			var equipped = new Dictionary<ulong, (Item Item, uint Archetype)>();
+			var equipped = new Dictionary<ulong, (Item Item, uint Hash)>();
 			foreach (var (slot, get) in InventoryEquippedSlots)
 			{
 				var item = get(equipment);

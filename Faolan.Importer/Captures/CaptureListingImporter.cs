@@ -64,9 +64,9 @@ namespace Faolan.Importer.Captures
 
 		// Ensures each listed item exists as an Items TEMPLATE so a bought item can persist (CharacterInventory.ItemId
 		// FK) and be re-rendered on relog. The AH listing carries the per-template identity quad + level (verified
-		// identical across a template's listings) but NO archetype (the search-results ProtoAcgItem.Hash is 0), so
+		// identical across a template's listings) but NO hash (the search-results ProtoAcgItem.Hash is 0), so
 		// these are by-template / Hash-0 items: they render via the live add-item path (DispatchAddItem), not the
-		// archetype-gated world-entry snapshot. Skips templates we already have (real harvested items win). Returns
+		// hash-gated world-entry snapshot. Skips templates we already have (real harvested items win). Returns
 		// the number of new Items rows seeded.
 		public static async Task<int> HarvestItems(IDatabaseContext db, IEnumerable<TradepostListing> listings)
 		{

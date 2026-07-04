@@ -13,16 +13,16 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 	//   entry  = InventoryListEntry { pos = slot, item = ProtoInventoryGameEntry }
 	//   item   = ProtoInventoryGameEntry { item_id, stat_list[ (0,flags),(23,recordId),(26,count) ], item_data }
 	//   data   = ProtoAcgItem { key1=key2=key3 = ProtoDecryptionKey(Data1..4), template1=template2 = Item.Id,
-	//                           level, hash = archetype }
+	//                           level, hash = hash }
 	// The per-instance state (itemId GUID, inventory record id, stack count, slot) is kept; the template identity -
-	// the Data1..4 quad (which is the item's ProtoDecryptionKey) plus the archetype hash - comes from the DB Item.
+	// the Data1..4 quad (which is the item's ProtoDecryptionKey) plus the hash hash - comes from the DB Item.
 	// Proven byte-exact against the captured "Slave Manacles" entry (SnapshotItemBuilderTests); the typed schema is
 	// proven to re-serialize the wire byte-for-byte (AocProtocolDecodeTests).
 	public static class SnapshotItemBuilder
 	{
-		public static ProtoField BuildEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, uint archetype, ulong flags = 1, ulong f7 = 1)
+		public static ProtoField BuildEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, uint hash, ulong flags = 1, ulong f7 = 1)
 		{
-			var entry = BuildListEntry(slot, itemId, recordId, count, item, archetype, flags, f7);
+			var entry = BuildListEntry(slot, itemId, recordId, count, item, hash, flags, f7);
 
 			using var ms = new MemoryStream();
 			Serializer.Serialize(ms, entry);
@@ -41,7 +41,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// wrapper) from a DB template + per-instance state and an explicit stat list. This is the form
 		// GameCharInterface.DispatchAddItem (s2c 0x2020) carries as i_cEntry - the live, mid-session counterpart
 		// to the world-entry snapshot; there the slot rides separately as i_nItemPos, so no Pos wrapper.
-		public static ProtoInventoryGameEntry BuildInventoryEntry(ulong itemId, Item item, uint archetype, IEnumerable<ItemStat> stats, ulong level = 1)
+		public static ProtoInventoryGameEntry BuildInventoryEntry(ulong itemId, Item item, uint hash, IEnumerable<ItemStat> stats, ulong level = 1)
 		{
 			var key = new ProtoDecryptionKey
 			{
@@ -62,7 +62,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 					Template1 = item.Id,
 					Template2 = item.Id,
 					Level = (uint)level,
-					Hash = archetype
+					Hash = hash
 				}
 			};
 
@@ -80,14 +80,14 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 		// The typed form, used directly by FullCharSnapshotBuilder's generated containers. The world-entry snapshot
 		// entry carries the fixed (flags, recordId, count) stat triple.
-		public static ProtoInventoryGame.InventoryListEntry BuildListEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, uint archetype, ulong flags = 1, ulong f7 = 1)
+		public static ProtoInventoryGame.InventoryListEntry BuildListEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, uint hash, ulong flags = 1, ulong f7 = 1)
 		{
 			return new ProtoInventoryGame.InventoryListEntry
 			{
 				Pos = (uint)slot,
 				Item = BuildInventoryEntry(itemId,
 					item,
-					archetype,
+					hash,
 					[
 						new ItemStat(0, (uint)flags),
 						new ItemStat(23, (uint)recordId),
@@ -97,7 +97,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			};
 		}
 
-		// Convenience overload: an item is buildable iff it has an archetype (DB column, harvested from captures).
+		// Convenience overload: an item is buildable iff it has an hash (DB column, harvested from captures).
 		// Returns false otherwise so the caller can fall back to the verbatim capture for that item.
 		public static bool TryBuildEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, out ProtoField entry, ulong flags = 1, ulong f7 = 1)
 		{

@@ -30,7 +30,7 @@ namespace Faolan.Tests
 			{
 				const uint accountId = 1;
 				const uint realmId = 1;
-				const uint itemId = 354477; // an item with a real archetype (renders in the container)
+				const uint itemId = 354477; // an item with a real hash (renders in the container)
 				const int bank = (int)FullCharSnapshotBuilder.BankKind; // 105
 				const int bag = (int)FullCharSnapshotBuilder.BagKind; // 104
 

@@ -667,7 +667,7 @@ namespace Faolan.Importer.Captures
 
 			// NB the key item's Type (Quest 113) is NOT forced here - the `items` module types it from data: the chain
 			// captures deliver the key via a live DispatchAddItem (0x2020) to the 0x71 quest container, which
-			// ArchetypeHarvester.ExtractFromAddItem reads as ItemType.Quest. Run the `items` module to (re)type it.
+			// ItemHashHarvester.ExtractFromAddItem reads as ItemType.Quest. Run the `items` module to (re)type it.
 
 			await db.SaveChangesAsync();
 			Console.WriteLine($"Seeded chain stage: quest {questId} = {goalType} '{target}' (goal {goalId}, required {required}, keyItem {questItemId}) -> {nextQuestId}.");

@@ -66,8 +66,8 @@ namespace Faolan.Importer.Extractors
 				: [];
 		}
 
-		// The item template ids inside a loot-bag IIR record (mirrors ArchetypeHarvester.ExtractFromLootBag, but yields
-		// only the template ids - the identity quad/archetype is harvested separately by the items module). `body` is the
+		// The item template ids inside a loot-bag IIR record (mirrors ItemHashHarvester.ExtractFromLootBag, but yields
+		// only the template ids - the identity quad/hash is harvested separately by the items module). `body` is the
 		// packet body after the framing header: [u32 payloadLen][u32 subOpcode][record]; the ProtoLootBagIIR record the
 		// codec parses starts at offset 8 (after the length + sub-opcode words).
 		private static IEnumerable<uint> ReadLootTemplates(byte[] body)

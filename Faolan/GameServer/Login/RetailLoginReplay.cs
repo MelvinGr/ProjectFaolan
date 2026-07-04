@@ -33,7 +33,7 @@ namespace Faolan.GameServer
 		private const uint StarterMaleLegsItem = 3805575; // Red Loincloth
 
 		// Default starter gear for beach characters (item ids that are fully buildable: p_items identity + harvested
-		// archetype), keyed by the CharacterEquipment slot they go in. Slot-appropriate so the client accepts them.
+		// hash), keyed by the CharacterEquipment slot they go in. Slot-appropriate so the client accepts them.
 		// Harvested from the create-flow captures (#220): every fresh beach character wears the Slave Manacles, and
 		// the rest of the slave outfit is sex-specific - males are bare-chested with a loincloth, females wear a gown
 		// + bottom (the exact garment COLOUR is randomised per character in retail, so one representative set is used
@@ -41,7 +41,7 @@ namespace Faolan.GameServer
 		private const uint StarterWristItem = 3361557; // Slave Manacles (wrist, 0x12) - universal
 
 		// Female (Sex 1): a gown (chest) + matching bottom (legs). Retail randomises the garment COLOUR per
-		// character, so pick a colour at random from the slave-gown set (all fully buildable - Archetype + Data
+		// character, so pick a colour at random from the slave-gown set (all fully buildable - Hash + Data
 		// present, Type 101 - same as the Silver pair that was the sole representative before).
 		private static readonly (uint Gown, uint Bottom)[] StarterFemaleOutfits =
 		[

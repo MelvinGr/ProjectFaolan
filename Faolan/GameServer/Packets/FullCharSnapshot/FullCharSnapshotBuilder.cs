@@ -41,7 +41,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 		// Builds a SINGLE inventory container (ProtoInventoryGame) of the given kind from CharacterInventory rows -
 		// used for the on-demand BANK delivery (kind 105), which isn't one of the 4 login-snapshot containers.
-		// Same item codec as the snapshot (SnapshotItemBuilder.BuildListEntry). Includes archetype-0 items too (they
+		// Same item codec as the snapshot (SnapshotItemBuilder.BuildListEntry). Includes hash-0 items too (they
 		// render by template / Hash 0, like the live add) so an AH-bought item deposited to the bank still shows on
 		// reopen - unlike the chat-critical world-entry snapshot, the BankIIR is its own channel, so a half-identified
 		// item here can't break world entry. Rows without a resolved Item (no DB identity at all) are still skipped.
@@ -57,7 +57,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			return container;
 		}
 
-		public static List<ProtoInventoryGame> BuildContainers(uint instance, IReadOnlyDictionary<ulong, (Item Item, uint Archetype)> equipped, (Item Item, uint Archetype)? bagFirst,
+		public static List<ProtoInventoryGame> BuildContainers(uint instance, IReadOnlyDictionary<ulong, (Item Item, uint Hash)> equipped, (Item Item, uint Hash)? bagFirst,
 			IReadOnlyCollection<CharacterInventory> inventoryRows = null)
 		{
 			var containers = new List<ProtoInventoryGame>
@@ -69,7 +69,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			};
 
 			foreach (var (slot, resolved) in equipped.OrderBy(kv => kv.Key))
-				containers[0].Items.Add(SnapshotItemBuilder.BuildListEntry(slot, ItemId(instance, EquippedKind, slot), RecordId(instance, EquippedKind, slot), 1, resolved.Item, resolved.Archetype));
+				containers[0].Items.Add(SnapshotItemBuilder.BuildListEntry(slot, ItemId(instance, EquippedKind, slot), RecordId(instance, EquippedKind, slot), 1, resolved.Item, resolved.Hash));
 
 			// CharacterInventory rows fill their container by kind (bag rows from unequip persistence; resource/
 			// quest rows once something writes them). Buildable items only - a row without real identity is
@@ -90,7 +90,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			// The seeded starter-bag item (legacy FirstPosBag nav) renders at the captured fresh-bag cell unless
 			// a persisted row already occupies it.
 			if (bagFirst != null && !bagSlotsTaken.Contains(BagFirstPos))
-				containers[1].Items.Add(SnapshotItemBuilder.BuildListEntry(BagFirstPos, ItemId(instance, BagKind, BagFirstPos), RecordId(instance, BagKind, BagFirstPos), 1, bagFirst.Value.Item, bagFirst.Value.Archetype));
+				containers[1].Items.Add(SnapshotItemBuilder.BuildListEntry(BagFirstPos, ItemId(instance, BagKind, BagFirstPos), RecordId(instance, BagKind, BagFirstPos), 1, bagFirst.Value.Item, bagFirst.Value.Hash));
 
 			// Captured containers list entries in ascending pos.
 			foreach (var container in containers)

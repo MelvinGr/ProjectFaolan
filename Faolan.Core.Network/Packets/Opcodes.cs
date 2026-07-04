@@ -628,7 +628,7 @@ namespace Faolan.Core.Network.Packets
 			// - each item entry ends with a stable 83-byte tail shaped like:
 			//   { f1=len20, f2=len20, f3=len20, f4=fixed32, f5=fixed32, f7=varint, f8=fixed32 }
 			//   where f1/f2/f3 are byte-identical, f4 always equals f5 in current samples, and f8 behaves like
-			//   a short 4-character archetype/type code because it uniquely determines the whole tail signature
+			//   a short 4-character hash/type code because it uniquely determines the whole tail signature
 			// - rare optional tiny submessages also exist (currently seen with leading kinds 265, 8, and 1290),
 			//   which likely carry special-case item properties rather than core bag-slot state
 			// - no server->client inventory packet follows later MoveItemInInventory requests, so the client
