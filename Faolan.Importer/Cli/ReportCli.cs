@@ -129,31 +129,45 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// Matrix CSV of the same index: one row per capture, one column per (direction, opcode) - sub-opcode collapsed
-		// so the column set stays sane (~122) - cell = packet count. Import into a spreadsheet to pivot/filter dumps.
+		// Matrix CSV, one row per capture, cell = packet count. Columns are the (direction, opcode) summary first
+		// (sub-opcode collapsed, ~122), then EVERY (direction, opcode, sub-opcode) appended at the end (header
+		// "S2C 0x2000:0x737A6DF9"). Wide (~10k sub columns, many are one-off entity handles) but a full pivot table.
 		private static void OpcodeCsv(IReadOnlyList<NamedCapture> captures)
 		{
-			var perCap = new Dictionary<string, Dictionary<(bool Dl, uint Op), int>>();
-			var cols = new SortedSet<(uint Op, bool Dl)>(); // orders by opcode, then C2S before S2C
+			var perCapOp = new Dictionary<string, Dictionary<(bool Dl, uint Op), int>>();
+			var perCapSub = new Dictionary<string, Dictionary<(bool Dl, uint Op, uint Sub), int>>();
+			var opCols = new SortedSet<(uint Op, bool Dl)>();
+			var subCols = new SortedSet<(uint Op, uint Sub, bool Dl)>();
 			foreach (var c in captures)
 			{
-				var counts = new Dictionary<(bool Dl, uint Op), int>();
+				var ops = new Dictionary<(bool Dl, uint Op), int>();
+				var subs = new Dictionary<(bool Dl, uint Op, uint Sub), int>();
 				foreach (var p in c.Packets)
 				{
-					counts[(p.IsDownload, p.Opcode)] = counts.GetValueOrDefault((p.IsDownload, p.Opcode)) + 1;
-					cols.Add((p.Opcode, p.IsDownload));
+					ops[(p.IsDownload, p.Opcode)] = ops.GetValueOrDefault((p.IsDownload, p.Opcode)) + 1;
+					subs[(p.IsDownload, p.Opcode, p.SubOpcode)] = subs.GetValueOrDefault((p.IsDownload, p.Opcode, p.SubOpcode)) + 1;
+					opCols.Add((p.Opcode, p.IsDownload));
+					subCols.Add((p.Opcode, p.SubOpcode, p.IsDownload));
 				}
-				perCap[c.Name] = counts;
+				perCapOp[c.Name] = ops;
+				perCapSub[c.Name] = subs;
 			}
 
-			var ordered = cols.ToList();
+			var ops2 = opCols.ToList();
+			var subs2 = subCols.ToList();
 			static string Csv(string s) => s.Contains(',') || s.Contains('"') ? $"\"{s.Replace("\"", "\"\"")}\"" : s;
 
-			Console.WriteLine("capture," + string.Join(",", ordered.Select(x => $"{(x.Dl ? "S2C" : "C2S")} 0x{x.Op:X4}")));
+			Console.Error.WriteLine($"{ops2.Count} opcode columns + {subs2.Count} sub-opcode columns across {captures.Count} captures");
+			Console.WriteLine("capture,"
+				+ string.Join(",", ops2.Select(x => $"{(x.Dl ? "S2C" : "C2S")} 0x{x.Op:X4}"))
+				+ "," + string.Join(",", subs2.Select(x => $"{(x.Dl ? "S2C" : "C2S")} 0x{x.Op:X4}:0x{x.Sub:X8}")));
 			foreach (var c in captures.OrderBy(c => c.Name, StringComparer.Ordinal))
 			{
-				var counts = perCap[c.Name];
-				Console.WriteLine(Csv(c.Name) + "," + string.Join(",", ordered.Select(x => counts.TryGetValue((x.Dl, x.Op), out var n) ? n : 0)));
+				var op = perCapOp[c.Name];
+				var sub = perCapSub[c.Name];
+				Console.WriteLine(Csv(c.Name) + ","
+					+ string.Join(",", ops2.Select(x => op.TryGetValue((x.Dl, x.Op), out var n) ? n : 0))
+					+ "," + string.Join(",", subs2.Select(x => sub.TryGetValue((x.Dl, x.Op, x.Sub), out var n) ? n : 0)));
 			}
 		}
 

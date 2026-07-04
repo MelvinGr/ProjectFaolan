@@ -6,12 +6,11 @@ namespace Faolan.Core.Database.Tables
 	// referenced RDB object's own name= (texscript for tattoos, monsterdata for heads) and the swatch Color from the
 	// creator XML. The morph slider bounds and the height range ride as special Category rows (Min/Max set). This is
 	// what the Faolan.Web appearance editor reads for its race/sex-gated pickers (replacing a runtime XML parse).
-	public class AppearanceChoice
+	public class AppearanceChoice : BaseEntity
 	{
 		public byte Race { get; set; }
 
 		public byte Sex { get; set; }
-		public int Id { get; set; }
 		public int Max { get; set; }
 
 		// Bounds for the morph/height rows (in CharacterBody signed-slider units for morphs); 0 for option rows.
