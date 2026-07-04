@@ -207,6 +207,27 @@ trivially. The generic_stats decode is kept below only for the record.
 Activate. The post-ready `SetStat(0x43)=Class` force-feed remains the correct, validated delivery; retiring it
 requires identifying and replicating Activate's derivation source (open, GUI-Ghidra).
 
+### CONFIRMED CONCLUSION: the class is client-derived from char-select, NOT on the GameServer wire (2026-07-05)
+
+Two independent proofs settle it:
+
+1. **Two-class live confirmation.** Live `/proc/mem` reads of two retail chars: Necromancer `stat 0x43 = 41`
+   (`0x29`), Demonologist `stat 0x43 = 44` (`0x2C`) — both exactly our `Class` enum. Mechanism + id-space done.
+2. **Necro-vs-Demo capture differential (decisive).** Across the two lvl80 login captures, there is **no
+   `(iirType, offset)` — from record start OR end, in ANY `0x2000` record — where the necro stream holds `41`
+   and the demo stream holds `44`.** So no GameServer download record carries the class as a field. (The small
+   20-byte `[handle][index]` records that briefly looked like a hit are just a `0..47` slot enumeration; the
+   `0x737A6DF9` snapshot stat block is `[id][value]` pairs but omits `0x43`.)
+
+Therefore the in-world class is **derived client-side from the char-select `Class`** (delivered earlier on the
+**PlayerAgent char-list**, which every capture/our server sends correctly) — the client caches it and applies it
+as `stat 0x43` when it Activates the player spawn. The GameServer login stream has no class at all. This is why
+"retail computes it client-side" (the original 2026-06-19 hypothesis) was right, and pins the source to the
+char-select cache. **Our force-feed is the functional equivalent** of that client-side application; a
+"retail-accurate" version would mean getting the client to run its own char-select→`0x43` caching on our
+world-entry path (handshake-dependent, likely not worth it). Recommendation: **keep the interim, close the #304
+sub-item as won't-fix-by-design.**
+
 ### (superseded) generic_stats decode — kept for reference
 
 The CoreCharacter's `generic_stats` vector is read by `CoreCharacterFullUpdateIIR::ReadSubClass`
