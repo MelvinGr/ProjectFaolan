@@ -51,6 +51,9 @@ namespace Faolan.Importer.Cli
 				case "opcodes-csv":
 					OpcodeCsv(LoadCaptures(capturesDir));
 					return 0;
+				case "subopcodes-csv":
+					SubOpcodeCsv(LoadCaptures(capturesDir), arg);
+					return 0;
 				case "worldobj":
 					await WorldObj(dbPath, arg ?? "hangingwoman");
 					return 0;
@@ -87,6 +90,42 @@ namespace Faolan.Importer.Cli
 				default:
 					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: conversation-states, anim, worldobj, spell-fields, rdb-assets.");
 					return 1;
+			}
+		}
+
+		// Matrix CSV for ONE opcode (arg, e.g. "0x2000"; default 0x2000): one row per capture, one column per
+		// (direction, sub-opcode) seen under that opcode, cell = packet count. This is the drill-down of opcodes-csv -
+		// e.g. every S2C 0x2000 IIR type as its own column. High-cardinality opcodes (0x2008/0x2020 handles) will be wide.
+		private static void SubOpcodeCsv(IReadOnlyList<NamedCapture> captures, string arg)
+		{
+			var op = string.IsNullOrWhiteSpace(arg)
+				? 0x2000u
+				: Convert.ToUInt32(arg.Trim().Replace("0x", "", StringComparison.OrdinalIgnoreCase), 16);
+
+			var perCap = new Dictionary<string, Dictionary<(bool Dl, uint Sub), int>>();
+			var cols = new SortedSet<(uint Sub, bool Dl)>();
+			foreach (var c in captures)
+			{
+				var counts = new Dictionary<(bool Dl, uint Sub), int>();
+				foreach (var p in c.Packets)
+				{
+					if (p.Opcode != op)
+						continue;
+					counts[(p.IsDownload, p.SubOpcode)] = counts.GetValueOrDefault((p.IsDownload, p.SubOpcode)) + 1;
+					cols.Add((p.SubOpcode, p.IsDownload));
+				}
+				perCap[c.Name] = counts;
+			}
+
+			var ordered = cols.ToList();
+			static string Csv(string s) => s.Contains(',') || s.Contains('"') ? $"\"{s.Replace("\"", "\"\"")}\"" : s;
+
+			Console.Error.WriteLine($"opcode 0x{op:X4}: {ordered.Count} distinct (dir,sub) columns across {captures.Count} captures");
+			Console.WriteLine("capture," + string.Join(",", ordered.Select(x => $"{(x.Dl ? "S2C" : "C2S")} 0x{x.Sub:X8}")));
+			foreach (var c in captures.OrderBy(c => c.Name, StringComparer.Ordinal))
+			{
+				var counts = perCap[c.Name];
+				Console.WriteLine(Csv(c.Name) + "," + string.Join(",", ordered.Select(x => counts.TryGetValue((x.Dl, x.Sub), out var n) ? n : 0)));
 			}
 		}
 
