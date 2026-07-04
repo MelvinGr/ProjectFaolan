@@ -70,6 +70,9 @@ namespace Faolan.Importer.Cli
 				case "item-template":
 					ItemTemplate(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", dbPath, arg ?? "", GetOption(args, "--out"));
 					return 0;
+				case "ability-names":
+					AbilityNames(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB", dbPath);
+					return 0;
 				case "rdb-types":
 					RdbTypes(GetOption(args, "--rdb") ?? "/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB");
 					return 0;
@@ -154,6 +157,39 @@ namespace Faolan.Importer.Cli
 			return i >= 0 && i + 1 < args.Length
 				? args[i + 1]
 				: null;
+		}
+
+		// Decrypts each Ability's RDB 1000020 entry with its stored Data1..4 TEA key (same scheme as item templates, #137)
+		// and dumps the printable strings - the ability NAME lives in that (encrypted-but-key-available) template.
+		private static void AbilityNames(string rdbDir, string dbPath)
+		{
+			using var db = new DatabaseContext(new DbContextOptionsBuilder<DatabaseContext>().UseSqlite($"Data Source={dbPath}").Options);
+			using var rdb = new RdbReader(rdbDir);
+			foreach (var a in db.Abilities.OrderBy(x => x.Slot).ToList())
+			{
+				var key = new[] { a.Data1, a.Data2, a.Data3, a.Data4 };
+				if (!rdb.TryGet(1000020, a.Id, out var e) || e.File == 0xff || e.Size == 0)
+				{
+					Console.WriteLine($"0x{a.Id:X8} slot={a.Slot,-5} start={(a.IsStartingAbility ? 1 : 0)} (no 1000020 entry)");
+					continue;
+				}
+
+				byte[] body;
+				try
+				{
+					body = rdb.ReadDecrypted(e, key);
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"0x{a.Id:X8} (decrypt failed: {ex.Message})");
+					continue;
+				}
+
+				var name = RdbItemImporter.ExtractName(body);
+				var fields = ReadIncreasingFields(body.AsSpan(12));
+				var fieldStr = string.Join(" ", fields.OrderBy(f => f.Key).Select(f => $"{f.Key}={f.Value}"));
+				Console.WriteLine($"0x{a.Id:X8} slot={a.Slot,-5} start={(a.IsStartingAbility ? 1 : 0)} \"{name}\"  | {fieldStr}");
+			}
 		}
 
 		private static void ItemTemplate(string rdbDir, string dbPath, string arg, string outDir = null)
