@@ -283,6 +283,21 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			return new InventoryPacketParts(prefix, root, SnapshotTails.Deserialize(tails));
 		}
 
+		// Parses ONLY the inventory root protobuf (skips the tails). The tails of a high-level caster's snapshot carry
+		// the whole spellbook/pet/quest data and can trip SnapshotTails.Deserialize; callers that only need the
+		// inventory (the importer's carried-inventory pass) must not lose the root to a tails-parse failure.
+		public static ProtoMessage ParseInventoryRoot(FaolanStream bodyStream)
+		{
+			var inventoryRootOffset = FindInventoryRootOffset(bodyStream);
+			var rootEndOffset = FindInventoryRootEndOffset(bodyStream, inventoryRootOffset);
+
+			bodyStream.Position = (uint)inventoryRootOffset;
+			var rootBytes = ReadExact(bodyStream, checked((int)(rootEndOffset - inventoryRootOffset)));
+
+			using var rootStream = new MemoryStream(rootBytes, false);
+			return ProtoMessage.Parse(rootStream);
+		}
+
 		public static TailScanResult ReadTailRecords(FaolanStream tailsStream)
 		{
 			var records = new List<ITailRecord>();

@@ -428,8 +428,8 @@ namespace Faolan.Importer.Captures
 					stream.ReadUInt32(); // subop
 					stream.ReadUInt32(); // ack
 					stream.ReadUInt32(); // instance
-					var parts = InventorySnapshotInspector.ParseInventoryPacketBody(stream);
-					root = ((ReadOnlySpan<byte>)parts.Root.ToArray()).FromProtobuf<ProtoFullCharacterIIR>();
+					var rootMessage = InventorySnapshotInspector.ParseInventoryRoot(stream);
+					root = ((ReadOnlySpan<byte>)rootMessage.ToArray()).FromProtobuf<ProtoFullCharacterIIR>();
 					break;
 				}
 				catch
