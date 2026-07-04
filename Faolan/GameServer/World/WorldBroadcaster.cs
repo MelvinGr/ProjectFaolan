@@ -543,23 +543,6 @@ namespace Faolan.GameServer.World
 				entity.SpawnBody = spawnPacket[bodyStart..];
 		}
 
-		// Records the playfield token the client will associate with this zone, read from the 0x737A6DF9 snapshot we
-		// actually send (so the despawn token matches what the client learned, by construction; see WorldDespawn). This
-		// OVERRIDES the token WorldState minted at zone creation - for a replayed playfield the burst's value is the
-		// authoritative one (the client learned it from the burst, not from us). Idempotent: the token is constant per
-		// playfield, so a re-entry re-extracts the same value; logged only when it actually changes.
-		public void CapturePlayfieldToken(uint mapId, uint instanceId, ReadOnlySpan<byte> snapshotBody)
-		{
-			if (!WorldDespawn.TryExtractPlayfieldToken(snapshotBody, out var token))
-				return;
-
-			var zone = _sim.World.ZoneFor(mapId, instanceId);
-			if (zone.PlayfieldToken == token)
-				return;
-
-			zone.PlayfieldToken = token;
-			_logger.LogInformation("World: map {Map} instance 0x{Instance:X8} playfield token = 0x{Token:X8} (from burst; overrides minted fallback).", mapId, instanceId, token);
-		}
 
 		// A player closed the loot window (top-level 0x2044): consume the bag - fade it out for nearby players and drop
 		// it from the model.

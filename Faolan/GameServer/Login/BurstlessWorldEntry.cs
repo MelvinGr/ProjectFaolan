@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -51,11 +50,11 @@ namespace Faolan.GameServer
 		}
 
 		private byte[] BuildBurstlessSnapshot(INetworkClient client, CharacterEquipment equipment, CharacterInventory[] inventoryRows, uint[] characterTags, IReadOnlyList<QuestDefinition> snapshotQuests,
-			QuestDefinition primaryQuest, IReadOnlyList<uint> knownSpellIds, IReadOnlyList<(CharacterStatId Id, uint Value)> statSheet)
+			QuestDefinition primaryQuest, IReadOnlyList<uint> knownSpellIds, IReadOnlyList<(CharacterStatId Id, uint Value)> statSheet, uint? playfieldToken)
 		{
 			var instance = client.Session.Account.ClientInstance;
 			var root = BuildBurstlessSnapshotRoot(instance, equipment, inventoryRows, characterTags);
-			var tails = SnapshotTailsBuilder.BuildFromScratch(snapshotQuests, primaryQuest, client.Session.Character, instance, null, knownSpellIds, statSheet);
+			var tails = SnapshotTailsBuilder.BuildFromScratch(snapshotQuests, primaryQuest, client.Session.Character, instance, playfieldToken, knownSpellIds, statSheet);
 			return BuildWorldEntrySnapshot(client, root, tails);
 		}
 
@@ -178,16 +177,15 @@ namespace Faolan.GameServer
 			var statSheet = character != null
 				? (await Database.GetCharacterStats(character.Id)).Select(s => (s.StatId, s.Value)).ToArray()
 				: [];
-			var snapshot = BuildBurstlessSnapshot(client, equipment, inventoryRows, characterTags, snapshotQuests, primaryQuest, knownSpellIds, statSheet);
-			// Record this playfield's despawn token from the snapshot we actually send (WorldDespawn), as the burst path does.
-			// This MUST happen before the world objects are built: the snapshot establishes the player's current playfield
-			// INSTANCE token, and a spawn renders only when its 0x18 transform token matches it. NPCs already stream with
-			// this live token (and render); world objects used to be stamped with the MapChange ZONE id (BeachPlayfieldId)
-			// instead, so they landed in a different playfield and the client culled them - the beach decor, incl.
-			// Casilda's hanging chain, never rendered (#267). Stamp them with the same live token the NPCs use.
-			var snapBodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(snapshot.AsSpan(8, 4));
-			_broadcaster.CapturePlayfieldToken(mapId, instanceId, snapshot.AsSpan(snapBodyStart));
-			var playfieldToken = _simulation.World.ZoneFor(mapId, instanceId).PlayfieldToken;
+			// The playfield-instance token is BeachPlayfieldId - the ONE value already threaded through the map-change, the
+			// player-spawn transform, and the world objects. Thread it into the SNAPSHOT (stat slot 0xBF, via
+			// BuildFromScratch) and the zone as well, so all of them AGREE BY CONSTRUCTION. The client scopes the character
+			// to the playfield it loaded, so a snapshot token that disagrees with the map-change/spawn hides the abilities
+			// tab (a server-minted id fails exactly this way). No more extract-the-token-back-out-of-the-snapshot. (Per-map
+			// sourcing is a follow-up - the beach id is used for every map for now, exactly as the spawn/map-change do.)
+			var playfieldToken = BeachPlayfieldId;
+			_simulation.World.ZoneFor(mapId, instanceId).PlayfieldToken = playfieldToken;
+			var snapshot = BuildBurstlessSnapshot(client, equipment, inventoryRows, characterTags, snapshotQuests, primaryQuest, knownSpellIds, statSheet, playfieldToken);
 
 			var toSend = new List<byte[]>(worldObjectRows.Length + 5) { BuildMapChange(client) };
 			toSend.AddRange(BuildBurstlessWorldObjects(client, worldObjectRows, playfieldToken));

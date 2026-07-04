@@ -114,12 +114,10 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 			List<(uint Id, uint Value)> sheet;
 			if (imported)
 			{
-				// The character's REAL captured sheet, with the SESSION/MAP-volatile 0xBF (playfield/position - a stale
-				// one hides the abilities tab, verified by bisecting NecroL80's sheet) and the character-derived XP-companion
-				// slots (0x15E MaxExp, 0x39) reset to baseline. XP (0x34) itself is authored positionally below.
+				// The character's REAL captured sheet, with the character-derived XP-companion slots (0x15E MaxExp, 0x39)
+				// reset to baseline. XP (0x34) is authored positionally below; the playfield-token slot (0xBF) is set for
+				// BOTH paths just below (from the live zone token, not the stale captured one).
 				sheet = [.. statSheet.Select(s => ((uint)s.Id, s.Value))];
-				foreach (var id in TailsStatBlock.VolatileStatIds)
-					SetSheet(sheet, id, TailsStatBlock.SkeletonValueOf(id));
 				SetSheet(sheet, (uint)CharacterStatId.MaxExp, TailsStatBlock.SkeletonValueOf((uint)CharacterStatId.MaxExp));
 				SetSheet(sheet, 0x39, TailsStatBlock.SkeletonValueOf(0x39));
 			}
@@ -131,6 +129,11 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 				if (character != null)
 					SetSheet(sheet, (uint)CharacterStatId.Level, character.Level);
 			}
+
+			// The playfield-instance token (stat slot 0xBF) is SESSION/MAP state, not a character stat: write the LIVE
+			// zone token into it - so the client, the world objects, and the despawns all scope to the SAME token by
+			// construction (no post-hoc patch). Falls back to the fresh/beach value when no live token is given (golden).
+			SetSheet(sheet, TailsStatBlock.PlayfieldTokenStatId, playfieldToken ?? TailsStatBlock.SkeletonValueOf(TailsStatBlock.PlayfieldTokenStatId));
 
 			var block = TailsStatBlock.CreateBlock(sheet, knownList);
 
@@ -154,16 +157,11 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 
 			var statBytes = TailsStatBlock.Serialize(block);
 
-			byte[] tails = [.. quest, .. AccessWindowTable, .. statBytes];
-
-			// The tails are fully addressed to the live player already: the quest portion is BUILT with `instance`, and
-			// the access-window + stat regions carry no per-session ids (both are game-static). Only this session's live
-			// playfield token still needs stamping. (The old ReplaceRawUInt32 template-instance re-address is retired -
-			// it dated from when the stat region was the BeachTailsTemplate.bin blob, which had Strie's instance baked in.)
-			if (playfieldToken.HasValue)
-				WorldDespawn.TryReplacePlayfieldToken(tails, playfieldToken.Value);
-
-			return tails;
+			// The tails are FULLY CONSTRUCTED for the live session - no post-hoc byte-patch: the quest portion is built
+			// with `instance`, the access-window + stat regions carry no per-session ids, and the playfield token is
+			// authored into the stat block above (from the live zone). (Both the old ReplaceRawUInt32 template-instance
+			// re-address and the WorldDespawn.TryReplacePlayfieldToken stamp are retired.)
+			return [.. quest, .. AccessWindowTable, .. statBytes];
 		}
 
 		// Sets a stat id's value at EVERY occurrence in the sheet (a few ids appear in both StatList#1 and StatList#2).

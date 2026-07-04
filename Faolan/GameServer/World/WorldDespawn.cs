@@ -60,17 +60,8 @@ namespace Faolan.GameServer.World
 			return true;
 		}
 
-		// Overwrites the marker-framed playfield token in a snapshot tails/body buffer IN PLACE (used when assembling
-		// tails from the server-owned template, whose baked-in token is the template capture's - the live map's token
-		// must be stamped over it). Returns false (buffer untouched) when the framing isn't present.
-		public static bool TryReplacePlayfieldToken(byte[] snapshotBody, uint token)
-		{
-			if (!TryLocateFramedToken(snapshotBody, out _, out var tokenStart))
-				return false;
-
-			BinaryPrimitives.WriteUInt32BigEndian(snapshotBody.AsSpan(tokenStart, 4), token);
-			return true;
-		}
+		// (The playfield token is now authored INTO the snapshot at build time - SnapshotTailsBuilder writes the live
+		// zone token into stat slot 0xBF - so the former TryReplacePlayfieldToken in-place stamp is retired.)
 
 		private static bool TryLocateFramedToken(ReadOnlySpan<byte> snapshotBody, out uint token, out int tokenStart)
 		{

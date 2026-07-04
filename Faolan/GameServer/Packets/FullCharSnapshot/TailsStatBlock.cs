@@ -31,7 +31,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		[
 			(Stat.Unknown0, 0x0), (Stat.Unknown1, 0x0), (Stat.Unknown2, 0x0), (Stat.Unknown3, 0x0),
 			(Stat.Unknown4, 0x1), (Stat.Unknown5, 0x0), (Stat.Unknown6, 0x2), (Stat.Unknown7, 0x2),
-			(Stat.Unknown8, 0x4FE428), (Stat.Unknown9, 0x0), (Stat.HealthMax, 0x2328), (Stat.HealthCurrent, 0x2648),
+			(Stat.PlayfieldToken, 0x4FE428), (Stat.Unknown9, 0x0), (Stat.HealthMax, 0x2328), (Stat.HealthCurrent, 0x2648),
 			(Stat.Level, 0x1), (Stat.Exp, 0x0), (Stat.MaxExp, 0x64), (Stat.Unknown10, 0x0),
 			(Stat.Unknown11, 0x0)
 		];
@@ -65,13 +65,12 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// records - is built inline by CreateBlock, so it is no longer spliced in after the fact).
 		private static readonly uint[] TrailerRest = [0x1, 0x1000000, 0x0, 0x0, 0x0, 0x0];
 
-		// Stat slots that are SESSION/MAP-volatile, NOT stable character state: the captured value belongs to the retail
-		// session it was recorded in, so authoring from an imported sheet must NOT replay it - it is reset to the fresh
-		// baseline (SkeletonValueOf). 0xBF is the playfield-token/position slot; replaying a stale one HIDES the entire
-		// in-client abilities tab (bisected on NecroL80's level-80 sheet, 2026-07-04). The other huge captured values
-		// (0x25F the documented session slot, 0x3C/0x44A/0x5B/0x3D handle-like) are left imported for now - they do not
-		// misbehave observably; add them here if a stale one is found to break something.
-		public static readonly uint[] VolatileStatIds = [0xBF];
+		// The stat slot whose VALUE is the playfield-instance token: in the snapshot the token is framed by the stat ids
+		// 0xBF..0x40B (see WorldDespawn). This is SESSION/MAP state, NOT a character stat - the snapshot is BUILT with the
+		// live zone's minted token (SnapshotTailsBuilder passes it in), never a captured one. Replaying a stale token
+		// HIDES the entire in-client abilities tab (bisected on NecroL80's level-80 sheet, 2026-07-04) and mis-scopes
+		// despawns. SkeletonValueOf (the beach 0x4FE428) is the fresh/fallback value when no live token is given.
+		public const uint PlayfieldTokenStatId = (uint)Stat.PlayfieldToken;
 
 		// The fresh-skeleton baseline value for a stat id (0 if absent). Used to reset the volatile slots above.
 		public static uint SkeletonValueOf(uint statId)

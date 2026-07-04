@@ -46,10 +46,15 @@ namespace Faolan.Core.Enums
 		Wisdom = 0x032A,
 		Dexterity = 0x032E,
 
+		// The VALUE at this slot in the FullChar-snapshot stat sheet is the PLAYFIELD-INSTANCE token (framed by stat ids
+		// 0xBF..0x40B in the snapshot; see WorldDespawn) - session/map state, not a real character stat. The snapshot is
+		// built with the live zone's token here.
+		PlayfieldToken = 0x00BF,
+
 		// Undecoded slots of the 0x737A6DF9 tails stat sheet, numbered Unknown{i} so the whole block is enumerable
 		// (StatBlockSchema). Values are the raw wire stat ids; rename to a real name as each is decoded.
 		Unknown0 = 0x252, Unknown1 = 0x253, Unknown2 = 0x254, Unknown3 = 0x255, Unknown4 = 0x000, Unknown5 = 0x0E0,
-		Unknown6 = 0x0AE, Unknown7 = 0x0AD, Unknown8 = 0x0BF, Unknown9 = 0x40B, Unknown10 = 0x039, Unknown11 = 0x0A9,
+		Unknown6 = 0x0AE, Unknown7 = 0x0AD, Unknown9 = 0x40B, Unknown10 = 0x039, Unknown11 = 0x0A9,
 		Unknown12 = 0x534, Unknown13 = 0x16B, Unknown14 = 0x44A, Unknown15 = 0x163, Unknown16 = 0x449, Unknown17 = 0x0A5,
 		Unknown18 = 0x241, Unknown19 = 0x113, Unknown20 = 0x04F, Unknown21 = 0x00C, Unknown22 = 0x022, Unknown23 = 0x03B,
 		Unknown24 = 0x00B, Unknown25 = 0x03A, Unknown26 = 0x021, Unknown27 = 0x04B, Unknown28 = 0x0D7, Unknown29 = 0x185,
