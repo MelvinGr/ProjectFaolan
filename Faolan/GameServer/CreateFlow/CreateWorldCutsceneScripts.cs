@@ -129,11 +129,11 @@ namespace Faolan.GameServer
 
 			// (c) Start the destiny cutscene (Scry scripts only - the begin marker, the scene-load character_creation
 			// step, and the two opening script groups). The per-callback steps follow via SendCreateCutsceneStep.
+			// EnergyIIR (0x40749B8A) seed on the avatar - constructed via CreateEditorRecordBuilder (byte-exact-locked
+			// by CreateEditorRecordTests), was a verbatim blob. flag=1, value=0x36B0.
 			await new PacketStream()
 				.WriteHeader(ConanEndpoints.EndpointBytes(ConanEndpoints.GameAgentType, 0x08), ConanEndpoints.EndpointBytes(ConanEndpoints.GameInterfaceType, id), GameServerCarrierOpcodes.IirCarrier)
-				.WriteArray(0x00, 0x00, 0x00, 0x11, 0x40, 0x74, 0x9B, 0x8A, 0x00, 0x00, 0xC3, 0x50)
-				.WriteUInt32(id)
-				.WriteArray(0x01, 0x00, 0x00, 0x36, 0xB0)
+				.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000RespondsOpcodes.EnergyIIR).WriteArray(CreateEditorRecordBuilder.BuildEnergyIir(CreateEditorRecordBuilder.CharacterWireType, id, 0x01, 0x36B0)))
 				.SendAsync(client);
 			await SendScry(client, ScryScript.BuildStartScriptGroup(id, 48126));
 			await SendScry(client,
