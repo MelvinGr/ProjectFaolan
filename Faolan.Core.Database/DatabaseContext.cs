@@ -202,16 +202,9 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<Character>().HasMany(c => c.Tags).WithOne(t => t.Character).HasForeignKey(t => t.CharacterId).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Character>().HasMany(c => c.RespawnPoints).WithOne(r => r.Character).HasForeignKey(r => r.CharacterId).OnDelete(DeleteBehavior.Cascade);
 
-			// Learned spells delete with the character; a character knows a given spell at most once.
+			// Learned spells delete with the character (a character knows a given spell at most once - now the
+			// (CharacterId, SpellId) compound primary key).
 			modelBuilder.Entity<CharacterSpell>().HasOne(s => s.Character).WithMany(c => c.Spells).OnDelete(DeleteBehavior.Cascade);
-			modelBuilder
-				.Entity<CharacterSpell>()
-				.HasIndex(s => new
-				{
-					s.CharacterId,
-					s.SpellId
-				})
-				.IsUnique();
 
 			// Guild membership: deleting a guild releases its members back to guildless instead of deleting them.
 			modelBuilder.Entity<Character>().HasOne(c => c.Guild).WithMany(g => g.Members).OnDelete(DeleteBehavior.SetNull);
@@ -241,15 +234,7 @@ namespace Faolan.Core.Database
 				.IsUnique();
 			modelBuilder.Entity<ConversationNode>().HasMany(n => n.Packets).WithOne(p => p.Node).OnDelete(DeleteBehavior.Cascade);
 
-			// A class<->spell access row is unique per (Class, SpellId) - re-importing the same capture upserts.
-			modelBuilder
-				.Entity<ClassSpell>()
-				.HasIndex(s => new
-				{
-					s.Class,
-					s.SpellId
-				})
-				.IsUnique();
+			// A class<->spell access row is unique per (Class, SpellId) - now the compound primary key.
 			// SpellId references the Spell catalog (the importer catalogs every harvested spell id). Restrict so a
 			// spell can't be deleted out from under a class loadout.
 			modelBuilder.Entity<ClassSpell>().HasOne(s => s.Spell).WithMany().HasForeignKey(s => s.SpellId).OnDelete(DeleteBehavior.Restrict);

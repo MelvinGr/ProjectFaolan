@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Faolan.Core.Database.Tables
@@ -8,7 +9,8 @@ namespace Faolan.Core.Database.Tables
 	// GrantCharacterSpells replays these rows on world entry, the spell counterpart to GrantCharacterAbilities. The
 	// grant packet was decoded in #73; #74 actually grants the spells. Captured characters are seeded with their
 	// observed learned set (CaptureSpellImporter, attributed via the grant's RpcHeader receiver = the character id).
-	public class CharacterSpell : BaseEntity
+	[PrimaryKey(nameof(CharacterId), nameof(SpellId))]
+	public class CharacterSpell
 	{
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; }

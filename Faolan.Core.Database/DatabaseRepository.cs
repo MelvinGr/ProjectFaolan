@@ -551,7 +551,7 @@ namespace Faolan.Core.Database
 		public async Task<CharacterSpell[]> GetCharacterSpells(uint characterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.CharacterSpells.Where(s => s.CharacterId == characterId).OrderBy(s => s.Id).ToArrayAsync();
+			return await ctx.CharacterSpells.Where(s => s.CharacterId == characterId).OrderBy(s => s.SpellId).ToArrayAsync();
 		}
 
 		// The character's stat sheet (CharacterStat) in wire order (Ordinal) - the FullChar snapshot's stat block,
@@ -567,7 +567,7 @@ namespace Faolan.Core.Database
 		public async Task<CharacterAbility[]> GetCharacterAbilities(uint characterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.CharacterAbilities.Where(a => a.CharacterId == characterId).OrderBy(a => a.Id).ToArrayAsync();
+			return await ctx.CharacterAbilities.Where(a => a.CharacterId == characterId).OrderBy(a => a.AbilityId).ToArrayAsync();
 		}
 
 		// The character's combo book (CharacterCombo) - re-emitted on login by GrantCharacterCombos (a max-level
@@ -575,7 +575,7 @@ namespace Faolan.Core.Database
 		public async Task<CharacterCombo[]> GetCharacterCombos(uint characterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.CharacterCombos.Where(c => c.CharacterId == characterId).OrderBy(c => c.Id).ToArrayAsync();
+			return await ctx.CharacterCombos.Where(c => c.CharacterId == characterId).OrderBy(c => c.ComboId).ToArrayAsync();
 		}
 
 		public async Task<uint[]> GetCharacterTags(uint characterId)

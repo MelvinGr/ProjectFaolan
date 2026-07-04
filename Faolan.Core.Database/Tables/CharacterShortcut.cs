@@ -8,8 +8,8 @@ namespace Faolan.Core.Database.Tables
 	// (observed ranges 0x64.. and 0x4E20.. - bar pages); type 4 = ability, 2/3 observed for items/other.
 	// NOTE: persistence only for now - how the bar is RESTORED at login is undecoded (RequestShortcutBar gets
 	// no direct reply in retail; the restore most likely rides inside the FullChar 0x737A6DF9 snapshot).
-	[Index(nameof(CharacterId), nameof(Slot), IsUnique = true)]
-	public class CharacterShortcut : BaseEntity
+	[PrimaryKey(nameof(CharacterId), nameof(Slot))]
+	public class CharacterShortcut
 	{
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; }

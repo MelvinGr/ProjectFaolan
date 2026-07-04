@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Faolan.Core.Database.Tables
@@ -7,7 +8,8 @@ namespace Faolan.Core.Database.Tables
 	// rows; worn items (which also drive the spawn's appearance) stay in CharacterEquipment. Replaces the opaque
 	// Bag/Quest/Resources serialized strings on CharacterEquipment with structured rows. See
 	// docs/archive/player-spawn-generation-plan.md.
-	public class CharacterInventory : BaseEntity
+	[PrimaryKey(nameof(CharacterId), nameof(Container), nameof(Slot))]
+	public class CharacterInventory
 	{
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; }

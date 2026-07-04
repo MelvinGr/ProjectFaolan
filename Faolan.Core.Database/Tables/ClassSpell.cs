@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Faolan.Core.Enums;
 
 namespace Faolan.Core.Database.Tables
@@ -9,7 +10,8 @@ namespace Faolan.Core.Database.Tables
 	// classes/levels we have beach captures for - the L1 starters); a class-aware ellatha scrape fills the rest later.
 	//
 	// Supersedes ClassStartingSpell (which carried a redundant, always-1 Level column and only modelled the L1 grant).
-	public class ClassSpell : BaseEntity
+	[PrimaryKey(nameof(Class), nameof(SpellId))]
+	public class ClassSpell
 	{
 		[ConstrainToEnumValues]
 		public Class Class { get; set; }

@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Faolan.Core.Database.Tables
@@ -6,7 +7,8 @@ namespace Faolan.Core.Database.Tables
 	// entry table, ascending ids, 0x3F1-terminated on the wire). Per-character progression data - fresh
 	// characters start with ~20 ids, geared ones have 40+. See docs/archive/player-spawn-generation-plan.md
 	// "VALIDATED GRAMMAR" / [[CharacterAttribute]].
-	public class CharacterSkill : BaseEntity
+	[PrimaryKey(nameof(CharacterId), nameof(SkillId))]
+	public class CharacterSkill
 	{
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; }

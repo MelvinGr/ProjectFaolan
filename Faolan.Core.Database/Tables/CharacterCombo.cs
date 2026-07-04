@@ -9,8 +9,8 @@ namespace Faolan.Core.Database.Tables
 	// never dings, so without a persisted set it would have an EMPTY combo book on login. This records WHICH combos a
 	// character has so GrantCharacterCombos can re-emit them on world entry. Captured characters are seeded from their
 	// observed ComboBookIIR grants (CaptureAbilityImporter, attributed via the grant's RpcHeader receiver = character id).
-	[Index(nameof(CharacterId), nameof(ComboId), IsUnique = true)]
-	public class CharacterCombo : BaseEntity
+	[PrimaryKey(nameof(CharacterId), nameof(ComboId))]
+	public class CharacterCombo
 	{
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; }

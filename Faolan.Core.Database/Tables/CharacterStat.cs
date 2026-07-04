@@ -10,8 +10,8 @@ namespace Faolan.Core.Database.Tables
 	// skeleton + targeted patches. Ordinal preserves wire order (statIds repeat across/within the lists, so it is the
 	// key, not StatId). Imported from the character's captured login snapshot (CaptureCharacterImporter); a freshly
 	// created character is seeded with the class default. Unnamed stat ids are surfaced as Unknown{ordinal} in tooling.
-	[Index(nameof(CharacterId), nameof(Ordinal), IsUnique = true)]
-	public class CharacterStat : BaseEntity
+	[PrimaryKey(nameof(CharacterId), nameof(Ordinal))]
+	public class CharacterStat
 	{
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; }

@@ -10,8 +10,8 @@ namespace Faolan.Core.Database.Tables
 	// identity, name by id in the client RDB) lives in the Abilities catalog; this just records WHICH abilities a
 	// character knows. Captured characters are seeded from their observed 0x2052 grants (CaptureAbilityImporter, attributed
 	// via the grant's RpcHeader receiver = the character id) - so the action bar is pure shortcuts, not the grant source.
-	[Index(nameof(CharacterId), nameof(AbilityId), IsUnique = true)]
-	public class CharacterAbility : BaseEntity
+	[PrimaryKey(nameof(CharacterId), nameof(AbilityId))]
+	public class CharacterAbility
 	{
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; }
