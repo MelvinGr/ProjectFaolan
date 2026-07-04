@@ -197,7 +197,7 @@ namespace Faolan.GameServer
 
 			// First-entry seeding (#74/#71): a freshly-created character with an empty action bar gets its class's
 			// starting spells (persisted) + the default bar layout, so the spell grant below sends them this session.
-			await EnsureStartingLoadout(client);
+			await EnsureCharacterLoadout(client);
 
 			// #237: re-grant the character's learned SPELLS (DispatchLearnSpell 0x200A) BEFORE the world snapshot, so
 			// the client absorbs them as part of the initial load and stays SILENT - retail sends them pre-entry
@@ -205,7 +205,7 @@ namespace Faolan.GameServer
 			// (the old PostReadyFollowUp call) made the client treat each as a fresh learn and re-toast "You have
 			// learned a new spell" on EVERY login. Done here, the shared world-entry path, so it's silent on login AND
 			// on changemap/teleport re-entry. (Abilities 0x2052 stay post-0x2024 - they don't toast.)
-			await GrantStartingSpells(client);
+			await GrantCharacterSpells(client);
 
 			var mapId = client.Session.Character.MapId;
 

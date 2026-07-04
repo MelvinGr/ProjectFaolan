@@ -538,7 +538,7 @@ namespace Faolan.Core.Database
 			return await ctx.CharacterShortcuts.Where(s => s.CharacterId == characterId).OrderBy(s => s.Slot).ToArrayAsync();
 		}
 
-		// The spells a character has learned; GrantStartingSpells replays these as DispatchLearnSpell grants on login.
+		// The spells a character has learned; GrantCharacterSpells replays these as DispatchLearnSpell grants on login.
 		public async Task<CharacterSpell[]> GetCharacterSpells(uint characterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();

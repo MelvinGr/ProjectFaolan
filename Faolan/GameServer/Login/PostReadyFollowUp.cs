@@ -229,10 +229,10 @@ namespace Faolan.GameServer
 				Logger.LogInformation("Existing-character login: sending 0x2024 ReadyForPlayScreen after the spawn handshake.");
 				await SendReadyForPlayScreen(client);
 				// Retail grants the starting abilities (0x2052) right after 0x2024, not during world entry.
-				await GrantStartingAbilities(client);
+				await GrantCharacterAbilities(client);
 				// NB the learned SPELLS (DispatchLearnSpell 0x200A) are NOT re-granted here: they ride the FullChar
 				// snapshot's known-spell list (#74/#71) so the client already knows them when it enters the world, and
-				// the pre-snapshot GrantStartingSpells re-send is absorbed silently. (The old PendingSpellLearns
+				// the pre-snapshot GrantCharacterSpells re-send is absorbed silently. (The old PendingSpellLearns
 				// post-ready re-announce - needed only while the snapshot carried an empty known-list - re-toasted "You
 				// have learned a new spell" on every login; the known-list makes it redundant.)
 				// ...re-applies the persistent shield self-buff every character carries (#221). This flush is also

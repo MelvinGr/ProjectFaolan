@@ -147,7 +147,7 @@ namespace Faolan.Importer.Captures
 		}
 
 		// Seeds each captured character's LEARNED spell set (CharacterSpell rows) from the DispatchLearnSpell grants
-		// in the captures, so GrantStartingSpells re-grants them on login (#74). Retail re-sends a caster's whole
+		// in the captures, so GrantCharacterSpells re-grants them on login (#74). Retail re-sends a caster's whole
 		// learned set on every world entry, so a capture's grants ARE that character's spellbook. Attributed to the
 		// character via the grant's RpcHeader receiver instance (= character id). Only characters already in the DB
 		// are touched (CaptureCharacterImporter materializes them first); idempotent (skips spells already recorded).

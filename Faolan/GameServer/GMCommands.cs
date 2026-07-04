@@ -22,7 +22,7 @@ namespace Faolan.GameServer
 {
 	partial class GameServerListener
 	{
-		private const uint MountShortcutSlot = 0x4E2C; // a free special-bar slot (the 0x4E20+ special bar EnsureStartingLoadout uses)
+		private const uint MountShortcutSlot = 0x4E2C; // a free special-bar slot (the 0x4E20+ special bar EnsureCharacterLoadout uses)
 
 		// .grantmount [mountIdHex]  - put a catalog mount on the player's action bar so they can SUMMON it themselves
 		// (#27), the client-initiated flow. Persists a CharacterShortcut (mount shortcut type 0x69, decoded from the
@@ -423,7 +423,7 @@ namespace Faolan.GameServer
 		// number of players saved.
 		// .grantability <id>  - grant an ability from the catalog to the player via the 0x2052 ability-grant. Makes the
 		// ability appear so it can be dragged to the hotbar and cast, which is how the spell/mana drain is tested. The
-		// grant is transient (not persisted) - it is re-sent only by login's GrantStartingAbilities. (The real spell
+		// grant is transient (not persisted) - it is re-sent only by login's GrantCharacterAbilities. (The real spell
 		// grant DispatchLearnSpell 0x200A is a separate command - see .learnspell / #73.)
 		private async Task GrantAbilityCommand(INetworkClient client, string arguments)
 		{
@@ -636,7 +636,7 @@ namespace Faolan.GameServer
 			}
 
 			await SendLearnSpell(client, spellId);
-			// Persist so the spell rides GrantStartingSpells on the next login (#74), like a real learn.
+			// Persist so the spell rides GrantCharacterSpells on the next login (#74), like a real learn.
 			var added = await Database.AddCharacterSpell(character.Id, spellId);
 			await _agentServerDispatcher.SendSystemMessage(character.Id, $"Learned spell 0x{spellId:X}.{(added ? "" : " (already known)")}");
 		}

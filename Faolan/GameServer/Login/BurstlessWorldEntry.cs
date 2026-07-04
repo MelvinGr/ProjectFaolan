@@ -108,11 +108,11 @@ namespace Faolan.GameServer
 
 			// Seed the class starting loadout (#74/#71) here in the SHARED world-entry path so a freshly CREATED character
 			// gets its class spells + default bar too - the create flow (CreateWorldCutsceneScripts) reaches world entry
-			// straight through SendBurstlessWorldEntry, bypassing SendWorldEntry's login-only EnsureStartingLoadout, so a
+			// straight through SendBurstlessWorldEntry, bypassing SendWorldEntry's login-only EnsureCharacterLoadout, so a
 			// new char previously had only its attack abilities and no spells until the first relog. Idempotent (gated on
 			// an empty bar), so this is a no-op on login (already seeded there). Runs BEFORE knownSpellIds is loaded below,
 			// so the freshly-seeded spells ride this entry's snapshot known-list (and place on the bar) with no relog.
-			await EnsureStartingLoadout(client);
+			await EnsureCharacterLoadout(client);
 
 			// The beach starter quest (10238) is granted ONCE at character creation (CommitCharacterName), not re-seeded
 			// here - so a completed/removed quest never reappears. The journal is now driven purely from CharacterQuests.
@@ -167,7 +167,7 @@ namespace Faolan.GameServer
 				? (new List<QuestDefinition>(), (QuestDefinition)null)
 				: await LoadSnapshotQuests(character);
 			// #74/#71: the character's learned spells ride the snapshot's known-list so they survive relog + place on the
-			// action bar (instead of the per-login DispatchLearnSpell band-aid). Loaded after EnsureStartingLoadout has
+			// action bar (instead of the per-login DispatchLearnSpell band-aid). Loaded after EnsureCharacterLoadout has
 			// seeded a fresh character's class spells.
 			var knownSpellIds = character != null
 				? (await Database.GetCharacterSpells(character.Id)).Select(s => s.SpellId).ToArray()

@@ -19,7 +19,7 @@ namespace Faolan.Importer.Captures
 	// CLASS-AWARE: each create-flow capture is attributed to its character's class via the ChangeClass editor command
 	// it contains (numericValue/2 = class id; same convention as HandleCommandPacket). An ability granted under two
 	// or more distinct classes is GENERIC (Class=0, the universal kit - Normal Attack L/R/F + toggle-combat /
-	// switch-weapon / utility); one granted under a single class is class-specific (Class=that id). GrantStartingAbilities
+	// switch-weapon / utility); one granted under a single class is class-specific (Class=that id). GrantCharacterAbilities
 	// then grants the generic set plus the character's own class set. Coverage is necessarily incomplete (only the
 	// classes/levels present in the captures) - that is expected.
 	public static class CaptureAbilityImporter
