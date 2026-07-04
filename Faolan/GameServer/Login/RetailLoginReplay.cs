@@ -98,7 +98,6 @@ namespace Faolan.GameServer
 				var femaleOutfit = StarterFemaleOutfits[Random.Shared.Next(StarterFemaleOutfits.Length)];
 				equipment = new CharacterEquipment
 				{
-					Id = character.Id,
 					CharacterId = character.Id,
 					Wrist = await Database.GetItem(StarterWristItem),
 					Chest = female

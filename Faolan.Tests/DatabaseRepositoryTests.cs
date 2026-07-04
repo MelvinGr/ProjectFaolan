@@ -253,7 +253,6 @@ namespace Faolan.Tests
 				// 2) Seed equipment with two real items (detached, from separate GetItem calls) and save.
 				var equipment = new CharacterEquipment
 				{
-					Id = characterId,
 					CharacterId = characterId,
 					Wrist = await repo.GetItem(slaveManacles),
 					FirstPosBag = await repo.GetItem(bagItem)

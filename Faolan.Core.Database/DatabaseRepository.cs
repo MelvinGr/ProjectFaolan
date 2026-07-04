@@ -1147,7 +1147,7 @@ namespace Faolan.Core.Database
 			// TRACKED entity runs EF's relationship fixup so the FK column updates correctly - INCLUDING being
 			// cleared to NULL when a slot is emptied (Attach/Update of a detached graph does NOT reliably null a
 			// reference-nav FK, which is what silently lost the unequip/clear-bag writes).
-			var tracked = await LoadTrackedEquipment(ctx, equipment.Id) ?? AddNewEquipment(ctx, equipment.Id, equipment.CharacterId);
+			var tracked = await LoadTrackedEquipment(ctx, equipment.CharacterId) ?? AddNewEquipment(ctx, equipment.CharacterId);
 
 			tracked.Neck = await ResolveItem(ctx, equipment.Neck?.Id);
 			tracked.Head = await ResolveItem(ctx, equipment.Head?.Id);
@@ -1492,11 +1492,10 @@ namespace Faolan.Core.Database
 			return await ctx.SaveChangesAsync();
 		}
 
-		private static CharacterEquipment AddNewEquipment(DatabaseContext ctx, uint id, uint characterId)
+		private static CharacterEquipment AddNewEquipment(DatabaseContext ctx, uint characterId)
 		{
 			var equipment = new CharacterEquipment
 			{
-				Id = id,
 				CharacterId = characterId
 			};
 			ctx.CharacterEquipment.Add(equipment);
@@ -1528,7 +1527,7 @@ namespace Faolan.Core.Database
 			return ctx.Guilds.Include(g => g.Members).FirstOrDefaultAsync(g => g.Id == id);
 		}
 
-		private static Task<CharacterEquipment> LoadTrackedEquipment(DatabaseContext ctx, uint id)
+		private static Task<CharacterEquipment> LoadTrackedEquipment(DatabaseContext ctx, uint characterId)
 		{
 			return ctx
 				.CharacterEquipment
@@ -1550,7 +1549,7 @@ namespace Faolan.Core.Database
 				.Include(e => e.Legs)
 				.Include(e => e.FirstPosBag)
 				.Include(e => e.Wrist)
-				.FirstOrDefaultAsync(e => e.Id == id);
+				.FirstOrDefaultAsync(e => e.CharacterId == characterId);
 		}
 
 		private static async Task<Item> ResolveItem(DatabaseContext ctx, uint? id)

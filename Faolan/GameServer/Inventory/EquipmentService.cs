@@ -90,7 +90,6 @@ namespace Faolan.GameServer.Inventory
 
 				var equipment = await _database.GetCharacterEquipment(character.Id) ?? new CharacterEquipment
 				{
-					Id = character.Id,
 					CharacterId = character.Id
 				};
 

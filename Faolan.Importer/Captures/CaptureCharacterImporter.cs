@@ -284,7 +284,6 @@ namespace Faolan.Importer.Captures
 			// Worn equipment: every IIR InventoryEntry whose template is a DB item.
 			var equipment = new CharacterEquipment
 			{
-				Id = character.Id,
 				CharacterId = character.Id
 			};
 			var worn = 0;

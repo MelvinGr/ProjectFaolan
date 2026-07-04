@@ -62,7 +62,6 @@ namespace Faolan.Tests
 					});
 					db.CharacterEquipment.Add(new CharacterEquipment
 					{
-						Id = characterId,
 						CharacterId = characterId,
 						Wrist = await db.Items.FindAsync(3361557u),
 						FirstPosBag = await db.Items.FindAsync(royalSignet)
