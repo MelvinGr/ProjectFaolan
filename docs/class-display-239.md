@@ -179,3 +179,33 @@ race/sex/vitals only, and we send no generic_stats), so the client never sets st
 stat, right value) but happens post-ready rather than during spawn-Activate. The fully retail-accurate fix is
 to embed stat 0x43 in the player spawn's stat data so Activate sets it (exact carrier field — generic_stats
 vs an extra stat block — is the remaining decode). Until then the interim is fine and validated.
+
+## CARRIER DECODED — it's `generic_stats`, VALUES-ONLY ordered by `g_Int32StatsOrder` (2026-07-04)
+
+The carrier is the CoreCharacter's **`generic_stats`** vector, read by `CoreCharacterFullUpdateIIR::ReadSubClass`
+(`FUN_0145ac80`). Key facts, all evidence-backed this session:
+
+- The reader ends with `assert(g_Int32StatsOrder.size() == m_CoreCharacterMessage.generic_stats_size())`
+  (`CoreCharacterFullUpdateIIR.cpp:0x435`; disasm `0145b279: MOV EDX,[0x02d25da8]; SUB EDX,[0x02d25da4]; SAR
+  EDX,2`). So `g_Int32StatsOrder` (a `std::vector<u32>` at `0x02d25da4`=begin / `..da8`=end) is the fixed
+  **key order**, and the wire `generic_stats` is a **values-only** list — the stat *ids* (incl. `0x43`) are
+  **implicit by position**, NOT on the wire.
+- Proven by exhaustive search: across all 8 per-class retail login captures (server `37.18.x`, so real retail
+  traffic), there is **no `(0x43, class)` pair in any byte order** (`scan43`/`pb22`/full-stream probe = 0 hits).
+  The `00 00 00 43` bytes in the stream are float noise (`43 A1 40 00` = 322.5 position arrays), not stat keys.
+  → The class value is one entry in a bare `[count][count×u32 value]` list, at the index where
+  `g_Int32StatsOrder == 0x43`.
+- **`g_Int32StatsOrder` is EMPTY on our Faolan client** (live `/proc/<pid>/mem` read of `0x02d25da4/da8` = 0/0,
+  base confirmed 0x400000, player loaded). It is zero-initialised by `FUN_01e14b00` and only ever read (not
+  filled) by our login path — which is exactly why our no-`generic_stats` spawn passes the assert (`0 == 0`)
+  and does NOT crash, and why the class defaults to Barbarian. On retail the table is populated (source not yet
+  found — `FUN_01458d40`, adjacent to the reader, is the accessor; no code takes the vector's address as an
+  immediate, so it's filled through a pointer alias / from a data source).
+
+**Consequence for retiring the interim:** you cannot embed *just* the class — the count-match assert means the
+player spawn must carry the **entire ordered `generic_stats` value vector** (`size() == g_Int32StatsOrder.size()`,
+correct value for every stat), or the client crashes on load. That is the full player-stat-vector construction,
+i.e. the **blocked `SpawnPacketBuilder.BuildSpawn` from-scratch** item (capture-bloat-blocked). The post-ready
+single-stat `SetStat(0x43)` force-feed is the correct decoupling and should stay until that larger decode lands.
+Remaining RE to unblock: recover `g_Int32StatsOrder`'s ordered keys (find `FUN_01458d40`'s data source, or read
+it live from a **retail-connected** client — ours never populates it).
