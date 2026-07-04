@@ -247,20 +247,32 @@ namespace Faolan.Importer.Captures
 				var existing = await db.NpcSpells.FirstOrDefaultAsync(s => s.NpcName == e.Name && s.SpellId == e.SpellId);
 				if (existing == null)
 				{
-					db.NpcSpells.Add(new NpcSpell
-					{
-						NpcName = e.Name,
-						SpellId = e.SpellId,
-						Payload = e.Payload
-					});
+					var s = new NpcSpell { NpcName = e.Name, SpellId = e.SpellId };
+					ApplyEffect(s, e.Payload);
+					db.NpcSpells.Add(s);
 					inserted++;
 				}
 				else
-					existing.Payload = e.Payload;
+					ApplyEffect(existing, e.Payload);
 			}
 
 			await db.SaveChangesAsync();
 			return inserted;
+		}
+
+		// Decodes the captured 54-byte ApplySpell effect payload into the NpcSpell columns (NpcSpellEffectCodec, #304).
+		private static void ApplyEffect(NpcSpell s, byte[] payload)
+		{
+			if (payload is not { Length: NpcSpellEffect.Length })
+				return;
+
+			var fx = NpcSpellEffect.Parse(payload);
+			s.Duration = fx.Duration;
+			s.Magnitude = fx.Magnitude;
+			s.Rank = fx.Rank;
+			s.FlagA = fx.FlagA;
+			s.FlagB = fx.FlagB;
+			s.FlagC = fx.FlagC;
 		}
 
 		// NPC patrol routes, deduped by (map, position). Replaces waypoints wholesale on re-import.

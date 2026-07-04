@@ -778,7 +778,7 @@ namespace Faolan.GameServer.World
 				if (npc.Npc.Spells is { Count: > 0 } typeSpells)
 				{
 					foreach (var s in typeSpells)
-						entity.Spells.Add(new NpcSpellCast(s.SpellId, s.Payload));
+						entity.Spells.Add(new NpcSpellCast(s.SpellId, new NpcSpellEffect(s.SpellId, s.Duration, s.Magnitude, s.Rank, s.FlagA, s.FlagB, s.FlagC).ToBytes()));
 				}
 
 				zone.Add(entity);
@@ -1041,7 +1041,7 @@ namespace Faolan.GameServer.World
 			if (entity.Name is { Length: > 0 } spellName)
 			{
 				foreach (var s in await _database.GetNpcSpellsByName(spellName))
-					entity.Spells.Add(new NpcSpellCast(s.SpellId, s.Payload));
+					entity.Spells.Add(new NpcSpellCast(s.SpellId, new NpcSpellEffect(s.SpellId, s.Duration, s.Magnitude, s.Rank, s.FlagA, s.FlagB, s.FlagC).ToBytes()));
 			}
 
 			_sim.World.ZoneForEntity(player).Add(entity);
