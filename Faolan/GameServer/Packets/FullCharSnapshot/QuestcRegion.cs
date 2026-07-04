@@ -29,15 +29,23 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 	//   ver(=1) · questId@+0xc · state@+0x10 · field114@+0x114 · field118@+0x118 · n@+0x14 · 5×string ·
 	//   fieldEc@+0xec · areaId@+0xcc · field2c@+0x2c · field11c@+0x11c · accept:u64@+0x20 · field28@+0x28 ·
 	//   objlist1(+0x10c) · objlist2(+0x110) · fieldF0:u32@+0xf0 · fieldF8:u64@+0xf8 · objlist3(+0x100) ·
-	//   objlist4(+0x104) · <MORE post-obj4 data — a +0xac/+0xb0 list this codec does NOT yet model>.
+	//   objlist4(+0x104) · <a NESTED 0x3F1-framed sub-list — see below>.
 	// Each ObjRec IS 16 u32 (confirmed: 2 words + 4-word cc0540 + 2 words + 4-word cc0540 + 2 words, scrambled
 	// into an 18-word struct). TWO CORRECTIONS to the model below: (1) the word this codec calls `Marker`/`0x412`
 	// is actually the variable `n` (goal count) — the `!= 0x412` assert only holds for the beach template and
 	// REJECTS real progressed snapshots (NecroL80's 27-quest login: n=2 in rec0); (2) `field2c` is NOT a second
-	// questId (the `questId2 == questId` assert is likewise beach-only). The round-trip below is still byte-exact
-	// for the BEACH template (its objlists are empty and n happened to be 0x412), but PARSING arbitrary snapshots
-	// needs this grammar + the post-obj4 tail decoded. TODO(#186/#304): finish the post-obj4 structure, drop the
-	// two beach-only asserts, then this region parses every login snapshot (not just the create template).
+	// questId (the `questId2 == questId` assert is likewise beach-only).
+	//
+	// KEY 2026-07-05 FINDING (why the beach codec can't parse real snapshots — validated on NecroL80's rec0 bytes):
+	// after obj4 each quest record carries a NESTED `0x3F1`-framed sub-list `[u32 0x3F1*(k+1)][k × nested-record]`
+	// (rec0: `0x7E2 = 0x3F1*2` ⇒ k=1; the nested record then carries the PLAYER HANDLE 0x0802E5D4 + quest/goal
+	// ids — i.e. per-character goal PROGRESS, which the empty beach template never exercised). So the real
+	// Quest_c record is deeply nested, NOT the flat header+4-objlists the beach round-trip suggested. The beach
+	// golden test still passes (that template has empty objlists and no nested progress). To parse ARBITRARY
+	// login snapshots the nested sub-list reader must be decompiled (Ghidra: FUN_0182d4c9 is the sub-call between
+	// obj2 and F0; the driver is FUN_0091f5c0, per-record reader FUN_0091df50). Header grammar above is fully
+	// decoded + validated on NecroL80's rec0. TODO(#186/#304): decode the nested progress sub-list, drop the two
+	// beach-only asserts, then this region parses every login snapshot.
 	public sealed class QuestcRegion
 	{
 		public const uint Frame = 0x3F1; // 1009 - the list-count framing multiplier
