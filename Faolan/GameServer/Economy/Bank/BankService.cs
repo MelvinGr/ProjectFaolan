@@ -84,7 +84,7 @@ namespace Faolan.GameServer.Economy.Bank
 		// deposit/withdraw response isn't captured yet, so this is a PoC: re-send the whole bank (BankIIR) to refresh
 		// the bank tab, and on a withdraw (bank -> bag) also push the live DispatchAddItem (0x2020) so the item
 		// renders in the bag. NEEDS in-client verification (does an already-open bank window re-read the BankIIR?).
-		public async Task UpdateBankAfterMove(INetworkClient client, MoveItemInInventoryArgs move)
+		public async Task UpdateBankAfterMove(INetworkClient client, ProtoMoveInventoryItemIIR move)
 		{
 			var character = client.Session.Character;
 			if (character == null || move?.SourceContainerId == null || move.DestinationContainerId == null)

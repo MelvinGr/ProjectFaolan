@@ -1,3 +1,4 @@
+using Faolan.Core.Network.Protobuf;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -28,10 +29,10 @@ namespace Faolan.GameServer.Inventory
 			_logger = logger;
 		}
 
-		// Persists an item drop (DropItem - the client sends only the source side of MoveItemInInventoryArgs) by
+		// Persists an item drop (DropItem - the client sends only the source side of ProtoMoveInventoryItemIIR) by
 		// clearing the source cell, so the dropped item does not reappear in the bag on relog. (Whether a ground
 		// loot bag spawns is a separate world-sim concern; this only removes it from the player's persisted bag.)
-		public async Task PersistDropItem(INetworkClient client, MoveItemInInventoryArgs move)
+		public async Task PersistDropItem(INetworkClient client, ProtoMoveInventoryItemIIR move)
 		{
 			var character = client.Session.Character;
 			if (character == null || move?.SourceContainerId == null)
@@ -123,7 +124,7 @@ namespace Faolan.GameServer.Inventory
 		// occupied; a move onto an empty cell clears the source. The legacy seeded FirstPosBag (a CharacterEquipment
 		// nav that auto-renders at bag slot 1) is materialized into rows the moment it is moved or displaced, so it
 		// stops re-appearing at slot 1.
-		public async Task PersistInventoryMove(INetworkClient client, MoveItemInInventoryArgs move)
+		public async Task PersistInventoryMove(INetworkClient client, ProtoMoveInventoryItemIIR move)
 		{
 			var character = client.Session.Character;
 			if (character == null || move?.SourceContainerId == null || move.DestinationContainerId == null)

@@ -1,3 +1,4 @@
+using Faolan.Core.Network.Protobuf;
 using System;
 using System.Buffers.Binary;
 using System.Threading.Tasks;
@@ -638,7 +639,7 @@ namespace Faolan.GameServer
 					var unk0 = packet.Body.ReadUInt32(); // c350
 					var clientInst = packet.Body.ReadUInt32();
 					var reserved = packet.Body.ReadUInt32();
-					var move = packet.Body.ReadProtobufByteLength<MoveItemInInventoryArgs>();
+					var move = packet.Body.ReadProtobufByteLength<ProtoMoveInventoryItemIIR>();
 
 					Logger.LogInformation($"DropItem: {move}");
 
@@ -649,7 +650,7 @@ namespace Faolan.GameServer
 					// implicit client-side removal, so without this the dropped item stays visible until next login.
 					// Same DispatchRemoveItem (0x201F) the .removeitem GM path / RemoveItemFromBackpack use.
 					if (move?.SourceContainerId is { Type: InventoryContainerBackpack })
-						await SendRemoveItem(client, InventoryContainerBackpack, move.SourceItemPos);
+						await SendRemoveItem(client, InventoryContainerBackpack, (uint)move.SourceItemPos);
 
 					break;
 				}
@@ -666,7 +667,7 @@ namespace Faolan.GameServer
 					var protocolConstant = packet.Body.ReadUInt32();
 					var characterHandle = packet.Body.ReadUInt32();
 					var reserved = packet.Body.ReadUInt32();
-					var move = packet.Body.ReadProtobufByteLength<MoveItemInInventoryArgs>();
+					var move = packet.Body.ReadProtobufByteLength<ProtoMoveInventoryItemIIR>();
 
 					Logger.LogInformation($"MoveItemInInventory: {move}");
 
