@@ -148,6 +148,29 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
+	// Combo catalog (name / unlock level / featid / actions / ...) from the RDB 1010206 plaintext-XML combo defs.
+	public sealed class RdbCombosModule : IImportModule
+	{
+		public ImportSource Source => ImportSource.Rdb;
+		public IReadOnlyList<string> DependsOn => [];
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "Combo catalog (name/level/featid/actions) from the RDB 1010206 plaintext XML.";
+		public string Name => "rdb-combos";
+
+		public async Task<ImportResult> RunAsync(ImportContext ctx)
+		{
+			var (seen, imported) = await RdbComboImporter.ImportAsync(ctx.Db, ctx.RdbDir!);
+			return new ImportResult($"{seen} combo XML entries, {imported} combos imported.");
+		}
+	}
+
 	public sealed class RdbMapsModule : IImportModule
 	{
 		public ImportSource Source => ImportSource.Rdb;

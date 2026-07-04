@@ -11,6 +11,7 @@ namespace Faolan.Core.Database
 	{
 		DatabaseFacade Database { get; } // from DbContext
 		DbSet<Ability> Abilities { get; }
+		DbSet<Combo> Combos { get; }
 		DbSet<Account> Accounts { get; }
 		DbSet<AppearanceChoice> AppearanceChoices { get; }
 		DbSet<Character> Characters { get; }
@@ -68,6 +69,7 @@ namespace Faolan.Core.Database
 	public class DatabaseContext : DbContext, IDatabaseContext
 	{
 		public DbSet<Ability> Abilities { get; set; }
+		public DbSet<Combo> Combos { get; set; }
 		public DbSet<Account> Accounts { get; set; }
 		public DbSet<AppearanceChoice> AppearanceChoices { get; set; }
 		public DbSet<Character> Characters { get; set; }

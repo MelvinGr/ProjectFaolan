@@ -47,6 +47,7 @@ namespace Faolan.Importer.Cli
 			new RdbAppearanceModule(),
 			new RdbSpellsModule(),
 			new RdbAbilitiesModule(),
+			new RdbCombosModule(),
 			new RdbMapsModule(),
 			new RdbLuaModule(),
 			new RdbRespawnsModule(),
