@@ -293,8 +293,13 @@ namespace Faolan.Importer.Captures
 				if (item == null)
 					continue;
 
-				if (EquipmentService.SetEquipmentSlot(equipment, (CharacterEquipmentSlot)entry.Pos, item))
-					worn++;
+				// entry.Pos is a raw wire slot: the worn slots + vanity map to a column; the bag / out-of-range ids don't.
+				var slot = (CharacterEquipmentSlot)entry.Pos;
+				if (!Enum.IsDefined(slot))
+					continue;
+
+				equipment[slot] = item;
+				worn++;
 			}
 
 			db.CharacterEquipment.Add(equipment);

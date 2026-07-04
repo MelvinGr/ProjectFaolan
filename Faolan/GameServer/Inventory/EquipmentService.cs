@@ -93,11 +93,7 @@ namespace Faolan.GameServer.Inventory
 					CharacterId = character.Id
 				};
 
-				if (!SetEquipmentSlot(equipment, targetSlot, item))
-				{
-					_logger.LogWarning("Equip not persisted: unmapped equip slot {Slot}.", targetSlot);
-					return;
-				}
+				equipment[targetSlot] = item;
 
 				// The item left the bag: clear FirstPosBag if that is where it was.
 				if (equipment.FirstPosBag != null && equipment.FirstPosBag.Id == item.Id)
@@ -252,14 +248,14 @@ namespace Faolan.GameServer.Inventory
 				if (equipment == null)
 					return;
 
-				var current = GetEquipmentSlot(equipment, fromSlot);
+				var current = equipment[fromSlot];
 				if (current == null)
 				{
 					_logger.LogInformation("Unequip not persisted: equip slot {Slot} holds no DB item (captured-only).", fromSlot);
 					return;
 				}
 
-				SetEquipmentSlot(equipment, fromSlot, null);
+				equipment[fromSlot] = null;
 				await _database.SaveCharacterEquipment(equipment);
 				await _database.SetCharacterInventorySlot(character.Id, (int)FullCharSnapshotBuilder.BagKind, targetBagSlot, current.Id);
 
@@ -271,92 +267,5 @@ namespace Faolan.GameServer.Inventory
 			}
 		}
 
-		// Maps an equip slot to its CharacterEquipment item nav. Mirrors EquippedSlotItem but keyed by
-		// the CharacterEquipmentSlot enum.
-		public static Item GetEquipmentSlot(CharacterEquipment e, CharacterEquipmentSlot slot)
-		{
-			return slot switch
-			{
-				CharacterEquipmentSlot.Neck          => e.Neck,
-				CharacterEquipmentSlot.Head          => e.Head,
-				CharacterEquipmentSlot.Tokens        => e.Tokens,
-				CharacterEquipmentSlot.Chest         => e.Chest,
-				CharacterEquipmentSlot.MainWeapon    => e.MainHandLeft,
-				CharacterEquipmentSlot.Belt          => e.Belt,
-				CharacterEquipmentSlot.OffHandWeapon => e.OffHandLeft,
-				CharacterEquipmentSlot.LeftRing      => e.RingLeft,
-				CharacterEquipmentSlot.RightRing     => e.RingRight,
-				CharacterEquipmentSlot.Cape          => e.Cloak,
-				CharacterEquipmentSlot.Shoulder      => e.Shoulder,
-				CharacterEquipmentSlot.Boots         => e.Boots,
-				CharacterEquipmentSlot.Hands         => e.Hands,
-				CharacterEquipmentSlot.Legs          => e.Legs,
-				CharacterEquipmentSlot.Wrist         => e.Wrist,
-				CharacterEquipmentSlot.RangedWeapon  => e.MainHandRight,
-				CharacterEquipmentSlot.Ammo          => e.OffHandRight,
-				_                                    => null
-			};
-		}
-
-		// Sets an equip slot's CharacterEquipment item nav. Returns false for an unmapped slot.
-		public static bool SetEquipmentSlot(CharacterEquipment e, CharacterEquipmentSlot slot, Item item)
-		{
-			switch (slot)
-			{
-				case CharacterEquipmentSlot.Neck:
-					e.Neck = item;
-					return true;
-				case CharacterEquipmentSlot.Head:
-					e.Head = item;
-					return true;
-				case CharacterEquipmentSlot.Chest:
-					e.Chest = item;
-					return true;
-				case CharacterEquipmentSlot.MainWeapon:
-					e.MainHandLeft = item;
-					return true;
-				case CharacterEquipmentSlot.Belt:
-					e.Belt = item;
-					return true;
-				case CharacterEquipmentSlot.LeftRing:
-					e.RingLeft = item;
-					return true;
-				case CharacterEquipmentSlot.RightRing:
-					e.RingRight = item;
-					return true;
-				case CharacterEquipmentSlot.Cape:
-					e.Cloak = item;
-					return true;
-				case CharacterEquipmentSlot.Shoulder:
-					e.Shoulder = item;
-					return true;
-				case CharacterEquipmentSlot.Boots:
-					e.Boots = item;
-					return true;
-				case CharacterEquipmentSlot.Hands:
-					e.Hands = item;
-					return true;
-				case CharacterEquipmentSlot.Legs:
-					e.Legs = item;
-					return true;
-				case CharacterEquipmentSlot.Wrist:
-					e.Wrist = item;
-					return true;
-				case CharacterEquipmentSlot.Tokens:
-					e.Tokens = item;
-					return true;
-				case CharacterEquipmentSlot.OffHandWeapon:
-					e.OffHandLeft = item;
-					return true;
-				case CharacterEquipmentSlot.RangedWeapon:
-					e.MainHandRight = item;
-					return true;
-				case CharacterEquipmentSlot.Ammo:
-					e.OffHandRight = item;
-					return true;
-				default:
-					return false;
-			}
-		}
 	}
 }
