@@ -14,31 +14,7 @@ namespace Faolan.GameServer.Spawn
 	// captured player's equipment in the spawn (see SpawnPacketBuilder.SetCharacterMessage / PlayerSpawnReader).
 	public static class PlayerSpawnEquipment
 	{
-		// Worn CharacterEquipment slot -> the spawn's equip-slot id (CharacterEquipmentSlot enum; pos in the
-		// capture). MainWeapon is main_hand_LEFT (the melee pair is 6/8; the ranged pair MainHandRight/
-		// OffHandRight is 20/21) - matching EquippedSlotItem and the equip/unequip persistence.
-		private static readonly (CharacterEquipmentSlot Slot, Func<CharacterEquipment, Item> Get)[] SlotMap =
-		[
-			(CharacterEquipmentSlot.Neck, e => e.Neck),
-			(CharacterEquipmentSlot.Head, e => e.Head),
-			(CharacterEquipmentSlot.Tokens, e => e.Tokens),
-			(CharacterEquipmentSlot.Chest, e => e.Chest),
-			(CharacterEquipmentSlot.MainWeapon, e => e.MainHandLeft),
-			(CharacterEquipmentSlot.Belt, e => e.Belt),
-			(CharacterEquipmentSlot.OffHandWeapon, e => e.OffHandLeft),
-			(CharacterEquipmentSlot.LeftRing, e => e.RingLeft),
-			(CharacterEquipmentSlot.RightRing, e => e.RingRight),
-			(CharacterEquipmentSlot.Cape, e => e.Cloak),
-			(CharacterEquipmentSlot.Shoulder, e => e.Shoulder),
-			(CharacterEquipmentSlot.Boots, e => e.Boots),
-			(CharacterEquipmentSlot.Hands, e => e.Hands),
-			(CharacterEquipmentSlot.Legs, e => e.Legs),
-			(CharacterEquipmentSlot.Wrist, e => e.Wrist),
-			(CharacterEquipmentSlot.RangedWeapon, e => e.MainHandRight),
-			(CharacterEquipmentSlot.Ammo, e => e.OffHandRight)
-		];
-
-		public static ProtoCoreCharacterIIR.InventoryEntry BuildEntry(uint pos, Item item)
+		public static ProtoCoreCharacterIIR.InventoryEntry BuildEntry(CharacterEquipmentSlot pos, Item item)
 		{
 			var key = new ProtoDecryptionKey
 			{
@@ -50,7 +26,7 @@ namespace Faolan.GameServer.Spawn
 
 			return new ProtoCoreCharacterIIR.InventoryEntry
 			{
-				Pos = pos,
+				Pos = (uint)pos,
 				Item = new ProtoAcgItem
 				{
 					Key1 = key,
@@ -70,13 +46,16 @@ namespace Faolan.GameServer.Spawn
 			if (equipment == null)
 				return entries;
 
-			foreach (var (slot, get) in SlotMap)
+			// Every CharacterEquipmentSlot (the 17 worn slots + the 5 vanity slots) via the entity's slot indexer, so
+			// vanity items ride the spawn at their equip-slot pos (1002+). The slot id IS the enum value (pos in the
+			// capture: MainWeapon = main_hand_left 6, the ranged pair 20/21, vanity 1002+).
+			foreach (var slot in Enum.GetValues<CharacterEquipmentSlot>())
 			{
-				var item = get(equipment);
+				var item = equipment[slot];
 				if (item == null || item.Archetype == 0) // only fully-buildable items (real identity + archetype)
 					continue;
 
-				entries.Add(BuildEntry((uint)slot, item));
+				entries.Add(BuildEntry(slot, item));
 			}
 
 			return entries.OrderBy(e => e.Pos).ToList();
