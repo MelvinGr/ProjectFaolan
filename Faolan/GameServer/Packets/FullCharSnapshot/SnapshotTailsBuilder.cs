@@ -76,10 +76,9 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// Builds the WHOLE beach 0x737A6DF9 tails FROM SCRATCH - no captured-tails template (#186). Assembles the three
 		// regions, each independently proven byte-exact: the generated quest portion (BuildQuestPortion, @0..1292),
 		// the game-static access-window catalog (AccessWindowCatalog typed entries, @1292..7917), and the code stat
-		// skeleton (TailsStatBlock.CreateFreshBlock, @7917..end) with the live character's vitals/XP patched in. Then
-		// re-addresses the template instance + stamps the playfield token. For the captured beach
-		// character + instance this reproduces BeachTailsTemplate.bin byte-for-byte (BeachTailsFromScratchTests), so the
-		// template .bin is no longer needed to author a beach entry.
+		// stat block (TailsStatBlock, @7917..end) authored with the character's vitals/XP + learned spells. Then stamps
+		// this session's playfield token. For the captured beach character + instance this reproduces
+		// BeachTailsTemplate.bin byte-for-byte (BeachTailsFromScratchTests), so the template .bin is no longer needed.
 		// Single-quest convenience (golden tests + the single-quest path): delegates to the multi-quest form with just
 		// the beach quest. BuildFromScratch([beach], beach) == BuildFromScratch(beach), so byte-identical.
 		public static byte[] BuildFromScratch(QuestDefinition beachDef, Character character, uint instance, uint? playfieldToken = null, IReadOnlyList<uint> knownSpellIds = null,
@@ -92,7 +91,7 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// The player's full set of snapshot-eligible held quests (#255): the journal region carries every held
 		// quest's record + objective region (primary owns the index's terminal). For a beach-only char this equals
 		// the beach-only overload. `primary` is the tracked quest (the beach quest when held). `knownSpellIds` are the
-		// character's learned spells - spliced into the stat block's known-list so they persist across relog + place on
+		// character's learned spells - built INTO the stat block's known-list so they persist across relog + place on
 		// the action bar (#74/#71); null/empty leaves the list empty (byte-identical to the captured beach tails).
 		public static byte[] BuildFromScratch(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, Character character, uint instance, uint? playfieldToken = null, IReadOnlyList<uint> knownSpellIds = null,
 			IReadOnlyList<(CharacterStatId Id, uint Value)> statSheet = null)
