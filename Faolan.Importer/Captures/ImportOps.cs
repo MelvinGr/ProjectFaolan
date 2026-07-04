@@ -18,11 +18,6 @@ namespace Faolan.Importer.Captures
 	// helpers that sit above the per-subsystem CaptureX importers/extractors.
 	public static class ImportOps
 	{
-		// The beach (4010) is a committed DB seed: its full world build was hand-assembled from the Strie login
-		// capture and is the ONE in-client-proven world blob. Skipped on import so the proven seed is never
-		// regenerated/perturbed by a capture re-run.
-		public const uint BeachMapId = 0x00000FAA;
-
 		// Unique quest-NPC home FACING (#267): the burst-truth dedup can pick a session where she'd already turned, so
 		// her facing drifts from the chained-at-the-post pose. Pin Casilda's rotation to her create-dump FA015807
 		// transform (quaternion 0, 0.8661140, 0, -0.4998470) - the byte-exact facing she has while chained at x≈362.
