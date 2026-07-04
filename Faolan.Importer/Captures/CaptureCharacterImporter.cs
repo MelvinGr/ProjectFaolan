@@ -56,7 +56,7 @@ namespace Faolan.Importer.Captures
 				var spawns = new List<(string Name, byte[] Body, uint MapId, uint Handle)>();
 				foreach (var p in capture)
 				{
-					if (p.Opcode == CharacterListOpcode && p.IsDownload)
+					if (p is { Opcode: CharacterListOpcode, IsDownload: true })
 					{
 						HarvestCharacterList(p.Bytes, charList);
 						continue;

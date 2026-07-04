@@ -75,7 +75,7 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var p in packets)
 			{
-				if (!p.IsDownload && p.Opcode == Opcode2000 && p.SubOpcode == InteractSubOpcode)
+				if (p is { IsDownload: false, Opcode: Opcode2000, SubOpcode: InteractSubOpcode })
 				{
 					var body = GetBody(p.Bytes);
 					if (body.Length < 26 || BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(18, 4)) != TalkToNpcActionType)
@@ -100,7 +100,7 @@ namespace Faolan.Importer.Extractors
 					grant = 0;
 					instanceContext = currentQuest; // the quest active WHEN the player opened this conversation (#264)
 				}
-				else if (!p.IsDownload && p.Opcode == Opcode2000 && p.SubOpcode == KnubotAnswerSubOpcode && active)
+				else if (p is { IsDownload: false, Opcode: Opcode2000, SubOpcode: KnubotAnswerSubOpcode } && active)
 				{
 					// The player picked option `idx`: the current screen is complete (emit it), and the responses that
 					// follow belong to the child screen reached by that option.
@@ -116,7 +116,7 @@ namespace Faolan.Importer.Extractors
 					screen = [];
 					grant = 0;
 				}
-				else if (p.IsDownload && p.Opcode == Opcode2000 && p.SubOpcode == QuestFullUpdateSubOpcode)
+				else if (p is { IsDownload: true, Opcode: Opcode2000, SubOpcode: QuestFullUpdateSubOpcode })
 				{
 					// A quest full-update. body @16 = [00000000][01][u32 questId]. It's a GRANT (vs a login restore or a
 					// re-display) only if: a conversation is active, the player has navigated past the greeting (path !=

@@ -166,7 +166,7 @@ namespace Faolan.GameServer.Spawn
 			// Lifted row (#187): CONSTRUCT the identity from columns + append the stored geometry tail - no Data
 			// slice read at all. Byte-identical to the verbatim splice (the columns reproduce the captured identity,
 			// the tail is stored verbatim), so the world-entry object is now fully DB-driven.
-			if (row?.DisplayName != null && row.KdTreeTail != null)
+			if (row is { DisplayName: not null, KdTreeTail: not null })
 			{
 				var identity = SimpleDynelMessageCodec.BuildMessage(SimpleDynelMessageCodec.ToMessage(row));
 				body = new byte[liveOffset + identity.Length + row.KdTreeTail.Length];

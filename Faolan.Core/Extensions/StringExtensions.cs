@@ -10,10 +10,9 @@ namespace Faolan.Core.Extensions
 		{
 			public byte[] Base64Decode()
 			{
-				if (string.IsNullOrWhiteSpace(str))
-					return [];
-
-				return Convert.FromBase64String(str);
+				return string.IsNullOrWhiteSpace(str)
+					? []
+					: Convert.FromBase64String(str);
 			}
 
 			public bool ContainsIgnoreCase(string find)
@@ -38,7 +37,7 @@ namespace Faolan.Core.Extensions
 			public bool TryParseNormalOrHex(out byte output)
 			{
 				return str.StartsWith("0x") || str.StartsWith("0X") || str.StartsWith("#")
-					? byte.TryParse(str.Substring(str[0] == '#'
+					? byte.TryParse(str.AsSpan(str[0] == '#'
 							? 1
 							: 2),
 						NumberStyles.HexNumber,
@@ -50,7 +49,7 @@ namespace Faolan.Core.Extensions
 			public bool TryParseNormalOrHex(out ushort output)
 			{
 				return str.StartsWith("0x") || str.StartsWith("0X") || str.StartsWith("#")
-					? ushort.TryParse(str.Substring(str[0] == '#'
+					? ushort.TryParse(str.AsSpan(str[0] == '#'
 							? 1
 							: 2),
 						NumberStyles.HexNumber,
@@ -62,7 +61,7 @@ namespace Faolan.Core.Extensions
 			public bool TryParseNormalOrHex(out uint output)
 			{
 				return str.StartsWith("0x") || str.StartsWith("0X") || str.StartsWith("#")
-					? uint.TryParse(str.Substring(str[0] == '#'
+					? uint.TryParse(str.AsSpan(str[0] == '#'
 							? 1
 							: 2),
 						NumberStyles.HexNumber,
@@ -74,7 +73,7 @@ namespace Faolan.Core.Extensions
 			public bool TryParseNormalOrHex(out ulong output)
 			{
 				return str.StartsWith("0x") || str.StartsWith("0X") || str.StartsWith("#")
-					? ulong.TryParse(str.Substring(str[0] == '#'
+					? ulong.TryParse(str.AsSpan(str[0] == '#'
 							? 1
 							: 2),
 						NumberStyles.HexNumber,
@@ -91,7 +90,7 @@ namespace Faolan.Core.Extensions
 				var builder = new StringBuilder();
 				foreach (var b in bytes)
 				{
-					if (b >= 0x21 && b <= 0x7e)
+					if (b is >= 0x21 and <= 0x7e)
 						builder.Append((char)b);
 					else if (b == '\n')
 						builder.Append(' ');
@@ -105,7 +104,7 @@ namespace Faolan.Core.Extensions
 				var builder = new StringBuilder(bytes.Length);
 				foreach (var b in bytes)
 				{
-					builder.Append(b >= 0x20 && b <= 0x7e
+					builder.Append(b is >= 0x20 and <= 0x7e
 						? (char)b
 						: nonPrintable);
 				}

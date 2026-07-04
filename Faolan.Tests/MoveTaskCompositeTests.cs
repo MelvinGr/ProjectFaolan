@@ -86,7 +86,7 @@ namespace Faolan.Tests
 							continue;
 
 						var len = (int)BinaryPrimitives.ReadUInt32BigEndian(raw.AsSpan(j - 4, 4));
-						if (len >= 8 && len <= 512 && j + len <= raw.Length)
+						if (len is >= 8 and <= 512 && j + len <= raw.Length)
 							yield return raw[j..(j + len)];
 					}
 				}

@@ -103,7 +103,7 @@ namespace Faolan.Importer.Extractors
 					? BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4))
 					: 0;
 
-				if (p.Opcode == Opcode2000 && p.IsDownload && subop == MapChangeSubOpcode && body.Length >= 38)
+				if (p is { Opcode: Opcode2000, IsDownload: true } && subop == MapChangeSubOpcode && body.Length >= 38)
 				{
 					currentMap = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(34, 4));
 					sawPoll = false;

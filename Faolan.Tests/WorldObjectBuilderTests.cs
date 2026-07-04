@@ -36,7 +36,7 @@ namespace Faolan.Tests
 			Assert.Equal(0x000B5678u, BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(SpawnPacketBuilder.HandleOffset, 4)));
 			for (var i = 0; i < body.Length; i++)
 			{
-				var inHandleField = i >= SpawnPacketBuilder.HandleOffset && i < SpawnPacketBuilder.HandleOffset + 4;
+				var inHandleField = i is >= SpawnPacketBuilder.HandleOffset and < SpawnPacketBuilder.HandleOffset + 4;
 				if (!inHandleField)
 					Assert.Equal(capturedBody[i], body[i]);
 			}

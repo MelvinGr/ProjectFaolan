@@ -8,7 +8,6 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Conan;
 using Faolan.Core.Network.Protobuf;
-using Faolan.GameServer.Packets.FullCharSnapshot;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 

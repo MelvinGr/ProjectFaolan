@@ -481,7 +481,7 @@ namespace Faolan.Core.Rdb.Assets
 				1000620
 			})
 			{
-				if (rdb.TryGet(type, itemId, out var e) && e.IsLocal && e.Size > 0)
+				if (rdb.TryGet(type, itemId, out var e) && e is { IsLocal: true, Size: > 0 })
 				{
 					try
 					{

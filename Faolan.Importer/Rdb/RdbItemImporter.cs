@@ -44,7 +44,7 @@ namespace Faolan.Importer.Rdb
 				{
 					// length is a u16; body[i+6..i+8] is a flags word (escaping marker) we don't need.
 					var len = BinaryPrimitives.ReadUInt16LittleEndian(body.Slice(i + 4, 2));
-					if (len >= 1 && len <= 1024 && i + 8 + len <= body.Length)
+					if (len is >= 1 and <= 1024 && i + 8 + len <= body.Length)
 					{
 						var s = body.Slice(i + 8, len);
 						if (IsPrintableAscii(s))

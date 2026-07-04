@@ -105,7 +105,7 @@ namespace Faolan.Importer.Extractors
 			var questId = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(21, 4));
 			var records = Records(body, 16).ToList();
 
-			var objective = records.FirstOrDefault(r => r.Tag == "remoteformat" && r.Category == 50304);
+			var objective = records.FirstOrDefault(r => r is { Tag: "remoteformat", Category: 50304 });
 			var objectiveLocalized = records.FirstOrDefault(r => r.Tag == "localized");
 			var title = records.FirstOrDefault(r => r.Category == 50301);
 			var summary = records.FirstOrDefault(r => r.Category == 50302);

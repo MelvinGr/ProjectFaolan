@@ -737,7 +737,7 @@ namespace Faolan.Core.Database
 			// Guard: a burst with an unknown captured instance (0) can't be re-addressed, so treat it as absent and
 			// let login fall back. Out-of-range instances ARE supported now - RewriteBurstInstance pads the live id's
 			// varint to the captured length (overlong), keeping the substitution length-preserving.
-			if (burst != null && burst.CapturedInstance == 0)
+			if (burst is { CapturedInstance: 0 })
 				return null;
 
 			return burst;
@@ -1128,7 +1128,7 @@ namespace Faolan.Core.Database
 			// one Modified and SaveChanges would fail with a 0-rows concurrency error. Flip any Modified dependent whose
 			// row doesn't actually exist yet to Added so it inserts instead. (SaveCharacter is the cold full-graph path;
 			// hot updates use the targeted ExecuteUpdate savers below.)
-			foreach (var entry in ctx.ChangeTracker.Entries().Where(e => e.State == EntityState.Modified && e.Entity is not Character).ToList())
+			foreach (var entry in ctx.ChangeTracker.Entries().Where(e => e is { State: EntityState.Modified, Entity: not Character }).ToList())
 			{
 				if (await entry.GetDatabaseValuesAsync() is null)
 					entry.State = EntityState.Added;

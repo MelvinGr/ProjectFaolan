@@ -212,7 +212,7 @@ namespace Faolan.Tests
 
 			// It stepped toward the player (closer than it started, not past them) and the broadcast segment recorded its
 			// origin (the from of the MoveFrom -> Position segment the client interpolates, #272).
-			Assert.True(npc.Position.X > 0 && npc.Position.X < 10);
+			Assert.True(npc.Position.X is > 0 and < 10);
 			Assert.Equal(0f, npc.MoveFrom.X);
 		}
 

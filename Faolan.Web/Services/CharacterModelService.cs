@@ -847,7 +847,7 @@ namespace Faolan.Web.Services
 		// when the item has no key / no local template entry.
 		private static byte[]? DecryptTemplate(RdbReader rdb, Item? item)
 		{
-			if (item == null || (item.Data1 == 0 && item.Data2 == 0 && item.Data3 == 0 && item.Data4 == 0))
+			if (item == null || item is { Data1: 0, Data2: 0, Data3: 0, Data4: 0 })
 				return null;
 
 			var key = new[]

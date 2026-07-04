@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using System.Text;
 using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;

@@ -53,7 +53,7 @@ namespace Faolan.Web.Services
 		{
 			await using var db = await _dbf.CreateDbContextAsync();
 			var m = await db.Mails.FirstOrDefaultAsync(x => x.MailId == mailId);
-			if (m != null && !m.IsRead)
+			if (m is { IsRead: false })
 			{
 				m.IsRead = true;
 				await db.SaveChangesAsync();

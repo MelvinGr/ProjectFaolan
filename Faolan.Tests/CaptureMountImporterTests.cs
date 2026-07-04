@@ -38,7 +38,7 @@ namespace Faolan.Tests
 
 				var mounts = await db.NpcSpawns.Include(n => n.Npc).Where(n => n.MapId == CaptureMountImporter.MountMapId).ToListAsync();
 
-				Assert.Contains(mounts, m => string.Equals(m.Npc!.Name, "Fading Black Horse", StringComparison.OrdinalIgnoreCase) && m.Data != null && m.Data.Length > 0);
+				Assert.Contains(mounts, m => string.Equals(m.Npc!.Name, "Fading Black Horse", StringComparison.OrdinalIgnoreCase) && m.Data is { Length: > 0 });
 			}
 			finally
 			{

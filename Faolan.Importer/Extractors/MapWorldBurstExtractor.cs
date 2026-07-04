@@ -81,13 +81,13 @@ namespace Faolan.Importer.Extractors
 				if (!sawPoll)
 				{
 					// Pre-poll spawn burst: every 0x2000 download (world objects, entity spawns, the player spawn).
-					if (p.Opcode == Opcode2000 && p.IsDownload)
+					if (p is { Opcode: Opcode2000, IsDownload: true })
 					{
 						current.Add(p.Bytes);
 						BackfillInstance(p.Bytes); // backfill if the MapChange header lacked the instance
 					}
 				}
-				else if (p.Opcode == Opcode2076 && p.IsDownload)
+				else if (p is { Opcode: Opcode2076, IsDownload: true })
 				{
 					// Post-poll: the one structural record worth keeping - the spawn manifest. Everything else here is
 					// server-generated or gameplay and is deliberately skipped.

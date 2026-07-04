@@ -676,7 +676,7 @@ namespace Faolan.GameServer.World
 								{
 									await _output.BroadcastNpcCombatMode(effect.Entity, effect.Type == WorldTickEffectType.NpcEnterCombat);
 									// On engage, also push the aggro so the threat/hate is visible (#216).
-									if (effect.Type == WorldTickEffectType.NpcEnterCombat && effect.Target != null)
+									if (effect is { Type: WorldTickEffectType.NpcEnterCombat, Target: not null })
 										await _output.BroadcastNpcAggro(effect.Entity, effect.Target);
 								}
 

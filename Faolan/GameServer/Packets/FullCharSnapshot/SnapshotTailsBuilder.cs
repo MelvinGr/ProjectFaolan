@@ -4,7 +4,6 @@ using System.Linq;
 using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Database.Tables;
-using Faolan.GameServer.World;
 
 namespace Faolan.GameServer.Packets.FullCharSnapshot
 {

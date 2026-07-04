@@ -1,5 +1,3 @@
-using Faolan.Core.Enums;
-using Faolan.GameServer;
 using Faolan.GameServer.Combat;
 using Xunit;
 

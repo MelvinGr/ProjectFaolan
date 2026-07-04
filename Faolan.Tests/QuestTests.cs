@@ -294,7 +294,7 @@ namespace Faolan.Tests
 				foreach (var p in doc.RootElement.GetProperty("Packets").EnumerateArray())
 				{
 					var bh = p.GetProperty("BodyHex").GetString();
-					if (bh != null && bh.Length >= 16 && bh.Substring(8, 8) == subOpHex && p.GetProperty("Frame").GetInt32() == frame)
+					if (bh is { Length: >= 16 } && bh.Substring(8, 8) == subOpHex && p.GetProperty("Frame").GetInt32() == frame)
 						return bh.Substring(8); // drop the 4-byte (8 hex) length prefix
 				}
 			}
