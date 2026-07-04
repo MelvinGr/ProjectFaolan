@@ -11,6 +11,7 @@ namespace Faolan.Core.Database.Tables
 	// Supersedes ClassStartingSpell (which carried a redundant, always-1 Level column and only modelled the L1 grant).
 	public class ClassSpell : BaseEntity
 	{
+		[ConstrainToEnumValues]
 		public Class Class { get; set; }
 
 		// FK into the Spell catalog. The importer ensures a catalog row exists for every harvested spell, so this

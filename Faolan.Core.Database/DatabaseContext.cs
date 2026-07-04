@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace Faolan.Core.Database
 {
@@ -139,35 +141,9 @@ namespace Faolan.Core.Database
 
 		protected override void OnModelCreating(ModelBuilder modelBuilder)
 		{
-			// Every enum column must hold a DEFINED value of its enum, not a stray/unset code (e.g. the class 0/1 + race 0
-			// the importer used to record for chars captured pre-class-selection). The allowed lists are GENERATED from
-			// the enums so they stay in sync. (CharacterStatId is intentionally NOT constrained - it is an open enum with
-			// Unknown fillers for still-undecoded stat ids.)
-			static string In<TEnum>() where TEnum : struct, Enum =>
-				string.Join(", ", Enum.GetValues<TEnum>().Select(v => Convert.ToInt64(v)).Distinct().OrderBy(v => v));
-
-			modelBuilder.Entity<Character>().ToTable(t =>
-			{
-				t.HasCheckConstraint("CK_Character_Class", $"Class IN ({In<Class>()})");
-				t.HasCheckConstraint("CK_Character_Race", $"Race IN ({In<Race>()})");
-				t.HasCheckConstraint("CK_Character_Sex", $"Sex IN ({In<Sex>()})");
-			});
-			modelBuilder.Entity<ClassAbility>().ToTable(t => t.HasCheckConstraint("CK_ClassAbility_Class", $"Class IN ({In<Class>()})"));
-			modelBuilder.Entity<ClassSpell>().ToTable(t => t.HasCheckConstraint("CK_ClassSpell_Class", $"Class IN ({In<Class>()})"));
-			modelBuilder.Entity<Account>().ToTable(t =>
-			{
-				t.HasCheckConstraint("CK_Account_Type", $"Type IN ({In<AccountType>()})");
-				t.HasCheckConstraint("CK_Account_State", $"State IN ({In<AccountState>()})");
-			});
-			modelBuilder.Entity<Item>().ToTable(t => t.HasCheckConstraint("CK_Item_Type", $"Type IN ({In<ItemType>()})"));
-			modelBuilder.Entity<CharacterQuest>().ToTable(t => t.HasCheckConstraint("CK_CharacterQuest_State", $"State IN ({In<QuestState>()})"));
-			modelBuilder.Entity<Realm>().ToTable(t =>
-			{
-				t.HasCheckConstraint("CK_Realm_Country", $"Country IN ({In<RealmCountry>()})");
-				t.HasCheckConstraint("CK_Realm_LoadStatus", $"LoadStatus IN ({In<RealmLoadStatus>()})");
-				t.HasCheckConstraint("CK_Realm_OnlineStatus", $"OnlineStatus IN ({In<RealmOnlineStatus>()})");
-				t.HasCheckConstraint("CK_Realm_Type", $"Type IN ({In<RealmType>()})");
-			});
+			// Enum columns marked [ConstrainToEnumValues] get a generated CHECK constraint (the allowed list is built from
+			// the enum, so it stays in sync). CharacterStatId is intentionally left open (Unknown fillers for undecoded ids).
+			ConstrainToEnumValuesAttribute.ApplyEnumCheckConstraints(modelBuilder);
 
 			// Natural-key catalogs whose Id is an external id set by the importer (RDB/wire id), never DB-generated - so
 			// EF must not treat the integer PK as auto-increment (like Character/RespawnPoint/MorphTarget below).

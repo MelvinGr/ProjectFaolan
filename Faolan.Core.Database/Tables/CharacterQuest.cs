@@ -11,6 +11,7 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; }
 
+		[ConstrainToEnumValues]
 		public QuestState State { get; set; } = QuestState.Active;
 
 		// A kill objective: the NPC name whose death advances this quest's goal (null = no kill objective). The real

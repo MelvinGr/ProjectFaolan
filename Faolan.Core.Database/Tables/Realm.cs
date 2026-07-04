@@ -10,9 +10,13 @@ namespace Faolan.Core.Database.Tables
 	{
 		public virtual ICollection<Character> Characters { get; set; }
 
+		[ConstrainToEnumValues]
 		public RealmCountry Country { get; set; }
+		[ConstrainToEnumValues]
 		public RealmLoadStatus LoadStatus { get; set; }
+		[ConstrainToEnumValues]
 		public RealmOnlineStatus OnlineStatus { get; set; }
+		[ConstrainToEnumValues]
 		public RealmType Type { get; set; }
 
 		[MaxLength(64)]

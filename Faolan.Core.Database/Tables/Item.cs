@@ -23,6 +23,7 @@ namespace Faolan.Core.Database.Tables
 		public byte Level { get; set; }
 
 		// Normal / Quest / Resource, set at import from the container an item was captured in (default Normal).
+		[ConstrainToEnumValues]
 		public ItemType Type { get; set; }
 
 		[MaxLength(255)]

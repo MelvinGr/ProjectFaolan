@@ -12,7 +12,9 @@ namespace Faolan.Core.Database.Tables
 	{
 		public virtual ICollection<Character> Characters { get; set; }
 
+		[ConstrainToEnumValues]
 		public AccountState State { get; set; }
+		[ConstrainToEnumValues]
 		public AccountType Type { get; set; }
 
 		// Persisted GM toggles (#279). Unlike the live WorldEntity flags (which clear on relog AND on every map

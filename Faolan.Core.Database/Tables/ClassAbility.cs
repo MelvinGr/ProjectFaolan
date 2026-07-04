@@ -13,6 +13,7 @@ namespace Faolan.Core.Database.Tables
 	[PrimaryKey(nameof(Class), nameof(AbilityId))]
 	public class ClassAbility
 	{
+		[ConstrainToEnumValues]
 		public Class Class { get; set; }
 
 		// FK into the Abilities catalog (Ability.Id). The catalog row always exists (harvested from the 0x2052 grants).
