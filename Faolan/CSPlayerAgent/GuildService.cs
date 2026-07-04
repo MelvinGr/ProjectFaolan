@@ -146,8 +146,12 @@ namespace Faolan.CSPlayerAgent
 				.SendAsync(client);
 		}
 
-		// 0x2021 CreateGuild(i_cGuildName). No retail capture of the upload exists; the recovered signature is a
-		// single string, read as the standard u16-length string.
+		// 0x2021 CreateGuild. Body decoded from DemoL80_..._create-guild.pcapng (docs/create-guild-decode.md):
+		//   [name s16][u8 form][u16 0]   e.g. `0006 "faolan" 06 0000`. The `form` is the government/guild-form the
+		// player picked in the registrar window (the blind impl used to drop it). NOTE: retail's IMMEDIATE reply is
+		// DispatchGuildCreated (0x2044) - a [creator member record][guild header][renown/trailer] packet that opens
+		// the window with NO relog - NOT the 0x203F we send here; that 0x2044 tail + its guild-chat 0x003c subs are
+		// the documented follow-up. Today the guild still shows via the login 0x203F push after a relog.
 		public async Task HandleCreateGuild(INetworkClient client, ConanPacket packet)
 		{
 			var character = client.Session.Character;
@@ -155,6 +159,7 @@ namespace Faolan.CSPlayerAgent
 				return;
 
 			var name = packet.Body.ReadString();
+			var form = packet.Body.Length - packet.Body.Position >= 1 ? packet.Body.ReadByte() : (byte)0; // guild-form (docs/create-guild-decode.md)
 			if (string.IsNullOrWhiteSpace(name) || character.GuildId != null)
 			{
 				_logger.LogWarning("CreateGuild rejected for {CharacterId:X8}: name \"{Name}\", already in guild: {InGuild}.", character.Id, name, character.GuildId != null);
@@ -173,7 +178,7 @@ namespace Faolan.CSPlayerAgent
 			character.GuildId = guild.Id;
 			character.GuildRank = Character.GuildLeaderRank;
 
-			_logger.LogInformation("Guild \"{Name}\" ({GuildId:X}) created by {Character}.", guild.Name, guild.Id, character.Name);
+			_logger.LogInformation("Guild \"{Name}\" ({GuildId:X}) created by {Character} (form 0x{Form:X2}).", guild.Name, guild.Id, character.Name, form);
 			await SendGuildFullUpdate(client, packet.ReceiverBytes, packet.SenderBytes, guild, character);
 			await _gameServerDispatcher.SendGuildTag(character.Id, guild.Name);
 		}
