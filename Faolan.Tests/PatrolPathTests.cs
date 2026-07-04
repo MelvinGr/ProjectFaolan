@@ -43,9 +43,9 @@ namespace Faolan.Tests
 				path.Waypoints.Add(new PatrolWaypoint
 				{
 					Ordinal = i,
-					X = entry.Waypoints[i].X,
-					Y = entry.Waypoints[i].Y,
-					Z = entry.Waypoints[i].Z
+					PositionX = entry.Waypoints[i].X,
+					PositionY = entry.Waypoints[i].Y,
+					PositionZ = entry.Waypoints[i].Z
 				});
 			}
 

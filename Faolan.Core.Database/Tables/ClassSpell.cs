@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 using Faolan.Core.Enums;
 
@@ -20,6 +21,7 @@ namespace Faolan.Core.Database.Tables
 		// navigation always resolves (load it with .Include(s => s.Spell) when the spell's params/level are needed).
 		// virtual so the lazy-loading-proxy DbContext used in tests can build its model.
 		public uint SpellId { get; set; }
+		[ForeignKey(nameof(SpellId))]
 		public virtual Spell Spell { get; set; }
 	}
 }

@@ -35,8 +35,8 @@ namespace Faolan.Core.Database.Tables
 		// NPCs ever appear - until then name is correct and the simpler key.)
 		[MaxLength(128)]
 		public string NpcName { get; set; }
-		public uint CapturedInstance { get; set; }
 
+		public uint CapturedInstance { get; set; }
 		public uint CapturedNpcHandle { get; set; }
 
 		// The RDB quest id this screen GRANTS when reached (0 = none). Harvested from the captures: a QuestFullUpdate /

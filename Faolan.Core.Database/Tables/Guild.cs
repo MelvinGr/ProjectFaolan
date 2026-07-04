@@ -38,10 +38,5 @@ namespace Faolan.Core.Database.Tables
 
 		// Guild bank, in tin (u64 on the wire; the wallet wire unit).
 		public ulong Cash { get; set; }
-
-		public override string ToString()
-		{
-			return $"{base.ToString()}: {Name}";
-		}
 	}
 }

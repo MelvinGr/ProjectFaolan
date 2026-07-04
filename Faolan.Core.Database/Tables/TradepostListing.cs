@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
@@ -16,6 +17,7 @@ namespace Faolan.Core.Database.Tables
 		// Navigation to the filed catalog item (FK ItemId -> Items.Id, Restrict). Load with Include when needed.
 		// virtual so the lazy-loading-proxy DbContext used in tests (EquipmentPersistenceTests etc.) can build its
 		// model - UseLazyLoadingProxies requires every navigation to be virtual (the live app doesn't enable proxies).
+		[ForeignKey(nameof(ItemId))]
 		public virtual Item Item { get; set; }
 
 		[MaxLength(64)]

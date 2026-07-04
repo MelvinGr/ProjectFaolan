@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -26,6 +27,9 @@ namespace Faolan.Core.Database.Tables
 		// Do NOT use for new render paths - build from the columns + KdTreeTail instead.
 		[Obsolete("Legacy verbatim packet; the render builds from the typed columns + KdTreeTail (#187). Kept only as the import source + runtime loot-bag/fallback.")]
 		public byte[] Data { get; set; }
+
+		[ForeignKey(nameof(MapId))]
+		public virtual Map Map { get; set; }
 
 		// The bytes AFTER the identity message: the kd-tree / collision / bounds geometry (FUN_0080c620), per-object
 		// but session-INDEPENDENT (static decor geometry). Stored so the world-entry build constructs the whole

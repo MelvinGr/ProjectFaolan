@@ -9,9 +9,14 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(PatrolPathId))]
 		public virtual PatrolPath PatrolPath { get; set; }
 
-		public float X { get; set; }
-		public float Y { get; set; }
-		public float Z { get; set; }
+		// TODO: Vector3
+		[Column("X")]
+		public float PositionX { get; set; }
+		[Column("Y")]
+		public float PositionY { get; set; }
+		[Column("Z")]
+		public float PositionZ { get; set; }
+
 		public int Ordinal { get; set; }
 		public uint PatrolPathId { get; set; }
 	}

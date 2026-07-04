@@ -292,9 +292,9 @@ namespace Faolan.Importer.Captures
 					existing.Waypoints.Add(new PatrolWaypoint
 					{
 						Ordinal = i,
-						X = e.Waypoints[i].X,
-						Y = e.Waypoints[i].Y,
-						Z = e.Waypoints[i].Z
+						PositionX = e.Waypoints[i].X,
+						PositionY = e.Waypoints[i].Y,
+						PositionZ = e.Waypoints[i].Z
 					});
 				}
 			}

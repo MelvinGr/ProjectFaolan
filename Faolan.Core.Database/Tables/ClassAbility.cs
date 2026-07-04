@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,6 +20,7 @@ namespace Faolan.Core.Database.Tables
 		// FK into the Abilities catalog (Ability.Id). The catalog row always exists (harvested from the 0x2052 grants).
 		public uint AbilityId { get; set; }
 
+		[ForeignKey(nameof(AbilityId))]
 		public virtual Ability Ability { get; set; }
 
 		// The character level this ability unlocks at FOR THIS CLASS (min level of that class's captured holders).
