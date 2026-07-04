@@ -6,7 +6,7 @@ namespace Faolan.Web.Components.Pages
 	public partial class Status
 	{
 		private bool _loaded;
-		private DateTime? _lastLogin;
+		private DateTimeOffset? _lastLogin;
 		private int _accounts;
 		private int _chars;
 		private int _classMax;

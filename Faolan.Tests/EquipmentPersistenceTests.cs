@@ -56,7 +56,9 @@ namespace Faolan.Tests
 						Id = characterId,
 						Name = "Tester",
 						AccountId = 1,
-						RealmId = 1
+						RealmId = 1,
+						Class = Class.Barbarian,
+						Race = Race.Cimmerian
 					});
 					db.CharacterEquipment.Add(new CharacterEquipment
 					{

@@ -273,12 +273,17 @@ namespace Faolan.Core.Database
 					RealmId = realmId,
 					AuthChallenge = Guid.NewGuid().ToString("N"),
 					Level = 1,
+					// The real Class/Race are committed later in the editor, but the columns are enum-constrained (no
+					// "unchosen" value exists), so seed a valid placeholder - the rogue archetype the baseline MaxStats
+					// below already assumes - overwritten when the player commits their choice.
+					Class = Class.Barbarian,
+					Race = Race.Cimmerian,
 					CreationDate = DateTime.UtcNow,
 					MapId = Map.TortageBeachId,
 					Position = Map.NewPlayerSpawnSpawnPoint.Position
 				};
 
-				// Seed default vitals (cascade-inserts with the character). Class isn't chosen yet at row
+				// Seed default vitals (cascade-inserts with the character). Class isn't committed yet at row
 				// allocation, so this is the level-1 rogue-default baseline; regenerate when class is committed.
 				character.MaxStats = CharacterMaxStats.CreateDefaults(character.Class, character.Level);
 

@@ -8,7 +8,8 @@ namespace Faolan.Core.Enums
 	// Used to keep quest/resource items out of random loot (GetRandomBuildableItems).
 	public enum ItemType
 	{
-		//Equipped = 101,
+		// No Equipped(101): the equipped container is a LOCATION, not an item class - worn gear is Normal loot, so the
+		// harvester (ArchetypeHarvester.ClassifyContainer) folds container-kind 101 into Normal.
 		Normal = 104, // BagKind
 		Resource = 112, // ResourceKind
 		Quest = 113 // QuestKind

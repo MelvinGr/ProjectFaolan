@@ -26,8 +26,8 @@ namespace Faolan.Core.Database.Tables
 		[NotMapped]
 		public Character? Character { get; set; }
 
-		public DateTime CreationDate { get; set; }
-		public DateTime? LastConnection { get; set; }
+		public DateTimeOffset CreationDate { get; set; }
+		public DateTimeOffset? LastConnection { get; set; }
 
 		public int CreateCounter { get; set; }
 		public int CreateState { get; set; }

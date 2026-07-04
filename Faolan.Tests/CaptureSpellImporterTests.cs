@@ -1,3 +1,4 @@
+using Faolan.Core.Enums;
 using System;
 using System.IO;
 using System.Linq;
@@ -92,14 +93,18 @@ namespace Faolan.Tests
 						Id = DemoL80Id,
 						Name = "DemoL80",
 						AccountId = 1,
-						RealmId = 1
+						RealmId = 1,
+						Class = Class.Barbarian,
+						Race = Race.Cimmerian
 					});
 					db.Characters.Add(new Character
 					{
 						Id = 0xDEAD,
 						Name = "Other",
 						AccountId = 1,
-						RealmId = 1
+						RealmId = 1,
+						Class = Class.Barbarian,
+						Race = Race.Cimmerian
 					});
 					await db.SaveChangesAsync();
 

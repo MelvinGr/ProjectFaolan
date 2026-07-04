@@ -240,7 +240,9 @@ namespace Faolan.Tests
 						Id = characterId,
 						Name = "Tester",
 						AccountId = accountId,
-						RealmId = 1
+						RealmId = 1,
+						Class = Class.Barbarian,
+						Race = Race.Cimmerian
 					});
 					await ctx.SaveChangesAsync();
 				}
@@ -383,7 +385,9 @@ namespace Faolan.Tests
 						Id = 5,
 						Name = "T",
 						AccountId = 1,
-						RealmId = 1
+						RealmId = 1,
+						Class = Class.Barbarian,
+						Race = Race.Cimmerian
 					});
 					ctx.Items.Add(new Item
 					{
@@ -516,7 +520,9 @@ namespace Faolan.Tests
 					{
 						Id = characterId,
 						AccountId = accountId,
-						RealmId = 1
+						RealmId = 1,
+						Class = Class.Barbarian,
+						Race = Race.Cimmerian
 					});
 					await ctx.SaveChangesAsync();
 				}

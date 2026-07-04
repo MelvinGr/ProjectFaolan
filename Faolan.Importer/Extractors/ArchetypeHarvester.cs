@@ -130,11 +130,17 @@ namespace Faolan.Importer.Extractors
 		}
 
 		// The container an item was captured in IS its kind: ItemType's values are the same protocol container-kind
-		// numbers as ContainerKind (Equipped 101 / Bag=Normal 104 / Resource 112 / Quest 113), so this is a direct
-		// cast.
+		// numbers as ContainerKind (Bag=Normal 104 / Resource 112 / Quest 113), so those map straight. EXCEPT the
+		// equipped container (101): that is a LOCATION, not an item class - worn gear is ordinary Normal loot - so it
+		// folds into Normal, keeping the catalog to the three real item classes (the routing hint that keeps quest/
+		// resource items out of random loot).
+		private const uint EquippedContainerKind = 101;
+
 		private static ItemType ClassifyContainer(InventorySnapshotInspector.ContainerKind kind)
 		{
-			return (ItemType)(uint)kind;
+			return (uint)kind == EquippedContainerKind
+				? ItemType.Normal
+				: (ItemType)(uint)kind;
 		}
 
 		// Recovers (template -> CapturedItem) AND the item's TYPE from a live DispatchAddItem (GameCharInterface s2c

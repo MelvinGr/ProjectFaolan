@@ -154,6 +154,15 @@ namespace Faolan.Importer.Captures
 					? body[136]
 					: 0u);
 
+				// Skip captures taken BEFORE class selection: their class byte is unset (0/1), not one of the 12
+				// real classes. Materializing them creates broken chars (and would violate the Class CHECK constraint).
+				if (!Enum.IsDefined((Class)classId))
+				{
+					Console.WriteLine($"Characters: skipped '{name}' - invalid/unset class {classId} (captured pre-class-selection).");
+					skipped++;
+					continue;
+				}
+
 				await AddCharacter(db, accountId, realmId, name, mapId, classId, scaffold, read.Message, snapshots.GetValueOrDefault(handle), charList.GetValueOrDefault(name));
 				added++;
 			}

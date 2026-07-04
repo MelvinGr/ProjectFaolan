@@ -5,10 +5,10 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Web.Services
 {
 	// One account row for the admin table.
-	public sealed record AccountRow(uint Id, string UserName, AccountType Type, AccountState State, DateTime? LastConnection, int Characters);
+	public sealed record AccountRow(uint Id, string UserName, AccountType Type, AccountState State, DateTimeOffset? LastConnection, int Characters);
 
 	// Full account detail for the per-account admin page.
-	public sealed record AccountDetail(uint Id, string UserName, AccountType Type, AccountState State, DateTime CreationDate, DateTime? LastConnection, string? LastIp, List<AccountChar> Characters);
+	public sealed record AccountDetail(uint Id, string UserName, AccountType Type, AccountState State, DateTimeOffset CreationDate, DateTimeOffset? LastConnection, string? LastIp, List<AccountChar> Characters);
 
 	public sealed record AccountChar(uint Id, string Name, ushort Level, string Class, string Race, ulong Money, DateTimeOffset? LastConnection);
 

@@ -190,9 +190,12 @@ namespace Faolan.Importer.Captures
 			var abilityIds = (await db.Abilities.Select(a => a.Id).ToListAsync()).ToHashSet();
 			var existing = await db.ClassAbilities.ToDictionaryAsync(x => (x.Class, x.AbilityId));
 
+			// Skip characters with an invalid class (0/1): create-flow chars captured BEFORE class selection carry an
+			// unset class the importer records as-is - real classes are the 12 defined Class enum values. Without this
+			// guard those pollute the access map with a phantom "class 1" holding the universal kit.
 			var inserted = 0;
 			var updated = 0;
-			foreach (var g in grants.Where(x => abilityIds.Contains(x.AbilityId)).GroupBy(x => (x.Class, x.AbilityId)))
+			foreach (var g in grants.Where(x => abilityIds.Contains(x.AbilityId) && Enum.IsDefined(x.Class)).GroupBy(x => (x.Class, x.AbilityId)))
 			{
 				var minLevel = (byte)Math.Clamp(g.Min(x => (int)x.Level), 1, 255);
 				if (existing.TryGetValue(g.Key, out var row))
