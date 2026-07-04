@@ -48,6 +48,9 @@ namespace Faolan.Importer.Cli
 				case "opcodes":
 					OpcodeScan(LoadCaptures(capturesDir));
 					return 0;
+				case "opcodes-csv":
+					OpcodeCsv(LoadCaptures(capturesDir));
+					return 0;
 				case "worldobj":
 					await WorldObj(dbPath, arg ?? "hangingwoman");
 					return 0;
@@ -84,6 +87,34 @@ namespace Faolan.Importer.Cli
 				default:
 					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: conversation-states, anim, worldobj, spell-fields, rdb-assets.");
 					return 1;
+			}
+		}
+
+		// Matrix CSV of the same index: one row per capture, one column per (direction, opcode) - sub-opcode collapsed
+		// so the column set stays sane (~122) - cell = packet count. Import into a spreadsheet to pivot/filter dumps.
+		private static void OpcodeCsv(IReadOnlyList<NamedCapture> captures)
+		{
+			var perCap = new Dictionary<string, Dictionary<(bool Dl, uint Op), int>>();
+			var cols = new SortedSet<(uint Op, bool Dl)>(); // orders by opcode, then C2S before S2C
+			foreach (var c in captures)
+			{
+				var counts = new Dictionary<(bool Dl, uint Op), int>();
+				foreach (var p in c.Packets)
+				{
+					counts[(p.IsDownload, p.Opcode)] = counts.GetValueOrDefault((p.IsDownload, p.Opcode)) + 1;
+					cols.Add((p.Opcode, p.IsDownload));
+				}
+				perCap[c.Name] = counts;
+			}
+
+			var ordered = cols.ToList();
+			static string Csv(string s) => s.Contains(',') || s.Contains('"') ? $"\"{s.Replace("\"", "\"\"")}\"" : s;
+
+			Console.WriteLine("capture," + string.Join(",", ordered.Select(x => $"{(x.Dl ? "S2C" : "C2S")} 0x{x.Op:X4}")));
+			foreach (var c in captures.OrderBy(c => c.Name, StringComparer.Ordinal))
+			{
+				var counts = perCap[c.Name];
+				Console.WriteLine(Csv(c.Name) + "," + string.Join(",", ordered.Select(x => counts.TryGetValue((x.Dl, x.Op), out var n) ? n : 0)));
 			}
 		}
 
