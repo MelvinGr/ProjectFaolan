@@ -84,12 +84,12 @@ namespace Faolan.GameServer
 			// exactly as it is - we just made its slots resolvable above.
 			var existingShortcuts = await Database.GetCharacterShortcuts(character.Id);
 
-			// Belt-and-braces: make every SPELL already on the bar known too, so an imported bar that points at
-			// spells beyond the class-starting set (higher ranks, off-class placements) still renders every slot.
-			foreach (var spellId in existingShortcuts.Where(s => s.ShortcutType == shortcutTypeSpell).Select(s => s.TargetId))
-				await Database.AddCharacterSpell(character.Id, spellId);
+			// NB the bar is just SHORTCUTS - it is NOT the source of truth for what the character KNOWS. The known-spell
+			// set is the snapshot known-list (CharacterSpells); we do NOT add the bar's spell targets to it. Doing so
+			// used to "learn" a spell twice when the bar referenced a different id than the known-list for the same spell
+			// (e.g. two ids both named "Quell the Ether (Rank 5)"), showing a duplicate in the spellbook.
 
-			// ...and grant every ABILITY on the bar (an imported bar references abilities beyond the class-starting
+			// Grant every ABILITY on the bar (an imported bar references abilities beyond the class-starting
 			// set - GetStartingAbilities only returns the IsStartingAbility ones). SendAbilityGrant needs the row;
 			// ids we don't have cataloged are skipped (that slot stays empty).
 			foreach (var abilityId in existingShortcuts.Where(s => s.ShortcutType == shortcutTypeAbility).Select(s => s.TargetId).Distinct())

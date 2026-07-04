@@ -124,6 +124,14 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 				foreach (var id in TailsStatBlock.VolatileStatIds)
 					block.SetStat(id, TailsStatBlock.SkeletonValueOf(id));
 
+				// XP is CHARACTER-derived (canonical in the character/level), not persistent sheet state: a captured
+				// max-level XP replayed verbatim renders as a garbage/negative XP bar in-client. Author 0x34 from the
+				// character (as the fresh path does) and reset its companion slots (0x15E MaxExp, 0x39) to baseline.
+				if (character != null)
+					block.CurrentXp = character.Experience;
+				block.SetStat((uint)CharacterStatId.MaxExp, TailsStatBlock.SkeletonValueOf((uint)CharacterStatId.MaxExp));
+				block.SetStat(0x39, TailsStatBlock.SkeletonValueOf(0x39));
+
 				// #214: a dead character logs in dead - the stored sheet is its alive-at-capture health, so still zero
 				// current-health so the client shows the release window at world entry.
 				if (character?.IsDead == true)
