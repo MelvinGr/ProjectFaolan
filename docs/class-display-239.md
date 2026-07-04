@@ -180,10 +180,37 @@ stat, right value) but happens post-ready rather than during spawn-Activate. The
 to embed stat 0x43 in the player spawn's stat data so Activate sets it (exact carrier field — generic_stats
 vs an extra stat block — is the remaining decode). Until then the interim is fine and validated.
 
-## CARRIER DECODED — it's `generic_stats`, VALUES-ONLY ordered by `g_Int32StatsOrder` (2026-07-04)
+## LIVE-RETAIL CONFIRMED: class = stat 0x43, but it is NOT a wire stat (2026-07-05)
 
-The carrier is the CoreCharacter's **`generic_stats`** vector, read by `CoreCharacterFullUpdateIIR::ReadSubClass`
-(`FUN_0145ac80`). Key facts, all evidence-backed this session:
+Read a **live retail** client (necro lvl80, `/proc/<pid>/mem`, base 0x400000) — the player StatHolder is at
+`player+0x134` (array) / `+0x138` (count): **240 stats, `stat 0x43 = 41 = Necromancer`**, `0x36`(level)=80,
+`0x1b`(HP)=634100, `0x1f`=4 (the fallback is NOT the class). Chain: `holder=*0x0297d374 → player=*(holder+0xa4)
+→ statArray=*(player+0x134)`, sorted `[u32 id][u32 value]` pairs (`live_stats.txt`). The mechanism is now
+**live-confirmed**, not just inferred.
+
+**The class is NOT delivered as a wire stat.** The player stat block on the wire (the `0x737A6DF9` FullChar
+snapshot) is `[u32 id][u32 value]` BE pairs (found via the HP=634100 fingerprint in
+`faolan-...-necro-lvl80` frame 81: `(0x1b,634100)(0x36,80)(0x34,…)…`), but it **does not contain id `0x43`
+at all**. Exhaustive search of both lvl80 necrol80 captures + all 8 fresh per-class login captures finds **no
+`(0x43, class)` pair in any byte order, in any record**. So the client SETS stat `0x43` during the player-spawn
+`GameCodeDynelFullUpdateIIR::Activate` (the retail backtrace) from a **non-stat source** — a dedicated class
+field in the spawn, or client-side derivation from cached char-select data (the char-LIST *does* carry the
+correct Class; retail likely caches it and applies it as stat 0x43 on Activate). Pinning the exact source needs
+GUI-Ghidra decompilation of `Activate`/the visitor `FUN_005bffe0` (the headless decompiler returns empty bodies
+for these).
+
+**This supersedes the "generic_stats values-only ordered" note below** — that was WRONG: `g_Int32StatsOrder`
+(`0x02d25da4`) reads **empty (0/0) on retail too** (live), so it is not the class carrier and the assert passes
+trivially. The generic_stats decode is kept below only for the record.
+
+**Bottom line for #304:** the class is not a simple wire stat we can add to our spawn — retail derives it during
+Activate. The post-ready `SetStat(0x43)=Class` force-feed remains the correct, validated delivery; retiring it
+requires identifying and replicating Activate's derivation source (open, GUI-Ghidra).
+
+### (superseded) generic_stats decode — kept for reference
+
+The CoreCharacter's `generic_stats` vector is read by `CoreCharacterFullUpdateIIR::ReadSubClass`
+(`FUN_0145ac80`):
 
 - The reader ends with `assert(g_Int32StatsOrder.size() == m_CoreCharacterMessage.generic_stats_size())`
   (`CoreCharacterFullUpdateIIR.cpp:0x435`; disasm `0145b279: MOV EDX,[0x02d25da8]; SUB EDX,[0x02d25da4]; SAR
