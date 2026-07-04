@@ -65,7 +65,6 @@ namespace Faolan.Tests
 			var character = new Character { Level = 1 };
 			character.RegenerateMaxStats();
 			var seeded = character.MaxStats;
-			seeded!.Id = 42; // simulate a persisted row
 
 			// The editor commits a mage class at a higher level -> stats regenerate into the SAME row.
 			character.Class = Class.Necromancer;
@@ -73,7 +72,6 @@ namespace Faolan.Tests
 			character.RegenerateMaxStats();
 
 			Assert.Same(seeded, character.MaxStats); // same tracked row, not a replacement
-			Assert.Equal(42u, character.MaxStats!.Id);
 			Assert.Equal(CharacterMaxStats.CreateDefaults(Class.Necromancer, 20).Mana, character.MaxStats.Mana);
 		}
 	}

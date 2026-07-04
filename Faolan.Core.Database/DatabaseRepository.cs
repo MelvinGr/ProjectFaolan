@@ -1121,7 +1121,19 @@ namespace Faolan.Core.Database
 		public async Task SaveCharacter(Character character)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			ctx.Characters.Update(character); // TrackGraph: existing keys -> Modified, default keys (new Body) -> Added
+			ctx.Characters.Update(character); // TrackGraph: default (store-generated) keys -> Added, set keys -> Modified
+
+			// Dependents keyed on a non-store-generated value - the shared-PK one-to-ones (Body/MaxStats/SpawnFrame on
+			// CharacterId) and the compound-PK junctions - carry a SET key even when brand-new, so Update() marks a new
+			// one Modified and SaveChanges would fail with a 0-rows concurrency error. Flip any Modified dependent whose
+			// row doesn't actually exist yet to Added so it inserts instead. (SaveCharacter is the cold full-graph path;
+			// hot updates use the targeted ExecuteUpdate savers below.)
+			foreach (var entry in ctx.ChangeTracker.Entries().Where(e => e.State == EntityState.Modified && e.Entity is not Character).ToList())
+			{
+				if (await entry.GetDatabaseValuesAsync() is null)
+					entry.State = EntityState.Added;
+			}
+
 			await ctx.SaveChangesAsync();
 		}
 

@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+
 namespace Faolan.Core.Database.Tables
 {
 	// One-to-one spawn-scaffold state that is not row-shaped: the raw pre-IIR frame (the near-constant skeleton
@@ -5,7 +7,8 @@ namespace Faolan.Core.Database.Tables
 	// variants) and the per-character u32 that follows the entry-table count. Captured characters get these
 	// extracted from their spawn; fresh characters get the fresh-character defaults
 	// (PlayerSpawnScaffoldRows.FreshPreFrame). See docs/archive/player-spawn-generation-plan.md "VALIDATED GRAMMAR".
-	public class CharacterSpawnFrame : BaseEntity
+	[PrimaryKey(nameof(CharacterId))]
+	public class CharacterSpawnFrame
 	{
 		public virtual Character Character { get; set; }
 

@@ -1,8 +1,10 @@
+using Microsoft.EntityFrameworkCore;
 using Faolan.Core.Enums;
 
 namespace Faolan.Core.Database.Tables
 {
-	public class CharacterMaxStats : BaseEntity
+	[PrimaryKey(nameof(CharacterId))]
+	public class CharacterMaxStats
 	{
 		public virtual Character Character { get; set; }
 		public uint CharacterId { get; set; }

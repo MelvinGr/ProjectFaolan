@@ -1,8 +1,10 @@
+using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Faolan.Core.Database.Tables
 {
-	public class CharacterBody : BaseEntity
+	[PrimaryKey(nameof(CharacterId))]
+	public class CharacterBody
 	{
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; }
