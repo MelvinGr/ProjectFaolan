@@ -10,11 +10,8 @@ namespace Faolan.Core.Database.Tables
 		public virtual PatrolPath PatrolPath { get; set; }
 
 		// TODO: Vector3
-		[Column("X")]
 		public float PositionX { get; set; }
-		[Column("Y")]
 		public float PositionY { get; set; }
-		[Column("Z")]
 		public float PositionZ { get; set; }
 
 		public int Ordinal { get; set; }
