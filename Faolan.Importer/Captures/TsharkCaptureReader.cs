@@ -68,13 +68,14 @@ namespace Faolan.Importer.Captures
 						? BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4))
 						: 0u;
 
-					// Real capture timestamp (frame.time_epoch, seconds) as epoch MICROSECONDS, so packets sort in
-					// true wall-clock order ACROSS captures - not just within one file. Falls back to the per-file
-					// sequence when TimeUtc is absent. (Used by CaptureCharacterStateImporter to take a character's
-					// LATEST-in-time wallet/hotbar when it appears in several captures.)
+					// Real capture timestamp so packets sort in true wall-clock order ACROSS captures, not just within
+					// one file. TimeUtc is an ISO-8601 string (e.g. "2026-07-04T09:12:42.741207819Z"), NOT a decimal
+					// epoch - parse it as a DateTimeOffset and use its 100ns UtcTicks. Falls back to the per-file
+					// sequence when absent/unparseable. (Used by CaptureCharacterStateImporter to take a character's
+					// LATEST-in-time saved hotbar/wallet when it appears in several captures.)
 					var tick = p.TryGetProperty("TimeUtc", out var tEl) && tEl.ValueKind == JsonValueKind.String
-					           && double.TryParse(tEl.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var epoch)
-						? (long)(epoch * 1_000_000)
+					           && DateTimeOffset.TryParse(tEl.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var timestamp)
+						? timestamp.UtcTicks
 						: seq;
 
 					var full = Rebuild(p, body, opcode);
