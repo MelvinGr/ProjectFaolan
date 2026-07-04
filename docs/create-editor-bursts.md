@@ -138,6 +138,10 @@ create-specific to decode, only builder wiring to do:
      0d51565 the last raw `IirId()` byte-literal records in `CreationScriptBurst` / `InitialBurst` /
      `WorldPrepBurst` are now built via `CreateEditorRecordBuilder` too (the per-class StatIIR runs as loops). The
      unused `C350` var + per-file `IirId` helpers were dropped. (`PlayfieldFIIR`/`GameTimeIIR` already wired.)
+     The remaining verbatim carriers of this family in `Post205FBurst` (18× StatIIR stat-0x13) and
+     `WorldEntryBurst` (7× StatIIR incl. 2 for NPC handle 0x00017ED0, 1× EnergyIIR, 2× StatUpdateIIR) were
+     converted the same way (#304) — **no StatIIR/EnergyIIR/StatUpdateIIR verbatim carrier remains in ANY
+     CreateFlow burst** (the `GameActionListIIR` 0xF508F4C1 records too, via `GameActionListCodec`).
 
    **`ScryScriptIIR` now CONSTRUCTED (#223):** the two CreationScript records (the "Slave Galley" PreloadAssets
    step + "PlayOrSkip") are built by `ScryScript.BuildStep`, and the post-morph `StartScriptGroupOnClient`
