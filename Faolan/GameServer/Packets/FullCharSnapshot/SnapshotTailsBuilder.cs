@@ -117,6 +117,13 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 				// word and the known-list ids). Values are already at wire scale as captured.
 				block = TailsStatBlock.CreateBlock([.. statSheet.Select(s => ((uint)s.Id, s.Value))]);
 
+				// Reset the SESSION/MAP-volatile slots to the fresh baseline: their captured value is specific to the
+				// retail session it came from, and replaying it into a fresh login misbehaves - 0xBF (the playfield-
+				// token/position slot) hides the entire abilities tab (verified by bisecting NecroL80's sheet). SetStat is
+				// safe here (these ids are not in the trailer, and this runs BEFORE the known-list splice).
+				foreach (var id in TailsStatBlock.VolatileStatIds)
+					block.SetStat(id, TailsStatBlock.SkeletonValueOf(id));
+
 				// #214: a dead character logs in dead - the stored sheet is its alive-at-capture health, so still zero
 				// current-health so the client shows the release window at world entry.
 				if (character?.IsDead == true)

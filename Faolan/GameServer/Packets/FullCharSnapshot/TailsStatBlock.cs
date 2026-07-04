@@ -55,6 +55,26 @@ namespace Faolan.GameServer.Packets.FullCharSnapshot
 		// The tail after StatList#2: the empty known-spell list (count 0x3F1) + the trailing pair-list.
 		private static readonly uint[] Trailer = [0x3F1, 0x1, 0x1000000, 0x0, 0x0, 0x0, 0x0];
 
+		// Stat slots that are SESSION/MAP-volatile, NOT stable character state: the captured value belongs to the retail
+		// session it was recorded in, so authoring from an imported sheet must NOT replay it - it is reset to the fresh
+		// baseline (SkeletonValueOf). 0xBF is the playfield-token/position slot; replaying a stale one HIDES the entire
+		// in-client abilities tab (bisected on NecroL80's level-80 sheet, 2026-07-04). The other huge captured values
+		// (0x25F the documented session slot, 0x3C/0x44A/0x5B/0x3D handle-like) are left imported for now - they do not
+		// misbehave observably; add them here if a stale one is found to break something.
+		public static readonly uint[] VolatileStatIds = [0xBF];
+
+		// The fresh-skeleton baseline value for a stat id (0 if absent). Used to reset the volatile slots above.
+		public static uint SkeletonValueOf(uint statId)
+		{
+			foreach (var (id, value) in StatList1)
+				if (id == statId)
+					return value;
+			foreach (var (id, value) in StatList2Half)
+				if (id == statId)
+					return value;
+			return 0;
+		}
+
 		// The number of stat pairs a full sheet carries: StatList#1 (the displayed stats) + StatList#2's single copy.
 		public static int SheetSize => StatList1.Length + StatList2Half.Length;
 
