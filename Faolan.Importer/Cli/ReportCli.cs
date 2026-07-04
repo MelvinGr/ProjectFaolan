@@ -45,6 +45,9 @@ namespace Faolan.Importer.Cli
 				case "mapchange":
 					MapChangeScan(LoadCaptures(capturesDir));
 					return 0;
+				case "opcodes":
+					OpcodeScan(LoadCaptures(capturesDir));
+					return 0;
 				case "worldobj":
 					await WorldObj(dbPath, arg ?? "hangingwoman");
 					return 0;
@@ -82,6 +85,50 @@ namespace Faolan.Importer.Cli
 					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: conversation-states, anim, worldobj, spell-fields, rdb-assets.");
 					return 1;
 			}
+		}
+
+		// Grep-friendly index of every (direction, opcode, sub-opcode) tuple across the captures: per-dump counts, then
+		// a global catalog (total + how many dumps carry it). Lets you find which dump to open for a given (sub)opcode.
+		private static void OpcodeScan(IReadOnlyList<NamedCapture> captures)
+		{
+			var globalCount = new Dictionary<(bool Dl, uint Op, uint Sub), int>();
+			var globalDumps = new Dictionary<(bool Dl, uint Op, uint Sub), HashSet<string>>();
+			var totalPackets = 0;
+
+			Console.WriteLine($"# Opcode index - {captures.Count} dumps");
+			Console.WriteLine();
+			Console.WriteLine("## Per dump");
+			foreach (var c in captures.OrderBy(c => c.Name, StringComparer.Ordinal))
+			{
+				var counts = new Dictionary<(bool Dl, uint Op, uint Sub), int>();
+				foreach (var p in c.Packets)
+				{
+					var k = (p.IsDownload, p.Opcode, p.SubOpcode);
+					counts[k] = counts.GetValueOrDefault(k) + 1;
+					globalCount[k] = globalCount.GetValueOrDefault(k) + 1;
+					(globalDumps.TryGetValue(k, out var s) ? s : globalDumps[k] = []).Add(c.Name);
+					totalPackets++;
+				}
+
+				Console.WriteLine($"### {c.Name}  ({c.Packets.Count} packets)");
+				foreach (var (k, n) in counts.OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key.Op).ThenBy(kv => kv.Key.Sub))
+					Console.WriteLine($"  {(k.Dl ? "S2C" : "C2S")} op=0x{k.Op:X4} sub=0x{k.Sub:X8}  {n}");
+				Console.WriteLine();
+			}
+
+			var byOp = globalCount
+				.GroupBy(kv => (kv.Key.Dl, kv.Key.Op))
+				.Select(g => (g.Key, Total: g.Sum(x => x.Value), Subs: g.Count(), Dumps: g.SelectMany(x => globalDumps[x.Key]).Distinct().Count()))
+				.OrderBy(x => x.Key.Op).ThenBy(x => x.Key.Dl)
+				.ToList();
+			Console.WriteLine($"## Opcodes (sub-opcode collapsed) - {byOp.Count} distinct (dir,op)");
+			foreach (var x in byOp)
+				Console.WriteLine($"{(x.Key.Dl ? "S2C" : "C2S")} op=0x{x.Key.Op:X4}  total={x.Total}  {x.Subs} subs  in {x.Dumps} dumps");
+			Console.WriteLine();
+
+			Console.WriteLine($"## Global (sub)opcode catalog - {totalPackets} packets, {globalCount.Count} distinct (dir,op,sub) tuples");
+			foreach (var (k, count) in globalCount.OrderBy(kv => kv.Key.Op).ThenBy(kv => kv.Key.Sub).ThenBy(kv => kv.Key.Dl))
+				Console.WriteLine($"{(k.Dl ? "S2C" : "C2S")} op=0x{k.Op:X4} sub=0x{k.Sub:X8}  total={count}  in {globalDumps[k].Count} dumps");
 		}
 
 		// One 0x5D85BFC7 MapChange body per distinct map across the captures, so the map-build constants can be diffed
