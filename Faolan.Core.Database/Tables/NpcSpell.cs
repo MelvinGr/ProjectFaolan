@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Faolan.Core.Database.Tables
@@ -28,17 +27,11 @@ namespace Faolan.Core.Database.Tables
 		public byte FlagB { get; set; }
 		public byte FlagC { get; set; }
 
-		// The casting NPC's name (matched against the live WorldEntity / NpcSpawn name). Retained during the #244
-		// expand phase as the live join key; superseded by the NpcId FK below once the loader reads spells via the type.
-		[MaxLength(128)]
-		public string NpcName { get; set; }
-
 		// The full wire spell id the NPC casts: (rdbBase << 8) | rank. The client resolves the visual/effect from it.
 		public uint SpellId { get; set; }
 
-		// The NPC TYPE that casts this spell (#244) - replaces the fragile NpcName string key. Nullable while the
-		// expand phase backfills it (by matching NpcName -> Npc.Name); the loader still joins by name until the
-		// contract step flips it to the FK.
-		public uint? NpcId { get; set; }
+		// The NPC TYPE that casts this spell (#244, contract step done): the loader reads spells via this FK
+		// (Npc.Spells), so a spell whose caster has no Npc type isn't stored. Resolved from the caster name at import.
+		public uint NpcId { get; set; }
 	}
 }

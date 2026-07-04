@@ -232,22 +232,28 @@ namespace Faolan.Importer.Captures
 			await db.SaveChangesAsync();
 		}
 
-		// Caster NPCs' spells (#232), upserted by (NPC name, spell id). PLAYER names skipped (their casts
-		// would be mis-attributed as NPC spells).
+		// Caster NPCs' spells (#232), upserted by (Npc type, spell id). The caster NAME is resolved to its Npc TYPE id
+		// (types were upserted by ImportNpcSpawns just before) and only stored as the NpcId FK - a cast whose caster is
+		// a PLAYER (mis-harvested self-buff) or has no captured Npc type (off-beach named NPCs) is DROPPED, since the
+		// loader reads spells via the FK (Npc.Spells).
 		public static async Task<int> ImportNpcSpells(DatabaseContext db, List<NpcSpellEntry> spells)
 		{
 			var playerNames = (await db.Characters.Select(c => c.Name).ToListAsync()).Where(n => !string.IsNullOrEmpty(n)).Select(n => n.ToLowerInvariant()).ToHashSet();
+			var typeByName = (await db.Npcs.Where(n => n.Name != null).ToListAsync())
+				.GroupBy(n => n.Name.ToLowerInvariant())
+				.ToDictionary(g => g.Key, g => g.First().Id);
 
 			var inserted = 0;
 			foreach (var e in spells)
 			{
-				if (playerNames.Contains(e.Name.ToLowerInvariant()))
+				var name = e.Name.ToLowerInvariant();
+				if (playerNames.Contains(name) || !typeByName.TryGetValue(name, out var npcId))
 					continue;
 
-				var existing = await db.NpcSpells.FirstOrDefaultAsync(s => s.NpcName == e.Name && s.SpellId == e.SpellId);
+				var existing = await db.NpcSpells.FirstOrDefaultAsync(s => s.NpcId == npcId && s.SpellId == e.SpellId);
 				if (existing == null)
 				{
-					var s = new NpcSpell { NpcName = e.Name, SpellId = e.SpellId };
+					var s = new NpcSpell { NpcId = npcId, SpellId = e.SpellId };
 					ApplyEffect(s, e.Payload);
 					db.NpcSpells.Add(s);
 					inserted++;
@@ -396,29 +402,6 @@ namespace Faolan.Importer.Captures
 			await db.SaveChangesAsync();
 		}
 
-		// Links each NpcSpell to its NPC type by name (#244). Returns the count linked.
-		public static async Task<int> LinkSpellsToTypes(DatabaseContext db)
-		{
-			var typeByName = new Dictionary<string, Npc>(StringComparer.OrdinalIgnoreCase);
-			foreach (var n in await db.Npcs.ToListAsync())
-			{
-				if (!string.IsNullOrEmpty(n.Name))
-					typeByName.TryAdd(n.Name, n);
-			}
-
-			var linked = 0;
-			foreach (var sp in await db.NpcSpells.ToListAsync())
-			{
-				if (sp.NpcName != null && typeByName.TryGetValue(sp.NpcName, out var npc))
-				{
-					sp.NpcId = npc.Id;
-					linked++;
-				}
-			}
-
-			await db.SaveChangesAsync();
-			return linked;
-		}
 
 		public static NpcSpawn Populate(NpcSpawn row, NpcSpawnEntry e)
 		{

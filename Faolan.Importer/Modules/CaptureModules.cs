@@ -377,7 +377,6 @@ namespace Faolan.Importer.Modules
 			await ImportOps.ImportNpcSpawns(ctx.Db, spawns);
 			var npcSpells = NpcSpellExtractor.Merge(ctx.Captures.SelectMany(c => NpcSpellExtractor.Extract(c.Packets)));
 			var spellsAdded = await ImportOps.ImportNpcSpells(ctx.Db, npcSpells);
-			await ImportOps.LinkSpellsToTypes(ctx.Db);
 			await ImportOps.ImportPatrolPaths(ctx.Db, patrols);
 
 			var prefix = removed > 0

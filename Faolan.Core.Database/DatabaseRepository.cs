@@ -776,7 +776,7 @@ namespace Faolan.Core.Database
 
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var lowered = name.ToLowerInvariant();
-			return await ctx.NpcSpells.Where(s => s.NpcName != null && s.NpcName.ToLower() == lowered).ToListAsync();
+			return await ctx.NpcSpells.Where(s => s.Npc != null && s.Npc.Name != null && s.Npc.Name.ToLower() == lowered).ToListAsync();
 		}
 
 		// A map's captured patrol routes (#266 patrol), each with its ordered waypoints. Keyed at the paired NPC's
