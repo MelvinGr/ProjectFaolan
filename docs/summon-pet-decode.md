@@ -68,6 +68,17 @@ not client inference and not a spawn field.
 The only non-protocol unknown is **which BCC summon-ability id maps to which pet template** (Deathless Acolyte
 Arcanist vs Magnus — a data mapping, harvestable from the BCC payload / RDB, not a wire decode).
 
+### Generic companion vs class (necro) pet — SAME subsystem
+
+Comparing the "Pleasurable Company" companion (frame 447) and the "Deathless Acolyte" necro pet (640) in the
+same capture: **both use the identical OWNERSHIP + COMMAND wire subsystem** — C→S BCC ability → channel →
+`FA015807` spawn → `PetIIR` mode-0 owner-assign (len 41) → stats, both commanded via `QueuePetCommand 0x205b`.
+The difference is the **combat layer**: "Pleasurable Company" is a **SOCIAL pet** (no combat abilities), so its
+summon has NO extra packets. The necro "Deathless Acolyte" is a **COMBAT pet**, so right after the spawn it also
+gets an `ApplySpell` (the pet's combat buff/aura) + a `MoveTask` (combat movement/AI). So: one shared
+spawn/own/command subsystem for ALL pets; combat pets stack the buff + combat-AI on top. Implementing `PetIIR`
++ `QueuePetCommand` once gives you both — social pets for free, combat pets by adding the buff + follow/attack AI.
+
 ## Follow-up (#307) to make it retail-accurate
 
 The capture DOES contain the flow (frames 1197→1222, above), so the remaining work is:
