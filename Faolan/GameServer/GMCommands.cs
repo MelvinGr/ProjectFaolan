@@ -1328,7 +1328,13 @@ namespace Faolan.GameServer
 		// `combat` picks the PetIIR kind triple (combat vs social). Returns null if no spawnable template matches.
 		internal async Task<World.WorldEntity> SummonPetForPlayer(INetworkClient client, string petTemplate, bool combat)
 		{
-			var entity = await _broadcaster.SpawnNpcForPlayer(client, petTemplate);
+			// The RIGHT model (#244/#307): spawn the pet from its creature TYPE (Npc.Data lifted stat core), no world
+			// placement. Fall back to the placement path only as a GM-test convenience (`.pet <any world NPC>`), so a
+			// creature that hasn't had its stat core lifted to the type yet can still be summoned as a follower.
+			var npcType = await Database.GetNpcByName(petTemplate);
+			var entity = npcType != null
+				? await _broadcaster.SpawnPetForPlayer(client, npcType)
+				: await _broadcaster.SpawnNpcForPlayer(client, petTemplate);
 			if (entity == null)
 				return null;
 

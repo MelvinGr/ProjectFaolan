@@ -35,6 +35,7 @@ namespace Faolan.Importer.Cli
 			new MapLootModule(),
 			new QuestsModule(),
 			new MountsModule(), // opt-in
+			new PetsModule(), // opt-in (#307)
 			// --- tsv modules ---
 			new EllathaLevelsModule(),
 			new EllathaCombosModule(),

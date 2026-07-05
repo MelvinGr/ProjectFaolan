@@ -476,4 +476,30 @@ namespace Faolan.Importer.Modules
 			return new ImportResult($"{seen} mount creature(s) found, {seeded} seeded.");
 		}
 	}
+
+	// Summonable PET creatures (#307): lifts each pet's captured FA015807 stat core onto its creature TYPE (Npc.Data)
+	// so a pet-summon spell spawns it FROM THE TYPE (no world placement). Opt-in like mounts; run against a pet-summon
+	// capture, e.g. `--only pets`.
+	public sealed class PetsModule : IImportModule
+	{
+		public bool InDefaultSet => false;
+		public ImportSource Source => ImportSource.Captures;
+		public IReadOnlyList<string> DependsOn => [];
+
+		public IReadOnlySet<WriteMode> SupportedModes =>
+			new HashSet<WriteMode>
+			{
+				WriteMode.Insert,
+				WriteMode.Upsert
+			};
+
+		public string Description => "Summonable pet creatures - type-level stat core (#307, opt-in).";
+		public string Name => "pets";
+
+		public async Task<ImportResult> RunAsync(ImportContext ctx)
+		{
+			var (seen, seeded) = await CapturePetImporter.ImportAsync(ctx.Db, ctx.Captures.Select(c => c.Packets));
+			return new ImportResult($"{seen} pet creature(s) found, {seeded} type(s) lifted.");
+		}
+	}
 }

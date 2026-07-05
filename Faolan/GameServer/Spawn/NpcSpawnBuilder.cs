@@ -82,6 +82,31 @@ namespace Faolan.GameServer.Spawn
 			return true;
 		}
 
+		// Builds an FA015807 for a creature TYPE at a caller-supplied transform - the spawn-from-type path with NO
+		// world placement (#244/#307). This is what a summoned PET uses: the pet's creature type carries the lifted
+		// stat CORE (Npc.Data) and we place it at the summoner's position. Uses the parsed message's own
+		// equipment/morphs (the Data blob already bakes them in); freshSpawn resets the runtime scaffolds like TryBuild.
+		public static bool TryBuildFromType(Npc npc, uint handle, Vector3 position, Quaternion rotation, out byte[] body, bool freshSpawn = true)
+		{
+			body = null;
+			var template = ExtractBody(npc?.Data);
+			if (template == null || !PlayerSpawnReader.TryReadCharacterMessage(template, out var read))
+				return false;
+
+			if (freshSpawn && read.Message.npc_stats != null)
+				read.Message.npc_stats.SpawnAnimation = 0;
+
+			body = SpawnPacketBuilder.BuildSpawn(template, handle, position, rotation, read.Message);
+
+			if (freshSpawn)
+			{
+				var humanoid = read.Message.InventoryEntries.Count > 0;
+				body = NpcSpawnScaffold.WithFreshScaffolds(body, humanoid);
+			}
+
+			return true;
+		}
+
 		// The captured `Data` is the full Conan packet ([u32 len][u32 crc][u32 headerLen][header][body]); the
 		// FA015807 body starts after the 12-byte prefix + the header. Returns null if the framing is malformed.
 		private static byte[] ExtractBody(byte[] data)

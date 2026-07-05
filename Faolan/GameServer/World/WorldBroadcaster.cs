@@ -1056,6 +1056,44 @@ namespace Faolan.GameServer.World
 			return entity;
 		}
 
+		// Spawns a creature TYPE at the player as a PET (#307/#244) - the RIGHT model: no NpcSpawns world placement,
+		// the FA015807 is built from the type's lifted stat core (Npc.Data) via TryBuildFromType at the summoner's
+		// position, then streamed to nearby viewers. The PetIIR owner-assign + follow are done by the caller
+		// (SummonPetForPlayer). Returns null if the type carries no lifted Data (not yet imported/lifted).
+		public async Task<WorldEntity> SpawnPetForPlayer(INetworkClient client, Npc npcType)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null || npcType?.Data == null)
+				return null;
+
+			var handle = NextLootHandle();
+			if (!NpcSpawnBuilder.TryBuildFromType(npcType, handle, player.Position, player.Rotation, out var body))
+			{
+				_logger.LogInformation("Pet spawn: creature type '{Type}' has no buildable stat core.", npcType.Name);
+				return null;
+			}
+
+			var maxHealth = npcType.Level > 0 ? CombatResolver.NpcMaxHealthForLevel(npcType.Level) : 1;
+			var vitals = EntityVitals.FromMax(maxHealth, 0, maxHealth);
+			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npcType.Name, vitals);
+			entity.Level = npcType.Level;
+			entity.SpawnBody = body;
+			entity.NoRespawn = true;
+
+			foreach (var s in npcType.Spells)
+				entity.Spells.Add(new NpcSpellCast(s.SpellId, new NpcSpellEffect(s.SpellId, s.Duration, s.Magnitude, s.Rank, s.FlagA, s.FlagB, s.FlagC).ToBytes()));
+
+			_sim.World.ZoneForEntity(player).Add(entity);
+			foreach (var viewer in _sim.World.ZoneForEntity(player).PlayersInRange(player.Position, WorldSimulation.PlayerInterestRange))
+			{
+				if (viewer.Client != null)
+					await SendWorldSpawn(viewer.Client, entity);
+			}
+
+			_logger.LogInformation("Pet: spawned creature type {Type} 0x{Handle:X8} for {Player}.", npcType.Name, handle, player.Name);
+			return entity;
+		}
+
 		// Take ONE item from a bag by its display POSITION - TryLootItem (0x2046), the single drag-out. The client does
 		// NOT compact its loot window after a removal: it removes the looted slot, leaves a GAP, and keeps every survivor
 		// at its ORIGINAL Pos - proven live (a 3-item bag dragged srcPos 1, then 2, then 0: the 2 could only arrive if

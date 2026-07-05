@@ -77,6 +77,7 @@ namespace Faolan.Core.Database
 
 		Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names);
 		Task<NpcSpawn> GetNpcSpawnByName(string name);
+		Task<Npc> GetNpcByName(string name);
 		Task<NpcSpawn[]> GetNpcSpawns(uint mapId);
 		Task<List<NpcSpell>> GetNpcSpellsByName(string name);
 		Task<PatrolPath[]> GetPatrolPaths(uint mapId);
@@ -750,6 +751,20 @@ namespace Faolan.Core.Database
 				.Include(n => n.Morphs)
 				.Include(n => n.Equipment)
 				.Where(n => n.Npc != null && n.Npc.Name != null && n.Npc.Name.ToLower() == lowered && n.Data != null) // #244: name lives on the type
+				.FirstOrDefaultAsync();
+		}
+
+		// The creature TYPE by name (for spawn-from-TYPE - a summoned pet #307/#244) - distinct from GetNpcSpawnByName,
+		// which returns a world PLACEMENT. Includes the type's caster Spells; the lifted stat core is Npc.Data. Null if
+		// no such type or it has no lifted Data (can't be spawned standalone yet).
+		public async Task<Npc> GetNpcByName(string name)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var lowered = name.ToLowerInvariant();
+			return await ctx
+				.Npcs
+				.Include(t => t.Spells)
+				.Where(t => t.Name != null && t.Name.ToLower() == lowered && t.Data != null)
 				.FirstOrDefaultAsync();
 		}
 
