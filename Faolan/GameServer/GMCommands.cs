@@ -724,10 +724,14 @@ namespace Faolan.GameServer
 			if (!string.IsNullOrWhiteSpace(arguments) && uint.TryParse(arguments.Trim().Replace("0x", "", StringComparison.OrdinalIgnoreCase), NumberStyles.HexNumber, null, out var id))
 				mount = MountCatalog.ForId(id) ?? mount;
 
+			// Duplicate retail (mount capture frame 520): summon cast (client animates the horse run-up), ride buff
+			// (seats), + the mount StatUpd - NO server horse entity (that made it pop in on the player). #26/#27.
 			var self = client.Session.Account.ClientInstance;
 			await ApplySpell(client, self, self, mount.SummonSpellId); // the channeled summon cast (broadcast)
-			await _broadcaster.SpawnMountForPlayer(client, mount.CreatureName);
 			await ApplySpell(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload()); // seat the rider (#26)
+			await SendStatUpdate(client, new CharacterStatBlock()
+				.Set((CharacterStatId)0xBA, mount.RideStat)
+				.Set((CharacterStatId)0xBB, 100), self);
 		}
 
 		// .noloot <itemId> [on|off]  - flag an item OUT of (on, default) or back INTO (off) random loot rolls (#273).

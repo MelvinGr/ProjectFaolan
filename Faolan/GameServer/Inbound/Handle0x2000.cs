@@ -3,6 +3,7 @@ using System;
 using System.Buffers.Binary;
 using System.Threading.Tasks;
 using Faolan.Core.Enums;
+using Faolan.GameServer.Packets.FullCharSnapshot;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Conan;
@@ -304,20 +305,22 @@ namespace Faolan.GameServer
 							case ActionType.SummonMount:
 							{
 								// The client-initiated mount summon (#27): `from` is the mount/feat id on the bar
-								// (0x3E34F1 = "Fading Black Horse", 0x3E34F2 = "Swift Fading Black Horse"; unk2's
-								// 4th byte is the mount variant index, target = 0). The server answers exactly like
-								// the `.mount` GM command: cast the summon spell (ApplySpell 0x6B87E316) so the
-								// channelled summon plays, then spawn the mount creature at the player so it renders
-								// (the FA015807 mount NPC, harvested by CaptureMountImporter), then apply the captured
-								// RIDE buff (0x31EB1500, NecroL80 mount capture frame 520) that actually seats the
-								// player - the summon+spawn alone never mounts (#26, in-client 2026-06-17).
+								// (0x3E34F1 = "Fading Black Horse", 0x3E34F2 = "Swift Fading Black Horse").
+								// Retail duplicates as (mount capture frame 520): cast the summon spell (the CLIENT plays
+								// the whole horse-appears-out-of-view / runs-up / mounts animation from it), apply the RIDE
+								// buff (0x31EB1500 - seats the rider), and push the mount StatUpd (stat 0xBA = the mount id,
+								// 0xBB = 100). Retail spawns NO server horse entity - the client animates the entire mount
+								// from the spell. (We used to also SpawnMountForPlayer, which made the horse pop in on top of
+								// the player instead of running up - removed. #26/#27.)
 								var mount = MountCatalog.ForId(from) ?? MountCatalog.Default;
 								Logger.LogInformation("SummonMount: from=0x{From:X} -> {Mount} (spell 0x{Spell:X}). {Args}", from, mount.CreatureName, mount.SummonSpellId, args);
 
 								var self = client.Session.Account.ClientInstance;
 								await ApplySpell(client, self, self, mount.SummonSpellId);
-								await _broadcaster.SpawnMountForPlayer(client, mount.CreatureName);
 								await ApplySpell(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload()); // seat the rider (#26)
+								await SendStatUpdate(client, new CharacterStatBlock()
+									.Set((CharacterStatId)0xBA, mount.RideStat)
+									.Set((CharacterStatId)0xBB, 100), self); // the mount StatUpd (frame 520)
 
 								break;
 							}

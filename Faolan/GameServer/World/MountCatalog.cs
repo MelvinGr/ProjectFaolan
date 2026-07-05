@@ -5,7 +5,11 @@ namespace Faolan.GameServer.World
 	// One summonable mount: the bar/feat id the client casts (SummonMount action `from`), the creature it spawns
 	// (an FA015807 NPC, matched by NAME against the harvested mount spawns - the stable key), and the summon SPELL
 	// the server casts in response (ApplySpell 0x6B87E316). Decoded from the necrol80 mount captures (#27).
-	public sealed record MountDef(uint Id, string CreatureName, uint SummonSpellId);
+	// RideStat = the mount's value for player stat 0xBA in the mount StatUpd retail pushes alongside the ride buff
+	// (mount capture frame 520: stat 0xBA = 0x00313C9B, stat 0xBB = 100). It selects the mount the player is riding;
+	// paired with the ride buff it's what the CLIENT animates the whole horse-runs-up-and-mount from - retail spawns
+	// NO server horse entity.
+	public sealed record MountDef(uint Id, string CreatureName, uint SummonSpellId, uint RideStat);
 
 	// The summonable-mount catalog (#27). The player triggers a mount with a BehaviorControlCenter SummonMount
 	// action (ActionType 0xA) whose `from` is the mount id; the server answers by casting the summon spell and
@@ -48,8 +52,8 @@ namespace Faolan.GameServer.World
 
 		public static readonly IReadOnlyList<MountDef> All =
 		[
-			new MountDef(0x3E34F1u, "Fading Black Horse", FadingHorseSummonSpell),
-			new MountDef(0x3E34F2u, "Swift Fading Black Horse", FadingHorseSummonSpell)
+			new MountDef(0x3E34F1u, "Fading Black Horse", FadingHorseSummonSpell, RideStat: 0x00313C9Bu),
+			new MountDef(0x3E34F2u, "Swift Fading Black Horse", FadingHorseSummonSpell, RideStat: 0x00313C9Bu)
 		];
 
 		// The default mount the GM `.mount` command summons when given no argument (the in-client-observed Tortage mount).
