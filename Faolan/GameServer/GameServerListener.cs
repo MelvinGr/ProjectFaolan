@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -126,7 +127,12 @@ namespace Faolan.GameServer
 			_broadcaster = new WorldBroadcaster(_simulation, database, logger);
 			_questProgression = new QuestProgressionService(database, _broadcaster, agentServerDispatcher, logger);
 			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAbilityGrant(c, a), (c, id) => SendLearnSpell(c, id)); // announced level-up ability + spell unlocks (#209/#73/#74)
-			_spellweave = new SpellweaveService(logger, (c, msg) => agentServerDispatcher.SendSystemMessage(c.Session.Account.ClientInstance, msg)); // caster combo (docs/combos.md)
+			_spellweave = new SpellweaveService(logger,
+				(c, msg) => agentServerDispatcher.SendSystemMessage(c.Session.Account.ClientInstance, msg),
+				(c, to, from, spellId) => ApplySpell(c, to, from, spellId), // trance buffs on activate
+				// reactive element list + fire burst (docs/combos.md); SendWorldIir wants a [u32 len]-prefixed body,
+				// the codec returns the bare record (PetIirCodec convention), so prefix it here.
+				(c, record) => SendWorldIir(c, new FaolanStream().WriteUInt32((uint)record.Length).WriteArray(record).ToArray()));
 			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression, _luaVm);
 			_loot = new LootService(_broadcaster, this, database, _questProgression, logger);
 			_equipment = new EquipmentService(database, logger);

@@ -12,12 +12,15 @@ Detailed handoff for the AoC combo (melee) + spellweaving (caster) systems. Comp
 | Rank-superseding of the combo grant (one per family)                    | ✅ committed                                    |
 | `ComboActionParser` + `ComboService` (data side)                        | ✅ committed                                    |
 | Grant wired to `ClassCombo` (fixed necro learning fighter combos)       | ✅ committed                                    |
-| **Spellweave wire decode** (activate/add/deactivate + buffs/meter/fire) | ✅ DECODED                                      |
+| **Spellweave wire decode** (activate/add/deactivate + buffs/meter/fire) | ✅ DECODED (`Captures/decode_spellweave.py`)    |
 | Spellweave FSM (state machine, toggle + add detected in-client)         | ✅ committed (skeleton)                         |
-| Spellweave full activate RESPONSE (buffs+meter+reactive), per-add, fire | ❌ TODO (the real build)                        |
+| Spellweave activate RESPONSE — 3 trance buffs + reactive element LIST   | ✅ built, byte-exact golden (`SpellweaveCodec`) |
+| Spellweave FIRE burst on deactivate (`0xF98E10B3` stages)               | ✅ built, byte-exact golden                     |
+| Spellweave METER drain, per-add re-send, componentIndex→effect table    | ❌ TODO (see §5)                                |
+| In-client verification of the necro weave end-to-end                    | ⏳ needs-testing                                |
 | **Melee wire decode** (cid → combo, animByte → direction)               | ⚠️ BLOCKED on client Ghidra RE                  |
 | Melee execution FSM                                                     | ❌ TODO (blocked by the decode)                 |
-| ⚠️ Regression: necro pets from a prior session went "permanent"         | ❌ needs investigation (likely my importer run) |
+| ~~Regression: necro pets went "permanent"~~                             | ✅ FIXED (`e1a1b501` importer + `33c8782a` data) |
 
 Commits this session (newest first): `5f1efb2a` spellweave FSM · `c2e87884`/`49662677`/`f02a8861` docs ·
 `50a4b4bb` ComboService · `02ffec0c` ComboActionParser · `753e5281`/`53dcce4e` fill ClassCombo(8 classes) ·
@@ -111,26 +114,38 @@ Timeline (clean dump): potions (BCC `RightClickItem` 0x0e) at 82.5/87.0/97.7s �
   firing. **Backlash**: chance of ill-effects scaling with weave power (wiki; not yet observed in a dump).
 - Noise to ignore: `0x2085` (~2s heartbeat, present in melee dumps too) and the `RightClickItem` potions.
 
-## 5. What's built for spellweaving (skeleton) + what's LEFT
+## 5. What's built for spellweaving + what's LEFT
 
-Built (`5f1efb2a`): `SpellweaveService` (`Faolan/GameServer/Combat/SpellweaveService.cs`) — the state machine.
-Session state on `NetworkClientSession`: `IsSpellweaving` + `WeaveComponents`. Wiring: the `0x205A`
-`PerformSpecialAction` handler (`GameServerListener.cs`) calls `ToggleAsync`; `Handle0x2000` routes
-`CombatReactiveIIR` (added to the c2s `GameServer0X2000Opcodes` enum) to `AddComponentAsync`. **Confirmed
-in-client**: activating a weave logs `Spellweave START for 'NecroL80'` — so the toggle path is LIVE.
+Built (`5f1efb2a` skeleton, then this session):
+- `SpellweaveService` (`Faolan/GameServer/Combat/SpellweaveService.cs`) — the state machine. Session state on
+  `NetworkClientSession`: `IsSpellweaving` + `WeaveComponents`.
+- **Activate RESPONSE on START** (§4 grammar): `StartAsync` resolves the caster's `SpellweaveProfile`
+  (`SpellweaveCatalog`) and emits the 3 trance buffs (via the listener's `ApplySpell` seam — their `DurationMs`
+  matches the capture, so that path is byte-exact) + the **reactive element LIST** (`SpellweaveCodec.BuildReactiveList`,
+  `0x54C02089`) which declares the addable weave elements the `componentIndex` indexes into. **This is what unblocks
+  the adds** (the client stalls at "started" without it).
+- **FIRE burst on DEACTIVATE**: `FireAsync` emits the `0xF98E10B3` stages (`SpellweaveCodec.BuildFireStage`).
+- The two new records are proven **byte-exact** vs the NecroL80 capture by `Faolan.Tests/SpellweaveCodecTests.cs`
+  (reactive list all-5 + consumed-element-zeroed, all 4 fire stages).
+- Wiring unchanged: `0x205A` `PerformSpecialAction` → `ToggleAsync`; `Handle0x2000` routes `CombatReactiveIIR` →
+  `AddComponentAsync`. The two new listener seams (`ApplySpell`, `SendWorldIir`) are passed to the service ctor.
+- `SpellweaveCatalog` currently has ONLY the Necromancer profile (capture-derived, real spell ids). The other 3
+  casters return no profile → the toggle reports "not available for your class yet" instead of opening a dead trance.
 
-LEFT to make it actually work in-client (the real, byte-exact build; the client STALLS at "started" without the
-full activate response, because it never enters the interactive trance that lets it send the adds):
+LEFT:
 
-1. **Send the activate RESPONSE on START** — the 3 trance buffs (`ApplySpell` 0x37F29800/0x37E5A800/0x3969D000),
-   the `CombatReactiveIIR` ack, and the `e9f24184` meter. This is what unblocks the adds. (Have `ToggleAsync`
-   return Started/Fired so the listener can emit the buffs on Started via the existing `ApplySpell` helper.)
-2. **Per-add response** on each `CombatReactiveIIR` add (what retail sends back per add — decode from the dump).
-3. **Fire on deactivate** — build the `f98e10b3` burst from the accumulated components + roll backlash.
-4. **`componentIndex → stat/effect` table** — the actual per-component contribution (needs the weave-element
-   table: a targeted dump enumerating a caster's components, or Ghidra).
+1. **In-client verification** of the necro weave end-to-end (needs-testing): drive the client as a necromancer,
+   activate → add → deactivate, confirm the trance opens and the adds flow. The byte-exact gate is met; this is the
+   live gate.
+2. **Trance METER drain-stream** (`0xE9F24184`, §4): the draining HUD gauge. Needs a per-trance timer to stream the
+   ticks (token climbs +90/tick, delta `-90`). Not required to unblock adds; decoded in the script, not built.
+3. **Per-add element re-send** — after each add, re-send the reactive list with the just-used element ZEROED (the
+   per-element cooldown; `BuildReactiveList` already takes `0` for a consumed slot — see the golden test — just wire
+   the re-send in `AddComponentAsync`).
+4. **`componentIndex → stat/effect` table** — the actual per-component contribution + backlash roll on fire (needs a
+   targeted dump enumerating a caster's components, or Ghidra).
 5. **Trance immobilisation** — have the Move handler reject motion while `IsSpellweaving`.
-6. Do it with **byte-exact golden tests** (the project's acceptance gate), not live-patching.
+6. **Other-caster profiles** (Demonologist / Priest of Mitra / Tempest of Set) — need per-class spellweaving captures.
 
 ## 6. Capture dumps (all under `Captures/`, `.tshark.json` are the parsed form)
 
@@ -146,8 +161,11 @@ full activate response, because it never enters the interactive trance that lets
 - `Faolan.Core.Database/DatabaseRepository.cs` — `GetClassCombos` + `ComboFamilyKey`/`IsRomanNumeral`
 - `Faolan.Importer/Captures/CaptureAbilityImporter.cs` — `DeriveClassCombosAsync` + `ClassComboPrefixes`
 - `Faolan/GameServer/Combat/ComboInput.cs` (parser), `ComboService.cs`, `SpellweaveService.cs`
+- `Faolan/GameServer/Combat/SpellweaveCodec.cs` — byte-exact reactive-list + fire-stage builders
+- `Faolan/GameServer/Combat/SpellweaveCatalog.cs` — per-class `SpellweaveProfile` (Necro seeded from capture)
+- `Faolan.Tests/SpellweaveCodecTests.cs` — the byte-exact golden tests · `Captures/decode_spellweave.py` — dissector
 - `Faolan/GameServer/Outbound/GrantAbilitiesBuilder.cs` — `GrantCharacterCombos`
-- `Faolan/GameServer/GameServerListener.cs` — `_spellweave`, `PerformSpecialAction` handler
+- `Faolan/GameServer/GameServerListener.cs` — `_spellweave` (ctor seams: `ApplySpell` + `SendWorldIir`), `PerformSpecialAction`
 - `Faolan/GameServer/Inbound/Handle0x2000.cs` — `CombatReactiveIIR` add case
 - `Faolan.Core.Network/NetworkClientSession.cs` — `IsSpellweaving` + `WeaveComponents`
 - `Faolan.Core.Network/Packets/Opcodes.cs` — `CombatReactiveIIR` (c2s) + `PerformSpecialAction` (0x205A)
